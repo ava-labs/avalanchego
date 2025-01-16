@@ -57,16 +57,44 @@ jobs:
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: E2E_SERIAL=1 ./scripts/tests.e2e.sh --delay-network-shutdown
-          prometheus_id: ${{ secrets.PROMETHEUS_ID || '' }}
+          run: E2E_SERIAL=1 bash -x ./scripts/tests.e2e.sh --delay-network-shutdown
+          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki_id: ${{ secrets.LOKI_ID || '' }}
+          loki_username: ${{ secrets.LOKI_ID || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
       - name: Upload tmpnet network dir
         uses: ./.github/actions/upload-tmpnet-artifact
         if: always()
         with:
           name: e2e-tmpnet-data
+  e2e_kube:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - name: Run e2e tests
+        shell: bash
+        run: bash -x ./scripts/tests.e2e.kube.sh
+        env:
+          PROMETHEUS_USERNAME: ${{ secrets.PROMETHEUS_ID || '' }}
+          PROMETHEUS_PASSWORD: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          LOKI_USERNAME: ${{ secrets.LOKI_ID || '' }}
+          LOKI_PASSWORD: ${{ secrets.LOKI_PASSWORD || '' }}
+          GH_REPO: ${{ github.repository_owner }}/${{ github.event.repository.name }}
+          GH_WORKFLOW: ${{ github.workflow }}
+          GH_RUN_ID: ${{ github.run_id }}
+          GH_RUN_NUMBER: ${{ github.run_number }}
+          GH_RUN_ATTEMPT: ${{ github.run_attempt }}
+          GH_JOB_ID: ${{ github.job }}
+      - name: Export kind logs
+        shell: bash
+        run: kind export logs /tmp/kind-logs
+      - name: Upload kind logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: kind-logs
+          path: /tmp/kind-logs
+          if-no-files-found: error
   e2e_existing_network:
     runs-on: ubuntu-latest
     steps:
@@ -78,10 +106,10 @@ jobs:
       - name: Run e2e tests with existing network
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: E2E_SERIAL=1 ./scripts/tests.e2e.existing.sh --delay-network-shutdown
-          prometheus_id: ${{ secrets.PROMETHEUS_ID || '' }}
+          run: E2E_SERIAL=1 bash -x ./scripts/tests.e2e.existing.sh --delay-network-shutdown
+          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki_id: ${{ secrets.LOKI_ID || '' }}
+          loki_username: ${{ secrets.LOKI_ID || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
       - name: Upload tmpnet network dir
         uses: ./.github/actions/upload-tmpnet-artifact
@@ -101,9 +129,9 @@ jobs:
         with:
           run: ./scripts/tests.upgrade.sh
           filter_by_owner: avalanchego-e2e
-          prometheus_id: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki_id: ${{ secrets.LOKI_ID || '' }}
+          loki_username: ${{ secrets.LOKI_ID || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
       - name: Upload tmpnet network dir
         uses: ./.github/actions/upload-tmpnet-artifact

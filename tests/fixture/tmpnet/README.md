@@ -235,6 +235,8 @@ The details required to configure a node's execution are written to
 runtime-specific details like the path of the avalanchego binary to
 start the node with.
 
+TODO(marun) Separate process from kube-based network deployment
+
 #### Flags
 
 All flags used to configure a node are written to
@@ -251,6 +253,12 @@ The process details of a node are written by avalanchego to
 process, the URI of the node's API, and the address other nodes can
 use to bootstrap themselves (aka staking address).
 
+## Kube-based networks
+
+- `tmpnet` supports deploying nodes to kubernetes.
+- Each node will be deployed as a stateful set.
+- The naming convention for statefulsets will be [network uuid]-[first 8 characters of node ID excluding NodeID-]
+
 ## Monitoring
 
 Monitoring is an essential part of understanding the workings of a
@@ -263,10 +271,10 @@ shared.
 
 ```bash
 # Start prometheus to collect metrics
-PROMETHEUS_ID=<id> PROMETHEUS_PASSWORD=<password> ./scripts/run_prometheus.sh
+PROMETHEUS_USERNAME=<username> PROMETHEUS_PASSWORD=<password> ./scripts/run_prometheus.sh
 
 # Start promtail to collect logs
-LOKI_ID=<id> LOKI_PASSWORD=<password> ./scripts/run_promtail.sh
+LOKI_USERNAME=<username> LOKI_PASSWORD=<password> ./scripts/run_promtail.sh
 
 # Network start emits link to grafana displaying collected logs and metrics
 ./build/tmpnetctl start-network
@@ -286,7 +294,7 @@ from the node is written to
 The `scripts/run_prometheus.sh` script starts prometheus in agent mode
 configured to scrape metrics from configured nodes and forward the
 metrics to a persistent prometheus instance. The script requires that
-the `PROMETHEUS_ID` and `PROMETHEUS_PASSWORD` env vars be set. By
+the `PROMETHEUS_USERNAME` and `PROMETHEUS_PASSWORD` env vars be set. By
 default the prometheus instance at
 https://prometheus-poc.avax-dev.network will be targeted and
 this can be overridden via the `PROMETHEUS_URL` env var.
@@ -304,7 +312,7 @@ uuid]-[node id].json`.
 
 The `scripts/run_promtail.sh` script starts promtail configured to
 collect logs from configured nodes and forward the results to loki. The
-script requires that the `LOKI_ID` and `LOKI_PASSWORD` env vars be
+script requires that the `LOKI_USERNAME` and `LOKI_PASSWORD` env vars be
 set. By default the loki instance at
 https://loki-poc.avax-dev.network will be targeted and this
 can be overridden via the `LOKI_URL` env var.
@@ -355,3 +363,11 @@ availability` that emits a link to grafana parametized to show results
 for the job. Additional links to grafana parametized to show results
 for individual network will appear in the logs displaying the start of
 those networks.
+
+## Concurrent usage
+
+The types (networks, nodes, etc) that tmpnet defines are not safe for
+concurrent usage. To avoid requiring an rpc daemon, tmpnet stores data on diskData is shared via the filesystem, and new instances
+can just be created for every usage. Since the  Add to this that tmpnet isn't intended to
+be multi-user either. Maybe not optimal in terms of scalability, but
+much simpler to work with for that lack.

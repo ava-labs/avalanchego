@@ -95,7 +95,7 @@ func configForNewNetwork(
 		defaultNetwork.Subnets = getSubnets(defaultNetwork.Nodes...)
 	}
 
-	testEnv := e2e.NewTestEnvironment(tc, flagVars, defaultNetwork)
+	testEnv := e2e.NewTestEnvironment(tc, tc.Log(), flagVars, defaultNetwork)
 
 	c := &Config{
 		Duration: duration,

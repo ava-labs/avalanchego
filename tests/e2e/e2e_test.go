@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/stretchr/testify/require"
 
 	// ensure test packages are scanned by ginkgo
 	_ "github.com/ava-labs/avalanchego/tests/e2e/banff"
@@ -16,6 +17,7 @@ import (
 	_ "github.com/ava-labs/avalanchego/tests/e2e/x"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/x/transfer"
 
+	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/e2e/vms"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
@@ -36,8 +38,15 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 
 	nodes := tmpnet.NewNodesOrPanic(flagVars.NodeCount())
 	subnets := vms.XSVMSubnetsOrPanic(nodes...)
+	tc := e2e.NewTestContext()
+	// Use a logger with full details for network setup since there
+	// won't be any ginkgo logs with timestamps to provide context.
+	// TODO(marun) Maybe make this internal to NewTestEnvironment?
+	log, err := tests.LoggerForFormat("", "auto")
+	require.NoError(tc, err)
 	return e2e.NewTestEnvironment(
-		e2e.NewTestContext(),
+		tc,
+		log,
 		flagVars,
 		&tmpnet.Network{
 			Owner:   "avalanchego-e2e",
@@ -49,5 +58,5 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run in every ginkgo process
 
 	// Initialize the local test environment from the global state
-	e2e.InitSharedTestEnvironment(ginkgo.GinkgoT(), envBytes)
+	e2e.InitSharedTestEnvironment(e2e.NewTestContext(), envBytes)
 })

@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -34,32 +35,54 @@ import (
 )
 
 // DefaultPodFlags defines common flags for avalanchego nodes running in a pod.
-func DefaultPodFlags(networkName string, dataDir string) map[string]string {
-	return map[string]string{
+func DefaultPodFlags(networkName string, dataDir string, sybilProtectionEnabled bool) FlagsMap {
+	return FlagsMap{
 		config.DataDirKey:                dataDir,
 		config.NetworkNameKey:            networkName,
-		config.SybilProtectionEnabledKey: "false",
+		config.SybilProtectionEnabledKey: sybilProtectionEnabled,
 		config.HealthCheckFreqKey:        "500ms", // Ensure rapid detection of a healthy state
-		config.LogDisplayLevelKey:        logging.Debug.String(),
-		config.LogLevelKey:               logging.Debug.String(),
+		config.LogDisplayLevelKey:        logging.Info.String(),
+		config.LogLevelKey:               logging.Off.String(),
 		config.HTTPHostKey:               "0.0.0.0", // Need to bind to pod IP to ensure kubelet can access the http port for the readiness check
 	}
 }
 
-// newNodeStatefulSet returns a statefulset for an avalanchego node.
+// NewNodeStatefulSet returns a statefulset for an avalanchego node.
 func NewNodeStatefulSet(
 	name string,
+	generateName bool,
 	imageName string,
 	containerName string,
 	volumeName string,
 	volumeSize string,
 	volumeMountPath string,
-	flags map[string]string,
+	labels map[string]string,
+	flags FlagsMap,
 ) *appsv1.StatefulSet {
-	return &appsv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{
+	var objectMeta metav1.ObjectMeta
+	if generateName {
+		objectMeta = metav1.ObjectMeta{
 			GenerateName: name + "-",
-		},
+		}
+	} else {
+		objectMeta = metav1.ObjectMeta{
+			Name: name,
+		}
+	}
+
+	podLabels := map[string]string{
+		"app": name,
+	}
+	for label, value := range labels {
+		// TODO(marun) Avoid requiring this hack by using annotations instead of labels
+		if label == "repo" {
+			value = strings.ReplaceAll(value, "/", "_")
+		}
+		podLabels[label] = value
+	}
+
+	return &appsv1.StatefulSet{
+		ObjectMeta: objectMeta,
 		Spec: appsv1.StatefulSetSpec{
 			Replicas:    pointer.Int32(1),
 			ServiceName: name,
@@ -87,8 +110,12 @@ func NewNodeStatefulSet(
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"app": name,
+					Labels: podLabels,
+					Annotations: map[string]string{
+						// TODO(marun) Specify the port prometheus should target
+						"prometheus.io/scrape": "true",
+						"prometheus.io/path":   "/ext/metrics",
+						"promtail/collect":     "true",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -122,7 +149,7 @@ func NewNodeStatefulSet(
 								PeriodSeconds:    1,
 								SuccessThreshold: 1,
 							},
-							Env: stringMapToEnvVarSlice(flags),
+							Env: flagsToEnvVarSlice(flags),
 						},
 					},
 				},
@@ -132,17 +159,35 @@ func NewNodeStatefulSet(
 }
 
 // stringMapToEnvVarSlice converts a string map to a kube EnvVar slice.
-func stringMapToEnvVarSlice(mapping map[string]string) []corev1.EnvVar {
-	envVars := make([]corev1.EnvVar, len(mapping))
+func flagsToEnvVarSlice(flags FlagsMap) []corev1.EnvVar {
+	envVars := make([]corev1.EnvVar, len(flags))
 	var i int
-	for k, v := range mapping {
+	for k, v := range flags {
 		envVars[i] = corev1.EnvVar{
 			Name:  config.EnvVarName(config.EnvPrefix, k),
-			Value: v,
+			Value: fmt.Sprintf("%v", v),
 		}
 		i++
 	}
+	sortEnvVars(envVars)
 	return envVars
+}
+
+func envVarsToJSONValue(envVars []corev1.EnvVar) []map[string]string {
+	jsonValue := make([]map[string]string, len(envVars))
+	for i, envVar := range envVars {
+		jsonValue[i] = map[string]string{
+			"name":  envVar.Name,
+			"value": envVar.Value,
+		}
+	}
+	return jsonValue
+}
+
+func sortEnvVars(envVars []corev1.EnvVar) {
+	sort.Slice(envVars, func(i, j int) bool {
+		return envVars[i].Name < envVars[j].Name
+	})
 }
 
 // WaitForNodeHealthy waits for the node running in the specified pod to report healthy.
