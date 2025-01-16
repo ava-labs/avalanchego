@@ -68,7 +68,7 @@ network.
 
 ### Simplifying usage with direnv
 
-The repo includes an [.envrc](../../.envrc) that can be applied by
+The repo includes an [.envrc](../../../.envrc) that can be applied by
 [direnv](https://direnv.net/) when in a shell. This will enable
 `tmpnetctl` to be invoked directly (without a `./bin/` prefix ) and
 without having to specify the `--avalanchego-path` or `--plugin-dir`
