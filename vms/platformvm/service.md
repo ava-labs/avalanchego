@@ -2062,7 +2062,7 @@ curl -X POST --data '{
 
 ### `platform.getValidatorFeeState`
 
-Returns the current validator fee state of the P-chain.
+Returns the current validator fee state of the P-Chain.
 
 **Signature:**
 
