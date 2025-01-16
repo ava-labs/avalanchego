@@ -10,6 +10,29 @@ The plugin version is unchanged at `38` and is compatible with versions `v1.12.0
 
 - Removed:
   - `info.GetTxFee`
+  - `keystore.createUser`
+  - `keystore.deleteUser`
+  - `keystore.listUsers`
+  - `keystore.importUser`
+  - `keystore.exportUser`
+  - `avm.createAddress`
+  - `avm.createFixedCapAsset`
+  - `avm.createNFTAsset`
+  - `avm.createVariableCapAsset`
+  - `avm.export`
+  - `avm.exportKey`
+  - `avm.import`
+  - `avm.importKey`
+  - `avm.listAddresses`
+  - `avm.mint`
+  - `avm.mintNFT`
+  - `avm.send`
+  - `avm.sendMultiple`
+  - `avm.sendNFT`
+  - `wallet.send`
+  - `wallet.sendMultiple`
+  - `platform.exportKey`
+  - `platform.listAddresses`
 - Added:
   - `avm.GetTxFee`
   - `platform.getValidatorFeeConfig`
@@ -25,6 +48,7 @@ The plugin version is unchanged at `38` and is compatible with versions `v1.12.0
   - `--add-primary-network-delegator-fee`
   - `--add-subnet-validator-fee`
   - `--add-subnet-delegator-fee`
+- Removed `--api-keystore-enabled`
   
 ### What's Changed
 
