@@ -19,8 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
-var errMissingUTXO = errors.New("missing utxo")
-
 type WalletService struct {
 	vm         *VM
 	pendingTxs *linked.Hashmap[ids.ID, *txs.Tx]

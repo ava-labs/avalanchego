@@ -55,29 +55,9 @@ import (
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
-var (
-	// Test user username
-	testUsername = "ScoobyUser"
-
-	// Test user password, must meet minimum complexity/length requirements
-	testPassword = "ShaggyPassword1Zoinks!"
-
-	// Bytes decoded from CB58 "ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"
-	testPrivateKey = []byte{
-		0x56, 0x28, 0x9e, 0x99, 0xc9, 0x4b, 0x69, 0x12,
-		0xbf, 0xc1, 0x2a, 0xdc, 0x09, 0x3c, 0x9b, 0x51,
-		0x12, 0x4f, 0x0d, 0xc5, 0x4a, 0xc7, 0xa7, 0x66,
-		0xb2, 0xbc, 0x5c, 0xcf, 0x55, 0x8d, 0x80, 0x27,
-	}
-
-	// 3cb7d3842e8cee6a0ebd09f1fe884f6861e1b29c
-	// Platform address resulting from the above private key
-	testAddress = "P-testing18jma8ppw3nhx5r4ap8clazz0dps7rv5umpc36y"
-
-	encodings = []formatting.Encoding{
-		formatting.JSON, formatting.Hex,
-	}
-)
+var encodings = []formatting.Encoding{
+	formatting.JSON, formatting.Hex,
+}
 
 func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
 	vm, _, mutableSharedMemory := defaultVM(t, upgradetest.Latest)

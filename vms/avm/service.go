@@ -36,17 +36,10 @@ const (
 )
 
 var (
-	errTxNotCreateAsset   = errors.New("transaction doesn't create an asset")
-	errNoMinters          = errors.New("no minters provided")
-	errNoHoldersOrMinters = errors.New("no minters or initialHolders provided")
-	errZeroAmount         = errors.New("amount must be positive")
-	errNoOutputs          = errors.New("no outputs to send")
-	errInvalidMintAmount  = errors.New("amount minted must be positive")
-	errNilTxID            = errors.New("nil transaction ID")
-	errNoAddresses        = errors.New("no addresses provided")
-	errNoKeys             = errors.New("from addresses have no keys or funds")
-	errMissingPrivateKey  = errors.New("argument 'privateKey' not given")
-	errNotLinearized      = errors.New("chain is not linearized")
+	errTxNotCreateAsset = errors.New("transaction doesn't create an asset")
+	errNilTxID          = errors.New("nil transaction ID")
+	errNoAddresses      = errors.New("no addresses provided")
+	errNotLinearized    = errors.New("chain is not linearized")
 )
 
 // FormattedAssetID defines a JSON formatted struct containing an assetID as a string
