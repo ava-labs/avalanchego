@@ -32,22 +32,6 @@ type JSONAddresses struct {
 	Addresses []string `json:"addresses"`
 }
 
-// JSONChangeAddr is the address change is sent to, if any
-type JSONChangeAddr struct {
-	ChangeAddr string `json:"changeAddr"`
-}
-
-// JSONTxIDChangeAddr is a tx ID and change address
-type JSONTxIDChangeAddr struct {
-	JSONTxID
-	JSONChangeAddr
-}
-
-// JSONFromAddrs is a list of addresses to send funds from
-type JSONFromAddrs struct {
-	From []string `json:"from"`
-}
-
 // GetBlockArgs is the parameters supplied to the GetBlock API
 type GetBlockArgs struct {
 	BlockID  ids.ID              `json:"blockID"`
