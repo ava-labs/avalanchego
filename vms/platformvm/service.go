@@ -37,6 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/types"
@@ -1972,12 +1973,6 @@ func (s *Service) GetFeeConfig(_ *http.Request, _ *struct{}, reply *gas.Config) 
 		zap.String("method", "getFeeConfig"),
 	)
 
-	// TODO: Remove after Etna is activated.
-	now := time.Now()
-	if !s.vm.Internal.UpgradeConfig.IsEtnaActivated(now) {
-		return nil
-	}
-
 	*reply = s.vm.DynamicFeeConfig
 	return nil
 }
@@ -2003,6 +1998,43 @@ func (s *Service) GetFeeState(_ *http.Request, _ *struct{}, reply *GetFeeStateRe
 		s.vm.DynamicFeeConfig.MinPrice,
 		reply.State.Excess,
 		s.vm.DynamicFeeConfig.ExcessConversionConstant,
+	)
+	reply.Time = s.vm.state.GetTimestamp()
+	return nil
+}
+
+// GetValidatorFeeConfig returns the validator fee config of the chain.
+func (s *Service) GetValidatorFeeConfig(_ *http.Request, _ *struct{}, reply *fee.Config) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "platform"),
+		zap.String("method", "getValidatorFeeConfig"),
+	)
+
+	*reply = s.vm.ValidatorFeeConfig
+	return nil
+}
+
+type GetValidatorFeeStateReply struct {
+	Excess gas.Gas   `json:"excess"`
+	Price  gas.Price `json:"price"`
+	Time   time.Time `json:"timestamp"`
+}
+
+// GetValidatorFeeState returns the current validator fee state of the chain.
+func (s *Service) GetValidatorFeeState(_ *http.Request, _ *struct{}, reply *GetValidatorFeeStateReply) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "platform"),
+		zap.String("method", "getValidatorFeeState"),
+	)
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
+	reply.Excess = s.vm.state.GetL1ValidatorExcess()
+	reply.Price = gas.CalculatePrice(
+		s.vm.ValidatorFeeConfig.MinPrice,
+		reply.Excess,
+		s.vm.ValidatorFeeConfig.ExcessConversionConstant,
 	)
 	reply.Time = s.vm.state.GetTimestamp()
 	return nil
