@@ -6,6 +6,8 @@ This version is backwards compatible to [v1.12.0](https://github.com/ava-labs/av
 
 The plugin version is unchanged at `38` and is compatible with versions `v1.12.0-v1.12.1`.
 
+**This release removes the support for the long deprecated Keystore API. Any users still relying on the keystore API will not be able to update to this version, or any later versions, of Avalanchego until their dependency on the keystore API has been removed.**
+
 ### APIs
 
 - Removed:
