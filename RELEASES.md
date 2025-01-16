@@ -8,7 +8,7 @@ The plugin version is unchanged at `38` and is compatible with versions `v1.12.0
 
 ### APIs
 
-- Removed:
+- Deprecated:
   - `info.GetTxFee`
 - Added:
   - `avm.GetTxFee`
