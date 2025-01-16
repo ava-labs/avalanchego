@@ -233,10 +233,6 @@ curl -X POST --data '{
 }
 ```
 
-<!--
-TODO: Add avm.createAsset
--->
-
 ### `avm.createFixedCapAsset`
 
 :::caution
@@ -596,10 +592,6 @@ curl -X POST --data '{
   "id": 1
 }
 ```
-
-<!--
-TODO: Add avm.exportAVAX
--->
 
 ### `avm.exportKey`
 
@@ -1490,10 +1482,6 @@ curl -X POST --data '{
   "id": 1
 }
 ```
-
-<!--
-TODO: Add avm.importAVAX
--->
 
 ### `avm.importKey`
 
