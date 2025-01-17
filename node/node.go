@@ -1382,6 +1382,9 @@ func (n *Node) initInfoAPI() error {
 			NetworkID: n.Config.NetworkID,
 			VMManager: n.VMManager,
 			Upgrades:  n.Config.UpgradeConfig,
+
+			TxFee:            n.Config.TxFee,
+			CreateAssetTxFee: n.Config.CreateAssetTxFee,
 		},
 		n.Log,
 		n.vdrs,

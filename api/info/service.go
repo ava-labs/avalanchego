@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -32,7 +33,37 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var errNoChainProvided = errors.New("argument 'chain' not given")
+var (
+	errNoChainProvided = errors.New("argument 'chain' not given")
+
+	mainnetGetTxFeeResponse = GetTxFeeResponse{
+		CreateSubnetTxFee:             json.Uint64(1 * units.Avax),
+		TransformSubnetTxFee:          json.Uint64(10 * units.Avax),
+		CreateBlockchainTxFee:         json.Uint64(1 * units.Avax),
+		AddPrimaryNetworkValidatorFee: json.Uint64(0),
+		AddPrimaryNetworkDelegatorFee: json.Uint64(0),
+		AddSubnetValidatorFee:         json.Uint64(units.MilliAvax),
+		AddSubnetDelegatorFee:         json.Uint64(units.MilliAvax),
+	}
+	fujiGetTxFeeResponse = GetTxFeeResponse{
+		CreateSubnetTxFee:             json.Uint64(100 * units.MilliAvax),
+		TransformSubnetTxFee:          json.Uint64(1 * units.Avax),
+		CreateBlockchainTxFee:         json.Uint64(100 * units.MilliAvax),
+		AddPrimaryNetworkValidatorFee: json.Uint64(0),
+		AddPrimaryNetworkDelegatorFee: json.Uint64(0),
+		AddSubnetValidatorFee:         json.Uint64(units.MilliAvax),
+		AddSubnetDelegatorFee:         json.Uint64(units.MilliAvax),
+	}
+	defaultGetTxFeeResponse = GetTxFeeResponse{
+		CreateSubnetTxFee:             json.Uint64(100 * units.MilliAvax),
+		TransformSubnetTxFee:          json.Uint64(100 * units.MilliAvax),
+		CreateBlockchainTxFee:         json.Uint64(100 * units.MilliAvax),
+		AddPrimaryNetworkValidatorFee: json.Uint64(0),
+		AddPrimaryNetworkDelegatorFee: json.Uint64(0),
+		AddSubnetValidatorFee:         json.Uint64(units.MilliAvax),
+		AddSubnetDelegatorFee:         json.Uint64(units.MilliAvax),
+	}
+)
 
 // Info is the API service for unprivileged info on a node
 type Info struct {
@@ -53,6 +84,9 @@ type Parameters struct {
 	NetworkID uint32
 	VMManager vms.Manager
 	Upgrades  upgrade.Config
+
+	TxFee            uint64
+	CreateAssetTxFee uint64
 }
 
 func NewService(
@@ -381,6 +415,38 @@ func (i *Info) Acps(_ *http.Request, _ *struct{}, reply *ACPsReply) error {
 		acp := reply.getACP(acpNum)
 		acp.AbstainWeight = json.Uint64(totalWeight) - acp.SupportWeight - acp.ObjectWeight
 	}
+	return nil
+}
+
+type GetTxFeeResponse struct {
+	TxFee                         json.Uint64 `json:"txFee"`
+	CreateAssetTxFee              json.Uint64 `json:"createAssetTxFee"`
+	CreateSubnetTxFee             json.Uint64 `json:"createSubnetTxFee"`
+	TransformSubnetTxFee          json.Uint64 `json:"transformSubnetTxFee"`
+	CreateBlockchainTxFee         json.Uint64 `json:"createBlockchainTxFee"`
+	AddPrimaryNetworkValidatorFee json.Uint64 `json:"addPrimaryNetworkValidatorFee"`
+	AddPrimaryNetworkDelegatorFee json.Uint64 `json:"addPrimaryNetworkDelegatorFee"`
+	AddSubnetValidatorFee         json.Uint64 `json:"addSubnetValidatorFee"`
+	AddSubnetDelegatorFee         json.Uint64 `json:"addSubnetDelegatorFee"`
+}
+
+// GetTxFee returns the transaction fee in nAVAX.
+func (i *Info) GetTxFee(_ *http.Request, _ *struct{}, reply *GetTxFeeResponse) error {
+	i.log.Warn("deprecated API called",
+		zap.String("service", "info"),
+		zap.String("method", "getTxFee"),
+	)
+
+	switch i.NetworkID {
+	case constants.MainnetID:
+		*reply = mainnetGetTxFeeResponse
+	case constants.FujiID:
+		*reply = fujiGetTxFeeResponse
+	default:
+		*reply = defaultGetTxFeeResponse
+	}
+	reply.TxFee = json.Uint64(i.TxFee)
+	reply.CreateAssetTxFee = json.Uint64(i.CreateAssetTxFee)
 	return nil
 }
 
