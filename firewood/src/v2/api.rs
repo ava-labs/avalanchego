@@ -52,6 +52,12 @@ pub enum BatchOp<K: KeyType, V: ValueType> {
         /// The key
         key: K,
     },
+
+    /// Delete a range of keys by prefix
+    DeleteRange {
+        /// The prefix of the keys to delete
+        prefix: K,
+    },
 }
 
 /// A list of operations to consist of a batch that

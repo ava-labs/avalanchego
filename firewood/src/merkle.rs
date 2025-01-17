@@ -808,6 +808,184 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
             }
         }
     }
+
+    /// Removes any key-value pairs with keys that have the given `prefix`.
+    /// Returns the number of key-value pairs removed.
+    pub fn remove_prefix(&mut self, prefix: &[u8]) -> Result<usize, MerkleError> {
+        let prefix = Path::from_nibbles_iterator(NibblesIterator::new(prefix));
+
+        let root = self.nodestore.mut_root();
+        let Some(root_node) = std::mem::take(root) else {
+            // The trie is empty. There is nothing to remove.
+            return Ok(0);
+        };
+
+        let mut deleted = 0;
+        let root_node = self.remove_prefix_helper(root_node, &prefix, &mut deleted)?;
+        *self.nodestore.mut_root() = root_node;
+        Ok(deleted)
+    }
+
+    fn remove_prefix_helper(
+        &mut self,
+        mut node: Node,
+        key: &[u8],
+        deleted: &mut usize,
+    ) -> Result<Option<Node>, MerkleError> {
+        // 4 possibilities for the position of the `key` relative to `node`:
+        // 1. The node is at `key`, in which case we need to delete this node and all its children.
+        // 2. The key is above the node (i.e. its ancestor), so the parent needs to be restructured (TODO).
+        // 3. The key is below the node (i.e. its descendant), so continue traversing the trie.
+        // 4. Neither is an ancestor of the other, in which case there's no work to do.
+        let path_overlap = PrefixOverlap::from(key, node.partial_path().as_ref());
+
+        let unique_key = path_overlap.unique_a;
+        let unique_node = path_overlap.unique_b;
+
+        match (
+            unique_key
+                .split_first()
+                .map(|(index, path)| (*index, Path::from(path))),
+            unique_node.split_first(),
+        ) {
+            (None, _) => {
+                // 1. The node is at `key`, or we're just above it
+                // so we can start deleting below here
+                match &mut node {
+                    Node::Branch(ref mut branch) => {
+                        if branch.value.is_some() {
+                            // a KV pair was in the branch itself
+                            *deleted += 1;
+                        }
+                        self.delete_children(branch, deleted)?;
+                    }
+                    Node::Leaf(_) => {
+                        // the prefix matched only a leaf, so we remove it and indicate only one item was removed
+                        *deleted += 1;
+                    }
+                };
+                Ok(None)
+            }
+            (_, Some(_)) => {
+                // Case (2) or (4)
+                Ok(Some(node))
+            }
+            (Some((child_index, child_partial_path)), None) => {
+                // 3. The key is below the node (i.e. its descendant)
+                match node {
+                    Node::Leaf(_) => Ok(Some(node)),
+                    Node::Branch(ref mut branch) => {
+                        #[allow(clippy::indexing_slicing)]
+                        let child = match std::mem::take(&mut branch.children[child_index as usize])
+                        {
+                            None => {
+                                return Ok(Some(node));
+                            }
+                            Some(Child::Node(node)) => node,
+                            Some(Child::AddressWithHash(addr, _)) => {
+                                self.nodestore.read_for_update(addr)?
+                            }
+                        };
+
+                        let child =
+                            self.remove_prefix_helper(child, child_partial_path.as_ref(), deleted)?;
+
+                        if let Some(child) = child {
+                            branch.update_child(child_index, Some(Child::Node(child)));
+                        } else {
+                            branch.update_child(child_index, None);
+                        }
+
+                        let mut children_iter =
+                            branch
+                                .children
+                                .iter_mut()
+                                .enumerate()
+                                .filter_map(|(index, child)| {
+                                    child.as_mut().map(|child| (index, child))
+                                });
+
+                        let Some((child_index, child)) = children_iter.next() else {
+                            // The branch has no children. Turn it into a leaf.
+                            let leaf = Node::Leaf(LeafNode {
+                                    value: SmallVec::from(&(*branch.value.take().expect(
+                                        "branch node must have a value if it previously had only 1 child",
+                                    ))[..]),
+                                    partial_path: branch.partial_path.clone(), // TODO remove clone
+                                });
+                            return Ok(Some(leaf));
+                        };
+
+                        if children_iter.next().is_some() {
+                            // The branch has more than 1 child. Return the branch.
+                            return Ok(Some(node));
+                        }
+
+                        // The branch has only 1 child. Remove the branch and return the child.
+                        let mut child = match child {
+                            Child::Node(child_node) => std::mem::replace(
+                                child_node,
+                                Node::Leaf(LeafNode {
+                                    value: SmallVec::default(),
+                                    partial_path: Path::new(),
+                                }),
+                            ),
+                            Child::AddressWithHash(addr, _) => {
+                                self.nodestore.read_for_update(*addr)?
+                            }
+                        };
+
+                        // The child's partial path is the concatenation of its (now removed) parent,
+                        // its (former) child index, and its partial path.
+                        let branch_partial_path =
+                            std::mem::replace(&mut branch.partial_path, Path::new());
+
+                        let child_partial_path = Path::from_nibbles_iterator(
+                            branch_partial_path
+                                .iter()
+                                .chain(once(&(child_index as u8)))
+                                .chain(child.partial_path().iter())
+                                .copied(),
+                        );
+                        child.update_partial_path(child_partial_path);
+
+                        Ok(Some(child))
+                    }
+                }
+            }
+        }
+    }
+
+    /// Recursively deletes all children of a branch node.
+    fn delete_children(
+        &mut self,
+        branch: &mut BranchNode,
+        deleted: &mut usize,
+    ) -> Result<(), std::io::Error> {
+        if branch.value.is_some() {
+            // a KV pair was in the branch itself
+            *deleted += 1;
+        }
+        for children in branch.children.iter_mut() {
+            // read the child node
+            let child = match children {
+                Some(Child::Node(node)) => node,
+                Some(Child::AddressWithHash(addr, _)) => {
+                    &mut self.nodestore.read_for_update(*addr)?
+                }
+                None => continue,
+            };
+            match child {
+                Node::Branch(ref mut child_branch) => {
+                    self.delete_children(child_branch, deleted)?;
+                }
+                Node::Leaf(_) => {
+                    *deleted += 1;
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Returns an iterator where each element is the result of combining
@@ -1004,6 +1182,51 @@ mod tests {
     }
 
     #[test]
+    fn remove_prefix_exact() {
+        let mut merkle = two_byte_all_keys();
+        for key_val in u8::MIN..=u8::MAX {
+            let key = [key_val];
+            let got = merkle.remove_prefix(&key).unwrap();
+            assert_eq!(got, 1);
+            let got = merkle.get_value(&key).unwrap();
+            assert!(got.is_none());
+        }
+    }
+
+    fn two_byte_all_keys() -> Merkle<NodeStore<MutableProposal, MemStore>> {
+        let mut merkle = create_in_memory_merkle();
+        for key_val in u8::MIN..=u8::MAX {
+            let key = [key_val, key_val];
+            let val = [key_val];
+
+            merkle.insert(&key, Box::new(val)).unwrap();
+            let got = merkle.get_value(&key).unwrap().unwrap();
+            assert_eq!(&*got, val);
+        }
+        merkle
+    }
+
+    #[test]
+    fn remove_prefix_all() {
+        let mut merkle = two_byte_all_keys();
+        let got = merkle.remove_prefix(&[]).unwrap();
+        assert_eq!(got, 256);
+    }
+
+    #[test]
+    fn remove_prefix_partial() {
+        let mut merkle = create_in_memory_merkle();
+        merkle
+            .insert(b"abc", Box::from(b"value".as_slice()))
+            .unwrap();
+        merkle
+            .insert(b"abd", Box::from(b"value".as_slice()))
+            .unwrap();
+        let got = merkle.remove_prefix(b"ab").unwrap();
+        assert_eq!(got, 2);
+    }
+
+    #[test]
     fn remove_many() {
         let mut merkle = create_in_memory_merkle();
 
@@ -1032,6 +1255,36 @@ mod tests {
             assert!(got.is_none());
         }
         assert!(merkle.nodestore.root_node().is_none());
+    }
+
+    #[test]
+    fn remove_prefix() {
+        let mut merkle = create_in_memory_merkle();
+
+        // insert key-value pairs
+        for key_val in u8::MIN..=u8::MAX {
+            let key = [key_val, key_val];
+            let val = [key_val];
+
+            merkle.insert(&key, Box::new(val)).unwrap();
+            let got = merkle.get_value(&key).unwrap().unwrap();
+            assert_eq!(&*got, val);
+        }
+
+        // remove key-value pairs with prefix [0]
+        let prefix = [0];
+        assert_eq!(merkle.remove_prefix(&[0]).unwrap(), 1);
+
+        // make sure all keys with prefix [0] were removed
+        for key_val in u8::MIN..=u8::MAX {
+            let key = [key_val, key_val];
+            let got = merkle.get_value(&key).unwrap();
+            if key[0] == prefix[0] {
+                assert!(got.is_none());
+            } else {
+                assert!(got.is_some());
+            }
+        }
     }
 
     #[test]
@@ -1535,6 +1788,27 @@ mod tests {
 
         assert_eq!(merkle.remove(b"does_not_exist").unwrap(), None);
         assert_eq!(&*merkle.get_value(b"do").unwrap().unwrap(), b"verb");
+    }
+
+    #[test]
+    fn test_delete_some() {
+        let items = (0..100)
+            .map(|n| {
+                let key = format!("key{}", n);
+                let val = format!("value{}", n);
+                (key.as_bytes().to_vec(), val.as_bytes().to_vec())
+            })
+            .collect::<Vec<(Vec<u8>, Vec<u8>)>>();
+        let mut merkle = merkle_build_test(items.clone()).unwrap();
+        merkle.remove_prefix(b"key1").unwrap();
+        for item in items {
+            let (key, val) = item;
+            if key.starts_with(b"key1") {
+                assert!(merkle.get_value(&key).unwrap().is_none());
+            } else {
+                assert_eq!(&*merkle.get_value(&key).unwrap().unwrap(), val.as_slice());
+            }
+        }
     }
 
     // #[test]
@@ -2621,4 +2895,12 @@ mod tests {
     //     }
     //     new_key
     // }
+    #[test]
+    fn remove_nonexistent_with_one() {
+        let items = vec![("do", "verb")];
+        let mut merkle = merkle_build_test(items).unwrap();
+
+        assert_eq!(merkle.remove(b"does_not_exist").unwrap(), None);
+        assert_eq!(&*merkle.get_value(b"do").unwrap().unwrap(), b"verb");
+    }
 }

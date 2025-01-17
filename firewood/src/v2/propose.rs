@@ -97,6 +97,9 @@ impl<T> Proposal<T> {
                 api::BatchOp::Delete { key } => {
                     (key.as_ref().to_vec().into_boxed_slice(), KeyOp::Delete)
                 }
+                api::BatchOp::DeleteRange { prefix } => {
+                    (prefix.as_ref().to_vec().into_boxed_slice(), KeyOp::Delete)
+                }
             })
             .collect::<BTreeMap<_, _>>();
 

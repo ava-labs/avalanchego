@@ -5,6 +5,7 @@ members = [
   "storage",
   "grpc-testtool", 
   "benchmark",
+  "ffi",
 ]
 resolver = "2"
 
