@@ -28,13 +28,14 @@ import (
 )
 
 const (
-	AvalancheGoPathEnvName      = "AVALANCHEGO_PATH"
-	AvalancheGoPluginDirEnvName = "AVALANCHEGO_PLUGIN_DIR"
+	AvalancheGoPathEnvName = "AVALANCHEGO_PATH"
 
 	defaultNodeInitTimeout = 10 * time.Second
 )
 
 var (
+	AvalancheGoPluginDirEnvName = config.EnvVarName(config.EnvPrefix, config.PluginDirKey)
+
 	errNodeAlreadyRunning = errors.New("failed to start node: node is already running")
 	errNotRunning         = errors.New("node is not running")
 )
