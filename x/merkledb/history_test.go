@@ -654,17 +654,10 @@ func Test_Change_List(t *testing.T) {
 	endRoot, err = db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	changes, err = db.history.getValueChanges(startRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 9)
+	changes, err = db.history.getValueChanges(startRoot, endRoot, maybe.Some[[]byte]([]byte("key22")), maybe.Some[[]byte]([]byte("key30")), 6)
 	require.NoError(err)
 
 	require.Equal(changes, []*keyChange{
-		{
-			change: &change[maybe.Maybe[[]byte]]{
-				before: maybe.Some([]byte("value21")),
-				after:  maybe.Nothing[[]byte](),
-			},
-			key: ToKey([]byte("key21")),
-		},
 		{
 			change: &change[maybe.Maybe[[]byte]]{
 				before: maybe.Some([]byte("value22")),
@@ -706,20 +699,6 @@ func Test_Change_List(t *testing.T) {
 				after:  maybe.Some([]byte("value28")),
 			},
 			key: ToKey([]byte("key28")),
-		},
-		{
-			change: &change[maybe.Maybe[[]byte]]{
-				before: maybe.Nothing[[]byte](),
-				after:  maybe.Some([]byte("value29")),
-			},
-			key: ToKey([]byte("key29")),
-		},
-		{
-			change: &change[maybe.Maybe[[]byte]]{
-				before: maybe.Nothing[[]byte](),
-				after:  maybe.Some([]byte("value30")),
-			},
-			key: ToKey([]byte("key30")),
 		},
 	})
 }
