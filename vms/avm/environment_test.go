@@ -39,8 +39,6 @@ const (
 	testTxFee    uint64 = 1000
 	startBalance uint64 = 50000
 
-	username       = "bobby"
-	password       = "StrnasfqewiurPasswdn56d" //#nosec G101
 	feeAssetName   = "TEST"
 	otherAssetName = "OTHER"
 )
