@@ -46,6 +46,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
@@ -1333,34 +1334,13 @@ func TestServiceGetSubnets(t *testing.T) {
 }
 
 func TestGetFeeConfig(t *testing.T) {
-	tests := []struct {
-		name     string
-		etnaTime time.Time
-		expected gas.Config
-	}{
-		{
-			name:     "pre-etna",
-			etnaTime: time.Now().Add(time.Hour),
-			expected: gas.Config{},
-		},
-		{
-			name:     "post-etna",
-			etnaTime: time.Now().Add(-time.Hour),
-			expected: defaultDynamicFeeConfig,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
+	require := require.New(t)
 
-			service, _ := defaultService(t)
-			service.vm.Internal.UpgradeConfig.EtnaTime = test.etnaTime
+	service, _ := defaultService(t)
 
-			var reply gas.Config
-			require.NoError(service.GetFeeConfig(nil, nil, &reply))
-			require.Equal(test.expected, reply)
-		})
-	}
+	var reply gas.Config
+	require.NoError(service.GetFeeConfig(nil, nil, &reply))
+	require.Equal(defaultDynamicFeeConfig, reply)
 }
 
 func FuzzGetFeeState(f *testing.F) {
@@ -1393,6 +1373,47 @@ func FuzzGetFeeState(f *testing.F) {
 
 		var reply GetFeeStateReply
 		require.NoError(service.GetFeeState(nil, nil, &reply))
+		require.Equal(expectedReply, reply)
+	})
+}
+
+func TestGetValidatorFeeConfig(t *testing.T) {
+	require := require.New(t)
+
+	service, _ := defaultService(t)
+
+	var reply fee.Config
+	require.NoError(service.GetValidatorFeeConfig(nil, nil, &reply))
+	require.Equal(defaultValidatorFeeConfig, reply)
+}
+
+func FuzzGetValidatorFeeState(f *testing.F) {
+	f.Fuzz(func(t *testing.T, l1ValidatorExcess uint64) {
+		require := require.New(t)
+
+		service, _ := defaultService(t)
+
+		var (
+			expectedL1ValidatorExcess = gas.Gas(l1ValidatorExcess)
+			expectedTime              = time.Now()
+			expectedReply             = GetValidatorFeeStateReply{
+				Excess: expectedL1ValidatorExcess,
+				Price: gas.CalculatePrice(
+					defaultValidatorFeeConfig.MinPrice,
+					expectedL1ValidatorExcess,
+					defaultValidatorFeeConfig.ExcessConversionConstant,
+				),
+				Time: expectedTime,
+			}
+		)
+
+		service.vm.ctx.Lock.Lock()
+		service.vm.state.SetL1ValidatorExcess(expectedL1ValidatorExcess)
+		service.vm.state.SetTimestamp(expectedTime)
+		service.vm.ctx.Lock.Unlock()
+
+		var reply GetValidatorFeeStateReply
+		require.NoError(service.GetValidatorFeeState(nil, nil, &reply))
 		require.Equal(expectedReply, reply)
 	})
 }
