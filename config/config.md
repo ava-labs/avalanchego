@@ -35,11 +35,6 @@ available. Defaults to `false`. See
 If set to `false`, this node will not expose the Info API. Defaults to `true`. See
 [here](docs.avax.network/reference/avalanchego/info-api) for more information.
 
-#### `--api-keystore-enabled` (boolean)
-
-If set to `true`, this node will expose the Keystore API. Defaults to `false`.
-See [here](docs.avax.network/reference/avalanchego/keystore-api) for more information.
-
 #### `--api-metrics-enabled` (boolean)
 
 If set to `false`, this node will not expose the Metrics API. Defaults to

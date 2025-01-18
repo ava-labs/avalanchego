@@ -68,6 +68,18 @@ type AssetDefinition struct {
 	Memo         string                   `json:"memo"`
 }
 
+// Holder describes how much an address owns of an asset
+type Holder struct {
+	Amount  avajson.Uint64 `json:"amount"`
+	Address string         `json:"address"`
+}
+
+// Owners describes who can perform an action
+type Owners struct {
+	Threshold avajson.Uint32 `json:"threshold"`
+	Minters   []string       `json:"minters"`
+}
+
 // BuildGenesisReply is the reply from BuildGenesis
 type BuildGenesisReply struct {
 	Bytes    string              `json:"bytes"`

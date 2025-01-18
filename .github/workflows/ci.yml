@@ -133,6 +133,8 @@ jobs:
         with:
           input: "proto"
           pr_comment: false
+          # Breaking changes are managed by the rpcchainvm protocol version.
+          breaking: false
           # buf-action defaults to pushing on non-fork branch pushes
           # which is never desirable for this job. The buf-push job is
           # responsible for pushes.

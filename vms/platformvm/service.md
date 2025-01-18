@@ -12,63 +12,6 @@ This API uses the `json 2.0` RPC format.
 
 ## Methods
 
-### `platform.exportKey`
-
-<Callout title="Caution" type="warn">
-
-Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
-
-</Callout>
-
-<Callout title="Warning" type="warn">
-
-Not recommended for use on Mainnet. See warning notice in [Keystore API](/api-reference/keystore-api).
-
-</Callout>
-
-Get the private key that controls a given address.
-
-**Signature:**
-
-```
-platform.exportKey({
-    username: string,
-    password: string,
-    address: string
-}) -> {privateKey: string}
-```
-
-- `username` is the user that controls `address`.
-- `password` is `username`‘s password.
-- `privateKey` is the string representation of the private key that controls `address`.
-
-**Example Call:**
-
-```sh
-curl -X POST --data '{
-    "jsonrpc":"2.0",
-    "id"     :1,
-    "method" :"platform.exportKey",
-    "params" :{
-        "username" :"myUsername",
-        "password": "myPassword",
-        "address": "P-avax18jma8ppw3nhx5r4ap8clazz0dps7rv5ukulre5"
-    }
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
-```
-
-**Example Response:**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": {
-    "privateKey": "PrivateKey-Lf49kAJw3CbaL783vmbeAJvhscJqC7vi5yBYLxw2XfbzNS5RS"
-  }
-}
-```
-
 ### `platform.getBalance`
 
 <Callout title="Caution" type="warn">
@@ -2138,57 +2081,6 @@ curl -X POST --data '{
   "jsonrpc": "2.0",
   "result": {
     "txID": "G3BuH6ytQ2averrLxJJugjWZHTRubzCrUZEXoheG5JMqL5ccY"
-  },
-  "id": 1
-}
-```
-
-### `platform.listAddresses`
-
-<Callout title="Caution" type="warn">
-
-Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
-
-</Callout>
-
-<Callout title="Warning" type="warn">
-
-Not recommended for use on Mainnet. See warning notice in [Keystore API](/api-reference/keystore-api).
-
-</Callout>
-
-List addresses controlled by the given user.
-
-**Signature:**
-
-```
-platform.listAddresses({
-    username: string,
-    password: string
-}) -> { addresses: []string }
-```
-
-**Example Call:**
-
-```sh
-curl -X POST --data '{
-    "jsonrpc": "2.0",
-    "method": "platform.listAddresses",
-    "params": {
-        "username":"myUsername",
-        "password":"myPassword"
-    },
-    "id": 1
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
-```
-
-**Example Response:**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "result": {
-    "addresses": ["P-avax18jma8ppw3nhx5r4ap8clazz0dps7rv5ukulre5"]
   },
   "id": 1
 }
