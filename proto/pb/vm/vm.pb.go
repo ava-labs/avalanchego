@@ -200,9 +200,8 @@ type InitializeRequest struct {
 	UpgradeBytes []byte `protobuf:"bytes,11,opt,name=upgrade_bytes,json=upgradeBytes,proto3" json:"upgrade_bytes,omitempty"`
 	ConfigBytes  []byte `protobuf:"bytes,12,opt,name=config_bytes,json=configBytes,proto3" json:"config_bytes,omitempty"`
 	DbServerAddr string `protobuf:"bytes,13,opt,name=db_server_addr,json=dbServerAddr,proto3" json:"db_server_addr,omitempty"`
-	// server_addr is the address of the gRPC server which serves
-	// the messenger, keystore, shared memory, blockchain alias,
-	// subnet alias, and appSender services
+	// server_addr is the address of the gRPC server which serves the messenger,
+	// shared memory, blockchain alias, subnet alias, and appSender services
 	ServerAddr string `protobuf:"bytes,14,opt,name=server_addr,json=serverAddr,proto3" json:"server_addr,omitempty"`
 	// network_upgrades_bytes is the json encoded network upgrades
 	NetworkUpgrades *NetworkUpgrades `protobuf:"bytes,15,opt,name=network_upgrades,json=networkUpgrades,proto3" json:"network_upgrades,omitempty"`

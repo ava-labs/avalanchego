@@ -8,7 +8,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
@@ -45,7 +44,6 @@ type Context struct {
 
 	Log          logging.Logger
 	Lock         sync.RWMutex
-	Keystore     keystore.BlockchainKeystore
 	SharedMemory atomic.SharedMemory
 	BCLookup     ids.AliaserReader
 	Metrics      metrics.MultiGatherer

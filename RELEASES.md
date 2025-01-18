@@ -6,10 +6,35 @@ This version is backwards compatible to [v1.12.0](https://github.com/ava-labs/av
 
 The plugin version is unchanged at `38` and is compatible with versions `v1.12.0-v1.12.1`.
 
+**This release removes the support for the long deprecated Keystore API. Any users still relying on the keystore API will not be able to update to this version, or any later versions, of Avalanchego until their dependency on the keystore API has been removed.**
+
 ### APIs
 
 - Deprecated:
   - `info.GetTxFee`
+  - `keystore.createUser`
+  - `keystore.deleteUser`
+  - `keystore.listUsers`
+  - `keystore.importUser`
+  - `keystore.exportUser`
+  - `avm.createAddress`
+  - `avm.createFixedCapAsset`
+  - `avm.createNFTAsset`
+  - `avm.createVariableCapAsset`
+  - `avm.export`
+  - `avm.exportKey`
+  - `avm.import`
+  - `avm.importKey`
+  - `avm.listAddresses`
+  - `avm.mint`
+  - `avm.mintNFT`
+  - `avm.send`
+  - `avm.sendMultiple`
+  - `avm.sendNFT`
+  - `wallet.send`
+  - `wallet.sendMultiple`
+  - `platform.exportKey`
+  - `platform.listAddresses`
 - Added:
   - `avm.GetTxFee`
   - `platform.getValidatorFeeConfig`
@@ -25,6 +50,7 @@ The plugin version is unchanged at `38` and is compatible with versions `v1.12.0
   - `--add-primary-network-delegator-fee`
   - `--add-subnet-validator-fee`
   - `--add-subnet-delegator-fee`
+- Removed `--api-keystore-enabled`
   
 ### What's Changed
 

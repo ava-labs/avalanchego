@@ -55,16 +55,12 @@ const (
 	chainConfigFileName  = "config"
 	chainUpgradeFileName = "upgrade"
 	subnetConfigFileExt  = ".json"
-
-	keystoreDeprecationMsg = "keystore API is deprecated"
 )
 
 var (
 	// Deprecated key --> deprecation message (i.e. which key replaces it)
 	// TODO: deprecate "BootstrapIDsKey" and "BootstrapIPsKey"
-	deprecatedKeys = map[string]string{
-		KeystoreAPIEnabledKey: keystoreDeprecationMsg,
-	}
+	deprecatedKeys = map[string]string{}
 
 	errConflictingACPOpinion                  = errors.New("supporting and objecting to the same ACP")
 	errConflictingImplicitACPOpinion          = errors.New("objecting to enabled ACP")
@@ -181,11 +177,10 @@ func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
 				IndexAPIEnabled:      v.GetBool(IndexEnabledKey),
 				IndexAllowIncomplete: v.GetBool(IndexAllowIncompleteKey),
 			},
-			AdminAPIEnabled:    v.GetBool(AdminAPIEnabledKey),
-			InfoAPIEnabled:     v.GetBool(InfoAPIEnabledKey),
-			KeystoreAPIEnabled: v.GetBool(KeystoreAPIEnabledKey),
-			MetricsAPIEnabled:  v.GetBool(MetricsAPIEnabledKey),
-			HealthAPIEnabled:   v.GetBool(HealthAPIEnabledKey),
+			AdminAPIEnabled:   v.GetBool(AdminAPIEnabledKey),
+			InfoAPIEnabled:    v.GetBool(InfoAPIEnabledKey),
+			MetricsAPIEnabled: v.GetBool(MetricsAPIEnabledKey),
+			HealthAPIEnabled:  v.GetBool(HealthAPIEnabledKey),
 		},
 		HTTPHost:           v.GetString(HTTPHostKey),
 		HTTPPort:           uint16(v.GetUint(HTTPPortKey)),
