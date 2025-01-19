@@ -57,18 +57,11 @@ if ! command -v "${CMD}" &> /dev/null; then
   CMD="${PWD}/bin/promtail"
   if ! command -v "${CMD}" &> /dev/null; then
     echo "promtail not found, attempting to install..."
-    # Determine the arch
-    if which sw_vers &> /dev/null; then
-      DIST="darwin-$(uname -m)"
-    else
-      ARCH="$(uname -i)"
-      if [[ "${ARCH}" == "aarch64" ]]; then
-        ARCH="arm64"
-      elif [[ "${ARCH}" == "x86_64" ]]; then
-        ARCH="amd64"
-      fi
-      DIST="linux-${ARCH}"
-    fi
+
+    # Determine the platform
+    GOOS="$(go env GOOS)"
+    GOARCH="$(go env GOARCH)"
+    DIST="${GOOS}-${GOARCH}"
 
     # Install the specified release
     PROMTAIL_FILE="promtail-${DIST}"

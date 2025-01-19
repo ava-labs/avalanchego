@@ -61,23 +61,19 @@ if ! command -v "${CMD}" &> /dev/null; then
   if ! command -v "${CMD}" &> /dev/null; then
     echo "prometheus not found, attempting to install..."
 
-    # Determine the arch
-    if which sw_vers &> /dev/null; then
+    GOOS="$(go env GOOS)"
+    GOARCH="$(go env GOARCH)"
+    if [[ "${GOOS}" == "darwin" && "${GOARCH}" == "arm64" ]]; then
       echo "On macos, only amd64 binaries are available so rosetta is required on apple silicon machines."
       echo "To avoid using rosetta, install via homebrew: brew install prometheus"
-      DIST=darwin
-    else
-      ARCH="$(uname -i)"
-      if [[ "${ARCH}" != "x86_64" ]]; then
-        echo "On linux, only amd64 binaries are available. manual installation of prometheus is required."
+    fi
+    if [[ "${GOOS}" == "linux" && "${GOARCH}" != "amd64" ]]; then
+        echo "On linux, only amd64 binaries are available. Manual installation of prometheus is required."
         exit 1
-      else
-        DIST="linux"
-      fi
     fi
 
     # Install the specified release
-    PROMETHEUS_FILE="prometheus-${VERSION}.${DIST}-amd64"
+    PROMETHEUS_FILE="prometheus-${VERSION}.${GOOS}-amd64"
     URL="https://github.com/prometheus/prometheus/releases/download/v${VERSION}/${PROMETHEUS_FILE}.tar.gz"
     curl -s -L "${URL}" | tar zxv -C /tmp > /dev/null
     mkdir -p "$(dirname "${CMD}")"
