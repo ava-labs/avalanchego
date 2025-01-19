@@ -24,8 +24,7 @@ RUN ./scripts/build_xsvm.sh
 # ============= Cleanup Stage ================
 FROM $AVALANCHEGO_NODE_IMAGE AS execution
 
-# Copy the xsvm binary to the default plugin path
-RUN mkdir -p /root/.avalanchego/plugins
-COPY --from=builder /build/build/xsvm /root/.avalanchego/plugins/v3m4wPxaHpvGr8qfMeyK6PRW3idZrPHmYcMTt7oXdK47yurVH
+# Copy the xsvm binary to the default plugin dir for images
+COPY --from=builder /build/build/xsvm /avalanchego/build/plugins/v3m4wPxaHpvGr8qfMeyK6PRW3idZrPHmYcMTt7oXdK47yurVH
 
 # The node image's entrypoint will be reused.

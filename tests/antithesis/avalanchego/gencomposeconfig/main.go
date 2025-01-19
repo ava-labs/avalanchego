@@ -18,7 +18,7 @@ const baseImageName = "antithesis-avalanchego"
 // Creates docker-compose.yml and its associated volumes in the target path.
 func main() {
 	network := tmpnet.LocalNetworkOrPanic()
-	if err := antithesis.GenerateComposeConfig(network, baseImageName, "" /* runtimePluginDir */); err != nil {
+	if err := antithesis.GenerateComposeConfig(network, baseImageName); err != nil {
 		tests.NewDefaultLogger("").Fatal("failed to generate compose config",
 			zap.Error(err),
 		)
