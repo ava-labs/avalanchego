@@ -17,10 +17,12 @@ set -euo pipefail
 #
 #  sudo apt-get install qemu qemu-user-static
 #
-# After installing qemu, it will also be necessary to start a new builder that can
-# support multiplatform builds:
+# After installing qemu, it will also be necessary to start a new builder that
+# supports multiplatform builds and can use the host's network:
 #
-#  docker buildx create --use
+#  docker buildx create --use --driver-opt network=host
+#
+# Without `network=host`, the builder will timeout running `go mod download`.
 #
 # Reference: https://docs.docker.com/buildx/working-with-buildx/
 
