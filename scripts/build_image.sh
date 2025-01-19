@@ -35,6 +35,9 @@ FORCE_TAG_LATEST="${FORCE_TAG_LATEST:-}"
 
 # Load the constants
 source "$AVALANCHE_PATH"/scripts/constants.sh
+source "$AVALANCHE_PATH"/scripts/git_commit.sh
+
+image_tag="$("${AVALANCHE_PATH}"/scripts/get_image_tag.sh)"
 
 if [[ -z "${SKIP_BUILD_RACE}" && $image_tag == *"-r" ]]; then
   echo "Branch name must not end in '-r'"
@@ -68,6 +71,12 @@ DOCKER_CMD="docker buildx build ${*}"
 # provided as an argument.
 GO_VERSION="$(go list -m -f '{{.GoVersion}}')"
 DOCKER_CMD="${DOCKER_CMD} --build-arg GO_VERSION=${GO_VERSION}"
+
+# Provide the git commit as a build argument to avoid requiring this
+# to be discovered within the image. This enables image builds from
+# git worktrees since a non-primary worktree won't have a .git
+# directory to copy into the image.
+DOCKER_CMD="${DOCKER_CMD} --build-arg AVALANCHEGO_COMMIT=${git_commit}"
 
 if [[ "${DOCKER_IMAGE}" == *"/"* ]]; then
   # Default to pushing when the image name includes a slash which indicates the

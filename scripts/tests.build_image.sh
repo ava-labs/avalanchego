@@ -12,6 +12,9 @@ set -euo pipefail
 AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 
 source "$AVALANCHE_PATH"/scripts/constants.sh
+source "$AVALANCHE_PATH"/scripts/git_commit.sh
+
+image_tag="$("${AVALANCHE_PATH}"/scripts/get_image_tag.sh)"
 
 build_and_test() {
   local image_name=$1

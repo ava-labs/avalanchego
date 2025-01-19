@@ -6,6 +6,7 @@ set -euo pipefail
 AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 # Load the constants
 source "$AVALANCHE_PATH"/scripts/constants.sh
+source "$AVALANCHE_PATH"/scripts/git_commit.sh
 
 echo "Building bootstrap-monitor..."
 go build -ldflags\
