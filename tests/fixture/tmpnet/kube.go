@@ -46,7 +46,7 @@ func DefaultPodFlags(networkName string, dataDir string) map[string]string {
 	}
 }
 
-// newNodeStatefulSet returns a statefulset for an avalanchego node.
+// NewNodeStatefulSet returns a statefulset for an avalanchego node.
 func NewNodeStatefulSet(
 	name string,
 	imageName string,
