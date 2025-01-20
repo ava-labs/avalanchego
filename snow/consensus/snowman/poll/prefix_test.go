@@ -126,29 +126,29 @@ func TestBifurcationsWithCommonPrefix(t *testing.T) {
 		members: []ids.ID{{0, 1, 1}, {0, 0, 1}, {0, 1, 0}, {0, 0, 0}},
 		children: [2]*prefixGroup{
 			{
-				prefix:  []uint8{0},
+				index:   1,
 				members: []ids.ID{{0, 1, 0}, {0, 0, 0}},
 				children: [2]*prefixGroup{
 					{
-						prefix:  []uint8{0, 0, 0},
+						index:   3,
 						members: []ids.ID{{0, 0, 0}},
 					},
 					{
-						prefix:  []uint8{0, 1, 0},
+						index:   3,
 						members: []ids.ID{{0, 1, 0}},
 					},
 				},
 			},
 			{
-				prefix:  []uint8{1},
+				index:   1,
 				members: []ids.ID{{0, 1, 1}, {0, 0, 1}},
 				children: [2]*prefixGroup{
 					{
-						prefix:  []uint8{0, 1, 1},
+						index:   3,
 						members: []ids.ID{{0, 1, 1}},
 					},
 					{
-						prefix:  []uint8{0, 0, 1},
+						index:   3,
 						members: []ids.ID{{0, 0, 1}},
 					},
 				},

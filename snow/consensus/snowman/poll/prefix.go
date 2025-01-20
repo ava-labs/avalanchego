@@ -16,8 +16,6 @@ import (
 type prefixGroup struct {
 	// the bit index this prefixGroup would be split on by the next invocation of split().
 	index int
-	// the bits of the members of this prefixGroup from the first bit to the bit index.
-	prefix []uint8
 	// the IDs of the prefixGroup
 	members []ids.ID
 	// children are prefixGroups that correspond to zero and one being the first bit of their members, respectively.
@@ -104,7 +102,7 @@ func determineDescendant(pg *prefixGroup) *prefixGroup {
 // to any instance of snowflake.
 func (pg *prefixGroup) bifurcationsWithCommonPrefix(f func([]ids.ID)) {
 	pg.traverse(func(prefixGroup *prefixGroup) {
-		if prefixGroup.isBifurcation() && len(prefixGroup.prefix) > 0 {
+		if prefixGroup.isBifurcation() && prefixGroup.index > 0 {
 			f(prefixGroup.members)
 		}
 	})
@@ -142,19 +140,12 @@ func (pg *prefixGroup) traverse(f func(*prefixGroup)) {
 func (pg *prefixGroup) split() (*prefixGroup, *prefixGroup) {
 	zg := &prefixGroup{
 		index:   pg.index + 1,
-		prefix:  make([]uint8, len(pg.prefix)+1),
 		members: make([]ids.ID, 0, len(pg.members)),
 	}
 	og := &prefixGroup{
 		index:   pg.index + 1,
-		prefix:  make([]uint8, len(pg.prefix)+1),
 		members: make([]ids.ID, 0, len(pg.members)),
 	}
-
-	copy(zg.prefix, pg.prefix)
-	copy(og.prefix, pg.prefix)
-	zg.prefix[len(zg.prefix)-1] = 0
-	og.prefix[len(og.prefix)-1] = 1
 
 	// Split members according to their next bit
 	for _, member := range pg.members {
