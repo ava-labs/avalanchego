@@ -26,13 +26,13 @@ type Server struct {
 	listener   net.Listener
 }
 
-func NewSignerService() *SignerService {
+func NewSignerService() (*SignerService, error) {
 	signer, err := localsigner.NewSigner()
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
-	return &SignerService{signer: signer}
+	return &SignerService{signer: signer}, nil
 }
 
 func Serve(service *SignerService) (*Server, error) {

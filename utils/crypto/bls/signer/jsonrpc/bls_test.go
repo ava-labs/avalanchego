@@ -22,7 +22,8 @@ func NewLocalPair(require *require.Assertions) (*localsigner.LocalSigner, *bls.P
 }
 
 func NewSigner(require *require.Assertions) (*Server, *Client, *bls.PublicKey) {
-	service := NewSignerService()
+	service, err := NewSignerService()
+	require.NoError(err)
 	server, err := Serve(service)
 	require.NoError(err)
 
