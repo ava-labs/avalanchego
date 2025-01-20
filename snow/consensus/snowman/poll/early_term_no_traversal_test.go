@@ -20,7 +20,7 @@ func (p parentGetter) GetParent(id ids.ID) (ids.ID, bool) {
 }
 
 func newEarlyTermNoTraversalTestFactory(require *require.Assertions, alpha int) Factory {
-	factory, err := NewEarlyTermTraversalFactory(alpha, alpha, prometheus.NewRegistry(), parentGetter(returnEmpty))
+	factory, err := NewEarlyTermFactory(alpha, alpha, prometheus.NewRegistry(), parentGetter(returnEmpty))
 	require.NoError(err)
 	return factory
 }
@@ -110,7 +110,7 @@ func TestEarlyTermNoTraversalTerminatesEarlyWithAlphaPreference(t *testing.T) {
 	alphaPreference := 3
 	alphaConfidence := 5
 
-	factory, err := NewEarlyTermTraversalFactory(alphaPreference, alphaConfidence, prometheus.NewRegistry(), parentGetter(returnEmpty))
+	factory, err := NewEarlyTermFactory(alphaPreference, alphaConfidence, prometheus.NewRegistry(), parentGetter(returnEmpty))
 	require.NoError(err)
 	poll := factory.New(vdrs)
 
@@ -135,7 +135,7 @@ func TestEarlyTermNoTraversalTerminatesEarlyWithAlphaConfidence(t *testing.T) {
 	alphaPreference := 3
 	alphaConfidence := 3
 
-	factory, err := NewEarlyTermTraversalFactory(alphaPreference, alphaConfidence, prometheus.NewRegistry(), parentGetter(returnEmpty))
+	factory, err := NewEarlyTermFactory(alphaPreference, alphaConfidence, prometheus.NewRegistry(), parentGetter(returnEmpty))
 	require.NoError(err)
 	poll := factory.New(vdrs)
 
@@ -166,7 +166,7 @@ func TestEarlyTermNoTraversalForSharedAncestor(t *testing.T) {
 		blkID4: blkID1,
 	}
 
-	factory, err := NewEarlyTermTraversalFactory(alpha, alpha, prometheus.NewRegistry(), g)
+	factory, err := NewEarlyTermFactory(alpha, alpha, prometheus.NewRegistry(), g)
 	require.NoError(err)
 
 	poll := factory.New(vdrs)
@@ -265,7 +265,7 @@ func TestEarlyTermYesTraversal(t *testing.T) {
 		blkID2: blkID1,
 	}
 
-	factory, err := NewEarlyTermTraversalFactory(alphaPreference, alphaConfidence, prometheus.NewRegistry(), g)
+	factory, err := NewEarlyTermFactory(alphaPreference, alphaConfidence, prometheus.NewRegistry(), g)
 	require.NoError(err)
 	poll := factory.New(vdrs)
 
@@ -302,7 +302,7 @@ func TestEarlyTermYesTraversalII(t *testing.T) {
 		blkID1: blkID0,
 	}
 
-	factory, err := NewEarlyTermTraversalFactory(alphaPreference, alphaConfidence, prometheus.NewRegistry(), g)
+	factory, err := NewEarlyTermFactory(alphaPreference, alphaConfidence, prometheus.NewRegistry(), g)
 	require.NoError(err)
 	poll := factory.New(vdrs)
 

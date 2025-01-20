@@ -40,7 +40,7 @@ var (
 	}
 )
 
-type earlyTermTraversalMetrics struct {
+type earlyTermMetrics struct {
 	durExhaustedPolls      prometheus.Gauge
 	durEarlyFailPolls      prometheus.Gauge
 	durEarlyAlphaPrefPolls prometheus.Gauge
@@ -52,7 +52,7 @@ type earlyTermTraversalMetrics struct {
 	countEarlyAlphaConfPolls prometheus.Counter
 }
 
-func newEarlyTermTraversalMetrics(reg prometheus.Registerer) (*earlyTermTraversalMetrics, error) {
+func newEarlyTermMetrics(reg prometheus.Registerer) (*earlyTermMetrics, error) {
 	pollCountVec := prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "poll_count",
 		Help: "Total # of terminated polls by reason",
@@ -68,7 +68,7 @@ func newEarlyTermTraversalMetrics(reg prometheus.Registerer) (*earlyTermTraversa
 		return nil, fmt.Errorf("%w: %w", errPollDurationVectorMetrics, err)
 	}
 
-	return &earlyTermTraversalMetrics{
+	return &earlyTermMetrics{
 		durExhaustedPolls:        durPollsVec.With(exhaustedLabel),
 		durEarlyFailPolls:        durPollsVec.With(earlyFailLabel),
 		durEarlyAlphaPrefPolls:   durPollsVec.With(earlyAlphaPrefLabel),
@@ -80,22 +80,22 @@ func newEarlyTermTraversalMetrics(reg prometheus.Registerer) (*earlyTermTraversa
 	}, nil
 }
 
-func (m *earlyTermTraversalMetrics) observeExhausted(duration time.Duration) {
+func (m *earlyTermMetrics) observeExhausted(duration time.Duration) {
 	m.durExhaustedPolls.Add(float64(duration.Nanoseconds()))
 	m.countExhaustedPolls.Inc()
 }
 
-func (m *earlyTermTraversalMetrics) observeEarlyFail(duration time.Duration) {
+func (m *earlyTermMetrics) observeEarlyFail(duration time.Duration) {
 	m.durEarlyFailPolls.Add(float64(duration.Nanoseconds()))
 	m.countEarlyFailPolls.Inc()
 }
 
-func (m *earlyTermTraversalMetrics) observeEarlyAlphaPref(duration time.Duration) {
+func (m *earlyTermMetrics) observeEarlyAlphaPref(duration time.Duration) {
 	m.durEarlyAlphaPrefPolls.Add(float64(duration.Nanoseconds()))
 	m.countEarlyAlphaPrefPolls.Inc()
 }
 
-func (m *earlyTermTraversalMetrics) observeEarlyAlphaConf(duration time.Duration) {
+func (m *earlyTermMetrics) observeEarlyAlphaConf(duration time.Duration) {
 	m.durEarlyAlphaConfPolls.Add(float64(duration.Nanoseconds()))
 	m.countEarlyAlphaConfPolls.Inc()
 }
@@ -104,18 +104,17 @@ type earlyTermTraversalFactory struct {
 	alphaPreference int
 	alphaConfidence int
 	bt              snow.BlockTraversal
-	metrics         *earlyTermTraversalMetrics
+	metrics         *earlyTermMetrics
 }
 
-// NewEarlyTermTraversalFactory returns a factory that returns polls with
-// early termination, without doing DAG traversals
-func NewEarlyTermTraversalFactory(
+// NewEarlyTermFactory returns a factory that returns polls with early termination.
+func NewEarlyTermFactory(
 	alphaPreference int,
 	alphaConfidence int,
 	reg prometheus.Registerer,
 	bt snow.BlockTraversal,
 ) (Factory, error) {
-	metrics, err := newEarlyTermTraversalMetrics(reg)
+	metrics, err := newEarlyTermMetrics(reg)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +128,7 @@ func NewEarlyTermTraversalFactory(
 }
 
 func (f *earlyTermTraversalFactory) New(vdrs bag.Bag[ids.NodeID]) Poll {
-	return &earlyTermTraversalPoll{
+	return &earlyTermPoll{
 		bt:              f.bt,
 		polled:          vdrs,
 		alphaPreference: f.alphaPreference,
@@ -139,21 +138,21 @@ func (f *earlyTermTraversalFactory) New(vdrs bag.Bag[ids.NodeID]) Poll {
 	}
 }
 
-// earlyTermTraversalPoll finishes when any remaining validators can't change
+// earlyTermPoll finishes when any remaining validators can't change
 // the result of the poll for all the votes and transitive votes.
-type earlyTermTraversalPoll struct {
+type earlyTermPoll struct {
 	votes           bag.Bag[ids.ID]
 	polled          bag.Bag[ids.NodeID]
 	alphaPreference int
 	alphaConfidence int
 	bt              snow.BlockTraversal
-	metrics         *earlyTermTraversalMetrics
+	metrics         *earlyTermMetrics
 	start           time.Time
 	finished        bool
 }
 
 // Vote registers a response for this poll
-func (p *earlyTermTraversalPoll) Vote(vdr ids.NodeID, vote ids.ID) {
+func (p *earlyTermPoll) Vote(vdr ids.NodeID, vote ids.ID) {
 	count := p.polled.Count(vdr)
 	// make sure that a validator can't respond multiple times
 	p.polled.Remove(vdr)
@@ -163,7 +162,7 @@ func (p *earlyTermTraversalPoll) Vote(vdr ids.NodeID, vote ids.ID) {
 }
 
 // Drop any future response for this poll
-func (p *earlyTermTraversalPoll) Drop(vdr ids.NodeID) {
+func (p *earlyTermPoll) Drop(vdr ids.NodeID) {
 	p.polled.Remove(vdr)
 }
 
@@ -176,7 +175,7 @@ func (p *earlyTermTraversalPoll) Drop(vdr ids.NodeID) {
 //     impossible for it to achieve an alphaConfidence majority after applying
 //     transitive voting.
 //  4. A single element has achieved an alphaConfidence majority.
-func (p *earlyTermTraversalPoll) Finished() bool {
+func (p *earlyTermPoll) Finished() bool {
 	if p.finished {
 		return true
 	}
@@ -242,7 +241,7 @@ func (p *earlyTermTraversalPoll) Finished() bool {
 	return p.finished
 }
 
-func (p *earlyTermTraversalPoll) shouldTerminateDueToConfidence(freq int, remaining int) bool {
+func (p *earlyTermPoll) shouldTerminateDueToConfidence(freq int, remaining int) bool {
 	maxPossibleVotes := freq + remaining
 	if maxPossibleVotes < p.alphaPreference {
 		return true // Case 2
@@ -262,11 +261,11 @@ func (p *earlyTermTraversalPoll) shouldTerminateDueToConfidence(freq int, remain
 }
 
 // Result returns the result of this poll
-func (p *earlyTermTraversalPoll) Result() bag.Bag[ids.ID] {
+func (p *earlyTermPoll) Result() bag.Bag[ids.ID] {
 	return p.votes
 }
 
-func (p *earlyTermTraversalPoll) PrefixedString(prefix string) string {
+func (p *earlyTermPoll) PrefixedString(prefix string) string {
 	return fmt.Sprintf(
 		"waiting on %s\n%sreceived %s",
 		p.polled.PrefixedString(prefix),
@@ -275,7 +274,7 @@ func (p *earlyTermTraversalPoll) PrefixedString(prefix string) string {
 	)
 }
 
-func (p *earlyTermTraversalPoll) String() string {
+func (p *earlyTermPoll) String() string {
 	return p.PrefixedString("")
 }
 
