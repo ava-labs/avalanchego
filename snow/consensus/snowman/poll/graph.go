@@ -43,12 +43,7 @@ func buildVoteGraph(getParent func(ids.ID) (ids.ID, bool), votes bag.Bag[ids.ID]
 
 	// Build a graph out of the vertices that correspond to the IDs of the votes.
 	for _, id := range idList {
-		_, ok := id2Vertex[id]
-		if ok || id == ids.Empty {
-			continue
-		}
-		v := &voteVertex{id: id, descendants: make([]*voteVertex, 0, 2)}
-		id2Vertex[id] = v
+		id2Vertex[id] = &voteVertex{id: id, descendants: make([]*voteVertex, 0, 2)}
 	}
 
 	// Add the parents of the IDs to the graph, for those that are not already there.
@@ -61,7 +56,7 @@ func buildVoteGraph(getParent func(ids.ID) (ids.ID, bool), votes bag.Bag[ids.ID]
 		_, ok = id2Vertex[parent]
 		// If the parent is not finalized we can vote on it, so add it to the graph
 		if !ok {
-			v := &voteVertex{id: parent, descendants: make([]*voteVertex, 0, 2)}
+			v := &voteVertex{id: parent}
 			id2Vertex[parent] = v
 		}
 	}
