@@ -8,7 +8,7 @@ import (
 	"errors"
 	"runtime"
 
-	"github.com/ava-labs/avalanchego/utils/crypto/bls" // Import the parent package
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 
 	blst "github.com/supranational/blst/bindings/go"
 )
