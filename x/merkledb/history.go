@@ -259,9 +259,10 @@ func (th *trieHistory) getValueChanges(
 				continue
 			}
 
-			// New key.
-			if !bytes.Equal(currentKeyChange.before.Value(), currentKeyChange.after.Value()) {
-				// If the value has changed, add [currentKeyChange] to [combinedKeyChanges].
+			// New key
+
+			// Add the last [currentKeyChange] to [combinedKeyChanges] if there is an actual change.
+			if !maybe.Equal(currentKeyChange.before, currentKeyChange.after, bytes.Equal) {
 				combinedKeyChanges = append(combinedKeyChanges, currentKeyChange)
 
 				if len(combinedKeyChanges) >= maxLength {
@@ -280,9 +281,11 @@ func (th *trieHistory) getValueChanges(
 		}
 	}
 
-	// Add the last [currentKeyChange] to [valueChanges] if needed.
-	if currentKeyChange != nil && !bytes.Equal(currentKeyChange.before.Value(), currentKeyChange.after.Value()) {
-		combinedKeyChanges = append(combinedKeyChanges, currentKeyChange)
+	if currentKeyChange != nil {
+		// Add the last [currentKeyChange] to [combinedKeyChanges] if there is an actual change.
+		if !maybe.Equal(currentKeyChange.before, currentKeyChange.after, bytes.Equal) {
+			combinedKeyChanges = append(combinedKeyChanges, currentKeyChange)
+		}
 	}
 
 	return combinedKeyChanges, nil
@@ -342,18 +345,21 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start maybe.Maybe[[]
 			}
 
 			if existing, ok := combinedChanges.values[kc.key]; ok {
+				// Update existing [after] with current [before]
 				existing.after = kc.before
-			} else {
-				keyChange := keyChange{
-					change: &change[maybe.Maybe[[]byte]]{
-						before: kc.after,
-						after:  kc.before,
-					},
-					key: kc.key,
-				}
 
-				combinedChanges.values[kc.key] = &keyChange
+				continue
 			}
+
+			keyChange := keyChange{
+				change: &change[maybe.Maybe[[]byte]]{
+					before: kc.after,
+					after:  kc.before,
+				},
+				key: kc.key,
+			}
+
+			combinedChanges.values[kc.key] = &keyChange
 		}
 	}
 
@@ -363,6 +369,13 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start maybe.Maybe[[]
 	})
 
 	for _, key := range sortedKeys {
+		if maybe.Equal(combinedChanges.values[key].before, combinedChanges.values[key].after, bytes.Equal) {
+			// Remove changed key, if there is a no-op.
+			delete(combinedChanges.values, key)
+
+			continue
+		}
+
 		combinedChanges.sortedKeyChanges = append(combinedChanges.sortedKeyChanges, combinedChanges.values[key])
 	}
 
