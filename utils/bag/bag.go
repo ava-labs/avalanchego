@@ -177,8 +177,8 @@ func (b *Bag[_]) String() string {
 
 func (b *Bag[T]) Clone() Bag[T] {
 	var clone Bag[T]
-	for _, id := range b.List() {
-		clone.AddCount(id, b.Count(id))
+	for id, count := range b.counts {
+		clone.AddCount(id, count)
 	}
 	return clone
 }
