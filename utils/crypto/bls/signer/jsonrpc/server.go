@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 )
 
-type signerService struct {
+type SignerService struct {
 	signer *localsigner.LocalSigner
 }
 
@@ -26,16 +26,16 @@ type Server struct {
 	listener   net.Listener
 }
 
-func NewSignerService() *signerService {
+func NewSignerService() *SignerService {
 	signer, err := localsigner.NewSigner()
 	if err != nil {
 		panic(err)
 	}
 
-	return &signerService{signer: signer}
+	return &SignerService{signer: signer}
 }
 
-func Serve(service *signerService) (*Server, error) {
+func Serve(service *SignerService) (*Server, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 
@@ -84,17 +84,17 @@ func (s *Server) Close() error {
 	return s.listener.Close()
 }
 
-func (s *signerService) PublicKey(_ *http.Request, _ *PublicKeyArgs, reply *PublicKeyReply) error {
+func (s *SignerService) PublicKey(_ *http.Request, _ *PublicKeyArgs, reply *PublicKeyReply) error {
 	*reply = toPkReply(s.signer.PublicKey())
 	return nil
 }
 
-func (s *signerService) Sign(_ *http.Request, args *struct{ Msg []byte }, reply *SignReply) error {
+func (s *SignerService) Sign(_ *http.Request, args *struct{ Msg []byte }, reply *SignReply) error {
 	*reply = toSignReply(s.signer.Sign(args.Msg))
 	return nil
 }
 
-func (s *signerService) SignProofOfPossession(_ *http.Request, args *struct{ Msg []byte }, reply *SignProofOfPossessionReply) error {
+func (s *SignerService) SignProofOfPossession(_ *http.Request, args *struct{ Msg []byte }, reply *SignProofOfPossessionReply) error {
 	*reply = toSignProofOfPossessionReply(s.signer.SignProofOfPossession(args.Msg))
 	return nil
 }
