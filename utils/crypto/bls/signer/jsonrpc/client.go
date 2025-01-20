@@ -29,7 +29,7 @@ func NewClient(url url.URL) *Client {
 	}
 }
 
-func (c *Client) call(method string, params []interface{}, result interface{}) error {
+func (c *Client) call(method string, params []any, result any) error {
 	requestBody, err := json2.EncodeClientRequest(method, params)
 	if err != nil {
 		return err
@@ -56,7 +56,7 @@ func (c *Client) call(method string, params []interface{}, result interface{}) e
 func (c *Client) PublicKey() *bls.PublicKey {
 	reply := new(PublicKeyReply)
 
-	err := c.call("Signer.PublicKey", []interface{}{PublicKeyArgs{}}, reply)
+	err := c.call("Signer.PublicKey", []any{PublicKeyArgs{}}, reply)
 	if err != nil {
 		panic(err)
 	}
@@ -69,7 +69,7 @@ func (c *Client) PublicKey() *bls.PublicKey {
 
 func (c *Client) Sign(msg []byte) *bls.Signature {
 	reply := new(SignReply)
-	err := c.call("Signer.Sign", []interface{}{SignArgs{msg}}, reply)
+	err := c.call("Signer.Sign", []any{SignArgs{msg}}, reply)
 	// TODO: handle this
 	if err != nil {
 		panic(err)
@@ -83,7 +83,7 @@ func (c *Client) Sign(msg []byte) *bls.Signature {
 
 func (c *Client) SignProofOfPossession(msg []byte) *bls.Signature {
 	reply := new(SignReply)
-	err := c.call("Signer.SignProofOfPossession", []interface{}{SignArgs{msg}}, reply)
+	err := c.call("Signer.SignProofOfPossession", []any{SignArgs{msg}}, reply)
 	// TODO: handle this
 	if err != nil {
 		panic(err)
