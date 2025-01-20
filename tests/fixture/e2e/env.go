@@ -16,6 +16,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/config"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -145,13 +146,27 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 		)
 
 		// Wait for chains to have bootstrapped on all nodes
+		uris := map[ids.NodeID]string{}
 		tc.Eventually(func() bool {
 			for _, subnet := range network.Subnets {
 				for _, validatorID := range subnet.ValidatorIDs {
-					uri, err := network.GetURIForNodeID(validatorID)
-					require.NoError(err)
+					// Cache the potentially forwarded uri to minimize load on the kube api server
+					uri := uris[validatorID]
+					if len(uri) == 0 {
+						node, err := network.GetNode(validatorID)
+						require.NoError(err)
+						localURI, cancel, err := node.GetLocalURI(tc.DefaultContext())
+						require.NoError(err)
+						tc.DeferCleanup(cancel)
+						uris[validatorID] = localURI
+						uri = localURI
+					}
 					infoClient := info.NewClient(uri)
 					for _, chain := range subnet.Chains {
+						tc.Log().Debug("checking if chain is bootstrapped",
+							zap.Stringer("chainID", chain.ChainID),
+							zap.Stringer("nodeID", validatorID),
+						)
 						isBootstrapped, err := infoClient.IsBootstrapped(tc.DefaultContext(), chain.ChainID.String())
 						// Ignore errors since a chain id that is not yet known will result in a recoverable error.
 						if err != nil || !isBootstrapped {

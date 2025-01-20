@@ -42,6 +42,8 @@ var (
 // NodeRuntime defines the methods required to support running a node.
 type NodeRuntime interface {
 	readState() error
+	GetLocalURI(ctx context.Context) (string, func(), error)
+	GetLocalStakingAddress(ctx context.Context) (netip.AddrPort, func(), error)
 	Start(log logging.Logger) error
 	InitiateStop() error
 	WaitForStopped(ctx context.Context) error
@@ -195,13 +197,26 @@ func (n *Node) GetDataDir() string {
 	return cast.ToString(n.Flags[config.DataDirKey])
 }
 
+func (n *Node) GetLocalURI(ctx context.Context) (string, func(), error) {
+	return n.getRuntime().GetLocalURI(ctx)
+}
+
+func (n *Node) GetLocalStakingAddress(ctx context.Context) (netip.AddrPort, func(), error) {
+	return n.getRuntime().GetLocalStakingAddress(ctx)
+}
+
 // Writes the current state of the metrics endpoint to disk
 func (n *Node) SaveMetricsSnapshot(ctx context.Context) error {
 	if len(n.URI) == 0 {
 		// No URI to request metrics from
 		return nil
 	}
-	uri := n.URI + "/ext/metrics"
+	baseURI, cancel, err := n.GetLocalURI(ctx)
+	if err != nil {
+		return nil
+	}
+	defer cancel()
+	uri := baseURI + "/ext/metrics"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, uri, nil)
 	if err != nil {
 		return err
