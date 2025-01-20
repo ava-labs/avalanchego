@@ -7,12 +7,13 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/ava-labs/avalanchego/utils/heap"
-	"golang.org/x/exp/maps"
 	"slices"
+
+	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/buffer"
+	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
