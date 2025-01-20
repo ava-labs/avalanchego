@@ -5,7 +5,6 @@ package poll
 
 import (
 	"fmt"
-
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -34,6 +33,9 @@ type prefixGroup struct {
 // of IDs, and the members field contains all IDs from the given idList for which their bit prefix
 // matches the prefix field.
 func longestSharedPrefixes(idList []ids.ID) *prefixGroup {
+	// First thing - de-duplicate all ids that appear twice or more
+	idList = deduplicate(idList)
+
 	originPG := &prefixGroup{members: idList}
 
 	pgs := make([]*prefixGroup, 0, len(idList))
@@ -179,4 +181,18 @@ func (pg *prefixGroup) split() (*prefixGroup, *prefixGroup) {
 	pg.wasSplit = true
 
 	return zg, og
+}
+
+func deduplicate(in []ids.ID) []ids.ID {
+	out := make([]ids.ID, 0, len(in))
+	used := make(map[ids.ID]struct{})
+	for _, id := range in {
+		if _, exists := used[id]; exists {
+			continue
+		}
+		used[id] = struct{}{}
+		out = append(out, id)
+	}
+
+	return out
 }

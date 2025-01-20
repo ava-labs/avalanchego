@@ -86,6 +86,16 @@ func TestSharedPrefixes(t *testing.T) {
 				"g": {{0xff, 0xff}},
 			},
 		},
+		{
+			name:          "same string included twice",
+			input:         []ids.ID{{0xff, 0x0f}, {0x00, 0x1f}, {0xff, 0x0f}, {0x00, 0x1f}},
+			expectedEdges: `(a,b)(a,c)`,
+			expectedMembers: map[string][]ids.ID{
+				"a": {{0xff, 0x0f}, {0x00, 0x1f}},
+				"b": {{0x00, 0x1f}},
+				"c": {{0xff, 0x0f}},
+			},
+		},
 	} {
 		t.Run(tst.name, func(t *testing.T) {
 			pg := longestSharedPrefixes(tst.input)
@@ -152,4 +162,9 @@ func TestBifurcationsWithCommonPrefix(t *testing.T) {
 	})
 
 	require.Equal(t, expectedTraversalOrder, actualOrder)
+}
+
+func TestDeduplicate(t *testing.T) {
+	actual := deduplicate([]ids.ID{{1, 2, 3}, {4, 5, 6}, {7, 8, 9}, {10, 11, 12}, {1, 2, 3}, {13, 14, 15}, {4, 5, 6}, {10, 11, 12}, {13, 14, 15}})
+	require.Equal(t, []ids.ID{{1, 2, 3}, {4, 5, 6}, {7, 8, 9}, {10, 11, 12}, {13, 14, 15}}, actual)
 }
