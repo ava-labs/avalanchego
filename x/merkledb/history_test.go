@@ -5,13 +5,13 @@ package merkledb
 
 import (
 	"context"
-	"golang.org/x/exp/maps"
 	"math/rand"
 	"slices"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -318,7 +318,7 @@ func Test_History_Values_Lookup_Over_Queue_Break(t *testing.T) {
 	changes, err := db.history.getValueChanges(startRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 10)
 	require.NoError(err)
 
-	require.Equal(changes, []*keyChange{
+	require.Equal([]*keyChange{
 		{
 			change: &change[maybe.Maybe[[]byte]]{
 				before: maybe.Nothing[[]byte](),
@@ -333,7 +333,7 @@ func Test_History_Values_Lookup_Over_Queue_Break(t *testing.T) {
 			},
 			key: ToKey([]byte("key2")),
 		},
-	})
+	}, changes)
 }
 
 func Test_History_RepeatedRoot(t *testing.T) {
@@ -845,7 +845,6 @@ func TestHistoryGetChangesToRootKeyRollback(t *testing.T) {
 
 	changeSummaries := make([]*changeSummary, maxHistoryLen)
 	for i := 0; i < maxHistoryLen; i++ {
-
 		changeSummary := &changeSummary{
 			rootID: ids.GenerateTestID(),
 			rootChange: change[maybe.Maybe[*node]]{

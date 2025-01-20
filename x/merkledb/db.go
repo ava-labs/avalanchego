@@ -12,6 +12,9 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"go.opentelemetry.io/otel/attribute"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
@@ -19,8 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/prometheus/client_golang/prometheus"
-	"go.opentelemetry.io/otel/attribute"
 
 	oteltrace "go.opentelemetry.io/otel/trace"
 )

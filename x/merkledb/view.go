@@ -6,11 +6,11 @@ package merkledb
 import (
 	"context"
 	"errors"
-	"golang.org/x/exp/maps"
 	"slices"
 	"sync"
 
 	"go.opentelemetry.io/otel/attribute"
+	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
