@@ -1,7 +1,7 @@
 {
   "networkID": 1002,
   "allocations": null,
-  "startTime": 1715348670,
+  "startTime": 1735738620,
   "initialStakeDuration": 0,
   "initialStakeDurationOffset": 3600,
   "initialStakedFunds": null,
@@ -1177,7 +1177,7 @@
         "avaxAddr": "X-kopernikus1nff7e6p069r3d2jcrwm8cywwlv0nur5j9jvetc",
         "xAmount": 0,
         "addressStates": {
-          "consortiumMember": false,
+          "consortiumMember": true,
           "kycVerified": true
         },
         "platformAllocations": [
@@ -1265,7 +1265,8 @@
           "X-kopernikus18pry238vq8uzzpar32wa4x4p2rkyc7wx2qnctc",
           "X-kopernikus18l0l8dz03vmk7k7y5cgax8k2l5mphj4p5k040u",
           "X-kopernikus1d0ydd4wyq670lzrp0y7xd3wej4z7ysp2surum8",
-          "X-kopernikus1h87ampd07hwtnqywpsagrxm9ygkmcr34ndjah9"
+          "X-kopernikus1h87ampd07hwtnqywpsagrxm9ygkmcr34ndjah9",
+          "X-kopernikus102uap4au55t22m797rr030wyrw0jlgw25ut8vj"
         ],
         "threshold": 2,
         "memo": "1931"
@@ -1276,7 +1277,8 @@
           "X-kopernikus18pry238vq8uzzpar32wa4x4p2rkyc7wx2qnctc",
           "X-kopernikus18l0l8dz03vmk7k7y5cgax8k2l5mphj4p5k040u",
           "X-kopernikus1d0ydd4wyq670lzrp0y7xd3wej4z7ysp2surum8",
-          "X-kopernikus1h87ampd07hwtnqywpsagrxm9ygkmcr34ndjah9"
+          "X-kopernikus1h87ampd07hwtnqywpsagrxm9ygkmcr34ndjah9",
+          "X-kopernikus102uap4au55t22m797rr030wyrw0jlgw25ut8vj"
         ],
         "threshold": 2,
         "memo": "1932"
