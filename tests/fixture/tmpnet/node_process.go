@@ -247,6 +247,10 @@ func (p *NodeProcess) getProcess() (*os.Process, error) {
 func (p *NodeProcess) writeMonitoringConfig() error {
 	// Ensure labeling that uniquely identifies the node and its network
 	commonLabels := FlagsMap{
+		// Explicitly setting an instance label avoids the default
+		// behavior of using the node's URI since the URI isn't
+		// guaranteed stable (e.g. port may change after restart).
+		"instance":          p.node.GetUniqueID(),
 		"network_uuid":      p.node.NetworkUUID,
 		"node_id":           p.node.NodeID,
 		"is_ephemeral_node": strconv.FormatBool(p.node.IsEphemeral),
