@@ -23,8 +23,6 @@ type prefixGroup struct {
 	members []ids.ID
 	// prefixGroups that correspond to zero and one being the first bit of their members, respectively.
 	zg, og *prefixGroup
-	// the prefixGroup that this prefixGroup was split from.
-	parent *prefixGroup
 	// was this prefixGroup split before. Used to prevent a prefixGroup from being split more than once,
 	// otherwise longestSharedPrefixes() would run indefinitely.
 	wasSplit bool
@@ -64,11 +62,8 @@ func longestSharedPrefixes(idList []ids.ID) *prefixGroup {
 			// so swallow up your descendant
 			descendant := determineDescendant(pg)
 
-			// Backup the parent
-			parent := pg.parent
-			// Become your descendant, but keep your original parent
+			// Become your descendant
 			*pg = *descendant
-			pg.parent = parent
 		}
 
 		if !couldSplit {
@@ -142,13 +137,11 @@ func (pg *prefixGroup) traverse(f func(*prefixGroup)) {
 // in the next bit, and then at least one prefixGroup would be returned.
 func (pg *prefixGroup) split() (*prefixGroup, *prefixGroup) {
 	zg := &prefixGroup{
-		parent:  pg,
 		index:   pg.index + 1,
 		prefix:  make([]uint8, len(pg.prefix)+1),
 		members: make([]ids.ID, 0, len(pg.members)),
 	}
 	og := &prefixGroup{
-		parent:  pg,
 		index:   pg.index + 1,
 		prefix:  make([]uint8, len(pg.prefix)+1),
 		members: make([]ids.ID, 0, len(pg.members)),
