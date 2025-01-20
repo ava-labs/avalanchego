@@ -20,8 +20,8 @@ type prefixGroup struct {
 	prefix []uint8
 	// the IDs of the prefixGroup
 	members []ids.ID
-	// prefixGroups that correspond to zero and one being the first bit of their members, respectively.
-	zg, og *prefixGroup
+	// children are prefixGroups that correspond to zero and one being the first bit of their members, respectively.
+	children [2]*prefixGroup
 	// was this prefixGroup split before. Used to prevent a prefixGroup from being split more than once,
 	// otherwise longestSharedPrefixes() would run indefinitely.
 	wasSplit bool
@@ -79,17 +79,20 @@ func longestSharedPrefixes(idList []ids.ID) *prefixGroup {
 func determineDescendant(pg *prefixGroup) *prefixGroup {
 	var descendant *prefixGroup
 
-	if pg.zg == nil && pg.og == nil {
+	zg := pg.children[0]
+	og := pg.children[1]
+
+	if zg == nil && og == nil {
 		// If both are nil, it's a programming error, so panic.
 		panic("programming error: both zero group and one group are nil")
 	}
 
-	if pg.zg != nil {
-		descendant = pg.zg
+	if zg != nil {
+		descendant = zg
 	}
 
-	if pg.og != nil {
-		descendant = pg.og
+	if og != nil {
+		descendant = og
 	}
 	return descendant
 }
@@ -109,7 +112,7 @@ func (pg *prefixGroup) bifurcationsWithCommonPrefix(f func([]ids.ID)) {
 
 // isBifurcation returns whether this prefixGroup has both zero and one bit descendants.
 func (pg *prefixGroup) isBifurcation() bool {
-	return pg.zg != nil && pg.og != nil
+	return pg.children[0] != nil && pg.children[1] != nil
 }
 
 // canSplit returns whether this prefixGroup can be split.
@@ -120,11 +123,10 @@ func (pg *prefixGroup) canSplit() bool {
 // traverse invokes f() on this prefixGroup and all descendants in pre-order traversal.
 func (pg *prefixGroup) traverse(f func(*prefixGroup)) {
 	f(pg)
-	if pg.zg != nil {
-		pg.zg.traverse(f)
-	}
-	if pg.og != nil {
-		pg.og.traverse(f)
+	for _, childPG := range pg.children {
+		if childPG != nil {
+			childPG.traverse(f)
+		}
 	}
 }
 
@@ -176,8 +178,9 @@ func (pg *prefixGroup) split() (*prefixGroup, *prefixGroup) {
 		zg = nil
 	}
 
-	pg.og = og
-	pg.zg = zg
+	pg.children[0] = zg
+	pg.children[1] = og
+
 	pg.wasSplit = true
 
 	return zg, og

@@ -107,11 +107,11 @@ func TestSharedPrefixes(t *testing.T) {
 			pg.traverse(func(pg *prefixGroup) {
 				pgVertexName := vertexNames[pg]
 				members[pgVertexName] = pg.members
-				if pg.zg != nil {
-					fmt.Fprintf(&edges, "(%s,%s)", pgVertexName, vertexNames[pg.zg])
+				if pg.children[0] != nil {
+					fmt.Fprintf(&edges, "(%s,%s)", pgVertexName, vertexNames[pg.children[0]])
 				}
-				if pg.og != nil {
-					fmt.Fprintf(&edges, "(%s,%s)", pgVertexName, vertexNames[pg.og])
+				if pg.children[1] != nil {
+					fmt.Fprintf(&edges, "(%s,%s)", pgVertexName, vertexNames[pg.children[1]])
 				}
 			})
 
@@ -124,28 +124,34 @@ func TestSharedPrefixes(t *testing.T) {
 func TestBifurcationsWithCommonPrefix(t *testing.T) {
 	pg := &prefixGroup{
 		members: []ids.ID{{0, 1, 1}, {0, 0, 1}, {0, 1, 0}, {0, 0, 0}},
-		og: &prefixGroup{
-			prefix:  []uint8{1},
-			members: []ids.ID{{0, 1, 1}, {0, 0, 1}},
-			og: &prefixGroup{
-				prefix:  []uint8{0, 0, 1},
-				members: []ids.ID{{0, 0, 1}},
+		children: [2]*prefixGroup{
+			{
+				prefix:  []uint8{0},
+				members: []ids.ID{{0, 1, 0}, {0, 0, 0}},
+				children: [2]*prefixGroup{
+					{
+						prefix:  []uint8{0, 0, 0},
+						members: []ids.ID{{0, 0, 0}},
+					},
+					{
+						prefix:  []uint8{0, 1, 0},
+						members: []ids.ID{{0, 1, 0}},
+					},
+				},
 			},
-			zg: &prefixGroup{
-				prefix:  []uint8{0, 1, 1},
-				members: []ids.ID{{0, 1, 1}},
-			},
-		},
-		zg: &prefixGroup{
-			prefix:  []uint8{0},
-			members: []ids.ID{{0, 1, 0}, {0, 0, 0}},
-			og: &prefixGroup{
-				prefix:  []uint8{0, 1, 0},
-				members: []ids.ID{{0, 1, 0}},
-			},
-			zg: &prefixGroup{
-				prefix:  []uint8{0, 0, 0},
-				members: []ids.ID{{0, 0, 0}},
+			{
+				prefix:  []uint8{1},
+				members: []ids.ID{{0, 1, 1}, {0, 0, 1}},
+				children: [2]*prefixGroup{
+					{
+						prefix:  []uint8{0, 1, 1},
+						members: []ids.ID{{0, 1, 1}},
+					},
+					{
+						prefix:  []uint8{0, 0, 1},
+						members: []ids.ID{{0, 0, 1}},
+					},
+				},
 			},
 		},
 	}
