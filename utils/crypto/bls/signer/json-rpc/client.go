@@ -18,7 +18,6 @@ import (
 var _ bls.Signer = (*Client)(nil)
 
 type Client struct {
-	// http client
 	http *http.Client
 	url  url.URL
 }
@@ -37,7 +36,7 @@ func (c *Client) call(method string, params []interface{}, result interface{}) e
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel() // Ensure the context is canceled to release resources
+	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url.String(), bytes.NewBuffer(requestBody))
 	if err != nil {
@@ -68,9 +67,7 @@ func (c *Client) PublicKey() *bls.PublicKey {
 	return pk
 }
 
-// Sign [msg] to authorize this message
 func (c *Client) Sign(msg []byte) *bls.Signature {
-	// request the public key from the json-rpc server
 	reply := new(SignReply)
 	err := c.call("Signer.Sign", []interface{}{SignArgs{msg}}, reply)
 	// TODO: handle this
@@ -78,17 +75,13 @@ func (c *Client) Sign(msg []byte) *bls.Signature {
 		panic(err)
 	}
 
-	// deserialize the public key
 	sig := new(bls.Signature)
 	sig = sig.Deserialize(reply.Signature)
 
-	// can be nil if the public key is invalid
 	return sig
 }
 
-// Sign [msg] to prove the ownership
 func (c *Client) SignProofOfPossession(msg []byte) *bls.Signature {
-	// request the public key from the json-rpc server
 	reply := new(SignReply)
 	err := c.call("Signer.SignProofOfPossession", []interface{}{SignArgs{msg}}, reply)
 	// TODO: handle this
@@ -96,10 +89,8 @@ func (c *Client) SignProofOfPossession(msg []byte) *bls.Signature {
 		panic(err)
 	}
 
-	// deserialize the public key
 	sig := new(bls.Signature)
 	sig = sig.Deserialize(reply.Signature)
 
-	// can be nil if the public key is invalid
 	return sig
 }
