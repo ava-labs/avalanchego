@@ -4,7 +4,6 @@
 package poll
 
 import (
-	"fmt"
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -138,43 +137,29 @@ func (pg *prefixGroup) traverse(f func(*prefixGroup)) {
 // in which case two prefixGroups would be returned, and otherwise they do not differ
 // in the next bit, and then at least one prefixGroup would be returned.
 func (pg *prefixGroup) split() (*prefixGroup, *prefixGroup) {
-	zg := &prefixGroup{
-		index:   pg.index + 1,
-		members: make([]ids.ID, 0, len(pg.members)),
-	}
-	og := &prefixGroup{
-		index:   pg.index + 1,
-		members: make([]ids.ID, 0, len(pg.members)),
+	for i := range pg.children {
+		pg.children[i] = &prefixGroup{
+			index:   pg.index + 1,
+			members: make([]ids.ID, 0, len(pg.members)),
+		}
 	}
 
 	// Split members according to their next bit
 	for _, member := range pg.members {
 		bit := member.Bit(uint(pg.index))
-		switch bit {
-		case 0:
-			zg.members = append(zg.members, member)
-		case 1:
-			og.members = append(og.members, member)
-		default:
-			// This is a sanity check which ensures that both zg.members and og.members cannot be empty.
-			panic(fmt.Sprintf("programming error: the %d bit of %s is %d", pg.index, member, bit))
+		child := pg.children[bit]
+		child.members = append(child.members, member)
+	}
+
+	for i, child := range pg.children {
+		if len(child.members) == 0 {
+			pg.children[i] = nil
 		}
 	}
 
-	if len(og.members) == 0 {
-		og = nil
-	}
-
-	if len(zg.members) == 0 {
-		zg = nil
-	}
-
-	pg.children[0] = zg
-	pg.children[1] = og
-
 	pg.wasSplit = true
 
-	return zg, og
+	return pg.children[0], pg.children[1]
 }
 
 func deduplicate(in []ids.ID) []ids.ID {
