@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls/signers/localsigner"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 )
 
 func TestProofOfPossession(t *testing.T) {

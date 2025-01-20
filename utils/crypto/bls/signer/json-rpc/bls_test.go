@@ -11,7 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/blstest"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls/signers/localsigner"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 )
 
 func NewLocalPair(require *require.Assertions) (*localsigner.LocalSigner, *bls.PublicKey) {

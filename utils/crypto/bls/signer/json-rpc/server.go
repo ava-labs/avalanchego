@@ -14,7 +14,7 @@ import (
 	"github.com/gorilla/rpc/v2/json"
 
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls/signers/localsigner"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 )
 
 type signerService struct {
