@@ -683,12 +683,9 @@ func (ts *Topological) rejectTransitively(ctx context.Context, rejected []ids.ID
 }
 
 func (ts *Topological) GetParent(id ids.ID) (ids.ID, bool) {
-	if block, ok := ts.blocks[id]; ok {
-		if block.blk == nil {
-			return ids.Empty, false
-		}
-		return block.blk.Parent(), true
-	} else {
+	block, ok := ts.blocks[id]
+	if !ok || block == nil || block.blk == nil {
 		return ids.Empty, false
 	}
+	return block.blk.Parent(), true
 }
