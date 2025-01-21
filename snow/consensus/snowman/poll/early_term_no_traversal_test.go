@@ -251,6 +251,66 @@ func TestTransitiveVotesForPrefixes(t *testing.T) {
 	require.Equal(2, voteCount)
 }
 
+func TestEarlyTermTraversalNotAllBlocksAreVotedOn(t *testing.T) {
+	require := require.New(t)
+	vdrs := bag.Of(vdr1, vdr2, vdr3, vdr4, vdr5) // k = 5
+	alphaPreference := 3
+	alphaConfidence := 3
+	blkID1 := ids.ID{0x01}
+	blkID2 := ids.ID{0x02}
+	blkID3 := ids.ID{0x03}
+	blkID4 := ids.ID{0x04}
+	blkID5 := ids.ID{0x05}
+
+	//    blkID1
+	//       |
+	//    blkID2
+	//       |
+	//    blkID3
+	//       |
+	//    blkID4
+	//       |
+	//    blkID5
+	g := ancestryGraph{
+		blkID2: blkID1,
+		blkID3: blkID2,
+		blkID4: blkID3,
+		blkID5: blkID4,
+	}
+	factory, err := NewEarlyTermFactory(alphaPreference, alphaConfidence, prometheus.NewRegistry(), g)
+	require.NoError(err)
+
+	poll := factory.New(vdrs)
+	poll.Vote(vdr1, blkID1)
+	// blkID1 has 1 vote
+	//
+	// 4 outstanding votes
+	require.False(poll.Finished())
+	poll.Vote(vdr2, blkID2)
+	// blkID1 has 2 votes
+	// blkID2 has 1 vote
+	//
+	// 3 outstanding votes
+	require.False(poll.Finished())
+	poll.Vote(vdr3, blkID2)
+	// blkID1 has 3 votes
+	// blkID2 has 2 votes
+	//
+	// 2 outstanding votes
+	require.False(poll.Finished())
+	poll.Vote(vdr4, blkID5)
+	// blkID1 has 4 votes
+	// blkID2 has 3 votes
+	// blkID3 has 1 vote
+	// blkID4 has 1 vote
+	// blkID5 has 1 vote
+	//
+	// Because there is only 1 more outstanding vote, and that vote can not
+	// cause any of the blocks to cross an alpha threshold, we can terminate
+	// early.
+	require.True(poll.Finished())
+}
+
 func TestEarlyTermYesTraversal(t *testing.T) {
 	require := require.New(t)
 
