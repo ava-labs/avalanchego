@@ -263,7 +263,6 @@ func (p *earlyTermPoll) shouldTerminateDueToConfidence(freq int, remaining int) 
 		p.metrics.observeEarlyAlphaConf(time.Since(p.start))
 		return true // Case 4
 	}
-
 	return false
 }
 

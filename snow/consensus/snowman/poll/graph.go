@@ -46,19 +46,9 @@ func buildVoteGraph(getParent func(ids.ID) (ids.ID, bool), votes bag.Bag[ids.ID]
 		id2Vertex[id] = &voteVertex{id: id, descendants: make([]*voteVertex, 0, 2)}
 	}
 
-	// Add the parents of the IDs to the graph, for those that are not already there.
+	// Add the ancestors of the IDs to the graph, for those that are not already there.
 	for _, id := range idList {
-		parent, ok := getParent(id)
-		// If this parent isn't found, it must be already finalized, so don't add it to the graph.
-		if !ok {
-			continue
-		}
-		_, ok = id2Vertex[parent]
-		// If the parent is not finalized we can vote on it, so add it to the graph
-		if !ok {
-			v := &voteVertex{id: parent}
-			id2Vertex[parent] = v
-		}
+		addAncestorsToGraph(getParent, id, id2Vertex)
 	}
 
 	for id, v := range id2Vertex {
@@ -76,6 +66,37 @@ func buildVoteGraph(getParent func(ids.ID) (ids.ID, bool), votes bag.Bag[ids.ID]
 	leaves := findLeaves(id2Vertex)
 
 	return voteGraph{leaves: leaves, roots: roots, vertexCount: len(id2Vertex)}
+}
+
+func addAncestorsToGraph(getParent func(ids.ID) (ids.ID, bool), id ids.ID, id2Vertex map[ids.ID]*voteVertex) {
+	addedAncestors := make(map[ids.ID]*voteVertex, len(id2Vertex))
+
+	for {
+		parent, ok := getParent(id)
+		// If this parent isn't found, it must be already finalized, so don't add it to the graph.
+		if !ok {
+			break
+		}
+
+		// If the parent is in the original vote set, no need to transitively add its ancestors,
+		// as we either already did so in previous iterations,
+		// or would do so in the next iterations.
+		if _, exists := id2Vertex[parent]; exists {
+			break
+		}
+
+		// If the parent is not finalized we can vote on it, so add it.
+		v := &voteVertex{id: parent}
+		addedAncestors[parent] = v
+
+		// Visit transitively the parent's ancestors.
+		id = parent
+	}
+
+	// Lastly, merge all the ancestors we found into id2Vertex.
+	for id, vv := range addedAncestors {
+		id2Vertex[id] = vv
+	}
 }
 
 // traverse traverses over all vertices in the voteGraph in pre-order traversal.
