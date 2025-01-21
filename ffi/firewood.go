@@ -87,6 +87,7 @@ func make_value(pin *runtime.Pinner, data []byte) C.struct_Value {
 func (f *Firewood) Root() []byte {
 	hash := C.fwd_root_hash(unsafe.Pointer(f.Db))
 	hash_bytes := C.GoBytes(unsafe.Pointer(hash.data), C.int(hash.len))
+	C.fwd_free_value(&hash)
 	return hash_bytes
 }
 
