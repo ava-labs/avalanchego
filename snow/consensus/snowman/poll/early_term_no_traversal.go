@@ -235,6 +235,9 @@ func (p *earlyTermPoll) Finished() bool {
 	// if we shouldn't terminate in one of them, then we should not terminate this poll now.
 	for _, completedVotes := range voteCountsForIDsOrPrefixes {
 		weCantImproveVoteForSomeIDOrPrefix = weCantImproveVoteForSomeIDOrPrefix && p.shouldTerminateDueToConfidence(completedVotes, remaining)
+		if !weCantImproveVoteForSomeIDOrPrefix {
+			break
+		}
 	}
 
 	// We should terminate the poll only when votes for all IDs or prefixes cannot be improved.
