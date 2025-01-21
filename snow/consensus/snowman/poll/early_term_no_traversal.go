@@ -271,7 +271,7 @@ func (p *earlyTermPoll) String() string {
 	return p.PrefixedString("")
 }
 
-func aggregateVotesFromPrefixesAndIDs(transitiveVotesForPrefixes map[string]int, transitiveVotes bag.Bag[ids.ID]) []int {
+func aggregateVotesFromPrefixesAndIDs(transitiveVotesForPrefixes []int, transitiveVotes bag.Bag[ids.ID]) []int {
 	voteCountsForIDsOrPrefixes := make([]int, 0, len(transitiveVotesForPrefixes)+len(transitiveVotes.List()))
 
 	for _, id := range transitiveVotes.List() {
@@ -285,8 +285,8 @@ func aggregateVotesFromPrefixesAndIDs(transitiveVotesForPrefixes map[string]int,
 	return voteCountsForIDsOrPrefixes
 }
 
-func computeTransitiveVotesForPrefixes(votesGraph *voteGraph, transitiveVotes bag.Bag[ids.ID]) map[string]int {
-	votesForPrefix := make(map[string]int)
+func computeTransitiveVotesForPrefixes(votesGraph *voteGraph, transitiveVotes bag.Bag[ids.ID]) []int {
+	var votesForPrefix []int
 	votesGraph.traverse(func(v *voteVertex) {
 		descendantIDs := descendantIDsOfVertex(v)
 		pg := longestSharedPrefixes(descendantIDs)
@@ -294,9 +294,8 @@ func computeTransitiveVotesForPrefixes(votesGraph *voteGraph, transitiveVotes ba
 		// Sum up all the transitive votes for these blocks,
 		// and return all such shared prefixes indexed by the underlying transitive descendant IDs.
 		pg.bifurcationsWithCommonPrefix(func(ids []ids.ID) {
-			key := concatIDs(ids)
 			count := sumVotesFromIDs(ids, transitiveVotes)
-			votesForPrefix[key] = count
+			votesForPrefix = append(votesForPrefix, count)
 		})
 	})
 	return votesForPrefix
