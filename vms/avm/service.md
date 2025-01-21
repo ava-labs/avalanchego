@@ -991,7 +991,7 @@ curl -X POST --data '{
     "jsonrpc": "2.0",
     "method": "avm.getBlockByHeight",
     "params": {
-        “height": "275686313486",
+        "height": "275686313486",
         "encoding": "hex"
     },
     "id": 1
