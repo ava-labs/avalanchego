@@ -18,11 +18,9 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/api"
-	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -46,43 +44,23 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
-	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
 	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
-var (
-	// Test user username
-	testUsername = "ScoobyUser"
+var encodings = []formatting.Encoding{
+	formatting.JSON, formatting.Hex,
+}
 
-	// Test user password, must meet minimum complexity/length requirements
-	testPassword = "ShaggyPassword1Zoinks!"
-
-	// Bytes decoded from CB58 "ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"
-	testPrivateKey = []byte{
-		0x56, 0x28, 0x9e, 0x99, 0xc9, 0x4b, 0x69, 0x12,
-		0xbf, 0xc1, 0x2a, 0xdc, 0x09, 0x3c, 0x9b, 0x51,
-		0x12, 0x4f, 0x0d, 0xc5, 0x4a, 0xc7, 0xa7, 0x66,
-		0xb2, 0xbc, 0x5c, 0xcf, 0x55, 0x8d, 0x80, 0x27,
-	}
-
-	// 3cb7d3842e8cee6a0ebd09f1fe884f6861e1b29c
-	// Platform address resulting from the above private key
-	testAddress = "P-testing18jma8ppw3nhx5r4ap8clazz0dps7rv5umpc36y"
-
-	encodings = []formatting.Encoding{
-		formatting.JSON, formatting.Hex,
-	}
-)
-
-func defaultService(t *testing.T, fork upgradetest.Fork) (*Service, *mutableSharedMemory) {
-	vm, _, mutableSharedMemory := defaultVM(t, fork)
+func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
+	vm, _, mutableSharedMemory := defaultVM(t, upgradetest.Latest)
 	return &Service{
 		vm:          vm,
 		addrManager: avax.NewAddressManager(vm.ctx),
@@ -94,7 +72,7 @@ func defaultService(t *testing.T, fork upgradetest.Fork) (*Service, *mutableShar
 
 func TestGetProposedHeight(t *testing.T) {
 	require := require.New(t)
-	service, _ := defaultService(t, upgradetest.Latest)
+	service, _ := defaultService(t)
 
 	reply := api.GetHeightResponse{}
 	require.NoError(service.GetProposedHeight(&http.Request{}, nil, &reply))
@@ -156,40 +134,10 @@ func TestGetProposedHeight(t *testing.T) {
 	require.Equal(latestBlock.Height(), uint64(reply.Height))
 }
 
-func TestExportKey(t *testing.T) {
-	require := require.New(t)
-
-	service, _ := defaultService(t, upgradetest.Latest)
-	service.vm.ctx.Lock.Lock()
-
-	ks := keystore.New(logging.NoLog{}, memdb.New())
-	require.NoError(ks.CreateUser(testUsername, testPassword))
-	service.vm.ctx.Keystore = ks.NewBlockchainKeyStore(service.vm.ctx.ChainID)
-
-	user, err := vmkeystore.NewUserFromKeystore(service.vm.ctx.Keystore, testUsername, testPassword)
-	require.NoError(err)
-
-	pk, err := secp256k1.ToPrivateKey(testPrivateKey)
-	require.NoError(err)
-
-	require.NoError(user.PutKeys(pk, genesistest.DefaultFundedKeys[0]))
-
-	service.vm.ctx.Lock.Unlock()
-
-	jsonString := `{"username":"` + testUsername + `","password":"` + testPassword + `","address":"` + testAddress + `"}`
-	args := ExportKeyArgs{}
-	require.NoError(json.Unmarshal([]byte(jsonString), &args))
-
-	reply := ExportKeyReply{}
-	require.NoError(service.ExportKey(nil, &args, &reply))
-
-	require.Equal(testPrivateKey, reply.PrivateKey.Bytes())
-}
-
 // Test issuing a tx and accepted
 func TestGetTxStatus(t *testing.T) {
 	require := require.New(t)
-	service, mutableSharedMemory := defaultService(t, upgradetest.Latest)
+	service, mutableSharedMemory := defaultService(t)
 	service.vm.ctx.Lock.Lock()
 
 	recipientKey, err := secp256k1.NewPrivateKey()
@@ -374,7 +322,7 @@ func TestGetTx(t *testing.T) {
 			)
 			t.Run(testName, func(t *testing.T) {
 				require := require.New(t)
-				service, _ := defaultService(t, upgradetest.Latest)
+				service, _ := defaultService(t)
 
 				service.vm.ctx.Lock.Lock()
 				tx := test.createTx(t, service)
@@ -427,7 +375,7 @@ func TestGetTx(t *testing.T) {
 					tx.Unsigned.InitCtx(service.vm.ctx)
 					expectedTxJSON, err := json.Marshal(tx)
 					require.NoError(err)
-					require.Equal(expectedTxJSON, []byte(response.Tx))
+					require.JSONEq(string(expectedTxJSON), string(response.Tx))
 				}
 			})
 		}
@@ -436,7 +384,7 @@ func TestGetTx(t *testing.T) {
 
 func TestGetBalance(t *testing.T) {
 	require := require.New(t)
-	service, _ := defaultService(t, upgradetest.Durango)
+	service, _ := defaultService(t)
 
 	feeCalculator := state.PickFeeCalculator(&service.vm.Internal, service.vm.state)
 	createSubnetFee, err := feeCalculator.CalculateFee(testSubnet1.Unsigned)
@@ -475,7 +423,7 @@ func TestGetBalance(t *testing.T) {
 
 func TestGetStake(t *testing.T) {
 	require := require.New(t)
-	service, _ := defaultService(t, upgradetest.Latest)
+	service, _ := defaultService(t)
 
 	// Ensure GetStake is correct for each of the genesis validators
 	genesis := genesistest.New(t, genesistest.Config{})
@@ -675,7 +623,7 @@ func TestGetStake(t *testing.T) {
 
 func TestGetCurrentValidators(t *testing.T) {
 	require := require.New(t)
-	service, _ := defaultService(t, upgradetest.Latest)
+	service, _ := defaultService(t)
 
 	genesis := genesistest.New(t, genesistest.Config{})
 
@@ -821,7 +769,7 @@ func TestGetCurrentValidators(t *testing.T) {
 
 func TestGetValidatorsAt(t *testing.T) {
 	require := require.New(t)
-	service, _ := defaultService(t, upgradetest.Latest)
+	service, _ := defaultService(t)
 
 	genesis := genesistest.New(t, genesistest.Config{})
 
@@ -957,7 +905,7 @@ func TestGetValidatorsAtArgsMarshalling(t *testing.T) {
 
 func TestGetTimestamp(t *testing.T) {
 	require := require.New(t)
-	service, _ := defaultService(t, upgradetest.Latest)
+	service, _ := defaultService(t)
 
 	reply := GetTimestampReply{}
 	require.NoError(service.GetTimestamp(nil, nil, &reply))
@@ -993,10 +941,8 @@ func TestGetBlock(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
-			service, _ := defaultService(t, upgradetest.Latest)
+			service, _ := defaultService(t)
 			service.vm.ctx.Lock.Lock()
-
-			service.vm.Internal.CreateAssetTxFee = 100 * defaultTxFee
 
 			subnetID := testSubnet1.ID()
 			wallet := newWallet(t, service.vm, walletConfig{
@@ -1043,7 +989,7 @@ func TestGetBlock(t *testing.T) {
 				statelessBlock.InitCtx(service.vm.ctx)
 				expectedBlockJSON, err := json.Marshal(statelessBlock)
 				require.NoError(err)
-				require.Equal(expectedBlockJSON, []byte(response.Block))
+				require.JSONEq(string(expectedBlockJSON), string(response.Block))
 			default:
 				var blockStr string
 				require.NoError(json.Unmarshal(response.Block, &blockStr))
@@ -1276,14 +1222,14 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 			expectedJSON, err := json.Marshal(expected)
 			require.NoError(err)
 
-			require.Equal(json.RawMessage(expectedJSON), reply.Block)
+			require.JSONEq(string(expectedJSON), string(reply.Block))
 		})
 	}
 }
 
 func TestServiceGetSubnets(t *testing.T) {
 	require := require.New(t)
-	service, _ := defaultService(t, upgradetest.Latest)
+	service, _ := defaultService(t)
 
 	testSubnet1ID := testSubnet1.ID()
 
@@ -1335,41 +1281,20 @@ func TestServiceGetSubnets(t *testing.T) {
 }
 
 func TestGetFeeConfig(t *testing.T) {
-	tests := []struct {
-		name     string
-		etnaTime time.Time
-		expected gas.Config
-	}{
-		{
-			name:     "pre-etna",
-			etnaTime: time.Now().Add(time.Hour),
-			expected: gas.Config{},
-		},
-		{
-			name:     "post-etna",
-			etnaTime: time.Now().Add(-time.Hour),
-			expected: defaultDynamicFeeConfig,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
+	require := require.New(t)
 
-			service, _ := defaultService(t, upgradetest.Latest)
-			service.vm.Internal.UpgradeConfig.EtnaTime = test.etnaTime
+	service, _ := defaultService(t)
 
-			var reply gas.Config
-			require.NoError(service.GetFeeConfig(nil, nil, &reply))
-			require.Equal(test.expected, reply)
-		})
-	}
+	var reply gas.Config
+	require.NoError(service.GetFeeConfig(nil, nil, &reply))
+	require.Equal(defaultDynamicFeeConfig, reply)
 }
 
 func FuzzGetFeeState(f *testing.F) {
 	f.Fuzz(func(t *testing.T, capacity, excess uint64) {
 		require := require.New(t)
 
-		service, _ := defaultService(t, upgradetest.Latest)
+		service, _ := defaultService(t)
 
 		var (
 			expectedState = gas.State{
@@ -1395,6 +1320,47 @@ func FuzzGetFeeState(f *testing.F) {
 
 		var reply GetFeeStateReply
 		require.NoError(service.GetFeeState(nil, nil, &reply))
+		require.Equal(expectedReply, reply)
+	})
+}
+
+func TestGetValidatorFeeConfig(t *testing.T) {
+	require := require.New(t)
+
+	service, _ := defaultService(t)
+
+	var reply fee.Config
+	require.NoError(service.GetValidatorFeeConfig(nil, nil, &reply))
+	require.Equal(defaultValidatorFeeConfig, reply)
+}
+
+func FuzzGetValidatorFeeState(f *testing.F) {
+	f.Fuzz(func(t *testing.T, l1ValidatorExcess uint64) {
+		require := require.New(t)
+
+		service, _ := defaultService(t)
+
+		var (
+			expectedL1ValidatorExcess = gas.Gas(l1ValidatorExcess)
+			expectedTime              = time.Now()
+			expectedReply             = GetValidatorFeeStateReply{
+				Excess: expectedL1ValidatorExcess,
+				Price: gas.CalculatePrice(
+					defaultValidatorFeeConfig.MinPrice,
+					expectedL1ValidatorExcess,
+					defaultValidatorFeeConfig.ExcessConversionConstant,
+				),
+				Time: expectedTime,
+			}
+		)
+
+		service.vm.ctx.Lock.Lock()
+		service.vm.state.SetL1ValidatorExcess(expectedL1ValidatorExcess)
+		service.vm.state.SetTimestamp(expectedTime)
+		service.vm.ctx.Lock.Unlock()
+
+		var reply GetValidatorFeeStateReply
+		require.NoError(service.GetValidatorFeeState(nil, nil, &reply))
 		require.Equal(expectedReply, reply)
 	})
 }

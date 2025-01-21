@@ -69,7 +69,7 @@ In the diagram above, if `view1` were committed, `view2` would be invalidated. I
 
 MerkleDB instances can produce _merkle proofs_, sometimes just called "proofs." A merkle proof uses cryptography to prove that a given key-value pair is or isn't in the key-value store with a given root. That is, a MerkleDB instance with root ID `r` can create a proof that shows that it has a key-value pair `(k,v)`, or that `k` is not present.
 
-Proofs can be useful as a client fetching data in a Byzantine environment. Suppose there are one or more servers, which may be Byzantine, serving a distirbuted key-value store using MerkleDB, and a client that wants to retrieve key-value pairs. Suppose also that the client can learn a "trusted" root ID, perhaps because it's posted on a blockchain. The client can request a key-value pair from a server, and use the returned proof to verify that the returned key-value pair is actually in the key-value store with (or isn't, as it were.)
+Proofs can be useful as a client fetching data in a Byzantine environment. Suppose there are one or more servers, which may be Byzantine, serving a distributed key-value store using MerkleDB, and a client that wants to retrieve key-value pairs. Suppose also that the client can learn a "trusted" root ID, perhaps because it's posted on a blockchain. The client can request a key-value pair from a server, and use the returned proof to verify that the returned key-value pair is actually in the key-value store with (or isn't, as it were.)
 
 ```mermaid
 flowchart TD
@@ -142,6 +142,70 @@ flowchart TD
 
 Clients can use range proofs to efficiently download many key-value pairs at a time from a MerkleDB instance, as opposed to getting a proof for each key-value pair individually.
 
+#### Visualisation
+
+```mermaid
+flowchart TD
+    classDef orange fill:orange;
+
+    A(6c0a)
+    B(5cf1)
+    C(8f74)
+    D(ec20)
+    E(781a)
+    F(3b95)
+    G(0d16)
+    H(4706)
+    I(248d)
+    J(778a)
+    K(fb04)
+    L(bd9f)
+    M(19c3)
+    N(373a)
+    O(4cb0)
+
+    leaf1(0x01)
+    leaf2(0x02)
+    leaf3(0x03)
+    leaf4(0x04)
+    leaf5(0x05)
+    leaf6(0x06)
+    leaf7(0x07)
+    leaf8(0x08)
+
+    A --> B --> D & E
+    A --> C --> F & G
+
+    D --> H & I
+    E --> J & K
+
+    F --> L & M
+    G --> N & O
+
+
+    H --> leaf1
+    I --> leaf2
+    J --> leaf3
+    K --> leaf4
+    L --> leaf5
+    M --> leaf6
+    N --> leaf7
+    O --> leaf8
+
+
+    subgraph proof [KeyValues]
+        leaf1:::orange
+        leaf2
+        leaf3
+        leaf4
+        leaf5:::orange
+    end
+
+
+    leaf1 --> StartProof@{shape: circle}
+    leaf5 --> EndProof@{shape: circle}
+```
+
 #### Verification
 
 Like simple proofs, range proofs can be verified without any additional context or knowledge of the contents of the key-value store.
@@ -212,6 +276,71 @@ flowchart TD
 
 Change proofs are useful for applying changes between revisions. For example, suppose a client has a MerkleDB instance at revision `r`. The client learns that the state has been updated and that the new root is `r'`. The client can request a change proof from a server at revision `r'`, and apply the changes in the change proof to change its state from `r` to `r'`. Note that `r` and `r'` need not be "consecutive" revisions. For example, it's possible that the state goes from revision `r` to `r1` to `r2` to `r'`. The client apply changes to get directly from `r` to `r'`, without ever needing to be at revision `r1` or `r2`.
 
+#### Visualisation
+
+Changed hashes highlighted in green.
+```mermaid
+flowchart TD
+    classDef green fill:lightgreen;
+    classDef orange fill:orange;
+
+    A(fda6):::green
+    B(fcc2):::green
+    C(4773):::green
+    D(7f49):::green
+    E(781a)
+    F(25a3):::green
+    G(0d16)
+    H(ab10):::green
+    I(e209):::green
+    J(778a)
+    K(fb04)
+    L(b7a9):::green
+    M(19c3)
+    N(373a)
+    O(4cb0)
+
+    leaf1(0x0A):::orange
+    leaf2(0x0B):::orange
+    leaf3(0x03)
+    leaf4(0x04)
+    leaf5(0x0C):::orange
+    leaf6(0x06)
+    leaf7(0x07)
+    leaf8(0x08)
+
+    A --> B --> D & E
+    A --> C --> F & G
+
+    D --> H & I
+    E --> J & K
+
+    F --> L & M
+    G --> N & O
+
+
+    H --> leaf1
+    I --> leaf2
+    J --> leaf3
+    K --> leaf4
+    L --> leaf5
+    M --> leaf6
+    N --> leaf7
+    O --> leaf8
+
+
+    subgraph proof [ ]
+        leaf1
+        leaf2
+        leaf3
+        leaf4
+        leaf5
+    end
+
+    leaf1 --> StartProof@{shape: circle}
+    leaf1 & leaf2 & leaf5 --> KeyChanges@{shape: circle}
+    leaf5 --> EndProof@{shape: circle}
+```
 #### Verification
 
 Unlike simple proofs and range proofs, change proofs require additional context to verify. Namely, the prover must have the trie at the start root `r`.
