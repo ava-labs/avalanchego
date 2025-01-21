@@ -28,7 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
@@ -260,7 +260,7 @@ func TestGetTx(t *testing.T) {
 			func(t testing.TB, s *Service) *txs.Tx {
 				wallet := newWallet(t, s.vm, walletConfig{})
 
-				sk, err := bls.NewSigner()
+				sk, err := localsigner.NewSigner()
 				require.NoError(t, err)
 
 				rewardsOwner := &secp256k1fx.OutputOwners{
@@ -796,7 +796,7 @@ func TestGetValidatorsAt(t *testing.T) {
 		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 	}
 
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.NewSigner()
 	require.NoError(err)
 
 	tx, err := wallet.IssueAddPermissionlessValidatorTx(
@@ -1019,7 +1019,7 @@ func TestGetValidatorsAtReplyMarshalling(t *testing.T) {
 	}
 	{
 		nodeID := ids.GenerateTestNodeID()
-		sk, err := bls.NewSigner()
+		sk, err := localsigner.NewSigner()
 		require.NoError(err)
 		reply.Validators[nodeID] = &validators.GetValidatorOutput{
 			NodeID:    nodeID,
