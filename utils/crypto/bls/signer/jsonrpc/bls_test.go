@@ -10,9 +10,21 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls/blstest"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 )
+
+func AggregateAndVerify(publicKeys []*bls.PublicKey, signatures []*bls.Signature, message []byte) (bool, error) {
+	aggSig, err := bls.AggregateSignatures(signatures)
+	if err != nil {
+		return false, err
+	}
+	aggPK, err := bls.AggregatePublicKeys(publicKeys)
+	if err != nil {
+		return false, err
+	}
+
+	return bls.Verify(aggPK, aggSig, message), nil
+}
 
 func NewLocalPair(require *require.Assertions) (*localsigner.LocalSigner, *bls.PublicKey) {
 	sk, err := localsigner.NewSigner()
@@ -111,7 +123,7 @@ func TestValidAggregation(t *testing.T) {
 		signer3.Sign(msg),
 	}
 
-	isValid, err := blstest.AggregateAndVerify(pks, sigs, msg)
+	isValid, err := AggregateAndVerify(pks, sigs, msg)
 	require.NoError(err)
 	require.True(isValid)
 }
@@ -127,7 +139,7 @@ func TestSingleKeyAggregation(t *testing.T) {
 
 	sig := signer.Sign(msg)
 
-	isValid, err := blstest.AggregateAndVerify(pks, []*bls.Signature{sig}, msg)
+	isValid, err := AggregateAndVerify(pks, []*bls.Signature{sig}, msg)
 	require.NoError(err)
 	require.True(isValid)
 }
@@ -150,7 +162,7 @@ func TestIncorrectMessageAggregation(t *testing.T) {
 		sk3.Sign(msg),
 	}
 
-	isValid, err := blstest.AggregateAndVerify(pks, signatures, []byte("a different message"))
+	isValid, err := AggregateAndVerify(pks, signatures, []byte("a different message"))
 	require.NoError(err)
 	require.False(isValid)
 }
@@ -174,7 +186,7 @@ func TestOneDifferentMessageAggregation(t *testing.T) {
 		sk3.Sign(differentMsg),
 	}
 
-	isValid, err := blstest.AggregateAndVerify(pks, signatures, msg)
+	isValid, err := AggregateAndVerify(pks, signatures, msg)
 	require.NoError(err)
 	require.False(isValid)
 }
@@ -198,7 +210,7 @@ func TestOneIncorrectPubKeyAggregation(t *testing.T) {
 		sk3.Sign(msg),
 	}
 
-	isValid, err := blstest.AggregateAndVerify(pks, signatures, msg)
+	isValid, err := AggregateAndVerify(pks, signatures, msg)
 	require.NoError(err)
 	require.False(isValid)
 }
@@ -219,7 +231,7 @@ func TestMorePubkeysThanSignaturesAggregation(t *testing.T) {
 		sk2.Sign(msg),
 	}
 
-	isValid, err := blstest.AggregateAndVerify(pks, signatures, msg)
+	isValid, err := AggregateAndVerify(pks, signatures, msg)
 	require.NoError(err)
 	require.False(isValid)
 }
@@ -241,7 +253,7 @@ func TestMoreSignaturesThanPubkeysAggregation(t *testing.T) {
 		sk3.Sign(msg),
 	}
 
-	isValid, err := blstest.AggregateAndVerify(pks, signatures, msg)
+	isValid, err := AggregateAndVerify(pks, signatures, msg)
 	require.NoError(err)
 	require.False(isValid)
 }
@@ -261,7 +273,7 @@ func TestNoPubkeysAggregation(t *testing.T) {
 		sk3.Sign(msg),
 	}
 
-	isValid, err := blstest.AggregateAndVerify(nil, signatures, msg)
+	isValid, err := AggregateAndVerify(nil, signatures, msg)
 	require.ErrorIs(err, bls.ErrNoPublicKeys)
 	require.False(isValid)
 }
@@ -277,7 +289,7 @@ func TestNoSignaturesAggregation(t *testing.T) {
 
 	msg := []byte("TestNoSignaturesAggregation json-rpc")
 
-	isValid, err := blstest.AggregateAndVerify(pks, nil, msg)
+	isValid, err := AggregateAndVerify(pks, nil, msg)
 	require.ErrorIs(err, bls.ErrNoSignatures)
 	require.False(isValid)
 }
