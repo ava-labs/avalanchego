@@ -94,8 +94,7 @@ func (vg *voteGraph) topologicalSortTraversal(f func(*voteVertex)) {
 		childCount[v.id] = len(v.descendants)
 	})
 
-	leaves := make([]*voteVertex, len(vg.leaves))
-	copy(leaves, vg.leaves)
+	leaves := vg.leaves
 
 	// Iterate from leaves to roots and recursively apply f() over each vertex
 	for len(leaves) > 0 {
