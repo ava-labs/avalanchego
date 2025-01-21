@@ -227,14 +227,18 @@ func (p *earlyTermPoll) Finished() bool {
 	// that can benefit from waiting for more invocations of Vote().
 	// We therefore check each amount of votes separately and see if voting for that snowflake instance
 	// should terminate, as it cannot be improved by further voting.
-	weCantImproveVoteForSomeIDOrPrefix := make(booleans, len(voteCountsForIDsOrPrefixes))
-	for i, completedVotes := range voteCountsForIDsOrPrefixes {
-		shouldTerminate := p.shouldTerminateDueToConfidence(completedVotes, remaining)
-		weCantImproveVoteForSomeIDOrPrefix[i] = shouldTerminate
+
+	// If we have no votes, we may be able to improve the poll on some ID.
+	weCantImproveVoteForSomeIDOrPrefix := len(voteCountsForIDsOrPrefixes) > 0
+
+	// Consider the votes for each ID or prefix of IDs,
+	// if we shouldn't terminate in one of them, then we should not terminate this poll now.
+	for _, completedVotes := range voteCountsForIDsOrPrefixes {
+		weCantImproveVoteForSomeIDOrPrefix = weCantImproveVoteForSomeIDOrPrefix && p.shouldTerminateDueToConfidence(completedVotes, remaining)
 	}
 
-	// We should terminate the poll only when voting for all snowflake instances should terminate.
-	if weCantImproveVoteForSomeIDOrPrefix.allTrue() && len(weCantImproveVoteForSomeIDOrPrefix) > 0 {
+	// We should terminate the poll only when votes for all IDs or prefixes cannot be improved.
+	if weCantImproveVoteForSomeIDOrPrefix {
 		p.finished = true
 	}
 
@@ -332,17 +336,4 @@ func sumVotesFromIDs(ids []ids.ID, transitiveVotes bag.Bag[ids.ID]) int {
 		count += transitiveVotes.Count(id)
 	}
 	return count
-}
-
-// booleans represents zero or more booleans
-type booleans []bool
-
-// allTrue returns whether all booleans are true
-func (bs booleans) allTrue() bool {
-	for _, b := range bs {
-		if !b {
-			return false
-		}
-	}
-	return true
 }
