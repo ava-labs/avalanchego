@@ -14,7 +14,7 @@ set -euo pipefail
 #     $ kill -9 `cat ~/.tmpnet/promtheus/run.pid` && rm ~/.tmpnet/promtail/run.pid
 
 # e.g.,
-# PROMETHEUS_ID=<id> PROMETHEUS_PASSWORD=<password> ./scripts/run_prometheus.sh
+# PROMETHEUS_USERNAME=<username> PROMETHEUS_PASSWORD=<password> ./scripts/run_prometheus.sh
 if ! [[ "$0" =~ scripts/run_prometheus.sh ]]; then
   echo "must be run from repository root"
   exit 255
@@ -36,9 +36,9 @@ if [[ -z "${PROMETHEUS_URL}" ]]; then
   exit 1
 fi
 
-PROMETHEUS_ID="${PROMETHEUS_ID:-}"
-if [[ -z "${PROMETHEUS_ID}" ]]; then
-  echo "Please provide a value for PROMETHEUS_ID"
+PROMETHEUS_USERNAME="${PROMETHEUS_USERNAME:-}"
+if [[ -z "${PROMETHEUS_USERNAME}" ]]; then
+  echo "Please provide a value for PROMETHEUS_USERNAME"
   exit 1
 fi
 
@@ -108,7 +108,7 @@ scrape_configs:
 remote_write:
   - url: "${PROMETHEUS_URL}/api/v1/write"
     basic_auth:
-      username: "${PROMETHEUS_ID}"
+      username: "${PROMETHEUS_USERNAME}"
       password: "${PROMETHEUS_PASSWORD}"
 EOL
 echo "Wrote configuration to ${CONFIG_PATH}"

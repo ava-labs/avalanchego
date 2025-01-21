@@ -23,13 +23,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/components/keystore"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
@@ -37,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/types"
@@ -113,49 +112,6 @@ func (s *Service) GetProposedHeight(r *http.Request, _ *struct{}, reply *api.Get
 	proposerHeight, err := s.vm.GetMinimumHeight(ctx)
 	reply.Height = avajson.Uint64(proposerHeight)
 	return err
-}
-
-// ExportKeyArgs are arguments for ExportKey
-type ExportKeyArgs struct {
-	api.UserPass
-	Address string `json:"address"`
-}
-
-// ExportKeyReply is the response for ExportKey
-type ExportKeyReply struct {
-	// The decrypted PrivateKey for the Address provided in the arguments
-	PrivateKey *secp256k1.PrivateKey `json:"privateKey"`
-}
-
-// ExportKey returns a private key from the provided user
-func (s *Service) ExportKey(_ *http.Request, args *ExportKeyArgs, reply *ExportKeyReply) error {
-	s.vm.ctx.Log.Warn("deprecated API called",
-		zap.String("service", "platform"),
-		zap.String("method", "exportKey"),
-		logging.UserString("username", args.Username),
-	)
-
-	address, err := avax.ParseServiceAddress(s.addrManager, args.Address)
-	if err != nil {
-		return fmt.Errorf("couldn't parse %s to address: %w", args.Address, err)
-	}
-
-	s.vm.ctx.Lock.Lock()
-	defer s.vm.ctx.Lock.Unlock()
-
-	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, args.Username, args.Password)
-	if err != nil {
-		return err
-	}
-
-	reply.PrivateKey, err = user.GetKey(address)
-	if err != nil {
-		// Drop any potential error closing the user to report the original
-		// error
-		_ = user.Close()
-		return fmt.Errorf("problem retrieving private key: %w", err)
-	}
-	return user.Close()
 }
 
 type GetBalanceRequest struct {
@@ -296,37 +252,6 @@ func newJSONBalanceMap(balanceMap map[ids.ID]uint64) map[ids.ID]avajson.Uint64 {
 		jsonBalanceMap[assetID] = avajson.Uint64(amount)
 	}
 	return jsonBalanceMap
-}
-
-// ListAddresses returns the addresses controlled by [args.Username]
-func (s *Service) ListAddresses(_ *http.Request, args *api.UserPass, response *api.JSONAddresses) error {
-	s.vm.ctx.Log.Warn("deprecated API called",
-		zap.String("service", "platform"),
-		zap.String("method", "listAddresses"),
-		logging.UserString("username", args.Username),
-	)
-
-	s.vm.ctx.Lock.Lock()
-	defer s.vm.ctx.Lock.Unlock()
-
-	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, args.Username, args.Password)
-	if err != nil {
-		return err
-	}
-	defer user.Close()
-
-	addresses, err := user.GetAddresses()
-	if err != nil {
-		return fmt.Errorf("couldn't get addresses: %w", err)
-	}
-	response.Addresses = make([]string, len(addresses))
-	for i, addr := range addresses {
-		response.Addresses[i], err = s.addrManager.FormatLocalAddress(addr)
-		if err != nil {
-			return fmt.Errorf("problem formatting address: %w", err)
-		}
-	}
-	return user.Close()
 }
 
 // Index is an address and an associated UTXO.
@@ -1972,12 +1897,6 @@ func (s *Service) GetFeeConfig(_ *http.Request, _ *struct{}, reply *gas.Config) 
 		zap.String("method", "getFeeConfig"),
 	)
 
-	// TODO: Remove after Etna is activated.
-	now := time.Now()
-	if !s.vm.Internal.UpgradeConfig.IsEtnaActivated(now) {
-		return nil
-	}
-
 	*reply = s.vm.DynamicFeeConfig
 	return nil
 }
@@ -2003,6 +1922,43 @@ func (s *Service) GetFeeState(_ *http.Request, _ *struct{}, reply *GetFeeStateRe
 		s.vm.DynamicFeeConfig.MinPrice,
 		reply.State.Excess,
 		s.vm.DynamicFeeConfig.ExcessConversionConstant,
+	)
+	reply.Time = s.vm.state.GetTimestamp()
+	return nil
+}
+
+// GetValidatorFeeConfig returns the validator fee config of the chain.
+func (s *Service) GetValidatorFeeConfig(_ *http.Request, _ *struct{}, reply *fee.Config) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "platform"),
+		zap.String("method", "getValidatorFeeConfig"),
+	)
+
+	*reply = s.vm.ValidatorFeeConfig
+	return nil
+}
+
+type GetValidatorFeeStateReply struct {
+	Excess gas.Gas   `json:"excess"`
+	Price  gas.Price `json:"price"`
+	Time   time.Time `json:"timestamp"`
+}
+
+// GetValidatorFeeState returns the current validator fee state of the chain.
+func (s *Service) GetValidatorFeeState(_ *http.Request, _ *struct{}, reply *GetValidatorFeeStateReply) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "platform"),
+		zap.String("method", "getValidatorFeeState"),
+	)
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
+	reply.Excess = s.vm.state.GetL1ValidatorExcess()
+	reply.Price = gas.CalculatePrice(
+		s.vm.ValidatorFeeConfig.MinPrice,
+		reply.Excess,
+		s.vm.ValidatorFeeConfig.ExcessConversionConstant,
 	)
 	reply.Time = s.vm.state.GetTimestamp()
 	return nil

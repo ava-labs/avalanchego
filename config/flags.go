@@ -235,7 +235,6 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	// Enable/Disable APIs
 	fs.Bool(AdminAPIEnabledKey, false, "If true, this node exposes the Admin API")
 	fs.Bool(InfoAPIEnabledKey, true, "If true, this node exposes the Info API")
-	fs.Bool(KeystoreAPIEnabledKey, false, "If true, this node exposes the Keystore API")
 	fs.Bool(MetricsAPIEnabledKey, true, "If true, this node exposes the Metrics API")
 	fs.Bool(HealthAPIEnabledKey, true, "If true, this node exposes the Health API")
 

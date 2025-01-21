@@ -17,7 +17,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/health"
-	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -205,7 +204,6 @@ type ManagerConfig struct {
 	NetworkID                 uint32                     // ID of the network this node is connected to
 	PartialSyncPrimaryNetwork bool
 	Server                    server.Server // Handles HTTP API calls
-	Keystore                  keystore.Keystore
 	AtomicMemory              *atomic.Memory
 	AVAXAssetID               ids.ID
 	XChainID                  ids.ID          // ID of the X-Chain,
@@ -505,7 +503,6 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			AVAXAssetID: m.AVAXAssetID,
 
 			Log:          chainLog,
-			Keystore:     m.Keystore.NewBlockchainKeyStore(chainParams.ID),
 			SharedMemory: m.AtomicMemory.NewSharedMemory(chainParams.ID),
 			BCLookup:     m,
 			Metrics:      metrics.NewPrefixGatherer(),

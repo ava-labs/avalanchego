@@ -58,6 +58,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/wallet"
 
@@ -105,6 +106,12 @@ var (
 		MinPrice:                 1,
 		ExcessConversionConstant: 5_000,
 	}
+	defaultValidatorFeeConfig = fee.Config{
+		Capacity:                 100,
+		Target:                   50,
+		MinPrice:                 1,
+		ExcessConversionConstant: 100,
+	}
 
 	// subnet that exists at genesis in defaultVM
 	testSubnet1 *txs.Tx
@@ -126,6 +133,7 @@ func defaultVM(t *testing.T, f upgradetest.Fork) (*VM, database.Database, *mutab
 		SybilProtectionEnabled: true,
 		Validators:             validators.NewManager(),
 		DynamicFeeConfig:       defaultDynamicFeeConfig,
+		ValidatorFeeConfig:     defaultValidatorFeeConfig,
 		MinValidatorStake:      defaultMinValidatorStake,
 		MaxValidatorStake:      defaultMaxValidatorStake,
 		MinDelegatorStake:      defaultMinDelegatorStake,
