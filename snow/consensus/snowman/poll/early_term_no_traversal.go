@@ -24,7 +24,6 @@ var (
 	exhaustedReason      = "exhausted"
 	earlyFailReason      = "early_fail"
 	earlyAlphaPrefReason = "early_alpha_pref"
-	earlyAlphaConfReason = "early_alpha_conf"
 
 	exhaustedLabel = prometheus.Labels{
 		terminationReason: exhaustedReason,
@@ -35,21 +34,16 @@ var (
 	earlyAlphaPrefLabel = prometheus.Labels{
 		terminationReason: earlyAlphaPrefReason,
 	}
-	earlyAlphaConfLabel = prometheus.Labels{
-		terminationReason: earlyAlphaConfReason,
-	}
 )
 
 type earlyTermMetrics struct {
-	durExhaustedPolls      prometheus.Gauge
-	durEarlyFailPolls      prometheus.Gauge
-	durEarlyAlphaPrefPolls prometheus.Gauge
-	durEarlyAlphaConfPolls prometheus.Gauge
+	durExhaustedPolls            prometheus.Gauge
+	durEarlyFailPolls            prometheus.Gauge
+	durEarlyAlphaPrefOrConfPolls prometheus.Gauge
 
-	countExhaustedPolls      prometheus.Counter
-	countEarlyFailPolls      prometheus.Counter
-	countEarlyAlphaPrefPolls prometheus.Counter
-	countEarlyAlphaConfPolls prometheus.Counter
+	countExhaustedPolls            prometheus.Counter
+	countEarlyFailPolls            prometheus.Counter
+	countEarlyAlphaPrefOrConfPolls prometheus.Counter
 }
 
 func newEarlyTermMetrics(reg prometheus.Registerer) (*earlyTermMetrics, error) {
@@ -69,14 +63,12 @@ func newEarlyTermMetrics(reg prometheus.Registerer) (*earlyTermMetrics, error) {
 	}
 
 	return &earlyTermMetrics{
-		durExhaustedPolls:        durPollsVec.With(exhaustedLabel),
-		durEarlyFailPolls:        durPollsVec.With(earlyFailLabel),
-		durEarlyAlphaPrefPolls:   durPollsVec.With(earlyAlphaPrefLabel),
-		durEarlyAlphaConfPolls:   durPollsVec.With(earlyAlphaConfLabel),
-		countExhaustedPolls:      pollCountVec.With(exhaustedLabel),
-		countEarlyFailPolls:      pollCountVec.With(earlyFailLabel),
-		countEarlyAlphaPrefPolls: pollCountVec.With(earlyAlphaPrefLabel),
-		countEarlyAlphaConfPolls: pollCountVec.With(earlyAlphaConfLabel),
+		durExhaustedPolls:              durPollsVec.With(exhaustedLabel),
+		durEarlyFailPolls:              durPollsVec.With(earlyFailLabel),
+		durEarlyAlphaPrefOrConfPolls:   durPollsVec.With(earlyAlphaPrefLabel),
+		countExhaustedPolls:            pollCountVec.With(exhaustedLabel),
+		countEarlyFailPolls:            pollCountVec.With(earlyFailLabel),
+		countEarlyAlphaPrefOrConfPolls: pollCountVec.With(earlyAlphaPrefLabel),
 	}, nil
 }
 
@@ -90,14 +82,9 @@ func (m *earlyTermMetrics) observeEarlyFail(duration time.Duration) {
 	m.countEarlyFailPolls.Inc()
 }
 
-func (m *earlyTermMetrics) observeEarlyAlphaPref(duration time.Duration) {
-	m.durEarlyAlphaPrefPolls.Add(float64(duration.Nanoseconds()))
-	m.countEarlyAlphaPrefPolls.Inc()
-}
-
-func (m *earlyTermMetrics) observeEarlyAlphaConf(duration time.Duration) {
-	m.durEarlyAlphaConfPolls.Add(float64(duration.Nanoseconds()))
-	m.countEarlyAlphaConfPolls.Inc()
+func (m *earlyTermMetrics) observeEarlyAlphaPrefOrConf(duration time.Duration) {
+	m.durEarlyAlphaPrefOrConfPolls.Add(float64(duration.Nanoseconds()))
+	m.countEarlyAlphaPrefOrConfPolls.Inc()
 }
 
 type earlyTermTraversalFactory struct {
@@ -255,12 +242,12 @@ func (p *earlyTermPoll) shouldTerminateDueToConfidence(freq int, remaining int) 
 	}
 
 	if freq >= p.alphaPreference && maxPossibleVotes < p.alphaConfidence {
-		p.metrics.observeEarlyAlphaPref(time.Since(p.start))
+		p.metrics.observeEarlyAlphaPrefOrConf(time.Since(p.start))
 		return true // Case 3
 	}
 
 	if freq >= p.alphaConfidence {
-		p.metrics.observeEarlyAlphaConf(time.Since(p.start))
+		p.metrics.observeEarlyAlphaPrefOrConf(time.Since(p.start))
 		return true // Case 4
 	}
 	return false
