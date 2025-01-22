@@ -154,7 +154,7 @@ func TestEarlyTermNoTraversalTerminatesEarlyWithAlphaConfidence(t *testing.T) {
 //
 // If the final vote is cast for any of A, B, C, or D, then A will have
 // transitively received alpha = 4 votes
-func TestEarlyTermNoTraversalForSharedAncestor(t *testing.T) {
+func TestEarlyTermForSharedAncestor(t *testing.T) {
 	require := require.New(t)
 
 	vdrs := bag.Of(vdr1, vdr2, vdr3, vdr4) // k = 4
@@ -311,11 +311,11 @@ func TestEarlyTermTraversalNotAllBlocksAreVotedOn(t *testing.T) {
 	require.True(poll.Finished())
 }
 
-func TestEarlyTermYesTraversal(t *testing.T) {
+func TestPollNoPrematureFinish(t *testing.T) {
 	require := require.New(t)
 
 	vdrs := bag.Of(vdr1, vdr2, vdr3, vdr4, vdr5) // k = 5
-	alphaPreference := 2
+	alphaPreference := 3
 	alphaConfidence := 3
 
 	//          blkID1
@@ -342,17 +342,17 @@ func TestEarlyTermYesTraversal(t *testing.T) {
 	require.False(poll.Finished())
 }
 
-func TestEarlyTermYesTraversalII(t *testing.T) {
+func TestEarlyTermTraversal(t *testing.T) {
 	require := require.New(t)
 
 	vdrs := bag.Of(vdr1, vdr2, vdr3, vdr4, vdr5) // k = 5
-	alphaPreference := 2
+	alphaPreference := 3
 	alphaConfidence := 3
 
 	blkID0 := ids.ID{0x00, 0x00}
-	blkID1 := ids.ID{0xf0, 0xff}
+	blkID1 := ids.ID{0x0f, 0x00}
 	blkID2 := ids.ID{0xff, 0xf0}
-	blkID3 := ids.ID{0x0f, 0xff}
+	blkID3 := ids.ID{0x0f, 0x0f}
 
 	//          blkID0
 	//    blkID1  blkID2  blkID3
@@ -366,25 +366,25 @@ func TestEarlyTermYesTraversalII(t *testing.T) {
 	require.NoError(err)
 	poll := factory.New(vdrs)
 
-	poll.Vote(vdr1, blkID2)
+	poll.Vote(vdr1, blkID1)
 	require.False(poll.Finished())
 
-	poll.Vote(vdr2, blkID3)
+	poll.Vote(vdr2, blkID2)
 	require.False(poll.Finished())
 
 	poll.Vote(vdr3, blkID3)
 	require.False(poll.Finished())
 
-	poll.Vote(vdr4, blkID3)
-	require.False(poll.Finished())
-
 	//
 	//        blkID0                       blk0: {0x00, 0x00}
-	//     0/       \4                     blk1: {0xf0, 0xff}
-	// blkID1      {0x?f}                  blk2: {0xff, 0xf0}
-	//            1/     \3                blk3: {0x0f, 0xff}
-	//           blkID2  blkID3
+	//              \3                     blk1: {0x0f, 0x00}
+	//              {0x?f}                 blk2: {0xff, 0xf0}
+	//              1/    \2               blk3: {0x0f, 0xff}
+	//            blkID2  {0x0f}
+	//                    1/  \1
+	//                 blkID1  blkID3
 
-	poll.Vote(vdr5, blkID2)
+	poll.Vote(vdr4, blkID0)
+
 	require.True(poll.Finished())
 }
