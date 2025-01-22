@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package signer;
+
+option go_package = "github.com/ava-labs/avalanchego/proto/pb/signer";
+
+message PublicKeyRequest {}
+message PublicKeyResponse {}
+message SignatureRequest {}
+message SignatureResponse {}
