@@ -3,9 +3,7 @@
 
 package poll
 
-import (
-	"github.com/ava-labs/avalanchego/ids"
-)
+import "github.com/ava-labs/avalanchego/ids"
 
 // prefixGroup represents a bunch of IDs (stored in the members field),
 // with a bit prefix.

@@ -4,7 +4,6 @@
 package poll
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"time"
@@ -279,9 +278,8 @@ func aggregateVotesFromPrefixesAndIDs(transitiveVotesForPrefixes []int, transiti
 		voteCountsForIDsOrPrefixes = append(voteCountsForIDsOrPrefixes, votesForID)
 	}
 
-	for _, voteCount := range transitiveVotesForPrefixes {
-		voteCountsForIDsOrPrefixes = append(voteCountsForIDsOrPrefixes, voteCount)
-	}
+	voteCountsForIDsOrPrefixes = append(voteCountsForIDsOrPrefixes, transitiveVotesForPrefixes...)
+
 	return voteCountsForIDsOrPrefixes
 }
 
@@ -307,15 +305,6 @@ func descendantIDsOfVertex(v *voteVertex) []ids.ID {
 		descendanstIDs[i] = child.id
 	}
 	return descendanstIDs
-}
-
-func concatIDs(ids []ids.ID) string {
-	var bb bytes.Buffer
-	for _, id := range ids {
-		bb.WriteString(id.String())
-		bb.WriteString(" ")
-	}
-	return bb.String()
 }
 
 func sumVotesFromIDs(ids []ids.ID, transitiveVotes bag.Bag[ids.ID]) int {
