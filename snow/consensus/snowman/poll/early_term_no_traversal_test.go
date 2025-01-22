@@ -220,10 +220,7 @@ type ancestryGraph map[ids.ID]ids.ID
 
 func (ag ancestryGraph) GetParent(id ids.ID) (ids.ID, bool) {
 	parent, ok := ag[id]
-	if !ok {
-		return ids.Empty, false
-	}
-	return parent, true
+	return parent, ok
 }
 
 func TestTransitiveVotesForPrefixes(t *testing.T) {
