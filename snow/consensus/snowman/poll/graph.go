@@ -47,12 +47,14 @@ func buildVoteGraph(getParent func(ids.ID) (ids.ID, bool), votes bag.Bag[ids.ID]
 	}
 
 	// Add the ancestors of the IDs to the graph, for those that are not already there.
-	for _, id := range idList {
-		addAncestorsToGraph(getParent, id, id2Vertex)
-	}
+	addAncestorsToGraph(getParent, idList, id2Vertex)
 
 	for id, v := range id2Vertex {
-		parent, _ := getParent(id)
+		parent, ok := getParent(id)
+		if !ok {
+			roots = append(roots, v)
+			continue
+		}
 
 		u, ok := id2Vertex[parent]
 		if ok {
@@ -68,8 +70,22 @@ func buildVoteGraph(getParent func(ids.ID) (ids.ID, bool), votes bag.Bag[ids.ID]
 	return voteGraph{leaves: leaves, roots: roots, vertexCount: len(id2Vertex)}
 }
 
-func addAncestorsToGraph(getParent func(ids.ID) (ids.ID, bool), id ids.ID, id2Vertex map[ids.ID]*voteVertex) {
-	addedAncestors := make(map[ids.ID]*voteVertex, len(id2Vertex))
+func addAncestorsToGraph(getParent func(ids.ID) (ids.ID, bool), idList []ids.ID, id2Vertex map[ids.ID]*voteVertex) {
+	var discoveredAncestors bag.Bag[ids.ID]
+
+	for _, id := range idList {
+		ancestors := discoverAncestorsOfID(getParent, id, id2Vertex)
+		discoveredAncestors.Add(ancestors.List()...)
+	}
+
+	for _, id := range discoveredAncestors.List() {
+		id2Vertex[id] = &voteVertex{id: id}
+	}
+}
+
+// discoverAncestorsOfID finds new ancestors of the given ID
+func discoverAncestorsOfID(getParent func(ids.ID) (ids.ID, bool), id ids.ID, id2Vertex map[ids.ID]*voteVertex) bag.Bag[ids.ID] {
+	var addedAncestors bag.Bag[ids.ID]
 
 	for {
 		parent, ok := getParent(id)
@@ -86,17 +102,13 @@ func addAncestorsToGraph(getParent func(ids.ID) (ids.ID, bool), id ids.ID, id2Ve
 		}
 
 		// If the parent is not finalized we can vote on it, so add it.
-		v := &voteVertex{id: parent}
-		addedAncestors[parent] = v
+		addedAncestors.Add(parent)
 
 		// Visit transitively the parent's ancestors.
 		id = parent
 	}
 
-	// Lastly, merge all the ancestors we found into id2Vertex.
-	for id, vv := range addedAncestors {
-		id2Vertex[id] = vv
-	}
+	return addedAncestors
 }
 
 // traverse traverses over all vertices in the voteGraph in pre-order traversal.

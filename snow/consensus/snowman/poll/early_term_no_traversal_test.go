@@ -383,5 +383,5 @@ func TestEarlyTermTraversal(t *testing.T) {
 
 	poll.Vote(vdr4, blkID0)
 
-	require.True(poll.Finished())
+	require.False(poll.Finished())
 }
