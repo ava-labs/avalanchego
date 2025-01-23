@@ -1,11 +1,62 @@
 # Release Notes
 
-## Pending Release
+## [v1.12.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.2)
+
+This version is backwards compatible to [v1.12.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0). It is optional, but encouraged.
+
+The plugin version is unchanged at `38` and is compatible with versions `v1.12.0-v1.12.1`.
+
+**This release removes the support for the long deprecated Keystore API. Any users still relying on the keystore API will not be able to update to this version, or any later versions, of Avalanchego until their dependency on the keystore API has been removed.**
 
 ### APIs
 
-- Added `validationID` to `platform.getL1Validator` outputs
-- Added L1 validators support to `platform.getCurrentValidators`
+- Deprecated:
+  - `info.GetTxFee`
+  - `keystore.createUser`
+  - `keystore.deleteUser`
+  - `keystore.listUsers`
+  - `keystore.importUser`
+  - `keystore.exportUser`
+  - `avm.createAddress`
+  - `avm.createFixedCapAsset`
+  - `avm.createNFTAsset`
+  - `avm.createVariableCapAsset`
+  - `avm.export`
+  - `avm.exportKey`
+  - `avm.import`
+  - `avm.importKey`
+  - `avm.listAddresses`
+  - `avm.mint`
+  - `avm.mintNFT`
+  - `avm.send`
+  - `avm.sendMultiple`
+  - `avm.sendNFT`
+  - `wallet.send`
+  - `wallet.sendMultiple`
+  - `platform.exportKey`
+  - `platform.listAddresses`
+- Added:
+  - `avm.GetTxFee`
+  - `platform.getValidatorFeeConfig`
+  - `platform.getValidatorFeeState`
+  - `validationID` to `platform.getL1Validator` results
+  - L1 validators to `platform.getCurrentValidators`
+
+### Configs
+
+- Removed static fee config flags
+  - `--create-subnet-tx-fee`
+  - `--transform-subnet-tx-fee`
+  - `--create-blockchain-tx-fee`
+  - `--add-primary-network-validator-fee`
+  - `--add-primary-network-delegator-fee`
+  - `--add-subnet-validator-fee`
+  - `--add-subnet-delegator-fee`
+- Removed `--api-keystore-enabled`
+  
+### What's Changed
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.12.1...v1.12.2
 
 ## [v1.12.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.1)
 

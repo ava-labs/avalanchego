@@ -384,6 +384,10 @@ curl -X POST --data '{
 
 ### `info.getTxFee`
 
+<Callout type="warn">
+Deprecated as of [v1.12.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.2).
+</Callout>
+
 Get the fees of the network.
 
 **Signature**:
@@ -403,15 +407,15 @@ info.getTxFee() ->
 }
 ```
 
-- `txFee` is the default fee for making transactions.
-- `createAssetTxFee` is the fee for creating a new asset.
-- `createSubnetTxFee` is the fee for creating a new Avalanche L1.
-- `transformSubnetTxFee` is the fee for converting a PoA Avalanche L1 into a PoS Avalanche L1.
-- `createBlockchainTxFee` is the fee for creating a new blockchain.
-- `addPrimaryNetworkValidatorFee` is the fee for adding a new primary network validator.
-- `addPrimaryNetworkDelegatorFee` is the fee for adding a new primary network delegator.
-- `addSubnetValidatorFee` is the fee for adding a new Avalanche L1 validator.
-- `addSubnetDelegatorFee` is the fee for adding a new Avalanche L1 delegator.
+- `txFee` is the default fee for issuing X-Chain transactions.
+- `createAssetTxFee` is the fee for issuing a `CreateAssetTx` on the X-Chain.
+- `createSubnetTxFee` is no longer used.
+- `transformSubnetTxFee` is no longer used.
+- `createBlockchainTxFee` is no longer used.
+- `addPrimaryNetworkValidatorFee` is no longer used.
+- `addPrimaryNetworkDelegatorFee` is no longer used.
+- `addSubnetValidatorFee` is no longer used.
+- `addSubnetDelegatorFee` is no longer used.
 
 All fees are denominated in nAVAX.
 
