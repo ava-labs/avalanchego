@@ -426,9 +426,9 @@ func (mr *MockStateMockRecorder) GetCurrentValidator(subnetID, nodeID any) *gomo
 }
 
 // GetCurrentValidators mocks base method.
-func (m *MockState) GetCurrentValidators(subnetID ids.ID) ([]*Staker, []L1Validator, uint64, error) {
+func (m *MockState) GetCurrentValidators(ctx context.Context, subnetID ids.ID) ([]*Staker, []L1Validator, uint64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetCurrentValidators", subnetID)
+	ret := m.ctrl.Call(m, "GetCurrentValidators", ctx, subnetID)
 	ret0, _ := ret[0].([]*Staker)
 	ret1, _ := ret[1].([]L1Validator)
 	ret2, _ := ret[2].(uint64)
@@ -437,9 +437,9 @@ func (m *MockState) GetCurrentValidators(subnetID ids.ID) ([]*Staker, []L1Valida
 }
 
 // GetCurrentValidators indicates an expected call of GetCurrentValidators.
-func (mr *MockStateMockRecorder) GetCurrentValidators(subnetID any) *gomock.Call {
+func (mr *MockStateMockRecorder) GetCurrentValidators(ctx, subnetID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentValidators", reflect.TypeOf((*MockState)(nil).GetCurrentValidators), subnetID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentValidators", reflect.TypeOf((*MockState)(nil).GetCurrentValidators), ctx, subnetID)
 }
 
 // GetDelegateeReward mocks base method.

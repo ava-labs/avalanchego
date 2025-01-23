@@ -103,7 +103,7 @@ type State interface {
 		subnetID ids.ID,
 	) error
 
-	GetCurrentValidators(subnetID ids.ID) ([]*state.Staker, []state.L1Validator, uint64, error)
+	GetCurrentValidators(ctx context.Context, subnetID ids.ID) ([]*state.Staker, []state.L1Validator, uint64, error)
 }
 
 func NewManager(
@@ -416,7 +416,7 @@ func (m *manager) OnAcceptedBlockID(blkID ids.ID) {
 
 func (m *manager) GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
 	result := make(map[ids.ID]*validators.GetCurrentValidatorOutput)
-	baseStakers, l1Validators, height, err := m.state.GetCurrentValidators(subnetID)
+	baseStakers, l1Validators, height, err := m.state.GetCurrentValidators(ctx, subnetID)
 	if err != nil {
 		return nil, 0, err
 	}
