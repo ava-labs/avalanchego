@@ -12,63 +12,6 @@ This API uses the `json 2.0` RPC format.
 
 ## Methods
 
-### `platform.exportKey`
-
-<Callout title="Caution" type="warn">
-
-Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
-
-</Callout>
-
-<Callout title="Warning" type="warn">
-
-Not recommended for use on Mainnet. See warning notice in [Keystore API](/api-reference/keystore-api).
-
-</Callout>
-
-Get the private key that controls a given address.
-
-**Signature:**
-
-```
-platform.exportKey({
-    username: string,
-    password: string,
-    address: string
-}) -> {privateKey: string}
-```
-
-- `username` is the user that controls `address`.
-- `password` is `username`‘s password.
-- `privateKey` is the string representation of the private key that controls `address`.
-
-**Example Call:**
-
-```sh
-curl -X POST --data '{
-    "jsonrpc":"2.0",
-    "id"     :1,
-    "method" :"platform.exportKey",
-    "params" :{
-        "username" :"myUsername",
-        "password": "myPassword",
-        "address": "P-avax18jma8ppw3nhx5r4ap8clazz0dps7rv5ukulre5"
-    }
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
-```
-
-**Example Response:**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": {
-    "privateKey": "PrivateKey-Lf49kAJw3CbaL783vmbeAJvhscJqC7vi5yBYLxw2XfbzNS5RS"
-  }
-}
-```
-
 ### `platform.getBalance`
 
 <Callout title="Caution" type="warn">
@@ -770,7 +713,7 @@ curl -X POST --data '{
 
 ### `platform.getFeeConfig`
 
-Returns the dynamic fees configuration of the P-chain.
+Returns the dynamic fee configuration of the P-chain.
 
 **Signature:**
 
@@ -807,16 +750,16 @@ curl -X POST --data '{
 
 ```json
 {
-    "jsonrpc": "2.0",
-    "result": {
-        "weights": [1,1000,1000,4],
-        "maxCapacity": 1000000,
-        "maxPerSecond": 100000,
-        "targetPerSecond": 50000,
-        "minPrice": 1,
-        "excessConversionConstant": 2164043
-    },
-    "id": 1
+  "jsonrpc": "2.0",
+  "result": {
+    "weights": [1, 1000, 1000, 4],
+    "maxCapacity": 1000000,
+    "maxPerSecond": 100000,
+    "targetPerSecond": 50000,
+    "minPrice": 1,
+    "excessConversionConstant": 2164043
+  },
+  "id": 1
 }
 ```
 
@@ -850,14 +793,50 @@ curl -X POST --data '{
 
 ```json
 {
+  "jsonrpc": "2.0",
+  "result": {
+    "capacity": 973044,
+    "excess": 26956,
+    "price": 1,
+    "timestamp": "2024-12-16T17:19:07Z"
+  },
+  "id": 1
+}
+```
+
+### `platform.getHeight`
+
+Returns the height of the last accepted block.
+
+**Signature:**
+
+```
+platform.getHeight() ->
+{
+  height: int,
+}
+```
+
+**Example Call:**
+
+```sh
+curl -X POST --data '{
     "jsonrpc": "2.0",
-    "result": {
-		    "capacity":973044,
-		    "excess":26956,
-		    "price":1,
-		    "timestamp":"2024-12-16T17:19:07Z"
-    },
+    "method": "platform.getHeight",
+    "params": {},
     "id": 1
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
+```
+
+**Example Response:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "height": "56"
+  },
+  "id": 1
 }
 ```
 
@@ -920,62 +899,26 @@ curl -X POST --data '{
 
 ```json
 {
-    "jsonrpc": "2.0",
-    "result": {
-        "subnetID": "2DeHa7Qb6sufPkmQcFWG2uCd4pBPv9WB6dkzroiMQhd1NSRtof",
-        "nodeID": "NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg",
-        "publicKey": "0x900c9b119b5c82d781d4b49be78c3fc7ae65f2b435b7ed9e3a8b9a03e475edff86d8a64827fec8db23a6f236afbf127d",
-        "remainingBalanceOwner": {
-            "locktime": "0",
-            "threshold": "0",
-            "addresses": []
-        },
-        "deactivationOwner": {
-            "locktime": "0",
-            "threshold": "0",
-            "addresses": []
-        },
-        "startTime": "1731445206",
-        "weight": "49463",
-        "minNonce": "0",
-        "balance": "1000000000",
-        "height": "3"
-    },
-    "id": 1
-}
-```
-
-### `platform.getHeight`
-
-Returns the height of the last accepted block.
-
-**Signature:**
-
-```
-platform.getHeight() ->
-{
-  height: int,
-}
-```
-
-**Example Call:**
-
-```sh
-curl -X POST --data '{
-    "jsonrpc": "2.0",
-    "method": "platform.getHeight",
-    "params": {},
-    "id": 1
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
-```
-
-**Example Response:**
-
-```json
-{
   "jsonrpc": "2.0",
   "result": {
-    "height": "56"
+    "subnetID": "2DeHa7Qb6sufPkmQcFWG2uCd4pBPv9WB6dkzroiMQhd1NSRtof",
+    "nodeID": "NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg",
+    "publicKey": "0x900c9b119b5c82d781d4b49be78c3fc7ae65f2b435b7ed9e3a8b9a03e475edff86d8a64827fec8db23a6f236afbf127d",
+    "remainingBalanceOwner": {
+      "locktime": "0",
+      "threshold": "0",
+      "addresses": []
+    },
+    "deactivationOwner": {
+      "locktime": "0",
+      "threshold": "0",
+      "addresses": []
+    },
+    "startTime": "1731445206",
+    "weight": "49463",
+    "minNonce": "0",
+    "balance": "1000000000",
+    "height": "3"
   },
   "id": 1
 }
@@ -1449,7 +1392,10 @@ curl -X POST --data '{
   "jsonrpc": "2.0",
   "result": {
     "isPermissioned": true,
-    "controlKeys": ["P-fuji1ztvstx6naeg6aarfd047fzppdt8v4gsah88e0c","P-fuji193kvt4grqewv6ce2x59wnhydr88xwdgfcedyr3"],
+    "controlKeys": [
+      "P-fuji1ztvstx6naeg6aarfd047fzppdt8v4gsah88e0c",
+      "P-fuji193kvt4grqewv6ce2x59wnhydr88xwdgfcedyr3"
+    ],
     "threshold": "1",
     "locktime": "0",
     "subnetTransformationTxID": "11111111111111111111111111111111LpoYY",
@@ -1975,7 +1921,7 @@ platform.getValidatorsAt(
 ```
 
 - `height` is the P-Chain height to get the validator set at, or the string literal "proposed"
-  to return the validator set at this node's ProposerVM height. 
+  to return the validator set at this node's ProposerVM height.
 - `subnetID` is the Subnet ID to get the validator set of. If not given, gets validator set of the
   Primary Network.
 
@@ -2005,6 +1951,92 @@ curl -X POST --data '{
       "NodeID-NFBbbJ4qCmNaCzeW7sxErhvWqvEQMnYcN": 2000000000000000,
       "NodeID-P7oB2McjBGgW2NXXWVYjV8JEDFoW9xDE5": 2000000000000000
     }
+  },
+  "id": 1
+}
+```
+
+### `platform.getValidatorFeeConfig`
+
+Returns the validator fee configuration of the P-Chain.
+
+**Signature:**
+
+```
+platform.getValidatorFeeConfig() -> {
+  capacity: uint64,
+  target: uint64,
+  minPrice: uint64,
+  excessConversionConstant: uint64
+}
+```
+
+- `capacity` is the maximum number of L1 validators the chain is allowed to have at any given time
+- `target` is the target number of L1 validators the chain should have to keep fees stable
+- `minPrice` is the minimum price per L1 validator
+- `excessConversionConstant` is used to convert excess L1 validators to a gas price
+
+**Example Call:**
+
+```sh
+curl -X POST --data '{
+    "jsonrpc": "2.0",
+    "method": "platform.getValidatorFeeConfig",
+    "params": {},
+    "id": 1
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
+```
+
+**Example Response:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "capacity": 20000,
+    "target": 10000,
+    "targetPerSecond": 50000,
+    "minPrice": 512,
+    "excessConversionConstant": 1246488515
+  },
+  "id": 1
+}
+```
+
+### `platform.getValidatorFeeState`
+
+Returns the current validator fee state of the P-Chain.
+
+**Signature:**
+
+```
+platform.getValidatorFeeState() -> {
+  excess: uint64,
+  price: uint64,
+  timestamp: string
+}
+```
+
+**Example Call:**
+
+```sh
+curl -X POST --data '{
+    "jsonrpc": "2.0",
+    "method": "platform.getValidatorFeeState",
+    "params": {},
+    "id": 1
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
+```
+
+**Example Response:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "excess": 26956,
+    "price": 512,
+    "timestamp": "2024-12-16T17:19:07Z"
   },
   "id": 1
 }
@@ -2049,57 +2081,6 @@ curl -X POST --data '{
   "jsonrpc": "2.0",
   "result": {
     "txID": "G3BuH6ytQ2averrLxJJugjWZHTRubzCrUZEXoheG5JMqL5ccY"
-  },
-  "id": 1
-}
-```
-
-### `platform.listAddresses`
-
-<Callout title="Caution" type="warn">
-
-Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
-
-</Callout>
-
-<Callout title="Warning" type="warn">
-
-Not recommended for use on Mainnet. See warning notice in [Keystore API](/api-reference/keystore-api).
-
-</Callout>
-
-List addresses controlled by the given user.
-
-**Signature:**
-
-```
-platform.listAddresses({
-    username: string,
-    password: string
-}) -> { addresses: []string }
-```
-
-**Example Call:**
-
-```sh
-curl -X POST --data '{
-    "jsonrpc": "2.0",
-    "method": "platform.listAddresses",
-    "params": {
-        "username":"myUsername",
-        "password":"myPassword"
-    },
-    "id": 1
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
-```
-
-**Example Response:**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "result": {
-    "addresses": ["P-avax18jma8ppw3nhx5r4ap8clazz0dps7rv5ukulre5"]
   },
   "id": 1
 }

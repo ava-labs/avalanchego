@@ -263,10 +263,10 @@ shared.
 
 ```bash
 # Start prometheus to collect metrics
-PROMETHEUS_ID=<id> PROMETHEUS_PASSWORD=<password> ./scripts/run_prometheus.sh
+PROMETHEUS_USERNAME=<username> PROMETHEUS_PASSWORD=<password> ./scripts/run_prometheus.sh
 
 # Start promtail to collect logs
-LOKI_ID=<id> LOKI_PASSWORD=<password> ./scripts/run_promtail.sh
+LOKI_USERNAME=<username> LOKI_PASSWORD=<password> ./scripts/run_promtail.sh
 
 # Network start emits link to grafana displaying collected logs and metrics
 ./build/tmpnetctl start-network
@@ -286,7 +286,7 @@ from the node is written to
 The `scripts/run_prometheus.sh` script starts prometheus in agent mode
 configured to scrape metrics from configured nodes and forward the
 metrics to a persistent prometheus instance. The script requires that
-the `PROMETHEUS_ID` and `PROMETHEUS_PASSWORD` env vars be set. By
+the `PROMETHEUS_USERNAME` and `PROMETHEUS_PASSWORD` env vars be set. By
 default the prometheus instance at
 https://prometheus-poc.avax-dev.network will be targeted and
 this can be overridden via the `PROMETHEUS_URL` env var.
@@ -304,7 +304,7 @@ uuid]-[node id].json`.
 
 The `scripts/run_promtail.sh` script starts promtail configured to
 collect logs from configured nodes and forward the results to loki. The
-script requires that the `LOKI_ID` and `LOKI_PASSWORD` env vars be
+script requires that the `LOKI_USERNAME` and `LOKI_PASSWORD` env vars be
 set. By default the loki instance at
 https://loki-poc.avax-dev.network will be targeted and this
 can be overridden via the `LOKI_URL` env var.
