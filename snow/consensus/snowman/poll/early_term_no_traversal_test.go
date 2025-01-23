@@ -339,23 +339,25 @@ func TestPollNoPrematureFinish(t *testing.T) {
 	require.False(poll.Finished())
 }
 
-func TestEarlyTermTraversal(t *testing.T) {
+func TestEarlyTermTraversalForest(t *testing.T) {
 	require := require.New(t)
 
 	vdrs := bag.Of(vdr1, vdr2, vdr3, vdr4, vdr5) // k = 5
-	alphaPreference := 3
-	alphaConfidence := 3
+	alphaPreference := 4
+	alphaConfidence := 4
 
 	blkID0 := ids.ID{0x00, 0x00}
 	blkID1 := ids.ID{0x0f, 0x00}
 	blkID2 := ids.ID{0xff, 0xf0}
 	blkID3 := ids.ID{0x0f, 0x0f}
+	blkID4 := ids.ID{0x00, 0x0f}
 
-	//          blkID0
-	//    blkID1  blkID2  blkID3
+	//        blkID0     blkID2
+	//        /  |         |
+	//  blkID1  blkID4   blkID3
 	g := ancestryGraph{
-		blkID3: blkID0,
-		blkID2: blkID0,
+		blkID4: blkID0,
+		blkID3: blkID2,
 		blkID1: blkID0,
 	}
 
@@ -372,16 +374,57 @@ func TestEarlyTermTraversal(t *testing.T) {
 	poll.Vote(vdr3, blkID3)
 	require.False(poll.Finished())
 
-	//
-	//        blkID0                       blk0: {0x00, 0x00}
-	//              \3                     blk1: {0x0f, 0x00}
-	//              {0x?f}                 blk2: {0xff, 0xf0}
-	//              1/    \2               blk3: {0x0f, 0xff}
-	//            blkID2  {0x0f}
-	//                    1/  \1
-	//                 blkID1  blkID3
+	poll.Drop(vdr4)
 
-	poll.Vote(vdr4, blkID0)
+	require.True(poll.Finished())
+}
 
+func TestEarlyTermTraversalTransitiveTree(t *testing.T) {
+	require := require.New(t)
+
+	vdrs := bag.Of(vdr1, vdr2, vdr3, vdr4, vdr5) // k = 5
+	alphaPreference := 4
+	alphaConfidence := 4
+
+	blkID0 := ids.ID{0x00, 0x00}
+	blkID1 := ids.ID{0x0f, 0x00}
+	blkID2 := ids.ID{0xff, 0xf0}
+	blkID3 := ids.ID{0x0f, 0x0f}
+	blkID4 := ids.ID{0x00, 0x0f}
+	blkID5 := ids.ID{0x00, 0xff}
+	blkID6 := ids.ID{0xff, 0xff}
+
+	//      blk0
+	//    /     \
+	//  blk1    blk2
+	//   |       |
+	//  blk3    blk4
+	//   |       |
+	//  blk5    blk6
+
+	g := ancestryGraph{
+		blkID5: blkID3,
+		blkID3: blkID1,
+		blkID1: blkID0,
+
+		blkID6: blkID4,
+		blkID4: blkID2,
+		blkID2: blkID0,
+	}
+
+	factory, err := NewEarlyTermFactory(alphaPreference, alphaConfidence, prometheus.NewRegistry(), g)
+	require.NoError(err)
+	poll := factory.New(vdrs)
+
+	poll.Vote(vdr1, blkID5)
 	require.False(poll.Finished())
+
+	poll.Vote(vdr2, blkID6)
+	require.False(poll.Finished())
+
+	poll.Vote(vdr3, blkID5)
+	require.False(poll.Finished())
+
+	poll.Vote(vdr4, blkID6)
+	require.True(poll.Finished())
 }
