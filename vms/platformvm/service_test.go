@@ -1559,7 +1559,7 @@ func TestGetCurrentValidatorsForL1(t *testing.T) {
 				SubnetID: subnetID,
 			}
 			reply := GetCurrentValidatorsReply{}
-			require.NoError(service.GetCurrentValidators(nil, &args, &reply))
+			require.NoError(service.GetCurrentValidators(&http.Request{}, &args, &reply))
 			require.Len(reply.Validators, len(stakersByTxID)+len(l1ValidatorsByVID))
 			for _, vdr := range reply.Validators {
 				testValidator(vdr)
@@ -1577,7 +1577,7 @@ func TestGetCurrentValidatorsForL1(t *testing.T) {
 
 			args.NodeIDs = nodeIDs
 			reply = GetCurrentValidatorsReply{}
-			require.NoError(service.GetCurrentValidators(nil, &args, &reply))
+			require.NoError(service.GetCurrentValidators(&http.Request{}, &args, &reply))
 			require.Len(reply.Validators, len(nodeIDs))
 			for i, vdr := range reply.Validators {
 				nodeID := testValidator(vdr)
