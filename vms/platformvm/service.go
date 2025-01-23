@@ -704,13 +704,11 @@ func (s *Service) loadStakerTxAttributes(txID ids.ID) (*stakerAttributes, error)
 // GetCurrentValidators returns the current validators. If a single nodeID
 // is provided, full delegators information is also returned. Otherwise only
 // delegators' number and total weight is returned.
-func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidatorsArgs, reply *GetCurrentValidatorsReply) error {
+func (s *Service) GetCurrentValidators(r *http.Request, args *GetCurrentValidatorsArgs, reply *GetCurrentValidatorsReply) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
 		zap.String("method", "getCurrentValidators"),
 	)
-
-	reply.Validators = []interface{}{}
 
 	// Create set of nodeIDs
 	nodeIDs := set.Of(args.NodeIDs...)
@@ -718,59 +716,51 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 	s.vm.ctx.Lock.Lock()
 	defer s.vm.ctx.Lock.Unlock()
 
-	// if the subnetID is the primary network, return the primary validators
-	if args.SubnetID == constants.PrimaryNetworkID {
-		primaryValidators, err := s.getPrimaryOrSubnetValidators(constants.PrimaryNetworkID, nodeIDs)
-		if err != nil {
-			return err
-		}
-
-		reply.Validators = primaryValidators
-		return nil
-	}
-
 	// Check if subnet is L1
 	_, err := s.vm.state.GetSubnetToL1Conversion(args.SubnetID)
 	if err == database.ErrNotFound {
 		// Subnet is not L1, get validators for the subnet
-		subnetValidators, err := s.getPrimaryOrSubnetValidators(args.SubnetID, nodeIDs)
-		if err != nil {
-			return err
-		}
-		reply.Validators = subnetValidators
-		return nil
+		reply.Validators, err = s.getPrimaryOrSubnetValidators(
+			args.SubnetID,
+			nodeIDs,
+		)
+		return err
 	}
 	if err != nil {
 		return err
 	}
+
 	// Subnet is L1, get validators for L1
-	l1Validators, err := s.getL1Validators(args.SubnetID, nodeIDs)
-	if err != nil {
-		return err
-	}
-	reply.Validators = l1Validators
-	return nil
+	reply.Validators, err = s.getL1Validators(
+		r.Context(),
+		args.SubnetID,
+		nodeIDs,
+	)
+	return err
 }
 
-func (s *Service) getL1Validators(subnetID ids.ID, nodeIDs set.Set[ids.NodeID]) ([]interface{}, error) {
+func (s *Service) getL1Validators(
+	ctx context.Context,
+	subnetID ids.ID,
+	nodeIDs set.Set[ids.NodeID],
+) ([]interface{}, error) {
 	validators := []interface{}{}
-	baseStakers, l1Validators, _, err := s.vm.state.GetCurrentValidators(subnetID)
+	baseStakers, l1Validators, _, err := s.vm.state.GetCurrentValidators(ctx, subnetID)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, staker := range baseStakers {
-		nodeID := staker.NodeID
-		if nodeIDs.Len() != 0 && !nodeIDs.Contains(nodeID) {
+		if nodeIDs.Len() != 0 && !nodeIDs.Contains(staker.NodeID) {
 			continue
 		}
+
 		apiStaker := toPlatformStaker(staker)
 		validators = append(validators, apiStaker)
 	}
 
 	for _, l1Validator := range l1Validators {
-		nodeID := l1Validator.NodeID
-		if nodeIDs.Len() != 0 && !nodeIDs.Contains(nodeID) {
+		if nodeIDs.Len() != 0 && !nodeIDs.Contains(l1Validator.NodeID) {
 			continue
 		}
 
@@ -992,8 +982,8 @@ type APIL1Validator struct {
 }
 
 type GetL1ValidatorReply struct {
+	APIL1Validator
 	SubnetID ids.ID `json:"subnetID"`
-	*APIL1Validator
 	// Height is the height of the last accepted block
 	Height avajson.Uint64 `json:"height"`
 }
@@ -1024,10 +1014,9 @@ func (s *Service) GetL1Validator(r *http.Request, args *GetL1ValidatorArgs, repl
 		return fmt.Errorf("failed converting L1 validator to API: %w", err)
 	}
 
+	reply.APIL1Validator = apiVdr
 	reply.SubnetID = l1Validator.SubnetID
-	reply.APIL1Validator = &apiVdr
 	reply.Height = avajson.Uint64(height)
-
 	return nil
 }
 
@@ -1056,23 +1045,22 @@ func (s *Service) convertL1ValidatorToAPI(vdr state.L1Validator) (APIL1Validator
 		return APIL1Validator{}, fmt.Errorf("failed formatting deactivation owner: %w", err)
 	}
 
-	var apiVdr APIL1Validator
-
-	apiVdr.ValidationID = vdr.ValidationID
-	apiVdr.NodeID = vdr.NodeID
-	apiVdr.PublicKey = bls.PublicKeyToCompressedBytes(
-		bls.PublicKeyFromValidUncompressedBytes(vdr.PublicKey),
-	)
-	apiVdr.RemainingBalanceOwner = *remainingBalanceAPIOwner
-	apiVdr.DeactivationOwner = *deactivationAPIOwner
-	apiVdr.StartTime = avajson.Uint64(vdr.StartTime)
-	apiVdr.Weight = avajson.Uint64(vdr.Weight)
-	apiVdr.MinNonce = avajson.Uint64(vdr.MinNonce)
+	apiVdr := APIL1Validator{
+		ValidationID: vdr.ValidationID,
+		NodeID:       vdr.NodeID,
+		PublicKey: bls.PublicKeyToCompressedBytes(
+			bls.PublicKeyFromValidUncompressedBytes(vdr.PublicKey),
+		),
+		RemainingBalanceOwner: *remainingBalanceAPIOwner,
+		DeactivationOwner:     *deactivationAPIOwner,
+		StartTime:             avajson.Uint64(vdr.StartTime),
+		Weight:                avajson.Uint64(vdr.Weight),
+		MinNonce:              avajson.Uint64(vdr.MinNonce),
+	}
 	if vdr.EndAccumulatedFee != 0 {
 		accruedFees := s.vm.state.GetAccruedFees()
 		apiVdr.Balance = avajson.Uint64(vdr.EndAccumulatedFee - accruedFees)
 	}
-
 	return apiVdr, nil
 }
 

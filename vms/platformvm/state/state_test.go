@@ -2315,7 +2315,7 @@ func TestGetCurrentValidators(t *testing.T) {
 			require.NoError(state.Commit())
 
 			for _, subnetID := range subnetIDs {
-				baseStakers, currentValidators, height, err := state.GetCurrentValidators(subnetID)
+				baseStakers, currentValidators, height, err := state.GetCurrentValidators(context.Background(), subnetID)
 				require.NoError(err)
 				require.Equal(uint64(0), height)
 				require.Len(baseStakers, stakersLenBySubnetID[subnetID])

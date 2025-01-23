@@ -214,10 +214,13 @@ type State interface {
 
 	SetHeight(height uint64)
 
-	// GetCurrentValidators returns subnet and L1 validators for the given subnetID along with current P-chain height.
-	// This method works for both subnets and L1s. Depending of the requested subnet/L1 validator schema, the return values can include
-	// return only subnet validator, only L1 validators or both if there are initial stakers in the L1 conversion.
-	GetCurrentValidators(subnetID ids.ID) ([]*Staker, []L1Validator, uint64, error)
+	// GetCurrentValidators returns subnet and L1 validators for the given
+	// subnetID along with current P-chain height.
+	// This method works for both subnets and L1s. Depending of the requested
+	// subnet/L1 validator schema, the return values can include only subnet
+	// validator, only L1 validators or both if there are initial stakers in the
+	// L1 conversion.
+	GetCurrentValidators(ctx context.Context, subnetID ids.ID) ([]*Staker, []L1Validator, uint64, error)
 
 	// Discard uncommitted changes to the database.
 	Abort()
@@ -837,13 +840,16 @@ func (s *state) DeleteExpiry(entry ExpiryEntry) {
 	s.expiryDiff.DeleteExpiry(entry)
 }
 
-func (s *state) GetCurrentValidators(subnetID ids.ID) ([]*Staker, []L1Validator, uint64, error) {
+func (s *state) GetCurrentValidators(ctx context.Context, subnetID ids.ID) ([]*Staker, []L1Validator, uint64, error) {
 	// First add the current validators (non-L1)
-	var legacyStakers []*Staker
-	if legacyBaseStakers, ok := s.currentStakers.validators[subnetID]; ok {
-		for _, staker := range legacyBaseStakers {
-			legacyStakers = append(legacyStakers, staker.validator)
+	legacyBaseStakers := s.currentStakers.validators[subnetID]
+	legacyStakers := make([]*Staker, 0, len(legacyBaseStakers))
+	for _, staker := range legacyBaseStakers {
+		if err := ctx.Err(); err != nil {
+			return nil, nil, 0, err
 		}
+
+		legacyStakers = append(legacyStakers, staker.validator)
 	}
 
 	// Then iterate over subnetIDNodeID DB and add the L1 validators
@@ -852,11 +858,17 @@ func (s *state) GetCurrentValidators(subnetID ids.ID) ([]*Staker, []L1Validator,
 		subnetID[:],
 	)
 	defer validationIDIter.Release()
+
 	for validationIDIter.Next() {
+		if err := ctx.Err(); err != nil {
+			return nil, nil, 0, err
+		}
+
 		validationID, err := ids.ToID(validationIDIter.Value())
 		if err != nil {
 			return nil, nil, 0, fmt.Errorf("failed to parse validation ID: %w", err)
 		}
+
 		vdr, err := s.GetL1Validator(validationID)
 		if err != nil {
 			return nil, nil, 0, fmt.Errorf("failed to get validator: %w", err)
