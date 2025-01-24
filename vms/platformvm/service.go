@@ -750,8 +750,10 @@ func (s *Service) getL1Validators(
 		return nil, err
 	}
 
+	fetchAll := nodeIDs.Len() == 0
+
 	for _, staker := range baseStakers {
-		if nodeIDs.Len() != 0 && !nodeIDs.Contains(staker.NodeID) {
+		if !fetchAll && !nodeIDs.Contains(staker.NodeID) {
 			continue
 		}
 
@@ -760,7 +762,7 @@ func (s *Service) getL1Validators(
 	}
 
 	for _, l1Validator := range l1Validators {
-		if nodeIDs.Len() != 0 && !nodeIDs.Contains(l1Validator.NodeID) {
+		if !fetchAll && !nodeIDs.Contains(l1Validator.NodeID) {
 			continue
 		}
 
