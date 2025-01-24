@@ -94,7 +94,6 @@ var (
 	InactivePrefix                = []byte("inactive")
 	SingletonPrefix               = []byte("singleton")
 
-	EtnaHeightKey        = []byte("etna height")
 	TimestampKey         = []byte("timestamp")
 	FeeStateKey          = []byte("fee state")
 	L1ValidatorExcessKey = []byte("l1Validator excess")
@@ -156,9 +155,6 @@ type State interface {
 	Chain
 	uptime.State
 	avax.UTXOReader
-
-	// TODO: Remove after Etna is activated
-	GetEtnaHeight() (uint64, error)
 
 	GetLastAccepted() ids.ID
 	SetLastAccepted(blkID ids.ID)
@@ -319,7 +315,6 @@ type stateBlk struct {
  * '-. singletons
  *   |-- initializedKey -> nil
  *   |-- blocksReindexedKey -> nil
- *   |-- etnaHeightKey -> height
  *   |-- timestampKey -> timestamp
  *   |-- feeStateKey -> feeState
  *   |-- l1ValidatorExcessKey -> l1ValidatorExcess
@@ -1326,10 +1321,6 @@ func (s *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 	return staker.StartTime, nil
 }
 
-func (s *state) GetEtnaHeight() (uint64, error) {
-	return database.GetUInt64(s.singletonDB, EtnaHeightKey)
-}
-
 // GetTimestamp allows for concurrent reads.
 func (s *state) GetTimestamp() time.Time {
 	return s.timestamp
@@ -2127,7 +2118,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 		s.writeTransformedSubnets(),
 		s.writeSubnetSupplies(),
 		s.writeChains(),
-		s.writeMetadata(height),
+		s.writeMetadata(),
 	)
 }
 
@@ -3041,13 +3032,7 @@ func (s *state) writeChains() error {
 	return nil
 }
 
-func (s *state) writeMetadata(height uint64) error {
-	if !s.upgrades.IsEtnaActivated(s.persistedTimestamp) && s.upgrades.IsEtnaActivated(s.timestamp) {
-		if err := database.PutUInt64(s.singletonDB, EtnaHeightKey, height); err != nil {
-			return fmt.Errorf("failed to write etna height: %w", err)
-		}
-	}
-
+func (s *state) writeMetadata() error {
 	if !s.persistedTimestamp.Equal(s.timestamp) {
 		if err := database.PutTimestamp(s.singletonDB, TimestampKey, s.timestamp); err != nil {
 			return fmt.Errorf("failed to write timestamp: %w", err)
