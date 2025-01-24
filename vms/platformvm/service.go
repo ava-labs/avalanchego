@@ -656,7 +656,7 @@ type GetCurrentValidatorsArgs struct {
 // GetCurrentValidatorsReply are the results from calling GetCurrentValidators.
 // Each validator contains a list of delegators to itself.
 type GetCurrentValidatorsReply struct {
-	Validators []interface{} `json:"validators"`
+	Validators []any `json:"validators"`
 }
 
 func (s *Service) loadStakerTxAttributes(txID ids.ID) (*stakerAttributes, error) {
@@ -704,7 +704,7 @@ func (s *Service) loadStakerTxAttributes(txID ids.ID) (*stakerAttributes, error)
 // GetCurrentValidators returns the current validators. If a single nodeID
 // is provided, full delegators information is also returned. Otherwise only
 // delegators' number and total weight is returned.
-func (s *Service) GetCurrentValidators(r *http.Request, args *GetCurrentValidatorsArgs, reply *GetCurrentValidatorsReply) error {
+func (s *Service) GetCurrentValidators(request *http.Request, args *GetCurrentValidatorsArgs, reply *GetCurrentValidatorsReply) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
 		zap.String("method", "getCurrentValidators"),
@@ -718,7 +718,7 @@ func (s *Service) GetCurrentValidators(r *http.Request, args *GetCurrentValidato
 
 	// Check if subnet is L1
 	_, err := s.vm.state.GetSubnetToL1Conversion(args.SubnetID)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		// Subnet is not L1, get validators for the subnet
 		reply.Validators, err = s.getPrimaryOrSubnetValidators(
 			args.SubnetID,
@@ -732,7 +732,7 @@ func (s *Service) GetCurrentValidators(r *http.Request, args *GetCurrentValidato
 
 	// Subnet is L1, get validators for L1
 	reply.Validators, err = s.getL1Validators(
-		r.Context(),
+		request.Context(),
 		args.SubnetID,
 		nodeIDs,
 	)
@@ -743,15 +743,17 @@ func (s *Service) getL1Validators(
 	ctx context.Context,
 	subnetID ids.ID,
 	nodeIDs set.Set[ids.NodeID],
-) ([]interface{}, error) {
-	validators := []interface{}{}
+) ([]any, error) {
+	validators := []any{}
 	baseStakers, l1Validators, _, err := s.vm.state.GetCurrentValidators(ctx, subnetID)
 	if err != nil {
 		return nil, err
 	}
 
+	fetchAll := nodeIDs.Len() == 0
+
 	for _, staker := range baseStakers {
-		if nodeIDs.Len() != 0 && !nodeIDs.Contains(staker.NodeID) {
+		if !fetchAll && !nodeIDs.Contains(staker.NodeID) {
 			continue
 		}
 
@@ -760,7 +762,7 @@ func (s *Service) getL1Validators(
 	}
 
 	for _, l1Validator := range l1Validators {
-		if nodeIDs.Len() != 0 && !nodeIDs.Contains(l1Validator.NodeID) {
+		if !fetchAll && !nodeIDs.Contains(l1Validator.NodeID) {
 			continue
 		}
 
@@ -775,7 +777,7 @@ func (s *Service) getL1Validators(
 	return validators, nil
 }
 
-func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[ids.NodeID]) ([]interface{}, error) {
+func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[ids.NodeID]) ([]any, error) {
 	numNodeIDs := nodeIDs.Len()
 
 	targetStakers := make([]*state.Staker, 0, numNodeIDs)
@@ -783,7 +785,7 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 	// Validator's node ID as string --> Delegators to them
 	vdrToDelegators := map[ids.NodeID][]platformapi.PrimaryDelegator{}
 
-	validators := []interface{}{}
+	validators := []any{}
 
 	if numNodeIDs == 0 { // Include all nodes
 		currentStakerIterator, err := s.vm.state.GetCurrentStakerIterator()
