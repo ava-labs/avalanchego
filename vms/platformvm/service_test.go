@@ -1513,7 +1513,7 @@ func TestGetCurrentValidatorsForL1(t *testing.T) {
 			require.NoError(service.vm.state.Commit())
 			service.vm.ctx.Lock.Unlock()
 
-			testValidator := func(vdr interface{}) ids.NodeID {
+			testValidator := func(vdr any) ids.NodeID {
 				switch v := vdr.(type) {
 				case pchainapi.Staker:
 					staker, exists := stakersByTxID[v.TxID]
