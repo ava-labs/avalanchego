@@ -33,6 +33,7 @@ func SetTimesTo(c *upgrade.Config, fork Fork, upgradeTime time.Time) {
 	switch fork {
 	case FUpgrade:
 		c.FUpgradeTime = upgradeTime
+		fallthrough
 	case Etna:
 		c.EtnaTime = upgradeTime
 		fallthrough
