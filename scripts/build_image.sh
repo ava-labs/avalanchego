@@ -38,8 +38,7 @@ FORCE_TAG_LATEST="${FORCE_TAG_LATEST:-}"
 # Load the constants
 source "$AVALANCHE_PATH"/scripts/constants.sh
 source "$AVALANCHE_PATH"/scripts/git_commit.sh
-
-image_tag="$("${AVALANCHE_PATH}"/scripts/get_image_tag.sh)"
+source "$AVALANCHE_PATH"/scripts/image_tag.sh
 
 if [[ -z "${SKIP_BUILD_RACE}" && $image_tag == *"-r" ]]; then
   echo "Branch name must not end in '-r'"
