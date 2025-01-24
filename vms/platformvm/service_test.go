@@ -1459,7 +1459,7 @@ func TestGetCurrentValidatorsForL1(t *testing.T) {
 					PublicKey: staker.PublicKey,
 					Weight:    5,
 					// start primary network staker 1 second before the subnet staker
-					StartTime: staker.StartTime.Add(-1 * time.Second),
+					StartTime: staker.StartTime.Add(-time.Second),
 					Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
 				}
 				require.NoError(service.vm.state.PutCurrentValidator(primaryStaker))

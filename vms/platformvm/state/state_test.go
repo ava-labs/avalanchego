@@ -2322,11 +2322,11 @@ func TestGetCurrentValidators(t *testing.T) {
 				require.Len(currentValidators, l1ValidatorsLenBySubnetID[subnetID])
 
 				for i, currentStaker := range baseStakers {
-					require.Equal(stakersByTxID[currentStaker.TxID], currentStaker, "index %d", i)
+					require.Equalf(stakersByTxID[currentStaker.TxID], currentStaker, "index %d", i)
 				}
 
 				for i, currentValidator := range currentValidators {
-					require.Equal(l1ValidatorsByVID[currentValidator.ValidationID], currentValidator, "index %d", i)
+					require.Equalf(l1ValidatorsByVID[currentValidator.ValidationID], currentValidator, "index %d", i)
 				}
 			}
 		})

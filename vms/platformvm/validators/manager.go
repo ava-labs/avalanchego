@@ -418,7 +418,7 @@ func (m *manager) GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (
 	result := make(map[ids.ID]*validators.GetCurrentValidatorOutput)
 	baseStakers, l1Validators, height, err := m.state.GetCurrentValidators(ctx, subnetID)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("failed to get current validators: %w", err)
 	}
 
 	for _, validator := range baseStakers {

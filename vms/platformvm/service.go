@@ -724,10 +724,13 @@ func (s *Service) GetCurrentValidators(request *http.Request, args *GetCurrentVa
 			args.SubnetID,
 			nodeIDs,
 		)
-		return err
+		if err != nil {
+			return fmt.Errorf("failed to get primary or subnet validators: %w", err)
+		}
+		return nil
 	}
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get subnet to L1 conversion: %w", err)
 	}
 
 	// Subnet is L1, get validators for L1
@@ -736,7 +739,10 @@ func (s *Service) GetCurrentValidators(request *http.Request, args *GetCurrentVa
 		args.SubnetID,
 		nodeIDs,
 	)
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to get L1 validators: %w", err)
+	}
+	return nil
 }
 
 func (s *Service) getL1Validators(
@@ -747,7 +753,7 @@ func (s *Service) getL1Validators(
 	validators := []any{}
 	baseStakers, l1Validators, _, err := s.vm.state.GetCurrentValidators(ctx, subnetID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get current validators: %w", err)
 	}
 
 	fetchAll := nodeIDs.Len() == 0
@@ -768,7 +774,7 @@ func (s *Service) getL1Validators(
 
 		apiL1Vdr, err := s.convertL1ValidatorToAPI(l1Validator)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("converting L1 validator to API format: %w", err)
 		}
 
 		validators = append(validators, apiL1Vdr)
@@ -1009,11 +1015,11 @@ func (s *Service) GetL1Validator(r *http.Request, args *GetL1ValidatorArgs, repl
 	ctx := r.Context()
 	height, err := s.vm.GetCurrentHeight(ctx)
 	if err != nil {
-		return fmt.Errorf("failed getting current height: %w", err)
+		return fmt.Errorf("failed to get the current height: %w", err)
 	}
 	apiVdr, err := s.convertL1ValidatorToAPI(l1Validator)
 	if err != nil {
-		return fmt.Errorf("failed converting L1 validator to API: %w", err)
+		return fmt.Errorf("failed to convert L1 validator to API format: %w", err)
 	}
 
 	reply.APIL1Validator = apiVdr
