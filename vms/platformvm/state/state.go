@@ -2118,7 +2118,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 		s.writeTransformedSubnets(),
 		s.writeSubnetSupplies(),
 		s.writeChains(),
-		s.writeMetadata(height),
+		s.writeMetadata(),
 	)
 }
 
@@ -3032,7 +3032,7 @@ func (s *state) writeChains() error {
 	return nil
 }
 
-func (s *state) writeMetadata(height uint64) error {
+func (s *state) writeMetadata() error {
 	if !s.persistedTimestamp.Equal(s.timestamp) {
 		if err := database.PutTimestamp(s.singletonDB, TimestampKey, s.timestamp); err != nil {
 			return fmt.Errorf("failed to write timestamp: %w", err)
