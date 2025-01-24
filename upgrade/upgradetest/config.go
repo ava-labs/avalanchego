@@ -31,6 +31,8 @@ func GetConfigWithUpgradeTime(fork Fork, upgradeTime time.Time) upgrade.Config {
 // to the provided upgradeTime.
 func SetTimesTo(c *upgrade.Config, fork Fork, upgradeTime time.Time) {
 	switch fork {
+	case FUpgrade:
+		c.FUpgradeTime = upgradeTime
 	case Etna:
 		c.EtnaTime = upgradeTime
 		fallthrough

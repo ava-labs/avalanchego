@@ -157,9 +157,6 @@ type State interface {
 	uptime.State
 	avax.UTXOReader
 
-	// TODO: Remove after Etna is activated
-	GetEtnaHeight() (uint64, error)
-
 	GetLastAccepted() ids.ID
 	SetLastAccepted(blkID ids.ID)
 
@@ -1324,10 +1321,6 @@ func (s *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 		return time.Time{}, err
 	}
 	return staker.StartTime, nil
-}
-
-func (s *state) GetEtnaHeight() (uint64, error) {
-	return database.GetUInt64(s.singletonDB, EtnaHeightKey)
 }
 
 // GetTimestamp allows for concurrent reads.
