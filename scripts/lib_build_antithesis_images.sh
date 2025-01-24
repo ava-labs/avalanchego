@@ -66,7 +66,7 @@ function build_antithesis_images {
  --build-arg GO_VERSION=${go_version}\
  --build-arg BUILDER_IMAGE_TAG=${image_tag}\
  --build-arg BUILDER_WORKDIR=${builder_workdir}"
-  if [[ -n "${avalanchego_commit:-}" ]]; then
+  if [[ -n "${avalanchego_commit}" ]]; then
     docker_cmd="${docker_cmd} --build-arg AVALANCHEGO_COMMIT=${avalanchego_commit}"
   fi
 
