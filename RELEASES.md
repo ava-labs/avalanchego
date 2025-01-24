@@ -39,8 +39,10 @@ The plugin version is unchanged at `38` and is compatible with versions `v1.12.0
   - `avm.GetTxFee`
   - `platform.getValidatorFeeConfig`
   - `platform.getValidatorFeeState`
-  - `validationID` to `platform.getL1Validator` results
+  - `validationID` field to `platform.getL1Validator` results
   - L1 validators to `platform.getCurrentValidators`
+- Removed:
+  - `StakeAmount` field from `platform.getCurrentValidators` results
 
 ### Configs
 
@@ -53,7 +55,7 @@ The plugin version is unchanged at `38` and is compatible with versions `v1.12.0
   - `--add-subnet-validator-fee`
   - `--add-subnet-delegator-fee`
 - Removed `--api-keystore-enabled`
-  
+
 ### What's Changed
 
 **Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.12.1...v1.12.2

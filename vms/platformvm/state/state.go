@@ -215,7 +215,7 @@ type State interface {
 	SetHeight(height uint64)
 
 	// GetCurrentValidators returns subnet and L1 validators for the given
-	// subnetID along with current P-chain height.
+	// subnetID along with the current P-chain height.
 	// This method works for both subnets and L1s. Depending of the requested
 	// subnet/L1 validator schema, the return values can include only subnet
 	// validator, only L1 validators or both if there are initial stakers in the
@@ -845,10 +845,6 @@ func (s *state) GetCurrentValidators(ctx context.Context, subnetID ids.ID) ([]*S
 	legacyBaseStakers := s.currentStakers.validators[subnetID]
 	legacyStakers := make([]*Staker, 0, len(legacyBaseStakers))
 	for _, staker := range legacyBaseStakers {
-		if err := ctx.Err(); err != nil {
-			return nil, nil, 0, err
-		}
-
 		legacyStakers = append(legacyStakers, staker.validator)
 	}
 

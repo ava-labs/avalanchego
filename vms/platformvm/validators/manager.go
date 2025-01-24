@@ -422,9 +422,6 @@ func (m *manager) GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (
 	}
 
 	for _, validator := range baseStakers {
-		if err := ctx.Err(); err != nil {
-			return nil, 0, err
-		}
 		result[validator.TxID] = &validators.GetCurrentValidatorOutput{
 			ValidationID:  validator.TxID,
 			NodeID:        validator.NodeID,
@@ -438,9 +435,6 @@ func (m *manager) GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (
 	}
 
 	for _, validator := range l1Validators {
-		if err := ctx.Err(); err != nil {
-			return nil, 0, err
-		}
 		result[validator.ValidationID] = &validators.GetCurrentValidatorOutput{
 			ValidationID:  validator.ValidationID,
 			NodeID:        validator.NodeID,
