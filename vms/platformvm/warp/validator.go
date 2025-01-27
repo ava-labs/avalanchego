@@ -154,3 +154,17 @@ func AggregatePublicKeys(vdrs []*Validator) (*bls.PublicKey, error) {
 	}
 	return bls.AggregatePublicKeys(pks)
 }
+
+// GetCanonicalValidatorSetFromState returns the canonical validator set given a validators.State, pChain height and a sourceChainID.
+func GetCanonicalValidatorSetFromState(ctx context.Context,
+	pChainState validators.State,
+	pChainHeight uint64,
+	sourceChainID ids.ID,
+) ([]*Validator, uint64, error) {
+	subnetID, err := pChainState.GetSubnetID(ctx, sourceChainID)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return GetCanonicalValidatorSet(ctx, pChainState, pChainHeight, subnetID)
+}

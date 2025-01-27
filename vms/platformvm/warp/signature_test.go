@@ -831,12 +831,20 @@ func TestSignatureVerification(t *testing.T) {
 			msg := tt.msgF(require)
 			pChainState := tt.stateF(ctrl)
 
-			err := msg.Signature.Verify(
+			canonicalValidatorsSet, totalWieght, err := GetCanonicalValidatorSetFromState(
+				context.Background(),
+				pChainState,
+				pChainHeight,
+				msg.SourceChainID,
+			)
+			require.NoError(err)
+
+			err = msg.Signature.Verify(
 				context.Background(),
 				&msg.UnsignedMessage,
 				tt.networkID,
-				pChainState,
-				pChainHeight,
+				canonicalValidatorsSet,
+				totalWieght,
 				tt.quorumNum,
 				tt.quorumDen,
 			)
