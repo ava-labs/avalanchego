@@ -12,7 +12,7 @@ set -euo pipefail
 # DOCKER_IMAGE=localhost:5001/avalanchego FORCE_TAG_LATEST=1 ./scripts/build_image.sh # Build and push image to private registry with tag `latest`
 
 # Multi-arch builds require Docker Buildx and QEMU. buildx should be enabled by
-# default in the verson of docker included with Ubuntu 22.04, and qemu can be
+# default in the version of docker included with Ubuntu 22.04, and qemu can be
 # installed as follows:
 #
 #  sudo apt-get install qemu qemu-user-static
