@@ -139,17 +139,17 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 
 			state := tt.stateF(ctrl)
 
-			vdrs, weight, err := GetCanonicalValidatorSet(context.Background(), state, pChainHeight, subnetID)
+			validators, err := GetCanonicalValidatorSet(context.Background(), state, pChainHeight, subnetID)
 			require.ErrorIs(err, tt.expectedErr)
 			if err != nil {
 				return
 			}
-			require.Equal(tt.expectedWeight, weight)
+			require.Equal(tt.expectedWeight, validators.TotalWeight)
 
 			// These are pointers so have to test equality like this
-			require.Len(vdrs, len(tt.expectedVdrs))
+			require.Len(validators.Validators, len(tt.expectedVdrs))
 			for i, expectedVdr := range tt.expectedVdrs {
-				gotVdr := vdrs[i]
+				gotVdr := validators.Validators[i]
 				expectedPKBytes := bls.PublicKeyToCompressedBytes(expectedVdr.PublicKey)
 				gotPKBytes := bls.PublicKeyToCompressedBytes(gotVdr.PublicKey)
 				require.Equal(expectedPKBytes, gotPKBytes)
@@ -339,7 +339,7 @@ func BenchmarkGetCanonicalValidatorSet(b *testing.B) {
 
 		b.Run(strconv.Itoa(size), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				_, _, err := GetCanonicalValidatorSet(context.Background(), validatorState, pChainHeight, subnetID)
+				_, err := GetCanonicalValidatorSet(context.Background(), validatorState, pChainHeight, subnetID)
 				require.NoError(b, err)
 			}
 		})
