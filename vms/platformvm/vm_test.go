@@ -1380,7 +1380,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 			MaxOutstandingItems:   1,
 			MaxItemProcessingTime: 1,
 		},
-		Consensus: &smcon.Topological{},
+		Consensus: &smcon.Topological{Factory: snowball.SnowflakeFactory},
 	}
 	engine, err := smeng.New(engineConfig)
 	require.NoError(err)
