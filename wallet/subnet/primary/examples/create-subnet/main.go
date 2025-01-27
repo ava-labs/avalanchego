@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
 func main() {
@@ -44,10 +45,15 @@ func main() {
 		},
 	}
 
-	createSubnetStartTime := time.Now()
-	createSubnetTx, err := wallet.IssueCreateSubnetTx(owner)
-	if err != nil {
-		log.Fatalf("failed to issue create subnet transaction: %s\n", err)
+	for {
+		createSubnetStartTime := time.Now()
+		createSubnetTx, err := wallet.IssueCreateSubnetTx(
+			owner,
+			common.WithPollFrequency(time.Nanosecond),
+		)
+		if err != nil {
+			log.Fatalf("failed to issue create subnet transaction: %s\n", err)
+		}
+		log.Printf("created new subnet %s in %s\n", createSubnetTx.ID(), time.Since(createSubnetStartTime))
 	}
-	log.Printf("created new subnet %s in %s\n", createSubnetTx.ID(), time.Since(createSubnetStartTime))
 }

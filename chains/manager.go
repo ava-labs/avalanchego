@@ -785,8 +785,8 @@ func (m *manager) createAvalancheChain(
 	proposerVM := proposervm.New(
 		vmWrappedInsideProposerVM,
 		proposervm.Config{
-			Upgrades:            m.Upgrades,
-			MinBlkDelay:         minBlockDelay,
+			Upgrades: m.Upgrades,
+			// MinBlkDelay:         minBlockDelay,
 			NumHistoricalBlocks: numHistoricalBlocks,
 			StakingLeafSigner:   m.StakingTLSSigner,
 			StakingCertLeaf:     m.StakingTLSCert,
@@ -1179,8 +1179,8 @@ func (m *manager) createSnowmanChain(
 	proposerVM := proposervm.New(
 		vm,
 		proposervm.Config{
-			Upgrades:            m.Upgrades,
-			MinBlkDelay:         minBlockDelay,
+			Upgrades: m.Upgrades,
+			// MinBlkDelay:         minBlockDelay,
 			NumHistoricalBlocks: numHistoricalBlocks,
 			StakingLeafSigner:   m.StakingTLSSigner,
 			StakingCertLeaf:     m.StakingTLSCert,
