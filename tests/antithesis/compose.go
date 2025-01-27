@@ -22,23 +22,28 @@ import (
 
 const bootstrapIndex = 0
 
+const (
+	targetPathEnvName = "TARGET_PATH"
+	imageTagEnvName   = "IMAGE_TAG"
+)
+
 var (
-	errTargetPathEnvVarNotSet = errors.New("TARGET_PATH environment variable not set")
-	errImageTagEnvVarNotSet   = errors.New("IMAGE_TAG environment variable not set")
-	errAvalancheGoEvVarNotSet = errors.New("AVALANCHEGO_PATH environment variable not set")
-	errPluginDirEnvVarNotSet  = errors.New("AVALANCHEGO_PLUGIN_DIR environment variable not set")
+	errTargetPathEnvVarNotSet = errors.New(targetPathEnvName + " environment variable not set")
+	errImageTagEnvVarNotSet   = errors.New(imageTagEnvName + " environment variable not set")
+	errAvalancheGoEvVarNotSet = errors.New(tmpnet.AvalancheGoPathEnvName + " environment variable not set")
+	errPluginDirEnvVarNotSet  = errors.New(tmpnet.AvalancheGoPluginDirEnvName + " environment variable not set")
 )
 
 // Creates docker compose configuration for an antithesis test setup. Configuration is via env vars to
 // simplify usage by main entrypoints. If the provided network includes a subnet, the initial DB state for
 // the subnet will be created and written to the target path.
 func GenerateComposeConfig(network *tmpnet.Network, baseImageName string) error {
-	targetPath := os.Getenv("TARGET_PATH")
+	targetPath := os.Getenv(targetPathEnvName)
 	if len(targetPath) == 0 {
 		return errTargetPathEnvVarNotSet
 	}
 
-	imageTag := os.Getenv("IMAGE_TAG")
+	imageTag := os.Getenv(imageTagEnvName)
 	if len(imageTag) == 0 {
 		return errImageTagEnvVarNotSet
 	}

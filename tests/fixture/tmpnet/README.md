@@ -46,11 +46,8 @@ A temporary network can be managed by the `tmpnetctl` cli tool:
 ```bash
 # From the root of the avalanchego repo
 
-# Build the tmpnetctl binary
-$ ./scripts/build_tmpnetctl.sh
-
 # Start a new network. Possible to specify the number of nodes (> 1) with --node-count.
-$ ./build/tmpnetctl start-network --avalanchego-path=/path/to/avalanchego
+$ ./bin/tmpnetctl start-network --avalanchego-path=/path/to/avalanchego
 ...
 Started network /home/me/.tmpnet/networks/20240306-152305.924531 (UUID: abaab590-b375-44f6-9ca5-f8a6dc061725)
 
@@ -60,7 +57,7 @@ Configure tmpnetctl to target this network by default with one of the following 
  - export TMPNET_NETWORK_DIR=/home/me/.tmpnet/networks/latest
 
 # Stop the network
-$ ./build/tmpnetctl stop-network --network-dir=/path/to/network
+$ ./bin/tmpnetctl stop-network --network-dir=/path/to/network
 ```
 
 Note the export of the path ending in `latest`. This is a symlink that
@@ -68,6 +65,14 @@ is set to the last network created by `tmpnetctl start-network`. Setting
 the `TMPNET_NETWORK_DIR` env var to this symlink ensures that
 `tmpnetctl` commands target the most recently deployed temporary
 network.
+
+### Simplifying usage with direnv
+
+The repo includes a [.envrc](../../../.envrc) that can be applied by
+[direnv](https://direnv.net/) when in a shell. This will enable
+`tmpnetctl` to be invoked directly (without a `./bin/` prefix ) and
+without having to specify the `--avalanchego-path` or `--plugin-dir`
+flags.
 
 #### Deprecated usage with e2e suite
 
@@ -269,7 +274,7 @@ PROMETHEUS_USERNAME=<username> PROMETHEUS_PASSWORD=<password> ./scripts/run_prom
 LOKI_USERNAME=<username> LOKI_PASSWORD=<password> ./scripts/run_promtail.sh
 
 # Network start emits link to grafana displaying collected logs and metrics
-./build/tmpnetctl start-network
+./bin/tmpnetctl start-network
 
 # Configure metrics collection from a local node binding to the default API
 # port of 9650 and storing its logs in ~/.avalanchego/logs. The script will
