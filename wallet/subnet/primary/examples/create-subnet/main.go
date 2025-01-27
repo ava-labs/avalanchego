@@ -49,7 +49,7 @@ func main() {
 		createSubnetStartTime := time.Now()
 		createSubnetTx, err := wallet.IssueCreateSubnetTx(
 			owner,
-			common.WithPollFrequency(time.Nanosecond),
+			common.WithPollFrequency(time.Millisecond),
 		)
 		if err != nil {
 			log.Fatalf("failed to issue create subnet transaction: %s\n", err)

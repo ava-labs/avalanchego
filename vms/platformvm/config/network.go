@@ -19,7 +19,7 @@ var DefaultNetwork = Network{
 	PushRegossipNumPeers:                        0,
 	PushGossipDiscardedCacheSize:                16384,
 	PushGossipMaxRegossipFrequency:              30 * time.Second,
-	PushGossipFrequency:                         500 * time.Millisecond,
+	PushGossipFrequency:                         5 * time.Millisecond,
 	PullGossipPollSize:                          1,
 	PullGossipFrequency:                         1500 * time.Millisecond,
 	PullGossipThrottlingPeriod:                  10 * time.Second,
