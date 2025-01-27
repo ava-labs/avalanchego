@@ -129,9 +129,23 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 		return err
 	}
 
+	// After the F upgrade is activated, blocks are considered to include state changes
+	// if they deactivate L1 validators that may not have enough balance to pay for the
+	// next second.
+	var lowBalanceL1ValidatorsEvicted bool
+	if v.txExecutorBackend.Config.UpgradeConfig.IsFUpgradeActivated(b.Timestamp()) {
+		lowBalanceL1ValidatorsEvicted, err = deactivateLowBalanceL1Validators(
+			v.txExecutorBackend.Config.ValidatorFeeConfig,
+			onAcceptState,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
 	// If this block doesn't perform any changes, then it should never have been
 	// issued.
-	if !changed && len(b.Transactions) == 0 {
+	if !changed && len(b.Transactions) == 0 && !lowBalanceL1ValidatorsEvicted {
 		return errBanffStandardBlockWithoutChanges
 	}
 
@@ -603,7 +617,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator txfee.Calcula
 	// might not have sufficient fee to pay for the next second.
 	//
 	// This ensures that L1 validators are not undercharged for the next second.
-	err := deactivateLowBalanceL1Validators(
+	_, err := deactivateLowBalanceL1Validators(
 		v.txExecutorBackend.Config.ValidatorFeeConfig,
 		diff,
 	)
@@ -651,7 +665,7 @@ func calculateBlockMetrics(
 func deactivateLowBalanceL1Validators(
 	config validatorfee.Config,
 	diff state.Diff,
-) error {
+) (bool, error) {
 	var (
 		accruedFees       = diff.GetAccruedFees()
 		validatorFeeState = validatorfee.State{
@@ -665,13 +679,13 @@ func deactivateLowBalanceL1Validators(
 	)
 	potentialAccruedFees, err := math.Add(accruedFees, potentialCost)
 	if err != nil {
-		return fmt.Errorf("could not calculate potentially accrued fees: %w", err)
+		return false, fmt.Errorf("could not calculate potentially accrued fees: %w", err)
 	}
 
 	// Invariant: Proposal transactions do not impact L1 validator state.
 	l1ValidatorIterator, err := diff.GetActiveL1ValidatorsIterator()
 	if err != nil {
-		return fmt.Errorf("could not iterate over active L1 validators: %w", err)
+		return false, fmt.Errorf("could not iterate over active L1 validators: %w", err)
 	}
 
 	var l1ValidatorsToDeactivate []state.L1Validator
@@ -693,11 +707,13 @@ func deactivateLowBalanceL1Validators(
 	// diff.
 	l1ValidatorIterator.Release()
 
+	var changed bool
 	for _, l1Validator := range l1ValidatorsToDeactivate {
 		l1Validator.EndAccumulatedFee = 0
 		if err := diff.PutL1Validator(l1Validator); err != nil {
-			return fmt.Errorf("could not deactivate L1 validator %s: %w", l1Validator.ValidationID, err)
+			return false, fmt.Errorf("could not deactivate L1 validator %s: %w", l1Validator.ValidationID, err)
 		}
+		changed = true
 	}
-	return nil
+	return changed, nil
 }
