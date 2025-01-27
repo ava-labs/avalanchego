@@ -1055,7 +1055,6 @@ curl -X POST --data '{
   "id": 1
 }
 ```
-```
 
 ### `platform.getRewardUTXOs`
 
