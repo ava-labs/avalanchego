@@ -734,31 +734,8 @@ curl -X POST --data '{
     "validators": [
       {
         "validationID": "2wTscvX3JUsMbZHFRd9t8Ywz2q9j2BmETg8cTvgUHgawjbSvZX",
-        "nodeID": "NodeID-51M3SLFFMyrWhJUCC9j4YpttkdF6LJsM8",
+        "nodeID": "NodeID-5mb46qkSBj81k9g9e4VFjGGSbaaSLFRzD",
         "publicKey": "0x91951771ff32b1a985a4936592bce8512a986353c4c2eb5a0f12dbb76bda3a0a0c975e26413ff44c0ee9d8d689eff8ed",
-        "remainingBalanceOwner": {
-          "locktime": "0",
-          "threshold": "1",
-          "addresses": [
-            "P-fuji1ywzvrftfqexh5g6qa9zyrytj6pqdfetza2hqln"
-          ]
-        },
-        "deactivationOwner": {
-          "locktime": "0",
-          "threshold": "1",
-          "addresses": [
-            "P-fuji1ywzvrftfqexh5g6qa9zyrytj6pqdfetza2hqln"
-          ]
-        },
-        "startTime": "1734034648",
-        "weight": "20",
-        "minNonce": "0",
-        "balance": "8780477952"
-      },
-      {
-        "validationID": "8NDHtNhmYnV2UdaFS5fcXsG5avRNRAWmR61oBxEVexK91SFp2",
-        "nodeID": "NodeID-M7NsAqk25rpQzDuHv7fBziMxdDy4pqLAm",
-        "publicKey": "0x8ae8690c9807960e7ec074c1b58b5409bd6e9b1018781b6375231bedc38f20ea192ea28b9142fcdc73f27e2f0dfac564",
         "remainingBalanceOwner": {
           "locktime": "0",
           "threshold": "1",
