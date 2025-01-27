@@ -9,26 +9,8 @@ if ! [[ "$0" =~ scripts/tests.e2e.bootstrap_monitor.sh ]]; then
   exit 255
 fi
 
-# Determine DIST and ARCH in case installation is required for kubectl and kind
-#
-# TODO(marun) Factor this out for reuse
-if which sw_vers &> /dev/null; then
-  OS="darwin"
-  ARCH="$(uname -m)"
-else
-  # Assume linux (windows is not supported)
-  OS="linux"
-  RAW_ARCH="$(uname -i)"
-  # Convert the linux arch string to the string used for k8s releases
-  if [[ "${RAW_ARCH}" == "aarch64" ]]; then
-    ARCH="arm64"
-  elif [[ "${RAW_ARCH}" == "x86_64" ]]; then
-    ARCH="amd64"
-  else
-    echo "Unsupported architecture: ${RAW_ARCH}"
-    exit 1
-  fi
-fi
+GOOS="$(go env GOOS)"
+GOARCH="$(go env GOARCH)"
 
 function ensure_command {
   local cmd=$1
@@ -49,11 +31,11 @@ function ensure_command {
 
 # Ensure the kubectl command is available
 KUBECTL_VERSION=v1.30.2
-ensure_command kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/${OS}/${ARCH}/kubectl"
+ensure_command kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/${GOOS}/${GOARCH}/kubectl"
 
 # Ensure the kind command is available
 KIND_VERSION=v0.23.0
-ensure_command kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-${OS}-${ARCH}"
+ensure_command kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-${GOOS}-${GOARCH}"
 
 # Ensure the kind-with-registry command is available
 ensure_command "kind-with-registry.sh" "https://raw.githubusercontent.com/kubernetes-sigs/kind/7cb9e6be25b48a0e248097eef29d496ab1a044d0/site/static/examples/kind-with-registry.sh"
@@ -63,4 +45,4 @@ ensure_command "kind-with-registry.sh" "https://raw.githubusercontent.com/kubern
 # call them without a qualifying path.
 PATH="${PWD}/bin:$PATH" bash -x "${PWD}/bin/kind-with-registry.sh"
 
-KUBECONFIG="$HOME/.kube/config" PATH="${PWD}/bin:$PATH" ./scripts/ginkgo.sh -v ./tests/fixture/bootstrapmonitor/e2e
+KUBECONFIG="$HOME/.kube/config" PATH="${PWD}/bin:$PATH" ./bin/ginkgo -v ./tests/fixture/bootstrapmonitor/e2e

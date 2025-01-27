@@ -39,6 +39,7 @@ function build_antithesis_images {
   local uninstrumented_node_dockerfile=$7
   local target_path=$8
   local node_only=${9:-}
+  local avalanchego_commit=${10:-}
 
   # Define image names
   if [[ -n "${image_prefix}" ]]; then
@@ -65,6 +66,9 @@ function build_antithesis_images {
  --build-arg GO_VERSION=${go_version}\
  --build-arg BUILDER_IMAGE_TAG=${image_tag}\
  --build-arg BUILDER_WORKDIR=${builder_workdir}"
+  if [[ -n "${avalanchego_commit}" ]]; then
+    docker_cmd="${docker_cmd} --build-arg AVALANCHEGO_COMMIT=${avalanchego_commit}"
+  fi
 
   # By default the node image is intended to be local-only.
   AVALANCHEGO_NODE_IMAGE="antithesis-avalanchego-node:${node_image_tag}"
