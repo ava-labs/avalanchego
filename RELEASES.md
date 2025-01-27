@@ -4,7 +4,7 @@
 
 This version is backwards compatible to [v1.12.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0). It is optional, but encouraged.
 
-The plugin version is unchanged at `38` and is compatible with versions `v1.12.0-v1.12.1`.
+The plugin version is updated to `39` all plugins must update to be compatible.
 
 **This release removes the support for the long deprecated Keystore API. Any users still relying on the keystore API will not be able to update to this version, or any later versions, of Avalanchego until their dependency on the keystore API has been removed.**
 
@@ -12,6 +12,14 @@ The plugin version is unchanged at `38` and is compatible with versions `v1.12.0
 
 - Deprecated:
   - `info.GetTxFee`
+- Added:
+  - `avm.GetTxFee`
+  - `platform.getValidatorFeeConfig`
+  - `platform.getValidatorFeeState`
+  - `validationID` field to `platform.getL1Validator` results
+  - L1 validators to `platform.getCurrentValidators`
+- Removed:
+  - `StakeAmount` field from `platform.getCurrentValidators` results
   - `keystore.createUser`
   - `keystore.deleteUser`
   - `keystore.listUsers`
@@ -35,14 +43,6 @@ The plugin version is unchanged at `38` and is compatible with versions `v1.12.0
   - `wallet.sendMultiple`
   - `platform.exportKey`
   - `platform.listAddresses`
-- Added:
-  - `avm.GetTxFee`
-  - `platform.getValidatorFeeConfig`
-  - `platform.getValidatorFeeState`
-  - `validationID` field to `platform.getL1Validator` results
-  - L1 validators to `platform.getCurrentValidators`
-- Removed:
-  - `StakeAmount` field from `platform.getCurrentValidators` results
 
 ### Configs
 
