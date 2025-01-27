@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -22,6 +23,17 @@ var (
 	ErrInvalidSignature   = errors.New("signature is invalid")
 	ErrParseSignature     = errors.New("failed to parse signature")
 )
+
+// VerifiableValidatorState allows the lookup of validator sets on specified subnets at the
+// requested P-chain height as well as the retrieval of subnet ids.
+type VerifiableValidatorState interface {
+	// GetValidatorSet returns the validators of the provided subnet at the
+	// requested P-chain height.
+	GetValidatorSet(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error)
+
+	// GetSubnetID returns the subnetID of the provided chain.
+	GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, error)
+}
 
 type Signature interface {
 	fmt.Stringer
@@ -40,7 +52,7 @@ type Signature interface {
 		ctx context.Context,
 		msg *UnsignedMessage,
 		networkID uint32,
-		pChainState validators.State,
+		pChainState VerifiableValidatorState,
 		pChainHeight uint64,
 		quorumNum uint64,
 		quorumDen uint64,
@@ -71,7 +83,7 @@ func (s *BitSetSignature) Verify(
 	ctx context.Context,
 	msg *UnsignedMessage,
 	networkID uint32,
-	pChainState validators.State,
+	pChainState VerifiableValidatorState,
 	pChainHeight uint64,
 	quorumNum uint64,
 	quorumDen uint64,
