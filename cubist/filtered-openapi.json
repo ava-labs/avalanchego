@@ -1,0 +1,1614 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "CubeSigner API",
+    "description": "The CubeSigner management and signing service.",
+    "contact": {
+      "name": "Cubist Inc.",
+      "email": "hello@cubist.dev"
+    },
+    "version": "v0.98.2"
+  },
+  "servers": [
+    {
+      "url": "https://gamma.signer.cubist.dev",
+      "description": "Testing and staging environment"
+    },
+    {
+      "url": "https://prod.signer.cubist.dev",
+      "description": "Production environment"
+    }
+  ],
+  "paths": {
+    "/v0/org/{org_id}/keys/{key_id}": {
+      "get": {
+        "tags": ["Keys"],
+        "summary": "Get Key",
+        "description": "Get Key\n\nReturns the properties of a key.",
+        "operationId": "getKeyInOrg",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "description": "Name or ID of the desired Org",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "Org#124dfe3e-3bbd-487d-80c0-53c55e8ab87a"
+          },
+          {
+            "name": "key_id",
+            "in": "path",
+            "description": "ID of the desired Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "Key#124dfe3e-3bbd-487d-80c0-53c55e8ab87a"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/KeyInfo"
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SignerAuth": ["manage:key:get"]
+          }
+        ]
+      }
+    },
+    "/v1/org/{org_id}/blob/sign/{key_id}": {
+      "post": {
+        "tags": ["Signing"],
+        "summary": "Sign Raw Blob",
+        "description": "Sign Raw Blob\n\nSigns an arbitrary blob with a given key.\n\n- ECDSA signatures are serialized as big-endian r and s plus recovery-id\nbyte v, which can in general take any of the values 0, 1, 2, or 3.\n\n- EdDSA signatures are serialized in the standard format.\n\n- BLS signatures are not supported on the blob-sign endpoint.",
+        "operationId": "blobSign",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "description": "Name or ID of the desired Org",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "Org#124dfe3e-3bbd-487d-80c0-53c55e8ab87a"
+          },
+          {
+            "name": "key_id",
+            "in": "path",
+            "description": "ID of the desired Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "Key#124dfe3e-3bbd-487d-80c0-53c55e8ab87a"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlobSignRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SignResponse"
+          },
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptedResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SignerAuth": ["sign:blob"]
+          }
+        ]
+      }
+    },
+    "/v1/org/{org_id}/token/refresh": {
+      "patch": {
+        "tags": ["SignerSession"],
+        "summary": "Refresh Signer Session",
+        "description": "Refresh Signer Session",
+        "operationId": "signerSessionRefresh",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "description": "ID of the organization owning the key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "Org#124dfe3e-3bbd-487d-80c0-53c55e8ab87a"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthData"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/NewSessionResponse"
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SignerAuth": [""]
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "description": "The structure of ErrorResponse must match the response template that AWS uses",
+        "required": ["message", "error_code"],
+        "properties": {
+          "accepted": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AcceptedValue"
+              }
+            ],
+            "nullable": true
+          },
+          "error_code": {
+            "$ref": "#/components/schemas/SignerErrorCode"
+          },
+          "message": {
+            "type": "string",
+            "description": "Error message"
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Optional request identifier"
+          }
+        }
+      },
+      "BlobSignRequest": {
+        "allOf": [
+          {
+            "type": "object",
+            "properties": {
+              "metadata": {
+                "description": "Optional metadata. Passing additional information as metadata can be used to make reviewing\nof pending MFA requests and/or historical key transactions more transparent. It can also be used e.g., to carry additional data to WebHook policies.",
+                "nullable": true
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": ["message_base64"],
+            "properties": {
+              "bls_dst": {
+                "type": "string",
+                "description": "An optional domain separation tag for use *only* with BLS signing requests.\nThis field must not be supplied for requests involving non-BLS key types.\n\nIf this field is not present or null, the domain separation tag specified in\nthe IETF BLS Signatures draft versions 4 and 5, section 4.2.3 (minimal pubkey\nsize variant) is used.\n\nOtherwise, this field must contain a base-64 string encoding a non-empty byte\nvector. When using a custom tag, RFC9380 (Section 3.1) recommends a length of\nat least 16 bytes.",
+                "example": "EbbLvCxI7gan71iISDsfr46etOv606QkGGDP5PpVl5Q=",
+                "nullable": true
+              },
+              "message_base64": {
+                "type": "string",
+                "description": "The blob to sign, encoded as a base64 string.\n\nNote that certain signing keys impose additional requirements on the contents of\nthe message. For example, Secp256k1 keys require that the message is 32 bytes long."
+              },
+              "segwit_tweak": {
+                "type": "string",
+                "description": "An optional tweak value for use *only* with Segwit (i.e., SecpBtc and SecpBtcTest)\nkeys. This field must not be supplied for requests involving any other key type.\n\nIf this field is not present or null, no tweak is applied. Otherwise, this field\nmust contain a base-64 string encoding a vector of exactly 32 bytes. See the\nCubeSigner documentation for more information on the Segwit tweaking procedure.",
+                "example": "F41HAy2q5Gn8laF2CuMsZbRAQTmD+4Ob3VUMZ7TBGK4=",
+                "nullable": true
+              },
+              "taproot_tweak": {
+                "type": "string",
+                "description": "An optional tweak value for use *only* with Taproot keys. This field must not\nbe supplied for requests involving any other key type.\n\nIf this field is not present or null, no tweak is applied. If the field is an\nempty string, the key is tweaked with an unspendable script path per BIP0341.\nOtherwise, this field must contain a 32-byte, base-64 string representing the\nMerkle root with which to tweak the key before signing.",
+                "example": "F41HAy2q5Gn8laF2CuMsZbRAQTmD+4Ob3VUMZ7TBGK4=",
+                "nullable": true
+              }
+            }
+          }
+        ],
+        "example": {
+          "message_base64": "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTYK"
+        }
+      },
+      "AcceptedResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          {
+            "type": "object"
+          }
+        ]
+      },
+      "AuthData": {
+        "type": "object",
+        "description": "Data required for both `authenticate` and `refresh`.",
+        "required": ["epoch_num", "epoch_token", "other_token"],
+        "properties": {
+          "epoch_num": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "epoch_token": {
+            "$ref": "#/components/schemas/B32"
+          },
+          "other_token": {
+            "type": "string"
+          }
+        }
+      },
+      "AcceptedValue": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": ["MfaRequired"],
+            "properties": {
+              "MfaRequired": {
+                "type": "object",
+                "required": ["id", "ids", "org_id"],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Always set to first MFA id from `Self::ids`"
+                  },
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": "Non-empty MFA request IDs"
+                  },
+                  "org_id": {
+                    "type": "string",
+                    "description": "Organization id"
+                  },
+                  "session": {
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/NewSessionResponse"
+                      }
+                    ],
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "description": "Different responses we return for status code \"202 Accepted\".\n\nEven though \"202 Accepted\" is a successful response, we represent\nit as a Rust error because that makes it easy to have route handlers\nreturn `Result<T, SignerError>` where `T` is the type of the\nresponse for the status code \"200 Ok\"."
+      },
+      "SignerErrorCode": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/SignerErrorOwnCodes"
+          },
+          {
+            "$ref": "#/components/schemas/AcceptedValueCode"
+          },
+          {
+            "$ref": "#/components/schemas/BadRequestErrorCode"
+          },
+          {
+            "$ref": "#/components/schemas/BadGatewayErrorCode"
+          },
+          {
+            "$ref": "#/components/schemas/NotFoundErrorCode"
+          },
+          {
+            "$ref": "#/components/schemas/ForbiddenErrorCode"
+          },
+          {
+            "$ref": "#/components/schemas/UnauthorizedErrorCode"
+          },
+          {
+            "$ref": "#/components/schemas/PreconditionErrorCode"
+          },
+          {
+            "$ref": "#/components/schemas/InternalErrorCode"
+          }
+        ]
+      },
+      "B32": {
+        "type": "string",
+        "description": "Wrapper around a zeroizing 32-byte fixed-size array"
+      },
+      "CommonFields": {
+        "type": "object",
+        "description": "Fields that are common to different types of resources such as keys",
+        "properties": {
+          "created": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EpochDateTime"
+              }
+            ],
+            "nullable": true
+          },
+          "edit_policy": {
+            "$ref": "#/components/schemas/EditPolicy"
+          },
+          "last_modified": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EpochDateTime"
+              }
+            ],
+            "nullable": true
+          },
+          "metadata": {
+            "description": "User-defined metadata. When rendering (e.g., in the browser) you should treat\nit as untrusted user data (and avoid injecting metadata into HTML directly) if\nuntrusted users can create/update keys (or their metadata)."
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Version of this object",
+            "minimum": 0
+          }
+        }
+      },
+      "KeyDerivationInfo": {
+        "type": "object",
+        "description": "Derivation-related metadata for keys derived from a long-lived mnemonic",
+        "required": ["mnemonic_id", "derivation_path"],
+        "properties": {
+          "derivation_path": {
+            "type": "string",
+            "description": "The derivation path used to derive this key"
+          },
+          "mnemonic_id": {
+            "type": "string",
+            "description": "The mnemonic-id of the key's parent mnemonic"
+          }
+        }
+      },
+      "KeyType": {
+        "type": "string",
+        "enum": [
+          "SecpEthAddr",
+          "SecpBtc",
+          "SecpBtcTest",
+          "SecpBtcLegacy",
+          "SecpBtcLegacyTest",
+          "SecpAvaAddr",
+          "SecpAvaTestAddr",
+          "BlsPub",
+          "BlsInactive",
+          "BlsAvaIcm",
+          "Ed25519SolanaAddr",
+          "Ed25519SuiAddr",
+          "Ed25519AptosAddr",
+          "Ed25519CardanoAddrVk",
+          "Ed25519StellarAddr",
+          "Ed25519SubstrateAddr",
+          "Mnemonic",
+          "Stark",
+          "BabylonEots",
+          "TaprootBtc",
+          "TaprootBtcTest",
+          "SecpCosmosAddr",
+          "P256CosmosAddr",
+          "P256OntologyAddr",
+          "P256Neo3Addr",
+          "Ed25519TendermintAddr",
+          "SecpTronAddr",
+          "Ed25519TonAddr",
+          "SecpDogeAddr",
+          "SecpDogeTestAddr"
+        ]
+      },
+      "ClientSessionInfo": {
+        "type": "object",
+        "description": "Session information sent to the client.\nThis struct works in tandem with its server-side counterpart [`SessionData`].",
+        "required": [
+          "session_id",
+          "auth_token",
+          "refresh_token",
+          "epoch",
+          "epoch_token",
+          "auth_token_exp",
+          "refresh_token_exp"
+        ],
+        "properties": {
+          "auth_token": {
+            "type": "string",
+            "description": "Token to use for authorization."
+          },
+          "auth_token_exp": {
+            "$ref": "#/components/schemas/EpochDateTime"
+          },
+          "epoch": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Epoch at which the token was last refreshed",
+            "minimum": 0
+          },
+          "epoch_token": {
+            "$ref": "#/components/schemas/B32"
+          },
+          "refresh_token": {
+            "type": "string",
+            "description": "Token to use for refreshing the `(auth, refresh)` token pair"
+          },
+          "refresh_token_exp": {
+            "$ref": "#/components/schemas/EpochDateTime"
+          },
+          "session_id": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        }
+      },
+      "NewSessionResponse": {
+        "type": "object",
+        "description": "Information about a new session, returned from multiple endpoints (e.g., login, refresh, etc.).",
+        "required": ["token", "refresh_token", "session_info"],
+        "properties": {
+          "expiration": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Session expiration (in seconds since UNIX epoch), beyond which it cannot be refreshed.",
+            "example": 1701879640,
+            "minimum": 0
+          },
+          "refresh_token": {
+            "type": "string",
+            "description": "Token that can be used to refresh this session."
+          },
+          "session_info": {
+            "$ref": "#/components/schemas/ClientSessionInfo"
+          },
+          "token": {
+            "type": "string",
+            "description": "New token to be used for authentication. Requests to signing endpoints\nshould include this value in the `Authorization` header."
+          }
+        }
+      },
+      "SignerErrorOwnCodes": {
+        "type": "string",
+        "enum": [
+          "PreComputed",
+          "StatusCodeWithMessage",
+          "JrpcError",
+          "UnhandledError",
+          "ProxyStartError",
+          "EnclaveError"
+        ]
+      },
+      "AcceptedValueCode": {
+        "type": "string",
+        "enum": ["MfaRequired"]
+      },
+      "BadRequestErrorCode": {
+        "type": "string",
+        "enum": [
+          "GenericBadRequest",
+          "QueryMetricsError",
+          "QueryMetricsValidationError",
+          "WebhookPolicyTimeoutOutOfBounds",
+          "WebhookPolicyDisallowedUrlScheme",
+          "WebhookPolicyDisallowedUrlHost",
+          "WebhookPolicyDisallowedHeaders",
+          "ReservedName",
+          "UserEmailNotConfigured",
+          "EmailPasswordNotFound",
+          "PasswordAuthNotAllowedByInvitation",
+          "OneTimeCodeExpired",
+          "InvalidBody",
+          "InvalidJwt",
+          "InvitationNoLongerValid",
+          "TokenRequestError",
+          "InvalidMfaReceipt",
+          "InvalidMfaPolicyCount",
+          "InvalidMfaPolicyNumAuthFactors",
+          "InvalidMfaPolicyNumAllowedApprovers",
+          "InvalidMfaPolicyGracePeriodTooLong",
+          "InvalidBabylonStakingPolicyParams",
+          "InvalidSuiTxReceiversEmptyAllowlist",
+          "InvalidBtcTxReceiversEmptyAllowlist",
+          "InvalidRequireRoleSessionAllowlist",
+          "InvalidCreateKeyCount",
+          "OrgInviteExistingUser",
+          "OrgUserAlreadyExists",
+          "OrgNameTaken",
+          "OrgIsNotOrgExport",
+          "RoleNameTaken",
+          "PolicyNameTaken",
+          "PolicyNotFound",
+          "PolicyVersionNotFound",
+          "PolicyRuleDisallowedByType",
+          "PolicyTypeDisallowed",
+          "AddKeyToRoleCountTooHigh",
+          "InvalidKeyId",
+          "InvalidTimeLockAlreadyInThePast",
+          "InvalidRestrictedScopes",
+          "InvalidUpdate",
+          "InvalidMetadataLength",
+          "InvalidKeyMaterialId",
+          "KeyNotFound",
+          "UserExportDerivedKey",
+          "UserExportPublicKeyInvalid",
+          "UnableToAccessSmtpRelay",
+          "UserExportInProgress",
+          "RoleNotFound",
+          "InvalidRoleNameOrId",
+          "InvalidMfaReceiptOrgIdMissing",
+          "InvalidMfaReceiptInvalidOrgId",
+          "MfaRequestNotFound",
+          "InvalidKeyType",
+          "InvalidKeyMaterial",
+          "InvalidHexValue",
+          "InvalidBase32Value",
+          "InvalidBase58Value",
+          "InvalidSs58Value",
+          "InvalidForkVersionLength",
+          "InvalidEthAddress",
+          "InvalidStellarAddress",
+          "InvalidOrgNameOrId",
+          "InvalidStakeDeposit",
+          "InvalidBlobSignRequest",
+          "InvalidSolanaSignRequest",
+          "InvalidEip712SignRequest",
+          "OnlySpecifyOne",
+          "NoOidcDataInProof",
+          "InvalidEvmSignRequest",
+          "InvalidEth2SignRequest",
+          "InvalidDeriveKeyRequest",
+          "InvalidStakingAmount",
+          "CustomStakingAmountNotAllowedForWrapperContract",
+          "InvalidUnstakeRequest",
+          "InvalidCreateUserRequest",
+          "UserAlreadyExists",
+          "IdpUserAlreadyExists",
+          "CognitoUserAlreadyOrgMember",
+          "UserNotFound",
+          "PolicyKeyMismatch",
+          "PolicyRuleKeyMismatch",
+          "EmptyScopes",
+          "InvalidScopesForRoleSession",
+          "InvalidLifetime",
+          "NoSingleKeyForUser",
+          "InvalidOrgPolicyRule",
+          "SourceIpAllowlistEmpty",
+          "LimitWindowTooLong",
+          "Erc20ContractDisallowed",
+          "EmptyRuleError",
+          "OptionalListEmpty",
+          "InvalidRange",
+          "InvalidOrgPolicyRepeatedRule",
+          "InvalidSuiTransaction",
+          "SuiSenderMismatch",
+          "AvaSignHashError",
+          "AvaSignError",
+          "BtcSegwitHashError",
+          "BtcTaprootHashError",
+          "BtcSignError",
+          "TaprootSignError",
+          "Eip712SignError",
+          "InvalidMemberRoleInUserAdd",
+          "InvalidMemberRoleInRecipientAdd",
+          "ThirdPartyUserAlreadyExists",
+          "OidcIdentityAlreadyExists",
+          "ThirdPartyUserNotFound",
+          "DeleteOidcUserError",
+          "DeleteUserError",
+          "SessionRoleMismatch",
+          "InvalidOidcToken",
+          "InvalidOidcIdentity",
+          "OidcIssuerUnsupported",
+          "OidcIssuerNotAllowed",
+          "OidcIssuerNoApplicableJwk",
+          "FidoKeyAlreadyRegistered",
+          "FidoKeySignCountTooLow",
+          "FidoVerificationFailed",
+          "FidoChallengeMfaMismatch",
+          "UnsupportedLegacyCognitoSession",
+          "InvalidIdentityProof",
+          "PaginationDataExpired",
+          "ExistingKeysViolateExclusiveKeyAccess",
+          "ExportDelayTooShort",
+          "ExportWindowTooLong",
+          "InvalidTotpFailureLimit",
+          "InvalidEip191SignRequest",
+          "CannotResendUserInvitation",
+          "InvalidNotificationEndpointCount",
+          "CannotDeletePendingSubscription",
+          "InvalidNotificationUrlProtocol",
+          "EmptyOneOfOrgEventFilter",
+          "EmptyAllExceptOrgEventFilter",
+          "InvalidTapNodeHash",
+          "InvalidOneTimeCode",
+          "MessageNotFound",
+          "MessageAlreadySigned",
+          "MessageRejected",
+          "MessageReplaced",
+          "InvalidMessageType",
+          "EmptyAddress",
+          "InvalidEth2SigningPolicySlotRange",
+          "InvalidEth2SigningPolicyEpochRange",
+          "InvalidEth2SigningPolicyTimestampRange",
+          "InvalidEth2SigningPolicyOverlappingRule",
+          "MmiRpcUrlMissing",
+          "MmiChainIdMissing",
+          "EthersInvalidRpcUrl",
+          "EthersGetTransactionCountError",
+          "InvalidPassword",
+          "BabylonStakingFeePlusDustOverflow",
+          "BabylonStaking",
+          "BabylonStakingIncorrectKey",
+          "BabylonStakingSegwitNonDeposit",
+          "PsbtSigning",
+          "TooManyResets",
+          "TooManyFailedLogins",
+          "BadBtcMessageSignP2shFlag",
+          "InvalidTendermintRequest",
+          "PolicyVersionMaxReached",
+          "PolicyVersionInvalid",
+          "PolicyAlienOwnerInvalid",
+          "EmptyUpdateRequest",
+          "InvalidPolicyReference",
+          "InvalidWasmPolicy"
+        ]
+      },
+      "BadGatewayErrorCode": {
+        "type": "string",
+        "enum": [
+          "EsploraApiError",
+          "CallWebhookError",
+          "OAuthProviderError",
+          "OidcDisoveryFailed",
+          "OidcIssuerJwkEndpointUnavailable",
+          "SmtpServerUnavailable"
+        ]
+      },
+      "NotFoundErrorCode": {
+        "type": "string",
+        "enum": [
+          "UriSegmentMissing",
+          "UriSegmentInvalid",
+          "TotpNotConfigured",
+          "FidoKeyNotFound",
+          "FidoChallengeNotFound",
+          "TotpChallengeNotFound",
+          "UserExportRequestNotFound",
+          "UserExportCiphertextNotFound",
+          "OrgExportCiphertextNotFound",
+          "UploadObjectNotFound"
+        ]
+      },
+      "ForbiddenErrorCode": {
+        "type": "string",
+        "enum": [
+          "CannotAssumeIdentity",
+          "CannotCreateOrg",
+          "WrongMfaEmailOtpJwt",
+          "FidoRequiredToRemoveTotp",
+          "OidcScopeCeilingMissing",
+          "OidcIssuerNotAllowedForMemberRole",
+          "OidcNoMemberRolesAllowed",
+          "EmailOtpNotConfigured",
+          "MfaChallengeExpired",
+          "ChainIdNotAllowed",
+          "InvalidOrg",
+          "OrgIdMismatch",
+          "SessionForWrongOrg",
+          "SelfDelete",
+          "SelfDisable",
+          "InvalidOrgMembershipRoleChange",
+          "UserMfaNotConfigured",
+          "UserDisabled",
+          "OrgDisabled",
+          "OrgNotFound",
+          "OrgWithoutOwner",
+          "OrphanedUser",
+          "OidcUserNotFound",
+          "UserNotInOrg",
+          "UserNotOrgOwner",
+          "UserNotKeyOwner",
+          "InvalidRole",
+          "DisabledRole",
+          "KeyDisabled",
+          "RoleNotInOrg",
+          "KeyNotInRole",
+          "KeyNotInOrg",
+          "UserExportRequestNotInOrg",
+          "UserExportRequestInvalid",
+          "UserNotOriginalKeyOwner",
+          "UserNotInRole",
+          "MustBeFullMember",
+          "SessionExpired",
+          "SessionChanged",
+          "SessionRevoked",
+          "ExpectedUserSession",
+          "SessionRoleChanged",
+          "ScopedNameNotFound",
+          "SessionInvalidEpochToken",
+          "SessionInvalidRefreshToken",
+          "SessionRefreshTokenExpired",
+          "InvalidAuthHeader",
+          "SessionNotFound",
+          "InvalidArn",
+          "SessionInvalidAuthToken",
+          "SessionAuthTokenExpired",
+          "SessionPossiblyStolenToken",
+          "MfaDisallowedIdentity",
+          "MfaDisallowedApprover",
+          "MfaTypeNotAllowed",
+          "MfaNotApprovedYet",
+          "MfaConfirmationCodeMismatch",
+          "MfaHttpRequestMismatch",
+          "MfaRemoveBelowMin",
+          "TotpAlreadyConfigured",
+          "TotpConfigurationChanged",
+          "MfaTotpBadConfiguration",
+          "MfaTotpBadCode",
+          "MfaTotpRateLimit",
+          "ImproperSessionScope",
+          "FullSessionRequired",
+          "SessionWithoutAnyScopeUnder",
+          "UserRoleUnprivileged",
+          "MfaNotConfigured",
+          "RemoveLastOidcIdentity",
+          "OperationNotAllowed",
+          "OrgExportRetrievalDisabled",
+          "AutoAddBlsKeyToProtectedRole",
+          "UserNotPolicyOwner",
+          "LegacySessionCannotHaveScopeCeiling",
+          "RoleInParentOrgNotAllowed"
+        ]
+      },
+      "UnauthorizedErrorCode": {
+        "type": "string",
+        "enum": [
+          "AuthorizationHeaderMissing",
+          "EndpointRequiresUserSession",
+          "RefreshTokenMissing"
+        ]
+      },
+      "PreconditionErrorCode": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/PreconditionErrorOwnCodes"
+          },
+          {
+            "$ref": "#/components/schemas/PolicyErrorCode"
+          }
+        ]
+      },
+      "InternalErrorCode": {
+        "type": "string",
+        "enum": [
+          "NoMaterialId",
+          "ClaimsParseError",
+          "InvalidThrottleId",
+          "InvalidEmailAddress",
+          "EmailTemplateRender",
+          "OidcIdentityHeaderMissing",
+          "OidcIdentityParseError",
+          "SystemTimeError",
+          "PasswordHashParseError",
+          "SendMailError",
+          "ReqwestError",
+          "EmailConstructionError",
+          "DbQueryError",
+          "DbGetError",
+          "DbDeleteError",
+          "DbPutError",
+          "DbUpdateError",
+          "SerdeError",
+          "TestAndSetError",
+          "ConcurrentLockCreation",
+          "DbGetItemsError",
+          "DbWriteError",
+          "CubistSignerError",
+          "CwListMetricsError",
+          "CwPutMetricDataError",
+          "GetAwsSecretError",
+          "SecretNotFound",
+          "KmsGenerateRandomError",
+          "MalformedTotpBytes",
+          "KmsGenerateRandomNoResponseError",
+          "CreateKeyError",
+          "ParseDerivationPathError",
+          "SplitSignerError",
+          "CreateImportKeyError",
+          "CreateEotsNoncesError",
+          "EotsSignError",
+          "CognitoDeleteUserError",
+          "CognitoListUsersError",
+          "CognitoGetUserError",
+          "MissingUserEmail",
+          "CognitoResendUserInvitation",
+          "CognitoSetUserPasswordError",
+          "GenericInternalError",
+          "OidcAuthWithoutOrg",
+          "MissingKeyMetadata",
+          "KmsKeyWithoutId",
+          "KmsEnableKeyError",
+          "KmsDisableKeyError",
+          "LambdaInvokeError",
+          "LambdaNoResponseError",
+          "LambdaFailure",
+          "LambdaUnparsableResponse",
+          "SerializeEncryptedExportKeyError",
+          "DeserializeEncryptedExportKeyError",
+          "ReEncryptUserExport",
+          "S3UploadError",
+          "S3DownloadError",
+          "S3CopyError",
+          "S3PresignedUrlError",
+          "ManagedStateMissing",
+          "InternalHeaderMissing",
+          "InvalidInternalHeaderValue",
+          "RequestLocalStateAlreadySet",
+          "OidcOrgMismatch",
+          "OidcIssuerInvalidJwk",
+          "InvalidPkForMaterialId",
+          "UncheckedOrg",
+          "SessionOrgIdMissing",
+          "AvaSignCredsMissing",
+          "AvaSignSignatureMissing",
+          "ExpectedRoleSession",
+          "InvalidThirdPartyIdentity",
+          "CognitoGetUser",
+          "SnsSubscribeError",
+          "SnsUnsubscribeError",
+          "SnsGetSubscriptionAttributesError",
+          "SnsSubscriptionAttributesMissing",
+          "SnsSetSubscriptionAttributesError",
+          "SnsPublishBatchError",
+          "InconsistentMultiValueTestAndSet",
+          "MaterialIdError",
+          "InvalidBtcAddress",
+          "HistoricalTxBodyMissing",
+          "InvalidOperation",
+          "ParentOrgNotFound",
+          "OrgParentLoop",
+          "ResolvedParentOrgWithNoScopeCeiling",
+          "InvalidUploadObjectId",
+          "PolicyEngineNotFound",
+          "PolicyEngineError"
+        ]
+      },
+      "EpochDateTime": {
+        "type": "integer",
+        "format": "int64",
+        "description": "DateTime measured in seconds since unix epoch.\nA wrapper type for serialization that encodes a [`SystemTime`] as a [`u64`]\nrepresenting the number of seconds since [`SystemTime::UNIX_EPOCH`].",
+        "minimum": 0
+      },
+      "EditPolicy": {
+        "type": "object",
+        "description": "A policy which governs when and who is allowed to update the entity this policy is\nattached to (e.g., a role or a key).\n\nWhen attached to a role, by default, this policy applies to role deletion and all\nrole updates (including adding/removing keys and users); in terms of scopes,\nit applies to `manage:role:update:*` and `manage:role:delete`.\n\nWhen attached to a key, by default, this policy applies to key deletion, all\nkey updates, and adding/removing that key to/from a role; in terms of scopes,\nit applies to `manage:key:update:*`, `manage:key:delete`, `manage:role:update:key:*`.\n\nThis default can be changed by setting the `applies_to_scopes` property.",
+        "properties": {
+          "applies_to_scopes": {
+            "$ref": "#/components/schemas/ScopeSet"
+          },
+          "mfa": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MfaPolicy"
+              }
+            ],
+            "nullable": true
+          },
+          "time_lock_until": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EpochDateTime"
+              }
+            ],
+            "nullable": true
+          }
+        }
+      },
+      "PreconditionErrorOwnCodes": {
+        "type": "string",
+        "enum": [
+          "Eth2ProposerSlotTooLow",
+          "Eth2AttestationSourceEpochTooLow",
+          "Eth2AttestationTargetEpochTooLow",
+          "Eth2ConcurrentBlockSigning",
+          "Eth2ConcurrentAttestationSigning",
+          "Eth2MultiDepositToNonGeneratedKey",
+          "Eth2MultiDepositUnknownInitialDeposit",
+          "Eth2MultiDepositWithdrawalAddressMismatch",
+          "ConcurrentSigningWhenTimeLimitPolicyIsDefined",
+          "BabylonEotsConcurrentSigning",
+          "TendermintStateError",
+          "TendermintConcurrentSigning",
+          "MfaApprovalsNotYetValid"
+        ]
+      },
+      "PolicyErrorCode": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/PolicyErrorOwnCodes"
+          },
+          {
+            "$ref": "#/components/schemas/EvmTxDepositErrorCode"
+          }
+        ]
+      },
+      "ScopeSet": {
+        "oneOf": [
+          {
+            "type": "string",
+            "description": "All scopes",
+            "enum": ["All"]
+          },
+          {
+            "type": "object",
+            "required": ["AllExcept"],
+            "properties": {
+              "AllExcept": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Scope"
+                },
+                "description": "All scopes except these (including those transitively implied)."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": ["AllOf"],
+            "properties": {
+              "AllOf": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Scope"
+                },
+                "description": "All of these scopes (including those transitively implied)."
+              }
+            }
+          }
+        ],
+        "description": "A set of scopes."
+      },
+      "MfaPolicy": {
+        "type": "object",
+        "properties": {
+          "allowed_approvers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Users who are allowed to approve. If empty at creation time, default to the current user."
+          },
+          "allowed_mfa_types": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MfaType"
+            },
+            "description": "Allowed approval types. When omitted, defaults to any.",
+            "nullable": true
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many users to require to approve (defaults to 1).",
+            "minimum": 0
+          },
+          "lifetime": {
+            "$ref": "#/components/schemas/Seconds"
+          },
+          "num_auth_factors": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many auth factors to require per user (defaults to 1).",
+            "minimum": 0
+          },
+          "request_comparer": {
+            "$ref": "#/components/schemas/HttpRequestCmp"
+          },
+          "restricted_operations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperationKind"
+            },
+            "description": "CubeSigner operations to which this policy should apply.\nWhen omitted, applies to all operations.",
+            "nullable": true
+          },
+          "time_delay": {
+            "$ref": "#/components/schemas/Seconds"
+          }
+        },
+        "example": {
+          "allowed_approvers": [
+            "User#fabc3f88-04e0-471b-9657-0ae12a3cd73e",
+            "User#d796c369-9974-473b-ab9e-e4a2418d2d07"
+          ],
+          "count": 2,
+          "lifetime": 900
+        }
+      },
+      "PolicyErrorOwnCodes": {
+        "type": "string",
+        "enum": [
+          "SuiTxReceiversDisallowedTransactionKind",
+          "SuiTxReceiversDisallowedTransferAddress",
+          "SuiTxReceiversDisallowedCommand",
+          "BtcTxDisallowedOutputs",
+          "BtcSignatureExceededValue",
+          "BtcValueOverflow",
+          "BtcSighashTypeDisallowed",
+          "EvmTxReceiverMismatch",
+          "EvmTxSenderMismatch",
+          "EvmTxExceededValue",
+          "EvmTxValueUndefined",
+          "EvmTxExceededGasCost",
+          "EvmTxGasCostUndefined",
+          "EvmDataDisallowed",
+          "Erc20DataInvalid",
+          "Erc20ContractAddressUndefined",
+          "Erc20ContractChainIdUndefined",
+          "Erc20NotInContractAllowlist",
+          "Erc20ExceededTransferLimit",
+          "Erc20ReceiverMismatch",
+          "Erc20ExceededApproveLimit",
+          "Erc20SpenderMismatch",
+          "PolicyDisjunctionError",
+          "PolicyNegationError",
+          "Eth2ExceededMaxUnstake",
+          "Eth2ConcurrentUnstaking",
+          "NotInIpv4Allowlist",
+          "NotInOriginAllowlist",
+          "InvalidSourceIp",
+          "RawSigningNotAllowed",
+          "Eip712SigningNotAllowed",
+          "OidcSourceNotAllowed",
+          "NoOidcAuthSourcesDefined",
+          "AddKeyToRoleDisallowed",
+          "KeysAlreadyInRole",
+          "KeyInMultipleRoles",
+          "KeyAccessError",
+          "RequireRoleSessionKeyAccessError",
+          "BtcMessageSigningNotAllowed",
+          "Eip191SigningNotAllowed",
+          "TaprootSigningDisallowed",
+          "SegwitSigningDisallowed",
+          "PsbtSigningDisallowed",
+          "BabylonStakingDisallowed",
+          "TimeLocked",
+          "BabylonStakingNetwork",
+          "BabylonStakingParamsVersion",
+          "BabylonStakingExplicitParams",
+          "BabylonStakingStakerPk",
+          "BabylonStakingFinalityProviderPk",
+          "BabylonStakingLockTime",
+          "BabylonStakingValue",
+          "BabylonStakingChangeAddress",
+          "BabylonStakingFee",
+          "BabylonStakingWithdrawalAddress",
+          "SolanaInstructionCountLow",
+          "SolanaInstructionCountHigh",
+          "SolanaNotInInstructionAllowlist",
+          "SolanaInstructionMismatch",
+          "WasmPolicyDenied",
+          "WebhookPoliciesDisabled",
+          "DeniedByWebhook"
+        ]
+      },
+      "EvmTxDepositErrorCode": {
+        "type": "string",
+        "enum": [
+          "EvmTxDepositReceiverMismatch",
+          "EvmTxDepositEmptyData",
+          "EvmTxDepositEmptyChainId",
+          "EvmTxDepositEmptyReceiver",
+          "EvmTxDepositUnexpectedValue",
+          "EvmTxDepositUnexpectedDataLength",
+          "EvmTxDepositNoAbi",
+          "EvmTxDepositNoDepositFunction",
+          "EvmTxDepositUnexpectedFunctionName",
+          "EvmTxDepositUnexpectedValidatorKey",
+          "EvmTxDepositInvalidValidatorKey",
+          "EvmTxDepositMissingDepositArg",
+          "EvmTxDepositWrongDepositArgType",
+          "EvmTxDepositValidatorKeyNotInRole",
+          "EvmTxDepositUnexpectedWithdrawalCredentials",
+          "EvmTxDepositUnresolvedRole",
+          "EvmTxDepositInvalidDepositEncoding"
+        ]
+      },
+      "Scope": {
+        "oneOf": [
+          {
+            "type": "string",
+            "title": "ExplicitScopes",
+            "description": "Explicitly named scopes for accessing CubeSigner APIs",
+            "enum": [
+              "sign:*",
+              "sign:ava",
+              "sign:blob",
+              "sign:btc:*",
+              "sign:btc:segwit",
+              "sign:btc:taproot",
+              "sign:btc:psbt:*",
+              "sign:btc:psbt:legacy",
+              "sign:btc:psbt:segwit",
+              "sign:btc:psbt:taproot",
+              "sign:btc:message:*",
+              "sign:btc:message:segwit",
+              "sign:btc:message:legacy",
+              "sign:babylon:*",
+              "sign:babylon:eots:*",
+              "sign:babylon:eots:nonces",
+              "sign:babylon:eots:sign",
+              "sign:babylon:staking:*",
+              "sign:babylon:staking:deposit",
+              "sign:babylon:staking:unbond",
+              "sign:babylon:staking:withdraw",
+              "sign:evm:*",
+              "sign:evm:tx",
+              "sign:evm:eip191",
+              "sign:evm:eip712",
+              "sign:eth2:*",
+              "sign:eth2:validate",
+              "sign:eth2:stake",
+              "sign:eth2:unstake",
+              "sign:solana",
+              "sign:sui",
+              "sign:tendermint",
+              "sign:mmi",
+              "manage:*",
+              "manage:readonly",
+              "manage:email",
+              "manage:mfa:*",
+              "manage:mfa:readonly",
+              "manage:mfa:list",
+              "manage:mfa:vote:*",
+              "manage:mfa:vote:cs",
+              "manage:mfa:vote:email",
+              "manage:mfa:vote:fido",
+              "manage:mfa:vote:totp",
+              "manage:mfa:register:*",
+              "manage:mfa:register:fido",
+              "manage:mfa:register:totp",
+              "manage:mfa:unregister:*",
+              "manage:mfa:unregister:fido",
+              "manage:mfa:unregister:totp",
+              "manage:mfa:verify:*",
+              "manage:mfa:verify:totp",
+              "manage:key:*",
+              "manage:key:readonly",
+              "manage:key:get",
+              "manage:key:listRoles",
+              "manage:key:list",
+              "manage:key:history:tx:list",
+              "manage:key:create",
+              "manage:key:import",
+              "manage:key:update:*",
+              "manage:key:update:owner",
+              "manage:key:update:policy",
+              "manage:key:update:enabled",
+              "manage:key:update:metadata",
+              "manage:key:update:editPolicy",
+              "manage:key:delete",
+              "manage:policy:*",
+              "manage:policy:create",
+              "manage:policy:get",
+              "manage:policy:update:*",
+              "manage:policy:update:owner",
+              "manage:policy:update:name",
+              "manage:policy:update:editPolicy",
+              "manage:policy:update:rule",
+              "manage:policy:wasm:*",
+              "manage:policy:wasm:upload",
+              "manage:role:*",
+              "manage:role:readonly",
+              "manage:role:create",
+              "manage:role:delete",
+              "manage:role:get:*",
+              "manage:role:get:keys",
+              "manage:role:get:keys:list",
+              "manage:role:get:keys:get",
+              "manage:role:get:users",
+              "manage:role:list",
+              "manage:role:update:*",
+              "manage:role:update:enabled",
+              "manage:role:update:policy",
+              "manage:role:update:editPolicy",
+              "manage:role:update:key:*",
+              "manage:role:update:key:add",
+              "manage:role:update:key:remove",
+              "manage:role:update:user:*",
+              "manage:role:update:user:add",
+              "manage:role:update:user:remove",
+              "manage:role:history:tx:list",
+              "manage:identity:*",
+              "manage:identity:verify",
+              "manage:identity:add",
+              "manage:identity:remove",
+              "manage:identity:list",
+              "manage:org:*",
+              "manage:org:create",
+              "manage:org:metrics:query",
+              "manage:org:readonly",
+              "manage:org:addUser",
+              "manage:org:inviteUser",
+              "manage:org:inviteAlien",
+              "manage:org:updateMembership",
+              "manage:org:listUsers",
+              "manage:org:user:get",
+              "manage:org:deleteUser",
+              "manage:org:get",
+              "manage:session:*",
+              "manage:session:readonly",
+              "manage:session:get",
+              "manage:session:list",
+              "manage:session:create",
+              "manage:session:extend",
+              "manage:session:revoke",
+              "manage:export:*",
+              "manage:export:org:*",
+              "manage:export:org:get",
+              "manage:export:user:*",
+              "manage:export:user:delete",
+              "manage:export:user:list",
+              "manage:mmi:*",
+              "manage:mmi:readonly",
+              "manage:mmi:get",
+              "manage:mmi:list",
+              "manage:mmi:reject",
+              "manage:mmi:delete",
+              "export:*",
+              "export:user:*",
+              "export:user:init",
+              "export:user:complete",
+              "mmi:*",
+              "orgAccess:*",
+              "orgAccess:child:*"
+            ]
+          },
+          {
+            "type": "string",
+            "title": "OtherScopes",
+            "description": "Scopes including wildcard fragments for accessing CubeSigner APIs",
+            "pattern": "^(orgAccess:child)(:[^:]+)?$"
+          }
+        ],
+        "description": "All scopes for accessing CubeSigner APIs"
+      },
+      "MfaType": {
+        "oneOf": [
+          {
+            "type": "string",
+            "description": "Log in with CubeSigner user credentials",
+            "enum": ["CubeSigner"]
+          },
+          {
+            "type": "string",
+            "description": "Provide TOTP code",
+            "enum": ["Totp"]
+          },
+          {
+            "type": "string",
+            "description": "Provide OTP code sent via email",
+            "enum": ["EmailOtp"]
+          },
+          {
+            "type": "string",
+            "description": "Answer a FIDO challenge using any registered FIDO key",
+            "enum": ["Fido"]
+          },
+          {
+            "type": "object",
+            "required": ["FidoKey"],
+            "properties": {
+              "FidoKey": {
+                "type": "object",
+                "description": "Answer a FIDO challenge with a specific FIDO key",
+                "required": ["key_id"],
+                "properties": {
+                  "key_id": {
+                    "type": "string",
+                    "description": "The ID of the FIDO key that must be use to approve the request",
+                    "example": "FidoKey#EtDd...ZZc8="
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "Seconds": {
+        "type": "integer",
+        "format": "int64",
+        "description": "Duration measured in seconds\nA wrapper type for serialization that encodes a `Duration` as a `u64` representing the number of seconds.",
+        "minimum": 0
+      },
+      "HttpRequestCmp": {
+        "oneOf": [
+          {
+            "type": "string",
+            "description": "The requests must match exactly. Any given MFA receipt can be used at most once.",
+            "enum": ["Eq"]
+          },
+          {
+            "type": "object",
+            "required": ["EvmTx"],
+            "properties": {
+              "EvmTx": {
+                "$ref": "#/components/schemas/EvmTxCmp"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": ["SolanaTx"],
+            "properties": {
+              "SolanaTx": {
+                "$ref": "#/components/schemas/SolanaTxCmp"
+              }
+            }
+          }
+        ],
+        "description": "How to compare HTTP requests when verifying MFA receipt (see [MfaRequest::verify_request])"
+      },
+      "OperationKind": {
+        "type": "string",
+        "description": "All different kinds of sensitive operations",
+        "enum": [
+          "AvaSign",
+          "AvaChainTxSign",
+          "BabylonStaking",
+          "BlobSign",
+          "BtcMessageSign",
+          "BtcSign",
+          "PsbtSign",
+          "TaprootSign",
+          "Eip191Sign",
+          "Eip712Sign",
+          "EotsNonces",
+          "EotsSign",
+          "Eth1Sign",
+          "Eth2Sign",
+          "Eth2Stake",
+          "Eth2Unstake",
+          "SolanaSign",
+          "SuiSign",
+          "TendermintSign",
+          "RoleUpdate"
+        ]
+      },
+      "EvmTxCmp": {
+        "type": "object",
+        "properties": {
+          "grace": {
+            "type": "integer",
+            "format": "int64",
+            "description": "To prevent replay attacks, any given MFA receipt is normally allowed to be used only once.\n\nIn this case, however, because EVM transactions already have a replay prevention mechanism\n(namely the 'nonce' property), we allow the user to specify a grace period (in seconds) to\nindicate how long an MFA receipt should remain valid after its first use.\n\nNote that we allow both 'grace' and 'ignore_nonce' to be set because once an MFA request\nenters its grace period we unconditionally set its 'ignore_nonce' property to 'false' to\nensure that any subsequent requests that claim the same receipt must sign for the same\nnonce as the request we signed originally with that receipt.\n\nAlso note that the grace period cannot extend the lifetime of an MFA request beyond its\noriginal expiration date.\n\nThe grace period must not be greater than 30 days.",
+            "nullable": true,
+            "minimum": 0
+          },
+          "ignore_gas": {
+            "type": "boolean",
+            "description": "Whether the 'gas' property of the EVM transaction is allowed to be different."
+          },
+          "ignore_nonce": {
+            "type": "boolean",
+            "description": "Whether the 'nonce' property of the EVM transaction is allowed to be different."
+          }
+        }
+      },
+      "SolanaTxCmp": {
+        "type": "object",
+        "properties": {
+          "ignore_blockhash": {
+            "type": "boolean",
+            "description": "Whether the 'recent_blockhash' property of the Solana transaction is allowed to be different."
+          }
+        }
+      }
+    },
+    "responses": {
+      "KeyInfo": {
+        "description": "",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/CommonFields"
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "key_type",
+                    "key_id",
+                    "material_id",
+                    "purpose",
+                    "enabled",
+                    "owner",
+                    "public_key",
+                    "policy"
+                  ],
+                  "properties": {
+                    "derivation_info": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/KeyDerivationInfo"
+                        }
+                      ],
+                      "nullable": true
+                    },
+                    "enabled": {
+                      "type": "boolean",
+                      "description": "Whether the key is enabled (only enabled keys may be used for signing)"
+                    },
+                    "key_id": {
+                      "type": "string",
+                      "description": "The id of the key: \"Key#\" followed by a unique identifier specific to\nthe type of key (such as a public key for BLS or an ethereum address for Secp)",
+                      "example": "Key#0x8e3484687e66cdd26cf04c3647633ab4f3570148"
+                    },
+                    "key_type": {
+                      "$ref": "#/components/schemas/KeyType"
+                    },
+                    "material_id": {
+                      "type": "string",
+                      "description": "A unique identifier specific to the type of key, such as a public key or an ethereum address",
+                      "example": "0x8e3484687e66cdd26cf04c3647633ab4f3570148"
+                    },
+                    "owner": {
+                      "type": "string",
+                      "description": "Owner of the key",
+                      "example": "User#c3b9379c-4e8c-4216-bd0a-65ace53cf98f"
+                    },
+                    "policy": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      },
+                      "description": "Key policy",
+                      "example": [
+                        "AllowRawBlobSigning",
+                        {
+                          "RequireMfa": {
+                            "count": 1
+                          }
+                        }
+                      ]
+                    },
+                    "public_key": {
+                      "type": "string",
+                      "description": "Hex-encoded, serialized public key. The format used depends on the key type:\n- Secp256k1 keys use 65-byte uncompressed SECG format;\n- Stark keys use 33-byte compressed SECG format;\n- BLS keys use 48-byte compressed BLS12-381 (ZCash) format;\n- Ed25519 keys use the canonical 32-byte encoding specified in RFC 8032.",
+                      "example": "0x04d2688b6bc2ce7f9879b9e745f3c4dc177908c5cef0c1b64cff19ae7ff27dee623c64fe9d9c325c7fbbc748bbd5f607ce14dd83e28ebbbb7d3e7f2ffb70a79431"
+                    },
+                    "purpose": {
+                      "type": "string",
+                      "description": "The purpose for which the key can be used (e.g., chain id for which the key is allowed to sign messages)",
+                      "example": "Eth2Validator(1)"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "SignResponse": {
+        "description": "",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "required": ["signature"],
+              "properties": {
+                "signature": {
+                  "type": "string",
+                  "description": "The hex-encoded resulting signature."
+                }
+              }
+            }
+          }
+        }
+      },
+      "NewSessionResponse": {
+        "description": "Information about a new session, returned from multiple endpoints (e.g., login, refresh, etc.).",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "description": "Information about a new session, returned from multiple endpoints (e.g., login, refresh, etc.).",
+              "required": ["token", "refresh_token", "session_info"],
+              "properties": {
+                "expiration": {
+                  "type": "integer",
+                  "format": "int64",
+                  "description": "Session expiration (in seconds since UNIX epoch), beyond which it cannot be refreshed.",
+                  "example": 1701879640,
+                  "minimum": 0
+                },
+                "refresh_token": {
+                  "type": "string",
+                  "description": "Token that can be used to refresh this session."
+                },
+                "session_info": {
+                  "$ref": "#/components/schemas/ClientSessionInfo"
+                },
+                "token": {
+                  "type": "string",
+                  "description": "New token to be used for authentication. Requests to signing endpoints\nshould include this value in the `Authorization` header."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "Oidc": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+        "description": "OIDC tokens allow users to authenticate using a third-party service. These are exchanged for signer session tokens."
+      },
+      "SignerAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+        "description": "Signing API end-points use session tokens for auth. Specifically, with each request you need to use the \\`token\\` from your signer session (which you create with `cs token create`)."
+      }
+    }
+  },
+  "security": [
+    {
+      "Cognito": []
+    }
+  ]
+}
