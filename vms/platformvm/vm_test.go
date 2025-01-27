@@ -637,7 +637,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 	rewardTx := blk.(block.Block).Txs()[0].Unsigned
 	require.IsType(&txs.RewardValidatorTx{}, rewardTx)
 
-	// Verify options and accept commmit block
+	// Verify options and accept commit block
 	require.NoError(commit.Verify(context.Background()))
 	require.NoError(abort.Verify(context.Background()))
 	txID := blk.(block.Block).Txs()[0].ID()
