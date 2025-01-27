@@ -85,7 +85,7 @@ else
   echo "Generating compose configuration for ${TEST_SETUP}"
   gen_antithesis_compose_config "${IMAGE_TAG}" "${AVALANCHE_PATH}/tests/antithesis/xsvm/gencomposeconfig" \
                                 "${AVALANCHE_PATH}/build/antithesis/xsvm" \
-                                "AVALANCHEGO_PATH=${AVALANCHE_PATH}/build/avalanchego AVALANCHEGO_PLUGIN_DIR=${HOME}/.avalanchego/plugins"
+                                "AVALANCHEGO_PATH=${AVALANCHE_PATH}/build/avalanchego AVAGO_PLUGIN_DIR=${AVALANCHE_PATH}/build/plugins"
 
   build_antithesis_images_for_avalanchego "${TEST_SETUP}" "${IMAGE_PREFIX}" "${AVALANCHE_PATH}/vms/example/xsvm/Dockerfile"
 fi
