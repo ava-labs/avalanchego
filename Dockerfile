@@ -1,6 +1,6 @@
 # The version is supplied as a build argument rather than hard-coded
 # to minimize the cost of version changes.
-ARG GO_VERSION
+ARG GO_VERSION=INVALID # This value isn't intended to be used but silences a warning
 
 # ============= Compilation Stage ================
 # Always use the native platform to ensure fast builds
@@ -40,9 +40,11 @@ RUN [ -d ./build ] && rm -rf ./build/* || true
 # enabling cross-compilation.
 ARG RACE_FLAG=""
 ARG BUILD_SCRIPT=build.sh
+ARG AVALANCHEGO_COMMIT=""
 RUN . ./build_env.sh && \
     echo "{CC=$CC, TARGETPLATFORM=$TARGETPLATFORM, BUILDPLATFORM=$BUILDPLATFORM}" && \
     export GOARCH=$(echo ${TARGETPLATFORM} | cut -d / -f2) && \
+    export AVALANCHEGO_COMMIT="${AVALANCHEGO_COMMIT}" && \
     ./scripts/${BUILD_SCRIPT} ${RACE_FLAG}
 
 # Create this directory in the builder to avoid requiring anything to be executed in the

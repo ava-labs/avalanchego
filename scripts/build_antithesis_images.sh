@@ -19,6 +19,9 @@ fi
 # Directory above this script
 AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 
+source "${AVALANCHE_PATH}"/scripts/constants.sh
+source "${AVALANCHE_PATH}"/scripts/git_commit.sh
+
 # Import common functions used to build images for antithesis test setups
 source "${AVALANCHE_PATH}"/scripts/lib_build_antithesis_images.sh
 
@@ -28,7 +31,6 @@ IMAGE_PREFIX="${IMAGE_PREFIX:-}"
 IMAGE_TAG="${IMAGE_TAG:-}"
 if [[ -z "${IMAGE_TAG}" ]]; then
   # Default to tagging with the commit hash
-  source "${AVALANCHE_PATH}"/scripts/constants.sh
   IMAGE_TAG="${commit_hash}"
 fi
 
@@ -56,7 +58,7 @@ function build_antithesis_images_for_avalanchego {
   fi
   build_antithesis_images "${GO_VERSION}" "${image_prefix}" "antithesis-${test_setup}" "${IMAGE_TAG}" "${IMAGE_TAG}" \
                           "${AVALANCHE_PATH}/tests/antithesis/${test_setup}/Dockerfile" "${uninstrumented_node_dockerfile}" \
-                          "${AVALANCHE_PATH}" "${node_only}"
+                          "${AVALANCHE_PATH}" "${node_only}" "${git_commit}"
 }
 
 if [[ "${TEST_SETUP}" == "avalanchego" ]]; then

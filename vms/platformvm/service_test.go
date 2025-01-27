@@ -16,6 +16,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/cache"
@@ -45,7 +46,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/vms/types"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
@@ -1322,6 +1325,265 @@ func FuzzGetFeeState(f *testing.F) {
 		require.NoError(service.GetFeeState(nil, nil, &reply))
 		require.Equal(expectedReply, reply)
 	})
+}
+
+func TestGetCurrentValidatorsForL1(t *testing.T) {
+	subnetID := ids.GenerateTestID()
+
+	sk, err := bls.NewSigner()
+	require.NoError(t, err)
+	pk := sk.PublicKey()
+	pkBytes := bls.PublicKeyToUncompressedBytes(pk)
+
+	otherSK, err := bls.NewSigner()
+	require.NoError(t, err)
+	otherPK := otherSK.PublicKey()
+	otherPKBytes := bls.PublicKeyToUncompressedBytes(otherPK)
+
+	tests := []struct {
+		name         string
+		initial      []*state.Staker
+		l1Validators []state.L1Validator
+	}{
+		{
+			name: "empty_noop",
+		},
+		{
+			name: "initial_stakers",
+			initial: []*state.Staker{
+				{
+					TxID:      ids.GenerateTestID(),
+					SubnetID:  subnetID,
+					NodeID:    ids.GenerateTestNodeID(),
+					PublicKey: pk,
+					Weight:    1,
+					StartTime: time.Unix(0, 0),
+				},
+				{
+					TxID:      ids.GenerateTestID(),
+					SubnetID:  subnetID,
+					NodeID:    ids.GenerateTestNodeID(),
+					PublicKey: otherPK,
+					Weight:    1,
+					StartTime: time.Unix(1, 0),
+				},
+			},
+		},
+		{
+			name: "l1_validators",
+			l1Validators: []state.L1Validator{
+				{
+					ValidationID: ids.GenerateTestID(),
+					SubnetID:     subnetID,
+					NodeID:       ids.GenerateTestNodeID(),
+					StartTime:    0,
+					PublicKey:    pkBytes,
+					Weight:       1,
+				},
+				{
+					ValidationID: ids.GenerateTestID(),
+					SubnetID:     subnetID,
+					NodeID:       ids.GenerateTestNodeID(),
+					PublicKey:    otherPKBytes,
+					StartTime:    1,
+					Weight:       1,
+				},
+			},
+		},
+		{
+			name: "initial_stakers_l1_validators_mixed",
+			initial: []*state.Staker{
+				{
+					TxID:      ids.GenerateTestID(),
+					SubnetID:  subnetID,
+					NodeID:    ids.GenerateTestNodeID(),
+					PublicKey: pk,
+					Weight:    123123,
+					StartTime: time.Unix(0, 0),
+				},
+				{
+					TxID:      ids.GenerateTestID(),
+					SubnetID:  subnetID,
+					NodeID:    ids.GenerateTestNodeID(),
+					PublicKey: otherPK,
+					Weight:    0,
+					StartTime: time.Unix(2, 0),
+				},
+			},
+			l1Validators: []state.L1Validator{
+				{
+					ValidationID:      ids.GenerateTestID(),
+					SubnetID:          subnetID,
+					NodeID:            ids.GenerateTestNodeID(),
+					StartTime:         0,
+					PublicKey:         pkBytes,
+					Weight:            1,
+					EndAccumulatedFee: 1,
+					MinNonce:          2,
+				},
+				{
+					ValidationID:      ids.GenerateTestID(),
+					SubnetID:          subnetID,
+					NodeID:            ids.GenerateTestNodeID(),
+					PublicKey:         pkBytes,
+					StartTime:         2,
+					Weight:            1,
+					EndAccumulatedFee: 0,
+				},
+				{
+					ValidationID:      ids.GenerateTestID(),
+					SubnetID:          subnetID,
+					NodeID:            ids.GenerateTestNodeID(),
+					PublicKey:         otherPKBytes,
+					StartTime:         3,
+					Weight:            0,
+					EndAccumulatedFee: 1,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			service, _ := defaultService(t)
+			service.vm.ctx.Lock.Lock()
+			stakersByTxID := make(map[ids.ID]*state.Staker)
+			for _, staker := range test.initial {
+				primaryStaker := &state.Staker{
+					TxID:      ids.GenerateTestID(),
+					SubnetID:  constants.PrimaryNetworkID,
+					NodeID:    staker.NodeID,
+					PublicKey: staker.PublicKey,
+					Weight:    5,
+					// start primary network staker 1 second before the subnet staker
+					StartTime: staker.StartTime.Add(-time.Second),
+					Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
+				}
+				require.NoError(service.vm.state.PutCurrentValidator(primaryStaker))
+				staker.Priority = txs.SubnetPermissionedValidatorCurrentPriority
+				require.NoError(service.vm.state.PutCurrentValidator(staker))
+
+				stakersByTxID[staker.TxID] = staker
+			}
+
+			l1ValidatorsByVID := make(map[ids.ID]state.L1Validator)
+			if len(test.l1Validators) != 0 {
+				service.vm.state.SetSubnetToL1Conversion(subnetID,
+					state.SubnetToL1Conversion{
+						ConversionID: ids.GenerateTestID(),
+						ChainID:      ids.GenerateTestID(),
+						Addr:         []byte{'a', 'd', 'd', 'r'},
+					})
+			}
+
+			for _, l1Validator := range test.l1Validators {
+				deactivationOwner := message.PChainOwner{
+					Threshold: 1,
+					Addresses: []ids.ShortID{
+						ids.GenerateTestShortID(),
+					},
+				}
+
+				remainingBalanceOwner := message.PChainOwner{
+					Threshold: 1,
+					Addresses: []ids.ShortID{
+						ids.GenerateTestShortID(),
+					},
+				}
+
+				remainingBalanceOwnerBytes, err := txs.Codec.Marshal(txs.CodecVersion, remainingBalanceOwner)
+				require.NoError(err)
+				deactivationOwnerBytes, err := txs.Codec.Marshal(txs.CodecVersion, deactivationOwner)
+				require.NoError(err)
+				l1Validator.RemainingBalanceOwner = remainingBalanceOwnerBytes
+				l1Validator.DeactivationOwner = deactivationOwnerBytes
+
+				require.NoError(service.vm.state.PutL1Validator(l1Validator))
+
+				if l1Validator.Weight == 0 {
+					continue
+				}
+				l1ValidatorsByVID[l1Validator.ValidationID] = l1Validator
+			}
+
+			service.vm.state.SetHeight(0)
+			require.NoError(service.vm.state.Commit())
+			service.vm.ctx.Lock.Unlock()
+
+			testValidator := func(vdr any) ids.NodeID {
+				switch v := vdr.(type) {
+				case pchainapi.Staker:
+					staker, exists := stakersByTxID[v.TxID]
+					require.True(exists, "unexpected validator: %s", vdr)
+					require.Equal(staker.NodeID, v.NodeID)
+					require.Equal(avajson.Uint64(staker.Weight), v.Weight)
+					require.Equal(staker.StartTime.Unix(), int64(v.StartTime))
+					return v.NodeID
+				case APIL1Validator:
+					validator, exists := l1ValidatorsByVID[v.ValidationID]
+					require.True(exists, "unexpected validator: %s", vdr)
+					require.Equal(validator.NodeID, v.NodeID)
+					require.Equal(avajson.Uint64(validator.Weight), v.Weight)
+					require.Equal(validator.StartTime, uint64(v.StartTime))
+					accruedFees := service.vm.state.GetAccruedFees()
+					require.Equal(avajson.Uint64(validator.EndAccumulatedFee-accruedFees), v.Balance)
+					require.Equal(avajson.Uint64(validator.MinNonce), v.MinNonce)
+					require.Equal(
+						types.JSONByteSlice(bls.PublicKeyToCompressedBytes(bls.PublicKeyFromValidUncompressedBytes(validator.PublicKey))),
+						v.PublicKey)
+					var expectedRemainingBalanceOwner message.PChainOwner
+					_, err := txs.Codec.Unmarshal(validator.RemainingBalanceOwner, &expectedRemainingBalanceOwner)
+					require.NoError(err)
+					formattedRemainingBalanceOwner, err := service.addrManager.FormatLocalAddress(expectedRemainingBalanceOwner.Addresses[0])
+					require.NoError(err)
+					require.Equal(formattedRemainingBalanceOwner, v.RemainingBalanceOwner.Addresses[0])
+					require.Equal(avajson.Uint32(expectedRemainingBalanceOwner.Threshold), v.RemainingBalanceOwner.Threshold)
+					var expectedDeactivationOwner message.PChainOwner
+					_, err = txs.Codec.Unmarshal(validator.DeactivationOwner, &expectedDeactivationOwner)
+					require.NoError(err)
+					formattedDeactivationOwner, err := service.addrManager.FormatLocalAddress(expectedDeactivationOwner.Addresses[0])
+					require.NoError(err)
+					require.Equal(formattedDeactivationOwner, v.DeactivationOwner.Addresses[0])
+					require.Equal(avajson.Uint32(expectedDeactivationOwner.Threshold), v.DeactivationOwner.Threshold)
+					return v.NodeID
+				default:
+					require.Fail("unexpected validator type: %T", vdr)
+					return ids.NodeID{}
+				}
+			}
+
+			args := GetCurrentValidatorsArgs{
+				SubnetID: subnetID,
+			}
+			reply := GetCurrentValidatorsReply{}
+			require.NoError(service.GetCurrentValidators(&http.Request{}, &args, &reply))
+			require.Len(reply.Validators, len(stakersByTxID)+len(l1ValidatorsByVID))
+			for _, vdr := range reply.Validators {
+				testValidator(vdr)
+			}
+
+			// Test with a specific node ID
+			var nodeIDs []ids.NodeID
+			if len(stakersByTxID) > 0 {
+				// pick the first staker
+				nodeIDs = append(nodeIDs, maps.Values(stakersByTxID)[0].NodeID)
+			}
+			if len(l1ValidatorsByVID) > 0 {
+				nodeIDs = append(nodeIDs, maps.Values(l1ValidatorsByVID)[0].NodeID)
+			}
+
+			args.NodeIDs = nodeIDs
+			reply = GetCurrentValidatorsReply{}
+			require.NoError(service.GetCurrentValidators(&http.Request{}, &args, &reply))
+			require.Len(reply.Validators, len(nodeIDs))
+			for i, vdr := range reply.Validators {
+				nodeID := testValidator(vdr)
+				require.Equal(args.NodeIDs[i], nodeID)
+			}
+		})
+	}
 }
 
 func TestGetValidatorFeeConfig(t *testing.T) {

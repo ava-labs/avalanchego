@@ -374,7 +374,7 @@ type AppResponseHandler interface {
 	// Notify this engine of the response to a previously sent AppRequest with
 	// the same requestID.
 	//
-	// The meaning of response is application (VM) specifc.
+	// The meaning of response is application (VM) specific.
 	//
 	// It is not guaranteed that response is well-formed or valid.
 	AppResponse(

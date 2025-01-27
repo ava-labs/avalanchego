@@ -30,7 +30,7 @@ var (
 	ErrNotValidator                    = errors.New("isn't a current or pending validator")
 	ErrRemovePermissionlessValidator   = errors.New("attempting to remove permissionless validator")
 	ErrStakeOverflow                   = errors.New("validator stake exceeds limit")
-	ErrPeriodMismatch                  = errors.New("proposed staking period is not inside dependant staking period")
+	ErrPeriodMismatch                  = errors.New("proposed staking period is not inside dependent staking period")
 	ErrOverDelegated                   = errors.New("validator would be over delegated")
 	ErrIsNotTransformSubnetTx          = errors.New("is not a transform subnet tx")
 	ErrTimestampNotBeforeStartTime     = errors.New("chain timestamp not before start time")

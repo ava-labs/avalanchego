@@ -198,6 +198,7 @@ func (vm *VMClient) Initialize(
 		CortinaXChainStopVertexId:     chainCtx.NetworkUpgrades.CortinaXChainStopVertexID[:],
 		DurangoTime:                   grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.DurangoTime),
 		EtnaTime:                      grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.EtnaTime),
+		FUpgradeTime:                  grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.FUpgradeTime),
 	}
 
 	resp, err := vm.client.Initialize(ctx, &vmpb.InitializeRequest{
