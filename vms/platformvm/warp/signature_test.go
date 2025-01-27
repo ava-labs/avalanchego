@@ -831,7 +831,7 @@ func TestSignatureVerification(t *testing.T) {
 			msg := tt.msgF(require)
 			pChainState := tt.stateF(ctrl)
 
-			canonicalValidatorsSet, totalWieght, err := GetCanonicalValidatorSetFromState(
+			validators, err := GetCanonicalValidatorSetFromState(
 				context.Background(),
 				pChainState,
 				pChainHeight,
@@ -843,8 +843,7 @@ func TestSignatureVerification(t *testing.T) {
 				context.Background(),
 				&msg.UnsignedMessage,
 				tt.networkID,
-				canonicalValidatorsSet,
-				totalWieght,
+				validators,
 				tt.quorumNum,
 				tt.quorumDen,
 			)

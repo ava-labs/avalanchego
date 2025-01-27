@@ -39,8 +39,7 @@ type Signature interface {
 		ctx context.Context,
 		msg *UnsignedMessage,
 		networkID uint32,
-		canonicalValidatorsSet []*Validator,
-		totalWeight uint64,
+		validators CanonicalValidatorSet,
 		quorumNum uint64,
 		quorumDen uint64,
 	) error
@@ -70,8 +69,7 @@ func (s *BitSetSignature) Verify(
 	ctx context.Context,
 	msg *UnsignedMessage,
 	networkID uint32,
-	canonicalValidatorsSet []*Validator,
-	totalWeight uint64,
+	validators CanonicalValidatorSet,
 	quorumNum uint64,
 	quorumDen uint64,
 ) error {
@@ -90,7 +88,7 @@ func (s *BitSetSignature) Verify(
 	}
 
 	// Get the validators that (allegedly) signed the message.
-	signers, err := FilterValidators(signerIndices, canonicalValidatorsSet)
+	signers, err := FilterValidators(signerIndices, validators.Validators)
 	if err != nil {
 		return err
 	}
@@ -101,7 +99,7 @@ func (s *BitSetSignature) Verify(
 	// Make sure the signature's weight is sufficient.
 	err = VerifyWeight(
 		sigWeight,
-		totalWeight,
+		validators.TotalWeight,
 		quorumNum,
 		quorumDen,
 	)

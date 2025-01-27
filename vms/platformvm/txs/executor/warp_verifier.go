@@ -128,7 +128,7 @@ func (w *warpVerifier) verify(message []byte) error {
 		return err
 	}
 
-	vds, weight, err := warp.GetCanonicalValidatorSetFromState(
+	validators, err := warp.GetCanonicalValidatorSetFromState(
 		w.context,
 		w.validatorState,
 		w.pChainHeight,
@@ -142,8 +142,7 @@ func (w *warpVerifier) verify(message []byte) error {
 		w.context,
 		&msg.UnsignedMessage,
 		w.networkID,
-		vds,
-		weight,
+		validators,
 		WarpQuorumNumerator,
 		WarpQuorumDenominator,
 	)

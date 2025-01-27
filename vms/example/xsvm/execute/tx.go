@@ -164,7 +164,7 @@ func (t *Tx) Import(i *tx.Import) error {
 		return errs.Err
 	}
 
-	vds, weight, err := warp.GetCanonicalValidatorSetFromState(
+	validators, err := warp.GetCanonicalValidatorSetFromState(
 		t.Context,
 		t.ChainContext.ValidatorState,
 		t.BlockContext.PChainHeight,
@@ -178,8 +178,7 @@ func (t *Tx) Import(i *tx.Import) error {
 		t.Context,
 		&message.UnsignedMessage,
 		t.ChainContext.NetworkID,
-		vds,
-		weight,
+		validators,
 		QuorumNumerator,
 		QuorumDenominator,
 	)
