@@ -128,12 +128,22 @@ func (w *warpVerifier) verify(message []byte) error {
 		return err
 	}
 
+	vds, weight, err := warp.GetCanonicalValidatorSetFromState(
+		w.context,
+		w.validatorState,
+		w.pChainHeight,
+		msg.SourceChainID,
+	)
+	if err != nil {
+		return err
+	}
+
 	return msg.Signature.Verify(
 		w.context,
 		&msg.UnsignedMessage,
 		w.networkID,
-		w.validatorState,
-		w.pChainHeight,
+		vds,
+		weight,
 		WarpQuorumNumerator,
 		WarpQuorumDenominator,
 	)
