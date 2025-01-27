@@ -42,7 +42,7 @@ import (
 	xbuilder "github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 )
 
-const NumKeys = 5
+const NumKeys = 6
 
 func main() {
 	// TODO(marun) Support choosing the log format
