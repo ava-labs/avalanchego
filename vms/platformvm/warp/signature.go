@@ -93,7 +93,7 @@ func (s *BitSetSignature) Verify(
 		return err
 	}
 
-	// Because [signers] is a subset of [vdrs], this can never error.
+	// Because [signers] is a subset of [validators.Validators], this can never error.
 	sigWeight, _ := SumWeight(signers)
 
 	// Make sure the signature's weight is sufficient.
