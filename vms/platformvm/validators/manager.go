@@ -14,12 +14,14 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -97,7 +99,7 @@ type State interface {
 		subnetID ids.ID,
 	) error
 
-	GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error)
+	GetCurrentValidators(ctx context.Context, subnetID ids.ID) ([]*state.Staker, []state.L1Validator, uint64, error)
 }
 
 func NewManager(
@@ -325,5 +327,36 @@ func (m *manager) OnAcceptedBlockID(blkID ids.ID) {
 }
 
 func (m *manager) GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
-	return m.state.GetCurrentValidatorSet(ctx, subnetID)
+	result := make(map[ids.ID]*validators.GetCurrentValidatorOutput)
+	baseStakers, l1Validators, height, err := m.state.GetCurrentValidators(ctx, subnetID)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get current validators: %w", err)
+	}
+
+	for _, validator := range baseStakers {
+		result[validator.TxID] = &validators.GetCurrentValidatorOutput{
+			ValidationID:  validator.TxID,
+			NodeID:        validator.NodeID,
+			PublicKey:     validator.PublicKey,
+			Weight:        validator.Weight,
+			StartTime:     uint64(validator.StartTime.Unix()),
+			MinNonce:      0,
+			IsActive:      true,
+			IsL1Validator: false,
+		}
+	}
+
+	for _, validator := range l1Validators {
+		result[validator.ValidationID] = &validators.GetCurrentValidatorOutput{
+			ValidationID:  validator.ValidationID,
+			NodeID:        validator.NodeID,
+			PublicKey:     bls.PublicKeyFromValidUncompressedBytes(validator.PublicKey),
+			Weight:        validator.Weight,
+			StartTime:     validator.StartTime,
+			IsActive:      validator.IsActive(),
+			MinNonce:      validator.MinNonce,
+			IsL1Validator: true,
+		}
+	}
+	return result, height, nil
 }

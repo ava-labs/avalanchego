@@ -88,10 +88,6 @@ type Staker struct {
 	EndTime   json.Uint64 `json:"endTime"`
 	Weight    json.Uint64 `json:"weight"`
 	NodeID    ids.NodeID  `json:"nodeID"`
-
-	// Deprecated: Use Weight instead
-	// TODO: remove [StakeAmount] after enough time for dependencies to update
-	StakeAmount *json.Uint64 `json:"stakeAmount,omitempty"`
 }
 
 // GenesisValidator should to be used for genesis validators only.
@@ -139,14 +135,6 @@ type GenesisPermissionlessValidator struct {
 	ExactDelegationFee *json.Uint32              `json:"exactDelegationFee,omitempty"`
 	Staked             []UTXO                    `json:"staked,omitempty"`
 	Signer             *signer.ProofOfPossession `json:"signer,omitempty"`
-}
-
-// PermissionedValidator is the repr. of a permissioned validator sent over APIs.
-type PermissionedValidator struct {
-	Staker
-	// The owner the staking reward, if applicable, will go to
-	Connected *bool         `json:"connected,omitempty"`
-	Uptime    *json.Float32 `json:"uptime,omitempty"`
 }
 
 // PrimaryDelegator is the repr. of a primary network delegator sent over APIs.
