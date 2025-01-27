@@ -3026,7 +3026,7 @@ func TestGetProcessingAncestor(t *testing.T) {
 				ctx = snowtest.ConsensusContext(
 					snowtest.Context(t, snowtest.PChainID),
 				)
-				consensus = &snowman.Topological{}
+				consensus = &snowman.Topological{Factory: snowball.SnowflakeFactory}
 			)
 			require.NoError(consensus.Initialize(
 				ctx,
@@ -3100,7 +3100,7 @@ func TestShouldIssueBlock(t *testing.T) {
 
 	require.NoError(t, blocks[0].Accept(context.Background()))
 
-	c := &snowman.Topological{}
+	c := &snowman.Topological{Factory: snowball.SnowflakeFactory}
 	require.NoError(t, c.Initialize(
 		ctx,
 		snowball.DefaultParameters,

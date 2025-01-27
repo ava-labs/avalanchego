@@ -59,4 +59,4 @@ fi
 
 #################################
 # shellcheck disable=SC2086
-./scripts/ginkgo.sh ${GINKGO_ARGS} -v ./tests/e2e -- "${E2E_ARGS[@]}" "${@}"
+./bin/ginkgo ${GINKGO_ARGS} -v ./tests/e2e -- "${E2E_ARGS[@]}" "${@}"
