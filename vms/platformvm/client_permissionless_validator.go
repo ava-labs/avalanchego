@@ -22,8 +22,6 @@ type ClientStaker struct {
 	EndTime uint64
 	// the validator weight when sampling validators
 	Weight uint64
-	// the amount of tokens being staked.
-	StakeAmount *uint64
 	// the node ID of the staker
 	NodeID ids.NodeID
 }
