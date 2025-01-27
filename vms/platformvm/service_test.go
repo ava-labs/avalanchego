@@ -1339,7 +1339,6 @@ func TestGetCurrentValidatorsForL1(t *testing.T) {
 	require.NoError(t, err)
 	otherPK := otherSK.PublicKey()
 	otherPKBytes := bls.PublicKeyToUncompressedBytes(otherPK)
-	now := time.Now()
 
 	tests := []struct {
 		name         string
@@ -1347,10 +1346,10 @@ func TestGetCurrentValidatorsForL1(t *testing.T) {
 		l1Validators []state.L1Validator
 	}{
 		{
-			name: "empty noop",
+			name: "empty_noop",
 		},
 		{
-			name: "initial stakers",
+			name: "initial_stakers",
 			initial: []*state.Staker{
 				{
 					TxID:      ids.GenerateTestID(),
@@ -1358,7 +1357,7 @@ func TestGetCurrentValidatorsForL1(t *testing.T) {
 					NodeID:    ids.GenerateTestNodeID(),
 					PublicKey: pk,
 					Weight:    1,
-					StartTime: now,
+					StartTime: time.Unix(0, 0),
 				},
 				{
 					TxID:      ids.GenerateTestID(),
@@ -1366,18 +1365,18 @@ func TestGetCurrentValidatorsForL1(t *testing.T) {
 					NodeID:    ids.GenerateTestNodeID(),
 					PublicKey: otherPK,
 					Weight:    1,
-					StartTime: now.Add(1 * time.Second),
+					StartTime: time.Unix(1, 0),
 				},
 			},
 		},
 		{
-			name: "L1 validators",
+			name: "l1_validators",
 			l1Validators: []state.L1Validator{
 				{
 					ValidationID: ids.GenerateTestID(),
 					SubnetID:     subnetID,
 					NodeID:       ids.GenerateTestNodeID(),
-					StartTime:    uint64(now.Unix()),
+					StartTime:    0,
 					PublicKey:    pkBytes,
 					Weight:       1,
 				},
@@ -1386,13 +1385,13 @@ func TestGetCurrentValidatorsForL1(t *testing.T) {
 					SubnetID:     subnetID,
 					NodeID:       ids.GenerateTestNodeID(),
 					PublicKey:    otherPKBytes,
-					StartTime:    uint64(now.Unix()) + 1,
+					StartTime:    1,
 					Weight:       1,
 				},
 			},
 		},
 		{
-			name: "initial stakers and L1 validators mixed",
+			name: "initial_stakers_l1_validators_mixed",
 			initial: []*state.Staker{
 				{
 					TxID:      ids.GenerateTestID(),
@@ -1400,7 +1399,7 @@ func TestGetCurrentValidatorsForL1(t *testing.T) {
 					NodeID:    ids.GenerateTestNodeID(),
 					PublicKey: pk,
 					Weight:    123123,
-					StartTime: now,
+					StartTime: time.Unix(0, 0),
 				},
 				{
 					TxID:      ids.GenerateTestID(),
@@ -1408,7 +1407,7 @@ func TestGetCurrentValidatorsForL1(t *testing.T) {
 					NodeID:    ids.GenerateTestNodeID(),
 					PublicKey: otherPK,
 					Weight:    0,
-					StartTime: now.Add(2 * time.Second),
+					StartTime: time.Unix(2, 0),
 				},
 			},
 			l1Validators: []state.L1Validator{
@@ -1416,7 +1415,7 @@ func TestGetCurrentValidatorsForL1(t *testing.T) {
 					ValidationID:      ids.GenerateTestID(),
 					SubnetID:          subnetID,
 					NodeID:            ids.GenerateTestNodeID(),
-					StartTime:         uint64(now.Unix()),
+					StartTime:         0,
 					PublicKey:         pkBytes,
 					Weight:            1,
 					EndAccumulatedFee: 1,
@@ -1427,7 +1426,7 @@ func TestGetCurrentValidatorsForL1(t *testing.T) {
 					SubnetID:          subnetID,
 					NodeID:            ids.GenerateTestNodeID(),
 					PublicKey:         pkBytes,
-					StartTime:         uint64(now.Unix()) + 2,
+					StartTime:         2,
 					Weight:            1,
 					EndAccumulatedFee: 0,
 				},
@@ -1436,7 +1435,7 @@ func TestGetCurrentValidatorsForL1(t *testing.T) {
 					SubnetID:          subnetID,
 					NodeID:            ids.GenerateTestNodeID(),
 					PublicKey:         otherPKBytes,
-					StartTime:         uint64(now.Unix()) + 3,
+					StartTime:         3,
 					Weight:            0,
 					EndAccumulatedFee: 1,
 				},
