@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -1330,12 +1331,12 @@ func FuzzGetFeeState(f *testing.F) {
 func TestGetCurrentValidatorsForL1(t *testing.T) {
 	subnetID := ids.GenerateTestID()
 
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.NewSigner()
 	require.NoError(t, err)
 	pk := sk.PublicKey()
 	pkBytes := bls.PublicKeyToUncompressedBytes(pk)
 
-	otherSK, err := bls.NewSigner()
+	otherSK, err := localsigner.NewSigner()
 	require.NoError(t, err)
 	otherPK := otherSK.PublicKey()
 	otherPKBytes := bls.PublicKeyToUncompressedBytes(otherPK)
