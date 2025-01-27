@@ -918,7 +918,8 @@ func (m *manager) createAvalancheChain(
 		return nil, fmt.Errorf("couldn't initialize snow base message handler: %w", err)
 	}
 
-	var snowmanConsensus smcon.Consensus = &smcon.Topological{Factory: snowball.SnowflakeFactory}
+	topological := &smcon.Topological{Factory: snowball.SnowflakeFactory}
+	var snowmanConsensus smcon.Consensus = topological
 	if m.TracingEnabled {
 		snowmanConsensus = smcon.Trace(snowmanConsensus, m.Tracer)
 	}
@@ -1312,7 +1313,9 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("couldn't initialize snow base message handler: %w", err)
 	}
 
-	var consensus smcon.Consensus = &smcon.Topological{Factory: snowball.SnowflakeFactory}
+	topological := &smcon.Topological{Factory: snowball.SnowflakeFactory}
+
+	var consensus smcon.Consensus = topological
 	if m.TracingEnabled {
 		consensus = smcon.Trace(consensus, m.Tracer)
 	}
