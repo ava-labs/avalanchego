@@ -37,7 +37,7 @@ import (
 const (
 	// DefaultMinBlockDelay should be kept as whole seconds because block
 	// timestamps are only specific to the second.
-	DefaultMinBlockDelay = time.Second
+	DefaultMinBlockDelay time.Duration = 0
 	// DefaultNumHistoricalBlocks as 0 results in never deleting any historical
 	// blocks.
 	DefaultNumHistoricalBlocks uint64 = 0
