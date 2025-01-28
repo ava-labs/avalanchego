@@ -263,15 +263,13 @@ func (p *earlyTermPoll) String() string {
 }
 
 func aggregateVotesFromPrefixesAndIDs(transitiveVotesForPrefixes []int, transitiveVotes bag.Bag[ids.ID]) []int {
-	voteCountsForIDsOrPrefixes := make([]int, 0, len(transitiveVotesForPrefixes)+len(transitiveVotes.List()))
-
-	for _, id := range transitiveVotes.List() {
+	transitiveVoteIDs := transitiveVotes.List()
+	voteCountsForIDsOrPrefixes := make([]int, 0, len(transitiveVoteIDs)+len(transitiveVotesForPrefixes))
+	for _, id := range transitiveVoteIDs {
 		votesForID := transitiveVotes.Count(id)
 		voteCountsForIDsOrPrefixes = append(voteCountsForIDsOrPrefixes, votesForID)
 	}
-
 	voteCountsForIDsOrPrefixes = append(voteCountsForIDsOrPrefixes, transitiveVotesForPrefixes...)
-
 	return voteCountsForIDsOrPrefixes
 }
 

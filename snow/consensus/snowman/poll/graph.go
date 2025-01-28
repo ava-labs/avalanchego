@@ -36,19 +36,14 @@ type voteGraph struct {
 // It returns a voteGraph where each vertex corresponds to an ID and is linked to vertices
 // according to what getParent() returns for each ID.
 func buildVoteGraph(getParent func(ids.ID) (ids.ID, bool), votes bag.Bag[ids.ID]) voteGraph {
-	idList := votes.List()
-
-	id2Vertex := make(map[ids.ID]*voteVertex, len(idList))
-	roots := make([]*voteVertex, 0, len(idList))
-
 	// Build a graph out of the vertices that correspond to the IDs of the votes.
+	idList := votes.List()
+	id2Vertex := make(map[ids.ID]*voteVertex, len(idList))
 	for _, id := range idList {
-		id2Vertex[id] = &voteVertex{id: id, descendants: make([]*voteVertex, 0, 2)}
+		addIDAndAncestorsToGraph(getParent, id, id2Vertex)
 	}
 
-	// Add the ancestors of the IDs to the graph, for those that are not already there.
-	addAncestorsToGraph(getParent, idList, id2Vertex)
-
+	roots := make([]*voteVertex, 0, len(idList))
 	for id, v := range id2Vertex {
 		parent, ok := getParent(id)
 		if !ok {
@@ -61,54 +56,48 @@ func buildVoteGraph(getParent func(ids.ID) (ids.ID, bool), votes bag.Bag[ids.ID]
 			v.parent = u
 			u.descendants = append(u.descendants, v)
 		} else {
+			// This case is typically dead code, as it can only happen if
+			// getParent returns new mappings that were not returned earlier in
+			// the loop. But it is handled for completeness.
 			roots = append(roots, v)
 		}
 	}
 
 	leaves := findLeaves(id2Vertex)
-
-	return voteGraph{leaves: leaves, roots: roots, vertexCount: len(id2Vertex)}
-}
-
-func addAncestorsToGraph(getParent func(ids.ID) (ids.ID, bool), idList []ids.ID, id2Vertex map[ids.ID]*voteVertex) {
-	var discoveredAncestors bag.Bag[ids.ID]
-
-	for _, id := range idList {
-		ancestors := discoverAncestorsOfID(getParent, id, id2Vertex)
-		discoveredAncestors.Add(ancestors.List()...)
-	}
-
-	for _, id := range discoveredAncestors.List() {
-		id2Vertex[id] = &voteVertex{id: id}
+	return voteGraph{
+		vertexCount: len(id2Vertex),
+		leaves:      leaves,
+		roots:       roots,
 	}
 }
 
-// discoverAncestorsOfID finds new ancestors of the given ID
-func discoverAncestorsOfID(getParent func(ids.ID) (ids.ID, bool), id ids.ID, id2Vertex map[ids.ID]*voteVertex) bag.Bag[ids.ID] {
-	var addedAncestors bag.Bag[ids.ID]
-
+// addIDAndAncestorsToGraph adds an ID and its ancestors to the graph
+func addIDAndAncestorsToGraph(
+	getParent func(ids.ID) (ids.ID, bool),
+	id ids.ID,
+	id2Vertex map[ids.ID]*voteVertex,
+) {
 	for {
+		// If the ID has already been added, no need to add it or its ancestors,
+		// as we already did so in previous iterations.
+		if _, exists := id2Vertex[id]; exists {
+			break
+		}
+
+		// Add the ID to the graph.
+		id2Vertex[id] = &voteVertex{id: id}
+
+		// Attempt to add the parent of the ID to the graph.
 		parent, ok := getParent(id)
-		// If this parent isn't found, it must be already finalized, so don't add it to the graph.
+		// If this parent isn't found, it must be already finalized, so don't
+		// add it to the graph.
 		if !ok {
 			break
 		}
 
-		// If the parent is in the original vote set, no need to transitively add its ancestors,
-		// as we either already did so in previous iterations,
-		// or would do so in the next iterations.
-		if _, exists := id2Vertex[parent]; exists {
-			break
-		}
-
-		// If the parent is not finalized we can vote on it, so add it.
-		addedAncestors.Add(parent)
-
-		// Visit transitively the parent's ancestors.
+		// If the parent is not finalized we can vote on it.
 		id = parent
 	}
-
-	return addedAncestors
 }
 
 // traverse traverses over all vertices in the voteGraph in pre-order traversal.
@@ -129,7 +118,7 @@ func (vg *voteGraph) topologicalSortTraversal(f func(*voteVertex)) {
 
 	leaves := vg.leaves
 
-	// Iterate from leaves to roots and recursively apply f() over each vertex
+	// Iterate from leaves to roots and apply f() over each vertex
 	for len(leaves) > 0 {
 		newLeaves := make([]*voteVertex, 0, len(leaves))
 		for _, leaf := range leaves {

@@ -51,8 +51,7 @@ func longestSharedPrefixes(idList []ids.ID) *prefixGroup {
 				break
 			}
 
-			// Else, there is no bifurcation,
-			// so swallow up your descendant
+			// Else, there is no bifurcation, so swallow up your descendant
 			descendant := determineDescendant(pg)
 
 			// Become your descendant
@@ -64,24 +63,13 @@ func longestSharedPrefixes(idList []ids.ID) *prefixGroup {
 }
 
 func determineDescendant(pg *prefixGroup) *prefixGroup {
-	var descendant *prefixGroup
-
-	zg := pg.children[0]
-	og := pg.children[1]
-
-	if zg == nil && og == nil {
-		// If both are nil, it's a programming error, so panic.
-		panic("programming error: both zero group and one group are nil")
+	for _, child := range pg.children {
+		if child != nil {
+			return child
+		}
 	}
-
-	if zg != nil {
-		descendant = zg
-	}
-
-	if og != nil {
-		descendant = og
-	}
-	return descendant
+	// If both are nil, it's a programming error, so panic.
+	panic("programming error: both children are nil")
 }
 
 // bifurcationsWithCommonPrefix traverses the transitive descendants of this prefix group,
@@ -150,7 +138,7 @@ func (pg *prefixGroup) split() {
 
 func deduplicate(in []ids.ID) []ids.ID {
 	out := make([]ids.ID, 0, len(in))
-	used := make(map[ids.ID]struct{})
+	used := make(map[ids.ID]struct{}, len(in))
 	for _, id := range in {
 		if _, exists := used[id]; exists {
 			continue
@@ -158,6 +146,5 @@ func deduplicate(in []ids.ID) []ids.ID {
 		used[id] = struct{}{}
 		out = append(out, id)
 	}
-
 	return out
 }

@@ -17,6 +17,7 @@ import (
 
 func DefaultConfig(t testing.TB) Config {
 	ctx := snowtest.Context(t, snowtest.PChainID)
+
 	return Config{
 		Ctx:                 snowtest.ConsensusContext(ctx),
 		VM:                  &blocktest.VM{},
