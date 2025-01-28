@@ -13,6 +13,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -266,20 +267,16 @@ func (b *basicAuthRoundTripper) RoundTrip(req *http.Request) (*http.Response, er
 func getSelectors(networkUUID string) (string, error) {
 	// If network UUID is provided, use it as the only selector
 	if len(networkUUID) > 0 {
-		return []string{fmt.Sprintf(`network_uuid="%s"`, networkUUID)}
+		return fmt.Sprintf(`network_uuid="%s"`, networkUUID), nil
 	}
 
 	// Fall back to using Github labels as selectors
-	githubLabels := githubLabelsFromEnv()
-	for label := range githubLabels {
-		value, err := githubLabels.GetStringVal(label)
-		if err != nil {
-			return "", err
+	selectors := []string{}
+	for _, label := range githubLabels {
+		value := os.Getenv(strings.ToUpper(label))
+		if len(value) > 0 {
+			selectors = append(selectors, fmt.Sprintf(`%s="%s"`, label, value))
 		}
-		if len(value) == 0 {
-			continue
-		}
-		selectors = append(selectors, fmt.Sprintf(`%s="%s"`, label, value))
 	}
 	if len(selectors) == 0 {
 		return "", errors.New("no GH_* env vars set to use for selectors")
