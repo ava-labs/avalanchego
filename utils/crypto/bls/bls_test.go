@@ -29,7 +29,7 @@ func publicKey(sk *blst.SecretKey) *PublicKey {
 }
 
 func sign(sk *blst.SecretKey, msg []byte) *Signature {
-	return new(Signature).Sign(sk, msg, CiphersuiteSignature)
+	return new(Signature).Sign(sk, msg, CiphersuiteSignature.Bytes())
 }
 
 func TestAggregationThreshold(t *testing.T) {
