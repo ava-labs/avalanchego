@@ -7,9 +7,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	blst "github.com/supranational/blst/bindings/go"
 
 	"github.com/ava-labs/avalanchego/utils"
+
+	blst "github.com/supranational/blst/bindings/go"
 )
 
 const SecretKeyLen = blst.BLST_SCALAR_BYTES
