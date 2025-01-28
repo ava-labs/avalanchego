@@ -9,9 +9,7 @@ import (
 	blst "github.com/supranational/blst/bindings/go"
 )
 
-const (
-	PublicKeyLen = blst.BLST_P1_COMPRESS_BYTES
-)
+const PublicKeyLen = blst.BLST_P1_COMPRESS_BYTES
 
 var (
 	ErrNoPublicKeys               = errors.New("no public keys")
