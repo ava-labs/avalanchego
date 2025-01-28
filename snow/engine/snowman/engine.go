@@ -114,7 +114,7 @@ func New(config Config) (*Engine, error) {
 		config.Params.AlphaPreference,
 		config.Params.AlphaConfidence,
 		config.Ctx.Registerer,
-		config.BlockTraversal,
+		config.Consensus,
 	)
 	if err != nil {
 		return nil, err
