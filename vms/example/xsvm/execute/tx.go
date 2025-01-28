@@ -164,7 +164,7 @@ func (t *Tx) Import(i *tx.Import) error {
 		return errs.Err
 	}
 
-	validators, err := warp.GetCanonicalValidatorSetFromState(
+	validators, err := warp.GetCanonicalValidatorSetFromSubnetID(
 		t.Context,
 		t.ChainContext.ValidatorState,
 		t.BlockContext.PChainHeight,

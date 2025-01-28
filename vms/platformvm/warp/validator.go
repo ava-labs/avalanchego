@@ -33,7 +33,9 @@ type ValidatorState interface {
 }
 
 type CanonicalValidatorSet struct {
-	Validators  []*Validator
+	// Validators slice in canonical ordering of the validators that has public key
+	Validators []*Validator
+	// The total weight of all the validators, including the ones that doesn't have a public key
 	TotalWeight uint64
 }
 
@@ -48,10 +50,10 @@ func (v *Validator) Compare(o *Validator) int {
 	return bytes.Compare(v.PublicKeyBytes, o.PublicKeyBytes)
 }
 
-// GetCanonicalValidatorSet returns the validator set of [subnetID] at
-// [pChcainHeight] in a canonical ordering. Also returns the total weight on
-// [subnetID].
-func GetCanonicalValidatorSet(
+// GetCanonicalValidatorSetFromSubnetID returns the CanonicalValidatorSet of [subnetID] at
+// [pChcainHeight] in a canonical ordering. CanonicalValidatorSet includes the validator set
+// and the total weight.
+func GetCanonicalValidatorSetFromSubnetID(
 	ctx context.Context,
 	pChainState ValidatorState,
 	pChainHeight uint64,
@@ -160,8 +162,8 @@ func AggregatePublicKeys(vdrs []*Validator) (*bls.PublicKey, error) {
 	return bls.AggregatePublicKeys(pks)
 }
 
-// GetCanonicalValidatorSetFromState returns the canonical validator set given a validators.State, pChain height and a sourceChainID.
-func GetCanonicalValidatorSetFromState(ctx context.Context,
+// GetCanonicalValidatorSetFromChainID returns the canonical validator set given a validators.State, pChain height and a sourceChainID.
+func GetCanonicalValidatorSetFromChainID(ctx context.Context,
 	pChainState validators.State,
 	pChainHeight uint64,
 	sourceChainID ids.ID,
@@ -171,5 +173,5 @@ func GetCanonicalValidatorSetFromState(ctx context.Context,
 		return CanonicalValidatorSet{}, err
 	}
 
-	return GetCanonicalValidatorSet(ctx, pChainState, pChainHeight, subnetID)
+	return GetCanonicalValidatorSetFromSubnetID(ctx, pChainState, pChainHeight, subnetID)
 }
