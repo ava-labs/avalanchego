@@ -139,7 +139,6 @@ func (w *warpVerifier) verify(message []byte) error {
 	}
 
 	return msg.Signature.Verify(
-		w.context,
 		&msg.UnsignedMessage,
 		w.networkID,
 		validators,

@@ -175,7 +175,6 @@ func (t *Tx) Import(i *tx.Import) error {
 	}
 
 	return message.Signature.Verify(
-		t.Context,
 		&message.UnsignedMessage,
 		t.ChainContext.NetworkID,
 		validators,

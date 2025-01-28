@@ -4,7 +4,6 @@
 package warp
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"math/big"
@@ -36,7 +35,6 @@ type Signature interface {
 	//
 	// Invariant: [msg] is correctly initialized.
 	Verify(
-		ctx context.Context,
 		msg *UnsignedMessage,
 		networkID uint32,
 		validators CanonicalValidatorSet,
@@ -66,7 +64,6 @@ func (s *BitSetSignature) NumSigners() (int, error) {
 }
 
 func (s *BitSetSignature) Verify(
-	ctx context.Context,
 	msg *UnsignedMessage,
 	networkID uint32,
 	validators CanonicalValidatorSet,
