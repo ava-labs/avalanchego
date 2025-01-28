@@ -52,9 +52,9 @@ func ConsensusContext(ctx *snow.Context) *snow.ConsensusContext {
 func Context(tb testing.TB, chainID ids.ID) *snow.Context {
 	require := require.New(tb)
 
-	secretKey, err := bls.NewSecretKey()
+	secretKey, err := bls.NewSigner()
 	require.NoError(err)
-	publicKey := bls.PublicFromSecretKey(secretKey)
+	publicKey := secretKey.PublicKey()
 
 	aliaser := ids.NewAliaser()
 	require.NoError(aliaser.Alias(constants.PlatformChainID, "P"))
@@ -65,6 +65,9 @@ func Context(tb testing.TB, chainID ids.ID) *snow.Context {
 	require.NoError(aliaser.Alias(CChainID, CChainID.String()))
 
 	validatorState := &validatorstest.State{
+		GetMinimumHeightF: func(context.Context) (uint64, error) {
+			return 0, nil
+		},
 		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
 			subnetID, ok := map[ids.ID]ids.ID{
 				constants.PlatformChainID: constants.PrimaryNetworkID,
@@ -95,6 +98,6 @@ func Context(tb testing.TB, chainID ids.ID) *snow.Context {
 		Metrics:  metrics.NewPrefixGatherer(),
 
 		ValidatorState: validatorState,
-		ChainDataDir:   "",
+		ChainDataDir:   tb.TempDir(),
 	}
 }

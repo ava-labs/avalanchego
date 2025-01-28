@@ -91,9 +91,9 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	// setup state to validate proposal block transaction
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 	onParentAccept.EXPECT().GetFeeState().Return(gas.State{}).AnyTimes()
-	onParentAccept.EXPECT().GetSoVExcess().Return(gas.Gas(0)).AnyTimes()
+	onParentAccept.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).AnyTimes()
 	onParentAccept.EXPECT().GetAccruedFees().Return(uint64(0)).AnyTimes()
-	onParentAccept.EXPECT().NumActiveSubnetOnlyValidators().Return(0).AnyTimes()
+	onParentAccept.EXPECT().NumActiveL1Validators().Return(0).AnyTimes()
 
 	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(
 		iterator.FromSlice(&state.Staker{
@@ -164,9 +164,9 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	onParentAccept := state.NewMockDiff(ctrl)
 	onParentAccept.EXPECT().GetTimestamp().Return(parentTime).AnyTimes()
 	onParentAccept.EXPECT().GetFeeState().Return(gas.State{}).AnyTimes()
-	onParentAccept.EXPECT().GetSoVExcess().Return(gas.Gas(0)).AnyTimes()
+	onParentAccept.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).AnyTimes()
 	onParentAccept.EXPECT().GetAccruedFees().Return(uint64(0)).AnyTimes()
-	onParentAccept.EXPECT().NumActiveSubnetOnlyValidators().Return(0).AnyTimes()
+	onParentAccept.EXPECT().NumActiveL1Validators().Return(0).AnyTimes()
 	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
 
 	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
@@ -219,7 +219,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 		), nil
 	}).AnyTimes()
 	onParentAccept.EXPECT().GetPendingStakerIterator().Return(iterator.Empty[*state.Staker]{}, nil).AnyTimes()
-	onParentAccept.EXPECT().GetActiveSubnetOnlyValidatorsIterator().Return(iterator.Empty[state.SubnetOnlyValidator]{}, nil).AnyTimes()
+	onParentAccept.EXPECT().GetActiveL1ValidatorsIterator().Return(iterator.Empty[state.L1Validator]{}, nil).AnyTimes()
 	onParentAccept.EXPECT().GetExpiryIterator().Return(iterator.Empty[state.ExpiryEntry]{}, nil).AnyTimes()
 
 	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, unsignedNextStakerTx.NodeID()).Return(uint64(0), nil).AnyTimes()
@@ -1329,7 +1329,7 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 		nodeID             = ids.GenerateTestNodeID()
 	)
 
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(err)
 
 	rewardsOwner := &secp256k1fx.OutputOwners{
@@ -1414,7 +1414,7 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 	validatorEndTime = validatorStartTime.Add(env.config.MinStakeDuration)
 	nodeID = ids.GenerateTestNodeID()
 
-	sk, err = bls.NewSecretKey()
+	sk, err = bls.NewSigner()
 	require.NoError(err)
 
 	addValidatorTx2, err := wallet.IssueAddPermissionlessValidatorTx(

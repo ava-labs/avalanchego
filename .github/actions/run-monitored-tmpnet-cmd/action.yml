@@ -7,17 +7,17 @@ inputs:
     required: true
   filter_by_owner:
     default: ''
-  prometheus_id:
+  prometheus_username:
     required: true
   prometheus_password:
     required: true
-  loki_id:
+  loki_username:
     required: true
   loki_password:
     required: true
   # The following inputs need never be provided by the caller. They
   # default to context values that the action's steps are unable to
-  # acccess directly.
+  # access directly.
   repository_owner:
     default: ${{ github.repository_owner }}
   repository_name:
@@ -38,21 +38,21 @@ runs:
   steps:
     - name: Start prometheus
       # Only run for the original repo; a forked repo won't have access to the monitoring credentials
-      if: (inputs.prometheus_id != '')
+      if: (inputs.prometheus_username != '')
       shell: bash
       run: bash -x ./scripts/run_prometheus.sh
       env:
-        PROMETHEUS_ID: ${{ inputs.prometheus_id }}
+        PROMETHEUS_USERNAME: ${{ inputs.prometheus_username }}
         PROMETHEUS_PASSWORD: ${{ inputs.prometheus_password }}
     - name: Start promtail
-      if: (inputs.prometheus_id != '')
+      if: (inputs.prometheus_username != '')
       shell: bash
       run: bash -x ./scripts/run_promtail.sh
       env:
-        LOKI_ID: ${{ inputs.loki_id }}
+        LOKI_USERNAME: ${{ inputs.loki_username }}
         LOKI_PASSWORD: ${{ inputs.loki_password }}
     - name: Notify of metrics availability
-      if: (inputs.prometheus_id != '')
+      if: (inputs.prometheus_username != '')
       shell: bash
       run: ${{ github.action_path }}/notify-metrics-availability.sh
       env:

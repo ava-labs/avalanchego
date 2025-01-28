@@ -1,11 +1,17 @@
 # https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners#codeowners-syntax
 
 # Code owners are the final gate for PR approval to their named section of code.
-# If a single PR involves multiple code owners, every code owner should approve
-# a PR prior to merging.
+# If a single PR modifies multiple files with different code owner groups, at
+# least one code owner of the touched file should approve the PR prior to
+# merging.
 
 * @StephenButtolph
+*.md @meaghanfitzgerald @StephenButtolph
 /.github/ @marun
+/.github/*.md @marun @meaghanfitzgerald
 /network/p2p/ @joshua-kim
+/network/p2p/*.md @joshua-kim @meaghanfitzgerald
 /scripts/ @marun
+/scripts/*.md @marun @meaghanfitzgerald
 /tests/ @marun
+/tests/*.md @marun @meaghanfitzgerald

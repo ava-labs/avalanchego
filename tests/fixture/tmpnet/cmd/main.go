@@ -13,8 +13,12 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/tests"
+	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -26,12 +30,16 @@ var (
 )
 
 func main() {
-	var networkDir string
+	var (
+		networkDir   string
+		rawLogFormat string
+	)
 	rootCmd := &cobra.Command{
 		Use:   "tmpnetctl",
 		Short: "tmpnetctl commands",
 	}
 	rootCmd.PersistentFlags().StringVar(&networkDir, "network-dir", os.Getenv(tmpnet.NetworkDirEnvName), "The path to the configuration directory of a temporary network")
+	rootCmd.PersistentFlags().StringVar(&rawLogFormat, "log-format", logging.AutoString, logging.FormatDescription)
 
 	versionCmd := &cobra.Command{
 		Use:   "version",
@@ -41,7 +49,7 @@ func main() {
 			if len(version.GitCommit) > 0 {
 				msg += ", commit=" + version.GitCommit
 			}
-			fmt.Fprintf(os.Stdout, msg+"\n")
+			fmt.Fprintln(os.Stdout, msg)
 			return nil
 		},
 	}
@@ -62,6 +70,11 @@ func main() {
 				return errAvalancheGoRequired
 			}
 
+			log, err := tests.LoggerForFormat("", rawLogFormat)
+			if err != nil {
+				return err
+			}
+
 			// Root dir will be defaulted on start if not provided
 
 			network := &tmpnet.Network{
@@ -74,15 +87,15 @@ func main() {
 
 			ctx, cancel := context.WithTimeout(context.Background(), networkStartTimeout)
 			defer cancel()
-			err := tmpnet.BootstrapNewNetwork(
+			if err := tmpnet.BootstrapNewNetwork(
 				ctx,
-				os.Stdout,
+				log,
 				network,
 				rootDir,
 				avalancheGoPath,
 				pluginDir,
-			)
-			if err != nil {
+			); err != nil {
+				log.Error("failed to bootstrap network", zap.Error(err))
 				return err
 			}
 
@@ -105,9 +118,15 @@ func main() {
 			return nil
 		},
 	}
+	// TODO(marun) Enable reuse of flags across tmpnetctl and e2e
 	startNetworkCmd.PersistentFlags().StringVar(&rootDir, "root-dir", os.Getenv(tmpnet.RootDirEnvName), "The path to the root directory for temporary networks")
 	startNetworkCmd.PersistentFlags().StringVar(&avalancheGoPath, "avalanchego-path", os.Getenv(tmpnet.AvalancheGoPathEnvName), "The path to an avalanchego binary")
-	startNetworkCmd.PersistentFlags().StringVar(&pluginDir, "plugin-dir", os.ExpandEnv("$HOME/.avalanchego/plugins"), "[optional] the dir containing VM plugins")
+	startNetworkCmd.PersistentFlags().StringVar(
+		&pluginDir,
+		"plugin-dir",
+		e2e.GetEnvWithDefault(tmpnet.AvalancheGoPluginDirEnvName, os.ExpandEnv("$HOME/.avalanchego/plugins")),
+		"[optional] the dir containing VM plugins",
+	)
 	startNetworkCmd.PersistentFlags().Uint8Var(&nodeCount, "node-count", tmpnet.DefaultNodeCount, "Number of nodes the network should initially consist of")
 	startNetworkCmd.PersistentFlags().StringVar(&networkOwner, "network-owner", "", "The string identifying the intended owner of the network")
 	rootCmd.AddCommand(startNetworkCmd)
@@ -137,9 +156,13 @@ func main() {
 			if len(networkDir) == 0 {
 				return errNetworkDirRequired
 			}
+			log, err := tests.LoggerForFormat("", rawLogFormat)
+			if err != nil {
+				return err
+			}
 			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
 			defer cancel()
-			return tmpnet.RestartNetwork(ctx, os.Stdout, networkDir)
+			return tmpnet.RestartNetwork(ctx, log, networkDir)
 		},
 	}
 	rootCmd.AddCommand(restartNetworkCmd)

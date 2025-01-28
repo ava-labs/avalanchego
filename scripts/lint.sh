@@ -32,7 +32,7 @@ fi
 TESTS=${TESTS:-"golangci_lint license_header require_error_is_no_funcs_as_params single_import interface_compliance_nil require_no_error_inline_func import_testing_only_in_tests"}
 
 function test_golangci_lint {
-  go install -v github.com/golangci/golangci-lint/cmd/golangci-lint@v1.59.1
+  go install -v github.com/golangci/golangci-lint/cmd/golangci-lint@v1.62.2
   golangci-lint run --config .golangci.yml
 }
 
@@ -43,7 +43,7 @@ _addlicense_flags=${ADDLICENSE_FLAGS:-"--verify --debug"}
 function test_license_header {
   go install -v github.com/palantir/go-license@v1.25.0
   local files=()
-  while IFS= read -r line; do files+=("$line"); done < <(find . -type f -name '*.go' ! -name '*.pb.go' ! -name 'mock_*.go' ! -path './**/*mock/*.go')
+  while IFS= read -r line; do files+=("$line"); done < <(find . -type f -name '*.go' ! -name '*.pb.go' ! -name 'mock_*.go' ! -name 'mocks_*.go' ! -path './**/*mock/*.go')
 
   # shellcheck disable=SC2086
   go-license \

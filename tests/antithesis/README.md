@@ -147,12 +147,15 @@ can be performed against master or an arbitrary branch:
  - Find the 'Run workflow' drop-down on the right and trigger the
    workflow against the desired branch. The default value for
    `image_tag` (`latest`) is used by scheduled test runs, so consider
-   supplying a different value to avoid interferring with the results
+   supplying a different value to avoid interfering with the results
    of the scheduled runs.
  - Wait for the publication job to complete successfully so that the
    images are available to be tested against.
- - Select the [Trigger Antithesis Test Runs](https://github.com/ava-labs/avalanchego/actions/workflows/trigger-antithesis-runs.yml)
-   workflow on the left.
+ - Select one of the [Trigger Antithesis Avalanchego
+   Setup](https://github.com/ava-labs/avalanchego/actions/workflows/trigger-antithesis-avalanchego.yml)
+   or [Trigger Antithesis XSVM
+   Setup](https://github.com/ava-labs/avalanchego/actions/workflows/trigger-antithesis-xsvm.yml)
+   workflows on the left.
  - Find the 'Run workflow' drop-down on the right and trigger the
    workflow against the desired branch. The branch only determines the
    CI configuration (the images have already been built), so master is

@@ -36,7 +36,7 @@ func (n *snowmanBlock) AddChild(child Block) {
 	// if the snowball instance is nil, this is the first child. So the instance
 	// should be initialized.
 	if n.sb == nil {
-		n.sb = snowball.NewTree(snowball.SnowballFactory, n.t.params, childID)
+		n.sb = snowball.NewTree(n.t.Factory, n.t.params, childID)
 		n.children = make(map[ids.ID]Block)
 	} else {
 		n.sb.Add(childID)

@@ -6,15 +6,20 @@
 ## Running tests
 
 ```bash
-go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.0.0
-ACK_GINKGO_RC=true ginkgo build ./tests/e2e
-./tests/e2e/e2e.test --help
-
-./tests/e2e/e2e.test \
---avalanchego-path=./build/avalanchego
+./scripts/build.sh        # Builds avalanchego for use in deploying a test network
+./scripts/build_xsvm.sh   # Builds xsvm for use in deploying a test network with a subnet
+./bin/ginkgo -v ./tests/e2e -- --avalanchego-path=./build/avalanchego
 ```
 
 See [`tests.e2e.sh`](../../scripts/tests.e2e.sh) for an example.
+
+### Simplifying usage with direnv
+
+The repo includes a [.envrc](../../.envrc) that can be applied by
+[direnv](https://direnv.net/) when in a shell. This will enable
+`ginkgo` to be invoked directly (without a `./bin/` prefix ) and
+without having to specify the `--avalanchego-path` or `--plugin-dir`
+flags.
 
 ### Filtering test execution with labels
 
@@ -27,9 +32,7 @@ primarily target the X-Chain:
 
 
 ```bash
-./tests/e2e/e2e.test \
-  --avalanchego-path=./build/avalanchego \
-  --ginkgo.label-filter=x
+./bin/ginkgo -v --label-filter=x ./tests/e2e -- --avalanchego-path=./build/avalanchego
 ```
 
 The ginkgo docs provide further detail on [how to compose label
@@ -45,17 +48,14 @@ Create a new package to implement feature-specific tests, or add tests to an exi
 tests
 └── e2e
     ├── README.md
-    ├── e2e.go
     ├── e2e_test.go
     └── x
         └── transfer.go
             └── virtuous.go
 ```
 
-`e2e.go` defines common configuration for other test
-packages. `x/transfer/virtuous.go` defines X-Chain transfer tests,
-labeled with `x`, which can be selected by `./tests/e2e/e2e.test
---ginkgo.label-filter "x"`.
+`x/transfer/virtuous.go` defines X-Chain transfer tests,
+labeled with `x`, which can be selected by `--label-filter=x`.
 
 ## Reusing temporary networks
 
@@ -70,7 +70,7 @@ To enable network reuse across test runs, pass `--reuse-network` as an
 argument to the test suite:
 
 ```bash
-ginkgo -v ./tests/e2e -- --avalanchego-path=/path/to/avalanchego --reuse-network
+./bin/gingko -v ./tests/e2e -- --avalanchego-path=/path/to/avalanchego --reuse-network
 ```
 
 If a network is not already running the first time the suite runs with
@@ -93,7 +93,7 @@ To stop a network configured for reuse, invoke the test suite with the
 immediately without executing any tests:
 
 ```bash
-ginkgo -v ./tests/e2e -- --stop-network
+./bin/gingko -v ./tests/e2e -- --stop-network
 ```
 
 ## Skipping bootstrap checks
@@ -105,5 +105,5 @@ these bootstrap checks during development, set the
 `E2E_SKIP_BOOTSTRAP_CHECKS` env var to a non-empty value:
 
 ```bash
-E2E_SKIP_BOOTSTRAP_CHECKS=1 ginkgo -v ./tests/e2e ...
+E2E_SKIP_BOOTSTRAP_CHECKS=1 ./bin/ginkgo -v ./tests/e2e ...
 ```

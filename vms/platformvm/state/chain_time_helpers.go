@@ -80,33 +80,34 @@ func GetNextStakerChangeTime(
 		}
 	}
 
-	return getNextSoVEvictionTime(config, state, nextTime)
+	return getNextL1ValidatorEvictionTime(config, state, nextTime)
 }
 
-func getNextSoVEvictionTime(
+func getNextL1ValidatorEvictionTime(
 	config validatorfee.Config,
 	state Chain,
 	nextTime time.Time,
 ) (time.Time, error) {
-	sovIterator, err := state.GetActiveSubnetOnlyValidatorsIterator()
+	l1ValidatorIterator, err := state.GetActiveL1ValidatorsIterator()
 	if err != nil {
-		return time.Time{}, fmt.Errorf("could not iterate over active SoVs: %w", err)
+		return time.Time{}, fmt.Errorf("could not iterate over active L1 validators: %w", err)
 	}
-	defer sovIterator.Release()
+	defer l1ValidatorIterator.Release()
 
-	// If there are no SoVs, return
-	if !sovIterator.Next() {
+	// If there are no L1 validators, return
+	if !l1ValidatorIterator.Next() {
 		return nextTime, nil
 	}
 
 	// Calculate the remaining funds that the next validator to evict has.
 	var (
-		// GetActiveSubnetOnlyValidatorsIterator iterates in order of increasing
-		// EndAccumulatedFee, so the first SoV is the next SoV to evict.
-		sov         = sovIterator.Value()
+		// GetActiveL1ValidatorsIterator iterates in order of increasing
+		// EndAccumulatedFee, so the first L1 validator is the next L1 validator
+		// to evict.
+		l1Validator = l1ValidatorIterator.Value()
 		accruedFees = state.GetAccruedFees()
 	)
-	remainingFunds, err := math.Sub(sov.EndAccumulatedFee, accruedFees)
+	remainingFunds, err := math.Sub(l1Validator.EndAccumulatedFee, accruedFees)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("could not calculate remaining funds: %w", err)
 	}
@@ -117,8 +118,8 @@ func getNextSoVEvictionTime(
 		maxSeconds  = uint64(nextTime.Sub(currentTime) / time.Second)
 	)
 	feeState := validatorfee.State{
-		Current: gas.Gas(state.NumActiveSubnetOnlyValidators()),
-		Excess:  state.GetSoVExcess(),
+		Current: gas.Gas(state.NumActiveL1Validators()),
+		Excess:  state.GetL1ValidatorExcess(),
 	}
 	remainingSeconds := feeState.SecondsRemaining(
 		config,
@@ -133,14 +134,14 @@ func getNextSoVEvictionTime(
 	return nextTime, nil
 }
 
-// PickFeeCalculator creates either a static or a dynamic fee calculator,
+// PickFeeCalculator creates either a simple or a dynamic fee calculator,
 // depending on the active upgrade.
 //
 // PickFeeCalculator does not modify [state].
 func PickFeeCalculator(config *config.Internal, state Chain) txfee.Calculator {
 	timestamp := state.GetTimestamp()
 	if !config.UpgradeConfig.IsEtnaActivated(timestamp) {
-		return NewStaticFeeCalculator(config, timestamp)
+		return txfee.NewSimpleCalculator(0)
 	}
 
 	feeState := state.GetFeeState()
@@ -153,15 +154,4 @@ func PickFeeCalculator(config *config.Internal, state Chain) txfee.Calculator {
 		config.DynamicFeeConfig.Weights,
 		gasPrice,
 	)
-}
-
-// NewStaticFeeCalculator creates a static fee calculator, with the config set
-// to either the pre-AP3 or post-AP3 config.
-func NewStaticFeeCalculator(config *config.Internal, timestamp time.Time) txfee.Calculator {
-	feeConfig := config.StaticFeeConfig
-	if !config.UpgradeConfig.IsApricotPhase3Activated(timestamp) {
-		feeConfig.CreateSubnetTxFee = config.CreateAssetTxFee
-		feeConfig.CreateBlockchainTxFee = config.CreateAssetTxFee
-	}
-	return txfee.NewStaticCalculator(feeConfig)
 }

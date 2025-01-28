@@ -26,7 +26,6 @@ type FlagVars struct {
 	stopNetwork          bool
 	restartNetwork       bool
 	nodeCount            int
-	activateEtna         bool
 }
 
 func (v *FlagVars) AvalancheGoExecPath() string {
@@ -75,11 +74,7 @@ func (v *FlagVars) NodeCount() int {
 	return v.nodeCount
 }
 
-func (v *FlagVars) ActivateEtna() bool {
-	return v.activateEtna
-}
-
-func getEnvWithDefault(envVar, defaultVal string) string {
+func GetEnvWithDefault(envVar, defaultVal string) string {
 	val := os.Getenv(envVar)
 	if len(val) == 0 {
 		return defaultVal
@@ -101,7 +96,7 @@ func RegisterFlags() *FlagVars {
 	flag.StringVar(
 		&vars.pluginDir,
 		"plugin-dir",
-		getEnvWithDefault(tmpnet.AvalancheGoPluginDirEnvName, os.ExpandEnv("$HOME/.avalanchego/plugins")),
+		GetEnvWithDefault(tmpnet.AvalancheGoPluginDirEnvName, os.ExpandEnv("$HOME/.avalanchego/plugins")),
 		fmt.Sprintf(
 			"[optional] the dir containing VM plugins. Also possible to configure via the %s env variable.",
 			tmpnet.AvalancheGoPluginDirEnvName,
@@ -148,12 +143,6 @@ func RegisterFlags() *FlagVars {
 		"node-count",
 		tmpnet.DefaultNodeCount,
 		"number of nodes the network should initially consist of",
-	)
-	flag.BoolVar(
-		&vars.activateEtna,
-		"activate-etna",
-		false,
-		"[optional] activate the etna upgrade",
 	)
 
 	return &vars

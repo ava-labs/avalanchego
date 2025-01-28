@@ -697,7 +697,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			onCommitState,
 			onAbortState,
 		)
-		require.ErrorIs(err, errUnauthorizedSubnetModification)
+		require.ErrorIs(err, errUnauthorizedModification)
 	}
 
 	{
@@ -737,7 +737,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			onCommitState,
 			onAbortState,
 		)
-		require.ErrorIs(err, errUnauthorizedSubnetModification)
+		require.ErrorIs(err, errUnauthorizedModification)
 	}
 
 	{

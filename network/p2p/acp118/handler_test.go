@@ -73,9 +73,9 @@ func TestHandler(t *testing.T) {
 			require := require.New(t)
 
 			ctx := context.Background()
-			sk, err := bls.NewSecretKey()
+			sk, err := bls.NewSigner()
 			require.NoError(err)
-			pk := bls.PublicFromSecretKey(sk)
+			pk := sk.PublicKey()
 			networkID := uint32(123)
 			chainID := ids.GenerateTestID()
 			signer := warp.NewSigner(sk, networkID, chainID)

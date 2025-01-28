@@ -145,7 +145,7 @@ func (m *manager) AddWeight(subnetID ids.ID, nodeID ids.NodeID, weight uint64) e
 	}
 
 	// We do not need to grab a write lock here because we never modify the
-	// subnetToVdrs map. However, we must hold the read lock during the entirity
+	// subnetToVdrs map. However, we must hold the read lock during the entirety
 	// of this function to ensure that errors are returned consistently.
 	//
 	// Consider the case that:

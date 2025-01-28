@@ -22,36 +22,28 @@ import (
 	xsigner "github.com/ava-labs/avalanchego/wallet/chain/x/signer"
 )
 
-var _ Wallet = (*wallet)(nil)
-
 // Wallet provides chain wallets for the primary network.
-type Wallet interface {
-	P() pwallet.Wallet
-	X() x.Wallet
-	C() c.Wallet
-}
-
-type wallet struct {
+type Wallet struct {
 	p pwallet.Wallet
 	x x.Wallet
 	c c.Wallet
 }
 
-func (w *wallet) P() pwallet.Wallet {
+func (w *Wallet) P() pwallet.Wallet {
 	return w.p
 }
 
-func (w *wallet) X() x.Wallet {
+func (w *Wallet) X() x.Wallet {
 	return w.x
 }
 
-func (w *wallet) C() c.Wallet {
+func (w *Wallet) C() c.Wallet {
 	return w.c
 }
 
 // Creates a new default wallet
-func NewWallet(p pwallet.Wallet, x x.Wallet, c c.Wallet) Wallet {
-	return &wallet{
+func NewWallet(p pwallet.Wallet, x x.Wallet, c c.Wallet) *Wallet {
+	return &Wallet{
 		p: p,
 		x: x,
 		c: c,
@@ -59,23 +51,21 @@ func NewWallet(p pwallet.Wallet, x x.Wallet, c c.Wallet) Wallet {
 }
 
 // Creates a Wallet with the given set of options
-func NewWalletWithOptions(w Wallet, options ...common.Option) Wallet {
+func NewWalletWithOptions(w *Wallet, options ...common.Option) *Wallet {
 	return NewWallet(
-		pwallet.WithOptions(w.P(), options...),
-		x.NewWalletWithOptions(w.X(), options...),
-		c.NewWalletWithOptions(w.C(), options...),
+		pwallet.WithOptions(w.p, options...),
+		x.NewWalletWithOptions(w.x, options...),
+		c.NewWalletWithOptions(w.c, options...),
 	)
 }
 
 type WalletConfig struct {
-	// Base URI to use for all node requests.
-	URI string // required
-	// Keys to use for signing all transactions.
-	AVAXKeychain keychain.Keychain // required
-	EthKeychain  c.EthKeychain     // required
-	// Subnet IDs that the wallet should know about to be able to
-	// generate transactions.
+	// Subnet IDs that the wallet should know about to be able to generate
+	// transactions.
 	SubnetIDs []ids.ID // optional
+	// Validation IDs that the wallet should know about to be able to generate
+	// transactions.
+	ValidationIDs []ids.ID // optional
 }
 
 // MakeWallet returns a wallet that supports issuing transactions to the chains
@@ -85,47 +75,88 @@ type WalletConfig struct {
 // that reference any of the provided keys. If the UTXOs are modified through an
 // external issuance process, such as another instance of the wallet, the UTXOs
 // may become out of sync. The wallet will also fetch all requested P-chain
-// transactions.
+// owners.
 //
 // The wallet manages all state locally, and performs all tx signing locally.
-func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
-	avaxAddrs := config.AVAXKeychain.Addresses()
-	avaxState, err := FetchState(ctx, config.URI, avaxAddrs)
+func MakeWallet(
+	ctx context.Context,
+	uri string,
+	avaxKeychain keychain.Keychain,
+	ethKeychain c.EthKeychain,
+	config WalletConfig,
+) (*Wallet, error) {
+	avaxAddrs := avaxKeychain.Addresses()
+	avaxState, err := FetchState(ctx, uri, avaxAddrs)
 	if err != nil {
 		return nil, err
 	}
 
-	ethAddrs := config.EthKeychain.EthAddresses()
-	ethState, err := FetchEthState(ctx, config.URI, ethAddrs)
+	ethAddrs := ethKeychain.EthAddresses()
+	ethState, err := FetchEthState(ctx, uri, ethAddrs)
 	if err != nil {
 		return nil, err
 	}
 
-	subnetOwners, err := platformvm.GetSubnetOwners(avaxState.PClient, ctx, config.SubnetIDs...)
+	owners, err := platformvm.GetOwners(avaxState.PClient, ctx, config.SubnetIDs, config.ValidationIDs)
 	if err != nil {
 		return nil, err
 	}
+
 	pUTXOs := common.NewChainUTXOs(constants.PlatformChainID, avaxState.UTXOs)
-	pBackend := pwallet.NewBackend(avaxState.PCTX, pUTXOs, subnetOwners)
+	pBackend := pwallet.NewBackend(avaxState.PCTX, pUTXOs, owners)
 	pClient := p.NewClient(avaxState.PClient, pBackend)
 	pBuilder := pbuilder.New(avaxAddrs, avaxState.PCTX, pBackend)
-	pSigner := psigner.New(config.AVAXKeychain, pBackend)
+	pSigner := psigner.New(avaxKeychain, pBackend)
 
 	xChainID := avaxState.XCTX.BlockchainID
 	xUTXOs := common.NewChainUTXOs(xChainID, avaxState.UTXOs)
 	xBackend := x.NewBackend(avaxState.XCTX, xUTXOs)
 	xBuilder := xbuilder.New(avaxAddrs, avaxState.XCTX, xBackend)
-	xSigner := xsigner.New(config.AVAXKeychain, xBackend)
+	xSigner := xsigner.New(avaxKeychain, xBackend)
 
 	cChainID := avaxState.CCTX.BlockchainID
 	cUTXOs := common.NewChainUTXOs(cChainID, avaxState.UTXOs)
 	cBackend := c.NewBackend(cUTXOs, ethState.Accounts)
 	cBuilder := c.NewBuilder(avaxAddrs, ethAddrs, avaxState.CCTX, cBackend)
-	cSigner := c.NewSigner(config.AVAXKeychain, config.EthKeychain, cBackend)
+	cSigner := c.NewSigner(avaxKeychain, ethKeychain, cBackend)
 
 	return NewWallet(
 		pwallet.New(pClient, pBuilder, pSigner),
 		x.NewWallet(xBuilder, xSigner, avaxState.XClient, xBackend),
 		c.NewWallet(cBuilder, cSigner, avaxState.CClient, ethState.Client, cBackend),
 	), nil
+}
+
+// MakePWallet returns a P-chain wallet that supports issuing transactions.
+//
+// On creation, the wallet attaches to the provided uri and fetches all UTXOs
+// that reference any of the provided keys. If the UTXOs are modified through an
+// external issuance process, such as another instance of the wallet, the UTXOs
+// may become out of sync. The wallet will also fetch all requested P-chain
+// owners.
+//
+// The wallet manages all state locally, and performs all tx signing locally.
+func MakePWallet(
+	ctx context.Context,
+	uri string,
+	keychain keychain.Keychain,
+	config WalletConfig,
+) (pwallet.Wallet, error) {
+	addrs := keychain.Addresses()
+	client, context, utxos, err := FetchPState(ctx, uri, addrs)
+	if err != nil {
+		return nil, err
+	}
+
+	owners, err := platformvm.GetOwners(client, ctx, config.SubnetIDs, config.ValidationIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	pUTXOs := common.NewChainUTXOs(constants.PlatformChainID, utxos)
+	pBackend := pwallet.NewBackend(context, pUTXOs, owners)
+	pClient := p.NewClient(client, pBackend)
+	pBuilder := pbuilder.New(addrs, context, pBackend)
+	pSigner := psigner.New(keychain, pBackend)
+	return pwallet.New(pClient, pBuilder, pSigner), nil
 }

@@ -14,7 +14,7 @@ set -euo pipefail
 #     $ kill -9 `cat ~/.tmpnet/promtheus/run.pid` && rm ~/.tmpnet/promtail/run.pid
 
 # e.g.,
-# PROMETHEUS_ID=<id> PROMETHEUS_PASSWORD=<password> ./scripts/run_prometheus.sh
+# PROMETHEUS_USERNAME=<username> PROMETHEUS_PASSWORD=<password> ./scripts/run_prometheus.sh
 if ! [[ "$0" =~ scripts/run_prometheus.sh ]]; then
   echo "must be run from repository root"
   exit 255
@@ -36,9 +36,9 @@ if [[ -z "${PROMETHEUS_URL}" ]]; then
   exit 1
 fi
 
-PROMETHEUS_ID="${PROMETHEUS_ID:-}"
-if [[ -z "${PROMETHEUS_ID}" ]]; then
-  echo "Please provide a value for PROMETHEUS_ID"
+PROMETHEUS_USERNAME="${PROMETHEUS_USERNAME:-}"
+if [[ -z "${PROMETHEUS_USERNAME}" ]]; then
+  echo "Please provide a value for PROMETHEUS_USERNAME"
   exit 1
 fi
 
@@ -61,23 +61,19 @@ if ! command -v "${CMD}" &> /dev/null; then
   if ! command -v "${CMD}" &> /dev/null; then
     echo "prometheus not found, attempting to install..."
 
-    # Determine the arch
-    if which sw_vers &> /dev/null; then
+    GOOS="$(go env GOOS)"
+    GOARCH="$(go env GOARCH)"
+    if [[ "${GOOS}" == "darwin" && "${GOARCH}" == "arm64" ]]; then
       echo "On macos, only amd64 binaries are available so rosetta is required on apple silicon machines."
       echo "To avoid using rosetta, install via homebrew: brew install prometheus"
-      DIST=darwin
-    else
-      ARCH="$(uname -i)"
-      if [[ "${ARCH}" != "x86_64" ]]; then
-        echo "On linux, only amd64 binaries are available. manual installation of prometheus is required."
+    fi
+    if [[ "${GOOS}" == "linux" && "${GOARCH}" != "amd64" ]]; then
+        echo "On linux, only amd64 binaries are available. Manual installation of prometheus is required."
         exit 1
-      else
-        DIST="linux"
-      fi
     fi
 
     # Install the specified release
-    PROMETHEUS_FILE="prometheus-${VERSION}.${DIST}-amd64"
+    PROMETHEUS_FILE="prometheus-${VERSION}.${GOOS}-amd64"
     URL="https://github.com/prometheus/prometheus/releases/download/v${VERSION}/${PROMETHEUS_FILE}.tar.gz"
     curl -s -L "${URL}" | tar zxv -C /tmp > /dev/null
     mkdir -p "$(dirname "${CMD}")"
@@ -108,14 +104,14 @@ scrape_configs:
 remote_write:
   - url: "${PROMETHEUS_URL}/api/v1/write"
     basic_auth:
-      username: "${PROMETHEUS_ID}"
+      username: "${PROMETHEUS_USERNAME}"
       password: "${PROMETHEUS_PASSWORD}"
 EOL
 echo "Wrote configuration to ${CONFIG_PATH}"
 
 echo "Starting prometheus..."
 cd "${PROMETHEUS_WORKING_DIR}"
-nohup "${CMD}" --config.file=prometheus.yaml --web.listen-address=localhost:0 --enable-feature=agent > prometheus.log 2>&1 &
+nohup "${CMD}" --config.file=prometheus.yaml --storage.agent.path=./data --web.listen-address=localhost:0 --enable-feature=agent > prometheus.log 2>&1 &
 echo $! > "${PIDFILE}"
 echo "prometheus started with pid $(cat "${PIDFILE}")"
 # shellcheck disable=SC2016

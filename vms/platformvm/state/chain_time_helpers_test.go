@@ -94,11 +94,11 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 	}
 
 	tests := []struct {
-		name     string
-		pending  []*Staker
-		sovs     []SubnetOnlyValidator
-		maxTime  time.Time
-		expected time.Time
+		name         string
+		pending      []*Staker
+		l1Validators []L1Validator
+		maxTime      time.Time
+		expected     time.Time
 	}{
 		{
 			name:     "only current validators",
@@ -124,8 +124,8 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 			expected: genesistest.DefaultValidatorStartTime.Add(time.Second),
 		},
 		{
-			name: "subnet only validator with less than 1 second of fees",
-			sovs: []SubnetOnlyValidator{
+			name: "L1 validator with less than 1 second of fees",
+			l1Validators: []L1Validator{
 				{
 					ValidationID:      ids.GenerateTestID(),
 					SubnetID:          ids.GenerateTestID(),
@@ -138,8 +138,8 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 			expected: genesistest.DefaultValidatorStartTime,
 		},
 		{
-			name: "subnet only validator with 1 second of fees",
-			sovs: []SubnetOnlyValidator{
+			name: "L1 validator with 1 second of fees",
+			l1Validators: []L1Validator{
 				{
 					ValidationID:      ids.GenerateTestID(),
 					SubnetID:          ids.GenerateTestID(),
@@ -152,8 +152,8 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 			expected: genesistest.DefaultValidatorStartTime.Add(time.Second),
 		},
 		{
-			name: "subnet only validator with less than 2 seconds of fees",
-			sovs: []SubnetOnlyValidator{
+			name: "L1 validator with less than 2 seconds of fees",
+			l1Validators: []L1Validator{
 				{
 					ValidationID:      ids.GenerateTestID(),
 					SubnetID:          ids.GenerateTestID(),
@@ -166,8 +166,8 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 			expected: genesistest.DefaultValidatorStartTime.Add(time.Second),
 		},
 		{
-			name: "current and subnet only validator with high balance",
-			sovs: []SubnetOnlyValidator{
+			name: "current and L1 validator with high balance",
+			l1Validators: []L1Validator{
 				{
 					ValidationID:      ids.GenerateTestID(),
 					SubnetID:          ids.GenerateTestID(),
@@ -194,8 +194,8 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 			for _, staker := range test.pending {
 				require.NoError(s.PutPendingValidator(staker))
 			}
-			for _, sov := range test.sovs {
-				require.NoError(s.PutSubnetOnlyValidator(sov))
+			for _, l1Validator := range test.l1Validators {
+				require.NoError(s.PutL1Validator(l1Validator))
 			}
 
 			actual, err := GetNextStakerChangeTime(
@@ -210,15 +210,7 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 }
 
 func TestPickFeeCalculator(t *testing.T) {
-	var (
-		createAssetTxFee = genesis.LocalParams.CreateAssetTxFee
-		staticFeeConfig  = genesis.LocalParams.StaticFeeConfig
-		dynamicFeeConfig = genesis.LocalParams.DynamicFeeConfig
-	)
-
-	apricotPhase2StaticFeeConfig := staticFeeConfig
-	apricotPhase2StaticFeeConfig.CreateSubnetTxFee = createAssetTxFee
-	apricotPhase2StaticFeeConfig.CreateBlockchainTxFee = createAssetTxFee
+	dynamicFeeConfig := genesis.LocalParams.DynamicFeeConfig
 
 	tests := []struct {
 		fork     upgradetest.Fork
@@ -226,11 +218,11 @@ func TestPickFeeCalculator(t *testing.T) {
 	}{
 		{
 			fork:     upgradetest.ApricotPhase2,
-			expected: txfee.NewStaticCalculator(apricotPhase2StaticFeeConfig),
+			expected: txfee.NewSimpleCalculator(0),
 		},
 		{
 			fork:     upgradetest.ApricotPhase3,
-			expected: txfee.NewStaticCalculator(staticFeeConfig),
+			expected: txfee.NewSimpleCalculator(0),
 		},
 		{
 			fork: upgradetest.Etna,
@@ -244,8 +236,6 @@ func TestPickFeeCalculator(t *testing.T) {
 		t.Run(test.fork.String(), func(t *testing.T) {
 			var (
 				config = &config.Internal{
-					CreateAssetTxFee: createAssetTxFee,
-					StaticFeeConfig:  staticFeeConfig,
 					DynamicFeeConfig: dynamicFeeConfig,
 					UpgradeConfig:    upgradetest.GetConfig(test.fork),
 				}

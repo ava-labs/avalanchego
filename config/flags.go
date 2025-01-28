@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -35,6 +36,14 @@ const (
 	defaultUnexpandedDataDir = "$" + AvalancheGoDataDirVar
 
 	DefaultProcessContextFilename = "process.json"
+
+	// The default plugin path of $HOME/.avalanchego/plugins is not
+	// suitable for docker images since $HOME might be writable but
+	// the plugin directory should not be. The value below is in the
+	// same hierarchy as avalanchego on the docker image
+	// (/avalanchego/build/avalanchego) and consistent with the
+	// location already used by subnet-evm.
+	DefaultImagePluginDir = "/avalanchego/build/plugins"
 )
 
 var (
@@ -121,16 +130,8 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Uint64(DynamicFeesMinGasPriceKey, uint64(genesis.LocalParams.DynamicFeeConfig.MinPrice), "Minimum Gas price")
 	fs.Uint64(DynamicFeesExcessConversionConstantKey, uint64(genesis.LocalParams.DynamicFeeConfig.ExcessConversionConstant), "Constant to convert excess Gas to the Gas price")
 	// Static fees:
-	fs.Uint64(TxFeeKey, genesis.LocalParams.StaticFeeConfig.TxFee, "Transaction fee, in nAVAX")
+	fs.Uint64(TxFeeKey, genesis.LocalParams.TxFee, "Transaction fee, in nAVAX")
 	fs.Uint64(CreateAssetTxFeeKey, genesis.LocalParams.CreateAssetTxFee, "Transaction fee, in nAVAX, for transactions that create new assets")
-	fs.Uint64(CreateSubnetTxFeeKey, genesis.LocalParams.StaticFeeConfig.CreateSubnetTxFee, "Transaction fee, in nAVAX, for transactions that create new subnets")
-	fs.Uint64(TransformSubnetTxFeeKey, genesis.LocalParams.StaticFeeConfig.TransformSubnetTxFee, "Transaction fee, in nAVAX, for transactions that transform subnets")
-	fs.Uint64(CreateBlockchainTxFeeKey, genesis.LocalParams.StaticFeeConfig.CreateBlockchainTxFee, "Transaction fee, in nAVAX, for transactions that create new blockchains")
-	fs.Uint64(AddPrimaryNetworkValidatorFeeKey, genesis.LocalParams.StaticFeeConfig.AddPrimaryNetworkValidatorFee, "Transaction fee, in nAVAX, for transactions that add new primary network validators")
-	fs.Uint64(AddPrimaryNetworkDelegatorFeeKey, genesis.LocalParams.StaticFeeConfig.AddPrimaryNetworkDelegatorFee, "Transaction fee, in nAVAX, for transactions that add new primary network delegators")
-	fs.Uint64(AddSubnetValidatorFeeKey, genesis.LocalParams.StaticFeeConfig.AddSubnetValidatorFee, "Transaction fee, in nAVAX, for transactions that add new subnet validators")
-	fs.Uint64(AddSubnetDelegatorFeeKey, genesis.LocalParams.StaticFeeConfig.AddSubnetDelegatorFee, "Transaction fee, in nAVAX, for transactions that add new subnet delegators")
-
 	// Database
 	fs.String(DBTypeKey, leveldb.Name, fmt.Sprintf("Database type to use. Must be one of {%s, %s, %s}", leveldb.Name, memdb.Name, pebbledb.Name))
 	fs.Bool(DBReadOnlyKey, false, "If true, database writes are to memory and never persisted. May still initialize database directory/files on disk if they don't exist")
@@ -142,7 +143,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.String(LogsDirKey, defaultLogDir, "Logging directory for Avalanche")
 	fs.String(LogLevelKey, "info", "The log level. Should be one of {verbo, debug, trace, info, warn, error, fatal, off}")
 	fs.String(LogDisplayLevelKey, "", "The log display level. If left blank, will inherit the value of log-level. Otherwise, should be one of {verbo, debug, trace, info, warn, error, fatal, off}")
-	fs.String(LogFormatKey, "auto", "The structure of log format. Defaults to 'auto' which formats terminal-like logs, when the output is a terminal. Otherwise, should be one of {auto, plain, colors, json}")
+	fs.String(LogFormatKey, logging.AutoString, logging.FormatDescription)
 	fs.Uint(LogRotaterMaxSizeKey, 8, "The maximum file size in megabytes of the log file before it gets rotated.")
 	fs.Uint(LogRotaterMaxFilesKey, 7, "The maximum number of old log files to retain. 0 means retain all old log files.")
 	fs.Uint(LogRotaterMaxAgeKey, 0, "The maximum number of days to retain old log files based on the timestamp encoded in their filename. 0 means retain all old log files.")
@@ -242,7 +243,6 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	// Enable/Disable APIs
 	fs.Bool(AdminAPIEnabledKey, false, "If true, this node exposes the Admin API")
 	fs.Bool(InfoAPIEnabledKey, true, "If true, this node exposes the Info API")
-	fs.Bool(KeystoreAPIEnabledKey, false, "If true, this node exposes the Keystore API")
 	fs.Bool(MetricsAPIEnabledKey, true, "If true, this node exposes the Metrics API")
 	fs.Bool(HealthAPIEnabledKey, true, "If true, this node exposes the Health API")
 

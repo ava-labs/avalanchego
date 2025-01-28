@@ -525,7 +525,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 			ID: vm.ctx.AVAXAssetID,
 		},
 		Out: &secp256k1fx.TransferOutput{
-			Amt:          vm.StaticFeeConfig.TxFee,
+			Amt:          1,
 			OutputOwners: secp256k1fx.OutputOwners{},
 		},
 	}
@@ -542,7 +542,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 				UTXOID: utxo.UTXOID,
 				Asset:  utxo.Asset,
 				In: &secp256k1fx.TransferInput{
-					Amt: vm.StaticFeeConfig.TxFee,
+					Amt: 1,
 				},
 			},
 		},
@@ -757,7 +757,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 			ID: vm.ctx.AVAXAssetID,
 		},
 		Out: &secp256k1fx.TransferOutput{
-			Amt:          vm.StaticFeeConfig.TxFee,
+			Amt:          1,
 			OutputOwners: secp256k1fx.OutputOwners{},
 		},
 	}
@@ -774,7 +774,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 				UTXOID: utxo.UTXOID,
 				Asset:  utxo.Asset,
 				In: &secp256k1fx.TransferInput{
-					Amt: vm.StaticFeeConfig.TxFee,
+					Amt: 1,
 				},
 			},
 		},
@@ -1477,9 +1477,9 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 		}
 	)
-	sk1, err := bls.NewSecretKey()
+	sk1, err := bls.NewSigner()
 	require.NoError(t, err)
-	pk1 := bls.PublicFromSecretKey(sk1)
+	pk1 := sk1.PublicKey()
 
 	// build primary network validator with BLS key
 	primaryTx, err := wallet.IssueAddPermissionlessValidatorTx(
@@ -1583,9 +1583,9 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	t.Logf("primaryEndHeight: %d", primaryEndHeight)
 
 	// reinsert primary validator with a different BLS key
-	sk2, err := bls.NewSecretKey()
+	sk2, err := bls.NewSigner()
 	require.NoError(t, err)
-	pk2 := bls.PublicFromSecretKey(sk2)
+	pk2 := sk2.PublicKey()
 
 	primaryRestartTx, err := wallet.IssueAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
@@ -1749,7 +1749,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(err)
 
 	// reinsert primary validator with a different BLS key
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(err)
 
 	primaryRestartTx, err := wallet.IssueAddPermissionlessValidatorTx(
@@ -1918,7 +1918,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(err)
 
 	// reinsert primary validator with a different BLS key
-	sk2, err := bls.NewSecretKey()
+	sk2, err := bls.NewSigner()
 	require.NoError(err)
 
 	primaryRestartTx, err := wallet.IssueAddPermissionlessValidatorTx(

@@ -4,10 +4,11 @@
 package tmpnet
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 func TestNetworkSerialization(t *testing.T) {
@@ -16,7 +17,7 @@ func TestNetworkSerialization(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	network := NewDefaultNetwork("testnet")
-	require.NoError(network.EnsureDefaultConfig(&bytes.Buffer{}, "/path/to/avalanche/go", ""))
+	require.NoError(network.EnsureDefaultConfig(logging.NoLog{}, "/path/to/avalanche/go", ""))
 	require.NoError(network.Create(tmpDir))
 	// Ensure node runtime is initialized
 	require.NoError(network.readNodes())

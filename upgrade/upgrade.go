@@ -34,7 +34,8 @@ var (
 		// Ref: https://subnets.avax.network/x-chain/block/0
 		CortinaXChainStopVertexID: ids.FromStringOrPanic("jrGWDh5Po9FMj54depyunNixpia5PN4aAYxfmNzU8n752Rjga"),
 		DurangoTime:               time.Date(2024, time.March, 6, 16, 0, 0, 0, time.UTC),
-		EtnaTime:                  UnscheduledActivationTime,
+		EtnaTime:                  time.Date(2024, time.December, 16, 17, 0, 0, 0, time.UTC),
+		FUpgradeTime:              UnscheduledActivationTime,
 	}
 	Fuji = Config{
 		ApricotPhase1Time:            time.Date(2021, time.March, 26, 14, 0, 0, 0, time.UTC),
@@ -54,7 +55,8 @@ var (
 		// Ref: https://subnets-test.avax.network/x-chain/block/0
 		CortinaXChainStopVertexID: ids.FromStringOrPanic("2D1cmbiG36BqQMRyHt4kFhWarmatA1ighSpND3FeFgz3vFVtCZ"),
 		DurangoTime:               time.Date(2024, time.February, 13, 16, 0, 0, 0, time.UTC),
-		EtnaTime:                  UnscheduledActivationTime,
+		EtnaTime:                  time.Date(2024, time.November, 25, 16, 0, 0, 0, time.UTC),
+		FUpgradeTime:              UnscheduledActivationTime,
 	}
 	Default = Config{
 		ApricotPhase1Time:            InitiallyActiveTime,
@@ -70,9 +72,8 @@ var (
 		CortinaTime:                  InitiallyActiveTime,
 		CortinaXChainStopVertexID:    ids.Empty,
 		DurangoTime:                  InitiallyActiveTime,
-		// Etna is left unactivated by default on local networks. It can be configured to
-		// activate by overriding the activation time in the upgrade file.
-		EtnaTime: UnscheduledActivationTime,
+		EtnaTime:                     InitiallyActiveTime,
+		FUpgradeTime:                 UnscheduledActivationTime,
 	}
 
 	ErrInvalidUpgradeTimes = errors.New("invalid upgrade configuration")
@@ -93,6 +94,7 @@ type Config struct {
 	CortinaXChainStopVertexID    ids.ID    `json:"cortinaXChainStopVertexID"`
 	DurangoTime                  time.Time `json:"durangoTime"`
 	EtnaTime                     time.Time `json:"etnaTime"`
+	FUpgradeTime                 time.Time `json:"fUpgradeTime"`
 }
 
 func (c *Config) Validate() error {
@@ -109,6 +111,7 @@ func (c *Config) Validate() error {
 		c.CortinaTime,
 		c.DurangoTime,
 		c.EtnaTime,
+		c.FUpgradeTime,
 	}
 	for i := 0; i < len(upgrades)-1; i++ {
 		if upgrades[i].After(upgrades[i+1]) {
@@ -170,6 +173,10 @@ func (c *Config) IsDurangoActivated(t time.Time) bool {
 
 func (c *Config) IsEtnaActivated(t time.Time) bool {
 	return !t.Before(c.EtnaTime)
+}
+
+func (c *Config) IsFUpgradeActivated(t time.Time) bool {
+	return !t.Before(c.FUpgradeTime)
 }
 
 func GetConfig(networkID uint32) Config {
