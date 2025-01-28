@@ -45,4 +45,4 @@ ensure_command "kind-with-registry.sh" "https://raw.githubusercontent.com/kubern
 # call them without a qualifying path.
 PATH="${PWD}/bin:$PATH" bash -x "${PWD}/bin/kind-with-registry.sh"
 
-KUBECONFIG="$HOME/.kube/config" PATH="${PWD}/bin:$PATH" ./scripts/ginkgo.sh -v ./tests/fixture/bootstrapmonitor/e2e
+KUBECONFIG="$HOME/.kube/config" PATH="${PWD}/bin:$PATH" ./bin/ginkgo -v ./tests/fixture/bootstrapmonitor/e2e
