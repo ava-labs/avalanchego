@@ -316,7 +316,7 @@ func (n *Node) GetProofOfPossession() (*signer.ProofOfPossession, error) {
 	if err != nil {
 		return nil, err
 	}
-	secretKey, err := localsigner.SecretKeyFromBytes(signingKeyBytes)
+	secretKey, err := localsigner.FromBytes(signingKeyBytes)
 	if err != nil {
 		return nil, err
 	}

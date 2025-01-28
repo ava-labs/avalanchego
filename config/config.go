@@ -654,7 +654,7 @@ func getStakingSigner(v *viper.Viper) (bls.Signer, error) {
 		if err != nil {
 			return nil, fmt.Errorf("unable to decode base64 content: %w", err)
 		}
-		key, err := localsigner.SecretKeyFromBytes(signerKeyContent)
+		key, err := localsigner.FromBytes(signerKeyContent)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't parse signing key: %w", err)
 		}
@@ -668,7 +668,7 @@ func getStakingSigner(v *viper.Viper) (bls.Signer, error) {
 		if err != nil {
 			return nil, err
 		}
-		key, err := localsigner.SecretKeyFromBytes(signingKeyBytes)
+		key, err := localsigner.FromBytes(signingKeyBytes)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't parse signing key: %w", err)
 		}

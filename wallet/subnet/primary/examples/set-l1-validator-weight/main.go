@@ -38,7 +38,7 @@ func main() {
 		log.Fatalf("failed to decode secret key: %s\n", err)
 	}
 
-	sk, err := localsigner.SecretKeyFromBytes(blsSKBytes)
+	sk, err := localsigner.FromBytes(blsSKBytes)
 	if err != nil {
 		log.Fatalf("failed to parse secret key: %s\n", err)
 	}

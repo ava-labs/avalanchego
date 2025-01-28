@@ -43,9 +43,9 @@ func (s *LocalSigner) ToBytes() []byte {
 	return s.sk.Serialize()
 }
 
-// SecretKeyFromBytes parses the big-endian format of the secret key into a
+// FromBytes parses the big-endian format of the secret key into a
 // secret key.
-func SecretKeyFromBytes(skBytes []byte) (*LocalSigner, error) {
+func FromBytes(skBytes []byte) (*LocalSigner, error) {
 	sk := new(secretKey).Deserialize(skBytes)
 	if sk == nil {
 		return nil, ErrFailedSecretKeyDeserialize
