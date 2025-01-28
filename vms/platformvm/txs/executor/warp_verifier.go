@@ -128,7 +128,7 @@ func (w *warpVerifier) verify(message []byte) error {
 		return err
 	}
 
-	validators, err := warp.GetCanonicalValidatorSetFromSubnetID(
+	validators, err := warp.GetCanonicalValidatorSetFromChainID(
 		w.context,
 		w.validatorState,
 		w.pChainHeight,

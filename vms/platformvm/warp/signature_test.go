@@ -850,7 +850,7 @@ func TestSignatureVerification(t *testing.T) {
 			msg := tt.msgF(require)
 			pChainState := tt.stateF(ctrl)
 
-			validators, err := GetCanonicalValidatorSetFromSubnetID(
+			validators, err := GetCanonicalValidatorSetFromChainID(
 				context.Background(),
 				pChainState,
 				pChainHeight,
