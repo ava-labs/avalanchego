@@ -109,7 +109,7 @@ func addPrimaryValidator(
 	endTime time.Time,
 	height uint64,
 ) (ids.NodeID, error) {
-	sk, err := localsigner.NewSigner()
+	sk, err := localsigner.New()
 	if err != nil {
 		return ids.EmptyNodeID, err
 	}

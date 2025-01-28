@@ -178,7 +178,7 @@ func TestSignatureRequestVerifySubnetToL1Conversion(t *testing.T) {
 }
 
 func TestSignatureRequestVerifyL1ValidatorRegistrationRegistered(t *testing.T) {
-	sk, err := localsigner.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 
 	var (
@@ -545,7 +545,7 @@ func TestSignatureRequestVerifyL1ValidatorRegistrationNotRegistered(t *testing.T
 }
 
 func TestSignatureRequestVerifyL1ValidatorWeight(t *testing.T) {
-	sk, err := localsigner.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 
 	const (

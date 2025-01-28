@@ -26,7 +26,7 @@ type LocalSigner struct {
 
 // NewSecretKey generates a new secret key from the local source of
 // cryptographically secure randomness.
-func NewSigner() (*LocalSigner, error) {
+func New() (*LocalSigner, error) {
 	var ikm [32]byte
 	_, err := rand.Read(ikm[:])
 	if err != nil {

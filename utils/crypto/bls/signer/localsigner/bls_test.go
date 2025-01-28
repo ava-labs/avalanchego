@@ -25,7 +25,7 @@ func AggregateAndVerify(publicKeys []*bls.PublicKey, signatures []*bls.Signature
 }
 
 func NewKeyPair(require *require.Assertions) (*LocalSigner, *bls.PublicKey) {
-	sk, err := NewSigner()
+	sk, err := New()
 	require.NoError(err)
 	pk := sk.PublicKey()
 	return sk, pk

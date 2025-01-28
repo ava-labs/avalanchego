@@ -276,7 +276,7 @@ func addPrimaryValidatorWithBLSKey(t testing.TB, vm *VM, data *validatorInputDat
 
 	wallet := newWallet(t, vm, walletConfig{})
 
-	sk, err := localsigner.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(err)
 
 	rewardsOwner := &secp256k1fx.OutputOwners{
@@ -414,7 +414,7 @@ func buildTimestampsList(events []uint8, currentTime time.Time, nodeID ids.NodeI
 	currentTime = currentTime.Add(txexecutor.SyncBound)
 	switch endTime := currentTime.Add(defaultMinStakingDuration); events[0] {
 	case startPrimaryWithBLS:
-		sk, err := localsigner.NewSigner()
+		sk, err := localsigner.New()
 		if err != nil {
 			return nil, fmt.Errorf("could not make private key: %w", err)
 		}
@@ -452,7 +452,7 @@ func buildTimestampsList(events []uint8, currentTime time.Time, nodeID ids.NodeI
 
 		case startPrimaryWithBLS:
 			currentTime = currentPrimaryVal.endTime.Add(txexecutor.SyncBound)
-			sk, err := localsigner.NewSigner()
+			sk, err := localsigner.New()
 			if err != nil {
 				return nil, fmt.Errorf("could not make private key: %w", err)
 			}

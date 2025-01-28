@@ -73,7 +73,7 @@ func TestHandler(t *testing.T) {
 			require := require.New(t)
 
 			ctx := context.Background()
-			sk, err := localsigner.NewSigner()
+			sk, err := localsigner.New()
 			require.NoError(err)
 			pk := sk.PublicKey()
 			networkID := uint32(123)

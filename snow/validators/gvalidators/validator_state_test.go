@@ -136,7 +136,7 @@ func TestGetValidatorSet(t *testing.T) {
 	state := setupState(t, ctrl)
 
 	// Happy path
-	sk0, err := localsigner.NewSigner()
+	sk0, err := localsigner.New()
 	require.NoError(err)
 	vdr0 := &validators.GetValidatorOutput{
 		NodeID:    ids.GenerateTestNodeID(),
@@ -144,7 +144,7 @@ func TestGetValidatorSet(t *testing.T) {
 		Weight:    1,
 	}
 
-	sk1, err := localsigner.NewSigner()
+	sk1, err := localsigner.New()
 	require.NoError(err)
 	vdr1 := &validators.GetValidatorOutput{
 		NodeID:    ids.GenerateTestNodeID(),
@@ -182,7 +182,7 @@ func TestGetValidatorSet(t *testing.T) {
 func TestPublicKeyDeserialize(t *testing.T) {
 	require := require.New(t)
 
-	sk, err := localsigner.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(err)
 	pk := sk.PublicKey()
 
@@ -223,7 +223,7 @@ func setupValidatorSet(b *testing.B, size int) map[ids.NodeID]*validators.GetVal
 	b.Helper()
 
 	set := make(map[ids.NodeID]*validators.GetValidatorOutput, size)
-	sk, err := localsigner.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(b, err)
 	pk := sk.PublicKey()
 	for i := 0; i < size; i++ {

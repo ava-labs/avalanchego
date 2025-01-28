@@ -266,7 +266,7 @@ func (n *Node) EnsureBLSSigningKey() error {
 	}
 
 	// Generate a new signing key
-	newKey, err := localsigner.NewSigner()
+	newKey, err := localsigner.New()
 	if err != nil {
 		return fmt.Errorf("failed to generate staking signer key: %w", err)
 	}

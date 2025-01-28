@@ -45,7 +45,7 @@ func (v *testValidator) Compare(o *testValidator) int {
 }
 
 func newTestValidator() *testValidator {
-	sk, err := localsigner.NewSigner()
+	sk, err := localsigner.New()
 	if err != nil {
 		panic(err)
 	}

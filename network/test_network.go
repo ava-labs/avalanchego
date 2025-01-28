@@ -84,7 +84,7 @@ func NewTestNetworkConfig(
 		return nil, err
 	}
 
-	blsKey, err := localsigner.NewSigner()
+	blsKey, err := localsigner.New()
 	if err != nil {
 		return nil, err
 	}

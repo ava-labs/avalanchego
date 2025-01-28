@@ -1217,7 +1217,7 @@ func TestBlockExecutionWithComplexity(t *testing.T) {
 }
 
 func TestDeactivateLowBalanceL1Validators(t *testing.T) {
-	sk, err := localsigner.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 
 	var (

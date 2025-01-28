@@ -166,7 +166,7 @@ func TestSetGet(t *testing.T) {
 	_, ok := s.Get(nodeID)
 	require.False(ok)
 
-	sk, err := localsigner.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(err)
 
 	pk := sk.PublicKey()
@@ -233,7 +233,7 @@ func TestSetMap(t *testing.T) {
 	m := s.Map()
 	require.Empty(m)
 
-	sk, err := localsigner.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(err)
 
 	pk := sk.PublicKey()
@@ -331,7 +331,7 @@ func TestSetSample(t *testing.T) {
 	require.NoError(err)
 	require.Empty(sampled)
 
-	sk, err := localsigner.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(err)
 
 	nodeID0 := ids.GenerateTestNodeID()
@@ -386,7 +386,7 @@ func TestSetAddCallback(t *testing.T) {
 	require := require.New(t)
 
 	nodeID0 := ids.BuildTestNodeID([]byte{1})
-	sk0, err := localsigner.NewSigner()
+	sk0, err := localsigner.New()
 	require.NoError(err)
 	pk0 := sk0.PublicKey()
 	txID0 := ids.GenerateTestID()

@@ -28,7 +28,7 @@ func TestIPSigner(t *testing.T) {
 	require.NoError(err)
 
 	tlsKey := tlsCert.PrivateKey.(crypto.Signer)
-	blsKey, err := localsigner.NewSigner()
+	blsKey, err := localsigner.New()
 	require.NoError(err)
 
 	s := NewIPSigner(dynIP, tlsKey, blsKey)

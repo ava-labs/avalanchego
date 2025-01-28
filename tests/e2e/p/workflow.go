@@ -115,7 +115,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 		}
 
 		tc.By("issuing an AddPermissionlessValidatorTx", func() {
-			sk, err := localsigner.NewSigner()
+			sk, err := localsigner.New()
 			require.NoError(err)
 			pop := signer.NewProofOfPossession(sk)
 

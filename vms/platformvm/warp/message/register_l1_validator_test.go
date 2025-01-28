@@ -17,7 +17,7 @@ import (
 )
 
 func newBLSPublicKey(t *testing.T) [bls.PublicKeyLen]byte {
-	sk, err := localsigner.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 
 	pk := sk.PublicKey()

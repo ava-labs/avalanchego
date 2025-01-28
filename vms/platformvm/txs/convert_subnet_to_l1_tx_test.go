@@ -546,7 +546,7 @@ func TestConvertSubnetToL1TxSerialization(t *testing.T) {
 }
 
 func TestConvertSubnetToL1TxSyntacticVerify(t *testing.T) {
-	sk, err := localsigner.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 
 	var (

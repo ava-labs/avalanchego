@@ -1397,7 +1397,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 		},
 	}
 
-	blsSK, err := localsigner.NewSigner()
+	blsSK, err := localsigner.New()
 	require.NoError(t, err)
 
 	blsPOP := signer.NewProofOfPossession(blsSK)

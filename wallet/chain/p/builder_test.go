@@ -470,7 +470,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		delegationShares       uint32 = reward.PercentDenominator
 	)
 
-	sk, err := localsigner.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 
 	pop := signer.NewProofOfPossession(sk)
@@ -571,9 +571,9 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 }
 
 func TestConvertSubnetToL1Tx(t *testing.T) {
-	sk0, err := localsigner.NewSigner()
+	sk0, err := localsigner.New()
 	require.NoError(t, err)
-	sk1, err := localsigner.NewSigner()
+	sk1, err := localsigner.New()
 	require.NoError(t, err)
 
 	var (
@@ -656,7 +656,7 @@ func TestRegisterL1ValidatorTx(t *testing.T) {
 		balance = units.Avax
 	)
 
-	sk, err := localsigner.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 	pop := signer.NewProofOfPossession(sk)
 
@@ -779,7 +779,7 @@ func TestSetL1ValidatorWeightTx(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	sk, err := localsigner.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 
 	warp, err := warp.NewMessage(

@@ -641,7 +641,7 @@ func getStakingTLSCert(v *viper.Viper) (tls.Certificate, error) {
 
 func getStakingSigner(v *viper.Viper) (bls.Signer, error) {
 	if v.GetBool(StakingEphemeralSignerEnabledKey) {
-		key, err := localsigner.NewSigner()
+		key, err := localsigner.New()
 		if err != nil {
 			return nil, fmt.Errorf("couldn't generate ephemeral signing key: %w", err)
 		}
@@ -679,7 +679,7 @@ func getStakingSigner(v *viper.Viper) (bls.Signer, error) {
 		return nil, errMissingStakingSigningKeyFile
 	}
 
-	key, err := localsigner.NewSigner()
+	key, err := localsigner.New()
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate new signing key: %w", err)
 	}

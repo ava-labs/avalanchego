@@ -1451,7 +1451,7 @@ func TestDurangoMemoField(t *testing.T) {
 					chainTime = env.state.GetTimestamp()
 					endTime   = chainTime.Add(defaultMaxStakingDuration)
 				)
-				sk, err := localsigner.NewSigner()
+				sk, err := localsigner.New()
 				require.NoError(err)
 
 				wallet := newWallet(t, env, walletConfig{})
@@ -2540,7 +2540,7 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			sk, err := localsigner.NewSigner()
+			sk, err := localsigner.New()
 			require.NoError(err)
 
 			// Create the ConvertSubnetToL1Tx
@@ -2741,7 +2741,7 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create the subnet conversion
-	initialSK, err := localsigner.NewSigner()
+	initialSK, err := localsigner.New()
 	require.NoError(t, err)
 
 	const (
@@ -2794,7 +2794,7 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 	const weight = 1
 
 	// Create the Warp message
-	sk, err := localsigner.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 	pop := signer.NewProofOfPossession(sk)
 	pk := sk.PublicKey()
@@ -3263,7 +3263,7 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create the subnet conversion
-	sk, err := localsigner.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 
 	const (
@@ -3758,7 +3758,7 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create the subnet conversion
-	sk, err := localsigner.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 
 	const (
@@ -4046,7 +4046,7 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create the subnet conversion
-	sk, err := localsigner.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 
 	const (
