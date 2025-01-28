@@ -3,10 +3,27 @@
 
 package bls
 
-var (
-	// The ciphersuite is more commonly known as G2ProofOfPossession.
-	// There are two digests to ensure that message space for normal
-	// signatures and the proof of possession are distinct.
-	CiphersuiteSignature         = []byte("BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_")
-	CiphersuiteProofOfPossession = []byte("BLS_POP_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_")
+type Ciphersuite int
+
+const (
+	CiphersuiteSignature Ciphersuite = iota
+	CiphersuiteProofOfPossession
 )
+
+var ciphersuiteStrings = [...]string{
+	"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_",
+	"BLS_POP_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_",
+}
+
+var ciphersuiteBytes = [...][]byte{
+	[]byte(ciphersuiteStrings[0]),
+	[]byte(ciphersuiteStrings[1]),
+}
+
+func (c Ciphersuite) String() string {
+	return ciphersuiteStrings[c]
+}
+
+func (c Ciphersuite) Bytes() []byte {
+	return ciphersuiteBytes[c]
+}

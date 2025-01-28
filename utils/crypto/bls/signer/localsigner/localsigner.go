@@ -64,10 +64,10 @@ func (s *LocalSigner) PublicKey() *bls.PublicKey {
 
 // Sign [msg] to authorize this message
 func (s *LocalSigner) Sign(msg []byte) *bls.Signature {
-	return new(bls.Signature).Sign(s.sk, msg, bls.CiphersuiteSignature)
+	return new(bls.Signature).Sign(s.sk, msg, bls.CiphersuiteSignature.Bytes())
 }
 
 // Sign [msg] to prove the ownership
 func (s *LocalSigner) SignProofOfPossession(msg []byte) *bls.Signature {
-	return new(bls.Signature).Sign(s.sk, msg, bls.CiphersuiteProofOfPossession)
+	return new(bls.Signature).Sign(s.sk, msg, bls.CiphersuiteProofOfPossession.Bytes())
 }
