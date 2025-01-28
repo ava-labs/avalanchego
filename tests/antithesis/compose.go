@@ -38,6 +38,12 @@ var (
 // simplify usage by main entrypoints. If the provided network includes a subnet, the initial DB state for
 // the subnet will be created and written to the target path.
 func GenerateComposeConfig(network *tmpnet.Network, baseImageName string) error {
+	// TODO(marun) Is there a better way to ensure parity between the configuration that initializes the database and the configuration used at runtime?
+	if network.DefaultFlags == nil {
+		network.DefaultFlags = tmpnet.FlagsMap{}
+	}
+	network.DefaultFlags.SetDefaults(tmpnet.DefaultTestFlags())
+
 	targetPath := os.Getenv(targetPathEnvName)
 	if len(targetPath) == 0 {
 		return errTargetPathEnvVarNotSet
@@ -66,7 +72,16 @@ func GenerateComposeConfig(network *tmpnet.Network, baseImageName string) error 
 			return fmt.Errorf("failed to get bootstrap volume path: %w", err)
 		}
 
-		if err := initBootstrapDB(network, avalancheGoPath, pluginDir, bootstrapVolumePath); err != nil {
+		network.DefaultRuntimeConfig = tmpnet.NodeRuntimeConfig{
+			AvalancheGoPath: avalancheGoPath,
+		}
+		// TODO(marun) Need to have a standard way of initializing a network
+		if network.DefaultFlags == nil {
+			network.DefaultFlags = tmpnet.FlagsMap{}
+		}
+		network.DefaultFlags[config.PluginDirKey] = pluginDir
+
+		if err := initBootstrapDB(network, bootstrapVolumePath); err != nil {
 			return fmt.Errorf("failed to initialize db volumes: %w", err)
 		}
 	}

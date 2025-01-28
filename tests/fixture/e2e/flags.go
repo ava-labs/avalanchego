@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/spf13/cast"
@@ -16,7 +15,12 @@ import (
 )
 
 type FlagVars struct {
+	runtime             string
 	avalancheGoExecPath string
+	kubeconfig          string
+	namespace           string
+	imageName           string
+	nodeRuntimeConfig   *tmpnet.NodeRuntimeConfig
 	pluginDir           string
 	networkDir          string
 	reuseNetwork        bool
@@ -27,31 +31,35 @@ type FlagVars struct {
 	nodeCount           int
 }
 
-func (v *FlagVars) AvalancheGoExecPath() (string, error) {
-	if err := v.validateAvalancheGoExecPath(); err != nil {
-		return "", err
-	}
-	return v.avalancheGoExecPath, nil
-}
-
-func (v *FlagVars) validateAvalancheGoExecPath() error {
-	if !filepath.IsAbs(v.avalancheGoExecPath) {
-		absPath, err := filepath.Abs(v.avalancheGoExecPath)
-		if err != nil {
-			return fmt.Errorf("avalanchego-path (%s) is a relative path but its absolute path cannot be determined: %w",
-				v.avalancheGoExecPath, err)
+func (v *FlagVars) NodeRuntimeConfig() *tmpnet.NodeRuntimeConfig {
+	if v.nodeRuntimeConfig == nil {
+		switch v.runtime {
+		case "process":
+			v.nodeRuntimeConfig = &tmpnet.NodeRuntimeConfig{
+				AvalancheGoPath: v.avalancheGoExecPath,
+			}
+		case "kube":
+			v.nodeRuntimeConfig = &tmpnet.NodeRuntimeConfig{
+				KubeRuntimeConfig: &tmpnet.KubeRuntimeConfig{
+					Kubeconfig: v.kubeconfig,
+					Namespace:  v.namespace,
+					ImageName:  v.imageName,
+				},
+			}
+		default:
+			// TODO(marun) Make this an error condition instead of a panic
+			panic("unknown runtime: " + v.runtime)
 		}
-
-		// If the absolute path file doesn't exist, it means it won't work out of the box.
-		if _, err := os.Stat(absPath); err != nil {
-			return fmt.Errorf("avalanchego-path (%s) is a relative path but must be an absolute path", v.avalancheGoExecPath)
-		}
 	}
-	return nil
+	return v.nodeRuntimeConfig
 }
 
 func (v *FlagVars) PluginDir() string {
-	return v.pluginDir
+	// TODO(marun) Will need to support this properly for VMs like subnet-evm
+	if v.runtime != "kube" {
+		return v.pluginDir
+	}
+	return ""
 }
 
 func (v *FlagVars) NetworkDir() string {
@@ -99,6 +107,12 @@ func (v *FlagVars) NodeCount() int {
 func RegisterFlags() *FlagVars {
 	vars := FlagVars{}
 	flag.StringVar(
+		&vars.runtime,
+		"runtime",
+		"process",
+		"[optional] the runtime to use to deploy nodes for the network. Valid options are 'process' and 'kube'.",
+	)
+	flag.StringVar(
 		&vars.avalancheGoExecPath,
 		"avalanchego-path",
 		os.Getenv(tmpnet.AvalancheGoPathEnvName),
@@ -106,6 +120,24 @@ func RegisterFlags() *FlagVars {
 			"[optional] avalanchego executable path if creating a new network. Also possible to configure via the %s env variable.",
 			tmpnet.AvalancheGoPathEnvName,
 		),
+	)
+	flag.StringVar(
+		&vars.kubeconfig,
+		"kubeconfig",
+		os.Getenv("KUBECONFIG"),
+		"The path to a kubernetes configuration file for the target cluster",
+	)
+	flag.StringVar(
+		&vars.namespace,
+		"namespace",
+		"tmpnet",
+		"The namespace in the target cluster to create nodes in",
+	)
+	flag.StringVar(
+		&vars.imageName,
+		"image-name",
+		"avaplatform/avalanchego:latest",
+		"The name of the docker image to use for creating nodes",
 	)
 	flag.StringVar(
 		&vars.pluginDir,
