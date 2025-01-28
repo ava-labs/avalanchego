@@ -290,11 +290,11 @@ func computeTransitiveVotesForPrefixes(votesGraph *voteGraph, transitiveVotes ba
 }
 
 func descendantIDsOfVertex(v *voteVertex) []ids.ID {
-	descendanstIDs := make([]ids.ID, len(v.descendants))
+	descendantIDs := make([]ids.ID, len(v.descendants))
 	for i, child := range v.descendants {
-		descendanstIDs[i] = child.id
+		descendantIDs[i] = child.id
 	}
-	return descendanstIDs
+	return descendantIDs
 }
 
 func sumVotesFromIDs(ids []ids.ID, transitiveVotes bag.Bag[ids.ID]) int {
