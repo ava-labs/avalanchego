@@ -17,9 +17,6 @@ type prefixGroup struct {
 	members []ids.ID
 	// children are prefixGroups that correspond to zero and one being the first bit of their members, respectively.
 	children [2]*prefixGroup
-	// was this prefixGroup split before. Used to prevent a prefixGroup from being split more than once,
-	// otherwise longestSharedPrefixes() would run indefinitely.
-	wasSplit bool
 }
 
 // longestSharedPrefixes creates a prefixGroup that is the root of a graph
@@ -38,21 +35,20 @@ func longestSharedPrefixes(idList []ids.ID) *prefixGroup {
 
 	// Try to split each prefix group.
 	// Continue until all prefix groups cannot be split anymore.
-	for {
-		var couldSplit bool
-		for _, pg := range pgs {
-			if !pg.canSplit() {
-				continue
-			}
+	for i := 0; i < len(pgs); i++ {
+		pg := pgs[i]
 
-			couldSplit = true
+		if !pg.canSplit() {
+			continue
+		}
 
-			pg0, pg1 := pg.split()
+		for {
+			pg.split()
 
-			if pg0 != nil && pg1 != nil {
-				pgs = append(pgs, pg0)
-				pgs = append(pgs, pg1)
-				continue
+			// We cannot split this prefix group any longer, as the shared prefix ends in this bifurcation
+			if pg.isBifurcation() {
+				pgs = append(pgs, pg.children[:]...)
+				break
 			}
 
 			// Else, there is no bifurcation,
@@ -61,10 +57,6 @@ func longestSharedPrefixes(idList []ids.ID) *prefixGroup {
 
 			// Become your descendant
 			*pg = *descendant
-		}
-
-		if !couldSplit {
-			break
 		}
 	}
 
@@ -112,7 +104,7 @@ func (pg *prefixGroup) isBifurcation() bool {
 
 // canSplit returns whether this prefixGroup can be split.
 func (pg *prefixGroup) canSplit() bool {
-	return !pg.wasSplit && len(pg.members) > 1
+	return len(pg.members) > 1
 }
 
 // traverse invokes f() on this prefixGroup and all descendants in pre-order traversal.
@@ -134,7 +126,7 @@ func (pg *prefixGroup) traverse(f func(*prefixGroup)) {
 // since it has at least two members, which means they either differ in the next bit index,
 // in which case two prefixGroups would be returned, and otherwise they do not differ
 // in the next bit, and then at least one prefixGroup would be returned.
-func (pg *prefixGroup) split() (*prefixGroup, *prefixGroup) {
+func (pg *prefixGroup) split() {
 	for i := range pg.children {
 		pg.children[i] = &prefixGroup{
 			index:   pg.index + 1,
@@ -154,10 +146,6 @@ func (pg *prefixGroup) split() (*prefixGroup, *prefixGroup) {
 			pg.children[i] = nil
 		}
 	}
-
-	pg.wasSplit = true
-
-	return pg.children[0], pg.children[1]
 }
 
 func deduplicate(in []ids.ID) []ids.ID {
