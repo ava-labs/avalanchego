@@ -10,7 +10,6 @@ import (
 )
 
 const (
-	SecretKeyLen = blst.BLST_SCALAR_BYTES
 	PublicKeyLen = blst.BLST_P1_COMPRESS_BYTES
 )
 

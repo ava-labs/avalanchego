@@ -7,15 +7,17 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	blst "github.com/supranational/blst/bindings/go"
 
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
+
+const SecretKeyLen = blst.BLST_SCALAR_BYTES
 
 func TestSecretKeyFromBytesZero(t *testing.T) {
 	require := require.New(t)
 
-	var skArr [bls.SecretKeyLen]byte
+	var skArr [SecretKeyLen]byte
 	skBytes := skArr[:]
 	_, err := SecretKeyFromBytes(skBytes)
 	require.ErrorIs(err, ErrFailedSecretKeyDeserialize)
@@ -24,7 +26,7 @@ func TestSecretKeyFromBytesZero(t *testing.T) {
 func TestSecretKeyFromBytesWrongSize(t *testing.T) {
 	require := require.New(t)
 
-	skBytes := utils.RandomBytes(bls.SecretKeyLen + 1)
+	skBytes := utils.RandomBytes(SecretKeyLen + 1)
 	_, err := SecretKeyFromBytes(skBytes)
 	require.ErrorIs(err, ErrFailedSecretKeyDeserialize)
 }
