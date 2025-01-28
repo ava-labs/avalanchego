@@ -2565,7 +2565,7 @@ func TestTimestampMetrics(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.blockType, func(t *testing.T) {
-			gauge, err := gaugeVec.GetMetricWithLabelValues(innerBlockTypeMetricLabel)
+			gauge, err := gaugeVec.GetMetricWithLabelValues(tt.blockType)
 			require.NoError(t, err)
 			require.Equal(t, float64(tt.want.Unix()), testutil.ToFloat64(gauge))
 		})
