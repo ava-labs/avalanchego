@@ -12,7 +12,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer/signermock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -202,7 +202,7 @@ func TestNewPendingStaker(t *testing.T) {
 
 func generateStakerTx(require *require.Assertions) *txs.AddPermissionlessValidatorTx {
 	nodeID := ids.GenerateTestNodeID()
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(err)
 	pop := signer.NewProofOfPossession(sk)
 	subnetID := ids.GenerateTestID()

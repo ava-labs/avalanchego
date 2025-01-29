@@ -30,7 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
@@ -175,7 +175,7 @@ func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []id
 		require.NoError(t, err)
 		nodeID := ids.NodeIDFromCert(cert)
 
-		blsKey, err := bls.NewSigner()
+		blsKey, err := localsigner.New()
 		require.NoError(t, err)
 
 		config := defaultConfig

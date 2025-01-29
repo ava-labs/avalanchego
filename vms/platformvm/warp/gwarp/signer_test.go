@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/signertest"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
@@ -29,7 +30,7 @@ type testSigner struct {
 func setupSigner(t testing.TB) *testSigner {
 	require := require.New(t)
 
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(err)
 
 	chainID := ids.GenerateTestID()

@@ -21,7 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
@@ -266,7 +266,7 @@ func (n *Node) EnsureBLSSigningKey() error {
 	}
 
 	// Generate a new signing key
-	newKey, err := bls.NewSigner()
+	newKey, err := localsigner.New()
 	if err != nil {
 		return fmt.Errorf("failed to generate staking signer key: %w", err)
 	}
@@ -316,7 +316,7 @@ func (n *Node) GetProofOfPossession() (*signer.ProofOfPossession, error) {
 	if err != nil {
 		return nil, err
 	}
-	secretKey, err := bls.SecretKeyFromBytes(signingKeyBytes)
+	secretKey, err := localsigner.FromBytes(signingKeyBytes)
 	if err != nil {
 		return nil, err
 	}
