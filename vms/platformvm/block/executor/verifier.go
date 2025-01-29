@@ -129,8 +129,6 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 		return err
 	}
 
-	// If this block doesn't perform any changes, then it should never have been
-	// issued.
 	feeCalculator := state.PickFeeCalculator(v.txExecutorBackend.Config, onAcceptState)
 	lowBalanceL1ValidatorsEvicted, err := v.standardBlock(
 		b,
@@ -142,7 +140,7 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 		return err
 	}
 
-	// Verify if the block performed any changes. If it does not, it doesn't never
+	// Verify if the block performed any changes. If it does not, it never should
 	// have been issued. Prior to the F upgrade, evicting L1 validators that don't
 	// have enough balance for the next second is not considered a change. After
 	// the F upgrade, it is.
