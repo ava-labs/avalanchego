@@ -49,8 +49,7 @@ const (
 )
 
 func (b *postForkBlock) updateLastAcceptedTimestampMetric(blockTypeLabel string, t time.Time) {
-	g := b.vm.lastAcceptedTimestampGaugeVec
-	g.WithLabelValues(blockTypeLabel)
+	g := b.vm.lastAcceptedTimestampGaugeVec.WithLabelValues(blockTypeLabel)
 	g.Set(float64(t.Unix()))
 }
 
