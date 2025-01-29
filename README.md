@@ -18,21 +18,8 @@ The Subnet EVM runs in a separate process from the main AvalancheGo process and 
 ### AvalancheGo Compatibility
 
 ```text
-[v0.6.0] AvalancheGo@v1.11.0-v1.11.1 (Protocol Version: 33)
-[v0.6.1] AvalancheGo@v1.11.0-v1.11.1 (Protocol Version: 33)
-[v0.6.2] AvalancheGo@v1.11.2 (Protocol Version: 34)
-[v0.6.3] AvalancheGo@v1.11.3-v1.11.9 (Protocol Version: 35)
-[v0.6.4] AvalancheGo@v1.11.3-v1.11.9 (Protocol Version: 35)
-[v0.6.5] AvalancheGo@v1.11.3-v1.11.9 (Protocol Version: 35)
-[v0.6.6] AvalancheGo@v1.11.3-v1.11.9 (Protocol Version: 35)
-[v0.6.7] AvalancheGo@v1.11.3-v1.11.9 (Protocol Version: 35)
-[v0.6.8] AvalancheGo@v1.11.10 (Protocol Version: 36)
-[v0.6.9] AvalancheGo@v1.11.11-v1.11.12 (Protocol Version: 37)
-[v0.6.10] AvalancheGo@v1.11.11-v1.11.12 (Protocol Version: 37)
-[v0.6.11] AvalancheGo@v1.11.11-v1.11.12 (Protocol Version: 37)
-[v0.6.12] AvalancheGo@v1.11.13/v1.12.0 (Protocol Version: 38)
 [v0.7.0] AvalancheGo@v1.12.0-v1.12.1 (Protocol Version: 38)
-[v0.7.1] AvalancheGo@v1.12.0-v1.12.1 (Protocol Version: 38)
+[v0.7.1] AvalancheGo@v1.12.2 (Protocol Version: 39)
 ```
 
 ## API
