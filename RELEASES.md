@@ -3,6 +3,7 @@
 ## Pending Release
 
 * Refactored trie_prefetcher.go to be structurally similar to upstream.
+* Remove legacy gossip handler and metrics
 
 ## [v0.7.0](https://github.com/ava-labs/subnet-evm/releases/tag/v0.7.0)
 

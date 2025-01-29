@@ -787,10 +787,8 @@ func (vm *VM) onNormalOperationsStarted() error {
 	}
 
 	// NOTE: gossip network must be initialized first otherwise ETH tx gossip will not work.
-	gossipStats := NewGossipStats()
 	vm.builder = vm.NewBlockBuilder(vm.toEngine)
 	vm.builder.awaitSubmittedTxs()
-	vm.Network.SetGossipHandler(NewGossipHandler(vm, gossipStats))
 
 	var p2pValidators p2p.ValidatorSet = &validatorSet{}
 	if vm.config.PullGossipFrequency.Duration > 0 {

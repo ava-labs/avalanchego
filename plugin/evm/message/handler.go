@@ -6,27 +6,12 @@ package message
 import (
 	"context"
 
-	"github.com/ethereum/go-ethereum/log"
-
 	"github.com/ava-labs/avalanchego/ids"
 )
 
 var (
-	_ GossipHandler  = NoopMempoolGossipHandler{}
 	_ RequestHandler = NoopRequestHandler{}
 )
-
-// GossipHandler handles incoming gossip messages
-type GossipHandler interface {
-	HandleEthTxs(nodeID ids.NodeID, msg EthTxsGossip) error
-}
-
-type NoopMempoolGossipHandler struct{}
-
-func (NoopMempoolGossipHandler) HandleEthTxs(nodeID ids.NodeID, msg EthTxsGossip) error {
-	log.Debug("dropping unexpected EthTxsGossip message", "peerID", nodeID)
-	return nil
-}
 
 // RequestHandler interface handles incoming requests from peers
 // Must have methods in format of handleType(context.Context, ids.NodeID, uint32, request Type) error
