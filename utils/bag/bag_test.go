@@ -287,3 +287,15 @@ func TestBagEquals(t *testing.T) {
 	require.True(bag1.Equals(bag2))
 	require.True(bag2.Equals(bag1))
 }
+
+func TestBagClone(t *testing.T) {
+	require := require.New(t)
+	bag := Bag[int]{}
+	bag.AddCount(100, 1)
+	bag.AddCount(200, 2)
+	bag.AddCount(300, 3)
+
+	clonedBag := bag.Clone()
+
+	require.Equal(bag, clonedBag)
+}
