@@ -238,7 +238,7 @@ func (vm *VM) Initialize(
 	vm.lastAcceptedTimestampGaugeVec = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "last_accepted_timestamp",
-			Help: "timestamp of the last block to be accepted",
+			Help: "timestamp of the last block accepted",
 		},
 		[]string{"block_type"},
 	)
