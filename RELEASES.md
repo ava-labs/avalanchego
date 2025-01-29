@@ -4,7 +4,7 @@
 
 This version is backwards compatible to [v1.12.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0). It is optional, but encouraged.
 
-The plugin version is unchanged at `38` and is compatible with versions `v1.12.0-v1.12.1`.
+The plugin version is updated to `39` all plugins must update to be compatible.
 
 **This release removes the support for the long deprecated Keystore API. Any users still relying on the keystore API will not be able to update to this version, or any later versions, of Avalanchego until their dependency on the keystore API has been removed.**
 
@@ -12,6 +12,14 @@ The plugin version is unchanged at `38` and is compatible with versions `v1.12.0
 
 - Deprecated:
   - `info.GetTxFee`
+- Added:
+  - `avm.GetTxFee`
+  - `platform.getValidatorFeeConfig`
+  - `platform.getValidatorFeeState`
+  - `validationID` field to `platform.getL1Validator` results
+  - L1 validators to `platform.getCurrentValidators`
+- Removed:
+  - `StakeAmount` field from `platform.getCurrentValidators` results
   - `keystore.createUser`
   - `keystore.deleteUser`
   - `keystore.listUsers`
@@ -35,10 +43,6 @@ The plugin version is unchanged at `38` and is compatible with versions `v1.12.0
   - `wallet.sendMultiple`
   - `platform.exportKey`
   - `platform.listAddresses`
-- Added:
-  - `avm.GetTxFee`
-  - `platform.getValidatorFeeConfig`
-  - `platform.getValidatorFeeState`
 
 ### Configs
 
@@ -51,8 +55,66 @@ The plugin version is unchanged at `38` and is compatible with versions `v1.12.0
   - `--add-subnet-validator-fee`
   - `--add-subnet-delegator-fee`
 - Removed `--api-keystore-enabled`
-  
+
 ### What's Changed
+
+- [testing] Always use the go.mod version of ginkgo by @marun in https://github.com/ava-labs/avalanchego/pull/3618
+- Bump antithesishq/antithesis-trigger-action from 0.5 to 0.6 by @dependabot in https://github.com/ava-labs/avalanchego/pull/3620
+- Fix typos in document files by @taozui472 in https://github.com/ava-labs/avalanchego/pull/3622
+- [ci] Always use the specified go version by @marun in https://github.com/ava-labs/avalanchego/pull/3616
+- Fix: quotation mark by @jasmyhigh in https://github.com/ava-labs/avalanchego/pull/3623
+- refactor: move node configs to config/node by @darioush in https://github.com/ava-labs/avalanchego/pull/3600
+- Update e2e tests and CI jobs for post-etna by @marun in https://github.com/ava-labs/avalanchego/pull/3614
+- Replace AWM terminology in ReadMe with ICM  by @meaghanfitzgerald in https://github.com/ava-labs/avalanchego/pull/3595
+- fix: grammatical mistakes by @crStiv in https://github.com/ava-labs/avalanchego/pull/3625
+- [testing] Update golangci-lint to latest version by @marun in https://github.com/ava-labs/avalanchego/pull/3617
+- partial sync default info by @meaghanfitzgerald in https://github.com/ava-labs/avalanchego/pull/3602
+- Update stale comment on commitToDB by @aaronbuchwald in https://github.com/ava-labs/avalanchego/pull/3627
+- coreth atomic pkg dependency by @ceyonur in https://github.com/ava-labs/avalanchego/pull/3588
+- Mark Meag as the owner of README files by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3635
+- Update x/net to v0.33.0 by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3636
+- Fix codeowners to simplify PR review by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3637
+- Add BLS healthcheck to communicate incorrect BLS key configuration by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3638
+- chore(all): mocks generation improved by @qdm12 in https://github.com/ava-labs/avalanchego/pull/3628
+- fix LRU sized cache: consistent size at element removal by @rrazvan1 in https://github.com/ava-labs/avalanchego/pull/3634
+- Index API and AvalancheGo Configs Docs Fix by @meaghanfitzgerald in https://github.com/ava-labs/avalanchego/pull/3632
+- [ci] Migrate from buf-*-action to buf-action by @marun in https://github.com/ava-labs/avalanchego/pull/3639
+- chore(ci): define Github labels as code with a workflow by @qdm12 in https://github.com/ava-labs/avalanchego/pull/3629
+- feat(github): add "needs Go upgrade" label by @qdm12 in https://github.com/ava-labs/avalanchego/pull/3642
+- [ci] Fix post-merge protobuf lint job breakage by @marun in https://github.com/ava-labs/avalanchego/pull/3644
+- merkledb visualisations v1 (change proofs and range proofs) by @rrazvan1 in https://github.com/ava-labs/avalanchego/pull/3643
+- Remove Static Fee Config by @samliok in https://github.com/ava-labs/avalanchego/pull/3610
+- fix(ci): trigger labels workflow on push to master not main by @qdm12 in https://github.com/ava-labs/avalanchego/pull/3646
+- X-Chain API fix by @meaghanfitzgerald in https://github.com/ava-labs/avalanchego/pull/3654
+- [ci] Rename {PROMETHEUS,LOKI}_ID to {PROMETHEUS,LOKI}_USERNAME by @marun in https://github.com/ava-labs/avalanchego/pull/3652
+- chore: replaced faulty link by @Radovenchyk in https://github.com/ava-labs/avalanchego/pull/3649
+- Add L1 validator fees API by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3647
+- Reintroduce the deprecated `info.getTxFee` API by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3656
+- remove x-chain api obsolete metadata  by @meaghanfitzgerald in https://github.com/ava-labs/avalanchego/pull/3655
+- Remove the Keystore API by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3657
+- Add F Upgrade Scaffolding. Post-Etna Cleanup by @michaelkaplan13 in https://github.com/ava-labs/avalanchego/pull/3672
+- [testing] Fix instructions for triggering antithesis test runs by @marun in https://github.com/ava-labs/avalanchego/pull/3664
+- [testing] Ensure run_prometheus.sh uses a writeable storage path by @marun in https://github.com/ava-labs/avalanchego/pull/3662
+- Make snowman use snowflake directly instead of snowball by @yacovm in https://github.com/ava-labs/avalanchego/pull/3403
+- chore: fix some typos by @chuangjinglu in https://github.com/ava-labs/avalanchego/pull/3670
+- Bump antithesishq/antithesis-trigger-action from 0.6 to 0.7 by @dependabot in https://github.com/ava-labs/avalanchego/pull/3667
+- [ci] Use go env {GOOS,GOARCH} for os and arch detection by @marun in https://github.com/ava-labs/avalanchego/pull/3661
+- Silence docker InvalidDefaultArgInFrom warnings by @marun in https://github.com/ava-labs/avalanchego/pull/3659
+- add L1 support to getCurrentValidators API by @ceyonur in https://github.com/ava-labs/avalanchego/pull/3564
+- [docker] Enable image builds from git worktrees by @marun in https://github.com/ava-labs/avalanchego/pull/3660
+- [tmpnet] Set an explicit `instance` label for logs and metrics by @marun in https://github.com/ava-labs/avalanchego/pull/3650
+- [docker] Switch to kube-compatible plugin path for images by @marun in https://github.com/ava-labs/avalanchego/pull/3653
+- [testing] Support direnv to simplify usage of test tooling by @marun in https://github.com/ava-labs/avalanchego/pull/3651
+
+### New Contributors
+
+- @taozui472 made their first contribution in https://github.com/ava-labs/avalanchego/pull/3622
+- @jasmyhigh made their first contribution in https://github.com/ava-labs/avalanchego/pull/3623
+- @crStiv made their first contribution in https://github.com/ava-labs/avalanchego/pull/3625
+- @qdm12 made their first contribution in https://github.com/ava-labs/avalanchego/pull/3628
+- @rrazvan1 made their first contribution in https://github.com/ava-labs/avalanchego/pull/3634
+- @Radovenchyk made their first contribution in https://github.com/ava-labs/avalanchego/pull/3649
+- @chuangjinglu made their first contribution in https://github.com/ava-labs/avalanchego/pull/3670
 
 **Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.12.1...v1.12.2
 

@@ -1,5 +1,5 @@
 # BUILDER_IMAGE_TAG should identify the builder image
-ARG BUILDER_IMAGE_TAG
+ARG BUILDER_IMAGE_TAG=INVALID # This value isn't intended to be used but silences a warning
 
 # ============= Compilation Stage ================
 FROM antithesis-avalanchego-builder:$BUILDER_IMAGE_TAG AS builder

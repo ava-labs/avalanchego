@@ -637,7 +637,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 	rewardTx := blk.(block.Block).Txs()[0].Unsigned
 	require.IsType(&txs.RewardValidatorTx{}, rewardTx)
 
-	// Verify options and accept commmit block
+	// Verify options and accept commit block
 	require.NoError(commit.Verify(context.Background()))
 	require.NoError(abort.Verify(context.Background()))
 	txID := blk.(block.Block).Txs()[0].ID()
@@ -1380,7 +1380,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 			MaxOutstandingItems:   1,
 			MaxItemProcessingTime: 1,
 		},
-		Consensus: &smcon.Topological{},
+		Consensus: &smcon.Topological{Factory: snowball.SnowflakeFactory},
 	}
 	engine, err := smeng.New(engineConfig)
 	require.NoError(err)

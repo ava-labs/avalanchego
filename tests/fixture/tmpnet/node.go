@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/netip"
 	"os"
@@ -366,19 +365,10 @@ func (n *Node) EnsureNodeID() error {
 	return nil
 }
 
-// Saves the currently allocated API port to the node's configuration
-// for use across restarts. Reusing the port ensures consistent
-// labeling of metrics.
-func (n *Node) SaveAPIPort() error {
-	hostPort := strings.TrimPrefix(n.URI, "http://")
-	if len(hostPort) == 0 {
-		// Without an API URI there is nothing to save
-		return nil
-	}
-	_, port, err := net.SplitHostPort(hostPort)
-	if err != nil {
-		return err
-	}
-	n.Flags[config.HTTPPortKey] = port
-	return nil
+// GetUniqueID returns a globally unique identifier for the node.
+func (n *Node) GetUniqueID() string {
+	nodeIDString := n.NodeID.String()
+	startIndex := len(ids.NodeIDPrefix)
+	endIndex := startIndex + 8 // 8 characters should be enough to identify a node in the context of its network
+	return n.NetworkUUID + "-" + strings.ToLower(nodeIDString[startIndex:endIndex])
 }
