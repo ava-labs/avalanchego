@@ -10,12 +10,13 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/ava-labs/avalanchego/config/node"
 	avalanchedatabase "github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
-	"github.com/ava-labs/avalanchego/node"
 	avalancheconstants "github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
+	"github.com/ava-labs/subnet-evm/plugin/evm/config"
 	"github.com/ava-labs/subnet-evm/plugin/evm/database"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -110,7 +111,7 @@ func (vm *VM) useStandaloneDatabase(acceptedDB avalanchedatabase.Database) (bool
 
 // getDatabaseConfig returns the database configuration for the chain
 // to be used by separate, standalone database.
-func getDatabaseConfig(config Config, chainDataDir string) (node.DatabaseConfig, error) {
+func getDatabaseConfig(config config.Config, chainDataDir string) (node.DatabaseConfig, error) {
 	var (
 		configBytes []byte
 		err         error

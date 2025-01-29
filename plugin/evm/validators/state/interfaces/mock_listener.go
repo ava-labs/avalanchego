@@ -20,6 +20,7 @@ import (
 type MockStateCallbackListener struct {
 	ctrl     *gomock.Controller
 	recorder *MockStateCallbackListenerMockRecorder
+	isgomock struct{}
 }
 
 // MockStateCallbackListenerMockRecorder is the mock recorder for MockStateCallbackListener.
@@ -40,37 +41,37 @@ func (m *MockStateCallbackListener) EXPECT() *MockStateCallbackListenerMockRecor
 }
 
 // OnValidatorAdded mocks base method.
-func (m *MockStateCallbackListener) OnValidatorAdded(arg0 ids.ID, arg1 ids.NodeID, arg2 uint64, arg3 bool) {
+func (m *MockStateCallbackListener) OnValidatorAdded(vID ids.ID, nodeID ids.NodeID, startTime uint64, isActive bool) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "OnValidatorAdded", arg0, arg1, arg2, arg3)
+	m.ctrl.Call(m, "OnValidatorAdded", vID, nodeID, startTime, isActive)
 }
 
 // OnValidatorAdded indicates an expected call of OnValidatorAdded.
-func (mr *MockStateCallbackListenerMockRecorder) OnValidatorAdded(arg0, arg1, arg2, arg3 any) *gomock.Call {
+func (mr *MockStateCallbackListenerMockRecorder) OnValidatorAdded(vID, nodeID, startTime, isActive any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnValidatorAdded", reflect.TypeOf((*MockStateCallbackListener)(nil).OnValidatorAdded), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnValidatorAdded", reflect.TypeOf((*MockStateCallbackListener)(nil).OnValidatorAdded), vID, nodeID, startTime, isActive)
 }
 
 // OnValidatorRemoved mocks base method.
-func (m *MockStateCallbackListener) OnValidatorRemoved(arg0 ids.ID, arg1 ids.NodeID) {
+func (m *MockStateCallbackListener) OnValidatorRemoved(vID ids.ID, nodeID ids.NodeID) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "OnValidatorRemoved", arg0, arg1)
+	m.ctrl.Call(m, "OnValidatorRemoved", vID, nodeID)
 }
 
 // OnValidatorRemoved indicates an expected call of OnValidatorRemoved.
-func (mr *MockStateCallbackListenerMockRecorder) OnValidatorRemoved(arg0, arg1 any) *gomock.Call {
+func (mr *MockStateCallbackListenerMockRecorder) OnValidatorRemoved(vID, nodeID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnValidatorRemoved", reflect.TypeOf((*MockStateCallbackListener)(nil).OnValidatorRemoved), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnValidatorRemoved", reflect.TypeOf((*MockStateCallbackListener)(nil).OnValidatorRemoved), vID, nodeID)
 }
 
 // OnValidatorStatusUpdated mocks base method.
-func (m *MockStateCallbackListener) OnValidatorStatusUpdated(arg0 ids.ID, arg1 ids.NodeID, arg2 bool) {
+func (m *MockStateCallbackListener) OnValidatorStatusUpdated(vID ids.ID, nodeID ids.NodeID, isActive bool) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "OnValidatorStatusUpdated", arg0, arg1, arg2)
+	m.ctrl.Call(m, "OnValidatorStatusUpdated", vID, nodeID, isActive)
 }
 
 // OnValidatorStatusUpdated indicates an expected call of OnValidatorStatusUpdated.
-func (mr *MockStateCallbackListenerMockRecorder) OnValidatorStatusUpdated(arg0, arg1, arg2 any) *gomock.Call {
+func (mr *MockStateCallbackListenerMockRecorder) OnValidatorStatusUpdated(vID, nodeID, isActive any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnValidatorStatusUpdated", reflect.TypeOf((*MockStateCallbackListener)(nil).OnValidatorStatusUpdated), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnValidatorStatusUpdated", reflect.TypeOf((*MockStateCallbackListener)(nil).OnValidatorStatusUpdated), vID, nodeID, isActive)
 }

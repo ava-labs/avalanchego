@@ -29,6 +29,7 @@ package state
 
 import (
 	"fmt"
+	"maps"
 	"sort"
 	"time"
 
@@ -774,18 +775,18 @@ func (s *StateDB) Copy() *StateDB {
 		db:                   s.db,
 		trie:                 s.db.CopyTrie(s.trie),
 		originalRoot:         s.originalRoot,
-		accounts:             make(map[common.Hash][]byte),
-		storages:             make(map[common.Hash]map[common.Hash][]byte),
-		accountsOrigin:       make(map[common.Address][]byte),
-		storagesOrigin:       make(map[common.Address]map[common.Hash][]byte),
+		accounts:             copySet(s.accounts),
+		storages:             copy2DSet(s.storages),
+		accountsOrigin:       copySet(s.accountsOrigin),
+		storagesOrigin:       copy2DSet(s.storagesOrigin),
 		stateObjects:         make(map[common.Address]*stateObject, len(s.journal.dirties)),
 		stateObjectsPending:  make(map[common.Address]struct{}, len(s.stateObjectsPending)),
 		stateObjectsDirty:    make(map[common.Address]struct{}, len(s.journal.dirties)),
-		stateObjectsDestruct: make(map[common.Address]*types.StateAccount, len(s.stateObjectsDestruct)),
+		stateObjectsDestruct: maps.Clone(s.stateObjectsDestruct),
 		refund:               s.refund,
 		logs:                 make(map[common.Hash][]*types.Log, len(s.logs)),
 		logSize:              s.logSize,
-		preimages:            make(map[common.Hash][]byte, len(s.preimages)),
+		preimages:            maps.Clone(s.preimages),
 		journal:              newJournal(),
 		hasher:               crypto.NewKeccakState(),
 
@@ -827,16 +828,6 @@ func (s *StateDB) Copy() *StateDB {
 		}
 		state.stateObjectsDirty[addr] = struct{}{}
 	}
-	// Deep copy the destruction markers.
-	for addr, value := range s.stateObjectsDestruct {
-		state.stateObjectsDestruct[addr] = value
-	}
-	// Deep copy the state changes made in the scope of block
-	// along with their original values.
-	state.accounts = copySet(s.accounts)
-	state.storages = copy2DSet(s.storages)
-	state.accountsOrigin = copySet(state.accountsOrigin)
-	state.storagesOrigin = copy2DSet(state.storagesOrigin)
 
 	// Deep copy the logs occurred in the scope of block
 	for hash, logs := range s.logs {
@@ -846,10 +837,6 @@ func (s *StateDB) Copy() *StateDB {
 			*cpy[i] = *l
 		}
 		state.logs[hash] = cpy
-	}
-	// Deep copy the preimages occurred in the scope of block
-	for hash, preimage := range s.preimages {
-		state.preimages[hash] = preimage
 	}
 	// Do we need to copy the access list and transient storage?
 	// In practice: No. At the start of a transaction, these two lists are empty.

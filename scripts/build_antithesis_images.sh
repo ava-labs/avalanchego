@@ -47,7 +47,7 @@ source "${AVALANCHEGO_CLONE_PATH}"/scripts/lib_build_antithesis_images.sh
 build_antithesis_builder_image "${GO_VERSION}" "antithesis-subnet-evm-builder:${IMAGE_TAG}" "${AVALANCHEGO_CLONE_PATH}" "${SUBNET_EVM_PATH}"
 
 # Ensure avalanchego and subnet-evm binaries are available to create an initial db state that includes subnets.
-"${AVALANCHEGO_CLONE_PATH}"/scripts/build.sh
+pushd "${AVALANCHEGO_CLONE_PATH}" && ./scripts/build.sh && popd
 "${SUBNET_EVM_PATH}"/scripts/build.sh
 
 echo "Generating compose configuration"

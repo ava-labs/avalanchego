@@ -9,13 +9,13 @@ import (
 	"path/filepath"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
+	avalanchenode "github.com/ava-labs/avalanchego/config/node"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/meterdb"
 	"github.com/ava-labs/avalanchego/database/pebbledb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
-	avalanchenode "github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/prometheus/client_golang/prometheus"
 )
