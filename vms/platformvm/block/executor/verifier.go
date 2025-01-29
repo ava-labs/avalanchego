@@ -74,7 +74,7 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 	}
 
 	feeCalculator := state.PickFeeCalculator(v.txExecutorBackend.Config, onDecisionState)
-	inputs, atomicRequests, onAcceptFunc, gasConsumed, err := v.processStandardTxs(
+	inputs, atomicRequests, onAcceptFunc, gasConsumed, _, err := v.processStandardTxs(
 		b.Transactions,
 		feeCalculator,
 		onDecisionState,
@@ -129,33 +129,30 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 		return err
 	}
 
-	// After the F upgrade is activated, blocks are considered to include state changes
-	// if they deactivate L1 validators that may not have enough balance to pay for the
-	// next second.
-	var lowBalanceL1ValidatorsEvicted bool
-	if v.txExecutorBackend.Config.UpgradeConfig.IsFUpgradeActivated(b.Timestamp()) {
-		lowBalanceL1ValidatorsEvicted, err = deactivateLowBalanceL1Validators(
-			v.txExecutorBackend.Config.ValidatorFeeConfig,
-			onAcceptState,
-		)
-		if err != nil {
-			return err
-		}
-	}
-
 	// If this block doesn't perform any changes, then it should never have been
 	// issued.
-	if !changed && len(b.Transactions) == 0 && !lowBalanceL1ValidatorsEvicted {
-		return errBanffStandardBlockWithoutChanges
-	}
-
 	feeCalculator := state.PickFeeCalculator(v.txExecutorBackend.Config, onAcceptState)
-	return v.standardBlock(
+	lowBalanceL1ValidatorsEvicted, err := v.standardBlock(
 		b,
 		b.Transactions,
 		feeCalculator,
 		onAcceptState,
 	)
+	if err != nil {
+		return err
+	}
+
+	// Verify if the block performed any changes. If it does not, it doesn't never
+	// have been issued. Prior to the F upgrade, evicting L1 validators that don't
+	// have enough balance for the next second is not considered a change. After
+	// the F upgrade, it is.
+	if !changed &&
+		len(b.Transactions) == 0 &&
+		(!v.txExecutorBackend.Config.UpgradeConfig.IsFUpgradeActivated(b.Timestamp()) || !lowBalanceL1ValidatorsEvicted) {
+		return errBanffStandardBlockWithoutChanges
+	}
+
+	return nil
 }
 
 func (v *verifier) ApricotAbortBlock(b *block.ApricotAbortBlock) error {
@@ -214,12 +211,13 @@ func (v *verifier) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
 	}
 
 	feeCalculator := txfee.NewSimpleCalculator(0)
-	return v.standardBlock(
+	_, err = v.standardBlock(
 		b,
 		b.Transactions,
 		feeCalculator,
 		onAcceptState,
 	)
+	return err
 }
 
 func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
@@ -478,15 +476,15 @@ func (v *verifier) standardBlock(
 	txs []*txs.Tx,
 	feeCalculator txfee.Calculator,
 	onAcceptState state.Diff,
-) error {
-	inputs, atomicRequests, onAcceptFunc, gasConsumed, err := v.processStandardTxs(
+) (bool, error) {
+	inputs, atomicRequests, onAcceptFunc, gasConsumed, lowBalanceL1ValidatorsEvicted, err := v.processStandardTxs(
 		txs,
 		feeCalculator,
 		onAcceptState,
 		b.Parent(),
 	)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	v.Mempool.Remove(txs...)
@@ -509,7 +507,7 @@ func (v *verifier) standardBlock(
 			gasConsumed,
 		),
 	}
-	return nil
+	return lowBalanceL1ValidatorsEvicted, nil
 }
 
 func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator txfee.Calculator, diff state.Diff, parentID ids.ID) (
@@ -517,6 +515,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator txfee.Calcula
 	map[ids.ID]*atomic.Requests,
 	func(),
 	gas.Gas,
+	bool,
 	error,
 ) {
 	// Complexity is limited first to avoid processing too large of a block.
@@ -528,19 +527,19 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator txfee.Calcula
 			if err != nil {
 				txID := tx.ID()
 				v.MarkDropped(txID, err)
-				return nil, nil, nil, 0, err
+				return nil, nil, nil, 0, false, err
 			}
 
 			blockComplexity, err = blockComplexity.Add(&txComplexity)
 			if err != nil {
-				return nil, nil, nil, 0, fmt.Errorf("block complexity overflow: %w", err)
+				return nil, nil, nil, 0, false, fmt.Errorf("block complexity overflow: %w", err)
 			}
 		}
 
 		var err error
 		gasConsumed, err = blockComplexity.ToGas(v.txExecutorBackend.Config.DynamicFeeConfig.Weights)
 		if err != nil {
-			return nil, nil, nil, 0, fmt.Errorf("block gas overflow: %w", err)
+			return nil, nil, nil, 0, false, fmt.Errorf("block gas overflow: %w", err)
 		}
 
 		// If this block exceeds the available capacity, ConsumeGas will return
@@ -548,7 +547,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator txfee.Calcula
 		feeState := diff.GetFeeState()
 		feeState, err = feeState.ConsumeGas(gasConsumed)
 		if err != nil {
-			return nil, nil, nil, 0, err
+			return nil, nil, nil, 0, false, err
 		}
 
 		// Updating the fee state prior to executing the transactions is fine
@@ -572,11 +571,11 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator txfee.Calcula
 		if err != nil {
 			txID := tx.ID()
 			v.MarkDropped(txID, err) // cache tx as dropped
-			return nil, nil, nil, 0, err
+			return nil, nil, nil, 0, false, err
 		}
 		// ensure it doesn't overlap with current input batch
 		if inputs.Overlaps(txInputs) {
-			return nil, nil, nil, 0, ErrConflictingBlockTxs
+			return nil, nil, nil, 0, false, ErrConflictingBlockTxs
 		}
 		// Add UTXOs to batch
 		inputs.Union(txInputs)
@@ -600,7 +599,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator txfee.Calcula
 	}
 
 	if err := v.verifyUniqueInputs(parentID, inputs); err != nil {
-		return nil, nil, nil, 0, err
+		return nil, nil, nil, 0, false, err
 	}
 
 	if numFuncs := len(funcs); numFuncs == 1 {
@@ -617,15 +616,15 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator txfee.Calcula
 	// might not have sufficient fee to pay for the next second.
 	//
 	// This ensures that L1 validators are not undercharged for the next second.
-	_, err := deactivateLowBalanceL1Validators(
+	lowBalanceL1ValidatorsEvicted, err := deactivateLowBalanceL1Validators(
 		v.txExecutorBackend.Config.ValidatorFeeConfig,
 		diff,
 	)
 	if err != nil {
-		return nil, nil, nil, 0, fmt.Errorf("failed to deactivate low balance L1 validators: %w", err)
+		return nil, nil, nil, 0, false, fmt.Errorf("failed to deactivate low balance L1 validators: %w", err)
 	}
 
-	return inputs, atomicRequests, onAcceptFunc, gasConsumed, nil
+	return inputs, atomicRequests, onAcceptFunc, gasConsumed, lowBalanceL1ValidatorsEvicted, nil
 }
 
 func calculateBlockMetrics(
