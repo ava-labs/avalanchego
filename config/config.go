@@ -37,6 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
@@ -47,26 +48,20 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 	"github.com/ava-labs/avalanchego/vms/proposervm"
-
-	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
-	validatorfee "github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
 const (
 	chainConfigFileName  = "config"
 	chainUpgradeFileName = "upgrade"
 	subnetConfigFileExt  = ".json"
-
-	keystoreDeprecationMsg = "keystore API is deprecated"
 )
 
 var (
 	// Deprecated key --> deprecation message (i.e. which key replaces it)
 	// TODO: deprecate "BootstrapIDsKey" and "BootstrapIPsKey"
-	deprecatedKeys = map[string]string{
-		KeystoreAPIEnabledKey: keystoreDeprecationMsg,
-	}
+	deprecatedKeys = map[string]string{}
 
 	errConflictingACPOpinion                  = errors.New("supporting and objecting to the same ACP")
 	errConflictingImplicitACPOpinion          = errors.New("objecting to enabled ACP")
@@ -183,11 +178,10 @@ func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
 				IndexAPIEnabled:      v.GetBool(IndexEnabledKey),
 				IndexAllowIncomplete: v.GetBool(IndexAllowIncompleteKey),
 			},
-			AdminAPIEnabled:    v.GetBool(AdminAPIEnabledKey),
-			InfoAPIEnabled:     v.GetBool(InfoAPIEnabledKey),
-			KeystoreAPIEnabled: v.GetBool(KeystoreAPIEnabledKey),
-			MetricsAPIEnabled:  v.GetBool(MetricsAPIEnabledKey),
-			HealthAPIEnabled:   v.GetBool(HealthAPIEnabledKey),
+			AdminAPIEnabled:   v.GetBool(AdminAPIEnabledKey),
+			InfoAPIEnabled:    v.GetBool(InfoAPIEnabledKey),
+			MetricsAPIEnabled: v.GetBool(MetricsAPIEnabledKey),
+			HealthAPIEnabled:  v.GetBool(HealthAPIEnabledKey),
 		},
 		HTTPHost:           v.GetString(HTTPHostKey),
 		HTTPPort:           uint16(v.GetUint(HTTPPortKey)),
@@ -647,7 +641,7 @@ func getStakingTLSCert(v *viper.Viper) (tls.Certificate, error) {
 
 func getStakingSigner(v *viper.Viper) (bls.Signer, error) {
 	if v.GetBool(StakingEphemeralSignerEnabledKey) {
-		key, err := bls.NewSigner()
+		key, err := localsigner.New()
 		if err != nil {
 			return nil, fmt.Errorf("couldn't generate ephemeral signing key: %w", err)
 		}
@@ -660,7 +654,7 @@ func getStakingSigner(v *viper.Viper) (bls.Signer, error) {
 		if err != nil {
 			return nil, fmt.Errorf("unable to decode base64 content: %w", err)
 		}
-		key, err := bls.SecretKeyFromBytes(signerKeyContent)
+		key, err := localsigner.FromBytes(signerKeyContent)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't parse signing key: %w", err)
 		}
@@ -674,7 +668,7 @@ func getStakingSigner(v *viper.Viper) (bls.Signer, error) {
 		if err != nil {
 			return nil, err
 		}
-		key, err := bls.SecretKeyFromBytes(signingKeyBytes)
+		key, err := localsigner.FromBytes(signingKeyBytes)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't parse signing key: %w", err)
 		}
@@ -685,7 +679,7 @@ func getStakingSigner(v *viper.Viper) (bls.Signer, error) {
 		return nil, errMissingStakingSigningKeyFile
 	}
 
-	key, err := bls.NewSigner()
+	key, err := localsigner.New()
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate new signing key: %w", err)
 	}
@@ -770,16 +764,7 @@ func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
 	if networkID != constants.MainnetID && networkID != constants.FujiID {
 		return genesis.TxFeeConfig{
 			CreateAssetTxFee: v.GetUint64(CreateAssetTxFeeKey),
-			StaticFeeConfig: txfee.StaticConfig{
-				TxFee:                         v.GetUint64(TxFeeKey),
-				CreateSubnetTxFee:             v.GetUint64(CreateSubnetTxFeeKey),
-				TransformSubnetTxFee:          v.GetUint64(TransformSubnetTxFeeKey),
-				CreateBlockchainTxFee:         v.GetUint64(CreateBlockchainTxFeeKey),
-				AddPrimaryNetworkValidatorFee: v.GetUint64(AddPrimaryNetworkValidatorFeeKey),
-				AddPrimaryNetworkDelegatorFee: v.GetUint64(AddPrimaryNetworkDelegatorFeeKey),
-				AddSubnetValidatorFee:         v.GetUint64(AddSubnetValidatorFeeKey),
-				AddSubnetDelegatorFee:         v.GetUint64(AddSubnetDelegatorFeeKey),
-			},
+			TxFee:            v.GetUint64(TxFeeKey),
 			DynamicFeeConfig: gas.Config{
 				Weights: gas.Dimensions{
 					gas.Bandwidth: v.GetUint64(DynamicFeesBandwidthWeightKey),
@@ -793,7 +778,7 @@ func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
 				MinPrice:                 gas.Price(v.GetUint64(DynamicFeesMinGasPriceKey)),
 				ExcessConversionConstant: gas.Gas(v.GetUint64(DynamicFeesExcessConversionConstantKey)),
 			},
-			ValidatorFeeConfig: validatorfee.Config{
+			ValidatorFeeConfig: fee.Config{
 				Capacity:                 gas.Gas(v.GetUint64(ValidatorFeesCapacityKey)),
 				Target:                   gas.Gas(v.GetUint64(ValidatorFeesTargetKey)),
 				MinPrice:                 gas.Price(v.GetUint64(ValidatorFeesMinPriceKey)),

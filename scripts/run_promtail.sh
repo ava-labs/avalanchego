@@ -13,7 +13,7 @@ set -euo pipefail
 #     $ kill -9 `cat ~/.tmpnet/promtail/run.pid` && rm ~/.tmpnet/promtail/run.pid
 
 # e.g.,
-# LOKI_ID=<id> LOKI_PASSWORD=<password> ./scripts/run_promtail.sh
+# LOKI_USERNAME=<username> LOKI_PASSWORD=<password> ./scripts/run_promtail.sh
 if ! [[ "$0" =~ scripts/run_promtail.sh ]]; then
   echo "must be run from repository root"
   exit 255
@@ -35,9 +35,9 @@ if [[ -z "${LOKI_URL}" ]]; then
   exit 1
 fi
 
-LOKI_ID="${LOKI_ID:-}"
-if [[ -z "${LOKI_ID}" ]]; then
-  echo "Please provide a value for LOKI_ID"
+LOKI_USERNAME="${LOKI_USERNAME:-}"
+if [[ -z "${LOKI_USERNAME}" ]]; then
+  echo "Please provide a value for LOKI_USERNAME"
   exit 1
 fi
 
@@ -57,18 +57,11 @@ if ! command -v "${CMD}" &> /dev/null; then
   CMD="${PWD}/bin/promtail"
   if ! command -v "${CMD}" &> /dev/null; then
     echo "promtail not found, attempting to install..."
-    # Determine the arch
-    if which sw_vers &> /dev/null; then
-      DIST="darwin-$(uname -m)"
-    else
-      ARCH="$(uname -i)"
-      if [[ "${ARCH}" == "aarch64" ]]; then
-        ARCH="arm64"
-      elif [[ "${ARCH}" == "x86_64" ]]; then
-        ARCH="amd64"
-      fi
-      DIST="linux-${ARCH}"
-    fi
+
+    # Determine the platform
+    GOOS="$(go env GOOS)"
+    GOARCH="$(go env GOARCH)"
+    DIST="${GOOS}-${GOARCH}"
 
     # Install the specified release
     PROMTAIL_FILE="promtail-${DIST}"
@@ -97,7 +90,7 @@ positions:
 client:
   url: "${LOKI_URL}/api/prom/push"
   basic_auth:
-    username: "${LOKI_ID}"
+    username: "${LOKI_USERNAME}"
     password: "${LOKI_PASSWORD}"
 
 scrape_configs:

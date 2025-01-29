@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -98,8 +99,6 @@ func newTestVerifier(t testing.TB, c testVerifierConfig) *verifier {
 		},
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Internal{
-				CreateAssetTxFee:       genesis.LocalParams.CreateAssetTxFee,
-				StaticFeeConfig:        genesis.LocalParams.StaticFeeConfig,
 				DynamicFeeConfig:       genesis.LocalParams.DynamicFeeConfig,
 				ValidatorFeeConfig:     genesis.LocalParams.ValidatorFeeConfig,
 				SybilProtectionEnabled: true,
@@ -1218,7 +1217,7 @@ func TestBlockExecutionWithComplexity(t *testing.T) {
 }
 
 func TestDeactivateLowBalanceL1Validators(t *testing.T) {
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 
 	var (

@@ -6,7 +6,6 @@ package txs
 import (
 	"encoding/hex"
 	"encoding/json"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -16,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
@@ -35,7 +34,7 @@ func TestRegisterL1ValidatorTxSerialization(t *testing.T) {
 
 	skBytes, err := hex.DecodeString("6668fecd4595b81e4d568398c820bbf3f073cb222902279fa55ebb84764ed2e3")
 	require.NoError(err)
-	sk, err := bls.SecretKeyFromBytes(skBytes)
+	sk, err := localsigner.FromBytes(skBytes)
 	require.NoError(err)
 
 	var (
@@ -327,11 +326,7 @@ func TestRegisterL1ValidatorTxSerialization(t *testing.T) {
 
 	txJSON, err := json.MarshalIndent(unsignedTx, "", "\t")
 	require.NoError(err)
-	require.Equal(
-		// Normalize newlines for Windows
-		strings.ReplaceAll(string(registerL1ValidatorTxJSON), "\r\n", "\n"),
-		string(txJSON),
-	)
+	require.JSONEq(string(registerL1ValidatorTxJSON), string(txJSON))
 }
 
 func TestRegisterL1ValidatorTxSyntacticVerify(t *testing.T) {

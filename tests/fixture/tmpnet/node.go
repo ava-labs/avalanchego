@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/netip"
 	"os"
@@ -22,7 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
@@ -267,7 +266,7 @@ func (n *Node) EnsureBLSSigningKey() error {
 	}
 
 	// Generate a new signing key
-	newKey, err := bls.NewSigner()
+	newKey, err := localsigner.New()
 	if err != nil {
 		return fmt.Errorf("failed to generate staking signer key: %w", err)
 	}
@@ -317,7 +316,7 @@ func (n *Node) GetProofOfPossession() (*signer.ProofOfPossession, error) {
 	if err != nil {
 		return nil, err
 	}
-	secretKey, err := bls.SecretKeyFromBytes(signingKeyBytes)
+	secretKey, err := localsigner.FromBytes(signingKeyBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -366,19 +365,10 @@ func (n *Node) EnsureNodeID() error {
 	return nil
 }
 
-// Saves the currently allocated API port to the node's configuration
-// for use across restarts. Reusing the port ensures consistent
-// labeling of metrics.
-func (n *Node) SaveAPIPort() error {
-	hostPort := strings.TrimPrefix(n.URI, "http://")
-	if len(hostPort) == 0 {
-		// Without an API URI there is nothing to save
-		return nil
-	}
-	_, port, err := net.SplitHostPort(hostPort)
-	if err != nil {
-		return err
-	}
-	n.Flags[config.HTTPPortKey] = port
-	return nil
+// GetUniqueID returns a globally unique identifier for the node.
+func (n *Node) GetUniqueID() string {
+	nodeIDString := n.NodeID.String()
+	startIndex := len(ids.NodeIDPrefix)
+	endIndex := startIndex + 8 // 8 characters should be enough to identify a node in the context of its network
+	return n.NetworkUUID + "-" + strings.ToLower(nodeIDString[startIndex:endIndex])
 }
