@@ -208,4 +208,5 @@ const (
 	TracingExporterTypeKey                             = "tracing-exporter-type"
 	TracingHeadersKey                                  = "tracing-headers"
 	ProcessContextFileKey                              = "process-context-file"
+	ProposerMinBlockDelayKey                           = "proposer-min-block-delay"
 )

@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/proposervm"
 )
 
 const (
@@ -384,6 +385,9 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.StringToString(TracingHeadersKey, map[string]string{}, "The headers to provide the trace indexer")
 
 	fs.String(ProcessContextFileKey, defaultProcessContextPath, "The path to write process context to (including PID, API URI, and staking address).")
+
+	// Primary Subnet Config
+	fs.Duration(ProposerMinBlockDelayKey, proposervm.DefaultMinBlockDelay, "Minimum delay to enforce when building a snowman++ block for the primary subnet")
 }
 
 // BuildFlagSet returns a complete set of flags for avalanchego
