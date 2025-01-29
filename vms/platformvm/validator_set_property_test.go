@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -275,7 +276,7 @@ func addPrimaryValidatorWithBLSKey(t testing.TB, vm *VM, data *validatorInputDat
 
 	wallet := newWallet(t, vm, walletConfig{})
 
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(err)
 
 	rewardsOwner := &secp256k1fx.OutputOwners{
@@ -413,7 +414,7 @@ func buildTimestampsList(events []uint8, currentTime time.Time, nodeID ids.NodeI
 	currentTime = currentTime.Add(txexecutor.SyncBound)
 	switch endTime := currentTime.Add(defaultMinStakingDuration); events[0] {
 	case startPrimaryWithBLS:
-		sk, err := bls.NewSigner()
+		sk, err := localsigner.New()
 		if err != nil {
 			return nil, fmt.Errorf("could not make private key: %w", err)
 		}
@@ -451,7 +452,7 @@ func buildTimestampsList(events []uint8, currentTime time.Time, nodeID ids.NodeI
 
 		case startPrimaryWithBLS:
 			currentTime = currentPrimaryVal.endTime.Add(txexecutor.SyncBound)
-			sk, err := bls.NewSigner()
+			sk, err := localsigner.New()
 			if err != nil {
 				return nil, fmt.Errorf("could not make private key: %w", err)
 			}
