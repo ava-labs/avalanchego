@@ -59,6 +59,8 @@ func DefaultTmpnetFlags() FlagsMap {
 		// Specific to e2e testing
 		config.MinStakeDurationKey:           DefaultMinStakeDuration.String(),
 		config.ProposerVMUseCurrentHeightKey: true,
+		// Reducing this from the 1s default speeds up tx acceptance
+		config.ProposerMinBlockDelayKey: "0s",
 	}
 	flags.SetDefaults(DefaultTestFlags())
 	return flags
@@ -74,5 +76,13 @@ func DefaultChainConfigs() map[string]FlagsMap {
 			"warp-api-enabled": true,
 			"log-level":        "trace",
 		},
+	}
+}
+
+// A set of subnet configuration appropriate for testing.
+func DefaultSubnetConfig() FlagsMap {
+	return FlagsMap{
+		// Reducing this from the 1s default speeds up tx acceptance
+		"proposerMinBlockDelay": 0, // Needs to be a number to be valid in subnet configuration
 	}
 }
