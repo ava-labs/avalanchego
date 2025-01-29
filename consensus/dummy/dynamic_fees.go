@@ -56,15 +56,14 @@ func CalcBaseFee(config *params.ChainConfig, feeConfig commontype.FeeConfig, par
 	// Add in the gas used by the parent block in the correct place
 	// If the parent consumed gas within the rollup window, add the consumed
 	// gas in.
-	expectedRollUp := params.RollupWindow
-	if roll < expectedRollUp {
-		slot := expectedRollUp - 1 - roll
+	if roll < params.RollupWindow {
+		slot := params.RollupWindow - 1 - roll
 		start := slot * wrappers.LongLen
 		updateLongWindow(newRollupWindow, start, parent.GasUsed)
 	}
 
 	// Calculate the amount of gas consumed within the rollup window.
-	totalGas := sumLongWindow(newRollupWindow, int(expectedRollUp))
+	totalGas := sumLongWindow(newRollupWindow, params.RollupWindow)
 
 	if totalGas == parentGasTarget {
 		return newRollupWindow, baseFee, nil
@@ -93,9 +92,9 @@ func CalcBaseFee(config *params.ChainConfig, feeConfig commontype.FeeConfig, par
 		// for the interval during which no blocks were produced.
 		// We use roll/rollupWindow, so that the transition is applied for every [rollupWindow] seconds
 		// that has elapsed between the parent and this block.
-		if roll > expectedRollUp {
+		if roll > params.RollupWindow {
 			// Note: roll/params.RollupWindow must be greater than 1 since we've checked that roll > params.RollupWindow
-			baseFeeDelta = new(big.Int).Mul(baseFeeDelta, new(big.Int).SetUint64(roll/expectedRollUp))
+			baseFeeDelta = new(big.Int).Mul(baseFeeDelta, new(big.Int).SetUint64(roll/params.RollupWindow))
 		}
 		baseFee.Sub(baseFee, baseFeeDelta)
 	}
