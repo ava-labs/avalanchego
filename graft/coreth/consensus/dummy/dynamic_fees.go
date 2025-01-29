@@ -32,7 +32,6 @@ var (
 	ApricotPhase4BlockGasCostStep        = big.NewInt(50_000)
 	ApricotPhase4TargetBlockRate  uint64 = 2 // in seconds
 	ApricotPhase5BlockGasCostStep        = big.NewInt(200_000)
-	rollupWindow                  uint64 = 10
 )
 
 // CalcBaseFee takes the previous header and the timestamp of its child block
@@ -87,7 +86,7 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 	// Add in the gas used by the parent block in the correct place
 	// If the parent consumed gas within the rollup window, add the consumed
 	// gas in.
-	if roll < rollupWindow {
+	if roll < params.RollupWindow {
 		var blockGasCost, parentExtraStateGasUsed uint64
 		switch {
 		case isApricotPhase5:
@@ -133,13 +132,13 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 			}
 		}
 
-		slot := rollupWindow - 1 - roll
+		slot := params.RollupWindow - 1 - roll
 		start := slot * wrappers.LongLen
 		updateLongWindow(newRollupWindow, start, addedGas)
 	}
 
 	// Calculate the amount of gas consumed within the rollup window.
-	totalGas := sumLongWindow(newRollupWindow, int(rollupWindow))
+	totalGas := sumLongWindow(newRollupWindow, params.RollupWindow)
 
 	if totalGas == parentGasTarget {
 		return newRollupWindow, baseFee, nil
@@ -167,9 +166,9 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 		// for the interval during which no blocks were produced.
 		// We use roll/rollupWindow, so that the transition is applied for every [rollupWindow] seconds
 		// that has elapsed between the parent and this block.
-		if roll > rollupWindow {
+		if roll > params.RollupWindow {
 			// Note: roll/rollupWindow must be greater than 1 since we've checked that roll > rollupWindow
-			baseFeeDelta = new(big.Int).Mul(baseFeeDelta, new(big.Int).SetUint64(roll/rollupWindow))
+			baseFeeDelta = new(big.Int).Mul(baseFeeDelta, new(big.Int).SetUint64(roll/params.RollupWindow))
 		}
 		baseFee.Sub(baseFee, baseFeeDelta)
 	}

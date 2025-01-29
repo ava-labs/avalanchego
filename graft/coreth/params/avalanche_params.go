@@ -7,6 +7,7 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 // Minimum Gas Price
@@ -32,8 +33,8 @@ const (
 	ApricotPhase5BaseFeeChangeDenominator uint64 = 36
 	EtnaMinBaseFee                        int64  = GWei
 
-	DynamicFeeExtraDataSize        = 80
-	RollupWindow            uint64 = 10
+	RollupWindow            = 10 // in seconds
+	DynamicFeeExtraDataSize = wrappers.LongLen * RollupWindow
 
 	// The base cost to charge per atomic transaction. Added in Apricot Phase 5.
 	AtomicTxBaseCost uint64 = 10_000
