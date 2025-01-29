@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	agoUtils "github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/coreth/core/state"
@@ -96,7 +95,7 @@ func TestSendWarpMessage(t *testing.T) {
 		sendWarpMessagePayload,
 	)
 	require.NoError(t, err)
-	unsignedWarpMessage, err := warp.NewUnsignedMessage(
+	unsignedWarpMessage, err := avalancheWarp.NewUnsignedMessage(
 		defaultSnowCtx.NetworkID,
 		blockchainID,
 		sendWarpMessageAddressedPayload.Bytes(),
@@ -747,7 +746,7 @@ func TestPackEvents(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	unsignedWarpMessage, err := warp.NewUnsignedMessage(
+	unsignedWarpMessage, err := avalancheWarp.NewUnsignedMessage(
 		networkID,
 		sourceChainID,
 		addressedPayload.Bytes(),
