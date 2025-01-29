@@ -17,6 +17,7 @@ import (
 	agoUtils "github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/set"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
@@ -111,7 +112,7 @@ func (v *testValidator) Compare(o *testValidator) int {
 }
 
 func newTestValidator() *testValidator {
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
 	if err != nil {
 		panic(err)
 	}
