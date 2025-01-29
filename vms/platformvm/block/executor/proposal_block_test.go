@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -1329,7 +1329,7 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 		nodeID             = ids.GenerateTestNodeID()
 	)
 
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(err)
 
 	rewardsOwner := &secp256k1fx.OutputOwners{
@@ -1414,7 +1414,7 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 	validatorEndTime = validatorStartTime.Add(env.config.MinStakeDuration)
 	nodeID = ids.GenerateTestNodeID()
 
-	sk, err = bls.NewSigner()
+	sk, err = localsigner.New()
 	require.NoError(err)
 
 	addValidatorTx2, err := wallet.IssueAddPermissionlessValidatorTx(

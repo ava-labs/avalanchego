@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators/validatorsmock"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -162,7 +163,7 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 }
 
 func TestFilterValidators(t *testing.T) {
-	sk0, err := bls.NewSigner()
+	sk0, err := localsigner.New()
 	require.NoError(t, err)
 	pk0 := sk0.PublicKey()
 	vdr0 := &Validator{
@@ -171,7 +172,7 @@ func TestFilterValidators(t *testing.T) {
 		Weight:         1,
 	}
 
-	sk1, err := bls.NewSigner()
+	sk1, err := localsigner.New()
 	require.NoError(t, err)
 	pk1 := sk1.PublicKey()
 	vdr1 := &Validator{
@@ -315,7 +316,7 @@ func BenchmarkGetCanonicalValidatorSet(b *testing.B) {
 	getValidatorOutputs := make([]*validators.GetValidatorOutput, 0, numNodes)
 	for i := 0; i < numNodes; i++ {
 		nodeID := ids.GenerateTestNodeID()
-		blsPrivateKey, err := bls.NewSigner()
+		blsPrivateKey, err := localsigner.New()
 		require.NoError(b, err)
 		blsPublicKey := blsPrivateKey.PublicKey()
 		getValidatorOutputs = append(getValidatorOutputs, &validators.GetValidatorOutput{

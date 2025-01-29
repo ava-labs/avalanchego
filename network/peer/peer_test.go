@@ -25,7 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
@@ -111,7 +111,7 @@ func newRawTestPeer(t *testing.T, config Config) *rawTestPeer {
 		1,
 	))
 	tls := tlsCert.PrivateKey.(crypto.Signer)
-	bls, err := bls.NewSigner()
+	bls, err := localsigner.New()
 	require.NoError(err)
 
 	config.IPSigner = NewIPSigner(ip, tls, bls)
@@ -327,7 +327,7 @@ func TestInvalidBLSKeyDisconnects(t *testing.T) {
 		1,
 	))
 
-	bogusBLSKey, err := bls.NewSigner()
+	bogusBLSKey, err := localsigner.New()
 	require.NoError(err)
 	require.NoError(rawPeer1.config.Validators.AddStaker(
 		constants.PrimaryNetworkID,
@@ -348,7 +348,7 @@ func TestInvalidBLSKeyDisconnects(t *testing.T) {
 func TestShouldDisconnect(t *testing.T) {
 	peerID := ids.GenerateTestNodeID()
 	txID := ids.GenerateTestID()
-	blsKey, err := bls.NewSigner()
+	blsKey, err := localsigner.New()
 	require.NoError(t, err)
 
 	tests := []struct {
