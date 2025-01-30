@@ -11,9 +11,7 @@ import (
 	"github.com/ava-labs/subnet-evm/utils"
 )
 
-var (
-	errCannotBeNil = fmt.Errorf("timestamp cannot be nil")
-)
+var errCannotBeNil = fmt.Errorf("timestamp cannot be nil")
 
 // NetworkUpgrades contains timestamps that enable network upgrades.
 // Avalanche specific network upgrades are also included here.
@@ -26,6 +24,9 @@ type NetworkUpgrades struct {
 	DurangoTimestamp *uint64 `json:"durangoTimestamp,omitempty"`
 	// Placeholder for EtnaTimestamp
 	EtnaTimestamp *uint64 `json:"etnaTimestamp,omitempty"`
+	// FUpgrade is a placeholder for the next upgrade.
+	// (nil = no fork, 0 = already activated)
+	FUpgradeTimestamp *uint64 `json:"fUpgradeTimestamp,omitempty"`
 }
 
 func (n *NetworkUpgrades) Equal(other *NetworkUpgrades) bool {
@@ -42,6 +43,10 @@ func (n *NetworkUpgrades) CheckNetworkUpgradesCompatible(newcfg *NetworkUpgrades
 	if isForkTimestampIncompatible(n.EtnaTimestamp, newcfg.EtnaTimestamp, time) {
 		return newTimestampCompatError("Etna fork block timestamp", n.EtnaTimestamp, newcfg.EtnaTimestamp)
 	}
+	if isForkTimestampIncompatible(n.FUpgradeTimestamp, newcfg.FUpgradeTimestamp, time) {
+		return newTimestampCompatError("F-Upgrade fork block timestamp", n.FUpgradeTimestamp, newcfg.FUpgradeTimestamp)
+	}
+
 	return nil
 }
 
@@ -50,6 +55,7 @@ func (n *NetworkUpgrades) forkOrder() []fork {
 		{name: "subnetEVMTimestamp", timestamp: n.SubnetEVMTimestamp},
 		{name: "durangoTimestamp", timestamp: n.DurangoTimestamp},
 		{name: "etnaTimestamp", timestamp: n.EtnaTimestamp},
+		{name: "fUpgradeTimestamp", timestamp: n.FUpgradeTimestamp},
 	}
 }
 
@@ -118,11 +124,18 @@ func (n *NetworkUpgrades) IsEtna(time uint64) bool {
 	return isTimestampForked(n.EtnaTimestamp, time)
 }
 
+// IsFUpgrade returns whether [time] represents a block
+// with a timestamp after the F upgrade time.
+func (n *NetworkUpgrades) IsFUpgrade(time uint64) bool {
+	return isTimestampForked(n.FUpgradeTimestamp, time)
+}
+
 func (n *NetworkUpgrades) Description() string {
 	var banner string
 	banner += fmt.Sprintf(" - SubnetEVM Timestamp:          @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0)\n", ptrToString(n.SubnetEVMTimestamp))
 	banner += fmt.Sprintf(" - Durango Timestamp:            @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0)\n", ptrToString(n.DurangoTimestamp))
 	banner += fmt.Sprintf(" - Etna Timestamp:           @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0)\n", ptrToString(n.EtnaTimestamp))
+	banner += fmt.Sprintf(" - F-Upgrade Timestamp:              @%-10v (Unscheduled)\n", ptrToString(n.FUpgradeTimestamp))
 	return banner
 }
 
@@ -130,6 +143,7 @@ type AvalancheRules struct {
 	IsSubnetEVM bool
 	IsDurango   bool
 	IsEtna      bool
+	IsFUpgrade  bool
 }
 
 func (n *NetworkUpgrades) GetAvalancheRules(time uint64) AvalancheRules {
@@ -137,6 +151,7 @@ func (n *NetworkUpgrades) GetAvalancheRules(time uint64) AvalancheRules {
 		IsSubnetEVM: n.IsSubnetEVM(time),
 		IsDurango:   n.IsDurango(time),
 		IsEtna:      n.IsEtna(time),
+		IsFUpgrade:  n.IsFUpgrade(time),
 	}
 }
 
@@ -147,6 +162,7 @@ func getDefaultNetworkUpgrades(agoUpgrade upgrade.Config) NetworkUpgrades {
 		SubnetEVMTimestamp: utils.NewUint64(0),
 		DurangoTimestamp:   utils.TimeToNewUint64(agoUpgrade.DurangoTime),
 		EtnaTimestamp:      utils.TimeToNewUint64(agoUpgrade.EtnaTime),
+		FUpgradeTimestamp:  utils.TimeToNewUint64(agoUpgrade.FUpgradeTime),
 	}
 }
 

@@ -97,6 +97,7 @@ var (
 	genesisJSONSubnetEVM    = genesisJSON(params.TestSubnetEVMChainConfig)
 	genesisJSONDurango      = genesisJSON(params.TestDurangoChainConfig)
 	genesisJSONEtna         = genesisJSON(params.TestEtnaChainConfig)
+	genesisJSONFUpgrade     = genesisJSON(params.TestFUpgradeChainConfig)
 	genesisJSONLatest       = genesisJSONEtna
 )
 
