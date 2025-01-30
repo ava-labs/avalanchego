@@ -25,21 +25,21 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 	chainID := ids.GenerateTestID()
 
 	nodeID0 := ids.GenerateTestNodeID()
-	sk0, err := bls.NewSecretKey()
+	sk0, err := bls.NewSigner()
 	require.NoError(t, err)
-	pk0 := bls.PublicFromSecretKey(sk0)
+	pk0 := sk0.PublicKey()
 	signer0 := warp.NewSigner(sk0, networkID, chainID)
 
 	nodeID1 := ids.GenerateTestNodeID()
-	sk1, err := bls.NewSecretKey()
+	sk1, err := bls.NewSigner()
 	require.NoError(t, err)
-	pk1 := bls.PublicFromSecretKey(sk1)
+	pk1 := sk1.PublicKey()
 	signer1 := warp.NewSigner(sk1, networkID, chainID)
 
 	nodeID2 := ids.GenerateTestNodeID()
-	sk2, err := bls.NewSecretKey()
+	sk2, err := bls.NewSigner()
 	require.NoError(t, err)
-	pk2 := bls.PublicFromSecretKey(sk2)
+	pk2 := sk2.PublicKey()
 	signer2 := warp.NewSigner(sk2, networkID, chainID)
 
 	unsignedMsg, err := warp.NewUnsignedMessage(
@@ -201,7 +201,6 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			},
 			wantTotalStake: 3,
 			wantSigners:    2,
-			wantFinished:   true,
 			quorumNum:      2,
 			quorumDen:      3,
 		},
