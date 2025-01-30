@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
@@ -17,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool/mempoolmock"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -119,7 +120,8 @@ func TestRejectBlock(t *testing.T) {
 			blk, err := tt.newBlockFunc()
 			require.NoError(err)
 
-			mempool := mempoolmock.NewMempool(ctrl)
+			mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+			require.NoError(err)
 			state := state.NewMockState(ctrl)
 			blkIDToState := map[ids.ID]*blockState{
 				blk.Parent(): nil,
@@ -136,13 +138,6 @@ func TestRejectBlock(t *testing.T) {
 				},
 				addTxsToMempool: true,
 			}
-
-			// Set expected calls on dependencies.
-			for _, tx := range blk.Txs() {
-				mempool.EXPECT().Add(tx).Return(nil).Times(1)
-			}
-
-			mempool.EXPECT().RequestBuildBlock(false).Times(1)
 
 			require.NoError(tt.rejectFunc(rejector, blk))
 			// Make sure block and its parent are removed from the state map.
