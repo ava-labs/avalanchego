@@ -322,6 +322,9 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Int(SnowMaxProcessingKey, snowball.DefaultParameters.MaxOutstandingItems, "Maximum number of processing items to be considered healthy")
 	fs.Duration(SnowMaxTimeProcessingKey, snowball.DefaultParameters.MaxItemProcessingTime, "Maximum amount of time an item should be processing and still be healthy")
 
+	// Primary Network Config
+	fs.Duration(ProposerMinBlockDelayKey, proposervm.DefaultMinBlockDelay, "Minimum delay to enforce when building a snowman++ block for the primary network chains")
+
 	// ProposerVM
 	fs.Bool(ProposerVMUseCurrentHeightKey, false, "Have the ProposerVM always report the last accepted P-chain block height")
 
@@ -386,8 +389,6 @@ func addNodeFlags(fs *pflag.FlagSet) {
 
 	fs.String(ProcessContextFileKey, defaultProcessContextPath, "The path to write process context to (including PID, API URI, and staking address).")
 
-	// Primary Subnet Config
-	fs.Duration(ProposerMinBlockDelayKey, proposervm.DefaultMinBlockDelay, "Minimum delay to enforce when building a snowman++ block for the primary subnet")
 }
 
 // BuildFlagSet returns a complete set of flags for avalanchego
