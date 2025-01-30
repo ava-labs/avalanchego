@@ -234,12 +234,14 @@ func getRangeProof(
 		err      error
 	)
 	if len(result.KeyValues) > 0 {
+		// [endProof] => inclusion proof for the largest key
 		greatestKey := result.KeyValues[len(result.KeyValues)-1].Key
 		endProof, err = getProof(t, greatestKey)
 		if err != nil {
 			return nil, err
 		}
 	} else if end.HasValue() {
+		// [endProof] => exclusion proof for the [end] key
 		endProof, err = getProof(t, end.Value())
 		if err != nil {
 			return nil, err
@@ -250,6 +252,7 @@ func getRangeProof(
 	}
 
 	if start.HasValue() {
+		// [startProof] => inclusion/exclusion proof for [start] key
 		startProof, err := getProof(t, start.Value())
 		if err != nil {
 			return nil, err

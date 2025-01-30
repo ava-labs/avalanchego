@@ -22,32 +22,35 @@ import (
 const verificationCacheSize = math.MaxUint16
 
 var (
-	ErrInvalidProof                = errors.New("proof obtained an invalid root ID")
-	ErrInvalidMaxLength            = errors.New("expected max length to be > 0")
-	ErrNonIncreasingValues         = errors.New("keys sent are not in increasing order")
-	ErrStateFromOutsideOfRange     = errors.New("state key falls outside of the start->end range")
-	ErrNonIncreasingProofNodes     = errors.New("each proof node key must be a strict prefix of the next")
-	ErrExtraProofNodes             = errors.New("extra proof nodes in path")
-	ErrDataInMissingRootProof      = errors.New("there should be no state or deleted keys in a change proof that had a missing root")
-	ErrEmptyProof                  = errors.New("proof is empty")
-	ErrNoMerkleProof               = errors.New("empty key response must include merkle proof")
-	ErrShouldJustBeRoot            = errors.New("end proof should only contain root")
-	ErrNoStartProof                = errors.New("no start proof")
-	ErrNoEndProof                  = errors.New("no end proof")
-	ErrProofNodeNotForKey          = errors.New("the provided node has a key that is not a prefix of the specified key")
-	ErrProofValueDoesntMatch       = errors.New("the provided value does not match the proof node for the provided key's value")
-	ErrProofNodeHasUnincludedValue = errors.New("the provided proof has a value for a key within the range that is not present in the provided key/values")
-	ErrInvalidMaybe                = errors.New("maybe is nothing but has value")
-	ErrNilProofNode                = errors.New("proof node is nil")
-	ErrNilValueOrHash              = errors.New("proof node's valueOrHash field is nil")
-	ErrNilKey                      = errors.New("key is nil")
-	ErrInvalidKeyLength            = errors.New("key length doesn't match bytes length, check specified branchFactor")
-	ErrNilRangeProof               = errors.New("range proof is nil")
-	ErrNilChangeProof              = errors.New("change proof is nil")
-	ErrNilMaybeBytes               = errors.New("maybe bytes is nil")
-	ErrNilProof                    = errors.New("proof is nil")
-	ErrNilValue                    = errors.New("value is nil")
-	ErrUnexpectedEndProof          = errors.New("end proof should be empty")
+	ErrInvalidProof                  = errors.New("proof obtained an invalid root ID")
+	ErrInvalidMaxLength              = errors.New("expected max length to be > 0")
+	ErrNonIncreasingValues           = errors.New("keys sent are not in increasing order")
+	ErrStateFromOutsideOfRange       = errors.New("state key falls outside of the start->end range")
+	ErrNonIncreasingProofNodes       = errors.New("each proof node key must be a strict prefix of the next")
+	ErrExtraProofNodes               = errors.New("extra proof nodes in path")
+	ErrDataInMissingRootProof        = errors.New("there should be no state or deleted keys in a change proof that had a missing root")
+	ErrEmptyProof                    = errors.New("proof is empty")
+	ErrNoMerkleProof                 = errors.New("empty key response must include merkle proof")
+	ErrShouldJustBeRoot              = errors.New("end proof should only contain root")
+	ErrNoEndProof                    = errors.New("no end proof")
+	ErrProofNodeNotForKey            = errors.New("the provided path has a key that is not a prefix of the specified key")
+	ErrExclusionProofMissingEndNodes = errors.New("missing end nodes from path")
+	ErrExclusionProofUnexpectedValue = errors.New("exclusion proof's value should be empty")
+	ErrExclusionProofInvalidNode     = errors.New("invalid node for exclusion proof")
+	ErrProofValueDoesntMatch         = errors.New("the provided value does not match the proof node for the provided key's value")
+	ErrProofNodeHasUnincludedValue   = errors.New("the provided proof has a value for a key within the range that is not present in the provided key/values")
+	ErrInvalidMaybe                  = errors.New("maybe is nothing but has value")
+	ErrNilProofNode                  = errors.New("proof node is nil")
+	ErrNilValueOrHash                = errors.New("proof node's valueOrHash field is nil")
+	ErrNilKey                        = errors.New("key is nil")
+	ErrInvalidKeyLength              = errors.New("key length doesn't match bytes length, check specified branchFactor")
+	ErrNilRangeProof                 = errors.New("range proof is nil")
+	ErrNilChangeProof                = errors.New("change proof is nil")
+	ErrNilMaybeBytes                 = errors.New("maybe bytes is nil")
+	ErrNilProof                      = errors.New("proof is nil")
+	ErrNilValue                      = errors.New("value is nil")
+	ErrUnexpectedEndProof            = errors.New("end proof should be empty")
+	ErrUnexpectedStartProof          = errors.New("start proof should be empty")
 )
 
 type ProofNode struct {
@@ -142,30 +145,19 @@ func (proof *Proof) Verify(
 		return ErrEmptyProof
 	}
 
-	if err := verifyProofPath(proof.Path, maybe.Some(proof.Key)); err != nil {
-		return err
-	}
-
-	// Confirm that the last proof node's value matches the claimed proof value
 	lastNode := proof.Path[len(proof.Path)-1]
+	inclusionProof := lastNode.Key.Compare(proof.Key) == 0
 
-	// If the last proof node's key is [proof.Key] (i.e. this is an inclusion proof)
-	// then the value of the last proof node must match [proof.Value].
-	// Note partial byte length keys can never match the [proof.Key] since it's bytes,
-	// and thus has a whole number of bytes
-	if !lastNode.Key.hasPartialByte() &&
-		proof.Key == lastNode.Key &&
-		!valueOrHashMatches(hasher, proof.Value, lastNode.ValueOrHash) {
+	if inclusionProof && !valueOrHashMatches(hasher, proof.Value, lastNode.ValueOrHash) {
 		return ErrProofValueDoesntMatch
 	}
 
-	// If the last proof node has a length not evenly divisible into bytes or a different key than [proof.Key]
-	// then this is an exclusion proof and should prove that [proof.Key] isn't in the trie.
-	// Note length not evenly divisible into bytes can never match the [proof.Key] since it's bytes,
-	// and thus an exact number of bytes.
-	if (lastNode.Key.hasPartialByte() || proof.Key != lastNode.Key) &&
-		proof.Value.HasValue() {
-		return ErrProofValueDoesntMatch
+	if !inclusionProof && proof.Value.HasValue() {
+		return ErrExclusionProofUnexpectedValue
+	}
+
+	if err := verifyProofPath(proof.Path, proof.Key, tokenSize); err != nil {
+		return err
 	}
 
 	// Don't bother locking [view] -- nobody else has a reference to it.
@@ -247,22 +239,83 @@ type KeyValue struct {
 type RangeProof struct {
 	// Invariant: At least one of [StartProof], [EndProof], [KeyValues] is non-empty.
 
-	// A proof that the smallest key in the requested range does/doesn't exist.
+	// An inclusion/exclusion proof for the lower range bound.
+	//
+	// If no lower range bound was given, this is empty.
+	//
 	// Note that this may not be an entire proof -- nodes are omitted if
 	// they are also in [EndProof].
 	StartProof []ProofNode
 
-	// If no upper range bound was given and [KeyValues] is empty, this is empty.
+	// An inclusion proof for the largest key in [KeyValues].
 	//
-	// If no upper range bound was given and [KeyValues] is non-empty, this is
-	// a proof for the largest key in [KeyValues].
+	// If [KeyValues] is empty, this is an exclusion proof for the upper range bound.
 	//
-	// Otherwise this is a proof for the upper range bound.
+	// If [KeyValues] is empty, and no upper range bound was given, this is empty.
 	EndProof []ProofNode
 
-	// This proof proves that the key-value pairs in [KeyValues] are in the trie.
-	// Sorted by increasing key.
+	// A subset of the requested key-value range, (because otherwise the proof may be too large)).
+	// Each key is in the requested range (inclusive).
+	// The first key-value is the first key-value at/after the range start.
+	// The key-value pairs are consecutive.
+	// Sorted by increasing key and with no duplicate keys.
 	KeyValues []KeyValue
+}
+
+// Validate received data from change/range proof requests
+// using the requested range.
+func validateRangeChangeProof(
+	start maybe.Maybe[[]byte],
+	end maybe.Maybe[[]byte],
+	startProof []ProofNode,
+	endProof []ProofNode,
+	keys []Key,
+	tokenSize int,
+) error {
+	switch {
+	case start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) > 0:
+		return ErrStartAfterEnd
+	case len(keys) == 0 && len(startProof) == 0 && len(endProof) == 0:
+		return ErrEmptyProof
+	case end.IsNothing() && len(keys) == 0 && len(endProof) != 0:
+		return ErrUnexpectedEndProof
+	case start.IsNothing() && len(startProof) > 0:
+		return ErrUnexpectedStartProof
+	case len(endProof) == 0 && (end.HasValue() || len(keys) > 0):
+		return ErrNoEndProof
+	}
+
+	var (
+		// [startProof] is an inclusion/exclusion proof of [start]
+		startProofKey = maybe.Bind(start, ToKey)
+
+		// [endProof] is an inclusion of the largest key in [keyValues],
+		// or an exclusion proof of [end] if [keyValues] is empty.
+		endProofKey = maybe.Bind(end, ToKey)
+	)
+
+	// Make sure the key-value pairs are sorted and in [start, end].
+	if err := verifyKeyValues(keys, startProofKey, endProofKey); err != nil {
+		return err
+	}
+
+	if len(keys) > 0 {
+		endProofKey = maybe.Some(keys[len(keys)-1])
+	}
+
+	// Ensure that the start proof is valid.
+	// If [startProof] is non-empty, [end] is non-empty (length is checked inside verifyProofPath).
+	if err := verifyProofPath(startProof, startProofKey.Value(), tokenSize); err != nil {
+		return err
+	}
+
+	// Ensure that the end proof is valid.
+	// If [endProof] is non-empty, [end] is non-empty (length is checked inside verifyProofPath).
+	if err := verifyProofPath(endProof, endProofKey.Value(), tokenSize); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Verify returns nil iff all the following hold:
@@ -283,22 +336,6 @@ func (proof *RangeProof) Verify(
 	tokenSize int,
 	hasher Hasher,
 ) error {
-	switch {
-	case start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) > 0:
-		return ErrStartAfterEnd
-	case len(proof.KeyValues) == 0 && len(proof.StartProof) == 0 && len(proof.EndProof) == 0:
-		return ErrEmptyProof
-	case end.IsNothing() && len(proof.KeyValues) == 0 && len(proof.EndProof) != 0:
-		return ErrUnexpectedEndProof
-	case len(proof.EndProof) == 0 && (end.HasValue() || len(proof.KeyValues) > 0):
-		return ErrNoEndProof
-	}
-
-	// Make sure the key-value pairs are sorted and in [start, end].
-	if err := verifyKeyValues(proof.KeyValues, start, end); err != nil {
-		return err
-	}
-
 	// [proof] allegedly provides and proves all key-value
 	// pairs in [smallestProvenKey, largestProvenKey].
 	// If [smallestProvenKey] is Nothing, [proof] should
@@ -306,48 +343,57 @@ func (proof *RangeProof) Verify(
 	// If [largestProvenKey] is Nothing, [proof] should
 	// provide and prove all keys > [smallestProvenKey].
 	// If both are Nothing, [proof] should prove the entire trie.
-	smallestProvenKey := maybe.Bind(start, ToKey)
 
-	largestProvenKey := maybe.Bind(end, ToKey)
+	// The key-value pairs (allegedly) are proven by [proof].
+	keyValues := make(map[Key][]byte, len(proof.KeyValues))
+	keys := make([]Key, len(proof.KeyValues))
+	for i, keyValue := range proof.KeyValues {
+		k := ToKey(keyValue.Key)
 
+		keyValues[k] = keyValue.Value
+		keys[i] = k
+	}
+
+	// Validate proof.
+	err := validateRangeChangeProof(start, end, proof.StartProof, proof.EndProof, keys, tokenSize)
+	if err != nil {
+		return err
+	}
+
+	var (
+		// [startProof] is an inclusion/exclusion proof of [startKey]
+		startProofKey = maybe.Bind(start, ToKey)
+
+		// [endProof] is an inclusion of the largest key in [keyValues],
+		// or an exclusion proof of [end] if [keyValues] is empty.
+		endProofKey = maybe.Bind(end, ToKey)
+	)
+
+	// Update [endProofKey] with the largest key in [keyValues].
 	if len(proof.KeyValues) > 0 {
 		// If [proof] has key-value pairs, we should insert children
 		// greater than [largestProvenKey] to ancestors of the node containing
 		// [largestProvenKey] so that we get the expected root ID.
-		largestProvenKey = maybe.Some(ToKey(proof.KeyValues[len(proof.KeyValues)-1].Key))
+		endProofKey = maybe.Some(ToKey(proof.KeyValues[len(proof.KeyValues)-1].Key))
 	}
 
-	// The key-value pairs (allegedly) are proven by [proof].
-	keyValues := make(map[Key][]byte, len(proof.KeyValues))
-	for _, keyValue := range proof.KeyValues {
-		keyValues[ToKey(keyValue.Key)] = keyValue.Value
-	}
-
-	// Ensure that the start proof is valid and contains values that
-	// match the key/values that were sent.
-	if err := verifyProofPath(proof.StartProof, smallestProvenKey); err != nil {
-		return err
-	}
+	// Ensure that the [startProof] contains values that match the key/values that were sent.
 	if err := verifyAllRangeProofKeyValuesPresent(
 		hasher,
 		proof.StartProof,
-		smallestProvenKey,
-		largestProvenKey,
+		startProofKey,
+		endProofKey,
 		keyValues,
 	); err != nil {
 		return err
 	}
 
-	// Ensure that the end proof is valid and contains values that
-	// match the key/values that were sent.
-	if err := verifyProofPath(proof.EndProof, largestProvenKey); err != nil {
-		return err
-	}
+	// Ensure that the [endProof] contains values that match the key/values that were sent.
 	if err := verifyAllRangeProofKeyValuesPresent(
 		hasher,
 		proof.EndProof,
-		smallestProvenKey,
-		largestProvenKey,
+		startProofKey,
+		endProofKey,
 		keyValues,
 	); err != nil {
 		return err
@@ -377,16 +423,17 @@ func (proof *RangeProof) Verify(
 	if err := addPathInfo(
 		view,
 		proof.StartProof,
-		smallestProvenKey,
-		largestProvenKey,
+		startProofKey,
+		endProofKey,
 	); err != nil {
 		return err
 	}
+
 	if err := addPathInfo(
 		view,
 		proof.EndProof,
-		smallestProvenKey,
-		largestProvenKey,
+		startProofKey,
+		endProofKey,
 	); err != nil {
 		return err
 	}
@@ -395,9 +442,11 @@ func (proof *RangeProof) Verify(
 	if err != nil {
 		return err
 	}
+
 	if expectedRootID != calculatedRoot {
 		return fmt.Errorf("%w:[%s], expected:[%s]", ErrInvalidProof, calculatedRoot, expectedRootID)
 	}
+
 	return nil
 }
 
@@ -498,12 +547,12 @@ type KeyChange struct {
 // between two trie roots, where each key-value pair's key is
 // between some lower and upper bound (inclusive).
 type ChangeProof struct {
-	// Invariant: At least one of [StartProof], [EndProof], or
-	// [KeyChanges] is non-empty.
+	// Invariant: At least one of [StartProof], [EndProof], [KeyChanges] is non-empty.
 
-	// A proof that the smallest key in the requested range does/doesn't
-	// exist in the trie with the requested start root.
-	// Empty if no lower bound on the requested range was given.
+	// An inclusion/exclusion proof for the lower range bound.
+	//
+	// If no lower range bound was given, this is empty.
+	//
 	// Note that this may not be an entire proof -- nodes are omitted if
 	// they are also in [EndProof].
 	StartProof []ProofNode
@@ -714,61 +763,96 @@ func verifyKeyChanges(kvs []KeyChange, start maybe.Maybe[[]byte], end maybe.Mayb
 // If [start] is nil, there is no lower bound on acceptable keys.
 // If [end] is nothing, there is no upper bound on acceptable keys.
 // If [kvs] is empty, returns nil.
-func verifyKeyValues(kvs []KeyValue, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte]) error {
+func verifyKeyValues(kvs []Key, start maybe.Maybe[Key], end maybe.Maybe[Key]) error {
 	hasLowerBound := start.HasValue()
 	hasUpperBound := end.HasValue()
 	for i := 0; i < len(kvs); i++ {
-		if i < len(kvs)-1 && bytes.Compare(kvs[i].Key, kvs[i+1].Key) >= 0 {
+		if i < len(kvs)-1 && kvs[i].Compare(kvs[i+1]) >= 0 {
 			return ErrNonIncreasingValues
 		}
-		if (hasLowerBound && bytes.Compare(kvs[i].Key, start.Value()) < 0) ||
-			(hasUpperBound && bytes.Compare(kvs[i].Key, end.Value()) > 0) {
+
+		if (hasLowerBound && kvs[i].Compare(start.Value()) < 0) ||
+			(hasUpperBound && kvs[i].Compare(end.Value()) > 0) {
 			return ErrStateFromOutsideOfRange
 		}
 	}
 	return nil
 }
 
+// If the last element in [proof] is [key], this is an inclusion proof.
+// Otherwise, this is an exclusion proof and [key] must not be in [proof].
+
 // Returns nil iff all the following hold:
+//
 //   - Any node with a partial byte length, should not have a value associated with it
 //     since all keys with values are written in complete bytes([]byte).
+//
 //   - Each key in [proof] is a strict prefix of the following key.
-//   - Each key in [proof] is a strict prefix of [keyBytes], except possibly the last.
-//   - If the last element in [proof] is [Key], this is an inclusion proof.
-//     Otherwise, this is an exclusion proof and [keyBytes] must not be in [proof].
-func verifyProofPath(proof []ProofNode, key maybe.Maybe[Key]) error {
+//
+//   - Each key in [proof] is a strict prefix of [key], except possibly the last.
+//
+//   - If this is an inclusionProof, the last key in [proof] is the [key].
+//
+//   - If this is an exclusionProof:
+//     -> the last key in [proof] is the replacement child and is at the corresponding index of the parent's children.
+//     -> the last key in [proof] is the possible parent and it doesn't have a child at the corresponding index.
+func verifyProofPath(proof []ProofNode, key Key, tokenSize int) error {
 	if len(proof) == 0 {
 		return nil
 	}
 
 	// loop over all but the last node since it will not have the prefix in exclusion proofs
-	for i := 0; i < len(proof)-1; i++ {
-		currentProofNode := proof[i]
-		nodeKey := currentProofNode.Key
+	for i, proofNode := range proof[:len(proof)-1] {
+		nodeKey := proofNode.Key
 
 		// Because the interface only supports []byte keys,
 		// a key with a partial byte may not store a value
-		if nodeKey.hasPartialByte() && proof[i].ValueOrHash.HasValue() {
+		if nodeKey.hasPartialByte() && proofNode.ValueOrHash.HasValue() {
 			return ErrPartialByteLengthWithValue
 		}
 
-		// each node should have a key that has the proven key as a prefix
-		if key.HasValue() && !key.Value().HasStrictPrefix(nodeKey) {
+		// each node's key should be a prefix of [key]
+		if !key.HasStrictPrefix(nodeKey) {
 			return ErrProofNodeNotForKey
 		}
 
-		// each node should have a key that has a matching TokenConfig and is a prefix of the next node's key
+		// each node's key must be a prefix of the next node's key
 		nextKey := proof[i+1].Key
 		if !nextKey.HasStrictPrefix(nodeKey) {
 			return ErrNonIncreasingProofNodes
 		}
 	}
 
-	// check the last node for a value since the above loop doesn't check the last node
-	if len(proof) > 0 {
-		lastNode := proof[len(proof)-1]
-		if lastNode.Key.hasPartialByte() && !lastNode.ValueOrHash.IsNothing() {
-			return ErrPartialByteLengthWithValue
+	lastNode := proof[len(proof)-1]
+	if lastNode.Key.hasPartialByte() && !lastNode.ValueOrHash.IsNothing() {
+		return ErrPartialByteLengthWithValue
+	}
+
+	if lastNode.Key.Compare(key) != 0 {
+		// exclusionProof
+
+		if key.HasPrefix(lastNode.Key) {
+			// [lastNode] is the parent of the node
+			nextIndex := key.Token(lastNode.Key.length, tokenSize)
+
+			if _, ok := lastNode.Children[nextIndex]; ok {
+				// [lastNode] shouldn't contain any other child at the specific index
+				return ErrExclusionProofMissingEndNodes
+			}
+		} else if len(proof) > 1 {
+			// For [lastNode] to be the replacement child, it should be at the same index as [key] would be
+			// inside the parent.
+			// So, we need to check that the first [number of bits of the parent] + [tokenSize] bits of both,
+			// [lastNode] and [key] are the same. Otherwise, it means the replacement child is at the wrong index.
+
+			lastNodeParent := proof[len(proof)-2]
+			parentKeyLen := lastNodeParent.Key.Length()
+			bitsToCheck := parentKeyLen + tokenSize
+
+			if !key.HasPrefix(lastNode.Key.Take(bitsToCheck)) {
+				// [lastNode] at wrong index inside parent
+				return ErrExclusionProofInvalidNode
+			}
 		}
 	}
 

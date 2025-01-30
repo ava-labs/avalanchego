@@ -47,83 +47,236 @@ func Test_Proof_Simple(t *testing.T) {
 	require.NoError(proof.Verify(ctx, expectedRoot, db.tokenSize, db.hasher))
 }
 
-func Test_Proof_Verify_Bad_Data(t *testing.T) {
-	type test struct {
-		name        string
-		malform     func(proof *Proof)
-		expectedErr error
-	}
+func Test_Proof_Verify(t *testing.T) {
+	require := require.New(t)
 
-	tests := []test{
-		{
-			name:        "happyPath",
-			malform:     func(*Proof) {},
-			expectedErr: nil,
-		},
-		{
-			name: "empty",
-			malform: func(proof *Proof) {
-				proof.Path = nil
-			},
-			expectedErr: ErrEmptyProof,
-		},
-		{
-			name: "odd length key path with value",
-			malform: func(proof *Proof) {
-				proof.Path[0].ValueOrHash = maybe.Some([]byte{1, 2})
-			},
-			expectedErr: ErrPartialByteLengthWithValue,
-		},
-		{
-			name: "last proof node has missing value",
-			malform: func(proof *Proof) {
-				proof.Path[len(proof.Path)-1].ValueOrHash = maybe.Nothing[[]byte]()
-			},
-			expectedErr: ErrProofValueDoesntMatch,
-		},
-		{
-			name: "missing value on proof",
-			malform: func(proof *Proof) {
-				proof.Value = maybe.Nothing[[]byte]()
-			},
-			expectedErr: ErrProofValueDoesntMatch,
-		},
-		{
-			name: "mismatched value on proof",
-			malform: func(proof *Proof) {
-				proof.Value = maybe.Some([]byte{10})
-			},
-			expectedErr: ErrProofValueDoesntMatch,
-		},
-		{
-			name: "value of exclusion proof",
-			malform: func(proof *Proof) {
-				// remove the value node to make it look like it is an exclusion proof
-				proof.Path = proof.Path[:len(proof.Path)-1]
-			},
-			expectedErr: ErrProofValueDoesntMatch,
-		},
-	}
+	t.Run("empty proof", func(t *testing.T) {
+		db, err := getBasicDB()
+		require.NoError(err)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
+		writeBasicBatch(t, db)
 
-			db, err := getBasicDB()
-			require.NoError(err)
+		proof := Proof{
+			Path:  nil,
+			Key:   Key{},
+			Value: maybe.Maybe[[]byte]{},
+		}
 
-			writeBasicBatch(t, db)
+		proof.Path = nil
+		err = proof.Verify(context.Background(), db.getMerkleRoot(), db.tokenSize, db.hasher)
+		require.ErrorIs(err, ErrEmptyProof)
 
-			proof, err := db.GetProof(context.Background(), []byte{2})
+		proof.Path = []ProofNode{}
+		err = proof.Verify(context.Background(), db.getMerkleRoot(), db.tokenSize, db.hasher)
+		require.ErrorIs(err, ErrEmptyProof)
+	})
+
+	t.Run("invalid proof", func(t *testing.T) {
+		db, err := getBasicDBWithBranchFactor(BranchFactor256)
+		require.NoError(err)
+
+		batch := db.NewBatch()
+		require.NoError(batch.Put([]byte{1}, []byte{0}))
+		require.NoError(batch.Put([]byte{1, 2}, []byte{0}))
+		require.NoError(batch.Put([]byte{1, 2, 3}, []byte{0}))
+		require.NoError(batch.Put([]byte{1, 2, 3, 4}, []byte{0}))
+		require.NoError(batch.Write())
+
+		t.Run("inclusion", func(t *testing.T) {
+			proof, err := db.GetProof(context.Background(), []byte{1, 2, 3, 4})
 			require.NoError(err)
 			require.NotNil(proof)
 
-			tt.malform(proof)
+			proof.Path[0].ValueOrHash = maybe.Some([]byte{10})
 
 			err = proof.Verify(context.Background(), db.getMerkleRoot(), db.tokenSize, db.hasher)
-			require.ErrorIs(err, tt.expectedErr)
+			require.ErrorIs(err, ErrInvalidProof)
 		})
-	}
+
+		t.Run("exclusion", func(t *testing.T) {
+			proof, err := db.GetProof(context.Background(), []byte{1, 2, 3, 4, 5, 6})
+			require.NoError(err)
+			require.NotNil(proof)
+
+			proof.Path[0].ValueOrHash = maybe.Some([]byte{10})
+
+			err = proof.Verify(context.Background(), db.getMerkleRoot(), db.tokenSize, db.hasher)
+			require.ErrorIs(err, ErrInvalidProof)
+		})
+	})
+
+	t.Run("inclusion proof", func(t *testing.T) {
+		type test struct {
+			name        string
+			malform     func(proof *Proof)
+			expectedErr error
+		}
+
+		tests := []test{
+			{
+				name:        "happy path",
+				malform:     func(*Proof) {},
+				expectedErr: nil,
+			},
+			{
+				name: "last proof node has missing value",
+				malform: func(proof *Proof) {
+					proof.Path[len(proof.Path)-1].ValueOrHash = maybe.Nothing[[]byte]()
+				},
+				expectedErr: ErrProofValueDoesntMatch,
+			},
+			{
+				name: "missing value on proof",
+				malform: func(proof *Proof) {
+					proof.Value = maybe.Nothing[[]byte]()
+				},
+				expectedErr: ErrProofValueDoesntMatch,
+			},
+			{
+				name: "mismatched value on proof",
+				malform: func(proof *Proof) {
+					proof.Value = maybe.Some([]byte{10})
+				},
+				expectedErr: ErrProofValueDoesntMatch,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				db, err := getBasicDB()
+				require.NoError(err)
+
+				writeBasicBatch(t, db)
+
+				for _, i := range []byte{0, 1, 2, 3, 4} {
+					proof, err := db.GetProof(context.Background(), []byte{i})
+					require.NoError(err)
+					require.NotNil(proof)
+
+					require.Equal(ToKey([]byte{i}), proof.Key)
+					require.Equal(maybe.Some([]byte{i}), proof.Value)
+					require.NotZero(proof.Path)
+
+					tt.malform(proof)
+
+					err = proof.Verify(context.Background(), db.getMerkleRoot(), db.tokenSize, db.hasher)
+					require.ErrorIs(err, tt.expectedErr)
+				}
+			})
+		}
+	})
+
+	t.Run("exclusion proof", func(t *testing.T) {
+		type test struct {
+			name        string
+			malform     func(proof *Proof)
+			expectedErr error
+		}
+
+		tests := []test{
+			{
+				name:        "happy path",
+				malform:     func(proof *Proof) {},
+				expectedErr: nil,
+			},
+			{
+				name: "proof value not empty",
+				malform: func(proof *Proof) {
+					proof.Value = maybe.Some([]byte{})
+				},
+				expectedErr: ErrExclusionProofUnexpectedValue,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				db, err := getBasicDB()
+				require.NoError(err)
+
+				writeBasicBatch(t, db)
+
+				for _, i := range []byte{5, 6, 7, 8} {
+					proof, err := db.GetProof(context.Background(), []byte{i})
+					require.NoError(err)
+					require.NotNil(proof)
+
+					require.Equal(ToKey([]byte{i}), proof.Key)
+					require.True(proof.Value.IsNothing())
+					require.NotZero(proof.Path)
+
+					tt.malform(proof)
+
+					err = proof.Verify(context.Background(), db.getMerkleRoot(), db.tokenSize, db.hasher)
+					require.ErrorIs(err, tt.expectedErr)
+				}
+			})
+		}
+	})
+}
+
+func Test_Proof(t *testing.T) {
+	require := require.New(t)
+
+	dbTrie, err := getBasicDB()
+	require.NoError(err)
+	require.NotNil(dbTrie)
+	trie, err := dbTrie.NewView(
+		context.Background(),
+		ViewChanges{
+			BatchOps: []database.BatchOp{
+				{
+					Key:   []byte("key"), // 6b 65 79
+					Value: []byte("value"),
+				},
+				{
+					Key:   []byte("key0"), // 6b 65 79 30
+					Value: []byte("value0"),
+				},
+				{
+					Key:   []byte("key1"), // 6b 65 79 31
+					Value: []byte("value1"),
+				},
+				{
+					Key:   []byte("key2"), // 6b 65 79 32
+					Value: []byte("value2"),
+				},
+				{
+					Key:   []byte("key3"), // 6b 65 79 33
+					Value: []byte("value3"),
+				},
+				{
+					Key:   []byte("key4"), // 6b 65 79 34
+					Value: []byte("value4"),
+				},
+			},
+		},
+	)
+	require.NoError(err)
+
+	expectedRootID, err := trie.GetMerkleRoot(context.Background())
+	require.NoError(err)
+
+	proof, err := trie.GetProof(context.Background(), []byte("key1"))
+	require.NoError(err)
+	require.NotNil(proof)
+
+	require.Len(proof.Path, 3)
+
+	require.Equal(ToKey([]byte("key")), proof.Path[0].Key)
+	require.Equal(maybe.Some([]byte("value")), proof.Path[0].ValueOrHash)
+
+	k := ToKey(append([]byte("key"), byte(0x30))).Take(28) // 6b 65 79 3
+	require.Equal(k, proof.Path[1].Key)
+	require.True(proof.Path[1].ValueOrHash.IsNothing()) // intermediate node
+
+	require.Equal(ToKey([]byte("key1")), proof.Path[2].Key)
+	require.Equal(maybe.Some([]byte("value1")), proof.Path[2].ValueOrHash)
+
+	require.NoError(proof.Verify(context.Background(), expectedRootID, dbTrie.tokenSize, dbTrie.hasher))
+
+	proof.Path[0].Key = ToKey([]byte("key1"))
+	err = proof.Verify(context.Background(), expectedRootID, dbTrie.tokenSize, dbTrie.hasher)
+	require.ErrorIs(err, ErrProofNodeNotForKey)
 }
 
 func Test_Proof_ValueOrHashMatches(t *testing.T) {
@@ -173,7 +326,7 @@ func Test_RangeProof_Extra_Value(t *testing.T) {
 		db.tokenSize,
 		db.hasher,
 	)
-	require.ErrorIs(err, ErrInvalidProof)
+	require.ErrorIs(err, ErrExclusionProofInvalidNode)
 }
 
 func Test_RangeProof_Verify_Bad_Data(t *testing.T) {
@@ -264,51 +417,6 @@ func Test_RangeProof_MaxLength(t *testing.T) {
 	require.ErrorIs(err, ErrInvalidMaxLength)
 }
 
-func Test_Proof(t *testing.T) {
-	require := require.New(t)
-
-	dbTrie, err := getBasicDB()
-	require.NoError(err)
-	require.NotNil(dbTrie)
-	trie, err := dbTrie.NewView(
-		context.Background(),
-		ViewChanges{
-			BatchOps: []database.BatchOp{
-				{Key: []byte("key"), Value: []byte("value")},
-				{Key: []byte("key0"), Value: []byte("value0")},
-				{Key: []byte("key1"), Value: []byte("value1")},
-				{Key: []byte("key2"), Value: []byte("value2")},
-				{Key: []byte("key3"), Value: []byte("value3")},
-				{Key: []byte("key4"), Value: []byte("value4")},
-			},
-		},
-	)
-	require.NoError(err)
-
-	_, err = trie.GetMerkleRoot(context.Background())
-	require.NoError(err)
-	proof, err := trie.GetProof(context.Background(), []byte("key1"))
-	require.NoError(err)
-	require.NotNil(proof)
-
-	require.Len(proof.Path, 3)
-
-	require.Equal(ToKey([]byte("key")), proof.Path[0].Key)
-	require.Equal(maybe.Some([]byte("value")), proof.Path[0].ValueOrHash)
-	require.Equal(ToKey([]byte("key0")).Take(28), proof.Path[1].Key)
-	require.True(proof.Path[1].ValueOrHash.IsNothing()) // intermediate node
-	require.Equal(ToKey([]byte("key1")), proof.Path[2].Key)
-	require.Equal(maybe.Some([]byte("value1")), proof.Path[2].ValueOrHash)
-
-	expectedRootID, err := trie.GetMerkleRoot(context.Background())
-	require.NoError(err)
-	require.NoError(proof.Verify(context.Background(), expectedRootID, dbTrie.tokenSize, dbTrie.hasher))
-
-	proof.Path[0].Key = ToKey([]byte("key1"))
-	err = proof.Verify(context.Background(), expectedRootID, dbTrie.tokenSize, dbTrie.hasher)
-	require.ErrorIs(err, ErrProofNodeNotForKey)
-}
-
 func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 	type test struct {
 		name        string
@@ -335,7 +443,7 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 		},
 		{
 			name:  "unexpected end proof",
-			start: maybe.Some([]byte{1}),
+			start: maybe.Nothing[[]byte](),
 			end:   maybe.Nothing[[]byte](),
 			proof: &RangeProof{
 				StartProof: []ProofNode{{}},
@@ -344,7 +452,17 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 			expectedErr: ErrUnexpectedEndProof,
 		},
 		{
-			name:  "no end proof; has end bound",
+			name:  "unexpected start proof",
+			start: maybe.Nothing[[]byte](),
+			end:   maybe.Some([]byte{1}),
+			proof: &RangeProof{
+				StartProof: []ProofNode{{}},
+				EndProof:   []ProofNode{{}},
+			},
+			expectedErr: ErrUnexpectedStartProof,
+		},
+		{
+			name:  "no end proof (has end bound)",
 			start: maybe.Some([]byte{1}),
 			end:   maybe.Some([]byte{1}),
 			proof: &RangeProof{
@@ -353,8 +471,8 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 			expectedErr: ErrNoEndProof,
 		},
 		{
-			name:  "no end proof; has key-values",
-			start: maybe.Some([]byte{1}),
+			name:  "no end proof (has key-values)",
+			start: maybe.Nothing[[]byte](),
 			end:   maybe.Nothing[[]byte](),
 			proof: &RangeProof{
 				KeyValues: []KeyValue{{}},
@@ -363,14 +481,14 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 		},
 		{
 			name:  "unsorted key values",
-			start: maybe.Some([]byte{1}),
+			start: maybe.Nothing[[]byte](),
 			end:   maybe.Nothing[[]byte](),
 			proof: &RangeProof{
 				KeyValues: []KeyValue{
 					{Key: []byte{1}, Value: []byte{1}},
 					{Key: []byte{0}, Value: []byte{0}},
 				},
-				EndProof: []ProofNode{{Key: Key{}}},
+				EndProof: []ProofNode{{}},
 			},
 			expectedErr: ErrNonIncreasingValues,
 		},
@@ -382,25 +500,26 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 				KeyValues: []KeyValue{
 					{Key: []byte{0}, Value: []byte{0}},
 				},
-				EndProof: []ProofNode{{Key: Key{}}},
+				StartProof: []ProofNode{{}},
+				EndProof:   []ProofNode{{}},
 			},
 			expectedErr: ErrStateFromOutsideOfRange,
 		},
 		{
 			name:  "key greater than end",
-			start: maybe.Some([]byte{1}),
+			start: maybe.Nothing[[]byte](),
 			end:   maybe.Some([]byte{1}),
 			proof: &RangeProof{
 				KeyValues: []KeyValue{
 					{Key: []byte{2}, Value: []byte{0}},
 				},
-				EndProof: []ProofNode{{Key: Key{}}},
+				EndProof: []ProofNode{{}},
 			},
 			expectedErr: ErrStateFromOutsideOfRange,
 		},
 		{
 			name:  "start proof nodes in wrong order",
-			start: maybe.Some([]byte{1, 2}),
+			start: maybe.Some([]byte{1}),
 			end:   maybe.Nothing[[]byte](),
 			proof: &RangeProof{
 				KeyValues: []KeyValue{
@@ -414,7 +533,7 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 						Key: ToKey([]byte{1}),
 					},
 				},
-				EndProof: []ProofNode{{Key: Key{}}},
+				EndProof: []ProofNode{{Key: ToKey([]byte{1, 2})}},
 			},
 			expectedErr: ErrProofNodeNotForKey,
 		},
@@ -437,7 +556,7 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 						Key: ToKey([]byte{1, 2, 3, 4}),
 					},
 				},
-				EndProof: []ProofNode{{Key: Key{}}},
+				EndProof: []ProofNode{{Key: ToKey([]byte{1, 2})}},
 			},
 			expectedErr: ErrProofNodeNotForKey,
 		},
@@ -456,27 +575,8 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 					{
 						Key: ToKey([]byte{1}),
 					},
-				},
-			},
-			expectedErr: ErrProofNodeNotForKey,
-		},
-		{
-			name:  "end proof has node for wrong key",
-			start: maybe.Nothing[[]byte](),
-			end:   maybe.Some([]byte{1, 2}),
-			proof: &RangeProof{
-				KeyValues: []KeyValue{
-					{Key: []byte{1, 2}, Value: []byte{1}},
-				},
-				EndProof: []ProofNode{
 					{
-						Key: ToKey([]byte{1}),
-					},
-					{
-						Key: ToKey([]byte{1, 2, 3}), // Not a prefix of [1, 2]
-					},
-					{
-						Key: ToKey([]byte{1, 2, 3, 4}),
+						Key: ToKey([]byte{1, 2}),
 					},
 				},
 			},
@@ -499,7 +599,23 @@ func Test_RangeProof(t *testing.T) {
 	require.NoError(err)
 	writeBasicBatch(t, db)
 
-	proof, err := db.GetRangeProof(context.Background(), maybe.Some([]byte{1}), maybe.Some([]byte{3, 5}), 10)
+	proof, err := db.GetRangeProof(context.Background(), maybe.Some([]byte{3}), maybe.Some([]byte{3}), 3)
+	require.NoError(err)
+	require.NotNil(proof)
+	require.Len(proof.StartProof, 0)
+	require.Len(proof.EndProof, 2)
+	require.Len(proof.KeyValues, 1)
+
+	require.NoError(proof.Verify(
+		context.Background(),
+		maybe.Some([]byte{3}),
+		maybe.Some([]byte{3}),
+		db.rootID,
+		db.tokenSize,
+		db.hasher,
+	))
+
+	proof, err = db.GetRangeProof(context.Background(), maybe.Some([]byte{1}), maybe.Some([]byte{3, 5}), 10)
 	require.NoError(err)
 	require.NotNil(proof)
 	require.Len(proof.KeyValues, 3)
@@ -922,36 +1038,43 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 
 	tests := []test{
 		{
-			name:        "start after end",
+			name:        "empty",
 			proof:       nil,
-			start:       maybe.Some([]byte{1}),
-			end:         maybe.Some([]byte{0}),
-			expectedErr: ErrStartAfterEnd,
+			start:       maybe.Nothing[[]byte](),
+			end:         maybe.Nothing[[]byte](),
+			expectedErr: ErrEmptyProof,
 		},
 		{
-			name:        "empty",
+			name:        "no change proof",
 			proof:       &ChangeProof{},
 			start:       maybe.Nothing[[]byte](),
 			end:         maybe.Nothing[[]byte](),
 			expectedErr: ErrEmptyProof,
 		},
 		{
-			name: "no end proof",
+			name:        "start after end",
+			proof:       &ChangeProof{},
+			start:       maybe.Some([]byte{1}),
+			end:         maybe.Some([]byte{0}),
+			expectedErr: ErrStartAfterEnd,
+		},
+		{
+			name: "no end proof (has end bounds)",
 			proof: &ChangeProof{
 				StartProof: []ProofNode{{}},
 			},
-			start:       maybe.Nothing[[]byte](),
-			end:         maybe.Some([]byte{1}),
+			start:       maybe.Some([]byte{1}),
+			end:         maybe.Some([]byte{2}),
 			expectedErr: ErrNoEndProof,
 		},
 		{
-			name: "no start proof",
+			name: "no end proof (has key-changes)",
 			proof: &ChangeProof{
-				KeyChanges: []KeyChange{{Key: []byte{1}}},
+				KeyChanges: []KeyChange{{}},
 			},
-			start:       maybe.Some([]byte{1}),
-			end:         maybe.Nothing[[]byte](),
-			expectedErr: ErrNoStartProof,
+			start:       maybe.Nothing[[]byte](),
+			end:         maybe.Some([]byte{2}),
+			expectedErr: ErrNoEndProof,
 		},
 		{
 			name: "non-increasing key-values",
@@ -960,6 +1083,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 					{Key: []byte{1}},
 					{Key: []byte{0}},
 				},
+				EndProof: []ProofNode{{}},
 			},
 			start:       maybe.Nothing[[]byte](),
 			end:         maybe.Nothing[[]byte](),
@@ -969,6 +1093,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			name: "key-value too low",
 			proof: &ChangeProof{
 				StartProof: []ProofNode{{}},
+				EndProof:   []ProofNode{{}},
 				KeyChanges: []KeyChange{
 					{Key: []byte{0}},
 				},
@@ -992,6 +1117,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 		{
 			name: "duplicate key",
 			proof: &ChangeProof{
+				EndProof: []ProofNode{{}},
 				KeyChanges: []KeyChange{
 					{Key: []byte{1}},
 					{Key: []byte{1}},
@@ -1033,7 +1159,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 				},
 				EndProof: []ProofNode{
 					{Key: ToKey([]byte{2})},
-					{Key: ToKey([]byte{2, 3})},
+					{Key: ToKey([]byte{1, 2})},
 				},
 			},
 			start:       maybe.Nothing[[]byte](),
@@ -1044,11 +1170,13 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			name: "end proof non-increasing",
 			proof: &ChangeProof{
 				KeyChanges: []KeyChange{
-					{Key: []byte{1, 2, 3}},
+					{Key: []byte{1, 2, 3, 4}},
 				},
 				EndProof: []ProofNode{
 					{Key: ToKey([]byte{1})},
-					{Key: ToKey([]byte{2, 3})},
+					{Key: ToKey([]byte{1, 2, 3})},
+					{Key: ToKey([]byte{1, 2})},
+					{Key: ToKey([]byte{1, 2, 3, 4})},
 				},
 			},
 			start:       maybe.Nothing[[]byte](),
@@ -1072,67 +1200,67 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 func TestVerifyKeyValues(t *testing.T) {
 	type test struct {
 		name        string
-		start       maybe.Maybe[[]byte]
-		end         maybe.Maybe[[]byte]
-		kvs         []KeyValue
+		start       maybe.Maybe[Key]
+		end         maybe.Maybe[Key]
+		kvs         []Key
 		expectedErr error
 	}
 
 	tests := []test{
 		{
 			name:        "empty",
-			start:       maybe.Nothing[[]byte](),
-			end:         maybe.Nothing[[]byte](),
+			start:       maybe.Nothing[Key](),
+			end:         maybe.Nothing[Key](),
 			kvs:         nil,
 			expectedErr: nil,
 		},
 		{
 			name:  "1 key",
-			start: maybe.Nothing[[]byte](),
-			end:   maybe.Nothing[[]byte](),
-			kvs: []KeyValue{
-				{Key: []byte{0}},
+			start: maybe.Nothing[Key](),
+			end:   maybe.Nothing[Key](),
+			kvs: []Key{
+				ToKey([]byte{0}),
 			},
 			expectedErr: nil,
 		},
 		{
 			name:  "non-increasing keys",
-			start: maybe.Nothing[[]byte](),
-			end:   maybe.Nothing[[]byte](),
-			kvs: []KeyValue{
-				{Key: []byte{0}},
-				{Key: []byte{0}},
+			start: maybe.Nothing[Key](),
+			end:   maybe.Nothing[Key](),
+			kvs: []Key{
+				ToKey([]byte{0}),
+				ToKey([]byte{0}),
 			},
 			expectedErr: ErrNonIncreasingValues,
 		},
 		{
 			name:  "key before start",
-			start: maybe.Some([]byte{1, 2}),
-			end:   maybe.Nothing[[]byte](),
-			kvs: []KeyValue{
-				{Key: []byte{1}},
-				{Key: []byte{1, 2}},
+			start: maybe.Some(ToKey([]byte{1, 2})),
+			end:   maybe.Nothing[Key](),
+			kvs: []Key{
+				ToKey([]byte{1}),
+				ToKey([]byte{1, 2}),
 			},
 			expectedErr: ErrStateFromOutsideOfRange,
 		},
 		{
 			name:  "key after end",
-			start: maybe.Nothing[[]byte](),
-			end:   maybe.Some([]byte{1, 2}),
-			kvs: []KeyValue{
-				{Key: []byte{1}},
-				{Key: []byte{1, 2}},
-				{Key: []byte{1, 2, 3}},
+			start: maybe.Nothing[Key](),
+			end:   maybe.Some(ToKey([]byte{1, 2})),
+			kvs: []Key{
+				ToKey([]byte{1}),
+				ToKey([]byte{1, 2}),
+				ToKey([]byte{1, 2, 3}),
 			},
 			expectedErr: ErrStateFromOutsideOfRange,
 		},
 		{
 			name:  "happy path",
-			start: maybe.Nothing[[]byte](),
-			end:   maybe.Some([]byte{1, 2, 3}),
-			kvs: []KeyValue{
-				{Key: []byte{1}},
-				{Key: []byte{1, 2}},
+			start: maybe.Nothing[Key](),
+			end:   maybe.Some(ToKey([]byte{1, 2, 3})),
+			kvs: []Key{
+				ToKey([]byte{1}),
+				ToKey([]byte{1, 2}),
 			},
 			expectedErr: nil,
 		},
@@ -1147,10 +1275,12 @@ func TestVerifyKeyValues(t *testing.T) {
 }
 
 func TestVerifyProofPath(t *testing.T) {
+	tokenSize := 8
+
 	type test struct {
 		name        string
 		path        []ProofNode
-		proofKey    maybe.Maybe[Key]
+		proofKey    Key
 		expectedErr error
 	}
 
@@ -1158,13 +1288,19 @@ func TestVerifyProofPath(t *testing.T) {
 		{
 			name:        "empty",
 			path:        nil,
-			proofKey:    maybe.Nothing[Key](),
+			proofKey:    ToKey([]byte{2}),
 			expectedErr: nil,
 		},
 		{
-			name:        "1 element",
+			name:        "1 element inclusion proof",
 			path:        []ProofNode{{Key: ToKey([]byte{1})}},
-			proofKey:    maybe.Nothing[Key](),
+			proofKey:    ToKey([]byte{1}),
+			expectedErr: nil,
+		},
+		{
+			name:        "1 element exclusion proof",
+			path:        []ProofNode{{Key: ToKey([]byte{1})}},
+			proofKey:    ToKey([]byte{2}),
 			expectedErr: nil,
 		},
 		{
@@ -1174,7 +1310,7 @@ func TestVerifyProofPath(t *testing.T) {
 				{Key: ToKey([]byte{1, 2})},
 				{Key: ToKey([]byte{1, 3})},
 			},
-			proofKey:    maybe.Some(ToKey([]byte{1, 2, 3})),
+			proofKey:    ToKey([]byte{1, 2, 3}),
 			expectedErr: ErrNonIncreasingProofNodes,
 		},
 		{
@@ -1185,7 +1321,7 @@ func TestVerifyProofPath(t *testing.T) {
 				{Key: ToKey([]byte{1, 2, 4})},
 				{Key: ToKey([]byte{1, 2, 3})},
 			},
-			proofKey:    maybe.Some(ToKey([]byte{1, 2, 3})),
+			proofKey:    ToKey([]byte{1, 2, 3}),
 			expectedErr: ErrProofNodeNotForKey,
 		},
 		{
@@ -1195,7 +1331,7 @@ func TestVerifyProofPath(t *testing.T) {
 				{Key: ToKey([]byte{1, 2})},
 				{Key: ToKey([]byte{1, 2, 3})},
 			},
-			proofKey:    maybe.Some(ToKey([]byte{1, 2})),
+			proofKey:    ToKey([]byte{1, 2}),
 			expectedErr: ErrProofNodeNotForKey,
 		},
 		{
@@ -1205,17 +1341,26 @@ func TestVerifyProofPath(t *testing.T) {
 				{Key: ToKey([]byte{1, 3})},
 				{Key: ToKey([]byte{1, 3, 4})},
 			},
-			proofKey:    maybe.Some(ToKey([]byte{1, 2})),
+			proofKey:    ToKey([]byte{1, 2}),
 			expectedErr: ErrProofNodeNotForKey,
 		},
 		{
-			name: "happy path exclusion proof",
+			name: "happy path exclusion proof with parent",
 			path: []ProofNode{
 				{Key: ToKey([]byte{1})},
 				{Key: ToKey([]byte{1, 2})},
-				{Key: ToKey([]byte{1, 2, 4})},
 			},
-			proofKey:    maybe.Some(ToKey([]byte{1, 2, 3})),
+			proofKey:    ToKey([]byte{1, 2, 3}),
+			expectedErr: nil,
+		},
+		{
+			name: "happy path exclusion proof with replacement",
+			path: []ProofNode{
+				{Key: ToKey([]byte{1})},
+				{Key: ToKey([]byte{1, 2})},
+				{Key: ToKey([]byte{1, 2, 3, 4})},
+			},
+			proofKey:    ToKey([]byte{1, 2, 3}),
 			expectedErr: nil,
 		},
 		{
@@ -1225,8 +1370,43 @@ func TestVerifyProofPath(t *testing.T) {
 				{Key: ToKey([]byte{1, 2})},
 				{Key: ToKey([]byte{1, 2, 3})},
 			},
-			proofKey:    maybe.Some(ToKey([]byte{1, 2, 3})),
+			proofKey:    ToKey([]byte{1, 2, 3}),
 			expectedErr: nil,
+		},
+		{
+			name: "wrong last node exclusion proof",
+			path: []ProofNode{
+				{Key: ToKey([]byte{1})},
+				{Key: ToKey([]byte{1, 2})},
+				{Key: ToKey([]byte{1, 2, 3})},
+			},
+			proofKey:    ToKey([]byte{1, 2, 4}),
+			expectedErr: ErrExclusionProofInvalidNode,
+		},
+		{
+			name: "wrong mid-node exclusion proof",
+			path: []ProofNode{
+				{Key: ToKey([]byte{1})},
+				{Key: ToKey([]byte{1, 2})},
+				{Key: ToKey([]byte{1, 2, 3})},
+				{Key: ToKey([]byte{1, 2, 3, 4})},
+			},
+			proofKey:    ToKey([]byte{1, 2, 4}),
+			expectedErr: ErrProofNodeNotForKey,
+		},
+		{
+			name: "wrong last node exclusion proof with parent (possible extension)",
+			path: []ProofNode{
+				{Key: ToKey([]byte{1})},
+				{
+					Key: ToKey([]byte{1, 2}),
+					Children: map[byte]ids.ID{
+						3: ids.Empty,
+					},
+				},
+			},
+			proofKey:    ToKey([]byte{1, 2, 3}),
+			expectedErr: ErrExclusionProofMissingEndNodes,
 		},
 		{
 			name: "repeat nodes",
@@ -1236,7 +1416,7 @@ func TestVerifyProofPath(t *testing.T) {
 				{Key: ToKey([]byte{1, 2})},
 				{Key: ToKey([]byte{1, 2, 3})},
 			},
-			proofKey:    maybe.Some(ToKey([]byte{1, 2, 3})),
+			proofKey:    ToKey([]byte{1, 2, 3}),
 			expectedErr: ErrNonIncreasingProofNodes,
 		},
 		{
@@ -1247,7 +1427,7 @@ func TestVerifyProofPath(t *testing.T) {
 				{Key: ToKey([]byte{1, 2})},
 				{Key: ToKey([]byte{1, 2, 3})},
 			},
-			proofKey:    maybe.Some(ToKey([]byte{1, 2, 3})),
+			proofKey:    ToKey([]byte{1, 2, 3}),
 			expectedErr: ErrNonIncreasingProofNodes,
 		},
 		{
@@ -1258,30 +1438,48 @@ func TestVerifyProofPath(t *testing.T) {
 				{Key: ToKey([]byte{1, 2, 3})},
 				{Key: ToKey([]byte{1, 2, 3})},
 			},
-			proofKey:    maybe.Some(ToKey([]byte{1, 2, 3})),
+			proofKey:    ToKey([]byte{1, 2, 3}),
 			expectedErr: ErrProofNodeNotForKey,
 		},
 		{
-			name: "oddLength key with value",
+			name: "odd length key with value",
 			path: []ProofNode{
-				{Key: ToKey([]byte{1})},
-				{Key: ToKey([]byte{1, 2})},
 				{
-					Key: Key{
-						value:  string([]byte{1, 2, 240}),
-						length: 20,
-					},
+					Key: ToKey([]byte{1}),
+				},
+				{
+					Key:         ToKey([]byte{1, 2}).Take(12),
 					ValueOrHash: maybe.Some([]byte{1}),
 				},
+				{
+					Key: ToKey([]byte{1, 2, 3}),
+				},
 			},
-			proofKey:    maybe.Some(ToKey([]byte{1, 2, 3})),
+			proofKey:    ToKey([]byte{1, 2, 3}),
+			expectedErr: ErrPartialByteLengthWithValue,
+		},
+		{
+			name: "odd length key with value",
+			path: []ProofNode{
+				{
+					Key: ToKey([]byte{1}),
+				},
+				{
+					Key:         ToKey([]byte{1, 2}).Take(12),
+					ValueOrHash: maybe.Some([]byte{1}),
+				},
+				{
+					Key: ToKey([]byte{1, 2, 3}),
+				},
+			},
+			proofKey:    ToKey([]byte{1, 2, 3}),
 			expectedErr: ErrPartialByteLengthWithValue,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := verifyProofPath(tt.path, tt.proofKey)
+			err := verifyProofPath(tt.path, tt.proofKey, tokenSize)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}

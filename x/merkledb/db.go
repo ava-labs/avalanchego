@@ -1094,53 +1094,40 @@ func (db *merkleDB) VerifyChangeProof(
 	end maybe.Maybe[[]byte],
 	expectedEndRootID ids.ID,
 ) error {
-	switch {
-	case start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) > 0:
-		return ErrStartAfterEnd
-	case proof.Empty():
+	if proof == nil {
 		return ErrEmptyProof
-	case end.HasValue() && len(proof.KeyChanges) == 0 && len(proof.EndProof) == 0:
-		// We requested an end proof but didn't get one.
-		return ErrNoEndProof
-	case start.HasValue() && len(proof.StartProof) == 0 && len(proof.EndProof) == 0:
-		// We requested a start proof but didn't get one.
-		// Note that we also have to check that [proof.EndProof] is empty
-		// to handle the case that the start proof is empty because all
-		// its nodes are also in the end proof, and those nodes are omitted.
-		return ErrNoStartProof
 	}
 
-	// Make sure the key-value pairs are sorted and in [start, end].
-	if err := verifyKeyChanges(proof.KeyChanges, start, end); err != nil {
+	keyChanges := make(map[Key]maybe.Maybe[[]byte], len(proof.KeyChanges))
+	keys := make([]Key, len(proof.KeyChanges))
+	for i, keyValue := range proof.KeyChanges {
+		k := ToKey(keyValue.Key)
+
+		keyChanges[k] = keyValue.Value
+		keys[i] = k
+	}
+
+	// Validate proof.
+	err := validateRangeChangeProof(start, end, proof.StartProof, proof.EndProof, keys, db.tokenSize)
+	if err != nil {
 		return err
 	}
 
-	smallestKey := maybe.Bind(start, ToKey)
+	var (
+		// [startProof] is an inclusion/exclusion proof of [startKey]
+		startProofKey = maybe.Bind(start, ToKey)
 
-	// Make sure the start proof, if given, is well-formed.
-	if err := verifyProofPath(proof.StartProof, smallestKey); err != nil {
-		return err
-	}
+		// [endProof] is an inclusion of the largest key in [keyValues],
+		// or an exclusion proof of [end] if [keyValues] is empty.
+		endProofKey = maybe.Bind(end, ToKey)
+	)
 
-	// Find the greatest key in [proof.KeyChanges]
-	// Note that [proof.EndProof] is a proof for this key.
-	// [largestKey] is also used when we add children of proof nodes to [trie] below.
-	largestKey := maybe.Bind(end, ToKey)
+	// Update [endProofKey] with the largest key in [keyValues].
 	if len(proof.KeyChanges) > 0 {
 		// If [proof] has key-value pairs, we should insert children
-		// greater than [end] to ancestors of the node containing [end]
-		// so that we get the expected root ID.
-		largestKey = maybe.Some(ToKey(proof.KeyChanges[len(proof.KeyChanges)-1].Key))
-	}
-
-	// Make sure the end proof, if given, is well-formed.
-	if err := verifyProofPath(proof.EndProof, largestKey); err != nil {
-		return err
-	}
-
-	keyValues := make(map[Key]maybe.Maybe[[]byte], len(proof.KeyChanges))
-	for _, keyValue := range proof.KeyChanges {
-		keyValues[ToKey(keyValue.Key)] = keyValue.Value
+		// greater than [largestProvenKey] to ancestors of the node containing
+		// [largestProvenKey] so that we get the expected root ID.
+		endProofKey = maybe.Some(ToKey(proof.KeyChanges[len(proof.KeyChanges)-1].Key))
 	}
 
 	// want to prevent commit writes to DB, but not prevent DB reads
@@ -1151,24 +1138,26 @@ func (db *merkleDB) VerifyChangeProof(
 		return database.ErrClosed
 	}
 
+	// Ensure that the [startProof] contains values that match the key/values that were sent.
 	if err := verifyAllChangeProofKeyValuesPresent(
 		ctx,
 		db,
 		proof.StartProof,
-		smallestKey,
-		largestKey,
-		keyValues,
+		startProofKey,
+		endProofKey,
+		keyChanges,
 	); err != nil {
 		return err
 	}
 
+	// Ensure that the [endProof] contains values that match the key/values that were sent.
 	if err := verifyAllChangeProofKeyValuesPresent(
 		ctx,
 		db,
 		proof.EndProof,
-		smallestKey,
-		largestKey,
-		keyValues,
+		startProofKey,
+		endProofKey,
+		keyChanges,
 	); err != nil {
 		return err
 	}
@@ -1196,16 +1185,16 @@ func (db *merkleDB) VerifyChangeProof(
 	if err := addPathInfo(
 		view,
 		proof.StartProof,
-		smallestKey,
-		largestKey,
+		startProofKey,
+		endProofKey,
 	); err != nil {
 		return err
 	}
 	if err := addPathInfo(
 		view,
 		proof.EndProof,
-		smallestKey,
-		largestKey,
+		startProofKey,
+		endProofKey,
 	); err != nil {
 		return err
 	}
@@ -1215,6 +1204,7 @@ func (db *merkleDB) VerifyChangeProof(
 	if err != nil {
 		return err
 	}
+
 	if expectedEndRootID != calculatedRoot {
 		return fmt.Errorf("%w:[%s], expected:[%s]", ErrInvalidProof, calculatedRoot, expectedEndRootID)
 	}
