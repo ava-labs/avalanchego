@@ -126,7 +126,8 @@ var (
 	genesisJSONCortina           = genesisJSON(params.TestCortinaChainConfig)
 	genesisJSONDurango           = genesisJSON(params.TestDurangoChainConfig)
 	genesisJSONEtna              = genesisJSON(params.TestEtnaChainConfig)
-	genesisJSONLatest            = genesisJSONEtna
+	genesisJSONFUpgrade          = genesisJSON(params.TestFUpgradeChainConfig)
+	genesisJSONLatest            = genesisJSONFUpgrade
 
 	genesisJSONCancun = genesisJSON(activateCancun(params.TestChainConfig))
 
