@@ -7,12 +7,13 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/txs/mempool"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/require"
 
 	pmempool "github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
