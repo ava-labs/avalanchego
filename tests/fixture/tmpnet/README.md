@@ -177,8 +177,7 @@ HOME
             └── subnets                                  // Directory containing subnet config for both avalanchego and tmpnet
                 ├── subnet-a.json                        // tmpnet configuration for subnet-a and its chain(s)
                 ├── subnet-b.json                        // tmpnet configuration for subnet-b and its chain(s)
-                └── 2jRbWtaonb2RP8DEM5DBsd7o2o8d...RqNs9 // The ID of a subnet is the name of its configuration dir
-                    └── config.json                      // avalanchego configuration for subnet
+                └── 2jRbWtaonb2RP8DEM5DBsd7...RqNs9.json // avalanchego configuration for subnet with ID 2jRbWtao...RqNs9
 ```
 
 ### Common networking configuration
@@ -196,6 +195,17 @@ referenced by default by all nodes in the network. The genesis file
 content will be generated with reasonable defaults if not
 supplied. Each node in the network can override the default by setting
 an explicit value for `--genesis-file` or `--genesis-file-content`.
+
+### Subnet configuration
+
+The subnet configuration for a temporary network is stored at
+`[network-dir]/subnets/[subnet ID].json` and referenced by all
+nodes in the network.
+
+Each node in the network can override network-level subnet
+configuration by setting `--subnet-config-dir` to an explicit value
+and ensuring that configuration files for all chains exist at
+`[custom-subnet-config-dir]/[subnet ID].json`.
 
 ### Chain configuration
 
