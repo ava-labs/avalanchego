@@ -887,6 +887,7 @@ func TestBlockReject(t *testing.T) {
 				unsignedTx2 := txsmock.NewUnsignedTx(ctrl)
 				unsignedTx2.EXPECT().SetBytes(gomock.Any())
 				unsignedTx2.EXPECT().Visit(gomock.Any()).Return(nil).AnyTimes() // Passes verification and execution
+				unsignedTx2.EXPECT().InputIDs().Return(nil)
 
 				// Give each tx a unique ID
 				tx1 := &txs.Tx{Unsigned: unsignedTx1}

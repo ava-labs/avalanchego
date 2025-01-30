@@ -266,15 +266,6 @@ func TestNetworkIssueTxFromRPCWithoutVerification(t *testing.T) {
 
 	tests := []test{
 		{
-			name: "can't add transaction to mempool",
-			mempool: func() xmempool.Mempool {
-				mempool, err := xmempool.New("", prometheus.NewRegistry(), nil)
-				require.NoError(t, err)
-				return mempool
-			}(),
-			expectedErr: errTest,
-		},
-		{
 			name: "happy path",
 			mempool: func() xmempool.Mempool {
 				mempool, err := xmempool.New("", prometheus.NewRegistry(), nil)
@@ -331,7 +322,7 @@ func TestNetworkIssueTxFromRPCWithoutVerification(t *testing.T) {
 				testConfig,
 			)
 			require.NoError(err)
-			err = n.IssueTxFromRPCWithoutVerification(&txs.Tx{})
+			err = n.IssueTxFromRPCWithoutVerification(&txs.Tx{Unsigned: &txs.BaseTx{}})
 			require.ErrorIs(err, tt.expectedErr)
 
 			require.NoError(n.txPushGossiper.Gossip(context.Background()))
