@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -25,19 +26,19 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 	chainID := ids.GenerateTestID()
 
 	nodeID0 := ids.GenerateTestNodeID()
-	sk0, err := bls.NewSigner()
+	sk0, err := localsigner.New()
 	require.NoError(t, err)
 	pk0 := sk0.PublicKey()
 	signer0 := warp.NewSigner(sk0, networkID, chainID)
 
 	nodeID1 := ids.GenerateTestNodeID()
-	sk1, err := bls.NewSigner()
+	sk1, err := localsigner.New()
 	require.NoError(t, err)
 	pk1 := sk1.PublicKey()
 	signer1 := warp.NewSigner(sk1, networkID, chainID)
 
 	nodeID2 := ids.GenerateTestNodeID()
-	sk2, err := bls.NewSigner()
+	sk2, err := localsigner.New()
 	require.NoError(t, err)
 	pk2 := sk2.PublicKey()
 	signer2 := warp.NewSigner(sk2, networkID, chainID)
