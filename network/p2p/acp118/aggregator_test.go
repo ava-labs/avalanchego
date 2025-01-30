@@ -42,17 +42,11 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 	pk2 := sk2.PublicKey()
 	signer2 := warp.NewSigner(sk2, networkID, chainID)
 
-	unsignedMsg, err := warp.NewUnsignedMessage(
-		networkID,
-		chainID,
-		[]byte("payload"),
-	)
-	require.NoError(t, err)
-
 	tests := []struct {
 		name           string
 		peers          map[ids.NodeID]p2p.Handler
 		ctx            context.Context
+		msg            *warp.Message
 		signature      warp.BitSetSignature
 		validators     []*warp.Validator
 		quorumNum      uint64
@@ -67,6 +61,19 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				nodeID0: NewHandler(&testVerifier{Errs: []*common.AppError{common.ErrUndefined}}, signer0),
 			},
 			ctx: context.Background(),
+			msg: func() *warp.Message {
+				unsignedMsg, err := warp.NewUnsignedMessage(
+					networkID,
+					chainID,
+					[]byte("payload"),
+				)
+				require.NoError(t, err)
+
+				return &warp.Message{
+					UnsignedMessage: *unsignedMsg,
+					Signature:       &warp.BitSetSignature{},
+				}
+			}(),
 			validators: []*warp.Validator{
 				{
 					PublicKey: pk0,
@@ -84,6 +91,19 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				nodeID0: NewHandler(&testVerifier{}, signer0),
 			},
 			ctx: context.Background(),
+			msg: func() *warp.Message {
+				unsignedMsg, err := warp.NewUnsignedMessage(
+					networkID,
+					chainID,
+					[]byte("payload"),
+				)
+				require.NoError(t, err)
+
+				return &warp.Message{
+					UnsignedMessage: *unsignedMsg,
+					Signature:       &warp.BitSetSignature{},
+				}
+			}(),
 			validators: []*warp.Validator{
 				{
 					PublicKey: pk0,
@@ -102,6 +122,19 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				nodeID0: NewHandler(&testVerifier{}, signer0),
 			},
 			ctx: context.Background(),
+			msg: func() *warp.Message {
+				unsignedMsg, err := warp.NewUnsignedMessage(
+					networkID,
+					chainID,
+					[]byte("payload"),
+				)
+				require.NoError(t, err)
+
+				return &warp.Message{
+					UnsignedMessage: *unsignedMsg,
+					Signature:       &warp.BitSetSignature{},
+				}
+			}(),
 			validators: []*warp.Validator{
 				{
 					PublicKey: pk0,
@@ -122,6 +155,19 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				nodeID2: NewHandler(&testVerifier{Errs: []*common.AppError{common.ErrUndefined}}, signer2),
 			},
 			ctx: context.Background(),
+			msg: func() *warp.Message {
+				unsignedMsg, err := warp.NewUnsignedMessage(
+					networkID,
+					chainID,
+					[]byte("payload"),
+				)
+				require.NoError(t, err)
+
+				return &warp.Message{
+					UnsignedMessage: *unsignedMsg,
+					Signature:       &warp.BitSetSignature{},
+				}
+			}(),
 			validators: []*warp.Validator{
 				{
 					PublicKey: pk0,
@@ -152,6 +198,19 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				nodeID2: NewHandler(&testVerifier{Errs: []*common.AppError{common.ErrUndefined}}, signer2),
 			},
 			ctx: context.Background(),
+			msg: func() *warp.Message {
+				unsignedMsg, err := warp.NewUnsignedMessage(
+					networkID,
+					chainID,
+					[]byte("payload"),
+				)
+				require.NoError(t, err)
+
+				return &warp.Message{
+					UnsignedMessage: *unsignedMsg,
+					Signature:       &warp.BitSetSignature{},
+				}
+			}(),
 			validators: []*warp.Validator{
 				{
 					PublicKey: pk0,
@@ -182,6 +241,19 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				nodeID2: NewHandler(&testVerifier{}, signer2),
 			},
 			ctx: context.Background(),
+			msg: func() *warp.Message {
+				unsignedMsg, err := warp.NewUnsignedMessage(
+					networkID,
+					chainID,
+					[]byte("payload"),
+				)
+				require.NoError(t, err)
+
+				return &warp.Message{
+					UnsignedMessage: *unsignedMsg,
+					Signature:       &warp.BitSetSignature{},
+				}
+			}(),
 			validators: []*warp.Validator{
 				{
 					PublicKey: pk0,
@@ -212,6 +284,19 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				nodeID2: NewHandler(&testVerifier{Errs: []*common.AppError{common.ErrUndefined}}, signer2),
 			},
 			ctx: context.Background(),
+			msg: func() *warp.Message {
+				unsignedMsg, err := warp.NewUnsignedMessage(
+					networkID,
+					chainID,
+					[]byte("payload"),
+				)
+				require.NoError(t, err)
+
+				return &warp.Message{
+					UnsignedMessage: *unsignedMsg,
+					Signature:       &warp.BitSetSignature{},
+				}
+			}(),
 			validators: []*warp.Validator{
 				{
 					PublicKey: pk0,
@@ -242,6 +327,19 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				nodeID2: NewHandler(&testVerifier{Errs: []*common.AppError{common.ErrUndefined}}, signer2),
 			},
 			ctx: context.Background(),
+			msg: func() *warp.Message {
+				unsignedMsg, err := warp.NewUnsignedMessage(
+					networkID,
+					chainID,
+					[]byte("payload"),
+				)
+				require.NoError(t, err)
+
+				return &warp.Message{
+					UnsignedMessage: *unsignedMsg,
+					Signature:       &warp.BitSetSignature{},
+				}
+			}(),
 			validators: []*warp.Validator{
 				{
 					PublicKey: pk0,
@@ -272,6 +370,19 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				nodeID2: NewHandler(&testVerifier{Errs: []*common.AppError{common.ErrUndefined}}, signer2),
 			},
 			ctx: context.Background(),
+			msg: func() *warp.Message {
+				unsignedMsg, err := warp.NewUnsignedMessage(
+					networkID,
+					chainID,
+					[]byte("payload"),
+				)
+				require.NoError(t, err)
+
+				return &warp.Message{
+					UnsignedMessage: *unsignedMsg,
+					Signature:       &warp.BitSetSignature{},
+				}
+			}(),
 			validators: []*warp.Validator{
 				{
 					PublicKey: pk0,
@@ -302,6 +413,19 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				nodeID2: NewHandler(&testVerifier{}, signer1),
 			},
 			ctx: context.Background(),
+			msg: func() *warp.Message {
+				unsignedMsg, err := warp.NewUnsignedMessage(
+					networkID,
+					chainID,
+					[]byte("payload"),
+				)
+				require.NoError(t, err)
+
+				return &warp.Message{
+					UnsignedMessage: *unsignedMsg,
+					Signature:       &warp.BitSetSignature{},
+				}
+			}(),
 			validators: []*warp.Validator{
 				{
 					PublicKey: pk1,
@@ -322,6 +446,19 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				nodeID2: NewHandler(&testVerifier{}, signer1),
 			},
 			ctx: context.Background(),
+			msg: func() *warp.Message {
+				unsignedMsg, err := warp.NewUnsignedMessage(
+					networkID,
+					chainID,
+					[]byte("payload"),
+				)
+				require.NoError(t, err)
+
+				return &warp.Message{
+					UnsignedMessage: *unsignedMsg,
+					Signature:       &warp.BitSetSignature{},
+				}
+			}(),
 			validators: []*warp.Validator{
 				{
 					PublicKey: pk0,
@@ -350,6 +487,19 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 
 				return ctx
 			}(),
+			msg: func() *warp.Message {
+				unsignedMsg, err := warp.NewUnsignedMessage(
+					networkID,
+					chainID,
+					[]byte("payload"),
+				)
+				require.NoError(t, err)
+
+				return &warp.Message{
+					UnsignedMessage: *unsignedMsg,
+					Signature:       &warp.BitSetSignature{},
+				}
+			}(),
 			validators: []*warp.Validator{
 				{
 					PublicKey: pk0,
@@ -373,6 +523,19 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				cancel()
 
 				return ctx
+			}(),
+			msg: func() *warp.Message {
+				unsignedMsg, err := warp.NewUnsignedMessage(
+					networkID,
+					chainID,
+					[]byte("payload"),
+				)
+				require.NoError(t, err)
+
+				return &warp.Message{
+					UnsignedMessage: *unsignedMsg,
+					Signature:       &warp.BitSetSignature{},
+				}
 			}(),
 			validators: []*warp.Validator{
 				{
@@ -403,8 +566,15 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				nodeID2: NewHandler(&testVerifier{}, signer2),
 			},
 			ctx: context.Background(),
-			signature: func() warp.BitSetSignature {
-				sig := warp.BitSetSignature{
+			msg: func() *warp.Message {
+				unsignedMsg, err := warp.NewUnsignedMessage(
+					networkID,
+					chainID,
+					[]byte("payload"),
+				)
+				require.NoError(t, err)
+
+				sig := &warp.BitSetSignature{
 					Signers:   set.NewBits(0).Bytes(),
 					Signature: [96]byte{},
 				}
@@ -413,7 +583,10 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				require.NoError(t, err)
 				copy(sig.Signature[:], sigBytes)
 
-				return sig
+				return &warp.Message{
+					UnsignedMessage: *unsignedMsg,
+					Signature:       sig,
+				}
 			}(),
 			validators: []*warp.Validator{
 				{
@@ -452,12 +625,9 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			)
 			aggregator := NewSignatureAggregator(logging.NoLog{}, client)
 
-			msg, err := warp.NewMessage(unsignedMsg, &tt.signature)
-			require.NoError(err)
-
 			gotMsg, gotAggregatedStake, gotTotalStake, err := aggregator.AggregateSignatures(
 				tt.ctx,
-				msg,
+				tt.msg,
 				[]byte("justification"),
 				tt.validators,
 				tt.quorumNum,
@@ -489,7 +659,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				require.NoError(err)
 				blsSig, err := bls.SignatureFromBytes(gotSignature.Signature[:])
 				require.NoError(err)
-				require.True(bls.Verify(aggPk, blsSig, unsignedMsg.Bytes()))
+				require.True(bls.Verify(aggPk, blsSig, tt.msg.UnsignedMessage.Bytes()))
 			}
 
 			require.Equal(new(big.Int).SetUint64(wantAggregatedStake), gotAggregatedStake)
