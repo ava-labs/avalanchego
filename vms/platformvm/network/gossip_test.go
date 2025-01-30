@@ -47,40 +47,6 @@ func TestGossipMempoolAddVerificationError(t *testing.T) {
 	require.False(gossipMempool.bloom.Has(tx))
 }
 
-//// Add should error if adding to the mempool errors
-//func TestGossipMempoolAddError(t *testing.T) {
-//	require := require.New(t)
-//
-//	txID := ids.GenerateTestID()
-//	tx := &txs.Tx{
-//		TxID: txID,
-//	}
-//
-//	txVerifier := testTxVerifier{}
-//	mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
-//	require.NoError(err)
-//
-//	mempool.EXPECT().Get(txID).Return(nil, false)
-//	mempool.EXPECT().GetDropReason(txID).Return(nil)
-//	mempool.EXPECT().Add(tx).Return(errFoo)
-//	mempool.EXPECT().MarkDropped(txID, errFoo).AnyTimes()
-//
-//	gossipMempool, err := newGossipMempool(
-//		mempool,
-//		prometheus.NewRegistry(),
-//		logging.NoLog{},
-//		txVerifier,
-//		testConfig.ExpectedBloomFilterElements,
-//		testConfig.ExpectedBloomFilterFalsePositiveProbability,
-//		testConfig.MaxBloomFilterFalsePositiveProbability,
-//	)
-//	require.NoError(err)
-//
-//	err = gossipMempool.Add(tx)
-//	require.ErrorIs(err, errFoo)
-//	require.False(gossipMempool.bloom.Has(tx))
-//}
-
 // Adding a duplicate to the mempool should return an error
 func TestMempoolDuplicate(t *testing.T) {
 	require := require.New(t)
