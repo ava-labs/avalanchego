@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -469,7 +470,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		delegationShares       uint32 = reward.PercentDenominator
 	)
 
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 
 	pop := signer.NewProofOfPossession(sk)
@@ -570,9 +571,9 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 }
 
 func TestConvertSubnetToL1Tx(t *testing.T) {
-	sk0, err := bls.NewSigner()
+	sk0, err := localsigner.New()
 	require.NoError(t, err)
-	sk1, err := bls.NewSigner()
+	sk1, err := localsigner.New()
 	require.NoError(t, err)
 
 	var (
@@ -655,7 +656,7 @@ func TestRegisterL1ValidatorTx(t *testing.T) {
 		balance = units.Avax
 	)
 
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 	pop := signer.NewProofOfPossession(sk)
 
@@ -778,7 +779,7 @@ func TestSetL1ValidatorWeightTx(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 
 	warp, err := warp.NewMessage(
