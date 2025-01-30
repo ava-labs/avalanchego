@@ -59,7 +59,6 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 		quorumDen      uint64
 		wantTotalStake int
 		wantSigners    int
-		wantFinished   bool
 		wantErr        error
 	}{
 		{
@@ -76,7 +75,6 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				},
 			},
 			wantTotalStake: 1,
-			wantFinished:   true,
 			quorumNum:      1,
 			quorumDen:      1,
 		},
@@ -95,7 +93,6 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			},
 			wantTotalStake: 1,
 			wantSigners:    1,
-			wantFinished:   true,
 			quorumNum:      1,
 			quorumDen:      1,
 		},
@@ -114,7 +111,6 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			},
 			wantTotalStake: 1,
 			wantSigners:    1,
-			wantFinished:   true,
 			quorumNum:      1,
 			quorumDen:      2,
 		},
@@ -145,7 +141,6 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			},
 			wantTotalStake: 3,
 			wantSigners:    1,
-			wantFinished:   true,
 			quorumNum:      2,
 			quorumDen:      3,
 		},
@@ -176,7 +171,6 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			},
 			wantTotalStake: 3,
 			wantSigners:    2,
-			wantFinished:   true,
 			quorumNum:      2,
 			quorumDen:      3,
 		},
@@ -238,7 +232,6 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			},
 			wantTotalStake: 6,
 			wantSigners:    1,
-			wantFinished:   true,
 			quorumNum:      2,
 			quorumDen:      3,
 		},
@@ -269,7 +262,6 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			},
 			wantTotalStake: 6,
 			wantSigners:    2,
-			wantFinished:   true,
 			quorumNum:      1,
 			quorumDen:      2,
 		},
@@ -300,7 +292,6 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			},
 			wantTotalStake: 10,
 			wantSigners:    2,
-			wantFinished:   true,
 			quorumNum:      4,
 			quorumDen:      10,
 		},
@@ -321,7 +312,6 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			},
 			wantTotalStake: 1,
 			wantSigners:    1,
-			wantFinished:   true,
 			quorumNum:      2,
 			quorumDen:      3,
 		},
@@ -347,7 +337,6 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			},
 			wantTotalStake: 2,
 			wantSigners:    1,
-			wantFinished:   true,
 			quorumNum:      2,
 			quorumDen:      3,
 		},
@@ -446,7 +435,6 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			},
 			wantTotalStake: 3,
 			wantSigners:    3,
-			wantFinished:   true,
 			quorumNum:      1,
 			quorumDen:      1,
 		},
@@ -468,7 +456,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			msg, err := warp.NewMessage(unsignedMsg, &tt.signature)
 			require.NoError(err)
 
-			gotMsg, gotAggregatedStake, gotTotalStake, finished, err := aggregator.AggregateSignatures(
+			gotMsg, gotAggregatedStake, gotTotalStake, err := aggregator.AggregateSignatures(
 				tt.ctx,
 				msg,
 				[]byte("justification"),
@@ -477,7 +465,6 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				tt.quorumDen,
 			)
 			require.ErrorIs(err, tt.wantErr)
-			require.Equal(tt.wantFinished, finished)
 
 			if tt.wantErr != nil {
 				return

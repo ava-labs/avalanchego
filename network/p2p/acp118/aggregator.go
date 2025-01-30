@@ -65,7 +65,6 @@ func (s *SignatureAggregator) AggregateSignatures(
 	_ *warp.Message,
 	aggregatedStake *big.Int,
 	totalStake *big.Int,
-	finished bool,
 	_ error,
 ) {
 	request := &sdk.SignatureRequest{
@@ -75,14 +74,14 @@ func (s *SignatureAggregator) AggregateSignatures(
 
 	requestBytes, err := proto.Marshal(request)
 	if err != nil {
-		return nil, nil, nil, false, fmt.Errorf("failed to marshal signature request: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to marshal signature request: %w", err)
 	}
 
 	nodeIDsToValidator := make(map[ids.NodeID]indexedValidator)
 	// TODO expose concrete type to avoid type casting
 	bitSetSignature, ok := message.Signature.(*warp.BitSetSignature)
 	if !ok {
-		return nil, nil, nil, false, errors.New("invalid warp signature type")
+		return nil, nil, nil, errors.New("invalid warp signature type")
 	}
 
 	signerBitSet := set.BitsFromBytes(bitSetSignature.Signers)
@@ -117,7 +116,7 @@ func (s *SignatureAggregator) AggregateSignatures(
 	if bitSetSignature.Signature != [bls.SignatureLen]byte{} {
 		blsSignature, err := bls.SignatureFromBytes(bitSetSignature.Signature[:])
 		if err != nil {
-			return nil, nil, nil, false, fmt.Errorf("failed to parse bls signature: %w", err)
+			return nil, nil, nil, fmt.Errorf("failed to parse bls signature: %w", err)
 		}
 		signatures = append(signatures, blsSignature)
 	}
@@ -130,7 +129,7 @@ func (s *SignatureAggregator) AggregateSignatures(
 	}
 
 	if err := s.client.AppRequest(ctx, set.Of(nonSigners...), requestBytes, handler.HandleResponse); err != nil {
-		return nil, nil, nil, false, fmt.Errorf("failed to send aggregation request: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to send aggregation request: %w", err)
 	}
 
 	minThreshold := new(big.Int).Mul(totalStakeWeight, new(big.Int).SetUint64(quorumNum))
@@ -146,10 +145,10 @@ func (s *SignatureAggregator) AggregateSignatures(
 			// Try to return whatever progress we have if the context is cancelled
 			msg, err := newWarpMessage(message, signerBitSet, signatures)
 			if err != nil {
-				return nil, nil, nil, false, err
+				return nil, nil, nil, err
 			}
 
-			return msg, aggregatedStakeWeight, totalStakeWeight, false, nil
+			return msg, aggregatedStakeWeight, totalStakeWeight, nil
 		case result := <-results:
 			if result.Err != nil {
 				s.log.Debug(
@@ -177,20 +176,20 @@ func (s *SignatureAggregator) AggregateSignatures(
 			if aggregatedStakeWeight.Cmp(minThreshold) != -1 {
 				msg, err := newWarpMessage(message, signerBitSet, signatures)
 				if err != nil {
-					return nil, nil, nil, false, err
+					return nil, nil, nil, err
 				}
 
-				return msg, aggregatedStakeWeight, totalStakeWeight, true, nil
+				return msg, aggregatedStakeWeight, totalStakeWeight, nil
 			}
 		}
 	}
 
 	msg, err := newWarpMessage(message, signerBitSet, signatures)
 	if err != nil {
-		return nil, nil, nil, false, err
+		return nil, nil, nil, err
 	}
 
-	return msg, aggregatedStakeWeight, totalStakeWeight, true, nil
+	return msg, aggregatedStakeWeight, totalStakeWeight, nil
 }
 
 func newWarpMessage(
