@@ -1453,6 +1453,8 @@ func TestDurangoMemoField(t *testing.T) {
 				)
 				sk, err := localsigner.New()
 				require.NoError(err)
+				pop, err := signer.NewProofOfPossession(sk)
+				require.NoError(err)
 
 				wallet := newWallet(t, env, walletConfig{})
 				tx, err := wallet.IssueAddPermissionlessValidatorTx(
@@ -1465,7 +1467,7 @@ func TestDurangoMemoField(t *testing.T) {
 						},
 						Subnet: constants.PrimaryNetworkID,
 					},
-					signer.NewProofOfPossession(sk),
+					pop,
 					env.ctx.AVAXAssetID,
 					owners,
 					owners,
@@ -2542,6 +2544,8 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 
 			sk, err := localsigner.New()
 			require.NoError(err)
+			pop, err := signer.NewProofOfPossession(sk)
+			require.NoError(err)
 
 			// Create the ConvertSubnetToL1Tx
 			const (
@@ -2561,7 +2565,6 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 				)
 				chainID   = ids.GenerateTestID()
 				address   = utils.RandomBytes(32)
-				pop       = signer.NewProofOfPossession(sk)
 				validator = &txs.ConvertSubnetToL1Validator{
 					NodeID:                nodeID.Bytes(),
 					Weight:                weight,
@@ -2743,6 +2746,8 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 	// Create the subnet conversion
 	initialSK, err := localsigner.New()
 	require.NoError(t, err)
+	initialPoP, err := signer.NewProofOfPossession(initialSK)
+	require.NoError(t, err)
 
 	const (
 		initialWeight  = 1
@@ -2753,7 +2758,6 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 		chainID       = ids.GenerateTestID()
 		address       = utils.RandomBytes(32)
 		initialNodeID = ids.GenerateTestNodeID()
-		initialPoP    = signer.NewProofOfPossession(initialSK)
 		validator     = &txs.ConvertSubnetToL1Validator{
 			NodeID:                initialNodeID.Bytes(),
 			Weight:                initialWeight,
@@ -2796,7 +2800,8 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 	// Create the Warp message
 	sk, err := localsigner.New()
 	require.NoError(t, err)
-	pop := signer.NewProofOfPossession(sk)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(t, err)
 	pk := sk.PublicKey()
 	pkBytes := bls.PublicKeyToUncompressedBytes(pk)
 
@@ -3265,6 +3270,8 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 	// Create the subnet conversion
 	sk, err := localsigner.New()
 	require.NoError(t, err)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(t, err)
 
 	const (
 		initialWeight = 1
@@ -3278,7 +3285,7 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 			NodeID:  ids.GenerateTestNodeID().Bytes(),
 			Weight:  initialWeight,
 			Balance: balance,
-			Signer:  *signer.NewProofOfPossession(sk),
+			Signer:  *pop,
 			// RemainingBalanceOwner and DeactivationOwner are initialized so
 			// that later reflect based equality checks pass.
 			RemainingBalanceOwner: message.PChainOwner{
@@ -3760,6 +3767,8 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 	// Create the subnet conversion
 	sk, err := localsigner.New()
 	require.NoError(t, err)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(t, err)
 
 	const (
 		weight                = 1
@@ -3773,7 +3782,7 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 			NodeID:  ids.GenerateTestNodeID().Bytes(),
 			Weight:  weight,
 			Balance: initialBalance,
-			Signer:  *signer.NewProofOfPossession(sk),
+			Signer:  *pop,
 			// RemainingBalanceOwner and DeactivationOwner are initialized so
 			// that later reflect based equality checks pass.
 			RemainingBalanceOwner: message.PChainOwner{
@@ -4048,6 +4057,8 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 	// Create the subnet conversion
 	sk, err := localsigner.New()
 	require.NoError(t, err)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(t, err)
 
 	const (
 		weight         = 1
@@ -4061,7 +4072,7 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 			NodeID:  ids.GenerateTestNodeID().Bytes(),
 			Weight:  weight,
 			Balance: initialBalance,
-			Signer:  *signer.NewProofOfPossession(sk),
+			Signer:  *pop,
 			// RemainingBalanceOwner and DeactivationOwner are initialized so
 			// that later reflect based equality checks pass.
 			RemainingBalanceOwner: message.PChainOwner{

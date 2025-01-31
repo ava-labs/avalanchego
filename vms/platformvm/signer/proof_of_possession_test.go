@@ -45,8 +45,10 @@ func TestNewProofOfPossessionDeterministic(t *testing.T) {
 	sk, err := localsigner.New()
 	require.NoError(err)
 
-	blsPOP0 := NewProofOfPossession(sk)
-	blsPOP1 := NewProofOfPossession(sk)
+	blsPOP0, err := NewProofOfPossession(sk)
+	require.NoError(err)
+	blsPOP1, err := NewProofOfPossession(sk)
+	require.NoError(err)
 	require.Equal(blsPOP0, blsPOP1)
 }
 
@@ -65,5 +67,9 @@ func newProofOfPossession() (*ProofOfPossession, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewProofOfPossession(sk), nil
+	pop, err := NewProofOfPossession(sk)
+	if err != nil {
+		return nil, err
+	}
+	return pop, nil
 }
