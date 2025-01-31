@@ -733,33 +733,6 @@ type ChangeOrRangeProof struct {
 // Returns nil iff both hold:
 // 1. [kvs] is sorted by key in increasing order.
 // 2. All keys in [kvs] are in the range [start, end].
-// If [start] is Nothing, there is no lower bound on acceptable keys.
-// If [end] is Nothing, there is no upper bound on acceptable keys.
-// If [kvs] is empty, returns nil.
-func verifyKeyChanges(kvs []KeyChange, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte]) error {
-	if len(kvs) == 0 {
-		return nil
-	}
-
-	// ensure that the keys are in increasing order
-	for i := 0; i < len(kvs)-1; i++ {
-		if bytes.Compare(kvs[i].Key, kvs[i+1].Key) >= 0 {
-			return ErrNonIncreasingValues
-		}
-	}
-
-	// ensure that the keys are within the range [start, end]
-	if (start.HasValue() && bytes.Compare(kvs[0].Key, start.Value()) < 0) ||
-		(end.HasValue() && bytes.Compare(kvs[len(kvs)-1].Key, end.Value()) > 0) {
-		return ErrStateFromOutsideOfRange
-	}
-
-	return nil
-}
-
-// Returns nil iff both hold:
-// 1. [kvs] is sorted by key in increasing order.
-// 2. All keys in [kvs] are in the range [start, end].
 // If [start] is nil, there is no lower bound on acceptable keys.
 // If [end] is nothing, there is no upper bound on acceptable keys.
 // If [kvs] is empty, returns nil.
