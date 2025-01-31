@@ -1098,7 +1098,6 @@ mod tests {
     use crate::linear::memory::MemStore;
     use crate::{BranchNode, LeafNode};
     use arc_swap::access::DynGuard;
-    use smallvec::SmallVec;
     use test_case::test_case;
 
     use super::*;
@@ -1200,7 +1199,7 @@ mod tests {
     #[test_case(
     Node::Leaf(LeafNode {
         partial_path: Path::from([0, 1, 2]),
-        value: SmallVec::from_slice(&[3, 4, 5]),
+        value: Box::new([3, 4, 5]),
     }); "leaf node")]
 
     fn test_serialized_len<N: Into<Node>>(node: N) {
@@ -1223,7 +1222,7 @@ mod tests {
 
         let giant_leaf = Node::Leaf(LeafNode {
             partial_path: Path::from([0, 1, 2]),
-            value: SmallVec::from_vec(huge_value),
+            value: huge_value.into_boxed_slice(),
         });
 
         node_store.mut_root().replace(giant_leaf);

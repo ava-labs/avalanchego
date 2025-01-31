@@ -584,7 +584,6 @@ fn key_from_nibble_iter<Iter: Iterator<Item = u8>>(mut nibbles: Iter) -> Key {
 #[cfg(test)]
 #[allow(clippy::indexing_slicing, clippy::unwrap_used)]
 mod tests {
-    use smallvec::SmallVec;
     use storage::{MemStore, MutableProposal, NodeStore};
 
     use crate::merkle::Merkle;
@@ -637,7 +636,7 @@ mod tests {
         );
         #[cfg(feature = "branch_factor_256")]
         assert_eq!(node.key_nibbles, vec![0xBE, 0xEF].into_boxed_slice());
-        assert_eq!(node.node.as_leaf().unwrap().value, SmallVec::from([0x42]));
+        assert_eq!(node.node.as_leaf().unwrap().value, Box::from([0x42]));
         assert_eq!(node.next_nibble, None);
 
         assert!(stream.next().is_none());
@@ -699,7 +698,7 @@ mod tests {
         assert_eq!(node.next_nibble, None);
         assert_eq!(
             node.node.as_leaf().unwrap().value,
-            SmallVec::from([0x00, 0x00, 0x00, 0x0FF])
+            Box::from([0x00, 0x00, 0x00, 0x0FF])
         );
 
         assert!(stream.next().is_none());

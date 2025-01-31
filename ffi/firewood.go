@@ -34,11 +34,6 @@ func OpenDatabase(path string) Firewood {
 	return Firewood{Db: ptr}
 }
 
-const (
-	OP_PUT = iota
-	OP_DELETE
-)
-
 type KeyValue struct {
 	Key   []byte
 	Value []byte

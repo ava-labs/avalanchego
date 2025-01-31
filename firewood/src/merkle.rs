@@ -7,7 +7,6 @@ use crate::stream::{MerkleKeyValueStream, PathIterator};
 use crate::v2::api;
 use futures::{StreamExt, TryStreamExt};
 use metrics::counter;
-use smallvec::SmallVec;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::future::ready;
@@ -435,7 +434,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
             // it as the root.
             let root_node = Node::Leaf(LeafNode {
                 partial_path: key,
-                value: SmallVec::from(&value[..]),
+                value,
             });
             *root = root_node.into();
             return Ok(());
@@ -516,7 +515,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                                 // There is no child at this index.
                                 // Create a new leaf and put it here.
                                 let new_leaf = Node::Leaf(LeafNode {
-                                    value: SmallVec::from(&value[..]),
+                                    value,
                                     partial_path,
                                 });
                                 branch.update_child(child_index, Some(Child::Node(new_leaf)));
@@ -537,12 +536,12 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                         // Turn this node into a branch node and put a new leaf as a child.
                         let mut branch = BranchNode {
                             partial_path: std::mem::replace(&mut leaf.partial_path, Path::new()),
-                            value: Some(std::mem::take(&mut leaf.value).into_boxed_slice()),
+                            value: Some(std::mem::take(&mut leaf.value)),
                             children: [const { None }; BranchNode::MAX_CHILDREN],
                         };
 
                         let new_leaf = Node::Leaf(LeafNode {
-                            value: SmallVec::from(&value[..]),
+                            value,
                             partial_path,
                         });
 
@@ -571,7 +570,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                 branch.update_child(node_index, Some(Child::Node(node)));
 
                 let new_leaf = Node::Leaf(LeafNode {
-                    value: SmallVec::from(&value[..]),
+                    value,
                     partial_path: key_partial_path,
                 });
                 branch.update_child(key_index, Some(Child::Node(new_leaf)));
@@ -718,7 +717,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                     }
                     Node::Leaf(leaf) => {
                         let removed_value = std::mem::take(&mut leaf.value);
-                        Ok((None, Some(removed_value.into_boxed_slice())))
+                        Ok((None, Some(removed_value)))
                     }
                 }
             }
@@ -761,9 +760,9 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                         let Some((child_index, child)) = children_iter.next() else {
                             // The branch has no children. Turn it into a leaf.
                             let leaf = Node::Leaf(LeafNode {
-                                    value: SmallVec::from(&(*branch.value.take().expect(
+                                    value: branch.value.take().expect(
                                         "branch node must have a value if it previously had only 1 child",
-                                    ))[..]),
+                                    ),
                                     partial_path: branch.partial_path.clone(), // TODO remove clone
                                 });
                             return Ok((Some(leaf), removed_value));
@@ -779,7 +778,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                             Child::Node(child_node) => std::mem::replace(
                                 child_node,
                                 Node::Leaf(LeafNode {
-                                    value: SmallVec::default(),
+                                    value: Box::default(),
                                     partial_path: Path::new(),
                                 }),
                             ),
@@ -908,9 +907,9 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                         let Some((child_index, child)) = children_iter.next() else {
                             // The branch has no children. Turn it into a leaf.
                             let leaf = Node::Leaf(LeafNode {
-                                    value: SmallVec::from(&(*branch.value.take().expect(
+                                    value: branch.value.take().expect(
                                         "branch node must have a value if it previously had only 1 child",
-                                    ))[..]),
+                                    ),
                                     partial_path: branch.partial_path.clone(), // TODO remove clone
                                 });
                             return Ok(Some(leaf));
@@ -926,7 +925,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                             Child::Node(child_node) => std::mem::replace(
                                 child_node,
                                 Node::Leaf(LeafNode {
-                                    value: SmallVec::default(),
+                                    value: Box::default(),
                                     partial_path: Path::new(),
                                 }),
                             ),

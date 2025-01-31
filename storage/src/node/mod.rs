@@ -5,7 +5,6 @@ use bitfield::bitfield;
 use enum_as_inner::EnumAsInner;
 use integer_encoding::{VarIntReader as _, VarIntWriter as _};
 use serde::{Deserialize, Serialize};
-use smallvec::SmallVec;
 use std::io::{Error, ErrorKind, Read, Write};
 use std::num::NonZero;
 use std::vec;
@@ -37,7 +36,7 @@ impl Default for Node {
     fn default() -> Self {
         Node::Leaf(LeafNode {
             partial_path: Path::new(),
-            value: SmallVec::default(),
+            value: Box::default(),
         })
     }
 }
@@ -174,7 +173,7 @@ impl Node {
     pub fn update_value(&mut self, value: Box<[u8]>) {
         match self {
             Node::Branch(b) => b.value = Some(value),
-            Node::Leaf(l) => l.value = SmallVec::from(&value[..]),
+            Node::Leaf(l) => l.value = value,
         }
     }
 
