@@ -4,11 +4,9 @@
 package dummy
 
 import (
-	"encoding/binary"
 	"fmt"
 	"math/big"
 
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
@@ -23,25 +21,12 @@ func CalcBaseFee(config *params.ChainConfig, feeConfig commontype.FeeConfig, par
 	// If the current block is the first EIP-1559 block, or it is the genesis block
 	// return the initial slice and initial base fee.
 	isSubnetEVM := config.IsSubnetEVM(parent.Time)
-	extraDataSize := params.DynamicFeeExtraDataSize
-
 	if !isSubnetEVM || parent.Number.Cmp(common.Big0) == 0 {
-		initialSlice := make([]byte, extraDataSize)
+		initialSlice := (&DynamicFeeWindow{}).Bytes()
 		return initialSlice, feeConfig.MinBaseFee, nil
 	}
-	if len(parent.Extra) < extraDataSize {
-		return nil, nil, fmt.Errorf("expected length of parent extra data to be >= %d, but found %d", extraDataSize, len(parent.Extra))
-	}
-	dynamicFeeWindow := parent.Extra[:params.DynamicFeeExtraDataSize]
 
-	if timestamp < parent.Time {
-		return nil, nil, fmt.Errorf("cannot calculate base fee for timestamp (%d) prior to parent timestamp (%d)", timestamp, parent.Time)
-	}
-	roll := timestamp - parent.Time
-
-	// roll the window over by the difference between the timestamps to generate
-	// the new rollup window.
-	newRollupWindow, err := rollLongWindow(dynamicFeeWindow, int(roll))
+	dynamicFeeWindow, err := ParseDynamicFeeWindow(parent.Extra)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -53,20 +38,23 @@ func CalcBaseFee(config *params.ChainConfig, feeConfig commontype.FeeConfig, par
 	parentGasTargetBig := feeConfig.TargetGas
 	parentGasTarget := parentGasTargetBig.Uint64()
 
-	// Add in the gas used by the parent block in the correct place
-	// If the parent consumed gas within the rollup window, add the consumed
-	// gas in.
-	if roll < params.RollupWindow {
-		slot := params.RollupWindow - 1 - roll
-		start := slot * wrappers.LongLen
-		updateLongWindow(newRollupWindow, start, parent.GasUsed)
+	// Compute the new state of the gas rolling window.
+	dynamicFeeWindow.Add(parent.GasUsed)
+
+	if timestamp < parent.Time {
+		return nil, nil, fmt.Errorf("cannot calculate base fee for timestamp %d prior to parent timestamp %d", timestamp, parent.Time)
 	}
+	roll := timestamp - parent.Time
+
+	// roll the window over by the difference between the timestamps to generate
+	// the new rollup window.
+	dynamicFeeWindow.Shift(roll)
+	dynamicFeeWindowBytes := dynamicFeeWindow.Bytes()
 
 	// Calculate the amount of gas consumed within the rollup window.
-	totalGas := sumLongWindow(newRollupWindow, params.RollupWindow)
-
+	totalGas := dynamicFeeWindow.Sum()
 	if totalGas == parentGasTarget {
-		return newRollupWindow, baseFee, nil
+		return dynamicFeeWindowBytes, baseFee, nil
 	}
 
 	num := new(big.Int)
@@ -101,7 +89,7 @@ func CalcBaseFee(config *params.ChainConfig, feeConfig commontype.FeeConfig, par
 
 	baseFee = selectBigWithinBounds(feeConfig.MinBaseFee, baseFee, nil)
 
-	return newRollupWindow, baseFee, nil
+	return dynamicFeeWindowBytes, baseFee, nil
 }
 
 // EstimateNextBaseFee attempts to estimate the next base fee based on a block with [parent] being built at
@@ -128,76 +116,6 @@ func selectBigWithinBounds(lowerBound, value, upperBound *big.Int) *big.Int {
 	default:
 		return value
 	}
-}
-
-// rollWindow rolls the longs within [consumptionWindow] over by [roll] places.
-// For example, if there are 4 longs encoded in a 32 byte slice, rollWindow would
-// have the following effect:
-// Original:
-// [1, 2, 3, 4]
-// Roll = 0
-// [1, 2, 3, 4]
-// Roll = 1
-// [2, 3, 4, 0]
-// Roll = 2
-// [3, 4, 0, 0]
-// Roll = 3
-// [4, 0, 0, 0]
-// Roll >= 4
-// [0, 0, 0, 0]
-// Assumes that [roll] is greater than or equal to 0
-func rollWindow(consumptionWindow []byte, size, roll int) ([]byte, error) {
-	if len(consumptionWindow)%size != 0 {
-		return nil, fmt.Errorf("expected consumption window length (%d) to be a multiple of size (%d)", len(consumptionWindow), size)
-	}
-
-	// Note: make allocates a zeroed array, so we are guaranteed
-	// that what we do not copy into, will be set to 0
-	res := make([]byte, len(consumptionWindow))
-	bound := roll * size
-	if bound > len(consumptionWindow) {
-		return res, nil
-	}
-	copy(res[:], consumptionWindow[roll*size:])
-	return res, nil
-}
-
-func rollLongWindow(consumptionWindow []byte, roll int) ([]byte, error) {
-	// Passes in [wrappers.LongLen] as the size of the individual value to be rolled over
-	// so that it can be used to roll an array of long values.
-	return rollWindow(consumptionWindow, wrappers.LongLen, roll)
-}
-
-// sumLongWindow sums [numLongs] encoded in [window]. Assumes that the length of [window]
-// is sufficient to contain [numLongs] or else this function panics.
-// If an overflow occurs, while summing the contents, the maximum uint64 value is returned.
-func sumLongWindow(window []byte, numLongs int) uint64 {
-	var (
-		sum      uint64 = 0
-		overflow bool
-	)
-	for i := 0; i < numLongs; i++ {
-		// If an overflow occurs while summing the elements of the window, return the maximum
-		// uint64 value immediately.
-		sum, overflow = math.SafeAdd(sum, binary.BigEndian.Uint64(window[wrappers.LongLen*i:]))
-		if overflow {
-			return math.MaxUint64
-		}
-	}
-	return sum
-}
-
-// updateLongWindow adds [gasConsumed] in at index within [window].
-// Assumes that [index] has already been validated.
-// If an overflow occurs, the maximum uint64 value is used.
-func updateLongWindow(window []byte, start uint64, gasConsumed uint64) {
-	prevGasConsumed := binary.BigEndian.Uint64(window[start:])
-
-	totalGasConsumed, overflow := math.SafeAdd(prevGasConsumed, gasConsumed)
-	if overflow {
-		totalGasConsumed = math.MaxUint64
-	}
-	binary.BigEndian.PutUint64(window[start:], totalGasConsumed)
 }
 
 // calcBlockGasCost calculates the required block gas cost. If [parentTime]
