@@ -4,11 +4,9 @@
 package dummy
 
 import (
-	"encoding/binary"
 	"fmt"
 	"math/big"
 
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
@@ -48,29 +46,17 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 		isEtna          = config.IsEtna(parent.Time)
 	)
 	if !isApricotPhase3 || parent.Number.Cmp(common.Big0) == 0 {
-		initialSlice := make([]byte, params.DynamicFeeExtraDataSize)
+		initialSlice := (&DynamicFeeWindow{}).Bytes()
 		initialBaseFee := big.NewInt(params.ApricotPhase3InitialBaseFee)
 		return initialSlice, initialBaseFee, nil
 	}
 
-	if uint64(len(parent.Extra)) < params.DynamicFeeExtraDataSize {
-		return nil, nil, fmt.Errorf("expected length of parent extra data to be %d, but found %d", params.DynamicFeeExtraDataSize, len(parent.Extra))
-	}
-	dynamicFeeWindow := parent.Extra[:params.DynamicFeeExtraDataSize]
-
-	if timestamp < parent.Time {
-		return nil, nil, fmt.Errorf("cannot calculate base fee for timestamp (%d) prior to parent timestamp (%d)", timestamp, parent.Time)
-	}
-	roll := timestamp - parent.Time
-
-	// roll the window over by the difference between the timestamps to generate
-	// the new rollup window.
-	newRollupWindow, err := rollLongWindow(dynamicFeeWindow, int(roll))
+	dynamicFeeWindow, err := ParseDynamicFeeWindow(parent.Extra)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// If AP5, use a less responsive [BaseFeeChangeDenominator] and a higher gas
+	// If AP5, use a less responsive BaseFeeChangeDenominator and a higher gas
 	// block limit
 	var (
 		baseFee                  = new(big.Int).Set(parent.BaseFee)
@@ -83,65 +69,55 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 	}
 	parentGasTargetBig := new(big.Int).SetUint64(parentGasTarget)
 
-	// Add in the gas used by the parent block in the correct place
-	// If the parent consumed gas within the rollup window, add the consumed
-	// gas in.
-	if roll < params.RollupWindow {
-		var blockGasCost, parentExtraStateGasUsed uint64
-		switch {
-		case isApricotPhase5:
-			// [blockGasCost] has been removed in AP5, so it is left as 0.
+	// Add in parent's consumed gas
+	var blockGasCost, parentExtraStateGasUsed uint64
+	switch {
+	case isApricotPhase5:
+		// blockGasCost has been removed in AP5, so it is left as 0.
 
-			// At the start of a new network, the parent
-			// may not have a populated [ExtDataGasUsed].
-			if parent.ExtDataGasUsed != nil {
-				parentExtraStateGasUsed = parent.ExtDataGasUsed.Uint64()
-			}
-		case isApricotPhase4:
-			// The [blockGasCost] is paid by the effective tips in the block using
-			// the block's value of [baseFee].
-			blockGasCost = calcBlockGasCost(
-				ApricotPhase4TargetBlockRate,
-				ApricotPhase4MinBlockGasCost,
-				ApricotPhase4MaxBlockGasCost,
-				ApricotPhase4BlockGasCostStep,
-				parent.BlockGasCost,
-				parent.Time, timestamp,
-			).Uint64()
-
-			// On the boundary of AP3 and AP4 or at the start of a new network, the parent
-			// may not have a populated [ExtDataGasUsed].
-			if parent.ExtDataGasUsed != nil {
-				parentExtraStateGasUsed = parent.ExtDataGasUsed.Uint64()
-			}
-		default:
-			blockGasCost = ApricotPhase3BlockGasFee
+		// At the start of a new network, the parent
+		// may not have a populated ExtDataGasUsed.
+		if parent.ExtDataGasUsed != nil {
+			parentExtraStateGasUsed = parent.ExtDataGasUsed.Uint64()
 		}
+	case isApricotPhase4:
+		// The blockGasCost is paid by the effective tips in the block using
+		// the block's value of baseFee.
+		blockGasCost = calcBlockGasCost(
+			ApricotPhase4TargetBlockRate,
+			ApricotPhase4MinBlockGasCost,
+			ApricotPhase4MaxBlockGasCost,
+			ApricotPhase4BlockGasCostStep,
+			parent.BlockGasCost,
+			parent.Time, timestamp,
+		).Uint64()
 
-		// Compute the new state of the gas rolling window.
-		addedGas, overflow := math.SafeAdd(parent.GasUsed, parentExtraStateGasUsed)
-		if overflow {
-			addedGas = math.MaxUint64
+		// On the boundary of AP3 and AP4 or at the start of a new network, the
+		// parent may not have a populated ExtDataGasUsed.
+		if parent.ExtDataGasUsed != nil {
+			parentExtraStateGasUsed = parent.ExtDataGasUsed.Uint64()
 		}
-
-		// Only add the [blockGasCost] to the gas used if it isn't AP5
-		if !isApricotPhase5 {
-			addedGas, overflow = math.SafeAdd(addedGas, blockGasCost)
-			if overflow {
-				addedGas = math.MaxUint64
-			}
-		}
-
-		slot := params.RollupWindow - 1 - roll
-		start := slot * wrappers.LongLen
-		updateLongWindow(newRollupWindow, start, addedGas)
+	default:
+		blockGasCost = ApricotPhase3BlockGasFee
 	}
 
-	// Calculate the amount of gas consumed within the rollup window.
-	totalGas := sumLongWindow(newRollupWindow, params.RollupWindow)
+	// Compute the new state of the gas rolling window.
+	dynamicFeeWindow.Add(parent.GasUsed, parentExtraStateGasUsed, blockGasCost)
 
+	if timestamp < parent.Time {
+		return nil, nil, fmt.Errorf("cannot calculate base fee for timestamp %d prior to parent timestamp %d", timestamp, parent.Time)
+	}
+	roll := timestamp - parent.Time
+
+	// roll the window over by the difference between the timestamps to generate
+	// the new rollup window.
+	dynamicFeeWindow.Shift(roll)
+	dynamicFeeWindowBytes := dynamicFeeWindow.Bytes()
+
+	// Calculate the amount of gas consumed within the rollup window.
+	totalGas := dynamicFeeWindow.Sum()
 	if totalGas == parentGasTarget {
-		return newRollupWindow, baseFee, nil
+		return dynamicFeeWindowBytes, baseFee, nil
 	}
 
 	num := new(big.Int)
@@ -185,7 +161,7 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 		baseFee = selectBigWithinBounds(ApricotPhase3MinBaseFee, baseFee, ApricotPhase3MaxBaseFee)
 	}
 
-	return newRollupWindow, baseFee, nil
+	return dynamicFeeWindowBytes, baseFee, nil
 }
 
 // EstimateNextBaseFee attempts to estimate the next base fee based on a block with [parent] being built at
@@ -212,76 +188,6 @@ func selectBigWithinBounds(lowerBound, value, upperBound *big.Int) *big.Int {
 	default:
 		return value
 	}
-}
-
-// rollWindow rolls the longs within [consumptionWindow] over by [roll] places.
-// For example, if there are 4 longs encoded in a 32 byte slice, rollWindow would
-// have the following effect:
-// Original:
-// [1, 2, 3, 4]
-// Roll = 0
-// [1, 2, 3, 4]
-// Roll = 1
-// [2, 3, 4, 0]
-// Roll = 2
-// [3, 4, 0, 0]
-// Roll = 3
-// [4, 0, 0, 0]
-// Roll >= 4
-// [0, 0, 0, 0]
-// Assumes that [roll] is greater than or equal to 0
-func rollWindow(consumptionWindow []byte, size, roll int) ([]byte, error) {
-	if len(consumptionWindow)%size != 0 {
-		return nil, fmt.Errorf("expected consumption window length (%d) to be a multiple of size (%d)", len(consumptionWindow), size)
-	}
-
-	// Note: make allocates a zeroed array, so we are guaranteed
-	// that what we do not copy into, will be set to 0
-	res := make([]byte, len(consumptionWindow))
-	bound := roll * size
-	if bound > len(consumptionWindow) {
-		return res, nil
-	}
-	copy(res[:], consumptionWindow[roll*size:])
-	return res, nil
-}
-
-func rollLongWindow(consumptionWindow []byte, roll int) ([]byte, error) {
-	// Passes in [wrappers.LongLen] as the size of the individual value to be rolled over
-	// so that it can be used to roll an array of long values.
-	return rollWindow(consumptionWindow, wrappers.LongLen, roll)
-}
-
-// sumLongWindow sums [numLongs] encoded in [window]. Assumes that the length of [window]
-// is sufficient to contain [numLongs] or else this function panics.
-// If an overflow occurs, while summing the contents, the maximum uint64 value is returned.
-func sumLongWindow(window []byte, numLongs int) uint64 {
-	var (
-		sum      uint64 = 0
-		overflow bool
-	)
-	for i := 0; i < numLongs; i++ {
-		// If an overflow occurs while summing the elements of the window, return the maximum
-		// uint64 value immediately.
-		sum, overflow = math.SafeAdd(sum, binary.BigEndian.Uint64(window[wrappers.LongLen*i:]))
-		if overflow {
-			return math.MaxUint64
-		}
-	}
-	return sum
-}
-
-// updateLongWindow adds [gasConsumed] in at index within [window].
-// Assumes that [index] has already been validated.
-// If an overflow occurs, the maximum uint64 value is used.
-func updateLongWindow(window []byte, start uint64, gasConsumed uint64) {
-	prevGasConsumed := binary.BigEndian.Uint64(window[start:])
-
-	totalGasConsumed, overflow := math.SafeAdd(prevGasConsumed, gasConsumed)
-	if overflow {
-		totalGasConsumed = math.MaxUint64
-	}
-	binary.BigEndian.PutUint64(window[start:], totalGasConsumed)
 }
 
 // calcBlockGasCost calculates the required block gas cost. If [parentTime]
