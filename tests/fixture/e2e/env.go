@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
@@ -143,25 +142,6 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 			flagVars.StartNetwork(),
 			flagVars.ReuseNetwork(),
 		)
-
-		// Wait for chains to have bootstrapped on all nodes
-		tc.Eventually(func() bool {
-			for _, subnet := range network.Subnets {
-				for _, validatorID := range subnet.ValidatorIDs {
-					uri, err := network.GetURIForNodeID(validatorID)
-					require.NoError(err)
-					infoClient := info.NewClient(uri)
-					for _, chain := range subnet.Chains {
-						isBootstrapped, err := infoClient.IsBootstrapped(tc.DefaultContext(), chain.ChainID.String())
-						// Ignore errors since a chain id that is not yet known will result in a recoverable error.
-						if err != nil || !isBootstrapped {
-							return false
-						}
-					}
-				}
-			}
-			return true
-		}, DefaultTimeout, DefaultPollingInterval, "failed to see all chains bootstrap before timeout")
 	}
 
 	if flagVars.StartNetwork() {
