@@ -16,6 +16,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/config"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -144,23 +145,43 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 			flagVars.ReuseNetwork(),
 		)
 
-		// Wait for chains to have bootstrapped on all nodes
-		tc.Eventually(func() bool {
-			for _, subnet := range network.Subnets {
-				for _, validatorID := range subnet.ValidatorIDs {
-					uri, err := network.GetURIForNodeID(validatorID)
-					require.NoError(err)
-					infoClient := info.NewClient(uri)
-					for _, chain := range subnet.Chains {
-						isBootstrapped, err := infoClient.IsBootstrapped(tc.DefaultContext(), chain.ChainID.String())
-						// Ignore errors since a chain id that is not yet known will result in a recoverable error.
-						if err != nil || !isBootstrapped {
-							return false
-						}
-					}
+		// create a slice of all the validators and chains pairs that we'll be waiting to be bootstrapped.
+		var pendingBootstappingChains []struct {
+			validatorID ids.NodeID
+			chainID     ids.ID
+		}
+		for _, subnet := range network.Subnets {
+			for _, validatorID := range subnet.ValidatorIDs {
+				for _, chain := range subnet.Chains {
+					pendingBootstappingChains = append(pendingBootstappingChains, struct {
+						validatorID ids.NodeID
+						chainID     ids.ID
+					}{validatorID: validatorID, chainID: chain.ChainID})
 				}
 			}
-			return true
+		}
+		// Wait for chains to have bootstrapped on all nodes
+		tc.Eventually(func() bool {
+			allNodesBootstrapped := true
+			for i := len(pendingBootstappingChains) - 1; i >= 0; i-- {
+				pending := pendingBootstappingChains[i]
+				uri, err := network.GetURIForNodeID(pending.validatorID)
+				require.NoError(err)
+				infoClient := info.NewClient(uri)
+				isBootstrapped, err := infoClient.IsBootstrapped(tc.DefaultContext(), pending.chainID.String())
+				// Ignore errors since a chain id that is not yet known will result in a recoverable error.
+				if err != nil || !isBootstrapped {
+					allNodesBootstrapped = false
+					continue
+				}
+				tc.Log().Info("Node successfully bootstrapped chain",
+					zap.String("nodeID", pending.validatorID.String()),
+					zap.String("chainID", pending.chainID.String()),
+				)
+				// remove the entry from the pending list so that we won't need to test this entry again.
+				pendingBootstappingChains = append(pendingBootstappingChains[:i], pendingBootstappingChains[i+1:]...)
+			}
+			return allNodesBootstrapped
 		}, DefaultTimeout, DefaultPollingInterval, "failed to see all chains bootstrap before timeout")
 	}
 
