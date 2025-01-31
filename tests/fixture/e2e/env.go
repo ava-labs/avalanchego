@@ -160,9 +160,9 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 				}
 			}
 		}
-		// Wait for chains to have bootstrapped on all nodes
+		// Wait for chains to have bootstrapped on all validators
 		tc.Eventually(func() bool {
-			allNodesBootstrapped := true
+			allValidatorsBootstrapped := true
 			for i := len(pendingBootstappingChains) - 1; i >= 0; i-- {
 				pending := pendingBootstappingChains[i]
 				uri, err := network.GetURIForNodeID(pending.validatorID)
@@ -171,17 +171,17 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 				isBootstrapped, err := infoClient.IsBootstrapped(tc.DefaultContext(), pending.chainID.String())
 				// Ignore errors since a chain id that is not yet known will result in a recoverable error.
 				if err != nil || !isBootstrapped {
-					allNodesBootstrapped = false
+					allValidatorsBootstrapped = false
 					continue
 				}
-				tc.Log().Info("Node successfully bootstrapped chain",
+				tc.Log().Info("Validator successfully bootstrapped chain",
 					zap.String("nodeID", pending.validatorID.String()),
 					zap.String("chainID", pending.chainID.String()),
 				)
 				// remove the entry from the pending list so that we won't need to test this entry again.
 				pendingBootstappingChains = append(pendingBootstappingChains[:i], pendingBootstappingChains[i+1:]...)
 			}
-			return allNodesBootstrapped
+			return allValidatorsBootstrapped
 		}, DefaultTimeout, DefaultPollingInterval, "failed to see all chains bootstrap before timeout")
 	}
 
