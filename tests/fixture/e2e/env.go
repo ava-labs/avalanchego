@@ -14,9 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/config"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -144,45 +142,6 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 			flagVars.StartNetwork(),
 			flagVars.ReuseNetwork(),
 		)
-
-		// create a slice of all the validators and chains pairs that we'll be waiting to be bootstrapped.
-		var pendingBootstappingChains []struct {
-			validatorID ids.NodeID
-			chainID     ids.ID
-		}
-		for _, subnet := range network.Subnets {
-			for _, validatorID := range subnet.ValidatorIDs {
-				for _, chain := range subnet.Chains {
-					pendingBootstappingChains = append(pendingBootstappingChains, struct {
-						validatorID ids.NodeID
-						chainID     ids.ID
-					}{validatorID: validatorID, chainID: chain.ChainID})
-				}
-			}
-		}
-		// Wait for chains to have bootstrapped on all validators
-		tc.Eventually(func() bool {
-			allValidatorsBootstrapped := true
-			for i := len(pendingBootstappingChains) - 1; i >= 0; i-- {
-				pending := pendingBootstappingChains[i]
-				uri, err := network.GetURIForNodeID(pending.validatorID)
-				require.NoError(err)
-				infoClient := info.NewClient(uri)
-				isBootstrapped, err := infoClient.IsBootstrapped(tc.DefaultContext(), pending.chainID.String())
-				// Ignore errors since a chain id that is not yet known will result in a recoverable error.
-				if err != nil || !isBootstrapped {
-					allValidatorsBootstrapped = false
-					continue
-				}
-				tc.Log().Info("Validator successfully bootstrapped chain",
-					zap.String("nodeID", pending.validatorID.String()),
-					zap.String("chainID", pending.chainID.String()),
-				)
-				// remove the entry from the pending list so that we won't need to test this entry again.
-				pendingBootstappingChains = append(pendingBootstappingChains[:i], pendingBootstappingChains[i+1:]...)
-			}
-			return allValidatorsBootstrapped
-		}, DefaultTimeout, DefaultPollingInterval, "failed to see all chains bootstrap before timeout")
 	}
 
 	if flagVars.StartNetwork() {
