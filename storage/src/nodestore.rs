@@ -863,36 +863,36 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
         path_prefix: &mut Path,
         new_nodes: &mut HashMap<LinearAddress, (u8, Arc<Node>)>,
     ) -> (LinearAddress, TrieHash) {
-        // Allocate addresses and calculate hashes for all new nodes
-        match node {
-            Node::Branch(ref mut b) => {
-                for (nibble, child) in b.children.iter_mut().enumerate() {
-                    // if this is already hashed, we're done
-                    if matches!(child, Some(Child::AddressWithHash(_, _))) {
-                        // We already know the hash of this child.
-                        continue;
-                    }
-
-                    // If this child is a node, hash it and update the child.
-                    let Some(Child::Node(child_node)) = std::mem::take(child) else {
-                        continue;
-                    };
-
-                    // Hash this child and update
-                    // we extend and truncate path_prefix to reduce memory allocations
-                    let original_length = path_prefix.len();
-                    path_prefix
-                        .0
-                        .extend(b.partial_path.0.iter().copied().chain(once(nibble as u8)));
-
-                    let (child_addr, child_hash) =
-                        self.hash_helper(child_node, path_prefix, new_nodes);
-                    *child = Some(Child::AddressWithHash(child_addr, child_hash));
-                    path_prefix.0.truncate(original_length);
+        // If this is a branch, find all unhashed children and recursively call hash_helper on them.
+        if let Node::Branch(ref mut b) = node {
+            for (nibble, child) in b.children.iter_mut().enumerate() {
+                // if this is already hashed, we're done
+                if matches!(child, Some(Child::AddressWithHash(_, _))) {
+                    // We already know the hash of this child.
+                    continue;
                 }
+
+                // If there was no child, we're done. Otherwise, remove the child from
+                // the branch and hash it. This has the side effect of dropping the [Child::Node]
+                // that was allocated. This is fine because we're about to replace it with a
+                // [Child::AddressWithHash].
+                let Some(Child::Node(child_node)) = std::mem::take(child) else {
+                    continue;
+                };
+
+                // Hash this child and update
+                // we extend and truncate path_prefix to reduce memory allocations
+                let original_length = path_prefix.len();
+                path_prefix
+                    .0
+                    .extend(b.partial_path.0.iter().copied().chain(once(nibble as u8)));
+
+                let (child_addr, child_hash) = self.hash_helper(child_node, path_prefix, new_nodes);
+                *child = Some(Child::AddressWithHash(child_addr, child_hash));
+                path_prefix.0.truncate(original_length);
             }
-            Node::Leaf(_) => {}
         }
+        // At this point, we either have a leaf or a branch with all children hashed.
 
         let hash = hash_node(&node, path_prefix);
         let (addr, size) = self.allocate_node(&node).expect("TODO handle error");
