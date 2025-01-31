@@ -289,8 +289,11 @@ func validateRangeChangeProof(
 		// [startProof] is an inclusion/exclusion proof of [start]
 		startProofKey = maybe.Bind(start, ToKey)
 
-		// [endProof] is an inclusion of the largest key in [keyValues],
-		// or an exclusion proof of [end] if [keyValues] is empty.
+		// [endProof] is an inclusion of the largest key in [keyValues].
+		//
+		// If [keyValues] is empty:
+		// - range proof: an exclusion proof of [end]
+		// - change proof: an inclusion/exclusion proof of [end].
 		endProofKey = maybe.Bind(end, ToKey)
 	)
 
@@ -902,6 +905,7 @@ func addPathInfo(
 
 		// Add [proofNode]'s children which are outside the range
 		// [insertChildrenLessThan, insertChildrenGreaterThan].
+		// What is inside the range, should be included in provided key-values.
 		for index, childID := range proofNode.Children {
 			var compressedKey Key
 			if existingChild, ok := n.children[index]; ok {
