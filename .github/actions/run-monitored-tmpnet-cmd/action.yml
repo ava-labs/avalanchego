@@ -40,14 +40,16 @@ runs:
       # Only run for the original repo; a forked repo won't have access to the monitoring credentials
       if: (inputs.prometheus_username != '')
       shell: bash
-      run: bash -x ./scripts/run_prometheus.sh
+      # Assumes calling project has a nix flake that ensures a compatible prometheus
+      run: nix develop --impure --command bash -x ./scripts/run_prometheus.sh
       env:
         PROMETHEUS_USERNAME: ${{ inputs.prometheus_username }}
         PROMETHEUS_PASSWORD: ${{ inputs.prometheus_password }}
     - name: Start promtail
       if: (inputs.prometheus_username != '')
       shell: bash
-      run: bash -x ./scripts/run_promtail.sh
+      # Assumes calling project has a nix flake that ensures a compatible promtail
+      run: nix develop --impure --command bash -x ./scripts/run_promtail.sh
       env:
         LOKI_USERNAME: ${{ inputs.loki_username }}
         LOKI_PASSWORD: ${{ inputs.loki_password }}

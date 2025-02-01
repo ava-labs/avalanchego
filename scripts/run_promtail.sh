@@ -19,6 +19,14 @@ if ! [[ "$0" =~ scripts/run_promtail.sh ]]; then
   exit 255
 fi
 
+CMD=promtail
+
+if ! command -v "${CMD}" &> /dev/null; then
+  echo "promtail not found, have you run 'nix develop'?"
+  echo "To install nix: https://github.com/DeterminateSystems/nix-installer?tab=readme-ov-file#install-nix"
+  exit 1
+fi
+
 PROMTAIL_WORKING_DIR="${HOME}/.tmpnet/promtail"
 PIDFILE="${PROMTAIL_WORKING_DIR}"/run.pid
 
@@ -45,33 +53,6 @@ LOKI_PASSWORD="${LOKI_PASSWORD:-}"
 if [[ -z "${LOKI_PASSWORD}" ]]; then
   echo "Please provide a value for LOKI_PASSWORD"
   exit 1
-fi
-
-# Version as of this writing
-VERSION="v2.9.5"
-
-# Ensure the promtail command is locally available
-CMD=promtail
-if ! command -v "${CMD}" &> /dev/null; then
-  # Try to use a local version
-  CMD="${PWD}/bin/promtail"
-  if ! command -v "${CMD}" &> /dev/null; then
-    echo "promtail not found, attempting to install..."
-
-    # Determine the platform
-    GOOS="$(go env GOOS)"
-    GOARCH="$(go env GOARCH)"
-    DIST="${GOOS}-${GOARCH}"
-
-    # Install the specified release
-    PROMTAIL_FILE="promtail-${DIST}"
-    ZIP_PATH="/tmp/${PROMTAIL_FILE}.zip"
-    BIN_DIR="$(dirname "${CMD}")"
-    URL="https://github.com/grafana/loki/releases/download/${VERSION}/promtail-${DIST}.zip"
-    curl -L -o "${ZIP_PATH}" "${URL}"
-    unzip "${ZIP_PATH}" -d "${BIN_DIR}"
-    mv "${BIN_DIR}/${PROMTAIL_FILE}" "${CMD}"
-  fi
 fi
 
 # Configure promtail
