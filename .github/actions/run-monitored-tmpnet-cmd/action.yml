@@ -44,23 +44,6 @@ runs:
     # Ensure promtail and prometheus are available
     - name: Install nix
       uses: ./.github/actions/install-nix
-    - name: Start prometheus
-      # Only run for the original repo; a forked repo won't have access to the monitoring credentials
-      if: (inputs.prometheus_username != '')
-      shell: bash
-      # Assumes calling project has a nix flake that ensures a compatible prometheus
-      run: nix develop --impure --command bash -x ./scripts/run_prometheus.sh
-      env:
-        PROMETHEUS_USERNAME: ${{ inputs.prometheus_username }}
-        PROMETHEUS_PASSWORD: ${{ inputs.prometheus_password }}
-    - name: Start promtail
-      if: (inputs.prometheus_username != '')
-      shell: bash
-      # Assumes calling project has a nix flake that ensures a compatible promtail
-      run: nix develop --impure --command bash -x ./scripts/run_promtail.sh
-      env:
-        LOKI_USERNAME: ${{ inputs.loki_username }}
-        LOKI_PASSWORD: ${{ inputs.loki_password }}
     - name: Notify of metrics availability
       if: (inputs.prometheus_username != '')
       shell: bash
@@ -71,9 +54,14 @@ runs:
         FILTER_BY_OWNER: ${{ inputs.filter_by_owner }}
     - name: Run command
       shell: bash
-      run: ${{ inputs.run_env }} ${{ inputs.run }}
+      # --impure ensures the env vars are accessible to the command
+      run: ${{ inputs.run_env }} nix develop --impure --command bash -x ${{ inputs.run }}
       env:
-        TMPNET_DELAY_NETWORK_SHUTDOWN: true # Ensure shutdown waits for a final metrics scrape
+        TMPNET_ENABLE_COLLECTORS: true
+        LOKI_USERNAME: ${{ inputs.loki_username }}
+        LOKI_PASSWORD: ${{ inputs.loki_password }}
+        PROMETHEUS_USERNAME: ${{ inputs.prometheus_username }}
+        PROMETHEUS_PASSWORD: ${{ inputs.prometheus_password }}
         GH_REPO: ${{ inputs.repository_owner }}/${{ inputs.repository_name }}
         GH_WORKFLOW: ${{ inputs.workflow }}
         GH_RUN_ID: ${{ inputs.run_id }}
