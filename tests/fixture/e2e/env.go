@@ -130,6 +130,10 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 		}
 	}
 
+	if flagVars.EnableCollectors() {
+		require.NoError(tmpnet.EnsureCollectorsRunning(tc.Log()))
+	}
+
 	// Start a new network
 	if network == nil {
 		network = desiredNetwork

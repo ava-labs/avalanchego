@@ -15,25 +15,17 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 )
 
-const (
-	// Ensure that this value takes into account the scrape_interval
-	// defined in scripts/run_prometheus.sh.
-	networkShutdownDelay = 12 * time.Second
-
-	delayNetworkShutdownEnvName = "TMPNET_DELAY_NETWORK_SHUTDOWN"
-)
-
 type FlagVars struct {
-	avalancheGoExecPath  string
-	pluginDir            string
-	networkDir           string
-	reuseNetwork         bool
-	delayNetworkShutdown bool
-	startNetwork         bool
-	stopNetwork          bool
-	restartNetwork       bool
-	nodeCount            int
-	activateFortuna      bool
+	avalancheGoExecPath string
+	pluginDir           string
+	networkDir          string
+	reuseNetwork        bool
+	enableCollectors    bool
+	startNetwork        bool
+	stopNetwork         bool
+	restartNetwork      bool
+	nodeCount           int
+	activateFortuna     bool
 }
 
 func (v *FlagVars) AvalancheGoExecPath() (string, error) {
@@ -81,10 +73,14 @@ func (v *FlagVars) RestartNetwork() bool {
 	return v.restartNetwork
 }
 
+func (v *FlagVars) EnableCollectors() bool {
+	return v.enableCollectors
+}
+
 func (v *FlagVars) NetworkShutdownDelay() time.Duration {
-	if v.delayNetworkShutdown {
+	if v.enableCollectors {
 		// Only return a non-zero value if the delay is enabled.
-		return networkShutdownDelay
+		return tmpnet.NetworkShutdownDelay
 	}
 	return 0
 }
@@ -152,10 +148,10 @@ func RegisterFlags() *FlagVars {
 		"[optional] restart an existing network previously started with --reuse-network. Useful for ensuring a network is running with the current state of binaries on disk. Ignored if a network is not already running or --stop-network is provided.",
 	)
 	flag.BoolVar(
-		&vars.delayNetworkShutdown,
-		"delay-network-shutdown",
-		cast.ToBool(GetEnvWithDefault(delayNetworkShutdownEnvName, "false")),
-		"[optional] whether to delay network shutdown to allow a final metrics scrape.",
+		&vars.enableCollectors,
+		"enable-collectors",
+		cast.ToBool(GetEnvWithDefault("TMPNET_ENABLE_COLLECTORS", "false")),
+		"[optional] whether to enable collectors of logs and metrics from nodes of the temporary network.",
 	)
 	flag.BoolVar(
 		&vars.startNetwork,

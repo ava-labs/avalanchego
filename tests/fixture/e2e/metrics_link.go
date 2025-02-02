@@ -49,7 +49,7 @@ var _ = ginkgo.AfterEach(func() {
 	// Extend the end time by the shutdown delay (a proxy for the metrics
 	// scrape interval) to maximize the chances of the specified duration
 	// including all metrics relevant to the current spec.
-	endTime := time.Now().Add(networkShutdownDelay).UnixMilli()
+	endTime := time.Now().Add(tmpnet.NetworkShutdownDelay).UnixMilli()
 	metricsLink := tmpnet.MetricsLinkForNetwork(
 		env.GetNetwork().UUID,
 		strconv.FormatInt(startTime, 10),

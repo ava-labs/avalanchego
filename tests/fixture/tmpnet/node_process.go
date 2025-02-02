@@ -226,7 +226,12 @@ func (p *NodeProcess) getProcess() (*os.Process, error) {
 		return nil, nil
 	}
 
-	proc, err := os.FindProcess(p.pid)
+	return getProcess(p.pid)
+}
+
+// getProcess retrieves the process if it is running.
+func getProcess(pid int) (*os.Process, error) {
+	proc, err := os.FindProcess(pid)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find process: %w", err)
 	}
