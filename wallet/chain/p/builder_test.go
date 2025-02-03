@@ -703,7 +703,9 @@ func TestRegisterL1ValidatorTx(t *testing.T) {
 	signers := set.NewBits(0)
 
 	unsignedBytes := unsignedWarp.Bytes()
-	sig := sk.Sign(unsignedBytes)
+	sig, err := sk.Sign(unsignedBytes)
+	require.NoError(t, err)
+
 	sigBytes := [bls.SignatureLen]byte{}
 	copy(sigBytes[:], bls.SignatureToBytes(sig))
 
@@ -787,15 +789,15 @@ func TestSetL1ValidatorWeightTx(t *testing.T) {
 
 	sk, err := localsigner.New()
 	require.NoError(t, err)
+	sig, err := sk.Sign(unsignedWarp.Bytes())
+	require.NoError(t, err)
 
 	warp, err := warp.NewMessage(
 		unsignedWarp,
 		&warp.BitSetSignature{
 			Signers: set.NewBits(0).Bytes(),
 			Signature: ([bls.SignatureLen]byte)(
-				bls.SignatureToBytes(
-					sk.Sign(unsignedWarp.Bytes()),
-				),
+				bls.SignatureToBytes(sig),
 			),
 		},
 	)

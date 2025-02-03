@@ -2830,11 +2830,11 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 			addressedCallPayload.Bytes(),
 		)).Bytes(),
 	))
+	sig, err := sk.Sign(unsignedWarp.Bytes())
+	require.NoError(t, err)
 	warpSignature := &warp.BitSetSignature{
-		Signers: set.NewBits(0).Bytes(),
-		Signature: ([bls.SignatureLen]byte)(bls.SignatureToBytes(
-			sk.Sign(unsignedWarp.Bytes()),
-		)),
+		Signers:   set.NewBits(0).Bytes(),
+		Signature: ([bls.SignatureLen]byte)(bls.SignatureToBytes(sig)),
 	}
 	warpMessage := must[*warp.Message](t)(warp.NewMessage(
 		unsignedWarp,
@@ -3341,11 +3341,13 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 			)).Bytes(),
 		)).Bytes(),
 	))
+
+	sig, err := sk.Sign(unsignedIncreaseWeightWarpMessage.Bytes())
+	require.NoError(t, err)
+
 	warpSignature := &warp.BitSetSignature{
-		Signers: set.NewBits(0).Bytes(),
-		Signature: ([bls.SignatureLen]byte)(bls.SignatureToBytes(
-			sk.Sign(unsignedIncreaseWeightWarpMessage.Bytes()),
-		)),
+		Signers:   set.NewBits(0).Bytes(),
+		Signature: ([bls.SignatureLen]byte)(bls.SignatureToBytes(sig)),
 	}
 	increaseWeightWarpMessage := must[*warp.Message](t)(warp.NewMessage(
 		unsignedIncreaseWeightWarpMessage,

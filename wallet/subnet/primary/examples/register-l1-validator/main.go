@@ -112,7 +112,10 @@ func main() {
 	signers := set.NewBits(0)
 
 	unsignedBytes := unsignedWarp.Bytes()
-	sig := sk.Sign(unsignedBytes)
+	sig, err := sk.Sign(unsignedBytes)
+	if err != nil {
+		log.Fatalf("failed to sign message: %s\n", err)
+	}
 	sigBytes := [bls.SignatureLen]byte{}
 	copy(sigBytes[:], bls.SignatureToBytes(sig))
 

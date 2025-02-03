@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
@@ -556,7 +557,11 @@ func TestShouldDisconnect(t *testing.T) {
 				id:      peerID,
 				version: version.CurrentApp,
 				ip: &SignedIP{
-					BLSSignature: blsKey.SignProofOfPossession([]byte("wrong message")),
+					BLSSignature: (func() *bls.Signature {
+						sig, err := blsKey.SignProofOfPossession([]byte("wrong message"))
+						require.NoError(t, err)
+						return sig
+					})(),
 				},
 			},
 			expectedPeer: &peer{
@@ -578,7 +583,11 @@ func TestShouldDisconnect(t *testing.T) {
 				id:      peerID,
 				version: version.CurrentApp,
 				ip: &SignedIP{
-					BLSSignature: blsKey.SignProofOfPossession([]byte("wrong message")),
+					BLSSignature: (func() *bls.Signature {
+						sig, err := blsKey.SignProofOfPossession([]byte("wrong message"))
+						require.NoError(t, err)
+						return sig
+					})(),
 				},
 			},
 			expectedShouldDisconnect: true,
@@ -604,7 +613,11 @@ func TestShouldDisconnect(t *testing.T) {
 				id:      peerID,
 				version: version.CurrentApp,
 				ip: &SignedIP{
-					BLSSignature: blsKey.SignProofOfPossession((&UnsignedIP{}).bytes()),
+					BLSSignature: (func() *bls.Signature {
+						sig, err := blsKey.SignProofOfPossession((&UnsignedIP{}).bytes())
+						require.NoError(t, err)
+						return sig
+					})(),
 				},
 			},
 			expectedPeer: &peer{
@@ -626,7 +639,11 @@ func TestShouldDisconnect(t *testing.T) {
 				id:      peerID,
 				version: version.CurrentApp,
 				ip: &SignedIP{
-					BLSSignature: blsKey.SignProofOfPossession((&UnsignedIP{}).bytes()),
+					BLSSignature: (func() *bls.Signature {
+						sig, err := blsKey.SignProofOfPossession((&UnsignedIP{}).bytes())
+						require.NoError(t, err)
+						return sig
+					})(),
 				},
 				txIDOfVerifiedBLSKey: txID,
 			},
