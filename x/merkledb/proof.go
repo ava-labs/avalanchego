@@ -38,6 +38,7 @@ var (
 	ErrExclusionProofUnexpectedValue = errors.New("exclusion proof's value should be empty")
 	ErrExclusionProofInvalidNode     = errors.New("invalid node for exclusion proof")
 	ErrProofValueDoesntMatch         = errors.New("the provided value does not match the proof node for the provided key's value")
+	ErrProofKeyPartialByte           = errors.New("the provided key has partial byte length")
 	ErrProofNodeHasUnincludedValue   = errors.New("the provided proof has a value for a key within the range that is not present in the provided key/values")
 	ErrInvalidMaybe                  = errors.New("maybe is nothing but has value")
 	ErrNilProofNode                  = errors.New("proof node is nil")
@@ -124,6 +125,7 @@ type Proof struct {
 	// Always contains at least the root.
 	Path []ProofNode
 	// This is a proof that [key] exists/doesn't exist.
+	// Must not have any partial bytes.
 	Key Key
 
 	// Nothing if [Key] isn't in the trie.
@@ -143,6 +145,10 @@ func (proof *Proof) Verify(
 	// Make sure the proof is well-formed.
 	if len(proof.Path) == 0 {
 		return ErrEmptyProof
+	}
+
+	if proof.Key.hasPartialByte() {
+		return ErrProofKeyPartialByte
 	}
 
 	lastNode := proof.Path[len(proof.Path)-1]
@@ -258,6 +264,7 @@ type RangeProof struct {
 	// Each key is in the requested range (inclusive).
 	// The first key-value is the first key-value at/after the range start.
 	// The key-value pairs are consecutive.
+	// Must not have any partial bytes.
 	// Sorted by increasing key and with no duplicate keys.
 	KeyValues []KeyValue
 }
@@ -352,6 +359,9 @@ func (proof *RangeProof) Verify(
 	keys := make([]Key, len(proof.KeyValues))
 	for i, keyValue := range proof.KeyValues {
 		k := ToKey(keyValue.Key)
+		if k.hasPartialByte() {
+			return ErrProofKeyPartialByte
+		}
 
 		keyValues[k] = keyValue.Value
 		keys[i] = k
@@ -580,6 +590,7 @@ type ChangeProof struct {
 	// end roots such that k1 < k3 < k2.
 	// This is a subset of the requested key-value range, rather than the entire
 	// range, because otherwise the proof may be too large.
+	// Must not have any partial bytes.
 	// Sorted by increasing key and with no duplicate keys.
 	//
 	// Example: Suppose that between the start root and the end root, the following

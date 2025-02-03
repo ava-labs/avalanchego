@@ -1102,6 +1102,9 @@ func (db *merkleDB) VerifyChangeProof(
 	keys := make([]Key, len(proof.KeyChanges))
 	for i, keyValue := range proof.KeyChanges {
 		k := ToKey(keyValue.Key)
+		if k.hasPartialByte() {
+			return ErrProofKeyPartialByte
+		}
 
 		keyChanges[k] = keyValue.Value
 		keys[i] = k
