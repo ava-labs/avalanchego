@@ -46,7 +46,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v3
         with:
           distribution: goreleaser
-          version: latest
+          version: v2.5.1
           args: release --clean
           workdir: ./subnet-evm/
         env:
