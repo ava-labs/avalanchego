@@ -89,10 +89,13 @@ A temporary network can be managed in code:
 
 ```golang
 network := &tmpnet.Network{                   // Configure non-default values for the new network
+    DefaultRuntimeConfig{
+        ReuseDynamicPorts: true,              // Configure process-based nodes to reuse a dynamically allocated API port when restarting
+    },
     DefaultFlags: tmpnet.FlagsMap{
         config.LogLevelKey: "INFO",           // Change one of the network's defaults
     },
-    Nodes: tmpnet.NewNodesOrPanic(5),           // Number of initial validating nodes
+    Nodes: tmpnet.NewNodesOrPanic(5),         // Number of initial validating nodes
     Subnets: []*tmpnet.Subnet{                // Subnets to create on the new network once it is running
         {
             Name: "xsvm-a",                   // User-defined name used to reference subnet in code and on disk
