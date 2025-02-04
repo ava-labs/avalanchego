@@ -1,12 +1,3 @@
----
-tags: [Configs]
-description: Reference for all available configuration options and parameters for the PlatformVM.
-pagination_label: P-Chain Configs
-sidebar_position: 1
----
-
-# P-Chain
-
 This document provides details about the configuration options available for the PlatformVM.
 
 In order to specify a configuration for the PlatformVM, you need to define a `Config` struct and its parameters. The default values for these parameters are:
