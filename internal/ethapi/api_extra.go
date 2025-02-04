@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/rpc"
 )
 
@@ -123,7 +124,7 @@ func (s *BlockChainAPI) FeeConfig(ctx context.Context, blockNrOrHash *rpc.BlockN
 
 // GetActivePrecompilesAt returns the active precompile configs at the given block timestamp.
 // DEPRECATED: Use GetActiveRulesAt instead.
-func (s *BlockChainAPI) GetActivePrecompilesAt(ctx context.Context, blockTimestamp *uint64) params.Precompiles {
+func (s *BlockChainAPI) GetActivePrecompilesAt(ctx context.Context, blockTimestamp *uint64) extras.Precompiles {
 	var timestamp uint64
 	if blockTimestamp == nil {
 		timestamp = s.b.CurrentHeader().Time
@@ -140,7 +141,7 @@ type ActivePrecompilesResult struct {
 
 type ActiveRulesResult struct {
 	EthRules          params.Rules                       `json:"ethRules"`
-	AvalancheRules    params.AvalancheRules              `json:"avalancheRules"`
+	AvalancheRules    extras.AvalancheRules              `json:"avalancheRules"`
 	ActivePrecompiles map[string]ActivePrecompilesResult `json:"precompiles"`
 }
 

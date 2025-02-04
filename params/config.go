@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	ethparams "github.com/ava-labs/libevm/params"
+	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/utils"
 )
 
@@ -55,11 +56,11 @@ var (
 			IstanbulBlock:       big.NewInt(0),
 			MuirGlacierBlock:    big.NewInt(0),
 		},
-		&ChainConfigExtra{
+		&extras.ChainConfig{
 			FeeConfig:          DefaultFeeConfig,
 			AllowFeeRecipients: false,
-			NetworkUpgrades:    getDefaultNetworkUpgrades(upgrade.GetConfig(constants.MainnetID)), // This can be changed to correct network (local, test) via VM.
-			GenesisPrecompiles: Precompiles{},
+			NetworkUpgrades:    extras.GetDefaultNetworkUpgrades(upgrade.GetConfig(constants.MainnetID)), // This can be changed to correct network (local, test) via VM.
+			GenesisPrecompiles: extras.Precompiles{},
 		},
 	)
 
@@ -80,14 +81,7 @@ var (
 			ShanghaiTime:        utils.TimeToNewUint64(upgrade.GetConfig(constants.UnitTestID).DurangoTime),
 			CancunTime:          utils.TimeToNewUint64(upgrade.GetConfig(constants.UnitTestID).EtnaTime),
 		},
-		&ChainConfigExtra{
-			AvalancheContext:   AvalancheContext{utils.TestSnowContext()},
-			FeeConfig:          DefaultFeeConfig,
-			AllowFeeRecipients: false,
-			NetworkUpgrades:    getDefaultNetworkUpgrades(upgrade.GetConfig(constants.UnitTestID)), // This can be changed to correct network (local, test) via VM.
-			GenesisPrecompiles: Precompiles{},
-			UpgradeConfig:      UpgradeConfig{},
-		},
+		extras.TestChainConfig,
 	)
 
 	TestPreSubnetEVMChainConfig = WithExtra(
@@ -105,17 +99,17 @@ var (
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
 		},
-		&ChainConfigExtra{
-			AvalancheContext:   AvalancheContext{utils.TestSnowContext()},
+		&extras.ChainConfig{
+			AvalancheContext:   extras.AvalancheContext{SnowCtx: utils.TestSnowContext()},
 			FeeConfig:          DefaultFeeConfig,
 			AllowFeeRecipients: false,
-			NetworkUpgrades: NetworkUpgrades{
+			NetworkUpgrades: extras.NetworkUpgrades{
 				SubnetEVMTimestamp: utils.TimeToNewUint64(upgrade.UnscheduledActivationTime),
 				DurangoTimestamp:   utils.TimeToNewUint64(upgrade.UnscheduledActivationTime),
 				EtnaTimestamp:      utils.TimeToNewUint64(upgrade.UnscheduledActivationTime),
 			},
-			GenesisPrecompiles: Precompiles{},
-			UpgradeConfig:      UpgradeConfig{},
+			GenesisPrecompiles: extras.Precompiles{},
+			UpgradeConfig:      extras.UpgradeConfig{},
 		},
 	)
 
@@ -134,17 +128,17 @@ var (
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
 		},
-		&ChainConfigExtra{
-			AvalancheContext:   AvalancheContext{utils.TestSnowContext()},
+		&extras.ChainConfig{
+			AvalancheContext:   extras.AvalancheContext{SnowCtx: utils.TestSnowContext()},
 			FeeConfig:          DefaultFeeConfig,
 			AllowFeeRecipients: false,
-			NetworkUpgrades: NetworkUpgrades{
+			NetworkUpgrades: extras.NetworkUpgrades{
 				SubnetEVMTimestamp: utils.NewUint64(0),
 				DurangoTimestamp:   utils.TimeToNewUint64(upgrade.UnscheduledActivationTime),
 				EtnaTimestamp:      utils.TimeToNewUint64(upgrade.UnscheduledActivationTime),
 			},
-			GenesisPrecompiles: Precompiles{},
-			UpgradeConfig:      UpgradeConfig{},
+			GenesisPrecompiles: extras.Precompiles{},
+			UpgradeConfig:      extras.UpgradeConfig{},
 		},
 	)
 
@@ -164,17 +158,17 @@ var (
 			LondonBlock:         big.NewInt(0),
 			ShanghaiTime:        utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
 		},
-		&ChainConfigExtra{
-			AvalancheContext:   AvalancheContext{utils.TestSnowContext()},
+		&extras.ChainConfig{
+			AvalancheContext:   extras.AvalancheContext{SnowCtx: utils.TestSnowContext()},
 			FeeConfig:          DefaultFeeConfig,
 			AllowFeeRecipients: false,
-			NetworkUpgrades: NetworkUpgrades{
+			NetworkUpgrades: extras.NetworkUpgrades{
 				SubnetEVMTimestamp: utils.NewUint64(0),
 				DurangoTimestamp:   utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
 				EtnaTimestamp:      utils.TimeToNewUint64(upgrade.UnscheduledActivationTime),
 			},
-			GenesisPrecompiles: Precompiles{},
-			UpgradeConfig:      UpgradeConfig{},
+			GenesisPrecompiles: extras.Precompiles{},
+			UpgradeConfig:      extras.UpgradeConfig{},
 		},
 	)
 
@@ -195,17 +189,17 @@ var (
 			ShanghaiTime:        utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
 			CancunTime:          utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
 		},
-		&ChainConfigExtra{
-			AvalancheContext:   AvalancheContext{utils.TestSnowContext()},
+		&extras.ChainConfig{
+			AvalancheContext:   extras.AvalancheContext{SnowCtx: utils.TestSnowContext()},
 			FeeConfig:          DefaultFeeConfig,
 			AllowFeeRecipients: false,
-			NetworkUpgrades: NetworkUpgrades{
+			NetworkUpgrades: extras.NetworkUpgrades{
 				SubnetEVMTimestamp: utils.NewUint64(0),
 				DurangoTimestamp:   utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
 				EtnaTimestamp:      utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
 			},
-			GenesisPrecompiles: Precompiles{},
-			UpgradeConfig:      UpgradeConfig{},
+			GenesisPrecompiles: extras.Precompiles{},
+			UpgradeConfig:      extras.UpgradeConfig{},
 		},
 	)
 	TestRules = TestChainConfig.Rules(new(big.Int), IsMergeTODO, 0)

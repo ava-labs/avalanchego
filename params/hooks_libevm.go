@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm"
+	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/deployerallowlist"
 	"github.com/ava-labs/subnet-evm/precompile/modules"
@@ -19,9 +20,17 @@ import (
 	"github.com/holiman/uint256"
 )
 
+type RulesExtra extras.Rules
+
+func GetRulesExtra(r Rules) *extras.Rules {
+	rules := payloads.PointerFromRules(&r)
+	return (*extras.Rules)(rules)
+}
+
 func (r RulesExtra) CanCreateContract(ac *libevm.AddressContext, gas uint64, state libevm.StateReader) (uint64, error) {
 	// If the allow list is enabled, check that [ac.Origin] has permission to deploy a contract.
-	if r.IsPrecompileEnabled(deployerallowlist.ContractAddress) {
+	rules := (extras.Rules)(r)
+	if rules.IsPrecompileEnabled(deployerallowlist.ContractAddress) {
 		allowListRole := deployerallowlist.GetContractDeployerAllowListStatus(state, ac.Origin)
 		if !allowListRole.IsEnabled() {
 			gas = 0

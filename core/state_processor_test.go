@@ -42,6 +42,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/holiman/uint256"
@@ -271,7 +272,7 @@ func TestStateProcessorErrors(t *testing.T) {
 						IstanbulBlock:       big.NewInt(0),
 						MuirGlacierBlock:    big.NewInt(0),
 					},
-					&params.ChainConfigExtra{FeeConfig: params.DefaultFeeConfig},
+					&extras.ChainConfig{FeeConfig: params.DefaultFeeConfig},
 				),
 				Alloc: types.GenesisAlloc{
 					common.HexToAddress("0x71562b71999873DB5b286dF957af199Ec94617F7"): types.Account{
@@ -370,12 +371,12 @@ func TestBadTxAllowListBlock(t *testing.T) {
 				BerlinBlock:         big.NewInt(0),
 				LondonBlock:         big.NewInt(0),
 			},
-			&params.ChainConfigExtra{
+			&extras.ChainConfig{
 				FeeConfig: params.DefaultFeeConfig,
-				NetworkUpgrades: params.NetworkUpgrades{
+				NetworkUpgrades: extras.NetworkUpgrades{
 					SubnetEVMTimestamp: utils.NewUint64(0),
 				},
-				GenesisPrecompiles: params.Precompiles{
+				GenesisPrecompiles: extras.Precompiles{
 					txallowlist.ConfigKey: txallowlist.NewConfig(utils.NewUint64(0), nil, nil, nil),
 				},
 			},

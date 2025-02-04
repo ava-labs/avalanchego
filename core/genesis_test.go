@@ -43,6 +43,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/deployerallowlist"
 	"github.com/ava-labs/subnet-evm/triedb/pathdb"
@@ -209,7 +210,7 @@ func TestStatefulPrecompilesConfigure(t *testing.T) {
 		"allow list enabled in genesis": {
 			getConfig: func() *params.ChainConfig {
 				config := params.Copy(params.TestChainConfig)
-				params.GetExtra(&config).GenesisPrecompiles = params.Precompiles{
+				params.GetExtra(&config).GenesisPrecompiles = extras.Precompiles{
 					deployerallowlist.ConfigKey: deployerallowlist.NewConfig(utils.NewUint64(0), []common.Address{addr}, nil, nil),
 				}
 				return &config
@@ -285,7 +286,7 @@ func TestPrecompileActivationAfterHeaderBlock(t *testing.T) {
 
 	activatedGenesisConfig := params.Copy(customg.Config)
 	contractDeployerConfig := deployerallowlist.NewConfig(utils.NewUint64(51), nil, nil, nil)
-	params.GetExtra(&activatedGenesisConfig).UpgradeConfig.PrecompileUpgrades = []params.PrecompileUpgrade{
+	params.GetExtra(&activatedGenesisConfig).UpgradeConfig.PrecompileUpgrades = []extras.PrecompileUpgrade{
 		{
 			Config: contractDeployerConfig,
 		},
@@ -323,7 +324,7 @@ func TestGenesisWriteUpgradesRegression(t *testing.T) {
 	_, _, err := SetupGenesisBlock(db, trieDB, genesis, genesisBlock.Hash(), false)
 	require.NoError(err)
 
-	params.GetExtra(genesis.Config).UpgradeConfig.PrecompileUpgrades = []params.PrecompileUpgrade{
+	params.GetExtra(genesis.Config).UpgradeConfig.PrecompileUpgrades = []extras.PrecompileUpgrade{
 		{
 			Config: deployerallowlist.NewConfig(utils.NewUint64(51), nil, nil, nil),
 		},

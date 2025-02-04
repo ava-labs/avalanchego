@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/state/pruner"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/holiman/uint256"
 )
 
@@ -315,7 +316,7 @@ func testRepopulateMissingTriesParallel(t *testing.T, parallelism int) {
 	gspec := &Genesis{
 		Config: params.WithExtra(
 			&params.ChainConfig{HomesteadBlock: new(big.Int)},
-			&params.ChainConfigExtra{FeeConfig: params.DefaultFeeConfig},
+			&extras.ChainConfig{FeeConfig: params.DefaultFeeConfig},
 		),
 		Alloc: types.GenesisAlloc{addr1: {Balance: genesisBalance}},
 	}
@@ -431,7 +432,7 @@ func TestUngracefulAsyncShutdown(t *testing.T) {
 	gspec := &Genesis{
 		Config: params.WithExtra(
 			&params.ChainConfig{HomesteadBlock: new(big.Int)},
-			&params.ChainConfigExtra{FeeConfig: params.DefaultFeeConfig},
+			&extras.ChainConfig{FeeConfig: params.DefaultFeeConfig},
 		),
 		Alloc: types.GenesisAlloc{addr1: {Balance: genesisBalance}},
 	}

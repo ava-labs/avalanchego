@@ -1,18 +1,14 @@
 // (c) 2024 Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package params
+package extras
 
 import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 )
 
-func GetRulesExtra(r Rules) *RulesExtra {
-	return extras.PointerFromRules(&r)
-}
-
-type RulesExtra struct {
+type Rules struct {
 	// Rules for Avalanche releases
 	AvalancheRules
 
@@ -29,17 +25,17 @@ type RulesExtra struct {
 	AccepterPrecompiles map[common.Address]precompileconfig.Accepter
 }
 
-func (r *RulesExtra) PredicatersExist() bool {
+func (r *Rules) PredicatersExist() bool {
 	return len(r.Predicaters) > 0
 }
 
-func (r *RulesExtra) PredicaterExists(addr common.Address) bool {
+func (r *Rules) PredicaterExists(addr common.Address) bool {
 	_, ok := r.Predicaters[addr]
 	return ok
 }
 
 // IsPrecompileEnabled returns true if the precompile at [addr] is enabled for this rule set.
-func (r *RulesExtra) IsPrecompileEnabled(addr common.Address) bool {
+func (r *Rules) IsPrecompileEnabled(addr common.Address) bool {
 	_, ok := r.Precompiles[addr]
 	return ok
 }

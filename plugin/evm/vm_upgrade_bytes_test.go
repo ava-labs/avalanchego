@@ -24,7 +24,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/metrics"
-	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ava-labs/subnet-evm/vmerrs"
@@ -38,8 +38,8 @@ var DefaultEtnaTime = uint64(upgrade.GetConfig(testNetworkID).EtnaTime.Unix())
 func TestVMUpgradeBytesPrecompile(t *testing.T) {
 	// Make a TxAllowListConfig upgrade at genesis and convert it to JSON to apply as upgradeBytes.
 	enableAllowListTimestamp := upgrade.InitiallyActiveTime // enable at initial time
-	upgradeConfig := &params.UpgradeConfig{
-		PrecompileUpgrades: []params.PrecompileUpgrade{
+	upgradeConfig := &extras.UpgradeConfig{
+		PrecompileUpgrades: []extras.PrecompileUpgrade{
 			{
 				Config: txallowlist.NewConfig(utils.TimeToNewUint64(enableAllowListTimestamp), testEthAddrs[0:1], nil, nil),
 			},
@@ -84,7 +84,7 @@ func TestVMUpgradeBytesPrecompile(t *testing.T) {
 	disableAllowListTimestamp := vm.clock.Time().Add(10 * time.Hour) // arbitrary choice
 	upgradeConfig.PrecompileUpgrades = append(
 		upgradeConfig.PrecompileUpgrades,
-		params.PrecompileUpgrade{
+		extras.PrecompileUpgrade{
 			Config: txallowlist.NewDisableConfig(utils.TimeToNewUint64(disableAllowListTimestamp)),
 		},
 	)
@@ -244,7 +244,7 @@ func TestVMStateUpgrade(t *testing.T) {
 	upgradedCodeStr := "0xdeadbeef" // this code will be applied during the upgrade
 	upgradedCode, err := hexutil.Decode(upgradedCodeStr)
 	// This modification will be applied to an existing account
-	genesisAccountUpgrade := &params.StateUpgradeAccount{
+	genesisAccountUpgrade := &extras.StateUpgradeAccount{
 		BalanceChange: (*math.HexOrDecimal256)(big.NewInt(100)),
 		Storage:       map[common.Hash]common.Hash{storageKey: {}},
 		Code:          upgradedCode,
@@ -253,7 +253,7 @@ func TestVMStateUpgrade(t *testing.T) {
 	// This modification will be applied to a new account
 	newAccount := common.Address{42}
 	require.NoError(t, err)
-	newAccountUpgrade := &params.StateUpgradeAccount{
+	newAccountUpgrade := &extras.StateUpgradeAccount{
 		BalanceChange: (*math.HexOrDecimal256)(big.NewInt(100)),
 		Storage:       map[common.Hash]common.Hash{storageKey: common.HexToHash("0x6666")},
 		Code:          upgradedCode,
@@ -349,8 +349,8 @@ func TestVMEupgradeActivatesCancun(t *testing.T) {
 			name:        "Later Etna activates Cancun",
 			genesisJSON: genesisJSONDurango,
 			upgradeJSON: func() string {
-				upgrade := &params.UpgradeConfig{
-					NetworkUpgradeOverrides: &params.NetworkUpgrades{
+				upgrade := &extras.UpgradeConfig{
+					NetworkUpgradeOverrides: &extras.NetworkUpgrades{
 						EtnaTimestamp: utils.NewUint64(DefaultEtnaTime + 2),
 					},
 				}
@@ -367,8 +367,8 @@ func TestVMEupgradeActivatesCancun(t *testing.T) {
 			name:        "Changed Etna changes Cancun",
 			genesisJSON: genesisJSONEtna,
 			upgradeJSON: func() string {
-				upgrade := &params.UpgradeConfig{
-					NetworkUpgradeOverrides: &params.NetworkUpgrades{
+				upgrade := &extras.UpgradeConfig{
+					NetworkUpgradeOverrides: &extras.NetworkUpgrades{
 						EtnaTimestamp: utils.NewUint64(DefaultEtnaTime + 2),
 					},
 				}

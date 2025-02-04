@@ -1,7 +1,7 @@
 // (c) 2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package params
+package extras
 
 import (
 	"encoding/json"
@@ -59,11 +59,11 @@ func TestVerifyStateUpgrades(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			baseConfig := Copy(TestChainConfig)
-			config := &baseConfig
-			GetExtra(config).StateUpgrades = tt.upgrades
+			copy := *TestChainConfig
+			config := &copy
+			config.StateUpgrades = tt.upgrades
 
-			err := GetExtra(config).Verify()
+			err := config.Verify()
 			if tt.expectedError == "" {
 				require.NoError(err)
 			} else {

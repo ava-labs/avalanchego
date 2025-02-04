@@ -1,9 +1,10 @@
 // (c) 2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package params
+package extras
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -15,8 +16,7 @@ import (
 
 func TestVerifyUpgradeConfig(t *testing.T) {
 	admins := []common.Address{{1}}
-	chainConfigCpy := Copy(TestChainConfig)
-	chainConfig := GetExtra(&chainConfigCpy)
+	chainConfig := &ChainConfig{}
 	chainConfig.GenesisPrecompiles = Precompiles{
 		txallowlist.ConfigKey: txallowlist.NewConfig(utils.NewUint64(1), admins, nil, nil),
 	}
@@ -73,8 +73,8 @@ func TestVerifyUpgradeConfig(t *testing.T) {
 
 func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 	admins := []common.Address{{1}}
-	chainConfig := Copy(TestChainConfig)
-	GetExtra(&chainConfig).GenesisPrecompiles = Precompiles{
+	chainConfig := &ChainConfig{}
+	chainConfig.GenesisPrecompiles = Precompiles{
 		txallowlist.ConfigKey:       txallowlist.NewConfig(utils.NewUint64(1), admins, nil, nil),
 		deployerallowlist.ConfigKey: deployerallowlist.NewConfig(utils.NewUint64(10), admins, nil, nil),
 	}
@@ -263,7 +263,7 @@ func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			tt.run(t, chainConfig)
+			tt.run(t, *chainConfig)
 		})
 	}
 }
@@ -277,16 +277,16 @@ type upgradeCompatibilityTest struct {
 func (tt *upgradeCompatibilityTest) run(t *testing.T, chainConfig ChainConfig) {
 	// apply all the upgrade bytes specified in order
 	for i, upgrade := range tt.configs {
-		newCfg := Copy(&chainConfig)
-		GetExtra(&newCfg).UpgradeConfig = *upgrade
+		newCfg := chainConfig
+		newCfg.UpgradeConfig = *upgrade
 
-		err := chainConfig.CheckCompatible(&newCfg, 0, tt.startTimestamps[i])
+		err := chainConfig.checkConfigCompatible(&newCfg, new(big.Int), tt.startTimestamps[i])
 
 		// if this is not the final upgradeBytes, continue applying
 		// the next upgradeBytes. (only check the result on the last apply)
 		if i != len(tt.configs)-1 {
 			if err != nil {
-				t.Fatalf("expecting checkCompatible call %d to return nil, got %s", i+1, err)
+				t.Fatalf("expecting checkConfigCompatible call %d to return nil, got %s", i+1, err)
 			}
 			chainConfig = newCfg
 			continue

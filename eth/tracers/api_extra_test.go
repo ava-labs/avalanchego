@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/internal/ethapi"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/subnet-evm/rpc"
 	"github.com/stretchr/testify/require"
@@ -42,17 +43,17 @@ func TestTraceBlockPrecompileActivation(t *testing.T) {
 	activateAllowlistBlock := 3
 	// assumes gap is 10 sec
 	activateAllowListTime := uint64(activateAllowlistBlock * 10)
-	activateTxAllowListConfig := params.PrecompileUpgrade{
+	activateTxAllowListConfig := extras.PrecompileUpgrade{
 		Config: txallowlist.NewConfig(&activateAllowListTime, []common.Address{accounts[0].addr}, nil, nil),
 	}
 
 	deactivateAllowlistBlock := activateAllowlistBlock + 3
 	deactivateAllowListTime := uint64(deactivateAllowlistBlock) * 10
-	deactivateTxAllowListConfig := params.PrecompileUpgrade{
+	deactivateTxAllowListConfig := extras.PrecompileUpgrade{
 		Config: txallowlist.NewDisableConfig(&deactivateAllowListTime),
 	}
 
-	params.GetExtra(genesis.Config).PrecompileUpgrades = []params.PrecompileUpgrade{
+	params.GetExtra(genesis.Config).PrecompileUpgrades = []extras.PrecompileUpgrade{
 		activateTxAllowListConfig,
 		deactivateTxAllowListConfig,
 	}
@@ -148,17 +149,17 @@ func TestTraceTransactionPrecompileActivation(t *testing.T) {
 	activateAllowlistBlock := uint64(2)
 	// assumes gap is 10 sec
 	activateAllowListTime := activateAllowlistBlock * 10
-	activateTxAllowListConfig := params.PrecompileUpgrade{
+	activateTxAllowListConfig := extras.PrecompileUpgrade{
 		Config: txallowlist.NewConfig(&activateAllowListTime, []common.Address{accounts[0].addr}, nil, nil),
 	}
 
 	deactivateAllowlistBlock := activateAllowlistBlock + 2
 	deactivateAllowListTime := deactivateAllowlistBlock * 10
-	deactivateTxAllowListConfig := params.PrecompileUpgrade{
+	deactivateTxAllowListConfig := extras.PrecompileUpgrade{
 		Config: txallowlist.NewDisableConfig(&deactivateAllowListTime),
 	}
 
-	params.GetExtra(genesis.Config).PrecompileUpgrades = []params.PrecompileUpgrade{
+	params.GetExtra(genesis.Config).PrecompileUpgrades = []extras.PrecompileUpgrade{
 		activateTxAllowListConfig,
 		deactivateTxAllowListConfig,
 	}
@@ -212,17 +213,17 @@ func TestTraceChainPrecompileActivation(t *testing.T) {
 	activateAllowlistBlock := uint64(20)
 	// assumes gap is 10 sec
 	activateAllowListTime := activateAllowlistBlock * 10
-	activateTxAllowListConfig := params.PrecompileUpgrade{
+	activateTxAllowListConfig := extras.PrecompileUpgrade{
 		Config: txallowlist.NewConfig(&activateAllowListTime, []common.Address{accounts[0].addr}, nil, nil),
 	}
 
 	deactivateAllowlistBlock := activateAllowlistBlock + 10
 	deactivateAllowListTime := deactivateAllowlistBlock * 10
-	deactivateTxAllowListConfig := params.PrecompileUpgrade{
+	deactivateTxAllowListConfig := extras.PrecompileUpgrade{
 		Config: txallowlist.NewDisableConfig(&deactivateAllowListTime),
 	}
 
-	params.GetExtra(genesis.Config).PrecompileUpgrades = []params.PrecompileUpgrade{
+	params.GetExtra(genesis.Config).PrecompileUpgrades = []extras.PrecompileUpgrade{
 		activateTxAllowListConfig,
 		deactivateTxAllowListConfig,
 	}
@@ -309,9 +310,9 @@ func TestTraceCallWithOverridesStateUpgrade(t *testing.T) {
 	activateStateUpgradeBlock := uint64(2)
 	// assumes gap is 10 sec
 	activateStateUpgradeTime := activateStateUpgradeBlock * 10
-	activateStateUpgradeConfig := params.StateUpgrade{
+	activateStateUpgradeConfig := extras.StateUpgrade{
 		BlockTimestamp: &activateStateUpgradeTime,
-		StateUpgradeAccounts: map[common.Address]params.StateUpgradeAccount{
+		StateUpgradeAccounts: map[common.Address]extras.StateUpgradeAccount{
 			accounts[2].addr: {
 				// deplete all balance
 				BalanceChange: (*math.HexOrDecimal256)(new(big.Int).Neg(big.NewInt(5 * params.Ether))),
@@ -319,7 +320,7 @@ func TestTraceCallWithOverridesStateUpgrade(t *testing.T) {
 		},
 	}
 
-	params.GetExtra(genesis.Config).StateUpgrades = []params.StateUpgrade{
+	params.GetExtra(genesis.Config).StateUpgrades = []extras.StateUpgrade{
 		activateStateUpgradeConfig,
 	}
 	genBlocks := 3

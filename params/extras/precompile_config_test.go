@@ -1,7 +1,7 @@
 // (c) 2022 Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package params
+package extras
 
 import (
 	"encoding/json"
@@ -21,8 +21,8 @@ import (
 
 func TestVerifyWithChainConfig(t *testing.T) {
 	admins := []common.Address{{1}}
-	baseConfig := Copy(TestChainConfig)
-	config := GetExtra(&baseConfig)
+	copy := *TestChainConfig
+	config := &copy
 	config.GenesisPrecompiles = Precompiles{
 		txallowlist.ConfigKey: txallowlist.NewConfig(utils.NewUint64(2), nil, nil, nil),
 	}
@@ -66,8 +66,8 @@ func TestVerifyWithChainConfig(t *testing.T) {
 
 func TestVerifyWithChainConfigAtNilTimestamp(t *testing.T) {
 	admins := []common.Address{{0}}
-	baseConfig := Copy(TestChainConfig)
-	config := GetExtra(&baseConfig)
+	copy := *TestChainConfig
+	config := &copy
 	config.PrecompileUpgrades = []PrecompileUpgrade{
 		// this does NOT enable the precompile, so it should be upgradeable.
 		{Config: txallowlist.NewConfig(nil, nil, nil, nil)},
@@ -186,8 +186,8 @@ func TestVerifyPrecompileUpgrades(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			baseConfig := Copy(TestChainConfig)
-			config := GetExtra(&baseConfig)
+			copy := *TestChainConfig
+			config := &copy
 			config.PrecompileUpgrades = tt.upgrades
 
 			err := config.Verify()
@@ -230,8 +230,8 @@ func TestVerifyPrecompiles(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			baseConfig := Copy(TestChainConfig)
-			config := GetExtra(&baseConfig)
+			copy := *TestChainConfig
+			config := &copy
 			config.GenesisPrecompiles = tt.precompiles
 
 			err := config.Verify()
@@ -246,8 +246,7 @@ func TestVerifyPrecompiles(t *testing.T) {
 
 func TestVerifyRequiresSortedTimestamps(t *testing.T) {
 	admins := []common.Address{{1}}
-	baseConfig := Copy(TestChainConfig)
-	config := GetExtra(&baseConfig)
+	config := &ChainConfig{}
 	config.PrecompileUpgrades = []PrecompileUpgrade{
 		{
 			Config: txallowlist.NewConfig(utils.NewUint64(2), admins, nil, nil),
@@ -264,22 +263,21 @@ func TestVerifyRequiresSortedTimestamps(t *testing.T) {
 
 func TestGetPrecompileConfig(t *testing.T) {
 	require := require.New(t)
-	baseConfig := Copy(TestChainConfig)
-	config := GetExtra(&baseConfig)
+	config := &ChainConfig{}
 	config.GenesisPrecompiles = Precompiles{
 		deployerallowlist.ConfigKey: deployerallowlist.NewConfig(utils.NewUint64(10), nil, nil, nil),
 	}
 
-	deployerConfig := config.getActivePrecompileConfig(deployerallowlist.ContractAddress, 0)
+	deployerConfig := config.GetActivePrecompileConfig(deployerallowlist.ContractAddress, 0)
 	require.Nil(deployerConfig)
 
-	deployerConfig = config.getActivePrecompileConfig(deployerallowlist.ContractAddress, 10)
+	deployerConfig = config.GetActivePrecompileConfig(deployerallowlist.ContractAddress, 10)
 	require.NotNil(deployerConfig)
 
-	deployerConfig = config.getActivePrecompileConfig(deployerallowlist.ContractAddress, 11)
+	deployerConfig = config.GetActivePrecompileConfig(deployerallowlist.ContractAddress, 11)
 	require.NotNil(deployerConfig)
 
-	txAllowListConfig := config.getActivePrecompileConfig(txallowlist.ContractAddress, 0)
+	txAllowListConfig := config.GetActivePrecompileConfig(txallowlist.ContractAddress, 0)
 	require.Nil(txAllowListConfig)
 }
 

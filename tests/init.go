@@ -34,6 +34,7 @@ import (
 	"strings"
 
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/utils"
 )
 
@@ -182,8 +183,8 @@ var Forks = map[string]*params.ChainConfig{
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
 		},
-		&params.ChainConfigExtra{
-			NetworkUpgrades: params.NetworkUpgrades{
+		&extras.ChainConfig{
+			NetworkUpgrades: extras.NetworkUpgrades{
 				SubnetEVMTimestamp: utils.NewUint64(0),
 			},
 		},
@@ -202,8 +203,8 @@ var Forks = map[string]*params.ChainConfig{
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
 		},
-		&params.ChainConfigExtra{
-			NetworkUpgrades: params.NetworkUpgrades{
+		&extras.ChainConfig{
+			NetworkUpgrades: extras.NetworkUpgrades{
 				SubnetEVMTimestamp: utils.NewUint64(0),
 				DurangoTimestamp:   utils.NewUint64(0),
 			},
@@ -225,8 +226,8 @@ var Forks = map[string]*params.ChainConfig{
 			ShanghaiTime:        utils.NewUint64(0),
 			CancunTime:          utils.NewUint64(0),
 		},
-		&params.ChainConfigExtra{
-			NetworkUpgrades: params.NetworkUpgrades{
+		&extras.ChainConfig{
+			NetworkUpgrades: extras.NetworkUpgrades{
 				SubnetEVMTimestamp: utils.NewUint64(0),
 				DurangoTimestamp:   utils.NewUint64(0),
 			},

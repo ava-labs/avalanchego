@@ -7,12 +7,12 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/holiman/uint256"
 )
 
 // Configure applies the state upgrade to the state.
-func Configure(stateUpgrade *params.StateUpgrade, chainConfig ChainContext, state StateDB, blockContext BlockContext) error {
+func Configure(stateUpgrade *extras.StateUpgrade, chainConfig ChainContext, state StateDB, blockContext BlockContext) error {
 	isEIP158 := chainConfig.IsEIP158(blockContext.Number())
 	for account, upgrade := range stateUpgrade.StateUpgradeAccounts {
 		if err := upgradeAccount(account, upgrade, state, isEIP158); err != nil {
@@ -23,7 +23,7 @@ func Configure(stateUpgrade *params.StateUpgrade, chainConfig ChainContext, stat
 }
 
 // upgradeAccount applies the state upgrade to the given account.
-func upgradeAccount(account common.Address, upgrade params.StateUpgradeAccount, state StateDB, isEIP158 bool) error {
+func upgradeAccount(account common.Address, upgrade extras.StateUpgradeAccount, state StateDB, isEIP158 bool) error {
 	// Create the account if it does not exist
 	if !state.Exist(account) {
 		state.CreateAccount(account)

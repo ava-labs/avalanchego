@@ -37,6 +37,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/holiman/uint256"
 )
 
@@ -82,8 +83,8 @@ func setDefaults(cfg *Config) {
 				BerlinBlock:         new(big.Int),
 				LondonBlock:         new(big.Int),
 			},
-			&params.ChainConfigExtra{
-				NetworkUpgrades: params.NetworkUpgrades{
+			&extras.ChainConfig{
+				NetworkUpgrades: extras.NetworkUpgrades{
 					SubnetEVMTimestamp: new(uint64),
 				},
 			},

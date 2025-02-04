@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/subnet-evm/miner"
 	"github.com/ava-labs/subnet-evm/node"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/peer"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/subnet-evm/plugin/evm/validators"
@@ -349,7 +350,7 @@ func (vm *VM) Initialize(
 
 	// Set the Avalanche Context on the ChainConfig
 	configExtra := params.GetExtra(g.Config)
-	configExtra.AvalancheContext = params.AvalancheContext{
+	configExtra.AvalancheContext = extras.AvalancheContext{
 		SnowCtx: chainCtx,
 	}
 
@@ -374,7 +375,7 @@ func (vm *VM) Initialize(
 	// Initializing the chain will verify upgradeBytes are compatible with existing values.
 	// This should be called before g.Verify().
 	if len(upgradeBytes) > 0 {
-		var upgradeConfig params.UpgradeConfig
+		var upgradeConfig extras.UpgradeConfig
 		if err := json.Unmarshal(upgradeBytes, &upgradeConfig); err != nil {
 			return fmt.Errorf("failed to parse upgrade bytes: %w", err)
 		}
@@ -1148,12 +1149,12 @@ func (vm *VM) GetCurrentNonce(address common.Address) (uint64, error) {
 	return state.GetNonce(address), nil
 }
 
-func (vm *VM) chainConfigExtra() *params.ChainConfigExtra {
+func (vm *VM) chainConfigExtra() *extras.ChainConfig {
 	return params.GetExtra(vm.chainConfig)
 }
 
 // currentRules returns the chain rules for the current block.
-func (vm *VM) currentRules() params.RulesExtra {
+func (vm *VM) currentRules() extras.Rules {
 	header := vm.eth.APIBackend.CurrentHeader()
 	rules := vm.chainConfig.Rules(header.Number, params.IsMergeTODO, header.Time)
 	return *params.GetRulesExtra(rules)

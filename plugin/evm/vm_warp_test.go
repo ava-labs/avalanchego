@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/eth/tracers"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
 	warpcontract "github.com/ava-labs/subnet-evm/precompile/contracts/warp"
@@ -67,7 +68,7 @@ func TestSendWarpMessage(t *testing.T) {
 	require := require.New(t)
 	genesis := &core.Genesis{}
 	require.NoError(genesis.UnmarshalJSON([]byte(genesisJSONDurango)))
-	params.GetExtra(genesis.Config).GenesisPrecompiles = params.Precompiles{
+	params.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 		warpcontract.ConfigKey: warpcontract.NewDefaultConfig(utils.TimeToNewUint64(upgrade.InitiallyActiveTime)),
 	}
 	genesisJSON, err := genesis.MarshalJSON()
@@ -264,7 +265,7 @@ func testWarpVMTransaction(t *testing.T, unsignedMessage *avalancheWarp.Unsigned
 	require := require.New(t)
 	genesis := &core.Genesis{}
 	require.NoError(genesis.UnmarshalJSON([]byte(genesisJSONDurango)))
-	params.GetExtra(genesis.Config).GenesisPrecompiles = params.Precompiles{
+	params.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 		warpcontract.ConfigKey: warpcontract.NewDefaultConfig(utils.TimeToNewUint64(upgrade.InitiallyActiveTime)),
 	}
 	genesisJSON, err := genesis.MarshalJSON()
@@ -420,7 +421,7 @@ func TestReceiveWarpMessage(t *testing.T) {
 	require := require.New(t)
 	genesis := &core.Genesis{}
 	require.NoError(genesis.UnmarshalJSON([]byte(genesisJSONDurango)))
-	params.GetExtra(genesis.Config).GenesisPrecompiles = params.Precompiles{
+	params.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 		// Note that warp is enabled without RequirePrimaryNetworkSigners
 		// by default in the genesis configuration.
 		warpcontract.ConfigKey: warpcontract.NewDefaultConfig(utils.TimeToNewUint64(upgrade.InitiallyActiveTime)),
@@ -440,8 +441,8 @@ func TestReceiveWarpMessage(t *testing.T) {
 		true, // RequirePrimaryNetworkSigners
 	)
 
-	upgradeConfig := params.UpgradeConfig{
-		PrecompileUpgrades: []params.PrecompileUpgrade{
+	upgradeConfig := extras.UpgradeConfig{
+		PrecompileUpgrades: []extras.PrecompileUpgrade{
 			{Config: disableConfig},
 			{Config: reEnableConfig},
 		},

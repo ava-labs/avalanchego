@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/subnet-evm/predicate"
 
@@ -79,7 +80,7 @@ func (b *Block) Accept(context.Context) error {
 
 // handlePrecompileAccept calls Accept on any logs generated with an active precompile address that implements
 // contract.Accepter
-func (b *Block) handlePrecompileAccept(rules params.RulesExtra) error {
+func (b *Block) handlePrecompileAccept(rules extras.Rules) error {
 	// Short circuit early if there are no precompile accepters to execute
 	if len(rules.AccepterPrecompiles) == 0 {
 		return nil

@@ -35,6 +35,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/nativeminter"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/rewardmanager"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/txallowlist"
@@ -152,8 +153,8 @@ func TestCheckCompatible(t *testing.T) {
 func TestConfigRules(t *testing.T) {
 	c := WithExtra(
 		&ChainConfig{},
-		&ChainConfigExtra{
-			NetworkUpgrades: NetworkUpgrades{
+		&extras.ChainConfig{
+			NetworkUpgrades: extras.NetworkUpgrades{
 				SubnetEVMTimestamp: utils.NewUint64(500),
 			},
 		},
@@ -242,14 +243,14 @@ func TestConfigUnmarshalJSON(t *testing.T) {
 func TestActivePrecompiles(t *testing.T) {
 	config := *WithExtra(
 		&ChainConfig{},
-		&ChainConfigExtra{
-			UpgradeConfig: UpgradeConfig{
-				PrecompileUpgrades: []PrecompileUpgrade{
+		&extras.ChainConfig{
+			UpgradeConfig: extras.UpgradeConfig{
+				PrecompileUpgrades: []extras.PrecompileUpgrade{
 					{
-						nativeminter.NewConfig(utils.NewUint64(0), nil, nil, nil, nil), // enable at genesis
+						Config: nativeminter.NewConfig(utils.NewUint64(0), nil, nil, nil, nil), // enable at genesis
 					},
 					{
-						nativeminter.NewDisableConfig(utils.NewUint64(1)), // disable at timestamp 1
+						Config: nativeminter.NewDisableConfig(utils.NewUint64(1)), // disable at timestamp 1
 					},
 				},
 			},
@@ -278,18 +279,18 @@ func TestChainConfigMarshalWithUpgrades(t *testing.T) {
 				IstanbulBlock:       big.NewInt(0),
 				MuirGlacierBlock:    big.NewInt(0),
 			},
-			&ChainConfigExtra{
+			&extras.ChainConfig{
 				FeeConfig:          DefaultFeeConfig,
 				AllowFeeRecipients: false,
-				NetworkUpgrades: NetworkUpgrades{
+				NetworkUpgrades: extras.NetworkUpgrades{
 					SubnetEVMTimestamp: utils.NewUint64(0),
 					DurangoTimestamp:   utils.NewUint64(0),
 				},
-				GenesisPrecompiles: Precompiles{},
+				GenesisPrecompiles: extras.Precompiles{},
 			},
 		),
-		UpgradeConfig: UpgradeConfig{
-			PrecompileUpgrades: []PrecompileUpgrade{
+		UpgradeConfig: extras.UpgradeConfig{
+			PrecompileUpgrades: []extras.PrecompileUpgrade{
 				{
 					Config: txallowlist.NewConfig(utils.NewUint64(100), nil, nil, nil),
 				},
