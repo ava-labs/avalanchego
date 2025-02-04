@@ -67,25 +67,27 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		sourceValidators := getNodesForIDs(network.Nodes, sourceSubnet.ValidatorIDs)
 		require.NotEmpty(sourceValidators)
 		sourceAPINode := sourceValidators[0]
+		sourceAPINodeURI := e2e.GetLocalURI(tc, sourceAPINode)
 		tc.Log().Info("issuing transactions for source subnet",
 			zap.String("subnetName", subnetAName),
 			zap.Stringer("nodeID", sourceAPINode.NodeID),
-			zap.String("nodeURI", sourceAPINode.URI),
+			zap.String("nodeURI", sourceAPINodeURI),
 		)
 
 		destinationValidators := getNodesForIDs(network.Nodes, destinationSubnet.ValidatorIDs)
 		require.NotEmpty(destinationValidators)
 		destinationAPINode := destinationValidators[0]
+		destinationAPINodeURI := e2e.GetLocalURI(tc, destinationAPINode)
 		tc.Log().Info("issuing transactions for destination subnet",
 			zap.String("subnetName", subnetBName),
 			zap.Stringer("nodeID", destinationAPINode.NodeID),
-			zap.String("nodeURI", destinationAPINode.URI),
+			zap.String("nodeURI", destinationAPINodeURI),
 		)
 
 		destinationKey := e2e.NewPrivateKey(tc)
 
 		tc.By("checking that the funded key has sufficient funds for the export")
-		sourceClient := api.NewClient(sourceAPINode.URI, sourceChain.ChainID.String())
+		sourceClient := api.NewClient(sourceAPINodeURI, sourceChain.ChainID.String())
 		initialSourcedBalance, err := sourceClient.Balance(
 			tc.DefaultContext(),
 			sourceChain.PreFundedKey.Address(),
@@ -98,7 +100,7 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		exportTxStatus, err := export.Export(
 			tc.DefaultContext(),
 			&export.Config{
-				URI:                sourceAPINode.URI,
+				URI:                sourceAPINodeURI,
 				SourceChainID:      sourceChain.ChainID,
 				DestinationChainID: destinationChain.ChainID,
 				Amount:             units.Schmeckle,
@@ -113,9 +115,10 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 
 		tc.By("checking that the export transaction has been accepted on all nodes")
 		for _, node := range sourceValidators[1:] {
+			uri := e2e.GetLocalURI(tc, node)
 			require.NoError(api.AwaitTxAccepted(
 				tc.DefaultContext(),
-				api.NewClient(node.URI, sourceChain.ChainID.String()),
+				api.NewClient(uri, sourceChain.ChainID.String()),
 				sourceChain.PreFundedKey.Address(),
 				exportTxStatus.Nonce,
 				pollingInterval,
@@ -128,7 +131,7 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		transferTxStatus, err := transfer.Transfer(
 			tc.DefaultContext(),
 			&transfer.Config{
-				URI:        destinationAPINode.URI,
+				URI:        destinationAPINodeURI,
 				ChainID:    destinationChain.ChainID,
 				AssetID:    destinationChain.ChainID,
 				Amount:     units.Schmeckle,
@@ -144,12 +147,12 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		tc.By(fmt.Sprintf("importing to blockchain %s on subnet %s", destinationChain.ChainID, destinationSubnet.SubnetID))
 		sourceURIs := make([]string, len(sourceValidators))
 		for i, node := range sourceValidators {
-			sourceURIs[i] = node.URI
+			sourceURIs[i] = e2e.GetLocalURI(tc, node)
 		}
 		importTxStatus, err := importtx.Import(
 			tc.DefaultContext(),
 			&importtx.Config{
-				URI:                destinationAPINode.URI,
+				URI:                destinationAPINodeURI,
 				SourceURIs:         sourceURIs,
 				SourceChainID:      sourceChain.ChainID.String(),
 				DestinationChainID: destinationChain.ChainID.String(),
@@ -168,7 +171,7 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		require.GreaterOrEqual(initialSourcedBalance-units.Schmeckle, sourceBalance)
 
 		tc.By("checking that the balance of the destination key is non-zero")
-		destinationClient := api.NewClient(destinationAPINode.URI, destinationChain.ChainID.String())
+		destinationClient := api.NewClient(destinationAPINodeURI, destinationChain.ChainID.String())
 		destinationBalance, err := destinationClient.Balance(tc.DefaultContext(), destinationKey.Address(), sourceChain.ChainID)
 		require.NoError(err)
 		require.Equal(units.Schmeckle, destinationBalance)
