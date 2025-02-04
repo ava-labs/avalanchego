@@ -516,6 +516,16 @@ func (n *Network) StartNode(ctx context.Context, log logging.Logger, node *Node)
 
 // Restart a single node.
 func (n *Network) RestartNode(ctx context.Context, log logging.Logger, node *Node) error {
+	if node.RuntimeConfig.ReuseDynamicPorts {
+		// Attempt to save the API port currently being used so the
+		// restarted node can reuse it. This may result in the node
+		// failing to start if the operating system allocates the port
+		// to a different process between node stop and start.
+		if err := node.SaveAPIPort(); err != nil {
+			return err
+		}
+	}
+
 	if err := node.Stop(ctx); err != nil {
 		return fmt.Errorf("failed to stop node %s: %w", node.NodeID, err)
 	}
