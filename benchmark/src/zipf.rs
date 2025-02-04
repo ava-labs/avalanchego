@@ -6,8 +6,7 @@ use firewood::db::{BatchOp, Db};
 use firewood::v2::api::{Db as _, Proposal as _};
 use log::{debug, trace};
 use pretty_duration::pretty_duration;
-use rand::prelude::Distribution as _;
-use rand::thread_rng;
+use rand::prelude::*;
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::error::Error;
@@ -29,14 +28,14 @@ impl TestRunner for Zipf {
         } else {
             unreachable!()
         };
-        let rows = (args.number_of_batches * args.batch_size) as usize;
-        let zipf = zipf::ZipfDistribution::new(rows, exponent).unwrap();
+        let rows = (args.number_of_batches * args.batch_size) as f64;
+        let zipf = rand_distr::Zipf::new(rows, exponent).unwrap();
         let start = Instant::now();
         let mut batch_id = 0;
 
         while start.elapsed().as_secs() / 60 < args.global_opts.duration_minutes {
             let batch: Vec<BatchOp<_, _>> =
-                generate_updates(batch_id, args.batch_size as usize, &zipf).collect();
+                generate_updates(batch_id, args.batch_size as usize, zipf).collect();
             if log::log_enabled!(log::Level::Debug) {
                 let mut distinct = HashSet::new();
                 for op in &batch {
@@ -71,14 +70,14 @@ impl TestRunner for Zipf {
 fn generate_updates(
     batch_id: u32,
     batch_size: usize,
-    zipf: &zipf::ZipfDistribution,
+    zipf: rand_distr::Zipf<f64>,
 ) -> impl Iterator<Item = BatchOp<Vec<u8>, Vec<u8>>> {
     let hash_of_batch_id = Sha256::digest(batch_id.to_ne_bytes()).to_vec();
-    let rng = thread_rng();
+    let rng = rand::rng();
     zipf.sample_iter(rng)
         .take(batch_size)
         .map(|inner_key| {
-            let digest = Sha256::digest(inner_key.to_ne_bytes()).to_vec();
+            let digest = Sha256::digest((inner_key as u64).to_ne_bytes()).to_vec();
             trace!(
                 "updating {:?} with digest {} to {}",
                 inner_key,
