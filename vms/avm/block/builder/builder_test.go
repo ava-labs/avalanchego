@@ -139,7 +139,6 @@ func TestBuilderBuildBlock(t *testing.T) {
 				mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
 				require.NoError(t, err)
 				require.NoError(t, mempool.Add(tx))
-				mempool.MarkDropped(tx.ID(), errTest)
 
 				return New(
 					&txexecutor.Backend{
