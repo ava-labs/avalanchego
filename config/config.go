@@ -1054,8 +1054,9 @@ func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]s
 
 	res := make(map[ids.ID]subnets.Config)
 	for _, subnetID := range subnetIDs {
+		config := getDefaultSubnetConfig(v)
+
 		if rawSubnetConfigBytes, ok := subnetConfigs[subnetID]; ok {
-			config := getDefaultSubnetConfig(v)
 			if err := json.Unmarshal(rawSubnetConfigBytes, &config); err != nil {
 				return nil, err
 			}
@@ -1068,9 +1069,9 @@ func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]s
 			if err := config.Valid(); err != nil {
 				return nil, err
 			}
-
-			res[subnetID] = config
 		}
+
+		res[subnetID] = config
 	}
 	return res, nil
 }
@@ -1090,11 +1091,14 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 
 	// reads subnet config files from a path and given subnetIDs and returns a map.
 	for _, subnetID := range subnetIDs {
+		config := getDefaultSubnetConfig(v)
+
 		filePath := filepath.Join(subnetConfigPath, subnetID.String()+subnetConfigFileExt)
 		fileInfo, err := os.Stat(filePath)
 		switch {
 		case errors.Is(err, os.ErrNotExist):
-			// this subnet config does not exist, move to the next one
+			// this subnet config does not exist, use the default configuration
+			subnetConfigs[subnetID] = config
 			continue
 		case err != nil:
 			return nil, err
@@ -1108,7 +1112,6 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 			return nil, err
 		}
 
-		config := getDefaultSubnetConfig(v)
 		if err := json.Unmarshal(file, &config); err != nil {
 			return nil, fmt.Errorf("%w: %w", errUnmarshalling, err)
 		}
@@ -1132,7 +1135,7 @@ func getDefaultSubnetConfig(v *viper.Viper) subnets.Config {
 	return subnets.Config{
 		ConsensusParameters:         getConsensusConfig(v),
 		ValidatorOnly:               false,
-		ProposerMinBlockDelay:       v.GetDuration(ProposerMinBlockDelayKey),
+		ProposerMinBlockDelay:       v.GetDuration(ProposerVMMinBlockDelayKey),
 		ProposerNumHistoricalBlocks: proposervm.DefaultNumHistoricalBlocks,
 	}
 }

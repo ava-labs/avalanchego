@@ -689,12 +689,6 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI 
 			zap.String("name", subnet.Name),
 		)
 
-		// Apply tmpnet defaults
-		if subnet.Config == nil {
-			subnet.Config = FlagsMap{}
-		}
-		subnet.Config.SetDefaults(DefaultSubnetConfig())
-
 		if subnet.OwningKey == nil {
 			// Allocate a pre-funded key and remove it from the network so it won't be used for
 			// other purposes
