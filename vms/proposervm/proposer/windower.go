@@ -144,6 +144,7 @@ func (w *windower) Proposers(ctx context.Context, blockHeight, pChainHeight uint
 	return nodeIDs, nil
 }
 
+// Only used Pre-Durango
 func (w *windower) Delay(ctx context.Context, blockHeight, pChainHeight uint64, validatorID ids.NodeID, maxWindows int) (time.Duration, error) {
 	if validatorID == ids.EmptyNodeID {
 		return time.Duration(maxWindows) * WindowDuration, nil
@@ -188,6 +189,7 @@ func (w *windower) ExpectedProposer(
 	)
 }
 
+// Used post-Durango
 func (w *windower) MinDelayForProposer(
 	ctx context.Context,
 	blockHeight,

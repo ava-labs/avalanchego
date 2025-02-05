@@ -55,7 +55,7 @@ func DefaultTmpnetFlags() FlagsMap {
 		config.HTTPHostKey:        "127.0.0.1",
 		config.StakingHostKey:     "127.0.0.1",
 		config.LogDisplayLevelKey: logging.Off.String(), // Display logging not needed since nodes run headless
-		config.LogLevelKey:        logging.Debug.String(),
+		config.LogLevelKey:        logging.Info.String(),
 		// Specific to e2e testing
 		config.MinStakeDurationKey:           DefaultMinStakeDuration.String(),
 		config.ProposerVMUseCurrentHeightKey: true,

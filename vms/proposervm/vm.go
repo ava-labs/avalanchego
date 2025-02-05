@@ -105,6 +105,10 @@ type VM struct {
 	// acceptedBlocksSlotHistogram reports the slots that accepted blocks were
 	// proposed in.
 	acceptedBlocksSlotHistogram prometheus.Histogram
+
+	epochLength        time.Duration
+	nextEpochStart     time.Time
+	currentEpochHeight uint64
 }
 
 // New performs best when [minBlkDelay] is whole seconds. This is because block
@@ -231,6 +235,10 @@ func (vm *VM) Initialize(
 		// of comparing floating point of the same numerical value.
 		Buckets: []float64{0.5, 1.5, 2.5},
 	})
+
+	vm.epochLength = 10 * time.Second
+	vm.nextEpochStart = time.Now().Add(vm.epochLength)
+	vm.currentEpochHeight = 0
 
 	return errors.Join(
 		vm.Config.Registerer.Register(vm.proposerBuildSlotGauge),

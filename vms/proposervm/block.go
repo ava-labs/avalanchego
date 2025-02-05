@@ -86,7 +86,7 @@ func (p *postForkCommonComponents) Height() uint64 {
 // 4) [child]'s timestamp isn't before [p]'s timestamp
 // 5) [child]'s timestamp is within the skew bound
 // 6) [childPChainHeight] <= the current P-Chain height
-// 7) [child]'s timestamp is within its proposer's window
+// 7) [child]'s timestamp is within its proposer's window  --> This is what verifies against WindowDuration
 // 8) [child] has a valid signature from its proposer
 // 9) [child]'s inner block is valid
 func (p *postForkCommonComponents) Verify(
@@ -162,12 +162,33 @@ func (p *postForkCommonComponents) Verify(
 		)
 	}
 
-	var contextPChainHeight uint64
-	if p.vm.Upgrades.IsEtnaActivated(childTimestamp) {
-		contextPChainHeight = childPChainHeight
-	} else {
-		contextPChainHeight = parentPChainHeight
+	// Set the epoch height for the first time
+	if p.vm.currentEpochHeight == 0 {
+		p.vm.currentEpochHeight = childPChainHeight
+		p.vm.ctx.Log.Info("set initial epoch height", zap.Uint64("epochHeight", p.vm.currentEpochHeight))
 	}
+
+	// Advance the epoch if enough time has passed
+	if child.Timestamp().After(p.vm.nextEpochStart) {
+		p.vm.ctx.Log.Info(
+			"epoch has ended",
+			zap.Time("epochEnd", p.vm.nextEpochStart),
+			zap.Uint64("epochHeight", p.vm.currentEpochHeight),
+			zap.Uint64("pChainHeight", childPChainHeight),
+		)
+
+		p.vm.nextEpochStart = child.Timestamp().Add(p.vm.epochLength)
+		p.vm.currentEpochHeight = childPChainHeight
+	}
+
+	contextPChainHeight := p.vm.currentEpochHeight
+
+	// TODO: Here's where we set the p-chain height for the inner block.
+	// if p.vm.Upgrades.IsEtnaActivated(childTimestamp) {
+	// 	contextPChainHeight = childPChainHeight
+	// } else {
+	// 	contextPChainHeight = parentPChainHeight
+	// }
 
 	return p.vm.verifyAndRecordInnerBlk(
 		ctx,
@@ -367,6 +388,7 @@ func (p *postForkCommonComponents) verifyPreDurangoBlockDelay(
 	return delay < proposer.MaxVerifyDelay, nil
 }
 
+// This is where the slot is verified
 func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
 	ctx context.Context,
 	parentTimestamp time.Time,
@@ -406,6 +428,7 @@ func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
 	}
 }
 
+// This is where a node decides if it is eligible to propose a block in the current slot
 func (p *postForkCommonComponents) shouldBuildSignedBlockPostDurango(
 	ctx context.Context,
 	parentID ids.ID,
