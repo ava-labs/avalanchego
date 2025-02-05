@@ -8,6 +8,8 @@ import (
 	"os"
 	"path"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -42,12 +44,20 @@ type Factory interface {
 
 	// Close stops and clears all of a Factory's instantiated loggers
 	Close()
+
+	// Amplify amplifies the logging level of all loggers to DEBUG.
+	Amplify()
+
+	// Revert reverts the logging level of all loggers to what it was before Amplify() was called.
+	Revert()
 }
 
 type logWrapper struct {
-	logger       Logger
-	displayLevel zap.AtomicLevel
-	logLevel     zap.AtomicLevel
+	logger                  *log
+	displayLevel            zap.AtomicLevel
+	logLevel                zap.AtomicLevel
+	longTermLogDisplayLevel uint32 // zapcore.Level to be accessed atomically
+	longTermLogFileLevel    uint32 // zapcore.Level to be accessed atomically
 }
 
 type factory struct {
@@ -56,15 +66,25 @@ type factory struct {
 
 	// For each logger created by this factory:
 	// Logger name --> the logger.
-	loggers map[string]logWrapper
+	loggers map[string]*logWrapper
+
+	// Used to restrict logging amplification to a limited duration
+	amplificationTracker amplificationDurationTracker
+	// frozen is used to prevent amplification from activating once it has exhausted its maximal duration.
+	// It is set to true once its maximal duration is exhausted, and is set to false once Revert() is called.
+	frozen atomic.Bool
 }
 
 // NewFactory returns a new instance of a Factory producing loggers configured with
 // the values set in the [config] parameter
-func NewFactory(config Config) Factory {
+func NewFactory(config Config) *factory {
 	return &factory{
 		config:  config,
-		loggers: make(map[string]logWrapper),
+		loggers: make(map[string]*logWrapper),
+		amplificationTracker: amplificationDurationTracker{
+			now:         time.Now,
+			maxDuration: config.LoggingAutoAmplificationMaxDuration,
+		},
 	}
 }
 
@@ -90,10 +110,12 @@ func (f *factory) makeLogger(config Config) (Logger, error) {
 	prefix := config.LogFormat.WrapPrefix(config.MsgPrefix)
 
 	l := NewLogger(prefix, consoleCore, fileCore)
-	f.loggers[config.LoggerName] = logWrapper{
-		logger:       l,
-		displayLevel: consoleCore.AtomicLevel,
-		logLevel:     fileCore.AtomicLevel,
+	f.loggers[config.LoggerName] = &logWrapper{
+		logger:                  l,
+		displayLevel:            consoleCore.AtomicLevel,
+		logLevel:                fileCore.AtomicLevel,
+		longTermLogDisplayLevel: uint32(consoleCore.AtomicLevel.Level()),
+		longTermLogFileLevel:    uint32(fileCore.AtomicLevel.Level()),
 	}
 	return l, nil
 }
@@ -126,6 +148,7 @@ func (f *factory) SetLogLevel(name string, level Level) error {
 		return fmt.Errorf("logger with name %q not found", name)
 	}
 	logger.logLevel.SetLevel(zapcore.Level(level))
+	atomic.StoreUint32(&logger.longTermLogFileLevel, uint32(level))
 	return nil
 }
 
@@ -138,6 +161,8 @@ func (f *factory) SetDisplayLevel(name string, level Level) error {
 		return fmt.Errorf("logger with name %q not found", name)
 	}
 	logger.displayLevel.SetLevel(zapcore.Level(level))
+	atomic.StoreUint32(&logger.longTermLogDisplayLevel, uint32(level))
+
 	return nil
 }
 
@@ -178,4 +203,115 @@ func (f *factory) Close() {
 		lw.logger.Stop()
 	}
 	f.loggers = nil
+}
+
+func (f *factory) setLoggingCoreLogLevel(logFunc func(logDisplayLevel zap.AtomicLevel, logFileLevel zap.AtomicLevel, originalDisplayLevel zapcore.Level, originalLogFileLevel zapcore.Level)) {
+	f.lock.RLock()
+	defer f.lock.RUnlock()
+
+	for _, logger := range f.loggers {
+		// This is a precaution to avoid crashing the node in case this code is executed in a different way we expect it to.
+		if len(logger.logger.wrappedCores) == 2 {
+			displayLevel := zapcore.Level(atomic.LoadUint32(&logger.longTermLogDisplayLevel))
+			logFileLevel := zapcore.Level(atomic.LoadUint32(&logger.longTermLogFileLevel))
+			logFunc(logger.logger.wrappedCores[0].AtomicLevel, logger.logger.wrappedCores[1].AtomicLevel, displayLevel, logFileLevel)
+		}
+	}
+}
+
+func (f *factory) Amplify() {
+	if f.amplificationDisabled() || f.frozen.Load() {
+		return
+	}
+
+	if f.amplificationTracker.isAmplificationDurationExhausted() {
+		f.revertLoggers()
+		f.frozen.Store(true)
+		return
+	}
+
+	f.setLoggingCoreLogLevel(func(logDisplayLevel zap.AtomicLevel, logFileLevel zap.AtomicLevel, _ zapcore.Level, _ zapcore.Level) {
+		if logDisplayLevel.Level() != zapcore.Level(Verbo) {
+			logDisplayLevel.SetLevel(zapcore.Level(Debug))
+		}
+		if logFileLevel.Level() != zapcore.Level(Verbo) {
+			logFileLevel.SetLevel(zapcore.Level(Debug))
+		}
+	})
+
+	f.amplificationTracker.markAmplification()
+}
+
+func (f *factory) Revert() {
+	f.revertLoggers()
+	f.frozen.Store(false)
+}
+
+func (f *factory) revertLoggers() {
+	if f.amplificationDisabled() {
+		return
+	}
+
+	f.setLoggingCoreLogLevel(func(logDisplayLevel zap.AtomicLevel, logFileLevel zap.AtomicLevel, originalDisplayLevel zapcore.Level, originalLogFileLevel zapcore.Level) {
+		logDisplayLevel.SetLevel(originalDisplayLevel)
+		logFileLevel.SetLevel(originalLogFileLevel)
+	})
+
+	f.amplificationTracker.markRevertion()
+}
+
+func (f *factory) amplificationDisabled() bool {
+	return !f.config.LoggingAutoAmplification || f.config.LoggingAutoAmplificationMaxDuration == 0
+}
+
+type amplificationDurationTracker struct {
+	now                  func() time.Time
+	startedAmplification atomicTime
+	maxDuration          time.Duration
+}
+
+func (t *amplificationDurationTracker) isAmplificationDurationExhausted() bool {
+	startedTime := t.startedAmplification.now()
+
+	if startedTime.IsZero() {
+		return false
+	}
+
+	elapsed := t.now().Sub(startedTime)
+
+	return elapsed >= t.maxDuration
+}
+
+func (t *amplificationDurationTracker) markAmplification() {
+	t.startedAmplification.setIfZero(t.now())
+}
+
+func (t *amplificationDurationTracker) markRevertion() {
+	t.startedAmplification.setZero()
+}
+
+type atomicTime struct {
+	v atomic.Int64
+}
+
+func (at *atomicTime) now() time.Time {
+	now := at.v.Load()
+
+	if now == 0 {
+		return time.Time{}
+	}
+
+	return time.UnixMilli(now)
+}
+
+func (at *atomicTime) setZero() {
+	at.v.Store(0)
+}
+
+func (at *atomicTime) isZero() bool {
+	return at.v.Load() == 0
+}
+
+func (at *atomicTime) setIfZero(t2 time.Time) {
+	at.v.CompareAndSwap(0, t2.UnixMilli())
 }
