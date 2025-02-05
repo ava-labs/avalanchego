@@ -296,7 +296,7 @@ type GetLoggerLevelArgs struct {
 func (a *Admin) GetLoggerLevel(_ *http.Request, args *GetLoggerLevelArgs, reply *LoggerLevelReply) error {
 	a.Log.Debug("API called",
 		zap.String("service", "admin"),
-		zap.String("method", "getLoggerLevels"),
+		zap.String("method", "getLoggerLevel"),
 		logging.UserString("loggerName", args.LoggerName),
 	)
 
