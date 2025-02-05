@@ -82,7 +82,7 @@ import (
 
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
-	coreth "github.com/ava-labs/coreth/plugin/evm"
+	corethfactory "github.com/ava-labs/coreth/plugin/factory"
 )
 
 const (
@@ -1226,7 +1226,7 @@ func (n *Node) initVMs() error {
 				CreateAssetTxFee: n.Config.CreateAssetTxFee,
 			},
 		}),
-		n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &coreth.Factory{}),
+		n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &corethfactory.Factory{}),
 	)
 	if err != nil {
 		return err
