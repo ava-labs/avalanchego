@@ -14,7 +14,7 @@ import (
 )
 
 func BenchmarkSign(b *testing.B) {
-	signer := NewRpcSigner(require.New(b))
+	signer := NewRPCSigner(require.New(b))
 	for _, messageSize := range blstest.BenchmarkSizes {
 		b.Run(strconv.Itoa(messageSize), func(b *testing.B) {
 			message := utils.RandomBytes(messageSize)

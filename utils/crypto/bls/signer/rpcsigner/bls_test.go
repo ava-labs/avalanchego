@@ -46,14 +46,14 @@ func (r *rpcSigner) Stop() {
 	r.server.Stop()
 }
 
-func NewRpcSigner(require *require.Assertions) *rpcSigner {
+func NewRPCSigner(require *require.Assertions) *rpcSigner {
 	serverImpl, err := newServer()
 	require.NoError(err)
 
 	server := grpc.NewServer()
 
 	pb.RegisterSignerServer(server, serverImpl)
-	lis, err := net.Listen("tcp", ":0")
+	lis, err := net.Listen("tcp", "[::1]:0")
 	require.NoError(err)
 
 	go func() {
@@ -106,7 +106,7 @@ func mapWithError[T any, U any](arr []T, fn func(T) (U, error)) ([]U, error) {
 
 func TestVerifyValidSignature(t *testing.T) {
 	require := require.New(t)
-	signer := NewRpcSigner(require)
+	signer := NewRPCSigner(require)
 	defer signer.Close()
 
 	msg := []byte("TestVerifyValidSignature local signer")
@@ -120,7 +120,7 @@ func TestVerifyValidSignature(t *testing.T) {
 
 func TestVerifyWrongMessageSignature(t *testing.T) {
 	require := require.New(t)
-	signer := NewRpcSigner(require)
+	signer := NewRPCSigner(require)
 	defer signer.Close()
 
 	msg := []byte("TestVerifyWrongMessageSignature local signer")
@@ -159,7 +159,7 @@ func TestValidAggregation(t *testing.T) {
 
 func TestSingleKeyAggregation(t *testing.T) {
 	require := require.New(t)
-	signer := NewRpcSigner(require)
+	signer := NewRPCSigner(require)
 
 	pks := []*bls.PublicKey{signer.PublicKey()}
 
@@ -175,7 +175,7 @@ func TestSingleKeyAggregation(t *testing.T) {
 
 func TestVerifyValidProofOfPossession(t *testing.T) {
 	require := require.New(t)
-	signer := NewRpcSigner(require)
+	signer := NewRPCSigner(require)
 
 	msg := []byte("TestVerifyValidProofOfPossession local signer")
 
@@ -188,7 +188,7 @@ func TestVerifyValidProofOfPossession(t *testing.T) {
 
 func TestVerifyWrongMessageProofOfPossession(t *testing.T) {
 	require := require.New(t)
-	signer := NewRpcSigner(require)
+	signer := NewRPCSigner(require)
 
 	msg := []byte("TestVerifyWrongMessageProofOfPossession local signer")
 	wrongMsg := []byte("TestVerifyWrongMessageProofOfPossession local signer with wrong message")
