@@ -3,6 +3,8 @@
 
 package logging
 
+import "time"
+
 type RotatingWriterConfig struct {
 	MaxSize   int    `json:"maxSize"` // in megabytes
 	MaxFiles  int    `json:"maxFiles"`
@@ -14,10 +16,12 @@ type RotatingWriterConfig struct {
 // Config defines the configuration of a logger
 type Config struct {
 	RotatingWriterConfig
-	DisableWriterDisplaying bool   `json:"disableWriterDisplaying"`
-	LogLevel                Level  `json:"logLevel"`
-	DisplayLevel            Level  `json:"displayLevel"`
-	LogFormat               Format `json:"logFormat"`
-	MsgPrefix               string `json:"-"`
-	LoggerName              string `json:"-"`
+	DisableWriterDisplaying             bool          `json:"disableWriterDisplaying"`
+	LogLevel                            Level         `json:"logLevel"`
+	DisplayLevel                        Level         `json:"displayLevel"`
+	LogFormat                           Format        `json:"logFormat"`
+	MsgPrefix                           string        `json:"-"`
+	LoggerName                          string        `json:"-"`
+	LoggingAutoAmplification            bool          `json:"LoggingAutoAmplification"`
+	LoggingAutoAmplificationMaxDuration time.Duration `json:"LoggingAutoAmplificationMaxDuration"`
 }
