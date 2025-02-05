@@ -149,6 +149,8 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Uint(LogRotaterMaxAgeKey, 0, "The maximum number of days to retain old log files based on the timestamp encoded in their filename. 0 means retain all old log files.")
 	fs.Bool(LogRotaterCompressEnabledKey, false, "Enables the compression of rotated log files through gzip.")
 	fs.Bool(LogDisableDisplayPluginLogsKey, false, "Disables displaying plugin logs in stdout.")
+	fs.Bool(LogAutoAmplificationKey, false, "Amplifies log level to DEBUG when health checks fail, reverts back once they succeed again or duration defined by --log-auto-amplification-max-duration elapses.")
+	fs.Duration(LoggingAutoAmplificationMaxDurationKey, 5*time.Minute, "Sets the max consecutive duration logging is amplified (see --log-auto-amplification).")
 
 	// Peer List Gossip
 	fs.Uint(NetworkPeerListNumValidatorIPsKey, constants.DefaultNetworkPeerListNumValidatorIPs, "Number of validator IPs to gossip to other nodes")

@@ -381,6 +381,9 @@ type Node struct {
 
 	resourceManager resource.Manager
 
+	// Tracks bootstrapping of subnets
+	subnets *chains.Subnets
+
 	// Tracks the CPU/disk usage caused by processing
 	// messages of each peer.
 	resourceTracker tracker.ResourceTracker
@@ -1053,6 +1056,21 @@ func (n *Node) addDefaultVMAliases() error {
 	return nil
 }
 
+func (n *Node) reportUnhealthy(unhealthy bool) {
+	subnetsLeftToBootstrap := n.subnets.Bootstrapping()
+	if len(subnetsLeftToBootstrap) > 0 {
+		n.Log.Verbo("Still bootstrapping, will not change logging level",
+			zap.Int("subnets left to bootstrap", len(subnetsLeftToBootstrap)))
+		return
+	}
+
+	if unhealthy {
+		n.LogFactory.Amplify()
+	} else {
+		n.LogFactory.Revert()
+	}
+}
+
 // Create the chainManager and register the following VMs:
 // AVM, Simple Payments DAG, Simple Payments Chain, and Platform VM
 // Assumes n.DBManager, n.vdrs all initialized (non-nil)
@@ -1124,6 +1142,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize subnets: %w", err)
 	}
+	n.subnets = subnets
 
 	n.chainManager, err = chains.New(
 		&chains.ManagerConfig{
@@ -1415,7 +1434,7 @@ func (n *Node) initHealthAPI() error {
 		return err
 	}
 
-	n.health, err = health.New(n.Log, healthReg)
+	n.health, err = health.New(n.Log, healthReg, n.reportUnhealthy)
 	if err != nil {
 		return err
 	}

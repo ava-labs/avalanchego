@@ -10,6 +10,7 @@ import (
 	"maps"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -39,10 +40,11 @@ type worker struct {
 	numFailingApplicationChecks int
 	tags                        map[string]set.Set[string] // tag -> set of check names
 
-	startOnce sync.Once
-	closeOnce sync.Once
-	wg        sync.WaitGroup
-	closer    chan struct{}
+	startOnce       sync.Once
+	closeOnce       sync.Once
+	wg              sync.WaitGroup
+	closer          chan struct{}
+	reportUnhealthy func(bool)
 }
 
 type taggedChecker struct {
@@ -55,6 +57,7 @@ func newWorker(
 	log logging.Logger,
 	name string,
 	failingChecks *prometheus.GaugeVec,
+	reportUnhealthy func(bool),
 ) *worker {
 	// Initialize the number of failing checks to 0 for all checks
 	for _, tag := range []string{AllTag, ApplicationTag} {
@@ -64,13 +67,14 @@ func newWorker(
 		}).Set(0)
 	}
 	return &worker{
-		log:           log,
-		name:          name,
-		failingChecks: failingChecks,
-		checks:        make(map[string]*taggedChecker),
-		results:       make(map[string]Result),
-		closer:        make(chan struct{}),
-		tags:          make(map[string]set.Set[string]),
+		reportUnhealthy: reportUnhealthy,
+		log:             log,
+		name:            name,
+		failingChecks:   failingChecks,
+		checks:          make(map[string]*taggedChecker),
+		results:         make(map[string]Result),
+		closer:          make(chan struct{}),
+		tags:            make(map[string]set.Set[string]),
 	}
 }
 
@@ -209,15 +213,19 @@ func (w *worker) runChecks(ctx context.Context) {
 	checks := maps.Clone(w.checks)
 	w.checksLock.RUnlock()
 
+	var hasSomeCheckFailed atomic.Bool
+
 	var wg sync.WaitGroup
 	wg.Add(len(checks))
 	for name, check := range checks {
-		go w.runCheck(ctx, &wg, name, check)
+		go w.runCheck(ctx, &wg, name, check, &hasSomeCheckFailed)
 	}
 	wg.Wait()
+
+	w.reportUnhealthy(hasSomeCheckFailed.Load())
 }
 
-func (w *worker) runCheck(ctx context.Context, wg *sync.WaitGroup, name string, check *taggedChecker) {
+func (w *worker) runCheck(ctx context.Context, wg *sync.WaitGroup, name string, check *taggedChecker, checkStatus *atomic.Bool) {
 	defer wg.Done()
 
 	start := time.Now()
@@ -238,6 +246,7 @@ func (w *worker) runCheck(ctx context.Context, wg *sync.WaitGroup, name string, 
 	defer w.resultsLock.Unlock()
 	prevResult := w.results[name]
 	if err != nil {
+		checkStatus.Store(true)
 		errString := err.Error()
 		result.Error = &errString
 

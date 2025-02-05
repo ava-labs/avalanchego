@@ -123,6 +123,8 @@ const (
 	BenchlistFailThresholdKey                          = "benchlist-fail-threshold"
 	BenchlistDurationKey                               = "benchlist-duration"
 	BenchlistMinFailingDurationKey                     = "benchlist-min-failing-duration"
+	LogAutoAmplificationKey                            = "log-auto-amplification"
+	LoggingAutoAmplificationMaxDurationKey             = "log-auto-amplification-max-duration"
 	LogsDirKey                                         = "log-dir"
 	LogLevelKey                                        = "log-level"
 	LogDisplayLevelKey                                 = "log-display-level"
