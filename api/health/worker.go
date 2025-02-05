@@ -39,10 +39,11 @@ type worker struct {
 	numFailingApplicationChecks int
 	tags                        map[string]set.Set[string] // tag -> set of check names
 
-	startOnce sync.Once
-	closeOnce sync.Once
-	wg        sync.WaitGroup
-	closer    chan struct{}
+	startOnce       sync.Once
+	closeOnce       sync.Once
+	wg              sync.WaitGroup
+	closer          chan struct{}
+	reportUnhealthy func(bool)
 }
 
 type taggedChecker struct {
@@ -55,6 +56,7 @@ func newWorker(
 	log logging.Logger,
 	name string,
 	failingChecks *prometheus.GaugeVec,
+	reportUnhealthy func(bool),
 ) *worker {
 	// Initialize the number of failing checks to 0 for all checks
 	for _, tag := range []string{AllTag, ApplicationTag} {
@@ -64,13 +66,14 @@ func newWorker(
 		}).Set(0)
 	}
 	return &worker{
-		log:           log,
-		name:          name,
-		failingChecks: failingChecks,
-		checks:        make(map[string]*taggedChecker),
-		results:       make(map[string]Result),
-		closer:        make(chan struct{}),
-		tags:          make(map[string]set.Set[string]),
+		reportUnhealthy: reportUnhealthy,
+		log:             log,
+		name:            name,
+		failingChecks:   failingChecks,
+		checks:          make(map[string]*taggedChecker),
+		results:         make(map[string]Result),
+		closer:          make(chan struct{}),
+		tags:            make(map[string]set.Set[string]),
 	}
 }
 
@@ -215,6 +218,19 @@ func (w *worker) runChecks(ctx context.Context) {
 		go w.runCheck(ctx, &wg, name, check)
 	}
 	wg.Wait()
+	w.reportUnhealthy(w.hasHealthCheckFailed())
+}
+
+func (w *worker) hasHealthCheckFailed() bool {
+	w.checksLock.RLock()
+	defer w.checksLock.RUnlock()
+
+	for _, res := range w.results {
+		if res.Error != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func (w *worker) runCheck(ctx context.Context, wg *sync.WaitGroup, name string, check *taggedChecker) {
