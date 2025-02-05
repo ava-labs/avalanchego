@@ -8,6 +8,10 @@
 -  How long after startup the aforementioned health check runs can be configured via:
 `--network-no-ingress-connections-grace-period`
 
+- Added logging auto-amplification upon a health check failure
+  - `--log-auto-amplification`
+  - `--log-auto-amplification-max-duration`
+
 
 ## [v1.12.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.2)
 

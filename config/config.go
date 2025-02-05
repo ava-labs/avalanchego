@@ -116,6 +116,8 @@ func getLoggingConfig(v *viper.Viper) (logging.Config, error) {
 	if v.IsSet(LogDisplayLevelKey) {
 		logDisplayLevel = v.GetString(LogDisplayLevelKey)
 	}
+	loggingConfig.LoggingAutoAmplification = v.GetBool(LogAutoAmplificationKey)
+	loggingConfig.LoggingAutoAmplificationMaxDuration = v.GetDuration(LoggingAutoAmplificationMaxDurationKey)
 	loggingConfig.DisplayLevel, err = logging.ToLevel(logDisplayLevel)
 	if err != nil {
 		return loggingConfig, err

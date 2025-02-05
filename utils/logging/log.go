@@ -47,7 +47,7 @@ func newZapLogger(prefix string, wrappedCores ...WrappedCore) *zap.Logger {
 }
 
 // New returns a new logger set up according to [config]
-func NewLogger(prefix string, wrappedCores ...WrappedCore) Logger {
+func NewLogger(prefix string, wrappedCores ...WrappedCore) *log {
 	return &log{
 		internalLogger: newZapLogger(prefix, wrappedCores...),
 		wrappedCores:   wrappedCores,
