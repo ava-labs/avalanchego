@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/netip"
 	"os"
@@ -52,7 +53,8 @@ type NodeRuntime interface {
 
 // Configuration required to configure a node runtime.
 type NodeRuntimeConfig struct {
-	AvalancheGoPath string
+	AvalancheGoPath   string
+	ReuseDynamicPorts bool
 }
 
 // Node supports configuring and running a node participating in a temporary network.
@@ -386,4 +388,20 @@ func (n *Node) GetUniqueID() string {
 	startIndex := len(ids.NodeIDPrefix)
 	endIndex := startIndex + 8 // 8 characters should be enough to identify a node in the context of its network
 	return n.NetworkUUID + "-" + strings.ToLower(nodeIDString[startIndex:endIndex])
+}
+
+// Saves the currently allocated API port to the node's configuration
+// for use across restarts.
+func (n *Node) SaveAPIPort() error {
+	hostPort := strings.TrimPrefix(n.URI, "http://")
+	if len(hostPort) == 0 {
+		// Without an API URI there is nothing to save
+		return nil
+	}
+	_, port, err := net.SplitHostPort(hostPort)
+	if err != nil {
+		return err
+	}
+	n.Flags[config.HTTPPortKey] = port
+	return nil
 }
