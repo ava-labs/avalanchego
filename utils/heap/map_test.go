@@ -85,12 +85,13 @@ func TestMap(t *testing.T) {
 			tt.setup(h)
 
 			require.Equal(len(tt.expected), h.Len())
-			for _, expected := range tt.expected {
-				k, v, ok := h.Pop()
-				require.True(ok)
-				require.Equal(expected.k, k)
-				require.Equal(expected.v, v)
+
+			entries := make([]entry[string, int], 0, h.Len())
+			for k, v := range h.Iterator() {
+				entries = append(entries, entry[string, int]{k: k, v: v})
 			}
+
+			require.Equal(tt.expected, entries)
 		})
 	}
 }
