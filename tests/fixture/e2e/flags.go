@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
@@ -28,8 +29,27 @@ type FlagVars struct {
 	nodeCount            int
 }
 
-func (v *FlagVars) AvalancheGoExecPath() string {
-	return v.avalancheGoExecPath
+func (v *FlagVars) AvalancheGoExecPath() (string, error) {
+	if err := v.validateAvalancheGoExecPath(); err != nil {
+		return "", err
+	}
+	return v.avalancheGoExecPath, nil
+}
+
+func (v *FlagVars) validateAvalancheGoExecPath() error {
+	if !filepath.IsAbs(v.avalancheGoExecPath) {
+		absPath, err := filepath.Abs(v.avalancheGoExecPath)
+		if err != nil {
+			return fmt.Errorf("avalanchego-path (%s) is a relative path but its absolute path cannot be determined: %w",
+				v.avalancheGoExecPath, err)
+		}
+
+		// If the absolute path file doesn't exist, it means it won't work out of the box.
+		if _, err := os.Stat(absPath); err != nil {
+			return fmt.Errorf("avalanchego-path (%s) is a relative path but must be an absolute path", v.avalancheGoExecPath)
+		}
+	}
+	return nil
 }
 
 func (v *FlagVars) PluginDir() string {
