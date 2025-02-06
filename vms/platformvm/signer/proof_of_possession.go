@@ -30,7 +30,6 @@ type ProofOfPossession struct {
 
 func NewProofOfPossession(sk bls.Signer) (*ProofOfPossession, error) {
 	pk := sk.PublicKey()
-
 	pkBytes := bls.PublicKeyToCompressedBytes(pk)
 	sig, err := sk.SignProofOfPossession(pkBytes)
 	if err != nil {
