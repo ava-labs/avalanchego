@@ -67,9 +67,5 @@ func newProofOfPossession() (*ProofOfPossession, error) {
 	if err != nil {
 		return nil, err
 	}
-	pop, err := NewProofOfPossession(sk)
-	if err != nil {
-		return nil, err
-	}
-	return pop, nil
+	return NewProofOfPossession(sk)
 }
