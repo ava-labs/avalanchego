@@ -69,6 +69,7 @@ func (txMarshaller) UnmarshalGossip(bytes []byte) (*txs.Tx, error) {
 
 func newGossipMempool(
 	mempool pmempool.Mempool,
+	toEngine chan<- common.Message,
 	registerer prometheus.Registerer,
 	log logging.Logger,
 	txVerifier TxVerifier,
@@ -79,6 +80,7 @@ func newGossipMempool(
 	bloom, err := gossip.NewBloomFilter(registerer, "mempool_bloom_filter", minTargetElements, targetFalsePositiveProbability, resetFalsePositiveProbability)
 	return &gossipMempool{
 		Mempool:    mempool,
+		toEngine:   toEngine,
 		log:        log,
 		txVerifier: txVerifier,
 		bloom:      bloom,
@@ -87,6 +89,7 @@ func newGossipMempool(
 
 type gossipMempool struct {
 	pmempool.Mempool
+	toEngine   chan<- common.Message
 	log        logging.Logger
 	txVerifier TxVerifier
 
@@ -140,7 +143,15 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 		})
 	}
 
-	g.Mempool.RequestBuildBlock(false)
+	if g.Mempool.Len() == 0 {
+		return nil
+	}
+
+	select {
+	case g.toEngine <- common.PendingTxs:
+	default:
+	}
+
 	return nil
 }
 

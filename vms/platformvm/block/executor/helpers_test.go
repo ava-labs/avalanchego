@@ -153,7 +153,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 	metrics := metrics.Noop
 
 	var err error
-	res.mempool, err = mempool.New("mempool", registerer, nil)
+	res.mempool, err = mempool.New("mempool", registerer)
 	if err != nil {
 		panic(fmt.Errorf("failed to create mempool: %w", err))
 	}
@@ -161,6 +161,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 	if ctrl == nil {
 		res.blkManager = NewManager(
 			res.mempool,
+			nil,
 			metrics,
 			res.state,
 			res.backend,
@@ -170,6 +171,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 	} else {
 		res.blkManager = NewManager(
 			res.mempool,
+			nil,
 			metrics,
 			res.mockedState,
 			res.backend,

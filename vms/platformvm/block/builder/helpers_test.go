@@ -142,11 +142,12 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 	metrics, err := metrics.New(registerer)
 	require.NoError(err)
 
-	res.mempool, err = mempool.New("mempool", registerer, nil)
+	res.mempool, err = mempool.New("mempool", registerer)
 	require.NoError(err)
 
 	res.blkManager = blockexecutor.NewManager(
 		res.mempool,
+		nil,
 		metrics,
 		res.state,
 		&res.backend,
@@ -161,6 +162,7 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 		res.backend.Ctx.ValidatorState,
 		txVerifier,
 		res.mempool,
+		nil,
 		res.backend.Config.PartialSyncPrimaryNetwork,
 		res.sender,
 		&res.ctx.Lock,
@@ -173,6 +175,7 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 
 	res.Builder = New(
 		res.mempool,
+		nil,
 		&res.backend,
 		res.blkManager,
 	)

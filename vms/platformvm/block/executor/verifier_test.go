@@ -75,7 +75,7 @@ func newTestVerifier(t testing.TB, c testVerifierConfig) *verifier {
 		c.ValidatorFeeConfig = genesis.LocalParams.ValidatorFeeConfig
 	}
 
-	mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+	mempool, err := mempool.New("", prometheus.NewRegistry())
 	require.NoError(err)
 
 	var (

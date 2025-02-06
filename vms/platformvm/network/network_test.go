@@ -204,7 +204,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 		{
 			name: "happy path",
 			mempool: func() pmempool.Mempool {
-				mempool, err := pmempool.New("", prometheus.NewRegistry(), nil)
+				mempool, err := pmempool.New("", prometheus.NewRegistry())
 				require.NoError(t, err)
 				return mempool
 			}(),
