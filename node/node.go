@@ -1380,7 +1380,7 @@ func (n *Node) initInfoAPI() error {
 
 	pop, err := signer.NewProofOfPossession(n.Config.StakingSigningKey)
 	if err != nil {
-		return err
+		return fmt.Errorf("problem creating proof of possession: %w", err)
 	}
 
 	service, err := info.NewService(
