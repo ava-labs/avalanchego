@@ -164,6 +164,13 @@ func awaitReady(t *testing.T, peers ...Peer) {
 	}
 }
 
+func must[T any](t *testing.T) func(T, error) T {
+	return func(val T, err error) T {
+		require.NoError(t, err)
+		return val
+	}
+}
+
 func TestReady(t *testing.T) {
 	require := require.New(t)
 
@@ -351,6 +358,7 @@ func TestShouldDisconnect(t *testing.T) {
 	txID := ids.GenerateTestID()
 	blsKey, err := localsigner.New()
 	require.NoError(t, err)
+	must := must[*bls.Signature](t)
 
 	tests := []struct {
 		name                     string
@@ -557,11 +565,7 @@ func TestShouldDisconnect(t *testing.T) {
 				id:      peerID,
 				version: version.CurrentApp,
 				ip: &SignedIP{
-					BLSSignature: (func() *bls.Signature {
-						sig, err := blsKey.SignProofOfPossession([]byte("wrong message"))
-						require.NoError(t, err)
-						return sig
-					})(),
+					BLSSignature: must(blsKey.SignProofOfPossession([]byte("wrong message"))),
 				},
 			},
 			expectedPeer: &peer{
@@ -583,11 +587,7 @@ func TestShouldDisconnect(t *testing.T) {
 				id:      peerID,
 				version: version.CurrentApp,
 				ip: &SignedIP{
-					BLSSignature: (func() *bls.Signature {
-						sig, err := blsKey.SignProofOfPossession([]byte("wrong message"))
-						require.NoError(t, err)
-						return sig
-					})(),
+					BLSSignature: must(blsKey.SignProofOfPossession([]byte("wrong message"))),
 				},
 			},
 			expectedShouldDisconnect: true,
@@ -613,11 +613,7 @@ func TestShouldDisconnect(t *testing.T) {
 				id:      peerID,
 				version: version.CurrentApp,
 				ip: &SignedIP{
-					BLSSignature: (func() *bls.Signature {
-						sig, err := blsKey.SignProofOfPossession((&UnsignedIP{}).bytes())
-						require.NoError(t, err)
-						return sig
-					})(),
+					BLSSignature: must(blsKey.SignProofOfPossession((&UnsignedIP{}).bytes())),
 				},
 			},
 			expectedPeer: &peer{
@@ -639,11 +635,7 @@ func TestShouldDisconnect(t *testing.T) {
 				id:      peerID,
 				version: version.CurrentApp,
 				ip: &SignedIP{
-					BLSSignature: (func() *bls.Signature {
-						sig, err := blsKey.SignProofOfPossession((&UnsignedIP{}).bytes())
-						require.NoError(t, err)
-						return sig
-					})(),
+					BLSSignature: must(blsKey.SignProofOfPossession((&UnsignedIP{}).bytes())),
 				},
 				txIDOfVerifiedBLSKey: txID,
 			},
