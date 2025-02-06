@@ -51,7 +51,7 @@ type Mempool[T Tx] interface {
 	// Remove [txs] and any conflicts of [txs] from the mempool.
 	Remove(txs ...T)
 
-	// Peek returns the oldest tx in the mempool.
+	// Peek returns a tx in the mempool.
 	Peek() (tx T, exists bool)
 
 	// Iterate iterates over the txs until f returns false

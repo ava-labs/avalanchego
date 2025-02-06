@@ -18,7 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/txs/mempool"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
+	txmempool "github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
 var (
@@ -66,7 +67,7 @@ func (txMarshaller) UnmarshalGossip(bytes []byte) (*txs.Tx, error) {
 }
 
 func newGossipMempool(
-	mempool mempool.Mempool[*txs.Tx],
+	mempool *mempool.Mempool,
 	toEngine chan<- common.Message,
 	registerer prometheus.Registerer,
 	log logging.Logger,
@@ -86,7 +87,7 @@ func newGossipMempool(
 }
 
 type gossipMempool struct {
-	mempool.Mempool[*txs.Tx]
+	*mempool.Mempool
 	toEngine   chan<- common.Message
 	log        logging.Logger
 	txVerifier TxVerifier
@@ -98,7 +99,7 @@ type gossipMempool struct {
 func (g *gossipMempool) Add(tx *txs.Tx) error {
 	txID := tx.ID()
 	if _, ok := g.Mempool.Get(txID); ok {
-		return fmt.Errorf("tx %s dropped: %w", txID, mempool.ErrDuplicateTx)
+		return fmt.Errorf("tx %s dropped: %w", txID, txmempool.ErrDuplicateTx)
 	}
 
 	if reason := g.Mempool.GetDropReason(txID); reason != nil {
@@ -135,8 +136,8 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 
 	if reset {
 		g.log.Debug("resetting bloom filter")
-		g.Mempool.Iterate(func(tx *txs.Tx) bool {
-			g.bloom.Add(tx)
+		g.Mempool.Iterate(func(tx mempool.Tx) bool {
+			g.bloom.Add(tx.Tx)
 			return true
 		})
 	}
@@ -156,6 +157,12 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 func (g *gossipMempool) Has(txID ids.ID) bool {
 	_, ok := g.Mempool.Get(txID)
 	return ok
+}
+
+func (g *gossipMempool) Iterate(f func(gossipable *txs.Tx) bool) {
+	g.Mempool.Iterate(func(tx mempool.Tx) bool {
+		return f(tx.Tx)
+	})
 }
 
 func (g *gossipMempool) GetFilter() (bloom []byte, salt []byte) {
