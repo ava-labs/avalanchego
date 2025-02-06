@@ -407,7 +407,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	require.ErrorIs(err, txexecutor.ErrTimestampNotBeforeStartTime)
 
 	txID := statelessBlk.Txs()[0].ID()
-	reason := vm.Builder.GetDropReason(txID)
+	reason := vm.mempool.GetDropReason(txID)
 	require.ErrorIs(reason, txexecutor.ErrTimestampNotBeforeStartTime)
 }
 
@@ -2116,7 +2116,7 @@ func TestPruneMempool(t *testing.T) {
 
 	// [baseTx] should be in the mempool.
 	baseTxID := baseTx.ID()
-	_, ok := vm.Builder.Get(baseTxID)
+	_, ok := vm.mempool.Get(baseTxID)
 	require.True(ok)
 
 	// Create a tx that will be invalid after time advancement.
@@ -2161,9 +2161,9 @@ func TestPruneMempool(t *testing.T) {
 
 	// [addValidatorTx] and [baseTx] should be in the mempool.
 	addValidatorTxID := addValidatorTx.ID()
-	_, ok = vm.Builder.Get(addValidatorTxID)
+	_, ok = vm.mempool.Get(addValidatorTxID)
 	require.True(ok)
-	_, ok = vm.Builder.Get(baseTxID)
+	_, ok = vm.mempool.Get(baseTxID)
 	require.True(ok)
 
 	// Advance clock to [endTime], making [addValidatorTx] invalid.
@@ -2175,9 +2175,9 @@ func TestPruneMempool(t *testing.T) {
 
 	// [addValidatorTx] should be ejected from the mempool.
 	// [baseTx] should still be in the mempool.
-	_, ok = vm.Builder.Get(addValidatorTxID)
+	_, ok = vm.mempool.Get(addValidatorTxID)
 	require.False(ok)
-	_, ok = vm.Builder.Get(baseTxID)
+	_, ok = vm.mempool.Get(baseTxID)
 	require.True(ok)
 }
 

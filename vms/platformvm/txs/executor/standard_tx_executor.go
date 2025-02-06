@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
@@ -207,6 +208,11 @@ func (e *standardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 		return err
 	}
 
+	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
+	if err != nil {
+		return fmt.Errorf("failed to get utxos: %w", err)
+	}
+
 	// Verify the flowcheck
 	fee, err := e.feeCalculator.CalculateFee(tx)
 	if err != nil {
@@ -215,11 +221,11 @@ func (e *standardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	if err := e.backend.FlowChecker.VerifySpend(
 		tx,
 		e.state,
-		tx.Ins,
-		tx.Outs,
+		ins,
+		outs,
 		baseTxCreds,
 		map[ids.ID]uint64{
-			e.backend.Ctx.AVAXAssetID: fee,
+			e.backend.Ctx.AVAXAssetID: fee + producedAVAX,
 		},
 	); err != nil {
 		return err
@@ -256,6 +262,11 @@ func (e *standardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 		return err
 	}
 
+	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
+	if err != nil {
+		return fmt.Errorf("failed to get utxos: %w", err)
+	}
+
 	// Verify the flowcheck
 	fee, err := e.feeCalculator.CalculateFee(tx)
 	if err != nil {
@@ -264,11 +275,11 @@ func (e *standardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	if err := e.backend.FlowChecker.VerifySpend(
 		tx,
 		e.state,
-		tx.Ins,
-		tx.Outs,
+		ins,
+		outs,
 		e.tx.Creds,
 		map[ids.ID]uint64{
-			e.backend.Ctx.AVAXAssetID: fee,
+			e.backend.Ctx.AVAXAssetID: fee + producedAVAX,
 		},
 	); err != nil {
 		return err
@@ -336,9 +347,10 @@ func (e *standardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 			utxos[i+len(tx.Ins)] = utxo
 		}
 
-		ins := make([]*avax.TransferableInput, len(tx.Ins)+len(tx.ImportedInputs))
-		copy(ins, tx.Ins)
-		copy(ins[len(tx.Ins):], tx.ImportedInputs)
+		ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
+		if err != nil {
+			return fmt.Errorf("failed to get utxos: %w", err)
+		}
 
 		// Verify the flowcheck
 		fee, err := e.feeCalculator.CalculateFee(tx)
@@ -349,10 +361,10 @@ func (e *standardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 			tx,
 			utxos,
 			ins,
-			tx.Outs,
+			outs,
 			e.tx.Creds,
 			map[ids.ID]uint64{
-				e.backend.Ctx.AVAXAssetID: fee,
+				e.backend.Ctx.AVAXAssetID: fee + producedAVAX,
 			},
 		); err != nil {
 			return err
@@ -390,14 +402,15 @@ func (e *standardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 		return err
 	}
 
-	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
-	copy(outs, tx.Outs)
-	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
-
 	if e.backend.Bootstrapped.Get() {
 		if err := verify.SameSubnet(context.TODO(), e.backend.Ctx, tx.DestinationChain); err != nil {
 			return err
 		}
+	}
+
+	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
+	if err != nil {
+		return fmt.Errorf("failed to get utxos: %w", err)
 	}
 
 	// Verify the flowcheck
@@ -408,11 +421,11 @@ func (e *standardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	if err := e.backend.FlowChecker.VerifySpend(
 		tx,
 		e.state,
-		tx.Ins,
+		ins,
 		outs,
 		e.tx.Creds,
 		map[ids.ID]uint64{
-			e.backend.Ctx.AVAXAssetID: fee,
+			e.backend.Ctx.AVAXAssetID: fee + producedAVAX,
 		},
 	); err != nil {
 		return fmt.Errorf("failed verifySpend: %w", err)
@@ -520,6 +533,11 @@ func (e *standardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		return err
 	}
 
+	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
+	if err != nil {
+		return fmt.Errorf("failed to get utxos: %w", err)
+	}
+
 	// Verify the flowcheck
 	fee, err := e.feeCalculator.CalculateFee(tx)
 	if err != nil {
@@ -529,14 +547,14 @@ func (e *standardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 	if err := e.backend.FlowChecker.VerifySpend(
 		tx,
 		e.state,
-		tx.Ins,
-		tx.Outs,
+		ins,
+		outs,
 		baseTxCreds,
 		// Invariant: [tx.AssetID != e.Ctx.AVAXAssetID]. This prevents the first
 		//            entry in this map literal from being overwritten by the
 		//            second entry.
 		map[ids.ID]uint64{
-			e.backend.Ctx.AVAXAssetID: fee,
+			e.backend.Ctx.AVAXAssetID: fee + producedAVAX,
 			tx.AssetID:                totalRewardAmount,
 		},
 	); err != nil {
@@ -651,6 +669,11 @@ func (e *standardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 		return err
 	}
 
+	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
+	if err != nil {
+		return fmt.Errorf("failed to get utxos: %w", err)
+	}
+
 	// Verify the flowcheck
 	fee, err := e.feeCalculator.CalculateFee(tx)
 	if err != nil {
@@ -659,11 +682,11 @@ func (e *standardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 	if err := e.backend.FlowChecker.VerifySpend(
 		tx,
 		e.state,
-		tx.Ins,
-		tx.Outs,
+		ins,
+		outs,
 		e.tx.Creds,
 		map[ids.ID]uint64{
-			e.backend.Ctx.AVAXAssetID: fee,
+			e.backend.Ctx.AVAXAssetID: fee + producedAVAX,
 		},
 	); err != nil {
 		return err
@@ -695,12 +718,6 @@ func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) er
 	}
 
 	baseTxCreds, err := verifyPoASubnetAuthorization(e.backend.Fx, e.state, e.tx, tx.Subnet, tx.SubnetAuth)
-	if err != nil {
-		return err
-	}
-
-	// Verify the flowcheck
-	fee, err := e.feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
 	}
@@ -752,11 +769,6 @@ func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) er
 			if err != nil {
 				return err
 			}
-
-			fee, err = math.Add(fee, vdr.Balance)
-			if err != nil {
-				return err
-			}
 		}
 
 		if err := e.state.PutL1Validator(l1Validator); err != nil {
@@ -769,11 +781,28 @@ func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) er
 			Weight:       vdr.Weight,
 		}
 	}
+
+	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
+	if err != nil {
+		return fmt.Errorf("failed to get utxos: %w", err)
+	}
+
+	// Verify the flowcheck
+	fee, err := e.feeCalculator.CalculateFee(tx)
+	if err != nil {
+		return err
+	}
+
+	fee, err = math.Add(fee, producedAVAX)
+	if err != nil {
+		return err
+	}
+
 	if err := e.backend.FlowChecker.VerifySpend(
 		tx,
 		e.state,
-		tx.Ins,
-		tx.Outs,
+		ins,
+		outs,
 		baseTxCreds,
 		map[ids.ID]uint64{
 			e.backend.Ctx.AVAXAssetID: fee,
@@ -822,12 +851,18 @@ func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx
 		return err
 	}
 
+	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
+	if err != nil {
+		return fmt.Errorf("failed to get utxos: %w", err)
+	}
+
 	// Verify the flowcheck
 	fee, err := e.feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
 	}
-	fee, err = math.Add(fee, tx.Balance)
+
+	fee, err = math.Add(fee, producedAVAX)
 	if err != nil {
 		return err
 	}
@@ -835,8 +870,8 @@ func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx
 	if err := e.backend.FlowChecker.VerifySpend(
 		tx,
 		e.state,
-		tx.Ins,
-		tx.Outs,
+		ins,
+		outs,
 		e.tx.Creds,
 		map[ids.ID]uint64{
 			e.backend.Ctx.AVAXAssetID: fee,
@@ -974,6 +1009,11 @@ func (e *standardTxExecutor) SetL1ValidatorWeightTx(tx *txs.SetL1ValidatorWeight
 		return err
 	}
 
+	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
+	if err != nil {
+		return fmt.Errorf("failed to get utxos: %w", err)
+	}
+
 	// Verify the flowcheck
 	fee, err := e.feeCalculator.CalculateFee(tx)
 	if err != nil {
@@ -983,11 +1023,11 @@ func (e *standardTxExecutor) SetL1ValidatorWeightTx(tx *txs.SetL1ValidatorWeight
 	if err := e.backend.FlowChecker.VerifySpend(
 		tx,
 		e.state,
-		tx.Ins,
-		tx.Outs,
+		ins,
+		outs,
 		e.tx.Creds,
 		map[ids.ID]uint64{
-			e.backend.Ctx.AVAXAssetID: fee,
+			e.backend.Ctx.AVAXAssetID: fee + producedAVAX,
 		},
 	); err != nil {
 		return err
@@ -1110,13 +1150,18 @@ func (e *standardTxExecutor) IncreaseL1ValidatorBalanceTx(tx *txs.IncreaseL1Vali
 		return err
 	}
 
+	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
+	if err != nil {
+		return fmt.Errorf("failed to get utxos: %w", err)
+	}
+
 	// Verify the flowcheck
 	fee, err := e.feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
 	}
 
-	fee, err = math.Add(fee, tx.Balance)
+	fee, err = math.Add(fee, producedAVAX)
 	if err != nil {
 		return err
 	}
@@ -1124,8 +1169,8 @@ func (e *standardTxExecutor) IncreaseL1ValidatorBalanceTx(tx *txs.IncreaseL1Vali
 	if err := e.backend.FlowChecker.VerifySpend(
 		tx,
 		e.state,
-		tx.Ins,
-		tx.Outs,
+		ins,
+		outs,
 		e.tx.Creds,
 		map[ids.ID]uint64{
 			e.backend.Ctx.AVAXAssetID: fee,
@@ -1205,6 +1250,11 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) 
 		return err
 	}
 
+	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
+	if err != nil {
+		return fmt.Errorf("failed to get utxos: %w", err)
+	}
+
 	// Verify the flowcheck
 	fee, err := e.feeCalculator.CalculateFee(tx)
 	if err != nil {
@@ -1214,11 +1264,11 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) 
 	if err := e.backend.FlowChecker.VerifySpend(
 		tx,
 		e.state,
-		tx.Ins,
-		tx.Outs,
+		ins,
+		outs,
 		baseTxCreds,
 		map[ids.ID]uint64{
-			e.backend.Ctx.AVAXAssetID: fee,
+			e.backend.Ctx.AVAXAssetID: fee + producedAVAX,
 		},
 	); err != nil {
 		return err

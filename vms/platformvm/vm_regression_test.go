@@ -67,15 +67,32 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 	}
 
+	sk, err := localsigner.New()
+	require.NoError(err)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(err)
+
 	// create valid tx
-	addValidatorTx, err := wallet.IssueAddValidatorTx(
-		&txs.Validator{
-			NodeID: nodeID,
-			Start:  uint64(validatorStartTime.Unix()),
-			End:    uint64(validatorEndTime.Unix()),
-			Wght:   vm.MinValidatorStake,
+	addValidatorTx, err := wallet.IssueAddPermissionlessValidatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(validatorStartTime.Unix()),
+				End:    uint64(validatorEndTime.Unix()),
+				Wght:   vm.MinValidatorStake,
+			},
+			Subnet: constants.PrimaryNetworkID,
 		},
-		rewardsOwner,
+		pop,
+		vm.ctx.AVAXAssetID,
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     rewardsOwner.Addrs,
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     rewardsOwner.Addrs,
+		},
 		reward.PercentDenominator,
 	)
 	require.NoError(err)
@@ -96,13 +113,17 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	firstDelegatorEndTime := firstDelegatorStartTime.Add(vm.MinStakeDuration)
 
 	// create valid tx
-	addFirstDelegatorTx, err := wallet.IssueAddDelegatorTx(
-		&txs.Validator{
-			NodeID: nodeID,
-			Start:  uint64(firstDelegatorStartTime.Unix()),
-			End:    uint64(firstDelegatorEndTime.Unix()),
-			Wght:   4 * vm.MinValidatorStake, // maximum amount of stake this delegator can provide
+	addFirstDelegatorTx, err := wallet.IssueAddPermissionlessDelegatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(firstDelegatorStartTime.Unix()),
+				End:    uint64(firstDelegatorEndTime.Unix()),
+				Wght:   4 * vm.MinValidatorStake, // maximum amount of stake this delegator can provide
+			},
+			Subnet: constants.PrimaryNetworkID,
 		},
+		vm.ctx.AVAXAssetID,
 		rewardsOwner,
 	)
 	require.NoError(err)
@@ -125,13 +146,17 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	vm.clock.Set(secondDelegatorStartTime.Add(-10 * executor.SyncBound))
 
 	// create valid tx
-	addSecondDelegatorTx, err := wallet.IssueAddDelegatorTx(
-		&txs.Validator{
-			NodeID: nodeID,
-			Start:  uint64(secondDelegatorStartTime.Unix()),
-			End:    uint64(secondDelegatorEndTime.Unix()),
-			Wght:   vm.MinDelegatorStake,
+	addSecondDelegatorTx, err := wallet.IssueAddPermissionlessDelegatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(secondDelegatorStartTime.Unix()),
+				End:    uint64(secondDelegatorEndTime.Unix()),
+				Wght:   vm.MinDelegatorStake,
+			},
+			Subnet: constants.PrimaryNetworkID,
 		},
+		vm.ctx.AVAXAssetID,
 		rewardsOwner,
 	)
 	require.NoError(err)
@@ -148,13 +173,17 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	thirdDelegatorEndTime := thirdDelegatorStartTime.Add(vm.MinStakeDuration)
 
 	// create invalid tx
-	addThirdDelegatorTx, err := wallet.IssueAddDelegatorTx(
-		&txs.Validator{
-			NodeID: nodeID,
-			Start:  uint64(thirdDelegatorStartTime.Unix()),
-			End:    uint64(thirdDelegatorEndTime.Unix()),
-			Wght:   vm.MinDelegatorStake,
+	addThirdDelegatorTx, err := wallet.IssueAddPermissionlessDelegatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(thirdDelegatorStartTime.Unix()),
+				End:    uint64(thirdDelegatorEndTime.Unix()),
+				Wght:   vm.MinDelegatorStake,
+			},
+			Subnet: constants.PrimaryNetworkID,
 		},
+		vm.ctx.AVAXAssetID,
 		rewardsOwner,
 	)
 	require.NoError(err)
@@ -219,14 +248,26 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 				Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 			}
 
+			sk, err := localsigner.New()
+			require.NoError(err)
+
+			pop, err := signer.NewProofOfPossession(sk)
+			require.NoError(err)
+
 			// create valid tx
-			addValidatorTx, err := wallet.IssueAddValidatorTx(
-				&txs.Validator{
-					NodeID: nodeID,
-					Start:  uint64(validatorStartTime.Unix()),
-					End:    uint64(validatorEndTime.Unix()),
-					Wght:   validatorStake,
+			addValidatorTx, err := wallet.IssueAddPermissionlessValidatorTx(
+				&txs.SubnetValidator{
+					Validator: txs.Validator{
+						NodeID: nodeID,
+						Start:  uint64(validatorStartTime.Unix()),
+						End:    uint64(validatorEndTime.Unix()),
+						Wght:   validatorStake,
+					},
+					Subnet: constants.PrimaryNetworkID,
 				},
+				pop,
+				vm.ctx.AVAXAssetID,
+				rewardsOwner,
 				rewardsOwner,
 				reward.PercentDenominator,
 			)
@@ -241,13 +282,17 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(buildAndAcceptStandardBlock(vm))
 
 			// create valid tx
-			addFirstDelegatorTx, err := wallet.IssueAddDelegatorTx(
-				&txs.Validator{
-					NodeID: nodeID,
-					Start:  uint64(delegator1StartTime.Unix()),
-					End:    uint64(delegator1EndTime.Unix()),
-					Wght:   delegator1Stake,
+			addFirstDelegatorTx, err := wallet.IssueAddPermissionlessDelegatorTx(
+				&txs.SubnetValidator{
+					Validator: txs.Validator{
+						NodeID: nodeID,
+						Start:  uint64(delegator1StartTime.Unix()),
+						End:    uint64(delegator1EndTime.Unix()),
+						Wght:   delegator1Stake,
+					},
+					Subnet: constants.PrimaryNetworkID,
 				},
+				vm.ctx.AVAXAssetID,
 				rewardsOwner,
 			)
 			require.NoError(err)
@@ -261,13 +306,17 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(buildAndAcceptStandardBlock(vm))
 
 			// create valid tx
-			addSecondDelegatorTx, err := wallet.IssueAddDelegatorTx(
-				&txs.Validator{
-					NodeID: nodeID,
-					Start:  uint64(delegator2StartTime.Unix()),
-					End:    uint64(delegator2EndTime.Unix()),
-					Wght:   delegator2Stake,
+			addSecondDelegatorTx, err := wallet.IssueAddPermissionlessDelegatorTx(
+				&txs.SubnetValidator{
+					Validator: txs.Validator{
+						NodeID: nodeID,
+						Start:  uint64(delegator2StartTime.Unix()),
+						End:    uint64(delegator2EndTime.Unix()),
+						Wght:   delegator2Stake,
+					},
+					Subnet: constants.PrimaryNetworkID,
 				},
+				vm.ctx.AVAXAssetID,
 				rewardsOwner,
 			)
 			require.NoError(err)
@@ -281,13 +330,17 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(buildAndAcceptStandardBlock(vm))
 
 			// create valid tx
-			addThirdDelegatorTx, err := wallet.IssueAddDelegatorTx(
-				&txs.Validator{
-					NodeID: nodeID,
-					Start:  uint64(delegator3StartTime.Unix()),
-					End:    uint64(delegator3EndTime.Unix()),
-					Wght:   delegator3Stake,
+			addThirdDelegatorTx, err := wallet.IssueAddPermissionlessDelegatorTx(
+				&txs.SubnetValidator{
+					Validator: txs.Validator{
+						NodeID: nodeID,
+						Start:  uint64(delegator3StartTime.Unix()),
+						End:    uint64(delegator3EndTime.Unix()),
+						Wght:   delegator3Stake,
+					},
+					Subnet: constants.PrimaryNetworkID,
 				},
+				vm.ctx.AVAXAssetID,
 				rewardsOwner,
 			)
 			require.NoError(err)
@@ -301,13 +354,17 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(buildAndAcceptStandardBlock(vm))
 
 			// create valid tx
-			addFourthDelegatorTx, err := wallet.IssueAddDelegatorTx(
-				&txs.Validator{
-					NodeID: nodeID,
-					Start:  uint64(delegator4StartTime.Unix()),
-					End:    uint64(delegator4EndTime.Unix()),
-					Wght:   delegator4Stake,
+			addFourthDelegatorTx, err := wallet.IssueAddPermissionlessDelegatorTx(
+				&txs.SubnetValidator{
+					Validator: txs.Validator{
+						NodeID: nodeID,
+						Start:  uint64(delegator4StartTime.Unix()),
+						End:    uint64(delegator4EndTime.Unix()),
+						Wght:   delegator4Stake,
+					},
+					Subnet: constants.PrimaryNetworkID,
 				},
+				vm.ctx.AVAXAssetID,
 				rewardsOwner,
 			)
 			require.NoError(err)
@@ -1108,14 +1165,26 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 	}
 
+	sk, err := localsigner.New()
+	require.NoError(err)
+
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(err)
+
 	// create valid tx
-	addValidatorTx, err := wallet.IssueAddValidatorTx(
-		&txs.Validator{
-			NodeID: nodeID,
-			Start:  uint64(validatorStartTime.Unix()),
-			End:    uint64(validatorEndTime.Unix()),
-			Wght:   validatorStake,
+	addValidatorTx, err := wallet.IssueAddPermissionlessValidatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(validatorStartTime.Unix()),
+				End:    uint64(validatorEndTime.Unix()),
+				Wght:   validatorStake,
+			},
+			Subnet: constants.PrimaryNetworkID,
 		},
+		pop,
+		vm.ctx.AVAXAssetID,
+		rewardsOwner,
 		rewardsOwner,
 		reward.PercentDenominator,
 	)
@@ -1130,13 +1199,17 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	// create valid tx
-	addFirstDelegatorTx, err := wallet.IssueAddDelegatorTx(
-		&txs.Validator{
-			NodeID: nodeID,
-			Start:  uint64(delegator1StartTime.Unix()),
-			End:    uint64(delegator1EndTime.Unix()),
-			Wght:   delegator1Stake,
+	addFirstDelegatorTx, err := wallet.IssueAddPermissionlessDelegatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(delegator1StartTime.Unix()),
+				End:    uint64(delegator1EndTime.Unix()),
+				Wght:   delegator1Stake,
+			},
+			Subnet: constants.PrimaryNetworkID,
 		},
+		vm.ctx.AVAXAssetID,
 		rewardsOwner,
 	)
 	require.NoError(err)
@@ -1150,13 +1223,17 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	// create invalid tx
-	addSecondDelegatorTx, err := wallet.IssueAddDelegatorTx(
-		&txs.Validator{
-			NodeID: nodeID,
-			Start:  uint64(delegator2StartTime.Unix()),
-			End:    uint64(delegator2EndTime.Unix()),
-			Wght:   delegator2Stake,
+	addSecondDelegatorTx, err := wallet.IssueAddPermissionlessDelegatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(delegator2StartTime.Unix()),
+				End:    uint64(delegator2EndTime.Unix()),
+				Wght:   delegator2Stake,
+			},
+			Subnet: constants.PrimaryNetworkID,
 		},
+		vm.ctx.AVAXAssetID,
 		rewardsOwner,
 	)
 	require.NoError(err)
@@ -1181,24 +1258,37 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 
 	wallet := newWallet(t, vm, walletConfig{})
 
+	sk, err := localsigner.New()
+	require.NoError(err)
+
 	nodeID := ids.GenerateTestNodeID()
-	addValidatorTx, err := wallet.IssueAddValidatorTx(
-		&txs.Validator{
-			NodeID: nodeID,
-			Start:  uint64(validatorStartTime.Unix()),
-			End:    uint64(validatorEndTime.Unix()),
-			Wght:   defaultMaxValidatorStake,
+	rewardOwner := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
+	}
+
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(err)
+	addPermissionlessValidatorTx, err := wallet.IssueAddPermissionlessValidatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(validatorStartTime.Unix()),
+				End:    uint64(validatorEndTime.Unix()),
+				Wght:   defaultMaxValidatorStake,
+			},
+			Subnet: ids.ID{},
 		},
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-		},
+		pop,
+		vm.ctx.AVAXAssetID,
+		rewardOwner,
+		rewardOwner,
 		reward.PercentDenominator,
 	)
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTxFromRPC(addValidatorTx))
+	require.NoError(vm.issueTxFromRPC(addPermissionlessValidatorTx))
 	vm.ctx.Lock.Lock()
 
 	// Accept addValidatorTx
@@ -1289,24 +1379,37 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 
 	wallet := newWallet(t, vm, walletConfig{})
 
+	sk, err := localsigner.New()
+	require.NoError(err)
+
 	nodeID := ids.GenerateTestNodeID()
-	addValidatorTx, err := wallet.IssueAddValidatorTx(
-		&txs.Validator{
-			NodeID: nodeID,
-			Start:  uint64(validatorStartTime.Unix()),
-			End:    uint64(validatorEndTime.Unix()),
-			Wght:   defaultMaxValidatorStake,
+	rewardOwner := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
+	}
+
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(err)
+	addPermissionlessValidatorTx, err := wallet.IssueAddPermissionlessValidatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(validatorStartTime.Unix()),
+				End:    uint64(validatorEndTime.Unix()),
+				Wght:   defaultMaxValidatorStake,
+			},
+			Subnet: ids.ID{},
 		},
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-		},
+		pop,
+		vm.ctx.AVAXAssetID,
+		rewardOwner,
+		rewardOwner,
 		reward.PercentDenominator,
 	)
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTxFromRPC(addValidatorTx))
+	require.NoError(vm.issueTxFromRPC(addPermissionlessValidatorTx))
 	vm.ctx.Lock.Lock()
 
 	// Accept addValidatorTx
@@ -2018,20 +2121,32 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 		primaryEndTime1   = subnetEndTime.Add(time.Second)
 	)
 
-	// Add a primary network validator with no BLS key
-	nodeID := ids.GenerateTestNodeID()
+	// Add a primary network validator
+	sk, err := localsigner.New()
+	require.NoError(err)
 
-	primaryTx1, err := wallet.IssueAddValidatorTx(
-		&txs.Validator{
-			NodeID: nodeID,
-			Start:  uint64(primaryStartTime1.Unix()),
-			End:    uint64(primaryEndTime1.Unix()),
-			Wght:   vm.MinValidatorStake,
+	nodeID := ids.GenerateTestNodeID()
+	rewardOwner := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+	}
+
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(err)
+	primaryTx1, err := wallet.IssueAddPermissionlessValidatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(primaryStartTime1.Unix()),
+				End:    uint64(primaryEndTime1.Unix()),
+				Wght:   vm.MinValidatorStake,
+			},
+			Subnet: ids.ID{},
 		},
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-		},
+		pop,
+		vm.ctx.AVAXAssetID,
+		rewardOwner,
+		rewardOwner,
 		reward.PercentDenominator,
 	)
 	require.NoError(err)

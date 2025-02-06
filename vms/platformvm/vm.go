@@ -64,6 +64,7 @@ type VM struct {
 	blockbuilder.Builder
 	*network.Network
 	validators.State
+	mempool *pmempool.Mempool
 
 	metrics platformvmmetrics.Metrics
 
@@ -167,13 +168,19 @@ func (vm *VM) Initialize(
 		Bootstrapped: &vm.bootstrapped,
 	}
 
-	mempool, err := pmempool.New("mempool", registerer)
+	vm.mempool, err = pmempool.New(
+		"mempool",
+		vm.Internal.DynamicFeeConfig.Weights,
+		execConfig.MempoolGasCapacity,
+		vm.ctx.AVAXAssetID,
+		registerer,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}
 
 	vm.manager = blockexecutor.NewManager(
-		mempool,
+		vm.mempool,
 		vm.metrics,
 		vm.state,
 		txExecutorBackend,
@@ -190,7 +197,7 @@ func (vm *VM) Initialize(
 			validatorManager,
 		),
 		txVerifier,
-		mempool,
+		vm.mempool,
 		txExecutorBackend.Config.PartialSyncPrimaryNetwork,
 		appSender,
 		chainCtx.Lock.RLocker(),
@@ -210,7 +217,7 @@ func (vm *VM) Initialize(
 	go vm.Network.PullGossip(vm.onShutdownCtx)
 
 	vm.Builder = blockbuilder.New(
-		mempool,
+		vm.mempool,
 		txExecutorBackend,
 		vm.manager,
 	)
@@ -278,7 +285,7 @@ func (vm *VM) pruneMempool() error {
 	}
 
 	for _, tx := range blockTxs {
-		if err := vm.Builder.Add(tx); err != nil {
+		if err := vm.mempool.Add(tx); err != nil {
 			vm.ctx.Log.Debug(
 				"failed to reissue tx",
 				zap.Stringer("txID", tx.ID()),
