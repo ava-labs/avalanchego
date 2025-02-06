@@ -18,8 +18,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/commonmock"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 
 	pmempool "github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -59,6 +61,8 @@ func (t testTxVerifier) VerifyTx(*txs.Tx) error {
 }
 
 func TestNetworkIssueTxFromRPC(t *testing.T) {
+	avaxAssetID := ids.GenerateTestID()
+
 	type test struct {
 		name          string
 		mempool       *pmempool.Mempool
@@ -72,21 +76,63 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 		{
 			name: "mempool has transaction",
 			mempool: func() *pmempool.Mempool {
-				mempool, err := pmempool.New("", prometheus.NewRegistry())
+				mempool, err := pmempool.New(
+					"",
+					gas.Dimensions{1, 1, 1, 1},
+					1_000_000,
+					avaxAssetID,
+					prometheus.NewRegistry(),
+				)
 				require.NoError(t, err)
-				require.NoError(t, mempool.Add(&txs.Tx{Unsigned: &txs.BaseTx{}}))
+				require.NoError(t, mempool.Add(&txs.Tx{
+					Unsigned: &txs.BaseTx{
+						BaseTx: avax.BaseTx{
+							Ins: []*avax.TransferableInput{
+								{
+									Asset: avax.Asset{
+										ID: avaxAssetID,
+									},
+									In: &secp256k1fx.TransferInput{
+										Amt: 1,
+									},
+								},
+							},
+						},
+					},
+				}))
 				return mempool
 			}(),
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				return commonmock.NewSender(ctrl)
 			},
-			tx:          &txs.Tx{Unsigned: &txs.BaseTx{}},
+			tx: &txs.Tx{
+				Unsigned: &txs.BaseTx{
+					BaseTx: avax.BaseTx{
+						Ins: []*avax.TransferableInput{
+							{
+								Asset: avax.Asset{
+									ID: avaxAssetID,
+								},
+								In: &secp256k1fx.TransferInput{
+									Amt: 1,
+								},
+							},
+						},
+					},
+				},
+			},
 			expectedErr: mempool.ErrDuplicateTx,
 		},
 		{
 			name: "transaction marked as dropped in mempool",
 			mempool: func() *pmempool.Mempool {
-				mempool, err := pmempool.New("", prometheus.NewRegistry())
+				mempool, err := pmempool.New(
+					"",
+					gas.Dimensions{1, 1, 1, 1},
+					1_000_000,
+					avaxAssetID,
+					prometheus.NewRegistry(),
+				)
 				require.NoError(t, err)
 				mempool.MarkDropped(ids.Empty, errTest)
 				return mempool
@@ -95,13 +141,34 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				// Shouldn't gossip the tx
 				return commonmock.NewSender(ctrl)
 			},
-			tx:          &txs.Tx{Unsigned: &txs.BaseTx{}},
+			tx: &txs.Tx{
+				Unsigned: &txs.BaseTx{
+					BaseTx: avax.BaseTx{
+						Ins: []*avax.TransferableInput{
+							{
+								Asset: avax.Asset{
+									ID: avaxAssetID,
+								},
+								In: &secp256k1fx.TransferInput{
+									Amt: 1,
+								},
+							},
+						},
+					},
+				},
+			},
 			expectedErr: errTest,
 		},
 		{
 			name: "tx dropped",
 			mempool: func() *pmempool.Mempool {
-				mempool, err := pmempool.New("", prometheus.NewRegistry())
+				mempool, err := pmempool.New(
+					"",
+					gas.Dimensions{1, 1, 1, 1},
+					1_000_000,
+					avaxAssetID,
+					prometheus.NewRegistry(),
+				)
 				require.NoError(t, err)
 				return mempool
 			}(),
@@ -110,32 +177,34 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				// Shouldn't gossip the tx
 				return commonmock.NewSender(ctrl)
 			},
-			tx:          &txs.Tx{Unsigned: &txs.BaseTx{}},
-			expectedErr: errTest,
-		},
-		{
-			name: "tx too big",
-			mempool: func() *pmempool.Mempool {
-				mempool, err := pmempool.New("", prometheus.NewRegistry())
-				require.NoError(t, err)
-				return mempool
-			}(),
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
-				// Shouldn't gossip the tx
-				return commonmock.NewSender(ctrl)
+			tx: &txs.Tx{
+				Unsigned: &txs.BaseTx{
+					BaseTx: avax.BaseTx{
+						Ins: []*avax.TransferableInput{
+							{
+								Asset: avax.Asset{
+									ID: avaxAssetID,
+								},
+								In: &secp256k1fx.TransferInput{
+									Amt: 1,
+								},
+							},
+						},
+					},
+				},
 			},
-			tx: func() *txs.Tx {
-				tx := &txs.Tx{Unsigned: &txs.BaseTx{}}
-				bytes := make([]byte, mempool.MaxTxSize+1)
-				tx.SetBytes(bytes, bytes)
-				return tx
-			}(),
-			expectedErr: mempool.ErrTxTooLarge,
+			expectedErr: errTest,
 		},
 		{
 			name: "tx conflicts",
 			mempool: func() *pmempool.Mempool {
-				mempool, err := pmempool.New("", prometheus.NewRegistry())
+				mempool, err := pmempool.New(
+					"",
+					gas.Dimensions{1, 1, 1, 1},
+					1_000_000,
+					avaxAssetID,
+					prometheus.NewRegistry(),
+				)
 				require.NoError(t, err)
 
 				tx := &txs.Tx{
@@ -143,7 +212,12 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 						BaseTx: avax.BaseTx{
 							Ins: []*avax.TransferableInput{
 								{
-									UTXOID: avax.UTXOID{},
+									Asset: avax.Asset{
+										ID: avaxAssetID,
+									},
+									In: &secp256k1fx.TransferInput{
+										Amt: 1,
+									},
 								},
 							},
 						},
@@ -163,30 +237,33 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 						BaseTx: avax.BaseTx{
 							Ins: []*avax.TransferableInput{
 								{
-									UTXOID: avax.UTXOID{},
+									Asset: avax.Asset{
+										ID: avaxAssetID,
+									},
+									In: &secp256k1fx.TransferInput{
+										Amt: 1,
+									},
 								},
 							},
 						},
 					},
-					TxID: ids.ID{1},
+					TxID: ids.GenerateTestID(),
 				}
 				return tx
 			}(),
 			expectedErr: mempool.ErrConflictsWithOtherTx,
 		},
 		{
-			name: "mempool full",
+			name: "mempool gas capacity exceeded",
 			mempool: func() *pmempool.Mempool {
-				m, err := pmempool.New("", prometheus.NewRegistry())
+				m, err := pmempool.New(
+					"",
+					gas.Dimensions{1, 1, 1, 1},
+					0,
+					avaxAssetID,
+					prometheus.NewRegistry(),
+				)
 				require.NoError(t, err)
-
-				for i := 0; i < 1024; i++ {
-					tx := &txs.Tx{Unsigned: &txs.BaseTx{}}
-					bytes := make([]byte, mempool.MaxTxSize)
-					tx.SetBytes(bytes, bytes)
-					tx.TxID = ids.GenerateTestID()
-					require.NoError(t, m.Add(tx))
-				}
 
 				return m
 			}(),
@@ -195,16 +272,35 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				return commonmock.NewSender(ctrl)
 			},
 			tx: func() *txs.Tx {
-				tx := &txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{}}}
-				tx.SetBytes([]byte{1, 2, 3}, []byte{1, 2, 3})
-				return tx
+				return &txs.Tx{
+					Unsigned: &txs.BaseTx{
+						BaseTx: avax.BaseTx{
+							Ins: []*avax.TransferableInput{
+								{
+									Asset: avax.Asset{
+										ID: avaxAssetID,
+									},
+									In: &secp256k1fx.TransferInput{
+										Amt: 1,
+									},
+								},
+							},
+						},
+					},
+				}
 			}(),
-			expectedErr: mempool.ErrMempoolFull,
+			expectedErr: pmempool.ErrGasCapacityExceeded,
 		},
 		{
 			name: "happy path",
 			mempool: func() *pmempool.Mempool {
-				mempool, err := pmempool.New("", prometheus.NewRegistry())
+				mempool, err := pmempool.New(
+					"",
+					gas.Dimensions{1, 1, 1, 1},
+					1_000_000,
+					avaxAssetID,
+					prometheus.NewRegistry(),
+				)
 				require.NoError(t, err)
 				return mempool
 			}(),
@@ -213,7 +309,22 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 				return appSender
 			},
-			tx:          &txs.Tx{Unsigned: &txs.BaseTx{}},
+			tx: &txs.Tx{
+				Unsigned: &txs.BaseTx{
+					BaseTx: avax.BaseTx{
+						Ins: []*avax.TransferableInput{
+							{
+								Asset: avax.Asset{
+									ID: avaxAssetID,
+								},
+								In: &secp256k1fx.TransferInput{
+									Amt: 1,
+								},
+							},
+						},
+					},
+				},
+			},
 			expectedErr: nil,
 		},
 	}
