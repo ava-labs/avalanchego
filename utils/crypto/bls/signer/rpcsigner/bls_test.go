@@ -17,22 +17,9 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/signer"
 )
 
-func AggregateAndVerify(publicKeys []*bls.PublicKey, signatures []*bls.Signature, message []byte) (bool, error) {
-	aggSig, err := bls.AggregateSignatures(signatures)
-	if err != nil {
-		return false, err
-	}
-	aggPK, err := bls.AggregatePublicKeys(publicKeys)
-	if err != nil {
-		return false, err
-	}
-
-	return bls.Verify(aggPK, aggSig, message), nil
-}
-
-func NewLocalSigner(require *require.Assertions) *localsigner.LocalSigner {
+func NewLocalSigner(t *testing.T) *localsigner.LocalSigner {
 	sk, err := localsigner.New()
-	require.NoError(err)
+	require.NoError(t, err)
 	return sk
 }
 
@@ -136,10 +123,10 @@ func TestVerifyWrongMessageSignature(t *testing.T) {
 func TestValidAggregation(t *testing.T) {
 	require := require.New(t)
 	keyPairs := collectN(2, func() bls.Signer {
-		return NewLocalSigner(require)
+		return NewLocalSigner(t)
 	})
 
-	keyPairs = append(keyPairs, NewLocalSigner(require))
+	keyPairs = append(keyPairs, NewLocalSigner(t))
 
 	msg := []byte("TestValidAggregation local signer")
 
@@ -152,8 +139,12 @@ func TestValidAggregation(t *testing.T) {
 		return s.PublicKey(), nil
 	})
 
-	isValid, err := AggregateAndVerify(pks, sigs, msg)
+	aggSig, err := bls.AggregateSignatures(sigs)
 	require.NoError(err)
+	aggPK, err := bls.AggregatePublicKeys(pks)
+	require.NoError(err)
+
+	isValid := bls.Verify(aggPK, aggSig, msg)
 	require.True(isValid)
 }
 
@@ -168,8 +159,12 @@ func TestSingleKeyAggregation(t *testing.T) {
 	sig, err := signer.Sign(msg)
 	require.NoError(err)
 
-	isValid, err := AggregateAndVerify(pks, []*bls.Signature{sig}, msg)
+	aggSig, err := bls.AggregateSignatures([]*bls.Signature{sig})
 	require.NoError(err)
+	aggPK, err := bls.AggregatePublicKeys(pks)
+	require.NoError(err)
+
+	isValid := bls.Verify(aggPK, aggSig, msg)
 	require.True(isValid)
 }
 

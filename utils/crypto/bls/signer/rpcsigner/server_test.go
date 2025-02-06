@@ -42,6 +42,7 @@ func (s *server) Sign(_ context.Context, in *signer.SignatureRequest) (*signer.S
 	if err != nil {
 		return nil, err
 	}
+
 	return &signer.SignatureResponse{
 		Signature: bls.SignatureToBytes(signature),
 	}, nil
@@ -52,6 +53,7 @@ func (s *server) SignProofOfPossession(_ context.Context, in *signer.ProofOfPoss
 	if err != nil {
 		return nil, err
 	}
+
 	return &signer.ProofOfPossessionSignatureResponse{
 		Signature: bls.SignatureToBytes(signature),
 	}, nil
