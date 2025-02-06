@@ -7,7 +7,7 @@ option go_package = "github.com/ava-labs/avalanchego/proto/pb/signer";
 service Signer {
   rpc PublicKey(PublicKeyRequest) returns (PublicKeyResponse) {}
   rpc Sign(SignatureRequest) returns (SignatureResponse) {}
-  rpc ProofOfPossession(ProofOfPossessionSignatureRequest) returns (ProofOfPossessionSignatureResponse) {}
+  rpc SignProofOfPossession(ProofOfPossessionSignatureRequest) returns (ProofOfPossessionSignatureResponse) {}
 }
 
 message PublicKeyRequest {}

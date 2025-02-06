@@ -47,7 +47,7 @@ func (s *server) Sign(_ context.Context, in *signer.SignatureRequest) (*signer.S
 	}, nil
 }
 
-func (s *server) ProofOfPossession(_ context.Context, in *signer.ProofOfPossessionSignatureRequest) (*signer.ProofOfPossessionSignatureResponse, error) {
+func (s *server) SignProofOfPossession(_ context.Context, in *signer.ProofOfPossessionSignatureRequest) (*signer.ProofOfPossessionSignatureResponse, error) {
 	signature, err := s.localSigner.SignProofOfPossession(in.Message)
 	if err != nil {
 		return nil, err

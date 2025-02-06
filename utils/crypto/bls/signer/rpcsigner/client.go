@@ -78,7 +78,7 @@ func (c *Client) Sign(message []byte) (*bls.Signature, error) {
 }
 
 func (c *Client) SignProofOfPossession(message []byte) (*bls.Signature, error) {
-	resp, err := c.client.ProofOfPossession(context.Background(), &pb.ProofOfPossessionSignatureRequest{Message: message})
+	resp, err := c.client.SignProofOfPossession(context.Background(), &pb.ProofOfPossessionSignatureRequest{Message: message})
 	if err != nil {
 		return nil, err
 	}
