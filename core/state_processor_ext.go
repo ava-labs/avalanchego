@@ -4,6 +4,7 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 
 	"github.com/ava-labs/coreth/core/extstate"
 	"github.com/ava-labs/coreth/core/state"
@@ -73,3 +74,23 @@ func ApplyPrecompileActivations(c *params.ChainConfig, parentTimestamp *uint64, 
 func ApplyUpgrades(c *params.ChainConfig, parentTimestamp *uint64, blockContext contract.ConfigurationBlockContext, statedb *state.StateDB) error {
 	return ApplyPrecompileActivations(c, parentTimestamp, blockContext, statedb)
 }
+
+// BlockContext implements the `contract.ConfigurationBlockContext` interface.
+type BlockContext struct {
+	number    *big.Int
+	timestamp uint64
+}
+
+// NewBlockContext creates a new block context using the block number
+// and block time provided. This function is usually necessary to convert
+// a `*types.Block` to be passed as a `contract.ConfigurationBlockContext`
+// interface to [ApplyUpgrades].
+func NewBlockContext(number *big.Int, timestamp uint64) *BlockContext {
+	return &BlockContext{
+		number:    number,
+		timestamp: timestamp,
+	}
+}
+
+func (bc *BlockContext) Number() *big.Int  { return bc.number }
+func (bc *BlockContext) Timestamp() uint64 { return bc.timestamp }
