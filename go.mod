@@ -9,8 +9,6 @@ module github.com/ava-labs/avalanchego
 //   - Consider updating the version of golangci-lint (in scripts/lint.sh).
 go 1.22.9
 
-toolchain go1.22.12
-
 require (
 	github.com/DataDog/zstd v1.5.2
 	github.com/NYTimes/gziphandler v1.1.1
