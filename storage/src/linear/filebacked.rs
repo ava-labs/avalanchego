@@ -23,7 +23,7 @@ use super::{ReadableStorage, WritableStorage};
 #[derive(Debug)]
 /// A [ReadableStorage] backed by a file
 pub struct FileBacked {
-    fd: Mutex<File>,
+    fd: File,
     cache: Mutex<LruCache<LinearAddress, Arc<Node>>>,
     free_list_cache: Mutex<LruCache<LinearAddress, Option<LinearAddress>>>,
 }
@@ -44,7 +44,7 @@ impl FileBacked {
             .open(path)?;
 
         Ok(Self {
-            fd: Mutex::new(fd),
+            fd,
             cache: Mutex::new(LruCache::new(node_cache_size)),
             free_list_cache: Mutex::new(LruCache::new(free_list_cache_size)),
         })
@@ -52,15 +52,12 @@ impl FileBacked {
 }
 
 impl ReadableStorage for FileBacked {
-    fn stream_from(&self, addr: u64) -> Result<Box<dyn Read>, Error> {
+    fn stream_from(&self, addr: u64) -> Result<Box<dyn Read + '_>, Error> {
         Ok(Box::new(PredictiveReader::new(self, addr)))
     }
 
     fn size(&self) -> Result<u64, Error> {
-        self.fd
-            .lock()
-            .expect("poisoned lock")
-            .seek(std::io::SeekFrom::End(0))
+        Ok(self.fd.metadata()?.len())
     }
 
     fn read_cached_node(&self, addr: LinearAddress) -> Option<Arc<Node>> {
@@ -81,10 +78,7 @@ impl ReadableStorage for FileBacked {
 
 impl WritableStorage for FileBacked {
     fn write(&self, offset: u64, object: &[u8]) -> Result<usize, Error> {
-        self.fd
-            .lock()
-            .expect("poisoned lock")
-            .write_at(object, offset)
+        self.fd.write_at(object, offset)
     }
 
     fn write_cached_nodes<'a>(
@@ -111,29 +105,24 @@ impl WritableStorage for FileBacked {
     }
 }
 
+const PREDICTIVE_READ_BUFFER_SIZE: usize = 1024;
+
 /// A reader that can predictively read from a file, avoiding reading past boundaries, but reading in 1k chunks
-struct PredictiveReader {
-    fd: File,
-    buffer: [u8; Self::PREDICTIVE_READ_BUFFER_SIZE],
+struct PredictiveReader<'a> {
+    fd: &'a File,
+    buffer: [u8; PREDICTIVE_READ_BUFFER_SIZE],
     offset: u64,
     len: usize,
     pos: usize,
 }
 
-impl PredictiveReader {
-    const PREDICTIVE_READ_BUFFER_SIZE: usize = 1024;
-
-    fn new(fb: &FileBacked, start: u64) -> Self {
-        let fd = fb
-            .fd
-            .lock()
-            .expect("poisoned lock")
-            .try_clone()
-            .expect("resource exhaustion");
+impl<'a> PredictiveReader<'a> {
+    fn new(fb: &'a FileBacked, start: u64) -> Self {
+        let fd = &fb.fd;
 
         Self {
             fd,
-            buffer: [0u8; Self::PREDICTIVE_READ_BUFFER_SIZE],
+            buffer: [0u8; PREDICTIVE_READ_BUFFER_SIZE],
             offset: start,
             len: 0,
             pos: 0,
@@ -141,11 +130,11 @@ impl PredictiveReader {
     }
 }
 
-impl Read for PredictiveReader {
+impl Read for PredictiveReader<'_> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, std::io::Error> {
         if self.len == self.pos {
-            let bytes_left_in_page = Self::PREDICTIVE_READ_BUFFER_SIZE
-                - (self.offset % Self::PREDICTIVE_READ_BUFFER_SIZE as u64) as usize;
+            let bytes_left_in_page = PREDICTIVE_READ_BUFFER_SIZE
+                - (self.offset % PREDICTIVE_READ_BUFFER_SIZE as u64) as usize;
             self.fd.seek(std::io::SeekFrom::Start(self.offset))?;
             let read = self.fd.read(&mut self.buffer[..bytes_left_in_page])?;
             self.offset += read as u64;
