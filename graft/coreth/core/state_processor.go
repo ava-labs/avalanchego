@@ -78,7 +78,8 @@ func (p *StateProcessor) Process(block *types.Block, parent *types.Header, state
 	)
 
 	// Configure any upgrades that should go into effect during this block.
-	err := ApplyUpgrades(p.config, &parent.Time, block, statedb)
+	blockContext := NewBlockContext(block.Number(), block.Time())
+	err := ApplyUpgrades(p.config, &parent.Time, blockContext, statedb)
 	if err != nil {
 		log.Error("failed to configure precompiles processing block", "hash", block.Hash(), "number", block.NumberU64(), "timestamp", block.Time(), "err", err)
 		return nil, nil, 0, err
