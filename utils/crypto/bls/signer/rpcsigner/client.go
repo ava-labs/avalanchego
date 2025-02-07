@@ -14,7 +14,11 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/signer"
 )
 
-var _ bls.Signer = (*Client)(nil)
+var (
+	_                   bls.Signer = (*Client)(nil)
+	ErrorEmptyPublicKey            = errors.New("empty public key")
+	ErrorEmptySignature            = errors.New("empty signature")
+)
 
 type Client struct {
 	client pb.SignerClient
@@ -35,7 +39,7 @@ func NewClient(conn *grpc.ClientConn) (*Client, error) {
 
 	if pkBytes == nil {
 		conn.Close()
-		return nil, errors.New("empty public key")
+		return nil, ErrorEmptyPublicKey
 	}
 
 	pk, err := bls.PublicKeyFromCompressedBytes(pkBytes)
@@ -61,8 +65,8 @@ type signatureResponse interface {
 
 func getSignatureFromResponse[T signatureResponse](resp T) (*bls.Signature, error) {
 	signature := resp.GetSignature()
-	if signature == nil {
-		return nil, errors.New("empty signature")
+	if len(signature) == 0 {
+		return nil, ErrorEmptySignature
 	}
 
 	return bls.SignatureFromBytes(signature)
