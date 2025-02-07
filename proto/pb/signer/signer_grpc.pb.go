@@ -29,8 +29,8 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type SignerClient interface {
 	PublicKey(ctx context.Context, in *PublicKeyRequest, opts ...grpc.CallOption) (*PublicKeyResponse, error)
-	Sign(ctx context.Context, in *SignatureRequest, opts ...grpc.CallOption) (*SignatureResponse, error)
-	SignProofOfPossession(ctx context.Context, in *ProofOfPossessionSignatureRequest, opts ...grpc.CallOption) (*ProofOfPossessionSignatureResponse, error)
+	Sign(ctx context.Context, in *SignRequest, opts ...grpc.CallOption) (*SignResponse, error)
+	SignProofOfPossession(ctx context.Context, in *SignProofOfPossessionRequest, opts ...grpc.CallOption) (*SignProofOfPossessionResponse, error)
 }
 
 type signerClient struct {
@@ -50,8 +50,8 @@ func (c *signerClient) PublicKey(ctx context.Context, in *PublicKeyRequest, opts
 	return out, nil
 }
 
-func (c *signerClient) Sign(ctx context.Context, in *SignatureRequest, opts ...grpc.CallOption) (*SignatureResponse, error) {
-	out := new(SignatureResponse)
+func (c *signerClient) Sign(ctx context.Context, in *SignRequest, opts ...grpc.CallOption) (*SignResponse, error) {
+	out := new(SignResponse)
 	err := c.cc.Invoke(ctx, Signer_Sign_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -59,8 +59,8 @@ func (c *signerClient) Sign(ctx context.Context, in *SignatureRequest, opts ...g
 	return out, nil
 }
 
-func (c *signerClient) SignProofOfPossession(ctx context.Context, in *ProofOfPossessionSignatureRequest, opts ...grpc.CallOption) (*ProofOfPossessionSignatureResponse, error) {
-	out := new(ProofOfPossessionSignatureResponse)
+func (c *signerClient) SignProofOfPossession(ctx context.Context, in *SignProofOfPossessionRequest, opts ...grpc.CallOption) (*SignProofOfPossessionResponse, error) {
+	out := new(SignProofOfPossessionResponse)
 	err := c.cc.Invoke(ctx, Signer_SignProofOfPossession_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -73,8 +73,8 @@ func (c *signerClient) SignProofOfPossession(ctx context.Context, in *ProofOfPos
 // for forward compatibility
 type SignerServer interface {
 	PublicKey(context.Context, *PublicKeyRequest) (*PublicKeyResponse, error)
-	Sign(context.Context, *SignatureRequest) (*SignatureResponse, error)
-	SignProofOfPossession(context.Context, *ProofOfPossessionSignatureRequest) (*ProofOfPossessionSignatureResponse, error)
+	Sign(context.Context, *SignRequest) (*SignResponse, error)
+	SignProofOfPossession(context.Context, *SignProofOfPossessionRequest) (*SignProofOfPossessionResponse, error)
 	mustEmbedUnimplementedSignerServer()
 }
 
@@ -85,10 +85,10 @@ type UnimplementedSignerServer struct {
 func (UnimplementedSignerServer) PublicKey(context.Context, *PublicKeyRequest) (*PublicKeyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PublicKey not implemented")
 }
-func (UnimplementedSignerServer) Sign(context.Context, *SignatureRequest) (*SignatureResponse, error) {
+func (UnimplementedSignerServer) Sign(context.Context, *SignRequest) (*SignResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Sign not implemented")
 }
-func (UnimplementedSignerServer) SignProofOfPossession(context.Context, *ProofOfPossessionSignatureRequest) (*ProofOfPossessionSignatureResponse, error) {
+func (UnimplementedSignerServer) SignProofOfPossession(context.Context, *SignProofOfPossessionRequest) (*SignProofOfPossessionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SignProofOfPossession not implemented")
 }
 func (UnimplementedSignerServer) mustEmbedUnimplementedSignerServer() {}
@@ -123,7 +123,7 @@ func _Signer_PublicKey_Handler(srv interface{}, ctx context.Context, dec func(in
 }
 
 func _Signer_Sign_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SignatureRequest)
+	in := new(SignRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -135,13 +135,13 @@ func _Signer_Sign_Handler(srv interface{}, ctx context.Context, dec func(interfa
 		FullMethod: Signer_Sign_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SignerServer).Sign(ctx, req.(*SignatureRequest))
+		return srv.(SignerServer).Sign(ctx, req.(*SignRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _Signer_SignProofOfPossession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ProofOfPossessionSignatureRequest)
+	in := new(SignProofOfPossessionRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -153,7 +153,7 @@ func _Signer_SignProofOfPossession_Handler(srv interface{}, ctx context.Context,
 		FullMethod: Signer_SignProofOfPossession_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SignerServer).SignProofOfPossession(ctx, req.(*ProofOfPossessionSignatureRequest))
+		return srv.(SignerServer).SignProofOfPossession(ctx, req.(*SignProofOfPossessionRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }

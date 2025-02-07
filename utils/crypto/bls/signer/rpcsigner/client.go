@@ -69,7 +69,7 @@ func getSignatureFromResponse[T signatureResponse](resp T) (*bls.Signature, erro
 }
 
 func (c *Client) Sign(message []byte) (*bls.Signature, error) {
-	resp, err := c.client.Sign(context.Background(), &pb.SignatureRequest{Message: message})
+	resp, err := c.client.Sign(context.Background(), &pb.SignRequest{Message: message})
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func (c *Client) Sign(message []byte) (*bls.Signature, error) {
 }
 
 func (c *Client) SignProofOfPossession(message []byte) (*bls.Signature, error) {
-	resp, err := c.client.SignProofOfPossession(context.Background(), &pb.ProofOfPossessionSignatureRequest{Message: message})
+	resp, err := c.client.SignProofOfPossession(context.Background(), &pb.SignProofOfPossessionRequest{Message: message})
 	if err != nil {
 		return nil, err
 	}
