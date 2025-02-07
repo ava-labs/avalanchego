@@ -63,7 +63,7 @@ func (b *Block) Accept(context.Context) error {
 	// Call Accept for relevant precompile logs. Note we do this prior to
 	// calling Accept on the blockChain so any side effects (eg warp signatures)
 	// take place before the accepted log is emitted to subscribers.
-	rules := b.vm.chainConfig.Rules(b.ethBlock.Number(), params.IsMergeTODO, b.ethBlock.Timestamp())
+	rules := b.vm.chainConfig.Rules(b.ethBlock.Number(), params.IsMergeTODO, b.ethBlock.Time())
 	if err := b.handlePrecompileAccept(*params.GetRulesExtra(rules)); err != nil {
 		return err
 	}
@@ -154,7 +154,7 @@ func (b *Block) Verify(context.Context) error {
 
 // ShouldVerifyWithContext implements the block.WithVerifyContext interface
 func (b *Block) ShouldVerifyWithContext(context.Context) (bool, error) {
-	rules := params.GetRulesExtra(b.vm.chainConfig.Rules(b.ethBlock.Number(), params.IsMergeTODO, b.ethBlock.Timestamp()))
+	rules := params.GetRulesExtra(b.vm.chainConfig.Rules(b.ethBlock.Number(), params.IsMergeTODO, b.ethBlock.Time()))
 	predicates := rules.Predicaters
 	// Short circuit early if there are no predicates to verify
 	if len(predicates) == 0 {
@@ -221,7 +221,7 @@ func (b *Block) verify(predicateContext *precompileconfig.PredicateContext, writ
 
 // verifyPredicates verifies the predicates in the block are valid according to predicateContext.
 func (b *Block) verifyPredicates(predicateContext *precompileconfig.PredicateContext) error {
-	rules := b.vm.chainConfig.Rules(b.ethBlock.Number(), params.IsMergeTODO, b.ethBlock.Timestamp())
+	rules := b.vm.chainConfig.Rules(b.ethBlock.Number(), params.IsMergeTODO, b.ethBlock.Time())
 	rulesExtra := params.GetRulesExtra(rules)
 
 	switch {

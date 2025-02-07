@@ -277,7 +277,8 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) *types.Blo
 	}
 
 	// Configure any stateful precompiles that should be enabled in the genesis.
-	err = ApplyPrecompileActivations(g.Config, nil, types.NewBlockWithHeader(head), statedb)
+	blockContext := NewBlockContext(head.Number, head.Time)
+	err = ApplyPrecompileActivations(g.Config, nil, blockContext, statedb)
 	if err != nil {
 		panic(fmt.Sprintf("unable to configure precompiles in genesis block: %v", err))
 	}

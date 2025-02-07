@@ -228,7 +228,8 @@ func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateConte
 		env.state.StopPrefetcher()
 	}()
 	// Configure any upgrades that should go into effect during this block.
-	err = core.ApplyUpgrades(w.chainConfig, &parent.Time, types.NewBlockWithHeader(header), env.state)
+	blockContext := core.NewBlockContext(header.Number, header.Time)
+	err = core.ApplyUpgrades(w.chainConfig, &parent.Time, blockContext, env.state)
 	if err != nil {
 		log.Error("failed to configure precompiles mining new block", "parent", parent.Hash(), "number", header.Number, "timestamp", header.Time, "err", err)
 		return nil, err
