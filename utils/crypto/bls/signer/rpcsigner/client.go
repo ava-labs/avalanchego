@@ -25,7 +25,7 @@ type Client struct {
 func NewClient(conn *grpc.ClientConn) (*Client, error) {
 	client := pb.NewSignerClient(conn)
 
-	pubkeyResponse, err := client.PublicKey(context.Background(), &pb.PublicKeyRequest{})
+	pubkeyResponse, err := client.PublicKey(context.TODO(), &pb.PublicKeyRequest{})
 	if err != nil {
 		conn.Close()
 		return nil, err
@@ -68,8 +68,12 @@ func getSignatureFromResponse[T signatureResponse](resp T) (*bls.Signature, erro
 	return bls.SignatureFromBytes(signature)
 }
 
+func (c *Client) PublicKey() *bls.PublicKey {
+	return c.pk
+}
+
 func (c *Client) Sign(message []byte) (*bls.Signature, error) {
-	resp, err := c.client.Sign(context.Background(), &pb.SignRequest{Message: message})
+	resp, err := c.client.Sign(context.TODO(), &pb.SignRequest{Message: message})
 	if err != nil {
 		return nil, err
 	}
@@ -78,13 +82,9 @@ func (c *Client) Sign(message []byte) (*bls.Signature, error) {
 }
 
 func (c *Client) SignProofOfPossession(message []byte) (*bls.Signature, error) {
-	resp, err := c.client.SignProofOfPossession(context.Background(), &pb.SignProofOfPossessionRequest{Message: message})
+	resp, err := c.client.SignProofOfPossession(context.TODO(), &pb.SignProofOfPossessionRequest{Message: message})
 	if err != nil {
 		return nil, err
 	}
 	return getSignatureFromResponse(resp)
-}
-
-func (c *Client) PublicKey() *bls.PublicKey {
-	return c.pk
 }
