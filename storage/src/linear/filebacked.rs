@@ -7,7 +7,7 @@
 // read/write operations at once
 
 use std::fs::{File, OpenOptions};
-use std::io::{Error, Read, Seek};
+use std::io::{Error, Read};
 use std::num::NonZero;
 use std::os::unix::fs::FileExt;
 use std::path::PathBuf;
@@ -135,8 +135,9 @@ impl Read for PredictiveReader<'_> {
         if self.len == self.pos {
             let bytes_left_in_page = PREDICTIVE_READ_BUFFER_SIZE
                 - (self.offset % PREDICTIVE_READ_BUFFER_SIZE as u64) as usize;
-            self.fd.seek(std::io::SeekFrom::Start(self.offset))?;
-            let read = self.fd.read(&mut self.buffer[..bytes_left_in_page])?;
+            let read = self
+                .fd
+                .read_at(&mut self.buffer[..bytes_left_in_page], self.offset)?;
             self.offset += read as u64;
             self.len = read;
             self.pos = 0;
