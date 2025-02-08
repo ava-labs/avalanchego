@@ -39,6 +39,8 @@ use opentelemetry_sdk::Resource;
 
 #[derive(Parser, Debug)]
 struct Args {
+    #[arg(short = 't', long, default_value_t = false)]
+    no_telemetry_server: bool,
     #[arg(short, long, default_value_t = 10000)]
     batch_size: u64,
     #[arg(short, long, default_value_t = 1000)]
@@ -141,28 +143,30 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let reporter = OpenTelemetryReporter::new(
-        SpanExporter::builder()
-            .with_tonic()
-            .with_endpoint("http://127.0.0.1:4317".to_string())
-            .with_protocol(opentelemetry_otlp::Protocol::Grpc)
-            .with_timeout(Duration::from_secs(
-                opentelemetry_otlp::OTEL_EXPORTER_OTLP_TIMEOUT_DEFAULT,
-            ))
-            .build()
-            .expect("initialize oltp exporter"),
-        SpanKind::Server,
-        Cow::Owned(Resource::new([KeyValue::new(
-            "service.name",
-            "avalabs.firewood.benchmark",
-        )])),
-        InstrumentationScope::builder("firewood")
-            .with_version(env!("CARGO_PKG_VERSION"))
-            .build(),
-    );
-    fastrace::set_reporter(reporter, Config::default());
-
     let args = Args::parse();
+
+    if !args.no_telemetry_server {
+        let reporter = OpenTelemetryReporter::new(
+            SpanExporter::builder()
+                .with_tonic()
+                .with_endpoint("http://127.0.0.1:4317".to_string())
+                .with_protocol(opentelemetry_otlp::Protocol::Grpc)
+                .with_timeout(Duration::from_secs(
+                    opentelemetry_otlp::OTEL_EXPORTER_OTLP_TIMEOUT_DEFAULT,
+                ))
+                .build()
+                .expect("initialize oltp exporter"),
+            SpanKind::Server,
+            Cow::Owned(Resource::new([KeyValue::new(
+                "service.name",
+                "avalabs.firewood.benchmark",
+            )])),
+            InstrumentationScope::builder("firewood")
+                .with_version(env!("CARGO_PKG_VERSION"))
+                .build(),
+        );
+        fastrace::set_reporter(reporter, Config::default());
+    }
 
     if args.test_name == TestName::Single && args.batch_size > 1000 {
         panic!("Single test is not designed to handle batch sizes > 1000");
