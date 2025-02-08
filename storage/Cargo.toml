@@ -24,7 +24,7 @@ bitfield = "0.18.1"
 fastrace = { version = "0.7.4" }
 
 [dev-dependencies]
-rand = "0.8.5"
+rand = "0.9.0"
 test-case = "3.3.1"
 criterion = { version = "0.5.1", features = ["async_tokio", "html_reports"] }
 pprof = { version = "0.14.0", features = ["flamegraph"] }
