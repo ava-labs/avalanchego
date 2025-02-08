@@ -98,6 +98,10 @@ type view struct {
 	// The root of the trie represented by this view.
 	root maybe.Maybe[*node]
 
+	// The ID of the root node, calculated during view creation
+	// This avoids recalculating it during node operations
+	rootID ids.ID
+
 	tokenSize int
 }
 
@@ -145,39 +149,29 @@ func newView(
 	parentTrie View,
 	changes ViewChanges,
 ) (*view, error) {
+	if err := validateViewChanges(changes); err != nil {
+		return nil, err
+	}
+
+	changeSummary := newChangeSummary()
+	if err := changeSummary.trackChanges(changes); err != nil {
+		return nil, err
+	}
+
 	v := &view{
-		root:       maybe.Bind(parentTrie.getRoot(), (*node).clone),
 		db:         db,
 		parentTrie: parentTrie,
-		changes:    newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),
+		changes:    changeSummary,
 		tokenSize:  db.tokenSize,
 	}
 
-	for _, op := range changes.BatchOps {
-		key := op.Key
-		if !changes.ConsumeBytes {
-			key = slices.Clone(op.Key)
-		}
+	// Initialize root and calculate rootID
+	root := v.getRoot()
+	if root.HasValue() {
+		v.rootID = v.db.hasher.HashNode(root.Value())
+		v.db.metrics.HashCalculated()
+	}
 
-		newVal := maybe.Nothing[[]byte]()
-		if !op.Delete {
-			newVal = maybe.Some(op.Value)
-			if !changes.ConsumeBytes {
-				newVal = maybe.Some(slices.Clone(op.Value))
-			}
-		}
-		if err := v.recordValueChange(toKey(key), newVal); err != nil {
-			return nil, err
-		}
-	}
-	for key, val := range changes.MapOps {
-		if !changes.ConsumeBytes {
-			val = maybe.Bind(val, slices.Clone[[]byte])
-		}
-		if err := v.recordValueChange(toKey(stringToByteSlice(key)), val); err != nil {
-			return nil, err
-		}
-	}
 	return v, nil
 }
 
@@ -778,20 +772,15 @@ func (v *view) insert(
 	if closestNode == nil {
 		// [v.root.key] isn't a prefix of [key].
 		var (
-			oldRoot            = v.root.Value()
-			commonPrefixLength = getLengthOfCommonPrefix(oldRoot.key, key, 0 /*offset*/, v.tokenSize)
-			commonPrefix       = oldRoot.key.Take(commonPrefixLength)
-			newRoot            = newNode(commonPrefix)
-			oldRootID          = v.db.hasher.HashNode(oldRoot)
+			oldRoot             = v.root.Value()
+			newRoot             = &node{}
+			oldRootID          = v.rootID
 		)
 		v.db.metrics.HashCalculated()
 
 		// Call addChildWithID instead of addChild so the old root is added
 		// to the new root with the correct ID.
-		// TODO:
-		// [oldRootID] shouldn't need to be calculated here.
-		// Either oldRootID should already be calculated or will be calculated at the end with the other nodes
-		// Initialize the v.changes.rootID during newView and then use that here instead of oldRootID
+		// Use the pre-calculated rootID from view initialization
 		newRoot.addChildWithID(oldRoot, v.tokenSize, oldRootID)
 		if err := v.recordNewNode(newRoot); err != nil {
 			return nil, err
