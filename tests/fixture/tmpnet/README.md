@@ -369,7 +369,7 @@ metrics and logs.
 
 Collection of logs and metrics is enabled for CI jobs that use
 tmpnet. Each job will execute a step titled `Notify of metrics
-availability` that emits a link to grafana parametized to show results
-for the job. Additional links to grafana parametized to show results
+availability` that emits a link to grafana parameterized to show results
+for the job. Additional links to grafana parameterized to show results
 for individual network will appear in the logs displaying the start of
 those networks.
