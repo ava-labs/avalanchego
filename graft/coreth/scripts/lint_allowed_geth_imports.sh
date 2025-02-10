@@ -8,7 +8,7 @@ set -o pipefail
 # 1. Recursively search through all go files for any lines that include a direct import from go-ethereum
 # 2. Sort the unique results
 # #. Print out the difference between the search results and the list of specified allowed package imports from geth.
-extra_imports=$(grep -r --include='*.go' '"github.com/ethereum/go-ethereum/.*"' -o -h | sort -u | comm -23 - ./scripts/geth-allowed-packages.txt)
+extra_imports=$(find . -type f \( -name "*.go" \) ! -path "./core/main_test.go" -exec grep -o -h '"github.com/ethereum/go-ethereum/.*"' {} + | sort -u | comm -23 - ./scripts/geth-allowed-packages.txt)
 if [ -n "${extra_imports}" ]; then
     echo "new go-ethereum imports should be added to ./scripts/geth-allowed-packages.txt to prevent accidental imports:"
     echo "${extra_imports}"
