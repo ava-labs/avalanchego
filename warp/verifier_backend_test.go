@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+	"github.com/ava-labs/coreth/plugin/evm/testutils"
 	"github.com/ava-labs/coreth/utils"
 	"github.com/ava-labs/coreth/warp/warptest"
 	"github.com/stretchr/testify/require"
@@ -24,6 +25,8 @@ import (
 )
 
 func TestAddressedCallSignatures(t *testing.T) {
+	testutils.WithMetrics(t)
+
 	database := memdb.New()
 	snowCtx := utils.TestSnowContext()
 	blsSecretKey, err := localsigner.New()
@@ -138,6 +141,8 @@ func TestAddressedCallSignatures(t *testing.T) {
 }
 
 func TestBlockSignatures(t *testing.T) {
+	testutils.WithMetrics(t)
+
 	database := memdb.New()
 	snowCtx := utils.TestSnowContext()
 	blsSecretKey, err := localsigner.New()

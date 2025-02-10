@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/coreth/metrics"
+	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/stretchr/testify/require"
 )
 

@@ -34,8 +34,7 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/coreth/eth/ethconfig"
-	"github.com/ava-labs/coreth/metrics"
-	corethPrometheus "github.com/ava-labs/coreth/metrics/prometheus"
+	corethprometheus "github.com/ava-labs/coreth/metrics/prometheus"
 	"github.com/ava-labs/coreth/miner"
 	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/coreth/params"
@@ -46,6 +45,7 @@ import (
 	"github.com/ava-labs/coreth/triedb"
 	"github.com/ava-labs/coreth/triedb/hashdb"
 	"github.com/ava-labs/coreth/utils"
+	"github.com/ethereum/go-ethereum/metrics"
 
 	warpcontract "github.com/ava-labs/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/coreth/rpc"
@@ -631,13 +631,9 @@ func (vm *VM) Initialize(
 }
 
 func (vm *VM) initializeMetrics() error {
+	metrics.Enabled = true
 	vm.sdkMetrics = prometheus.NewRegistry()
-	// If metrics are enabled, register the default metrics registry
-	if !metrics.Enabled {
-		return nil
-	}
-
-	gatherer := corethPrometheus.Gatherer(metrics.DefaultRegistry)
+	gatherer := corethprometheus.NewGatherer(metrics.DefaultRegistry)
 	if err := vm.ctx.Metrics.Register(ethMetricsPrefix, gatherer); err != nil {
 		return err
 	}
