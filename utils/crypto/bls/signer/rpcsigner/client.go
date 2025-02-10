@@ -31,20 +31,17 @@ func NewClient(conn *grpc.ClientConn) (*Client, error) {
 
 	pubkeyResponse, err := client.PublicKey(context.TODO(), &pb.PublicKeyRequest{})
 	if err != nil {
-		conn.Close()
 		return nil, err
 	}
 
 	pkBytes := pubkeyResponse.GetPublicKey()
 
 	if pkBytes == nil {
-		conn.Close()
 		return nil, ErrorEmptyPublicKey
 	}
 
 	pk, err := bls.PublicKeyFromCompressedBytes(pkBytes)
 	if err != nil {
-		conn.Close()
 		return nil, err
 	}
 
@@ -53,10 +50,6 @@ func NewClient(conn *grpc.ClientConn) (*Client, error) {
 		conn:   conn,
 		pk:     pk,
 	}, nil
-}
-
-func (c *Client) Close() error {
-	return c.conn.Close()
 }
 
 type signatureResponse interface {
