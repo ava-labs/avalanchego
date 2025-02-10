@@ -16,26 +16,31 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 )
 
-type testClient struct{}
-
 var (
-	localSigner, _ = localsigner.New()
-
-	client = &Client{
-		client: &testClient{},
-		pk:     localSigner.PublicKey(),
-	}
-
 	validSignatureMsg        = []byte("valid")
 	uncompressedSignatureMsg = []byte("uncompressed")
 	emptySignatureMsg        = []byte("empty")
 	noSignatureMsg           = []byte("none")
 )
 
+func newSigner(t *testing.T) *Client {
+	localSigner, err := localsigner.New()
+	require.NoError(t, err)
+
+	return &Client{
+		client: &stubClient{
+			signer: localSigner,
+		},
+		pk: localSigner.PublicKey(),
+	}
+}
+
 func TestValidSignature(t *testing.T) {
+	client := newSigner(t)
 	sig, err := client.Sign(validSignatureMsg)
 	require.NoError(t, err)
-	bls.Verify(client.PublicKey(), sig, validSignatureMsg)
+	ok := bls.Verify(client.PublicKey(), sig, validSignatureMsg)
+	require.True(t, ok)
 }
 
 type test struct {
@@ -46,56 +51,69 @@ type test struct {
 
 var tests = []test{
 	{
-		name: "Uncompressed",
+		name: "uncompressed",
 		msg:  uncompressedSignatureMsg,
 		err:  bls.ErrFailedSignatureDecompress,
 	},
 	{
-		name: "Empty",
+		name: "empty",
 		msg:  emptySignatureMsg,
 		err:  ErrorEmptySignature,
 	},
 	{
-		name: "None",
+		name: "none",
 		msg:  noSignatureMsg,
 		err:  ErrorEmptySignature,
 	},
 }
 
 func TestInvalidSignature(t *testing.T) {
+	client := newSigner(t)
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			sig, err := client.Sign(test.msg)
 			require.Nil(t, sig)
-			require.EqualError(t, err, test.err.Error())
+			require.ErrorIs(t, err, test.err)
 		})
 	}
 }
 
 func TestValidPOPSignature(t *testing.T) {
+	client := newSigner(t)
 	sig, err := client.SignProofOfPossession(validSignatureMsg)
 	require.NoError(t, err)
-	bls.VerifyProofOfPossession(client.PublicKey(), sig, validSignatureMsg)
+	ok := bls.VerifyProofOfPossession(client.PublicKey(), sig, validSignatureMsg)
+	require.True(t, ok)
 }
 
 func TestInvalidPOPSignature(t *testing.T) {
+	client := newSigner(t)
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			sig, err := client.SignProofOfPossession(test.msg)
 			require.Nil(t, sig)
-			require.EqualError(t, err, test.err.Error())
+			require.ErrorIs(t, err, test.err)
 		})
 	}
 }
 
-func (*testClient) PublicKey(_ context.Context, _ *signer.PublicKeyRequest, _ ...grpc.CallOption) (*signer.PublicKeyResponse, error) {
+type stubClient struct {
+	signer *localsigner.LocalSigner
+}
+
+func (*stubClient) PublicKey(_ context.Context, _ *signer.PublicKeyRequest, _ ...grpc.CallOption) (*signer.PublicKeyResponse, error) {
+	// this function is not used in the tests, however it's required to implement the `signer.SignerClient` interface
 	return nil, nil
 }
 
-func (*testClient) Sign(_ context.Context, in *signer.SignRequest, _ ...grpc.CallOption) (*signer.SignResponse, error) {
+// for the `Sign` and `SignProofOfPossession` methods, we're using the same logic where
+// we match on the message to determine the type of response we want to test
+func (c *stubClient) Sign(_ context.Context, in *signer.SignRequest, _ ...grpc.CallOption) (*signer.SignResponse, error) {
 	switch string(in.Message) {
 	case string(validSignatureMsg):
-		sig, err := localSigner.Sign(in.Message)
+		sig, err := c.signer.Sign(in.Message)
 		if err != nil {
 			return nil, err
 		}
@@ -103,8 +121,9 @@ func (*testClient) Sign(_ context.Context, in *signer.SignRequest, _ ...grpc.Cal
 		return &signer.SignResponse{
 			Signature: bls.SignatureToBytes(sig),
 		}, nil
+	// the client expects a compressed signature so this signature is invalid
 	case string(uncompressedSignatureMsg):
-		sig, err := localSigner.Sign(in.Message)
+		sig, err := c.signer.Sign(in.Message)
 		if err != nil {
 			return nil, err
 		}
@@ -112,6 +131,8 @@ func (*testClient) Sign(_ context.Context, in *signer.SignRequest, _ ...grpc.Cal
 		bytes := sig.Serialize()
 
 		return &signer.SignResponse{
+			// here, we're using the compressed signature length
+			// we could also use the full signature
 			Signature: bytes[:bls.SignatureLen],
 		}, nil
 	case string(emptySignatureMsg):
@@ -125,10 +146,11 @@ func (*testClient) Sign(_ context.Context, in *signer.SignRequest, _ ...grpc.Cal
 	}
 }
 
-func (*testClient) SignProofOfPossession(_ context.Context, in *signer.SignProofOfPossessionRequest, _ ...grpc.CallOption) (*signer.SignProofOfPossessionResponse, error) {
+// see comments from `Sign` function above
+func (c *stubClient) SignProofOfPossession(_ context.Context, in *signer.SignProofOfPossessionRequest, _ ...grpc.CallOption) (*signer.SignProofOfPossessionResponse, error) {
 	switch string(in.Message) {
 	case string(validSignatureMsg):
-		sig, err := localSigner.SignProofOfPossession(in.Message)
+		sig, err := c.signer.SignProofOfPossession(in.Message)
 		if err != nil {
 			return nil, err
 		}
@@ -136,7 +158,7 @@ func (*testClient) SignProofOfPossession(_ context.Context, in *signer.SignProof
 			Signature: bls.SignatureToBytes(sig),
 		}, nil
 	case string(uncompressedSignatureMsg):
-		sig, err := localSigner.SignProofOfPossession(in.Message)
+		sig, err := c.signer.SignProofOfPossession(in.Message)
 		if err != nil {
 			return nil, err
 		}
