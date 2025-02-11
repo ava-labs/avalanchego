@@ -19,6 +19,8 @@ import (
 	"github.com/ava-labs/subnet-evm/trie"
 	"github.com/ava-labs/subnet-evm/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
+
+	customheader "github.com/ava-labs/subnet-evm/plugin/evm/header"
 )
 
 var (
@@ -200,25 +202,18 @@ func (eng *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, header
 
 // modified from consensus.go
 func (eng *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header *types.Header, parent *types.Header, uncle bool) error {
-	config := chain.Config()
 	// Ensure that we do not verify an uncle
 	if uncle {
 		return errUnclesUnsupported
 	}
-	switch {
-	case config.IsDurango(header.Time):
-		if len(header.Extra) < params.DynamicFeeExtraDataSize {
-			return fmt.Errorf("expected extra-data field length >= %d, found %d", params.DynamicFeeExtraDataSize, len(header.Extra))
-		}
-	case config.IsSubnetEVM(header.Time):
-		if len(header.Extra) != params.DynamicFeeExtraDataSize {
-			return fmt.Errorf("expected extra-data field to be: %d, but found %d", params.DynamicFeeExtraDataSize, len(header.Extra))
-		}
-	default:
-		if uint64(len(header.Extra)) > params.MaximumExtraDataSize {
-			return fmt.Errorf("extra-data too long: %d > %d", len(header.Extra), params.MaximumExtraDataSize)
-		}
+
+	// Verify the extra data is well-formed.
+	config := chain.Config()
+	rules := config.GetAvalancheRules(header.Time)
+	if err := customheader.VerifyExtra(rules, header.Extra); err != nil {
+		return err
 	}
+
 	// Ensure gas-related header fields are correct
 	if err := eng.verifyHeaderGasFields(config, header, parent, chain); err != nil {
 		return err
@@ -242,7 +237,7 @@ func (eng *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header *
 		return consensus.ErrInvalidNumber
 	}
 	// Verify the existence / non-existence of excessBlobGas
-	cancun := chain.Config().IsCancun(header.Number, header.Time)
+	cancun := config.IsCancun(header.Number, header.Time)
 	if !cancun {
 		switch {
 		case header.ExcessBlobGas != nil:
