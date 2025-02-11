@@ -19,10 +19,10 @@ tikv-jemallocator = "0.6.0"
 env_logger = "0.11.5"
 log = "0.4.20"
 fastrace = { version = "0.7.4", features = ["enable"] }
-fastrace-opentelemetry = { version = "0.8.0" }
-opentelemetry-otlp = "0.27.0"
-opentelemetry = "0.27.0"
-opentelemetry_sdk = "0.27.1"
+fastrace-opentelemetry = { version = "0.9.0" }
+opentelemetry-otlp = { version = "0.28.0", features = ["grpc-tonic"] }
+opentelemetry = "0.28.0"
+opentelemetry_sdk = "0.28.0"
 
 [features]
 logger = ["firewood/logger"]
