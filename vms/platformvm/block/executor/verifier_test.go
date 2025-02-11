@@ -72,7 +72,7 @@ func newTestVerifier(t testing.TB, c testVerifierConfig) *verifier {
 		c.Context = snowtest.Context(t, constants.PlatformChainID)
 	}
 
-	mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+	mempool, err := mempool.New("", prometheus.NewRegistry())
 	require.NoError(err)
 
 	var (

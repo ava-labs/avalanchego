@@ -135,8 +135,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
 				mempool.EXPECT().GetDropReason(gomock.Any()).Return(nil)
 				mempool.EXPECT().Add(gomock.Any()).Return(nil)
-				mempool.EXPECT().Len().Return(0)
-				mempool.EXPECT().RequestBuildBlock(false)
+				mempool.EXPECT().Len().Return(0).AnyTimes()
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, true).Times(2)
 				return mempool
 			},
@@ -162,6 +161,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				snowCtx.ValidatorState,
 				tt.txVerifier,
 				tt.mempoolFunc(ctrl),
+				nil,
 				false,
 				tt.appSenderFunc(ctrl),
 				nil,

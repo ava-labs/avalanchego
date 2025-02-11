@@ -46,6 +46,7 @@ func New(
 	vdrs validators.State,
 	txVerifier TxVerifier,
 	mempool mempool.Mempool,
+	toEngine chan<- common.Message,
 	partialSyncPrimaryNetwork bool,
 	appSender common.AppSender,
 	stateLock sync.Locker,
@@ -78,6 +79,7 @@ func New(
 
 	gossipMempool, err := newGossipMempool(
 		mempool,
+		toEngine,
 		registerer,
 		log,
 		txVerifier,

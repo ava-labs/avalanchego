@@ -142,7 +142,7 @@ func TestRejectBlock(t *testing.T) {
 				mempool.EXPECT().Add(tx).Return(nil).Times(1)
 			}
 
-			mempool.EXPECT().RequestBuildBlock(false).Times(1)
+			mempool.EXPECT().Len().Return(len(blk.Txs()))
 
 			require.NoError(tt.rejectFunc(rejector, blk))
 			// Make sure block and its parent are removed from the state map.

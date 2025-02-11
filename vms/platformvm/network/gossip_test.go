@@ -39,6 +39,7 @@ func TestGossipMempoolAddVerificationError(t *testing.T) {
 
 	gossipMempool, err := newGossipMempool(
 		mempool,
+		nil,
 		prometheus.NewRegistry(),
 		logging.NoLog{},
 		txVerifier,
@@ -73,6 +74,7 @@ func TestGossipMempoolAddError(t *testing.T) {
 
 	gossipMempool, err := newGossipMempool(
 		mempool,
+		nil,
 		prometheus.NewRegistry(),
 		logging.NoLog{},
 		txVerifier,
@@ -104,6 +106,7 @@ func TestMempoolDuplicate(t *testing.T) {
 
 	gossipMempool, err := newGossipMempool(
 		testMempool,
+		nil,
 		prometheus.NewRegistry(),
 		logging.NoLog{},
 		txVerifier,
@@ -134,11 +137,11 @@ func TestGossipAddBloomFilter(t *testing.T) {
 	mempool.EXPECT().Get(txID).Return(nil, false)
 	mempool.EXPECT().GetDropReason(txID).Return(nil)
 	mempool.EXPECT().Add(tx).Return(nil)
-	mempool.EXPECT().Len().Return(0)
-	mempool.EXPECT().RequestBuildBlock(false)
+	mempool.EXPECT().Len().Return(0).AnyTimes()
 
 	gossipMempool, err := newGossipMempool(
 		mempool,
+		nil,
 		prometheus.NewRegistry(),
 		logging.NoLog{},
 		txVerifier,

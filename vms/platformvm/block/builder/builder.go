@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -84,6 +85,7 @@ type Builder interface {
 type builder struct {
 	mempool.Mempool
 
+	toEngine          chan<- common.Message
 	txExecutorBackend *txexecutor.Backend
 	blkManager        blockexecutor.Manager
 
@@ -96,11 +98,13 @@ type builder struct {
 
 func New(
 	mempool mempool.Mempool,
+	toEngine chan<- common.Message,
 	txExecutorBackend *txexecutor.Backend,
 	blkManager blockexecutor.Manager,
 ) Builder {
 	return &builder{
 		Mempool:           mempool,
+		toEngine:          toEngine,
 		txExecutorBackend: txExecutorBackend,
 		blkManager:        blkManager,
 		resetTimer:        make(chan struct{}, 1),
@@ -143,7 +147,10 @@ func (b *builder) StartBlockTimer() {
 				}
 
 				// Block needs to be issued to advance time.
-				b.Mempool.RequestBuildBlock(true /*=emptyBlockPermitted*/)
+				select {
+				case b.toEngine <- common.PendingTxs:
+				default:
+				}
 
 				// Invariant: ResetBlockTimer is guaranteed to be called after
 				// [durationToSleep] returns a value <= 0. This is because we
@@ -225,7 +232,16 @@ func (b *builder) BuildBlockWithContext(
 ) (snowman.Block, error) {
 	// If there are still transactions in the mempool, then we need to
 	// re-trigger block building.
-	defer b.Mempool.RequestBuildBlock(false /*=emptyBlockPermitted*/)
+	defer func() {
+		if b.Mempool.Len() == 0 {
+			return
+		}
+
+		select {
+		case b.toEngine <- common.PendingTxs:
+		default:
+		}
+	}()
 
 	b.txExecutorBackend.Ctx.Log.Debug("starting to attempt to build a block")
 
