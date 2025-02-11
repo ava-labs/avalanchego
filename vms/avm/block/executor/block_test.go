@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
@@ -27,7 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/state/statemock"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
-	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool/mempoolmock"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/txsmock"
 )
 
@@ -127,8 +128,8 @@ func TestBlockVerify(t *testing.T) {
 				}
 				mockBlock.EXPECT().Txs().Return([]*txs.Tx{errTx}).AnyTimes()
 
-				mempool := mempoolmock.NewMempool(ctrl)
-				mempool.EXPECT().MarkDropped(errTx.ID(), errTest).Times(1)
+				mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+				require.NoError(t, err)
 				return &Block{
 					Block: mockBlock,
 					manager: &manager{
@@ -285,8 +286,8 @@ func TestBlockVerify(t *testing.T) {
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
 
-				mempool := mempoolmock.NewMempool(ctrl)
-				mempool.EXPECT().MarkDropped(tx.ID(), errTest).Times(1)
+				mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+				require.NoError(t, err)
 				return &Block{
 					Block: mockBlock,
 					manager: &manager{
@@ -336,8 +337,8 @@ func TestBlockVerify(t *testing.T) {
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
 
-				mempool := mempoolmock.NewMempool(ctrl)
-				mempool.EXPECT().MarkDropped(tx.ID(), errTest).Times(1)
+				mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+				require.NoError(t, err)
 				return &Block{
 					Block: mockBlock,
 					manager: &manager{
@@ -414,8 +415,8 @@ func TestBlockVerify(t *testing.T) {
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
 
-				mempool := mempoolmock.NewMempool(ctrl)
-				mempool.EXPECT().MarkDropped(tx2.ID(), ErrConflictingBlockTxs).Times(1)
+				mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+				require.NoError(t, err)
 				return &Block{
 					Block: mockBlock,
 					manager: &manager{
@@ -509,6 +510,7 @@ func TestBlockVerify(t *testing.T) {
 				mockUnsignedTx.EXPECT().Visit(gomock.Any()).Return(nil).Times(1) // Syntactic verification passes
 				mockUnsignedTx.EXPECT().Visit(gomock.Any()).Return(nil).Times(1) // Semantic verification fails
 				mockUnsignedTx.EXPECT().Visit(gomock.Any()).Return(nil).Times(1) // Execution passes
+				mockUnsignedTx.EXPECT().InputIDs().AnyTimes()
 				tx := &txs.Tx{
 					Unsigned: mockUnsignedTx,
 				}
@@ -524,12 +526,13 @@ func TestBlockVerify(t *testing.T) {
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
 
-				mockMempool := mempoolmock.NewMempool(ctrl)
-				mockMempool.EXPECT().Remove([]*txs.Tx{tx})
+				mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+				require.NoError(t, err)
+
 				return &Block{
 					Block: mockBlock,
 					manager: &manager{
-						mempool: mockMempool,
+						mempool: mempool,
 						metrics: metricsmock.NewMetrics(ctrl),
 						backend: defaultTestBackend(false, nil),
 						blkIDToState: map[ids.ID]*blockState{
@@ -597,8 +600,8 @@ func TestBlockAccept(t *testing.T) {
 				mockBlock.EXPECT().ID().Return(ids.GenerateTestID()).AnyTimes()
 				mockBlock.EXPECT().Txs().Return([]*txs.Tx{}).AnyTimes()
 
-				mempool := mempoolmock.NewMempool(ctrl)
-				mempool.EXPECT().Remove(gomock.Any()).AnyTimes()
+				mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+				require.NoError(t, err)
 
 				return &Block{
 					Block: mockBlock,
@@ -620,8 +623,8 @@ func TestBlockAccept(t *testing.T) {
 				mockBlock.EXPECT().ID().Return(blockID).AnyTimes()
 				mockBlock.EXPECT().Txs().Return([]*txs.Tx{}).AnyTimes()
 
-				mempool := mempoolmock.NewMempool(ctrl)
-				mempool.EXPECT().Remove(gomock.Any()).AnyTimes()
+				mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+				require.NoError(t, err)
 
 				mockManagerState := statemock.NewState(ctrl)
 				mockManagerState.EXPECT().CommitBatch().Return(nil, errTest)
@@ -654,8 +657,8 @@ func TestBlockAccept(t *testing.T) {
 				mockBlock.EXPECT().ID().Return(blockID).AnyTimes()
 				mockBlock.EXPECT().Txs().Return([]*txs.Tx{}).AnyTimes()
 
-				mempool := mempoolmock.NewMempool(ctrl)
-				mempool.EXPECT().Remove(gomock.Any()).AnyTimes()
+				mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+				require.NoError(t, err)
 
 				mockManagerState := statemock.NewState(ctrl)
 				// Note the returned batch is nil but not used
@@ -693,8 +696,8 @@ func TestBlockAccept(t *testing.T) {
 				mockBlock.EXPECT().ID().Return(blockID).AnyTimes()
 				mockBlock.EXPECT().Txs().Return([]*txs.Tx{}).AnyTimes()
 
-				mempool := mempoolmock.NewMempool(ctrl)
-				mempool.EXPECT().Remove(gomock.Any()).AnyTimes()
+				mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+				require.NoError(t, err)
 
 				mockManagerState := statemock.NewState(ctrl)
 				// Note the returned batch is nil but not used
@@ -738,8 +741,8 @@ func TestBlockAccept(t *testing.T) {
 				mockBlock.EXPECT().Parent().Return(ids.GenerateTestID()).AnyTimes()
 				mockBlock.EXPECT().Txs().Return([]*txs.Tx{}).AnyTimes()
 
-				mempool := mempoolmock.NewMempool(ctrl)
-				mempool.EXPECT().Remove(gomock.Any()).AnyTimes()
+				mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+				require.NoError(t, err)
 
 				mockManagerState := statemock.NewState(ctrl)
 				// Note the returned batch is nil but not used
@@ -810,6 +813,7 @@ func TestBlockReject(t *testing.T) {
 				unsignedValidTx := txsmock.NewUnsignedTx(ctrl)
 				unsignedValidTx.EXPECT().SetBytes(gomock.Any())
 				unsignedValidTx.EXPECT().Visit(gomock.Any()).Return(nil).AnyTimes() // Passes verification and execution
+				unsignedValidTx.EXPECT().InputIDs().Return(nil)
 
 				unsignedSyntacticallyInvalidTx := txsmock.NewUnsignedTx(ctrl)
 				unsignedSyntacticallyInvalidTx.EXPECT().SetBytes(gomock.Any())
@@ -843,9 +847,8 @@ func TestBlockReject(t *testing.T) {
 					executionFailsTx,
 				})
 
-				mempool := mempoolmock.NewMempool(ctrl)
-				mempool.EXPECT().Add(validTx).Return(nil) // Only add the one that passes verification
-				mempool.EXPECT().RequestBuildBlock()
+				mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+				require.NoError(t, err)
 
 				lastAcceptedID := ids.GenerateTestID()
 				mockState := statemock.NewState(ctrl)
@@ -879,10 +882,12 @@ func TestBlockReject(t *testing.T) {
 				unsignedTx1 := txsmock.NewUnsignedTx(ctrl)
 				unsignedTx1.EXPECT().SetBytes(gomock.Any())
 				unsignedTx1.EXPECT().Visit(gomock.Any()).Return(nil).AnyTimes() // Passes verification and execution
+				unsignedTx1.EXPECT().InputIDs().Return(nil)
 
 				unsignedTx2 := txsmock.NewUnsignedTx(ctrl)
 				unsignedTx2.EXPECT().SetBytes(gomock.Any())
 				unsignedTx2.EXPECT().Visit(gomock.Any()).Return(nil).AnyTimes() // Passes verification and execution
+				unsignedTx2.EXPECT().InputIDs().Return(nil)
 
 				// Give each tx a unique ID
 				tx1 := &txs.Tx{Unsigned: unsignedTx1}
@@ -895,10 +900,8 @@ func TestBlockReject(t *testing.T) {
 					tx2,
 				})
 
-				mempool := mempoolmock.NewMempool(ctrl)
-				mempool.EXPECT().Add(tx1).Return(nil)
-				mempool.EXPECT().Add(tx2).Return(nil)
-				mempool.EXPECT().RequestBuildBlock()
+				mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+				require.NoError(t, err)
 
 				lastAcceptedID := ids.GenerateTestID()
 				mockState := statemock.NewState(ctrl)
