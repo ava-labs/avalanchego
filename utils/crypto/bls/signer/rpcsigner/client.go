@@ -26,10 +26,10 @@ type Client struct {
 	pk     *bls.PublicKey
 }
 
-func NewClient(conn *grpc.ClientConn) (*Client, error) {
+func NewClient(ctx context.Context, conn *grpc.ClientConn) (*Client, error) {
 	client := pb.NewSignerClient(conn)
 
-	pubkeyResponse, err := client.PublicKey(context.TODO(), &pb.PublicKeyRequest{})
+	pubkeyResponse, err := client.PublicKey(ctx, &pb.PublicKeyRequest{})
 	if err != nil {
 		return nil, err
 	}
