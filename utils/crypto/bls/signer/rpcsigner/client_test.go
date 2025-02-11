@@ -68,10 +68,9 @@ var tests = []test{
 }
 
 func TestInvalidSignature(t *testing.T) {
-	client := newSigner(t)
-
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			client := newSigner(t)
 			sig, err := client.Sign(test.msg)
 			require.Nil(t, sig)
 			require.ErrorIs(t, err, test.err)
@@ -88,10 +87,9 @@ func TestValidPOPSignature(t *testing.T) {
 }
 
 func TestInvalidPOPSignature(t *testing.T) {
-	client := newSigner(t)
-
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			client := newSigner(t)
 			sig, err := client.SignProofOfPossession(test.msg)
 			require.Nil(t, sig)
 			require.ErrorIs(t, err, test.err)
