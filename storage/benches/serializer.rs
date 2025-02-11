@@ -1,10 +1,14 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use std::{array::from_fn, fs::File, num::NonZeroU64, os::raw::c_int};
+use std::array::from_fn;
+use std::fs::File;
+use std::num::NonZeroU64;
+use std::os::raw::c_int;
 
 use bincode::Options;
-use criterion::{criterion_group, criterion_main, profiler::Profiler, Criterion};
+use criterion::profiler::Profiler;
+use criterion::{criterion_group, criterion_main, Criterion};
 use pprof::ProfilerGuard;
 use smallvec::SmallVec;
 use storage::{LeafNode, Node, Path};

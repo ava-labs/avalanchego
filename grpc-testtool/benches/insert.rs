@@ -2,11 +2,17 @@
 // See the file LICENSE.md for licensing terms.
 
 use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
-use rand::{distributions::Alphanumeric, Rng, SeedableRng};
-use std::{
-    borrow::BorrowMut as _, cell::RefCell, env, fs::remove_dir_all, net::TcpStream,
-    os::unix::process::CommandExt, path::PathBuf, thread::sleep, time::Duration,
-};
+use rand::distributions::Alphanumeric;
+use rand::{Rng, SeedableRng};
+use std::borrow::BorrowMut as _;
+use std::cell::RefCell;
+use std::env;
+use std::fs::remove_dir_all;
+use std::net::TcpStream;
+use std::os::unix::process::CommandExt;
+use std::path::PathBuf;
+use std::thread::sleep;
+use std::time::Duration;
 
 use rpc::rpcdb::{self, PutRequest, WriteBatchRequest};
 pub use rpc::service::Database as DatabaseService;

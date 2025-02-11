@@ -2,13 +2,14 @@
 // See the file LICENSE.md for licensing terms.
 
 use super::{Database as DatabaseService, IntoStatusResultExt as _, Iter};
+use crate::rpcdb::database_server::Database;
 use crate::rpcdb::{
-    database_server::Database, CloseRequest, CloseResponse, CompactRequest, CompactResponse,
-    DeleteRequest, DeleteResponse, GetRequest, GetResponse, HasRequest, HasResponse,
-    HealthCheckResponse, IteratorErrorRequest, IteratorErrorResponse, IteratorNextRequest,
-    IteratorNextResponse, IteratorReleaseRequest, IteratorReleaseResponse,
-    NewIteratorWithStartAndPrefixRequest, NewIteratorWithStartAndPrefixResponse, PutRequest,
-    PutResponse, WriteBatchRequest, WriteBatchResponse,
+    CloseRequest, CloseResponse, CompactRequest, CompactResponse, DeleteRequest, DeleteResponse,
+    GetRequest, GetResponse, HasRequest, HasResponse, HealthCheckResponse, IteratorErrorRequest,
+    IteratorErrorResponse, IteratorNextRequest, IteratorNextResponse, IteratorReleaseRequest,
+    IteratorReleaseResponse, NewIteratorWithStartAndPrefixRequest,
+    NewIteratorWithStartAndPrefixResponse, PutRequest, PutResponse, WriteBatchRequest,
+    WriteBatchResponse,
 };
 use firewood::v2::api::{BatchOp, Db as _, DbView as _, Proposal as _};
 

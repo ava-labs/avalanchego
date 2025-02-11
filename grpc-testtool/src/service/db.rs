@@ -2,10 +2,11 @@
 // See the file LICENSE.md for licensing terms.
 
 use super::Database;
+use crate::sync::db_server::Db as DbServerTrait;
 use crate::sync::{
-    db_server::Db as DbServerTrait, CommitChangeProofRequest, CommitRangeProofRequest,
-    GetChangeProofRequest, GetChangeProofResponse, GetMerkleRootResponse, GetProofRequest,
-    GetProofResponse, GetRangeProofRequest, GetRangeProofResponse, VerifyChangeProofRequest,
+    CommitChangeProofRequest, CommitRangeProofRequest, GetChangeProofRequest,
+    GetChangeProofResponse, GetMerkleRootResponse, GetProofRequest, GetProofResponse,
+    GetRangeProofRequest, GetRangeProofResponse, VerifyChangeProofRequest,
     VerifyChangeProofResponse,
 };
 use tonic::{async_trait, Request, Response, Status};

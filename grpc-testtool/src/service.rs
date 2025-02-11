@@ -2,18 +2,13 @@
 // See the file LICENSE.md for licensing terms.
 
 use firewood::db::{Db, DbConfig};
-use firewood::v2::api::Db as _;
-use firewood::v2::api::Error;
+use firewood::v2::api::{Db as _, Error};
 
+use std::collections::HashMap;
+use std::ops::Deref;
 use std::path::Path;
-use std::{
-    collections::HashMap,
-    ops::Deref,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
-};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use tokio::sync::Mutex;
 use tonic::Status;
 

@@ -4,8 +4,7 @@
 use sha2::{Digest, Sha256};
 use std::iter::{self};
 
-use crate::{BranchNode, Child, LeafNode, TrieHash};
-use crate::{Node, Path};
+use crate::{BranchNode, Child, LeafNode, Node, Path, TrieHash};
 
 use integer_encoding::VarInt;
 

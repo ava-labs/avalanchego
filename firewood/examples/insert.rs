@@ -5,16 +5,16 @@
 // insert some random keys using the front-end API.
 
 use clap::Parser;
-use std::{
-    borrow::BorrowMut as _, collections::HashMap, error::Error, num::NonZeroUsize,
-    ops::RangeInclusive, time::Instant,
-};
+use std::borrow::BorrowMut as _;
+use std::collections::HashMap;
+use std::error::Error;
+use std::num::NonZeroUsize;
+use std::ops::RangeInclusive;
+use std::time::Instant;
 
-use firewood::{
-    db::{Batch, BatchOp, Db, DbConfig},
-    manager::RevisionManagerConfig,
-    v2::api::{Db as _, DbView, Proposal as _},
-};
+use firewood::db::{Batch, BatchOp, Db, DbConfig};
+use firewood::manager::RevisionManagerConfig;
+use firewood::v2::api::{Db as _, DbView, Proposal as _};
 use rand::{Rng, SeedableRng as _};
 use rand_distr::Alphanumeric;
 

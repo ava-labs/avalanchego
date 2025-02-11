@@ -2,10 +2,8 @@
 // See the file LICENSE.md for licensing terms.
 
 use super::{ReadableStorage, WritableStorage};
-use std::{
-    io::{Cursor, Read},
-    sync::Mutex,
-};
+use std::io::{Cursor, Read};
+use std::sync::Mutex;
 
 #[derive(Debug, Default)]
 /// An in-memory impelementation of [WritableStorage] and [ReadableStorage]

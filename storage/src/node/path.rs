@@ -5,11 +5,8 @@
 use bitflags::bitflags;
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
-use std::iter::FusedIterator;
-use std::{
-    fmt::{self, Debug},
-    iter::once,
-};
+use std::fmt::{self, Debug};
+use std::iter::{once, FusedIterator};
 
 static NIBBLES: [u8; 16] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 

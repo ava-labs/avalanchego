@@ -3,15 +3,20 @@
 
 // hash benchmarks; run with 'cargo bench'
 
-use criterion::{criterion_group, criterion_main, profiler::Profiler, BatchSize, Criterion};
+use criterion::profiler::Profiler;
+use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use firewood::db::{BatchOp, DbConfig};
 use firewood::merkle::Merkle;
 use firewood::v2::api::{Db as _, Proposal as _};
 use pprof::ProfilerGuard;
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use rand_distr::Alphanumeric;
+use std::fs::File;
+use std::iter::repeat_with;
+use std::os::raw::c_int;
+use std::path::Path;
 use std::sync::Arc;
-use std::{fs::File, iter::repeat_with, os::raw::c_int, path::Path};
 use storage::{MemStore, NodeStore};
 
 // To enable flamegraph output

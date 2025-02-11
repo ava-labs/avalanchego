@@ -1,7 +1,8 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use serde::{ser::SerializeStruct as _, Deserialize, Serialize};
+use serde::ser::SerializeStruct as _;
+use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 
 use crate::{LeafNode, LinearAddress, Node, Path, TrieHash};

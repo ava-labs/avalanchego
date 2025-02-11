@@ -1,7 +1,10 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use std::{env::temp_dir, fs::remove_file, ops::Deref, path::PathBuf};
+use std::env::temp_dir;
+use std::fs::remove_file;
+use std::ops::Deref;
+use std::path::PathBuf;
 
 use firewood::db::{Db, DbConfig};
 use typed_builder::TypedBuilder;

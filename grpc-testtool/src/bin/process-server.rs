@@ -5,20 +5,18 @@ use chrono::Local;
 use clap::Parser;
 use env_logger::Builder;
 use log::{info, LevelFilter};
-use rpc::{
-    process_server::process_server_service_server::ProcessServerServiceServer,
-    rpcdb::database_server::DatabaseServer as RpcServer, sync::db_server::DbServer as SyncServer,
-    DatabaseService,
-};
+use rpc::process_server::process_server_service_server::ProcessServerServiceServer;
+use rpc::rpcdb::database_server::DatabaseServer as RpcServer;
+use rpc::sync::db_server::DbServer as SyncServer;
+use rpc::DatabaseService;
 use serde::Deserialize;
-use std::{
-    error::Error,
-    io::Write,
-    net::{IpAddr::V4, Ipv4Addr},
-    path::PathBuf,
-    str::FromStr,
-    sync::Arc,
-};
+use std::error::Error;
+use std::io::Write;
+use std::net::IpAddr::V4;
+use std::net::Ipv4Addr;
+use std::path::PathBuf;
+use std::str::FromStr;
+use std::sync::Arc;
 use tonic::transport::Server;
 
 #[derive(Clone, Debug, Deserialize)]

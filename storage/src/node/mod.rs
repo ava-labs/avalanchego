@@ -5,17 +5,17 @@ use bitfield::bitfield;
 use enum_as_inner::EnumAsInner;
 use integer_encoding::{VarIntReader as _, VarIntWriter as _};
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 use std::io::{Error, ErrorKind, Read, Write};
 use std::num::NonZero;
+use std::sync::Arc;
 use std::vec;
-use std::{fmt::Debug, sync::Arc};
 
 mod branch;
 mod leaf;
 pub mod path;
 
-pub use branch::BranchNode;
-pub use branch::Child;
+pub use branch::{BranchNode, Child};
 pub use leaf::LeafNode;
 
 use crate::Path;
@@ -464,10 +464,8 @@ pub struct PathIterItem {
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        node::{BranchNode, LeafNode, Node},
-        Child, LinearAddress, Path,
-    };
+    use crate::node::{BranchNode, LeafNode, Node};
+    use crate::{Child, LinearAddress, Path};
     use test_case::test_case;
 
     #[test_case(

@@ -3,8 +3,10 @@
 
 use std::fmt::{self, Debug};
 
-use serde::{de::Visitor, Deserialize, Serialize};
-use sha2::digest::{generic_array::GenericArray, typenum};
+use serde::de::Visitor;
+use serde::{Deserialize, Serialize};
+use sha2::digest::generic_array::GenericArray;
+use sha2::digest::typenum;
 
 /// A hash value inside a merkle trie
 /// We use the same type as returned by sha2 here to avoid copies

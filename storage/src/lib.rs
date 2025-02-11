@@ -23,14 +23,14 @@ pub mod logger;
 // re-export these so callers don't need to know where they are
 pub use hashednode::{hash_node, hash_preimage, Hashable, Preimage, ValueDigest};
 pub use linear::{ReadableStorage, WritableStorage};
-pub use node::{
-    path::NibblesIterator, path::Path, BranchNode, Child, LeafNode, Node, PathIterItem,
-};
+pub use node::path::{NibblesIterator, Path};
+pub use node::{BranchNode, Child, LeafNode, Node, PathIterItem};
 pub use nodestore::{
     Committed, HashedNodeReader, ImmutableProposal, LinearAddress, MutableProposal, NodeReader,
     NodeStore, Parentable, ReadInMemoryNode, RootReader, TrieReader, UpdateError,
 };
 
-pub use linear::{filebacked::FileBacked, memory::MemStore};
+pub use linear::filebacked::FileBacked;
+pub use linear::memory::MemStore;
 
 pub use trie_hash::TrieHash;

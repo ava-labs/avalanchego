@@ -2,12 +2,13 @@
 // See the file LICENSE.md for licensing terms.
 
 use crate::manager::RevisionManagerError;
-use crate::proof::ProofNode;
+use crate::merkle::MerkleError;
+use crate::proof::{Proof, ProofNode};
 pub use crate::range_proof::RangeProof;
-use crate::{merkle::MerkleError, proof::Proof};
 use async_trait::async_trait;
 use futures::Stream;
-use std::{fmt::Debug, sync::Arc};
+use std::fmt::Debug;
+use std::sync::Arc;
 use storage::TrieHash;
 
 /// A `KeyType` is something that can be xcast to a u8 reference,

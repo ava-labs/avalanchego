@@ -1,15 +1,11 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use crate::{
-    proof::{Proof, ProofNode},
-    range_proof::RangeProof,
-};
+use crate::proof::{Proof, ProofNode};
+use crate::range_proof::RangeProof;
 
-use super::{
-    api::{Batch, Db, DbView, Error, HashKey, KeyType, ValueType},
-    propose::{Proposal, ProposalBase},
-};
+use super::api::{Batch, Db, DbView, Error, HashKey, KeyType, ValueType};
+use super::propose::{Proposal, ProposalBase};
 use async_trait::async_trait;
 use futures::Stream;
 use std::sync::Arc;
