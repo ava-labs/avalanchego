@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/coreth/constants"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/header"
 	"github.com/ava-labs/coreth/trie"
 )
 
@@ -120,37 +121,9 @@ func (v blockValidator) SyntacticVerify(b *Block, rules params.Rules) error {
 		}
 	}
 
-	// Check that the size of the header's Extra data field is correct for [rules].
-	headerExtraDataSize := len(ethHeader.Extra)
-	switch {
-	case rules.IsDurango:
-		if headerExtraDataSize < params.DynamicFeeExtraDataSize {
-			return fmt.Errorf(
-				"expected header ExtraData to be len >= %d but got %d",
-				params.DynamicFeeExtraDataSize, len(ethHeader.Extra),
-			)
-		}
-	case rules.IsApricotPhase3:
-		if headerExtraDataSize != params.DynamicFeeExtraDataSize {
-			return fmt.Errorf(
-				"expected header ExtraData to be len %d but got %d",
-				params.DynamicFeeExtraDataSize, headerExtraDataSize,
-			)
-		}
-	case rules.IsApricotPhase1:
-		if headerExtraDataSize != 0 {
-			return fmt.Errorf(
-				"expected header ExtraData to be 0 but got %d",
-				headerExtraDataSize,
-			)
-		}
-	default:
-		if uint64(headerExtraDataSize) > params.MaximumExtraDataSize {
-			return fmt.Errorf(
-				"expected header ExtraData to be <= %d but got %d",
-				params.MaximumExtraDataSize, headerExtraDataSize,
-			)
-		}
+	// Verify the extra data is well-formed.
+	if err := header.VerifyExtra(rules.AvalancheRules, ethHeader.Extra); err != nil {
+		return err
 	}
 
 	if b.ethBlock.Version() != 0 {
