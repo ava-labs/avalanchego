@@ -16,4 +16,8 @@ if [[ -n "${FILTER_BY_OWNER:-}" ]]; then
   metrics_url="${metrics_url}&var-filter=network_owner%7C%3D%7C${FILTER_BY_OWNER}"
 fi
 
-echo "::notice links::metrics ${metrics_url}"
+# Github annotations don't support direct links, so unfortunately the
+# resulting URL will have to be copied and pasted into the browser.
+#
+# Reference: https://github.com/orgs/community/discussions/72821#discussioncomment-11919890
+echo "::notice links::grafana_dashboard ${metrics_url}"
