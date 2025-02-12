@@ -7,7 +7,7 @@ use std::os::unix::ffi::OsStrExt as _;
 use std::path::Path;
 
 use firewood::db::{BatchOp as DbBatchOp, Db, DbConfig, DbViewSync as _};
-use firewood::manager::RevisionManagerConfig;
+use firewood::manager::{CacheReadStrategy, RevisionManagerConfig};
 
 #[derive(Debug)]
 #[repr(C)]
@@ -160,7 +160,8 @@ pub unsafe extern "C" fn fwd_free_value(value: *const Value) {
     drop(recreated_box);
 }
 
-/// Create a database with the given cache size and maximum number of revisions
+/// Create a database with the given cache size and maximum number of revisions, as well
+/// as a specific cache strategy
 ///
 /// # Arguments
 ///
@@ -184,10 +185,11 @@ pub unsafe extern "C" fn fwd_create_db(
     path: *const std::ffi::c_char,
     cache_size: usize,
     revisions: usize,
+    strategy: u8,
 ) -> *mut Db {
     let cfg = DbConfig::builder()
         .truncate(true)
-        .manager(manager_config(cache_size, revisions))
+        .manager(manager_config(cache_size, revisions, strategy))
         .build();
     common_create(path, cfg)
 }
@@ -216,10 +218,11 @@ pub unsafe extern "C" fn fwd_open_db(
     path: *const std::ffi::c_char,
     cache_size: usize,
     revisions: usize,
+    strategy: u8,
 ) -> *mut Db {
     let cfg = DbConfig::builder()
         .truncate(false)
-        .manager(manager_config(cache_size, revisions))
+        .manager(manager_config(cache_size, revisions, strategy))
         .build();
     common_create(path, cfg)
 }
@@ -232,7 +235,13 @@ unsafe fn common_create(path: *const std::ffi::c_char, cfg: DbConfig) -> *mut Db
     ))
 }
 
-fn manager_config(cache_size: usize, revisions: usize) -> RevisionManagerConfig {
+fn manager_config(cache_size: usize, revisions: usize, strategy: u8) -> RevisionManagerConfig {
+    let cache_read_strategy = match strategy {
+        0 => CacheReadStrategy::WritesOnly,
+        1 => CacheReadStrategy::BranchReads,
+        2 => CacheReadStrategy::All,
+        _ => panic!("invalid cache strategy"),
+    };
     RevisionManagerConfig::builder()
         .node_cache_size(
             cache_size
@@ -240,6 +249,7 @@ fn manager_config(cache_size: usize, revisions: usize) -> RevisionManagerConfig 
                 .expect("cache size should always be non-zero"),
         )
         .max_revisions(revisions)
+        .cache_read_strategy(cache_read_strategy)
         .build()
 }
 

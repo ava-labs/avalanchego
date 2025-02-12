@@ -4,10 +4,9 @@ package firewood
 // this is used for some of the firewood performance tests
 
 // Validate that Firewood implements the KVBackend interface
-var _ KVBackend = (*Firewood)(nil)
+var _ kVBackend = (*Firewood)(nil)
 
-// Copy of KVBackend from ava-labs/avalanchego
-type KVBackend interface {
+type kVBackend interface {
 	// Returns the current root hash of the trie.
 	// Empty trie must return common.Hash{}.
 	// Length of the returned slice must be common.HashLength.
@@ -46,12 +45,13 @@ func (f *Firewood) Prefetch(key []byte) ([]byte, error) {
 	return nil, nil
 }
 
-// / Commit does nothing, since update already persists changes
+// Commit does nothing, since update already persists changes
 func (f *Firewood) Commit(root []byte) error {
 	return nil
 }
 
-// Update could use some more work, but for now we just batch the keys and values
+// Update batches all the keys and values and applies them to the
+// database
 func (f *Firewood) Update(keys, vals [][]byte) ([]byte, error) {
 	// batch the keys and values
 	ops := make([]KeyValue, len(keys))

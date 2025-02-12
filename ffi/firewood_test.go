@@ -7,7 +7,7 @@ import (
 )
 
 func TestInsert(t *testing.T) {
-	var f Firewood = CreateDatabase("test.db")
+	var f Firewood = NewDatabase(WithCreate(true), WithPath("test.db"))
 	defer os.Remove("test.db")
 	defer f.Close()
 	f.Batch([]KeyValue{
@@ -21,7 +21,7 @@ func TestInsert(t *testing.T) {
 }
 
 func TestInsert100(t *testing.T) {
-	var f Firewood = CreateDatabase("test.db")
+	var f Firewood = NewDatabase(WithCreate(true), WithPath("test.db"))
 	defer os.Remove("test.db")
 	defer f.Close()
 	ops := make([]KeyValue, 100)
@@ -57,7 +57,7 @@ func TestInsert100(t *testing.T) {
 
 func TestRangeDelete(t *testing.T) {
 	const N = 100
-	var f Firewood = CreateDatabase("test.db")
+	var f Firewood = NewDatabase(WithCreate(true), WithPath("test.db"))
 	defer os.Remove("test.db")
 	defer f.Close()
 	ops := make([]KeyValue, N)
@@ -84,7 +84,7 @@ func TestRangeDelete(t *testing.T) {
 }
 
 func TestInvariants(t *testing.T) {
-	var f Firewood = CreateDatabase("test.db")
+	var f Firewood = NewDatabase(WithCreate(true), WithPath("test.db"))
 	defer os.Remove("test.db")
 	defer f.Close()
 

@@ -54,7 +54,8 @@ struct Value fwd_batch(void *db,
 void fwd_close_db(void *db);
 
 /**
- * Create a database with the given cache size and maximum number of revisions
+ * Create a database with the given cache size and maximum number of revisions, as well
+ * as a specific cache strategy
  *
  * # Arguments
  *
@@ -76,7 +77,8 @@ void fwd_close_db(void *db);
  */
 void *fwd_create_db(const char *path,
                     size_t cache_size,
-                    size_t revisions);
+                    size_t revisions,
+                    uint8_t strategy);
 
 /**
  * Frees the memory associated with a `Value`.
@@ -127,7 +129,8 @@ struct Value fwd_get(void *db, struct Value key);
  */
 void *fwd_open_db(const char *path,
                   size_t cache_size,
-                  size_t revisions);
+                  size_t revisions,
+                  uint8_t strategy);
 
 /**
  * Get the root hash of the latest version of the database
