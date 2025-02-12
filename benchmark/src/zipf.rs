@@ -28,14 +28,14 @@ impl TestRunner for Zipf {
         } else {
             unreachable!()
         };
-        let rows = (args.number_of_batches * args.batch_size) as f64;
+        let rows = (args.global_opts.number_of_batches * args.global_opts.batch_size) as f64;
         let zipf = rand_distr::Zipf::new(rows, exponent).unwrap();
         let start = Instant::now();
         let mut batch_id = 0;
 
         while start.elapsed().as_secs() / 60 < args.global_opts.duration_minutes {
             let batch: Vec<BatchOp<_, _>> =
-                generate_updates(batch_id, args.batch_size as usize, zipf).collect();
+                generate_updates(batch_id, args.global_opts.batch_size as usize, zipf).collect();
             if log::log_enabled!(log::Level::Debug) {
                 let mut distinct = HashSet::new();
                 for op in &batch {

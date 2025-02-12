@@ -33,13 +33,14 @@ pub use nodestore::{
 pub use linear::filebacked::FileBacked;
 pub use linear::memory::MemStore;
 
+use strum_macros::VariantArray;
 pub use trie_hash::TrieHash;
 
 /// The strategy for caching nodes that are read
 /// from the storage layer. Generally, we only want to
 /// cache write operations, but for some read-heavy workloads
 /// you can enable caching of branch reads or all reads.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, VariantArray)]
 pub enum CacheReadStrategy {
     /// Only cache writes (no reads will be cached)
     WritesOnly,
@@ -49,4 +50,10 @@ pub enum CacheReadStrategy {
 
     /// Cache all reads (leaves and branches)
     All,
+}
+
+impl std::fmt::Display for CacheReadStrategy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
 }
