@@ -729,7 +729,7 @@ func verifyKeyValues(kvs []KeyValue, start maybe.Maybe[[]byte], end maybe.Maybe[
 	return nil
 }
 
-// Returns nil if all the following hold:
+// Returns nil iff all the following hold:
 //   - Any node with a partial byte length, should not have a value associated with it
 //     since all keys with values are written in complete bytes([]byte).
 //   - Each key in [proof] is a strict prefix of the following key.
