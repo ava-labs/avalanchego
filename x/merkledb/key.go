@@ -118,12 +118,12 @@ func toKey(keyBytes []byte) Key {
 	}
 }
 
-// hasPartialByte returns true iff the key fits into a non-whole number of bytes
+// hasPartialByte returns true if the key fits into a non-whole number of bytes
 func (k Key) hasPartialByte() bool {
 	return k.length%8 > 0
 }
 
-// HasPrefix returns true iff [prefix] is a prefix of [k] or equal to it.
+// HasPrefix returns true if [prefix] is a prefix of [k] or equal to it.
 func (k Key) HasPrefix(prefix Key) bool {
 	// [prefix] must be shorter than [k] to be a prefix.
 	if k.length < prefix.length {
