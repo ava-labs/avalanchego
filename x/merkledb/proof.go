@@ -265,7 +265,7 @@ type RangeProof struct {
 	KeyValues []KeyValue
 }
 
-// Verify returns nil if all the following hold:
+// Verify returns nil iff all the following hold:
 //   - The invariants of RangeProof hold.
 //   - [start] <= [end].
 //   - [proof] proves the key-value pairs in [proof.KeyValues] are in the trie
