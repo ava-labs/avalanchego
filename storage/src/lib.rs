@@ -34,3 +34,19 @@ pub use linear::filebacked::FileBacked;
 pub use linear::memory::MemStore;
 
 pub use trie_hash::TrieHash;
+
+/// The strategy for caching nodes that are read
+/// from the storage layer. Generally, we only want to
+/// cache write operations, but for some read-heavy workloads
+/// you can enable caching of branch reads or all reads.
+#[derive(Clone, Debug)]
+pub enum CacheReadStrategy {
+    /// Only cache writes (no reads will be cached)
+    WritesOnly,
+
+    /// Cache branch reads (reads that are not leaf nodes)
+    BranchReads,
+
+    /// Cache all reads (leaves and branches)
+    All,
+}

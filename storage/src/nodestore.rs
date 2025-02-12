@@ -61,7 +61,7 @@ use std::sync::Arc;
 
 use crate::hashednode::hash_node;
 use crate::node::{ByteCounter, Node};
-use crate::{Child, FileBacked, Path, ReadableStorage, TrieHash};
+use crate::{CacheReadStrategy, Child, FileBacked, Path, ReadableStorage, TrieHash};
 
 use super::linear::WritableStorage;
 
@@ -217,13 +217,24 @@ impl<T: ReadInMemoryNode, S: ReadableStorage> NodeStore<T, S> {
 
         debug_assert!(addr.get() % 8 == 0);
 
-        let addr = addr.get() + 1; // skip the length byte
+        let actual_addr = addr.get() + 1; // skip the length byte
 
         let _span = LocalSpan::enter_with_local_parent("read_and_deserialize");
 
-        let area_stream = self.storage.stream_from(addr)?;
-        let node = Node::from_reader(area_stream)?;
-        Ok(node.into())
+        let area_stream = self.storage.stream_from(actual_addr)?;
+        let node = Arc::new(Node::from_reader(area_stream)?);
+        match self.storage.cache_read_strategy() {
+            CacheReadStrategy::All => {
+                self.storage.cache_node(addr, node.clone());
+            }
+            CacheReadStrategy::BranchReads => {
+                if !node.is_leaf() {
+                    self.storage.cache_node(addr, node.clone());
+                }
+            }
+            CacheReadStrategy::WritesOnly => {}
+        }
+        Ok(node)
     }
 }
 

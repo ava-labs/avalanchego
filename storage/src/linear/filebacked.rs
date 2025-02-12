@@ -16,7 +16,7 @@ use std::sync::{Arc, Mutex};
 use lru::LruCache;
 use metrics::counter;
 
-use crate::{LinearAddress, Node};
+use crate::{CacheReadStrategy, LinearAddress, Node};
 
 use super::{ReadableStorage, WritableStorage};
 
@@ -26,6 +26,7 @@ pub struct FileBacked {
     fd: File,
     cache: Mutex<LruCache<LinearAddress, Arc<Node>>>,
     free_list_cache: Mutex<LruCache<LinearAddress, Option<LinearAddress>>>,
+    cache_read_strategy: CacheReadStrategy,
 }
 
 impl FileBacked {
@@ -35,6 +36,7 @@ impl FileBacked {
         node_cache_size: NonZero<usize>,
         free_list_cache_size: NonZero<usize>,
         truncate: bool,
+        cache_read_strategy: CacheReadStrategy,
     ) -> Result<Self, Error> {
         let fd = OpenOptions::new()
             .read(true)
@@ -47,6 +49,7 @@ impl FileBacked {
             fd,
             cache: Mutex::new(LruCache::new(node_cache_size)),
             free_list_cache: Mutex::new(LruCache::new(free_list_cache_size)),
+            cache_read_strategy,
         })
     }
 }
@@ -73,6 +76,28 @@ impl ReadableStorage for FileBacked {
         let cached = guard.pop(&addr);
         counter!("firewood.cache.freelist", "type" => if cached.is_some() { "hit" } else { "miss" }).increment(1);
         cached
+    }
+
+    fn cache_read_strategy(&self) -> &CacheReadStrategy {
+        &self.cache_read_strategy
+    }
+
+    fn cache_node(&self, addr: LinearAddress, node: Arc<Node>) {
+        match self.cache_read_strategy {
+            CacheReadStrategy::WritesOnly => {
+                // we don't cache reads
+            }
+            CacheReadStrategy::All => {
+                let mut guard = self.cache.lock().expect("poisoned lock");
+                guard.put(addr, node);
+            }
+            CacheReadStrategy::BranchReads => {
+                if !node.is_leaf() {
+                    let mut guard = self.cache.lock().expect("poisoned lock");
+                    guard.put(addr, node);
+                }
+            }
+        }
     }
 }
 
@@ -169,6 +194,7 @@ mod test {
             NonZero::new(10).unwrap(),
             NonZero::new(10).unwrap(),
             false,
+            CacheReadStrategy::WritesOnly,
         )
         .unwrap();
         let mut reader = fb.stream_from(0).unwrap();
@@ -208,6 +234,7 @@ mod test {
             NonZero::new(10).unwrap(),
             NonZero::new(10).unwrap(),
             false,
+            CacheReadStrategy::WritesOnly,
         )
         .unwrap();
         let mut reader = fb.stream_from(0).unwrap();

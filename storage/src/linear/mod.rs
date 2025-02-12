@@ -22,7 +22,7 @@ use std::io::{Error, Read};
 use std::num::NonZero;
 use std::sync::Arc;
 
-use crate::{LinearAddress, Node};
+use crate::{CacheReadStrategy, LinearAddress, Node};
 pub(super) mod filebacked;
 pub mod memory;
 
@@ -51,6 +51,14 @@ pub trait ReadableStorage: Debug + Sync + Send {
     fn free_list_cache(&self, _addr: LinearAddress) -> Option<Option<LinearAddress>> {
         None
     }
+
+    /// Return the cache read strategy for this readable storage
+    fn cache_read_strategy(&self) -> &CacheReadStrategy {
+        &CacheReadStrategy::WritesOnly
+    }
+
+    /// Cache a node for future reads
+    fn cache_node(&self, _addr: LinearAddress, _node: Arc<Node>) {}
 }
 
 /// Trait for writable storage.

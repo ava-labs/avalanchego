@@ -14,7 +14,9 @@ use typed_builder::TypedBuilder;
 
 use crate::v2::api::HashKey;
 
-use storage::{Committed, FileBacked, ImmutableProposal, NodeStore, Parentable, TrieHash};
+use storage::{
+    CacheReadStrategy, Committed, FileBacked, ImmutableProposal, NodeStore, Parentable, TrieHash,
+};
 
 #[derive(Clone, Debug, TypedBuilder)]
 /// Revision manager configuratoin
@@ -29,6 +31,9 @@ pub struct RevisionManagerConfig {
 
     #[builder(default_code = "NonZero::new(40000).expect(\"non-zero\")")]
     free_list_cache_size: NonZero<usize>,
+
+    #[builder(default = CacheReadStrategy::WritesOnly)]
+    cache_read_strategy: CacheReadStrategy,
 }
 
 type CommittedRevision = Arc<NodeStore<Committed, FileBacked>>;
@@ -73,6 +78,7 @@ impl RevisionManager {
             config.node_cache_size,
             config.free_list_cache_size,
             truncate,
+            config.cache_read_strategy,
         )?);
         let nodestore = match truncate {
             true => Arc::new(NodeStore::new_empty_committed(storage.clone())?),
