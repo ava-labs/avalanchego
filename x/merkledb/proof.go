@@ -681,7 +681,7 @@ type ChangeOrRangeProof struct {
 	RangeProof  *RangeProof
 }
 
-// Returns nil if both hold:
+// Returns nil iff both hold:
 // 1. [kvs] is sorted by key in increasing order.
 // 2. All keys in [kvs] are in the range [start, end].
 // If [start] is Nothing, there is no lower bound on acceptable keys.
@@ -708,7 +708,7 @@ func verifyKeyChanges(kvs []KeyChange, start maybe.Maybe[[]byte], end maybe.Mayb
 	return nil
 }
 
-// Returns nil if both hold:
+// Returns nil iff both hold:
 // 1. [kvs] is sorted by key in increasing order.
 // 2. All keys in [kvs] are in the range [start, end].
 // If [start] is nil, there is no lower bound on acceptable keys.
