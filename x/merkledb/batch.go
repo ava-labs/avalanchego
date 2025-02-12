@@ -3,7 +3,11 @@
 
 package merkledb
 
-import "github.com/ava-labs/avalanchego/database"
+import (
+	"context"
+
+	"github.com/ava-labs/avalanchego/database"
+)
 
 var _ database.Batch = (*batch)(nil)
 
@@ -15,7 +19,7 @@ type batch struct {
 
 // Assumes [b.db.lock] isn't held.
 func (b *batch) Write() error {
-	return b.db.commitBatch(b.Ops)
+	return b.db.commitBatch(context.TODO(), b.Ops)
 }
 
 func (b *batch) Inner() database.Batch {
