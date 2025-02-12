@@ -21,7 +21,7 @@ import (
 func getNodeValue(t Trie, key string) ([]byte, error) {
 	path := ToKey([]byte(key))
 	if asView, ok := t.(*view); ok {
-		if err := asView.applyValueChanges(context.Background()); err != nil {
+		if err := asView.ensureChangesApplied(context.Background()); err != nil {
 			return nil, err
 		}
 	}
@@ -131,7 +131,7 @@ func TestVisitPathToKey(t *testing.T) {
 	require.NoError(err)
 	require.IsType(&view{}, trieIntf)
 	trie = trieIntf.(*view)
-	require.NoError(trie.applyValueChanges(context.Background()))
+	require.NoError(trie.ensureChangesApplied(context.Background()))
 
 	nodePath = make([]*node, 0, 1)
 	require.NoError(visitPathToKey(trie, ToKey(key1), func(n *node) error {
@@ -156,7 +156,7 @@ func TestVisitPathToKey(t *testing.T) {
 	require.NoError(err)
 	require.IsType(&view{}, trieIntf)
 	trie = trieIntf.(*view)
-	require.NoError(trie.applyValueChanges(context.Background()))
+	require.NoError(trie.ensureChangesApplied(context.Background()))
 
 	nodePath = make([]*node, 0, 2)
 	require.NoError(visitPathToKey(trie, ToKey(key2), func(n *node) error {
@@ -185,7 +185,7 @@ func TestVisitPathToKey(t *testing.T) {
 	require.NoError(err)
 	require.IsType(&view{}, trieIntf)
 	trie = trieIntf.(*view)
-	require.NoError(trie.applyValueChanges(context.Background()))
+	require.NoError(trie.ensureChangesApplied(context.Background()))
 
 	// Trie is:
 	//    []
@@ -775,7 +775,7 @@ func Test_Trie_ChainDeletion(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(newTrie.(*view).applyValueChanges(context.Background()))
+	require.NoError(newTrie.(*view).ensureChangesApplied(context.Background()))
 	maybeRoot := newTrie.getRoot()
 	require.NoError(err)
 	require.True(maybeRoot.HasValue())
@@ -794,7 +794,7 @@ func Test_Trie_ChainDeletion(t *testing.T) {
 		},
 	)
 	require.NoError(err)
-	require.NoError(newTrie.(*view).applyValueChanges(context.Background()))
+	require.NoError(newTrie.(*view).ensureChangesApplied(context.Background()))
 
 	// trie should be empty
 	root := newTrie.getRoot()
@@ -861,7 +861,7 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(trie.(*view).applyValueChanges(context.Background()))
+	require.NoError(trie.(*view).ensureChangesApplied(context.Background()))
 
 	for _, kv := range kvs {
 		node, err := trie.getEditableNode(ToKey(kv.Key), true)
@@ -888,7 +888,7 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(trie.(*view).applyValueChanges(context.Background()))
+	require.NoError(trie.(*view).ensureChangesApplied(context.Background()))
 
 	for _, kv := range deletedKVs {
 		_, err := trie.getEditableNode(ToKey(kv.Key), true)
@@ -1039,8 +1039,7 @@ func TestNewViewOnCommittedView(t *testing.T) {
 	//   |
 	//  db
 
-	require.Len(db.childViews, 1)
-	require.Contains(db.childViews, view1)
+	require.Len(db.childViews, 0)
 	require.Equal(db, view1.parentTrie)
 
 	// Create a new view on the committed view
@@ -1056,9 +1055,8 @@ func TestNewViewOnCommittedView(t *testing.T) {
 	//  db
 
 	require.Equal(db, view2.parentTrie)
-	require.Contains(db.childViews, view1)
 	require.Contains(db.childViews, view2)
-	require.Len(db.childViews, 2)
+	require.Len(db.childViews, 1)
 
 	// Make sure the new view has the right value
 	got, err := view2.GetValue(context.Background(), []byte{1})
@@ -1082,9 +1080,8 @@ func TestNewViewOnCommittedView(t *testing.T) {
 	require.Equal(view2, view3.parentTrie)
 	require.Contains(view2.childViews, view3)
 	require.Len(view2.childViews, 1)
-	require.Contains(db.childViews, view1)
 	require.Contains(db.childViews, view2)
-	require.Len(db.childViews, 2)
+	require.Len(db.childViews, 1)
 
 	// Commit view2
 	require.NoError(view2.CommitToDB(context.Background()))
@@ -1099,9 +1096,8 @@ func TestNewViewOnCommittedView(t *testing.T) {
 
 	// Note that view2 being committed invalidates view1
 	require.True(view1.invalidated)
-	require.Contains(db.childViews, view2)
 	require.Contains(db.childViews, view3)
-	require.Len(db.childViews, 2)
+	require.Len(db.childViews, 1)
 	require.Equal(db, view3.parentTrie)
 
 	// Commit view3
@@ -1109,8 +1105,7 @@ func TestNewViewOnCommittedView(t *testing.T) {
 
 	// view3 being committed invalidates view2
 	require.True(view2.invalidated)
-	require.Contains(db.childViews, view3)
-	require.Len(db.childViews, 1)
+	require.Len(db.childViews, 0)
 	require.Equal(db, view3.parentTrie)
 }
 
