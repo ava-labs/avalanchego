@@ -265,7 +265,7 @@ type RangeProof struct {
 	KeyValues []KeyValue
 }
 
-// Verify returns nil iff all the following hold:
+// Verify returns nil if all the following hold:
 //   - The invariants of RangeProof hold.
 //   - [start] <= [end].
 //   - [proof] proves the key-value pairs in [proof.KeyValues] are in the trie
@@ -317,7 +317,7 @@ func (proof *RangeProof) Verify(
 		largestProvenKey = maybe.Some(ToKey(proof.KeyValues[len(proof.KeyValues)-1].Key))
 	}
 
-	// The key-value pairs (allegedly) proven by [proof].
+	// The key-value pairs (allegedly) are proven by [proof].
 	keyValues := make(map[Key][]byte, len(proof.KeyValues))
 	for _, keyValue := range proof.KeyValues {
 		keyValues[ToKey(keyValue.Key)] = keyValue.Value
@@ -681,7 +681,7 @@ type ChangeOrRangeProof struct {
 	RangeProof  *RangeProof
 }
 
-// Returns nil iff both hold:
+// Returns nil if both hold:
 // 1. [kvs] is sorted by key in increasing order.
 // 2. All keys in [kvs] are in the range [start, end].
 // If [start] is Nothing, there is no lower bound on acceptable keys.
@@ -708,7 +708,7 @@ func verifyKeyChanges(kvs []KeyChange, start maybe.Maybe[[]byte], end maybe.Mayb
 	return nil
 }
 
-// Returns nil iff both hold:
+// Returns nil if both hold:
 // 1. [kvs] is sorted by key in increasing order.
 // 2. All keys in [kvs] are in the range [start, end].
 // If [start] is nil, there is no lower bound on acceptable keys.
@@ -729,7 +729,7 @@ func verifyKeyValues(kvs []KeyValue, start maybe.Maybe[[]byte], end maybe.Maybe[
 	return nil
 }
 
-// Returns nil iff all the following hold:
+// Returns nil if all the following hold:
 //   - Any node with a partial byte length, should not have a value associated with it
 //     since all keys with values are written in complete bytes([]byte).
 //   - Each key in [proof] is a strict prefix of the following key.
