@@ -85,7 +85,7 @@ type ChangeProofer interface {
 		maxLength int,
 	) (*ChangeProof, error)
 
-	// Returns nil if all the following hold:
+	// Returns nil iff all the following hold:
 	//   - [start] <= [end].
 	//   - [proof] is non-empty.
 	//   - All keys in [proof.KeyValues] and [proof.DeletedKeys] are in [start, end].
@@ -216,7 +216,7 @@ type merkleDB struct {
 	// historical views of the trie.
 	history *trieHistory
 
-	// True if the db has been closed.
+	// True iff the db has been closed.
 	closed bool
 
 	metrics metrics
