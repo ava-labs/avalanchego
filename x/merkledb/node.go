@@ -54,7 +54,7 @@ func parseNode(hasher Hasher, key Key, nodeBytes []byte) (*node, error) {
 	return result, nil
 }
 
-// Returns true iff this node has a value.
+// Returns true if this node has a value.
 func (n *node) hasValue() bool {
 	return !n.value.IsNothing()
 }
