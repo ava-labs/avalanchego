@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -212,108 +211,6 @@ func TestSelectBigWithinBounds(t *testing.T) {
 			if v.Cmp(test.expected) != 0 {
 				t.Fatalf("Expected (%d), found (%d)", test.expected, v)
 			}
-		})
-	}
-}
-
-func TestCalcBlockGasCost(t *testing.T) {
-	tests := map[string]struct {
-		parentBlockGasCost      *big.Int
-		parentTime, currentTime uint64
-
-		expected *big.Int
-	}{
-		"Nil parentBlockGasCost": {
-			parentBlockGasCost: nil,
-			parentTime:         1,
-			currentTime:        1,
-			expected:           params.DefaultFeeConfig.MinBlockGasCost,
-		},
-		"Same timestamp from 0": {
-			parentBlockGasCost: big.NewInt(0),
-			parentTime:         1,
-			currentTime:        1,
-			expected:           big.NewInt(100_000),
-		},
-		"1s from 0": {
-			parentBlockGasCost: big.NewInt(0),
-			parentTime:         1,
-			currentTime:        2,
-			expected:           big.NewInt(50_000),
-		},
-		"Same timestamp from non-zero": {
-			parentBlockGasCost: big.NewInt(50_000),
-			parentTime:         1,
-			currentTime:        1,
-			expected:           big.NewInt(150_000),
-		},
-		"0s Difference (MAX)": {
-			parentBlockGasCost: big.NewInt(1_000_000),
-			parentTime:         1,
-			currentTime:        1,
-			expected:           big.NewInt(1_000_000),
-		},
-		"1s Difference (MAX)": {
-			parentBlockGasCost: big.NewInt(1_000_000),
-			parentTime:         1,
-			currentTime:        2,
-			expected:           big.NewInt(1_000_000),
-		},
-		"2s Difference": {
-			parentBlockGasCost: big.NewInt(900_000),
-			parentTime:         1,
-			currentTime:        3,
-			expected:           big.NewInt(900_000),
-		},
-		"3s Difference": {
-			parentBlockGasCost: big.NewInt(1_000_000),
-			parentTime:         1,
-			currentTime:        4,
-			expected:           big.NewInt(950_000),
-		},
-		"10s Difference": {
-			parentBlockGasCost: big.NewInt(1_000_000),
-			parentTime:         1,
-			currentTime:        11,
-			expected:           big.NewInt(600_000),
-		},
-		"20s Difference": {
-			parentBlockGasCost: big.NewInt(1_000_000),
-			parentTime:         1,
-			currentTime:        21,
-			expected:           big.NewInt(100_000),
-		},
-		"22s Difference": {
-			parentBlockGasCost: big.NewInt(1_000_000),
-			parentTime:         1,
-			currentTime:        23,
-			expected:           big.NewInt(0),
-		},
-		"23s Difference": {
-			parentBlockGasCost: big.NewInt(1_000_000),
-			parentTime:         1,
-			currentTime:        24,
-			expected:           big.NewInt(0),
-		},
-		"-1s Difference": {
-			parentBlockGasCost: big.NewInt(50_000),
-			parentTime:         1,
-			currentTime:        0,
-			expected:           big.NewInt(150_000),
-		},
-	}
-
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			assert.Zero(t, test.expected.Cmp(calcBlockGasCost(
-				params.DefaultFeeConfig.TargetBlockRate,
-				params.DefaultFeeConfig.MinBlockGasCost,
-				params.DefaultFeeConfig.MaxBlockGasCost,
-				testBlockGasCostStep,
-				test.parentBlockGasCost,
-				test.parentTime,
-				test.currentTime,
-			)))
 		})
 	}
 }

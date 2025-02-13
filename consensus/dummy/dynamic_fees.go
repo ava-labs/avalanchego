@@ -31,6 +31,11 @@ func CalcBaseFee(config *params.ChainConfig, feeConfig commontype.FeeConfig, par
 		return nil, nil, err
 	}
 
+	if timestamp < parent.Time {
+		return nil, nil, fmt.Errorf("cannot calculate base fee for timestamp %d prior to parent timestamp %d", timestamp, parent.Time)
+	}
+	timeElapsed := timestamp - parent.Time
+
 	// start off with parent's base fee
 	baseFee := new(big.Int).Set(parent.BaseFee)
 	baseFeeChangeDenominator := feeConfig.BaseFeeChangeDenominator
@@ -41,14 +46,9 @@ func CalcBaseFee(config *params.ChainConfig, feeConfig commontype.FeeConfig, par
 	// Compute the new state of the gas rolling window.
 	dynamicFeeWindow.Add(parent.GasUsed)
 
-	if timestamp < parent.Time {
-		return nil, nil, fmt.Errorf("cannot calculate base fee for timestamp %d prior to parent timestamp %d", timestamp, parent.Time)
-	}
-	roll := timestamp - parent.Time
-
-	// roll the window over by the difference between the timestamps to generate
-	// the new rollup window.
-	dynamicFeeWindow.Shift(roll)
+	// roll the window over by the timeElapsed to generate the new rollup
+	// window.
+	dynamicFeeWindow.Shift(timeElapsed)
 	dynamicFeeWindowBytes := dynamicFeeWindow.Bytes()
 
 	// Calculate the amount of gas consumed within the rollup window.
@@ -75,14 +75,17 @@ func CalcBaseFee(config *params.ChainConfig, feeConfig commontype.FeeConfig, par
 		num.Div(num, parentGasTargetBig)
 		num.Div(num, baseFeeChangeDenominator)
 		baseFeeDelta := math.BigMax(num, common.Big1)
-
-		// If [roll] is greater than [rollupWindow], apply the state transition to the base fee to account
-		// for the interval during which no blocks were produced.
-		// We use roll/rollupWindow, so that the transition is applied for every [rollupWindow] seconds
-		// that has elapsed between the parent and this block.
-		if roll > params.RollupWindow {
-			// Note: roll/params.RollupWindow must be greater than 1 since we've checked that roll > params.RollupWindow
-			baseFeeDelta = new(big.Int).Mul(baseFeeDelta, new(big.Int).SetUint64(roll/params.RollupWindow))
+		// If timeElapsed is greater than [params.RollupWindow], apply the
+		// state transition to the base fee to account for the interval during
+		// which no blocks were produced.
+		//
+		// We use timeElapsed/params.RollupWindow, so that the transition is
+		// applied for every [params.RollupWindow] seconds that has elapsed
+		// between the parent and this block.
+		if timeElapsed > params.RollupWindow {
+			// Note: timeElapsed/params.RollupWindow must be at least 1 since
+			// we've checked that timeElapsed > params.RollupWindow
+			baseFeeDelta = new(big.Int).Mul(baseFeeDelta, new(big.Int).SetUint64(timeElapsed/params.RollupWindow))
 		}
 		baseFee.Sub(baseFee, baseFeeDelta)
 	}
@@ -117,43 +120,6 @@ func selectBigWithinBounds(lowerBound, value, upperBound *big.Int) *big.Int {
 	default:
 		return value
 	}
-}
-
-// calcBlockGasCost calculates the required block gas cost. If [parentTime]
-// > [currentTime], the timeElapsed will be treated as 0.
-func calcBlockGasCost(
-	targetBlockRate uint64,
-	minBlockGasCost *big.Int,
-	maxBlockGasCost *big.Int,
-	blockGasCostStep *big.Int,
-	parentBlockGasCost *big.Int,
-	parentTime, currentTime uint64,
-) *big.Int {
-	// Handle Subnet EVM boundary by returning the minimum value as the boundary.
-	if parentBlockGasCost == nil {
-		return new(big.Int).Set(minBlockGasCost)
-	}
-
-	// Treat an invalid parent/current time combination as 0 elapsed time.
-	var timeElapsed uint64
-	if parentTime <= currentTime {
-		timeElapsed = currentTime - parentTime
-	}
-
-	var blockGasCost *big.Int
-	if timeElapsed < targetBlockRate {
-		blockGasCostDelta := new(big.Int).Mul(blockGasCostStep, new(big.Int).SetUint64(targetBlockRate-timeElapsed))
-		blockGasCost = new(big.Int).Add(parentBlockGasCost, blockGasCostDelta)
-	} else {
-		blockGasCostDelta := new(big.Int).Mul(blockGasCostStep, new(big.Int).SetUint64(timeElapsed-targetBlockRate))
-		blockGasCost = new(big.Int).Sub(parentBlockGasCost, blockGasCostDelta)
-	}
-
-	blockGasCost = selectBigWithinBounds(minBlockGasCost, blockGasCost, maxBlockGasCost)
-	if !blockGasCost.IsUint64() {
-		blockGasCost = new(big.Int).SetUint64(math.MaxUint64)
-	}
-	return blockGasCost
 }
 
 // MinRequiredTip is the estimated minimum tip a transaction would have
