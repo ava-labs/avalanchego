@@ -18,6 +18,9 @@ import (
 const ApricotPhase3BlockGasFee = 1_000_000
 
 var (
+	MaxUint256Plus1 = new(big.Int).Lsh(common.Big1, 256)
+	MaxUint256      = new(big.Int).Sub(MaxUint256Plus1, common.Big1)
+
 	ApricotPhase3MinBaseFee     = big.NewInt(params.ApricotPhase3MinBaseFee)
 	ApricotPhase3MaxBaseFee     = big.NewInt(params.ApricotPhase3MaxBaseFee)
 	ApricotPhase4MinBaseFee     = big.NewInt(params.ApricotPhase4MinBaseFee)
@@ -155,9 +158,9 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 	// Ensure that the base fee does not increase/decrease outside of the bounds
 	switch {
 	case isEtna:
-		baseFee = selectBigWithinBounds(EtnaMinBaseFee, baseFee, nil)
+		baseFee = selectBigWithinBounds(EtnaMinBaseFee, baseFee, MaxUint256)
 	case isApricotPhase5:
-		baseFee = selectBigWithinBounds(ApricotPhase4MinBaseFee, baseFee, nil)
+		baseFee = selectBigWithinBounds(ApricotPhase4MinBaseFee, baseFee, MaxUint256)
 	case isApricotPhase4:
 		baseFee = selectBigWithinBounds(ApricotPhase4MinBaseFee, baseFee, ApricotPhase4MaxBaseFee)
 	default:
