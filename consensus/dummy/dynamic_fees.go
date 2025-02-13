@@ -169,11 +169,12 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 // If [timestamp] is less than the timestamp of [parent], then it uses the same timestamp as parent.
 // Warning: This function should only be used in estimation and should not be used when calculating the canonical
 // base fee for a subsequent block.
-func EstimateNextBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uint64) ([]byte, *big.Int, error) {
+func EstimateNextBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uint64) (*big.Int, error) {
 	if timestamp < parent.Time {
 		timestamp = parent.Time
 	}
-	return CalcBaseFee(config, parent, timestamp)
+	_, baseFee, err := CalcBaseFee(config, parent, timestamp)
+	return baseFee, err
 }
 
 // selectBigWithinBounds returns [value] if it is within the bounds:
