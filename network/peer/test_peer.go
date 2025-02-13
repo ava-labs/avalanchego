@@ -141,6 +141,7 @@ func StartTestPeer(
 			logging.NoLog{},
 			maxMessageToSend,
 		),
+		false,
 	)
 	return peer, peer.AwaitReady(ctx)
 }
