@@ -48,6 +48,14 @@ const (
 	SendFailRateKey             = "sendFailRate"
 )
 
+type connectionType uint8
+
+const (
+	connectionTypeUnknown connectionType = iota
+	connectionTypeIngress
+	connectionTypeEgress
+)
+
 var (
 	_ Network = (*network)(nil)
 
@@ -88,6 +96,9 @@ type Network interface {
 	// NodeUptime returns given node's primary network UptimeResults in the view of
 	// this node's peer validators.
 	NodeUptime() (UptimeResult, error)
+
+	// IngressConnCount returns the number of ingress connections this node has.
+	IngressConnCount() int
 }
 
 type UptimeResult struct {
@@ -256,30 +267,34 @@ func NewNetwork(
 		ipTracker.ManuallyTrack(nodeID)
 	}
 
-	peerConfig := &peer.Config{
-		ReadBufferSize:  config.PeerReadBufferSize,
-		WriteBufferSize: config.PeerWriteBufferSize,
-		Metrics:         peerMetrics,
-		MessageCreator:  msgCreator,
+	// ingressConnCount tracks connections to all remote peers,
+	// so for safety we set it as pointer, in case the config object is copied.
+	var ingressConnCount atomic.Uint32
 
-		Log:                  log,
-		InboundMsgThrottler:  inboundMsgThrottler,
-		Network:              nil, // This is set below.
-		Router:               router,
-		VersionCompatibility: version.GetCompatibility(minCompatibleTime),
-		MyNodeID:             config.MyNodeID,
-		MySubnets:            config.TrackedSubnets,
-		Beacons:              config.Beacons,
-		Validators:           config.Validators,
-		NetworkID:            config.NetworkID,
-		PingFrequency:        config.PingFrequency,
-		PongTimeout:          config.PingPongTimeout,
-		MaxClockDifference:   config.MaxClockDifference,
-		SupportedACPs:        config.SupportedACPs.List(),
-		ObjectedACPs:         config.ObjectedACPs.List(),
-		ResourceTracker:      config.ResourceTracker,
-		UptimeCalculator:     config.UptimeCalculator,
-		IPSigner:             peer.NewIPSigner(config.MyIPPort, config.TLSKey, config.BLSKey),
+	peerConfig := &peer.Config{
+		ReadBufferSize:         config.PeerReadBufferSize,
+		WriteBufferSize:        config.PeerWriteBufferSize,
+		Metrics:                peerMetrics,
+		MessageCreator:         msgCreator,
+		IngressConnectionCount: &ingressConnCount,
+		Log:                    log,
+		InboundMsgThrottler:    inboundMsgThrottler,
+		Network:                nil, // This is set below.
+		Router:                 router,
+		VersionCompatibility:   version.GetCompatibility(minCompatibleTime),
+		MyNodeID:               config.MyNodeID,
+		MySubnets:              config.TrackedSubnets,
+		Beacons:                config.Beacons,
+		Validators:             config.Validators,
+		NetworkID:              config.NetworkID,
+		PingFrequency:          config.PingFrequency,
+		PongTimeout:            config.PingPongTimeout,
+		MaxClockDifference:     config.MaxClockDifference,
+		SupportedACPs:          config.SupportedACPs.List(),
+		ObjectedACPs:           config.ObjectedACPs.List(),
+		ResourceTracker:        config.ResourceTracker,
+		UptimeCalculator:       config.UptimeCalculator,
+		IPSigner:               peer.NewIPSigner(config.MyIPPort, config.TLSKey, config.BLSKey),
 	}
 
 	onCloseCtx, cancel := context.WithCancel(context.Background())
@@ -428,6 +443,10 @@ func (n *network) HealthCheck(context.Context) (interface{}, error) {
 		errorReasons = append(errorReasons, fmt.Sprintf("messages failure send rate %g > %g", sendFailRate, n.config.HealthConfig.MaxSendFailRate))
 	}
 	return details, fmt.Errorf("network layer is unhealthy reason: %s", strings.Join(errorReasons, ", "))
+}
+
+func (n *network) IngressConnCount() int {
+	return int(n.peerConfig.IngressConnectionCount.Load())
 }
 
 // Connected is called after the peer finishes the handshake.
@@ -630,7 +649,7 @@ func (n *network) Dispatch() error {
 				zap.Stringer("peerIP", ip),
 			)
 
-			if err := n.upgrade(conn, n.serverUpgrader); err != nil {
+			if err := n.upgrade(conn, n.serverUpgrader, connectionTypeIngress); err != nil {
 				n.peerConfig.Log.Verbo("failed to upgrade connection",
 					zap.String("direction", "inbound"),
 					zap.Error(err),
@@ -977,7 +996,7 @@ func (n *network) dial(nodeID ids.NodeID, ip *trackedIP) {
 				zap.Stringer("peerIP", ip.ip),
 			)
 
-			err = n.upgrade(conn, n.clientUpgrader)
+			err = n.upgrade(conn, n.clientUpgrader, connectionTypeEgress)
 			if err != nil {
 				n.peerConfig.Log.Verbo(
 					"failed to upgrade, attempting again",
@@ -1000,7 +1019,7 @@ func (n *network) dial(nodeID ids.NodeID, ip *trackedIP) {
 // If the connection is desired by the node, then the resulting upgraded
 // connection will be used to create a new peer. Otherwise the connection will
 // be immediately closed.
-func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
+func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader, connType connectionType) error {
 	upgradeTimeout := n.peerConfig.Clock.Time().Add(n.config.ReadHandshakeTimeout)
 	if err := conn.SetReadDeadline(upgradeTimeout); err != nil {
 		_ = conn.Close()
@@ -1089,6 +1108,7 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 	// peer.Start requires there is only ever one peer instance running with the
 	// same [peerConfig.InboundMsgThrottler]. This is guaranteed by the above
 	// de-duplications for [connectingPeers] and [connectedPeers].
+	isIngress := connType == connectionTypeIngress
 	peer := peer.Start(
 		n.peerConfig,
 		tlsConn,
@@ -1100,6 +1120,7 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 			n.peerConfig.Log,
 			n.outboundMsgThrottler,
 		),
+		isIngress,
 	)
 	n.connectingPeers.Add(peer)
 	n.peersLock.Unlock()
