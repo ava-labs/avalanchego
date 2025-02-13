@@ -142,6 +142,7 @@ func startTestPeer(self *rawTestPeer, peer *rawTestPeer, conn net.Conn) *testPee
 				logging.NoLog{},
 				throttling.NewNoOutboundThrottler(),
 			),
+			false,
 		),
 		inboundMsgChan: self.inboundMsgChan,
 	}

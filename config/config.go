@@ -1437,6 +1437,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	nodeConfig.SystemTrackerProcessingHalflife = v.GetDuration(SystemTrackerProcessingHalflifeKey)
 	nodeConfig.SystemTrackerCPUHalflife = v.GetDuration(SystemTrackerCPUHalflifeKey)
 	nodeConfig.SystemTrackerDiskHalflife = v.GetDuration(SystemTrackerDiskHalflifeKey)
+	nodeConfig.NoIngressValidatorConnectionTimeout = v.GetDuration(NoIngressValidatorConnectionTimeoutKey)
 
 	nodeConfig.RequiredAvailableDiskSpace, nodeConfig.WarningThresholdAvailableDiskSpace, err = getDiskSpaceConfig(v)
 	if err != nil {

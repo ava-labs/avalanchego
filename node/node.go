@@ -248,6 +248,11 @@ func New(
 	if err := n.initChainManager(n.Config.AvaxAssetID); err != nil { // Set up the chain manager
 		return nil, fmt.Errorf("couldn't initialize chain manager: %w", err)
 	}
+	// IngressConnCount depends on both chain manager and health API, so we initialize it after both.
+	if err := n.initIngressConnectionCountHealthCheck(); err != nil {
+		return nil, fmt.Errorf("couldn't initialize ingress connection count health check: %w", err)
+	}
+
 	if err := n.initVMs(); err != nil { // Initialize the VM registry.
 		return nil, fmt.Errorf("couldn't initialize VM registry: %w", err)
 	}
@@ -347,6 +352,8 @@ type Node struct {
 
 	// current validators of the network
 	vdrs validators.Manager
+
+	bootstrappedSubnets *chains.Subnets
 
 	apiURI string
 
@@ -1130,6 +1137,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		return fmt.Errorf("failed to initialize subnets: %w", err)
 	}
 
+	n.bootstrappedSubnets = subnets
+
 	n.chainManager, err = chains.New(
 		&chains.ManagerConfig{
 			SybilProtectionEnabled:                  n.Config.SybilProtectionEnabled,
@@ -1542,6 +1551,17 @@ func (n *Node) initHealthAPI() error {
 		"health",
 		"/liveness",
 	)
+}
+
+func (n *Node) initIngressConnectionCountHealthCheck() error {
+	return n.health.RegisterHealthCheck("ingressConnCount", &noIngressConnAlert{
+		now:                time.Now,
+		ingressConnections: n.Net,
+		bootstrapping:      n.bootstrappedSubnets,
+		selfID:             n.ID,
+		validators:         n.vdrs,
+		minCheckInterval:   n.Config.NoIngressValidatorConnectionTimeout,
+	}, health.ApplicationTag)
 }
 
 // Give chains aliases as specified by the genesis information
