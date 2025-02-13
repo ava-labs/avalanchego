@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/subnet-evm/consensus"
 	"github.com/ava-labs/subnet-evm/consensus/misc/eip4844"
@@ -141,13 +142,9 @@ func (eng *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, header
 		}
 	} else {
 		// Verify that the gas limit remains within allowed bounds
-		diff := int64(parent.GasLimit) - int64(header.GasLimit)
-		if diff < 0 {
-			diff *= -1
-		}
+		diff := math.AbsDiff(parent.GasLimit, header.GasLimit)
 		limit := parent.GasLimit / params.GasLimitBoundDivisor
-
-		if uint64(diff) >= limit || header.GasLimit < params.MinGasLimit {
+		if diff >= limit || header.GasLimit < params.MinGasLimit {
 			return fmt.Errorf("invalid gas limit: have %d, want %d += %d", header.GasLimit, parent.GasLimit, limit)
 		}
 		// Verify BaseFee is not present before Subnet EVM
@@ -160,22 +157,15 @@ func (eng *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, header
 		return nil
 	}
 
-	// Verify baseFee and rollupWindow encoding as part of header verification
-	// starting in Subnet EVM
-	expectedRollupWindowBytes, expectedBaseFee, err := CalcBaseFee(config, feeConfig, parent, header.Time)
+	// Verify header.Extra and header.BaseFee match their expected values.
+	expectedExtraPrefix, expectedBaseFee, err := CalcBaseFee(config, feeConfig, parent, header.Time)
 	if err != nil {
 		return fmt.Errorf("failed to calculate base fee: %w", err)
 	}
-	if len(header.Extra) < len(expectedRollupWindowBytes) || !bytes.Equal(expectedRollupWindowBytes, header.Extra[:len(expectedRollupWindowBytes)]) {
-		return fmt.Errorf("expected rollup window bytes: %x, found %x", expectedRollupWindowBytes, header.Extra)
+	if !bytes.HasPrefix(header.Extra, expectedExtraPrefix) {
+		return fmt.Errorf("expected header.Extra to have prefix: %x, found %x", expectedExtraPrefix, header.Extra)
 	}
-	if header.BaseFee == nil {
-		return errors.New("expected baseFee to be non-nil")
-	}
-	if bfLen := header.BaseFee.BitLen(); bfLen > 256 {
-		return fmt.Errorf("too large base fee: bitlen %d", bfLen)
-	}
-	if header.BaseFee.Cmp(expectedBaseFee) != 0 {
+	if !utils.BigEqual(header.BaseFee, expectedBaseFee) {
 		return fmt.Errorf("expected base fee (%d), found (%d)", expectedBaseFee, header.BaseFee)
 	}
 

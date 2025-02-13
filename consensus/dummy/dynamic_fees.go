@@ -14,6 +14,11 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 )
 
+var (
+	MaxUint256Plus1 = new(big.Int).Lsh(common.Big1, 256)
+	MaxUint256      = new(big.Int).Sub(MaxUint256Plus1, common.Big1)
+)
+
 // CalcBaseFee takes the previous header and the timestamp of its child block
 // and calculates the expected base fee as well as the encoding of the past
 // pricing information for the child block.
@@ -90,7 +95,7 @@ func CalcBaseFee(config *params.ChainConfig, feeConfig commontype.FeeConfig, par
 		baseFee.Sub(baseFee, baseFeeDelta)
 	}
 
-	baseFee = selectBigWithinBounds(feeConfig.MinBaseFee, baseFee, nil)
+	baseFee = selectBigWithinBounds(feeConfig.MinBaseFee, baseFee, MaxUint256)
 
 	return dynamicFeeWindowBytes, baseFee, nil
 }
