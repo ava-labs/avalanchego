@@ -1816,7 +1816,7 @@ func (pool *LegacyPool) updateBaseFee() {
 
 // assumes lock is already held
 func (pool *LegacyPool) updateBaseFeeAt(head *types.Header) error {
-	_, baseFeeEstimate, err := dummy.EstimateNextBaseFee(pool.chainconfig, head, uint64(time.Now().Unix()))
+	baseFeeEstimate, err := dummy.EstimateNextBaseFee(pool.chainconfig, head, uint64(time.Now().Unix()))
 	if err != nil {
 		return err
 	}
