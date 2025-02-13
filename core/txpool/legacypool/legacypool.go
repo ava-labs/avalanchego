@@ -1834,7 +1834,7 @@ func (pool *LegacyPool) updateBaseFeeAt(head *types.Header) error {
 	if err != nil {
 		return err
 	}
-	_, baseFeeEstimate, err := dummy.EstimateNextBaseFee(pool.chainconfig, feeConfig, head, uint64(time.Now().Unix()))
+	baseFeeEstimate, err := dummy.EstimateNextBaseFee(pool.chainconfig, feeConfig, head, uint64(time.Now().Unix()))
 	if err != nil {
 		return err
 	}

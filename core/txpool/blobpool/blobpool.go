@@ -415,7 +415,7 @@ func (p *BlobPool) Init(gasTip uint64, head *types.Header, reserve txpool.Addres
 		p.Close()
 		return err
 	}
-	_, baseFee, err := dummy.EstimateNextBaseFee(
+	baseFee, err := dummy.EstimateNextBaseFee(
 		p.chain.Config(),
 		feeConfig,
 		p.head,
@@ -851,7 +851,7 @@ func (p *BlobPool) Reset(oldHead, newHead *types.Header) {
 		log.Error("Failed to get fee config to reset blobpool fees", "err", err)
 		return
 	}
-	_, baseFeeBig, err := dummy.EstimateNextBaseFee(
+	baseFeeBig, err := dummy.EstimateNextBaseFee(
 		p.chain.Config(),
 		feeConfig,
 		p.head,

@@ -268,8 +268,7 @@ func (oracle *Oracle) estimateNextBaseFee(ctx context.Context) (*big.Int, error)
 	// If the block does have a baseFee, calculate the next base fee
 	// based on the current time and add it to the tip to estimate the
 	// total gas price estimate.
-	_, nextBaseFee, err := dummy.EstimateNextBaseFee(oracle.backend.ChainConfig(), feeConfig, header, oracle.clock.Unix())
-	return nextBaseFee, err
+	return dummy.EstimateNextBaseFee(oracle.backend.ChainConfig(), feeConfig, header, oracle.clock.Unix())
 }
 
 // SuggestPrice returns an estimated price for legacy transactions.

@@ -38,7 +38,7 @@ func TestVerifyExtra(t *testing.T) {
 			expected: nil,
 		},
 		{
-			name: "subnet_invalid_less",
+			name: "subnet_evm_invalid_less",
 			rules: params.AvalancheRules{
 				IsSubnetEVM: true,
 			},
@@ -46,7 +46,7 @@ func TestVerifyExtra(t *testing.T) {
 			expected: errInvalidExtraLength,
 		},
 		{
-			name: "subnet_invalid_more",
+			name: "subnet_evm_invalid_more",
 			rules: params.AvalancheRules{
 				IsSubnetEVM: true,
 			},
