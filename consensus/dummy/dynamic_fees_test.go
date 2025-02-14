@@ -243,3 +243,72 @@ func TestCalcBaseFeeRegression(t *testing.T) {
 	require.NoError(t, err)
 	require.Equalf(t, 0, common.Big1.Cmp(big.NewInt(1)), "big1 should be 1, got %s", common.Big1)
 }
+
+func TestEstimateNextBaseFee(t *testing.T) {
+	testBaseFee := uint64(225 * params.GWei)
+	nilUpgrade := params.NetworkUpgrades{}
+	tests := []struct {
+		name string
+
+		upgrades params.NetworkUpgrades
+
+		parentTime           uint64
+		parentNumber         int64
+		parentExtra          []byte
+		parentBaseFee        *big.Int
+		parentGasUsed        uint64
+		parentExtDataGasUsed *big.Int
+
+		timestamp uint64
+
+		want    *big.Int
+		wantErr error
+	}{
+		{
+			name:          "activated",
+			upgrades:      params.TestSubnetEVMChainConfig.NetworkUpgrades,
+			parentNumber:  1,
+			parentExtra:   (&DynamicFeeWindow{}).Bytes(),
+			parentBaseFee: new(big.Int).SetUint64(testBaseFee),
+			timestamp:     1,
+			want: func() *big.Int {
+				var (
+					gasTarget                  = testFeeConfig.TargetGas.Uint64()
+					gasUsed                    = uint64(0)
+					amountUnderTarget          = gasTarget - gasUsed
+					parentBaseFee              = testBaseFee
+					smoothingFactor            = testFeeConfig.BaseFeeChangeDenominator.Uint64()
+					baseFeeFractionUnderTarget = amountUnderTarget * parentBaseFee / gasTarget
+					delta                      = baseFeeFractionUnderTarget / smoothingFactor
+					baseFee                    = parentBaseFee - delta
+				)
+				return new(big.Int).SetUint64(baseFee)
+			}(),
+		},
+		{
+			name:     "not_scheduled",
+			upgrades: nilUpgrade,
+			wantErr:  errEstimateBaseFeeWithoutActivation,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			config := &params.ChainConfig{
+				NetworkUpgrades: test.upgrades,
+			}
+			parentHeader := &types.Header{
+				Time:    test.parentTime,
+				Number:  big.NewInt(test.parentNumber),
+				Extra:   test.parentExtra,
+				BaseFee: test.parentBaseFee,
+				GasUsed: test.parentGasUsed,
+			}
+
+			got, err := EstimateNextBaseFee(config, testFeeConfig, parentHeader, test.timestamp)
+			require.ErrorIs(err, test.wantErr)
+			require.Equal(test.want, got)
+		})
+	}
+}

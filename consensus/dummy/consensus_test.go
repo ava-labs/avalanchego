@@ -15,10 +15,12 @@ import (
 )
 
 var testFeeConfig = commontype.FeeConfig{
-	MinBlockGasCost:  big.NewInt(0),
-	MaxBlockGasCost:  big.NewInt(1_000_000),
-	TargetBlockRate:  2,
-	BlockGasCostStep: big.NewInt(50_000),
+	MinBlockGasCost:          big.NewInt(0),
+	MaxBlockGasCost:          big.NewInt(1_000_000),
+	TargetBlockRate:          2,
+	BlockGasCostStep:         big.NewInt(50_000),
+	TargetGas:                big.NewInt(10_000_000),
+	BaseFeeChangeDenominator: big.NewInt(12),
 }
 
 func TestVerifyBlockFee(t *testing.T) {
