@@ -355,3 +355,71 @@ func TestCalcBaseFeeRegression(t *testing.T) {
 	require.NoError(t, err)
 	require.Equalf(t, 0, common.Big1.Cmp(big.NewInt(1)), "big1 should be 1, got %s", common.Big1)
 }
+
+func TestEstimateNextBaseFee(t *testing.T) {
+	tests := []struct {
+		name string
+
+		upgrades params.NetworkUpgrades
+
+		parentTime           uint64
+		parentNumber         int64
+		parentExtra          []byte
+		parentBaseFee        *big.Int
+		parentGasUsed        uint64
+		parentExtDataGasUsed *big.Int
+
+		timestamp uint64
+
+		want    *big.Int
+		wantErr error
+	}{
+		{
+			name:          "ap3",
+			upgrades:      params.TestApricotPhase3Config.NetworkUpgrades,
+			parentNumber:  1,
+			parentExtra:   (&DynamicFeeWindow{}).Bytes(),
+			parentBaseFee: big.NewInt(params.ApricotPhase3MaxBaseFee),
+			timestamp:     1,
+			want: func() *big.Int {
+				const (
+					gasTarget                  = params.ApricotPhase3TargetGas
+					gasUsed                    = ApricotPhase3BlockGasFee
+					amountUnderTarget          = gasTarget - gasUsed
+					parentBaseFee              = params.ApricotPhase3MaxBaseFee
+					smoothingFactor            = params.ApricotPhase4BaseFeeChangeDenominator
+					baseFeeFractionUnderTarget = amountUnderTarget * parentBaseFee / gasTarget
+					delta                      = baseFeeFractionUnderTarget / smoothingFactor
+					baseFee                    = parentBaseFee - delta
+				)
+				return big.NewInt(baseFee)
+			}(),
+		},
+		{
+			name:     "ap3_not_scheduled",
+			upgrades: params.TestApricotPhase2Config.NetworkUpgrades,
+			wantErr:  errEstimateBaseFeeWithoutActivation,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			config := &params.ChainConfig{
+				NetworkUpgrades: test.upgrades,
+			}
+			parentHeader := &types.Header{
+				Time:           test.parentTime,
+				Number:         big.NewInt(test.parentNumber),
+				Extra:          test.parentExtra,
+				BaseFee:        test.parentBaseFee,
+				GasUsed:        test.parentGasUsed,
+				ExtDataGasUsed: test.parentExtDataGasUsed,
+			}
+
+			got, err := EstimateNextBaseFee(config, parentHeader, test.timestamp)
+			require.ErrorIs(err, test.wantErr)
+			require.Equal(test.want, got)
+		})
+	}
+}
