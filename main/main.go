@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -51,7 +52,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	nodeConfig, err := config.GetNodeConfig(v)
+	nodeConfig, err := config.GetNodeConfig(context.Background(), v)
 	if err != nil {
 		fmt.Printf("couldn't load node config: %s\n", err)
 		os.Exit(1)
