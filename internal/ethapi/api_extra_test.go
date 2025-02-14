@@ -69,7 +69,7 @@ func TestBlockChainAPI_stateQueryBlockNumberAllowed(t *testing.T) {
 				backend.EXPECT().HistoricalProofQueryWindow().Return(queryWindow)
 				backend.EXPECT().LastAcceptedBlock().Return(makeBlockWithNumber(2200))
 				backend.EXPECT().
-					BlockByNumberOrHash(gomock.Any(), gomock.Any()).
+					BlockByHash(gomock.Any(), gomock.Any()).
 					Return(makeBlockWithNumber(2000), nil)
 				return backend
 			},
@@ -82,7 +82,7 @@ func TestBlockChainAPI_stateQueryBlockNumberAllowed(t *testing.T) {
 				backend.EXPECT().HistoricalProofQueryWindow().Return(queryWindow)
 				backend.EXPECT().LastAcceptedBlock().Return(makeBlockWithNumber(2200))
 				backend.EXPECT().
-					BlockByNumberOrHash(gomock.Any(), gomock.Any()).
+					BlockByHash(gomock.Any(), gomock.Any()).
 					Return(nil, fmt.Errorf("test error"))
 				return backend
 			},
