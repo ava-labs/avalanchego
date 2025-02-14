@@ -182,12 +182,12 @@ func FuzzRNG(f *testing.F) {
 		require := require.New(t)
 
 		var (
-			max        uint64
+			maximum    uint64
 			sourceNums []uint64
 		)
 		fz := fuzzer.NewFuzzer(data)
-		fz.Fill(&max, &sourceNums)
-		if max >= math.MaxInt64 {
+		fz.Fill(&maximum, &sourceNums)
+		if maximum >= math.MaxInt64 {
 			t.SkipNow()
 		}
 
@@ -196,14 +196,14 @@ func FuzzRNG(f *testing.F) {
 			nums:      sourceNums,
 		}
 		r := &rng{rng: source}
-		val := r.Uint64Inclusive(max)
+		val := r.Uint64Inclusive(maximum)
 
 		stdSource := &testSTDSource{
 			onInvalid: t.SkipNow,
 			nums:      sourceNums,
 		}
 		mathRNG := rand.New(stdSource) //#nosec G404
-		stdVal := mathRNG.Int63n(int64(max + 1))
+		stdVal := mathRNG.Int63n(int64(maximum + 1))
 		require.Equal(val, uint64(stdVal))
 		require.Len(stdSource.nums, len(source.nums))
 	})
