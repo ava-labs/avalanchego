@@ -68,31 +68,22 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 	}
 
-	sk, err := localsigner.New()
-	require.NoError(err)
-
 	// create valid tx
-	addPermissionlessValidatorTx, err := wallet.IssueAddPermissionlessValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
-				NodeID: nodeID,
-				Start:  uint64(validatorStartTime.Unix()),
-				End:    uint64(validatorEndTime.Unix()),
-				Wght:   vm.MinValidatorStake,
-			},
-			Subnet: constants.PrimaryNetworkID,
+	addValidatorTx, err := wallet.IssueAddValidatorTx(
+		&txs.Validator{
+			NodeID: nodeID,
+			Start:  uint64(validatorStartTime.Unix()),
+			End:    uint64(validatorEndTime.Unix()),
+			Wght:   vm.MinValidatorStake,
 		},
-		signer.NewProofOfPossession(sk),
-		vm.ctx.AVAXAssetID,
 		rewardsOwner,
-		rewardsOwner,
-		0,
+		reward.PercentDenominator,
 	)
 	require.NoError(err)
 
 	// trigger block creation
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTxFromRPC(addPermissionlessValidatorTx))
+	require.NoError(vm.issueTxFromRPC(addValidatorTx))
 	vm.ctx.Lock.Lock()
 
 	// Accept addValidatorTx
