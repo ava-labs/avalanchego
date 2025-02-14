@@ -1223,7 +1223,7 @@ func getTraceConfig(v *viper.Viper) (trace.Config, error) {
 
 // Returns the path to the directory that contains VM binaries.
 func getPluginDir(v *viper.Viper) (string, error) {
-	pluginDir := GetExpandedString(v, v.GetString(PluginDirKey))
+	pluginDir := GetExpandedArg(v, PluginDirKey)
 
 	if v.IsSet(PluginDirKey) {
 		// If the flag was given, assert it exists and is a directory
