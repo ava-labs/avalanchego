@@ -394,11 +394,11 @@ func BuildFlagSet() *pflag.FlagSet {
 	return fs
 }
 
-// GetExpandedArg gets the string in viper corresponding to [key] and expands
+// getExpandedArg gets the string in viper corresponding to [key] and expands
 // any variables using the OS env. If the [AvalancheGoDataDirVar] var is used,
 // we expand the value of the variable with the string in viper corresponding to
 // [DataDirKey].
-func GetExpandedArg(v *viper.Viper, key string) string {
+func getExpandedArg(v *viper.Viper, key string) string {
 	return os.Expand(
 		v.GetString(key),
 		func(strVar string) string {
