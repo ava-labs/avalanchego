@@ -1,6 +1,6 @@
 package firewood
 
-// #cgo LDFLAGS: -L../target/release -L/usr/local/lib -lfirewood_ffi
+// #cgo LDFLAGS: -L../target/release -L/usr/local/lib -lfirewood_ffi -lm
 // #include "firewood.h"
 // #include <stdlib.h>
 import "C"
@@ -20,8 +20,9 @@ type openConfig struct {
 	path              string
 	nodeCacheEntries  uintptr
 	revisions         uintptr
-	readCacheStrategy int8
+	readCacheStrategy uint8
 	create            bool
+	metricsPort       uint16
 }
 
 // OpenOption is a function that configures the database at open time
@@ -54,12 +55,20 @@ func WithRevisions(revisions uintptr) OpenOption {
 	}
 }
 
+// WithMetricIntervalSeconds sets the interval in seconds for metrics
+// set to 0 for no metrics
+func WithMetricsPort(metrics_port uint16) OpenOption {
+	return func(o *openConfig) {
+		o.metricsPort = metrics_port
+	}
+}
+
 // WithReadCacheStrategy sets the read cache strategy
 // 0: Only writes are cached
 // 1: Branch reads are cached
 // 2: All reads are cached
-func WithReadCacheStrategy(strategy int8) OpenOption {
-	if (strategy < 0) || (strategy > 2) {
+func WithReadCacheStrategy(strategy uint8) OpenOption {
+	if strategy > 2 {
 		panic("Invalid read cache strategy " + strconv.Itoa(int(strategy)))
 	}
 	return func(o *openConfig) {
@@ -84,6 +93,7 @@ func NewDatabase(options ...OpenOption) Firewood {
 		revisions:         100,
 		readCacheStrategy: 0,
 		path:              "firewood.db",
+		metricsPort:       3000,
 	}
 
 	for _, opt := range options {
@@ -91,9 +101,9 @@ func NewDatabase(options ...OpenOption) Firewood {
 	}
 	var db unsafe.Pointer
 	if opts.create {
-		db = C.fwd_create_db(C.CString(opts.path), C.size_t(opts.nodeCacheEntries), C.size_t(opts.revisions), C.uint8_t(opts.readCacheStrategy))
+		db = C.fwd_create_db(C.CString(opts.path), C.size_t(opts.nodeCacheEntries), C.size_t(opts.revisions), C.uint8_t(opts.readCacheStrategy), C.uint16_t(opts.metricsPort))
 	} else {
-		db = C.fwd_open_db(C.CString(opts.path), C.size_t(opts.nodeCacheEntries), C.size_t(opts.revisions), C.uint8_t(opts.readCacheStrategy))
+		db = C.fwd_open_db(C.CString(opts.path), C.size_t(opts.nodeCacheEntries), C.size_t(opts.revisions), C.uint8_t(opts.readCacheStrategy), C.uint16_t(opts.metricsPort))
 	}
 
 	ptr := (*C.void)(db)

@@ -9,6 +9,8 @@ use std::path::Path;
 use firewood::db::{BatchOp as DbBatchOp, Db, DbConfig, DbViewSync as _};
 use firewood::manager::{CacheReadStrategy, RevisionManagerConfig};
 
+mod metrics;
+
 #[derive(Debug)]
 #[repr(C)]
 pub struct Value {
@@ -186,12 +188,13 @@ pub unsafe extern "C" fn fwd_create_db(
     cache_size: usize,
     revisions: usize,
     strategy: u8,
+    metrics_port: u16,
 ) -> *mut Db {
     let cfg = DbConfig::builder()
         .truncate(true)
         .manager(manager_config(cache_size, revisions, strategy))
         .build();
-    common_create(path, cfg)
+    common_create(path, metrics_port, cfg)
 }
 
 /// Open a database with the given cache size and maximum number of revisions
@@ -219,17 +222,25 @@ pub unsafe extern "C" fn fwd_open_db(
     cache_size: usize,
     revisions: usize,
     strategy: u8,
+    metrics_port: u16,
 ) -> *mut Db {
     let cfg = DbConfig::builder()
         .truncate(false)
         .manager(manager_config(cache_size, revisions, strategy))
         .build();
-    common_create(path, cfg)
+    common_create(path, metrics_port, cfg)
 }
 
-unsafe fn common_create(path: *const std::ffi::c_char, cfg: DbConfig) -> *mut Db {
+unsafe fn common_create(
+    path: *const std::ffi::c_char,
+    metrics_port: u16,
+    cfg: DbConfig,
+) -> *mut Db {
     let path = unsafe { CStr::from_ptr(path) };
     let path: &Path = OsStr::from_bytes(path.to_bytes()).as_ref();
+    if metrics_port > 0 {
+        metrics::setup_metrics(metrics_port);
+    }
     Box::into_raw(Box::new(
         Db::new_sync(path, cfg).expect("db initialization should succeed"),
     ))

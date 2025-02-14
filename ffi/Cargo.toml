@@ -9,6 +9,10 @@ crate-type = ["staticlib"]
 [dependencies]
 libc = "0.2.2"
 firewood = { path = "../firewood" }
+metrics = "0.24.1"
+metrics-util = "0.19.0"
+chrono = "0.4.39"
+oxhttp = "0.3.0"
 
 [build-dependencies]
 cbindgen = "0.28.0"
