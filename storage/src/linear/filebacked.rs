@@ -11,12 +11,12 @@ use std::io::{Error, Read};
 use std::num::NonZero;
 use std::os::unix::fs::FileExt;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 use lru::LruCache;
 use metrics::counter;
 
-use crate::{CacheReadStrategy, LinearAddress, Node};
+use crate::{CacheReadStrategy, LinearAddress, SharedNode};
 
 use super::{ReadableStorage, WritableStorage};
 
@@ -24,7 +24,7 @@ use super::{ReadableStorage, WritableStorage};
 /// A [ReadableStorage] backed by a file
 pub struct FileBacked {
     fd: File,
-    cache: Mutex<LruCache<LinearAddress, Arc<Node>>>,
+    cache: Mutex<LruCache<LinearAddress, SharedNode>>,
     free_list_cache: Mutex<LruCache<LinearAddress, Option<LinearAddress>>>,
     cache_read_strategy: CacheReadStrategy,
 }
@@ -63,7 +63,7 @@ impl ReadableStorage for FileBacked {
         Ok(self.fd.metadata()?.len())
     }
 
-    fn read_cached_node(&self, addr: LinearAddress) -> Option<Arc<Node>> {
+    fn read_cached_node(&self, addr: LinearAddress) -> Option<SharedNode> {
         let mut guard = self.cache.lock().expect("poisoned lock");
         let cached = guard.get(&addr).cloned();
         counter!("firewood.cache.node", "type" => if cached.is_some() { "hit" } else { "miss" })
@@ -82,7 +82,7 @@ impl ReadableStorage for FileBacked {
         &self.cache_read_strategy
     }
 
-    fn cache_node(&self, addr: LinearAddress, node: Arc<Node>) {
+    fn cache_node(&self, addr: LinearAddress, node: SharedNode) {
         match self.cache_read_strategy {
             CacheReadStrategy::WritesOnly => {
                 // we don't cache reads
@@ -108,7 +108,7 @@ impl WritableStorage for FileBacked {
 
     fn write_cached_nodes<'a>(
         &self,
-        nodes: impl Iterator<Item = (&'a std::num::NonZero<u64>, &'a std::sync::Arc<crate::Node>)>,
+        nodes: impl Iterator<Item = (&'a std::num::NonZero<u64>, &'a SharedNode)>,
     ) -> Result<(), Error> {
         let mut guard = self.cache.lock().expect("poisoned lock");
         for (addr, node) in nodes {

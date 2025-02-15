@@ -20,9 +20,8 @@
 use std::fmt::Debug;
 use std::io::{Error, Read};
 use std::num::NonZero;
-use std::sync::Arc;
 
-use crate::{CacheReadStrategy, LinearAddress, Node};
+use crate::{CacheReadStrategy, LinearAddress, SharedNode};
 pub(super) mod filebacked;
 pub mod memory;
 
@@ -43,7 +42,7 @@ pub trait ReadableStorage: Debug + Sync + Send {
     fn size(&self) -> Result<u64, Error>;
 
     /// Read a node from the cache (if any)
-    fn read_cached_node(&self, _addr: LinearAddress) -> Option<Arc<Node>> {
+    fn read_cached_node(&self, _addr: LinearAddress) -> Option<SharedNode> {
         None
     }
 
@@ -58,7 +57,7 @@ pub trait ReadableStorage: Debug + Sync + Send {
     }
 
     /// Cache a node for future reads
-    fn cache_node(&self, _addr: LinearAddress, _node: Arc<Node>) {}
+    fn cache_node(&self, _addr: LinearAddress, _node: SharedNode) {}
 }
 
 /// Trait for writable storage.
@@ -78,7 +77,7 @@ pub trait WritableStorage: ReadableStorage {
     /// Write all nodes to the cache (if any)
     fn write_cached_nodes<'a>(
         &self,
-        _nodes: impl Iterator<Item = (&'a NonZero<u64>, &'a Arc<Node>)>,
+        _nodes: impl Iterator<Item = (&'a NonZero<u64>, &'a SharedNode)>,
     ) -> Result<(), Error> {
         Ok(())
     }

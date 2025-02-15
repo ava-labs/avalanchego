@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::io::{Error, ErrorKind, Read, Write};
 use std::num::NonZero;
-use std::sync::Arc;
 use std::vec;
 
 mod branch;
@@ -18,7 +17,7 @@ pub mod path;
 pub use branch::{BranchNode, Child};
 pub use leaf::LeafNode;
 
-use crate::Path;
+use crate::{Path, SharedNode};
 
 /// A node, either a Branch or Leaf
 
@@ -174,21 +173,6 @@ impl Node {
         match self {
             Node::Branch(b) => b.value = Some(value),
             Node::Leaf(l) => l.value = value,
-        }
-    }
-
-    /// Returns a new `Arc<Node>` which is the same as `self` but with the given `partial_path`.
-    pub fn new_with_partial_path(self: &Node, partial_path: Path) -> Node {
-        match self {
-            Node::Branch(b) => Node::Branch(Box::new(BranchNode {
-                partial_path,
-                value: b.value.clone(),
-                children: b.children.clone(),
-            })),
-            Node::Leaf(l) => Node::Leaf(LeafNode {
-                partial_path,
-                value: l.value.clone(),
-            }),
         }
     }
 
@@ -454,7 +438,7 @@ pub struct PathIterItem {
     /// The key of the node at `address` as nibbles.
     pub key_nibbles: Box<[u8]>,
     /// A reference to the node
-    pub node: Arc<Node>,
+    pub node: SharedNode,
     /// The next item returned by the iterator is a child of `node`.
     /// Specifically, it's the child at index `next_nibble` in `node`'s
     /// children array.

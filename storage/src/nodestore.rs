@@ -61,7 +61,7 @@ use std::sync::Arc;
 
 use crate::hashednode::hash_node;
 use crate::node::{ByteCounter, Node};
-use crate::{CacheReadStrategy, Child, FileBacked, Path, ReadableStorage, TrieHash};
+use crate::{CacheReadStrategy, Child, FileBacked, Path, ReadableStorage, SharedNode, TrieHash};
 
 use super::linear::WritableStorage;
 
@@ -210,7 +210,7 @@ impl<T: ReadInMemoryNode, S: ReadableStorage> NodeStore<T, S> {
 
     /// Read a [Node] from the provided [LinearAddress].
     /// `addr` is the address of a StoredArea in the ReadableStorage.
-    pub fn read_node_from_disk(&self, addr: LinearAddress) -> Result<Arc<Node>, Error> {
+    pub fn read_node_from_disk(&self, addr: LinearAddress) -> Result<SharedNode, Error> {
         if let Some(node) = self.storage.read_cached_node(addr) {
             return Ok(node);
         }
@@ -222,7 +222,7 @@ impl<T: ReadInMemoryNode, S: ReadableStorage> NodeStore<T, S> {
         let _span = LocalSpan::enter_with_local_parent("read_and_deserialize");
 
         let area_stream = self.storage.stream_from(actual_addr)?;
-        let node = Arc::new(Node::from_reader(area_stream)?);
+        let node: SharedNode = Node::from_reader(area_stream)?.into();
         match self.storage.cache_read_strategy() {
             CacheReadStrategy::All => {
                 self.storage.cache_node(addr, node.clone());
@@ -657,7 +657,7 @@ impl<T> TrieReader for T where T: NodeReader + RootReader {}
 /// Reads nodes from a merkle trie.
 pub trait NodeReader {
     /// Returns the node at `addr`.
-    fn read_node(&self, addr: LinearAddress) -> Result<Arc<Node>, Error>;
+    fn read_node(&self, addr: LinearAddress) -> Result<SharedNode, Error>;
 }
 
 impl<T> NodeReader for T
@@ -665,7 +665,7 @@ where
     T: Deref,
     T::Target: NodeReader,
 {
-    fn read_node(&self, addr: LinearAddress) -> Result<Arc<Node>, Error> {
+    fn read_node(&self, addr: LinearAddress) -> Result<SharedNode, Error> {
         self.deref().read_node(addr)
     }
 }
@@ -675,7 +675,7 @@ where
     T: Deref,
     T::Target: RootReader,
 {
-    fn root_node(&self) -> Option<Arc<Node>> {
+    fn root_node(&self) -> Option<SharedNode> {
         self.deref().root_node()
     }
 }
@@ -683,7 +683,7 @@ where
 /// Reads the root of a merkle trie.
 pub trait RootReader {
     /// Returns the root of the trie.
-    fn root_node(&self) -> Option<Arc<Node>>;
+    fn root_node(&self) -> Option<SharedNode>;
 }
 
 /// A committed revision of a merkle trie.
@@ -696,7 +696,7 @@ pub struct Committed {
 
 impl ReadInMemoryNode for Committed {
     // A committed revision has no in-memory changes. All its nodes are in storage.
-    fn read_in_memory_node(&self, _addr: LinearAddress) -> Option<Arc<Node>> {
+    fn read_in_memory_node(&self, _addr: LinearAddress) -> Option<SharedNode> {
         None
     }
 }
@@ -723,7 +723,7 @@ impl Eq for NodeStoreParent {}
 /// Contains state for a proposed revision of the trie.
 pub struct ImmutableProposal {
     /// Address --> Node for nodes created in this proposal.
-    new: HashMap<LinearAddress, (u8, Arc<Node>)>,
+    new: HashMap<LinearAddress, (u8, SharedNode)>,
     /// Nodes that have been deleted in this proposal.
     deleted: Box<[LinearAddress]>,
     /// The parent of this proposal.
@@ -747,7 +747,7 @@ impl ImmutableProposal {
 }
 
 impl ReadInMemoryNode for ImmutableProposal {
-    fn read_in_memory_node(&self, addr: LinearAddress) -> Option<Arc<Node>> {
+    fn read_in_memory_node(&self, addr: LinearAddress) -> Option<SharedNode> {
         // Check if the node being requested was created in this proposal.
         if let Some((_, node)) = self.new.get(&addr) {
             return Some(node.clone());
@@ -770,7 +770,7 @@ impl ReadInMemoryNode for ImmutableProposal {
 pub trait ReadInMemoryNode {
     /// Returns the node at `addr` if it is in memory.
     /// Returns None if it isn't.
-    fn read_in_memory_node(&self, addr: LinearAddress) -> Option<Arc<Node>>;
+    fn read_in_memory_node(&self, addr: LinearAddress) -> Option<SharedNode>;
 }
 
 impl<T> ReadInMemoryNode for T
@@ -778,7 +778,7 @@ where
     T: Deref,
     T::Target: ReadInMemoryNode,
 {
-    fn read_in_memory_node(&self, addr: LinearAddress) -> Option<Arc<Node>> {
+    fn read_in_memory_node(&self, addr: LinearAddress) -> Option<SharedNode> {
         self.deref().read_in_memory_node(addr)
     }
 }
@@ -819,7 +819,7 @@ pub struct MutableProposal {
 impl ReadInMemoryNode for NodeStoreParent {
     /// Returns the node at `addr` if it is in memory from a parent proposal.
     /// If the base revision is committed, there are no in-memory nodes, so we return None
-    fn read_in_memory_node(&self, addr: LinearAddress) -> Option<Arc<Node>> {
+    fn read_in_memory_node(&self, addr: LinearAddress) -> Option<SharedNode> {
         match self {
             NodeStoreParent::Proposed(proposed) => proposed.read_in_memory_node(addr),
             NodeStoreParent::Committed(_) => None,
@@ -830,7 +830,7 @@ impl ReadInMemoryNode for NodeStoreParent {
 impl ReadInMemoryNode for MutableProposal {
     /// [MutableProposal] types do not have any nodes in memory, but their parent proposal might, so we check there.
     /// This might be recursive: a grandparent might also have that node in memory.
-    fn read_in_memory_node(&self, addr: LinearAddress) -> Option<Arc<Node>> {
+    fn read_in_memory_node(&self, addr: LinearAddress) -> Option<SharedNode> {
         self.parent.read_in_memory_node(addr)
     }
 }
@@ -872,7 +872,7 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
         &mut self,
         mut node: Node,
         path_prefix: &mut Path,
-        new_nodes: &mut HashMap<LinearAddress, (u8, Arc<Node>)>,
+        new_nodes: &mut HashMap<LinearAddress, (u8, SharedNode)>,
     ) -> (LinearAddress, TrieHash) {
         // If this is a branch, find all unhashed children and recursively call hash_helper on them.
         if let Node::Branch(ref mut b) = node {
@@ -908,7 +908,7 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
         let hash = hash_node(&node, path_prefix);
         let (addr, size) = self.allocate_node(&node).expect("TODO handle error");
 
-        new_nodes.insert(addr, (size, Arc::new(node)));
+        new_nodes.insert(addr, (size, node.into()));
 
         (addr, hash)
     }
@@ -1026,7 +1026,7 @@ impl<S: ReadableStorage> From<NodeStore<MutableProposal, S>>
 }
 
 impl<T: ReadInMemoryNode, S: ReadableStorage> NodeReader for NodeStore<T, S> {
-    fn read_node(&self, addr: LinearAddress) -> Result<Arc<Node>, Error> {
+    fn read_node(&self, addr: LinearAddress) -> Result<SharedNode, Error> {
         if let Some(node) = self.kind.read_in_memory_node(addr) {
             return Ok(node);
         }
@@ -1036,8 +1036,8 @@ impl<T: ReadInMemoryNode, S: ReadableStorage> NodeReader for NodeStore<T, S> {
 }
 
 impl<S: ReadableStorage> RootReader for NodeStore<MutableProposal, S> {
-    fn root_node(&self) -> Option<Arc<Node>> {
-        self.kind.root.as_ref().map(|node| Arc::new(node.clone()))
+    fn root_node(&self) -> Option<SharedNode> {
+        self.kind.root.as_ref().map(|node| node.clone().into())
     }
 }
 
@@ -1046,7 +1046,7 @@ impl Hashed for Committed {}
 impl Hashed for Arc<ImmutableProposal> {}
 
 impl<T: ReadInMemoryNode + Hashed, S: ReadableStorage> RootReader for NodeStore<T, S> {
-    fn root_node(&self) -> Option<Arc<Node>> {
+    fn root_node(&self) -> Option<SharedNode> {
         // TODO: If the read_node fails, we just say there is no root; this is incorrect
         self.header
             .root_address

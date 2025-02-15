@@ -8,9 +8,8 @@ use futures::stream::FusedStream;
 use futures::{Stream, StreamExt};
 use std::cmp::Ordering;
 use std::iter::once;
-use std::sync::Arc;
 use std::task::Poll;
-use storage::{BranchNode, Child, NibblesIterator, Node, PathIterItem, TrieReader};
+use storage::{BranchNode, Child, NibblesIterator, Node, PathIterItem, SharedNode, TrieReader};
 
 /// Represents an ongoing iteration over a node and its children.
 enum IterationNode {
@@ -18,7 +17,7 @@ enum IterationNode {
     Unvisited {
         /// The key (as nibbles) of this node.
         key: Key,
-        node: Arc<Node>,
+        node: SharedNode,
     },
     /// This node has been returned. Track which child to visit next.
     Visited {
@@ -94,7 +93,7 @@ impl<'a, T: TrieReader> MerkleNodeStream<'a, T> {
 }
 
 impl<T: TrieReader> Stream for MerkleNodeStream<'_, T> {
-    type Item = Result<(Key, Arc<Node>), api::Error>;
+    type Item = Result<(Key, SharedNode), api::Error>;
 
     fn poll_next(
         mut self: std::pin::Pin<&mut Self>,
@@ -141,7 +140,7 @@ impl<T: TrieReader> Stream for MerkleNodeStream<'_, T> {
 
                             let child = match child {
                                 Child::AddressWithHash(addr, _) => merkle.read_node(addr)?,
-                                Child::Node(node) => Arc::new(node.clone()),
+                                Child::Node(node) => node.clone().into(),
                             };
 
                             let child_partial_path = child.partial_path().iter().copied();
@@ -251,7 +250,7 @@ fn get_iterator_intial_state<T: TrieReader>(
                     node = match child {
                         None => return Ok(NodeStreamState::Iterating { iter_stack }),
                         Some(Child::AddressWithHash(addr, _)) => merkle.read_node(*addr)?,
-                        Some(Child::Node(node)) => Arc::new((*node).clone()), // TODO can we avoid cloning this?
+                        Some(Child::Node(node)) => (*node).clone().into(), // TODO can we avoid cloning this?
                     };
 
                     matched_key_nibbles.push(next_unmatched_key_nibble);
@@ -374,7 +373,7 @@ enum PathIteratorState<'a> {
         /// prefix of the key we're traversing to.
         matched_key: Vec<u8>,
         unmatched_key: NibblesIterator<'a>,
-        node: Arc<Node>,
+        node: SharedNode,
     },
     Exhausted,
 }
@@ -504,7 +503,7 @@ impl<T: TrieReader> Iterator for PathIterator<'_, '_, T> {
                                         matched_key.push(next_unmatched_key_nibble);
 
                                         let ret = node.clone();
-                                        *node = Arc::new(child.clone());
+                                        *node = child.clone().into();
 
                                         Some(Ok(PathIterItem {
                                             key_nibbles: node_key,
@@ -584,6 +583,8 @@ fn key_from_nibble_iter<Iter: Iterator<Item = u8>>(mut nibbles: Iter) -> Key {
 #[cfg(test)]
 #[allow(clippy::indexing_slicing, clippy::unwrap_used)]
 mod tests {
+    use std::sync::Arc;
+
     use storage::{MemStore, MutableProposal, NodeStore};
 
     use crate::merkle::Merkle;

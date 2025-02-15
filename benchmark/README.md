@@ -169,15 +169,12 @@ If you're looking for detailed logging, there are some command line options to e
     cargo run --profile release --bin benchmark -- -l debug -n 10000 single
 ```
 
-# Using opentelemetry
+## Using opentelemetry
 
 To use the opentelemetry server and record timings, just run a docker image that collects the data using:
 
 ```sh
 docker run   -p 127.0.0.1:4318:4318   -p 127.0.0.1:55679:55679   otel/opentelemetry-collector-contrib:0.97.0   2>&1
-```
-
-Then, pass the `-e` option to the benchmark.
 ```
 
 Then, pass the `-e` option to the benchmark.
