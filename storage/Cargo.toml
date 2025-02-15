@@ -22,6 +22,7 @@ bytemuck = "1.7.0"
 bytemuck_derive = "1.7.0"
 bitfield = "0.18.1"
 fastrace = { version = "0.7.4" }
+io-uring = { version = "0.7.4", optional = true }
 triomphe = "0.1.14"
 
 [dev-dependencies]
@@ -34,6 +35,7 @@ tempfile = "3.12.0"
 [features]
 logger = ["log"]
 branch_factor_256 = []
+io-uring = ["dep:io-uring"]
 
 [[bench]]
 name = "serializer"

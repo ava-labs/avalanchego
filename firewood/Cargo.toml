@@ -18,7 +18,6 @@ readme = "../README.md"
 [dependencies]
 aquamarine = "0.6.0"
 async-trait = "0.1.77"
-storage = { version = "0.0.4", path = "../storage" }
 futures = "0.3.30"
 hex = "0.4.3"
 metrics = "0.24.0"
@@ -29,14 +28,13 @@ thiserror = "2.0.3"
 typed-builder = "0.20.0"
 bincode = "1.3.3"
 integer-encoding = "4.0.0"
-io-uring = {version = "0.7", optional = true }
 smallvec = "1.6.1"
 fastrace = { version = "0.7.4" }
 
 [features]
 default = []
 nightly = []
-iouring = ["io-uring"]
+io-uring = ["storage/io-uring"]
 logger = ["storage/logger"]
 branch_factor_256 = [ "storage/branch_factor_256" ]
 
@@ -60,3 +58,9 @@ unwrap_used = "warn"
 indexing_slicing = "warn"
 explicit_deref_methods = "warn"
 missing_const_for_fn = "warn"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+storage = { version = "0.0.4", path = "../storage", features = ["io-uring"] }
+
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+storage = { version = "0.0.4", path = "../storage" }

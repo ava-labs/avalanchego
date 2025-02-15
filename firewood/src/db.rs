@@ -425,7 +425,7 @@ impl<'a> api::Proposal for Proposal<'a> {
         match Arc::into_inner(self) {
             Some(proposal) => {
                 let mut manager = proposal.db.manager.write().expect("poisoned lock");
-                Ok(manager.commit(proposal.nodestore.clone())?)
+                Ok(manager.commit(proposal.nodestore)?)
             }
             None => Err(api::Error::CannotCommitClonedProposal),
         }
@@ -438,7 +438,7 @@ impl Proposal<'_> {
         match Arc::into_inner(self) {
             Some(proposal) => {
                 let mut manager = proposal.db.manager.write().expect("poisoned lock");
-                Ok(manager.commit(proposal.nodestore.clone())?)
+                Ok(manager.commit(proposal.nodestore)?)
             }
             None => Err(api::Error::CannotCommitClonedProposal),
         }

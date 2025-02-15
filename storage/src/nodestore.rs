@@ -937,7 +937,7 @@ impl<T, S: WritableStorage> NodeStore<T, S> {
     }
 }
 
-impl<S: WritableStorage> NodeStore<Arc<ImmutableProposal>, S> {
+impl NodeStore<Arc<ImmutableProposal>, FileBacked> {
     /// Persist the freelist from this proposal to storage.
     #[fastrace::trace(short_name = true)]
     pub fn flush_freelist(&self) -> Result<(), Error> {
@@ -950,6 +950,7 @@ impl<S: WritableStorage> NodeStore<Arc<ImmutableProposal>, S> {
 
     /// Persist all the nodes of a proposal to storage.
     #[fastrace::trace(short_name = true)]
+    #[cfg(not(feature = "io-uring"))]
     pub fn flush_nodes(&self) -> Result<(), Error> {
         for (addr, (area_size_index, node)) in self.kind.new.iter() {
             let mut stored_area_bytes = Vec::new();
@@ -960,6 +961,83 @@ impl<S: WritableStorage> NodeStore<Arc<ImmutableProposal>, S> {
 
         self.storage
             .write_cached_nodes(self.kind.new.iter().map(|(addr, (_, node))| (addr, node)))?;
+
+        Ok(())
+    }
+
+    /// Persist all the nodes of a proposal to storage.
+    #[fastrace::trace(short_name = true)]
+    #[cfg(feature = "io-uring")]
+    pub fn flush_nodes(&self) -> Result<(), Error> {
+        const RINGSIZE: usize = FileBacked::RINGSIZE as usize;
+
+        let mut ring = self.storage.ring.lock().expect("poisoned lock");
+        let mut saved_pinned_buffers = vec![(false, std::pin::Pin::new(Box::default())); RINGSIZE];
+        for (&addr, &(area_size_index, ref node)) in self.kind.new.iter() {
+            let mut serialized = Vec::with_capacity(100); // TODO: better size? we can guess branches are larger
+            node.as_bytes(area_size_index, &mut serialized);
+            let mut serialized = serialized.into_boxed_slice();
+            loop {
+                // Find the first available write buffer, enumerate to get the position for marking it completed
+                if let Some((pos, (busy, found))) = saved_pinned_buffers
+                    .iter_mut()
+                    .enumerate()
+                    .find(|(_, (busy, _))| !*busy)
+                {
+                    *found = std::pin::Pin::new(std::mem::take(&mut serialized));
+                    let submission_queue_entry = self
+                        .storage
+                        .make_op(found)
+                        .offset(addr.get())
+                        .build()
+                        .user_data(pos as u64);
+
+                    *busy = true;
+                    // SAFETY: the submission_queue_entry's found buffer must not move or go out of scope
+                    // until the operation has been completed. This is ensured by marking the slot busy,
+                    // and not marking it !busy until the kernel has said it's done below.
+                    #[allow(unsafe_code)]
+                    while unsafe { ring.submission().push(&submission_queue_entry) }.is_err() {
+                        ring.submitter().squeue_wait()?;
+                        trace!("submission queue is full");
+                        counter!("ring.full").increment(1);
+                    }
+                    break;
+                }
+                // if we get here, that means we couldn't find a place to queue the request, so wait for at least one operation
+                // to complete, then handle the completion queue
+                counter!("ring.full").increment(1);
+                ring.submit_and_wait(1)?;
+                let completion_queue = ring.completion();
+                trace!("competion queue length: {}", completion_queue.len());
+                for entry in completion_queue {
+                    let item = entry.user_data() as usize;
+                    saved_pinned_buffers
+                        .get_mut(item)
+                        .expect("should be an index into the array")
+                        .0 = false;
+                }
+            }
+        }
+        let pending = saved_pinned_buffers
+            .iter()
+            .filter(|(busy, _)| *busy)
+            .count();
+        ring.submit_and_wait(pending)?;
+
+        for entry in ring.completion() {
+            let item = entry.user_data() as usize;
+            saved_pinned_buffers
+                .get_mut(item)
+                .expect("should be an index into the array")
+                .0 = false;
+        }
+
+        debug_assert_eq!(saved_pinned_buffers.iter().find(|(busy, _)| *busy), None);
+
+        self.storage
+            .write_cached_nodes(self.kind.new.iter().map(|(addr, (_, node))| (addr, node)))?;
+        debug_assert!(ring.completion().is_empty());
 
         Ok(())
     }
