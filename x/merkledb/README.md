@@ -2,7 +2,7 @@
 
 ## Structure
 
-A _Merkle radix trie_ is a data structure that is both a [Merkle tree](https://en.wikipedia.org/wiki/Merkle_tree) and a [radix trie](https://en.wikipedia.org/wiki/Radix_tree). MerkleDB is an implementation of a persisted key-value store (sometimes just called "a store") using a Merkle radix trie. We sometimes use "Merkle radix trie" and "MerkleDB instance" interchangeably below, but the two are not the same. MerkleDB maintains data in a Merkle radix trie, but not all Merkle radix tries implement a key-value store.
+A _Merkle radix trie_ is a data structure that is both a [Merkle tree](https://en.wikipedia.org/wiki/Merkle_tree) and a [radix trie](https://en.wikipedia.org/wiki/Radix_tree). MerkleDB is an implementation of a persisted key-value store (sometimes just called "a store") using a Merkle radix trie. We sometimes use "Merkle radix trie" and "MerkleDB instance" interchangeably below, but the two are not the same. MerkleDB maintains data in a Merkle radix trie, but not all Merkle radix tries to implement a key-value store.
 
 Like all tries, a MerkleDB instance is composed of nodes. Conceptually, a node has:
   * A unique _key_ which identifies its position in the trie. A node's key is a prefix of its childrens' keys.
@@ -61,7 +61,7 @@ When a view is created, we don't apply changes to the trie's structure or calcul
 
 When a view is committed, its siblings and all of their descendants are _invalidated_. An invalid view can't be read or committed. Method calls on it will return `ErrInvalid`.
 
-In the diagram above, if `view1` were committed, `view2` would be invalidated. It `view2` were committed, `view1` and `view3` would be invalidated.
+In the diagram above, if `view1` were committed, `view2` would be invalidated. If `view2` were committed, `view1` and `view3` would be invalidated.
 
 ## Proofs
 
