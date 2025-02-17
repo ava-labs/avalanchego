@@ -706,7 +706,6 @@ func TestAtomicTrie_AcceptTrie(t *testing.T) {
 	}
 
 	for name, testCase := range testCases {
-		testCase := testCase // capture range variable for running tests with Go < 1.22
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
