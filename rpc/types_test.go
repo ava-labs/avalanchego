@@ -145,7 +145,6 @@ func TestBlockNumberOrHash_WithNumber_MarshalAndUnmarshal(t *testing.T) {
 		{"earliest", int64(EarliestBlockNumber)},
 	}
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			bnh := BlockNumberOrHashWithNumber(BlockNumber(test.number))
 			marshalled, err := json.Marshal(bnh)
