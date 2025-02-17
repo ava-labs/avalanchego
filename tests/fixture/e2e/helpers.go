@@ -20,7 +20,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/config"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -77,13 +76,9 @@ func NewWallet(tc tests.TestContext, keychain *secp256k1fx.Keychain, nodeURI tmp
 	require.NoError(tc, err)
 	wallet := primary.NewWalletWithOptions(
 		baseWallet,
-		common.WithPostIssuanceFunc(
-			func(id ids.ID) {
-				tc.Log().Info("issued transaction",
-					zap.Stringer("txID", id),
-				)
-			},
-		),
+		common.WithLoggedIssuranceAndConfirmation(tc.Log()),
+		// Use a low poll frequency to ensure more accurate determination of confirmation duration
+		common.WithPollFrequency(10*time.Millisecond),
 	)
 	OutputWalletBalances(tc, wallet)
 	return wallet
