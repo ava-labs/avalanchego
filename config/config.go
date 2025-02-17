@@ -676,9 +676,15 @@ func getStakingSigner(v *viper.Viper) (bls.Signer, error) {
 		return key, nil
 	}
 
+	// If the key is set, but a user-file isn't provided, we don't create one.
+	// The siging key is only stored to the default file-location if it's created
+	// and saved by the current application run.
+
 	if v.IsSet(StakingSignerKeyPathKey) {
 		return nil, errMissingStakingSigningKeyFile
 	}
+
+	// no config values explicitly set,
 
 	key, err := localsigner.New()
 	if err != nil {
