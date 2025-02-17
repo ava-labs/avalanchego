@@ -14,7 +14,7 @@ import (
 )
 
 func BenchmarkSign(b *testing.B) {
-	privateKey, _ := NewKeyPair(require.New(b))
+	signer := NewSigner(require.New(b))
 	for _, messageSize := range blstest.BenchmarkSizes {
 		b.Run(strconv.Itoa(messageSize), func(b *testing.B) {
 			message := utils.RandomBytes(messageSize)
@@ -22,7 +22,7 @@ func BenchmarkSign(b *testing.B) {
 			b.ResetTimer()
 
 			for n := 0; n < b.N; n++ {
-				_ = privateKey.Sign(message)
+				_, _ = signer.Sign(message)
 			}
 		})
 	}

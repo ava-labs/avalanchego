@@ -49,6 +49,9 @@ func (s *signer) Sign(msg *UnsignedMessage) ([]byte, error) {
 	}
 
 	msgBytes := msg.Bytes()
-	sig := s.sk.Sign(msgBytes)
+	sig, err := s.sk.Sign(msgBytes)
+	if err != nil {
+		return nil, err
+	}
 	return bls.SignatureToBytes(sig), nil
 }

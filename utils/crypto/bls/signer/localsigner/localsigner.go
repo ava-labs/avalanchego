@@ -22,6 +22,7 @@ type secretKey = blst.SecretKey
 
 type LocalSigner struct {
 	sk *secretKey
+	pk *bls.PublicKey
 }
 
 // NewSecretKey generates a new secret key from the local source of
@@ -34,8 +35,9 @@ func New() (*LocalSigner, error) {
 	}
 	sk := blst.KeyGen(ikm[:])
 	ikm = [32]byte{} // zero out the ikm
+	pk := new(bls.PublicKey).From(sk)
 
-	return &LocalSigner{sk: sk}, nil
+	return &LocalSigner{sk: sk, pk: pk}, nil
 }
 
 // ToBytes returns the big-endian format of the secret key.
@@ -53,21 +55,23 @@ func FromBytes(skBytes []byte) (*LocalSigner, error) {
 	runtime.SetFinalizer(sk, func(sk *secretKey) {
 		sk.Zeroize()
 	})
-	return &LocalSigner{sk: sk}, nil
+	pk := new(bls.PublicKey).From(sk)
+
+	return &LocalSigner{sk: sk, pk: pk}, nil
 }
 
 // PublicKey returns the public key that corresponds to this secret
 // key.
 func (s *LocalSigner) PublicKey() *bls.PublicKey {
-	return new(bls.PublicKey).From(s.sk)
+	return s.pk
 }
 
 // Sign [msg] to authorize this message
-func (s *LocalSigner) Sign(msg []byte) *bls.Signature {
-	return new(bls.Signature).Sign(s.sk, msg, bls.CiphersuiteSignature.Bytes())
+func (s *LocalSigner) Sign(msg []byte) (*bls.Signature, error) {
+	return new(bls.Signature).Sign(s.sk, msg, bls.CiphersuiteSignature.Bytes()), nil
 }
 
 // Sign [msg] to prove the ownership
-func (s *LocalSigner) SignProofOfPossession(msg []byte) *bls.Signature {
-	return new(bls.Signature).Sign(s.sk, msg, bls.CiphersuiteProofOfPossession.Bytes())
+func (s *LocalSigner) SignProofOfPossession(msg []byte) (*bls.Signature, error) {
+	return new(bls.Signature).Sign(s.sk, msg, bls.CiphersuiteProofOfPossession.Bytes()), nil
 }
