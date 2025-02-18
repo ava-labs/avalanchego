@@ -90,7 +90,7 @@ type input struct {
 }
 
 func Transition(ctx *cli.Context) error {
-	var getTracer = func(txIndex int, txHash common.Hash) (vm.EVMLogger, error) { return nil, nil }
+	getTracer := func(txIndex int, txHash common.Hash) (vm.EVMLogger, error) { return nil, nil }
 
 	baseDir, err := createBasedir(ctx)
 	if err != nil {
@@ -230,7 +230,7 @@ func applyLondonChecks(env *stEnv, chainConfig *params.ChainConfig) error {
 		feeConfig.MinBaseFee = env.MinBaseFee
 	}
 	var err error
-	_, env.BaseFee, err = dummy.CalcBaseFee(chainConfig, feeConfig, parent, env.Timestamp)
+	env.BaseFee, err = dummy.CalcBaseFee(chainConfig, feeConfig, parent, env.Timestamp)
 	if err != nil {
 		return NewError(ErrorConfig, fmt.Errorf("failed calculating base fee: %v", err))
 	}
@@ -282,7 +282,7 @@ func saveFile(baseDir, filename string, data interface{}) error {
 		return NewError(ErrorJson, fmt.Errorf("failed marshalling output: %v", err))
 	}
 	location := path.Join(baseDir, filename)
-	if err = os.WriteFile(location, b, 0644); err != nil {
+	if err = os.WriteFile(location, b, 0o644); err != nil {
 		return NewError(ErrorIO, fmt.Errorf("failed writing output: %v", err))
 	}
 	log.Info("Wrote file", "file", location)

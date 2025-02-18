@@ -149,10 +149,11 @@ func testDynamicFeesStaysWithinRange(t *testing.T, test test) {
 			BlockGasCostStep: big.NewInt(200_000),
 		}
 
-		nextExtraData, nextBaseFee, err := CalcBaseFee(params.TestChainConfig, testFeeConfig, header, block.timestamp)
+		nextExtraData, err := CalcExtraPrefix(params.TestChainConfig, testFeeConfig, header, block.timestamp)
 		if err != nil {
-			t.Fatalf("Failed to calculate base fee at index %d: %s", index, err)
+			t.Fatalf("Failed to calculate extra prefix at index %d: %s", index, err)
 		}
+		nextBaseFee, err := CalcBaseFee(params.TestChainConfig, testFeeConfig, header, block.timestamp)
 		if nextBaseFee.Cmp(test.minFee) < 0 {
 			t.Fatalf("Expected fee to stay greater than %d, but found %d", test.minFee, nextBaseFee)
 		}
@@ -239,7 +240,7 @@ func TestCalcBaseFeeRegression(t *testing.T) {
 		MaxBlockGasCost:  big.NewInt(1_000_000),
 		BlockGasCostStep: big.NewInt(200_000),
 	}
-	_, _, err := CalcBaseFee(params.TestChainConfig, testFeeConfig, parentHeader, timestamp)
+	_, err := CalcBaseFee(params.TestChainConfig, testFeeConfig, parentHeader, timestamp)
 	require.NoError(t, err)
 	require.Equalf(t, 0, common.Big1.Cmp(big.NewInt(1)), "big1 should be 1, got %s", common.Big1)
 }

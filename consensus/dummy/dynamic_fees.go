@@ -21,51 +21,51 @@ var (
 	errEstimateBaseFeeWithoutActivation = errors.New("cannot estimate base fee for chain without activation")
 )
 
+// CalcExtraPrefix takes the previous header and the timestamp of its child
+// block and calculates the expected extra prefix for the child block.
+//
+// CalcExtraPrefix should only be called if timestamp >= config.ApricotPhase3Timestamp
+func CalcExtraPrefix(
+	config *params.ChainConfig,
+	feeConfig commontype.FeeConfig,
+	parent *types.Header,
+	timestamp uint64,
+) ([]byte, error) {
+	window, err := calcFeeWindow(config, feeConfig, parent, timestamp)
+	return window.Bytes(), err
+}
+
 // CalcBaseFee takes the previous header and the timestamp of its child block
-// and calculates the expected base fee as well as the encoding of the past
-// pricing information for the child block.
-func CalcBaseFee(config *params.ChainConfig, feeConfig commontype.FeeConfig, parent *types.Header, timestamp uint64) ([]byte, *big.Int, error) {
+// and calculates the expected base fee for the child block.
+//
+// CalcBaseFee should only be called if timestamp >= config.IsSubnetEVMTimestamp
+func CalcBaseFee(config *params.ChainConfig, feeConfig commontype.FeeConfig, parent *types.Header, timestamp uint64) (*big.Int, error) {
 	// If the current block is the first EIP-1559 block, or it is the genesis block
 	// return the initial slice and initial base fee.
-	isSubnetEVM := config.IsSubnetEVM(parent.Time)
-	if !isSubnetEVM || parent.Number.Cmp(common.Big0) == 0 {
-		initialSlice := (&DynamicFeeWindow{}).Bytes()
-		return initialSlice, feeConfig.MinBaseFee, nil
+	if !config.IsSubnetEVM(parent.Time) || parent.Number.Cmp(common.Big0) == 0 {
+		return big.NewInt(feeConfig.MinBaseFee.Int64()), nil
 	}
 
-	dynamicFeeWindow, err := ParseDynamicFeeWindow(parent.Extra)
+	dynamicFeeWindow, err := calcFeeWindow(config, feeConfig, parent, timestamp)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-
-	if timestamp < parent.Time {
-		return nil, nil, fmt.Errorf("cannot calculate base fee for timestamp %d prior to parent timestamp %d", timestamp, parent.Time)
-	}
-	timeElapsed := timestamp - parent.Time
 
 	var (
 		baseFee                  = new(big.Int).Set(parent.BaseFee)
 		baseFeeChangeDenominator = feeConfig.BaseFeeChangeDenominator
-		parentGasTargetBig       = feeConfig.TargetGas
-		parentGasTarget          = parentGasTargetBig.Uint64()
+		parentGasTarget          = feeConfig.TargetGas.Uint64()
+		totalGas                 = dynamicFeeWindow.Sum()
 	)
 
-	// Compute the new state of the gas rolling window.
-	dynamicFeeWindow.Add(parent.GasUsed)
-
-	// roll the window over by the timeElapsed to generate the new rollup
-	// window.
-	dynamicFeeWindow.Shift(timeElapsed)
-	dynamicFeeWindowBytes := dynamicFeeWindow.Bytes()
-
-	// Calculate the amount of gas consumed within the rollup window.
-	totalGas := dynamicFeeWindow.Sum()
 	if totalGas == parentGasTarget {
-		return dynamicFeeWindowBytes, baseFee, nil
+		return baseFee, nil
 	}
 
-	num := new(big.Int)
-
+	var (
+		num                = new(big.Int)
+		parentGasTargetBig = new(big.Int).SetUint64(parentGasTarget)
+	)
 	if totalGas > parentGasTarget {
 		// If the parent block used more gas than its target, the baseFee should increase.
 		num.SetUint64(totalGas - parentGasTarget)
@@ -82,6 +82,16 @@ func CalcBaseFee(config *params.ChainConfig, feeConfig commontype.FeeConfig, par
 		num.Div(num, parentGasTargetBig)
 		num.Div(num, baseFeeChangeDenominator)
 		baseFeeDelta := math.BigMax(num, common.Big1)
+
+		if timestamp < parent.Time {
+			// This should never happen as the fee window calculations should
+			// have already failed, but it is kept for clarity.
+			return nil, fmt.Errorf("cannot calculate base fee for timestamp %d prior to parent timestamp %d",
+				timestamp,
+				parent.Time,
+			)
+		}
+
 		// If timeElapsed is greater than [params.RollupWindow], apply the
 		// state transition to the base fee to account for the interval during
 		// which no blocks were produced.
@@ -89,17 +99,61 @@ func CalcBaseFee(config *params.ChainConfig, feeConfig commontype.FeeConfig, par
 		// We use timeElapsed/params.RollupWindow, so that the transition is
 		// applied for every [params.RollupWindow] seconds that has elapsed
 		// between the parent and this block.
-		if timeElapsed > params.RollupWindow {
-			// Note: timeElapsed/params.RollupWindow must be at least 1 since
-			// we've checked that timeElapsed > params.RollupWindow
-			baseFeeDelta = new(big.Int).Mul(baseFeeDelta, new(big.Int).SetUint64(timeElapsed/params.RollupWindow))
+		var (
+			timeElapsed    = timestamp - parent.Time
+			windowsElapsed = timeElapsed / params.RollupWindow
+		)
+		if windowsElapsed > 1 {
+			bigWindowsElapsed := new(big.Int).SetUint64(windowsElapsed)
+			// Because baseFeeDelta could actually be [common.Big1], we must not
+			// modify the existing value of `baseFeeDelta` but instead allocate
+			// a new one.
+			baseFeeDelta = new(big.Int).Mul(baseFeeDelta, bigWindowsElapsed)
 		}
 		baseFee.Sub(baseFee, baseFeeDelta)
 	}
 
 	baseFee = selectBigWithinBounds(feeConfig.MinBaseFee, baseFee, maxUint256)
 
-	return dynamicFeeWindowBytes, baseFee, nil
+	return baseFee, nil
+}
+
+// calcFeeWindow takes the previous header and the timestamp of its child block
+// and calculates the expected fee window.
+//
+// calcFeeWindow should only be called if timestamp >= config.IsSubnetEVM
+func calcFeeWindow(
+	config *params.ChainConfig,
+	feeConfig commontype.FeeConfig,
+	parent *types.Header,
+	timestamp uint64,
+) (DynamicFeeWindow, error) {
+	// If the current block is the first EIP-1559 block, or it is the genesis block
+	// return the initial window.
+	if !config.IsSubnetEVM(parent.Time) || parent.Number.Cmp(common.Big0) == 0 {
+		return DynamicFeeWindow{}, nil
+	}
+
+	dynamicFeeWindow, err := ParseDynamicFeeWindow(parent.Extra)
+	if err != nil {
+		return DynamicFeeWindow{}, err
+	}
+
+	if timestamp < parent.Time {
+		return DynamicFeeWindow{}, fmt.Errorf("cannot calculate fee window for timestamp %d prior to parent timestamp %d",
+			timestamp,
+			parent.Time,
+		)
+	}
+	timeElapsed := timestamp - parent.Time
+
+	// Compute the new state of the gas rolling window.
+	dynamicFeeWindow.Add(parent.GasUsed)
+
+	// roll the window over by the timeElapsed to generate the new rollup
+	// window.
+	dynamicFeeWindow.Shift(timeElapsed)
+	return dynamicFeeWindow, nil
 }
 
 // EstimateNextBaseFee attempts to estimate the base fee of a block built at
@@ -116,8 +170,7 @@ func EstimateNextBaseFee(config *params.ChainConfig, feeConfig commontype.FeeCon
 	}
 
 	timestamp = max(timestamp, parent.Time, *config.SubnetEVMTimestamp)
-	_, baseFee, err := CalcBaseFee(config, feeConfig, parent, timestamp)
-	return baseFee, err
+	return CalcBaseFee(config, feeConfig, parent, timestamp)
 }
 
 // selectBigWithinBounds returns [value] if it is within the bounds:

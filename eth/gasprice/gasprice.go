@@ -192,12 +192,8 @@ func NewOracle(backend OracleBackend, config Config) (*Oracle, error) {
 		}
 	}()
 	feeConfig, _, err := backend.GetFeeConfigAt(backend.LastAcceptedBlock().Header())
-	var minBaseFee *big.Int
 	if err != nil {
-		// resort back to chain config
 		return nil, fmt.Errorf("failed getting fee config in the oracle: %w", err)
-	} else {
-		minBaseFee = feeConfig.MinBaseFee
 	}
 	feeInfoProvider, err := newFeeInfoProvider(backend, minGasUsed.Uint64(), config.Blocks)
 	if err != nil {
@@ -206,7 +202,7 @@ func NewOracle(backend OracleBackend, config Config) (*Oracle, error) {
 	return &Oracle{
 		backend:             backend,
 		lastPrice:           minPrice,
-		lastBaseFee:         new(big.Int).Set(minBaseFee),
+		lastBaseFee:         new(big.Int).Set(feeConfig.MinBaseFee),
 		minPrice:            minPrice,
 		maxPrice:            maxPrice,
 		checkBlocks:         blocks,

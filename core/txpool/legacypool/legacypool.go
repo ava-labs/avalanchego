@@ -1818,6 +1818,8 @@ func (pool *LegacyPool) periodicBaseFeeUpdate() {
 	}
 }
 
+// updateBaseFee updates the base fee in the tx pool based on the current head block.
+// should only be called when the chain is in Subnet EVM.
 func (pool *LegacyPool) updateBaseFee() {
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
@@ -1829,6 +1831,7 @@ func (pool *LegacyPool) updateBaseFee() {
 }
 
 // assumes lock is already held
+// should only be called when the chain is in Subnet EVM.
 func (pool *LegacyPool) updateBaseFeeAt(head *types.Header) error {
 	feeConfig, _, err := pool.chain.GetFeeConfigAt(head)
 	if err != nil {
