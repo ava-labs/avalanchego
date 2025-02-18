@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ava-labs/avalanchego/x/merkledb"
 	"github.com/gorilla/rpc/v2"
 	"go.uber.org/zap"
 
@@ -73,7 +74,7 @@ type VM struct {
 
 	// The context of this vm
 	ctx *snow.Context
-	db  database.Database
+	db  merkledb.MerkleDB
 
 	state state.State
 
@@ -124,7 +125,10 @@ func (vm *VM) Initialize(
 	}
 
 	vm.ctx = chainCtx
-	vm.db = db
+	vm.db, err = merkledb.New(ctx, db, merkledb.NewConfig(registerer))
+	if err != nil {
+		return fmt.Errorf("failed to initialize database: %w", err)
+	}
 
 	// Note: this codec is never used to serialize anything
 	vm.codecRegistry = linearcodec.NewDefault()

@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/dbtest"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -40,19 +39,10 @@ func newDB(ctx context.Context, db database.Database, config Config) (*merkleDB,
 }
 
 func newDefaultConfig() Config {
-	return Config{
-		BranchFactor:                BranchFactor16,
-		Hasher:                      DefaultHasher,
-		RootGenConcurrency:          0,
-		HistoryLength:               defaultHistoryLength,
-		ValueNodeCacheSize:          units.MiB,
-		IntermediateNodeCacheSize:   units.MiB,
-		IntermediateWriteBufferSize: units.KiB,
-		IntermediateWriteBatchSize:  256 * units.KiB,
-		Reg:                         prometheus.NewRegistry(),
-		TraceLevel:                  InfoTrace,
-		Tracer:                      trace.Noop,
-	}
+	config := NewConfig(prometheus.NewRegistry())
+	config.HistoryLength = defaultHistoryLength
+
+	return config
 }
 
 func Test_MerkleDB_Get_Safety(t *testing.T) {

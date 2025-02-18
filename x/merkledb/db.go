@@ -194,6 +194,22 @@ type Config struct {
 	Tracer     trace.Tracer
 }
 
+func NewConfig(registry prometheus.Registerer) Config {
+	return Config{
+		BranchFactor:                BranchFactor16,
+		Hasher:                      DefaultHasher,
+		RootGenConcurrency:          0,
+		HistoryLength:               300,
+		ValueNodeCacheSize:          units.MiB,
+		IntermediateNodeCacheSize:   units.MiB,
+		IntermediateWriteBufferSize: units.KiB,
+		IntermediateWriteBatchSize:  256 * units.KiB,
+		Reg:                         registry,
+		TraceLevel:                  InfoTrace,
+		Tracer:                      trace.Noop,
+	}
+}
+
 // merkleDB can only be edited by committing changes from a view.
 type merkleDB struct {
 	// Must be held when reading/writing fields.
