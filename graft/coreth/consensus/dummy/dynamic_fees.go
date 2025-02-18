@@ -37,22 +37,40 @@ var (
 
 // CalcExtraPrefix takes the previous header and the timestamp of its child
 // block and calculates the expected extra prefix for the child block.
-//
-// CalcExtraPrefix should only be called if timestamp >= config.ApricotPhase3Timestamp
 func CalcExtraPrefix(
 	config *params.ChainConfig,
 	parent *types.Header,
 	timestamp uint64,
 ) ([]byte, error) {
-	window, err := calcFeeWindow(config, parent, timestamp)
-	return window.Bytes(), err
+	switch {
+	case config.IsApricotPhase3(timestamp):
+		window, err := calcFeeWindow(config, parent, timestamp)
+		if err != nil {
+			return nil, fmt.Errorf("failed to calculate fee window: %w", err)
+		}
+		return window.Bytes(), nil
+	default:
+		// Prior to AP3 there was no expected extra prefix.
+		return nil, nil
+	}
 }
 
 // CalcBaseFee takes the previous header and the timestamp of its child block
 // and calculates the expected base fee for the child block.
 //
-// CalcBaseFee should only be called if timestamp >= config.ApricotPhase3Timestamp
+// Prior to AP3, the returned base fee will be nil.
 func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uint64) (*big.Int, error) {
+	switch {
+	case config.IsApricotPhase3(timestamp):
+		return calcBaseFeeWithWindow(config, parent, timestamp)
+	default:
+		// Prior to AP3 the expected base fee is nil.
+		return nil, nil
+	}
+}
+
+// calcBaseFeeWithWindow should only be called if `timestamp` >= `config.ApricotPhase3Timestamp`
+func calcBaseFeeWithWindow(config *params.ChainConfig, parent *types.Header, timestamp uint64) (*big.Int, error) {
 	// If the current block is the first EIP-1559 block, or it is the genesis block
 	// return the initial slice and initial base fee.
 	if !config.IsApricotPhase3(parent.Time) || parent.Number.Cmp(common.Big0) == 0 {
