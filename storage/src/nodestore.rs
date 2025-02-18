@@ -210,8 +210,12 @@ impl<T: ReadInMemoryNode, S: ReadableStorage> NodeStore<T, S> {
 
     /// Read a [Node] from the provided [LinearAddress].
     /// `addr` is the address of a StoredArea in the ReadableStorage.
-    pub fn read_node_from_disk(&self, addr: LinearAddress) -> Result<SharedNode, Error> {
-        if let Some(node) = self.storage.read_cached_node(addr) {
+    pub fn read_node_from_disk(
+        &self,
+        addr: LinearAddress,
+        mode: &'static str,
+    ) -> Result<SharedNode, Error> {
+        if let Some(node) = self.storage.read_cached_node(addr, mode) {
             return Ok(node);
         }
 
@@ -272,7 +276,7 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
         };
 
         if let Some(root_address) = nodestore.header.root_address {
-            let node = nodestore.read_node_from_disk(root_address);
+            let node = nodestore.read_node_from_disk(root_address, "open");
             let root_hash = node.map(|n| hash_node(&n, &Path(Default::default())))?;
             nodestore.kind.root_hash = Some(root_hash);
         }
@@ -1103,13 +1107,22 @@ impl<S: ReadableStorage> From<NodeStore<MutableProposal, S>>
     }
 }
 
-impl<T: ReadInMemoryNode, S: ReadableStorage> NodeReader for NodeStore<T, S> {
+impl<S: ReadableStorage> NodeReader for NodeStore<MutableProposal, S> {
     fn read_node(&self, addr: LinearAddress) -> Result<SharedNode, Error> {
         if let Some(node) = self.kind.read_in_memory_node(addr) {
             return Ok(node);
         }
 
-        self.read_node_from_disk(addr)
+        self.read_node_from_disk(addr, "write")
+    }
+}
+
+impl<T: Parentable + ReadInMemoryNode, S: ReadableStorage> NodeReader for NodeStore<T, S> {
+    fn read_node(&self, addr: LinearAddress) -> Result<SharedNode, Error> {
+        if let Some(node) = self.kind.read_in_memory_node(addr) {
+            return Ok(node);
+        }
+        self.read_node_from_disk(addr, "read")
     }
 }
 
@@ -1119,11 +1132,7 @@ impl<S: ReadableStorage> RootReader for NodeStore<MutableProposal, S> {
     }
 }
 
-trait Hashed {}
-impl Hashed for Committed {}
-impl Hashed for Arc<ImmutableProposal> {}
-
-impl<T: ReadInMemoryNode + Hashed, S: ReadableStorage> RootReader for NodeStore<T, S> {
+impl<T: ReadInMemoryNode + Parentable, S: ReadableStorage> RootReader for NodeStore<T, S> {
     fn root_node(&self) -> Option<SharedNode> {
         // TODO: If the read_node fails, we just say there is no root; this is incorrect
         self.header
