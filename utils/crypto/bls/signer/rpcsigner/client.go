@@ -35,11 +35,6 @@ func NewClient(ctx context.Context, conn *grpc.ClientConn) (*Client, error) {
 	}
 
 	pkBytes := pubkeyResponse.GetPublicKey()
-
-	if pkBytes == nil {
-		return nil, ErrorEmptyPublicKey
-	}
-
 	pk, err := bls.PublicKeyFromCompressedBytes(pkBytes)
 	if err != nil {
 		return nil, err
