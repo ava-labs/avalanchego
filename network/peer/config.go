@@ -62,5 +62,5 @@ type Config struct {
 
 	// IngressConnectionCount counts the ingress (to us) connections.
 	// Needs to be a pointer because it's shared across all peer connections.
-	IngressConnectionCount *atomic.Uint32
+	IngressConnectionCount *atomic.Uint64
 }

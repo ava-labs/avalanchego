@@ -286,7 +286,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 			// This forces nodes to connect to each other in a deterministic order.
 			require.Eventually(func() bool {
 				return len(net.PeerInfo([]ids.NodeID{config.MyNodeID})) > 0
-			}, time.Minute, time.Millisecond)
+			}, 10*time.Second, time.Millisecond)
 		}
 
 		go func(net Network) {
@@ -323,6 +323,8 @@ func TestIngressConnCount(t *testing.T) {
 			router.InboundHandlerFunc(emptyHandler),
 		})
 
+	wg.Done()
+
 	require.Eventually(func() bool {
 		result := true
 		for _, net := range networks {
@@ -336,8 +338,6 @@ func TestIngressConnCount(t *testing.T) {
 	for _, net := range networks {
 		ingressConnections = append(ingressConnections, net.IngressConnCount())
 	}
-
-	wg.Done()
 
 	// First node has all nodes connected to it.
 	// Second node has only the third node connected to it.
