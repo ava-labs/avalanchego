@@ -54,6 +54,7 @@ import (
 var (
 	_ snowmanblock.ChainVM                      = (*VM)(nil)
 	_ snowmanblock.BuildBlockWithContextChainVM = (*VM)(nil)
+	_ snowmanblock.StateSyncableVM              = (*VM)(nil)
 	_ secp256k1fx.VM                            = (*VM)(nil)
 	_ validators.State                          = (*VM)(nil)
 )
@@ -513,4 +514,31 @@ func (vm *VM) issueTxFromRPC(tx *txs.Tx) error {
 	}
 
 	return nil
+}
+
+func (*VM) StateSyncEnabled(context.Context) (bool, error) {
+	return true, nil
+}
+
+// 1. enabled check
+// 2. delete the summary if state sync is disabled in initialize + when bootstrap starts
+// 3.
+func (vm *VM) GetOngoingSyncStateSummary(ctx context.Context) (snowmanblock.StateSummary, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (vm *VM) GetLastStateSummary(ctx context.Context) (snowmanblock.StateSummary, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (vm *VM) ParseStateSummary(ctx context.Context, summaryBytes []byte) (snowmanblock.StateSummary, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (vm *VM) GetStateSummary(ctx context.Context, summaryHeight uint64) (snowmanblock.StateSummary, error) {
+	//TODO implement me
+	panic("implement me")
 }
