@@ -397,7 +397,7 @@ func TestEstimateNextBaseFee(t *testing.T) {
 					gasUsed                    = ApricotPhase3BlockGasFee
 					amountUnderTarget          = gasTarget - gasUsed
 					parentBaseFee              = params.ApricotPhase3MaxBaseFee
-					smoothingFactor            = params.ApricotPhase4BaseFeeChangeDenominator
+					smoothingFactor            = params.ApricotPhase3BaseFeeChangeDenominator
 					baseFeeFractionUnderTarget = amountUnderTarget * parentBaseFee / gasTarget
 					delta                      = baseFeeFractionUnderTarget / smoothingFactor
 					baseFee                    = parentBaseFee - delta
