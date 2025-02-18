@@ -379,27 +379,28 @@ func (cm *chainMaker) makeHeader(parent *types.Block, gap uint64, state *state.S
 		ParentHash: parent.Hash(),
 		Coinbase:   parent.Coinbase(),
 		Difficulty: engine.CalcDifficulty(cm, time, parent.Header()),
-		GasLimit:   parent.GasLimit(),
 		Number:     new(big.Int).Add(parent.Number(), common.Big1),
 		Time:       time,
 	}
+	feeConfig, _, err := cm.GetFeeConfigAt(parent.Header())
+	if err != nil {
+		panic(err)
+	}
 	if cm.config.IsSubnetEVM(time) {
-		feeConfig, _, err := cm.GetFeeConfigAt(parent.Header())
-		if err != nil {
-			panic(err)
-		}
 		header.GasLimit = feeConfig.GasLimit.Uint64()
-		header.Extra, err = dummy.CalcExtraPrefix(cm.config, feeConfig, parent.Header(), time)
-		if err != nil {
-			panic(err)
-		}
-		header.BaseFee, err = dummy.CalcBaseFee(cm.config, feeConfig, parent.Header(), time)
-		if err != nil {
-			panic(err)
-		}
 	} else {
 		header.GasLimit = CalcGasLimit(parent.GasUsed(), parent.GasLimit(), parent.GasLimit(), parent.GasLimit())
 	}
+
+	header.Extra, err = dummy.CalcExtraPrefix(cm.config, feeConfig, parent.Header(), time)
+	if err != nil {
+		panic(err)
+	}
+	header.BaseFee, err = dummy.CalcBaseFee(cm.config, feeConfig, parent.Header(), time)
+	if err != nil {
+		panic(err)
+	}
+
 	if cm.config.IsCancun(header.Number, header.Time) {
 		var (
 			parentExcessBlobGas uint64

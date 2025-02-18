@@ -90,7 +90,7 @@ type input struct {
 }
 
 func Transition(ctx *cli.Context) error {
-	getTracer := func(txIndex int, txHash common.Hash) (vm.EVMLogger, error) { return nil, nil }
+	var getTracer = func(txIndex int, txHash common.Hash) (vm.EVMLogger, error) { return nil, nil }
 
 	baseDir, err := createBasedir(ctx)
 	if err != nil {
@@ -282,7 +282,7 @@ func saveFile(baseDir, filename string, data interface{}) error {
 		return NewError(ErrorJson, fmt.Errorf("failed marshalling output: %v", err))
 	}
 	location := path.Join(baseDir, filename)
-	if err = os.WriteFile(location, b, 0o644); err != nil {
+	if err = os.WriteFile(location, b, 0644); err != nil {
 		return NewError(ErrorIO, fmt.Errorf("failed writing output: %v", err))
 	}
 	log.Info("Wrote file", "file", location)

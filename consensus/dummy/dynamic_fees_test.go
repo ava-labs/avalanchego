@@ -154,6 +154,9 @@ func testDynamicFeesStaysWithinRange(t *testing.T, test test) {
 			t.Fatalf("Failed to calculate extra prefix at index %d: %s", index, err)
 		}
 		nextBaseFee, err := CalcBaseFee(params.TestChainConfig, testFeeConfig, header, block.timestamp)
+		if err != nil {
+			t.Fatalf("Failed to calculate base fee at index %d: %s", index, err)
+		}
 		if nextBaseFee.Cmp(test.minFee) < 0 {
 			t.Fatalf("Expected fee to stay greater than %d, but found %d", test.minFee, nextBaseFee)
 		}

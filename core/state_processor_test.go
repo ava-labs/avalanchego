@@ -65,11 +65,11 @@ func TestStateProcessorErrors(t *testing.T) {
 		signer  = types.LatestSigner(config)
 		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 	)
-	makeTx := func(key *ecdsa.PrivateKey, nonce uint64, to common.Address, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte) *types.Transaction {
+	var makeTx = func(key *ecdsa.PrivateKey, nonce uint64, to common.Address, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte) *types.Transaction {
 		tx, _ := types.SignTx(types.NewTransaction(nonce, to, amount, gasLimit, gasPrice, data), signer, key)
 		return tx
 	}
-	mkDynamicTx := func(nonce uint64, to common.Address, gasLimit uint64, gasTipCap, gasFeeCap *big.Int) *types.Transaction {
+	var mkDynamicTx = func(nonce uint64, to common.Address, gasLimit uint64, gasTipCap, gasFeeCap *big.Int) *types.Transaction {
 		tx, _ := types.SignTx(types.NewTx(&types.DynamicFeeTx{
 			Nonce:     nonce,
 			GasTipCap: gasTipCap,
@@ -80,7 +80,7 @@ func TestStateProcessorErrors(t *testing.T) {
 		}), signer, key1)
 		return tx
 	}
-	mkDynamicCreationTx := func(nonce uint64, gasLimit uint64, gasTipCap, gasFeeCap *big.Int, data []byte) *types.Transaction {
+	var mkDynamicCreationTx = func(nonce uint64, gasLimit uint64, gasTipCap, gasFeeCap *big.Int, data []byte) *types.Transaction {
 		tx, _ := types.SignTx(types.NewTx(&types.DynamicFeeTx{
 			Nonce:     nonce,
 			GasTipCap: gasTipCap,
@@ -91,7 +91,7 @@ func TestStateProcessorErrors(t *testing.T) {
 		}), signer, key1)
 		return tx
 	}
-	mkBlobTx := func(nonce uint64, to common.Address, gasLimit uint64, gasTipCap, gasFeeCap, blobGasFeeCap *big.Int, hashes []common.Hash) *types.Transaction {
+	var mkBlobTx = func(nonce uint64, to common.Address, gasLimit uint64, gasTipCap, gasFeeCap, blobGasFeeCap *big.Int, hashes []common.Hash) *types.Transaction {
 		tx, err := types.SignTx(types.NewTx(&types.BlobTx{
 			Nonce:      nonce,
 			GasTipCap:  uint256.MustFromBig(gasTipCap),
@@ -444,10 +444,9 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 		Time:      parent.Time() + 10,
 		UncleHash: types.EmptyUncleHash,
 	}
-
+	header.Extra, _ = dummy.CalcExtraPrefix(config, config.FeeConfig, parent.Header(), header.Time)
+	header.BaseFee, _ = dummy.CalcBaseFee(config, config.FeeConfig, parent.Header(), header.Time)
 	if config.IsSubnetEVM(header.Time) {
-		header.Extra, _ = dummy.CalcExtraPrefix(config, config.FeeConfig, parent.Header(), header.Time)
-		header.BaseFee, _ = dummy.CalcBaseFee(config, config.FeeConfig, parent.Header(), header.Time)
 		header.BlockGasCost = big.NewInt(0)
 	}
 	var receipts []*types.Receipt
@@ -469,7 +468,7 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 	}
 	header.Root = common.BytesToHash(hasher.Sum(nil))
 	if config.IsCancun(header.Number, header.Time) {
-		pExcess, pUsed := uint64(0), uint64(0)
+		var pExcess, pUsed = uint64(0), uint64(0)
 		if parent.ExcessBlobGas() != nil {
 			pExcess = *parent.ExcessBlobGas()
 			pUsed = *parent.BlobGasUsed()
