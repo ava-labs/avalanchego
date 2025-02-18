@@ -96,9 +96,7 @@ func TestVerifyWrongMessageSignedSignature(t *testing.T) {
 func TestValidAggregation(t *testing.T) {
 	require := require.New(t)
 	signers := []*LocalSigner{NewSigner(require), NewSigner(require), NewSigner(require)}
-	pks := Map(signers, func(signer *LocalSigner) *bls.PublicKey {
-		return signer.PublicKey()
-	})
+	pks := Map(signers, (*LocalSigner).PublicKey)
 
 	msg := []byte("TestValidAggregation local signer")
 
@@ -132,9 +130,7 @@ func TestSingleKeyAggregation(t *testing.T) {
 func TestIncorrectMessageAggregation(t *testing.T) {
 	require := require.New(t)
 	signers := []*LocalSigner{NewSigner(require), NewSigner(require), NewSigner(require)}
-	pks := Map(signers, func(signer *LocalSigner) *bls.PublicKey {
-		return signer.PublicKey()
-	})
+	pks := Map(signers, (*LocalSigner).PublicKey)
 
 	msg := []byte("TestIncorrectMessageAggregation local signer")
 
@@ -152,9 +148,7 @@ func TestIncorrectMessageAggregation(t *testing.T) {
 func TestDifferentMessageAggregation(t *testing.T) {
 	require := require.New(t)
 	signers := []*LocalSigner{NewSigner(require), NewSigner(require), NewSigner(require)}
-	pks := Map(signers, func(signer *LocalSigner) *bls.PublicKey {
-		return signer.PublicKey()
-	})
+	pks := Map(signers, (*LocalSigner).PublicKey)
 
 	msg := []byte("TestDifferentMessagesAggregation local signer")
 	differentMsg := []byte("TestDifferentMessagesAggregation local signer with different message")
@@ -178,9 +172,7 @@ func TestDifferentMessageAggregation(t *testing.T) {
 func TestOneIncorrectPubKeyAggregation(t *testing.T) {
 	require := require.New(t)
 	signers := []*LocalSigner{NewSigner(require), NewSigner(require), NewSigner(require)}
-	pks := Map(signers, func(signer *LocalSigner) *bls.PublicKey {
-		return signer.PublicKey()
-	})
+	pks := Map(signers, (*LocalSigner).PublicKey)
 
 	msg := []byte("TestOneIncorrectPubKeyAggregation local signer")
 
@@ -201,9 +193,7 @@ func TestOneIncorrectPubKeyAggregation(t *testing.T) {
 func TestMorePubkeysThanSignaturesAggregation(t *testing.T) {
 	require := require.New(t)
 	signers := []*LocalSigner{NewSigner(require), NewSigner(require), NewSigner(require)}
-	pks := Map(signers, func(signer *LocalSigner) *bls.PublicKey {
-		return signer.PublicKey()
-	})
+	pks := Map(signers, (*LocalSigner).PublicKey)
 
 	msg := []byte("TestMorePubkeysThanSignatures local signer")
 
@@ -224,9 +214,7 @@ func TestMorePubkeysThanSignaturesAggregation(t *testing.T) {
 func TestMoreSignaturesThanPubkeysAggregation(t *testing.T) {
 	require := require.New(t)
 	signers := []*LocalSigner{NewSigner(require), NewSigner(require), NewSigner(require)}
-	pks := Map(signers, func(signer *LocalSigner) *bls.PublicKey {
-		return signer.PublicKey()
-	})
+	pks := Map(signers, (*LocalSigner).PublicKey)
 
 	msg := []byte("TestMoreSignaturesThanPubkeys local signer")
 
@@ -261,9 +249,7 @@ func TestNoPubkeysAggregation(t *testing.T) {
 func TestNoSignaturesAggregation(t *testing.T) {
 	require := require.New(t)
 	signers := []*LocalSigner{NewSigner(require), NewSigner(require), NewSigner(require)}
-	pks := Map(signers, func(signer *LocalSigner) *bls.PublicKey {
-		return signer.PublicKey()
-	})
+	pks := Map(signers, (*LocalSigner).PublicKey)
 
 	msg := []byte("TestNoSignaturesAggregation local signer")
 
