@@ -91,15 +91,17 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to create unsigned Warp message: %s\n", err)
 	}
+	signedWarp, err := sk.Sign(unsignedWarp.Bytes())
+	if err != nil {
+		log.Fatalf("failed to sign Warp message: %s\n", err)
+	}
 
 	warp, err := warp.NewMessage(
 		unsignedWarp,
 		&warp.BitSetSignature{
 			Signers: set.NewBits(0).Bytes(),
 			Signature: ([bls.SignatureLen]byte)(
-				bls.SignatureToBytes(
-					sk.Sign(unsignedWarp.Bytes()),
-				),
+				bls.SignatureToBytes(signedWarp),
 			),
 		},
 	)

@@ -114,6 +114,8 @@ func TestBuildBlockShouldReward(t *testing.T) {
 
 	sk, err := localsigner.New()
 	require.NoError(err)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(err)
 
 	rewardOwners := &secp256k1fx.OutputOwners{
 		Threshold: 1,
@@ -131,7 +133,7 @@ func TestBuildBlockShouldReward(t *testing.T) {
 			},
 			Subnet: constants.PrimaryNetworkID,
 		},
-		signer.NewProofOfPossession(sk),
+		pop,
 		env.ctx.AVAXAssetID,
 		rewardOwners,
 		rewardOwners,
@@ -322,6 +324,8 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 
 	sk, err := localsigner.New()
 	require.NoError(err)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(err)
 
 	rewardsOwner := &secp256k1fx.OutputOwners{
 		Threshold: 1,
@@ -337,7 +341,7 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 			},
 			Subnet: constants.PrimaryNetworkID,
 		},
-		signer.NewProofOfPossession(sk),
+		pop,
 		env.ctx.AVAXAssetID,
 		rewardsOwner,
 		rewardsOwner,
@@ -355,6 +359,8 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 
 	sk, err = localsigner.New()
 	require.NoError(err)
+	pop, err = signer.NewProofOfPossession(sk)
+	require.NoError(err)
 
 	tx2, err := wallet.IssueAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
@@ -366,7 +372,7 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 			},
 			Subnet: constants.PrimaryNetworkID,
 		},
-		signer.NewProofOfPossession(sk),
+		pop,
 		env.ctx.AVAXAssetID,
 		rewardsOwner,
 		rewardsOwner,

@@ -39,13 +39,21 @@ func (ip *UnsignedIP) Sign(tlsSigner crypto.Signer, blsSigner bls.Signer) (*Sign
 		hashing.ComputeHash256(ipBytes),
 		crypto.SHA256,
 	)
-	blsSignature := blsSigner.SignProofOfPossession(ipBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	blsSignature, err := blsSigner.SignProofOfPossession(ipBytes)
+	if err != nil {
+		return nil, err
+	}
+
 	return &SignedIP{
 		UnsignedIP:        *ip,
 		TLSSignature:      tlsSignature,
 		BLSSignature:      blsSignature,
 		BLSSignatureBytes: bls.SignatureToBytes(blsSignature),
-	}, err
+	}, nil
 }
 
 func (ip *UnsignedIP) bytes() []byte {

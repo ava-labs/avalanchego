@@ -43,6 +43,8 @@ func TestAddPermissionlessPrimaryValidator(t *testing.T) {
 
 	sk, err := localsigner.FromBytes(skBytes)
 	require.NoError(err)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(err)
 
 	avaxAssetID, err := ids.FromString("FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z")
 	require.NoError(err)
@@ -99,7 +101,7 @@ func TestAddPermissionlessPrimaryValidator(t *testing.T) {
 			Wght:   2 * units.KiloAvax,
 		},
 		Subnet: constants.PrimaryNetworkID,
-		Signer: signer.NewProofOfPossession(sk),
+		Signer: pop,
 		StakeOuts: []*avax.TransferableOutput{
 			{
 				Asset: avax.Asset{
@@ -387,7 +389,7 @@ func TestAddPermissionlessPrimaryValidator(t *testing.T) {
 			Wght:   5 * units.KiloAvax,
 		},
 		Subnet: constants.PrimaryNetworkID,
-		Signer: signer.NewProofOfPossession(sk),
+		Signer: pop,
 		StakeOuts: []*avax.TransferableOutput{
 			{
 				Asset: avax.Asset{
@@ -1400,7 +1402,8 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 	blsSK, err := localsigner.New()
 	require.NoError(t, err)
 
-	blsPOP := signer.NewProofOfPossession(blsSK)
+	blsPOP, err := signer.NewProofOfPossession(blsSK)
+	require.NoError(t, err)
 
 	// A BaseTx that fails syntactic verification.
 	invalidBaseTx := BaseTx{}

@@ -337,7 +337,12 @@ func (n *Node) GetProofOfPossession() (*signer.ProofOfPossession, error) {
 	if err != nil {
 		return nil, err
 	}
-	return signer.NewProofOfPossession(secretKey), nil
+	pop, err := signer.NewProofOfPossession(secretKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return pop, nil
 }
 
 // Derives the node ID. Requires that a tls keypair is present.
