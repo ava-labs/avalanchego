@@ -591,16 +591,18 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
         let root = self.nodestore.mut_root();
         let Some(root_node) = std::mem::take(root) else {
             // The trie is empty. There is nothing to remove.
-            counter!("firewood.remove", "result" => "nonexistent").increment(1);
+            counter!("firewood.remove", "prefix" => "false", "result" => "nonexistent")
+                .increment(1);
             return Ok(None);
         };
 
         let (root_node, removed_value) = self.remove_helper(root_node, &key)?;
         *self.nodestore.mut_root() = root_node;
         if removed_value.is_some() {
-            counter!("firewood.remove", "result" => "success").increment(1);
+            counter!("firewood.remove", "prefix" => "false", "result" => "success").increment(1);
         } else {
-            counter!("firewood.remove", "result" => "nonexistent").increment(1);
+            counter!("firewood.remove", "prefix" => "false", "result" => "nonexistent")
+                .increment(1);
         }
         Ok(removed_value)
     }
@@ -816,11 +818,14 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
         let root = self.nodestore.mut_root();
         let Some(root_node) = std::mem::take(root) else {
             // The trie is empty. There is nothing to remove.
+            counter!("firewood.remove", "prefix" => "true", "result" => "nonexistent").increment(1);
             return Ok(0);
         };
 
         let mut deleted = 0;
         let root_node = self.remove_prefix_helper(root_node, &prefix, &mut deleted)?;
+        counter!("firewood.remove", "prefix" => "true", "result" => "success")
+            .increment(deleted as u64);
         *self.nodestore.mut_root() = root_node;
         Ok(deleted)
     }
