@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/x/merkledb"
 	"github.com/google/btree"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
@@ -552,9 +553,14 @@ func New(
 		return nil, err
 	}
 
-	baseDB := versiondb.New(db)
+	//TODO metrics
+	merkleDB, err := merkledb.New(context.TODO(), db, merkledb.NewConfig(prometheus.NewRegistry()))
+	if err != nil {
+		// TODO err
+		return nil, err
+	}
 
-	validatorsDB := prefixdb.New(ValidatorsPrefix, baseDB)
+	validatorsDB := prefixdb.New(ValidatorsPrefix, merkleDB)
 
 	currentValidatorsDB := prefixdb.New(CurrentPrefix, validatorsDB)
 	currentValidatorBaseDB := prefixdb.New(ValidatorPrefix, currentValidatorsDB)
@@ -628,7 +634,7 @@ func New(
 		return nil, err
 	}
 
-	rewardUTXODB := prefixdb.New(RewardUTXOsPrefix, baseDB)
+	rewardUTXODB := prefixdb.New(RewardUTXOsPrefix, merkleDB)
 	rewardUTXOsCache, err := metercacher.New[ids.ID, []*avax.UTXO](
 		"reward_utxos_cache",
 		metricsReg,
@@ -638,15 +644,15 @@ func New(
 		return nil, err
 	}
 
-	utxoDB := prefixdb.New(UTXOPrefix, baseDB)
+	utxoDB := prefixdb.New(UTXOPrefix, merkleDB)
 	utxoState, err := avax.NewMeteredUTXOState(utxoDB, txs.GenesisCodec, metricsReg, execCfg.ChecksumsEnabled)
 	if err != nil {
 		return nil, err
 	}
 
-	subnetBaseDB := prefixdb.New(SubnetPrefix, baseDB)
+	subnetBaseDB := prefixdb.New(SubnetPrefix, merkleDB)
 
-	subnetOwnerDB := prefixdb.New(SubnetOwnerPrefix, baseDB)
+	subnetOwnerDB := prefixdb.New(SubnetOwnerPrefix, merkleDB)
 	subnetOwnerCache, err := metercacher.New[ids.ID, fxOwnerAndSize](
 		"subnet_owner_cache",
 		metricsReg,
@@ -658,7 +664,7 @@ func New(
 		return nil, err
 	}
 
-	subnetToL1ConversionDB := prefixdb.New(SubnetToL1ConversionPrefix, baseDB)
+	subnetToL1ConversionDB := prefixdb.New(SubnetToL1ConversionPrefix, merkleDB)
 	subnetToL1ConversionCache, err := metercacher.New[ids.ID, SubnetToL1Conversion](
 		"subnet_conversion_cache",
 		metricsReg,
@@ -714,19 +720,19 @@ func New(
 		upgrades:   upgrades,
 		metrics:    metrics,
 		rewards:    rewards,
-		baseDB:     baseDB,
+		baseDB:     versiondb.New(merkleDB),
 
 		addedBlockIDs: make(map[uint64]ids.ID),
 		blockIDCache:  blockIDCache,
-		blockIDDB:     prefixdb.New(BlockIDPrefix, baseDB),
+		blockIDDB:     prefixdb.New(BlockIDPrefix, merkleDB),
 
 		addedBlocks: make(map[ids.ID]block.Block),
 		blockCache:  blockCache,
-		blockDB:     prefixdb.New(BlockPrefix, baseDB),
+		blockDB:     prefixdb.New(BlockPrefix, merkleDB),
 
 		expiry:     btree.NewG(defaultTreeDegree, ExpiryEntry.Less),
 		expiryDiff: newExpiryDiff(),
-		expiryDB:   prefixdb.New(ExpiryReplayProtectionPrefix, baseDB),
+		expiryDB:   prefixdb.New(ExpiryReplayProtectionPrefix, merkleDB),
 
 		activeL1Validators:  newActiveL1Validators(),
 		l1ValidatorsDiff:    newL1ValidatorsDiff(),
@@ -765,7 +771,7 @@ func New(
 		validatorPublicKeyDiffsDB:    validatorPublicKeyDiffsDB,
 
 		addedTxs: make(map[ids.ID]*txAndStatus),
-		txDB:     prefixdb.New(TxPrefix, baseDB),
+		txDB:     prefixdb.New(TxPrefix, merkleDB),
 		txCache:  txCache,
 
 		addedRewardUTXOs: make(map[ids.ID][]*avax.UTXO),
@@ -789,18 +795,18 @@ func New(
 
 		transformedSubnets:     make(map[ids.ID]*txs.Tx),
 		transformedSubnetCache: transformedSubnetCache,
-		transformedSubnetDB:    prefixdb.New(TransformedSubnetPrefix, baseDB),
+		transformedSubnetDB:    prefixdb.New(TransformedSubnetPrefix, merkleDB),
 
 		modifiedSupplies: make(map[ids.ID]uint64),
 		supplyCache:      supplyCache,
-		supplyDB:         prefixdb.New(SupplyPrefix, baseDB),
+		supplyDB:         prefixdb.New(SupplyPrefix, merkleDB),
 
 		addedChains:  make(map[ids.ID][]*txs.Tx),
-		chainDB:      prefixdb.New(ChainPrefix, baseDB),
+		chainDB:      prefixdb.New(ChainPrefix, merkleDB),
 		chainCache:   chainCache,
 		chainDBCache: chainDBCache,
 
-		singletonDB: prefixdb.New(SingletonPrefix, baseDB),
+		singletonDB: prefixdb.New(SingletonPrefix, merkleDB),
 	}
 
 	if err := s.sync(genesisBytes); err != nil {

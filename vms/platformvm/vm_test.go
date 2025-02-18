@@ -1019,9 +1019,8 @@ func TestOptimisticAtomicImport(t *testing.T) {
 // test restarting the node
 func TestRestartFullyAccepted(t *testing.T) {
 	require := require.New(t)
-	db := memdb.New()
 
-	firstDB := prefixdb.New([]byte{}, db)
+	firstDB := prefixdb.New([]byte{}, memdb.New())
 	firstVM := &VM{Internal: config.Internal{
 		Chains:                 chains.TestManager,
 		Validators:             validators.NewManager(),
@@ -1126,7 +1125,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		secondCtx.Lock.Unlock()
 	}()
 
-	secondDB := prefixdb.New([]byte{}, db)
+	secondDB := prefixdb.New([]byte{}, memdb.New())
 	secondMsgChan := make(chan common.Message, 1)
 	require.NoError(secondVM.Initialize(
 		context.Background(),
