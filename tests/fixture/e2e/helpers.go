@@ -84,6 +84,8 @@ func NewWallet(tc tests.TestContext, keychain *secp256k1fx.Keychain, nodeURI tmp
 				)
 			},
 		),
+		// Reducing the default from 100ms speeds up detection of tx acceptance
+		common.WithPollFrequency(10*time.Millisecond),
 	)
 	OutputWalletBalances(tc, wallet)
 	return wallet
