@@ -48,14 +48,6 @@ const (
 	SendFailRateKey             = "sendFailRate"
 )
 
-type connectionType uint8
-
-const (
-	connectionTypeUnknown connectionType = iota
-	connectionTypeIngress
-	connectionTypeEgress
-)
-
 var (
 	_ Network = (*network)(nil)
 
@@ -269,7 +261,7 @@ func NewNetwork(
 
 	// ingressConnCount tracks connections to all remote peers,
 	// so for safety we set it as pointer, in case the config object is copied.
-	var ingressConnCount atomic.Uint32
+	var ingressConnCount atomic.Uint64
 
 	peerConfig := &peer.Config{
 		ReadBufferSize:         config.PeerReadBufferSize,
@@ -649,7 +641,7 @@ func (n *network) Dispatch() error {
 				zap.Stringer("peerIP", ip),
 			)
 
-			if err := n.upgrade(conn, n.serverUpgrader, connectionTypeIngress); err != nil {
+			if err := n.upgrade(conn, n.serverUpgrader, true); err != nil {
 				n.peerConfig.Log.Verbo("failed to upgrade connection",
 					zap.String("direction", "inbound"),
 					zap.Error(err),
@@ -996,7 +988,7 @@ func (n *network) dial(nodeID ids.NodeID, ip *trackedIP) {
 				zap.Stringer("peerIP", ip.ip),
 			)
 
-			err = n.upgrade(conn, n.clientUpgrader, connectionTypeEgress)
+			err = n.upgrade(conn, n.clientUpgrader, false)
 			if err != nil {
 				n.peerConfig.Log.Verbo(
 					"failed to upgrade, attempting again",
@@ -1019,7 +1011,7 @@ func (n *network) dial(nodeID ids.NodeID, ip *trackedIP) {
 // If the connection is desired by the node, then the resulting upgraded
 // connection will be used to create a new peer. Otherwise the connection will
 // be immediately closed.
-func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader, connType connectionType) error {
+func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader, isIngress bool) error {
 	upgradeTimeout := n.peerConfig.Clock.Time().Add(n.config.ReadHandshakeTimeout)
 	if err := conn.SetReadDeadline(upgradeTimeout); err != nil {
 		_ = conn.Close()
@@ -1108,7 +1100,6 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader, connType connec
 	// peer.Start requires there is only ever one peer instance running with the
 	// same [peerConfig.InboundMsgThrottler]. This is guaranteed by the above
 	// de-duplications for [connectingPeers] and [connectedPeers].
-	isIngress := connType == connectionTypeIngress
 	peer := peer.Start(
 		n.peerConfig,
 		tlsConn,
