@@ -29,7 +29,7 @@ var (
 	ApricotPhase3InitialBaseFee = big.NewInt(params.ApricotPhase3InitialBaseFee)
 	EtnaMinBaseFee              = big.NewInt(params.EtnaMinBaseFee)
 
-	ApricotPhase4BaseFeeChangeDenominator = new(big.Int).SetUint64(params.ApricotPhase4BaseFeeChangeDenominator)
+	ApricotPhase3BaseFeeChangeDenominator = new(big.Int).SetUint64(params.ApricotPhase3BaseFeeChangeDenominator)
 	ApricotPhase5BaseFeeChangeDenominator = new(big.Int).SetUint64(params.ApricotPhase5BaseFeeChangeDenominator)
 
 	errEstimateBaseFeeWithoutActivation = errors.New("cannot estimate base fee for chain without apricot phase 3 scheduled")
@@ -86,7 +86,7 @@ func calcBaseFeeWithWindow(config *params.ChainConfig, parent *types.Header, tim
 	// block limit
 	var (
 		isApricotPhase5                 = config.IsApricotPhase5(parent.Time)
-		baseFeeChangeDenominator        = ApricotPhase4BaseFeeChangeDenominator
+		baseFeeChangeDenominator        = ApricotPhase3BaseFeeChangeDenominator
 		parentGasTarget          uint64 = params.ApricotPhase3TargetGas
 	)
 	if isApricotPhase5 {
