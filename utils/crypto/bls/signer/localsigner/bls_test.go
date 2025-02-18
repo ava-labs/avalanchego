@@ -30,7 +30,7 @@ func NewSigner(require *require.Assertions) *LocalSigner {
 	return sk
 }
 
-func Map[T any, U any](arr []T, f func(T) U) []U {
+func mapSlice[T any, U any](arr []T, f func(T) U) []U {
 	result := make([]U, len(arr))
 	for i, val := range arr {
 		result[i] = f(val)
@@ -96,11 +96,11 @@ func TestVerifyWrongMessageSignedSignature(t *testing.T) {
 func TestValidAggregation(t *testing.T) {
 	require := require.New(t)
 	signers := []*LocalSigner{NewSigner(require), NewSigner(require), NewSigner(require)}
-	pks := Map(signers, (*LocalSigner).PublicKey)
+	pks := mapSlice(signers, (*LocalSigner).PublicKey)
 
 	msg := []byte("TestValidAggregation local signer")
 
-	sigs := Map(signers, func(signer *LocalSigner) *bls.Signature {
+	sigs := mapSlice(signers, func(signer *LocalSigner) *bls.Signature {
 		sig, err := signer.Sign(msg)
 		require.NoError(err)
 		return sig
@@ -130,11 +130,11 @@ func TestSingleKeyAggregation(t *testing.T) {
 func TestIncorrectMessageAggregation(t *testing.T) {
 	require := require.New(t)
 	signers := []*LocalSigner{NewSigner(require), NewSigner(require), NewSigner(require)}
-	pks := Map(signers, (*LocalSigner).PublicKey)
+	pks := mapSlice(signers, (*LocalSigner).PublicKey)
 
 	msg := []byte("TestIncorrectMessageAggregation local signer")
 
-	signatures := Map(signers, func(signer *LocalSigner) *bls.Signature {
+	signatures := mapSlice(signers, func(signer *LocalSigner) *bls.Signature {
 		sig, err := signer.Sign(msg)
 		require.NoError(err)
 		return sig
@@ -148,7 +148,7 @@ func TestIncorrectMessageAggregation(t *testing.T) {
 func TestDifferentMessageAggregation(t *testing.T) {
 	require := require.New(t)
 	signers := []*LocalSigner{NewSigner(require), NewSigner(require), NewSigner(require)}
-	pks := Map(signers, (*LocalSigner).PublicKey)
+	pks := mapSlice(signers, (*LocalSigner).PublicKey)
 
 	msg := []byte("TestDifferentMessagesAggregation local signer")
 	differentMsg := []byte("TestDifferentMessagesAggregation local signer with different message")
@@ -156,7 +156,7 @@ func TestDifferentMessageAggregation(t *testing.T) {
 	diffSig, err := signers[0].Sign(differentMsg)
 	require.NoError(err)
 
-	sameSigs := Map(signers[1:], func(signer *LocalSigner) *bls.Signature {
+	sameSigs := mapSlice(signers[1:], func(signer *LocalSigner) *bls.Signature {
 		sig, err := signer.Sign(msg)
 		require.NoError(err)
 		return sig
@@ -172,11 +172,11 @@ func TestDifferentMessageAggregation(t *testing.T) {
 func TestOneIncorrectPubKeyAggregation(t *testing.T) {
 	require := require.New(t)
 	signers := []*LocalSigner{NewSigner(require), NewSigner(require), NewSigner(require)}
-	pks := Map(signers, (*LocalSigner).PublicKey)
+	pks := mapSlice(signers, (*LocalSigner).PublicKey)
 
 	msg := []byte("TestOneIncorrectPubKeyAggregation local signer")
 
-	signatures := Map(signers, func(signer *LocalSigner) *bls.Signature {
+	signatures := mapSlice(signers, func(signer *LocalSigner) *bls.Signature {
 		sig, err := signer.Sign(msg)
 		require.NoError(err)
 		return sig
@@ -193,11 +193,11 @@ func TestOneIncorrectPubKeyAggregation(t *testing.T) {
 func TestMorePubkeysThanSignaturesAggregation(t *testing.T) {
 	require := require.New(t)
 	signers := []*LocalSigner{NewSigner(require), NewSigner(require), NewSigner(require)}
-	pks := Map(signers, (*LocalSigner).PublicKey)
+	pks := mapSlice(signers, (*LocalSigner).PublicKey)
 
 	msg := []byte("TestMorePubkeysThanSignatures local signer")
 
-	signatures := Map(signers, func(signer *LocalSigner) *bls.Signature {
+	signatures := mapSlice(signers, func(signer *LocalSigner) *bls.Signature {
 		sig, err := signer.Sign(msg)
 		require.NoError(err)
 		return sig
@@ -214,11 +214,11 @@ func TestMorePubkeysThanSignaturesAggregation(t *testing.T) {
 func TestMoreSignaturesThanPubkeysAggregation(t *testing.T) {
 	require := require.New(t)
 	signers := []*LocalSigner{NewSigner(require), NewSigner(require), NewSigner(require)}
-	pks := Map(signers, (*LocalSigner).PublicKey)
+	pks := mapSlice(signers, (*LocalSigner).PublicKey)
 
 	msg := []byte("TestMoreSignaturesThanPubkeys local signer")
 
-	signatures := Map(signers, func(signer *LocalSigner) *bls.Signature {
+	signatures := mapSlice(signers, func(signer *LocalSigner) *bls.Signature {
 		sig, err := signer.Sign(msg)
 		require.NoError(err)
 		return sig
@@ -235,7 +235,7 @@ func TestNoPubkeysAggregation(t *testing.T) {
 
 	msg := []byte("TestNoPubkeysAggregation local signer")
 
-	signatures := Map(signers, func(signer *LocalSigner) *bls.Signature {
+	signatures := mapSlice(signers, func(signer *LocalSigner) *bls.Signature {
 		sig, err := signer.Sign(msg)
 		require.NoError(err)
 		return sig
@@ -249,7 +249,7 @@ func TestNoPubkeysAggregation(t *testing.T) {
 func TestNoSignaturesAggregation(t *testing.T) {
 	require := require.New(t)
 	signers := []*LocalSigner{NewSigner(require), NewSigner(require), NewSigner(require)}
-	pks := Map(signers, (*LocalSigner).PublicKey)
+	pks := mapSlice(signers, (*LocalSigner).PublicKey)
 
 	msg := []byte("TestNoSignaturesAggregation local signer")
 
