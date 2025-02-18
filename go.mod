@@ -7,15 +7,17 @@ module github.com/ava-labs/avalanchego
 //
 // - If updating between minor versions (e.g. 1.22.x -> 1.23.x):
 //   - Consider updating the version of golangci-lint (in scripts/lint.sh).
-go 1.22.8
+go 1.23
+
+toolchain go1.23.6
 
 require (
 	github.com/DataDog/zstd v1.5.2
 	github.com/NYTimes/gziphandler v1.1.1
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
-	github.com/ava-labs/coreth v0.13.9-0.20250109181626-6493558fa52c
+	github.com/ava-labs/coreth v0.13.9-0.20250218232256-11455745265b
 	github.com/ava-labs/ledger-avalanche/go v0.0.0-20241009183145-e6f90a8a1a60
-	github.com/ava-labs/libevm v1.13.14-0.1.0.rc-2
+	github.com/ava-labs/libevm v1.13.14-0.2.0.rc.3
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593
 	github.com/compose-spec/compose-go v1.20.2
