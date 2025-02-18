@@ -58,12 +58,12 @@ var tests = []test{
 	{
 		name: "empty",
 		msg:  emptySignatureMsg,
-		err:  ErrorEmptySignature,
+		err:  bls.ErrFailedSignatureDecompress,
 	},
 	{
 		name: "none",
 		msg:  noSignatureMsg,
-		err:  ErrorEmptySignature,
+		err:  bls.ErrFailedSignatureDecompress,
 	},
 }
 

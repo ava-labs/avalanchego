@@ -5,7 +5,6 @@ package rpcsigner
 
 import (
 	"context"
-	"errors"
 
 	"google.golang.org/grpc"
 
@@ -14,11 +13,7 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/signer"
 )
 
-var (
-	_                   bls.Signer = (*Client)(nil)
-	ErrorEmptyPublicKey            = errors.New("empty public key")
-	ErrorEmptySignature            = errors.New("empty signature")
-)
+var _ bls.Signer = (*Client)(nil)
 
 type Client struct {
 	client pb.SignerClient
@@ -47,19 +42,6 @@ func NewClient(ctx context.Context, conn *grpc.ClientConn) (*Client, error) {
 	}, nil
 }
 
-type signatureResponse interface {
-	GetSignature() []byte
-}
-
-func getSignatureFromResponse[T signatureResponse](resp T) (*bls.Signature, error) {
-	signature := resp.GetSignature()
-	if len(signature) == 0 {
-		return nil, ErrorEmptySignature
-	}
-
-	return bls.SignatureFromBytes(signature)
-}
-
 func (c *Client) PublicKey() *bls.PublicKey {
 	return c.pk
 }
@@ -69,8 +51,9 @@ func (c *Client) Sign(message []byte) (*bls.Signature, error) {
 	if err != nil {
 		return nil, err
 	}
+	signature := resp.GetSignature()
 
-	return getSignatureFromResponse(resp)
+	return bls.SignatureFromBytes(signature)
 }
 
 func (c *Client) SignProofOfPossession(message []byte) (*bls.Signature, error) {
@@ -78,5 +61,7 @@ func (c *Client) SignProofOfPossession(message []byte) (*bls.Signature, error) {
 	if err != nil {
 		return nil, err
 	}
-	return getSignatureFromResponse(resp)
+	signature := resp.GetSignature()
+
+	return bls.SignatureFromBytes(signature)
 }
