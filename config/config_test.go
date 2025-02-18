@@ -555,6 +555,8 @@ type signerServer struct {
 }
 
 func (*signerServer) PublicKey(context.Context, *signer.PublicKeyRequest) (*signer.PublicKeyResponse, error) {
+	// for tests to pass, this must be the base64 encoding of a 32 byte public key
+	// but it does not need to be associated with any private key
 	bytes, err := base64.StdEncoding.DecodeString("j8Ndzc1I6EYWYUWAdhcwpQ1I2xX/i4fdwgJIaxbHlf9yQKMT0jlReiiLYsydgaS1")
 	if err != nil {
 		return nil, err
