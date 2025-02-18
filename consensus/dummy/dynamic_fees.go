@@ -24,8 +24,8 @@ var (
 
 	ApricotPhase3MinBaseFee     = big.NewInt(params.ApricotPhase3MinBaseFee)
 	ApricotPhase3MaxBaseFee     = big.NewInt(params.ApricotPhase3MaxBaseFee)
-	ApricotPhase4MinBaseFee     = big.NewInt(params.ApricotPhase4MinBaseFee)
-	ApricotPhase4MaxBaseFee     = big.NewInt(params.ApricotPhase4MaxBaseFee)
+	ApricotPhase4MinBaseFee     = big.NewInt(ap4.MinBaseFee)
+	ApricotPhase4MaxBaseFee     = big.NewInt(ap4.MaxBaseFee)
 	ApricotPhase3InitialBaseFee = big.NewInt(params.ApricotPhase3InitialBaseFee)
 	EtnaMinBaseFee              = big.NewInt(params.EtnaMinBaseFee)
 

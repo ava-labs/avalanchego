@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/ap4"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/log"
@@ -346,7 +347,7 @@ func TestDynamicFeesEtna(t *testing.T) {
 	require.NoError(err)
 	// After some time has passed in the Etna phase, the base fee should drop
 	// lower than the prior base fee minimum.
-	require.Less(nextBaseFee.Int64(), params.ApricotPhase4MinBaseFee)
+	require.Less(nextBaseFee.Int64(), int64(ap4.MinBaseFee))
 }
 
 func TestCalcBaseFeeRegression(t *testing.T) {
