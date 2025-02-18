@@ -35,39 +35,39 @@ var (
 	errEstimateBaseFeeWithoutActivation = errors.New("cannot estimate base fee for chain without apricot phase 3 scheduled")
 )
 
+// CalcExtraPrefix takes the previous header and the timestamp of its child
+// block and calculates the expected extra prefix for the child block.
+//
+// CalcExtraPrefix should only be called if timestamp >= config.ApricotPhase3Timestamp
+func CalcExtraPrefix(
+	config *params.ChainConfig,
+	parent *types.Header,
+	timestamp uint64,
+) ([]byte, error) {
+	window, err := calcFeeWindow(config, parent, timestamp)
+	return window.Bytes(), err
+}
+
 // CalcBaseFee takes the previous header and the timestamp of its child block
-// and calculates the expected base fee as well as the encoding of the past
-// pricing information for the child block.
-// CalcBaseFee should only be called if [timestamp] >= [config.ApricotPhase3Timestamp]
-func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uint64) ([]byte, *big.Int, error) {
+// and calculates the expected base fee for the child block.
+//
+// CalcBaseFee should only be called if timestamp >= config.ApricotPhase3Timestamp
+func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uint64) (*big.Int, error) {
 	// If the current block is the first EIP-1559 block, or it is the genesis block
 	// return the initial slice and initial base fee.
-	var (
-		isApricotPhase3 = config.IsApricotPhase3(parent.Time)
-		isApricotPhase4 = config.IsApricotPhase4(parent.Time)
-		isApricotPhase5 = config.IsApricotPhase5(parent.Time)
-		isEtna          = config.IsEtna(parent.Time)
-	)
-	if !isApricotPhase3 || parent.Number.Cmp(common.Big0) == 0 {
-		initialSlice := (&DynamicFeeWindow{}).Bytes()
-		initialBaseFee := big.NewInt(params.ApricotPhase3InitialBaseFee)
-		return initialSlice, initialBaseFee, nil
+	if !config.IsApricotPhase3(parent.Time) || parent.Number.Cmp(common.Big0) == 0 {
+		return big.NewInt(params.ApricotPhase3InitialBaseFee), nil
 	}
 
-	dynamicFeeWindow, err := ParseDynamicFeeWindow(parent.Extra)
+	dynamicFeeWindow, err := calcFeeWindow(config, parent, timestamp)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-
-	if timestamp < parent.Time {
-		return nil, nil, fmt.Errorf("cannot calculate base fee for timestamp %d prior to parent timestamp %d", timestamp, parent.Time)
-	}
-	timeElapsed := timestamp - parent.Time
 
 	// If AP5, use a less responsive BaseFeeChangeDenominator and a higher gas
 	// block limit
 	var (
-		baseFee                         = new(big.Int).Set(parent.BaseFee)
+		isApricotPhase5                 = config.IsApricotPhase5(parent.Time)
 		baseFeeChangeDenominator        = ApricotPhase4BaseFeeChangeDenominator
 		parentGasTarget          uint64 = params.ApricotPhase3TargetGas
 	)
@@ -75,20 +75,123 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 		baseFeeChangeDenominator = ApricotPhase5BaseFeeChangeDenominator
 		parentGasTarget = params.ApricotPhase5TargetGas
 	}
-	parentGasTargetBig := new(big.Int).SetUint64(parentGasTarget)
+
+	// Calculate the amount of gas consumed within the rollup window.
+	var (
+		baseFee  = new(big.Int).Set(parent.BaseFee)
+		totalGas = dynamicFeeWindow.Sum()
+	)
+	if totalGas == parentGasTarget {
+		return baseFee, nil
+	}
+
+	var (
+		num                = new(big.Int)
+		parentGasTargetBig = new(big.Int).SetUint64(parentGasTarget)
+	)
+	if totalGas > parentGasTarget {
+		// If the parent block used more gas than its target, the baseFee should increase.
+		num.SetUint64(totalGas - parentGasTarget)
+		num.Mul(num, parent.BaseFee)
+		num.Div(num, parentGasTargetBig)
+		num.Div(num, baseFeeChangeDenominator)
+		baseFeeDelta := math.BigMax(num, common.Big1)
+
+		baseFee.Add(baseFee, baseFeeDelta)
+	} else {
+		// Otherwise if the parent block used less gas than its target, the baseFee should decrease.
+		num.SetUint64(parentGasTarget - totalGas)
+		num.Mul(num, parent.BaseFee)
+		num.Div(num, parentGasTargetBig)
+		num.Div(num, baseFeeChangeDenominator)
+		baseFeeDelta := math.BigMax(num, common.Big1)
+
+		if timestamp < parent.Time {
+			// This should never happen as the fee window calculations should
+			// have already failed, but it is kept for clarity.
+			return nil, fmt.Errorf("cannot calculate base fee for timestamp %d prior to parent timestamp %d",
+				timestamp,
+				parent.Time,
+			)
+		}
+
+		// If timeElapsed is greater than [params.RollupWindow], apply the
+		// state transition to the base fee to account for the interval during
+		// which no blocks were produced.
+		//
+		// We use timeElapsed/params.RollupWindow, so that the transition is
+		// applied for every [params.RollupWindow] seconds that has elapsed
+		// between the parent and this block.
+		var (
+			timeElapsed    = timestamp - parent.Time
+			windowsElapsed = timeElapsed / params.RollupWindow
+		)
+		if windowsElapsed > 1 {
+			bigWindowsElapsed := new(big.Int).SetUint64(windowsElapsed)
+			// Because baseFeeDelta could actually be [common.Big1], we must not
+			// modify the existing value of `baseFeeDelta` but instead allocate
+			// a new one.
+			baseFeeDelta = new(big.Int).Mul(baseFeeDelta, bigWindowsElapsed)
+		}
+		baseFee.Sub(baseFee, baseFeeDelta)
+	}
+
+	// Ensure that the base fee does not increase/decrease outside of the bounds
+	switch {
+	case config.IsEtna(parent.Time):
+		baseFee = selectBigWithinBounds(EtnaMinBaseFee, baseFee, MaxUint256)
+	case isApricotPhase5:
+		baseFee = selectBigWithinBounds(ApricotPhase4MinBaseFee, baseFee, MaxUint256)
+	case config.IsApricotPhase4(parent.Time):
+		baseFee = selectBigWithinBounds(ApricotPhase4MinBaseFee, baseFee, ApricotPhase4MaxBaseFee)
+	default:
+		baseFee = selectBigWithinBounds(ApricotPhase3MinBaseFee, baseFee, ApricotPhase3MaxBaseFee)
+	}
+
+	return baseFee, nil
+}
+
+// calcFeeWindow takes the previous header and the timestamp of its child block
+// and calculates the expected fee window.
+//
+// calcFeeWindow should only be called if timestamp >= config.ApricotPhase3Timestamp
+func calcFeeWindow(
+	config *params.ChainConfig,
+	parent *types.Header,
+	timestamp uint64,
+) (DynamicFeeWindow, error) {
+	// If the current block is the first EIP-1559 block, or it is the genesis block
+	// return the initial window.
+	if !config.IsApricotPhase3(parent.Time) || parent.Number.Cmp(common.Big0) == 0 {
+		return DynamicFeeWindow{}, nil
+	}
+
+	dynamicFeeWindow, err := ParseDynamicFeeWindow(parent.Extra)
+	if err != nil {
+		return DynamicFeeWindow{}, err
+	}
+
+	if timestamp < parent.Time {
+		return DynamicFeeWindow{}, fmt.Errorf("cannot calculate fee window for timestamp %d prior to parent timestamp %d",
+			timestamp,
+			parent.Time,
+		)
+	}
+	timeElapsed := timestamp - parent.Time
 
 	// Add in parent's consumed gas
 	var blockGasCost, parentExtraStateGasUsed uint64
 	switch {
-	case isApricotPhase5:
-		// blockGasCost has been removed in AP5, so it is left as 0.
+	case config.IsApricotPhase5(parent.Time):
+		// blockGasCost is not included in the fee window after AP5, so it is
+		// left as 0.
 
 		// At the start of a new network, the parent
 		// may not have a populated ExtDataGasUsed.
 		if parent.ExtDataGasUsed != nil {
 			parentExtraStateGasUsed = parent.ExtDataGasUsed.Uint64()
 		}
-	case isApricotPhase4:
+	case config.IsApricotPhase4(parent.Time):
 		// The blockGasCost is paid by the effective tips in the block using
 		// the block's value of baseFee.
 		//
@@ -117,60 +220,7 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 	// roll the window over by the timeElapsed to generate the new rollup
 	// window.
 	dynamicFeeWindow.Shift(timeElapsed)
-	dynamicFeeWindowBytes := dynamicFeeWindow.Bytes()
-
-	// Calculate the amount of gas consumed within the rollup window.
-	totalGas := dynamicFeeWindow.Sum()
-	if totalGas == parentGasTarget {
-		return dynamicFeeWindowBytes, baseFee, nil
-	}
-
-	num := new(big.Int)
-
-	if totalGas > parentGasTarget {
-		// If the parent block used more gas than its target, the baseFee should increase.
-		num.SetUint64(totalGas - parentGasTarget)
-		num.Mul(num, parent.BaseFee)
-		num.Div(num, parentGasTargetBig)
-		num.Div(num, baseFeeChangeDenominator)
-		baseFeeDelta := math.BigMax(num, common.Big1)
-
-		baseFee.Add(baseFee, baseFeeDelta)
-	} else {
-		// Otherwise if the parent block used less gas than its target, the baseFee should decrease.
-		num.SetUint64(parentGasTarget - totalGas)
-		num.Mul(num, parent.BaseFee)
-		num.Div(num, parentGasTargetBig)
-		num.Div(num, baseFeeChangeDenominator)
-		baseFeeDelta := math.BigMax(num, common.Big1)
-		// If timeElapsed is greater than [params.RollupWindow], apply the
-		// state transition to the base fee to account for the interval during
-		// which no blocks were produced.
-		//
-		// We use timeElapsed/params.RollupWindow, so that the transition is
-		// applied for every [params.RollupWindow] seconds that has elapsed
-		// between the parent and this block.
-		if timeElapsed > params.RollupWindow {
-			// Note: timeElapsed/params.RollupWindow must be at least 1 since
-			// we've checked that timeElapsed > params.RollupWindow
-			baseFeeDelta = new(big.Int).Mul(baseFeeDelta, new(big.Int).SetUint64(timeElapsed/params.RollupWindow))
-		}
-		baseFee.Sub(baseFee, baseFeeDelta)
-	}
-
-	// Ensure that the base fee does not increase/decrease outside of the bounds
-	switch {
-	case isEtna:
-		baseFee = selectBigWithinBounds(EtnaMinBaseFee, baseFee, MaxUint256)
-	case isApricotPhase5:
-		baseFee = selectBigWithinBounds(ApricotPhase4MinBaseFee, baseFee, MaxUint256)
-	case isApricotPhase4:
-		baseFee = selectBigWithinBounds(ApricotPhase4MinBaseFee, baseFee, ApricotPhase4MaxBaseFee)
-	default:
-		baseFee = selectBigWithinBounds(ApricotPhase3MinBaseFee, baseFee, ApricotPhase3MaxBaseFee)
-	}
-
-	return dynamicFeeWindowBytes, baseFee, nil
+	return dynamicFeeWindow, nil
 }
 
 // EstimateNextBaseFee attempts to estimate the base fee of a block built at
@@ -187,8 +237,7 @@ func EstimateNextBaseFee(config *params.ChainConfig, parent *types.Header, times
 	}
 
 	timestamp = max(timestamp, parent.Time, *config.ApricotPhase3BlockTimestamp)
-	_, baseFee, err := CalcBaseFee(config, parent, timestamp)
-	return baseFee, err
+	return CalcBaseFee(config, parent, timestamp)
 }
 
 // selectBigWithinBounds returns [value] if it is within the bounds:

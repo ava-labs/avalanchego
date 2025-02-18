@@ -393,7 +393,11 @@ func (cm *chainMaker) makeHeader(parent *types.Block, gap uint64, state *state.S
 	}
 	if cm.config.IsApricotPhase3(time) {
 		var err error
-		header.Extra, header.BaseFee, err = dummy.CalcBaseFee(cm.config, parent.Header(), time)
+		header.Extra, err = dummy.CalcExtraPrefix(cm.config, parent.Header(), time)
+		if err != nil {
+			panic(err)
+		}
+		header.BaseFee, err = dummy.CalcBaseFee(cm.config, parent.Header(), time)
 		if err != nil {
 			panic(err)
 		}

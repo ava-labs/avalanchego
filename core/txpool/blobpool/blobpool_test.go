@@ -121,7 +121,7 @@ func (bc *testBlockChain) CurrentBlock() *types.Header {
 			BaseFee:  mid,
 			Extra:    make([]byte, params.DynamicFeeExtraDataSize),
 		}
-		_, baseFee, err := dummy.CalcBaseFee(
+		baseFee, err := dummy.CalcBaseFee(
 			bc.config, parent, blockTime,
 		)
 		if err != nil {
