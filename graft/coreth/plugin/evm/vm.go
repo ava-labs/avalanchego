@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/peer"
+	"github.com/ava-labs/coreth/plugin/evm/ap5"
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/coreth/plugin/evm/config"
 	"github.com/ava-labs/coreth/plugin/evm/message"
@@ -848,7 +849,7 @@ func (vm *VM) postBatchOnFinalizeAndAssemble(header *types.Header, state *state.
 			return nil, nil, nil, err
 		}
 		// ensure [gasUsed] + [batchGasUsed] doesnt exceed the [atomicGasLimit]
-		if totalGasUsed := new(big.Int).Add(batchGasUsed, txGasUsed); totalGasUsed.Cmp(params.AtomicGasLimit) > 0 {
+		if totalGasUsed := new(big.Int).Add(batchGasUsed, txGasUsed); !utils.BigLessOrEqualUint64(totalGasUsed, ap5.AtomicGasLimit) {
 			// Send [tx] back to the mempool's tx heap.
 			vm.mempool.CancelCurrentTx(tx.ID())
 			break
@@ -976,8 +977,8 @@ func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) (*big
 		// atomic gas limit.
 		if rules.IsApricotPhase5 {
 			// Ensure that [tx] does not push [block] above the atomic gas limit.
-			if batchGasUsed.Cmp(params.AtomicGasLimit) == 1 {
-				return nil, nil, fmt.Errorf("atomic gas used (%d) by block (%s), exceeds atomic gas limit (%d)", batchGasUsed, block.Hash().Hex(), params.AtomicGasLimit)
+			if !utils.BigLessOrEqualUint64(batchGasUsed, ap5.AtomicGasLimit) {
+				return nil, nil, fmt.Errorf("atomic gas used (%d) by block (%s), exceeds atomic gas limit (%d)", batchGasUsed, block.Hash().Hex(), ap5.AtomicGasLimit)
 			}
 		}
 	}
@@ -1564,8 +1565,8 @@ func (vm *VM) verifyTxAtTip(tx *atomic.Tx) error {
 	if err != nil {
 		return err
 	}
-	if new(big.Int).SetUint64(gasUsed).Cmp(params.AtomicGasLimit) > 0 {
-		return fmt.Errorf("tx gas usage (%d) exceeds atomic gas limit (%d)", gasUsed, params.AtomicGasLimit.Uint64())
+	if gasUsed > ap5.AtomicGasLimit {
+		return fmt.Errorf("tx gas usage (%d) exceeds atomic gas limit (%d)", gasUsed, ap5.AtomicGasLimit)
 	}
 
 	// Note: we fetch the current block and then the state at that block instead of the current state directly
