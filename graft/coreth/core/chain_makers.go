@@ -31,13 +31,13 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/coreth/consensus"
-	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/consensus/misc/eip4844"
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/header"
 	"github.com/ava-labs/coreth/triedb"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -382,6 +382,15 @@ func (cm *chainMaker) makeHeader(parent *types.Block, gap uint64, state *state.S
 		gasLimit = CalcGasLimit(parent.GasUsed(), parent.GasLimit(), parent.GasLimit(), parent.GasLimit())
 	}
 
+	extra, err := header.ExtraPrefix(cm.config, parent.Header(), time)
+	if err != nil {
+		panic(err)
+	}
+	baseFee, err := header.BaseFee(cm.config, parent.Header(), time)
+	if err != nil {
+		panic(err)
+	}
+
 	header := &types.Header{
 		Root:       state.IntermediateRoot(cm.config.IsEIP158(parent.Number())),
 		ParentHash: parent.Hash(),
@@ -390,16 +399,8 @@ func (cm *chainMaker) makeHeader(parent *types.Block, gap uint64, state *state.S
 		GasLimit:   gasLimit,
 		Number:     new(big.Int).Add(parent.Number(), common.Big1),
 		Time:       time,
-	}
-
-	var err error
-	header.Extra, err = dummy.CalcExtraPrefix(cm.config, parent.Header(), time)
-	if err != nil {
-		panic(err)
-	}
-	header.BaseFee, err = dummy.CalcBaseFee(cm.config, parent.Header(), time)
-	if err != nil {
-		panic(err)
+		Extra:      extra,
+		BaseFee:    baseFee,
 	}
 
 	if cm.config.IsCancun(header.Number, header.Time) {

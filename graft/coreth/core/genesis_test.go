@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/ap3"
 	"github.com/ava-labs/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ava-labs/coreth/triedb"
@@ -309,7 +310,7 @@ func TestVerkleGenesisCommit(t *testing.T) {
 	}
 
 	genesis := &Genesis{
-		BaseFee:    big.NewInt(params.ApricotPhase3InitialBaseFee),
+		BaseFee:    big.NewInt(ap3.InitialBaseFee),
 		Config:     verkleConfig,
 		Timestamp:  verkleTime,
 		Difficulty: big.NewInt(0),

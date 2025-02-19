@@ -50,7 +50,7 @@ func TestVerifyExtra(t *testing.T) {
 			rules: params.AvalancheRules{
 				IsApricotPhase3: true,
 			},
-			extra:    make([]byte, params.DynamicFeeExtraDataSize),
+			extra:    make([]byte, FeeWindowSize),
 			expected: nil,
 		},
 		{
@@ -58,7 +58,7 @@ func TestVerifyExtra(t *testing.T) {
 			rules: params.AvalancheRules{
 				IsApricotPhase3: true,
 			},
-			extra:    make([]byte, params.DynamicFeeExtraDataSize-1),
+			extra:    make([]byte, FeeWindowSize-1),
 			expected: errInvalidExtraLength,
 		},
 		{
@@ -66,7 +66,7 @@ func TestVerifyExtra(t *testing.T) {
 			rules: params.AvalancheRules{
 				IsApricotPhase3: true,
 			},
-			extra:    make([]byte, params.DynamicFeeExtraDataSize+1),
+			extra:    make([]byte, FeeWindowSize+1),
 			expected: errInvalidExtraLength,
 		},
 		{
@@ -74,7 +74,7 @@ func TestVerifyExtra(t *testing.T) {
 			rules: params.AvalancheRules{
 				IsDurango: true,
 			},
-			extra:    make([]byte, params.DynamicFeeExtraDataSize),
+			extra:    make([]byte, FeeWindowSize),
 			expected: nil,
 		},
 		{
@@ -82,7 +82,7 @@ func TestVerifyExtra(t *testing.T) {
 			rules: params.AvalancheRules{
 				IsDurango: true,
 			},
-			extra:    make([]byte, params.DynamicFeeExtraDataSize+1),
+			extra:    make([]byte, FeeWindowSize+1),
 			expected: nil,
 		},
 		{
@@ -90,7 +90,7 @@ func TestVerifyExtra(t *testing.T) {
 			rules: params.AvalancheRules{
 				IsDurango: true,
 			},
-			extra:    make([]byte, params.DynamicFeeExtraDataSize-1),
+			extra:    make([]byte, FeeWindowSize-1),
 			expected: errInvalidExtraLength,
 		},
 	}

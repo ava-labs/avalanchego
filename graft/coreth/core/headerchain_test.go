@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/ap3"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -75,7 +76,7 @@ func TestHeaderInsertion(t *testing.T) {
 	var (
 		db    = rawdb.NewMemoryDatabase()
 		gspec = &Genesis{
-			BaseFee: big.NewInt(params.ApricotPhase3InitialBaseFee),
+			BaseFee: big.NewInt(ap3.InitialBaseFee),
 			Config:  params.TestChainConfig,
 		}
 	)

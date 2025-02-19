@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/header"
 	"github.com/stretchr/testify/require"
 )
 
@@ -52,15 +52,15 @@ func TestUnpackInvalidPredicate(t *testing.T) {
 
 func TestPredicateResultsBytes(t *testing.T) {
 	require := require.New(t)
-	dataTooShort := utils.RandomBytes(params.DynamicFeeExtraDataSize - 1)
+	dataTooShort := utils.RandomBytes(header.FeeWindowSize - 1)
 	_, ok := GetPredicateResultBytes(dataTooShort)
 	require.False(ok)
 
-	preDurangoData := utils.RandomBytes(params.DynamicFeeExtraDataSize)
+	preDurangoData := utils.RandomBytes(header.FeeWindowSize)
 	_, ok = GetPredicateResultBytes(preDurangoData)
 	require.False(ok)
-	postDurangoData := utils.RandomBytes(params.DynamicFeeExtraDataSize + 2)
+	postDurangoData := utils.RandomBytes(header.FeeWindowSize + 2)
 	resultBytes, ok := GetPredicateResultBytes(postDurangoData)
 	require.True(ok)
-	require.Equal(resultBytes, postDurangoData[params.DynamicFeeExtraDataSize:])
+	require.Equal(resultBytes, postDurangoData[header.FeeWindowSize:])
 }

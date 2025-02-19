@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/eth/tracers/logger"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/ap3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -582,7 +583,7 @@ func testCanonicalHashMarker(t *testing.T, scheme string) {
 			gspec = &Genesis{
 				Config:  params.TestChainConfig,
 				Alloc:   types.GenesisAlloc{},
-				BaseFee: big.NewInt(params.ApricotPhase3InitialBaseFee),
+				BaseFee: big.NewInt(ap3.InitialBaseFee),
 			}
 			engine = dummy.NewCoinbaseFaker()
 		)

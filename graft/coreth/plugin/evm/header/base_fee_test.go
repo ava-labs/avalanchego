@@ -1,7 +1,7 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// (c) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package dummy
+package header
 
 import (
 	"math/big"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/ap3"
 	"github.com/ava-labs/coreth/plugin/evm/ap4"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
@@ -24,23 +25,19 @@ type blockDefinition struct {
 }
 
 type test struct {
-	extraData      []byte
-	baseFee        *big.Int
-	genBlocks      func() []blockDefinition
+	blocks         []blockDefinition
 	minFee, maxFee *big.Int
 }
 
 func TestDynamicFees(t *testing.T) {
 	spacedTimestamps := []uint64{1, 1, 2, 5, 15, 120}
 
-	var tests []test = []test{
+	tests := []test{
 		// Test minimal gas usage
 		{
-			extraData: nil,
-			baseFee:   nil,
-			minFee:    big.NewInt(params.ApricotPhase3MinBaseFee),
-			maxFee:    big.NewInt(params.ApricotPhase3MaxBaseFee),
-			genBlocks: func() []blockDefinition {
+			minFee: big.NewInt(ap3.MinBaseFee),
+			maxFee: big.NewInt(ap3.MaxBaseFee),
+			blocks: func() []blockDefinition {
 				blocks := make([]blockDefinition, 0, len(spacedTimestamps))
 				for _, timestamp := range spacedTimestamps {
 					blocks = append(blocks, blockDefinition{
@@ -49,15 +46,13 @@ func TestDynamicFees(t *testing.T) {
 					})
 				}
 				return blocks
-			},
+			}(),
 		},
 		// Test overflow handling
 		{
-			extraData: nil,
-			baseFee:   nil,
-			minFee:    big.NewInt(params.ApricotPhase3MinBaseFee),
-			maxFee:    big.NewInt(params.ApricotPhase3MaxBaseFee),
-			genBlocks: func() []blockDefinition {
+			minFee: big.NewInt(ap3.MinBaseFee),
+			maxFee: big.NewInt(ap3.MaxBaseFee),
+			blocks: func() []blockDefinition {
 				blocks := make([]blockDefinition, 0, len(spacedTimestamps))
 				for _, timestamp := range spacedTimestamps {
 					blocks = append(blocks, blockDefinition{
@@ -66,48 +61,44 @@ func TestDynamicFees(t *testing.T) {
 					})
 				}
 				return blocks
-			},
+			}(),
 		},
 		{
-			extraData: nil,
-			baseFee:   nil,
-			minFee:    big.NewInt(params.ApricotPhase3MinBaseFee),
-			maxFee:    big.NewInt(params.ApricotPhase3MaxBaseFee),
-			genBlocks: func() []blockDefinition {
-				return []blockDefinition{
-					{
-						timestamp: 1,
-						gasUsed:   1_000_000,
-					},
-					{
-						timestamp: 3,
-						gasUsed:   1_000_000,
-					},
-					{
-						timestamp: 5,
-						gasUsed:   2_000_000,
-					},
-					{
-						timestamp: 5,
-						gasUsed:   6_000_000,
-					},
-					{
-						timestamp: 7,
-						gasUsed:   6_000_000,
-					},
-					{
-						timestamp: 1000,
-						gasUsed:   6_000_000,
-					},
-					{
-						timestamp: 1001,
-						gasUsed:   6_000_000,
-					},
-					{
-						timestamp: 1002,
-						gasUsed:   6_000_000,
-					},
-				}
+			minFee: big.NewInt(ap3.MinBaseFee),
+			maxFee: big.NewInt(ap3.MaxBaseFee),
+			blocks: []blockDefinition{
+				{
+					timestamp: 1,
+					gasUsed:   1_000_000,
+				},
+				{
+					timestamp: 3,
+					gasUsed:   1_000_000,
+				},
+				{
+					timestamp: 5,
+					gasUsed:   2_000_000,
+				},
+				{
+					timestamp: 5,
+					gasUsed:   6_000_000,
+				},
+				{
+					timestamp: 7,
+					gasUsed:   6_000_000,
+				},
+				{
+					timestamp: 1000,
+					gasUsed:   6_000_000,
+				},
+				{
+					timestamp: 1001,
+					gasUsed:   6_000_000,
+				},
+				{
+					timestamp: 1002,
+					gasUsed:   6_000_000,
+				},
 			},
 		},
 	}
@@ -118,22 +109,20 @@ func TestDynamicFees(t *testing.T) {
 }
 
 func testDynamicFeesStaysWithinRange(t *testing.T, test test) {
-	blocks := test.genBlocks()
+	blocks := test.blocks
 	initialBlock := blocks[0]
 	header := &types.Header{
 		Time:    initialBlock.timestamp,
 		GasUsed: initialBlock.gasUsed,
 		Number:  big.NewInt(0),
-		BaseFee: test.baseFee,
-		Extra:   test.extraData,
 	}
 
 	for index, block := range blocks[1:] {
-		nextExtraData, err := CalcExtraPrefix(params.TestApricotPhase3Config, header, block.timestamp)
+		nextExtraData, err := ExtraPrefix(params.TestApricotPhase3Config, header, block.timestamp)
 		if err != nil {
 			t.Fatalf("Failed to calculate extra prefix at index %d: %s", index, err)
 		}
-		nextBaseFee, err := CalcBaseFee(params.TestApricotPhase3Config, header, block.timestamp)
+		nextBaseFee, err := BaseFee(params.TestApricotPhase3Config, header, block.timestamp)
 		if err != nil {
 			t.Fatalf("Failed to calculate base fee at index %d: %s", index, err)
 		}
@@ -151,54 +140,6 @@ func testDynamicFeesStaysWithinRange(t *testing.T, test test) {
 			BaseFee: nextBaseFee,
 			Extra:   nextExtraData,
 		}
-	}
-}
-
-func TestSelectBigWithinBounds(t *testing.T) {
-	type test struct {
-		lower, value, upper, expected *big.Int
-	}
-
-	tests := map[string]test{
-		"value within bounds": {
-			lower:    big.NewInt(0),
-			value:    big.NewInt(5),
-			upper:    big.NewInt(10),
-			expected: big.NewInt(5),
-		},
-		"value below lower bound": {
-			lower:    big.NewInt(0),
-			value:    big.NewInt(-1),
-			upper:    big.NewInt(10),
-			expected: big.NewInt(0),
-		},
-		"value above upper bound": {
-			lower:    big.NewInt(0),
-			value:    big.NewInt(11),
-			upper:    big.NewInt(10),
-			expected: big.NewInt(10),
-		},
-		"value matches lower bound": {
-			lower:    big.NewInt(0),
-			value:    big.NewInt(0),
-			upper:    big.NewInt(10),
-			expected: big.NewInt(0),
-		},
-		"value matches upper bound": {
-			lower:    big.NewInt(0),
-			value:    big.NewInt(10),
-			upper:    big.NewInt(10),
-			expected: big.NewInt(10),
-		},
-	}
-
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			v := selectBigWithinBounds(test.lower, test.value, test.upper)
-			if v.Cmp(test.expected) != 0 {
-				t.Fatalf("Expected (%d), found (%d)", test.expected, v)
-			}
-		})
 	}
 }
 
@@ -291,9 +232,9 @@ func TestCalcBaseFeeAP4(t *testing.T) {
 
 	for index, event := range events {
 		block := event.block
-		nextExtraData, err := CalcExtraPrefix(params.TestApricotPhase4Config, header, block.timestamp)
+		nextExtraData, err := ExtraPrefix(params.TestApricotPhase4Config, header, block.timestamp)
 		assert.NoError(t, err)
-		nextBaseFee, err := CalcBaseFee(params.TestApricotPhase4Config, header, block.timestamp)
+		nextBaseFee, err := BaseFee(params.TestApricotPhase4Config, header, block.timestamp)
 		assert.NoError(t, err)
 		log.Info("Update", "baseFee", nextBaseFee)
 		header = &types.Header{
@@ -304,9 +245,9 @@ func TestCalcBaseFeeAP4(t *testing.T) {
 			Extra:   nextExtraData,
 		}
 
-		nextExtraData, err = CalcExtraPrefix(params.TestApricotPhase4Config, extDataHeader, block.timestamp)
+		nextExtraData, err = ExtraPrefix(params.TestApricotPhase4Config, extDataHeader, block.timestamp)
 		assert.NoError(t, err)
-		nextBaseFee, err = CalcBaseFee(params.TestApricotPhase4Config, extDataHeader, block.timestamp)
+		nextBaseFee, err = BaseFee(params.TestApricotPhase4Config, extDataHeader, block.timestamp)
 		assert.NoError(t, err)
 		log.Info("Update", "baseFee (w/extData)", nextBaseFee)
 		extDataHeader = &types.Header{
@@ -329,12 +270,12 @@ func TestDynamicFeesEtna(t *testing.T) {
 	}
 
 	timestamp := uint64(1)
-	extra, err := CalcExtraPrefix(params.TestEtnaChainConfig, header, timestamp)
+	extra, err := ExtraPrefix(params.TestEtnaChainConfig, header, timestamp)
 	require.NoError(err)
-	nextBaseFee, err := CalcBaseFee(params.TestEtnaChainConfig, header, timestamp)
+	nextBaseFee, err := BaseFee(params.TestEtnaChainConfig, header, timestamp)
 	require.NoError(err)
 	// Genesis matches the initial base fee
-	require.Equal(params.ApricotPhase3InitialBaseFee, nextBaseFee.Int64())
+	require.Equal(int64(ap3.InitialBaseFee), nextBaseFee.Int64())
 
 	timestamp = uint64(10_000)
 	header = &types.Header{
@@ -343,7 +284,7 @@ func TestDynamicFeesEtna(t *testing.T) {
 		BaseFee: nextBaseFee,
 		Extra:   extra,
 	}
-	nextBaseFee, err = CalcBaseFee(params.TestEtnaChainConfig, header, timestamp)
+	nextBaseFee, err = BaseFee(params.TestEtnaChainConfig, header, timestamp)
 	require.NoError(err)
 	// After some time has passed in the Etna phase, the base fee should drop
 	// lower than the prior base fee minimum.
@@ -352,17 +293,17 @@ func TestDynamicFeesEtna(t *testing.T) {
 
 func TestCalcBaseFeeRegression(t *testing.T) {
 	parentTimestamp := uint64(1)
-	timestamp := parentTimestamp + params.RollupWindow + 1000
+	timestamp := parentTimestamp + ap3.WindowLen + 1000
 
 	parentHeader := &types.Header{
 		Time:    parentTimestamp,
 		GasUsed: 14_999_999,
 		Number:  big.NewInt(1),
 		BaseFee: big.NewInt(1),
-		Extra:   make([]byte, params.DynamicFeeExtraDataSize),
+		Extra:   make([]byte, FeeWindowSize),
 	}
 
-	_, err := CalcBaseFee(params.TestChainConfig, parentHeader, timestamp)
+	_, err := BaseFee(params.TestChainConfig, parentHeader, timestamp)
 	require.NoError(t, err)
 	require.Equalf(t, 0, common.Big1.Cmp(big.NewInt(1)), "big1 should be 1, got %s", common.Big1)
 }
@@ -389,16 +330,16 @@ func TestEstimateNextBaseFee(t *testing.T) {
 			name:          "ap3",
 			upgrades:      params.TestApricotPhase3Config.NetworkUpgrades,
 			parentNumber:  1,
-			parentExtra:   (&DynamicFeeWindow{}).Bytes(),
-			parentBaseFee: big.NewInt(params.ApricotPhase3MaxBaseFee),
+			parentExtra:   feeWindowBytes(ap3.Window{}),
+			parentBaseFee: big.NewInt(ap3.MaxBaseFee),
 			timestamp:     1,
 			want: func() *big.Int {
 				const (
-					gasTarget                  = params.ApricotPhase3TargetGas
-					gasUsed                    = ApricotPhase3BlockGasFee
+					gasTarget                  = ap3.TargetGas
+					gasUsed                    = ap3.IntrinsicBlockGas
 					amountUnderTarget          = gasTarget - gasUsed
-					parentBaseFee              = params.ApricotPhase3MaxBaseFee
-					smoothingFactor            = params.ApricotPhase3BaseFeeChangeDenominator
+					parentBaseFee              = ap3.MaxBaseFee
+					smoothingFactor            = ap3.BaseFeeChangeDenominator
 					baseFeeFractionUnderTarget = amountUnderTarget * parentBaseFee / gasTarget
 					delta                      = baseFeeFractionUnderTarget / smoothingFactor
 					baseFee                    = parentBaseFee - delta
