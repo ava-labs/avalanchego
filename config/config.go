@@ -718,7 +718,6 @@ func getStakingSigner(ctx context.Context, v *viper.Viper) (bls.Signer, error) {
 	case ephemeralSignerEnabled || contentKeyIsSet || keyPathIsSet || rpcSignerURLIsSet:
 		return nil, errInvalidSignerConfig
 	default:
-
 		signer, err := localsigner.New()
 		if err != nil {
 			return nil, fmt.Errorf("couldn't generate new signing key: %w", err)
@@ -739,7 +738,6 @@ func getStakingSigner(ctx context.Context, v *viper.Viper) (bls.Signer, error) {
 
 		return signer, nil
 	}
-
 }
 
 func getStakingConfig(ctx context.Context, v *viper.Viper, networkID uint32) (node.StakingConfig, error) {
