@@ -718,29 +718,29 @@ func getStakingSigner(ctx context.Context, v *viper.Viper) (bls.Signer, error) {
 
 	case ephemeralSignerEnabled || contentKeyIsSet || keyPathIsSet || rpcSignerURLIsSet:
 		return nil, errInvalidSignerConfig
+	default:
+
+		signer, err := localsigner.New()
+		if err != nil {
+			return nil, fmt.Errorf("couldn't generate new signing key: %w", err)
+		}
+
+		if err := os.MkdirAll(filepath.Dir(signingKeyPath), perms.ReadWriteExecute); err != nil {
+			return nil, fmt.Errorf("couldn't create path for signing key at %s: %w", signingKeyPath, err)
+		}
+
+		keyBytes := signer.ToBytes()
+		if err := os.WriteFile(signingKeyPath, keyBytes, perms.ReadWrite); err != nil {
+			return nil, fmt.Errorf("couldn't write new signing key to %s: %w", signingKeyPath, err)
+		}
+
+		if err := os.Chmod(signingKeyPath, perms.ReadOnly); err != nil {
+			return nil, fmt.Errorf("couldn't restrict permissions on new signing key at %s: %w", signingKeyPath, err)
+		}
+
+		return signer, nil
 	}
 
-	// no config values explicitly set,
-
-	signer, err := localsigner.New()
-	if err != nil {
-		return nil, fmt.Errorf("couldn't generate new signing key: %w", err)
-	}
-
-	if err := os.MkdirAll(filepath.Dir(signingKeyPath), perms.ReadWriteExecute); err != nil {
-		return nil, fmt.Errorf("couldn't create path for signing key at %s: %w", signingKeyPath, err)
-	}
-
-	keyBytes := signer.ToBytes()
-	if err := os.WriteFile(signingKeyPath, keyBytes, perms.ReadWrite); err != nil {
-		return nil, fmt.Errorf("couldn't write new signing key to %s: %w", signingKeyPath, err)
-	}
-
-	if err := os.Chmod(signingKeyPath, perms.ReadOnly); err != nil {
-		return nil, fmt.Errorf("couldn't restrict permissions on new signing key at %s: %w", signingKeyPath, err)
-	}
-
-	return signer, nil
 }
 
 func getStakingConfig(ctx context.Context, v *viper.Viper, networkID uint32) (node.StakingConfig, error) {
