@@ -59,10 +59,11 @@ func TestVerifyWarpMessages(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	var (
-		sig0 = sk0.Sign(validUnsignedWarpMessage.Bytes())
-		sig1 = sk1.Sign(validUnsignedWarpMessage.Bytes())
-	)
+	sig0, err := sk0.Sign(validUnsignedWarpMessage.Bytes())
+	require.NoError(t, err)
+	sig1, err := sk1.Sign(validUnsignedWarpMessage.Bytes())
+	require.NoError(t, err)
+
 	sig, err := bls.AggregateSignatures([]*bls.Signature{sig0, sig1})
 	require.NoError(t, err)
 
