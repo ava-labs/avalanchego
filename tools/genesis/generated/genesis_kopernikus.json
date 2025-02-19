@@ -255,7 +255,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-kopernikus1nff7e6p069r3d2jcrwm8cywwlv0nur5j9jvetc",
+        "avaxAddr": "X-kopernikus17vzv0gvh9qrnnl5ym24lc2zck8lrmqwc8ruf7m",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -441,7 +441,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-kopernikus10arus5qqv8e5kj5hrx5zuyp4c7nsr24s8gwv0v",
+        "avaxAddr": "X-kopernikus18w9xl0f9wqjelw77qgafn252j3l74tzqs0hqrg",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -1174,7 +1174,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-kopernikus1nff7e6p069r3d2jcrwm8cywwlv0nur5j9jvetc",
+        "avaxAddr": "X-kopernikus17vzv0gvh9qrnnl5ym24lc2zck8lrmqwc8ruf7m",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -1260,25 +1260,25 @@
         "memo": "1155"
       },
       {
-        "alias": "X-kopernikus1nff7e6p069r3d2jcrwm8cywwlv0nur5j9jvetc",
+        "alias": "X-kopernikus17vzv0gvh9qrnnl5ym24lc2zck8lrmqwc8ruf7m",
         "addresses": [
           "X-kopernikus18pry238vq8uzzpar32wa4x4p2rkyc7wx2qnctc",
           "X-kopernikus18l0l8dz03vmk7k7y5cgax8k2l5mphj4p5k040u",
           "X-kopernikus1d0ydd4wyq670lzrp0y7xd3wej4z7ysp2surum8",
-          "X-kopernikus1h87ampd07hwtnqywpsagrxm9ygkmcr34ndjah9",
-          "X-kopernikus102uap4au55t22m797rr030wyrw0jlgw25ut8vj"
+          "X-kopernikus102uap4au55t22m797rr030wyrw0jlgw25ut8vj",
+          "X-kopernikus1h87ampd07hwtnqywpsagrxm9ygkmcr34ndjah9"
         ],
         "threshold": 2,
         "memo": "1931"
       },
       {
-        "alias": "X-kopernikus10arus5qqv8e5kj5hrx5zuyp4c7nsr24s8gwv0v",
+        "alias": "X-kopernikus18w9xl0f9wqjelw77qgafn252j3l74tzqs0hqrg",
         "addresses": [
           "X-kopernikus18pry238vq8uzzpar32wa4x4p2rkyc7wx2qnctc",
           "X-kopernikus18l0l8dz03vmk7k7y5cgax8k2l5mphj4p5k040u",
           "X-kopernikus1d0ydd4wyq670lzrp0y7xd3wej4z7ysp2surum8",
-          "X-kopernikus1h87ampd07hwtnqywpsagrxm9ygkmcr34ndjah9",
-          "X-kopernikus102uap4au55t22m797rr030wyrw0jlgw25ut8vj"
+          "X-kopernikus102uap4au55t22m797rr030wyrw0jlgw25ut8vj",
+          "X-kopernikus1h87ampd07hwtnqywpsagrxm9ygkmcr34ndjah9"
         ],
         "threshold": 2,
         "memo": "1932"
