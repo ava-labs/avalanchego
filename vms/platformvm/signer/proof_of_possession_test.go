@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 )
 
 func TestProofOfPossession(t *testing.T) {
@@ -41,7 +42,7 @@ func TestProofOfPossession(t *testing.T) {
 func TestNewProofOfPossessionDeterministic(t *testing.T) {
 	require := require.New(t)
 
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(err)
 
 	blsPOP0 := NewProofOfPossession(sk)
@@ -60,7 +61,7 @@ func BenchmarkProofOfPossessionVerify(b *testing.B) {
 }
 
 func newProofOfPossession() (*ProofOfPossession, error) {
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
 	if err != nil {
 		return nil, err
 	}

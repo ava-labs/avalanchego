@@ -5,11 +5,9 @@ module github.com/ava-labs/avalanchego
 //   - README.md
 //   - go.mod (here)
 //
-// - If updating between minor versions (e.g. 1.22.x -> 1.23.x):
+// - If updating between minor versions (e.g. 1.23.x -> 1.24.x):
 //   - Consider updating the version of golangci-lint (in scripts/lint.sh).
-go 1.23
-
-toolchain go1.23.6
+go 1.23.6
 
 require (
 	github.com/DataDog/zstd v1.5.2
@@ -198,3 +196,5 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
+
+replace github.com/ava-labs/coreth => ../coreth

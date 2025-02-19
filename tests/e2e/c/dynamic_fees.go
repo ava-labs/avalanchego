@@ -53,7 +53,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		node := privateNetwork.Nodes[0]
 		nodeURI := tmpnet.NodeURI{
 			NodeID: node.NodeID,
-			URI:    node.URI,
+			URI:    e2e.GetLocalURI(tc, node),
 		}
 		ethClient := e2e.NewEthClient(tc, nodeURI)
 

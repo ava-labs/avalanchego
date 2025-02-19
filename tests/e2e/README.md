@@ -8,10 +8,18 @@
 ```bash
 ./scripts/build.sh        # Builds avalanchego for use in deploying a test network
 ./scripts/build_xsvm.sh   # Builds xsvm for use in deploying a test network with a subnet
-./scripts/ginkgo.sh -v ./tests/e2e -- --avalanchego-path=./build/avalanchego
+./bin/ginkgo -v ./tests/e2e -- --avalanchego-path=$PWD/build/avalanchego # Note that the path given for --avalanchego-path must be an absolute and not a relative path.
 ```
 
 See [`tests.e2e.sh`](../../scripts/tests.e2e.sh) for an example.
+
+### Simplifying usage with direnv
+
+The repo includes a [.envrc](../../.envrc) that can be applied by
+[direnv](https://direnv.net/) when in a shell. This will enable
+`ginkgo` to be invoked directly (without a `./bin/` prefix ) and
+without having to specify the `--avalanchego-path` or `--plugin-dir`
+flags.
 
 ### Filtering test execution with labels
 
@@ -24,7 +32,7 @@ primarily target the X-Chain:
 
 
 ```bash
-./scripts/ginkgo.sh -v --label-filter=x ./tests/e2e -- --avalanchego-path=./build/avalanchego
+./bin/ginkgo -v --label-filter=x ./tests/e2e -- --avalanchego-path=$PWD/build/avalanchego
 ```
 
 The ginkgo docs provide further detail on [how to compose label
@@ -62,7 +70,7 @@ To enable network reuse across test runs, pass `--reuse-network` as an
 argument to the test suite:
 
 ```bash
-./scripts/gingko.sh -v ./tests/e2e -- --avalanchego-path=/path/to/avalanchego --reuse-network
+./bin/gingko -v ./tests/e2e -- --avalanchego-path=/path/to/avalanchego --reuse-network
 ```
 
 If a network is not already running the first time the suite runs with
@@ -85,7 +93,7 @@ To stop a network configured for reuse, invoke the test suite with the
 immediately without executing any tests:
 
 ```bash
-./scripts/gingko.sh -v ./tests/e2e -- --stop-network
+./bin/gingko -v ./tests/e2e -- --stop-network
 ```
 
 ## Skipping bootstrap checks
@@ -97,5 +105,5 @@ these bootstrap checks during development, set the
 `E2E_SKIP_BOOTSTRAP_CHECKS` env var to a non-empty value:
 
 ```bash
-E2E_SKIP_BOOTSTRAP_CHECKS=1 ./scripts/ginkgo.sh -v ./tests/e2e ...
+E2E_SKIP_BOOTSTRAP_CHECKS=1 ./bin/ginkgo -v ./tests/e2e ...
 ```

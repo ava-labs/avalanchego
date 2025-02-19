@@ -35,11 +35,6 @@ available. Defaults to `false`. See
 If set to `false`, this node will not expose the Info API. Defaults to `true`. See
 [here](docs.avax.network/reference/avalanchego/info-api) for more information.
 
-#### `--api-keystore-enabled` (boolean)
-
-If set to `true`, this node will expose the Keystore API. Defaults to `false`.
-See [here](docs.avax.network/reference/avalanchego/keystore-api) for more information.
-
 #### `--api-metrics-enabled` (boolean)
 
 If set to `false`, this node will not expose the Metrics API. Defaults to
@@ -826,43 +821,6 @@ Timeout before killing an unresponsive chain. Defaults to `5s`.
 Transaction fee, in nAVAX, for transactions that create new assets. Defaults to
 `10000000` nAVAX (.01 AVAX) per transaction. This can only be changed on a local
 network.
-
-#### `--create-subnet-tx-fee` (int)
-
-Transaction fee, in nAVAX, for transactions that create new Subnets. Defaults to
-`1000000000` nAVAX (1 AVAX) per transaction. This can only be changed on a local
-network.
-
-#### `--create-blockchain-tx-fee` (int)
-
-Transaction fee, in nAVAX, for transactions that create new blockchains.
-Defaults to `1000000000` nAVAX (1 AVAX) per transaction. This can only be
-changed on a local network.
-
-#### `--transform-subnet-tx-fee` (int)
-
-Transaction fee, in nAVAX, for transactions that transform Subnets. Defaults to
-`1000000000` nAVAX (1 AVAX) per transaction. This can only be changed on a local network.
-
-#### `--add-primary-network-validator-fee` (int)
-
-Transaction fee, in nAVAX, for transactions that add new primary network validators. Defaults to 0.
-This can only be changed on a local network.
-
-#### `--add-primary-network-delegator-fee` (int)
-
-Transaction fee, in nAVAX, for transactions that add new primary network delegators. Defaults to 0.
-This can only be changed on a local network.
-
-#### `--add-subnet-validator-fee` (int)
-
-Transaction fee, in nAVAX, for transactions that add new Subnet validators.
-Defaults to `10000000` nAVAX (.01 AVAX).
-
-#### `--add-subnet-delegator-fee` (int)
-
-Transaction fee, in nAVAX, for transactions that add new Subnet delegators.
-Defaults to `10000000` nAVAX (.01 AVAX).
 
 #### `--min-delegator-stake` (int)
 

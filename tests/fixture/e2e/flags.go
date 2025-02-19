@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
@@ -28,8 +29,27 @@ type FlagVars struct {
 	nodeCount            int
 }
 
-func (v *FlagVars) AvalancheGoExecPath() string {
-	return v.avalancheGoExecPath
+func (v *FlagVars) AvalancheGoExecPath() (string, error) {
+	if err := v.validateAvalancheGoExecPath(); err != nil {
+		return "", err
+	}
+	return v.avalancheGoExecPath, nil
+}
+
+func (v *FlagVars) validateAvalancheGoExecPath() error {
+	if !filepath.IsAbs(v.avalancheGoExecPath) {
+		absPath, err := filepath.Abs(v.avalancheGoExecPath)
+		if err != nil {
+			return fmt.Errorf("avalanchego-path (%s) is a relative path but its absolute path cannot be determined: %w",
+				v.avalancheGoExecPath, err)
+		}
+
+		// If the absolute path file doesn't exist, it means it won't work out of the box.
+		if _, err := os.Stat(absPath); err != nil {
+			return fmt.Errorf("avalanchego-path (%s) is a relative path but must be an absolute path", v.avalancheGoExecPath)
+		}
+	}
+	return nil
 }
 
 func (v *FlagVars) PluginDir() string {
@@ -74,7 +94,7 @@ func (v *FlagVars) NodeCount() int {
 	return v.nodeCount
 }
 
-func getEnvWithDefault(envVar, defaultVal string) string {
+func GetEnvWithDefault(envVar, defaultVal string) string {
 	val := os.Getenv(envVar)
 	if len(val) == 0 {
 		return defaultVal
@@ -96,7 +116,7 @@ func RegisterFlags() *FlagVars {
 	flag.StringVar(
 		&vars.pluginDir,
 		"plugin-dir",
-		getEnvWithDefault(tmpnet.AvalancheGoPluginDirEnvName, os.ExpandEnv("$HOME/.avalanchego/plugins")),
+		GetEnvWithDefault(tmpnet.AvalancheGoPluginDirEnvName, os.ExpandEnv("$HOME/.avalanchego/plugins")),
 		fmt.Sprintf(
 			"[optional] the dir containing VM plugins. Also possible to configure via the %s env variable.",
 			tmpnet.AvalancheGoPluginDirEnvName,

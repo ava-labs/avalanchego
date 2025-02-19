@@ -52,11 +52,10 @@ type APIConfig struct {
 	APIIndexerConfig `json:"indexerConfig"`
 
 	// Enable/Disable APIs
-	AdminAPIEnabled    bool `json:"adminAPIEnabled"`
-	InfoAPIEnabled     bool `json:"infoAPIEnabled"`
-	KeystoreAPIEnabled bool `json:"keystoreAPIEnabled"`
-	MetricsAPIEnabled  bool `json:"metricsAPIEnabled"`
-	HealthAPIEnabled   bool `json:"healthAPIEnabled"`
+	AdminAPIEnabled   bool `json:"adminAPIEnabled"`
+	InfoAPIEnabled    bool `json:"infoAPIEnabled"`
+	MetricsAPIEnabled bool `json:"metricsAPIEnabled"`
+	HealthAPIEnabled  bool `json:"healthAPIEnabled"`
 }
 
 type IPConfig struct {

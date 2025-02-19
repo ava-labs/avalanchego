@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"net/netip"
 	"os"
 	"strings"
 	"time"
@@ -332,7 +333,7 @@ func NewPChainFeeCalculatorFromContext(context *builder.Context) fee.Calculator 
 	if context.GasPrice != 0 {
 		return fee.NewDynamicCalculator(context.ComplexityWeights, context.GasPrice)
 	}
-	return fee.NewStaticCalculator(context.StaticFeeConfig)
+	return fee.NewSimpleCalculator(0)
 }
 
 // GetRepoRootPath strips the provided suffix from the current working
@@ -352,4 +353,27 @@ func GetRepoRootPath(suffix string) (string, error) {
 		return "", err
 	}
 	return strings.TrimSuffix(cwd, suffix), nil
+}
+
+// GetLocalURI retrieves the locally-accessible URI of the provided node. When a node
+// is running as a local process, this will be the URI exposed by the node. For a
+// node running remotely in kube, the URI will be a local address whose port is
+// forwarded to the node's URI through the kube API server.
+func GetLocalURI(tc tests.TestContext, node *tmpnet.Node) string {
+	uri, cancel, err := node.GetLocalURI(tc.DefaultContext())
+	require.NoError(tc, err)
+	tc.DeferCleanup(cancel)
+	return uri
+}
+
+// GetLocalStakingAddress retrieves the locally-accessible staking address of the
+// provided node. When a node is a local process, this will be the staking address
+// exposed by the node. For a node running remotely in kube, the staking address will
+// be a local address whose port will be forwarded to the node's staking address
+// through the kube API server.
+func GetLocalStakingAddress(tc tests.TestContext, node *tmpnet.Node) netip.AddrPort {
+	stakingAddress, cancel, err := node.GetLocalStakingAddress(tc.DefaultContext())
+	require.NoError(tc, err)
+	tc.DeferCleanup(cancel)
+	return stakingAddress
 }

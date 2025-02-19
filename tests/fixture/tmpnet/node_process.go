@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/netip"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -28,13 +29,14 @@ import (
 )
 
 const (
-	AvalancheGoPathEnvName      = "AVALANCHEGO_PATH"
-	AvalancheGoPluginDirEnvName = "AVALANCHEGO_PLUGIN_DIR"
+	AvalancheGoPathEnvName = "AVALANCHEGO_PATH"
 
 	defaultNodeInitTimeout = 10 * time.Second
 )
 
 var (
+	AvalancheGoPluginDirEnvName = config.EnvVarName(config.EnvPrefix, config.PluginDirKey)
+
 	errNodeAlreadyRunning = errors.New("failed to start node: node is already running")
 	errNotRunning         = errors.New("node is not running")
 )
@@ -247,6 +249,10 @@ func (p *NodeProcess) getProcess() (*os.Process, error) {
 func (p *NodeProcess) writeMonitoringConfig() error {
 	// Ensure labeling that uniquely identifies the node and its network
 	commonLabels := FlagsMap{
+		// Explicitly setting an instance label avoids the default
+		// behavior of using the node's URI since the URI isn't
+		// guaranteed stable (e.g. port may change after restart).
+		"instance":          p.node.GetUniqueID(),
 		"network_uuid":      p.node.NetworkUUID,
 		"node_id":           p.node.NodeID,
 		"is_ephemeral_node": strconv.FormatBool(p.node.IsEphemeral),
@@ -333,6 +339,14 @@ func (p *NodeProcess) writeMonitoringConfigFile(tmpnetDir string, name string, c
 	}
 
 	return nil
+}
+
+func (p *NodeProcess) GetLocalURI(_ context.Context) (string, func(), error) {
+	return p.node.URI, func() {}, nil
+}
+
+func (p *NodeProcess) GetLocalStakingAddress(_ context.Context) (netip.AddrPort, func(), error) {
+	return p.node.StakingAddress, func() {}, nil
 }
 
 // watchLogFileForFatal waits for the specified file path to exist and then checks each of

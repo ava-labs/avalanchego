@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -1450,7 +1451,7 @@ func TestDurangoMemoField(t *testing.T) {
 					chainTime = env.state.GetTimestamp()
 					endTime   = chainTime.Add(defaultMaxStakingDuration)
 				)
-				sk, err := bls.NewSigner()
+				sk, err := localsigner.New()
 				require.NoError(err)
 
 				wallet := newWallet(t, env, walletConfig{})
@@ -1765,7 +1766,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Etna, env.latestForkTime),
 				}
-				feeCalculator := state.NewStaticFeeCalculator(cfg, env.state.GetTimestamp())
+				feeCalculator := txfee.NewSimpleCalculator(0)
 				e := &standardTxExecutor{
 					backend: &Backend{
 						Config:       cfg,
@@ -2492,14 +2493,6 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 			expectedErr: errIsImmutable,
 		},
 		{
-			name: "invalid fee calculation",
-			updateExecutor: func(e *standardTxExecutor) error {
-				e.feeCalculator = txfee.NewStaticCalculator(e.backend.Config.StaticFeeConfig)
-				return nil
-			},
-			expectedErr: txfee.ErrUnsupportedTx,
-		},
-		{
 			name: "too many active validators",
 			updateExecutor: func(e *standardTxExecutor) error {
 				e.backend.Config = &config.Internal{
@@ -2547,7 +2540,7 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			sk, err := bls.NewSigner()
+			sk, err := localsigner.New()
 			require.NoError(err)
 
 			// Create the ConvertSubnetToL1Tx
@@ -2748,7 +2741,7 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create the subnet conversion
-	initialSK, err := bls.NewSigner()
+	initialSK, err := localsigner.New()
 	require.NoError(t, err)
 
 	const (
@@ -2801,7 +2794,7 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 	const weight = 1
 
 	// Create the Warp message
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 	pop := signer.NewProofOfPossession(sk)
 	pk := sk.PublicKey()
@@ -2877,14 +2870,6 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 				common.WithMemo([]byte("memo!")),
 			},
 			expectedErr: avax.ErrMemoTooLarge,
-		},
-		{
-			name: "invalid fee calculation",
-			updateExecutor: func(e *standardTxExecutor) error {
-				e.feeCalculator = txfee.NewStaticCalculator(e.backend.Config.StaticFeeConfig)
-				return nil
-			},
-			expectedErr: txfee.ErrUnsupportedTx,
 		},
 		{
 			name: "fee calculation overflow",
@@ -3278,7 +3263,7 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create the subnet conversion
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 
 	const (
@@ -3419,14 +3404,6 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 				common.WithMemo([]byte("memo!")),
 			},
 			expectedErr: avax.ErrMemoTooLarge,
-		},
-		{
-			name: "invalid fee calculation",
-			updateExecutor: func(e *standardTxExecutor) error {
-				e.feeCalculator = txfee.NewStaticCalculator(e.backend.Config.StaticFeeConfig)
-				return nil
-			},
-			expectedErr: txfee.ErrUnsupportedTx,
 		},
 		{
 			name: "insufficient fee",
@@ -3781,7 +3758,7 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create the subnet conversion
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 
 	const (
@@ -3869,14 +3846,6 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 				common.WithMemo([]byte("memo!")),
 			},
 			expectedErr: avax.ErrMemoTooLarge,
-		},
-		{
-			name: "invalid fee calculation",
-			updateExecutor: func(e *standardTxExecutor) error {
-				e.feeCalculator = txfee.NewStaticCalculator(e.backend.Config.StaticFeeConfig)
-				return nil
-			},
-			expectedErr: txfee.ErrUnsupportedTx,
 		},
 		{
 			name: "fee overflow",
@@ -4077,7 +4046,7 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create the subnet conversion
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 
 	const (
@@ -4181,15 +4150,6 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 				tx.DisableAuth.(*secp256k1fx.Input).SigIndices[0]++
 			},
 			expectedErr: errUnauthorizedModification,
-		},
-		{
-			name:         "invalid fee calculation",
-			validationID: validationID,
-			updateExecutor: func(e *standardTxExecutor) error {
-				e.feeCalculator = txfee.NewStaticCalculator(e.backend.Config.StaticFeeConfig)
-				return nil
-			},
-			expectedErr: txfee.ErrUnsupportedTx,
 		},
 		{
 			name:         "already deactivated",

@@ -13,10 +13,18 @@ set -euo pipefail
 #     $ kill -9 `cat ~/.tmpnet/promtail/run.pid` && rm ~/.tmpnet/promtail/run.pid
 
 # e.g.,
-# LOKI_ID=<id> LOKI_PASSWORD=<password> ./scripts/run_promtail.sh
+# LOKI_USERNAME=<username> LOKI_PASSWORD=<password> ./scripts/run_promtail.sh
 if ! [[ "$0" =~ scripts/run_promtail.sh ]]; then
   echo "must be run from repository root"
   exit 255
+fi
+
+CMD=promtail
+
+if ! command -v "${CMD}" &> /dev/null; then
+  echo "promtail not found, have you run 'nix develop'?"
+  echo "To install nix: https://github.com/DeterminateSystems/nix-installer?tab=readme-ov-file#install-nix"
+  exit 1
 fi
 
 PROMTAIL_WORKING_DIR="${HOME}/.tmpnet/promtail"
@@ -35,9 +43,9 @@ if [[ -z "${LOKI_URL}" ]]; then
   exit 1
 fi
 
-LOKI_ID="${LOKI_ID:-}"
-if [[ -z "${LOKI_ID}" ]]; then
-  echo "Please provide a value for LOKI_ID"
+LOKI_USERNAME="${LOKI_USERNAME:-}"
+if [[ -z "${LOKI_USERNAME}" ]]; then
+  echo "Please provide a value for LOKI_USERNAME"
   exit 1
 fi
 
@@ -45,40 +53,6 @@ LOKI_PASSWORD="${LOKI_PASSWORD:-}"
 if [[ -z "${LOKI_PASSWORD}" ]]; then
   echo "Please provide a value for LOKI_PASSWORD"
   exit 1
-fi
-
-# Version as of this writing
-VERSION="v2.9.5"
-
-# Ensure the promtail command is locally available
-CMD=promtail
-if ! command -v "${CMD}" &> /dev/null; then
-  # Try to use a local version
-  CMD="${PWD}/bin/promtail"
-  if ! command -v "${CMD}" &> /dev/null; then
-    echo "promtail not found, attempting to install..."
-    # Determine the arch
-    if which sw_vers &> /dev/null; then
-      DIST="darwin-$(uname -m)"
-    else
-      ARCH="$(uname -i)"
-      if [[ "${ARCH}" == "aarch64" ]]; then
-        ARCH="arm64"
-      elif [[ "${ARCH}" == "x86_64" ]]; then
-        ARCH="amd64"
-      fi
-      DIST="linux-${ARCH}"
-    fi
-
-    # Install the specified release
-    PROMTAIL_FILE="promtail-${DIST}"
-    ZIP_PATH="/tmp/${PROMTAIL_FILE}.zip"
-    BIN_DIR="$(dirname "${CMD}")"
-    URL="https://github.com/grafana/loki/releases/download/${VERSION}/promtail-${DIST}.zip"
-    curl -L -o "${ZIP_PATH}" "${URL}"
-    unzip "${ZIP_PATH}" -d "${BIN_DIR}"
-    mv "${BIN_DIR}/${PROMTAIL_FILE}" "${CMD}"
-  fi
 fi
 
 # Configure promtail
@@ -97,7 +71,7 @@ positions:
 client:
   url: "${LOKI_URL}/api/prom/push"
   basic_auth:
-    username: "${LOKI_ID}"
+    username: "${LOKI_USERNAME}"
     password: "${LOKI_PASSWORD}"
 
 scrape_configs:

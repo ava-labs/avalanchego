@@ -108,9 +108,8 @@ message InitializeRequest {
   bytes upgrade_bytes = 11;
   bytes config_bytes = 12;
   string db_server_addr = 13;
-  // server_addr is the address of the gRPC server which serves
-  // the messenger, keystore, shared memory, blockchain alias,
-  // subnet alias, and appSender services
+  // server_addr is the address of the gRPC server which serves the messenger,
+  // shared memory, blockchain alias, subnet alias, and appSender services
   string server_addr = 14;
   // network_upgrades_bytes is the json encoded network upgrades
   NetworkUpgrades network_upgrades = 15;
@@ -131,6 +130,7 @@ message NetworkUpgrades {
   bytes cortina_x_chain_stop_vertex_id = 12;
   google.protobuf.Timestamp durango_time = 13;
   google.protobuf.Timestamp etna_time = 14;
+  google.protobuf.Timestamp f_upgrade_time = 15;
 }
 
 message InitializeResponse {
