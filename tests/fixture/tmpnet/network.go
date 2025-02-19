@@ -843,6 +843,7 @@ func (n *Network) GetNodeURIs() []NodeURI {
 
 // Retrieves bootstrap IPs and IDs for all nodes except the skipped one (this supports
 // collecting the bootstrap details for restarting a node).
+// For consumption outside of avalanchego. Needs to be kept exported.
 func (n *Network) GetBootstrapIPsAndIDs(skippedNode *Node) ([]string, []string, error) {
 	// Collect staking addresses of non-ephemeral nodes for use in bootstrapping a node
 	nodes, err := ReadNodes(n.Dir, false /* includeEphemeral */)
@@ -882,6 +883,7 @@ func (n *Network) GetNetworkID() uint32 {
 	return n.NetworkID
 }
 
+// For consumption outside of avalanchego. Needs to be kept exported.
 func (n *Network) GetPluginDir() (string, error) {
 	return n.DefaultFlags.GetStringVal(config.PluginDirKey)
 }

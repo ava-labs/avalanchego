@@ -81,6 +81,7 @@ func (n *Network) writeNodes() error {
 	return nil
 }
 
+// For consumption outside of avalanchego. Needs to be kept exported.
 func (n *Network) GetGenesisPath() string {
 	return filepath.Join(n.Dir, "genesis.json")
 }

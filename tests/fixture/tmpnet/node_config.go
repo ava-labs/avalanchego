@@ -17,6 +17,7 @@ import (
 // The Node type is defined in this file node_config.go
 // (reading/writing configuration) and node.go (orchestration).
 
+// For consumption outside of avalanchego. Needs to be kept exported.
 func (n *Node) GetFlagsPath() string {
 	return filepath.Join(n.GetDataDir(), "flags.json")
 }
