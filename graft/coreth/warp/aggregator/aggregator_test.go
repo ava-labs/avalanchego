@@ -44,9 +44,12 @@ func TestAggregateSignatures(t *testing.T) {
 	vdr1sk, vdr1 := newValidator(t, vdrWeight)
 	vdr2sk, vdr2 := newValidator(t, vdrWeight+1)
 	vdr3sk, vdr3 := newValidator(t, vdrWeight-1)
-	sig1 := vdr1sk.Sign(unsignedMsg.Bytes())
-	sig2 := vdr2sk.Sign(unsignedMsg.Bytes())
-	sig3 := vdr3sk.Sign(unsignedMsg.Bytes())
+	sig1, err := vdr1sk.Sign(unsignedMsg.Bytes())
+	require.NoError(t, err)
+	sig2, err := vdr2sk.Sign(unsignedMsg.Bytes())
+	require.NoError(t, err)
+	sig3, err := vdr3sk.Sign(unsignedMsg.Bytes())
+	require.NoError(t, err)
 	vdrToSig := map[*avalancheWarp.Validator]*bls.Signature{
 		vdr1: sig1,
 		vdr2: sig2,
@@ -54,7 +57,8 @@ func TestAggregateSignatures(t *testing.T) {
 	}
 	nonVdrSk, err := localsigner.New()
 	require.NoError(t, err)
-	nonVdrSig := nonVdrSk.Sign(unsignedMsg.Bytes())
+	nonVdrSig, err := nonVdrSk.Sign(unsignedMsg.Bytes())
+	require.NoError(t, err)
 	vdrs := []*avalancheWarp.Validator{
 		{
 			PublicKey: vdr1.PublicKey,

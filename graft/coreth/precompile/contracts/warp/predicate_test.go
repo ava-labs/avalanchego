@@ -94,7 +94,10 @@ func init() {
 	}
 
 	for _, testVdr := range testVdrs {
-		blsSignature := testVdr.sk.Sign(unsignedMsg.Bytes())
+		blsSignature, err := testVdr.sk.Sign(unsignedMsg.Bytes())
+		if err != nil {
+			panic(err)
+		}
 		blsSignatures = append(blsSignatures, blsSignature)
 	}
 
@@ -235,13 +238,16 @@ func testWarpMessageFromPrimaryNetwork(t *testing.T, requirePrimaryNetworkSigner
 	getValidatorsOutput := make(map[ids.NodeID]*validators.GetValidatorOutput)
 	blsSignatures := make([]*bls.Signature, 0, numKeys)
 	for i := 0; i < numKeys; i++ {
+		sig, err := testVdrs[i].sk.Sign(unsignedMsg.Bytes())
+		require.NoError(err)
+
 		validatorOutput := &validators.GetValidatorOutput{
 			NodeID:    testVdrs[i].nodeID,
 			Weight:    20,
 			PublicKey: testVdrs[i].vdr.PublicKey,
 		}
 		getValidatorsOutput[testVdrs[i].nodeID] = validatorOutput
-		blsSignatures = append(blsSignatures, testVdrs[i].sk.Sign(unsignedMsg.Bytes()))
+		blsSignatures = append(blsSignatures, sig)
 	}
 	aggregateSignature, err := bls.AggregateSignatures(blsSignatures)
 	require.NoError(err)
