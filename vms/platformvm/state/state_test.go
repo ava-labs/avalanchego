@@ -532,7 +532,7 @@ func TestState_writeStakers(t *testing.T) {
 					} else {
 						require.NoError(err)
 
-						require.Equal(expectedDiff.prevPublicKey, publicKeyDiffBytes)
+						require.True(bytes.Equal(expectedDiff.prevPublicKey, publicKeyDiffBytes))
 					}
 				}
 
