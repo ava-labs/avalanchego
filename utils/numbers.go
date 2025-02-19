@@ -54,3 +54,11 @@ func BigEqualUint64(a *big.Int, b uint64) bool {
 		a.IsUint64() &&
 		a.Uint64() == b
 }
+
+// BigLessOrEqualUint64 returns true if a is less than or equal to b. If a is
+// nil or not a uint64, it returns false.
+func BigLessOrEqualUint64(a *big.Int, b uint64) bool {
+	return a != nil &&
+		a.IsUint64() &&
+		a.Uint64() <= b
+}

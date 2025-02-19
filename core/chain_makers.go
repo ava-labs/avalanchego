@@ -32,7 +32,6 @@ import (
 
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/consensus"
-	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/consensus/misc/eip4844"
 	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
@@ -40,6 +39,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/core/vm"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/plugin/evm/header"
 	"github.com/ava-labs/subnet-evm/triedb"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -374,31 +374,36 @@ func GenerateChainWithGenesis(genesis *Genesis, engine consensus.Engine, n int, 
 
 func (cm *chainMaker) makeHeader(parent *types.Block, gap uint64, state *state.StateDB, engine consensus.Engine) *types.Header {
 	time := parent.Time() + gap // block time is fixed at [gap] seconds
+	feeConfig, _, err := cm.GetFeeConfigAt(parent.Header())
+	if err != nil {
+		panic(err)
+	}
+	var gasLimit uint64
+	if cm.config.IsSubnetEVM(time) {
+		gasLimit = feeConfig.GasLimit.Uint64()
+	} else {
+		gasLimit = CalcGasLimit(parent.GasUsed(), parent.GasLimit(), parent.GasLimit(), parent.GasLimit())
+	}
+
+	extra, err := header.ExtraPrefix(cm.config, feeConfig, parent.Header(), time)
+	if err != nil {
+		panic(err)
+	}
+	baseFee, err := header.BaseFee(cm.config, feeConfig, parent.Header(), time)
+	if err != nil {
+		panic(err)
+	}
+
 	header := &types.Header{
 		Root:       state.IntermediateRoot(cm.config.IsEIP158(parent.Number())),
 		ParentHash: parent.Hash(),
 		Coinbase:   parent.Coinbase(),
 		Difficulty: engine.CalcDifficulty(cm, time, parent.Header()),
+		GasLimit:   gasLimit,
 		Number:     new(big.Int).Add(parent.Number(), common.Big1),
 		Time:       time,
-	}
-	feeConfig, _, err := cm.GetFeeConfigAt(parent.Header())
-	if err != nil {
-		panic(err)
-	}
-	if cm.config.IsSubnetEVM(time) {
-		header.GasLimit = feeConfig.GasLimit.Uint64()
-	} else {
-		header.GasLimit = CalcGasLimit(parent.GasUsed(), parent.GasLimit(), parent.GasLimit(), parent.GasLimit())
-	}
-
-	header.Extra, err = dummy.CalcExtraPrefix(cm.config, feeConfig, parent.Header(), time)
-	if err != nil {
-		panic(err)
-	}
-	header.BaseFee, err = dummy.CalcBaseFee(cm.config, feeConfig, parent.Header(), time)
-	if err != nil {
-		panic(err)
+		Extra:      extra,
+		BaseFee:    baseFee,
 	}
 
 	if cm.config.IsCancun(header.Number, header.Time) {

@@ -40,7 +40,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/subnet-evm/commontype"
-	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/consensus/misc/eip4844"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
@@ -48,6 +47,8 @@ import (
 	"github.com/ava-labs/subnet-evm/core/txpool"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/plugin/evm/header"
+	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/legacy"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/kzg4844"
@@ -114,9 +115,9 @@ func (bc *testBlockChain) CurrentBlock() *types.Header {
 			GasLimit: gasLimit,
 			GasUsed:  0,
 			BaseFee:  mid,
-			Extra:    make([]byte, params.DynamicFeeExtraDataSize),
+			Extra:    make([]byte, header.FeeWindowSize),
 		}
-		baseFee, err := dummy.CalcBaseFee(
+		baseFee, err := header.BaseFee(
 			bc.config, bc.config.FeeConfig, parent, blockTime,
 		)
 		if err != nil {
@@ -153,7 +154,7 @@ func (bc *testBlockChain) CurrentBlock() *types.Header {
 		GasLimit:      gasLimit,
 		BaseFee:       baseFee,
 		ExcessBlobGas: &excessBlobGas,
-		Extra:         make([]byte, params.DynamicFeeExtraDataSize),
+		Extra:         make([]byte, header.FeeWindowSize),
 	}
 }
 
@@ -587,7 +588,7 @@ func TestOpenDrops(t *testing.T) {
 
 	chain := &testBlockChain{
 		config:  testChainConfig,
-		basefee: uint256.NewInt(uint64(params.TestInitialBaseFee)),
+		basefee: uint256.NewInt(uint64(legacy.BaseFee)),
 		blobfee: uint256.NewInt(params.BlobTxMinBlobGasprice),
 		statedb: statedb,
 	}
@@ -706,7 +707,7 @@ func TestOpenIndex(t *testing.T) {
 
 	chain := &testBlockChain{
 		config:  testChainConfig,
-		basefee: uint256.NewInt(uint64(params.TestInitialBaseFee)),
+		basefee: uint256.NewInt(uint64(legacy.BaseFee)),
 		blobfee: uint256.NewInt(params.BlobTxMinBlobGasprice),
 		statedb: statedb,
 	}

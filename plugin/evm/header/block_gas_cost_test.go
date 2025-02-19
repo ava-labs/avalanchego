@@ -12,22 +12,30 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestBlockGasCost(t *testing.T) {
-	testFeeConfig := commontype.FeeConfig{
-		MinBlockGasCost:  big.NewInt(0),
-		MaxBlockGasCost:  big.NewInt(1_000_000),
-		TargetBlockRate:  2,
-		BlockGasCostStep: big.NewInt(50_000),
+var (
+	testFeeConfig = commontype.FeeConfig{
+		MinBlockGasCost:          big.NewInt(0),
+		MaxBlockGasCost:          big.NewInt(1_000_000),
+		TargetBlockRate:          2,
+		BlockGasCostStep:         big.NewInt(50_000),
+		TargetGas:                big.NewInt(10_000_000),
+		BaseFeeChangeDenominator: big.NewInt(12),
 	}
+
+	testFeeConfigDouble = commontype.FeeConfig{
+		MinBlockGasCost:          big.NewInt(2),
+		MaxBlockGasCost:          big.NewInt(2_000_000),
+		TargetBlockRate:          4,
+		BlockGasCostStep:         big.NewInt(100_000),
+		TargetGas:                big.NewInt(20_000_000),
+		BaseFeeChangeDenominator: big.NewInt(12),
+	}
+)
+
+func TestBlockGasCost(t *testing.T) {
 	t.Run("normal", func(t *testing.T) {
 		BlockGasCostTest(t, testFeeConfig)
 	})
-	testFeeConfigDouble := commontype.FeeConfig{
-		MinBlockGasCost:  big.NewInt(2),
-		MaxBlockGasCost:  big.NewInt(2_000_000),
-		TargetBlockRate:  4,
-		BlockGasCostStep: big.NewInt(100_000),
-	}
 	t.Run("double", func(t *testing.T) {
 		BlockGasCostTest(t, testFeeConfigDouble)
 	})
@@ -80,22 +88,9 @@ func BlockGasCostTest(t *testing.T, feeConfig commontype.FeeConfig) {
 }
 
 func TestBlockGasCostWithStep(t *testing.T) {
-	testFeeConfig := commontype.FeeConfig{
-		MinBlockGasCost:  big.NewInt(0),
-		MaxBlockGasCost:  big.NewInt(1_000_000),
-		TargetBlockRate:  2,
-		BlockGasCostStep: big.NewInt(50_000),
-	}
 	t.Run("normal", func(t *testing.T) {
 		BlockGasCostWithStepTest(t, testFeeConfig)
 	})
-
-	testFeeConfigDouble := commontype.FeeConfig{
-		MinBlockGasCost:  big.NewInt(200_000),
-		MaxBlockGasCost:  big.NewInt(2_000_000),
-		TargetBlockRate:  4,
-		BlockGasCostStep: big.NewInt(100_000),
-	}
 	t.Run("double", func(t *testing.T) {
 		BlockGasCostWithStepTest(t, testFeeConfigDouble)
 	})

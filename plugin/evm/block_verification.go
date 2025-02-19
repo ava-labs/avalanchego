@@ -13,10 +13,11 @@ import (
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/plugin/evm/header"
+	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/legacy"
 	"github.com/ava-labs/subnet-evm/trie"
 )
 
-var legacyMinGasPrice = big.NewInt(params.MinGasPrice)
+var legacyMinGasPrice = big.NewInt(legacy.BaseFee)
 
 type BlockValidator interface {
 	SyntacticVerify(b *Block, rules params.Rules) error

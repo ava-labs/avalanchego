@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/core/vm"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/legacy"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
@@ -43,7 +44,7 @@ func TestAcceptedLogsSubscription(t *testing.T) {
 		gspec   = &Genesis{
 			Config:  params.TestChainConfig,
 			Alloc:   GenesisAlloc{addr1: {Balance: funds}},
-			BaseFee: big.NewInt(params.TestInitialBaseFee),
+			BaseFee: big.NewInt(legacy.BaseFee),
 		}
 		contractAddress = crypto.CreateAddress(addr1, 0)
 		signer          = types.LatestSigner(gspec.Config)
@@ -59,13 +60,13 @@ func TestAcceptedLogsSubscription(t *testing.T) {
 		switch i {
 		case 0:
 			// First, we deploy the contract
-			contractTx := types.NewContractCreation(0, common.Big0, 200000, big.NewInt(params.TestInitialBaseFee), common.FromHex(callableBin))
+			contractTx := types.NewContractCreation(0, common.Big0, 200000, big.NewInt(legacy.BaseFee), common.FromHex(callableBin))
 			contractSignedTx, err := types.SignTx(contractTx, signer, key1)
 			require.NoError(err)
 			b.AddTx(contractSignedTx)
 		case 1:
 			// In the next block, we call the contract function
-			tx := types.NewTransaction(1, contractAddress, common.Big0, 23000, big.NewInt(params.TestInitialBaseFee), packedFunction)
+			tx := types.NewTransaction(1, contractAddress, common.Big0, 23000, big.NewInt(legacy.BaseFee), packedFunction)
 			tx, err := types.SignTx(tx, signer, key1)
 			require.NoError(err)
 			b.AddTx(tx)

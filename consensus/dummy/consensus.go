@@ -30,8 +30,6 @@ var (
 
 	errInvalidBlockTime  = errors.New("timestamp less than parent's")
 	errUnclesUnsupported = errors.New("uncles unsupported")
-	errBlockGasCostNil   = errors.New("block gas cost is nil")
-	errBaseFeeNil        = errors.New("base fee is nil")
 )
 
 type Mode struct {
@@ -158,7 +156,7 @@ func (eng *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, header
 	}
 
 	// Verify header.Extra matches the expected value.
-	expectedExtraPrefix, err := CalcExtraPrefix(config, feeConfig, parent, header.Time)
+	expectedExtraPrefix, err := customheader.ExtraPrefix(config, feeConfig, parent, header.Time)
 	if err != nil {
 		return fmt.Errorf("failed to calculate extra prefix: %w", err)
 	}
@@ -167,7 +165,7 @@ func (eng *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, header
 	}
 
 	// Verify header.BaseFee matches the expected value.
-	expectedBaseFee, err := CalcBaseFee(config, feeConfig, parent, header.Time)
+	expectedBaseFee, err := customheader.BaseFee(config, feeConfig, parent, header.Time)
 	if err != nil {
 		return fmt.Errorf("failed to calculate base fee: %w", err)
 	}

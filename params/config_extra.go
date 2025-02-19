@@ -10,7 +10,6 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ethereum/go-ethereum/common"
@@ -18,15 +17,6 @@ import (
 
 const (
 	maxJSONLen = 64 * 1024 * 1024 // 64MB
-
-	// Consensus Params
-	RollupWindow            = 10 // in seconds
-	DynamicFeeExtraDataSize = wrappers.LongLen * RollupWindow
-
-	// For legacy tests
-	MinGasPrice        int64 = 225_000_000_000
-	TestInitialBaseFee int64 = 225_000_000_000
-	TestMaxBaseFee     int64 = 225_000_000_000
 )
 
 var (

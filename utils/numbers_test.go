@@ -91,3 +91,49 @@ func TestBigEqualUint64(t *testing.T) {
 		})
 	}
 }
+
+func TestLessOrEqualUint64(t *testing.T) {
+	tests := []struct {
+		name string
+		a    *big.Int
+		b    uint64
+		want bool
+	}{
+		{
+			name: "nil",
+			a:    nil,
+			b:    0,
+			want: false,
+		},
+		{
+			name: "not_uint64",
+			a:    big.NewInt(-1),
+			b:    0,
+			want: false,
+		},
+		{
+			name: "less",
+			a:    big.NewInt(1),
+			b:    2,
+			want: true,
+		},
+		{
+			name: "equal",
+			a:    big.NewInt(1),
+			b:    1,
+			want: true,
+		},
+		{
+			name: "greater",
+			a:    big.NewInt(2),
+			b:    1,
+			want: false,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := BigLessOrEqualUint64(test.a, test.b)
+			assert.Equal(t, test.want, got)
+		})
+	}
+}

@@ -1,7 +1,7 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// (c) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package dummy
+package header
 
 import (
 	"math/big"
@@ -10,13 +10,12 @@ import (
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/subnetevm"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/stretchr/testify/require"
 )
-
-var testMinBaseFee = big.NewInt(75_000_000_000)
 
 type blockDefinition struct {
 	timestamp uint64
@@ -24,20 +23,21 @@ type blockDefinition struct {
 }
 
 type test struct {
-	baseFee   *big.Int
-	genBlocks func() []blockDefinition
-	minFee    *big.Int
+	baseFee        *big.Int
+	blocks         []blockDefinition
+	minFee, maxFee *big.Int
 }
 
 func TestDynamicFees(t *testing.T) {
+	testMinBaseFee := big.NewInt(75_000_000_000)
 	spacedTimestamps := []uint64{1, 1, 2, 5, 15, 120}
 
-	var tests []test = []test{
+	tests := []test{
 		// Test minimal gas usage
 		{
-			baseFee: nil,
-			minFee:  testMinBaseFee,
-			genBlocks: func() []blockDefinition {
+			minFee: testMinBaseFee,
+			maxFee: maxUint256,
+			blocks: func() []blockDefinition {
 				blocks := make([]blockDefinition, 0, len(spacedTimestamps))
 				for _, timestamp := range spacedTimestamps {
 					blocks = append(blocks, blockDefinition{
@@ -46,13 +46,13 @@ func TestDynamicFees(t *testing.T) {
 					})
 				}
 				return blocks
-			},
+			}(),
 		},
 		// Test overflow handling
 		{
-			baseFee: nil,
-			minFee:  testMinBaseFee,
-			genBlocks: func() []blockDefinition {
+			minFee: testMinBaseFee,
+			maxFee: maxUint256,
+			blocks: func() []blockDefinition {
 				blocks := make([]blockDefinition, 0, len(spacedTimestamps))
 				for _, timestamp := range spacedTimestamps {
 					blocks = append(blocks, blockDefinition{
@@ -61,13 +61,13 @@ func TestDynamicFees(t *testing.T) {
 					})
 				}
 				return blocks
-			},
+			}(),
 		},
 		// Test update increase handling
 		{
 			baseFee: big.NewInt(50_000_000_000),
 			minFee:  testMinBaseFee,
-			genBlocks: func() []blockDefinition {
+			blocks: func() []blockDefinition {
 				blocks := make([]blockDefinition, 0, len(spacedTimestamps))
 				for _, timestamp := range spacedTimestamps {
 					blocks = append(blocks, blockDefinition{
@@ -76,46 +76,43 @@ func TestDynamicFees(t *testing.T) {
 					})
 				}
 				return blocks
-			},
+			}(),
 		},
 		{
-			baseFee: nil,
-			minFee:  testMinBaseFee,
-			genBlocks: func() []blockDefinition {
-				return []blockDefinition{
-					{
-						timestamp: 1,
-						gasUsed:   1_000_000,
-					},
-					{
-						timestamp: 3,
-						gasUsed:   1_000_000,
-					},
-					{
-						timestamp: 5,
-						gasUsed:   2_000_000,
-					},
-					{
-						timestamp: 5,
-						gasUsed:   6_000_000,
-					},
-					{
-						timestamp: 7,
-						gasUsed:   6_000_000,
-					},
-					{
-						timestamp: 1000,
-						gasUsed:   6_000_000,
-					},
-					{
-						timestamp: 1001,
-						gasUsed:   6_000_000,
-					},
-					{
-						timestamp: 1002,
-						gasUsed:   6_000_000,
-					},
-				}
+			minFee: testMinBaseFee,
+			blocks: []blockDefinition{
+				{
+					timestamp: 1,
+					gasUsed:   1_000_000,
+				},
+				{
+					timestamp: 3,
+					gasUsed:   1_000_000,
+				},
+				{
+					timestamp: 5,
+					gasUsed:   2_000_000,
+				},
+				{
+					timestamp: 5,
+					gasUsed:   6_000_000,
+				},
+				{
+					timestamp: 7,
+					gasUsed:   6_000_000,
+				},
+				{
+					timestamp: 1000,
+					gasUsed:   6_000_000,
+				},
+				{
+					timestamp: 1001,
+					gasUsed:   6_000_000,
+				},
+				{
+					timestamp: 1002,
+					gasUsed:   6_000_000,
+				},
 			},
 		},
 	}
@@ -126,7 +123,7 @@ func TestDynamicFees(t *testing.T) {
 }
 
 func testDynamicFeesStaysWithinRange(t *testing.T, test test) {
-	blocks := test.genBlocks()
+	blocks := test.blocks
 	initialBlock := blocks[0]
 	header := &types.Header{
 		Time:    initialBlock.timestamp,
@@ -149,11 +146,11 @@ func testDynamicFeesStaysWithinRange(t *testing.T, test test) {
 			BlockGasCostStep: big.NewInt(200_000),
 		}
 
-		nextExtraData, err := CalcExtraPrefix(params.TestChainConfig, testFeeConfig, header, block.timestamp)
+		nextExtraData, err := ExtraPrefix(params.TestChainConfig, testFeeConfig, header, block.timestamp)
 		if err != nil {
 			t.Fatalf("Failed to calculate extra prefix at index %d: %s", index, err)
 		}
-		nextBaseFee, err := CalcBaseFee(params.TestChainConfig, testFeeConfig, header, block.timestamp)
+		nextBaseFee, err := BaseFee(params.TestChainConfig, testFeeConfig, header, block.timestamp)
 		if err != nil {
 			t.Fatalf("Failed to calculate base fee at index %d: %s", index, err)
 		}
@@ -171,64 +168,16 @@ func testDynamicFeesStaysWithinRange(t *testing.T, test test) {
 	}
 }
 
-func TestSelectBigWithinBounds(t *testing.T) {
-	type test struct {
-		lower, value, upper, expected *big.Int
-	}
-
-	tests := map[string]test{
-		"value within bounds": {
-			lower:    big.NewInt(0),
-			value:    big.NewInt(5),
-			upper:    big.NewInt(10),
-			expected: big.NewInt(5),
-		},
-		"value below lower bound": {
-			lower:    big.NewInt(0),
-			value:    big.NewInt(-1),
-			upper:    big.NewInt(10),
-			expected: big.NewInt(0),
-		},
-		"value above upper bound": {
-			lower:    big.NewInt(0),
-			value:    big.NewInt(11),
-			upper:    big.NewInt(10),
-			expected: big.NewInt(10),
-		},
-		"value matches lower bound": {
-			lower:    big.NewInt(0),
-			value:    big.NewInt(0),
-			upper:    big.NewInt(10),
-			expected: big.NewInt(0),
-		},
-		"value matches upper bound": {
-			lower:    big.NewInt(0),
-			value:    big.NewInt(10),
-			upper:    big.NewInt(10),
-			expected: big.NewInt(10),
-		},
-	}
-
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			v := selectBigWithinBounds(test.lower, test.value, test.upper)
-			if v.Cmp(test.expected) != 0 {
-				t.Fatalf("Expected (%d), found (%d)", test.expected, v)
-			}
-		})
-	}
-}
-
 func TestCalcBaseFeeRegression(t *testing.T) {
 	parentTimestamp := uint64(1)
-	timestamp := parentTimestamp + params.RollupWindow + 1000
+	timestamp := parentTimestamp + subnetevm.WindowLen + 1000
 
 	parentHeader := &types.Header{
 		Time:    parentTimestamp,
 		GasUsed: 1_000_000,
 		Number:  big.NewInt(1),
 		BaseFee: big.NewInt(1),
-		Extra:   make([]byte, params.DynamicFeeExtraDataSize),
+		Extra:   make([]byte, FeeWindowSize),
 	}
 
 	testFeeConfig := commontype.FeeConfig{
@@ -243,7 +192,7 @@ func TestCalcBaseFeeRegression(t *testing.T) {
 		MaxBlockGasCost:  big.NewInt(1_000_000),
 		BlockGasCostStep: big.NewInt(200_000),
 	}
-	_, err := CalcBaseFee(params.TestChainConfig, testFeeConfig, parentHeader, timestamp)
+	_, err := BaseFee(params.TestChainConfig, testFeeConfig, parentHeader, timestamp)
 	require.NoError(t, err)
 	require.Equalf(t, 0, common.Big1.Cmp(big.NewInt(1)), "big1 should be 1, got %s", common.Big1)
 }
@@ -272,7 +221,7 @@ func TestEstimateNextBaseFee(t *testing.T) {
 			name:          "activated",
 			upgrades:      params.TestSubnetEVMChainConfig.NetworkUpgrades,
 			parentNumber:  1,
-			parentExtra:   (&DynamicFeeWindow{}).Bytes(),
+			parentExtra:   feeWindowBytes(subnetevm.Window{}),
 			parentBaseFee: new(big.Int).SetUint64(testBaseFee),
 			timestamp:     1,
 			want: func() *big.Int {
