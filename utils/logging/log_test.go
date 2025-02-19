@@ -57,10 +57,10 @@ func TestWithOption(t *testing.T) {
 	testWriter := &testLogWriter{}
 	parentLogger := NewLogger("", NewWrappedCore(Info, testWriter, Plain.ConsoleEncoder()))
 
-	hookTriggered := new(bool)
+	hookTriggered := false
 
 	hook := func(_ zapcore.Entry) error {
-		*hookTriggered = true
+		hookTriggered = true
 		return nil
 	}
 
@@ -68,9 +68,9 @@ func TestWithOption(t *testing.T) {
 
 	parentLogger.Info("parent message")
 	require.Len(t, testWriter.logs, 1)
-	require.False(t, *hookTriggered)
+	require.False(t, hookTriggered)
 
 	childLogger.Info("child message")
 	require.Len(t, testWriter.logs, 2)
-	require.True(t, *hookTriggered)
+	require.True(t, hookTriggered)
 }
