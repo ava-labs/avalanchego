@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/pflag"
 	"golang.org/x/term"
@@ -52,7 +53,9 @@ func main() {
 		os.Exit(0)
 	}
 
-	nodeConfig, err := config.GetNodeConfig(context.Background(), v)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	nodeConfig, err := config.GetNodeConfig(ctx, v)
+	cancel()
 	if err != nil {
 		fmt.Printf("couldn't load node config: %s\n", err)
 		os.Exit(1)
