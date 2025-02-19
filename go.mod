@@ -13,7 +13,7 @@ require (
 	github.com/DataDog/zstd v1.5.2
 	github.com/NYTimes/gziphandler v1.1.1
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
-	github.com/ava-labs/coreth v0.13.9-0.20250218232256-11455745265b
+	github.com/ava-labs/coreth v0.14.1-rc.1.0.20250219020008-53dfaf58ba4a
 	github.com/ava-labs/ledger-avalanche/go v0.0.0-20241009183145-e6f90a8a1a60
 	github.com/ava-labs/libevm v1.13.14-0.2.0.rc.3
 	github.com/btcsuite/btcd/btcutil v1.1.3
@@ -196,5 +196,3 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
-
-replace github.com/ava-labs/coreth => ../coreth
