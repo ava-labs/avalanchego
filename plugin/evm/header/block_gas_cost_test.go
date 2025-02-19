@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/ap4"
+	"github.com/ava-labs/coreth/plugin/evm/ap5"
 	"github.com/ava-labs/coreth/utils"
 	"github.com/stretchr/testify/assert"
 )
@@ -36,7 +37,7 @@ func TestBlockGasCost(t *testing.T) {
 			parentTime:                  10,
 			parentCost:                  big.NewInt(ap4.MaxBlockGasCost),
 			timestamp:                   10 + ap4.TargetBlockRate + 1,
-			expected:                    ap4.MaxBlockGasCost - ApricotPhase5BlockGasCostStep,
+			expected:                    ap4.MaxBlockGasCost - ap5.BlockGasCostStep,
 		},
 		{
 			name:       "negative_time_elapsed",
