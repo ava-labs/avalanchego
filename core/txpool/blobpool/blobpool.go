@@ -39,13 +39,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/consensus/misc/eip4844"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/txpool"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/header"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
@@ -410,7 +410,7 @@ func (p *BlobPool) Init(gasTip uint64, head *types.Header, reserve txpool.Addres
 	for addr := range p.index {
 		p.recheck(addr, nil)
 	}
-	baseFee, err := dummy.EstimateNextBaseFee(
+	baseFee, err := header.EstimateNextBaseFee(
 		p.chain.Config(),
 		p.head,
 		uint64(time.Now().Unix()),
@@ -840,7 +840,7 @@ func (p *BlobPool) Reset(oldHead, newHead *types.Header) {
 	if p.chain.Config().IsCancun(p.head.Number, p.head.Time) {
 		p.limbo.finalize(p.chain.CurrentFinalBlock())
 	}
-	baseFeeBig, err := dummy.EstimateNextBaseFee(
+	baseFeeBig, err := header.EstimateNextBaseFee(
 		p.chain.Config(),
 		p.head,
 		uint64(time.Now().Unix()),

@@ -39,7 +39,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/coreth/consensus"
-	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/consensus/misc/eip4844"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/state"
@@ -47,6 +46,7 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/header"
 	"github.com/ava-labs/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/coreth/predicate"
 	"github.com/ethereum/go-ethereum/common"
@@ -156,22 +156,23 @@ func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateConte
 		// such that the gas limit converged to it. Since this is hardbaked now, we remove the ability to configure it.
 		gasLimit = core.CalcGasLimit(parent.GasUsed, parent.GasLimit, params.ApricotPhase1GasLimit, params.ApricotPhase1GasLimit)
 	}
+
+	extra, err := header.ExtraPrefix(w.chainConfig, parent, timestamp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate new extra prefix: %w", err)
+	}
+	baseFee, err := header.BaseFee(w.chainConfig, parent, timestamp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate new base fee: %w", err)
+	}
+
 	header := &types.Header{
 		ParentHash: parent.Hash(),
 		Number:     new(big.Int).Add(parent.Number, common.Big1),
 		GasLimit:   gasLimit,
-		Extra:      nil,
 		Time:       timestamp,
-	}
-
-	var err error
-	header.Extra, err = dummy.CalcExtraPrefix(w.chainConfig, parent, timestamp)
-	if err != nil {
-		return nil, fmt.Errorf("failed to calculate new extra prefix: %w", err)
-	}
-	header.BaseFee, err = dummy.CalcBaseFee(w.chainConfig, parent, timestamp)
-	if err != nil {
-		return nil, fmt.Errorf("failed to calculate new base fee: %w", err)
+		Extra:      extra,
+		BaseFee:    baseFee,
 	}
 
 	// Apply EIP-4844, EIP-4788.

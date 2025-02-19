@@ -42,6 +42,7 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/ap5"
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/coreth/plugin/evm/config"
+	"github.com/ava-labs/coreth/plugin/evm/header"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	"github.com/ava-labs/coreth/triedb"
 	"github.com/ava-labs/coreth/triedb/hashdb"
@@ -1581,7 +1582,7 @@ func (vm *VM) verifyTxAtTip(tx *atomic.Tx) error {
 	var nextBaseFee *big.Int
 	timestamp := uint64(vm.clock.Time().Unix())
 	if vm.chainConfig.IsApricotPhase3(timestamp) {
-		nextBaseFee, err = dummy.EstimateNextBaseFee(vm.chainConfig, parentHeader, timestamp)
+		nextBaseFee, err = header.EstimateNextBaseFee(vm.chainConfig, parentHeader, timestamp)
 		if err != nil {
 			// Return extremely detailed error since CalcBaseFee should never encounter an issue here
 			return fmt.Errorf("failed to calculate base fee with parent timestamp (%d), parent ExtraData: (0x%x), and current timestamp (%d): %w", parentHeader.Time, parentHeader.Extra, timestamp, err)
