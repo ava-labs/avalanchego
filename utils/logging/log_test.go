@@ -20,7 +20,7 @@ func (w *testLogWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-func (w *testLogWriter) Close() error {
+func (*testLogWriter) Close() error {
 	return nil
 }
 
@@ -59,7 +59,7 @@ func TestWithOption(t *testing.T) {
 
 	hookTriggered := new(bool)
 
-	hook := func(entry zapcore.Entry) error {
+	hook := func(_ zapcore.Entry) error {
 		*hookTriggered = true
 		return nil
 	}
