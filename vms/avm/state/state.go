@@ -4,8 +4,10 @@
 package state
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -29,6 +31,7 @@ const (
 
 var (
 	utxoPrefix      = []byte("utxo")
+	indexPrefix     = []byte("index")
 	txPrefix        = []byte("tx")
 	blockIDPrefix   = []byte("blockID")
 	blockPrefix     = []byte("block")
@@ -89,8 +92,12 @@ type State interface {
 	// pending changes to the base database.
 	CommitBatch() (database.Batch, error)
 
-	// Checksums returns the current TxChecksum and UTXOChecksum.
-	Checksums() (txChecksum ids.ID, utxoChecksum ids.ID)
+	// UTXOChecksum returns the current UTXO checksum.
+	UTXOChecksum(ctx context.Context) (ids.ID, error)
+
+	UTXOs() iter.Seq2[*avax.UTXO, error]
+	Txs() iter.Seq2[*txs.Tx, error]
+	Blocks() iter.Seq2[block.Block, error]
 
 	Close() error
 }
@@ -134,9 +141,6 @@ type state struct {
 	lastAccepted, persistedLastAccepted ids.ID
 	timestamp, persistedTimestamp       time.Time
 	singletonDB                         database.Database
-
-	trackChecksum bool
-	txChecksum    ids.ID
 }
 
 func New(
@@ -150,7 +154,30 @@ func New(
 	blockIDDB := prefixdb.New(blockIDPrefix, db)
 	blockDB := prefixdb.New(blockPrefix, db)
 	singletonDB := prefixdb.New(singletonPrefix, db)
+	return NewWithFormat(
+		db,
+		utxoDB,
+		txDB,
+		blockIDDB,
+		blockDB,
+		singletonDB,
+		parser,
+		metrics,
+		trackChecksums,
+	)
+}
 
+func NewWithFormat(
+	db *versiondb.Database,
+	utxoDB database.Database,
+	txDB database.Database,
+	blockIDDB database.Database,
+	blockDB database.Database,
+	singletonDB database.Database,
+	parser block.Parser,
+	metrics prometheus.Registerer,
+	trackChecksums bool,
+) (*state, error) {
 	txCache, err := metercacher.New[ids.ID, *txs.Tx](
 		"tx_cache",
 		metrics,
@@ -178,12 +205,18 @@ func New(
 		return nil, err
 	}
 
-	utxoState, err := avax.NewMeteredUTXOState(utxoDB, parser.Codec(), metrics, trackChecksums)
+	utxoState, err := avax.NewMeteredUTXOState(
+		prefixdb.New(utxoPrefix, utxoDB),
+		prefixdb.New(indexPrefix, utxoDB),
+		parser.Codec(),
+		metrics,
+		trackChecksums,
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	s := &state{
+	return &state{
 		parser: parser,
 		db:     db,
 
@@ -204,10 +237,7 @@ func New(
 		blockDB:     blockDB,
 
 		singletonDB: singletonDB,
-
-		trackChecksum: trackChecksums,
-	}
-	return s, s.initTxChecksum()
+	}, nil
 }
 
 func (s *state) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
@@ -264,7 +294,6 @@ func (s *state) GetTx(txID ids.ID) (*txs.Tx, error) {
 
 func (s *state) AddTx(tx *txs.Tx) {
 	txID := tx.ID()
-	s.updateTxChecksum(txID)
 	s.addedTxs[txID] = tx
 }
 
@@ -407,6 +436,46 @@ func (s *state) CommitBatch() (database.Batch, error) {
 	return s.db.CommitBatch()
 }
 
+func (s *state) UTXOs() iter.Seq2[*avax.UTXO, error] {
+	return s.utxoState.UTXOs()
+}
+
+func (s *state) Txs() iter.Seq2[*txs.Tx, error] {
+	return func(yield func(*txs.Tx, error) bool) {
+		itr := s.txDB.NewIterator()
+		defer itr.Release()
+
+		for itr.Next() {
+			tx, err := s.parser.ParseGenesisTx(itr.Value())
+			if err != nil {
+				return
+			}
+
+			if !yield(tx, errors.Join(err, itr.Error())) {
+				return
+			}
+		}
+	}
+}
+
+func (s *state) Blocks() iter.Seq2[block.Block, error] {
+	return func(yield func(block.Block, error) bool) {
+		itr := s.blockDB.NewIterator()
+		defer itr.Release()
+
+		for itr.Next() {
+			blk, err := s.parser.ParseBlock(itr.Value())
+			if err != nil {
+				return
+			}
+
+			if !yield(blk, errors.Join(err, itr.Error())) {
+				return
+			}
+		}
+	}
+}
+
 func (s *state) Close() error {
 	return errors.Join(
 		s.utxoDB.Close(),
@@ -500,36 +569,6 @@ func (s *state) writeMetadata() error {
 	return nil
 }
 
-func (s *state) Checksums() (ids.ID, ids.ID) {
-	return s.txChecksum, s.utxoState.Checksum()
-}
-
-func (s *state) initTxChecksum() error {
-	if !s.trackChecksum {
-		return nil
-	}
-
-	txIt := s.txDB.NewIterator()
-	defer txIt.Release()
-
-	for txIt.Next() {
-		txIDBytes := txIt.Key()
-
-		txID, err := ids.ToID(txIDBytes)
-		if err != nil {
-			return err
-		}
-
-		s.updateTxChecksum(txID)
-	}
-
-	return txIt.Error()
-}
-
-func (s *state) updateTxChecksum(modifiedID ids.ID) {
-	if !s.trackChecksum {
-		return
-	}
-
-	s.txChecksum = s.txChecksum.XOR(modifiedID)
+func (s *state) UTXOChecksum(context.Context) (ids.ID, error) {
+	return s.utxoState.Checksum(), nil
 }

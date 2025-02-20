@@ -716,3 +716,75 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	assertIndexedTX(t, env.vm.db, 0, key.PublicKey().Address(), assetID.AssetID(), tx.ID())
 	assertLatestIdx(t, env.vm.db, key.PublicKey().Address(), assetID.AssetID(), 1)
 }
+
+//// TODO test checkpointing
+//func TestStateMigration(t *testing.T) {
+//	require := require.New(t)
+//
+//	prev, err := state.New(
+//		versiondb.New(memdb.New()),
+//		parser,
+//		prometheus.NewRegistry(),
+//		false,
+//	)
+//	require.NoError(err)
+//
+//	prev.AddUTXO(populatedUTXO)
+//	prev.AddTx(populatedTx)
+//	prev.AddBlock(populatedBlk)
+//	prev.SetTimestamp(time.UnixMilli(123))
+//	prev.SetLastAccepted(ids.ID{123})
+//	require.NoError(prev.SetInitialized()) // test both true/false
+//	require.NoError(prev.Commit())
+//
+//	next, err := newGForkState(
+//		context.Background(),
+//		versiondb.New(memdb.New()),
+//		parser,
+//		prometheus.NewRegistry(),
+//		false,
+//	)
+//	require.NoError(err)
+//
+//	require.NoError(Migrate(logging.NoLog{}, prev, next, 1))
+//
+//	gotUTXO, err := next.GetUTXO(populatedUTXOID)
+//	require.NoError(err)
+//	c := cmp.DeepEqual(
+//		populatedUTXO,
+//		gotUTXO,
+//		cmpopts.EquateEmpty(),
+//		cmpopts.IgnoreUnexported(avax.UTXOID{}, secp256k1fx.OutputOwners{}),
+//	)()
+//	require.Truef(c.Success(), fmt.Sprintf("%s", c))
+//
+//	gotTx, err := next.GetTx(populatedTxID)
+//	require.NoError(err)
+//	c = cmp.DeepEqual(
+//		populatedTx,
+//		gotTx,
+//		cmpopts.EquateEmpty(),
+//		cmpopts.IgnoreUnexported(txs.Tx{}, txs.BaseTx{}),
+//	)()
+//	require.Truef(c.Success(), fmt.Sprintf("%s", c))
+//
+//	gotBlk, err := next.GetBlock(populatedBlkID)
+//	require.NoError(err)
+//	c = cmp.DeepEqual(
+//		populatedBlk,
+//		gotBlk,
+//		cmpopts.EquateEmpty(),
+//		cmpopts.IgnoreUnexported(block.StandardBlock{}, txs.Tx{}, txs.BaseTx{}),
+//	)()
+//	require.Truef(c.Success(), fmt.Sprintf("%s", c))
+//
+//	gotBlkID, err := next.GetBlockIDAtHeight(populatedBlkHeight)
+//	require.NoError(err)
+//	require.Equal(populatedBlkID, gotBlkID)
+//
+//	require.Equal(prev.GetLastAccepted(), next.GetLastAccepted())
+//	require.Equal(prev.GetTimestamp(), next.GetTimestamp())
+//	gotInitialized, err := next.IsInitialized()
+//	require.NoError(err)
+//	require.True(gotInitialized)
+//}

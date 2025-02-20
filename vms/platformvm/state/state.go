@@ -93,6 +93,7 @@ var (
 	ActivePrefix                  = []byte("active")
 	InactivePrefix                = []byte("inactive")
 	SingletonPrefix               = []byte("singleton")
+	indexPrefix                   = []byte("index")
 
 	TimestampKey         = []byte("timestamp")
 	FeeStateKey          = []byte("fee state")
@@ -639,7 +640,13 @@ func New(
 	}
 
 	utxoDB := prefixdb.New(UTXOPrefix, baseDB)
-	utxoState, err := avax.NewMeteredUTXOState(utxoDB, txs.GenesisCodec, metricsReg, execCfg.ChecksumsEnabled)
+	utxoState, err := avax.NewMeteredUTXOState(
+		prefixdb.New(UTXOPrefix, utxoDB),
+		prefixdb.New(indexPrefix, utxoDB),
+		txs.GenesisCodec,
+		metricsReg,
+		execCfg.ChecksumsEnabled,
+	)
 	if err != nil {
 		return nil, err
 	}
