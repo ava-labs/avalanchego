@@ -196,7 +196,8 @@ func New(
 		return nil, err
 	}
 
-	utxoState, err := avax.NewMeteredUTXOState(utxoDB, parser.Codec(), metrics, trackChecksums)
+	avaxUTXOState, err := avax.NewMeteredUTXOState(utxoDB, parser.Codec(),
+		metrics, trackChecksums)
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +210,10 @@ func New(
 
 		modifiedUTXOs: make(map[ids.ID]*avax.UTXO),
 		utxoDB:        utxoDB,
-		utxoState:     utxoState,
+		utxoState: utxoState{
+			UTXOState: avaxUTXOState,
+			db:        utxoDB,
+		},
 
 		addedTxs: make(map[ids.ID]*txs.Tx),
 		txCache:  txCache,
