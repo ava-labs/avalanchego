@@ -4,6 +4,7 @@
 package state
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -39,7 +40,8 @@ var (
 	timestampKey     = []byte{0x01}
 	lastAcceptedKey  = []byte{0x02}
 
-	_ State = (*state)(nil)
+	_ State          = (*state)(nil)
+	_ avax.UTXOState = (*utxoState)(nil)
 )
 
 type ReadOnlyChain interface {
@@ -91,7 +93,7 @@ type State interface {
 	CommitBatch() (database.Batch, error)
 
 	// Checksums returns the current TxChecksum and UTXOChecksum.
-	Checksums() (txChecksum ids.ID, utxoChecksum ids.ID)
+	Checksums(ctx context.Context) (txChecksum ids.ID, utxoChecksum ids.ID, err error)
 
 	Close() error
 }
@@ -509,8 +511,13 @@ func (s *state) writeMetadata() error {
 	return nil
 }
 
-func (s *state) Checksums() (ids.ID, ids.ID) {
-	return s.txChecksum, s.utxoState.Checksum()
+func (s *state) Checksums(ctx context.Context) (ids.ID, ids.ID, error) {
+	utxoChecksum, err := s.utxoState.Checksum(ctx)
+	if err != nil {
+		return ids.ID{}, ids.ID{}, err
+	}
+
+	return s.txChecksum, utxoChecksum, nil
 }
 
 func (s *state) initTxChecksum() error {
@@ -541,4 +548,13 @@ func (s *state) updateTxChecksum(modifiedID ids.ID) {
 	}
 
 	s.txChecksum = s.txChecksum.XOR(modifiedID)
+}
+
+type utxoState struct {
+	avax.UTXOState
+	db merkledb.MerkleDB
+}
+
+func (u utxoState) Checksum(ctx context.Context) (ids.ID, error) {
+	return u.db.GetMerkleRoot(ctx)
 }

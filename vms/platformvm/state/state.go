@@ -2226,7 +2226,11 @@ func (s *state) Abort() {
 }
 
 func (s *state) Checksum() ids.ID {
-	return s.utxoState.Checksum()
+	// TODO merkle-ize P-Chain state
+	// The P-Chain does not use the merkledb implementation of the state type so
+	// the context + error are guaranteed to not be used
+	checksum, _ := s.utxoState.Checksum(context.TODO())
+	return checksum
 }
 
 func (s *state) CommitBatch() (database.Batch, error) {
