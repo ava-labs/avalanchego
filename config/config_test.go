@@ -15,11 +15,10 @@ import (
 	"reflect"
 	"testing"
 
-	"google.golang.org/grpc"
-
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/ids"
