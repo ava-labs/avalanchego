@@ -4,11 +4,19 @@
   #  - run `nix develop` or use direnv (https://direnv.net/)
   #    - for quieter direnv output, set `export DIRENV_LOG_FORMAT=`
 
-  description = "AvalancheGo development environment";
+  description = "Go implementation of an Avalanche node";
 
   # Flake inputs
   inputs = {
     nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.2505.*.tar.gz";
+    flake-utils.url = "github:numtide/flake-utils";
+    gomod2nix = {
+      url = "github:maru-ava/gomod2nix?ref=cc78df101c18e6687f4e7e9d41b2d8c8d070cdb0";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        flake-utils.follows = "flake-utils";
+      };
+    };
   };
 
   # Flake outputs

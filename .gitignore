@@ -65,3 +65,6 @@ vendor
 
 # debug files
 __debug_*
+
+# Nix output dir
+result

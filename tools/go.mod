@@ -18,6 +18,7 @@ go 1.24.7
 tool (
 	github.com/go-task/task/v3/cmd/task
 	github.com/golangci/golangci-lint/v2/cmd/golangci-lint
+	github.com/maru-ava/gomod2nix
 	github.com/palantir/go-license
 	github.com/rhysd/actionlint/cmd/actionlint
 )
@@ -139,6 +140,7 @@ require (
 	github.com/manuelarte/funcorder v0.2.1 // indirect
 	github.com/maratori/testableexamples v1.0.0 // indirect
 	github.com/maratori/testpackage v1.1.1 // indirect
+	github.com/maru-ava/gomod2nix v0.0.0-20250220150906-cc78df101c18 // indirect
 	github.com/matoous/godox v1.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -155,6 +157,7 @@ require (
 	github.com/nakabonne/nestif v0.3.1 // indirect
 	github.com/nishanths/exhaustive v0.12.0 // indirect
 	github.com/nishanths/predeclared v0.2.2 // indirect
+	github.com/nix-community/go-nix v0.0.0-20220612195009-5f5614f7ca47 // indirect
 	github.com/nmiyake/pkg/errorstringer v1.1.0 // indirect
 	github.com/nunnatsa/ginkgolinter v0.19.1 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
@@ -237,6 +240,7 @@ require (
 	golang.org/x/term v0.24.0 // indirect
 	golang.org/x/text v0.24.0 // indirect
 	golang.org/x/tools v0.32.0 // indirect
+	golang.org/x/tools/go/vcs v0.1.0-deprecated // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
