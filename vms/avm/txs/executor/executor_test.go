@@ -4,13 +4,17 @@
 package executor
 
 import (
+	"context"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/trace"
+	"github.com/ava-labs/avalanchego/x/merkledb"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -45,7 +49,20 @@ func TestBaseTxExecutor(t *testing.T) {
 	db := memdb.New()
 	vdb := versiondb.New(db)
 	registerer := prometheus.NewRegistry()
-	state, err := state.New(vdb, parser, registerer, trackChecksums)
+	stateDB, err := merkledb.New(
+		context.Background(),
+		prefixdb.New([]byte("state"), vdb),
+		merkledb.NewConfig(registerer, trace.Noop),
+	)
+	require.NoError(err)
+	state, err := state.New(
+		vdb,
+		stateDB,
+		prefixdb.New([]byte("metadata"), vdb),
+		parser,
+		registerer,
+		trackChecksums,
+	)
 	require.NoError(err)
 
 	utxoID := avax.UTXOID{
@@ -152,7 +169,19 @@ func TestCreateAssetTxExecutor(t *testing.T) {
 	db := memdb.New()
 	vdb := versiondb.New(db)
 	registerer := prometheus.NewRegistry()
-	state, err := state.New(vdb, parser, registerer, trackChecksums)
+	stateDB, err := merkledb.New(
+		context.Background(),
+		prefixdb.New([]byte("state"), vdb),
+		merkledb.NewConfig(registerer, trace.Noop),
+	)
+	state, err := state.New(
+		vdb,
+		stateDB,
+		prefixdb.New([]byte("metadata"), vdb),
+		parser,
+		registerer,
+		trackChecksums,
+	)
 	require.NoError(err)
 
 	utxoID := avax.UTXOID{
@@ -297,7 +326,20 @@ func TestOperationTxExecutor(t *testing.T) {
 	db := memdb.New()
 	vdb := versiondb.New(db)
 	registerer := prometheus.NewRegistry()
-	state, err := state.New(vdb, parser, registerer, trackChecksums)
+	stateDB, err := merkledb.New(
+		context.Background(),
+		prefixdb.New([]byte("state"), vdb),
+		merkledb.NewConfig(registerer, trace.Noop),
+	)
+	require.NoError(err)
+	state, err := state.New(
+		vdb,
+		stateDB,
+		prefixdb.New([]byte("metadata"), vdb),
+		parser,
+		registerer,
+		trackChecksums,
+	)
 	require.NoError(err)
 
 	outputOwners := secp256k1fx.OutputOwners{

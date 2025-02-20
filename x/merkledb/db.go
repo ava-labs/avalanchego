@@ -159,6 +159,22 @@ type MerkleDB interface {
 	Prefetcher
 }
 
+func NewConfig(registerer prometheus.Registerer, tracer trace.Tracer) Config {
+	return Config{
+		BranchFactor:                BranchFactor16,
+		Hasher:                      DefaultHasher,
+		RootGenConcurrency:          0,
+		HistoryLength:               300,
+		ValueNodeCacheSize:          units.MiB,
+		IntermediateNodeCacheSize:   units.MiB,
+		IntermediateWriteBufferSize: units.KiB,
+		IntermediateWriteBatchSize:  256 * units.KiB,
+		Reg:                         registerer,
+		TraceLevel:                  InfoTrace,
+		Tracer:                      tracer,
+	}
+}
+
 type Config struct {
 	// BranchFactor determines the number of children each node can have.
 	BranchFactor BranchFactor

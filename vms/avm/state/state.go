@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/x/merkledb"
 )
 
 const (
@@ -111,8 +112,10 @@ type State interface {
  *   '-- lastAcceptedKey -> lastAccepted
  */
 type state struct {
-	parser block.Parser
-	db     *versiondb.Database
+	parser     block.Parser
+	db         *versiondb.Database
+	metadataDB database.Database
+	stateDB    merkledb.MerkleDB
 
 	modifiedUTXOs map[ids.ID]*avax.UTXO // map of modified UTXOID -> *UTXO if the UTXO is nil, it has been removed
 	utxoDB        database.Database
@@ -140,16 +143,18 @@ type state struct {
 }
 
 func New(
-	db *versiondb.Database,
+	versionDB *versiondb.Database,
+	stateDB merkledb.MerkleDB,
+	metadataDB database.Database,
 	parser block.Parser,
 	metrics prometheus.Registerer,
 	trackChecksums bool,
 ) (State, error) {
-	utxoDB := prefixdb.New(utxoPrefix, db)
-	txDB := prefixdb.New(txPrefix, db)
-	blockIDDB := prefixdb.New(blockIDPrefix, db)
-	blockDB := prefixdb.New(blockPrefix, db)
-	singletonDB := prefixdb.New(singletonPrefix, db)
+	utxoDB := prefixdb.New(utxoPrefix, stateDB)
+	txDB := prefixdb.New(txPrefix, metadataDB)
+	blockIDDB := prefixdb.New(blockIDPrefix, metadataDB)
+	blockDB := prefixdb.New(blockPrefix, metadataDB)
+	singletonDB := prefixdb.New(singletonPrefix, metadataDB)
 
 	txCache, err := metercacher.New[ids.ID, *txs.Tx](
 		"tx_cache",
@@ -184,8 +189,10 @@ func New(
 	}
 
 	s := &state{
-		parser: parser,
-		db:     db,
+		parser:     parser,
+		db:         versionDB,
+		metadataDB: metadataDB,
+		stateDB:    stateDB,
 
 		modifiedUTXOs: make(map[ids.ID]*avax.UTXO),
 		utxoDB:        utxoDB,
@@ -414,6 +421,8 @@ func (s *state) Close() error {
 		s.blockIDDB.Close(),
 		s.blockDB.Close(),
 		s.singletonDB.Close(),
+		s.stateDB.Close(),
+		s.metadataDB.Close(),
 		s.db.Close(),
 	)
 }

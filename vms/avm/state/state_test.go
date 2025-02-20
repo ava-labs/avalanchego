@@ -4,14 +4,18 @@
 package state
 
 import (
+	"context"
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/trace"
+	"github.com/ava-labs/avalanchego/x/merkledb"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/upgrade"
@@ -102,15 +106,37 @@ func TestState(t *testing.T) {
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
-	s, err := New(vdb, parser, prometheus.NewRegistry(), trackChecksums)
+	metadataDB := prefixdb.New([]byte("metadata"), vdb)
+	registerer := prometheus.NewRegistry()
+	stateDB, err := merkledb.New(
+		context.Background(),
+		prefixdb.New([]byte("state"), vdb),
+		merkledb.NewConfig(registerer, trace.Noop),
+	)
+	require.NoError(err)
+
+	s, err := New(
+		vdb,
+		stateDB,
+		metadataDB,
+		parser,
+		registerer,
+		trackChecksums,
+	)
 	require.NoError(err)
 
 	s.AddUTXO(populatedUTXO)
 	s.AddTx(populatedTx)
 	s.AddBlock(populatedBlk)
 	require.NoError(s.Commit())
-
-	s, err = New(vdb, parser, prometheus.NewRegistry(), trackChecksums)
+	s, err = New(
+		vdb,
+		stateDB,
+		metadataDB,
+		parser,
+		prometheus.NewRegistry(),
+		trackChecksums,
+	)
 	require.NoError(err)
 
 	ChainUTXOTest(t, s)
@@ -123,7 +149,20 @@ func TestDiff(t *testing.T) {
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
-	s, err := New(vdb, parser, prometheus.NewRegistry(), trackChecksums)
+	registerer := prometheus.NewRegistry()
+	stateDB, err := merkledb.New(
+		context.Background(),
+		prefixdb.New([]byte("state"), vdb),
+		merkledb.NewConfig(registerer, trace.Noop),
+	)
+	s, err := New(
+		vdb,
+		stateDB,
+		prefixdb.New([]byte("metadata"), vdb),
+		parser,
+		registerer,
+		trackChecksums,
+	)
 	require.NoError(err)
 
 	s.AddUTXO(populatedUTXO)
@@ -283,7 +322,21 @@ func TestInitializeChainState(t *testing.T) {
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
-	s, err := New(vdb, parser, prometheus.NewRegistry(), trackChecksums)
+	registerer := prometheus.NewRegistry()
+	stateDB, err := merkledb.New(
+		context.Background(),
+		prefixdb.New([]byte("state"), vdb),
+		merkledb.NewConfig(registerer, trace.Noop),
+	)
+	require.NoError(err)
+	s, err := New(
+		vdb,
+		stateDB,
+		prefixdb.New([]byte("metadata"), vdb),
+		parser,
+		registerer,
+		trackChecksums,
+	)
 	require.NoError(err)
 
 	stopVertexID := ids.GenerateTestID()
