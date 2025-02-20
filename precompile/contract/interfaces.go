@@ -61,7 +61,7 @@ type AccessibleState interface {
 	GetBlockContext() BlockContext
 	GetSnowContext() *snow.Context
 	GetChainConfig() precompileconfig.ChainConfig
-	Call(addr common.Address, input []byte, gas uint64, value *uint256.Int, opts ...vm.CallOption) (ret []byte, gasRemaining uint64, _ error)
+	GetPrecompileEnv() vm.PrecompileEnvironment
 }
 
 // ConfigurationBlockContext defines the interface required to configure a precompile.

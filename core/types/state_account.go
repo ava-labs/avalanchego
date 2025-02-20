@@ -46,8 +46,15 @@ var (
 
 type isMultiCoin bool
 
-var IsMultiCoinPayloads = ethtypes.RegisterExtras[isMultiCoin]()
+var (
+	extras = ethtypes.RegisterExtras[
+		ethtypes.NOOPHeaderHooks, *ethtypes.NOOPHeaderHooks,
+		ethtypes.NOOPBlockBodyHooks, *ethtypes.NOOPBlockBodyHooks,
+		isMultiCoin,
+	]()
+	IsMultiCoinPayloads = extras.StateAccount
+)
 
-func IsMultiCoin(a ethtypes.ExtraPayloadCarrier) bool {
-	return bool(IsMultiCoinPayloads.FromPayloadCarrier(a))
+func IsMultiCoin(s ethtypes.StateOrSlimAccount) bool {
+	return bool(IsMultiCoinPayloads.Get(s))
 }

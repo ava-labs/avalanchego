@@ -25,6 +25,7 @@
 "github.com/ava-labs/libevm/ethdb/pebble"
 "github.com/ava-labs/libevm/event"
 "github.com/ava-labs/libevm/libevm"
+"github.com/ava-labs/libevm/libevm/legacy"
 "github.com/ava-labs/libevm/libevm/stateconf"
 "github.com/ava-labs/libevm/log"
 "github.com/ava-labs/libevm/params"
