@@ -28,6 +28,7 @@
 "github.com/ava-labs/libevm/libevm/legacy"
 "github.com/ava-labs/libevm/libevm/stateconf"
 "github.com/ava-labs/libevm/log"
+"github.com/ava-labs/libevm/metrics"
 "github.com/ava-labs/libevm/params"
 "github.com/ava-labs/libevm/rlp"
 "github.com/ava-labs/libevm/trie"

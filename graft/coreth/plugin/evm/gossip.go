@@ -49,7 +49,7 @@ func newTxGossipHandler[T gossip.Gossipable](
 	maxMessageSize int,
 	throttlingPeriod time.Duration,
 	throttlingLimit int,
-	validators *p2p.Validators,
+	validators p2p.ValidatorSet,
 ) txGossipHandler {
 	// push gossip messages can be handled from any peer
 	handler := gossip.NewHandler(

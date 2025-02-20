@@ -5,23 +5,29 @@ package evm
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/rlp"
+	"github.com/ava-labs/libevm/trie/trienode"
 )
 
 const testCommitInterval = 100
@@ -587,6 +593,170 @@ func TestApplyToSharedMemory(t *testing.T) {
 			hasMarker, err = atomicTrie.metadataDB.Has(appliedSharedMemoryCursorKey)
 			assert.NoError(t, err)
 			assert.False(t, hasMarker)
+		})
+	}
+}
+
+func TestAtomicTrie_AcceptTrie(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		lastAcceptedRoot        common.Hash
+		lastCommittedRoot       common.Hash
+		lastCommittedHeight     uint64
+		commitInterval          uint64
+		height                  uint64
+		root                    common.Hash
+		wantHasCommitted        bool
+		wantLastCommittedHeight uint64
+		wantLastCommittedRoot   common.Hash
+		wantLastAcceptedRoot    common.Hash
+		wantTipBufferRoot       common.Hash
+		wantMetadataDBKVs       map[string]string // hex to hex
+	}{
+		"no_committing": {
+			lastAcceptedRoot:        types.EmptyRootHash,
+			lastCommittedRoot:       common.Hash{2},
+			lastCommittedHeight:     100,
+			commitInterval:          10,
+			height:                  105,
+			root:                    common.Hash{3},
+			wantLastCommittedHeight: 100,
+			wantLastCommittedRoot:   common.Hash{2},
+			wantLastAcceptedRoot:    common.Hash{3},
+			wantTipBufferRoot:       common.Hash{3},
+			wantMetadataDBKVs: map[string]string{
+				"0000000000000064":                   hex.EncodeToString(common.Hash{2}.Bytes()), // height 100
+				hex.EncodeToString(lastCommittedKey): "0000000000000064",                         // height 100
+			},
+		},
+		"no_committing_with_previous_root": {
+			lastAcceptedRoot:        common.Hash{1},
+			lastCommittedRoot:       common.Hash{2},
+			lastCommittedHeight:     100,
+			commitInterval:          10,
+			height:                  105,
+			root:                    common.Hash{3},
+			wantLastCommittedHeight: 100,
+			wantLastCommittedRoot:   common.Hash{2},
+			wantLastAcceptedRoot:    common.Hash{3},
+			wantTipBufferRoot:       common.Hash{3},
+			wantMetadataDBKVs: map[string]string{
+				"0000000000000064":                   hex.EncodeToString(common.Hash{2}.Bytes()), // height 100
+				hex.EncodeToString(lastCommittedKey): "0000000000000064",                         // height 100
+			},
+		},
+		"commit_all_up_to_height_without_height": {
+			lastAcceptedRoot:        types.EmptyRootHash,
+			lastCommittedRoot:       common.Hash{2},
+			lastCommittedHeight:     60,
+			commitInterval:          10,
+			height:                  105,
+			root:                    common.Hash{3},
+			wantHasCommitted:        true,
+			wantLastCommittedHeight: 100,
+			wantLastCommittedRoot:   types.EmptyRootHash,
+			wantLastAcceptedRoot:    common.Hash{3},
+			wantTipBufferRoot:       common.Hash{3},
+			wantMetadataDBKVs: map[string]string{
+				"000000000000003c":                   hex.EncodeToString(common.Hash{2}.Bytes()), // height 60
+				"0000000000000046":                   hex.EncodeToString(types.EmptyRootHash[:]), // height 70
+				"0000000000000050":                   hex.EncodeToString(types.EmptyRootHash[:]), // height 80
+				"000000000000005a":                   hex.EncodeToString(types.EmptyRootHash[:]), // height 90
+				"0000000000000064":                   hex.EncodeToString(types.EmptyRootHash[:]), // height 100
+				hex.EncodeToString(lastCommittedKey): "0000000000000064",                         // height 100
+			},
+		},
+		"commit_root": {
+			lastAcceptedRoot:        types.EmptyRootHash,
+			lastCommittedRoot:       common.Hash{2},
+			lastCommittedHeight:     100,
+			commitInterval:          10,
+			height:                  110,
+			root:                    common.Hash{3},
+			wantHasCommitted:        true,
+			wantLastCommittedHeight: 110,
+			wantLastCommittedRoot:   common.Hash{3},
+			wantLastAcceptedRoot:    common.Hash{3},
+			wantTipBufferRoot:       common.Hash{3},
+			wantMetadataDBKVs: map[string]string{
+				"0000000000000064":                   hex.EncodeToString(common.Hash{2}.Bytes()), // height 100
+				"000000000000006e":                   hex.EncodeToString(common.Hash{3}.Bytes()), // height 110
+				hex.EncodeToString(lastCommittedKey): "000000000000006e",                         // height 110
+			},
+		},
+		"commit_root_with_previous_root": {
+			lastAcceptedRoot:        common.Hash{1},
+			lastCommittedRoot:       common.Hash{2},
+			lastCommittedHeight:     100,
+			commitInterval:          10,
+			height:                  110,
+			root:                    common.Hash{3},
+			wantHasCommitted:        true,
+			wantLastCommittedHeight: 110,
+			wantLastCommittedRoot:   common.Hash{3},
+			wantLastAcceptedRoot:    common.Hash{3},
+			wantTipBufferRoot:       common.Hash{3},
+			wantMetadataDBKVs: map[string]string{
+				"0000000000000064":                   hex.EncodeToString(common.Hash{2}.Bytes()), // height 100
+				"000000000000006e":                   hex.EncodeToString(common.Hash{3}.Bytes()), // height 110
+				hex.EncodeToString(lastCommittedKey): "000000000000006e",                         // height 110
+			},
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			versionDB := versiondb.New(memdb.New())
+			atomicTrieDB := prefixdb.New(atomicTrieDBPrefix, versionDB)
+			metadataDB := prefixdb.New(atomicTrieMetaDBPrefix, versionDB)
+			const lastAcceptedHeight = 0 // no effect
+			atomicTrie, err := newAtomicTrie(atomicTrieDB, metadataDB, atomic.TestTxCodec,
+				lastAcceptedHeight, testCase.commitInterval)
+			require.NoError(t, err)
+			atomicTrie.lastAcceptedRoot = testCase.lastAcceptedRoot
+			if testCase.lastAcceptedRoot != types.EmptyRootHash {
+				// Generate trie node test blob
+				encoder := rlp.NewEncoderBuffer(nil)
+				offset := encoder.List()
+				encoder.WriteBytes([]byte{1})        // key
+				encoder.WriteBytes(make([]byte, 32)) // value
+				encoder.ListEnd(offset)
+				testBlob := encoder.ToBytes()
+				err := encoder.Flush()
+				require.NoError(t, err)
+
+				nodeSet := trienode.NewNodeSet(testCase.lastAcceptedRoot)
+				nodeSet.AddNode([]byte("any"), trienode.New(testCase.lastAcceptedRoot, testBlob)) // dirty node
+				err = atomicTrie.InsertTrie(nodeSet, testCase.lastAcceptedRoot)
+				require.NoError(t, err)
+
+				_, storageSize, _ := atomicTrie.trieDB.Size()
+				require.NotZero(t, storageSize, "there should be a dirty node taking up storage space")
+			}
+			atomicTrie.updateLastCommitted(testCase.lastCommittedRoot, testCase.lastCommittedHeight)
+
+			hasCommitted, err := atomicTrie.AcceptTrie(testCase.height, testCase.root)
+			require.NoError(t, err)
+
+			assert.Equal(t, testCase.wantHasCommitted, hasCommitted)
+			assert.Equal(t, testCase.wantLastCommittedHeight, atomicTrie.lastCommittedHeight)
+			assert.Equal(t, testCase.wantLastCommittedRoot, atomicTrie.lastCommittedRoot)
+			assert.Equal(t, testCase.wantLastAcceptedRoot, atomicTrie.lastAcceptedRoot)
+
+			// Check dereferencing previous dirty root inserted occurred
+			_, storageSize, _ := atomicTrie.trieDB.Size()
+			assert.Zerof(t, storageSize, "storage size should be zero after accepting the trie due to the dirty nodes derefencing but is %s", storageSize)
+
+			for wantKeyHex, wantValueHex := range testCase.wantMetadataDBKVs {
+				wantKey, err := hex.DecodeString(wantKeyHex)
+				require.NoError(t, err)
+				value, err := metadataDB.Get(wantKey)
+				assert.NoErrorf(t, err, "getting key %s from metadata database", wantKeyHex)
+				assert.Equalf(t, wantValueHex, hex.EncodeToString(value), "value for key %s", wantKeyHex)
+			}
 		})
 	}
 }

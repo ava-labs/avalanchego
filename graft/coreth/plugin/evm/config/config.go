@@ -59,6 +59,9 @@ const (
 	// - state sync time: ~6 hrs.
 	defaultStateSyncMinBlocks   = 300_000
 	DefaultStateSyncRequestSize = 1024 // the number of key/values to ask peers for per request
+
+	estimatedBlockAcceptPeriod        = 2 * time.Second
+	defaultHistoricalProofQueryWindow = uint64(24 * time.Hour / estimatedBlockAcceptPeriod)
 )
 
 var (
@@ -123,6 +126,10 @@ type Config struct {
 	PopulateMissingTries            *uint64 `json:"populate-missing-tries,omitempty"`   // Sets the starting point for re-populating missing tries. Disables re-generation if nil.
 	PopulateMissingTriesParallelism int     `json:"populate-missing-tries-parallelism"` // Number of concurrent readers to use when re-populating missing tries on startup.
 	PruneWarpDB                     bool    `json:"prune-warp-db-enabled"`              // Determines if the warpDB should be cleared on startup
+
+	// HistoricalProofQueryWindow is, when running in archive mode only, the number of blocks before the
+	// last accepted block to be accepted for proof state queries.
+	HistoricalProofQueryWindow uint64 `json:"historical-proof-query-window,omitempty"`
 
 	// Metric Settings
 	MetricsExpensiveEnabled bool `json:"metrics-expensive-enabled"` // Debug-level metrics that might impact runtime performance
@@ -288,6 +295,7 @@ func (c *Config) SetDefaults(txPoolConfig TxPoolConfig) {
 	c.StateSyncRequestSize = DefaultStateSyncRequestSize
 	c.AllowUnprotectedTxHashes = defaultAllowUnprotectedTxHashes
 	c.AcceptedCacheSize = defaultAcceptedCacheSize
+	c.HistoricalProofQueryWindow = defaultHistoricalProofQueryWindow
 }
 
 func (d *Duration) UnmarshalJSON(data []byte) (err error) {

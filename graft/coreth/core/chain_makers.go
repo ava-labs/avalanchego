@@ -392,13 +392,17 @@ func (cm *chainMaker) makeHeader(parent *types.Block, gap uint64, state *state.S
 		Number:     new(big.Int).Add(parent.Number(), common.Big1),
 		Time:       time,
 	}
-	if configExtra.IsApricotPhase3(time) {
-		var err error
-		header.Extra, header.BaseFee, err = dummy.CalcBaseFee(cm.config, parent.Header(), time)
-		if err != nil {
-			panic(err)
-		}
+
+	var err error
+	header.Extra, err = dummy.CalcExtraPrefix(cm.config, parent.Header(), time)
+	if err != nil {
+		panic(err)
 	}
+	header.BaseFee, err = dummy.CalcBaseFee(cm.config, parent.Header(), time)
+	if err != nil {
+		panic(err)
+	}
+
 	if cm.config.IsCancun(header.Number, header.Time) {
 		var (
 			parentExcessBlobGas uint64

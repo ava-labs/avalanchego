@@ -5,6 +5,7 @@ package ethapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/coreth/core"
@@ -91,4 +92,47 @@ func (s *BlockChainAPI) GetBadBlocks(ctx context.Context) ([]*BadBlockArgs, erro
 		})
 	}
 	return results, nil
+}
+
+// stateQueryBlockNumberAllowed returns a nil error if:
+//   - the node is configured to accept any state query (the query window is zero)
+//   - the block given has its number within the query window before the last accepted block.
+//     This query window is set to [core.TipBufferSize] when running in a non-archive mode.
+//
+// Otherwise, it returns a non-nil error containing block number information.
+func (s *BlockChainAPI) stateQueryBlockNumberAllowed(blockNumOrHash rpc.BlockNumberOrHash) (err error) {
+	queryWindow := uint64(core.TipBufferSize)
+	if s.b.IsArchive() {
+		queryWindow = s.b.HistoricalProofQueryWindow()
+		if queryWindow == 0 {
+			return nil
+		}
+	}
+
+	lastAcceptedNumber := s.b.LastAcceptedBlock().NumberU64()
+
+	var number uint64
+	if blockNumOrHash.BlockNumber != nil {
+		number = uint64(blockNumOrHash.BlockNumber.Int64())
+	} else if blockHash, ok := blockNumOrHash.Hash(); ok {
+		block, err := s.b.BlockByHash(context.Background(), blockHash)
+		if err != nil {
+			return fmt.Errorf("failed to get block from hash: %s", err)
+		} else if block == nil {
+			return fmt.Errorf("block from hash %s doesn't exist", blockHash)
+		}
+		number = block.NumberU64()
+	} else {
+		return errors.New("block number or hash not provided")
+	}
+
+	var oldestAllowed uint64
+	if lastAcceptedNumber > queryWindow {
+		oldestAllowed = lastAcceptedNumber - queryWindow
+	}
+	if number >= oldestAllowed {
+		return nil
+	}
+	return fmt.Errorf("block number %d is before the oldest allowed block number %d (window of %d blocks)",
+		number, oldestAllowed, queryWindow)
 }

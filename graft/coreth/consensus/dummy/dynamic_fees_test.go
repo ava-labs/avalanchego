@@ -4,95 +4,19 @@
 package dummy
 
 import (
-	"encoding/binary"
 	"math/big"
 	"testing"
 
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/params/extras"
+	"github.com/ava-labs/coreth/plugin/evm/ap4"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func testRollup(t *testing.T, longs []uint64, roll int) {
-	slice := make([]byte, len(longs)*8)
-	numLongs := len(longs)
-	for i := 0; i < numLongs; i++ {
-		binary.BigEndian.PutUint64(slice[8*i:], longs[i])
-	}
-
-	newSlice, err := rollLongWindow(slice, roll)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// numCopies is the number of longs that should have been copied over from the previous
-	// slice as opposed to being left empty.
-	numCopies := numLongs - roll
-	for i := 0; i < numLongs; i++ {
-		// Extract the long value that is encoded at position [i] in [newSlice]
-		num := binary.BigEndian.Uint64(newSlice[8*i:])
-		// If the current index is past the point where we should have copied the value
-		// over from the previous slice, assert that the value encoded in [newSlice]
-		// is 0
-		if i >= numCopies {
-			if num != 0 {
-				t.Errorf("Expected num encoded in newSlice at position %d to be 0, but found %d", i, num)
-			}
-		} else {
-			// Otherwise, check that the value was copied over correctly
-			prevIndex := i + roll
-			prevNum := longs[prevIndex]
-			if prevNum != num {
-				t.Errorf("Expected num encoded in new slice at position %d to be %d, but found %d", i, prevNum, num)
-			}
-		}
-	}
-}
-
-func TestRollupWindow(t *testing.T) {
-	type test struct {
-		longs []uint64
-		roll  int
-	}
-
-	var tests []test = []test{
-		{
-			[]uint64{1, 2, 3, 4},
-			0,
-		},
-		{
-			[]uint64{1, 2, 3, 4},
-			1,
-		},
-		{
-			[]uint64{1, 2, 3, 4},
-			2,
-		},
-		{
-			[]uint64{1, 2, 3, 4},
-			3,
-		},
-		{
-			[]uint64{1, 2, 3, 4},
-			4,
-		},
-		{
-			[]uint64{1, 2, 3, 4},
-			5,
-		},
-		{
-			[]uint64{121, 232, 432},
-			2,
-		},
-	}
-
-	for _, test := range tests {
-		testRollup(t, test.longs, test.roll)
-	}
-}
 
 type blockDefinition struct {
 	timestamp      uint64
@@ -206,7 +130,11 @@ func testDynamicFeesStaysWithinRange(t *testing.T, test test) {
 	}
 
 	for index, block := range blocks[1:] {
-		nextExtraData, nextBaseFee, err := CalcBaseFee(params.TestApricotPhase3Config, header, block.timestamp)
+		nextExtraData, err := CalcExtraPrefix(params.TestApricotPhase3Config, header, block.timestamp)
+		if err != nil {
+			t.Fatalf("Failed to calculate extra prefix at index %d: %s", index, err)
+		}
+		nextBaseFee, err := CalcBaseFee(params.TestApricotPhase3Config, header, block.timestamp)
 		if err != nil {
 			t.Fatalf("Failed to calculate base fee at index %d: %s", index, err)
 		}
@@ -223,53 +151,6 @@ func testDynamicFeesStaysWithinRange(t *testing.T, test test) {
 			Number:  big.NewInt(int64(index) + 1),
 			BaseFee: nextBaseFee,
 			Extra:   nextExtraData,
-		}
-	}
-}
-
-func TestLongWindow(t *testing.T) {
-	longs := []uint64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
-	sumLongs := uint64(0)
-	longWindow := make([]byte, 10*8)
-	for i, long := range longs {
-		sumLongs = sumLongs + long
-		binary.BigEndian.PutUint64(longWindow[i*8:], long)
-	}
-
-	sum := sumLongWindow(longWindow, 10)
-	if sum != sumLongs {
-		t.Fatalf("Expected sum to be %d but found %d", sumLongs, sum)
-	}
-
-	for i := uint64(0); i < 10; i++ {
-		updateLongWindow(longWindow, i*8, i)
-		sum = sumLongWindow(longWindow, 10)
-		sumLongs += i
-
-		if sum != sumLongs {
-			t.Fatalf("Expected sum to be %d but found %d (iteration: %d)", sumLongs, sum, i)
-		}
-	}
-}
-
-func TestLongWindowOverflow(t *testing.T) {
-	longs := []uint64{0, 0, 0, 0, 0, 0, 0, 0, 2, math.MaxUint64 - 1}
-	longWindow := make([]byte, 10*8)
-	for i, long := range longs {
-		binary.BigEndian.PutUint64(longWindow[i*8:], long)
-	}
-
-	sum := sumLongWindow(longWindow, 10)
-	if sum != math.MaxUint64 {
-		t.Fatalf("Expected sum to be maxUint64 (%d), but found %d", uint64(math.MaxUint64), sum)
-	}
-
-	for i := uint64(0); i < 10; i++ {
-		updateLongWindow(longWindow, i*8, i)
-		sum = sumLongWindow(longWindow, 10)
-
-		if sum != math.MaxUint64 {
-			t.Fatalf("Expected sum to be maxUint64 (%d), but found %d", uint64(math.MaxUint64), sum)
 		}
 	}
 }
@@ -411,7 +292,9 @@ func TestCalcBaseFeeAP4(t *testing.T) {
 
 	for index, event := range events {
 		block := event.block
-		nextExtraData, nextBaseFee, err := CalcBaseFee(params.TestApricotPhase4Config, header, block.timestamp)
+		nextExtraData, err := CalcExtraPrefix(params.TestApricotPhase4Config, header, block.timestamp)
+		assert.NoError(t, err)
+		nextBaseFee, err := CalcBaseFee(params.TestApricotPhase4Config, header, block.timestamp)
 		assert.NoError(t, err)
 		log.Info("Update", "baseFee", nextBaseFee)
 		header = &types.Header{
@@ -422,7 +305,9 @@ func TestCalcBaseFeeAP4(t *testing.T) {
 			Extra:   nextExtraData,
 		}
 
-		nextExtraData, nextBaseFee, err = CalcBaseFee(params.TestApricotPhase4Config, extDataHeader, block.timestamp)
+		nextExtraData, err = CalcExtraPrefix(params.TestApricotPhase4Config, extDataHeader, block.timestamp)
+		assert.NoError(t, err)
+		nextBaseFee, err = CalcBaseFee(params.TestApricotPhase4Config, extDataHeader, block.timestamp)
 		assert.NoError(t, err)
 		log.Info("Update", "baseFee (w/extData)", nextBaseFee)
 		extDataHeader = &types.Header{
@@ -438,108 +323,6 @@ func TestCalcBaseFeeAP4(t *testing.T) {
 	}
 }
 
-func TestCalcBlockGasCost(t *testing.T) {
-	tests := map[string]struct {
-		parentBlockGasCost      *big.Int
-		parentTime, currentTime uint64
-
-		expected *big.Int
-	}{
-		"Nil parentBlockGasCost": {
-			parentBlockGasCost: nil,
-			parentTime:         1,
-			currentTime:        1,
-			expected:           ApricotPhase4MinBlockGasCost,
-		},
-		"Same timestamp from 0": {
-			parentBlockGasCost: big.NewInt(0),
-			parentTime:         1,
-			currentTime:        1,
-			expected:           big.NewInt(100_000),
-		},
-		"1s from 0": {
-			parentBlockGasCost: big.NewInt(0),
-			parentTime:         1,
-			currentTime:        2,
-			expected:           big.NewInt(50_000),
-		},
-		"Same timestamp from non-zero": {
-			parentBlockGasCost: big.NewInt(50_000),
-			parentTime:         1,
-			currentTime:        1,
-			expected:           big.NewInt(150_000),
-		},
-		"0s Difference (MAX)": {
-			parentBlockGasCost: big.NewInt(1_000_000),
-			parentTime:         1,
-			currentTime:        1,
-			expected:           big.NewInt(1_000_000),
-		},
-		"1s Difference (MAX)": {
-			parentBlockGasCost: big.NewInt(1_000_000),
-			parentTime:         1,
-			currentTime:        2,
-			expected:           big.NewInt(1_000_000),
-		},
-		"2s Difference": {
-			parentBlockGasCost: big.NewInt(900_000),
-			parentTime:         1,
-			currentTime:        3,
-			expected:           big.NewInt(900_000),
-		},
-		"3s Difference": {
-			parentBlockGasCost: big.NewInt(1_000_000),
-			parentTime:         1,
-			currentTime:        4,
-			expected:           big.NewInt(950_000),
-		},
-		"10s Difference": {
-			parentBlockGasCost: big.NewInt(1_000_000),
-			parentTime:         1,
-			currentTime:        11,
-			expected:           big.NewInt(600_000),
-		},
-		"20s Difference": {
-			parentBlockGasCost: big.NewInt(1_000_000),
-			parentTime:         1,
-			currentTime:        21,
-			expected:           big.NewInt(100_000),
-		},
-		"22s Difference": {
-			parentBlockGasCost: big.NewInt(1_000_000),
-			parentTime:         1,
-			currentTime:        23,
-			expected:           big.NewInt(0),
-		},
-		"23s Difference": {
-			parentBlockGasCost: big.NewInt(1_000_000),
-			parentTime:         1,
-			currentTime:        24,
-			expected:           big.NewInt(0),
-		},
-		"-1s Difference": {
-			parentBlockGasCost: big.NewInt(50_000),
-			parentTime:         1,
-			currentTime:        0,
-			expected:           big.NewInt(150_000),
-		},
-	}
-
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			assert.Zero(t, test.expected.Cmp(calcBlockGasCost(
-				ApricotPhase4TargetBlockRate,
-				ApricotPhase4MinBlockGasCost,
-				ApricotPhase4MaxBlockGasCost,
-				ApricotPhase4BlockGasCostStep,
-				test.parentBlockGasCost,
-				test.parentTime,
-				test.currentTime,
-			)))
-		})
-	}
-}
-
 func TestDynamicFeesEtna(t *testing.T) {
 	require := require.New(t)
 	header := &types.Header{
@@ -547,7 +330,9 @@ func TestDynamicFeesEtna(t *testing.T) {
 	}
 
 	timestamp := uint64(1)
-	extra, nextBaseFee, err := CalcBaseFee(params.TestEtnaChainConfig, header, timestamp)
+	extra, err := CalcExtraPrefix(params.TestEtnaChainConfig, header, timestamp)
+	require.NoError(err)
+	nextBaseFee, err := CalcBaseFee(params.TestEtnaChainConfig, header, timestamp)
 	require.NoError(err)
 	// Genesis matches the initial base fee
 	require.Equal(params.ApricotPhase3InitialBaseFee, nextBaseFee.Int64())
@@ -559,11 +344,11 @@ func TestDynamicFeesEtna(t *testing.T) {
 		BaseFee: nextBaseFee,
 		Extra:   extra,
 	}
-	_, nextBaseFee, err = CalcBaseFee(params.TestEtnaChainConfig, header, timestamp)
+	nextBaseFee, err = CalcBaseFee(params.TestEtnaChainConfig, header, timestamp)
 	require.NoError(err)
 	// After some time has passed in the Etna phase, the base fee should drop
 	// lower than the prior base fee minimum.
-	require.Less(nextBaseFee.Int64(), params.ApricotPhase4MinBaseFee)
+	require.Less(nextBaseFee.Int64(), int64(ap4.MinBaseFee))
 }
 
 func TestCalcBaseFeeRegression(t *testing.T) {
@@ -578,7 +363,77 @@ func TestCalcBaseFeeRegression(t *testing.T) {
 		Extra:   make([]byte, params.DynamicFeeExtraDataSize),
 	}
 
-	_, _, err := CalcBaseFee(params.TestChainConfig, parentHeader, timestamp)
+	_, err := CalcBaseFee(params.TestChainConfig, parentHeader, timestamp)
 	require.NoError(t, err)
 	require.Equalf(t, 0, common.Big1.Cmp(big.NewInt(1)), "big1 should be 1, got %s", common.Big1)
+}
+
+func TestEstimateNextBaseFee(t *testing.T) {
+	tests := []struct {
+		name string
+
+		upgrades extras.NetworkUpgrades
+
+		parentTime           uint64
+		parentNumber         int64
+		parentExtra          []byte
+		parentBaseFee        *big.Int
+		parentGasUsed        uint64
+		parentExtDataGasUsed *big.Int
+
+		timestamp uint64
+
+		want    *big.Int
+		wantErr error
+	}{
+		{
+			name:          "ap3",
+			upgrades:      params.GetExtra(params.TestApricotPhase3Config).NetworkUpgrades,
+			parentNumber:  1,
+			parentExtra:   (&DynamicFeeWindow{}).Bytes(),
+			parentBaseFee: big.NewInt(params.ApricotPhase3MaxBaseFee),
+			timestamp:     1,
+			want: func() *big.Int {
+				const (
+					gasTarget                  = params.ApricotPhase3TargetGas
+					gasUsed                    = ApricotPhase3BlockGasFee
+					amountUnderTarget          = gasTarget - gasUsed
+					parentBaseFee              = params.ApricotPhase3MaxBaseFee
+					smoothingFactor            = params.ApricotPhase3BaseFeeChangeDenominator
+					baseFeeFractionUnderTarget = amountUnderTarget * parentBaseFee / gasTarget
+					delta                      = baseFeeFractionUnderTarget / smoothingFactor
+					baseFee                    = parentBaseFee - delta
+				)
+				return big.NewInt(baseFee)
+			}(),
+		},
+		{
+			name:     "ap3_not_scheduled",
+			upgrades: params.GetExtra(params.TestApricotPhase2Config).NetworkUpgrades,
+			wantErr:  errEstimateBaseFeeWithoutActivation,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			config := params.WithExtra(
+				&params.ChainConfig{},
+				&extras.ChainConfig{
+					NetworkUpgrades: test.upgrades,
+				})
+			parentHeader := &types.Header{
+				Time:           test.parentTime,
+				Number:         big.NewInt(test.parentNumber),
+				Extra:          test.parentExtra,
+				BaseFee:        test.parentBaseFee,
+				GasUsed:        test.parentGasUsed,
+				ExtDataGasUsed: test.parentExtDataGasUsed,
+			}
+
+			got, err := EstimateNextBaseFee(config, parentHeader, test.timestamp)
+			require.ErrorIs(err, test.wantErr)
+			require.Equal(test.want, got)
+		})
+	}
 }

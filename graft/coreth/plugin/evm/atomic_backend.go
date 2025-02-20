@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
-	syncclient "github.com/ava-labs/coreth/sync/client"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/log"
 )
@@ -56,10 +55,6 @@ type AtomicBackend interface {
 	// from [previousLastAcceptedHeight+1] to the [lastAcceptedHeight] set by state sync
 	// will not have been executed on shared memory.
 	MarkApplyToSharedMemoryCursor(previousLastAcceptedHeight uint64) error
-
-	// Syncer creates and returns a new Syncer object that can be used to sync the
-	// state of the atomic trie from peers
-	Syncer(client syncclient.LeafClient, targetRoot common.Hash, targetHeight uint64, requestSize uint16) (Syncer, error)
 
 	// SetLastAccepted is used after state-sync to reset the last accepted block.
 	SetLastAccepted(lastAcceptedHash common.Hash)
@@ -354,12 +349,6 @@ func (a *atomicBackend) MarkApplyToSharedMemoryCursor(previousLastAcceptedHeight
 	// Set the cursor to [previousLastAcceptedHeight+1] so that we begin the iteration at the
 	// first item that has not been applied to shared memory.
 	return database.PutUInt64(a.metadataDB, appliedSharedMemoryCursorKey, previousLastAcceptedHeight+1)
-}
-
-// Syncer creates and returns a new Syncer object that can be used to sync the
-// state of the atomic trie from peers
-func (a *atomicBackend) Syncer(client syncclient.LeafClient, targetRoot common.Hash, targetHeight uint64, requestSize uint16) (Syncer, error) {
-	return newAtomicSyncer(client, a, targetRoot, targetHeight, requestSize)
 }
 
 func (a *atomicBackend) GetVerifiedAtomicState(blockHash common.Hash) (AtomicState, error) {

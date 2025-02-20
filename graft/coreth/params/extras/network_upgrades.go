@@ -41,6 +41,9 @@ type NetworkUpgrades struct {
 	// Note: EIP-4844 BlobTxs are not enabled in the mempool and blocks are not
 	// allowed to contain them. For details see https://github.com/avalanche-foundation/ACPs/pull/131
 	EtnaTimestamp *uint64 `json:"etnaTimestamp,omitempty"`
+	// FUpgrade is a placeholder for the next upgrade.
+	// (nil = no fork, 0 = already activated)
+	FUpgradeTimestamp *uint64 `json:"fUpgradeTimestamp,omitempty"`
 }
 
 func (n *NetworkUpgrades) Equal(other *NetworkUpgrades) bool {
@@ -84,6 +87,9 @@ func (n *NetworkUpgrades) checkNetworkUpgradesCompatible(newcfg *NetworkUpgrades
 	if isForkTimestampIncompatible(n.EtnaTimestamp, newcfg.EtnaTimestamp, time) {
 		return newTimestampCompatError("Etna fork block timestamp", n.EtnaTimestamp, newcfg.EtnaTimestamp)
 	}
+	if isForkTimestampIncompatible(n.FUpgradeTimestamp, newcfg.FUpgradeTimestamp, time) {
+		return newTimestampCompatError("F-Upgrade fork block timestamp", n.FUpgradeTimestamp, newcfg.FUpgradeTimestamp)
+	}
 
 	return nil
 }
@@ -102,6 +108,7 @@ func (n *NetworkUpgrades) forkOrder() []fork {
 		{name: "cortinaBlockTimestamp", timestamp: n.CortinaBlockTimestamp},
 		{name: "durangoBlockTimestamp", timestamp: n.DurangoBlockTimestamp},
 		{name: "etnaTimestamp", timestamp: n.EtnaTimestamp},
+		{name: "fUpgradeTimestamp", timestamp: n.FUpgradeTimestamp},
 	}
 }
 
@@ -177,6 +184,12 @@ func (n NetworkUpgrades) IsEtna(time uint64) bool {
 	return isTimestampForked(n.EtnaTimestamp, time)
 }
 
+// IsFUpgrade returns whether [time] represents a block
+// with a timestamp after the F upgrade time.
+func (n *NetworkUpgrades) IsFUpgrade(time uint64) bool {
+	return isTimestampForked(n.FUpgradeTimestamp, time)
+}
+
 func (n NetworkUpgrades) Description() string {
 	var banner string
 	banner += fmt.Sprintf(" - Apricot Phase 1 Timestamp:        @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.3.0)\n", ptrToString(n.ApricotPhase1BlockTimestamp))
@@ -190,7 +203,8 @@ func (n NetworkUpgrades) Description() string {
 	banner += fmt.Sprintf(" - Banff Timestamp:                  @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0)\n", ptrToString(n.BanffBlockTimestamp))
 	banner += fmt.Sprintf(" - Cortina Timestamp:                @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0)\n", ptrToString(n.CortinaBlockTimestamp))
 	banner += fmt.Sprintf(" - Durango Timestamp:                @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0)\n", ptrToString(n.DurangoBlockTimestamp))
-	banner += fmt.Sprintf(" - Etna Timestamp:               @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0)\n", ptrToString(n.EtnaTimestamp))
+	banner += fmt.Sprintf(" - Etna Timestamp:                   @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0)\n", ptrToString(n.EtnaTimestamp))
+	banner += fmt.Sprintf(" - F-Upgrade Timestamp:              @%-10v (Unscheduled)\n", ptrToString(n.FUpgradeTimestamp))
 	return banner
 }
 
@@ -208,6 +222,7 @@ func GetNetworkUpgrades(agoUpgrade upgrade.Config) NetworkUpgrades {
 		CortinaBlockTimestamp:           utils.TimeToNewUint64(agoUpgrade.CortinaTime),
 		DurangoBlockTimestamp:           utils.TimeToNewUint64(agoUpgrade.DurangoTime),
 		EtnaTimestamp:                   utils.TimeToNewUint64(agoUpgrade.EtnaTime),
+		FUpgradeTimestamp:               utils.TimeToNewUint64(agoUpgrade.FUpgradeTime),
 	}
 }
 
@@ -218,6 +233,7 @@ type AvalancheRules struct {
 	IsCortina                                                                           bool
 	IsDurango                                                                           bool
 	IsEtna                                                                              bool
+	IsFUpgrade                                                                          bool
 }
 
 func (n *NetworkUpgrades) GetAvalancheRules(timestamp uint64) AvalancheRules {
@@ -234,5 +250,6 @@ func (n *NetworkUpgrades) GetAvalancheRules(timestamp uint64) AvalancheRules {
 		IsCortina:           n.IsCortina(timestamp),
 		IsDurango:           n.IsDurango(timestamp),
 		IsEtna:              n.IsEtna(timestamp),
+		IsFUpgrade:          n.IsFUpgrade(timestamp),
 	}
 }
