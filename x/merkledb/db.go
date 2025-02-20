@@ -159,7 +159,7 @@ type MerkleDB interface {
 	Prefetcher
 }
 
-func NewConfig(registerer prometheus.Registerer, tracer trace.Tracer) Config {
+func NewConfig() Config {
 	return Config{
 		BranchFactor:                BranchFactor16,
 		Hasher:                      DefaultHasher,
@@ -169,9 +169,7 @@ func NewConfig(registerer prometheus.Registerer, tracer trace.Tracer) Config {
 		IntermediateNodeCacheSize:   units.MiB,
 		IntermediateWriteBufferSize: units.KiB,
 		IntermediateWriteBatchSize:  256 * units.KiB,
-		Reg:                         registerer,
-		TraceLevel:                  InfoTrace,
-		Tracer:                      tracer,
+		TraceLevel:                  NoTrace,
 	}
 }
 
@@ -260,8 +258,13 @@ type merkleDB struct {
 }
 
 // New returns a new merkle database.
-func New(ctx context.Context, db database.Database, config Config) (MerkleDB, error) {
-	metrics, err := newMetrics("merkledb", config.Reg)
+func New(
+	ctx context.Context,
+	db database.Database,
+	config Config,
+	namespace string,
+) (MerkleDB, error) {
+	metrics, err := newMetrics(namespace, config.Reg)
 	if err != nil {
 		return nil, err
 	}

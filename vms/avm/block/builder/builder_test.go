@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -521,17 +520,19 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	stateDB, err := merkledb.New(
 		context.Background(),
 		prefixdb.New([]byte("state"), baseDB),
-		merkledb.NewConfig(registerer, trace.Noop),
+		merkledb.NewConfig(),
+		"",
 	)
 	require.NoError(err)
-
 	state, err := state.New(
+		context.Background(),
 		baseDB,
 		stateDB,
 		metadataDB,
 		parser,
 		registerer,
 		trackChecksums,
+		merkledb.NewConfig(),
 	)
 	require.NoError(err)
 

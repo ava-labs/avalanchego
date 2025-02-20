@@ -26,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -233,22 +232,26 @@ func (vm *VM) Initialize(
 	codec := vm.parser.Codec()
 	vm.Spender = utxo.NewSpender(&vm.clock, codec)
 
+	merkleDBConfig := merkledb.NewConfig()
 	stateDB, err := merkledb.New(
 		ctx,
 		prefixdb.New(dbPrefixState, vm.versionDB),
-		merkledb.NewConfig(vm.registerer, trace.Noop),
+		merkleDBConfig,
+		"",
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initialize state db: %w", err)
 	}
 
 	state, err := state.New(
+		context.Background(),
 		vm.versionDB,
 		stateDB,
 		vm.metadataDB,
 		vm.parser,
 		vm.registerer,
 		avmConfig.ChecksumsEnabled,
+		merkleDBConfig,
 	)
 	if err != nil {
 		return err

@@ -145,14 +145,25 @@ type state struct {
 }
 
 func New(
+	ctx context.Context,
 	versionDB *versiondb.Database,
 	stateDB merkledb.MerkleDB,
 	metadataDB database.Database,
 	parser block.Parser,
 	metrics prometheus.Registerer,
 	trackChecksums bool,
+	merkleDBConfig merkledb.Config,
 ) (State, error) {
-	utxoDB := prefixdb.New(utxoPrefix, stateDB)
+	utxoDB, err := merkledb.New(
+		ctx,
+		prefixdb.New(utxoPrefix, stateDB),
+		merkleDBConfig,
+		"utxo_db",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize utxo db: %w", err)
+	}
+
 	txDB := prefixdb.New(txPrefix, metadataDB)
 	blockIDDB := prefixdb.New(blockIDPrefix, metadataDB)
 	blockDB := prefixdb.New(blockPrefix, metadataDB)

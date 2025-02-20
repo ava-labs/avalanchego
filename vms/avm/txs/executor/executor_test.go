@@ -7,8 +7,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/trace"
-	"github.com/ava-labs/avalanchego/x/merkledb"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
@@ -27,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/x/merkledb"
 )
 
 const trackChecksums = false
@@ -48,20 +47,23 @@ func TestBaseTxExecutor(t *testing.T) {
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
-	registerer := prometheus.NewRegistry()
+	merkleDBConfig := merkledb.NewConfig()
 	stateDB, err := merkledb.New(
 		context.Background(),
 		prefixdb.New([]byte("state"), vdb),
-		merkledb.NewConfig(registerer, trace.Noop),
+		merkleDBConfig,
+		"",
 	)
 	require.NoError(err)
 	state, err := state.New(
+		context.Background(),
 		vdb,
 		stateDB,
 		prefixdb.New([]byte("metadata"), vdb),
 		parser,
-		registerer,
+		prometheus.NewRegistry(),
 		trackChecksums,
+		merkleDBConfig,
 	)
 	require.NoError(err)
 
@@ -169,18 +171,23 @@ func TestCreateAssetTxExecutor(t *testing.T) {
 	db := memdb.New()
 	vdb := versiondb.New(db)
 	registerer := prometheus.NewRegistry()
+	merkleDBConfig := merkledb.NewConfig()
 	stateDB, err := merkledb.New(
 		context.Background(),
 		prefixdb.New([]byte("state"), vdb),
-		merkledb.NewConfig(registerer, trace.Noop),
+		merkleDBConfig,
+		"",
 	)
+	require.NoError(err)
 	state, err := state.New(
+		context.Background(),
 		vdb,
 		stateDB,
 		prefixdb.New([]byte("metadata"), vdb),
 		parser,
 		registerer,
 		trackChecksums,
+		merkleDBConfig,
 	)
 	require.NoError(err)
 
@@ -326,19 +333,23 @@ func TestOperationTxExecutor(t *testing.T) {
 	db := memdb.New()
 	vdb := versiondb.New(db)
 	registerer := prometheus.NewRegistry()
+	merkleDBConfig := merkledb.NewConfig()
 	stateDB, err := merkledb.New(
 		context.Background(),
 		prefixdb.New([]byte("state"), vdb),
-		merkledb.NewConfig(registerer, trace.Noop),
+		merkleDBConfig,
+		"",
 	)
 	require.NoError(err)
 	state, err := state.New(
+		context.Background(),
 		vdb,
 		stateDB,
 		prefixdb.New([]byte("metadata"), vdb),
 		parser,
 		registerer,
 		trackChecksums,
+		merkleDBConfig,
 	)
 	require.NoError(err)
 

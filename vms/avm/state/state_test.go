@@ -8,8 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/trace"
-	"github.com/ava-labs/avalanchego/x/merkledb"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
@@ -24,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/x/merkledb"
 )
 
 const trackChecksums = false
@@ -107,21 +106,23 @@ func TestState(t *testing.T) {
 	db := memdb.New()
 	vdb := versiondb.New(db)
 	metadataDB := prefixdb.New([]byte("metadata"), vdb)
-	registerer := prometheus.NewRegistry()
+	merkleDBConfig := merkledb.NewConfig()
 	stateDB, err := merkledb.New(
 		context.Background(),
 		prefixdb.New([]byte("state"), vdb),
-		merkledb.NewConfig(registerer, trace.Noop),
+		merkleDBConfig,
+		"state_db",
 	)
 	require.NoError(err)
-
 	s, err := New(
+		context.Background(),
 		vdb,
 		stateDB,
 		metadataDB,
 		parser,
-		registerer,
+		prometheus.NewRegistry(),
 		trackChecksums,
+		merkleDBConfig,
 	)
 	require.NoError(err)
 
@@ -130,12 +131,14 @@ func TestState(t *testing.T) {
 	s.AddBlock(populatedBlk)
 	require.NoError(s.Commit())
 	s, err = New(
+		context.Background(),
 		vdb,
 		stateDB,
 		metadataDB,
 		parser,
 		prometheus.NewRegistry(),
 		trackChecksums,
+		merkleDBConfig,
 	)
 	require.NoError(err)
 
@@ -149,19 +152,22 @@ func TestDiff(t *testing.T) {
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
-	registerer := prometheus.NewRegistry()
 	stateDB, err := merkledb.New(
 		context.Background(),
 		prefixdb.New([]byte("state"), vdb),
-		merkledb.NewConfig(registerer, trace.Noop),
+		merkledb.NewConfig(),
+		"",
 	)
+	require.NoError(err)
 	s, err := New(
+		context.Background(),
 		vdb,
 		stateDB,
 		prefixdb.New([]byte("metadata"), vdb),
 		parser,
-		registerer,
+		prometheus.NewRegistry(),
 		trackChecksums,
+		merkledb.NewConfig(),
 	)
 	require.NoError(err)
 
@@ -322,20 +328,23 @@ func TestInitializeChainState(t *testing.T) {
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
-	registerer := prometheus.NewRegistry()
 	stateDB, err := merkledb.New(
 		context.Background(),
 		prefixdb.New([]byte("state"), vdb),
-		merkledb.NewConfig(registerer, trace.Noop),
+		merkledb.NewConfig(),
+		"",
 	)
 	require.NoError(err)
+	merkleDBConfig := merkledb.NewConfig()
 	s, err := New(
+		context.Background(),
 		vdb,
 		stateDB,
 		prefixdb.New([]byte("metadata"), vdb),
 		parser,
-		registerer,
+		prometheus.NewRegistry(),
 		trackChecksums,
+		merkleDBConfig,
 	)
 	require.NoError(err)
 

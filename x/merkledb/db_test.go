@@ -32,7 +32,7 @@ const defaultHistoryLength = 300
 
 // newDB returns a new merkle database with the underlying type so that tests can access unexported fields
 func newDB(ctx context.Context, db database.Database, config Config) (*merkleDB, error) {
-	db, err := New(ctx, db, config)
+	db, err := New(ctx, db, config, "")
 	if err != nil {
 		return nil, err
 	}
@@ -40,8 +40,10 @@ func newDB(ctx context.Context, db database.Database, config Config) (*merkleDB,
 }
 
 func newDefaultConfig() Config {
-	config := NewConfig(prometheus.NewRegistry(), trace.Noop)
+	config := NewConfig()
 	config.HistoryLength = defaultHistoryLength
+	config.Reg = prometheus.NewRegistry()
+	config.Tracer = trace.Noop
 
 	return config
 }
@@ -122,11 +124,7 @@ func Test_MerkleDB_DB_Load_Root_From_DB(t *testing.T) {
 	baseDB := memdb.New()
 	defer baseDB.Close()
 
-	db, err := New(
-		context.Background(),
-		baseDB,
-		newDefaultConfig(),
-	)
+	db, err := New(context.Background(), baseDB, newDefaultConfig(), "")
 	require.NoError(err)
 
 	// Populate initial set of key-value pairs
@@ -150,11 +148,7 @@ func Test_MerkleDB_DB_Load_Root_From_DB(t *testing.T) {
 	require.NoError(db.Close())
 
 	// reloading the db should set the root back to the one that was saved to [baseDB]
-	db, err = New(
-		context.Background(),
-		baseDB,
-		newDefaultConfig(),
-	)
+	db, err = New(context.Background(), baseDB, newDefaultConfig(), "")
 	require.NoError(err)
 
 	reloadedRoot, err := db.GetMerkleRoot(context.Background())
@@ -221,11 +215,7 @@ func Test_MerkleDB_Failed_Batch_Commit(t *testing.T) {
 	require := require.New(t)
 
 	memDB := memdb.New()
-	db, err := New(
-		context.Background(),
-		memDB,
-		newDefaultConfig(),
-	)
+	db, err := New(context.Background(), memDB, newDefaultConfig(), "")
 	require.NoError(err)
 
 	_ = memDB.Close()
@@ -242,11 +232,7 @@ func Test_MerkleDB_Value_Cache(t *testing.T) {
 	require := require.New(t)
 
 	memDB := memdb.New()
-	db, err := New(
-		context.Background(),
-		memDB,
-		newDefaultConfig(),
-	)
+	db, err := New(context.Background(), memDB, newDefaultConfig(), "")
 	require.NoError(err)
 
 	batch := db.NewBatch()
