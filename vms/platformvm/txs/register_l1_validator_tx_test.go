@@ -36,9 +36,10 @@ func TestRegisterL1ValidatorTxSerialization(t *testing.T) {
 	require.NoError(err)
 	sk, err := localsigner.FromBytes(skBytes)
 	require.NoError(err)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(err)
 
 	var (
-		pop     = signer.NewProofOfPossession(sk)
 		message = []byte("message")
 		addr    = ids.ShortID{
 			0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb,

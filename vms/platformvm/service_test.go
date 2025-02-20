@@ -266,6 +266,8 @@ func TestGetTx(t *testing.T) {
 
 				sk, err := localsigner.New()
 				require.NoError(t, err)
+				pop, err := signer.NewProofOfPossession(sk)
+				require.NoError(t, err)
 
 				rewardsOwner := &secp256k1fx.OutputOwners{
 					Threshold: 1,
@@ -281,7 +283,7 @@ func TestGetTx(t *testing.T) {
 						},
 						Subnet: constants.PrimaryNetworkID,
 					},
-					signer.NewProofOfPossession(sk),
+					pop,
 					s.vm.ctx.AVAXAssetID,
 					rewardsOwner,
 					rewardsOwner,
@@ -802,6 +804,8 @@ func TestGetValidatorsAt(t *testing.T) {
 
 	sk, err := localsigner.New()
 	require.NoError(err)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(err)
 
 	tx, err := wallet.IssueAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
@@ -813,7 +817,7 @@ func TestGetValidatorsAt(t *testing.T) {
 			},
 			Subnet: constants.PrimaryNetworkID,
 		},
-		signer.NewProofOfPossession(sk),
+		pop,
 		service.vm.ctx.AVAXAssetID,
 		rewardsOwner,
 		rewardsOwner,

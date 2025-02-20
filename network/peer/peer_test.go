@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
@@ -160,6 +161,13 @@ func awaitReady(t *testing.T, peers ...Peer) {
 	for _, peer := range peers {
 		require.NoError(peer.AwaitReady(context.Background()))
 		require.True(peer.Ready())
+	}
+}
+
+func must[T any](t *testing.T) func(T, error) T {
+	return func(val T, err error) T {
+		require.NoError(t, err)
+		return val
 	}
 }
 
@@ -350,6 +358,7 @@ func TestShouldDisconnect(t *testing.T) {
 	txID := ids.GenerateTestID()
 	blsKey, err := localsigner.New()
 	require.NoError(t, err)
+	must := must[*bls.Signature](t)
 
 	tests := []struct {
 		name                     string
@@ -556,7 +565,7 @@ func TestShouldDisconnect(t *testing.T) {
 				id:      peerID,
 				version: version.CurrentApp,
 				ip: &SignedIP{
-					BLSSignature: blsKey.SignProofOfPossession([]byte("wrong message")),
+					BLSSignature: must(blsKey.SignProofOfPossession([]byte("wrong message"))),
 				},
 			},
 			expectedPeer: &peer{
@@ -578,7 +587,7 @@ func TestShouldDisconnect(t *testing.T) {
 				id:      peerID,
 				version: version.CurrentApp,
 				ip: &SignedIP{
-					BLSSignature: blsKey.SignProofOfPossession([]byte("wrong message")),
+					BLSSignature: must(blsKey.SignProofOfPossession([]byte("wrong message"))),
 				},
 			},
 			expectedShouldDisconnect: true,
@@ -604,7 +613,7 @@ func TestShouldDisconnect(t *testing.T) {
 				id:      peerID,
 				version: version.CurrentApp,
 				ip: &SignedIP{
-					BLSSignature: blsKey.SignProofOfPossession((&UnsignedIP{}).bytes()),
+					BLSSignature: must(blsKey.SignProofOfPossession((&UnsignedIP{}).bytes())),
 				},
 			},
 			expectedPeer: &peer{
@@ -626,7 +635,7 @@ func TestShouldDisconnect(t *testing.T) {
 				id:      peerID,
 				version: version.CurrentApp,
 				ip: &SignedIP{
-					BLSSignature: blsKey.SignProofOfPossession((&UnsignedIP{}).bytes()),
+					BLSSignature: must(blsKey.SignProofOfPossession((&UnsignedIP{}).bytes())),
 				},
 				txIDOfVerifiedBLSKey: txID,
 			},
