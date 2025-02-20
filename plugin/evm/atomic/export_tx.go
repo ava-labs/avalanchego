@@ -10,6 +10,7 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/coreth/params/extras"
+	"github.com/ava-labs/coreth/plugin/evm/ap5"
 	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -142,7 +143,7 @@ func (utx *UnsignedExportTx) GasUsed(fixedFee bool) (uint64, error) {
 		return 0, err
 	}
 	if fixedFee {
-		cost, err = math.Add64(cost, AtomicTxBaseCost)
+		cost, err = math.Add64(cost, ap5.AtomicTxIntrinsicGas)
 		if err != nil {
 			return 0, err
 		}
