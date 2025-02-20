@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ava-labs/coreth/plugin/evm/etna"
+	"github.com/ava-labs/coreth/plugin/evm/upgrade/etna"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
 )
