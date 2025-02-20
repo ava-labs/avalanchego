@@ -85,7 +85,8 @@ func (p *postForkCommonComponents) Height() uint64 {
 // 3) [p]'s inner block is the parent of [c]'s inner block
 // 4) [child]'s timestamp isn't before [p]'s timestamp
 // 5) [child]'s timestamp is within the skew bound
-// 6) [childPChainHeight] <= the current P-Chain height
+// 6) [childPChainHeight] >= the current P-Chain height
+// *) [childPChainHeight] > the current P-Chain height iff the epoch has advanced
 // 7) [child]'s timestamp is within its proposer's window  --> This is what verifies against WindowDuration
 // 8) [child] has a valid signature from its proposer
 // 9) [child]'s inner block is valid
