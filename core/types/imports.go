@@ -11,24 +11,25 @@ import (
 // So we list them all here to avoid having many individual files.
 type (
 	AccessList        = ethtypes.AccessList
-	AccessTuple       = ethtypes.AccessTuple
 	AccessListTx      = ethtypes.AccessListTx
-	Bloom             = ethtypes.Bloom
-	Receipt           = ethtypes.Receipt
-	Receipts          = ethtypes.Receipts
-	ReceiptForStorage = ethtypes.ReceiptForStorage
-	LegacyTx          = ethtypes.LegacyTx
-	DynamicFeeTx      = ethtypes.DynamicFeeTx
+	AccessTuple       = ethtypes.AccessTuple
 	BlobTx            = ethtypes.BlobTx
 	BlobTxSidecar     = ethtypes.BlobTxSidecar
-	Signer            = ethtypes.Signer
-	HomesteadSigner   = ethtypes.HomesteadSigner
+	Bloom             = ethtypes.Bloom
+	DynamicFeeTx      = ethtypes.DynamicFeeTx
 	FrontierSigner    = ethtypes.FrontierSigner
-
-	Transaction  = ethtypes.Transaction
-	Transactions = ethtypes.Transactions
-	TxByNonce    = ethtypes.TxByNonce
-	TxData       = ethtypes.TxData
+	HomesteadSigner   = ethtypes.HomesteadSigner
+	LegacyTx          = ethtypes.LegacyTx
+	Receipt           = ethtypes.Receipt
+	ReceiptForStorage = ethtypes.ReceiptForStorage
+	Receipts          = ethtypes.Receipts
+	Signer            = ethtypes.Signer
+	SlimAccount       = ethtypes.SlimAccount
+	StateAccount      = ethtypes.StateAccount
+	Transaction       = ethtypes.Transaction
+	Transactions      = ethtypes.Transactions
+	TxByNonce         = ethtypes.TxByNonce
+	TxData            = ethtypes.TxData
 )
 
 // The following constants are used directly as their upstream definitions.
@@ -39,10 +40,10 @@ const (
 	ReceiptStatusSuccessful = ethtypes.ReceiptStatusSuccessful
 
 	// Transaction types.
-	LegacyTxType     = ethtypes.LegacyTxType
 	AccessListTxType = ethtypes.AccessListTxType
-	DynamicFeeTxType = ethtypes.DynamicFeeTxType
 	BlobTxType       = ethtypes.BlobTxType
+	DynamicFeeTxType = ethtypes.DynamicFeeTxType
+	LegacyTxType     = ethtypes.LegacyTxType
 )
 
 // The following functions are used directly as their upstream definitions.
@@ -50,28 +51,30 @@ var (
 	BloomLookup         = ethtypes.BloomLookup
 	BytesToBloom        = ethtypes.BytesToBloom
 	CreateBloom         = ethtypes.CreateBloom
-	NewReceipt          = ethtypes.NewReceipt
+	FullAccount         = ethtypes.FullAccount
+	FullAccountRLP      = ethtypes.FullAccountRLP
 	NewContractCreation = ethtypes.NewContractCreation
+	NewReceipt          = ethtypes.NewReceipt
 	NewTransaction      = ethtypes.NewTransaction
+	SlimAccountRLP      = ethtypes.SlimAccountRLP
 
 	// Signers
+	LatestSigner           = ethtypes.LatestSigner
+	LatestSignerForChainID = ethtypes.LatestSignerForChainID
+	MakeSigner             = ethtypes.MakeSigner
+	MustSignNewTx          = ethtypes.MustSignNewTx
 	NewEIP155Signer        = ethtypes.NewEIP155Signer
 	NewEIP2930Signer       = ethtypes.NewEIP2930Signer
 	NewLondonSigner        = ethtypes.NewLondonSigner
-	NewCancunSigner        = ethtypes.NewCancunSigner
-	MakeSigner             = ethtypes.MakeSigner
-	LatestSigner           = ethtypes.LatestSigner
-	LatestSignerForChainID = ethtypes.LatestSignerForChainID
-	SignTx                 = ethtypes.SignTx
-	SignNewTx              = ethtypes.SignNewTx
-	MustSignNewTx          = ethtypes.MustSignNewTx
 	Sender                 = ethtypes.Sender
+	SignNewTx              = ethtypes.SignNewTx
+	SignTx                 = ethtypes.SignTx
 
 	// Transactions
 	NewTx        = ethtypes.NewTx
 	TxDifference = ethtypes.TxDifference
 
 	// Errors
-	ErrTxTypeNotSupported = ethtypes.ErrTxTypeNotSupported
 	ErrGasFeeCapTooLow    = ethtypes.ErrGasFeeCapTooLow
+	ErrTxTypeNotSupported = ethtypes.ErrTxTypeNotSupported
 )
