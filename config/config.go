@@ -18,8 +18,6 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
@@ -701,16 +699,8 @@ func getStakingSigner(ctx context.Context, v *viper.Viper) (bls.Signer, error) {
 	case !ephemeralSignerEnabled && !contentKeyIsSet && !keyPathIsSet && rpcSignerURLIsSet:
 		rpcSignerURL := v.GetString(StakingRPCSignerKey)
 
-		// the rpc-signer client should call a proxy server (on the same machine) that forwards
-		// the request to the actual signer instead of relying on tls-credentials
-		conn, err := grpc.NewClient(rpcSignerURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		signer, err := rpcsigner.NewClient(ctx, rpcSignerURL)
 		if err != nil {
-			return nil, fmt.Errorf("couldn't create rpc signer client: %w", err)
-		}
-
-		signer, err := rpcsigner.NewClient(ctx, conn)
-		if err != nil {
-			conn.Close()
 			return nil, fmt.Errorf("couldn't create rpc signer client: %w", err)
 		}
 
@@ -749,7 +739,7 @@ func getStakingConfig(ctx context.Context, v *viper.Viper, networkID uint32) (no
 		StakingKeyPath:                getExpandedArg(v, StakingTLSKeyPathKey),
 		StakingCertPath:               getExpandedArg(v, StakingCertPathKey),
 		StakingSignerPath:             getExpandedArg(v, StakingSignerKeyPathKey),
-		StakingSignerRpc:              getExpandedArg(v, StakingRPCSignerKey),
+		StakingSignerRPC:              getExpandedArg(v, StakingRPCSignerKey),
 	}
 	if !config.SybilProtectionEnabled && config.SybilProtectionDisabledWeight == 0 {
 		return node.StakingConfig{}, errSybilProtectionDisabledStakerWeights

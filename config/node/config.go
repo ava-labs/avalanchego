@@ -82,7 +82,7 @@ type StakingConfig struct {
 	StakingKeyPath    string `json:"stakingKeyPath"`
 	StakingCertPath   string `json:"stakingCertPath"`
 	StakingSignerPath string `json:"stakingSignerPath"`
-	StakingSignerRpc  string `json:"stakingSignerRpc"`
+	StakingSignerRPC  string `json:"stakingSignerRpc"`
 }
 
 type StateSyncConfig struct {
