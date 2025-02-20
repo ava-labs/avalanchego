@@ -1,11 +1,13 @@
 module github.com/ava-labs/coreth
 
-go 1.22.8
+go 1.23
+
+toolchain go1.23.6
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.12.1
 	github.com/ava-labs/avalanchego v1.12.1-0.20250107220127-32f58b4fa9c8
-	github.com/ava-labs/libevm v1.13.14-0.1.0.rc-2
+	github.com/ava-labs/libevm v1.13.14-0.2.0.rc.3
 	github.com/crate-crypto/go-ipa v0.0.0-20231025140028-3c0104f4b233
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set/v2 v2.1.0

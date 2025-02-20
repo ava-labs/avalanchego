@@ -305,27 +305,6 @@ func (m *MockAccessibleState) EXPECT() *MockAccessibleStateMockRecorder {
 	return m.recorder
 }
 
-// Call mocks base method.
-func (m *MockAccessibleState) Call(addr common.Address, input []byte, gas uint64, value *uint256.Int, opts ...vm.CallOption) ([]byte, uint64, error) {
-	m.ctrl.T.Helper()
-	varargs := []any{addr, input, gas, value}
-	for _, a := range opts {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "Call", varargs...)
-	ret0, _ := ret[0].([]byte)
-	ret1, _ := ret[1].(uint64)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
-}
-
-// Call indicates an expected call of Call.
-func (mr *MockAccessibleStateMockRecorder) Call(addr, input, gas, value any, opts ...any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{addr, input, gas, value}, opts...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Call", reflect.TypeOf((*MockAccessibleState)(nil).Call), varargs...)
-}
-
 // GetBlockContext mocks base method.
 func (m *MockAccessibleState) GetBlockContext() BlockContext {
 	m.ctrl.T.Helper()
@@ -352,6 +331,20 @@ func (m *MockAccessibleState) GetChainConfig() precompileconfig.ChainConfig {
 func (mr *MockAccessibleStateMockRecorder) GetChainConfig() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetChainConfig", reflect.TypeOf((*MockAccessibleState)(nil).GetChainConfig))
+}
+
+// GetPrecompileEnv mocks base method.
+func (m *MockAccessibleState) GetPrecompileEnv() vm.PrecompileEnvironment {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPrecompileEnv")
+	ret0, _ := ret[0].(vm.PrecompileEnvironment)
+	return ret0
+}
+
+// GetPrecompileEnv indicates an expected call of GetPrecompileEnv.
+func (mr *MockAccessibleStateMockRecorder) GetPrecompileEnv() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPrecompileEnv", reflect.TypeOf((*MockAccessibleState)(nil).GetPrecompileEnv))
 }
 
 // GetSnowContext mocks base method.

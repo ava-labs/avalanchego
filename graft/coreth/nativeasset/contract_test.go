@@ -239,8 +239,8 @@ func TestStatefulPrecompile(t *testing.T) {
 			precompileAddr:       NativeAssetCallAddr,
 			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(50), nil),
 			value:                big0,
-			gasInput:             params.AssetCallApricot + params.CallNewAccountGas,
-			expectedGasRemaining: 0,
+			gasInput:             params.AssetCallApricot + params.CallNewAccountGas + 123,
+			expectedGasRemaining: 123,
 			expectedErr:          nil,
 			expectedResult:       nil,
 			name:                 "native asset call: multicoin transfer",
@@ -459,7 +459,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			evm := vm.NewEVM(vmCtx, vm.TxContext{}, stateDB, params.TestApricotPhase5Config, vm.Config{}) // Use ApricotPhase5Config because these precompiles are deprecated in ApricotPhase6.
 			ret, gasRemaining, err := evm.Call(vm.AccountRef(test.from), test.precompileAddr, test.input, test.gasInput, test.value)
 			// Place gas remaining check before error check, so that it is not skipped when there is an error
-			assert.Equal(t, test.expectedGasRemaining, gasRemaining, "unexpected gas remaining")
+			assert.Equalf(t, test.expectedGasRemaining, gasRemaining, "unexpected gas remaining (%d of %d)", gasRemaining, test.gasInput)
 
 			if test.expectedErr != nil {
 				assert.Equal(t, test.expectedErr, err, "expected error to match")
