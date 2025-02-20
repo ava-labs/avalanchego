@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/ap1"
 	customheader "github.com/ava-labs/coreth/plugin/evm/header"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/common"
@@ -352,7 +353,7 @@ func TestSuggestGasPricePreAP3(t *testing.T) {
 		b.SetCoinbase(common.Address{1})
 
 		signer := types.LatestSigner(params.TestApricotPhase2Config)
-		gasPrice := big.NewInt(params.ApricotPhase1MinGasPrice)
+		gasPrice := big.NewInt(ap1.MinGasPrice)
 		for j := 0; j < 50; j++ {
 			tx := types.NewTx(&types.LegacyTx{
 				Nonce:    b.TxNonce(addr),

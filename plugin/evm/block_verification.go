@@ -15,15 +15,18 @@ import (
 	"github.com/ava-labs/coreth/constants"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/ap0"
+	"github.com/ava-labs/coreth/plugin/evm/ap1"
 	"github.com/ava-labs/coreth/plugin/evm/ap5"
+	"github.com/ava-labs/coreth/plugin/evm/cortina"
 	"github.com/ava-labs/coreth/plugin/evm/header"
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ava-labs/coreth/utils"
 )
 
 var (
-	apricotPhase0MinGasPrice = big.NewInt(params.LaunchMinGasPrice)
-	apricotPhase1MinGasPrice = big.NewInt(params.ApricotPhase1MinGasPrice)
+	ap0MinGasPrice = big.NewInt(ap0.MinGasPrice)
+	ap1MinGasPrice = big.NewInt(ap1.MinGasPrice)
 )
 
 type BlockValidator interface {
@@ -108,17 +111,17 @@ func (v blockValidator) SyntacticVerify(b *Block, rules params.Rules) error {
 
 	// Enforce static gas limit after ApricotPhase1 (prior to ApricotPhase1 it's handled in processing).
 	if rules.IsCortina {
-		if ethHeader.GasLimit != params.CortinaGasLimit {
+		if ethHeader.GasLimit != cortina.GasLimit {
 			return fmt.Errorf(
 				"expected gas limit to be %d after cortina but got %d",
-				params.CortinaGasLimit, ethHeader.GasLimit,
+				cortina.GasLimit, ethHeader.GasLimit,
 			)
 		}
 	} else if rules.IsApricotPhase1 {
-		if ethHeader.GasLimit != params.ApricotPhase1GasLimit {
+		if ethHeader.GasLimit != ap1.GasLimit {
 			return fmt.Errorf(
 				"expected gas limit to be %d after apricot phase 1 but got %d",
-				params.ApricotPhase1GasLimit, ethHeader.GasLimit,
+				ap1.GasLimit, ethHeader.GasLimit,
 			)
 		}
 	}
@@ -162,15 +165,15 @@ func (v blockValidator) SyntacticVerify(b *Block, rules params.Rules) error {
 	case !rules.IsApricotPhase1:
 		// If we are in ApricotPhase0, enforce each transaction has a minimum gas price of at least the LaunchMinGasPrice
 		for _, tx := range b.ethBlock.Transactions() {
-			if tx.GasPrice().Cmp(apricotPhase0MinGasPrice) < 0 {
-				return fmt.Errorf("block contains tx %s with gas price too low (%d < %d)", tx.Hash(), tx.GasPrice(), params.LaunchMinGasPrice)
+			if tx.GasPrice().Cmp(ap0MinGasPrice) < 0 {
+				return fmt.Errorf("block contains tx %s with gas price too low (%d < %d)", tx.Hash(), tx.GasPrice(), ap0.MinGasPrice)
 			}
 		}
 	case !rules.IsApricotPhase3:
 		// If we are prior to ApricotPhase3, enforce each transaction has a minimum gas price of at least the ApricotPhase1MinGasPrice
 		for _, tx := range b.ethBlock.Transactions() {
-			if tx.GasPrice().Cmp(apricotPhase1MinGasPrice) < 0 {
-				return fmt.Errorf("block contains tx %s with gas price too low (%d < %d)", tx.Hash(), tx.GasPrice(), params.ApricotPhase1MinGasPrice)
+			if tx.GasPrice().Cmp(ap1MinGasPrice) < 0 {
+				return fmt.Errorf("block contains tx %s with gas price too low (%d < %d)", tx.Hash(), tx.GasPrice(), ap1.MinGasPrice)
 			}
 		}
 	}
