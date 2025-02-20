@@ -196,8 +196,12 @@ func New(
 		return nil, err
 	}
 
-	avaxUTXOState, err := avax.NewMeteredUTXOState(utxoDB, parser.Codec(),
-		metrics, trackChecksums)
+	avaxUTXOState, err := avax.NewMeteredUTXOState(
+		utxoDB,
+		parser.Codec(),
+		metrics,
+		trackChecksums,
+	)
 	if err != nil {
 		return nil, err
 	}

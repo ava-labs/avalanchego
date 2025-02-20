@@ -10,7 +10,7 @@
 package statemock
 
 import (
-	"context"
+	context "context"
 	reflect "reflect"
 	time "time"
 
