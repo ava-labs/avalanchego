@@ -1,6 +1,6 @@
 # Coreth and the C-Chain
 
-[Avalanche](https://docs.avax.network/intro) is a network composed of multiple blockchains.
+[Avalanche](https://www.avax.network/) is a network composed of multiple blockchains.
 Each blockchain is an instance of a Virtual Machine (VM), much like an object in an object-oriented language is an instance of a class.
 That is, the VM defines the behavior of the blockchain.
 Coreth (from core Ethereum) is the [Virtual Machine (VM)](https://docs.avax.network/learn/virtual-machines) that defines the Contract Chain (C-Chain).
@@ -39,7 +39,7 @@ Full documentation for the C-Chain's API can be found [here.](https://docs.avax.
 
 ## Compatibility
 
-The C-Chain is compatible with almost all Ethereum tooling, including [Core,](https://docs.avax.network/build/dapp/launch-dapp#through-core) [Metamask,](https://docs.avax.network/build/dapp/launch-dapp#through-metamask) [Remix](https://docs.avax.network/build/tutorials/smart-contracts/deploy-a-smart-contract-on-avalanche-using-remix-and-metamask) and [Truffle.](https://docs.avax.network/build/tutorials/smart-contracts/using-truffle-with-the-avalanche-c-chain)
+The C-Chain is compatible with almost all Ethereum tooling, including [Core,](https://docs.avax.network/build/dapp/launch-dapp#through-core) [Metamask,](https://docs.avax.network/build/dapp/launch-dapp#through-metamask) [Remix](https://docs.avax.network/dapps/smart-contract-dev/deploy-with-remix-ide) and [Truffle.](https://docs.avax.network/build/tutorials/smart-contracts/using-truffle-with-the-avalanche-c-chain)
 
 ## Differences Between Avalanche C-Chain and Ethereum
 

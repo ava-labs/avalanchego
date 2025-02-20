@@ -23,7 +23,6 @@ import (
 
 	"github.com/ava-labs/coreth/constants"
 	"github.com/ava-labs/coreth/eth/filters"
-	"github.com/ava-labs/coreth/metrics"
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/coreth/plugin/evm/config"
 	"github.com/ava-labs/coreth/utils"
@@ -32,7 +31,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/api/keystore"
+	"github.com/ava-labs/avalanchego/api/metrics"
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -42,11 +41,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/cb58"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -77,8 +75,6 @@ var (
 	testEthAddrs     []common.Address // testEthAddrs[i] corresponds to testKeys[i]
 	testShortIDAddrs []ids.ShortID
 	testAvaxAssetID  = ids.ID{1, 2, 3}
-	username         = "Johns"
-	password         = "CjasdjhiPeirbSenfeI13" // #nosec G101
 
 	genesisJSON = func(cfg *params.ChainConfig) string {
 		g := new(core.Genesis)
@@ -129,7 +125,8 @@ var (
 	genesisJSONCortina           = genesisJSON(params.TestCortinaChainConfig)
 	genesisJSONDurango           = genesisJSON(params.TestDurangoChainConfig)
 	genesisJSONEtna              = genesisJSON(params.TestEtnaChainConfig)
-	genesisJSONLatest            = genesisJSONEtna
+	genesisJSONFUpgrade          = genesisJSON(params.TestFUpgradeChainConfig)
+	genesisJSONLatest            = genesisJSONFUpgrade
 
 	genesisJSONCancun = genesisJSON(activateCancun(params.TestChainConfig))
 
@@ -222,7 +219,7 @@ func NewContext() *snow.Context {
 			return subnetID, nil
 		},
 	}
-	blsSecretKey, err := bls.NewSigner()
+	blsSecretKey, err := localsigner.New()
 	if err != nil {
 		panic(err)
 	}
@@ -257,12 +254,6 @@ func setupGenesis(
 	// NB: this lock is intentionally left locked when this function returns.
 	// The caller of this function is responsible for unlocking.
 	ctx.Lock.Lock()
-
-	userKeystore := keystore.New(logging.NoLog{}, memdb.New())
-	if err := userKeystore.CreateUser(username, password); err != nil {
-		t.Fatal(err)
-	}
-	ctx.Keystore = userKeystore.NewBlockchainKeyStore(ctx.ChainID)
 
 	issuer := make(chan commonEng.Message, 1)
 	prefixedDB := prefixdb.New([]byte{1}, baseDB)
@@ -381,6 +372,12 @@ func GenesisVMWithUTXOs(t *testing.T, finishBootstrapping bool, genesisJSON stri
 	}
 
 	return issuer, vm, db, sharedMemory, sender
+}
+
+// resetMetrics resets the vm avalanchego metrics, and allows
+// for the VM to be re-initialized in tests.
+func resetMetrics(vm *VM) {
+	vm.ctx.Metrics = metrics.NewPrefixGatherer()
 }
 
 func TestVMConfig(t *testing.T) {
@@ -3777,10 +3774,6 @@ func TestExtraStateChangeAtomicGasLimitExceeded(t *testing.T) {
 }
 
 func TestSkipChainConfigCheckCompatible(t *testing.T) {
-	// Hack: registering metrics uses global variables, so we need to disable metrics here so that we can initialize the VM twice.
-	metrics.Enabled = false
-	defer func() { metrics.Enabled = true }()
-
 	importAmount := uint64(50000000)
 	issuer, vm, dbManager, _, appSender := GenesisVMWithUTXOs(t, true, genesisJSONApricotPhase1, "", "", map[ids.ShortID]uint64{
 		testShortIDAddrs[0]: importAmount,
@@ -3809,9 +3802,13 @@ func TestSkipChainConfigCheckCompatible(t *testing.T) {
 	genesisWithUpgradeBytes, err := json.Marshal(genesisWithUpgrade)
 	require.NoError(t, err)
 
+	resetMetrics(vm)
+
 	// this will not be allowed
 	err = reinitVM.Initialize(context.Background(), vm.ctx, dbManager, genesisWithUpgradeBytes, []byte{}, []byte{}, issuer, []*commonEng.Fx{}, appSender)
 	require.ErrorContains(t, err, "mismatching ApricotPhase2 fork block timestamp in database")
+
+	resetMetrics(vm)
 
 	// try again with skip-upgrade-check
 	config := []byte(`{"skip-upgrade-check": true}`)

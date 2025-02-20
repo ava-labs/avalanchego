@@ -68,6 +68,10 @@ var tests = []ChainTest{
 		TestEmptyBlocks,
 	},
 	{
+		"ReorgReInsert",
+		TestReorgReInsert,
+	},
+	{
 		"AcceptBlockIdenticalStateRoot",
 		TestAcceptBlockIdenticalStateRoot,
 	},
@@ -880,9 +884,6 @@ func TestReorgReInsert(t *testing.T, create func(db ethdb.Database, gspec *Genes
 		key2, _ = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
 		addr1   = crypto.PubkeyToAddress(key1.PublicKey)
 		addr2   = crypto.PubkeyToAddress(key2.PublicKey)
-		// We use two separate databases since GenerateChain commits the state roots to its underlying
-		// database.
-		genDB   = rawdb.NewMemoryDatabase()
 		chainDB = rawdb.NewMemoryDatabase()
 	)
 
@@ -892,7 +893,6 @@ func TestReorgReInsert(t *testing.T, create func(db ethdb.Database, gspec *Genes
 		Config: &params.ChainConfig{HomesteadBlock: new(big.Int)},
 		Alloc:  types.GenesisAlloc{addr1: {Balance: genesisBalance}},
 	}
-	genesis := gspec.ToBlock()
 
 	blockchain, err := create(chainDB, gspec, common.Hash{})
 	if err != nil {
@@ -902,7 +902,7 @@ func TestReorgReInsert(t *testing.T, create func(db ethdb.Database, gspec *Genes
 
 	signer := types.HomesteadSigner{}
 	numBlocks := 3
-	chain, _, err := GenerateChain(gspec.Config, genesis, blockchain.engine, genDB, numBlocks, 10, func(i int, gen *BlockGen) {
+	_, chain, _, err := GenerateChainWithGenesis(gspec, blockchain.engine, numBlocks, 10, func(i int, gen *BlockGen) {
 		// Generate a transaction to create a unique block
 		tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr1), addr2, big.NewInt(10000), params.TxGas, nil, nil), signer, key1)
 		gen.AddTx(tx)

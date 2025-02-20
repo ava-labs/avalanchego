@@ -165,14 +165,16 @@ func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateConte
 		Time:       timestamp,
 	}
 
-	// Set BaseFee and Extra data field if we are post ApricotPhase3
-	if chainExtra.IsApricotPhase3(timestamp) {
-		var err error
-		header.Extra, header.BaseFee, err = dummy.CalcBaseFee(w.chainConfig, parent, timestamp)
-		if err != nil {
-			return nil, fmt.Errorf("failed to calculate new base fee: %w", err)
-		}
+	var err error
+	header.Extra, err = dummy.CalcExtraPrefix(w.chainConfig, parent, timestamp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate new extra prefix: %w", err)
 	}
+	header.BaseFee, err = dummy.CalcBaseFee(w.chainConfig, parent, timestamp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate new base fee: %w", err)
+	}
+
 	// Apply EIP-4844, EIP-4788.
 	if w.chainConfig.IsCancun(header.Number, header.Time) {
 		var excessBlobGas uint64

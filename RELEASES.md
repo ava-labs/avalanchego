@@ -1,6 +1,15 @@
 # Release Notes
 
+## Pending Release
+- Bump golang version to v1.23.6
+- Bump golangci-lint to v1.63 and add linters
+
 ## [v0.14.1](https://github.com/ava-labs/coreth/releases/tag/v0.14.1)
+
+- Removed deprecated `ExportKey`, `ExportAVAX`, `Export`, `ImportKey`, `ImportAVAX`, `Import` APIs
+- IMPORTANT: `eth_getProof` calls for historical state will be rejected by default.
+  - On archive nodes (`"pruning-enabled": false`): queries for historical proofs for state older than approximately 24 hours preceding the last accepted block will be rejected by default. This can be adjusted with the new option `historical-proof-query-window` which defines the number of blocks before the last accepted block which should be accepted for state proof queries, or set to `0` to accept any block number state query (previous behavior).
+  - On `pruning` nodes: queries for proofs past the tip buffer (32 blocks) will be rejected. This is in support of moving to a path based storage scheme, which does not support historical state proofs.
 - Remove API eth_getAssetBalance that was used to query ANT balances (deprecated since v0.10.0)
 - Remove legacy gossip handler and metrics (deprecated since v0.10.0)
 - Refactored trie_prefetcher.go to be structurally similar to [upstream](https://github.com/ethereum/go-ethereum/tree/v1.13.14).

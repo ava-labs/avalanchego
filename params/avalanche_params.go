@@ -6,7 +6,7 @@ package params
 import (
 	"math/big"
 
-	"github.com/ava-labs/coreth/predicate"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 // Minimum Gas Price
@@ -20,20 +20,19 @@ const (
 	CortinaGasLimit       uint64 = 15_000_000
 
 	ApricotPhase3MinBaseFee               int64  = 75 * GWei
-	ApricotPhase3MaxBaseFee               int64  = 225 * GWei
+	ApricotPhase3MaxBaseFee                      = 225 * GWei
 	ApricotPhase3InitialBaseFee           int64  = 225 * GWei
-	ApricotPhase3TargetGas                uint64 = 10_000_000
-	ApricotPhase4MinBaseFee               int64  = 25 * GWei
-	ApricotPhase4MaxBaseFee               int64  = 1_000 * GWei
-	ApricotPhase4BaseFeeChangeDenominator uint64 = 12
-	ApricotPhase5TargetGas                uint64 = 15_000_000
+	ApricotPhase3TargetGas                       = 10_000_000
+	ApricotPhase3BaseFeeChangeDenominator        = 12
+	ApricotPhase5TargetGas                       = 15_000_000
 	ApricotPhase5BaseFeeChangeDenominator uint64 = 36
 	EtnaMinBaseFee                        int64  = GWei
 
-	// DynamicFeeExtraDataSize is defined in the predicate package to avoid a circular dependency.
-	// After Durango, the extra data past the dynamic fee rollup window represents predicate results.
-	DynamicFeeExtraDataSize        = predicate.DynamicFeeExtraDataSize
-	RollupWindow            uint64 = 10
+	RollupWindow            = 10 // in seconds
+	DynamicFeeExtraDataSize = wrappers.LongLen * RollupWindow
+
+	// The base cost to charge per atomic transaction. Added in Apricot Phase 5.
+	AtomicTxBaseCost uint64 = 10_000
 )
 
 // The atomic gas limit specifies the maximum amount of gas that can be consumed by the atomic

@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
@@ -25,7 +25,7 @@ var (
 )
 
 func TestSnowContext() *snow.Context {
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
 	if err != nil {
 		panic(err)
 	}

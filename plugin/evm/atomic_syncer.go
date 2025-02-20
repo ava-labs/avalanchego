@@ -50,8 +50,7 @@ func addZeroes(height uint64) []byte {
 	return packer.Bytes
 }
 
-func newAtomicSyncer(client syncclient.LeafClient, atomicBackend *atomicBackend, targetRoot common.Hash, targetHeight uint64, requestSize uint16) (*atomicSyncer, error) {
-	atomicTrie := atomicBackend.AtomicTrie()
+func newAtomicSyncer(client syncclient.LeafClient, vdb *versiondb.Database, atomicTrie AtomicTrie, targetRoot common.Hash, targetHeight uint64, requestSize uint16) (*atomicSyncer, error) {
 	lastCommittedRoot, lastCommit := atomicTrie.LastCommitted()
 	trie, err := atomicTrie.OpenTrie(lastCommittedRoot)
 	if err != nil {
@@ -59,7 +58,7 @@ func newAtomicSyncer(client syncclient.LeafClient, atomicBackend *atomicBackend,
 	}
 
 	atomicSyncer := &atomicSyncer{
-		db:           atomicBackend.db,
+		db:           vdb,
 		atomicTrie:   atomicTrie,
 		trie:         trie,
 		targetRoot:   targetRoot,
