@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
 )
@@ -18,13 +17,12 @@ var errInvalidExtraLength = errors.New("invalid header.Extra length")
 // block and calculates the expected extra prefix for the child block.
 func ExtraPrefix(
 	config *params.ChainConfig,
-	feeConfig commontype.FeeConfig,
 	parent *types.Header,
 	timestamp uint64,
 ) ([]byte, error) {
 	switch {
 	case config.IsSubnetEVM(timestamp):
-		window, err := feeWindow(config, feeConfig, parent, timestamp)
+		window, err := feeWindow(config, parent, timestamp)
 		if err != nil {
 			return nil, fmt.Errorf("failed to calculate fee window: %w", err)
 		}

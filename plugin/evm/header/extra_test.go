@@ -4,11 +4,109 @@
 package header
 
 import (
+	"math/big"
 	"testing"
 
+	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/subnetevm"
+	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/stretchr/testify/require"
 )
+
+const (
+	targetGas = 10_000_000
+	blockGas  = 1_000_000
+)
+
+func TestExtraPrefix(t *testing.T) {
+	tests := []struct {
+		name      string
+		upgrades  params.NetworkUpgrades
+		parent    *types.Header
+		timestamp uint64
+		want      []byte
+		wantErr   error
+	}{
+		{
+			name:     "pre_subnet_evm",
+			upgrades: params.TestPreSubnetEVMChainConfig.NetworkUpgrades,
+			want:     nil,
+			wantErr:  nil,
+		},
+		{
+			name: "subnet_evm_first_block",
+			upgrades: params.NetworkUpgrades{
+				SubnetEVMTimestamp: utils.NewUint64(1),
+			},
+			parent: &types.Header{
+				Number: big.NewInt(1),
+			},
+			timestamp: 1,
+			want:      feeWindowBytes(subnetevm.Window{}),
+		},
+		{
+			name:     "subnet_evm_genesis_block",
+			upgrades: params.TestSubnetEVMChainConfig.NetworkUpgrades,
+			parent: &types.Header{
+				Number: big.NewInt(0),
+			},
+			want: feeWindowBytes(subnetevm.Window{}),
+		},
+		{
+			name:     "subnet_evm_invalid_fee_window",
+			upgrades: params.TestSubnetEVMChainConfig.NetworkUpgrades,
+			parent: &types.Header{
+				Number: big.NewInt(1),
+			},
+			wantErr: errDynamicFeeWindowInsufficientLength,
+		},
+		{
+			name:     "subnet_evm_invalid_timestamp",
+			upgrades: params.TestSubnetEVMChainConfig.NetworkUpgrades,
+			parent: &types.Header{
+				Number: big.NewInt(1),
+				Time:   1,
+				Extra:  feeWindowBytes(subnetevm.Window{}),
+			},
+			timestamp: 0,
+			wantErr:   errInvalidTimestamp,
+		},
+		{
+			name:     "subnet_evm_normal",
+			upgrades: params.TestSubnetEVMChainConfig.NetworkUpgrades,
+			parent: &types.Header{
+				Number:  big.NewInt(1),
+				GasUsed: targetGas,
+				Extra: feeWindowBytes(subnetevm.Window{
+					1, 2, 3, 4,
+				}),
+				BlockGasCost: big.NewInt(blockGas),
+			},
+			timestamp: 1,
+			want: func() []byte {
+				window := subnetevm.Window{
+					1, 2, 3, 4,
+				}
+				window.Add(targetGas)
+				window.Shift(1)
+				return feeWindowBytes(window)
+			}(),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			config := &params.ChainConfig{
+				NetworkUpgrades: test.upgrades,
+			}
+			got, err := ExtraPrefix(config, test.parent, test.timestamp)
+			require.ErrorIs(err, test.wantErr)
+			require.Equal(test.want, got)
+		})
+	}
+}
 
 func TestVerifyExtra(t *testing.T) {
 	tests := []struct {

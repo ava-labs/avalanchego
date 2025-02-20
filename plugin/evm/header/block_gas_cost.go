@@ -67,30 +67,35 @@ func BlockGasCostWithStep(
 	)
 }
 
-// MinRequiredTip is the estimated minimum tip a transaction would have
-// needed to pay to be included in a given block (assuming it paid a tip
-// proportional to its gas usage). In reality, there is no minimum tip that
-// is enforced by the consensus engine and high tip paying transactions can
-// subsidize the inclusion of low tip paying transactions. The only
-// correctness check performed is that the sum of all tips is >= the
-// required block fee.
+// EstimateRequiredTip is the estimated tip a transaction would have needed to
+// pay to be included in a given block (assuming it paid a tip proportional to
+// its gas usage).
 //
-// This function will return nil for all return values prior to Subnet EVM.
-func MinRequiredTip(config *params.ChainConfig, header *types.Header) (*big.Int, error) {
-	if !config.IsSubnetEVM(header.Time) {
+// In reality, the consensus engine does not enforce a minimum tip on individual
+// transactions. The only correctness check performed is that the sum of all
+// tips is >= the required block fee.
+//
+// This function will return nil for all return values prior to Apricot Phase 4.
+func EstimateRequiredTip(
+	config *params.ChainConfig,
+	header *types.Header,
+) (*big.Int, error) {
+	switch {
+	case !config.IsSubnetEVM(header.Time):
 		return nil, nil
-	}
-	if header.BaseFee == nil {
+	case header.BaseFee == nil:
 		return nil, errBaseFeeNil
-	}
-	if header.BlockGasCost == nil {
+	case header.BlockGasCost == nil:
 		return nil, errBlockGasCostNil
 	}
 
-	// minTip = requiredBlockFee/blockGasUsage
-	requiredBlockFee := new(big.Int).Mul(
-		header.BlockGasCost,
-		header.BaseFee,
-	)
-	return new(big.Int).Div(requiredBlockFee, new(big.Int).SetUint64(header.GasUsed)), nil
+	totalGasUsed := new(big.Int).SetUint64(header.GasUsed)
+
+	// totalRequiredTips = blockGasCost * baseFee
+	totalRequiredTips := new(big.Int)
+	totalRequiredTips.Mul(header.BlockGasCost, header.BaseFee)
+
+	// estimatedTip = totalRequiredTips / totalGasUsed
+	estimatedTip := totalRequiredTips.Div(totalRequiredTips, totalGasUsed)
+	return estimatedTip, nil
 }

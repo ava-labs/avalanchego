@@ -160,7 +160,7 @@ func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateConte
 		gasLimit = core.CalcGasLimit(parent.GasUsed, parent.GasLimit, configuredGasLimit, configuredGasLimit)
 	}
 
-	extra, err := header.ExtraPrefix(w.chainConfig, feeConfig, parent, timestamp)
+	extra, err := header.ExtraPrefix(w.chainConfig, parent, timestamp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate new extra prefix: %w", err)
 	}

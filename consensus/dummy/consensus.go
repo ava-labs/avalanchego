@@ -156,7 +156,7 @@ func (eng *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, header
 	}
 
 	// Verify header.Extra matches the expected value.
-	expectedExtraPrefix, err := customheader.ExtraPrefix(config, feeConfig, parent, header.Time)
+	expectedExtraPrefix, err := customheader.ExtraPrefix(config, parent, header.Time)
 	if err != nil {
 		return fmt.Errorf("failed to calculate extra prefix: %w", err)
 	}

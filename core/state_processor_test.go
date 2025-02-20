@@ -437,7 +437,7 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 	if err != nil {
 		panic(err)
 	}
-	extra, _ := header.ExtraPrefix(config, feeConfig, parent.Header(), time)
+	extra, _ := header.ExtraPrefix(config, parent.Header(), time)
 	baseFee, _ := header.BaseFee(config, feeConfig, parent.Header(), time)
 	header := &types.Header{
 		ParentHash: parent.Hash(),

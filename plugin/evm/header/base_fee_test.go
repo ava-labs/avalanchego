@@ -11,226 +11,227 @@ import (
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/subnetevm"
+	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/stretchr/testify/require"
 )
 
-type blockDefinition struct {
-	timestamp uint64
-	gasUsed   uint64
+const (
+	maxBaseFee = 225 * utils.GWei
+)
+
+func TestBaseFee(t *testing.T) {
+	t.Run("normal", func(t *testing.T) {
+		BaseFeeTest(t, testFeeConfig)
+	})
+	t.Run("double", func(t *testing.T) {
+		BaseFeeTest(t, testFeeConfigDouble)
+	})
 }
 
-type test struct {
-	baseFee        *big.Int
-	blocks         []blockDefinition
-	minFee, maxFee *big.Int
-}
-
-func TestDynamicFees(t *testing.T) {
-	testMinBaseFee := big.NewInt(75_000_000_000)
-	spacedTimestamps := []uint64{1, 1, 2, 5, 15, 120}
-
-	tests := []test{
-		// Test minimal gas usage
+func BaseFeeTest(t *testing.T, feeConfig commontype.FeeConfig) {
+	tests := []struct {
+		name      string
+		upgrades  params.NetworkUpgrades
+		parent    *types.Header
+		timestamp uint64
+		want      *big.Int
+		wantErr   error
+	}{
 		{
-			minFee: testMinBaseFee,
-			maxFee: maxUint256,
-			blocks: func() []blockDefinition {
-				blocks := make([]blockDefinition, 0, len(spacedTimestamps))
-				for _, timestamp := range spacedTimestamps {
-					blocks = append(blocks, blockDefinition{
-						timestamp: timestamp,
-						gasUsed:   21000,
-					})
-				}
-				return blocks
-			}(),
-		},
-		// Test overflow handling
-		{
-			minFee: testMinBaseFee,
-			maxFee: maxUint256,
-			blocks: func() []blockDefinition {
-				blocks := make([]blockDefinition, 0, len(spacedTimestamps))
-				for _, timestamp := range spacedTimestamps {
-					blocks = append(blocks, blockDefinition{
-						timestamp: timestamp,
-						gasUsed:   math.MaxUint64,
-					})
-				}
-				return blocks
-			}(),
-		},
-		// Test update increase handling
-		{
-			baseFee: big.NewInt(50_000_000_000),
-			minFee:  testMinBaseFee,
-			blocks: func() []blockDefinition {
-				blocks := make([]blockDefinition, 0, len(spacedTimestamps))
-				for _, timestamp := range spacedTimestamps {
-					blocks = append(blocks, blockDefinition{
-						timestamp: timestamp,
-						gasUsed:   math.MaxUint64,
-					})
-				}
-				return blocks
-			}(),
+			name:     "pre_subnet_evm",
+			upgrades: params.TestPreSubnetEVMChainConfig.NetworkUpgrades,
+			want:     nil,
+			wantErr:  nil,
 		},
 		{
-			minFee: testMinBaseFee,
-			blocks: []blockDefinition{
-				{
-					timestamp: 1,
-					gasUsed:   1_000_000,
-				},
-				{
-					timestamp: 3,
-					gasUsed:   1_000_000,
-				},
-				{
-					timestamp: 5,
-					gasUsed:   2_000_000,
-				},
-				{
-					timestamp: 5,
-					gasUsed:   6_000_000,
-				},
-				{
-					timestamp: 7,
-					gasUsed:   6_000_000,
-				},
-				{
-					timestamp: 1000,
-					gasUsed:   6_000_000,
-				},
-				{
-					timestamp: 1001,
-					gasUsed:   6_000_000,
-				},
-				{
-					timestamp: 1002,
-					gasUsed:   6_000_000,
-				},
+			name: "subnet_evm_first_block",
+			upgrades: params.NetworkUpgrades{
+				SubnetEVMTimestamp: utils.NewUint64(1),
 			},
+			parent: &types.Header{
+				Number: big.NewInt(1),
+			},
+			timestamp: 1,
+			want:      big.NewInt(feeConfig.MinBaseFee.Int64()),
+		},
+		{
+			name:     "subnet_evm_genesis_block",
+			upgrades: params.TestSubnetEVMChainConfig.NetworkUpgrades,
+			parent: &types.Header{
+				Number: big.NewInt(0),
+			},
+			want: big.NewInt(feeConfig.MinBaseFee.Int64()),
+		},
+		{
+			name:     "subnet_evm_invalid_fee_window",
+			upgrades: params.TestSubnetEVMChainConfig.NetworkUpgrades,
+			parent: &types.Header{
+				Number: big.NewInt(1),
+			},
+			wantErr: errDynamicFeeWindowInsufficientLength,
+		},
+		{
+			name:     "subnet_evm_invalid_timestamp",
+			upgrades: params.TestSubnetEVMChainConfig.NetworkUpgrades,
+			parent: &types.Header{
+				Number: big.NewInt(1),
+				Time:   1,
+				Extra:  feeWindowBytes(subnetevm.Window{}),
+			},
+			timestamp: 0,
+			wantErr:   errInvalidTimestamp,
+		},
+		{
+			name:     "subnet_evm_no_change",
+			upgrades: params.TestSubnetEVMChainConfig.NetworkUpgrades,
+			parent: &types.Header{
+				Number:  big.NewInt(1),
+				GasUsed: feeConfig.TargetGas.Uint64(),
+				Time:    1,
+				Extra:   feeWindowBytes(subnetevm.Window{}),
+				BaseFee: big.NewInt(feeConfig.MinBaseFee.Int64() + 1),
+			},
+			timestamp: 1,
+			want:      big.NewInt(feeConfig.MinBaseFee.Int64() + 1),
+		},
+		{
+			name:     "subnet_evm_small_decrease",
+			upgrades: params.TestSubnetEVMChainConfig.NetworkUpgrades,
+			parent: &types.Header{
+				Number:  big.NewInt(1),
+				Extra:   feeWindowBytes(subnetevm.Window{}),
+				BaseFee: big.NewInt(maxBaseFee),
+			},
+			timestamp: 1,
+			want: func() *big.Int {
+				var (
+					gasTarget                  = feeConfig.TargetGas.Int64()
+					gasUsed                    = int64(0)
+					amountUnderTarget          = gasTarget - gasUsed
+					parentBaseFee              = int64(maxBaseFee)
+					smoothingFactor            = feeConfig.BaseFeeChangeDenominator.Int64()
+					baseFeeFractionUnderTarget = amountUnderTarget * parentBaseFee / gasTarget
+					delta                      = baseFeeFractionUnderTarget / smoothingFactor
+					baseFee                    = parentBaseFee - delta
+				)
+				return big.NewInt(baseFee)
+			}(),
+		},
+		{
+			name:     "subnet_evm_large_decrease",
+			upgrades: params.TestSubnetEVMChainConfig.NetworkUpgrades,
+			parent: &types.Header{
+				Number:  big.NewInt(1),
+				Extra:   feeWindowBytes(subnetevm.Window{}),
+				BaseFee: big.NewInt(maxBaseFee),
+			},
+			timestamp: 2 * subnetevm.WindowLen,
+			want: func() *big.Int {
+				var (
+					gasTarget                  = feeConfig.TargetGas.Int64()
+					gasUsed                    = int64(0)
+					amountUnderTarget          = gasTarget - gasUsed
+					parentBaseFee              = int64(maxBaseFee)
+					smoothingFactor            = feeConfig.BaseFeeChangeDenominator.Int64()
+					baseFeeFractionUnderTarget = amountUnderTarget * parentBaseFee / gasTarget
+					windowsElapsed             = int64(2)
+					delta                      = windowsElapsed * baseFeeFractionUnderTarget / smoothingFactor
+					baseFee                    = parentBaseFee - delta
+				)
+				return big.NewInt(baseFee)
+			}(),
+		},
+		{
+			name:     "subnet_evm_increase",
+			upgrades: params.TestSubnetEVMChainConfig.NetworkUpgrades,
+			parent: &types.Header{
+				Number:  big.NewInt(1),
+				GasUsed: 2 * feeConfig.TargetGas.Uint64(),
+				Extra:   feeWindowBytes(subnetevm.Window{}),
+				BaseFee: big.NewInt(feeConfig.MinBaseFee.Int64()),
+			},
+			timestamp: 1,
+			want: func() *big.Int {
+				var (
+					gasTarget                 = feeConfig.TargetGas.Int64()
+					gasUsed                   = 2 * gasTarget
+					amountOverTarget          = gasUsed - gasTarget
+					parentBaseFee             = feeConfig.MinBaseFee.Int64()
+					smoothingFactor           = feeConfig.BaseFeeChangeDenominator.Int64()
+					baseFeeFractionOverTarget = amountOverTarget * parentBaseFee / gasTarget
+					delta                     = baseFeeFractionOverTarget / smoothingFactor
+					baseFee                   = parentBaseFee + delta
+				)
+				return big.NewInt(baseFee)
+			}(),
+		},
+		{
+			name:     "subnet_evm_big_1_not_modified",
+			upgrades: params.TestSubnetEVMChainConfig.NetworkUpgrades,
+			parent: &types.Header{
+				Number:  big.NewInt(1),
+				GasUsed: 1,
+				Extra:   feeWindowBytes(subnetevm.Window{}),
+				BaseFee: big.NewInt(1),
+			},
+			timestamp: 2 * subnetevm.WindowLen,
+			want:      big.NewInt(feeConfig.MinBaseFee.Int64()),
 		},
 	}
-
 	for _, test := range tests {
-		testDynamicFeesStaysWithinRange(t, test)
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			config := &params.ChainConfig{
+				NetworkUpgrades: test.upgrades,
+			}
+			got, err := BaseFee(config, feeConfig, test.parent, test.timestamp)
+			require.ErrorIs(err, test.wantErr)
+			require.Equal(test.want, got)
+
+			// Verify that [common.Big1] is not modified by [BaseFee].
+			require.Equal(big.NewInt(1), common.Big1)
+		})
 	}
-}
-
-func testDynamicFeesStaysWithinRange(t *testing.T, test test) {
-	blocks := test.blocks
-	initialBlock := blocks[0]
-	header := &types.Header{
-		Time:    initialBlock.timestamp,
-		GasUsed: initialBlock.gasUsed,
-		Number:  big.NewInt(0),
-		BaseFee: test.baseFee,
-	}
-
-	for index, block := range blocks[1:] {
-		testFeeConfig := commontype.FeeConfig{
-			GasLimit:        big.NewInt(8_000_000),
-			TargetBlockRate: 2, // in seconds
-
-			MinBaseFee:               test.minFee,
-			TargetGas:                big.NewInt(15_000_000),
-			BaseFeeChangeDenominator: big.NewInt(36),
-
-			MinBlockGasCost:  big.NewInt(0),
-			MaxBlockGasCost:  big.NewInt(1_000_000),
-			BlockGasCostStep: big.NewInt(200_000),
-		}
-
-		nextExtraData, err := ExtraPrefix(params.TestChainConfig, testFeeConfig, header, block.timestamp)
-		if err != nil {
-			t.Fatalf("Failed to calculate extra prefix at index %d: %s", index, err)
-		}
-		nextBaseFee, err := BaseFee(params.TestChainConfig, testFeeConfig, header, block.timestamp)
-		if err != nil {
-			t.Fatalf("Failed to calculate base fee at index %d: %s", index, err)
-		}
-		if nextBaseFee.Cmp(test.minFee) < 0 {
-			t.Fatalf("Expected fee to stay greater than %d, but found %d", test.minFee, nextBaseFee)
-		}
-		log.Info("Update", "baseFee", nextBaseFee)
-		header = &types.Header{
-			Time:    block.timestamp,
-			GasUsed: block.gasUsed,
-			Number:  big.NewInt(int64(index) + 1),
-			BaseFee: nextBaseFee,
-			Extra:   nextExtraData,
-		}
-	}
-}
-
-func TestCalcBaseFeeRegression(t *testing.T) {
-	parentTimestamp := uint64(1)
-	timestamp := parentTimestamp + subnetevm.WindowLen + 1000
-
-	parentHeader := &types.Header{
-		Time:    parentTimestamp,
-		GasUsed: 1_000_000,
-		Number:  big.NewInt(1),
-		BaseFee: big.NewInt(1),
-		Extra:   make([]byte, FeeWindowSize),
-	}
-
-	testFeeConfig := commontype.FeeConfig{
-		GasLimit:        big.NewInt(8_000_000),
-		TargetBlockRate: 2, // in seconds
-
-		MinBaseFee:               big.NewInt(1 * params.GWei),
-		TargetGas:                big.NewInt(15_000_000),
-		BaseFeeChangeDenominator: big.NewInt(100000),
-
-		MinBlockGasCost:  big.NewInt(0),
-		MaxBlockGasCost:  big.NewInt(1_000_000),
-		BlockGasCostStep: big.NewInt(200_000),
-	}
-	_, err := BaseFee(params.TestChainConfig, testFeeConfig, parentHeader, timestamp)
-	require.NoError(t, err)
-	require.Equalf(t, 0, common.Big1.Cmp(big.NewInt(1)), "big1 should be 1, got %s", common.Big1)
 }
 
 func TestEstimateNextBaseFee(t *testing.T) {
-	testBaseFee := uint64(225 * params.GWei)
+	t.Run("normal", func(t *testing.T) {
+		BlockGasCostTest(t, testFeeConfig)
+	})
+	t.Run("double", func(t *testing.T) {
+		BlockGasCostTest(t, testFeeConfigDouble)
+	})
+}
+
+func EstimateNextBaseFeeTest(t *testing.T, feeConfig commontype.FeeConfig) {
+	testBaseFee := uint64(225 * utils.GWei)
 	nilUpgrade := params.NetworkUpgrades{}
 	tests := []struct {
-		name string
-
-		upgrades params.NetworkUpgrades
-
-		parentTime           uint64
-		parentNumber         int64
-		parentExtra          []byte
-		parentBaseFee        *big.Int
-		parentGasUsed        uint64
-		parentExtDataGasUsed *big.Int
-
+		name      string
+		upgrades  params.NetworkUpgrades
+		parent    *types.Header
 		timestamp uint64
-
-		want    *big.Int
-		wantErr error
+		want      *big.Int
+		wantErr   error
 	}{
 		{
-			name:          "activated",
-			upgrades:      params.TestSubnetEVMChainConfig.NetworkUpgrades,
-			parentNumber:  1,
-			parentExtra:   feeWindowBytes(subnetevm.Window{}),
-			parentBaseFee: new(big.Int).SetUint64(testBaseFee),
-			timestamp:     1,
+			name:     "activated",
+			upgrades: params.TestSubnetEVMChainConfig.NetworkUpgrades,
+			parent: &types.Header{
+				Number:  big.NewInt(1),
+				Extra:   feeWindowBytes(subnetevm.Window{}),
+				BaseFee: new(big.Int).SetUint64(testBaseFee),
+			},
+			timestamp: 1,
 			want: func() *big.Int {
 				var (
-					gasTarget                  = testFeeConfig.TargetGas.Uint64()
+					gasTarget                  = feeConfig.TargetGas.Uint64()
 					gasUsed                    = uint64(0)
 					amountUnderTarget          = gasTarget - gasUsed
 					parentBaseFee              = testBaseFee
-					smoothingFactor            = testFeeConfig.BaseFeeChangeDenominator.Uint64()
+					smoothingFactor            = feeConfig.BaseFeeChangeDenominator.Uint64()
 					baseFeeFractionUnderTarget = amountUnderTarget * parentBaseFee / gasTarget
 					delta                      = baseFeeFractionUnderTarget / smoothingFactor
 					baseFee                    = parentBaseFee - delta
@@ -251,15 +252,7 @@ func TestEstimateNextBaseFee(t *testing.T) {
 			config := &params.ChainConfig{
 				NetworkUpgrades: test.upgrades,
 			}
-			parentHeader := &types.Header{
-				Time:    test.parentTime,
-				Number:  big.NewInt(test.parentNumber),
-				Extra:   test.parentExtra,
-				BaseFee: test.parentBaseFee,
-				GasUsed: test.parentGasUsed,
-			}
-
-			got, err := EstimateNextBaseFee(config, testFeeConfig, parentHeader, test.timestamp)
+			got, err := EstimateNextBaseFee(config, feeConfig, test.parent, test.timestamp)
 			require.ErrorIs(err, test.wantErr)
 			require.Equal(test.want, got)
 		})

@@ -18,7 +18,12 @@ var errEstimateBaseFeeWithoutActivation = errors.New("cannot estimate base fee f
 // calculates the expected base fee for the child block.
 //
 // Prior to SubnetEVM, the returned base fee will be nil.
-func BaseFee(config *params.ChainConfig, feeConfig commontype.FeeConfig, parent *types.Header, timestamp uint64) (*big.Int, error) {
+func BaseFee(
+	config *params.ChainConfig,
+	feeConfig commontype.FeeConfig,
+	parent *types.Header,
+	timestamp uint64,
+) (*big.Int, error) {
 	switch {
 	case config.IsSubnetEVM(timestamp):
 		return baseFeeFromWindow(config, feeConfig, parent, timestamp)
@@ -36,7 +41,12 @@ func BaseFee(config *params.ChainConfig, feeConfig commontype.FeeConfig, parent 
 //
 // Warning: This function should only be used in estimation and should not be
 // used when calculating the canonical base fee for a block.
-func EstimateNextBaseFee(config *params.ChainConfig, feeConfig commontype.FeeConfig, parent *types.Header, timestamp uint64) (*big.Int, error) {
+func EstimateNextBaseFee(
+	config *params.ChainConfig,
+	feeConfig commontype.FeeConfig,
+	parent *types.Header,
+	timestamp uint64,
+) (*big.Int, error) {
 	if config.SubnetEVMTimestamp == nil {
 		return nil, errEstimateBaseFeeWithoutActivation
 	}

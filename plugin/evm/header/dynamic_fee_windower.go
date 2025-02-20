@@ -23,8 +23,10 @@ import (
 const FeeWindowSize = wrappers.LongLen * subnetevm.WindowLen
 
 var (
-	maxUint256Plus1                       = new(big.Int).Lsh(common.Big1, 256)
-	maxUint256                            = new(big.Int).Sub(maxUint256Plus1, common.Big1)
+	maxUint256Plus1 = new(big.Int).Lsh(common.Big1, 256)
+	maxUint256      = new(big.Int).Sub(maxUint256Plus1, common.Big1)
+
+	errInvalidTimestamp                   = errors.New("invalid timestamp")
 	errDynamicFeeWindowInsufficientLength = errors.New("insufficient length for dynamic fee window")
 )
 
@@ -36,7 +38,7 @@ func baseFeeFromWindow(config *params.ChainConfig, feeConfig commontype.FeeConfi
 		return big.NewInt(feeConfig.MinBaseFee.Int64()), nil
 	}
 
-	dynamicFeeWindow, err := feeWindow(config, feeConfig, parent, timestamp)
+	dynamicFeeWindow, err := feeWindow(config, parent, timestamp)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +123,6 @@ func baseFeeFromWindow(config *params.ChainConfig, feeConfig commontype.FeeConfi
 // feeWindow should only be called if timestamp >= config.SubnetEVMTimestamp
 func feeWindow(
 	config *params.ChainConfig,
-	feeConfig commontype.FeeConfig,
 	parent *types.Header,
 	timestamp uint64,
 ) (subnetevm.Window, error) {
@@ -137,7 +138,8 @@ func feeWindow(
 	}
 
 	if timestamp < parent.Time {
-		return subnetevm.Window{}, fmt.Errorf("cannot calculate fee window for timestamp %d prior to parent timestamp %d",
+		return subnetevm.Window{}, fmt.Errorf("%w: timestamp %d prior to parent timestamp %d",
+			errInvalidTimestamp,
 			timestamp,
 			parent.Time,
 		)

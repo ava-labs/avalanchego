@@ -9,7 +9,10 @@ import (
 
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/core/types"
+	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -20,6 +23,7 @@ var (
 		BlockGasCostStep:         big.NewInt(50_000),
 		TargetGas:                big.NewInt(10_000_000),
 		BaseFeeChangeDenominator: big.NewInt(12),
+		MinBaseFee:               big.NewInt(25 * utils.GWei),
 	}
 
 	testFeeConfigDouble = commontype.FeeConfig{
@@ -28,7 +32,8 @@ var (
 		TargetBlockRate:          4,
 		BlockGasCostStep:         big.NewInt(100_000),
 		TargetGas:                big.NewInt(20_000_000),
-		BaseFeeChangeDenominator: big.NewInt(12),
+		BaseFeeChangeDenominator: big.NewInt(24),
+		MinBaseFee:               big.NewInt(50 * utils.GWei),
 	}
 )
 
@@ -184,6 +189,64 @@ func BlockGasCostWithStepTest(t *testing.T, feeConfig commontype.FeeConfig) {
 				blockGasCostStep,
 				test.timeElapsed,
 			))
+		})
+	}
+}
+
+func TestEstimateRequiredTip(t *testing.T) {
+	tests := []struct {
+		name               string
+		subnetEVMTimestamp *uint64
+		header             *types.Header
+		want               *big.Int
+		wantErr            error
+	}{
+		{
+			name:               "not_subnet_evm",
+			subnetEVMTimestamp: utils.NewUint64(1),
+			header:             &types.Header{},
+		},
+		{
+			name:               "nil_base_fee",
+			subnetEVMTimestamp: utils.NewUint64(0),
+			header: &types.Header{
+				BlockGasCost: big.NewInt(1),
+			},
+			wantErr: errBaseFeeNil,
+		},
+		{
+			name:               "nil_block_gas_cost",
+			subnetEVMTimestamp: utils.NewUint64(0),
+			header: &types.Header{
+				BaseFee: big.NewInt(1),
+			},
+			wantErr: errBlockGasCostNil,
+		},
+		{
+			name:               "success",
+			subnetEVMTimestamp: utils.NewUint64(0),
+			header: &types.Header{
+				GasUsed:      123,
+				BaseFee:      big.NewInt(456),
+				BlockGasCost: big.NewInt(101112),
+			},
+			// totalRequiredTips = BlockGasCost * BaseFee
+			// estimatedTip = totalRequiredTips / GasUsed
+			want: big.NewInt((101112 * 456) / (123)),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			config := &params.ChainConfig{
+				NetworkUpgrades: params.NetworkUpgrades{
+					SubnetEVMTimestamp: test.subnetEVMTimestamp,
+				},
+			}
+			requiredTip, err := EstimateRequiredTip(config, test.header)
+			require.ErrorIs(err, test.wantErr)
+			require.Equal(test.want, requiredTip)
 		})
 	}
 }
