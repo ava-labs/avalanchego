@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/plugin/evm/ap4"
+	"github.com/ava-labs/coreth/plugin/evm/ap5"
 	"github.com/ava-labs/coreth/plugin/evm/header"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
@@ -31,7 +32,7 @@ var (
 	EtnaMinBaseFee              = big.NewInt(params.EtnaMinBaseFee)
 
 	ApricotPhase3BaseFeeChangeDenominator = new(big.Int).SetUint64(params.ApricotPhase3BaseFeeChangeDenominator)
-	ApricotPhase5BaseFeeChangeDenominator = new(big.Int).SetUint64(params.ApricotPhase5BaseFeeChangeDenominator)
+	ApricotPhase5BaseFeeChangeDenominator = big.NewInt(ap5.BaseFeeChangeDenominator)
 
 	errEstimateBaseFeeWithoutActivation = errors.New("cannot estimate base fee for chain without apricot phase 3 scheduled")
 )
@@ -94,7 +95,7 @@ func calcBaseFeeWithWindow(config *extras.ChainConfig, parent *types.Header, tim
 	)
 	if isApricotPhase5 {
 		baseFeeChangeDenominator = ApricotPhase5BaseFeeChangeDenominator
-		parentGasTarget = params.ApricotPhase5TargetGas
+		parentGasTarget = ap5.TargetGas
 	}
 
 	// Calculate the amount of gas consumed within the rollup window.
