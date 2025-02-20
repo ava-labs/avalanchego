@@ -163,33 +163,41 @@ func (p *postForkCommonComponents) Verify(
 		)
 	}
 
-	// Set the epoch height for the first time
-	if p.vm.currentEpochHeight == 0 {
-		p.vm.currentEpochHeight = childPChainHeight
-		p.vm.ctx.Log.Info("set initial epoch height", zap.Uint64("epochHeight", p.vm.currentEpochHeight))
-	}
-
-	// Advance the epoch if enough time has passed
-	if child.Timestamp().After(p.vm.nextEpochStart) {
-		p.vm.ctx.Log.Info(
-			"epoch has ended",
-			zap.Time("epochEnd", p.vm.nextEpochStart),
-			zap.Uint64("epochHeight", p.vm.currentEpochHeight),
-			zap.Uint64("pChainHeight", childPChainHeight),
-		)
-
-		p.vm.nextEpochStart = child.Timestamp().Add(p.vm.epochLength)
-		p.vm.currentEpochHeight = childPChainHeight
-	}
-
-	contextPChainHeight := p.vm.currentEpochHeight
-
 	// TODO: Here's where we set the p-chain height for the inner block.
-	// if p.vm.Upgrades.IsEtnaActivated(childTimestamp) {
-	// 	contextPChainHeight = childPChainHeight
-	// } else {
-	// 	contextPChainHeight = parentPChainHeight
-	// }
+	var contextPChainHeight uint64
+	if p.vm.Upgrades.IsFUpgradeActivated(childTimestamp) {
+		// Set the epoch height for the first time
+		if p.vm.currentEpochHeight == 0 {
+			p.vm.currentEpochHeight = childPChainHeight
+			p.vm.nextEpochStart = parentTimestamp.Add(p.vm.Upgrades.FUpgradeEpochDuration)
+			p.vm.ctx.Log.Info(
+				"set initial epoch",
+				zap.Uint64("epochHeight", p.vm.currentEpochHeight),
+				zap.Time("epochStart", parentTimestamp),
+				zap.Time("epochEnd", p.vm.nextEpochStart),
+			)
+		}
+
+		// Advance the epoch if enough time has passed
+		if child.Timestamp().After(p.vm.nextEpochStart) {
+			p.vm.ctx.Log.Info(
+				"epoch has ended",
+				zap.Time("epochEnd", p.vm.nextEpochStart),
+				zap.Uint64("epochHeight", p.vm.currentEpochHeight),
+				zap.Uint64("pChainHeight", childPChainHeight),
+			)
+
+			p.vm.nextEpochStart = child.Timestamp().Add(p.vm.Upgrades.FUpgradeEpochDuration)
+			p.vm.currentEpochHeight = childPChainHeight
+		}
+
+		contextPChainHeight = p.vm.currentEpochHeight
+	} else if p.vm.Upgrades.IsEtnaActivated(childTimestamp) {
+		contextPChainHeight = childPChainHeight
+	} else {
+		// TODO: I assume we must continue to consider the pre-Etna case for syncing.
+		contextPChainHeight = parentPChainHeight
+	}
 
 	return p.vm.verifyAndRecordInnerBlk(
 		ctx,

@@ -74,6 +74,7 @@ var (
 		DurangoTime:                  InitiallyActiveTime,
 		EtnaTime:                     InitiallyActiveTime,
 		FUpgradeTime:                 InitiallyActiveTime,
+		FUpgradeEpochDuration:        time.Duration(30 * time.Second), // Placeholder value
 	}
 
 	ErrInvalidUpgradeTimes = errors.New("invalid upgrade configuration")
@@ -95,6 +96,8 @@ type Config struct {
 	DurangoTime                  time.Time `json:"durangoTime"`
 	EtnaTime                     time.Time `json:"etnaTime"`
 	FUpgradeTime                 time.Time `json:"fUpgradeTime"`
+	// TODO: confirm JSON unmarshalling works
+	FUpgradeEpochDuration time.Duration `json:"fUpgradeEpochDuration"`
 }
 
 func (c *Config) Validate() error {

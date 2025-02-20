@@ -110,7 +110,6 @@ type VM struct {
 	// [postForkBlock] and its inner block.
 	lastAcceptedTimestampGaugeVec *prometheus.GaugeVec
 
-	epochLength        time.Duration
 	nextEpochStart     time.Time
 	currentEpochHeight uint64
 }
@@ -247,8 +246,6 @@ func (vm *VM) Initialize(
 		[]string{"block_type"},
 	)
 
-	vm.epochLength = 10 * time.Second
-	vm.nextEpochStart = time.Now().Add(vm.epochLength)
 	vm.currentEpochHeight = 0
 
 	return errors.Join(
