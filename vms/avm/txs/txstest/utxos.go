@@ -28,7 +28,7 @@ var (
 
 func newUTXOs(
 	ctx *snow.Context,
-	state state.State,
+	state state.Interface,
 	sharedMemory atomic.SharedMemory,
 	codec codec.Manager,
 ) *utxos {
@@ -42,7 +42,7 @@ func newUTXOs(
 
 type utxos struct {
 	xchainID     ids.ID
-	state        state.State
+	state        state.Interface
 	sharedMemory atomic.SharedMemory
 	codec        codec.Manager
 }

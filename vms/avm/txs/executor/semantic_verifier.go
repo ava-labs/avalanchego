@@ -6,6 +6,7 @@ package executor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 
 	"github.com/ava-labs/avalanchego/ids"

@@ -10,6 +10,8 @@
 package statemock
 
 import (
+	context "context"
+	iter "iter"
 	reflect "reflect"
 	time "time"
 
@@ -94,17 +96,18 @@ func (mr *StateMockRecorder) AddUTXO(utxo any) *gomock.Call {
 }
 
 // Checksum mocks base method.
-func (m *State) Checksum() ids.ID {
+func (m *State) Checksum(ctx context.Context) (ids.ID, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Checksum")
+	ret := m.ctrl.Call(m, "Checksum", ctx)
 	ret0, _ := ret[0].(ids.ID)
-	return ret0
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // Checksum indicates an expected call of Checksum.
-func (mr *StateMockRecorder) Checksum() *gomock.Call {
+func (mr *StateMockRecorder) Checksum(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Checksum", reflect.TypeOf((*State)(nil).Checksum))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Checksum", reflect.TypeOf((*State)(nil).Checksum), ctx)
 }
 
 // Close mocks base method.
@@ -330,4 +333,18 @@ func (m *State) UTXOIDs(addr []byte, previous ids.ID, limit int) ([]ids.ID, erro
 func (mr *StateMockRecorder) UTXOIDs(addr, previous, limit any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UTXOIDs", reflect.TypeOf((*State)(nil).UTXOIDs), addr, previous, limit)
+}
+
+// UTXOs mocks base method.
+func (m *State) UTXOs(startingUTXOID ids.ID) iter.Seq2[*avax.UTXO, error] {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UTXOs", startingUTXOID)
+	ret0, _ := ret[0].(iter.Seq2[*avax.UTXO, error])
+	return ret0
+}
+
+// UTXOs indicates an expected call of UTXOs.
+func (mr *StateMockRecorder) UTXOs(startingUTXOID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UTXOs", reflect.TypeOf((*State)(nil).UTXOs), startingUTXOID)
 }
