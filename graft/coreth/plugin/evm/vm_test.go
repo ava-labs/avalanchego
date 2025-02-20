@@ -3276,7 +3276,7 @@ func TestBuildApricotPhase4Block(t *testing.T) {
 	if eExtDataGasUsed := ethBlk.ExtDataGasUsed(); eExtDataGasUsed == nil || eExtDataGasUsed.Cmp(big.NewInt(1230)) != 0 {
 		t.Fatalf("expected extDataGasUsed to be 1000 but got %d", eExtDataGasUsed)
 	}
-	minRequiredTip, err := header.MinRequiredTip(vm.chainConfig, ethBlk.Header())
+	minRequiredTip, err := header.EstimateRequiredTip(vm.chainConfig, ethBlk.Header())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3335,11 +3335,11 @@ func TestBuildApricotPhase4Block(t *testing.T) {
 	if ethBlk.ExtDataGasUsed() == nil || ethBlk.ExtDataGasUsed().Cmp(common.Big0) != 0 {
 		t.Fatalf("expected extDataGasUsed to be 0 but got %d", ethBlk.ExtDataGasUsed())
 	}
-	minRequiredTip, err = header.MinRequiredTip(vm.chainConfig, ethBlk.Header())
+	minRequiredTip, err = header.EstimateRequiredTip(vm.chainConfig, ethBlk.Header())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if minRequiredTip == nil || minRequiredTip.Cmp(big.NewInt(0.05*params.GWei)) < 0 {
+	if minRequiredTip == nil || minRequiredTip.Cmp(big.NewInt(0.05*utils.GWei)) < 0 {
 		t.Fatalf("expected minRequiredTip to be at least 0.05 gwei but got %d", minRequiredTip)
 	}
 
@@ -3446,7 +3446,7 @@ func TestBuildApricotPhase5Block(t *testing.T) {
 	if eExtDataGasUsed := ethBlk.ExtDataGasUsed(); eExtDataGasUsed == nil || eExtDataGasUsed.Cmp(big.NewInt(11230)) != 0 {
 		t.Fatalf("expected extDataGasUsed to be 11230 but got %d", eExtDataGasUsed)
 	}
-	minRequiredTip, err := header.MinRequiredTip(vm.chainConfig, ethBlk.Header())
+	minRequiredTip, err := header.EstimateRequiredTip(vm.chainConfig, ethBlk.Header())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3497,11 +3497,11 @@ func TestBuildApricotPhase5Block(t *testing.T) {
 	if ethBlk.ExtDataGasUsed() == nil || ethBlk.ExtDataGasUsed().Cmp(common.Big0) != 0 {
 		t.Fatalf("expected extDataGasUsed to be 0 but got %d", ethBlk.ExtDataGasUsed())
 	}
-	minRequiredTip, err = header.MinRequiredTip(vm.chainConfig, ethBlk.Header())
+	minRequiredTip, err = header.EstimateRequiredTip(vm.chainConfig, ethBlk.Header())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if minRequiredTip == nil || minRequiredTip.Cmp(big.NewInt(0.05*params.GWei)) < 0 {
+	if minRequiredTip == nil || minRequiredTip.Cmp(big.NewInt(0.05*utils.GWei)) < 0 {
 		t.Fatalf("expected minRequiredTip to be at least 0.05 gwei but got %d", minRequiredTip)
 	}
 

@@ -69,37 +69,39 @@ func BlockGasCostWithStep(
 	)
 }
 
-// MinRequiredTip is the estimated minimum tip a transaction would have
-// needed to pay to be included in a given block (assuming it paid a tip
-// proportional to its gas usage). In reality, there is no minimum tip that
-// is enforced by the consensus engine and high tip paying transactions can
-// subsidize the inclusion of low tip paying transactions. The only
-// correctness check performed is that the sum of all tips is >= the
-// required block fee.
+// EstimateRequiredTip is the estimated tip a transaction would have needed to
+// pay to be included in a given block (assuming it paid a tip proportional to
+// its gas usage).
+//
+// In reality, the consensus engine does not enforce a minimum tip on individual
+// transactions. The only correctness check performed is that the sum of all
+// tips is >= the required block fee.
 //
 // This function will return nil for all return values prior to Apricot Phase 4.
-func MinRequiredTip(config *params.ChainConfig, header *types.Header) (*big.Int, error) {
-	if !config.IsApricotPhase4(header.Time) {
+func EstimateRequiredTip(
+	config *params.ChainConfig,
+	header *types.Header,
+) (*big.Int, error) {
+	switch {
+	case !config.IsApricotPhase4(header.Time):
 		return nil, nil
-	}
-	if header.BaseFee == nil {
+	case header.BaseFee == nil:
 		return nil, errBaseFeeNil
-	}
-	if header.BlockGasCost == nil {
+	case header.BlockGasCost == nil:
 		return nil, errBlockGasCostNil
-	}
-	if header.ExtDataGasUsed == nil {
+	case header.ExtDataGasUsed == nil:
 		return nil, errExtDataGasUsedNil
 	}
 
-	// minTip = requiredBlockFee/blockGasUsage
-	requiredBlockFee := new(big.Int).Mul(
-		header.BlockGasCost,
-		header.BaseFee,
-	)
-	blockGasUsage := new(big.Int).Add(
-		new(big.Int).SetUint64(header.GasUsed),
-		header.ExtDataGasUsed,
-	)
-	return new(big.Int).Div(requiredBlockFee, blockGasUsage), nil
+	// totalGasUsed = GasUsed + ExtDataGasUsed
+	totalGasUsed := new(big.Int).SetUint64(header.GasUsed)
+	totalGasUsed.Add(totalGasUsed, header.ExtDataGasUsed)
+
+	// totalRequiredTips = blockGasCost * baseFee
+	totalRequiredTips := new(big.Int)
+	totalRequiredTips.Mul(header.BlockGasCost, header.BaseFee)
+
+	// estimatedTip = totalRequiredTips / totalGasUsed
+	estimatedTip := totalRequiredTips.Div(totalRequiredTips, totalGasUsed)
+	return estimatedTip, nil
 }
