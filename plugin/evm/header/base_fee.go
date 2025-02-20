@@ -17,7 +17,11 @@ var errEstimateBaseFeeWithoutActivation = errors.New("cannot estimate base fee f
 // calculates the expected base fee for the child block.
 //
 // Prior to AP3, the returned base fee will be nil.
-func BaseFee(config *params.ChainConfig, parent *types.Header, timestamp uint64) (*big.Int, error) {
+func BaseFee(
+	config *params.ChainConfig,
+	parent *types.Header,
+	timestamp uint64,
+) (*big.Int, error) {
 	switch {
 	case config.IsApricotPhase3(timestamp):
 		return baseFeeFromWindow(config, parent, timestamp)
@@ -35,7 +39,11 @@ func BaseFee(config *params.ChainConfig, parent *types.Header, timestamp uint64)
 //
 // Warning: This function should only be used in estimation and should not be
 // used when calculating the canonical base fee for a block.
-func EstimateNextBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uint64) (*big.Int, error) {
+func EstimateNextBaseFee(
+	config *params.ChainConfig,
+	parent *types.Header,
+	timestamp uint64,
+) (*big.Int, error) {
 	if config.ApricotPhase3BlockTimestamp == nil {
 		return nil, errEstimateBaseFeeWithoutActivation
 	}

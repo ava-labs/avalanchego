@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
+	"github.com/ava-labs/coreth/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/holiman/uint256"
 
@@ -574,7 +575,7 @@ func TestImportTxGasCost(t *testing.T) {
 			Keys:            [][]*secp256k1.PrivateKey{{testKeys[0]}},
 			ExpectedGasUsed: 1230,
 			ExpectedFee:     30750,
-			BaseFee:         big.NewInt(25 * params.GWei),
+			BaseFee:         big.NewInt(25 * utils.GWei),
 		},
 		"simple import 1wei": {
 			UnsignedImportTx: &atomic.UnsignedImportTx{
@@ -659,7 +660,7 @@ func TestImportTxGasCost(t *testing.T) {
 			Keys:            [][]*secp256k1.PrivateKey{{testKeys[0]}, {testKeys[0]}},
 			ExpectedGasUsed: 2318,
 			ExpectedFee:     57950,
-			BaseFee:         big.NewInt(25 * params.GWei),
+			BaseFee:         big.NewInt(25 * utils.GWei),
 		},
 		"complex ANT import": {
 			UnsignedImportTx: &atomic.UnsignedImportTx{
@@ -700,7 +701,7 @@ func TestImportTxGasCost(t *testing.T) {
 			Keys:            [][]*secp256k1.PrivateKey{{testKeys[0]}, {testKeys[0]}},
 			ExpectedGasUsed: 2378,
 			ExpectedFee:     59450,
-			BaseFee:         big.NewInt(25 * params.GWei),
+			BaseFee:         big.NewInt(25 * utils.GWei),
 		},
 		"multisig import": {
 			UnsignedImportTx: &atomic.UnsignedImportTx{
@@ -724,7 +725,7 @@ func TestImportTxGasCost(t *testing.T) {
 			Keys:            [][]*secp256k1.PrivateKey{{testKeys[0], testKeys[1]}},
 			ExpectedGasUsed: 2234,
 			ExpectedFee:     55850,
-			BaseFee:         big.NewInt(25 * params.GWei),
+			BaseFee:         big.NewInt(25 * utils.GWei),
 		},
 		"large import": {
 			UnsignedImportTx: &atomic.UnsignedImportTx{
@@ -835,7 +836,7 @@ func TestImportTxGasCost(t *testing.T) {
 			},
 			ExpectedGasUsed: 11022,
 			ExpectedFee:     275550,
-			BaseFee:         big.NewInt(25 * params.GWei),
+			BaseFee:         big.NewInt(25 * utils.GWei),
 		},
 	}
 

@@ -13,16 +13,17 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/ap5"
 	"github.com/ava-labs/coreth/utils"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBlockGasCost(t *testing.T) {
 	tests := []struct {
-		name                        string
-		apricotPhase5BlockTimestamp *uint64
-		parentTime                  uint64
-		parentCost                  *big.Int
-		timestamp                   uint64
-		expected                    uint64
+		name         string
+		ap5Timestamp *uint64
+		parentTime   uint64
+		parentCost   *big.Int
+		timestamp    uint64
+		expected     uint64
 	}{
 		{
 			name:       "normal_ap4",
@@ -32,12 +33,12 @@ func TestBlockGasCost(t *testing.T) {
 			expected:   ap4.MaxBlockGasCost - ap4.BlockGasCostStep,
 		},
 		{
-			name:                        "normal_ap5",
-			apricotPhase5BlockTimestamp: utils.NewUint64(0),
-			parentTime:                  10,
-			parentCost:                  big.NewInt(ap4.MaxBlockGasCost),
-			timestamp:                   10 + ap4.TargetBlockRate + 1,
-			expected:                    ap4.MaxBlockGasCost - ap5.BlockGasCostStep,
+			name:         "normal_ap5",
+			ap5Timestamp: utils.NewUint64(0),
+			parentTime:   10,
+			parentCost:   big.NewInt(ap4.MaxBlockGasCost),
+			timestamp:    10 + ap4.TargetBlockRate + 1,
+			expected:     ap4.MaxBlockGasCost - ap5.BlockGasCostStep,
 		},
 		{
 			name:       "negative_time_elapsed",
@@ -52,7 +53,7 @@ func TestBlockGasCost(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			config := &params.ChainConfig{
 				NetworkUpgrades: params.NetworkUpgrades{
-					ApricotPhase5BlockTimestamp: test.apricotPhase5BlockTimestamp,
+					ApricotPhase5BlockTimestamp: test.ap5Timestamp,
 				},
 			}
 			parent := &types.Header{
@@ -157,6 +158,77 @@ func TestBlockGasCostWithStep(t *testing.T) {
 				ap4.BlockGasCostStep,
 				test.timeElapsed,
 			))
+		})
+	}
+}
+
+func TestEstimateRequiredTip(t *testing.T) {
+	tests := []struct {
+		name         string
+		ap4Timestamp *uint64
+		header       *types.Header
+		want         *big.Int
+		wantErr      error
+	}{
+		{
+			name:         "not_ap4",
+			ap4Timestamp: utils.NewUint64(1),
+			header:       &types.Header{},
+		},
+		{
+			name:         "nil_base_fee",
+			ap4Timestamp: utils.NewUint64(0),
+			header: &types.Header{
+				ExtDataGasUsed: big.NewInt(1),
+				BlockGasCost:   big.NewInt(1),
+			},
+			wantErr: errBaseFeeNil,
+		},
+		{
+			name:         "nil_block_gas_cost",
+			ap4Timestamp: utils.NewUint64(0),
+			header: &types.Header{
+				BaseFee:        big.NewInt(1),
+				ExtDataGasUsed: big.NewInt(1),
+			},
+			wantErr: errBlockGasCostNil,
+		},
+		{
+			name:         "nil_extra_data_gas_used",
+			ap4Timestamp: utils.NewUint64(0),
+			header: &types.Header{
+				BaseFee:      big.NewInt(1),
+				BlockGasCost: big.NewInt(1),
+			},
+			wantErr: errExtDataGasUsedNil,
+		},
+		{
+			name:         "success",
+			ap4Timestamp: utils.NewUint64(0),
+			header: &types.Header{
+				GasUsed:        123,
+				ExtDataGasUsed: big.NewInt(789),
+				BaseFee:        big.NewInt(456),
+				BlockGasCost:   big.NewInt(101112),
+			},
+			// totalGasUsed = GasUsed + ExtDataGasUsed
+			// totalRequiredTips = BlockGasCost * BaseFee
+			// estimatedTip = totalRequiredTips / totalGasUsed
+			want: big.NewInt((101112 * 456) / (123 + 789)),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			config := &params.ChainConfig{
+				NetworkUpgrades: params.NetworkUpgrades{
+					ApricotPhase4BlockTimestamp: test.ap4Timestamp,
+				},
+			}
+			requiredTip, err := EstimateRequiredTip(config, test.header)
+			require.ErrorIs(err, test.wantErr)
+			require.Equal(test.want, requiredTip)
 		})
 	}
 }

@@ -7,7 +7,7 @@ package ap3
 import (
 	"math"
 
-	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/utils"
 	safemath "github.com/ethereum/go-ethereum/common/math"
 )
 
@@ -19,13 +19,13 @@ const (
 	// upgrade.
 	//
 	// This value was modified in Apricot Phase 4.
-	MinBaseFee = 75 * params.GWei
+	MinBaseFee = 75 * utils.GWei
 
 	// MaxBaseFee is the maximum base fee that is allowed after Apricot Phase 3
 	// upgrade.
 	//
 	// This value was modified in Apricot Phase 4.
-	MaxBaseFee = 225 * params.GWei
+	MaxBaseFee = 225 * utils.GWei
 
 	// InitialBaseFee is the base fee that is used for the first Apricot Phase 3
 	// block.

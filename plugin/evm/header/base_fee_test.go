@@ -11,328 +11,344 @@ import (
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/ap3"
 	"github.com/ava-labs/coreth/plugin/evm/ap4"
+	"github.com/ava-labs/coreth/plugin/evm/ap5"
+	"github.com/ava-labs/coreth/utils"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-type blockDefinition struct {
-	timestamp      uint64
-	gasUsed        uint64
-	extDataGasUsed *big.Int
-}
-
-type test struct {
-	blocks         []blockDefinition
-	minFee, maxFee *big.Int
-}
-
-func TestDynamicFees(t *testing.T) {
-	spacedTimestamps := []uint64{1, 1, 2, 5, 15, 120}
-
-	tests := []test{
-		// Test minimal gas usage
-		{
-			minFee: big.NewInt(ap3.MinBaseFee),
-			maxFee: big.NewInt(ap3.MaxBaseFee),
-			blocks: func() []blockDefinition {
-				blocks := make([]blockDefinition, 0, len(spacedTimestamps))
-				for _, timestamp := range spacedTimestamps {
-					blocks = append(blocks, blockDefinition{
-						timestamp: timestamp,
-						gasUsed:   21000,
-					})
-				}
-				return blocks
-			}(),
-		},
-		// Test overflow handling
-		{
-			minFee: big.NewInt(ap3.MinBaseFee),
-			maxFee: big.NewInt(ap3.MaxBaseFee),
-			blocks: func() []blockDefinition {
-				blocks := make([]blockDefinition, 0, len(spacedTimestamps))
-				for _, timestamp := range spacedTimestamps {
-					blocks = append(blocks, blockDefinition{
-						timestamp: timestamp,
-						gasUsed:   math.MaxUint64,
-					})
-				}
-				return blocks
-			}(),
-		},
-		{
-			minFee: big.NewInt(ap3.MinBaseFee),
-			maxFee: big.NewInt(ap3.MaxBaseFee),
-			blocks: []blockDefinition{
-				{
-					timestamp: 1,
-					gasUsed:   1_000_000,
-				},
-				{
-					timestamp: 3,
-					gasUsed:   1_000_000,
-				},
-				{
-					timestamp: 5,
-					gasUsed:   2_000_000,
-				},
-				{
-					timestamp: 5,
-					gasUsed:   6_000_000,
-				},
-				{
-					timestamp: 7,
-					gasUsed:   6_000_000,
-				},
-				{
-					timestamp: 1000,
-					gasUsed:   6_000_000,
-				},
-				{
-					timestamp: 1001,
-					gasUsed:   6_000_000,
-				},
-				{
-					timestamp: 1002,
-					gasUsed:   6_000_000,
-				},
-			},
-		},
-	}
-
-	for _, test := range tests {
-		testDynamicFeesStaysWithinRange(t, test)
-	}
-}
-
-func testDynamicFeesStaysWithinRange(t *testing.T, test test) {
-	blocks := test.blocks
-	initialBlock := blocks[0]
-	header := &types.Header{
-		Time:    initialBlock.timestamp,
-		GasUsed: initialBlock.gasUsed,
-		Number:  big.NewInt(0),
-	}
-
-	for index, block := range blocks[1:] {
-		nextExtraData, err := ExtraPrefix(params.TestApricotPhase3Config, header, block.timestamp)
-		if err != nil {
-			t.Fatalf("Failed to calculate extra prefix at index %d: %s", index, err)
-		}
-		nextBaseFee, err := BaseFee(params.TestApricotPhase3Config, header, block.timestamp)
-		if err != nil {
-			t.Fatalf("Failed to calculate base fee at index %d: %s", index, err)
-		}
-		if nextBaseFee.Cmp(test.maxFee) > 0 {
-			t.Fatalf("Expected fee to stay less than %d, but found %d", test.maxFee, nextBaseFee)
-		}
-		if nextBaseFee.Cmp(test.minFee) < 0 {
-			t.Fatalf("Expected fee to stay greater than %d, but found %d", test.minFee, nextBaseFee)
-		}
-		log.Info("Update", "baseFee", nextBaseFee)
-		header = &types.Header{
-			Time:    block.timestamp,
-			GasUsed: block.gasUsed,
-			Number:  big.NewInt(int64(index) + 1),
-			BaseFee: nextBaseFee,
-			Extra:   nextExtraData,
-		}
-	}
-}
-
-// TestCalcBaseFeeAP4 confirms that the inclusion of ExtDataGasUsage increases
-// the base fee.
-func TestCalcBaseFeeAP4(t *testing.T) {
-	events := []struct {
-		block             blockDefinition
-		extDataFeeGreater bool
+func TestBaseFee(t *testing.T) {
+	tests := []struct {
+		name      string
+		upgrades  params.NetworkUpgrades
+		parent    *types.Header
+		timestamp uint64
+		want      *big.Int
+		wantErr   error
 	}{
 		{
-			block: blockDefinition{
-				timestamp:      1,
-				gasUsed:        1_000_000,
-				extDataGasUsed: big.NewInt(100_000),
-			},
+			name:     "ap2",
+			upgrades: params.TestApricotPhase2Config.NetworkUpgrades,
+			want:     nil,
+			wantErr:  nil,
 		},
 		{
-			block: blockDefinition{
-				timestamp:      3,
-				gasUsed:        1_000_000,
-				extDataGasUsed: big.NewInt(10_000),
+			name: "ap3_first_block",
+			upgrades: params.NetworkUpgrades{
+				ApricotPhase3BlockTimestamp: utils.NewUint64(1),
 			},
-			extDataFeeGreater: true,
+			parent: &types.Header{
+				Number: big.NewInt(1),
+			},
+			timestamp: 1,
+			want:      big.NewInt(ap3.InitialBaseFee),
 		},
 		{
-			block: blockDefinition{
-				timestamp:      5,
-				gasUsed:        2_000_000,
-				extDataGasUsed: big.NewInt(50_000),
+			name:     "ap3_genesis_block",
+			upgrades: params.TestApricotPhase3Config.NetworkUpgrades,
+			parent: &types.Header{
+				Number: big.NewInt(0),
 			},
-			extDataFeeGreater: true,
+			want: big.NewInt(ap3.InitialBaseFee),
 		},
 		{
-			block: blockDefinition{
-				timestamp:      5,
-				gasUsed:        6_000_000,
-				extDataGasUsed: big.NewInt(50_000),
+			name:     "ap3_invalid_fee_window",
+			upgrades: params.TestApricotPhase3Config.NetworkUpgrades,
+			parent: &types.Header{
+				Number: big.NewInt(1),
 			},
-			extDataFeeGreater: true,
+			wantErr: errDynamicFeeWindowInsufficientLength,
 		},
 		{
-			block: blockDefinition{
-				timestamp:      7,
-				gasUsed:        6_000_000,
-				extDataGasUsed: big.NewInt(0),
+			name:     "ap3_invalid_timestamp",
+			upgrades: params.TestApricotPhase3Config.NetworkUpgrades,
+			parent: &types.Header{
+				Number: big.NewInt(1),
+				Time:   1,
+				Extra:  feeWindowBytes(ap3.Window{}),
 			},
-			extDataFeeGreater: true,
+			timestamp: 0,
+			wantErr:   errInvalidTimestamp,
 		},
 		{
-			block: blockDefinition{
-				timestamp:      1000,
-				gasUsed:        6_000_000,
-				extDataGasUsed: big.NewInt(0),
+			name:     "ap3_no_change",
+			upgrades: params.TestApricotPhase3Config.NetworkUpgrades,
+			parent: &types.Header{
+				Number:  big.NewInt(1),
+				GasUsed: ap3.TargetGas - ap3.IntrinsicBlockGas,
+				Time:    1,
+				Extra:   feeWindowBytes(ap3.Window{}),
+				BaseFee: big.NewInt(ap3.MinBaseFee + 1),
 			},
+			timestamp: 1,
+			want:      big.NewInt(ap3.MinBaseFee + 1),
 		},
 		{
-			block: blockDefinition{
-				timestamp:      1001,
-				gasUsed:        6_000_000,
-				extDataGasUsed: big.NewInt(10_000),
+			name:     "ap3_small_decrease",
+			upgrades: params.TestApricotPhase3Config.NetworkUpgrades,
+			parent: &types.Header{
+				Number:  big.NewInt(1),
+				Extra:   feeWindowBytes(ap3.Window{}),
+				BaseFee: big.NewInt(ap3.MaxBaseFee),
 			},
+			timestamp: 1,
+			want: func() *big.Int {
+				const (
+					gasTarget                  = ap3.TargetGas
+					gasUsed                    = ap3.IntrinsicBlockGas
+					amountUnderTarget          = gasTarget - gasUsed
+					parentBaseFee              = ap3.MaxBaseFee
+					smoothingFactor            = ap3.BaseFeeChangeDenominator
+					baseFeeFractionUnderTarget = amountUnderTarget * parentBaseFee / gasTarget
+					delta                      = baseFeeFractionUnderTarget / smoothingFactor
+					baseFee                    = parentBaseFee - delta
+				)
+				return big.NewInt(baseFee)
+			}(),
 		},
 		{
-			block: blockDefinition{
-				timestamp:      1002,
-				gasUsed:        6_000_000,
-				extDataGasUsed: big.NewInt(0),
+			name:     "ap3_large_decrease",
+			upgrades: params.TestApricotPhase3Config.NetworkUpgrades,
+			parent: &types.Header{
+				Number:  big.NewInt(1),
+				Extra:   feeWindowBytes(ap3.Window{}),
+				BaseFee: big.NewInt(ap3.MaxBaseFee),
 			},
-			extDataFeeGreater: true,
+			timestamp: 2 * ap3.WindowLen,
+			want: func() *big.Int {
+				const (
+					gasTarget                  = ap3.TargetGas
+					gasUsed                    = 0
+					amountUnderTarget          = gasTarget - gasUsed
+					parentBaseFee              = ap3.MaxBaseFee
+					smoothingFactor            = ap3.BaseFeeChangeDenominator
+					baseFeeFractionUnderTarget = amountUnderTarget * parentBaseFee / gasTarget
+					windowsElapsed             = 2
+					delta                      = windowsElapsed * baseFeeFractionUnderTarget / smoothingFactor
+					baseFee                    = parentBaseFee - delta
+				)
+				return big.NewInt(baseFee)
+			}(),
+		},
+		{
+			name:     "ap3_increase",
+			upgrades: params.TestApricotPhase3Config.NetworkUpgrades,
+			parent: &types.Header{
+				Number:  big.NewInt(1),
+				GasUsed: 2 * ap3.TargetGas,
+				Extra:   feeWindowBytes(ap3.Window{}),
+				BaseFee: big.NewInt(ap3.MinBaseFee),
+			},
+			timestamp: 1,
+			want: func() *big.Int {
+				const (
+					gasTarget                 = ap3.TargetGas
+					gasUsed                   = 2*ap3.TargetGas + ap3.IntrinsicBlockGas
+					amountOverTarget          = gasUsed - gasTarget
+					parentBaseFee             = ap3.MinBaseFee
+					smoothingFactor           = ap3.BaseFeeChangeDenominator
+					baseFeeFractionOverTarget = amountOverTarget * parentBaseFee / gasTarget
+					delta                     = baseFeeFractionOverTarget / smoothingFactor
+					baseFee                   = parentBaseFee + delta
+				)
+				return big.NewInt(baseFee)
+			}(),
+		},
+		{
+			name:     "ap3_big_1_not_modified",
+			upgrades: params.TestApricotPhase3Config.NetworkUpgrades,
+			parent: &types.Header{
+				Number:  big.NewInt(1),
+				GasUsed: 1,
+				Extra:   feeWindowBytes(ap3.Window{}),
+				BaseFee: big.NewInt(1),
+			},
+			timestamp: 2 * ap3.WindowLen,
+			want:      big.NewInt(ap3.MinBaseFee),
+		},
+		{
+			name:     "ap4_genesis_block",
+			upgrades: params.TestApricotPhase4Config.NetworkUpgrades,
+			parent: &types.Header{
+				Number: big.NewInt(0),
+			},
+			want: big.NewInt(ap3.InitialBaseFee),
+		},
+		{
+			name:     "ap4_decrease",
+			upgrades: params.TestApricotPhase4Config.NetworkUpgrades,
+			parent: &types.Header{
+				Number:       big.NewInt(1),
+				Extra:        feeWindowBytes(ap3.Window{}),
+				BaseFee:      big.NewInt(ap4.MaxBaseFee),
+				BlockGasCost: big.NewInt(ap4.MinBlockGasCost),
+			},
+			timestamp: 1,
+			want: func() *big.Int {
+				const (
+					gasTarget                  = ap3.TargetGas
+					gasUsed                    = (ap4.TargetBlockRate - 1) * ap4.BlockGasCostStep
+					amountUnderTarget          = gasTarget - gasUsed
+					parentBaseFee              = ap4.MaxBaseFee
+					smoothingFactor            = ap3.BaseFeeChangeDenominator
+					baseFeeFractionUnderTarget = amountUnderTarget * parentBaseFee / gasTarget
+					delta                      = baseFeeFractionUnderTarget / smoothingFactor
+					baseFee                    = parentBaseFee - delta
+				)
+				return big.NewInt(baseFee)
+			}(),
+		},
+		{
+			name:     "ap4_increase",
+			upgrades: params.TestApricotPhase4Config.NetworkUpgrades,
+			parent: &types.Header{
+				Number:         big.NewInt(1),
+				GasUsed:        ap3.TargetGas,
+				Extra:          feeWindowBytes(ap3.Window{}),
+				BaseFee:        big.NewInt(ap4.MinBaseFee),
+				ExtDataGasUsed: big.NewInt(ap3.TargetGas),
+				BlockGasCost:   big.NewInt(ap4.MinBlockGasCost),
+			},
+			timestamp: 1,
+			want: func() *big.Int {
+				const (
+					gasTarget                 = ap3.TargetGas
+					gasUsed                   = 2*ap3.TargetGas + (ap4.TargetBlockRate-1)*ap4.BlockGasCostStep
+					amountOverTarget          = gasUsed - gasTarget
+					parentBaseFee             = ap4.MinBaseFee
+					smoothingFactor           = ap3.BaseFeeChangeDenominator
+					baseFeeFractionOverTarget = amountOverTarget * parentBaseFee / gasTarget
+					delta                     = baseFeeFractionOverTarget / smoothingFactor
+					baseFee                   = parentBaseFee + delta
+				)
+				return big.NewInt(baseFee)
+			}(),
+		},
+		{
+			name:     "ap5_genesis_block",
+			upgrades: params.TestApricotPhase5Config.NetworkUpgrades,
+			parent: &types.Header{
+				Number: big.NewInt(0),
+			},
+			want: big.NewInt(ap3.InitialBaseFee),
+		},
+		{
+			name:     "ap5_decrease",
+			upgrades: params.TestApricotPhase5Config.NetworkUpgrades,
+			parent: &types.Header{
+				Number:  big.NewInt(1),
+				Extra:   feeWindowBytes(ap3.Window{}),
+				BaseFee: big.NewInt(ap4.MaxBaseFee),
+			},
+			timestamp: 1,
+			want: func() *big.Int {
+				const (
+					gasTarget                  = ap5.TargetGas
+					gasUsed                    = 0
+					amountUnderTarget          = gasTarget - gasUsed
+					parentBaseFee              = ap4.MaxBaseFee
+					smoothingFactor            = ap5.BaseFeeChangeDenominator
+					baseFeeFractionUnderTarget = amountUnderTarget * parentBaseFee / gasTarget
+					delta                      = baseFeeFractionUnderTarget / smoothingFactor
+					baseFee                    = parentBaseFee - delta
+				)
+				return big.NewInt(baseFee)
+			}(),
+		},
+		{
+			name:     "ap5_increase",
+			upgrades: params.TestApricotPhase5Config.NetworkUpgrades,
+			parent: &types.Header{
+				Number:         big.NewInt(1),
+				GasUsed:        ap5.TargetGas,
+				Extra:          feeWindowBytes(ap3.Window{}),
+				BaseFee:        big.NewInt(ap4.MinBaseFee),
+				ExtDataGasUsed: big.NewInt(ap5.TargetGas),
+			},
+			timestamp: 1,
+			want: func() *big.Int {
+				const (
+					gasTarget                 = ap5.TargetGas
+					gasUsed                   = 2 * ap5.TargetGas
+					amountOverTarget          = gasUsed - gasTarget
+					parentBaseFee             = ap4.MinBaseFee
+					smoothingFactor           = ap5.BaseFeeChangeDenominator
+					baseFeeFractionOverTarget = amountOverTarget * parentBaseFee / gasTarget
+					delta                     = baseFeeFractionOverTarget / smoothingFactor
+					baseFee                   = parentBaseFee + delta
+				)
+				return big.NewInt(baseFee)
+			}(),
+		},
+		{
+			name:     "etna_genesis_block",
+			upgrades: params.TestEtnaChainConfig.NetworkUpgrades,
+			parent: &types.Header{
+				Number: big.NewInt(0),
+			},
+			want: big.NewInt(ap3.InitialBaseFee),
+		},
+		{
+			name:     "etna_increase",
+			upgrades: params.TestEtnaChainConfig.NetworkUpgrades,
+			parent: &types.Header{
+				Number:         big.NewInt(1),
+				GasUsed:        ap5.TargetGas,
+				Extra:          feeWindowBytes(ap3.Window{}),
+				BaseFee:        big.NewInt(params.EtnaMinBaseFee),
+				ExtDataGasUsed: big.NewInt(ap5.TargetGas),
+			},
+			timestamp: 1,
+			want: func() *big.Int {
+				const (
+					gasTarget                 = ap5.TargetGas
+					gasUsed                   = 2 * ap5.TargetGas
+					amountOverTarget          = gasUsed - gasTarget
+					parentBaseFee             = params.EtnaMinBaseFee
+					smoothingFactor           = ap5.BaseFeeChangeDenominator
+					baseFeeFractionOverTarget = amountOverTarget * parentBaseFee / gasTarget
+					delta                     = baseFeeFractionOverTarget / smoothingFactor
+					baseFee                   = parentBaseFee + delta
+				)
+				return big.NewInt(baseFee)
+			}(),
 		},
 	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
 
-	header := &types.Header{
-		Time:    0,
-		GasUsed: 1_000_000,
-		Number:  big.NewInt(0),
-		BaseFee: big.NewInt(225 * params.GWei),
-		Extra:   nil,
+			config := &params.ChainConfig{
+				NetworkUpgrades: test.upgrades,
+			}
+			got, err := BaseFee(config, test.parent, test.timestamp)
+			require.ErrorIs(err, test.wantErr)
+			require.Equal(test.want, got)
+
+			// Verify that [common.Big1] is not modified by [BaseFee].
+			require.Equal(big.NewInt(1), common.Big1)
+		})
 	}
-	extDataHeader := &types.Header{
-		Time:    0,
-		GasUsed: 1_000_000,
-		Number:  big.NewInt(0),
-		BaseFee: big.NewInt(225 * params.GWei),
-		Extra:   nil,
-		// ExtDataGasUsage is set to be nil to ensure CalcBaseFee can handle the
-		// AP3/AP4 boundary.
-	}
-
-	for index, event := range events {
-		block := event.block
-		nextExtraData, err := ExtraPrefix(params.TestApricotPhase4Config, header, block.timestamp)
-		assert.NoError(t, err)
-		nextBaseFee, err := BaseFee(params.TestApricotPhase4Config, header, block.timestamp)
-		assert.NoError(t, err)
-		log.Info("Update", "baseFee", nextBaseFee)
-		header = &types.Header{
-			Time:    block.timestamp,
-			GasUsed: block.gasUsed,
-			Number:  big.NewInt(int64(index) + 1),
-			BaseFee: nextBaseFee,
-			Extra:   nextExtraData,
-		}
-
-		nextExtraData, err = ExtraPrefix(params.TestApricotPhase4Config, extDataHeader, block.timestamp)
-		assert.NoError(t, err)
-		nextBaseFee, err = BaseFee(params.TestApricotPhase4Config, extDataHeader, block.timestamp)
-		assert.NoError(t, err)
-		log.Info("Update", "baseFee (w/extData)", nextBaseFee)
-		extDataHeader = &types.Header{
-			Time:           block.timestamp,
-			GasUsed:        block.gasUsed,
-			Number:         big.NewInt(int64(index) + 1),
-			BaseFee:        nextBaseFee,
-			Extra:          nextExtraData,
-			ExtDataGasUsed: block.extDataGasUsed,
-		}
-
-		assert.Equal(t, event.extDataFeeGreater, extDataHeader.BaseFee.Cmp(header.BaseFee) == 1, "unexpected cmp for index %d", index)
-	}
-}
-
-func TestDynamicFeesEtna(t *testing.T) {
-	require := require.New(t)
-	header := &types.Header{
-		Number: big.NewInt(0),
-	}
-
-	timestamp := uint64(1)
-	extra, err := ExtraPrefix(params.TestEtnaChainConfig, header, timestamp)
-	require.NoError(err)
-	nextBaseFee, err := BaseFee(params.TestEtnaChainConfig, header, timestamp)
-	require.NoError(err)
-	// Genesis matches the initial base fee
-	require.Equal(int64(ap3.InitialBaseFee), nextBaseFee.Int64())
-
-	timestamp = uint64(10_000)
-	header = &types.Header{
-		Number:  big.NewInt(1),
-		Time:    header.Time,
-		BaseFee: nextBaseFee,
-		Extra:   extra,
-	}
-	nextBaseFee, err = BaseFee(params.TestEtnaChainConfig, header, timestamp)
-	require.NoError(err)
-	// After some time has passed in the Etna phase, the base fee should drop
-	// lower than the prior base fee minimum.
-	require.Less(nextBaseFee.Int64(), int64(ap4.MinBaseFee))
-}
-
-func TestCalcBaseFeeRegression(t *testing.T) {
-	parentTimestamp := uint64(1)
-	timestamp := parentTimestamp + ap3.WindowLen + 1000
-
-	parentHeader := &types.Header{
-		Time:    parentTimestamp,
-		GasUsed: 14_999_999,
-		Number:  big.NewInt(1),
-		BaseFee: big.NewInt(1),
-		Extra:   make([]byte, FeeWindowSize),
-	}
-
-	_, err := BaseFee(params.TestChainConfig, parentHeader, timestamp)
-	require.NoError(t, err)
-	require.Equalf(t, 0, common.Big1.Cmp(big.NewInt(1)), "big1 should be 1, got %s", common.Big1)
 }
 
 func TestEstimateNextBaseFee(t *testing.T) {
 	tests := []struct {
-		name string
-
-		upgrades params.NetworkUpgrades
-
-		parentTime           uint64
-		parentNumber         int64
-		parentExtra          []byte
-		parentBaseFee        *big.Int
-		parentGasUsed        uint64
-		parentExtDataGasUsed *big.Int
-
+		name      string
+		upgrades  params.NetworkUpgrades
+		parent    *types.Header
 		timestamp uint64
-
-		want    *big.Int
-		wantErr error
+		want      *big.Int
+		wantErr   error
 	}{
 		{
-			name:          "ap3",
-			upgrades:      params.TestApricotPhase3Config.NetworkUpgrades,
-			parentNumber:  1,
-			parentExtra:   feeWindowBytes(ap3.Window{}),
-			parentBaseFee: big.NewInt(ap3.MaxBaseFee),
-			timestamp:     1,
+			name:     "ap3",
+			upgrades: params.TestApricotPhase3Config.NetworkUpgrades,
+			parent: &types.Header{
+				Number:  big.NewInt(1),
+				Extra:   feeWindowBytes(ap3.Window{}),
+				BaseFee: big.NewInt(ap3.MaxBaseFee),
+			},
+			timestamp: 1,
 			want: func() *big.Int {
 				const (
 					gasTarget                  = ap3.TargetGas
@@ -360,16 +376,7 @@ func TestEstimateNextBaseFee(t *testing.T) {
 			config := &params.ChainConfig{
 				NetworkUpgrades: test.upgrades,
 			}
-			parentHeader := &types.Header{
-				Time:           test.parentTime,
-				Number:         big.NewInt(test.parentNumber),
-				Extra:          test.parentExtra,
-				BaseFee:        test.parentBaseFee,
-				GasUsed:        test.parentGasUsed,
-				ExtDataGasUsed: test.parentExtDataGasUsed,
-			}
-
-			got, err := EstimateNextBaseFee(config, parentHeader, test.timestamp)
+			got, err := EstimateNextBaseFee(config, test.parent, test.timestamp)
 			require.ErrorIs(err, test.wantErr)
 			require.Equal(test.want, got)
 		})
