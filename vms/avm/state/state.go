@@ -4,8 +4,10 @@
 package state
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -16,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -29,6 +32,7 @@ const (
 
 var (
 	utxoPrefix      = []byte("utxo")
+	indexPrefix     = []byte("index")
 	txPrefix        = []byte("tx")
 	blockIDPrefix   = []byte("blockID")
 	blockPrefix     = []byte("block")
@@ -90,7 +94,11 @@ type State interface {
 	CommitBatch() (database.Batch, error)
 
 	// Checksum returns the current state checksum.
-	Checksum() ids.ID
+	Checksum(ctx context.Context) (ids.ID, error)
+
+	UTXOs() iter.Seq2[*avax.UTXO, error]
+	Txs() iter.Seq2[*txs.Tx, error]
+	Blocks() iter.Seq2[block.Block, error]
 
 	Close() error
 }
@@ -147,9 +155,34 @@ func New(
 	blockIDDB := prefixdb.New(blockIDPrefix, db)
 	blockDB := prefixdb.New(blockPrefix, db)
 	singletonDB := prefixdb.New(singletonPrefix, db)
+	return NewWithFormat(
+		"",
+		db,
+		utxoDB,
+		txDB,
+		blockIDDB,
+		blockDB,
+		singletonDB,
+		parser,
+		metrics,
+		trackChecksums,
+	)
+}
 
+func NewWithFormat(
+	namespace string,
+	db *versiondb.Database,
+	utxoDB database.Database,
+	txDB database.Database,
+	blockIDDB database.Database,
+	blockDB database.Database,
+	singletonDB database.Database,
+	parser block.Parser,
+	metrics prometheus.Registerer,
+	trackChecksums bool,
+) (*state, error) {
 	txCache, err := metercacher.New[ids.ID, *txs.Tx](
-		"tx_cache",
+		metric.AppendNamespace(namespace, "tx_cache"),
 		metrics,
 		&cache.LRU[ids.ID, *txs.Tx]{Size: txCacheSize},
 	)
@@ -158,7 +191,7 @@ func New(
 	}
 
 	blockIDCache, err := metercacher.New[uint64, ids.ID](
-		"block_id_cache",
+		metric.AppendNamespace(namespace, "block_id_cache"),
 		metrics,
 		&cache.LRU[uint64, ids.ID]{Size: blockIDCacheSize},
 	)
@@ -167,7 +200,7 @@ func New(
 	}
 
 	blockCache, err := metercacher.New[ids.ID, block.Block](
-		"block_cache",
+		metric.AppendNamespace(namespace, "block_cache"),
 		metrics,
 		&cache.LRU[ids.ID, block.Block]{Size: blockCacheSize},
 	)
@@ -175,7 +208,14 @@ func New(
 		return nil, err
 	}
 
-	utxoState, err := avax.NewMeteredUTXOState(utxoDB, parser.Codec(), metrics, trackChecksums)
+	utxoState, err := avax.NewMeteredUTXOState(
+		namespace,
+		prefixdb.New(utxoPrefix, utxoDB),
+		prefixdb.New(indexPrefix, utxoDB),
+		parser.Codec(),
+		metrics,
+		trackChecksums,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -400,6 +440,43 @@ func (s *state) CommitBatch() (database.Batch, error) {
 	return s.db.CommitBatch()
 }
 
+func (s *state) UTXOs() iter.Seq2[*avax.UTXO, error] {
+	return s.utxoState.UTXOs()
+}
+
+func (s *state) Txs() iter.Seq2[*txs.Tx, error] {
+	return func(yield func(*txs.Tx, error) bool) {
+		itr := s.txDB.NewIterator()
+		defer itr.Release()
+
+		for itr.Next() {
+			tx, err := s.parser.ParseGenesisTx(itr.Value())
+			if err != nil {
+				return
+			}
+
+			if !yield(tx, errors.Join(err, itr.Error())) {
+				return
+			}
+		}
+	}
+}
+
+func (s *state) Blocks() iter.Seq2[block.Block, error] {
+	return func(yield func(block.Block, error) bool) {
+		itr := s.blockDB.NewIterator()
+		defer itr.Release()
+
+		for itr.Next() {
+			//TODO error handling
+			blk, err := s.parser.ParseBlock(itr.Value())
+			if !yield(blk, errors.Join(err, itr.Error())) {
+				return
+			}
+		}
+	}
+}
+
 func (s *state) Close() error {
 	return errors.Join(
 		s.utxoDB.Close(),
@@ -493,6 +570,6 @@ func (s *state) writeMetadata() error {
 	return nil
 }
 
-func (s *state) Checksum() ids.ID {
-	return s.utxoState.Checksum()
+func (s *state) Checksum(context.Context) (ids.ID, error) {
+	return s.utxoState.Checksum(), nil
 }

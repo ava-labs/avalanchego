@@ -5,6 +5,7 @@ package avm
 
 import (
 	"context"
+	"encoding/json"
 	"math"
 	"testing"
 
@@ -15,12 +16,15 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -31,7 +35,7 @@ import (
 func TestInvalidGenesis(t *testing.T) {
 	require := require.New(t)
 
-	vm := &VM{}
+	vm := &VM{StateMigrationFactory: NoStateMigrationFactory{}}
 	ctx := snowtest.Context(t, snowtest.XChainID)
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
@@ -715,4 +719,123 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 
 	assertIndexedTX(t, env.vm.db, 0, key.PublicKey().Address(), assetID.AssetID(), tx.ID())
 	assertLatestIdx(t, env.vm.db, key.PublicKey().Address(), assetID.AssetID(), 1)
+}
+
+// Tests db migration to merkle-ize existing state
+func TestDBMigration(t *testing.T) {
+	require := require.New(t)
+
+	db := memdb.New()
+	snowCtx := snowtest.Context(t, snowtest.XChainID)
+	snowCtx.SharedMemory = atomic.NewMemory(db).NewSharedMemory(ids.ID{})
+	configBytes, err := json.Marshal(DefaultConfig)
+	require.NoError(err)
+
+	fxs := []*common.Fx{
+		{
+			ID: secp256k1fx.ID,
+			Fx: &secp256k1fx.Fx{},
+		},
+		{
+			ID: nftfx.ID,
+			Fx: &nftfx.Fx{},
+		},
+	}
+
+	vm := &VM{StateMigrationFactory: NoStateMigrationFactory{}}
+	toEngine := make(chan common.Message, 1)
+	genesisBytes := buildGenesisTest(t)
+	require.NoError(vm.Initialize(
+		context.Background(),
+		snowCtx,
+		db,
+		genesisBytes,
+		nil,
+		configBytes,
+		toEngine,
+		fxs,
+		&enginetest.Sender{},
+	))
+	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+	require.NoError(vm.Linearize(context.Background(), ids.ID{}, toEngine))
+	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
+
+	txBuilder := txstest.New(
+		vm.parser.Codec(),
+		vm.ctx,
+		&vm.Config,
+		vm.ctx.AVAXAssetID,
+		vm.state,
+	)
+
+	genesisBlkID, err := vm.LastAccepted(context.Background())
+	require.NoError(err)
+
+	wantBlkIDs := []ids.ID{genesisBlkID}
+	n := 10
+	for i := 0; i < n-1; i++ {
+		kc := secp256k1fx.NewKeychain(keys[0])
+		tx, err := txBuilder.CreateAssetTx(
+			"foobar",
+			"FOO",
+			0,
+			map[uint32][]verify.State{
+				0: {
+					&nftfx.MintOutput{
+						GroupID: 0,
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+						},
+					},
+				},
+			},
+			kc,
+			ids.ShortID{},
+		)
+		require.NoError(err)
+
+		issueAndAccept(require, vm, toEngine, tx)
+
+		blkID, err := vm.LastAccepted(context.Background())
+		require.NoError(err)
+		wantBlkIDs = append(wantBlkIDs, blkID)
+	}
+
+	require.Len(wantBlkIDs, n)
+
+	db, err = memdb.Copy(db)
+	require.NoError(vm.Shutdown(context.Background()))
+
+	vm = &VM{
+		StateMigrationFactory: GForkStateMigrationFactory{CommitFrequency: 2},
+	}
+
+	snowCtx = snowtest.Context(t, snowtest.XChainID)
+	snowCtx.SharedMemory = atomic.NewMemory(db).NewSharedMemory(ids.ID{})
+	toEngine = make(chan common.Message, 1)
+	require.NoError(vm.Initialize(
+		context.Background(),
+		snowCtx,
+		db,
+		genesisBytes,
+		nil,
+		configBytes,
+		toEngine,
+		fxs,
+		&enginetest.Sender{},
+	))
+	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+	require.NoError(vm.Linearize(context.Background(), ids.ID{}, toEngine))
+	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
+
+	lastAcceptedBlkID, err := vm.LastAccepted(context.Background())
+	require.NoError(err)
+	require.Equal(wantBlkIDs[len(wantBlkIDs)-1], lastAcceptedBlkID)
+
+	for _, wantBlkID := range wantBlkIDs {
+		gotBlk, err := vm.GetBlock(context.Background(), wantBlkID)
+		require.NoError(err)
+		require.Equal(wantBlkID, gotBlk.ID())
+	}
 }

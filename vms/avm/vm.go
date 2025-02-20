@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -118,6 +119,9 @@ type VM struct {
 	blockbuilder.Builder
 	chainManager blockexecutor.Manager
 	network      *network.Network
+
+	StateMigrationFactory StateMigrationFactory
+	avmConfig             Config
 }
 
 func (vm *VM) Connected(ctx context.Context, nodeID ids.NodeID, version *version.Application) error {
@@ -147,8 +151,8 @@ func (vm *VM) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
  */
 
 func (vm *VM) Initialize(
-	_ context.Context,
-	ctx *snow.Context,
+	ctx context.Context,
+	snowCtx *snow.Context,
 	db database.Database,
 	genesisBytes []byte,
 	_ []byte,
@@ -157,18 +161,19 @@ func (vm *VM) Initialize(
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
-	noopMessageHandler := common.NewNoOpAppHandler(ctx.Log)
+	noopMessageHandler := common.NewNoOpAppHandler(snowCtx.Log)
 	vm.Atomic = network.NewAtomic(noopMessageHandler)
 
 	avmConfig, err := ParseConfig(configBytes)
 	if err != nil {
 		return err
 	}
-	ctx.Log.Info("VM config initialized",
+	vm.avmConfig = avmConfig
+	snowCtx.Log.Info("VM config initialized",
 		zap.Reflect("config", avmConfig),
 	)
 
-	vm.registerer, err = metrics.MakeAndRegister(ctx.Metrics, "")
+	vm.registerer, err = metrics.MakeAndRegister(snowCtx.Metrics, "")
 	if err != nil {
 		return err
 	}
@@ -181,10 +186,10 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("failed to initialize metrics: %w", err)
 	}
 
-	vm.AddressManager = avax.NewAddressManager(ctx)
+	vm.AddressManager = avax.NewAddressManager(snowCtx)
 	vm.Aliaser = ids.NewAliaser()
 
-	vm.ctx = ctx
+	vm.ctx = snowCtx
 	vm.appSender = appSender
 	vm.baseDB = db
 	vm.db = versiondb.New(db)
@@ -211,7 +216,7 @@ func (vm *VM) Initialize(
 	vm.parser, err = block.NewCustomParser(
 		vm.typeToFxIndex,
 		&vm.clock,
-		ctx.Log,
+		snowCtx.Log,
 		typedFxs,
 	)
 	if err != nil {
@@ -221,7 +226,7 @@ func (vm *VM) Initialize(
 	codec := vm.parser.Codec()
 	vm.Spender = utxo.NewSpender(&vm.clock, codec)
 
-	state, err := state.New(
+	vm.state, err = state.New(
 		vm.db,
 		vm.parser,
 		vm.registerer,
@@ -230,8 +235,6 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return err
 	}
-
-	vm.state = state
 
 	if err := vm.initGenesis(genesisBytes); err != nil {
 		return err
@@ -256,7 +259,7 @@ func (vm *VM) Initialize(
 	}
 
 	vm.txBackend = &txexecutor.Backend{
-		Ctx:           ctx,
+		Ctx:           snowCtx,
 		Config:        &vm.Config,
 		Fxs:           vm.fxs,
 		TypeToFxIndex: vm.typeToFxIndex,
@@ -387,11 +390,26 @@ func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, erro
  */
 
 func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<- common.Message) error {
-	time := vm.Config.Upgrades.CortinaTime
-	err := vm.state.InitializeChainState(stopVertexID, time)
-	if err != nil {
+	if err := vm.state.InitializeChainState(
+		stopVertexID,
+		vm.Config.Upgrades.CortinaTime,
+	); err != nil {
 		return err
 	}
+
+	stateMigration := vm.StateMigrationFactory.New(
+		vm.ctx.Log,
+		prefixdb.New([]byte("v2"), vm.db),
+		vm.parser,
+		vm.registerer,
+		vm.avmConfig.ChecksumsEnabled,
+	)
+
+	state, err := stateMigration.Migrate(ctx, vm.state)
+	if err != nil {
+		return fmt.Errorf("failed to migrate state: %w", err)
+	}
+	vm.state = state
 
 	mempool, err := xmempool.New("mempool", vm.registerer, toEngine)
 	if err != nil {
