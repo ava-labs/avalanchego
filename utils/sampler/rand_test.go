@@ -56,68 +56,68 @@ func (s *testSTDSource) Uint64() uint64 {
 
 func TestRNG(t *testing.T) {
 	tests := []struct {
-		max      uint64
+		maximum  uint64
 		nums     []uint64
 		expected uint64
 	}{
 		{
-			max: math.MaxUint64,
+			maximum: math.MaxUint64,
 			nums: []uint64{
 				0x01,
 			},
 			expected: 0x01,
 		},
 		{
-			max: math.MaxUint64,
+			maximum: math.MaxUint64,
 			nums: []uint64{
 				0x0102030405060708,
 			},
 			expected: 0x0102030405060708,
 		},
 		{
-			max: math.MaxUint64,
+			maximum: math.MaxUint64,
 			nums: []uint64{
 				0xF102030405060708,
 			},
 			expected: 0xF102030405060708,
 		},
 		{
-			max: math.MaxInt64,
+			maximum: math.MaxInt64,
 			nums: []uint64{
 				0x01,
 			},
 			expected: 0x01,
 		},
 		{
-			max: math.MaxInt64,
+			maximum: math.MaxInt64,
 			nums: []uint64{
 				0x0102030405060708,
 			},
 			expected: 0x0102030405060708,
 		},
 		{
-			max: math.MaxInt64,
+			maximum: math.MaxInt64,
 			nums: []uint64{
 				0x8102030405060708,
 			},
 			expected: 0x0102030405060708,
 		},
 		{
-			max: 15,
+			maximum: 15,
 			nums: []uint64{
 				0x810203040506071a,
 			},
 			expected: 0x0a,
 		},
 		{
-			max: math.MaxInt64 + 1,
+			maximum: math.MaxInt64 + 1,
 			nums: []uint64{
 				math.MaxInt64 + 1,
 			},
 			expected: math.MaxInt64 + 1,
 		},
 		{
-			max: math.MaxInt64 + 1,
+			maximum: math.MaxInt64 + 1,
 			nums: []uint64{
 				math.MaxInt64 + 2,
 				0,
@@ -125,7 +125,7 @@ func TestRNG(t *testing.T) {
 			expected: 0,
 		},
 		{
-			max: math.MaxInt64 + 1,
+			maximum: math.MaxInt64 + 1,
 			nums: []uint64{
 				math.MaxInt64 + 2,
 				0x0102030405060708,
@@ -133,14 +133,14 @@ func TestRNG(t *testing.T) {
 			expected: 0x0102030405060708,
 		},
 		{
-			max: 2,
+			maximum: 2,
 			nums: []uint64{
 				math.MaxInt64 - 2,
 			},
 			expected: 0x02,
 		},
 		{
-			max: 2,
+			maximum: 2,
 			nums: []uint64{
 				math.MaxInt64 - 1,
 				0x01,
@@ -157,11 +157,11 @@ func TestRNG(t *testing.T) {
 				nums:      test.nums,
 			}
 			r := &rng{rng: source}
-			val := r.Uint64Inclusive(test.max)
+			val := r.Uint64Inclusive(test.maximum)
 			require.Equal(test.expected, val)
 			require.Empty(source.nums)
 
-			if test.max >= math.MaxInt64 {
+			if test.maximum >= math.MaxInt64 {
 				return
 			}
 
@@ -170,7 +170,7 @@ func TestRNG(t *testing.T) {
 				nums:      test.nums,
 			}
 			mathRNG := rand.New(stdSource) //#nosec G404
-			stdVal := mathRNG.Int63n(int64(test.max + 1))
+			stdVal := mathRNG.Int63n(int64(test.maximum + 1))
 			require.Equal(test.expected, uint64(stdVal))
 			require.Empty(source.nums)
 		})
@@ -182,12 +182,12 @@ func FuzzRNG(f *testing.F) {
 		require := require.New(t)
 
 		var (
-			max        uint64
+			maximum    uint64
 			sourceNums []uint64
 		)
 		fz := fuzzer.NewFuzzer(data)
-		fz.Fill(&max, &sourceNums)
-		if max >= math.MaxInt64 {
+		fz.Fill(&maximum, &sourceNums)
+		if maximum >= math.MaxInt64 {
 			t.SkipNow()
 		}
 
@@ -196,14 +196,14 @@ func FuzzRNG(f *testing.F) {
 			nums:      sourceNums,
 		}
 		r := &rng{rng: source}
-		val := r.Uint64Inclusive(max)
+		val := r.Uint64Inclusive(maximum)
 
 		stdSource := &testSTDSource{
 			onInvalid: t.SkipNow,
 			nums:      sourceNums,
 		}
 		mathRNG := rand.New(stdSource) //#nosec G404
-		stdVal := mathRNG.Int63n(int64(max + 1))
+		stdVal := mathRNG.Int63n(int64(maximum + 1))
 		require.Equal(val, uint64(stdVal))
 		require.Len(stdSource.nums, len(source.nums))
 	})

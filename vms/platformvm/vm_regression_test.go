@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
@@ -1477,9 +1478,11 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 		}
 	)
-	sk1, err := bls.NewSigner()
+	sk1, err := localsigner.New()
 	require.NoError(t, err)
 	pk1 := sk1.PublicKey()
+	pop1, err := signer.NewProofOfPossession(sk1)
+	require.NoError(t, err)
 
 	// build primary network validator with BLS key
 	primaryTx, err := wallet.IssueAddPermissionlessValidatorTx(
@@ -1492,7 +1495,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 			},
 			Subnet: constants.PrimaryNetworkID,
 		},
-		signer.NewProofOfPossession(sk1),
+		pop1,
 		vm.ctx.AVAXAssetID,
 		rewardsOwner,
 		rewardsOwner,
@@ -1583,9 +1586,11 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	t.Logf("primaryEndHeight: %d", primaryEndHeight)
 
 	// reinsert primary validator with a different BLS key
-	sk2, err := bls.NewSigner()
+	sk2, err := localsigner.New()
 	require.NoError(t, err)
 	pk2 := sk2.PublicKey()
+	pop2, err := signer.NewProofOfPossession(sk2)
+	require.NoError(t, err)
 
 	primaryRestartTx, err := wallet.IssueAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
@@ -1597,7 +1602,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 			},
 			Subnet: constants.PrimaryNetworkID,
 		},
-		signer.NewProofOfPossession(sk2),
+		pop2,
 		vm.ctx.AVAXAssetID,
 		rewardsOwner,
 		rewardsOwner,
@@ -1749,7 +1754,9 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(err)
 
 	// reinsert primary validator with a different BLS key
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
+	require.NoError(err)
+	pop, err := signer.NewProofOfPossession(sk)
 	require.NoError(err)
 
 	primaryRestartTx, err := wallet.IssueAddPermissionlessValidatorTx(
@@ -1762,7 +1769,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 			},
 			Subnet: constants.PrimaryNetworkID,
 		},
-		signer.NewProofOfPossession(sk),
+		pop,
 		vm.ctx.AVAXAssetID,
 		rewardsOwner,
 		rewardsOwner,
@@ -1918,7 +1925,9 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(err)
 
 	// reinsert primary validator with a different BLS key
-	sk2, err := bls.NewSigner()
+	sk2, err := localsigner.New()
+	require.NoError(err)
+	pop2, err := signer.NewProofOfPossession(sk2)
 	require.NoError(err)
 
 	primaryRestartTx, err := wallet.IssueAddPermissionlessValidatorTx(
@@ -1931,7 +1940,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 			},
 			Subnet: constants.PrimaryNetworkID,
 		},
-		signer.NewProofOfPossession(sk2),
+		pop2,
 		vm.ctx.AVAXAssetID,
 		rewardsOwner,
 		rewardsOwner,

@@ -106,6 +106,10 @@ type VM struct {
 	// proposed in.
 	acceptedBlocksSlotHistogram prometheus.Histogram
 
+	// lastAcceptedTimestampGaugeVec reports timestamps for the last-accepted
+	// [postForkBlock] and its inner block.
+	lastAcceptedTimestampGaugeVec *prometheus.GaugeVec
+
 	epochLength        time.Duration
 	nextEpochStart     time.Time
 	currentEpochHeight uint64
@@ -235,6 +239,13 @@ func (vm *VM) Initialize(
 		// of comparing floating point of the same numerical value.
 		Buckets: []float64{0.5, 1.5, 2.5},
 	})
+	vm.lastAcceptedTimestampGaugeVec = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "last_accepted_timestamp",
+			Help: "timestamp of the last block accepted",
+		},
+		[]string{"block_type"},
+	)
 
 	vm.epochLength = 10 * time.Second
 	vm.nextEpochStart = time.Now().Add(vm.epochLength)
@@ -243,6 +254,7 @@ func (vm *VM) Initialize(
 	return errors.Join(
 		vm.Config.Registerer.Register(vm.proposerBuildSlotGauge),
 		vm.Config.Registerer.Register(vm.acceptedBlocksSlotHistogram),
+		vm.Config.Registerer.Register(vm.lastAcceptedTimestampGaugeVec),
 	)
 }
 

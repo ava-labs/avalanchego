@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
@@ -2527,6 +2528,46 @@ func TestLocalParse(t *testing.T) {
 			block, err := test.f(context.Background(), test.block)
 			require.NoError(t, err)
 			require.IsType(t, test.resultingBlock, block)
+		})
+	}
+}
+
+func TestTimestampMetrics(t *testing.T) {
+	ctx := context.Background()
+
+	coreVM, _, proVM, _ := initTestProposerVM(t, time.Unix(0, 0), mockable.MaxTime, 0)
+	defer func() {
+		require.NoError(t, proVM.Shutdown(ctx))
+	}()
+
+	innerBlock := snowmantest.BuildChild(snowmantest.Genesis)
+
+	outerTime := time.Unix(314159, 0)
+	innerTime := time.Unix(142857, 0)
+	proVM.Clock.Set(outerTime)
+	innerBlock.TimestampV = innerTime
+
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return innerBlock, nil
+	}
+	outerBlock, err := proVM.BuildBlock(ctx)
+	require.NoError(t, err)
+	require.IsType(t, &postForkBlock{}, outerBlock)
+	require.NoError(t, outerBlock.Accept(ctx))
+
+	gaugeVec := proVM.lastAcceptedTimestampGaugeVec
+	tests := []struct {
+		blockType string
+		want      time.Time
+	}{
+		{innerBlockTypeMetricLabel, innerTime},
+		{outerBlockTypeMetricLabel, outerTime},
+	}
+	for _, tt := range tests {
+		t.Run(tt.blockType, func(t *testing.T) {
+			gauge, err := gaugeVec.GetMetricWithLabelValues(tt.blockType)
+			require.NoError(t, err)
+			require.Equal(t, float64(tt.want.Unix()), testutil.ToFloat64(gauge))
 		})
 	}
 }

@@ -73,7 +73,7 @@ var (
 		CortinaXChainStopVertexID:    ids.Empty,
 		DurangoTime:                  InitiallyActiveTime,
 		EtnaTime:                     InitiallyActiveTime,
-		FUpgradeTime:                 UnscheduledActivationTime,
+		FUpgradeTime:                 InitiallyActiveTime,
 	}
 
 	ErrInvalidUpgradeTimes = errors.New("invalid upgrade configuration")

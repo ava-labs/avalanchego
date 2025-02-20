@@ -20,6 +20,14 @@ if ! [[ "$0" =~ scripts/run_prometheus.sh ]]; then
   exit 255
 fi
 
+CMD=prometheus
+
+if ! command -v "${CMD}" &> /dev/null; then
+  echo "prometheus not found, have you run 'nix develop'?"
+  echo "To install nix: https://github.com/DeterminateSystems/nix-installer?tab=readme-ov-file#install-nix"
+  exit 1
+fi
+
 PROMETHEUS_WORKING_DIR="${HOME}/.tmpnet/prometheus"
 PIDFILE="${PROMETHEUS_WORKING_DIR}"/run.pid
 
@@ -46,39 +54,6 @@ PROMETHEUS_PASSWORD="${PROMETHEUS_PASSWORD:-}"
 if [[ -z "${PROMETHEUS_PASSWORD}" ]]; then
   echo "Please provide a value for PROMETHEUS_PASSWORD"
   exit 1
-fi
-
-# This was the LTS version when this script was written. Probably not
-# much reason to update it unless something breaks since the usage
-# here is only to collect metrics from temporary networks.
-VERSION="2.45.3"
-
-# Ensure the prometheus command is locally available
-CMD=prometheus
-if ! command -v "${CMD}" &> /dev/null; then
-  # Try to use a local version
-  CMD="${PWD}/bin/prometheus"
-  if ! command -v "${CMD}" &> /dev/null; then
-    echo "prometheus not found, attempting to install..."
-
-    GOOS="$(go env GOOS)"
-    GOARCH="$(go env GOARCH)"
-    if [[ "${GOOS}" == "darwin" && "${GOARCH}" == "arm64" ]]; then
-      echo "On macos, only amd64 binaries are available so rosetta is required on apple silicon machines."
-      echo "To avoid using rosetta, install via homebrew: brew install prometheus"
-    fi
-    if [[ "${GOOS}" == "linux" && "${GOARCH}" != "amd64" ]]; then
-        echo "On linux, only amd64 binaries are available. Manual installation of prometheus is required."
-        exit 1
-    fi
-
-    # Install the specified release
-    PROMETHEUS_FILE="prometheus-${VERSION}.${GOOS}-amd64"
-    URL="https://github.com/prometheus/prometheus/releases/download/v${VERSION}/${PROMETHEUS_FILE}.tar.gz"
-    curl -s -L "${URL}" | tar zxv -C /tmp > /dev/null
-    mkdir -p "$(dirname "${CMD}")"
-    cp /tmp/"${PROMETHEUS_FILE}/prometheus" "${CMD}"
-  fi
 fi
 
 # Configure prometheus
