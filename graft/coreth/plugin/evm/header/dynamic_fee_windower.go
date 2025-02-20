@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/ap3"
 	"github.com/ava-labs/coreth/plugin/evm/ap4"
 	"github.com/ava-labs/coreth/plugin/evm/ap5"
+	"github.com/ava-labs/coreth/plugin/evm/etna"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 )
@@ -32,7 +33,7 @@ var (
 	// EtnaMinBaseFee is exported so that it can be modified by tests.
 	//
 	// TODO: Unexport this.
-	EtnaMinBaseFee = big.NewInt(params.EtnaMinBaseFee)
+	EtnaMinBaseFee = big.NewInt(etna.MinBaseFee)
 
 	ap3MaxBaseFee = big.NewInt(ap3.MaxBaseFee)
 	ap4MaxBaseFee = big.NewInt(ap4.MaxBaseFee)

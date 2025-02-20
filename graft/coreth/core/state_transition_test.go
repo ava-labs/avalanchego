@@ -37,6 +37,8 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/ap0"
+	"github.com/ava-labs/coreth/plugin/evm/ap1"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	ethCrypto "github.com/ethereum/go-ethereum/crypto"
@@ -104,7 +106,7 @@ func executeStateTransitionTest(t *testing.T, st stateTransitionTest) {
 					Nonce:   0,
 				},
 			},
-			GasLimit: params.ApricotPhase1GasLimit,
+			GasLimit: ap1.GasLimit,
 		}
 		genesis       = gspec.ToBlock()
 		engine        = dummy.NewFaker()
@@ -138,8 +140,8 @@ func TestNativeAssetContractCall(t *testing.T) {
 
 	contractAddr := ethCrypto.CreateAddress(testAddr, 0)
 	txs := []*types.Transaction{
-		makeContractTx(0, common.Big0, 500_000, big.NewInt(params.LaunchMinGasPrice), data),
-		makeTx(1, contractAddr, common.Big0, 100_000, big.NewInt(params.LaunchMinGasPrice), nil), // No input data is necessary, since this will hit the contract's fallback function.
+		makeContractTx(0, common.Big0, 500_000, big.NewInt(ap0.MinGasPrice), data),
+		makeTx(1, contractAddr, common.Big0, 100_000, big.NewInt(ap0.MinGasPrice), nil), // No input data is necessary, since this will hit the contract's fallback function.
 	}
 
 	tests := map[string]stateTransitionTest{
@@ -195,7 +197,7 @@ func TestNativeAssetContractConstructor(t *testing.T) {
 	require.NoError(err)
 
 	txs := []*types.Transaction{
-		makeContractTx(0, common.Big0, 100_000, big.NewInt(params.LaunchMinGasPrice), data),
+		makeContractTx(0, common.Big0, 100_000, big.NewInt(ap0.MinGasPrice), data),
 	}
 
 	phase6Tests := map[string]stateTransitionTest{
@@ -234,7 +236,7 @@ func TestNativeAssetContractConstructor(t *testing.T) {
 
 func TestNativeAssetDirectEOACall(t *testing.T) {
 	txs := []*types.Transaction{
-		makeTx(0, vm.NativeAssetCallAddr, common.Big0, 100_000, big.NewInt(params.LaunchMinGasPrice), nil),
+		makeTx(0, vm.NativeAssetCallAddr, common.Big0, 100_000, big.NewInt(ap0.MinGasPrice), nil),
 	}
 
 	phase6Tests := map[string]stateTransitionTest{

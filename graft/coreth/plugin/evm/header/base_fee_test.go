@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/ap3"
 	"github.com/ava-labs/coreth/plugin/evm/ap4"
 	"github.com/ava-labs/coreth/plugin/evm/ap5"
+	"github.com/ava-labs/coreth/plugin/evm/etna"
 	"github.com/ava-labs/coreth/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
@@ -295,7 +296,7 @@ func TestBaseFee(t *testing.T) {
 				Number:         big.NewInt(1),
 				GasUsed:        ap5.TargetGas,
 				Extra:          feeWindowBytes(ap3.Window{}),
-				BaseFee:        big.NewInt(params.EtnaMinBaseFee),
+				BaseFee:        big.NewInt(etna.MinBaseFee),
 				ExtDataGasUsed: big.NewInt(ap5.TargetGas),
 			},
 			timestamp: 1,
@@ -304,7 +305,7 @@ func TestBaseFee(t *testing.T) {
 					gasTarget                 = ap5.TargetGas
 					gasUsed                   = 2 * ap5.TargetGas
 					amountOverTarget          = gasUsed - gasTarget
-					parentBaseFee             = params.EtnaMinBaseFee
+					parentBaseFee             = etna.MinBaseFee
 					smoothingFactor           = ap5.BaseFeeChangeDenominator
 					baseFeeFractionOverTarget = amountOverTarget * parentBaseFee / gasTarget
 					delta                     = baseFeeFractionOverTarget / smoothingFactor

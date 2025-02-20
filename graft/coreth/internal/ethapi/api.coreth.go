@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/etna"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
 )
@@ -16,7 +16,7 @@ import (
 const (
 	nAVAX = 1_000_000_000
 
-	minBaseFee       = params.EtnaMinBaseFee // 1 nAVAX
+	minBaseFee       = etna.MinBaseFee // 1 nAVAX
 	maxNormalBaseFee = 100 * nAVAX
 
 	minGasTip       = 1 // 1 wei

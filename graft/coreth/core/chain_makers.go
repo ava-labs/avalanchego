@@ -37,6 +37,8 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/ap1"
+	"github.com/ava-labs/coreth/plugin/evm/cortina"
 	"github.com/ava-labs/coreth/plugin/evm/header"
 	"github.com/ava-labs/coreth/triedb"
 	"github.com/ethereum/go-ethereum/common"
@@ -375,9 +377,9 @@ func (cm *chainMaker) makeHeader(parent *types.Block, gap uint64, state *state.S
 
 	var gasLimit uint64
 	if cm.config.IsCortina(time) {
-		gasLimit = params.CortinaGasLimit
+		gasLimit = cortina.GasLimit
 	} else if cm.config.IsApricotPhase1(time) {
-		gasLimit = params.ApricotPhase1GasLimit
+		gasLimit = ap1.GasLimit
 	} else {
 		gasLimit = CalcGasLimit(parent.GasUsed(), parent.GasLimit(), parent.GasLimit(), parent.GasLimit())
 	}
