@@ -37,7 +37,7 @@ import (
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/coreth/plugin/evm/ap3"
+	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap3"
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ava-labs/coreth/triedb"
 	"github.com/ava-labs/coreth/triedb/pathdb"

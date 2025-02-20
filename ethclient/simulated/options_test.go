@@ -26,7 +26,7 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/interfaces"
 	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/coreth/plugin/evm/cortina"
+	"github.com/ava-labs/coreth/plugin/evm/upgrade/cortina"
 )
 
 // Tests that the simulator starts with the initial gas limit in the genesis block,
