@@ -41,6 +41,8 @@ func TestAmplifyRollbackDifferentLoggers(t *testing.T) {
 		LogLevel:                            Info,
 	})
 
+	defer factory.Close()
+
 	red, err := factory.Make("red")
 	require.NoError(t, err)
 
@@ -91,6 +93,66 @@ func TestAmplifyRollbackDifferentLoggers(t *testing.T) {
 	assertDefaultLogLevels()
 }
 
+func TestRevertTwiceIsNoOp(t *testing.T) {
+	factory := NewFactory(Config{
+		RotatingWriterConfig: RotatingWriterConfig{
+			Directory: t.TempDir(),
+		},
+		LoggingAutoAmplificationMaxDuration: 5 * time.Minute,
+		LoggingAutoAmplification:            true,
+		DisplayLevel:                        Info,
+	})
+	defer factory.Close()
+
+	logger, err := factory.Make("test")
+	require.NoError(t, err)
+
+	var testBuffer bytes.Buffer
+	internalLogger := logger.(*log).internalLogger
+	logger.(*log).internalLogger = internalLogger.WithOptions(zap.Hooks(func(entry zapcore.Entry) error {
+		testBuffer.WriteString(entry.Message)
+		return nil
+	}))
+
+	t.Run("does not log in debug at first", func(t *testing.T) {
+		logger.Debug("test")
+		require.Zero(t, testBuffer.Len())
+	})
+
+	t.Run("logs in debug when amplified", func(t *testing.T) {
+		factory.Amplify()
+		logger.Debug("test")
+		require.Equal(t, "test", testBuffer.String())
+		testBuffer.Reset()
+	})
+
+	t.Run("does not log in debug when reverted back to the default", func(t *testing.T) {
+		factory.Revert()
+		logger.Debug("test")
+		require.Zero(t, testBuffer.Len())
+		testBuffer.Reset()
+	})
+
+	t.Run("Revert the second time is a no-op", func(t *testing.T) {
+		logger.SetLevel(Debug) // we set the logging level directly which doesn't change the default level
+		factory.Revert()
+		logger.Debug("test")
+		require.Equal(t, "test", testBuffer.String())
+		logger.SetLevel(Info)
+		testBuffer.Reset()
+	})
+
+	t.Run("Further amplification after a double revert works as expected", func(t *testing.T) {
+		factory.Amplify()
+		logger.Debug("test")
+		require.Equal(t, "test", testBuffer.String())
+		testBuffer.Reset()
+		factory.Revert()
+		logger.Debug("test")
+		require.Zero(t, testBuffer.Len())
+	})
+}
+
 func TestAmplifyRollback(t *testing.T) {
 	var testBuffer bytes.Buffer
 
@@ -102,6 +164,8 @@ func TestAmplifyRollback(t *testing.T) {
 		LoggingAutoAmplification:            true,
 		DisplayLevel:                        Info,
 	})
+
+	defer factory.Close()
 
 	logger, err := factory.Make("test")
 	require.NoError(t, err)
