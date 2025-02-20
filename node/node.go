@@ -1064,6 +1064,13 @@ func (n *Node) reportUnhealthy(unhealthy bool) {
 		return
 	}
 
+	// Either amplify the log level or revert it to what it was.
+	// It is assumed that reportUnhealthy() is called upon every health check
+	// iteration, otherwise there is nothing to reset the logging level to what it was
+	// when the health check succeeds after failing.
+	// Similarly, if the health check continuously fails, this function needs to be called
+	// repeatedly, otherwise there is nothing to revert the logging level to what it was
+	// once it was amplified for too long.
 	if unhealthy {
 		n.LogFactory.Amplify()
 	} else {

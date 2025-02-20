@@ -231,10 +231,10 @@ func (f *factory) Amplify() {
 	}
 
 	f.setLoggingCoreLogLevel(func(logDisplayLevel zap.AtomicLevel, logFileLevel zap.AtomicLevel, _ zapcore.Level, _ zapcore.Level) {
-		if logDisplayLevel.Level() != zapcore.Level(Verbo) {
+		if logDisplayLevel.Level() > zapcore.Level(Debug) {
 			logDisplayLevel.SetLevel(zapcore.Level(Debug))
 		}
-		if logFileLevel.Level() != zapcore.Level(Verbo) {
+		if logFileLevel.Level() > zapcore.Level(Debug) {
 			logFileLevel.SetLevel(zapcore.Level(Debug))
 		}
 	})
@@ -248,7 +248,7 @@ func (f *factory) Revert() {
 }
 
 func (f *factory) revertLoggers() {
-	if f.amplificationDisabled() {
+	if f.amplificationDisabled() || f.amplificationTracker.startedAmplification.isZero() {
 		return
 	}
 
