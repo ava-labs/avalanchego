@@ -164,12 +164,12 @@ func (p *postForkCommonComponents) Verify(
 		)
 	}
 
-	// TODO: Here's where we set the p-chain height for the inner block.
 	var contextPChainHeight uint64
-	if p.vm.Upgrades.IsEtnaActivated(childTimestamp) {
+	if p.vm.Upgrades.IsFUpgradeActivated(childTimestamp) {
+		contextPChainHeight = child.PChainEpochHeight()
+	} else if p.vm.Upgrades.IsEtnaActivated(childTimestamp) {
 		contextPChainHeight = childPChainHeight
 	} else {
-		// TODO: I assume we must continue to consider the pre-Etna case for syncing.
 		contextPChainHeight = parentPChainHeight
 	}
 
@@ -195,10 +195,19 @@ func (p *postForkCommonComponents) buildChild(
 		newTimestamp = parentTimestamp
 	}
 
-	var (
-		pChainHeight uint64
-		err          error
-	)
+	// The child's P-Chain height is proposed as the optimal P-Chain height that
+	// is at least the parent's P-Chain height
+	pChainHeight, err := p.vm.optimalPChainHeight(ctx, parentPChainHeight)
+	if err != nil {
+		p.vm.ctx.Log.Error("unexpected build block failure",
+			zap.String("reason", "failed to calculate optimal P-chain height"),
+			zap.Stringer("parentID", parentID),
+			zap.Error(err),
+		)
+		return nil, err
+	}
+
+	var pChainEpochHeight, pChainEpochHeightParent uint64
 	if p.vm.Upgrades.IsFUpgradeActivated(newTimestamp) {
 		parent, err := p.vm.getBlock(ctx, parentID)
 		if err != nil {
@@ -220,27 +229,18 @@ func (p *postForkCommonComponents) buildChild(
 		}
 
 		if p.vm.GetEpoch(parent.Timestamp()) == p.vm.GetEpoch(parent2.Timestamp()) {
-			pChainHeight, err = parent.pChainEpochHeight(ctx)
+			pChainEpochHeightParent, err = parent.pChainEpochHeight(ctx)
 			if err != nil {
 				return nil, err
 			}
+			pChainEpochHeight = pChainEpochHeightParent
+			p.vm.ctx.Log.Info("Continuing epoch", zap.Uint64("pChainEpochHeight", pChainEpochHeight), zap.Uint64("epoch", p.vm.GetEpoch(newTimestamp)))
 		} else {
-			pChainHeight, err = parent.pChainHeight(ctx)
+			pChainEpochHeight, err = parent.pChainHeight(ctx)
 			if err != nil {
 				return nil, err
 			}
-		}
-	} else {
-		// The child's P-Chain height is proposed as the optimal P-Chain height that
-		// is at least the parent's P-Chain height
-		pChainHeight, err = p.vm.optimalPChainHeight(ctx, parentPChainHeight)
-		if err != nil {
-			p.vm.ctx.Log.Error("unexpected build block failure",
-				zap.String("reason", "failed to calculate optimal P-chain height"),
-				zap.Stringer("parentID", parentID),
-				zap.Error(err),
-			)
-			return nil, err
+			p.vm.ctx.Log.Info("Epoch has advanced", zap.Uint64("pChainEpochHeight", pChainEpochHeight), zap.Uint64("epoch", p.vm.GetEpoch(newTimestamp)))
 		}
 	}
 
@@ -267,7 +267,9 @@ func (p *postForkCommonComponents) buildChild(
 	}
 
 	var contextPChainHeight uint64
-	if p.vm.Upgrades.IsEtnaActivated(newTimestamp) {
+	if p.vm.Upgrades.IsFUpgradeActivated(newTimestamp) {
+		contextPChainHeight = pChainEpochHeight
+	} else if p.vm.Upgrades.IsEtnaActivated(newTimestamp) {
 		contextPChainHeight = pChainHeight
 	} else {
 		contextPChainHeight = parentPChainHeight
@@ -292,6 +294,7 @@ func (p *postForkCommonComponents) buildChild(
 			parentID,
 			newTimestamp,
 			pChainHeight,
+			pChainEpochHeight,
 			p.vm.StakingCertLeaf,
 			innerBlock.Bytes(),
 			p.vm.ctx.ChainID,
@@ -302,6 +305,7 @@ func (p *postForkCommonComponents) buildChild(
 			parentID,
 			newTimestamp,
 			pChainHeight,
+			pChainEpochHeight,
 			innerBlock.Bytes(),
 		)
 	}
