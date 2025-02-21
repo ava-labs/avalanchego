@@ -62,17 +62,13 @@ jobs:
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: E2E_SERIAL=1 ./scripts/tests.e2e.sh --delay-network-shutdown
+          run: E2E_SERIAL=1 ./scripts/tests.e2e.sh
+          artifact_name: e2e-tmpnet-data
           filter_by_owner: avalanchego-e2e
           prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           loki_username: ${{ secrets.LOKI_ID || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-      - name: Upload tmpnet network dir
-        uses: ./.github/actions/upload-tmpnet-artifact
-        if: always()
-        with:
-          name: e2e-tmpnet-data
   e2e_existing_network:
     runs-on: ubuntu-latest
     steps:
@@ -88,16 +84,12 @@ jobs:
       - name: Run e2e tests with existing network
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: E2E_SERIAL=1 ./scripts/tests.e2e.existing.sh --delay-network-shutdown
+          run: E2E_SERIAL=1 ./scripts/tests.e2e.existing.sh
+          artifact_name: e2e-existing-network-tmpnet-data
           prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           loki_username: ${{ secrets.LOKI_ID || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-      - name: Upload tmpnet network dir
-        uses: ./.github/actions/upload-tmpnet-artifact
-        if: always()
-        with:
-          name: e2e-existing-network-tmpnet-data
   Upgrade:
     runs-on: ubuntu-latest
     steps:
@@ -114,15 +106,11 @@ jobs:
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
           run: ./scripts/tests.upgrade.sh
+          artifact_name: upgrade-tmpnet-data
           prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           loki_username: ${{ secrets.LOKI_ID || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-      - name: Upload tmpnet network dir
-        uses: ./.github/actions/upload-tmpnet-artifact
-        if: always()
-        with:
-          name: upgrade-tmpnet-data
   Lint:
     runs-on: ubuntu-latest
     steps:

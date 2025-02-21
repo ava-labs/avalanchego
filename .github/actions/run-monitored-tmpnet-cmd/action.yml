@@ -7,6 +7,8 @@ inputs:
     required: true
   filter_by_owner:
     default: ''
+  artifact_name:
+    default: 'tmpnet-data'
   prometheus_username:
     required: true
   prometheus_password:
@@ -65,9 +67,15 @@ runs:
       shell: bash
       run: ${{ inputs.run }}
       env:
+        TMPNET_DELAY_NETWORK_SHUTDOWN: true # Ensure shutdown waits for a final metrics scrape
         GH_REPO: ${{ inputs.repository_owner }}/${{ inputs.repository_name }}
         GH_WORKFLOW: ${{ inputs.workflow }}
         GH_RUN_ID: ${{ inputs.run_id }}
         GH_RUN_NUMBER: ${{ inputs.run_number }}
         GH_RUN_ATTEMPT: ${{ inputs.run_attempt }}
         GH_JOB_ID: ${{ inputs.job }}
+    - name: Upload tmpnet network dir
+      uses: ./.github/actions/upload-tmpnet-artifact
+      if: always()
+      with:
+        name: ${{ inputs.artifact_name }}
