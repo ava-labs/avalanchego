@@ -36,18 +36,22 @@ func NewClient(ctx context.Context, rpcSignerURL string) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create rpc signer client: %w", err)
 	}
+	defer func() {
+		if err != nil {
+			conn.Close()
+		}
+	}()
+
 	client := pb.NewSignerClient(conn)
 
 	pubkeyResponse, err := client.PublicKey(ctx, &pb.PublicKeyRequest{})
 	if err != nil {
-		conn.Close()
 		return nil, err
 	}
 
 	pkBytes := pubkeyResponse.GetPublicKey()
 	pk, err := bls.PublicKeyFromCompressedBytes(pkBytes)
 	if err != nil {
-		conn.Close()
 		return nil, err
 	}
 
@@ -65,25 +69,55 @@ func (c *Client) PublicKey() *bls.PublicKey {
 // Sign a message. The [Client] already handles transient connection errors. If this method fails, it will
 // render the client in an unusable state and the client should be discarded.
 func (c *Client) Sign(message []byte) (*bls.Signature, error) {
+	var err error
+	defer func() {
+		if err != nil {
+			c.Close()
+		}
+	}()
+
 	resp, err := c.client.Sign(context.TODO(), &pb.SignRequest{Message: message})
 	if err != nil {
-		c.conn.Close()
 		return nil, err
 	}
-	signature := resp.GetSignature()
 
-	return bls.SignatureFromBytes(signature)
+	sigBytes := resp.GetSignature()
+	sig, err := bls.SignatureFromBytes(sigBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return sig, nil
 }
 
 // [SignProofOfPossession] has the same behavior as [Sign] but will product a different signature.
 // See BLS spec for more details.
 func (c *Client) SignProofOfPossession(message []byte) (*bls.Signature, error) {
+	var err error
+	defer func() {
+		if err != nil {
+			c.Close()
+		}
+	}()
+
 	resp, err := c.client.SignProofOfPossession(context.TODO(), &pb.SignProofOfPossessionRequest{Message: message})
 	if err != nil {
-		c.conn.Close()
 		return nil, err
 	}
-	signature := resp.GetSignature()
 
-	return bls.SignatureFromBytes(signature)
+	sigBytes := resp.GetSignature()
+	sig, err := bls.SignatureFromBytes(sigBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return sig, nil
+}
+
+func (c *Client) Close() error {
+	if c.conn == nil {
+		return nil
+	}
+
+	return c.conn.Close()
 }
