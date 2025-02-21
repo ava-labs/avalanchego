@@ -9,9 +9,9 @@ import (
 	"github.com/ava-labs/libevm/common"
 )
 
-// DynamicFeeExtraDataSize is defined in the predicate package to avoid a circular dependency.
+// HeaderFeeWindowSize is defined in the predicate package to avoid a circular dependency.
 // After Durango, the extra data past the dynamic fee rollup window represents predicate results.
-const DynamicFeeExtraDataSize = 80
+const HeaderFeeWindowSize = 80
 
 // EndByte is used as a delimiter for the bytes packed into a precompile predicate.
 // Precompile predicates are encoded in the Access List of transactions in the access tuples
@@ -59,12 +59,12 @@ func UnpackPredicate(paddedPredicate []byte) ([]byte, error) {
 func GetPredicateResultBytes(extraData []byte) []byte {
 	// Prior to Durango, the VM enforces the extra data is smaller than or equal
 	// to this size.
-	if len(extraData) <= DynamicFeeExtraDataSize {
+	if len(extraData) <= HeaderFeeWindowSize {
 		return nil
 	}
 	// After Durango, the extra data past the dynamic fee rollup window represents
 	// predicate results.
-	return extraData[DynamicFeeExtraDataSize:]
+	return extraData[HeaderFeeWindowSize:]
 }
 
 // SetPredicateResultBytes sets the predicate results in the extraData in the
@@ -72,5 +72,5 @@ func GetPredicateResultBytes(extraData []byte) []byte {
 // without modifying the initial portion of the extra data (dynamic fee window
 // rollup).
 func SetPredicateResultBytes(extraData []byte, predicateResults []byte) []byte {
-	return append(extraData[:DynamicFeeExtraDataSize], predicateResults...)
+	return append(extraData[:HeaderFeeWindowSize], predicateResults...)
 }

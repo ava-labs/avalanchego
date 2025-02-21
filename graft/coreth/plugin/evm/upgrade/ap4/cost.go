@@ -9,7 +9,7 @@ import (
 	"math"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/utils"
 )
 
 const (
@@ -36,13 +36,13 @@ const (
 	// This value modifies the previously used `ap3.MinBaseFee`.
 	//
 	// This value was modified in Etna.
-	MinBaseFee = 25 * params.GWei
+	MinBaseFee = 25 * utils.GWei
 
 	// MaxBaseFee is the maximum base fee that is allowed after Apricot Phase 3
 	// upgrade.
 	//
 	// This value modifies the previously used `ap3.MaxBaseFee`.
-	MaxBaseFee = 1_000 * params.GWei
+	MaxBaseFee = 1_000 * utils.GWei
 )
 
 // BlockGasCost calculates the required block gas cost.

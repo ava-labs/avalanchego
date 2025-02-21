@@ -13,9 +13,9 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 
-	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
+	"github.com/ava-labs/coreth/utils"
 
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
@@ -37,7 +37,7 @@ func TestCalculateDynamicFee(t *testing.T) {
 		},
 		{
 			gas:           21000,
-			baseFee:       big.NewInt(25 * params.GWei),
+			baseFee:       big.NewInt(25 * utils.GWei),
 			expectedValue: 525000,
 		},
 	}

@@ -11,7 +11,8 @@ import (
 	"slices"
 
 	"github.com/ava-labs/coreth/params/extras"
-	"github.com/ava-labs/coreth/plugin/evm/ap5"
+	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap0"
+	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap5"
 	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -216,7 +217,7 @@ func (utx *UnsignedImportTx) SemanticVerify(
 
 	// Apply fees to import transactions as of Apricot Phase 2
 	case rules.IsApricotPhase2:
-		fc.Produce(ctx.AVAXAssetID, AvalancheAtomicTxFee)
+		fc.Produce(ctx.AVAXAssetID, ap0.AtomicTxFee)
 	}
 	for _, out := range utx.Outs {
 		fc.Produce(out.AssetID, out.Amount)
@@ -378,8 +379,8 @@ func NewImportTx(
 			return nil, err
 		}
 	case rules.IsApricotPhase2:
-		txFeeWithoutChange = AvalancheAtomicTxFee
-		txFeeWithChange = AvalancheAtomicTxFee
+		txFeeWithoutChange = ap0.AtomicTxFee
+		txFeeWithChange = ap0.AtomicTxFee
 	}
 
 	// AVAX output

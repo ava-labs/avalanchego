@@ -30,9 +30,9 @@ import (
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/eth/tracers"
-	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/plugin/evm/message"
+	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap0"
 	"github.com/ava-labs/coreth/precompile/contract"
 	warpcontract "github.com/ava-labs/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/coreth/predicate"
@@ -93,7 +93,7 @@ func TestSendWarpMessage(t *testing.T) {
 	require.NoError(err)
 
 	// Submit a transaction to trigger sending a warp message
-	tx0 := types.NewTransaction(uint64(0), warpcontract.ContractAddress, big.NewInt(1), 100_000, big.NewInt(params.LaunchMinGasPrice), warpSendMessageInput)
+	tx0 := types.NewTransaction(uint64(0), warpcontract.ContractAddress, big.NewInt(1), 100_000, big.NewInt(ap0.MinGasPrice), warpSendMessageInput)
 	signedTx0, err := types.SignTx(tx0, types.LatestSignerForChainID(vm.chainConfig.ChainID), testKeys[0].ToECDSA())
 	require.NoError(err)
 
@@ -328,7 +328,7 @@ func testWarpVMTransaction(t *testing.T, unsignedMessage *avalancheWarp.Unsigned
 	require.NoError(err)
 
 	createTx, err := types.SignTx(
-		types.NewContractCreation(0, common.Big0, 7_000_000, big.NewInt(225*params.GWei), common.Hex2Bytes(exampleWarpBin)),
+		types.NewContractCreation(0, common.Big0, 7_000_000, big.NewInt(225*utils.GWei), common.Hex2Bytes(exampleWarpBin)),
 		types.LatestSignerForChainID(vm.chainConfig.ChainID),
 		testKeys[0].ToECDSA(),
 	)
@@ -341,8 +341,8 @@ func testWarpVMTransaction(t *testing.T, unsignedMessage *avalancheWarp.Unsigned
 			1,
 			&exampleWarpAddress,
 			1_000_000,
-			big.NewInt(225*params.GWei),
-			big.NewInt(params.GWei),
+			big.NewInt(225*utils.GWei),
+			big.NewInt(utils.GWei),
 			common.Big0,
 			txPayload,
 			types.AccessList{},
@@ -623,8 +623,8 @@ func testReceiveWarpMessage(
 			vm.txPool.Nonce(testEthAddrs[0]),
 			&warpcontract.Module.Address,
 			1_000_000,
-			big.NewInt(225*params.GWei),
-			big.NewInt(params.GWei),
+			big.NewInt(225*utils.GWei),
+			big.NewInt(utils.GWei),
 			common.Big0,
 			getWarpMsgInput,
 			types.AccessList{},
