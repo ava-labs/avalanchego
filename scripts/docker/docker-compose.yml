@@ -1,0 +1,23 @@
+version: "3.3"
+services:
+  autoheal:
+    image: willfarrell/autoheal:latest
+    container_name: autoheal
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+  avalanchego:
+    image: avaplatform/avalanchego:latest
+    container_name: avalanchego
+    hostname: avalanchego
+    user: "9650"
+    labels:
+      autoheal: "true"
+    environment:
+      - HOME=/avalanchego
+    volumes:
+      - /home/avalanchego/.avalanchego:/avalanchego/.avalanchego
+    ports:
+      - 9650:9650
+      - 9651:9651
+    restart: unless-stopped
