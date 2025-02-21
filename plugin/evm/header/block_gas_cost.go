@@ -75,7 +75,7 @@ func BlockGasCostWithStep(
 // transactions. The only correctness check performed is that the sum of all
 // tips is >= the required block fee.
 //
-// This function will return nil for all return values prior to Apricot Phase 4.
+// This function will return nil for all return values prior to SubnetEVM.
 func EstimateRequiredTip(
 	config *params.ChainConfig,
 	header *types.Header,

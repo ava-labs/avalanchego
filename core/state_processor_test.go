@@ -39,7 +39,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/core/vm"
 	"github.com/ava-labs/subnet-evm/params"
-	"github.com/ava-labs/subnet-evm/plugin/evm/header"
+	customheader "github.com/ava-labs/subnet-evm/plugin/evm/header"
 	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/legacy"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/subnet-evm/trie"
@@ -437,8 +437,7 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 	if err != nil {
 		panic(err)
 	}
-	extra, _ := header.ExtraPrefix(config, parent.Header(), time)
-	baseFee, _ := header.BaseFee(config, feeConfig, parent.Header(), time)
+	baseFee, _ := customheader.BaseFee(config, feeConfig, parent.Header(), time)
 	header := &types.Header{
 		ParentHash: parent.Hash(),
 		Coinbase:   parent.Coinbase(),
@@ -451,7 +450,6 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 		GasLimit:  parent.GasLimit(),
 		Number:    new(big.Int).Add(parent.Number(), common.Big1),
 		Time:      time,
-		Extra:     extra,
 		UncleHash: types.EmptyUncleHash,
 		BaseFee:   baseFee,
 	}
@@ -475,6 +473,7 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 		cumulativeGas += tx.Gas()
 		nBlobs += len(tx.BlobHashes())
 	}
+	header.Extra, _ = customheader.ExtraPrefix(config, parent.Header(), time)
 	header.Root = common.BytesToHash(hasher.Sum(nil))
 	if config.IsCancun(header.Number, header.Time) {
 		var pExcess, pUsed = uint64(0), uint64(0)
