@@ -577,8 +577,7 @@ func TestGetStakingSigner(t *testing.T) {
 	require.NoError(t, err)
 
 	go func() {
-		err := rpcServer.Serve(listener)
-		require.NoError(t, err)
+		require.NoError(t, rpcServer.Serve(listener))
 	}()
 
 	type config map[string]any
