@@ -109,9 +109,15 @@ type VM struct {
 	// lastAcceptedTimestampGaugeVec reports timestamps for the last-accepted
 	// [postForkBlock] and its inner block.
 	lastAcceptedTimestampGaugeVec *prometheus.GaugeVec
+}
 
-	nextEpochStart     time.Time
-	currentEpochHeight uint64
+// Epochs are numbered starting from 0.
+// The 0th epoch is defined as ending at FUpgradeTime + FUpgradeEpochDuration
+func (vm *VM) GetEpoch(timestamp time.Time) uint64 {
+	if timestamp.Before(vm.Upgrades.FUpgradeTime) {
+		return 0
+	}
+	return uint64(timestamp.Sub(vm.Upgrades.FUpgradeTime).Seconds()) / uint64(vm.Upgrades.FUpgradeEpochDuration.Seconds())
 }
 
 // New performs best when [minBlkDelay] is whole seconds. This is because block
@@ -245,8 +251,6 @@ func (vm *VM) Initialize(
 		},
 		[]string{"block_type"},
 	)
-
-	vm.currentEpochHeight = 0
 
 	return errors.Join(
 		vm.Config.Registerer.Register(vm.proposerBuildSlotGauge),
