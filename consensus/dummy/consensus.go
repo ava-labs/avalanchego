@@ -22,6 +22,8 @@ import (
 	"github.com/ava-labs/libevm/trie"
 
 	customheader "github.com/ava-labs/coreth/plugin/evm/header"
+	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap1"
+	"github.com/ava-labs/coreth/plugin/evm/upgrade/cortina"
 )
 
 var (
@@ -29,8 +31,6 @@ var (
 
 	errInvalidBlockTime       = errors.New("timestamp less than parent's")
 	errUnclesUnsupported      = errors.New("uncles unsupported")
-	errBlockGasCostNil        = errors.New("block gas cost is nil")
-	errBaseFeeNil             = errors.New("base fee is nil")
 	errExtDataGasUsedNil      = errors.New("extDataGasUsed is nil")
 	errExtDataGasUsedTooLarge = errors.New("extDataGasUsed is not uint64")
 )
@@ -124,12 +124,12 @@ func (eng *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, header
 		return fmt.Errorf("invalid gasUsed: have %d, gasLimit %d", header.GasUsed, header.GasLimit)
 	}
 	if configExtra.IsCortina(header.Time) {
-		if header.GasLimit != params.CortinaGasLimit {
-			return fmt.Errorf("expected gas limit to be %d in Cortina, but found %d", params.CortinaGasLimit, header.GasLimit)
+		if header.GasLimit != cortina.GasLimit {
+			return fmt.Errorf("expected gas limit to be %d in Cortina, but found %d", cortina.GasLimit, header.GasLimit)
 		}
 	} else if configExtra.IsApricotPhase1(header.Time) {
-		if header.GasLimit != params.ApricotPhase1GasLimit {
-			return fmt.Errorf("expected gas limit to be %d in ApricotPhase1, but found %d", params.ApricotPhase1GasLimit, header.GasLimit)
+		if header.GasLimit != ap1.GasLimit {
+			return fmt.Errorf("expected gas limit to be %d in ApricotPhase1, but found %d", ap1.GasLimit, header.GasLimit)
 		}
 	} else {
 		// Verify that the gas limit remains within allowed bounds
@@ -141,7 +141,7 @@ func (eng *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, header
 	}
 
 	// Verify header.Extra matches the expected value.
-	expectedExtraPrefix, err := CalcExtraPrefix(config, parent, header.Time)
+	expectedExtraPrefix, err := customheader.ExtraPrefix(configExtra, parent, header.Time)
 	if err != nil {
 		return fmt.Errorf("failed to calculate extra prefix: %w", err)
 	}
@@ -150,7 +150,7 @@ func (eng *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, header
 	}
 
 	// Verify header.BaseFee matches the expected value.
-	expectedBaseFee, err := CalcBaseFee(config, parent, header.Time)
+	expectedBaseFee, err := customheader.BaseFee(configExtra, parent, header.Time)
 	if err != nil {
 		return fmt.Errorf("failed to calculate base fee: %w", err)
 	}

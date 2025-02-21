@@ -39,13 +39,15 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/coreth/consensus"
-	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/consensus/misc/eip4844"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/txpool"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/header"
+	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap1"
+	"github.com/ava-labs/coreth/plugin/evm/upgrade/cortina"
 	"github.com/ava-labs/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/coreth/predicate"
 	"github.com/ava-labs/libevm/common"
@@ -149,30 +151,33 @@ func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateConte
 	var gasLimit uint64
 	chainExtra := params.GetExtra(w.chainConfig)
 	if chainExtra.IsCortina(timestamp) {
-		gasLimit = params.CortinaGasLimit
+		gasLimit = cortina.GasLimit
 	} else if chainExtra.IsApricotPhase1(timestamp) {
-		gasLimit = params.ApricotPhase1GasLimit
+		gasLimit = ap1.GasLimit
 	} else {
-		// The gas limit is set in phase1 to ApricotPhase1GasLimit because the ceiling and floor were set to the same value
-		// such that the gas limit converged to it. Since this is hardbaked now, we remove the ability to configure it.
-		gasLimit = core.CalcGasLimit(parent.GasUsed, parent.GasLimit, params.ApricotPhase1GasLimit, params.ApricotPhase1GasLimit)
+		// The gas limit is set in phase1 to [ap1.GasLimit] because the ceiling
+		// and floor were set to the same value such that the gas limit
+		// converged to it. Since this is hardcoded now, we remove the ability
+		// to configure it.
+		gasLimit = core.CalcGasLimit(parent.GasUsed, parent.GasLimit, ap1.GasLimit, ap1.GasLimit)
 	}
+
+	extra, err := header.ExtraPrefix(chainExtra, parent, timestamp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate new extra prefix: %w", err)
+	}
+	baseFee, err := header.BaseFee(chainExtra, parent, timestamp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate new base fee: %w", err)
+	}
+
 	header := &types.Header{
 		ParentHash: parent.Hash(),
 		Number:     new(big.Int).Add(parent.Number, common.Big1),
 		GasLimit:   gasLimit,
-		Extra:      nil,
 		Time:       timestamp,
-	}
-
-	var err error
-	header.Extra, err = dummy.CalcExtraPrefix(w.chainConfig, parent, timestamp)
-	if err != nil {
-		return nil, fmt.Errorf("failed to calculate new extra prefix: %w", err)
-	}
-	header.BaseFee, err = dummy.CalcBaseFee(w.chainConfig, parent, timestamp)
-	if err != nil {
-		return nil, fmt.Errorf("failed to calculate new base fee: %w", err)
+		Extra:      extra,
+		BaseFee:    baseFee,
 	}
 
 	// Apply EIP-4844, EIP-4788.

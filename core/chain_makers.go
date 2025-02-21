@@ -31,12 +31,14 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/coreth/consensus"
-	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/consensus/misc/eip4844"
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/header"
+	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap1"
+	"github.com/ava-labs/coreth/plugin/evm/upgrade/cortina"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/ethdb"
@@ -376,11 +378,20 @@ func (cm *chainMaker) makeHeader(parent *types.Block, gap uint64, state *state.S
 	var gasLimit uint64
 	configExtra := params.GetExtra(cm.config)
 	if configExtra.IsCortina(time) {
-		gasLimit = params.CortinaGasLimit
+		gasLimit = cortina.GasLimit
 	} else if configExtra.IsApricotPhase1(time) {
-		gasLimit = params.ApricotPhase1GasLimit
+		gasLimit = ap1.GasLimit
 	} else {
 		gasLimit = CalcGasLimit(parent.GasUsed(), parent.GasLimit(), parent.GasLimit(), parent.GasLimit())
+	}
+
+	extra, err := header.ExtraPrefix(configExtra, parent.Header(), time)
+	if err != nil {
+		panic(err)
+	}
+	baseFee, err := header.BaseFee(configExtra, parent.Header(), time)
+	if err != nil {
+		panic(err)
 	}
 
 	header := &types.Header{
@@ -391,16 +402,8 @@ func (cm *chainMaker) makeHeader(parent *types.Block, gap uint64, state *state.S
 		GasLimit:   gasLimit,
 		Number:     new(big.Int).Add(parent.Number(), common.Big1),
 		Time:       time,
-	}
-
-	var err error
-	header.Extra, err = dummy.CalcExtraPrefix(cm.config, parent.Header(), time)
-	if err != nil {
-		panic(err)
-	}
-	header.BaseFee, err = dummy.CalcBaseFee(cm.config, parent.Header(), time)
-	if err != nil {
-		panic(err)
+		Extra:      extra,
+		BaseFee:    baseFee,
 	}
 
 	if cm.config.IsCancun(header.Number, header.Time) {

@@ -17,9 +17,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
+	"github.com/ava-labs/coreth/utils"
 	"github.com/ava-labs/libevm/common"
 	"github.com/holiman/uint256"
 )
@@ -1492,7 +1492,7 @@ func TestExportTxGasCost(t *testing.T) {
 			Keys:            [][]*secp256k1.PrivateKey{{testKeys[0]}},
 			ExpectedGasUsed: 1230,
 			ExpectedFee:     30750,
-			BaseFee:         big.NewInt(25 * params.GWei),
+			BaseFee:         big.NewInt(25 * utils.GWei),
 		},
 		"simple export 225Gwei BaseFee": {
 			UnsignedExportTx: &atomic.UnsignedExportTx{
@@ -1524,7 +1524,7 @@ func TestExportTxGasCost(t *testing.T) {
 			Keys:            [][]*secp256k1.PrivateKey{{testKeys[0]}},
 			ExpectedGasUsed: 1230,
 			ExpectedFee:     276750,
-			BaseFee:         big.NewInt(225 * params.GWei),
+			BaseFee:         big.NewInt(225 * utils.GWei),
 		},
 		"complex export 25Gwei BaseFee": {
 			UnsignedExportTx: &atomic.UnsignedExportTx{
@@ -1568,7 +1568,7 @@ func TestExportTxGasCost(t *testing.T) {
 			Keys:            [][]*secp256k1.PrivateKey{{testKeys[0], testKeys[0], testKeys[0]}},
 			ExpectedGasUsed: 3366,
 			ExpectedFee:     84150,
-			BaseFee:         big.NewInt(25 * params.GWei),
+			BaseFee:         big.NewInt(25 * utils.GWei),
 		},
 		"complex export 225Gwei BaseFee": {
 			UnsignedExportTx: &atomic.UnsignedExportTx{
@@ -1612,7 +1612,7 @@ func TestExportTxGasCost(t *testing.T) {
 			Keys:            [][]*secp256k1.PrivateKey{{testKeys[0], testKeys[0], testKeys[0]}},
 			ExpectedGasUsed: 3366,
 			ExpectedFee:     757350,
-			BaseFee:         big.NewInt(225 * params.GWei),
+			BaseFee:         big.NewInt(225 * utils.GWei),
 		},
 	}
 

@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/coreth/core/txpool/legacypool"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/utils"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
@@ -67,7 +68,7 @@ func TestGossipSubscribe(t *testing.T) {
 	}, 10*time.Second, 500*time.Millisecond, "expected gossipTxPool to be subscribed")
 
 	// create eth txs
-	ethTxs := getValidEthTxs(key, 10, big.NewInt(226*params.GWei))
+	ethTxs := getValidEthTxs(key, 10, big.NewInt(226*utils.GWei))
 
 	// Notify mempool about txs
 	errs := txPool.AddRemotesSync(ethTxs)
