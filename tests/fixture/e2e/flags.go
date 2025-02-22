@@ -96,14 +96,6 @@ func (v *FlagVars) NodeCount() int {
 	return v.nodeCount
 }
 
-func GetEnvWithDefault(envVar, defaultVal string) string {
-	val := os.Getenv(envVar)
-	if len(val) == 0 {
-		return defaultVal
-	}
-	return val
-}
-
 func RegisterFlags() *FlagVars {
 	vars := FlagVars{}
 	flag.StringVar(
@@ -118,7 +110,7 @@ func RegisterFlags() *FlagVars {
 	flag.StringVar(
 		&vars.pluginDir,
 		"plugin-dir",
-		GetEnvWithDefault(tmpnet.AvalancheGoPluginDirEnvName, os.ExpandEnv("$HOME/.avalanchego/plugins")),
+		tmpnet.GetEnvWithDefault(tmpnet.AvalancheGoPluginDirEnvName, os.ExpandEnv("$HOME/.avalanchego/plugins")),
 		fmt.Sprintf(
 			"[optional] the dir containing VM plugins. Also possible to configure via the %s env variable.",
 			tmpnet.AvalancheGoPluginDirEnvName,
@@ -142,12 +134,7 @@ func RegisterFlags() *FlagVars {
 		false,
 		"[optional] restart an existing network previously started with --reuse-network. Useful for ensuring a network is running with the current state of binaries on disk. Ignored if a network is not already running or --stop-network is provided.",
 	)
-	flag.BoolVar(
-		&vars.enableCollectors,
-		"enable-collectors",
-		cast.ToBool(GetEnvWithDefault("TMPNET_ENABLE_COLLECTORS", "false")),
-		"[optional] whether to enable collectors of logs and metrics from nodes of the temporary network.",
-	)
+	SetEnableCollectorsFlag(&vars.enableCollectors)
 	flag.BoolVar(
 		&vars.startNetwork,
 		"start-network",
@@ -168,4 +155,14 @@ func RegisterFlags() *FlagVars {
 	)
 
 	return &vars
+}
+
+// Enable reuse by the upgrade job
+func SetEnableCollectorsFlag(p *bool) {
+	flag.BoolVar(
+		p,
+		"enable-collectors",
+		cast.ToBool(tmpnet.GetEnvWithDefault("TMPNET_ENABLE_COLLECTORS", "false")),
+		"[optional] whether to enable collectors of logs and metrics from nodes of the temporary network.",
+	)
 }
