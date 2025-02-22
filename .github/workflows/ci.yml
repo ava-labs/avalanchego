@@ -51,11 +51,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
-      - uses: cachix/install-nix-action@v30
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
-      # TODO(marun) Maybe figure out how to use `nix build` somehow i.e. make the default shell double as the default package
-      - run: nix develop --command echo "dependencies installed"
       - name: Build AvalancheGo Binary
         shell: bash
         run: ./scripts/build.sh -r
@@ -75,10 +70,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
-      - uses: cachix/install-nix-action@v30
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
-      - run: nix develop --command echo "dependencies installed"
       - name: Build AvalancheGo Binary
         shell: bash
         run: ./scripts/build.sh -r
@@ -97,10 +88,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
-      - uses: cachix/install-nix-action@v30
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
-      - run: nix develop --command echo "dependencies installed"
       - name: Build AvalancheGo Binary
         shell: bash
         run: ./scripts/build.sh
@@ -233,9 +220,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
-      - uses: cachix/install-nix-action@v30
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: ./.github/actions/install-nix
       - run: nix develop --command echo "dependencies installed"
       - name: Run e2e tests
         shell: bash
