@@ -24,18 +24,24 @@ repositories.
 The functionality in this package is grouped by logical purpose into
 the following non-test files:
 
-| Filename          | Types       | Purpose                                        |
-|:------------------|:------------|:-----------------------------------------------|
-| defaults.go       |             | Defines common default configuration           |
-| flags.go          | FlagsMap    | Simplifies configuration of avalanchego flags  |
-| genesis.go        |             | Creates test genesis                           |
-| network.go        | Network     | Orchestrates and configures temporary networks |
-| network_config.go | Network     | Reads and writes network configuration         |
-| node.go           | Node        | Orchestrates and configures nodes              |
-| node_config.go    | Node        | Reads and writes node configuration            |
-| node_process.go   | NodeProcess | Orchestrates node processes                    |
-| subnet.go         | Subnet      | Orchestrates subnets                           |
-| utils.go          |             | Defines shared utility functions               |
+| Filename                    | Types       | Purpose                                             |
+|:----------------------------|:------------|:----------------------------------------------------|
+| collectors.go               |             | Starts and stops collectors for logs and metrics    |
+| defaults.go                 |             | Defines common default configuration                |
+| detached_process_default.go |             | Configures detached processes for darwin and linux  |
+| detached_process_windows.go |             | No-op detached process configuration for windows    |
+| flags.go                    | FlagsMap    | Simplifies configuration of avalanchego flags       |
+| genesis.go                  |             | Creates test genesis                                |
+| kube.go                     |             | Library for Kubernetes interaction                  |
+| local_network.go            |             | Defines configuration for the default local network |
+| network.go                  | Network     | Orchestrates and configures temporary networks      |
+| network_config.go           | Network     | Reads and writes network configuration              |
+| network_test.go             |             | Simple test round-tripping Network serialization    |
+| node.go                     | Node        | Orchestrates and configures nodes                   |
+| node_config.go              | Node        | Reads and writes node configuration                 |
+| node_process.go             | NodeProcess | Orchestrates node processes                         |
+| subnet.go                   | Subnet      | Orchestrates subnets                                |
+| utils.go                    |             | Defines shared utility functions                    |
 
 ## Usage
 
@@ -280,34 +286,53 @@ shared.
 ### Example usage
 
 ```bash
-# Start prometheus to collect metrics
-PROMETHEUS_USERNAME=<username> PROMETHEUS_PASSWORD=<password> ./scripts/run_prometheus.sh
+# Start a nix shell to ensure the availability of promtail and prometheus.
+nix develop
 
-# Start promtail to collect logs
-LOKI_USERNAME=<username> LOKI_PASSWORD=<password> ./scripts/run_promtail.sh
+# Enable collection of logs and metrics
+PROMETHEUS_USERNAME=<username> \
+PROMETHEUS_PASSWORD=<password> \
+LOKI_USERNAME=<username> \
+LOKI_PASSWORD=<password> \
+./bin/tmpnetctl start-collectors
 
 # Network start emits link to grafana displaying collected logs and metrics
 ./bin/tmpnetctl start-network
 
-# Configure metrics collection from a local node binding to the default API
-# port of 9650 and storing its logs in ~/.avalanchego/logs. The script will
-# also emit a link to grafana.
-./scripts/configure-local-metrics-collection.sh
+# When done with the network, stop the collectors
+./bin/tmpnetctl stop-collectors
 ```
+
+### Starting collectors
+
+Collectors for logs and metrics can be started by `tmpnetctl
+start-collectors`:
+
+ - Requires that the following env vars be set
+   - `PROMETHEUS_USERNAME`
+   - `PROMETHEUS_PASSWORD`
+   - `LOKI_USERNAME`
+   - `LOKI_PASSWORD`
+ - Requires that binaries for promtail and prometheus be available in the path
+   - Starting a development shell with `nix develop` is one way to
+     ensure this and requires the [installation of
+     nix](https://github.com/DeterminateSystems/nix-installer?tab=readme-ov-file#install-nix).
+ - Starts prometheus in agent mode configured to scrape metrics from
+   configured nodes and forward them to
+   https://prometheus-poc.avax-dev.network.
+ - Starts promtail configured to collect logs from configured nodes
+   and forward them to https://loki-poc.avax-dev.network.
+
+### Stopping collectors
+
+Collectors for logs and metrics can be stopped by `tmpnetctl
+stop-collectors`:
 
 ### Metrics collection
 
 When a node is started, configuration enabling collection of metrics
 from the node is written to
 `~/.tmpnet/prometheus/file_sd_configs/[network uuid]-[node id].json`.
-
-The `scripts/run_prometheus.sh` script starts prometheus in agent mode
-configured to scrape metrics from configured nodes and forward the
-metrics to a persistent prometheus instance. The script requires that
-the `PROMETHEUS_USERNAME` and `PROMETHEUS_PASSWORD` env vars be set. By
-default the prometheus instance at
-https://prometheus-poc.avax-dev.network will be targeted and
-this can be overridden via the `PROMETHEUS_URL` env var.
 
 ### Log collection
 
@@ -319,13 +344,6 @@ When a node is started, promtail configuration enabling
 collection of logs for the node is written to
 `~/.tmpnet/promtail/file_sd_configs/[network
 uuid]-[node id].json`.
-
-The `scripts/run_promtail.sh` script starts promtail configured to
-collect logs from configured nodes and forward the results to loki. The
-script requires that the `LOKI_USERNAME` and `LOKI_PASSWORD` env vars be
-set. By default the loki instance at
-https://loki-poc.avax-dev.network will be targeted and this
-can be overridden via the `LOKI_URL` env var.
 
 ### Labels
 
