@@ -41,6 +41,9 @@ inputs:
 runs:
   using: composite
   steps:
+    # Ensure promtail and prometheus are available
+    - name: Install nix
+      uses: ./.github/actions/install-nix
     - name: Start prometheus
       # Only run for the original repo; a forked repo won't have access to the monitoring credentials
       if: (inputs.prometheus_username != '')
