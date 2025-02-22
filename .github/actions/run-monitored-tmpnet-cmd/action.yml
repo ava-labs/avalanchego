@@ -3,12 +3,15 @@ description: 'Run the provided command in an environment configured to monitor t
 
 inputs:
   run:
-    description: "the bash command to run"
+    description: "the bash script to run e.g. ./scripts/my-script.sh"
     required: true
+  run_env:
+    description: 'a string containing env vars for the command e.g. "MY_VAR1=foo MY_VAR2=bar"'
+    default: ''
   filter_by_owner:
     default: ''
-  artifact_name:
-    default: 'tmpnet-data'
+  artifact_prefix:
+    default: ''
   prometheus_username:
     required: true
   prometheus_password:
@@ -65,7 +68,7 @@ runs:
         FILTER_BY_OWNER: ${{ inputs.filter_by_owner }}
     - name: Run command
       shell: bash
-      run: ${{ inputs.run }}
+      run: ${{ inputs.run_env }} ${{ inputs.run }}
       env:
         TMPNET_DELAY_NETWORK_SHUTDOWN: true # Ensure shutdown waits for a final metrics scrape
         GH_REPO: ${{ inputs.repository_owner }}/${{ inputs.repository_name }}
@@ -78,4 +81,4 @@ runs:
       uses: ./.github/actions/upload-tmpnet-artifact
       if: always()
       with:
-        name: ${{ inputs.artifact_name }}
+        name: ${{ inputs.artifact_prefix }}-tmpnet-data
