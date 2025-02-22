@@ -41,9 +41,15 @@ inputs:
 runs:
   using: composite
   steps:
-    # Ensure promtail and prometheus are available
-    - name: Install nix
-      uses: ./.github/actions/install-nix
+    # - Ensure promtail and prometheus are available
+    # - Avoid using the install-nix custom action since a relative
+    #   path wouldn't be resolveable from other repos and an absolute
+    #   path would require setting a version.
+    - uses: cachix/install-nix-action@v30
+      with:
+        github_access_token: ${{ inputs.github_token }}
+    - run: nix develop --command echo "dependencies installed"
+      shell: bash
     - name: Notify of metrics availability
       if: (inputs.prometheus_username != '')
       shell: bash
