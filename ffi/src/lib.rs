@@ -9,7 +9,9 @@ use std::path::Path;
 use firewood::db::{BatchOp as DbBatchOp, Db, DbConfig, DbViewSync as _};
 use firewood::manager::{CacheReadStrategy, RevisionManagerConfig};
 
-mod metrics;
+mod metrics_setup;
+
+use metrics::counter;
 
 #[derive(Debug)]
 #[repr(C)]
@@ -79,6 +81,7 @@ pub struct KeyValue {
 ///
 #[no_mangle]
 pub unsafe extern "C" fn fwd_batch(db: *mut Db, nkeys: usize, values: *const KeyValue) -> Value {
+    let start = coarsetime::Instant::now();
     let db = unsafe { db.as_ref() }.expect("db should be non-null");
     let mut batch = Vec::with_capacity(nkeys);
     for i in 0..nkeys {
@@ -96,7 +99,10 @@ pub unsafe extern "C" fn fwd_batch(db: *mut Db, nkeys: usize, values: *const Key
     }
     let proposal = db.propose_sync(batch).expect("proposal should succeed");
     proposal.commit_sync().expect("commit should succeed");
-    hash(db)
+    let hash = hash(db);
+    counter!("firewood.ffi.batch_ms").increment(start.elapsed().as_millis());
+    counter!("firewood.ffi.batch").increment(1);
+    hash
 }
 
 /// Get the root hash of the latest version of the database
@@ -239,7 +245,7 @@ unsafe fn common_create(
     let path = unsafe { CStr::from_ptr(path) };
     let path: &Path = OsStr::from_bytes(path.to_bytes()).as_ref();
     if metrics_port > 0 {
-        metrics::setup_metrics(metrics_port);
+        metrics_setup::setup_metrics(metrics_port);
     }
     Box::into_raw(Box::new(
         Db::new_sync(path, cfg).expect("db initialization should succeed"),

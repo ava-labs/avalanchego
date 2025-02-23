@@ -24,6 +24,7 @@ bitfield = "0.18.1"
 fastrace = { version = "0.7.4" }
 io-uring = { version = "0.7.4", optional = true }
 triomphe = "0.1.14"
+coarsetime = "0.1.35"
 
 [dev-dependencies]
 rand = "0.9.0"
