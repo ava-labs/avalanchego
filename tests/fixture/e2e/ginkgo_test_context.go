@@ -66,7 +66,7 @@ func NewEventHandlerTestContext() *GinkgoTestContext {
 }
 
 // NewTestContext provides a logger with limited output to account for
-// the context already provided by ginkgo in the context of test logging.
+// the context already provided by ginkgo for test logging.
 func NewTestContext() *GinkgoTestContext {
 	return &GinkgoTestContext{
 		logger: newGinkgoLogger(
