@@ -98,9 +98,13 @@ pub unsafe extern "C" fn fwd_batch(db: *mut Db, nkeys: usize, values: *const Key
         });
     }
     let proposal = db.propose_sync(batch).expect("proposal should succeed");
+    let propose_time = start.elapsed().as_millis();
+    counter!("firewood.ffi.propose_ms").increment(propose_time);
     proposal.commit_sync().expect("commit should succeed");
     let hash = hash(db);
-    counter!("firewood.ffi.batch_ms").increment(start.elapsed().as_millis());
+    let propose_plus_commit_time = start.elapsed().as_millis();
+    counter!("firewood.ffi.batch_ms").increment(propose_plus_commit_time);
+    counter!("firewood.ffi.commit_ms").increment(propose_plus_commit_time - propose_time);
     counter!("firewood.ffi.batch").increment(1);
     hash
 }
