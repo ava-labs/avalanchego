@@ -373,6 +373,75 @@ additional labels will be applied:
 These labels are sourced from Github Actions' `github` context as per
 https://docs.github.com/en/actions/learn-github-actions/contexts#github-context.
 
+### CI Collection
+
+A [custom github
+action](../../../.github/actions/run-monitored-tmpnet-cmd/action.yml)
+exists to simplify collection of logs and metrics from CI. The action
+takes care of invoking a nix shell to ensure the availability of
+binary dependencies, configures tmpnet to collect metrics and ensures
+that the tmpnet path is collected as a github artifact to aid in troubleshooting.
+
+Example usage:
+
+```yaml
+- name: Run e2e tests
+
+  # A qualified path is required for use outside of avalanchego
+  # e.g. `ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@[sha or tag]`
+  uses: ./.github/actions/run-monitored-tmpnet-cmd #
+
+  with:
+    # This needs to be the path to a bash script
+    run: ./scripts/tests.e2e.sh
+
+    # Env vars for the script need to be provided via run_env as a space-separated string
+    # e.g. `MY_VAR1=foo MY_VAR2=bar`
+    run_env: E2E_SERIAL=1
+
+    # Sets the prefix of the artifact containing the tmpnet network dir for this job.
+    # Only required if a workflow uses this action more than once so that each artifact
+    # will have a unique name.
+    artifact_prefix: e2e
+
+    # These credentials are mandatory
+    prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+    prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+    loki_username: ${{ secrets.LOKI_ID || '' }}
+    loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+```
+
+The action assumes a nix flake file in the repo root that enables
+availability of promtail and prometheus. The following is a minimal
+flake file that inherits from avalanchego's flake:
+
+```nix
+{
+  # To use:
+  #  - install nix: https://github.com/DeterminateSystems/nix-installer?tab=readme-ov-file#install-nix
+  #  - run `nix develop` or use direnv (https://direnv.net/)
+  #    - for quieter direnv output, set `export DIRENV_LOG_FORMAT=`
+
+  description = "VM development environment";
+
+  inputs = {
+    nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.2405.*.tar.gz";
+    # Make sure to set a SHA or tag to the desired version
+    avalanchego.url = "github:ava-labs/avalanchego?ref=[sha or tag]";
+  };
+
+  outputs = { self, nixpkgs, avalanchego, ... }:
+    let
+      allSystems = builtins.attrNames avalanchego.devShells;
+      forAllSystems = nixpkgs.lib.genAttrs allSystems;
+    in {
+      devShells = forAllSystems (system: {
+        default = avalanchego.devShells.${system}.default;
+      });
+    };
+}
+```
+
 ### Viewing
 
 #### Local networks
