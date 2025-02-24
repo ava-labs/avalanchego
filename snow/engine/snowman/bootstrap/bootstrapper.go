@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bootstrap
@@ -302,7 +302,7 @@ func (b *Bootstrapper) sendBootstrappingMessagesOrFinish(ctx context.Context) er
 			zap.String("reason", "no blocks accepted"),
 			zap.Int("numBeacons", b.Beacons.NumValidators(b.Ctx.SubnetID)),
 		)
-		// Invariant: These functions are mutualy recursive. However, when
+		// Invariant: These functions are mutually recursive. However, when
 		// [startBootstrapping] calls [sendMessagesOrFinish], it is guaranteed
 		// to exit when sending GetAcceptedFrontier requests.
 		return b.startBootstrapping(ctx)
