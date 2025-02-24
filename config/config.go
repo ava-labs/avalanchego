@@ -1084,21 +1084,23 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 	}
 
 	subnetConfigs := make(map[ids.ID]subnets.Config)
-	if len(subnetConfigPath) == 0 {
-		// subnet config path does not exist but not explicitly specified, so ignore it
-		return subnetConfigs, nil
-	}
 
 	// reads subnet config files from a path and given subnetIDs and returns a map.
 	for _, subnetID := range subnetIDs {
+		// Ensure default configuration
 		config := getDefaultSubnetConfig(v)
+		subnetConfigs[subnetID] = config
+
+		if len(subnetConfigPath) == 0 {
+			// subnet config path does not exist but not explicitly specified, so ignore it
+			continue
+		}
 
 		filePath := filepath.Join(subnetConfigPath, subnetID.String()+subnetConfigFileExt)
 		fileInfo, err := os.Stat(filePath)
 		switch {
 		case errors.Is(err, os.ErrNotExist):
-			// this subnet config does not exist, use the default configuration
-			subnetConfigs[subnetID] = config
+			// this subnet config does not exist, the default configuration will be used
 			continue
 		case err != nil:
 			return nil, err
@@ -1112,6 +1114,7 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 			return nil, err
 		}
 
+		// Update the default config with the values from the file
 		if err := json.Unmarshal(file, &config); err != nil {
 			return nil, fmt.Errorf("%w: %w", errUnmarshalling, err)
 		}

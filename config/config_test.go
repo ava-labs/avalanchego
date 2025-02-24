@@ -368,6 +368,10 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 	subnetID, err := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 	require.NoError(t, err)
 
+	defaultConfigs := map[ids.ID]subnets.Config{
+		subnetID: getDefaultSubnetConfig(setupViperFlags()),
+	}
+
 	tests := map[string]struct {
 		fileName    string
 		givenJSON   string
@@ -382,16 +386,19 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 			},
 			expectedErr: errUnmarshalling,
 		},
+		"subnet is not tracked": {
+			fileName:  "Gmt4fuNsGJAd2PX86LBvycGaBpgCYKbuULdCLZs3SEs1Jx1LU.json",
+			givenJSON: `{"validatorOnly": true}`,
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				require.Equal(defaultConfigs, given)
+			},
+			expectedErr: nil,
+		},
 		"default config when incorrect extension used": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.yaml",
 			givenJSON: `{"validatorOnly": true}`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
-				v := setupViperFlags()
-				defaultConfig := getDefaultSubnetConfig(v)
-				expected := map[ids.ID]subnets.Config{
-					subnetID: defaultConfig,
-				}
-				require.Equal(expected, given)
+				require.Equal(defaultConfigs, given)
 			},
 			expectedErr: nil,
 		},
@@ -447,6 +454,10 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 	subnetID, err := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 	require.NoError(t, err)
 
+	defaultConfigs := map[ids.ID]subnets.Config{
+		subnetID: getDefaultSubnetConfig(setupViperFlags()),
+	}
+
 	tests := map[string]struct {
 		givenJSON   string
 		testF       func(*require.Assertions, map[ids.ID]subnets.Config)
@@ -455,12 +466,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 		"default config used when no config provided": {
 			givenJSON: `{}`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
-				v := setupViperFlags()
-				defaultConfig := getDefaultSubnetConfig(v)
-				expected := map[ids.ID]subnets.Config{
-					subnetID: defaultConfig,
-				}
-				require.Equal(expected, given)
+				require.Equal(defaultConfigs, given)
 			},
 			expectedErr: nil,
 		},
@@ -473,6 +479,13 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				require.True(ok)
 				// should respect defaults
 				require.Equal(20, config.ConsensusParameters.K)
+			},
+			expectedErr: nil,
+		},
+		"default config used when subnet is not tracked": {
+			givenJSON: `{"Gmt4fuNsGJAd2PX86LBvycGaBpgCYKbuULdCLZs3SEs1Jx1LU":{"validatorOnly":true}}`,
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				require.Equal(defaultConfigs, given)
 			},
 			expectedErr: nil,
 		},
