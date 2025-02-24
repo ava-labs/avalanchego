@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-func TestNewClient_AppGossip(t *testing.T) {
+func TestClient_AppGossip(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 
@@ -27,12 +27,18 @@ func TestNewClient_AppGossip(t *testing.T) {
 		},
 	}
 
-	client := NewClient(t, ctx, testHandler, ids.GenerateTestNodeID(), ids.GenerateTestNodeID())
-	require.NoError(client.AppGossip(ctx, common.SendConfig{}, []byte("foobar")))
+	nodeID := ids.GenerateTestNodeID()
+	client := NewSelfClient(
+		t,
+		ctx,
+		nodeID,
+		testHandler,
+	)
+	require.NoError(client.AppGossip(ctx, common.SendConfig{NodeIDs: set.Of(nodeID)}, []byte("foobar")))
 	<-appGossipChan
 }
 
-func TestNewClient_AppRequest(t *testing.T) {
+func TestClient_AppRequest(t *testing.T) {
 	tests := []struct {
 		name        string
 		appResponse []byte
@@ -43,7 +49,7 @@ func TestNewClient_AppRequest(t *testing.T) {
 			name:        "AppRequest - response",
 			appResponse: []byte("foobar"),
 			appRequestF: func(ctx context.Context, client *p2p.Client, onResponse p2p.AppResponseCallback) error {
-				return client.AppRequest(ctx, set.Of(ids.GenerateTestNodeID()), []byte("foo"), onResponse)
+				return client.AppRequest(ctx, set.Of(ids.EmptyNodeID), []byte("foo"), onResponse)
 			},
 		},
 		{
@@ -53,7 +59,7 @@ func TestNewClient_AppRequest(t *testing.T) {
 				Message: "foobar",
 			},
 			appRequestF: func(ctx context.Context, client *p2p.Client, onResponse p2p.AppResponseCallback) error {
-				return client.AppRequest(ctx, set.Of(ids.GenerateTestNodeID()), []byte("foo"), onResponse)
+				return client.AppRequest(ctx, set.Of(ids.EmptyNodeID), []byte("foo"), onResponse)
 			},
 		},
 		{
@@ -94,14 +100,19 @@ func TestNewClient_AppRequest(t *testing.T) {
 				},
 			}
 
-			client := NewClient(t, ctx, testHandler, ids.GenerateTestNodeID(), ids.GenerateTestNodeID())
+			client := NewSelfClient(
+				t,
+				ctx,
+				ids.EmptyNodeID,
+				testHandler,
+			)
 			require.NoError(tt.appRequestF(
 				ctx,
 				client,
 				func(_ context.Context, _ ids.NodeID, responseBytes []byte, err error) {
+					defer close(appRequestChan)
 					require.ErrorIs(err, tt.appErr)
 					require.Equal(tt.appResponse, responseBytes)
-					close(appRequestChan)
 				},
 			))
 			<-appRequestChan
