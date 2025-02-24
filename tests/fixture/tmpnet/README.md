@@ -24,24 +24,24 @@ repositories.
 The functionality in this package is grouped by logical purpose into
 the following non-test files:
 
-| Filename                    | Types       | Purpose                                             |
-|:----------------------------|:------------|:----------------------------------------------------|
-| collectors.go               |             | Starts and stops collectors for logs and metrics    |
-| defaults.go                 |             | Defines common default configuration                |
-| detached_process_default.go |             | Configures detached processes for darwin and linux  |
-| detached_process_windows.go |             | No-op detached process configuration for windows    |
-| flags.go                    | FlagsMap    | Simplifies configuration of avalanchego flags       |
-| genesis.go                  |             | Creates test genesis                                |
-| kube.go                     |             | Library for Kubernetes interaction                  |
-| local_network.go            |             | Defines configuration for the default local network |
-| network.go                  | Network     | Orchestrates and configures temporary networks      |
-| network_config.go           | Network     | Reads and writes network configuration              |
-| network_test.go             |             | Simple test round-tripping Network serialization    |
-| node.go                     | Node        | Orchestrates and configures nodes                   |
-| node_config.go              | Node        | Reads and writes node configuration                 |
-| node_process.go             | NodeProcess | Orchestrates node processes                         |
-| subnet.go                   | Subnet      | Orchestrates subnets                                |
-| utils.go                    |             | Defines shared utility functions                    |
+| Filename                    | Types       | Purpose                                                     |
+|:----------------------------|:------------|:------------------------------------------------------------|
+| defaults.go                 |             | Defines common default configuration                        |
+| detached_process_default.go |             | Configures detached processes for darwin and linux          |
+| detached_process_windows.go |             | No-op detached process configuration for windows            |
+| flags.go                    | FlagsMap    | Simplifies configuration of avalanchego flags               |
+| genesis.go                  |             | Creates test genesis                                        |
+| kube.go                     |             | Library for Kubernetes interaction                          |
+| local_network.go            |             | Defines configuration for the default local network         |
+| monitor_processes.go        |             | Enables collection of logs and metrics from local processes |
+| network.go                  | Network     | Orchestrates and configures temporary networks              |
+| network_config.go           | Network     | Reads and writes network configuration                      |
+| network_test.go             |             | Simple test round-tripping Network serialization            |
+| node.go                     | Node        | Orchestrates and configures nodes                           |
+| node_config.go              | Node        | Reads and writes node configuration                         |
+| node_process.go             | NodeProcess | Orchestrates node processes                                 |
+| subnet.go                   | Subnet      | Orchestrates subnets                                        |
+| utils.go                    |             | Defines shared utility functions                            |
 
 ## Usage
 

@@ -50,6 +50,7 @@ runs:
         github_access_token: ${{ inputs.github_token }}
     - run: nix develop --command echo "dependencies installed"
       shell: bash
+    # TODO(marun) Stop emitting this annotation so that any annotation that appears can be assumed to be actionable
     - name: Notify of metrics availability
       if: (inputs.prometheus_username != '')
       shell: bash
@@ -63,7 +64,7 @@ runs:
       # --impure ensures the env vars are accessible to the command
       run: ${{ inputs.run_env }} nix develop --impure --command bash -x ${{ inputs.run }}
       env:
-        TMPNET_ENABLE_COLLECTORS: true
+        TMPNET_START_COLLECTORS: true
         LOKI_USERNAME: ${{ inputs.loki_username }}
         LOKI_PASSWORD: ${{ inputs.loki_password }}
         PROMETHEUS_USERNAME: ${{ inputs.prometheus_username }}
@@ -79,3 +80,4 @@ runs:
       if: always()
       with:
         name: ${{ inputs.artifact_prefix }}-tmpnet-data
+    # TODO(marun) Check that collection is working by querying prometheus and loki with the GH_* labels above
