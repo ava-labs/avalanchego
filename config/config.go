@@ -1054,8 +1054,9 @@ func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]s
 
 	res := make(map[ids.ID]subnets.Config)
 	for _, subnetID := range subnetIDs {
+		config := getDefaultSubnetConfig(v)
+
 		if rawSubnetConfigBytes, ok := subnetConfigs[subnetID]; ok {
-			config := getDefaultSubnetConfig(v)
 			if err := json.Unmarshal(rawSubnetConfigBytes, &config); err != nil {
 				return nil, err
 			}
@@ -1068,9 +1069,9 @@ func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]s
 			if err := config.Valid(); err != nil {
 				return nil, err
 			}
-
-			res[subnetID] = config
 		}
+
+		res[subnetID] = config
 	}
 	return res, nil
 }
@@ -1083,18 +1084,23 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 	}
 
 	subnetConfigs := make(map[ids.ID]subnets.Config)
-	if len(subnetConfigPath) == 0 {
-		// subnet config path does not exist but not explicitly specified, so ignore it
-		return subnetConfigs, nil
-	}
 
 	// reads subnet config files from a path and given subnetIDs and returns a map.
 	for _, subnetID := range subnetIDs {
+		// Ensure default configuration
+		config := getDefaultSubnetConfig(v)
+		subnetConfigs[subnetID] = config
+
+		if len(subnetConfigPath) == 0 {
+			// subnet config path does not exist but not explicitly specified, so ignore it
+			continue
+		}
+
 		filePath := filepath.Join(subnetConfigPath, subnetID.String()+subnetConfigFileExt)
 		fileInfo, err := os.Stat(filePath)
 		switch {
 		case errors.Is(err, os.ErrNotExist):
-			// this subnet config does not exist, move to the next one
+			// this subnet config does not exist, the default configuration will be used
 			continue
 		case err != nil:
 			return nil, err
@@ -1108,7 +1114,7 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 			return nil, err
 		}
 
-		config := getDefaultSubnetConfig(v)
+		// Update the default config with the values from the file
 		if err := json.Unmarshal(file, &config); err != nil {
 			return nil, fmt.Errorf("%w: %w", errUnmarshalling, err)
 		}
@@ -1132,7 +1138,7 @@ func getDefaultSubnetConfig(v *viper.Viper) subnets.Config {
 	return subnets.Config{
 		ConsensusParameters:         getConsensusConfig(v),
 		ValidatorOnly:               false,
-		ProposerMinBlockDelay:       proposervm.DefaultMinBlockDelay,
+		ProposerMinBlockDelay:       v.GetDuration(ProposerVMMinBlockDelayKey),
 		ProposerNumHistoricalBlocks: proposervm.DefaultNumHistoricalBlocks,
 	}
 }
