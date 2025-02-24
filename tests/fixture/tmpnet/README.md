@@ -26,7 +26,7 @@ the following non-test files:
 
 | Filename                    | Types       | Purpose                                                     |
 |:----------------------------|:------------|:------------------------------------------------------------|
-| check_collection.go         |             | Enables checking if logs and metrics were collected         |
+| check_monitoring.go         |             | Enables checking if logs and metrics were collected         |
 | defaults.go                 |             | Defines common default configuration                        |
 | detached_process_default.go |             | Configures detached processes for darwin and linux          |
 | detached_process_windows.go |             | No-op detached process configuration for windows            |
