@@ -191,7 +191,7 @@ func getProof(t Trie, key []byte) (*Proof, error) {
 	return proof, nil
 }
 
-// GetRangeProof returns a range proof for (at least part of) the key range [start, end].
+// getRangeProof returns a range proof for (at least part of) the key range [start, end].
 // The returned proof's [KeyValues] has at most [maxLength] values.
 // [maxLength] must be > 0.
 // Assumes [t] doesn't change while this function is running.
