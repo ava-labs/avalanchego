@@ -37,7 +37,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	nodes := tmpnet.NewNodesOrPanic(flagVars.NodeCount())
 	subnets := vms.XSVMSubnetsOrPanic(nodes...)
 	return e2e.NewTestEnvironment(
-		e2e.NewTestContext(),
+		e2e.NewEventHandlerTestContext(),
 		flagVars,
 		&tmpnet.Network{
 			Owner:   "avalanchego-e2e",
