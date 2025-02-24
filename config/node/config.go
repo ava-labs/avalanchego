@@ -196,6 +196,10 @@ type Config struct {
 	// Larger halflife --> disk usage metrics change more slowly.
 	SystemTrackerDiskHalflife time.Duration `json:"systemTrackerDiskHalflife"`
 
+	// NoIngressValidatorConnectionTimeout denotes the time after which at least one
+	// node is expected to be connected to us if we validate the primary network, otherwise a health check fails.
+	NoIngressValidatorConnectionTimeout time.Duration `json:"noIngressValidatorConnectionTimeout"`
+
 	CPUTargeterConfig tracker.TargeterConfig `json:"cpuTargeterConfig"`
 
 	DiskTargeterConfig tracker.TargeterConfig `json:"diskTargeterConfig"`
