@@ -37,7 +37,6 @@ import (
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/coreth/vmerrs"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/log"
@@ -128,7 +127,7 @@ func Estimate(ctx context.Context, call *core.Message, opts *Options, gasCap uin
 		return 0, nil, err
 	}
 	if failed {
-		if result != nil && !errors.Is(result.Err, vmerrs.ErrOutOfGas) {
+		if result != nil && !errors.Is(result.Err, vm.ErrOutOfGas) {
 			return 0, result.Revert(), result.Err
 		}
 		return 0, nil, fmt.Errorf("gas required exceeds allowance (%d)", hi)

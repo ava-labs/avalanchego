@@ -8,7 +8,6 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/coreth/precompile/contract"
-	"github.com/ava-labs/coreth/vmerrs"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/log"
@@ -56,18 +55,18 @@ func UnpackNativeAssetBalanceInput(input []byte) (common.Address, common.Hash, e
 func (b *NativeAssetBalance) Run(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	// input: encodePacked(address 20 bytes, assetID 32 bytes)
 	if suppliedGas < b.GasCost {
-		return nil, 0, vmerrs.ErrOutOfGas
+		return nil, 0, vm.ErrOutOfGas
 	}
 	remainingGas = suppliedGas - b.GasCost
 
 	address, assetID, err := UnpackNativeAssetBalanceInput(input)
 	if err != nil {
-		return nil, remainingGas, vmerrs.ErrExecutionReverted
+		return nil, remainingGas, vm.ErrExecutionReverted
 	}
 
 	res, overflow := uint256.FromBig(accessibleState.GetStateDB().GetBalanceMultiCoin(address, assetID))
 	if overflow {
-		return nil, remainingGas, vmerrs.ErrExecutionReverted
+		return nil, remainingGas, vm.ErrExecutionReverted
 	}
 	return common.LeftPadBytes(res.Bytes(), 32), remainingGas, nil
 }
@@ -107,7 +106,7 @@ func UnpackNativeAssetCallInput(input []byte) (common.Address, common.Hash, *big
 func (c *NativeAssetCall) Run(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	env := accessibleState.GetPrecompileEnv()
 	if !env.UseGas(c.GasCost) {
-		return nil, 0, vmerrs.ErrOutOfGas
+		return nil, 0, vm.ErrOutOfGas
 	}
 	ret, err = c.run(env, accessibleState.GetStateDB(), caller, addr, input, readOnly)
 	// This precompile will be wrapped in a libevm `legacy` wrapper, which
@@ -123,26 +122,26 @@ func (c *NativeAssetCall) Run(accessibleState contract.AccessibleState, caller c
 // avoids mixing gas-accounting patterns when using env.Call().
 func (c *NativeAssetCall) run(env vm.PrecompileEnvironment, stateDB contract.StateDB, caller common.Address, addr common.Address, input []byte, readOnly bool) (ret []byte, err error) {
 	if readOnly {
-		return nil, vmerrs.ErrExecutionReverted
+		return nil, vm.ErrExecutionReverted
 	}
 
 	to, assetID, assetAmount, callData, err := UnpackNativeAssetCallInput(input)
 	if err != nil {
 		log.Debug("unpacking native asset call input failed", "err", err)
-		return nil, vmerrs.ErrExecutionReverted
+		return nil, vm.ErrExecutionReverted
 	}
 
 	// Note: it is not possible for a negative assetAmount to be passed in here due to the fact that decoding a
 	// byte slice into a *big.Int type will always return a positive value, as documented on [big.Int.SetBytes].
 	if assetAmount.Sign() != 0 && stateDB.GetBalanceMultiCoin(caller, assetID).Cmp(assetAmount) < 0 {
-		return nil, vmerrs.ErrInsufficientBalance
+		return nil, vm.ErrInsufficientBalance
 	}
 
 	snapshot := stateDB.Snapshot()
 
 	if !stateDB.Exist(to) {
 		if !env.UseGas(c.CallNewAccountGas) {
-			return nil, vmerrs.ErrOutOfGas
+			return nil, vm.ErrOutOfGas
 		}
 		stateDB.CreateAccount(to)
 	}
@@ -152,13 +151,12 @@ func (c *NativeAssetCall) run(env vm.PrecompileEnvironment, stateDB contract.Sta
 	stateDB.AddBalanceMultiCoin(to, assetID, assetAmount)
 
 	ret, err = env.Call(to, callData, env.Gas(), new(uint256.Int), vm.WithUNSAFECallerAddressProxying())
-
 	// When an error was returned by the EVM or when setting the creation code
 	// above we revert to the snapshot and consume any gas remaining. Additionally
 	// when we're in homestead this also counts for code storage gas errors.
 	if err != nil {
 		stateDB.RevertToSnapshot(snapshot)
-		if err != vmerrs.ErrExecutionReverted {
+		if err != vm.ErrExecutionReverted {
 			env.UseGas(env.Gas())
 		}
 		// TODO: consider clearing up unused snapshots:
@@ -171,5 +169,5 @@ func (c *NativeAssetCall) run(env vm.PrecompileEnvironment, stateDB contract.Sta
 type DeprecatedContract struct{}
 
 func (*DeprecatedContract) Run(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
-	return nil, suppliedGas, vmerrs.ErrExecutionReverted
+	return nil, suppliedGas, vm.ErrExecutionReverted
 }

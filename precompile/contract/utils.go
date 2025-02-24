@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/ava-labs/coreth/accounts/abi"
-	"github.com/ava-labs/coreth/vmerrs"
+	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
 )
 
@@ -43,7 +43,7 @@ func CalculateFunctionSelector(functionSignature string) []byte {
 // DeductGas checks if [suppliedGas] is sufficient against [requiredGas] and deducts [requiredGas] from [suppliedGas].
 func DeductGas(suppliedGas uint64, requiredGas uint64) (uint64, error) {
 	if suppliedGas < requiredGas {
-		return 0, vmerrs.ErrOutOfGas
+		return 0, vm.ErrOutOfGas
 	}
 	return suppliedGas - requiredGas, nil
 }
