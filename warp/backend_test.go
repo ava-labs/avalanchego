@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/subnet-evm/warp/warptest"
@@ -41,7 +41,7 @@ func init() {
 func TestAddAndGetValidMessage(t *testing.T) {
 	db := memdb.New()
 
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 	warpSigner := avalancheWarp.NewSigner(sk, networkID, sourceChainID)
 	messageSignatureCache := &cache.LRU[ids.ID, []byte]{Size: 500}
@@ -64,7 +64,7 @@ func TestAddAndGetValidMessage(t *testing.T) {
 func TestAddAndGetUnknownMessage(t *testing.T) {
 	db := memdb.New()
 
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 	warpSigner := avalancheWarp.NewSigner(sk, networkID, sourceChainID)
 	messageSignatureCache := &cache.LRU[ids.ID, []byte]{Size: 500}
@@ -83,7 +83,7 @@ func TestGetBlockSignature(t *testing.T) {
 	blockClient := warptest.MakeBlockClient(blkID)
 	db := memdb.New()
 
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(err)
 	warpSigner := avalancheWarp.NewSigner(sk, networkID, sourceChainID)
 	messageSignatureCache := &cache.LRU[ids.ID, []byte]{Size: 500}
@@ -108,7 +108,7 @@ func TestGetBlockSignature(t *testing.T) {
 func TestZeroSizedCache(t *testing.T) {
 	db := memdb.New()
 
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 	warpSigner := avalancheWarp.NewSigner(sk, networkID, sourceChainID)
 
@@ -136,7 +136,7 @@ func TestOffChainMessages(t *testing.T) {
 		check            func(require *require.Assertions, b Backend)
 		err              error
 	}
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 	warpSigner := avalancheWarp.NewSigner(sk, networkID, sourceChainID)
 

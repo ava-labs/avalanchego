@@ -5,7 +5,7 @@
 ARG AVALANCHEGO_NODE_IMAGE
 
 # ============= Compilation Stage ================
-FROM --platform=$BUILDPLATFORM golang:1.22.8-bullseye AS builder
+FROM --platform=$BUILDPLATFORM golang:1.23.6-bullseye AS builder
 
 WORKDIR /build
 
@@ -14,7 +14,7 @@ WORKDIR /build
 COPY go.mod go.sum avalanchego* ./
 
 # Download avalanche dependencies using go mod
-RUN go mod download && go mod tidy -compat=1.22
+RUN go mod download && go mod tidy -compat=1.23
 
 # Copy the code into the container
 COPY . .

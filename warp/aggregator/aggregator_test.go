@@ -14,11 +14,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
 func newValidator(t testing.TB, weight uint64) (bls.Signer, *avalancheWarp.Validator) {
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 	pk := sk.PublicKey()
 	return sk, &avalancheWarp.Validator{
@@ -51,7 +52,7 @@ func TestAggregateSignatures(t *testing.T) {
 		vdr2: sig2,
 		vdr3: sig3,
 	}
-	nonVdrSk, err := bls.NewSigner()
+	nonVdrSk, err := localsigner.New()
 	require.NoError(t, err)
 	nonVdrSig := nonVdrSk.Sign(unsignedMsg.Bytes())
 	vdrs := []*avalancheWarp.Validator{

@@ -293,7 +293,6 @@ func TestCheckPredicate(t *testing.T) {
 			expectedErr: ErrIntrinsicGas,
 		},
 	} {
-		test := test
 		t.Run(name, func(t *testing.T) {
 			require := require.New(t)
 			// Create the rules from TestChainConfig and update the predicates based on the test params

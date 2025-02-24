@@ -31,16 +31,17 @@ var (
 )
 
 var (
-	errOverflowSignersGasCost  = errors.New("overflow calculating warp signers gas cost")
-	errInvalidPredicateBytes   = errors.New("cannot unpack predicate bytes")
-	errInvalidWarpMsg          = errors.New("cannot unpack warp message")
-	errCannotParseWarpMsg      = errors.New("cannot parse warp message")
-	errInvalidWarpMsgPayload   = errors.New("cannot unpack warp message payload")
-	errInvalidAddressedPayload = errors.New("cannot unpack addressed payload")
-	errInvalidBlockHashPayload = errors.New("cannot unpack block hash payload")
-	errCannotGetNumSigners     = errors.New("cannot fetch num signers from warp message")
-	errWarpCannotBeActivated   = errors.New("warp cannot be activated before Durango")
-	errFailedVerification      = errors.New("cannot verify warp signature")
+	errOverflowSignersGasCost     = errors.New("overflow calculating warp signers gas cost")
+	errInvalidPredicateBytes      = errors.New("cannot unpack predicate bytes")
+	errInvalidWarpMsg             = errors.New("cannot unpack warp message")
+	errCannotParseWarpMsg         = errors.New("cannot parse warp message")
+	errInvalidWarpMsgPayload      = errors.New("cannot unpack warp message payload")
+	errInvalidAddressedPayload    = errors.New("cannot unpack addressed payload")
+	errInvalidBlockHashPayload    = errors.New("cannot unpack block hash payload")
+	errCannotGetNumSigners        = errors.New("cannot fetch num signers from warp message")
+	errWarpCannotBeActivated      = errors.New("warp cannot be activated before Durango")
+	errFailedVerification         = errors.New("cannot verify warp signature")
+	errCannotRetrieveValidatorSet = errors.New("cannot retrieve validator set")
 )
 
 // Config implements the precompileconfig.Config interface and
@@ -208,16 +209,25 @@ func (c *Config) VerifyPredicate(predicateContext *precompileconfig.PredicateCon
 		warpMsg.SourceChainID,
 		c.RequirePrimaryNetworkSigners,
 	)
-	err = warpMsg.Signature.Verify(
+
+	validatorSet, err := warp.GetCanonicalValidatorSetFromChainID(
 		context.Background(),
-		&warpMsg.UnsignedMessage,
-		predicateContext.SnowCtx.NetworkID,
 		state,
 		predicateContext.ProposerVMBlockCtx.PChainHeight,
+		warpMsg.UnsignedMessage.SourceChainID,
+	)
+	if err != nil {
+		log.Debug("failed to retrieve canonical validator set", "msgID", warpMsg.ID(), "err", err)
+		return fmt.Errorf("%w: %w", errCannotRetrieveValidatorSet, err)
+	}
+
+	err = warpMsg.Signature.Verify(
+		&warpMsg.UnsignedMessage,
+		predicateContext.SnowCtx.NetworkID,
+		validatorSet,
 		quorumNumerator,
 		WarpQuorumDenominator,
 	)
-
 	if err != nil {
 		log.Debug("failed to verify warp signature", "msgID", warpMsg.ID(), "err", err)
 		return fmt.Errorf("%w: %w", errFailedVerification, err)

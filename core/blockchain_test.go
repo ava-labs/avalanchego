@@ -293,7 +293,6 @@ func TestBlockChainOfflinePruningUngracefulShutdown(t *testing.T) {
 		return createBlockChain(db, pruningConfig, gspec, lastAcceptedHash)
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
 			tt.testFunc(t, create)

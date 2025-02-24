@@ -22,7 +22,7 @@ func Run(versionStr string) {
 		os.Exit(1)
 	}
 	if printVersion && versionStr != "" {
-		fmt.Printf(versionStr)
+		fmt.Print(versionStr)
 		os.Exit(0)
 	}
 	if err := ulimit.Set(ulimit.DefaultFDLimit, logging.NoLog{}); err != nil {

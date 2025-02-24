@@ -112,22 +112,22 @@ func (a *API) aggregateSignatures(ctx context.Context, unsignedMessage *warp.Uns
 	}
 
 	state := warpValidators.NewState(a.state, a.sourceSubnetID, a.sourceChainID, a.requirePrimaryNetworkSigners())
-	validators, totalWeight, err := warp.GetCanonicalValidatorSet(ctx, state, pChainHeight, subnetID)
+	validatorSet, err := warp.GetCanonicalValidatorSetFromSubnetID(ctx, state, pChainHeight, subnetID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get validator set: %w", err)
 	}
-	if len(validators) == 0 {
+	if len(validatorSet.Validators) == 0 {
 		return nil, fmt.Errorf("%w (SubnetID: %s, Height: %d)", errNoValidators, subnetID, pChainHeight)
 	}
 
 	log.Debug("Fetching signature",
 		"sourceSubnetID", subnetID,
 		"height", pChainHeight,
-		"numValidators", len(validators),
-		"totalWeight", totalWeight,
+		"numValidators", len(validatorSet.Validators),
+		"totalWeight", validatorSet.TotalWeight,
 	)
 
-	agg := aggregator.New(aggregator.NewSignatureGetter(a.client), validators, totalWeight)
+	agg := aggregator.New(aggregator.NewSignatureGetter(a.client), validatorSet.Validators, validatorSet.TotalWeight)
 	signatureResult, err := agg.AggregateSignatures(ctx, unsignedMessage, quorumNum)
 	if err != nil {
 		return nil, err
