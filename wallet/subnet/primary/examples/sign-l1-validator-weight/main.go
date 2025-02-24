@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package main
@@ -85,7 +85,7 @@ func main() {
 		log.Fatalf("failed to start peer: %s\n", err)
 	}
 
-	mesageBuilder, err := p2pmessage.NewCreator(
+	messageBuilder, err := p2pmessage.NewCreator(
 		logging.NoLog{},
 		prometheus.NewRegistry(),
 		compression.TypeZstd,
@@ -102,7 +102,7 @@ func main() {
 		log.Fatalf("failed to marshal SignatureRequest: %s\n", err)
 	}
 
-	appRequest, err := mesageBuilder.AppRequest(
+	appRequest, err := messageBuilder.AppRequest(
 		constants.PlatformChainID,
 		0,
 		time.Hour,
