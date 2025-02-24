@@ -12,7 +12,7 @@ on:
 
 jobs:
   build-x86_64-binaries-tarball:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     permissions:
       id-token: write
       contents: read
@@ -58,7 +58,7 @@ jobs:
           TAG: ${{ env.TAG }}
           BUCKET: ${{ secrets.BUCKET }}
           ARCH: "amd64"
-          RELEASE: "focal"
+          RELEASE: "jammy"
 
       - name: Save as Github artifact
         uses: actions/upload-artifact@v4
