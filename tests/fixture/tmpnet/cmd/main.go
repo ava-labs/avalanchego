@@ -10,7 +10,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -81,10 +80,7 @@ func main() {
 				Nodes: tmpnet.NewNodesOrPanic(int(nodeCount)),
 			}
 
-			// Extreme upper bound, should never take this long
-			networkStartTimeout := 2 * time.Minute
-
-			ctx, cancel := context.WithTimeout(context.Background(), networkStartTimeout)
+			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
 			defer cancel()
 			if err := tmpnet.BootstrapNewNetwork(
 				ctx,
@@ -195,6 +191,50 @@ func main() {
 		},
 	}
 	rootCmd.AddCommand(stopCollectorsCmd)
+
+	var networkUUID string
+
+	checkMetricsCmd := &cobra.Command{
+		Use:   "check-metrics",
+		Short: "Checks whether the default prometheus server has the expected metrics",
+		RunE: func(*cobra.Command, []string) error {
+			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
+			defer cancel()
+			log, err := tests.LoggerForFormat("", rawLogFormat)
+			if err != nil {
+				return err
+			}
+			return tmpnet.CheckMetricsExist(ctx, log, networkUUID)
+		},
+	}
+	checkMetricsCmd.PersistentFlags().StringVar(
+		&networkUUID,
+		"network-uuid",
+		"",
+		"[optional] The network UUID to check metrics for. Labels read from GH_* env vars will always be used.",
+	)
+	rootCmd.AddCommand(checkMetricsCmd)
+
+	checkLogsCmd := &cobra.Command{
+		Use:   "check-logs",
+		Short: "Checks whether the default loki server has the expected logs",
+		RunE: func(*cobra.Command, []string) error {
+			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
+			defer cancel()
+			log, err := tests.LoggerForFormat("", rawLogFormat)
+			if err != nil {
+				return err
+			}
+			return tmpnet.CheckLogsExist(ctx, log, networkUUID)
+		},
+	}
+	checkLogsCmd.PersistentFlags().StringVar(
+		&networkUUID,
+		"network-uuid",
+		"",
+		"[optional] The network UUID to check logs for. Labels read from GH_* env vars will always be used.",
+	)
+	rootCmd.AddCommand(checkLogsCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "tmpnetctl failed: %v\n", err)
