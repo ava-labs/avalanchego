@@ -113,7 +113,7 @@ E2E_SKIP_BOOTSTRAP_CHECKS=1 ./bin/ginkgo -v ./tests/e2e ...
 It is possible to enable collection of logs and metrics from the
 temporary networks used for e2e testing by:
 
- - Supplying `--enable-collectors` as an argument to the test suite
+ - Supplying `--start-collectors` as an argument to the test suite
  - Starting collectors in advance of a test run with `tmpnetctl
    start-collectors`
 

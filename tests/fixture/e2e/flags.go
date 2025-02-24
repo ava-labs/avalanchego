@@ -20,7 +20,7 @@ type FlagVars struct {
 	pluginDir           string
 	networkDir          string
 	reuseNetwork        bool
-	enableCollectors    bool
+	startCollectors     bool
 	startNetwork        bool
 	stopNetwork         bool
 	restartNetwork      bool
@@ -73,12 +73,12 @@ func (v *FlagVars) RestartNetwork() bool {
 	return v.restartNetwork
 }
 
-func (v *FlagVars) EnableCollectors() bool {
-	return v.enableCollectors
+func (v *FlagVars) StartCollectors() bool {
+	return v.startCollectors
 }
 
 func (v *FlagVars) NetworkShutdownDelay() time.Duration {
-	if v.enableCollectors {
+	if v.startCollectors {
 		// Only return a non-zero value if the delay is enabled.
 		return tmpnet.NetworkShutdownDelay
 	}
@@ -139,7 +139,7 @@ func RegisterFlags() *FlagVars {
 		false,
 		"[optional] restart an existing network previously started with --reuse-network. Useful for ensuring a network is running with the current state of binaries on disk. Ignored if a network is not already running or --stop-network is provided.",
 	)
-	SetEnableCollectorsFlag(&vars.enableCollectors)
+	SetStartCollectorsFlag(&vars.startCollectors)
 	flag.BoolVar(
 		&vars.startNetwork,
 		"start-network",
@@ -169,11 +169,11 @@ func RegisterFlags() *FlagVars {
 }
 
 // Enable reuse by the upgrade job
-func SetEnableCollectorsFlag(p *bool) {
+func SetStartCollectorsFlag(p *bool) {
 	flag.BoolVar(
 		p,
-		"enable-collectors",
-		cast.ToBool(tmpnet.GetEnvWithDefault("TMPNET_ENABLE_COLLECTORS", "false")),
-		"[optional] whether to enable collectors of logs and metrics from nodes of the temporary network.",
+		"start-collectors",
+		cast.ToBool(tmpnet.GetEnvWithDefault("TMPNET_START_COLLECTORS", "false")),
+		"[optional] whether to start collectors of logs and metrics from nodes of the temporary network.",
 	)
 }

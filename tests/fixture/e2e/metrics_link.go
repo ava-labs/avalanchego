@@ -24,16 +24,12 @@ var EmitMetricsLink bool
 // will be emitted at the end of spec execution. If the test uses a
 // private network, it can disable this behavior by setting
 // EmitMetricsLink to false.
-//
-// TODO(marun) Make this conditional on metrics collection being enabled
 var _ = ginkgo.BeforeEach(func() {
 	EmitMetricsLink = true
 })
 
 // This event handler attempts to emit a metrics link scoped to the duration
 // of the current spec.
-//
-// TODO(marun) Make this conditional on metrics collection being enabled
 var _ = ginkgo.AfterEach(func() {
 	tc := NewTestContext()
 	env := GetEnv(tc)

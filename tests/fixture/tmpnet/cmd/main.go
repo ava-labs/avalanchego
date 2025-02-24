@@ -176,7 +176,7 @@ func main() {
 			if err != nil {
 				return err
 			}
-			return tmpnet.EnsureCollectorsRunning(ctx, log)
+			return tmpnet.StartCollectors(ctx, log)
 		},
 	}
 	rootCmd.AddCommand(startCollectorsCmd)
@@ -191,7 +191,7 @@ func main() {
 			if err != nil {
 				return err
 			}
-			return tmpnet.EnsureCollectorsStopped(ctx, log)
+			return tmpnet.StopCollectors(ctx, log)
 		},
 	}
 	rootCmd.AddCommand(stopCollectorsCmd)
