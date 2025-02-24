@@ -17,12 +17,13 @@ import (
 // The Node type is defined in this file node_config.go
 // (reading/writing configuration) and node.go (orchestration).
 
-func (n *Node) getFlagsPath() string {
+// For consumption outside of avalanchego. Needs to be kept exported.
+func (n *Node) GetFlagsPath() string {
 	return filepath.Join(n.GetDataDir(), "flags.json")
 }
 
 func (n *Node) readFlags() error {
-	bytes, err := os.ReadFile(n.getFlagsPath())
+	bytes, err := os.ReadFile(n.GetFlagsPath())
 	if err != nil {
 		return fmt.Errorf("failed to read node flags: %w", err)
 	}
@@ -39,7 +40,7 @@ func (n *Node) writeFlags() error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal node flags: %w", err)
 	}
-	if err := os.WriteFile(n.getFlagsPath(), bytes, perms.ReadWrite); err != nil {
+	if err := os.WriteFile(n.GetFlagsPath(), bytes, perms.ReadWrite); err != nil {
 		return fmt.Errorf("failed to write node flags: %w", err)
 	}
 	return nil
