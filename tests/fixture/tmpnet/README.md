@@ -369,7 +369,19 @@ metrics and logs.
 
 Collection of logs and metrics is enabled for CI jobs that use
 tmpnet. Each job will execute a step titled `Notify of metrics
-availability` that emits a link to grafana parametized to show results
-for the job. Additional links to grafana parametized to show results
-for individual network will appear in the logs displaying the start of
+availability` that emits a link to grafana parameterized to show
+results for the job. This link is emitted as a github actions
+annotation that appears on the summary page for a test run to increase
+the visibility of collected metrics and logs.
+
+Additional links to grafana parameterized to show results for
+individual network will appear in the logs displaying the start of
 those networks.
+
+In cases where a given job uses private networks in addition to the
+usual shared network, it may be useful to parameterize the
+[run_monitored_tmpnet_action](../../../.github/actions/run-monitored-tmpnet-cmd/action.yml)
+github action with `filter_by_owner` set to the owner string for the
+shared network. This ensures that the link emitted by the annotation
+displays results for only the shared network of the job rather than
+mixing results from all the networks started for the job.

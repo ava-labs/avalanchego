@@ -39,12 +39,14 @@ func TestSecretKeyBytes(t *testing.T) {
 
 	sk, err := New()
 	require.NoError(err)
-	sig := sk.Sign(msg)
+	sig, err := sk.Sign(msg)
+	require.NoError(err)
 	skBytes := sk.ToBytes()
 
 	sk2, err := FromBytes(skBytes)
 	require.NoError(err)
-	sig2 := sk2.Sign(msg)
+	sig2, err := sk2.Sign(msg)
+	require.NoError(err)
 	sk2Bytes := sk2.ToBytes()
 
 	require.Equal(sk, sk2)
