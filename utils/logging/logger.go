@@ -33,7 +33,7 @@ type Logger interface {
 	// Log an event that may be useful for understanding the order of the
 	// execution of the protocol
 	Trace(msg string, fields ...zap.Field)
-	// Log an event that may be useful for a programmer to see when debuging the
+	// Log an event that may be useful for a programmer to see when debugging the
 	// execution of the protocol
 	Debug(msg string, fields ...zap.Field)
 	// Log extremely detailed events that can be useful for inspecting every

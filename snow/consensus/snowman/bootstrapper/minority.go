@@ -16,7 +16,7 @@ import (
 var _ Poll = (*Minority)(nil)
 
 // Minority implements the bootstrapping poll to determine the initial set of
-// potentially accaptable blocks.
+// potentially acceptable blocks.
 //
 // This poll fetches the last accepted block from an initial set of peers. In
 // order for the protocol to find a recently accepted block, there must be at
