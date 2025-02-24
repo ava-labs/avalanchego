@@ -21,7 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
-type configGeneratorFunc func(workingDir string, username string, password string) string
+type configGeneratorFunc func(workingDir string, serviceDiscoveryDir string, username string, password string) string
 
 const (
 	collectorTickerInterval = 100 * time.Millisecond
@@ -35,15 +35,15 @@ const (
 	NetworkShutdownDelay = prometheusScrapeInterval + 2*time.Second
 )
 
-// EnsureCollectorsRunning ensures collectors are running to collect logs and metrics from local nodes.
-func EnsureCollectorsRunning(ctx context.Context, log logging.Logger) error {
+// StartCollectors ensures collectors are running to collect logs and metrics from local nodes.
+func StartCollectors(ctx context.Context, log logging.Logger) error {
 	if _, ok := ctx.Deadline(); !ok {
 		return errors.New("unable to start collectors with a context without a deadline")
 	}
-	if err := ensurePrometheusRunning(ctx, log); err != nil {
+	if err := startPrometheus(ctx, log); err != nil {
 		return err
 	}
-	if err := ensurePromtailRunning(ctx, log); err != nil {
+	if err := startPromtail(ctx, log); err != nil {
 		return err
 	}
 
@@ -53,7 +53,7 @@ func EnsureCollectorsRunning(ctx context.Context, log logging.Logger) error {
 }
 
 // EnsureCollectorsStopped ensures collectors are not running.
-func EnsureCollectorsStopped(ctx context.Context, log logging.Logger) error {
+func StopCollectors(ctx context.Context, log logging.Logger) error {
 	if _, ok := ctx.Deadline(); !ok {
 		return errors.New("unable to start collectors with a context without a deadline")
 	}
@@ -123,15 +123,15 @@ func EnsureCollectorsStopped(ctx context.Context, log logging.Logger) error {
 	return nil
 }
 
-// ensurePrometheusRunning ensures an agent-mode prometheus process is running to collect metrics from local nodes.
-func ensurePrometheusRunning(ctx context.Context, log logging.Logger) error {
-	return ensureCollectorRunning(
+// startPrometheus ensures an agent-mode prometheus process is running to collect metrics from local nodes.
+func startPrometheus(ctx context.Context, log logging.Logger) error {
+	return startCollector(
 		ctx,
 		log,
 		prometheusCmd,
 		"--config.file=prometheus.yaml --storage.agent.path=./data --web.listen-address=localhost:0 --enable-feature=agent",
 		"PROMETHEUS",
-		func(workingDir string, username string, password string) string {
+		func(_ string, serviceDiscoveryDir string, username string, password string) string {
 			return fmt.Sprintf(`
 global:
   scrape_interval: %v     # Default is every 1 minute.
@@ -143,27 +143,27 @@ scrape_configs:
     metrics_path: "/ext/metrics"
     file_sd_configs:
       - files:
-          - '%s/file_sd_configs/*.json'
+          - '%s/*.json'
 
 remote_write:
   - url: "https://prometheus-poc.avax-dev.network/api/v1/write"
     basic_auth:
       username: "%s"
       password: "%s"
-`, prometheusScrapeInterval, workingDir, username, password)
+`, prometheusScrapeInterval, serviceDiscoveryDir, username, password)
 		},
 	)
 }
 
-// ensurePromtailRunning ensures a promtail process is running to collect logs from local nodes.
-func ensurePromtailRunning(ctx context.Context, log logging.Logger) error {
-	return ensureCollectorRunning(
+// startPromtail ensures a promtail process is running to collect logs from local nodes.
+func startPromtail(ctx context.Context, log logging.Logger) error {
+	return startCollector(
 		ctx,
 		log,
 		promtailCmd,
 		"-config.file=promtail.yaml",
 		"LOKI",
-		func(workingDir string, username string, password string) string {
+		func(workingDir string, serviceDiscoveryDir string, username string, password string) string {
 			return fmt.Sprintf(`
 server:
   http_listen_port: 0
@@ -182,8 +182,8 @@ scrape_configs:
   - job_name: "avalanchego"
     file_sd_configs:
       - files:
-          - '%s/file_sd_configs/*.json'
-`, workingDir, username, password, workingDir)
+          - '%s/*.json'
+`, workingDir, username, password, serviceDiscoveryDir)
 		},
 	)
 }
@@ -196,12 +196,20 @@ func getWorkingDir(cmdName string) (string, error) {
 	return filepath.Join(tmpnetDir, cmdName), nil
 }
 
+func getServiceDiscoveryDir(cmdName string) (string, error) {
+	tmpnetDir, err := getTmpnetPath()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(tmpnetDir, cmdName, "file_sd_configs"), nil
+}
+
 func getPIDPath(workingDir string) string {
 	return filepath.Join(workingDir, "run.pid")
 }
 
-// ensureCollectorRunning starts a collector process if it is not already running.
-func ensureCollectorRunning(
+// startCollector starts a collector process if it is not already running.
+func startCollector(
 	ctx context.Context,
 	log logging.Logger,
 	cmdName string,
@@ -247,8 +255,8 @@ func ensureCollectorRunning(
 		return err
 	}
 
-	// Start the collector
-	return startCollector(ctx, log, cmdName, args, workingDir, pidPath)
+	// Start the process
+	return startCollectorProcess(ctx, log, cmdName, args, workingDir, pidPath)
 }
 
 // processFromPIDFile attempts to retrieve a running process from the specified PID file.
@@ -313,7 +321,11 @@ func writeConfigFile(
 	log.Info("writing "+cmdName+" config",
 		zap.String("path", confPath),
 	)
-	config := configGenerator(workingDir, username, password)
+	serviceDiscoveryDir, err := getServiceDiscoveryDir(cmdName)
+	if err != nil {
+		return err
+	}
+	config := configGenerator(workingDir, serviceDiscoveryDir, username, password)
 	return os.WriteFile(confPath, []byte(config), perms.ReadWrite)
 }
 
@@ -332,14 +344,14 @@ func getCredentials(baseEnvName string) (string, string, error) {
 	return username, password, nil
 }
 
-// Start a collector. Use bash to execute the command in the background and enable
+// Start a collector process. Use bash to execute the command in the background and enable
 // stderr and stdout redirection to a log file.
 //
 // Ideally this would be possible without bash, but it does not seem possible to
 // have this process open a log file, set cmd.Stdout cmd.Stderr to that file, and
 // then have the child process be able to write to that file once the parent
 // process exits. Attempting to do so resulted in an empty log file.
-func startCollector(
+func startCollectorProcess(
 	ctx context.Context,
 	log logging.Logger,
 	cmdName string,
@@ -369,6 +381,9 @@ func startCollector(
 			zap.String("pid", pid),
 		)
 	}
+
+	// TODO(marun) Perform a readiness check
+	// TODO(marun) Check that the log is not empty
 
 	return nil
 }
