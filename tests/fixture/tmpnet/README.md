@@ -413,7 +413,7 @@ Example usage:
 
 The action assumes a nix flake file in the repo root that enables
 availability of promtail and prometheus. The following is a minimal
-flake file that inherits from avalanchego's flake:
+flake file that inherits from the avalanchego flake:
 
 ```nix
 {
