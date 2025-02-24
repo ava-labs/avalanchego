@@ -24,6 +24,7 @@ var (
 		TargetGas:                big.NewInt(10_000_000),
 		BaseFeeChangeDenominator: big.NewInt(12),
 		MinBaseFee:               big.NewInt(25 * utils.GWei),
+		GasLimit:                 big.NewInt(12_000_000),
 	}
 
 	testFeeConfigDouble = commontype.FeeConfig{
@@ -34,6 +35,7 @@ var (
 		TargetGas:                big.NewInt(20_000_000),
 		BaseFeeChangeDenominator: big.NewInt(24),
 		MinBaseFee:               big.NewInt(50 * utils.GWei),
+		GasLimit:                 big.NewInt(24_000_000),
 	}
 )
 

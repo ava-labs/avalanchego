@@ -1,5 +1,7 @@
 package legacy
 
 const (
-	BaseFee int64 = 225_000_000_000
+	BaseFee = 225_000_000_000
+
+	GasLimit = 8_000_000
 )

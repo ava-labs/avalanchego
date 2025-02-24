@@ -144,22 +144,13 @@ func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateConte
 		timestamp = parent.Time
 	}
 
-	var gasLimit uint64
 	// The fee manager relies on the state of the parent block to set the fee config
 	// because the fee config may be changed by the current block.
 	feeConfig, _, err := w.chain.GetFeeConfigAt(parent)
 	if err != nil {
 		return nil, err
 	}
-	configuredGasLimit := feeConfig.GasLimit.Uint64()
-	if w.chainConfig.IsSubnetEVM(timestamp) {
-		gasLimit = configuredGasLimit
-	} else {
-		// The gas limit is set in SubnetEVMGasLimit because the ceiling and floor were set to the same value
-		// such that the gas limit converged to it. Since this is hardbaked now, we remove the ability to configure it.
-		gasLimit = core.CalcGasLimit(parent.GasUsed, parent.GasLimit, configuredGasLimit, configuredGasLimit)
-	}
-
+	gasLimit := header.GasLimit(w.chainConfig, feeConfig, parent, timestamp)
 	baseFee, err := header.BaseFee(w.chainConfig, feeConfig, parent, timestamp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate new base fee: %w", err)

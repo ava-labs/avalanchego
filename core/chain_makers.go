@@ -378,13 +378,7 @@ func (cm *chainMaker) makeHeader(parent *types.Block, gap uint64, state *state.S
 	if err != nil {
 		panic(err)
 	}
-	var gasLimit uint64
-	if cm.config.IsSubnetEVM(time) {
-		gasLimit = feeConfig.GasLimit.Uint64()
-	} else {
-		gasLimit = CalcGasLimit(parent.GasUsed(), parent.GasLimit(), parent.GasLimit(), parent.GasLimit())
-	}
-
+	gasLimit := header.GasLimit(cm.config, feeConfig, parent.Header(), time)
 	baseFee, err := header.BaseFee(cm.config, feeConfig, parent.Header(), time)
 	if err != nil {
 		panic(err)
