@@ -24,6 +24,29 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
+type getCountFunc func() (int, error)
+
+func waitForCount(ctx context.Context, log logging.Logger, name string, getCount getCountFunc) error {
+	if err := pollUntilContextCancel(ctx, func(_ context.Context) (bool, error) {
+		count, err := getCount()
+		if err != nil {
+			log.Warn("failed to query for "+name,
+				zap.Error(err),
+			)
+			return false, nil
+		}
+		if count > 0 {
+			log.Info(name+" exist",
+				zap.Int("count", count),
+			)
+		}
+		return count > 0, nil
+	}); err != nil {
+		return fmt.Errorf("%s not found before timeout: %w", name, err)
+	}
+	return nil
+}
+
 // CheckLogsExist checks if logs exist for the given network. Github labels are also
 // included if provided as env vars (GH_*).
 func CheckLogsExist(ctx context.Context, log logging.Logger, networkUUID string) error {
@@ -42,19 +65,9 @@ func CheckLogsExist(ctx context.Context, log logging.Logger, networkUUID string)
 		zap.String("query", query),
 	)
 
-	logsCount, err := queryLoki(ctx, url, username, password, query)
-	if err != nil {
-		return err
-	}
-
-	if logsCount > 0 {
-		log.Info("logs exist",
-			zap.Int("count", logsCount),
-		)
-		return nil
-	}
-
-	return errors.New("logs not found")
+	return waitForCount(ctx, log, "logs", func() (int, error) {
+		return queryLoki(ctx, url, username, password, query)
+	})
 }
 
 // getCheckLogsQuery returns the query to check if logs exist.
@@ -157,18 +170,9 @@ func CheckMetricsExist(ctx context.Context, log logging.Logger, networkUUID stri
 		zap.String("query", query),
 	)
 
-	count, err := queryPrometheus(ctx, log, url, username, password, query)
-	if err != nil {
-		return err
-	}
-	if count == 0 {
-		return errors.New("metrics not found")
-	}
-
-	log.Info("metrics exist",
-		zap.Int("count", count),
-	)
-	return nil
+	return waitForCount(ctx, log, "metrics", func() (int, error) {
+		return queryPrometheus(ctx, log, url, username, password, query)
+	})
 }
 
 // getCheckMetricsQuery returns the query to check if metrics exist.
