@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
@@ -53,16 +54,18 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 		require.NoError(err)
 		network.Genesis = genesis
 
+		shutdownDelay := 0 * time.Second
 		if startCollectors {
 			require.NoError(tmpnet.StartCollectors(tc.DefaultContext(), tc.Log()))
+			shutdownDelay = tmpnet.NetworkShutdownDelay // Ensure a final metrics scrape
 		}
 
 		e2e.StartNetwork(
 			tc,
 			network,
 			avalancheGoExecPath,
-			"",    /* pluginDir */
-			0,     /* shutdownDelay */
+			"", /* pluginDir */
+			shutdownDelay,
 			false, /* skipShutdown */
 			false, /* reuseNetwork */
 		)
