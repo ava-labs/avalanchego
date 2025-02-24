@@ -40,7 +40,7 @@ var (
 			name: "almost_excess_change",
 			state: State{
 				Gas: gas.State{
-					Excess: 29_805_331, // MinTargetPerSecond * ln(2) * TargetToPriceUpdateConversion
+					Excess: 60_303_808, // MinTargetPerSecond * ln(2) * TargetToPriceUpdateConversion
 				},
 				TargetExcess: 33, // Largest excess that doesn't increase the target
 			},
@@ -53,7 +53,7 @@ var (
 			name: "small_excess_change",
 			state: State{
 				Gas: gas.State{
-					Excess: 29_805_362, // (MinTargetPerSecond + 1) * ln(2) * TargetToPriceUpdateConversion
+					Excess: 60_303_868, // (MinTargetPerSecond + 1) * ln(2) * TargetToPriceUpdateConversion
 				},
 				TargetExcess: 34, // Smallest excess that increases the target
 			},
@@ -65,7 +65,7 @@ var (
 			name: "max_initial_excess_change",
 			state: State{
 				Gas: gas.State{
-					Excess: 47_286_485, // (MinTargetPerSecond + 977) * ln(3) * TargetToPriceUpdateConversion
+					Excess: 95_672_652, // (MinTargetPerSecond + 977) * ln(3) * TargetToPriceUpdateConversion
 				},
 				TargetExcess: MaxTargetExcessDiff,
 			},
@@ -78,85 +78,85 @@ var (
 			name: "current_target",
 			state: State{
 				Gas: gas.State{
-					Excess: 1_336_650_647, // 1_500_000 * ln(nAVAX) * TargetToPriceUpdateConversion
+					Excess: 2_704_386_192, // 1_500_000 * ln(nAVAX) * TargetToPriceUpdateConversion
 				},
 				TargetExcess: 13_605_152, // 2^25 * ln(1.5)
 			},
 			target:      1_500_000,
 			maxCapacity: targetToMaxCapacity * 1_500_000,
-			gasPrice:    (nAVAX + 7) * MinGasPrice, // +7 due to approximation
+			gasPrice:    nAVAX*MinGasPrice + 2, // +2 due to approximation
 		},
 		{
 			name: "3m_target",
 			state: State{
 				Gas: gas.State{
-					Excess: 3_267_368_247, // 3_000_000 * ln(100*nAVAX) * TargetToPriceUpdateConversion
+					Excess: 6_610_721_802, // 3_000_000 * ln(100*nAVAX) * TargetToPriceUpdateConversion
 				},
 				TargetExcess: 36_863_312, // 2^25 * ln(3)
 			},
 			target:      3_000_000,
 			maxCapacity: targetToMaxCapacity * 3_000_000,
-			gasPrice:    (100*nAVAX + 31) * MinGasPrice, // +31 due to approximation
+			gasPrice:    100*nAVAX*MinGasPrice + 4, // +4 due to approximation
 		},
 		{
 			name: "6m_target",
 			state: State{
 				Gas: gas.State{
-					Excess: 6_534_736_494, // 6_000_000 * ln(100*nAVAX) * TargetToPriceUpdateConversion
+					Excess: 13_221_443_604, // 6_000_000 * ln(100*nAVAX) * TargetToPriceUpdateConversion
 				},
 				TargetExcess: 60_121_472, // 2^25 * ln(6)
 			},
 			target:      6_000_000,
 			maxCapacity: targetToMaxCapacity * 6_000_000,
-			gasPrice:    (100*nAVAX + 31) * MinGasPrice, // +31 due to approximation
+			gasPrice:    100*nAVAX*MinGasPrice + 4, // +4 due to approximation
 		},
 		{
 			name: "10m_target",
 			state: State{
 				Gas: gas.State{
-					Excess: 10_891_227_490, // 10_000_000 * ln(100*nAVAX) * TargetToPriceUpdateConversion
+					Excess: 22_035_739_340, // 10_000_000 * ln(100*nAVAX) * TargetToPriceUpdateConversion
 				},
 				TargetExcess: 77_261_935, // 2^25 * ln(10)
 			},
 			target:      10_000_000,
 			maxCapacity: targetToMaxCapacity * 10_000_000,
-			gasPrice:    (100*nAVAX + 31) * MinGasPrice, // +31 due to approximation
+			gasPrice:    100*nAVAX*MinGasPrice + 5, // +5 due to approximation
 		},
 		{
 			name: "100m_target",
 			state: State{
 				Gas: gas.State{
-					Excess: 108_912_274_899, // 100_000_000 * ln(100*nAVAX) * TargetToPriceUpdateConversion
+					Excess: 220_357_393_400, // 100_000_000 * ln(100*nAVAX) * TargetToPriceUpdateConversion
 				},
 				TargetExcess: 154_523_870, // 2^25 * ln(100)
 			},
 			target:      100_000_000,
 			maxCapacity: targetToMaxCapacity * 100_000_000,
-			gasPrice:    (100*nAVAX + 8) * MinGasPrice, // +8 due to approximation
+			gasPrice:    100*nAVAX*MinGasPrice + 5, // +5 due to approximation
 		},
 		{
 			name: "low_1b_target",
 			state: State{
 				Gas: gas.State{
-					Excess: 1_089_122_722_848, // (1_000_000_000 - 24) * ln(100*nAVAX) * TargetToPriceUpdateConversion
+					Excess: 2_203_573_881_110, // (1_000_000_000 - 24) * ln(100*nAVAX) * TargetToPriceUpdateConversion
 				},
 				TargetExcess: 231_785_804, // 2^25 * ln(1000)
 			},
 			target:      1_000_000_000 - 24,
 			maxCapacity: targetToMaxCapacity * (1_000_000_000 - 24),
-			gasPrice:    (100*nAVAX + 1) * MinGasPrice, // +1 due to approximation
+			gasPrice:    100 * nAVAX * MinGasPrice,
 		},
 		{
 			name: "high_1b_target",
 			state: State{
 				Gas: gas.State{
-					Excess: 1_089_122_755_521, // (1_000_000_000 + 6) * ln(100*nAVAX) * TargetToPriceUpdateConversion
+					Excess: 2_203_573_947_217, // (1_000_000_000 + 6) * ln(100*nAVAX) * TargetToPriceUpdateConversion
 				},
 				TargetExcess: 231_785_805, // 2^25 * ln(1000) + 1
 			},
 			target:      1_000_000_000 + 6,
 			maxCapacity: targetToMaxCapacity * (1_000_000_000 + 6),
-			gasPrice:    (100 * nAVAX) * MinGasPrice,
+			gasPrice:    100 * nAVAX * MinGasPrice,
 		},
 		{
 			name: "largest_max_capacity",
@@ -556,6 +556,42 @@ var (
 					Excess: 1_999_999_999, // inverse of max_decrease -1 due to rounding error
 				},
 				TargetExcess: 2 * MaxTargetExcessDiff,
+			},
+		},
+		{
+			name: "reduce_capacity",
+			initial: State{
+				Gas: gas.State{
+					Capacity: 20_039_100, // MinTargetPerSecond * e^(2*MaxTargetExcessDiff / TargetConversion)
+					Excess:   2_000_000_000,
+				},
+				TargetExcess: 2 * MaxTargetExcessDiff,
+			},
+			desiredTargetExcess: 0,
+			expected: State{
+				Gas: gas.State{
+					Capacity: 20_019_540,    // MinTargetPerSecond * e^(MaxTargetExcessDiff / TargetConversion)
+					Excess:   1_998_047_816, // 2M * NewTarget / OldTarget
+				},
+				TargetExcess: MaxTargetExcessDiff,
+			},
+		},
+		{
+			name: "overflow_max_capacity",
+			initial: State{
+				Gas: gas.State{
+					Capacity: math.MaxUint64,
+					Excess:   2_000_000_000,
+				},
+				TargetExcess: maxTargetExcess,
+			},
+			desiredTargetExcess: 0,
+			expected: State{
+				Gas: gas.State{
+					Capacity: math.MaxUint64,
+					Excess:   1_998_047_867, // 2M * NewTarget / OldTarget
+				},
+				TargetExcess: maxTargetExcess - MaxTargetExcessDiff,
 			},
 		},
 	}
