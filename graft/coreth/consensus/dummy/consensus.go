@@ -10,7 +10,6 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/coreth/consensus"
 	"github.com/ava-labs/coreth/consensus/misc/eip4844"
@@ -22,8 +21,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	customheader "github.com/ava-labs/coreth/plugin/evm/header"
-	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap1"
-	"github.com/ava-labs/coreth/plugin/evm/upgrade/cortina"
 )
 
 var (
@@ -114,31 +111,13 @@ func NewFullFaker() *DummyEngine {
 }
 
 func (eng *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, header *types.Header, parent *types.Header) error {
-	// Verify that the gas limit is <= 2^63-1
-	if header.GasLimit > params.MaxGasLimit {
-		return fmt.Errorf("invalid gasLimit: have %v, max %v", header.GasLimit, params.MaxGasLimit)
-	}
 	// Verify that the gasUsed is <= gasLimit
 	if header.GasUsed > header.GasLimit {
 		return fmt.Errorf("invalid gasUsed: have %d, gasLimit %d", header.GasUsed, header.GasLimit)
 	}
-	if config.IsCortina(header.Time) {
-		if header.GasLimit != cortina.GasLimit {
-			return fmt.Errorf("expected gas limit to be %d in Cortina, but found %d", cortina.GasLimit, header.GasLimit)
-		}
-	} else if config.IsApricotPhase1(header.Time) {
-		if header.GasLimit != ap1.GasLimit {
-			return fmt.Errorf("expected gas limit to be %d in ApricotPhase1, but found %d", ap1.GasLimit, header.GasLimit)
-		}
-	} else {
-		// Verify that the gas limit remains within allowed bounds
-		diff := math.AbsDiff(parent.GasLimit, header.GasLimit)
-		limit := parent.GasLimit / params.GasLimitBoundDivisor
-		if diff >= limit || header.GasLimit < params.MinGasLimit {
-			return fmt.Errorf("invalid gas limit: have %d, want %d += %d", header.GasLimit, parent.GasLimit, limit)
-		}
+	if err := customheader.VerifyGasLimit(config, parent, header); err != nil {
+		return err
 	}
-
 	// Verify header.Extra matches the expected value.
 	expectedExtraPrefix, err := customheader.ExtraPrefix(config, parent, header.Time)
 	if err != nil {
