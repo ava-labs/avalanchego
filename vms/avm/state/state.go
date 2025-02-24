@@ -4,6 +4,7 @@
 package state
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/x/merkledb"
 )
 
 const (
@@ -38,7 +40,8 @@ var (
 	timestampKey     = []byte{0x01}
 	lastAcceptedKey  = []byte{0x02}
 
-	_ State = (*state)(nil)
+	_ State          = (*state)(nil)
+	_ avax.UTXOState = (*utxoState)(nil)
 )
 
 type ReadOnlyChain interface {
@@ -90,7 +93,7 @@ type State interface {
 	CommitBatch() (database.Batch, error)
 
 	// Checksums returns the current TxChecksum and UTXOChecksum.
-	Checksums() (txChecksum ids.ID, utxoChecksum ids.ID)
+	Checksums(ctx context.Context) (txChecksum ids.ID, utxoChecksum ids.ID, err error)
 
 	Close() error
 }
@@ -111,8 +114,10 @@ type State interface {
  *   '-- lastAcceptedKey -> lastAccepted
  */
 type state struct {
-	parser block.Parser
-	db     *versiondb.Database
+	parser     block.Parser
+	db         *versiondb.Database
+	metadataDB database.Database
+	stateDB    merkledb.MerkleDB
 
 	modifiedUTXOs map[ids.ID]*avax.UTXO // map of modified UTXOID -> *UTXO if the UTXO is nil, it has been removed
 	utxoDB        database.Database
@@ -140,16 +145,29 @@ type state struct {
 }
 
 func New(
-	db *versiondb.Database,
+	ctx context.Context,
+	versionDB *versiondb.Database,
+	stateDB merkledb.MerkleDB,
+	metadataDB database.Database,
 	parser block.Parser,
 	metrics prometheus.Registerer,
 	trackChecksums bool,
+	merkleDBConfig merkledb.Config,
 ) (State, error) {
-	utxoDB := prefixdb.New(utxoPrefix, db)
-	txDB := prefixdb.New(txPrefix, db)
-	blockIDDB := prefixdb.New(blockIDPrefix, db)
-	blockDB := prefixdb.New(blockPrefix, db)
-	singletonDB := prefixdb.New(singletonPrefix, db)
+	utxoDB, err := merkledb.New(
+		ctx,
+		prefixdb.New(utxoPrefix, stateDB),
+		merkleDBConfig,
+		"utxo_db",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize utxo db: %w", err)
+	}
+
+	txDB := prefixdb.New(txPrefix, metadataDB)
+	blockIDDB := prefixdb.New(blockIDPrefix, metadataDB)
+	blockDB := prefixdb.New(blockPrefix, metadataDB)
+	singletonDB := prefixdb.New(singletonPrefix, metadataDB)
 
 	txCache, err := metercacher.New[ids.ID, *txs.Tx](
 		"tx_cache",
@@ -178,18 +196,28 @@ func New(
 		return nil, err
 	}
 
-	utxoState, err := avax.NewMeteredUTXOState(utxoDB, parser.Codec(), metrics, trackChecksums)
+	avaxUTXOState, err := avax.NewMeteredUTXOState(
+		utxoDB,
+		parser.Codec(),
+		metrics,
+		trackChecksums,
+	)
 	if err != nil {
 		return nil, err
 	}
 
 	s := &state{
-		parser: parser,
-		db:     db,
+		parser:     parser,
+		db:         versionDB,
+		metadataDB: metadataDB,
+		stateDB:    stateDB,
 
 		modifiedUTXOs: make(map[ids.ID]*avax.UTXO),
 		utxoDB:        utxoDB,
-		utxoState:     utxoState,
+		utxoState: utxoState{
+			UTXOState: avaxUTXOState,
+			db:        utxoDB,
+		},
 
 		addedTxs: make(map[ids.ID]*txs.Tx),
 		txCache:  txCache,
@@ -414,6 +442,8 @@ func (s *state) Close() error {
 		s.blockIDDB.Close(),
 		s.blockDB.Close(),
 		s.singletonDB.Close(),
+		s.stateDB.Close(),
+		s.metadataDB.Close(),
 		s.db.Close(),
 	)
 }
@@ -500,8 +530,13 @@ func (s *state) writeMetadata() error {
 	return nil
 }
 
-func (s *state) Checksums() (ids.ID, ids.ID) {
-	return s.txChecksum, s.utxoState.Checksum()
+func (s *state) Checksums(ctx context.Context) (ids.ID, ids.ID, error) {
+	utxoChecksum, err := s.utxoState.Checksum(ctx)
+	if err != nil {
+		return ids.ID{}, ids.ID{}, err
+	}
+
+	return s.txChecksum, utxoChecksum, nil
 }
 
 func (s *state) initTxChecksum() error {
@@ -532,4 +567,13 @@ func (s *state) updateTxChecksum(modifiedID ids.ID) {
 	}
 
 	s.txChecksum = s.txChecksum.XOR(modifiedID)
+}
+
+type utxoState struct {
+	avax.UTXOState
+	db merkledb.MerkleDB
+}
+
+func (u utxoState) Checksum(ctx context.Context) (ids.ID, error) {
+	return u.db.GetMerkleRoot(ctx)
 }

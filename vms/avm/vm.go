@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -39,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/index"
 	"github.com/ava-labs/avalanchego/vms/txs/mempool"
+	"github.com/ava-labs/avalanchego/x/merkledb"
 
 	blockbuilder "github.com/ava-labs/avalanchego/vms/avm/block/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/avm/block/executor"
@@ -56,6 +58,13 @@ var (
 	errGenesisAssetMustHaveState = errors.New("genesis asset must have non-empty state")
 
 	_ vertex.LinearizableVMWithEngine = (*VM)(nil)
+
+	// Metadata DB Prefixes
+	dbPrefixMetadata = []byte{0x0}
+	dbPrefixIndexer  = []byte{0x1}
+
+	// State DB Prefixes
+	dbPrefixState = []byte{0x1}
 )
 
 type VM struct {
@@ -95,8 +104,9 @@ type VM struct {
 	// Asset ID --> Bit set with fx IDs the asset supports
 	assetToFxCache *cache.LRU[ids.ID, set.Bits64]
 
-	baseDB database.Database
-	db     *versiondb.Database
+	baseDB     database.Database
+	versionDB  *versiondb.Database
+	metadataDB *prefixdb.Database
 
 	typeToFxIndex map[reflect.Type]int
 	fxs           []*extensions.ParsedFx
@@ -147,8 +157,8 @@ func (vm *VM) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
  */
 
 func (vm *VM) Initialize(
-	_ context.Context,
-	ctx *snow.Context,
+	ctx context.Context,
+	snowCtx *snow.Context,
 	db database.Database,
 	genesisBytes []byte,
 	_ []byte,
@@ -157,18 +167,18 @@ func (vm *VM) Initialize(
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
-	noopMessageHandler := common.NewNoOpAppHandler(ctx.Log)
+	noopMessageHandler := common.NewNoOpAppHandler(snowCtx.Log)
 	vm.Atomic = network.NewAtomic(noopMessageHandler)
 
 	avmConfig, err := ParseConfig(configBytes)
 	if err != nil {
 		return err
 	}
-	ctx.Log.Info("VM config initialized",
+	snowCtx.Log.Info("VM config initialized",
 		zap.Reflect("config", avmConfig),
 	)
 
-	vm.registerer, err = metrics.MakeAndRegister(ctx.Metrics, "")
+	vm.registerer, err = metrics.MakeAndRegister(snowCtx.Metrics, "")
 	if err != nil {
 		return err
 	}
@@ -181,13 +191,14 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("failed to initialize metrics: %w", err)
 	}
 
-	vm.AddressManager = avax.NewAddressManager(ctx)
+	vm.AddressManager = avax.NewAddressManager(snowCtx)
 	vm.Aliaser = ids.NewAliaser()
 
-	vm.ctx = ctx
+	vm.ctx = snowCtx
 	vm.appSender = appSender
 	vm.baseDB = db
-	vm.db = versiondb.New(db)
+	vm.versionDB = versiondb.New(db)
+	vm.metadataDB = prefixdb.New(dbPrefixMetadata, vm.versionDB)
 	vm.assetToFxCache = &cache.LRU[ids.ID, set.Bits64]{Size: assetToFxCacheSize}
 
 	typedFxs := make([]extensions.Fx, len(fxs))
@@ -211,7 +222,7 @@ func (vm *VM) Initialize(
 	vm.parser, err = block.NewCustomParser(
 		vm.typeToFxIndex,
 		&vm.clock,
-		ctx.Log,
+		snowCtx.Log,
 		typedFxs,
 	)
 	if err != nil {
@@ -221,11 +232,26 @@ func (vm *VM) Initialize(
 	codec := vm.parser.Codec()
 	vm.Spender = utxo.NewSpender(&vm.clock, codec)
 
+	merkleDBConfig := merkledb.NewConfig()
+	stateDB, err := merkledb.New(
+		ctx,
+		prefixdb.New(dbPrefixState, vm.versionDB),
+		merkleDBConfig,
+		"",
+	)
+	if err != nil {
+		return fmt.Errorf("failed to initialize state db: %w", err)
+	}
+
 	state, err := state.New(
-		vm.db,
+		context.Background(),
+		vm.versionDB,
+		stateDB,
+		vm.metadataDB,
 		vm.parser,
 		vm.registerer,
 		avmConfig.ChecksumsEnabled,
+		merkleDBConfig,
 	)
 	if err != nil {
 		return err
@@ -240,23 +266,24 @@ func (vm *VM) Initialize(
 	vm.walletService.vm = vm
 	vm.walletService.pendingTxs = linked.NewHashmap[ids.ID, *txs.Tx]()
 
+	indexerDB := prefixdb.New(dbPrefixIndexer, vm.metadataDB)
 	// use no op impl when disabled in config
 	if avmConfig.IndexTransactions {
 		vm.ctx.Log.Warn("deprecated address transaction indexing is enabled")
-		vm.addressTxsIndexer, err = index.NewIndexer(vm.db, vm.ctx.Log, "", vm.registerer, avmConfig.IndexAllowIncomplete)
+		vm.addressTxsIndexer, err = index.NewIndexer(indexerDB, vm.ctx.Log, "", vm.registerer, avmConfig.IndexAllowIncomplete)
 		if err != nil {
 			return fmt.Errorf("failed to initialize address transaction indexer: %w", err)
 		}
 	} else {
 		vm.ctx.Log.Info("address transaction indexing is disabled")
-		vm.addressTxsIndexer, err = index.NewNoIndexer(vm.db, avmConfig.IndexAllowIncomplete)
+		vm.addressTxsIndexer, err = index.NewNoIndexer(indexerDB, avmConfig.IndexAllowIncomplete)
 		if err != nil {
 			return fmt.Errorf("failed to initialize disabled indexer: %w", err)
 		}
 	}
 
 	vm.txBackend = &txexecutor.Backend{
-		Ctx:           ctx,
+		Ctx:           snowCtx,
 		Config:        &vm.Config,
 		Fxs:           vm.fxs,
 		TypeToFxIndex: vm.typeToFxIndex,

@@ -10,6 +10,7 @@
 package statemock
 
 import (
+	context "context"
 	reflect "reflect"
 	time "time"
 
@@ -94,18 +95,19 @@ func (mr *StateMockRecorder) AddUTXO(utxo any) *gomock.Call {
 }
 
 // Checksums mocks base method.
-func (m *State) Checksums() (ids.ID, ids.ID) {
+func (m *State) Checksums(ctx context.Context) (ids.ID, ids.ID, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Checksums")
+	ret := m.ctrl.Call(m, "Checksums", ctx)
 	ret0, _ := ret[0].(ids.ID)
 	ret1, _ := ret[1].(ids.ID)
-	return ret0, ret1
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // Checksums indicates an expected call of Checksums.
-func (mr *StateMockRecorder) Checksums() *gomock.Call {
+func (mr *StateMockRecorder) Checksums(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Checksums", reflect.TypeOf((*State)(nil).Checksums))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Checksums", reflect.TypeOf((*State)(nil).Checksums), ctx)
 }
 
 // Close mocks base method.

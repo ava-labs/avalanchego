@@ -159,6 +159,20 @@ type MerkleDB interface {
 	Prefetcher
 }
 
+func NewConfig() Config {
+	return Config{
+		BranchFactor:                BranchFactor16,
+		Hasher:                      DefaultHasher,
+		RootGenConcurrency:          0,
+		HistoryLength:               300,
+		ValueNodeCacheSize:          units.MiB,
+		IntermediateNodeCacheSize:   units.MiB,
+		IntermediateWriteBufferSize: units.KiB,
+		IntermediateWriteBatchSize:  256 * units.KiB,
+		TraceLevel:                  NoTrace,
+	}
+}
+
 type Config struct {
 	// BranchFactor determines the number of children each node can have.
 	BranchFactor BranchFactor
@@ -244,8 +258,13 @@ type merkleDB struct {
 }
 
 // New returns a new merkle database.
-func New(ctx context.Context, db database.Database, config Config) (MerkleDB, error) {
-	metrics, err := newMetrics("merkledb", config.Reg)
+func New(
+	ctx context.Context,
+	db database.Database,
+	config Config,
+	namespace string,
+) (MerkleDB, error) {
+	metrics, err := newMetrics(namespace, config.Reg)
 	if err != nil {
 		return nil, err
 	}
