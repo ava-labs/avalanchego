@@ -47,8 +47,6 @@ import (
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/header"
-	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap1"
-	"github.com/ava-labs/coreth/plugin/evm/upgrade/cortina"
 	"github.com/ava-labs/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/coreth/predicate"
 	"github.com/ethereum/go-ethereum/common"
@@ -148,19 +146,7 @@ func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateConte
 		timestamp = parent.Time
 	}
 
-	var gasLimit uint64
-	if w.chainConfig.IsCortina(timestamp) {
-		gasLimit = cortina.GasLimit
-	} else if w.chainConfig.IsApricotPhase1(timestamp) {
-		gasLimit = ap1.GasLimit
-	} else {
-		// The gas limit is set in phase1 to [ap1.GasLimit] because the ceiling
-		// and floor were set to the same value such that the gas limit
-		// converged to it. Since this is hardcoded now, we remove the ability
-		// to configure it.
-		gasLimit = core.CalcGasLimit(parent.GasUsed, parent.GasLimit, ap1.GasLimit, ap1.GasLimit)
-	}
-
+	gasLimit := header.GasLimit(w.chainConfig, parent, timestamp)
 	baseFee, err := header.BaseFee(w.chainConfig, parent, timestamp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate new base fee: %w", err)

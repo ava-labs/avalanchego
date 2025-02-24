@@ -38,8 +38,6 @@ import (
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/header"
-	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap1"
-	"github.com/ava-labs/coreth/plugin/evm/upgrade/cortina"
 	"github.com/ava-labs/coreth/triedb"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -375,15 +373,7 @@ func GenerateChainWithGenesis(genesis *Genesis, engine consensus.Engine, n int, 
 func (cm *chainMaker) makeHeader(parent *types.Block, gap uint64, state *state.StateDB, engine consensus.Engine) *types.Header {
 	time := parent.Time() + gap // block time is fixed at [gap] seconds
 
-	var gasLimit uint64
-	if cm.config.IsCortina(time) {
-		gasLimit = cortina.GasLimit
-	} else if cm.config.IsApricotPhase1(time) {
-		gasLimit = ap1.GasLimit
-	} else {
-		gasLimit = CalcGasLimit(parent.GasUsed(), parent.GasLimit(), parent.GasLimit(), parent.GasLimit())
-	}
-
+	gasLimit := header.GasLimit(cm.config, parent.Header(), time)
 	baseFee, err := header.BaseFee(cm.config, parent.Header(), time)
 	if err != nil {
 		panic(err)
