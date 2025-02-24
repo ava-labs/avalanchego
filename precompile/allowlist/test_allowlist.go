@@ -7,11 +7,11 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
 	"github.com/ava-labs/subnet-evm/precompile/modules"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/subnet-evm/precompile/testutils"
-	"github.com/ava-labs/subnet-evm/vmerrs"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
@@ -473,7 +473,7 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 			},
 			SuppliedGas: ModifyAllowListGasCost,
 			ReadOnly:    true,
-			ExpectedErr: vmerrs.ErrWriteProtection.Error(),
+			ExpectedErr: vm.ErrWriteProtection.Error(),
 		},
 		"admin set no role insufficient gas": {
 			Caller:     TestAdminAddr,
@@ -486,7 +486,7 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 			},
 			SuppliedGas: ModifyAllowListGasCost - 1,
 			ReadOnly:    false,
-			ExpectedErr: vmerrs.ErrOutOfGas.Error(),
+			ExpectedErr: vm.ErrOutOfGas.Error(),
 		},
 		"no role read allow list": {
 			Caller:     TestNoRoleAddr,
@@ -535,7 +535,7 @@ func AllowListTests(t testing.TB, module modules.Module) map[string]testutils.Pr
 				return input
 			}, SuppliedGas: ReadAllowListGasCost - 1,
 			ReadOnly:    true,
-			ExpectedErr: vmerrs.ErrOutOfGas.Error(),
+			ExpectedErr: vm.ErrOutOfGas.Error(),
 		},
 		"initial config sets admins": {
 			Config: mkConfigWithAllowList(

@@ -49,6 +49,7 @@ import (
 	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/plugin/evm/config"
 	"github.com/ava-labs/subnet-evm/plugin/evm/header"
+	"github.com/ava-labs/subnet-evm/plugin/evm/vmerrors"
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/deployerallowlist"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/feemanager"
@@ -56,7 +57,6 @@ import (
 	"github.com/ava-labs/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/subnet-evm/rpc"
 	"github.com/ava-labs/subnet-evm/utils"
-	"github.com/ava-labs/subnet-evm/vmerrs"
 
 	avagoconstants "github.com/ava-labs/avalanchego/utils/constants"
 )
@@ -2163,7 +2163,7 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 	}
 
 	errs = vm.txPool.AddRemotesSync([]*types.Transaction{signedTx1})
-	if err := errs[0]; !errors.Is(err, vmerrs.ErrSenderAddressNotAllowListed) {
+	if err := errs[0]; !errors.Is(err, vmerrors.ErrSenderAddressNotAllowListed) {
 		t.Fatalf("expected ErrSenderAddressNotAllowListed, got: %s", err)
 	}
 
@@ -2173,7 +2173,7 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 	require.NoError(t, err)
 
 	errs = vm.txPool.AddRemotesSync([]*types.Transaction{signedTx2})
-	require.ErrorIs(t, errs[0], vmerrs.ErrSenderAddressNotAllowListed)
+	require.ErrorIs(t, errs[0], vmerrors.ErrSenderAddressNotAllowListed)
 
 	blk := issueAndAccept(t, issuer, vm)
 	newHead := <-newTxPoolHeadChan
@@ -2377,7 +2377,7 @@ func TestTxAllowListDisablePrecompile(t *testing.T) {
 	}
 
 	errs = vm.txPool.AddRemotesSync([]*types.Transaction{signedTx1})
-	if err := errs[0]; !errors.Is(err, vmerrs.ErrSenderAddressNotAllowListed) {
+	if err := errs[0]; !errors.Is(err, vmerrors.ErrSenderAddressNotAllowListed) {
 		t.Fatalf("expected ErrSenderAddressNotAllowListed, got: %s", err)
 	}
 
@@ -2597,7 +2597,7 @@ func TestAllowFeeRecipientDisabled(t *testing.T) {
 
 	modifiedBlk := vm.newBlock(modifiedBlock)
 
-	require.ErrorIs(t, modifiedBlk.Verify(context.Background()), vmerrs.ErrInvalidCoinbase)
+	require.ErrorIs(t, modifiedBlk.Verify(context.Background()), vmerrors.ErrInvalidCoinbase)
 }
 
 func TestAllowFeeRecipientEnabled(t *testing.T) {

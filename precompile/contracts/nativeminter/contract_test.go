@@ -9,12 +9,12 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
+	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/subnet-evm/core/extstate"
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/subnet-evm/precompile/testutils"
-	"github.com/ava-labs/subnet-evm/vmerrs"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -139,7 +139,7 @@ var (
 			},
 			SuppliedGas: MintGasCost,
 			ReadOnly:    true,
-			ExpectedErr: vmerrs.ErrWriteProtection.Error(),
+			ExpectedErr: vm.ErrWriteProtection.Error(),
 		},
 		"readOnly mint with allow role fails": {
 			Caller:     allowlist.TestEnabledAddr,
@@ -152,7 +152,7 @@ var (
 			},
 			SuppliedGas: MintGasCost,
 			ReadOnly:    true,
-			ExpectedErr: vmerrs.ErrWriteProtection.Error(),
+			ExpectedErr: vm.ErrWriteProtection.Error(),
 		},
 		"readOnly mint with admin role fails": {
 			Caller:     allowlist.TestAdminAddr,
@@ -165,7 +165,7 @@ var (
 			},
 			SuppliedGas: MintGasCost,
 			ReadOnly:    true,
-			ExpectedErr: vmerrs.ErrWriteProtection.Error(),
+			ExpectedErr: vm.ErrWriteProtection.Error(),
 		},
 		"insufficient gas mint from admin": {
 			Caller:     allowlist.TestAdminAddr,
@@ -178,7 +178,7 @@ var (
 			},
 			SuppliedGas: MintGasCost + NativeCoinMintedEventGasCost - 1,
 			ReadOnly:    false,
-			ExpectedErr: vmerrs.ErrOutOfGas.Error(),
+			ExpectedErr: vm.ErrOutOfGas.Error(),
 		},
 		"mint doesn't log pre-Durango": {
 			Caller:     allowlist.TestEnabledAddr,

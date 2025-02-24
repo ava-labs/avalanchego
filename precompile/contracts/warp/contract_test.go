@@ -14,12 +14,12 @@ import (
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/subnet-evm/core/extstate"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
 	"github.com/ava-labs/subnet-evm/precompile/testutils"
 	"github.com/ava-labs/subnet-evm/predicate"
 	"github.com/ava-labs/subnet-evm/utils"
-	"github.com/ava-labs/subnet-evm/vmerrs"
 	"github.com/stretchr/testify/require"
 )
 
@@ -74,7 +74,7 @@ func TestGetBlockchainID(t *testing.T) {
 			},
 			SuppliedGas: GetBlockchainIDGasCost - 1,
 			ReadOnly:    false,
-			ExpectedErr: vmerrs.ErrOutOfGas.Error(),
+			ExpectedErr: vm.ErrOutOfGas.Error(),
 		},
 	}
 
@@ -108,21 +108,21 @@ func TestSendWarpMessage(t *testing.T) {
 			InputFn:     func(t testing.TB) []byte { return sendWarpMessageInput },
 			SuppliedGas: SendWarpMessageGasCost + uint64(len(sendWarpMessageInput[4:])*int(SendWarpMessageGasCostPerByte)),
 			ReadOnly:    true,
-			ExpectedErr: vmerrs.ErrWriteProtection.Error(),
+			ExpectedErr: vm.ErrWriteProtection.Error(),
 		},
 		"send warp message insufficient gas for first step": {
 			Caller:      callerAddr,
 			InputFn:     func(t testing.TB) []byte { return sendWarpMessageInput },
 			SuppliedGas: SendWarpMessageGasCost - 1,
 			ReadOnly:    false,
-			ExpectedErr: vmerrs.ErrOutOfGas.Error(),
+			ExpectedErr: vm.ErrOutOfGas.Error(),
 		},
 		"send warp message insufficient gas for payload bytes": {
 			Caller:      callerAddr,
 			InputFn:     func(t testing.TB) []byte { return sendWarpMessageInput },
 			SuppliedGas: SendWarpMessageGasCost + uint64(len(sendWarpMessageInput[4:])*int(SendWarpMessageGasCostPerByte)) - 1,
 			ReadOnly:    false,
-			ExpectedErr: vmerrs.ErrOutOfGas.Error(),
+			ExpectedErr: vm.ErrOutOfGas.Error(),
 		},
 		"send warp message invalid input": {
 			Caller: callerAddr,
@@ -361,7 +361,7 @@ func TestGetVerifiedWarpMessage(t *testing.T) {
 			},
 			SuppliedGas: GetVerifiedWarpMessageBaseCost - 1,
 			ReadOnly:    false,
-			ExpectedErr: vmerrs.ErrOutOfGas.Error(),
+			ExpectedErr: vm.ErrOutOfGas.Error(),
 		},
 		"get message out of gas": {
 			Caller:  callerAddr,
@@ -374,7 +374,7 @@ func TestGetVerifiedWarpMessage(t *testing.T) {
 			},
 			SuppliedGas: GetVerifiedWarpMessageBaseCost + GasCostPerWarpMessageBytes*uint64(len(warpMessagePredicateBytes)) - 1,
 			ReadOnly:    false,
-			ExpectedErr: vmerrs.ErrOutOfGas.Error(),
+			ExpectedErr: vm.ErrOutOfGas.Error(),
 		},
 		"get message invalid predicate packing": {
 			Caller:  callerAddr,
@@ -639,7 +639,7 @@ func TestGetVerifiedWarpBlockHash(t *testing.T) {
 			},
 			SuppliedGas: GetVerifiedWarpMessageBaseCost - 1,
 			ReadOnly:    false,
-			ExpectedErr: vmerrs.ErrOutOfGas.Error(),
+			ExpectedErr: vm.ErrOutOfGas.Error(),
 		},
 		"get message out of gas": {
 			Caller:  callerAddr,
@@ -652,7 +652,7 @@ func TestGetVerifiedWarpBlockHash(t *testing.T) {
 			},
 			SuppliedGas: GetVerifiedWarpMessageBaseCost + GasCostPerWarpMessageBytes*uint64(len(warpMessagePredicateBytes)) - 1,
 			ReadOnly:    false,
-			ExpectedErr: vmerrs.ErrOutOfGas.Error(),
+			ExpectedErr: vm.ErrOutOfGas.Error(),
 		},
 		"get message invalid predicate packing": {
 			Caller:  callerAddr,

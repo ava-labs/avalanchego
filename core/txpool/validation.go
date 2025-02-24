@@ -32,14 +32,15 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto/kzg4844"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/plugin/evm/vmerrors"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/txallowlist"
-	"github.com/ava-labs/subnet-evm/vmerrs"
 )
 
 var (
@@ -86,7 +87,7 @@ func ValidateTransaction(tx *types.Transaction, head *types.Header, signer types
 	}
 	// Check whether the init code size has been exceeded
 	if opts.Config.IsShanghai(head.Number, head.Time) && tx.To() == nil && len(tx.Data()) > params.MaxInitCodeSize {
-		return fmt.Errorf("%w: code size %v, limit %v", vmerrs.ErrMaxInitCodeSizeExceeded, len(tx.Data()), params.MaxInitCodeSize)
+		return fmt.Errorf("%w: code size %v, limit %v", vm.ErrMaxInitCodeSizeExceeded, len(tx.Data()), params.MaxInitCodeSize)
 	}
 	// Transactions can't be negative. This may never happen using RLP decoded
 	// transactions but may occur for transactions created using the RPC.
@@ -277,7 +278,7 @@ func ValidateTransactionWithState(tx *types.Transaction, signer types.Signer, op
 	if params.GetRulesExtra(opts.Rules).IsPrecompileEnabled(txallowlist.ContractAddress) {
 		txAllowListRole := txallowlist.GetTxAllowListStatus(opts.State, from)
 		if !txAllowListRole.IsEnabled() {
-			return fmt.Errorf("%w: %s", vmerrs.ErrSenderAddressNotAllowListed, from)
+			return fmt.Errorf("%w: %s", vmerrors.ErrSenderAddressNotAllowListed, from)
 		}
 	}
 

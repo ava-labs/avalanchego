@@ -11,12 +11,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/subnet-evm/accounts/abi"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
-	"github.com/ava-labs/subnet-evm/vmerrs"
 
 	_ "embed"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
+	"github.com/ava-labs/libevm/core/vm"
 )
 
 const (
@@ -236,13 +236,13 @@ func sendWarpMessage(accessibleState contract.AccessibleState, caller common.Add
 	// This ensures that we charge gas before we unpack the variable sized input.
 	payloadGas, overflow := math.SafeMul(SendWarpMessageGasCostPerByte, uint64(len(input)))
 	if overflow {
-		return nil, 0, vmerrs.ErrOutOfGas
+		return nil, 0, vm.ErrOutOfGas
 	}
 	if remainingGas, err = contract.DeductGas(remainingGas, payloadGas); err != nil {
 		return nil, 0, err
 	}
 	if readOnly {
-		return nil, remainingGas, vmerrs.ErrWriteProtection
+		return nil, remainingGas, vm.ErrWriteProtection
 	}
 	// unpack the arguments
 	payloadData, err := UnpackSendWarpMessageInput(input)

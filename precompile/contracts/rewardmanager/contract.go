@@ -15,9 +15,9 @@ import (
 	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
-	"github.com/ava-labs/subnet-evm/vmerrs"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/vm"
 )
 
 const (
@@ -82,7 +82,7 @@ func allowFeeRecipients(accessibleState contract.AccessibleState, caller common.
 		return nil, 0, err
 	}
 	if readOnly {
-		return nil, remainingGas, vmerrs.ErrWriteProtection
+		return nil, remainingGas, vm.ErrWriteProtection
 	}
 	// no input provided for this function
 
@@ -196,7 +196,7 @@ func setRewardAddress(accessibleState contract.AccessibleState, caller common.Ad
 		return nil, 0, err
 	}
 	if readOnly {
-		return nil, remainingGas, vmerrs.ErrWriteProtection
+		return nil, remainingGas, vm.ErrWriteProtection
 	}
 	// attempts to unpack [input] into the arguments to the SetRewardAddressInput.
 	// Assumes that [input] does not include selector
@@ -273,7 +273,7 @@ func disableRewards(accessibleState contract.AccessibleState, caller common.Addr
 		return nil, 0, err
 	}
 	if readOnly {
-		return nil, remainingGas, vmerrs.ErrWriteProtection
+		return nil, remainingGas, vm.ErrWriteProtection
 	}
 	// no input provided for this function
 

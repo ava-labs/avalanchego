@@ -11,9 +11,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
+	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
 	"github.com/ava-labs/subnet-evm/predicate"
-	"github.com/ava-labs/subnet-evm/vmerrs"
 )
 
 var (
@@ -71,7 +71,7 @@ func handleWarpMessage(accessibleState contract.AccessibleState, input []byte, s
 	// EVM execution because each execution incurs an additional read cost.
 	msgBytesGas, overflow := math.SafeMul(GasCostPerWarpMessageBytes, uint64(len(predicateBytes)))
 	if overflow {
-		return nil, 0, vmerrs.ErrOutOfGas
+		return nil, 0, vm.ErrOutOfGas
 	}
 	if remainingGas, err = contract.DeductGas(remainingGas, msgBytesGas); err != nil {
 		return nil, 0, err

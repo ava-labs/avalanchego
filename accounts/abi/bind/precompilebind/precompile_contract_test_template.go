@@ -19,13 +19,13 @@ import (
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 	{{- end}}
 	"github.com/ava-labs/subnet-evm/precompile/testutils"
-	"github.com/ava-labs/subnet-evm/vmerrs"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/vm"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	_ = vmerrs.ErrOutOfGas
+	_ = vm.ErrOutOfGas
 	_ = big.NewInt
 	_ = common.Big0
 	_ = require.New
@@ -121,7 +121,7 @@ var(
 			},
 			SuppliedGas:  {{$func.Normalized.Name}}GasCost,
 			ReadOnly:    true,
-			ExpectedErr: vmerrs.ErrWriteProtection.Error(),
+			ExpectedErr: vm.ErrWriteProtection.Error(),
 		},
 		{{- end}}
 		"insufficient gas for {{decapitalise $func.Normalized.Name}} should fail": {
@@ -147,7 +147,7 @@ var(
 			},
 			SuppliedGas: {{$func.Normalized.Name}}GasCost - 1,
 			ReadOnly:    false,
-			ExpectedErr: vmerrs.ErrOutOfGas.Error(),
+			ExpectedErr: vm.ErrOutOfGas.Error(),
 		},
 		{{- end}}
 		{{- if .Contract.Fallback}}
@@ -156,14 +156,14 @@ var(
 			Input: []byte{},
 			SuppliedGas: {{.Contract.Type}}FallbackGasCost - 1,
 			ReadOnly:    false,
-			ExpectedErr: vmerrs.ErrOutOfGas.Error(),
+			ExpectedErr: vm.ErrOutOfGas.Error(),
 		},
 		"readOnly fallback should fail": {
 			Caller:	common.Address{1},
 			Input: []byte{},
 			SuppliedGas: {{.Contract.Type}}FallbackGasCost,
 			ReadOnly:    true,
-			ExpectedErr: vmerrs.ErrWriteProtection.Error(),
+			ExpectedErr: vm.ErrWriteProtection.Error(),
 		},
 		"fallback should succeed": {
 			Caller:	common.Address{1},

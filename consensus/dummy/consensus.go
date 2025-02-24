@@ -18,8 +18,8 @@ import (
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/params/extras"
+	"github.com/ava-labs/subnet-evm/plugin/evm/vmerrors"
 	"github.com/ava-labs/subnet-evm/utils"
-	"github.com/ava-labs/subnet-evm/vmerrs"
 
 	customheader "github.com/ava-labs/subnet-evm/plugin/evm/header"
 )
@@ -121,7 +121,7 @@ func (eng *DummyEngine) verifyCoinbase(header *types.Header, parent *types.Heade
 	// we fetch the configured coinbase at the parent's state
 	// to check against the coinbase in [header].
 	if configuredAddressAtParent != header.Coinbase {
-		return fmt.Errorf("%w: %v does not match required coinbase address %v", vmerrs.ErrInvalidCoinbase, header.Coinbase, configuredAddressAtParent)
+		return fmt.Errorf("%w: %v does not match required coinbase address %v", vmerrors.ErrInvalidCoinbase, header.Coinbase, configuredAddressAtParent)
 	}
 	return nil
 }
