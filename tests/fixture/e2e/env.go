@@ -79,6 +79,11 @@ func (te *TestEnvironment) Marshal() []byte {
 func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork *tmpnet.Network) *TestEnvironment {
 	require := require.New(tc)
 
+	// Start collectors for any command but stop
+	if flagVars.StartCollectors() && !flagVars.StopNetwork() {
+		require.NoError(tmpnet.StartCollectors(tc.DefaultContext(), tc.Log()))
+	}
+
 	var network *tmpnet.Network
 	// Need to load the network if it is being stopped or reused
 	if flagVars.StopNetwork() || flagVars.ReuseNetwork() {
@@ -130,10 +135,6 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 		}
 	}
 
-	if flagVars.StartCollectors() {
-		require.NoError(tmpnet.StartCollectors(tc.DefaultContext(), tc.Log()))
-	}
-
 	// Start a new network
 	if network == nil {
 		network = desiredNetwork
@@ -149,6 +150,11 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 			flagVars.StartNetwork(),
 			flagVars.ReuseNetwork(),
 		)
+	}
+
+	// Once one or more nodes are running it should be safe to wait for promtail to report readiness
+	if flagVars.StartCollectors() {
+		require.NoError(tmpnet.WaitForPromtailReadiness(tc.DefaultContext(), tc.Log()))
 	}
 
 	if flagVars.StartNetwork() {
