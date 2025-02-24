@@ -63,21 +63,20 @@ func StartCollectors(ctx context.Context, log logging.Logger) error {
 		return err
 	}
 
-	// Wait for readiness. These checks are performed separately from start to
-	// minimize time to readiness.
-	readinessURLs := map[string]string{
-		promtailCmd:   promtailReadinessURL,
-		prometheusCmd: prometheusReadinessURL,
-	}
-	for cmdName, readinessURLs := range readinessURLs {
-		if err := waitForReadiness(ctx, log, cmdName, readinessURLs); err != nil {
-			return err
-		}
+	log.Info("skipping promtail readiness check until one or more nodes have written their service discovery configuration")
+	if err := waitForReadiness(ctx, log, prometheusCmd, prometheusReadinessURL); err != nil {
+		return err
 	}
 
 	log.Info("To stop: tmpnetctl stop-collectors")
 
 	return nil
+}
+
+// WaitForPromtailReadiness waits until prometheus is ready. It can only succeed after
+// one or more nodes have written their service discovery configuration.
+func WaitForPromtailReadiness(ctx context.Context, log logging.Logger) error {
+	return waitForReadiness(ctx, log, promtailCmd, promtailReadinessURL)
 }
 
 // EnsureCollectorsStopped ensures collectors are not running.
@@ -354,7 +353,7 @@ func getPrometheusURL() string {
 }
 
 func getLokiURL() string {
-	return GetEnvWithDefault("LOKI_URL", defaultPrometheusURL)
+	return GetEnvWithDefault("LOKI_URL", defaultLokiURL)
 }
 
 // getCollectorCredentials retrieves the username and password for the command.
@@ -488,9 +487,7 @@ func waitForReadiness(ctx context.Context, log logging.Logger, cmdName string, r
 	}); err != nil {
 		return err
 	}
-	log.Info(cmdName+" ready",
-		zap.String("url", readinessURL),
-	)
+	log.Info(cmdName + " ready")
 	return nil
 }
 
