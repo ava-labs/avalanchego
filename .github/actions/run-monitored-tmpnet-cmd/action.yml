@@ -75,9 +75,18 @@ runs:
         GH_RUN_NUMBER: ${{ inputs.run_number }}
         GH_RUN_ATTEMPT: ${{ inputs.run_attempt }}
         GH_JOB_ID: ${{ inputs.job }}
-    - name: Upload tmpnet network dir
-      uses: ./.github/actions/upload-tmpnet-artifact
+    # This step is duplicated from upload-tmpnet-artifact for the same
+    # reason as the nix installation. There doesn't appear to be an
+    # easy way to composee custom actions for use by other repos
+    # without running into versioning issues.
+    - name: Upload tmpnet data
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: ${{ inputs.artifact_prefix }}-tmpnet-data
+        path: |
+          ~/.tmpnet/networks
+          ~/.tmpnet/prometheus/prometheus.log
+          ~/.tmpnet/promtail/promtail.log
+        if-no-files-found: error
     # TODO(marun) Check that collection is working by querying prometheus and loki with the GH_* labels above
