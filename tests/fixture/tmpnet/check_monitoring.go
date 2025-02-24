@@ -26,6 +26,7 @@ import (
 
 type getCountFunc func() (int, error)
 
+// waitForCount waits until the provided function returns greater than zero.
 func waitForCount(ctx context.Context, log logging.Logger, name string, getCount getCountFunc) error {
 	if err := pollUntilContextCancel(ctx, func(_ context.Context) (bool, error) {
 		count, err := getCount()
@@ -54,11 +55,14 @@ func CheckLogsExist(ctx context.Context, log logging.Logger, networkUUID string)
 	if err != nil {
 		return fmt.Errorf("failed to get collector credentials: %w", err)
 	}
-	query, err := getCheckLogsQuery(networkUUID)
+
+	url := getLokiURL()
+
+	selectors, err := getSelectors(networkUUID)
 	if err != nil {
 		return err
 	}
-	url := getLokiURL()
+	query := fmt.Sprintf("sum(count_over_time({%s}[1h]))", selectors)
 
 	log.Info("checking if logs exist",
 		zap.String("url", url),
@@ -68,15 +72,6 @@ func CheckLogsExist(ctx context.Context, log logging.Logger, networkUUID string)
 	return waitForCount(ctx, log, "logs", func() (int, error) {
 		return queryLoki(ctx, url, username, password, query)
 	})
-}
-
-// getCheckLogsQuery returns the query to check if logs exist.
-func getCheckLogsQuery(networkUUID string) (string, error) {
-	selectors, err := getSelectors(networkUUID)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("sum(count_over_time({%s}[1h]))", selectors), nil
 }
 
 func queryLoki(
@@ -159,11 +154,14 @@ func CheckMetricsExist(ctx context.Context, log logging.Logger, networkUUID stri
 	if err != nil {
 		return fmt.Errorf("failed to get collector credentials: %w", err)
 	}
-	query, err := getCheckMetricsQuery(networkUUID)
+
+	url := getPrometheusURL()
+
+	selectors, err := getSelectors(networkUUID)
 	if err != nil {
 		return err
 	}
-	url := getPrometheusURL()
+	query := fmt.Sprintf("count({%s})", selectors)
 
 	log.Info("checking if metrics exist",
 		zap.String("url", url),
@@ -173,15 +171,6 @@ func CheckMetricsExist(ctx context.Context, log logging.Logger, networkUUID stri
 	return waitForCount(ctx, log, "metrics", func() (int, error) {
 		return queryPrometheus(ctx, log, url, username, password, query)
 	})
-}
-
-// getCheckMetricsQuery returns the query to check if metrics exist.
-func getCheckMetricsQuery(networkUUID string) (string, error) {
-	selectors, err := getSelectors(networkUUID)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("count({%s})", selectors), nil
 }
 
 func queryPrometheus(
