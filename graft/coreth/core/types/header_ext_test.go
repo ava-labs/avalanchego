@@ -168,4 +168,6 @@ func assertNonZero[T interface {
 	}
 }
 
+// Note [TestCopyHeader] tests the [HeaderExtra.PostCopy] method.
+
 func ptrTo[T any](x T) *T { return &x }
