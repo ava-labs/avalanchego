@@ -10,13 +10,12 @@ import (
 	"sync"
 
 	"go.opentelemetry.io/otel/attribute"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/maybe"
-
-	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -48,8 +47,8 @@ type view struct {
 
 	// valueChangesApplied is used to enforce that no changes are made to the
 	// trie after the nodes have been calculated
-	valueChangesApplied bool
-	valueChangesLock    sync.RWMutex
+	valueChangesApplied     bool
+	valueChangesAppliedLock sync.RWMutex
 
 	// Controls the view's validity related fields.
 	// Must be held while reading/writing [childViews], [invalidated], and [parentTrie].
@@ -79,8 +78,7 @@ type view struct {
 	invalidated       bool
 	notifyInvalidated chan struct{}
 
-	// todo: wrong message
-	// the uncommitted parent trie of this view
+	// the uncommitted parent trie of this view OR the db itself
 	// [validityTrackingLock] must be held when reading/writing this field.
 	parentTrie View
 
@@ -91,8 +89,7 @@ type view struct {
 	// Changes made to this view.
 	// May include nodes that haven't been updated
 	// but will when their ID is recalculated.
-	changes      *changeSummary
-	changesMutex sync.RWMutex
+	changes *changeSummary
 
 	db *merkleDB
 
@@ -110,17 +107,23 @@ func (v *view) NewView(
 	ctx context.Context,
 	changes ViewChanges,
 ) (View, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	if v.isInvalid() {
 		return nil, ErrInvalid
 	}
 
-	childViewChan := make(chan *view)
-	dbViewChan := make(chan View)
-	errChan := make(chan error)
-
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	type viewErr struct {
+		view View
+		err  error
+	}
+
+	ch := make(chan viewErr)
 	go func(ctx context.Context) {
 		v.commitLock.RLock()
 		defer v.commitLock.RUnlock()
@@ -128,26 +131,35 @@ func (v *view) NewView(
 			// v.getParentTrie() is the db itself
 			view, err := v.getParentTrie().NewView(ctx, changes)
 			if err != nil {
-				errChan <- err
+				ch <- viewErr{err: err}
 				return
 			}
 
-			dbViewChan <- view
+			ch <- viewErr{view: view}
 			return
 		}
 
 		if err := v.ensureChangesApplied(ctx); err != nil {
-			errChan <- err
+			ch <- viewErr{err: err}
 			return
 		}
 
-		childView, err := newView(ctx, v.db, v, changes)
+		view, err := newView(ctx, v.db, v, changes)
 		if err != nil {
-			errChan <- err
+			ch <- viewErr{err: err}
 			return
 		}
 
-		childViewChan <- childView
+		v.validityTrackingLock.Lock()
+		defer v.validityTrackingLock.Unlock()
+		if v.invalidated {
+			// if this happens, it should early return in the select below using [notifyInvalidated].
+			ch <- viewErr{err: ErrInvalid}
+			return
+		}
+
+		v.childViews = append(v.childViews, view)
+		ch <- viewErr{view: view}
 	}(ctx)
 
 	select {
@@ -157,30 +169,8 @@ func (v *view) NewView(
 	case <-ctx.Done():
 		return nil, ctx.Err()
 
-	case err := <-errChan:
-		return nil, err
-
-	case dbView := <-dbViewChan:
-		// view created by a committed view (directly by db itself)
-		v.validityTrackingLock.RLock()
-		defer v.validityTrackingLock.RUnlock()
-		if v.invalidated {
-			return nil, ErrInvalid
-		}
-
-		return dbView, nil
-
-	case childView := <-childViewChan:
-		// view created by a non-committed view
-		v.validityTrackingLock.Lock()
-		defer v.validityTrackingLock.Unlock()
-		if v.invalidated {
-			return nil, ErrInvalid
-		}
-
-		v.childViews = append(v.childViews, childView)
-
-		return childView, nil
+	case viewErr := <-ch:
+		return viewErr.view, viewErr.err
 	}
 }
 
@@ -251,7 +241,6 @@ func newView(
 		v.changes.sortedKeys = sortedKeys
 
 		ch <- viewErr{view: v}
-		return
 	}()
 
 	select {
@@ -320,8 +309,8 @@ func (v *view) getRoot() maybe.Maybe[*node] {
 }
 
 func (v *view) ensureChangesApplied(ctx context.Context) error {
-	v.valueChangesLock.Lock()
-	defer v.valueChangesLock.Unlock()
+	v.valueChangesAppliedLock.Lock()
+	defer v.valueChangesAppliedLock.Unlock()
 	if v.valueChangesApplied {
 		return nil
 	}
@@ -338,24 +327,38 @@ func (v *view) ensureChangesApplied(ctx context.Context) error {
 // applyValueChanges generates the node changes from the value changes. It then
 // hashes the changed nodes to calculate the new trie.
 func (v *view) applyChanges(ctx context.Context) error {
-	// todo: use context to cancel + parallelize
-
 	ctx, span := v.db.infoTracer.Start(ctx, "MerkleDB.view.applyValueChanges")
 	defer span.End()
 
-	oldRoot := maybe.Bind(v.root, (*node).clone)
-
-	if err := v.calculateNodeChanges(ctx); err != nil {
+	if err := ctx.Err(); err != nil {
 		return err
 	}
-	v.hashChangedNodes(ctx)
 
-	v.changes.rootChange = change[maybe.Maybe[*node]]{
-		before: oldRoot,
-		after:  v.root,
+	ch := make(chan error)
+	go func() {
+		oldRoot := maybe.Bind(v.root, (*node).clone)
+
+		if err := v.calculateNodeChanges(ctx); err != nil {
+			ch <- err
+			return
+		}
+
+		v.hashChangedNodes(ctx)
+
+		v.changes.rootChange = change[maybe.Maybe[*node]]{
+			before: oldRoot,
+			after:  v.root,
+		}
+
+		ch <- nil
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case err := <-ch:
+		return err
 	}
-
-	return nil
 }
 
 func (v *view) calculateNodeChanges(ctx context.Context) error {
@@ -540,25 +543,37 @@ func (v *view) GetProof(ctx context.Context, key []byte) (*Proof, error) {
 	_, span := v.db.infoTracer.Start(ctx, "MerkleDB.view.GetProof")
 	defer span.End()
 
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
 	if v.isInvalid() {
 		return nil, ErrInvalid
 	}
 
-	resultChan := make(chan *Proof)
-	errChan := make(chan error)
+	type proofErr struct {
+		proof *Proof
+		err   error
+	}
+
+	ch := make(chan proofErr)
 	go func() {
 		if err := v.ensureChangesApplied(ctx); err != nil {
-			errChan <- err
+			ch <- proofErr{err: err}
 			return
 		}
 
-		result, err := getProof(v, key)
+		// todo: what if the parentTrie is changing?
+		//		Maybe v2 <- v1 <- DB. What if v1 is committed, and I try to query the parentTrie, which is invalidated v1.
+		//		Answer: is invalidated only after v2 is committed, so it shouldn't be an issue.
+		//		But maybe there are some possible issues.
+		proof, err := getProof(v, key)
 		if err != nil {
-			errChan <- err
+			ch <- proofErr{err: err}
 			return
 		}
 
-		resultChan <- result
+		ch <- proofErr{proof: proof}
 	}()
 
 	select {
@@ -566,10 +581,8 @@ func (v *view) GetProof(ctx context.Context, key []byte) (*Proof, error) {
 		return nil, ErrInvalid
 	case <-ctx.Done():
 		return nil, ctx.Err()
-	case err := <-errChan:
-		return nil, err
-	case proof := <-resultChan:
-		return proof, nil
+	case proofErr := <-ch:
+		return proofErr.proof, proofErr.err
 	}
 }
 
@@ -585,24 +598,34 @@ func (v *view) GetRangeProof(
 	_, span := v.db.infoTracer.Start(ctx, "MerkleDB.view.GetRangeProof")
 	defer span.End()
 
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	if v.isInvalid() {
 		return nil, ErrInvalid
 	}
 
-	resultChan := make(chan *RangeProof)
-	errChan := make(chan error)
+	type proofErr struct {
+		proof *RangeProof
+		err   error
+	}
+
+	ch := make(chan proofErr)
+
 	go func() {
 		if err := v.ensureChangesApplied(ctx); err != nil {
-			errChan <- err
-			return
-		}
-		result, err := getRangeProof(v, start, end, maxLength)
-		if err != nil {
-			errChan <- err
+			ch <- proofErr{err: err}
 			return
 		}
 
-		resultChan <- result
+		result, err := getRangeProof(v, start, end, maxLength)
+		if err != nil {
+			ch <- proofErr{err: err}
+			return
+		}
+
+		ch <- proofErr{proof: result}
 	}()
 
 	select {
@@ -610,10 +633,8 @@ func (v *view) GetRangeProof(
 		return nil, ErrInvalid
 	case <-ctx.Done():
 		return nil, ctx.Err()
-	case err := <-errChan:
-		return nil, err
-	case proof := <-resultChan:
-		return proof, nil
+	case result := <-ch:
+		return result.proof, result.err
 	}
 }
 
@@ -794,17 +815,15 @@ func (v *view) remove(key Key) error {
 		grandParent = parent
 		parent = nodeToDelete
 		nodeToDelete = n
+
 		return v.recordNodeChange(n)
 	}); err != nil {
 		return err
 	}
 
-	hadValue := nodeToDelete.hasValue()
-	nodeToDelete.setValue(v.db.hasher, maybe.Nothing[[]byte]())
-
 	// if the removed node has no children, the node can be removed from the trie
 	if len(nodeToDelete.children) == 0 {
-		if err := v.recordNodeDeleted(nodeToDelete, hadValue); err != nil {
+		if err := v.recordNodeDeleted(nodeToDelete); err != nil {
 			return err
 		}
 
@@ -816,11 +835,13 @@ func (v *view) remove(key Key) error {
 
 		// Note [parent] != nil since [nodeToDelete.key] != [v.root.key].
 		// i.e. There's the root and at least one more node.
-		parent.removeChild(nodeToDelete, v.tokenSize)
+		parent.removeChild(nodeToDelete.key, v.tokenSize)
 
 		// merge the parent node and its child into a single node if possible
 		return v.compressNodePath(grandParent, parent)
 	}
+
+	nodeToDelete.setValue(v.db.hasher, maybe.Nothing[[]byte]())
 
 	// merge this node and its parent into a single node if possible
 	return v.compressNodePath(parent, nodeToDelete)
@@ -838,7 +859,7 @@ func (v *view) compressNodePath(parent, n *node) error {
 	}
 
 	// We know from above that [n] has no value.
-	if err := v.recordNodeDeleted(n, false /* hasValue */); err != nil {
+	if err := v.recordNodeDeleted(n); err != nil {
 		return err
 	}
 
@@ -872,39 +893,15 @@ func (v *view) compressNodePath(parent, n *node) error {
 	return v.recordNodeChange(parent)
 }
 
-// Get a copy of the node matching the passed key from the view.
-// Used by views to get nodes from their ancestors.
-func (v *view) getEditableNode(key Key, hadValue bool) (*node, error) {
-	if v.isInvalid() {
-		return nil, ErrInvalid
-	}
-
-	// grab the node in question
-	n, err := v.getNode(key, hadValue)
-	if err != nil {
-		return nil, err
-	}
-
-	// ensure no ancestor changes occurred during execution
-	if v.isInvalid() {
-		return nil, ErrInvalid
-	}
-
-	// return a clone of the node, so it can be edited without affecting this view
-	return n.clone(), nil
-}
-
 // insert a key/value pair into the correct node of the trie.
 // Must not be called after [applyValueChanges] has returned.
-func (v *view) insert(
-	key Key,
-	value maybe.Maybe[[]byte],
-) (*node, error) {
+func (v *view) insert(key Key, value maybe.Maybe[[]byte]) (*node, error) {
 	if v.root.IsNothing() {
 		// the trie is empty, so create a new root node.
 		root := newNode(key)
 		root.setValue(v.db.hasher, value)
 		v.root = maybe.Some(root)
+
 		return root, v.recordNewNode(root)
 	}
 
@@ -925,21 +922,17 @@ func (v *view) insert(
 			commonPrefixLength = getLengthOfCommonPrefix(oldRoot.key, key, 0 /*offset*/, v.tokenSize)
 			commonPrefix       = oldRoot.key.Take(commonPrefixLength)
 			newRoot            = newNode(commonPrefix)
-			oldRootID          = v.db.hasher.HashNode(oldRoot)
 		)
-		v.db.metrics.HashCalculated()
 
-		// Call addChildWithID instead of addChild so the old root is added
-		// to the new root with the correct ID.
-		// TODO:
-		// [oldRootID] shouldn't need to be calculated here.
-		// Either oldRootID should already be calculated or will be calculated at the end with the other nodes
-		// Initialize the v.changes.rootID during newView and then use that here instead of oldRootID
-		newRoot.addChildWithID(oldRoot, v.tokenSize, oldRootID)
+		newRoot.addChild(oldRoot, v.tokenSize)
 		if err := v.recordNewNode(newRoot); err != nil {
 			return nil, err
 		}
 		v.root = maybe.Some(newRoot)
+
+		if err := v.recordNodeChange(oldRoot); err != nil {
+			return nil, err
+		}
 
 		closestNode = newRoot
 	}
@@ -987,7 +980,7 @@ func (v *view) insert(
 	}
 
 	branchNode := newNode(key.Take(closestNode.key.length + v.tokenSize + commonPrefixLength))
-	closestNode.addChild(branchNode, v.tokenSize)
+	closestNode.addChild(branchNode, v.tokenSize) // overwriting [existingChildEntry]
 	nodeWithValue := branchNode
 
 	if key.length == branchNode.key.length {
@@ -1040,8 +1033,8 @@ func (v *view) recordNodeChange(after *node) error {
 
 // Records that the node associated with the given key has been deleted.
 // Must not be called after [applyValueChanges] has returned.
-func (v *view) recordNodeDeleted(after *node, hadValue bool) error {
-	return v.recordKeyChange(after.key, nil, hadValue, false /* newNode */)
+func (v *view) recordNodeDeleted(after *node) error {
+	return v.recordKeyChange(after.key, nil, after.hasValue(), false /* newNode */)
 }
 
 // Records that the node associated with the given key has been changed.
@@ -1071,11 +1064,32 @@ func (v *view) recordKeyChange(key Key, after *node, hadValue bool, newNode bool
 	return nil
 }
 
+func (v *view) getBeforeValue(key Key) (maybe.Maybe[[]byte], error) {
+	if existing, ok := v.changes.values[key]; ok {
+		return existing.before, nil
+	}
+
+	before, err := v.getParentTrie().getValue(key)
+	if err != nil && !errors.Is(err, database.ErrNotFound) {
+		return maybe.Nothing[[]byte](), err
+	}
+
+	beforeMaybe := maybe.Nothing[[]byte]()
+	if before != nil {
+		beforeMaybe = maybe.Some(before)
+	}
+
+	return beforeMaybe, nil
+}
+
 // Retrieves a node with the given [key].
-// If the node is fetched from [v.parentTrie] and [id] isn't empty,
-// sets the node's ID to [id].
+// If the node is fetched from [v.parentTrie], the node is cloned.
 // If the node is loaded from the baseDB, [hasValue] determines which database the node is stored in.
 // Returns database.ErrNotFound if the node doesn't exist.
+//
+// A returned node value presence != [hasValue]
+// Because it is only used to select baseDB (if necessary), but not for checking the value presence
+// inside current view or parent views.
 func (v *view) getNode(key Key, hasValue bool) (*node, error) {
 	// check for the key within the changed nodes
 	if nodeChange, isChanged := v.changes.nodes[key]; isChanged {
@@ -1083,12 +1097,52 @@ func (v *view) getNode(key Key, hasValue bool) (*node, error) {
 		if nodeChange.after == nil {
 			return nil, database.ErrNotFound
 		}
+
 		return nodeChange.after, nil
 	}
 	v.db.metrics.ViewChangesNodeMiss()
 
-	// get the node from the parent trie and store a local copy
+	// get the cloned node from the parent trie
 	return v.getParentTrie().getEditableNode(key, hasValue)
+}
+
+// Get a copy of the node matching the passed key from the view.
+// Used by views to get nodes from their ancestors.
+func (v *view) getEditableNode(key Key, hadValue bool) (*node, error) {
+	if v.isInvalid() {
+		return nil, ErrInvalid
+	}
+
+	var n *node
+
+	// check for the key within the changed nodes
+	if nodeChange, isChanged := v.changes.nodes[key]; isChanged {
+		v.db.metrics.ViewChangesNodeHit()
+
+		if nodeChange.after == nil {
+			return nil, database.ErrNotFound
+		}
+
+		n = nodeChange.after.clone()
+	} else {
+		v.db.metrics.ViewChangesNodeMiss()
+
+		var err error
+
+		// already returning a clone, no need to clone it again
+		n, err = v.getParentTrie().getEditableNode(key, hadValue)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// get the node from the parent trie and store a local copy
+	// ensure no ancestor changes occurred during execution
+	if v.isInvalid() {
+		return nil, ErrInvalid
+	}
+
+	return n, nil
 }
 
 // Get the parent trie of the view

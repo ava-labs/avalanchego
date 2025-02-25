@@ -478,7 +478,6 @@ func (db *merkleDB) Close() error {
 
 	// mark all children as no longer valid because the db has closed
 	db.invalidateChildrenExcept(nil)
-	db.childViews = nil // todo: is this ok?
 
 	db.closed = true
 	db.valueNodeDB.Close()
@@ -981,14 +980,21 @@ func (db *merkleDB) commitView(ctx context.Context, trieToCommit *view) error {
 		return nil
 	}
 
-	// todo: what if something fails below this? Are we going to have a corrupt db? Shall we rollback?
-	valueNodeBatch := db.baseDB.NewBatch()
-	if err := db.applyChanges(ctx, valueNodeBatch, changes); err != nil {
+	var (
+		valueNodeBatch        = db.valueNodeDB.baseDB.NewBatch()
+		intermediateNodeBatch = db.intermediateNodeDB.baseDB.NewBatch()
+	)
+
+	if err := db.applyChanges(ctx, valueNodeBatch, intermediateNodeBatch, changes); err != nil {
 		return err
 	}
 
 	if err := db.commitValueChanges(ctx, valueNodeBatch); err != nil {
-		return err
+		return fmt.Errorf("failed to commit value node changes: %w", err)
+	}
+
+	if err := db.commitValueChanges(ctx, intermediateNodeBatch); err != nil {
+		return fmt.Errorf("failed to commit intermediate node changes: %w", err)
 	}
 
 	db.history.record(changes)
@@ -996,6 +1002,7 @@ func (db *merkleDB) commitView(ctx context.Context, trieToCommit *view) error {
 	// Update root in database.
 	db.root = changes.rootChange.after
 	db.rootID = changes.rootID
+
 	return nil
 }
 
@@ -1004,7 +1011,6 @@ func (db *merkleDB) commitView(ctx context.Context, trieToCommit *view) error {
 //
 // assumes [db.lock] is held
 func (db *merkleDB) moveChildViewsToDB(trieToCommit *view) {
-	// todo: add tests
 	trieToCommit.validityTrackingLock.Lock()
 	defer trieToCommit.validityTrackingLock.Unlock()
 
@@ -1015,15 +1021,20 @@ func (db *merkleDB) moveChildViewsToDB(trieToCommit *view) {
 		db.childViews[i] = childView
 	}
 
-	trieToCommit.childViews = make([]*view, 0, defaultPreallocationSize) // todo: does this make sense?
+	// no need to allocate anything for [childViews], because a committed view shouldn't accept have child views
+	trieToCommit.childViews = nil
 }
 
 // applyChanges takes the [changes] and applies them to [db.intermediateNodeDB]
 // and [valueNodeBatch].
 //
 // assumes [db.lock] is held
-func (db *merkleDB) applyChanges(ctx context.Context, valueNodeBatch database.KeyValueWriterDeleter, changes *changeSummary) error {
-	// todo: transactional interaction with db?
+func (db *merkleDB) applyChanges(
+	ctx context.Context,
+	valueNodeBatch database.KeyValueWriterDeleter,
+	intermediateNodeBatch database.KeyValueWriterDeleter,
+	changes *changeSummary,
+) error {
 	_, span := db.infoTracer.Start(ctx, "MerkleDB.applyChanges")
 	defer span.End()
 
@@ -1035,11 +1046,11 @@ func (db *merkleDB) applyChanges(ctx context.Context, valueNodeBatch database.Ke
 		shouldDeleteValue := !shouldAddValue && nodeChange.before != nil && nodeChange.before.hasValue()
 
 		if shouldAddIntermediate {
-			if err := db.intermediateNodeDB.Put(key, nodeChange.after); err != nil {
+			if err := db.intermediateNodeDB.addToBatch(intermediateNodeBatch, key, nodeChange.after); err != nil {
 				return err
 			}
 		} else if shouldDeleteIntermediate {
-			if err := db.intermediateNodeDB.Delete(key); err != nil {
+			if err := db.intermediateNodeDB.addToBatch(intermediateNodeBatch, key, nil); err != nil {
 				return err
 			}
 		}
@@ -1054,6 +1065,7 @@ func (db *merkleDB) applyChanges(ctx context.Context, valueNodeBatch database.Ke
 			}
 		}
 	}
+
 	return nil
 }
 
