@@ -21,6 +21,7 @@ func (u *Uint64) UnmarshalJSON(b []byte) error {
 			str = str[1:lastIndex]
 		}
 	}
+	atomic.uint64
 	val, err := strconv.ParseUint(str, 10, 64)
 	*u = Uint64(val)
 	return err
