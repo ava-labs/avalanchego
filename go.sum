@@ -68,6 +68,8 @@ github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPd
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
 github.com/ava-labs/coreth v0.14.1-rc.1.0.20250219033119-0865d964a800 h1:XyNoEcjRUTeWMfDzDu4gR4yEFkVYhh7KwP8uSADo9gc=
 github.com/ava-labs/coreth v0.14.1-rc.1.0.20250219033119-0865d964a800/go.mod h1:PMxTJ/IfEGmieOHW1s+l+VJb/e4f4ZXfVCUSvansfPY=
+github.com/ava-labs/coreth v0.14.1-rc.1.0.20250224203223-f8f555c4814b h1:7UyVbL2faFCq81lFhBr9B0fP5+2I29BnBJwqXWXv6TQ=
+github.com/ava-labs/coreth v0.14.1-rc.1.0.20250224203223-f8f555c4814b/go.mod h1:EN1FK3ir+S7L/YyODaXMBdZxW4wGs5KPwBJb/HTDn/w=
 github.com/ava-labs/ledger-avalanche/go v0.0.0-20241009183145-e6f90a8a1a60 h1:EL66gtXOAwR/4KYBjOV03LTWgkEXvLePribLlJNu4g0=
 github.com/ava-labs/ledger-avalanche/go v0.0.0-20241009183145-e6f90a8a1a60/go.mod h1:/7qKobTfbzBu7eSTVaXMTr56yTYk4j2Px6/8G+idxHo=
 github.com/ava-labs/libevm v1.13.14-0.2.0.rc.3 h1:1CWGo2icnX9dRqGQl7CFywYGIZWxe+ucy0w8NAsVTWE=
