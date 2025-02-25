@@ -192,6 +192,11 @@ func SendEthTransaction(tc tests.TestContext, ethClient ethclient.Client, signed
 func SuggestGasPrice(tc tests.TestContext, ethClient ethclient.Client) *big.Int {
 	gasPrice, err := ethClient.SuggestGasPrice(tc.DefaultContext())
 	require.NoError(tc, err)
+
+	tc.Log().Info("suggested gas price",
+		zap.Stringer("price", gasPrice),
+	)
+
 	// Double the suggested gas price to maximize the chances of
 	// acceptance. Maybe this can be revisited pending resolution of
 	// https://github.com/ava-labs/coreth/issues/314.
