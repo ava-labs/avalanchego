@@ -51,6 +51,7 @@ const (
 var (
 	BloomLookup          = ethtypes.BloomLookup
 	BytesToBloom         = ethtypes.BytesToBloom
+	CopyHeader           = ethtypes.CopyHeader
 	CreateBloom          = ethtypes.CreateBloom
 	EncodeNonce          = ethtypes.EncodeNonce
 	FullAccount          = ethtypes.FullAccount
