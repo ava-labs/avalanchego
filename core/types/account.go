@@ -28,7 +28,7 @@ import (
 	"github.com/ava-labs/libevm/common/math"
 )
 
-//go:generate go run github.com/fjl/gencodec -type Account -field-override accountMarshaling -out gen_account.go
+//go:generate go run github.com/fjl/gencodec@a3c3302847cea77ab534228aefa025992dc2c696 -type Account -field-override accountMarshaling -out gen_account.go
 
 // Account represents an Ethereum account and its attached data.
 // This type is used to specify accounts in the genesis block state, and

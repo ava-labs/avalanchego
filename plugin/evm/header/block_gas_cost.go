@@ -43,7 +43,7 @@ func BlockGasCost(
 	}
 	return new(big.Int).SetUint64(BlockGasCostWithStep(
 		feeConfig,
-		parent.BlockGasCost,
+		types.GetHeaderExtra(parent).BlockGasCost,
 		step,
 		timeElapsed,
 	))
@@ -87,12 +87,13 @@ func EstimateRequiredTip(
 	config *extras.ChainConfig,
 	header *types.Header,
 ) (*big.Int, error) {
+	extra := types.GetHeaderExtra(header)
 	switch {
 	case !config.IsSubnetEVM(header.Time):
 		return nil, nil
 	case header.BaseFee == nil:
 		return nil, errBaseFeeNil
-	case header.BlockGasCost == nil:
+	case extra.BlockGasCost == nil:
 		return nil, errBlockGasCostNil
 	}
 
@@ -106,7 +107,7 @@ func EstimateRequiredTip(
 	// We add totalGasUsed - 1 to ensure that the total required tips
 	// calculation rounds up.
 	totalRequiredTips := new(big.Int)
-	totalRequiredTips.Mul(header.BlockGasCost, header.BaseFee)
+	totalRequiredTips.Mul(extra.BlockGasCost, header.BaseFee)
 	totalRequiredTips.Add(totalRequiredTips, totalGasUsed)
 	totalRequiredTips.Sub(totalRequiredTips, common.Big1)
 

@@ -95,9 +95,12 @@ func BlockGasCostTest(t *testing.T, feeConfig commontype.FeeConfig) {
 				NetworkUpgrades: test.upgrades,
 			}
 			parent := &types.Header{
-				Time:         test.parentTime,
+				Time: test.parentTime,
+			}
+			extra := &types.HeaderExtra{
 				BlockGasCost: test.parentCost,
 			}
+			types.SetHeaderExtra(parent, extra)
 
 			assert.Equal(t, test.expected, BlockGasCost(
 				config,
@@ -215,6 +218,7 @@ func TestEstimateRequiredTip(t *testing.T) {
 		name               string
 		subnetEVMTimestamp *uint64
 		header             *types.Header
+		headerExtra        *types.HeaderExtra
 		want               *big.Int
 		wantErr            error
 	}{
@@ -226,7 +230,8 @@ func TestEstimateRequiredTip(t *testing.T) {
 		{
 			name:               "nil_base_fee",
 			subnetEVMTimestamp: utils.NewUint64(0),
-			header: &types.Header{
+			header:             &types.Header{},
+			headerExtra: &types.HeaderExtra{
 				BlockGasCost: big.NewInt(1),
 			},
 			wantErr: errBaseFeeNil,
@@ -243,8 +248,10 @@ func TestEstimateRequiredTip(t *testing.T) {
 			name:               "no_gas_used",
 			subnetEVMTimestamp: utils.NewUint64(0),
 			header: &types.Header{
-				GasUsed:      0,
-				BaseFee:      big.NewInt(1),
+				GasUsed: 0,
+				BaseFee: big.NewInt(1),
+			},
+			headerExtra: &types.HeaderExtra{
 				BlockGasCost: big.NewInt(1),
 			},
 			wantErr: errNoGasUsed,
@@ -253,8 +260,10 @@ func TestEstimateRequiredTip(t *testing.T) {
 			name:               "success",
 			subnetEVMTimestamp: utils.NewUint64(0),
 			header: &types.Header{
-				GasUsed:      912,
-				BaseFee:      big.NewInt(456),
+				GasUsed: 912,
+				BaseFee: big.NewInt(456),
+			},
+			headerExtra: &types.HeaderExtra{
 				BlockGasCost: big.NewInt(101112),
 			},
 			// totalRequiredTips = BlockGasCost * BaseFee
@@ -265,8 +274,10 @@ func TestEstimateRequiredTip(t *testing.T) {
 			name:               "success_rounds_up",
 			subnetEVMTimestamp: utils.NewUint64(0),
 			header: &types.Header{
-				GasUsed:      124,
-				BaseFee:      big.NewInt(456),
+				GasUsed: 124,
+				BaseFee: big.NewInt(456),
+			},
+			headerExtra: &types.HeaderExtra{
 				BlockGasCost: big.NewInt(101112),
 			},
 			// totalGasUsed = GasUsed + ExtDataGasUsed
@@ -283,6 +294,9 @@ func TestEstimateRequiredTip(t *testing.T) {
 				NetworkUpgrades: extras.NetworkUpgrades{
 					SubnetEVMTimestamp: test.subnetEVMTimestamp,
 				},
+			}
+			if test.headerExtra != nil {
+				types.SetHeaderExtra(test.header, test.headerExtra)
 			}
 			requiredTip, err := EstimateRequiredTip(config, test.header)
 			require.ErrorIs(err, test.wantErr)

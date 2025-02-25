@@ -162,8 +162,9 @@ func verifyHeaderGasFields(config *extras.ChainConfig, header *types.Header, par
 		parent,
 		header.Time,
 	)
-	if !utils.BigEqual(header.BlockGasCost, expectedBlockGasCost) {
-		return fmt.Errorf("invalid block gas cost: have %d, want %d", header.BlockGasCost, expectedBlockGasCost)
+	headerExtra := types.GetHeaderExtra(header)
+	if !utils.BigEqual(headerExtra.BlockGasCost, expectedBlockGasCost) {
+		return fmt.Errorf("invalid block gas cost: have %d, want %d", headerExtra.BlockGasCost, expectedBlockGasCost)
 	}
 	return nil
 }
@@ -373,7 +374,8 @@ func (eng *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, h
 	config := params.GetExtra(chain.Config())
 
 	// Calculate the required block gas cost for this block.
-	header.BlockGasCost = customheader.BlockGasCost(
+	headerExtra := types.GetHeaderExtra(header)
+	headerExtra.BlockGasCost = customheader.BlockGasCost(
 		config,
 		feeConfig,
 		parent,
@@ -383,7 +385,7 @@ func (eng *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, h
 		// Verify that this block covers the block fee.
 		if err := eng.verifyBlockFee(
 			header.BaseFee,
-			header.BlockGasCost,
+			headerExtra.BlockGasCost,
 			txs,
 			receipts,
 		); err != nil {

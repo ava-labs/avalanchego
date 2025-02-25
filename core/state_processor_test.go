@@ -379,7 +379,8 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 	}
 
 	if params.GetExtra(config).IsSubnetEVM(header.Time) {
-		header.BlockGasCost = big.NewInt(0)
+		headerExtra := types.GetHeaderExtra(header)
+		headerExtra.BlockGasCost = big.NewInt(0)
 	}
 	var receipts []*types.Receipt
 	// The post-state result doesn't need to be correct (this is a bad block), but we do need something there
