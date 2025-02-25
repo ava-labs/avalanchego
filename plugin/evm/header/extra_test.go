@@ -183,3 +183,40 @@ func TestVerifyExtra(t *testing.T) {
 		})
 	}
 }
+
+func TestPredicateBytesFromExtra(t *testing.T) {
+	tests := []struct {
+		name     string
+		extra    []byte
+		expected []byte
+	}{
+		{
+			name:     "empty_extra",
+			extra:    nil,
+			expected: nil,
+		},
+		{
+			name:     "too_short",
+			extra:    make([]byte, FeeWindowSize-1),
+			expected: nil,
+		},
+		{
+			name:     "empty_predicate",
+			extra:    make([]byte, FeeWindowSize),
+			expected: nil,
+		},
+		{
+			name: "non_empty_predicate",
+			extra: []byte{
+				FeeWindowSize: 5,
+			},
+			expected: []byte{5},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := PredicateBytesFromExtra(test.extra)
+			require.Equal(t, test.expected, got)
+		})
+	}
+}

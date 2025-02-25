@@ -6,7 +6,6 @@ package predicate
 import (
 	"fmt"
 
-	"github.com/ava-labs/subnet-evm/plugin/evm/header"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -49,16 +48,4 @@ func UnpackPredicate(paddedPredicate []byte) ([]byte, error) {
 	}
 
 	return trimmedPredicateBytes[:len(trimmedPredicateBytes)-1], nil
-}
-
-// GetPredicateResultBytes returns the predicate result bytes from the extra data and
-// true iff the predicate results bytes have non-zero length.
-func GetPredicateResultBytes(extraData []byte) ([]byte, bool) {
-	// Prior to Durango, the VM enforces the extra data is smaller than or equal to this size.
-	// After Durango, the VM pre-verifies the extra data past the dynamic fee rollup window is
-	// valid.
-	if len(extraData) <= header.FeeWindowSize {
-		return nil, false
-	}
-	return extraData[header.FeeWindowSize:], true
 }

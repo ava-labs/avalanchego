@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/plugin/evm/header"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/deployerallowlist"
 	"github.com/ava-labs/subnet-evm/precompile/modules"
@@ -43,6 +44,7 @@ import (
 	"github.com/ava-labs/subnet-evm/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/holiman/uint256"
 )
 
@@ -111,9 +113,14 @@ type BlockContext struct {
 	Transfer TransferFunc
 	// GetHash returns the hash corresponding to n
 	GetHash GetHashFunc
-	// PredicateResults are the results of predicate verification available throughout the EVM's execution.
-	// PredicateResults may be nil if it is not encoded in the block's header.
+	// PredicateResults are the results of predicate verification available
+	// throughout the EVM's execution.
+	//
+	// PredicateResults may be nil if it is not encoded in the extra field of
+	// the block's header or if the extra field has not been parsed yet.
 	PredicateResults *predicate.Results
+	// Extra is the extra field from the block header.
+	Extra []byte
 
 	// Block information
 	Coinbase    common.Address // Provides information for COINBASE
@@ -209,6 +216,32 @@ func NewEVM(blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig
 		chainRules:  chainConfig.Rules(blockCtx.BlockNumber, blockCtx.Time),
 	}
 	evm.interpreter = NewEVMInterpreter(evm)
+
+	// If the predicate results were set by the miner, use them.
+	if blockCtx.PredicateResults != nil {
+		return evm
+	}
+
+	// Parse the predicate results from the extra field and store them in the
+	// block context.
+	predicateBytes := header.PredicateBytesFromExtra(blockCtx.Extra)
+	if len(predicateBytes) == 0 {
+		return evm
+	}
+
+	// The VM has already verified the correctness of the results during header
+	// validation.
+	results, err := predicate.ParseResults(predicateBytes)
+	if err != nil {
+		log.Error("Unexpected error parsing predicate results",
+			"err", err,
+		)
+		return evm
+	}
+
+	// Because the BlockContext is pass-by-value, this does not cache the
+	// results for future calls to NewEVM.
+	evm.Context.PredicateResults = results
 	return evm
 }
 

@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/eth/tracers"
 	"github.com/ava-labs/subnet-evm/params"
+	customheader "github.com/ava-labs/subnet-evm/plugin/evm/header"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
 	warpcontract "github.com/ava-labs/subnet-evm/precompile/contracts/warp"
@@ -668,8 +669,7 @@ func testReceiveWarpMessage(
 
 	// Require the block was built with a successful predicate result
 	ethBlock := block2.(*chain.BlockWrapper).Block.(*Block).ethBlock
-	headerPredicateResultsBytes, ok := predicate.GetPredicateResultBytes(ethBlock.Extra())
-	require.True(ok)
+	headerPredicateResultsBytes := customheader.PredicateBytesFromExtra(ethBlock.Extra())
 	results, err := predicate.ParseResults(headerPredicateResultsBytes)
 	require.NoError(err)
 
