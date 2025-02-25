@@ -211,6 +211,7 @@ func (b *preForkBlock) buildChild(ctx context.Context) (Block, error) {
 		parentID,
 		newTimestamp,
 		pChainHeight,
+		pChainHeight,
 		innerBlock.Bytes(),
 	)
 	if err != nil {
@@ -236,5 +237,9 @@ func (b *preForkBlock) buildChild(ctx context.Context) (Block, error) {
 }
 
 func (*preForkBlock) pChainHeight(context.Context) (uint64, error) {
+	return 0, nil
+}
+
+func (*preForkBlock) pChainEpochHeight(context.Context) (uint64, error) {
 	return 0, nil
 }

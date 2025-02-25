@@ -59,6 +59,7 @@ type Block interface {
 	buildChild(context.Context) (Block, error)
 
 	pChainHeight(context.Context) (uint64, error)
+	pChainEpochHeight(context.Context) (uint64, error)
 }
 
 type PostForkBlock interface {
@@ -163,7 +164,9 @@ func (p *postForkCommonComponents) Verify(
 	}
 
 	var contextPChainHeight uint64
-	if p.vm.Upgrades.IsEtnaActivated(childTimestamp) {
+	if p.vm.Upgrades.IsFUpgradeActivated(childTimestamp) {
+		contextPChainHeight = child.PChainEpochHeight()
+	} else if p.vm.Upgrades.IsEtnaActivated(childTimestamp) {
 		contextPChainHeight = childPChainHeight
 	} else {
 		contextPChainHeight = parentPChainHeight
@@ -203,6 +206,64 @@ func (p *postForkCommonComponents) buildChild(
 		return nil, err
 	}
 
+	var pChainEpochHeight, pChainEpochHeightParent uint64
+	if p.vm.Upgrades.IsFUpgradeActivated(newTimestamp) {
+		parent, err := p.vm.getBlock(ctx, parentID)
+		if err != nil {
+			p.vm.ctx.Log.Error("unexpected build block failure",
+				zap.String("reason", "failed to fetch parent block"),
+				zap.Stringer("parentID", parentID),
+				zap.Error(err),
+			)
+			return nil, err
+		}
+		parent2, err := p.vm.getBlock(ctx, parent.Parent())
+		if err != nil {
+			p.vm.ctx.Log.Error("unexpected build block failure",
+				zap.String("reason", "failed to fetch second parent block"),
+				zap.Stringer("parentID", parentID),
+				zap.Error(err),
+			)
+			return nil, err
+		}
+
+		if p.vm.GetEpoch(parent.Timestamp()) == p.vm.GetEpoch(parent2.Timestamp()) {
+			pChainEpochHeightParent, err = parent.pChainEpochHeight(ctx)
+			if err != nil {
+				p.vm.ctx.Log.Error("unexpected build block failure",
+					zap.String("reason", "failed to get parent epoch height"),
+					zap.Stringer("parentID", parentID),
+					zap.Error(err),
+				)
+				return nil, err
+			}
+			pChainEpochHeight = pChainEpochHeightParent
+
+			p.vm.ctx.Log.Info(
+				"continuing epoch",
+				zap.Uint64("pChainHeight", pChainHeight),
+				zap.Uint64("pChainEpochHeight", pChainEpochHeight),
+				zap.Uint64("epoch", p.vm.GetEpoch(newTimestamp)),
+			)
+		} else {
+			pChainEpochHeight, err = parent.pChainHeight(ctx)
+			if err != nil {
+				p.vm.ctx.Log.Error("unexpected build block failure",
+					zap.String("reason", "failed to get parent p-chain height"),
+					zap.Stringer("parentID", parentID),
+					zap.Error(err),
+				)
+				return nil, err
+			}
+			p.vm.ctx.Log.Info(
+				"epoch has advanced",
+				zap.Uint64("pChainHeight", pChainHeight),
+				zap.Uint64("pChainEpochHeight", pChainEpochHeight),
+				zap.Uint64("epoch", p.vm.GetEpoch(newTimestamp)),
+			)
+		}
+	}
+
 	var shouldBuildSignedBlock bool
 	if p.vm.Upgrades.IsDurangoActivated(parentTimestamp) {
 		shouldBuildSignedBlock, err = p.shouldBuildSignedBlockPostDurango(
@@ -226,7 +287,9 @@ func (p *postForkCommonComponents) buildChild(
 	}
 
 	var contextPChainHeight uint64
-	if p.vm.Upgrades.IsEtnaActivated(newTimestamp) {
+	if p.vm.Upgrades.IsFUpgradeActivated(newTimestamp) {
+		contextPChainHeight = pChainEpochHeight
+	} else if p.vm.Upgrades.IsEtnaActivated(newTimestamp) {
 		contextPChainHeight = pChainHeight
 	} else {
 		contextPChainHeight = parentPChainHeight
@@ -251,6 +314,7 @@ func (p *postForkCommonComponents) buildChild(
 			parentID,
 			newTimestamp,
 			pChainHeight,
+			pChainEpochHeight,
 			p.vm.StakingCertLeaf,
 			innerBlock.Bytes(),
 			p.vm.ctx.ChainID,
@@ -261,6 +325,7 @@ func (p *postForkCommonComponents) buildChild(
 			parentID,
 			newTimestamp,
 			pChainHeight,
+			pChainEpochHeight,
 			innerBlock.Bytes(),
 		)
 	}

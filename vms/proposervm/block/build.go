@@ -18,15 +18,17 @@ func BuildUnsigned(
 	parentID ids.ID,
 	timestamp time.Time,
 	pChainHeight uint64,
+	pChainEpochHeight uint64,
 	blockBytes []byte,
 ) (SignedBlock, error) {
 	var block SignedBlock = &statelessBlock{
 		StatelessBlock: statelessUnsignedBlock{
-			ParentID:     parentID,
-			Timestamp:    timestamp.Unix(),
-			PChainHeight: pChainHeight,
-			Certificate:  nil,
-			Block:        blockBytes,
+			ParentID:          parentID,
+			Timestamp:         timestamp.Unix(),
+			PChainHeight:      pChainHeight,
+			PChainEpochHeight: pChainEpochHeight,
+			Certificate:       nil,
+			Block:             blockBytes,
 		},
 		timestamp: timestamp,
 	}
@@ -43,6 +45,7 @@ func Build(
 	parentID ids.ID,
 	timestamp time.Time,
 	pChainHeight uint64,
+	pChainEpochHeight uint64,
 	cert *staking.Certificate,
 	blockBytes []byte,
 	chainID ids.ID,
@@ -50,11 +53,12 @@ func Build(
 ) (SignedBlock, error) {
 	block := &statelessBlock{
 		StatelessBlock: statelessUnsignedBlock{
-			ParentID:     parentID,
-			Timestamp:    timestamp.Unix(),
-			PChainHeight: pChainHeight,
-			Certificate:  cert.Raw,
-			Block:        blockBytes,
+			ParentID:          parentID,
+			Timestamp:         timestamp.Unix(),
+			PChainHeight:      pChainHeight,
+			PChainEpochHeight: pChainEpochHeight,
+			Certificate:       cert.Raw,
+			Block:             blockBytes,
 		},
 		timestamp: timestamp,
 		cert:      cert,

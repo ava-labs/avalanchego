@@ -2530,3 +2530,57 @@ func TestLocalParse(t *testing.T) {
 		})
 	}
 }
+
+func TestGetEpoch(t *testing.T) {
+	t0 := time.Now()
+	vm := New(
+		&fullVM{},
+		Config{
+			Upgrades: upgrade.Config{
+				FUpgradeTime:          t0,
+				FUpgradeEpochDuration: 10,
+			},
+		},
+	)
+
+	testCases := []struct {
+		timestamp time.Time
+		epoch     uint64
+	}{
+		{
+			timestamp: t0.Add(-10 * time.Second),
+			epoch:     0,
+		},
+		{
+			timestamp: t0.Add(-1 * time.Second),
+			epoch:     0,
+		},
+		{
+			timestamp: t0,
+			epoch:     0,
+		},
+		{
+			timestamp: t0.Add(1 * time.Second),
+			epoch:     0,
+		},
+		{
+			timestamp: t0.Add(9 * time.Second),
+			epoch:     0,
+		},
+		{
+			timestamp: t0.Add(10 * time.Second),
+			epoch:     1,
+		},
+		{
+			timestamp: t0.Add(11 * time.Second),
+			epoch:     1,
+		},
+		{
+			timestamp: t0.Add(20 * time.Second),
+			epoch:     2,
+		},
+	}
+	for i := range testCases {
+		require.Equal(t, vm.GetEpoch(testCases[i].timestamp), testCases[i].epoch)
+	}
+}

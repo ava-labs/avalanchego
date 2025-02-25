@@ -73,7 +73,8 @@ var (
 		CortinaXChainStopVertexID:    ids.Empty,
 		DurangoTime:                  InitiallyActiveTime,
 		EtnaTime:                     InitiallyActiveTime,
-		FUpgradeTime:                 UnscheduledActivationTime,
+		FUpgradeTime:                 InitiallyActiveTime,
+		FUpgradeEpochDuration:        30,
 	}
 
 	ErrInvalidUpgradeTimes = errors.New("invalid upgrade configuration")
@@ -95,6 +96,7 @@ type Config struct {
 	DurangoTime                  time.Time `json:"durangoTime"`
 	EtnaTime                     time.Time `json:"etnaTime"`
 	FUpgradeTime                 time.Time `json:"fUpgradeTime"`
+	FUpgradeEpochDuration        uint64    `json:"fUpgradeEpochDuration"`
 }
 
 func (c *Config) Validate() error {
