@@ -188,8 +188,8 @@ func feeWindow(
 
 		// At the start of a new network, the parent may not have a populated
 		// ExtDataGasUsed.
-		if parent.ExtDataGasUsed != nil {
-			parentExtraStateGasUsed = parent.ExtDataGasUsed.Uint64()
+		if used := types.GetHeaderExtra(parent).ExtDataGasUsed; used != nil {
+			parentExtraStateGasUsed = used.Uint64()
 		}
 	case config.IsApricotPhase4(parent.Time):
 		// The blockGasCost is paid by the effective tips in the block using
@@ -199,16 +199,17 @@ func feeWindow(
 		// still calculated using the AP4 step. This is different than the
 		// actual BlockGasCost calculation used for the child block. This
 		// behavior is kept to preserve the original behavior of this function.
+		parentExtra := types.GetHeaderExtra(parent)
 		blockGasCost = BlockGasCostWithStep(
-			parent.BlockGasCost,
+			parentExtra.BlockGasCost,
 			ap4.BlockGasCostStep,
 			timeElapsed,
 		)
 
 		// On the boundary of AP3 and AP4 or at the start of a new network, the
 		// parent may not have a populated ExtDataGasUsed.
-		if parent.ExtDataGasUsed != nil {
-			parentExtraStateGasUsed = parent.ExtDataGasUsed.Uint64()
+		if parentExtra.ExtDataGasUsed != nil {
+			parentExtraStateGasUsed = parentExtra.ExtDataGasUsed.Uint64()
 		}
 	default:
 		blockGasCost = ap3.IntrinsicBlockGas

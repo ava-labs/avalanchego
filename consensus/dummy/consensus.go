@@ -159,12 +159,13 @@ func (eng *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, header
 	}
 
 	// Verify BlockGasCost, ExtDataGasUsed not present before AP4
+	headerExtra := types.GetHeaderExtra(header)
 	if !configExtra.IsApricotPhase4(header.Time) {
-		if header.BlockGasCost != nil {
-			return fmt.Errorf("invalid blockGasCost before fork: have %d, want <nil>", header.BlockGasCost)
+		if headerExtra.BlockGasCost != nil {
+			return fmt.Errorf("invalid blockGasCost before fork: have %d, want <nil>", headerExtra.BlockGasCost)
 		}
-		if header.ExtDataGasUsed != nil {
-			return fmt.Errorf("invalid extDataGasUsed before fork: have %d, want <nil>", header.ExtDataGasUsed)
+		if headerExtra.ExtDataGasUsed != nil {
+			return fmt.Errorf("invalid extDataGasUsed before fork: have %d, want <nil>", headerExtra.ExtDataGasUsed)
 		}
 		return nil
 	}
@@ -175,16 +176,16 @@ func (eng *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, header
 		parent,
 		header.Time,
 	)
-	if !utils.BigEqualUint64(header.BlockGasCost, expectedBlockGasCost) {
-		return fmt.Errorf("invalid block gas cost: have %d, want %d", header.BlockGasCost, expectedBlockGasCost)
+	if !utils.BigEqualUint64(headerExtra.BlockGasCost, expectedBlockGasCost) {
+		return fmt.Errorf("invalid block gas cost: have %d, want %d", headerExtra.BlockGasCost, expectedBlockGasCost)
 	}
 
 	// ExtDataGasUsed correctness is checked during block validation
 	// (when the validator has access to the block contents)
-	if header.ExtDataGasUsed == nil {
+	if headerExtra.ExtDataGasUsed == nil {
 		return errExtDataGasUsedNil
 	}
-	if !header.ExtDataGasUsed.IsUint64() {
+	if !headerExtra.ExtDataGasUsed.IsUint64() {
 		return errExtDataGasUsedTooLarge
 	}
 	return nil
@@ -422,10 +423,11 @@ func (eng *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, h
 	}
 
 	configExtra := params.GetExtra(chain.Config())
+	headerExtra := types.GetHeaderExtra(header)
 	if configExtra.IsApricotPhase4(header.Time) {
-		header.ExtDataGasUsed = extDataGasUsed
-		if header.ExtDataGasUsed == nil {
-			header.ExtDataGasUsed = new(big.Int).Set(common.Big0)
+		headerExtra.ExtDataGasUsed = extDataGasUsed
+		if headerExtra.ExtDataGasUsed == nil {
+			headerExtra.ExtDataGasUsed = new(big.Int).Set(common.Big0)
 		}
 		// Calculate the required block gas cost for this block.
 		blockGasCost := customheader.BlockGasCost(
@@ -433,12 +435,12 @@ func (eng *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, h
 			parent,
 			header.Time,
 		)
-		header.BlockGasCost = new(big.Int).SetUint64(blockGasCost)
+		headerExtra.BlockGasCost = new(big.Int).SetUint64(blockGasCost)
 
 		// Verify that this block covers the block fee.
 		if err := eng.verifyBlockFee(
 			header.BaseFee,
-			header.BlockGasCost,
+			headerExtra.BlockGasCost,
 			txs,
 			receipts,
 			contribution,

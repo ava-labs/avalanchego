@@ -980,7 +980,8 @@ func testConflictingImportTxs(t *testing.T, genesis string) {
 	}
 
 	header := types.CopyHeader(validEthBlock.Header())
-	header.ExtDataGasUsed.Mul(common.Big2, header.ExtDataGasUsed)
+	headerExtra := types.GetHeaderExtra(header)
+	headerExtra.ExtDataGasUsed.Mul(common.Big2, headerExtra.ExtDataGasUsed)
 
 	internalConflictBlock := types.NewBlockWithExtData(
 		header,
@@ -2449,7 +2450,7 @@ func TestEmptyBlock(t *testing.T) {
 		false,
 	)
 
-	if len(emptyEthBlock.ExtData()) != 0 || emptyEthBlock.Header().ExtDataHash != (common.Hash{}) {
+	if len(emptyEthBlock.ExtData()) != 0 || types.GetHeaderExtra(emptyEthBlock.Header()).ExtDataHash != (common.Hash{}) {
 		t.Fatalf("emptyEthBlock should not have any extra data")
 	}
 
