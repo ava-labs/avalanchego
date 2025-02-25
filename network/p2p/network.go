@@ -24,7 +24,7 @@ import (
 var (
 	_ validators.Connector = (*Network)(nil)
 	_ common.AppHandler    = (*Network)(nil)
-	_ NodeSampler          = (*peerSampler)(nil)
+	_ NodeSampler          = (*PeerSampler)(nil)
 
 	opLabel      = "op"
 	handlerLabel = "handlerID"
@@ -144,7 +144,7 @@ func (n *Network) NewClient(handlerID uint64, options ...ClientOption) *Client {
 		sender:        n.sender,
 		router:        n.router,
 		options: &clientOptions{
-			nodeSampler: &peerSampler{
+			nodeSampler: &PeerSampler{
 				peers: n.Peers,
 			},
 		},
@@ -197,11 +197,11 @@ func (p *Peers) Sample(limit int) []ids.NodeID {
 	return p.set.Sample(limit)
 }
 
-type peerSampler struct {
+type PeerSampler struct {
 	peers *Peers
 }
 
-func (p peerSampler) Sample(_ context.Context, limit int) []ids.NodeID {
+func (p PeerSampler) Sample(_ context.Context, limit int) []ids.NodeID {
 	return p.peers.Sample(limit)
 }
 
