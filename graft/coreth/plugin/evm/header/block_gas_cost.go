@@ -39,7 +39,7 @@ func BlockGasCost(
 		timeElapsed = timestamp - parent.Time
 	}
 	return BlockGasCostWithStep(
-		parent.BlockGasCost,
+		types.GetHeaderExtra(parent).BlockGasCost,
 		step,
 		timeElapsed,
 	)
@@ -82,24 +82,25 @@ func EstimateRequiredTip(
 	config *extras.ChainConfig,
 	header *types.Header,
 ) (*big.Int, error) {
+	extra := types.GetHeaderExtra(header)
 	switch {
 	case !config.IsApricotPhase4(header.Time):
 		return nil, nil
 	case header.BaseFee == nil:
 		return nil, errBaseFeeNil
-	case header.BlockGasCost == nil:
+	case extra.BlockGasCost == nil:
 		return nil, errBlockGasCostNil
-	case header.ExtDataGasUsed == nil:
+	case extra.ExtDataGasUsed == nil:
 		return nil, errExtDataGasUsedNil
 	}
 
 	// totalGasUsed = GasUsed + ExtDataGasUsed
 	totalGasUsed := new(big.Int).SetUint64(header.GasUsed)
-	totalGasUsed.Add(totalGasUsed, header.ExtDataGasUsed)
+	totalGasUsed.Add(totalGasUsed, extra.ExtDataGasUsed)
 
 	// totalRequiredTips = blockGasCost * baseFee
 	totalRequiredTips := new(big.Int)
-	totalRequiredTips.Mul(header.BlockGasCost, header.BaseFee)
+	totalRequiredTips.Mul(extra.BlockGasCost, header.BaseFee)
 
 	// estimatedTip = totalRequiredTips / totalGasUsed
 	estimatedTip := totalRequiredTips.Div(totalRequiredTips, totalGasUsed)

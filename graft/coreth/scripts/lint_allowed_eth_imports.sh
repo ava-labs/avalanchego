@@ -11,7 +11,7 @@ set -o pipefail
 # 4. Print out the difference between the search results and the list of specified allowed package imports from libevm.
 libevm_regexp='"github.com/ava-labs/libevm/.*"'
 allow_named_imports='eth\w\+ "'
-extra_imports=$(find . -type f \( -name "*.go" \) ! -path "./core/main_test.go" \
+extra_imports=$(find . -type f \( -name "*.go" \) ! -path "./core/main_test.go" ! -name "gen_*.go" \
   -exec sh -c 'grep "$0" -h "$2" | grep -v "$1" | grep -o "$0"' "${libevm_regexp}" "${allow_named_imports}" {} \; | \
   sort -u | comm -23 - ./scripts/eth-allowed-packages.txt)
 if [ -n "${extra_imports}" ]; then

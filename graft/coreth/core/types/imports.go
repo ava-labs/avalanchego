@@ -15,8 +15,10 @@ type (
 	AccessTuple       = ethtypes.AccessTuple
 	BlobTx            = ethtypes.BlobTx
 	BlobTxSidecar     = ethtypes.BlobTxSidecar
+	BlockNonce        = ethtypes.BlockNonce
 	Bloom             = ethtypes.Bloom
 	DynamicFeeTx      = ethtypes.DynamicFeeTx
+	Header            = ethtypes.Header
 	HomesteadSigner   = ethtypes.HomesteadSigner
 	LegacyTx          = ethtypes.LegacyTx
 	Receipt           = ethtypes.Receipt
@@ -50,6 +52,7 @@ var (
 	BloomLookup          = ethtypes.BloomLookup
 	BytesToBloom         = ethtypes.BytesToBloom
 	CreateBloom          = ethtypes.CreateBloom
+	EncodeNonce          = ethtypes.EncodeNonce
 	FullAccount          = ethtypes.FullAccount
 	FullAccountRLP       = ethtypes.FullAccountRLP
 	NewContractCreation  = ethtypes.NewContractCreation

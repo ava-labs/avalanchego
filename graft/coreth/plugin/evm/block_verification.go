@@ -79,15 +79,16 @@ func (v blockValidator) SyntacticVerify(b *Block, rules params.Rules) error {
 	}
 
 	// Verify the ExtDataHash field
+	headerExtra := types.GetHeaderExtra(ethHeader)
 	if rulesExtra.IsApricotPhase1 {
-		if hash := types.CalcExtDataHash(b.ethBlock.ExtData()); ethHeader.ExtDataHash != hash {
-			return fmt.Errorf("extra data hash mismatch: have %x, want %x", ethHeader.ExtDataHash, hash)
+		if hash := types.CalcExtDataHash(b.ethBlock.ExtData()); headerExtra.ExtDataHash != hash {
+			return fmt.Errorf("extra data hash mismatch: have %x, want %x", headerExtra.ExtDataHash, hash)
 		}
 	} else {
-		if ethHeader.ExtDataHash != (common.Hash{}) {
+		if headerExtra.ExtDataHash != (common.Hash{}) {
 			return fmt.Errorf(
 				"expected ExtDataHash to be empty but got %x",
-				ethHeader.ExtDataHash,
+				headerExtra.ExtDataHash,
 			)
 		}
 	}
@@ -200,16 +201,16 @@ func (v blockValidator) SyntacticVerify(b *Block, rules params.Rules) error {
 	// If we are in ApricotPhase4, ensure that ExtDataGasUsed is populated correctly.
 	if rulesExtra.IsApricotPhase4 {
 		// Make sure ExtDataGasUsed is not nil and correct
-		if ethHeader.ExtDataGasUsed == nil {
+		if headerExtra.ExtDataGasUsed == nil {
 			return errNilExtDataGasUsedApricotPhase4
 		}
 		if rulesExtra.IsApricotPhase5 {
-			if !utils.BigLessOrEqualUint64(ethHeader.ExtDataGasUsed, ap5.AtomicGasLimit) {
-				return fmt.Errorf("too large extDataGasUsed: %d", ethHeader.ExtDataGasUsed)
+			if !utils.BigLessOrEqualUint64(headerExtra.ExtDataGasUsed, ap5.AtomicGasLimit) {
+				return fmt.Errorf("too large extDataGasUsed: %d", headerExtra.ExtDataGasUsed)
 			}
 		} else {
-			if !ethHeader.ExtDataGasUsed.IsUint64() {
-				return fmt.Errorf("too large extDataGasUsed: %d", ethHeader.ExtDataGasUsed)
+			if !headerExtra.ExtDataGasUsed.IsUint64() {
+				return fmt.Errorf("too large extDataGasUsed: %d", headerExtra.ExtDataGasUsed)
 			}
 		}
 		var totalGasUsed uint64
@@ -228,15 +229,15 @@ func (v blockValidator) SyntacticVerify(b *Block, rules params.Rules) error {
 		}
 
 		switch {
-		case ethHeader.ExtDataGasUsed.Cmp(new(big.Int).SetUint64(totalGasUsed)) != 0:
-			return fmt.Errorf("invalid extDataGasUsed: have %d, want %d", ethHeader.ExtDataGasUsed, totalGasUsed)
+		case headerExtra.ExtDataGasUsed.Cmp(new(big.Int).SetUint64(totalGasUsed)) != 0:
+			return fmt.Errorf("invalid extDataGasUsed: have %d, want %d", headerExtra.ExtDataGasUsed, totalGasUsed)
 
 		// Make sure BlockGasCost is not nil
 		// NOTE: ethHeader.BlockGasCost correctness is checked in header verification
-		case ethHeader.BlockGasCost == nil:
+		case headerExtra.BlockGasCost == nil:
 			return errNilBlockGasCostApricotPhase4
-		case !ethHeader.BlockGasCost.IsUint64():
-			return fmt.Errorf("too large blockGasCost: %d", ethHeader.BlockGasCost)
+		case !headerExtra.BlockGasCost.IsUint64():
+			return fmt.Errorf("too large blockGasCost: %d", headerExtra.BlockGasCost)
 		}
 	}
 
