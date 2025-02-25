@@ -10,7 +10,6 @@ import (
 	"maps"
 	"slices"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -213,19 +212,28 @@ func (w *worker) runChecks(ctx context.Context) {
 	checks := maps.Clone(w.checks)
 	w.checksLock.RUnlock()
 
-	var hasSomeCheckFailed atomic.Bool
-
 	var wg sync.WaitGroup
 	wg.Add(len(checks))
 	for name, check := range checks {
-		go w.runCheck(ctx, &wg, name, check, &hasSomeCheckFailed)
+		go w.runCheck(ctx, &wg, name, check)
 	}
 	wg.Wait()
-
-	w.reportUnhealthy(hasSomeCheckFailed.Load())
+	w.reportUnhealthy(w.hasHealthCheckFailed())
 }
 
-func (w *worker) runCheck(ctx context.Context, wg *sync.WaitGroup, name string, check *taggedChecker, checkStatus *atomic.Bool) {
+func (w *worker) hasHealthCheckFailed() bool {
+	w.checksLock.RLock()
+	defer w.checksLock.RUnlock()
+
+	for _, res := range w.results {
+		if res.Error != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func (w *worker) runCheck(ctx context.Context, wg *sync.WaitGroup, name string, check *taggedChecker) {
 	defer wg.Done()
 
 	start := time.Now()
@@ -246,7 +254,6 @@ func (w *worker) runCheck(ctx context.Context, wg *sync.WaitGroup, name string, 
 	defer w.resultsLock.Unlock()
 	prevResult := w.results[name]
 	if err != nil {
-		checkStatus.Store(true)
 		errString := err.Error()
 		result.Error = &errString
 
