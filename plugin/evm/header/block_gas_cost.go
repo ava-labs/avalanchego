@@ -11,12 +11,14 @@ import (
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap4"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap5"
+	"github.com/ethereum/go-ethereum/common"
 )
 
 var (
 	errBaseFeeNil        = errors.New("base fee is nil")
 	errBlockGasCostNil   = errors.New("block gas cost is nil")
 	errExtDataGasUsedNil = errors.New("extDataGasUsed is nil")
+	errNoGasUsed         = errors.New("no gas used")
 )
 
 // BlockGasCost calculates the required block gas cost based on the parent
@@ -96,10 +98,18 @@ func EstimateRequiredTip(
 	// totalGasUsed = GasUsed + ExtDataGasUsed
 	totalGasUsed := new(big.Int).SetUint64(header.GasUsed)
 	totalGasUsed.Add(totalGasUsed, header.ExtDataGasUsed)
+	if totalGasUsed.Sign() == 0 {
+		return nil, errNoGasUsed
+	}
 
-	// totalRequiredTips = blockGasCost * baseFee
+	// totalRequiredTips = blockGasCost * baseFee + totalGasUsed - 1
+	//
+	// We add totalGasUsed - 1 to ensure that the total required tips
+	// calculation rounds up.
 	totalRequiredTips := new(big.Int)
 	totalRequiredTips.Mul(header.BlockGasCost, header.BaseFee)
+	totalRequiredTips.Add(totalRequiredTips, totalGasUsed)
+	totalRequiredTips.Sub(totalRequiredTips, common.Big1)
 
 	// estimatedTip = totalRequiredTips / totalGasUsed
 	estimatedTip := totalRequiredTips.Div(totalRequiredTips, totalGasUsed)
