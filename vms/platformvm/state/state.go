@@ -96,6 +96,7 @@ var (
 	ActivePrefix                            = []byte("active")
 	InactivePrefix                          = []byte("inactive")
 	SingletonPrefix                         = []byte("singleton")
+	indexPrefix                   					= []byte("index")
 
 	TimestampKey         = []byte("timestamp")
 	FeeStateKey          = []byte("fee state")
@@ -275,7 +276,7 @@ type State interface {
 	// pending changes to the base database.
 	CommitBatch() (database.Batch, error)
 
-	Checksum() ids.ID
+	Checksum() (ids.ID, error)
 
 	Close() error
 }
@@ -686,7 +687,14 @@ func New(
 	}
 
 	utxoDB := prefixdb.New(UTXOPrefix, baseDB)
-	utxoState, err := avax.NewMeteredUTXOState(utxoDB, txs.GenesisCodec, metricsReg, execCfg.ChecksumsEnabled)
+	utxoState, err := avax.NewMeteredUTXOState(
+		"",
+		avax.NewUTXODatabase(prefixdb.New(UTXOPrefix, utxoDB)),
+		prefixdb.New(indexPrefix, utxoDB),
+		txs.GenesisCodec,
+		metricsReg,
+		execCfg.ChecksumsEnabled,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -2384,7 +2392,7 @@ func (s *state) Abort() {
 	s.baseDB.Abort()
 }
 
-func (s *state) Checksum() ids.ID {
+func (s *state) Checksum() (ids.ID, error) {
 	return s.utxoState.Checksum()
 }
 

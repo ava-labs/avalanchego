@@ -11,6 +11,7 @@ package state
 
 import (
 	context "context"
+	iter "iter"
 	reflect "reflect"
 	sync "sync"
 	time "time"
@@ -1053,6 +1054,14 @@ func (m *MockState) UTXOIDs(addr []byte, previous ids.ID, limit int) ([]ids.ID, 
 func (mr *MockStateMockRecorder) UTXOIDs(addr, previous, limit any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UTXOIDs", reflect.TypeOf((*MockState)(nil).UTXOIDs), addr, previous, limit)
+}
+
+// UTXOs mocks base method.
+
+// UTXOs indicates an expected call of UTXOs.
+func (mr *MockStateMockRecorder) UTXOs(startingUTXOID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UTXOs", reflect.TypeOf((*MockState)(nil).UTXOs), startingUTXOID)
 }
 
 // WeightOfL1Validators mocks base method.

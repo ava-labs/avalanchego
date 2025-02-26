@@ -4,6 +4,7 @@
 package state
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -17,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -30,6 +32,7 @@ const (
 
 var (
 	utxoPrefix      = []byte("utxo")
+	indexPrefix     = []byte("index")
 	txPrefix        = []byte("tx")
 	blockIDPrefix   = []byte("blockID")
 	blockPrefix     = []byte("block")
@@ -41,6 +44,12 @@ var (
 
 	_ State = (*state)(nil)
 )
+
+type ChainDB interface {
+	Close() error
+	NewBatch() (database.Batch, error)
+	Abort()
+}
 
 type ReadOnlyChain interface {
 	avax.UTXOGetter
@@ -91,7 +100,7 @@ type State interface {
 	CommitBatch() (database.Batch, error)
 
 	// Checksum returns the current state checksum.
-	Checksum() ids.ID
+	Checksum(ctx context.Context) (ids.ID, error)
 
 	Close() error
 }
@@ -113,23 +122,26 @@ type State interface {
  */
 type state struct {
 	parser block.Parser
-	db     *versiondb.Database
+	// TODO make sure that we write localDB before chainDB
+	// TODO repair dbs
+	chainDB     ChainDB
+	baseLocalDB database.Database
+	localDB     *versiondb.Database
 
 	modifiedUTXOs map[ids.ID]*avax.UTXO // map of modified UTXOID -> *UTXO if the UTXO is nil, it has been removed
-	utxoDB        database.Database
-	utxoState     avax.UTXOState
+	utxoState avax.UTXOState
 
 	addedTxs map[ids.ID]*txs.Tx            // map of txID -> *txs.Tx
 	txCache  cache.Cacher[ids.ID, *txs.Tx] // cache of txID -> *txs.Tx. If the entry is nil, it is not in the database
-	txDB     database.Database
+	txDB database.Database
 
 	addedBlockIDs map[uint64]ids.ID            // map of height -> blockID
 	blockIDCache  cache.Cacher[uint64, ids.ID] // cache of height -> blockID. If the entry is ids.Empty, it is not in the database
-	blockIDDB     database.Database
+	blockIDDB database.Database
 
 	addedBlocks map[ids.ID]block.Block            // map of blockID -> Block
 	blockCache  cache.Cacher[ids.ID, block.Block] // cache of blockID -> Block. If the entry is nil, it is not in the database
-	blockDB     database.Database
+	blockDB database.Database
 
 	// [lastAccepted] is the most recently accepted block.
 	lastAccepted, persistedLastAccepted ids.ID
@@ -138,19 +150,48 @@ type state struct {
 }
 
 func New(
-	db *versiondb.Database,
+	baseDB database.Database,
 	parser block.Parser,
 	metrics prometheus.Registerer,
 	trackChecksums bool,
-) (State, error) {
-	utxoDB := prefixdb.New(utxoPrefix, db)
-	txDB := prefixdb.New(txPrefix, db)
-	blockIDDB := prefixdb.New(blockIDPrefix, db)
-	blockDB := prefixdb.New(blockPrefix, db)
-	singletonDB := prefixdb.New(singletonPrefix, db)
+) (*state, error) {
+	vdb := versiondb.New(baseDB)
+	return NewWithFormat[*GraniteChainDB](
+		"legacy_state",
+		&GraniteChainDB{},
+		baseDB,
+		vdb,
+		prefixdb.New(indexPrefix, vdb),
+		prefixdb.New(txPrefix, vdb),
+		prefixdb.New(blockIDPrefix, vdb),
+		prefixdb.New(blockPrefix, vdb),
+		prefixdb.New(singletonPrefix, vdb),
+		func(db *GraniteChainDB) avax.UTXODB {
+			return avax.NewUTXODatabase(prefixdb.New(utxoPrefix, db.vdb))
+		},
+		parser,
+		metrics,
+		trackChecksums,
+	)
+}
 
+func NewWithFormat[T ChainDB](
+	namespace string,
+	chainDB T,
+	localBaseDB database.Database,
+	localDB *versiondb.Database,
+	utxoIndexDB database.Database,
+	txDB database.Database,
+	blockIDDB database.Database,
+	blockDB database.Database,
+	singletonDB database.Database,
+	utxoDBFunc func(db T) avax.UTXODB,
+	parser block.Parser,
+	metrics prometheus.Registerer,
+	trackChecksums bool,
+) (*state, error) {
 	txCache, err := metercacher.New[ids.ID, *txs.Tx](
-		"tx_cache",
+		metric.AppendNamespace(namespace, "tx_cache"),
 		metrics,
 		lru.NewCache[ids.ID, *txs.Tx](txCacheSize),
 	)
@@ -159,7 +200,7 @@ func New(
 	}
 
 	blockIDCache, err := metercacher.New[uint64, ids.ID](
-		"block_id_cache",
+		metric.AppendNamespace(namespace, "block_id_cache"),
 		metrics,
 		lru.NewCache[uint64, ids.ID](blockIDCacheSize),
 	)
@@ -168,7 +209,7 @@ func New(
 	}
 
 	blockCache, err := metercacher.New[ids.ID, block.Block](
-		"block_cache",
+		metric.AppendNamespace(namespace, "block_cache"),
 		metrics,
 		lru.NewCache[ids.ID, block.Block](blockCacheSize),
 	)
@@ -176,30 +217,38 @@ func New(
 		return nil, err
 	}
 
-	utxoState, err := avax.NewMeteredUTXOState(utxoDB, parser.Codec(), metrics, trackChecksums)
+	utxoState, err := avax.NewMeteredUTXOState(
+		namespace,
+		utxoDBFunc(chainDB),
+		utxoIndexDB,
+		parser.Codec(),
+		metrics,
+		trackChecksums,
+	)
 	if err != nil {
 		return nil, err
 	}
 
 	return &state{
 		parser: parser,
-		db:     db,
+		chainDB:     chainDB,
+		baseLocalDB: localBaseDB,
+		localDB:     localDB,
 
 		modifiedUTXOs: make(map[ids.ID]*avax.UTXO),
-		utxoDB:        utxoDB,
 		utxoState:     utxoState,
 
 		addedTxs: make(map[ids.ID]*txs.Tx),
 		txCache:  txCache,
-		txDB:     txDB,
+		txDB: txDB,
 
 		addedBlockIDs: make(map[uint64]ids.ID),
 		blockIDCache:  blockIDCache,
-		blockIDDB:     blockIDDB,
+		blockIDDB: blockIDDB,
 
 		addedBlocks: make(map[ids.ID]block.Block),
 		blockCache:  blockCache,
-		blockDB:     blockDB,
+		blockDB: blockDB,
 
 		singletonDB: singletonDB,
 	}, nil
@@ -215,7 +264,10 @@ func (s *state) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
 	return s.utxoState.GetUTXO(utxoID)
 }
 
-func (s *state) UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
+func (s *state) UTXOIDs(addr []byte, start ids.ID, limit int) (
+	[]ids.ID,
+	error,
+) {
 	return s.utxoState.UTXOIDs(addr, start, limit)
 }
 
@@ -325,7 +377,10 @@ func (s *state) AddBlock(block block.Block) {
 	s.addedBlocks[blkID] = block
 }
 
-func (s *state) InitializeChainState(stopVertexID ids.ID, genesisTimestamp time.Time) error {
+func (s *state) InitializeChainState(
+	stopVertexID ids.ID,
+	genesisTimestamp time.Time,
+) error {
 	lastAccepted, err := database.GetID(s.singletonDB, lastAcceptedKey)
 	if err == database.ErrNotFound {
 		return s.initializeChainState(stopVertexID, genesisTimestamp)
@@ -346,7 +401,10 @@ func (s *state) InitializeChainState(stopVertexID ids.ID, genesisTimestamp time.
 	return nil
 }
 
-func (s *state) initializeChainState(stopVertexID ids.ID, genesisTimestamp time.Time) error {
+func (s *state) initializeChainState(
+	stopVertexID ids.ID,
+	genesisTimestamp time.Time,
+) error {
 	genesis, err := block.NewStandardBlock(
 		stopVertexID,
 		0,
@@ -403,24 +461,28 @@ func (s *state) Commit() error {
 }
 
 func (s *state) Abort() {
-	s.db.Abort()
+	s.chainDB.Abort()
+	s.localDB.Abort()
 }
 
+// TODO check what batch we need here
 func (s *state) CommitBatch() (database.Batch, error) {
 	if err := s.write(); err != nil {
 		return nil, err
 	}
-	return s.db.CommitBatch()
+	return s.chainDB.NewBatch()
 }
 
 func (s *state) Close() error {
 	return errors.Join(
-		s.utxoDB.Close(),
+		s.utxoState.Close(),
 		s.txDB.Close(),
 		s.blockIDDB.Close(),
 		s.blockDB.Close(),
 		s.singletonDB.Close(),
-		s.db.Close(),
+		// TODO check ordering here
+		s.localDB.Close(),
+		s.chainDB.Close(),
 	)
 }
 
@@ -506,6 +568,6 @@ func (s *state) writeMetadata() error {
 	return nil
 }
 
-func (s *state) Checksum() ids.ID {
+func (s *state) Checksum(context.Context) (ids.ID, error) {
 	return s.utxoState.Checksum()
 }
