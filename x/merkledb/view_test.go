@@ -53,7 +53,7 @@ var hashChangedNodesTests = []struct {
 }
 
 func makeViewForHashChangedNodes(t require.TestingT, numKeys uint64, parallelism uint) *view {
-	config := newDefaultConfig()
+	config := NewConfig()
 	config.RootGenConcurrency = parallelism
 	db, err := newDatabase(
 		context.Background(),
