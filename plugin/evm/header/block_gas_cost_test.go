@@ -225,16 +225,39 @@ func TestEstimateRequiredTip(t *testing.T) {
 			wantErr: errBlockGasCostNil,
 		},
 		{
+			name:               "no_gas_used",
+			subnetEVMTimestamp: utils.NewUint64(0),
+			header: &types.Header{
+				GasUsed:      0,
+				BaseFee:      big.NewInt(1),
+				BlockGasCost: big.NewInt(1),
+			},
+			wantErr: errNoGasUsed,
+		},
+		{
 			name:               "success",
 			subnetEVMTimestamp: utils.NewUint64(0),
 			header: &types.Header{
-				GasUsed:      123,
+				GasUsed:      912,
 				BaseFee:      big.NewInt(456),
 				BlockGasCost: big.NewInt(101112),
 			},
 			// totalRequiredTips = BlockGasCost * BaseFee
 			// estimatedTip = totalRequiredTips / GasUsed
-			want: big.NewInt((101112 * 456) / (123)),
+			want: big.NewInt((101112 * 456) / (912)),
+		},
+		{
+			name:               "success_rounds_up",
+			subnetEVMTimestamp: utils.NewUint64(0),
+			header: &types.Header{
+				GasUsed:      124,
+				BaseFee:      big.NewInt(456),
+				BlockGasCost: big.NewInt(101112),
+			},
+			// totalGasUsed = GasUsed + ExtDataGasUsed
+			// totalRequiredTips = BlockGasCost * BaseFee
+			// estimatedTip = totalRequiredTips / totalGasUsed
+			want: big.NewInt((101112*456)/(124) + 1), // +1 to round up
 		},
 	}
 	for _, test := range tests {

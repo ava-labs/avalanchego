@@ -262,7 +262,7 @@ func TestSuggestTipCap(t *testing.T) {
 		chainConfig: params.TestChainConfig,
 		numBlocks:   3,
 		genBlock:    testGenBlock(t, 55, 370),
-		expectedTip: big.NewInt(643_500_643),
+		expectedTip: big.NewInt(643_500_644),
 	}, defaultOracleConfig())
 }
 
@@ -315,7 +315,7 @@ func TestSuggestTipCapSmallTips(t *testing.T) {
 				b.AddTx(tx)
 			}
 		},
-		expectedTip: big.NewInt(643_500_643),
+		expectedTip: big.NewInt(643_500_644),
 	}, defaultOracleConfig())
 }
 
@@ -369,7 +369,7 @@ func TestSuggestTipCapMaxBlocksLookback(t *testing.T) {
 		chainConfig: params.TestChainConfig,
 		numBlocks:   20,
 		genBlock:    testGenBlock(t, 550, 370),
-		expectedTip: big.NewInt(5_807_226_110),
+		expectedTip: big.NewInt(5_807_226_111),
 	}, defaultOracleConfig())
 }
 
@@ -378,7 +378,7 @@ func TestSuggestTipCapMaxBlocksSecondsLookback(t *testing.T) {
 		chainConfig: params.TestChainConfig,
 		numBlocks:   20,
 		genBlock:    testGenBlock(t, 550, 370),
-		expectedTip: big.NewInt(10_384_877_851),
+		expectedTip: big.NewInt(10_384_877_852),
 	}, timeCrunchOracleConfig())
 }
 
