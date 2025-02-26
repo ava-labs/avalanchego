@@ -298,15 +298,16 @@ func CalculateDynamicFee(cost uint64, baseFee *big.Int) (uint64, error) {
 	if baseFee == nil {
 		return 0, errNilBaseFee
 	}
-	bigCost := new(big.Int).SetUint64(cost)
-	fee := new(big.Int).Mul(bigCost, baseFee)
-	feeToRoundUp := new(big.Int).Add(fee, x2cRateMinus1.ToBig())
-	feeInNAVAX := new(big.Int).Div(feeToRoundUp, X2CRate.ToBig())
-	if !feeInNAVAX.IsUint64() {
+	// fee = (cost * baseFee + [X2CRate] - 1) / [X2CRate]
+	fee := new(big.Int).SetUint64(cost)
+	fee.Mul(fee, baseFee)
+	fee.Add(fee, x2cRateMinus1.ToBig())
+	fee.Div(fee, X2CRate.ToBig())
+	if !fee.IsUint64() {
 		// the fee is more than can fit in a uint64
 		return 0, errFeeOverflow
 	}
-	return feeInNAVAX.Uint64(), nil
+	return fee.Uint64(), nil
 }
 
 func calcBytesCost(len int) uint64 {
