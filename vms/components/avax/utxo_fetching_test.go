@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -45,8 +46,12 @@ func TestFetchUTXOs(t *testing.T) {
 	require.NoError(c.RegisterType(&secp256k1fx.TransferOutput{}))
 	require.NoError(manager.RegisterCodec(codecVersion, c))
 
-	db := memdb.New()
-	s, err := NewUTXOState(db, manager, trackChecksum)
+	s, err := NewUTXOState(
+		memdb.New(),
+		memdb.New(),
+		manager,
+		trackChecksum,
+	)
 	require.NoError(err)
 
 	require.NoError(s.PutUTXO(utxo))
@@ -79,7 +84,12 @@ func TestGetPaginatedUTXOs(t *testing.T) {
 	require.NoError(manager.RegisterCodec(codecVersion, c))
 
 	db := memdb.New()
-	s, err := NewUTXOState(db, manager, trackChecksum)
+	s, err := NewUTXOState(
+		prefixdb.New([]byte("foo"), db),
+		prefixdb.New([]byte("bar"), db),
+		manager,
+		trackChecksum,
+	)
 	require.NoError(err)
 
 	// Create 1000 UTXOs each on addr0, addr1, and addr2.

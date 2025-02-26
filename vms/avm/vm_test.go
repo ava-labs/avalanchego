@@ -5,6 +5,7 @@ package avm
 
 import (
 	"context"
+	"encoding/json"
 	"math"
 	"testing"
 
@@ -15,12 +16,17 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/linked"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -31,7 +37,7 @@ import (
 func TestInvalidGenesis(t *testing.T) {
 	require := require.New(t)
 
-	vm := &VM{}
+	vm := &VM{StateMigrationFactory: NoStateMigrationFactory{}}
 	ctx := snowtest.Context(t, snowtest.XChainID)
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
@@ -715,4 +721,210 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 
 	assertIndexedTX(t, env.vm.db, 0, key.PublicKey().Address(), assetID.AssetID(), tx.ID())
 	assertLatestIdx(t, env.vm.db, key.PublicKey().Address(), assetID.AssetID(), 1)
+}
+
+// Tests that VM.Linearize migrates existing state to merkle-ized state
+func TestVMLinearizeStateMigration(t *testing.T) {
+	require := require.New(t)
+
+	db := memdb.New()
+	snowCtx := snowtest.Context(t, snowtest.XChainID)
+	snowCtx.SharedMemory = atomic.NewMemory(db).NewSharedMemory(ids.ID{})
+	configBytes, err := json.Marshal(DefaultConfig)
+	require.NoError(err)
+
+	fxs := []*common.Fx{
+		{
+			ID: secp256k1fx.ID,
+			Fx: &secp256k1fx.Fx{},
+		},
+	}
+
+	config := config.Config{
+		Upgrades: upgradetest.GetConfig(upgradetest.Latest),
+	}
+
+	vm := &VM{
+		Config:                config,
+		StateMigrationFactory: NoStateMigrationFactory{},
+	}
+
+	toEngine := make(chan common.Message, 1)
+	genesisBytes := buildGenesisTest(t)
+	require.NoError(vm.Initialize(
+		context.Background(),
+		snowCtx,
+		db,
+		genesisBytes,
+		nil,
+		configBytes,
+		toEngine,
+		fxs,
+		&enginetest.Sender{},
+	))
+	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+	require.NoError(vm.Linearize(context.Background(), ids.ID{}, toEngine))
+	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
+
+	txBuilder := txstest.New(
+		vm.parser.Codec(),
+		vm.ctx,
+		&vm.Config,
+		vm.ctx.AVAXAssetID,
+		vm.state,
+	)
+
+	genesisBlkID, err := vm.LastAccepted(context.Background())
+	require.NoError(err)
+
+	wantBlkIDs := linked.NewHashmap[ids.ID, uint64]()
+	wantBlkIDs.Put(genesisBlkID, 0)
+
+	letters := []rune("ABCEFGHIJKLMNOPQRSTUVWXYZ")
+	numBlocks := 10
+	wantTxs := make([]ids.ID, 0)
+	wantUTXOs := make([]*avax.UTXO, 0)
+
+	for i := 1; i < numBlocks; i++ {
+		symbol := string(letters[i%(len(letters)-1)])
+
+		tx, err := txBuilder.CreateAssetTx(
+			symbol,
+			symbol,
+			0,
+			map[uint32][]verify.State{
+				0: {
+					&secp256k1fx.MintOutput{
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{keys[0].Address()},
+						},
+					},
+				},
+			},
+			secp256k1fx.NewKeychain(keys[0]),
+			keys[0].Address(),
+		)
+		require.NoError(err)
+		issueAndAccept(require, vm, toEngine, tx)
+
+		wantTxs = append(wantTxs, tx.ID())
+		utxos := tx.UTXOs()
+		wantUTXOs = append(wantUTXOs, utxos...)
+
+		wantBlkID, err := vm.LastAccepted(context.Background())
+		require.NoError(err)
+		wantBlkIDs.Put(wantBlkID, uint64(i))
+	}
+
+	require.Equal(numBlocks, wantBlkIDs.Len())
+
+	db, err = memdb.Copy(db)
+	require.NoError(err)
+	require.NoError(vm.Shutdown(context.Background()))
+
+	// Migrate state
+	snowCtx = snowtest.Context(t, snowtest.XChainID)
+	snowCtx.SharedMemory = atomic.NewMemory(db).NewSharedMemory(ids.ID{})
+
+	vm = &VM{
+		Config:                config,
+		StateMigrationFactory: GForkStateMigrationFactory{CommitFrequency: 1},
+	}
+
+	toEngine = make(chan common.Message, 1)
+	require.NoError(vm.Initialize(
+		context.Background(),
+		snowCtx,
+		db,
+		genesisBytes,
+		nil,
+		configBytes,
+		toEngine,
+		fxs,
+		&enginetest.Sender{},
+	))
+	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+	require.NoError(vm.Linearize(context.Background(), ids.ID{}, toEngine))
+	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
+
+	// Check that all previous state still exists
+	for itr := wantBlkIDs.NewIterator(); itr.Next(); {
+		wantBlkID := itr.Key()
+		height := itr.Value()
+
+		gotBlkID, err := vm.GetBlockIDAtHeight(context.Background(), height)
+		require.NoError(err)
+		require.Equal(wantBlkID, gotBlkID)
+
+		gotBlk, err := vm.GetBlock(context.Background(), wantBlkID)
+		require.NoError(err)
+		require.Equal(wantBlkID, gotBlk.ID())
+	}
+
+	for _, wantTxID := range wantTxs {
+		gotTx, err := vm.GetTx(wantTxID)
+		require.NoError(err)
+		require.Equal(wantTxID, gotTx.ID())
+	}
+
+	for _, wantUTXO := range wantUTXOs {
+		gotUTXO, err := vm.GetUTXO(wantUTXO.InputID())
+		require.NoError(err)
+		require.Equal(wantUTXO.InputID(), gotUTXO.InputID())
+	}
+
+	wantLastAcceptedBlkID, _, _ := wantBlkIDs.Newest()
+	gotLastAcceptedBlkID, err := vm.LastAccepted(context.Background())
+	require.NoError(err)
+	require.Equal(wantLastAcceptedBlkID, gotLastAcceptedBlkID)
+
+	db, err = memdb.Copy(db)
+	require.NoError(err)
+	require.NoError(vm.Shutdown(context.Background()))
+
+	// Check that all previous state was deleted
+	snowCtx = snowtest.Context(t, snowtest.XChainID)
+	snowCtx.SharedMemory = atomic.NewMemory(db).NewSharedMemory(ids.ID{})
+
+	vm = &VM{
+		Config:                config,
+		StateMigrationFactory: NoStateMigrationFactory{},
+	}
+	toEngine = make(chan common.Message, 1)
+	require.NoError(vm.Initialize(
+		context.Background(),
+		snowCtx,
+		db,
+		genesisBytes,
+		nil,
+		configBytes,
+		toEngine,
+		fxs,
+		&enginetest.Sender{},
+	))
+	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+	require.NoError(vm.Linearize(context.Background(), ids.ID{}, toEngine))
+	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
+
+	for itr := wantBlkIDs.NewIterator(); itr.Next(); {
+		wantBlkID := itr.Key()
+		height := itr.Value()
+
+		_, err := vm.GetBlock(context.Background(), wantBlkID)
+		require.ErrorIs(err, database.ErrNotFound)
+
+		_, err = vm.GetBlockIDAtHeight(context.Background(), height)
+		require.ErrorIs(err, database.ErrNotFound)
+	}
+
+	for _, txID := range wantTxs {
+		_, err := vm.GetTx(txID)
+		require.ErrorIs(err, database.ErrNotFound)
+	}
+
+	for _, utxo := range wantUTXOs {
+		_, err := vm.GetUTXO(utxo.InputID())
+		require.ErrorIs(err, database.ErrNotFound)
+	}
 }

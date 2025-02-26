@@ -51,7 +51,7 @@ type Manager interface {
 func NewManager(
 	mempool mempool.Mempool,
 	metrics metrics.Metrics,
-	state state.State,
+	state state.Interface,
 	backend *executor.Backend,
 	clk *mockable.Clock,
 	onAccept func(*txs.Tx) error,
@@ -72,7 +72,7 @@ func NewManager(
 
 type manager struct {
 	backend *executor.Backend
-	state   state.State
+	state   state.Interface
 	metrics metrics.Metrics
 	mempool mempool.Mempool
 	clk     *mockable.Clock
