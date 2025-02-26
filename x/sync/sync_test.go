@@ -33,6 +33,7 @@ func Test_Creation(t *testing.T) {
 		context.Background(),
 		memdb.New(),
 		newDefaultDBConfig(),
+		"",
 	)
 	require.NoError(err)
 
@@ -56,6 +57,7 @@ func Test_Completion(t *testing.T) {
 		context.Background(),
 		memdb.New(),
 		newDefaultDBConfig(),
+		"",
 	)
 	require.NoError(err)
 
@@ -66,6 +68,7 @@ func Test_Completion(t *testing.T) {
 		context.Background(),
 		memdb.New(),
 		newDefaultDBConfig(),
+		"",
 	)
 	require.NoError(err)
 
@@ -171,6 +174,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 		context.Background(),
 		memdb.New(),
 		newDefaultDBConfig(),
+		"",
 	)
 	require.NoError(err)
 
@@ -242,6 +246,7 @@ func Test_Sync_FindNextKey_Deleted(t *testing.T) {
 		context.Background(),
 		memdb.New(),
 		newDefaultDBConfig(),
+		"",
 	)
 	require.NoError(err)
 	require.NoError(db.Put([]byte{0x10}, []byte{1}))
@@ -289,6 +294,7 @@ func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
 		context.Background(),
 		memdb.New(),
 		newDefaultDBConfig(),
+		"",
 	)
 	require.NoError(err)
 	require.NoError(db.Put([]byte{0x11}, []byte{1}))
@@ -325,6 +331,7 @@ func Test_Sync_FindNextKey_BranchInReceived(t *testing.T) {
 		context.Background(),
 		memdb.New(),
 		newDefaultDBConfig(),
+		"",
 	)
 	require.NoError(err)
 	require.NoError(db.Put([]byte{0x11}, []byte{1}))
@@ -370,6 +377,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 		context.Background(),
 		memdb.New(),
 		newDefaultDBConfig(),
+		"",
 	)
 	require.NoError(err)
 
@@ -432,6 +440,7 @@ func TestFindNextKeyEmptyEndProof(t *testing.T) {
 		context.Background(),
 		memdb.New(),
 		newDefaultDBConfig(),
+		"",
 	)
 	require.NoError(err)
 
@@ -501,6 +510,7 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 		context.Background(),
 		memdb.New(),
 		newDefaultDBConfig(),
+		"",
 	)
 	require.NoError(err)
 
@@ -551,6 +561,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		context.Background(),
 		memdb.New(),
 		newDefaultDBConfig(),
+		"",
 	)
 	require.NoError(err)
 
@@ -559,6 +570,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		context.Background(),
 		memdb.New(),
 		config,
+		"",
 	)
 	require.NoError(err)
 
@@ -937,6 +949,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 				ctx,
 				memdb.New(),
 				newDefaultDBConfig(),
+				"",
 			)
 			require.NoError(err)
 
@@ -1025,6 +1038,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 		context.Background(),
 		memdb.New(),
 		newDefaultDBConfig(),
+		"",
 	)
 	require.NoError(err)
 
@@ -1122,6 +1136,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 		context.Background(),
 		memdb.New(),
 		newDefaultDBConfig(),
+		"",
 	)
 	require.NoError(err)
 
@@ -1184,6 +1199,7 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 		context.Background(),
 		memdb.New(),
 		newDefaultDBConfig(),
+		"",
 	)
 	require.NoError(err)
 	ctx := context.Background()
@@ -1241,6 +1257,7 @@ func generateTrieWithMinKeyLen(t *testing.T, r *rand.Rand, count int, minKeyLen 
 		context.Background(),
 		memdb.New(),
 		newDefaultDBConfig(),
+		"",
 	)
 	if err != nil {
 		return nil, err
