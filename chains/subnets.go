@@ -56,6 +56,7 @@ func (s *Subnets) Bootstrapping() []ids.ID {
 	for subnetID, subnet := range s.subnets {
 		if !subnet.IsBootstrapped() {
 			subnetsBootstrapping = append(subnetsBootstrapping, subnetID)
+			subnet.IsBootstrapped()
 		}
 	}
 

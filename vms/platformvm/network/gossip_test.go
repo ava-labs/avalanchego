@@ -91,7 +91,7 @@ func TestGossipAddBloomFilter(t *testing.T) {
 	}
 
 	txVerifier := testTxVerifier{}
-	mempool, err := pmempool.New("", prometheus.NewRegistry(), nil)
+	mempool, err := pmempool.New("", prometheus.NewRegistry(), func() {})
 	require.NoError(err)
 
 	gossipMempool, err := newGossipMempool(

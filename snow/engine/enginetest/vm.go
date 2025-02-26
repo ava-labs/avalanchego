@@ -45,18 +45,26 @@ type VM struct {
 	CantHealthCheck, CantConnected, CantDisconnected, CantVersion,
 	CantAppRequest, CantAppResponse, CantAppGossip, CantAppRequestFailed bool
 
-	InitializeF       func(ctx context.Context, chainCtx *snow.Context, db database.Database, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, msgChan chan<- common.Message, fxs []*common.Fx, appSender common.AppSender) error
-	SetStateF         func(ctx context.Context, state snow.State) error
-	ShutdownF         func(context.Context) error
-	CreateHandlersF   func(context.Context) (map[string]http.Handler, error)
-	ConnectedF        func(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error
-	DisconnectedF     func(ctx context.Context, nodeID ids.NodeID) error
-	HealthCheckF      func(context.Context) (interface{}, error)
-	AppRequestF       func(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, msg []byte) error
-	AppResponseF      func(ctx context.Context, nodeID ids.NodeID, requestID uint32, msg []byte) error
-	AppGossipF        func(ctx context.Context, nodeID ids.NodeID, msg []byte) error
-	AppRequestFailedF func(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *common.AppError) error
-	VersionF          func(context.Context) (string, error)
+	SubscribeToEventsF func(ctx context.Context) common.Message
+	InitializeF        func(ctx context.Context, chainCtx *snow.Context, db database.Database, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, fxs []*common.Fx, appSender common.AppSender) error
+	SetStateF          func(ctx context.Context, state snow.State) error
+	ShutdownF          func(context.Context) error
+	CreateHandlersF    func(context.Context) (map[string]http.Handler, error)
+	ConnectedF         func(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error
+	DisconnectedF      func(ctx context.Context, nodeID ids.NodeID) error
+	HealthCheckF       func(context.Context) (interface{}, error)
+	AppRequestF        func(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, msg []byte) error
+	AppResponseF       func(ctx context.Context, nodeID ids.NodeID, requestID uint32, msg []byte) error
+	AppGossipF         func(ctx context.Context, nodeID ids.NodeID, msg []byte) error
+	AppRequestFailedF  func(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *common.AppError) error
+	VersionF           func(context.Context) (string, error)
+}
+
+func (vm *VM) SubscribeToEvents(ctx context.Context) common.Message {
+	if vm.SubscribeToEventsF != nil {
+		return vm.SubscribeToEventsF(ctx)
+	}
+	return 0
 }
 
 func (vm *VM) Default(cant bool) {
@@ -81,7 +89,6 @@ func (vm *VM) Initialize(
 	genesisBytes,
 	upgradeBytes,
 	configBytes []byte,
-	msgChan chan<- common.Message,
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
@@ -93,7 +100,6 @@ func (vm *VM) Initialize(
 			genesisBytes,
 			upgradeBytes,
 			configBytes,
-			msgChan,
 			fxs,
 			appSender,
 		)

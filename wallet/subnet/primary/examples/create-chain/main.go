@@ -6,7 +6,7 @@ package main
 import (
 	"context"
 	"log"
-	"math"
+	"os"
 	"time"
 
 	"github.com/ava-labs/avalanchego/genesis"
@@ -14,35 +14,25 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
-
-	xsgenesis "github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
 )
 
 func main() {
 	key := genesis.EWOQKey
 	uri := primary.LocalAPIURI
 	kc := secp256k1fx.NewKeychain(key)
-	subnetIDStr := "29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL"
-	genesis := &xsgenesis.Genesis{
-		Timestamp: time.Now().Unix(),
-		Allocations: []xsgenesis.Allocation{
-			{
-				Address: genesis.EWOQKey.Address(),
-				Balance: math.MaxUint64,
-			},
-		},
+	subnetIDStr := "BKBZ6xXTnT86B4L5fp8rvtcmNSpvtNz8En9jG61ywV2uWyeHy"
+
+	vmID := constants.SubnetEVMID
+	name := "simplexvm"
+
+	genesisBytes, err := os.ReadFile("/Users/yacov.manevich/.avalanche-cli/subnets/yak/genesis.json")
+	if err != nil {
+		log.Fatalf("failed to read genesis file: %s\n", err)
 	}
-	vmID := constants.XSVMID
-	name := "let there"
 
 	subnetID, err := ids.FromString(subnetIDStr)
 	if err != nil {
 		log.Fatalf("failed to parse subnet ID: %s\n", err)
-	}
-
-	genesisBytes, err := xsgenesis.Codec.Marshal(xsgenesis.CodecVersion, genesis)
-	if err != nil {
-		log.Fatalf("failed to create genesis bytes: %s\n", err)
 	}
 
 	ctx := context.Background()

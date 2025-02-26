@@ -13,6 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/simplex"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
@@ -324,6 +326,9 @@ func New(config *ManagerConfig) (Manager, error) {
 		return nil, err
 	}
 
+	config.Log.Info("C-chain ID is:", zap.String("C-chain ID", config.CChainID.String()))
+	config.Log.Info("X-chain ID is:", zap.String("C-chain ID", config.XChainID.String()))
+
 	return &manager{
 		Aliaser:                ids.NewAliaser(),
 		ManagerConfig:          *config,
@@ -519,7 +524,6 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		TxAcceptor:     m.TxAcceptorGroup,
 		VertexAcceptor: m.VertexAcceptorGroup,
 	}
-
 	// Get a factory for the vm we want to use on our chain
 	vmFactory, err := m.VMManager.GetFactory(chainParams.VMID)
 	if err != nil {
@@ -566,15 +570,32 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			beacons = chainParams.CustomBeacons
 		}
 
-		chain, err = m.createSnowmanChain(
-			ctx,
-			chainParams.GenesisData,
-			m.Validators,
-			beacons,
-			vm,
-			chainFxs,
-			sb,
-		)
+		var err error
+
+		isPrimaryNetwork := chainParams.SubnetID == constants.PrimaryNetworkID
+		isPlugin := chainParams.VMID == constants.SubnetEVMID || chainParams.VMID == constants.XSVMID
+
+		if isPlugin && !isPrimaryNetwork {
+			chain, err = m.createSimplexChain(
+				ctx,
+				chainParams.GenesisData,
+				m.Validators,
+				beacons,
+				vm,
+				chainFxs,
+				sb)
+		} else {
+			chain, err = m.createSnowmanChain(
+				ctx,
+				chainParams.GenesisData,
+				m.Validators,
+				beacons,
+				vm,
+				chainFxs,
+				sb,
+			)
+		}
+
 		if err != nil {
 			return nil, fmt.Errorf("error while creating new snowman vm %w", err)
 		}
@@ -596,6 +617,22 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		m.snowmanGatherer.Register(primaryAlias, ctx.Registerer),
 		vmGatherer.Register(primaryAlias, ctx.Metrics),
 	)
+}
+
+func (m *manager) createSimplexEngine(ctx *snow.ConsensusContext, vm block.ChainVM, vdrs validators.Manager, getServer common.AllGetsServer, genesisData []byte) (*simplex.Engine, error) {
+	conf := &simplex.Config{
+		GenesisData:        genesisData,
+		GetServer:          getServer,
+		SignBLS:            m.ManagerConfig.StakingBLSKey.Sign,
+		Sender:             m.Net,
+		OutboundMsgBuilder: m.MsgCreator,
+		DB:                 m.DB,
+		Ctx:                ctx,
+		VM:                 vm,
+		Validators:         vdrs,
+	}
+
+	return simplex.CreateEngine(conf)
 }
 
 func (m *manager) AddRegistrant(r Registrant) {
@@ -727,10 +764,6 @@ func (m *manager) createAvalancheChain(
 		},
 	)
 
-	// The channel through which a VM may send messages to the consensus engine
-	// VM uses this channel to notify engine that a block is ready to be made
-	msgChan := make(chan common.Message, defaultChannelSize)
-
 	// The only difference between using avalancheMessageSender and
 	// snowmanMessageSender here is where the metrics will be placed. Because we
 	// end up using this sender after the linearization, we pass in
@@ -742,7 +775,6 @@ func (m *manager) createAvalancheChain(
 		genesisData,
 		chainConfig.Upgrade,
 		chainConfig.Config,
-		msgChan,
 		fxs,
 		snowmanMessageSender,
 	)
@@ -823,7 +855,6 @@ func (m *manager) createAvalancheChain(
 		genesisBytes: genesisData,
 		upgradeBytes: chainConfig.Upgrade,
 		configBytes:  chainConfig.Config,
-		toEngine:     msgChan,
 		fxs:          fxs,
 		appSender:    snowmanMessageSender,
 	}
@@ -886,7 +917,6 @@ func (m *manager) createAvalancheChain(
 	h, err := handler.New(
 		ctx,
 		vdrs,
-		msgChan,
 		m.FrontierPollFrequency,
 		m.ConsensusAppConcurrency,
 		m.ResourceTracker,
@@ -1202,10 +1232,6 @@ func (m *manager) createSnowmanChain(
 		vm = tracedvm.NewBlockVM(vm, "proposervm", m.Tracer)
 	}
 
-	// The channel through which a VM may send messages to the consensus engine
-	// VM uses this channel to notify engine that a block is ready to be made
-	msgChan := make(chan common.Message, defaultChannelSize)
-
 	if err := vm.Initialize(
 		context.TODO(),
 		ctx.Context,
@@ -1213,7 +1239,6 @@ func (m *manager) createSnowmanChain(
 		genesisData,
 		chainConfig.Upgrade,
 		chainConfig.Config,
-		msgChan,
 		fxs,
 		messageSender,
 	); err != nil {
@@ -1278,7 +1303,6 @@ func (m *manager) createSnowmanChain(
 	h, err := handler.New(
 		ctx,
 		vdrs,
-		msgChan,
 		m.FrontierPollFrequency,
 		m.ConsensusAppConcurrency,
 		m.ResourceTracker,
@@ -1412,6 +1436,213 @@ func (m *manager) createSnowmanChain(
 	}, nil
 }
 
+// Create a linear chain using the Snowman consensus engine
+func (m *manager) createSimplexChain(
+	ctx *snow.ConsensusContext,
+	genesisData []byte,
+	vdrs validators.Manager,
+	beacons validators.Manager,
+	vm block.ChainVM,
+	fxs []*common.Fx,
+	sb subnets.Subnet,
+) (*chain, error) {
+	ctx.Lock.Lock()
+	defer ctx.Lock.Unlock()
+
+	ctx.State.Set(snow.EngineState{
+		Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
+		State: snow.NormalOp,
+	})
+
+	primaryAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
+	meterDBReg, err := metrics.MakeAndRegister(
+		m.MeterDBMetrics,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	meterDB, err := meterdb.New(meterDBReg, m.DB)
+	if err != nil {
+		return nil, err
+	}
+
+	prefixDB := prefixdb.New(ctx.ChainID[:], meterDB)
+	vmDB := prefixdb.New(VMDBPrefix, prefixDB)
+
+	// Passes messages from the consensus engine to the network
+	messageSender, err := sender.New(
+		ctx,
+		m.MsgCreator,
+		m.Net,
+		m.ManagerConfig.Router,
+		m.TimeoutManager,
+		p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
+		sb,
+		ctx.Registerer,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
+	}
+
+	if m.TracingEnabled {
+		messageSender = sender.Trace(messageSender, m.Tracer)
+	}
+
+	chainConfig, err := m.getChainConfig(ctx.ChainID)
+	if err != nil {
+		return nil, fmt.Errorf("error while fetching chain config: %w", err)
+	}
+
+	if m.TracingEnabled {
+		vm = tracedvm.NewBlockVM(vm, primaryAlias, m.Tracer)
+	}
+
+	if m.MeterVMEnabled {
+		meterchainvmReg, err := metrics.MakeAndRegister(
+			m.meterChainVMGatherer,
+			primaryAlias,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		vm = metervm.NewBlockVM(vm, meterchainvmReg)
+	}
+	if m.TracingEnabled {
+		vm = tracedvm.NewBlockVM(vm, "proposervm", m.Tracer)
+	}
+
+	if err := vm.Initialize(
+		context.TODO(),
+		ctx.Context,
+		vmDB,
+		genesisData,
+		chainConfig.Upgrade,
+		chainConfig.Config,
+		fxs,
+		messageSender,
+	); err != nil {
+		return nil, err
+	}
+
+	sb.Bootstrapped(ctx.ChainID)
+
+	if err := vm.SetState(context.Background(), snow.NormalOp); err != nil {
+		return nil, fmt.Errorf("couldn't set chain's state to NormalOp: %w", err)
+	}
+
+	bootstrapWeight, err := beacons.TotalWeight(ctx.SubnetID)
+	if err != nil {
+		return nil, fmt.Errorf("error while fetching weight for subnet %s: %w", ctx.SubnetID, err)
+	}
+
+	stakeReg, err := metrics.MakeAndRegister(
+		m.stakeGatherer,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	connectedValidators, err := tracker.NewMeteredPeers(stakeReg)
+	if err != nil {
+		return nil, fmt.Errorf("error creating peer tracker: %w", err)
+	}
+	vdrs.RegisterSetCallbackListener(ctx.SubnetID, connectedValidators)
+
+	p2pReg, err := metrics.MakeAndRegister(
+		m.p2pGatherer,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	peerTracker, err := p2p.NewPeerTracker(
+		ctx.Log,
+		"peer_tracker",
+		p2pReg,
+		set.Of(ctx.NodeID),
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error creating peer tracker: %w", err)
+	}
+
+	handlerReg, err := metrics.MakeAndRegister(
+		m.handlerGatherer,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	var halter common.Halter
+
+	// Asynchronously passes messages from the network to the consensus engine
+	h, err := handler.New(
+		ctx,
+		vdrs,
+		m.FrontierPollFrequency,
+		m.ConsensusAppConcurrency,
+		m.ResourceTracker,
+		sb,
+		connectedValidators,
+		peerTracker,
+		handlerReg,
+		halter.Halt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize message handler: %w", err)
+	}
+
+	connectedBeacons := tracker.NewPeers()
+	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)
+	beacons.RegisterSetCallbackListener(ctx.SubnetID, startupTracker)
+
+	snowGetHandler, err := snowgetter.New(
+		vm,
+		messageSender,
+		ctx.Log,
+		m.BootstrapMaxTimeGetAncestors,
+		m.BootstrapAncestorsMaxContainersSent,
+		ctx.Registerer,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize snow base message handler: %w", err)
+	}
+
+	// Create engine, bootstrapper and state-syncer in this order,
+	// to make sure start callbacks are duly initialized
+	simplex, err := m.createSimplexEngine(ctx, vm, vdrs, snowGetHandler, genesisData)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't create simplex instance: %w", err)
+	}
+
+	var engine common.Engine
+	engine = simplex
+
+	if m.TracingEnabled {
+		engine = common.TraceEngine(engine, m.Tracer)
+	}
+
+	h.SetEngineManager(&handler.EngineManager{
+		Avalanche: nil,
+		Snowman: &handler.Engine{
+			Consensus: engine,
+		},
+	})
+
+	return &chain{
+		Name:    primaryAlias,
+		Context: ctx,
+		VM:      vm,
+		Handler: h,
+	}, nil
+}
+
 func (m *manager) IsBootstrapped(id ids.ID) bool {
 	m.chainsLock.Lock()
 	chain, exists := m.chains[id]
@@ -1426,6 +1657,7 @@ func (m *manager) IsBootstrapped(id ids.ID) bool {
 func (m *manager) registerBootstrappedHealthChecks() error {
 	bootstrappedCheck := health.CheckerFunc(func(context.Context) (interface{}, error) {
 		if subnetIDs := m.Subnets.Bootstrapping(); len(subnetIDs) != 0 {
+			m.Log.Info("node is currently bootstrapping chains", zap.String("subnets", fmt.Sprintf("%v", subnetIDs)))
 			return subnetIDs, errNotBootstrapped
 		}
 		return []ids.ID{}, nil

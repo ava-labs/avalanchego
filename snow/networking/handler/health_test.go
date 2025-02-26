@@ -85,7 +85,6 @@ func TestHealthCheckSubnet(t *testing.T) {
 			handlerIntf, err := New(
 				ctx,
 				vdrs,
-				nil,
 				time.Second,
 				testThreadPoolSize,
 				resourceTracker,

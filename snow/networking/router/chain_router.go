@@ -207,10 +207,15 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	nodeID := msg.NodeID()
 	op := msg.Op()
 
+	if op == message.Simplex {
+		cr.log.Info("we got a simplex message",
+			zap.Stringer("op", msg.Op()))
+	}
+
 	m := msg.Message()
 	chainID, err := message.GetChainID(m)
 	if err != nil {
-		cr.log.Debug("dropping message with invalid field",
+		cr.log.Warn("dropping message with invalid field",
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("messageOp", op),
 			zap.String("field", "ChainID"),
@@ -222,14 +227,17 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	}
 
 	requestID, ok := message.GetRequestID(m)
-	if !ok {
-		cr.log.Debug("dropping message with invalid field",
+	if !ok && msg.Op() != message.Simplex {
+		cr.log.Warn("dropping message with invalid field",
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("messageOp", op),
 			zap.String("field", "RequestID"),
 		)
 
 		msg.OnFinishedHandling()
+		if op == message.Simplex {
+			cr.log.Warn("1111111111")
+		}
 		return
 	}
 
@@ -250,7 +258,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	// Get the chain, if it exists
 	chain, exists := cr.chainHandlers[chainID]
 	if !exists {
-		cr.log.Debug("dropping message",
+		cr.log.Warn("dropping message",
 			zap.Stringer("messageOp", op),
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("chainID", chainID),
@@ -261,7 +269,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	}
 
 	if !chain.ShouldHandle(nodeID) {
-		cr.log.Debug("dropping message",
+		cr.log.Warn("dropping message",
 			zap.Stringer("messageOp", op),
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("chainID", chainID),
@@ -274,7 +282,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	chainCtx := chain.Context()
 	if message.UnrequestedOps.Contains(op) {
 		if chainCtx.Executing.Get() {
-			cr.log.Debug("dropping message and skipping queue",
+			cr.log.Warn("dropping message and skipping queue",
 				zap.String("reason", "the chain is currently executing"),
 				zap.Stringer("messageOp", op),
 			)
@@ -297,10 +305,11 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	}
 
 	if expectedResponse, isFailed := message.FailedToResponseOps[op]; isFailed {
+
 		// Create the request ID of the request we sent that this message is in
 		// response to.
 		uniqueRequestID, req := cr.clearRequest(expectedResponse, nodeID, chainID, requestID)
-		if req == nil {
+		if req == nil && op != message.Simplex {
 			// This was a duplicated response.
 			msg.OnFinishedHandling()
 			return
@@ -317,11 +326,12 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 				EngineType:     req.engineType,
 			},
 		)
+
 		return
 	}
 
 	if chainCtx.Executing.Get() {
-		cr.log.Debug("dropping message and skipping queue",
+		cr.log.Warn("dropping message and skipping queue",
 			zap.String("reason", "the chain is currently executing"),
 			zap.Stringer("messageOp", op),
 		)
@@ -331,24 +341,34 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	}
 
 	uniqueRequestID, req := cr.clearRequest(op, nodeID, chainID, requestID)
-	if req == nil {
+	if req == nil && op != message.Simplex {
 		// We didn't request this message.
 		msg.OnFinishedHandling()
 		return
 	}
 
-	// Calculate how long it took [nodeID] to reply
-	latency := cr.clock.Time().Sub(req.time)
+	var engineType p2p.EngineType
 
-	// Tell the timeout manager we got a response
-	cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, req.op, latency)
+	if req != nil {
+		// Calculate how long it took [nodeID] to reply
+		latency := cr.clock.Time().Sub(req.time)
+
+		// Tell the timeout manager we got a response
+		cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, req.op, latency)
+
+		engineType = req.engineType
+	}
+
+	if op == message.Simplex {
+		engineType = p2p.EngineType_ENGINE_TYPE_UNSPECIFIED
+	}
 
 	// Pass the response to the chain
 	chain.Push(
 		ctx,
 		handler.Message{
 			InboundMessage: msg,
-			EngineType:     req.engineType,
+			EngineType:     engineType,
 		},
 	)
 }

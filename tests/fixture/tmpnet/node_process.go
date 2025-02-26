@@ -183,6 +183,7 @@ func (p *NodeProcess) IsHealthy(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	fmt.Println(">>>", healthReply)
 	return healthReply.Healthy, nil
 }
 

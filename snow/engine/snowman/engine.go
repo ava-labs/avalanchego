@@ -48,6 +48,8 @@ type Engine struct {
 	Config
 	*metrics
 
+	nf *common.NotificationForwarder
+
 	// list of NoOpsHandler for messages dropped by engine
 	common.StateSummaryFrontierHandler
 	common.AcceptedStateSummaryHandler
@@ -133,7 +135,7 @@ func New(config Config) (*Engine, error) {
 		return nil, err
 	}
 
-	return &Engine{
+	engine := &Engine{
 		Config:                      config,
 		metrics:                     metrics,
 		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Ctx.Log),
@@ -151,7 +153,15 @@ func New(config Config) (*Engine, error) {
 		polls:                       polls,
 		blkReqs:                     bimap.New[common.Request, ids.ID](),
 		blkReqSourceMetric:          make(map[common.Request]prometheus.Counter),
-	}, nil
+	}
+
+	engine.nf = &common.NotificationForwarder{
+		Log:       config.Ctx.Log,
+		Subscribe: config.VM.SubscribeToEvents,
+		Notifier:  engine,
+	}
+
+	return engine, nil
 }
 
 func (e *Engine) Gossip(ctx context.Context) error {
@@ -438,10 +448,15 @@ func (e *Engine) Shutdown(ctx context.Context) error {
 	e.Ctx.Lock.Lock()
 	defer e.Ctx.Lock.Unlock()
 
+	e.nf.Close()
+
 	return e.VM.Shutdown(ctx)
 }
 
 func (e *Engine) Notify(ctx context.Context, msg common.Message) error {
+	e.Ctx.Lock.Lock()
+	defer e.Ctx.Lock.Unlock()
+
 	switch msg {
 	case common.PendingTxs:
 		// the pending txs message means we should attempt to build a block.
@@ -463,6 +478,8 @@ func (e *Engine) Context() *snow.ConsensusContext {
 }
 
 func (e *Engine) Start(ctx context.Context, startReqID uint32) error {
+	e.nf.Start()
+
 	e.requestID = startReqID
 	lastAcceptedID, err := e.VM.LastAccepted(ctx)
 	if err != nil {

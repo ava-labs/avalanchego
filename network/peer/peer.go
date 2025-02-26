@@ -475,7 +475,7 @@ func (p *peer) readMessages() {
 		// Parse the message
 		msg, err := p.MessageCreator.Parse(msgBytes, p.id, onFinishedHandling)
 		if err != nil {
-			p.Log.Verbo("failed to parse message",
+			p.Log.Warn("failed to parse message",
 				zap.Stringer("nodeID", p.id),
 				zap.Binary("messageBytes", msgBytes),
 				zap.Error(err),
@@ -487,6 +487,14 @@ func (p *peer) readMessages() {
 			onFinishedHandling()
 			p.ResourceTracker.StopProcessing(p.id, p.Clock.Time())
 			continue
+		}
+
+		if msg.Op() == message.Simplex {
+			p.Log.Info("received simplex message",
+				zap.Stringer("op", msg.Op()),
+				zap.Stringer("nodeID", p.id),
+				zap.Binary("messageBytes", msgBytes),
+			)
 		}
 
 		now := p.Clock.Time()
@@ -587,6 +595,13 @@ func (p *peer) writeMessages() {
 
 func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
 	msgBytes := msg.Bytes()
+	if msg.Op() == message.Simplex {
+		p.Log.Info("sending message",
+			zap.Stringer("op", msg.Op()),
+			zap.Stringer("nodeID", p.id),
+			zap.Binary("messageBytes", msgBytes),
+		)
+	}
 	p.Log.Verbo("sending message",
 		zap.Stringer("op", msg.Op()),
 		zap.Stringer("nodeID", p.id),
@@ -594,7 +609,7 @@ func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
 	)
 
 	if err := p.conn.SetWriteDeadline(p.nextTimeout()); err != nil {
-		p.Log.Verbo(failedToSetDeadlineLog,
+		p.Log.Warn(failedToSetDeadlineLog,
 			zap.Stringer("nodeID", p.id),
 			zap.String("direction", "write"),
 			zap.Error(err),
@@ -760,7 +775,7 @@ func (p *peer) handle(msg message.InboundMessage) {
 		return
 	}
 	if !p.finishedHandshake.Get() {
-		p.Log.Debug("dropping message",
+		p.Log.Warn("dropping message",
 			zap.Stringer("nodeID", p.id),
 			zap.Stringer("messageOp", msg.Op()),
 			zap.String("reason", "handshake isn't finished"),

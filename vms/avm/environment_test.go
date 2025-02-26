@@ -74,6 +74,7 @@ type environment struct {
 	issuer       chan common.Message
 	vm           *VM
 	txBuilder    *txstest.Builder
+	close        chan struct{}
 }
 
 // setup the testing environment
@@ -128,7 +129,6 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),
 		genesisBytes,
-		nil,
 		configBytes,
 		nil,
 		append(
@@ -151,6 +151,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 	issuer := make(chan common.Message, 1)
 
 	env := &environment{
+		close:        make(chan struct{}),
 		genesisBytes: genesisBytes,
 		genesisTx:    getCreateTxFromGenesisTest(tb, genesisBytes, assetName),
 		sharedMemory: m,
@@ -164,10 +165,20 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		return env
 	}
 
-	require.NoError(vm.Linearize(context.Background(), stopVertexID, issuer))
+	require.NoError(vm.Linearize(context.Background(), stopVertexID))
 	if c.notBootstrapped {
 		return env
 	}
+
+	go func() {
+		for {
+			select {
+			case <-env.close:
+				return
+			case issuer <- vm.SubscribeToEvents(context.Background()):
+			}
+		}
+	}()
 
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
@@ -176,6 +187,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		defer env.vm.ctx.Lock.Unlock()
 
 		require.NoError(env.vm.Shutdown(context.Background()))
+		close(env.close)
 	})
 
 	return env

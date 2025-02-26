@@ -24,7 +24,7 @@ const (
 	DefaultNetworkTimeout = 2 * time.Minute
 
 	// Minimum required to ensure connectivity-based health checks will pass
-	DefaultNodeCount = 2
+	DefaultNodeCount = 4
 
 	// Arbitrary number of pre-funded keys to create by default
 	DefaultPreFundedKeyCount = 50
@@ -57,7 +57,7 @@ func DefaultTmpnetFlags() FlagsMap {
 		config.PublicIPKey:        "127.0.0.1",
 		config.HTTPHostKey:        "127.0.0.1",
 		config.StakingHostKey:     "127.0.0.1",
-		config.LogDisplayLevelKey: logging.Off.String(), // Display logging not needed since nodes run headless
+		config.LogDisplayLevelKey: logging.Info.String(), // Display logging not needed since nodes run headless
 		config.LogLevelKey:        logging.Debug.String(),
 		// Specific to e2e testing
 		config.ProposerVMUseCurrentHeightKey: true,

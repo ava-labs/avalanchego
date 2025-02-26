@@ -51,7 +51,6 @@ type VM interface {
 		genesisBytes []byte,
 		upgradeBytes []byte,
 		configBytes []byte,
-		toEngine chan<- Message,
 		fxs []*Fx,
 		appSender AppSender,
 	) error
@@ -77,4 +76,7 @@ type VM interface {
 	// it have an extension called `accounts`, where clients could get
 	// information about their accounts.
 	CreateHandlers(context.Context) (map[string]http.Handler, error)
+
+	// SubscribeToEvents blocks until either the given context is cancelled, or a message is returned.
+	SubscribeToEvents(ctx context.Context) Message
 }

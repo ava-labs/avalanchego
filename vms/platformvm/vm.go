@@ -64,6 +64,10 @@ type VM struct {
 	*network.Network
 	validators.State
 
+	common.Subscriber
+
+	closeSubscriber func()
+
 	metrics platformvmmetrics.Metrics
 
 	// Used to get time. Useful for faking time during tests.
@@ -100,7 +104,6 @@ func (vm *VM) Initialize(
 	genesisBytes []byte,
 	_ []byte,
 	configBytes []byte,
-	toEngine chan<- common.Message,
 	_ []*common.Fx,
 	appSender common.AppSender,
 ) error {
@@ -167,7 +170,14 @@ func (vm *VM) Initialize(
 		Bootstrapped: &vm.bootstrapped,
 	}
 
-	mempool, err := pmempool.New("mempool", registerer, toEngine)
+	ss := common.NewSimpleSubscriber()
+	vm.closeSubscriber = ss.Close
+	vm.Subscriber = ss
+	notifyEngine := func() {
+		ss.Publish(common.PendingTxs)
+	}
+
+	mempool, err := pmempool.New("mempool", registerer, notifyEngine)
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}
@@ -395,6 +405,8 @@ func (vm *VM) Shutdown(context.Context) error {
 			return err
 		}
 	}
+
+	vm.closeSubscriber()
 
 	return errors.Join(
 		vm.state.Close(),

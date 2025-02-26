@@ -5,7 +5,7 @@ package messenger;
 option go_package = "github.com/ava-labs/avalanchego/proto/pb/messenger";
 
 service Messenger {
-  rpc Notify(NotifyRequest) returns (NotifyResponse);
+  rpc Notify(stream Event) returns (stream EventRequest);
 }
 
 enum Message {
@@ -14,8 +14,13 @@ enum Message {
   MESSAGE_STATE_SYNC_FINISHED = 2;
 }
 
-message NotifyRequest {
-  Message message = 1;
+message EventRequest {
+  oneof event {
+    bool start = 1;
+    bool stop = 2;
+  }
 }
 
-message NotifyResponse {}
+message Event {
+  Message message = 1;
+}

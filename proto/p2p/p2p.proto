@@ -55,7 +55,85 @@ message Message {
     AppResponse app_response = 31;
     AppGossip app_gossip = 32;
     AppError app_error = 34;
+
+    // Simplex messages
+    SimplexMessage simplex = 33;
   }
+}
+
+message SimplexMessage {
+  // Chain being responded from
+  bytes chain_id = 1;
+
+  oneof message {
+    Block block = 2;
+    Vote vote = 3;
+    EmptyVote empty_vote = 4;
+    Finalization finalization = 5;
+    Notarization notarization = 6;
+    EmptyNotarization empty_notarization = 7;
+    FinalizationCertificate finalization_certificate = 8;
+  }
+}
+
+message Block {
+  bytes block = 1;
+  Vote vote = 2;
+}
+
+message ProtocolMetadata {
+  // Version defines the version of the protocol this block was created with.
+  uint32 version = 1;
+  // Epoch returns the epoch in which the block was proposed
+  uint64 epoch = 2;
+  // Round returns the round number in which the block was proposed.
+  // Can also be an empty block.
+  uint64 round = 3;
+  // Seq is the order of the block among all blocks in the blockchain.
+  // Cannot correspond to an empty block.
+  uint64 seq = 4;
+  // Prev returns the digest of the previous data block
+  bytes prev = 5;
+}
+
+message BlockHeader {
+  ProtocolMetadata metadata = 1;
+  bytes digest = 2;
+}
+
+message Signature {
+  bytes signer = 1;
+  bytes value = 2;
+}
+
+message Vote {
+  BlockHeader vote = 1;
+  Signature signature = 2;
+}
+
+message EmptyVote {
+  ProtocolMetadata vote = 1;
+  Signature signature = 2;
+}
+
+message Finalization {
+  BlockHeader vote = 1;
+  Signature signature = 2;
+}
+
+message FinalizationCertificate {
+  Finalization finalization = 1;
+  bytes quorum_certificate = 2;
+}
+
+message Notarization {
+  BlockHeader vote = 1;
+  bytes quorum_certificate = 2;
+}
+
+message EmptyNotarization {
+  BlockHeader empty_vote = 1;
+  bytes quorum_certificate = 2;
 }
 
 // Ping reports a peer's perceived uptime percentage.

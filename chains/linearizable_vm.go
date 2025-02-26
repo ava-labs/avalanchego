@@ -33,7 +33,6 @@ type initializeOnLinearizeVM struct {
 	genesisBytes []byte
 	upgradeBytes []byte
 	configBytes  []byte
-	toEngine     chan<- common.Message
 	fxs          []*common.Fx
 	appSender    common.AppSender
 }
@@ -47,7 +46,6 @@ func (vm *initializeOnLinearizeVM) Linearize(ctx context.Context, stopVertexID i
 		vm.genesisBytes,
 		vm.upgradeBytes,
 		vm.configBytes,
-		vm.toEngine,
 		vm.fxs,
 		vm.appSender,
 	)
@@ -74,9 +72,8 @@ func (vm *linearizeOnInitializeVM) Initialize(
 	_ []byte,
 	_ []byte,
 	_ []byte,
-	toEngine chan<- common.Message,
 	_ []*common.Fx,
 	_ common.AppSender,
 ) error {
-	return vm.Linearize(ctx, vm.stopVertexID, toEngine)
+	return vm.Linearize(ctx, vm.stopVertexID)
 }

@@ -5,6 +5,7 @@ package message
 
 import (
 	"net/netip"
+	"simplex"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -181,6 +182,20 @@ type OutboundMsgBuilder interface {
 		chainID ids.ID,
 		msg []byte,
 	) (OutboundMessage, error)
+
+	Block(chainID ids.ID, block []byte, vote simplex.BlockHeader, signature simplex.Signature) (OutboundMessage, error)
+
+	Vote(chainID ids.ID, header simplex.BlockHeader, signature simplex.Signature) (OutboundMessage, error)
+
+	EmptyVote(chainID ids.ID, header simplex.ProtocolMetadata, signature simplex.Signature) (OutboundMessage, error)
+
+	Finalization(chainID ids.ID, header simplex.BlockHeader, signature simplex.Signature) (OutboundMessage, error)
+
+	FinalizationCertificate(chainID ids.ID, header simplex.BlockHeader, qc []byte) (OutboundMessage, error)
+
+	Notarization(chainID ids.ID, header simplex.BlockHeader, qc []byte) (OutboundMessage, error)
+
+	EmptyNotarization(chainID ids.ID, header simplex.ProtocolMetadata, qc []byte) (OutboundMessage, error)
 }
 
 type outMsgBuilder struct {
@@ -718,6 +733,226 @@ func (b *outMsgBuilder) AppGossip(chainID ids.ID, msg []byte) (OutboundMessage, 
 				AppGossip: &p2p.AppGossip{
 					ChainId:  chainID[:],
 					AppBytes: msg,
+				},
+			},
+		},
+		b.compressionType,
+		false,
+	)
+}
+
+func (b *outMsgBuilder) Block(chainID ids.ID, block []byte, vote simplex.BlockHeader, signature simplex.Signature) (OutboundMessage, error) {
+	msg, err := b.builder.createOutbound(
+		&p2p.Message{
+			Message: &p2p.Message_Simplex{
+				Simplex: &p2p.SimplexMessage{
+					ChainId: chainID[:],
+					Message: &p2p.SimplexMessage_Block{
+						Block: &p2p.Block{
+							Vote: &p2p.Vote{
+								Signature: &p2p.Signature{
+									Signer: signature.Signer,
+									Value:  signature.Value,
+								},
+								Vote: &p2p.BlockHeader{
+									Digest: vote.Digest[:],
+									Metadata: &p2p.ProtocolMetadata{
+										Version: uint32(vote.Version),
+										Epoch:   vote.Epoch,
+										Round:   vote.Round,
+										Seq:     vote.Seq,
+										Prev:    vote.Prev[:],
+									},
+								},
+							},
+							Block: block,
+						},
+					},
+				},
+			},
+		},
+		b.compressionType,
+		false,
+	)
+
+	return msg, err
+
+}
+
+func (b *outMsgBuilder) Vote(chainID ids.ID, header simplex.BlockHeader, signature simplex.Signature) (OutboundMessage, error) {
+	return b.builder.createOutbound(
+		&p2p.Message{
+			Message: &p2p.Message_Simplex{
+				Simplex: &p2p.SimplexMessage{
+					ChainId: chainID[:],
+					Message: &p2p.SimplexMessage_Vote{
+						Vote: &p2p.Vote{
+							Vote: &p2p.BlockHeader{
+								Metadata: &p2p.ProtocolMetadata{
+									Version: uint32(header.Version),
+									Epoch:   header.Epoch,
+									Round:   header.Round,
+									Seq:     header.Seq,
+									Prev:    header.Prev[:],
+								},
+								Digest: header.Digest[:],
+							},
+							Signature: &p2p.Signature{
+								Signer: signature.Signer,
+								Value:  signature.Value,
+							},
+						},
+					},
+				},
+			},
+		},
+		b.compressionType,
+		false,
+	)
+}
+
+func (b *outMsgBuilder) EmptyVote(chainID ids.ID, header simplex.ProtocolMetadata, signature simplex.Signature) (OutboundMessage, error) {
+	return b.builder.createOutbound(
+		&p2p.Message{
+			Message: &p2p.Message_Simplex{
+				Simplex: &p2p.SimplexMessage{
+					ChainId: chainID[:],
+					Message: &p2p.SimplexMessage_EmptyVote{
+						EmptyVote: &p2p.EmptyVote{
+							Vote: &p2p.ProtocolMetadata{
+								Version: uint32(header.Version),
+								Epoch:   header.Epoch,
+								Round:   header.Round,
+								Seq:     header.Seq,
+								Prev:    header.Prev[:],
+							},
+							Signature: &p2p.Signature{
+								Signer: signature.Signer,
+								Value:  signature.Value,
+							},
+						},
+					},
+				},
+			},
+		},
+		b.compressionType,
+		false,
+	)
+}
+
+func (b *outMsgBuilder) Finalization(chainID ids.ID, header simplex.BlockHeader, signature simplex.Signature) (OutboundMessage, error) {
+	return b.builder.createOutbound(
+		&p2p.Message{
+			Message: &p2p.Message_Simplex{
+				Simplex: &p2p.SimplexMessage{
+					ChainId: chainID[:],
+					Message: &p2p.SimplexMessage_Finalization{
+						Finalization: &p2p.Finalization{
+							Vote: &p2p.BlockHeader{
+								Metadata: &p2p.ProtocolMetadata{
+									Version: uint32(header.Version),
+									Epoch:   header.Epoch,
+									Round:   header.Round,
+									Seq:     header.Seq,
+									Prev:    header.Prev[:],
+								},
+								Digest: header.Digest[:],
+							},
+							Signature: &p2p.Signature{
+								Signer: signature.Signer,
+								Value:  signature.Value,
+							},
+						},
+					},
+				},
+			},
+		},
+		b.compressionType,
+		false,
+	)
+}
+
+func (b *outMsgBuilder) FinalizationCertificate(chainID ids.ID, header simplex.BlockHeader, qc []byte) (OutboundMessage, error) {
+	return b.builder.createOutbound(
+		&p2p.Message{
+			Message: &p2p.Message_Simplex{
+				Simplex: &p2p.SimplexMessage{
+					ChainId: chainID[:],
+					Message: &p2p.SimplexMessage_FinalizationCertificate{
+						FinalizationCertificate: &p2p.FinalizationCertificate{
+							Finalization: &p2p.Finalization{
+								Vote: &p2p.BlockHeader{
+									Metadata: &p2p.ProtocolMetadata{
+										Version: uint32(header.Version),
+										Epoch:   header.Epoch,
+										Round:   header.Round,
+										Seq:     header.Seq,
+										Prev:    header.Prev[:],
+									},
+									Digest: header.Digest[:],
+								},
+							},
+							QuorumCertificate: qc,
+						},
+					},
+				},
+			},
+		},
+		b.compressionType,
+		false,
+	)
+}
+
+func (b *outMsgBuilder) Notarization(chainID ids.ID, header simplex.BlockHeader, qc []byte) (OutboundMessage, error) {
+	return b.builder.createOutbound(
+		&p2p.Message{
+			Message: &p2p.Message_Simplex{
+				Simplex: &p2p.SimplexMessage{
+					ChainId: chainID[:],
+					Message: &p2p.SimplexMessage_Notarization{
+						Notarization: &p2p.Notarization{
+							Vote: &p2p.BlockHeader{
+								Metadata: &p2p.ProtocolMetadata{
+									Version: uint32(header.Version),
+									Epoch:   header.Epoch,
+									Round:   header.Round,
+									Seq:     header.Seq,
+									Prev:    header.Prev[:],
+								},
+								Digest: header.Digest[:],
+							},
+							QuorumCertificate: qc,
+						},
+					},
+				},
+			},
+		},
+		b.compressionType,
+		false,
+	)
+}
+
+func (b *outMsgBuilder) EmptyNotarization(chainID ids.ID, header simplex.ProtocolMetadata, qc []byte) (OutboundMessage, error) {
+	return b.builder.createOutbound(
+		&p2p.Message{
+			Message: &p2p.Message_Simplex{
+				Simplex: &p2p.SimplexMessage{
+					ChainId: chainID[:],
+					Message: &p2p.SimplexMessage_EmptyNotarization{
+						EmptyNotarization: &p2p.EmptyNotarization{
+							EmptyVote: &p2p.BlockHeader{
+								Metadata: &p2p.ProtocolMetadata{
+									Version: uint32(header.Version),
+									Epoch:   header.Epoch,
+									Round:   header.Round,
+									Seq:     header.Seq,
+									Prev:    header.Prev[:],
+								},
+								Digest: nil,
+							},
+							QuorumCertificate: qc,
+						},
+					},
 				},
 			},
 		},

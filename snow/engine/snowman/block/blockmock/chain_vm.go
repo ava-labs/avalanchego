@@ -28,7 +28,6 @@ import (
 type ChainVM struct {
 	ctrl     *gomock.Controller
 	recorder *ChainVMMockRecorder
-	isgomock struct{}
 }
 
 // ChainVMMockRecorder is the mock recorder for ChainVM.
@@ -49,59 +48,59 @@ func (m *ChainVM) EXPECT() *ChainVMMockRecorder {
 }
 
 // AppGossip mocks base method.
-func (m *ChainVM) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) error {
+func (m *ChainVM) AppGossip(arg0 context.Context, arg1 ids.NodeID, arg2 []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AppGossip", ctx, nodeID, msg)
+	ret := m.ctrl.Call(m, "AppGossip", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // AppGossip indicates an expected call of AppGossip.
-func (mr *ChainVMMockRecorder) AppGossip(ctx, nodeID, msg any) *gomock.Call {
+func (mr *ChainVMMockRecorder) AppGossip(arg0, arg1, arg2 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppGossip", reflect.TypeOf((*ChainVM)(nil).AppGossip), ctx, nodeID, msg)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppGossip", reflect.TypeOf((*ChainVM)(nil).AppGossip), arg0, arg1, arg2)
 }
 
 // AppRequest mocks base method.
-func (m *ChainVM) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
+func (m *ChainVM) AppRequest(arg0 context.Context, arg1 ids.NodeID, arg2 uint32, arg3 time.Time, arg4 []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AppRequest", ctx, nodeID, requestID, deadline, request)
+	ret := m.ctrl.Call(m, "AppRequest", arg0, arg1, arg2, arg3, arg4)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // AppRequest indicates an expected call of AppRequest.
-func (mr *ChainVMMockRecorder) AppRequest(ctx, nodeID, requestID, deadline, request any) *gomock.Call {
+func (mr *ChainVMMockRecorder) AppRequest(arg0, arg1, arg2, arg3, arg4 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppRequest", reflect.TypeOf((*ChainVM)(nil).AppRequest), ctx, nodeID, requestID, deadline, request)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppRequest", reflect.TypeOf((*ChainVM)(nil).AppRequest), arg0, arg1, arg2, arg3, arg4)
 }
 
 // AppRequestFailed mocks base method.
-func (m *ChainVM) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *common.AppError) error {
+func (m *ChainVM) AppRequestFailed(arg0 context.Context, arg1 ids.NodeID, arg2 uint32, arg3 *common.AppError) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AppRequestFailed", ctx, nodeID, requestID, appErr)
+	ret := m.ctrl.Call(m, "AppRequestFailed", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // AppRequestFailed indicates an expected call of AppRequestFailed.
-func (mr *ChainVMMockRecorder) AppRequestFailed(ctx, nodeID, requestID, appErr any) *gomock.Call {
+func (mr *ChainVMMockRecorder) AppRequestFailed(arg0, arg1, arg2, arg3 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppRequestFailed", reflect.TypeOf((*ChainVM)(nil).AppRequestFailed), ctx, nodeID, requestID, appErr)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppRequestFailed", reflect.TypeOf((*ChainVM)(nil).AppRequestFailed), arg0, arg1, arg2, arg3)
 }
 
 // AppResponse mocks base method.
-func (m *ChainVM) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
+func (m *ChainVM) AppResponse(arg0 context.Context, arg1 ids.NodeID, arg2 uint32, arg3 []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AppResponse", ctx, nodeID, requestID, response)
+	ret := m.ctrl.Call(m, "AppResponse", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // AppResponse indicates an expected call of AppResponse.
-func (mr *ChainVMMockRecorder) AppResponse(ctx, nodeID, requestID, response any) *gomock.Call {
+func (mr *ChainVMMockRecorder) AppResponse(arg0, arg1, arg2, arg3 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppResponse", reflect.TypeOf((*ChainVM)(nil).AppResponse), ctx, nodeID, requestID, response)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppResponse", reflect.TypeOf((*ChainVM)(nil).AppResponse), arg0, arg1, arg2, arg3)
 }
 
 // BuildBlock mocks base method.
@@ -120,17 +119,17 @@ func (mr *ChainVMMockRecorder) BuildBlock(arg0 any) *gomock.Call {
 }
 
 // Connected mocks base method.
-func (m *ChainVM) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
+func (m *ChainVM) Connected(arg0 context.Context, arg1 ids.NodeID, arg2 *version.Application) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Connected", ctx, nodeID, nodeVersion)
+	ret := m.ctrl.Call(m, "Connected", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Connected indicates an expected call of Connected.
-func (mr *ChainVMMockRecorder) Connected(ctx, nodeID, nodeVersion any) *gomock.Call {
+func (mr *ChainVMMockRecorder) Connected(arg0, arg1, arg2 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Connected", reflect.TypeOf((*ChainVM)(nil).Connected), ctx, nodeID, nodeVersion)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Connected", reflect.TypeOf((*ChainVM)(nil).Connected), arg0, arg1, arg2)
 }
 
 // CreateHandlers mocks base method.
@@ -149,47 +148,47 @@ func (mr *ChainVMMockRecorder) CreateHandlers(arg0 any) *gomock.Call {
 }
 
 // Disconnected mocks base method.
-func (m *ChainVM) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+func (m *ChainVM) Disconnected(arg0 context.Context, arg1 ids.NodeID) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Disconnected", ctx, nodeID)
+	ret := m.ctrl.Call(m, "Disconnected", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Disconnected indicates an expected call of Disconnected.
-func (mr *ChainVMMockRecorder) Disconnected(ctx, nodeID any) *gomock.Call {
+func (mr *ChainVMMockRecorder) Disconnected(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Disconnected", reflect.TypeOf((*ChainVM)(nil).Disconnected), ctx, nodeID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Disconnected", reflect.TypeOf((*ChainVM)(nil).Disconnected), arg0, arg1)
 }
 
 // GetBlock mocks base method.
-func (m *ChainVM) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block, error) {
+func (m *ChainVM) GetBlock(arg0 context.Context, arg1 ids.ID) (snowman.Block, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetBlock", ctx, blkID)
+	ret := m.ctrl.Call(m, "GetBlock", arg0, arg1)
 	ret0, _ := ret[0].(snowman.Block)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetBlock indicates an expected call of GetBlock.
-func (mr *ChainVMMockRecorder) GetBlock(ctx, blkID any) *gomock.Call {
+func (mr *ChainVMMockRecorder) GetBlock(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlock", reflect.TypeOf((*ChainVM)(nil).GetBlock), ctx, blkID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlock", reflect.TypeOf((*ChainVM)(nil).GetBlock), arg0, arg1)
 }
 
 // GetBlockIDAtHeight mocks base method.
-func (m *ChainVM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
+func (m *ChainVM) GetBlockIDAtHeight(arg0 context.Context, arg1 uint64) (ids.ID, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetBlockIDAtHeight", ctx, height)
+	ret := m.ctrl.Call(m, "GetBlockIDAtHeight", arg0, arg1)
 	ret0, _ := ret[0].(ids.ID)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetBlockIDAtHeight indicates an expected call of GetBlockIDAtHeight.
-func (mr *ChainVMMockRecorder) GetBlockIDAtHeight(ctx, height any) *gomock.Call {
+func (mr *ChainVMMockRecorder) GetBlockIDAtHeight(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockIDAtHeight", reflect.TypeOf((*ChainVM)(nil).GetBlockIDAtHeight), ctx, height)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockIDAtHeight", reflect.TypeOf((*ChainVM)(nil).GetBlockIDAtHeight), arg0, arg1)
 }
 
 // HealthCheck mocks base method.
@@ -208,17 +207,17 @@ func (mr *ChainVMMockRecorder) HealthCheck(arg0 any) *gomock.Call {
 }
 
 // Initialize mocks base method.
-func (m *ChainVM) Initialize(ctx context.Context, chainCtx *snow.Context, db database.Database, genesisBytes, upgradeBytes, configBytes []byte, toEngine chan<- common.Message, fxs []*common.Fx, appSender common.AppSender) error {
+func (m *ChainVM) Initialize(arg0 context.Context, arg1 *snow.Context, arg2 database.Database, arg3, arg4, arg5 []byte, arg6 []*common.Fx, arg7 common.AppSender) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Initialize", ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs, appSender)
+	ret := m.ctrl.Call(m, "Initialize", arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Initialize indicates an expected call of Initialize.
-func (mr *ChainVMMockRecorder) Initialize(ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs, appSender any) *gomock.Call {
+func (mr *ChainVMMockRecorder) Initialize(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Initialize", reflect.TypeOf((*ChainVM)(nil).Initialize), ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs, appSender)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Initialize", reflect.TypeOf((*ChainVM)(nil).Initialize), arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
 }
 
 // LastAccepted mocks base method.
@@ -237,46 +236,46 @@ func (mr *ChainVMMockRecorder) LastAccepted(arg0 any) *gomock.Call {
 }
 
 // ParseBlock mocks base method.
-func (m *ChainVM) ParseBlock(ctx context.Context, blockBytes []byte) (snowman.Block, error) {
+func (m *ChainVM) ParseBlock(arg0 context.Context, arg1 []byte) (snowman.Block, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ParseBlock", ctx, blockBytes)
+	ret := m.ctrl.Call(m, "ParseBlock", arg0, arg1)
 	ret0, _ := ret[0].(snowman.Block)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ParseBlock indicates an expected call of ParseBlock.
-func (mr *ChainVMMockRecorder) ParseBlock(ctx, blockBytes any) *gomock.Call {
+func (mr *ChainVMMockRecorder) ParseBlock(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ParseBlock", reflect.TypeOf((*ChainVM)(nil).ParseBlock), ctx, blockBytes)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ParseBlock", reflect.TypeOf((*ChainVM)(nil).ParseBlock), arg0, arg1)
 }
 
 // SetPreference mocks base method.
-func (m *ChainVM) SetPreference(ctx context.Context, blkID ids.ID) error {
+func (m *ChainVM) SetPreference(arg0 context.Context, arg1 ids.ID) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetPreference", ctx, blkID)
+	ret := m.ctrl.Call(m, "SetPreference", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SetPreference indicates an expected call of SetPreference.
-func (mr *ChainVMMockRecorder) SetPreference(ctx, blkID any) *gomock.Call {
+func (mr *ChainVMMockRecorder) SetPreference(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPreference", reflect.TypeOf((*ChainVM)(nil).SetPreference), ctx, blkID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPreference", reflect.TypeOf((*ChainVM)(nil).SetPreference), arg0, arg1)
 }
 
 // SetState mocks base method.
-func (m *ChainVM) SetState(ctx context.Context, state snow.State) error {
+func (m *ChainVM) SetState(arg0 context.Context, arg1 snow.State) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetState", ctx, state)
+	ret := m.ctrl.Call(m, "SetState", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SetState indicates an expected call of SetState.
-func (mr *ChainVMMockRecorder) SetState(ctx, state any) *gomock.Call {
+func (mr *ChainVMMockRecorder) SetState(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetState", reflect.TypeOf((*ChainVM)(nil).SetState), ctx, state)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetState", reflect.TypeOf((*ChainVM)(nil).SetState), arg0, arg1)
 }
 
 // Shutdown mocks base method.
@@ -291,6 +290,20 @@ func (m *ChainVM) Shutdown(arg0 context.Context) error {
 func (mr *ChainVMMockRecorder) Shutdown(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Shutdown", reflect.TypeOf((*ChainVM)(nil).Shutdown), arg0)
+}
+
+// SubscribeToEvents mocks base method.
+func (m *ChainVM) SubscribeToEvents(arg0 context.Context) common.Message {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SubscribeToEvents", arg0)
+	ret0, _ := ret[0].(common.Message)
+	return ret0
+}
+
+// SubscribeToEvents indicates an expected call of SubscribeToEvents.
+func (mr *ChainVMMockRecorder) SubscribeToEvents(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubscribeToEvents", reflect.TypeOf((*ChainVM)(nil).SubscribeToEvents), arg0)
 }
 
 // Version mocks base method.

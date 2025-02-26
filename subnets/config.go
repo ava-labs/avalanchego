@@ -6,6 +6,7 @@ package subnets
 import (
 	"errors"
 	"fmt"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -16,6 +17,7 @@ import (
 var errAllowedNodesWhenNotValidatorOnly = errors.New("allowedNodes can only be set when ValidatorOnly is true")
 
 type Config struct {
+	Logger logging.Logger
 	// ValidatorOnly indicates that this Subnet's Chains are available to only subnet validators.
 	// No chain related messages will go out to non-validators.
 	// Validators will drop messages received from non-validators.

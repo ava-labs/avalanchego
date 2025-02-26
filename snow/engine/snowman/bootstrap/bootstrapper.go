@@ -69,6 +69,8 @@ var (
 type Bootstrapper struct {
 	Config
 
+	nf *common.NotificationForwarder
+
 	*metrics
 	TimeoutRegistrar common.TimeoutRegistrar
 	// list of NoOpsHandler for messages dropped by bootstrapper
@@ -149,6 +151,11 @@ func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) e
 		}
 	}
 	bs.TimeoutRegistrar = common.NewTimeoutScheduler(timeout, config.BootstrapTracker.AllBootstrapped())
+	bs.nf = &common.NotificationForwarder{
+		Subscribe: bs.VM.SubscribeToEvents,
+		Log:       bs.Config.Ctx.Log,
+		Notifier:  bs,
+	}
 
 	return bs, err
 }
@@ -165,6 +172,7 @@ func (b *Bootstrapper) Clear(context.Context) error {
 }
 
 func (b *Bootstrapper) Start(ctx context.Context, startReqID uint32) error {
+	b.nf.Start()
 	b.Ctx.State.Set(snow.EngineState{
 		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		State: snow.Bootstrapping,
@@ -718,6 +726,7 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 		b.TimeoutRegistrar.RegisterTimeout(bootstrappingDelay)
 		return nil
 	}
+	b.nf.Close()
 	return b.onFinished(ctx, b.requestID)
 }
 
@@ -742,6 +751,7 @@ func (b *Bootstrapper) Timeout() error {
 	if !b.Config.BootstrapTracker.IsBootstrapped() {
 		return b.restartBootstrapping(context.TODO())
 	}
+	b.nf.Close()
 	return b.onFinished(context.TODO(), b.requestID)
 }
 
@@ -779,6 +789,7 @@ func (b *Bootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
 
 func (b *Bootstrapper) Shutdown(ctx context.Context) error {
 	b.Ctx.Log.Info("shutting down bootstrapper")
+	b.nf.Close()
 
 	b.Ctx.Lock.Lock()
 	defer b.Ctx.Lock.Unlock()

@@ -5,6 +5,7 @@ package common
 
 import (
 	"context"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"time"
 
 	"github.com/ava-labs/avalanchego/api/health"
@@ -426,4 +427,8 @@ type InternalHandler interface {
 
 	// Notify this engine of a message from the virtual machine.
 	Notify(context.Context, Message) error
+}
+
+type SimplexHandler interface {
+	SimplexMessage(nodeID ids.NodeID, message *p2p.SimplexMessage) error
 }

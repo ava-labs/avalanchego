@@ -39,6 +39,8 @@ type weightedSummary struct {
 type stateSyncer struct {
 	Config
 
+	nf *common.NotificationForwarder
+
 	// list of NoOpsHandler for messages dropped by state syncer
 	common.AcceptedFrontierHandler
 	common.AcceptedHandler
@@ -95,7 +97,7 @@ func New(
 	onDoneStateSyncing func(ctx context.Context, lastReqID uint32) error,
 ) common.StateSyncer {
 	ssVM, _ := cfg.VM.(block.StateSyncableVM)
-	return &stateSyncer{
+	ss := &stateSyncer{
 		Config:                  cfg,
 		AcceptedFrontierHandler: common.NewNoOpAcceptedFrontierHandler(cfg.Ctx.Log),
 		AcceptedHandler:         common.NewNoOpAcceptedHandler(cfg.Ctx.Log),
@@ -107,10 +109,20 @@ func New(
 		stateSyncVM:             ssVM,
 		onDoneStateSyncing:      onDoneStateSyncing,
 	}
+
+	ss.nf = &common.NotificationForwarder{
+		Subscribe: cfg.VM.SubscribeToEvents,
+		Notifier:  ss,
+		Log:       cfg.Ctx.Log,
+	}
+
+	return ss
 }
 
 func (ss *stateSyncer) Start(ctx context.Context, startReqID uint32) error {
 	ss.Ctx.Log.Info("starting state sync")
+
+	ss.nf.Start()
 
 	ss.Ctx.State.Set(snow.EngineState{
 		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,

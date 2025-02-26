@@ -9,12 +9,16 @@ module github.com/ava-labs/avalanchego
 //   - Consider updating the version of golangci-lint (in scripts/lint.sh).
 go 1.23.6
 
+replace simplex => ../Simplex
+
+replace github.com/ava-labs/coreth => ../coreth
+
 require (
 	github.com/DataDog/zstd v1.5.2
 	github.com/NYTimes/gziphandler v1.1.1
 	github.com/StephenButtolph/canoto v0.15.0
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
-	github.com/ava-labs/coreth v0.15.1-rc.0
+	github.com/ava-labs/coreth v0.15.1-rc.0.0.20250422161611-7cc3557e9955
 	github.com/ava-labs/ledger-avalanche/go v0.0.0-20241009183145-e6f90a8a1a60
 	github.com/ava-labs/libevm v1.13.14-0.2.0.release
 	github.com/btcsuite/btcd/btcutil v1.1.3
@@ -77,6 +81,7 @@ require (
 	k8s.io/apimachinery v0.29.0
 	k8s.io/client-go v0.29.0
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
+	simplex v0.0.0-00010101000000-000000000000
 )
 
 require (

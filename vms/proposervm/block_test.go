@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmanmock"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blockmock"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -32,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer/proposermock"
 	"github.com/ava-labs/avalanchego/vms/proposervm/scheduler/schedulermock"
+	"github.com/ava-labs/avalanchego/vms/proposervm/subscribermock"
 )
 
 // Assert that when the underlying VM implements ChainVMWithBuildBlockContext
@@ -74,7 +76,13 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 
 	pk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(err)
+
+	subscriber := subscribermock.NewSelfSubscriber(ctrl)
+	scheduler := schedulermock.NewScheduler(ctrl)
+
 	vm := &VM{
+		subscriber: subscriber,
+		Scheduler:  scheduler,
 		Config: Config{
 			Upgrades:          upgradetest.GetConfig(upgradetest.Latest),
 			StakingCertLeaf:   &staking.Certificate{},
@@ -384,6 +392,13 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 
 	scheduler := schedulermock.NewScheduler(ctrl)
 
+	subscriber := subscribermock.NewSelfSubscriber(ctrl)
+	subscriber.EXPECT().SetAbsorbedMsg(gomock.Any()).Do(func(message common.Message) {
+		subscriber.EXPECT().SubscribeToEvents(gomock.Any()).Return(common.PendingTxs).AnyTimes()
+	}).AnyTimes()
+
+	innerVM := blockmock.NewChainVM(ctrl)
+
 	pk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(err)
 	vm := &VM{
@@ -393,7 +408,7 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 			StakingLeafSigner: pk,
 			Registerer:        prometheus.NewRegistry(),
 		},
-		ChainVM: blockmock.NewChainVM(ctrl),
+		ChainVM: innerVM,
 		ctx: &snow.Context{
 			NodeID:         thisNodeID,
 			ValidatorState: vdrState,
@@ -401,6 +416,7 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 		},
 		Windower:               windower,
 		Scheduler:              scheduler,
+		subscriber:             subscriber,
 		proposerBuildSlotGauge: prometheus.NewGauge(prometheus.GaugeOpts{}),
 	}
 	vm.Clock.Set(now)

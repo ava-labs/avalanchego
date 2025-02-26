@@ -32,6 +32,7 @@ var (
 	_ chainIDGetter = (*p2p.AppRequest)(nil)
 	_ chainIDGetter = (*p2p.AppResponse)(nil)
 	_ chainIDGetter = (*p2p.AppGossip)(nil)
+	_ chainIDGetter = (*p2p.SimplexMessage)(nil)
 
 	_ requestIDGetter = (*p2p.GetStateSummaryFrontier)(nil)
 	_ requestIDGetter = (*p2p.StateSummaryFrontier)(nil)
