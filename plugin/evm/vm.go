@@ -164,16 +164,15 @@ var (
 )
 
 var (
-	errEmptyBlock                     = errors.New("empty block")
-	errUnsupportedFXs                 = errors.New("unsupported feature extensions")
-	errInvalidBlock                   = errors.New("invalid block")
-	errInvalidNonce                   = errors.New("invalid nonce")
-	errUnclesUnsupported              = errors.New("uncles unsupported")
-	errRejectedParent                 = errors.New("rejected parent")
-	errNilBaseFeeApricotPhase3        = errors.New("nil base fee is invalid after apricotPhase3")
-	errNilExtDataGasUsedApricotPhase4 = errors.New("nil extDataGasUsed is invalid after apricotPhase4")
-	errNilBlockGasCostApricotPhase4   = errors.New("nil blockGasCost is invalid after apricotPhase4")
-	errInvalidHeaderPredicateResults  = errors.New("invalid header predicate results")
+	errEmptyBlock                    = errors.New("empty block")
+	errUnsupportedFXs                = errors.New("unsupported feature extensions")
+	errInvalidBlock                  = errors.New("invalid block")
+	errInvalidNonce                  = errors.New("invalid nonce")
+	errUnclesUnsupported             = errors.New("uncles unsupported")
+	errRejectedParent                = errors.New("rejected parent")
+	errNilBaseFeeApricotPhase3       = errors.New("nil base fee is invalid after apricotPhase3")
+	errNilBlockGasCostApricotPhase4  = errors.New("nil blockGasCost is invalid after apricotPhase4")
+	errInvalidHeaderPredicateResults = errors.New("invalid header predicate results")
 )
 
 var originalStderr *os.File
