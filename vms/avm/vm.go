@@ -78,13 +78,14 @@ type VM struct {
 
 	appSender common.AppSender
 
-	// State management
-	state state.State
-
 	// asset id that will be used for fees
 	feeAssetID ids.ID
 
-	baseDB database.Database
+	// Granite state
+	state state.State
+
+	// Pre-Granite state
+	preGraniteState state.State
 	db     *versiondb.Database
 
 	typeToFxIndex map[reflect.Type]int
@@ -105,6 +106,8 @@ type VM struct {
 	blockbuilder.Builder
 	chainManager blockexecutor.Manager
 	network      *network.Network
+
+	StateFactory StateMigration
 }
 
 func (vm *VM) Connected(ctx context.Context, nodeID ids.NodeID, version *version.Application) error {
@@ -172,8 +175,6 @@ func (vm *VM) Initialize(
 
 	vm.ctx = ctx
 	vm.appSender = appSender
-	vm.baseDB = db
-	vm.db = versiondb.New(db)
 
 	typedFxs := make([]extensions.Fx, len(fxs))
 	vm.fxs = make([]*extensions.ParsedFx, len(fxs))
@@ -206,7 +207,7 @@ func (vm *VM) Initialize(
 	codec := vm.parser.Codec()
 	vm.Spender = utxo.NewSpender(&vm.clock, codec)
 
-	state, err := state.New(
+	vm.preGraniteState, err = state.New(
 		vm.db,
 		vm.parser,
 		vm.registerer,
@@ -216,7 +217,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	vm.state = state
+	vm.state = vm.preGraniteState
 
 	if err := vm.initGenesis(genesisBytes); err != nil {
 		return err
@@ -280,10 +281,7 @@ func (vm *VM) Shutdown(context.Context) error {
 	vm.onShutdownCtxCancel()
 	vm.awaitShutdown.Wait()
 
-	return errors.Join(
-		vm.state.Close(),
-		vm.baseDB.Close(),
-	)
+	return vm.state.Close()
 }
 
 func (*VM) Version(context.Context) (string, error) {
@@ -360,6 +358,29 @@ func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, erro
 
 func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID) error {
 	time := vm.Config.Upgrades.CortinaTime
+
+	if err := vm.preGraniteState.InitializeChainState(
+		stopVertexID,
+		time,
+	); err != nil {
+		return fmt.Errorf("failed to initialize legacy chain state: %w", err)
+	}
+
+	state, err := vm.StateFactory.Migrate(
+		ctx,
+		vm.ctx.Log,
+		vm.parser,
+		vm.registerer,
+		vm.preGraniteState,
+		vm.db,
+		vm.ctx.ChainDataDir,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to migrate state: %w", err)
+	}
+
+	vm.state = state
+
 	if err := vm.state.InitializeChainState(stopVertexID, time); err != nil {
 		return fmt.Errorf("failed to initialize chain state: %w", err)
 	}
@@ -453,6 +474,14 @@ func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
 		vm: vm,
 		tx: tx,
 	}, nil
+}
+
+func (vm *VM) GetTx(txID ids.ID) (*txs.Tx, error) {
+	return vm.state.GetTx(txID)
+}
+
+func (vm *VM) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
+	return vm.state.GetUTXO(utxoID)
 }
 
 /*
