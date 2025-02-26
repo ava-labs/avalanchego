@@ -7,7 +7,7 @@ import "github.com/ava-labs/avalanchego/trace"
 
 const (
 	DebugTrace TraceLevel = iota - 1
-	InfoTrace             // Default
+	InfoTrace
 	NoTrace
 )
 
