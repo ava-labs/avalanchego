@@ -27,6 +27,8 @@ import (
 var (
 	allowedFutureBlockTime = 10 * time.Second // Max time from current time allowed for blocks, before they're considered future blocks
 
+	ErrInsufficientBlockGas = errors.New("insufficient gas to cover the block cost")
+
 	errInvalidBlockTime  = errors.New("timestamp less than parent's")
 	errUnclesUnsupported = errors.New("uncles unsupported")
 )
@@ -311,15 +313,16 @@ func (eng *DummyEngine) verifyBlockFee(
 	// set by the base fee of this block.
 	blockGas := new(big.Int).Div(totalBlockFee, baseFee)
 
-	// Require that the amount of gas purchased by the effective tips within the block, [blockGas],
-	// covers at least [requiredBlockGasCost].
+	// Require that the amount of gas purchased by the effective tips within the
+	// block covers at least `requiredBlockGasCost`.
 	//
-	// NOTE: To determine the [requiredBlockFee], multiply [requiredBlockGasCost]
-	// by [baseFee].
+	// NOTE: To determine the required block fee, multiply
+	// `requiredBlockGasCost` by `baseFee`.
 	if blockGas.Cmp(requiredBlockGasCost) < 0 {
-		return fmt.Errorf(
-			"insufficient gas (%d) to cover the block cost (%d) at base fee (%d) (total block fee: %d)",
-			blockGas, requiredBlockGasCost, baseFee, totalBlockFee,
+		return fmt.Errorf("%w: expected %d but got %d",
+			ErrInsufficientBlockGas,
+			requiredBlockGasCost,
+			blockGas,
 		)
 	}
 	return nil

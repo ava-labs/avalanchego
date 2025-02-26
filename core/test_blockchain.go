@@ -6,10 +6,10 @@ package core
 import (
 	"fmt"
 	"math/big"
-	"strings"
 	"testing"
 	"time"
 
+	"github.com/ava-labs/coreth/plugin/evm/ap4"
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
@@ -1279,6 +1279,7 @@ func TestReprocessAcceptBlockIdenticalStateRoot(t *testing.T, create func(db eth
 
 func TestGenerateChainInvalidBlockFee(t *testing.T, create func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash) (*BlockChain, error)) {
 	var (
+		require = require.New(t)
 		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 		key2, _ = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
 		addr1   = crypto.PubkeyToAddress(key1.PublicKey)
@@ -1294,10 +1295,8 @@ func TestGenerateChainInvalidBlockFee(t *testing.T, create func(db ethdb.Databas
 	}
 
 	blockchain, err := create(chainDB, gspec, common.Hash{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer blockchain.Stop()
+	require.NoError(err)
+	t.Cleanup(blockchain.Stop)
 
 	// This call generates a chain of 3 blocks.
 	signer := types.LatestSigner(params.TestChainConfig)
@@ -1313,21 +1312,15 @@ func TestGenerateChainInvalidBlockFee(t *testing.T, create func(db ethdb.Databas
 		})
 
 		signedTx, err := types.SignTx(tx, signer, key1)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 		gen.AddTx(signedTx)
 	})
-	if err == nil {
-		t.Fatal("should not have been able to build a block because of insufficient block fee")
-	}
-	if !strings.Contains(err.Error(), "insufficient gas (0) to cover the block cost (400000)") {
-		t.Fatalf("should have gotten insufficient block fee error but got %v instead", err)
-	}
+	require.ErrorIs(err, dummy.ErrInsufficientBlockGas)
 }
 
 func TestInsertChainInvalidBlockFee(t *testing.T, create func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash) (*BlockChain, error)) {
 	var (
+		require = require.New(t)
 		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 		key2, _ = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
 		addr1   = crypto.PubkeyToAddress(key1.PublicKey)
@@ -1343,10 +1336,8 @@ func TestInsertChainInvalidBlockFee(t *testing.T, create func(db ethdb.Database,
 	}
 
 	blockchain, err := create(chainDB, gspec, common.Hash{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer blockchain.Stop()
+	require.NoError(err)
+	t.Cleanup(blockchain.Stop)
 
 	// This call generates a chain of 3 blocks.
 	signer := types.LatestSigner(params.TestChainConfig)
@@ -1363,25 +1354,17 @@ func TestInsertChainInvalidBlockFee(t *testing.T, create func(db ethdb.Database,
 		})
 
 		signedTx, err := types.SignTx(tx, signer, key1)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 		gen.AddTx(signedTx)
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	_, err = blockchain.InsertChain(chain)
-	if err == nil {
-		t.Fatal("should not have been able to build a block because of insufficient block fee")
-	}
-	if !strings.Contains(err.Error(), "insufficient gas (0) to cover the block cost (400000)") {
-		t.Fatalf("should have gotten insufficient block fee error but got %v instead", err)
-	}
+	require.ErrorIs(err, dummy.ErrInsufficientBlockGas)
 }
 
 func TestInsertChainValidBlockFee(t *testing.T, create func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash) (*BlockChain, error)) {
 	var (
+		require = require.New(t)
 		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 		key2, _ = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
 		addr1   = crypto.PubkeyToAddress(key1.PublicKey)
@@ -1397,16 +1380,14 @@ func TestInsertChainValidBlockFee(t *testing.T, create func(db ethdb.Database, g
 	}
 
 	blockchain, err := create(chainDB, gspec, common.Hash{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer blockchain.Stop()
+	require.NoError(err)
+	t.Cleanup(blockchain.Stop)
 
 	// This call generates a chain of 3 blocks.
 	signer := types.LatestSigner(params.TestChainConfig)
 	tip := big.NewInt(50000 * params.GWei)
 	transfer := big.NewInt(10000)
-	_, chain, _, err := GenerateChainWithGenesis(gspec, blockchain.engine, 3, 0, func(i int, gen *BlockGen) {
+	_, chain, _, err := GenerateChainWithGenesis(gspec, blockchain.engine, 3, ap4.TargetBlockRate-1, func(i int, gen *BlockGen) {
 		feeCap := new(big.Int).Add(gen.BaseFee(), tip)
 		tx := types.NewTx(&types.DynamicFeeTx{
 			ChainID:   params.TestChainConfig.ChainID,
@@ -1420,22 +1401,15 @@ func TestInsertChainValidBlockFee(t *testing.T, create func(db ethdb.Database, g
 		})
 
 		signedTx, err := types.SignTx(tx, signer, key1)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 		gen.AddTx(signedTx)
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	// Insert three blocks into the chain and accept only the first block.
-	if _, err := blockchain.InsertChain(chain); err != nil {
-		t.Fatal(err)
-	}
-	if err := blockchain.Accept(chain[0]); err != nil {
-		t.Fatal(err)
-	}
+	_, err = blockchain.InsertChain(chain)
+	require.NoError(err)
+	require.NoError(blockchain.Accept(chain[0]))
 	blockchain.DrainAcceptorQueue()
 
 	// check the state of the last accepted block
