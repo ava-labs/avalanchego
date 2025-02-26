@@ -197,6 +197,7 @@ func (p *Peers) Sample(limit int) []ids.NodeID {
 	return p.set.Sample(limit)
 }
 
+// PeerSampler implements NodeSampler
 type PeerSampler struct {
 	peers *Peers
 }
