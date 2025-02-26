@@ -159,6 +159,21 @@ type MerkleDB interface {
 	Prefetcher
 }
 
+func NewConfig() Config {
+	return Config{
+		BranchFactor:                BranchFactor16,
+		Hasher:                      DefaultHasher,
+		RootGenConcurrency:          0,
+		HistoryLength:               300,
+		ValueNodeCacheSize:          units.MiB,
+		IntermediateNodeCacheSize:   units.MiB,
+		IntermediateWriteBufferSize: units.KiB,
+		IntermediateWriteBatchSize:  256 * units.KiB,
+		TraceLevel:                  InfoTrace,
+		Tracer:                      trace.Noop,
+	}
+}
+
 type Config struct {
 	// BranchFactor determines the number of children each node can have.
 	BranchFactor BranchFactor
