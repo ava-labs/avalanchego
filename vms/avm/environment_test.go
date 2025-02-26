@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/vms/avm/state"
 )
 
 const (
@@ -113,7 +114,8 @@ func setup(tb testing.TB, c *envConfig) *environment {
 	}
 
 	vm := &VM{
-		Config: vmStaticConfig,
+		Config:         vmStaticConfig,
+		StateMigration: state.NoMigration{},
 	}
 
 	vmDynamicConfig := DefaultConfig

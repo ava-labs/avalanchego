@@ -43,6 +43,7 @@ import (
 	avmmetrics "github.com/ava-labs/avalanchego/vms/avm/metrics"
 	txexecutor "github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 	xmempool "github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 )
 
 var (
@@ -78,14 +79,15 @@ type VM struct {
 
 	appSender common.AppSender
 
-	// State management
-	state state.State
-
 	// asset id that will be used for fees
 	feeAssetID ids.ID
 
-	baseDB database.Database
-	db     *versiondb.Database
+	// Granite state
+	state state.State
+
+	// Pre-Granite state
+	graniteState state.State
+	db           *versiondb.Database
 
 	typeToFxIndex map[reflect.Type]int
 	fxs           []*extensions.ParsedFx
@@ -105,6 +107,15 @@ type VM struct {
 	blockbuilder.Builder
 	chainManager blockexecutor.Manager
 	network      *network.Network
+
+	StateMigration state.Migration
+
+	utxoDB      database.Database
+	indexDB     database.Database
+	txDB        database.Database
+	blockIDDB   database.Database
+	blockDB     database.Database
+	singletonDB database.Database
 }
 
 func (vm *VM) Connected(ctx context.Context, nodeID ids.NodeID, version *version.Application) error {
@@ -172,8 +183,6 @@ func (vm *VM) Initialize(
 
 	vm.ctx = ctx
 	vm.appSender = appSender
-	vm.baseDB = db
-	vm.db = versiondb.New(db)
 
 	typedFxs := make([]extensions.Fx, len(fxs))
 	vm.fxs = make([]*extensions.ParsedFx, len(fxs))
@@ -206,8 +215,23 @@ func (vm *VM) Initialize(
 	codec := vm.parser.Codec()
 	vm.Spender = utxo.NewSpender(&vm.clock, codec)
 
-	state, err := state.New(
-		vm.db,
+	vm.db = versiondb.New(db)
+	vm.utxoDB = prefixdb.New(state.UTXOPrefix, vm.db)
+	vm.indexDB = prefixdb.New(state.IndexPrefix, vm.db)
+	vm.txDB = prefixdb.New(state.TxPrefix, vm.db)
+	vm.blockIDDB = prefixdb.New(state.BlockIDPrefix, vm.db)
+	vm.blockDB = prefixdb.New(state.BlockPrefix, vm.db)
+	vm.singletonDB = prefixdb.New(state.SingletonPrefix, vm.db)
+	vm.graniteState, err = state.NewWithFormat("state",
+		state.NewGraniteChainDB(db, vm.db),
+		db,
+		vm.indexDB,
+		vm.txDB,
+		vm.blockIDDB,
+		vm.blockDB,
+		vm.singletonDB,
+		nil,
+		avax.NewUTXODatabase(vm.utxoDB),
 		vm.parser,
 		vm.registerer,
 		avmConfig.ChecksumsEnabled,
@@ -216,7 +240,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	vm.state = state
+	vm.state = vm.graniteState
 
 	if err := vm.initGenesis(genesisBytes); err != nil {
 		return err
@@ -280,10 +304,7 @@ func (vm *VM) Shutdown(context.Context) error {
 	vm.onShutdownCtxCancel()
 	vm.awaitShutdown.Wait()
 
-	return errors.Join(
-		vm.state.Close(),
-		vm.baseDB.Close(),
-	)
+	return vm.state.Close()
 }
 
 func (*VM) Version(context.Context) (string, error) {
@@ -360,6 +381,33 @@ func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, erro
 
 func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID) error {
 	time := vm.Config.Upgrades.CortinaTime
+
+	if err := vm.graniteState.InitializeChainState(
+		stopVertexID,
+		time,
+	); err != nil {
+		return fmt.Errorf("failed to initialize legacy chain state: %w", err)
+	}
+
+	state, err := vm.StateMigration.Migrate(
+		vm.ctx.Log,
+		vm.parser,
+		vm.registerer,
+		vm.state,
+		vm.db,
+		vm.utxoDB,
+		vm.txDB,
+		vm.blockIDDB,
+		vm.blockDB,
+		vm.singletonDB,
+		vm.ctx.ChainDataDir,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to migrate state: %w", err)
+	}
+
+	vm.state = state
+
 	if err := vm.state.InitializeChainState(stopVertexID, time); err != nil {
 		return fmt.Errorf("failed to initialize chain state: %w", err)
 	}
@@ -453,6 +501,14 @@ func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
 		vm: vm,
 		tx: tx,
 	}, nil
+}
+
+func (vm *VM) GetTx(txID ids.ID) (*txs.Tx, error) {
+	return vm.state.GetTx(txID)
+}
+
+func (vm *VM) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
+	return vm.state.GetUTXO(utxoID)
 }
 
 /*
