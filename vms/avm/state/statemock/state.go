@@ -10,6 +10,7 @@
 package statemock
 
 import (
+	context "context"
 	reflect "reflect"
 	time "time"
 
@@ -94,17 +95,18 @@ func (mr *StateMockRecorder) AddUTXO(utxo any) *gomock.Call {
 }
 
 // Checksum mocks base method.
-func (m *State) Checksum() ids.ID {
+func (m *State) Checksum(ctx context.Context) (ids.ID, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Checksum")
+	ret := m.ctrl.Call(m, "Checksum", ctx)
 	ret0, _ := ret[0].(ids.ID)
-	return ret0
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // Checksum indicates an expected call of Checksum.
-func (mr *StateMockRecorder) Checksum() *gomock.Call {
+func (mr *StateMockRecorder) Checksum(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Checksum", reflect.TypeOf((*State)(nil).Checksum))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Checksum", reflect.TypeOf((*State)(nil).Checksum), ctx)
 }
 
 // Close mocks base method.
@@ -248,6 +250,21 @@ func (m *State) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
 func (mr *StateMockRecorder) GetUTXO(utxoID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUTXO", reflect.TypeOf((*State)(nil).GetUTXO), utxoID)
+}
+
+// HasAtomicTx mocks base method.
+func (m *State) HasAtomicTx(txID ids.ID) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HasAtomicTx", txID)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// HasAtomicTx indicates an expected call of HasAtomicTx.
+func (mr *StateMockRecorder) HasAtomicTx(txID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasAtomicTx", reflect.TypeOf((*State)(nil).HasAtomicTx), txID)
 }
 
 // InitializeChainState mocks base method.

@@ -180,6 +180,21 @@ func (mr *ChainMockRecorder) GetUTXO(utxoID any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUTXO", reflect.TypeOf((*Chain)(nil).GetUTXO), utxoID)
 }
 
+// HasAtomicTx mocks base method.
+func (m *Chain) HasAtomicTx(txID ids.ID) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HasAtomicTx", txID)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// HasAtomicTx indicates an expected call of HasAtomicTx.
+func (mr *ChainMockRecorder) HasAtomicTx(txID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasAtomicTx", reflect.TypeOf((*Chain)(nil).HasAtomicTx), txID)
+}
+
 // SetLastAccepted mocks base method.
 func (m *Chain) SetLastAccepted(blkID ids.ID) {
 	m.ctrl.T.Helper()

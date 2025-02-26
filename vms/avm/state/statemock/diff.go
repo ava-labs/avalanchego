@@ -193,6 +193,21 @@ func (mr *DiffMockRecorder) GetUTXO(utxoID any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUTXO", reflect.TypeOf((*Diff)(nil).GetUTXO), utxoID)
 }
 
+// HasAtomicTx mocks base method.
+func (m *Diff) HasAtomicTx(txID ids.ID) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HasAtomicTx", txID)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// HasAtomicTx indicates an expected call of HasAtomicTx.
+func (mr *DiffMockRecorder) HasAtomicTx(txID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasAtomicTx", reflect.TypeOf((*Diff)(nil).HasAtomicTx), txID)
+}
+
 // SetLastAccepted mocks base method.
 func (m *Diff) SetLastAccepted(blkID ids.ID) {
 	m.ctrl.T.Helper()

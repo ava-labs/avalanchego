@@ -115,6 +115,20 @@ func (d *diff) AddTx(tx *txs.Tx) {
 	d.addedTxs[tx.ID()] = tx
 }
 
+func (d *diff) HasAtomicTx(txID ids.ID) (bool, error) {
+	_, ok := d.addedTxs[txID]
+	if ok {
+		return true, nil
+	}
+
+	parent, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return false, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+
+	return parent.HasAtomicTx(txID)
+}
+
 func (d *diff) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	if blkID, exists := d.addedBlockIDs[height]; exists {
 		return blkID, nil
