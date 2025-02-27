@@ -6,9 +6,11 @@ package c
 import (
 	"math/big"
 	"strings"
+	"time"
 
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/upgrade/acp176"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/cortina"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -16,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 )
@@ -28,8 +31,6 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 	require := require.New(tc)
 
 	const (
-		// gasLimit is the maximum amount of gas that can be used in a block.
-		gasLimit = cortina.GasLimit // acp176.MinMaxCapacity
 		// maxFeePerGas is the maximum fee that transactions issued by this test
 		// will be willing to pay.
 		maxFeePerGas = 1000 * params.GWei
@@ -83,6 +84,24 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 			require.NoError(err)
 			return signedTx
 		}
+
+		// gasLimit is the maximum amount of gas that can be used in a block.
+		var gasLimit uint64
+		tc.By("verifying Fortuna is activated", func() {
+			infoClient := info.NewClient(nodeURI.URI)
+			upgrades, err := infoClient.Upgrades(tc.DefaultContext())
+			require.NoError(err)
+
+			now := time.Now()
+			if upgrades.IsFUpgradeActivated(now) {
+				gasLimit = acp176.MinMaxCapacity
+			} else {
+				gasLimit = cortina.GasLimit
+			}
+		})
+		tc.Log().Info("set gas limit",
+			zap.Uint64("gasLimit", gasLimit),
+		)
 
 		var contractAddress common.Address
 		tc.By("deploying an expensive contract", func() {
