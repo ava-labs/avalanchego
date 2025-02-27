@@ -72,7 +72,7 @@ jobs:
         uses: ./.github/actions/upload-tmpnet-artifact
         if: always()
         with:
-          name: e2e-pre-etna-tmpnet-data
+          name: e2e-pre-fortuna-tmpnet-data
   e2e_post_fortuna:
     runs-on: ubuntu-latest
     steps:
@@ -93,7 +93,7 @@ jobs:
         uses: ./.github/actions/upload-tmpnet-artifact
         if: always()
         with:
-          name: e2e-post-etna-tmpnet-data
+          name: e2e-post-fortuna-tmpnet-data
   e2e_existing_network:
     runs-on: ubuntu-latest
     steps:
