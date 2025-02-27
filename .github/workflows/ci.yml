@@ -46,7 +46,7 @@ jobs:
       - name: fuzz_test
         shell: bash
         run: ./scripts/build_fuzz.sh 10 # Run each fuzz test 10 seconds
-  e2e_pre_fortuna:
+  e2e:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -72,7 +72,7 @@ jobs:
         uses: ./.github/actions/upload-tmpnet-artifact
         if: always()
         with:
-          name: e2e-pre-fortuna-tmpnet-data
+          name: e2e-tmpnet-data
   e2e_post_fortuna:
     runs-on: ubuntu-latest
     steps:
