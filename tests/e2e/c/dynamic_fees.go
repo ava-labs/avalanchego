@@ -35,7 +35,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 
 	ginkgo.It("should ensure that the gas price is affected by load", func() {
 		tc.By("creating a new private network to ensure isolation from other tests")
-		privateNetwork := tmpnet.NewDefaultNetwork("avalanchego-e2e-dynamic-fees")
+		privateNetwork := tmpnet.NewDefaultNetwork(tc.Log(), "avalanchego-e2e-dynamic-fees")
 		e2e.GetEnv(tc).StartPrivateNetwork(privateNetwork)
 
 		// Avoid emitting a spec-scoped metrics link for the shared

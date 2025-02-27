@@ -47,7 +47,7 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 	require := require.New(tc)
 
 	ginkgo.It("can upgrade versions", func() {
-		network := tmpnet.NewDefaultNetwork("avalanchego-upgrade")
+		network := tmpnet.NewDefaultNetwork(tc.Log(), "avalanchego-upgrade")
 
 		// Get the default genesis so we can modify it
 		genesis, err := network.DefaultGenesis()
@@ -61,9 +61,11 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 		}
 
 		e2e.StartNetwork(
-			tc,
+			e2e.NewEventHandlerTestContext(),
 			network,
-			avalancheGoExecPath,
+			&tmpnet.NodeRuntimeConfig{
+				AvalancheGoPath: avalancheGoExecPath,
+			},
 			"", /* pluginDir */
 			shutdownDelay,
 			false, /* skipShutdown */
@@ -77,7 +79,7 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 
 			node.RuntimeConfig.AvalancheGoPath = avalancheGoExecPathToUpgradeTo
 
-			require.NoError(network.StartNode(tc.DefaultContext(), tc.Log(), node))
+			require.NoError(network.StartNode(tc.DefaultContext(), node))
 
 			tc.By(fmt.Sprintf("waiting for node %q to report healthy after restart", node.NodeID))
 			e2e.WaitForHealthy(tc, node)

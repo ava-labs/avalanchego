@@ -49,5 +49,5 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run in every ginkgo process
 
 	// Initialize the local test environment from the global state
-	e2e.InitSharedTestEnvironment(ginkgo.GinkgoT(), envBytes)
+	e2e.InitSharedTestEnvironment(e2e.NewTestContext(), envBytes)
 })
