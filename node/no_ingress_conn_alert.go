@@ -58,7 +58,7 @@ func (nica *noIngressConnAlert) HealthCheck(context.Context) (interface{}, error
 
 	if nica.lastCheck.IsZero() {
 		nica.lastCheck = now
-		return nica.lastResult, nica.lastError
+		return nil, nil
 	}
 
 	if now.Sub(nica.lastCheck) < nica.minCheckInterval && nica.lastResult == nil {
