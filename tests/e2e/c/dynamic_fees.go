@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/upgrade/cortina"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/onsi/ginkgo/v2"
@@ -19,19 +20,27 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 )
 
-// This test uses the compiled bin for `hashing.sol` as
-// well as its ABI contained in `hashing_contract.go`.
+// This test uses the compiled bytecode for `consume_gas.sol` as well as its ABI
+// contained in `consume_gas.go`.
 
 var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 	tc := e2e.NewTestContext()
 	require := require.New(tc)
 
-	// Need a gas limit much larger than the standard 21_000 to enable
-	// the contract to induce a gas price increase
-	const largeGasLimit = uint64(8_000_000)
-
-	// TODO(marun) What is the significance of this value?
-	gasTip := big.NewInt(1000 * params.GWei)
+	const (
+		// gasLimit is the maximum amount of gas that can be used in a block.
+		gasLimit = cortina.GasLimit // acp176.MinMaxCapacity
+		// maxFeePerGas is the maximum fee that transactions issued by this test
+		// will be willing to pay.
+		maxFeePerGas = 1000 * params.GWei
+		// minFeePerGas is the minimum fee that transactions issued by this test
+		// will pay.
+		minFeePerGas = 1 * params.Wei
+	)
+	var (
+		gasFeeCap = big.NewInt(maxFeePerGas)
+		gasTipCap = big.NewInt(minFeePerGas)
+	)
 
 	ginkgo.It("should ensure that the gas price is affected by load", func() {
 		tc.By("creating a new private network to ensure isolation from other tests")
@@ -73,18 +82,21 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 			// Create transaction
 			nonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), ethAddress)
 			require.NoError(err)
-			compiledContract := common.Hex2Bytes(hashingCompiledContract)
-			tx := types.NewTx(&types.LegacyTx{
-				Nonce:    nonce,
-				GasPrice: gasTip,
-				Gas:      largeGasLimit,
-				Value:    common.Big0,
-				Data:     compiledContract,
+			compiledContract := common.Hex2Bytes(consumeGasCompiledContract)
+			tx := types.NewTx(&types.DynamicFeeTx{
+				ChainID:   cChainID,
+				Nonce:     nonce,
+				GasTipCap: gasTipCap,
+				GasFeeCap: gasFeeCap,
+				Gas:       gasLimit,
+				To:        nil, // contract creation
+				Data:      compiledContract,
 			})
 
 			// Send the transaction and wait for acceptance
 			signedTx := sign(tx)
 			receipt := e2e.SendEthTransaction(tc, ethClient, signedTx)
+			require.Equal(types.ReceiptStatusSuccessful, receipt.Status)
 
 			contractAddress = receipt.ContractAddress
 		})
@@ -92,25 +104,30 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		var gasPrice *big.Int
 		tc.By("calling the expensive contract repeatedly until a gas price increase is detected", func() {
 			// Evaluate the bytes representation of the contract
-			hashingABI, err := abi.JSON(strings.NewReader(hashingABIJson))
+			hashingABI, err := abi.JSON(strings.NewReader(consumeGasABIJson))
 			require.NoError(err)
-			contractData, err := hashingABI.Pack("hashIt")
+			contractData, err := hashingABI.Pack(consumeGasFunction)
 			require.NoError(err)
 
 			var initialGasPrice *big.Int
 			tc.Eventually(func() bool {
 				// Check the gas price
-				var err error
 				gasPrice, err = ethClient.SuggestGasPrice(tc.DefaultContext())
 				require.NoError(err)
+
+				// If this is the first iteration, record the initial gas price.
 				if initialGasPrice == nil {
 					initialGasPrice = gasPrice
 					tc.Log().Info("initial gas price",
-						zap.Uint64("price", initialGasPrice.Uint64()),
+						zap.Stringer("price", initialGasPrice),
 					)
-				} else if gasPrice.Cmp(initialGasPrice) > 0 {
+				}
+
+				// If the gas price has increased, stop the loop.
+				if gasPrice.Cmp(initialGasPrice) > 0 {
 					tc.Log().Info("gas price has increased",
-						zap.Uint64("price", gasPrice.Uint64()),
+						zap.Stringer("initialPrice", initialGasPrice),
+						zap.Stringer("newPrice", gasPrice),
 					)
 					return true
 				}
@@ -118,13 +135,14 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 				// Create the transaction
 				nonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), ethAddress)
 				require.NoError(err)
-				tx := types.NewTx(&types.LegacyTx{
-					Nonce:    nonce,
-					GasPrice: gasTip,
-					Gas:      largeGasLimit,
-					To:       &contractAddress,
-					Value:    common.Big0,
-					Data:     contractData,
+				tx := types.NewTx(&types.DynamicFeeTx{
+					ChainID:   cChainID,
+					Nonce:     nonce,
+					GasTipCap: gasTipCap,
+					GasFeeCap: gasFeeCap,
+					Gas:       gasLimit,
+					To:        &contractAddress,
+					Data:      contractData,
 				})
 
 				// Send the transaction and wait for acceptance
@@ -145,7 +163,8 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 				return initialGasPrice.Cmp(gasPrice) > 0
 			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "failed to see gas price decrease before timeout")
 			tc.Log().Info("gas price has decreased",
-				zap.Uint64("price", gasPrice.Uint64()),
+				zap.Stringer("initialPrice", initialGasPrice),
+				zap.Stringer("newPrice", gasPrice),
 			)
 		})
 

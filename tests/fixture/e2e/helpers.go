@@ -183,7 +183,12 @@ func SendEthTransaction(tc tests.TestContext, ethClient ethclient.Client, signed
 		return true
 	}, DefaultTimeout, DefaultPollingInterval, "failed to see transaction acceptance before timeout")
 
-	require.Equal(types.ReceiptStatusSuccessful, receipt.Status)
+	tc.Log().Info("eth transaction accepted",
+		zap.Stringer("txID", txID),
+		zap.Uint64("gasUsed", receipt.GasUsed),
+		zap.Stringer("gasPrice", receipt.EffectiveGasPrice),
+		zap.Stringer("blockNumber", receipt.BlockNumber),
+	)
 	return receipt
 }
 
