@@ -69,7 +69,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		tc.By("initializing a transaction signer")
 		cChainID, err := ethClient.ChainID(tc.DefaultContext())
 		require.NoError(err)
-		signer := types.NewEIP155Signer(cChainID)
+		signer := types.NewLondonSigner(cChainID)
 		ecdsaKey := key.ToECDSA()
 		sign := func(tx *types.Transaction) *types.Transaction {
 			signedTx, err := types.SignTx(tx, signer, ecdsaKey)
