@@ -1388,8 +1388,8 @@ func TestDeactivateLowBalanceL1ValidatorBlockChanges(t *testing.T) {
 			blk, err := block.NewBanffStandardBlock(
 				genesistest.DefaultValidatorStartTime.Add(test.durationToAdvance),
 				verifier.state.GetLastAccepted(),
-				1,
-				nil, // txs do not matter in this test
+				1,   // This block is built on top of the genesis
+				nil, // There are no transactions in the block
 			)
 			require.NoError(err)
 
