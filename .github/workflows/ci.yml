@@ -78,6 +78,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
+      - uses: cachix/install-nix-action@v30
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      # TODO(marun) Maybe figure out how to use `nix build` somehow i.e. make the default shell double as the default package
+      - run: nix develop --command echo "dependencies installed"
       - name: Build AvalancheGo Binary
         shell: bash
         run: ./scripts/build.sh -r
@@ -85,9 +90,10 @@ jobs:
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
           run: E2E_SERIAL=1 ./scripts/tests.e2e.sh --delay-network-shutdown --activate-fortuna
-          prometheus_id: ${{ secrets.PROMETHEUS_ID || '' }}
+          filter_by_owner: avalanchego-e2e
+          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki_id: ${{ secrets.LOKI_ID || '' }}
+          loki_username: ${{ secrets.LOKI_ID || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
       - name: Upload tmpnet network dir
         uses: ./.github/actions/upload-tmpnet-artifact
