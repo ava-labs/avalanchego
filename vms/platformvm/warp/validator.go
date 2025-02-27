@@ -32,6 +32,13 @@ type ValidatorState interface {
 	GetValidatorSet(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error)
 }
 
+type CanonicalValidatorSet struct {
+	// Validators slice in canonical ordering of the validators that has public key
+	Validators []*Validator
+	// The total weight of all the validators, including the ones that doesn't have a public key
+	TotalWeight uint64
+}
+
 type Validator struct {
 	PublicKey      *bls.PublicKey
 	PublicKeyBytes []byte
@@ -43,19 +50,19 @@ func (v *Validator) Compare(o *Validator) int {
 	return bytes.Compare(v.PublicKeyBytes, o.PublicKeyBytes)
 }
 
-// GetCanonicalValidatorSet returns the validator set of [subnetID] at
-// [pChcainHeight] in a canonical ordering. Also returns the total weight on
-// [subnetID].
-func GetCanonicalValidatorSet(
+// GetCanonicalValidatorSetFromSubnetID returns the CanonicalValidatorSet of [subnetID] at
+// [pChcainHeight]. The returned CanonicalValidatorSet includes the validator set in a canonical ordering
+// and the total weight.
+func GetCanonicalValidatorSetFromSubnetID(
 	ctx context.Context,
 	pChainState ValidatorState,
 	pChainHeight uint64,
 	subnetID ids.ID,
-) ([]*Validator, uint64, error) {
+) (CanonicalValidatorSet, error) {
 	// Get the validator set at the given height.
 	vdrSet, err := pChainState.GetValidatorSet(ctx, pChainHeight, subnetID)
 	if err != nil {
-		return nil, 0, err
+		return CanonicalValidatorSet{}, err
 	}
 
 	// Convert the validator set into the canonical ordering.
@@ -64,7 +71,7 @@ func GetCanonicalValidatorSet(
 
 // FlattenValidatorSet converts the provided [vdrSet] into a canonical ordering.
 // Also returns the total weight of the validator set.
-func FlattenValidatorSet(vdrSet map[ids.NodeID]*validators.GetValidatorOutput) ([]*Validator, uint64, error) {
+func FlattenValidatorSet(vdrSet map[ids.NodeID]*validators.GetValidatorOutput) (CanonicalValidatorSet, error) {
 	var (
 		vdrs        = make(map[string]*Validator, len(vdrSet))
 		totalWeight uint64
@@ -73,7 +80,7 @@ func FlattenValidatorSet(vdrSet map[ids.NodeID]*validators.GetValidatorOutput) (
 	for _, vdr := range vdrSet {
 		totalWeight, err = math.Add(totalWeight, vdr.Weight)
 		if err != nil {
-			return nil, 0, fmt.Errorf("%w: %w", ErrWeightOverflow, err)
+			return CanonicalValidatorSet{}, fmt.Errorf("%w: %w", ErrWeightOverflow, err)
 		}
 
 		if vdr.PublicKey == nil {
@@ -97,7 +104,7 @@ func FlattenValidatorSet(vdrSet map[ids.NodeID]*validators.GetValidatorOutput) (
 	// Sort validators by public key
 	vdrList := maps.Values(vdrs)
 	utils.Sort(vdrList)
-	return vdrList, totalWeight, nil
+	return CanonicalValidatorSet{Validators: vdrList, TotalWeight: totalWeight}, nil
 }
 
 // FilterValidators returns the validators in [vdrs] whose bit is set to 1 in
@@ -153,4 +160,18 @@ func AggregatePublicKeys(vdrs []*Validator) (*bls.PublicKey, error) {
 		pks[i] = vdr.PublicKey
 	}
 	return bls.AggregatePublicKeys(pks)
+}
+
+// GetCanonicalValidatorSetFromChainID returns the canonical validator set given a validators.State, pChain height and a sourceChainID.
+func GetCanonicalValidatorSetFromChainID(ctx context.Context,
+	pChainState validators.State,
+	pChainHeight uint64,
+	sourceChainID ids.ID,
+) (CanonicalValidatorSet, error) {
+	subnetID, err := pChainState.GetSubnetID(ctx, sourceChainID)
+	if err != nil {
+		return CanonicalValidatorSet{}, err
+	}
+
+	return GetCanonicalValidatorSetFromSubnetID(ctx, pChainState, pChainHeight, subnetID)
 }

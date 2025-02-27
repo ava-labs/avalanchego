@@ -62,7 +62,8 @@ var _ = ginkgo.Describe("Duplicate node handling", func() {
 	})
 })
 
-// Check that a new node is connected to existing nodes and vice versa
+// Check that a new node is connected to existing nodes and vice versa.
+// Safe to use Node.URI directly as long as this test isn't running against kube-hosted nodes.
 func checkConnectedPeers(tc tests.TestContext, existingNodes []*tmpnet.Node, newNode *tmpnet.Node) {
 	require := require.New(tc)
 

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/netip"
 	"os"
@@ -21,7 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
@@ -42,6 +43,8 @@ var (
 // NodeRuntime defines the methods required to support running a node.
 type NodeRuntime interface {
 	readState() error
+	GetLocalURI(ctx context.Context) (string, func(), error)
+	GetLocalStakingAddress(ctx context.Context) (netip.AddrPort, func(), error)
 	Start(log logging.Logger) error
 	InitiateStop() error
 	WaitForStopped(ctx context.Context) error
@@ -50,7 +53,8 @@ type NodeRuntime interface {
 
 // Configuration required to configure a node runtime.
 type NodeRuntimeConfig struct {
-	AvalancheGoPath string
+	AvalancheGoPath   string
+	ReuseDynamicPorts bool
 }
 
 // Node supports configuring and running a node participating in a temporary network.
@@ -195,13 +199,26 @@ func (n *Node) GetDataDir() string {
 	return cast.ToString(n.Flags[config.DataDirKey])
 }
 
+func (n *Node) GetLocalURI(ctx context.Context) (string, func(), error) {
+	return n.getRuntime().GetLocalURI(ctx)
+}
+
+func (n *Node) GetLocalStakingAddress(ctx context.Context) (netip.AddrPort, func(), error) {
+	return n.getRuntime().GetLocalStakingAddress(ctx)
+}
+
 // Writes the current state of the metrics endpoint to disk
 func (n *Node) SaveMetricsSnapshot(ctx context.Context) error {
 	if len(n.URI) == 0 {
 		// No URI to request metrics from
 		return nil
 	}
-	uri := n.URI + "/ext/metrics"
+	baseURI, cancel, err := n.GetLocalURI(ctx)
+	if err != nil {
+		return nil
+	}
+	defer cancel()
+	uri := baseURI + "/ext/metrics"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, uri, nil)
 	if err != nil {
 		return err
@@ -266,7 +283,7 @@ func (n *Node) EnsureBLSSigningKey() error {
 	}
 
 	// Generate a new signing key
-	newKey, err := bls.NewSigner()
+	newKey, err := localsigner.New()
 	if err != nil {
 		return fmt.Errorf("failed to generate staking signer key: %w", err)
 	}
@@ -316,11 +333,16 @@ func (n *Node) GetProofOfPossession() (*signer.ProofOfPossession, error) {
 	if err != nil {
 		return nil, err
 	}
-	secretKey, err := bls.SecretKeyFromBytes(signingKeyBytes)
+	secretKey, err := localsigner.FromBytes(signingKeyBytes)
 	if err != nil {
 		return nil, err
 	}
-	return signer.NewProofOfPossession(secretKey), nil
+	pop, err := signer.NewProofOfPossession(secretKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return pop, nil
 }
 
 // Derives the node ID. Requires that a tls keypair is present.
@@ -371,4 +393,20 @@ func (n *Node) GetUniqueID() string {
 	startIndex := len(ids.NodeIDPrefix)
 	endIndex := startIndex + 8 // 8 characters should be enough to identify a node in the context of its network
 	return n.NetworkUUID + "-" + strings.ToLower(nodeIDString[startIndex:endIndex])
+}
+
+// Saves the currently allocated API port to the node's configuration
+// for use across restarts.
+func (n *Node) SaveAPIPort() error {
+	hostPort := strings.TrimPrefix(n.URI, "http://")
+	if len(hostPort) == 0 {
+		// Without an API URI there is nothing to save
+		return nil
+	}
+	_, port, err := net.SplitHostPort(hostPort)
+	if err != nil {
+		return err
+	}
+	n.Flags[config.HTTPPortKey] = port
+	return nil
 }

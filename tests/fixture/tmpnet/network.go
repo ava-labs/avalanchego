@@ -434,7 +434,12 @@ func (n *Network) Bootstrap(ctx context.Context, log logging.Logger) error {
 	}
 
 	// Don't restart the node during subnet creation since it will always be restarted afterwards.
-	if err := n.CreateSubnets(ctx, log, bootstrapNode.URI, false /* restartRequired */); err != nil {
+	uri, cancel, err := bootstrapNode.GetLocalURI(ctx)
+	if err != nil {
+		return err
+	}
+	defer cancel()
+	if err := n.CreateSubnets(ctx, log, uri, false /* restartRequired */); err != nil {
 		return err
 	}
 
@@ -511,6 +516,16 @@ func (n *Network) StartNode(ctx context.Context, log logging.Logger, node *Node)
 
 // Restart a single node.
 func (n *Network) RestartNode(ctx context.Context, log logging.Logger, node *Node) error {
+	if node.RuntimeConfig.ReuseDynamicPorts {
+		// Attempt to save the API port currently being used so the
+		// restarted node can reuse it. This may result in the node
+		// failing to start if the operating system allocates the port
+		// to a different process between node stop and start.
+		if err := node.SaveAPIPort(); err != nil {
+			return err
+		}
+	}
+
 	if err := node.Stop(ctx); err != nil {
 		return fmt.Errorf("failed to stop node %s: %w", node.NodeID, err)
 	}
@@ -685,7 +700,7 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI 
 		}
 
 		// Create the subnet on the network
-		if err := subnet.Create(ctx, n.Nodes[0].URI); err != nil {
+		if err := subnet.Create(ctx, apiURI); err != nil {
 			return err
 		}
 
@@ -766,7 +781,7 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI 
 	}
 
 	// Wait for nodes to become subnet validators
-	pChainClient := platformvm.NewClient(n.Nodes[0].URI)
+	pChainClient := platformvm.NewClient(apiURI)
 	validatorsToRestart := set.Set[ids.NodeID]{}
 	for _, subnet := range createdSubnets {
 		if err := WaitForActiveValidators(ctx, log, pChainClient, subnet); err != nil {
@@ -774,7 +789,7 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI 
 		}
 
 		// It should now be safe to create chains for the subnet
-		if err := subnet.CreateChains(ctx, log, n.Nodes[0].URI); err != nil {
+		if err := subnet.CreateChains(ctx, log, apiURI); err != nil {
 			return err
 		}
 
@@ -813,13 +828,13 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI 
 	return nil
 }
 
-func (n *Network) GetURIForNodeID(nodeID ids.NodeID) (string, error) {
+func (n *Network) GetNode(nodeID ids.NodeID) (*Node, error) {
 	for _, node := range n.Nodes {
 		if node.NodeID == nodeID {
-			return node.URI, nil
+			return node, nil
 		}
 	}
-	return "", fmt.Errorf("%s is not known to the network", nodeID)
+	return nil, fmt.Errorf("%s is not known to the network", nodeID)
 }
 
 func (n *Network) GetNodeURIs() []NodeURI {

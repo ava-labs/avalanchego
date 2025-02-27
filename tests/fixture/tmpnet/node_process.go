@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/netip"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -338,6 +339,14 @@ func (p *NodeProcess) writeMonitoringConfigFile(tmpnetDir string, name string, c
 	}
 
 	return nil
+}
+
+func (p *NodeProcess) GetLocalURI(_ context.Context) (string, func(), error) {
+	return p.node.URI, func() {}, nil
+}
+
+func (p *NodeProcess) GetLocalStakingAddress(_ context.Context) (netip.AddrPort, func(), error) {
+	return p.node.StakingAddress, func() {}, nil
 }
 
 // watchLogFileForFatal waits for the specified file path to exist and then checks each of

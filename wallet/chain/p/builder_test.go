@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -469,10 +470,11 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		delegationShares       uint32 = reward.PercentDenominator
 	)
 
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 
-	pop := signer.NewProofOfPossession(sk)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(t, err)
 
 	for _, e := range testEnvironment {
 		t.Run(e.name, func(t *testing.T) {
@@ -570,9 +572,13 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 }
 
 func TestConvertSubnetToL1Tx(t *testing.T) {
-	sk0, err := bls.NewSigner()
+	sk0, err := localsigner.New()
 	require.NoError(t, err)
-	sk1, err := bls.NewSigner()
+	pop0, err := signer.NewProofOfPossession(sk0)
+	require.NoError(t, err)
+	sk1, err := localsigner.New()
+	require.NoError(t, err)
+	pop1, err := signer.NewProofOfPossession(sk1)
 	require.NoError(t, err)
 
 	var (
@@ -583,7 +589,7 @@ func TestConvertSubnetToL1Tx(t *testing.T) {
 				NodeID:  utils.RandomBytes(ids.NodeIDLen),
 				Weight:  rand.Uint64(), //#nosec G404
 				Balance: units.Avax,
-				Signer:  *signer.NewProofOfPossession(sk0),
+				Signer:  *pop0,
 				RemainingBalanceOwner: message.PChainOwner{
 					Threshold: 1,
 					Addresses: []ids.ShortID{
@@ -601,7 +607,7 @@ func TestConvertSubnetToL1Tx(t *testing.T) {
 				NodeID:                utils.RandomBytes(ids.NodeIDLen),
 				Weight:                rand.Uint64(), //#nosec G404
 				Balance:               2 * units.Avax,
-				Signer:                *signer.NewProofOfPossession(sk1),
+				Signer:                *pop1,
 				RemainingBalanceOwner: message.PChainOwner{},
 				DeactivationOwner:     message.PChainOwner{},
 			},
@@ -655,9 +661,10 @@ func TestRegisterL1ValidatorTx(t *testing.T) {
 		balance = units.Avax
 	)
 
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
-	pop := signer.NewProofOfPossession(sk)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(t, err)
 
 	addressedCallPayload, err := message.NewRegisterL1Validator(
 		subnetID,
@@ -696,7 +703,9 @@ func TestRegisterL1ValidatorTx(t *testing.T) {
 	signers := set.NewBits(0)
 
 	unsignedBytes := unsignedWarp.Bytes()
-	sig := sk.Sign(unsignedBytes)
+	sig, err := sk.Sign(unsignedBytes)
+	require.NoError(t, err)
+
 	sigBytes := [bls.SignatureLen]byte{}
 	copy(sigBytes[:], bls.SignatureToBytes(sig))
 
@@ -778,7 +787,9 @@ func TestSetL1ValidatorWeightTx(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
+	require.NoError(t, err)
+	sig, err := sk.Sign(unsignedWarp.Bytes())
 	require.NoError(t, err)
 
 	warp, err := warp.NewMessage(
@@ -786,9 +797,7 @@ func TestSetL1ValidatorWeightTx(t *testing.T) {
 		&warp.BitSetSignature{
 			Signers: set.NewBits(0).Bytes(),
 			Signature: ([bls.SignatureLen]byte)(
-				bls.SignatureToBytes(
-					sk.Sign(unsignedWarp.Bytes()),
-				),
+				bls.SignatureToBytes(sig),
 			),
 		},
 	)

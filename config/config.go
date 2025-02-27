@@ -37,6 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
@@ -105,7 +106,7 @@ func getConsensusConfig(v *viper.Viper) snowball.Parameters {
 
 func getLoggingConfig(v *viper.Viper) (logging.Config, error) {
 	loggingConfig := logging.Config{}
-	loggingConfig.Directory = GetExpandedArg(v, LogsDirKey)
+	loggingConfig.Directory = getExpandedArg(v, LogsDirKey)
 	var err error
 	loggingConfig.LogLevel, err = logging.ToLevel(v.GetString(LogLevelKey))
 	if err != nil {
@@ -143,7 +144,7 @@ func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
 			return node.HTTPConfig{}, fmt.Errorf("unable to decode base64 content: %w", err)
 		}
 	case v.IsSet(HTTPSKeyFileKey):
-		httpsKeyFilepath := GetExpandedArg(v, HTTPSKeyFileKey)
+		httpsKeyFilepath := getExpandedArg(v, HTTPSKeyFileKey)
 		httpsKey, err = os.ReadFile(filepath.Clean(httpsKeyFilepath))
 		if err != nil {
 			return node.HTTPConfig{}, err
@@ -158,7 +159,7 @@ func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
 			return node.HTTPConfig{}, fmt.Errorf("unable to decode base64 content: %w", err)
 		}
 	case v.IsSet(HTTPSCertFileKey):
-		httpsCertFilepath := GetExpandedArg(v, HTTPSCertFileKey)
+		httpsCertFilepath := getExpandedArg(v, HTTPSCertFileKey)
 		httpsCert, err = os.ReadFile(filepath.Clean(httpsCertFilepath))
 		if err != nil {
 			return node.HTTPConfig{}, err
@@ -557,7 +558,7 @@ func getIPConfig(v *viper.Viper) (node.IPConfig, error) {
 
 func getProfilerConfig(v *viper.Viper) (profiler.Config, error) {
 	config := profiler.Config{
-		Dir:         GetExpandedArg(v, ProfileDirKey),
+		Dir:         getExpandedArg(v, ProfileDirKey),
 		Enabled:     v.GetBool(ProfileContinuousEnabledKey),
 		Freq:        v.GetDuration(ProfileContinuousFreqKey),
 		MaxNumFiles: v.GetInt(ProfileContinuousMaxFilesKey),
@@ -591,8 +592,8 @@ func getStakingTLSCertFromFlag(v *viper.Viper) (tls.Certificate, error) {
 
 func getStakingTLSCertFromFile(v *viper.Viper) (tls.Certificate, error) {
 	// Parse the staking key/cert paths and expand environment variables
-	stakingKeyPath := GetExpandedArg(v, StakingTLSKeyPathKey)
-	stakingCertPath := GetExpandedArg(v, StakingCertPathKey)
+	stakingKeyPath := getExpandedArg(v, StakingTLSKeyPathKey)
+	stakingCertPath := getExpandedArg(v, StakingCertPathKey)
 
 	// If staking key/cert locations are specified but not found, error
 	if v.IsSet(StakingTLSKeyPathKey) || v.IsSet(StakingCertPathKey) {
@@ -640,7 +641,7 @@ func getStakingTLSCert(v *viper.Viper) (tls.Certificate, error) {
 
 func getStakingSigner(v *viper.Viper) (bls.Signer, error) {
 	if v.GetBool(StakingEphemeralSignerEnabledKey) {
-		key, err := bls.NewSigner()
+		key, err := localsigner.New()
 		if err != nil {
 			return nil, fmt.Errorf("couldn't generate ephemeral signing key: %w", err)
 		}
@@ -653,21 +654,21 @@ func getStakingSigner(v *viper.Viper) (bls.Signer, error) {
 		if err != nil {
 			return nil, fmt.Errorf("unable to decode base64 content: %w", err)
 		}
-		key, err := bls.SecretKeyFromBytes(signerKeyContent)
+		key, err := localsigner.FromBytes(signerKeyContent)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't parse signing key: %w", err)
 		}
 		return key, nil
 	}
 
-	signingKeyPath := GetExpandedArg(v, StakingSignerKeyPathKey)
+	signingKeyPath := getExpandedArg(v, StakingSignerKeyPathKey)
 	_, err := os.Stat(signingKeyPath)
 	if !errors.Is(err, fs.ErrNotExist) {
 		signingKeyBytes, err := os.ReadFile(signingKeyPath)
 		if err != nil {
 			return nil, err
 		}
-		key, err := bls.SecretKeyFromBytes(signingKeyBytes)
+		key, err := localsigner.FromBytes(signingKeyBytes)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't parse signing key: %w", err)
 		}
@@ -678,7 +679,7 @@ func getStakingSigner(v *viper.Viper) (bls.Signer, error) {
 		return nil, errMissingStakingSigningKeyFile
 	}
 
-	key, err := bls.NewSigner()
+	key, err := localsigner.New()
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate new signing key: %w", err)
 	}
@@ -702,9 +703,9 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 		SybilProtectionEnabled:        v.GetBool(SybilProtectionEnabledKey),
 		SybilProtectionDisabledWeight: v.GetUint64(SybilProtectionDisabledWeightKey),
 		PartialSyncPrimaryNetwork:     v.GetBool(PartialSyncPrimaryNetworkKey),
-		StakingKeyPath:                GetExpandedArg(v, StakingTLSKeyPathKey),
-		StakingCertPath:               GetExpandedArg(v, StakingCertPathKey),
-		StakingSignerPath:             GetExpandedArg(v, StakingSignerKeyPathKey),
+		StakingKeyPath:                getExpandedArg(v, StakingTLSKeyPathKey),
+		StakingCertPath:               getExpandedArg(v, StakingCertPathKey),
+		StakingSignerPath:             getExpandedArg(v, StakingSignerKeyPathKey),
 	}
 	if !config.SybilProtectionEnabled && config.SybilProtectionDisabledWeight == 0 {
 		return node.StakingConfig{}, errSybilProtectionDisabledStakerWeights
@@ -806,7 +807,7 @@ func getUpgradeConfig(v *viper.Viper, networkID uint32) (upgrade.Config, error) 
 	)
 	switch {
 	case v.IsSet(UpgradeFileKey):
-		upgradeFileName := GetExpandedArg(v, UpgradeFileKey)
+		upgradeFileName := getExpandedArg(v, UpgradeFileKey)
 		upgradeBytes, err = os.ReadFile(upgradeFileName)
 		if err != nil {
 			return upgrade.Config{}, fmt.Errorf("unable to read upgrade file: %w", err)
@@ -835,7 +836,7 @@ func getGenesisData(v *viper.Viper, networkID uint32, stakingCfg *genesis.Stakin
 
 	// if content is not specified go for the file
 	if v.IsSet(GenesisFileKey) {
-		genesisFileName := GetExpandedArg(v, GenesisFileKey)
+		genesisFileName := getExpandedArg(v, GenesisFileKey)
 		return genesis.FromFile(networkID, genesisFileName, stakingCfg)
 	}
 
@@ -876,7 +877,7 @@ func getDatabaseConfig(v *viper.Viper, networkID uint32) (node.DatabaseConfig, e
 			return node.DatabaseConfig{}, fmt.Errorf("unable to decode base64 content: %w", err)
 		}
 	} else if v.IsSet(DBConfigFileKey) {
-		path := GetExpandedArg(v, DBConfigFileKey)
+		path := getExpandedArg(v, DBConfigFileKey)
 		configBytes, err = os.ReadFile(path)
 		if err != nil {
 			return node.DatabaseConfig{}, err
@@ -887,7 +888,7 @@ func getDatabaseConfig(v *viper.Viper, networkID uint32) (node.DatabaseConfig, e
 		Name:     v.GetString(DBTypeKey),
 		ReadOnly: v.GetBool(DBReadOnlyKey),
 		Path: filepath.Join(
-			GetExpandedArg(v, DBPathKey),
+			getExpandedArg(v, DBPathKey),
 			constants.NetworkName(networkID),
 		),
 		Config: configBytes,
@@ -904,7 +905,7 @@ func getAliases(v *viper.Viper, name string, contentKey string, fileKey string) 
 			return nil, fmt.Errorf("unable to decode base64 content for %s: %w", name, err)
 		}
 	} else {
-		aliasFilePath := filepath.Clean(GetExpandedArg(v, fileKey))
+		aliasFilePath := filepath.Clean(getExpandedArg(v, fileKey))
 		exists, err := storage.FileExists(aliasFilePath)
 		if err != nil {
 			return nil, err
@@ -940,7 +941,7 @@ func getChainAliases(v *viper.Viper) (map[ids.ID][]string, error) {
 
 // getPathFromDirKey reads flag value from viper instance and then checks the folder existence
 func getPathFromDirKey(v *viper.Viper, configKey string) (string, error) {
-	configDir := GetExpandedArg(v, configKey)
+	configDir := getExpandedArg(v, configKey)
 	cleanPath := filepath.Clean(configDir)
 	ok, err := storage.FolderExists(cleanPath)
 	if err != nil {
@@ -1222,7 +1223,7 @@ func getTraceConfig(v *viper.Viper) (trace.Config, error) {
 
 // Returns the path to the directory that contains VM binaries.
 func getPluginDir(v *viper.Viper) (string, error) {
-	pluginDir := GetExpandedString(v, v.GetString(PluginDirKey))
+	pluginDir := getExpandedArg(v, PluginDirKey)
 
 	if v.IsSet(PluginDirKey) {
 		// If the flag was given, assert it exists and is a directory
@@ -1451,9 +1452,9 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 		return node.Config{}, err
 	}
 
-	nodeConfig.ChainDataDir = GetExpandedArg(v, ChainDataDirKey)
+	nodeConfig.ChainDataDir = getExpandedArg(v, ChainDataDirKey)
 
-	nodeConfig.ProcessContextFilePath = GetExpandedArg(v, ProcessContextFileKey)
+	nodeConfig.ProcessContextFilePath = getExpandedArg(v, ProcessContextFileKey)
 
 	nodeConfig.ProvidedFlags = providedFlags(v)
 	return nodeConfig, nil

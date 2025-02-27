@@ -5,15 +5,15 @@ module github.com/ava-labs/avalanchego
 //   - README.md
 //   - go.mod (here)
 //
-// - If updating between minor versions (e.g. 1.22.x -> 1.23.x):
+// - If updating between minor versions (e.g. 1.23.x -> 1.24.x):
 //   - Consider updating the version of golangci-lint (in scripts/lint.sh).
-go 1.22.8
+go 1.23.6
 
 require (
 	github.com/DataDog/zstd v1.5.2
 	github.com/NYTimes/gziphandler v1.1.1
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
-	github.com/ava-labs/coreth v0.14.1-rc.1
+	github.com/ava-labs/coreth v0.14.1-rc.1.0.20250219185827-6a9db205a450
 	github.com/ava-labs/ledger-avalanche/go v0.0.0-20241009183145-e6f90a8a1a60
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593

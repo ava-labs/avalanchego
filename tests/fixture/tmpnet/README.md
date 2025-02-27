@@ -89,10 +89,13 @@ A temporary network can be managed in code:
 
 ```golang
 network := &tmpnet.Network{                   // Configure non-default values for the new network
+    DefaultRuntimeConfig{
+        ReuseDynamicPorts: true,              // Configure process-based nodes to reuse a dynamically allocated API port when restarting
+    },
     DefaultFlags: tmpnet.FlagsMap{
         config.LogLevelKey: "INFO",           // Change one of the network's defaults
     },
-    Nodes: tmpnet.NewNodesOrPanic(5),           // Number of initial validating nodes
+    Nodes: tmpnet.NewNodesOrPanic(5),         // Number of initial validating nodes
     Subnets: []*tmpnet.Subnet{                // Subnets to create on the new network once it is running
         {
             Name: "xsvm-a",                   // User-defined name used to reference subnet in code and on disk
@@ -177,8 +180,7 @@ HOME
             └── subnets                                  // Directory containing subnet config for both avalanchego and tmpnet
                 ├── subnet-a.json                        // tmpnet configuration for subnet-a and its chain(s)
                 ├── subnet-b.json                        // tmpnet configuration for subnet-b and its chain(s)
-                └── 2jRbWtaonb2RP8DEM5DBsd7o2o8d...RqNs9 // The ID of a subnet is the name of its configuration dir
-                    └── config.json                      // avalanchego configuration for subnet
+                └── 2jRbWtaonb2RP8DEM5DBsd7...RqNs9.json // avalanchego configuration for subnet with ID 2jRbWtao...RqNs9
 ```
 
 ### Common networking configuration
@@ -196,6 +198,17 @@ referenced by default by all nodes in the network. The genesis file
 content will be generated with reasonable defaults if not
 supplied. Each node in the network can override the default by setting
 an explicit value for `--genesis-file` or `--genesis-file-content`.
+
+### Subnet configuration
+
+The subnet configuration for a temporary network is stored at
+`[network-dir]/subnets/[subnet ID].json` and referenced by all
+nodes in the network.
+
+Each node in the network can override network-level subnet
+configuration by setting `--subnet-config-dir` to an explicit value
+and ensuring that configuration files for all chains exist at
+`[custom-subnet-config-dir]/[subnet ID].json`.
 
 ### Chain configuration
 
@@ -356,7 +369,19 @@ metrics and logs.
 
 Collection of logs and metrics is enabled for CI jobs that use
 tmpnet. Each job will execute a step titled `Notify of metrics
-availability` that emits a link to grafana parametized to show results
-for the job. Additional links to grafana parametized to show results
-for individual network will appear in the logs displaying the start of
+availability` that emits a link to grafana parameterized to show
+results for the job. This link is emitted as a github actions
+annotation that appears on the summary page for a test run to increase
+the visibility of collected metrics and logs.
+
+Additional links to grafana parameterized to show results for
+individual network will appear in the logs displaying the start of
 those networks.
+
+In cases where a given job uses private networks in addition to the
+usual shared network, it may be useful to parameterize the
+[run_monitored_tmpnet_action](../../../.github/actions/run-monitored-tmpnet-cmd/action.yml)
+github action with `filter_by_owner` set to the owner string for the
+shared network. This ensures that the link emitted by the annotation
+displays results for only the shared network of the job rather than
+mixing results from all the networks started for the job.

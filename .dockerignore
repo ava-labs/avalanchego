@@ -9,5 +9,5 @@
 LICENSE
 *.md
 
-Dockerfile
-
+# Ignore all dockerfiles not just the main one
+Dockerfile*

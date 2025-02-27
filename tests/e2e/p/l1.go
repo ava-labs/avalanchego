@@ -186,10 +186,11 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		var (
 			networkID           = env.GetNetwork().GetNetworkID()
 			genesisPeerMessages = buffer.NewUnboundedBlockingDeque[p2pmessage.InboundMessage](1)
+			stakingAddress      = e2e.GetLocalStakingAddress(tc, subnetGenesisNode)
 		)
 		genesisPeer, err := peer.StartTestPeer(
 			tc.DefaultContext(),
-			subnetGenesisNode.StakingAddress,
+			stakingAddress,
 			networkID,
 			router.InboundHandlerFunc(func(_ context.Context, m p2pmessage.InboundMessage) {
 				tc.Log().Info("received a message",
@@ -201,6 +202,8 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			}),
 		)
 		require.NoError(err)
+
+		subnetGenesisNodeURI := e2e.GetLocalURI(tc, subnetGenesisNode)
 
 		address := []byte{}
 		tc.By("issuing a ConvertSubnetToL1Tx", func() {
@@ -220,9 +223,9 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			)
 			require.NoError(err)
 
-			tc.By("ensuring the genesis peer has accepted the tx at "+subnetGenesisNode.URI, func() {
+			tc.By("ensuring the genesis peer has accepted the tx at "+subnetGenesisNodeURI, func() {
 				var (
-					client = platformvm.NewClient(subnetGenesisNode.URI)
+					client = platformvm.NewClient(subnetGenesisNodeURI)
 					txID   = tx.ID()
 				)
 				tc.Eventually(
@@ -420,9 +423,9 @@ var _ = e2e.DescribePChain("[L1]", func() {
 				)
 				require.NoError(err)
 
-				tc.By("ensuring the genesis peer has accepted the tx at "+subnetGenesisNode.URI, func() {
+				tc.By("ensuring the genesis peer has accepted the tx at "+subnetGenesisNodeURI, func() {
 					var (
-						client = platformvm.NewClient(subnetGenesisNode.URI)
+						client = platformvm.NewClient(subnetGenesisNodeURI)
 						txID   = tx.ID()
 					)
 					tc.Eventually(
@@ -558,9 +561,9 @@ var _ = e2e.DescribePChain("[L1]", func() {
 				)
 				require.NoError(err)
 
-				tc.By("ensuring the genesis peer has accepted the tx at "+subnetGenesisNode.URI, func() {
+				tc.By("ensuring the genesis peer has accepted the tx at "+subnetGenesisNodeURI, func() {
 					var (
-						client = platformvm.NewClient(subnetGenesisNode.URI)
+						client = platformvm.NewClient(subnetGenesisNodeURI)
 						txID   = tx.ID()
 					)
 					tc.Eventually(

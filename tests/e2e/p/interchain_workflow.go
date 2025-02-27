@@ -112,7 +112,8 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		e2e.WaitForHealthy(tc, node)
 
 		tc.By("retrieving new node's id and pop")
-		infoClient := info.NewClient(node.URI)
+		uri := e2e.GetLocalURI(tc, node)
+		infoClient := info.NewClient(uri)
 		nodeID, nodePOP, err := infoClient.GetNodeID(tc.DefaultContext())
 		require.NoError(err)
 
