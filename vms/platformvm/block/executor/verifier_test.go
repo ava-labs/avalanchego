@@ -53,9 +53,10 @@ import (
 )
 
 type testVerifierConfig struct {
-	DB       database.Database
-	Upgrades upgrade.Config
-	Context  *snow.Context
+	DB                 database.Database
+	Upgrades           upgrade.Config
+	Context            *snow.Context
+	ValidatorFeeConfig validatorfee.Config
 }
 
 func newTestVerifier(t testing.TB, c testVerifierConfig) *verifier {
@@ -69,6 +70,9 @@ func newTestVerifier(t testing.TB, c testVerifierConfig) *verifier {
 	}
 	if c.Context == nil {
 		c.Context = snowtest.Context(t, constants.PlatformChainID)
+	}
+	if c.ValidatorFeeConfig == (validatorfee.Config{}) {
+		c.ValidatorFeeConfig = genesis.LocalParams.ValidatorFeeConfig
 	}
 
 	mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
@@ -99,7 +103,7 @@ func newTestVerifier(t testing.TB, c testVerifierConfig) *verifier {
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Internal{
 				DynamicFeeConfig:       genesis.LocalParams.DynamicFeeConfig,
-				ValidatorFeeConfig:     genesis.LocalParams.ValidatorFeeConfig,
+				ValidatorFeeConfig:     c.ValidatorFeeConfig,
 				SybilProtectionEnabled: true,
 				UpgradeConfig:          c.Upgrades,
 			},
@@ -1325,7 +1329,6 @@ func TestDeactivateLowBalanceL1Validators(t *testing.T) {
 func TestDeactivateLowBalanceL1ValidatorBlockChanges(t *testing.T) {
 	signer, err := localsigner.New()
 	require.NoError(t, err)
-	ctrl := gomock.NewController(t)
 
 	fractionalTimeL1Validator := state.L1Validator{
 		ValidationID:      ids.GenerateTestID(),
@@ -1337,133 +1340,61 @@ func TestDeactivateLowBalanceL1ValidatorBlockChanges(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                     string
-		currentFork              upgradetest.Fork
-		evictLowBalanceValidator bool
-		expectedErr              error
+		name              string
+		currentFork       upgradetest.Fork
+		durationToAdvance time.Duration
+		expectedErr       error
 	}{
 		{
-			name:                     "Before F Upgrade - no L1 validators evicted",
-			currentFork:              upgradetest.Etna,
-			evictLowBalanceValidator: false,
-			expectedErr:              errBanffStandardBlockWithoutChanges,
+			name:              "Before F Upgrade - no L1 validators evicted",
+			currentFork:       upgradetest.Etna,
+			durationToAdvance: 0,
+			expectedErr:       errBanffStandardBlockWithoutChanges,
 		},
 		{
-			name:                     "After F Upgrade - no L1 validators evicted",
-			currentFork:              upgradetest.FUpgrade,
-			evictLowBalanceValidator: false,
-			expectedErr:              errBanffStandardBlockWithoutChanges,
+			name:              "After F Upgrade - no L1 validators evicted",
+			currentFork:       upgradetest.FUpgrade,
+			durationToAdvance: 0,
+			expectedErr:       errBanffStandardBlockWithoutChanges,
 		},
 		{
-			name:                     "Before F Upgrade - L1 validators evicted",
-			currentFork:              upgradetest.Etna,
-			evictLowBalanceValidator: true,
-			expectedErr:              errBanffStandardBlockWithoutChanges,
+			name:              "Before F Upgrade - L1 validators evicted",
+			currentFork:       upgradetest.Etna,
+			durationToAdvance: time.Second,
+			expectedErr:       errBanffStandardBlockWithoutChanges,
 		},
 		{
-			name:                     "After F Upgrade - L1 validators evicted",
-			currentFork:              upgradetest.FUpgrade,
-			evictLowBalanceValidator: true,
+			name:              "After F Upgrade - L1 validators evicted",
+			currentFork:       upgradetest.FUpgrade,
+			durationToAdvance: time.Second,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			env := newEnvironment(t, ctrl, test.currentFork)
-			env.clk.Set(time.Now().Truncate(time.Second))
-
-			parentTime := env.clk.Time()
-			parentHeight := uint64(2022)
-
-			banffParentBlk, err := block.NewBanffStandardBlock(
-				parentTime,
-				ids.Empty, // does not matter
-				parentHeight,
-				nil, // txs do not matter in this test
-			)
-			require.NoError(err)
-			parentID := banffParentBlk.ID()
-
-			// store parent block, with relevant quantities
-			onParentAccept := state.NewMockDiff(ctrl)
-			parentBlockState := &blockState{
-				statelessBlock: banffParentBlk,
-				onAcceptState:  onParentAccept,
-				timestamp:      parentTime,
-			}
-			env.blkManager.(*manager).blkIDToState[parentID] = parentBlockState
-			env.blkManager.(*manager).lastAccepted = parentID
-
-			env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
-				statelessBlock: banffParentBlk,
-				onAcceptState:  onParentAccept,
-				timestamp:      parentTime,
-			}
-			env.blkManager.(*manager).lastAccepted = parentID
-
-			// store just one current staker to mark next staker time.
-			onParentAccept.EXPECT().GetCurrentStakerIterator().Return(iterator.Empty[*state.Staker]{}, nil).AnyTimes()
-			onParentAccept.EXPECT().GetPendingStakerIterator().Return(iterator.Empty[*state.Staker]{}, nil).AnyTimes()
-			onParentAccept.EXPECT().GetExpiryIterator().Return(iterator.Empty[state.ExpiryEntry]{}, nil).AnyTimes()
-
-			onParentAccept.EXPECT().GetTimestamp().Return(parentTime).AnyTimes()
-			onParentAccept.EXPECT().GetFeeState().Return(gas.State{}).AnyTimes()
-			onParentAccept.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).AnyTimes()
-			onParentAccept.EXPECT().GetAccruedFees().Return(uint64(0)).AnyTimes()
-			if test.evictLowBalanceValidator {
-				onParentAccept.EXPECT().NumActiveL1Validators().Return(1).AnyTimes()
-				onParentAccept.EXPECT().GetActiveL1ValidatorsIterator().DoAndReturn(func() (iterator.Iterator[state.L1Validator], error) {
-					return iterator.FromSlice(fractionalTimeL1Validator), nil
-				}).AnyTimes()
-				onParentAccept.EXPECT().GetL1Validator(fractionalTimeL1Validator.ValidationID).Return(fractionalTimeL1Validator, nil).AnyTimes()
-			} else {
-				onParentAccept.EXPECT().NumActiveL1Validators().Return(0).AnyTimes()
-				onParentAccept.EXPECT().GetActiveL1ValidatorsIterator().DoAndReturn(func() (iterator.Iterator[state.L1Validator], error) {
-					return iterator.Empty[state.L1Validator]{}, nil
-				}).AnyTimes()
-			}
-
-			validatorFeeConfig := validatorfee.Config{
-				Capacity:                 genesis.LocalParams.ValidatorFeeConfig.Capacity,
-				Target:                   genesis.LocalParams.ValidatorFeeConfig.Target,
-				MinPrice:                 gas.Price(2 * units.NanoAvax), // Min price is increased to allow fractional fees
-				ExcessConversionConstant: genesis.LocalParams.ValidatorFeeConfig.ExcessConversionConstant,
-			}
-
-			mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
-			require.NoError(err)
-
-			verifier := &verifier{
-				txExecutorBackend: &executor.Backend{
-					Config: &config.Internal{
-						UpgradeConfig:      upgradetest.GetConfig(test.currentFork),
-						ValidatorFeeConfig: validatorFeeConfig,
-					},
-					Clk: &mockable.Clock{},
+			verifier := newTestVerifier(t, testVerifierConfig{
+				Upgrades: upgradetest.GetConfig(test.currentFork),
+				ValidatorFeeConfig: validatorfee.Config{
+					Capacity:                 genesis.LocalParams.ValidatorFeeConfig.Capacity,
+					Target:                   genesis.LocalParams.ValidatorFeeConfig.Target,
+					MinPrice:                 gas.Price(2 * units.NanoAvax), // Min price is increased to allow fractional fees
+					ExcessConversionConstant: genesis.LocalParams.ValidatorFeeConfig.ExcessConversionConstant,
 				},
-				backend: &backend{
-					blkIDToState: map[ids.ID]*blockState{
-						parentID: parentBlockState,
-					},
-					Mempool: mempool,
-					state:   statetest.New(t, statetest.Config{}),
-					ctx: &snow.Context{
-						Log: logging.NoLog{},
-					},
-				},
-			}
+			})
+
+			require.NoError(verifier.state.PutL1Validator(fractionalTimeL1Validator))
 
 			blk, err := block.NewBanffStandardBlock(
-				parentTime.Add(time.Second), // 1 second after parent block
-				parentID,
-				parentHeight+1,
-				[]*txs.Tx{},
+				genesistest.DefaultValidatorStartTime.Add(test.durationToAdvance),
+				verifier.state.GetLastAccepted(),
+				1,
+				nil, // txs do not matter in this test
 			)
 			require.NoError(err)
 
 			err = verifier.BanffStandardBlock(blk)
-			require.Equal(test.expectedErr, err)
+			require.ErrorIs(err, test.expectedErr)
 		})
 	}
 }
