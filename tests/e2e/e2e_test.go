@@ -10,6 +10,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	// ensure test packages are scanned by ginkgo
 	_ "github.com/ava-labs/avalanchego/tests/e2e/banff"
@@ -50,6 +51,9 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	} else {
 		upgrades.FUpgradeTime = upgrade.UnscheduledActivationTime
 	}
+	tc.Log().Info("setting upgrades",
+		zap.Reflect("upgrades", upgrades),
+	)
 
 	upgradeJSON, err := json.Marshal(upgrades)
 	require.NoError(tc, err)
