@@ -89,6 +89,7 @@ runs:
           ~/.tmpnet/prometheus/prometheus.log
           ~/.tmpnet/promtail/promtail.log
         if-no-files-found: error
+    # TODO(marun) Maybe optionally run these checks in an AfterSuite step?
     - name: Check that logs were collected
       if: always()
       shell: bash
