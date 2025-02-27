@@ -183,7 +183,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 
 				// If the gas price has decreased, stop the loop.
 				if initialGasPrice.Cmp(latest.BaseFee) >= 0 {
-					tc.Log().Info("gas price has increased",
+					tc.Log().Info("gas price has decreased",
 						zap.Stringer("initialPrice", initialGasPrice),
 						zap.Stringer("newPrice", latest.BaseFee),
 					)
@@ -214,7 +214,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 
 				// The gas price will be checked at the start of the next iteration
 				return false
-			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "failed to see gas price increase before timeout")
+			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "failed to see gas price decrease before timeout")
 		})
 
 		_ = e2e.CheckBootstrapIsPossible(tc, privateNetwork)
