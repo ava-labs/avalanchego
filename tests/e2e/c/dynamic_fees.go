@@ -144,7 +144,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 			zap.Stringer("targetPrice", targetGasPrice),
 		)
 
-		tc.By("calling the contract repeatedly until a gas price increase is detected", func() {
+		tc.By("calling the contract repeatedly until a sufficient gas price increase is detected", func() {
 			// Evaluate the bytes representation of the contract
 			hashingABI, err := abi.JSON(strings.NewReader(consumeGasABIJson))
 			require.NoError(err)
@@ -199,7 +199,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 			recipientKey        = e2e.NewPrivateKey(tc)
 			recipientEthAddress = recipientKey.EthAddress()
 		)
-		tc.By("calling the contract repeatedly until a gas price decrease is detected", func() {
+		tc.By("calling the contract repeatedly until a sufficient gas price decrease is detected", func() {
 			tc.Eventually(func() bool {
 				// Check the gas price
 				latest, err := ethClient.HeaderByNumber(tc.DefaultContext(), nil)
