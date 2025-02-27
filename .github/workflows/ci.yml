@@ -46,7 +46,7 @@ jobs:
       - name: fuzz_test
         shell: bash
         run: ./scripts/build_fuzz.sh 10 # Run each fuzz test 10 seconds
-  e2e_pre_etna:
+  e2e_pre_fortuna:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -73,7 +73,7 @@ jobs:
         if: always()
         with:
           name: e2e-pre-etna-tmpnet-data
-  e2e_post_etna:
+  e2e_post_fortuna:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -84,7 +84,7 @@ jobs:
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: E2E_SERIAL=1 ./scripts/tests.e2e.sh --delay-network-shutdown --activate-etna
+          run: E2E_SERIAL=1 ./scripts/tests.e2e.sh --delay-network-shutdown --activate-fortuna
           prometheus_id: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           loki_id: ${{ secrets.LOKI_ID || '' }}
