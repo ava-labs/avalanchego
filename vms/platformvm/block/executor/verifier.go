@@ -704,13 +704,11 @@ func deactivateLowBalanceL1Validators(
 	// diff.
 	l1ValidatorIterator.Release()
 
-	var changed bool
 	for _, l1Validator := range l1ValidatorsToDeactivate {
 		l1Validator.EndAccumulatedFee = 0
 		if err := diff.PutL1Validator(l1Validator); err != nil {
 			return false, fmt.Errorf("could not deactivate L1 validator %s: %w", l1Validator.ValidationID, err)
 		}
-		changed = true
 	}
-	return changed, nil
+	return len(l1ValidatorsToDeactivate) > 0, nil
 }

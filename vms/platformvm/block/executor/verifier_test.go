@@ -1323,7 +1323,7 @@ func TestDeactivateLowBalanceL1Validators(t *testing.T) {
 }
 
 func TestDeactivateLowBalanceL1ValidatorBlockChanges(t *testing.T) {
-	sk, err := bls.NewSigner()
+	signer, err := localsigner.New()
 	require.NoError(t, err)
 	ctrl := gomock.NewController(t)
 
@@ -1331,7 +1331,7 @@ func TestDeactivateLowBalanceL1ValidatorBlockChanges(t *testing.T) {
 		ValidationID:      ids.GenerateTestID(),
 		SubnetID:          ids.GenerateTestID(),
 		NodeID:            ids.GenerateTestNodeID(),
-		PublicKey:         bls.PublicKeyToUncompressedBytes(sk.PublicKey()),
+		PublicKey:         bls.PublicKeyToUncompressedBytes(signer.PublicKey()),
 		Weight:            1,
 		EndAccumulatedFee: 3 * units.NanoAvax, // lasts 1.5 seconds
 	}
@@ -1431,8 +1431,8 @@ func TestDeactivateLowBalanceL1ValidatorBlockChanges(t *testing.T) {
 				ExcessConversionConstant: genesis.LocalParams.ValidatorFeeConfig.ExcessConversionConstant,
 			}
 
-			mempool := mempoolmock.NewMempool(ctrl)
-			mempool.EXPECT().Remove(gomock.Any()).AnyTimes()
+			mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+			require.NoError(err)
 
 			verifier := &verifier{
 				txExecutorBackend: &executor.Backend{
