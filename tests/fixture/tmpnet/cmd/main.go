@@ -16,7 +16,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/tests"
-	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
@@ -124,7 +123,7 @@ func main() {
 	startNetworkCmd.PersistentFlags().StringVar(
 		&pluginDir,
 		"plugin-dir",
-		e2e.GetEnvWithDefault(tmpnet.AvalancheGoPluginDirEnvName, os.ExpandEnv("$HOME/.avalanchego/plugins")),
+		tmpnet.GetEnvWithDefault(tmpnet.AvalancheGoPluginDirEnvName, os.ExpandEnv("$HOME/.avalanchego/plugins")),
 		"[optional] the dir containing VM plugins",
 	)
 	startNetworkCmd.PersistentFlags().Uint8Var(&nodeCount, "node-count", tmpnet.DefaultNodeCount, "Number of nodes the network should initially consist of")
@@ -166,6 +165,36 @@ func main() {
 		},
 	}
 	rootCmd.AddCommand(restartNetworkCmd)
+
+	startCollectorsCmd := &cobra.Command{
+		Use:   "start-collectors",
+		Short: "Start log and metric collectors for local process-based nodes",
+		RunE: func(*cobra.Command, []string) error {
+			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
+			defer cancel()
+			log, err := tests.LoggerForFormat("", rawLogFormat)
+			if err != nil {
+				return err
+			}
+			return tmpnet.StartCollectors(ctx, log)
+		},
+	}
+	rootCmd.AddCommand(startCollectorsCmd)
+
+	stopCollectorsCmd := &cobra.Command{
+		Use:   "stop-collectors",
+		Short: "Stop log and metric collectors for local process-based nodes",
+		RunE: func(*cobra.Command, []string) error {
+			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
+			defer cancel()
+			log, err := tests.LoggerForFormat("", rawLogFormat)
+			if err != nil {
+				return err
+			}
+			return tmpnet.StopCollectors(ctx, log)
+		},
+	}
+	rootCmd.AddCommand(stopCollectorsCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "tmpnetctl failed: %v\n", err)
