@@ -32,7 +32,8 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 
 	const (
 		// maxFeePerGas is the maximum fee that transactions issued by this test
-		// will be willing to pay.
+		// will be willing to pay. The actual value doesn't really matter, it
+		// just needs to be higher than the `targetGasPrice` calculated below.
 		maxFeePerGas = 1000 * params.GWei
 		// minFeePerGas is the minimum fee that transactions issued by this test
 		// will pay.
