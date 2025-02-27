@@ -92,10 +92,14 @@ func (f *feeInfoProvider) addHeader(ctx context.Context, header *types.Header) (
 		timestamp: header.Time,
 		baseFee:   header.BaseFee,
 	}
+
+	totalGasUsed := new(big.Int).SetUint64(header.GasUsed)
+	minGasUsed := new(big.Int).SetUint64(f.minGasUsed)
+
 	// Don't bias the estimate with blocks containing a limited number of transactions paying to
 	// expedite block production.
 	var err error
-	if f.minGasUsed <= header.GasUsed {
+	if minGasUsed.Cmp(totalGasUsed) <= 0 {
 		// Compute minimum required tip to be included in previous block
 		//
 		// NOTE: Using this approach, we will never recommend that the caller
