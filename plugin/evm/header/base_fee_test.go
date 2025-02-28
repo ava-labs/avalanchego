@@ -58,7 +58,7 @@ func TestBaseFee(t *testing.T) {
 			parent: &types.Header{
 				Number: big.NewInt(1),
 			},
-			wantErr: errDynamicFeeWindowInsufficientLength,
+			wantErr: ap3.ErrWindowInsufficientLength,
 		},
 		{
 			name:     "ap3_invalid_timestamp",
@@ -66,7 +66,7 @@ func TestBaseFee(t *testing.T) {
 			parent: &types.Header{
 				Number: big.NewInt(1),
 				Time:   1,
-				Extra:  feeWindowBytes(ap3.Window{}),
+				Extra:  (&ap3.Window{}).Bytes(),
 			},
 			timestamp: 0,
 			wantErr:   errInvalidTimestamp,
@@ -78,7 +78,7 @@ func TestBaseFee(t *testing.T) {
 				Number:  big.NewInt(1),
 				GasUsed: ap3.TargetGas - ap3.IntrinsicBlockGas,
 				Time:    1,
-				Extra:   feeWindowBytes(ap3.Window{}),
+				Extra:   (&ap3.Window{}).Bytes(),
 				BaseFee: big.NewInt(ap3.MinBaseFee + 1),
 			},
 			timestamp: 1,
@@ -89,7 +89,7 @@ func TestBaseFee(t *testing.T) {
 			upgrades: params.TestApricotPhase3Config.NetworkUpgrades,
 			parent: &types.Header{
 				Number:  big.NewInt(1),
-				Extra:   feeWindowBytes(ap3.Window{}),
+				Extra:   (&ap3.Window{}).Bytes(),
 				BaseFee: big.NewInt(ap3.MaxBaseFee),
 			},
 			timestamp: 1,
@@ -112,7 +112,7 @@ func TestBaseFee(t *testing.T) {
 			upgrades: params.TestApricotPhase3Config.NetworkUpgrades,
 			parent: &types.Header{
 				Number:  big.NewInt(1),
-				Extra:   feeWindowBytes(ap3.Window{}),
+				Extra:   (&ap3.Window{}).Bytes(),
 				BaseFee: big.NewInt(ap3.MaxBaseFee),
 			},
 			timestamp: 2 * ap3.WindowLen,
@@ -137,7 +137,7 @@ func TestBaseFee(t *testing.T) {
 			parent: &types.Header{
 				Number:  big.NewInt(1),
 				GasUsed: 2 * ap3.TargetGas,
-				Extra:   feeWindowBytes(ap3.Window{}),
+				Extra:   (&ap3.Window{}).Bytes(),
 				BaseFee: big.NewInt(ap3.MinBaseFee),
 			},
 			timestamp: 1,
@@ -161,7 +161,7 @@ func TestBaseFee(t *testing.T) {
 			parent: &types.Header{
 				Number:  big.NewInt(1),
 				GasUsed: 1,
-				Extra:   feeWindowBytes(ap3.Window{}),
+				Extra:   (&ap3.Window{}).Bytes(),
 				BaseFee: big.NewInt(1),
 			},
 			timestamp: 2 * ap3.WindowLen,
@@ -180,7 +180,7 @@ func TestBaseFee(t *testing.T) {
 			upgrades: params.TestApricotPhase4Config.NetworkUpgrades,
 			parent: &types.Header{
 				Number:       big.NewInt(1),
-				Extra:        feeWindowBytes(ap3.Window{}),
+				Extra:        (&ap3.Window{}).Bytes(),
 				BaseFee:      big.NewInt(ap4.MaxBaseFee),
 				BlockGasCost: big.NewInt(ap4.MinBlockGasCost),
 			},
@@ -205,7 +205,7 @@ func TestBaseFee(t *testing.T) {
 			parent: &types.Header{
 				Number:         big.NewInt(1),
 				GasUsed:        ap3.TargetGas,
-				Extra:          feeWindowBytes(ap3.Window{}),
+				Extra:          (&ap3.Window{}).Bytes(),
 				BaseFee:        big.NewInt(ap4.MinBaseFee),
 				ExtDataGasUsed: big.NewInt(ap3.TargetGas),
 				BlockGasCost:   big.NewInt(ap4.MinBlockGasCost),
@@ -238,7 +238,7 @@ func TestBaseFee(t *testing.T) {
 			upgrades: params.TestApricotPhase5Config.NetworkUpgrades,
 			parent: &types.Header{
 				Number:  big.NewInt(1),
-				Extra:   feeWindowBytes(ap3.Window{}),
+				Extra:   (&ap3.Window{}).Bytes(),
 				BaseFee: big.NewInt(ap4.MaxBaseFee),
 			},
 			timestamp: 1,
@@ -262,7 +262,7 @@ func TestBaseFee(t *testing.T) {
 			parent: &types.Header{
 				Number:         big.NewInt(1),
 				GasUsed:        ap5.TargetGas,
-				Extra:          feeWindowBytes(ap3.Window{}),
+				Extra:          (&ap3.Window{}).Bytes(),
 				BaseFee:        big.NewInt(ap4.MinBaseFee),
 				ExtDataGasUsed: big.NewInt(ap5.TargetGas),
 			},
@@ -295,7 +295,7 @@ func TestBaseFee(t *testing.T) {
 			parent: &types.Header{
 				Number:         big.NewInt(1),
 				GasUsed:        ap5.TargetGas,
-				Extra:          feeWindowBytes(ap3.Window{}),
+				Extra:          (&ap3.Window{}).Bytes(),
 				BaseFee:        big.NewInt(etna.MinBaseFee),
 				ExtDataGasUsed: big.NewInt(ap5.TargetGas),
 			},
@@ -346,7 +346,7 @@ func TestEstimateNextBaseFee(t *testing.T) {
 			upgrades: params.TestApricotPhase3Config.NetworkUpgrades,
 			parent: &types.Header{
 				Number:  big.NewInt(1),
-				Extra:   feeWindowBytes(ap3.Window{}),
+				Extra:   (&ap3.Window{}).Bytes(),
 				BaseFee: big.NewInt(ap3.MaxBaseFee),
 			},
 			timestamp: 1,

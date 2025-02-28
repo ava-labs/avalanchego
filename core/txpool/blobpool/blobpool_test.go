@@ -120,7 +120,7 @@ func (bc *testBlockChain) CurrentBlock() *types.Header {
 			GasLimit: gasLimit,
 			GasUsed:  0,
 			BaseFee:  mid,
-			Extra:    make([]byte, header.FeeWindowSize),
+			Extra:    make([]byte, ap3.WindowSize),
 		}
 		baseFee, err := header.BaseFee(
 			bc.config, parent, blockTime,
@@ -159,7 +159,7 @@ func (bc *testBlockChain) CurrentBlock() *types.Header {
 		GasLimit:      gasLimit,
 		BaseFee:       baseFee,
 		ExcessBlobGas: &excessBlobGas,
-		Extra:         make([]byte, header.FeeWindowSize),
+		Extra:         make([]byte, ap3.WindowSize),
 	}
 }
 
