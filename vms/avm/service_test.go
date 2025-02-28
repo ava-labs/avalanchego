@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -261,7 +262,13 @@ func TestServiceGetTxs(t *testing.T) {
 	service := &Service{vm: env.vm}
 
 	var err error
-	env.vm.addressTxsIndexer, err = index.NewIndexer(env.vm.db, env.vm.ctx.Log, "", prometheus.NewRegistry(), false)
+	env.vm.addressTxsIndexer, err = index.NewIndexer(
+		prefixdb.New(dbPrefixIndexer, env.vm.metadataDB),
+		env.vm.ctx.Log,
+		"",
+		prometheus.NewRegistry(),
+		false,
+	)
 	require.NoError(err)
 
 	assetID := ids.GenerateTestID()
@@ -270,7 +277,7 @@ func TestServiceGetTxs(t *testing.T) {
 	require.NoError(err)
 
 	testTxCount := 25
-	testTxs := initTestTxIndex(t, env.vm.db, addr, assetID, testTxCount)
+	testTxs := initTestTxIndex(t, env.vm.metadataDB, addr, assetID, testTxCount)
 
 	env.vm.ctx.Lock.Unlock()
 

@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"context"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -23,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/x/merkledb"
 )
 
 const trackChecksums = false
@@ -44,8 +47,24 @@ func TestBaseTxExecutor(t *testing.T) {
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
-	registerer := prometheus.NewRegistry()
-	state, err := state.New(vdb, parser, registerer, trackChecksums)
+	merkleDBConfig := merkledb.NewConfig()
+	stateDB, err := merkledb.New(
+		context.Background(),
+		prefixdb.New([]byte("state"), vdb),
+		merkleDBConfig,
+		"",
+	)
+	require.NoError(err)
+	state, err := state.New(
+		context.Background(),
+		vdb,
+		stateDB,
+		prefixdb.New([]byte("metadata"), vdb),
+		parser,
+		prometheus.NewRegistry(),
+		trackChecksums,
+		merkleDBConfig,
+	)
 	require.NoError(err)
 
 	utxoID := avax.UTXOID{
@@ -152,7 +171,24 @@ func TestCreateAssetTxExecutor(t *testing.T) {
 	db := memdb.New()
 	vdb := versiondb.New(db)
 	registerer := prometheus.NewRegistry()
-	state, err := state.New(vdb, parser, registerer, trackChecksums)
+	merkleDBConfig := merkledb.NewConfig()
+	stateDB, err := merkledb.New(
+		context.Background(),
+		prefixdb.New([]byte("state"), vdb),
+		merkleDBConfig,
+		"",
+	)
+	require.NoError(err)
+	state, err := state.New(
+		context.Background(),
+		vdb,
+		stateDB,
+		prefixdb.New([]byte("metadata"), vdb),
+		parser,
+		registerer,
+		trackChecksums,
+		merkleDBConfig,
+	)
 	require.NoError(err)
 
 	utxoID := avax.UTXOID{
@@ -297,7 +333,24 @@ func TestOperationTxExecutor(t *testing.T) {
 	db := memdb.New()
 	vdb := versiondb.New(db)
 	registerer := prometheus.NewRegistry()
-	state, err := state.New(vdb, parser, registerer, trackChecksums)
+	merkleDBConfig := merkledb.NewConfig()
+	stateDB, err := merkledb.New(
+		context.Background(),
+		prefixdb.New([]byte("state"), vdb),
+		merkleDBConfig,
+		"",
+	)
+	require.NoError(err)
+	state, err := state.New(
+		context.Background(),
+		vdb,
+		stateDB,
+		prefixdb.New([]byte("metadata"), vdb),
+		parser,
+		registerer,
+		trackChecksums,
+		merkleDBConfig,
+	)
 	require.NoError(err)
 
 	outputOwners := secp256k1fx.OutputOwners{

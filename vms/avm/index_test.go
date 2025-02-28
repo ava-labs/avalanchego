@@ -59,9 +59,9 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 
 	// for each tx check its indexed at right index
 	for i, tx := range txs {
-		assertIndexedTX(t, env.vm.db, uint64(i), addr, txAssetID.ID, tx.ID())
+		assertIndexedTX(t, env.vm.metadataDB, uint64(i), addr, txAssetID.ID, tx.ID())
 	}
-	assertLatestIdx(t, env.vm.db, addr, txAssetID.ID, 5)
+	assertLatestIdx(t, env.vm.metadataDB, addr, txAssetID.ID, 5)
 }
 
 func TestIndexTransaction_MultipleTransactions(t *testing.T) {
@@ -102,8 +102,8 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 
 	// for each *UniqueTx check its indexed at right index for the right address
 	for addr, tx := range addressTxMap {
-		assertIndexedTX(t, env.vm.db, 0, addr, txAssetID.ID, tx.ID())
-		assertLatestIdx(t, env.vm.db, addr, txAssetID.ID, 1)
+		assertIndexedTX(t, env.vm.metadataDB, 0, addr, txAssetID.ID, tx.ID())
+		assertLatestIdx(t, env.vm.metadataDB, addr, txAssetID.ID, 1)
 	}
 }
 
@@ -141,8 +141,8 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 
 	env.vm.ctx.Lock.Lock()
 
-	assertIndexedTX(t, env.vm.db, 0, addr, txAssetID.ID, tx.ID())
-	assertLatestIdx(t, env.vm.db, addr, txAssetID.ID, 1)
+	assertIndexedTX(t, env.vm.metadataDB, 0, addr, txAssetID.ID, tx.ID())
+	assertLatestIdx(t, env.vm.metadataDB, addr, txAssetID.ID, 1)
 }
 
 func TestIndexer_Read(t *testing.T) {
@@ -156,7 +156,7 @@ func TestIndexer_Read(t *testing.T) {
 	addr := ids.GenerateTestShortID()
 
 	// setup some fake txs under the above generated address and asset IDs
-	testTxs := initTestTxIndex(t, env.vm.db, addr, assetID, 25)
+	testTxs := initTestTxIndex(t, env.vm.metadataDB, addr, assetID, 25)
 	require.Len(testTxs, 25)
 
 	// read the pages, 5 items at a time
@@ -275,9 +275,10 @@ func buildTX(chainID ids.ID, utxoID avax.UTXOID, txAssetID avax.Asset, address .
 	}}
 }
 
-func assertLatestIdx(t *testing.T, db database.Database, sourceAddress ids.ShortID, assetID ids.ID, expectedIdx uint64) {
+func assertLatestIdx(t *testing.T, baseDB database.Database, sourceAddress ids.ShortID, assetID ids.ID, expectedIdx uint64) {
 	require := require.New(t)
 
+	db := prefixdb.New(dbPrefixIndexer, baseDB)
 	addressDB := prefixdb.New(sourceAddress[:], db)
 	assetDB := prefixdb.New(assetID[:], addressDB)
 
@@ -287,9 +288,17 @@ func assertLatestIdx(t *testing.T, db database.Database, sourceAddress ids.Short
 	require.Equal(expectedIdxBytes, idxBytes)
 }
 
-func assertIndexedTX(t *testing.T, db database.Database, index uint64, sourceAddress ids.ShortID, assetID ids.ID, transactionID ids.ID) {
+func assertIndexedTX(
+	t *testing.T,
+	metadataDB database.Database,
+	index uint64,
+	sourceAddress ids.ShortID,
+	assetID ids.ID,
+	transactionID ids.ID,
+) {
 	require := require.New(t)
 
+	db := prefixdb.New(dbPrefixIndexer, metadataDB)
 	addressDB := prefixdb.New(sourceAddress[:], db)
 	assetDB := prefixdb.New(assetID[:], addressDB)
 
@@ -307,7 +316,7 @@ func assertIndexedTX(t *testing.T, db database.Database, index uint64, sourceAdd
 //	    - "idx": 2
 //	    - 0: txID1
 //	    - 1: txID1
-func initTestTxIndex(t *testing.T, db *versiondb.Database, address ids.ShortID, assetID ids.ID, txCount int) []ids.ID {
+func initTestTxIndex(t *testing.T, baseDB database.Database, address ids.ShortID, assetID ids.ID, txCount int) []ids.ID {
 	require := require.New(t)
 
 	testTxs := make([]ids.ID, txCount)
@@ -315,6 +324,7 @@ func initTestTxIndex(t *testing.T, db *versiondb.Database, address ids.ShortID, 
 		testTxs[i] = ids.GenerateTestID()
 	}
 
+	db := prefixdb.New(dbPrefixIndexer, baseDB)
 	addressPrefixDB := prefixdb.New(address[:], db)
 	assetPrefixDB := prefixdb.New(assetID[:], addressPrefixDB)
 
@@ -322,11 +332,8 @@ func initTestTxIndex(t *testing.T, db *versiondb.Database, address ids.ShortID, 
 		idxBytes := database.PackUInt64(uint64(i))
 		require.NoError(assetPrefixDB.Put(idxBytes, txID[:]))
 	}
-	_, err := db.CommitBatch()
-	require.NoError(err)
 
 	idxBytes := database.PackUInt64(uint64(len(testTxs)))
 	require.NoError(assetPrefixDB.Put([]byte("idx"), idxBytes))
-	require.NoError(db.Commit())
 	return testTxs
 }

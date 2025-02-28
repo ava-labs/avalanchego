@@ -4,6 +4,7 @@
 package state
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/upgrade"
@@ -20,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/x/merkledb"
 )
 
 const trackChecksums = false
@@ -102,15 +105,41 @@ func TestState(t *testing.T) {
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
-	s, err := New(vdb, parser, prometheus.NewRegistry(), trackChecksums)
+	metadataDB := prefixdb.New([]byte("metadata"), vdb)
+	merkleDBConfig := merkledb.NewConfig()
+	stateDB, err := merkledb.New(
+		context.Background(),
+		prefixdb.New([]byte("state"), vdb),
+		merkleDBConfig,
+		"state_db",
+	)
+	require.NoError(err)
+	s, err := New(
+		context.Background(),
+		vdb,
+		stateDB,
+		metadataDB,
+		parser,
+		prometheus.NewRegistry(),
+		trackChecksums,
+		merkleDBConfig,
+	)
 	require.NoError(err)
 
 	s.AddUTXO(populatedUTXO)
 	s.AddTx(populatedTx)
 	s.AddBlock(populatedBlk)
 	require.NoError(s.Commit())
-
-	s, err = New(vdb, parser, prometheus.NewRegistry(), trackChecksums)
+	s, err = New(
+		context.Background(),
+		vdb,
+		stateDB,
+		metadataDB,
+		parser,
+		prometheus.NewRegistry(),
+		trackChecksums,
+		merkleDBConfig,
+	)
 	require.NoError(err)
 
 	ChainUTXOTest(t, s)
@@ -123,7 +152,23 @@ func TestDiff(t *testing.T) {
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
-	s, err := New(vdb, parser, prometheus.NewRegistry(), trackChecksums)
+	stateDB, err := merkledb.New(
+		context.Background(),
+		prefixdb.New([]byte("state"), vdb),
+		merkledb.NewConfig(),
+		"",
+	)
+	require.NoError(err)
+	s, err := New(
+		context.Background(),
+		vdb,
+		stateDB,
+		prefixdb.New([]byte("metadata"), vdb),
+		parser,
+		prometheus.NewRegistry(),
+		trackChecksums,
+		merkledb.NewConfig(),
+	)
 	require.NoError(err)
 
 	s.AddUTXO(populatedUTXO)
@@ -283,7 +328,24 @@ func TestInitializeChainState(t *testing.T) {
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
-	s, err := New(vdb, parser, prometheus.NewRegistry(), trackChecksums)
+	stateDB, err := merkledb.New(
+		context.Background(),
+		prefixdb.New([]byte("state"), vdb),
+		merkledb.NewConfig(),
+		"",
+	)
+	require.NoError(err)
+	merkleDBConfig := merkledb.NewConfig()
+	s, err := New(
+		context.Background(),
+		vdb,
+		stateDB,
+		prefixdb.New([]byte("metadata"), vdb),
+		parser,
+		prometheus.NewRegistry(),
+		trackChecksums,
+		merkleDBConfig,
+	)
 	require.NoError(err)
 
 	stopVertexID := ids.GenerateTestID()

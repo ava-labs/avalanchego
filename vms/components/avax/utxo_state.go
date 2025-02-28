@@ -4,6 +4,8 @@
 package avax
 
 import (
+	"context"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -32,7 +34,7 @@ type UTXOState interface {
 	UTXOWriter
 
 	// Checksum returns the current UTXOChecksum.
-	Checksum() ids.ID
+	Checksum(ctx context.Context) (ids.ID, error)
 }
 
 // UTXOReader is a thin wrapper around a database to provide fetching of UTXOs.
@@ -251,8 +253,8 @@ func (s *utxoState) UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, err
 	return utxoIDs, iter.Error()
 }
 
-func (s *utxoState) Checksum() ids.ID {
-	return s.checksum
+func (s *utxoState) Checksum(context.Context) (ids.ID, error) {
+	return s.checksum, nil
 }
 
 func (s *utxoState) getIndexDB(addr []byte) linkeddb.LinkedDB {
