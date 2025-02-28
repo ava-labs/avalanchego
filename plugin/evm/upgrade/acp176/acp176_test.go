@@ -164,10 +164,10 @@ var (
 				Gas: gas.State{
 					Excess: math.MaxUint64,
 				},
-				TargetExcess: 924430531, // 2^25 * ln(MaxUint64 / MinMaxCapacity)
+				TargetExcess: 947_688_691, // 2^25 * ln(MaxUint64 / MinMaxCapacity)
 			},
-			target:      922_337_190_378_117_171,
-			maxCapacity: 18_446_743_807_562_343_420,
+			target:      1_844_674_384_269_701_322,
+			maxCapacity: 18_446_743_842_697_013_220,
 			gasPrice:    2 * MinGasPrice,
 		},
 		{
@@ -287,16 +287,16 @@ var (
 			name: "0_seconds_over_capacity",
 			initial: State{
 				Gas: gas.State{
-					Capacity: 31_000_000, // Could happen if the targetExcess was modified
+					Capacity: 16_000_000, // Could happen if the targetExcess was modified
 					Excess:   2_000_000,
 				},
-				// Set capacity to 30M
+				// Set capacity to 15M
 				TargetExcess: 13_605_152, // 2^25 * ln(1.5)
 			},
 			seconds: 0,
 			expected: State{
 				Gas: gas.State{
-					Capacity: 30_000_000, // capped at 30M
+					Capacity: 15_000_000, // capped at 15M
 					Excess:   2_000_000,  // unmodified
 				},
 				TargetExcess: 13_605_152, // unmodified
@@ -562,7 +562,7 @@ var (
 			name: "reduce_capacity",
 			initial: State{
 				Gas: gas.State{
-					Capacity: 20_039_100, // MinTargetPerSecond * e^(2*MaxTargetExcessDiff / TargetConversion)
+					Capacity: 10_019_550, // MinMaxCapacity * e^(2*MaxTargetExcessDiff / TargetConversion)
 					Excess:   2_000_000_000,
 				},
 				TargetExcess: 2 * MaxTargetExcessDiff,
@@ -570,7 +570,7 @@ var (
 			desiredTargetExcess: 0,
 			expected: State{
 				Gas: gas.State{
-					Capacity: 20_019_540,    // MinTargetPerSecond * e^(MaxTargetExcessDiff / TargetConversion)
+					Capacity: 10_009_770,    // MinMaxCapacity * e^(MaxTargetExcessDiff / TargetConversion)
 					Excess:   1_998_047_816, // 2M * NewTarget / OldTarget
 				},
 				TargetExcess: MaxTargetExcessDiff,

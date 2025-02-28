@@ -156,7 +156,7 @@ func TestStateProcessorErrors(t *testing.T) {
 					// This test was modified to account for ACP-176 gas limits
 					makeTx(key1, 0, common.Address{}, big.NewInt(0), acp176.MinMaxCapacity+1, big.NewInt(acp176.MinGasPrice), nil),
 				},
-				want: "could not apply tx 0 [0x6c95e59678246e8b44a1d9382a9cc6589684298b32b7aaf640e8b6fc75ce3dfc]: gas limit reached",
+				want: "could not apply tx 0 [0xb709565c056a68a4b4dc7714ae901a0f03663bb98f9fa58a10b88ec614362caf]: gas limit reached",
 			},
 			{ // ErrInsufficientFundsForTransfer
 				txs: []*types.Transaction{

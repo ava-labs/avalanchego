@@ -25,7 +25,7 @@ const (
 	MaxTargetExcessDiff = 1 << 15                                   // Q
 	MinGasPrice         = 1                                         // M
 
-	TimeToFillCapacity            = 10   // in seconds
+	TimeToFillCapacity            = 5    // in seconds
 	TargetToMax                   = 2    // multiplier to convert from target per second to max per second
 	TargetToPriceUpdateConversion = 87   // 87s ~= 60s * ln(2) which makes the price double at most every ~60 seconds
 	MaxTargetChangeRate           = 1024 // Controls the rate that the target can change per block.
