@@ -29,5 +29,5 @@ source "$AVALANCHE_PATH"/scripts/constants.sh
 source "$AVALANCHE_PATH"/scripts/git_commit.sh
 
 build_args="$race"
-echo "Building AvalancheGo..."
+echo "Building AvalancheGo with [$(go version)]..."
 go build $build_args -ldflags "-X github.com/ava-labs/avalanchego/version.GitCommit=$git_commit $static_ld_flags" -o "$avalanchego_path" "$AVALANCHE_PATH/main/"*.go

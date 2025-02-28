@@ -179,13 +179,17 @@ jobs:
           go generate -run "go.uber.org/mock/mockgen" ./...
           .github/workflows/check-clean-branch.sh
   go_mod_tidy:
-    name: Up-to-date go.mod and go.sum
+    name: Up-to-date go.mod and go.sum and gomod2nix.toml
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
       - shell: bash
         run: go mod tidy
+      - shell: bash
+        run: .github/workflows/check-clean-branch.sh
+      - shell: bash
+        run: ./scripts/gomod2nix_gen.sh
       - shell: bash
         run: .github/workflows/check-clean-branch.sh
   test_build_image:
