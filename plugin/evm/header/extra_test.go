@@ -7,8 +7,10 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/upgrade/acp176"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap3"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap4"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap5"
@@ -18,16 +20,18 @@ import (
 
 func TestExtraPrefix(t *testing.T) {
 	tests := []struct {
-		name      string
-		upgrades  params.NetworkUpgrades
-		parent    *types.Header
-		timestamp uint64
-		want      []byte
-		wantErr   error
+		name                string
+		upgrades            params.NetworkUpgrades
+		parent              *types.Header
+		header              *types.Header
+		desiredTargetExcess *gas.Gas
+		want                []byte
+		wantErr             error
 	}{
 		{
 			name:     "ap2",
 			upgrades: params.TestApricotPhase2Config.NetworkUpgrades,
+			header:   &types.Header{},
 			want:     nil,
 			wantErr:  nil,
 		},
@@ -39,8 +43,10 @@ func TestExtraPrefix(t *testing.T) {
 			parent: &types.Header{
 				Number: big.NewInt(1),
 			},
-			timestamp: 1,
-			want:      (&ap3.Window{}).Bytes(),
+			header: &types.Header{
+				Time: 1,
+			},
+			want: (&ap3.Window{}).Bytes(),
 		},
 		{
 			name:     "ap3_genesis_block",
@@ -48,7 +54,8 @@ func TestExtraPrefix(t *testing.T) {
 			parent: &types.Header{
 				Number: big.NewInt(0),
 			},
-			want: (&ap3.Window{}).Bytes(),
+			header: &types.Header{},
+			want:   (&ap3.Window{}).Bytes(),
 		},
 		{
 			name:     "ap3_invalid_fee_window",
@@ -56,6 +63,7 @@ func TestExtraPrefix(t *testing.T) {
 			parent: &types.Header{
 				Number: big.NewInt(1),
 			},
+			header:  &types.Header{},
 			wantErr: ap3.ErrWindowInsufficientLength,
 		},
 		{
@@ -66,8 +74,10 @@ func TestExtraPrefix(t *testing.T) {
 				Time:   1,
 				Extra:  (&ap3.Window{}).Bytes(),
 			},
-			timestamp: 0,
-			wantErr:   errInvalidTimestamp,
+			header: &types.Header{
+				Time: 0,
+			},
+			wantErr: errInvalidTimestamp,
 		},
 		{
 			name:     "ap3_normal",
@@ -79,7 +89,9 @@ func TestExtraPrefix(t *testing.T) {
 					1, 2, 3, 4,
 				}).Bytes(),
 			},
-			timestamp: 1,
+			header: &types.Header{
+				Time: 1,
+			},
 			want: func() []byte {
 				window := ap3.Window{
 					1, 2, 3, 4,
@@ -95,7 +107,8 @@ func TestExtraPrefix(t *testing.T) {
 			parent: &types.Header{
 				Number: big.NewInt(0),
 			},
-			want: (&ap3.Window{}).Bytes(),
+			header: &types.Header{},
+			want:   (&ap3.Window{}).Bytes(),
 		},
 		{
 			name:     "ap4_no_block_gas_cost",
@@ -105,7 +118,9 @@ func TestExtraPrefix(t *testing.T) {
 				GasUsed: ap3.TargetGas,
 				Extra:   (&ap3.Window{}).Bytes(),
 			},
-			timestamp: 2,
+			header: &types.Header{
+				Time: 2,
+			},
 			want: func() []byte {
 				var window ap3.Window
 				window.Add(ap3.TargetGas)
@@ -122,7 +137,9 @@ func TestExtraPrefix(t *testing.T) {
 				Extra:        (&ap3.Window{}).Bytes(),
 				BlockGasCost: big.NewInt(ap4.MinBlockGasCost),
 			},
-			timestamp: 1,
+			header: &types.Header{
+				Time: 1,
+			},
 			want: func() []byte {
 				var window ap3.Window
 				window.Add(
@@ -142,7 +159,9 @@ func TestExtraPrefix(t *testing.T) {
 				Extra:          (&ap3.Window{}).Bytes(),
 				ExtDataGasUsed: big.NewInt(5),
 			},
-			timestamp: 1,
+			header: &types.Header{
+				Time: 1,
+			},
 			want: func() []byte {
 				var window ap3.Window
 				window.Add(
@@ -165,7 +184,9 @@ func TestExtraPrefix(t *testing.T) {
 				ExtDataGasUsed: big.NewInt(5),
 				BlockGasCost:   big.NewInt(ap4.MinBlockGasCost),
 			},
-			timestamp: 1,
+			header: &types.Header{
+				Time: 1,
+			},
 			want: func() []byte {
 				window := ap3.Window{
 					1, 2, 3, 4,
@@ -188,7 +209,9 @@ func TestExtraPrefix(t *testing.T) {
 				Extra:        (&ap3.Window{}).Bytes(),
 				BlockGasCost: big.NewInt(ap4.MinBlockGasCost),
 			},
-			timestamp: 1,
+			header: &types.Header{
+				Time: 1,
+			},
 			want: func() []byte {
 				var window ap3.Window
 				window.Add(ap5.TargetGas)
@@ -208,7 +231,9 @@ func TestExtraPrefix(t *testing.T) {
 				ExtDataGasUsed: big.NewInt(5),
 				BlockGasCost:   big.NewInt(ap4.MinBlockGasCost),
 			},
-			timestamp: 1,
+			header: &types.Header{
+				Time: 1,
+			},
 			want: func() []byte {
 				window := ap3.Window{
 					1, 2, 3, 4,
@@ -221,6 +246,94 @@ func TestExtraPrefix(t *testing.T) {
 				return window.Bytes()
 			}(),
 		},
+		{
+			name: "fupgrade_first_block",
+			upgrades: params.NetworkUpgrades{
+				FUpgradeTimestamp: utils.NewUint64(1),
+			},
+			parent: &types.Header{
+				Number: big.NewInt(1),
+			},
+			header: &types.Header{
+				Time:           1,
+				GasUsed:        1,
+				ExtDataGasUsed: big.NewInt(5),
+			},
+			want: (&acp176.State{
+				Gas: gas.State{
+					Capacity: acp176.MinMaxPerSecond - 6,
+					Excess:   6,
+				},
+				TargetExcess: 0,
+			}).Bytes(),
+		},
+		{
+			name:     "fupgrade_genesis_block",
+			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			parent: &types.Header{
+				Number: big.NewInt(0),
+			},
+			header: &types.Header{
+				Time:           1,
+				GasUsed:        2,
+				ExtDataGasUsed: big.NewInt(1),
+			},
+			desiredTargetExcess: (*gas.Gas)(utils.NewUint64(3)),
+			want: (&acp176.State{
+				Gas: gas.State{
+					Capacity: acp176.MinMaxPerSecond - 3,
+					Excess:   3,
+				},
+				TargetExcess: 3,
+			}).Bytes(),
+		},
+		{
+			name:     "fupgrade_invalid_fee_state",
+			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			parent: &types.Header{
+				Number: big.NewInt(1),
+			},
+			header:  &types.Header{},
+			wantErr: acp176.ErrStateInsufficientLength,
+		},
+		{
+			name:     "fupgrade_invalid_gas_used",
+			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			parent: &types.Header{
+				Number: big.NewInt(1),
+				Extra:  (&acp176.State{}).Bytes(),
+			},
+			header: &types.Header{
+				GasUsed: 1,
+			},
+			wantErr: gas.ErrInsufficientCapacity,
+		},
+		{
+			name:     "fupgrade_reduce_capacity",
+			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			parent: &types.Header{
+				Number: big.NewInt(1),
+				Extra: (&acp176.State{
+					Gas: gas.State{
+						Capacity: 20_039_100, // [acp176.MinTargetPerSecond] * e^(2*[acp176.MaxTargetExcessDiff] / [acp176.TargetConversion])
+						Excess:   2_000_000_000 - 3,
+					},
+					TargetExcess: 2 * acp176.MaxTargetExcessDiff,
+				}).Bytes(),
+			},
+			header: &types.Header{
+				GasUsed:        2,
+				ExtDataGasUsed: big.NewInt(1),
+			},
+			desiredTargetExcess: (*gas.Gas)(utils.NewUint64(0)),
+			want: (&acp176.State{
+				Gas: gas.State{
+					Capacity: 20_019_540,    // [acp176.MinTargetPerSecond] * e^([acp176.MaxTargetExcessDiff] / [acp176.TargetConversion])
+					Excess:   1_998_047_816, // 2M * NewTarget / OldTarget
+				},
+				TargetExcess: acp176.MaxTargetExcessDiff,
+			}).Bytes(),
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -229,9 +342,120 @@ func TestExtraPrefix(t *testing.T) {
 			config := &params.ChainConfig{
 				NetworkUpgrades: test.upgrades,
 			}
-			got, err := ExtraPrefix(config, test.parent, test.timestamp)
+			got, err := ExtraPrefix(config, test.parent, test.header, test.desiredTargetExcess)
 			require.ErrorIs(err, test.wantErr)
 			require.Equal(test.want, got)
+		})
+	}
+}
+
+func TestVerifyExtraPrefix(t *testing.T) {
+	tests := []struct {
+		name     string
+		upgrades params.NetworkUpgrades
+		parent   *types.Header
+		header   *types.Header
+		wantErr  error
+	}{
+		{
+			name:     "ap2",
+			upgrades: params.TestApricotPhase2Config.NetworkUpgrades,
+			header:   &types.Header{},
+			wantErr:  nil,
+		},
+		{
+			name:     "ap3_invalid_parent_header",
+			upgrades: params.TestApricotPhase3Config.NetworkUpgrades,
+			parent: &types.Header{
+				Number: big.NewInt(1),
+			},
+			header:  &types.Header{},
+			wantErr: ap3.ErrWindowInsufficientLength,
+		},
+		{
+			name:     "ap3_invalid_header",
+			upgrades: params.TestApricotPhase3Config.NetworkUpgrades,
+			parent: &types.Header{
+				Number: big.NewInt(0),
+			},
+			header:  &types.Header{},
+			wantErr: errInvalidExtraPrefix,
+		},
+		{
+			name:     "ap3_valid",
+			upgrades: params.TestApricotPhase3Config.NetworkUpgrades,
+			parent: &types.Header{
+				Number: big.NewInt(0),
+			},
+			header: &types.Header{
+				Extra: (&ap3.Window{}).Bytes(),
+			},
+			wantErr: nil,
+		},
+		{
+			name:     "fupgrade_invalid_header",
+			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			header:   &types.Header{},
+			wantErr:  acp176.ErrStateInsufficientLength,
+		},
+		{
+			name:     "fupgrade_invalid_gas_consumed",
+			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			parent: &types.Header{
+				Number: big.NewInt(0),
+			},
+			header: &types.Header{
+				GasUsed: 1,
+				Extra:   (&acp176.State{}).Bytes(),
+			},
+			wantErr: gas.ErrInsufficientCapacity,
+		},
+		{
+			name:     "fupgrade_wrong_fee_state",
+			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			parent: &types.Header{
+				Number: big.NewInt(0),
+			},
+			header: &types.Header{
+				Time:    1,
+				GasUsed: 1,
+				Extra: (&acp176.State{
+					Gas: gas.State{
+						Capacity: acp176.MinMaxPerSecond - 1,
+						Excess:   1,
+					},
+					TargetExcess: acp176.MaxTargetExcessDiff + 1, // Too much of a diff
+				}).Bytes(),
+			},
+			wantErr: errIncorrectFeeState,
+		},
+		{
+			name:     "fupgrade_valid",
+			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			parent: &types.Header{
+				Number: big.NewInt(0),
+			},
+			header: &types.Header{
+				Time:    1,
+				GasUsed: 1,
+				Extra: (&acp176.State{
+					Gas: gas.State{
+						Capacity: acp176.MinMaxPerSecond - 1,
+						Excess:   1,
+					},
+					TargetExcess: acp176.MaxTargetExcessDiff,
+				}).Bytes(),
+			},
+			wantErr: nil,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			config := &params.ChainConfig{
+				NetworkUpgrades: test.upgrades,
+			}
+			err := VerifyExtraPrefix(config, test.parent, test.header)
+			require.ErrorIs(t, err, test.wantErr)
 		})
 	}
 }
@@ -319,6 +543,30 @@ func TestVerifyExtra(t *testing.T) {
 			extra:    make([]byte, ap3.WindowSize-1),
 			expected: errInvalidExtraLength,
 		},
+		{
+			name: "fupgrade_valid_min",
+			rules: params.AvalancheRules{
+				IsFUpgrade: true,
+			},
+			extra:    make([]byte, acp176.StateSize),
+			expected: nil,
+		},
+		{
+			name: "fupgrade_valid_extra",
+			rules: params.AvalancheRules{
+				IsFUpgrade: true,
+			},
+			extra:    make([]byte, acp176.StateSize+1),
+			expected: nil,
+		},
+		{
+			name: "fupgrade_invalid",
+			rules: params.AvalancheRules{
+				IsFUpgrade: true,
+			},
+			extra:    make([]byte, acp176.StateSize-1),
+			expected: errInvalidExtraLength,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -354,6 +602,40 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 			name: "non_empty_predicate",
 			extra: []byte{
 				ap3.WindowSize: 5,
+			},
+			expected: []byte{5},
+		},
+		{
+			name: "fupgrade_empty_extra",
+			rules: params.AvalancheRules{
+				IsFUpgrade: true,
+			},
+			extra:    nil,
+			expected: nil,
+		},
+		{
+			name: "fupgrade_too_short",
+			rules: params.AvalancheRules{
+				IsFUpgrade: true,
+			},
+			extra:    make([]byte, acp176.StateSize-1),
+			expected: nil,
+		},
+		{
+			name: "fupgrade_empty_predicate",
+			rules: params.AvalancheRules{
+				IsFUpgrade: true,
+			},
+			extra:    make([]byte, acp176.StateSize),
+			expected: nil,
+		},
+		{
+			name: "fupgrade_non_empty_predicate",
+			rules: params.AvalancheRules{
+				IsFUpgrade: true,
+			},
+			extra: []byte{
+				acp176.StateSize: 5,
 			},
 			expected: []byte{5},
 		},

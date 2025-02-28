@@ -78,13 +78,6 @@ func init() {
 	*testChainConfig.CancunTime = uint64(time.Now().Unix())
 }
 
-// overrideMinFee sets the minimum base fee to 1 wei for the duration of the test.
-func overrideMinFee(t *testing.T) {
-	orig := header.EtnaMinBaseFee
-	header.EtnaMinBaseFee = big.NewInt(1)
-	t.Cleanup(func() { header.EtnaMinBaseFee = orig })
-}
-
 // testBlockChain is a mock of the live chain for testing the pool.
 type testBlockChain struct {
 	config  *params.ChainConfig
@@ -755,7 +748,6 @@ func TestOpenIndex(t *testing.T) {
 // Tests that after indexing all the loaded transactions from disk, a price heap
 // is correctly constructed based on the head basefee and blobfee.
 func TestOpenHeap(t *testing.T) {
-	overrideMinFee(t)
 	log.SetDefault(log.NewLogger(log.NewTerminalHandlerWithLevel(os.Stderr, log.LevelTrace, true)))
 
 	// Create a temporary folder for the persistent backend
@@ -843,7 +835,6 @@ func TestOpenHeap(t *testing.T) {
 // Tests that after the pool's previous state is loaded back, any transactions
 // over the new storage cap will get dropped.
 func TestOpenCap(t *testing.T) {
-	overrideMinFee(t)
 	log.SetDefault(log.NewLogger(log.NewTerminalHandlerWithLevel(os.Stderr, log.LevelTrace, true)))
 
 	// Create a temporary folder for the persistent backend

@@ -22,12 +22,9 @@ var (
 	maxUint256Plus1 = new(big.Int).Lsh(common.Big1, 256)
 	maxUint256      = new(big.Int).Sub(maxUint256Plus1, common.Big1)
 
-	ap3MinBaseFee = big.NewInt(ap3.MinBaseFee)
-	ap4MinBaseFee = big.NewInt(ap4.MinBaseFee)
-	// EtnaMinBaseFee is exported so that it can be modified by tests.
-	//
-	// TODO: Unexport this.
-	EtnaMinBaseFee = big.NewInt(etna.MinBaseFee)
+	ap3MinBaseFee  = big.NewInt(ap3.MinBaseFee)
+	ap4MinBaseFee  = big.NewInt(ap4.MinBaseFee)
+	etnaMinBaseFee = big.NewInt(etna.MinBaseFee)
 
 	ap3MaxBaseFee = big.NewInt(ap3.MaxBaseFee)
 	ap4MaxBaseFee = big.NewInt(ap4.MaxBaseFee)
@@ -131,7 +128,7 @@ func baseFeeFromWindow(config *params.ChainConfig, parent *types.Header, timesta
 	// Ensure that the base fee does not increase/decrease outside of the bounds
 	switch {
 	case config.IsEtna(parent.Time):
-		baseFee = selectBigWithinBounds(EtnaMinBaseFee, baseFee, maxUint256)
+		baseFee = selectBigWithinBounds(etnaMinBaseFee, baseFee, maxUint256)
 	case isApricotPhase5:
 		baseFee = selectBigWithinBounds(ap4MinBaseFee, baseFee, maxUint256)
 	case config.IsApricotPhase4(parent.Time):

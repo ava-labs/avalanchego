@@ -11,10 +11,15 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap1"
+	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap5"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/cortina"
 )
 
-var errInvalidGasLimit = errors.New("invalid gas limit")
+var (
+	errInvalidExtraDataGasUsed = errors.New("invalid extra data gas used")
+	errInvalidGasUsed          = errors.New("invalid gas used")
+	errInvalidGasLimit         = errors.New("invalid gas limit")
+)
 
 // GasLimit takes the previous header and the timestamp of its child block and
 // calculates the gas limit for the child block.
@@ -22,12 +27,22 @@ func GasLimit(
 	config *params.ChainConfig,
 	parent *types.Header,
 	timestamp uint64,
-) uint64 {
+) (uint64, error) {
 	switch {
+	case config.IsFUpgrade(timestamp):
+		state, err := feeStateBeforeBlock(config, parent, timestamp)
+		if err != nil {
+			return 0, fmt.Errorf("calculating initial fee state: %w", err)
+		}
+		// The gas limit is set to the maximum capacity, rather than the current
+		// capacity, to minimize the differences with upstream geth. During
+		// block building and gas usage calculations, the gas limit is checked
+		// against the current capacity.
+		return uint64(state.MaxCapacity()), nil
 	case config.IsCortina(timestamp):
-		return cortina.GasLimit
+		return cortina.GasLimit, nil
 	case config.IsApricotPhase1(timestamp):
-		return ap1.GasLimit
+		return ap1.GasLimit, nil
 	default:
 		// The gas limit prior Apricot Phase 1 started at the genesis value and
 		// migrated towards the [ap1.GasLimit] following the `core.CalcGasLimit`
@@ -35,8 +50,44 @@ func GasLimit(
 		// this code is not used in production. To avoid a dependency on the
 		// `core` package, this code is modified to just return the parent gas
 		// limit; which was valid to do prior to Apricot Phase 1.
-		return parent.GasLimit
+		return parent.GasLimit, nil
 	}
+}
+
+// VerifyGasUsed verifies that the gas used is less than or equal to the gas
+// limit.
+func VerifyGasUsed(
+	config *params.ChainConfig,
+	parent *types.Header,
+	header *types.Header,
+) error {
+	gasUsed := header.GasUsed
+	if config.IsFUpgrade(header.Time) && header.ExtDataGasUsed != nil {
+		if !header.ExtDataGasUsed.IsUint64() {
+			return fmt.Errorf("%w: %d is not a uint64",
+				errInvalidExtraDataGasUsed,
+				header.ExtDataGasUsed,
+			)
+		}
+		var err error
+		gasUsed, err = math.Add(gasUsed, header.ExtDataGasUsed.Uint64())
+		if err != nil {
+			return fmt.Errorf("%w while calculating gas used", err)
+		}
+	}
+
+	capacity, err := GasCapacity(config, parent, header.Time)
+	if err != nil {
+		return fmt.Errorf("calculating gas capacity: %w", err)
+	}
+	if gasUsed > capacity {
+		return fmt.Errorf("%w: have %d, capacity %d",
+			errInvalidGasUsed,
+			gasUsed,
+			capacity,
+		)
+	}
+	return nil
 }
 
 // VerifyGasLimit verifies that the gas limit for the header is valid.
@@ -46,6 +97,19 @@ func VerifyGasLimit(
 	header *types.Header,
 ) error {
 	switch {
+	case config.IsFUpgrade(header.Time):
+		state, err := feeStateBeforeBlock(config, parent, header.Time)
+		if err != nil {
+			return fmt.Errorf("calculating initial fee state: %w", err)
+		}
+		maxCapacity := state.MaxCapacity()
+		if header.GasLimit != uint64(maxCapacity) {
+			return fmt.Errorf("%w: have %d, want %d",
+				errInvalidGasLimit,
+				header.GasLimit,
+				maxCapacity,
+			)
+		}
 	case config.IsCortina(header.Time):
 		if header.GasLimit != cortina.GasLimit {
 			return fmt.Errorf("%w: expected to be %d in Cortina, but found %d",
@@ -85,4 +149,47 @@ func VerifyGasLimit(
 		}
 	}
 	return nil
+}
+
+// GasCapacity takes the previous header and the timestamp of its child block
+// and calculates the available gas that can be consumed in the child block.
+func GasCapacity(
+	config *params.ChainConfig,
+	parent *types.Header,
+	timestamp uint64,
+) (uint64, error) {
+	// Prior to the F upgrade, the gas capacity is equal to the gas limit.
+	if !config.IsFUpgrade(timestamp) {
+		return GasLimit(config, parent, timestamp)
+	}
+
+	state, err := feeStateBeforeBlock(config, parent, timestamp)
+	if err != nil {
+		return 0, fmt.Errorf("calculating initial fee state: %w", err)
+	}
+	return uint64(state.Gas.Capacity), nil
+}
+
+// RemainingAtomicGasCapacity returns the maximum amount ExtDataGasUsed could be
+// on `header` while still being valid based on the initial capacity and
+// consumed gas.
+func RemainingAtomicGasCapacity(
+	config *params.ChainConfig,
+	parent *types.Header,
+	header *types.Header,
+) (uint64, error) {
+	// Prior to the F upgrade, the atomic gas limit was a constant independent
+	// of the evm gas used.
+	if !config.IsFUpgrade(header.Time) {
+		return ap5.AtomicGasLimit, nil
+	}
+
+	state, err := feeStateBeforeBlock(config, parent, header.Time)
+	if err != nil {
+		return 0, fmt.Errorf("calculating initial fee state: %w", err)
+	}
+	if err := state.ConsumeGas(header.GasUsed, nil); err != nil {
+		return 0, fmt.Errorf("%w while calculating available gas", err)
+	}
+	return uint64(state.Gas.Capacity), nil
 }

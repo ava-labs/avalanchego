@@ -40,7 +40,9 @@ import (
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/params"
 	customheader "github.com/ava-labs/coreth/plugin/evm/header"
+	"github.com/ava-labs/coreth/plugin/evm/upgrade/acp176"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap1"
+	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap4"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -103,7 +105,7 @@ func newTestBackendFakerEngine(t *testing.T, config *params.ChainConfig, numBloc
 	engine := dummy.NewETHFaker()
 
 	// Generate testing blocks
-	_, blocks, _, err := core.GenerateChainWithGenesis(gspec, engine, numBlocks, 0, genBlocks)
+	_, blocks, _, err := core.GenerateChainWithGenesis(gspec, engine, numBlocks, ap4.TargetBlockRate-1, genBlocks)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,16 +130,16 @@ func newTestBackend(t *testing.T, config *params.ChainConfig, numBlocks int, ext
 	}
 
 	engine := dummy.NewFakerWithCallbacks(dummy.ConsensusCallbacks{
-		OnFinalizeAndAssemble: func(header *types.Header, state *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, *big.Int, error) {
+		OnFinalizeAndAssemble: func(*types.Header, *types.Header, *state.StateDB, []*types.Transaction) ([]byte, *big.Int, *big.Int, error) {
 			return nil, common.Big0, extDataGasUsage, nil
 		},
-		OnExtraStateChange: func(block *types.Block, state *state.StateDB) (*big.Int, *big.Int, error) {
+		OnExtraStateChange: func(*types.Block, *types.Header, *state.StateDB) (*big.Int, *big.Int, error) {
 			return common.Big0, extDataGasUsage, nil
 		},
 	})
 
 	// Generate testing blocks
-	_, blocks, _, err := core.GenerateChainWithGenesis(gspec, engine, numBlocks, 1, genBlocks)
+	_, blocks, _, err := core.GenerateChainWithGenesis(gspec, engine, numBlocks, ap4.TargetBlockRate-1, genBlocks)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -249,8 +251,8 @@ func TestSuggestTipCapEmptyExtDataGasUsage(t *testing.T) {
 		chainConfig:     params.TestChainConfig,
 		numBlocks:       3,
 		extDataGasUsage: nil,
-		genBlock:        testGenBlock(t, 55, 370),
-		expectedTip:     big.NewInt(5_713_963_964),
+		genBlock:        testGenBlock(t, 55, 80),
+		expectedTip:     big.NewInt(1),
 	}, defaultOracleConfig())
 }
 
@@ -259,8 +261,8 @@ func TestSuggestTipCapSimple(t *testing.T) {
 		chainConfig:     params.TestChainConfig,
 		numBlocks:       3,
 		extDataGasUsage: common.Big0,
-		genBlock:        testGenBlock(t, 55, 370),
-		expectedTip:     big.NewInt(5_713_963_964),
+		genBlock:        testGenBlock(t, 55, 80),
+		expectedTip:     big.NewInt(1),
 	}, defaultOracleConfig())
 }
 
@@ -269,8 +271,8 @@ func TestSuggestTipCapSimpleFloor(t *testing.T) {
 		chainConfig:     params.TestChainConfig,
 		numBlocks:       1,
 		extDataGasUsage: common.Big0,
-		genBlock:        testGenBlock(t, 55, 370),
-		expectedTip:     common.Big0,
+		genBlock:        testGenBlock(t, 55, 80),
+		expectedTip:     big.NewInt(1),
 	}, defaultOracleConfig())
 }
 
@@ -286,7 +288,7 @@ func TestSuggestTipCapSmallTips(t *testing.T) {
 			signer := types.LatestSigner(params.TestChainConfig)
 			baseFee := b.BaseFee()
 			feeCap := new(big.Int).Add(baseFee, tip)
-			for j := 0; j < 185; j++ {
+			for j := 0; j < 40; j++ {
 				tx := types.NewTx(&types.DynamicFeeTx{
 					ChainID:   params.TestChainConfig.ChainID,
 					Nonce:     b.TxNonce(addr),
@@ -316,7 +318,7 @@ func TestSuggestTipCapSmallTips(t *testing.T) {
 			}
 		},
 		// NOTE: small tips do not bias estimate
-		expectedTip: big.NewInt(5_713_963_964),
+		expectedTip: big.NewInt(1),
 	}, defaultOracleConfig())
 }
 
@@ -325,8 +327,8 @@ func TestSuggestTipCapExtDataUsage(t *testing.T) {
 		chainConfig:     params.TestChainConfig,
 		numBlocks:       3,
 		extDataGasUsage: big.NewInt(10_000),
-		genBlock:        testGenBlock(t, 55, 370),
-		expectedTip:     big.NewInt(5_706_726_650),
+		genBlock:        testGenBlock(t, 55, 80),
+		expectedTip:     big.NewInt(1),
 	}, defaultOracleConfig())
 }
 
@@ -336,7 +338,7 @@ func TestSuggestTipCapMinGas(t *testing.T) {
 		numBlocks:       3,
 		extDataGasUsage: common.Big0,
 		genBlock:        testGenBlock(t, 500, 50),
-		expectedTip:     big.NewInt(0),
+		expectedTip:     big.NewInt(1),
 	}, defaultOracleConfig())
 }
 
@@ -379,10 +381,10 @@ func TestSuggestGasPricePreAP3(t *testing.T) {
 func TestSuggestTipCapMaxBlocksLookback(t *testing.T) {
 	applyGasPriceTest(t, suggestTipCapTest{
 		chainConfig:     params.TestChainConfig,
-		numBlocks:       20,
+		numBlocks:       200,
 		extDataGasUsage: common.Big0,
-		genBlock:        testGenBlock(t, 550, 370),
-		expectedTip:     big.NewInt(51_565_264_257),
+		genBlock:        testGenBlock(t, 550, 80),
+		expectedTip:     big.NewInt(3),
 	}, defaultOracleConfig())
 }
 
@@ -391,20 +393,20 @@ func TestSuggestTipCapMaxBlocksSecondsLookback(t *testing.T) {
 		chainConfig:     params.TestChainConfig,
 		numBlocks:       20,
 		extDataGasUsage: big.NewInt(1),
-		genBlock:        testGenBlock(t, 550, 370),
-		expectedTip:     big.NewInt(92_212_529_424),
+		genBlock:        testGenBlock(t, 550, 80),
+		expectedTip:     big.NewInt(1),
 	}, timeCrunchOracleConfig())
 }
 
 func TestSuggestTipCapIncludesExtraDataGas(t *testing.T) {
 	applyGasPriceTest(t, suggestTipCapTest{
 		chainConfig:     params.TestChainConfig,
-		numBlocks:       20,
-		extDataGasUsage: DefaultMinGasUsed,
+		numBlocks:       1000,
+		extDataGasUsage: big.NewInt(acp176.MinMaxPerSecond - int64(params.TxGas)),
 		// The tip on the transaction is very large to pay the block gas cost.
 		genBlock: testGenBlock(t, 100_000, 1),
 		// The actual tip doesn't matter, we just want to ensure that the tip is
 		// non-zero when almost all the gas is coming from the extDataGasUsage.
-		expectedTip: big.NewInt(83_603_561_239),
-	}, timeCrunchOracleConfig())
+		expectedTip: big.NewInt(44_252),
+	}, defaultOracleConfig())
 }
