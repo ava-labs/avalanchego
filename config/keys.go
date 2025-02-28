@@ -152,6 +152,7 @@ const (
 	ConsensusShutdownTimeoutKey                        = "consensus-shutdown-timeout"
 	ConsensusFrontierPollFrequencyKey                  = "consensus-frontier-poll-frequency"
 	ProposerVMUseCurrentHeightKey                      = "proposervm-use-current-height"
+	ProposerVMMinBlockDelayKey                         = "proposervm-min-block-delay"
 	FdLimitKey                                         = "fd-limit"
 	IndexEnabledKey                                    = "index-enabled"
 	IndexAllowIncompleteKey                            = "index-allow-incomplete"
