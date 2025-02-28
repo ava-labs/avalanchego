@@ -4,12 +4,10 @@
 package header
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"math/big"
 
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap3"
@@ -19,10 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 )
-
-// FeeWindowSize is the number of bytes that are used to encode the dynamic fee
-// window in the header's Extra field after the Apricot Phase 3 upgrade.
-const FeeWindowSize = wrappers.LongLen * ap3.WindowLen
 
 var (
 	maxUint256Plus1 = new(big.Int).Lsh(common.Big1, 256)
@@ -41,8 +35,7 @@ var (
 	ap3BaseFeeChangeDenominator = big.NewInt(ap3.BaseFeeChangeDenominator)
 	ap5BaseFeeChangeDenominator = big.NewInt(ap5.BaseFeeChangeDenominator)
 
-	errInvalidTimestamp                   = errors.New("invalid timestamp")
-	errDynamicFeeWindowInsufficientLength = errors.New("insufficient length for dynamic fee window")
+	errInvalidTimestamp = errors.New("invalid timestamp")
 )
 
 // baseFeeFromWindow should only be called if `timestamp` >= `config.ApricotPhase3Timestamp`
@@ -165,7 +158,7 @@ func feeWindow(
 		return ap3.Window{}, nil
 	}
 
-	dynamicFeeWindow, err := parseFeeWindow(parent.Extra)
+	dynamicFeeWindow, err := ap3.ParseWindow(parent.Extra)
 	if err != nil {
 		return ap3.Window{}, err
 	}
@@ -235,30 +228,4 @@ func selectBigWithinBounds(lowerBound, value, upperBound *big.Int) *big.Int {
 	default:
 		return value
 	}
-}
-
-func parseFeeWindow(bytes []byte) (ap3.Window, error) {
-	if len(bytes) < FeeWindowSize {
-		return ap3.Window{}, fmt.Errorf("%w: expected at least %d bytes but got %d bytes",
-			errDynamicFeeWindowInsufficientLength,
-			FeeWindowSize,
-			len(bytes),
-		)
-	}
-
-	var window ap3.Window
-	for i := range window {
-		offset := i * wrappers.LongLen
-		window[i] = binary.BigEndian.Uint64(bytes[offset:])
-	}
-	return window, nil
-}
-
-func feeWindowBytes(w ap3.Window) []byte {
-	bytes := make([]byte, FeeWindowSize)
-	for i, v := range w {
-		offset := i * wrappers.LongLen
-		binary.BigEndian.PutUint64(bytes[offset:], v)
-	}
-	return bytes
 }

@@ -6,15 +6,17 @@
 package acp176
 
 import (
+	"encoding/binary"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
 	"sort"
 
+	safemath "github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/holiman/uint256"
-
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (
@@ -32,13 +34,38 @@ const (
 	MinMaxPerSecond     = MinTargetPerSecond * TargetToMax
 	MinMaxCapacity      = MinMaxPerSecond * TimeToFillCapacity
 
+	StateSize = 3 * wrappers.LongLen
+
 	maxTargetExcess = 1_024_950_627 // TargetConversion * ln(MaxUint64 / MinTargetPerSecond) + 1
 )
+
+var ErrStateInsufficientLength = errors.New("insufficient length for fee state")
 
 // State represents the current state of the gas pricing and constraints.
 type State struct {
 	Gas          gas.State
 	TargetExcess gas.Gas // q
+}
+
+// ParseState returns the state from the provided bytes. It is the inverse of
+// [State.Bytes]. This function allows for additional bytes to be padded at the
+// end of the provided bytes.
+func ParseState(bytes []byte) (State, error) {
+	if len(bytes) < StateSize {
+		return State{}, fmt.Errorf("%w: expected at least %d bytes but got %d bytes",
+			ErrStateInsufficientLength,
+			StateSize,
+			len(bytes),
+		)
+	}
+
+	return State{
+		Gas: gas.State{
+			Capacity: gas.Gas(binary.BigEndian.Uint64(bytes)),
+			Excess:   gas.Gas(binary.BigEndian.Uint64(bytes[wrappers.LongLen:])),
+		},
+		TargetExcess: gas.Gas(binary.BigEndian.Uint64(bytes[2*wrappers.LongLen:])),
+	}, nil
 }
 
 // Target returns the target gas consumed per second, `T`.
@@ -127,6 +154,15 @@ func (s *State) UpdateTargetExcess(desiredTargetExcess gas.Gas) {
 	// Ensure the gas capacity does not exceed the maximum capacity.
 	newMaxCapacity := mulWithUpperBound(newTargetPerSecond, TargetToMaxCapacity) // C
 	s.Gas.Capacity = min(s.Gas.Capacity, newMaxCapacity)
+}
+
+// Bytes returns the binary representation of the state.
+func (s *State) Bytes() []byte {
+	bytes := make([]byte, StateSize)
+	binary.BigEndian.PutUint64(bytes, uint64(s.Gas.Capacity))
+	binary.BigEndian.PutUint64(bytes[wrappers.LongLen:], uint64(s.Gas.Excess))
+	binary.BigEndian.PutUint64(bytes[2*wrappers.LongLen:], uint64(s.TargetExcess))
+	return bytes
 }
 
 // DesiredTargetExcess calculates the optimal desiredTargetExcess given the

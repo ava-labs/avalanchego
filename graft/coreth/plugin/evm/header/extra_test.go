@@ -40,7 +40,7 @@ func TestExtraPrefix(t *testing.T) {
 				Number: big.NewInt(1),
 			},
 			timestamp: 1,
-			want:      feeWindowBytes(ap3.Window{}),
+			want:      (&ap3.Window{}).Bytes(),
 		},
 		{
 			name:     "ap3_genesis_block",
@@ -48,7 +48,7 @@ func TestExtraPrefix(t *testing.T) {
 			parent: &types.Header{
 				Number: big.NewInt(0),
 			},
-			want: feeWindowBytes(ap3.Window{}),
+			want: (&ap3.Window{}).Bytes(),
 		},
 		{
 			name:     "ap3_invalid_fee_window",
@@ -56,7 +56,7 @@ func TestExtraPrefix(t *testing.T) {
 			parent: &types.Header{
 				Number: big.NewInt(1),
 			},
-			wantErr: errDynamicFeeWindowInsufficientLength,
+			wantErr: ap3.ErrWindowInsufficientLength,
 		},
 		{
 			name:     "ap3_invalid_timestamp",
@@ -64,7 +64,7 @@ func TestExtraPrefix(t *testing.T) {
 			parent: &types.Header{
 				Number: big.NewInt(1),
 				Time:   1,
-				Extra:  feeWindowBytes(ap3.Window{}),
+				Extra:  (&ap3.Window{}).Bytes(),
 			},
 			timestamp: 0,
 			wantErr:   errInvalidTimestamp,
@@ -75,9 +75,9 @@ func TestExtraPrefix(t *testing.T) {
 			parent: &types.Header{
 				Number:  big.NewInt(1),
 				GasUsed: ap3.TargetGas,
-				Extra: feeWindowBytes(ap3.Window{
+				Extra: (&ap3.Window{
 					1, 2, 3, 4,
-				}),
+				}).Bytes(),
 			},
 			timestamp: 1,
 			want: func() []byte {
@@ -86,7 +86,7 @@ func TestExtraPrefix(t *testing.T) {
 				}
 				window.Add(ap3.TargetGas, ap3.IntrinsicBlockGas)
 				window.Shift(1)
-				return feeWindowBytes(window)
+				return window.Bytes()
 			}(),
 		},
 		{
@@ -95,7 +95,7 @@ func TestExtraPrefix(t *testing.T) {
 			parent: &types.Header{
 				Number: big.NewInt(0),
 			},
-			want: feeWindowBytes(ap3.Window{}),
+			want: (&ap3.Window{}).Bytes(),
 		},
 		{
 			name:     "ap4_no_block_gas_cost",
@@ -103,14 +103,14 @@ func TestExtraPrefix(t *testing.T) {
 			parent: &types.Header{
 				Number:  big.NewInt(1),
 				GasUsed: ap3.TargetGas,
-				Extra:   feeWindowBytes(ap3.Window{}),
+				Extra:   (&ap3.Window{}).Bytes(),
 			},
 			timestamp: 2,
 			want: func() []byte {
 				var window ap3.Window
 				window.Add(ap3.TargetGas)
 				window.Shift(2)
-				return feeWindowBytes(window)
+				return window.Bytes()
 			}(),
 		},
 		{
@@ -119,7 +119,7 @@ func TestExtraPrefix(t *testing.T) {
 			parent: &types.Header{
 				Number:       big.NewInt(1),
 				GasUsed:      ap3.TargetGas,
-				Extra:        feeWindowBytes(ap3.Window{}),
+				Extra:        (&ap3.Window{}).Bytes(),
 				BlockGasCost: big.NewInt(ap4.MinBlockGasCost),
 			},
 			timestamp: 1,
@@ -130,7 +130,7 @@ func TestExtraPrefix(t *testing.T) {
 					(ap4.TargetBlockRate-1)*ap4.BlockGasCostStep,
 				)
 				window.Shift(1)
-				return feeWindowBytes(window)
+				return window.Bytes()
 			}(),
 		},
 		{
@@ -139,7 +139,7 @@ func TestExtraPrefix(t *testing.T) {
 			parent: &types.Header{
 				Number:         big.NewInt(1),
 				GasUsed:        ap3.TargetGas,
-				Extra:          feeWindowBytes(ap3.Window{}),
+				Extra:          (&ap3.Window{}).Bytes(),
 				ExtDataGasUsed: big.NewInt(5),
 			},
 			timestamp: 1,
@@ -150,7 +150,7 @@ func TestExtraPrefix(t *testing.T) {
 					5,
 				)
 				window.Shift(1)
-				return feeWindowBytes(window)
+				return window.Bytes()
 			}(),
 		},
 		{
@@ -159,9 +159,9 @@ func TestExtraPrefix(t *testing.T) {
 			parent: &types.Header{
 				Number:  big.NewInt(1),
 				GasUsed: ap3.TargetGas,
-				Extra: feeWindowBytes(ap3.Window{
+				Extra: (&ap3.Window{
 					1, 2, 3, 4,
-				}),
+				}).Bytes(),
 				ExtDataGasUsed: big.NewInt(5),
 				BlockGasCost:   big.NewInt(ap4.MinBlockGasCost),
 			},
@@ -176,7 +176,7 @@ func TestExtraPrefix(t *testing.T) {
 					(ap4.TargetBlockRate-1)*ap4.BlockGasCostStep,
 				)
 				window.Shift(1)
-				return feeWindowBytes(window)
+				return window.Bytes()
 			}(),
 		},
 		{
@@ -185,7 +185,7 @@ func TestExtraPrefix(t *testing.T) {
 			parent: &types.Header{
 				Number:       big.NewInt(1),
 				GasUsed:      ap5.TargetGas,
-				Extra:        feeWindowBytes(ap3.Window{}),
+				Extra:        (&ap3.Window{}).Bytes(),
 				BlockGasCost: big.NewInt(ap4.MinBlockGasCost),
 			},
 			timestamp: 1,
@@ -193,7 +193,7 @@ func TestExtraPrefix(t *testing.T) {
 				var window ap3.Window
 				window.Add(ap5.TargetGas)
 				window.Shift(1)
-				return feeWindowBytes(window)
+				return window.Bytes()
 			}(),
 		},
 		{
@@ -202,9 +202,9 @@ func TestExtraPrefix(t *testing.T) {
 			parent: &types.Header{
 				Number:  big.NewInt(1),
 				GasUsed: ap5.TargetGas,
-				Extra: feeWindowBytes(ap3.Window{
+				Extra: (&ap3.Window{
 					1, 2, 3, 4,
-				}),
+				}).Bytes(),
 				ExtDataGasUsed: big.NewInt(5),
 				BlockGasCost:   big.NewInt(ap4.MinBlockGasCost),
 			},
@@ -218,7 +218,7 @@ func TestExtraPrefix(t *testing.T) {
 					5,
 				)
 				window.Shift(1)
-				return feeWindowBytes(window)
+				return window.Bytes()
 			}(),
 		},
 	}
@@ -276,7 +276,7 @@ func TestVerifyExtra(t *testing.T) {
 			rules: params.AvalancheRules{
 				IsApricotPhase3: true,
 			},
-			extra:    make([]byte, FeeWindowSize),
+			extra:    make([]byte, ap3.WindowSize),
 			expected: nil,
 		},
 		{
@@ -284,7 +284,7 @@ func TestVerifyExtra(t *testing.T) {
 			rules: params.AvalancheRules{
 				IsApricotPhase3: true,
 			},
-			extra:    make([]byte, FeeWindowSize-1),
+			extra:    make([]byte, ap3.WindowSize-1),
 			expected: errInvalidExtraLength,
 		},
 		{
@@ -292,7 +292,7 @@ func TestVerifyExtra(t *testing.T) {
 			rules: params.AvalancheRules{
 				IsApricotPhase3: true,
 			},
-			extra:    make([]byte, FeeWindowSize+1),
+			extra:    make([]byte, ap3.WindowSize+1),
 			expected: errInvalidExtraLength,
 		},
 		{
@@ -300,7 +300,7 @@ func TestVerifyExtra(t *testing.T) {
 			rules: params.AvalancheRules{
 				IsDurango: true,
 			},
-			extra:    make([]byte, FeeWindowSize),
+			extra:    make([]byte, ap3.WindowSize),
 			expected: nil,
 		},
 		{
@@ -308,7 +308,7 @@ func TestVerifyExtra(t *testing.T) {
 			rules: params.AvalancheRules{
 				IsDurango: true,
 			},
-			extra:    make([]byte, FeeWindowSize+1),
+			extra:    make([]byte, ap3.WindowSize+1),
 			expected: nil,
 		},
 		{
@@ -316,7 +316,7 @@ func TestVerifyExtra(t *testing.T) {
 			rules: params.AvalancheRules{
 				IsDurango: true,
 			},
-			extra:    make([]byte, FeeWindowSize-1),
+			extra:    make([]byte, ap3.WindowSize-1),
 			expected: errInvalidExtraLength,
 		},
 	}
@@ -342,18 +342,18 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 		},
 		{
 			name:     "too_short",
-			extra:    make([]byte, FeeWindowSize-1),
+			extra:    make([]byte, ap3.WindowSize-1),
 			expected: nil,
 		},
 		{
 			name:     "empty_predicate",
-			extra:    make([]byte, FeeWindowSize),
+			extra:    make([]byte, ap3.WindowSize),
 			expected: nil,
 		},
 		{
 			name: "non_empty_predicate",
 			extra: []byte{
-				FeeWindowSize: 5,
+				ap3.WindowSize: 5,
 			},
 			expected: []byte{5},
 		},
