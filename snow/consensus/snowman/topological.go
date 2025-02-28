@@ -550,7 +550,7 @@ func (ts *Topological) vote(ctx context.Context, voteStack []votes) (ids.ID, err
 			// Therefore, we need to make sure the child is still in the tree.
 			childBlock, notRejected := ts.blocks[childID]
 			if notRejected {
-				ts.ctx.Log.Verbo("defering confidence reset of child block",
+				ts.ctx.Log.Verbo("deferring confidence reset of child block",
 					zap.Stringer("childID", childID),
 				)
 
