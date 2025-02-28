@@ -224,7 +224,7 @@ func NewEVM(blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig
 
 	// Parse the predicate results from the extra field and store them in the
 	// block context.
-	predicateBytes := header.PredicateBytesFromExtra(blockCtx.Extra)
+	predicateBytes := header.PredicateBytesFromExtra(evm.chainRules.AvalancheRules, blockCtx.Extra)
 	if len(predicateBytes) == 0 {
 		return evm
 	}
