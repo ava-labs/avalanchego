@@ -77,7 +77,7 @@ func NewSyncSegmentsIterator(db ethdb.Iteratee, root common.Hash) ethdb.Iterator
 }
 
 // WriteSyncSegment adds a trie segment for root at the given start position.
-func WriteSyncSegment(db ethdb.KeyValueWriter, root common.Hash, start []byte) error {
+func WriteSyncSegment(db ethdb.KeyValueWriter, root common.Hash, start common.Hash) error {
 	return db.Put(packSyncSegmentKey(root, start), []byte{0x01})
 }
 
@@ -104,11 +104,11 @@ func UnpackSyncSegmentKey(keyBytes []byte) (common.Hash, []byte) {
 }
 
 // packSyncSegmentKey packs root and account into a key for storage in db.
-func packSyncSegmentKey(root common.Hash, start []byte) []byte {
-	bytes := make([]byte, len(syncSegmentsPrefix)+common.HashLength+len(start))
+func packSyncSegmentKey(root common.Hash, start common.Hash) []byte {
+	bytes := make([]byte, syncSegmentsKeyLength)
 	copy(bytes, syncSegmentsPrefix)
 	copy(bytes[len(syncSegmentsPrefix):], root[:])
-	copy(bytes[len(syncSegmentsPrefix)+common.HashLength:], start)
+	copy(bytes[len(syncSegmentsPrefix)+common.HashLength:], start.Bytes())
 	return bytes
 }
 

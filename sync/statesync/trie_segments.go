@@ -301,7 +301,7 @@ func (t *trieToSync) createSegments(numSegments int) error {
 
 		// create the segments
 		segment := t.addSegment(startBytes, endBytes)
-		if err := rawdb.WriteSyncSegment(t.sync.db, t.root, segment.start); err != nil {
+		if err := rawdb.WriteSyncSegment(t.sync.db, t.root, common.BytesToHash(segment.start)); err != nil {
 			return err
 		}
 	}
