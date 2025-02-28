@@ -377,12 +377,12 @@ func (eng *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *types
 		if extDataGasUsed == nil {
 			extDataGasUsed = new(big.Int).Set(common.Big0)
 		}
-		if blockExtDataGasUsed := block.ExtDataGasUsed(); blockExtDataGasUsed == nil || !blockExtDataGasUsed.IsUint64() || blockExtDataGasUsed.Cmp(extDataGasUsed) != 0 {
+		if blockExtDataGasUsed := types.BlockExtDataGasUsed(block); blockExtDataGasUsed == nil || !blockExtDataGasUsed.IsUint64() || blockExtDataGasUsed.Cmp(extDataGasUsed) != 0 {
 			return fmt.Errorf("invalid extDataGasUsed: have %d, want %d", blockExtDataGasUsed, extDataGasUsed)
 		}
 
 		// Verify the BlockGasCost set in the header matches the expected value.
-		blockGasCost := block.BlockGasCost()
+		blockGasCost := types.BlockGasCost(block)
 		expectedBlockGasCost := customheader.BlockGasCost(
 			configExtra,
 			parent,

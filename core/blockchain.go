@@ -1367,7 +1367,7 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 		"parentHash", block.ParentHash(),
 		"uncles", len(block.Uncles()), "txs", len(block.Transactions()), "gas", block.GasUsed(),
 		"elapsed", common.PrettyDuration(time.Since(start)),
-		"root", block.Root(), "baseFeePerGas", block.BaseFee(), "blockGasCost", block.BlockGasCost(),
+		"root", block.Root(), "baseFeePerGas", block.BaseFee(), "blockGasCost", types.BlockGasCost(block),
 	)
 
 	processedBlockGasUsedCounter.Inc(int64(block.GasUsed()))
