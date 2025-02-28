@@ -180,7 +180,9 @@ func (v blockValidator) SyntacticVerify(b *Block, rules params.Rules) error {
 
 	// If we are in ApricotPhase4, ensure that ExtDataGasUsed is populated correctly.
 	if rules.IsApricotPhase4 {
-		if rules.IsApricotPhase5 {
+		// After the F upgrade, the extDataGasUsed field is validated by
+		// [header.VerifyGasUsed].
+		if !rules.IsFUpgrade && rules.IsApricotPhase5 {
 			if !utils.BigLessOrEqualUint64(ethHeader.ExtDataGasUsed, ap5.AtomicGasLimit) {
 				return fmt.Errorf("too large extDataGasUsed: %d", ethHeader.ExtDataGasUsed)
 			}
