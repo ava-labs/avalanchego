@@ -1,13 +1,12 @@
-"ava-labs/avalanchego"
+"github.com/ava-labs/avalanchego"
 
 module(
-    name = "ava-labs_avalanchego",
+    name = "com_github_ava_labs_avalanchego",
     version = "",
 )
 
 bazel_dep(name = "rules_go", version = "0.53.0")
 bazel_dep(name = "gazelle", version = "0.42.0")
-bazel_dep(name = "rules_proto", version = "7.1.0")
 
 go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
 go_sdk.download(version = "1.23.6")
@@ -17,3 +16,28 @@ go_deps.from_file(go_mod = "//:go.mod")
 
 # Do not update this manually; run `bazel mod tidy` to pull it from `go.mod`
 use_repo(go_deps, "com_github_antithesishq_antithesis_sdk_go", "com_github_ava_labs_coreth", "com_github_ava_labs_ledger_avalanche_go", "com_github_btcsuite_btcd_btcutil", "com_github_cockroachdb_pebble", "com_github_compose_spec_compose_go", "com_github_datadog_zstd", "com_github_decred_dcrd_dcrec_secp256k1_v4", "com_github_ethereum_go_ethereum", "com_github_google_btree", "com_github_google_renameio_v2", "com_github_google_uuid", "com_github_gorilla_mux", "com_github_gorilla_rpc", "com_github_grpc_ecosystem_go_grpc_prometheus", "com_github_holiman_uint256", "com_github_huin_goupnp", "com_github_jackpal_gateway", "com_github_jackpal_go_nat_pmp", "com_github_leanovate_gopter", "com_github_mitchellh_mapstructure", "com_github_mr_tron_base58", "com_github_nbutton23_zxcvbn_go", "com_github_nytimes_gziphandler", "com_github_onsi_ginkgo_v2", "com_github_pires_go_proxyproto", "com_github_prometheus_client_golang", "com_github_prometheus_client_model", "com_github_prometheus_common", "com_github_rs_cors", "com_github_shirou_gopsutil", "com_github_spf13_cast", "com_github_spf13_cobra", "com_github_spf13_pflag", "com_github_spf13_viper", "com_github_stretchr_testify", "com_github_supranational_blst", "com_github_syndtr_goleveldb", "com_github_thepudds_fzgen", "com_github_tyler_smith_go_bip32", "in_gopkg_natefinch_lumberjack_v2", "in_gopkg_yaml_v3", "io_k8s_api", "io_k8s_apimachinery", "io_k8s_client_go", "io_k8s_utils", "io_opentelemetry_go_otel", "io_opentelemetry_go_otel_exporters_otlp_otlptrace", "io_opentelemetry_go_otel_exporters_otlp_otlptrace_otlptracegrpc", "io_opentelemetry_go_otel_exporters_otlp_otlptrace_otlptracehttp", "io_opentelemetry_go_otel_sdk", "io_opentelemetry_go_otel_trace", "org_golang_google_genproto_googleapis_rpc", "org_golang_google_grpc", "org_golang_google_protobuf", "org_golang_x_crypto", "org_golang_x_exp", "org_golang_x_mod", "org_golang_x_net", "org_golang_x_sync", "org_golang_x_term", "org_golang_x_time", "org_gonum_v1_gonum", "org_uber_go_goleak", "org_uber_go_mock", "org_uber_go_zap")
+
+# The circular dependency between this and the ava-labs/coreth repo confuses
+# gazelle because it doesn't conform to the repo-naming convention, expecting
+# avalanchego to be @com_github_ava_labs_avalanchego. @@ refers to the "main"
+# repo.
+go_deps.gazelle_override(
+    directives = [
+        "gazelle:resolve_regexp go github.com/ava-labs/avalanchego/(.*) @@//$1",
+    ],
+    path = "github.com/ava-labs/coreth",
+)
+
+CGO_PATCHES = {
+    "github.com/supranational/blst": [
+        "com_github_supranational_blst.patch",
+    ],
+    "github.com/ethereum/go-ethereum": [
+        "com_github_ethereum_go_ethereum.patch",
+    ],
+}
+
+[go_deps.module_override(
+    patches = ["//bazel:%s" % f for f in patch_files],
+    path = path,
+) for path, patch_files in CGO_PATCHES.items()]

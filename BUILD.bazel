@@ -1,10 +1,10 @@
 load("@gazelle//:def.bzl", "gazelle")
 load("@rules_go//go:def.bzl", "go_library")
 
-# No need for gazelle:prefix as it reads from go.mod
-
 # Use the pre-generated .pb.go files (https://github.com/bazel-contrib/rules_go/blob/master/proto/core.rst#option-2-use-pre-generated-pbgo-files)
 # gazelle:proto disable_global
+
+# No need for gazelle:prefix as it reads from go.mod
 
 gazelle(
     name = "gazelle",

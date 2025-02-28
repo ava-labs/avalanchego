@@ -1,0 +1,133 @@
+--- bindings/go/BUILD.bazel
++++ bindings/go/BUILD.bazel
+@@ -1,40 +1,61 @@
+ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+ 
++COPTS = [
++    "-Iexternal/gazelle++go_deps+com_github_supranational_blst/bindings -Iexternal/gazelle++go_deps+com_github_supranational_blst/build -Iexternal/gazelle++go_deps+com_github_supranational_blst/src -D__BLST_CGO__ -fno-builtin-memcpy -fno-builtin-memset",
++] + select({
++    "@io_bazel_rules_go//go/platform:amd64": [
++        "-D__ADX__ -mno-avx",
++    ],
++    "@io_bazel_rules_go//go/platform:mips64": [
++        "-D__BLST_NO_ASM__",
++    ],
++    "@io_bazel_rules_go//go/platform:mips64le": [
++        "-D__BLST_NO_ASM__",
++    ],
++    "@io_bazel_rules_go//go/platform:ppc64": [
++        "-D__BLST_NO_ASM__",
++    ],
++    "@io_bazel_rules_go//go/platform:ppc64le": [
++        "-D__BLST_NO_ASM__",
++    ],
++    "@io_bazel_rules_go//go/platform:riscv64": [
++        "-D__BLST_NO_ASM__",
++    ],
++    "@io_bazel_rules_go//go/platform:s390x": [
++        "-D__BLST_NO_ASM__",
++    ],
++    "//conditions:default": [],
++})
++
++cc_library(
++    name = "cgo",
++    srcs = [
++        "cgo_assembly.S",
++        "cgo_server.c",
++    ],
++    deps = [
++        "//bindings",
++        "//build:build_cc",
++        "//src",
++    ],
++    copts = COPTS,
++    visibility = ["//visibility:private"],
++)
++
+ go_library(
+     name = "go",
+     srcs = [
+         "blst.go",
+-        "cgo_assembly.S",
+-        "cgo_server.c",
+         "rb_tree.go",
+     ],
+     cgo = True,
+-    copts = [
+-        "-Ibindings/go/external/gazelle++go_deps+com_github_supranational_blst/bindings -Ibindings/go/external/gazelle++go_deps+com_github_supranational_blst/build -Ibindings/go/external/gazelle++go_deps+com_github_supranational_blst/src -D__BLST_CGO__ -fno-builtin-memcpy -fno-builtin-memset",
+-    ] + select({
+-        "@io_bazel_rules_go//go/platform:amd64": [
+-            "-D__ADX__ -mno-avx",
+-        ],
+-        "@io_bazel_rules_go//go/platform:mips64": [
+-            "-D__BLST_NO_ASM__",
+-        ],
+-        "@io_bazel_rules_go//go/platform:mips64le": [
+-            "-D__BLST_NO_ASM__",
+-        ],
+-        "@io_bazel_rules_go//go/platform:ppc64": [
+-            "-D__BLST_NO_ASM__",
+-        ],
+-        "@io_bazel_rules_go//go/platform:ppc64le": [
+-            "-D__BLST_NO_ASM__",
+-        ],
+-        "@io_bazel_rules_go//go/platform:riscv64": [
+-            "-D__BLST_NO_ASM__",
+-        ],
+-        "@io_bazel_rules_go//go/platform:s390x": [
+-            "-D__BLST_NO_ASM__",
+-        ],
+-        "//conditions:default": [],
+-    }),
++    cdeps = [
++        ":cgo",
++        "//bindings",
++        "//build:build_cc",
++        "//src",
++    ],
++    copts = COPTS,
+     importpath = "github.com/supranational/blst/bindings/go",
+     visibility = ["//visibility:public"],
+ )
+
+--- bindings/BUILD.bazel
++++ bindings/BUILD.bazel
+@@ -0,0 +1,8 @@
++cc_library(
++    name = "bindings",
++    hdrs = glob([
++        "**/*.c",
++        "**/*.h",
++    ], allow_empty=True),
++    visibility = ["//:__subpackages__"],
++)
+
+--- src/BUILD.bazel
++++ src/BUILD.bazel
+@@ -0,0 +1,8 @@
++cc_library(
++    name = "src",
++    hdrs = glob([
++        "**/*.c",
++        "**/*.h",
++    ], allow_empty=True),
++    visibility = ["//:__subpackages__"],
++)
+
+--- build/BUILD.bazel
++++ build/BUILD.bazel
+@@ -12,3 +12,13 @@
+     actual = ":build",
+     visibility = ["//visibility:public"],
+ )
++
++cc_library(
++    name = "build_cc",
++    hdrs = glob([
++        "**/*.c",
++        "**/*.h",
++        "**/*.S",
++    ], allow_empty = True),
++    visibility = ["//:__subpackages__"],
++)
