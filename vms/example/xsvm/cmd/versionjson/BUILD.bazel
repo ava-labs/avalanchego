@@ -1,0 +1,15 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "versionjson",
+    srcs = ["cmd.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/versionjson",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//utils/constants",
+        "//version",
+        "//vms/example/xsvm",
+        "@com_github_spf13_cobra//:cobra",
+    ],
+)

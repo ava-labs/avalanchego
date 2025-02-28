@@ -1,0 +1,23 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "corruptabledb",
+    srcs = ["db.go"],
+    importpath = "github.com/ava-labs/avalanchego/database/corruptabledb",
+    visibility = ["//visibility:public"],
+    deps = ["//database"],
+)
+
+go_test(
+    name = "corruptabledb_test",
+    srcs = ["db_test.go"],
+    embed = [":corruptabledb"],
+    deps = [
+        "//database",
+        "//database/databasemock",
+        "//database/dbtest",
+        "//database/memdb",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_mock//gomock",
+    ],
+)

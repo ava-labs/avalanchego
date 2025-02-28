@@ -1,0 +1,37 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "proposer",
+    srcs = [
+        "validators.go",
+        "windower.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/proposervm/proposer",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//snow/validators",
+        "//utils",
+        "//utils/math",
+        "//utils/sampler",
+        "//utils/wrappers",
+        "@org_gonum_v1_gonum//mathext/prng",
+    ],
+)
+
+go_test(
+    name = "proposer_test",
+    srcs = [
+        "mocks_generate_test.go",
+        "validators_test.go",
+        "windower_test.go",
+    ],
+    embed = [":proposer"],
+    deps = [
+        "//ids",
+        "//snow/validators",
+        "//snow/validators/validatorstest",
+        "//utils/math",
+        "@com_github_stretchr_testify//require",
+    ],
+)

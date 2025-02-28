@@ -1,0 +1,22 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "vertextest",
+    srcs = [
+        "builder.go",
+        "manager.go",
+        "parser.go",
+        "storage.go",
+        "vm.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex/vertextest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//snow/consensus/avalanche",
+        "//snow/consensus/snowstorm",
+        "//snow/engine/avalanche/vertex",
+        "//snow/engine/snowman/block/blocktest",
+        "@com_github_stretchr_testify//require",
+    ],
+)

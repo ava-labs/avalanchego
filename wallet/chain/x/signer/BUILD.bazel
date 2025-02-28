@@ -1,0 +1,25 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "signer",
+    srcs = [
+        "signer.go",
+        "visitor.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/wallet/chain/x/signer",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//ids",
+        "//utils/crypto/keychain",
+        "//utils/crypto/secp256k1",
+        "//vms/avm/fxs",
+        "//vms/avm/txs",
+        "//vms/components/avax",
+        "//vms/components/verify",
+        "//vms/nftfx",
+        "//vms/propertyfx",
+        "//vms/secp256k1fx",
+        "//wallet/chain/x/builder",
+    ],
+)

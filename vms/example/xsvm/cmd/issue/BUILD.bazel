@@ -1,0 +1,14 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "issue",
+    srcs = ["cmd.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vms/example/xsvm/cmd/issue/export",
+        "//vms/example/xsvm/cmd/issue/importtx",
+        "//vms/example/xsvm/cmd/issue/transfer",
+        "@com_github_spf13_cobra//:cobra",
+    ],
+)

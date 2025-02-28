@@ -1,0 +1,28 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "register-l1-validator_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/ava-labs/avalanchego/wallet/subnet/primary/examples/register-l1-validator",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//api/info",
+        "//genesis",
+        "//ids",
+        "//utils/crypto/bls",
+        "//utils/crypto/bls/signer/localsigner",
+        "//utils/set",
+        "//utils/units",
+        "//vms/platformvm/warp",
+        "//vms/platformvm/warp/message",
+        "//vms/platformvm/warp/payload",
+        "//vms/secp256k1fx",
+        "//wallet/subnet/primary",
+    ],
+)
+
+go_binary(
+    name = "register-l1-validator",
+    embed = [":register-l1-validator_lib"],
+    visibility = ["//visibility:public"],
+)

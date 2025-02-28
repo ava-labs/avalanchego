@@ -1,0 +1,31 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "keychain",
+    srcs = [
+        "keychain.go",
+        "ledger.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/crypto/keychain",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//utils/set",
+        "//version",
+    ],
+)
+
+go_test(
+    name = "keychain_test",
+    srcs = [
+        "keychain_test.go",
+        "mocks_generate_test.go",
+    ],
+    embed = [":keychain"],
+    deps = [
+        "//ids",
+        "//utils/crypto/keychain/keychainmock",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_mock//gomock",
+    ],
+)

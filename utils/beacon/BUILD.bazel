@@ -1,0 +1,22 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "beacon",
+    srcs = [
+        "beacon.go",
+        "set.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/beacon",
+    visibility = ["//visibility:public"],
+    deps = ["//ids"],
+)
+
+go_test(
+    name = "beacon_test",
+    srcs = ["set_test.go"],
+    embed = [":beacon"],
+    deps = [
+        "//ids",
+        "@com_github_stretchr_testify//require",
+    ],
+)

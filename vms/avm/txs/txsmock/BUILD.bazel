@@ -1,0 +1,16 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "txsmock",
+    srcs = ["tx.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/avm/txs/txsmock",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//snow",
+        "//utils/set",
+        "//vms/avm/txs",
+        "//vms/components/avax",
+        "@org_uber_go_mock//gomock",
+    ],
+)

@@ -1,0 +1,28 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "ghttp",
+    srcs = [
+        "http_client.go",
+        "http_server.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//proto/pb/http",
+        "//proto/pb/http/responsewriter",
+        "//vms/rpcchainvm/ghttp/gresponsewriter",
+        "//vms/rpcchainvm/grpcutils",
+        "@org_golang_google_protobuf//types/known/emptypb",
+    ],
+)
+
+go_test(
+    name = "ghttp_test",
+    srcs = ["http_test.go"],
+    embed = [":ghttp"],
+    deps = [
+        "//proto/pb/http",
+        "@com_github_stretchr_testify//require",
+    ],
+)

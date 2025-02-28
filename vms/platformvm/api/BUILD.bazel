@@ -1,0 +1,44 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "api",
+    srcs = [
+        "height.go",
+        "static_service.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/platformvm/api",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//utils",
+        "//utils/formatting",
+        "//utils/formatting/address",
+        "//utils/json",
+        "//utils/math",
+        "//vms/components/avax",
+        "//vms/platformvm/genesis",
+        "//vms/platformvm/signer",
+        "//vms/platformvm/stakeable",
+        "//vms/platformvm/txs",
+        "//vms/platformvm/txs/txheap",
+        "//vms/secp256k1fx",
+    ],
+)
+
+go_test(
+    name = "api_test",
+    srcs = [
+        "height_test.go",
+        "static_service_test.go",
+    ],
+    embed = [":api"],
+    deps = [
+        "//ids",
+        "//utils/constants",
+        "//utils/formatting",
+        "//utils/formatting/address",
+        "//utils/json",
+        "//vms/platformvm/genesis",
+        "@com_github_stretchr_testify//require",
+    ],
+)

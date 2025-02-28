@@ -1,0 +1,17 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "gconn",
+    srcs = [
+        "conn_client.go",
+        "conn_server.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gconn",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//proto/pb/net/conn",
+        "//utils/wrappers",
+        "//vms/rpcchainvm/grpcutils",
+        "@org_golang_google_protobuf//types/known/emptypb",
+    ],
+)

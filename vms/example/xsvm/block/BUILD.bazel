@@ -1,0 +1,16 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "block",
+    srcs = [
+        "block.go",
+        "codec.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/example/xsvm/block",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//utils/hashing",
+        "//vms/example/xsvm/tx",
+    ],
+)

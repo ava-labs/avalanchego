@@ -1,0 +1,19 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "g_db",
+    srcs = [
+        "db_client.go",
+        "db_server.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/x/sync/g_db",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//proto/pb/sync",
+        "//utils/maybe",
+        "//x/merkledb",
+        "//x/sync",
+        "@org_golang_google_protobuf//types/known/emptypb",
+    ],
+)

@@ -1,0 +1,27 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "scheduler",
+    srcs = ["scheduler.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/proposervm/scheduler",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//snow/engine/common",
+        "//utils/logging",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "scheduler_test",
+    srcs = [
+        "mocks_generate_test.go",
+        "scheduler_test.go",
+    ],
+    embed = [":scheduler"],
+    deps = [
+        "//snow/engine/common",
+        "//utils/logging",
+        "@com_github_stretchr_testify//require",
+    ],
+)

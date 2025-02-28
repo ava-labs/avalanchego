@@ -1,0 +1,28 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "ledger",
+    srcs = ["ledger.go"],
+    importpath = "github.com/ava-labs/avalanchego/utils/crypto/ledger",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//utils/crypto/keychain",
+        "//utils/hashing",
+        "//version",
+        "@com_github_ava_labs_ledger_avalanche_go//:go",
+        "@com_github_tyler_smith_go_bip32//:go-bip32",
+    ],
+)
+
+go_test(
+    name = "ledger_test",
+    srcs = ["ledger_test.go"],
+    embed = [":ledger"],
+    deps = [
+        "//utils/crypto/secp256k1",
+        "//utils/formatting/address",
+        "//utils/hashing",
+        "@com_github_stretchr_testify//require",
+    ],
+)

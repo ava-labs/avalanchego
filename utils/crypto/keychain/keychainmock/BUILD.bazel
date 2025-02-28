@@ -1,0 +1,13 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "keychainmock",
+    srcs = ["ledger.go"],
+    importpath = "github.com/ava-labs/avalanchego/utils/crypto/keychain/keychainmock",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//version",
+        "@org_uber_go_mock//gomock",
+    ],
+)

@@ -1,0 +1,19 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "wrappers",
+    srcs = [
+        "closers.go",
+        "errors.go",
+        "packing.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/wrappers",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "wrappers_test",
+    srcs = ["packing_test.go"],
+    embed = [":wrappers"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

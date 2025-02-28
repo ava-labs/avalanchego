@@ -1,0 +1,22 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "index",
+    srcs = [
+        "index.go",
+        "metrics.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/components/index",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//database/prefixdb",
+        "//ids",
+        "//utils/logging",
+        "//utils/set",
+        "//utils/wrappers",
+        "//vms/components/avax",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@org_uber_go_zap//:zap",
+    ],
+)

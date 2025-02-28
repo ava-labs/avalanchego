@@ -1,0 +1,19 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "upgrade",
+    srcs = ["upgrade.go"],
+    importpath = "github.com/ava-labs/avalanchego/upgrade",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//utils/constants",
+    ],
+)
+
+go_test(
+    name = "upgrade_test",
+    srcs = ["upgrade_test.go"],
+    embed = [":upgrade"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

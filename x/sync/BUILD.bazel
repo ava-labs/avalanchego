@@ -1,0 +1,60 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "sync",
+    srcs = [
+        "db.go",
+        "manager.go",
+        "metrics.go",
+        "network_server.go",
+        "workheap.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/x/sync",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//network/p2p",
+        "//proto/pb/sync",
+        "//snow/engine/common",
+        "//utils/constants",
+        "//utils/hashing",
+        "//utils/heap",
+        "//utils/logging",
+        "//utils/maybe",
+        "//utils/set",
+        "//utils/units",
+        "//x/merkledb",
+        "@com_github_google_btree//:btree",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@org_golang_google_protobuf//proto",
+        "@org_golang_x_exp//maps",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "sync_test",
+    srcs = [
+        "client_test.go",
+        "network_server_test.go",
+        "sync_test.go",
+        "workheap_test.go",
+    ],
+    embed = [":sync"],
+    deps = [
+        "//database",
+        "//database/memdb",
+        "//ids",
+        "//network/p2p",
+        "//network/p2p/p2ptest",
+        "//proto/pb/sync",
+        "//snow/engine/common",
+        "//trace",
+        "//utils/logging",
+        "//utils/maybe",
+        "//x/merkledb",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_google_protobuf//proto",
+    ],
+)

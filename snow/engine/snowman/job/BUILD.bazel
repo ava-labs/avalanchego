@@ -1,0 +1,15 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "job",
+    srcs = ["scheduler.go"],
+    importpath = "github.com/ava-labs/avalanchego/snow/engine/snowman/job",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "job_test",
+    srcs = ["scheduler_test.go"],
+    embed = [":job"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

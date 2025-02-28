@@ -1,0 +1,23 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "getter",
+    srcs = ["getter.go"],
+    importpath = "github.com/ava-labs/avalanchego/snow/engine/avalanche/getter",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//message",
+        "//snow/choices",
+        "//snow/consensus/avalanche",
+        "//snow/engine/avalanche/vertex",
+        "//snow/engine/common",
+        "//utils/constants",
+        "//utils/logging",
+        "//utils/metric",
+        "//utils/set",
+        "//utils/wrappers",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@org_uber_go_zap//:zap",
+    ],
+)

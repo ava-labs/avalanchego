@@ -1,0 +1,27 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "formatting",
+    srcs = [
+        "encoding.go",
+        "int_format.go",
+        "prefixed_stringer.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/formatting",
+    visibility = ["//visibility:public"],
+    deps = ["//utils/hashing"],
+)
+
+go_test(
+    name = "formatting_test",
+    srcs = [
+        "encoding_benchmark_test.go",
+        "encoding_test.go",
+        "int_format_test.go",
+    ],
+    embed = [":formatting"],
+    deps = [
+        "//utils/units",
+        "@com_github_stretchr_testify//require",
+    ],
+)

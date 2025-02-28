@@ -1,0 +1,33 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "gwarp",
+    srcs = [
+        "client.go",
+        "server.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/platformvm/warp/gwarp",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//proto/pb/warp",
+        "//vms/platformvm/warp",
+    ],
+)
+
+go_test(
+    name = "gwarp_test",
+    srcs = ["signer_test.go"],
+    embed = [":gwarp"],
+    deps = [
+        "//ids",
+        "//proto/pb/warp",
+        "//utils/constants",
+        "//utils/crypto/bls",
+        "//utils/crypto/bls/signer/localsigner",
+        "//vms/platformvm/warp",
+        "//vms/platformvm/warp/signertest",
+        "//vms/rpcchainvm/grpcutils",
+        "@com_github_stretchr_testify//require",
+    ],
+)

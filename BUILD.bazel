@@ -2,6 +2,10 @@ load("@gazelle//:def.bzl", "gazelle")
 load("@rules_go//go:def.bzl", "go_library")
 
 # No need for gazelle:prefix as it reads from go.mod
+
+# Use the pre-generated .pb.go files (https://github.com/bazel-contrib/rules_go/blob/master/proto/core.rst#option-2-use-pre-generated-pbgo-files)
+# gazelle:proto disable_global
+
 gazelle(
     name = "gazelle",
     command = "fix",
@@ -11,4 +15,12 @@ gazelle(
     name = "gazelle_diff",
     command = "fix",
     extra_args = ["--mode=diff"],
+)
+
+go_library(
+    name = "avalanchego",
+    srcs = ["tools.go"],
+    importpath = "github.com/ava-labs/avalanchego",
+    visibility = ["//visibility:public"],
+    deps = ["@org_golang_x_mod//semver"],
 )

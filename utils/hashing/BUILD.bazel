@@ -1,0 +1,18 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "hashing",
+    srcs = [
+        "hasher.go",
+        "hashing.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/hashing",
+    visibility = ["//visibility:public"],
+    deps = ["@org_golang_x_crypto//ripemd160"],
+)
+
+go_test(
+    name = "hashing_test",
+    srcs = ["mocks_generate_test.go"],
+    embed = [":hashing"],
+)

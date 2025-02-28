@@ -1,0 +1,44 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "avalanchego_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/ava-labs/avalanchego/tests/antithesis/avalanchego",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//database",
+        "//genesis",
+        "//ids",
+        "//tests",
+        "//tests/antithesis",
+        "//tests/fixture/e2e",
+        "//tests/fixture/tmpnet",
+        "//utils/constants",
+        "//utils/crypto/secp256k1",
+        "//utils/logging",
+        "//utils/set",
+        "//utils/timer",
+        "//utils/units",
+        "//vms/avm",
+        "//vms/avm/txs",
+        "//vms/components/avax",
+        "//vms/components/verify",
+        "//vms/platformvm",
+        "//vms/platformvm/txs",
+        "//vms/propertyfx",
+        "//vms/secp256k1fx",
+        "//wallet/chain/x/builder",
+        "//wallet/subnet/primary",
+        "//wallet/subnet/primary/common",
+        "@com_github_antithesishq_antithesis_sdk_go//assert",
+        "@com_github_antithesishq_antithesis_sdk_go//lifecycle",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_binary(
+    name = "avalanchego",
+    embed = [":avalanchego_lib"],
+    visibility = ["//visibility:public"],
+)

@@ -1,0 +1,11 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "units",
+    srcs = [
+        "avax.go",
+        "bytes.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/units",
+    visibility = ["//visibility:public"],
+)

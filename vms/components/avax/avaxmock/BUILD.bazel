@@ -1,0 +1,16 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "avaxmock",
+    srcs = [
+        "transferable_in.go",
+        "transferable_out.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/components/avax/avaxmock",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//snow",
+        "//vms/components/verify",
+        "@org_uber_go_mock//gomock",
+    ],
+)

@@ -1,0 +1,15 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "messenger",
+    srcs = [
+        "messenger_client.go",
+        "messenger_server.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/rpcchainvm/messenger",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//proto/pb/messenger",
+        "//snow/engine/common",
+    ],
+)

@@ -1,0 +1,15 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "signertest",
+    srcs = ["signertest.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/platformvm/warp/signertest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//utils/constants",
+        "//utils/crypto/bls",
+        "//vms/platformvm/warp",
+        "@com_github_stretchr_testify//require",
+    ],
+)

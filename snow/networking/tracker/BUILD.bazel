@@ -1,0 +1,45 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "tracker",
+    srcs = [
+        "resource_tracker.go",
+        "targeter.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/snow/networking/tracker",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//snow/validators",
+        "//utils/constants",
+        "//utils/linked",
+        "//utils/logging",
+        "//utils/math/meter",
+        "//utils/resource",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "tracker_test",
+    srcs = [
+        "mocks_generate_test.go",
+        "resource_tracker_test.go",
+        "targeter_test.go",
+    ],
+    embed = [":tracker"],
+    deps = [
+        "//ids",
+        "//snow/networking/tracker/trackermock",
+        "//snow/validators",
+        "//utils/constants",
+        "//utils/logging",
+        "//utils/math/meter",
+        "//utils/resource",
+        "//utils/resource/resourcemock",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_mock//gomock",
+    ],
+)

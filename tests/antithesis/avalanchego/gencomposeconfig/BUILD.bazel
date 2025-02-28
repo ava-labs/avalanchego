@@ -1,0 +1,20 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "gencomposeconfig_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/ava-labs/avalanchego/tests/antithesis/avalanchego/gencomposeconfig",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//tests",
+        "//tests/antithesis",
+        "//tests/fixture/tmpnet",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_binary(
+    name = "gencomposeconfig",
+    embed = [":gencomposeconfig_lib"],
+    visibility = ["//visibility:public"],
+)
