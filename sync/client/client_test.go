@@ -266,7 +266,7 @@ func TestGetBlocks(t *testing.T) {
 
 				return responseBytes
 			},
-			expectedErr: "failed to unmarshal response: rlp: expected input list for types.extblock",
+			expectedErr: "failed to unmarshal response: rlp: expected List",
 		},
 		"incorrect starting point": {
 			request: message.BlockRequest{
@@ -381,7 +381,7 @@ func TestGetBlocks(t *testing.T) {
 				if err == nil {
 					t.Fatalf("Expected error: %s, but found no error", test.expectedErr)
 				}
-				assert.True(t, strings.Contains(err.Error(), test.expectedErr), "expected error to contain [%s], but found [%s]", test.expectedErr, err)
+				assert.ErrorContains(t, err, test.expectedErr)
 				return
 			}
 			if err != nil {

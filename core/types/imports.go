@@ -15,8 +15,11 @@ type (
 	AccessTuple       = ethtypes.AccessTuple
 	BlobTx            = ethtypes.BlobTx
 	BlobTxSidecar     = ethtypes.BlobTxSidecar
+	Block             = ethtypes.Block
 	BlockNonce        = ethtypes.BlockNonce
+	Blocks            = ethtypes.Blocks
 	Bloom             = ethtypes.Bloom
+	Body              = ethtypes.Body
 	DynamicFeeTx      = ethtypes.DynamicFeeTx
 	FrontierSigner    = ethtypes.FrontierSigner
 	Header            = ethtypes.Header
@@ -52,11 +55,14 @@ const (
 var (
 	BloomLookup         = ethtypes.BloomLookup
 	BytesToBloom        = ethtypes.BytesToBloom
+	CalcUncleHash       = ethtypes.CalcUncleHash
 	CopyHeader          = ethtypes.CopyHeader
 	CreateBloom         = ethtypes.CreateBloom
 	EncodeNonce         = ethtypes.EncodeNonce
 	FullAccount         = ethtypes.FullAccount
 	FullAccountRLP      = ethtypes.FullAccountRLP
+	NewBlock            = ethtypes.NewBlock
+	NewBlockWithHeader  = ethtypes.NewBlockWithHeader
 	NewContractCreation = ethtypes.NewContractCreation
 	NewReceipt          = ethtypes.NewReceipt
 	NewTransaction      = ethtypes.NewTransaction

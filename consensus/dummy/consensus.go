@@ -337,7 +337,7 @@ func (eng *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *types
 		return err
 	}
 	// Verify the BlockGasCost set in the header matches the expected value.
-	blockGasCost := block.BlockGasCost()
+	blockGasCost := types.BlockGasCost(block)
 	expectedBlockGasCost := customheader.BlockGasCost(
 		config,
 		feeConfig,

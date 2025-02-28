@@ -1984,8 +1984,8 @@ func TestBuildSubnetEVMBlock(t *testing.T) {
 
 	blk = issueAndAccept(t, issuer, vm)
 	ethBlk := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
-	if ethBlk.BlockGasCost() == nil || ethBlk.BlockGasCost().Cmp(big.NewInt(100)) < 0 {
-		t.Fatalf("expected blockGasCost to be at least 100 but got %d", ethBlk.BlockGasCost())
+	if types.BlockGasCost(ethBlk) == nil || types.BlockGasCost(ethBlk).Cmp(big.NewInt(100)) < 0 {
+		t.Fatalf("expected blockGasCost to be at least 100 but got %d", types.BlockGasCost(ethBlk))
 	}
 	chainConfig := params.GetExtra(vm.chainConfig)
 	minRequiredTip, err := header.EstimateRequiredTip(chainConfig, ethBlk.Header())
