@@ -23,8 +23,11 @@ FROM $AVALANCHEGO_NODE_IMAGE AS execution
 # The builder workdir will vary between instrumented and non-instrumented builders
 ARG BUILDER_WORKDIR
 
+# Configure the node with the location of the xsvm plugin
+ENV AVAGO_PLUGIN_DIR=/avalanchego/build/plugins
+
 # Copy the executable into the container
 COPY --from=builder $BUILDER_WORKDIR/build/xsvm \
-    /avalanchego/build/plugins/v3m4wPxaHpvGr8qfMeyK6PRW3idZrPHmYcMTt7oXdK47yurVH
+    $AVAGO_PLUGIN_DIR/v3m4wPxaHpvGr8qfMeyK6PRW3idZrPHmYcMTt7oXdK47yurVH
 
 # The node image's entrypoint will be reused.
