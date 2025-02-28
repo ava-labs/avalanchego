@@ -5,20 +5,46 @@
 package subnetevm
 
 import (
+	"encoding/binary"
+	"errors"
+	"fmt"
 	"math"
 
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	safemath "github.com/ethereum/go-ethereum/common/math"
 )
 
 const (
 	// WindowLen is the number of seconds of gas consumption to track.
 	WindowLen = 10
+
+	// WindowSize is the number of bytes that are used to encode the window.
+	WindowSize = wrappers.LongLen * WindowLen
 )
+
+var ErrWindowInsufficientLength = errors.New("insufficient length for window")
 
 // Window is a window of the last [WindowLen] seconds of gas usage.
 //
 // Index 0 is the oldest entry, and [WindowLen]-1 is the current entry.
 type Window [WindowLen]uint64
+
+func ParseWindow(bytes []byte) (Window, error) {
+	if len(bytes) < WindowSize {
+		return Window{}, fmt.Errorf("%w: expected at least %d bytes but got %d bytes",
+			ErrWindowInsufficientLength,
+			WindowSize,
+			len(bytes),
+		)
+	}
+
+	var window Window
+	for i := range window {
+		offset := i * wrappers.LongLen
+		window[i] = binary.BigEndian.Uint64(bytes[offset:])
+	}
+	return window, nil
+}
 
 // Add adds the amounts to the most recent entry in the window.
 //
@@ -46,6 +72,15 @@ func (w *Window) Shift(n uint64) {
 // If the sum overflows, [math.MaxUint64] is returned.
 func (w *Window) Sum() uint64 {
 	return add(0, w[:]...)
+}
+
+func (w *Window) Bytes() []byte {
+	bytes := make([]byte, WindowSize)
+	for i, v := range w {
+		offset := i * wrappers.LongLen
+		binary.BigEndian.PutUint64(bytes[offset:], v)
+	}
+	return bytes
 }
 
 func add(sum uint64, values ...uint64) uint64 {

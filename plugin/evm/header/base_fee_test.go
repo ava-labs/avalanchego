@@ -69,7 +69,7 @@ func BaseFeeTest(t *testing.T, feeConfig commontype.FeeConfig) {
 			parent: &types.Header{
 				Number: big.NewInt(1),
 			},
-			wantErr: errDynamicFeeWindowInsufficientLength,
+			wantErr: subnetevm.ErrWindowInsufficientLength,
 		},
 		{
 			name:     "subnet_evm_invalid_timestamp",
@@ -77,7 +77,7 @@ func BaseFeeTest(t *testing.T, feeConfig commontype.FeeConfig) {
 			parent: &types.Header{
 				Number: big.NewInt(1),
 				Time:   1,
-				Extra:  feeWindowBytes(subnetevm.Window{}),
+				Extra:  (&subnetevm.Window{}).Bytes(),
 			},
 			timestamp: 0,
 			wantErr:   errInvalidTimestamp,
@@ -89,7 +89,7 @@ func BaseFeeTest(t *testing.T, feeConfig commontype.FeeConfig) {
 				Number:  big.NewInt(1),
 				GasUsed: feeConfig.TargetGas.Uint64(),
 				Time:    1,
-				Extra:   feeWindowBytes(subnetevm.Window{}),
+				Extra:   (&subnetevm.Window{}).Bytes(),
 				BaseFee: big.NewInt(feeConfig.MinBaseFee.Int64() + 1),
 			},
 			timestamp: 1,
@@ -100,7 +100,7 @@ func BaseFeeTest(t *testing.T, feeConfig commontype.FeeConfig) {
 			upgrades: params.TestSubnetEVMChainConfig.NetworkUpgrades,
 			parent: &types.Header{
 				Number:  big.NewInt(1),
-				Extra:   feeWindowBytes(subnetevm.Window{}),
+				Extra:   (&subnetevm.Window{}).Bytes(),
 				BaseFee: big.NewInt(maxBaseFee),
 			},
 			timestamp: 1,
@@ -123,7 +123,7 @@ func BaseFeeTest(t *testing.T, feeConfig commontype.FeeConfig) {
 			upgrades: params.TestSubnetEVMChainConfig.NetworkUpgrades,
 			parent: &types.Header{
 				Number:  big.NewInt(1),
-				Extra:   feeWindowBytes(subnetevm.Window{}),
+				Extra:   (&subnetevm.Window{}).Bytes(),
 				BaseFee: big.NewInt(maxBaseFee),
 			},
 			timestamp: 2 * subnetevm.WindowLen,
@@ -148,7 +148,7 @@ func BaseFeeTest(t *testing.T, feeConfig commontype.FeeConfig) {
 			parent: &types.Header{
 				Number:  big.NewInt(1),
 				GasUsed: 2 * feeConfig.TargetGas.Uint64(),
-				Extra:   feeWindowBytes(subnetevm.Window{}),
+				Extra:   (&subnetevm.Window{}).Bytes(),
 				BaseFee: big.NewInt(feeConfig.MinBaseFee.Int64()),
 			},
 			timestamp: 1,
@@ -172,7 +172,7 @@ func BaseFeeTest(t *testing.T, feeConfig commontype.FeeConfig) {
 			parent: &types.Header{
 				Number:  big.NewInt(1),
 				GasUsed: 1,
-				Extra:   feeWindowBytes(subnetevm.Window{}),
+				Extra:   (&subnetevm.Window{}).Bytes(),
 				BaseFee: big.NewInt(1),
 			},
 			timestamp: 2 * subnetevm.WindowLen,
@@ -221,7 +221,7 @@ func EstimateNextBaseFeeTest(t *testing.T, feeConfig commontype.FeeConfig) {
 			upgrades: params.TestSubnetEVMChainConfig.NetworkUpgrades,
 			parent: &types.Header{
 				Number:  big.NewInt(1),
-				Extra:   feeWindowBytes(subnetevm.Window{}),
+				Extra:   (&subnetevm.Window{}).Bytes(),
 				BaseFee: new(big.Int).SetUint64(testBaseFee),
 			},
 			timestamp: 1,

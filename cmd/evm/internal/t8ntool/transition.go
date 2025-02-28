@@ -41,6 +41,7 @@ import (
 	"github.com/ava-labs/subnet-evm/eth/tracers/logger"
 	"github.com/ava-labs/subnet-evm/params"
 	customheader "github.com/ava-labs/subnet-evm/plugin/evm/header"
+	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/subnetevm"
 	"github.com/ava-labs/subnet-evm/tests"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -222,7 +223,7 @@ func applyLondonChecks(env *stEnv, chainConfig *params.ChainConfig) error {
 		BaseFee:  env.ParentBaseFee,
 		GasUsed:  env.ParentGasUsed,
 		GasLimit: env.ParentGasLimit,
-		Extra:    make([]byte, customheader.FeeWindowSize), // TODO: consider passing extra through env
+		Extra:    make([]byte, subnetevm.WindowSize), // TODO: consider passing extra through env
 	}
 	feeConfig := params.DefaultFeeConfig
 	if env.MinBaseFee != nil {

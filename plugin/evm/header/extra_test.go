@@ -43,7 +43,7 @@ func TestExtraPrefix(t *testing.T) {
 				Number: big.NewInt(1),
 			},
 			timestamp: 1,
-			want:      feeWindowBytes(subnetevm.Window{}),
+			want:      (&subnetevm.Window{}).Bytes(),
 		},
 		{
 			name:     "subnet_evm_genesis_block",
@@ -51,7 +51,7 @@ func TestExtraPrefix(t *testing.T) {
 			parent: &types.Header{
 				Number: big.NewInt(0),
 			},
-			want: feeWindowBytes(subnetevm.Window{}),
+			want: (&subnetevm.Window{}).Bytes(),
 		},
 		{
 			name:     "subnet_evm_invalid_fee_window",
@@ -59,7 +59,7 @@ func TestExtraPrefix(t *testing.T) {
 			parent: &types.Header{
 				Number: big.NewInt(1),
 			},
-			wantErr: errDynamicFeeWindowInsufficientLength,
+			wantErr: subnetevm.ErrWindowInsufficientLength,
 		},
 		{
 			name:     "subnet_evm_invalid_timestamp",
@@ -67,7 +67,7 @@ func TestExtraPrefix(t *testing.T) {
 			parent: &types.Header{
 				Number: big.NewInt(1),
 				Time:   1,
-				Extra:  feeWindowBytes(subnetevm.Window{}),
+				Extra:  (&subnetevm.Window{}).Bytes(),
 			},
 			timestamp: 0,
 			wantErr:   errInvalidTimestamp,
@@ -78,9 +78,9 @@ func TestExtraPrefix(t *testing.T) {
 			parent: &types.Header{
 				Number:  big.NewInt(1),
 				GasUsed: targetGas,
-				Extra: feeWindowBytes(subnetevm.Window{
+				Extra: (&subnetevm.Window{
 					1, 2, 3, 4,
-				}),
+				}).Bytes(),
 				BlockGasCost: big.NewInt(blockGas),
 			},
 			timestamp: 1,
@@ -90,7 +90,7 @@ func TestExtraPrefix(t *testing.T) {
 				}
 				window.Add(targetGas)
 				window.Shift(1)
-				return feeWindowBytes(window)
+				return window.Bytes()
 			}(),
 		},
 	}
@@ -132,7 +132,7 @@ func TestVerifyExtra(t *testing.T) {
 			rules: params.AvalancheRules{
 				IsSubnetEVM: true,
 			},
-			extra:    make([]byte, FeeWindowSize),
+			extra:    make([]byte, subnetevm.WindowSize),
 			expected: nil,
 		},
 		{
@@ -140,7 +140,7 @@ func TestVerifyExtra(t *testing.T) {
 			rules: params.AvalancheRules{
 				IsSubnetEVM: true,
 			},
-			extra:    make([]byte, FeeWindowSize-1),
+			extra:    make([]byte, subnetevm.WindowSize-1),
 			expected: errInvalidExtraLength,
 		},
 		{
@@ -148,7 +148,7 @@ func TestVerifyExtra(t *testing.T) {
 			rules: params.AvalancheRules{
 				IsSubnetEVM: true,
 			},
-			extra:    make([]byte, FeeWindowSize+1),
+			extra:    make([]byte, subnetevm.WindowSize+1),
 			expected: errInvalidExtraLength,
 		},
 		{
@@ -156,7 +156,7 @@ func TestVerifyExtra(t *testing.T) {
 			rules: params.AvalancheRules{
 				IsDurango: true,
 			},
-			extra:    make([]byte, FeeWindowSize),
+			extra:    make([]byte, subnetevm.WindowSize),
 			expected: nil,
 		},
 		{
@@ -164,7 +164,7 @@ func TestVerifyExtra(t *testing.T) {
 			rules: params.AvalancheRules{
 				IsDurango: true,
 			},
-			extra:    make([]byte, FeeWindowSize+1),
+			extra:    make([]byte, subnetevm.WindowSize+1),
 			expected: nil,
 		},
 		{
@@ -172,7 +172,7 @@ func TestVerifyExtra(t *testing.T) {
 			rules: params.AvalancheRules{
 				IsDurango: true,
 			},
-			extra:    make([]byte, FeeWindowSize-1),
+			extra:    make([]byte, subnetevm.WindowSize-1),
 			expected: errInvalidExtraLength,
 		},
 	}
@@ -198,18 +198,18 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 		},
 		{
 			name:     "too_short",
-			extra:    make([]byte, FeeWindowSize-1),
+			extra:    make([]byte, subnetevm.WindowSize-1),
 			expected: nil,
 		},
 		{
 			name:     "empty_predicate",
-			extra:    make([]byte, FeeWindowSize),
+			extra:    make([]byte, subnetevm.WindowSize),
 			expected: nil,
 		},
 		{
 			name: "non_empty_predicate",
 			extra: []byte{
-				FeeWindowSize: 5,
+				subnetevm.WindowSize: 5,
 			},
 			expected: []byte{5},
 		},

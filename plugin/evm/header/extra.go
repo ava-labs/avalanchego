@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/subnetevm"
 )
 
 var errInvalidExtraLength = errors.New("invalid header.Extra length")
@@ -26,7 +27,7 @@ func ExtraPrefix(
 		if err != nil {
 			return nil, fmt.Errorf("failed to calculate fee window: %w", err)
 		}
-		return feeWindowBytes(window), nil
+		return window.Bytes(), nil
 	default:
 		// Prior to SubnetEVM there was no expected extra prefix.
 		return nil, nil
@@ -39,20 +40,20 @@ func VerifyExtra(rules params.AvalancheRules, extra []byte) error {
 	extraLen := len(extra)
 	switch {
 	case rules.IsDurango:
-		if extraLen < FeeWindowSize {
+		if extraLen < subnetevm.WindowSize {
 			return fmt.Errorf(
 				"%w: expected >= %d but got %d",
 				errInvalidExtraLength,
-				FeeWindowSize,
+				subnetevm.WindowSize,
 				extraLen,
 			)
 		}
 	case rules.IsSubnetEVM:
-		if extraLen != FeeWindowSize {
+		if extraLen != subnetevm.WindowSize {
 			return fmt.Errorf(
 				"%w: expected %d but got %d",
 				errInvalidExtraLength,
-				FeeWindowSize,
+				subnetevm.WindowSize,
 				extraLen,
 			)
 		}
@@ -76,8 +77,8 @@ func PredicateBytesFromExtra(_ params.AvalancheRules, extra []byte) []byte {
 	// to this size.
 	// After Durango, the VM pre-verifies the extra data past the dynamic fee
 	// rollup window is valid.
-	if len(extra) <= FeeWindowSize {
+	if len(extra) <= subnetevm.WindowSize {
 		return nil
 	}
-	return extra[FeeWindowSize:]
+	return extra[subnetevm.WindowSize:]
 }

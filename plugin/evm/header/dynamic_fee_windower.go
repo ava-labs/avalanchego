@@ -4,12 +4,10 @@
 package header
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"math/big"
 
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
@@ -18,16 +16,11 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 )
 
-// FeeWindowSize is the number of bytes that are used to encode the dynamic fee
-// window in the header's Extra field after the SubnetEVM activation.
-const FeeWindowSize = wrappers.LongLen * subnetevm.WindowLen
-
 var (
 	maxUint256Plus1 = new(big.Int).Lsh(common.Big1, 256)
 	maxUint256      = new(big.Int).Sub(maxUint256Plus1, common.Big1)
 
-	errInvalidTimestamp                   = errors.New("invalid timestamp")
-	errDynamicFeeWindowInsufficientLength = errors.New("insufficient length for dynamic fee window")
+	errInvalidTimestamp = errors.New("invalid timestamp")
 )
 
 // baseFeeFromWindow should only be called if `timestamp` >= `config.SubnetEVMTimestamp`
@@ -132,7 +125,7 @@ func feeWindow(
 		return subnetevm.Window{}, nil
 	}
 
-	dynamicFeeWindow, err := parseFeeWindow(parent.Extra)
+	dynamicFeeWindow, err := subnetevm.ParseWindow(parent.Extra)
 	if err != nil {
 		return subnetevm.Window{}, err
 	}
@@ -167,30 +160,4 @@ func selectBigWithinBounds(lowerBound, value, upperBound *big.Int) *big.Int {
 	default:
 		return value
 	}
-}
-
-func parseFeeWindow(bytes []byte) (subnetevm.Window, error) {
-	if len(bytes) < FeeWindowSize {
-		return subnetevm.Window{}, fmt.Errorf("%w: expected at least %d bytes but got %d bytes",
-			errDynamicFeeWindowInsufficientLength,
-			FeeWindowSize,
-			len(bytes),
-		)
-	}
-
-	var window subnetevm.Window
-	for i := range window {
-		offset := i * wrappers.LongLen
-		window[i] = binary.BigEndian.Uint64(bytes[offset:])
-	}
-	return window, nil
-}
-
-func feeWindowBytes(w subnetevm.Window) []byte {
-	bytes := make([]byte, FeeWindowSize)
-	for i, v := range w {
-		offset := i * wrappers.LongLen
-		binary.BigEndian.PutUint64(bytes[offset:], v)
-	}
-	return bytes
 }
