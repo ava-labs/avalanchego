@@ -52,6 +52,8 @@ const (
 	DefaultNetworkPeerReadBufferSize        = 8 * units.KiB
 	DefaultNetworkPeerWriteBufferSize       = 8 * units.KiB
 
+	DefaultNoIngressValidatorConnectionTimeout = 20 * time.Minute
+
 	DefaultNetworkTCPProxyEnabled = false
 
 	// The PROXY protocol specification recommends setting this value to be at
