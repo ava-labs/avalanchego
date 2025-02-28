@@ -145,7 +145,6 @@ func NewTestGenesis(
 			},
 		)
 	}
-
 	chainID := big.NewInt(int64(networkID))
 	// Define C-Chain genesis
 	cChainGenesis := &core.Genesis{
