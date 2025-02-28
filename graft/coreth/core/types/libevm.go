@@ -9,6 +9,6 @@ import (
 
 var extras = ethtypes.RegisterExtras[
 	HeaderExtra, *HeaderExtra,
-	ethtypes.NOOPBlockBodyHooks, *ethtypes.NOOPBlockBodyHooks,
+	BlockBodyExtra, *BlockBodyExtra,
 	isMultiCoin,
 ]()

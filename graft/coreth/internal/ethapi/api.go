@@ -1279,7 +1279,7 @@ func RPCMarshalHeader(head *types.Header) map[string]interface{} {
 func RPCMarshalBlock(block *types.Block, inclTx bool, fullTx bool, config *params.ChainConfig) map[string]interface{} {
 	fields := RPCMarshalHeader(block.Header())
 	fields["size"] = hexutil.Uint64(block.Size())
-	fields["blockExtraData"] = hexutil.Bytes(block.ExtData())
+	fields["blockExtraData"] = hexutil.Bytes(types.BlockExtData(block))
 
 	if inclTx {
 		formatTx := func(idx int, tx *types.Transaction) interface{} {
