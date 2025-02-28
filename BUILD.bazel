@@ -1,0 +1,14 @@
+load("@gazelle//:def.bzl", "gazelle")
+load("@rules_go//go:def.bzl", "go_library")
+
+# No need for gazelle:prefix as it reads from go.mod
+gazelle(
+    name = "gazelle",
+    command = "fix",
+)
+
+gazelle(
+    name = "gazelle_diff",
+    command = "fix",
+    extra_args = ["--mode=diff"],
+)

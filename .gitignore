@@ -45,6 +45,7 @@ db*
 
 bin/
 build/
+/bazel-*
 
 keys/staker.*
 
