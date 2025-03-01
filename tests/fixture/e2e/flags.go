@@ -10,12 +10,18 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/spf13/cast"
+
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 )
 
-// Ensure that this value takes into account the scrape_interval
-// defined in scripts/run_prometheus.sh.
-const networkShutdownDelay = 12 * time.Second
+const (
+	// Ensure that this value takes into account the scrape_interval
+	// defined in scripts/run_prometheus.sh.
+	networkShutdownDelay = 12 * time.Second
+
+	delayNetworkShutdownEnvName = "TMPNET_DELAY_NETWORK_SHUTDOWN"
+)
 
 type FlagVars struct {
 	avalancheGoExecPath  string
@@ -143,7 +149,7 @@ func RegisterFlags() *FlagVars {
 	flag.BoolVar(
 		&vars.delayNetworkShutdown,
 		"delay-network-shutdown",
-		false,
+		cast.ToBool(GetEnvWithDefault(delayNetworkShutdownEnvName, "false")),
 		"[optional] whether to delay network shutdown to allow a final metrics scrape.",
 	)
 	flag.BoolVar(
