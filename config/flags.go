@@ -36,14 +36,6 @@ const (
 	defaultUnexpandedDataDir = "$" + AvalancheGoDataDirVar
 
 	DefaultProcessContextFilename = "process.json"
-
-	// The default plugin path of $HOME/.avalanchego/plugins is not
-	// suitable for docker images since $HOME might be writable but
-	// the plugin directory should not be. The value below is in the
-	// same hierarchy as avalanchego on the docker image
-	// (/avalanchego/build/avalanchego) and consistent with the
-	// location already used by subnet-evm.
-	DefaultImagePluginDir = "/avalanchego/build/plugins"
 )
 
 var (
