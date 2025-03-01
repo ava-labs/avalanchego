@@ -47,6 +47,10 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		expectedGasPriceIncreaseDenominator = 5
 	)
 	var (
+		bigExpectedGasPriceIncreaseNumerator         = big.NewInt(expectedGasPriceIncreaseNumerator)
+		bigExpectedGasPriceIncreaseDenominator       = big.NewInt(expectedGasPriceIncreaseDenominator)
+		bigExpectedGasPriceIncreaseDenominatorMinus1 = big.NewInt(expectedGasPriceIncreaseDenominator - 1)
+
 		gasFeeCap = big.NewInt(maxFeePerGas)
 		gasTipCap = big.NewInt(minFeePerGas)
 	)
@@ -138,8 +142,10 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 
 		initialGasPrice := latest.BaseFee
 		targetGasPrice := new(big.Int).Set(initialGasPrice)
-		targetGasPrice.Mul(targetGasPrice, big.NewInt(expectedGasPriceIncreaseNumerator))
-		targetGasPrice.Div(targetGasPrice, big.NewInt(expectedGasPriceIncreaseDenominator))
+		targetGasPrice.Mul(targetGasPrice, bigExpectedGasPriceIncreaseNumerator)
+		targetGasPrice.Add(targetGasPrice, bigExpectedGasPriceIncreaseDenominatorMinus1)
+		targetGasPrice.Div(targetGasPrice, bigExpectedGasPriceIncreaseDenominator)
+
 		tc.Log().Info("initializing gas prices",
 			zap.Stringer("initialPrice", initialGasPrice),
 			zap.Stringer("targetPrice", targetGasPrice),
@@ -158,7 +164,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 				require.NoError(err)
 
 				// If the gas price has increased, stop the loop.
-				if latest.BaseFee.Cmp(targetGasPrice) > 0 {
+				if latest.BaseFee.Cmp(targetGasPrice) >= 0 {
 					tc.Log().Info("gas price has increased",
 						zap.Stringer("initialPrice", initialGasPrice),
 						zap.Stringer("targetPrice", targetGasPrice),
@@ -207,7 +213,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 				require.NoError(err)
 
 				// If the gas price has decreased, stop the loop.
-				if initialGasPrice.Cmp(latest.BaseFee) >= 0 {
+				if latest.BaseFee.Cmp(initialGasPrice) <= 0 {
 					tc.Log().Info("gas price has decreased",
 						zap.Stringer("initialPrice", initialGasPrice),
 						zap.Stringer("newPrice", latest.BaseFee),
