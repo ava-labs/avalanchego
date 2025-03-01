@@ -36,7 +36,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		// just needs to be higher than the `targetGasPrice` calculated below.
 		maxFeePerGas = 1000 * params.GWei
 		// minFeePerGas is the minimum fee that transactions issued by this test
-		// will pay.
+		// will pay. The mempool enforces that this value is non-zero.
 		minFeePerGas = 1 * params.Wei
 
 		// expectedGasPriceIncreaseNumerator/expectedGasPriceIncreaseDenominator
@@ -61,6 +61,8 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		publicNetwork := env.GetNetwork()
 
 		privateNetwork := tmpnet.NewDefaultNetwork("avalanchego-e2e-dynamic-fees")
+		// Copy over the defaults from the normal test suite to include settings
+		// like the upgrade config.
 		privateNetwork.DefaultFlags = tmpnet.FlagsMap{}
 		privateNetwork.DefaultFlags.SetDefaults(publicNetwork.DefaultFlags)
 		env.StartPrivateNetwork(privateNetwork)
@@ -206,7 +208,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 			recipientKey        = e2e.NewPrivateKey(tc)
 			recipientEthAddress = recipientKey.EthAddress()
 		)
-		tc.By("calling the contract repeatedly until a sufficient gas price decrease is detected", func() {
+		tc.By("sending small transactions until a sufficient gas price decrease is detected", func() {
 			tc.Eventually(func() bool {
 				// Check the gas price
 				latest, err := ethClient.HeaderByNumber(tc.DefaultContext(), nil)
