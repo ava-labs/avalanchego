@@ -93,7 +93,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 
 		// gasLimit is the maximum amount of gas that can be used in a block.
 		var gasLimit uint64
-		tc.By("verifying Fortuna is activated", func() {
+		tc.By("checking if Fortuna is activated", func() {
 			infoClient := info.NewClient(nodeURI.URI)
 			upgrades, err := infoClient.Upgrades(tc.DefaultContext())
 			require.NoError(err)
