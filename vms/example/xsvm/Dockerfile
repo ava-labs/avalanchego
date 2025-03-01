@@ -1,9 +1,9 @@
 # The version is supplied as a build argument rather than hard-coded
 # to minimize the cost of version changes.
-ARG GO_VERSION=INVALID # This value isn't intended to be used but silences a warning
+ARG GO_VERSION=INVALID # This value is not intended to be used but silences a warning
 
 # AVALANCHEGO_NODE_IMAGE needs to identify an existing node image and should include the tag
-ARG AVALANCHEGO_NODE_IMAGE=INVALID # This value isn't intended to be used but silences a warning
+ARG AVALANCHEGO_NODE_IMAGE=INVALID # This value is not intended to be used but silences a warning
 
 # ============= Compilation Stage ================
 FROM golang:$GO_VERSION-bullseye AS builder
