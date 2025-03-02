@@ -36,6 +36,14 @@ func (NoLog) Debug(string, ...zap.Field) {}
 
 func (NoLog) Verbo(string, ...zap.Field) {}
 
+func (n NoLog) With(...zap.Field) Logger {
+	return n
+}
+
+func (n NoLog) WithOptions(...zap.Option) Logger {
+	return n
+}
+
 func (NoLog) SetLevel(Level) {}
 
 func (NoLog) Enabled(Level) bool {
