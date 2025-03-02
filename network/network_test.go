@@ -325,6 +325,11 @@ func TestIngressConnCount(t *testing.T) {
 
 	wg.Done()
 
+	for _, net := range networks {
+		net.config.NoIngressValidatorConnectionGracePeriod = 0
+		net.config.HealthConfig.Enabled = true
+	}
+
 	require.Eventually(func() bool {
 		result := true
 		for _, net := range networks {
@@ -334,15 +339,20 @@ func TestIngressConnCount(t *testing.T) {
 	}, time.Minute, time.Millisecond*10)
 
 	ingressConnections := make([]int, 0, len(networks))
+	healthCheckErrors := make([]error, 0, len(networks))
 
 	for _, net := range networks {
 		ingressConnections = append(ingressConnections, net.IngressConnCount())
+		_, err := net.HealthCheck(context.Background())
+		healthCheckErrors = append(healthCheckErrors, err)
 	}
 
 	// First node has all nodes connected to it.
 	// Second node has only the third node connected to it.
 	// Third node has no node connected to it, as it connects to the first and second node.
 	require.Equal([]int{2, 1, 0}, ingressConnections)
+	require.Equal([]error{nil, nil}, healthCheckErrors[:2])
+	require.EqualError(healthCheckErrors[2], "network layer is unhealthy reason: primary network validator is unreachable")
 }
 
 func TestSend(t *testing.T) {
