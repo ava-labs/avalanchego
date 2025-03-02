@@ -64,7 +64,8 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 			signedTx, err := types.SignTx(tx, signer, senderKey.ToECDSA())
 			require.NoError(err)
 
-			_ = e2e.SendEthTransaction(tc, ethClient, signedTx)
+			receipt := e2e.SendEthTransaction(tc, ethClient, signedTx)
+			require.Equal(types.ReceiptStatusSuccessful, receipt.Status)
 
 			tc.By("waiting for the C-Chain recipient address to have received the sent funds")
 			tc.Eventually(func() bool {
