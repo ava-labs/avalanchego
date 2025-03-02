@@ -327,13 +327,14 @@ func getNetworkConfig(
 		},
 
 		HealthConfig: network.HealthConfig{
-			Enabled:                      sybilProtectionEnabled,
-			MaxTimeSinceMsgSent:          v.GetDuration(NetworkHealthMaxTimeSinceMsgSentKey),
-			MaxTimeSinceMsgReceived:      v.GetDuration(NetworkHealthMaxTimeSinceMsgReceivedKey),
-			MaxPortionSendQueueBytesFull: v.GetFloat64(NetworkHealthMaxPortionSendQueueFillKey),
-			MinConnectedPeers:            v.GetUint(NetworkHealthMinPeersKey),
-			MaxSendFailRate:              v.GetFloat64(NetworkHealthMaxSendFailRateKey),
-			SendFailRateHalflife:         halflife,
+			Enabled:                                 sybilProtectionEnabled,
+			MaxTimeSinceMsgSent:                     v.GetDuration(NetworkHealthMaxTimeSinceMsgSentKey),
+			MaxTimeSinceMsgReceived:                 v.GetDuration(NetworkHealthMaxTimeSinceMsgReceivedKey),
+			MaxPortionSendQueueBytesFull:            v.GetFloat64(NetworkHealthMaxPortionSendQueueFillKey),
+			MinConnectedPeers:                       v.GetUint(NetworkHealthMinPeersKey),
+			MaxSendFailRate:                         v.GetFloat64(NetworkHealthMaxSendFailRateKey),
+			SendFailRateHalflife:                    halflife,
+			NoIngressValidatorConnectionGracePeriod: v.GetDuration(NetworkNoIngressValidatorConnectionsGracePeriodKey),
 		},
 
 		ProxyEnabled:           v.GetBool(NetworkTCPProxyEnabledKey),
@@ -1437,7 +1438,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	nodeConfig.SystemTrackerProcessingHalflife = v.GetDuration(SystemTrackerProcessingHalflifeKey)
 	nodeConfig.SystemTrackerCPUHalflife = v.GetDuration(SystemTrackerCPUHalflifeKey)
 	nodeConfig.SystemTrackerDiskHalflife = v.GetDuration(SystemTrackerDiskHalflifeKey)
-	nodeConfig.NoIngressValidatorConnectionTimeout = v.GetDuration(NoIngressValidatorConnectionTimeoutKey)
+	nodeConfig.NoIngressValidatorConnectionTimeout = v.GetDuration(NetworkNoIngressValidatorConnectionsGracePeriodKey)
 
 	nodeConfig.RequiredAvailableDiskSpace, nodeConfig.WarningThresholdAvailableDiskSpace, err = getDiskSpaceConfig(v)
 	if err != nil {

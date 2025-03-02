@@ -42,10 +42,11 @@ import (
 )
 
 const (
-	ConnectedPeersKey           = "connectedPeers"
-	TimeSinceLastMsgReceivedKey = "timeSinceLastMsgReceived"
-	TimeSinceLastMsgSentKey     = "timeSinceLastMsgSent"
-	SendFailRateKey             = "sendFailRate"
+	PrimaryNetworkValidatorHealthKey = "primary network validator health"
+	ConnectedPeersKey                = "connectedPeers"
+	TimeSinceLastMsgReceivedKey      = "timeSinceLastMsgReceived"
+	TimeSinceLastMsgSentKey          = "timeSinceLastMsgSent"
+	SendFailRateKey                  = "sendFailRate"
 )
 
 var (
@@ -156,6 +157,9 @@ type network struct {
 	connectedPeers  peer.Set
 	closing         bool
 
+	ingressConnAlerter noIngressConnAlert
+	startupTime        time.Time
+
 	// router is notified about all peer [Connected] and [Disconnected] events
 	// as well as all non-handshake peer messages.
 	//
@@ -259,38 +263,34 @@ func NewNetwork(
 		ipTracker.ManuallyTrack(nodeID)
 	}
 
-	// ingressConnCount tracks connections to all remote peers,
-	// so for safety we set it as pointer, in case the config object is copied.
-	var ingressConnCount atomic.Uint64
-
 	peerConfig := &peer.Config{
-		ReadBufferSize:         config.PeerReadBufferSize,
-		WriteBufferSize:        config.PeerWriteBufferSize,
-		Metrics:                peerMetrics,
-		MessageCreator:         msgCreator,
-		IngressConnectionCount: &ingressConnCount,
-		Log:                    log,
-		InboundMsgThrottler:    inboundMsgThrottler,
-		Network:                nil, // This is set below.
-		Router:                 router,
-		VersionCompatibility:   version.GetCompatibility(minCompatibleTime),
-		MyNodeID:               config.MyNodeID,
-		MySubnets:              config.TrackedSubnets,
-		Beacons:                config.Beacons,
-		Validators:             config.Validators,
-		NetworkID:              config.NetworkID,
-		PingFrequency:          config.PingFrequency,
-		PongTimeout:            config.PingPongTimeout,
-		MaxClockDifference:     config.MaxClockDifference,
-		SupportedACPs:          config.SupportedACPs.List(),
-		ObjectedACPs:           config.ObjectedACPs.List(),
-		ResourceTracker:        config.ResourceTracker,
-		UptimeCalculator:       config.UptimeCalculator,
-		IPSigner:               peer.NewIPSigner(config.MyIPPort, config.TLSKey, config.BLSKey),
+		ReadBufferSize:       config.PeerReadBufferSize,
+		WriteBufferSize:      config.PeerWriteBufferSize,
+		Metrics:              peerMetrics,
+		MessageCreator:       msgCreator,
+		Log:                  log,
+		InboundMsgThrottler:  inboundMsgThrottler,
+		Network:              nil, // This is set below.
+		Router:               router,
+		VersionCompatibility: version.GetCompatibility(minCompatibleTime),
+		MyNodeID:             config.MyNodeID,
+		MySubnets:            config.TrackedSubnets,
+		Beacons:              config.Beacons,
+		Validators:           config.Validators,
+		NetworkID:            config.NetworkID,
+		PingFrequency:        config.PingFrequency,
+		PongTimeout:          config.PingPongTimeout,
+		MaxClockDifference:   config.MaxClockDifference,
+		SupportedACPs:        config.SupportedACPs.List(),
+		ObjectedACPs:         config.ObjectedACPs.List(),
+		ResourceTracker:      config.ResourceTracker,
+		UptimeCalculator:     config.UptimeCalculator,
+		IPSigner:             peer.NewIPSigner(config.MyIPPort, config.TLSKey, config.BLSKey),
 	}
 
 	onCloseCtx, cancel := context.WithCancel(context.Background())
 	n := &network{
+		startupTime:          time.Now(),
 		config:               config,
 		peerConfig:           peerConfig,
 		metrics:              metrics,
@@ -318,6 +318,11 @@ func NewNetwork(
 		router:          router,
 	}
 	n.peerConfig.Network = n
+	n.ingressConnAlerter = noIngressConnAlert{
+		ingressConnections: n,
+		validators:         config.Validators,
+		selfID:             config.MyNodeID,
+	}
 	return n, nil
 }
 
@@ -408,6 +413,15 @@ func (n *network) HealthCheck(context.Context) (interface{}, error) {
 	details[SendFailRateKey] = sendFailRate
 	n.metrics.sendFailRate.Set(sendFailRate)
 
+	reachablePrimaryNetworkValidator := true
+	// Make sure if we're a primary network validator, we have ingress connections
+	if time.Since(n.startupTime) > n.config.NoIngressValidatorConnectionGracePeriod {
+		connectedPrimaryValidatorInfo, isConnectedPrimaryValidatorErr := n.ingressConnAlerter.checkHealth()
+		reachablePrimaryNetworkValidator = isConnectedPrimaryValidatorErr == nil
+		details[PrimaryNetworkValidatorHealthKey] = connectedPrimaryValidatorInfo
+	}
+	healthy = healthy && reachablePrimaryNetworkValidator
+
 	// emit metrics about the lifetime of peer connections
 	n.metrics.updatePeerConnectionLifetimeMetrics()
 
@@ -434,6 +448,11 @@ func (n *network) HealthCheck(context.Context) (interface{}, error) {
 	if !isMsgFailRate {
 		errorReasons = append(errorReasons, fmt.Sprintf("messages failure send rate %g > %g", sendFailRate, n.config.HealthConfig.MaxSendFailRate))
 	}
+
+	if !reachablePrimaryNetworkValidator {
+		errorReasons = append(errorReasons, "primary network validator is unreachable")
+	}
+
 	return details, fmt.Errorf("network layer is unhealthy reason: %s", strings.Join(errorReasons, ", "))
 }
 
