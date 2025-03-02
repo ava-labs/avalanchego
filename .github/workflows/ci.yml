@@ -78,7 +78,7 @@ jobs:
         with:
           run: ./scripts/tests.e2e.sh --activate-fortuna
           run_env: E2E_SERIAL=1
-          artifact_prefix: e2e
+          artifact_prefix: e2e-post-fortuna
           filter_by_owner: avalanchego-e2e
           prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
