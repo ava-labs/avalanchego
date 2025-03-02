@@ -61,6 +61,5 @@ type Config struct {
 	IPSigner *IPSigner
 
 	// IngressConnectionCount counts the ingress (to us) connections.
-	// Needs to be a pointer because it's shared across all peer connections.
-	IngressConnectionCount *atomic.Uint64
+	IngressConnectionCount atomic.Uint64
 }
