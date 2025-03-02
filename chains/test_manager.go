@@ -13,8 +13,6 @@ type testManager struct{}
 
 func (testManager) QueueChainCreation(ChainParameters) {}
 
-func (testManager) ForceCreateChain(ChainParameters) {}
-
 func (testManager) AddRegistrant(Registrant) {}
 
 func (testManager) Aliases(ids.ID) ([]string, error) {
