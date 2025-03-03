@@ -48,7 +48,7 @@ func SendJSONRequest(
 	}
 
 	// Return an error for any non successful status code
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		// Drop any error during close to report the original error
 		_ = resp.Body.Close()
 		return fmt.Errorf("received status code: %d", resp.StatusCode)
