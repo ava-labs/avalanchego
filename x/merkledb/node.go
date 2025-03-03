@@ -103,8 +103,8 @@ func (n *node) setChildEntry(index byte, childEntry *child) {
 }
 
 // Removes [child] from [n]'s children.
-func (n *node) removeChild(child *node, tokenSize int) {
-	delete(n.children, child.key.Token(n.key.length, tokenSize))
+func (n *node) removeChild(childKey Key, tokenSize int) {
+	delete(n.children, childKey.Token(n.key.length, tokenSize))
 }
 
 // clone Returns a copy of [n].
