@@ -120,6 +120,7 @@ const (
 	NetworkInboundThrottlerMaxConnsPerSecKey           = "network-inbound-connection-throttling-max-conns-per-sec"
 	NetworkOutboundConnectionThrottlingRpsKey          = "network-outbound-connection-throttling-rps"
 	NetworkOutboundConnectionTimeoutKey                = "network-outbound-connection-timeout"
+	NetworkNoIngressValidatorConnectionsGracePeriodKey = "network-no-ingress-connections-grace-period"
 	BenchlistFailThresholdKey                          = "benchlist-fail-threshold"
 	BenchlistDurationKey                               = "benchlist-duration"
 	BenchlistMinFailingDurationKey                     = "benchlist-min-failing-duration"
