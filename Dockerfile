@@ -1,6 +1,6 @@
 # The version is supplied as a build argument rather than hard-coded
 # to minimize the cost of version changes.
-ARG GO_VERSION=INVALID # This value isn't intended to be used but silences a warning
+ARG GO_VERSION=INVALID # This value is not intended to be used but silences a warning
 
 # ============= Compilation Stage ================
 # Always use the native platform to ensure fast builds
