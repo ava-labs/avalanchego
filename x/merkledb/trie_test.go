@@ -914,11 +914,7 @@ func Test_Trie_MultipleStates(t *testing.T) {
 			randCount++
 			rdb := memdb.New()
 			defer rdb.Close()
-			db, err := New(
-				context.Background(),
-				rdb,
-				newDefaultConfig(),
-			)
+			db, err := New(context.Background(), rdb, newDefaultConfig(), "")
 			require.NoError(err)
 			defer db.Close()
 

@@ -91,11 +91,7 @@ func Test_History_Large(t *testing.T) {
 		// History must be large enough to get the change proof
 		// after this loop.
 		config.HistoryLength = uint(numIters)
-		db, err := New(
-			context.Background(),
-			memdb.New(),
-			config,
-		)
+		db, err := New(context.Background(), memdb.New(), config, "")
 		require.NoError(err)
 		roots := []ids.ID{}
 

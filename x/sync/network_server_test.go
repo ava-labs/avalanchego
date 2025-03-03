@@ -160,6 +160,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 		context.Background(),
 		memdb.New(),
 		newDefaultDBConfig(),
+		"",
 	)
 	require.NoError(t, err)
 	startRoot, err := serverDB.GetMerkleRoot(context.Background())

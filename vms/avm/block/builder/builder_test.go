@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/codecmock"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -36,6 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/txs/txsmock"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/x/merkledb"
 
 	blkexecutor "github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/avm/txs/executor"
@@ -514,8 +516,24 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	}
 
 	baseDB := versiondb.New(memdb.New())
-
-	state, err := state.New(baseDB, parser, registerer, trackChecksums)
+	metadataDB := prefixdb.New([]byte("metadata"), baseDB)
+	stateDB, err := merkledb.New(
+		context.Background(),
+		prefixdb.New([]byte("state"), baseDB),
+		merkledb.NewConfig(),
+		"",
+	)
+	require.NoError(err)
+	state, err := state.New(
+		context.Background(),
+		baseDB,
+		stateDB,
+		metadataDB,
+		parser,
+		registerer,
+		trackChecksums,
+		merkledb.NewConfig(),
+	)
 	require.NoError(err)
 
 	clk := &mockable.Clock{}
