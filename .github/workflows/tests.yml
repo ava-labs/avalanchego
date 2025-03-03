@@ -8,9 +8,6 @@ on:
       - "*"
   pull_request:
 
-env:
-  min_go_version: "~1.23.6"
-
 jobs:
   lint_test:
     name: Lint
@@ -21,7 +18,7 @@ jobs:
         shell: bash
       - uses: actions/setup-go@v5
         with:
-          go-version: ${{ env.min_go_version }}
+          go-version-file: "go.mod"
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
@@ -51,7 +48,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: ${{ env.min_go_version }}
+          go-version-file: "go.mod"
       - name: Set timeout on Windows # Windows UT run slower and need a longer timeout
         shell: bash
         if: matrix.os == 'windows-latest'
@@ -85,7 +82,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ env.min_go_version }}
+          go-version-file: "go.mod"
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
@@ -126,7 +123,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ env.min_go_version }}
+          go-version-file: "go.mod"
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
@@ -170,7 +167,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ env.min_go_version }}
+          go-version-file: "go.mod"
       - name: Install AvalancheGo Release
         shell: bash
         run: BASEDIR=/tmp/e2e-test AVALANCHEGO_BUILD_PATH=/tmp/e2e-test/avalanchego ./scripts/install_avalanchego_release.sh
@@ -205,7 +202,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: ${{ env.min_go_version }}
+          go-version-file: "go.mod"
       - name: Install AvalancheGo Release
         shell: bash
         run: BASEDIR=/tmp/e2e-test AVALANCHEGO_BUILD_PATH=/tmp/e2e-test/avalanchego ./scripts/install_avalanchego_release.sh
