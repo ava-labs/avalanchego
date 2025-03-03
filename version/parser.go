@@ -35,8 +35,8 @@ func Parse(s string) (*Semantic, error) {
 
 func parseVersions(s string) (int, int, int, error) {
 	splitVersion := strings.SplitN(s, ".", 3)
-	if numSeperators := len(splitVersion); numSeperators != 3 {
-		return 0, 0, 0, fmt.Errorf("%w: expected 3 only got %d", errMissingVersions, numSeperators)
+	if numSeparators := len(splitVersion); numSeparators != 3 {
+		return 0, 0, 0, fmt.Errorf("%w: expected 3 only got %d", errMissingVersions, numSeparators)
 	}
 
 	major, err := strconv.Atoi(splitVersion[0])

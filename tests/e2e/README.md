@@ -8,7 +8,7 @@
 ```bash
 ./scripts/build.sh        # Builds avalanchego for use in deploying a test network
 ./scripts/build_xsvm.sh   # Builds xsvm for use in deploying a test network with a subnet
-./bin/ginkgo -v ./tests/e2e -- --avalanchego-path=./build/avalanchego
+./bin/ginkgo -v ./tests/e2e -- --avalanchego-path=$PWD/build/avalanchego # Note that the path given for --avalanchego-path must be an absolute and not a relative path.
 ```
 
 See [`tests.e2e.sh`](../../scripts/tests.e2e.sh) for an example.
@@ -32,7 +32,7 @@ primarily target the X-Chain:
 
 
 ```bash
-./bin/ginkgo -v --label-filter=x ./tests/e2e -- --avalanchego-path=./build/avalanchego
+./bin/ginkgo -v --label-filter=x ./tests/e2e -- --avalanchego-path=$PWD/build/avalanchego
 ```
 
 The ginkgo docs provide further detail on [how to compose label

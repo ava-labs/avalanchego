@@ -78,9 +78,10 @@ type StakingConfig struct {
 	StakingTLSCert                tls.Certificate `json:"-"`
 	StakingSigningKey             bls.Signer      `json:"-"`
 	SybilProtectionDisabledWeight uint64          `json:"sybilProtectionDisabledWeight"`
-	StakingKeyPath                string          `json:"stakingKeyPath"`
-	StakingCertPath               string          `json:"stakingCertPath"`
-	StakingSignerPath             string          `json:"stakingSignerPath"`
+	// not accessed but used for logging
+	StakingKeyPath    string `json:"stakingKeyPath"`
+	StakingCertPath   string `json:"stakingCertPath"`
+	StakingSignerPath string `json:"stakingSignerPath"`
 }
 
 type StateSyncConfig struct {

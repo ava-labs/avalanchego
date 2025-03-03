@@ -138,7 +138,11 @@ func New(
 
 	n.DoneShuttingDown.Add(1)
 
-	pop := signer.NewProofOfPossession(n.Config.StakingSigningKey)
+	pop, err := signer.NewProofOfPossession(n.Config.StakingSigningKey)
+	if err != nil {
+		return nil, fmt.Errorf("problem creating proof of possession: %w", err)
+	}
+
 	logger.Info("initializing node",
 		zap.Stringer("version", version.CurrentApp),
 		zap.Stringer("nodeID", n.ID),
@@ -1374,11 +1378,16 @@ func (n *Node) initInfoAPI() error {
 
 	n.Log.Info("initializing info API")
 
+	pop, err := signer.NewProofOfPossession(n.Config.StakingSigningKey)
+	if err != nil {
+		return fmt.Errorf("problem creating proof of possession: %w", err)
+	}
+
 	service, err := info.NewService(
 		info.Parameters{
 			Version:   version.CurrentApp,
 			NodeID:    n.ID,
-			NodePOP:   signer.NewProofOfPossession(n.Config.StakingSigningKey),
+			NodePOP:   pop,
 			NetworkID: n.Config.NetworkID,
 			VMManager: n.VMManager,
 			Upgrades:  n.Config.UpgradeConfig,

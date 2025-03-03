@@ -44,7 +44,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool/mempoolmock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -451,7 +450,8 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
-	mempool := mempoolmock.NewMempool(ctrl)
+	mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+	require.NoError(err)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	parentOnDecisionState := state.NewMockDiff(ctrl)
@@ -524,7 +524,8 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
-	mempool := mempoolmock.NewMempool(ctrl)
+	mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+	require.NoError(err)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	parentOnDecisionState := state.NewMockDiff(ctrl)
@@ -598,7 +599,8 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
-	mempool := mempoolmock.NewMempool(ctrl)
+	mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+	require.NoError(err)
 	parentID := ids.GenerateTestID()
 
 	backend := &backend{
@@ -668,7 +670,8 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 
 			// Create mocked dependencies.
 			s := state.NewMockState(ctrl)
-			mempool := mempoolmock.NewMempool(ctrl)
+			mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+			require.NoError(err)
 			parentID := ids.GenerateTestID()
 			parentStatelessBlk := block.NewMockBlock(ctrl)
 			parentHeight := uint64(1)
@@ -768,7 +771,8 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 
 			// Create mocked dependencies.
 			s := state.NewMockState(ctrl)
-			mempool := mempoolmock.NewMempool(ctrl)
+			mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+			require.NoError(err)
 			parentID := ids.GenerateTestID()
 			parentStatelessBlk := block.NewMockBlock(ctrl)
 			parentHeight := uint64(1)
@@ -836,7 +840,8 @@ func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) 
 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
-	mempool := mempoolmock.NewMempool(ctrl)
+	mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+	require.NoError(err)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	parentOnCommitState := state.NewMockDiff(ctrl)
@@ -892,7 +897,8 @@ func TestVerifierVisitBanffStandardBlockWithProposalBlockParent(t *testing.T) {
 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
-	mempool := mempoolmock.NewMempool(ctrl)
+	mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+	require.NoError(err)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	parentTime := time.Now()

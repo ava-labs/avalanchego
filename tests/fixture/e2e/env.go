@@ -133,10 +133,13 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 	// Start a new network
 	if network == nil {
 		network = desiredNetwork
+		avalancheBinaryPath, err := flagVars.AvalancheGoExecPath()
+		require.NoError(err)
+
 		StartNetwork(
 			tc,
 			network,
-			flagVars.AvalancheGoExecPath(),
+			avalancheBinaryPath,
 			flagVars.PluginDir(),
 			flagVars.NetworkShutdownDelay(),
 			flagVars.StartNetwork(),

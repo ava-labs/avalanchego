@@ -7,14 +7,21 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
+
+	"github.com/spf13/cast"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 )
 
-// Ensure that this value takes into account the scrape_interval
-// defined in scripts/run_prometheus.sh.
-const networkShutdownDelay = 12 * time.Second
+const (
+	// Ensure that this value takes into account the scrape_interval
+	// defined in scripts/run_prometheus.sh.
+	networkShutdownDelay = 12 * time.Second
+
+	delayNetworkShutdownEnvName = "TMPNET_DELAY_NETWORK_SHUTDOWN"
+)
 
 type FlagVars struct {
 	avalancheGoExecPath  string
@@ -28,8 +35,27 @@ type FlagVars struct {
 	nodeCount            int
 }
 
-func (v *FlagVars) AvalancheGoExecPath() string {
-	return v.avalancheGoExecPath
+func (v *FlagVars) AvalancheGoExecPath() (string, error) {
+	if err := v.validateAvalancheGoExecPath(); err != nil {
+		return "", err
+	}
+	return v.avalancheGoExecPath, nil
+}
+
+func (v *FlagVars) validateAvalancheGoExecPath() error {
+	if !filepath.IsAbs(v.avalancheGoExecPath) {
+		absPath, err := filepath.Abs(v.avalancheGoExecPath)
+		if err != nil {
+			return fmt.Errorf("avalanchego-path (%s) is a relative path but its absolute path cannot be determined: %w",
+				v.avalancheGoExecPath, err)
+		}
+
+		// If the absolute path file doesn't exist, it means it won't work out of the box.
+		if _, err := os.Stat(absPath); err != nil {
+			return fmt.Errorf("avalanchego-path (%s) is a relative path but must be an absolute path", v.avalancheGoExecPath)
+		}
+	}
+	return nil
 }
 
 func (v *FlagVars) PluginDir() string {
@@ -123,7 +149,7 @@ func RegisterFlags() *FlagVars {
 	flag.BoolVar(
 		&vars.delayNetworkShutdown,
 		"delay-network-shutdown",
-		false,
+		cast.ToBool(GetEnvWithDefault(delayNetworkShutdownEnvName, "false")),
 		"[optional] whether to delay network shutdown to allow a final metrics scrape.",
 	)
 	flag.BoolVar(
