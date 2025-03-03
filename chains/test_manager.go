@@ -39,10 +39,6 @@ func (testManager) StartChainCreator(ChainParameters) error {
 	return nil
 }
 
-func (testManager) SubnetID(ids.ID) (ids.ID, error) {
-	return ids.Empty, nil
-}
-
 func (testManager) IsBootstrapped(ids.ID) bool {
 	return false
 }
