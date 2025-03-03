@@ -194,6 +194,38 @@ func (s *DBServer) GetRangeProof(
 	return protoProof, nil
 }
 
+func (s *DBServer) VerifyRangeProof(
+	ctx context.Context,
+	req *pb.VerifyRangeProofRequest,
+) (*pb.VerifyRangeProofResponse, error) {
+	var proof merkledb.RangeProof
+	if err := proof.UnmarshalProto(req.Proof); err != nil {
+		return nil, err
+	}
+
+	rootID, err := ids.ToID(req.ExpectedRootHash)
+	if err != nil {
+		return nil, err
+	}
+	startKey := maybe.Nothing[[]byte]()
+	if req.StartKey != nil && !req.StartKey.IsNothing {
+		startKey = maybe.Some(req.StartKey.Value)
+	}
+	endKey := maybe.Nothing[[]byte]()
+	if req.EndKey != nil && !req.EndKey.IsNothing {
+		endKey = maybe.Some(req.EndKey.Value)
+	}
+
+	// TODO there's probably a better way to do this.
+	var errString string
+	if err := s.db.VerifyRangeProof(ctx, &proof, startKey, endKey, rootID); err != nil {
+		errString = err.Error()
+	}
+	return &pb.VerifyRangeProofResponse{
+		Error: errString,
+	}, nil
+}
+
 func (s *DBServer) CommitRangeProof(
 	ctx context.Context,
 	req *pb.CommitRangeProofRequest,
