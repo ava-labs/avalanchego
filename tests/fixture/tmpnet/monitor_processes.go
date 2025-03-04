@@ -33,22 +33,17 @@ const (
 	prometheusCmd            = "prometheus"
 	defaultPrometheusURL     = "https://prometheus-poc.avax-dev.network"
 	prometheusScrapeInterval = 10 * time.Second
-	prometheusHTTPPort       = 9090
+	prometheusListenAddress  = "127.0.0.1:9090"
+	prometheusReadinessURL   = "http://" + prometheusListenAddress + "/-/ready"
 
 	// Promtail configuration
-	promtailCmd      = "promtail"
-	defaultLokiURL   = "https://loki-poc.avax-dev.network"
-	promtailHTTPPort = 3101
+	promtailCmd          = "promtail"
+	defaultLokiURL       = "https://loki-poc.avax-dev.network"
+	promtailHTTPPort     = "3101"
+	promtailReadinessURL = "http://127.0.0.1:" + promtailHTTPPort + "/ready"
 
 	// Use a delay slightly longer than the scrape interval to ensure a final scrape before shutdown
 	NetworkShutdownDelay = prometheusScrapeInterval + 2*time.Second
-)
-
-var (
-	prometheusListenAddress = fmt.Sprintf("127.0.0.1:%d", prometheusHTTPPort)
-	prometheusReadinessURL  = fmt.Sprintf("http://%s/-/ready", prometheusListenAddress)
-
-	promtailReadinessURL = fmt.Sprintf("http://127.0.0.1:%d/ready", promtailHTTPPort)
 )
 
 // StartCollectors ensures collectors are running to collect logs and metrics from local nodes.
@@ -103,7 +98,7 @@ func StopCollectors(ctx context.Context, log logging.Logger) error {
 		}
 
 		log.Info("sending SIGTERM to collector process",
-			zap.String("cmdName", cmdName),
+			zap.String("cmd", cmdName),
 			zap.Int("pid", proc.Pid),
 		)
 		if err := proc.Signal(syscall.SIGTERM); err != nil {
@@ -111,28 +106,32 @@ func StopCollectors(ctx context.Context, log logging.Logger) error {
 		}
 
 		log.Info("waiting for collector process to stop",
-			zap.String("cmdName", cmdName),
+			zap.String("cmd", cmdName),
 			zap.Int("pid", proc.Pid),
 		)
-		if err := pollUntilContextCancel(ctx, func(_ context.Context) (bool, error) {
-			p, err := getProcess(proc.Pid)
-			if err != nil {
-				return false, fmt.Errorf("failed to retrieve process: %w", err)
-			}
-			if p == nil {
-				// Process is no longer running
-
-				// Attempt to clear the PID file. Not critical that it is removed, just good housekeeping.
-				if err := clearStalePIDFile(log, cmdName, pidPath); err != nil {
-					log.Warn("failed to remove stale PID file",
-						zap.String("cmd", cmdName),
-						zap.String("pidFile", pidPath),
-						zap.Error(err),
-					)
+		err = pollUntilContextCancel(
+			ctx,
+			func(_ context.Context) (bool, error) {
+				p, err := getProcess(proc.Pid)
+				if err != nil {
+					return false, fmt.Errorf("failed to retrieve process: %w", err)
 				}
-			}
-			return p == nil, nil
-		}); err != nil {
+				if p == nil {
+					// Process is no longer running
+
+					// Attempt to clear the PID file. Not critical that it is removed, just good housekeeping.
+					if err := clearStalePIDFile(log, cmdName, pidPath); err != nil {
+						log.Warn("failed to remove stale PID file",
+							zap.String("cmd", cmdName),
+							zap.String("pidFile", pidPath),
+							zap.Error(err),
+						)
+					}
+				}
+				return p == nil, nil
+			},
+		)
+		if err != nil {
 			return err
 		}
 		log.Info("collector stopped",
@@ -209,7 +208,7 @@ func startPromtail(ctx context.Context, log logging.Logger) error {
 
 	config := fmt.Sprintf(`
 server:
-  http_listen_port: %d
+  http_listen_port: %s
   grpc_listen_port: 0
 
 positions:
@@ -278,7 +277,9 @@ func startCollector(
 	if process, err := processFromPIDFile(cmdName, pidPath); err != nil {
 		return err
 	} else if process != nil {
-		log.Info(cmdName + " is already running")
+		log.Info("collector already running",
+			zap.String("cmd", cmdName),
+		)
 		return nil
 	}
 
@@ -295,7 +296,8 @@ func startCollector(
 	// Write the collector config file
 	confFilename := cmdName + ".yaml"
 	confPath := filepath.Join(workingDir, confFilename)
-	log.Info("writing "+cmdName+" config",
+	log.Info("writing collector config",
+		zap.String("cmd", cmdName),
 		zap.String("path", confPath),
 	)
 	if err := os.WriteFile(confPath, []byte(config), perms.ReadWrite); err != nil {
@@ -341,7 +343,8 @@ func clearStalePIDFile(log logging.Logger, cmdName string, pidPath string) error
 			return fmt.Errorf("failed to remove stale pid file: %w", err)
 		}
 	} else {
-		log.Info("deleted stale "+cmdName+" pid file",
+		log.Info("deleted stale collector pid file",
+			zap.String("cmd", cmdName),
 			zap.String("path", pidPath),
 		)
 	}
@@ -398,7 +401,8 @@ func startCollectorProcess(
 ) error {
 	logFilename := cmdName + ".log"
 	fullCmd := "nohup " + cmdName + " " + args + " > " + logFilename + " 2>&1 & echo -n \"$!\" > " + pidPath
-	log.Info("starting "+cmdName,
+	log.Info("starting collector",
+		zap.String("cmd", cmdName),
 		zap.String("workingDir", workingDir),
 		zap.String("fullCmd", fullCmd),
 	)
@@ -412,34 +416,43 @@ func startCollectorProcess(
 
 	// Wait for PID file
 	var pid int
-	if err := pollUntilContextCancel(ctx, func(_ context.Context) (bool, error) {
-		var err error
-		pid, err = getPID(cmdName, pidPath)
-		if err != nil {
-			log.Warn("failed to read PID file",
-				zap.String("cmd", cmdName),
-				zap.String("pidPath", pidPath),
-				zap.Error(err),
-			)
-		}
-		return pid != 0, nil
-	}); err != nil {
+	err := pollUntilContextCancel(
+		ctx,
+		func(_ context.Context) (bool, error) {
+			var err error
+			pid, err = getPID(cmdName, pidPath)
+			if err != nil {
+				log.Warn("failed to read PID file",
+					zap.String("cmd", cmdName),
+					zap.String("pidPath", pidPath),
+					zap.Error(err),
+				)
+			}
+			return pid != 0, nil
+		},
+	)
+	if err != nil {
 		return err
 	}
-	log.Info(cmdName+" started",
+	log.Info("started collector",
+		zap.String("cmd", cmdName),
 		zap.Int("pid", pid),
 	)
 
 	// Wait for non-empty log file. An empty log file should only occur if the command
 	// invocation is not correctly redirecting stderr and stdout to the expected file.
 	logPath := filepath.Join(workingDir, logFilename)
-	if err := pollUntilContextCancel(ctx, func(_ context.Context) (bool, error) {
-		logData, err := os.ReadFile(logPath)
-		if err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return false, fmt.Errorf("failed to read log file %s for %s: %w", logPath, cmdName, err)
-		}
-		return len(logData) != 0, nil
-	}); err != nil {
+	err = pollUntilContextCancel(
+		ctx,
+		func(_ context.Context) (bool, error) {
+			logData, err := os.ReadFile(logPath)
+			if err != nil && !errors.Is(err, fs.ErrNotExist) {
+				return false, fmt.Errorf("failed to read log file %s for %s: %w", logPath, cmdName, err)
+			}
+			return len(logData) != 0, nil
+		},
+	)
+	if err != nil {
 		return fmt.Errorf("empty log file %s for %s indicates misconfiguration: %w", logPath, cmdName, err)
 	}
 
@@ -469,25 +482,32 @@ func checkReadiness(ctx context.Context, url string) (bool, string, error) {
 
 // waitForReadiness waits until the given readiness URL returns 200
 func waitForReadiness(ctx context.Context, log logging.Logger, cmdName string, readinessURL string) error {
-	log.Info("waiting for "+cmdName+" readiness",
+	log.Info("waiting for collector readiness",
+		zap.String("cmd", cmdName),
 		zap.String("url", readinessURL),
 	)
-	if err := pollUntilContextCancel(ctx, func(_ context.Context) (bool, error) {
-		ready, body, err := checkReadiness(ctx, readinessURL)
-		if err == nil {
-			return ready, nil
-		}
-		log.Warn("failed to check readiness",
-			zap.String("cmd", cmdName),
-			zap.String("url", readinessURL),
-			zap.String("body", body),
-			zap.Error(err),
-		)
-		return false, nil
-	}); err != nil {
+	err := pollUntilContextCancel(
+		ctx,
+		func(_ context.Context) (bool, error) {
+			ready, body, err := checkReadiness(ctx, readinessURL)
+			if err == nil {
+				return ready, nil
+			}
+			log.Warn("failed to check readiness",
+				zap.String("cmd", cmdName),
+				zap.String("url", readinessURL),
+				zap.String("body", body),
+				zap.Error(err),
+			)
+			return false, nil
+		},
+	)
+	if err != nil {
 		return err
 	}
-	log.Info(cmdName + " ready")
+	log.Info("collector ready",
+		zap.String("cmd", cmdName),
+	)
 	return nil
 }
 
