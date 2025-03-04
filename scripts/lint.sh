@@ -43,7 +43,7 @@ _addlicense_flags=${ADDLICENSE_FLAGS:-"--verify --debug"}
 function test_license_header {
   go install -v github.com/palantir/go-license@v1.25.0
   local files=()
-  while IFS= read -r line; do files+=("$line"); done < <(find . -type f -name '*.go' ! -name '*.pb.go' ! -name 'mock_*.go' ! -name 'mocks_*.go' ! -path './**/*mock/*.go' ! -path '*.canoto.go')
+  while IFS= read -r line; do files+=("$line"); done < <(find . -type f -name '*.go' ! -name '*.pb.go' ! -name 'mock_*.go' ! -name 'mocks_*.go' ! -path './**/*mock/*.go' ! -name '*.canoto.go')
 
   # shellcheck disable=SC2086
   go-license \
