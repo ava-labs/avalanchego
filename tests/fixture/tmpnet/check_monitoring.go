@@ -28,21 +28,27 @@ type getCountFunc func() (int, error)
 
 // waitForCount waits until the provided function returns greater than zero.
 func waitForCount(ctx context.Context, log logging.Logger, name string, getCount getCountFunc) error {
-	if err := pollUntilContextCancel(ctx, func(_ context.Context) (bool, error) {
-		count, err := getCount()
-		if err != nil {
-			log.Warn("failed to query for "+name,
-				zap.Error(err),
-			)
-			return false, nil
-		}
-		if count > 0 {
-			log.Info(name+" exist",
-				zap.Int("count", count),
-			)
-		}
-		return count > 0, nil
-	}); err != nil {
+	err := pollUntilContextCancel(
+		ctx,
+		func(_ context.Context) (bool, error) {
+			count, err := getCount()
+			if err != nil {
+				log.Warn("failed to query for collected count",
+					zap.String("type", name),
+					zap.Error(err),
+				)
+				return false, nil
+			}
+			if count > 0 {
+				log.Info("collected count is non-zero",
+					zap.String("type", name),
+					zap.Int("count", count),
+				)
+			}
+			return count > 0, nil
+		},
+	)
+	if err != nil {
 		return fmt.Errorf("%s not found before timeout: %w", name, err)
 	}
 	return nil
