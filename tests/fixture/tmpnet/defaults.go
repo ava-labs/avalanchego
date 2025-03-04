@@ -59,6 +59,8 @@ func DefaultTmpnetFlags() FlagsMap {
 		// Specific to e2e testing
 		config.MinStakeDurationKey:           DefaultMinStakeDuration.String(),
 		config.ProposerVMUseCurrentHeightKey: true,
+		// Reducing this from the 1s default speeds up tx acceptance
+		config.ProposerVMMinBlockDelayKey: "0s",
 	}
 	flags.SetDefaults(DefaultTestFlags())
 	return flags

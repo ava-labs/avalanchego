@@ -41,26 +41,16 @@ inputs:
 runs:
   using: composite
   steps:
-    # Ensure promtail and prometheus are available
-    - name: Install nix
-      uses: ./.github/actions/install-nix
-    - name: Start prometheus
-      # Only run for the original repo; a forked repo won't have access to the monitoring credentials
-      if: (inputs.prometheus_username != '')
+    # - Ensure promtail and prometheus are available
+    # - Avoid using the install-nix custom action since a relative
+    #   path wouldn't be resolveable from other repos and an absolute
+    #   path would require setting a version.
+    - uses: cachix/install-nix-action@v30
+      with:
+        github_access_token: ${{ inputs.github_token }}
+    - run: nix develop --command echo "dependencies installed"
       shell: bash
-      # Assumes calling project has a nix flake that ensures a compatible prometheus
-      run: nix develop --impure --command bash -x ./scripts/run_prometheus.sh
-      env:
-        PROMETHEUS_USERNAME: ${{ inputs.prometheus_username }}
-        PROMETHEUS_PASSWORD: ${{ inputs.prometheus_password }}
-    - name: Start promtail
-      if: (inputs.prometheus_username != '')
-      shell: bash
-      # Assumes calling project has a nix flake that ensures a compatible promtail
-      run: nix develop --impure --command bash -x ./scripts/run_promtail.sh
-      env:
-        LOKI_USERNAME: ${{ inputs.loki_username }}
-        LOKI_PASSWORD: ${{ inputs.loki_password }}
+    # TODO(marun) Stop emitting this annotation so that any annotation that appears can be assumed to be actionable
     - name: Notify of metrics availability
       if: (inputs.prometheus_username != '')
       shell: bash
@@ -71,17 +61,58 @@ runs:
         FILTER_BY_OWNER: ${{ inputs.filter_by_owner }}
     - name: Run command
       shell: bash
-      run: ${{ inputs.run_env }} ${{ inputs.run }}
+      # --impure ensures the env vars are accessible to the command
+      run: ${{ inputs.run_env }} nix develop --impure --command bash -x ${{ inputs.run }}
       env:
-        TMPNET_DELAY_NETWORK_SHUTDOWN: true # Ensure shutdown waits for a final metrics scrape
+        TMPNET_START_COLLECTORS: true
+        LOKI_USERNAME: ${{ inputs.loki_username }}
+        LOKI_PASSWORD: ${{ inputs.loki_password }}
+        PROMETHEUS_USERNAME: ${{ inputs.prometheus_username }}
+        PROMETHEUS_PASSWORD: ${{ inputs.prometheus_password }}
         GH_REPO: ${{ inputs.repository_owner }}/${{ inputs.repository_name }}
         GH_WORKFLOW: ${{ inputs.workflow }}
         GH_RUN_ID: ${{ inputs.run_id }}
         GH_RUN_NUMBER: ${{ inputs.run_number }}
         GH_RUN_ATTEMPT: ${{ inputs.run_attempt }}
         GH_JOB_ID: ${{ inputs.job }}
-    - name: Upload tmpnet network dir
-      uses: ./.github/actions/upload-tmpnet-artifact
+    # This step is duplicated from upload-tmpnet-artifact for the same
+    # reason as the nix installation. There doesn't appear to be an
+    # easy way to composee custom actions for use by other repos
+    # without running into versioning issues.
+    - name: Upload tmpnet data
       if: always()
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.artifact_prefix }}-tmpnet-data
+        path: |
+          ~/.tmpnet/networks
+          ~/.tmpnet/prometheus/prometheus.log
+          ~/.tmpnet/promtail/promtail.log
+        if-no-files-found: error
+    # TODO(marun) Maybe optionally run these checks in an AfterSuite step?
+    - name: Check that logs were collected
+      if: always()
+      shell: bash
+      run: go run github.com/ava-labs/avalanchego/tests/fixture/tmpnet/cmd check-logs
+      env:
+        LOKI_USERNAME: ${{ inputs.loki_username }}
+        LOKI_PASSWORD: ${{ inputs.loki_password }}
+        GH_REPO: ${{ inputs.repository_owner }}/${{ inputs.repository_name }}
+        GH_WORKFLOW: ${{ inputs.workflow }}
+        GH_RUN_ID: ${{ inputs.run_id }}
+        GH_RUN_NUMBER: ${{ inputs.run_number }}
+        GH_RUN_ATTEMPT: ${{ inputs.run_attempt }}
+        GH_JOB_ID: ${{ inputs.job }}
+    - name: Check that metrics were collected
+      if: always()
+      shell: bash
+      run: go run github.com/ava-labs/avalanchego/tests/fixture/tmpnet/cmd check-metrics
+      env:
+        PROMETHEUS_USERNAME: ${{ inputs.prometheus_username }}
+        PROMETHEUS_PASSWORD: ${{ inputs.prometheus_password }}
+        GH_REPO: ${{ inputs.repository_owner }}/${{ inputs.repository_name }}
+        GH_WORKFLOW: ${{ inputs.workflow }}
+        GH_RUN_ID: ${{ inputs.run_id }}
+        GH_RUN_NUMBER: ${{ inputs.run_number }}
+        GH_RUN_ATTEMPT: ${{ inputs.run_attempt }}
+        GH_JOB_ID: ${{ inputs.job }}
