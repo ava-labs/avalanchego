@@ -146,7 +146,7 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 	// After the F upgrade, it is.
 	if !changed &&
 		len(b.Transactions) == 0 &&
-		(!v.txExecutorBackend.Config.UpgradeConfig.IsFUpgradeActivated(b.Timestamp()) || !lowBalanceL1ValidatorsEvicted) {
+		(!v.txExecutorBackend.Config.UpgradeConfig.IsFortunaActivated(b.Timestamp()) || !lowBalanceL1ValidatorsEvicted) {
 		return errBanffStandardBlockWithoutChanges
 	}
 

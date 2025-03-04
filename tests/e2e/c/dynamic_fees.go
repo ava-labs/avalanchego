@@ -105,7 +105,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 			require.NoError(err)
 
 			now := time.Now()
-			if upgrades.IsFUpgradeActivated(now) {
+			if upgrades.IsFortunaActivated(now) {
 				gasLimit = acp176.MinMaxCapacity
 			} else {
 				gasLimit = cortina.GasLimit
