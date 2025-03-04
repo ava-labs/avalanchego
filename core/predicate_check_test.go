@@ -244,7 +244,7 @@ func TestCheckPredicate(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
-		"two predicates niether named by access list": {
+		"two predicates neither named by access list": {
 			gas:              61600,
 			predicateContext: predicateContext,
 			createPredicates: func(t testing.TB) map[common.Address]precompileconfig.Predicater {

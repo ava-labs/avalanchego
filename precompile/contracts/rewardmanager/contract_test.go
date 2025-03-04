@@ -366,7 +366,7 @@ var (
 			ReadOnly:    true,
 			ExpectedErr: vmerrs.ErrWriteProtection.Error(),
 		},
-		"readOnly set reward addresss with allowed role fails": {
+		"readOnly set reward address with allowed role fails": {
 			Caller:     allowlist.TestEnabledAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {

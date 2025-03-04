@@ -72,7 +72,7 @@ func NewEVMBlockContext(header *types.Header, chain ChainContext, author *common
 // NewEVMBlockContextWithPredicateResults creates a new context for use in the EVM with an override for the predicate results that is not present
 // in header.Extra.
 // This function is used to create a BlockContext when the header Extra data is not fully formed yet and it's more efficient to pass in predicateResults
-// directly rather than re-encode the latest results when executing each individaul transaction.
+// directly rather than re-encode the latest results when executing each individual transaction.
 func NewEVMBlockContextWithPredicateResults(header *types.Header, chain ChainContext, author *common.Address, predicateResults *predicate.Results) vm.BlockContext {
 	return newEVMBlockContext(header, chain, author, predicateResults)
 }
