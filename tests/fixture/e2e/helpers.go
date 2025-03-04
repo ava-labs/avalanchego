@@ -159,8 +159,8 @@ func WaitForHealthy(t require.TestingT, node *tmpnet.Node) {
 	require.NoError(t, tmpnet.WaitForHealthy(ctx, node))
 }
 
-// Sends an eth transaction, waits for the transaction receipt to be issued
-// and checks that the receipt indicates success.
+// Sends an eth transaction and waits for the transaction receipt from the
+// execution of the transaction.
 func SendEthTransaction(tc tests.TestContext, ethClient ethclient.Client, signedTx *types.Transaction) *types.Receipt {
 	require := require.New(tc)
 
