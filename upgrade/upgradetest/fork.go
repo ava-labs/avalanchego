@@ -19,7 +19,7 @@ const (
 	Etna
 	Fortuna
 
-	Latest = Etna
+	Latest = FUpgrade
 )
 
 // Fork is an enum of all the major network upgrades.
