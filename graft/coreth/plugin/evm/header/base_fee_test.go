@@ -317,8 +317,8 @@ func TestBaseFee(t *testing.T) {
 			}(),
 		},
 		{
-			name:     "fupgrade_invalid_timestamp",
-			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			name:     "fortuna_invalid_timestamp",
+			upgrades: params.TestFortunaChainConfig.NetworkUpgrades,
 			parent: &types.Header{
 				Number: big.NewInt(1),
 				Time:   1,
@@ -328,9 +328,9 @@ func TestBaseFee(t *testing.T) {
 			wantErr:   errInvalidTimestamp,
 		},
 		{
-			name: "fupgrade_first_block",
+			name: "fortuna_first_block",
 			upgrades: params.NetworkUpgrades{
-				FUpgradeTimestamp: utils.NewUint64(1),
+				FortunaTimestamp: utils.NewUint64(1),
 			},
 			parent: &types.Header{
 				Number: big.NewInt(1),
@@ -339,16 +339,16 @@ func TestBaseFee(t *testing.T) {
 			want:      big.NewInt(acp176.MinGasPrice),
 		},
 		{
-			name:     "fupgrade_genesis_block",
-			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			name:     "fortuna_genesis_block",
+			upgrades: params.TestFortunaChainConfig.NetworkUpgrades,
 			parent: &types.Header{
 				Number: big.NewInt(0),
 			},
 			want: big.NewInt(acp176.MinGasPrice),
 		},
 		{
-			name:     "fupgrade_invalid_fee_state",
-			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			name:     "fortuna_invalid_fee_state",
+			upgrades: params.TestFortunaChainConfig.NetworkUpgrades,
 			parent: &types.Header{
 				Number: big.NewInt(1),
 				Extra:  make([]byte, acp176.StateSize-1),
@@ -356,8 +356,8 @@ func TestBaseFee(t *testing.T) {
 			wantErr: acp176.ErrStateInsufficientLength,
 		},
 		{
-			name:     "fupgrade_current",
-			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			name:     "fortuna_current",
+			upgrades: params.TestFortunaChainConfig.NetworkUpgrades,
 			parent: &types.Header{
 				Number: big.NewInt(1),
 				Extra: (&acp176.State{
@@ -370,8 +370,8 @@ func TestBaseFee(t *testing.T) {
 			want: big.NewInt(1_000_000_002), // nAVAX + 2 due to rounding
 		},
 		{
-			name:     "fupgrade_decrease",
-			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			name:     "fortuna_decrease",
+			upgrades: params.TestFortunaChainConfig.NetworkUpgrades,
 			parent: &types.Header{
 				Number: big.NewInt(1),
 				Extra: (&acp176.State{

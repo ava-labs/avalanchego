@@ -1105,8 +1105,8 @@ func overrideConfig(original *params.ChainConfig, override *params.ChainConfig) 
 		copy.EtnaTimestamp = timestamp
 		canon = false
 	}
-	if timestamp := override.FUpgradeTimestamp; timestamp != nil {
-		copy.FUpgradeTimestamp = timestamp
+	if timestamp := override.FortunaTimestamp; timestamp != nil {
+		copy.FortunaTimestamp = timestamp
 		canon = false
 	}
 	if timestamp := override.CancunTime; timestamp != nil {

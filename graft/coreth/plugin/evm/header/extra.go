@@ -32,7 +32,7 @@ func ExtraPrefix(
 	desiredTargetExcess *gas.Gas,
 ) ([]byte, error) {
 	switch {
-	case config.IsFUpgrade(header.Time):
+	case config.IsFortuna(header.Time):
 		state, err := feeStateAfterBlock(
 			config,
 			parent,
@@ -63,7 +63,7 @@ func VerifyExtraPrefix(
 	header *types.Header,
 ) error {
 	switch {
-	case config.IsFUpgrade(header.Time):
+	case config.IsFortuna(header.Time):
 		remoteState, err := acp176.ParseState(header.Extra)
 		if err != nil {
 			return fmt.Errorf("parsing remote fee state: %w", err)
@@ -115,7 +115,7 @@ func VerifyExtraPrefix(
 func VerifyExtra(rules params.AvalancheRules, extra []byte) error {
 	extraLen := len(extra)
 	switch {
-	case rules.IsFUpgrade:
+	case rules.IsFortuna:
 		if extraLen < acp176.StateSize {
 			return fmt.Errorf(
 				"%w: expected >= %d but got %d",
@@ -167,7 +167,7 @@ func VerifyExtra(rules params.AvalancheRules, extra []byte) error {
 // extra data. If the extra data is not long enough, an empty slice is returned.
 func PredicateBytesFromExtra(rules params.AvalancheRules, extra []byte) []byte {
 	offset := ap3.WindowSize
-	if rules.IsFUpgrade {
+	if rules.IsFortuna {
 		offset = acp176.StateSize
 	}
 

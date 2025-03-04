@@ -29,16 +29,16 @@ func TestGasLimit(t *testing.T) {
 		wantErr   error
 	}{
 		{
-			name:     "fupgrade_invalid_parent_header",
-			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			name:     "fortuna_invalid_parent_header",
+			upgrades: params.TestFortunaChainConfig.NetworkUpgrades,
 			parent: &types.Header{
 				Number: big.NewInt(1),
 			},
 			wantErr: acp176.ErrStateInsufficientLength,
 		},
 		{
-			name:     "fupgrade_initial_max_capacity",
-			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			name:     "fortuna_initial_max_capacity",
+			upgrades: params.TestFortunaChainConfig.NetworkUpgrades,
 			parent: &types.Header{
 				Number: big.NewInt(0),
 			},
@@ -86,16 +86,16 @@ func TestVerifyGasUsed(t *testing.T) {
 		want     error
 	}{
 		{
-			name:     "fupgrade_massive_extra_gas_used",
-			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			name:     "fortuna_massive_extra_gas_used",
+			upgrades: params.TestFortunaChainConfig.NetworkUpgrades,
 			header: &types.Header{
 				ExtDataGasUsed: new(big.Int).Lsh(common.Big1, 64),
 			},
 			want: errInvalidExtraDataGasUsed,
 		},
 		{
-			name:     "fupgrade_gas_used_overflow",
-			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			name:     "fortuna_gas_used_overflow",
+			upgrades: params.TestFortunaChainConfig.NetworkUpgrades,
 			header: &types.Header{
 				GasUsed:        math.MaxUint[uint64](),
 				ExtDataGasUsed: common.Big1,
@@ -103,8 +103,8 @@ func TestVerifyGasUsed(t *testing.T) {
 			want: math.ErrOverflow,
 		},
 		{
-			name:     "fupgrade_invalid_capacity",
-			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			name:     "fortuna_invalid_capacity",
+			upgrades: params.TestFortunaChainConfig.NetworkUpgrades,
 			parent: &types.Header{
 				Number: big.NewInt(1),
 			},
@@ -112,8 +112,8 @@ func TestVerifyGasUsed(t *testing.T) {
 			want:   acp176.ErrStateInsufficientLength,
 		},
 		{
-			name:     "fupgrade_invalid_usage",
-			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			name:     "fortuna_invalid_usage",
+			upgrades: params.TestFortunaChainConfig.NetworkUpgrades,
 			parent: &types.Header{
 				Number: big.NewInt(0),
 			},
@@ -127,8 +127,8 @@ func TestVerifyGasUsed(t *testing.T) {
 			want: errInvalidGasUsed,
 		},
 		{
-			name:     "fupgrade_max_consumption",
-			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			name:     "fortuna_max_consumption",
+			upgrades: params.TestFortunaChainConfig.NetworkUpgrades,
 			parent: &types.Header{
 				Number: big.NewInt(0),
 			},
@@ -171,8 +171,8 @@ func TestVerifyGasLimit(t *testing.T) {
 		want     error
 	}{
 		{
-			name:     "fupgrade_invalid_header",
-			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			name:     "fortuna_invalid_header",
+			upgrades: params.TestFortunaChainConfig.NetworkUpgrades,
 			parent: &types.Header{
 				Number: big.NewInt(1),
 			},
@@ -180,8 +180,8 @@ func TestVerifyGasLimit(t *testing.T) {
 			want:   acp176.ErrStateInsufficientLength,
 		},
 		{
-			name:     "fupgrade_invalid",
-			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			name:     "fortuna_invalid",
+			upgrades: params.TestFortunaChainConfig.NetworkUpgrades,
 			parent: &types.Header{
 				Number: big.NewInt(0),
 			},
@@ -191,8 +191,8 @@ func TestVerifyGasLimit(t *testing.T) {
 			want: errInvalidGasLimit,
 		},
 		{
-			name:     "fupgrade_valid",
-			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			name:     "fortuna_valid",
+			upgrades: params.TestFortunaChainConfig.NetworkUpgrades,
 			parent: &types.Header{
 				Number: big.NewInt(0),
 			},
@@ -300,16 +300,16 @@ func TestGasCapacity(t *testing.T) {
 			want:     cortina.GasLimit,
 		},
 		{
-			name:     "fupgrade_invalid_header",
-			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			name:     "fortuna_invalid_header",
+			upgrades: params.TestFortunaChainConfig.NetworkUpgrades,
 			parent: &types.Header{
 				Number: big.NewInt(1),
 			},
 			wantErr: acp176.ErrStateInsufficientLength,
 		},
 		{
-			name:     "fupgrade_after_1s",
-			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			name:     "fortuna_after_1s",
+			upgrades: params.TestFortunaChainConfig.NetworkUpgrades,
 			parent: &types.Header{
 				Number: big.NewInt(0),
 			},
@@ -347,8 +347,8 @@ func TestRemainingAtomicGasCapacity(t *testing.T) {
 			want:     ap5.AtomicGasLimit,
 		},
 		{
-			name:     "fupgrade_invalid_header",
-			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			name:     "fortuna_invalid_header",
+			upgrades: params.TestFortunaChainConfig.NetworkUpgrades,
 			parent: &types.Header{
 				Number: big.NewInt(1),
 			},
@@ -356,8 +356,8 @@ func TestRemainingAtomicGasCapacity(t *testing.T) {
 			wantErr: acp176.ErrStateInsufficientLength,
 		},
 		{
-			name:     "fupgrade_negative_capacity",
-			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			name:     "fortuna_negative_capacity",
+			upgrades: params.TestFortunaChainConfig.NetworkUpgrades,
 			parent: &types.Header{
 				Number: big.NewInt(0),
 			},
@@ -368,7 +368,7 @@ func TestRemainingAtomicGasCapacity(t *testing.T) {
 		},
 		{
 			name:     "f",
-			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			upgrades: params.TestFortunaChainConfig.NetworkUpgrades,
 			parent: &types.Header{
 				Number: big.NewInt(0),
 			},
