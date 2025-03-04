@@ -299,7 +299,6 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 
 			for i := 0; i < totalRounds; i++ {
 				runFunc(i)
-				time.Sleep(time.Second)
 			}
 
 			_ = e2e.CheckBootstrapIsPossible(tc, env.GetNetwork())
