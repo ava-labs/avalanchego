@@ -26,5 +26,5 @@ Link the relevant documentation PRs for this release.
 - [ ] Update AvalancheGo dependency in scripts/versions.sh for e2e tests.
 - [ ] Add new entry in compatibility.json for RPCChainVM Compatibility
 - [ ] Update AvalancheGo compatibility in README
-- [ ] Deploy to WAGMI
+- [ ] Deploy to Echo/Dispatch
 - [ ] Confirm goreleaser job has successfully generated binaries by checking the releases page
