@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"syscall"
 	"time"
 
@@ -124,4 +125,12 @@ func NodesToIDs(nodes ...*Node) []ids.NodeID {
 		nodeIDs[i] = node.NodeID
 	}
 	return nodeIDs
+}
+
+func GetEnvWithDefault(envVar, defaultVal string) string {
+	val := os.Getenv(envVar)
+	if len(val) == 0 {
+		return defaultVal
+	}
+	return val
 }
