@@ -720,17 +720,11 @@ func (vm *VM) onNormalOperationsStarted() error {
 	ctx, cancel := context.WithCancel(context.TODO())
 	vm.cancel = cancel
 
-	// sync validators first
-	if err := vm.validatorsManager.Sync(ctx); err != nil {
-		return fmt.Errorf("failed to update validators: %w", err)
+	// Start the validators manager
+	if err := vm.validatorsManager.Initialize(ctx); err != nil {
+		return fmt.Errorf("failed to initialize validators manager: %w", err)
 	}
-	vdrIDs := vm.validatorsManager.GetNodeIDs().List()
-	// Then start tracking with updated validators
-	// StartTracking initializes the uptime tracking with the known validators
-	// and update their uptime to account for the time we were being offline.
-	if err := vm.validatorsManager.StartTracking(vdrIDs); err != nil {
-		return fmt.Errorf("failed to start tracking uptime: %w", err)
-	}
+
 	// dispatch validator set update
 	vm.shutdownWg.Add(1)
 	go func() {
@@ -875,12 +869,8 @@ func (vm *VM) Shutdown(context.Context) error {
 		vm.cancel()
 	}
 	if vm.bootstrapped.Get() {
-		vdrIDs := vm.validatorsManager.GetNodeIDs().List()
-		if err := vm.validatorsManager.StopTracking(vdrIDs); err != nil {
-			return fmt.Errorf("failed to stop tracking uptime: %w", err)
-		}
-		if err := vm.validatorsManager.WriteState(); err != nil {
-			return fmt.Errorf("failed to write validator: %w", err)
+		if err := vm.validatorsManager.Shutdown(); err != nil {
+			return fmt.Errorf("failed to shutdown validators manager: %w", err)
 		}
 	}
 	vm.Network.Shutdown()

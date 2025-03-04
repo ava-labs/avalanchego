@@ -56,6 +56,54 @@ func NewManager(
 	}, nil
 }
 
+// Initialize initializes the validator manager
+// by syncing the validator state with the current validator set
+// and starting the uptime tracking.
+// Initialize holds the chain context lock while performing the operation.
+func (m *manager) Initialize(ctx context.Context) error {
+	m.chainCtx.Lock.Lock()
+	defer m.chainCtx.Lock.Unlock()
+	// sync validators first
+	if err := m.sync(ctx); err != nil {
+		return fmt.Errorf("failed to update validators: %w", err)
+	}
+	vdrIDs := m.GetNodeIDs().List()
+	// Then start tracking with updated validators
+	// StartTracking initializes the uptime tracking with the known validators
+	// and update their uptime to account for the time we were being offline.
+	if err := m.StartTracking(vdrIDs); err != nil {
+		return fmt.Errorf("failed to start tracking uptime: %w", err)
+	}
+	return nil
+}
+
+// Shutdown stops the uptime tracking and writes the validator state to the database.
+// Shutdown holds the chain context lock while performing the operation.
+func (m *manager) Shutdown() error {
+	m.chainCtx.Lock.Lock()
+	defer m.chainCtx.Lock.Unlock()
+	vdrIDs := m.GetNodeIDs().List()
+	if err := m.StopTracking(vdrIDs); err != nil {
+		return fmt.Errorf("failed to stop tracking uptime: %w", err)
+	}
+	if err := m.WriteState(); err != nil {
+		return fmt.Errorf("failed to write validator: %w", err)
+	}
+	return nil
+}
+
+func (m *manager) Connect(nodeID ids.NodeID) error {
+	m.chainCtx.Lock.Lock()
+	defer m.chainCtx.Lock.Unlock()
+	return m.PausableManager.Connect(nodeID)
+}
+
+func (m *manager) Disconnect(nodeID ids.NodeID) error {
+	m.chainCtx.Lock.Lock()
+	defer m.chainCtx.Lock.Unlock()
+	return m.PausableManager.Disconnect(nodeID)
+}
+
 // GetValidatorAndUptime returns the calculated uptime of the validator specified by validationID
 // and the last updated time.
 // GetValidatorAndUptime holds the chain context lock while performing the operation and can be called concurrently.
@@ -88,7 +136,7 @@ func (m *manager) DispatchSync(ctx context.Context) {
 		select {
 		case <-ticker.C:
 			m.chainCtx.Lock.Lock()
-			if err := m.Sync(ctx); err != nil {
+			if err := m.sync(ctx); err != nil {
 				log.Error("failed to sync validators", "error", err)
 			}
 			m.chainCtx.Lock.Unlock()
@@ -98,10 +146,10 @@ func (m *manager) DispatchSync(ctx context.Context) {
 	}
 }
 
-// Sync synchronizes the validator state with the current validator set
+// sync synchronizes the validator state with the current validator set
 // and writes the state to the database.
-// Sync is not safe to call concurrently and should be called with the chain context locked.
-func (m *manager) Sync(ctx context.Context) error {
+// sync is not safe to call concurrently and should be called with the chain context locked.
+func (m *manager) sync(ctx context.Context) error {
 	now := time.Now()
 	log.Debug("performing validator sync")
 	// get current validator set

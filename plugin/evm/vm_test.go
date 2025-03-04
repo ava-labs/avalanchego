@@ -153,10 +153,6 @@ func setupGenesis(
 	atomicMemory := atomic.NewMemory(prefixdb.New([]byte{0}, baseDB))
 	ctx.SharedMemory = atomicMemory.NewSharedMemory(ctx.ChainID)
 
-	// NB: this lock is intentionally left locked when this function returns.
-	// The caller of this function is responsible for unlocking.
-	ctx.Lock.Lock()
-
 	issuer := make(chan commonEng.Message, 1)
 	prefixedDB := prefixdb.New([]byte{1}, baseDB)
 	return ctx, prefixedDB, genesisBytes, issuer, atomicMemory
