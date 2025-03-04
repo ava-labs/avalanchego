@@ -658,7 +658,8 @@ func calculateBlockMetrics(
 }
 
 // deactivateLowBalanceL1Validators deactivates any L1 validators that might not
-// have sufficient fees to pay for the next second.
+// have sufficient fees to pay for the next second. The returned bool will be
+// true if at least one L1 validator was deactivated.
 func deactivateLowBalanceL1Validators(
 	config validatorfee.Config,
 	diff state.Diff,

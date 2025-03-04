@@ -1250,10 +1250,10 @@ func TestDeactivateLowBalanceL1Validators(t *testing.T) {
 	)
 
 	tests := []struct {
-		name                 string
-		initialL1Validators  []state.L1Validator
-		expectedL1Validators []state.L1Validator
-		expectedChanges      bool
+		name                                  string
+		initialL1Validators                   []state.L1Validator
+		expectedL1Validators                  []state.L1Validator
+		expectedLowBalanceL1ValidatorsEvicted bool
 	}{
 		{
 			name: "no L1 validators",
@@ -1263,7 +1263,7 @@ func TestDeactivateLowBalanceL1Validators(t *testing.T) {
 			initialL1Validators: []state.L1Validator{
 				fractionalTimeL1Validator0,
 			},
-			expectedChanges: true,
+			expectedLowBalanceL1ValidatorsEvicted: true,
 		},
 		{
 			name: "fractional L1 validators are not undercharged",
@@ -1271,7 +1271,7 @@ func TestDeactivateLowBalanceL1Validators(t *testing.T) {
 				fractionalTimeL1Validator0,
 				fractionalTimeL1Validator1,
 			},
-			expectedChanges: true,
+			expectedLowBalanceL1ValidatorsEvicted: true,
 		},
 		{
 			name: "whole L1 validators are not overcharged",
@@ -1291,7 +1291,7 @@ func TestDeactivateLowBalanceL1Validators(t *testing.T) {
 			expectedL1Validators: []state.L1Validator{
 				wholeTimeL1Validator,
 			},
-			expectedChanges: true,
+			expectedLowBalanceL1ValidatorsEvicted: true,
 		},
 	}
 	for _, test := range tests {
@@ -1312,9 +1312,9 @@ func TestDeactivateLowBalanceL1Validators(t *testing.T) {
 				MinPrice:                 gas.Price(2 * units.NanoAvax), // Min price is increased to allow fractional fees
 				ExcessConversionConstant: genesis.LocalParams.ValidatorFeeConfig.ExcessConversionConstant,
 			}
-			changes, err := deactivateLowBalanceL1Validators(config, diff)
+			lowBalanceL1ValidatorsEvicted, err := deactivateLowBalanceL1Validators(config, diff)
 			require.NoError(err)
-			require.Equal(test.expectedChanges, changes)
+			require.Equal(test.expectedLowBalanceL1ValidatorsEvicted, lowBalanceL1ValidatorsEvicted)
 
 			l1Validators, err := diff.GetActiveL1ValidatorsIterator()
 			require.NoError(err)
