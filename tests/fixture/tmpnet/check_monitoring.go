@@ -75,9 +75,14 @@ func CheckLogsExist(ctx context.Context, log logging.Logger, networkUUID string)
 		zap.String("query", query),
 	)
 
-	return waitForCount(ctx, log, "logs", func() (int, error) {
-		return queryLoki(ctx, url, username, password, query)
-	})
+	return waitForCount(
+		ctx,
+		log,
+		"logs",
+		func() (int, error) {
+			return queryLoki(ctx, url, username, password, query)
+		},
+	)
 }
 
 func queryLoki(
@@ -174,9 +179,14 @@ func CheckMetricsExist(ctx context.Context, log logging.Logger, networkUUID stri
 		zap.String("query", query),
 	)
 
-	return waitForCount(ctx, log, "metrics", func() (int, error) {
-		return queryPrometheus(ctx, log, url, username, password, query)
-	})
+	return waitForCount(
+		ctx,
+		log,
+		"metrics",
+		func() (int, error) {
+			return queryPrometheus(ctx, log, url, username, password, query)
+		},
+	)
 }
 
 func queryPrometheus(
