@@ -22,7 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/subnets"
 )
 
-const chainConfigFilenameExtention = ".ex"
+const chainConfigFilenameExtension = ".ex"
 
 func TestGetChainConfigsFromFiles(t *testing.T) {
 	tests := map[string]struct {
@@ -74,11 +74,11 @@ func TestGetChainConfigsFromFiles(t *testing.T) {
 			// Create custom configs
 			for key, value := range test.configs {
 				chainDir := filepath.Join(chainsDir, key)
-				setupFile(t, chainDir, chainConfigFileName+chainConfigFilenameExtention, value)
+				setupFile(t, chainDir, chainConfigFileName+chainConfigFilenameExtension, value)
 			}
 			for key, value := range test.upgrades {
 				chainDir := filepath.Join(chainsDir, key)
-				setupFile(t, chainDir, chainUpgradeFileName+chainConfigFilenameExtention, value)
+				setupFile(t, chainDir, chainUpgradeFileName+chainConfigFilenameExtension, value)
 			}
 
 			v := setupViper(configFile)
@@ -163,7 +163,7 @@ func TestSetChainConfigDefaultDir(t *testing.T) {
 	require.Equal(defaultChainConfigDir, v.GetString(ChainConfigDirKey))
 
 	chainsDir := filepath.Join(defaultChainConfigDir, "C")
-	setupFile(t, chainsDir, chainConfigFileName+chainConfigFilenameExtention, "helloworld")
+	setupFile(t, chainsDir, chainConfigFileName+chainConfigFilenameExtension, "helloworld")
 	chainConfigs, err := getChainConfigs(v)
 	require.NoError(err)
 	expected := map[string]chains.ChainConfig{"C": {Config: []byte("helloworld"), Upgrade: []byte(nil)}}
