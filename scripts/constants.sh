@@ -8,12 +8,13 @@ set -euo pipefail
 # Set the PATHS
 GOPATH="$(go env GOPATH)"
 DEFAULT_PLUGIN_DIR="${HOME}/.avalanchego/plugins"
+DEFAULT_VM_NAME="subnet-evm"
 DEFAULT_VM_ID="srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy"
 
 # Avalabs docker hub
 # avaplatform/avalanchego - defaults to local as to avoid unintentional pushes
-# You should probably set it - export DOCKER_REPO='avaplatform/subnet-evm'
-DOCKERHUB_REPO=${DOCKER_REPO:-"subnet-evm"}
+# You should probably set it - export IMAGE_NAME='avaplatform/subnet-evm'
+IMAGE_NAME=${IMAGE_NAME:-"subnet-evm"}
 
 # Shared between ./scripts/build_docker_image.sh and ./scripts/tests.build_docker_image.sh
 AVALANCHEGO_IMAGE_NAME="${AVALANCHEGO_IMAGE_NAME:-avaplatform/avalanchego}"
@@ -51,3 +52,6 @@ fi
 # We use "export" here instead of just setting a bash variable because we need
 # to pass this flag to all child processes spawned by the shell.
 export CGO_CFLAGS="-O2 -D__BLST_PORTABLE__"
+
+# CGO_ENABLED is required for multi-arch builds.
+export CGO_ENABLED=1
