@@ -77,7 +77,7 @@ var (
 			CortinaBlockTimestamp:           utils.NewUint64(0),
 			DurangoBlockTimestamp:           utils.NewUint64(0),
 			EtnaTimestamp:                   utils.NewUint64(0),
-			FUpgradeTimestamp:               utils.NewUint64(0),
+			FortunaTimestamp:                utils.NewUint64(0),
 		},
 	}
 
@@ -108,7 +108,7 @@ var (
 			CortinaBlockTimestamp:           nil,
 			DurangoBlockTimestamp:           nil,
 			EtnaTimestamp:                   nil,
-			FUpgradeTimestamp:               nil,
+			FortunaTimestamp:                nil,
 		},
 	}
 
@@ -139,7 +139,7 @@ var (
 			CortinaBlockTimestamp:           nil,
 			DurangoBlockTimestamp:           nil,
 			EtnaTimestamp:                   nil,
-			FUpgradeTimestamp:               nil,
+			FortunaTimestamp:                nil,
 		},
 	}
 
@@ -171,7 +171,7 @@ var (
 			CortinaBlockTimestamp:           nil,
 			DurangoBlockTimestamp:           nil,
 			EtnaTimestamp:                   nil,
-			FUpgradeTimestamp:               nil,
+			FortunaTimestamp:                nil,
 		},
 	}
 
@@ -204,7 +204,7 @@ var (
 			CortinaBlockTimestamp:           nil,
 			DurangoBlockTimestamp:           nil,
 			EtnaTimestamp:                   nil,
-			FUpgradeTimestamp:               nil,
+			FortunaTimestamp:                nil,
 		},
 	}
 
@@ -237,7 +237,7 @@ var (
 			CortinaBlockTimestamp:           nil,
 			DurangoBlockTimestamp:           nil,
 			EtnaTimestamp:                   nil,
-			FUpgradeTimestamp:               nil,
+			FortunaTimestamp:                nil,
 		},
 	}
 
@@ -270,7 +270,7 @@ var (
 			CortinaBlockTimestamp:           nil,
 			DurangoBlockTimestamp:           nil,
 			EtnaTimestamp:                   nil,
-			FUpgradeTimestamp:               nil,
+			FortunaTimestamp:                nil,
 		},
 	}
 
@@ -303,7 +303,7 @@ var (
 			CortinaBlockTimestamp:           nil,
 			DurangoBlockTimestamp:           nil,
 			EtnaTimestamp:                   nil,
-			FUpgradeTimestamp:               nil,
+			FortunaTimestamp:                nil,
 		},
 	}
 
@@ -336,7 +336,7 @@ var (
 			CortinaBlockTimestamp:           nil,
 			DurangoBlockTimestamp:           nil,
 			EtnaTimestamp:                   nil,
-			FUpgradeTimestamp:               nil,
+			FortunaTimestamp:                nil,
 		},
 	}
 
@@ -369,7 +369,7 @@ var (
 			CortinaBlockTimestamp:           nil,
 			DurangoBlockTimestamp:           nil,
 			EtnaTimestamp:                   nil,
-			FUpgradeTimestamp:               nil,
+			FortunaTimestamp:                nil,
 		},
 	}
 
@@ -402,7 +402,7 @@ var (
 			CortinaBlockTimestamp:           nil,
 			DurangoBlockTimestamp:           nil,
 			EtnaTimestamp:                   nil,
-			FUpgradeTimestamp:               nil,
+			FortunaTimestamp:                nil,
 		},
 	}
 
@@ -435,7 +435,7 @@ var (
 			CortinaBlockTimestamp:           utils.NewUint64(0),
 			DurangoBlockTimestamp:           nil,
 			EtnaTimestamp:                   nil,
-			FUpgradeTimestamp:               nil,
+			FortunaTimestamp:                nil,
 		},
 	}
 
@@ -469,7 +469,7 @@ var (
 			CortinaBlockTimestamp:           utils.NewUint64(0),
 			DurangoBlockTimestamp:           utils.NewUint64(0),
 			EtnaTimestamp:                   nil,
-			FUpgradeTimestamp:               nil,
+			FortunaTimestamp:                nil,
 		},
 	}
 
@@ -504,11 +504,11 @@ var (
 			CortinaBlockTimestamp:           utils.NewUint64(0),
 			DurangoBlockTimestamp:           utils.NewUint64(0),
 			EtnaTimestamp:                   utils.NewUint64(0),
-			FUpgradeTimestamp:               nil,
+			FortunaTimestamp:                nil,
 		},
 	}
 
-	TestFUpgradeChainConfig = &ChainConfig{
+	TestFortunaChainConfig = &ChainConfig{
 		AvalancheContext:    AvalancheContext{utils.TestSnowContext()},
 		ChainID:             big.NewInt(1),
 		HomesteadBlock:      big.NewInt(0),
@@ -539,7 +539,7 @@ var (
 			CortinaBlockTimestamp:           utils.NewUint64(0),
 			DurangoBlockTimestamp:           utils.NewUint64(0),
 			EtnaTimestamp:                   utils.NewUint64(0),
-			FUpgradeTimestamp:               utils.NewUint64(0),
+			FortunaTimestamp:                utils.NewUint64(0),
 		},
 	}
 

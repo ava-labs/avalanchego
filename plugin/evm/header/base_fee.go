@@ -24,7 +24,7 @@ func BaseFee(
 	timestamp uint64,
 ) (*big.Int, error) {
 	switch {
-	case config.IsFUpgrade(timestamp):
+	case config.IsFortuna(timestamp):
 		state, err := feeStateBeforeBlock(config, parent, timestamp)
 		if err != nil {
 			return nil, fmt.Errorf("calculating initial fee state: %w", err)

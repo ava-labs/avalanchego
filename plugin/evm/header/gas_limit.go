@@ -29,7 +29,7 @@ func GasLimit(
 	timestamp uint64,
 ) (uint64, error) {
 	switch {
-	case config.IsFUpgrade(timestamp):
+	case config.IsFortuna(timestamp):
 		state, err := feeStateBeforeBlock(config, parent, timestamp)
 		if err != nil {
 			return 0, fmt.Errorf("calculating initial fee state: %w", err)
@@ -62,7 +62,7 @@ func VerifyGasUsed(
 	header *types.Header,
 ) error {
 	gasUsed := header.GasUsed
-	if config.IsFUpgrade(header.Time) && header.ExtDataGasUsed != nil {
+	if config.IsFortuna(header.Time) && header.ExtDataGasUsed != nil {
 		if !header.ExtDataGasUsed.IsUint64() {
 			return fmt.Errorf("%w: %d is not a uint64",
 				errInvalidExtraDataGasUsed,
@@ -97,7 +97,7 @@ func VerifyGasLimit(
 	header *types.Header,
 ) error {
 	switch {
-	case config.IsFUpgrade(header.Time):
+	case config.IsFortuna(header.Time):
 		state, err := feeStateBeforeBlock(config, parent, header.Time)
 		if err != nil {
 			return fmt.Errorf("calculating initial fee state: %w", err)
@@ -159,7 +159,7 @@ func GasCapacity(
 	timestamp uint64,
 ) (uint64, error) {
 	// Prior to the F upgrade, the gas capacity is equal to the gas limit.
-	if !config.IsFUpgrade(timestamp) {
+	if !config.IsFortuna(timestamp) {
 		return GasLimit(config, parent, timestamp)
 	}
 
@@ -180,7 +180,7 @@ func RemainingAtomicGasCapacity(
 ) (uint64, error) {
 	// Prior to the F upgrade, the atomic gas limit was a constant independent
 	// of the evm gas used.
-	if !config.IsFUpgrade(header.Time) {
+	if !config.IsFortuna(header.Time) {
 		return ap5.AtomicGasLimit, nil
 	}
 

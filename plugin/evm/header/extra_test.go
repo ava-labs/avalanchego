@@ -247,9 +247,9 @@ func TestExtraPrefix(t *testing.T) {
 			}(),
 		},
 		{
-			name: "fupgrade_first_block",
+			name: "fortuna_first_block",
 			upgrades: params.NetworkUpgrades{
-				FUpgradeTimestamp: utils.NewUint64(1),
+				FortunaTimestamp: utils.NewUint64(1),
 			},
 			parent: &types.Header{
 				Number: big.NewInt(1),
@@ -268,8 +268,8 @@ func TestExtraPrefix(t *testing.T) {
 			}).Bytes(),
 		},
 		{
-			name:     "fupgrade_genesis_block",
-			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			name:     "fortuna_genesis_block",
+			upgrades: params.TestFortunaChainConfig.NetworkUpgrades,
 			parent: &types.Header{
 				Number: big.NewInt(0),
 			},
@@ -288,8 +288,8 @@ func TestExtraPrefix(t *testing.T) {
 			}).Bytes(),
 		},
 		{
-			name:     "fupgrade_invalid_fee_state",
-			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			name:     "fortuna_invalid_fee_state",
+			upgrades: params.TestFortunaChainConfig.NetworkUpgrades,
 			parent: &types.Header{
 				Number: big.NewInt(1),
 			},
@@ -297,8 +297,8 @@ func TestExtraPrefix(t *testing.T) {
 			wantErr: acp176.ErrStateInsufficientLength,
 		},
 		{
-			name:     "fupgrade_invalid_gas_used",
-			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			name:     "fortuna_invalid_gas_used",
+			upgrades: params.TestFortunaChainConfig.NetworkUpgrades,
 			parent: &types.Header{
 				Number: big.NewInt(1),
 				Extra:  (&acp176.State{}).Bytes(),
@@ -309,8 +309,8 @@ func TestExtraPrefix(t *testing.T) {
 			wantErr: gas.ErrInsufficientCapacity,
 		},
 		{
-			name:     "fupgrade_reduce_capacity",
-			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			name:     "fortuna_reduce_capacity",
+			upgrades: params.TestFortunaChainConfig.NetworkUpgrades,
 			parent: &types.Header{
 				Number: big.NewInt(1),
 				Extra: (&acp176.State{
@@ -393,14 +393,14 @@ func TestVerifyExtraPrefix(t *testing.T) {
 			wantErr: nil,
 		},
 		{
-			name:     "fupgrade_invalid_header",
-			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			name:     "fortuna_invalid_header",
+			upgrades: params.TestFortunaChainConfig.NetworkUpgrades,
 			header:   &types.Header{},
 			wantErr:  acp176.ErrStateInsufficientLength,
 		},
 		{
-			name:     "fupgrade_invalid_gas_consumed",
-			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			name:     "fortuna_invalid_gas_consumed",
+			upgrades: params.TestFortunaChainConfig.NetworkUpgrades,
 			parent: &types.Header{
 				Number: big.NewInt(0),
 			},
@@ -411,8 +411,8 @@ func TestVerifyExtraPrefix(t *testing.T) {
 			wantErr: gas.ErrInsufficientCapacity,
 		},
 		{
-			name:     "fupgrade_wrong_fee_state",
-			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			name:     "fortuna_wrong_fee_state",
+			upgrades: params.TestFortunaChainConfig.NetworkUpgrades,
 			parent: &types.Header{
 				Number: big.NewInt(0),
 			},
@@ -430,8 +430,8 @@ func TestVerifyExtraPrefix(t *testing.T) {
 			wantErr: errIncorrectFeeState,
 		},
 		{
-			name:     "fupgrade_valid",
-			upgrades: params.TestFUpgradeChainConfig.NetworkUpgrades,
+			name:     "fortuna_valid",
+			upgrades: params.TestFortunaChainConfig.NetworkUpgrades,
 			parent: &types.Header{
 				Number: big.NewInt(0),
 			},
@@ -544,25 +544,25 @@ func TestVerifyExtra(t *testing.T) {
 			expected: errInvalidExtraLength,
 		},
 		{
-			name: "fupgrade_valid_min",
+			name: "fortuna_valid_min",
 			rules: params.AvalancheRules{
-				IsFUpgrade: true,
+				IsFortuna: true,
 			},
 			extra:    make([]byte, acp176.StateSize),
 			expected: nil,
 		},
 		{
-			name: "fupgrade_valid_extra",
+			name: "fortuna_valid_extra",
 			rules: params.AvalancheRules{
-				IsFUpgrade: true,
+				IsFortuna: true,
 			},
 			extra:    make([]byte, acp176.StateSize+1),
 			expected: nil,
 		},
 		{
-			name: "fupgrade_invalid",
+			name: "fortuna_invalid",
 			rules: params.AvalancheRules{
-				IsFUpgrade: true,
+				IsFortuna: true,
 			},
 			extra:    make([]byte, acp176.StateSize-1),
 			expected: errInvalidExtraLength,
@@ -606,33 +606,33 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 			expected: []byte{5},
 		},
 		{
-			name: "fupgrade_empty_extra",
+			name: "fortuna_empty_extra",
 			rules: params.AvalancheRules{
-				IsFUpgrade: true,
+				IsFortuna: true,
 			},
 			extra:    nil,
 			expected: nil,
 		},
 		{
-			name: "fupgrade_too_short",
+			name: "fortuna_too_short",
 			rules: params.AvalancheRules{
-				IsFUpgrade: true,
+				IsFortuna: true,
 			},
 			extra:    make([]byte, acp176.StateSize-1),
 			expected: nil,
 		},
 		{
-			name: "fupgrade_empty_predicate",
+			name: "fortuna_empty_predicate",
 			rules: params.AvalancheRules{
-				IsFUpgrade: true,
+				IsFortuna: true,
 			},
 			extra:    make([]byte, acp176.StateSize),
 			expected: nil,
 		},
 		{
-			name: "fupgrade_non_empty_predicate",
+			name: "fortuna_non_empty_predicate",
 			rules: params.AvalancheRules{
-				IsFUpgrade: true,
+				IsFortuna: true,
 			},
 			extra: []byte{
 				acp176.StateSize: 5,

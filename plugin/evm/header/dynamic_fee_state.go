@@ -29,7 +29,7 @@ func feeStateBeforeBlock(
 	}
 
 	var state acp176.State
-	if config.IsFUpgrade(parent.Time) && parent.Number.Cmp(common.Big0) != 0 {
+	if config.IsFortuna(parent.Time) && parent.Number.Cmp(common.Big0) != 0 {
 		// If the parent block was running with ACP-176, we start with the
 		// resulting fee state from the parent block. It is assumed that the
 		// parent has been verified, so the claimed fee state equals the actual
