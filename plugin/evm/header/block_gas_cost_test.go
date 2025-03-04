@@ -18,43 +18,51 @@ import (
 
 func TestBlockGasCost(t *testing.T) {
 	tests := []struct {
-		name         string
-		ap5Timestamp *uint64
-		parentTime   uint64
-		parentCost   *big.Int
-		timestamp    uint64
-		expected     uint64
+		name       string
+		upgrades   params.NetworkUpgrades
+		parentTime uint64
+		parentCost *big.Int
+		timestamp  uint64
+		expected   *big.Int
 	}{
+		{
+			name:       "before_ap4",
+			parentTime: 10,
+			upgrades:   params.TestApricotPhase3Config.NetworkUpgrades,
+			parentCost: big.NewInt(ap4.MaxBlockGasCost),
+			timestamp:  10 + ap4.TargetBlockRate + 1,
+			expected:   nil,
+		},
 		{
 			name:       "normal_ap4",
 			parentTime: 10,
+			upgrades:   params.TestApricotPhase4Config.NetworkUpgrades,
 			parentCost: big.NewInt(ap4.MaxBlockGasCost),
 			timestamp:  10 + ap4.TargetBlockRate + 1,
-			expected:   ap4.MaxBlockGasCost - ap4.BlockGasCostStep,
+			expected:   big.NewInt(ap4.MaxBlockGasCost - ap4.BlockGasCostStep),
 		},
 		{
-			name:         "normal_ap5",
-			ap5Timestamp: utils.NewUint64(0),
-			parentTime:   10,
-			parentCost:   big.NewInt(ap4.MaxBlockGasCost),
-			timestamp:    10 + ap4.TargetBlockRate + 1,
-			expected:     ap4.MaxBlockGasCost - ap5.BlockGasCostStep,
+			name:       "normal_ap5",
+			upgrades:   params.TestApricotPhase5Config.NetworkUpgrades,
+			parentTime: 10,
+			parentCost: big.NewInt(ap4.MaxBlockGasCost),
+			timestamp:  10 + ap4.TargetBlockRate + 1,
+			expected:   big.NewInt(ap4.MaxBlockGasCost - ap5.BlockGasCostStep),
 		},
 		{
 			name:       "negative_time_elapsed",
+			upgrades:   params.TestApricotPhase4Config.NetworkUpgrades,
 			parentTime: 10,
 			parentCost: big.NewInt(ap4.MinBlockGasCost),
 			timestamp:  9,
-			expected:   ap4.MinBlockGasCost + ap4.BlockGasCostStep*ap4.TargetBlockRate,
+			expected:   big.NewInt(ap4.MinBlockGasCost + ap4.BlockGasCostStep*ap4.TargetBlockRate),
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			config := &params.ChainConfig{
-				NetworkUpgrades: params.NetworkUpgrades{
-					ApricotPhase5BlockTimestamp: test.ap5Timestamp,
-				},
+				NetworkUpgrades: test.upgrades,
 			}
 			parent := &types.Header{
 				Time:         test.parentTime,
