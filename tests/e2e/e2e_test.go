@@ -47,9 +47,9 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 
 	upgrades := upgrade.Default
 	if flagVars.ActivateFortuna() {
-		upgrades.FUpgradeTime = upgrade.InitiallyActiveTime
+		upgrades.FortunaTime = upgrade.InitiallyActiveTime
 	} else {
-		upgrades.FUpgradeTime = upgrade.UnscheduledActivationTime
+		upgrades.FortunaTime = upgrade.UnscheduledActivationTime
 	}
 	tc.Log().Info("setting upgrades",
 		zap.Reflect("upgrades", upgrades),
