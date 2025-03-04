@@ -22,6 +22,7 @@ func TestUpgrade(t *testing.T) {
 var (
 	avalancheGoExecPath            string
 	avalancheGoExecPathToUpgradeTo string
+	startCollectors                bool
 )
 
 func init() {
@@ -37,6 +38,7 @@ func init() {
 		"",
 		"avalanchego executable path to upgrade to",
 	)
+	e2e.SetStartCollectorsFlag(&startCollectors)
 }
 
 var _ = ginkgo.Describe("[Upgrade]", func() {
@@ -50,6 +52,10 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 		genesis, err := network.DefaultGenesis()
 		require.NoError(err)
 		network.Genesis = genesis
+
+		if startCollectors {
+			require.NoError(tmpnet.StartCollectors(tc.DefaultContext(), tc.Log()))
+		}
 
 		e2e.StartNetwork(
 			tc,
