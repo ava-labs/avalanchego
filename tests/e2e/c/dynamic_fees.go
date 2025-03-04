@@ -196,7 +196,9 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 
 				// Send the transaction and wait for acceptance
 				signedTx := sign(tx)
-				_ = e2e.SendEthTransaction(tc, ethClient, signedTx)
+				receipt := e2e.SendEthTransaction(tc, ethClient, signedTx)
+				// The transaction should have run out of gas
+				require.Equal(types.ReceiptStatusFailed, receipt.Status)
 
 				// The gas price will be checked at the start of the next iteration
 				return false
