@@ -57,35 +57,50 @@ func BlockGasCostTest(t *testing.T, feeConfig commontype.FeeConfig) {
 
 	tests := []struct {
 		name       string
+		upgrades   params.NetworkUpgrades
 		parentTime uint64
 		parentCost *big.Int
 		timestamp  uint64
-		expected   uint64
+		expected   *big.Int
 	}{
 		{
+			name:       "before_subnet_evm",
+			parentTime: 10,
+			upgrades:   params.TestPreSubnetEVMChainConfig.NetworkUpgrades,
+			parentCost: maxBlockGasCostBig,
+			timestamp:  10 + targetBlockRate + 1,
+			expected:   nil,
+		},
+		{
 			name:       "normal",
+			upgrades:   params.TestChainConfig.NetworkUpgrades,
 			parentTime: 10,
 			parentCost: maxBlockGasCostBig,
 			timestamp:  10 + targetBlockRate + 1,
-			expected:   maxBlockGasCost - blockGasCostStep,
+			expected:   new(big.Int).SetUint64(maxBlockGasCost - blockGasCostStep),
 		},
 		{
 			name:       "negative_time_elapsed",
+			upgrades:   params.TestChainConfig.NetworkUpgrades,
 			parentTime: 10,
 			parentCost: feeConfig.MinBlockGasCost,
 			timestamp:  9,
-			expected:   minBlockGasCost + blockGasCostStep*targetBlockRate,
+			expected:   new(big.Int).SetUint64(minBlockGasCost + blockGasCostStep*targetBlockRate),
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			config := &params.ChainConfig{
+				NetworkUpgrades: test.upgrades,
+			}
 			parent := &types.Header{
 				Time:         test.parentTime,
 				BlockGasCost: test.parentCost,
 			}
 
 			assert.Equal(t, test.expected, BlockGasCost(
+				config,
 				feeConfig,
 				parent,
 				test.timestamp,

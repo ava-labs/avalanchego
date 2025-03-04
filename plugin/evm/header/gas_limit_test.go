@@ -147,10 +147,10 @@ func VerifyGasLimitTest(t *testing.T, feeConfig commontype.FeeConfig) {
 
 func TestGasCapacity(t *testing.T) {
 	t.Run("normal", func(t *testing.T) {
-		GasLimitTest(t, testFeeConfig)
+		GasCapacityTest(t, testFeeConfig)
 	})
 	t.Run("double", func(t *testing.T) {
-		GasLimitTest(t, testFeeConfigDouble)
+		GasCapacityTest(t, testFeeConfigDouble)
 	})
 }
 
