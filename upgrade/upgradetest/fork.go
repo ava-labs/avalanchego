@@ -17,7 +17,7 @@ const (
 	Cortina
 	Durango
 	Etna
-	FUpgrade
+	Fortuna
 
 	Latest = Etna
 )
@@ -27,8 +27,8 @@ type Fork int
 
 func (f Fork) String() string {
 	switch f {
-	case FUpgrade:
-		return "FUpgrade"
+	case Fortuna:
+		return "Fortuna"
 	case Etna:
 		return "Etna"
 	case Durango:
