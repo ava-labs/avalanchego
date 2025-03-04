@@ -79,7 +79,8 @@ func (v *FlagVars) StartCollectors() bool {
 
 func (v *FlagVars) NetworkShutdownDelay() time.Duration {
 	if v.startCollectors {
-		// Only return a non-zero value if the delay is enabled.
+		// Only return a non-zero value if we want to ensure the collectors have
+		// a chance to collect the metrics at the end of the test.
 		return tmpnet.NetworkShutdownDelay
 	}
 	return 0
