@@ -40,6 +40,13 @@ type Logger interface {
 	// aspect of the program
 	Verbo(msg string, fields ...zap.Field)
 
+	// With creates a new child logger with provided structured fields added as context
+	// It doesn't modify the parent logger
+	With(fields ...zap.Field) Logger
+
+	// WithOptions clones the current Logger, applies the supplied Options, and returns the resulting Logger.
+	WithOptions(opts ...zap.Option) Logger
+
 	// SetLevel that this logger should log to
 	SetLevel(level Level)
 	// Enabled returns true if the given level is at or above this level.
