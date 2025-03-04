@@ -218,25 +218,15 @@ func newView(
 			}
 		}
 
-		//for _, op := range changes.BatchOps {
-		//	key := op.Key
-		//	if !changes.ConsumeBytes {
-		//		key = slices.Clone(op.Key)
-		//	}
-		//
-		//	newVal := maybe.Nothing[[]byte]()
-		//	if !op.Delete {
-		//		newVal = maybe.Some(op.Value)
-		//		if !changes.ConsumeBytes {
-		//			newVal = maybe.Some(slices.Clone(op.Value))
-		//		}
-		//	}
-		//
-		//	if err := v.recordValueChange(toKey(key), newVal); err != nil {
-		//		ch <- viewErr{err: err}
-		//		return
-		//	}
-		//}
+		for key, val := range changes.MapOps {
+			if !changes.ConsumeBytes {
+				val = maybe.Bind(val, slices.Clone[[]byte])
+			}
+			if err := v.recordValueChange(toKey(stringToByteSlice(key)), val); err != nil {
+				ch <- viewErr{err: err}
+				return
+			}
+		}
 
 		ch <- viewErr{view: v}
 	}()
