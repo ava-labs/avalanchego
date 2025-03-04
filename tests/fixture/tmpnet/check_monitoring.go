@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -63,6 +64,9 @@ func CheckLogsExist(ctx context.Context, log logging.Logger, networkUUID string)
 	}
 
 	url := getLokiURL()
+	if !strings.HasPrefix(url, "https") {
+		return fmt.Errorf("loki URL must be https for basic auth to be secure: %s", url)
+	}
 
 	selectors, err := getSelectors(networkUUID)
 	if err != nil {
@@ -155,7 +159,7 @@ func queryLoki(
 		return 0, fmt.Errorf("parsing count value: %w", err)
 	}
 	// Round to nearest integer
-	return int(floatVal + 0.5), nil
+	return int(math.Round(floatVal)), nil
 }
 
 // CheckMetricsExist checks if metrics exist for the given network. Github labels are also
@@ -167,6 +171,9 @@ func CheckMetricsExist(ctx context.Context, log logging.Logger, networkUUID stri
 	}
 
 	url := getPrometheusURL()
+	if !strings.HasPrefix(url, "https") {
+		return fmt.Errorf("prometheus URL must be https for basic auth to be secure: %s", url)
+	}
 
 	selectors, err := getSelectors(networkUUID)
 	if err != nil {
