@@ -27,6 +27,15 @@ import (
 
 type getCountFunc func() (int, error)
 
+// CheckMonitoring checks if logs and metrics exist for the given network. Github labels
+// are also used as filters if provided as env vars (GH_*).
+func CheckMonitoring(ctx context.Context, log logging.Logger, networkUUID string) error {
+	return errors.Join(
+		CheckLogsExist(ctx, log, networkUUID),
+		CheckMetricsExist(ctx, log, networkUUID),
+	)
+}
+
 // waitForCount waits until the provided function returns greater than zero.
 func waitForCount(ctx context.Context, log logging.Logger, name string, getCount getCountFunc) error {
 	err := pollUntilContextCancel(
@@ -56,7 +65,7 @@ func waitForCount(ctx context.Context, log logging.Logger, name string, getCount
 }
 
 // CheckLogsExist checks if logs exist for the given network. Github labels are also
-// included if provided as env vars (GH_*).
+// used as filters if provided as env vars (GH_*).
 func CheckLogsExist(ctx context.Context, log logging.Logger, networkUUID string) error {
 	username, password, err := getCollectorCredentials(promtailCmd)
 	if err != nil {
@@ -163,7 +172,7 @@ func queryLoki(
 }
 
 // CheckMetricsExist checks if metrics exist for the given network. Github labels are also
-// included if provided as env vars (GH_*).
+// used as filters if provided as env vars (GH_*).
 func CheckMetricsExist(ctx context.Context, log logging.Logger, networkUUID string) error {
 	username, password, err := getCollectorCredentials(prometheusCmd)
 	if err != nil {
