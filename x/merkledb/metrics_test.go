@@ -51,7 +51,11 @@ func Test_Metrics_Basic_Usage(t *testing.T) {
 }
 
 func Test_Metrics_Initialize(t *testing.T) {
-	db, err := New(context.Background(), memdb.New(), newDefaultConfig())
+	db, err := New(
+		context.Background(),
+		memdb.New(),
+		newDefaultConfig(),
+	)
 	require.NoError(t, err)
 
 	require.NoError(t, db.Put([]byte("key"), []byte("value")))
