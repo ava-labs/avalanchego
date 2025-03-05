@@ -33,12 +33,19 @@ type Logger interface {
 	// Log an event that may be useful for understanding the order of the
 	// execution of the protocol
 	Trace(msg string, fields ...zap.Field)
-	// Log an event that may be useful for a programmer to see when debuging the
+	// Log an event that may be useful for a programmer to see when debugging the
 	// execution of the protocol
 	Debug(msg string, fields ...zap.Field)
 	// Log extremely detailed events that can be useful for inspecting every
 	// aspect of the program
 	Verbo(msg string, fields ...zap.Field)
+
+	// With creates a new child logger with provided structured fields added as context
+	// It doesn't modify the parent logger
+	With(fields ...zap.Field) Logger
+
+	// WithOptions clones the current Logger, applies the supplied Options, and returns the resulting Logger.
+	WithOptions(opts ...zap.Option) Logger
 
 	// SetLevel that this logger should log to
 	SetLevel(level Level)

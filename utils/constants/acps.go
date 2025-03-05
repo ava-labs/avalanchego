@@ -32,7 +32,9 @@ var (
 	// release, marked as implementable and not activated.
 	//
 	// See: https://github.com/orgs/avalanche-foundation/projects/1
-	CurrentACPs = set.Of[uint32]()
+	CurrentACPs = set.Of[uint32](
+		176, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/176-dynamic-evm-gas-limit-and-price-discovery-updates/README.md
+	)
 
 	// ScheduledACPs are the ACPs included into the next upgrade.
 	ScheduledACPs = set.Of[uint32]()

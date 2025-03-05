@@ -84,6 +84,8 @@ func NewWallet(tc tests.TestContext, keychain *secp256k1fx.Keychain, nodeURI tmp
 				)
 			},
 		),
+		// Reducing the default from 100ms speeds up detection of tx acceptance
+		common.WithPollFrequency(10*time.Millisecond),
 	)
 	OutputWalletBalances(tc, wallet)
 	return wallet
@@ -159,8 +161,8 @@ func WaitForHealthy(t require.TestingT, node *tmpnet.Node) {
 	require.NoError(t, tmpnet.WaitForHealthy(ctx, node))
 }
 
-// Sends an eth transaction, waits for the transaction receipt to be issued
-// and checks that the receipt indicates success.
+// Sends an eth transaction and waits for the transaction receipt from the
+// execution of the transaction.
 func SendEthTransaction(tc tests.TestContext, ethClient ethclient.Client, signedTx *types.Transaction) *types.Receipt {
 	require := require.New(tc)
 
@@ -183,7 +185,12 @@ func SendEthTransaction(tc tests.TestContext, ethClient ethclient.Client, signed
 		return true
 	}, DefaultTimeout, DefaultPollingInterval, "failed to see transaction acceptance before timeout")
 
-	require.Equal(types.ReceiptStatusSuccessful, receipt.Status)
+	tc.Log().Info("eth transaction accepted",
+		zap.Stringer("txID", txID),
+		zap.Uint64("gasUsed", receipt.GasUsed),
+		zap.Stringer("gasPrice", receipt.EffectiveGasPrice),
+		zap.Stringer("blockNumber", receipt.BlockNumber),
+	)
 	return receipt
 }
 
@@ -192,6 +199,11 @@ func SendEthTransaction(tc tests.TestContext, ethClient ethclient.Client, signed
 func SuggestGasPrice(tc tests.TestContext, ethClient ethclient.Client) *big.Int {
 	gasPrice, err := ethClient.SuggestGasPrice(tc.DefaultContext())
 	require.NoError(tc, err)
+
+	tc.Log().Info("suggested gas price",
+		zap.Stringer("price", gasPrice),
+	)
+
 	// Double the suggested gas price to maximize the chances of
 	// acceptance. Maybe this can be revisited pending resolution of
 	// https://github.com/ava-labs/coreth/issues/314.

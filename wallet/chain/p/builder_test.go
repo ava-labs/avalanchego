@@ -473,7 +473,8 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 	sk, err := localsigner.New()
 	require.NoError(t, err)
 
-	pop := signer.NewProofOfPossession(sk)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(t, err)
 
 	for _, e := range testEnvironment {
 		t.Run(e.name, func(t *testing.T) {
@@ -573,7 +574,11 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 func TestConvertSubnetToL1Tx(t *testing.T) {
 	sk0, err := localsigner.New()
 	require.NoError(t, err)
+	pop0, err := signer.NewProofOfPossession(sk0)
+	require.NoError(t, err)
 	sk1, err := localsigner.New()
+	require.NoError(t, err)
+	pop1, err := signer.NewProofOfPossession(sk1)
 	require.NoError(t, err)
 
 	var (
@@ -584,7 +589,7 @@ func TestConvertSubnetToL1Tx(t *testing.T) {
 				NodeID:  utils.RandomBytes(ids.NodeIDLen),
 				Weight:  rand.Uint64(), //#nosec G404
 				Balance: units.Avax,
-				Signer:  *signer.NewProofOfPossession(sk0),
+				Signer:  *pop0,
 				RemainingBalanceOwner: message.PChainOwner{
 					Threshold: 1,
 					Addresses: []ids.ShortID{
@@ -602,7 +607,7 @@ func TestConvertSubnetToL1Tx(t *testing.T) {
 				NodeID:                utils.RandomBytes(ids.NodeIDLen),
 				Weight:                rand.Uint64(), //#nosec G404
 				Balance:               2 * units.Avax,
-				Signer:                *signer.NewProofOfPossession(sk1),
+				Signer:                *pop1,
 				RemainingBalanceOwner: message.PChainOwner{},
 				DeactivationOwner:     message.PChainOwner{},
 			},
@@ -658,7 +663,8 @@ func TestRegisterL1ValidatorTx(t *testing.T) {
 
 	sk, err := localsigner.New()
 	require.NoError(t, err)
-	pop := signer.NewProofOfPossession(sk)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(t, err)
 
 	addressedCallPayload, err := message.NewRegisterL1Validator(
 		subnetID,
@@ -697,7 +703,9 @@ func TestRegisterL1ValidatorTx(t *testing.T) {
 	signers := set.NewBits(0)
 
 	unsignedBytes := unsignedWarp.Bytes()
-	sig := sk.Sign(unsignedBytes)
+	sig, err := sk.Sign(unsignedBytes)
+	require.NoError(t, err)
+
 	sigBytes := [bls.SignatureLen]byte{}
 	copy(sigBytes[:], bls.SignatureToBytes(sig))
 
@@ -781,15 +789,15 @@ func TestSetL1ValidatorWeightTx(t *testing.T) {
 
 	sk, err := localsigner.New()
 	require.NoError(t, err)
+	sig, err := sk.Sign(unsignedWarp.Bytes())
+	require.NoError(t, err)
 
 	warp, err := warp.NewMessage(
 		unsignedWarp,
 		&warp.BitSetSignature{
 			Signers: set.NewBits(0).Bytes(),
 			Signature: ([bls.SignatureLen]byte)(
-				bls.SignatureToBytes(
-					sk.Sign(unsignedWarp.Bytes()),
-				),
+				bls.SignatureToBytes(sig),
 			),
 		},
 	)

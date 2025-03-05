@@ -193,11 +193,6 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 			return nil, err
 		}
 		if len(trackSubnets) > 0 {
-			// The plugin dir is only required when subnets will be
-			// tracked. VM images are expected to put their plugins in
-			// the default dir.
-			env[config.PluginDirKey] = config.DefaultImagePluginDir
-
 			env[config.TrackSubnetsKey] = trackSubnets
 			if i == bootstrapIndex {
 				// DB volume for bootstrap node will need to initialized with the subnet

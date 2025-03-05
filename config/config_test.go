@@ -22,7 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/subnets"
 )
 
-const chainConfigFilenameExtention = ".ex"
+const chainConfigFilenameExtension = ".ex"
 
 func TestGetChainConfigsFromFiles(t *testing.T) {
 	tests := map[string]struct {
@@ -74,11 +74,11 @@ func TestGetChainConfigsFromFiles(t *testing.T) {
 			// Create custom configs
 			for key, value := range test.configs {
 				chainDir := filepath.Join(chainsDir, key)
-				setupFile(t, chainDir, chainConfigFileName+chainConfigFilenameExtention, value)
+				setupFile(t, chainDir, chainConfigFileName+chainConfigFilenameExtension, value)
 			}
 			for key, value := range test.upgrades {
 				chainDir := filepath.Join(chainsDir, key)
-				setupFile(t, chainDir, chainUpgradeFileName+chainConfigFilenameExtention, value)
+				setupFile(t, chainDir, chainUpgradeFileName+chainConfigFilenameExtension, value)
 			}
 
 			v := setupViper(configFile)
@@ -163,7 +163,7 @@ func TestSetChainConfigDefaultDir(t *testing.T) {
 	require.Equal(defaultChainConfigDir, v.GetString(ChainConfigDirKey))
 
 	chainsDir := filepath.Join(defaultChainConfigDir, "C")
-	setupFile(t, chainsDir, chainConfigFileName+chainConfigFilenameExtention, "helloworld")
+	setupFile(t, chainsDir, chainConfigFileName+chainConfigFilenameExtension, "helloworld")
 	chainConfigs, err := getChainConfigs(v)
 	require.NoError(err)
 	expected := map[string]chains.ChainConfig{"C": {Config: []byte("helloworld"), Upgrade: []byte(nil)}}
@@ -368,6 +368,10 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 	subnetID, err := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 	require.NoError(t, err)
 
+	defaultConfigs := map[ids.ID]subnets.Config{
+		subnetID: getDefaultSubnetConfig(setupViperFlags()),
+	}
+
 	tests := map[string]struct {
 		fileName    string
 		givenJSON   string
@@ -386,15 +390,15 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 			fileName:  "Gmt4fuNsGJAd2PX86LBvycGaBpgCYKbuULdCLZs3SEs1Jx1LU.json",
 			givenJSON: `{"validatorOnly": true}`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
-				require.Empty(given)
+				require.Equal(defaultConfigs, given)
 			},
 			expectedErr: nil,
 		},
-		"wrong extension": {
+		"default config when incorrect extension used": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.yaml",
 			givenJSON: `{"validatorOnly": true}`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
-				require.Empty(given)
+				require.Equal(defaultConfigs, given)
 			},
 			expectedErr: nil,
 		},
@@ -450,15 +454,19 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 	subnetID, err := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 	require.NoError(t, err)
 
+	defaultConfigs := map[ids.ID]subnets.Config{
+		subnetID: getDefaultSubnetConfig(setupViperFlags()),
+	}
+
 	tests := map[string]struct {
 		givenJSON   string
 		testF       func(*require.Assertions, map[ids.ID]subnets.Config)
 		expectedErr error
 	}{
-		"no configs": {
+		"default config used when no config provided": {
 			givenJSON: `{}`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
-				require.Empty(given)
+				require.Equal(defaultConfigs, given)
 			},
 			expectedErr: nil,
 		},
@@ -474,10 +482,10 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
-		"subnet is not tracked": {
+		"default config used when subnet is not tracked": {
 			givenJSON: `{"Gmt4fuNsGJAd2PX86LBvycGaBpgCYKbuULdCLZs3SEs1Jx1LU":{"validatorOnly":true}}`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
-				require.Empty(given)
+				require.Equal(defaultConfigs, given)
 			},
 			expectedErr: nil,
 		},
