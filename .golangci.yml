@@ -20,12 +20,11 @@ run:
   build-tags:
     - test
 
-output:
+issues:
   # Make issues output unique by line.
   # Default: true
   uniq-by-line: false
 
-issues:
   # Maximum issues count per one linter.
   # Set to 0 to disable.
   # Default: 50

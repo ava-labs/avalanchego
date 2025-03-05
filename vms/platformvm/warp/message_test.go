@@ -17,12 +17,15 @@ import (
 func TestMessage(t *testing.T) {
 	require := require.New(t)
 
+	payload := []byte("payload")
+
 	unsignedMsg, err := NewUnsignedMessage(
 		constants.UnitTestID,
 		ids.GenerateTestID(),
-		[]byte("payload"),
+		payload,
 	)
 	require.NoError(err)
+	require.Len(unsignedMsg.Bytes(), 42+len(payload))
 
 	msg, err := NewMessage(
 		unsignedMsg,
