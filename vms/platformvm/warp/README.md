@@ -27,17 +27,20 @@ BLS provides a way to aggregate signatures off chain into a single signature tha
 Unsigned Message:
 
 ```
-+-----------------+----------+--------------------------+
-|      network_id :  uint32  |                 4 bytes  |
-+-----------------+----------+--------------------------+
-| source_chain_id : [32]byte |                32 bytes  |
-+-----------------+----------+--------------------------+
-|         payload :   []byte |       4 + size(payload)  |
-+-----------------+----------+--------------------------+
-                             |  40 + size(payload) bytes|
-                             +--------------------------+
++---------------+----------+--------------------------+
+|      codecID  :  uint16  |                 2 bytes  |
++---------------+----------+--------------------------+
+|     networkID :  uint32  |                 4 bytes  |
++---------------+----------+--------------------------+
+| sourceChainId : [32]byte |                32 bytes  |
++---------------+----------+--------------------------+
+|       payload :   []byte |       4 + size(payload)  |
++---------------+----------+--------------------------+
+                           |  42 + size(payload) bytes|
+                           +--------------------------+
 ```
 
+- `codecID` is the codec version used to serialize the payload and is hardcoded to `0x0000`
 - `networkID` is the unique ID of an Avalanche Network (Mainnet/Testnet) and provides replay protection for BLS Signers across different Avalanche Networks
 - `sourceChainID` is the hash of the transaction that created the blockchain on the Avalanche P-Chain. It serves as the unique identifier for the blockchain across the Avalanche Network so that each blockchain can only sign a message with its own id.
 - `payload` provides an arbitrary byte array containing the contents of the message. VMs define their own message types to include in the `payload`
