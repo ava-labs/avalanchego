@@ -18,7 +18,69 @@ The plugin version is unchanged at `39` and is compatible with version `v1.12.2`
 
 ### What's Changed
 
+- Implement traversal based early termination by @yacovm in https://github.com/ava-labs/avalanchego/pull/3337
+- Add networked-signer tests by @richardpringle in https://github.com/ava-labs/avalanchego/pull/3613
+- Remove unused code by @yacovm in https://github.com/ava-labs/avalanchego/pull/3682
+- chore(proposervm): timestamp metrics for block acceptance by @ARR4N in https://github.com/ava-labs/avalanchego/pull/3680
+- remove dependency of validator.State from BitSetSignature.Verify by @tsachiherman in https://github.com/ava-labs/avalanchego/pull/3679
+- [docker] Optimize build time by copying and downloading deps first by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3683
+- fix: broken link in README.md by @DeVikingMark in https://github.com/ava-labs/avalanchego/pull/3681
+- [docker] Silence remaining InvalidDefaultArgInFrom warnings by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3684
+- [tmpnet] Update subnet configuration in README by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3686
+- testing: improve e2e test bootstrapping by @tsachiherman in https://github.com/ava-labs/avalanchego/pull/3690
+- [tmpnet] Update URI and StakingAddress usage in support of kube by @marun in https://github.com/ava-labs/avalanchego/pull/3665
+- [tmpnet] Re-enable reuse of dynamically allocated API ports by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3697
+- fix spelling issues  by @futreall in https://github.com/ava-labs/avalanchego/pull/3700
+- fix: correct typos in parser.go and tmpnet documentation by @avorylli in https://github.com/ava-labs/avalanchego/pull/3712
+- fix: typos in documentation files by @maximevtush in https://github.com/ava-labs/avalanchego/pull/3710
+- Fail fast in tests if avalancheGo executable isn't an absolute path by @yacovm in https://github.com/ava-labs/avalanchego/pull/3707
+- [ci] Fix metrics link annotation emitted for e2e and upgrade jobs by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3713
+- Remove Mock Mempool by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/3687
+- cleanup(tmpnet): resolve chainconfig post-etna TODO by @darioush in https://github.com/ava-labs/avalanchego/pull/3720
+- Update to go 1.23.6 by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/3722
+- docs: Fix grammatical errors and improve clarity in documentation and comments by @VolodymyrBg in https://github.com/ava-labs/avalanchego/pull/3716
+- [testing] Replace script-based tool installation with nix by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3691
+- Remove unnecessary function by @richardpringle in https://github.com/ava-labs/avalanchego/pull/3723
+- bump coreth to master by @darioush in https://github.com/ava-labs/avalanchego/pull/3724
+- Make `bls.Signer` api fallible by @richardpringle in https://github.com/ava-labs/avalanchego/pull/3696
+- Add comment to seemingly dead code by @richardpringle in https://github.com/ava-labs/avalanchego/pull/3721
+- Bump coreth by @richardpringle in https://github.com/ava-labs/avalanchego/pull/3728
+- Comment on the need for `CGO_ENABLED=1` to support cross-compilation by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3735
+- [ci] Update to golangci-lint version compatible with go 1.23 by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3739
+- [testing] Provide more logging context for SynchronizedBeforeSuite by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3741
+- refactor: export PeerSample by @Elvis339 in https://github.com/ava-labs/avalanchego/pull/3745
+- [antithesis] Set AVAGO_PLUGIN_DIR for VM images by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3751
+- [ci] Drop support for Ubuntu 20.04 by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3737
+- Fix spelling errors in `majority.go`, `minority.go`, `compressor.go`, and `logger.go` by @tomasandroil in https://github.com/ava-labs/avalanchego/pull/3738
+- [ci] Simplify tmpnet monitoring action by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3736
+- Remove apostrophe from Dockerfile comments by @aaronbuchwald in https://github.com/ava-labs/avalanchego/pull/3706
+- fix error 404 link README.md by @futreall in https://github.com/ava-labs/avalanchego/pull/3750
+- fix: typos in documentation files by @leopardracer in https://github.com/ava-labs/avalanchego/pull/3733
+- Add With and WithOptions receivers to the Logger interface by @iansuvak in https://github.com/ava-labs/avalanchego/pull/3729
+- [tmpnet] Minimize duration of tx acceptance for e2e testing by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3685
+- Remove unused `ForceCreateChain` function from `testManager` by @comfsrt in https://github.com/ava-labs/avalanchego/pull/3755
+- chore: make function comments match function names by @rustco in https://github.com/ava-labs/avalanchego/pull/3757
+- L1 validator eviction block validity by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3758
+- Add ACP-176 e2e tests by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3749
+- [tmpnet] Deploy collectors with golang to simplify cross-repo use by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3692
+- fix spelling issues config_test.go by @futreall in https://github.com/ava-labs/avalanchego/pull/3760
+- [tmpnet] Add check for collection of logs and metrics to custom github action by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3740
+- Deprecate the `snow.Context.Lock` by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3762
+- Name F-Upgrade Fortuna by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3761
+
 ### New Contributors
+
+- @maru-ava made their first contribution in https://github.com/ava-labs/avalanchego/pull/3683
+- @DeVikingMark made their first contribution in https://github.com/ava-labs/avalanchego/pull/3681
+- @futreall made their first contribution in https://github.com/ava-labs/avalanchego/pull/3700
+- @avorylli made their first contribution in https://github.com/ava-labs/avalanchego/pull/3712
+- @maximevtush made their first contribution in https://github.com/ava-labs/avalanchego/pull/3710
+- @VolodymyrBg made their first contribution in https://github.com/ava-labs/avalanchego/pull/3716
+- @Elvis339 made their first contribution in https://github.com/ava-labs/avalanchego/pull/3745
+- @tomasandroil made their first contribution in https://github.com/ava-labs/avalanchego/pull/3738
+- @leopardracer made their first contribution in https://github.com/ava-labs/avalanchego/pull/3733
+- @comfsrt made their first contribution in https://github.com/ava-labs/avalanchego/pull/3755
+- @rustco made their first contribution in https://github.com/ava-labs/avalanchego/pull/3757
 
 **Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.12.2...v1.12.3
 
