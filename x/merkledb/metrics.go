@@ -108,7 +108,7 @@ func newMetrics(prefix string, reg prometheus.Registerer) (metrics, error) {
 		return &mockMetrics{}, nil
 	}
 
-	namespace := getMetricsNamespace(prefix, "merkledb")
+	namespace := metric.AppendNamespace(prefix, "merkledb")
 
 	m := prometheusMetrics{
 		hashes: prometheus.NewCounter(prometheus.CounterOpts{
