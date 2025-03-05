@@ -5,10 +5,11 @@ package merkledb
 
 import (
 	"errors"
-	"strings"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/ava-labs/avalanchego/utils/metric"
 )
 
 const (
@@ -94,14 +95,6 @@ type prometheusMetrics struct {
 	lookup *prometheus.CounterVec
 }
 
-func getMetricsNamespace(prefix string, namespace string) string {
-	if prefix == "" {
-		return namespace
-	}
-
-	return strings.Join([]string{prefix, namespace}, "_")
-}
-
 func newMetrics(prefix string, reg prometheus.Registerer) (metrics, error) {
 	// TODO: Should we instead return an error if reg is nil?
 	if reg == nil {
@@ -109,7 +102,6 @@ func newMetrics(prefix string, reg prometheus.Registerer) (metrics, error) {
 	}
 
 	namespace := metric.AppendNamespace(prefix, "merkledb")
-
 	m := prometheusMetrics{
 		hashes: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
