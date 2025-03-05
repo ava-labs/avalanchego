@@ -1,5 +1,18 @@
 # Release Notes
 
+## [v1.13.0-fuji](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.0-fuji)
+
+**Please note that this release is unable to run mainnet - and will display "mainnet is not supported" if attempted to run with a mainnet configuration.**
+
+This upgrade consists of the following Avalanche Community Proposal (ACP):
+- [ACP-176](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/77-reinventing-subnets/README.md) Reinventing Subnets
+
+The changes in the upgrade go into effect at 11 AM ET (3 PM UTC) on Thursday, March 13th, 2025 on the Fuji testnet.
+
+**All Fuji nodes must upgrade before 11 AM ET, March 13th 2025.**
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.12.3...v1.13.0-fuji
+
 ## [v1.12.3](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.3)
 
 This version is backwards compatible to [v1.12.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0). It is optional, but encouraged.
