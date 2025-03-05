@@ -156,12 +156,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 	t.Logf("seed: %d", now)
 	r := rand.New(rand.NewSource(now)) // #nosec G404
 
-	serverDB, err := merkledb.New(
-		context.Background(),
-		memdb.New(),
-		newDefaultDBConfig(),
-		"",
-	)
+	serverDB, err := merkledb.New(context.Background(), memdb.New(), newDefaultDBConfig())
 	require.NoError(t, err)
 	startRoot, err := serverDB.GetMerkleRoot(context.Background())
 	require.NoError(t, err)

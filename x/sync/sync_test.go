@@ -29,12 +29,7 @@ var _ p2p.Handler = (*waitingHandler)(nil)
 func Test_Creation(t *testing.T) {
 	require := require.New(t)
 
-	db, err := merkledb.New(
-		context.Background(),
-		memdb.New(),
-		newDefaultDBConfig(),
-		"",
-	)
+	db, err := merkledb.New(context.Background(), memdb.New(), newDefaultDBConfig())
 	require.NoError(err)
 
 	ctx := context.Background()
@@ -53,23 +48,13 @@ func Test_Creation(t *testing.T) {
 func Test_Completion(t *testing.T) {
 	require := require.New(t)
 
-	emptyDB, err := merkledb.New(
-		context.Background(),
-		memdb.New(),
-		newDefaultDBConfig(),
-		"",
-	)
+	emptyDB, err := merkledb.New(context.Background(), memdb.New(), newDefaultDBConfig())
 	require.NoError(err)
 
 	emptyRoot, err := emptyDB.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	db, err := merkledb.New(
-		context.Background(),
-		memdb.New(),
-		newDefaultDBConfig(),
-		"",
-	)
+	db, err := merkledb.New(context.Background(), memdb.New(), newDefaultDBConfig())
 	require.NoError(err)
 
 	ctx := context.Background()
@@ -170,12 +155,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 	syncRoot, err := dbToSync.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	db, err := merkledb.New(
-		context.Background(),
-		memdb.New(),
-		newDefaultDBConfig(),
-		"",
-	)
+	db, err := merkledb.New(context.Background(), memdb.New(), newDefaultDBConfig())
 	require.NoError(err)
 
 	ctx := context.Background()
@@ -242,12 +222,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 func Test_Sync_FindNextKey_Deleted(t *testing.T) {
 	require := require.New(t)
 
-	db, err := merkledb.New(
-		context.Background(),
-		memdb.New(),
-		newDefaultDBConfig(),
-		"",
-	)
+	db, err := merkledb.New(context.Background(), memdb.New(), newDefaultDBConfig())
 	require.NoError(err)
 	require.NoError(db.Put([]byte{0x10}, []byte{1}))
 	require.NoError(db.Put([]byte{0x11, 0x11}, []byte{2}))
@@ -290,12 +265,7 @@ func Test_Sync_FindNextKey_Deleted(t *testing.T) {
 func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
 	require := require.New(t)
 
-	db, err := merkledb.New(
-		context.Background(),
-		memdb.New(),
-		newDefaultDBConfig(),
-		"",
-	)
+	db, err := merkledb.New(context.Background(), memdb.New(), newDefaultDBConfig())
 	require.NoError(err)
 	require.NoError(db.Put([]byte{0x11}, []byte{1}))
 	require.NoError(db.Put([]byte{0x11, 0x11}, []byte{2}))
@@ -327,12 +297,7 @@ func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
 func Test_Sync_FindNextKey_BranchInReceived(t *testing.T) {
 	require := require.New(t)
 
-	db, err := merkledb.New(
-		context.Background(),
-		memdb.New(),
-		newDefaultDBConfig(),
-		"",
-	)
+	db, err := merkledb.New(context.Background(), memdb.New(), newDefaultDBConfig())
 	require.NoError(err)
 	require.NoError(db.Put([]byte{0x11}, []byte{1}))
 	require.NoError(db.Put([]byte{0x12}, []byte{2}))
@@ -373,12 +338,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 	syncRoot, err := dbToSync.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	db, err := merkledb.New(
-		context.Background(),
-		memdb.New(),
-		newDefaultDBConfig(),
-		"",
-	)
+	db, err := merkledb.New(context.Background(), memdb.New(), newDefaultDBConfig())
 	require.NoError(err)
 
 	ctx := context.Background()
@@ -436,12 +396,7 @@ func TestFindNextKeyEmptyEndProof(t *testing.T) {
 	t.Logf("seed: %d", now)
 	r := rand.New(rand.NewSource(now)) // #nosec G404
 
-	db, err := merkledb.New(
-		context.Background(),
-		memdb.New(),
-		newDefaultDBConfig(),
-		"",
-	)
+	db, err := merkledb.New(context.Background(), memdb.New(), newDefaultDBConfig())
 	require.NoError(err)
 
 	ctx := context.Background()
@@ -506,12 +461,7 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 	syncRoot, err := dbToSync.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	db, err := merkledb.New(
-		context.Background(),
-		memdb.New(),
-		newDefaultDBConfig(),
-		"",
-	)
+	db, err := merkledb.New(context.Background(), memdb.New(), newDefaultDBConfig())
 	require.NoError(err)
 
 	ctx := context.Background()
@@ -557,21 +507,11 @@ func TestFindNextKeyRandom(t *testing.T) {
 	require := require.New(t)
 
 	// Create a "remote" database and "local" database
-	remoteDB, err := merkledb.New(
-		context.Background(),
-		memdb.New(),
-		newDefaultDBConfig(),
-		"",
-	)
+	remoteDB, err := merkledb.New(context.Background(), memdb.New(), newDefaultDBConfig())
 	require.NoError(err)
 
 	config := newDefaultDBConfig()
-	localDB, err := merkledb.New(
-		context.Background(),
-		memdb.New(),
-		config,
-		"",
-	)
+	localDB, err := merkledb.New(context.Background(), memdb.New(), config)
 	require.NoError(err)
 
 	var (
@@ -945,12 +885,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			syncRoot, err := dbToSync.GetMerkleRoot(ctx)
 			require.NoError(err)
 
-			db, err := merkledb.New(
-				ctx,
-				memdb.New(),
-				newDefaultDBConfig(),
-				"",
-			)
+			db, err := merkledb.New(ctx, memdb.New(), newDefaultDBConfig())
 			require.NoError(err)
 
 			var (
@@ -1034,12 +969,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	syncRoot, err := dbToSync.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	db, err := merkledb.New(
-		context.Background(),
-		memdb.New(),
-		newDefaultDBConfig(),
-		"",
-	)
+	db, err := merkledb.New(context.Background(), memdb.New(), newDefaultDBConfig())
 	require.NoError(err)
 
 	ctx := context.Background()
@@ -1132,12 +1062,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	secondSyncRoot, err := dbToSync.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	db, err := merkledb.New(
-		context.Background(),
-		memdb.New(),
-		newDefaultDBConfig(),
-		"",
-	)
+	db, err := merkledb.New(context.Background(), memdb.New(), newDefaultDBConfig())
 	require.NoError(err)
 
 	// Only let one response go through until we update the root.
@@ -1195,12 +1120,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	require := require.New(t)
 
-	db, err := merkledb.New(
-		context.Background(),
-		memdb.New(),
-		newDefaultDBConfig(),
-		"",
-	)
+	db, err := merkledb.New(context.Background(), memdb.New(), newDefaultDBConfig())
 	require.NoError(err)
 	ctx := context.Background()
 	m, err := NewManager(ManagerConfig{
@@ -1253,12 +1173,7 @@ func generateTrie(t *testing.T, r *rand.Rand, count int) (merkledb.MerkleDB, err
 func generateTrieWithMinKeyLen(t *testing.T, r *rand.Rand, count int, minKeyLen int) (merkledb.MerkleDB, error) {
 	require := require.New(t)
 
-	db, err := merkledb.New(
-		context.Background(),
-		memdb.New(),
-		newDefaultDBConfig(),
-		"",
-	)
+	db, err := merkledb.New(context.Background(), memdb.New(), newDefaultDBConfig())
 	if err != nil {
 		return nil, err
 	}

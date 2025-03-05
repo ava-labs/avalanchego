@@ -5,6 +5,7 @@ package merkledb
 
 import (
 	"errors"
+	"strings"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -93,11 +94,22 @@ type prometheusMetrics struct {
 	lookup *prometheus.CounterVec
 }
 
-func newMetrics(namespace string, reg prometheus.Registerer) (metrics, error) {
+func getMetricsNamespace(prefix string, namespace string) string {
+	if prefix == "" {
+		return namespace
+	}
+
+	return strings.Join([]string{prefix, namespace}, "_")
+}
+
+func newMetrics(prefix string, reg prometheus.Registerer) (metrics, error) {
 	// TODO: Should we instead return an error if reg is nil?
 	if reg == nil {
 		return &mockMetrics{}, nil
 	}
+
+	namespace := getMetricsNamespace(prefix, "merkledb")
+
 	m := prometheusMetrics{
 		hashes: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
