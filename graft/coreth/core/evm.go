@@ -54,7 +54,7 @@ type hooks struct{}
 // It allows for the modification of the EVM arguments before the EVM is created.
 // Specifically, we set Random to be the same as Difficulty since Shanghai.
 // This allows using the same jump table as upstream.
-// Then we set Difficulty to nil as it is post Merge in upstream.
+// Then we set Difficulty to 0 as it is post Merge in upstream.
 // Additionally we wrap the StateDB with the appropriate StateDB wrapper,
 // which is used in coreth to process historical pre-AP1 blocks with the
 // GetCommittedState method as it was historically.
@@ -65,7 +65,7 @@ func (hooks) OverrideNewEVMArgs(args *vm.NewEVMArgs) *vm.NewEVMArgs {
 	if rules.IsShanghai {
 		args.BlockContext.Random = new(common.Hash)
 		args.BlockContext.Random.SetBytes(args.BlockContext.Difficulty.Bytes())
-		args.BlockContext.Difficulty = nil
+		args.BlockContext.Difficulty = new(big.Int)
 	}
 
 	return args
