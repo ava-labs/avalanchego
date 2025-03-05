@@ -31,14 +31,14 @@ func WriteSyncRoot(db ethdb.KeyValueWriter, root common.Hash) error {
 	return db.Put(syncRootKey, root[:])
 }
 
-// AddCodeToFetch adds a marker that we need to fetch the code for [hash].
+// AddCodeToFetch adds a marker that we need to fetch the code for `hash`.
 func AddCodeToFetch(db ethdb.KeyValueWriter, hash common.Hash) {
 	if err := db.Put(codeToFetchKey(hash), nil); err != nil {
 		log.Crit("Failed to put code to fetch", "codeHash", hash, "err", err)
 	}
 }
 
-// DeleteCodeToFetch removes the marker that the code corresponding to [hash] needs to be fetched.
+// DeleteCodeToFetch removes the marker that the code corresponding to `hash` needs to be fetched.
 func DeleteCodeToFetch(db ethdb.KeyValueWriter, hash common.Hash) {
 	if err := db.Delete(codeToFetchKey(hash)); err != nil {
 		log.Crit("Failed to delete code to fetch", "codeHash", hash, "err", err)
@@ -86,12 +86,12 @@ func ClearSyncSegments(db ethdb.KeyValueStore, root common.Hash) error {
 	segmentsPrefix := make([]byte, len(syncSegmentsPrefix)+common.HashLength)
 	copy(segmentsPrefix, syncSegmentsPrefix)
 	copy(segmentsPrefix[len(syncSegmentsPrefix):], root[:])
-	return ClearPrefix(db, segmentsPrefix, syncSegmentsKeyLength)
+	return clearPrefix(db, segmentsPrefix, syncSegmentsKeyLength)
 }
 
 // ClearAllSyncSegments removes all segment markers from db
 func ClearAllSyncSegments(db ethdb.KeyValueStore) error {
-	return ClearPrefix(db, syncSegmentsPrefix, syncSegmentsKeyLength)
+	return clearPrefix(db, syncSegmentsPrefix, syncSegmentsKeyLength)
 }
 
 // UnpackSyncSegmentKey returns the root and start position for a trie segment
@@ -130,12 +130,12 @@ func ClearSyncStorageTrie(db ethdb.KeyValueStore, root common.Hash) error {
 	accountsPrefix := make([]byte, len(syncStorageTriesPrefix)+common.HashLength)
 	copy(accountsPrefix, syncStorageTriesPrefix)
 	copy(accountsPrefix[len(syncStorageTriesPrefix):], root[:])
-	return ClearPrefix(db, accountsPrefix, syncStorageTriesKeyLength)
+	return clearPrefix(db, accountsPrefix, syncStorageTriesKeyLength)
 }
 
 // ClearAllSyncStorageTries removes all storage tries added for syncing from db
 func ClearAllSyncStorageTries(db ethdb.KeyValueStore) error {
-	return ClearPrefix(db, syncStorageTriesPrefix, syncStorageTriesKeyLength)
+	return clearPrefix(db, syncStorageTriesPrefix, syncStorageTriesKeyLength)
 }
 
 // UnpackSyncStorageTrieKey returns the root and account for a storage trie
@@ -156,7 +156,7 @@ func packSyncStorageTrieKey(root common.Hash, account common.Hash) []byte {
 	return bytes
 }
 
-// WriteSyncPerformed logs an entry in [db] indicating the VM state synced to [blockNumber].
+// WriteSyncPerformed logs an entry in `db` indicating the VM state synced to `blockNumber`.
 func WriteSyncPerformed(db ethdb.KeyValueWriter, blockNumber uint64) error {
 	syncPerformedPrefixLen := len(syncPerformedPrefix)
 	bytes := make([]byte, syncPerformedPrefixLen+wrappers.LongLen)
@@ -190,4 +190,32 @@ func GetLatestSyncPerformed(db ethdb.Iteratee) uint64 {
 		}
 	}
 	return latestSyncPerformed
+}
+
+// clearPrefix removes all keys in db that begin with prefix and match an
+// expected key length. `keyLen` must include the length of the prefix.
+func clearPrefix(db ethdb.KeyValueStore, prefix []byte, keyLen int) error {
+	it := db.NewIterator(prefix, nil)
+	defer it.Release()
+
+	batch := db.NewBatch()
+	for it.Next() {
+		key := common.CopyBytes(it.Key())
+		if len(key) != keyLen {
+			continue
+		}
+		if err := batch.Delete(key); err != nil {
+			return err
+		}
+		if batch.ValueSize() > ethdb.IdealBatchSize {
+			if err := batch.Write(); err != nil {
+				return err
+			}
+			batch.Reset()
+		}
+	}
+	if err := it.Error(); err != nil {
+		return err
+	}
+	return batch.Write()
 }
