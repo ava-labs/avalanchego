@@ -50,7 +50,6 @@ runs:
         github_access_token: ${{ inputs.github_token }}
     - run: nix develop --command echo "dependencies installed"
       shell: bash
-    # TODO(marun) Stop emitting this annotation so that any annotation that appears can be assumed to be actionable
     - name: Notify of metrics availability
       if: (inputs.prometheus_username != '')
       shell: bash
