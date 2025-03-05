@@ -43,46 +43,15 @@ const (
 )
 
 var (
-	_ Builder = (*builder)(nil)
-
 	ErrEndOfTime                 = errors.New("program time is suspiciously far in the future")
 	ErrNoPendingBlocks           = errors.New("no pending blocks")
 	errMissingPreferredState     = errors.New("missing preferred block state")
 	errCalculatingNextStakerTime = errors.New("failed calculating next staker time")
 )
 
-type Builder interface {
-	smblock.BuildBlockWithContextChainVM
-	mempool.Mempool
-
-	// StartBlockTimer starts to issue block creation requests to advance the
-	// chain timestamp.
-	StartBlockTimer()
-
-	// ResetBlockTimer forces the block timer to recalculate when it should
-	// advance the chain timestamp.
-	ResetBlockTimer()
-
-	// ShutdownBlockTimer stops block creation requests to advance the chain
-	// timestamp.
-	//
-	// Invariant: Assumes the context lock is held when calling.
-	ShutdownBlockTimer()
-
-	// BuildBlock can be called to attempt to create a new block
-	BuildBlock(context.Context) (snowman.Block, error)
-
-	// PackAllBlockTxs returns an array of all txs that could be packed into a
-	// valid block of infinite size. The returned txs are all verified against
-	// the preferred state.
-	//
-	// Note: This function does not call the consensus engine.
-	PackAllBlockTxs() ([]*txs.Tx, error)
-}
-
-// builder implements a simple builder to convert txs into valid blocks
-type builder struct {
-	mempool.Mempool
+// Builder implements a simple Builder to convert txs into valid blocks
+type Builder struct {
+	*mempool.Mempool
 
 	txExecutorBackend *txexecutor.Backend
 	blkManager        blockexecutor.Manager
@@ -95,11 +64,11 @@ type builder struct {
 }
 
 func New(
-	mempool mempool.Mempool,
+	mempool *mempool.Mempool,
 	txExecutorBackend *txexecutor.Backend,
 	blkManager blockexecutor.Manager,
-) Builder {
-	return &builder{
+) *Builder {
+	return &Builder{
 		Mempool:           mempool,
 		txExecutorBackend: txExecutorBackend,
 		blkManager:        blkManager,
@@ -108,7 +77,9 @@ func New(
 	}
 }
 
-func (b *builder) StartBlockTimer() {
+// StartBlockTimer starts to issue block creation requests to advance the
+// chain timestamp.
+func (b *Builder) StartBlockTimer() {
 	go func() {
 		timer := time.NewTimer(0)
 		defer timer.Stop()
@@ -160,7 +131,7 @@ func (b *builder) StartBlockTimer() {
 	}()
 }
 
-func (b *builder) durationToSleep() (time.Duration, error) {
+func (b *Builder) durationToSleep() (time.Duration, error) {
 	// Grabbing the lock here enforces that this function is not called mid-way
 	// through modifying of the state.
 	b.txExecutorBackend.Ctx.Lock.Lock()
@@ -196,7 +167,9 @@ func (b *builder) durationToSleep() (time.Duration, error) {
 	return nextStakerChangeTime.Sub(now), nil
 }
 
-func (b *builder) ResetBlockTimer() {
+// ResetBlockTimer forces the block timer to recalculate when it should
+// advance the chain timestamp.
+func (b *Builder) ResetBlockTimer() {
 	// Ensure that the timer will be reset at least once.
 	select {
 	case b.resetTimer <- struct{}{}:
@@ -204,13 +177,18 @@ func (b *builder) ResetBlockTimer() {
 	}
 }
 
-func (b *builder) ShutdownBlockTimer() {
+// ShutdownBlockTimer stops block creation requests to advance the chain
+// timestamp.
+//
+// Invariant: Assumes the context lock is held when calling.
+func (b *Builder) ShutdownBlockTimer() {
 	b.closeOnce.Do(func() {
 		close(b.closed)
 	})
 }
 
-func (b *builder) BuildBlock(ctx context.Context) (snowman.Block, error) {
+// BuildBlock can be called to attempt to create a new block
+func (b *Builder) BuildBlock(ctx context.Context) (snowman.Block, error) {
 	return b.BuildBlockWithContext(
 		ctx,
 		&smblock.Context{
@@ -219,7 +197,7 @@ func (b *builder) BuildBlock(ctx context.Context) (snowman.Block, error) {
 	)
 }
 
-func (b *builder) BuildBlockWithContext(
+func (b *Builder) BuildBlockWithContext(
 	ctx context.Context,
 	blockContext *smblock.Context,
 ) (snowman.Block, error) {
@@ -267,7 +245,12 @@ func (b *builder) BuildBlockWithContext(
 	return b.blkManager.NewBlock(statelessBlk), nil
 }
 
-func (b *builder) PackAllBlockTxs() ([]*txs.Tx, error) {
+// PackAllBlockTxs returns an array of all txs that could be packed into a
+// valid block of infinite size. The returned txs are all verified against
+// the preferred state.
+//
+// Note: This function does not call the consensus engine.
+func (b *Builder) PackAllBlockTxs() ([]*txs.Tx, error) {
 	preferredID := b.blkManager.Preferred()
 	preferredState, ok := b.blkManager.GetState(preferredID)
 	if !ok {
@@ -317,7 +300,7 @@ func (b *builder) PackAllBlockTxs() ([]*txs.Tx, error) {
 // [timestamp] is min(max(now, parent timestamp), next staker change time)
 func buildBlock(
 	ctx context.Context,
-	builder *builder,
+	builder *Builder,
 	parentID ids.ID,
 	height uint64,
 	timestamp time.Time,
@@ -402,7 +385,7 @@ func packDurangoBlockTxs(
 	ctx context.Context,
 	parentID ids.ID,
 	parentState state.Chain,
-	mempool mempool.Mempool,
+	mempool *mempool.Mempool,
 	backend *txexecutor.Backend,
 	manager blockexecutor.Manager,
 	timestamp time.Time,
@@ -443,7 +426,7 @@ func packDurangoBlockTxs(
 			pChainHeight,
 			&inputs,
 			feeCalculator,
-			tx,
+			tx.Tx,
 		)
 		if err != nil {
 			return nil, err
@@ -453,7 +436,7 @@ func packDurangoBlockTxs(
 		}
 
 		remainingSize -= txSize
-		blockTxs = append(blockTxs, tx)
+		blockTxs = append(blockTxs, tx.Tx)
 	}
 
 	return blockTxs, nil
@@ -463,7 +446,7 @@ func packEtnaBlockTxs(
 	ctx context.Context,
 	parentID ids.ID,
 	parentState state.Chain,
-	mempool mempool.Mempool,
+	mempool *mempool.Mempool,
 	backend *txexecutor.Backend,
 	manager blockexecutor.Manager,
 	timestamp time.Time,
@@ -511,11 +494,7 @@ func packEtnaBlockTxs(
 			break
 		}
 
-		txComplexity, err := fee.TxComplexity(tx.Unsigned)
-		if err != nil {
-			return nil, err
-		}
-		newBlockComplexity, err := blockComplexity.Add(&txComplexity)
+		newBlockComplexity, err := blockComplexity.Add(&tx.Complexity)
 		if err != nil {
 			return nil, err
 		}
@@ -543,7 +522,7 @@ func packEtnaBlockTxs(
 			pChainHeight,
 			&inputs,
 			feeCalculator,
-			tx,
+			tx.Tx,
 		)
 		if err != nil {
 			return nil, err
@@ -553,7 +532,7 @@ func packEtnaBlockTxs(
 		}
 
 		blockComplexity = newBlockComplexity
-		blockTxs = append(blockTxs, tx)
+		blockTxs = append(blockTxs, tx.Tx)
 	}
 
 	return blockTxs, nil
@@ -563,7 +542,7 @@ func executeTx(
 	ctx context.Context,
 	parentID ids.ID,
 	stateDiff state.Diff,
-	mempool mempool.Mempool,
+	mempool *mempool.Mempool,
 	backend *txexecutor.Backend,
 	manager blockexecutor.Manager,
 	pChainHeight uint64,
