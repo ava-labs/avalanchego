@@ -1,5 +1,27 @@
 # Release Notes
 
+## [v1.12.3](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.3)
+
+This version is backwards compatible to [v1.12.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0). It is optional, but encouraged.
+
+The plugin version is unchanged at `39` and is compatible with version `v1.12.2`.
+
+**This release does not support Ubuntu 20.04 as it is reaching the end of its support period. Any nodes still using Ubuntu 20.04 should update to at least Ubuntu 22.04.**
+
+### APIs
+
+- Added ProposerVM block timestamp metrics: `avalanche_proposervm_last_accepted_timestamp`
+
+### Configs
+
+- Added `--proposervm-min-block-duration`
+
+### What's Changed
+
+### New Contributors
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.12.2...v1.12.3
+
 ## [v1.12.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.2)
 
 This version is backwards compatible to [v1.12.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0). It is optional, but encouraged.
