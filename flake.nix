@@ -42,6 +42,9 @@
             kind                                       # Kubernetes-in-Docker
             kubernetes-helm                            # Helm CLI (Kubernetes package manager)
             self.packages.${system}.kind-with-registry # Script installing kind configured with a local registry
+
+            # macOS-specific frameworks
+            darwin.apple_sdk.frameworks.Security
           ];
         };
       });
