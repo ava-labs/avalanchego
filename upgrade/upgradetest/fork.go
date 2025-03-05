@@ -17,9 +17,9 @@ const (
 	Cortina
 	Durango
 	Etna
-	FUpgrade
+	Fortuna
 
-	Latest = Etna
+	Latest = Fortuna
 )
 
 // Fork is an enum of all the major network upgrades.
@@ -27,8 +27,8 @@ type Fork int
 
 func (f Fork) String() string {
 	switch f {
-	case FUpgrade:
-		return "FUpgrade"
+	case Fortuna:
+		return "Fortuna"
 	case Etna:
 		return "Etna"
 	case Durango:
