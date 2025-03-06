@@ -27,10 +27,10 @@ import (
 var (
 	_ block.Visitor = (*verifier)(nil)
 
-	ErrConflictingBlockTxs = errors.New("block contains conflicting transactions")
+	ErrConflictingBlockTxs         = errors.New("block contains conflicting transactions")
+	ErrStandardBlockWithoutChanges = errors.New("BanffStandardBlock performs no state changes")
 
 	errApricotBlockIssuedAfterFork           = errors.New("apricot block issued after fork")
-	errBanffStandardBlockWithoutChanges      = errors.New("BanffStandardBlock performs no state changes")
 	errIncorrectBlockHeight                  = errors.New("incorrect block height")
 	errOptionBlockTimestampNotMatchingParent = errors.New("option block proposed timestamp not matching parent block one")
 )
@@ -130,27 +130,13 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 	}
 
 	feeCalculator := state.PickFeeCalculator(v.txExecutorBackend.Config, onAcceptState)
-	lowBalanceL1ValidatorsEvicted, err := v.standardBlock(
+	return v.standardBlock(
 		b,
 		b.Transactions,
 		feeCalculator,
 		onAcceptState,
+		changed,
 	)
-	if err != nil {
-		return err
-	}
-
-	// Verify that the block performs changes. If it does not, it never should
-	// have been issued. Prior to the F upgrade, evicting L1 validators that
-	// don't have enough balance for the next second is not considered a change.
-	// After the F upgrade, it is.
-	if !changed &&
-		len(b.Transactions) == 0 &&
-		(!v.txExecutorBackend.Config.UpgradeConfig.IsFortunaActivated(b.Timestamp()) || !lowBalanceL1ValidatorsEvicted) {
-		return errBanffStandardBlockWithoutChanges
-	}
-
-	return nil
 }
 
 func (v *verifier) ApricotAbortBlock(b *block.ApricotAbortBlock) error {
@@ -209,13 +195,13 @@ func (v *verifier) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
 	}
 
 	feeCalculator := txfee.NewSimpleCalculator(0)
-	_, err = v.standardBlock(
+	return v.standardBlock(
 		b,
 		b.Transactions,
 		feeCalculator,
 		onAcceptState,
+		true,
 	)
-	return err
 }
 
 func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
@@ -474,7 +460,8 @@ func (v *verifier) standardBlock(
 	txs []*txs.Tx,
 	feeCalculator txfee.Calculator,
 	onAcceptState state.Diff,
-) (bool, error) {
+	changed bool,
+) error {
 	inputs, atomicRequests, onAcceptFunc, gasConsumed, lowBalanceL1ValidatorsEvicted, err := v.processStandardTxs(
 		txs,
 		feeCalculator,
@@ -482,7 +469,18 @@ func (v *verifier) standardBlock(
 		b.Parent(),
 	)
 	if err != nil {
-		return false, err
+		return err
+	}
+
+	// Verify that the block performs changes. If it does not, it never should
+	// have been issued. Prior to Fortuna, evicting L1 validators that don't
+	// have enough balance for the next second is not considered a change. After
+	// Fortuna, it is.
+	timestamp := onAcceptState.GetTimestamp()
+	if !changed &&
+		len(txs) == 0 &&
+		(!v.txExecutorBackend.Config.UpgradeConfig.IsFortunaActivated(timestamp) || !lowBalanceL1ValidatorsEvicted) {
+		return ErrStandardBlockWithoutChanges
 	}
 
 	v.Mempool.Remove(txs...)
@@ -494,7 +492,7 @@ func (v *verifier) standardBlock(
 		onAcceptState: onAcceptState,
 		onAcceptFunc:  onAcceptFunc,
 
-		timestamp:       onAcceptState.GetTimestamp(),
+		timestamp:       timestamp,
 		inputs:          inputs,
 		atomicRequests:  atomicRequests,
 		verifiedHeights: set.Of(v.pChainHeight),
@@ -505,7 +503,7 @@ func (v *verifier) standardBlock(
 			gasConsumed,
 		),
 	}
-	return lowBalanceL1ValidatorsEvicted, nil
+	return nil
 }
 
 func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator txfee.Calculator, diff state.Diff, parentID ids.ID) (

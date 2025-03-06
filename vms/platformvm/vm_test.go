@@ -109,7 +109,7 @@ var (
 	defaultValidatorFeeConfig = fee.Config{
 		Capacity:                 100,
 		Target:                   50,
-		MinPrice:                 1,
+		MinPrice:                 2,
 		ExcessConversionConstant: 100,
 	}
 
