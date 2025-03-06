@@ -6,7 +6,6 @@ package executor
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
@@ -496,9 +495,8 @@ func (v *verifier) standardBlock(
 		timestamp = onAcceptState.GetTimestamp()
 		isFortuna = v.txExecutorBackend.Config.UpgradeConfig.IsFortunaActivated(timestamp)
 
-		fujiTimeToEnforceOnlyPreFortunaChanges = time.Date(2025, time.March, 6, 19, 0, 0, 0, time.UTC) // 2PM ET
-		allowFortunaChangesPreActivation       = v.ctx.NetworkID == constants.FujiID && timestamp.Before(fujiTimeToEnforceOnlyPreFortunaChanges)
-		allowPostFortunaChanges                = isFortuna || allowFortunaChangesPreActivation
+		allowFortunaChangesPreActivation = v.ctx.NetworkID == constants.FujiID
+		allowPostFortunaChanges          = isFortuna || allowFortunaChangesPreActivation
 
 		hasChanges = hasPreFortunaChanges || (allowPostFortunaChanges && lowBalanceL1ValidatorsEvicted)
 	)
