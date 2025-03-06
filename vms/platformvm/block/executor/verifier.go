@@ -495,10 +495,10 @@ func (v *verifier) standardBlock(
 		timestamp = onAcceptState.GetTimestamp()
 		isFortuna = v.txExecutorBackend.Config.UpgradeConfig.IsFortunaActivated(timestamp)
 
-		allowFortunaChangesPreActivation = v.ctx.NetworkID == constants.FujiID
-		allowPostFortunaChanges          = isFortuna || allowFortunaChangesPreActivation
+		checkFortunaChangesPreActivation = v.ctx.NetworkID == constants.FujiID
+		checkPostFortunaChanges          = isFortuna || checkFortunaChangesPreActivation
 
-		hasChanges = hasPreFortunaChanges || (allowPostFortunaChanges && lowBalanceL1ValidatorsEvicted)
+		hasChanges = hasPreFortunaChanges || (checkPostFortunaChanges && lowBalanceL1ValidatorsEvicted)
 	)
 	if !hasChanges {
 		return ErrStandardBlockWithoutChanges
