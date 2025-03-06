@@ -8,9 +8,9 @@ use crate::v2::api;
 use futures::{StreamExt, TryStreamExt};
 use metrics::counter;
 use std::collections::HashSet;
-use std::fmt::Debug;
+use std::fmt::{Debug, Write};
 use std::future::ready;
-use std::io::Write;
+use std::io::Error;
 use std::iter::once;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
@@ -20,26 +20,12 @@ use storage::{
     TrieReader, ValueDigest,
 };
 
-use thiserror::Error;
-
 /// Keys are boxed u8 slices
 pub type Key = Box<[u8]>;
 
 /// Values are vectors
 /// TODO: change to Box<[u8]>
 pub type Value = Vec<u8>;
-
-#[derive(Debug, Error)]
-/// Errors that can occur when interacting with the Merkle trie
-pub enum MerkleError {
-    /// Can't generate proof for empty node
-    #[error("can't generate proof for empty node")]
-    Empty,
-
-    /// IO error
-    #[error("IO error: {0:?}")]
-    IO(#[from] std::io::Error),
-}
 
 // convert a set of nibbles into a printable string
 // panics if there is a non-nibble byte in the set
@@ -67,20 +53,21 @@ macro_rules! write_attributes {
                 $writer,
                 " pp={}",
                 nibbles_formatter($node.partial_path.0.clone())
-            )?;
+            )
+            .map_err(|e| Error::other(e))?;
         }
         #[allow(clippy::unnecessary_to_owned)]
         if !$value.is_empty() {
             match std::str::from_utf8($value) {
                 Ok(string) if string.chars().all(char::is_alphanumeric) => {
-                    write!($writer, " val={}", string)?
+                    write!($writer, " val={}", string).map_err(|e| Error::other(e))?
                 }
                 _ => {
                     let hex = hex::encode($value);
                     if hex.len() > 6 {
-                        write!($writer, " val={:.6}...", hex)?;
+                        write!($writer, " val={:.6}...", hex).map_err(|e| Error::other(e))?;
                     } else {
-                        write!($writer, " val={}", hex)?;
+                        write!($writer, " val={}", hex).map_err(|e| Error::other(e))?;
                     }
                 }
             }
@@ -93,7 +80,7 @@ fn get_helper<T: TrieReader>(
     nodestore: &T,
     node: &Node,
     key: &[u8],
-) -> Result<Option<SharedNode>, MerkleError> {
+) -> Result<Option<SharedNode>, Error> {
     // 4 possibilities for the position of the `key` relative to `node`:
     // 1. The node is at `key`
     // 2. The key is above the node (i.e. its ancestor)
@@ -161,15 +148,15 @@ impl<T: TrieReader> Merkle<T> {
         &self.nodestore
     }
 
-    fn read_node(&self, addr: LinearAddress) -> Result<SharedNode, MerkleError> {
-        self.nodestore.read_node(addr).map_err(Into::into)
+    fn read_node(&self, addr: LinearAddress) -> Result<SharedNode, Error> {
+        self.nodestore.read_node(addr)
     }
 
     /// Returns a proof that the given key has a certain value,
     /// or that the key isn't in the trie.
-    pub fn prove(&self, key: &[u8]) -> Result<Proof<ProofNode>, MerkleError> {
+    pub fn prove(&self, key: &[u8]) -> Result<Proof<ProofNode>, ProofError> {
         let Some(root) = self.root() else {
-            return Err(MerkleError::Empty);
+            return Err(ProofError::Empty);
         };
 
         // Get the path to the key
@@ -218,10 +205,7 @@ impl<T: TrieReader> Merkle<T> {
         todo!()
     }
 
-    pub(crate) fn path_iter<'a>(
-        &self,
-        key: &'a [u8],
-    ) -> Result<PathIterator<'_, 'a, T>, MerkleError> {
+    pub(crate) fn path_iter<'a>(&self, key: &'a [u8]) -> Result<PathIterator<'_, 'a, T>, Error> {
         PathIterator::new(&self.nodestore, key)
     }
 
@@ -328,14 +312,14 @@ impl<T: TrieReader> Merkle<T> {
         })
     }
 
-    pub(crate) fn get_value(&self, key: &[u8]) -> Result<Option<Box<[u8]>>, MerkleError> {
+    pub(crate) fn get_value(&self, key: &[u8]) -> Result<Option<Box<[u8]>>, Error> {
         let Some(node) = self.get_node(key)? else {
             return Ok(None);
         };
         Ok(node.value().map(|v| v.to_vec().into_boxed_slice()))
     }
 
-    pub(crate) fn get_node(&self, key: &[u8]) -> Result<Option<SharedNode>, MerkleError> {
+    pub(crate) fn get_node(&self, key: &[u8]) -> Result<Option<SharedNode>, Error> {
         let Some(root) = self.root() else {
             return Ok(None);
         };
@@ -352,16 +336,16 @@ impl<T: HashedNodeReader> Merkle<T> {
         hash: Option<&TrieHash>,
         seen: &mut HashSet<LinearAddress>,
         writer: &mut dyn Write,
-    ) -> Result<(), MerkleError> {
-        write!(writer, "  {addr}[label=\"addr:{addr:?}")?;
+    ) -> Result<(), Error> {
+        write!(writer, "  {addr}[label=\"addr:{addr:?}").map_err(Error::other)?;
         if let Some(hash) = hash {
-            write!(writer, " hash:{hash:.6?}...")?;
+            write!(writer, " hash:{hash:.6?}...").map_err(Error::other)?;
         }
 
         match &*self.read_node(addr)? {
             Node::Branch(b) => {
                 write_attributes!(writer, b, &b.value.clone().unwrap_or(Box::from([])));
-                writeln!(writer, "\"]")?;
+                writeln!(writer, "\"]").map_err(Error::other)?;
                 for (childidx, child) in b.children.iter().enumerate() {
                     let (child_addr, child_hash) = match child {
                         None => continue,
@@ -376,32 +360,34 @@ impl<T: HashedNodeReader> Merkle<T> {
                         writeln!(
                             writer,
                             "  {addr} -> {child_addr}[label=\"{childidx} (dup)\" color=red]"
-                        )?;
+                        )
+                        .map_err(Error::other)?;
                     } else {
-                        writeln!(writer, "  {addr} -> {child_addr}[label=\"{childidx}\"]")?;
+                        writeln!(writer, "  {addr} -> {child_addr}[label=\"{childidx}\"]")
+                            .map_err(Error::other)?;
                         self.dump_node(child_addr, child_hash, seen, writer)?;
                     }
                 }
             }
             Node::Leaf(l) => {
                 write_attributes!(writer, l, &l.value);
-                writeln!(writer, "\" shape=rect]")?;
+                writeln!(writer, "\" shape=rect]").map_err(Error::other)?;
             }
         };
         Ok(())
     }
 
-    pub(crate) fn dump(&self) -> Result<String, MerkleError> {
-        let mut result = vec![];
-        writeln!(result, "digraph Merkle {{\n  rankdir=LR;")?;
+    pub(crate) fn dump(&self) -> Result<String, Error> {
+        let mut result = String::new();
+        writeln!(result, "digraph Merkle {{\n  rankdir=LR;").map_err(Error::other)?;
         if let Some((root_addr, root_hash)) = self.nodestore.root_address_and_hash()? {
-            writeln!(result, " root -> {root_addr}")?;
+            writeln!(result, " root -> {root_addr}").map_err(Error::other)?;
             let mut seen = HashSet::new();
             self.dump_node(root_addr, Some(&root_hash), &mut seen, &mut result)?;
         }
-        write!(result, "}}")?;
+        write!(result, "}}").map_err(Error::other)?;
 
-        Ok(String::from_utf8_lossy(&result).to_string())
+        Ok(result)
     }
 }
 
@@ -424,7 +410,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
 
     /// Map `key` to `value` in the trie.
     /// Each element of key is 2 nibbles.
-    pub fn insert(&mut self, key: &[u8], value: Box<[u8]>) -> Result<(), MerkleError> {
+    pub fn insert(&mut self, key: &[u8], value: Box<[u8]>) -> Result<(), Error> {
         let key = Path::from_nibbles_iterator(NibblesIterator::new(key));
 
         let root = self.nodestore.mut_root();
@@ -453,7 +439,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
         mut node: Node,
         key: &[u8],
         value: Box<[u8]>,
-    ) -> Result<Node, MerkleError> {
+    ) -> Result<Node, Error> {
         // 4 possibilities for the position of the `key` relative to `node`:
         // 1. The node is at `key`
         // 2. The key is above the node (i.e. its ancestor)
@@ -585,7 +571,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
     /// Returns the value that was removed, if any.
     /// Otherwise returns `None`.
     /// Each element of `key` is 2 nibbles.
-    pub fn remove(&mut self, key: &[u8]) -> Result<Option<Box<[u8]>>, MerkleError> {
+    pub fn remove(&mut self, key: &[u8]) -> Result<Option<Box<[u8]>>, Error> {
         let key = Path::from_nibbles_iterator(NibblesIterator::new(key));
 
         let root = self.nodestore.mut_root();
@@ -615,7 +601,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
         &mut self,
         mut node: Node,
         key: &[u8],
-    ) -> Result<(Option<Node>, Option<Box<[u8]>>), MerkleError> {
+    ) -> Result<(Option<Node>, Option<Box<[u8]>>), Error> {
         // 4 possibilities for the position of the `key` relative to `node`:
         // 1. The node is at `key`
         // 2. The key is above the node (i.e. its ancestor)
@@ -812,7 +798,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
 
     /// Removes any key-value pairs with keys that have the given `prefix`.
     /// Returns the number of key-value pairs removed.
-    pub fn remove_prefix(&mut self, prefix: &[u8]) -> Result<usize, MerkleError> {
+    pub fn remove_prefix(&mut self, prefix: &[u8]) -> Result<usize, Error> {
         let prefix = Path::from_nibbles_iterator(NibblesIterator::new(prefix));
 
         let root = self.nodestore.mut_root();
@@ -835,7 +821,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
         mut node: Node,
         key: &[u8],
         deleted: &mut usize,
-    ) -> Result<Option<Node>, MerkleError> {
+    ) -> Result<Option<Node>, Error> {
         // 4 possibilities for the position of the `key` relative to `node`:
         // 1. The node is at `key`, in which case we need to delete this node and all its children.
         // 2. The key is above the node (i.e. its ancestor), so the parent needs to be restructured (TODO).
@@ -965,7 +951,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
         &mut self,
         branch: &mut BranchNode,
         deleted: &mut usize,
-    ) -> Result<(), std::io::Error> {
+    ) -> Result<(), Error> {
         if branch.value.is_some() {
             // a KV pair was in the branch itself
             *deleted += 1;
@@ -1295,7 +1281,7 @@ mod tests {
     fn get_empty_proof() {
         let merkle = create_in_memory_merkle().hash();
         let proof = merkle.prove(b"any-key");
-        assert!(matches!(proof.unwrap_err(), MerkleError::Empty));
+        assert!(matches!(proof.unwrap_err(), ProofError::Empty));
     }
 
     #[test]
@@ -1695,7 +1681,7 @@ mod tests {
 
     fn merkle_build_test<K: AsRef<[u8]>, V: AsRef<[u8]>>(
         items: Vec<(K, V)>,
-    ) -> Result<Merkle<NodeStore<MutableProposal, MemStore>>, MerkleError> {
+    ) -> Result<Merkle<NodeStore<MutableProposal, MemStore>>, Error> {
         let nodestore = NodeStore::new_empty_proposal(MemStore::new(vec![]).into());
         let mut merkle = Merkle::from(nodestore);
         for (k, v) in items.iter() {
@@ -1706,7 +1692,7 @@ mod tests {
     }
 
     #[test]
-    fn test_root_hash_simple_insertions() -> Result<(), MerkleError> {
+    fn test_root_hash_simple_insertions() -> Result<(), Error> {
         let items = vec![
             ("do", "verb"),
             ("doe", "reindeer"),
@@ -1750,7 +1736,7 @@ mod tests {
     }
 
     #[test]
-    fn test_root_hash_fuzz_insertions() -> Result<(), MerkleError> {
+    fn test_root_hash_fuzz_insertions() -> Result<(), Error> {
         use rand::rngs::StdRng;
         use rand::{Rng, SeedableRng};
         let rng = std::cell::RefCell::new(StdRng::seed_from_u64(42));
@@ -1815,79 +1801,86 @@ mod tests {
         }
     }
 
+    #[test]
+    #[allow(clippy::unwrap_used)]
+    fn test_root_hash_reversed_deletions() -> Result<(), Error> {
+        use rand::rngs::StdRng;
+        use rand::{Rng, SeedableRng};
+        let rng = std::cell::RefCell::new(StdRng::seed_from_u64(42));
+        let max_len0 = 8;
+        let max_len1 = 4;
+        let keygen = || {
+            let (len0, len1): (usize, usize) = {
+                let mut rng = rng.borrow_mut();
+                (
+                    rng.random_range(1..max_len0 + 1),
+                    rng.random_range(1..max_len1 + 1),
+                )
+            };
+            let key: Vec<u8> = (0..len0)
+                .map(|_| rng.borrow_mut().random_range(0..2))
+                .chain((0..len1).map(|_| rng.borrow_mut().random()))
+                .collect();
+            key
+        };
+
+        for _ in 0..10 {
+            let mut items: Vec<_> = (0..10)
+                .map(|_| keygen())
+                .map(|key| {
+                    let val: Box<[u8]> = (0..8).map(|_| rng.borrow_mut().random()).collect();
+                    (key, val)
+                })
+                .collect();
+
+            items.sort();
+
+            let mut merkle = merkle_build_test(items.clone())?;
+
+            let mut hashes = Vec::new();
+
+            for (k, v) in items.iter() {
+                let root_hash = merkle
+                    .nodestore
+                    .root_address_and_hash()?
+                    .map(|(_, hash)| hash);
+                hashes.push((root_hash, merkle.dump()?));
+                merkle.insert(k, v.clone())?;
+            }
+
+            let mut new_hashes = Vec::new();
+
+            for (k, _) in items.iter().rev() {
+                let before = merkle.dump()?;
+                merkle.remove(k)?;
+                let root_hash = merkle
+                    .nodestore
+                    .root_address_and_hash()?
+                    .map(|(_, hash)| hash);
+                new_hashes.push((root_hash, k, before, merkle.dump()?));
+            }
+
+            hashes.reverse();
+
+            for i in 0..hashes.len() {
+                #[allow(clippy::indexing_slicing)]
+                let (new_hash, key, before_removal, after_removal) = &new_hashes[i];
+                #[allow(clippy::indexing_slicing)]
+                let expected_hash = &hashes[i];
+                let key = key.iter().fold(String::new(), |mut s, b| {
+                    let _ = write!(s, "{:02x}", b);
+                    s
+                });
+                assert_eq!(new_hash.clone(), expected_hash.0, "\n\nkey: {key}\nbefore:\n{before_removal}\nafter:\n{after_removal}\n\nexpected:\n{:?}\n", expected_hash.0);
+            }
+        }
+
+        Ok(())
+    }
+
     // #[test]
     // #[allow(clippy::unwrap_used)]
-    // fn test_root_hash_reversed_deletions() -> Result<(), MerkleError> {
-    //     use rand::rngs::StdRng;
-    //     use rand::{Rng, SeedableRng};
-    //     let rng = std::cell::RefCell::new(StdRng::seed_from_u64(42));
-    //     let max_len0 = 8;
-    //     let max_len1 = 4;
-    //     let keygen = || {
-    //         let (len0, len1): (usize, usize) = {
-    //             let mut rng = rng.borrow_mut();
-    //             (
-    //                 rng.random_range(1..max_len0 + 1),
-    //                 rng.random_range(1..max_len1 + 1),
-    //             )
-    //         };
-    //         let key: Vec<u8> = (0..len0)
-    //             .map(|_| rng.borrow_mut().random_range(0..2))
-    //             .chain((0..len1).map(|_| rng.borrow_mut().random()))
-    //             .collect();
-    //         key
-    //     };
-
-    //     for _ in 0..10 {
-    //         let mut items: Vec<_> = (0..10)
-    //             .map(|_| keygen())
-    //             .map(|key| {
-    //                 let val: Box<[u8]> = (0..8).map(|_| rng.borrow_mut().random()).collect();
-    //                 (key, val)
-    //             })
-    //             .collect();
-
-    //         items.sort();
-
-    //         let mut merkle =
-    //             Merkle::new(HashedNodeStore::initialize(MemStore::new(vec![])).unwrap());
-
-    //         let mut hashes = Vec::new();
-
-    //         for (k, v) in items.iter() {
-    //             hashes.push((merkle.root_hash()?, merkle.dump()?));
-    //             merkle.insert(k, v.clone())?;
-    //         }
-
-    //         let mut new_hashes = Vec::new();
-
-    //         for (k, _) in items.iter().rev() {
-    //             let before = merkle.dump()?;
-    //             merkle.remove(k)?;
-    //             new_hashes.push((merkle.root_hash()?, k, before, merkle.dump()?));
-    //         }
-
-    //         hashes.reverse();
-
-    //         for i in 0..hashes.len() {
-    //             #[allow(clippy::indexing_slicing)]
-    //             let (new_hash, key, before_removal, after_removal) = &new_hashes[i];
-    //             #[allow(clippy::indexing_slicing)]
-    //             let expected_hash = &hashes[i];
-    //             let key = key.iter().fold(String::new(), |mut s, b| {
-    //                 let _ = write!(s, "{:02x}", b);
-    //                 s
-    //             });
-    //             // assert_eq!(new_hash, expected_hash, "\n\nkey: {key}\nbefore:\n{before_removal}\nafter:\n{after_removal}\n\nexpected:\n{expected_dump}\n");
-    //         }
-    //     }
-
-    //     Ok(())
-    // }
-
-    // #[test]
-    // #[allow(clippy::unwrap_used)]
-    // fn test_root_hash_random_deletions() -> Result<(), MerkleError> {
+    // fn test_root_hash_random_deletions() -> Result<(), Error> {
     //     use rand::rngs::StdRng;
     //     use rand::seq::SliceRandom;
     //     use rand::{Rng, SeedableRng};
@@ -1963,7 +1956,7 @@ mod tests {
 
     // #[test]
     // #[allow(clippy::unwrap_used, clippy::indexing_slicing)]
-    // fn test_proof() -> Result<(), MerkleError> {
+    // fn test_proof() -> Result<(), Error> {
     //     let set = fixed_and_pseudorandom_data(500);
     //     let mut items = Vec::from_iter(set.iter());
     //     items.sort();
@@ -1983,7 +1976,7 @@ mod tests {
 
     // #[test]
     // /// Verify the proofs that end with leaf node with the given key.
-    // fn test_proof_end_with_leaf() -> Result<(), MerkleError> {
+    // fn test_proof_end_with_leaf() -> Result<(), Error> {
     //     let items = vec![
     //         ("do", "verb"),
     //         ("doe", "reindeer"),
@@ -2006,7 +1999,7 @@ mod tests {
 
     // #[test]
     // /// Verify the proofs that end with branch node with the given key.
-    // fn test_proof_end_with_branch() -> Result<(), MerkleError> {
+    // fn test_proof_end_with_branch() -> Result<(), Error> {
     //     let items = vec![
     //         ("d", "verb"),
     //         ("do", "verb"),
@@ -2026,7 +2019,7 @@ mod tests {
     // }
 
     // #[test]
-    // fn test_bad_proof() -> Result<(), MerkleError> {
+    // fn test_bad_proof() -> Result<(), Error> {
     //     let set = fixed_and_pseudorandom_data(800);
     //     let mut items = Vec::from_iter(set.iter());
     //     items.sort();
@@ -2049,7 +2042,7 @@ mod tests {
     // #[test]
     // // Tests that missing keys can also be proven. The test explicitly uses a single
     // // entry trie and checks for missing keys both before and after the single entry.
-    // fn test_missing_key_proof() -> Result<(), MerkleError> {
+    // fn test_missing_key_proof() -> Result<(), Error> {
     //     let items = vec![("k", "v")];
     //     let merkle = merkle_build_test(items)?;
     //     for key in ["a", "j", "l", "z"] {
@@ -2065,7 +2058,7 @@ mod tests {
     // }
 
     // #[test]
-    // fn test_empty_tree_proof() -> Result<(), MerkleError> {
+    // fn test_empty_tree_proof() -> Result<(), Error> {
     //     let items: Vec<(&str, &str)> = Vec::new();
     //     let merkle = merkle_build_test(items)?;
     //     let key = "x".as_ref();
@@ -2540,7 +2533,7 @@ mod tests {
     // #[test]
     // // Tests the element is not in the range covered by proofs.
     // #[allow(clippy::indexing_slicing)]
-    // fn test_same_side_proof() -> Result<(), MerkleError> {
+    // fn test_same_side_proof() -> Result<(), Error> {
     //     let set = fixed_and_pseudorandom_data(4096);
     //     let mut items = Vec::from_iter(set.iter());
     //     items.sort();

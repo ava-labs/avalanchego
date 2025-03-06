@@ -4,9 +4,6 @@
 /// The public API
 pub mod api;
 
-/// The database
-pub mod db;
-
 /// The proposal
 pub mod propose;
 

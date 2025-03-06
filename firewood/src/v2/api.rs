@@ -2,8 +2,7 @@
 // See the file LICENSE.md for licensing terms.
 
 use crate::manager::RevisionManagerError;
-use crate::merkle::MerkleError;
-use crate::proof::{Proof, ProofNode};
+use crate::proof::{Proof, ProofError, ProofNode};
 pub use crate::range_proof::RangeProof;
 use async_trait::async_trait;
 use futures::Stream;
@@ -140,9 +139,9 @@ pub enum Error {
     #[error("sibling already committed")]
     SiblingCommitted,
 
-    /// Generic merkle error
-    #[error("merkle error: {0}")]
-    Merkle(#[from] MerkleError),
+    /// Proof error
+    #[error("proof error")]
+    ProofError(#[from] ProofError),
 }
 
 impl From<RevisionManagerError> for Error {

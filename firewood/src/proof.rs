@@ -1,7 +1,6 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use crate::merkle::MerkleError;
 use sha2::{Digest, Sha256};
 use storage::{
     BranchNode, Hashable, NibblesIterator, PathIterItem, Preimage, TrieHash, ValueDigest,
@@ -57,7 +56,7 @@ pub enum ProofError {
 
     /// Error from the merkle package
     #[error("{0:?}")]
-    Merkle(#[from] MerkleError),
+    IO(#[from] std::io::Error),
 
     /// Empty range
     #[error("empty range")]

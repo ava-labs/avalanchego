@@ -1,7 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use crate::merkle::{Key, MerkleError, Value};
+use crate::merkle::{Key, Value};
 use crate::v2::api;
 
 use futures::stream::FusedStream;
@@ -390,7 +390,7 @@ pub struct PathIterator<'a, 'b, T> {
 }
 
 impl<'a, 'b, T: TrieReader> PathIterator<'a, 'b, T> {
-    pub(super) fn new(merkle: &'a T, key: &'b [u8]) -> Result<Self, MerkleError> {
+    pub(super) fn new(merkle: &'a T, key: &'b [u8]) -> Result<Self, std::io::Error> {
         let Some(root) = merkle.root_node() else {
             return Ok(Self {
                 state: PathIteratorState::Exhausted,
@@ -410,7 +410,7 @@ impl<'a, 'b, T: TrieReader> PathIterator<'a, 'b, T> {
 }
 
 impl<T: TrieReader> Iterator for PathIterator<'_, '_, T> {
-    type Item = Result<PathIterItem, MerkleError>;
+    type Item = Result<PathIterItem, std::io::Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         // destructuring is necessary here because we need mutable access to `state`
@@ -483,7 +483,7 @@ impl<T: TrieReader> Iterator for PathIterator<'_, '_, T> {
                                     Some(Child::AddressWithHash(child_addr, _)) => {
                                         let child = match merkle.read_node(*child_addr) {
                                             Ok(child) => child,
-                                            Err(e) => return Some(Err(e.into())),
+                                            Err(e) => return Some(Err(e)),
                                         };
 
                                         let node_key = matched_key.clone().into_boxed_slice();

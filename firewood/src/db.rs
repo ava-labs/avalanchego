@@ -1,7 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use crate::merkle::{Merkle, MerkleError};
+use crate::merkle::Merkle;
 use crate::proof::{Proof, ProofNode};
 use crate::range_proof::RangeProof;
 use crate::stream::MerkleKeyValueStream;
@@ -23,8 +23,6 @@ use typed_builder::TypedBuilder;
 #[non_exhaustive]
 /// Represents the different types of errors that can occur in the database.
 pub enum DbError {
-    /// Merkle error occurred.
-    Merkle(MerkleError),
     /// I/O error occurred.
     IO(std::io::Error),
 }
@@ -32,7 +30,6 @@ pub enum DbError {
 impl fmt::Display for DbError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            DbError::Merkle(e) => write!(f, "merkle error: {e:?}"),
             DbError::IO(e) => write!(f, "I/O error: {e:?}"),
         }
     }
@@ -69,7 +66,7 @@ pub trait DbViewSync {
 impl DbViewSync for HistoricalRev {
     fn val_sync<K: KeyType>(&self, key: K) -> Result<Option<Box<[u8]>>, DbError> {
         let merkle = Merkle::from(self);
-        let value = merkle.get_value(key.as_ref()).map_err(DbError::Merkle)?;
+        let value = merkle.get_value(key.as_ref())?;
         Ok(value)
     }
 }
@@ -312,12 +309,12 @@ impl Db {
     }
 
     /// Dump the Trie of the latest revision.
-    pub async fn dump(&self, w: &mut dyn Write) -> Result<(), DbError> {
+    pub async fn dump(&self, w: &mut dyn Write) -> Result<(), std::io::Error> {
         self.dump_sync(w)
     }
 
     /// Dump the Trie of the latest revision, synchronously.
-    pub fn dump_sync(&self, w: &mut dyn Write) -> Result<(), DbError> {
+    pub fn dump_sync(&self, w: &mut dyn Write) -> Result<(), std::io::Error> {
         let latest_rev_nodestore = self
             .manager
             .read()
@@ -325,8 +322,8 @@ impl Db {
             .current_revision();
         let merkle = Merkle::from(latest_rev_nodestore);
         // TODO: This should be a stream
-        let output = merkle.dump().map_err(DbError::Merkle)?;
-        write!(w, "{}", output).map_err(DbError::IO)
+        let output = merkle.dump()?;
+        write!(w, "{}", output)
     }
 
     /// Get a copy of the database metrics
