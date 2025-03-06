@@ -190,6 +190,7 @@ type Config struct {
 	// Prometheus.
 	// This may be useful for testing.
 	Reg        prometheus.Registerer
+	Namespace  string
 	TraceLevel TraceLevel
 	Tracer     trace.Tracer
 }
@@ -245,7 +246,7 @@ type merkleDB struct {
 
 // New returns a new merkle database.
 func New(ctx context.Context, db database.Database, config Config) (MerkleDB, error) {
-	metrics, err := newMetrics("merkledb", config.Reg)
+	metrics, err := newMetrics(config.Namespace, config.Reg)
 	if err != nil {
 		return nil, err
 	}
