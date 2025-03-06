@@ -107,8 +107,11 @@ var (
 		ExcessConversionConstant: 5_000,
 	}
 	defaultValidatorFeeConfig = fee.Config{
-		Capacity:                 100,
-		Target:                   50,
+		Capacity: 100,
+		Target:   50,
+		// The minimum price is set to 2 so that tests can include cases where
+		// L1 validator balances do not evenly divide into a timestamp granular
+		// to a second.
 		MinPrice:                 2,
 		ExcessConversionConstant: 100,
 	}

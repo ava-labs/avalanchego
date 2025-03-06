@@ -478,7 +478,7 @@ func (v *verifier) standardBlock(
 	// Fortuna, it is.
 	timestamp := onAcceptState.GetTimestamp()
 	isFortuna := v.txExecutorBackend.Config.UpgradeConfig.IsFortunaActivated(timestamp)
-	if hasChanges := changed || len(txs) > 0 || (isFortuna && lowBalanceL1ValidatorsEvicted); !hasChanges { {
+	if hasChanges := changed || len(txs) > 0 || (isFortuna && lowBalanceL1ValidatorsEvicted); !hasChanges {
 		return ErrStandardBlockWithoutChanges
 	}
 
