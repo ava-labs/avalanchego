@@ -246,9 +246,9 @@ func (b *Block) Accept(ctx context.Context) error {
 		return err
 	}
 
-	utxoChecksum, err := b.manager.state.UTXOChecksum(ctx)
+	checksum, err := b.manager.state.Checksum(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get checksums: %w", err)
+		return fmt.Errorf("failed to get checksum: %w", err)
 	}
 
 	b.manager.backend.Ctx.Log.Trace(
@@ -256,7 +256,7 @@ func (b *Block) Accept(ctx context.Context) error {
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", b.Parent()),
-		zap.Stringer("utxoChecksum", utxoChecksum),
+		zap.Stringer("checksum", checksum),
 	)
 	return nil
 }

@@ -92,8 +92,8 @@ type State interface {
 	// pending changes to the base database.
 	CommitBatch() (database.Batch, error)
 
-	// UTXOChecksum returns the current UTXO checksum.
-	UTXOChecksum(ctx context.Context) (ids.ID, error)
+	// Checksum returns the current state checksum.
+	Checksum() ids.ID
 
 	UTXOs() iter.Seq2[*avax.UTXO, error]
 	Txs() iter.Seq2[*txs.Tx, error]
@@ -569,6 +569,6 @@ func (s *state) writeMetadata() error {
 	return nil
 }
 
-func (s *state) UTXOChecksum(context.Context) (ids.ID, error) {
-	return s.utxoState.Checksum(), nil
+func (s *state) Checksum(context.Context) ids.ID {
+	return s.utxoState.Checksum()
 }
