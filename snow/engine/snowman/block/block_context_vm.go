@@ -3,6 +3,8 @@
 
 package block
 
+//go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
+
 import (
 	"context"
 
