@@ -22,7 +22,7 @@ var (
 )
 
 const (
-	canoto__Context__PChainHeight__tag = "\x09" // canoto.Tag(1, canoto.I64)
+	canoto__Context__PChainHeight__tag = "\x08" // canoto.Tag(1, canoto.Varint)
 )
 
 type canotoData_Context struct {
@@ -77,11 +77,11 @@ func (c *Context) UnmarshalCanotoFrom(r canoto.Reader) error {
 
 		switch field {
 		case 1:
-			if wireType != canoto.I64 {
+			if wireType != canoto.Varint {
 				return canoto.ErrUnexpectedWireType
 			}
 
-			if err := canoto.ReadFint64(&r, &c.PChainHeight); err != nil {
+			if err := canoto.ReadInt(&r, &c.PChainHeight); err != nil {
 				return err
 			}
 			if canoto.IsZero(c.PChainHeight) {
@@ -120,7 +120,7 @@ func (c *Context) CalculateCanotoCache() {
 	}
 	c.canotoData.size = 0
 	if !canoto.IsZero(c.PChainHeight) {
-		c.canotoData.size += len(canoto__Context__PChainHeight__tag) + canoto.SizeFint64
+		c.canotoData.size += len(canoto__Context__PChainHeight__tag) + canoto.SizeInt(c.PChainHeight)
 	}
 }
 
@@ -167,7 +167,7 @@ func (c *Context) MarshalCanotoInto(w canoto.Writer) canoto.Writer {
 	}
 	if !canoto.IsZero(c.PChainHeight) {
 		canoto.Append(&w, canoto__Context__PChainHeight__tag)
-		canoto.AppendFint64(&w, c.PChainHeight)
+		canoto.AppendInt(&w, c.PChainHeight)
 	}
 	return w
 }

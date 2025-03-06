@@ -21,7 +21,7 @@ type Context struct {
 	//
 	// Because PreForkBlocks and PostForkOptions do not verify their execution
 	// against the P-chain's state, this context is undefined for those blocks.
-	PChainHeight uint64 `canoto:"fint64,1" json:"pChainHeight"`
+	PChainHeight uint64 `canoto:"int,1" json:"pChainHeight"`
 
 	canotoData canotoData_Context
 }
