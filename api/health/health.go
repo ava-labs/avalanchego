@@ -65,7 +65,7 @@ type health struct {
 	liveness  *worker
 }
 
-func New(log logging.Logger, registerer prometheus.Registerer) (Health, error) {
+func New(log logging.Logger, registerer prometheus.Registerer, reportUnhealthy func(bool)) (Health, error) {
 	failingChecks := prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "checks_failing",
@@ -73,11 +73,12 @@ func New(log logging.Logger, registerer prometheus.Registerer) (Health, error) {
 		},
 		[]string{CheckLabel, TagLabel},
 	)
+
 	return &health{
 		log:       log,
-		readiness: newWorker(log, "readiness", failingChecks),
-		health:    newWorker(log, "health", failingChecks),
-		liveness:  newWorker(log, "liveness", failingChecks),
+		readiness: newWorker(log, "readiness", failingChecks, emptyReport),
+		health:    newWorker(log, "health", failingChecks, reportUnhealthy),
+		liveness:  newWorker(log, "liveness", failingChecks, emptyReport),
 	}, registerer.Register(failingChecks)
 }
 
@@ -136,4 +137,7 @@ func (h *health) Stop() {
 	h.readiness.Stop()
 	h.health.Stop()
 	h.liveness.Stop()
+}
+
+func emptyReport(bool) {
 }
