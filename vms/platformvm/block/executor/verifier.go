@@ -477,9 +477,8 @@ func (v *verifier) standardBlock(
 	// have enough balance for the next second is not considered a change. After
 	// Fortuna, it is.
 	timestamp := onAcceptState.GetTimestamp()
-	if !changed &&
-		len(txs) == 0 &&
-		(!v.txExecutorBackend.Config.UpgradeConfig.IsFortunaActivated(timestamp) || !lowBalanceL1ValidatorsEvicted) {
+	isFortuna := v.txExecutorBackend.Config.UpgradeConfig.IsFortunaActivated(timestamp)
+	if hasChanges := changed || len(txs) > 0 || (isFortuna && lowBalanceL1ValidatorsEvicted); !hasChanges { {
 		return ErrStandardBlockWithoutChanges
 	}
 

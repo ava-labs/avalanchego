@@ -2217,15 +2217,14 @@ func TestL1ValidatorDeactivationCausesTrackingOfInvalidBlock(t *testing.T) {
 	vm.ctx.Lock.Lock()
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
-	vm.clock.Set(time.Now().Add(1 * time.Minute))
+	vm.clock.Set(vm.clock.Time().Add(1 * time.Minute))
 	blk, err := vm.BuildBlock(context.Background())
 	require.NoError(err)
 
-	err = blk.Verify(context.Background())
-	require.ErrorIs(err, blockexecutor.ErrStandardBlockWithoutChanges)
-
-	err = blk.Verify(context.Background())
-	require.ErrorIs(err, blockexecutor.ErrStandardBlockWithoutChanges)
+	for range 2 {
+		err = blk.Verify(context.Background())
+		require.ErrorIs(err, blockexecutor.ErrStandardBlockWithoutChanges)
+	}
 }
 
 func buildAndAcceptStandardBlock(vm *VM) error {
