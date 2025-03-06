@@ -27,10 +27,10 @@ import (
 var (
 	_ block.Visitor = (*verifier)(nil)
 
-	ErrConflictingBlockTxs = errors.New("block contains conflicting transactions")
+	ErrConflictingBlockTxs         = errors.New("block contains conflicting transactions")
+	ErrStandardBlockWithoutChanges = errors.New("BanffStandardBlock performs no state changes")
 
 	errApricotBlockIssuedAfterFork           = errors.New("apricot block issued after fork")
-	errBanffStandardBlockWithoutChanges      = errors.New("BanffStandardBlock performs no state changes")
 	errIncorrectBlockHeight                  = errors.New("incorrect block height")
 	errOptionBlockTimestampNotMatchingParent = errors.New("option block proposed timestamp not matching parent block one")
 )
@@ -46,14 +46,14 @@ func (v *verifier) BanffAbortBlock(b *block.BanffAbortBlock) error {
 	if err := v.banffOptionBlock(b); err != nil {
 		return err
 	}
-	return v.abortBlock(b)
+	return v.abortBlock(b) // Must be the last validity check on the block
 }
 
 func (v *verifier) BanffCommitBlock(b *block.BanffCommitBlock) error {
 	if err := v.banffOptionBlock(b); err != nil {
 		return err
 	}
-	return v.commitBlock(b)
+	return v.commitBlock(b) // Must be the last validity check on the block
 }
 
 func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
@@ -94,7 +94,7 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		return err
 	}
 
-	return v.proposalBlock(
+	return v.proposalBlock( // Must be the last validity check on the block
 		b,
 		b.Tx,
 		onDecisionState,
@@ -130,41 +130,27 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 	}
 
 	feeCalculator := state.PickFeeCalculator(v.txExecutorBackend.Config, onAcceptState)
-	lowBalanceL1ValidatorsEvicted, err := v.standardBlock(
+	return v.standardBlock( // Must be the last validity check on the block
 		b,
 		b.Transactions,
 		feeCalculator,
 		onAcceptState,
+		changed,
 	)
-	if err != nil {
-		return err
-	}
-
-	// Verify that the block performs changes. If it does not, it never should
-	// have been issued. Prior to the F upgrade, evicting L1 validators that
-	// don't have enough balance for the next second is not considered a change.
-	// After the F upgrade, it is.
-	if !changed &&
-		len(b.Transactions) == 0 &&
-		(!v.txExecutorBackend.Config.UpgradeConfig.IsFortunaActivated(b.Timestamp()) || !lowBalanceL1ValidatorsEvicted) {
-		return errBanffStandardBlockWithoutChanges
-	}
-
-	return nil
 }
 
 func (v *verifier) ApricotAbortBlock(b *block.ApricotAbortBlock) error {
 	if err := v.apricotCommonBlock(b); err != nil {
 		return err
 	}
-	return v.abortBlock(b)
+	return v.abortBlock(b) // Must be the last validity check on the block
 }
 
 func (v *verifier) ApricotCommitBlock(b *block.ApricotCommitBlock) error {
 	if err := v.apricotCommonBlock(b); err != nil {
 		return err
 	}
-	return v.commitBlock(b)
+	return v.commitBlock(b) // Must be the last validity check on the block
 }
 
 func (v *verifier) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
@@ -183,7 +169,7 @@ func (v *verifier) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
 	}
 
 	feeCalculator := txfee.NewSimpleCalculator(0)
-	return v.proposalBlock(
+	return v.proposalBlock( // Must be the last validity check on the block
 		b,
 		b.Tx,
 		nil,
@@ -209,13 +195,13 @@ func (v *verifier) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
 	}
 
 	feeCalculator := txfee.NewSimpleCalculator(0)
-	_, err = v.standardBlock(
+	return v.standardBlock( // Must be the last validity check on the block
 		b,
 		b.Transactions,
 		feeCalculator,
 		onAcceptState,
+		true,
 	)
-	return err
 }
 
 func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
@@ -360,7 +346,10 @@ func (v *verifier) commonBlock(b block.Block) error {
 	return nil
 }
 
-// abortBlock populates the state of this block if [nil] is returned
+// abortBlock populates the state of this block if [nil] is returned.
+//
+// Invariant: The call to abortBlock must be the last validity check on the
+// block. If this function returns [nil], the block is cached as valid.
 func (v *verifier) abortBlock(b block.Block) error {
 	parentID := b.Parent()
 	onAbortState, ok := v.getOnAbortState(parentID)
@@ -384,7 +373,10 @@ func (v *verifier) abortBlock(b block.Block) error {
 	return nil
 }
 
-// commitBlock populates the state of this block if [nil] is returned
+// commitBlock populates the state of this block if [nil] is returned.
+//
+// Invariant: The call to commitBlock must be the last validity check on the
+// block. If this function returns [nil], the block is cached as valid.
 func (v *verifier) commitBlock(b block.Block) error {
 	parentID := b.Parent()
 	onCommitState, ok := v.getOnCommitState(parentID)
@@ -408,7 +400,10 @@ func (v *verifier) commitBlock(b block.Block) error {
 	return nil
 }
 
-// proposalBlock populates the state of this block if [nil] is returned
+// proposalBlock populates the state of this block if [nil] is returned.
+//
+// Invariant: The call to proposalBlock must be the last validity check on the
+// block. If this function returns [nil], the block is cached as valid.
 func (v *verifier) proposalBlock(
 	b block.Block,
 	tx *txs.Tx,
@@ -468,13 +463,17 @@ func (v *verifier) proposalBlock(
 	return nil
 }
 
-// standardBlock populates the state of this block if [nil] is returned
+// standardBlock populates the state of this block if [nil] is returned.
+//
+// Invariant: The call to standardBlock must be the last validity check on the
+// block. If this function returns [nil], the block is cached as valid.
 func (v *verifier) standardBlock(
 	b block.Block,
 	txs []*txs.Tx,
 	feeCalculator txfee.Calculator,
 	onAcceptState state.Diff,
-) (bool, error) {
+	changedDuringAdvanceTime bool,
+) error {
 	inputs, atomicRequests, onAcceptFunc, gasConsumed, lowBalanceL1ValidatorsEvicted, err := v.processStandardTxs(
 		txs,
 		feeCalculator,
@@ -482,7 +481,17 @@ func (v *verifier) standardBlock(
 		b.Parent(),
 	)
 	if err != nil {
-		return false, err
+		return err
+	}
+
+	// Verify that the block performs changes. If it does not, it never should
+	// have been issued. Prior to Fortuna, evicting L1 validators that don't
+	// have enough balance for the next second is not considered a change. After
+	// Fortuna, it is.
+	timestamp := onAcceptState.GetTimestamp()
+	isFortuna := v.txExecutorBackend.Config.UpgradeConfig.IsFortunaActivated(timestamp)
+	if hasChanges := changedDuringAdvanceTime || len(txs) > 0 || (isFortuna && lowBalanceL1ValidatorsEvicted); !hasChanges {
+		return ErrStandardBlockWithoutChanges
 	}
 
 	v.Mempool.Remove(txs...)
@@ -494,7 +503,7 @@ func (v *verifier) standardBlock(
 		onAcceptState: onAcceptState,
 		onAcceptFunc:  onAcceptFunc,
 
-		timestamp:       onAcceptState.GetTimestamp(),
+		timestamp:       timestamp,
 		inputs:          inputs,
 		atomicRequests:  atomicRequests,
 		verifiedHeights: set.Of(v.pChainHeight),
@@ -505,7 +514,7 @@ func (v *verifier) standardBlock(
 			gasConsumed,
 		),
 	}
-	return lowBalanceL1ValidatorsEvicted, nil
+	return nil
 }
 
 func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator txfee.Calculator, diff state.Diff, parentID ids.ID) (

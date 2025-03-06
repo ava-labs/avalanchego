@@ -1349,19 +1349,19 @@ func TestDeactivateLowBalanceL1ValidatorBlockChanges(t *testing.T) {
 			name:              "Before F Upgrade - no L1 validators evicted",
 			currentFork:       upgradetest.Etna,
 			durationToAdvance: 0,
-			expectedErr:       errBanffStandardBlockWithoutChanges,
+			expectedErr:       ErrStandardBlockWithoutChanges,
 		},
 		{
 			name:              "After F Upgrade - no L1 validators evicted",
 			currentFork:       upgradetest.Fortuna,
 			durationToAdvance: 0,
-			expectedErr:       errBanffStandardBlockWithoutChanges,
+			expectedErr:       ErrStandardBlockWithoutChanges,
 		},
 		{
 			name:              "Before F Upgrade - L1 validators evicted",
 			currentFork:       upgradetest.Etna,
 			durationToAdvance: time.Second,
-			expectedErr:       errBanffStandardBlockWithoutChanges,
+			expectedErr:       ErrStandardBlockWithoutChanges,
 		},
 		{
 			name:              "After F Upgrade - L1 validators evicted",
