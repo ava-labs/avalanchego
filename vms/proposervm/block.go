@@ -193,7 +193,7 @@ func (p *postForkCommonComponents) buildChild(
 
 	// The child's P-Chain height is proposed as the optimal P-Chain height that
 	// is at least the parent's P-Chain height
-	pChainHeight, err := p.vm.optimalPChainHeight(ctx, parentPChainHeight)
+	pChainHeight, err := p.vm.selectChildPChainHeight(ctx, parentPChainHeight)
 	if err != nil {
 		p.vm.ctx.Log.Error("unexpected build block failure",
 			zap.String("reason", "failed to calculate optimal P-chain height"),
