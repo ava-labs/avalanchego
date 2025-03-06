@@ -109,6 +109,21 @@ func (mr *StateMockRecorder) Blocks() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Blocks", reflect.TypeOf((*State)(nil).Blocks))
 }
 
+// Checksum mocks base method.
+func (m *State) Checksum(ctx context.Context) (ids.ID, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Checksum", ctx)
+	ret0, _ := ret[0].(ids.ID)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Checksum indicates an expected call of Checksum.
+func (mr *StateMockRecorder) Checksum(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Checksum", reflect.TypeOf((*State)(nil).Checksum), ctx)
+}
+
 // Close mocks base method.
 func (m *State) Close() error {
 	m.ctrl.T.Helper()
@@ -331,21 +346,6 @@ func (m *State) Txs() iter.Seq2[*txs.Tx, error] {
 func (mr *StateMockRecorder) Txs() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Txs", reflect.TypeOf((*State)(nil).Txs))
-}
-
-// UTXOChecksum mocks base method.
-func (m *State) UTXOChecksum(ctx context.Context) (ids.ID, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UTXOChecksum", ctx)
-	ret0, _ := ret[0].(ids.ID)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// UTXOChecksum indicates an expected call of UTXOChecksum.
-func (mr *StateMockRecorder) UTXOChecksum(ctx any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UTXOChecksum", reflect.TypeOf((*State)(nil).UTXOChecksum), ctx)
 }
 
 // UTXOIDs mocks base method.

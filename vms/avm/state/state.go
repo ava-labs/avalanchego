@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -93,7 +94,7 @@ type State interface {
 	CommitBatch() (database.Batch, error)
 
 	// Checksum returns the current state checksum.
-	Checksum() ids.ID
+	Checksum(ctx context.Context) (ids.ID, error)
 
 	UTXOs() iter.Seq2[*avax.UTXO, error]
 	Txs() iter.Seq2[*txs.Tx, error]
@@ -155,6 +156,7 @@ func New(
 	blockDB := prefixdb.New(blockPrefix, db)
 	singletonDB := prefixdb.New(singletonPrefix, db)
 	return NewWithFormat(
+		"",
 		db,
 		utxoDB,
 		txDB,
@@ -168,6 +170,7 @@ func New(
 }
 
 func NewWithFormat(
+	namespace string,
 	db *versiondb.Database,
 	utxoDB database.Database,
 	txDB database.Database,
@@ -179,7 +182,7 @@ func NewWithFormat(
 	trackChecksums bool,
 ) (*state, error) {
 	txCache, err := metercacher.New[ids.ID, *txs.Tx](
-		"tx_cache",
+		metric.AppendNamespace(namespace, "tx_cache"),
 		metrics,
 		&cache.LRU[ids.ID, *txs.Tx]{Size: txCacheSize},
 	)
@@ -188,7 +191,7 @@ func NewWithFormat(
 	}
 
 	blockIDCache, err := metercacher.New[uint64, ids.ID](
-		"block_id_cache",
+		metric.AppendNamespace(namespace, "block_id_cache"),
 		metrics,
 		&cache.LRU[uint64, ids.ID]{Size: blockIDCacheSize},
 	)
@@ -197,7 +200,7 @@ func NewWithFormat(
 	}
 
 	blockCache, err := metercacher.New[ids.ID, block.Block](
-		"block_cache",
+		metric.AppendNamespace(namespace, "block_cache"),
 		metrics,
 		&cache.LRU[ids.ID, block.Block]{Size: blockCacheSize},
 	)
@@ -206,6 +209,7 @@ func NewWithFormat(
 	}
 
 	utxoState, err := avax.NewMeteredUTXOState(
+		namespace,
 		prefixdb.New(utxoPrefix, utxoDB),
 		prefixdb.New(indexPrefix, utxoDB),
 		parser.Codec(),
@@ -569,6 +573,6 @@ func (s *state) writeMetadata() error {
 	return nil
 }
 
-func (s *state) Checksum(context.Context) ids.ID {
-	return s.utxoState.Checksum()
+func (s *state) Checksum(context.Context) (ids.ID, error) {
+	return s.utxoState.Checksum(), nil
 }

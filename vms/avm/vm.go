@@ -118,6 +118,8 @@ type VM struct {
 	blockbuilder.Builder
 	chainManager blockexecutor.Manager
 	network      *network.Network
+
+	StateMigrationFactory StateMigrationFactory
 }
 
 func (vm *VM) Connected(ctx context.Context, nodeID ids.NodeID, version *version.Application) error {
@@ -147,8 +149,8 @@ func (vm *VM) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
  */
 
 func (vm *VM) Initialize(
-	_ context.Context,
-	ctx *snow.Context,
+	ctx context.Context,
+	snowCtx *snow.Context,
 	db database.Database,
 	genesisBytes []byte,
 	_ []byte,
@@ -157,18 +159,18 @@ func (vm *VM) Initialize(
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
-	noopMessageHandler := common.NewNoOpAppHandler(ctx.Log)
+	noopMessageHandler := common.NewNoOpAppHandler(snowCtx.Log)
 	vm.Atomic = network.NewAtomic(noopMessageHandler)
 
 	avmConfig, err := ParseConfig(configBytes)
 	if err != nil {
 		return err
 	}
-	ctx.Log.Info("VM config initialized",
+	snowCtx.Log.Info("VM config initialized",
 		zap.Reflect("config", avmConfig),
 	)
 
-	vm.registerer, err = metrics.MakeAndRegister(ctx.Metrics, "")
+	vm.registerer, err = metrics.MakeAndRegister(snowCtx.Metrics, "")
 	if err != nil {
 		return err
 	}
@@ -181,10 +183,10 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("failed to initialize metrics: %w", err)
 	}
 
-	vm.AddressManager = avax.NewAddressManager(ctx)
+	vm.AddressManager = avax.NewAddressManager(snowCtx)
 	vm.Aliaser = ids.NewAliaser()
 
-	vm.ctx = ctx
+	vm.ctx = snowCtx
 	vm.appSender = appSender
 	vm.baseDB = db
 	vm.db = versiondb.New(db)
@@ -211,7 +213,7 @@ func (vm *VM) Initialize(
 	vm.parser, err = block.NewCustomParser(
 		vm.typeToFxIndex,
 		&vm.clock,
-		ctx.Log,
+		snowCtx.Log,
 		typedFxs,
 	)
 	if err != nil {
@@ -221,7 +223,7 @@ func (vm *VM) Initialize(
 	codec := vm.parser.Codec()
 	vm.Spender = utxo.NewSpender(&vm.clock, codec)
 
-	state, err := state.New(
+	legacyState, err := state.New(
 		vm.db,
 		vm.parser,
 		vm.registerer,
@@ -231,7 +233,17 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	vm.state = state
+	stateMigration := vm.StateMigrationFactory.New(
+		vm.ctx.Log,
+		vm.db,
+		vm.parser,
+		vm.registerer,
+		avmConfig.ChecksumsEnabled,
+	)
+
+	if vm.state, err = stateMigration.Migrate(ctx, legacyState); err != nil {
+		return fmt.Errorf("failed to migrate state: %w", err)
+	}
 
 	if err := vm.initGenesis(genesisBytes); err != nil {
 		return err
@@ -256,7 +268,7 @@ func (vm *VM) Initialize(
 	}
 
 	vm.txBackend = &txexecutor.Backend{
-		Ctx:           ctx,
+		Ctx:           snowCtx,
 		Config:        &vm.Config,
 		Fxs:           vm.fxs,
 		TypeToFxIndex: vm.typeToFxIndex,

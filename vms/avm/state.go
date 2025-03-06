@@ -20,7 +20,138 @@ import (
 	"github.com/ava-labs/avalanchego/x/merkledb"
 )
 
-var _ state.State = (*gForkState)(nil)
+var (
+	_ state.State           = (*gForkState)(nil)
+	_ StateMigrationFactory = (*NoMigrationFactory)(nil)
+	_ StateMigration        = (*noMigration)(nil)
+	_ StateMigrationFactory = (*GForkStateMigrationFactory)(nil)
+	_ StateMigration        = (*gForkStateMigration)(nil)
+)
+
+type StateMigrationFactory interface {
+	New(
+		log logging.Logger,
+		db database.Database,
+		parser block.Parser,
+		registerer prometheus.Registerer,
+		trackChecksums bool,
+	) StateMigration
+}
+
+type StateMigration interface {
+	Migrate(ctx context.Context, prev state.State) (state.State, error)
+}
+
+type NoMigrationFactory struct{}
+
+func (n NoMigrationFactory) New(
+	logging.Logger,
+	database.Database,
+	block.Parser,
+	prometheus.Registerer,
+	bool,
+) StateMigration {
+	return noMigration{}
+}
+
+type noMigration struct{}
+
+func (noMigration) Migrate(_ context.Context, prev state.State) (state.State, error) {
+	return prev, nil
+}
+
+type GForkStateMigrationFactory struct {
+	CommitFrequency int
+}
+
+func (g GForkStateMigrationFactory) New(
+	log logging.Logger,
+	db database.Database,
+	parser block.Parser,
+	registerer prometheus.Registerer,
+	trackChecksums bool,
+) StateMigration {
+	return gForkStateMigration{
+		log:             log,
+		commitFrequency: g.CommitFrequency,
+		db:              db,
+		parser:          parser,
+		metrics:         registerer,
+		trackChecksums:  trackChecksums,
+	}
+}
+
+type gForkStateMigration struct {
+	log             logging.Logger
+	commitFrequency int
+	db              database.Database
+	parser          block.Parser
+	metrics         prometheus.Registerer
+	trackChecksums  bool
+}
+
+func (g gForkStateMigration) Migrate(
+	ctx context.Context,
+	prev state.State,
+) (state.State, error) {
+	next, err := newGForkState(ctx, g.db, g.parser, g.metrics, g.trackChecksums)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize state: %w", err)
+	}
+
+	g.log.Debug("migrating utxos")
+	if err := migrateDB[*avax.UTXO](
+		prev.UTXOs(),
+		func(utxo *avax.UTXO) { next.AddUTXO(utxo) },
+		next,
+		g.commitFrequency,
+	); err != nil {
+		return nil, fmt.Errorf("failed to migrate utxos: %w", err)
+	}
+
+	g.log.Debug("migrating txs")
+	if err := migrateDB[*txs.Tx](
+		prev.Txs(),
+		func(tx *txs.Tx) { next.AddTx(tx) },
+		next,
+		g.commitFrequency,
+	); err != nil {
+		return nil, fmt.Errorf("failed to migrate txs: %w", err)
+	}
+
+	g.log.Debug("migrating blocks")
+	if err := migrateDB[block.Block](
+		prev.Blocks(),
+		func(blk block.Block) {
+			next.AddBlock(blk)
+		},
+		next,
+		g.commitFrequency,
+	); err != nil {
+		return nil, fmt.Errorf("failed to migrate blocks: %w", err)
+	}
+
+	g.log.Debug("migrating singletons")
+	next.SetTimestamp(prev.GetTimestamp())
+	ok, err := prev.IsInitialized()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get initialized flag: %w", err)
+	}
+	if ok {
+		if err := next.SetInitialized(); err != nil {
+			return nil, fmt.Errorf("failed to set initialized flag: %w", err)
+		}
+	}
+
+	next.SetLastAccepted(prev.GetLastAccepted())
+
+	if err := next.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit db: %w", err)
+	}
+
+	g.log.Debug("migration complete")
+	return next, nil
+}
 
 func newGForkState(
 	ctx context.Context,
@@ -36,7 +167,7 @@ func newGForkState(
 	stateMerkleDBConfig := merkleDBConfig
 	stateMerkleDBConfig.Namespace = "state"
 
-	// Holds data required for tx execution
+	// Data required for execution is stored under the state prefix
 	stateDB := prefixdb.New([]byte("state"), versionDB)
 	stateMerkleDB, err := merkledb.New(
 		ctx,
@@ -55,7 +186,8 @@ func newGForkState(
 		return gForkState{}, fmt.Errorf("failed to initialize utxo db: %w", err)
 	}
 
-	// Holds all other data
+	// TODO naming?
+	// All other data is stored under the metadata prefix
 	metadataDB := prefixdb.New([]byte("metadata"), versionDB)
 	txDB := prefixdb.New([]byte("tx"), metadataDB)
 	blockIDDB := prefixdb.New([]byte("block_id"), metadataDB)
@@ -63,6 +195,7 @@ func newGForkState(
 	singletonDB := prefixdb.New([]byte("singleton"), metadataDB)
 
 	s, err := state.NewWithFormat(
+		"v2",
 		versionDB,
 		utxoMerkleDB,
 		txDB,
@@ -138,7 +271,11 @@ func (g gForkState) SetTimestamp(t time.Time) {
 	g.state.SetTimestamp(t)
 }
 
-func (g gForkState) UTXOIDs(addr []byte, previous ids.ID, limit int) ([]ids.ID, error) {
+func (g gForkState) UTXOIDs(
+	addr []byte,
+	previous ids.ID,
+	limit int,
+) ([]ids.ID, error) {
 	return g.state.UTXOIDs(addr, previous, limit)
 }
 
@@ -154,7 +291,10 @@ func (g gForkState) SetInitialized() error {
 	return g.state.SetInitialized()
 }
 
-func (g gForkState) InitializeChainState(stopVertexID ids.ID, genesisTimestamp time.Time) error {
+func (g gForkState) InitializeChainState(
+	stopVertexID ids.ID,
+	genesisTimestamp time.Time,
+) error {
 	return g.state.InitializeChainState(stopVertexID, genesisTimestamp)
 }
 
@@ -170,7 +310,7 @@ func (g gForkState) CommitBatch() (database.Batch, error) {
 	return g.state.CommitBatch()
 }
 
-func (g gForkState) Checksums(ctx context.Context) (ids.ID, error) {
+func (g gForkState) Checksum(ctx context.Context) (ids.ID, error) {
 	stateRoot, err := g.stateMerkleDB.GetMerkleRoot(ctx)
 	if err != nil {
 		return ids.ID{}, fmt.Errorf("failed to get utxo root: %w", err)
@@ -194,7 +334,7 @@ func (g gForkState) Close() error {
 func migrateDB[T any](
 	seq iter.Seq2[T, error],
 	accept func(t T),
-	s *gForkState,
+	state gForkState,
 	freq int,
 ) error {
 	i := 0
@@ -210,72 +350,14 @@ func migrateDB[T any](
 			continue
 		}
 
-		if err := s.Commit(); err != nil {
+		if err := state.Commit(); err != nil {
 			return fmt.Errorf("failed to commit db: %w", err)
 		}
 	}
 
-	if err := s.Commit(); err != nil {
+	if err := state.Commit(); err != nil {
 		return fmt.Errorf("failed to commit db: %w", err)
 	}
-
-	return nil
-}
-
-// TODO move to vm?
-func Migrate(log logging.Logger, prev state.State, next gForkState,
-	commitFrequency int) error {
-	log.Debug("migrating utxos")
-	if err := migrateDB[*avax.UTXO](
-		prev.UTXOs(),
-		func(utxo *avax.UTXO) { next.AddUTXO(utxo) },
-		next,
-		commitFrequency,
-	); err != nil {
-		return fmt.Errorf("failed to migrate utxos: %w", err)
-	}
-
-	log.Debug("migrating txs")
-	if err := migrateDB[*txs.Tx](
-		prev.Txs(),
-		func(tx *txs.Tx) { next.AddTx(tx) },
-		next,
-		commitFrequency,
-	); err != nil {
-		return fmt.Errorf("failed to migrate txs: %w", err)
-	}
-
-	log.Debug("migrating blocks")
-	if err := migrateDB[block.Block](
-		prev.Blocks(),
-		func(blk block.Block) {
-			next.AddBlock(blk)
-		},
-		next,
-		commitFrequency,
-	); err != nil {
-		return fmt.Errorf("failed to migrate blocks: %w", err)
-	}
-
-	log.Debug("migrating singletons")
-	next.SetTimestamp(prev.GetTimestamp())
-	ok, err := prev.IsInitialized()
-	if err != nil {
-		return fmt.Errorf("failed to get initialized flag: %w", err)
-	}
-	if ok {
-		if err := next.SetInitialized(); err != nil {
-			return fmt.Errorf("failed to set initialized flag: %w", err)
-		}
-	}
-
-	next.SetLastAccepted(prev.GetLastAccepted())
-
-	if err := next.Commit(); err != nil {
-		return fmt.Errorf("failed to commit db: %w", err)
-	}
-
-	log.Debug("migration complete")
 
 	return nil
 }

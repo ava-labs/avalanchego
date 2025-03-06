@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/metric"
 )
 
 const (
@@ -102,6 +103,7 @@ func NewUTXOState(
 }
 
 func NewMeteredUTXOState(
+	namespace string,
 	utxoDB database.Database,
 	indexDB database.Database,
 	codec codec.Manager,
@@ -109,7 +111,7 @@ func NewMeteredUTXOState(
 	trackChecksum bool,
 ) (UTXOState, error) {
 	utxoCache, err := metercacher.New[ids.ID, *UTXO](
-		"utxo_cache",
+		metric.AppendNamespace(namespace, "utxo_cache"),
 		metrics,
 		&cache.LRU[ids.ID, *UTXO]{Size: utxoCacheSize},
 	)
@@ -118,7 +120,7 @@ func NewMeteredUTXOState(
 	}
 
 	indexCache, err := metercacher.New[string, linkeddb.LinkedDB](
-		"index_cache",
+		metric.AppendNamespace(namespace, "index_cache"),
 		metrics,
 		&cache.LRU[string, linkeddb.LinkedDB]{
 			Size: indexCacheSize,

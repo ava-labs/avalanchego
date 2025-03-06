@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"math"
 	"sync"
 	"time"
@@ -641,6 +642,7 @@ func New(
 
 	utxoDB := prefixdb.New(UTXOPrefix, baseDB)
 	utxoState, err := avax.NewMeteredUTXOState(
+		"",
 		prefixdb.New(UTXOPrefix, utxoDB),
 		prefixdb.New(indexPrefix, utxoDB),
 		txs.GenesisCodec,
@@ -3233,6 +3235,10 @@ func (s *state) GetUptime(vdrID ids.NodeID) (time.Duration, time.Time, error) {
 
 func (s *state) SetUptime(vdrID ids.NodeID, upDuration time.Duration, lastUpdated time.Time) error {
 	return s.validatorState.SetUptime(vdrID, constants.PrimaryNetworkID, upDuration, lastUpdated)
+}
+
+func (s *state) UTXOs() iter.Seq2[*avax.UTXO, error] {
+	return s.utxoState.UTXOs()
 }
 
 func markInitialized(db database.KeyValueWriter) error {
