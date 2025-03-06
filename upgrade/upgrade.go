@@ -56,7 +56,7 @@ var (
 		CortinaXChainStopVertexID: ids.FromStringOrPanic("2D1cmbiG36BqQMRyHt4kFhWarmatA1ighSpND3FeFgz3vFVtCZ"),
 		DurangoTime:               time.Date(2024, time.February, 13, 16, 0, 0, 0, time.UTC),
 		EtnaTime:                  time.Date(2024, time.November, 25, 16, 0, 0, 0, time.UTC),
-		FortunaTime:               UnscheduledActivationTime,
+		FortunaTime:               time.Date(2025, time.March, 13, 15, 0, 0, 0, time.UTC),
 	}
 	Default = Config{
 		ApricotPhase1Time:            InitiallyActiveTime,
@@ -73,7 +73,7 @@ var (
 		CortinaXChainStopVertexID:    ids.Empty,
 		DurangoTime:                  InitiallyActiveTime,
 		EtnaTime:                     InitiallyActiveTime,
-		FortunaTime:                  UnscheduledActivationTime,
+		FortunaTime:                  InitiallyActiveTime,
 	}
 
 	ErrInvalidUpgradeTimes = errors.New("invalid upgrade configuration")

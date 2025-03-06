@@ -1,5 +1,22 @@
 # Release Notes
 
+## [v1.13.0-fuji](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.0-fuji)
+
+**Please note that this release is unable to run mainnet - and will display "mainnet is not supported" if attempted to run with a mainnet configuration.**
+
+This release fixes a P-Chain regression that caused nodes to be unable to synchronize the network. It is recommended for all Fuji node operators to update as soon as possible.
+
+**All Subnet or L1 node operators should upgrade before Noon ET, March 7th 2025 to ensure a graceful upgrade process.**
+
+Additionally, this release schedules the activation of an Avalanche Community Proposal (ACP):
+- [ACP-176](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/176-dynamic-evm-gas-limit-and-price-discovery-updates/README.md) Dynamic EVM Gas Limits and Price Discovery Updates
+
+The ACP in this upgrade goes into effect at 11 AM ET (3 PM UTC) on Thursday, March 13th, 2025 on the Fuji testnet.
+
+**All Fuji nodes must upgrade before 11 AM ET, March 13th 2025.**
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.12.2...v1.13.0-fuji
+
 ## [v1.12.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.2)
 
 This version is backwards compatible to [v1.12.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0). It is optional, but encouraged.
