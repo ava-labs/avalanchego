@@ -2203,8 +2203,11 @@ func TestL1ValidatorDeactivationCausesTrackingOfInvalidBlock(t *testing.T) {
 		nil,
 		[]*txs.ConvertSubnetToL1Validator{
 			{
-				NodeID:  nodeID[:],
-				Weight:  1,
+				NodeID: nodeID[:],
+				Weight: 1,
+				// Ensure that the validator is active for a 1 second and that
+				// it does not have sufficient balance to be active for 2
+				// seconds.
 				Balance: uint64(vm.ValidatorFeeConfig.MinPrice) + 1,
 				Signer:  *pop,
 			},
