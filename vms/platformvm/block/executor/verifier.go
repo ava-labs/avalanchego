@@ -496,12 +496,11 @@ func (v *verifier) standardBlock(
 		timestamp = onAcceptState.GetTimestamp()
 		isFortuna = v.txExecutorBackend.Config.UpgradeConfig.IsFortunaActivated(timestamp)
 
-		fujiTimeToEnforcePreFortunaChanges = time.Date(2025, time.March, 6, 19, 0, 0, 0, time.UTC) // 2PM ET
-		allowFortunaChangesPreActivation   = v.ctx.NetworkID == constants.FujiID && timestamp.Before(fujiTimeToEnforcePreFortunaChanges)
-		allowPostFortunaChanges            = isFortuna || allowFortunaChangesPreActivation
-		hasPostFortunaChanges              = lowBalanceL1ValidatorsEvicted
+		fujiTimeToEnforceOnlyPreFortunaChanges = time.Date(2025, time.March, 6, 19, 0, 0, 0, time.UTC) // 2PM ET
+		allowFortunaChangesPreActivation       = v.ctx.NetworkID == constants.FujiID && timestamp.Before(fujiTimeToEnforceOnlyPreFortunaChanges)
+		allowPostFortunaChanges                = isFortuna || allowFortunaChangesPreActivation
 
-		hasChanges = hasPreFortunaChanges || (allowPostFortunaChanges && hasPostFortunaChanges)
+		hasChanges = hasPreFortunaChanges || (allowPostFortunaChanges && lowBalanceL1ValidatorsEvicted)
 	)
 	if !hasChanges {
 		return ErrStandardBlockWithoutChanges
