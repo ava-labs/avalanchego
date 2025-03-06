@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -488,9 +489,18 @@ func (v *verifier) standardBlock(
 	// have been issued. Prior to Fortuna, evicting L1 validators that don't
 	// have enough balance for the next second is not considered a change. After
 	// Fortuna, it is.
-	timestamp := onAcceptState.GetTimestamp()
-	isFortuna := v.txExecutorBackend.Config.UpgradeConfig.IsFortunaActivated(timestamp)
-	if hasChanges := changedDuringAdvanceTime || len(txs) > 0 || (isFortuna && lowBalanceL1ValidatorsEvicted); !hasChanges {
+	var (
+		hasPreFortunaChanges = changedDuringAdvanceTime || len(txs) > 0
+
+		timestamp = onAcceptState.GetTimestamp()
+		isFortuna = v.txExecutorBackend.Config.UpgradeConfig.IsFortunaActivated(timestamp)
+
+		includeFortunaChangesPreActivation = v.ctx.NetworkID == constants.FujiID
+		includePostFortunaChanges          = isFortuna || includeFortunaChangesPreActivation
+
+		hasChanges = hasPreFortunaChanges || (includePostFortunaChanges && lowBalanceL1ValidatorsEvicted)
+	)
+	if !hasChanges {
 		return ErrStandardBlockWithoutChanges
 	}
 
