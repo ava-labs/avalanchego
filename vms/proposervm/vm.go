@@ -725,17 +725,21 @@ func (vm *VM) notifyInnerBlockReady() {
 	}
 }
 
-const fujiFaultHeight = 200041
+// fujiOverridePChainHeightUntilHeight is the P-chain height at which the
+// proposervm will no longer attempt to keep the P-chain height the same.
+const fujiOverridePChainHeightUntilHeight = 200041
 
-var fujiOverrideUntilTimestamp = time.Date(2025, time.March, 7, 17, 0, 0, 0, time.UTC) // noon ET
+// fujiOverridePChainHeightUntilTimestamp is the timestamp at which the
+// proposervm will no longer attempt to keep the P-chain height the same.
+var fujiOverridePChainHeightUntilTimestamp = time.Date(2025, time.March, 7, 17, 0, 0, 0, time.UTC) // noon ET
 
 func (vm *VM) selectChildPChainHeight(ctx context.Context, minPChainHeight uint64) (uint64, error) {
 	var (
 		now            = vm.Clock.Time()
 		shouldOverride = vm.ctx.NetworkID == constants.FujiID &&
 			vm.ctx.SubnetID != constants.PrimaryNetworkID &&
-			now.Before(fujiOverrideUntilTimestamp) &&
-			minPChainHeight < fujiFaultHeight
+			now.Before(fujiOverridePChainHeightUntilTimestamp) &&
+			minPChainHeight < fujiOverridePChainHeightUntilHeight
 	)
 	if shouldOverride {
 		return minPChainHeight, nil
