@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -85,9 +86,10 @@ func TestHandler(t *testing.T) {
 			c := p2ptest.NewClient(
 				t,
 				ctx,
-				h,
 				clientNodeID,
+				p2p.NoOpHandler{},
 				serverNodeID,
+				h,
 			)
 
 			unsignedMessage, err := warp.NewUnsignedMessage(
@@ -135,7 +137,7 @@ func TestHandler(t *testing.T) {
 			}
 
 			for _, expectedErr = range tt.expectedErrs {
-				require.NoError(c.AppRequest(ctx, set.Of(clientNodeID), requestBytes, onResponse))
+				require.NoError(c.AppRequest(ctx, set.Of(serverNodeID), requestBytes, onResponse))
 				<-handled
 			}
 		})
