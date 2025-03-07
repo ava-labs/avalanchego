@@ -749,7 +749,7 @@ func TestBlockAccept(t *testing.T) {
 				// because we mock the call to shared memory
 				mockManagerState.EXPECT().CommitBatch().Return(nil, nil)
 				mockManagerState.EXPECT().Abort()
-				mockManagerState.EXPECT().Checksums().Return(ids.Empty, ids.Empty)
+				mockManagerState.EXPECT().Checksum().Return(ids.Empty)
 
 				mockSharedMemory := atomicmock.NewSharedMemory(ctrl)
 				mockSharedMemory.EXPECT().Apply(gomock.Any(), gomock.Any()).Return(nil)

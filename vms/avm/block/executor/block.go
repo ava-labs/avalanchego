@@ -246,14 +246,13 @@ func (b *Block) Accept(context.Context) error {
 		return err
 	}
 
-	txChecksum, utxoChecksum := b.manager.state.Checksums()
+	checksum := b.manager.state.Checksum()
 	b.manager.backend.Ctx.Log.Trace(
 		"accepted block",
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", b.Parent()),
-		zap.Stringer("txChecksum", txChecksum),
-		zap.Stringer("utxoChecksum", utxoChecksum),
+		zap.Stringer("checksum", checksum),
 	)
 	return nil
 }

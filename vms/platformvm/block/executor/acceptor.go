@@ -110,7 +110,7 @@ func (a *acceptor) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", b.Parent()),
-		zap.Stringer("utxoChecksum", a.state.Checksum()),
+		zap.Stringer("checksum", a.state.Checksum()),
 	)
 
 	return nil
@@ -180,7 +180,7 @@ func (a *acceptor) optionBlock(b block.Block, blockType string) error {
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", parentID),
-		zap.Stringer("utxoChecksum", a.state.Checksum()),
+		zap.Stringer("checksum", a.state.Checksum()),
 	)
 
 	return nil
@@ -212,7 +212,7 @@ func (a *acceptor) proposalBlock(b block.Block, blockType string) {
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", b.Parent()),
-		zap.Stringer("utxoChecksum", a.state.Checksum()),
+		zap.Stringer("checksum", a.state.Checksum()),
 	)
 }
 
@@ -259,7 +259,7 @@ func (a *acceptor) standardBlock(b block.Block, blockType string) error {
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", b.Parent()),
-		zap.Stringer("utxoChecksum", a.state.Checksum()),
+		zap.Stringer("checksum", a.state.Checksum()),
 	)
 
 	return nil
