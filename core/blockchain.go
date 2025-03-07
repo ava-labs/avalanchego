@@ -58,45 +58,57 @@ import (
 	"github.com/ava-labs/libevm/metrics"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/triedb"
+
+	// Force libevm metrics of the same name to be registered first.
+	_ "github.com/ava-labs/libevm/core"
 )
 
+// ====== If resolving merge conflicts ======
+//
+// All calls to metrics.NewRegistered*() have been replaced with
+// metrics.GetOrRegister*() and this package's corresponding libevm package
+// imported above. Together these ensure that the metric here is the same as the
+// one with the same name in libevm.
+//
+// Note, however, those that have had their types overridden as
+// [metrics.Counter].
 var (
-	accountReadTimer         = metrics.NewRegisteredCounter("chain/account/reads", nil)
-	accountHashTimer         = metrics.NewRegisteredCounter("chain/account/hashes", nil)
-	accountUpdateTimer       = metrics.NewRegisteredCounter("chain/account/updates", nil)
-	accountCommitTimer       = metrics.NewRegisteredCounter("chain/account/commits", nil)
-	storageReadTimer         = metrics.NewRegisteredCounter("chain/storage/reads", nil)
-	storageHashTimer         = metrics.NewRegisteredCounter("chain/storage/hashes", nil)
-	storageUpdateTimer       = metrics.NewRegisteredCounter("chain/storage/updates", nil)
-	storageCommitTimer       = metrics.NewRegisteredCounter("chain/storage/commits", nil)
-	snapshotAccountReadTimer = metrics.NewRegisteredCounter("chain/snapshot/account/reads", nil)
-	snapshotStorageReadTimer = metrics.NewRegisteredCounter("chain/snapshot/storage/reads", nil)
-	snapshotCommitTimer      = metrics.NewRegisteredCounter("chain/snapshot/commits", nil)
+	accountReadTimer         = getOrOverrideAsRegisteredCounter("chain/account/reads", nil)
+	accountHashTimer         = getOrOverrideAsRegisteredCounter("chain/account/hashes", nil)
+	accountUpdateTimer       = getOrOverrideAsRegisteredCounter("chain/account/updates", nil)
+	accountCommitTimer       = getOrOverrideAsRegisteredCounter("chain/account/commits", nil)
+	storageReadTimer         = getOrOverrideAsRegisteredCounter("chain/storage/reads", nil)
+	storageHashTimer         = getOrOverrideAsRegisteredCounter("chain/storage/hashes", nil)
+	storageUpdateTimer       = getOrOverrideAsRegisteredCounter("chain/storage/updates", nil)
+	storageCommitTimer       = getOrOverrideAsRegisteredCounter("chain/storage/commits", nil)
+	snapshotAccountReadTimer = getOrOverrideAsRegisteredCounter("chain/snapshot/account/reads", nil)
+	snapshotStorageReadTimer = getOrOverrideAsRegisteredCounter("chain/snapshot/storage/reads", nil)
+	snapshotCommitTimer      = getOrOverrideAsRegisteredCounter("chain/snapshot/commits", nil)
 
-	triedbCommitTimer = metrics.NewRegisteredCounter("chain/triedb/commits", nil)
+	triedbCommitTimer = getOrOverrideAsRegisteredCounter("chain/triedb/commits", nil)
 
-	blockInsertTimer            = metrics.NewRegisteredCounter("chain/block/inserts", nil)
-	blockInsertCount            = metrics.NewRegisteredCounter("chain/block/inserts/count", nil)
-	blockContentValidationTimer = metrics.NewRegisteredCounter("chain/block/validations/content", nil)
-	blockStateInitTimer         = metrics.NewRegisteredCounter("chain/block/inits/state", nil)
-	blockExecutionTimer         = metrics.NewRegisteredCounter("chain/block/executions", nil)
-	blockTrieOpsTimer           = metrics.NewRegisteredCounter("chain/block/trie", nil)
-	blockValidationTimer        = metrics.NewRegisteredCounter("chain/block/validations/state", nil)
-	blockWriteTimer             = metrics.NewRegisteredCounter("chain/block/writes", nil)
+	blockInsertTimer            = metrics.GetOrRegisterCounter("chain/block/inserts", nil)
+	blockInsertCount            = metrics.GetOrRegisterCounter("chain/block/inserts/count", nil)
+	blockContentValidationTimer = metrics.GetOrRegisterCounter("chain/block/validations/content", nil)
+	blockStateInitTimer         = metrics.GetOrRegisterCounter("chain/block/inits/state", nil)
+	blockExecutionTimer         = metrics.GetOrRegisterCounter("chain/block/executions", nil)
+	blockTrieOpsTimer           = metrics.GetOrRegisterCounter("chain/block/trie", nil)
+	blockValidationTimer        = metrics.GetOrRegisterCounter("chain/block/validations/state", nil)
+	blockWriteTimer             = metrics.GetOrRegisterCounter("chain/block/writes", nil)
 
-	acceptorQueueGauge           = metrics.NewRegisteredGauge("chain/acceptor/queue/size", nil)
-	acceptorWorkTimer            = metrics.NewRegisteredCounter("chain/acceptor/work", nil)
-	acceptorWorkCount            = metrics.NewRegisteredCounter("chain/acceptor/work/count", nil)
-	processedBlockGasUsedCounter = metrics.NewRegisteredCounter("chain/block/gas/used/processed", nil)
-	acceptedBlockGasUsedCounter  = metrics.NewRegisteredCounter("chain/block/gas/used/accepted", nil)
-	badBlockCounter              = metrics.NewRegisteredCounter("chain/block/bad/count", nil)
+	acceptorQueueGauge           = metrics.GetOrRegisterGauge("chain/acceptor/queue/size", nil)
+	acceptorWorkTimer            = metrics.GetOrRegisterCounter("chain/acceptor/work", nil)
+	acceptorWorkCount            = metrics.GetOrRegisterCounter("chain/acceptor/work/count", nil)
+	processedBlockGasUsedCounter = metrics.GetOrRegisterCounter("chain/block/gas/used/processed", nil)
+	acceptedBlockGasUsedCounter  = metrics.GetOrRegisterCounter("chain/block/gas/used/accepted", nil)
+	badBlockCounter              = metrics.GetOrRegisterCounter("chain/block/bad/count", nil)
 
-	txUnindexTimer      = metrics.NewRegisteredCounter("chain/txs/unindex", nil)
-	acceptedTxsCounter  = metrics.NewRegisteredCounter("chain/txs/accepted", nil)
-	processedTxsCounter = metrics.NewRegisteredCounter("chain/txs/processed", nil)
+	txUnindexTimer      = metrics.GetOrRegisterCounter("chain/txs/unindex", nil)
+	acceptedTxsCounter  = metrics.GetOrRegisterCounter("chain/txs/accepted", nil)
+	processedTxsCounter = metrics.GetOrRegisterCounter("chain/txs/processed", nil)
 
-	acceptedLogsCounter  = metrics.NewRegisteredCounter("chain/logs/accepted", nil)
-	processedLogsCounter = metrics.NewRegisteredCounter("chain/logs/processed", nil)
+	acceptedLogsCounter  = metrics.GetOrRegisterCounter("chain/logs/accepted", nil)
+	processedLogsCounter = metrics.GetOrRegisterCounter("chain/logs/processed", nil)
 
 	ErrRefuseToCorruptArchiver = errors.New("node has operated with pruning disabled, shutting down to prevent missing tries")
 
