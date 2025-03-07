@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap0"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap1"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap5"
-	"github.com/ava-labs/coreth/plugin/evm/upgrade/cortina"
 	"github.com/ava-labs/coreth/utils"
 )
 
@@ -113,23 +112,6 @@ func (v blockValidator) SyntacticVerify(b *Block, rules params.Rules) error {
 		return fmt.Errorf("invalid mix digest: %v", ethHeader.MixDigest)
 	}
 
-	// Enforce static gas limit after ApricotPhase1 (prior to ApricotPhase1 it's handled in processing).
-	if rulesExtra.IsCortina {
-		if ethHeader.GasLimit != cortina.GasLimit {
-			return fmt.Errorf(
-				"expected gas limit to be %d after cortina but got %d",
-				cortina.GasLimit, ethHeader.GasLimit,
-			)
-		}
-	} else if rulesExtra.IsApricotPhase1 {
-		if ethHeader.GasLimit != ap1.GasLimit {
-			return fmt.Errorf(
-				"expected gas limit to be %d after apricot phase 1 but got %d",
-				ap1.GasLimit, ethHeader.GasLimit,
-			)
-		}
-	}
-
 	// Verify the extra data is well-formed.
 	if err := header.VerifyExtra(rulesExtra.AvalancheRules, ethHeader.Extra); err != nil {
 		return err
@@ -202,16 +184,10 @@ func (v blockValidator) SyntacticVerify(b *Block, rules params.Rules) error {
 
 	// If we are in ApricotPhase4, ensure that ExtDataGasUsed is populated correctly.
 	if rulesExtra.IsApricotPhase4 {
-		// Make sure ExtDataGasUsed is not nil and correct
-		if headerExtra.ExtDataGasUsed == nil {
-			return errNilExtDataGasUsedApricotPhase4
-		}
-		if rulesExtra.IsApricotPhase5 {
+		// After the F upgrade, the extDataGasUsed field is validated by
+		// [header.VerifyGasUsed].
+		if !rulesExtra.IsFortuna && rulesExtra.IsApricotPhase5 {
 			if !utils.BigLessOrEqualUint64(headerExtra.ExtDataGasUsed, ap5.AtomicGasLimit) {
-				return fmt.Errorf("too large extDataGasUsed: %d", headerExtra.ExtDataGasUsed)
-			}
-		} else {
-			if !headerExtra.ExtDataGasUsed.IsUint64() {
 				return fmt.Errorf("too large extDataGasUsed: %d", headerExtra.ExtDataGasUsed)
 			}
 		}
@@ -224,14 +200,14 @@ func (v blockValidator) SyntacticVerify(b *Block, rules params.Rules) error {
 			if err != nil {
 				return err
 			}
-			totalGasUsed, err = safemath.Add64(totalGasUsed, gasUsed)
+			totalGasUsed, err = safemath.Add(totalGasUsed, gasUsed)
 			if err != nil {
 				return err
 			}
 		}
 
 		switch {
-		case headerExtra.ExtDataGasUsed.Cmp(new(big.Int).SetUint64(totalGasUsed)) != 0:
+		case !utils.BigEqualUint64(headerExtra.ExtDataGasUsed, totalGasUsed):
 			return fmt.Errorf("invalid extDataGasUsed: have %d, want %d", headerExtra.ExtDataGasUsed, totalGasUsed)
 
 		// Make sure BlockGasCost is not nil

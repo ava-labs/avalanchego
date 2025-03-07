@@ -14,6 +14,89 @@ import (
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
+var (
+	TestChainConfig = &ChainConfig{
+		AvalancheContext: AvalancheContext{SnowCtx: utils.TestSnowContext()},
+		NetworkUpgrades: NetworkUpgrades{
+			ApricotPhase1BlockTimestamp:     utils.NewUint64(0),
+			ApricotPhase2BlockTimestamp:     utils.NewUint64(0),
+			ApricotPhase3BlockTimestamp:     utils.NewUint64(0),
+			ApricotPhase4BlockTimestamp:     utils.NewUint64(0),
+			ApricotPhase5BlockTimestamp:     utils.NewUint64(0),
+			ApricotPhasePre6BlockTimestamp:  utils.NewUint64(0),
+			ApricotPhase6BlockTimestamp:     utils.NewUint64(0),
+			ApricotPhasePost6BlockTimestamp: utils.NewUint64(0),
+			BanffBlockTimestamp:             utils.NewUint64(0),
+			CortinaBlockTimestamp:           utils.NewUint64(0),
+			DurangoBlockTimestamp:           utils.NewUint64(0),
+			EtnaTimestamp:                   utils.NewUint64(0),
+			FortunaTimestamp:                utils.NewUint64(0),
+		},
+	}
+
+	TestLaunchConfig = &ChainConfig{
+		AvalancheContext: AvalancheContext{SnowCtx: utils.TestSnowContext()},
+	}
+
+	TestApricotPhase1Config = copyAndSet(TestLaunchConfig, func(c *ChainConfig) {
+		c.NetworkUpgrades.ApricotPhase1BlockTimestamp = utils.NewUint64(0)
+	})
+
+	TestApricotPhase2Config = copyAndSet(TestApricotPhase1Config, func(c *ChainConfig) {
+		c.NetworkUpgrades.ApricotPhase2BlockTimestamp = utils.NewUint64(0)
+	})
+
+	TestApricotPhase3Config = copyAndSet(TestApricotPhase2Config, func(c *ChainConfig) {
+		c.NetworkUpgrades.ApricotPhase3BlockTimestamp = utils.NewUint64(0)
+	})
+
+	TestApricotPhase4Config = copyAndSet(TestApricotPhase3Config, func(c *ChainConfig) {
+		c.NetworkUpgrades.ApricotPhase4BlockTimestamp = utils.NewUint64(0)
+	})
+
+	TestApricotPhase5Config = copyAndSet(TestApricotPhase4Config, func(c *ChainConfig) {
+		c.NetworkUpgrades.ApricotPhase5BlockTimestamp = utils.NewUint64(0)
+	})
+
+	TestApricotPhasePre6Config = copyAndSet(TestApricotPhase5Config, func(c *ChainConfig) {
+		c.NetworkUpgrades.ApricotPhasePre6BlockTimestamp = utils.NewUint64(0)
+	})
+
+	TestApricotPhase6Config = copyAndSet(TestApricotPhasePre6Config, func(c *ChainConfig) {
+		c.NetworkUpgrades.ApricotPhase6BlockTimestamp = utils.NewUint64(0)
+	})
+
+	TestApricotPhasePost6Config = copyAndSet(TestApricotPhase6Config, func(c *ChainConfig) {
+		c.NetworkUpgrades.ApricotPhasePost6BlockTimestamp = utils.NewUint64(0)
+	})
+
+	TestBanffChainConfig = copyAndSet(TestApricotPhasePost6Config, func(c *ChainConfig) {
+		c.NetworkUpgrades.BanffBlockTimestamp = utils.NewUint64(0)
+	})
+
+	TestCortinaChainConfig = copyAndSet(TestBanffChainConfig, func(c *ChainConfig) {
+		c.NetworkUpgrades.CortinaBlockTimestamp = utils.NewUint64(0)
+	})
+
+	TestDurangoChainConfig = copyAndSet(TestCortinaChainConfig, func(c *ChainConfig) {
+		c.NetworkUpgrades.DurangoBlockTimestamp = utils.NewUint64(0)
+	})
+
+	TestEtnaChainConfig = copyAndSet(TestDurangoChainConfig, func(c *ChainConfig) {
+		c.NetworkUpgrades.EtnaTimestamp = utils.NewUint64(0)
+	})
+
+	TestFortunaChainConfig = copyAndSet(TestEtnaChainConfig, func(c *ChainConfig) {
+		c.NetworkUpgrades.FortunaTimestamp = utils.NewUint64(0)
+	})
+)
+
+func copyAndSet(c *ChainConfig, set func(*ChainConfig)) *ChainConfig {
+	newConfig := *c
+	set(&newConfig)
+	return &newConfig
+}
+
 // UpgradeConfig includes the following configs that may be specified in upgradeBytes:
 // - Timestamps that enable avalanche network upgrades,
 // - Enabling or disabling precompiles as network upgrades.

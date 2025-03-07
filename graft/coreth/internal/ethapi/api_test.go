@@ -1022,7 +1022,10 @@ func TestSignTransaction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expect := `{"type":"0x2","chainId":"0x1","nonce":"0x0","to":"0x703c4b2bd70c169f5717101caee543299fc946c7","gas":"0x5208","gasPrice":null,"maxPriorityFeePerGas":"0x0","maxFeePerGas":"0x68c6171400","value":"0x1","input":"0x","accessList":[],"v":"0x1","r":"0x83cf4820cfd50fdd240fea74eaf7227e2e3919507cc567c885a6e6bf27543567","s":"0x899543bbe903a76b705e03cfba217e5cb91fc7204309170c0e91f34988d5fb2","yParity":"0x1","hash":"0x09572232b67f69faab343c5b417c8964b15263c5abbbcdb1ebf7f5eda8ed3a63"}`
+	// The expected result has deviated from upstream because the base fee, and
+	// therefore the `maxFeePerGas`, resulting from [params.TestChainConfig] is
+	// different.
+	expect := `{"type":"0x2","chainId":"0x1","nonce":"0x0","to":"0x703c4b2bd70c169f5717101caee543299fc946c7","gas":"0x5208","gasPrice":null,"maxPriorityFeePerGas":"0x0","maxFeePerGas":"0x2","value":"0x1","input":"0x","accessList":[],"v":"0x1","r":"0x5a32230e497be0277b58afb995227a167e087462fb770057ed6946f5ef5a2df5","s":"0x431e048124baffbd67bc35df940bb9f5ddf8a36afb2672616d075ac39415e885","yParity":"0x1","hash":"0xf5e941beeca516d3d3dca2707d74c54a58e07365b89efc5de58dd7b6041ef78e"}`
 	if !bytes.Equal(tx, []byte(expect)) {
 		t.Errorf("result mismatch. Have:\n%s\nWant:\n%s\n", tx, expect)
 	}

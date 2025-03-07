@@ -37,8 +37,6 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/header"
-	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap1"
-	"github.com/ava-labs/coreth/plugin/evm/upgrade/cortina"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/ethdb"
@@ -375,17 +373,8 @@ func GenerateChainWithGenesis(genesis *Genesis, engine consensus.Engine, n int, 
 func (cm *chainMaker) makeHeader(parent *types.Block, gap uint64, state *state.StateDB, engine consensus.Engine) *types.Header {
 	time := parent.Time() + gap // block time is fixed at [gap] seconds
 
-	var gasLimit uint64
 	configExtra := params.GetExtra(cm.config)
-	if configExtra.IsCortina(time) {
-		gasLimit = cortina.GasLimit
-	} else if configExtra.IsApricotPhase1(time) {
-		gasLimit = ap1.GasLimit
-	} else {
-		gasLimit = CalcGasLimit(parent.GasUsed(), parent.GasLimit(), parent.GasLimit(), parent.GasLimit())
-	}
-
-	extra, err := header.ExtraPrefix(configExtra, parent.Header(), time)
+	gasLimit, err := header.GasLimit(configExtra, parent.Header(), time)
 	if err != nil {
 		panic(err)
 	}
@@ -402,7 +391,6 @@ func (cm *chainMaker) makeHeader(parent *types.Block, gap uint64, state *state.S
 		GasLimit:   gasLimit,
 		Number:     new(big.Int).Add(parent.Number(), common.Big1),
 		Time:       time,
-		Extra:      extra,
 		BaseFee:    baseFee,
 	}
 

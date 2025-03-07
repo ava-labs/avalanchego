@@ -18,7 +18,7 @@ on:
 jobs:
   lint:
     name: Lint
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: check out ${{ github.event.inputs.avalanchegoRepo }} ${{ github.event.inputs.avalanchegoBranch }}
@@ -31,7 +31,7 @@ jobs:
           token: ${{ secrets.AVALANCHE_PAT }}
       - uses: actions/setup-go@v5
         with:
-          go-version: "~1.22.8"
+          go-version-file: "go.mod"
       - name: change avalanchego dep
         if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
@@ -59,7 +59,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-20.04, ubuntu-latest, windows-latest]
+        os: [macos-latest, ubuntu-22.04, ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
       - name: check out ${{ github.event.inputs.avalanchegoRepo }} ${{ github.event.inputs.avalanchegoBranch }}
@@ -72,7 +72,7 @@ jobs:
           token: ${{ secrets.AVALANCHE_PAT }}
       - uses: actions/setup-go@v5
         with:
-          go-version: "~1.22.8"
+          go-version-file: "go.mod"
       - name: change avalanchego dep
         if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
@@ -104,11 +104,8 @@ jobs:
       - run: ./scripts/coverage.sh
         shell: bash
   avalanchego_e2e:
-    name: AvalancheGo E2E Tests (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-20.04]
+    name: AvalancheGo E2E Tests
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: check out ${{ github.event.inputs.avalanchegoRepo }} ${{ github.event.inputs.avalanchegoBranch }}
@@ -121,7 +118,7 @@ jobs:
           token: ${{ secrets.AVALANCHE_PAT }}
       - uses: actions/setup-go@v5
         with:
-          go-version: "~1.22.8"
+          go-version-file: "go.mod"
       - name: Run e2e tests
         run: E2E_SERIAL=1 ./scripts/tests.e2e.sh
         shell: bash

@@ -33,130 +33,130 @@ var (
 				TargetExcess: 0,
 			},
 			target:      MinTargetPerSecond,
-			maxCapacity: targetToMaxCapacity * MinTargetPerSecond,
+			maxCapacity: MinMaxCapacity,
 			gasPrice:    MinGasPrice,
 		},
 		{
 			name: "almost_excess_change",
 			state: State{
 				Gas: gas.State{
-					Excess: 29_805_331, // MinTargetPerSecond * ln(2) * TargetToPriceUpdateConversion
+					Excess: 60_303_808, // MinTargetPerSecond * ln(2) * TargetToPriceUpdateConversion
 				},
 				TargetExcess: 33, // Largest excess that doesn't increase the target
 			},
 			skipTestDesiredTargetExcess: true,
 			target:                      MinTargetPerSecond,
-			maxCapacity:                 targetToMaxCapacity * MinTargetPerSecond,
+			maxCapacity:                 MinMaxCapacity,
 			gasPrice:                    2 * MinGasPrice,
 		},
 		{
 			name: "small_excess_change",
 			state: State{
 				Gas: gas.State{
-					Excess: 29_805_362, // (MinTargetPerSecond + 1) * ln(2) * TargetToPriceUpdateConversion
+					Excess: 60_303_868, // (MinTargetPerSecond + 1) * ln(2) * TargetToPriceUpdateConversion
 				},
 				TargetExcess: 34, // Smallest excess that increases the target
 			},
 			target:      MinTargetPerSecond + 1,
-			maxCapacity: targetToMaxCapacity * (MinTargetPerSecond + 1),
+			maxCapacity: TargetToMaxCapacity * (MinTargetPerSecond + 1),
 			gasPrice:    2 * MinGasPrice,
 		},
 		{
 			name: "max_initial_excess_change",
 			state: State{
 				Gas: gas.State{
-					Excess: 47_286_485, // (MinTargetPerSecond + 977) * ln(3) * TargetToPriceUpdateConversion
+					Excess: 95_672_652, // (MinTargetPerSecond + 977) * ln(3) * TargetToPriceUpdateConversion
 				},
 				TargetExcess: MaxTargetExcessDiff,
 			},
 			skipTestDesiredTargetExcess: true,
 			target:                      MinTargetPerSecond + 977,
-			maxCapacity:                 targetToMaxCapacity * (MinTargetPerSecond + 977),
+			maxCapacity:                 TargetToMaxCapacity * (MinTargetPerSecond + 977),
 			gasPrice:                    3 * MinGasPrice,
 		},
 		{
 			name: "current_target",
 			state: State{
 				Gas: gas.State{
-					Excess: 1_336_650_647, // 1_500_000 * ln(nAVAX) * TargetToPriceUpdateConversion
+					Excess: 2_704_386_192, // 1_500_000 * ln(nAVAX) * TargetToPriceUpdateConversion
 				},
 				TargetExcess: 13_605_152, // 2^25 * ln(1.5)
 			},
 			target:      1_500_000,
-			maxCapacity: targetToMaxCapacity * 1_500_000,
-			gasPrice:    (nAVAX + 7) * MinGasPrice, // +7 due to approximation
+			maxCapacity: TargetToMaxCapacity * 1_500_000,
+			gasPrice:    nAVAX*MinGasPrice + 2, // +2 due to approximation
 		},
 		{
 			name: "3m_target",
 			state: State{
 				Gas: gas.State{
-					Excess: 3_267_368_247, // 3_000_000 * ln(100*nAVAX) * TargetToPriceUpdateConversion
+					Excess: 6_610_721_802, // 3_000_000 * ln(100*nAVAX) * TargetToPriceUpdateConversion
 				},
 				TargetExcess: 36_863_312, // 2^25 * ln(3)
 			},
 			target:      3_000_000,
-			maxCapacity: targetToMaxCapacity * 3_000_000,
-			gasPrice:    (100*nAVAX + 31) * MinGasPrice, // +31 due to approximation
+			maxCapacity: TargetToMaxCapacity * 3_000_000,
+			gasPrice:    100*nAVAX*MinGasPrice + 4, // +4 due to approximation
 		},
 		{
 			name: "6m_target",
 			state: State{
 				Gas: gas.State{
-					Excess: 6_534_736_494, // 6_000_000 * ln(100*nAVAX) * TargetToPriceUpdateConversion
+					Excess: 13_221_443_604, // 6_000_000 * ln(100*nAVAX) * TargetToPriceUpdateConversion
 				},
 				TargetExcess: 60_121_472, // 2^25 * ln(6)
 			},
 			target:      6_000_000,
-			maxCapacity: targetToMaxCapacity * 6_000_000,
-			gasPrice:    (100*nAVAX + 31) * MinGasPrice, // +31 due to approximation
+			maxCapacity: TargetToMaxCapacity * 6_000_000,
+			gasPrice:    100*nAVAX*MinGasPrice + 4, // +4 due to approximation
 		},
 		{
 			name: "10m_target",
 			state: State{
 				Gas: gas.State{
-					Excess: 10_891_227_490, // 10_000_000 * ln(100*nAVAX) * TargetToPriceUpdateConversion
+					Excess: 22_035_739_340, // 10_000_000 * ln(100*nAVAX) * TargetToPriceUpdateConversion
 				},
 				TargetExcess: 77_261_935, // 2^25 * ln(10)
 			},
 			target:      10_000_000,
-			maxCapacity: targetToMaxCapacity * 10_000_000,
-			gasPrice:    (100*nAVAX + 31) * MinGasPrice, // +31 due to approximation
+			maxCapacity: TargetToMaxCapacity * 10_000_000,
+			gasPrice:    100*nAVAX*MinGasPrice + 5, // +5 due to approximation
 		},
 		{
 			name: "100m_target",
 			state: State{
 				Gas: gas.State{
-					Excess: 108_912_274_899, // 100_000_000 * ln(100*nAVAX) * TargetToPriceUpdateConversion
+					Excess: 220_357_393_400, // 100_000_000 * ln(100*nAVAX) * TargetToPriceUpdateConversion
 				},
 				TargetExcess: 154_523_870, // 2^25 * ln(100)
 			},
 			target:      100_000_000,
-			maxCapacity: targetToMaxCapacity * 100_000_000,
-			gasPrice:    (100*nAVAX + 8) * MinGasPrice, // +8 due to approximation
+			maxCapacity: TargetToMaxCapacity * 100_000_000,
+			gasPrice:    100*nAVAX*MinGasPrice + 5, // +5 due to approximation
 		},
 		{
 			name: "low_1b_target",
 			state: State{
 				Gas: gas.State{
-					Excess: 1_089_122_722_848, // (1_000_000_000 - 24) * ln(100*nAVAX) * TargetToPriceUpdateConversion
+					Excess: 2_203_573_881_110, // (1_000_000_000 - 24) * ln(100*nAVAX) * TargetToPriceUpdateConversion
 				},
 				TargetExcess: 231_785_804, // 2^25 * ln(1000)
 			},
 			target:      1_000_000_000 - 24,
-			maxCapacity: targetToMaxCapacity * (1_000_000_000 - 24),
-			gasPrice:    (100*nAVAX + 1) * MinGasPrice, // +1 due to approximation
+			maxCapacity: TargetToMaxCapacity * (1_000_000_000 - 24),
+			gasPrice:    100 * nAVAX * MinGasPrice,
 		},
 		{
 			name: "high_1b_target",
 			state: State{
 				Gas: gas.State{
-					Excess: 1_089_122_755_521, // (1_000_000_000 + 6) * ln(100*nAVAX) * TargetToPriceUpdateConversion
+					Excess: 2_203_573_947_217, // (1_000_000_000 + 6) * ln(100*nAVAX) * TargetToPriceUpdateConversion
 				},
 				TargetExcess: 231_785_805, // 2^25 * ln(1000) + 1
 			},
 			target:      1_000_000_000 + 6,
-			maxCapacity: targetToMaxCapacity * (1_000_000_000 + 6),
-			gasPrice:    (100 * nAVAX) * MinGasPrice,
+			maxCapacity: TargetToMaxCapacity * (1_000_000_000 + 6),
+			gasPrice:    100 * nAVAX * MinGasPrice,
 		},
 		{
 			name: "largest_max_capacity",
@@ -164,10 +164,10 @@ var (
 				Gas: gas.State{
 					Excess: math.MaxUint64,
 				},
-				TargetExcess: 924430531, // 2^25 * ln(MaxUint64 / MinMaxCapacity)
+				TargetExcess: 947_688_691, // 2^25 * ln(MaxUint64 / MinMaxCapacity)
 			},
-			target:      922_337_190_378_117_171,
-			maxCapacity: 18_446_743_807_562_343_420,
+			target:      1_844_674_384_269_701_322,
+			maxCapacity: 18_446_743_842_697_013_220,
 			gasPrice:    2 * MinGasPrice,
 		},
 		{
@@ -200,7 +200,7 @@ var (
 				Gas: gas.State{
 					Excess: math.MaxUint64,
 				},
-				TargetExcess: 1_024_950_627, // 2^25 * ln(MaxUint64 / MinTargetPerSecond) + 1
+				TargetExcess: maxTargetExcess,
 			},
 			target:      math.MaxUint64,
 			maxCapacity: math.MaxUint64,
@@ -287,16 +287,16 @@ var (
 			name: "0_seconds_over_capacity",
 			initial: State{
 				Gas: gas.State{
-					Capacity: 31_000_000, // Could happen if the targetExcess was modified
+					Capacity: 16_000_000, // Could happen if the targetExcess was modified
 					Excess:   2_000_000,
 				},
-				// Set capacity to 30M
+				// Set capacity to 15M
 				TargetExcess: 13_605_152, // 2^25 * ln(1.5)
 			},
 			seconds: 0,
 			expected: State{
 				Gas: gas.State{
-					Capacity: 30_000_000, // capped at 30M
+					Capacity: 15_000_000, // capped at 15M
 					Excess:   2_000_000,  // unmodified
 				},
 				TargetExcess: 13_605_152, // unmodified
@@ -558,6 +558,81 @@ var (
 				TargetExcess: 2 * MaxTargetExcessDiff,
 			},
 		},
+		{
+			name: "reduce_capacity",
+			initial: State{
+				Gas: gas.State{
+					Capacity: 10_019_550, // MinMaxCapacity * e^(2*MaxTargetExcessDiff / TargetConversion)
+					Excess:   2_000_000_000,
+				},
+				TargetExcess: 2 * MaxTargetExcessDiff,
+			},
+			desiredTargetExcess: 0,
+			expected: State{
+				Gas: gas.State{
+					Capacity: 10_009_770,    // MinMaxCapacity * e^(MaxTargetExcessDiff / TargetConversion)
+					Excess:   1_998_047_816, // 2M * NewTarget / OldTarget
+				},
+				TargetExcess: MaxTargetExcessDiff,
+			},
+		},
+		{
+			name: "overflow_max_capacity",
+			initial: State{
+				Gas: gas.State{
+					Capacity: math.MaxUint64,
+					Excess:   2_000_000_000,
+				},
+				TargetExcess: maxTargetExcess,
+			},
+			desiredTargetExcess: 0,
+			expected: State{
+				Gas: gas.State{
+					Capacity: math.MaxUint64,
+					Excess:   1_998_047_867, // 2M * NewTarget / OldTarget
+				},
+				TargetExcess: maxTargetExcess - MaxTargetExcessDiff,
+			},
+		},
+	}
+	parseTests = []struct {
+		name        string
+		bytes       []byte
+		state       State
+		expectedErr error
+	}{
+		{
+			name:        "insufficient_length",
+			bytes:       make([]byte, StateSize-1),
+			expectedErr: ErrStateInsufficientLength,
+		},
+		{
+			name:  "zero_state",
+			bytes: make([]byte, StateSize),
+			state: State{},
+		},
+		{
+			name: "truncate_bytes",
+			bytes: []byte{
+				StateSize: 1,
+			},
+			state: State{},
+		},
+		{
+			name: "endianess",
+			bytes: []byte{
+				0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+				0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18,
+				0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28,
+			},
+			state: State{
+				Gas: gas.State{
+					Capacity: 0x0102030405060708,
+					Excess:   0x1112131415161718,
+				},
+				TargetExcess: 0x2122232425262728,
+			},
+		},
 	}
 )
 
@@ -698,6 +773,54 @@ func BenchmarkDesiredTargetExcess(b *testing.B) {
 		b.Run(test.name, func(b *testing.B) {
 			for range b.N {
 				DesiredTargetExcess(test.target)
+			}
+		})
+	}
+}
+
+func TestParseState(t *testing.T) {
+	for _, test := range parseTests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			state, err := ParseState(test.bytes)
+			require.ErrorIs(err, test.expectedErr)
+			require.Equal(test.state, state)
+		})
+	}
+}
+
+func BenchmarkParseState(b *testing.B) {
+	for _, test := range parseTests {
+		b.Run(test.name, func(b *testing.B) {
+			for range b.N {
+				_, _ = ParseState(test.bytes)
+			}
+		})
+	}
+}
+
+func TestBytes(t *testing.T) {
+	for _, test := range parseTests {
+		if test.expectedErr != nil {
+			continue
+		}
+		t.Run(test.name, func(t *testing.T) {
+			expectedBytes := test.bytes[:StateSize]
+			bytes := test.state.Bytes()
+			require.Equal(t, expectedBytes, bytes)
+		})
+	}
+}
+
+func BenchmarkBytes(b *testing.B) {
+	for _, test := range parseTests {
+		if test.expectedErr != nil {
+			continue
+		}
+		b.Run(test.name, func(b *testing.B) {
+			for range b.N {
+				_ = test.state.Bytes()
 			}
 		})
 	}

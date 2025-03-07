@@ -17,7 +17,7 @@ import (
 )
 
 func TestFeeInfoProvider(t *testing.T) {
-	backend := newTestBackend(t, params.TestChainConfig, 2, common.Big0, testGenBlock(t, 55, 370))
+	backend := newTestBackend(t, params.TestChainConfig, 2, common.Big0, testGenBlock(t, 55, 80))
 	f, err := newFeeInfoProvider(backend, 1, 2)
 	require.NoError(t, err)
 

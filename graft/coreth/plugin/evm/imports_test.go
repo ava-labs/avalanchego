@@ -57,6 +57,7 @@ func TestMustNotImport(t *testing.T) {
 		"plugin/evm/atomic": {"core", "core/vm", "params"},
 		"plugin/evm/client": {"core", "core/vm", "params"},
 		"plugin/evm/config": {"core", "core/vm", "params"},
+		"plugin/evm/header": {"core", "core/vm", "params"},
 	}
 
 	for packageName, forbiddenImports := range mustNotImport {
