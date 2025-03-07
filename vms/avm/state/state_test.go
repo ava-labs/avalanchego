@@ -4,17 +4,22 @@
 package state
 
 import (
+	"context"
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+	"gotest.tools/v3/assert/cmp"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -73,11 +78,7 @@ func init() {
 		1,
 		time.Now(),
 		[]*txs.Tx{
-			{
-				Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
-					BlockchainID: ids.GenerateTestID(),
-				}},
-			},
+			populatedTx,
 		},
 		parser.Codec(),
 	)

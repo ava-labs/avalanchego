@@ -201,7 +201,7 @@ func (b *Block) Verify(context.Context) error {
 	return nil
 }
 
-func (b *Block) Accept(context.Context) error {
+func (b *Block) Accept(ctx context.Context) error {
 	blkID := b.ID()
 	defer b.manager.free(blkID)
 
@@ -246,14 +246,17 @@ func (b *Block) Accept(context.Context) error {
 		return err
 	}
 
-	txChecksum, utxoChecksum := b.manager.state.Checksums()
+	checksum, err := b.manager.state.Checksum(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get checksum: %w", err)
+	}
+
 	b.manager.backend.Ctx.Log.Trace(
 		"accepted block",
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", b.Parent()),
-		zap.Stringer("txChecksum", txChecksum),
-		zap.Stringer("utxoChecksum", utxoChecksum),
+		zap.Stringer("checksum", checksum),
 	)
 	return nil
 }
