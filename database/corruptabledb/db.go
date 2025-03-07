@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package corruptabledb
+package corruptibledb
 
 import (
 	"context"
@@ -16,7 +16,7 @@ var (
 	_ database.Batch    = (*batch)(nil)
 )
 
-// CorruptableDB is a wrapper around Database
+// CorruptibleDB is a wrapper around Database
 // it prevents any future calls in case of a corruption occurs
 type Database struct {
 	database.Database
