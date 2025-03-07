@@ -69,23 +69,8 @@ var (
 			ShanghaiTime:        utils.TimeToNewUint64(upgrade.GetConfig(constants.UnitTestID).DurangoTime),
 			CancunTime:          utils.TimeToNewUint64(upgrade.GetConfig(constants.UnitTestID).EtnaTime),
 		},
-		&extras.ChainConfig{
-			AvalancheContext: extras.AvalancheContext{SnowCtx: utils.TestSnowContext()},
-			NetworkUpgrades: extras.NetworkUpgrades{
-				ApricotPhase1BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase2BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase3BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase4BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase5BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhasePre6BlockTimestamp:  utils.NewUint64(0),
-				ApricotPhase6BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhasePost6BlockTimestamp: utils.NewUint64(0),
-				BanffBlockTimestamp:             utils.NewUint64(0),
-				CortinaBlockTimestamp:           utils.NewUint64(0),
-				DurangoBlockTimestamp:           utils.NewUint64(0),
-				EtnaTimestamp:                   utils.NewUint64(0),
-			},
-		})
+		extras.TestChainConfig,
+	)
 
 	TestLaunchConfig = WithExtra(
 		&ChainConfig{
@@ -102,23 +87,8 @@ var (
 			IstanbulBlock:       big.NewInt(0),
 			MuirGlacierBlock:    big.NewInt(0),
 		},
-		&extras.ChainConfig{
-			AvalancheContext: extras.AvalancheContext{SnowCtx: utils.TestSnowContext()},
-			NetworkUpgrades: extras.NetworkUpgrades{
-				ApricotPhase1BlockTimestamp:     nil,
-				ApricotPhase2BlockTimestamp:     nil,
-				ApricotPhase3BlockTimestamp:     nil,
-				ApricotPhase4BlockTimestamp:     nil,
-				ApricotPhase5BlockTimestamp:     nil,
-				ApricotPhasePre6BlockTimestamp:  nil,
-				ApricotPhase6BlockTimestamp:     nil,
-				ApricotPhasePost6BlockTimestamp: nil,
-				BanffBlockTimestamp:             nil,
-				CortinaBlockTimestamp:           nil,
-				DurangoBlockTimestamp:           nil,
-				EtnaTimestamp:                   nil,
-			},
-		})
+		extras.TestLaunchConfig,
+	)
 
 	TestApricotPhase1Config = WithExtra(
 		&ChainConfig{
@@ -135,23 +105,8 @@ var (
 			IstanbulBlock:       big.NewInt(0),
 			MuirGlacierBlock:    big.NewInt(0),
 		},
-		&extras.ChainConfig{
-			AvalancheContext: extras.AvalancheContext{SnowCtx: utils.TestSnowContext()},
-			NetworkUpgrades: extras.NetworkUpgrades{
-				ApricotPhase1BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase2BlockTimestamp:     nil,
-				ApricotPhase3BlockTimestamp:     nil,
-				ApricotPhase4BlockTimestamp:     nil,
-				ApricotPhase5BlockTimestamp:     nil,
-				ApricotPhasePre6BlockTimestamp:  nil,
-				ApricotPhase6BlockTimestamp:     nil,
-				ApricotPhasePost6BlockTimestamp: nil,
-				BanffBlockTimestamp:             nil,
-				CortinaBlockTimestamp:           nil,
-				DurangoBlockTimestamp:           nil,
-				EtnaTimestamp:                   nil,
-			},
-		})
+		extras.TestApricotPhase1Config,
+	)
 
 	TestApricotPhase2Config = WithExtra(
 		&ChainConfig{
@@ -169,23 +124,8 @@ var (
 			MuirGlacierBlock:    big.NewInt(0),
 			BerlinBlock:         big.NewInt(0),
 		},
-		&extras.ChainConfig{
-			AvalancheContext: extras.AvalancheContext{SnowCtx: utils.TestSnowContext()},
-			NetworkUpgrades: extras.NetworkUpgrades{
-				ApricotPhase1BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase2BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase3BlockTimestamp:     nil,
-				ApricotPhase4BlockTimestamp:     nil,
-				ApricotPhase5BlockTimestamp:     nil,
-				ApricotPhasePre6BlockTimestamp:  nil,
-				ApricotPhase6BlockTimestamp:     nil,
-				ApricotPhasePost6BlockTimestamp: nil,
-				BanffBlockTimestamp:             nil,
-				CortinaBlockTimestamp:           nil,
-				DurangoBlockTimestamp:           nil,
-				EtnaTimestamp:                   nil,
-			},
-		})
+		extras.TestApricotPhase2Config,
+	)
 
 	TestApricotPhase3Config = WithExtra(
 		&ChainConfig{
@@ -204,23 +144,8 @@ var (
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
 		},
-		&extras.ChainConfig{
-			AvalancheContext: extras.AvalancheContext{SnowCtx: utils.TestSnowContext()},
-			NetworkUpgrades: extras.NetworkUpgrades{
-				ApricotPhase1BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase2BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase3BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase4BlockTimestamp:     nil,
-				ApricotPhase5BlockTimestamp:     nil,
-				ApricotPhasePre6BlockTimestamp:  nil,
-				ApricotPhase6BlockTimestamp:     nil,
-				ApricotPhasePost6BlockTimestamp: nil,
-				BanffBlockTimestamp:             nil,
-				CortinaBlockTimestamp:           nil,
-				DurangoBlockTimestamp:           nil,
-				EtnaTimestamp:                   nil,
-			},
-		})
+		extras.TestApricotPhase3Config,
+	)
 
 	TestApricotPhase4Config = WithExtra(
 		&ChainConfig{
@@ -239,23 +164,8 @@ var (
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
 		},
-		&extras.ChainConfig{
-			AvalancheContext: extras.AvalancheContext{SnowCtx: utils.TestSnowContext()},
-			NetworkUpgrades: extras.NetworkUpgrades{
-				ApricotPhase1BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase2BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase3BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase4BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase5BlockTimestamp:     nil,
-				ApricotPhasePre6BlockTimestamp:  nil,
-				ApricotPhase6BlockTimestamp:     nil,
-				ApricotPhasePost6BlockTimestamp: nil,
-				BanffBlockTimestamp:             nil,
-				CortinaBlockTimestamp:           nil,
-				DurangoBlockTimestamp:           nil,
-				EtnaTimestamp:                   nil,
-			},
-		})
+		extras.TestApricotPhase4Config,
+	)
 
 	TestApricotPhase5Config = WithExtra(
 		&ChainConfig{
@@ -274,23 +184,8 @@ var (
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
 		},
-		&extras.ChainConfig{
-			AvalancheContext: extras.AvalancheContext{SnowCtx: utils.TestSnowContext()},
-			NetworkUpgrades: extras.NetworkUpgrades{
-				ApricotPhase1BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase2BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase3BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase4BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase5BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhasePre6BlockTimestamp:  nil,
-				ApricotPhase6BlockTimestamp:     nil,
-				ApricotPhasePost6BlockTimestamp: nil,
-				BanffBlockTimestamp:             nil,
-				CortinaBlockTimestamp:           nil,
-				DurangoBlockTimestamp:           nil,
-				EtnaTimestamp:                   nil,
-			},
-		})
+		extras.TestApricotPhase5Config,
+	)
 
 	TestApricotPhasePre6Config = WithExtra(
 		&ChainConfig{
@@ -309,23 +204,8 @@ var (
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
 		},
-		&extras.ChainConfig{
-			AvalancheContext: extras.AvalancheContext{SnowCtx: utils.TestSnowContext()},
-			NetworkUpgrades: extras.NetworkUpgrades{
-				ApricotPhase1BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase2BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase3BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase4BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase5BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhasePre6BlockTimestamp:  utils.NewUint64(0),
-				ApricotPhase6BlockTimestamp:     nil,
-				ApricotPhasePost6BlockTimestamp: nil,
-				BanffBlockTimestamp:             nil,
-				CortinaBlockTimestamp:           nil,
-				DurangoBlockTimestamp:           nil,
-				EtnaTimestamp:                   nil,
-			},
-		})
+		extras.TestApricotPhasePre6Config,
+	)
 
 	TestApricotPhase6Config = WithExtra(
 		&ChainConfig{
@@ -344,23 +224,8 @@ var (
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
 		},
-		&extras.ChainConfig{
-			AvalancheContext: extras.AvalancheContext{SnowCtx: utils.TestSnowContext()},
-			NetworkUpgrades: extras.NetworkUpgrades{
-				ApricotPhase1BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase2BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase3BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase4BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase5BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhasePre6BlockTimestamp:  utils.NewUint64(0),
-				ApricotPhase6BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhasePost6BlockTimestamp: nil,
-				BanffBlockTimestamp:             nil,
-				CortinaBlockTimestamp:           nil,
-				DurangoBlockTimestamp:           nil,
-				EtnaTimestamp:                   nil,
-			},
-		})
+		extras.TestApricotPhase6Config,
+	)
 
 	TestApricotPhasePost6Config = WithExtra(
 		&ChainConfig{
@@ -379,23 +244,8 @@ var (
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
 		},
-		&extras.ChainConfig{
-			AvalancheContext: extras.AvalancheContext{SnowCtx: utils.TestSnowContext()},
-			NetworkUpgrades: extras.NetworkUpgrades{
-				ApricotPhase1BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase2BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase3BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase4BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase5BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhasePre6BlockTimestamp:  utils.NewUint64(0),
-				ApricotPhase6BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhasePost6BlockTimestamp: utils.NewUint64(0),
-				BanffBlockTimestamp:             nil,
-				CortinaBlockTimestamp:           nil,
-				DurangoBlockTimestamp:           nil,
-				EtnaTimestamp:                   nil,
-			},
-		})
+		extras.TestApricotPhasePost6Config,
+	)
 
 	TestBanffChainConfig = WithExtra(
 		&ChainConfig{
@@ -414,23 +264,8 @@ var (
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
 		},
-		&extras.ChainConfig{
-			AvalancheContext: extras.AvalancheContext{SnowCtx: utils.TestSnowContext()},
-			NetworkUpgrades: extras.NetworkUpgrades{
-				ApricotPhase1BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase2BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase3BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase4BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase5BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhasePre6BlockTimestamp:  utils.NewUint64(0),
-				ApricotPhase6BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhasePost6BlockTimestamp: utils.NewUint64(0),
-				BanffBlockTimestamp:             utils.NewUint64(0),
-				CortinaBlockTimestamp:           nil,
-				DurangoBlockTimestamp:           nil,
-				EtnaTimestamp:                   nil,
-			},
-		})
+		extras.TestBanffChainConfig,
+	)
 
 	TestCortinaChainConfig = WithExtra(
 		&ChainConfig{
@@ -449,23 +284,8 @@ var (
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
 		},
-		&extras.ChainConfig{
-			AvalancheContext: extras.AvalancheContext{SnowCtx: utils.TestSnowContext()},
-			NetworkUpgrades: extras.NetworkUpgrades{
-				ApricotPhase1BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase2BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase3BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase4BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase5BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhasePre6BlockTimestamp:  utils.NewUint64(0),
-				ApricotPhase6BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhasePost6BlockTimestamp: utils.NewUint64(0),
-				BanffBlockTimestamp:             utils.NewUint64(0),
-				CortinaBlockTimestamp:           utils.NewUint64(0),
-				DurangoBlockTimestamp:           nil,
-				EtnaTimestamp:                   nil,
-			},
-		})
+		extras.TestCortinaChainConfig,
+	)
 
 	TestDurangoChainConfig = WithExtra(
 		&ChainConfig{
@@ -485,23 +305,8 @@ var (
 			LondonBlock:         big.NewInt(0),
 			ShanghaiTime:        utils.NewUint64(0),
 		},
-		&extras.ChainConfig{
-			AvalancheContext: extras.AvalancheContext{SnowCtx: utils.TestSnowContext()},
-			NetworkUpgrades: extras.NetworkUpgrades{
-				ApricotPhase1BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase2BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase3BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase4BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase5BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhasePre6BlockTimestamp:  utils.NewUint64(0),
-				ApricotPhase6BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhasePost6BlockTimestamp: utils.NewUint64(0),
-				BanffBlockTimestamp:             utils.NewUint64(0),
-				CortinaBlockTimestamp:           utils.NewUint64(0),
-				DurangoBlockTimestamp:           utils.NewUint64(0),
-				EtnaTimestamp:                   nil,
-			},
-		})
+		extras.TestDurangoChainConfig,
+	)
 
 	TestEtnaChainConfig = WithExtra(
 		&ChainConfig{
@@ -522,25 +327,10 @@ var (
 			ShanghaiTime:        utils.NewUint64(0),
 			CancunTime:          utils.NewUint64(0),
 		},
-		&extras.ChainConfig{
-			AvalancheContext: extras.AvalancheContext{SnowCtx: utils.TestSnowContext()},
-			NetworkUpgrades: extras.NetworkUpgrades{
-				ApricotPhase1BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase2BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase3BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase4BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase5BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhasePre6BlockTimestamp:  utils.NewUint64(0),
-				ApricotPhase6BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhasePost6BlockTimestamp: utils.NewUint64(0),
-				BanffBlockTimestamp:             utils.NewUint64(0),
-				CortinaBlockTimestamp:           utils.NewUint64(0),
-				DurangoBlockTimestamp:           utils.NewUint64(0),
-				EtnaTimestamp:                   utils.NewUint64(0),
-			},
-		})
+		extras.TestEtnaChainConfig,
+	)
 
-	TestFUpgradeChainConfig = WithExtra(
+	TestFortunaChainConfig = WithExtra(
 		&ChainConfig{
 			ChainID:             big.NewInt(1),
 			HomesteadBlock:      big.NewInt(0),
@@ -559,24 +349,8 @@ var (
 			ShanghaiTime:        utils.NewUint64(0),
 			CancunTime:          utils.NewUint64(0),
 		},
-		&extras.ChainConfig{
-			AvalancheContext: extras.AvalancheContext{SnowCtx: utils.TestSnowContext()},
-			NetworkUpgrades: extras.NetworkUpgrades{
-				ApricotPhase1BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase2BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase3BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase4BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhase5BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhasePre6BlockTimestamp:  utils.NewUint64(0),
-				ApricotPhase6BlockTimestamp:     utils.NewUint64(0),
-				ApricotPhasePost6BlockTimestamp: utils.NewUint64(0),
-				BanffBlockTimestamp:             utils.NewUint64(0),
-				CortinaBlockTimestamp:           utils.NewUint64(0),
-				DurangoBlockTimestamp:           utils.NewUint64(0),
-				EtnaTimestamp:                   utils.NewUint64(0),
-				FUpgradeTimestamp:               utils.NewUint64(0),
-			},
-		})
+		extras.TestFortunaChainConfig,
+	)
 
 	TestRules = TestChainConfig.Rules(new(big.Int), IsMergeTODO, 0)
 )

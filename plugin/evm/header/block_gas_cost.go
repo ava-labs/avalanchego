@@ -11,21 +11,27 @@ import (
 	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap4"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap5"
+	"github.com/ava-labs/libevm/common"
 )
 
 var (
 	errBaseFeeNil        = errors.New("base fee is nil")
 	errBlockGasCostNil   = errors.New("block gas cost is nil")
 	errExtDataGasUsedNil = errors.New("extDataGasUsed is nil")
+	errNoGasUsed         = errors.New("no gas used")
 )
 
 // BlockGasCost calculates the required block gas cost based on the parent
 // header and the timestamp of the new block.
+// Prior to AP4, the returned block gas cost will be nil.
 func BlockGasCost(
 	config *extras.ChainConfig,
 	parent *types.Header,
 	timestamp uint64,
-) uint64 {
+) *big.Int {
+	if !config.IsApricotPhase4(timestamp) {
+		return nil
+	}
 	step := uint64(ap4.BlockGasCostStep)
 	if config.IsApricotPhase5(timestamp) {
 		step = ap5.BlockGasCostStep
@@ -38,11 +44,11 @@ func BlockGasCost(
 	if parent.Time <= timestamp {
 		timeElapsed = timestamp - parent.Time
 	}
-	return BlockGasCostWithStep(
+	return new(big.Int).SetUint64(BlockGasCostWithStep(
 		types.GetHeaderExtra(parent).BlockGasCost,
 		step,
 		timeElapsed,
-	)
+	))
 }
 
 // BlockGasCostWithStep calculates the required block gas cost based on the
@@ -95,12 +101,21 @@ func EstimateRequiredTip(
 	}
 
 	// totalGasUsed = GasUsed + ExtDataGasUsed
+	headerExtra := types.GetHeaderExtra(header)
 	totalGasUsed := new(big.Int).SetUint64(header.GasUsed)
-	totalGasUsed.Add(totalGasUsed, extra.ExtDataGasUsed)
+	totalGasUsed.Add(totalGasUsed, headerExtra.ExtDataGasUsed)
+	if totalGasUsed.Sign() == 0 {
+		return nil, errNoGasUsed
+	}
 
-	// totalRequiredTips = blockGasCost * baseFee
+	// totalRequiredTips = blockGasCost * baseFee + totalGasUsed - 1
+	//
+	// We add totalGasUsed - 1 to ensure that the total required tips
+	// calculation rounds up.
 	totalRequiredTips := new(big.Int)
-	totalRequiredTips.Mul(extra.BlockGasCost, header.BaseFee)
+	totalRequiredTips.Mul(headerExtra.BlockGasCost, header.BaseFee)
+	totalRequiredTips.Add(totalRequiredTips, totalGasUsed)
+	totalRequiredTips.Sub(totalRequiredTips, common.Big1)
 
 	// estimatedTip = totalRequiredTips / totalGasUsed
 	estimatedTip := totalRequiredTips.Div(totalRequiredTips, totalGasUsed)

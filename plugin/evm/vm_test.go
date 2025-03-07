@@ -128,8 +128,8 @@ var (
 	genesisJSONCortina           = genesisJSON(params.TestCortinaChainConfig)
 	genesisJSONDurango           = genesisJSON(params.TestDurangoChainConfig)
 	genesisJSONEtna              = genesisJSON(params.TestEtnaChainConfig)
-	genesisJSONFUpgrade          = genesisJSON(params.TestFUpgradeChainConfig)
-	genesisJSONLatest            = genesisJSONFUpgrade
+	genesisJSONFortuna           = genesisJSON(params.TestFortunaChainConfig)
+	genesisJSONLatest            = genesisJSONFortuna
 
 	genesisJSONCancun = genesisJSON(activateCancun(params.TestChainConfig))
 
@@ -3772,7 +3772,7 @@ func TestExtraStateChangeAtomicGasLimitExceeded(t *testing.T) {
 	}
 
 	// Hack: test [onExtraStateChange] directly to ensure it catches the atomic gas limit error correctly.
-	if _, _, err := vm2.onExtraStateChange(ethBlk2, state); err == nil || !strings.Contains(err.Error(), "exceeds atomic gas limit") {
+	if _, _, err := vm2.onExtraStateChange(ethBlk2, nil, state); err == nil || !strings.Contains(err.Error(), "exceeds atomic gas limit") {
 		t.Fatalf("Expected block to fail verification due to exceeded atomic gas limit, but found error: %v", err)
 	}
 }

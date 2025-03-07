@@ -26,7 +26,7 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/interfaces"
 	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/coreth/plugin/evm/upgrade/cortina"
+	"github.com/ava-labs/coreth/plugin/evm/upgrade/acp176"
 )
 
 // Tests that the simulator starts with the initial gas limit in the genesis block,
@@ -50,8 +50,8 @@ func TestWithBlockGasLimitOption(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to retrieve head block: %v", err)
 	}
-	if head.GasLimit() != cortina.GasLimit {
-		t.Errorf("head gas limit mismatch: have %v, want %v", head.GasLimit(), cortina.GasLimit)
+	if head.GasLimit() != acp176.MinMaxCapacity {
+		t.Errorf("head gas limit mismatch: have %v, want %v", head.GasLimit(), acp176.MinMaxCapacity)
 	}
 }
 

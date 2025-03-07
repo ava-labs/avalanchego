@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 	customheader "github.com/ava-labs/coreth/plugin/evm/header"
+	"github.com/ava-labs/coreth/plugin/evm/upgrade/acp176"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap3"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/libevm/common"
@@ -64,9 +65,9 @@ const (
 
 var (
 	DefaultMaxPrice           = big.NewInt(150 * params.GWei)
-	DefaultMinPrice           = big.NewInt(0 * params.GWei)
+	DefaultMinPrice           = big.NewInt(acp176.MinGasPrice)
 	DefaultMinBaseFee         = big.NewInt(ap3.InitialBaseFee)
-	DefaultMinGasUsed         = big.NewInt(6_000_000) // block gas limit is 8,000,000
+	DefaultMinGasUsed         = big.NewInt(acp176.MinTargetPerSecond)
 	DefaultMaxLookbackSeconds = uint64(80)
 )
 

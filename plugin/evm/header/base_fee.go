@@ -5,6 +5,7 @@ package header
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/ava-labs/coreth/core/types"
@@ -23,6 +24,13 @@ func BaseFee(
 	timestamp uint64,
 ) (*big.Int, error) {
 	switch {
+	case config.IsFortuna(timestamp):
+		state, err := feeStateBeforeBlock(config, parent, timestamp)
+		if err != nil {
+			return nil, fmt.Errorf("calculating initial fee state: %w", err)
+		}
+		price := state.GasPrice()
+		return new(big.Int).SetUint64(uint64(price)), nil
 	case config.IsApricotPhase3(timestamp):
 		return baseFeeFromWindow(config, parent, timestamp)
 	default:

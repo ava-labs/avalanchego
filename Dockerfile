@@ -1,5 +1,5 @@
 # ============= Compilation Stage ================
-FROM golang:1.22.8-bullseye AS builder
+FROM golang:1.23.6-bullseye AS builder
 
 ARG AVALANCHE_VERSION
 
@@ -17,7 +17,7 @@ WORKDIR $GOPATH/src/github.com/ava-labs/avalanchego
 RUN go mod download
 # Replace the coreth dependency
 RUN go mod edit -replace github.com/ava-labs/coreth=../coreth
-RUN go mod download && go mod tidy -compat=1.22
+RUN go mod download && go mod tidy -compat=1.23
 
 # Build the AvalancheGo binary with local version of coreth.
 RUN ./scripts/build_avalanche.sh
