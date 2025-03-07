@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/proposervm"
 )
 
 const (
@@ -36,14 +37,6 @@ const (
 	defaultUnexpandedDataDir = "$" + AvalancheGoDataDirVar
 
 	DefaultProcessContextFilename = "process.json"
-
-	// The default plugin path of $HOME/.avalanchego/plugins is not
-	// suitable for docker images since $HOME might be writable but
-	// the plugin directory should not be. The value below is in the
-	// same hierarchy as avalanchego on the docker image
-	// (/avalanchego/build/avalanchego) and consistent with the
-	// location already used by subnet-evm.
-	DefaultImagePluginDir = "/avalanchego/build/plugins"
 )
 
 var (
@@ -323,6 +316,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 
 	// ProposerVM
 	fs.Bool(ProposerVMUseCurrentHeightKey, false, "Have the ProposerVM always report the last accepted P-chain block height")
+	fs.Duration(ProposerVMMinBlockDelayKey, proposervm.DefaultMinBlockDelay, "Minimum delay to enforce when building a snowman++ block for the primary network chains and the default minimum delay for subnets")
 
 	// Metrics
 	fs.Bool(MeterVMsEnabledKey, true, "Enable Meter VMs to track VM performance with more granularity")
@@ -394,20 +388,13 @@ func BuildFlagSet() *pflag.FlagSet {
 	return fs
 }
 
-// GetExpandedArg gets the string in viper corresponding to [key] and expands
+// getExpandedArg gets the string in viper corresponding to [key] and expands
 // any variables using the OS env. If the [AvalancheGoDataDirVar] var is used,
 // we expand the value of the variable with the string in viper corresponding to
 // [DataDirKey].
-func GetExpandedArg(v *viper.Viper, key string) string {
-	return GetExpandedString(v, v.GetString(key))
-}
-
-// GetExpandedString expands [s] with any variables using the OS env. If the
-// [AvalancheGoDataDirVar] var is used, we expand the value of the variable with
-// the string in viper corresponding to [DataDirKey].
-func GetExpandedString(v *viper.Viper, s string) string {
+func getExpandedArg(v *viper.Viper, key string) string {
 	return os.Expand(
-		s,
+		v.GetString(key),
 		func(strVar string) string {
 			if strVar == AvalancheGoDataDirVar {
 				return os.ExpandEnv(v.GetString(DataDirKey))

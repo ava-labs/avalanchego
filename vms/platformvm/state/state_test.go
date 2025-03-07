@@ -548,7 +548,8 @@ func createPermissionlessValidatorTx(t testing.TB, subnetID ids.ID, validatorsDa
 	if subnetID == constants.PrimaryNetworkID {
 		sk, err := localsigner.New()
 		require.NoError(t, err)
-		sig = signer.NewProofOfPossession(sk)
+		sig, err = signer.NewProofOfPossession(sk)
+		require.NoError(t, err)
 	}
 
 	return &txs.AddPermissionlessValidatorTx{

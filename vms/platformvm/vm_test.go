@@ -107,9 +107,12 @@ var (
 		ExcessConversionConstant: 5_000,
 	}
 	defaultValidatorFeeConfig = fee.Config{
-		Capacity:                 100,
-		Target:                   50,
-		MinPrice:                 1,
+		Capacity: 100,
+		Target:   50,
+		// The minimum price is set to 2 so that tests can include cases where
+		// L1 validator balances do not evenly divide into a timestamp granular
+		// to a second.
+		MinPrice:                 2,
 		ExcessConversionConstant: 100,
 	}
 
@@ -319,6 +322,8 @@ func TestAddValidatorCommit(t *testing.T) {
 
 	sk, err := localsigner.New()
 	require.NoError(err)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(err)
 
 	// create valid tx
 	tx, err := wallet.IssueAddPermissionlessValidatorTx(
@@ -330,7 +335,7 @@ func TestAddValidatorCommit(t *testing.T) {
 			},
 			Subnet: constants.PrimaryNetworkID,
 		},
-		signer.NewProofOfPossession(sk),
+		pop,
 		vm.ctx.AVAXAssetID,
 		rewardsOwner,
 		rewardsOwner,
@@ -475,6 +480,8 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 
 	sk, err := localsigner.New()
 	require.NoError(err)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(err)
 
 	rewardsOwner := &secp256k1fx.OutputOwners{
 		Threshold: 1,
@@ -492,7 +499,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 			},
 			Subnet: constants.PrimaryNetworkID,
 		},
-		signer.NewProofOfPossession(sk),
+		pop,
 		vm.ctx.AVAXAssetID,
 		rewardsOwner,
 		rewardsOwner,
@@ -1910,6 +1917,9 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	sk, err := localsigner.New()
 	require.NoError(err)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(err)
+
 	rewardsOwner := &secp256k1fx.OutputOwners{
 		Threshold: 1,
 		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
@@ -1925,7 +1935,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 			},
 			Subnet: constants.PrimaryNetworkID,
 		},
-		signer.NewProofOfPossession(sk),
+		pop,
 		vm.ctx.AVAXAssetID,
 		rewardsOwner,
 		rewardsOwner,
@@ -2126,6 +2136,8 @@ func TestPruneMempool(t *testing.T) {
 
 	sk, err := localsigner.New()
 	require.NoError(err)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(err)
 
 	rewardsOwner := &secp256k1fx.OutputOwners{
 		Threshold: 1,
@@ -2141,7 +2153,7 @@ func TestPruneMempool(t *testing.T) {
 			},
 			Subnet: constants.PrimaryNetworkID,
 		},
-		signer.NewProofOfPossession(sk),
+		pop,
 		vm.ctx.AVAXAssetID,
 		rewardsOwner,
 		rewardsOwner,

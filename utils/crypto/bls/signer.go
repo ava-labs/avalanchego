@@ -5,6 +5,6 @@ package bls
 
 type Signer interface {
 	PublicKey() *PublicKey
-	Sign(msg []byte) *Signature
-	SignProofOfPossession(msg []byte) *Signature
+	Sign(msg []byte) (*Signature, error)
+	SignProofOfPossession(msg []byte) (*Signature, error)
 }
