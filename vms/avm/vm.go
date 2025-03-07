@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -235,7 +236,7 @@ func (vm *VM) Initialize(
 
 	stateMigration := vm.StateMigrationFactory.New(
 		vm.ctx.Log,
-		vm.db,
+		prefixdb.New([]byte("v2"), vm.db),
 		vm.parser,
 		vm.registerer,
 		avmConfig.ChecksumsEnabled,

@@ -468,11 +468,8 @@ func (s *state) Blocks() iter.Seq2[block.Block, error] {
 		defer itr.Release()
 
 		for itr.Next() {
+			//TODO error handling
 			blk, err := s.parser.ParseBlock(itr.Value())
-			if err != nil {
-				return
-			}
-
 			if !yield(blk, errors.Join(err, itr.Error())) {
 				return
 			}

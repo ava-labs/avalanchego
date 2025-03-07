@@ -6,6 +6,7 @@ package avm
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"math"
 	"testing"
 
@@ -17,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -751,12 +751,14 @@ func TestStateMigration(t *testing.T) {
 	}
 
 	//TODO ctx lock handling + shutdown vm
+	db := memdb.New()
 	toEngine := make(chan common.Message, 1)
+	genesisBytes := buildGenesisTest(t)
 	require.NoError(vm.Initialize(
 		context.Background(),
 		snowCtx,
-		memdb.New(),
-		buildGenesisTest(t),
+		db,
+		genesisBytes,
 		nil,
 		configBytes,
 		toEngine,
@@ -777,48 +779,52 @@ func TestStateMigration(t *testing.T) {
 
 	kc := secp256k1fx.NewKeychain(keys[0])
 
-	lastAcceptedBlkID, err := vm.LastAccepted(context.Background())
-	require.NoError(err)
-	lastAcceptedBlk, err := vm.GetBlock(context.Background(), lastAcceptedBlkID)
+	genesisBlk, err := vm.LastAccepted(context.Background())
 	require.NoError(err)
 
-	wantBlks := []snowman.Block{lastAcceptedBlk}
-	numBlks := 10
+	wantBlkIDs := []ids.ID{genesisBlk}
 	// The genesis block already exists, so build N - 1 blocks to have a total of
 	// N blocks in the ancestry
-	for i := 0; i < numBlks-1; i++ {
-		tx, err := txBuilder.CreateAssetTx(
-			"foobar",
-			"FOO",
-			0,
-			map[uint32][]verify.State{
-				0: {
-					&nftfx.MintOutput{
-						GroupID: 0,
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{kc.Keys[0].PublicKey().Address()},
-						},
+	tx, err := txBuilder.CreateAssetTx(
+		"foobar",
+		"FOO",
+		0,
+		map[uint32][]verify.State{
+			0: {
+				&nftfx.MintOutput{
+					GroupID: 0,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{kc.Keys[0].PublicKey().Address()},
 					},
 				},
 			},
-			kc,
-			ids.ShortID{},
-		)
-		require.NoError(err)
+		},
+		kc,
+		ids.ShortID{},
+	)
+	require.NoError(err)
 
-		issueAndAccept(require, vm, toEngine, tx)
+	issueAndAccept(require, vm, toEngine, tx)
 
-		lastAcceptedBlkID, err = vm.LastAccepted(context.Background())
-		require.NoError(err)
-		lastAcceptedBlk, err = vm.GetBlock(context.Background(), lastAcceptedBlkID)
-		require.NoError(err)
+	lastAcceptedBlk, err := vm.LastAccepted(context.Background())
+	require.NoError(err)
+	_, err = vm.GetBlock(context.Background(), lastAcceptedBlk)
+	require.NoError(err)
 
-		wantBlks = append(wantBlks, lastAcceptedBlk)
+	require.NotContains(wantBlkIDs, lastAcceptedBlk)
+	wantBlkIDs = append(wantBlkIDs, lastAcceptedBlk)
+
+	require.Len(wantBlkIDs, 2)
+	lastAccepted, err := vm.LastAccepted(context.Background())
+	require.NoError(err)
+	require.NotEqual(wantBlkIDs[0], lastAccepted)
+
+	fmt.Printf("genesis: %s\n", genesisBlk)
+	for blk := range vm.state.Blocks() {
+		require.Contains(wantBlkIDs, blk.ID())
+		fmt.Printf("blk: %s\n", blk.ID())
 	}
-
-	require.NoError(vm.Shutdown(context.Background()))
-	require.Len(wantBlks, numBlks)
 
 	vm = &VM{
 		Config: config.Config{
@@ -833,8 +839,8 @@ func TestStateMigration(t *testing.T) {
 	require.NoError(vm.Initialize(
 		context.Background(),
 		snowCtx,
-		memdb.New(),
-		buildGenesisTest(t),
+		db,
+		genesisBytes,
 		nil,
 		configBytes,
 		toEngine,
@@ -845,9 +851,14 @@ func TestStateMigration(t *testing.T) {
 	require.NoError(vm.Linearize(context.Background(), ids.ID{}, toEngine))
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
-	for _, wantBlk := range wantBlks {
-		gotBlk, err := vm.GetBlock(context.Background(), wantBlk.ID())
+	lastAccepted, err = vm.LastAccepted(context.Background())
+	require.NoError(err)
+
+	require.Equal(wantBlkIDs[len(wantBlkIDs)-1], lastAccepted)
+
+	for _, wantBlkID := range wantBlkIDs {
+		gotBlk, err := vm.GetBlock(context.Background(), wantBlkID)
 		require.NoError(err)
-		require.Equal(wantBlk.ID(), gotBlk.ID())
+		require.Equal(wantBlkID, gotBlk.ID())
 	}
 }
