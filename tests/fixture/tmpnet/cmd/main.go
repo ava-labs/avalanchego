@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/tests"
@@ -236,9 +237,44 @@ func main() {
 	)
 	rootCmd.AddCommand(checkLogsCmd)
 
+	var (
+		kubeConfigPath    string
+		kubeConfigContext string
+	)
+	startKindClusterCmd := &cobra.Command{
+		Use:   "start-kind-cluster",
+		Short: "Starts a local kind cluster with an integrated registry",
+		RunE: func(*cobra.Command, []string) error {
+			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
+			defer cancel()
+			log, err := tests.LoggerForFormat("", rawLogFormat)
+			if err != nil {
+				return err
+			}
+			return tmpnet.StartKindCluster(ctx, log, kubeConfigPath, kubeConfigContext)
+		},
+	}
+	SetKubeConfigFlags(startKindClusterCmd.PersistentFlags(), &kubeConfigPath, &kubeConfigContext)
+	rootCmd.AddCommand(startKindClusterCmd)
+
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "tmpnetctl failed: %v\n", err)
 		os.Exit(1)
 	}
 	os.Exit(0)
+}
+
+func SetKubeConfigFlags(flagSet *pflag.FlagSet, kubeConfigPath *string, kubeConfigContext *string) {
+	flagSet.StringVar(
+		kubeConfigPath,
+		"kubeconfig",
+		os.Getenv("KUBECONFIG"),
+		"The path to a kubernetes configuration file for the target cluster",
+	)
+	flagSet.StringVar(
+		kubeConfigContext,
+		"kubeconfig-context",
+		"",
+		"The path to a kubernetes configuration file for the target cluster",
+	)
 }
