@@ -41,6 +41,7 @@ the following non-test files:
 | node.go                     | Node        | Orchestrates and configures nodes                           |
 | node_config.go              | Node        | Reads and writes node configuration                         |
 | node_process.go             | NodeProcess | Orchestrates node processes                                 |
+| start_kind_cluster.go       |             | Starts a local kind cluster                                 |
 | subnet.go                   | Subnet      | Orchestrates subnets                                        |
 | utils.go                    |             | Defines shared utility functions                            |
 
@@ -260,6 +261,8 @@ The details required to configure a node's execution are written to
 runtime-specific details like the path of the avalanchego binary to
 start the node with.
 
+TODO(marun) Separate process from kube-based network deployment
+
 #### Flags
 
 All flags used to configure a node are written to
@@ -275,6 +278,12 @@ The process details of a node are written by avalanchego to
 `[base-data-dir]/process.json`. The file contains the PID of the node
 process, the URI of the node's API, and the address other nodes can
 use to bootstrap themselves (aka staking address).
+
+## Kube-based networks
+
+- `tmpnet` supports deploying nodes to kubernetes.
+- Each node will be deployed as a stateful set.
+- The naming convention for statefulsets will be [network uuid]-[first 8 characters of node ID excluding NodeID-]
 
 ## Monitoring
 
@@ -485,3 +494,12 @@ github action with `filter_by_owner` set to the owner string for the
 shared network. This ensures that the link emitted by the annotation
 displays results for only the shared network of the job rather than
 mixing results from all the networks started for the job.
+
+## Concurrent usage
+
+The types (networks, nodes, etc) that tmpnet defines are not safe for
+concurrent usage. To avoid requiring an rpc daemon, tmpnet stores data
+on diskData is shared via the filesystem, and new instances can just
+be created for every usage. Since the Add to this that tmpnet isn't
+intended to be multi-user either. Maybe not optimal in terms of
+scalability, but much simpler to work with for that lack.

@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
 	"k8s.io/utils/pointer"
@@ -34,32 +36,63 @@ import (
 )
 
 // DefaultPodFlags defines common flags for avalanchego nodes running in a pod.
-func DefaultPodFlags(networkName string, dataDir string) map[string]string {
-	return map[string]string{
+func DefaultPodFlags(networkName string, dataDir string, sybilProtectionEnabled bool) FlagsMap {
+	return FlagsMap{
 		config.DataDirKey:                dataDir,
 		config.NetworkNameKey:            networkName,
-		config.SybilProtectionEnabledKey: "false",
+		config.SybilProtectionEnabledKey: sybilProtectionEnabled,
 		config.HealthCheckFreqKey:        "500ms", // Ensure rapid detection of a healthy state
-		config.LogDisplayLevelKey:        logging.Debug.String(),
-		config.LogLevelKey:               logging.Debug.String(),
+		config.LogDisplayLevelKey:        logging.Info.String(),
+		config.LogLevelKey:               logging.Off.String(),
 		config.HTTPHostKey:               "0.0.0.0", // Need to bind to pod IP to ensure kubelet can access the http port for the readiness check
 	}
 }
 
-// newNodeStatefulSet returns a statefulset for an avalanchego node.
+// NewNodeStatefulSet returns a statefulset for an avalanchego node.
 func NewNodeStatefulSet(
 	name string,
+	generateName bool,
 	imageName string,
 	containerName string,
 	volumeName string,
 	volumeSize string,
 	volumeMountPath string,
-	flags map[string]string,
+	labels map[string]string,
+	flags FlagsMap,
 ) *appsv1.StatefulSet {
-	return &appsv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{
+	var objectMeta metav1.ObjectMeta
+	if generateName {
+		objectMeta = metav1.ObjectMeta{
 			GenerateName: name + "-",
-		},
+		}
+	} else {
+		objectMeta = metav1.ObjectMeta{
+			Name: name,
+		}
+	}
+
+	podLabels := map[string]string{
+		"app": name,
+	}
+	ghRepo := ""
+	for label, value := range labels {
+		// gh_repo contains a slash so it is not a valid label. Set it as an annotation instead.
+		if label == "gh_repo" {
+			ghRepo = value
+			continue
+		}
+		podLabels[label] = value
+	}
+	podAnnotations := map[string]string{
+		// TODO(marun) Specify the port prometheus should target
+		"prometheus.io/scrape": "true",
+		"prometheus.io/path":   "/ext/metrics",
+		"promtail/collect":     "true",
+		"gh_repo":              ghRepo,
+	}
+
+	return &appsv1.StatefulSet{
+		ObjectMeta: objectMeta,
 		Spec: appsv1.StatefulSetSpec{
 			Replicas:    pointer.Int32(1),
 			ServiceName: name,
@@ -87,9 +120,8 @@ func NewNodeStatefulSet(
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"app": name,
-					},
+					Labels:      podLabels,
+					Annotations: podAnnotations,
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -122,7 +154,7 @@ func NewNodeStatefulSet(
 								PeriodSeconds:    1,
 								SuccessThreshold: 1,
 							},
-							Env: stringMapToEnvVarSlice(flags),
+							Env: flagsToEnvVarSlice(flags),
 						},
 					},
 				},
@@ -132,17 +164,35 @@ func NewNodeStatefulSet(
 }
 
 // stringMapToEnvVarSlice converts a string map to a kube EnvVar slice.
-func stringMapToEnvVarSlice(mapping map[string]string) []corev1.EnvVar {
-	envVars := make([]corev1.EnvVar, len(mapping))
+func flagsToEnvVarSlice(flags FlagsMap) []corev1.EnvVar {
+	envVars := make([]corev1.EnvVar, len(flags))
 	var i int
-	for k, v := range mapping {
+	for k, v := range flags {
 		envVars[i] = corev1.EnvVar{
 			Name:  config.EnvVarName(config.EnvPrefix, k),
-			Value: v,
+			Value: fmt.Sprintf("%v", v),
 		}
 		i++
 	}
+	sortEnvVars(envVars)
 	return envVars
+}
+
+func envVarsToJSONValue(envVars []corev1.EnvVar) []map[string]string {
+	jsonValue := make([]map[string]string, len(envVars))
+	for i, envVar := range envVars {
+		jsonValue[i] = map[string]string{
+			"name":  envVar.Name,
+			"value": envVar.Value,
+		}
+	}
+	return jsonValue
+}
+
+func sortEnvVars(envVars []corev1.EnvVar) {
+	sort.Slice(envVars, func(i, j int) bool {
+		return envVars[i].Name < envVars[j].Name
+	})
 }
 
 // WaitForNodeHealthy waits for the node running in the specified pod to report healthy.
@@ -298,4 +348,44 @@ func enableLocalForwardForPod(
 		return 0, nil, fmt.Errorf("failed to find at least one forwarded port: %w", err)
 	}
 	return forwardedPorts[0].Local, stopChan, nil
+}
+
+// GetClientConfig replicates the behavior of clientcmd.BuildConfigFromFlags with zap logging and
+// support for an optional config context. If path is not provided, use of in-cluster config will
+// be attempted.
+func GetClientConfig(log logging.Logger, path string, context string) (*restclient.Config, error) {
+	if len(path) == 0 {
+		log.Warn("--kubeconfig not set.  Using the inClusterConfig.  This might not work.")
+		kubeconfig, err := restclient.InClusterConfig()
+		if err == nil {
+			return kubeconfig, nil
+		}
+		log.Warn("failed to create inClusterConfig, falling back to default config",
+			zap.Error(err),
+		)
+	}
+	overrides := &clientcmd.ConfigOverrides{}
+	if len(context) > 0 {
+		overrides.CurrentContext = context
+	}
+	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{
+			ExplicitPath: path,
+		},
+		overrides,
+	).ClientConfig()
+}
+
+// GetClientset returns a kubernetes clientset for the provided kubeconfig path and context.
+func GetClientset(log logging.Logger, path string, context string) (*kubernetes.Clientset, error) {
+	clientConfig, err := GetClientConfig(log, path, context)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client config: %w", err)
+	}
+
+	clientset, err := kubernetes.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create clientset: %w", err)
+	}
+	return clientset, nil
 }

@@ -4,6 +4,7 @@
 package upgrade
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"testing"
@@ -24,6 +25,7 @@ var (
 	avalancheGoExecPath            string
 	avalancheGoExecPathToUpgradeTo string
 	startCollectors                bool
+	checkMonitoring                bool
 )
 
 func init() {
@@ -39,7 +41,10 @@ func init() {
 		"",
 		"avalanchego executable path to upgrade to",
 	)
-	e2e.SetStartCollectorsFlag(&startCollectors)
+	e2e.SetMonitoringFlags(
+		&startCollectors,
+		&checkMonitoring,
+	)
 }
 
 var _ = ginkgo.Describe("[Upgrade]", func() {
@@ -47,7 +52,7 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 	require := require.New(tc)
 
 	ginkgo.It("can upgrade versions", func() {
-		network := tmpnet.NewDefaultNetwork("avalanchego-upgrade")
+		network := tmpnet.NewDefaultNetwork(tc.Log(), "avalanchego-upgrade")
 
 		// Get the default genesis so we can modify it
 		genesis, err := network.DefaultGenesis()
@@ -59,11 +64,22 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 			require.NoError(tmpnet.StartCollectors(tc.DefaultContext(), tc.Log()))
 			shutdownDelay = tmpnet.NetworkShutdownDelay // Ensure a final metrics scrape
 		}
+		if checkMonitoring {
+			// Since cleanups are run in LIFO order, adding this cleanup before
+			// StartNetwork is called ensures network shutdown will be called first.
+			tc.DeferCleanup(func() {
+				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultTimeout)
+				defer cancel()
+				require.NoError(tmpnet.CheckMonitoring(ctx, tc.Log(), network.UUID))
+			})
+		}
 
 		e2e.StartNetwork(
-			tc,
+			e2e.NewEventHandlerTestContext(),
 			network,
-			avalancheGoExecPath,
+			&tmpnet.NodeRuntimeConfig{
+				AvalancheGoPath: avalancheGoExecPath,
+			},
 			"", /* pluginDir */
 			shutdownDelay,
 			false, /* skipShutdown */
@@ -77,7 +93,7 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 
 			node.RuntimeConfig.AvalancheGoPath = avalancheGoExecPathToUpgradeTo
 
-			require.NoError(network.StartNode(tc.DefaultContext(), tc.Log(), node))
+			require.NoError(network.StartNode(tc.DefaultContext(), node))
 
 			tc.By(fmt.Sprintf("waiting for node %q to report healthy after restart", node.NodeID))
 			e2e.WaitForHealthy(tc, node)

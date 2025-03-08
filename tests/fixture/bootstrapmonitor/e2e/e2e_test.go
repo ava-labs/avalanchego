@@ -17,7 +17,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
@@ -105,7 +104,7 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 
 		ginkgo.By("Configuring a kubernetes client")
 		kubeconfigPath := os.Getenv("KUBECONFIG")
-		kubeconfig, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+		kubeconfig, err := tmpnet.GetClientConfig(tc.Log(), kubeconfigPath, "")
 		require.NoError(err)
 		clientset, err := kubernetes.NewForConfig(kubeconfig)
 		require.NoError(err)
@@ -262,14 +261,16 @@ func buildImage(tc tests.TestContext, imageName string, forceNewHash bool, scrip
 	require.NoError(err, "Image build failed: %s", output)
 }
 
-func newNodeStatefulSet(name string, flags map[string]string) *appsv1.StatefulSet {
+func newNodeStatefulSet(name string, flags tmpnet.FlagsMap) *appsv1.StatefulSet {
 	statefulSet := tmpnet.NewNodeStatefulSet(
 		name,
+		true, /* generateName */
 		latestAvalanchegoImage,
 		nodeContainerName,
 		volumeName,
 		volumeSize,
 		nodeDataDir,
+		nil,
 		flags,
 	)
 
@@ -282,8 +283,9 @@ func newNodeStatefulSet(name string, flags map[string]string) *appsv1.StatefulSe
 	return statefulSet
 }
 
-func defaultPodFlags() map[string]string {
-	return tmpnet.DefaultPodFlags(constants.LocalName, nodeDataDir)
+func defaultPodFlags() tmpnet.FlagsMap {
+	// TODO(marun) DefaultPodFlags is only used by bootstrap monitor - maybe inline
+	return tmpnet.DefaultPodFlags(constants.LocalName, nodeDataDir, false /* sybilProtectionEnabled */)
 }
 
 // waitForPodCondition waits until the specified pod reports the specified condition

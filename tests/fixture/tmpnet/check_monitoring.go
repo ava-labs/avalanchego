@@ -13,6 +13,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -26,6 +27,16 @@ import (
 )
 
 type getCountFunc func() (int, error)
+
+// CheckMonitoring checks if logs and metrics exist for the given network. If no network
+// UUID is provided, an attempt will be made to derive selectors from env vars (GH_*)
+// identifying a github actions run.
+func CheckMonitoring(ctx context.Context, log logging.Logger, networkUUID string) error {
+	return errors.Join(
+		CheckLogsExist(ctx, log, networkUUID),
+		CheckMetricsExist(ctx, log, networkUUID),
+	)
+}
 
 // waitForCount waits until the provided function returns greater than zero.
 func waitForCount(ctx context.Context, log logging.Logger, name string, getCount getCountFunc) error {
@@ -55,8 +66,9 @@ func waitForCount(ctx context.Context, log logging.Logger, name string, getCount
 	return nil
 }
 
-// CheckLogsExist checks if logs exist for the given network. Github labels are also
-// included if provided as env vars (GH_*).
+// CheckLogsExist checks if logs exist for the given network. If no network UUID is
+// provided, an attempt will be made to derive selectors from env vars (GH_*) identifying
+// a github actions run.
 func CheckLogsExist(ctx context.Context, log logging.Logger, networkUUID string) error {
 	username, password, err := getCollectorCredentials(promtailCmd)
 	if err != nil {
@@ -163,7 +175,7 @@ func queryLoki(
 }
 
 // CheckMetricsExist checks if metrics exist for the given network. Github labels are also
-// included if provided as env vars (GH_*).
+// used as filters if provided as env vars (GH_*).
 func CheckMetricsExist(ctx context.Context, log logging.Logger, networkUUID string) error {
 	username, password, err := getCollectorCredentials(prometheusCmd)
 	if err != nil {
@@ -253,20 +265,22 @@ func (b *basicAuthRoundTripper) RoundTrip(req *http.Request) (*http.Response, er
 
 // getSelectors returns the comma-separated list of selectors.
 func getSelectors(networkUUID string) (string, error) {
-	selectors := []string{}
+	// If network UUID is provided, use it as the only selector
 	if len(networkUUID) > 0 {
-		selectors = append(selectors, fmt.Sprintf(`network_uuid="%s"`, networkUUID))
+		return fmt.Sprintf(`network_uuid="%s"`, networkUUID), nil
 	}
-	githubLabels := githubLabelsFromEnv()
-	for label := range githubLabels {
-		value, err := githubLabels.GetStringVal(label)
-		if err != nil {
-			return "", err
+
+	// Fall back to using Github labels as selectors
+	selectors := []string{}
+	for _, label := range githubLabels {
+		value := os.Getenv(strings.ToUpper(label))
+		if len(value) > 0 {
+			selectors = append(selectors, fmt.Sprintf(`%s="%s"`, label, value))
 		}
-		if len(value) == 0 {
-			continue
-		}
-		selectors = append(selectors, fmt.Sprintf(`%s="%s"`, label, value))
 	}
+	if len(selectors) == 0 {
+		return "", errors.New("no GH_* env vars set to use for selectors")
+	}
+
 	return strings.Join(selectors, ","), nil
 }
