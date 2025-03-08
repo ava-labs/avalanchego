@@ -27,8 +27,9 @@ import (
 
 type getCountFunc func() (int, error)
 
-// CheckMonitoring checks if logs and metrics exist for the given network. Github labels
-// are also used as filters if provided as env vars (GH_*).
+// CheckMonitoring checks if logs and metrics exist for the given network. If no network
+// UUID is provided, an attempt will be made to derive selectors from env vars (GH_*)
+// identifying a github actions run.
 func CheckMonitoring(ctx context.Context, log logging.Logger, networkUUID string) error {
 	return errors.Join(
 		CheckLogsExist(ctx, log, networkUUID),
@@ -64,8 +65,9 @@ func waitForCount(ctx context.Context, log logging.Logger, name string, getCount
 	return nil
 }
 
-// CheckLogsExist checks if logs exist for the given network. Github labels are also
-// used as filters if provided as env vars (GH_*).
+// CheckLogsExist checks if logs exist for the given network. If no network UUID is
+// provided, an attempt will be made to derive selectors from env vars (GH_*) identifying
+// a github actions run.
 func CheckLogsExist(ctx context.Context, log logging.Logger, networkUUID string) error {
 	username, password, err := getCollectorCredentials(promtailCmd)
 	if err != nil {
@@ -262,10 +264,13 @@ func (b *basicAuthRoundTripper) RoundTrip(req *http.Request) (*http.Response, er
 
 // getSelectors returns the comma-separated list of selectors.
 func getSelectors(networkUUID string) (string, error) {
-	selectors := []string{}
+	// If network UUID is provided, use it as the only selector
 	if len(networkUUID) > 0 {
-		selectors = append(selectors, fmt.Sprintf(`network_uuid="%s"`, networkUUID))
+		return fmt.Sprintf(`network_uuid="%s"`, networkUUID), nil
 	}
+
+	// Fall back to using Github labels as selectors
+	selectors := []string{}
 	githubLabels := githubLabelsFromEnv()
 	for label := range githubLabels {
 		value, err := githubLabels.GetStringVal(label)
@@ -277,5 +282,9 @@ func getSelectors(networkUUID string) (string, error) {
 		}
 		selectors = append(selectors, fmt.Sprintf(`%s="%s"`, label, value))
 	}
+	if len(selectors) == 0 {
+		return "", errors.New("no GH_* env vars set to use for selectors")
+	}
+
 	return strings.Join(selectors, ","), nil
 }
