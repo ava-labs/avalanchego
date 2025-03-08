@@ -10,4 +10,4 @@ cd "${AVALANCHE_PATH}"
 if [[ ! -f ./build/tmpnetctl ]]; then
    ./scripts/build_tmpnetctl.sh
 fi
-./build/tmpnetctl
+./build/tmpnetctl "${@}"
