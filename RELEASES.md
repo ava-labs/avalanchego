@@ -1,5 +1,12 @@
 # Release Notes
 
+## [v1.12.3] (pending)
+
+### Configs
+- Added logging auto-amplification upon a health check failure
+  - `--log-auto-amplification`
+  - `--log-auto-amplification-max-duration`
+
 ## [v1.12.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.2)
 
 This version is backwards compatible to [v1.12.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0). It is optional, but encouraged.
