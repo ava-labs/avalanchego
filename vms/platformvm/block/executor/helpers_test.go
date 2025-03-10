@@ -81,7 +81,7 @@ type test struct {
 
 type environment struct {
 	blkManager Manager
-	mempool    mempool.Mempool
+	mempool    *mempool.Mempool
 	sender     *enginetest.Sender
 
 	isBootstrapped *utils.Atomic[bool]
@@ -153,7 +153,13 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 	metrics := metrics.Noop
 
 	var err error
-	res.mempool, err = mempool.New("mempool", registerer, nil)
+	res.mempool, err = mempool.New(
+		res.config,
+		"mempool",
+		registerer,
+		time.Time{},
+		nil,
+	)
 	if err != nil {
 		panic(fmt.Errorf("failed to create mempool: %w", err))
 	}
