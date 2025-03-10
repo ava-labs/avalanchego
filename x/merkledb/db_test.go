@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -27,8 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
-const defaultHistoryLength = 300
-
 // newDB returns a new merkle database with the underlying type so that tests can access unexported fields
 func newDB(ctx context.Context, db database.Database, config Config) (*merkleDB, error) {
 	db, err := New(ctx, db, config)
@@ -36,14 +33,6 @@ func newDB(ctx context.Context, db database.Database, config Config) (*merkleDB,
 		return nil, err
 	}
 	return db.(*merkleDB), nil
-}
-
-func newDefaultConfig() Config {
-	config := NewConfig()
-	config.HistoryLength = defaultHistoryLength
-	config.Reg = prometheus.NewRegistry()
-
-	return config
 }
 
 func Test_MerkleDB_Get_Safety(t *testing.T) {
@@ -125,7 +114,7 @@ func Test_MerkleDB_DB_Load_Root_From_DB(t *testing.T) {
 	db, err := New(
 		context.Background(),
 		baseDB,
-		newDefaultConfig(),
+		NewConfig(),
 	)
 	require.NoError(err)
 
@@ -153,7 +142,7 @@ func Test_MerkleDB_DB_Load_Root_From_DB(t *testing.T) {
 	db, err = New(
 		context.Background(),
 		baseDB,
-		newDefaultConfig(),
+		NewConfig(),
 	)
 	require.NoError(err)
 
@@ -167,7 +156,7 @@ func Test_MerkleDB_DB_Rebuild(t *testing.T) {
 
 	initialSize := 5_000
 
-	config := newDefaultConfig()
+	config := NewConfig()
 	config.ValueNodeCacheSize = uint(initialSize)
 	config.IntermediateNodeCacheSize = uint(initialSize)
 
@@ -224,7 +213,7 @@ func Test_MerkleDB_Failed_Batch_Commit(t *testing.T) {
 	db, err := New(
 		context.Background(),
 		memDB,
-		newDefaultConfig(),
+		NewConfig(),
 	)
 	require.NoError(err)
 
@@ -245,7 +234,7 @@ func Test_MerkleDB_Value_Cache(t *testing.T) {
 	db, err := New(
 		context.Background(),
 		memDB,
-		newDefaultConfig(),
+		NewConfig(),
 	)
 	require.NoError(err)
 
@@ -1292,7 +1281,7 @@ func TestCrashRecovery(t *testing.T) {
 	merkleDB, err := newDatabase(
 		context.Background(),
 		baseDB,
-		newDefaultConfig(),
+		NewConfig(),
 		&mockMetrics{},
 	)
 	require.NoError(err)
@@ -1310,7 +1299,7 @@ func TestCrashRecovery(t *testing.T) {
 	newMerkleDB, err := newDatabase(
 		context.Background(),
 		baseDB,
-		newDefaultConfig(),
+		NewConfig(),
 		&mockMetrics{},
 	)
 	require.NoError(err)
