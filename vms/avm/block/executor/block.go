@@ -246,7 +246,6 @@ func (b *Block) Accept(context.Context) error {
 		return err
 	}
 
-	checksum := b.manager.state.Checksum()
 	b.manager.backend.Ctx.Log.Trace(
 		"accepted block",
 		zap.Stringer("blkID", blkID),
