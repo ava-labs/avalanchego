@@ -28,7 +28,6 @@ package gasprice
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"sync"
 
@@ -43,7 +42,6 @@ import (
 	"github.com/ava-labs/subnet-evm/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/lru"
-	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"golang.org/x/exp/slices"
@@ -109,10 +107,9 @@ type OracleBackend interface {
 // Oracle recommends gas prices based on the content of recent
 // blocks. Suitable for both light and full clients.
 type Oracle struct {
-	backend     OracleBackend
-	lastHead    common.Hash
-	lastPrice   *big.Int
-	lastBaseFee *big.Int
+	backend   OracleBackend
+	lastHead  common.Hash
+	lastPrice *big.Int
 	// [minPrice] ensures we don't get into a positive feedback loop where tips
 	// sink to 0 during a period of slow block production, such that nobody's
 	// transactions will be included until the full block fee duration has
@@ -192,10 +189,6 @@ func NewOracle(backend OracleBackend, config Config) (*Oracle, error) {
 			lastHead = ev.Block.Hash()
 		}
 	}()
-	feeConfig, _, err := backend.GetFeeConfigAt(backend.LastAcceptedBlock().Header())
-	if err != nil {
-		return nil, fmt.Errorf("failed getting fee config in the oracle: %w", err)
-	}
 	feeInfoProvider, err := newFeeInfoProvider(backend, minGasUsed.Uint64(), config.Blocks)
 	if err != nil {
 		return nil, err
@@ -203,7 +196,6 @@ func NewOracle(backend OracleBackend, config Config) (*Oracle, error) {
 	return &Oracle{
 		backend:             backend,
 		lastPrice:           minPrice,
-		lastBaseFee:         new(big.Int).Set(feeConfig.MinBaseFee),
 		minPrice:            minPrice,
 		maxPrice:            maxPrice,
 		checkBlocks:         blocks,
@@ -220,26 +212,7 @@ func NewOracle(backend OracleBackend, config Config) (*Oracle, error) {
 // produced at the current time. If SubnetEVM has not been activated, it may
 // return a nil value and a nil error.
 func (oracle *Oracle) EstimateBaseFee(ctx context.Context) (*big.Int, error) {
-	_, baseFee, err := oracle.suggestDynamicFees(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	// We calculate the [nextBaseFee] if a block were to be produced immediately.
-	// If [nextBaseFee] is lower than the estimate from sampling, then we return it
-	// to prevent returning an incorrectly high fee when the network is quiescent.
-	nextBaseFee, err := oracle.estimateNextBaseFee(ctx)
-	if err != nil {
-		log.Warn("failed to estimate next base fee", "err", err)
-		return baseFee, nil
-	}
-	// If base fees have not been enabled, return a nil value.
-	if nextBaseFee == nil {
-		return nil, nil
-	}
-
-	baseFee = math.BigMin(baseFee, nextBaseFee)
-	return baseFee, nil
+	return oracle.estimateNextBaseFee(ctx)
 }
 
 // estimateNextBaseFee calculates what the base fee should be on the next block if it
@@ -271,25 +244,23 @@ func (oracle *Oracle) estimateNextBaseFee(ctx context.Context) (*big.Int, error)
 // SuggestPrice returns an estimated price for legacy transactions.
 func (oracle *Oracle) SuggestPrice(ctx context.Context) (*big.Int, error) {
 	// Estimate the effective tip based on recent blocks.
-	tip, baseFee, err := oracle.suggestDynamicFees(ctx)
+	tip, err := oracle.suggestTip(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// We calculate the [nextBaseFee] if a block were to be produced immediately.
-	// If [nextBaseFee] is lower than the estimate from sampling, then we return it
-	// to prevent returning an incorrectly high fee when the network is quiescent.
+	// We calculate the `nextBaseFee` if a block were to be produced immediately.
 	nextBaseFee, err := oracle.estimateNextBaseFee(ctx)
 	if err != nil {
 		log.Warn("failed to estimate next base fee", "err", err)
+		return nil, err
 	}
-	// Separately from checking the error value, check that [nextBaseFee] is non-nil
-	// before attempting to take the minimum.
-	if nextBaseFee != nil {
-		baseFee = math.BigMin(baseFee, nextBaseFee)
+	if nextBaseFee == nil {
+		// This occurs if Subnet-EVM has not been scheduled yet
+		return tip, nil
 	}
 
-	return new(big.Int).Add(tip, baseFee), nil
+	return new(big.Int).Add(tip, nextBaseFee), nil
 }
 
 // SuggestTipCap returns a tip cap so that newly created transaction can have a
@@ -299,25 +270,21 @@ func (oracle *Oracle) SuggestPrice(ctx context.Context) (*big.Int, error) {
 // necessary to add the basefee to the returned number to fall back to the legacy
 // behavior.
 func (oracle *Oracle) SuggestTipCap(ctx context.Context) (*big.Int, error) {
-	tip, _, err := oracle.suggestDynamicFees(ctx)
-	return tip, err
+	return oracle.suggestTip(ctx)
 }
 
-// suggestDynamicFees estimates the gas tip and base fee based on a simple sampling method
-func (oracle *Oracle) suggestDynamicFees(ctx context.Context) (*big.Int, *big.Int, error) {
+// suggestTip estimates the gas tip based on a simple sampling method
+func (oracle *Oracle) suggestTip(ctx context.Context) (*big.Int, error) {
 	head, err := oracle.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	var (
-		feeLastChangedAt *big.Int
-		feeConfig        commontype.FeeConfig
-	)
+	var feeLastChangedAt *big.Int
 	if oracle.backend.ChainConfig().IsPrecompileEnabled(feemanager.ContractAddress, head.Time) {
-		feeConfig, feeLastChangedAt, err = oracle.backend.GetFeeConfigAt(head)
+		_, feeLastChangedAt, err = oracle.backend.GetFeeConfigAt(head)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 	}
 
@@ -325,27 +292,26 @@ func (oracle *Oracle) suggestDynamicFees(ctx context.Context) (*big.Int, *big.In
 
 	// If the latest gasprice is still available, return it.
 	oracle.cacheLock.RLock()
-	lastHead, lastPrice, lastBaseFee := oracle.lastHead, oracle.lastPrice, oracle.lastBaseFee
+	lastHead, lastPrice := oracle.lastHead, oracle.lastPrice
 	oracle.cacheLock.RUnlock()
 	if headHash == lastHead {
-		return new(big.Int).Set(lastPrice), new(big.Int).Set(lastBaseFee), nil
+		return new(big.Int).Set(lastPrice), nil
 	}
 	oracle.fetchLock.Lock()
 	defer oracle.fetchLock.Unlock()
 
 	// Try checking the cache again, maybe the last fetch fetched what we need
 	oracle.cacheLock.RLock()
-	lastHead, lastPrice, lastBaseFee = oracle.lastHead, oracle.lastPrice, oracle.lastBaseFee
+	lastHead, lastPrice = oracle.lastHead, oracle.lastPrice
 	oracle.cacheLock.RUnlock()
 	if headHash == lastHead {
-		return new(big.Int).Set(lastPrice), new(big.Int).Set(lastBaseFee), nil
+		return new(big.Int).Set(lastPrice), nil
 	}
 	var (
 		latestBlockNumber     = head.Number.Uint64()
 		lowerBlockNumberLimit = uint64(0)
 		currentTime           = oracle.clock.Unix()
 		tipResults            []*big.Int
-		baseFeeResults        []*big.Int
 	)
 
 	if uint64(oracle.checkBlocks) <= latestBlockNumber {
@@ -357,19 +323,13 @@ func (oracle *Oracle) suggestDynamicFees(ctx context.Context) (*big.Int, *big.In
 		if lowerBlockNumberLimit < feeLastChangedAt.Uint64() {
 			lowerBlockNumberLimit = feeLastChangedAt.Uint64()
 		}
-
-		// If the fee config has been increased in the latest block, increase the lastBaseFee to the
-		// new minimum base fee.
-		if feeLastChangedAt.Uint64() == latestBlockNumber && lastBaseFee.Cmp(feeConfig.MinBaseFee) < 0 {
-			lastBaseFee = feeConfig.MinBaseFee
-		}
 	}
 
 	// Process block headers in the range calculated for this gas price estimation.
 	for i := latestBlockNumber; i > lowerBlockNumberLimit; i-- {
 		feeInfo, err := oracle.getFeeInfo(ctx, i)
 		if err != nil {
-			return new(big.Int).Set(lastPrice), new(big.Int).Set(lastBaseFee), err
+			return new(big.Int).Set(lastPrice), err
 		}
 
 		if feeInfo.timestamp+oracle.maxLookbackSeconds < currentTime {
@@ -381,25 +341,14 @@ func (oracle *Oracle) suggestDynamicFees(ctx context.Context) (*big.Int, *big.In
 		} else {
 			tipResults = append(tipResults, new(big.Int).Set(common.Big0))
 		}
-
-		if feeInfo.baseFee != nil {
-			baseFeeResults = append(baseFeeResults, feeInfo.baseFee)
-		} else {
-			baseFeeResults = append(baseFeeResults, new(big.Int).Set(common.Big0))
-		}
 	}
 
 	price := lastPrice
-	baseFee := lastBaseFee
 	if len(tipResults) > 0 {
 		slices.SortFunc(tipResults, func(a, b *big.Int) int { return a.Cmp(b) })
 		price = tipResults[(len(tipResults)-1)*oracle.percentile/100]
 	}
 
-	if len(baseFeeResults) > 0 {
-		slices.SortFunc(baseFeeResults, func(a, b *big.Int) int { return a.Cmp(b) })
-		baseFee = baseFeeResults[(len(baseFeeResults)-1)*oracle.percentile/100]
-	}
 	if price.Cmp(oracle.maxPrice) > 0 {
 		price = new(big.Int).Set(oracle.maxPrice)
 	}
@@ -409,10 +358,9 @@ func (oracle *Oracle) suggestDynamicFees(ctx context.Context) (*big.Int, *big.In
 	oracle.cacheLock.Lock()
 	oracle.lastHead = headHash
 	oracle.lastPrice = price
-	oracle.lastBaseFee = baseFee
 	oracle.cacheLock.Unlock()
 
-	return new(big.Int).Set(price), new(big.Int).Set(baseFee), nil
+	return new(big.Int).Set(price), nil
 }
 
 // getFeeInfo calculates the minimum required tip to be included in a given
