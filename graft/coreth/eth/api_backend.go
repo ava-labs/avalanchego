@@ -42,6 +42,7 @@ import (
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/eth/gasprice"
 	"github.com/ava-labs/coreth/eth/tracers"
+	"github.com/ava-labs/coreth/internal/ethapi"
 	"github.com/ava-labs/coreth/params"
 	customheader "github.com/ava-labs/coreth/plugin/evm/header"
 	"github.com/ava-labs/coreth/rpc"
@@ -484,6 +485,10 @@ func (b *EthAPIBackend) RPCEVMTimeout() time.Duration {
 
 func (b *EthAPIBackend) RPCTxFeeCap() float64 {
 	return b.eth.config.RPCTxFeeCap
+}
+
+func (b *EthAPIBackend) PriceOptionsConfig() ethapi.PriceOptionConfig {
+	return b.eth.config.PriceOptionConfig
 }
 
 func (b *EthAPIBackend) BloomStatus() (uint64, uint64) {
