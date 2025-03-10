@@ -13,13 +13,13 @@ import (
 // SendConfig is used to specify who to send messages to over the p2p network.
 type SendConfig struct {
 	NodeIDs set.Set[ids.NodeID]
-	// If [Validators] >= number of connected validators, the message will be sent to all
+	// If Validators >= number of connected validators, the message will be sent to all
 	// connected validators.
 	Validators int
-	// If [NonValidators] >= number of connected non-validators, the message will be sent to
+	// If NonValidators >= number of connected non-validators, the message will be sent to
 	// all connected non-validators.
 	NonValidators int
-	// If [Peers] >= number of connected peers, the message will be sent to all connected peers.
+	// If Peers >= number of connected peers, the message will be sent to all connected peers.
 	Peers int
 }
 
