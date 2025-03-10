@@ -8,6 +8,11 @@ on:
         default: ''
         required: false
         type: string
+      avalanche_version:
+        description: 'The SHA or tag of avalanchego to use for the base image (must be compatible with the version in go.mod)'
+        default: ''
+        required: false
+        type: string
 
   push:
     tags:
@@ -30,4 +35,5 @@ jobs:
           VM_ID: ${{ inputs.vm_id }}
           PUBLISH: 1
           PLATFORMS: "linux/amd64,linux/arm64"
+          AVALANCHE_VERSION: ${{ inputs.avalanche_version }}
         run: scripts/build_docker_image.sh
