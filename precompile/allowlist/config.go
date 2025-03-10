@@ -5,6 +5,7 @@ package allowlist
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/ava-labs/subnet-evm/precompile/contract"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
@@ -50,15 +51,7 @@ func (c *AllowListConfig) Equal(other *AllowListConfig) bool {
 
 // areEqualAddressLists returns true iff [a] and [b] have the same addresses in the same order.
 func areEqualAddressLists(current []common.Address, other []common.Address) bool {
-	if len(current) != len(other) {
-		return false
-	}
-	for i, address := range current {
-		if address != other[i] {
-			return false
-		}
-	}
-	return true
+	return slices.Equal(current, other)
 }
 
 // Verify returns an error if there is an overlapping address between admin and enabled roles
