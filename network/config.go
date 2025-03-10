@@ -26,6 +26,10 @@ type HealthConfig struct {
 	// Marks if the health check should be enabled
 	Enabled bool `json:"-"`
 
+	// NoIngressValidatorConnectionGracePeriod denotes the time after which the health check fails
+	// for primary network validators with no ingress connections.
+	NoIngressValidatorConnectionGracePeriod time.Duration
+
 	// MinConnectedPeers is the minimum number of peers that the network should
 	// be connected to be considered healthy.
 	MinConnectedPeers uint `json:"minConnectedPeers"`
