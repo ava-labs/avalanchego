@@ -5,6 +5,7 @@ package warp
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -291,8 +292,10 @@ func TestUptimeSignatures(t *testing.T) {
 		clk := &mockable.Clock{}
 		validatorsManager, err := validators.NewManager(chainCtx, memdb.New(), clk)
 		require.NoError(t, err)
+		lock := &sync.RWMutex{}
+		newLockedValidatorManager := validators.NewLockedValidatorReader(validatorsManager, lock)
 		validatorsManager.StartTracking([]ids.NodeID{})
-		warpBackend, err := NewBackend(snowCtx.NetworkID, snowCtx.ChainID, warpSigner, warptest.EmptyBlockClient, validatorsManager, database, sigCache, nil)
+		warpBackend, err := NewBackend(snowCtx.NetworkID, snowCtx.ChainID, warpSigner, warptest.EmptyBlockClient, newLockedValidatorManager, database, sigCache, nil)
 		require.NoError(t, err)
 		handler := acp118.NewCachedHandler(sigCache, warpBackend, warpSigner)
 
