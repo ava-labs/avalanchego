@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/coreth/core/txpool/blobpool"
 	"github.com/ava-labs/coreth/core/txpool/legacypool"
 	"github.com/ava-labs/coreth/eth/gasprice"
+	"github.com/ava-labs/coreth/internal/ethapi"
 	"github.com/ava-labs/coreth/miner"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
@@ -178,4 +179,7 @@ type Config struct {
 	// This is useful for validators that don't need to index transactions.
 	// TransactionHistory can be still used to control unindexing old transactions.
 	SkipTxIndexing bool
+
+	// TODO: remove once we move SuggestPriceOptions to AVAX/custom API
+	PriceOptionConfig ethapi.PriceOptionConfig
 }
