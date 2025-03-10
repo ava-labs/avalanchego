@@ -252,7 +252,7 @@ func (b *Block) Accept(context.Context) error {
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", b.Parent()),
-		zap.Stringer("checksum", checksum),
+		zap.Stringer("checksum", b.manager.state.Checksum()),
 	)
 	return nil
 }
