@@ -64,3 +64,6 @@ vendor
 **/testdata
 
 .direnv
+
+# Nix output dir
+result
