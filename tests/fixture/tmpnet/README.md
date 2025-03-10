@@ -41,6 +41,7 @@ the following non-test files:
 | node.go                     | Node        | Orchestrates and configures nodes                           |
 | node_config.go              | Node        | Reads and writes node configuration                         |
 | node_process.go             | NodeProcess | Orchestrates node processes                                 |
+| start_kind_cluster.go       |             | Starts a local kind cluster                                 |
 | subnet.go                   | Subnet      | Orchestrates subnets                                        |
 | utils.go                    |             | Defines shared utility functions                            |
 
