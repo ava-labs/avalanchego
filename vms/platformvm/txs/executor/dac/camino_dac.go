@@ -28,7 +28,7 @@ var (
 	errNotPermittedToCreateProposal = errors.New("don't have permission to create proposal of this type")
 	errAlreadyActiveProposal        = errors.New("there is already active proposal of this type")
 	errNoActiveValidator            = errors.New("no active validator")
-	errNotCairoPhase                = errors.New("not allowed before CairoPhase")
+	errNotDPhase                    = errors.New("not allowed before DPhase")
 )
 
 type proposalVerifier struct {
@@ -93,8 +93,8 @@ func getBondTxIDs(bondTxIDsGetter dac.BondTxIDsGetter, state state.Chain, tx *tx
 // BaseFeeProposal
 
 func (e *proposalVerifier) BaseFeeProposal(*dac.BaseFeeProposal) error {
-	if !e.config.IsCairoPhaseActivated(e.state.GetTimestamp()) {
-		return errNotCairoPhase
+	if !e.config.IsDPhaseActivated(e.state.GetTimestamp()) {
+		return errNotDPhase
 	}
 
 	// verify address state (role)
@@ -362,8 +362,8 @@ func (*proposalBondTxIDsGetter) GeneralProposal(*dac.GeneralProposalState) ([]id
 // FeeDistributionProposal
 
 func (e *proposalVerifier) FeeDistributionProposal(*dac.FeeDistributionProposal) error {
-	if !e.config.IsCairoPhaseActivated(e.state.GetTimestamp()) {
-		return errNotCairoPhase
+	if !e.config.IsDPhaseActivated(e.state.GetTimestamp()) {
+		return errNotDPhase
 	}
 
 	// verify address state (role)

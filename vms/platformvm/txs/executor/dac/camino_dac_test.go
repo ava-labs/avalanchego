@@ -27,8 +27,8 @@ import (
 
 func TestProposalVerifierBaseFeeProposal(t *testing.T) {
 	ctx := snow.DefaultContextTest()
-	// TODO @evlekht replace with test.PhaseLast when cairo phase will be added as last
-	defaultConfig := test.Config(t, test.PhaseCairo)
+	// TODO @evlekht replace with test.PhaseLast when D phase will be added as last
+	defaultConfig := test.Config(t, test.PhaseD)
 
 	feeOwnerKey, _, feeOwner := generate.KeyAndOwner(t, test.Keys[0])
 	bondOwnerKey, _, bondOwner := generate.KeyAndOwner(t, test.Keys[1])
@@ -62,7 +62,7 @@ func TestProposalVerifierBaseFeeProposal(t *testing.T) {
 		isAdminProposal bool
 		expectedErr     error
 	}{
-		"Not CairoPhase": {
+		"Not DPhase": {
 			state: func(c *gomock.Controller, utx *txs.AddProposalTx, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().GetTimestamp().Return(cfg.BerlinPhaseTime)
@@ -80,12 +80,12 @@ func TestProposalVerifierBaseFeeProposal(t *testing.T) {
 			signers: [][]*secp256k1.PrivateKey{
 				{feeOwnerKey}, {bondOwnerKey}, {proposerKey},
 			},
-			expectedErr: errNotCairoPhase,
+			expectedErr: errNotDPhase,
 		},
 		"Proposer isn't FoundationAdmin": {
 			state: func(c *gomock.Controller, utx *txs.AddProposalTx, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
-				s.EXPECT().GetTimestamp().Return(cfg.CairoPhaseTime)
+				s.EXPECT().GetTimestamp().Return(cfg.DPhaseTime)
 				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateEmpty, nil) // not AddressStateFoundationAdmin
 				return s
 			},
@@ -111,7 +111,7 @@ func TestProposalVerifierBaseFeeProposal(t *testing.T) {
 				proposalsIterator.EXPECT().Value().Return(&dac.BaseFeeProposalState{}, nil)
 				proposalsIterator.EXPECT().Release()
 
-				s.EXPECT().GetTimestamp().Return(cfg.CairoPhaseTime)
+				s.EXPECT().GetTimestamp().Return(cfg.DPhaseTime)
 				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateFoundationAdmin, nil)
 				s.EXPECT().GetProposalIterator().Return(proposalsIterator, nil)
 				return s
@@ -138,7 +138,7 @@ func TestProposalVerifierBaseFeeProposal(t *testing.T) {
 				proposalsIterator.EXPECT().Release()
 				proposalsIterator.EXPECT().Error().Return(nil)
 
-				s.EXPECT().GetTimestamp().Return(cfg.CairoPhaseTime)
+				s.EXPECT().GetTimestamp().Return(cfg.DPhaseTime)
 				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateFoundationAdmin, nil)
 				s.EXPECT().GetProposalIterator().Return(proposalsIterator, nil)
 				return s
@@ -926,7 +926,7 @@ func TestProposalVerifierFeeDistributionProposal(t *testing.T) {
 		isAdminProposal bool
 		expectedErr     error
 	}{
-		"Not CairoPhase": {
+		"Not DPhase": {
 			state: func(c *gomock.Controller, utx *txs.AddProposalTx, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().GetTimestamp().Return(cfg.BerlinPhaseTime)
@@ -944,12 +944,12 @@ func TestProposalVerifierFeeDistributionProposal(t *testing.T) {
 			signers: [][]*secp256k1.PrivateKey{
 				{feeOwnerKey}, {bondOwnerKey}, {proposerKey},
 			},
-			expectedErr: errNotCairoPhase,
+			expectedErr: errNotDPhase,
 		},
 		"Proposer isn't FoundationAdmin": {
 			state: func(c *gomock.Controller, utx *txs.AddProposalTx, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
-				s.EXPECT().GetTimestamp().Return(cfg.CairoPhaseTime)
+				s.EXPECT().GetTimestamp().Return(cfg.DPhaseTime)
 				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateEmpty, nil) // not AddressStateFoundationAdmin
 				return s
 			},
@@ -975,7 +975,7 @@ func TestProposalVerifierFeeDistributionProposal(t *testing.T) {
 				proposalsIterator.EXPECT().Value().Return(&dac.FeeDistributionProposalState{}, nil)
 				proposalsIterator.EXPECT().Release()
 
-				s.EXPECT().GetTimestamp().Return(cfg.CairoPhaseTime)
+				s.EXPECT().GetTimestamp().Return(cfg.DPhaseTime)
 				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateFoundationAdmin, nil)
 				s.EXPECT().GetProposalIterator().Return(proposalsIterator, nil)
 				return s
@@ -1002,7 +1002,7 @@ func TestProposalVerifierFeeDistributionProposal(t *testing.T) {
 				proposalsIterator.EXPECT().Release()
 				proposalsIterator.EXPECT().Error().Return(nil)
 
-				s.EXPECT().GetTimestamp().Return(cfg.CairoPhaseTime)
+				s.EXPECT().GetTimestamp().Return(cfg.DPhaseTime)
 				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateFoundationAdmin, nil)
 				s.EXPECT().GetProposalIterator().Return(proposalsIterator, nil)
 				return s

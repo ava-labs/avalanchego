@@ -568,7 +568,7 @@ func TestProposals(t *testing.T) {
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 				InitialAdmin:        test.FundedKeys[0].Address(),
-			}, test.PhaseCairo, []api.UTXO{ // TODO @evlekht replace with PhaseLast when cairo is added
+			}, test.PhaseD, []api.UTXO{ // TODO @evlekht replace with PhaseLast when D is added
 				{
 					Amount:  json.Uint64(balance),
 					Address: test.KeysBech32[0],

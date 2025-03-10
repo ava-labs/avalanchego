@@ -23,11 +23,12 @@ const (
 	PhaseCortina  Phase = 3 // avax, included into Berlin phase
 	PhaseBerlin   Phase = 3
 	PhaseCairo    Phase = 4
+	PhaseD        Phase = 5
 )
 
 const (
 	PhaseFirst = PhaseSunrise
-	PhaseLast  = PhaseBerlin
+	PhaseLast  = PhaseCairo
 )
 
 func PhaseTime(t *testing.T, phase Phase, cfg *config.Config) time.Time {
@@ -40,6 +41,8 @@ func PhaseTime(t *testing.T, phase Phase, cfg *config.Config) time.Time {
 		return cfg.BerlinPhaseTime
 	case PhaseCairo:
 		return cfg.CairoPhaseTime
+	case PhaseD:
+		return cfg.DPhaseTime
 	}
 	require.FailNow(t, "unknown phase")
 	return time.Time{}
@@ -55,6 +58,8 @@ func PhaseName(t *testing.T, phase Phase) string {
 		return "BerlinPhase"
 	case PhaseCairo:
 		return "CairoPhase"
+	case PhaseD:
+		return "DPhase"
 	}
 	require.FailNow(t, "unknown phase")
 	return ""

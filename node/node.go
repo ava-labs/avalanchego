@@ -824,6 +824,7 @@ func (n *Node) initVMs() error {
 				AthensPhaseTime:                 version.GetAthensPhaseTime(n.Config.NetworkID),
 				BerlinPhaseTime:                 version.GetBerlinPhaseTime(n.Config.NetworkID),
 				CairoPhaseTime:                  version.GetCairoPhaseTime(n.Config.NetworkID),
+				DPhaseTime:                      version.GetDPhaseTime(n.Config.NetworkID),
 				MinPercentConnectedStakeHealthy: n.Config.MinPercentConnectedStakeHealthy,
 				UseCurrentHeight:                n.Config.UseCurrentHeight,
 				CaminoConfig:                    n.Config.CaminoConfig,

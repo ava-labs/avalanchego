@@ -2310,7 +2310,9 @@ func TestCaminoStandardTxExecutorAddressStateTx(t *testing.T) {
 				permissionsMatrix[phase][role][bit] = errNotBerlinPhase
 			}
 		}
-		permissionsMatrix[test.PhaseBerlin][role][as.AddressStateBitConsortium] = errBerlinPhase
+		for phase := test.PhaseBerlin; phase <= test.PhaseLast; phase++ {
+			permissionsMatrix[phase][role][as.AddressStateBitConsortium] = errBerlinPhase
+		}
 	}
 
 	// set phase-txUpgrade restrictions

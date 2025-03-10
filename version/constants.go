@@ -34,7 +34,7 @@ var (
 
 	Current = &Semantic{
 		Major: 1,
-		Minor: 1,
+		Minor: 2,
 		Patch: 0,
 	}
 	CurrentApp = &Application{
@@ -44,12 +44,12 @@ var (
 	}
 	MinimumCompatibleVersion = &Application{
 		Major: 1,
-		Minor: 1,
+		Minor: 2,
 		Patch: 0,
 	}
 	PrevMinimumCompatibleVersion = &Application{
 		Major: 1,
-		Minor: 0,
+		Minor: 1,
 		Patch: 0,
 	}
 
@@ -211,6 +211,12 @@ var (
 	CortinaDefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 
 	CairoPhaseTimes = map[uint32]time.Time{
+		constants.KopernikusID: time.Date(2025, time.February, 18, 0, 0, 0, 0, time.UTC),
+		constants.ColumbusID:   unreachableFutureTime,
+		constants.CaminoID:     unreachableFutureTime,
+	}
+
+	DPhaseTimes = map[uint32]time.Time{
 		constants.KopernikusID: unreachableFutureTime,
 		constants.ColumbusID:   unreachableFutureTime,
 		constants.CaminoID:     unreachableFutureTime,
@@ -317,6 +323,13 @@ func GetBerlinPhaseTime(networkID uint32) time.Time {
 
 func GetCairoPhaseTime(networkID uint32) time.Time {
 	if upgradeTime, exists := CairoPhaseTimes[networkID]; exists {
+		return upgradeTime
+	}
+	return DefaultUpgradeTime
+}
+
+func GetDPhaseTime(networkID uint32) time.Time {
+	if upgradeTime, exists := DPhaseTimes[networkID]; exists {
 		return upgradeTime
 	}
 	return DefaultUpgradeTime
