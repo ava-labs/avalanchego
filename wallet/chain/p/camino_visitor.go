@@ -58,6 +58,10 @@ func (*backendVisitor) FinishProposalsTx(*txs.FinishProposalsTx) error {
 	return errUnsupportedTxType
 }
 
+func (*backendVisitor) UnlockExpiredDepositTx(*txs.UnlockExpiredDepositTx) error {
+	return errUnsupportedTxType
+}
+
 // signer
 
 func (s *signerVisitor) AddressStateTx(tx *txs.AddressStateTx) error {
@@ -145,5 +149,9 @@ func (s *signerVisitor) AddVoteTx(tx *txs.AddVoteTx) error {
 }
 
 func (*signerVisitor) FinishProposalsTx(*txs.FinishProposalsTx) error {
+	return errUnsupportedTxType
+}
+
+func (*signerVisitor) UnlockExpiredDepositTx(*txs.UnlockExpiredDepositTx) error {
 	return errUnsupportedTxType
 }

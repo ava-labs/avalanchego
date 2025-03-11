@@ -134,6 +134,7 @@ func RegisterUnsignedTxsTypes(targetCodec codec.CaminoRegistry) error {
 		targetCodec.RegisterCustomType(&dac.ExcludeMemberProposal{}),
 		targetCodec.RegisterCustomType(&dac.GeneralProposal{}),
 		targetCodec.RegisterCustomType(&dac.FeeDistributionProposal{}),
+		targetCodec.RegisterCustomType(&UnlockExpiredDepositTx{}),
 	)
 	return errs.Err
 }

@@ -1008,3 +1008,62 @@ func TestNewRewardsImportTx(t *testing.T) {
 		})
 	}
 }
+
+func TestNewUnlockExpiredDepositTx(t *testing.T) {
+	_, depositOwnerAddr, depositOwner := generate.KeyAndOwner(t, test.Keys[0])
+
+	depositTxID := ids.ID{1}
+	bondTxID := ids.ID{2}
+
+	depositedUTXO := generate.UTXO(ids.ID{3}, test.AVAXAssetID, 11, depositOwner, depositTxID, ids.Empty, false)
+	depositedBondedUTXO := generate.UTXO(ids.ID{4}, test.AVAXAssetID, 17, depositOwner, depositTxID, bondTxID, false)
+
+	tests := map[string]struct {
+		state        func(*gomock.Controller, []ids.ID) state.State
+		depositTxIDs []ids.ID
+		utx          *txs.UnlockExpiredDepositTx
+		expectedErr  error
+	}{
+		"OK": {
+			state: func(ctrl *gomock.Controller, depositTxIDs []ids.ID) state.State {
+				s := state.NewMockState(ctrl)
+				expect.StateUnlock(t, s,
+					depositTxIDs,
+					[]ids.ShortID{depositOwnerAddr},
+					[]*avax.UTXO{depositedUTXO, depositedBondedUTXO},
+					locked.StateDeposited,
+				)
+				return s
+			},
+			depositTxIDs: []ids.ID{depositTxID},
+			utx: &txs.UnlockExpiredDepositTx{
+				Ins: []*avax.TransferableInput{
+					generate.InFromUTXO(t, depositedUTXO, []uint32{}, false),
+					generate.InFromUTXO(t, depositedBondedUTXO, []uint32{}, false),
+				},
+				Outs: []*avax.TransferableOutput{
+					generate.OutFromUTXO(t, depositedUTXO, ids.Empty, ids.Empty),
+					generate.OutFromUTXO(t, depositedBondedUTXO, ids.Empty, bondTxID),
+				},
+			},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+			ctrl := gomock.NewController(t)
+			b := newCaminoBuilder(t, tt.state(ctrl, tt.depositTxIDs), nil, test.PhaseLast)
+
+			tx, err := b.NewUnlockExpiredDepositTx(tt.depositTxIDs)
+			require.ErrorIs(err, tt.expectedErr)
+			if err != nil {
+				require.Nil(tx)
+				return
+			}
+			expectedTx := &txs.Tx{Unsigned: tt.utx}
+			require.NoError(expectedTx.Initialize(txs.Codec))
+			require.NoError(expectedTx.SyntacticVerify(b.ctx))
+			require.Equal(expectedTx, tx)
+		})
+	}
+}

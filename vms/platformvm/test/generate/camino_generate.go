@@ -99,6 +99,15 @@ func OutFromUTXO(t *testing.T, utxo *avax.UTXO, depositTxID, bondTxID ids.ID) *a
 	}
 }
 
+func OutsFromUTXOs(t *testing.T, utxos []*avax.UTXO, depositTxID, bondTxID ids.ID) []*avax.TransferableOutput {
+	t.Helper()
+	outs := make([]*avax.TransferableOutput, len(utxos))
+	for i := range utxos {
+		outs[i] = OutFromUTXO(t, utxos[i], depositTxID, bondTxID)
+	}
+	return outs
+}
+
 func Out(assetID ids.ID, amount uint64, outputOwners secp256k1fx.OutputOwners, depositTxID, bondTxID ids.ID) *avax.TransferableOutput {
 	var out avax.TransferableOut = &secp256k1fx.TransferOutput{
 		Amt:          amount,
@@ -267,6 +276,15 @@ func InsFromUTXOsWithSigIndices(t *testing.T, utxos []*avax.UTXO, sigIndices []u
 	ins := make([]*avax.TransferableInput, len(utxos))
 	for i := range utxos {
 		ins[i] = InFromUTXO(t, utxos[i], sigIndices, false)
+	}
+	return ins
+}
+
+func InsFromUTXOsWithoutSigIndices(t *testing.T, utxos []*avax.UTXO) []*avax.TransferableInput {
+	t.Helper()
+	ins := make([]*avax.TransferableInput, len(utxos))
+	for i := range utxos {
+		ins[i] = InFromUTXO(t, utxos[i], []uint32{}, false)
 	}
 	return ins
 }

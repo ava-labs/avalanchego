@@ -114,6 +114,10 @@ type CaminoTxBuilder interface {
 		depositTxIDs []ids.ID,
 	) (*txs.Tx, error)
 
+	NewUnlockExpiredDepositTx(
+		depositTxIDs []ids.ID,
+	) (*txs.Tx, error)
+
 	NewFinishProposalsTx(
 		state state.Chain,
 		earlyFinishedProposalIDs []ids.ID,
@@ -703,6 +707,7 @@ func (b *caminoBuilder) NewRewardsImportTx() (*txs.Tx, error) {
 	return tx, tx.SyntacticVerify(b.ctx)
 }
 
+// TODO@ test
 func (b *caminoBuilder) NewSystemUnlockDepositTx(
 	depositTxIDs []ids.ID,
 ) (*txs.Tx, error) {
@@ -718,6 +723,24 @@ func (b *caminoBuilder) NewSystemUnlockDepositTx(
 			Ins:          ins,
 			Outs:         outs,
 		}},
+	}}
+	if err := tx.Initialize(txs.Codec); err != nil {
+		return nil, err
+	}
+	return tx, tx.SyntacticVerify(b.ctx)
+}
+
+func (b *caminoBuilder) NewUnlockExpiredDepositTx(
+	depositTxIDs []ids.ID,
+) (*txs.Tx, error) {
+	ins, outs, err := b.Unlock(b.state, depositTxIDs, locked.StateDeposited)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+
+	tx := &txs.Tx{Unsigned: &txs.UnlockExpiredDepositTx{
+		Ins:  ins,
+		Outs: outs,
 	}}
 	if err := tx.Initialize(txs.Codec); err != nil {
 		return nil, err

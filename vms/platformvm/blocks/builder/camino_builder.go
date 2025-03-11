@@ -78,11 +78,18 @@ func caminoBuildBlock(
 		return nil, fmt.Errorf("could not find next deposits to unlock: %w", err)
 	}
 	if shouldUnlock {
-		unlockDepositTx, err := txBuilder.NewSystemUnlockDepositTx(depositsTxIDs)
-		if err != nil {
-			return nil, fmt.Errorf("could not build tx to unlock deposits: %w", err)
+		var unlockDepositTx *txs.Tx
+		if builder.txExecutorBackend.Config.IsCairoPhaseActivated(timestamp) {
+			unlockDepositTx, err = txBuilder.NewUnlockExpiredDepositTx(depositsTxIDs)
+			if err != nil {
+				return nil, fmt.Errorf("could not build tx to unlock deposits: %w", err)
+			}
+		} else {
+			unlockDepositTx, err = txBuilder.NewSystemUnlockDepositTx(depositsTxIDs)
+			if err != nil {
+				return nil, fmt.Errorf("could not build tx to unlock deposits: %w", err)
+			}
 		}
-
 		return blocks.NewBanffStandardBlock(
 			timestamp,
 			parentID,

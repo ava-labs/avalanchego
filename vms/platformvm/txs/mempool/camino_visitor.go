@@ -72,6 +72,10 @@ func (*issuer) FinishProposalsTx(*txs.FinishProposalsTx) error {
 	return errUnsupportedTxType
 }
 
+func (*issuer) UnlockExpiredDepositTx(*txs.UnlockExpiredDepositTx) error {
+	return errUnsupportedTxType
+}
+
 // Remover
 
 func (r *remover) AddressStateTx(*txs.AddressStateTx) error {
@@ -130,6 +134,11 @@ func (r *remover) AddVoteTx(*txs.AddVoteTx) error {
 }
 
 func (*remover) FinishProposalsTx(*txs.FinishProposalsTx) error {
+	// this tx is never in mempool
+	return nil
+}
+
+func (*remover) UnlockExpiredDepositTx(*txs.UnlockExpiredDepositTx) error {
 	// this tx is never in mempool
 	return nil
 }

@@ -106,6 +106,9 @@ var (
 	errNotPermittedToCreateProposal      = errors.New("don't have permission to create proposal of this type")
 	errZeroDepositOfferLimits            = errors.New("deposit offer TotalMaxAmount and TotalMaxRewardAmount are zero")
 	errAddrStateNotChanged               = errors.New("address state wasn't changed")
+	errNotDepositedInput                 = errors.New("input is not deposited")
+	errNotCairoPhase                     = errors.New("not allowed before CairoPhase")
+	errDepositNotExpired                 = errors.New("deposit is not expired")
 
 	ErrInvalidProposal = errors.New("proposal is semantically invalid")
 )
@@ -971,6 +974,120 @@ func (e *CaminoStandardTxExecutor) UnlockDepositTx(tx *txs.UnlockDepositTx) erro
 				Duration:            deposit.Duration,
 				RewardOwner:         deposit.RewardOwner,
 			})
+		}
+	}
+
+	avax.Consume(e.State, tx.Ins)
+	avax.Produce(e.State, e.Tx.ID(), tx.Outs)
+
+	return nil
+}
+
+func (e *CaminoStandardTxExecutor) UnlockExpiredDepositTx(tx *txs.UnlockExpiredDepositTx) error {
+	caminoConfig, err := e.State.CaminoConfig()
+	if err != nil {
+		return err
+	}
+
+	if !caminoConfig.LockModeBondDeposit {
+		return errWrongLockMode
+	}
+
+	switch {
+	case tx == nil:
+		return txs.ErrNilTx
+	case len(e.Tx.Creds) != 0:
+		return errWrongCredentialsNumber
+	}
+
+	chainTime := e.State.GetTimestamp()
+
+	if !e.Config.IsCairoPhaseActivated(chainTime) {
+		return errNotCairoPhase
+	}
+
+	chainTimestamp := uint64(chainTime.Unix())
+	depositTxIDs := set.Set[ids.ID]{}
+
+	for _, input := range tx.Ins {
+		lockedIn, ok := input.In.(*locked.In)
+		if !ok || lockedIn.DepositTxID == ids.Empty {
+			return errNotDepositedInput
+		}
+
+		deposit, err := e.State.GetDeposit(lockedIn.DepositTxID)
+		if err != nil {
+			return err
+		}
+
+		if !deposit.IsExpired(chainTimestamp) {
+			return errDepositNotExpired
+		}
+
+		depositTxIDs.Add(lockedIn.DepositTxID)
+	}
+
+	expectedIns, expectedOuts, err := e.FlowChecker.Unlock(
+		e.State,
+		depositTxIDs.List(),
+		locked.StateDeposited,
+	)
+	if err != nil {
+		return err
+	}
+
+	if !inputsAreEqual(tx.Ins, expectedIns) {
+		return fmt.Errorf("%w: invalid inputs", errInvalidSystemTxBody)
+	}
+
+	if !outputsAreEqual(tx.Outs, expectedOuts) {
+		return fmt.Errorf("%w: invalid outputs", errInvalidSystemTxBody)
+	}
+
+	for depositTxID := range depositTxIDs {
+		deposit, err := e.State.GetDeposit(depositTxID)
+		if err != nil {
+			return err
+		}
+
+		offer, err := e.State.GetDepositOffer(deposit.DepositOfferID)
+		if err != nil {
+			return err
+		}
+
+		e.State.RemoveDeposit(depositTxID, deposit)
+
+		if remainingReward := deposit.TotalReward(offer) - deposit.ClaimedRewardAmount; remainingReward > 0 {
+			claimableOwnerID, err := txs.GetOwnerID(deposit.RewardOwner)
+			if err != nil {
+				return err
+			}
+
+			claimable, err := e.State.GetClaimable(claimableOwnerID)
+			switch {
+			case err == database.ErrNotFound:
+				secpOwner, ok := deposit.RewardOwner.(*secp256k1fx.OutputOwners)
+				if !ok {
+					return errWrongOwnerType
+				}
+				claimable = &state.Claimable{
+					Owner: secpOwner,
+				}
+			case err != nil:
+				return err
+			}
+
+			newClaimable := &state.Claimable{
+				Owner:           claimable.Owner,
+				ValidatorReward: claimable.ValidatorReward,
+			}
+
+			newClaimable.ExpiredDepositReward, err = math.Add64(claimable.ExpiredDepositReward, remainingReward)
+			if err != nil {
+				return err
+			}
+
+			e.State.SetClaimable(claimableOwnerID, newClaimable)
 		}
 	}
 

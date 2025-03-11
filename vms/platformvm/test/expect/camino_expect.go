@@ -72,6 +72,36 @@ func VerifyUnlockDeposit(
 	GetMultisigAliases(t, s, addrs, aliases)
 }
 
+func StateUnlock(
+	t *testing.T,
+	s *state.MockState,
+	lockTxIDs []ids.ID,
+	addrs []ids.ShortID,
+	utxos []*avax.UTXO,
+	removedLockState locked.State,
+) {
+	t.Helper()
+	lockTxIDsSet := set.NewSet[ids.ID](len(lockTxIDs))
+	addrsSet := set.NewSet[ids.ShortID](len(addrs))
+	lockTxIDsSet.Add(lockTxIDs...)
+	addrsSet.Add(addrs...)
+	for _, txID := range lockTxIDs {
+		s.EXPECT().GetTx(txID).Return(&txs.Tx{
+			Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
+				Outs: []*avax.TransferableOutput{{
+					Out: &locked.Out{
+						IDs: locked.IDsEmpty.Lock(removedLockState),
+						TransferableOut: &secp256k1fx.TransferOutput{
+							OutputOwners: secp256k1fx.OutputOwners{Addrs: addrs},
+						},
+					},
+				}},
+			}},
+		}, status.Committed, nil)
+	}
+	s.EXPECT().LockedUTXOs(lockTxIDsSet, addrsSet, removedLockState).Return(utxos, nil)
+}
+
 func Unlock(
 	t *testing.T,
 	s *state.MockDiff,

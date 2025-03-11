@@ -24,7 +24,8 @@ type caminoTxMetrics struct {
 	numAddDepositOfferTxs,
 	numAddProposalTxs,
 	numAddVoteTxs,
-	numFinishProposalsTxs prometheus.Counter
+	numFinishProposalsTxs,
+	numUnlockExpiredDepositTxs prometheus.Counter
 }
 
 func newCaminoTxMetrics(
@@ -40,18 +41,19 @@ func newCaminoTxMetrics(
 	m := &caminoTxMetrics{
 		txMetrics: *txm,
 		// Camino specific tx metrics
-		numAddressStateTxs:    newTxMetric(namespace, "add_address_state", registerer, &errs),
-		numDepositTxs:         newTxMetric(namespace, "deposit", registerer, &errs),
-		numUnlockDepositTxs:   newTxMetric(namespace, "unlock_deposit", registerer, &errs),
-		numClaimTxs:           newTxMetric(namespace, "claim", registerer, &errs),
-		numRegisterNodeTxs:    newTxMetric(namespace, "register_node", registerer, &errs),
-		numRewardsImportTxs:   newTxMetric(namespace, "rewards_import", registerer, &errs),
-		numBaseTxs:            newTxMetric(namespace, "base", registerer, &errs),
-		numMultisigAliasTxs:   newTxMetric(namespace, "multisig_alias", registerer, &errs),
-		numAddDepositOfferTxs: newTxMetric(namespace, "add_deposit_offer", registerer, &errs),
-		numAddProposalTxs:     newTxMetric(namespace, "add_proposal", registerer, &errs),
-		numAddVoteTxs:         newTxMetric(namespace, "add_vote", registerer, &errs),
-		numFinishProposalsTxs: newTxMetric(namespace, "finish_proposals", registerer, &errs),
+		numAddressStateTxs:         newTxMetric(namespace, "add_address_state", registerer, &errs),
+		numDepositTxs:              newTxMetric(namespace, "deposit", registerer, &errs),
+		numUnlockDepositTxs:        newTxMetric(namespace, "unlock_deposit", registerer, &errs),
+		numClaimTxs:                newTxMetric(namespace, "claim", registerer, &errs),
+		numRegisterNodeTxs:         newTxMetric(namespace, "register_node", registerer, &errs),
+		numRewardsImportTxs:        newTxMetric(namespace, "rewards_import", registerer, &errs),
+		numBaseTxs:                 newTxMetric(namespace, "base", registerer, &errs),
+		numMultisigAliasTxs:        newTxMetric(namespace, "multisig_alias", registerer, &errs),
+		numAddDepositOfferTxs:      newTxMetric(namespace, "add_deposit_offer", registerer, &errs),
+		numAddProposalTxs:          newTxMetric(namespace, "add_proposal", registerer, &errs),
+		numAddVoteTxs:              newTxMetric(namespace, "add_vote", registerer, &errs),
+		numFinishProposalsTxs:      newTxMetric(namespace, "finish_proposals", registerer, &errs),
+		numUnlockExpiredDepositTxs: newTxMetric(namespace, "system_unlock_deposit", registerer, &errs),
 	}
 	return m, errs.Err
 }
@@ -103,6 +105,10 @@ func (*txMetrics) AddVoteTx(*txs.AddVoteTx) error {
 }
 
 func (*txMetrics) FinishProposalsTx(*txs.FinishProposalsTx) error {
+	return nil
+}
+
+func (*txMetrics) UnlockExpiredDepositTx(*txs.UnlockExpiredDepositTx) error {
 	return nil
 }
 
@@ -165,5 +171,10 @@ func (m *caminoTxMetrics) AddVoteTx(*txs.AddVoteTx) error {
 
 func (m *caminoTxMetrics) FinishProposalsTx(*txs.FinishProposalsTx) error {
 	m.numFinishProposalsTxs.Inc()
+	return nil
+}
+
+func (m *caminoTxMetrics) UnlockExpiredDepositTx(*txs.UnlockExpiredDepositTx) error {
+	m.numUnlockExpiredDepositTxs.Inc()
 	return nil
 }

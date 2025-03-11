@@ -57,6 +57,10 @@ func (*StandardTxExecutor) FinishProposalsTx(*txs.FinishProposalsTx) error {
 	return errWrongTxType
 }
 
+func (*StandardTxExecutor) UnlockExpiredDepositTx(*txs.UnlockExpiredDepositTx) error {
+	return errWrongTxType
+}
+
 // Proposal
 
 func (*ProposalTxExecutor) AddressStateTx(*txs.AddressStateTx) error {
@@ -104,6 +108,10 @@ func (*ProposalTxExecutor) AddVoteTx(*txs.AddVoteTx) error {
 }
 
 func (*ProposalTxExecutor) FinishProposalsTx(*txs.FinishProposalsTx) error {
+	return errWrongTxType
+}
+
+func (*ProposalTxExecutor) UnlockExpiredDepositTx(*txs.UnlockExpiredDepositTx) error {
 	return errWrongTxType
 }
 
@@ -157,6 +165,10 @@ func (*AtomicTxExecutor) FinishProposalsTx(*txs.FinishProposalsTx) error {
 	return errWrongTxType
 }
 
+func (*AtomicTxExecutor) UnlockExpiredDepositTx(*txs.UnlockExpiredDepositTx) error {
+	return errWrongTxType
+}
+
 // MemPool
 
 func (v *MempoolTxVerifier) AddressStateTx(tx *txs.AddressStateTx) error {
@@ -204,5 +216,9 @@ func (v *MempoolTxVerifier) AddVoteTx(tx *txs.AddVoteTx) error {
 }
 
 func (*MempoolTxVerifier) FinishProposalsTx(*txs.FinishProposalsTx) error {
+	return errWrongTxType
+}
+
+func (*MempoolTxVerifier) UnlockExpiredDepositTx(*txs.UnlockExpiredDepositTx) error {
 	return errWrongTxType
 }
