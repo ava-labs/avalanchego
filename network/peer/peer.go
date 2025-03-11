@@ -361,7 +361,7 @@ func (p *peer) close() {
 	}
 
 	if p.isIngress {
-		p.IngressConnectionCount.Add(^uint64(0))
+		p.IngressConnectionCount.Add(-1)
 	}
 
 	p.Network.Disconnected(p.id)

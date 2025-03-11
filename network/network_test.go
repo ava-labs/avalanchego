@@ -352,7 +352,7 @@ func TestIngressConnCount(t *testing.T) {
 	// Third node has no node connected to it, as it connects to the first and second node.
 	require.Equal([]int{2, 1, 0}, ingressConnections)
 	require.Equal([]error{nil, nil}, healthCheckErrors[:2])
-	require.EqualError(healthCheckErrors[2], "network layer is unhealthy reason: primary network validator is unreachable")
+	require.ErrorContains(healthCheckErrors[2], ErrNoIngressConnections.Error()) //nolint
 }
 
 func TestSend(t *testing.T) {

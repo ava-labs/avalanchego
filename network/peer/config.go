@@ -61,5 +61,5 @@ type Config struct {
 	IPSigner *IPSigner
 
 	// IngressConnectionCount counts the ingress (to us) connections.
-	IngressConnectionCount atomic.Uint64
+	IngressConnectionCount atomic.Int64
 }

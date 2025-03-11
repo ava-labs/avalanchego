@@ -12,7 +12,7 @@ import (
 )
 
 // ErrNoIngressConnections denotes that no node is connected to this validator.
-var ErrNoIngressConnections = errors.New("no ingress connections")
+var ErrNoIngressConnections = errors.New("primary network validator has no inbound connections")
 
 type ingressConnectionCounter interface {
 	IngressConnCount() int
@@ -22,27 +22,18 @@ type validatorRetriever interface {
 	GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*validators.Validator, bool)
 }
 
-type noIngressConnAlert struct {
-	selfID             ids.NodeID
-	ingressConnections ingressConnectionCounter
-	validators         validatorRetriever
-}
+func checkNoIngressConnections(selfID ids.NodeID, ingressConnections ingressConnectionCounter, validators validatorRetriever) (interface{}, error) {
+	connCount := ingressConnections.IngressConnCount()
+	_, areWeValidator := validators.GetValidator(constants.PrimaryNetworkID, selfID)
 
-func ingressConnResult(n int, areWeValidator bool) map[string]interface{} {
-	return map[string]interface{}{"ingressConnectionCount": n, "primary network validator": areWeValidator}
-}
-
-func (nica *noIngressConnAlert) checkHealth() (interface{}, error) {
-	connCount := nica.ingressConnections.IngressConnCount()
-	_, areWeValidator := nica.validators.GetValidator(constants.PrimaryNetworkID, nica.selfID)
-
-	if connCount > 0 {
-		return ingressConnResult(connCount, areWeValidator), nil
+	result := map[string]interface{}{
+		"ingressConnectionCount":  connCount,
+		"primaryNetworkValidator": areWeValidator,
 	}
 
-	if !areWeValidator {
-		return ingressConnResult(connCount, areWeValidator), nil
+	if connCount > 0 || !areWeValidator {
+		return result, nil
 	}
 
-	return ingressConnResult(connCount, areWeValidator), ErrNoIngressConnections
+	return result, ErrNoIngressConnections
 }

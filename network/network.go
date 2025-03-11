@@ -89,9 +89,6 @@ type Network interface {
 	// NodeUptime returns given node's primary network UptimeResults in the view of
 	// this node's peer validators.
 	NodeUptime() (UptimeResult, error)
-
-	// IngressConnCount returns the number of ingress connections this node has.
-	IngressConnCount() int
 }
 
 type UptimeResult struct {
@@ -157,8 +154,7 @@ type network struct {
 	connectedPeers  peer.Set
 	closing         bool
 
-	ingressConnAlerter noIngressConnAlert
-	startupTime        time.Time
+	startupTime time.Time
 
 	// router is notified about all peer [Connected] and [Disconnected] events
 	// as well as all non-handshake peer messages.
@@ -318,11 +314,6 @@ func NewNetwork(
 		router:          router,
 	}
 	n.peerConfig.Network = n
-	n.ingressConnAlerter = noIngressConnAlert{
-		ingressConnections: n,
-		validators:         config.Validators,
-		selfID:             config.MyNodeID,
-	}
 	return n, nil
 }
 
@@ -414,9 +405,9 @@ func (n *network) HealthCheck(context.Context) (interface{}, error) {
 	n.metrics.sendFailRate.Set(sendFailRate)
 
 	reachablePrimaryNetworkValidator := true
-	// Make sure if we're a primary network validator, we have ingress connections
+	// If we're a primary network validator, make sure we have ingress connections
 	if time.Since(n.startupTime) > n.config.NoIngressValidatorConnectionGracePeriod {
-		connectedPrimaryValidatorInfo, isConnectedPrimaryValidatorErr := n.ingressConnAlerter.checkHealth()
+		connectedPrimaryValidatorInfo, isConnectedPrimaryValidatorErr := checkNoIngressConnections(n.config.MyNodeID, n, n.config.Validators)
 		reachablePrimaryNetworkValidator = isConnectedPrimaryValidatorErr == nil
 		details[PrimaryNetworkValidatorHealthKey] = connectedPrimaryValidatorInfo
 	}
@@ -450,7 +441,7 @@ func (n *network) HealthCheck(context.Context) (interface{}, error) {
 	}
 
 	if !reachablePrimaryNetworkValidator {
-		errorReasons = append(errorReasons, "primary network validator is unreachable")
+		errorReasons = append(errorReasons, ErrNoIngressConnections.Error())
 	}
 
 	return details, fmt.Errorf("network layer is unhealthy reason: %s", strings.Join(errorReasons, ", "))

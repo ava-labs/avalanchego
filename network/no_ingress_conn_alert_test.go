@@ -38,32 +38,26 @@ func TestNoIngressConnAlertHealthCheck(t *testing.T) {
 	}{
 		{
 			name:           "not a validator of a primary network",
-			expectedResult: map[string]interface{}{"ingressConnectionCount": 0, "primary network validator": false},
+			expectedResult: map[string]interface{}{"ingressConnectionCount": 0, "primaryNetworkValidator": false},
 		},
 		{
 			name:               "a validator of the primary network",
 			getValidatorResult: true,
 			expectedResult: map[string]interface{}{
-				"ingressConnectionCount": 0, "primary network validator": true,
+				"ingressConnectionCount": 0, "primaryNetworkValidator": true,
 			},
 			expectedErr: ErrNoIngressConnections,
 		},
 		{
 			name:                   "a validator with ingress connections",
-			expectedResult:         map[string]interface{}{"ingressConnectionCount": 42, "primary network validator": true},
+			expectedResult:         map[string]interface{}{"ingressConnectionCount": 42, "primaryNetworkValidator": true},
 			expectedErr:            nil,
 			ingressConnCountResult: 42,
 			getValidatorResult:     true,
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			nica := &noIngressConnAlert{
-				selfID:             ids.EmptyNodeID,
-				validators:         &fakeValidatorRetriever{result: testCase.getValidatorResult},
-				ingressConnections: &fakeIngressConnectionCounter{res: testCase.ingressConnCountResult},
-			}
-
-			result, err := nica.checkHealth()
+			result, err := checkNoIngressConnections(ids.EmptyNodeID, &fakeIngressConnectionCounter{res: testCase.ingressConnCountResult}, &fakeValidatorRetriever{result: testCase.getValidatorResult})
 			require.Equal(t, testCase.expectedErr, err)
 			require.Equal(t, testCase.expectedResult, result)
 		})
