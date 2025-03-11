@@ -13,6 +13,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -271,16 +272,11 @@ func getSelectors(networkUUID string) (string, error) {
 
 	// Fall back to using Github labels as selectors
 	selectors := []string{}
-	githubLabels := githubLabelsFromEnv()
-	for label := range githubLabels {
-		value, err := githubLabels.GetStringVal(label)
-		if err != nil {
-			return "", err
+	for _, label := range githubLabels {
+		value := os.Getenv(strings.ToUpper(label))
+		if len(value) > 0 {
+			selectors = append(selectors, fmt.Sprintf(`%s="%s"`, label, value))
 		}
-		if len(value) == 0 {
-			continue
-		}
-		selectors = append(selectors, fmt.Sprintf(`%s="%s"`, label, value))
 	}
 	if len(selectors) == 0 {
 		return "", errors.New("no GH_* env vars set to use for selectors")
