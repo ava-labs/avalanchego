@@ -148,7 +148,7 @@ func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
 	extras.BlockGasCost = h.BlockGasCost
 }
 
-//go:generate go run github.com/fjl/gencodec@a3c3302847cea77ab534228aefa025992dc2c696 -type HeaderSerializable -field-override headerMarshaling -out gen_header_serializable_json.go
+//go:generate go run github.com/fjl/gencodec -type HeaderSerializable -field-override headerMarshaling -out gen_header_serializable_json.go
 //go:generate go run github.com/ava-labs/libevm/rlp/rlpgen@739ba847f6f407f63fd6a24175b24e56fea583a1 -type HeaderSerializable -out gen_header_serializable_rlp.go
 
 // HeaderSerializable defines the header of a block in the Ethereum blockchain,
