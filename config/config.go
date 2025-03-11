@@ -1076,7 +1076,7 @@ func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]s
 	return res, nil
 }
 
-// getSubnetConfigs reads SubnetConfigs to node config map
+// getSubnetConfigsFromDir reads SubnetConfigs to node config map
 func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]subnets.Config, error) {
 	subnetConfigPath, err := getPathFromDirKey(v, SubnetConfigDirKey)
 	if err != nil {
