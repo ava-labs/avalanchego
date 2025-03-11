@@ -21,16 +21,17 @@ const (
 
 func TestExtraPrefix(t *testing.T) {
 	tests := []struct {
-		name      string
-		upgrades  params.NetworkUpgrades
-		parent    *types.Header
-		timestamp uint64
-		want      []byte
-		wantErr   error
+		name     string
+		upgrades params.NetworkUpgrades
+		parent   *types.Header
+		header   *types.Header
+		want     []byte
+		wantErr  error
 	}{
 		{
 			name:     "pre_subnet_evm",
 			upgrades: params.TestPreSubnetEVMChainConfig.NetworkUpgrades,
+			header:   &types.Header{},
 			want:     nil,
 			wantErr:  nil,
 		},
@@ -42,8 +43,10 @@ func TestExtraPrefix(t *testing.T) {
 			parent: &types.Header{
 				Number: big.NewInt(1),
 			},
-			timestamp: 1,
-			want:      (&subnetevm.Window{}).Bytes(),
+			header: &types.Header{
+				Time: 1,
+			},
+			want: (&subnetevm.Window{}).Bytes(),
 		},
 		{
 			name:     "subnet_evm_genesis_block",
@@ -51,7 +54,8 @@ func TestExtraPrefix(t *testing.T) {
 			parent: &types.Header{
 				Number: big.NewInt(0),
 			},
-			want: (&subnetevm.Window{}).Bytes(),
+			header: &types.Header{},
+			want:   (&subnetevm.Window{}).Bytes(),
 		},
 		{
 			name:     "subnet_evm_invalid_fee_window",
@@ -59,6 +63,7 @@ func TestExtraPrefix(t *testing.T) {
 			parent: &types.Header{
 				Number: big.NewInt(1),
 			},
+			header:  &types.Header{},
 			wantErr: subnetevm.ErrWindowInsufficientLength,
 		},
 		{
@@ -69,8 +74,10 @@ func TestExtraPrefix(t *testing.T) {
 				Time:   1,
 				Extra:  (&subnetevm.Window{}).Bytes(),
 			},
-			timestamp: 0,
-			wantErr:   errInvalidTimestamp,
+			header: &types.Header{
+				Time: 0,
+			},
+			wantErr: errInvalidTimestamp,
 		},
 		{
 			name:     "subnet_evm_normal",
@@ -83,7 +90,9 @@ func TestExtraPrefix(t *testing.T) {
 				}).Bytes(),
 				BlockGasCost: big.NewInt(blockGas),
 			},
-			timestamp: 1,
+			header: &types.Header{
+				Time: 1,
+			},
 			want: func() []byte {
 				window := subnetevm.Window{
 					1, 2, 3, 4,
@@ -101,9 +110,64 @@ func TestExtraPrefix(t *testing.T) {
 			config := &params.ChainConfig{
 				NetworkUpgrades: test.upgrades,
 			}
-			got, err := ExtraPrefix(config, test.parent, test.timestamp)
+			got, err := ExtraPrefix(config, test.parent, test.header)
 			require.ErrorIs(err, test.wantErr)
 			require.Equal(test.want, got)
+		})
+	}
+}
+
+func TestVerifyExtraPrefix(t *testing.T) {
+	tests := []struct {
+		name     string
+		upgrades params.NetworkUpgrades
+		parent   *types.Header
+		header   *types.Header
+		wantErr  error
+	}{
+		{
+			name:     "pre_subnet_evm",
+			upgrades: params.TestPreSubnetEVMChainConfig.NetworkUpgrades,
+			header:   &types.Header{},
+			wantErr:  nil,
+		},
+		{
+			name:     "subnet_evm_invalid_parent_header",
+			upgrades: params.TestSubnetEVMChainConfig.NetworkUpgrades,
+			parent: &types.Header{
+				Number: big.NewInt(1),
+			},
+			header:  &types.Header{},
+			wantErr: subnetevm.ErrWindowInsufficientLength,
+		},
+		{
+			name:     "subnet_evm_invalid_header",
+			upgrades: params.TestSubnetEVMChainConfig.NetworkUpgrades,
+			parent: &types.Header{
+				Number: big.NewInt(0),
+			},
+			header:  &types.Header{},
+			wantErr: errInvalidExtraPrefix,
+		},
+		{
+			name:     "subnet_evm_valid",
+			upgrades: params.TestSubnetEVMChainConfig.NetworkUpgrades,
+			parent: &types.Header{
+				Number: big.NewInt(0),
+			},
+			header: &types.Header{
+				Extra: (&subnetevm.Window{}).Bytes(),
+			},
+			wantErr: nil,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			config := &params.ChainConfig{
+				NetworkUpgrades: test.upgrades,
+			}
+			err := VerifyExtraPrefix(config, test.parent, test.header)
+			require.ErrorIs(t, err, test.wantErr)
 		})
 	}
 }

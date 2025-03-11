@@ -4,7 +4,6 @@
 package dummy
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"math/big"
@@ -45,6 +44,16 @@ type (
 		consensusMode Mode
 	}
 )
+
+func NewDummyEngine(
+	mode Mode,
+	clock *mockable.Clock,
+) *DummyEngine {
+	return &DummyEngine{
+		clock:         clock,
+		consensusMode: mode,
+	}
+}
 
 func NewETHFaker() *DummyEngine {
 	return &DummyEngine{
@@ -116,7 +125,7 @@ func (eng *DummyEngine) verifyCoinbase(config *params.ChainConfig, header *types
 	return nil
 }
 
-func (eng *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, header *types.Header, parent *types.Header, chain consensus.ChainHeaderReader) error {
+func verifyHeaderGasFields(config *params.ChainConfig, header *types.Header, parent *types.Header, chain consensus.ChainHeaderReader) error {
 	// We verify the current block by checking the parent fee config
 	// this is because the current block cannot set the fee config for itself
 	// Fee config might depend on the state when precompile is activated
@@ -126,20 +135,14 @@ func (eng *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, header
 	if err != nil {
 		return err
 	}
-	// Verify that the gasUsed is <= gasLimit
-	if header.GasUsed > header.GasLimit {
-		return fmt.Errorf("invalid gasUsed: have %d, gasLimit %d", header.GasUsed, header.GasLimit)
+	if err := customheader.VerifyGasUsed(config, feeConfig, parent, header); err != nil {
+		return err
 	}
 	if err := customheader.VerifyGasLimit(config, feeConfig, parent, header); err != nil {
 		return err
 	}
-	// Verify header.Extra matches the expected value.
-	expectedExtraPrefix, err := customheader.ExtraPrefix(config, parent, header.Time)
-	if err != nil {
-		return fmt.Errorf("failed to calculate extra prefix: %w", err)
-	}
-	if !bytes.HasPrefix(header.Extra, expectedExtraPrefix) {
-		return fmt.Errorf("expected header.Extra to have prefix: %x, found %x", expectedExtraPrefix, header.Extra)
+	if err := customheader.VerifyExtraPrefix(config, parent, header); err != nil {
+		return err
 	}
 
 	// Verify header.BaseFee matches the expected value.
@@ -185,7 +188,7 @@ func (eng *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header *
 	}
 
 	// Ensure gas-related header fields are correct
-	if err := eng.verifyHeaderGasFields(config, header, parent, chain); err != nil {
+	if err := verifyHeaderGasFields(config, header, parent, chain); err != nil {
 		return err
 	}
 	// Ensure that coinbase is valid
@@ -395,7 +398,7 @@ func (eng *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, h
 	}
 
 	// finalize the header.Extra
-	extraPrefix, err := customheader.ExtraPrefix(config, parent, header.Time)
+	extraPrefix, err := customheader.ExtraPrefix(config, parent, header)
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate new header.Extra: %w", err)
 	}

@@ -4,6 +4,7 @@
 package header
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 
@@ -12,18 +13,21 @@ import (
 	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/subnetevm"
 )
 
-var errInvalidExtraLength = errors.New("invalid header.Extra length")
+var (
+	errInvalidExtraPrefix = errors.New("invalid header.Extra prefix")
+	errInvalidExtraLength = errors.New("invalid header.Extra length")
+)
 
 // ExtraPrefix takes the previous header and the timestamp of its child
 // block and calculates the expected extra prefix for the child block.
 func ExtraPrefix(
 	config *params.ChainConfig,
 	parent *types.Header,
-	timestamp uint64,
+	header *types.Header,
 ) ([]byte, error) {
 	switch {
-	case config.IsSubnetEVM(timestamp):
-		window, err := feeWindow(config, parent, timestamp)
+	case config.IsSubnetEVM(header.Time):
+		window, err := feeWindow(config, parent, header.Time)
 		if err != nil {
 			return nil, fmt.Errorf("failed to calculate fee window: %w", err)
 		}
@@ -34,8 +38,35 @@ func ExtraPrefix(
 	}
 }
 
+// VerifyExtraPrefix verifies that the header's Extra field is correctly
+// formatted.
+func VerifyExtraPrefix(
+	config *params.ChainConfig,
+	parent *types.Header,
+	header *types.Header,
+) error {
+	switch {
+	case config.IsSubnetEVM(header.Time):
+		feeWindow, err := feeWindow(config, parent, header.Time)
+		if err != nil {
+			return fmt.Errorf("calculating expected fee window: %w", err)
+		}
+		feeWindowBytes := feeWindow.Bytes()
+		if !bytes.HasPrefix(header.Extra, feeWindowBytes) {
+			return fmt.Errorf("%w: expected %x as prefix, found %x",
+				errInvalidExtraPrefix,
+				feeWindowBytes,
+				header.Extra,
+			)
+		}
+	}
+	return nil
+}
+
 // VerifyExtra verifies that the header's Extra field is correctly formatted for
-// [rules].
+// rules.
+//
+// TODO: Should this be merged with VerifyExtraPrefix?
 func VerifyExtra(rules params.AvalancheRules, extra []byte) error {
 	extraLen := len(extra)
 	switch {
@@ -72,13 +103,13 @@ func VerifyExtra(rules params.AvalancheRules, extra []byte) error {
 
 // PredicateBytesFromExtra returns the predicate result bytes from the header's
 // extra data. If the extra data is not long enough, an empty slice is returned.
-func PredicateBytesFromExtra(_ params.AvalancheRules, extra []byte) []byte {
+func PredicateBytesFromExtra(rules params.AvalancheRules, extra []byte) []byte {
+	offset := subnetevm.WindowSize
 	// Prior to Durango, the VM enforces the extra data is smaller than or equal
-	// to this size.
-	// After Durango, the VM pre-verifies the extra data past the dynamic fee
-	// rollup window is valid.
-	if len(extra) <= subnetevm.WindowSize {
+	// to `offset`.
+	// After Durango, the VM pre-verifies the extra data past `offset` is valid.
+	if len(extra) <= offset {
 		return nil
 	}
-	return extra[subnetevm.WindowSize:]
+	return extra[offset:]
 }
