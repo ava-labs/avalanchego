@@ -21,13 +21,12 @@ const (
 
 func TestExtraPrefix(t *testing.T) {
 	tests := []struct {
-		name        string
-		upgrades    extras.NetworkUpgrades
-		parent      *types.Header
-		parentExtra *types.HeaderExtra
-		header      *types.Header
-		want        []byte
-		wantErr     error
+		name     string
+		upgrades extras.NetworkUpgrades
+		parent   *types.Header
+		header   *types.Header
+		want     []byte
+		wantErr  error
 	}{
 		{
 			name:     "pre_subnet_evm",
@@ -83,16 +82,18 @@ func TestExtraPrefix(t *testing.T) {
 		{
 			name:     "subnet_evm_normal",
 			upgrades: extras.TestSubnetEVMChainConfig.NetworkUpgrades,
-			parent: &types.Header{
-				Number:  big.NewInt(1),
-				GasUsed: targetGas,
-				Extra: (&subnetevm.Window{
-					1, 2, 3, 4,
-				}).Bytes(),
-			},
-			parentExtra: &types.HeaderExtra{
-				BlockGasCost: big.NewInt(blockGas),
-			},
+			parent: types.WithHeaderExtra(
+				&types.Header{
+					Number:  big.NewInt(1),
+					GasUsed: targetGas,
+					Extra: (&subnetevm.Window{
+						1, 2, 3, 4,
+					}).Bytes(),
+				},
+				&types.HeaderExtra{
+					BlockGasCost: big.NewInt(blockGas),
+				},
+			),
 			header: &types.Header{
 				Time: 1,
 			},
@@ -113,10 +114,6 @@ func TestExtraPrefix(t *testing.T) {
 			config := &extras.ChainConfig{
 				NetworkUpgrades: test.upgrades,
 			}
-			if test.parentExtra != nil {
-				types.SetHeaderExtra(test.parent, test.parentExtra)
-			}
-
 			got, err := ExtraPrefix(config, test.parent, test.header)
 			require.ErrorIs(err, test.wantErr)
 			require.Equal(test.want, got)
