@@ -776,6 +776,7 @@ func TestDBMigration(t *testing.T) {
 	wantBlkIDs.Put(genesisBlkID, 0)
 
 	wantTxs := make([]ids.ID, 0)
+	wantUTXOs := make([]*avax.UTXO, 0)
 	numBlocks := 10
 	for i := 1; i < numBlocks; i++ {
 		kc := secp256k1fx.NewKeychain(keys[0])
@@ -801,6 +802,8 @@ func TestDBMigration(t *testing.T) {
 
 		issueAndAccept(require, vm, toEngine, tx)
 		wantTxs = append(wantTxs, tx.ID())
+		utxos := tx.UTXOs()
+		wantUTXOs = append(wantUTXOs, utxos...)
 
 		blkID, err := vm.LastAccepted(context.Background())
 		require.NoError(err)
@@ -808,6 +811,7 @@ func TestDBMigration(t *testing.T) {
 	}
 
 	require.Equal(numBlocks, wantBlkIDs.Len())
+	wantLastAcceptedTimestamp := vm.GetLastAcceptedTimestamp()
 
 	db, err = memdb.Copy(db)
 	require.NoError(vm.Shutdown(context.Background()))
@@ -853,9 +857,17 @@ func TestDBMigration(t *testing.T) {
 		require.Equal(wantTxID, gotTx.ID())
 	}
 
+	for _, wantUTXO := range wantUTXOs {
+		gotUTXO, err := vm.GetUTXO(wantUTXO.InputID())
+		require.NoError(err)
+		require.Equal(wantUTXO.InputID(), gotUTXO.InputID())
+	}
+
 	gotLastAcceptedBlkID, err := vm.LastAccepted(context.Background())
 	require.NoError(err)
 	wantLastAcceptedBlkID, _, ok := wantBlkIDs.Newest()
 	require.True(ok)
 	require.Equal(wantLastAcceptedBlkID, gotLastAcceptedBlkID)
+
+	require.Equal(wantLastAcceptedTimestamp, vm.GetLastAcceptedTimestamp())
 }

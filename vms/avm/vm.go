@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/gorilla/rpc/v2"
 	"github.com/prometheus/client_golang/prometheus"
@@ -504,6 +505,14 @@ func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
 
 func (vm *VM) GetTx(txID ids.ID) (*txs.Tx, error) {
 	return vm.state.GetTx(txID)
+}
+
+func (vm *VM) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
+	return vm.state.GetUTXO(utxoID)
+}
+
+func (vm *VM) GetLastAcceptedTimestamp() time.Time {
+	return vm.state.GetTimestamp()
 }
 
 /*
