@@ -1,9 +1,20 @@
 # Release Notes
 
 ## Pending Release
+
+## [v0.7.2](https://github.com/ava-labs/subnet-evm/releases/tag/v0.7.2)
+
+This version is backwards compatible to [v0.7.0](https://github.com/ava-labs/subnet-evm/releases/tag/v0.7.0). It is optional, **but strongly encouraged as it's fixing an important bug in uptime tracking.**
+
+### AvalancheGo Compatibility
+
+The plugin version is unchanged at 39 and is compatible with AvalancheGo version v1.12.2.
+
+### Updates
+
+* Fixed concurrency issue in validators/uptime manager
 * Bump golang version to v1.23.6
 * Bump golangci-lint to v1.63 and add linters
-* Fixed concurrency issue in validators/uptime manager
 
 ## [v0.7.1](https://github.com/ava-labs/subnet-evm/releases/tag/v0.7.1)
 
