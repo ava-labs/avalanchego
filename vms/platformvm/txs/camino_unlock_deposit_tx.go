@@ -4,13 +4,19 @@
 package txs
 
 import (
+	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 )
 
-var _ UnsignedTx = (*UnlockDepositTx)(nil)
+var (
+	_ UnsignedTx = (*UnlockDepositTx)(nil)
+
+	errNotDepositedLockedInput = errors.New("input is not a deposited locked input")
+)
 
 // UnlockDepositTx is an unsigned unlockDepositTx
 type UnlockDepositTx struct {
@@ -33,6 +39,13 @@ func (tx *UnlockDepositTx) SyntacticVerify(ctx *snow.Context) error {
 
 	if err := locked.VerifyLockMode(tx.Ins, tx.Outs, true); err != nil {
 		return err
+	}
+
+	for _, in := range tx.Ins {
+		lockedIn, ok := in.In.(*locked.In)
+		if ok && lockedIn.DepositTxID == ids.Empty {
+			return errNotDepositedLockedInput
+		}
 	}
 
 	// cache that this is valid

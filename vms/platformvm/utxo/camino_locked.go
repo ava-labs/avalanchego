@@ -165,7 +165,7 @@ type CaminoVerifier interface {
 	// Arguments:
 	// - [ins] and [outs] are the inputs and outputs of [tx].
 	// - [creds] are the credentials of [tx], which allow [ins] to be spent.
-	// - [burnedAmount] if any of deposits are still active, then unlocked inputs must have at least [burnedAmount] more than unlocked outs.
+	// - [amountToBurn] if any of deposits are still active, then unlocked inputs must have at least [amountToBurn] more than unlocked outs.
 	// - [assetID] is id of allowed asset, ins/outs with other assets will return error
 	// - [verifyCreds] if false, [creds] will be ignored
 	//
@@ -176,7 +176,7 @@ type CaminoVerifier interface {
 		ins []*avax.TransferableInput,
 		outs []*avax.TransferableOutput,
 		creds []verify.Verifiable,
-		burnedAmount uint64,
+		amountToBurn uint64,
 		assetID ids.ID,
 		verifyCreds bool,
 	) error
@@ -827,17 +827,9 @@ func (h *handler) VerifyLock(
 		return secp256k1fx.ErrNotAliasGetter
 	}
 
-	utxos := make([]*avax.UTXO, len(ins))
-	for index, input := range ins {
-		utxo, err := utxoDB.GetUTXO(input.InputID())
-		if err != nil {
-			return fmt.Errorf(
-				"failed to read consumed UTXO %s due to: %w",
-				&input.UTXOID,
-				err,
-			)
-		}
-		utxos[index] = utxo
+	utxos, err := getUTXOs(utxoDB, ins)
+	if err != nil {
+		return err
 	}
 
 	return h.VerifyLockUTXOs(msigState, tx, utxos, ins, outs, creds, mintedAmount, burnedAmount, assetID, appliedLockState)
@@ -1071,7 +1063,7 @@ func (h *handler) VerifyUnlockDeposit(
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
 	creds []verify.Verifiable,
-	burnedAmount uint64,
+	amountToBurn uint64,
 	assetID ids.ID,
 	verifyCreds bool,
 ) error {
@@ -1080,20 +1072,12 @@ func (h *handler) VerifyUnlockDeposit(
 		return secp256k1fx.ErrNotAliasGetter
 	}
 
-	utxos := make([]*avax.UTXO, len(ins))
-	for index, input := range ins {
-		utxo, err := utxoDB.GetUTXO(input.InputID())
-		if err != nil {
-			return fmt.Errorf(
-				"failed to read consumed UTXO %s due to: %w",
-				&input.UTXOID,
-				err,
-			)
-		}
-		utxos[index] = utxo
+	utxos, err := getUTXOs(utxoDB, ins)
+	if err != nil {
+		return err
 	}
 
-	return h.VerifyUnlockDepositedUTXOs(msigState, tx, utxos, ins, outs, creds, burnedAmount, assetID, verifyCreds)
+	return h.VerifyUnlockDepositedUTXOs(msigState, tx, utxos, ins, outs, creds, amountToBurn, assetID, verifyCreds)
 }
 
 func (h *handler) VerifyUnlockDepositedUTXOs(
@@ -1103,7 +1087,7 @@ func (h *handler) VerifyUnlockDepositedUTXOs(
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
 	creds []verify.Verifiable,
-	burnedAmount uint64,
+	amountToBurn uint64,
 	assetID ids.ID,
 	verifyCreds bool,
 ) error {
@@ -1284,12 +1268,12 @@ func (h *handler) VerifyUnlockDepositedUTXOs(
 	}
 
 	// checking that we burned required amount
-	if consumedUnlocked < burnedAmount {
+	if consumedUnlocked < amountToBurn {
 		return fmt.Errorf(
 			"asset %s burned %d unlocked, but needed to burn %d: %w",
 			assetID,
 			consumedUnlocked,
-			burnedAmount,
+			amountToBurn,
 			errNotBurnedEnough,
 		)
 	}
@@ -1387,6 +1371,22 @@ func (sort *innerSortUTXOs) Swap(i, j int) {
 // will not retain order by lockTxID if lockState is unlocked
 func sortUTXOs(utxos []*avax.UTXO, allowedAssetID ids.ID, lockState locked.State) {
 	sort.Sort(&innerSortUTXOs{utxos: utxos, allowedAssetID: allowedAssetID, lockState: lockState})
+}
+
+func getUTXOs(utxoDB avax.UTXOGetter, ins []*avax.TransferableInput) ([]*avax.UTXO, error) {
+	utxos := make([]*avax.UTXO, len(ins))
+	for index, input := range ins {
+		utxo, err := utxoDB.GetUTXO(input.InputID())
+		if err != nil {
+			return nil, fmt.Errorf(
+				"failed to read consumed UTXO %s due to: %w",
+				&input.UTXOID,
+				err,
+			)
+		}
+		utxos[index] = utxo
+	}
+	return utxos, nil
 }
 
 func getDepositUnlockableAmounts(

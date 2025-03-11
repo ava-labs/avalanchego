@@ -258,10 +258,12 @@ func InFromUTXO(t *testing.T, utxo *avax.UTXO, sigIndices []uint32, initID bool)
 }
 
 func InsFromUTXOs(t *testing.T, utxos []*avax.UTXO) []*avax.TransferableInput {
+	t.Helper()
 	return InsFromUTXOsWithSigIndices(t, utxos, []uint32{0})
 }
 
 func InsFromUTXOsWithSigIndices(t *testing.T, utxos []*avax.UTXO, sigIndices []uint32) []*avax.TransferableInput {
+	t.Helper()
 	ins := make([]*avax.TransferableInput, len(utxos))
 	for i := range utxos {
 		ins[i] = InFromUTXO(t, utxos[i], sigIndices, false)

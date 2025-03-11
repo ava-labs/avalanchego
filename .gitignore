@@ -25,6 +25,7 @@ tmp/
 *logs/
 
 .vscode*
+__debug*
 
 *.pb*
 

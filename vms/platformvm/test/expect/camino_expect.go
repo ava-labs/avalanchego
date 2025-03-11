@@ -72,7 +72,6 @@ func VerifyUnlockDeposit(
 	GetMultisigAliases(t, s, addrs, aliases)
 }
 
-// TODO @evlekht seems, that [addrs] actually not affecting anything and could be omitted
 func Unlock(
 	t *testing.T,
 	s *state.MockDiff,
@@ -103,7 +102,6 @@ func Unlock(
 	s.EXPECT().LockedUTXOs(lockTxIDsSet, addrsSet, removedLockState).Return(utxos, nil)
 }
 
-// TODO @evlekht seems, that [addrs] actually not affecting anything and could be omitted
 func UnlockDeposit(
 	t *testing.T,
 	s *state.MockState,

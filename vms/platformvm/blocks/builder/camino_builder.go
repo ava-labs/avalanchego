@@ -101,7 +101,7 @@ func caminoBuildBlock(
 		return nil, fmt.Errorf("could not find successful proposals: %w", err)
 	}
 	if len(expiredProposalIDs) > 0 || len(earlyFinishedProposalIDs) > 0 {
-		finishProposalsTx, err := txBuilder.FinishProposalsTx(parentState, earlyFinishedProposalIDs, expiredProposalIDs)
+		finishProposalsTx, err := txBuilder.NewFinishProposalsTx(parentState, earlyFinishedProposalIDs, expiredProposalIDs)
 		if err != nil {
 			return nil, fmt.Errorf("could not build tx to finish proposals: %w", err)
 		}

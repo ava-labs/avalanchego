@@ -27,7 +27,7 @@ func (deposit *Deposit) StartTime() time.Time {
 }
 
 func (deposit *Deposit) EndTime() time.Time {
-	return deposit.StartTime().Add(time.Duration(deposit.Duration) * time.Second)
+	return deposit.StartTime().Add(deposit.DurationNano())
 }
 
 func (deposit *Deposit) IsExpired(timestamp uint64) bool {
@@ -117,4 +117,16 @@ func (deposit *Deposit) TotalReward(offer *Offer) uint64 {
 	bigTotalRewardAmount.Div(bigTotalRewardAmount, bigInterestRateDenominator)
 
 	return bigTotalRewardAmount.Uint64()
+}
+
+func (deposit *Deposit) RemainingReward(offer *Offer) uint64 {
+	return deposit.TotalReward(offer) - deposit.ClaimedRewardAmount
+}
+
+func (deposit *Deposit) StartUnlockTime(offer *Offer) time.Time {
+	return deposit.StartTime().Add(deposit.DurationNano()).Add(-offer.UnlockPeriodDurationNano())
+}
+
+func (deposit *Deposit) DurationNano() time.Duration {
+	return time.Duration(deposit.Duration) * time.Second
 }

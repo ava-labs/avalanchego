@@ -48,16 +48,10 @@ const (
 )
 
 var (
-	AVAXAssetID  = ids.ID{'C', 'A', 'M'}
-	OtherAssetID = ids.ID{'O', 'T', 'H', 'E', 'R'}
-	cChainID     = ids.ID{'C', '-', 'C', 'H', 'A', 'I', 'N'}
-	xChainID     = ids.ID{'X', '-', 'C', 'H', 'A', 'I', 'N'}
-	rewardConfig = reward.Config{
-		MaxConsumptionRate: .12 * reward.PercentDenominator,
-		MinConsumptionRate: .10 * reward.PercentDenominator,
-		MintingPeriod:      365 * 24 * time.Hour,
-		SupplyCap:          720 * units.MegaAvax,
-	}
+	AVAXAssetID             = ids.ID{'C', 'A', 'M'}
+	OtherAssetID            = ids.ID{'O', 'T', 'H', 'E', 'R'}
+	CChainID                = ids.ID{'C', '-', 'C', 'H', 'A', 'I', 'N'}
+	NetworkID               = constants.UnitTestID
 	GenesisTime             = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
 	LatestPhaseTime         = GenesisTime.Add(time.Second * 10000)
 	ValidatorStartTime      = GenesisTime
@@ -65,6 +59,14 @@ var (
 	GenesisTimestamp        = uint64(GenesisTime.Unix())
 	ValidatorStartTimestamp = uint64(ValidatorStartTime.Unix())
 	ValidatorEndTimestamp   = uint64(ValidatorEndTime.Unix())
+
+	xChainID     = ids.ID{'X', '-', 'C', 'H', 'A', 'I', 'N'}
+	rewardConfig = reward.Config{
+		MaxConsumptionRate: .12 * reward.PercentDenominator,
+		MinConsumptionRate: .10 * reward.PercentDenominator,
+		MintingPeriod:      365 * 24 * time.Hour,
+		SupplyCap:          720 * units.MegaAvax,
+	}
 )
 
 func Config(t *testing.T, phase Phase) *config.Config {
@@ -187,7 +189,7 @@ func Genesis(t *testing.T, avaxAssetID ids.ID, caminoGenesisConfig api.Camino, a
 	}
 
 	buildGenesisArgs := api.BuildGenesisArgs{
-		NetworkID:     json.Uint32(constants.UnitTestID),
+		NetworkID:     json.Uint32(NetworkID),
 		AvaxAssetID:   avaxAssetID,
 		UTXOs:         utxos,
 		Validators:    genesisValidators,
@@ -218,9 +220,9 @@ func Context(t *testing.T) *snow.Context {
 	ctx.AVAXAssetID = AVAXAssetID
 	ctx.ChainID = constants.PlatformChainID
 	ctx.XChainID = xChainID
-	ctx.CChainID = cChainID
+	ctx.CChainID = CChainID
 	ctx.BCLookup = aliaser
-	ctx.NetworkID = constants.UnitTestID
+	ctx.NetworkID = NetworkID
 	ctx.SubnetID = constants.PrimaryNetworkID
 	ctx.ValidatorState = &validators.TestState{
 		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {

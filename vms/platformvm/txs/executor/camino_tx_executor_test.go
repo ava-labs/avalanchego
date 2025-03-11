@@ -749,7 +749,6 @@ func TestCaminoStandardTxExecutorAddValidatorTxBody(t *testing.T) {
 }
 
 func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
-	ctx := test.Context(t)
 	outputOwners := secp256k1fx.OutputOwners{
 		Locktime:  0,
 		Threshold: 1,
@@ -771,7 +770,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 	}{
 		"Locked out - LockModeBondDeposit: true": {
 			outs: []*avax.TransferableOutput{
-				generate.Out(ctx.AVAXAssetID, test.ValidatorWeight, outputOwners, ids.Empty, ids.GenerateTestID()),
+				generate.Out(test.AVAXAssetID, test.ValidatorWeight, outputOwners, ids.Empty, ids.GenerateTestID()),
 			},
 			ins:         []*avax.TransferableInput{},
 			expectedErr: locked.ErrWrongOutType,
@@ -783,7 +782,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 		"Locked in - LockModeBondDeposit: true": {
 			outs: []*avax.TransferableOutput{},
 			ins: []*avax.TransferableInput{
-				generate.In(ctx.AVAXAssetID, test.ValidatorWeight, ids.GenerateTestID(), ids.Empty, sigIndices),
+				generate.In(test.AVAXAssetID, test.ValidatorWeight, ids.GenerateTestID(), ids.Empty, sigIndices),
 			},
 			expectedErr: locked.ErrWrongInType,
 			caminoConfig: api.Camino{
@@ -793,7 +792,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 		},
 		"Locked out - LockModeBondDeposit: false": {
 			outs: []*avax.TransferableOutput{
-				generate.Out(ctx.AVAXAssetID, test.ValidatorWeight, outputOwners, ids.Empty, ids.GenerateTestID()),
+				generate.Out(test.AVAXAssetID, test.ValidatorWeight, outputOwners, ids.Empty, ids.GenerateTestID()),
 			},
 			ins:         []*avax.TransferableInput{},
 			expectedErr: locked.ErrWrongOutType,
@@ -805,7 +804,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 		"Locked in - LockModeBondDeposit: false": {
 			outs: []*avax.TransferableOutput{},
 			ins: []*avax.TransferableInput{
-				generate.In(ctx.AVAXAssetID, test.ValidatorWeight, ids.GenerateTestID(), ids.Empty, sigIndices),
+				generate.In(test.AVAXAssetID, test.ValidatorWeight, ids.GenerateTestID(), ids.Empty, sigIndices),
 			},
 			expectedErr: locked.ErrWrongInType,
 			caminoConfig: api.Camino{
@@ -815,7 +814,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 		},
 		"Stakeable out - LockModeBondDeposit: true": {
 			outs: []*avax.TransferableOutput{
-				generate.StakeableOut(ctx.AVAXAssetID, test.ValidatorWeight, uint64(test.MinStakingDuration), outputOwners),
+				generate.StakeableOut(test.AVAXAssetID, test.ValidatorWeight, uint64(test.MinStakingDuration), outputOwners),
 			},
 			ins:         []*avax.TransferableInput{},
 			expectedErr: locked.ErrWrongOutType,
@@ -827,7 +826,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 		"Stakeable in - LockModeBondDeposit: true": {
 			outs: []*avax.TransferableOutput{},
 			ins: []*avax.TransferableInput{
-				generate.StakeableIn(ctx.AVAXAssetID, test.ValidatorWeight, uint64(test.MinStakingDuration), sigIndices),
+				generate.StakeableIn(test.AVAXAssetID, test.ValidatorWeight, uint64(test.MinStakingDuration), sigIndices),
 			},
 			expectedErr: locked.ErrWrongInType,
 			caminoConfig: api.Camino{
@@ -837,7 +836,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 		},
 		"Stakeable out - LockModeBondDeposit: false": {
 			outs: []*avax.TransferableOutput{
-				generate.StakeableOut(ctx.AVAXAssetID, test.ValidatorWeight, uint64(test.MinStakingDuration), outputOwners),
+				generate.StakeableOut(test.AVAXAssetID, test.ValidatorWeight, uint64(test.MinStakingDuration), outputOwners),
 			},
 			ins:         []*avax.TransferableInput{},
 			expectedErr: locked.ErrWrongOutType,
@@ -849,7 +848,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 		"Stakeable in - LockModeBondDeposit: false": {
 			outs: []*avax.TransferableOutput{},
 			ins: []*avax.TransferableInput{
-				generate.StakeableIn(ctx.AVAXAssetID, test.ValidatorWeight, uint64(test.MinStakingDuration), sigIndices),
+				generate.StakeableIn(test.AVAXAssetID, test.ValidatorWeight, uint64(test.MinStakingDuration), sigIndices),
 			},
 			expectedErr: locked.ErrWrongInType,
 			caminoConfig: api.Camino{
@@ -1055,7 +1054,6 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 }
 
 func TestCaminoAddSubnetValidatorTxNodeSig(t *testing.T) {
-	ctx := test.Context(t)
 	nodeKey1, nodeID1 := test.FundedNodeKeys[0], test.FundedNodeIDs[0]
 	nodeKey2 := test.FundedNodeKeys[1]
 
@@ -1084,13 +1082,13 @@ func TestCaminoAddSubnetValidatorTxNodeSig(t *testing.T) {
 			nodeID:  nodeID1,
 			nodeKey: nodeKey1,
 			utxos: []*avax.UTXO{
-				generate.UTXO(ids.ID{1}, ctx.AVAXAssetID, test.ValidatorWeight*2, outputOwners, ids.Empty, ids.Empty, true),
+				generate.UTXO(ids.ID{1}, test.AVAXAssetID, test.ValidatorWeight*2, outputOwners, ids.Empty, ids.Empty, true),
 			},
 			outs: []*avax.TransferableOutput{
-				generate.Out(ctx.AVAXAssetID, test.ValidatorWeight-test.TxFee, outputOwners, ids.Empty, ids.Empty),
+				generate.Out(test.AVAXAssetID, test.ValidatorWeight-test.TxFee, outputOwners, ids.Empty, ids.Empty),
 			},
 			stakedOuts: []*avax.TransferableOutput{
-				generate.StakeableOut(ctx.AVAXAssetID, test.ValidatorWeight, uint64(test.MinStakingDuration), outputOwners),
+				generate.StakeableOut(test.AVAXAssetID, test.ValidatorWeight, uint64(test.MinStakingDuration), outputOwners),
 			},
 			expectedErr: nil,
 		},
@@ -1102,13 +1100,13 @@ func TestCaminoAddSubnetValidatorTxNodeSig(t *testing.T) {
 			nodeID:  nodeID1,
 			nodeKey: nodeKey2,
 			utxos: []*avax.UTXO{
-				generate.UTXO(ids.ID{1}, ctx.AVAXAssetID, test.ValidatorWeight*2, outputOwners, ids.Empty, ids.Empty, true),
+				generate.UTXO(ids.ID{1}, test.AVAXAssetID, test.ValidatorWeight*2, outputOwners, ids.Empty, ids.Empty, true),
 			},
 			outs: []*avax.TransferableOutput{
-				generate.Out(ctx.AVAXAssetID, test.ValidatorWeight-test.TxFee, outputOwners, ids.Empty, ids.Empty),
+				generate.Out(test.AVAXAssetID, test.ValidatorWeight-test.TxFee, outputOwners, ids.Empty, ids.Empty),
 			},
 			stakedOuts: []*avax.TransferableOutput{
-				generate.StakeableOut(ctx.AVAXAssetID, test.ValidatorWeight, uint64(test.MinStakingDuration), outputOwners),
+				generate.StakeableOut(test.AVAXAssetID, test.ValidatorWeight, uint64(test.MinStakingDuration), outputOwners),
 			},
 			expectedErr: errNodeSignatureMissing,
 		},
@@ -1120,10 +1118,10 @@ func TestCaminoAddSubnetValidatorTxNodeSig(t *testing.T) {
 			nodeID:  nodeID1,
 			nodeKey: nodeKey2,
 			utxos: []*avax.UTXO{
-				generate.UTXO(ids.ID{1}, ctx.AVAXAssetID, test.ValidatorWeight*2, outputOwners, ids.Empty, ids.Empty, true),
+				generate.UTXO(ids.ID{1}, test.AVAXAssetID, test.ValidatorWeight*2, outputOwners, ids.Empty, ids.Empty, true),
 			},
 			outs: []*avax.TransferableOutput{
-				generate.Out(ctx.AVAXAssetID, test.ValidatorWeight-test.TxFee, outputOwners, ids.Empty, ids.Empty),
+				generate.Out(test.AVAXAssetID, test.ValidatorWeight-test.TxFee, outputOwners, ids.Empty, ids.Empty),
 			},
 			expectedErr: errNodeSignatureMissing,
 		},
@@ -1135,10 +1133,10 @@ func TestCaminoAddSubnetValidatorTxNodeSig(t *testing.T) {
 			nodeID:  nodeID1,
 			nodeKey: nodeKey2,
 			utxos: []*avax.UTXO{
-				generate.UTXO(ids.ID{1}, ctx.AVAXAssetID, test.ValidatorWeight*2, outputOwners, ids.Empty, ids.Empty, true),
+				generate.UTXO(ids.ID{1}, test.AVAXAssetID, test.ValidatorWeight*2, outputOwners, ids.Empty, ids.Empty, true),
 			},
 			outs: []*avax.TransferableOutput{
-				generate.Out(ctx.AVAXAssetID, test.ValidatorWeight-test.TxFee, outputOwners, ids.Empty, ids.Empty),
+				generate.Out(test.AVAXAssetID, test.ValidatorWeight-test.TxFee, outputOwners, ids.Empty, ids.Empty),
 			},
 			expectedErr: errUnauthorizedSubnetModification,
 		},
@@ -1150,13 +1148,13 @@ func TestCaminoAddSubnetValidatorTxNodeSig(t *testing.T) {
 			nodeID:  nodeID1,
 			nodeKey: nodeKey1,
 			utxos: []*avax.UTXO{
-				generate.UTXO(ids.ID{1}, ctx.AVAXAssetID, test.ValidatorWeight*2, outputOwners, ids.Empty, ids.Empty, true),
+				generate.UTXO(ids.ID{1}, test.AVAXAssetID, test.ValidatorWeight*2, outputOwners, ids.Empty, ids.Empty, true),
 			},
 			outs: []*avax.TransferableOutput{
-				generate.Out(ctx.AVAXAssetID, test.ValidatorWeight-test.TxFee, outputOwners, ids.Empty, ids.Empty),
+				generate.Out(test.AVAXAssetID, test.ValidatorWeight-test.TxFee, outputOwners, ids.Empty, ids.Empty),
 			},
 			stakedOuts: []*avax.TransferableOutput{
-				generate.StakeableOut(ctx.AVAXAssetID, test.ValidatorWeight, uint64(test.MinStakingDuration), outputOwners),
+				generate.StakeableOut(test.AVAXAssetID, test.ValidatorWeight, uint64(test.MinStakingDuration), outputOwners),
 			},
 			expectedErr: errUnauthorizedSubnetModification,
 		},
@@ -1643,7 +1641,6 @@ func TestCaminoStandardTxExecutorCaminoRewardValidatorTx(t *testing.T) {
 }
 
 func TestCaminoStandardTxExecutorAddressStateTx(t *testing.T) {
-	ctx := test.Context(t)
 	caminoGenesisConf := api.Camino{VerifyNodeSignature: true, LockModeBondDeposit: true}
 
 	otherAddr := ids.ShortID{1}
@@ -1656,14 +1653,14 @@ func TestCaminoStandardTxExecutorAddressStateTx(t *testing.T) {
 	feeOwnerKey, feeOwnerAddr, feeOwner := generate.KeyAndOwner(t, test.Keys[0])
 	executorKey, executorAddr, executorOwner := generate.KeyAndOwner(t, test.Keys[1])
 
-	feeUTXO := generate.UTXO(ids.ID{1}, ctx.AVAXAssetID, defaultTxFee, feeOwner, ids.Empty, ids.Empty, false)
-	halfFeeUTXO1 := generate.UTXO(ids.ID{2}, ctx.AVAXAssetID, defaultTxFee/2, feeOwner, ids.Empty, ids.Empty, false)
-	halfFeeUTXO2 := generate.UTXO(ids.ID{3}, ctx.AVAXAssetID, defaultTxFee-defaultTxFee/2, executorOwner, ids.Empty, ids.Empty, false)
-	msigFeeUTXO := generate.UTXO(ids.ID{4}, ctx.AVAXAssetID, defaultTxFee, msigAliasOwner, ids.Empty, ids.Empty, false)
+	feeUTXO := generate.UTXO(ids.ID{1}, test.AVAXAssetID, defaultTxFee, feeOwner, ids.Empty, ids.Empty, false)
+	halfFeeUTXO1 := generate.UTXO(ids.ID{2}, test.AVAXAssetID, defaultTxFee/2, feeOwner, ids.Empty, ids.Empty, false)
+	halfFeeUTXO2 := generate.UTXO(ids.ID{3}, test.AVAXAssetID, defaultTxFee-defaultTxFee/2, executorOwner, ids.Empty, ids.Empty, false)
+	msigFeeUTXO := generate.UTXO(ids.ID{4}, test.AVAXAssetID, defaultTxFee, msigAliasOwner, ids.Empty, ids.Empty, false)
 
 	baseTx := txs.BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    ctx.NetworkID,
-		BlockchainID: ctx.ChainID,
+		NetworkID:    test.NetworkID,
+		BlockchainID: constants.PlatformChainID,
 		Ins:          []*avax.TransferableInput{generate.InFromUTXO(t, feeUTXO, []uint32{0}, false)},
 	}}
 
@@ -1711,8 +1708,8 @@ func TestCaminoStandardTxExecutorAddressStateTx(t *testing.T) {
 			},
 			utx: &txs.AddressStateTx{
 				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    ctx.NetworkID,
-					BlockchainID: ctx.ChainID,
+					NetworkID:    test.NetworkID,
+					BlockchainID: constants.PlatformChainID,
 					Ins:          []*avax.TransferableInput{generate.InFromUTXO(t, msigFeeUTXO, []uint32{0}, false)},
 				}},
 				Address:      otherAddr,
@@ -2206,8 +2203,8 @@ func TestCaminoStandardTxExecutorAddressStateTx(t *testing.T) {
 			},
 			utx: &txs.AddressStateTx{
 				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    ctx.NetworkID,
-					BlockchainID: ctx.ChainID,
+					NetworkID:    test.NetworkID,
+					BlockchainID: constants.PlatformChainID,
 					Ins: []*avax.TransferableInput{
 						generate.InFromUTXO(t, halfFeeUTXO1, []uint32{0}, false),
 						generate.InFromUTXO(t, halfFeeUTXO2, []uint32{0}, false),
@@ -2397,8 +2394,6 @@ func TestCaminoStandardTxExecutorAddressStateTx(t *testing.T) {
 }
 
 func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
-	ctx := test.Context(t)
-
 	feeOwnerKey, feeOwnerAddr, feeOwner := generate.KeyAndOwner(t, test.Keys[0])
 	utxoOwnerKey, utxoOwnerAddr, utxoOwner := generate.KeyAndOwner(t, test.Keys[1])
 	_, newUTXOOwnerAddr, newUTXOOwner := generate.KeyAndOwner(t, test.Keys[2])
@@ -2443,12 +2438,12 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 		OwnerAddress: offerOwnerAddr,
 	}
 
-	feeUTXO := generate.UTXO(ids.ID{1}, ctx.AVAXAssetID, test.TxFee, feeOwner, ids.Empty, ids.Empty, true)
-	doubleFeeUTXO := generate.UTXO(ids.ID{1}, ctx.AVAXAssetID, test.TxFee*2, feeOwner, ids.Empty, ids.Empty, true)
-	unlockedUTXO1 := generate.UTXO(ids.ID{2}, ctx.AVAXAssetID, offer.MinAmount, utxoOwner, ids.Empty, ids.Empty, true)
-	unlockedUTXO2 := generate.UTXO(ids.ID{3}, ctx.AVAXAssetID, offerWithMaxAmount.RemainingAmount(), utxoOwner, ids.Empty, ids.Empty, true)
-	unlockedUTXO3 := generate.UTXO(ids.ID{4}, ctx.AVAXAssetID, offerWithMaxRewardAmount.MaxRemainingAmountByReward(), utxoOwner, ids.Empty, ids.Empty, true)
-	bondedUTXOWithMinAmount := generate.UTXO(ids.ID{4}, ctx.AVAXAssetID, offer.MinAmount, utxoOwner, ids.Empty, ids.ID{100}, true)
+	feeUTXO := generate.UTXO(ids.ID{1}, test.AVAXAssetID, test.TxFee, feeOwner, ids.Empty, ids.Empty, true)
+	doubleFeeUTXO := generate.UTXO(ids.ID{1}, test.AVAXAssetID, test.TxFee*2, feeOwner, ids.Empty, ids.Empty, true)
+	unlockedUTXO1 := generate.UTXO(ids.ID{2}, test.AVAXAssetID, offer.MinAmount, utxoOwner, ids.Empty, ids.Empty, true)
+	unlockedUTXO2 := generate.UTXO(ids.ID{3}, test.AVAXAssetID, offerWithMaxAmount.RemainingAmount(), utxoOwner, ids.Empty, ids.Empty, true)
+	unlockedUTXO3 := generate.UTXO(ids.ID{4}, test.AVAXAssetID, offerWithMaxRewardAmount.MaxRemainingAmountByReward(), utxoOwner, ids.Empty, ids.Empty, true)
+	bondedUTXOWithMinAmount := generate.UTXO(ids.ID{4}, test.AVAXAssetID, offer.MinAmount, utxoOwner, ids.Empty, ids.ID{100}, true)
 
 	phases := []struct {
 		name    string
@@ -2486,8 +2481,8 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			utx: func() *txs.DepositTx {
 				return &txs.DepositTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 					}},
 					RewardsOwner: &secp256k1fx.OutputOwners{},
 				}
@@ -2503,10 +2498,10 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			utx: func() *txs.DepositTx {
 				return &txs.DepositTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: []*avax.TransferableInput{
-							generate.StakeableIn(ctx.AVAXAssetID, test.PreFundedBalance, uint64(test.MinStakingDuration), []uint32{0}),
+							generate.StakeableIn(test.AVAXAssetID, test.PreFundedBalance, uint64(test.MinStakingDuration), []uint32{0}),
 						},
 					}},
 					RewardsOwner: &secp256k1fx.OutputOwners{},
@@ -2523,10 +2518,10 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			utx: func() *txs.DepositTx {
 				return &txs.DepositTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Outs: []*avax.TransferableOutput{
-							generate.StakeableOut(ctx.AVAXAssetID, test.PreFundedBalance, uint64(test.MinStakingDuration), utxoOwner),
+							generate.StakeableOut(test.AVAXAssetID, test.PreFundedBalance, uint64(test.MinStakingDuration), utxoOwner),
 						},
 					}},
 					RewardsOwner: &secp256k1fx.OutputOwners{},
@@ -2544,8 +2539,8 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			utx: func() *txs.DepositTx {
 				return &txs.DepositTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 					}},
 					DepositOfferID: offer.ID,
 					RewardsOwner:   &secp256k1fx.OutputOwners{},
@@ -2564,8 +2559,8 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			utx: func() *txs.DepositTx {
 				return &txs.DepositTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 					}},
 					DepositOfferID: offer.ID,
 					RewardsOwner:   &secp256k1fx.OutputOwners{},
@@ -2585,8 +2580,8 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			utx: func() *txs.DepositTx {
 				return &txs.DepositTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 					}},
 					DepositOfferID: offer.ID,
 					RewardsOwner:   &secp256k1fx.OutputOwners{},
@@ -2606,8 +2601,8 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			utx: func() *txs.DepositTx {
 				return &txs.DepositTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 					}},
 					DepositOfferID: offer.ID,
 					RewardsOwner:   &secp256k1fx.OutputOwners{},
@@ -2627,8 +2622,8 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			utx: func() *txs.DepositTx {
 				return &txs.DepositTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 					}},
 					DepositOfferID:  offer.ID,
 					DepositDuration: offer.MinDuration - 1,
@@ -2649,8 +2644,8 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			utx: func() *txs.DepositTx {
 				return &txs.DepositTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 					}},
 					DepositOfferID:  offer.ID,
 					DepositDuration: offer.MaxDuration + 1,
@@ -2671,10 +2666,10 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			utx: func() *txs.DepositTx {
 				return &txs.DepositTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Outs: []*avax.TransferableOutput{
-							generate.Out(ctx.AVAXAssetID, offer.MinAmount-1, utxoOwner, locked.ThisTxID, ids.Empty),
+							generate.Out(test.AVAXAssetID, offer.MinAmount-1, utxoOwner, locked.ThisTxID, ids.Empty),
 						},
 					}},
 					DepositOfferID:  offer.ID,
@@ -2697,10 +2692,10 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				amt := offerWithMaxAmount.RemainingAmount() + 1
 				return &txs.DepositTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Outs: []*avax.TransferableOutput{
-							generate.Out(ctx.AVAXAssetID, amt, utxoOwner, locked.ThisTxID, ids.Empty),
+							generate.Out(test.AVAXAssetID, amt, utxoOwner, locked.ThisTxID, ids.Empty),
 						},
 					}},
 					DepositOfferID:  offerWithMaxAmount.ID,
@@ -2723,10 +2718,10 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				amt := offerWithMaxRewardAmount.MaxRemainingAmountByReward() + 1
 				return &txs.DepositTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Outs: []*avax.TransferableOutput{
-							generate.Out(ctx.AVAXAssetID, amt, utxoOwner, locked.ThisTxID, ids.Empty),
+							generate.Out(test.AVAXAssetID, amt, utxoOwner, locked.ThisTxID, ids.Empty),
 						},
 					}},
 					DepositOfferID:  offerWithMaxRewardAmount.ID,
@@ -2750,14 +2745,14 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			utx: func() *txs.DepositTx {
 				return &txs.DepositTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: []*avax.TransferableInput{
 							generate.InFromUTXO(t, unlockedUTXO1, []uint32{0}, false),
 							generate.InFromUTXO(t, bondedUTXOWithMinAmount, []uint32{0}, false),
 						},
 						Outs: []*avax.TransferableOutput{
-							generate.Out(ctx.AVAXAssetID, offer.MinAmount, utxoOwner, locked.ThisTxID, ids.Empty),
+							generate.Out(test.AVAXAssetID, offer.MinAmount, utxoOwner, locked.ThisTxID, ids.Empty),
 						},
 					}},
 					DepositOfferID:  offer.ID,
@@ -2781,13 +2776,13 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			utx: func() *txs.DepositTx {
 				return &txs.DepositTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: []*avax.TransferableInput{
 							generate.InFromUTXO(t, unlockedUTXO1, []uint32{0}, false),
 						},
 						Outs: []*avax.TransferableOutput{
-							generate.Out(ctx.AVAXAssetID, offer.MinAmount, utxoOwner, locked.ThisTxID, ids.Empty),
+							generate.Out(test.AVAXAssetID, offer.MinAmount, utxoOwner, locked.ThisTxID, ids.Empty),
 						},
 					}},
 					DepositOfferID:  offer.ID,
@@ -2814,14 +2809,14 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				return &txs.DepositTx{
 					UpgradeVersionID: codec.UpgradeVersion1,
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: []*avax.TransferableInput{
 							generate.InFromUTXO(t, feeUTXO, []uint32{0}, false),
 							generate.InFromUTXO(t, unlockedUTXO1, []uint32{0}, false),
 						},
 						Outs: []*avax.TransferableOutput{
-							generate.Out(ctx.AVAXAssetID, offer.MinAmount, utxoOwner, locked.ThisTxID, ids.Empty),
+							generate.Out(test.AVAXAssetID, offer.MinAmount, utxoOwner, locked.ThisTxID, ids.Empty),
 						},
 					}},
 					DepositOfferID:        offerWithOwner.ID,
@@ -2861,14 +2856,14 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				return &txs.DepositTx{
 					UpgradeVersionID: codec.UpgradeVersion1,
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: []*avax.TransferableInput{
 							generate.InFromUTXO(t, feeUTXO, []uint32{0}, false),
 							generate.InFromUTXO(t, unlockedUTXO1, []uint32{0}, false),
 						},
 						Outs: []*avax.TransferableOutput{
-							generate.Out(ctx.AVAXAssetID, offer.MinAmount, utxoOwner, locked.ThisTxID, ids.Empty),
+							generate.Out(test.AVAXAssetID, offer.MinAmount, utxoOwner, locked.ThisTxID, ids.Empty),
 						},
 					}},
 					DepositOfferID:        offerWithOwner.ID,
@@ -2908,14 +2903,14 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				return &txs.DepositTx{
 					UpgradeVersionID: codec.UpgradeVersion1,
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: []*avax.TransferableInput{
 							generate.InFromUTXO(t, feeUTXO, []uint32{0}, false),
 							generate.InFromUTXO(t, unlockedUTXO1, []uint32{0}, false),
 						},
 						Outs: []*avax.TransferableOutput{
-							generate.Out(ctx.AVAXAssetID, offer.MinAmount, utxoOwner, locked.ThisTxID, ids.Empty),
+							generate.Out(test.AVAXAssetID, offer.MinAmount, utxoOwner, locked.ThisTxID, ids.Empty),
 						},
 					}},
 					DepositOfferID:        offerWithOwner.ID,
@@ -2955,14 +2950,14 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				return &txs.DepositTx{
 					UpgradeVersionID: codec.UpgradeVersion1,
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: []*avax.TransferableInput{
 							generate.InFromUTXO(t, feeUTXO, []uint32{0}, false),
 							generate.InFromUTXO(t, unlockedUTXO1, []uint32{0}, false),
 						},
 						Outs: []*avax.TransferableOutput{
-							generate.Out(ctx.AVAXAssetID, offer.MinAmount, utxoOwner, locked.ThisTxID, ids.Empty),
+							generate.Out(test.AVAXAssetID, offer.MinAmount, utxoOwner, locked.ThisTxID, ids.Empty),
 						},
 					}},
 					DepositOfferID:        offerWithOwner.ID,
@@ -3002,14 +2997,14 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				return &txs.DepositTx{
 					UpgradeVersionID: codec.UpgradeVersion1,
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: []*avax.TransferableInput{
 							generate.InFromUTXO(t, feeUTXO, []uint32{0}, false),
 							generate.InFromUTXO(t, unlockedUTXO1, []uint32{0}, false),
 						},
 						Outs: []*avax.TransferableOutput{
-							generate.Out(ctx.AVAXAssetID, offer.MinAmount, utxoOwner, locked.ThisTxID, ids.Empty),
+							generate.Out(test.AVAXAssetID, offer.MinAmount, utxoOwner, locked.ThisTxID, ids.Empty),
 						},
 					}},
 					DepositOfferID:        offerWithOwner.ID,
@@ -3061,14 +3056,14 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			utx: func() *txs.DepositTx {
 				return &txs.DepositTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: []*avax.TransferableInput{
 							generate.InFromUTXO(t, feeUTXO, []uint32{0}, false),
 							generate.InFromUTXO(t, unlockedUTXO1, []uint32{0}, false),
 						},
 						Outs: []*avax.TransferableOutput{
-							generate.Out(ctx.AVAXAssetID, offer.MinAmount, utxoOwner, locked.ThisTxID, ids.Empty),
+							generate.Out(test.AVAXAssetID, offer.MinAmount, utxoOwner, locked.ThisTxID, ids.Empty),
 						},
 					}},
 					DepositOfferID:  offer.ID,
@@ -3111,14 +3106,14 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			utx: func() *txs.DepositTx {
 				return &txs.DepositTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: []*avax.TransferableInput{
 							generate.InFromUTXO(t, feeUTXO, []uint32{0}, false),
 							generate.InFromUTXO(t, unlockedUTXO1, []uint32{0}, false),
 						},
 						Outs: []*avax.TransferableOutput{
-							generate.Out(ctx.AVAXAssetID, offer.MinAmount, utxoOwner, locked.ThisTxID, ids.Empty),
+							generate.Out(test.AVAXAssetID, offer.MinAmount, utxoOwner, locked.ThisTxID, ids.Empty),
 						},
 					}},
 					DepositOfferID:  offer.ID,
@@ -3160,15 +3155,15 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			utx: func() *txs.DepositTx {
 				return &txs.DepositTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: []*avax.TransferableInput{
 							generate.InFromUTXO(t, doubleFeeUTXO, []uint32{0}, false),
 							generate.InFromUTXO(t, unlockedUTXO1, []uint32{0}, false),
 						},
 						Outs: []*avax.TransferableOutput{
-							generate.Out(ctx.AVAXAssetID, test.TxFee, newUTXOOwner, ids.Empty, ids.Empty),
-							generate.Out(ctx.AVAXAssetID, offer.MinAmount, utxoOwner, locked.ThisTxID, ids.Empty),
+							generate.Out(test.AVAXAssetID, test.TxFee, newUTXOOwner, ids.Empty, ids.Empty),
+							generate.Out(test.AVAXAssetID, offer.MinAmount, utxoOwner, locked.ThisTxID, ids.Empty),
 						},
 					}},
 					DepositOfferID:  offer.ID,
@@ -3210,14 +3205,14 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			utx: func() *txs.DepositTx {
 				return &txs.DepositTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: []*avax.TransferableInput{
 							generate.InFromUTXO(t, feeUTXO, []uint32{0}, false),
 							generate.InFromUTXO(t, bondedUTXOWithMinAmount, []uint32{0}, false),
 						},
 						Outs: []*avax.TransferableOutput{
-							generate.Out(ctx.AVAXAssetID, offer.MinAmount, utxoOwner, locked.ThisTxID, ids.ID{100}),
+							generate.Out(test.AVAXAssetID, offer.MinAmount, utxoOwner, locked.ThisTxID, ids.ID{100}),
 						},
 					}},
 					DepositOfferID:  offer.ID,
@@ -3259,16 +3254,16 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			utx: func() *txs.DepositTx {
 				return &txs.DepositTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: []*avax.TransferableInput{
 							generate.InFromUTXO(t, feeUTXO, []uint32{0}, false),
 							generate.InFromUTXO(t, unlockedUTXO1, []uint32{0}, false),
 							generate.InFromUTXO(t, bondedUTXOWithMinAmount, []uint32{0}, false),
 						},
 						Outs: []*avax.TransferableOutput{
-							generate.Out(ctx.AVAXAssetID, offer.MinAmount, utxoOwner, locked.ThisTxID, ids.Empty),
-							generate.Out(ctx.AVAXAssetID, offer.MinAmount, utxoOwner, locked.ThisTxID, ids.ID{100}),
+							generate.Out(test.AVAXAssetID, offer.MinAmount, utxoOwner, locked.ThisTxID, ids.Empty),
+							generate.Out(test.AVAXAssetID, offer.MinAmount, utxoOwner, locked.ThisTxID, ids.ID{100}),
 						},
 					}},
 					DepositOfferID:  offer.ID,
@@ -3310,14 +3305,14 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			utx: func() *txs.DepositTx {
 				return &txs.DepositTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: []*avax.TransferableInput{
 							generate.InFromUTXO(t, feeUTXO, []uint32{0}, false),
 							generate.InFromUTXO(t, unlockedUTXO1, []uint32{0}, false),
 						},
 						Outs: []*avax.TransferableOutput{
-							generate.Out(ctx.AVAXAssetID, offer.MinAmount, newUTXOOwner, locked.ThisTxID, ids.Empty),
+							generate.Out(test.AVAXAssetID, offer.MinAmount, newUTXOOwner, locked.ThisTxID, ids.Empty),
 						},
 					}},
 					DepositOfferID:  offer.ID,
@@ -3363,14 +3358,14 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				amt := offerWithMaxAmount.RemainingAmount()
 				return &txs.DepositTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: []*avax.TransferableInput{
 							generate.InFromUTXO(t, feeUTXO, []uint32{0}, false),
 							generate.InFromUTXO(t, unlockedUTXO2, []uint32{0}, false),
 						},
 						Outs: []*avax.TransferableOutput{
-							generate.Out(ctx.AVAXAssetID, amt, utxoOwner, locked.ThisTxID, ids.Empty),
+							generate.Out(test.AVAXAssetID, amt, utxoOwner, locked.ThisTxID, ids.Empty),
 						},
 					}},
 					DepositOfferID:  offerWithMaxAmount.ID,
@@ -3419,14 +3414,14 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				amt := offerWithMaxRewardAmount.MaxRemainingAmountByReward()
 				return &txs.DepositTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: []*avax.TransferableInput{
 							generate.InFromUTXO(t, feeUTXO, []uint32{0}, false),
 							generate.InFromUTXO(t, unlockedUTXO3, []uint32{0}, false),
 						},
 						Outs: []*avax.TransferableOutput{
-							generate.Out(ctx.AVAXAssetID, amt, utxoOwner, locked.ThisTxID, ids.Empty),
+							generate.Out(test.AVAXAssetID, amt, utxoOwner, locked.ThisTxID, ids.Empty),
 						},
 					}},
 					DepositOfferID:  offerWithMaxRewardAmount.ID,
@@ -3473,14 +3468,14 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				return &txs.DepositTx{
 					UpgradeVersionID: codec.UpgradeVersion1,
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: []*avax.TransferableInput{
 							generate.InFromUTXO(t, feeUTXO, []uint32{0}, false),
 							generate.InFromUTXO(t, unlockedUTXO1, []uint32{0}, false),
 						},
 						Outs: []*avax.TransferableOutput{
-							generate.Out(ctx.AVAXAssetID, offer.MinAmount, utxoOwner, locked.ThisTxID, ids.Empty),
+							generate.Out(test.AVAXAssetID, offer.MinAmount, utxoOwner, locked.ThisTxID, ids.Empty),
 						},
 					}},
 					DepositOfferID:        offerWithOwner.ID,
@@ -3545,7 +3540,6 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 }
 
 func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
-	ctx := test.Context(t)
 	caminoGenesisConf := api.Camino{
 		VerifyNodeSignature: true,
 		LockModeBondDeposit: true,
@@ -3591,25 +3585,17 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 		DepositOfferID: depositOffer.ID,
 	}
 
-	deposit1StartUnlockTime := deposit1.StartTime().
-		Add(time.Duration(deposit1.Duration) * time.Second).
-		Add(-time.Duration(depositOffer.UnlockPeriodDuration) * time.Second)
-	deposit1HalfUnlockTime := deposit1.StartTime().
-		Add(time.Duration(deposit1.Duration) * time.Second).
-		Add(-time.Duration(depositOffer.UnlockPeriodDuration/2) * time.Second)
-	deposit1Expired := deposit1.StartTime().
-		Add(time.Duration(deposit1.Duration) * time.Second)
-
+	deposit1HalfUnlockTime := deposit1.StartUnlockTime(depositOffer).Add(depositOffer.UnlockPeriodDurationNano() / 2)
 	deposit1HalfUnlockableAmount := deposit1.UnlockableAmount(depositOffer, uint64(deposit1HalfUnlockTime.Unix()))
 	deposit2HalfUnlockableAmount := deposit2.UnlockableAmount(depositOffer, uint64(deposit1HalfUnlockTime.Unix()))
 
-	feeUTXO := generate.UTXO(ids.ID{1}, ctx.AVAXAssetID, test.TxFee, feeOwner, ids.Empty, ids.Empty, true)
-	lessFeeUTXO := generate.UTXO(ids.ID{2}, ctx.AVAXAssetID, 1, feeOwner, ids.Empty, ids.Empty, true)
-	deposit1UTXO := generate.UTXO(ids.ID{3}, ctx.AVAXAssetID, deposit1.Amount, owner1, depositTxID1, ids.Empty, true)
-	deposit2UTXO := generate.UTXO(ids.ID{4}, ctx.AVAXAssetID, deposit2.Amount, owner1, depositTxID2, ids.Empty, true)
-	deposit1WithRewardUTXO := generate.UTXO(ids.ID{5}, ctx.AVAXAssetID, deposit1WithReward.Amount, owner1, depositWithRewardTxID1, ids.Empty, true)
-	deposit1UTXOLargerTxID := generate.UTXO(ids.ID{6}, ctx.AVAXAssetID, deposit1.Amount, owner1, depositTxID1, ids.Empty, true)
-	unlockedUTXOWithLargerTxID := generate.UTXO(ids.ID{7}, ctx.AVAXAssetID, 1, owner1, ids.Empty, ids.Empty, true)
+	feeUTXO := generate.UTXO(ids.ID{1}, test.AVAXAssetID, test.TxFee, feeOwner, ids.Empty, ids.Empty, true)
+	lessFeeUTXO := generate.UTXO(ids.ID{2}, test.AVAXAssetID, 1, feeOwner, ids.Empty, ids.Empty, true)
+	deposit1UTXO := generate.UTXO(ids.ID{3}, test.AVAXAssetID, deposit1.Amount, owner1, depositTxID1, ids.Empty, true)
+	deposit2UTXO := generate.UTXO(ids.ID{4}, test.AVAXAssetID, deposit2.Amount, owner1, depositTxID2, ids.Empty, true)
+	deposit1WithRewardUTXO := generate.UTXO(ids.ID{5}, test.AVAXAssetID, deposit1WithReward.Amount, owner1, depositWithRewardTxID1, ids.Empty, true)
+	deposit1UTXOLargerTxID := generate.UTXO(ids.ID{6}, test.AVAXAssetID, deposit1.Amount, owner1, depositTxID1, ids.Empty, true)
+	unlockedUTXOWithLargerTxID := generate.UTXO(ids.ID{7}, test.AVAXAssetID, 1, owner1, ids.Empty, ids.Empty, true)
 
 	tests := map[string]struct {
 		state       func(*testing.T, *gomock.Controller, *txs.UnlockDepositTx, ids.ID) *state.MockDiff
@@ -3630,7 +3616,7 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			state: func(t *testing.T, c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
-				s.EXPECT().GetTimestamp().Return(deposit1StartUnlockTime.Add(-1 * time.Second))
+				s.EXPECT().GetTimestamp().Return(deposit1.StartUnlockTime(depositOffer).Add(-time.Second))
 				s.EXPECT().GetBaseFee().Return(test.TxFee, nil)
 				expect.VerifyUnlockDeposit(t, s, utx.Ins,
 					[]*avax.UTXO{feeUTXO, deposit1UTXO},
@@ -3645,8 +3631,8 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			utx: &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 				Ins: generate.InsFromUTXOs(t, []*avax.UTXO{feeUTXO, deposit1UTXO}),
 				Outs: []*avax.TransferableOutput{
-					generate.Out(ctx.AVAXAssetID, 1, owner1, ids.Empty, ids.Empty),
-					generate.Out(ctx.AVAXAssetID, deposit1.Amount-1, owner1, depositTxID1, ids.Empty),
+					generate.Out(test.AVAXAssetID, 1, owner1, ids.Empty, ids.Empty),
+					generate.Out(test.AVAXAssetID, deposit1.Amount-1, owner1, depositTxID1, ids.Empty),
 				},
 			}}},
 			signers:     [][]*secp256k1.PrivateKey{{feeOwnerKey}, {owner1Key}},
@@ -3656,7 +3642,7 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			state: func(t *testing.T, c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
-				s.EXPECT().GetTimestamp().Return(deposit1Expired)
+				s.EXPECT().GetTimestamp().Return(deposit1.EndTime())
 				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
 				return s
 			},
@@ -3670,7 +3656,7 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			state: func(t *testing.T, c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
-				s.EXPECT().GetTimestamp().Return(deposit1Expired)
+				s.EXPECT().GetTimestamp().Return(deposit1.EndTime())
 				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
 				return s
 			},
@@ -3684,7 +3670,7 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			state: func(t *testing.T, c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
-				s.EXPECT().GetTimestamp().Return(deposit1Expired)
+				s.EXPECT().GetTimestamp().Return(deposit1.EndTime())
 				s.EXPECT().GetDeposit(depositTxID2).Return(deposit2, nil)
 				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
 				return s
@@ -3699,7 +3685,7 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			state: func(t *testing.T, c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
-				s.EXPECT().GetTimestamp().Return(deposit1Expired)
+				s.EXPECT().GetTimestamp().Return(deposit1.EndTime())
 				expect.VerifyUnlockDeposit(t, s, utx.Ins,
 					[]*avax.UTXO{deposit1UTXO},
 					[]ids.ShortID{
@@ -3711,8 +3697,8 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			utx: &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 				Ins: generate.InsFromUTXOs(t, []*avax.UTXO{deposit1UTXO}),
 				Outs: []*avax.TransferableOutput{
-					generate.Out(ctx.AVAXAssetID, deposit1.Amount-1, owner1, ids.Empty, ids.Empty),
-					generate.Out(ctx.AVAXAssetID, 1, owner1, depositTxID1, ids.Empty),
+					generate.Out(test.AVAXAssetID, deposit1.Amount-1, owner1, ids.Empty, ids.Empty),
+					generate.Out(test.AVAXAssetID, 1, owner1, depositTxID1, ids.Empty),
 				},
 			}}},
 			expectedErr: errExpiredDepositNotFullyUnlocked,
@@ -3736,8 +3722,8 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			utx: &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 				Ins: generate.InsFromUTXOs(t, []*avax.UTXO{feeUTXO, deposit1UTXO}),
 				Outs: []*avax.TransferableOutput{
-					generate.Out(ctx.AVAXAssetID, deposit1HalfUnlockableAmount+1, owner1, ids.Empty, ids.Empty),
-					generate.Out(ctx.AVAXAssetID, deposit1.Amount-deposit1HalfUnlockableAmount-1, owner1, depositTxID1, ids.Empty),
+					generate.Out(test.AVAXAssetID, deposit1HalfUnlockableAmount+1, owner1, ids.Empty, ids.Empty),
+					generate.Out(test.AVAXAssetID, deposit1.Amount-deposit1HalfUnlockableAmount-1, owner1, depositTxID1, ids.Empty),
 				},
 			}}},
 			signers:     [][]*secp256k1.PrivateKey{{feeOwnerKey}, {owner1Key}},
@@ -3747,14 +3733,14 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			state: func(t *testing.T, c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
-				s.EXPECT().GetTimestamp().Return(deposit1Expired)
+				s.EXPECT().GetTimestamp().Return(deposit1.EndTime())
 				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
 				return s
 			},
 			utx: &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 				Ins: generate.InsFromUTXOs(t, []*avax.UTXO{deposit1UTXO}),
 				Outs: []*avax.TransferableOutput{
-					generate.Out(ctx.AVAXAssetID, deposit1.Amount-1, owner1, ids.Empty, ids.Empty),
+					generate.Out(test.AVAXAssetID, deposit1.Amount-1, owner1, ids.Empty, ids.Empty),
 				},
 			}}},
 			expectedErr: errBurnedDepositUnlock,
@@ -3777,8 +3763,8 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			utx: &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 				Ins: generate.InsFromUTXOs(t, []*avax.UTXO{feeUTXO, lessFeeUTXO, deposit1UTXO}),
 				Outs: []*avax.TransferableOutput{
-					generate.Out(ctx.AVAXAssetID, lessFeeUTXO.Out.(avax.Amounter).Amount(), feeOwner, ids.Empty, ids.Empty),
-					generate.Out(ctx.AVAXAssetID, deposit1UTXO.Out.(avax.Amounter).Amount(), owner1, depositTxID1, ids.Empty),
+					generate.Out(test.AVAXAssetID, lessFeeUTXO.Out.(avax.Amounter).Amount(), feeOwner, ids.Empty, ids.Empty),
+					generate.Out(test.AVAXAssetID, deposit1UTXO.Out.(avax.Amounter).Amount(), owner1, depositTxID1, ids.Empty),
 				},
 			}}},
 			signers:     [][]*secp256k1.PrivateKey{{feeOwnerKey}, {feeOwnerKey}, {owner1Key}},
@@ -3789,7 +3775,7 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 				s := state.NewMockDiff(c)
 				// checks
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
-				s.EXPECT().GetTimestamp().Return(deposit1Expired)
+				s.EXPECT().GetTimestamp().Return(deposit1.EndTime())
 				expect.VerifyUnlockDeposit(t, s, utx.Ins,
 					[]*avax.UTXO{deposit1WithRewardUTXO},
 					[]ids.ShortID{
@@ -3799,10 +3785,9 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 				s.EXPECT().GetDeposit(depositWithRewardTxID1).Return(deposit1WithReward, nil).Times(2)
 				s.EXPECT().GetDepositOffer(deposit1WithReward.DepositOfferID).Return(depositOfferWithReward, nil)
 				s.EXPECT().GetClaimable(owner1ID).Return(&state.Claimable{Owner: &owner1}, nil)
-				remainingReward := deposit1WithReward.TotalReward(depositOfferWithReward) - deposit1WithReward.ClaimedRewardAmount
 				s.EXPECT().SetClaimable(owner1ID, &state.Claimable{
 					Owner:                &owner1,
-					ExpiredDepositReward: remainingReward,
+					ExpiredDepositReward: deposit1WithReward.RemainingReward(depositOfferWithReward),
 				})
 				s.EXPECT().RemoveDeposit(depositWithRewardTxID1, deposit1WithReward)
 				// state update: ins/outs/utxos
@@ -3813,7 +3798,7 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			utx: &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 				Ins: generate.InsFromUTXOs(t, []*avax.UTXO{deposit1WithRewardUTXO}),
 				Outs: []*avax.TransferableOutput{
-					generate.Out(ctx.AVAXAssetID, deposit1WithReward.Amount, owner1, ids.Empty, ids.Empty),
+					generate.Out(test.AVAXAssetID, deposit1WithReward.Amount, owner1, ids.Empty, ids.Empty),
 				},
 			}}},
 		},
@@ -3862,9 +3847,9 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			utx: &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 				Ins: generate.InsFromUTXOs(t, []*avax.UTXO{feeUTXO, deposit1UTXO, deposit2UTXO}),
 				Outs: []*avax.TransferableOutput{
-					generate.Out(ctx.AVAXAssetID, deposit1HalfUnlockableAmount+deposit2HalfUnlockableAmount, owner1, ids.Empty, ids.Empty),
-					generate.Out(ctx.AVAXAssetID, deposit1.Amount-deposit1HalfUnlockableAmount, owner1, depositTxID1, ids.Empty),
-					generate.Out(ctx.AVAXAssetID, deposit2.Amount-deposit2HalfUnlockableAmount, owner1, depositTxID2, ids.Empty),
+					generate.Out(test.AVAXAssetID, deposit1HalfUnlockableAmount+deposit2HalfUnlockableAmount, owner1, ids.Empty, ids.Empty),
+					generate.Out(test.AVAXAssetID, deposit1.Amount-deposit1HalfUnlockableAmount, owner1, depositTxID1, ids.Empty),
+					generate.Out(test.AVAXAssetID, deposit2.Amount-deposit2HalfUnlockableAmount, owner1, depositTxID2, ids.Empty),
 				},
 			}}},
 			signers: [][]*secp256k1.PrivateKey{{feeOwnerKey}, {owner1Key}, {owner1Key}},
@@ -3893,8 +3878,6 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 }
 
 func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
-	ctx := test.Context(t)
-
 	feeOwnerKey, feeOwnerAddr, feeOwner := generate.KeyAndOwner(t, test.Keys[0])
 	depositRewardOwnerKey, _, depositRewardOwner := generate.KeyAndOwner(t, test.Keys[1])
 	claimableOwnerKey1, _, claimableOwner1 := generate.KeyAndOwner(t, test.Keys[2])
@@ -3905,8 +3888,8 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 	claimableMsigKeys, claimableMsigAlias, claimableMsigAliasOwner, claimableMsigOwner := generate.MsigAliasAndKeys([]*secp256k1.PrivateKey{test.Keys[8], test.Keys[9], test.Keys[10]}, 2, false)
 	feeMsigKeys, feeMsigAlias, feeMsigAliasOwner, feeMsigOwner := generate.MsigAliasAndKeys([]*secp256k1.PrivateKey{test.Keys[11], test.Keys[12]}, 2, false)
 
-	feeUTXO := generate.UTXO(ids.GenerateTestID(), ctx.AVAXAssetID, test.TxFee, feeOwner, ids.Empty, ids.Empty, true)
-	msigFeeUTXO := generate.UTXO(ids.GenerateTestID(), ctx.AVAXAssetID, test.TxFee, *feeMsigOwner, ids.Empty, ids.Empty, true)
+	feeUTXO := generate.UTXO(ids.GenerateTestID(), test.AVAXAssetID, test.TxFee, feeOwner, ids.Empty, ids.Empty, true)
+	msigFeeUTXO := generate.UTXO(ids.GenerateTestID(), test.AVAXAssetID, test.TxFee, *feeMsigOwner, ids.Empty, ids.Empty, true)
 
 	depositOfferID := ids.GenerateTestID()
 	depositTxID1 := ids.GenerateTestID()
@@ -3946,8 +3929,8 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 
 	baseTxWithFeeInput := func(outs []*avax.TransferableOutput) *txs.BaseTx {
 		return &txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    ctx.NetworkID,
-			BlockchainID: ctx.ChainID,
+			NetworkID:    test.NetworkID,
+			BlockchainID: constants.PlatformChainID,
 			Ins:          []*avax.TransferableInput{generate.InFromUTXO(t, feeUTXO, []uint32{0}, false)},
 			Outs:         outs,
 		}}
@@ -4230,21 +4213,21 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			utx: &txs.ClaimTx{
 				BaseTx: *baseTxWithFeeInput([]*avax.TransferableOutput{
 					{
-						Asset: avax.Asset{ID: ctx.AVAXAssetID},
+						Asset: avax.Asset{ID: test.AVAXAssetID},
 						Out: &secp256k1fx.TransferOutput{
 							Amt:          5, // expected claimable reward amount
 							OutputOwners: claimToOwner1,
 						},
 					},
 					{
-						Asset: avax.Asset{ID: ctx.AVAXAssetID},
+						Asset: avax.Asset{ID: test.AVAXAssetID},
 						Out: &secp256k1fx.TransferOutput{
 							Amt:          5, // expected claimable reward amount
 							OutputOwners: claimToOwner1,
 						},
 					},
 					{
-						Asset: avax.Asset{ID: ctx.AVAXAssetID},
+						Asset: avax.Asset{ID: test.AVAXAssetID},
 						Out: &secp256k1fx.TransferOutput{
 							Amt:          claimable1.ValidatorReward + claimable1.ExpiredDepositReward,
 							OutputOwners: claimToOwner1,
@@ -4311,28 +4294,28 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			utx: &txs.ClaimTx{
 				BaseTx: *baseTxWithFeeInput([]*avax.TransferableOutput{
 					{
-						Asset: avax.Asset{ID: ctx.AVAXAssetID},
+						Asset: avax.Asset{ID: test.AVAXAssetID},
 						Out: &secp256k1fx.TransferOutput{
 							Amt:          7, // part of claimableValidatorReward1.ValidatorReward
 							OutputOwners: claimToOwner1,
 						},
 					},
 					{
-						Asset: avax.Asset{ID: ctx.AVAXAssetID},
+						Asset: avax.Asset{ID: test.AVAXAssetID},
 						Out: &secp256k1fx.TransferOutput{
 							Amt:          claimableValidatorReward1.ValidatorReward - 7,
 							OutputOwners: claimToOwner2,
 						},
 					},
 					{
-						Asset: avax.Asset{ID: ctx.AVAXAssetID},
+						Asset: avax.Asset{ID: test.AVAXAssetID},
 						Out: &secp256k1fx.TransferOutput{
 							Amt:          2, // part of claimableValidatorReward2.ValidatorReward
 							OutputOwners: claimToOwner1,
 						},
 					},
 					{
-						Asset: avax.Asset{ID: ctx.AVAXAssetID},
+						Asset: avax.Asset{ID: test.AVAXAssetID},
 						Out: &secp256k1fx.TransferOutput{
 							Amt:          claimableValidatorReward2.ValidatorReward/2 - 2,
 							OutputOwners: claimToOwner1,
@@ -4389,7 +4372,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			utx: &txs.ClaimTx{
 				BaseTx: *baseTxWithFeeInput([]*avax.TransferableOutput{
 					{
-						Asset: avax.Asset{ID: ctx.AVAXAssetID},
+						Asset: avax.Asset{ID: test.AVAXAssetID},
 						Out: &secp256k1fx.TransferOutput{
 							Amt:          claimableValidatorReward1.ValidatorReward + claimableValidatorReward2.ValidatorReward/2,
 							OutputOwners: claimToOwner1,
@@ -4457,7 +4440,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			},
 			utx: &txs.ClaimTx{
 				BaseTx: *baseTxWithFeeInput([]*avax.TransferableOutput{{
-					Asset: avax.Asset{ID: ctx.AVAXAssetID},
+					Asset: avax.Asset{ID: test.AVAXAssetID},
 					Out: &secp256k1fx.TransferOutput{
 						Amt:          4, // expected claimable reward amount
 						OutputOwners: claimToOwner1,
@@ -4522,14 +4505,14 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			utx: &txs.ClaimTx{
 				BaseTx: *baseTxWithFeeInput([]*avax.TransferableOutput{
 					{
-						Asset: avax.Asset{ID: ctx.AVAXAssetID},
+						Asset: avax.Asset{ID: test.AVAXAssetID},
 						Out: &secp256k1fx.TransferOutput{
 							Amt:          claimable1.ValidatorReward + claimable1.ExpiredDepositReward/2,
 							OutputOwners: claimToOwner1,
 						},
 					},
 					{
-						Asset: avax.Asset{ID: ctx.AVAXAssetID},
+						Asset: avax.Asset{ID: test.AVAXAssetID},
 						Out: &secp256k1fx.TransferOutput{
 							Amt:          2, // 5 is expected available reward amount
 							OutputOwners: claimToOwner1,
@@ -4580,7 +4563,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			},
 			utx: &txs.ClaimTx{
 				BaseTx: *baseTxWithFeeInput([]*avax.TransferableOutput{{
-					Asset: avax.Asset{ID: ctx.AVAXAssetID},
+					Asset: avax.Asset{ID: test.AVAXAssetID},
 					Out: &secp256k1fx.TransferOutput{
 						Amt:          claimable1.ExpiredDepositReward,
 						OutputOwners: claimToOwner1,
@@ -4621,7 +4604,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			},
 			utx: &txs.ClaimTx{
 				BaseTx: *baseTxWithFeeInput([]*avax.TransferableOutput{{
-					Asset: avax.Asset{ID: ctx.AVAXAssetID},
+					Asset: avax.Asset{ID: test.AVAXAssetID},
 					Out: &secp256k1fx.TransferOutput{
 						Amt:          claimable1.ValidatorReward,
 						OutputOwners: claimToOwner1,
@@ -4697,11 +4680,11 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			},
 			utx: &txs.ClaimTx{
 				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    ctx.NetworkID,
-					BlockchainID: ctx.ChainID,
+					NetworkID:    test.NetworkID,
+					BlockchainID: constants.PlatformChainID,
 					Ins:          []*avax.TransferableInput{generate.InFromUTXO(t, msigFeeUTXO, []uint32{0, 1}, false)},
 					Outs: []*avax.TransferableOutput{{
-						Asset: avax.Asset{ID: ctx.AVAXAssetID},
+						Asset: avax.Asset{ID: test.AVAXAssetID},
 						Out: &secp256k1fx.TransferOutput{
 							Amt:          claimableMsigOwned.ExpiredDepositReward,
 							OutputOwners: claimToOwner1,
@@ -4757,7 +4740,6 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 }
 
 func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
-	ctx := test.Context(t)
 	caminoGenesisConf := api.Camino{
 		VerifyNodeSignature: true,
 		LockModeBondDeposit: true,
@@ -4771,11 +4753,11 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 	nodeID1 := ids.NodeID(nodeAddr1)
 	nodeID2 := ids.NodeID(nodeAddr2)
 
-	feeUTXO := generate.UTXO(ids.GenerateTestID(), ctx.AVAXAssetID, test.TxFee, feeOwner, ids.Empty, ids.Empty, true)
+	feeUTXO := generate.UTXO(ids.GenerateTestID(), test.AVAXAssetID, test.TxFee, feeOwner, ids.Empty, ids.Empty, true)
 
 	baseTx := txs.BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    ctx.NetworkID,
-		BlockchainID: ctx.ChainID,
+		NetworkID:    test.NetworkID,
+		BlockchainID: constants.PlatformChainID,
 		Ins:          []*avax.TransferableInput{generate.InFromUTXO(t, feeUTXO, []uint32{0}, false)},
 	}}
 
@@ -5068,7 +5050,6 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 }
 
 func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
-	ctx := test.Context(t)
 	caminoGenesisConf := api.Camino{
 		VerifyNodeSignature: true,
 		LockModeBondDeposit: true,
@@ -5102,7 +5083,7 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 			require.NoError(t, err)
 			utxosBytes[i] = utxoBytes
 		}
-		shm.EXPECT().Indexed(ctx.CChainID, treasury.AddrTraitsBytes,
+		shm.EXPECT().Indexed(test.CChainID, treasury.AddrTraitsBytes,
 			ids.ShortEmpty[:], ids.Empty[:], maxPageSize).Return(utxosBytes, nil, nil, nil)
 		return shm
 	}
@@ -5127,8 +5108,8 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 			sharedMemory: shmWithUTXOs,
 			utx: func(utxos []*avax.TimedUTXO) *txs.RewardsImportTx {
 				return &txs.RewardsImportTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    ctx.NetworkID,
-					BlockchainID: ctx.ChainID,
+					NetworkID:    test.NetworkID,
+					BlockchainID: constants.PlatformChainID,
 					Ins: []*avax.TransferableInput{
 						generate.InFromUTXO(t, &utxos[0].UTXO, []uint32{0}, false),
 						generate.InFromUTXO(t, &utxos[1].UTXO, []uint32{0}, false),
@@ -5137,15 +5118,15 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 			},
 			utxos: []*avax.TimedUTXO{
 				{
-					UTXO:      *generate.UTXO(ids.ID{1}, ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty, true),
+					UTXO:      *generate.UTXO(ids.ID{1}, test.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty, true),
 					Timestamp: athensBlockTimestamp - atomic.SharedMemorySyncBound,
 				},
 				{
-					UTXO:      *generate.UTXO(ids.ID{2}, ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty, true),
+					UTXO:      *generate.UTXO(ids.ID{2}, test.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty, true),
 					Timestamp: athensBlockTimestamp - atomic.SharedMemorySyncBound,
 				},
 				{
-					UTXO:      *generate.UTXO(ids.ID{3}, ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty, true),
+					UTXO:      *generate.UTXO(ids.ID{3}, test.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty, true),
 					Timestamp: athensBlockTimestamp - atomic.SharedMemorySyncBound,
 				},
 			},
@@ -5161,15 +5142,15 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 			sharedMemory: shmWithUTXOs,
 			utx: func(utxos []*avax.TimedUTXO) *txs.RewardsImportTx {
 				return &txs.RewardsImportTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    ctx.NetworkID,
-					BlockchainID: ctx.ChainID,
+					NetworkID:    test.NetworkID,
+					BlockchainID: constants.PlatformChainID,
 					Ins: []*avax.TransferableInput{
-						generate.In(ctx.AVAXAssetID, 1, ids.Empty, ids.Empty, []uint32{}),
+						generate.In(test.AVAXAssetID, 1, ids.Empty, ids.Empty, []uint32{}),
 					},
 				}}}
 			},
 			utxos: []*avax.TimedUTXO{{
-				UTXO:      *generate.UTXO(ids.ID{1}, ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty, true),
+				UTXO:      *generate.UTXO(ids.ID{1}, test.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty, true),
 				Timestamp: athensBlockTimestamp - atomic.SharedMemorySyncBound,
 			}},
 			expectedErr: errImportedUTXOMismatch,
@@ -5184,11 +5165,11 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 			sharedMemory: shmWithUTXOs,
 			utx: func(utxos []*avax.TimedUTXO) *txs.RewardsImportTx {
 				return &txs.RewardsImportTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    ctx.NetworkID,
-					BlockchainID: ctx.ChainID,
+					NetworkID:    test.NetworkID,
+					BlockchainID: constants.PlatformChainID,
 					Ins: []*avax.TransferableInput{{
 						UTXOID: utxos[0].UTXOID,
-						Asset:  avax.Asset{ID: ctx.AVAXAssetID},
+						Asset:  avax.Asset{ID: test.AVAXAssetID},
 						In: &secp256k1fx.TransferInput{
 							Amt:   2,
 							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
@@ -5197,7 +5178,7 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 				}}}
 			},
 			utxos: []*avax.TimedUTXO{{
-				UTXO:      *generate.UTXO(ids.ID{1}, ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty, true),
+				UTXO:      *generate.UTXO(ids.ID{1}, test.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty, true),
 				Timestamp: athensBlockTimestamp - atomic.SharedMemorySyncBound,
 			}},
 			expectedErr: errInputAmountMismatch,
@@ -5291,8 +5272,8 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 			sharedMemory: shmWithUTXOs,
 			utx: func(utxos []*avax.TimedUTXO) *txs.RewardsImportTx {
 				return &txs.RewardsImportTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    ctx.NetworkID,
-					BlockchainID: ctx.ChainID,
+					NetworkID:    test.NetworkID,
+					BlockchainID: constants.PlatformChainID,
 					Ins: []*avax.TransferableInput{
 						generate.InFromUTXO(t, &utxos[0].UTXO, []uint32{0}, false),
 						generate.InFromUTXO(t, &utxos[2].UTXO, []uint32{0}, false),
@@ -5301,18 +5282,18 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 			},
 			utxos: []*avax.TimedUTXO{
 				{ // timed utxo, old enough
-					UTXO:      *generate.UTXO(ids.ID{1}, ctx.AVAXAssetID, 3, *treasury.Owner, ids.Empty, ids.Empty, true),
+					UTXO:      *generate.UTXO(ids.ID{1}, test.AVAXAssetID, 3, *treasury.Owner, ids.Empty, ids.Empty, true),
 					Timestamp: athensBlockTimestamp - atomic.SharedMemorySyncBound,
 				},
 				{ // not timed utxo
-					UTXO: *generate.UTXO(ids.ID{2}, ctx.AVAXAssetID, 5, *treasury.Owner, ids.Empty, ids.Empty, true),
+					UTXO: *generate.UTXO(ids.ID{2}, test.AVAXAssetID, 5, *treasury.Owner, ids.Empty, ids.Empty, true),
 				},
 				{ // timed utxo, old enough
-					UTXO:      *generate.UTXO(ids.ID{3}, ctx.AVAXAssetID, 2, *treasury.Owner, ids.Empty, ids.Empty, true),
+					UTXO:      *generate.UTXO(ids.ID{3}, test.AVAXAssetID, 2, *treasury.Owner, ids.Empty, ids.Empty, true),
 					Timestamp: athensBlockTimestamp - atomic.SharedMemorySyncBound,
 				},
 				{ // timed utxo, not old enough
-					UTXO:      *generate.UTXO(ids.ID{4}, ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty, true),
+					UTXO:      *generate.UTXO(ids.ID{4}, test.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty, true),
 					Timestamp: athensBlockTimestamp - atomic.SharedMemorySyncBound + 1,
 				},
 			},
@@ -5325,7 +5306,7 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 			expectedAtomicRequests: func(utxos []*avax.TimedUTXO) map[ids.ID]*atomic.Requests {
 				utxoID0 := utxos[0].InputID()
 				utxoID2 := utxos[2].InputID()
-				return map[ids.ID]*atomic.Requests{ctx.CChainID: {
+				return map[ids.ID]*atomic.Requests{test.CChainID: {
 					RemoveRequests: [][]byte{utxoID0[:], utxoID2[:]},
 				}}
 			},
@@ -5421,8 +5402,8 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 			sharedMemory: shmWithUTXOs,
 			utx: func(utxos []*avax.TimedUTXO) *txs.RewardsImportTx {
 				return &txs.RewardsImportTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    ctx.NetworkID,
-					BlockchainID: ctx.ChainID,
+					NetworkID:    test.NetworkID,
+					BlockchainID: constants.PlatformChainID,
 					Ins: []*avax.TransferableInput{
 						generate.InFromUTXO(t, &utxos[0].UTXO, []uint32{0}, false),
 						generate.InFromUTXO(t, &utxos[2].UTXO, []uint32{0}, false),
@@ -5431,18 +5412,18 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 			},
 			utxos: []*avax.TimedUTXO{
 				{ // timed utxo, old enough
-					UTXO:      *generate.UTXO(ids.ID{1}, ctx.AVAXAssetID, 3, *treasury.Owner, ids.Empty, ids.Empty, true),
+					UTXO:      *generate.UTXO(ids.ID{1}, test.AVAXAssetID, 3, *treasury.Owner, ids.Empty, ids.Empty, true),
 					Timestamp: beforeAthensBlockTimestamp - atomic.SharedMemorySyncBound,
 				},
 				{ // not timed utxo
-					UTXO: *generate.UTXO(ids.ID{2}, ctx.AVAXAssetID, 5, *treasury.Owner, ids.Empty, ids.Empty, true),
+					UTXO: *generate.UTXO(ids.ID{2}, test.AVAXAssetID, 5, *treasury.Owner, ids.Empty, ids.Empty, true),
 				},
 				{ // timed utxo, old enough
-					UTXO:      *generate.UTXO(ids.ID{3}, ctx.AVAXAssetID, 2, *treasury.Owner, ids.Empty, ids.Empty, true),
+					UTXO:      *generate.UTXO(ids.ID{3}, test.AVAXAssetID, 2, *treasury.Owner, ids.Empty, ids.Empty, true),
 					Timestamp: beforeAthensBlockTimestamp - atomic.SharedMemorySyncBound,
 				},
 				{ // timed utxo, not old enough
-					UTXO:      *generate.UTXO(ids.ID{4}, ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty, true),
+					UTXO:      *generate.UTXO(ids.ID{4}, test.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty, true),
 					Timestamp: beforeAthensBlockTimestamp - atomic.SharedMemorySyncBound + 1,
 				},
 			},
@@ -5455,7 +5436,7 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 			expectedAtomicRequests: func(utxos []*avax.TimedUTXO) map[ids.ID]*atomic.Requests {
 				utxoID0 := utxos[0].InputID()
 				utxoID2 := utxos[2].InputID()
-				return map[ids.ID]*atomic.Requests{ctx.CChainID: {
+				return map[ids.ID]*atomic.Requests{test.CChainID: {
 					RemoveRequests: [][]byte{utxoID0[:], utxoID2[:]},
 				}}
 			},
@@ -5502,7 +5483,6 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 }
 
 func TestCaminoStandardTxExecutorExportTxMultisig(t *testing.T) {
-	ctx := test.Context(t)
 	fakeMSigAlias := test.FundedKeys[0].Address()
 	sourceKey := test.FundedKeys[1]
 	nestedAlias := ids.ShortID{0, 0, 0, 1, 0xa}
@@ -5543,13 +5523,13 @@ func TestCaminoStandardTxExecutorExportTxMultisig(t *testing.T) {
 
 	tests := map[string]testCase{
 		"P->C export from msig wallet": {
-			destinationChainID: ctx.CChainID,
+			destinationChainID: test.CChainID,
 			to:                 fakeMSigAlias,
 			expectedErr:        nil,
 			expectedMsigAddrs:  []ids.ShortID{fakeMSigAlias},
 		},
 		"P->C export simple account not multisig": {
-			destinationChainID: ctx.CChainID,
+			destinationChainID: test.CChainID,
 			to:                 sourceKey.Address(),
 			expectedErr:        nil,
 			expectedMsigAddrs:  []ids.ShortID{},
@@ -5635,8 +5615,6 @@ func TestCaminoStandardTxExecutorExportTxMultisig(t *testing.T) {
 }
 
 func TestCaminoCrossExport(t *testing.T) {
-	ctx := test.Context(t)
-
 	addr0 := test.FundedKeys[0].Address()
 	addr1 := test.FundedKeys[1].Address()
 
@@ -5657,24 +5635,24 @@ func TestCaminoCrossExport(t *testing.T) {
 	}{
 		"CrossTransferOutput OK": {
 			utxos: []*avax.UTXO{
-				generate.UTXO(ids.ID{0}, ctx.AVAXAssetID, test.ValidatorWeight, outputOwners, ids.Empty, ids.Empty, true),
+				generate.UTXO(ids.ID{0}, test.AVAXAssetID, test.ValidatorWeight, outputOwners, ids.Empty, ids.Empty, true),
 			},
 			ins: []*avax.TransferableInput{
-				generate.InWithTxID(ids.ID{0}, ctx.AVAXAssetID, test.ValidatorWeight, ids.Empty, ids.Empty, sigIndices),
+				generate.InWithTxID(ids.ID{0}, test.AVAXAssetID, test.ValidatorWeight, ids.Empty, ids.Empty, sigIndices),
 			},
 			exportedOuts: []*avax.TransferableOutput{
-				generate.CrossOut(ctx.AVAXAssetID, test.ValidatorWeight-test.TxFee, outputOwners, addr1),
+				generate.CrossOut(test.AVAXAssetID, test.ValidatorWeight-test.TxFee, outputOwners, addr1),
 			},
 		},
 		"CrossTransferOutput Invalid Recipient": {
 			utxos: []*avax.UTXO{
-				generate.UTXO(ids.ID{0}, ctx.AVAXAssetID, test.ValidatorWeight, outputOwners, ids.Empty, ids.Empty, true),
+				generate.UTXO(ids.ID{0}, test.AVAXAssetID, test.ValidatorWeight, outputOwners, ids.Empty, ids.Empty, true),
 			},
 			ins: []*avax.TransferableInput{
-				generate.InWithTxID(ids.ID{0}, ctx.AVAXAssetID, test.ValidatorWeight, ids.Empty, ids.Empty, sigIndices),
+				generate.InWithTxID(ids.ID{0}, test.AVAXAssetID, test.ValidatorWeight, ids.Empty, ids.Empty, sigIndices),
 			},
 			exportedOuts: []*avax.TransferableOutput{
-				generate.CrossOut(ctx.AVAXAssetID, test.ValidatorWeight-test.TxFee, outputOwners, ids.ShortEmpty),
+				generate.CrossOut(test.AVAXAssetID, test.ValidatorWeight-test.TxFee, outputOwners, ids.ShortEmpty),
 			},
 			expectedErr: secp256k1fx.ErrEmptyRecipient,
 		},
@@ -5718,18 +5696,16 @@ func TestCaminoCrossExport(t *testing.T) {
 }
 
 func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
-	ctx := test.Context(t)
-
 	ownerKey, ownerAddr, owner := generate.KeyAndOwner(t, test.Keys[0])
 	msigKeys, msigAlias, msigAliasOwners, msigOwner := generate.MsigAliasAndKeys([]*secp256k1.PrivateKey{test.Keys[1], test.Keys[2]}, 2, true)
 
-	ownerUTXO := generate.UTXO(ids.ID{1}, ctx.AVAXAssetID, test.TxFee, owner, ids.Empty, ids.Empty, true)
-	msigUTXO := generate.UTXO(ids.ID{3}, ctx.AVAXAssetID, test.TxFee, *msigOwner, ids.Empty, ids.Empty, true)
+	ownerUTXO := generate.UTXO(ids.ID{1}, test.AVAXAssetID, test.TxFee, owner, ids.Empty, ids.Empty, true)
+	msigUTXO := generate.UTXO(ids.ID{3}, test.AVAXAssetID, test.TxFee, *msigOwner, ids.Empty, ids.Empty, true)
 
 	baseTx := txs.BaseTx{
 		BaseTx: avax.BaseTx{
-			NetworkID:    ctx.NetworkID,
-			BlockchainID: ctx.ChainID,
+			NetworkID:    test.NetworkID,
+			BlockchainID: constants.PlatformChainID,
 			Ins:          []*avax.TransferableInput{generate.InFromUTXO(t, ownerUTXO, []uint32{0}, false)},
 		},
 	}
@@ -6046,8 +6022,8 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 			utx: &txs.MultisigAliasTx{
 				BaseTx: txs.BaseTx{
 					BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins:          []*avax.TransferableInput{generate.InFromUTXO(t, msigUTXO, []uint32{0, 1}, false)},
 					},
 				},
@@ -6125,7 +6101,6 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 }
 
 func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
-	ctx := test.Context(t)
 	caminoGenesisConf := api.Camino{
 		VerifyNodeSignature: true,
 		LockModeBondDeposit: true,
@@ -6134,7 +6109,7 @@ func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
 	feeOwnerKey, feeOwnerAddr, feeOwner := generate.KeyAndOwner(t, test.Keys[0])
 	offerCreatorKey, offerCreatorAddr := test.Keys[1], test.Keys[1].Address()
 
-	feeUTXO := generate.UTXO(ids.GenerateTestID(), ctx.AVAXAssetID, test.TxFee, feeOwner, ids.Empty, ids.Empty, true)
+	feeUTXO := generate.UTXO(ids.GenerateTestID(), test.AVAXAssetID, test.TxFee, feeOwner, ids.Empty, ids.Empty, true)
 
 	offer1 := &deposit.Offer{
 		UpgradeVersionID:      codec.UpgradeVersion1,
@@ -6156,8 +6131,8 @@ func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
 	}
 
 	baseTx := txs.BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    ctx.NetworkID,
-		BlockchainID: ctx.ChainID,
+		NetworkID:    test.NetworkID,
+		BlockchainID: constants.PlatformChainID,
 		Ins:          []*avax.TransferableInput{generate.InFromUTXO(t, feeUTXO, []uint32{0}, false)},
 	}}
 
@@ -6459,7 +6434,6 @@ func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
 }
 
 func TestCaminoStandardTxExecutorAddProposalTx(t *testing.T) {
-	ctx := test.Context(t)
 	caminoGenesisConf := api.Camino{
 		VerifyNodeSignature: true,
 		LockModeBondDeposit: true,
@@ -6474,8 +6448,8 @@ func TestCaminoStandardTxExecutorAddProposalTx(t *testing.T) {
 	proposerKey, proposerAddr := test.Keys[2], test.Keys[2].Address()
 
 	proposalBondAmt := uint64(100)
-	feeUTXO := generate.UTXO(ids.ID{1, 2, 3, 4, 5}, ctx.AVAXAssetID, test.TxFee, feeOwner, ids.Empty, ids.Empty, true)
-	bondUTXO := generate.UTXO(ids.ID{1, 2, 3, 4, 6}, ctx.AVAXAssetID, proposalBondAmt, bondOwner, ids.Empty, ids.Empty, true)
+	feeUTXO := generate.UTXO(ids.ID{1, 2, 3, 4, 5}, test.AVAXAssetID, test.TxFee, feeOwner, ids.Empty, ids.Empty, true)
+	bondUTXO := generate.UTXO(ids.ID{1, 2, 3, 4, 6}, test.AVAXAssetID, proposalBondAmt, bondOwner, ids.Empty, ids.Empty, true)
 
 	applicantAddress := ids.ShortID{1, 1, 1}
 	proposerNodeShortID := ids.ShortID{2, 2, 2}
@@ -6488,14 +6462,14 @@ func TestCaminoStandardTxExecutorAddProposalTx(t *testing.T) {
 
 	baseTxWithBondAmt := func(bondAmt uint64) *txs.BaseTx {
 		return &txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    ctx.NetworkID,
-			BlockchainID: ctx.ChainID,
+			NetworkID:    test.NetworkID,
+			BlockchainID: constants.PlatformChainID,
 			Ins: []*avax.TransferableInput{
 				generate.InFromUTXO(t, feeUTXO, []uint32{0}, false),
 				generate.InFromUTXO(t, bondUTXO, []uint32{0}, false),
 			},
 			Outs: []*avax.TransferableOutput{
-				generate.Out(ctx.AVAXAssetID, bondAmt, bondOwner, ids.Empty, locked.ThisTxID),
+				generate.Out(test.AVAXAssetID, bondAmt, bondOwner, ids.Empty, locked.ThisTxID),
 			},
 		}}
 	}
@@ -6880,7 +6854,6 @@ func TestCaminoStandardTxExecutorAddProposalTx(t *testing.T) {
 }
 
 func TestCaminoStandardTxExecutorAddVoteTx(t *testing.T) {
-	ctx := test.Context(t)
 	caminoGenesisConf := api.Camino{
 		VerifyNodeSignature: true,
 		LockModeBondDeposit: true,
@@ -6896,15 +6869,15 @@ func TestCaminoStandardTxExecutorAddVoteTx(t *testing.T) {
 	_, voterAddr3 := test.Keys[3], test.Keys[3].Address()
 	voterKey4, voterAddr4 := test.Keys[4], test.Keys[4].Address()
 
-	feeUTXO := generate.UTXO(ids.ID{1, 2, 3, 4, 5}, ctx.AVAXAssetID, test.TxFee, feeOwner, ids.Empty, ids.Empty, true)
+	feeUTXO := generate.UTXO(ids.ID{1, 2, 3, 4, 5}, test.AVAXAssetID, test.TxFee, feeOwner, ids.Empty, ids.Empty, true)
 
 	simpleVote := &txs.VoteWrapper{Vote: &dac.SimpleVote{OptionIndex: 0}}
 	voteBytes, err := txs.Codec.Marshal(txs.Version, simpleVote)
 	require.NoError(t, err)
 
 	baseTx := txs.BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    ctx.NetworkID,
-		BlockchainID: ctx.ChainID,
+		NetworkID:    test.NetworkID,
+		BlockchainID: constants.PlatformChainID,
 		Ins: []*avax.TransferableInput{
 			generate.InFromUTXO(t, feeUTXO, []uint32{0}, false),
 		},
@@ -7291,7 +7264,6 @@ func TestCaminoStandardTxExecutorAddVoteTx(t *testing.T) {
 }
 
 func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
-	ctx := test.Context(t)
 	caminoGenesisConf := api.Camino{
 		VerifyNodeSignature: true,
 		LockModeBondDeposit: true,
@@ -7339,23 +7311,23 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 	validatorTxID1 := ids.ID{9, 9}
 	validatorTxID2 := ids.ID{10, 10}
 
-	earlySuccessfulProposalUTXO := generate.UTXOWithIndex(earlySuccessfulProposalID, 0, ctx.AVAXAssetID, proposalBondAmt, bondOwner1, ids.Empty, earlySuccessfulProposalID, true)
-	earlyFailedProposalUTXO := generate.UTXOWithIndex(earlyFailedProposalID, 0, ctx.AVAXAssetID, proposalBondAmt, bondOwner2, ids.Empty, earlyFailedProposalID, true)
-	expiredSuccessfulProposalUTXO := generate.UTXOWithIndex(expiredSuccessfulProposalID, 0, ctx.AVAXAssetID, proposalBondAmt, bondOwner3, ids.Empty, expiredSuccessfulProposalID, true)
-	expiredFailedProposalUTXO := generate.UTXOWithIndex(expiredFailedProposalID, 0, ctx.AVAXAssetID, proposalBondAmt, bondOwner4, ids.Empty, expiredFailedProposalID, true)
-	activeSuccessfulProposalUTXO := generate.UTXOWithIndex(activeSuccessfulProposalID, 0, ctx.AVAXAssetID, proposalBondAmt, bondOwner5, ids.Empty, activeSuccessfulProposalID, true)
-	activeFailedProposalUTXO := generate.UTXOWithIndex(activeFailedProposalID, 0, ctx.AVAXAssetID, proposalBondAmt, bondOwner6, ids.Empty, activeFailedProposalID, true)
-	earlySuccessfulProposalWithBondUTXO := generate.UTXOWithIndex(earlySuccessfulProposalWithBondID, 0, ctx.AVAXAssetID, proposalBondAmt, bondOwner7, ids.Empty, earlySuccessfulProposalWithBondID, true)
-	expiredSuccessfulProposalWithBondUTXO := generate.UTXOWithIndex(expiredSuccessfulProposalWithBondID, 0, ctx.AVAXAssetID, proposalBondAmt, bondOwner8, ids.Empty, expiredSuccessfulProposalWithBondID, true)
-	additionalBondUTXO1 := generate.UTXOWithIndex(validatorTxID1, 0, ctx.AVAXAssetID, proposalBondAmt, bondOwner9, ids.Empty, validatorTxID1, true)
-	additionalBondUTXO2 := generate.UTXOWithIndex(validatorTxID2, 0, ctx.AVAXAssetID, proposalBondAmt, bondOwner10, ids.Empty, validatorTxID2, true)
+	earlySuccessfulProposalUTXO := generate.UTXOWithIndex(earlySuccessfulProposalID, 0, test.AVAXAssetID, proposalBondAmt, bondOwner1, ids.Empty, earlySuccessfulProposalID, true)
+	earlyFailedProposalUTXO := generate.UTXOWithIndex(earlyFailedProposalID, 0, test.AVAXAssetID, proposalBondAmt, bondOwner2, ids.Empty, earlyFailedProposalID, true)
+	expiredSuccessfulProposalUTXO := generate.UTXOWithIndex(expiredSuccessfulProposalID, 0, test.AVAXAssetID, proposalBondAmt, bondOwner3, ids.Empty, expiredSuccessfulProposalID, true)
+	expiredFailedProposalUTXO := generate.UTXOWithIndex(expiredFailedProposalID, 0, test.AVAXAssetID, proposalBondAmt, bondOwner4, ids.Empty, expiredFailedProposalID, true)
+	activeSuccessfulProposalUTXO := generate.UTXOWithIndex(activeSuccessfulProposalID, 0, test.AVAXAssetID, proposalBondAmt, bondOwner5, ids.Empty, activeSuccessfulProposalID, true)
+	activeFailedProposalUTXO := generate.UTXOWithIndex(activeFailedProposalID, 0, test.AVAXAssetID, proposalBondAmt, bondOwner6, ids.Empty, activeFailedProposalID, true)
+	earlySuccessfulProposalWithBondUTXO := generate.UTXOWithIndex(earlySuccessfulProposalWithBondID, 0, test.AVAXAssetID, proposalBondAmt, bondOwner7, ids.Empty, earlySuccessfulProposalWithBondID, true)
+	expiredSuccessfulProposalWithBondUTXO := generate.UTXOWithIndex(expiredSuccessfulProposalWithBondID, 0, test.AVAXAssetID, proposalBondAmt, bondOwner8, ids.Empty, expiredSuccessfulProposalWithBondID, true)
+	additionalBondUTXO1 := generate.UTXOWithIndex(validatorTxID1, 0, test.AVAXAssetID, proposalBondAmt, bondOwner9, ids.Empty, validatorTxID1, true)
+	additionalBondUTXO2 := generate.UTXOWithIndex(validatorTxID2, 0, test.AVAXAssetID, proposalBondAmt, bondOwner10, ids.Empty, validatorTxID2, true)
 
 	pendingValidator1 := &state.Staker{TxID: validatorTxID1}
 	pendingValidator2 := &state.Staker{TxID: validatorTxID2}
 
 	baseTx := txs.BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    ctx.NetworkID,
-		BlockchainID: ctx.ChainID,
+		NetworkID:    test.NetworkID,
+		BlockchainID: constants.PlatformChainID,
 		Ins: generate.InsFromUTXOsWithSigIndices(t, []*avax.UTXO{
 			earlySuccessfulProposalUTXO, earlyFailedProposalUTXO,
 			expiredSuccessfulProposalUTXO, expiredFailedProposalUTXO,
@@ -7517,8 +7489,8 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
 				return &txs.FinishProposalsTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: generate.InsFromUTXOsWithSigIndices(t, []*avax.UTXO{
 							activeSuccessfulProposalUTXO,
 						}, []uint32{}),
@@ -7544,8 +7516,8 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
 				return &txs.FinishProposalsTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: generate.InsFromUTXOsWithSigIndices(t, []*avax.UTXO{
 							expiredSuccessfulProposalUTXO,
 						}, []uint32{}),
@@ -7571,8 +7543,8 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
 				return &txs.FinishProposalsTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: generate.InsFromUTXOsWithSigIndices(t, []*avax.UTXO{
 							expiredSuccessfulProposalUTXO,
 						}, []uint32{}),
@@ -7604,8 +7576,8 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
 				return &txs.FinishProposalsTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: []*avax.TransferableInput{ // missing 2nd input
 							generate.InFromUTXO(t, earlyFailedProposalUTXO, []uint32{0}, false),
 						},
@@ -7648,8 +7620,8 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
 				return &txs.FinishProposalsTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: []*avax.TransferableInput{
 							generate.InFromUTXO(t, earlySuccessfulProposalWithBondUTXO, []uint32{0}, false),
 							// generate.TestInFromUTXO(additionalBondUTXO1, []uint32{}), // missing pending validator bond
@@ -7683,14 +7655,14 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
 				return &txs.FinishProposalsTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: generate.InsFromUTXOsWithSigIndices(t, []*avax.UTXO{
 							earlyFailedProposalUTXO, expiredFailedProposalUTXO,
 						}, []uint32{}),
 						Outs: []*avax.TransferableOutput{
 							generate.OutFromUTXO(t, earlySuccessfulProposalUTXO, ids.Empty, ids.Empty),
-							generate.Out(ctx.AVAXAssetID, proposalBondAmt, bondOwner1, ids.Empty, ids.Empty), // expiredFailedProposalUTXO with different owner
+							generate.Out(test.AVAXAssetID, proposalBondAmt, bondOwner1, ids.Empty, ids.Empty), // expiredFailedProposalUTXO with different owner
 						},
 					}},
 					EarlyFinishedFailedProposalIDs: []ids.ID{earlyFailedProposalID},
@@ -7727,8 +7699,8 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
 				return &txs.FinishProposalsTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: []*avax.TransferableInput{
 							generate.InFromUTXO(t, earlySuccessfulProposalWithBondUTXO, []uint32{0}, false),
 							generate.InFromUTXO(t, additionalBondUTXO1, []uint32{0}, false),
@@ -7771,8 +7743,8 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
 				return &txs.FinishProposalsTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: []*avax.TransferableInput{
 							generate.InFromUTXO(t, earlySuccessfulProposalWithBondUTXO, []uint32{0}, false),
 							// generate.TestInFromUTXO(additionalBondUTXO1, []uint32{}), // missing pending validator bond
@@ -7805,8 +7777,8 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
 				return &txs.FinishProposalsTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: generate.InsFromUTXOsWithSigIndices(t, []*avax.UTXO{
 							earlyFailedProposalUTXO,
 						}, []uint32{}),
@@ -7840,8 +7812,8 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
 				return &txs.FinishProposalsTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: generate.InsFromUTXOsWithSigIndices(t, []*avax.UTXO{
 							earlySuccessfulProposalUTXO,
 							expiredSuccessfulProposalUTXO,
@@ -7878,8 +7850,8 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
 				return &txs.FinishProposalsTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: generate.InsFromUTXOsWithSigIndices(t, []*avax.UTXO{
 							earlySuccessfulProposalUTXO,
 							expiredSuccessfulProposalUTXO,
@@ -7914,8 +7886,8 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
 				return &txs.FinishProposalsTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: generate.InsFromUTXOsWithSigIndices(t, []*avax.UTXO{
 							activeSuccessfulProposalUTXO,
 						}, []uint32{}),
@@ -7947,8 +7919,8 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
 				return &txs.FinishProposalsTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: generate.InsFromUTXOsWithSigIndices(t, []*avax.UTXO{
 							activeFailedProposalUTXO,
 						}, []uint32{}),
@@ -7980,8 +7952,8 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
 				return &txs.FinishProposalsTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: generate.InsFromUTXOsWithSigIndices(t, []*avax.UTXO{
 							activeSuccessfulProposalUTXO,
 						}, []uint32{}),
@@ -8013,8 +7985,8 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
 				return &txs.FinishProposalsTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: generate.InsFromUTXOsWithSigIndices(t, []*avax.UTXO{
 							activeFailedProposalUTXO,
 						}, []uint32{}),
@@ -8047,8 +8019,8 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
 				return &txs.FinishProposalsTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: generate.InsFromUTXOsWithSigIndices(t, []*avax.UTXO{
 							expiredFailedProposalUTXO,
 						}, []uint32{}),
@@ -8080,8 +8052,8 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
 				return &txs.FinishProposalsTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: generate.InsFromUTXOsWithSigIndices(t, []*avax.UTXO{
 							earlyFailedProposalUTXO,
 						}, []uint32{}),
@@ -8114,8 +8086,8 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
 				return &txs.FinishProposalsTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: generate.InsFromUTXOsWithSigIndices(t, []*avax.UTXO{
 							expiredSuccessfulProposalUTXO,
 						}, []uint32{}),
@@ -8147,8 +8119,8 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
 				return &txs.FinishProposalsTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: generate.InsFromUTXOsWithSigIndices(t, []*avax.UTXO{
 							earlySuccessfulProposalUTXO,
 						}, []uint32{}),
@@ -8282,8 +8254,8 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 			utx: func(cfg *config.Config) *txs.FinishProposalsTx {
 				return &txs.FinishProposalsTx{
 					BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
+						NetworkID:    test.NetworkID,
+						BlockchainID: constants.PlatformChainID,
 						Ins: []*avax.TransferableInput{
 							generate.InFromUTXO(t, earlySuccessfulProposalWithBondUTXO, []uint32{}, false),
 							generate.InFromUTXO(t, expiredSuccessfulProposalWithBondUTXO, []uint32{}, false),

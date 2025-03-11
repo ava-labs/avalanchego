@@ -498,8 +498,6 @@ func TestDepositsAutoUnlock(t *testing.T) {
 func TestProposals(t *testing.T) {
 	proposerKey, proposerAddr := test.Keys[0], test.Keys[0].Address()
 
-	defaultConfig := test.Config(t, test.PhaseLast)
-	proposalBondAmount := defaultConfig.CaminoConfig.DACProposalBondAmount
 	newFee := (defaultTxFee + 7) * 10
 
 	type vote struct {
@@ -561,7 +559,7 @@ func TestProposals(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			require := require.New(t)
-			balance := proposalBondAmount + defaultTxFee*(uint64(len(tt.votes))+1) + newFee
+			balance := test.DACProposalBondAmount + defaultTxFee*(uint64(len(tt.votes))+1) + newFee
 
 			// Prepare vm
 			vm := newCaminoVM(t, api.Camino{
@@ -604,7 +602,7 @@ func TestProposals(t *testing.T) {
 
 			// Add proposal
 			chainTime := vm.state.GetTimestamp()
-			proposalTx := buildBaseFeeProposalTx(t, vm, proposerKey, proposalBondAmount, fee,
+			proposalTx := buildBaseFeeProposalTx(t, vm, proposerKey, test.DACProposalBondAmount, fee,
 				proposerKey, tt.feeOptions, chainTime.Add(100*time.Second), chainTime.Add(200*time.Second))
 			proposalState, nextProposalIDsToExpire, nexExpirationTime, proposalIDsToFinish := makeProposalWithTx(t, vm, proposalTx)
 			baseFeeProposalState, ok := proposalState.(*dac.BaseFeeProposalState)
@@ -615,9 +613,9 @@ func TestProposals(t *testing.T) {
 			require.Empty(proposalIDsToFinish) // no early-finished proposals
 			burnedAmt += fee
 			checkBalance(t, vm.state, proposerAddr,
-				balance-burnedAmt,                          // total
-				proposalBondAmount,                         // bonded
-				0, 0, balance-proposalBondAmount-burnedAmt, // unlocked
+				balance-burnedAmt,                                  // total
+				test.DACProposalBondAmount,                         // bonded
+				0, 0, balance-test.DACProposalBondAmount-burnedAmt, // unlocked
 			)
 
 			// Fast-forward clock to time a bit forward, but still before proposals start
@@ -648,9 +646,9 @@ func TestProposals(t *testing.T) {
 				require.Equal(vote.success, proposalState.IsSuccessful())
 				burnedAmt += fee
 				checkBalance(t, vm.state, proposerAddr,
-					balance-burnedAmt,                          // total
-					proposalBondAmount,                         // bonded
-					0, 0, balance-proposalBondAmount-burnedAmt, // unlocked
+					balance-burnedAmt,                                  // total
+					test.DACProposalBondAmount,                         // bonded
+					0, 0, balance-test.DACProposalBondAmount-burnedAmt, // unlocked
 				)
 			}
 

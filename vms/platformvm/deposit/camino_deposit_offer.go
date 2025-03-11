@@ -71,6 +71,10 @@ func (o *Offer) EndTime() time.Time {
 	return time.Unix(int64(o.End), 0)
 }
 
+func (o *Offer) UnlockPeriodDurationNano() time.Duration {
+	return time.Duration(o.UnlockPeriodDuration) * time.Second
+}
+
 // Return 0 if o.TotalMaxAmount is 0.
 func (o *Offer) RemainingAmount() uint64 {
 	return o.TotalMaxAmount - o.DepositedAmount

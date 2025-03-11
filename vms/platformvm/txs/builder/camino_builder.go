@@ -114,7 +114,7 @@ type CaminoTxBuilder interface {
 		depositTxIDs []ids.ID,
 	) (*txs.Tx, error)
 
-	FinishProposalsTx(
+	NewFinishProposalsTx(
 		state state.Chain,
 		earlyFinishedProposalIDs []ids.ID,
 		expiredProposalIDs []ids.ID,
@@ -725,7 +725,7 @@ func (b *caminoBuilder) NewSystemUnlockDepositTx(
 	return tx, tx.SyntacticVerify(b.ctx)
 }
 
-func (b *caminoBuilder) FinishProposalsTx(
+func (b *caminoBuilder) NewFinishProposalsTx(
 	state state.Chain,
 	earlyFinishedProposalIDs []ids.ID,
 	expiredProposalIDs []ids.ID,
@@ -736,7 +736,7 @@ func (b *caminoBuilder) FinishProposalsTx(
 	}}}
 
 	var err error
-	sortOutProposals := func(proposalIDs []ids.ID) (successfulProposalIDs []ids.ID, failedProposalIDs []ids.ID, err error) {
+	split := func(proposalIDs []ids.ID) (successfulProposalIDs []ids.ID, failedProposalIDs []ids.ID, err error) {
 		for _, proposalID := range proposalIDs {
 			proposal, err := state.GetProposal(proposalID)
 			if err != nil {
@@ -750,11 +750,11 @@ func (b *caminoBuilder) FinishProposalsTx(
 		}
 		return successfulProposalIDs, failedProposalIDs, nil
 	}
-	utx.EarlyFinishedSuccessfulProposalIDs, utx.EarlyFinishedFailedProposalIDs, err = sortOutProposals(earlyFinishedProposalIDs)
+	utx.EarlyFinishedSuccessfulProposalIDs, utx.EarlyFinishedFailedProposalIDs, err = split(earlyFinishedProposalIDs)
 	if err != nil {
 		return nil, err
 	}
-	utx.ExpiredSuccessfulProposalIDs, utx.ExpiredFailedProposalIDs, err = sortOutProposals(expiredProposalIDs)
+	utx.ExpiredSuccessfulProposalIDs, utx.ExpiredFailedProposalIDs, err = split(expiredProposalIDs)
 	if err != nil {
 		return nil, err
 	}
