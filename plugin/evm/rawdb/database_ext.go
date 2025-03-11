@@ -14,12 +14,18 @@ import (
 // InspectDatabase traverses the entire database and checks the size
 // of all different categories of data.
 func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
-	var (
-		codeToFetch   ethrawdb.DatabaseStat
-		syncPerformed ethrawdb.DatabaseStat
-		syncProgress  ethrawdb.DatabaseStat
-		syncSegments  ethrawdb.DatabaseStat
-	)
+	type stat = ethrawdb.DatabaseStat
+	stats := []struct {
+		name      string
+		keyLen    int
+		keyPrefix []byte
+		stat      *stat
+	}{
+		{"Trie segments", syncSegmentsKeyLength, syncSegmentsPrefix, &stat{}},
+		{"Storage tries to fetch", syncStorageTriesKeyLength, syncStorageTriesPrefix, &stat{}},
+		{"Code to fetch", codeToFetchKeyLength, CodeToFetchPrefix, &stat{}},
+		{"Block numbers synced to", syncPerformedKeyLength, syncPerformedPrefix, &stat{}},
+	}
 
 	options := []ethrawdb.InspectDatabaseOption{
 		ethrawdb.WithDatabaseMetadataKeys(func(key []byte) bool {
@@ -27,45 +33,29 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 				bytes.Equal(key, syncRootKey)
 		}),
 		ethrawdb.WithDatabaseStatRecorder(func(key []byte, size common.StorageSize) bool {
-			switch {
-			case bytes.HasPrefix(key, syncSegmentsPrefix) && len(key) == syncSegmentsKeyLength:
-				syncSegments.Add(size)
-				return true
-			case bytes.HasPrefix(key, syncStorageTriesPrefix) && len(key) == syncStorageTriesKeyLength:
-				syncProgress.Add(size)
-				return true
-			case bytes.HasPrefix(key, CodeToFetchPrefix) && len(key) == codeToFetchKeyLength:
-				codeToFetch.Add(size)
-				return true
-			case bytes.HasPrefix(key, syncPerformedPrefix) && len(key) == syncPerformedKeyLength:
-				syncPerformed.Add(size)
-				return true
-			default:
-				return false
+			for _, s := range stats {
+				if len(key) == s.keyLen && bytes.HasPrefix(key, s.keyPrefix) {
+					s.stat.Add(size)
+					return true
+				}
 			}
+			return false
 		}),
 		ethrawdb.WithDatabaseStatsTransformer(func(rows [][]string) [][]string {
 			newRows := make([][]string, 0, len(rows))
 			for _, row := range rows {
-				database := row[0]
-				category := row[1]
-				switch {
-				case database == "Key-Value store" && category == "Difficulties",
-					database == "Key-Value store" && category == "Beacon sync headers",
-					database == "Ancient store (Chain)":
-					// Discard rows specific to libevm (geth) but irrelevant to coreth.
-					continue
+				switch db, cat := row[0], row[1]; {
+				// Discard rows specific to libevm (geth) but irrelevant to coreth.
+				case db == "Key-Value store" && (cat == "Difficulties" || cat == "Beacon sync headers"):
+				case db == "Ancient store (Chain)":
+				default:
+					newRows = append(newRows, row)
 				}
-				newRows = append(newRows, row)
 			}
-
-			return append(
-				newRows,
-				[]string{"State sync", "Trie segments", syncSegments.Size(), syncSegments.Count()},
-				[]string{"State sync", "Storage tries to fetch", syncProgress.Size(), syncProgress.Count()},
-				[]string{"State sync", "Code to fetch", codeToFetch.Size(), codeToFetch.Count()},
-				[]string{"State sync", "Block numbers synced to", syncPerformed.Size(), syncPerformed.Count()},
-			)
+			for _, s := range stats {
+				newRows = append(newRows, []string{"State sync", s.name, s.stat.Size(), s.stat.Count()})
+			}
+			return newRows
 		}),
 	}
 
