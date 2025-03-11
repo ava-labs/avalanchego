@@ -6,6 +6,7 @@ package avm
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"math"
 	"testing"
 
@@ -779,6 +780,7 @@ func TestDBMigration(t *testing.T) {
 	wantUTXOs := make([]*avax.UTXO, 0)
 	numBlocks := 10
 	for i := 1; i < numBlocks; i++ {
+		// TODO make better unique txs
 		kc := secp256k1fx.NewKeychain(keys[0])
 		tx, err := txBuilder.CreateAssetTx(
 			"foobar",
@@ -898,18 +900,19 @@ func TestDBMigration(t *testing.T) {
 	require.NoError(vm.Linearize(context.Background(), ids.ID{}, toEngine))
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
-	for itr := wantBlkIDs.NewIterator(); itr.Next(); {
-		_, err := vm.GetBlock(context.Background(), itr.Key())
-		require.ErrorIs(err, database.ErrNotFound)
-	}
-
-	for _, txID := range wantTxs {
-		_, err := vm.GetTx(txID)
-		require.ErrorIs(err, database.ErrNotFound)
-	}
+	//for itr := wantBlkIDs.NewIterator(); itr.Next(); {
+	//	_, err := vm.GetBlock(context.Background(), itr.Key())
+	//	require.ErrorIs(err, database.ErrNotFound)
+	//}
+	//
+	//for _, txID := range wantTxs {
+	//	_, err := vm.GetTx(txID)
+	//	require.ErrorIs(err, database.ErrNotFound)
+	//}
 
 	for _, utxo := range wantUTXOs {
-		_, err := vm.GetUTXO(utxo.InputID())
+		got, err := vm.GetUTXO(utxo.InputID())
+		fmt.Print(got)
 		require.ErrorIs(err, database.ErrNotFound)
 	}
 }

@@ -103,7 +103,11 @@ func (g gForkStateMigration) Migrate(
 	g.log.Debug("migrating utxos")
 	if err := migrateDB[*avax.UTXO](
 		prev.UTXOs(),
-		func(utxo *avax.UTXO) { next.AddUTXO(utxo) },
+		func(utxo *avax.UTXO) {
+			next.AddUTXO(utxo)
+			prev.DeleteUTXO(utxo.InputID())
+		},
+		prev,
 		next,
 		g.commitFrequency,
 	); err != nil {
@@ -114,6 +118,7 @@ func (g gForkStateMigration) Migrate(
 	if err := migrateDB[*txs.Tx](
 		prev.Txs(),
 		func(tx *txs.Tx) { next.AddTx(tx) },
+		prev,
 		next,
 		g.commitFrequency,
 	); err != nil {
@@ -126,6 +131,7 @@ func (g gForkStateMigration) Migrate(
 		func(blk block.Block) {
 			next.AddBlock(blk)
 		},
+		prev,
 		next,
 		g.commitFrequency,
 	); err != nil {
@@ -332,7 +338,8 @@ func (g gForkState) Close() error {
 func migrateDB[T any](
 	seq iter.Seq2[T, error],
 	accept func(t T),
-	state gForkState,
+	prev state.State,
+	next state.State,
 	freq int,
 ) error {
 	i := 0
@@ -348,12 +355,21 @@ func migrateDB[T any](
 			continue
 		}
 
-		if err := state.Commit(); err != nil {
+		if err := next.Commit(); err != nil {
 			return fmt.Errorf("failed to commit db: %w", err)
 		}
+
+		if err := prev.Commit(); err != nil {
+			return fmt.Errorf("failed to commit db: %w", err)
+		}
+
 	}
 
-	if err := state.Commit(); err != nil {
+	if err := next.Commit(); err != nil {
+		return fmt.Errorf("failed to commit db: %w", err)
+	}
+
+	if err := prev.Commit(); err != nil {
 		return fmt.Errorf("failed to commit db: %w", err)
 	}
 
