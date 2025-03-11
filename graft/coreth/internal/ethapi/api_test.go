@@ -485,6 +485,7 @@ func (b testBackend) ExtRPCEnabled() bool                        { return false 
 func (b testBackend) RPCGasCap() uint64                          { return 10000000 }
 func (b testBackend) RPCEVMTimeout() time.Duration               { return time.Second }
 func (b testBackend) RPCTxFeeCap() float64                       { return 0 }
+func (b testBackend) PriceOptionsConfig() PriceOptionConfig      { return PriceOptionConfig{} }
 func (b testBackend) UnprotectedAllowed(*types.Transaction) bool { return false }
 func (b testBackend) SetHead(number uint64)                      {}
 func (b testBackend) HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Header, error) {

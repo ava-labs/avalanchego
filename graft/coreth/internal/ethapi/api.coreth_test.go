@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/stretchr/testify/require"
@@ -18,6 +19,8 @@ type testSuggestPriceOptionsBackend struct {
 
 	estimateBaseFee  *big.Int
 	suggestGasTipCap *big.Int
+
+	cfg PriceOptionConfig
 }
 
 func (b *testSuggestPriceOptionsBackend) EstimateBaseFee(context.Context) (*big.Int, error) {
@@ -28,11 +31,27 @@ func (b *testSuggestPriceOptionsBackend) SuggestGasTipCap(context.Context) (*big
 	return b.suggestGasTipCap, nil
 }
 
+func (b *testSuggestPriceOptionsBackend) PriceOptionsConfig() PriceOptionConfig {
+	return b.cfg
+}
+
 func TestSuggestPriceOptions(t *testing.T) {
+	testCfg := PriceOptionConfig{
+		SlowFeePercentage: 95,
+		FastFeePercentage: 105,
+		MaxBaseFee:        100 * params.GWei,
+		MaxTip:            20 * params.GWei,
+	}
+	slowFeeNumerator := testCfg.SlowFeePercentage
+	fastFeeNumerator := testCfg.FastFeePercentage
+	maxNormalGasTip := testCfg.MaxTip
+	maxNormalBaseFee := testCfg.MaxBaseFee
+
 	tests := []struct {
 		name             string
 		estimateBaseFee  *big.Int
 		suggestGasTipCap *big.Int
+		cfg              PriceOptionConfig
 		want             *PriceOptions
 	}{
 		{
@@ -51,25 +70,52 @@ func TestSuggestPriceOptions(t *testing.T) {
 			name:             "minimum_values",
 			estimateBaseFee:  bigMinBaseFee,
 			suggestGasTipCap: bigMinGasTip,
+			cfg:              testCfg,
 			want: &PriceOptions{
 				Slow: newPrice(
 					minGasTip,
-					minBaseFee+minGasTip,
+					uint64(minBaseFee+minGasTip),
 				),
 				Normal: newPrice(
 					minGasTip,
-					minBaseFee+minGasTip,
+					uint64(minBaseFee+minGasTip),
 				),
 				Fast: newPrice(
 					minGasTip,
-					(fastFeeNumerator*minBaseFee)/feeDenominator+(fastFeeNumerator*minGasTip)/feeDenominator,
+					(fastFeeNumerator*uint64(minBaseFee)/feeDenominator)+(fastFeeNumerator*uint64(minGasTip)/feeDenominator),
+				),
+			},
+		},
+		{
+			name:             "maximum_values_1_slow_perc_2_fast_perc",
+			estimateBaseFee:  new(big.Int).SetUint64(maxNormalBaseFee),
+			suggestGasTipCap: new(big.Int).SetUint64(maxNormalGasTip),
+			cfg: PriceOptionConfig{
+				SlowFeePercentage: 100,
+				FastFeePercentage: 200,
+				MaxBaseFee:        100 * params.GWei,
+				MaxTip:            20 * params.GWei,
+			},
+			want: &PriceOptions{
+				Slow: newPrice(
+					20*params.GWei,
+					120*params.GWei,
+				),
+				Normal: newPrice(
+					20*params.GWei,
+					120*params.GWei,
+				),
+				Fast: newPrice(
+					40*params.GWei,
+					240*params.GWei,
 				),
 			},
 		},
 		{
 			name:             "maximum_values",
-			estimateBaseFee:  bigMaxNormalBaseFee,
-			suggestGasTipCap: bigMaxNormalGasTip,
+			cfg:              testCfg,
+			estimateBaseFee:  new(big.Int).SetUint64(maxNormalBaseFee),
+			suggestGasTipCap: new(big.Int).SetUint64(maxNormalGasTip),
 			want: &PriceOptions{
 				Slow: newPrice(
 					(slowFeeNumerator*maxNormalGasTip)/feeDenominator,
@@ -87,8 +133,9 @@ func TestSuggestPriceOptions(t *testing.T) {
 		},
 		{
 			name:             "double_maximum_values",
-			estimateBaseFee:  big.NewInt(2 * maxNormalBaseFee),
-			suggestGasTipCap: big.NewInt(2 * maxNormalGasTip),
+			estimateBaseFee:  big.NewInt(2 * int64(maxNormalBaseFee)),
+			suggestGasTipCap: big.NewInt(2 * int64(maxNormalGasTip)),
+			cfg:              testCfg,
 			want: &PriceOptions{
 				Slow: newPrice(
 					(slowFeeNumerator*maxNormalGasTip)/feeDenominator,
@@ -112,6 +159,7 @@ func TestSuggestPriceOptions(t *testing.T) {
 			backend := &testSuggestPriceOptionsBackend{
 				estimateBaseFee:  test.estimateBaseFee,
 				suggestGasTipCap: test.suggestGasTipCap,
+				cfg:              test.cfg,
 			}
 			api := NewEthereumAPI(backend)
 
@@ -122,9 +170,9 @@ func TestSuggestPriceOptions(t *testing.T) {
 	}
 }
 
-func newPrice(gasTip, gasFee int64) *Price {
+func newPrice(gasTip, gasFee uint64) *Price {
 	return &Price{
-		GasTip: (*hexutil.Big)(big.NewInt(gasTip)),
-		GasFee: (*hexutil.Big)(big.NewInt(gasFee)),
+		GasTip: (*hexutil.Big)(new(big.Int).SetUint64(gasTip)),
+		GasFee: (*hexutil.Big)(new(big.Int).SetUint64(gasFee)),
 	}
 }

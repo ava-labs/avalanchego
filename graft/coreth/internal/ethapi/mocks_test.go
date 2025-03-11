@@ -469,6 +469,20 @@ func (mr *MockBackendMockRecorder) LastAcceptedBlock() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LastAcceptedBlock", reflect.TypeOf((*MockBackend)(nil).LastAcceptedBlock))
 }
 
+// PriceOptionsConfig mocks base method.
+func (m *MockBackend) PriceOptionsConfig() PriceOptionConfig {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PriceOptionsConfig")
+	ret0, _ := ret[0].(PriceOptionConfig)
+	return ret0
+}
+
+// PriceOptionsConfig indicates an expected call of PriceOptionsConfig.
+func (mr *MockBackendMockRecorder) PriceOptionsConfig() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PriceOptionsConfig", reflect.TypeOf((*MockBackend)(nil).PriceOptionsConfig))
+}
+
 // RPCEVMTimeout mocks base method.
 func (m *MockBackend) RPCEVMTimeout() time.Duration {
 	m.ctrl.T.Helper()
