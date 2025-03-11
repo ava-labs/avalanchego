@@ -32,13 +32,13 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/lru"
+	"github.com/ava-labs/libevm/core/rawdb"
 	ethstate "github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/trie/utils"
 	"github.com/ava-labs/libevm/triedb"
-	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/crate-crypto/go-ipa/banderwagon"
 )
 

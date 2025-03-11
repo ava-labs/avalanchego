@@ -38,16 +38,17 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/bloombits"
-	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/interfaces"
 	"github.com/ava-labs/subnet-evm/internal/ethapi"
 	"github.com/ava-labs/subnet-evm/params"
+	customrawdb "github.com/ava-labs/subnet-evm/plugin/evm/rawdb"
 	"github.com/ava-labs/subnet-evm/rpc"
 	"github.com/stretchr/testify/require"
 )
@@ -97,7 +98,7 @@ func (b *testBackend) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumbe
 	switch blockNr {
 	case rpc.FinalizedBlockNumber:
 		var err error
-		hash, err = rawdb.ReadAcceptorTip(b.db)
+		hash, err = customrawdb.ReadAcceptorTip(b.db)
 		if err != nil {
 			return nil, err
 		}

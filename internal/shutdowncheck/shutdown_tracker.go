@@ -30,9 +30,9 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
-	"github.com/ava-labs/subnet-evm/core/rawdb"
 )
 
 // ShutdownTracker is a service that reports previous unclean shutdowns

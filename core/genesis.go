@@ -36,15 +36,16 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/common/math"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/triedb"
-	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
+	customrawdb "github.com/ava-labs/subnet-evm/plugin/evm/rawdb"
 	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/legacy"
 	"github.com/ava-labs/subnet-evm/triedb/pathdb"
 	"github.com/holiman/uint256"
@@ -175,12 +176,12 @@ func SetupGenesisBlock(
 	if err := newcfg.CheckConfigForkOrder(); err != nil {
 		return newcfg, common.Hash{}, err
 	}
-	storedcfg := rawdb.ReadChainConfig(db, stored)
+	storedcfg := customrawdb.ReadChainConfig(db, stored)
 	// If there is no previously stored chain config, write the chain config to disk.
 	if storedcfg == nil {
 		// Note: this can happen since we did not previously write the genesis block and chain config in the same batch.
 		log.Warn("Found genesis block without chain config")
-		rawdb.WriteChainConfig(db, stored, newcfg)
+		customrawdb.WriteChainConfig(db, stored, newcfg)
 		return newcfg, stored, nil
 	}
 	// Check config compatibility and write the config. Compatibility errors
@@ -210,7 +211,7 @@ func SetupGenesisBlock(
 	}
 	// Required to write the chain config to disk to ensure both the chain config and upgrade bytes are persisted to disk.
 	// Note: this intentionally removes an extra check from upstream.
-	rawdb.WriteChainConfig(db, stored, newcfg)
+	customrawdb.WriteChainConfig(db, stored, newcfg)
 	return newcfg, stored, nil
 }
 
@@ -359,7 +360,7 @@ func (g *Genesis) Commit(db ethdb.Database, triedb *triedb.Database) (*types.Blo
 	rawdb.WriteCanonicalHash(batch, block.Hash(), block.NumberU64())
 	rawdb.WriteHeadBlockHash(batch, block.Hash())
 	rawdb.WriteHeadHeaderHash(batch, block.Hash())
-	rawdb.WriteChainConfig(batch, block.Hash(), config)
+	customrawdb.WriteChainConfig(batch, block.Hash(), config)
 	if err := batch.Write(); err != nil {
 		return nil, fmt.Errorf("failed to write genesis block: %w", err)
 	}

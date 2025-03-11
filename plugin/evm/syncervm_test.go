@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/rlp"
@@ -34,10 +35,10 @@ import (
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/core"
-	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/plugin/evm/database"
+	customrawdb "github.com/ava-labs/subnet-evm/plugin/evm/rawdb"
 	"github.com/ava-labs/subnet-evm/predicate"
 	statesyncclient "github.com/ava-labs/subnet-evm/sync/client"
 	"github.com/ava-labs/subnet-evm/sync/statesync"
@@ -592,12 +593,12 @@ func generateAndAcceptBlocks(t *testing.T, vm *VM, numBlocks int, gen func(int, 
 // assertSyncPerformedHeights iterates over all heights the VM has synced to and
 // verifies it matches [expected].
 func assertSyncPerformedHeights(t *testing.T, db ethdb.Iteratee, expected map[uint64]struct{}) {
-	it := rawdb.NewSyncPerformedIterator(db)
+	it := customrawdb.NewSyncPerformedIterator(db)
 	defer it.Release()
 
 	found := make(map[uint64]struct{}, len(expected))
 	for it.Next() {
-		found[rawdb.UnpackSyncPerformedKey(it.Key())] = struct{}{}
+		found[customrawdb.UnpackSyncPerformedKey(it.Key())] = struct{}{}
 	}
 	require.NoError(t, it.Error())
 	require.Equal(t, expected, found)

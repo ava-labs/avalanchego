@@ -32,8 +32,8 @@ import (
 	"os"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/log"
-	"github.com/ava-labs/subnet-evm/core/rawdb"
 	bloomfilter "github.com/holiman/bloomfilter/v2"
 )
 

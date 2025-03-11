@@ -31,9 +31,10 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
-	"github.com/ava-labs/subnet-evm/core/rawdb"
+	customrawdb "github.com/ava-labs/subnet-evm/plugin/evm/rawdb"
 )
 
 // WipeSnapshot starts a goroutine to iterate over the entire key-value database
@@ -43,7 +44,7 @@ import (
 func WipeSnapshot(db ethdb.KeyValueStore, full bool) chan struct{} {
 	// Wipe the snapshot root marker synchronously
 	if full {
-		rawdb.DeleteSnapshotBlockHash(db)
+		customrawdb.DeleteSnapshotBlockHash(db)
 		rawdb.DeleteSnapshotRoot(db)
 	}
 	// Wipe everything else asynchronously

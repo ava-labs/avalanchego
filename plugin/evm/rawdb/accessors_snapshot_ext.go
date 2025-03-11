@@ -5,6 +5,7 @@ package rawdb
 
 import (
 	"github.com/ava-labs/libevm/common"
+	ethrawdb "github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
 )
@@ -39,7 +40,7 @@ func DeleteSnapshotBlockHash(db ethdb.KeyValueWriter) {
 
 // IterateAccountSnapshots returns an iterator for walking all of the accounts in the snapshot
 func IterateAccountSnapshots(db ethdb.Iteratee) ethdb.Iterator {
-	it := db.NewIterator(SnapshotAccountPrefix, nil)
-	keyLen := len(SnapshotAccountPrefix) + common.HashLength
-	return NewKeyLengthIterator(it, keyLen)
+	it := db.NewIterator(ethrawdb.SnapshotAccountPrefix, nil)
+	keyLen := len(ethrawdb.SnapshotAccountPrefix) + common.HashLength
+	return ethrawdb.NewKeyLengthIterator(it, keyLen)
 }

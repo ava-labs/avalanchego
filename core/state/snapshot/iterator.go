@@ -32,9 +32,9 @@ import (
 	"sort"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
 	ethsnapshot "github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/ethdb"
-	"github.com/ava-labs/subnet-evm/core/rawdb"
 )
 
 // Iterator is an iterator to step over all the accounts or the specific

@@ -33,11 +33,12 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/triedb"
-	"github.com/ava-labs/subnet-evm/core/rawdb"
+	customrawdb "github.com/ava-labs/subnet-evm/plugin/evm/rawdb"
 )
 
 // journalGenerator is a disk layer entry containing the generator progress marker.
@@ -59,7 +60,7 @@ type journalGenerator struct {
 func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *triedb.Database, cache int, blockHash, root common.Hash, noBuild bool) (snapshot, bool, error) {
 	// Retrieve the block number and hash of the snapshot, failing if no snapshot
 	// is present in the database (or crashed mid-update).
-	baseBlockHash := rawdb.ReadSnapshotBlockHash(diskdb)
+	baseBlockHash := customrawdb.ReadSnapshotBlockHash(diskdb)
 	if baseBlockHash == (common.Hash{}) {
 		return nil, false, errors.New("missing or corrupted snapshot, no snapshot block hash")
 	}

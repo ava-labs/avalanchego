@@ -35,15 +35,16 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/ava-labs/subnet-evm/accounts/abi"
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/core"
-	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
+	customrawdb "github.com/ava-labs/subnet-evm/plugin/evm/rawdb"
 	"github.com/ava-labs/subnet-evm/rpc"
 	"github.com/stretchr/testify/require"
 )
@@ -273,7 +274,7 @@ func TestFilters(t *testing.T) {
 
 	// Set block 998 as Finalized (-3)
 	// bc.SetFinalized(chain[998].Header())
-	err = rawdb.WriteAcceptorTip(db, chain[998].Hash())
+	err = customrawdb.WriteAcceptorTip(db, chain[998].Hash())
 	require.NoError(t, err)
 
 	for i, tc := range []struct {
