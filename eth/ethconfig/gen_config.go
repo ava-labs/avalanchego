@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/coreth/core/txpool/blobpool"
 	"github.com/ava-labs/coreth/core/txpool/legacypool"
 	"github.com/ava-labs/coreth/eth/gasprice"
+	"github.com/ava-labs/coreth/internal/ethapi"
 	"github.com/ava-labs/coreth/miner"
 	"github.com/ava-labs/libevm/common"
 )
@@ -56,6 +57,7 @@ func (c Config) MarshalTOML() (interface{}, error) {
 		StateHistory                    uint64 `toml:",omitempty"`
 		StateScheme                     string `toml:",omitempty"`
 		SkipTxIndexing                  bool
+		PriceOptionConfig               ethapi.PriceOptionConfig
 	}
 	var enc Config
 	enc.Genesis = c.Genesis
@@ -98,6 +100,7 @@ func (c Config) MarshalTOML() (interface{}, error) {
 	enc.StateHistory = c.StateHistory
 	enc.StateScheme = c.StateScheme
 	enc.SkipTxIndexing = c.SkipTxIndexing
+	enc.PriceOptionConfig = c.PriceOptionConfig
 	return &enc, nil
 }
 
@@ -144,6 +147,7 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 		StateHistory                    *uint64 `toml:",omitempty"`
 		StateScheme                     *string `toml:",omitempty"`
 		SkipTxIndexing                  *bool
+		PriceOptionConfig               *ethapi.PriceOptionConfig
 	}
 	var dec Config
 	if err := unmarshal(&dec); err != nil {
@@ -268,6 +272,9 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	}
 	if dec.SkipTxIndexing != nil {
 		c.SkipTxIndexing = *dec.SkipTxIndexing
+	}
+	if dec.PriceOptionConfig != nil {
+		c.PriceOptionConfig = *dec.PriceOptionConfig
 	}
 	return nil
 }
