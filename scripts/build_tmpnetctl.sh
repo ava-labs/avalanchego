@@ -12,4 +12,4 @@ echo "Building tmpnetctl..."
 go build -ldflags\
    "-X github.com/ava-labs/avalanchego/version.GitCommit=$git_commit $static_ld_flags"\
    -o "$AVALANCHE_PATH/build/tmpnetctl"\
-   "$AVALANCHE_PATH/tests/fixture/tmpnet/cmd/"*.go
+   "$AVALANCHE_PATH/tests/fixture/tmpnet/tmpnetctl/"*.go
