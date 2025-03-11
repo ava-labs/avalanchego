@@ -6,7 +6,6 @@ package avm
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"math"
 	"testing"
 
@@ -745,6 +744,7 @@ func TestDBMigration(t *testing.T) {
 	}
 
 	vm := &VM{StateMigrationFactory: NoStateMigrationFactory{}}
+
 	toEngine := make(chan common.Message, 1)
 	genesisBytes := buildGenesisTest(t)
 	require.NoError(vm.Initialize(
@@ -819,12 +819,13 @@ func TestDBMigration(t *testing.T) {
 	require.NoError(vm.Shutdown(context.Background()))
 
 	// Migrate state
+	snowCtx = snowtest.Context(t, snowtest.XChainID)
+	snowCtx.SharedMemory = atomic.NewMemory(db).NewSharedMemory(ids.ID{})
+
 	vm = &VM{
 		StateMigrationFactory: GForkStateMigrationFactory{CommitFrequency: 2},
 	}
 
-	snowCtx = snowtest.Context(t, snowtest.XChainID)
-	snowCtx.SharedMemory = atomic.NewMemory(db).NewSharedMemory(ids.ID{})
 	toEngine = make(chan common.Message, 1)
 	require.NoError(vm.Initialize(
 		context.Background(),
@@ -878,12 +879,10 @@ func TestDBMigration(t *testing.T) {
 	require.NoError(vm.Shutdown(context.Background()))
 
 	// Check that all previous state was deleted
-	vm = &VM{
-		StateMigrationFactory: NoStateMigrationFactory{},
-	}
-
 	snowCtx = snowtest.Context(t, snowtest.XChainID)
 	snowCtx.SharedMemory = atomic.NewMemory(db).NewSharedMemory(ids.ID{})
+
+	vm = &VM{StateMigrationFactory: NoStateMigrationFactory{}}
 	toEngine = make(chan common.Message, 1)
 	require.NoError(vm.Initialize(
 		context.Background(),
@@ -905,14 +904,13 @@ func TestDBMigration(t *testing.T) {
 	//	require.ErrorIs(err, database.ErrNotFound)
 	//}
 	//
-	//for _, txID := range wantTxs {
-	//	_, err := vm.GetTx(txID)
-	//	require.ErrorIs(err, database.ErrNotFound)
-	//}
+	for _, txID := range wantTxs {
+		_, err := vm.GetTx(txID)
+		require.ErrorIs(err, database.ErrNotFound)
+	}
 
 	for _, utxo := range wantUTXOs {
-		got, err := vm.GetUTXO(utxo.InputID())
-		fmt.Print(got)
+		_, err := vm.GetUTXO(utxo.InputID())
 		require.ErrorIs(err, database.ErrNotFound)
 	}
 }
