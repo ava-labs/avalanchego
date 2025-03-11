@@ -123,24 +123,28 @@ func assertDifferentPointers[T any](t *testing.T, a *T, b any) {
 // can recover all fields, but not that the encoded format is correct. This is
 // very important as the RLP encoding of a [Block] defines its hash.
 func blockWithNonZeroFields() (*Block, *BlockBodyExtra) {
-	header := &Header{
-		ParentHash: common.Hash{1},
-	}
-	headerExtra := &HeaderExtra{
-		ExtDataHash: common.Hash{2},
-	}
-	SetHeaderExtra(header, headerExtra)
+	header := WithHeaderExtra(
+		&Header{
+			ParentHash: common.Hash{1},
+		},
+		&HeaderExtra{
+			ExtDataHash: common.Hash{2},
+		},
+	)
 
 	tx := NewTransaction(1, common.Address{2}, big.NewInt(3), 4, big.NewInt(5), []byte{6})
 	txs := []*Transaction{tx}
 
-	uncle := &Header{
-		Difficulty: big.NewInt(7),
-		Number:     big.NewInt(8),
-		ParentHash: common.Hash{9},
-	}
-	uncleExtra := &HeaderExtra{ExtDataHash: common.Hash{10}}
-	SetHeaderExtra(uncle, uncleExtra)
+	uncle := WithHeaderExtra(
+		&Header{
+			Difficulty: big.NewInt(7),
+			Number:     big.NewInt(8),
+			ParentHash: common.Hash{9},
+		},
+		&HeaderExtra{
+			ExtDataHash: common.Hash{10},
+		},
+	)
 	uncles := []*Header{uncle}
 
 	receipts := []*Receipt{{PostState: []byte{11}}}
@@ -340,8 +344,7 @@ func TestBlockGetters(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			header := &Header{}
-			SetHeaderExtra(header, test.headerExtra)
+			header := WithHeaderExtra(&Header{}, test.headerExtra)
 
 			block := NewBlock(header, nil, nil, nil, stubHasher{})
 			extras.Block.Set(block, test.blockExtra)
@@ -370,24 +373,30 @@ func TestNewBlockWithExtData(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		header    func() *Header
+		header    *Header
 		txs       []*Transaction
-		uncles    func() []*Header
+		uncles    []*Header
 		receipts  []*Receipt
 		extdata   []byte
 		recalc    bool
 		wantBlock func() *Block
 	}{
 		{
-			name: "empty",
-			header: func() *Header {
-				header := &Header{}
-				SetHeaderExtra(header, &HeaderExtra{})
-				return header
-			},
+			name:   "empty",
+			header: WithHeaderExtra(&Header{}, &HeaderExtra{}),
 			wantBlock: func() *Block {
-				header := &Header{}
-				SetHeaderExtra(header, &HeaderExtra{})
+				header := WithHeaderExtra(&Header{}, &HeaderExtra{})
+				block := NewBlock(header, nil, nil, nil, stubHasher{})
+				blockExtra := &BlockBodyExtra{ExtData: &[]byte{}}
+				extras.Block.Set(block, blockExtra)
+				return block
+			},
+		},
+		{
+			name:   "header_nil_extra",
+			header: &Header{},
+			wantBlock: func() *Block {
+				header := WithHeaderExtra(&Header{}, &HeaderExtra{})
 				block := NewBlock(header, nil, nil, nil, stubHasher{})
 				blockExtra := &BlockBodyExtra{ExtData: &[]byte{}}
 				extras.Block.Set(block, blockExtra)
@@ -396,22 +405,19 @@ func TestNewBlockWithExtData(t *testing.T) {
 		},
 		{
 			name: "with_recalc",
-			header: func() *Header {
-				header := &Header{}
-				extra := &HeaderExtra{
+			header: WithHeaderExtra(
+				&Header{},
+				&HeaderExtra{
 					ExtDataHash: common.Hash{1}, // should be overwritten
-				}
-				SetHeaderExtra(header, extra)
-				return header
-			},
+				},
+			),
 			extdata: []byte{2},
 			recalc:  true,
 			wantBlock: func() *Block {
-				header := &Header{}
-				extra := &HeaderExtra{
-					ExtDataHash: CalcExtDataHash([]byte{2}),
-				}
-				SetHeaderExtra(header, extra)
+				header := WithHeaderExtra(
+					&Header{},
+					&HeaderExtra{ExtDataHash: CalcExtDataHash([]byte{2})},
+				)
 				block := NewBlock(header, nil, nil, nil, stubHasher{})
 				blockExtra := &BlockBodyExtra{ExtData: &[]byte{2}}
 				extras.Block.Set(block, blockExtra)
@@ -420,34 +426,36 @@ func TestNewBlockWithExtData(t *testing.T) {
 		},
 		{
 			name: "filled_no_recalc",
-			header: func() *Header {
-				header := &Header{GasLimit: 1}
-				extra := &HeaderExtra{
+			header: WithHeaderExtra(
+				&Header{GasLimit: 1},
+				&HeaderExtra{
 					ExtDataHash:    common.Hash{2},
 					ExtDataGasUsed: big.NewInt(3),
 					BlockGasCost:   big.NewInt(4),
-				}
-				SetHeaderExtra(header, extra)
-				return header
-			},
+				},
+			),
 			txs: []*Transaction{testTx},
-			uncles: func() []*Header {
-				uncle := &Header{GasLimit: 5}
-				SetHeaderExtra(uncle, &HeaderExtra{BlockGasCost: big.NewInt(6)})
-				return []*Header{uncle}
+			uncles: []*Header{
+				WithHeaderExtra(
+					&Header{GasLimit: 5},
+					&HeaderExtra{BlockGasCost: big.NewInt(6)},
+				),
 			},
 			receipts: []*Receipt{{PostState: []byte{7}}},
 			extdata:  []byte{8},
 			wantBlock: func() *Block {
-				header := &Header{GasLimit: 1}
-				extra := &HeaderExtra{
-					ExtDataHash:    common.Hash{2},
-					ExtDataGasUsed: big.NewInt(3),
-					BlockGasCost:   big.NewInt(4),
-				}
-				SetHeaderExtra(header, extra)
-				uncle := &Header{GasLimit: 5}
-				SetHeaderExtra(uncle, &HeaderExtra{BlockGasCost: big.NewInt(6)})
+				header := WithHeaderExtra(
+					&Header{GasLimit: 1},
+					&HeaderExtra{
+						ExtDataHash:    common.Hash{2},
+						ExtDataGasUsed: big.NewInt(3),
+						BlockGasCost:   big.NewInt(4),
+					},
+				)
+				uncle := WithHeaderExtra(
+					&Header{GasLimit: 5},
+					&HeaderExtra{BlockGasCost: big.NewInt(6)},
+				)
 				uncles := []*Header{uncle}
 				block := NewBlock(header, []*Transaction{testTx}, uncles, []*Receipt{{PostState: []byte{7}}}, stubHasher{})
 				blockExtra := &BlockBodyExtra{ExtData: &[]byte{8}}
@@ -461,15 +469,10 @@ func TestNewBlockWithExtData(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			var uncles []*Header
-			if test.uncles != nil {
-				uncles = test.uncles()
-			}
-
 			block := NewBlockWithExtData(
-				test.header(),
+				test.header,
 				test.txs,
-				uncles,
+				test.uncles,
 				test.receipts,
 				stubHasher{},
 				test.extdata,

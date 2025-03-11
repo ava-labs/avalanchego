@@ -80,31 +80,34 @@ func TestGasLimit(t *testing.T) {
 
 func TestVerifyGasUsed(t *testing.T) {
 	tests := []struct {
-		name        string
-		upgrades    extras.NetworkUpgrades
-		parent      *types.Header
-		header      *types.Header
-		headerExtra *types.HeaderExtra
-		want        error
+		name     string
+		upgrades extras.NetworkUpgrades
+		parent   *types.Header
+		header   *types.Header
+		want     error
 	}{
 		{
 			name:     "fortuna_massive_extra_gas_used",
 			upgrades: extras.TestFortunaChainConfig.NetworkUpgrades,
-			header:   &types.Header{},
-			headerExtra: &types.HeaderExtra{
-				ExtDataGasUsed: new(big.Int).Lsh(common.Big1, 64),
-			},
+			header: types.WithHeaderExtra(
+				&types.Header{},
+				&types.HeaderExtra{
+					ExtDataGasUsed: new(big.Int).Lsh(common.Big1, 64),
+				},
+			),
 			want: errInvalidExtraDataGasUsed,
 		},
 		{
 			name:     "fortuna_gas_used_overflow",
 			upgrades: extras.TestFortunaChainConfig.NetworkUpgrades,
-			header: &types.Header{
-				GasUsed: math.MaxUint[uint64](),
-			},
-			headerExtra: &types.HeaderExtra{
-				ExtDataGasUsed: common.Big1,
-			},
+			header: types.WithHeaderExtra(
+				&types.Header{
+					GasUsed: math.MaxUint[uint64](),
+				},
+				&types.HeaderExtra{
+					ExtDataGasUsed: common.Big1,
+				},
+			),
 			want: math.ErrOverflow,
 		},
 		{
@@ -149,21 +152,19 @@ func TestVerifyGasUsed(t *testing.T) {
 			parent: &types.Header{
 				Number: big.NewInt(0),
 			},
-			header: &types.Header{
-				GasUsed: cortina.GasLimit,
-			},
-			headerExtra: &types.HeaderExtra{
-				ExtDataGasUsed: common.Big1,
-			},
+			header: types.WithHeaderExtra(
+				&types.Header{
+					GasUsed: cortina.GasLimit,
+				},
+				&types.HeaderExtra{
+					ExtDataGasUsed: common.Big1,
+				},
+			),
 			want: nil,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if test.headerExtra != nil {
-				types.SetHeaderExtra(test.header, test.headerExtra)
-			}
-
 			config := &extras.ChainConfig{
 				NetworkUpgrades: test.upgrades,
 			}
