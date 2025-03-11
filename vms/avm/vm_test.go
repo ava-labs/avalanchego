@@ -868,6 +868,5 @@ func TestDBMigration(t *testing.T) {
 	wantLastAcceptedBlkID, _, ok := wantBlkIDs.Newest()
 	require.True(ok)
 	require.Equal(wantLastAcceptedBlkID, gotLastAcceptedBlkID)
-
 	require.Equal(wantLastAcceptedTimestamp, vm.GetLastAcceptedTimestamp())
 }
