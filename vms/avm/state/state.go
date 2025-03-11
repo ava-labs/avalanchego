@@ -60,7 +60,7 @@ type Chain interface {
 	avax.UTXOAdder
 	avax.UTXODeleter
 
-	AddTx(tx *txs.Tx)
+	AddTx(txID ids.ID)
 	AddBlock(block block.Block)
 	SetLastAccepted(blkID ids.ID)
 	SetTimestamp(t time.Time)
@@ -71,6 +71,10 @@ type Chain interface {
 type State interface {
 	Chain
 	avax.UTXOReader
+
+	DeleteTx(txID ids.ID)
+	DeleteBlock(blkID ids.ID)
+	DeleteSingletons()
 
 	IsInitialized() (bool, error)
 	SetInitialized() error
@@ -130,18 +134,20 @@ type state struct {
 	txCache  cache.Cacher[ids.ID, *txs.Tx] // cache of txID -> *txs.Tx. If the entry is nil, it is not in the database
 	txDB     database.Database
 
-	addedBlockIDs map[uint64]ids.ID            // map of height -> blockID
+	addedBlockIDs map[uint64]*ids.ID           // map of height -> blockID
 	blockIDCache  cache.Cacher[uint64, ids.ID] // cache of height -> blockID. If the entry is ids.Empty, it is not in the database
 	blockIDDB     database.Database
 
-	addedBlocks map[ids.ID]block.Block            // map of blockID -> Block
+	addedBlocks map[ids.ID]*block.Block           // map of blockID -> Block
 	blockCache  cache.Cacher[ids.ID, block.Block] // cache of blockID -> Block. If the entry is nil, it is not in the database
 	blockDB     database.Database
 
 	// [lastAccepted] is the most recently accepted block.
-	lastAccepted, persistedLastAccepted ids.ID
-	timestamp, persistedTimestamp       time.Time
-	singletonDB                         database.Database
+	lastAccepted          *ids.ID
+	persistedLastAccepted ids.ID
+	timestamp             *time.Time
+	persistedTimestamp    time.Time
+	singletonDB           database.Database
 }
 
 func New(
@@ -420,6 +426,18 @@ func (s *state) SetTimestamp(t time.Time) {
 	s.timestamp = t
 }
 
+func (s *state) DeleteTx(txID ids.ID) {
+	s.addedTxs[txID] = nil
+}
+
+func (s *state) DeleteBlock(blkID ids.ID) {
+	s.addedBlocks[blkID] = nil
+}
+
+func (s *state) DeleteSingletons() {
+	s.singletonDB
+}
+
 func (s *state) Commit() error {
 	defer s.Abort()
 	batch, err := s.CommitBatch()
@@ -520,9 +538,15 @@ func (s *state) writeTxs() error {
 		txBytes := tx.Bytes()
 
 		delete(s.addedTxs, txID)
-		s.txCache.Put(txID, tx)
-		if err := s.txDB.Put(txID[:], txBytes); err != nil {
-			return fmt.Errorf("failed to add tx: %w", err)
+		if tx != nil {
+			s.txCache.Put(txID, tx)
+			if err := s.txDB.Put(txID[:], txBytes); err != nil {
+				return fmt.Errorf("failed to add tx: %w", err)
+			}
+		} else {
+			if err := s.txDB.Delete(txID[:]); err != nil {
+				return fmt.Errorf("failed to remove tx: %w", err)
+			}
 		}
 	}
 	return nil
@@ -533,9 +557,16 @@ func (s *state) writeBlockIDs() error {
 		heightKey := database.PackUInt64(height)
 
 		delete(s.addedBlockIDs, height)
-		s.blockIDCache.Put(height, blkID)
-		if err := database.PutID(s.blockIDDB, heightKey, blkID); err != nil {
-			return fmt.Errorf("failed to add blockID: %w", err)
+
+		if blkID != nil {
+			s.blockIDCache.Put(height, *blkID)
+			if err := database.PutID(s.blockIDDB, heightKey, *blkID); err != nil {
+				return fmt.Errorf("failed to add blockID: %w", err)
+			}
+		} else {
+			if err := s.blockIDDB.Delete(heightKey); err != nil {
+				return fmt.Errorf("failed to remove blockID: %w", err)
+			}
 		}
 	}
 	return nil
@@ -543,12 +574,18 @@ func (s *state) writeBlockIDs() error {
 
 func (s *state) writeBlocks() error {
 	for blkID, blk := range s.addedBlocks {
-		blkBytes := blk.Bytes()
-
 		delete(s.addedBlocks, blkID)
-		s.blockCache.Put(blkID, blk)
-		if err := s.blockDB.Put(blkID[:], blkBytes); err != nil {
-			return fmt.Errorf("failed to add block: %w", err)
+
+		if blk != nil {
+			blkBytes := (*blk).Bytes()
+			s.blockCache.Put(blkID, *blk)
+			if err := s.blockDB.Put(blkID[:], blkBytes); err != nil {
+				return fmt.Errorf("failed to add block: %w", err)
+			}
+		} else {
+			if err := s.blockDB.Delete(blkID[:]); err != nil {
+				return fmt.Errorf("failed to remove block: %w", err)
+			}
 		}
 	}
 	return nil
