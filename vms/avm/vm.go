@@ -502,6 +502,10 @@ func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
 	}, nil
 }
 
+func (vm *VM) GetTx(txID ids.ID) (*txs.Tx, error) {
+	return vm.state.GetTx(txID)
+}
+
 /*
  ******************************************************************************
  ********************************** JSON API **********************************

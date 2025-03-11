@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -771,9 +772,12 @@ func TestDBMigration(t *testing.T) {
 	genesisBlkID, err := vm.LastAccepted(context.Background())
 	require.NoError(err)
 
-	wantBlkIDs := []ids.ID{genesisBlkID}
-	n := 10
-	for i := 0; i < n-1; i++ {
+	wantBlkIDs := linked.NewHashmap[ids.ID, uint64]()
+	wantBlkIDs.Put(genesisBlkID, 0)
+
+	wantTxs := make([]ids.ID, 0)
+	numBlocks := 10
+	for i := 1; i < numBlocks; i++ {
 		kc := secp256k1fx.NewKeychain(keys[0])
 		tx, err := txBuilder.CreateAssetTx(
 			"foobar",
@@ -796,13 +800,14 @@ func TestDBMigration(t *testing.T) {
 		require.NoError(err)
 
 		issueAndAccept(require, vm, toEngine, tx)
+		wantTxs = append(wantTxs, tx.ID())
 
 		blkID, err := vm.LastAccepted(context.Background())
 		require.NoError(err)
-		wantBlkIDs = append(wantBlkIDs, blkID)
+		wantBlkIDs.Put(blkID, uint64(i))
 	}
 
-	require.Len(wantBlkIDs, n)
+	require.Equal(numBlocks, wantBlkIDs.Len())
 
 	db, err = memdb.Copy(db)
 	require.NoError(vm.Shutdown(context.Background()))
@@ -829,13 +834,28 @@ func TestDBMigration(t *testing.T) {
 	require.NoError(vm.Linearize(context.Background(), ids.ID{}, toEngine))
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
-	lastAcceptedBlkID, err := vm.LastAccepted(context.Background())
-	require.NoError(err)
-	require.Equal(wantBlkIDs[len(wantBlkIDs)-1], lastAcceptedBlkID)
+	for itr := wantBlkIDs.NewIterator(); itr.Next(); {
+		wantBlkID := itr.Key()
+		height := itr.Value()
 
-	for _, wantBlkID := range wantBlkIDs {
+		gotBlkID, err := vm.GetBlockIDAtHeight(context.Background(), height)
+		require.NoError(err)
+		require.Equal(wantBlkID, gotBlkID)
+
 		gotBlk, err := vm.GetBlock(context.Background(), wantBlkID)
 		require.NoError(err)
 		require.Equal(wantBlkID, gotBlk.ID())
 	}
+
+	for _, wantTxID := range wantTxs {
+		gotTx, err := vm.GetTx(wantTxID)
+		require.NoError(err)
+		require.Equal(wantTxID, gotTx.ID())
+	}
+
+	gotLastAcceptedBlkID, err := vm.LastAccepted(context.Background())
+	require.NoError(err)
+	wantLastAcceptedBlkID, _, ok := wantBlkIDs.Newest()
+	require.True(ok)
+	require.Equal(wantLastAcceptedBlkID, gotLastAcceptedBlkID)
 }
