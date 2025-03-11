@@ -816,6 +816,7 @@ func TestDBMigration(t *testing.T) {
 	db, err = memdb.Copy(db)
 	require.NoError(vm.Shutdown(context.Background()))
 
+	// Migrate state
 	vm = &VM{
 		StateMigrationFactory: GForkStateMigrationFactory{CommitFrequency: 2},
 	}
@@ -838,6 +839,7 @@ func TestDBMigration(t *testing.T) {
 	require.NoError(vm.Linearize(context.Background(), ids.ID{}, toEngine))
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
+	// Check that all previous state still exists
 	for itr := wantBlkIDs.NewIterator(); itr.Next(); {
 		wantBlkID := itr.Key()
 		height := itr.Value()
@@ -869,4 +871,45 @@ func TestDBMigration(t *testing.T) {
 	require.True(ok)
 	require.Equal(wantLastAcceptedBlkID, gotLastAcceptedBlkID)
 	require.Equal(wantLastAcceptedTimestamp, vm.GetLastAcceptedTimestamp())
+
+	db, err = memdb.Copy(db)
+	require.NoError(vm.Shutdown(context.Background()))
+
+	// Check that all previous state was deleted
+	vm = &VM{
+		StateMigrationFactory: NoStateMigrationFactory{},
+	}
+
+	snowCtx = snowtest.Context(t, snowtest.XChainID)
+	snowCtx.SharedMemory = atomic.NewMemory(db).NewSharedMemory(ids.ID{})
+	toEngine = make(chan common.Message, 1)
+	require.NoError(vm.Initialize(
+		context.Background(),
+		snowCtx,
+		db,
+		genesisBytes,
+		nil,
+		configBytes,
+		toEngine,
+		fxs,
+		&enginetest.Sender{},
+	))
+	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+	require.NoError(vm.Linearize(context.Background(), ids.ID{}, toEngine))
+	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
+
+	for itr := wantBlkIDs.NewIterator(); itr.Next(); {
+		_, err := vm.GetBlock(context.Background(), itr.Key())
+		require.ErrorIs(err, database.ErrNotFound)
+	}
+
+	for _, txID := range wantTxs {
+		_, err := vm.GetTx(txID)
+		require.ErrorIs(err, database.ErrNotFound)
+	}
+
+	for _, utxo := range wantUTXOs {
+		_, err := vm.GetUTXO(utxo.InputID())
+		require.ErrorIs(err, database.ErrNotFound)
+	}
 }
