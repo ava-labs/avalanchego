@@ -30,8 +30,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/trie/testutil"
 	"github.com/ava-labs/libevm/trie/trienode"
 )

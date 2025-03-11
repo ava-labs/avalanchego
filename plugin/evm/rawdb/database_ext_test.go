@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
 )
 
@@ -17,7 +18,7 @@ func ExampleInspectDatabase() {
 
 	// Extra metadata keys: (17 + 32) + (12 + 32) = 93 bytes
 	WriteSnapshotBlockHash(db, common.Hash{})
-	WriteSnapshotRoot(db, common.Hash{})
+	rawdb.WriteSnapshotRoot(db, common.Hash{})
 	// Trie segments: (77 + 2) + 1 = 80 bytes
 	_ = WriteSyncSegment(db, common.Hash{}, common.Hash{})
 	// Storage tries to fetch: 76 + 1 = 77 bytes

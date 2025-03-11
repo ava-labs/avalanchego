@@ -38,7 +38,6 @@ import (
 	"github.com/ava-labs/coreth/consensus"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/bloombits"
-	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/state/pruner"
 	"github.com/ava-labs/coreth/core/txpool"
 	"github.com/ava-labs/coreth/core/txpool/legacypool"
@@ -52,9 +51,11 @@ import (
 	"github.com/ava-labs/coreth/miner"
 	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/coreth/params"
+	customrawdb "github.com/ava-labs/coreth/plugin/evm/rawdb"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/libevm/accounts"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
@@ -415,13 +416,13 @@ func (s *Ethereum) precheckPopulateMissingTries() error {
 	if s.config.PopulateMissingTries == nil {
 		// Delete the populate missing tries marker to indicate that the node started with
 		// populate missing tries disabled.
-		if err := rawdb.DeletePopulateMissingTries(s.chainDb); err != nil {
+		if err := customrawdb.DeletePopulateMissingTries(s.chainDb); err != nil {
 			return fmt.Errorf("failed to write populate missing tries disabled marker: %w", err)
 		}
 		return nil
 	}
 
-	if lastRun, err := rawdb.ReadPopulateMissingTries(s.chainDb); err == nil {
+	if lastRun, err := customrawdb.ReadPopulateMissingTries(s.chainDb); err == nil {
 		log.Error("Populate missing tries is not meant to be left enabled permanently. Please disable populate missing tries and allow your node to start successfully before running again.")
 		return fmt.Errorf("cannot start chain with populate missing tries enabled on consecutive starts (last=%v)", lastRun)
 	}
@@ -438,7 +439,7 @@ func (s *Ethereum) handleOfflinePruning(cacheConfig *core.CacheConfig, gspec *co
 
 	if !s.config.OfflinePruning {
 		// Delete the offline pruning marker to indicate that the node started with offline pruning disabled.
-		if err := rawdb.DeleteOfflinePruning(s.chainDb); err != nil {
+		if err := customrawdb.DeleteOfflinePruning(s.chainDb); err != nil {
 			return fmt.Errorf("failed to write offline pruning disabled marker: %w", err)
 		}
 		return nil
@@ -448,7 +449,7 @@ func (s *Ethereum) handleOfflinePruning(cacheConfig *core.CacheConfig, gspec *co
 	// to the last accepted block before pruning begins.
 	// If offline pruning marker is on disk, then we force the node to be started with offline pruning disabled
 	// before allowing another run of offline pruning.
-	if lastRun, err := rawdb.ReadOfflinePruning(s.chainDb); err == nil {
+	if lastRun, err := customrawdb.ReadOfflinePruning(s.chainDb); err == nil {
 		log.Error("Offline pruning is not meant to be left enabled permanently. Please disable offline pruning and allow your node to start successfully before running offline pruning again.")
 		return fmt.Errorf("cannot start chain with offline pruning enabled on consecutive starts (last=%v)", lastRun)
 	}
