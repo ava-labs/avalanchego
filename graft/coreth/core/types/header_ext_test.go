@@ -81,7 +81,7 @@ func TestHeaderWithNonZeroFields(t *testing.T) {
 
 // headerWithNonZeroFields returns a [Header] and a [HeaderExtra],
 // each with all fields set to non-zero values.
-// The [HeaderExtra] extra payload is set in the [Header] via [SetHeaderExtra].
+// The [HeaderExtra] extra payload is set in the [Header] via [WithHeaderExtra].
 //
 // NOTE: They can be used to demonstrate that RLP and JSON round-trip encoding
 // can recover all fields, but not that the encoded format is correct. This is
@@ -114,8 +114,7 @@ func headerWithNonZeroFields() (*Header, *HeaderExtra) {
 		ExtDataGasUsed: big.NewInt(22),
 		BlockGasCost:   big.NewInt(23),
 	}
-	SetHeaderExtra(header, extra)
-	return header, extra
+	return WithHeaderExtra(header, extra), extra
 }
 
 func allFieldsSet[T interface {

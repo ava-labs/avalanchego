@@ -22,13 +22,12 @@ import (
 
 func TestBaseFee(t *testing.T) {
 	tests := []struct {
-		name        string
-		upgrades    extras.NetworkUpgrades
-		parent      *types.Header
-		parentExtra *types.HeaderExtra
-		timestamp   uint64
-		want        *big.Int
-		wantErr     error
+		name      string
+		upgrades  extras.NetworkUpgrades
+		parent    *types.Header
+		timestamp uint64
+		want      *big.Int
+		wantErr   error
 	}{
 		{
 			name:     "ap2",
@@ -181,14 +180,16 @@ func TestBaseFee(t *testing.T) {
 		{
 			name:     "ap4_decrease",
 			upgrades: extras.TestApricotPhase4Config.NetworkUpgrades,
-			parent: &types.Header{
-				Number:  big.NewInt(1),
-				Extra:   (&ap3.Window{}).Bytes(),
-				BaseFee: big.NewInt(ap4.MaxBaseFee),
-			},
-			parentExtra: &types.HeaderExtra{
-				BlockGasCost: big.NewInt(ap4.MinBlockGasCost),
-			},
+			parent: types.WithHeaderExtra(
+				&types.Header{
+					Number:  big.NewInt(1),
+					Extra:   (&ap3.Window{}).Bytes(),
+					BaseFee: big.NewInt(ap4.MaxBaseFee),
+				},
+				&types.HeaderExtra{
+					BlockGasCost: big.NewInt(ap4.MinBlockGasCost),
+				},
+			),
 			timestamp: 1,
 			want: func() *big.Int {
 				const (
@@ -207,16 +208,18 @@ func TestBaseFee(t *testing.T) {
 		{
 			name:     "ap4_increase",
 			upgrades: extras.TestApricotPhase4Config.NetworkUpgrades,
-			parent: &types.Header{
-				Number:  big.NewInt(1),
-				GasUsed: ap3.TargetGas,
-				Extra:   (&ap3.Window{}).Bytes(),
-				BaseFee: big.NewInt(ap4.MinBaseFee),
-			},
-			parentExtra: &types.HeaderExtra{
-				ExtDataGasUsed: big.NewInt(ap3.TargetGas),
-				BlockGasCost:   big.NewInt(ap4.MinBlockGasCost),
-			},
+			parent: types.WithHeaderExtra(
+				&types.Header{
+					Number:  big.NewInt(1),
+					GasUsed: ap3.TargetGas,
+					Extra:   (&ap3.Window{}).Bytes(),
+					BaseFee: big.NewInt(ap4.MinBaseFee),
+				},
+				&types.HeaderExtra{
+					ExtDataGasUsed: big.NewInt(ap3.TargetGas),
+					BlockGasCost:   big.NewInt(ap4.MinBlockGasCost),
+				},
+			),
 			timestamp: 1,
 			want: func() *big.Int {
 				const (
@@ -266,15 +269,17 @@ func TestBaseFee(t *testing.T) {
 		{
 			name:     "ap5_increase",
 			upgrades: extras.TestApricotPhase5Config.NetworkUpgrades,
-			parent: &types.Header{
-				Number:  big.NewInt(1),
-				GasUsed: ap5.TargetGas,
-				Extra:   (&ap3.Window{}).Bytes(),
-				BaseFee: big.NewInt(ap4.MinBaseFee),
-			},
-			parentExtra: &types.HeaderExtra{
-				ExtDataGasUsed: big.NewInt(ap5.TargetGas),
-			},
+			parent: types.WithHeaderExtra(
+				&types.Header{
+					Number:  big.NewInt(1),
+					GasUsed: ap5.TargetGas,
+					Extra:   (&ap3.Window{}).Bytes(),
+					BaseFee: big.NewInt(ap4.MinBaseFee),
+				},
+				&types.HeaderExtra{
+					ExtDataGasUsed: big.NewInt(ap5.TargetGas),
+				},
+			),
 			timestamp: 1,
 			want: func() *big.Int {
 				const (
@@ -301,15 +306,17 @@ func TestBaseFee(t *testing.T) {
 		{
 			name:     "etna_increase",
 			upgrades: extras.TestEtnaChainConfig.NetworkUpgrades,
-			parent: &types.Header{
-				Number:  big.NewInt(1),
-				GasUsed: ap5.TargetGas,
-				Extra:   (&ap3.Window{}).Bytes(),
-				BaseFee: big.NewInt(etna.MinBaseFee),
-			},
-			parentExtra: &types.HeaderExtra{
-				ExtDataGasUsed: big.NewInt(ap5.TargetGas),
-			},
+			parent: types.WithHeaderExtra(
+				&types.Header{
+					Number:  big.NewInt(1),
+					GasUsed: ap5.TargetGas,
+					Extra:   (&ap3.Window{}).Bytes(),
+					BaseFee: big.NewInt(etna.MinBaseFee),
+				},
+				&types.HeaderExtra{
+					ExtDataGasUsed: big.NewInt(ap5.TargetGas),
+				},
+			),
 			timestamp: 1,
 			want: func() *big.Int {
 				const (
@@ -400,9 +407,6 @@ func TestBaseFee(t *testing.T) {
 
 			config := &extras.ChainConfig{
 				NetworkUpgrades: test.upgrades,
-			}
-			if test.parentExtra != nil {
-				types.SetHeaderExtra(test.parent, test.parentExtra)
 			}
 			got, err := BaseFee(config, test.parent, test.timestamp)
 			require.ErrorIs(err, test.wantErr)

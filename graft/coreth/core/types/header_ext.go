@@ -23,6 +23,13 @@ func SetHeaderExtra(h *Header, extra *HeaderExtra) {
 	extras.Header.Set(h, extra)
 }
 
+// WithHeaderExtra sets the given [HeaderExtra] on the [Header]
+// and returns the [Header] for chaining.
+func WithHeaderExtra(h *Header, extra *HeaderExtra) *Header {
+	SetHeaderExtra(h, extra)
+	return h
+}
+
 // HeaderExtra is a struct that contains extra fields used by Avalanche
 // in the block header.
 // This type uses [HeaderSerializable] to encode and decode the extra fields
