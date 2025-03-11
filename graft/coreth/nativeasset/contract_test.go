@@ -7,11 +7,11 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/state"
 	. "github.com/ava-labs/coreth/nativeasset"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
 	ethtypes "github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/holiman/uint256"

@@ -31,8 +31,8 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
 	ethsnapshot "github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/ethdb"
 )

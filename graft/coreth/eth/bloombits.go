@@ -29,8 +29,8 @@ package eth
 import (
 	"time"
 
-	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/libevm/common/bitutil"
+	"github.com/ava-labs/libevm/core/rawdb"
 )
 
 const (

@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/state/snapshot"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/plugin/evm/message"
@@ -22,6 +21,7 @@ import (
 	handlerstats "github.com/ava-labs/coreth/sync/handlers/stats"
 	"github.com/ava-labs/coreth/sync/syncutils"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/rlp"

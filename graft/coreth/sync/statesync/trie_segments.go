@@ -11,11 +11,12 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/plugin/evm/message"
+	customrawdb "github.com/ava-labs/coreth/plugin/evm/rawdb"
 	syncclient "github.com/ava-labs/coreth/sync/client"
 	"github.com/ava-labs/coreth/utils"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/trie"
@@ -86,7 +87,7 @@ func (t *trieToSync) loadSegments() error {
 	// Get an iterator for segments for t.root and see if we find anything.
 	// This lets us check if this trie was previously segmented, in which
 	// case we need to restore the same segments on resume.
-	it := rawdb.NewSyncSegmentsIterator(t.sync.db, t.root)
+	it := customrawdb.NewSyncSegmentsIterator(t.sync.db, t.root)
 	defer it.Release()
 
 	// Track the previously added segment as we loop over persisted values.
@@ -99,7 +100,7 @@ func (t *trieToSync) loadSegments() error {
 		// key immediately prior to the segment we found on disk.
 		// This is because we do not persist the beginning of
 		// the first segment.
-		_, segmentStart := rawdb.UnpackSyncSegmentKey(it.Key())
+		_, segmentStart := customrawdb.UnpackSyncSegmentKey(it.Key())
 		segmentStartPos := binary.BigEndian.Uint16(segmentStart[:wrappers.ShortLen])
 		t.addSegment(prevSegmentStart, addPadding(segmentStartPos-1, 0xff))
 
@@ -232,7 +233,7 @@ func (t *trieToSync) segmentFinished(ctx context.Context, idx int) error {
 	}
 
 	// remove all segments for this root from persistent storage
-	if err := rawdb.ClearSyncSegments(t.sync.db, t.root); err != nil {
+	if err := customrawdb.ClearSyncSegments(t.sync.db, t.root); err != nil {
 		return err
 	}
 	return t.task.OnFinish()
@@ -301,7 +302,7 @@ func (t *trieToSync) createSegments(numSegments int) error {
 
 		// create the segments
 		segment := t.addSegment(startBytes, endBytes)
-		if err := rawdb.WriteSyncSegment(t.sync.db, t.root, common.BytesToHash(segment.start)); err != nil {
+		if err := customrawdb.WriteSyncSegment(t.sync.db, t.root, common.BytesToHash(segment.start)); err != nil {
 			return err
 		}
 	}

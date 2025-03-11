@@ -8,11 +8,12 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/types"
+	customrawdb "github.com/ava-labs/coreth/plugin/evm/rawdb"
 	"github.com/ava-labs/coreth/sync/syncutils"
 	"github.com/ava-labs/coreth/utils"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/rlp"
@@ -25,7 +26,7 @@ import (
 // Also verifies any code referenced by the EVM state is present in [clientTrieDB] and the hash is correct.
 func assertDBConsistency(t testing.TB, root common.Hash, clientDB ethdb.Database, serverTrieDB, clientTrieDB *triedb.Database) {
 	numSnapshotAccounts := 0
-	accountIt := rawdb.IterateAccountSnapshots(clientDB)
+	accountIt := customrawdb.IterateAccountSnapshots(clientDB)
 	defer accountIt.Release()
 	for accountIt.Next() {
 		if !bytes.HasPrefix(accountIt.Key(), rawdb.SnapshotAccountPrefix) || len(accountIt.Key()) != len(rawdb.SnapshotAccountPrefix)+common.HashLength {

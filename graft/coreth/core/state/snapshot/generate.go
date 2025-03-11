@@ -31,10 +31,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/types"
+	customrawdb "github.com/ava-labs/coreth/plugin/evm/rawdb"
 	"github.com/ava-labs/coreth/utils"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/rlp"
@@ -62,7 +63,7 @@ func generateSnapshot(diskdb ethdb.KeyValueStore, triedb *triedb.Database, cache
 		batch     = diskdb.NewBatch()
 		genMarker = []byte{} // Initialized but empty!
 	)
-	rawdb.WriteSnapshotBlockHash(batch, blockHash)
+	customrawdb.WriteSnapshotBlockHash(batch, blockHash)
 	rawdb.WriteSnapshotRoot(batch, root)
 	journalProgress(batch, genMarker, stats)
 	if err := batch.Write(); err != nil {
