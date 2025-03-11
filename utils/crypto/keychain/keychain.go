@@ -137,7 +137,7 @@ func (l *ledgerSigner) SignHash(b []byte) ([]byte, error) {
 		)
 	}
 
-	return sigs[0], err
+	return sigs[0], nil
 }
 
 // expects to receive the unsigned tx bytes
@@ -157,7 +157,7 @@ func (l *ledgerSigner) Sign(b []byte) ([]byte, error) {
 		)
 	}
 
-	return sigs[0], err
+	return sigs[0], nil
 }
 
 func (l *ledgerSigner) Address() ids.ShortID {
