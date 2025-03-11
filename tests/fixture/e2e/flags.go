@@ -188,3 +188,26 @@ func SetMonitoringFlags(startCollectors *bool, checkMonitoring *bool) {
 		"[optional] whether to check that logs and metrics have been collected from nodes of the temporary network.",
 	)
 }
+
+type StringVarFunc func(p *string, name string, value string, usage string)
+
+func SetKubeFlags(stringVar StringVarFunc, kubeConfigPath *string, kubeConfigContext *string, namespace *string) {
+	stringVar(
+		kubeConfigPath,
+		"kubeconfig",
+		tmpnet.GetEnvWithDefault("KUBECONFIG", os.ExpandEnv("$HOME/.kube/config")),
+		"The path to a kubernetes configuration file for the target cluster",
+	)
+	stringVar(
+		kubeConfigContext,
+		"kubeconfig-context",
+		"",
+		"The path to a kubernetes configuration file for the target cluster",
+	)
+	stringVar(
+		namespace,
+		"namespace",
+		tmpnet.DefaultTmpnetNamespace,
+		"The namespace in the target cluster to create nodes in",
+	)
+}

@@ -11,11 +11,11 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net"
 	"net/netip"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -57,7 +57,7 @@ func (p *NodeProcess) setProcessContext(processContext node.ProcessContext) {
 	p.node.StakingAddress = processContext.StakingAddress
 }
 
-func (p *NodeProcess) readState() error {
+func (p *NodeProcess) readState(_ context.Context) error {
 	path := p.getProcessContextPath()
 	bytes, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -80,7 +80,7 @@ func (p *NodeProcess) readState() error {
 // its staking port. The network will start faster with this
 // synchronization due to the avoidance of exponential backoff
 // if a node tries to connect to a beacon that is not ready.
-func (p *NodeProcess) Start(log logging.Logger) error {
+func (p *NodeProcess) Start(_ context.Context, log logging.Logger) error {
 	// Avoid attempting to start an already running node.
 	proc, err := p.getProcess()
 	if err != nil {
@@ -142,7 +142,7 @@ func (p *NodeProcess) Start(log logging.Logger) error {
 }
 
 // Signals the node process to stop.
-func (p *NodeProcess) InitiateStop() error {
+func (p *NodeProcess) InitiateStop(_ context.Context) error {
 	proc, err := p.getProcess()
 	if err != nil {
 		return fmt.Errorf("failed to retrieve process to stop: %w", err)
@@ -178,7 +178,27 @@ func (p *NodeProcess) WaitForStopped(ctx context.Context) error {
 	}
 }
 
-func (p *NodeProcess) IsHealthy(ctx context.Context) (bool, error) {
+// Restarts the node
+func (p *NodeProcess) Restart(ctx context.Context, log logging.Logger) error {
+	if p.node.getRuntimeConfig().Process.ReuseDynamicPorts {
+		// Attempt to save the API port currently being used so the
+		// restarted node can reuse it. This may result in the node
+		// failing to start if the operating system allocates the port
+		// to a different process between node stop and start.
+		if err := p.saveAPIPort(); err != nil {
+			return err
+		}
+	}
+	if err := p.node.Stop(ctx); err != nil {
+		return fmt.Errorf("failed to stop node %s: %w", p.node.NodeID, err)
+	}
+	if err := p.node.network.StartNode(ctx, log, p.node); err != nil {
+		return fmt.Errorf("failed to start node %s: %w", p.node.NodeID, err)
+	}
+	return nil
+}
+
+func (p *NodeProcess) IsHealthy(ctx context.Context, log logging.Logger) (bool, error) {
 	// Check that the node process is running as a precondition for
 	// checking health. getProcess will also ensure that the node's
 	// API URI is current.
@@ -190,9 +210,22 @@ func (p *NodeProcess) IsHealthy(ctx context.Context) (bool, error) {
 		return false, errNotRunning
 	}
 
-	healthReply, err := CheckNodeHealth(ctx, p.node.URI)
+	uri, cancel, err := p.node.GetLocalURI(ctx)
 	if err != nil {
 		return false, err
+	}
+	defer cancel()
+
+	healthReply, err := CheckNodeHealth(ctx, uri)
+	if errors.Is(ErrUnrecoverableNodeHealthCheck, err) {
+		return false, err
+	}
+	if err != nil {
+		log.Debug("failed to check node health",
+			zap.Stringer("nodeID", p.node.NodeID),
+			zap.Error(err),
+		)
+		return false, nil
 	}
 	return healthReply.Healthy, nil
 }
@@ -208,7 +241,7 @@ func (p *NodeProcess) waitForProcessContext(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, defaultNodeInitTimeout)
 	defer cancel()
 	for len(p.node.URI) == 0 {
-		err := p.readState()
+		err := p.readState(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to read process context for node %q: %w", p.node.NodeID, err)
 		}
@@ -228,7 +261,7 @@ func (p *NodeProcess) waitForProcessContext(ctx context.Context) error {
 func (p *NodeProcess) getProcess() (*os.Process, error) {
 	// Read the process context to ensure freshness. The node may have
 	// stopped or been restarted since last read.
-	if err := p.readState(); err != nil {
+	if err := p.readState(context.Background()); err != nil {
 		return nil, fmt.Errorf("failed to read process context: %w", err)
 	}
 
@@ -264,17 +297,7 @@ func getProcess(pid int) (*os.Process, error) {
 // Write monitoring configuration enabling collection of metrics and logs from the node.
 func (p *NodeProcess) writeMonitoringConfig() error {
 	// Ensure labeling that uniquely identifies the node and its network
-	commonLabels := FlagsMap{
-		// Explicitly setting an instance label avoids the default
-		// behavior of using the node's URI since the URI isn't
-		// guaranteed stable (e.g. port may change after restart).
-		"instance":          p.node.GetUniqueID(),
-		"network_uuid":      p.node.network.UUID,
-		"node_id":           p.node.NodeID,
-		"is_ephemeral_node": strconv.FormatBool(p.node.IsEphemeral),
-		"network_owner":     p.node.network.Owner,
-	}
-	commonLabels.SetDefaults(githubLabelsFromEnv())
+	commonLabels := p.node.getPodLabels()
 
 	prometheusConfig := []FlagsMap{
 		{
@@ -289,7 +312,13 @@ func (p *NodeProcess) writeMonitoringConfig() error {
 	promtailLabels := FlagsMap{
 		"__path__": filepath.Join(p.node.GetDataDir(), "logs", "*.log"),
 	}
-	promtailLabels.SetDefaults(commonLabels)
+	// TODO(marun) Need to reconcile between map[string]string and map[string]any
+	for k, v := range commonLabels {
+		if _, ok := promtailLabels[k]; ok {
+			continue
+		}
+		promtailLabels[k] = v
+	}
 	promtailConfig := []FlagsMap{
 		{
 			"targets": []string{"localhost"},
@@ -356,6 +385,22 @@ func (p *NodeProcess) GetLocalStakingAddress(_ context.Context) (netip.AddrPort,
 	return p.node.StakingAddress, func() {}, nil
 }
 
+// Saves the currently allocated API port to the node's configuration
+// for use across restarts.
+func (p *NodeProcess) saveAPIPort() error {
+	hostPort := strings.TrimPrefix(p.node.URI, "http://")
+	if len(hostPort) == 0 {
+		// Without an API URI there is nothing to save
+		return nil
+	}
+	_, port, err := net.SplitHostPort(hostPort)
+	if err != nil {
+		return err
+	}
+	p.node.Flags[config.HTTPPortKey] = port
+	return nil
+}
+
 // watchLogFileForFatal waits for the specified file path to exist and then checks each of
 // its lines for the string 'FATAL' until such a line is observed or the provided context
 // is canceled. If line containing 'FATAL' is encountered, it will be provided as an error
@@ -420,19 +465,5 @@ func watchLogFileForFatal(ctx context.Context, cancelWithCause context.CancelCau
 				return
 			}
 		}
-	}
-}
-
-func githubLabelsFromEnv() FlagsMap {
-	return FlagsMap{
-		// prometheus/promtail ignore empty values so including these
-		// labels with empty values outside of a github worker (where
-		// the env vars will not be set) should not be a problem.
-		"gh_repo":        os.Getenv("GH_REPO"),
-		"gh_workflow":    os.Getenv("GH_WORKFLOW"),
-		"gh_run_id":      os.Getenv("GH_RUN_ID"),
-		"gh_run_number":  os.Getenv("GH_RUN_NUMBER"),
-		"gh_run_attempt": os.Getenv("GH_RUN_ATTEMPT"),
-		"gh_job_id":      os.Getenv("GH_JOB_ID"),
 	}
 }

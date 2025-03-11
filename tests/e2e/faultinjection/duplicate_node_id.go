@@ -26,6 +26,11 @@ var _ = ginkgo.Describe("Duplicate node handling", func() {
 	ginkgo.It("should ensure that a given Node ID (i.e. staking keypair) can be used at most once on a network", func() {
 		network := e2e.GetEnv(tc).GetNetwork()
 
+		if network.DefaultRuntimeConfig.KubeRuntimeConfig != nil {
+			// Enabling this test for kube requires supporting a flexible name mapping
+			ginkgo.Skip("This test is not supported on kube to avoid having to deviate from composing the statefulset name with the network uuid + nodeid")
+		}
+
 		tc.By("creating new node")
 		node1 := e2e.AddEphemeralNode(tc, network, tmpnet.FlagsMap{})
 		e2e.WaitForHealthy(tc, node1)
@@ -43,10 +48,10 @@ var _ = ginkgo.Describe("Duplicate node handling", func() {
 			// the same node ID.
 			config.DataDirKey: fmt.Sprintf("%s-second", node1Flags[config.DataDirKey]),
 		}
-		node2 := e2e.AddEphemeralNode(tc, network, node2Flags)
+		node2 := e2e.AddEphemeralNodeWithWaitForHealth(tc, network, node2Flags, false /* waitForHealth */)
 
 		tc.By("checking that the second new node fails to become healthy before timeout")
-		err := tmpnet.WaitForHealthy(tc.DefaultContext(), node2)
+		err := tmpnet.WaitForHealthyNode(tc.DefaultContext(), tc.Log(), node2)
 		require.ErrorIs(err, context.DeadlineExceeded)
 
 		tc.By("stopping the first new node")
@@ -68,7 +73,8 @@ func checkConnectedPeers(tc tests.TestContext, existingNodes []*tmpnet.Node, new
 	require := require.New(tc)
 
 	// Collect the node ids of the new node's peers
-	infoClient := info.NewClient(newNode.URI)
+	uri := e2e.GetLocalURI(tc, newNode)
+	infoClient := info.NewClient(uri)
 	peers, err := infoClient.Peers(tc.DefaultContext(), nil)
 	require.NoError(err)
 	peerIDs := set.NewSet[ids.NodeID](len(existingNodes))
@@ -81,7 +87,8 @@ func checkConnectedPeers(tc tests.TestContext, existingNodes []*tmpnet.Node, new
 		require.True(peerIDs.Contains(existingNode.NodeID))
 
 		// Check that the new node is a peer
-		infoClient := info.NewClient(existingNode.URI)
+		uri := e2e.GetLocalURI(tc, existingNode)
+		infoClient := info.NewClient(uri)
 		peers, err := infoClient.Peers(tc.DefaultContext(), nil)
 		require.NoError(err)
 		isPeer := false

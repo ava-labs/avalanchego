@@ -4,6 +4,7 @@
 package tmpnet
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,11 +23,11 @@ import (
 var errMissingNetworkDir = errors.New("failed to write network: missing network directory")
 
 // Read network and node configuration from disk.
-func (n *Network) Read() error {
+func (n *Network) Read(ctx context.Context) error {
 	if err := n.readNetwork(); err != nil {
 		return err
 	}
-	if err := n.readNodes(); err != nil {
+	if err := n.readNodes(ctx); err != nil {
 		return err
 	}
 	return n.readSubnets()
@@ -58,8 +59,8 @@ func (n *Network) readNetwork() error {
 }
 
 // Read the non-ephemeral nodes associated with the network from disk.
-func (n *Network) readNodes() error {
-	nodes, err := ReadNodes(n, false /* includeEphemeral */)
+func (n *Network) readNodes(ctx context.Context) error {
+	nodes, err := ReadNodes(ctx, n, false /* includeEphemeral */)
 	if err != nil {
 		return err
 	}

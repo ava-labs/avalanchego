@@ -60,7 +60,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		env := e2e.GetEnv(tc)
 		publicNetwork := env.GetNetwork()
 
-		privateNetwork := tmpnet.NewDefaultNetwork("avalanchego-e2e-dynamic-fees")
+		privateNetwork := tmpnet.NewDefaultNetwork(tc.Log(), "avalanchego-e2e-dynamic-fees")
 		// Copy over the defaults from the normal test suite to include settings
 		// like the upgrade config.
 		privateNetwork.DefaultFlags = tmpnet.FlagsMap{}

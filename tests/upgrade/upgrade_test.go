@@ -52,7 +52,7 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 	require := require.New(tc)
 
 	ginkgo.It("can upgrade versions", func() {
-		network := tmpnet.NewDefaultNetwork("avalanchego-upgrade")
+		network := tmpnet.NewDefaultNetwork(tc.Log(), "avalanchego-upgrade")
 
 		network.DefaultRuntimeConfig = tmpnet.NodeRuntimeConfig{
 			Process: &tmpnet.ProcessRuntimeConfig{
@@ -81,7 +81,7 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 		}
 
 		e2e.StartNetwork(
-			tc,
+			e2e.NewEventHandlerTestContext(),
 			network,
 			"", /* rootNetworkDir */
 			shutdownDelay,
