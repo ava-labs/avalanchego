@@ -1048,6 +1048,7 @@ func apiOfferFromOffer(offer *deposit.Offer) *APIDepositOffer {
 type GetUpgradePhasesReply struct {
 	AthensPhase utilsjson.Uint32 `json:"athensPhase"`
 	BerlinPhase utilsjson.Uint32 `json:"berlinPhase"`
+	CairoPhase  utilsjson.Uint32 `json:"cairoPhase"`
 }
 
 func (s *CaminoService) GetUpgradePhases(_ *http.Request, _ *struct{}, response *GetUpgradePhasesReply) error {
@@ -1058,6 +1059,9 @@ func (s *CaminoService) GetUpgradePhases(_ *http.Request, _ *struct{}, response 
 	}
 	if s.vm.Config.IsBerlinPhaseActivated(s.vm.state.GetTimestamp()) {
 		response.BerlinPhase = 1
+	}
+	if s.vm.Config.IsCairoPhaseActivated(s.vm.state.GetTimestamp()) {
+		response.CairoPhase = 1
 	}
 	return nil
 }
