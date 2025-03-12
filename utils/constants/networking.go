@@ -38,13 +38,14 @@ const (
 	DefaultOutboundConnectionTimeout       = 30 * time.Second
 
 	// Timeouts
-	DefaultNetworkInitialTimeout        = 5 * time.Second
-	DefaultNetworkMinimumTimeout        = 2 * time.Second
-	DefaultNetworkMaximumTimeout        = 10 * time.Second
-	DefaultNetworkMaximumInboundTimeout = 10 * time.Second
-	DefaultNetworkTimeoutHalflife       = 5 * time.Minute
-	DefaultNetworkTimeoutCoefficient    = 2
-	DefaultNetworkReadHandshakeTimeout  = 15 * time.Second
+	DefaultNetworkInitialTimeout                   = 5 * time.Second
+	DefaultNetworkMinimumTimeout                   = 2 * time.Second
+	DefaultNetworkMaximumTimeout                   = 10 * time.Second
+	DefaultNetworkMaximumInboundTimeout            = 10 * time.Second
+	DefaultNetworkTimeoutHalflife                  = 5 * time.Minute
+	DefaultNetworkTimeoutCoefficient               = 2
+	DefaultNetworkReadHandshakeTimeout             = 15 * time.Second
+	DefaultNoIngressValidatorConnectionGracePeriod = 10 * time.Minute
 
 	DefaultNetworkCompressionType           = compression.TypeZstd
 	DefaultNetworkMaxClockDifference        = time.Minute

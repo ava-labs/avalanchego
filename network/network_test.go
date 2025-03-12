@@ -282,6 +282,11 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 		if i != 0 {
 			config := configs[0]
 			net.ManuallyTrack(config.MyNodeID, config.MyIPPort.Get())
+			// Wait until the node is connected to the first node.
+			// This forces nodes to connect to each other in a deterministic order.
+			require.Eventually(func() bool {
+				return len(net.PeerInfo([]ids.NodeID{config.MyNodeID})) > 0
+			}, 10*time.Second, time.Millisecond)
 		}
 
 		go func(net Network) {
@@ -304,6 +309,50 @@ func TestNewNetwork(t *testing.T) {
 		net.StartClose()
 	}
 	wg.Wait()
+}
+
+func TestIngressConnCount(t *testing.T) {
+	require := require.New(t)
+
+	emptyHandler := func(context.Context, message.InboundMessage) {}
+
+	_, networks, wg := newFullyConnectedTestNetwork(
+		t, []router.InboundHandler{
+			router.InboundHandlerFunc(emptyHandler),
+			router.InboundHandlerFunc(emptyHandler),
+			router.InboundHandlerFunc(emptyHandler),
+		})
+
+	wg.Done()
+
+	for _, net := range networks {
+		net.config.NoIngressValidatorConnectionGracePeriod = 0
+		net.config.HealthConfig.Enabled = true
+	}
+
+	require.Eventually(func() bool {
+		result := true
+		for _, net := range networks {
+			result = result && len(net.PeerInfo(nil)) == len(networks)-1
+		}
+		return result
+	}, time.Minute, time.Millisecond*10)
+
+	ingressConnections := make([]int, 0, len(networks))
+	healthCheckErrors := make([]error, 0, len(networks))
+
+	for _, net := range networks {
+		ingressConnections = append(ingressConnections, net.IngressConnCount())
+		_, err := net.HealthCheck(context.Background())
+		healthCheckErrors = append(healthCheckErrors, err)
+	}
+
+	// First node has all nodes connected to it.
+	// Second node has only the third node connected to it.
+	// Third node has no node connected to it, as it connects to the first and second node.
+	require.Equal([]int{2, 1, 0}, ingressConnections)
+	require.Equal([]error{nil, nil}, healthCheckErrors[:2])
+	require.ErrorContains(healthCheckErrors[2], ErrNoIngressConnections.Error()) //nolint
 }
 
 func TestSend(t *testing.T) {
