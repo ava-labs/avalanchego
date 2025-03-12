@@ -10,10 +10,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/dac"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -327,4 +329,41 @@ func Lock(t *testing.T, s *state.MockState, utxosMap map[ids.ShortID][]*avax.UTX
 func PhaseTime(t *testing.T, s *state.MockDiff, cfg *config.Config, phase test.Phase) {
 	t.Helper()
 	s.EXPECT().GetTimestamp().Return(test.PhaseTime(t, phase, cfg))
+}
+
+func StateGetBondTxIDs(
+	t *testing.T,
+	s *state.MockState,
+	tx *txs.FinishProposalsTx,
+	proposals []dac.ProposalState,
+	nodeIDs []ids.NodeID,
+	validatorTxIDs []ids.ID,
+) {
+	t.Helper()
+	j := 0
+	for i, proposalID := range tx.SuccessfulProposalIDs() {
+		dacProposal := proposals[i]
+		s.EXPECT().GetProposal(proposalID).Return(dacProposal, nil)
+		if excludeMemberProposalState, ok := dacProposal.(*dac.ExcludeMemberProposalState); ok {
+			if accepted, _, _ := excludeMemberProposalState.Result(); !accepted {
+				continue
+			}
+			if nodeIDs[j] == ids.EmptyNodeID {
+				s.EXPECT().GetShortIDLink(excludeMemberProposalState.MemberAddress, state.ShortLinkKeyRegisterNode).Return(ids.ShortEmpty, database.ErrNotFound)
+				j++
+				continue
+			}
+
+			s.EXPECT().GetShortIDLink(excludeMemberProposalState.MemberAddress, state.ShortLinkKeyRegisterNode).Return(ids.ShortID(nodeIDs[j]), nil)
+
+			if validatorTxIDs[j] == ids.Empty {
+				s.EXPECT().GetPendingValidator(constants.PrimaryNetworkID, nodeIDs[j]).Return(nil, database.ErrNotFound)
+			} else {
+				s.EXPECT().GetPendingValidator(constants.PrimaryNetworkID, nodeIDs[j]).Return(&state.Staker{
+					TxID: validatorTxIDs[j],
+				}, nil)
+			}
+			j++
+		}
+	}
 }

@@ -21,7 +21,7 @@ type UnlockExpiredDepositTx struct {
 	unsignedBytes []byte // Unsigned byte representation of this data
 }
 
-func (*UnlockExpiredDepositTx) SyntacticVerify(_ *snow.Context) error {
+func (*UnlockExpiredDepositTx) SyntacticVerify(*snow.Context) error {
 	return nil
 }
 

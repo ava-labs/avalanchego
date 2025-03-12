@@ -13,10 +13,12 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
+	"github.com/ava-labs/avalanchego/vms/platformvm/dac"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -1005,6 +1007,219 @@ func TestNewRewardsImportTx(t *testing.T) {
 			} else {
 				require.Nil(tx)
 			}
+		})
+	}
+}
+
+func TestNewFinishProposalsTx(t *testing.T) {
+	ctx := test.Context(t)
+
+	_, bondOwnerAddr, bondOwner := generate.KeyAndOwner(t, test.Keys[0])
+
+	bondTxID := ids.ID{1}
+
+	earlySuccessfulAddMemberID := ids.ID{2}
+	earlySuccessfulExcludeMemberID1 := ids.ID{3}
+	earlySuccessfulExcludeMemberID2 := ids.ID{4}
+	earlyFailedAddMemberID1 := ids.ID{5}
+	earlyFailedAddMemberID2 := ids.ID{6}
+	expiredSuccessfulAddMemberID := ids.ID{7}
+	expiredSuccessfulExcludeMemberID := ids.ID{8}
+	expiredFailedAddMemberID1 := ids.ID{9}
+	expiredFailedAddMemberID2 := ids.ID{10}
+
+	memberToExcludeAddr := ids.ShortID{11}
+	memberToExcludeNodeID := ids.NodeID{12}
+
+	bondedUTXO := generate.UTXO(ids.ID{13}, test.AVAXAssetID, 17, bondOwner, ids.Empty, bondTxID, false)
+
+	successfulAddMemberProposal := &dac.AddMemberProposalState{
+		SimpleVoteOptions: dac.SimpleVoteOptions[bool]{
+			Options: []dac.SimpleVoteOption[bool]{{Value: true, Weight: 1}},
+		},
+	}
+
+	failedAddMemberProposal := &dac.AddMemberProposalState{
+		TotalAllowedVoters: 1,
+		SimpleVoteOptions: dac.SimpleVoteOptions[bool]{
+			Options: []dac.SimpleVoteOption[bool]{{}},
+		},
+	}
+
+	successfulExcludeMemberProposal := &dac.ExcludeMemberProposalState{
+		MemberAddress: memberToExcludeAddr,
+		SimpleVoteOptions: dac.SimpleVoteOptions[bool]{
+			Options: []dac.SimpleVoteOption[bool]{{Value: true, Weight: 1}},
+		},
+	}
+
+	proposals := map[ids.ID]dac.ProposalState{
+		earlySuccessfulAddMemberID:       successfulAddMemberProposal,
+		earlySuccessfulExcludeMemberID1:  successfulExcludeMemberProposal,
+		earlySuccessfulExcludeMemberID2:  successfulExcludeMemberProposal,
+		earlyFailedAddMemberID1:          failedAddMemberProposal,
+		earlyFailedAddMemberID2:          failedAddMemberProposal,
+		expiredSuccessfulAddMemberID:     successfulAddMemberProposal,
+		expiredSuccessfulExcludeMemberID: successfulExcludeMemberProposal,
+		expiredFailedAddMemberID1:        failedAddMemberProposal,
+		expiredFailedAddMemberID2:        failedAddMemberProposal,
+	}
+
+	tests := map[string]struct {
+		state                    func(*gomock.Controller, *txs.FinishProposalsTx) state.State
+		earlyFinishedProposalIDs []ids.ID
+		expiredProposalIDs       []ids.ID
+		utx                      *txs.FinishProposalsTx
+		expectedErr              error
+	}{
+		"OK": {
+			state: func(ctrl *gomock.Controller, utx *txs.FinishProposalsTx) state.State {
+				s := state.NewMockState(ctrl)
+				for proposalID, proposal := range proposals {
+					s.EXPECT().GetProposal(proposalID).Return(proposal, nil)
+				}
+				expect.StateGetBondTxIDs(t, s, utx, []dac.ProposalState{
+					successfulAddMemberProposal,     // earlySuccessfulAddMemberID
+					successfulExcludeMemberProposal, // earlySuccessfulExcludeMemberID1 // no nodeID
+					successfulExcludeMemberProposal, // earlySuccessfulExcludeMemberID2 // no validator
+					successfulAddMemberProposal,     // expiredSuccessfulAddMemberID
+					successfulExcludeMemberProposal, // expiredSuccessfulExcludeMemberID // has validator
+				}, []ids.NodeID{
+					ids.EmptyNodeID,
+					memberToExcludeNodeID, // ExcludeMemberProposal.MemberAddress node id
+					memberToExcludeNodeID, // ExcludeMemberProposal.MemberAddress node id
+				}, []ids.ID{
+					ids.Empty,
+					ids.Empty,
+					bondTxID, // ExcludeMemberProposal.MemberAddress validator tx id
+				})
+				expect.StateUnlock(t, s,
+					append(utx.ProposalIDs(), bondTxID),
+					[]ids.ShortID{bondOwnerAddr},
+					[]*avax.UTXO{bondedUTXO},
+					locked.StateBonded,
+				)
+				return s
+			},
+			earlyFinishedProposalIDs: []ids.ID{
+				earlySuccessfulAddMemberID, earlySuccessfulExcludeMemberID1, earlySuccessfulExcludeMemberID2,
+				earlyFailedAddMemberID1, earlyFailedAddMemberID2,
+			},
+			expiredProposalIDs: []ids.ID{
+				expiredSuccessfulAddMemberID, expiredSuccessfulExcludeMemberID,
+				expiredFailedAddMemberID1, expiredFailedAddMemberID2,
+			},
+			utx: &txs.FinishProposalsTx{
+				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    ctx.NetworkID,
+					BlockchainID: ctx.ChainID,
+					Ins:          generate.InsFromUTXOsWithoutSigIndices(t, []*avax.UTXO{bondedUTXO}),
+					Outs:         generate.OutsFromUTXOs(t, []*avax.UTXO{bondedUTXO}, ids.Empty, ids.Empty),
+				}},
+				EarlyFinishedSuccessfulProposalIDs: []ids.ID{
+					earlySuccessfulAddMemberID,
+					earlySuccessfulExcludeMemberID1,
+					earlySuccessfulExcludeMemberID2,
+				},
+				EarlyFinishedFailedProposalIDs: []ids.ID{
+					earlyFailedAddMemberID1,
+					earlyFailedAddMemberID2,
+				},
+				ExpiredSuccessfulProposalIDs: []ids.ID{
+					expiredSuccessfulAddMemberID,
+					expiredSuccessfulExcludeMemberID,
+				},
+				ExpiredFailedProposalIDs: []ids.ID{
+					expiredFailedAddMemberID1,
+					expiredFailedAddMemberID2,
+				},
+			},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+			ctrl := gomock.NewController(t)
+			state := tt.state(ctrl, tt.utx)
+			b := newCaminoBuilder(t, state, nil, test.PhaseLast)
+
+			tx, err := b.NewFinishProposalsTx(
+				state,
+				tt.earlyFinishedProposalIDs,
+				tt.expiredProposalIDs,
+			)
+			require.ErrorIs(err, tt.expectedErr)
+			if err != nil {
+				require.Nil(tx)
+				return
+			}
+			expectedTx := &txs.Tx{Unsigned: tt.utx}
+			require.NoError(expectedTx.Initialize(txs.Codec))
+			require.NoError(expectedTx.SyntacticVerify(b.ctx))
+			require.Equal(expectedTx, tx)
+		})
+	}
+}
+
+func TestNewSystemUnlockDepositTx(t *testing.T) {
+	_, depositOwnerAddr, depositOwner := generate.KeyAndOwner(t, test.Keys[0])
+
+	depositTxID := ids.ID{1}
+	bondTxID := ids.ID{2}
+
+	depositedUTXO := generate.UTXO(ids.ID{3}, test.AVAXAssetID, 11, depositOwner, depositTxID, ids.Empty, false)
+	depositedBondedUTXO := generate.UTXO(ids.ID{4}, test.AVAXAssetID, 17, depositOwner, depositTxID, bondTxID, false)
+
+	tests := map[string]struct {
+		state        func(*gomock.Controller, []ids.ID) state.State
+		depositTxIDs []ids.ID
+		utx          *txs.UnlockDepositTx
+		expectedErr  error
+	}{
+		"OK": {
+			state: func(ctrl *gomock.Controller, depositTxIDs []ids.ID) state.State {
+				s := state.NewMockState(ctrl)
+				expect.StateUnlock(t, s,
+					depositTxIDs,
+					[]ids.ShortID{depositOwnerAddr},
+					[]*avax.UTXO{depositedUTXO, depositedBondedUTXO},
+					locked.StateDeposited,
+				)
+				return s
+			},
+			depositTxIDs: []ids.ID{depositTxID},
+			utx: &txs.UnlockDepositTx{
+				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    test.NetworkID,
+					BlockchainID: constants.PlatformChainID,
+					Ins: []*avax.TransferableInput{
+						generate.InFromUTXO(t, depositedUTXO, []uint32{}, false),
+						generate.InFromUTXO(t, depositedBondedUTXO, []uint32{}, false),
+					},
+					Outs: []*avax.TransferableOutput{
+						generate.OutFromUTXO(t, depositedUTXO, ids.Empty, ids.Empty),
+						generate.OutFromUTXO(t, depositedBondedUTXO, ids.Empty, bondTxID),
+					},
+				}},
+			},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+			ctrl := gomock.NewController(t)
+			b := newCaminoBuilder(t, tt.state(ctrl, tt.depositTxIDs), nil, test.PhaseLast)
+
+			tx, err := b.NewSystemUnlockDepositTx(tt.depositTxIDs)
+			require.ErrorIs(err, tt.expectedErr)
+			if err != nil {
+				require.Nil(tx)
+				return
+			}
+			expectedTx := &txs.Tx{Unsigned: tt.utx}
+			require.NoError(expectedTx.Initialize(txs.Codec))
+			require.NoError(expectedTx.SyntacticVerify(b.ctx))
+			require.Equal(expectedTx, tx)
 		})
 	}
 }

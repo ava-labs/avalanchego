@@ -110,13 +110,9 @@ type CaminoTxBuilder interface {
 
 	NewRewardsImportTx() (*txs.Tx, error)
 
-	NewSystemUnlockDepositTx(
-		depositTxIDs []ids.ID,
-	) (*txs.Tx, error)
+	NewSystemUnlockDepositTx(depositTxIDs []ids.ID) (*txs.Tx, error)
 
-	NewUnlockExpiredDepositTx(
-		depositTxIDs []ids.ID,
-	) (*txs.Tx, error)
+	NewUnlockExpiredDepositTx(depositTxIDs []ids.ID) (*txs.Tx, error)
 
 	NewFinishProposalsTx(
 		state state.Chain,
@@ -707,7 +703,6 @@ func (b *caminoBuilder) NewRewardsImportTx() (*txs.Tx, error) {
 	return tx, tx.SyntacticVerify(b.ctx)
 }
 
-// TODO@ test
 func (b *caminoBuilder) NewSystemUnlockDepositTx(
 	depositTxIDs []ids.ID,
 ) (*txs.Tx, error) {
