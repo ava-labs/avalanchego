@@ -34,7 +34,7 @@ func NewClient(ctx context.Context, rpcSignerURL string) (*Client, error) {
 	// the request to the actual signer instead of relying on tls-credentials
 	conn, err := grpc.NewClient(rpcSignerURL, opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		return nil, fmt.Errorf("couldn't create rpc signer client: %w", err)
+		return nil, fmt.Errorf("failed to create rpc signer client: %w", err)
 	}
 	defer func() {
 		if err != nil {
