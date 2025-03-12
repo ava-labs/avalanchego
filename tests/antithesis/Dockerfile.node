@@ -25,8 +25,11 @@ COPY --from=builder /build/commit_hash.txt /avalanchego/build/commit_hash.txt
 # Copy the antithesis dependencies into the container
 COPY --from=builder /instrumented/symbols /symbols
 
+# Configure the node with the location of the plugin
+ENV AVAGO_PLUGIN_DIR=/avalanchego/build/plugins
+
 # Copy the executable into the container
-COPY --from=builder /build/srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy\
- /avalanchego/build/plugins/srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy
+COPY --from=builder $BUILDER_WORKDIR/build/srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy\
+  $AVAGO_PLUGIN_DIR/srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy
 
 # The node image's entrypoint will be reused.
