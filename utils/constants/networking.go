@@ -45,7 +45,7 @@ const (
 	DefaultNetworkTimeoutHalflife                  = 5 * time.Minute
 	DefaultNetworkTimeoutCoefficient               = 2
 	DefaultNetworkReadHandshakeTimeout             = 15 * time.Second
-	DefaultNoIngressValidatorConnectionGracePeriod = time.Minute * 10
+	DefaultNoIngressValidatorConnectionGracePeriod = 10 * time.Minute
 
 	DefaultNetworkCompressionType           = compression.TypeZstd
 	DefaultNetworkMaxClockDifference        = time.Minute
