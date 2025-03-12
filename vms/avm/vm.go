@@ -86,7 +86,8 @@ type VM struct {
 	appSender common.AppSender
 
 	// State management
-	state state.State
+	legacyState *state.PreGState
+	state       state.State
 
 	// Set to true once this VM is marked as `Bootstrapped` by the engine
 	bootstrapped bool
@@ -227,7 +228,7 @@ func (vm *VM) Initialize(
 	codec := vm.parser.Codec()
 	vm.Spender = utxo.NewSpender(&vm.clock, codec)
 
-	vm.state, err = state.New(
+	vm.legacyState, err = state.New(
 		vm.db,
 		vm.parser,
 		vm.registerer,
@@ -236,6 +237,8 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return err
 	}
+
+	vm.state = vm.legacyState
 
 	if err := vm.initGenesis(genesisBytes); err != nil {
 		return err
@@ -391,7 +394,7 @@ func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, erro
  */
 
 func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<- common.Message) error {
-	if err := vm.state.InitializeChainState(
+	if err := vm.legacyState.InitializeChainState(
 		stopVertexID,
 		vm.Config.Upgrades.CortinaTime,
 	); err != nil {
@@ -400,13 +403,21 @@ func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<
 
 	stateMigration := vm.StateMigrationFactory.New(
 		vm.ctx.Log,
-		prefixdb.New([]byte("v2"), vm.db),
 		vm.parser,
 		vm.registerer,
 		vm.avmConfig.ChecksumsEnabled,
 	)
 
-	state, err := stateMigration.Migrate(ctx, vm.state)
+	state, err := stateMigration.Migrate(
+		ctx,
+		vm.legacyState,
+		vm.legacyState.DB,
+		vm.legacyState.TxDB,
+		vm.legacyState.BlockIDDB,
+		vm.legacyState.BlockDB,
+		vm.legacyState.SingletonDB,
+		prefixdb.New([]byte("v2"), vm.db),
+	)
 	if err != nil {
 		return fmt.Errorf("failed to migrate state: %w", err)
 	}

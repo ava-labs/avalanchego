@@ -27,38 +27,68 @@ var (
 	_ StateMigration        = (*noStateMigration)(nil)
 	_ StateMigrationFactory = (*GForkStateMigrationFactory)(nil)
 	_ StateMigration        = (*gForkStateMigration)(nil)
+
+	migrationStatusKey         = []byte("status")
+	lastMigratedUTXOKey        = []byte("utxo")
+	lastMigratedTxKey          = []byte("tx")
+	lastMigratedBlockKey       = []byte("block")
+	lastMigratedBlockHeightKey = []byte("block_height")
 )
 
 type StateMigrationFactory interface {
 	New(
 		log logging.Logger,
-		db database.Database,
 		parser block.Parser,
-		registerer prometheus.Registerer,
+		metrics prometheus.Registerer,
 		trackChecksums bool,
 	) StateMigration
 }
 
 type StateMigration interface {
-	Migrate(ctx context.Context, prev state.State) (state.State, error)
+	Migrate(
+		ctx context.Context,
+		prevState state.State,
+		prevBaseDB *versiondb.Database,
+		prevTXDB database.Database,
+		prevBlockIDDB database.Database,
+		prevBlockDB database.Database,
+		prevSingletonDB database.Database,
+		nextDB database.Database,
+	) (state.State, error)
 }
 
 type NoStateMigrationFactory struct{}
 
 func (n NoStateMigrationFactory) New(
-	logging.Logger,
-	database.Database,
-	block.Parser,
-	prometheus.Registerer,
-	bool,
+	_ logging.Logger,
+	parser block.Parser,
+	metrics prometheus.Registerer,
+	trackChecksums bool,
 ) StateMigration {
-	return noStateMigration{}
+	return noStateMigration{
+		parser:         parser,
+		metrics:        metrics,
+		trackChecksums: trackChecksums,
+	}
 }
 
-type noStateMigration struct{}
+type noStateMigration struct {
+	parser         block.Parser
+	metrics        prometheus.Registerer
+	trackChecksums bool
+}
 
-func (noStateMigration) Migrate(_ context.Context, prev state.State) (state.State, error) {
-	return prev, nil
+func (n noStateMigration) Migrate(
+	_ context.Context,
+	prevState state.State,
+	_ *versiondb.Database,
+	_ database.Database,
+	_ database.Database,
+	_ database.Database,
+	_ database.Database,
+	_ database.Database,
+) (state.State, error) {
+	return prevState, nil
 }
 
 type GForkStateMigrationFactory struct {
@@ -67,97 +97,182 @@ type GForkStateMigrationFactory struct {
 
 func (g GForkStateMigrationFactory) New(
 	log logging.Logger,
-	db database.Database,
 	parser block.Parser,
-	registerer prometheus.Registerer,
+	metrics prometheus.Registerer,
 	trackChecksums bool,
 ) StateMigration {
-	return gForkStateMigration{
-		log:             log,
+	return &gForkStateMigration{
 		commitFrequency: g.CommitFrequency,
-		db:              db,
+		log:             log,
 		parser:          parser,
-		metrics:         registerer,
+		metrics:         metrics,
 		trackChecksums:  trackChecksums,
 	}
 }
 
 type gForkStateMigration struct {
-	log             logging.Logger
 	commitFrequency int
-	db              database.Database
+	log             logging.Logger
 	parser          block.Parser
 	metrics         prometheus.Registerer
 	trackChecksums  bool
+
+	updates int
 }
 
-func (g gForkStateMigration) Migrate(
+func (g *gForkStateMigration) Migrate(
 	ctx context.Context,
-	prev state.State,
+	prevUTXOState state.State,
+	prevBaseDB *versiondb.Database,
+	prevTXDB database.Database,
+	prevBlockIDDB database.Database,
+	prevBlockDB database.Database,
+	prevSingletonDB database.Database,
+	nextDB database.Database,
 ) (state.State, error) {
-	next, err := newGForkState(ctx, g.db, g.parser, g.metrics, g.trackChecksums)
+	next, err := newGForkState(ctx, nextDB, g.parser, g.metrics, g.trackChecksums)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize state: %w", err)
 	}
 
-	g.log.Debug("migrating utxos")
-	if err := migrateDB[*avax.UTXO](
-		prev.UTXOs(),
-		func(utxo *avax.UTXO) {
-			next.AddUTXO(utxo)
-			prev.DeleteUTXO(utxo.InputID())
-		},
-		prev,
-		next,
-		g.commitFrequency,
-	); err != nil {
-		return nil, fmt.Errorf("failed to migrate utxos: %w", err)
-	}
-
-	g.log.Debug("migrating txs")
-	if err := migrateDB[*txs.Tx](
-		prev.Txs(),
-		func(tx *txs.Tx) { next.AddTx(tx) },
-		prev,
-		next,
-		g.commitFrequency,
-	); err != nil {
-		return nil, fmt.Errorf("failed to migrate txs: %w", err)
-	}
-
-	g.log.Debug("migrating blocks")
-	if err := migrateDB[block.Block](
-		prev.Blocks(),
-		func(blk block.Block) {
-			next.AddBlock(blk)
-		},
-		prev,
-		next,
-		g.commitFrequency,
-	); err != nil {
-		return nil, fmt.Errorf("failed to migrate blocks: %w", err)
-	}
-
-	g.log.Debug("migrating singletons")
-	next.SetTimestamp(prev.GetTimestamp())
-	ok, err := prev.IsInitialized()
+	done, ok, err := next.getMigrationStatus()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get initialized flag: %w", err)
+		return nil, fmt.Errorf("failed to get state migration status: %w", err)
 	}
+
+	if done {
+		g.log.Debug("skipping state migration")
+		return next, nil
+	}
+
 	if ok {
-		if err := next.SetInitialized(); err != nil {
-			return nil, fmt.Errorf("failed to set initialized flag: %w", err)
+		g.log.Debug("resuming state migration")
+	} else {
+		if err := next.putMigrationStatus(false); err != nil {
+			return nil, fmt.Errorf("failed to put migration status: %w", err)
+		}
+
+		g.log.Debug("starting state migration")
+	}
+
+	// TODO i think we only need one commit call since we share the same
+	// version db
+	// TODO test progress tracking
+	lastMigratedUTXO, _, err := next.getLastMigratedUTXO()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get last migrated UTXO: %w", err)
+	}
+
+	for utxo, err := range prevUTXOState.UTXOs(lastMigratedUTXO) {
+		if err != nil {
+			return nil, fmt.Errorf("failed to get utxo: %w", err)
+		}
+
+		next.AddUTXO(utxo)
+		prevUTXOState.DeleteUTXO(utxo.InputID())
+
+		if err := next.putLastMigratedUTXO(utxo.InputID()); err != nil {
+			return nil, fmt.Errorf("failed to put last migrated utxo: %w", err)
+		}
+
+		ok, err := g.updateAndCommit(next)
+		if err != nil {
+			return nil, fmt.Errorf("failed to commit next state: %w", err)
+		}
+		if ok {
+			if err := prevBaseDB.Commit(); err != nil {
+				return nil, fmt.Errorf("failed to commit previous db: %w", err)
+			}
 		}
 	}
 
-	next.SetLastAccepted(prev.GetLastAccepted())
+	g.log.Debug("migrating txs")
+	var startingTxKey []byte
+	lastMigratedTx, ok, err := next.getLastMigratedTx()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get last migrated tx: %w", err)
+	}
 
-	if err := next.Commit(); err != nil {
-		return nil, fmt.Errorf("failed to commit db: %w", err)
+	if ok {
+		startingTxKey = lastMigratedTx[:]
+	}
+
+	for itr := prevTXDB.NewIteratorWithStart(startingTxKey); itr.Next(); {
+		if err := next.txDB.Put(itr.Key(), itr.Value()); err != nil {
+			return nil, fmt.Errorf("failed to migrate tx: %w", err)
+		}
+
+		_, err := g.updateAndCommit(next)
+		if err != nil {
+			return nil, fmt.Errorf("failed to commit next state: %w", err)
+		}
+
+	}
+
+	g.log.Debug("migrating blocks")
+
+	var startingBlkKey []byte
+	lastMigratedBlk, ok, err := next.getLastMigratedBlock()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get last migrated block: %w", err)
+	}
+
+	if ok {
+		startingBlkKey = lastMigratedBlk[:]
+	}
+
+	for itr := prevBlockDB.NewIteratorWithStart(startingBlkKey); itr.Next(); {
+		if err := next.blockDB.Put(itr.Key(), itr.Value()); err != nil {
+			return nil, fmt.Errorf("failed to migrate block: %w", err)
+		}
+
+	}
+
+	g.log.Debug("migrating height index")
+
+	var startingBlkHeightKey []byte
+	lastMigratedBlkHeight, ok, err := next.getLastMigratedBlockHeight()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get last migrated block height: %w", err)
+	}
+
+	if ok {
+		startingBlkHeightKey = database.PackUInt64(lastMigratedBlkHeight)
+	}
+
+	for itr := prevBlockIDDB.NewIteratorWithStart(startingBlkHeightKey); itr.Next(); {
+		if err := next.blockIDDB.Put(itr.Key(), itr.Value()); err != nil {
+			return nil, fmt.Errorf("failed to migrate block height: %w", err)
+		}
+	}
+
+	g.log.Debug("migrating singletons")
+	for itr := prevSingletonDB.NewIterator(); itr.Next(); {
+		if err := next.singletonDB.Put(itr.Key(), itr.Value()); err != nil {
+			return nil, fmt.Errorf("failed to migrate singleton: %w", err)
+		}
 	}
 
 	g.log.Debug("migration complete")
+
+	if err := next.putMigrationStatus(true); err != nil {
+		return nil, fmt.Errorf("failed to put migration status: %w", err)
+	}
+
 	return next, nil
+}
+
+func (g *gForkStateMigration) updateAndCommit(next state.State) (bool, error) {
+	g.updates++
+	if g.updates%g.commitFrequency == 0 {
+		if err := next.Commit(); err != nil {
+			return false, err
+		}
+
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func newGForkState(
@@ -196,15 +311,19 @@ func newGForkState(
 	// TODO naming?
 	// All other data is stored under the metadata prefix
 	metadataDB := prefixdb.New([]byte("metadata"), versionDB)
+	utxoIndexDB := prefixdb.New([]byte("utxo_index"), metadataDB)
 	txDB := prefixdb.New([]byte("tx"), metadataDB)
 	blockIDDB := prefixdb.New([]byte("block_id"), metadataDB)
 	blockDB := prefixdb.New([]byte("block"), metadataDB)
 	singletonDB := prefixdb.New([]byte("singleton"), metadataDB)
+	// Metadata for migrated keys
+	migrationDB := prefixdb.New([]byte("migration"), metadataDB)
 
 	s, err := state.NewWithFormat(
 		"v2",
 		versionDB,
 		utxoMerkleDB,
+		utxoIndexDB,
 		txDB,
 		blockIDDB,
 		blockDB,
@@ -220,14 +339,131 @@ func newGForkState(
 	return gForkState{
 		state:         s,
 		stateMerkleDB: stateMerkleDB,
+		versionDB:     versionDB,
+		metadataDB:    metadataDB,
+		utxoDB:        utxoMerkleDB,
+		utxoIndexDB:   utxoIndexDB,
+		txDB:          txDB,
+		blockIDDB:     blockIDDB,
+		blockDB:       blockDB,
+		singletonDB:   singletonDB,
+		migrationDB:   migrationDB,
 	}, nil
 }
 
-// TODO decompose this struct into state used/not used during execution
-// TODO move this into state/ once the G fork is completed
+// TODO remove once the G fork is released
 type gForkState struct {
 	state         state.State
 	stateMerkleDB merkledb.MerkleDB
+
+	versionDB   *versiondb.Database
+	metadataDB  database.Database
+	utxoDB      merkledb.MerkleDB
+	utxoIndexDB database.Database
+	txDB        database.Database
+	blockIDDB   database.Database
+	blockDB     database.Database
+	singletonDB database.Database
+	migrationDB database.Database
+}
+
+func (g gForkState) getMigrationStatus() (bool, bool, error) {
+	ok, err := database.GetBool(g.migrationDB, migrationStatusKey)
+	if errors.Is(err, database.ErrNotFound) {
+		return false, false, nil
+	}
+	if err != nil {
+		return false, false, err
+	}
+
+	return ok, true, nil
+}
+
+func (g gForkState) putMigrationStatus(done bool) error {
+	return database.PutBool(g.migrationDB, migrationStatusKey, done)
+}
+
+func (g gForkState) getLastMigratedUTXO() (ids.ID, bool, error) {
+	utxoIDBytes, err := g.migrationDB.Get(lastMigratedUTXOKey)
+	if errors.Is(err, database.ErrNotFound) {
+		return ids.ID{}, false, nil
+	}
+	if err != nil {
+		return ids.ID{}, false, err
+	}
+
+	utxoID, err := ids.ToID(utxoIDBytes)
+	if err != nil {
+		return ids.ID{}, false, err
+	}
+
+	return utxoID, true, nil
+}
+
+func (g gForkState) putLastMigratedUTXO(utxoID ids.ID) error {
+	return g.migrationDB.Put(lastMigratedUTXOKey, utxoID[:])
+}
+
+func (g gForkState) getLastMigratedTx() (ids.ID, bool, error) {
+	txIDBytes, err := g.migrationDB.Get(lastMigratedTxKey)
+	if errors.Is(err, database.ErrNotFound) {
+		return ids.ID{}, false, nil
+	}
+	if err != nil {
+		return ids.ID{}, false, err
+	}
+
+	txID, err := ids.ToID(txIDBytes)
+	if err != nil {
+		return ids.ID{}, false, err
+	}
+
+	return txID, true, nil
+}
+
+func (g gForkState) putLastMigratedTx(txID ids.ID) error {
+	if err := g.migrationDB.Put(lastMigratedTxKey, txID[:]); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (g gForkState) getLastMigratedBlock() (ids.ID, bool, error) {
+	blkIDBytes, err := g.migrationDB.Get(lastMigratedBlockKey)
+	if errors.Is(err, database.ErrNotFound) {
+		return ids.ID{}, false, nil
+	}
+	if err != nil {
+		return ids.ID{}, false, err
+	}
+
+	blkID, err := ids.ToID(blkIDBytes)
+	if err != nil {
+		return ids.ID{}, false, err
+	}
+
+	return blkID, true, nil
+}
+
+func (g gForkState) putLastMigratedBlock(blkID ids.ID) error {
+	return g.migrationDB.Put(lastMigratedBlockKey, blkID[:])
+}
+
+func (g gForkState) getLastMigratedBlockHeight() (uint64, bool, error) {
+	height, err := database.GetUInt64(g.migrationDB, lastMigratedBlockHeightKey)
+	if errors.Is(err, database.ErrNotFound) {
+		return 0, false, nil
+	}
+	if err != nil {
+		return 0, false, err
+	}
+
+	return height, true, nil
+}
+
+func (g gForkState) putLastMigratedBlockHeight(height uint64) error {
+	return g.migrationDB.Put(lastMigratedBlockHeightKey, database.PackUInt64(height))
 }
 
 func (g gForkState) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
@@ -286,8 +522,8 @@ func (g gForkState) UTXOIDs(
 	return g.state.UTXOIDs(addr, previous, limit)
 }
 
-func (g gForkState) UTXOs() iter.Seq2[*avax.UTXO, error] {
-	return g.state.UTXOs()
+func (g gForkState) UTXOs(startingUTXOID ids.ID) iter.Seq2[*avax.UTXO, error] {
+	return g.state.UTXOs(startingUTXOID)
 }
 
 func (g gForkState) IsInitialized() (bool, error) {
@@ -323,55 +559,6 @@ func (g gForkState) Checksum(ctx context.Context) (ids.ID, error) {
 	return stateRoot, nil
 }
 
-func (g gForkState) Txs() iter.Seq2[*txs.Tx, error] {
-	return g.state.Txs()
-}
-
-func (g gForkState) Blocks() iter.Seq2[block.Block, error] {
-	return g.state.Blocks()
-}
-
 func (g gForkState) Close() error {
 	return g.state.Close()
-}
-
-func migrateDB[T any](
-	seq iter.Seq2[T, error],
-	accept func(t T),
-	prev state.State,
-	next state.State,
-	freq int,
-) error {
-	i := 0
-	for e, err := range seq {
-		if err != nil {
-			return err
-		}
-
-		accept(e)
-		i++
-
-		if i%freq != 0 {
-			continue
-		}
-
-		if err := next.Commit(); err != nil {
-			return fmt.Errorf("failed to commit db: %w", err)
-		}
-
-		if err := prev.Commit(); err != nil {
-			return fmt.Errorf("failed to commit db: %w", err)
-		}
-
-	}
-
-	if err := next.Commit(); err != nil {
-		return fmt.Errorf("failed to commit db: %w", err)
-	}
-
-	if err := prev.Commit(); err != nil {
-		return fmt.Errorf("failed to commit db: %w", err)
-	}
-
-	return nil
 }

@@ -44,7 +44,8 @@ type UTXOReader interface {
 	// Returns at most [limit] IDs.
 	// TODO replace with 1.23 iterator
 	UTXOIDs(addr []byte, previous ids.ID, limit int) ([]ids.ID, error)
-	UTXOs() iter.Seq2[*UTXO, error]
+	// UTXOs returns an iterator starting at startingUTXOID
+	UTXOs(startingUTXOID ids.ID) iter.Seq2[*UTXO, error]
 }
 
 // UTXOGetter is a thin wrapper around a database to provide fetching of a UTXO.
@@ -228,6 +229,7 @@ func (s *utxoState) DeleteUTXO(utxoID ids.ID) error {
 	return nil
 }
 
+// TODO add tests on this for migration
 func (s *utxoState) UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
 	indexList := s.getIndexDB(addr)
 	iter := indexList.NewIteratorWithStart(start[:])
@@ -249,9 +251,17 @@ func (s *utxoState) UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, err
 	return utxoIDs, iter.Error()
 }
 
-func (s *utxoState) UTXOs() iter.Seq2[*UTXO, error] {
+func (s *utxoState) UTXOs(startingUTXOID ids.ID) iter.Seq2[*UTXO, error] {
 	return func(yield func(*UTXO, error) bool) {
-		itr := s.utxoDB.NewIterator()
+		var itr database.Iterator
+
+		// TODO hacky
+		if startingUTXOID != ids.Empty {
+			itr = s.utxoDB.NewIteratorWithStart(startingUTXOID[:])
+		} else {
+			itr = s.utxoDB.NewIterator()
+		}
+
 		defer itr.Release()
 
 		for itr.Next() {

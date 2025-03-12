@@ -42,7 +42,7 @@ var (
 	timestampKey     = []byte{0x01}
 	lastAcceptedKey  = []byte{0x02}
 
-	_ State = (*state)(nil)
+	_ State = (*PreGState)(nil)
 )
 
 type ReadOnlyChain interface {
@@ -81,6 +81,7 @@ type State interface {
 	//
 	// Invariant: After the chain is linearized, this function is expected to be
 	// called during startup.
+	// TODO make sure we call this post-migration
 	InitializeChainState(stopVertexID ids.ID, genesisTimestamp time.Time) error
 
 	// Discard uncommitted changes to the database.
@@ -95,10 +96,6 @@ type State interface {
 
 	// Checksum returns the current state checksum.
 	Checksum(ctx context.Context) (ids.ID, error)
-
-	UTXOs() iter.Seq2[*avax.UTXO, error]
-	Txs() iter.Seq2[*txs.Tx, error]
-	Blocks() iter.Seq2[block.Block, error]
 
 	Close() error
 }
@@ -118,30 +115,32 @@ type State interface {
  *   |-- timestampKey -> timestamp
  *   '-- lastAcceptedKey -> lastAccepted
  */
-type state struct {
+type PreGState struct {
 	parser block.Parser
-	db     *versiondb.Database
+	DB     *versiondb.Database
 
 	modifiedUTXOs map[ids.ID]*avax.UTXO // map of modified UTXOID -> *UTXO if the UTXO is nil, it has been removed
-	utxoDB        database.Database
-	utxoState     avax.UTXOState
+	// TODO un-export databases post-migration
+	UTXODB      database.Database
+	UTXOIndexDB database.Database
+	utxoState   avax.UTXOState
 
 	addedTxs map[ids.ID]*txs.Tx            // map of txID -> *txs.Tx
 	txCache  cache.Cacher[ids.ID, *txs.Tx] // cache of txID -> *txs.Tx. If the entry is nil, it is not in the database
-	txDB     database.Database
+	TxDB     database.Database
 
 	addedBlockIDs map[uint64]ids.ID            // map of height -> blockID
 	blockIDCache  cache.Cacher[uint64, ids.ID] // cache of height -> blockID. If the entry is ids.Empty, it is not in the database
-	blockIDDB     database.Database
+	BlockIDDB     database.Database
 
 	addedBlocks map[ids.ID]block.Block            // map of blockID -> Block
 	blockCache  cache.Cacher[ids.ID, block.Block] // cache of blockID -> Block. If the entry is nil, it is not in the database
-	blockDB     database.Database
+	BlockDB     database.Database
 
 	// [lastAccepted] is the most recently accepted block.
 	lastAccepted, persistedLastAccepted ids.ID
 	timestamp, persistedTimestamp       time.Time
-	singletonDB                         database.Database
+	SingletonDB                         database.Database
 }
 
 func New(
@@ -149,7 +148,7 @@ func New(
 	parser block.Parser,
 	metrics prometheus.Registerer,
 	trackChecksums bool,
-) (State, error) {
+) (*PreGState, error) {
 	utxoDB := prefixdb.New(utxoPrefix, db)
 	txDB := prefixdb.New(txPrefix, db)
 	blockIDDB := prefixdb.New(blockIDPrefix, db)
@@ -158,7 +157,8 @@ func New(
 	return NewWithFormat(
 		"",
 		db,
-		utxoDB,
+		prefixdb.New(utxoPrefix, utxoDB),
+		prefixdb.New(indexPrefix, utxoDB),
 		txDB,
 		blockIDDB,
 		blockDB,
@@ -171,8 +171,9 @@ func New(
 
 func NewWithFormat(
 	namespace string,
-	db *versiondb.Database,
+	baseDB *versiondb.Database,
 	utxoDB database.Database,
+	utxoIndexDB database.Database,
 	txDB database.Database,
 	blockIDDB database.Database,
 	blockDB database.Database,
@@ -180,7 +181,7 @@ func NewWithFormat(
 	parser block.Parser,
 	metrics prometheus.Registerer,
 	trackChecksums bool,
-) (*state, error) {
+) (*PreGState, error) {
 	txCache, err := metercacher.New[ids.ID, *txs.Tx](
 		metric.AppendNamespace(namespace, "tx_cache"),
 		metrics,
@@ -210,8 +211,8 @@ func NewWithFormat(
 
 	utxoState, err := avax.NewMeteredUTXOState(
 		namespace,
-		prefixdb.New(utxoPrefix, utxoDB),
-		prefixdb.New(indexPrefix, utxoDB),
+		utxoDB,
+		utxoIndexDB,
 		parser.Codec(),
 		metrics,
 		trackChecksums,
@@ -220,31 +221,32 @@ func NewWithFormat(
 		return nil, err
 	}
 
-	return &state{
+	return &PreGState{
 		parser: parser,
-		db:     db,
+		DB:     baseDB,
 
 		modifiedUTXOs: make(map[ids.ID]*avax.UTXO),
-		utxoDB:        utxoDB,
+		UTXODB:        utxoDB,
+		UTXOIndexDB:   utxoIndexDB,
 		utxoState:     utxoState,
 
 		addedTxs: make(map[ids.ID]*txs.Tx),
 		txCache:  txCache,
-		txDB:     txDB,
+		TxDB:     txDB,
 
 		addedBlockIDs: make(map[uint64]ids.ID),
 		blockIDCache:  blockIDCache,
-		blockIDDB:     blockIDDB,
+		BlockIDDB:     blockIDDB,
 
 		addedBlocks: make(map[ids.ID]block.Block),
 		blockCache:  blockCache,
-		blockDB:     blockDB,
+		BlockDB:     blockDB,
 
-		singletonDB: singletonDB,
+		SingletonDB: singletonDB,
 	}, nil
 }
 
-func (s *state) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
+func (s *PreGState) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
 	if utxo, exists := s.modifiedUTXOs[utxoID]; exists {
 		if utxo == nil {
 			return nil, database.ErrNotFound
@@ -254,19 +256,19 @@ func (s *state) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
 	return s.utxoState.GetUTXO(utxoID)
 }
 
-func (s *state) UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
+func (s *PreGState) UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
 	return s.utxoState.UTXOIDs(addr, start, limit)
 }
 
-func (s *state) AddUTXO(utxo *avax.UTXO) {
+func (s *PreGState) AddUTXO(utxo *avax.UTXO) {
 	s.modifiedUTXOs[utxo.InputID()] = utxo
 }
 
-func (s *state) DeleteUTXO(utxoID ids.ID) {
+func (s *PreGState) DeleteUTXO(utxoID ids.ID) {
 	s.modifiedUTXOs[utxoID] = nil
 }
 
-func (s *state) GetTx(txID ids.ID) (*txs.Tx, error) {
+func (s *PreGState) GetTx(txID ids.ID) (*txs.Tx, error) {
 	if tx, exists := s.addedTxs[txID]; exists {
 		return tx, nil
 	}
@@ -277,7 +279,7 @@ func (s *state) GetTx(txID ids.ID) (*txs.Tx, error) {
 		return tx, nil
 	}
 
-	txBytes, err := s.txDB.Get(txID[:])
+	txBytes, err := s.TxDB.Get(txID[:])
 	if err == database.ErrNotFound {
 		s.txCache.Put(txID, nil)
 		return nil, database.ErrNotFound
@@ -296,12 +298,12 @@ func (s *state) GetTx(txID ids.ID) (*txs.Tx, error) {
 	return tx, nil
 }
 
-func (s *state) AddTx(tx *txs.Tx) {
+func (s *PreGState) AddTx(tx *txs.Tx) {
 	txID := tx.ID()
 	s.addedTxs[txID] = tx
 }
 
-func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
+func (s *PreGState) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	if blkID, exists := s.addedBlockIDs[height]; exists {
 		return blkID, nil
 	}
@@ -315,7 +317,7 @@ func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 
 	heightKey := database.PackUInt64(height)
 
-	blkID, err := database.GetID(s.blockIDDB, heightKey)
+	blkID, err := database.GetID(s.BlockIDDB, heightKey)
 	if err == database.ErrNotFound {
 		s.blockIDCache.Put(height, ids.Empty)
 		return ids.Empty, database.ErrNotFound
@@ -328,7 +330,7 @@ func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	return blkID, nil
 }
 
-func (s *state) GetBlock(blkID ids.ID) (block.Block, error) {
+func (s *PreGState) GetBlock(blkID ids.ID) (block.Block, error) {
 	if blk, exists := s.addedBlocks[blkID]; exists {
 		return blk, nil
 	}
@@ -340,7 +342,7 @@ func (s *state) GetBlock(blkID ids.ID) (block.Block, error) {
 		return blk, nil
 	}
 
-	blkBytes, err := s.blockDB.Get(blkID[:])
+	blkBytes, err := s.BlockDB.Get(blkID[:])
 	if err == database.ErrNotFound {
 		s.blockCache.Put(blkID, nil)
 		return nil, database.ErrNotFound
@@ -358,14 +360,14 @@ func (s *state) GetBlock(blkID ids.ID) (block.Block, error) {
 	return blk, nil
 }
 
-func (s *state) AddBlock(block block.Block) {
+func (s *PreGState) AddBlock(block block.Block) {
 	blkID := block.ID()
 	s.addedBlockIDs[block.Height()] = blkID
 	s.addedBlocks[blkID] = block
 }
 
-func (s *state) InitializeChainState(stopVertexID ids.ID, genesisTimestamp time.Time) error {
-	lastAccepted, err := database.GetID(s.singletonDB, lastAcceptedKey)
+func (s *PreGState) InitializeChainState(stopVertexID ids.ID, genesisTimestamp time.Time) error {
+	lastAccepted, err := database.GetID(s.SingletonDB, lastAcceptedKey)
 	if err == database.ErrNotFound {
 		return s.initializeChainState(stopVertexID, genesisTimestamp)
 	} else if err != nil {
@@ -373,12 +375,12 @@ func (s *state) InitializeChainState(stopVertexID ids.ID, genesisTimestamp time.
 	}
 	s.lastAccepted = lastAccepted
 	s.persistedLastAccepted = lastAccepted
-	s.timestamp, err = database.GetTimestamp(s.singletonDB, timestampKey)
+	s.timestamp, err = database.GetTimestamp(s.SingletonDB, timestampKey)
 	s.persistedTimestamp = s.timestamp
 	return err
 }
 
-func (s *state) initializeChainState(stopVertexID ids.ID, genesisTimestamp time.Time) error {
+func (s *PreGState) initializeChainState(stopVertexID ids.ID, genesisTimestamp time.Time) error {
 	genesis, err := block.NewStandardBlock(
 		stopVertexID,
 		0,
@@ -396,31 +398,31 @@ func (s *state) initializeChainState(stopVertexID ids.ID, genesisTimestamp time.
 	return s.Commit()
 }
 
-func (s *state) IsInitialized() (bool, error) {
-	return s.singletonDB.Has(isInitializedKey)
+func (s *PreGState) IsInitialized() (bool, error) {
+	return s.SingletonDB.Has(isInitializedKey)
 }
 
-func (s *state) SetInitialized() error {
-	return s.singletonDB.Put(isInitializedKey, nil)
+func (s *PreGState) SetInitialized() error {
+	return s.SingletonDB.Put(isInitializedKey, nil)
 }
 
-func (s *state) GetLastAccepted() ids.ID {
+func (s *PreGState) GetLastAccepted() ids.ID {
 	return s.lastAccepted
 }
 
-func (s *state) SetLastAccepted(lastAccepted ids.ID) {
+func (s *PreGState) SetLastAccepted(lastAccepted ids.ID) {
 	s.lastAccepted = lastAccepted
 }
 
-func (s *state) GetTimestamp() time.Time {
+func (s *PreGState) GetTimestamp() time.Time {
 	return s.timestamp
 }
 
-func (s *state) SetTimestamp(t time.Time) {
+func (s *PreGState) SetTimestamp(t time.Time) {
 	s.timestamp = t
 }
 
-func (s *state) Commit() error {
+func (s *PreGState) Commit() error {
 	defer s.Abort()
 	batch, err := s.CommitBatch()
 	if err != nil {
@@ -429,66 +431,34 @@ func (s *state) Commit() error {
 	return batch.Write()
 }
 
-func (s *state) Abort() {
-	s.db.Abort()
+func (s *PreGState) Abort() {
+	s.DB.Abort()
 }
 
-func (s *state) CommitBatch() (database.Batch, error) {
+func (s *PreGState) CommitBatch() (database.Batch, error) {
 	if err := s.write(); err != nil {
 		return nil, err
 	}
-	return s.db.CommitBatch()
+	return s.DB.CommitBatch()
 }
 
-func (s *state) UTXOs() iter.Seq2[*avax.UTXO, error] {
-	return s.utxoState.UTXOs()
+func (s *PreGState) UTXOs(startingUTXOID ids.ID) iter.Seq2[*avax.UTXO, error] {
+	return s.utxoState.UTXOs(startingUTXOID)
 }
 
-func (s *state) Txs() iter.Seq2[*txs.Tx, error] {
-	return func(yield func(*txs.Tx, error) bool) {
-		itr := s.txDB.NewIterator()
-		defer itr.Release()
-
-		for itr.Next() {
-			tx, err := s.parser.ParseGenesisTx(itr.Value())
-			if err != nil {
-				return
-			}
-
-			if !yield(tx, errors.Join(err, itr.Error())) {
-				return
-			}
-		}
-	}
-}
-
-func (s *state) Blocks() iter.Seq2[block.Block, error] {
-	return func(yield func(block.Block, error) bool) {
-		itr := s.blockDB.NewIterator()
-		defer itr.Release()
-
-		for itr.Next() {
-			//TODO error handling
-			blk, err := s.parser.ParseBlock(itr.Value())
-			if !yield(blk, errors.Join(err, itr.Error())) {
-				return
-			}
-		}
-	}
-}
-
-func (s *state) Close() error {
+func (s *PreGState) Close() error {
 	return errors.Join(
-		s.utxoDB.Close(),
-		s.txDB.Close(),
-		s.blockIDDB.Close(),
-		s.blockDB.Close(),
-		s.singletonDB.Close(),
-		s.db.Close(),
+		s.UTXODB.Close(),
+		s.UTXOIndexDB.Close(),
+		s.TxDB.Close(),
+		s.BlockIDDB.Close(),
+		s.BlockDB.Close(),
+		s.SingletonDB.Close(),
+		s.DB.Close(),
 	)
 }
 
-func (s *state) write() error {
+func (s *PreGState) write() error {
 	return errors.Join(
 		s.writeUTXOs(),
 		s.writeTxs(),
@@ -498,7 +468,7 @@ func (s *state) write() error {
 	)
 }
 
-func (s *state) writeUTXOs() error {
+func (s *PreGState) writeUTXOs() error {
 	for utxoID, utxo := range s.modifiedUTXOs {
 		delete(s.modifiedUTXOs, utxoID)
 
@@ -515,54 +485,54 @@ func (s *state) writeUTXOs() error {
 	return nil
 }
 
-func (s *state) writeTxs() error {
+func (s *PreGState) writeTxs() error {
 	for txID, tx := range s.addedTxs {
 		txBytes := tx.Bytes()
 
 		delete(s.addedTxs, txID)
 		s.txCache.Put(txID, tx)
-		if err := s.txDB.Put(txID[:], txBytes); err != nil {
+		if err := s.TxDB.Put(txID[:], txBytes); err != nil {
 			return fmt.Errorf("failed to add tx: %w", err)
 		}
 	}
 	return nil
 }
 
-func (s *state) writeBlockIDs() error {
+func (s *PreGState) writeBlockIDs() error {
 	for height, blkID := range s.addedBlockIDs {
 		heightKey := database.PackUInt64(height)
 
 		delete(s.addedBlockIDs, height)
 		s.blockIDCache.Put(height, blkID)
-		if err := database.PutID(s.blockIDDB, heightKey, blkID); err != nil {
+		if err := database.PutID(s.BlockIDDB, heightKey, blkID); err != nil {
 			return fmt.Errorf("failed to add blockID: %w", err)
 		}
 	}
 	return nil
 }
 
-func (s *state) writeBlocks() error {
+func (s *PreGState) writeBlocks() error {
 	for blkID, blk := range s.addedBlocks {
 		blkBytes := blk.Bytes()
 
 		delete(s.addedBlocks, blkID)
 		s.blockCache.Put(blkID, blk)
-		if err := s.blockDB.Put(blkID[:], blkBytes); err != nil {
+		if err := s.BlockDB.Put(blkID[:], blkBytes); err != nil {
 			return fmt.Errorf("failed to add block: %w", err)
 		}
 	}
 	return nil
 }
 
-func (s *state) writeMetadata() error {
+func (s *PreGState) writeMetadata() error {
 	if !s.persistedTimestamp.Equal(s.timestamp) {
-		if err := database.PutTimestamp(s.singletonDB, timestampKey, s.timestamp); err != nil {
+		if err := database.PutTimestamp(s.SingletonDB, timestampKey, s.timestamp); err != nil {
 			return fmt.Errorf("failed to write timestamp: %w", err)
 		}
 		s.persistedTimestamp = s.timestamp
 	}
 	if s.persistedLastAccepted != s.lastAccepted {
-		if err := database.PutID(s.singletonDB, lastAcceptedKey, s.lastAccepted); err != nil {
+		if err := database.PutID(s.SingletonDB, lastAcceptedKey, s.lastAccepted); err != nil {
 			return fmt.Errorf("failed to write last accepted: %w", err)
 		}
 		s.persistedLastAccepted = s.lastAccepted
@@ -570,6 +540,6 @@ func (s *state) writeMetadata() error {
 	return nil
 }
 
-func (s *state) Checksum(context.Context) (ids.ID, error) {
+func (s *PreGState) Checksum(context.Context) (ids.ID, error) {
 	return s.utxoState.Checksum(), nil
 }

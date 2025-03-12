@@ -95,20 +95,6 @@ func (mr *StateMockRecorder) AddUTXO(utxo any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddUTXO", reflect.TypeOf((*State)(nil).AddUTXO), utxo)
 }
 
-// Blocks mocks base method.
-func (m *State) Blocks() iter.Seq2[block.Block, error] {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Blocks")
-	ret0, _ := ret[0].(iter.Seq2[block.Block, error])
-	return ret0
-}
-
-// Blocks indicates an expected call of Blocks.
-func (mr *StateMockRecorder) Blocks() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Blocks", reflect.TypeOf((*State)(nil).Blocks))
-}
-
 // Checksum mocks base method.
 func (m *State) Checksum(ctx context.Context) (ids.ID, error) {
 	m.ctrl.T.Helper()
@@ -334,20 +320,6 @@ func (mr *StateMockRecorder) SetTimestamp(t any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTimestamp", reflect.TypeOf((*State)(nil).SetTimestamp), t)
 }
 
-// Txs mocks base method.
-func (m *State) Txs() iter.Seq2[*txs.Tx, error] {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Txs")
-	ret0, _ := ret[0].(iter.Seq2[*txs.Tx, error])
-	return ret0
-}
-
-// Txs indicates an expected call of Txs.
-func (mr *StateMockRecorder) Txs() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Txs", reflect.TypeOf((*State)(nil).Txs))
-}
-
 // UTXOIDs mocks base method.
 func (m *State) UTXOIDs(addr []byte, previous ids.ID, limit int) ([]ids.ID, error) {
 	m.ctrl.T.Helper()
@@ -364,15 +336,15 @@ func (mr *StateMockRecorder) UTXOIDs(addr, previous, limit any) *gomock.Call {
 }
 
 // UTXOs mocks base method.
-func (m *State) UTXOs() iter.Seq2[*avax.UTXO, error] {
+func (m *State) UTXOs(startingUTXOID ids.ID) iter.Seq2[*avax.UTXO, error] {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UTXOs")
+	ret := m.ctrl.Call(m, "UTXOs", startingUTXOID)
 	ret0, _ := ret[0].(iter.Seq2[*avax.UTXO, error])
 	return ret0
 }
 
 // UTXOs indicates an expected call of UTXOs.
-func (mr *StateMockRecorder) UTXOs() *gomock.Call {
+func (mr *StateMockRecorder) UTXOs(startingUTXOID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UTXOs", reflect.TypeOf((*State)(nil).UTXOs))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UTXOs", reflect.TypeOf((*State)(nil).UTXOs), startingUTXOID)
 }
