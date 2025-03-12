@@ -1388,7 +1388,7 @@ func TestUnlockDeposit(t *testing.T) {
 	}
 }
 
-func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
+func TestVerifyUnlockDepositedUTXOsBeforeCairo(t *testing.T) {
 	tx := &dummyUnsignedTx{txs.BaseTx{}}
 	tx.SetBytes([]byte{0})
 	owner1, cred1 := generateOwnersAndSig(t, test.Keys[0], tx)
@@ -1727,7 +1727,7 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			err := defaultCaminoHandler(t).VerifyUnlockDepositedUTXOs(
+			err := defaultCaminoHandler(t).verifyUnlockDepositedUTXOsBeforeCairo(
 				tt.handlerState(ctrl),
 				tt.args.tx,
 				tt.args.utxos,
@@ -1737,6 +1737,332 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 				tt.args.burnedAmount,
 				tt.args.assetID,
 				tt.args.verifyCreds,
+			)
+			require.ErrorIs(t, err, tt.expectedErr)
+		})
+	}
+}
+
+func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
+	tx := &dummyUnsignedTx{txs.BaseTx{}}
+	tx.SetBytes([]byte{0})
+	owner1, cred1 := generateOwnersAndSig(t, test.Keys[0], tx)
+	owner2, cred2 := generateOwnersAndSig(t, test.Keys[1], tx)
+	depositTxID1 := ids.ID{1}
+	depositTxID2 := ids.ID{2}
+	bondTxID1 := ids.ID{3}
+	bondTxID2 := ids.ID{4}
+
+	noMsigState := func(ctrl *gomock.Controller) *state.MockChain {
+		s := state.NewMockChain(ctrl)
+		s.EXPECT().GetMultisigAlias(gomock.Any()).Return(nil, database.ErrNotFound).AnyTimes()
+		return s
+	}
+
+	type args struct {
+		tx           txs.UnsignedTx
+		utxos        []*avax.UTXO
+		ins          []*avax.TransferableInput
+		outs         []*avax.TransferableOutput
+		creds        []verify.Verifiable
+		amountToBurn uint64
+		assetID      ids.ID
+	}
+	tests := map[string]struct {
+		handlerState func(ctrl *gomock.Controller) *state.MockChain
+		args         args
+		expectedErr  error
+	}{
+		"Number of inputs-utxos mismatch": {
+			handlerState: noMsigState,
+			args: args{
+				utxos: []*avax.UTXO{{}, {}},
+				ins:   []*avax.TransferableInput{{}},
+			},
+			expectedErr: errInputsUTXOsMismatch,
+		},
+		"Number of inputs-credentials mismatch": {
+			handlerState: noMsigState,
+			args: args{
+				utxos: []*avax.UTXO{{}},
+				ins:   []*avax.TransferableInput{{}},
+				creds: []verify.Verifiable{cred1, cred1},
+			},
+			expectedErr: errInputsCredentialsMismatch,
+		},
+		"Bad credential": {
+			handlerState: noMsigState,
+			args: args{
+				utxos: []*avax.UTXO{{}},
+				ins:   []*avax.TransferableInput{{}},
+				creds: []verify.Verifiable{(*secp256k1fx.Credential)(nil)},
+			},
+			expectedErr: errBadCredentials,
+		},
+		"UTXO AssetID mismatch": {
+			handlerState: noMsigState,
+			args: args{
+				utxos: []*avax.UTXO{
+					generate.UTXO(ids.ID{100}, test.OtherAssetID, 1, owner1, depositTxID1, ids.Empty, true),
+				},
+				ins: []*avax.TransferableInput{
+					generate.In(test.AVAXAssetID, 1, depositTxID1, ids.Empty, []uint32{0}),
+				},
+				creds:   []verify.Verifiable{cred1},
+				assetID: test.AVAXAssetID,
+			},
+			expectedErr: errAssetIDMismatch,
+		},
+		"Input AssetID mismatch": {
+			handlerState: noMsigState,
+			args: args{
+				utxos: []*avax.UTXO{
+					generate.UTXO(ids.ID{100}, test.AVAXAssetID, 1, owner1, depositTxID1, ids.Empty, true),
+				},
+				ins: []*avax.TransferableInput{
+					generate.In(test.OtherAssetID, 1, depositTxID1, ids.Empty, []uint32{0}),
+				},
+				creds:   []verify.Verifiable{cred1},
+				assetID: test.AVAXAssetID,
+			},
+			expectedErr: errAssetIDMismatch,
+		},
+		"UTXO locked, but not deposited (e.g. just bonded)": {
+			handlerState: noMsigState,
+			args: args{
+				utxos: []*avax.UTXO{
+					generate.UTXO(ids.ID{100}, test.AVAXAssetID, 1, owner1, ids.Empty, bondTxID1, true),
+				},
+				ins: []*avax.TransferableInput{
+					generate.In(test.AVAXAssetID, 1, ids.Empty, bondTxID1, []uint32{0}),
+				},
+				creds:   []verify.Verifiable{cred1},
+				assetID: test.AVAXAssetID,
+			},
+			expectedErr: errUnlockingUnlockedUTXO,
+		},
+		"Input and utxo lock IDs mismatch: different depositTxIDs": {
+			handlerState: noMsigState,
+			args: args{
+				utxos: []*avax.UTXO{
+					generate.UTXO(depositTxID1, test.AVAXAssetID, 1, owner1, depositTxID1, ids.Empty, true),
+				},
+				ins: []*avax.TransferableInput{
+					generate.In(test.AVAXAssetID, 1, depositTxID2, ids.Empty, []uint32{0}),
+				},
+				creds:   []verify.Verifiable{cred1},
+				assetID: test.AVAXAssetID,
+			},
+			expectedErr: errLockIDsMismatch,
+		},
+		"Input and utxo lock IDs mismatch: different bondTxIDs": {
+			handlerState: noMsigState,
+			args: args{
+				utxos: []*avax.UTXO{
+					generate.UTXO(depositTxID1, test.AVAXAssetID, 1, owner1, depositTxID1, bondTxID1, true),
+				},
+				ins: []*avax.TransferableInput{
+					generate.In(test.AVAXAssetID, 1, depositTxID1, bondTxID2, []uint32{0}),
+				},
+				creds:   []verify.Verifiable{cred1},
+				assetID: test.AVAXAssetID,
+			},
+			expectedErr: errLockIDsMismatch,
+		},
+		"Input and utxo lock IDs mismatch: utxo is locked, but input isn't locked": {
+			handlerState: noMsigState,
+			args: args{
+				utxos: []*avax.UTXO{
+					generate.UTXO(ids.ID{100}, test.AVAXAssetID, 1, owner1, depositTxID1, ids.Empty, true),
+				},
+				ins: []*avax.TransferableInput{
+					generate.In(test.AVAXAssetID, 1, ids.Empty, ids.Empty, []uint32{0}),
+				},
+				creds:   []verify.Verifiable{cred1},
+				assetID: test.AVAXAssetID,
+			},
+			expectedErr: errLockedFundsNotMarkedAsLocked,
+		},
+		"Input and utxo lock IDs mismatch: utxo isn't locked, but input is locked": {
+			handlerState: noMsigState,
+			args: args{
+				utxos: []*avax.UTXO{
+					generate.UTXO(depositTxID1, test.AVAXAssetID, 1, owner1, ids.Empty, ids.Empty, true),
+				},
+				ins: []*avax.TransferableInput{
+					generate.In(test.AVAXAssetID, 1, depositTxID1, ids.Empty, []uint32{0}),
+				},
+				creds:   []verify.Verifiable{cred1},
+				assetID: test.AVAXAssetID,
+			},
+			expectedErr: errLockIDsMismatch,
+		},
+		"Wrong credential": {
+			handlerState: noMsigState,
+			args: args{
+				tx: tx,
+				utxos: []*avax.UTXO{
+					generate.UTXO(ids.ID{100}, test.AVAXAssetID, 5, owner1, depositTxID1, ids.Empty, true),
+				},
+				ins: []*avax.TransferableInput{
+					generate.In(test.AVAXAssetID, 5, depositTxID1, ids.Empty, []uint32{0}),
+				},
+				outs: []*avax.TransferableOutput{
+					generate.Out(test.AVAXAssetID, 5, owner1, ids.Empty, ids.Empty),
+				},
+				creds:   []verify.Verifiable{cred2},
+				assetID: test.AVAXAssetID,
+			},
+			expectedErr: errCantSpend,
+		},
+		"Not burned enough": {
+			handlerState: noMsigState,
+			args: args{
+				tx: tx,
+				utxos: []*avax.UTXO{
+					generate.UTXO(ids.ID{100}, test.AVAXAssetID, 1, owner1, ids.Empty, ids.Empty, true),
+				},
+				ins: []*avax.TransferableInput{
+					generate.In(test.AVAXAssetID, 1, ids.Empty, ids.Empty, []uint32{0}),
+				},
+				amountToBurn: 2,
+				creds:        []verify.Verifiable{cred1},
+				assetID:      test.AVAXAssetID,
+			},
+			expectedErr: errNotBurnedEnough,
+		},
+		"Produced unlocked more, than consumed deposited or unlocked": {
+			handlerState: noMsigState,
+			args: args{
+				tx: tx,
+				utxos: []*avax.UTXO{
+					generate.UTXO(ids.ID{100}, test.AVAXAssetID, 1, owner1, depositTxID1, ids.Empty, true),
+				},
+				ins: []*avax.TransferableInput{
+					generate.In(test.AVAXAssetID, 1, depositTxID1, ids.Empty, []uint32{0}),
+				},
+				outs: []*avax.TransferableOutput{
+					generate.Out(test.AVAXAssetID, 2, owner1, ids.Empty, ids.Empty),
+				},
+				creds:   []verify.Verifiable{cred1},
+				assetID: test.AVAXAssetID,
+			},
+			expectedErr: errWrongProducedAmount,
+		},
+		"Consumed-produced amount mismatch (per lockIDs)": {
+			handlerState: noMsigState,
+			args: args{
+				tx: tx,
+				utxos: []*avax.UTXO{
+					generate.UTXO(ids.ID{100}, test.AVAXAssetID, 1, owner1, depositTxID1, ids.Empty, true),
+				},
+				ins: []*avax.TransferableInput{
+					generate.In(test.AVAXAssetID, 1, depositTxID1, ids.Empty, []uint32{0}),
+				},
+				outs: []*avax.TransferableOutput{
+					generate.Out(test.AVAXAssetID, 1, owner1, ids.Empty, bondTxID1),
+				},
+				creds:   []verify.Verifiable{cred1},
+				assetID: test.AVAXAssetID,
+			},
+			expectedErr: errWrongProducedAmount,
+		},
+		"Consumed-produced amount mismatch (per ownerID, e.g. produced locked for different owner)": {
+			handlerState: noMsigState,
+			args: args{
+				tx: tx,
+				utxos: []*avax.UTXO{
+					generate.UTXO(ids.ID{100}, test.AVAXAssetID, 1, owner1, depositTxID1, bondTxID1, true),
+				},
+				ins: []*avax.TransferableInput{
+					generate.In(test.AVAXAssetID, 1, depositTxID1, bondTxID1, []uint32{0}),
+				},
+				outs: []*avax.TransferableOutput{
+					generate.Out(test.AVAXAssetID, 1, owner2, ids.Empty, bondTxID1),
+				},
+				creds:   []verify.Verifiable{cred1},
+				assetID: test.AVAXAssetID,
+			},
+			expectedErr: errWrongProducedAmount,
+		},
+		"OK": {
+			handlerState: noMsigState,
+			args: args{
+				tx: tx,
+				utxos: []*avax.UTXO{
+					generate.UTXO(ids.ID{100}, test.AVAXAssetID, 5, owner1, depositTxID1, ids.Empty, true),
+					generate.UTXO(ids.ID{101}, test.AVAXAssetID, 11, owner1, depositTxID1, bondTxID1, true),
+				},
+				ins: []*avax.TransferableInput{
+					generate.In(test.AVAXAssetID, 5, depositTxID1, ids.Empty, []uint32{0}),
+					generate.In(test.AVAXAssetID, 11, depositTxID1, bondTxID1, []uint32{0}),
+				},
+				outs: []*avax.TransferableOutput{
+					generate.Out(test.AVAXAssetID, 5, owner1, ids.Empty, ids.Empty),
+					generate.Out(test.AVAXAssetID, 11, owner1, ids.Empty, bondTxID1),
+				},
+				creds:   []verify.Verifiable{cred1, cred1},
+				assetID: test.AVAXAssetID,
+			},
+		},
+		"OK: with burn": {
+			handlerState: noMsigState,
+			args: args{
+				tx: tx,
+				utxos: []*avax.UTXO{
+					generate.UTXO(ids.ID{100}, test.AVAXAssetID, 2, owner1, ids.Empty, ids.Empty, true),
+					generate.UTXO(ids.ID{102}, test.AVAXAssetID, 5, owner1, depositTxID1, ids.Empty, true),
+					generate.UTXO(ids.ID{103}, test.AVAXAssetID, 11, owner1, depositTxID1, bondTxID1, true),
+				},
+				ins: []*avax.TransferableInput{
+					generate.In(test.AVAXAssetID, 2, ids.Empty, ids.Empty, []uint32{0}),
+					generate.In(test.AVAXAssetID, 5, depositTxID1, ids.Empty, []uint32{0}),
+					generate.In(test.AVAXAssetID, 11, depositTxID1, bondTxID1, []uint32{0}),
+				},
+				outs: []*avax.TransferableOutput{
+					generate.Out(test.AVAXAssetID, 6, owner1, ids.Empty, ids.Empty),
+					generate.Out(test.AVAXAssetID, 11, owner1, ids.Empty, bondTxID1),
+				},
+				amountToBurn: 1,
+				creds:        []verify.Verifiable{cred1, cred1, cred1},
+				assetID:      test.AVAXAssetID,
+			},
+		},
+		"OK: with burn, partial unlock, no bond": {
+			handlerState: noMsigState,
+			args: args{
+				tx: tx,
+				utxos: []*avax.UTXO{
+					generate.UTXO(ids.ID{100}, test.AVAXAssetID, 100, owner1, ids.Empty, ids.Empty, true), // TODO@ refactor to be able to call without bool
+					generate.UTXO(ids.ID{101}, test.AVAXAssetID, 50, owner1, depositTxID1, ids.Empty, true),
+				},
+				ins: []*avax.TransferableInput{
+					generate.In(test.AVAXAssetID, 100, ids.Empty, ids.Empty, []uint32{0}),
+					generate.In(test.AVAXAssetID, 50, depositTxID1, ids.Empty, []uint32{0}),
+				},
+				outs: []*avax.TransferableOutput{
+					generate.Out(test.AVAXAssetID, 10, owner1, ids.Empty, ids.Empty),
+					generate.Out(test.AVAXAssetID, 99, owner1, ids.Empty, ids.Empty),
+					generate.Out(test.AVAXAssetID, 40, owner1, depositTxID1, ids.Empty),
+				},
+				creds:        []verify.Verifiable{cred1, cred1},
+				amountToBurn: 1,
+				assetID:      test.AVAXAssetID,
+			},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			err := defaultCaminoHandler(t).verifyUnlockDepositedUTXOs(
+				tt.handlerState(ctrl),
+				tt.args.tx,
+				tt.args.utxos,
+				tt.args.ins,
+				tt.args.outs,
+				tt.args.creds,
+				tt.args.amountToBurn,
+				tt.args.assetID,
 			)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
@@ -1876,5 +2202,58 @@ func TestSortUTXOs(t *testing.T) {
 			// }
 			require.Equal(t, tt.expectedUTXOs(originalUTXOs), utxos)
 		})
+	}
+}
+
+// VerifyUnlockDepositedUTXOs requires outputs to be sorted exactly, that unlocked outs will go first
+func TestAVAXSortTransferableOutputsUnlockedFirst(t *testing.T) {
+	owner1 := secp256k1fx.OutputOwners{
+		Locktime:  0,
+		Threshold: 1,
+		Addrs:     []ids.ShortID{{1}},
+	}
+	owner2 := secp256k1fx.OutputOwners{
+		Locktime:  0,
+		Threshold: 1,
+		Addrs:     []ids.ShortID{{2}},
+	}
+	owner1And2 := secp256k1fx.OutputOwners{
+		Locktime:  0,
+		Threshold: 1,
+		Addrs:     []ids.ShortID{{1}, {2}},
+	}
+	depositTxID1 := ids.ID{3}
+	bondTxID1 := ids.ID{4}
+	depositTxID2 := ids.ID{5}
+	bondTxID2 := ids.ID{6}
+
+	outsWithLockIDs := func(depositTxID, bondTxID ids.ID) []*avax.TransferableOutput {
+		return []*avax.TransferableOutput{
+			generate.Out(test.AVAXAssetID, 1, owner1, depositTxID, bondTxID),
+			generate.Out(test.AVAXAssetID, 2, owner1, depositTxID, bondTxID),
+			generate.Out(test.AVAXAssetID, 1, owner2, depositTxID, bondTxID),
+			generate.Out(test.AVAXAssetID, 2, owner2, depositTxID, bondTxID),
+			generate.Out(test.AVAXAssetID, 1, owner1And2, depositTxID, bondTxID),
+			generate.Out(test.AVAXAssetID, 2, owner1And2, depositTxID, bondTxID),
+		}
+	}
+
+	outs := outsWithLockIDs(ids.Empty, ids.Empty)
+	outs = append(outs, outsWithLockIDs(depositTxID1, ids.Empty)...)
+	outs = append(outs, outsWithLockIDs(depositTxID2, ids.Empty)...)
+	outs = append(outs, outsWithLockIDs(ids.Empty, bondTxID1)...)
+	outs = append(outs, outsWithLockIDs(ids.Empty, bondTxID2)...)
+	outs = append(outs, outsWithLockIDs(depositTxID1, bondTxID1)...)
+	outs = append(outs, outsWithLockIDs(depositTxID1, bondTxID2)...)
+	outs = append(outs, outsWithLockIDs(depositTxID2, bondTxID1)...)
+	outs = append(outs, outsWithLockIDs(depositTxID2, bondTxID2)...)
+
+	avax.SortTransferableOutputs(outs, txs.Codec)
+
+	doneWithUnlockedOuts := false
+	for i, out := range outs {
+		_, isLocked := out.Out.(*locked.Out)
+		require.Truef(t, isLocked || !doneWithUnlockedOuts, "outs[%d] is locked, but there are unlocked outs after it", i-1)
+		doneWithUnlockedOuts = isLocked
 	}
 }

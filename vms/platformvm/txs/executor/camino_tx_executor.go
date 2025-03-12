@@ -106,6 +106,7 @@ var (
 	errNotPermittedToCreateProposal      = errors.New("don't have permission to create proposal of this type")
 	errZeroDepositOfferLimits            = errors.New("deposit offer TotalMaxAmount and TotalMaxRewardAmount are zero")
 	errAddrStateNotChanged               = errors.New("address state wasn't changed")
+	errDepositExpired                    = errors.New("deposit is expired")
 	errNotDepositedInput                 = errors.New("input is not deposited")
 	errNotCairoPhase                     = errors.New("not allowed before CairoPhase")
 	errDepositNotExpired                 = errors.New("deposit is not expired")
@@ -814,6 +815,113 @@ func (e *CaminoStandardTxExecutor) UnlockDepositTx(tx *txs.UnlockDepositTx) erro
 		return err
 	}
 
+	chainTime := e.State.GetTimestamp()
+
+	if !e.Config.IsCairoPhaseActivated(chainTime) {
+		// Before Cairo, unlockDepositTx was used both:
+		// as system tx for expired deposits and as user tx for active deposits.
+		// After CairoPhase system unlock of expired deposits is done by UnlockExpiredDepositTx.
+		return e.unlockDepositTxBeforeCairo(tx)
+	}
+
+	baseFee, err := e.State.GetBaseFee()
+	if err != nil {
+		return err
+	}
+
+	if err := e.FlowChecker.VerifyUnlockDeposit(
+		e.State,
+		tx,
+		tx.Ins,
+		tx.Outs,
+		e.Tx.Creds,
+		baseFee,
+		e.Ctx.AVAXAssetID,
+	); err != nil {
+		return fmt.Errorf("%w: %s", errFlowCheckFailed, err)
+	}
+
+	chainTimestamp := uint64(chainTime.Unix())
+	consumedDepositedAmounts := make(map[ids.ID]uint64)
+	producedDepositedAmounts := make(map[ids.ID]uint64)
+
+	for _, input := range tx.Ins {
+		lockedIn, ok := input.In.(*locked.In)
+		// bonded & not deposited inputs excluded in syntactic verification
+		if ok {
+			deposit, err := e.State.GetDeposit(lockedIn.DepositTxID)
+			if err != nil {
+				return err
+			}
+
+			if deposit.IsExpired(chainTimestamp) {
+				return errDepositExpired // should never happen
+			}
+
+			consumedDepositedAmounts[lockedIn.DepositTxID], err = math.Add64(consumedDepositedAmounts[lockedIn.DepositTxID], lockedIn.Amount())
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	if len(consumedDepositedAmounts) == 0 {
+		return errNoUnlock
+	}
+
+	for _, output := range tx.Outs {
+		if lockedOut, ok := output.Out.(*locked.Out); ok && lockedOut.DepositTxID != ids.Empty {
+			producedDepositedAmounts[lockedOut.DepositTxID], err = math.Add64(producedDepositedAmounts[lockedOut.DepositTxID], lockedOut.Amount())
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	for depositTxID, consumedDepositedAmount := range consumedDepositedAmounts {
+		deposit, err := e.State.GetDeposit(depositTxID)
+		if err != nil {
+			return err
+		}
+
+		unlockedAmount := consumedDepositedAmount - producedDepositedAmounts[depositTxID]
+		newTotalUnlockedAmount, err := math.Add64(unlockedAmount, deposit.UnlockedAmount)
+		if err != nil {
+			return err
+		}
+
+		if newTotalUnlockedAmount == deposit.UnlockedAmount {
+			return errNoUnlock
+		}
+
+		offer, err := e.State.GetDepositOffer(deposit.DepositOfferID)
+		if err != nil {
+			return err
+		}
+
+		if unlockableAmount := deposit.UnlockableAmount(offer, chainTimestamp); unlockableAmount < newTotalUnlockedAmount {
+			return errUnlockedMoreThanAvailable
+		}
+
+		e.State.ModifyDeposit(depositTxID, &deposits.Deposit{
+			DepositOfferID:      deposit.DepositOfferID,
+			UnlockedAmount:      newTotalUnlockedAmount,
+			ClaimedRewardAmount: deposit.ClaimedRewardAmount,
+			Amount:              deposit.Amount,
+			Start:               deposit.Start,
+			Duration:            deposit.Duration,
+			RewardOwner:         deposit.RewardOwner,
+		})
+	}
+
+	avax.Consume(e.State, tx.Ins)
+	avax.Produce(e.State, e.Tx.ID(), tx.Outs)
+
+	return nil
+}
+
+func (e *CaminoStandardTxExecutor) unlockDepositTxBeforeCairo(tx *txs.UnlockDepositTx) error {
+	var err error
 	chainTimestamp := uint64(e.State.GetTimestamp().Unix())
 	consumedDepositedAmounts := make(map[ids.ID]uint64)
 	producedDepositedAmounts := make(map[ids.ID]uint64)
@@ -884,7 +992,7 @@ func (e *CaminoStandardTxExecutor) UnlockDepositTx(tx *txs.UnlockDepositTx) erro
 		amountToBurn = baseFee
 	}
 
-	if err := e.FlowChecker.VerifyUnlockDeposit(
+	if err := e.FlowChecker.VerifyUnlockDepositBeforeCairo(
 		e.State,
 		tx,
 		tx.Ins,

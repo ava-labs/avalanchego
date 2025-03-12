@@ -167,7 +167,6 @@ type CaminoVerifier interface {
 	// - [creds] are the credentials of [tx], which allow [ins] to be spent.
 	// - [amountToBurn] if any of deposits are still active, then unlocked inputs must have at least [amountToBurn] more than unlocked outs.
 	// - [assetID] is id of allowed asset, ins/outs with other assets will return error
-	// - [verifyCreds] if false, [creds] will be ignored
 	//
 	// Precondition: [tx] has already been syntactically verified.
 	VerifyUnlockDeposit(
@@ -177,6 +176,25 @@ type CaminoVerifier interface {
 		outs []*avax.TransferableOutput,
 		creds []verify.Verifiable,
 		amountToBurn uint64,
+		assetID ids.ID,
+	) error
+
+	// Verify that deposit unlock [tx] is semantically valid.
+	// Arguments:
+	// - [ins] and [outs] are the inputs and outputs of [tx].
+	// - [creds] are the credentials of [tx], which allow [ins] to be spent.
+	// - [burnedAmount] if any of deposits are still active, then unlocked inputs must have at least [burnedAmount] more than unlocked outs.
+	// - [assetID] is id of allowed asset, ins/outs with other assets will return error
+	// - [verifyCreds] if false, [creds] will be ignored
+	//
+	// Precondition: [tx] has already been syntactically verified.
+	VerifyUnlockDepositBeforeCairo(
+		utxoDB avax.UTXOGetter,
+		tx txs.UnsignedTx,
+		ins []*avax.TransferableInput,
+		outs []*avax.TransferableOutput,
+		creds []verify.Verifiable,
+		burnedAmount uint64,
 		assetID ids.ID,
 		verifyCreds bool,
 	) error
@@ -1065,6 +1083,206 @@ func (h *handler) VerifyUnlockDeposit(
 	creds []verify.Verifiable,
 	amountToBurn uint64,
 	assetID ids.ID,
+) error {
+	msigState, ok := utxoDB.(secp256k1fx.AliasGetter)
+	if !ok {
+		return secp256k1fx.ErrNotAliasGetter
+	}
+
+	utxos, err := getUTXOs(utxoDB, ins)
+	if err != nil {
+		return err
+	}
+
+	return h.verifyUnlockDepositedUTXOs(msigState, tx, utxos, ins, outs, creds, amountToBurn, assetID)
+}
+
+func (h *handler) verifyUnlockDepositedUTXOs(
+	msigState secp256k1fx.AliasGetter,
+	tx txs.UnsignedTx,
+	utxos []*avax.UTXO,
+	ins []*avax.TransferableInput,
+	outs []*avax.TransferableOutput,
+	creds []verify.Verifiable,
+	amountToBurn uint64,
+	assetID ids.ID,
+) error {
+	if len(ins) != len(utxos) {
+		return fmt.Errorf(
+			"there are %d inputs and %d utxos: %w",
+			len(ins),
+			len(utxos),
+			errInputsUTXOsMismatch,
+		)
+	}
+
+	if len(ins) != len(creds) {
+		return fmt.Errorf(
+			"there are %d inputs and %d credentials: %w",
+			len(ins),
+			len(creds),
+			errInputsCredentialsMismatch,
+		)
+	}
+
+	for _, cred := range creds {
+		if err := cred.Verify(); err != nil {
+			return errBadCredentials
+		}
+	}
+
+	consumedUnlocked := uint64(0)
+	consumedDeposited := make(map[ids.ID]map[ids.ID]uint64) // ownerID -> bondTxID -> amount
+
+	// iterate over ins, get utxos, calculate consumed values
+	for index, input := range ins {
+		utxo := utxos[index] // The UTXO consumed by [input]
+
+		if utxoAssetID := utxo.AssetID(); utxoAssetID != assetID {
+			return fmt.Errorf(
+				"utxo %d has asset ID %s but expect %s: %w",
+				index,
+				utxoAssetID,
+				assetID,
+				errAssetIDMismatch,
+			)
+		}
+
+		if inputAssetID := input.AssetID(); inputAssetID != assetID {
+			return fmt.Errorf(
+				"input %d has asset ID %s but expect %s: %w",
+				index,
+				inputAssetID,
+				assetID,
+				errAssetIDMismatch,
+			)
+		}
+
+		out := utxo.Out
+		lockIDs := &locked.IDsEmpty
+		if lockedOut, ok := out.(*locked.Out); ok {
+			// utxo isn't deposited, so it can't be unlocked
+			// bonded-not-deposited utxos are not allowed
+			if lockedOut.DepositTxID == ids.Empty {
+				return errUnlockingUnlockedUTXO
+			}
+			out = lockedOut.TransferableOut
+			lockIDs = &lockedOut.IDs
+		}
+
+		in := input.In
+		if lockedIn, ok := in.(*locked.In); ok {
+			// Input is locked, but LockIDs isn't matching utxo's
+			if *lockIDs != lockedIn.IDs {
+				return errLockIDsMismatch
+			}
+			in = lockedIn.TransferableIn
+		} else if lockIDs.IsLocked() {
+			// The UTXO is locked, but consuming input isn't locked
+			return errLockedFundsNotMarkedAsLocked
+		}
+
+		consumedAmount := in.Amount()
+
+		if err := h.fx.VerifyMultisigTransfer(tx, in, creds[index], out, msigState); err != nil {
+			return fmt.Errorf("failed to verify transfer: %w: %s", errCantSpend, err)
+		}
+
+		// calculating consumed amounts
+		if lockIDs.IsLocked() {
+			ownerID, err := txs.GetOutputOwnerID(out)
+			if err != nil {
+				return err
+			}
+
+			consumedOwnerAmounts, ok := consumedDeposited[ownerID]
+			if !ok {
+				consumedOwnerAmounts = make(map[ids.ID]uint64)
+				consumedDeposited[ownerID] = consumedOwnerAmounts
+			}
+
+			newAmount, err := math.Add64(consumedOwnerAmounts[lockIDs.BondTxID], consumedAmount)
+			if err != nil {
+				return err
+			}
+			consumedOwnerAmounts[lockIDs.BondTxID] = newAmount
+		} else {
+			newAmount, err := math.Add64(consumedUnlocked, consumedAmount)
+			if err != nil {
+				return err
+			}
+			consumedUnlocked = newAmount
+		}
+	}
+
+	// iterating over outs, checking produced amounts with consumed map
+	// outputs expected to be sorted, so unlocked outputs are at the beginning
+	for i := len(outs) - 1; i >= 0; i-- {
+		out := outs[i].Out
+		lockIDs := &locked.IDsEmpty
+		lockedOut, isLocked := out.(*locked.Out)
+
+		if isLocked {
+			lockIDs = &lockedOut.IDs
+			out = lockedOut.TransferableOut
+		} else {
+			// Unlocked tokens can be transferred to new owner.
+			// We verify owner msig composition to prevent creation of invalid multisig utxos.
+			if err := h.fx.VerifyMultisigOutputOwner(out, msigState); err != nil {
+				return err
+			}
+		}
+
+		ownerID, err := txs.GetOutputOwnerID(out)
+		if err != nil {
+			return err
+		}
+
+		consumedDepositedOwnerAmounts, ok := consumedDeposited[ownerID]
+		if !ok {
+			consumedDepositedOwnerAmounts = make(map[ids.ID]uint64)
+			consumedDeposited[ownerID] = consumedDepositedOwnerAmounts
+		}
+
+		amountToVerify := out.Amount()
+		verifiedAmount := math.Min(consumedDepositedOwnerAmounts[lockIDs.BondTxID], amountToVerify)
+
+		consumedDepositedOwnerAmounts[lockIDs.BondTxID] -= verifiedAmount
+		amountToVerify -= verifiedAmount
+
+		if amountToVerify == 0 {
+			continue
+		}
+
+		if isLocked || consumedUnlocked < amountToVerify {
+			return fmt.Errorf("owner %s out[%d] produces more than allowed by consumed: %w", ownerID, i, errWrongProducedAmount)
+		}
+
+		consumedUnlocked -= amountToVerify
+	}
+
+	// checking that we burned required amount
+	if consumedUnlocked < amountToBurn {
+		return fmt.Errorf(
+			"asset %s burned %d unlocked, but needed to burn %d: %w",
+			assetID,
+			consumedUnlocked,
+			amountToBurn,
+			errNotBurnedEnough,
+		)
+	}
+
+	return nil
+}
+
+func (h *handler) VerifyUnlockDepositBeforeCairo(
+	utxoDB avax.UTXOGetter,
+	tx txs.UnsignedTx,
+	ins []*avax.TransferableInput,
+	outs []*avax.TransferableOutput,
+	creds []verify.Verifiable,
+	amountToBurn uint64,
+	assetID ids.ID,
 	verifyCreds bool,
 ) error {
 	msigState, ok := utxoDB.(secp256k1fx.AliasGetter)
@@ -1077,10 +1295,10 @@ func (h *handler) VerifyUnlockDeposit(
 		return err
 	}
 
-	return h.VerifyUnlockDepositedUTXOs(msigState, tx, utxos, ins, outs, creds, amountToBurn, assetID, verifyCreds)
+	return h.verifyUnlockDepositedUTXOsBeforeCairo(msigState, tx, utxos, ins, outs, creds, amountToBurn, assetID, verifyCreds)
 }
 
-func (h *handler) VerifyUnlockDepositedUTXOs(
+func (h *handler) verifyUnlockDepositedUTXOsBeforeCairo(
 	msigState secp256k1fx.AliasGetter,
 	tx txs.UnsignedTx,
 	utxos []*avax.UTXO,
