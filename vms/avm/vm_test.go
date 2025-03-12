@@ -722,8 +722,8 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	assertLatestIdx(t, env.vm.db, key.PublicKey().Address(), assetID.AssetID(), 1)
 }
 
-// Tests db migration to merkle-ize existing state
-func TestDBMigration(t *testing.T) {
+// Tests that VM.Linearize migrates existing state to merkle-ized state
+func TestVMLinearizeStateMigration(t *testing.T) {
 	require := require.New(t)
 
 	db := memdb.New()

@@ -53,7 +53,7 @@ type StateMigration interface {
 		prevBlockIDDB database.Database,
 		prevBlockDB database.Database,
 		prevSingletonDB database.Database,
-		nextDB database.Database,
+		nextDB database.Database, // TODO should i pass in versiondb instead? Or just use the prevBaseDB for both
 	) (state.State, error)
 }
 
@@ -237,6 +237,7 @@ func (g *gForkStateMigration) Migrate(
 	}
 
 	if ok {
+		// TODO skips
 		startingBlkHeightKey = database.PackUInt64(lastMigratedBlkHeight)
 	}
 
@@ -248,6 +249,7 @@ func (g *gForkStateMigration) Migrate(
 
 	g.log.Debug("migrating singletons")
 	for itr := prevSingletonDB.NewIterator(); itr.Next(); {
+		fmt.Printf("key: %s value: %s\n", itr.Key(), itr.Value())
 		if err := next.singletonDB.Put(itr.Key(), itr.Value()); err != nil {
 			return nil, fmt.Errorf("failed to migrate singleton: %w", err)
 		}
@@ -259,7 +261,7 @@ func (g *gForkStateMigration) Migrate(
 		return nil, fmt.Errorf("failed to put migration status: %w", err)
 	}
 
-	return next, nil
+	return next, next.Commit()
 }
 
 func (g *gForkStateMigration) updateAndCommit(next state.State) (bool, error) {
@@ -316,7 +318,6 @@ func newGForkState(
 	blockIDDB := prefixdb.New([]byte("block_id"), metadataDB)
 	blockDB := prefixdb.New([]byte("block"), metadataDB)
 	singletonDB := prefixdb.New([]byte("singleton"), metadataDB)
-	// Metadata for migrated keys
 	migrationDB := prefixdb.New([]byte("migration"), metadataDB)
 
 	s, err := state.NewWithFormat(
@@ -364,6 +365,7 @@ type gForkState struct {
 	blockIDDB   database.Database
 	blockDB     database.Database
 	singletonDB database.Database
+	// Metadata for migrated keys
 	migrationDB database.Database
 }
 
