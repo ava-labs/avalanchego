@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -651,8 +652,13 @@ func getStakingSigner(ctx context.Context, v *viper.Viper) (bls.Signer, error) {
 
 	signingKeyPath := getExpandedArg(v, StakingSignerKeyPathKey)
 
+	bools := bag.Of(ephemeralSignerEnabled, contentKeyIsSet, keyPathIsSet, rpcSignerURLIsSet)
+	if bools.Count(true) > 1 {
+		return nil, errInvalidSignerConfig
+	}
+
 	switch {
-	case ephemeralSignerEnabled && !contentKeyIsSet && !keyPathIsSet && !rpcSignerURLIsSet:
+	case ephemeralSignerEnabled:
 		signer, err := localsigner.New()
 		if err != nil {
 			return nil, fmt.Errorf("couldn't generate ephemeral signing signer: %w", err)
@@ -660,7 +666,7 @@ func getStakingSigner(ctx context.Context, v *viper.Viper) (bls.Signer, error) {
 
 		return signer, nil
 
-	case !ephemeralSignerEnabled && contentKeyIsSet && !keyPathIsSet && !rpcSignerURLIsSet:
+	case contentKeyIsSet:
 		signerKeyRawContent := v.GetString(StakingSignerKeyContentKey)
 		signerKeyContent, err := base64.StdEncoding.DecodeString(signerKeyRawContent)
 		if err != nil {
@@ -674,7 +680,7 @@ func getStakingSigner(ctx context.Context, v *viper.Viper) (bls.Signer, error) {
 
 		return signer, nil
 
-	case !ephemeralSignerEnabled && !contentKeyIsSet && keyPathIsSet && !rpcSignerURLIsSet:
+	case keyPathIsSet:
 		// If the key is set, but a user-file isn't provided, we don't create one.
 		// The siging key is only stored to the default file-location if it's created
 		// and saved by the current application run.
@@ -684,19 +690,9 @@ func getStakingSigner(ctx context.Context, v *viper.Viper) (bls.Signer, error) {
 			return nil, errMissingStakingSigningKeyFile
 		}
 
-		signingKeyBytes, err := os.ReadFile(signingKeyPath)
-		if err != nil {
-			return nil, err
-		}
+		return createSignerFromFile(signingKeyPath)
 
-		signer, err := localsigner.FromBytes(signingKeyBytes)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't parse signing key: %w", err)
-		}
-
-		return signer, nil
-
-	case !ephemeralSignerEnabled && !contentKeyIsSet && !keyPathIsSet && rpcSignerURLIsSet:
+	case rpcSignerURLIsSet:
 		rpcSignerURL := v.GetString(StakingRPCSignerKey)
 
 		signer, err := rpcsigner.NewClient(ctx, rpcSignerURL)
@@ -706,9 +702,14 @@ func getStakingSigner(ctx context.Context, v *viper.Viper) (bls.Signer, error) {
 
 		return signer, nil
 
-	case ephemeralSignerEnabled || contentKeyIsSet || keyPathIsSet || rpcSignerURLIsSet:
-		return nil, errInvalidSignerConfig
 	default:
+		_, err := os.Stat(signingKeyPath)
+
+		// if the file exists, try to load the key from the file
+		if !errors.Is(err, fs.ErrNotExist) {
+			return createSignerFromFile(signingKeyPath)
+		}
+
 		signer, err := localsigner.New()
 		if err != nil {
 			return nil, fmt.Errorf("couldn't generate new signing key: %w", err)
@@ -729,6 +730,20 @@ func getStakingSigner(ctx context.Context, v *viper.Viper) (bls.Signer, error) {
 
 		return signer, nil
 	}
+}
+
+func createSignerFromFile(signingKeyPath string) (bls.Signer, error) {
+	signingKeyBytes, err := os.ReadFile(signingKeyPath)
+	if err != nil {
+		return nil, err
+	}
+
+	signer, err := localsigner.FromBytes(signingKeyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't parse signing key: %w", err)
+	}
+
+	return signer, nil
 }
 
 func getStakingConfig(ctx context.Context, v *viper.Viper, networkID uint32) (node.StakingConfig, error) {
