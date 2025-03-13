@@ -659,6 +659,21 @@ func TestGetStakingSigner(t *testing.T) {
 	}
 }
 
+func TestDefaultConfigInitializtionUsesExistingDefaultKey(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	require := require.New(t)
+	v := setupViperFlags()
+
+	config1, err := GetNodeConfig(context.Background(), v)
+	require.NoError(err)
+
+	config2, err := GetNodeConfig(context.Background(), v)
+	require.NoError(err)
+
+	require.Equal(config1.StakingSigningKey.PublicKey(), config2.StakingSigningKey.PublicKey())
+}
+
 // setups config json file and writes content
 func setupConfigJSON(t *testing.T, rootPath string, value string) string {
 	configFilePath := filepath.Join(rootPath, "config.json")
