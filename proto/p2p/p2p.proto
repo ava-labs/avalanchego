@@ -420,5 +420,5 @@ message AppGossip {
   bytes app_bytes = 2;
 
   // DO NOT MERGE
-  bytes app_bytes = 3;
+  bytes app_bytez = 3;
 }
