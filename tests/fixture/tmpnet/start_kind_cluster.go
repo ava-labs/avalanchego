@@ -32,7 +32,13 @@ func CheckClusterRunning(log logging.Logger, configPath string, configContext st
 }
 
 // StartKindCluster starts a new kind cluster if one is not already running.
-func StartKindCluster(ctx context.Context, log logging.Logger, configPath string, configContext string) error {
+func StartKindCluster(
+	ctx context.Context,
+	log logging.Logger,
+	configPath string,
+	configContext string,
+	startCollectors bool,
+) error {
 	err := CheckClusterRunning(log, configPath, configContext)
 	if err == nil {
 		log.Info("kubernetes cluster already running",
@@ -74,6 +80,12 @@ func StartKindCluster(ctx context.Context, log logging.Logger, configPath string
 	log.Info("created namespace",
 		zap.String("namespace", DefaultTmpnetNamespace),
 	)
+
+	if startCollectors {
+		if err := DeployKubeCollectors(ctx, log, configPath, configContext); err != nil {
+			return fmt.Errorf("failed to deploy kube collectors: %w", err)
+		}
+	}
 
 	return nil
 }

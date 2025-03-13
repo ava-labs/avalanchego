@@ -95,6 +95,8 @@ jobs:
         shell: bash
         run: nix develop --command bash -x ./scripts/tests.e2e.kube.sh
         env:
+          TMPNET_START_COLLECTORS: ${{ secrets.PROMETHEUS_ID != '' }}
+          TMPNET_CHECK_MONITORING: ${{ secrets.PROMETHEUS_ID != '' }}
           PROMETHEUS_USERNAME: ${{ secrets.PROMETHEUS_ID || '' }}
           PROMETHEUS_PASSWORD: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           LOKI_USERNAME: ${{ secrets.LOKI_ID || '' }}
