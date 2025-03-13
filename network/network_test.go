@@ -338,21 +338,24 @@ func TestIngressConnCount(t *testing.T) {
 		return result
 	}, time.Minute, time.Millisecond*10)
 
-	ingressConnections := make([]int, 0, len(networks))
-	healthCheckErrors := make([]error, 0, len(networks))
+	ingressConnCount := set.Of[int]()
 
 	for _, net := range networks {
-		ingressConnections = append(ingressConnections, net.IngressConnCount())
+		connCount := net.IngressConnCount()
+		ingressConnCount.Add(connCount)
 		_, err := net.HealthCheck(context.Background())
-		healthCheckErrors = append(healthCheckErrors, err)
+		if connCount == 0 {
+			require.ErrorContains(err, ErrNoIngressConnections.Error()) //nolint
+		} else {
+			require.NoError(err)
+		}
 	}
 
-	// First node has all nodes connected to it.
-	// Second node has only the third node connected to it.
-	// Third node has no node connected to it, as it connects to the first and second node.
-	require.Equal([]int{2, 1, 0}, ingressConnections)
-	require.Equal([]error{nil, nil}, healthCheckErrors[:2])
-	require.ErrorContains(healthCheckErrors[2], ErrNoIngressConnections.Error()) //nolint
+	// Some node has all nodes connected to it.
+	// Some other node has only the remaining last node connected to it.
+	// The remaining last node has no node connected to it, as it connects to the first and second node.
+	// Since it has no one connecting to it, its health check fails.
+	require.Equal(set.Of(0, 1, 2), ingressConnCount)
 }
 
 func TestSend(t *testing.T) {
