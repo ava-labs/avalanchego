@@ -3,6 +3,8 @@
 
 package block
 
+//go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
+
 import (
 	"context"
 
@@ -21,7 +23,9 @@ type Context struct {
 	//
 	// Because PreForkBlocks and PostForkOptions do not verify their execution
 	// against the P-chain's state, this context is undefined for those blocks.
-	PChainHeight uint64
+	PChainHeight uint64 `canoto:"int,1" json:"pChainHeight"`
+
+	canotoData canotoData_Context
 }
 
 // BuildBlockWithContextChainVM defines the interface a ChainVM can optionally
