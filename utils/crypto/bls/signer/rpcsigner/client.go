@@ -24,7 +24,7 @@ type Client struct {
 	pk     *bls.PublicKey
 }
 
-func NewClient(ctx context.Context, rpcSignerURL string) (*Client, error) {
+func NewClient(ctx context.Context, url string) (*Client, error) {
 	// TODO: figure out the best parameters here given the target block-time
 	opts := grpc.WithConnectParams(grpc.ConnectParams{
 		Backoff: backoff.DefaultConfig,
@@ -32,7 +32,7 @@ func NewClient(ctx context.Context, rpcSignerURL string) (*Client, error) {
 
 	// the rpc-signer client should call a proxy server (on the same machine) that forwards
 	// the request to the actual signer instead of relying on tls-credentials
-	conn, err := grpc.NewClient(rpcSignerURL, opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(url, opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create rpc signer client: %w", err)
 	}
