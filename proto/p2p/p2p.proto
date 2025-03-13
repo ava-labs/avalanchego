@@ -418,7 +418,4 @@ message AppGossip {
   bytes chain_id = 1;
   // Message body
   bytes app_bytes = 2;
-
-  // DO NOT MERGE
-  bytes app_bytez = 3;
 }
