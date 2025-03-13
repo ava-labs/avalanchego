@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -416,7 +415,6 @@ func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<
 		vm.legacyState.BlockIDDB,
 		vm.legacyState.BlockDB,
 		vm.legacyState.SingletonDB,
-		prefixdb.New([]byte("v2"), vm.db),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to migrate state: %w", err)

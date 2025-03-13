@@ -48,12 +48,11 @@ type StateMigration interface {
 	Migrate(
 		ctx context.Context,
 		prevState state.State,
-		prevBaseDB *versiondb.Database,
+		baseDB *versiondb.Database,
 		prevTXDB database.Database,
 		prevBlockIDDB database.Database,
 		prevBlockDB database.Database,
 		prevSingletonDB database.Database,
-		nextDB database.Database, // TODO should i pass in versiondb instead? Or just use the prevBaseDB for both
 	) (state.State, error)
 }
 
@@ -82,7 +81,6 @@ func (n noStateMigration) Migrate(
 	_ context.Context,
 	prevState state.State,
 	_ *versiondb.Database,
-	_ database.Database,
 	_ database.Database,
 	_ database.Database,
 	_ database.Database,
@@ -123,14 +121,14 @@ type gForkStateMigration struct {
 func (g *gForkStateMigration) Migrate(
 	ctx context.Context,
 	prevUTXOState state.State,
-	prevBaseDB *versiondb.Database,
+	baseDB *versiondb.Database,
 	prevTXDB database.Database,
 	prevBlockIDDB database.Database,
 	prevBlockDB database.Database,
 	prevSingletonDB database.Database,
-	nextDB database.Database,
 ) (state.State, error) {
-	next, err := newGForkState(ctx, nextDB, g.parser, g.metrics, g.trackChecksums)
+	nextBaseDB := prefixdb.New([]byte("v2"), baseDB)
+	next, err := newGForkState(ctx, nextBaseDB, g.parser, g.metrics, g.trackChecksums)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize state: %w", err)
 	}
@@ -175,12 +173,12 @@ func (g *gForkStateMigration) Migrate(
 			return nil, fmt.Errorf("failed to put last migrated utxo: %w", err)
 		}
 
-		ok, err := g.updateAndCommit(next)
+		ok, err := g.updateAndCommit(baseDB, next)
 		if err != nil {
 			return nil, fmt.Errorf("failed to commit next state: %w", err)
 		}
 		if ok {
-			if err := prevBaseDB.Commit(); err != nil {
+			if err := baseDB.Commit(); err != nil {
 				return nil, fmt.Errorf("failed to commit previous db: %w", err)
 			}
 		}
@@ -202,8 +200,7 @@ func (g *gForkStateMigration) Migrate(
 			return nil, fmt.Errorf("failed to migrate tx: %w", err)
 		}
 
-		_, err := g.updateAndCommit(next)
-		if err != nil {
+		if _, err := g.updateAndCommit(baseDB, next); err != nil {
 			return nil, fmt.Errorf("failed to commit next state: %w", err)
 		}
 
@@ -255,19 +252,27 @@ func (g *gForkStateMigration) Migrate(
 		}
 	}
 
-	g.log.Debug("migration complete")
-
 	if err := next.putMigrationStatus(true); err != nil {
 		return nil, fmt.Errorf("failed to put migration status: %w", err)
 	}
 
-	return next, next.Commit()
+	if err := next.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit next state: %w", err)
+	}
+
+	g.log.Debug("migration complete")
+
+	return next, nil
 }
 
-func (g *gForkStateMigration) updateAndCommit(next state.State) (bool, error) {
+func (g *gForkStateMigration) updateAndCommit(baseDB *versiondb.Database, next state.State) (bool, error) {
 	g.updates++
 	if g.updates%g.commitFrequency == 0 {
 		if err := next.Commit(); err != nil {
+			return false, err
+		}
+
+		if err := baseDB.Commit(); err != nil {
 			return false, err
 		}
 
