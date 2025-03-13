@@ -197,13 +197,14 @@ func (s *state) WriteState() error {
 			if err := batch.Delete(vID[:]); err != nil {
 				return err
 			}
-		default:
-			return fmt.Errorf("unknown update status for %s", vID)
 		}
-		// we're done, remove the updated marker
-		delete(s.updatedData, vID)
 	}
-	return batch.Write()
+	if err := batch.Write(); err != nil {
+		return err
+	}
+	// we've successfully flushed the updates, clear the updated marker.
+	clear(s.updatedData)
+	return nil
 }
 
 // SetStatus sets the active status of the validator with the given vID

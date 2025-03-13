@@ -151,8 +151,8 @@ func TestValidatorState(t *testing.T) {
 
 	// new validator should be added to the state eventually after SyncFrequency
 	require.EventuallyWithT(func(c *assert.CollectT) {
-		vm.ctx.Lock.Lock()
-		defer vm.ctx.Lock.Unlock()
+		vm.vmLock.Lock()
+		defer vm.vmLock.Unlock()
 		assert.Len(c, vm.validatorsManager.GetNodeIDs(), 4)
 		newValidator, err := vm.validatorsManager.GetValidator(newValidationID)
 		assert.NoError(c, err)

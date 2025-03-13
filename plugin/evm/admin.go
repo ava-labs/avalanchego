@@ -30,8 +30,8 @@ func NewAdminService(vm *VM, performanceDir string) *Admin {
 func (p *Admin) StartCPUProfiler(_ *http.Request, _ *struct{}, _ *api.EmptyReply) error {
 	log.Info("Admin: StartCPUProfiler called")
 
-	p.vm.ctx.Lock.Lock()
-	defer p.vm.ctx.Lock.Unlock()
+	p.vm.vmLock.Lock()
+	defer p.vm.vmLock.Unlock()
 
 	return p.profiler.StartCPUProfiler()
 }
@@ -40,8 +40,8 @@ func (p *Admin) StartCPUProfiler(_ *http.Request, _ *struct{}, _ *api.EmptyReply
 func (p *Admin) StopCPUProfiler(r *http.Request, _ *struct{}, _ *api.EmptyReply) error {
 	log.Info("Admin: StopCPUProfiler called")
 
-	p.vm.ctx.Lock.Lock()
-	defer p.vm.ctx.Lock.Unlock()
+	p.vm.vmLock.Lock()
+	defer p.vm.vmLock.Unlock()
 
 	return p.profiler.StopCPUProfiler()
 }
@@ -50,8 +50,8 @@ func (p *Admin) StopCPUProfiler(r *http.Request, _ *struct{}, _ *api.EmptyReply)
 func (p *Admin) MemoryProfile(_ *http.Request, _ *struct{}, _ *api.EmptyReply) error {
 	log.Info("Admin: MemoryProfile called")
 
-	p.vm.ctx.Lock.Lock()
-	defer p.vm.ctx.Lock.Unlock()
+	p.vm.vmLock.Lock()
+	defer p.vm.vmLock.Unlock()
 
 	return p.profiler.MemoryProfile()
 }
@@ -60,8 +60,8 @@ func (p *Admin) MemoryProfile(_ *http.Request, _ *struct{}, _ *api.EmptyReply) e
 func (p *Admin) LockProfile(_ *http.Request, _ *struct{}, _ *api.EmptyReply) error {
 	log.Info("Admin: LockProfile called")
 
-	p.vm.ctx.Lock.Lock()
-	defer p.vm.ctx.Lock.Unlock()
+	p.vm.vmLock.Lock()
+	defer p.vm.vmLock.Unlock()
 
 	return p.profiler.LockProfile()
 }
@@ -69,8 +69,8 @@ func (p *Admin) LockProfile(_ *http.Request, _ *struct{}, _ *api.EmptyReply) err
 func (p *Admin) SetLogLevel(_ *http.Request, args *client.SetLogLevelArgs, reply *api.EmptyReply) error {
 	log.Info("EVM: SetLogLevel called", "logLevel", args.Level)
 
-	p.vm.ctx.Lock.Lock()
-	defer p.vm.ctx.Lock.Unlock()
+	p.vm.vmLock.Lock()
+	defer p.vm.vmLock.Unlock()
 
 	if err := p.vm.logger.SetLogLevel(args.Level); err != nil {
 		return fmt.Errorf("failed to parse log level: %w ", err)

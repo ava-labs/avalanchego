@@ -18,8 +18,8 @@ type ValidatorsAPI struct {
 }
 
 func (api *ValidatorsAPI) GetCurrentValidators(_ *http.Request, req *client.GetCurrentValidatorsRequest, reply *client.GetCurrentValidatorsResponse) error {
-	api.vm.ctx.Lock.RLock()
-	defer api.vm.ctx.Lock.RUnlock()
+	api.vm.vmLock.RLock()
+	defer api.vm.vmLock.RUnlock()
 
 	var vIDs set.Set[ids.ID]
 	if len(req.NodeIDs) > 0 {
