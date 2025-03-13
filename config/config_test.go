@@ -12,7 +12,6 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"reflect"
 	"testing"
 
 	"github.com/spf13/pflag"
@@ -25,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/proto/pb/signer"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/subnets"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/rpcsigner"
 	"github.com/ava-labs/avalanchego/utils/perms"
@@ -594,22 +594,22 @@ func TestGetStakingSigner(t *testing.T) {
 		name               string
 		viperKeys          string
 		config             config
-		expectedSignerType reflect.Type
+		expectedSignerType bls.Signer
 		expectedErr        error
 	}{
 		{
 			name:               "default-signer",
-			expectedSignerType: reflect.TypeOf(&localsigner.LocalSigner{}),
+			expectedSignerType: &localsigner.LocalSigner{},
 		},
 		{
 			name:               "ephemeral-signer",
 			config:             config{StakingEphemeralSignerEnabledKey: true},
-			expectedSignerType: reflect.TypeOf(&localsigner.LocalSigner{}),
+			expectedSignerType: &localsigner.LocalSigner{},
 		},
 		{
 			name:               "content-key",
 			config:             config{StakingSignerKeyContentKey: testKey},
-			expectedSignerType: reflect.TypeOf(&localsigner.LocalSigner{}),
+			expectedSignerType: &localsigner.LocalSigner{},
 		},
 		{
 			name: "file-key",
@@ -622,12 +622,12 @@ func TestGetStakingSigner(t *testing.T) {
 					return filePath
 				}(),
 			},
-			expectedSignerType: reflect.TypeOf(&localsigner.LocalSigner{}),
+			expectedSignerType: &localsigner.LocalSigner{},
 		},
 		{
 			name:               "rpc-signer",
 			config:             config{StakingRPCSignerKey: listener.Addr().String()},
-			expectedSignerType: reflect.TypeOf(&rpcsigner.Client{}),
+			expectedSignerType: &rpcsigner.Client{},
 		},
 		{
 			name: "multiple-configurations-set",
@@ -654,7 +654,7 @@ func TestGetStakingSigner(t *testing.T) {
 			signer, err := getStakingSigner(context.Background(), v)
 
 			require.ErrorIs(err, tt.expectedErr)
-			require.Equal(tt.expectedSignerType, reflect.TypeOf(signer))
+			require.IsType(tt.expectedSignerType, signer)
 		})
 	}
 }
