@@ -651,10 +651,10 @@ func TestGetStakingSigner(t *testing.T) {
 				v.Set(key, value)
 			}
 
-			signer, err := getStakingSigner(context.Background(), v)
+			config, err := GetNodeConfig(context.Background(), v)
 
 			require.ErrorIs(err, tt.expectedErr)
-			require.IsType(tt.expectedSignerType, signer)
+			require.IsType(tt.expectedSignerType, config.StakingSigningKey)
 		})
 	}
 }
