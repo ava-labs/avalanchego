@@ -167,3 +167,34 @@ jobs:
             target/
           key: ${{ needs.build.outputs.cache-key }}
       - run: RUSTDOCFLAGS="-D warnings" cargo doc --document-private-items --no-deps
+
+  ffi:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: arduino/setup-protoc@v2
+      - name: Restore Cargo Cache
+        id: cache-build-deps-restore
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ needs.build.outputs.cache-key }}
+      - name: Build Firewood FFI
+        working-directory: ffi
+        run: cargo build --release
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "ffi/go.mod"
+          cache-dependency-path: "ffi/go.sum"
+      - name: Test Go FFI bindings
+        working-directory: ffi
+        # cgocheck2 is expensive but provides complete pointer checks
+        run: GOEXPERIMENT=cgocheck2 go test ./...

@@ -4,7 +4,7 @@ package firewood
 // this is used for some of the firewood performance tests
 
 // Validate that Firewood implements the KVBackend interface
-var _ kVBackend = (*Firewood)(nil)
+var _ kVBackend = (*Database)(nil)
 
 type kVBackend interface {
 	// Returns the current root hash of the trie.
@@ -40,23 +40,22 @@ type kVBackend interface {
 	Close() error
 }
 
-// Prefetch does nothing since we don't need to prefetch for firewood
-func (f *Firewood) Prefetch(key []byte) ([]byte, error) {
+// Prefetch is a no-op since we don't need to prefetch for Firewood.
+func (*Database) Prefetch(key []byte) ([]byte, error) {
 	return nil, nil
 }
 
-// Commit does nothing, since update already persists changes
-func (f *Firewood) Commit(root []byte) error {
+// Commit is a no-op, since [Database.Update] already persists changes.
+func (*Database) Commit(root []byte) error {
 	return nil
 }
 
 // Update batches all the keys and values and applies them to the
-// database
-func (f *Firewood) Update(keys, vals [][]byte) ([]byte, error) {
-	// batch the keys and values
+// database.
+func (db *Database) Update(keys, vals [][]byte) ([]byte, error) {
 	ops := make([]KeyValue, len(keys))
 	for i := range keys {
 		ops[i] = KeyValue{keys[i], vals[i]}
 	}
-	return f.Batch(ops), nil
+	return db.Batch(ops), nil
 }

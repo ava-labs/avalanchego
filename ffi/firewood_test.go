@@ -1,106 +1,177 @@
 package firewood
 
 import (
+	"bytes"
+	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
+func TestMain(m *testing.M) {
+	// The cgocheck debugging flag checks that all pointers are pinned.
+	// TODO(arr4n) why doesn't `//go:debug cgocheck=1` work? https://go.dev/doc/godebug
+	debug := strings.Split(os.Getenv("GODEBUG"), ",")
+	var hasCgoCheck bool
+	for _, kv := range debug {
+		switch strings.TrimSpace(kv) {
+		case "cgocheck=1":
+			hasCgoCheck = true
+			break
+		case "cgocheck=0":
+			fmt.Fprint(os.Stderr, "GODEBUG=cgocheck=0; MUST be 1 for Firewood cgo tests")
+			os.Exit(1)
+		}
+	}
+
+	if !hasCgoCheck {
+		debug = append(debug, "cgocheck=1")
+		if err := os.Setenv("GODEBUG", strings.Join(debug, ",")); err != nil {
+			fmt.Fprintf(os.Stderr, `os.Setenv("GODEBUG", ...) error %v`, err)
+			os.Exit(1)
+		}
+	}
+
+	os.Exit(m.Run())
+}
+
+func newTestDatabase(t *testing.T) *Database {
+	t.Helper()
+
+	conf := DefaultConfig()
+	conf.Create = true
+	// The TempDir directory is automatically cleaned up so there's no need to
+	// remove test.db.
+	dbFile := filepath.Join(t.TempDir(), "test.db")
+
+	f, err := New(dbFile, conf)
+	require.NoErrorf(t, err, "NewDatabase(%+v)", conf)
+	// Close() always returns nil, its signature returning an error only to
+	// conform with an externally required interface.
+	t.Cleanup(func() { f.Close() })
+	return f
+}
+
 func TestInsert(t *testing.T) {
-	var f Firewood = NewDatabase(WithCreate(true), WithPath("test.db"))
-	defer os.Remove("test.db")
-	defer f.Close()
-	f.Batch([]KeyValue{
-		{[]byte("abc"), []byte("def")},
+	db := newTestDatabase(t)
+	const (
+		key = "abc"
+		val = "def"
+	)
+	db.Batch([]KeyValue{
+		{[]byte(key), []byte(val)},
 	})
 
-	value, _ := f.Get([]byte("abc"))
-	if string(value) != "def" {
-		t.Errorf("expected def, got %s", value)
+	got, err := db.Get([]byte(key))
+	require.NoErrorf(t, err, "%T.Get(%q)", db, key)
+	assert.Equal(t, val, string(got), "Recover lone batch-inserted value")
+}
+
+func keyForTest(i int) []byte {
+	return []byte("key" + strconv.Itoa(i))
+}
+
+func valForTest(i int) []byte {
+	return []byte("value" + strconv.Itoa(i))
+}
+
+func kvForTest(i int) KeyValue {
+	return KeyValue{
+		Key:   keyForTest(i),
+		Value: valForTest(i),
 	}
 }
 
 func TestInsert100(t *testing.T) {
-	var f Firewood = NewDatabase(WithCreate(true), WithPath("test.db"))
-	defer os.Remove("test.db")
-	defer f.Close()
-	ops := make([]KeyValue, 100)
-	for i := 0; i < 100; i++ {
-		ops[i] = KeyValue{[]byte("key" + strconv.Itoa(i)), []byte("value" + strconv.Itoa(i))}
-	}
-	f.Batch(ops)
-
-	for i := 0; i < 100; i++ {
-		value, err := f.Get([]byte("key" + strconv.Itoa(i)))
-		if err != nil {
-			t.FailNow()
-		}
-		if string(value) != "value"+strconv.Itoa(i) {
-			t.Errorf("expected value%d, got %s", i, value)
-		}
-	}
-
-	hash := f.Root()
-	if len(hash) != 32 {
-		t.Errorf("expected 32 bytes, got %d", len(hash))
-	}
-
-	// we know the hash starts with 0xf8
-	if hash[0] != 0xf8 {
-		t.Errorf("expected 0xf8, got %x", hash[0])
+	tests := []struct {
+		name   string
+		insert func(*Database, []KeyValue) (root []byte, _ error)
+	}{
+		{
+			name: "Batch",
+			insert: func(db *Database, kvs []KeyValue) ([]byte, error) {
+				return db.Batch(kvs), nil
+			},
+		},
+		{
+			name: "Update",
+			insert: func(db *Database, kvs []KeyValue) ([]byte, error) {
+				var keys, vals [][]byte
+				for _, kv := range kvs {
+					keys = append(keys, kv.Key)
+					vals = append(vals, kv.Value)
+				}
+				return db.Update(keys, vals)
+			},
+		},
 	}
 
-	delete_ops := make([]KeyValue, 1)
-	ops[0] = KeyValue{[]byte(""), []byte("")}
-	f.Batch(delete_ops)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db := newTestDatabase(t)
+
+			ops := make([]KeyValue, 100)
+			for i := range ops {
+				ops[i] = kvForTest(i)
+			}
+			rootFromInsert, err := tt.insert(db, ops)
+			require.NoError(t, err, "inserting")
+
+			for _, op := range ops {
+				got, err := db.Get(op.Key)
+				require.NoErrorf(t, err, "%T.Get(%q)", db, op.Key)
+				// Cast as strings to improve debug messages.
+				want := string(op.Value)
+				assert.Equal(t, want, string(got), "Recover nth batch-inserted value")
+			}
+
+			hash := db.Root()
+			assert.Lenf(t, hash, 32, "%T.Root()", db)
+			// we know the hash starts with 0xf8
+			assert.Equalf(t, byte(0xf8), hash[0], "First byte of %T.Root()", db)
+			assert.Equalf(t, rootFromInsert, hash, "%T.Root() matches value returned by insertion", db)
+		})
+	}
 }
 
 func TestRangeDelete(t *testing.T) {
-	const N = 100
-	var f Firewood = NewDatabase(WithCreate(true), WithPath("test.db"))
-	defer os.Remove("test.db")
-	defer f.Close()
-	ops := make([]KeyValue, N)
-	for i := 0; i < N; i++ {
-		ops[i] = KeyValue{[]byte("key" + strconv.Itoa(i)), []byte("value" + strconv.Itoa(i))}
+	db := newTestDatabase(t)
+	ops := make([]KeyValue, 100)
+	for i := range ops {
+		ops[i] = kvForTest(i)
 	}
-	f.Batch(ops)
+	db.Batch(ops)
 
-	// delete all keys that start with "key"
-	delete_ops := make([]KeyValue, 1)
-	delete_ops[0] = KeyValue{[]byte("key1"), []byte("")}
-	f.Batch(delete_ops)
+	const deletePrefix = 1
+	db.Batch([]KeyValue{{
+		Key: keyForTest(deletePrefix),
+		// delete all keys that start with "key1"
+		Value: nil,
+	}})
 
-	for i := 0; i < N; i++ {
-		keystring := "key" + strconv.Itoa(i)
-		value, err := f.Get([]byte(keystring))
-		if err != nil {
-			t.FailNow()
-		}
-		if (value != nil) == (keystring[3] == '1') {
-			t.Errorf("incorrect response for %s %s %x", keystring, value, keystring[3])
+	for _, op := range ops {
+		got, err := db.Get(op.Key)
+		require.NoError(t, err)
+
+		if deleted := bytes.HasPrefix(op.Key, keyForTest(deletePrefix)); deleted {
+			assert.Empty(t, err, got)
+		} else {
+			assert.Equal(t, op.Value, got)
 		}
 	}
 }
 
 func TestInvariants(t *testing.T) {
-	var f Firewood = NewDatabase(WithCreate(true), WithPath("test.db"))
-	defer os.Remove("test.db")
-	defer f.Close()
+	db := newTestDatabase(t)
 
-	// validate that the root of an empty trie is all zeroes
-	empty_root := f.Root()
-	if len(empty_root) != 32 {
-		t.Errorf("expected 32 bytes, got %d", len(empty_root))
-	}
-	empty_array := [32]byte(empty_root)
-	if empty_array != [32]byte{} {
-		t.Errorf("expected empty root, got %x", empty_root)
-	}
+	assert.Equalf(t, make([]byte, 32), db.Root(), "%T.Root() of empty trie")
 
-	// validate that get returns nil, nil for non-existent key
-	val, err := f.Get([]byte("non-existent"))
-	if val != nil || err != nil {
-		t.Errorf("expected nil, nil, got %v, %v", val, err)
-	}
+	got, err := db.Get([]byte("non-existent"))
+	require.NoError(t, err)
+	assert.Emptyf(t, got, "%T.Get([non-existent key])", db)
 }

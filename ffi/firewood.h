@@ -19,6 +19,22 @@ typedef struct KeyValue {
 } KeyValue;
 
 /**
+ * Common arguments, accepted by both `fwd_create_db()` and `fwd_open_db()`.
+ *
+ * * `path` - The path to the database file, which will be truncated if passed to `fwd_create_db()`
+ *    otherwise should exist if passed to `fwd_open_db()`.
+ * * `cache_size` - The size of the node cache, panics if <= 0
+ * * `revisions` - The maximum number of revisions to keep; firewood currently requires this to be at least 2
+ */
+typedef struct CreateOrOpenArgs {
+  const char *path;
+  size_t cache_size;
+  size_t revisions;
+  uint8_t strategy;
+  uint16_t metrics_port;
+} CreateOrOpenArgs;
+
+/**
  * Puts the given key-value pairs into the database.
  *
  * # Returns
@@ -59,9 +75,7 @@ void fwd_close_db(void *db);
  *
  * # Arguments
  *
- * * `path` - The path to the database file, which will be overwritten
- * * `cache_size` - The size of the node cache, panics if <= 0
- * * `revisions` - The maximum number of revisions to keep; firewood currently requires this to be at least 2
+ * See `CreateOrOpenArgs`.
  *
  * # Returns
  *
@@ -75,11 +89,7 @@ void fwd_close_db(void *db);
  * The caller must call `close` to free the memory associated with the returned database handle.
  *
  */
-void *fwd_create_db(const char *path,
-                    size_t cache_size,
-                    size_t revisions,
-                    uint8_t strategy,
-                    uint16_t metrics_port);
+void *fwd_create_db(struct CreateOrOpenArgs args);
 
 /**
  * Frees the memory associated with a `Value`.
@@ -112,9 +122,7 @@ struct Value fwd_get(void *db, struct Value key);
  *
  * # Arguments
  *
- * * `path` - The path to the database file, which should exist
- * * `cache_size` - The size of the node cache, panics if <= 0
- * * `revisions` - The maximum number of revisions to keep; firewood currently requires this to be at least 2
+ * See `CreateOrOpenArgs`.
  *
  * # Returns
  *
@@ -128,11 +136,7 @@ struct Value fwd_get(void *db, struct Value key);
  * The caller must call `close` to free the memory associated with the returned database handle.
  *
  */
-void *fwd_open_db(const char *path,
-                  size_t cache_size,
-                  size_t revisions,
-                  uint8_t strategy,
-                  uint16_t metrics_port);
+void *fwd_open_db(struct CreateOrOpenArgs args);
 
 /**
  * Get the root hash of the latest version of the database

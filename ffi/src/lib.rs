@@ -172,14 +172,27 @@ pub unsafe extern "C" fn fwd_free_value(value: *const Value) {
     drop(recreated_box);
 }
 
+/// Common arguments, accepted by both `fwd_create_db()` and `fwd_open_db()`.
+///
+/// * `path` - The path to the database file, which will be truncated if passed to `fwd_create_db()`
+///    otherwise should exist if passed to `fwd_open_db()`.
+/// * `cache_size` - The size of the node cache, panics if <= 0
+/// * `revisions` - The maximum number of revisions to keep; firewood currently requires this to be at least 2
+#[repr(C)]
+pub struct CreateOrOpenArgs {
+    path: *const std::ffi::c_char,
+    cache_size: usize,
+    revisions: usize,
+    strategy: u8,
+    metrics_port: u16,
+}
+
 /// Create a database with the given cache size and maximum number of revisions, as well
 /// as a specific cache strategy
 ///
 /// # Arguments
 ///
-/// * `path` - The path to the database file, which will be overwritten
-/// * `cache_size` - The size of the node cache, panics if <= 0
-/// * `revisions` - The maximum number of revisions to keep; firewood currently requires this to be at least 2
+/// See `CreateOrOpenArgs`.
 ///
 /// # Returns
 ///
@@ -193,27 +206,23 @@ pub unsafe extern "C" fn fwd_free_value(value: *const Value) {
 /// The caller must call `close` to free the memory associated with the returned database handle.
 ///
 #[no_mangle]
-pub unsafe extern "C" fn fwd_create_db(
-    path: *const std::ffi::c_char,
-    cache_size: usize,
-    revisions: usize,
-    strategy: u8,
-    metrics_port: u16,
-) -> *mut Db {
+pub unsafe extern "C" fn fwd_create_db(args: CreateOrOpenArgs) -> *mut Db {
     let cfg = DbConfig::builder()
         .truncate(true)
-        .manager(manager_config(cache_size, revisions, strategy))
+        .manager(manager_config(
+            args.cache_size,
+            args.revisions,
+            args.strategy,
+        ))
         .build();
-    common_create(path, metrics_port, cfg)
+    common_create(args.path, args.metrics_port, cfg)
 }
 
 /// Open a database with the given cache size and maximum number of revisions
 ///
 /// # Arguments
 ///
-/// * `path` - The path to the database file, which should exist
-/// * `cache_size` - The size of the node cache, panics if <= 0
-/// * `revisions` - The maximum number of revisions to keep; firewood currently requires this to be at least 2
+/// See `CreateOrOpenArgs`.
 ///
 /// # Returns
 ///
@@ -227,18 +236,16 @@ pub unsafe extern "C" fn fwd_create_db(
 /// The caller must call `close` to free the memory associated with the returned database handle.
 ///
 #[no_mangle]
-pub unsafe extern "C" fn fwd_open_db(
-    path: *const std::ffi::c_char,
-    cache_size: usize,
-    revisions: usize,
-    strategy: u8,
-    metrics_port: u16,
-) -> *mut Db {
+pub unsafe extern "C" fn fwd_open_db(args: CreateOrOpenArgs) -> *mut Db {
     let cfg = DbConfig::builder()
         .truncate(false)
-        .manager(manager_config(cache_size, revisions, strategy))
+        .manager(manager_config(
+            args.cache_size,
+            args.revisions,
+            args.strategy,
+        ))
         .build();
-    common_create(path, metrics_port, cfg)
+    common_create(args.path, args.metrics_port, cfg)
 }
 
 unsafe fn common_create(
