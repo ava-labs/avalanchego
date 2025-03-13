@@ -68,6 +68,7 @@ runs:
       run: ${{ inputs.run_env }} nix develop --impure --command bash -x ${{ inputs.run }}
       env:
         TMPNET_START_COLLECTORS: ${{ inputs.prometheus_username != '' }}
+        TMPNET_CHECK_MONITORING: ${{ inputs.prometheus_username != '' }}
         LOKI_USERNAME: ${{ inputs.loki_username }}
         LOKI_PASSWORD: ${{ inputs.loki_password }}
         PROMETHEUS_USERNAME: ${{ inputs.prometheus_username }}
@@ -92,30 +93,3 @@ runs:
           ~/.tmpnet/prometheus/prometheus.log
           ~/.tmpnet/promtail/promtail.log
         if-no-files-found: error
-    # TODO(marun) Maybe optionally run these checks in an AfterSuite step?
-    - name: Check that logs were collected
-      if: (inputs.prometheus_username != '')
-      shell: bash
-      run: go run github.com/ava-labs/avalanchego/tests/fixture/tmpnet/cmd check-logs
-      env:
-        LOKI_USERNAME: ${{ inputs.loki_username }}
-        LOKI_PASSWORD: ${{ inputs.loki_password }}
-        GH_REPO: ${{ inputs.repository_owner }}/${{ inputs.repository_name }}
-        GH_WORKFLOW: ${{ inputs.workflow }}
-        GH_RUN_ID: ${{ inputs.run_id }}
-        GH_RUN_NUMBER: ${{ inputs.run_number }}
-        GH_RUN_ATTEMPT: ${{ inputs.run_attempt }}
-        GH_JOB_ID: ${{ inputs.job }}
-    - name: Check that metrics were collected
-      if: (inputs.prometheus_username != '')
-      shell: bash
-      run: go run github.com/ava-labs/avalanchego/tests/fixture/tmpnet/cmd check-metrics
-      env:
-        PROMETHEUS_USERNAME: ${{ inputs.prometheus_username }}
-        PROMETHEUS_PASSWORD: ${{ inputs.prometheus_password }}
-        GH_REPO: ${{ inputs.repository_owner }}/${{ inputs.repository_name }}
-        GH_WORKFLOW: ${{ inputs.workflow }}
-        GH_RUN_ID: ${{ inputs.run_id }}
-        GH_RUN_NUMBER: ${{ inputs.run_number }}
-        GH_RUN_ATTEMPT: ${{ inputs.run_attempt }}
-        GH_JOB_ID: ${{ inputs.job }}

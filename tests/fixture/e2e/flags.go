@@ -21,6 +21,7 @@ type FlagVars struct {
 	networkDir          string
 	reuseNetwork        bool
 	startCollectors     bool
+	checkMonitoring     bool
 	startNetwork        bool
 	stopNetwork         bool
 	restartNetwork      bool
@@ -75,6 +76,10 @@ func (v *FlagVars) RestartNetwork() bool {
 
 func (v *FlagVars) StartCollectors() bool {
 	return v.startCollectors
+}
+
+func (v *FlagVars) CheckMonitoring() bool {
+	return v.checkMonitoring
 }
 
 func (v *FlagVars) NetworkShutdownDelay() time.Duration {
@@ -140,7 +145,10 @@ func RegisterFlags() *FlagVars {
 		false,
 		"[optional] restart an existing network previously started with --reuse-network. Useful for ensuring a network is running with the current state of binaries on disk. Ignored if a network is not already running or --stop-network is provided.",
 	)
-	SetStartCollectorsFlag(&vars.startCollectors)
+	SetMonitoringFlags(
+		&vars.startCollectors,
+		&vars.checkMonitoring,
+	)
 	flag.BoolVar(
 		&vars.startNetwork,
 		"start-network",
@@ -170,11 +178,17 @@ func RegisterFlags() *FlagVars {
 }
 
 // Enable reuse by the upgrade job
-func SetStartCollectorsFlag(p *bool) {
+func SetMonitoringFlags(startCollectors *bool, checkMonitoring *bool) {
 	flag.BoolVar(
-		p,
+		startCollectors,
 		"start-collectors",
 		cast.ToBool(tmpnet.GetEnvWithDefault("TMPNET_START_COLLECTORS", "false")),
 		"[optional] whether to start collectors of logs and metrics from nodes of the temporary network.",
+	)
+	flag.BoolVar(
+		checkMonitoring,
+		"check-monitoring",
+		cast.ToBool(tmpnet.GetEnvWithDefault("TMPNET_CHECK_MONITORING", "false")),
+		"[optional] whether to check that logs and metrics have been collected from nodes of the temporary network.",
 	)
 }
