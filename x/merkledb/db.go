@@ -234,6 +234,9 @@ type merkleDB struct {
 	// Valid children of this trie.
 	childViews []*view
 
+	// Last committed view. Used to be invalidated when a new view is committed.
+	lastCommittedView *view
+
 	// hashNodesKeyPool controls the number of goroutines that are created
 	// inside [hashChangedNode] at any given time and provides slices for the
 	// keys needed while hashing.
@@ -363,7 +366,7 @@ func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
 	defer func() { valueIt.Release() }()
 	for valueIt.Next() {
 		if len(currentOps) >= opsSizeLimit {
-			view, err := newView(db, db, ViewChanges{BatchOps: currentOps, ConsumeBytes: true})
+			view, err := newView(ctx, db, db, ViewChanges{BatchOps: currentOps, ConsumeBytes: true})
 			if err != nil {
 				return err
 			}
@@ -386,7 +389,7 @@ func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
 	if err := valueIt.Error(); err != nil {
 		return err
 	}
-	view, err := newView(db, db, ViewChanges{BatchOps: currentOps, ConsumeBytes: true})
+	view, err := newView(ctx, db, db, ViewChanges{BatchOps: currentOps, ConsumeBytes: true})
 	if err != nil {
 		return err
 	}
@@ -397,12 +400,6 @@ func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
 }
 
 func (db *merkleDB) CommitChangeProof(ctx context.Context, proof *ChangeProof) error {
-	db.commitLock.Lock()
-	defer db.commitLock.Unlock()
-
-	if db.closed {
-		return database.ErrClosed
-	}
 	ops := make([]database.BatchOp, len(proof.KeyChanges))
 	for i, kv := range proof.KeyChanges {
 		ops[i] = database.BatchOp{
@@ -412,22 +409,12 @@ func (db *merkleDB) CommitChangeProof(ctx context.Context, proof *ChangeProof) e
 		}
 	}
 
-	view, err := newView(db, db, ViewChanges{BatchOps: ops})
-	if err != nil {
-		return err
-	}
-	return view.commitToDB(ctx)
+	return db.commitBatch(ctx, ops)
 }
 
 func (db *merkleDB) CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) error {
-	db.commitLock.Lock()
-	defer db.commitLock.Unlock()
-
-	if db.closed {
-		return database.ErrClosed
-	}
-
 	ops := make([]database.BatchOp, len(proof.KeyValues))
+
 	keys := set.NewSet[string](len(proof.KeyValues))
 	for i, kv := range proof.KeyValues {
 		keys.Add(string(kv.Key))
@@ -441,10 +428,12 @@ func (db *merkleDB) CommitRangeProof(ctx context.Context, start, end maybe.Maybe
 	if len(proof.KeyValues) > 0 {
 		largestKey = maybe.Some(proof.KeyValues[len(proof.KeyValues)-1].Key)
 	}
+
 	keysToDelete, err := db.getKeysNotInSet(start, largestKey, keys)
 	if err != nil {
 		return err
 	}
+
 	for _, keyToDelete := range keysToDelete {
 		ops = append(ops, database.BatchOp{
 			Key:    keyToDelete,
@@ -452,13 +441,7 @@ func (db *merkleDB) CommitRangeProof(ctx context.Context, start, end maybe.Maybe
 		})
 	}
 
-	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := newView(db, db, ViewChanges{BatchOps: ops})
-	if err != nil {
-		return err
-	}
-
-	return view.commitToDB(ctx)
+	return db.commitBatch(ctx, ops)
 }
 
 func (db *merkleDB) Compact(start []byte, limit []byte) error {
@@ -813,7 +796,7 @@ func (db *merkleDB) GetChangeProof(
 //
 // Assumes [db.commitLock] and [db.lock] aren't held.
 func (db *merkleDB) NewView(
-	_ context.Context,
+	ctx context.Context,
 	changes ViewChanges,
 ) (View, error) {
 	// ensure the db doesn't change while creating the new view
@@ -824,7 +807,7 @@ func (db *merkleDB) NewView(
 		return nil, database.ErrClosed
 	}
 
-	view, err := newView(db, db, changes)
+	view, err := newView(ctx, db, db, changes)
 	if err != nil {
 		return nil, err
 	}
@@ -897,7 +880,7 @@ func (db *merkleDB) PutContext(ctx context.Context, k, v []byte) error {
 		return database.ErrClosed
 	}
 
-	view, err := newView(db, db, ViewChanges{BatchOps: []database.BatchOp{{Key: k, Value: v}}})
+	view, err := newView(ctx, db, db, ViewChanges{BatchOps: []database.BatchOp{{Key: k, Value: v}}})
 	if err != nil {
 		return err
 	}
@@ -916,14 +899,13 @@ func (db *merkleDB) DeleteContext(ctx context.Context, key []byte) error {
 		return database.ErrClosed
 	}
 
-	view, err := newView(db, db,
-		ViewChanges{
-			BatchOps: []database.BatchOp{{
-				Key:    key,
-				Delete: true,
-			}},
-			ConsumeBytes: true,
-		})
+	view, err := newView(ctx, db, db, ViewChanges{
+		BatchOps: []database.BatchOp{{
+			Key:    key,
+			Delete: true,
+		}},
+		ConsumeBytes: true,
+	})
 	if err != nil {
 		return err
 	}
@@ -932,7 +914,7 @@ func (db *merkleDB) DeleteContext(ctx context.Context, key []byte) error {
 
 // Assumes values inside [ops] are safe to reference after the function
 // returns. Assumes [db.lock] isn't held.
-func (db *merkleDB) commitBatch(ops []database.BatchOp) error {
+func (db *merkleDB) commitBatch(ctx context.Context, ops []database.BatchOp) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
@@ -940,7 +922,7 @@ func (db *merkleDB) commitBatch(ops []database.BatchOp) error {
 		return database.ErrClosed
 	}
 
-	view, err := newView(db, db, ViewChanges{BatchOps: ops, ConsumeBytes: true})
+	view, err := newView(ctx, db, db, ViewChanges{BatchOps: ops, ConsumeBytes: true})
 	if err != nil {
 		return err
 	}
@@ -980,17 +962,31 @@ func (db *merkleDB) commitView(ctx context.Context, trieToCommit *view) error {
 	// move any child views of the committed trie onto the db
 	db.moveChildViewsToDB(trieToCommit)
 
+	// invalidate last committed view and update it
+	if db.lastCommittedView != nil {
+		db.lastCommittedView.invalidate()
+	}
+	db.lastCommittedView = trieToCommit
+
 	if len(changes.nodes) == 0 {
 		return nil
 	}
 
-	valueNodeBatch := db.baseDB.NewBatch()
-	if err := db.applyChanges(ctx, valueNodeBatch, changes); err != nil {
+	var (
+		valueNodeBatch        = db.valueNodeDB.baseDB.NewBatch()
+		intermediateNodeBatch = db.intermediateNodeDB.baseDB.NewBatch()
+	)
+
+	if err := db.applyChanges(ctx, valueNodeBatch, intermediateNodeBatch, changes); err != nil {
 		return err
 	}
 
 	if err := db.commitValueChanges(ctx, valueNodeBatch); err != nil {
-		return err
+		return fmt.Errorf("failed to commit value node changes: %w", err)
+	}
+
+	if err := db.commitValueChanges(ctx, intermediateNodeBatch); err != nil {
+		return fmt.Errorf("failed to commit intermediate node changes: %w", err)
 	}
 
 	db.history.record(changes)
@@ -998,6 +994,7 @@ func (db *merkleDB) commitView(ctx context.Context, trieToCommit *view) error {
 	// Update root in database.
 	db.root = changes.rootChange.after
 	db.rootID = changes.rootID
+
 	return nil
 }
 
@@ -1009,18 +1006,27 @@ func (db *merkleDB) moveChildViewsToDB(trieToCommit *view) {
 	trieToCommit.validityTrackingLock.Lock()
 	defer trieToCommit.validityTrackingLock.Unlock()
 
-	for _, childView := range trieToCommit.childViews {
+	db.childViews = make([]*view, len(trieToCommit.childViews))
+
+	for i, childView := range trieToCommit.childViews {
 		childView.updateParent(db)
-		db.childViews = append(db.childViews, childView)
+		db.childViews[i] = childView
 	}
-	trieToCommit.childViews = make([]*view, 0, defaultPreallocationSize)
+
+	// no need to allocate anything for [childViews], because a committed view shouldn't accept have child views
+	trieToCommit.childViews = nil
 }
 
 // applyChanges takes the [changes] and applies them to [db.intermediateNodeDB]
 // and [valueNodeBatch].
 //
 // assumes [db.lock] is held
-func (db *merkleDB) applyChanges(ctx context.Context, valueNodeBatch database.KeyValueWriterDeleter, changes *changeSummary) error {
+func (db *merkleDB) applyChanges(
+	ctx context.Context,
+	valueNodeBatch database.KeyValueWriterDeleter,
+	intermediateNodeBatch database.KeyValueWriterDeleter,
+	changes *changeSummary,
+) error {
 	_, span := db.infoTracer.Start(ctx, "MerkleDB.applyChanges")
 	defer span.End()
 
@@ -1032,11 +1038,11 @@ func (db *merkleDB) applyChanges(ctx context.Context, valueNodeBatch database.Ke
 		shouldDeleteValue := !shouldAddValue && nodeChange.before != nil && nodeChange.before.hasValue()
 
 		if shouldAddIntermediate {
-			if err := db.intermediateNodeDB.Put(key, nodeChange.after); err != nil {
+			if err := db.intermediateNodeDB.addToBatch(intermediateNodeBatch, key, nodeChange.after); err != nil {
 				return err
 			}
 		} else if shouldDeleteIntermediate {
-			if err := db.intermediateNodeDB.Delete(key); err != nil {
+			if err := db.intermediateNodeDB.addToBatch(intermediateNodeBatch, key, nil); err != nil {
 				return err
 			}
 		}
@@ -1051,6 +1057,7 @@ func (db *merkleDB) applyChanges(ctx context.Context, valueNodeBatch database.Ke
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -1169,7 +1176,7 @@ func (db *merkleDB) VerifyChangeProof(
 	}
 
 	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := newView(db, db, ViewChanges{BatchOps: ops, ConsumeBytes: true})
+	view, err := newView(ctx, db, db, ViewChanges{BatchOps: ops, ConsumeBytes: true})
 	if err != nil {
 		return err
 	}
@@ -1207,21 +1214,13 @@ func (db *merkleDB) VerifyChangeProof(
 	return nil
 }
 
-// Invalidates and removes any child views that aren't [exception].
+// Invalidates any child views that aren't [exception].
 // Assumes [db.lock] is held.
 func (db *merkleDB) invalidateChildrenExcept(exception *view) {
-	isTrackedView := false
-
 	for _, childView := range db.childViews {
 		if childView != exception {
 			childView.invalidate()
-		} else {
-			isTrackedView = true
 		}
-	}
-	db.childViews = make([]*view, 0, defaultPreallocationSize)
-	if isTrackedView {
-		db.childViews = append(db.childViews, exception)
 	}
 }
 
