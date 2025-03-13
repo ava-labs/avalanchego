@@ -14,6 +14,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -23,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
 
@@ -42,32 +42,42 @@ var (
 
 // NodeRuntime defines the methods required to support running a node.
 type NodeRuntime interface {
-	readState() error
+	readState(ctx context.Context) error
 	GetLocalURI(ctx context.Context) (string, func(), error)
 	GetLocalStakingAddress(ctx context.Context) (netip.AddrPort, func(), error)
-	Start(log logging.Logger) error
-	InitiateStop() error
+	SetDefaultFlags()
+	Start(ctx context.Context) error
+	InitiateStop(ctx context.Context) error
 	WaitForStopped(ctx context.Context) error
+	Restart(ctx context.Context) error
 	IsHealthy(ctx context.Context) (bool, error)
 }
 
-// Configuration required to configure a node runtime.
+// Configuration required to configure a node runtime. Only one of the fields should be set.
 type NodeRuntimeConfig struct {
-	AvalancheGoPath   string
+	// Path to the AvalancheGo binary if the node is running as a process.
+	AvalancheGoPath string
+	// TODO(marun) Document this
 	ReuseDynamicPorts bool
+	// The kubernetes configuration if the node is running as a pod.
+	KubeRuntimeConfig *KubeRuntimeConfig
+}
+
+// Configuration required to configure a node running as a pod.
+type KubeRuntimeConfig struct {
+	// Path to the kubeconfig file to use.
+	Kubeconfig string
+	// Namespace the node will be deployed to. For simplicity all
+	// nodes in the same network are deployed to the same namespace to
+	// ensure they can communicate freely.
+	Namespace string
+	// The name of the image the node should run.
+	ImageName string
 }
 
 // Node supports configuring and running a node participating in a temporary network.
 type Node struct {
-	// Uniquely identifies the network the node is part of to enable monitoring.
-	NetworkUUID string
-
-	// Identify the entity associated with this network. This is
-	// intended to be used to label metrics to enable filtering
-	// results for a test run between the primary/shared network used
-	// by the majority of tests and private networks used by
-	// individual tests.
-	NetworkOwner string
+	network *Network
 
 	// Set by EnsureNodeID which is also called when the node is read.
 	NodeID ids.NodeID
@@ -122,17 +132,18 @@ func NewNodesOrPanic(count int) []*Node {
 }
 
 // Reads a node's configuration from the specified directory.
-func ReadNode(dataDir string) (*Node, error) {
+func ReadNode(ctx context.Context, network *Network, dataDir string) (*Node, error) {
 	node := NewNode(dataDir)
-	return node, node.Read()
+	node.network = network
+	return node, node.Read(ctx)
 }
 
 // Reads nodes from the specified network directory.
-func ReadNodes(networkDir string, includeEphemeral bool) ([]*Node, error) {
+func ReadNodes(ctx context.Context, network *Network, includeEphemeral bool) ([]*Node, error) {
 	nodes := []*Node{}
 
 	// Node configuration is stored in child directories
-	entries, err := os.ReadDir(networkDir)
+	entries, err := os.ReadDir(network.Dir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read dir: %w", err)
 	}
@@ -141,8 +152,8 @@ func ReadNodes(networkDir string, includeEphemeral bool) ([]*Node, error) {
 			continue
 		}
 
-		nodeDir := filepath.Join(networkDir, entry.Name())
-		node, err := ReadNode(nodeDir)
+		nodeDir := filepath.Join(network.Dir, entry.Name())
+		node, err := ReadNode(ctx, network, nodeDir)
 		if errors.Is(err, os.ErrNotExist) {
 			// If no config file exists, assume this is not the path of a node
 			continue
@@ -163,8 +174,22 @@ func ReadNodes(networkDir string, includeEphemeral bool) ([]*Node, error) {
 // Retrieves the runtime for the node.
 func (n *Node) getRuntime() NodeRuntime {
 	if n.runtime == nil {
-		n.runtime = &NodeProcess{
-			node: n,
+		runtime := "process"
+		if n.RuntimeConfig.KubeRuntimeConfig != nil {
+			runtime = "kube"
+		}
+		switch runtime {
+		case "process":
+			n.runtime = &NodeProcess{
+				node: n,
+			}
+		case "kube":
+			n.runtime = &NodePod{
+				node: n,
+			}
+		default:
+			// TODO(marun) Validate the runtime sooner and avoid an error condition
+			panic("unsupported runtime: " + runtime)
 		}
 	}
 	return n.runtime
@@ -176,23 +201,36 @@ func (n *Node) IsHealthy(ctx context.Context) (bool, error) {
 	return n.getRuntime().IsHealthy(ctx)
 }
 
-func (n *Node) Start(log logging.Logger) error {
-	return n.getRuntime().Start(log)
+func (n *Node) Start(ctx context.Context) error {
+	return n.getRuntime().Start(ctx)
 }
 
 func (n *Node) InitiateStop(ctx context.Context) error {
 	if err := n.SaveMetricsSnapshot(ctx); err != nil {
 		return err
 	}
-	return n.getRuntime().InitiateStop()
+	return n.getRuntime().InitiateStop(ctx)
 }
 
 func (n *Node) WaitForStopped(ctx context.Context) error {
 	return n.getRuntime().WaitForStopped(ctx)
 }
 
-func (n *Node) readState() error {
-	return n.getRuntime().readState()
+func (n *Node) Restart(ctx context.Context) error {
+	if n.RuntimeConfig.ReuseDynamicPorts {
+		// Attempt to save the API port currently being used so the
+		// restarted node can reuse it. This may result in the node
+		// failing to start if the operating system allocates the port
+		// to a different process between node stop and start.
+		if err := n.SaveAPIPort(); err != nil {
+			return err
+		}
+	}
+	return n.getRuntime().Restart(ctx)
+}
+
+func (n *Node) readState(ctx context.Context) error {
+	return n.getRuntime().readState(ctx)
 }
 
 func (n *Node) GetDataDir() string {
@@ -205,6 +243,18 @@ func (n *Node) GetLocalURI(ctx context.Context) (string, func(), error) {
 
 func (n *Node) GetLocalStakingAddress(ctx context.Context) (netip.AddrPort, func(), error) {
 	return n.getRuntime().GetLocalStakingAddress(ctx)
+}
+
+// getNetwork returns the network associated with the node. If not
+// network is set, a placeholder network will be returned as a simple
+// way of communicating an undesirable circumstance.
+func (n *Node) getNetwork() *Network {
+	if n.network != nil {
+		return n.network
+	}
+	// Tripwire for unexpected usage
+	// TODO(marun) Not appropriate for anything load-bearing
+	panic("no network set for the node")
 }
 
 // Writes the current state of the metrics endpoint to disk
@@ -241,21 +291,6 @@ func (n *Node) Stop(ctx context.Context) error {
 		return err
 	}
 	return n.WaitForStopped(ctx)
-}
-
-// Sets networking configuration for the node.
-// Convenience method for setting networking flags.
-func (n *Node) SetNetworkingConfig(bootstrapIDs []string, bootstrapIPs []string) {
-	if _, ok := n.Flags[config.HTTPPortKey]; !ok {
-		// Default to dynamic port allocation
-		n.Flags[config.HTTPPortKey] = 0
-	}
-	if _, ok := n.Flags[config.StakingPortKey]; !ok {
-		// Default to dynamic port allocation
-		n.Flags[config.StakingPortKey] = 0
-	}
-	n.Flags[config.BootstrapIDsKey] = strings.Join(bootstrapIDs, ",")
-	n.Flags[config.BootstrapIPsKey] = strings.Join(bootstrapIPs, ",")
 }
 
 // Ensures staking and signing keys are generated if not already present and
@@ -392,7 +427,37 @@ func (n *Node) GetUniqueID() string {
 	nodeIDString := n.NodeID.String()
 	startIndex := len(ids.NodeIDPrefix)
 	endIndex := startIndex + 8 // 8 characters should be enough to identify a node in the context of its network
-	return n.NetworkUUID + "-" + strings.ToLower(nodeIDString[startIndex:endIndex])
+	return n.getNetwork().UUID + "-" + strings.ToLower(nodeIDString[startIndex:endIndex])
+}
+
+var githubLabels = []string{
+	"gh_repo",
+	"gh_workflow",
+	"gh_run_id",
+	"gh_run_number",
+	"gh_run_attempt",
+	"gh_job_id",
+}
+
+func (n *Node) getPodLabels() map[string]string {
+	labels := map[string]string{
+		// Explicitly setting an instance label avoids the default
+		// behavior of using the node's URI since the URI isn't
+		// guaranteed stable (e.g. port may change after restart).
+		"instance":          n.GetUniqueID(),
+		"network_uuid":      n.getNetwork().UUID,
+		"node_id":           n.NodeID.String(),
+		"is_ephemeral_node": strconv.FormatBool(n.IsEphemeral),
+		"network_owner":     n.getNetwork().Owner,
+	}
+	// Include the values of github labels if available
+	for _, label := range githubLabels {
+		value := os.Getenv(strings.ToUpper(label))
+		if len(value) > 0 {
+			labels[label] = value
+		}
+	}
+	return labels
 }
 
 // Saves the currently allocated API port to the node's configuration
