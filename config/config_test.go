@@ -651,7 +651,8 @@ func TestGetStakingSigner(t *testing.T) {
 				v.Set(key, value)
 			}
 
-			config, err := GetNodeConfig(context.Background(), v)
+			config, cleanup, err := GetNodeConfig(context.Background(), v)
+			defer func() { _ = cleanup() }()
 
 			require.ErrorIs(err, tt.expectedErr)
 			require.IsType(tt.expectedSignerType, config.StakingSigningKey)
@@ -665,10 +666,12 @@ func TestDefaultConfigInitializtionUsesExistingDefaultKey(t *testing.T) {
 	require := require.New(t)
 	v := setupViperFlags()
 
-	config1, err := GetNodeConfig(context.Background(), v)
+	config1, cleanup1, err := GetNodeConfig(context.Background(), v)
+	defer func() { _ = cleanup1() }()
 	require.NoError(err)
 
-	config2, err := GetNodeConfig(context.Background(), v)
+	config2, cleanup2, err := GetNodeConfig(context.Background(), v)
+	defer func() { _ = cleanup2() }()
 	require.NoError(err)
 
 	require.Equal(config1.StakingSigningKey.PublicKey(), config2.StakingSigningKey.PublicKey())

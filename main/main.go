@@ -54,10 +54,13 @@ func main() {
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	nodeConfig, err := config.GetNodeConfig(ctx, v)
+	nodeConfig, cleanup, err := config.GetNodeConfig(ctx, v)
 	cancel()
 	if err != nil {
 		fmt.Printf("couldn't load node config: %s\n", err)
+		if err := cleanup(); err != nil {
+			fmt.Printf("error cleaning up: %s\n", err)
+		}
 		os.Exit(1)
 	}
 
@@ -68,9 +71,15 @@ func main() {
 	nodeApp, err := app.New(nodeConfig)
 	if err != nil {
 		fmt.Printf("couldn't start node: %s\n", err)
+		if err := cleanup(); err != nil {
+			fmt.Printf("error cleaning up: %s\n", err)
+		}
 		os.Exit(1)
 	}
 
 	exitCode := app.Run(nodeApp)
+	if err := cleanup(); err != nil {
+		fmt.Printf("error cleaning up: %s\n", err)
+	}
 	os.Exit(exitCode)
 }
