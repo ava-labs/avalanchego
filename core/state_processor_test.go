@@ -34,13 +34,14 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/subnet-evm/consensus"
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/consensus/misc/eip4844"
-	"github.com/ava-labs/subnet-evm/core/types"
+	customtypes "github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/params/extras"
 	customheader "github.com/ava-labs/subnet-evm/plugin/evm/header"
@@ -379,7 +380,7 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 	}
 
 	if params.GetExtra(config).IsSubnetEVM(header.Time) {
-		headerExtra := types.GetHeaderExtra(header)
+		headerExtra := customtypes.GetHeaderExtra(header)
 		headerExtra.BlockGasCost = big.NewInt(0)
 	}
 	var receipts []*types.Receipt

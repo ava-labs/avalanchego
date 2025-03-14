@@ -30,8 +30,8 @@ import (
 	"context"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/subnet-evm/accounts/abi/bind"
-	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/ethclient/simulated"
 	"github.com/ava-labs/subnet-evm/interfaces"
 )

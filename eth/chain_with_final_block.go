@@ -2,8 +2,8 @@
 package eth
 
 import (
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/subnet-evm/core"
-	"github.com/ava-labs/subnet-evm/core/types"
 )
 
 const blocksToKeep = 604_800 // Approx. 2 weeks worth of blocks assuming 2s block time

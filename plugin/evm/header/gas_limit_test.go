@@ -6,8 +6,8 @@ package header
 import (
 	"testing"
 
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/subnet-evm/commontype"
-	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/stretchr/testify/require"
 )

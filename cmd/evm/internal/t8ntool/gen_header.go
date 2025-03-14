@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/common/math"
-	types0 "github.com/ava-labs/subnet-evm/core/types"
+	"github.com/ava-labs/libevm/core/types"
 )
 
 var _ = (*headerMarshaling)(nil)
@@ -24,7 +24,7 @@ func (h header) MarshalJSON() ([]byte, error) {
 		Root                  common.Hash           `json:"stateRoot"        gencodec:"required"`
 		TxHash                *common.Hash          `json:"transactionsRoot"`
 		ReceiptHash           *common.Hash          `json:"receiptsRoot"`
-		Bloom                 types0.Bloom          `json:"logsBloom"`
+		Bloom                 types.Bloom           `json:"logsBloom"`
 		Difficulty            *math.HexOrDecimal256 `json:"difficulty"`
 		Number                *math.HexOrDecimal256 `json:"number"           gencodec:"required"`
 		GasLimit              math.HexOrDecimal64   `json:"gasLimit"         gencodec:"required"`
@@ -32,7 +32,7 @@ func (h header) MarshalJSON() ([]byte, error) {
 		Time                  math.HexOrDecimal64   `json:"timestamp"        gencodec:"required"`
 		Extra                 hexutil.Bytes         `json:"extraData"`
 		MixDigest             common.Hash           `json:"mixHash"`
-		Nonce                 *types0.BlockNonce    `json:"nonce"`
+		Nonce                 *types.BlockNonce     `json:"nonce"`
 		BaseFee               *math.HexOrDecimal256 `json:"baseFeePerGas" rlp:"optional"`
 		BlobGasUsed           *math.HexOrDecimal64  `json:"blobGasUsed"   rlp:"optional"`
 		ExcessBlobGas         *math.HexOrDecimal64  `json:"excessBlobGas"   rlp:"optional"`
@@ -70,7 +70,7 @@ func (h *header) UnmarshalJSON(input []byte) error {
 		Root                  *common.Hash          `json:"stateRoot"        gencodec:"required"`
 		TxHash                *common.Hash          `json:"transactionsRoot"`
 		ReceiptHash           *common.Hash          `json:"receiptsRoot"`
-		Bloom                 *types0.Bloom         `json:"logsBloom"`
+		Bloom                 *types.Bloom          `json:"logsBloom"`
 		Difficulty            *math.HexOrDecimal256 `json:"difficulty"`
 		Number                *math.HexOrDecimal256 `json:"number"           gencodec:"required"`
 		GasLimit              *math.HexOrDecimal64  `json:"gasLimit"         gencodec:"required"`
@@ -78,7 +78,7 @@ func (h *header) UnmarshalJSON(input []byte) error {
 		Time                  *math.HexOrDecimal64  `json:"timestamp"        gencodec:"required"`
 		Extra                 *hexutil.Bytes        `json:"extraData"`
 		MixDigest             *common.Hash          `json:"mixHash"`
-		Nonce                 *types0.BlockNonce    `json:"nonce"`
+		Nonce                 *types.BlockNonce     `json:"nonce"`
 		BaseFee               *math.HexOrDecimal256 `json:"baseFeePerGas" rlp:"optional"`
 		BlobGasUsed           *math.HexOrDecimal64  `json:"blobGasUsed"   rlp:"optional"`
 		ExcessBlobGas         *math.HexOrDecimal64  `json:"excessBlobGas"   rlp:"optional"`

@@ -28,7 +28,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ava-labs/subnet-evm/core/types"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/subnet-evm/utils"
 )
 

@@ -37,10 +37,10 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/log"
-	"github.com/ava-labs/subnet-evm/core/types"
 )
 
 // ChainIndexerBackend defines the methods needed to process chain segments in

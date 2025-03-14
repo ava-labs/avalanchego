@@ -5,9 +5,11 @@ package types
 
 import (
 	"math/big"
+
+	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
-func BlockGasCost(b *Block) *big.Int {
+func BlockGasCost(b *ethtypes.Block) *big.Int {
 	cost := GetHeaderExtra(b.Header()).BlockGasCost
 	if cost == nil {
 		return nil

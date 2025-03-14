@@ -24,6 +24,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/metrics"
 	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/triedb"
@@ -32,7 +33,6 @@ import (
 	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/txpool"
-	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/eth"
 	"github.com/ava-labs/subnet-evm/eth/ethconfig"
 	subnetevmprometheus "github.com/ava-labs/subnet-evm/metrics/prometheus"

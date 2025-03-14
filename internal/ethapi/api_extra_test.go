@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/subnet-evm/core/types"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/subnet-evm/rpc"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"

@@ -3,9 +3,11 @@
 
 package types
 
+import ethtypes "github.com/ava-labs/libevm/core/types"
+
 // FlattenLogs converts a nested array of logs to a single array of logs.
-func FlattenLogs(list [][]*Log) []*Log {
-	var flat []*Log
+func FlattenLogs(list [][]*ethtypes.Log) []*ethtypes.Log {
+	var flat []*ethtypes.Log
 	for _, logs := range list {
 		flat = append(flat, logs...)
 	}

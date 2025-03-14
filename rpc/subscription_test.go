@@ -39,7 +39,10 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/subnet-evm/core/types"
+	"github.com/ava-labs/libevm/core/types"
+
+	// Side effect: registration of libevm extras.
+	_ "github.com/ava-labs/subnet-evm/core/types"
 )
 
 func TestNewID(t *testing.T) {

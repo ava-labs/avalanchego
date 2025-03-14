@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/log"
 
@@ -43,7 +44,7 @@ import (
 	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/txpool"
-	"github.com/ava-labs/subnet-evm/core/types"
+	customtypes "github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/eth"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/params/extras"
@@ -1984,8 +1985,8 @@ func TestBuildSubnetEVMBlock(t *testing.T) {
 
 	blk = issueAndAccept(t, issuer, vm)
 	ethBlk := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
-	if types.BlockGasCost(ethBlk) == nil || types.BlockGasCost(ethBlk).Cmp(big.NewInt(100)) < 0 {
-		t.Fatalf("expected blockGasCost to be at least 100 but got %d", types.BlockGasCost(ethBlk))
+	if customtypes.BlockGasCost(ethBlk) == nil || customtypes.BlockGasCost(ethBlk).Cmp(big.NewInt(100)) < 0 {
+		t.Fatalf("expected blockGasCost to be at least 100 but got %d", customtypes.BlockGasCost(ethBlk))
 	}
 	chainConfig := params.GetExtra(vm.chainConfig)
 	minRequiredTip, err := header.EstimateRequiredTip(chainConfig, ethBlk.Header())

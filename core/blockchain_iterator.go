@@ -33,7 +33,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/ava-labs/subnet-evm/core/types"
+	"github.com/ava-labs/libevm/core/types"
 )
 
 type blockAndState struct {

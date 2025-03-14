@@ -7,7 +7,8 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ava-labs/subnet-evm/core/types"
+	"github.com/ava-labs/libevm/core/types"
+	customtypes "github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/subnetevm"
 	"github.com/ava-labs/subnet-evm/utils"
@@ -82,7 +83,7 @@ func TestExtraPrefix(t *testing.T) {
 		{
 			name:     "subnet_evm_normal",
 			upgrades: extras.TestSubnetEVMChainConfig.NetworkUpgrades,
-			parent: types.WithHeaderExtra(
+			parent: customtypes.WithHeaderExtra(
 				&types.Header{
 					Number:  big.NewInt(1),
 					GasUsed: targetGas,
@@ -90,7 +91,7 @@ func TestExtraPrefix(t *testing.T) {
 						1, 2, 3, 4,
 					}).Bytes(),
 				},
-				&types.HeaderExtra{
+				&customtypes.HeaderExtra{
 					BlockGasCost: big.NewInt(blockGas),
 				},
 			),

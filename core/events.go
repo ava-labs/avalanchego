@@ -28,7 +28,7 @@ package core
 
 import (
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/subnet-evm/core/types"
+	"github.com/ava-labs/libevm/core/types"
 )
 
 // NewTxsEvent is posted when a batch of transactions enter the transaction pool.

@@ -7,8 +7,9 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/subnet-evm/commontype"
-	"github.com/ava-labs/subnet-evm/core/types"
+	customtypes "github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/stretchr/testify/assert"
@@ -94,11 +95,11 @@ func BlockGasCostTest(t *testing.T, feeConfig commontype.FeeConfig) {
 			config := &extras.ChainConfig{
 				NetworkUpgrades: test.upgrades,
 			}
-			parent := types.WithHeaderExtra(
+			parent := customtypes.WithHeaderExtra(
 				&types.Header{
 					Time: test.parentTime,
 				},
-				&types.HeaderExtra{
+				&customtypes.HeaderExtra{
 					BlockGasCost: test.parentCost,
 				},
 			)
@@ -230,9 +231,9 @@ func TestEstimateRequiredTip(t *testing.T) {
 		{
 			name:               "nil_base_fee",
 			subnetEVMTimestamp: utils.NewUint64(0),
-			header: types.WithHeaderExtra(
+			header: customtypes.WithHeaderExtra(
 				&types.Header{},
-				&types.HeaderExtra{
+				&customtypes.HeaderExtra{
 					BlockGasCost: big.NewInt(1),
 				},
 			),
@@ -249,12 +250,12 @@ func TestEstimateRequiredTip(t *testing.T) {
 		{
 			name:               "no_gas_used",
 			subnetEVMTimestamp: utils.NewUint64(0),
-			header: types.WithHeaderExtra(
+			header: customtypes.WithHeaderExtra(
 				&types.Header{
 					GasUsed: 0,
 					BaseFee: big.NewInt(1),
 				},
-				&types.HeaderExtra{
+				&customtypes.HeaderExtra{
 					BlockGasCost: big.NewInt(1),
 				},
 			),
@@ -263,12 +264,12 @@ func TestEstimateRequiredTip(t *testing.T) {
 		{
 			name:               "success",
 			subnetEVMTimestamp: utils.NewUint64(0),
-			header: types.WithHeaderExtra(
+			header: customtypes.WithHeaderExtra(
 				&types.Header{
 					GasUsed: 912,
 					BaseFee: big.NewInt(456),
 				},
-				&types.HeaderExtra{
+				&customtypes.HeaderExtra{
 					BlockGasCost: big.NewInt(101112),
 				},
 			),
@@ -279,12 +280,12 @@ func TestEstimateRequiredTip(t *testing.T) {
 		{
 			name:               "success_rounds_up",
 			subnetEVMTimestamp: utils.NewUint64(0),
-			header: types.WithHeaderExtra(
+			header: customtypes.WithHeaderExtra(
 				&types.Header{
 					GasUsed: 124,
 					BaseFee: big.NewInt(456),
 				},
-				&types.HeaderExtra{
+				&customtypes.HeaderExtra{
 					BlockGasCost: big.NewInt(101112),
 				},
 			),

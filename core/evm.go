@@ -31,13 +31,12 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/libevm/common"
-	ethtypes "github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/subnet-evm/consensus"
 	"github.com/ava-labs/subnet-evm/consensus/misc/eip4844"
 	"github.com/ava-labs/subnet-evm/core/extstate"
-	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
 	customheader "github.com/ava-labs/subnet-evm/plugin/evm/header"
 	"github.com/ava-labs/subnet-evm/predicate"
@@ -155,7 +154,7 @@ func newEVMBlockContext(header *types.Header, chain ChainContext, author *common
 		BaseFee:     baseFee,
 		BlobBaseFee: blobBaseFee,
 		GasLimit:    header.GasLimit,
-		Header: &ethtypes.Header{
+		Header: &types.Header{
 			Number: new(big.Int).Set(header.Number),
 			Time:   header.Time,
 			Extra:  extra,

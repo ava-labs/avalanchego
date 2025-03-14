@@ -11,11 +11,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/subnet-evm/consensus"
 	"github.com/ava-labs/subnet-evm/consensus/misc/eip4844"
 	"github.com/ava-labs/subnet-evm/core/state"
-	"github.com/ava-labs/subnet-evm/core/types"
+	customtypes "github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/plugin/evm/vmerrors"
@@ -162,7 +163,7 @@ func verifyHeaderGasFields(config *extras.ChainConfig, header *types.Header, par
 		parent,
 		header.Time,
 	)
-	headerExtra := types.GetHeaderExtra(header)
+	headerExtra := customtypes.GetHeaderExtra(header)
 	if !utils.BigEqual(headerExtra.BlockGasCost, expectedBlockGasCost) {
 		return fmt.Errorf("invalid block gas cost: have %d, want %d", headerExtra.BlockGasCost, expectedBlockGasCost)
 	}
@@ -337,7 +338,7 @@ func (eng *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *types
 		return err
 	}
 	// Verify the BlockGasCost set in the header matches the expected value.
-	blockGasCost := types.BlockGasCost(block)
+	blockGasCost := customtypes.BlockGasCost(block)
 	expectedBlockGasCost := customheader.BlockGasCost(
 		config,
 		feeConfig,
@@ -374,7 +375,7 @@ func (eng *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, h
 	config := params.GetExtra(chain.Config())
 
 	// Calculate the required block gas cost for this block.
-	headerExtra := types.GetHeaderExtra(header)
+	headerExtra := customtypes.GetHeaderExtra(header)
 	headerExtra.BlockGasCost = customheader.BlockGasCost(
 		config,
 		feeConfig,

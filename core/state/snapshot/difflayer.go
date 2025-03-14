@@ -36,8 +36,8 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rlp"
-	"github.com/ava-labs/subnet-evm/core/types"
 	bloomfilter "github.com/holiman/bloomfilter/v2"
 	"golang.org/x/exp/slices"
 )

@@ -10,8 +10,9 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/trie"
-	"github.com/ava-labs/subnet-evm/core/types"
+	customtypes "github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/plugin/evm/header"
 	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/legacy"
@@ -113,7 +114,7 @@ func (v blockValidator) SyntacticVerify(b *Block, rules params.Rules) error {
 	}
 
 	if rulesExtra.IsSubnetEVM {
-		blockGasCost := types.GetHeaderExtra(ethHeader).BlockGasCost
+		blockGasCost := customtypes.GetHeaderExtra(ethHeader).BlockGasCost
 		switch {
 		// Make sure BlockGasCost is not nil
 		// NOTE: ethHeader.BlockGasCost correctness is checked in header verification

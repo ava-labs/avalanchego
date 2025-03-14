@@ -8,8 +8,9 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/subnet-evm/commontype"
-	"github.com/ava-labs/subnet-evm/core/types"
+	customtypes "github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/plugin/evm/blockgascost"
 )
@@ -43,7 +44,7 @@ func BlockGasCost(
 	}
 	return new(big.Int).SetUint64(BlockGasCostWithStep(
 		feeConfig,
-		types.GetHeaderExtra(parent).BlockGasCost,
+		customtypes.GetHeaderExtra(parent).BlockGasCost,
 		step,
 		timeElapsed,
 	))
@@ -87,7 +88,7 @@ func EstimateRequiredTip(
 	config *extras.ChainConfig,
 	header *types.Header,
 ) (*big.Int, error) {
-	extra := types.GetHeaderExtra(header)
+	extra := customtypes.GetHeaderExtra(header)
 	switch {
 	case !config.IsSubnetEVM(header.Time):
 		return nil, nil

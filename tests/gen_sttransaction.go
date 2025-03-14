@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/common/math"
-	types0 "github.com/ava-labs/subnet-evm/core/types"
+	"github.com/ava-labs/libevm/core/types"
 )
 
 var _ = (*stTransactionMarshaling)(nil)
@@ -23,7 +23,7 @@ func (s stTransaction) MarshalJSON() ([]byte, error) {
 		Nonce                math.HexOrDecimal64   `json:"nonce"`
 		To                   string                `json:"to"`
 		Data                 []string              `json:"data"`
-		AccessLists          []*types0.AccessList  `json:"accessLists,omitempty"`
+		AccessLists          []*types.AccessList   `json:"accessLists,omitempty"`
 		GasLimit             []math.HexOrDecimal64 `json:"gasLimit"`
 		Value                []string              `json:"value"`
 		PrivateKey           hexutil.Bytes         `json:"secretKey"`
@@ -62,7 +62,7 @@ func (s *stTransaction) UnmarshalJSON(input []byte) error {
 		Nonce                *math.HexOrDecimal64  `json:"nonce"`
 		To                   *string               `json:"to"`
 		Data                 []string              `json:"data"`
-		AccessLists          []*types0.AccessList  `json:"accessLists,omitempty"`
+		AccessLists          []*types.AccessList   `json:"accessLists,omitempty"`
 		GasLimit             []math.HexOrDecimal64 `json:"gasLimit"`
 		Value                []string              `json:"value"`
 		PrivateKey           *hexutil.Bytes        `json:"secretKey"`

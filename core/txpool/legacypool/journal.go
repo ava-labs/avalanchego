@@ -33,9 +33,9 @@ import (
 	"os"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/rlp"
-	"github.com/ava-labs/subnet-evm/core/types"
 )
 
 // errNoActiveJournal is returned if a transaction is attempted to be inserted
