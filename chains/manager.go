@@ -945,7 +945,7 @@ func (m *manager) createAvalancheChain(
 
 	// create bootstrap gear
 	bootstrapCfg := smbootstrap.Config{
-		ShouldHalt:                     halter.Halted,
+		Haltable:                       &halter,
 		NonVerifyingParse:              block.ParseFunc(proposerVM.ParseLocalBlock),
 		AllGetsServer:                  snowGetHandler,
 		Ctx:                            ctx,
@@ -1002,6 +1002,7 @@ func (m *manager) createAvalancheChain(
 		TxBlocked:                      txBlocker,
 		Manager:                        vtxManager,
 		VM:                             linearizableVM,
+		Haltable:                       &halter,
 	}
 	if ctx.ChainID == m.XChainID {
 		avalancheBootstrapperConfig.StopVertexID = m.Upgrades.CortinaXChainStopVertexID
@@ -1337,7 +1338,7 @@ func (m *manager) createSnowmanChain(
 
 	// create bootstrap gear
 	bootstrapCfg := smbootstrap.Config{
-		ShouldHalt:                     halter.Halted,
+		Haltable:                       &halter,
 		NonVerifyingParse:              block.ParseFunc(proposerVM.ParseLocalBlock),
 		AllGetsServer:                  snowGetHandler,
 		Ctx:                            ctx,

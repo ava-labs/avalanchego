@@ -480,7 +480,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 		{
 			name: "single validator - context canceled",
 			peers: map[ids.NodeID]p2p.Handler{
-				nodeID0: NewHandler(&testVerifier{}, signer0),
+				nodeID0: p2p.NoOpHandler{},
 			},
 			ctx: func() context.Context {
 				ctx, cancel := context.WithCancel(context.Background())
@@ -515,9 +515,9 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 		{
 			name: "multiple validators - context canceled",
 			peers: map[ids.NodeID]p2p.Handler{
-				nodeID0: NewHandler(&testVerifier{}, signer0),
-				nodeID1: NewHandler(&testVerifier{}, signer1),
-				nodeID2: NewHandler(&testVerifier{}, signer2),
+				nodeID0: p2p.NoOpHandler{},
+				nodeID1: p2p.NoOpHandler{},
+				nodeID2: p2p.NoOpHandler{},
 			},
 			ctx: func() context.Context {
 				ctx, cancel := context.WithCancel(context.Background())
