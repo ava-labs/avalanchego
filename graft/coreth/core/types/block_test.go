@@ -24,7 +24,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package types
+package types_test
 
 import (
 	"bytes"
@@ -33,11 +33,13 @@ import (
 	"testing"
 
 	"github.com/ava-labs/coreth/internal/blocktest"
+	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/crypto"
-	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/rlp"
+
+	. "github.com/ava-labs/coreth/core/types"
 )
 
 // This test has been modified from https://github.com/ethereum/go-ethereum/blob/v1.9.21/core/types/block_test.go#L35 to fit
