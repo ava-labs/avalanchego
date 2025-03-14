@@ -15,6 +15,7 @@ var errCannotBeNil = fmt.Errorf("timestamp cannot be nil")
 
 // NetworkUpgrades contains timestamps that enable network upgrades.
 // Avalanche specific network upgrades are also included here.
+// (nil = no fork, 0 = already activated)
 type NetworkUpgrades struct {
 	// SubnetEVMTimestamp is a placeholder that activates Avalanche Upgrades prior to ApricotPhase6
 	SubnetEVMTimestamp *uint64 `json:"subnetEVMTimestamp,omitempty"`
@@ -24,8 +25,7 @@ type NetworkUpgrades struct {
 	DurangoTimestamp *uint64 `json:"durangoTimestamp,omitempty"`
 	// Placeholder for EtnaTimestamp
 	EtnaTimestamp *uint64 `json:"etnaTimestamp,omitempty"`
-	// Fortuna is a placeholder for the next upgrade.
-	// (nil = no fork, 0 = already activated)
+	// Fortuna has no effect on Subnet-EVM by itself, but is included for completeness.
 	FortunaTimestamp *uint64 `json:"fortunaTimestamp,omitempty"`
 }
 
@@ -55,7 +55,7 @@ func (n *NetworkUpgrades) forkOrder() []fork {
 		{name: "subnetEVMTimestamp", timestamp: n.SubnetEVMTimestamp},
 		{name: "durangoTimestamp", timestamp: n.DurangoTimestamp},
 		{name: "etnaTimestamp", timestamp: n.EtnaTimestamp},
-		{name: "fortunaTimestamp", timestamp: n.FortunaTimestamp},
+		{name: "fortunaTimestamp", timestamp: n.FortunaTimestamp, optional: true},
 	}
 }
 
@@ -77,6 +77,9 @@ func (n *NetworkUpgrades) setDefaults(agoUpgrades upgrade.Config) {
 	if n.EtnaTimestamp == nil || *n.EtnaTimestamp == 0 {
 		n.EtnaTimestamp = defaults.EtnaTimestamp
 	}
+	if n.FortunaTimestamp == nil || *n.FortunaTimestamp == 0 {
+		n.FortunaTimestamp = defaults.FortunaTimestamp
+	}
 }
 
 // verifyNetworkUpgrades checks that the network upgrades are well formed.
@@ -91,6 +94,9 @@ func (n *NetworkUpgrades) verifyNetworkUpgrades(agoUpgrades upgrade.Config) erro
 	if err := verifyWithDefault(n.EtnaTimestamp, defaults.EtnaTimestamp); err != nil {
 		return fmt.Errorf("Etna fork block timestamp is invalid: %w", err)
 	}
+	if err := verifyWithDefault(n.FortunaTimestamp, defaults.FortunaTimestamp); err != nil {
+		return fmt.Errorf("Fortuna fork block timestamp is invalid: %w", err)
+	}
 	return nil
 }
 
@@ -103,6 +109,9 @@ func (n *NetworkUpgrades) Override(o *NetworkUpgrades) {
 	}
 	if o.EtnaTimestamp != nil {
 		n.EtnaTimestamp = o.EtnaTimestamp
+	}
+	if o.FortunaTimestamp != nil {
+		n.FortunaTimestamp = o.FortunaTimestamp
 	}
 }
 
@@ -134,8 +143,8 @@ func (n *NetworkUpgrades) Description() string {
 	var banner string
 	banner += fmt.Sprintf(" - SubnetEVM Timestamp:          @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0)\n", ptrToString(n.SubnetEVMTimestamp))
 	banner += fmt.Sprintf(" - Durango Timestamp:            @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0)\n", ptrToString(n.DurangoTimestamp))
-	banner += fmt.Sprintf(" - Etna Timestamp:           @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0)\n", ptrToString(n.EtnaTimestamp))
-	banner += fmt.Sprintf(" - Fortuna Timestamp:              @%-10v (Unscheduled)\n", ptrToString(n.FortunaTimestamp))
+	banner += fmt.Sprintf(" - Etna Timestamp:               @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0)\n", ptrToString(n.EtnaTimestamp))
+	banner += fmt.Sprintf(" - Fortuna Timestamp:            @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.13.0)\n", ptrToString(n.FortunaTimestamp))
 	return banner
 }
 
@@ -156,18 +165,22 @@ func (n *NetworkUpgrades) GetAvalancheRules(time uint64) AvalancheRules {
 }
 
 // getDefaultNetworkUpgrades returns the network upgrades for the specified avalanchego upgrades.
-// These should not return nil values.
+// Nil values are used to indicate optional upgrades.
 func getDefaultNetworkUpgrades(agoUpgrade upgrade.Config) NetworkUpgrades {
 	return NetworkUpgrades{
 		SubnetEVMTimestamp: utils.NewUint64(0),
 		DurangoTimestamp:   utils.TimeToNewUint64(agoUpgrade.DurangoTime),
 		EtnaTimestamp:      utils.TimeToNewUint64(agoUpgrade.EtnaTime),
-		FortunaTimestamp:   utils.TimeToNewUint64(agoUpgrade.FortunaTime),
+		FortunaTimestamp:   nil, // Fortuna is optional and has no effect on Subnet-EVM
 	}
 }
 
 // verifyWithDefault checks that the provided timestamp is greater than or equal to the default timestamp.
 func verifyWithDefault(configTimestamp *uint64, defaultTimestamp *uint64) error {
+	if defaultTimestamp == nil {
+		return nil
+	}
+
 	if configTimestamp == nil {
 		return errCannotBeNil
 	}
