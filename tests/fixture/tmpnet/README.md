@@ -41,6 +41,7 @@ the following non-test files:
 | node.go                     | Node        | Orchestrates and configures nodes                           |
 | node_config.go              | Node        | Reads and writes node configuration                         |
 | node_process.go             | NodeProcess | Orchestrates node processes                                 |
+| start_kind_cluster.go       |             | Starts a local kind cluster                                 |
 | subnet.go                   | Subnet      | Orchestrates subnets                                        |
 | utils.go                    |             | Defines shared utility functions                            |
 
@@ -443,16 +444,27 @@ flake that inherits from the avalanchego flake:
 }
 ```
 
-The action also requires being able to invoke tmpnetctl via `go
-run`. Use of a `tools.go` file that imports tmpnetctl is suggested to
-enable this:
+The action expects to be able to run bin/tmpnetctl from the root of
+the repository. A suggested version of this script:
 
-```golang
-package tools
+```bash
+#!/usr/bin/env bash
 
-import (
-	_ "github.com/ava-labs/avalanchego/tests/fixture/tmpnet/cmd" // tmpnetctl
-)
+set -euo pipefail
+
+# Ensure the go command is run from the root of the repository
+REPO_ROOT=$(cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
+cd "${REPO_ROOT}"
+
+# Set AVALANCHE_VERSION
+source ./scripts/versions.sh
+
+# Install if not already available
+if command -v tmpnetctl &2> /dev/null; then
+  # An explicit version is required since a main package can't be included as a dependency of the go module.
+  go install github.com/ava-labs/avalanchego/tests/fixture/tmpnet/tmpnetctl@${AVALANCHE_VERSION}
+fi
+tmpnetctl "${@}"
 ```
 
 ### Viewing
