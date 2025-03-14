@@ -8,8 +8,8 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/utils/math"
-	customtypes "github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params/extras"
+	customtypes "github.com/ava-labs/coreth/plugin/evm/types"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap0"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap1"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap5"

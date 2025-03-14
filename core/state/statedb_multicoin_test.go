@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/coreth/core/state/snapshot"
-	customtypes "github.com/ava-labs/coreth/core/types"
+	customtypes "github.com/ava-labs/coreth/plugin/evm/types"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/crypto"

@@ -61,9 +61,9 @@ import (
 
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core"
-	customtypes "github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/coreth/params"
+	customtypes "github.com/ava-labs/coreth/plugin/evm/types"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/libevm/core/types"
 
