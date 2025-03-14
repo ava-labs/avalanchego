@@ -299,7 +299,7 @@ var bindTests = []struct {
 
 			"github.com/ava-labs/coreth/accounts/abi/bind"
 			"github.com/ava-labs/coreth/accounts/abi/bind/backends"
-			"github.com/ava-labs/coreth/core/types"
+			"github.com/ava-labs/libevm/core/types"
 			"github.com/ava-labs/libevm/crypto"
 		`,
 		`
@@ -355,7 +355,7 @@ var bindTests = []struct {
 
 			"github.com/ava-labs/coreth/accounts/abi/bind"
 			"github.com/ava-labs/coreth/accounts/abi/bind/backends"
-			"github.com/ava-labs/coreth/core/types"
+			"github.com/ava-labs/libevm/core/types"
 			"github.com/ava-labs/libevm/crypto"
 		`,
 		`
@@ -401,7 +401,7 @@ var bindTests = []struct {
 
 			"github.com/ava-labs/coreth/accounts/abi/bind"
 			"github.com/ava-labs/coreth/accounts/abi/bind/backends"
-			"github.com/ava-labs/coreth/core/types"
+			"github.com/ava-labs/libevm/core/types"
 			"github.com/ava-labs/libevm/crypto"
 		`,
 		`
@@ -459,7 +459,7 @@ var bindTests = []struct {
 			"github.com/ava-labs/coreth/accounts/abi/bind"
 			"github.com/ava-labs/coreth/accounts/abi/bind/backends"
 			"github.com/ava-labs/libevm/common"
-			"github.com/ava-labs/coreth/core/types"
+			"github.com/ava-labs/libevm/core/types"
 			"github.com/ava-labs/libevm/crypto"
 		`,
 		`
@@ -507,7 +507,7 @@ var bindTests = []struct {
 
 			"github.com/ava-labs/coreth/accounts/abi/bind"
 			"github.com/ava-labs/coreth/accounts/abi/bind/backends"
-			"github.com/ava-labs/coreth/core/types"
+			"github.com/ava-labs/libevm/core/types"
 			"github.com/ava-labs/libevm/crypto"
 		`,
 		`
@@ -574,7 +574,7 @@ var bindTests = []struct {
 
 			"github.com/ava-labs/coreth/accounts/abi/bind"
 			"github.com/ava-labs/coreth/accounts/abi/bind/backends"
-			"github.com/ava-labs/coreth/core/types"
+			"github.com/ava-labs/libevm/core/types"
 			"github.com/ava-labs/libevm/crypto"
 		`,
 		`
@@ -620,7 +620,7 @@ var bindTests = []struct {
 			"github.com/ava-labs/coreth/accounts/abi/bind"
 			"github.com/ava-labs/coreth/accounts/abi/bind/backends"
 			"github.com/ava-labs/libevm/common"
-			"github.com/ava-labs/coreth/core/types"
+			"github.com/ava-labs/libevm/core/types"
 		`,
 		`
 			// Create a simulator and wrap a non-deployed contract
@@ -659,7 +659,7 @@ var bindTests = []struct {
 			"github.com/ava-labs/coreth/accounts/abi/bind"
 			"github.com/ava-labs/coreth/accounts/abi/bind/backends"
 			"github.com/ava-labs/libevm/common"
-			"github.com/ava-labs/coreth/core/types"
+			"github.com/ava-labs/libevm/core/types"
 		`,
 		`
 			// Create a simulator and wrap a non-deployed contract
@@ -706,7 +706,7 @@ var bindTests = []struct {
 
 			"github.com/ava-labs/coreth/accounts/abi/bind"
 			"github.com/ava-labs/coreth/accounts/abi/bind/backends"
-			"github.com/ava-labs/coreth/core/types"
+			"github.com/ava-labs/libevm/core/types"
 			"github.com/ava-labs/libevm/crypto"
 		`,
 		`
@@ -756,7 +756,7 @@ var bindTests = []struct {
 			"github.com/ava-labs/coreth/accounts/abi/bind"
 			"github.com/ava-labs/coreth/accounts/abi/bind/backends"
 			"github.com/ava-labs/libevm/common"
-			"github.com/ava-labs/coreth/core/types"
+			"github.com/ava-labs/libevm/core/types"
 			"github.com/ava-labs/libevm/crypto"
 		`,
 		`
@@ -831,7 +831,7 @@ var bindTests = []struct {
 
 			"github.com/ava-labs/coreth/accounts/abi/bind"
 			"github.com/ava-labs/coreth/accounts/abi/bind/backends"
-			"github.com/ava-labs/coreth/core/types"
+			"github.com/ava-labs/libevm/core/types"
 			"github.com/ava-labs/libevm/crypto"
 		`,
 		`
@@ -925,7 +925,7 @@ var bindTests = []struct {
 			"github.com/ava-labs/coreth/accounts/abi/bind"
 			"github.com/ava-labs/coreth/accounts/abi/bind/backends"
 			"github.com/ava-labs/libevm/common"
-			"github.com/ava-labs/coreth/core/types"
+			"github.com/ava-labs/libevm/core/types"
 			"github.com/ava-labs/libevm/crypto"
 		`,
 		`
@@ -1115,7 +1115,7 @@ var bindTests = []struct {
 
 			"github.com/ava-labs/coreth/accounts/abi/bind"
 			"github.com/ava-labs/coreth/accounts/abi/bind/backends"
-			"github.com/ava-labs/coreth/core/types"
+			"github.com/ava-labs/libevm/core/types"
 			"github.com/ava-labs/libevm/crypto"
 		`,
 		`
@@ -1250,7 +1250,7 @@ var bindTests = []struct {
 
 			"github.com/ava-labs/coreth/accounts/abi/bind"
 			"github.com/ava-labs/coreth/accounts/abi/bind/backends"
-			"github.com/ava-labs/coreth/core/types"
+			"github.com/ava-labs/libevm/core/types"
 			"github.com/ava-labs/libevm/crypto"
 		`,
 
@@ -1392,7 +1392,7 @@ var bindTests = []struct {
 
 			"github.com/ava-labs/coreth/accounts/abi/bind"
 			"github.com/ava-labs/coreth/accounts/abi/bind/backends"
-			"github.com/ava-labs/coreth/core/types"
+			"github.com/ava-labs/libevm/core/types"
 			"github.com/ava-labs/libevm/crypto"
 		`,
 		`
@@ -1458,7 +1458,7 @@ var bindTests = []struct {
 
 		"github.com/ava-labs/coreth/accounts/abi/bind"
 		"github.com/ava-labs/coreth/accounts/abi/bind/backends"
-		"github.com/ava-labs/coreth/core/types"
+		"github.com/ava-labs/libevm/core/types"
 		"github.com/ava-labs/libevm/crypto"
 		`,
 		`
@@ -1568,7 +1568,7 @@ var bindTests = []struct {
 		"github.com/ava-labs/coreth/accounts/abi/bind"
 		"github.com/ava-labs/coreth/accounts/abi/bind/backends"
 		"github.com/ava-labs/libevm/crypto"
-		"github.com/ava-labs/coreth/core/types"
+		"github.com/ava-labs/libevm/core/types"
 		`,
 		`
 		// Initialize test accounts
@@ -1631,7 +1631,7 @@ var bindTests = []struct {
 		"github.com/ava-labs/coreth/accounts/abi/bind"
 		"github.com/ava-labs/coreth/accounts/abi/bind/backends"
 		"github.com/ava-labs/libevm/crypto"
-		"github.com/ava-labs/coreth/core/types"
+		"github.com/ava-labs/libevm/core/types"
         `,
 		`
 		key, _ := crypto.GenerateKey()
@@ -1692,7 +1692,7 @@ var bindTests = []struct {
 
 			"github.com/ava-labs/coreth/accounts/abi/bind"
 			"github.com/ava-labs/coreth/accounts/abi/bind/backends"
-			"github.com/ava-labs/coreth/core/types"
+			"github.com/ava-labs/libevm/core/types"
 			"github.com/ava-labs/libevm/crypto"
 		`,
 		`
@@ -1753,7 +1753,7 @@ var bindTests = []struct {
 	
 			"github.com/ava-labs/coreth/accounts/abi/bind"
 			"github.com/ava-labs/coreth/accounts/abi/bind/backends"
-			"github.com/ava-labs/coreth/core/types"
+			"github.com/ava-labs/libevm/core/types"
 			"github.com/ava-labs/libevm/crypto"
 	   `,
 		`
@@ -1841,7 +1841,7 @@ var bindTests = []struct {
 
 			"github.com/ava-labs/coreth/accounts/abi/bind"
 			"github.com/ava-labs/coreth/accounts/abi/bind/backends"
-			"github.com/ava-labs/coreth/core/types"
+			"github.com/ava-labs/libevm/core/types"
 			"github.com/ava-labs/libevm/crypto"
 	   `,
 		`
@@ -1911,7 +1911,7 @@ var bindTests = []struct {
 	
 			"github.com/ava-labs/coreth/accounts/abi/bind"
 			"github.com/ava-labs/coreth/accounts/abi/bind/backends"
-			"github.com/ava-labs/coreth/core/types"
+			"github.com/ava-labs/libevm/core/types"
 			"github.com/ava-labs/libevm/crypto"
 	   `,
 		`
@@ -1963,7 +1963,7 @@ var bindTests = []struct {
 
 			"github.com/ava-labs/coreth/accounts/abi/bind"
 			"github.com/ava-labs/coreth/accounts/abi/bind/backends"
-			"github.com/ava-labs/coreth/core/types"
+			"github.com/ava-labs/libevm/core/types"
 			"github.com/ava-labs/libevm/crypto"
 		`,
 		tester: `
@@ -2011,7 +2011,7 @@ var bindTests = []struct {
 
 			"github.com/ava-labs/coreth/accounts/abi/bind"
 			"github.com/ava-labs/coreth/accounts/abi/bind/backends"
-			"github.com/ava-labs/coreth/core/types"
+			"github.com/ava-labs/libevm/core/types"
 			"github.com/ava-labs/libevm/crypto"
 		`,
 		tester: `
@@ -2052,7 +2052,7 @@ var bindTests = []struct {
 
 			"github.com/ava-labs/coreth/accounts/abi/bind"
 			"github.com/ava-labs/coreth/accounts/abi/bind/backends"
-			"github.com/ava-labs/coreth/core/types"
+			"github.com/ava-labs/libevm/core/types"
 			"github.com/ava-labs/libevm/crypto"
 		`,
 		tester: `

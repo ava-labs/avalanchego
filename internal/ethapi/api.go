@@ -38,7 +38,7 @@ import (
 	"github.com/ava-labs/coreth/consensus"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/state"
-	"github.com/ava-labs/coreth/core/types"
+	customtypes "github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/eth/gasestimator"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/rpc"
@@ -48,6 +48,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/common/math"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/eth/tracers/logger"
@@ -1232,7 +1233,7 @@ func (s *BlockChainAPI) EstimateGas(ctx context.Context, args TransactionArgs, b
 
 // RPCMarshalHeader converts the given header to the RPC output .
 func RPCMarshalHeader(head *types.Header) map[string]interface{} {
-	headExtra := types.GetHeaderExtra(head)
+	headExtra := customtypes.GetHeaderExtra(head)
 	result := map[string]interface{}{
 		"number":           (*hexutil.Big)(head.Number),
 		"hash":             head.Hash(),
@@ -1279,7 +1280,7 @@ func RPCMarshalHeader(head *types.Header) map[string]interface{} {
 func RPCMarshalBlock(block *types.Block, inclTx bool, fullTx bool, config *params.ChainConfig) map[string]interface{} {
 	fields := RPCMarshalHeader(block.Header())
 	fields["size"] = hexutil.Uint64(block.Size())
-	fields["blockExtraData"] = hexutil.Bytes(types.BlockExtData(block))
+	fields["blockExtraData"] = hexutil.Bytes(customtypes.BlockExtData(block))
 
 	if inclTx {
 		formatTx := func(idx int, tx *types.Transaction) interface{} {

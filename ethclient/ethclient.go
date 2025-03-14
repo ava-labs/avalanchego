@@ -35,11 +35,12 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/coreth/accounts/abi/bind"
-	"github.com/ava-labs/coreth/core/types"
+	customtypes "github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/interfaces"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
+	"github.com/ava-labs/libevm/core/types"
 
 	// Force-load precompiles to trigger registration
 	_ "github.com/ava-labs/coreth/precompile/registry"
@@ -271,11 +272,11 @@ func (ec *client) getBlock(ctx context.Context, method string, args ...interface
 			Transactions: txs,
 			Uncles:       uncles,
 		})
-	extra := &types.BlockBodyExtra{
+	extra := &customtypes.BlockBodyExtra{
 		Version: body.Version,
 		ExtData: (*[]byte)(body.BlockExtraData),
 	}
-	types.SetBlockExtra(block, extra)
+	customtypes.SetBlockExtra(block, extra)
 	return block, nil
 }
 

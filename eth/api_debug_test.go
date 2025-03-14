@@ -34,8 +34,8 @@ import (
 	"testing"
 
 	"github.com/ava-labs/coreth/core/state"
-	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/holiman/uint256"
 

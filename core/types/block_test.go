@@ -40,6 +40,11 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 
 	. "github.com/ava-labs/coreth/core/types"
+
+	// TODO(arr4n) These tests were originally part of the `coreth/core/types`
+	// package so assume the presence of identifiers. A dot-import reduces PR
+	// noise during the refactoring.
+	. "github.com/ava-labs/libevm/core/types"
 )
 
 // This test has been modified from https://github.com/ethereum/go-ethereum/blob/v1.9.21/core/types/block_test.go#L35 to fit

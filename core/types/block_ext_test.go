@@ -11,12 +11,16 @@ import (
 	"unsafe"
 
 	"github.com/ava-labs/libevm/common"
-	ethtypes "github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	// TODO(arr4n) These tests were originally part of the `coreth/core/types`
+	// package so assume the presence of identifiers. A dot-import reduces PR
+	// noise during the refactoring.
+	. "github.com/ava-labs/libevm/core/types"
 )
 
 func TestCopyHeader(t *testing.T) {
@@ -150,7 +154,7 @@ func blockWithNonZeroFields() (*Block, *BlockBodyExtra) {
 	receipts := []*Receipt{{PostState: []byte{11}}}
 
 	block := NewBlock(header, txs, uncles, receipts, stubHasher{})
-	withdrawals := []*ethtypes.Withdrawal{{Index: 12}}
+	withdrawals := []*Withdrawal{{Index: 12}}
 	block = block.WithWithdrawals(withdrawals)
 	extra := &BlockBodyExtra{
 		Version: 13,
@@ -174,7 +178,7 @@ func TestBlockWithNonZeroFields(t *testing.T) {
 // bodyWithNonZeroFields returns a [Body] and a [BlockBodyExtra],
 // each with all fields set to non-zero values.
 // The [BlockBodyExtra] extra payload is set in the [Body] via `extras.Block.Set`
-// and the extra copying done in [ethtypes.Block.Body].
+// and the extra copying done in `Block.Body()`.
 //
 // NOTE: They can be used to demonstrate that RLP round-trip encoding
 // can recover all fields, but not that the encoded format is correct. This is

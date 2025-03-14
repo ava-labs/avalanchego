@@ -4,9 +4,9 @@
 package predicate
 
 import (
-	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/utils"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
 )
 
 type predicaters interface {

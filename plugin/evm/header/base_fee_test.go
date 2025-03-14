@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/coreth/core/types"
+	customtypes "github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/acp176"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap3"
@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/etna"
 	"github.com/ava-labs/coreth/utils"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -180,13 +181,13 @@ func TestBaseFee(t *testing.T) {
 		{
 			name:     "ap4_decrease",
 			upgrades: extras.TestApricotPhase4Config.NetworkUpgrades,
-			parent: types.WithHeaderExtra(
+			parent: customtypes.WithHeaderExtra(
 				&types.Header{
 					Number:  big.NewInt(1),
 					Extra:   (&ap3.Window{}).Bytes(),
 					BaseFee: big.NewInt(ap4.MaxBaseFee),
 				},
-				&types.HeaderExtra{
+				&customtypes.HeaderExtra{
 					BlockGasCost: big.NewInt(ap4.MinBlockGasCost),
 				},
 			),
@@ -208,14 +209,14 @@ func TestBaseFee(t *testing.T) {
 		{
 			name:     "ap4_increase",
 			upgrades: extras.TestApricotPhase4Config.NetworkUpgrades,
-			parent: types.WithHeaderExtra(
+			parent: customtypes.WithHeaderExtra(
 				&types.Header{
 					Number:  big.NewInt(1),
 					GasUsed: ap3.TargetGas,
 					Extra:   (&ap3.Window{}).Bytes(),
 					BaseFee: big.NewInt(ap4.MinBaseFee),
 				},
-				&types.HeaderExtra{
+				&customtypes.HeaderExtra{
 					ExtDataGasUsed: big.NewInt(ap3.TargetGas),
 					BlockGasCost:   big.NewInt(ap4.MinBlockGasCost),
 				},
@@ -269,14 +270,14 @@ func TestBaseFee(t *testing.T) {
 		{
 			name:     "ap5_increase",
 			upgrades: extras.TestApricotPhase5Config.NetworkUpgrades,
-			parent: types.WithHeaderExtra(
+			parent: customtypes.WithHeaderExtra(
 				&types.Header{
 					Number:  big.NewInt(1),
 					GasUsed: ap5.TargetGas,
 					Extra:   (&ap3.Window{}).Bytes(),
 					BaseFee: big.NewInt(ap4.MinBaseFee),
 				},
-				&types.HeaderExtra{
+				&customtypes.HeaderExtra{
 					ExtDataGasUsed: big.NewInt(ap5.TargetGas),
 				},
 			),
@@ -306,14 +307,14 @@ func TestBaseFee(t *testing.T) {
 		{
 			name:     "etna_increase",
 			upgrades: extras.TestEtnaChainConfig.NetworkUpgrades,
-			parent: types.WithHeaderExtra(
+			parent: customtypes.WithHeaderExtra(
 				&types.Header{
 					Number:  big.NewInt(1),
 					GasUsed: ap5.TargetGas,
 					Extra:   (&ap3.Window{}).Bytes(),
 					BaseFee: big.NewInt(etna.MinBaseFee),
 				},
-				&types.HeaderExtra{
+				&customtypes.HeaderExtra{
 					ExtDataGasUsed: big.NewInt(ap5.TargetGas),
 				},
 			),

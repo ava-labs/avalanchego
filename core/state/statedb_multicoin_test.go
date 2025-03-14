@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/coreth/core/state/snapshot"
-	"github.com/ava-labs/coreth/core/types"
+	customtypes "github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/crypto"
@@ -150,7 +150,7 @@ func TestGenerateMultiCoinAccounts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !types.IsMultiCoin(snapAccount) {
+	if !customtypes.IsMultiCoin(snapAccount) {
 		t.Fatalf("Expected SnapAccount to return IsMultiCoin: true, found: false")
 	}
 

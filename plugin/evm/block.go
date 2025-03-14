@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 
 	"github.com/ava-labs/coreth/core"
-	"github.com/ava-labs/coreth/core/types"
+	customtypes "github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/coreth/predicate"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/types"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -121,7 +122,7 @@ type Block struct {
 // newBlock returns a new Block wrapping the ethBlock type and implementing the snowman.Block interface
 func (vm *VM) newBlock(ethBlock *types.Block) (*Block, error) {
 	isApricotPhase5 := vm.chainConfigExtra().IsApricotPhase5(ethBlock.Time())
-	atomicTxs, err := atomic.ExtractAtomicTxs(types.BlockExtData(ethBlock), isApricotPhase5, atomic.Codec)
+	atomicTxs, err := atomic.ExtractAtomicTxs(customtypes.BlockExtData(ethBlock), isApricotPhase5, atomic.Codec)
 	if err != nil {
 		return nil, err
 	}

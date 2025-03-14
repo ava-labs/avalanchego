@@ -7,11 +7,12 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/ava-labs/coreth/core/types"
+	customtypes "github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap4"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap5"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
 )
 
 var (
@@ -45,7 +46,7 @@ func BlockGasCost(
 		timeElapsed = timestamp - parent.Time
 	}
 	return new(big.Int).SetUint64(BlockGasCostWithStep(
-		types.GetHeaderExtra(parent).BlockGasCost,
+		customtypes.GetHeaderExtra(parent).BlockGasCost,
 		step,
 		timeElapsed,
 	))
@@ -88,7 +89,7 @@ func EstimateRequiredTip(
 	config *extras.ChainConfig,
 	header *types.Header,
 ) (*big.Int, error) {
-	extra := types.GetHeaderExtra(header)
+	extra := customtypes.GetHeaderExtra(header)
 	switch {
 	case !config.IsApricotPhase4(header.Time):
 		return nil, nil
@@ -101,7 +102,7 @@ func EstimateRequiredTip(
 	}
 
 	// totalGasUsed = GasUsed + ExtDataGasUsed
-	headerExtra := types.GetHeaderExtra(header)
+	headerExtra := customtypes.GetHeaderExtra(header)
 	totalGasUsed := new(big.Int).SetUint64(header.GasUsed)
 	totalGasUsed.Add(totalGasUsed, headerExtra.ExtDataGasUsed)
 	if totalGasUsed.Sign() == 0 {

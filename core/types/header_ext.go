@@ -14,18 +14,18 @@ import (
 )
 
 // GetHeaderExtra returns the [HeaderExtra] from the given [Header].
-func GetHeaderExtra(h *Header) *HeaderExtra {
+func GetHeaderExtra(h *ethtypes.Header) *HeaderExtra {
 	return extras.Header.Get(h)
 }
 
 // SetHeaderExtra sets the given [HeaderExtra] on the [Header].
-func SetHeaderExtra(h *Header, extra *HeaderExtra) {
+func SetHeaderExtra(h *ethtypes.Header, extra *HeaderExtra) {
 	extras.Header.Set(h, extra)
 }
 
 // WithHeaderExtra sets the given [HeaderExtra] on the [Header]
 // and returns the [Header] for chaining.
-func WithHeaderExtra(h *Header, extra *HeaderExtra) *Header {
+func WithHeaderExtra(h *ethtypes.Header, extra *HeaderExtra) *ethtypes.Header {
 	SetHeaderExtra(h, extra)
 	return h
 }
@@ -169,22 +169,22 @@ func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
 // as it is to be serialized into RLP and JSON. Note it must be exported so that
 // rlpgen can generate the serialization code from it.
 type HeaderSerializable struct {
-	ParentHash  common.Hash    `json:"parentHash"       gencodec:"required"`
-	UncleHash   common.Hash    `json:"sha3Uncles"       gencodec:"required"`
-	Coinbase    common.Address `json:"miner"            gencodec:"required"`
-	Root        common.Hash    `json:"stateRoot"        gencodec:"required"`
-	TxHash      common.Hash    `json:"transactionsRoot" gencodec:"required"`
-	ReceiptHash common.Hash    `json:"receiptsRoot"     gencodec:"required"`
-	Bloom       Bloom          `json:"logsBloom"        gencodec:"required"`
-	Difficulty  *big.Int       `json:"difficulty"       gencodec:"required"`
-	Number      *big.Int       `json:"number"           gencodec:"required"`
-	GasLimit    uint64         `json:"gasLimit"         gencodec:"required"`
-	GasUsed     uint64         `json:"gasUsed"          gencodec:"required"`
-	Time        uint64         `json:"timestamp"        gencodec:"required"`
-	Extra       []byte         `json:"extraData"        gencodec:"required"`
-	MixDigest   common.Hash    `json:"mixHash"`
-	Nonce       BlockNonce     `json:"nonce"`
-	ExtDataHash common.Hash    `json:"extDataHash"      gencodec:"required"`
+	ParentHash  common.Hash         `json:"parentHash"       gencodec:"required"`
+	UncleHash   common.Hash         `json:"sha3Uncles"       gencodec:"required"`
+	Coinbase    common.Address      `json:"miner"            gencodec:"required"`
+	Root        common.Hash         `json:"stateRoot"        gencodec:"required"`
+	TxHash      common.Hash         `json:"transactionsRoot" gencodec:"required"`
+	ReceiptHash common.Hash         `json:"receiptsRoot"     gencodec:"required"`
+	Bloom       ethtypes.Bloom      `json:"logsBloom"        gencodec:"required"`
+	Difficulty  *big.Int            `json:"difficulty"       gencodec:"required"`
+	Number      *big.Int            `json:"number"           gencodec:"required"`
+	GasLimit    uint64              `json:"gasLimit"         gencodec:"required"`
+	GasUsed     uint64              `json:"gasUsed"          gencodec:"required"`
+	Time        uint64              `json:"timestamp"        gencodec:"required"`
+	Extra       []byte              `json:"extraData"        gencodec:"required"`
+	MixDigest   common.Hash         `json:"mixHash"`
+	Nonce       ethtypes.BlockNonce `json:"nonce"`
+	ExtDataHash common.Hash         `json:"extDataHash"      gencodec:"required"`
 
 	// BaseFee was added by EIP-1559 and is ignored in legacy headers.
 	BaseFee *big.Int `json:"baseFeePerGas" rlp:"optional"`
