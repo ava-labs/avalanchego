@@ -9,8 +9,8 @@ import (
 
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/subnet-evm/commontype"
-	customtypes "github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params/extras"
+	customtypes "github.com/ava-labs/subnet-evm/plugin/evm/types"
 	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

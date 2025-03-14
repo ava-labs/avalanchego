@@ -43,7 +43,7 @@ import (
 	// This test file has to be in package types_test to avoid a circular
 	// dependency when importing `params`. We dot-import the package to mimic
 	// regular same-package behaviour.
-	. "github.com/ava-labs/subnet-evm/core/types"
+	. "github.com/ava-labs/subnet-evm/plugin/evm/types"
 )
 
 func TestBlockEncoding(t *testing.T) {

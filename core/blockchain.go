@@ -55,10 +55,10 @@ import (
 	"github.com/ava-labs/subnet-evm/consensus/misc/eip4844"
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/core/state/snapshot"
-	customtypes "github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/internal/version"
 	"github.com/ava-labs/subnet-evm/params"
 	customrawdb "github.com/ava-labs/subnet-evm/plugin/evm/rawdb"
+	customtypes "github.com/ava-labs/subnet-evm/plugin/evm/types"
 	"github.com/ava-labs/subnet-evm/triedb/hashdb"
 	"github.com/ava-labs/subnet-evm/triedb/pathdb"
 

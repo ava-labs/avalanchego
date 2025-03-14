@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/core/types"
-	customtypes "github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params/extras"
+	customtypes "github.com/ava-labs/subnet-evm/plugin/evm/types"
 	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/subnetevm"
 	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/stretchr/testify/require"
