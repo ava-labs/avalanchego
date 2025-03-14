@@ -35,7 +35,7 @@ import (
 	"github.com/ava-labs/coreth/consensus"
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/consensus/misc/eip4844"
-	"github.com/ava-labs/coreth/core/types"
+	customtypes "github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/params/extras"
 	customheader "github.com/ava-labs/coreth/plugin/evm/header"
@@ -46,6 +46,7 @@ import (
 	"github.com/ava-labs/coreth/utils"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/trie"
@@ -385,7 +386,7 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 		BaseFee:   baseFee,
 	}
 	if configExtra.IsApricotPhase4(header.Time) {
-		headerExtra := types.GetHeaderExtra(header)
+		headerExtra := customtypes.GetHeaderExtra(header)
 		headerExtra.BlockGasCost = big.NewInt(0)
 		headerExtra.ExtDataGasUsed = big.NewInt(0)
 	}

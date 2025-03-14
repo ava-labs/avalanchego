@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/coreth/core/types"
+	customtypes "github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/acp176"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap0"
@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap4"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap5"
 	"github.com/ava-labs/coreth/utils"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -132,13 +133,13 @@ func TestExtraPrefix(t *testing.T) {
 		{
 			name:     "ap4_with_block_gas_cost",
 			upgrades: extras.TestApricotPhase4Config.NetworkUpgrades,
-			parent: types.WithHeaderExtra(
+			parent: customtypes.WithHeaderExtra(
 				&types.Header{
 					Number:  big.NewInt(1),
 					GasUsed: ap3.TargetGas,
 					Extra:   (&ap3.Window{}).Bytes(),
 				},
-				&types.HeaderExtra{
+				&customtypes.HeaderExtra{
 					BlockGasCost: big.NewInt(ap4.MinBlockGasCost),
 				},
 			),
@@ -158,13 +159,13 @@ func TestExtraPrefix(t *testing.T) {
 		{
 			name:     "ap4_with_extra_data_gas",
 			upgrades: extras.TestApricotPhase4Config.NetworkUpgrades,
-			parent: types.WithHeaderExtra(
+			parent: customtypes.WithHeaderExtra(
 				&types.Header{
 					Number:  big.NewInt(1),
 					GasUsed: ap3.TargetGas,
 					Extra:   (&ap3.Window{}).Bytes(),
 				},
-				&types.HeaderExtra{
+				&customtypes.HeaderExtra{
 					ExtDataGasUsed: big.NewInt(5),
 				},
 			),
@@ -184,7 +185,7 @@ func TestExtraPrefix(t *testing.T) {
 		{
 			name:     "ap4_normal",
 			upgrades: extras.TestApricotPhase4Config.NetworkUpgrades,
-			parent: types.WithHeaderExtra(
+			parent: customtypes.WithHeaderExtra(
 				&types.Header{
 					Number:  big.NewInt(1),
 					GasUsed: ap3.TargetGas,
@@ -192,7 +193,7 @@ func TestExtraPrefix(t *testing.T) {
 						1, 2, 3, 4,
 					}).Bytes(),
 				},
-				&types.HeaderExtra{
+				&customtypes.HeaderExtra{
 					ExtDataGasUsed: big.NewInt(5),
 					BlockGasCost:   big.NewInt(ap4.MinBlockGasCost),
 				},
@@ -216,13 +217,13 @@ func TestExtraPrefix(t *testing.T) {
 		{
 			name:     "ap5_no_extra_data_gas",
 			upgrades: extras.TestApricotPhase5Config.NetworkUpgrades,
-			parent: types.WithHeaderExtra(
+			parent: customtypes.WithHeaderExtra(
 				&types.Header{
 					Number:  big.NewInt(1),
 					GasUsed: ap5.TargetGas,
 					Extra:   (&ap3.Window{}).Bytes(),
 				},
-				&types.HeaderExtra{
+				&customtypes.HeaderExtra{
 					BlockGasCost: big.NewInt(ap4.MinBlockGasCost),
 				},
 			),
@@ -239,7 +240,7 @@ func TestExtraPrefix(t *testing.T) {
 		{
 			name:     "ap5_normal",
 			upgrades: extras.TestApricotPhase5Config.NetworkUpgrades,
-			parent: types.WithHeaderExtra(
+			parent: customtypes.WithHeaderExtra(
 				&types.Header{
 					Number:  big.NewInt(1),
 					GasUsed: ap5.TargetGas,
@@ -247,7 +248,7 @@ func TestExtraPrefix(t *testing.T) {
 						1, 2, 3, 4,
 					}).Bytes(),
 				},
-				&types.HeaderExtra{
+				&customtypes.HeaderExtra{
 					ExtDataGasUsed: big.NewInt(5),
 					BlockGasCost:   big.NewInt(ap4.MinBlockGasCost),
 				},
@@ -275,12 +276,12 @@ func TestExtraPrefix(t *testing.T) {
 			parent: &types.Header{
 				Number: big.NewInt(1),
 			},
-			header: types.WithHeaderExtra(
+			header: customtypes.WithHeaderExtra(
 				&types.Header{
 					Time:    1,
 					GasUsed: 1,
 				},
-				&types.HeaderExtra{
+				&customtypes.HeaderExtra{
 					ExtDataGasUsed: big.NewInt(5),
 				},
 			),
@@ -298,12 +299,12 @@ func TestExtraPrefix(t *testing.T) {
 			parent: &types.Header{
 				Number: big.NewInt(0),
 			},
-			header: types.WithHeaderExtra(
+			header: customtypes.WithHeaderExtra(
 				&types.Header{
 					Time:    1,
 					GasUsed: 2,
 				},
-				&types.HeaderExtra{
+				&customtypes.HeaderExtra{
 					ExtDataGasUsed: big.NewInt(1),
 				},
 			),
@@ -350,11 +351,11 @@ func TestExtraPrefix(t *testing.T) {
 					TargetExcess: 2 * acp176.MaxTargetExcessDiff,
 				}).Bytes(),
 			},
-			header: types.WithHeaderExtra(
+			header: customtypes.WithHeaderExtra(
 				&types.Header{
 					GasUsed: 2,
 				},
-				&types.HeaderExtra{
+				&customtypes.HeaderExtra{
 					ExtDataGasUsed: big.NewInt(1),
 				},
 			),

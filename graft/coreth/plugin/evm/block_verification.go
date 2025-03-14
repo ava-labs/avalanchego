@@ -14,13 +14,14 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 
 	"github.com/ava-labs/coreth/constants"
-	"github.com/ava-labs/coreth/core/types"
+	customtypes "github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/header"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap0"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap1"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap5"
 	"github.com/ava-labs/coreth/utils"
+	"github.com/ava-labs/libevm/core/types"
 )
 
 var (
@@ -53,8 +54,8 @@ func (v blockValidator) SyntacticVerify(b *Block, rules params.Rules) error {
 
 	if !rulesExtra.IsApricotPhase1 {
 		if v.extDataHashes != nil {
-			extData := types.BlockExtData(b.ethBlock)
-			extDataHash := types.CalcExtDataHash(extData)
+			extData := customtypes.BlockExtData(b.ethBlock)
+			extDataHash := customtypes.CalcExtDataHash(extData)
 			// If there is no extra data, check that there is no extra data in the hash map either to ensure we do not
 			// have a block that is unexpectedly missing extra data.
 			expectedExtDataHash, ok := v.extDataHashes[blockHash]
@@ -78,10 +79,10 @@ func (v blockValidator) SyntacticVerify(b *Block, rules params.Rules) error {
 	}
 
 	// Verify the ExtDataHash field
-	headerExtra := types.GetHeaderExtra(ethHeader)
+	headerExtra := customtypes.GetHeaderExtra(ethHeader)
 	if rulesExtra.IsApricotPhase1 {
-		extraData := types.BlockExtData(b.ethBlock)
-		hash := types.CalcExtDataHash(extraData)
+		extraData := customtypes.BlockExtData(b.ethBlock)
+		hash := customtypes.CalcExtDataHash(extraData)
 		if headerExtra.ExtDataHash != hash {
 			return fmt.Errorf("extra data hash mismatch: have %x, want %x", headerExtra.ExtDataHash, hash)
 		}
@@ -117,7 +118,7 @@ func (v blockValidator) SyntacticVerify(b *Block, rules params.Rules) error {
 		return err
 	}
 
-	if version := types.BlockVersion(b.ethBlock); version != 0 {
+	if version := customtypes.BlockVersion(b.ethBlock); version != 0 {
 		return fmt.Errorf("invalid version: %d", version)
 	}
 

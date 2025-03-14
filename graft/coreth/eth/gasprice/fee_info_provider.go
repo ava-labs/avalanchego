@@ -31,8 +31,9 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/coreth/core"
-	"github.com/ava-labs/coreth/core/types"
+	customtypes "github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/rpc"
+	"github.com/ava-labs/libevm/core/types"
 	lru "github.com/hashicorp/golang-lru"
 )
 
@@ -94,7 +95,7 @@ func (f *feeInfoProvider) addHeader(ctx context.Context, header *types.Header) (
 	}
 
 	totalGasUsed := new(big.Int).SetUint64(header.GasUsed)
-	if used := types.GetHeaderExtra(header).ExtDataGasUsed; used != nil {
+	if used := customtypes.GetHeaderExtra(header).ExtDataGasUsed; used != nil {
 		totalGasUsed.Add(totalGasUsed, used)
 	}
 	minGasUsed := new(big.Int).SetUint64(f.minGasUsed)

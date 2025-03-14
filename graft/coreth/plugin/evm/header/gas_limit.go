@@ -8,12 +8,13 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/coreth/core/types"
+	customtypes "github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap0"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap1"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap5"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/cortina"
+	"github.com/ava-labs/libevm/core/types"
 )
 
 var (
@@ -63,7 +64,7 @@ func VerifyGasUsed(
 	header *types.Header,
 ) error {
 	gasUsed := header.GasUsed
-	extDataGasUsed := types.GetHeaderExtra(header).ExtDataGasUsed
+	extDataGasUsed := customtypes.GetHeaderExtra(header).ExtDataGasUsed
 	if config.IsFortuna(header.Time) && extDataGasUsed != nil {
 		if !extDataGasUsed.IsUint64() {
 			return fmt.Errorf("%w: %d is not a uint64",

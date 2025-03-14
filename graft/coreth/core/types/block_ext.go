@@ -13,7 +13,7 @@ import (
 )
 
 // SetBlockExtra sets the [BlockBodyExtra] `extra` in the [Block] `b`.
-func SetBlockExtra(b *Block, extra *BlockBodyExtra) {
+func SetBlockExtra(b *ethtypes.Block, extra *BlockBodyExtra) {
 	extras.Block.Set(b, extra)
 }
 
@@ -45,7 +45,7 @@ func (b *BlockBodyExtra) Copy() *BlockBodyExtra {
 // - (-) [ethtypes.Body] `Withdrawals` field
 // - (+) [BlockBodyExtra] `Version` field
 // - (+) [BlockBodyExtra] `ExtData` field
-func (b *BlockBodyExtra) BodyRLPFieldsForEncoding(body *Body) *rlp.Fields {
+func (b *BlockBodyExtra) BodyRLPFieldsForEncoding(body *ethtypes.Body) *rlp.Fields {
 	return &rlp.Fields{
 		Required: []any{
 			body.Transactions,
@@ -58,7 +58,7 @@ func (b *BlockBodyExtra) BodyRLPFieldsForEncoding(body *Body) *rlp.Fields {
 
 // BodyRLPFieldPointersForDecoding returns the fields that should be decoded to
 // for the [Body] and [BlockBodyExtra].
-func (b *BlockBodyExtra) BodyRLPFieldPointersForDecoding(body *Body) *rlp.Fields {
+func (b *BlockBodyExtra) BodyRLPFieldPointersForDecoding(body *ethtypes.Body) *rlp.Fields {
 	return &rlp.Fields{
 		Required: []any{
 			&body.Transactions,
@@ -101,18 +101,18 @@ func (b *BlockBodyExtra) BlockRLPFieldPointersForDecoding(block *ethtypes.BlockR
 	}
 }
 
-func BlockExtData(b *Block) []byte {
+func BlockExtData(b *ethtypes.Block) []byte {
 	if data := extras.Block.Get(b).ExtData; data != nil {
 		return *data
 	}
 	return nil
 }
 
-func BlockVersion(b *Block) uint32 {
+func BlockVersion(b *ethtypes.Block) uint32 {
 	return extras.Block.Get(b).Version
 }
 
-func BlockExtDataGasUsed(b *Block) *big.Int {
+func BlockExtDataGasUsed(b *ethtypes.Block) *big.Int {
 	used := GetHeaderExtra(b.Header()).ExtDataGasUsed
 	if used == nil {
 		return nil
@@ -120,7 +120,7 @@ func BlockExtDataGasUsed(b *Block) *big.Int {
 	return new(big.Int).Set(used)
 }
 
-func BlockGasCost(b *Block) *big.Int {
+func BlockGasCost(b *ethtypes.Block) *big.Int {
 	cost := GetHeaderExtra(b.Header()).BlockGasCost
 	if cost == nil {
 		return nil
@@ -136,14 +136,14 @@ func CalcExtDataHash(extdata []byte) common.Hash {
 }
 
 func NewBlockWithExtData(
-	header *Header, txs []*Transaction, uncles []*Header, receipts []*Receipt,
-	hasher TrieHasher, extdata []byte, recalc bool,
-) *Block {
+	header *ethtypes.Header, txs []*ethtypes.Transaction, uncles []*ethtypes.Header, receipts []*ethtypes.Receipt,
+	hasher ethtypes.TrieHasher, extdata []byte, recalc bool,
+) *ethtypes.Block {
 	if recalc {
 		headerExtra := GetHeaderExtra(header)
 		headerExtra.ExtDataHash = CalcExtDataHash(extdata)
 	}
-	block := NewBlock(header, txs, uncles, receipts, hasher)
+	block := ethtypes.NewBlock(header, txs, uncles, receipts, hasher)
 	extdataCopy := make([]byte, len(extdata))
 	copy(extdataCopy, extdata)
 	extra := &BlockBodyExtra{

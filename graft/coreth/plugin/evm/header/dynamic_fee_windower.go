@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ava-labs/coreth/core/types"
+	customtypes "github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap3"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap4"
@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/etna"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
+	"github.com/ava-labs/libevm/core/types"
 )
 
 var (
@@ -178,7 +179,7 @@ func feeWindow(
 
 		// At the start of a new network, the parent may not have a populated
 		// ExtDataGasUsed.
-		if used := types.GetHeaderExtra(parent).ExtDataGasUsed; used != nil {
+		if used := customtypes.GetHeaderExtra(parent).ExtDataGasUsed; used != nil {
 			parentExtraStateGasUsed = used.Uint64()
 		}
 	case config.IsApricotPhase4(parent.Time):
@@ -189,7 +190,7 @@ func feeWindow(
 		// still calculated using the AP4 step. This is different than the
 		// actual BlockGasCost calculation used for the child block. This
 		// behavior is kept to preserve the original behavior of this function.
-		parentExtra := types.GetHeaderExtra(parent)
+		parentExtra := customtypes.GetHeaderExtra(parent)
 		blockGasCost = BlockGasCostWithStep(
 			parentExtra.BlockGasCost,
 			ap4.BlockGasCostStep,

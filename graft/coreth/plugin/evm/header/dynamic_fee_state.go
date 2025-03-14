@@ -7,10 +7,11 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/coreth/core/types"
+	customtypes "github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/acp176"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
 )
 
 // feeStateBeforeBlock takes the previous header and the timestamp of its child
@@ -60,7 +61,7 @@ func feeStateAfterBlock(
 	}
 
 	// Consume the gas used by the block
-	extDataGasUsed := types.GetHeaderExtra(header).ExtDataGasUsed
+	extDataGasUsed := customtypes.GetHeaderExtra(header).ExtDataGasUsed
 	if err := state.ConsumeGas(header.GasUsed, extDataGasUsed); err != nil {
 		return acp176.State{}, fmt.Errorf("advancing the fee state: %w", err)
 	}

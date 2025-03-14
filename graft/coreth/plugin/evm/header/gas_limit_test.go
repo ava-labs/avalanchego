@@ -9,7 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/coreth/core/types"
+	customtypes "github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/acp176"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap0"
@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap5"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/cortina"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -89,9 +90,9 @@ func TestVerifyGasUsed(t *testing.T) {
 		{
 			name:     "fortuna_massive_extra_gas_used",
 			upgrades: extras.TestFortunaChainConfig.NetworkUpgrades,
-			header: types.WithHeaderExtra(
+			header: customtypes.WithHeaderExtra(
 				&types.Header{},
-				&types.HeaderExtra{
+				&customtypes.HeaderExtra{
 					ExtDataGasUsed: new(big.Int).Lsh(common.Big1, 64),
 				},
 			),
@@ -100,11 +101,11 @@ func TestVerifyGasUsed(t *testing.T) {
 		{
 			name:     "fortuna_gas_used_overflow",
 			upgrades: extras.TestFortunaChainConfig.NetworkUpgrades,
-			header: types.WithHeaderExtra(
+			header: customtypes.WithHeaderExtra(
 				&types.Header{
 					GasUsed: math.MaxUint[uint64](),
 				},
-				&types.HeaderExtra{
+				&customtypes.HeaderExtra{
 					ExtDataGasUsed: common.Big1,
 				},
 			),
@@ -152,11 +153,11 @@ func TestVerifyGasUsed(t *testing.T) {
 			parent: &types.Header{
 				Number: big.NewInt(0),
 			},
-			header: types.WithHeaderExtra(
+			header: customtypes.WithHeaderExtra(
 				&types.Header{
 					GasUsed: cortina.GasLimit,
 				},
-				&types.HeaderExtra{
+				&customtypes.HeaderExtra{
 					ExtDataGasUsed: common.Big1,
 				},
 			),

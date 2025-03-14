@@ -7,11 +7,12 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ava-labs/coreth/core/types"
+	customtypes "github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap4"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap5"
 	"github.com/ava-labs/coreth/utils"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -64,11 +65,11 @@ func TestBlockGasCost(t *testing.T) {
 			config := &extras.ChainConfig{
 				NetworkUpgrades: test.upgrades,
 			}
-			parent := types.WithHeaderExtra(
+			parent := customtypes.WithHeaderExtra(
 				&types.Header{
 					Time: test.parentTime,
 				},
-				&types.HeaderExtra{
+				&customtypes.HeaderExtra{
 					BlockGasCost: test.parentCost,
 				},
 			)
@@ -190,9 +191,9 @@ func TestEstimateRequiredTip(t *testing.T) {
 		{
 			name:         "nil_base_fee",
 			ap4Timestamp: utils.NewUint64(0),
-			header: types.WithHeaderExtra(
+			header: customtypes.WithHeaderExtra(
 				&types.Header{},
-				&types.HeaderExtra{
+				&customtypes.HeaderExtra{
 					ExtDataGasUsed: big.NewInt(1),
 					BlockGasCost:   big.NewInt(1),
 				},
@@ -202,11 +203,11 @@ func TestEstimateRequiredTip(t *testing.T) {
 		{
 			name:         "nil_block_gas_cost",
 			ap4Timestamp: utils.NewUint64(0),
-			header: types.WithHeaderExtra(
+			header: customtypes.WithHeaderExtra(
 				&types.Header{
 					BaseFee: big.NewInt(1),
 				},
-				&types.HeaderExtra{
+				&customtypes.HeaderExtra{
 					ExtDataGasUsed: big.NewInt(1),
 				},
 			),
@@ -215,11 +216,11 @@ func TestEstimateRequiredTip(t *testing.T) {
 		{
 			name:         "nil_extra_data_gas_used",
 			ap4Timestamp: utils.NewUint64(0),
-			header: types.WithHeaderExtra(
+			header: customtypes.WithHeaderExtra(
 				&types.Header{
 					BaseFee: big.NewInt(1),
 				},
-				&types.HeaderExtra{
+				&customtypes.HeaderExtra{
 					BlockGasCost: big.NewInt(1),
 				},
 			),
@@ -228,12 +229,12 @@ func TestEstimateRequiredTip(t *testing.T) {
 		{
 			name:         "no_gas_used",
 			ap4Timestamp: utils.NewUint64(0),
-			header: types.WithHeaderExtra(
+			header: customtypes.WithHeaderExtra(
 				&types.Header{
 					GasUsed: 0,
 					BaseFee: big.NewInt(1),
 				},
-				&types.HeaderExtra{
+				&customtypes.HeaderExtra{
 					ExtDataGasUsed: big.NewInt(0),
 					BlockGasCost:   big.NewInt(1),
 				},
@@ -243,12 +244,12 @@ func TestEstimateRequiredTip(t *testing.T) {
 		{
 			name:         "success",
 			ap4Timestamp: utils.NewUint64(0),
-			header: types.WithHeaderExtra(
+			header: customtypes.WithHeaderExtra(
 				&types.Header{
 					GasUsed: 123,
 					BaseFee: big.NewInt(456),
 				},
-				&types.HeaderExtra{
+				&customtypes.HeaderExtra{
 					ExtDataGasUsed: big.NewInt(789),
 					BlockGasCost:   big.NewInt(101112),
 				},
@@ -261,12 +262,12 @@ func TestEstimateRequiredTip(t *testing.T) {
 		{
 			name:         "success_rounds_up",
 			ap4Timestamp: utils.NewUint64(0),
-			header: types.WithHeaderExtra(
+			header: customtypes.WithHeaderExtra(
 				&types.Header{
 					GasUsed: 124,
 					BaseFee: big.NewInt(456),
 				},
-				&types.HeaderExtra{
+				&customtypes.HeaderExtra{
 					ExtDataGasUsed: big.NewInt(789),
 					BlockGasCost:   big.NewInt(101112),
 				},
