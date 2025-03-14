@@ -468,11 +468,9 @@ metrics and logs.
 #### CI
 
 Collection of logs and metrics is enabled for CI jobs that use
-tmpnet. Each job will execute a step titled `Notify of metrics
-availability` that emits a link to grafana parameterized to show
-results for the job. This link is emitted as a github actions
-annotation that appears on the summary page for a test run to increase
-the visibility of collected metrics and logs.
+tmpnet. Each job will execute a step including the script
+`notify-metrics-availability.sh` that emits a link to grafana
+parameterized to show results for the job.
 
 Additional links to grafana parameterized to show results for
 individual network will appear in the logs displaying the start of

@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/ethclient"
 	"github.com/ava-labs/coreth/interfaces"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 

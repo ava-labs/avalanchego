@@ -8,6 +8,8 @@ import (
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/ava-labs/avalanchego/utils/metric"
 )
 
 const (
@@ -93,11 +95,13 @@ type prometheusMetrics struct {
 	lookup *prometheus.CounterVec
 }
 
-func newMetrics(namespace string, reg prometheus.Registerer) (metrics, error) {
+func newMetrics(prefix string, reg prometheus.Registerer) (metrics, error) {
 	// TODO: Should we instead return an error if reg is nil?
 	if reg == nil {
 		return &mockMetrics{}, nil
 	}
+
+	namespace := metric.AppendNamespace(prefix, "merkledb")
 	m := prometheusMetrics{
 		hashes: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,

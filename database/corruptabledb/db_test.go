@@ -184,7 +184,7 @@ func TestIterator(t *testing.T) {
 			// Put a key-value pair in the database.
 			require.NoError(corruptableDB.Put([]byte{0}, []byte{1}))
 
-			// Mark database as corupted, if applicable
+			// Mark database as corrupted, if applicable
 			_ = corruptableDB.handleError(tt.databaseErrBefore)
 
 			// Make an iterator
