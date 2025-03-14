@@ -39,7 +39,7 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/rlp"
 
-	. "github.com/ava-labs/coreth/core/types"
+	. "github.com/ava-labs/coreth/plugin/evm/types"
 
 	// TODO(arr4n) These tests were originally part of the `coreth/core/types`
 	// package so assume the presence of identifiers. A dot-import reduces PR

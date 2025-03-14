@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	customtypes "github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params/extras"
+	customtypes "github.com/ava-labs/coreth/plugin/evm/types"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/acp176"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap0"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap3"
