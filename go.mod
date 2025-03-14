@@ -9,7 +9,7 @@ require (
 	github.com/crate-crypto/go-ipa v0.0.0-20231025140028-3c0104f4b233
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set/v2 v2.1.0
-	github.com/fjl/gencodec v0.1.1-0.20250303202438-8effaadd1b1b
+	github.com/fjl/gencodec v0.1.1-0.20250314100332-a3c3302847ce
 	github.com/google/go-cmp v0.7.0
 	github.com/gorilla/rpc v1.2.0
 	github.com/gorilla/websocket v1.5.0

@@ -8,11 +8,11 @@ import (
 )
 
 // The following types are used directly as their upstream definitions.
-// So we list them all here to avoid having many individual files.
 type (
 	AccessList        = ethtypes.AccessList
 	AccessListTx      = ethtypes.AccessListTx
 	AccessTuple       = ethtypes.AccessTuple
+	Account           = ethtypes.Account
 	BlobTx            = ethtypes.BlobTx
 	BlobTxSidecar     = ethtypes.BlobTxSidecar
 	Block             = ethtypes.Block
@@ -20,10 +20,13 @@ type (
 	Blocks            = ethtypes.Blocks
 	Bloom             = ethtypes.Bloom
 	Body              = ethtypes.Body
+	DerivableList     = ethtypes.DerivableList
 	DynamicFeeTx      = ethtypes.DynamicFeeTx
+	GenesisAlloc      = ethtypes.GenesisAlloc
 	Header            = ethtypes.Header
 	HomesteadSigner   = ethtypes.HomesteadSigner
 	LegacyTx          = ethtypes.LegacyTx
+	Log               = ethtypes.Log
 	Receipt           = ethtypes.Receipt
 	ReceiptForStorage = ethtypes.ReceiptForStorage
 	Receipts          = ethtypes.Receipts
@@ -32,6 +35,7 @@ type (
 	StateAccount      = ethtypes.StateAccount
 	Transaction       = ethtypes.Transaction
 	Transactions      = ethtypes.Transactions
+	TrieHasher        = ethtypes.TrieHasher
 	TxByNonce         = ethtypes.TxByNonce
 	TxData            = ethtypes.TxData
 )
@@ -50,6 +54,16 @@ const (
 	LegacyTxType     = ethtypes.LegacyTxType
 )
 
+// The following variables are used directly as their upstream definitions.
+var (
+	EmptyRootHash     = ethtypes.EmptyRootHash
+	EmptyUncleHash    = ethtypes.EmptyUncleHash
+	EmptyCodeHash     = ethtypes.EmptyCodeHash
+	EmptyTxsHash      = ethtypes.EmptyTxsHash
+	EmptyReceiptsHash = ethtypes.EmptyReceiptsHash
+	EmptyVerkleHash   = ethtypes.EmptyVerkleHash
+)
+
 // The following functions are used directly as their upstream definitions.
 var (
 	BloomLookup          = ethtypes.BloomLookup
@@ -57,6 +71,7 @@ var (
 	CalcUncleHash        = ethtypes.CalcUncleHash
 	CopyHeader           = ethtypes.CopyHeader
 	CreateBloom          = ethtypes.CreateBloom
+	DeriveSha            = ethtypes.DeriveSha
 	EncodeNonce          = ethtypes.EncodeNonce
 	FullAccount          = ethtypes.FullAccount
 	FullAccountRLP       = ethtypes.FullAccountRLP
@@ -67,6 +82,7 @@ var (
 	NewReceipt           = ethtypes.NewReceipt
 	NewTransaction       = ethtypes.NewTransaction
 	SlimAccountRLP       = ethtypes.SlimAccountRLP
+	TrieRootHash         = ethtypes.TrieRootHash
 
 	// Signers
 	LatestSigner           = ethtypes.LatestSigner
