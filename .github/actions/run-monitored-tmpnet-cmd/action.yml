@@ -8,6 +8,8 @@ inputs:
   run_env:
     description: 'a string containing env vars for the command e.g. "MY_VAR1=foo MY_VAR2=bar"'
     default: ''
+  working_directory:
+    default: ''
   filter_by_owner:
     default: ''
   artifact_prefix:
@@ -66,6 +68,7 @@ runs:
       shell: bash
       # --impure ensures the env vars are accessible to the command
       run: ${{ inputs.run_env }} nix develop --impure --command bash -x ${{ inputs.run }}
+      working-directory: ${{ inputs.working_directory }}
       env:
         TMPNET_START_COLLECTORS: ${{ inputs.prometheus_username != '' }}
         TMPNET_CHECK_MONITORING: ${{ inputs.prometheus_username != '' }}
