@@ -552,9 +552,6 @@ func (ts *Topological) vote(ctx context.Context, voteStack []votes) (ids.ID, err
 			if notRejected {
 				ts.ctx.Log.Verbo("deferring confidence reset of child block",
 					zap.Stringer("childID", childID),
-				)
-
-				ts.ctx.Log.Verbo("voting for next block",
 					zap.Stringer("nextID", nextID),
 				)
 
