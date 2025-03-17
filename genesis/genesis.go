@@ -41,11 +41,11 @@ var (
 	errNoCChainGenesis                 = errors.New("C-Chain genesis cannot be empty")
 	errNoTxs                           = errors.New("genesis creates no transactions")
 	errNoAllocationToStake             = errors.New("no allocation to stake")
-	errDuplicateInitiallyStakedAddress = errors.New("duplicate initially staked address")
+	errDuplicateInitiallyStakedAddress = errors.New("duplicate initial staked address")
 	errConflictingNetworkIDs           = errors.New("conflicting networkIDs")
 	errFutureStartTime                 = errors.New("startTime cannot be in the future")
 	errInitialStakeDurationTooLow      = errors.New("initial stake duration is too low")
-	errOverridesStandardNetworkConfig  = errors.New("overrides standard network genesis config")
+	errOverridesStandardNetworkConfig  = errors.New("overrides standard network genesis configuration")
 )
 
 // validateInitialStakedFunds ensures all staked
