@@ -95,6 +95,8 @@ func (f *FeeConfig) Verify() error {
 		return fmt.Errorf("minBlockGasCost = %d cannot be greater than maxBlockGasCost = %d", f.MinBlockGasCost, f.MaxBlockGasCost)
 	case f.BlockGasCostStep.Cmp(common.Big0) == -1:
 		return fmt.Errorf("blockGasCostStep = %d cannot be less than 0", f.BlockGasCostStep)
+	case !f.MaxBlockGasCost.IsUint64():
+		return fmt.Errorf("maxBlockGasCost = %d is not a valid uint64", f.MaxBlockGasCost)
 	}
 	return f.checkByteLens()
 }

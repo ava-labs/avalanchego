@@ -9,26 +9,33 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/core/types"
-	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/plugin/evm/header"
 )
 
-var testBlockGasCostStep = big.NewInt(50_000)
+var testFeeConfig = commontype.FeeConfig{
+	MinBlockGasCost:          big.NewInt(0),
+	MaxBlockGasCost:          big.NewInt(1_000_000),
+	TargetBlockRate:          2,
+	BlockGasCostStep:         big.NewInt(50_000),
+	TargetGas:                big.NewInt(10_000_000),
+	BaseFeeChangeDenominator: big.NewInt(12),
+}
 
 func TestVerifyBlockFee(t *testing.T) {
 	tests := map[string]struct {
-		baseFee                 *big.Int
-		parentBlockGasCost      *big.Int
-		parentTime, currentTime uint64
-		txs                     []*types.Transaction
-		receipts                []*types.Receipt
-		shouldErr               bool
+		baseFee            *big.Int
+		parentBlockGasCost *big.Int
+		timeElapsed        uint64
+		txs                []*types.Transaction
+		receipts           []*types.Receipt
+		shouldErr          bool
 	}{
 		"tx only base fee": {
 			baseFee:            big.NewInt(100),
 			parentBlockGasCost: big.NewInt(0),
-			parentTime:         10,
-			currentTime:        10,
+			timeElapsed:        0,
 			txs: []*types.Transaction{
 				types.NewTransaction(0, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 100, big.NewInt(100), nil),
 			},
@@ -40,8 +47,7 @@ func TestVerifyBlockFee(t *testing.T) {
 		"tx covers exactly block fee": {
 			baseFee:            big.NewInt(100),
 			parentBlockGasCost: big.NewInt(0),
-			parentTime:         10,
-			currentTime:        10,
+			timeElapsed:        0,
 			txs: []*types.Transaction{
 				types.NewTransaction(0, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 100_000, big.NewInt(200), nil),
 			},
@@ -53,8 +59,7 @@ func TestVerifyBlockFee(t *testing.T) {
 		"txs share block fee": {
 			baseFee:            big.NewInt(100),
 			parentBlockGasCost: big.NewInt(0),
-			parentTime:         10,
-			currentTime:        10,
+			timeElapsed:        0,
 			txs: []*types.Transaction{
 				types.NewTransaction(0, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 100_000, big.NewInt(200), nil),
 				types.NewTransaction(1, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 100_000, big.NewInt(100), nil),
@@ -68,8 +73,7 @@ func TestVerifyBlockFee(t *testing.T) {
 		"txs split block fee": {
 			baseFee:            big.NewInt(100),
 			parentBlockGasCost: big.NewInt(0),
-			parentTime:         10,
-			currentTime:        10,
+			timeElapsed:        0,
 			txs: []*types.Transaction{
 				types.NewTransaction(0, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 100_000, big.NewInt(150), nil),
 				types.NewTransaction(1, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 100_000, big.NewInt(150), nil),
@@ -83,8 +87,7 @@ func TestVerifyBlockFee(t *testing.T) {
 		"tx only base fee after full time window": {
 			baseFee:            big.NewInt(100),
 			parentBlockGasCost: big.NewInt(500_000),
-			parentTime:         10,
-			currentTime:        22, // 2s target + 10
+			timeElapsed:        testFeeConfig.TargetBlockRate + 10,
 			txs: []*types.Transaction{
 				types.NewTransaction(0, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 100, big.NewInt(100), nil),
 			},
@@ -96,8 +99,7 @@ func TestVerifyBlockFee(t *testing.T) {
 		"tx only base fee after large time window": {
 			baseFee:            big.NewInt(100),
 			parentBlockGasCost: big.NewInt(100_000),
-			parentTime:         0,
-			currentTime:        math.MaxUint64,
+			timeElapsed:        math.MaxUint64,
 			txs: []*types.Transaction{
 				types.NewTransaction(0, common.HexToAddress("7ef5a6135f1fd6a02593eedc869c6d41d934aef8"), big.NewInt(0), 100, big.NewInt(100), nil),
 			},
@@ -106,29 +108,20 @@ func TestVerifyBlockFee(t *testing.T) {
 			},
 			shouldErr: false,
 		},
-		"parent time > current time": {
-			baseFee:            big.NewInt(100),
-			parentBlockGasCost: big.NewInt(0),
-			parentTime:         11,
-			currentTime:        10,
-			txs:                nil,
-			receipts:           nil,
-			shouldErr:          true,
-		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			blockGasCost := calcBlockGasCost(
-				params.DefaultFeeConfig.TargetBlockRate,
-				params.DefaultFeeConfig.MinBlockGasCost,
-				params.DefaultFeeConfig.MaxBlockGasCost,
-				testBlockGasCostStep,
+			blockGasCost := header.BlockGasCostWithStep(
+				testFeeConfig,
 				test.parentBlockGasCost,
-				test.parentTime, test.currentTime,
+				testFeeConfig.BlockGasCostStep.Uint64(),
+				test.timeElapsed,
 			)
+			bigBlockGasCost := new(big.Int).SetUint64(blockGasCost)
+
 			engine := NewFaker()
-			if err := engine.verifyBlockFee(test.baseFee, blockGasCost, test.txs, test.receipts); err != nil {
+			if err := engine.verifyBlockFee(test.baseFee, bigBlockGasCost, test.txs, test.receipts); err != nil {
 				if !test.shouldErr {
 					t.Fatalf("Unexpected error: %s", err)
 				}

@@ -43,6 +43,8 @@ import (
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/params/extras"
+	customheader "github.com/ava-labs/subnet-evm/plugin/evm/header"
+	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/legacy"
 	"github.com/holiman/uint256"
 	"golang.org/x/crypto/sha3"
 )
@@ -58,7 +60,7 @@ func TestStateProcessorErrors(t *testing.T) {
 	config := &cpcfg
 	config.ShanghaiTime = u64(0)
 	config.CancunTime = u64(0)
-	params.GetExtra(config).FeeConfig.MinBaseFee = big.NewInt(params.TestMaxBaseFee)
+	params.GetExtra(config).FeeConfig.MinBaseFee = big.NewInt(legacy.BaseFee)
 
 	var (
 		signer  = types.LatestSigner(config)
@@ -224,13 +226,13 @@ func TestStateProcessorErrors(t *testing.T) {
 			},
 			{ // ErrMaxInitCodeSizeExceeded
 				txs: []*types.Transaction{
-					mkDynamicCreationTx(0, 500000, common.Big0, big.NewInt(params.TestInitialBaseFee), tooBigInitCode[:]),
+					mkDynamicCreationTx(0, 500000, common.Big0, big.NewInt(legacy.BaseFee), tooBigInitCode[:]),
 				},
 				want: "could not apply tx 0 [0x18a05f40f29ff16d5287f6f88b21c9f3c7fbc268f707251144996294552c4cd6]: max initcode size exceeded: code size 49153 limit 49152",
 			},
 			{ // ErrIntrinsicGas: Not enough gas to cover init code
 				txs: []*types.Transaction{
-					mkDynamicCreationTx(0, 54299, common.Big0, big.NewInt(params.TestInitialBaseFee), make([]byte, 320)),
+					mkDynamicCreationTx(0, 54299, common.Big0, big.NewInt(legacy.BaseFee), make([]byte, 320)),
 				},
 				want: "could not apply tx 0 [0x849278f616d51ab56bba399551317213ce7a10e4d9cbc3d14bb663e50cb7ab99]: intrinsic gas too low: have 54299, want 54300",
 			},
@@ -352,6 +354,14 @@ func TestStateProcessorErrors(t *testing.T) {
 // - valid pow (fake), ancestry, difficulty, gaslimit etc
 func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Transactions, config *params.ChainConfig) *types.Block {
 	fakeChainReader := newChainMaker(nil, config, engine)
+	time := parent.Time() + 10
+	feeConfig, _, err := fakeChainReader.GetFeeConfigAt(parent.Header())
+	if err != nil {
+		panic(err)
+	}
+	configExtra := params.GetExtra(config)
+	gasLimit, _ := customheader.GasLimit(configExtra, feeConfig, parent.Header(), time)
+	baseFee, _ := customheader.BaseFee(configExtra, feeConfig, parent.Header(), time)
 	header := &types.Header{
 		ParentHash: parent.Hash(),
 		Coinbase:   parent.Coinbase(),
@@ -361,14 +371,14 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 			Difficulty: parent.Difficulty(),
 			UncleHash:  parent.UncleHash(),
 		}),
-		GasLimit:  parent.GasLimit(),
+		GasLimit:  gasLimit,
 		Number:    new(big.Int).Add(parent.Number(), common.Big1),
-		Time:      parent.Time() + 10,
+		Time:      time,
 		UncleHash: types.EmptyUncleHash,
+		BaseFee:   baseFee,
 	}
 
 	if params.GetExtra(config).IsSubnetEVM(header.Time) {
-		header.Extra, header.BaseFee, _ = dummy.CalcBaseFee(config, params.GetExtra(config).FeeConfig, parent.Header(), header.Time)
 		header.BlockGasCost = big.NewInt(0)
 	}
 	var receipts []*types.Receipt
@@ -388,6 +398,7 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 		cumulativeGas += tx.Gas()
 		nBlobs += len(tx.BlobHashes())
 	}
+	header.Extra, _ = customheader.ExtraPrefix(configExtra, parent.Header(), header)
 	header.Root = common.BytesToHash(hasher.Sum(nil))
 	if config.IsCancun(header.Number, header.Time) {
 		var pExcess, pUsed = uint64(0), uint64(0)

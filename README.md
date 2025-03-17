@@ -1,9 +1,9 @@
 # Subnet EVM
 
-[![Build + Test + Release](https://github.com/ava-labs/subnet-evm/actions/workflows/lint-tests-release.yml/badge.svg)](https://github.com/ava-labs/subnet-evm/actions/workflows/lint-tests-release.yml)
+[![CI](https://github.com/ava-labs/subnet-evm/actions/workflows/ci.yml/badge.svg)](https://github.com/ava-labs/subnet-evm/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/ava-labs/subnet-evm/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/ava-labs/subnet-evm/actions/workflows/codeql-analysis.yml)
 
-[Avalanche](https://docs.avax.network/overview/getting-started/avalanche-platform) is a network composed of multiple blockchains.
+[Avalanche](https://docs.avax.network/avalanche-l1s) is a network composed of multiple blockchains.
 Each blockchain is an instance of a Virtual Machine (VM), much like an object in an object-oriented language is an instance of a class.
 That is, the VM defines the behavior of the blockchain.
 
@@ -18,21 +18,9 @@ The Subnet EVM runs in a separate process from the main AvalancheGo process and 
 ### AvalancheGo Compatibility
 
 ```text
-[v0.6.0] AvalancheGo@v1.11.0-v1.11.1 (Protocol Version: 33)
-[v0.6.1] AvalancheGo@v1.11.0-v1.11.1 (Protocol Version: 33)
-[v0.6.2] AvalancheGo@v1.11.2 (Protocol Version: 34)
-[v0.6.3] AvalancheGo@v1.11.3-v1.11.9 (Protocol Version: 35)
-[v0.6.4] AvalancheGo@v1.11.3-v1.11.9 (Protocol Version: 35)
-[v0.6.5] AvalancheGo@v1.11.3-v1.11.9 (Protocol Version: 35)
-[v0.6.6] AvalancheGo@v1.11.3-v1.11.9 (Protocol Version: 35)
-[v0.6.7] AvalancheGo@v1.11.3-v1.11.9 (Protocol Version: 35)
-[v0.6.8] AvalancheGo@v1.11.10 (Protocol Version: 36)
-[v0.6.9] AvalancheGo@v1.11.11-v1.11.12 (Protocol Version: 37)
-[v0.6.10] AvalancheGo@v1.11.11-v1.11.12 (Protocol Version: 37)
-[v0.6.11] AvalancheGo@v1.11.11-v1.11.12 (Protocol Version: 37)
-[v0.6.12] AvalancheGo@v1.11.13/v1.12.0 (Protocol Version: 38)
 [v0.7.0] AvalancheGo@v1.12.0-v1.12.1 (Protocol Version: 38)
-[v0.7.1] AvalancheGo@v1.12.0-v1.12.1 (Protocol Version: 38)
+[v0.7.1] AvalancheGo@v1.12.2 (Protocol Version: 39)
+[v0.7.2] AvalancheGo@v1.12.2/1.13.0-fuji (Protocol Version: 39)
 ```
 
 ## API
@@ -72,7 +60,7 @@ To support these changes, there have been a number of changes to the SubnetEVM b
 
 ### Clone Subnet-evm
 
-First install Go 1.22.8 or later. Follow the instructions [here](https://go.dev/doc/install). You can verify by running `go version`.
+First install Go 1.23.6 or later. Follow the instructions [here](https://go.dev/doc/install). You can verify by running `go version`.
 
 Set `$GOPATH` environment variable properly for Go to look for Go Workspaces. Please read [this](https://go.dev/doc/code) for details. You can verify by running `echo $GOPATH`.
 
@@ -96,5 +84,5 @@ To run a local network, it is recommended to use the [avalanche-cli](https://git
 
 There are two options when using the Avalanche-CLI:
 
-1. Use an official Subnet-EVM release: https://docs.avax.network/subnets/build-first-subnet
-2. Build and deploy a locally built (and optionally modified) version of Subnet-EVM: https://docs.avax.network/subnets/create-custom-subnet
+1. Use an official Subnet-EVM release: <https://docs.avax.network/subnets/build-first-subnet>
+2. Build and deploy a locally built (and optionally modified) version of Subnet-EVM: <https://docs.avax.network/subnets/create-custom-subnet>

@@ -40,7 +40,7 @@ Once you've built AvalancheGo, open the AvalancheGo directory in a separate term
 
 WARNING:
 
-The staking-enabled flag is only for local testing. Disabling staking serves two functions explicitly for testing purposes:
+The `--sybil-protection-enabled=false` flag is only suitable for local testing. Disabling staking serves two functions explicitly for testing purposes:
 
 1. Ignore stake weight on the P-Chain and count each connected peer as having a stake weight of 1
 2. Automatically opts in to validate every Subnet

@@ -39,7 +39,6 @@ import (
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/consensus"
-	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/bloombits"
 	"github.com/ava-labs/subnet-evm/core/state"
@@ -48,6 +47,7 @@ import (
 	"github.com/ava-labs/subnet-evm/eth/gasprice"
 	"github.com/ava-labs/subnet-evm/eth/tracers"
 	"github.com/ava-labs/subnet-evm/params"
+	customheader "github.com/ava-labs/subnet-evm/plugin/evm/header"
 	"github.com/ava-labs/subnet-evm/rpc"
 )
 
@@ -61,11 +61,26 @@ type EthAPIBackend struct {
 	allowUnfinalizedQueries  bool
 	eth                      *Ethereum
 	gpo                      *gasprice.Oracle
+
+	// historicalProofQueryWindow is the number of blocks before the last accepted block to be accepted for
+	// state queries when running archive mode.
+	historicalProofQueryWindow uint64
 }
 
 // ChainConfig returns the active chain configuration.
 func (b *EthAPIBackend) ChainConfig() *params.ChainConfig {
 	return b.eth.blockchain.Config()
+}
+
+// IsArchive returns true if the node is running in archive mode, false otherwise.
+func (b *EthAPIBackend) IsArchive() bool {
+	return !b.eth.config.Pruning
+}
+
+// HistoricalProofQueryWindow returns the number of blocks before the last accepted block to be accepted for state queries.
+// It returns 0 to indicate to accept any block number for state queries.
+func (b *EthAPIBackend) HistoricalProofQueryWindow() uint64 {
+	return b.historicalProofQueryWindow
 }
 
 func (b *EthAPIBackend) IsAllowUnfinalizedQueries() bool {
@@ -512,7 +527,8 @@ func (b *EthAPIBackend) StateAtTransaction(ctx context.Context, block *types.Blo
 }
 
 func (b *EthAPIBackend) MinRequiredTip(ctx context.Context, header *types.Header) (*big.Int, error) {
-	return dummy.MinRequiredTip(b.ChainConfig(), header)
+	config := params.GetExtra(b.ChainConfig())
+	return customheader.EstimateRequiredTip(config, header)
 }
 
 func (b *EthAPIBackend) isLatestAndAllowed(number rpc.BlockNumber) bool {

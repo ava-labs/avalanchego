@@ -24,7 +24,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -36,12 +35,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/subnet-evm/commontype"
-	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/txpool"
@@ -50,6 +47,8 @@ import (
 	"github.com/ava-labs/subnet-evm/metrics"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/params/extras"
+	"github.com/ava-labs/subnet-evm/plugin/evm/config"
+	"github.com/ava-labs/subnet-evm/plugin/evm/header"
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/deployerallowlist"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/feemanager"
@@ -68,8 +67,6 @@ var (
 	testMinGasPrice int64 = 225_000_000_000
 	testKeys        []*ecdsa.PrivateKey
 	testEthAddrs    []common.Address // testEthAddrs[i] corresponds to testKeys[i]
-	username        = "Johns"
-	password        = "CjasdjhiPeirbSenfeI13" // #nosec G101
 
 	firstTxAmount  = new(big.Int).Mul(big.NewInt(testMinGasPrice), big.NewInt(21000*100))
 	genesisBalance = new(big.Int).Mul(big.NewInt(testMinGasPrice), big.NewInt(21000*1000))
@@ -100,7 +97,8 @@ var (
 	genesisJSONSubnetEVM    = genesisJSON(params.TestSubnetEVMChainConfig)
 	genesisJSONDurango      = genesisJSON(params.TestDurangoChainConfig)
 	genesisJSONEtna         = genesisJSON(params.TestEtnaChainConfig)
-	genesisJSONLatest       = genesisJSONEtna
+	genesisJSONFortuna      = genesisJSON(params.TestFortunaChainConfig)
+	genesisJSONLatest       = genesisJSONFortuna
 )
 
 func init() {
@@ -155,16 +153,6 @@ func setupGenesis(
 	// initialize the atomic memory
 	atomicMemory := atomic.NewMemory(prefixdb.New([]byte{0}, baseDB))
 	ctx.SharedMemory = atomicMemory.NewSharedMemory(ctx.ChainID)
-
-	// NB: this lock is intentionally left locked when this function returns.
-	// The caller of this function is responsible for unlocking.
-	ctx.Lock.Lock()
-
-	userKeystore := keystore.New(logging.NoLog{}, memdb.New())
-	if err := userKeystore.CreateUser(username, password); err != nil {
-		t.Fatal(err)
-	}
-	ctx.Keystore = userKeystore.NewBlockchainKeyStore(ctx.ChainID)
 
 	issuer := make(chan commonEng.Message, 1)
 	prefixedDB := prefixdb.New([]byte{1}, baseDB)
@@ -228,8 +216,8 @@ func TestVMConfigDefaults(t *testing.T) {
 	configJSON := fmt.Sprintf(`{"rpc-tx-fee-cap": %g,"eth-apis": %s}`, txFeeCap, fmt.Sprintf("[%q]", enabledEthAPIs[0]))
 	_, vm, _, _ := GenesisVM(t, false, "", configJSON, "")
 
-	var vmConfig Config
-	vmConfig.SetDefaults()
+	var vmConfig config.Config
+	vmConfig.SetDefaults(defaultTxPoolConfig)
 	vmConfig.RPCTxFeeCap = txFeeCap
 	vmConfig.EnabledEthAPIs = enabledEthAPIs
 	require.Equal(t, vmConfig, vm.config, "VM Config should match default with overrides")
@@ -240,8 +228,8 @@ func TestVMNilConfig(t *testing.T) {
 	_, vm, _, _ := GenesisVM(t, false, "", "", "")
 
 	// VM Config should match defaults if no config is passed in
-	var vmConfig Config
-	vmConfig.SetDefaults()
+	var vmConfig config.Config
+	vmConfig.SetDefaults(defaultTxPoolConfig)
 	require.Equal(t, vmConfig, vm.config, "VM Config should match default config")
 	require.NoError(t, vm.Shutdown(context.Background()))
 }
@@ -1999,11 +1987,12 @@ func TestBuildSubnetEVMBlock(t *testing.T) {
 	if ethBlk.BlockGasCost() == nil || ethBlk.BlockGasCost().Cmp(big.NewInt(100)) < 0 {
 		t.Fatalf("expected blockGasCost to be at least 100 but got %d", ethBlk.BlockGasCost())
 	}
-	minRequiredTip, err := dummy.MinRequiredTip(vm.chainConfig, ethBlk.Header())
+	chainConfig := params.GetExtra(vm.chainConfig)
+	minRequiredTip, err := header.EstimateRequiredTip(chainConfig, ethBlk.Header())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if minRequiredTip == nil || minRequiredTip.Cmp(big.NewInt(0.05*params.GWei)) < 0 {
+	if minRequiredTip == nil || minRequiredTip.Cmp(big.NewInt(0.05*utils.GWei)) < 0 {
 		t.Fatalf("expected minRequiredTip to be at least 0.05 gwei but got %d", minRequiredTip)
 	}
 
@@ -2623,8 +2612,8 @@ func TestAllowFeeRecipientEnabled(t *testing.T) {
 	}
 
 	etherBase := common.HexToAddress("0x0123456789")
-	c := Config{}
-	c.SetDefaults()
+	c := config.Config{}
+	c.SetDefaults(defaultTxPoolConfig)
 	c.FeeRecipient = etherBase.String()
 	configJSON, err := json.Marshal(c)
 	if err != nil {
@@ -2683,8 +2672,8 @@ func TestRewardManagerPrecompileSetRewardAddress(t *testing.T) {
 	require.NoError(t, err)
 
 	etherBase := common.HexToAddress("0x0123456789") // give custom ether base
-	c := Config{}
-	c.SetDefaults()
+	c := config.Config{}
+	c.SetDefaults(defaultTxPoolConfig)
 	c.FeeRecipient = etherBase.String()
 	configJSON, err := json.Marshal(c)
 	require.NoError(t, err)
@@ -2824,8 +2813,8 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 	genesisJSON, err := genesis.MarshalJSON()
 	require.NoError(t, err)
 	etherBase := common.HexToAddress("0x0123456789") // give custom ether base
-	c := Config{}
-	c.SetDefaults()
+	c := config.Config{}
+	c.SetDefaults(defaultTxPoolConfig)
 	c.FeeRecipient = etherBase.String()
 	configJSON, err := json.Marshal(c)
 	require.NoError(t, err)

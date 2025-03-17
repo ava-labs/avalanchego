@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/txpool/legacypool"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -67,7 +68,7 @@ func TestGossipSubscribe(t *testing.T) {
 	}, 10*time.Second, 500*time.Millisecond, "expected gossipTxPool to be subscribed")
 
 	// create eth txs
-	ethTxs := getValidEthTxs(key, 10, big.NewInt(226*params.GWei))
+	ethTxs := getValidEthTxs(key, 10, big.NewInt(226*utils.GWei))
 
 	// Notify mempool about txs
 	errs := txPool.AddRemotesSync(ethTxs)

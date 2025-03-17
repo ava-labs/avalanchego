@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/legacy"
 )
 
 func verifyUnbrokenCanonchain(bc *BlockChain) error {
@@ -75,7 +76,7 @@ func TestHeaderInsertion(t *testing.T) {
 	var (
 		db    = rawdb.NewMemoryDatabase()
 		gspec = &Genesis{
-			BaseFee: big.NewInt(params.TestInitialBaseFee),
+			BaseFee: big.NewInt(legacy.BaseFee),
 			Config:  params.TestChainConfig,
 		}
 	)

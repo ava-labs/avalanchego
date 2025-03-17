@@ -10,35 +10,16 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/subnet-evm/plugin/evm/client"
 )
 
 type ValidatorsAPI struct {
 	vm *VM
 }
 
-type GetCurrentValidatorsRequest struct {
-	NodeIDs []ids.NodeID `json:"nodeIDs"`
-}
-
-type GetCurrentValidatorsResponse struct {
-	Validators []CurrentValidator `json:"validators"`
-}
-
-type CurrentValidator struct {
-	ValidationID     ids.ID     `json:"validationID"`
-	NodeID           ids.NodeID `json:"nodeID"`
-	Weight           uint64     `json:"weight"`
-	StartTimestamp   uint64     `json:"startTimestamp"`
-	IsActive         bool       `json:"isActive"`
-	IsL1Validator    bool       `json:"isL1Validator"`
-	IsConnected      bool       `json:"isConnected"`
-	UptimePercentage float32    `json:"uptimePercentage"`
-	UptimeSeconds    uint64     `json:"uptimeSeconds"`
-}
-
-func (api *ValidatorsAPI) GetCurrentValidators(_ *http.Request, req *GetCurrentValidatorsRequest, reply *GetCurrentValidatorsResponse) error {
-	api.vm.ctx.Lock.RLock()
-	defer api.vm.ctx.Lock.RUnlock()
+func (api *ValidatorsAPI) GetCurrentValidators(_ *http.Request, req *client.GetCurrentValidatorsRequest, reply *client.GetCurrentValidatorsResponse) error {
+	api.vm.vmLock.RLock()
+	defer api.vm.vmLock.RUnlock()
 
 	var vIDs set.Set[ids.ID]
 	if len(req.NodeIDs) > 0 {
@@ -54,7 +35,7 @@ func (api *ValidatorsAPI) GetCurrentValidators(_ *http.Request, req *GetCurrentV
 		vIDs = api.vm.validatorsManager.GetValidationIDs()
 	}
 
-	reply.Validators = make([]CurrentValidator, 0, vIDs.Len())
+	reply.Validators = make([]client.CurrentValidator, 0, vIDs.Len())
 
 	for _, vID := range vIDs.List() {
 		validator, err := api.vm.validatorsManager.GetValidator(vID)
@@ -81,7 +62,7 @@ func (api *ValidatorsAPI) GetCurrentValidators(_ *http.Request, req *GetCurrentV
 		// with currentValidators in PlatformVM API
 		uptimePercentage := float32(uptimeFloat * 100)
 
-		reply.Validators = append(reply.Validators, CurrentValidator{
+		reply.Validators = append(reply.Validators, client.CurrentValidator{
 			ValidationID:     validator.ValidationID,
 			NodeID:           validator.NodeID,
 			StartTimestamp:   validator.StartTimestamp,

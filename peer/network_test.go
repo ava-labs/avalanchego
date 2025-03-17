@@ -46,9 +46,7 @@ var (
 	_ message.RequestHandler = &HelloGreetingRequestHandler{}
 	_ message.RequestHandler = &testRequestHandler{}
 
-	_ common.AppSender      = testAppSender{}
-	_ message.GossipMessage = HelloGossip{}
-	_ message.GossipHandler = &testGossipHandler{}
+	_ common.AppSender = testAppSender{}
 
 	_ p2p.Handler = &testSDKHandler{}
 )
@@ -503,7 +501,6 @@ func TestHandleInvalidMessages(t *testing.T) {
 	p2pNetwork, err := p2p.NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 	require.NoError(t, err)
 	clientNetwork := NewNetwork(p2pNetwork, sender, codecManager, ids.EmptyNodeID, 1)
-	clientNetwork.SetGossipHandler(message.NoopMempoolGossipHandler{})
 	clientNetwork.SetRequestHandler(&testRequestHandler{})
 
 	assert.NoError(t, clientNetwork.Connected(context.Background(), nodeID, defaultPeerVersion))
@@ -511,7 +508,8 @@ func TestHandleInvalidMessages(t *testing.T) {
 	defer clientNetwork.Shutdown()
 
 	// Ensure a valid gossip message sent as any App specific message type does not trigger a fatal error
-	gossipMsg, err := buildGossip(codecManager, HelloGossip{Msg: "hello there!"})
+	marshaller := helloGossipMarshaller{codec: codecManager}
+	gossipMsg, err := marshaller.MarshalGossip(&HelloGossip{Msg: "hello there!"})
 	assert.NoError(t, err)
 
 	// Ensure a valid request message sent as any App specific message type does not trigger a fatal error
@@ -552,7 +550,6 @@ func TestNetworkPropagatesRequestHandlerError(t *testing.T) {
 	p2pNetwork, err := p2p.NewNetwork(logging.NoLog{}, nil, prometheus.NewRegistry(), "")
 	require.NoError(t, err)
 	clientNetwork := NewNetwork(p2pNetwork, sender, codecManager, ids.EmptyNodeID, 1)
-	clientNetwork.SetGossipHandler(message.NoopMempoolGossipHandler{})
 	clientNetwork.SetRequestHandler(&testRequestHandler{err: errors.New("fail")}) // Return an error from the request handler
 
 	assert.NoError(t, clientNetwork.Connected(context.Background(), nodeID, defaultPeerVersion))
@@ -623,10 +620,6 @@ func buildCodec(t *testing.T, types ...interface{}) codec.Manager {
 // so that the codec is able to include the TypeID in the resulting bytes
 func marshalStruct(codec codec.Manager, obj interface{}) ([]byte, error) {
 	return codec.Marshal(message.Version, &obj)
-}
-
-func buildGossip(codec codec.Manager, msg message.GossipMessage) ([]byte, error) {
-	return codec.Marshal(message.Version, &msg)
 }
 
 type testAppSender struct {
@@ -719,28 +712,22 @@ type HelloGossip struct {
 	Msg string `serialize:"true"`
 }
 
-func (h HelloGossip) Handle(handler message.GossipHandler, nodeID ids.NodeID) error {
-	return handler.HandleEthTxs(nodeID, message.EthTxsGossip{})
+func (tx *HelloGossip) GossipID() ids.ID {
+	return ids.FromStringOrPanic(tx.Msg)
 }
 
-func (h HelloGossip) String() string {
-	return fmt.Sprintf("HelloGossip(%s)", h.Msg)
+type helloGossipMarshaller struct {
+	codec codec.Manager
 }
 
-func (h HelloGossip) Bytes() []byte {
-	// no op
-	return nil
+func (g helloGossipMarshaller) MarshalGossip(tx *HelloGossip) ([]byte, error) {
+	return g.codec.Marshal(0, tx)
 }
 
-type testGossipHandler struct {
-	received bool
-	nodeID   ids.NodeID
-}
-
-func (t *testGossipHandler) HandleEthTxs(nodeID ids.NodeID, msg message.EthTxsGossip) error {
-	t.received = true
-	t.nodeID = nodeID
-	return nil
+func (g helloGossipMarshaller) UnmarshalGossip(bytes []byte) (*HelloGossip, error) {
+	h := &HelloGossip{}
+	_, err := g.codec.Unmarshal(bytes, h)
+	return h, err
 }
 
 type testRequestHandler struct {

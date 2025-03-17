@@ -31,15 +31,70 @@ var (
 		BlockGasCostStep: big.NewInt(200_000),
 	}
 
-	TestChainConfig = &ChainConfig{
-		AvalancheContext:   AvalancheContext{utils.TestSnowContext()},
+	SubnetEVMDefaultChainConfig = &ChainConfig{
 		FeeConfig:          DefaultFeeConfig,
-		AllowFeeRecipients: false,
-		NetworkUpgrades:    GetDefaultNetworkUpgrades(upgrade.GetConfig(constants.UnitTestID)), // This can be changed to correct network (local, test) via VM.
+		NetworkUpgrades:    getDefaultNetworkUpgrades(upgrade.GetConfig(constants.MainnetID)),
 		GenesisPrecompiles: Precompiles{},
-		UpgradeConfig:      UpgradeConfig{},
 	}
+
+	TestChainConfig = &ChainConfig{
+		AvalancheContext:   AvalancheContext{SnowCtx: utils.TestSnowContext()},
+		FeeConfig:          DefaultFeeConfig,
+		NetworkUpgrades:    getDefaultNetworkUpgrades(upgrade.GetConfig(constants.UnitTestID)), // This can be changed to correct network (local, test) via VM.
+		GenesisPrecompiles: Precompiles{},
+	}
+
+	TestPreSubnetEVMChainConfig = copyAndSet(TestChainConfig, func(c *ChainConfig) {
+		c.NetworkUpgrades = NetworkUpgrades{
+			SubnetEVMTimestamp: utils.TimeToNewUint64(upgrade.UnscheduledActivationTime),
+			DurangoTimestamp:   utils.TimeToNewUint64(upgrade.UnscheduledActivationTime),
+			EtnaTimestamp:      utils.TimeToNewUint64(upgrade.UnscheduledActivationTime),
+			FortunaTimestamp:   utils.TimeToNewUint64(upgrade.UnscheduledActivationTime),
+		}
+	})
+
+	TestSubnetEVMChainConfig = copyAndSet(TestChainConfig, func(c *ChainConfig) {
+		c.NetworkUpgrades = NetworkUpgrades{
+			SubnetEVMTimestamp: utils.NewUint64(0),
+			DurangoTimestamp:   utils.TimeToNewUint64(upgrade.UnscheduledActivationTime),
+			EtnaTimestamp:      utils.TimeToNewUint64(upgrade.UnscheduledActivationTime),
+			FortunaTimestamp:   utils.TimeToNewUint64(upgrade.UnscheduledActivationTime),
+		}
+	})
+
+	TestDurangoChainConfig = copyAndSet(TestChainConfig, func(c *ChainConfig) {
+		c.NetworkUpgrades = NetworkUpgrades{
+			SubnetEVMTimestamp: utils.NewUint64(0),
+			DurangoTimestamp:   utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
+			EtnaTimestamp:      utils.TimeToNewUint64(upgrade.UnscheduledActivationTime),
+			FortunaTimestamp:   utils.TimeToNewUint64(upgrade.UnscheduledActivationTime),
+		}
+	})
+
+	TestEtnaChainConfig = copyAndSet(TestChainConfig, func(c *ChainConfig) {
+		c.NetworkUpgrades = NetworkUpgrades{
+			SubnetEVMTimestamp: utils.NewUint64(0),
+			DurangoTimestamp:   utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
+			EtnaTimestamp:      utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
+			FortunaTimestamp:   utils.TimeToNewUint64(upgrade.UnscheduledActivationTime),
+		}
+	})
+
+	TestFortunaChainConfig = copyAndSet(TestChainConfig, func(c *ChainConfig) {
+		c.NetworkUpgrades = NetworkUpgrades{
+			SubnetEVMTimestamp: utils.NewUint64(0),
+			DurangoTimestamp:   utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
+			EtnaTimestamp:      utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
+			FortunaTimestamp:   utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
+		}
+	})
 )
+
+func copyAndSet(c *ChainConfig, set func(*ChainConfig)) *ChainConfig {
+	newConfig := *c
+	set(&newConfig)
+	return &newConfig
+}
 
 // UpgradeConfig includes the following configs that may be specified in upgradeBytes:
 // - Timestamps that enable avalanche network upgrades,

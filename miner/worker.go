@@ -42,14 +42,15 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/log"
+	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/consensus"
-	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/consensus/misc/eip4844"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/core/txpool"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
+	customheader "github.com/ava-labs/subnet-evm/plugin/evm/header"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/subnet-evm/predicate"
 	"github.com/holiman/uint256"
@@ -144,37 +145,30 @@ func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateConte
 		timestamp = parent.Time
 	}
 
-	var gasLimit uint64
 	// The fee manager relies on the state of the parent block to set the fee config
 	// because the fee config may be changed by the current block.
 	feeConfig, _, err := w.chain.GetFeeConfigAt(parent)
 	if err != nil {
 		return nil, err
 	}
-	configuredGasLimit := feeConfig.GasLimit.Uint64()
-	chainExtra := params.GetExtra(w.chainConfig)
-	if chainExtra.IsSubnetEVM(timestamp) {
-		gasLimit = configuredGasLimit
-	} else {
-		// The gas limit is set in SubnetEVMGasLimit because the ceiling and floor were set to the same value
-		// such that the gas limit converged to it. Since this is hardbaked now, we remove the ability to configure it.
-		gasLimit = core.CalcGasLimit(parent.GasUsed, parent.GasLimit, configuredGasLimit, configuredGasLimit)
+	chainConfig := params.GetExtra(w.chainConfig)
+	gasLimit, err := customheader.GasLimit(chainConfig, feeConfig, parent, timestamp)
+	if err != nil {
+		return nil, fmt.Errorf("calculating new gas limit: %w", err)
 	}
+	baseFee, err := customheader.BaseFee(chainConfig, feeConfig, parent, timestamp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate new base fee: %w", err)
+	}
+
 	header := &types.Header{
 		ParentHash: parent.Hash(),
 		Number:     new(big.Int).Add(parent.Number, common.Big1),
 		GasLimit:   gasLimit,
-		Extra:      nil,
 		Time:       timestamp,
+		BaseFee:    baseFee,
 	}
 
-	if chainExtra.IsSubnetEVM(timestamp) {
-		var err error
-		header.Extra, header.BaseFee, err = dummy.CalcBaseFee(w.chainConfig, feeConfig, parent, timestamp)
-		if err != nil {
-			return nil, fmt.Errorf("failed to calculate new base fee: %w", err)
-		}
-	}
 	// Apply EIP-4844, EIP-4788.
 	if w.chainConfig.IsCancun(header.Number, header.Time) {
 		var excessBlobGas uint64
@@ -211,7 +205,7 @@ func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateConte
 		return nil, fmt.Errorf("failed to prepare header for mining: %w", err)
 	}
 
-	env, err := w.createCurrentEnvironment(predicateContext, parent, header, tstart)
+	env, err := w.createCurrentEnvironment(predicateContext, parent, header, feeConfig, tstart)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new current environment: %w", err)
 	}
@@ -281,10 +275,15 @@ func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateConte
 	return w.commit(env)
 }
 
-func (w *worker) createCurrentEnvironment(predicateContext *precompileconfig.PredicateContext, parent *types.Header, header *types.Header, tstart time.Time) (*environment, error) {
+func (w *worker) createCurrentEnvironment(predicateContext *precompileconfig.PredicateContext, parent *types.Header, header *types.Header, feeConfig commontype.FeeConfig, tstart time.Time) (*environment, error) {
 	currentState, err := w.chain.StateAt(parent.Root)
 	if err != nil {
 		return nil, err
+	}
+	chainConfig := params.GetExtra(w.chainConfig)
+	capacity, err := customheader.GasCapacity(chainConfig, feeConfig, parent, header.Time)
+	if err != nil {
+		return nil, fmt.Errorf("calculating gas capacity: %w", err)
 	}
 	numPrefetchers := w.chain.CacheConfig().TriePrefetcherParallelism
 	currentState.StartPrefetcher("miner", state.WithConcurrentWorkers(numPrefetchers))
@@ -294,7 +293,7 @@ func (w *worker) createCurrentEnvironment(predicateContext *precompileconfig.Pre
 		parent:           parent,
 		header:           header,
 		tcount:           0,
-		gasPool:          new(core.GasPool).AddGas(header.GasLimit),
+		gasPool:          new(core.GasPool).AddGas(capacity),
 		rules:            w.chainConfig.Rules(header.Number, params.IsMergeTODO, header.Time),
 		predicateContext: predicateContext,
 		predicateResults: predicate.NewResults(),

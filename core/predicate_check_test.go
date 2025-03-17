@@ -244,7 +244,7 @@ func TestCheckPredicate(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
-		"two predicates niether named by access list": {
+		"two predicates neither named by access list": {
 			gas:              61600,
 			predicateContext: predicateContext,
 			createPredicates: func(t testing.TB) map[common.Address]precompileconfig.Predicater {
@@ -293,7 +293,6 @@ func TestCheckPredicate(t *testing.T) {
 			expectedErr: ErrIntrinsicGas,
 		},
 	} {
-		test := test
 		t.Run(name, func(t *testing.T) {
 			require := require.New(t)
 			// Create the rules from TestChainConfig and update the predicates based on the test params

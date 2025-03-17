@@ -125,5 +125,5 @@ func addSimulatorFlags(fs *pflag.FlagSet) {
 	fs.String(LogLevelKey, "info", "Specify the log level to use in the simulator")
 	fs.Uint64(BatchSizeKey, 100, "Specify the batchsize for the worker to issue and confirm txs")
 	fs.Uint64(MetricsPortKey, 8082, "Specify the port to use for the metrics server")
-	fs.String(MetricsOutputKey, "", "Specify the file to write metrics in json format, or empy to write to stdout (defaults to stdout)")
+	fs.String(MetricsOutputKey, "", "Specify the file to write metrics in json format, or empty to write to stdout (defaults to stdout)")
 }

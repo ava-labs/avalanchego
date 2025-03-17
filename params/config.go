@@ -55,13 +55,10 @@ var (
 			PetersburgBlock:     big.NewInt(0),
 			IstanbulBlock:       big.NewInt(0),
 			MuirGlacierBlock:    big.NewInt(0),
+			BerlinBlock:         big.NewInt(0),
+			LondonBlock:         big.NewInt(0),
 		},
-		&extras.ChainConfig{
-			FeeConfig:          DefaultFeeConfig,
-			AllowFeeRecipients: false,
-			NetworkUpgrades:    extras.GetDefaultNetworkUpgrades(upgrade.GetConfig(constants.MainnetID)), // This can be changed to correct network (local, test) via VM.
-			GenesisPrecompiles: extras.Precompiles{},
-		},
+		extras.SubnetEVMDefaultChainConfig,
 	)
 
 	TestChainConfig = WithExtra(
@@ -99,18 +96,7 @@ var (
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
 		},
-		&extras.ChainConfig{
-			AvalancheContext:   extras.AvalancheContext{SnowCtx: utils.TestSnowContext()},
-			FeeConfig:          DefaultFeeConfig,
-			AllowFeeRecipients: false,
-			NetworkUpgrades: extras.NetworkUpgrades{
-				SubnetEVMTimestamp: utils.TimeToNewUint64(upgrade.UnscheduledActivationTime),
-				DurangoTimestamp:   utils.TimeToNewUint64(upgrade.UnscheduledActivationTime),
-				EtnaTimestamp:      utils.TimeToNewUint64(upgrade.UnscheduledActivationTime),
-			},
-			GenesisPrecompiles: extras.Precompiles{},
-			UpgradeConfig:      extras.UpgradeConfig{},
-		},
+		extras.TestPreSubnetEVMChainConfig,
 	)
 
 	TestSubnetEVMChainConfig = WithExtra(
@@ -128,18 +114,7 @@ var (
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
 		},
-		&extras.ChainConfig{
-			AvalancheContext:   extras.AvalancheContext{SnowCtx: utils.TestSnowContext()},
-			FeeConfig:          DefaultFeeConfig,
-			AllowFeeRecipients: false,
-			NetworkUpgrades: extras.NetworkUpgrades{
-				SubnetEVMTimestamp: utils.NewUint64(0),
-				DurangoTimestamp:   utils.TimeToNewUint64(upgrade.UnscheduledActivationTime),
-				EtnaTimestamp:      utils.TimeToNewUint64(upgrade.UnscheduledActivationTime),
-			},
-			GenesisPrecompiles: extras.Precompiles{},
-			UpgradeConfig:      extras.UpgradeConfig{},
-		},
+		extras.TestSubnetEVMChainConfig,
 	)
 
 	TestDurangoChainConfig = WithExtra(
@@ -158,18 +133,7 @@ var (
 			LondonBlock:         big.NewInt(0),
 			ShanghaiTime:        utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
 		},
-		&extras.ChainConfig{
-			AvalancheContext:   extras.AvalancheContext{SnowCtx: utils.TestSnowContext()},
-			FeeConfig:          DefaultFeeConfig,
-			AllowFeeRecipients: false,
-			NetworkUpgrades: extras.NetworkUpgrades{
-				SubnetEVMTimestamp: utils.NewUint64(0),
-				DurangoTimestamp:   utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
-				EtnaTimestamp:      utils.TimeToNewUint64(upgrade.UnscheduledActivationTime),
-			},
-			GenesisPrecompiles: extras.Precompiles{},
-			UpgradeConfig:      extras.UpgradeConfig{},
-		},
+		extras.TestDurangoChainConfig,
 	)
 
 	TestEtnaChainConfig = WithExtra(
@@ -189,18 +153,27 @@ var (
 			ShanghaiTime:        utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
 			CancunTime:          utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
 		},
-		&extras.ChainConfig{
-			AvalancheContext:   extras.AvalancheContext{SnowCtx: utils.TestSnowContext()},
-			FeeConfig:          DefaultFeeConfig,
-			AllowFeeRecipients: false,
-			NetworkUpgrades: extras.NetworkUpgrades{
-				SubnetEVMTimestamp: utils.NewUint64(0),
-				DurangoTimestamp:   utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
-				EtnaTimestamp:      utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
-			},
-			GenesisPrecompiles: extras.Precompiles{},
-			UpgradeConfig:      extras.UpgradeConfig{},
+		extras.TestEtnaChainConfig,
+	)
+
+	TestFortunaChainConfig = WithExtra(
+		&ChainConfig{
+			ChainID:             big.NewInt(1),
+			HomesteadBlock:      big.NewInt(0),
+			EIP150Block:         big.NewInt(0),
+			EIP155Block:         big.NewInt(0),
+			EIP158Block:         big.NewInt(0),
+			ByzantiumBlock:      big.NewInt(0),
+			ConstantinopleBlock: big.NewInt(0),
+			PetersburgBlock:     big.NewInt(0),
+			IstanbulBlock:       big.NewInt(0),
+			MuirGlacierBlock:    big.NewInt(0),
+			BerlinBlock:         big.NewInt(0),
+			LondonBlock:         big.NewInt(0),
+			ShanghaiTime:        utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
+			CancunTime:          utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
 		},
+		extras.TestFortunaChainConfig,
 	)
 	TestRules = TestChainConfig.Rules(new(big.Int), IsMergeTODO, 0)
 )

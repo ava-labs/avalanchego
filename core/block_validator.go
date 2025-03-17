@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/params/extras"
 )
 
 // BlockValidator is responsible for validating block headers, uncles and
@@ -147,10 +148,10 @@ func (v *BlockValidator) ValidateState(block *types.Block, statedb *state.StateD
 // the gas allowance.
 func CalcGasLimit(parentGasUsed, parentGasLimit, gasFloor, gasCeil uint64) uint64 {
 	// contrib = (parentGasUsed * 3 / 2) / 1024
-	contrib := (parentGasUsed + parentGasUsed/2) / params.GasLimitBoundDivisor
+	contrib := (parentGasUsed + parentGasUsed/2) / extras.GasLimitBoundDivisor
 
 	// decay = parentGasLimit / 1024 -1
-	decay := parentGasLimit/params.GasLimitBoundDivisor - 1
+	decay := parentGasLimit/extras.GasLimitBoundDivisor - 1
 
 	/*
 		strategy: gasLimit of block-to-mine is set based on parent's
@@ -160,8 +161,8 @@ func CalcGasLimit(parentGasUsed, parentGasLimit, gasFloor, gasCeil uint64) uint6
 		from parentGasLimit * (2/3) parentGasUsed is.
 	*/
 	limit := parentGasLimit - decay + contrib
-	if limit < params.MinGasLimit {
-		limit = params.MinGasLimit
+	if limit < extras.MinGasLimit {
+		limit = extras.MinGasLimit
 	}
 	// If we're outside our allowed gas range, we try to hone towards them
 	if limit < gasFloor {

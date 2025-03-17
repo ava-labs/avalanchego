@@ -39,11 +39,12 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/eth/tracers/logger"
 	"github.com/ava-labs/libevm/log"
-	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/eth/tracers"
 	"github.com/ava-labs/subnet-evm/params"
+	customheader "github.com/ava-labs/subnet-evm/plugin/evm/header"
+	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/subnetevm"
 	"github.com/ava-labs/subnet-evm/tests"
 	"github.com/urfave/cli/v2"
 )
@@ -221,15 +222,16 @@ func applyLondonChecks(env *stEnv, chainConfig *params.ChainConfig) error {
 		BaseFee:  env.ParentBaseFee,
 		GasUsed:  env.ParentGasUsed,
 		GasLimit: env.ParentGasLimit,
-		Extra:    make([]byte, params.DynamicFeeExtraDataSize), // TODO: consider passing extra through env
+		Extra:    make([]byte, subnetevm.WindowSize), // TODO: consider passing extra through env
 	}
 	feeConfig := params.DefaultFeeConfig
 	if env.MinBaseFee != nil {
 		// Override the default min base fee if it's set in the env
 		feeConfig.MinBaseFee = env.MinBaseFee
 	}
+	configExtra := params.GetExtra(chainConfig)
 	var err error
-	_, env.BaseFee, err = dummy.CalcBaseFee(chainConfig, feeConfig, parent, env.Timestamp)
+	env.BaseFee, err = customheader.BaseFee(configExtra, feeConfig, parent, env.Timestamp)
 	if err != nil {
 		return NewError(ErrorConfig, fmt.Errorf("failed calculating base fee: %v", err))
 	}

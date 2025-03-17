@@ -66,7 +66,6 @@ func (l *Loader[T]) Execute(ctx context.Context) error {
 	log.Info("Starting tx agents...")
 	eg := errgroup.Group{}
 	for _, agent := range agents {
-		agent := agent
 		eg.Go(func() error {
 			return agent.Execute(ctx)
 		})
@@ -100,8 +99,6 @@ func (l *Loader[T]) ConfirmReachedTip(ctx context.Context) error {
 
 	eg := errgroup.Group{}
 	for i, client := range l.clients {
-		i := i
-		client := client
 		eg.Go(func() error {
 			for {
 				latestHeight, err := client.LatestHeight(ctx)

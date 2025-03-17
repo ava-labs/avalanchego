@@ -43,6 +43,8 @@ import (
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/params/extras"
+	customheader "github.com/ava-labs/subnet-evm/plugin/evm/header"
+	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/legacy"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/feemanager"
 	"github.com/ava-labs/subnet-evm/rpc"
 	"github.com/ava-labs/subnet-evm/utils"
@@ -108,7 +110,8 @@ func newTestBackendFakerEngine(t *testing.T, config *params.ChainConfig, numBloc
 	engine := dummy.NewETHFaker()
 
 	// Generate testing blocks
-	_, blocks, _, err := core.GenerateChainWithGenesis(gspec, engine, numBlocks, 0, genBlocks)
+	targetBlockRate := params.GetExtra(config).FeeConfig.TargetBlockRate
+	_, blocks, _, err := core.GenerateChainWithGenesis(gspec, engine, numBlocks, targetBlockRate-1, genBlocks)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +138,8 @@ func newTestBackend(t *testing.T, config *params.ChainConfig, numBlocks int, gen
 	engine := dummy.NewFaker()
 
 	// Generate testing blocks
-	_, blocks, _, err := core.GenerateChainWithGenesis(gspec, engine, numBlocks, 1, genBlocks)
+	targetBlockRate := params.GetExtra(config).FeeConfig.TargetBlockRate
+	_, blocks, _, err := core.GenerateChainWithGenesis(gspec, engine, numBlocks, targetBlockRate-1, genBlocks)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +155,8 @@ func newTestBackend(t *testing.T, config *params.ChainConfig, numBlocks int, gen
 }
 
 func (b *testBackend) MinRequiredTip(ctx context.Context, header *types.Header) (*big.Int, error) {
-	return dummy.MinRequiredTip(b.chain.Config(), header)
+	config := params.GetExtra(b.chain.Config())
+	return customheader.EstimateRequiredTip(config, header)
 }
 
 func (b *testBackend) CurrentHeader() *types.Header {
@@ -256,12 +261,12 @@ func TestSuggestTipCapNetworkUpgrades(t *testing.T) {
 	}
 }
 
-func TestSuggestTipCap(t *testing.T) {
+func TestSuggestTipCapSimple(t *testing.T) {
 	applyGasPriceTest(t, suggestTipCapTest{
 		chainConfig: params.TestChainConfig,
 		numBlocks:   3,
 		genBlock:    testGenBlock(t, 55, 370),
-		expectedTip: big.NewInt(643_500_643),
+		expectedTip: big.NewInt(643_500_644),
 	}, defaultOracleConfig())
 }
 
@@ -314,7 +319,7 @@ func TestSuggestTipCapSmallTips(t *testing.T) {
 				b.AddTx(tx)
 			}
 		},
-		expectedTip: big.NewInt(643_500_643),
+		expectedTip: big.NewInt(643_500_644),
 	}, defaultOracleConfig())
 }
 
@@ -340,7 +345,7 @@ func TestSuggestGasPriceSubnetEVM(t *testing.T) {
 		b.SetCoinbase(common.Address{1})
 
 		signer := types.LatestSigner(params.TestChainConfig)
-		gasPrice := big.NewInt(params.MinGasPrice)
+		gasPrice := big.NewInt(legacy.BaseFee)
 		for j := 0; j < 50; j++ {
 			tx := types.NewTx(&types.LegacyTx{
 				Nonce:    b.TxNonce(addr),
@@ -368,7 +373,7 @@ func TestSuggestTipCapMaxBlocksLookback(t *testing.T) {
 		chainConfig: params.TestChainConfig,
 		numBlocks:   20,
 		genBlock:    testGenBlock(t, 550, 370),
-		expectedTip: big.NewInt(5_807_226_110),
+		expectedTip: big.NewInt(5_807_226_111),
 	}, defaultOracleConfig())
 }
 
@@ -377,7 +382,7 @@ func TestSuggestTipCapMaxBlocksSecondsLookback(t *testing.T) {
 		chainConfig: params.TestChainConfig,
 		numBlocks:   20,
 		genBlock:    testGenBlock(t, 550, 370),
-		expectedTip: big.NewInt(10_384_877_851),
+		expectedTip: big.NewInt(10_384_877_852),
 	}, timeCrunchOracleConfig())
 }
 

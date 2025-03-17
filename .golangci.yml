@@ -3,11 +3,6 @@
 run:
   timeout: 10m
   tests: true
-  # default is true. Enables skipping of directories:
-  #   vendor$, third_party$, testdata$, examples$, Godeps$, builtin$
-  skip-dirs-use-default: true
-  # Include non-test files tagged as test-only.
-  # Context: https://github.com/ava-labs/avalanchego/pull/3173
 
 linters:
   disable-all: true
@@ -18,8 +13,19 @@ linters:
     - ineffassign
     - misspell
     - unconvert
+    - typecheck
     - unused
+    # - staticcheck
+    - bidichk
+    - durationcheck
+    - copyloopvar
     - whitespace
+    # - revive # only certain checks enabled
+    - durationcheck
+    - gocheckcompilerdirectives
+    - reassign
+    - mirror
+    - tenv
 
 linters-settings:
   gofmt:

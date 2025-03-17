@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
+	"github.com/ava-labs/subnet-evm/plugin/evm/config"
 	"github.com/ava-labs/subnet-evm/plugin/evm/database"
 )
 
@@ -110,7 +111,7 @@ func (vm *VM) useStandaloneDatabase(acceptedDB avalanchedatabase.Database) (bool
 
 // getDatabaseConfig returns the database configuration for the chain
 // to be used by separate, standalone database.
-func getDatabaseConfig(config Config, chainDataDir string) (node.DatabaseConfig, error) {
+func getDatabaseConfig(config config.Config, chainDataDir string) (node.DatabaseConfig, error) {
 	var (
 		configBytes []byte
 		err         error

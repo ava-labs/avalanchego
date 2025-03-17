@@ -44,6 +44,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/params/extras"
+	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/legacy"
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/deployerallowlist"
 	"github.com/ava-labs/subnet-evm/triedb/pathdb"
@@ -376,7 +377,7 @@ func TestVerkleGenesisCommit(t *testing.T) {
 	}
 
 	genesis := &Genesis{
-		BaseFee:    big.NewInt(params.TestInitialBaseFee),
+		BaseFee:    big.NewInt(legacy.BaseFee),
 		Config:     verkleConfig,
 		Timestamp:  verkleTime,
 		Difficulty: big.NewInt(0),

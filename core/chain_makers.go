@@ -36,13 +36,13 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/consensus"
-	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/consensus/misc/eip4844"
 	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/plugin/evm/header"
 	"github.com/holiman/uint256"
 )
 
@@ -375,29 +375,31 @@ func GenerateChainWithGenesis(genesis *Genesis, engine consensus.Engine, n int, 
 
 func (cm *chainMaker) makeHeader(parent *types.Block, gap uint64, state *state.StateDB, engine consensus.Engine) *types.Header {
 	time := parent.Time() + gap // block time is fixed at [gap] seconds
+	feeConfig, _, err := cm.GetFeeConfigAt(parent.Header())
+	if err != nil {
+		panic(err)
+	}
+	config := params.GetExtra(cm.config)
+	gasLimit, err := header.GasLimit(config, feeConfig, parent.Header(), time)
+	if err != nil {
+		panic(err)
+	}
+	baseFee, err := header.BaseFee(config, feeConfig, parent.Header(), time)
+	if err != nil {
+		panic(err)
+	}
+
 	header := &types.Header{
 		Root:       state.IntermediateRoot(cm.config.IsEIP158(parent.Number())),
 		ParentHash: parent.Hash(),
 		Coinbase:   parent.Coinbase(),
 		Difficulty: engine.CalcDifficulty(cm, time, parent.Header()),
-		GasLimit:   parent.GasLimit(),
+		GasLimit:   gasLimit,
 		Number:     new(big.Int).Add(parent.Number(), common.Big1),
 		Time:       time,
+		BaseFee:    baseFee,
 	}
-	if params.GetExtra(cm.config).IsSubnetEVM(time) {
-		feeConfig, _, err := cm.GetFeeConfigAt(parent.Header())
-		if err != nil {
-			panic(err)
-		}
 
-		header.GasLimit = feeConfig.GasLimit.Uint64()
-		header.Extra, header.BaseFee, err = dummy.CalcBaseFee(cm.config, feeConfig, parent.Header(), time)
-		if err != nil {
-			panic(err)
-		}
-	} else {
-		header.GasLimit = CalcGasLimit(parent.GasUsed(), parent.GasLimit(), parent.GasLimit(), parent.GasLimit())
-	}
 	if cm.config.IsCancun(header.Number, header.Time) {
 		var (
 			parentExcessBlobGas uint64

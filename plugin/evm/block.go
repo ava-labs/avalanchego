@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/params/extras"
+	"github.com/ava-labs/subnet-evm/plugin/evm/header"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/subnet-evm/predicate"
 
@@ -245,10 +246,7 @@ func (b *Block) verifyPredicates(predicateContext *precompileconfig.PredicateCon
 		return fmt.Errorf("failed to marshal predicate results: %w", err)
 	}
 	extraData := b.ethBlock.Extra()
-	headerPredicateResultsBytes := predicate.GetPredicateResultBytes(extraData)
-	if len(headerPredicateResultsBytes) == 0 {
-		return fmt.Errorf("failed to find predicate results in extra data: %x", extraData)
-	}
+	headerPredicateResultsBytes := header.PredicateBytesFromExtra(extraData)
 	if !bytes.Equal(headerPredicateResultsBytes, predicateResultsBytes) {
 		return fmt.Errorf("%w (remote: %x local: %x)", errInvalidHeaderPredicateResults, headerPredicateResultsBytes, predicateResultsBytes)
 	}

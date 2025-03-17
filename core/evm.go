@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/extstate"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
+	customheader "github.com/ava-labs/subnet-evm/plugin/evm/header"
 	"github.com/ava-labs/subnet-evm/predicate"
 	"github.com/holiman/uint256"
 )
@@ -91,7 +92,7 @@ type ChainContext interface {
 
 // NewEVMBlockContext creates a new context for use in the EVM.
 func NewEVMBlockContext(header *types.Header, chain ChainContext, author *common.Address) vm.BlockContext {
-	predicateBytes := predicate.GetPredicateResultBytes(header.Extra)
+	predicateBytes := customheader.PredicateBytesFromExtra(header.Extra)
 	if len(predicateBytes) == 0 {
 		return newEVMBlockContext(header, chain, author, nil)
 	}
@@ -112,13 +113,16 @@ func NewEVMBlockContext(header *types.Header, chain ChainContext, author *common
 // NewEVMBlockContextWithPredicateResults creates a new context for use in the EVM with an override for the predicate results that is not present
 // in header.Extra.
 // This function is used to create a BlockContext when the header Extra data is not fully formed yet and it's more efficient to pass in predicateResults
-// directly rather than re-encode the latest results when executing each individaul transaction.
+// directly rather than re-encode the latest results when executing each individual transaction.
 func NewEVMBlockContextWithPredicateResults(header *types.Header, chain ChainContext, author *common.Address, predicateBytes []byte) vm.BlockContext {
-	extra := bytes.Clone(header.Extra)
-	if len(predicateBytes) > 0 {
-		extra = predicate.SetPredicateResultBytes(extra, predicateBytes)
-	}
-	return newEVMBlockContext(header, chain, author, extra)
+	blockCtx := NewEVMBlockContext(header, chain, author)
+	// Note this only sets the block context, which is the hand-off point for
+	// the EVM. The actual header is not modified.
+	blockCtx.Header.Extra = customheader.SetPredicateBytesInExtra(
+		bytes.Clone(header.Extra),
+		predicateBytes,
+	)
+	return blockCtx
 }
 
 func newEVMBlockContext(header *types.Header, chain ChainContext, author *common.Address, extra []byte) vm.BlockContext {
@@ -140,7 +144,6 @@ func newEVMBlockContext(header *types.Header, chain ChainContext, author *common
 	if header.ExcessBlobGas != nil {
 		blobBaseFee = eip4844.CalcBlobFee(*header.ExcessBlobGas)
 	}
-
 	return vm.BlockContext{
 		CanTransfer: CanTransfer,
 		Transfer:    Transfer,

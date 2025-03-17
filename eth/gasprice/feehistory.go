@@ -45,6 +45,10 @@ var (
 	errBeyondHistoricalLimit = errors.New("request beyond historical limit")
 )
 
+const (
+	maxQueryLimit = 100
+)
+
 // txGasAndReward is sorted in ascending order based on reward
 type txGasAndReward struct {
 	gasUsed uint64
@@ -172,6 +176,9 @@ func (oracle *Oracle) resolveBlockRange(ctx context.Context, lastBlock rpc.Block
 func (oracle *Oracle) FeeHistory(ctx context.Context, blocks uint64, unresolvedLastBlock rpc.BlockNumber, rewardPercentiles []float64) (*big.Int, [][]*big.Int, []*big.Int, []float64, error) {
 	if blocks < 1 {
 		return common.Big0, nil, nil, nil, nil // returning with no data and no error means there are no retrievable blocks
+	}
+	if len(rewardPercentiles) > maxQueryLimit {
+		return common.Big0, nil, nil, nil, fmt.Errorf("%w: over the query limit %d", errInvalidPercentile, maxQueryLimit)
 	}
 	if blocks > oracle.maxCallBlockHistory {
 		log.Warn("Sanitizing fee history length", "requested", blocks, "truncated", oracle.maxCallBlockHistory)

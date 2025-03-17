@@ -15,7 +15,6 @@ import (
 
 	snow "github.com/ava-labs/avalanchego/snow"
 	common "github.com/ava-labs/libevm/common"
-	types "github.com/ava-labs/libevm/core/types"
 	precompileconfig "github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	uint256 "github.com/holiman/uint256"
 	gomock "go.uber.org/mock/gomock"
@@ -204,7 +203,7 @@ func (mr *MockStateDBMockRecorder) AddBalance(arg0, arg1 any) *gomock.Call {
 }
 
 // AddLog mocks base method.
-func (m *MockStateDB) AddLog(arg0 *types.Log) {
+func (m *MockStateDB) AddLog(arg0 *Log) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "AddLog", arg0)
 }

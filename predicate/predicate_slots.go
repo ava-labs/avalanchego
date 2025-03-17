@@ -13,7 +13,7 @@ type predicaters interface {
 	PredicaterExists(common.Address) bool
 }
 
-// PreparePredicateStorageSlots populates the the predicate storage slots of a transaction's access list
+// PreparePredicateStorageSlots populates the predicate storage slots of a transaction's access list
 // Note: if an address is specified multiple times in the access list, each storage slot for that address is
 // appended to a slice of byte slices. Each byte slice represents a predicate, making it a slice of predicates
 // for each access list address, and every predicate in the slice goes through verification.
