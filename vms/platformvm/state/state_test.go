@@ -9,7 +9,6 @@ import (
 	"maps"
 	"math"
 	"math/rand"
-	"sync"
 	"testing"
 	"time"
 
@@ -22,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
@@ -1099,74 +1097,6 @@ func copyValidatorSet(
 		result[nodeID] = &vdrCopy
 	}
 	return result
-}
-
-func TestParsedStateBlock(t *testing.T) {
-	var (
-		require = require.New(t)
-		blks    = makeBlocks(require)
-	)
-
-	for _, blk := range blks {
-		stBlk := stateBlk{
-			Bytes:  blk.Bytes(),
-			Status: choices.Accepted,
-		}
-
-		stBlkBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &stBlk)
-		require.NoError(err)
-
-		gotBlk, isStateBlk, err := parseStoredBlock(stBlkBytes)
-		require.NoError(err)
-		require.True(isStateBlk)
-		require.Equal(blk.ID(), gotBlk.ID())
-
-		gotBlk, isStateBlk, err = parseStoredBlock(blk.Bytes())
-		require.NoError(err)
-		require.False(isStateBlk)
-		require.Equal(blk.ID(), gotBlk.ID())
-	}
-}
-
-func TestReindexBlocks(t *testing.T) {
-	var (
-		require = require.New(t)
-		s       = newTestState(t, memdb.New())
-		blks    = makeBlocks(require)
-	)
-
-	// Populate the blocks using the legacy format.
-	for _, blk := range blks {
-		stBlk := stateBlk{
-			Bytes:  blk.Bytes(),
-			Status: choices.Accepted,
-		}
-		stBlkBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &stBlk)
-		require.NoError(err)
-
-		blkID := blk.ID()
-		require.NoError(s.blockDB.Put(blkID[:], stBlkBytes))
-	}
-
-	// Convert the indices to the new format.
-	require.NoError(s.ReindexBlocks(&sync.Mutex{}, logging.NoLog{}))
-
-	// Verify that the blocks are stored in the new format.
-	for _, blk := range blks {
-		blkID := blk.ID()
-		blkBytes, err := s.blockDB.Get(blkID[:])
-		require.NoError(err)
-
-		parsedBlk, err := block.Parse(block.GenesisCodec, blkBytes)
-		require.NoError(err)
-		require.Equal(blkID, parsedBlk.ID())
-	}
-
-	// Verify that the flag has been written to disk to allow skipping future
-	// reindexings.
-	reindexed, err := s.singletonDB.Has(BlocksReindexedKey)
-	require.NoError(err)
-	require.True(reindexed)
 }
 
 func TestStateSubnetOwner(t *testing.T) {
