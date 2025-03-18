@@ -775,7 +775,7 @@ func (p *peer) handle(msg message.InboundMessage) {
 
 func (p *peer) handlePing(msg *p2p.Ping) {
 	if msg.Uptime > 100 {
-		p.Log.Debug(malformedMessageLog,
+		p.Log.Trace(malformedMessageLog,
 			zap.Stringer("nodeID", p.id),
 			zap.Stringer("messageOp", message.PingOp),
 			zap.Stringer("subnetID", constants.PrimaryNetworkID),
@@ -821,7 +821,7 @@ func (*peer) handlePong(*p2p.Pong) {}
 
 func (p *peer) handleHandshake(msg *p2p.Handshake) {
 	if p.gotHandshake.Get() {
-		p.Log.Debug(malformedMessageLog,
+		p.Log.Trace(malformedMessageLog,
 			zap.Stringer("nodeID", p.id),
 			zap.Stringer("messageOp", message.HandshakeOp),
 			zap.String("reason", "already received handshake"),
@@ -899,7 +899,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 	for _, subnetIDBytes := range msg.TrackedSubnets {
 		subnetID, err := ids.ToID(subnetIDBytes)
 		if err != nil {
-			p.Log.Debug(malformedMessageLog,
+			p.Log.Trace(malformedMessageLog,
 				zap.Stringer("nodeID", p.id),
 				zap.Stringer("messageOp", message.HandshakeOp),
 				zap.String("field", "trackedSubnets"),
@@ -923,7 +923,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 	}
 
 	if p.supportedACPs.Overlaps(p.objectedACPs) {
-		p.Log.Debug(malformedMessageLog,
+		p.Log.Trace(malformedMessageLog,
 			zap.Stringer("nodeID", p.id),
 			zap.Stringer("messageOp", message.HandshakeOp),
 			zap.String("field", "acps"),
@@ -942,7 +942,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		var err error
 		knownPeers, err = bloom.Parse(msg.KnownPeers.Filter)
 		if err != nil {
-			p.Log.Debug(malformedMessageLog,
+			p.Log.Trace(malformedMessageLog,
 				zap.Stringer("nodeID", p.id),
 				zap.Stringer("messageOp", message.HandshakeOp),
 				zap.String("field", "knownPeers.filter"),
@@ -954,7 +954,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 
 		salt = msg.KnownPeers.Salt
 		if saltLen := len(salt); saltLen > maxBloomSaltLen {
-			p.Log.Debug(malformedMessageLog,
+			p.Log.Trace(malformedMessageLog,
 				zap.Stringer("nodeID", p.id),
 				zap.Stringer("messageOp", message.HandshakeOp),
 				zap.String("field", "knownPeers.salt"),
@@ -967,7 +967,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 
 	addr, ok := ips.AddrFromSlice(msg.IpAddr)
 	if !ok {
-		p.Log.Debug(malformedMessageLog,
+		p.Log.Trace(malformedMessageLog,
 			zap.Stringer("nodeID", p.id),
 			zap.Stringer("messageOp", message.HandshakeOp),
 			zap.String("field", "ip"),
@@ -979,7 +979,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 
 	port := uint16(msg.IpPort)
 	if msg.IpPort == 0 {
-		p.Log.Debug(malformedMessageLog,
+		p.Log.Trace(malformedMessageLog,
 			zap.Stringer("nodeID", p.id),
 			zap.Stringer("messageOp", message.HandshakeOp),
 			zap.String("field", "port"),
@@ -1020,7 +1020,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 
 	signature, err := bls.SignatureFromBytes(msg.IpBlsSig)
 	if err != nil {
-		p.Log.Debug(malformedMessageLog,
+		p.Log.Trace(malformedMessageLog,
 			zap.Stringer("nodeID", p.id),
 			zap.Stringer("messageOp", message.HandshakeOp),
 			zap.String("field", "blsSignature"),
@@ -1072,7 +1072,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 
 func (p *peer) handleGetPeerList(msg *p2p.GetPeerList) {
 	if !p.finishedHandshake.Get() {
-		p.Log.Debug(malformedMessageLog,
+		p.Log.Trace(malformedMessageLog,
 			zap.Stringer("nodeID", p.id),
 			zap.Stringer("messageOp", message.GetPeerListOp),
 			zap.String("reason", "not finished handshake"),
@@ -1083,7 +1083,7 @@ func (p *peer) handleGetPeerList(msg *p2p.GetPeerList) {
 	knownPeersMsg := msg.GetKnownPeers()
 	filter, err := bloom.Parse(knownPeersMsg.GetFilter())
 	if err != nil {
-		p.Log.Debug(malformedMessageLog,
+		p.Log.Trace(malformedMessageLog,
 			zap.Stringer("nodeID", p.id),
 			zap.Stringer("messageOp", message.GetPeerListOp),
 			zap.String("field", "knownPeers.filter"),
@@ -1095,7 +1095,7 @@ func (p *peer) handleGetPeerList(msg *p2p.GetPeerList) {
 
 	salt := knownPeersMsg.GetSalt()
 	if saltLen := len(salt); saltLen > maxBloomSaltLen {
-		p.Log.Debug(malformedMessageLog,
+		p.Log.Trace(malformedMessageLog,
 			zap.Stringer("nodeID", p.id),
 			zap.Stringer("messageOp", message.GetPeerListOp),
 			zap.String("field", "knownPeers.salt"),
@@ -1143,7 +1143,7 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 	for i, claimedIPPort := range msg.ClaimedIpPorts {
 		tlsCert, err := staking.ParseCertificate(claimedIPPort.X509Certificate)
 		if err != nil {
-			p.Log.Debug(malformedMessageLog,
+			p.Log.Trace(malformedMessageLog,
 				zap.Stringer("nodeID", p.id),
 				zap.Stringer("messageOp", message.PeerListOp),
 				zap.String("field", "cert"),
@@ -1155,7 +1155,7 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 
 		addr, ok := ips.AddrFromSlice(claimedIPPort.IpAddr)
 		if !ok {
-			p.Log.Debug(malformedMessageLog,
+			p.Log.Trace(malformedMessageLog,
 				zap.Stringer("nodeID", p.id),
 				zap.Stringer("messageOp", message.PeerListOp),
 				zap.String("field", "ip"),
@@ -1167,7 +1167,7 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 
 		port := uint16(claimedIPPort.IpPort)
 		if port == 0 {
-			p.Log.Debug(malformedMessageLog,
+			p.Log.Trace(malformedMessageLog,
 				zap.Stringer("nodeID", p.id),
 				zap.Stringer("messageOp", message.PeerListOp),
 				zap.String("field", "port"),
@@ -1189,7 +1189,7 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 	}
 
 	if err := p.Network.Track(discoveredIPs); err != nil {
-		p.Log.Debug(malformedMessageLog,
+		p.Log.Trace(malformedMessageLog,
 			zap.Stringer("nodeID", p.id),
 			zap.Stringer("messageOp", message.PeerListOp),
 			zap.String("field", "claimedIP"),

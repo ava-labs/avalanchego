@@ -239,7 +239,7 @@ func (e *Engine) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, b
 	case ok:
 		actualBlkID := blk.ID()
 		if actualBlkID != expectedBlkID {
-			e.Ctx.Log.Debug("incorrect block returned in Put",
+			e.Ctx.Log.Trace("incorrect block returned in Put",
 				zap.Stringer("nodeID", nodeID),
 				zap.Uint32("requestID", requestID),
 				zap.Stringer("blkID", actualBlkID),
@@ -286,7 +286,7 @@ func (e *Engine) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID uin
 	}
 	blkID, ok := e.blkReqs.DeleteKey(req)
 	if !ok {
-		e.Ctx.Log.Debug("unexpected GetFailed",
+		e.Ctx.Log.Trace("unexpected GetFailed",
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 		)

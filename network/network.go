@@ -457,8 +457,7 @@ func (n *network) Connected(nodeID ids.NodeID) {
 	n.peersLock.Lock()
 	peer, ok := n.connectingPeers.GetByID(nodeID)
 	if !ok {
-		n.peerConfig.Log.Error(
-			"unexpectedly connected to peer when not marked as attempting to connect",
+		n.peerConfig.Log.Error("unexpectedly connected to peer when not marked as attempting to connect",
 			zap.Stringer("nodeID", nodeID),
 		)
 		n.peersLock.Unlock()
@@ -609,7 +608,9 @@ func (n *network) Dispatch() error {
 
 		conn, err := n.listener.Accept() // Returns error when n.Close() is called
 		if err != nil {
-			n.peerConfig.Log.Debug("error during server accept", zap.Error(err))
+			n.peerConfig.Log.Debug("error during server accept",
+				zap.Error(err),
+			)
 			// Sleep for a small amount of time to try to wait for the
 			// error to go away.
 			time.Sleep(time.Millisecond)

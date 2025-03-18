@@ -214,7 +214,7 @@ func (gh *getter) Get(ctx context.Context, nodeID ids.NodeID, requestID uint32, 
 		// If we failed to get the block, that means either an unexpected error
 		// has occurred, [vdr] is not following the protocol, or the
 		// block has been pruned.
-		gh.log.Debug("failed Get request",
+		gh.log.Trace("failed Get request",
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 			zap.Stringer("blkID", blkID),

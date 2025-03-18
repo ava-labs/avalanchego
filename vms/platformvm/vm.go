@@ -110,7 +110,9 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return err
 	}
-	chainCtx.Log.Info("using VM execution config", zap.Reflect("config", execConfig))
+	chainCtx.Log.Info("using VM execution config",
+		zap.Reflect("config", execConfig),
+	)
 
 	registerer, err := metrics.MakeAndRegister(chainCtx.Metrics, "")
 	if err != nil {
@@ -257,7 +259,7 @@ func (vm *VM) periodicallyPruneMempool(frequency time.Duration) {
 			return
 		case <-ticker.C:
 			if err := vm.pruneMempool(); err != nil {
-				vm.ctx.Log.Debug("pruning mempool failed",
+				vm.ctx.Log.Error("pruning mempool failed",
 					zap.Error(err),
 				)
 			}
@@ -279,8 +281,7 @@ func (vm *VM) pruneMempool() error {
 
 	for _, tx := range blockTxs {
 		if err := vm.Builder.Add(tx); err != nil {
-			vm.ctx.Log.Debug(
-				"failed to reissue tx",
+			vm.ctx.Log.Error("failed to reissue tx",
 				zap.Stringer("txID", tx.ID()),
 				zap.Error(err),
 			)

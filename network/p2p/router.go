@@ -112,7 +112,7 @@ func (r *router) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID ui
 	start := time.Now()
 	parsedMsg, handler, handlerID, ok := r.parse(request)
 	if !ok {
-		r.log.Debug("received message for unregistered handler",
+		r.log.Trace("received message for unregistered handler",
 			zap.Stringer("messageOp", message.AppRequestOp),
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
@@ -197,7 +197,7 @@ func (r *router) AppGossip(ctx context.Context, nodeID ids.NodeID, gossip []byte
 	start := time.Now()
 	parsedMsg, handler, handlerID, ok := r.parse(gossip)
 	if !ok {
-		r.log.Debug("received message for unregistered handler",
+		r.log.Trace("received message for unregistered handler",
 			zap.Stringer("messageOp", message.AppGossipOp),
 			zap.Stringer("nodeID", nodeID),
 			zap.Binary("message", gossip),

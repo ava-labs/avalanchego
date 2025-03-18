@@ -87,8 +87,7 @@ func New(file string, configBytes []byte, log logging.Logger, _ prometheus.Regis
 	}
 	opts.Experimental.ReadSamplingMultiplier = -1 // Disable seek compaction
 
-	log.Info(
-		"opening pebble",
+	log.Info("opening pebble",
 		zap.Reflect("config", cfg),
 	)
 

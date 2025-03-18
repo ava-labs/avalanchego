@@ -104,7 +104,7 @@ func (v *vertexJob) Execute(ctx context.Context) error {
 		return fmt.Errorf("attempting to execute vertex with status %s", status)
 	case choices.Processing:
 		v.numAccepted.Inc()
-		v.log.Trace("accepting vertex in bootstrapping",
+		v.log.Debug("accepting vertex in bootstrapping",
 			zap.Stringer("vtxID", v.vtx.ID()),
 		)
 		if err := v.vtx.Accept(ctx); err != nil {

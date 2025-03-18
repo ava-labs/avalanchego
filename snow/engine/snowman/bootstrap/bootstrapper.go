@@ -145,7 +145,9 @@ func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) e
 		defer config.Ctx.Lock.Unlock()
 
 		if err := bs.Timeout(); err != nil {
-			bs.Config.Ctx.Log.Warn("Encountered error during bootstrapping: %w", zap.Error(err))
+			bs.Config.Ctx.Log.Warn("Encountered error during bootstrapping",
+				zap.Error(err),
+			)
 		}
 	}
 	bs.TimeoutRegistrar = common.NewTimeoutScheduler(timeout, config.BootstrapTracker.AllBootstrapped())
@@ -456,7 +458,7 @@ func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 	}
 	wantedBlkID, ok := b.outstandingRequests.DeleteKey(request)
 	if !ok { // this message isn't in response to a request we made
-		b.Ctx.Log.Debug("received unexpected Ancestors",
+		b.Ctx.Log.Trace("received unexpected Ancestors",
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 		)
@@ -480,7 +482,7 @@ func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 
 	if lenBlks > b.Config.AncestorsMaxContainersReceived {
 		blks = blks[:b.Config.AncestorsMaxContainersReceived]
-		b.Ctx.Log.Debug("ignoring containers in Ancestors",
+		b.Ctx.Log.Trace("ignoring containers in Ancestors",
 			zap.Int("numContainers", lenBlks-b.Config.AncestorsMaxContainersReceived),
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
@@ -489,7 +491,7 @@ func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 
 	blocks, err := block.BatchedParseBlock(ctx, b.VM, blks)
 	if err != nil { // the provided blocks couldn't be parsed
-		b.Ctx.Log.Debug("failed to parse blocks in Ancestors",
+		b.Ctx.Log.Trace("failed to parse blocks in Ancestors",
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 			zap.Error(err),
@@ -499,7 +501,7 @@ func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 	}
 
 	if len(blocks) == 0 {
-		b.Ctx.Log.Debug("parsing blocks returned an empty set of blocks",
+		b.Ctx.Log.Trace("parsing blocks returned an empty set of blocks",
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 		)
@@ -509,7 +511,7 @@ func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 
 	requestedBlock := blocks[0]
 	if actualID := requestedBlock.ID(); actualID != wantedBlkID {
-		b.Ctx.Log.Debug("first block is not the requested block",
+		b.Ctx.Log.Trace("first block is not the requested block",
 			zap.Stringer("expectedBlkID", wantedBlkID),
 			zap.Stringer("blkID", actualID),
 		)
@@ -548,7 +550,7 @@ func (b *Bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID
 	}
 	blkID, ok := b.outstandingRequests.DeleteKey(request)
 	if !ok {
-		b.Ctx.Log.Debug("unexpectedly called GetAncestorsFailed",
+		b.Ctx.Log.Trace("unexpectedly called GetAncestorsFailed",
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 		)

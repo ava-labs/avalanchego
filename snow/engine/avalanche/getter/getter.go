@@ -111,7 +111,7 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 	vertex, err := gh.storage.GetVtx(ctx, vtxID)
 	if err != nil || vertex.Status() == choices.Unknown {
 		// Don't have the requested vertex. Drop message.
-		gh.log.Trace("dropping getAncestors",
+		gh.log.Verbo("dropping getAncestors",
 			zap.Error(err),
 		)
 		return nil

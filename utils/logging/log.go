@@ -136,7 +136,10 @@ func (l *log) SetLevel(level Level) {
 
 func (l *log) StopOnPanic() {
 	if r := recover(); r != nil {
-		l.Fatal("panicking", zap.Any("reason", r), zap.Stack("from"))
+		l.Fatal("panicking",
+			zap.Any("reason", r),
+			zap.Stack("from"),
+		)
 		l.Stop()
 		panic(r)
 	}
@@ -149,7 +152,10 @@ func (l *log) RecoverAndPanic(f func()) {
 
 func (l *log) stopAndExit(exit func()) {
 	if r := recover(); r != nil {
-		l.Fatal("panicking", zap.Any("reason", r), zap.Stack("from"))
+		l.Fatal("panicking",
+			zap.Any("reason", r),
+			zap.Stack("from"),
+		)
 		l.Stop()
 		exit()
 	}

@@ -230,8 +230,7 @@ func (p *PullGossiper[_]) handleResponse(
 	err error,
 ) {
 	if err != nil {
-		p.log.Debug(
-			"failed gossip request",
+		p.log.Debug("failed gossip request",
 			zap.Stringer("nodeID", nodeID),
 			zap.Error(err),
 		)
@@ -240,7 +239,9 @@ func (p *PullGossiper[_]) handleResponse(
 
 	gossip, err := ParseAppResponse(responseBytes)
 	if err != nil {
-		p.log.Debug("failed to unmarshal gossip response", zap.Error(err))
+		p.log.Trace("failed to unmarshal gossip response",
+			zap.Error(err),
+		)
 		return
 	}
 
@@ -250,8 +251,7 @@ func (p *PullGossiper[_]) handleResponse(
 
 		gossipable, err := p.marshaller.UnmarshalGossip(bytes)
 		if err != nil {
-			p.log.Debug(
-				"failed to unmarshal gossip",
+			p.log.Trace("failed to unmarshal gossip",
 				zap.Stringer("nodeID", nodeID),
 				zap.Error(err),
 			)
@@ -259,14 +259,12 @@ func (p *PullGossiper[_]) handleResponse(
 		}
 
 		gossipID := gossipable.GossipID()
-		p.log.Debug(
-			"received gossip",
+		p.log.Debug("received gossip",
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("id", gossipID),
 		)
 		if err := p.set.Add(gossipable); err != nil {
-			p.log.Debug(
-				"failed to add gossip to the known set",
+			p.log.Debug("failed to add gossip to the known set",
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("id", gossipID),
 				zap.Error(err),
@@ -577,7 +575,9 @@ func Every(ctx context.Context, log logging.Logger, gossiper Gossiper, frequency
 		select {
 		case <-ticker.C:
 			if err := gossiper.Gossip(ctx); err != nil {
-				log.Warn("failed to gossip", zap.Error(err))
+				log.Warn("failed to gossip",
+					zap.Error(err),
+				)
 			}
 		case <-ctx.Done():
 			log.Debug("shutting down gossip")

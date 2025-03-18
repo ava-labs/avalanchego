@@ -298,7 +298,7 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 	for summaryID := range summaryIDs {
 		ws, ok := ss.weightedSummaries[summaryID]
 		if !ok {
-			ss.Ctx.Log.Debug("skipping summary",
+			ss.Ctx.Log.Trace("skipping summary",
 				zap.String("reason", "unknown summary"),
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("summaryID", summaryID),

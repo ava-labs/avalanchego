@@ -246,8 +246,7 @@ func (b *Block) Accept(context.Context) error {
 		return err
 	}
 
-	b.manager.backend.Ctx.Log.Trace(
-		"accepted block",
+	b.manager.backend.Ctx.Log.Debug("accepted block",
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", b.Parent()),

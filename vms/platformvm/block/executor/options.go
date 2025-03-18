@@ -75,7 +75,7 @@ func (o *options) BanffProposalBlock(b *block.BanffProposalBlock) error {
 
 	prefersCommit, err := o.prefersCommit(b.Tx)
 	if err != nil {
-		o.log.Debug("falling back to prefer commit",
+		o.log.Trace("falling back to prefer commit",
 			zap.Error(err),
 		)
 		// We fall back to commit here to err on the side of over-rewarding

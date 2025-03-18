@@ -644,7 +644,9 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 // Write process context to the configured path. Supports the use of
 // dynamically chosen network ports with local network orchestration.
 func (n *Node) writeProcessContext() error {
-	n.Log.Info("writing process context", zap.String("path", n.Config.ProcessContextFilePath))
+	n.Log.Info("writing process context",
+		zap.String("path", n.Config.ProcessContextFilePath),
+	)
 
 	// Write the process context to disk
 	processContext := &node.ProcessContext{
@@ -1677,7 +1679,7 @@ func (n *Node) shutdown() {
 
 		err := n.health.RegisterHealthCheck("shuttingDown", shuttingDownCheck, health.ApplicationTag)
 		if err != nil {
-			n.Log.Debug("couldn't register shuttingDown health check",
+			n.Log.Warn("couldn't register shuttingDown health check",
 				zap.Error(err),
 			)
 		}
@@ -1717,8 +1719,7 @@ func (n *Node) shutdown() {
 
 	if n.DB != nil {
 		if err := n.DB.Delete(ungracefulShutdown); err != nil {
-			n.Log.Error(
-				"failed to delete ungraceful shutdown key",
+			n.Log.Error("failed to delete ungraceful shutdown key",
 				zap.Error(err),
 			)
 		}
