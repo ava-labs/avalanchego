@@ -460,7 +460,7 @@ cd "${REPO_ROOT}"
 source ./scripts/versions.sh
 
 # Install if not already available
-if command -v tmpnetctl &2> /dev/null; then
+if ! command -v tmpnetctl &2> /dev/null; then
   # An explicit version is required since a main package can't be included as a dependency of the go module.
   go install github.com/ava-labs/avalanchego/tests/fixture/tmpnet/tmpnetctl@${AVALANCHE_VERSION}
 fi

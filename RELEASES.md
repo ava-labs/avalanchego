@@ -1,13 +1,28 @@
 # Release Notes
 
-## [v1.12.3] (pending)
+## [v1.13.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.0)
 
-- Extended the network health check by also alerting if a primary network validator has no nodes connected to it. Runs a configurable time after startup or 10 minutes by default.
+This upgrade consists of the following Avalanche Community Proposal (ACP):
+- [ACP-176](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/176-dynamic-evm-gas-limit-and-price-discovery-updates/README.md) Dynamic EVM Gas Limits and Price Discovery Updates
+
+The ACP in this upgrade goes into effect at 11 AM ET (3 PM UTC) on Tuesday, April 8th, 2025 on Mainnet.
+
+**All Fortuna supporting Mainnet nodes should upgrade before 11 AM ET, April 8th 2025.**
+
+The plugin version is unchanged at `39` and is compatible with version `v1.12.2`.
+
+### APIs
+
+- Added ProposerVM block timestamp metrics: `avalanche_proposervm_last_accepted_timestamp`
+- Added network health check to alert if a primary network validator has no ingress connections. Runs a configurable time after startup or 10 minutes by default.
 
 ### Configs
--  How long after startup the aforementioned health check runs can be configured via:
-`--network-no-ingress-connections-grace-period`
 
+- Added:
+  - `--proposervm-min-block-duration`
+  - `--network-no-ingress-connections-grace-period` to configure how long after startup it is expected for a Mainnet validator to have received an ingress connection.
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.12.2...v1.13.0
 
 ## [v1.12.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.2)
 
