@@ -1,12 +1,14 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use std::fmt::{self, Debug};
+use std::fmt::{self, Debug, Display, Formatter};
 
 use serde::de::Visitor;
 use serde::{Deserialize, Serialize};
 use sha2::digest::generic_array::GenericArray;
 use sha2::digest::typenum;
+
+use crate::node::branch::Serializable;
 
 /// A hash value inside a merkle trie
 /// We use the same type as returned by sha2 here to avoid copies
@@ -34,7 +36,13 @@ impl AsRef<[u8]> for TrieHash {
 
 impl Debug for TrieHash {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        let width = f.precision().unwrap_or_default();
+        let width = f.precision().unwrap_or(64);
+        write!(f, "{:.*}", width, hex::encode(self.0))
+    }
+}
+impl Display for TrieHash {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
+        let width = f.precision().unwrap_or(64);
         write!(f, "{:.*}", width, hex::encode(self.0))
     }
 }
@@ -42,6 +50,20 @@ impl Debug for TrieHash {
 impl From<[u8; 32]> for TrieHash {
     fn from(value: [u8; Self::len()]) -> Self {
         TrieHash(value.into())
+    }
+}
+
+impl TryFrom<&[u8]> for TrieHash {
+    type Error = &'static str;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        if value.len() == Self::len() {
+            let mut hash = TrieHash::default();
+            hash.0.copy_from_slice(value);
+            Ok(hash)
+        } else {
+            Err("Invalid length")
+        }
     }
 }
 
@@ -55,6 +77,27 @@ impl TrieHash {
     /// Return the length of a TrieHash
     pub(crate) const fn len() -> usize {
         std::mem::size_of::<TrieHash>()
+    }
+
+    /// Some code needs a TrieHash even though it only has a HashType.
+    /// This function is a no-op, as HashType is a TrieHash in this context.
+    pub const fn into_triehash(self) -> Self {
+        self
+    }
+}
+
+impl Serializable for TrieHash {
+    fn serialized_bytes(&self) -> Vec<u8> {
+        self.0.to_vec()
+    }
+
+    fn from_reader<R: std::io::Read>(mut reader: R) -> Result<Self, std::io::Error>
+    where
+        Self: Sized,
+    {
+        let mut buf = [0u8; 32];
+        reader.read_exact(&mut buf)?;
+        Ok(TrieHash::from(buf))
     }
 }
 

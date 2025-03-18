@@ -53,7 +53,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::io::{Error, ErrorKind, Write};
-use std::iter::once;
 use std::mem::{offset_of, take};
 use std::num::NonZeroU64;
 use std::ops::Deref;
@@ -61,7 +60,9 @@ use std::sync::Arc;
 
 use crate::hashednode::hash_node;
 use crate::node::{ByteCounter, Node};
-use crate::{CacheReadStrategy, Child, FileBacked, Path, ReadableStorage, SharedNode, TrieHash};
+use crate::{
+    CacheReadStrategy, Child, FileBacked, HashType, Path, ReadableStorage, SharedNode, TrieHash,
+};
 
 use super::linear::WritableStorage;
 
@@ -278,7 +279,7 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
         if let Some(root_address) = nodestore.header.root_address {
             let node = nodestore.read_node_from_disk(root_address, "open");
             let root_hash = node.map(|n| hash_node(&n, &Path(Default::default())))?;
-            nodestore.kind.root_hash = Some(root_hash);
+            nodestore.kind.root_hash = Some(root_hash.into_triehash());
         }
 
         Ok(nodestore)
@@ -877,9 +878,63 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
         mut node: Node,
         path_prefix: &mut Path,
         new_nodes: &mut HashMap<LinearAddress, (u8, SharedNode)>,
-    ) -> (LinearAddress, TrieHash) {
+        #[cfg(feature = "ethhash")] fake_root_extra_nibble: Option<u8>,
+    ) -> Result<(LinearAddress, HashType), Error> {
         // If this is a branch, find all unhashed children and recursively call hash_helper on them.
+        trace!("hashing {node:?} at {path_prefix:?}");
         if let Node::Branch(ref mut b) = node {
+            // special case code for ethereum hashes at the account level
+            #[cfg(feature = "ethhash")]
+            let make_fake_root = if path_prefix.0.len() + b.partial_path.0.len() == 64 {
+                // looks like we're at an account branch
+                // tally up how many hashes we need to deal with
+                let (unhashed, mut hashed) = b.children.iter_mut().enumerate().fold(
+                    (Vec::new(), Vec::new()),
+                    |(mut unhashed, mut hashed), (idx, child)| {
+                        match child {
+                            None => {}
+                            Some(Child::AddressWithHash(a, h)) => hashed.push((idx, (a, h))),
+                            Some(Child::Node(node)) => unhashed.push((idx, node)),
+                        }
+                        (unhashed, hashed)
+                    },
+                );
+                if hashed.len() == 1 && !unhashed.is_empty() {
+                    // Previously, only one child was hashed, but now there are more, so
+                    // we must recompute the hash of that child without the magic prefix
+                    trace!("Rehashing account branch: hashed {hashed:?} unhashed {unhashed:?}");
+                    let invalidated_node = hashed.first_mut().expect("hashed is not empty");
+                    let hashable_node = self.read_node(*invalidated_node.1 .0)?.deref().clone();
+                    let original_length = path_prefix.len();
+                    path_prefix.0.extend(
+                        b.partial_path
+                            .0
+                            .iter()
+                            .copied()
+                            .chain(std::iter::once(invalidated_node.0 as u8)),
+                    );
+
+                    let hash = hash_node(&hashable_node, path_prefix);
+                    path_prefix.0.truncate(original_length);
+                    *invalidated_node.1 .1 = hash;
+                }
+                // handle the single-child case for an account special below
+                if hashed.is_empty() && unhashed.len() == 1 {
+                    Some(unhashed.last().expect("only one").0 as u8)
+                } else {
+                    None
+                }
+            } else {
+                // not a single child
+                None
+            };
+
+            // branch children -- 1. 1 child, already hashed, 2. >1 child, already hashed,
+            // 3. 1 hashed child, 1 unhashed child
+            // 4. 0 hashed, 1 unhashed <-- handle child special
+            // 5. 1 hashed, >0 unhashed <-- rehash case
+            // everything already hashed
+
             for (nibble, child) in b.children.iter_mut().enumerate() {
                 // if this is already hashed, we're done
                 if matches!(child, Some(Child::AddressWithHash(_, _))) {
@@ -898,23 +953,53 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
                 // Hash this child and update
                 // we extend and truncate path_prefix to reduce memory allocations
                 let original_length = path_prefix.len();
-                path_prefix
-                    .0
-                    .extend(b.partial_path.0.iter().copied().chain(once(nibble as u8)));
+                path_prefix.0.extend(b.partial_path.0.iter().copied());
+                #[cfg(feature = "ethhash")]
+                if make_fake_root.is_none() {
+                    // we don't push the nibble there is only one unhashed child and
+                    // we're on an account
+                    path_prefix.0.push(nibble as u8);
+                }
+                #[cfg(not(feature = "ethhash"))]
+                path_prefix.0.push(nibble as u8);
 
-                let (child_addr, child_hash) = self.hash_helper(child_node, path_prefix, new_nodes);
+                #[cfg(feature = "ethhash")]
+                let (child_addr, child_hash) =
+                    self.hash_helper(child_node, path_prefix, new_nodes, make_fake_root)?;
+                #[cfg(not(feature = "ethhash"))]
+                let (child_addr, child_hash) =
+                    self.hash_helper(child_node, path_prefix, new_nodes)?;
+
                 *child = Some(Child::AddressWithHash(child_addr, child_hash));
                 path_prefix.0.truncate(original_length);
             }
         }
         // At this point, we either have a leaf or a branch with all children hashed.
+        // if the encoded child hash <32 bytes then we use that RLP
 
+        #[cfg(feature = "ethhash")]
+        // if we have a child that is the only child of an account branch, we will hash this child as if it
+        // is a root node. This means we have to take the nibble from the parent and prefix it to the partial path
+        let hash = if let Some(nibble) = fake_root_extra_nibble {
+            let mut fake_root = node.clone();
+            trace!("old node: {:?}", fake_root);
+            fake_root.update_partial_path(Path::from_nibbles_iterator(
+                std::iter::once(nibble).chain(fake_root.partial_path().0.iter().copied()),
+            ));
+            trace!("new node: {:?}", fake_root);
+            hash_node(&fake_root, path_prefix)
+        } else {
+            hash_node(&node, path_prefix)
+        };
+
+        #[cfg(not(feature = "ethhash"))]
         let hash = hash_node(&node, path_prefix);
-        let (addr, size) = self.allocate_node(&node).expect("TODO handle error");
+
+        let (addr, size) = self.allocate_node(&node)?;
 
         new_nodes.insert(addr, (size, node.into()));
 
-        (addr, hash)
+        Ok((addr, hash))
     }
 }
 
@@ -1072,10 +1157,12 @@ impl NodeStore<Arc<ImmutableProposal>, FileBacked> {
     }
 }
 
-impl<S: ReadableStorage> From<NodeStore<MutableProposal, S>>
+impl<S: ReadableStorage> TryFrom<NodeStore<MutableProposal, S>>
     for NodeStore<Arc<ImmutableProposal>, S>
 {
-    fn from(val: NodeStore<MutableProposal, S>) -> Self {
+    type Error = std::io::Error;
+
+    fn try_from(val: NodeStore<MutableProposal, S>) -> Result<Self, Self::Error> {
         let NodeStore {
             header,
             kind,
@@ -1096,12 +1183,17 @@ impl<S: ReadableStorage> From<NodeStore<MutableProposal, S>>
         let Some(root) = kind.root else {
             // This trie is now empty.
             nodestore.header.root_address = None;
-            return nodestore;
+            return Ok(nodestore);
         };
 
         // Hashes the trie and returns the address of the new root.
         let mut new_nodes = HashMap::new();
-        let (root_addr, root_hash) = nodestore.hash_helper(root, &mut Path::new(), &mut new_nodes);
+        #[cfg(feature = "ethhash")]
+        let (root_addr, root_hash) =
+            nodestore.hash_helper(root, &mut Path::new(), &mut new_nodes, None)?;
+        #[cfg(not(feature = "ethhash"))]
+        let (root_addr, root_hash) =
+            nodestore.hash_helper(root, &mut Path::new(), &mut new_nodes)?;
 
         nodestore.header.root_address = Some(root_addr);
         let immutable_proposal =
@@ -1110,10 +1202,10 @@ impl<S: ReadableStorage> From<NodeStore<MutableProposal, S>>
             new: new_nodes,
             deleted: immutable_proposal.deleted,
             parent: immutable_proposal.parent,
-            root_hash: Some(root_hash),
+            root_hash: Some(root_hash.into_triehash()),
         });
 
-        nodestore
+        Ok(nodestore)
     }
 }
 
@@ -1161,7 +1253,7 @@ where
         if let Some(root_addr) = self.header.root_address {
             let root_node = self.read_node(root_addr)?;
             let root_hash = hash_node(&root_node, &Path::new());
-            Ok(Some((root_addr, root_hash)))
+            Ok(Some((root_addr, root_hash.into_triehash())))
         } else {
             Ok(None)
         }
@@ -1178,7 +1270,7 @@ where
         if let Some(root_addr) = self.header.root_address {
             let root_node = self.read_node(root_addr)?;
             let root_hash = hash_node(&root_node, &Path::new());
-            Ok(Some((root_addr, root_hash)))
+            Ok(Some((root_addr, root_hash.into_triehash())))
         } else {
             Ok(None)
         }
@@ -1248,13 +1340,13 @@ mod tests {
 
         // create an empty r1, check that it's parent is the empty committed version
         let r1 = NodeStore::new(base).unwrap();
-        let r1: Arc<NodeStore<Arc<ImmutableProposal>, _>> = Arc::new(r1.into());
+        let r1: Arc<NodeStore<Arc<ImmutableProposal>, _>> = Arc::new(r1.try_into().unwrap());
         let parent: DynGuard<Arc<NodeStoreParent>> = r1.kind.parent.load();
         assert!(matches!(**parent, NodeStoreParent::Committed(None)));
 
         // create an empty r2, check that it's parent is the proposed version r1
         let r2: NodeStore<MutableProposal, _> = NodeStore::new(r1.clone()).unwrap();
-        let r2: Arc<NodeStore<Arc<ImmutableProposal>, _>> = Arc::new(r2.into());
+        let r2: Arc<NodeStore<Arc<ImmutableProposal>, _>> = Arc::new(r2.try_into().unwrap());
         let parent: DynGuard<Arc<NodeStoreParent>> = r2.kind.parent.load();
         assert!(matches!(**parent, NodeStoreParent::Proposed(_)));
 
@@ -1335,7 +1427,7 @@ mod tests {
 
         node_store.mut_root().replace(giant_leaf);
 
-        let immutable = NodeStore::<Arc<ImmutableProposal>, _>::from(node_store);
+        let immutable = NodeStore::<Arc<ImmutableProposal>, _>::try_from(node_store).unwrap();
         println!("{:?}", immutable); // should not be reached, but need to consume immutable to avoid optimization removal
     }
 }

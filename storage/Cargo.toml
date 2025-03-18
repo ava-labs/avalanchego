@@ -25,6 +25,9 @@ fastrace = { version = "0.7.4" }
 io-uring = { version = "0.7.4", optional = true }
 triomphe = "0.1.14"
 coarsetime = "0.1.35"
+rlp = { version = "0.6.1", optional = true }
+sha3 = { version = "0.10.8", optional = true }
+bytes = { version = "1.10.1", optional = true }
 
 [dev-dependencies]
 rand = "0.9.0"
@@ -37,6 +40,7 @@ tempfile = "3.12.0"
 logger = ["log"]
 branch_factor_256 = []
 io-uring = ["dep:io-uring"]
+ethhash = [ "dep:rlp", "dep:sha3", "dep:bytes" ]
 
 [[bench]]
 name = "serializer"

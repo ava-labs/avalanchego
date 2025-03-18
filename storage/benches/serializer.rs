@@ -88,7 +88,7 @@ fn branch(c: &mut Criterion) {
             if i == 0 {
                 Some(storage::Child::AddressWithHash(
                     NonZeroU64::new(1).unwrap(),
-                    storage::TrieHash::from([0; 32]),
+                    storage::HashType::from([0; 32]),
                 ))
             } else {
                 None

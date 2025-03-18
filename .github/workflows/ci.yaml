@@ -121,8 +121,13 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ needs.build.outputs.cache-key }}
-      - name: Run tests
+      - name: Run tests with features enabled
+        run: cargo test --verbose --features logger,ethhash
+      - name: Run tests with ethhash disabled
         run: cargo test --verbose
+      # TODO: Enable testing with branch_factor_256
+      # - name: Run tests with branch_factor_256
+      #   run: cargo test --verbose --features branch_factor_256
 
   examples:
     needs: build

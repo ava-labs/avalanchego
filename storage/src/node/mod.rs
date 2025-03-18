@@ -2,6 +2,7 @@
 // See the file LICENSE.md for licensing terms.
 
 use bitfield::bitfield;
+use branch::Serializable as _;
 use enum_as_inner::EnumAsInner;
 use integer_encoding::{VarIntReader as _, VarIntWriter as _};
 use serde::{Deserialize, Serialize};
@@ -10,14 +11,14 @@ use std::io::{Error, ErrorKind, Read, Write};
 use std::num::NonZero;
 use std::vec;
 
-mod branch;
+pub mod branch;
 mod leaf;
 pub mod path;
 
 pub use branch::{BranchNode, Child};
 pub use leaf::LeafNode;
 
-use crate::{Path, SharedNode};
+use crate::{HashType, Path, SharedNode};
 
 /// A node, either a Branch or Leaf
 
@@ -251,7 +252,7 @@ impl Node {
                 encoded.push(prefix);
                 encoded.push(first_byte.0);
                 #[cfg(feature = "branch_factor_256")]
-                encoded.extend_one((childcount % BranchNode::MAX_CHILDREN) as u8);
+                encoded.push((childcount % BranchNode::MAX_CHILDREN) as u8);
 
                 // encode the partial path, including the length if it didn't fit above
                 if b.partial_path.0.len() > MAX_ENCODED_PARTIAL_PATH_LEN {
@@ -274,7 +275,7 @@ impl Node {
                     for (_, child) in child_iter {
                         if let Child::AddressWithHash(address, hash) = child {
                             encoded.extend_from_slice(&address.get().to_ne_bytes());
-                            encoded.extend_from_slice(hash);
+                            encoded.extend_from_slice(&hash.serialized_bytes());
                         } else {
                             panic!("attempt to serialize to persist a branch with a child that is not an AddressWithHash");
                         }
@@ -286,7 +287,7 @@ impl Node {
                             .expect("writing to vec should succeed");
                         if let Child::AddressWithHash(address, hash) = child {
                             encoded.extend_from_slice(&address.get().to_ne_bytes());
-                            encoded.extend_from_slice(hash);
+                            encoded.extend_from_slice(&hash.serialized_bytes());
                         } else {
                             panic!("attempt to serialize to persist a branch with a child that is not an AddressWithHash");
                         }
@@ -392,12 +393,11 @@ impl Node {
                         serialized.read_exact(&mut address_buf)?;
                         let address = u64::from_ne_bytes(address_buf);
 
-                        let mut hash = [0u8; 32];
-                        serialized.read_exact(&mut hash)?;
+                        let hash = HashType::from_reader(&mut serialized)?;
 
                         *child = Some(Child::AddressWithHash(
                             NonZero::new(address).ok_or(Error::other("zero address in child"))?,
-                            hash.into(),
+                            hash,
                         ));
                     }
                 } else {
@@ -410,12 +410,11 @@ impl Node {
                         serialized.read_exact(&mut address_buf)?;
                         let address = u64::from_ne_bytes(address_buf);
 
-                        let mut hash = [0u8; 32];
-                        serialized.read_exact(&mut hash)?;
+                        let hash = HashType::from_reader(&mut serialized)?;
 
                         children[position] = Some(Child::AddressWithHash(
                             NonZero::new(address).ok_or(Error::other("zero address in child"))?,
-                            hash.into(),
+                            hash,
                         ));
                     }
                 }
@@ -482,7 +481,7 @@ mod test {
 
         let mut serialized = Vec::new();
         node.as_bytes(0, &mut serialized);
-        #[cfg(not(feature = "branch_factor_256"))] // TODO: enable this test for branch_factor_256
+        #[cfg(not(any(feature = "branch_factor_256", feature = "ethhash")))]
         assert_eq!(serialized.len(), expected_length);
         let mut cursor = Cursor::new(&serialized);
         cursor.set_position(1);

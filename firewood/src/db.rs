@@ -197,7 +197,7 @@ where
 
         let nodestore = merkle.into_inner();
         let immutable: Arc<NodeStore<Arc<ImmutableProposal>, FileBacked>> =
-            Arc::new(nodestore.into());
+            Arc::new(nodestore.try_into()?);
 
         drop(span);
         self.manager
@@ -294,7 +294,7 @@ impl Db {
         }
         let nodestore = merkle.into_inner();
         let immutable: Arc<NodeStore<Arc<ImmutableProposal>, FileBacked>> =
-            Arc::new(nodestore.into());
+            Arc::new(nodestore.try_into()?);
         self.manager
             .write()
             .expect("poisoned lock")
@@ -404,7 +404,7 @@ impl<'a> api::Proposal for Proposal<'a> {
         }
         let nodestore = merkle.into_inner();
         let immutable: Arc<NodeStore<Arc<ImmutableProposal>, FileBacked>> =
-            Arc::new(nodestore.into());
+            Arc::new(nodestore.try_into()?);
         self.db
             .manager
             .write()
@@ -502,10 +502,16 @@ mod test {
     #[tokio::test]
     async fn reopen_test() {
         let db = testdb().await;
-        let batch = vec![BatchOp::Put {
-            key: b"k",
-            value: b"v",
-        }];
+        let batch = vec![
+            BatchOp::Put {
+                key: b"a",
+                value: b"1",
+            },
+            BatchOp::Put {
+                key: b"b",
+                value: b"2",
+            },
+        ];
         let proposal = db.propose(batch).await.unwrap();
         proposal.commit().await.unwrap();
         println!("{:?}", db.root_hash().await.unwrap().unwrap());
@@ -514,7 +520,7 @@ mod test {
         println!("{:?}", db.root_hash().await.unwrap().unwrap());
         let committed = db.root_hash().await.unwrap().unwrap();
         let historical = db.revision(committed).await.unwrap();
-        assert_eq!(&*historical.val(b"k").await.unwrap().unwrap(), b"v");
+        assert_eq!(&*historical.val(b"a").await.unwrap().unwrap(), b"1");
     }
 
     // Testdb is a helper struct for testing the Db. Once it's dropped, the directory and file disappear

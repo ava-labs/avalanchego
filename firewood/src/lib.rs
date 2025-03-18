@@ -106,6 +106,12 @@
 //! abandoned, nothing has actually been written to disk.
 //!
 #![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
+
+#[cfg(all(feature = "ethhash", feature = "branch_factor_256"))]
+compile_error!(
+    "feature \"ethhash\" and feature \"branch_factor_256\" cannot be enabled at the same time"
+);
+
 /// Database module for Firewood.
 pub mod db;
 
