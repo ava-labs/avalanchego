@@ -5,6 +5,7 @@ package rpcsigner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"google.golang.org/grpc"
@@ -20,11 +21,10 @@ var _ bls.Signer = (*Client)(nil)
 
 type Client struct {
 	client pb.SignerClient
-	conn   *grpc.ClientConn
 	pk     *bls.PublicKey
 }
 
-func NewClient(ctx context.Context, url string) (*Client, error) {
+func NewClient(ctx context.Context, url string) (*Client, func() error, error) {
 	// TODO: figure out the best parameters here given the target block-time
 	opts := grpc.WithConnectParams(grpc.ConnectParams{
 		Backoff: backoff.DefaultConfig,
@@ -34,32 +34,30 @@ func NewClient(ctx context.Context, url string) (*Client, error) {
 	// the request to the actual signer instead of relying on tls-credentials
 	conn, err := grpc.NewClient(url, opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create rpc signer client: %w", err)
+		return nil, func() error { return nil }, fmt.Errorf("failed to create rpc signer client: %w", err)
 	}
-	defer func() {
-		if err != nil {
-			conn.Close()
-		}
-	}()
+
+	cleanup := func() error {
+		return conn.Close()
+	}
 
 	client := pb.NewSignerClient(conn)
 
 	pubkeyResponse, err := client.PublicKey(ctx, &pb.PublicKeyRequest{})
 	if err != nil {
-		return nil, err
+		return nil, nil, errors.Join(err, cleanup())
 	}
 
 	pkBytes := pubkeyResponse.GetPublicKey()
 	pk, err := bls.PublicKeyFromCompressedBytes(pkBytes)
 	if err != nil {
-		return nil, err
+		return nil, nil, errors.Join(err, cleanup())
 	}
 
 	return &Client{
 		client: client,
-		conn:   conn,
 		pk:     pk,
-	}, nil
+	}, cleanup, nil
 }
 
 func (c *Client) PublicKey() *bls.PublicKey {
@@ -69,55 +67,23 @@ func (c *Client) PublicKey() *bls.PublicKey {
 // Sign a message. The [Client] already handles transient connection errors. If this method fails, it will
 // render the client in an unusable state and the client should be discarded.
 func (c *Client) Sign(message []byte) (*bls.Signature, error) {
-	var err error
-	defer func() {
-		if err != nil {
-			c.Close()
-		}
-	}()
-
 	resp, err := c.client.Sign(context.TODO(), &pb.SignRequest{Message: message})
 	if err != nil {
 		return nil, err
 	}
 
 	sigBytes := resp.GetSignature()
-	sig, err := bls.SignatureFromBytes(sigBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	return sig, nil
+	return bls.SignatureFromBytes(sigBytes)
 }
 
 // [SignProofOfPossession] has the same behavior as [Sign] but will product a different signature.
 // See BLS spec for more details.
 func (c *Client) SignProofOfPossession(message []byte) (*bls.Signature, error) {
-	var err error
-	defer func() {
-		if err != nil {
-			c.Close()
-		}
-	}()
-
 	resp, err := c.client.SignProofOfPossession(context.TODO(), &pb.SignProofOfPossessionRequest{Message: message})
 	if err != nil {
 		return nil, err
 	}
 
 	sigBytes := resp.GetSignature()
-	sig, err := bls.SignatureFromBytes(sigBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	return sig, nil
-}
-
-func (c *Client) Close() error {
-	if c.conn == nil {
-		return nil
-	}
-
-	return c.conn.Close()
+	return bls.SignatureFromBytes(sigBytes)
 }
