@@ -111,10 +111,11 @@ data:
           target_label: network_uuid
         - source_labels: [__meta_kubernetes_pod_label_node_id]
           target_label: node_id
-        # gh_repo is an annotation because labels can't contain `/`
+        # gh_repo is an annotation because labels can't contain `/` and a repo is typically `[org]/[repo]`
         - source_labels: [__meta_kubernetes_pod_annotation_gh_repo]
           target_label: gh_repo
-        - source_labels: [__meta_kubernetes_pod_label_gh_workflow]
+        # gh_workflow is an annotation because workflows can contain spaces
+        - source_labels: [__meta_kubernetes_pod_annotation_gh_workflow]
           target_label: gh_workflow
         - source_labels: [__meta_kubernetes_pod_label_gh_run_id]
           target_label: gh_run_id

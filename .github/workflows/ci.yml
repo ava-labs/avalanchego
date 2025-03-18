@@ -93,7 +93,7 @@ jobs:
       - uses: ./.github/actions/install-nix
       - name: Run e2e tests
         shell: bash
-        run: nix develop --command bash -x ./scripts/tests.e2e.kube.sh
+        run: nix develop --impure --command bash -x ./scripts/tests.e2e.kube.sh
         env:
           TMPNET_START_COLLECTORS: ${{ secrets.PROMETHEUS_ID != '' }}
           TMPNET_CHECK_MONITORING: ${{ secrets.PROMETHEUS_ID != '' }}
