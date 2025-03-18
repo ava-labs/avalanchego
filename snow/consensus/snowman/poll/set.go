@@ -88,17 +88,8 @@ func NewSet(
 // should be made.
 func (s *set) Add(requestID uint32, vdrs bag.Bag[ids.NodeID]) bool {
 	if _, exists := s.polls.Get(requestID); exists {
-		s.log.Debug("dropping poll",
-			zap.String("reason", "duplicated request"),
-			zap.Uint32("requestID", requestID),
-		)
 		return false
 	}
-
-	s.log.Verbo("creating poll",
-		zap.Uint32("requestID", requestID),
-		zap.Stringer("validators", &vdrs),
-	)
 
 	s.polls.Put(requestID, poll{
 		Poll:  s.factory.New(vdrs), // create the new poll
@@ -110,12 +101,12 @@ func (s *set) Add(requestID uint32, vdrs bag.Bag[ids.NodeID]) bool {
 
 // Vote registers the connections response to a query for [id]. If there was no
 // query, or the response has already be registered, nothing is performed.
-func (s *set) Vote(requestID uint32, vdr ids.NodeID, vote ids.ID) []bag.Bag[ids.ID] {
+func (s *set) Vote(requestID uint32, nodeID ids.NodeID, vote ids.ID) []bag.Bag[ids.ID] {
 	holder, exists := s.polls.Get(requestID)
 	if !exists {
 		s.log.Verbo("dropping vote",
 			zap.String("reason", "unknown poll"),
-			zap.Stringer("validator", vdr),
+			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 		)
 		return nil
@@ -124,12 +115,12 @@ func (s *set) Vote(requestID uint32, vdr ids.NodeID, vote ids.ID) []bag.Bag[ids.
 	p := holder.GetPoll()
 
 	s.log.Verbo("processing vote",
-		zap.Stringer("validator", vdr),
+		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
 		zap.Stringer("vote", vote),
 	)
 
-	p.Vote(vdr, vote)
+	p.Vote(nodeID, vote)
 	if !p.Finished() {
 		return nil
 	}
@@ -152,7 +143,7 @@ func (s *set) processFinishedPolls() []bag.Bag[ids.ID] {
 			break
 		}
 
-		s.log.Verbo("poll finished",
+		s.log.Debug("poll finished",
 			zap.Uint32("requestID", iter.Key()),
 			zap.Stringer("poll", holder.GetPoll()),
 		)
@@ -170,25 +161,25 @@ func (s *set) processFinishedPolls() []bag.Bag[ids.ID] {
 
 // Drop registers the connections response to a query for [id]. If there was no
 // query, or the response has already be registered, nothing is performed.
-func (s *set) Drop(requestID uint32, vdr ids.NodeID) []bag.Bag[ids.ID] {
+func (s *set) Drop(requestID uint32, nodeID ids.NodeID) []bag.Bag[ids.ID] {
 	holder, exists := s.polls.Get(requestID)
 	if !exists {
 		s.log.Verbo("dropping vote",
 			zap.String("reason", "unknown poll"),
-			zap.Stringer("validator", vdr),
+			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 		)
 		return nil
 	}
 
 	s.log.Verbo("processing dropped vote",
-		zap.Stringer("validator", vdr),
+		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
 	)
 
 	poll := holder.GetPoll()
 
-	poll.Drop(vdr)
+	poll.Drop(nodeID)
 	if !poll.Finished() {
 		return nil
 	}

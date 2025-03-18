@@ -197,7 +197,7 @@ func (ss *stateSyncer) StateSummaryFrontier(ctx context.Context, nodeID ids.Node
 				zap.Error(err),
 			)
 		} else {
-			ss.Ctx.Log.Debug("failed to parse summary",
+			ss.Ctx.Log.Trace("failed to parse summary",
 				zap.Error(err),
 			)
 		}

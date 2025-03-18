@@ -142,26 +142,21 @@ func (ts *Topological) NumProcessing() int {
 }
 
 func (ts *Topological) Add(blk Block) error {
-	blkID := blk.ID()
-	height := blk.Height()
-	ts.ctx.Log.Verbo("adding block",
-		zap.Stringer("blkID", blkID),
-		zap.Uint64("height", height),
-	)
-
 	// Make sure a block is not inserted twice.
+	blkID := blk.ID()
 	if ts.Processing(blkID) {
 		return errDuplicateAdd
 	}
-
-	ts.metrics.Verified(height)
-	ts.metrics.Issued(blkID, ts.pollNumber)
 
 	parentID := blk.Parent()
 	parentNode, ok := ts.blocks[parentID]
 	if !ok {
 		return errUnknownParentBlock
 	}
+
+	height := blk.Height()
+	ts.metrics.Verified(height)
+	ts.metrics.Issued(blkID, ts.pollNumber)
 
 	// add the block as a child of its parent, and add the block to the tree
 	parentNode.AddChild(blk)
@@ -177,7 +172,7 @@ func (ts *Topological) Add(blk Block) error {
 		ts.preferredHeights[height] = blkID
 	}
 
-	ts.ctx.Log.Verbo("added block",
+	ts.ctx.Log.Debug("added block",
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", height),
 		zap.Stringer("parentID", parentID),

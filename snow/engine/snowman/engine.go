@@ -216,7 +216,7 @@ func (e *Engine) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, b
 				zap.Error(err),
 			)
 		} else {
-			e.Ctx.Log.Debug("failed to parse block",
+			e.Ctx.Log.Trace("failed to parse block",
 				zap.Stringer("nodeID", nodeID),
 				zap.Uint32("requestID", requestID),
 				zap.Error(err),
@@ -330,7 +330,7 @@ func (e *Engine) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uin
 				zap.Error(err),
 			)
 		} else {
-			e.Ctx.Log.Debug("failed to parse block",
+			e.Ctx.Log.Trace("failed to parse block",
 				zap.Stringer("nodeID", nodeID),
 				zap.Uint32("requestID", requestID),
 				zap.Error(err),
@@ -823,7 +823,7 @@ func (e *Engine) issue(
 	// either the last accepted block or is not decided.
 	var deps []ids.ID
 	if parentID := blk.Parent(); !e.canIssueChildOn(parentID) {
-		e.Ctx.Log.Verbo("block waiting for parent to be issued",
+		e.Ctx.Log.Debug("block waiting for parent to be issued",
 			zap.Stringer("blkID", blkID),
 			zap.Stringer("parentID", parentID),
 		)
@@ -853,7 +853,7 @@ func (e *Engine) sendRequest(
 	e.blkReqs.Put(req, blkID)
 	e.blkReqSourceMetric[req] = issuedMetric
 
-	e.Ctx.Log.Verbo("sending Get request",
+	e.Ctx.Log.Debug("sending Get request",
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", e.requestID),
 		zap.Stringer("blkID", blkID),
@@ -874,11 +874,7 @@ func (e *Engine) sendQuery(
 		return
 	}
 
-	e.Ctx.Log.Verbo("sampling from validators",
-		zap.Stringer("validators", e.Validators),
-	)
-
-	vdrIDs, err := e.Validators.Sample(e.Ctx.SubnetID, e.Params.K)
+	nodeIDs, err := e.Validators.Sample(e.Ctx.SubnetID, e.Params.K)
 	if err != nil {
 		e.Ctx.Log.Warn("dropped query for block",
 			zap.String("reason", "insufficient number of validators"),
@@ -900,9 +896,9 @@ func (e *Engine) sendQuery(
 		return
 	}
 
-	vdrBag := bag.Of(vdrIDs...)
+	nodeIDBag := bag.Of(nodeIDs...)
 	e.requestID++
-	if !e.polls.Add(e.requestID, vdrBag) {
+	if !e.polls.Add(e.requestID, nodeIDBag) {
 		e.Ctx.Log.Error("dropped query for block",
 			zap.String("reason", "failed to add poll"),
 			zap.Stringer("blkID", blkID),
@@ -911,11 +907,18 @@ func (e *Engine) sendQuery(
 		return
 	}
 
-	vdrSet := set.Of(vdrIDs...)
+	e.Ctx.Log.Debug("sending query",
+		zap.Stringer("blkID", blkID),
+		zap.Uint32("requestID", e.requestID),
+		zap.Stringers("nodeIDs", nodeIDs),
+		zap.Bool("push", push),
+	)
+
+	nodeIDSet := set.Of(nodeIDs...)
 	if push {
-		e.Sender.SendPushQuery(ctx, vdrSet, e.requestID, blkBytes, nextHeightToAccept)
+		e.Sender.SendPushQuery(ctx, nodeIDSet, e.requestID, blkBytes, nextHeightToAccept)
 	} else {
-		e.Sender.SendPullQuery(ctx, vdrSet, e.requestID, blkID, nextHeightToAccept)
+		e.Sender.SendPullQuery(ctx, nodeIDSet, e.requestID, blkID, nextHeightToAccept)
 	}
 }
 
@@ -1093,7 +1096,7 @@ func (e *Engine) addUnverifiedBlockToConsensus(
 	e.unverifiedIDToAncestor.Remove(blkID)
 	e.unverifiedBlockCache.Evict(blkID)
 	e.metrics.issuerStake.Observe(float64(e.Validators.GetWeight(e.Ctx.SubnetID, nodeID)))
-	e.Ctx.Log.Verbo("adding block to consensus",
+	e.Ctx.Log.Debug("adding block to consensus",
 		zap.Stringer("nodeID", nodeID),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", blkHeight),
@@ -1131,7 +1134,7 @@ func (e *Engine) getProcessingAncestor(initialVote ids.ID) (ids.ID, bool) {
 		// If we haven't cached the block, drop [vote].
 		blk, ok := e.unverifiedBlockCache.Get(bubbledVote)
 		if !ok {
-			e.Ctx.Log.Debug("dropping vote",
+			e.Ctx.Log.Verbo("dropping vote",
 				zap.String("reason", "ancestor isn't cached"),
 				zap.Stringer("initialVoteID", initialVote),
 				zap.Stringer("bubbledVoteID", bubbledVote),
@@ -1141,7 +1144,7 @@ func (e *Engine) getProcessingAncestor(initialVote ids.ID) (ids.ID, bool) {
 		}
 
 		if e.isDecided(blk) {
-			e.Ctx.Log.Debug("dropping vote",
+			e.Ctx.Log.Verbo("dropping vote",
 				zap.String("reason", "bubbled vote already decided"),
 				zap.Stringer("initialVoteID", initialVote),
 				zap.Stringer("bubbledVoteID", bubbledVote),

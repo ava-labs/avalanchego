@@ -1050,7 +1050,7 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader, isIngress bool)
 
 	if nodeID == n.config.MyNodeID {
 		_ = tlsConn.Close()
-		n.peerConfig.Log.Verbo("dropping connection to myself")
+		n.peerConfig.Log.Trace("dropping connection to myself")
 		return nil
 	}
 

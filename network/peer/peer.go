@@ -405,7 +405,7 @@ func (p *peer) readMessages() {
 		// Parse the message length
 		msgLen, err := readMsgLen(msgLenBytes, constants.DefaultMaxMessageSize)
 		if err != nil {
-			p.Log.Verbo("error parsing message length",
+			p.Log.Trace("error parsing message length",
 				zap.Stringer("nodeID", p.id),
 				zap.Error(err),
 			)
@@ -475,7 +475,7 @@ func (p *peer) readMessages() {
 		// Parse the message
 		msg, err := p.MessageCreator.Parse(msgBytes, p.id, onFinishedHandling)
 		if err != nil {
-			p.Log.Verbo("failed to parse message",
+			p.Log.Trace("failed to parse message",
 				zap.Stringer("nodeID", p.id),
 				zap.Binary("messageBytes", msgBytes),
 				zap.Error(err),
@@ -605,7 +605,7 @@ func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
 	msgLen := uint32(len(msgBytes))
 	msgLenBytes, err := writeMsgLen(msgLen, constants.DefaultMaxMessageSize)
 	if err != nil {
-		p.Log.Verbo("error writing message length",
+		p.Log.Error("error writing message length",
 			zap.Stringer("nodeID", p.id),
 			zap.Error(err),
 		)
