@@ -14,6 +14,11 @@ fi
 
 export KUBECONFIG="${KUBECONFIG:-$HOME/.kube/config}"
 
+# Enable collector start if credentials are set in the env
+if [[ -n "${PROMETHEUS_USERNAME:-}" ]]; then
+  export TMPNET_START_COLLECTORS=true
+fi
+
 ./bin/tmpnetctl start-kind-cluster
 
 if [[ -z "${SKIP_BUILD_IMAGE:-}" ]]; then
