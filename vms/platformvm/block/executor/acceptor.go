@@ -104,8 +104,7 @@ func (a *acceptor) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 		)
 	}
 
-	a.ctx.Log.Trace(
-		"accepted block",
+	a.ctx.Log.Debug("accepted block",
 		zap.String("blockType", "apricot atomic"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
@@ -174,8 +173,7 @@ func (a *acceptor) optionBlock(b block.Block, blockType string) error {
 		onAcceptFunc()
 	}
 
-	a.ctx.Log.Trace(
-		"accepted block",
+	a.ctx.Log.Debug("accepted block",
 		zap.String("blockType", blockType),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
@@ -206,8 +204,7 @@ func (a *acceptor) proposalBlock(b block.Block, blockType string) {
 	blkID := b.ID()
 	a.backend.lastAccepted = blkID
 
-	a.ctx.Log.Trace(
-		"accepted block",
+	a.ctx.Log.Debug("accepted block",
 		zap.String("blockType", blockType),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
@@ -253,8 +250,7 @@ func (a *acceptor) standardBlock(b block.Block, blockType string) error {
 		onAcceptFunc()
 	}
 
-	a.ctx.Log.Trace(
-		"accepted block",
+	a.ctx.Log.Debug("accepted block",
 		zap.String("blockType", blockType),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),

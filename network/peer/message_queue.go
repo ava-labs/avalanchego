@@ -90,8 +90,7 @@ func NewThrottledMessageQueue(
 
 func (q *throttledMessageQueue) Push(ctx context.Context, msg message.OutboundMessage) bool {
 	if err := ctx.Err(); err != nil {
-		q.log.Debug(
-			"dropping outgoing message",
+		q.log.Debug("dropping outgoing message",
 			zap.Stringer("messageOp", msg.Op()),
 			zap.Stringer("nodeID", q.id),
 			zap.Error(err),
@@ -102,8 +101,7 @@ func (q *throttledMessageQueue) Push(ctx context.Context, msg message.OutboundMe
 
 	// Acquire space on the outbound message queue, or drop [msg] if we can't.
 	if !q.outboundMsgThrottler.Acquire(msg, q.id) {
-		q.log.Debug(
-			"dropping outgoing message",
+		q.log.Debug("dropping outgoing message",
 			zap.String("reason", "rate-limiting"),
 			zap.Stringer("messageOp", msg.Op()),
 			zap.Stringer("nodeID", q.id),
@@ -120,8 +118,7 @@ func (q *throttledMessageQueue) Push(ctx context.Context, msg message.OutboundMe
 	defer q.cond.L.Unlock()
 
 	if q.closed {
-		q.log.Debug(
-			"dropping outgoing message",
+		q.log.Debug("dropping outgoing message",
 			zap.String("reason", "closed queue"),
 			zap.Stringer("messageOp", msg.Op()),
 			zap.Stringer("nodeID", q.id),
@@ -227,16 +224,14 @@ func (q *blockingMessageQueue) Push(ctx context.Context, msg message.OutboundMes
 	ctxDone := ctx.Done()
 	select {
 	case <-q.closing:
-		q.log.Debug(
-			"dropping message",
+		q.log.Debug("dropping message",
 			zap.String("reason", "closed queue"),
 			zap.Stringer("messageOp", msg.Op()),
 		)
 		q.onFailed.SendFailed(msg)
 		return false
 	case <-ctxDone:
-		q.log.Debug(
-			"dropping message",
+		q.log.Debug("dropping message",
 			zap.String("reason", "cancelled context"),
 			zap.Stringer("messageOp", msg.Op()),
 		)
@@ -249,16 +244,14 @@ func (q *blockingMessageQueue) Push(ctx context.Context, msg message.OutboundMes
 	case q.queue <- msg:
 		return true
 	case <-ctxDone:
-		q.log.Debug(
-			"dropping message",
+		q.log.Debug("dropping message",
 			zap.String("reason", "cancelled context"),
 			zap.Stringer("messageOp", msg.Op()),
 		)
 		q.onFailed.SendFailed(msg)
 		return false
 	case <-q.closing:
-		q.log.Debug(
-			"dropping message",
+		q.log.Debug("dropping message",
 			zap.String("reason", "closed queue"),
 			zap.Stringer("messageOp", msg.Op()),
 		)

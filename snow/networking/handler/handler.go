@@ -540,7 +540,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 	case *p2ppb.AcceptedStateSummary:
 		summaryIDs, err := getIDs(msg.SummaryIds)
 		if err != nil {
-			h.ctx.Log.Debug("message with invalid field",
+			h.ctx.Log.Trace("message with invalid field",
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("messageOp", message.AcceptedStateSummaryOp),
 				zap.Uint32("requestID", msg.RequestId),
@@ -563,7 +563,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 	case *p2ppb.AcceptedFrontier:
 		containerID, err := ids.ToID(msg.ContainerId)
 		if err != nil {
-			h.ctx.Log.Debug("message with invalid field",
+			h.ctx.Log.Trace("message with invalid field",
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("messageOp", message.AcceptedFrontierOp),
 				zap.Uint32("requestID", msg.RequestId),
@@ -581,7 +581,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 	case *p2ppb.GetAccepted:
 		containerIDs, err := getIDs(msg.ContainerIds)
 		if err != nil {
-			h.ctx.Log.Debug("message with invalid field",
+			h.ctx.Log.Trace("message with invalid field",
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("messageOp", message.GetAcceptedOp),
 				zap.Uint32("requestID", msg.RequestId),
@@ -596,7 +596,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 	case *p2ppb.Accepted:
 		containerIDs, err := getIDs(msg.ContainerIds)
 		if err != nil {
-			h.ctx.Log.Debug("message with invalid field",
+			h.ctx.Log.Trace("message with invalid field",
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("messageOp", message.AcceptedOp),
 				zap.Uint32("requestID", msg.RequestId),
@@ -614,7 +614,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 	case *p2ppb.GetAncestors:
 		containerID, err := ids.ToID(msg.ContainerId)
 		if err != nil {
-			h.ctx.Log.Debug("dropping message with invalid field",
+			h.ctx.Log.Trace("dropping message with invalid field",
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("messageOp", message.GetAncestorsOp),
 				zap.Uint32("requestID", msg.RequestId),
@@ -635,7 +635,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 	case *p2ppb.Get:
 		containerID, err := ids.ToID(msg.ContainerId)
 		if err != nil {
-			h.ctx.Log.Debug("dropping message with invalid field",
+			h.ctx.Log.Trace("dropping message with invalid field",
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("messageOp", message.GetOp),
 				zap.Uint32("requestID", msg.RequestId),
@@ -659,7 +659,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 	case *p2ppb.PullQuery:
 		containerID, err := ids.ToID(msg.ContainerId)
 		if err != nil {
-			h.ctx.Log.Debug("dropping message with invalid field",
+			h.ctx.Log.Trace("dropping message with invalid field",
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("messageOp", message.PullQueryOp),
 				zap.Uint32("requestID", msg.RequestId),
@@ -674,7 +674,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 	case *p2ppb.Chits:
 		preferredID, err := ids.ToID(msg.PreferredId)
 		if err != nil {
-			h.ctx.Log.Debug("message with invalid field",
+			h.ctx.Log.Trace("message with invalid field",
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("messageOp", message.ChitsOp),
 				zap.Uint32("requestID", msg.RequestId),
@@ -686,7 +686,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 
 		preferredIDAtHeight, err := ids.ToID(msg.PreferredIdAtHeight)
 		if err != nil {
-			h.ctx.Log.Debug("message with invalid field",
+			h.ctx.Log.Trace("message with invalid field",
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("messageOp", message.ChitsOp),
 				zap.Uint32("requestID", msg.RequestId),
@@ -698,7 +698,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 
 		acceptedID, err := ids.ToID(msg.AcceptedId)
 		if err != nil {
-			h.ctx.Log.Debug("message with invalid field",
+			h.ctx.Log.Trace("message with invalid field",
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("messageOp", message.ChitsOp),
 				zap.Uint32("requestID", msg.RequestId),

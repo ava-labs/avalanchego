@@ -348,7 +348,7 @@ func New(config *ManagerConfig) (Manager, error) {
 // Invariant: Tracked Subnet must be checked before calling this function
 func (m *manager) QueueChainCreation(chainParams ChainParameters) {
 	if sb, _ := m.Subnets.GetOrCreate(chainParams.SubnetID); !sb.AddChain(chainParams.ID) {
-		m.Log.Debug("skipping chain creation",
+		m.Log.Warn("skipping chain creation",
 			zap.String("reason", "chain already staged"),
 			zap.Stringer("subnetID", chainParams.SubnetID),
 			zap.Stringer("chainID", chainParams.ID),
@@ -358,7 +358,7 @@ func (m *manager) QueueChainCreation(chainParams ChainParameters) {
 	}
 
 	if ok := m.chainsQueue.PushRight(chainParams); !ok {
-		m.Log.Warn("skipping chain creation",
+		m.Log.Error("skipping chain creation",
 			zap.String("reason", "couldn't enqueue chain"),
 			zap.Stringer("subnetID", chainParams.SubnetID),
 			zap.Stringer("chainID", chainParams.ID),

@@ -36,15 +36,13 @@ type testExternalHandler struct {
 // called by messages explicitly sent by the peer. If timeouts are required,
 // that must be handled by the user of this utility.
 func (t *testExternalHandler) HandleInbound(_ context.Context, message message.InboundMessage) {
-	t.log.Info(
-		"receiving message",
+	t.log.Info("receiving message",
 		zap.Stringer("op", message.Op()),
 	)
 }
 
 func (t *testExternalHandler) Connected(nodeID ids.NodeID, version *version.Application, subnetID ids.ID) {
-	t.log.Info(
-		"connected",
+	t.log.Info("connected",
 		zap.Stringer("nodeID", nodeID),
 		zap.Stringer("version", version),
 		zap.Stringer("subnetID", subnetID),
@@ -52,8 +50,7 @@ func (t *testExternalHandler) Connected(nodeID ids.NodeID, version *version.Appl
 }
 
 func (t *testExternalHandler) Disconnected(nodeID ids.NodeID) {
-	t.log.Info(
-		"disconnected",
+	t.log.Info("disconnected",
 		zap.Stringer("nodeID", nodeID),
 	)
 }
@@ -98,8 +95,7 @@ func ExampleNewTestNetwork() {
 		trackedSubnets,
 	)
 	if err != nil {
-		log.Fatal(
-			"failed to create test network config",
+		log.Fatal("failed to create test network config",
 			zap.Error(err),
 		)
 		return
@@ -111,8 +107,7 @@ func ExampleNewTestNetwork() {
 		handler,
 	)
 	if err != nil {
-		log.Fatal(
-			"failed to create test network",
+		log.Fatal("failed to create test network",
 			zap.Error(err),
 		)
 		return
@@ -138,8 +133,7 @@ func ExampleNewTestNetwork() {
 	// Calling network.Dispatch() will block until a fatal error occurs or
 	// network.StartClose() is called.
 	err = network.Dispatch()
-	log.Info(
-		"network exited",
+	log.Info("network exited",
 		zap.Error(err),
 	)
 }

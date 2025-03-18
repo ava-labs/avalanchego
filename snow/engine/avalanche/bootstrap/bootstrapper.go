@@ -136,7 +136,7 @@ func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 	}
 	requestedVtxID, ok := b.outstandingRequests.DeleteKey(request)
 	if !ok { // this message isn't in response to a request we made
-		b.Ctx.Log.Debug("received unexpected Ancestors",
+		b.Ctx.Log.Trace("received unexpected Ancestors",
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 		)
@@ -147,7 +147,7 @@ func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 
 	lenVtxs := len(vtxs)
 	if lenVtxs == 0 {
-		b.Ctx.Log.Debug("Ancestors contains no vertices",
+		b.Ctx.Log.Trace("Ancestors contains no vertices",
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 		)
@@ -159,7 +159,7 @@ func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 	if lenVtxs > b.Config.AncestorsMaxContainersReceived {
 		vtxs = vtxs[:b.Config.AncestorsMaxContainersReceived]
 
-		b.Ctx.Log.Debug("ignoring containers in Ancestors",
+		b.Ctx.Log.Trace("ignoring containers in Ancestors",
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 			zap.Int("numIgnored", lenVtxs-b.Config.AncestorsMaxContainersReceived),
@@ -168,7 +168,7 @@ func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 
 	vtx, err := b.Manager.ParseVtx(ctx, vtxs[0])
 	if err != nil {
-		b.Ctx.Log.Debug("failed to parse requested vertex",
+		b.Ctx.Log.Trace("failed to parse requested vertex",
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 			zap.Stringer("vtxID", requestedVtxID),
@@ -180,7 +180,7 @@ func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 	}
 
 	if actualID := vtx.ID(); actualID != requestedVtxID {
-		b.Ctx.Log.Debug("received incorrect vertex",
+		b.Ctx.Log.Trace("received incorrect vertex",
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 			zap.Stringer("vtxID", actualID),
@@ -212,7 +212,7 @@ func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 	for _, vtxBytes := range vtxs[1:] {
 		vtx, err := b.Manager.ParseVtx(ctx, vtxBytes) // Persists the vtx
 		if err != nil {
-			b.Ctx.Log.Debug("failed to parse vertex",
+			b.Ctx.Log.Trace("failed to parse vertex",
 				zap.Stringer("nodeID", nodeID),
 				zap.Uint32("requestID", requestID),
 				zap.Error(err),
@@ -221,7 +221,7 @@ func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 		}
 		vtxID := vtx.ID()
 		if !eligibleVertices.Contains(vtxID) {
-			b.Ctx.Log.Debug("received vertex that should not have been included",
+			b.Ctx.Log.Trace("received vertex that should not have been included",
 				zap.Stringer("nodeID", nodeID),
 				zap.Uint32("requestID", requestID),
 				zap.Stringer("vtxID", vtxID),
@@ -260,7 +260,7 @@ func (b *Bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID
 	}
 	vtxID, ok := b.outstandingRequests.DeleteKey(request)
 	if !ok {
-		b.Ctx.Log.Debug("unexpectedly called GetAncestorsFailed",
+		b.Ctx.Log.Trace("unexpectedly called GetAncestorsFailed",
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 		)

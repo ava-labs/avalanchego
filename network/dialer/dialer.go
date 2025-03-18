@@ -49,8 +49,7 @@ func NewDialer(network string, dialerConfig Config, log logging.Logger) Dialer {
 	} else {
 		throttler = throttling.NewDialThrottler(int(dialerConfig.ThrottleRps))
 	}
-	log.Debug(
-		"creating dialer",
+	log.Info("creating dialer",
 		zap.Uint32("throttleRPS", dialerConfig.ThrottleRps),
 		zap.Duration("dialTimeout", dialerConfig.ConnectionTimeout),
 	)

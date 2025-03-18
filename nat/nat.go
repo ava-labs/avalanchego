@@ -190,5 +190,5 @@ func (m *Mapper) updateIP(ip *utils.Atomic[netip.AddrPort]) {
 func (m *Mapper) UnmapAllPorts() {
 	close(m.closer)
 	m.wg.Wait()
-	m.log.Info("Unmapped all ports")
+	m.log.Info("unmapped all ports")
 }

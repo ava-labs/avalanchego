@@ -457,8 +457,7 @@ func (n *network) Connected(nodeID ids.NodeID) {
 	n.peersLock.Lock()
 	peer, ok := n.connectingPeers.GetByID(nodeID)
 	if !ok {
-		n.peerConfig.Log.Error(
-			"unexpectedly connected to peer when not marked as attempting to connect",
+		n.peerConfig.Log.Error("unexpectedly connected to peer when not marked as attempting to connect",
 			zap.Stringer("nodeID", nodeID),
 		)
 		n.peersLock.Unlock()
@@ -609,7 +608,9 @@ func (n *network) Dispatch() error {
 
 		conn, err := n.listener.Accept() // Returns error when n.Close() is called
 		if err != nil {
-			n.peerConfig.Log.Debug("error during server accept", zap.Error(err))
+			n.peerConfig.Log.Debug("error during server accept",
+				zap.Error(err),
+			)
 			// Sleep for a small amount of time to try to wait for the
 			// error to go away.
 			time.Sleep(time.Millisecond)
@@ -947,8 +948,7 @@ func (n *network) dial(nodeID ids.NodeID, ip *trackedIP) {
 			// "connection reset by peer" errors from interfering with the
 			// later duplicated connection check.
 			if connecting || connected {
-				n.peerConfig.Log.Verbo(
-					"exiting attempt to dial peer",
+				n.peerConfig.Log.Verbo("exiting attempt to dial peer",
 					zap.String("reason", "already connected"),
 					zap.Stringer("nodeID", nodeID),
 				)
@@ -983,8 +983,7 @@ func (n *network) dial(nodeID ids.NodeID, ip *trackedIP) {
 
 			conn, err := n.dialer.Dial(n.onCloseCtx, ip.ip)
 			if err != nil {
-				n.peerConfig.Log.Verbo(
-					"failed to reach peer, attempting again",
+				n.peerConfig.Log.Verbo("failed to reach peer, attempting again",
 					zap.Stringer("nodeID", nodeID),
 					zap.Stringer("peerIP", ip.ip),
 					zap.Duration("delay", ip.delay),
@@ -1000,8 +999,7 @@ func (n *network) dial(nodeID ids.NodeID, ip *trackedIP) {
 
 			err = n.upgrade(conn, n.clientUpgrader, false)
 			if err != nil {
-				n.peerConfig.Log.Verbo(
-					"failed to upgrade, attempting again",
+				n.peerConfig.Log.Verbo("failed to upgrade, attempting again",
 					zap.Stringer("nodeID", nodeID),
 					zap.Stringer("peerIP", ip.ip),
 					zap.Duration("delay", ip.delay),
@@ -1053,14 +1051,13 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader, isIngress bool)
 
 	if nodeID == n.config.MyNodeID {
 		_ = tlsConn.Close()
-		n.peerConfig.Log.Verbo("dropping connection to myself")
+		n.peerConfig.Log.Trace("dropping connection to myself")
 		return nil
 	}
 
 	if !n.AllowConnection(nodeID) {
 		_ = tlsConn.Close()
-		n.peerConfig.Log.Verbo(
-			"dropping undesired connection",
+		n.peerConfig.Log.Verbo("dropping undesired connection",
 			zap.Stringer("nodeID", nodeID),
 		)
 		return nil
@@ -1071,8 +1068,7 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader, isIngress bool)
 		n.peersLock.Unlock()
 
 		_ = tlsConn.Close()
-		n.peerConfig.Log.Verbo(
-			"dropping connection",
+		n.peerConfig.Log.Verbo("dropping connection",
 			zap.String("reason", "shutting down the p2p network"),
 			zap.Stringer("nodeID", nodeID),
 		)
@@ -1083,8 +1079,7 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader, isIngress bool)
 		n.peersLock.Unlock()
 
 		_ = tlsConn.Close()
-		n.peerConfig.Log.Verbo(
-			"dropping connection",
+		n.peerConfig.Log.Verbo("dropping connection",
 			zap.String("reason", "already connecting to peer"),
 			zap.Stringer("nodeID", nodeID),
 		)
@@ -1095,9 +1090,8 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader, isIngress bool)
 		n.peersLock.Unlock()
 
 		_ = tlsConn.Close()
-		n.peerConfig.Log.Verbo(
-			"dropping connection",
-			zap.String("reason", "already connecting to peer"),
+		n.peerConfig.Log.Verbo("dropping connection",
+			zap.String("reason", "already connected to peer"),
 			zap.Stringer("nodeID", nodeID),
 		)
 		return nil

@@ -201,7 +201,9 @@ func (m *Manager) Start(ctx context.Context) error {
 		return ErrAlreadyStarted
 	}
 
-	m.config.Log.Info("starting sync", zap.Stringer("target root", m.config.TargetRoot))
+	m.config.Log.Info("starting state sync",
+		zap.Stringer("target root", m.config.TargetRoot),
+	)
 
 	// Add work item to fetch the entire key range.
 	// Note that this will be the first work item to be processed.
@@ -373,7 +375,10 @@ func (m *Manager) requestChangeProof(ctx context.Context, work *workItem) {
 
 		if err := m.handleChangeProofResponse(ctx, targetRootID, work, request, responseBytes, err); err != nil {
 			// TODO log responses
-			m.config.Log.Debug("dropping response", zap.Error(err), zap.Stringer("request", request))
+			m.config.Log.Debug("dropping response",
+				zap.Stringer("request", request),
+				zap.Error(err),
+			)
 			m.retryWork(work)
 			return
 		}
@@ -431,7 +436,10 @@ func (m *Manager) requestRangeProof(ctx context.Context, work *workItem) {
 
 		if err := m.handleRangeProofResponse(ctx, targetRootID, work, request, responseBytes, appErr); err != nil {
 			// TODO log responses
-			m.config.Log.Debug("dropping response", zap.Error(err), zap.Stringer("request", request))
+			m.config.Log.Debug("dropping response",
+				zap.Stringer("request", request),
+				zap.Error(err),
+			)
 			m.retryWork(work)
 			return
 		}
@@ -858,7 +866,9 @@ func (m *Manager) Wait(ctx context.Context) error {
 		return fmt.Errorf("%w: expected %s, got %s", ErrFinishedWithUnexpectedRoot, targetRootID, root)
 	}
 
-	m.config.Log.Info("completed", zap.Stringer("root", root))
+	m.config.Log.Info("state sync completed",
+		zap.Stringer("root", root),
+	)
 	return nil
 }
 
@@ -880,7 +890,9 @@ func (m *Manager) UpdateSyncTarget(syncTargetRoot ids.ID) error {
 		return nil
 	}
 
-	m.config.Log.Debug("updated sync target", zap.Stringer("target", syncTargetRoot))
+	m.config.Log.Debug("updated sync target",
+		zap.Stringer("target", syncTargetRoot),
+	)
 	m.config.TargetRoot = syncTargetRoot
 
 	// move all completed ranges into the work heap with high priority
@@ -913,7 +925,9 @@ func (m *Manager) setError(err error) {
 	m.errLock.Lock()
 	defer m.errLock.Unlock()
 
-	m.config.Log.Error("sync errored", zap.Error(err))
+	m.config.Log.Error("sync errored",
+		zap.Error(err),
+	)
 	m.fatalError = err
 	// Call in goroutine because we might be holding [m.workLock]
 	// which [m.Close] will try to acquire.

@@ -280,7 +280,7 @@ func (t *inboundMsgByteThrottler) release(metadata *msgMetadata, nodeID ids.Node
 			}
 		} else {
 			// This should never happen
-			t.log.Warn("couldn't find message",
+			t.log.Error("couldn't find message",
 				zap.Stringer("nodeID", nodeID),
 				zap.Uint64("messageID", msgID),
 			)

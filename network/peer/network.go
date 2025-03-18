@@ -21,7 +21,8 @@ type Network interface {
 	AllowConnection(peerID ids.NodeID) bool
 
 	// Track allows the peer to notify the network of potential new peers to
-	// connect to.
+	// connect to. This function should only return an error if the signature on
+	// one of the provided IPs is invalid.
 	Track(ips []*ips.ClaimedIPPort) error
 
 	// Disconnected is called when the peer finishes shutting down. It is not

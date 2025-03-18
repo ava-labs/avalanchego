@@ -151,8 +151,7 @@ func (s *SignatureAggregator) AggregateSignatures(
 			return msg, aggregatedStakeWeight, totalStakeWeight, nil
 		case result := <-results:
 			if result.Err != nil {
-				s.log.Debug(
-					"dropping response",
+				s.log.Debug("dropping response",
 					zap.Stringer("nodeID", result.NodeID),
 					zap.Error(err),
 				)
@@ -161,8 +160,7 @@ func (s *SignatureAggregator) AggregateSignatures(
 
 			// Validators may share public keys so drop any duplicate signatures
 			if signerBitSet.Contains(result.Validator.Index) {
-				s.log.Debug(
-					"dropping duplicate signature",
+				s.log.Debug("dropping duplicate signature",
 					zap.Stringer("nodeID", result.NodeID),
 					zap.Error(err),
 				)

@@ -84,7 +84,7 @@ func (t *txJob) Execute(ctx context.Context) error {
 		}
 
 		t.numAccepted.Inc()
-		t.log.Trace("accepting transaction in bootstrapping",
+		t.log.Debug("accepting transaction in bootstrapping",
 			zap.Stringer("txID", txID),
 		)
 		if err := t.tx.Accept(ctx); err != nil {

@@ -210,7 +210,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	m := msg.Message()
 	chainID, err := message.GetChainID(m)
 	if err != nil {
-		cr.log.Debug("dropping message with invalid field",
+		cr.log.Trace("dropping message with invalid field",
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("messageOp", op),
 			zap.String("field", "ChainID"),
@@ -223,7 +223,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 
 	requestID, ok := message.GetRequestID(m)
 	if !ok {
-		cr.log.Debug("dropping message with invalid field",
+		cr.log.Trace("dropping message with invalid field",
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("messageOp", op),
 			zap.String("field", "RequestID"),
@@ -400,7 +400,7 @@ func (cr *ChainRouter) AddChain(ctx context.Context, chain handler.Handler) {
 		)
 		return
 	}
-	cr.log.Debug("registering chain with chain router",
+	cr.log.Info("registering chain with chain router",
 		zap.Stringer("chainID", chainID),
 	)
 	chain.SetOnStopped(func() {
