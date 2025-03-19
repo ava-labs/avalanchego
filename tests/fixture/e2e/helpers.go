@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ava-labs/coreth/ethclient"
-	"github.com/ava-labs/coreth/interfaces"
+	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/ethclient"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
@@ -123,7 +123,7 @@ func GetWalletBalances(tc tests.TestContext, wallet *primary.Wallet) (uint64, ui
 }
 
 // Create a new eth client targeting the specified node URI.
-func NewEthClient(tc tests.TestContext, nodeURI tmpnet.NodeURI) ethclient.Client {
+func NewEthClient(tc tests.TestContext, nodeURI tmpnet.NodeURI) *ethclient.Client {
 	tc.Log().Info("initializing a new eth client",
 		zap.Stringer("nodeID", nodeURI.NodeID),
 		zap.String("URI", nodeURI.URI),
@@ -163,7 +163,7 @@ func WaitForHealthy(t require.TestingT, node *tmpnet.Node) {
 
 // Sends an eth transaction and waits for the transaction receipt from the
 // execution of the transaction.
-func SendEthTransaction(tc tests.TestContext, ethClient ethclient.Client, signedTx *types.Transaction) *types.Receipt {
+func SendEthTransaction(tc tests.TestContext, ethClient *ethclient.Client, signedTx *types.Transaction) *types.Receipt {
 	require := require.New(tc)
 
 	txID := signedTx.Hash()
@@ -178,7 +178,7 @@ func SendEthTransaction(tc tests.TestContext, ethClient ethclient.Client, signed
 	tc.Eventually(func() bool {
 		var err error
 		receipt, err = ethClient.TransactionReceipt(tc.DefaultContext(), txID)
-		if errors.Is(err, interfaces.NotFound) {
+		if errors.Is(err, ethereum.NotFound) {
 			return false // Transaction is still pending
 		}
 		require.NoError(err)
@@ -196,7 +196,7 @@ func SendEthTransaction(tc tests.TestContext, ethClient ethclient.Client, signed
 
 // Determines the suggested gas price for the configured client that will
 // maximize the chances of transaction acceptance.
-func SuggestGasPrice(tc tests.TestContext, ethClient ethclient.Client) *big.Int {
+func SuggestGasPrice(tc tests.TestContext, ethClient *ethclient.Client) *big.Int {
 	gasPrice, err := ethClient.SuggestGasPrice(tc.DefaultContext())
 	require.NoError(tc, err)
 
@@ -212,7 +212,7 @@ func SuggestGasPrice(tc tests.TestContext, ethClient ethclient.Client) *big.Int 
 }
 
 // Helper simplifying use via an option of a gas price appropriate for testing.
-func WithSuggestedGasPrice(tc tests.TestContext, ethClient ethclient.Client) common.Option {
+func WithSuggestedGasPrice(tc tests.TestContext, ethClient *ethclient.Client) common.Option {
 	baseFee := SuggestGasPrice(tc, ethClient)
 	return common.WithBaseFee(baseFee)
 }
