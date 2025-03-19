@@ -67,7 +67,7 @@ type Client interface {
 	// subnet corresponding to [subnetID]
 	GetStakingAssetID(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (ids.ID, error)
 	// GetCurrentValidators returns the list of current validators for subnet with ID [subnetID]
-	GetCurrentValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.NodeID, options ...rpc.Option) ([]ClientPermissionlessValidator, error)
+	GetCurrentValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.NodeID, options ...rpc.Option) ([]SimpleValidator, error)
 	// GetL1Validator returns the requested L1 validator with [validationID] and
 	// the height at which it was calculated.
 	GetL1Validator(ctx context.Context, validationID ids.ID, options ...rpc.Option) (L1Validator, uint64, error)
@@ -318,7 +318,7 @@ func (c *client) GetCurrentValidators(
 	subnetID ids.ID,
 	nodeIDs []ids.NodeID,
 	options ...rpc.Option,
-) ([]ClientPermissionlessValidator, error) {
+) ([]SimpleValidator, error) {
 	res := &GetCurrentValidatorsReply{}
 	err := c.requester.SendRequest(ctx, "platform.getCurrentValidators", &GetCurrentValidatorsArgs{
 		SubnetID: subnetID,

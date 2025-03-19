@@ -10,6 +10,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
+	"github.com/ava-labs/avalanchego/vms/types"
+
+	avajson "github.com/ava-labs/avalanchego/utils/json"
 )
 
 // ClientStaker is the representation of a staker sent via client.
@@ -85,61 +88,30 @@ func apiOwnerToClientOwner(rewardOwner *api.Owner) (*ClientOwner, error) {
 	}, err
 }
 
-func getClientPermissionlessValidators(validatorsSliceIntf []interface{}) ([]ClientPermissionlessValidator, error) {
-	clientValidators := make([]ClientPermissionlessValidator, len(validatorsSliceIntf))
+type SimpleValidator struct {
+	TxID         ids.ID                    `json:"txID"`
+	ValidationID ids.ID                    `json:"validationID"`
+	NodeID       ids.NodeID                `json:"nodeID"`
+	PublicKey    types.JSONByteSlice       `json:"publicKey"`
+	Signer       *signer.ProofOfPossession `json:"signer"`
+	Weight       avajson.Uint64            `json:"weight"`
+}
+
+func getClientPermissionlessValidators(validatorsSliceIntf []interface{}) ([]SimpleValidator, error) {
+	clientValidators := make([]SimpleValidator, len(validatorsSliceIntf))
 	for i, validatorMapIntf := range validatorsSliceIntf {
 		validatorMapJSON, err := json.Marshal(validatorMapIntf)
 		if err != nil {
 			return nil, err
 		}
 
-		var apiValidator api.PermissionlessValidator
+		var apiValidator SimpleValidator
 		err = json.Unmarshal(validatorMapJSON, &apiValidator)
 		if err != nil {
 			return nil, err
 		}
 
-		validationRewardOwner, err := apiOwnerToClientOwner(apiValidator.ValidationRewardOwner)
-		if err != nil {
-			return nil, err
-		}
-
-		delegationRewardOwner, err := apiOwnerToClientOwner(apiValidator.DelegationRewardOwner)
-		if err != nil {
-			return nil, err
-		}
-
-		var clientDelegators []ClientDelegator
-		if apiValidator.Delegators != nil {
-			clientDelegators = make([]ClientDelegator, len(*apiValidator.Delegators))
-			for j, apiDelegator := range *apiValidator.Delegators {
-				rewardOwner, err := apiOwnerToClientOwner(apiDelegator.RewardOwner)
-				if err != nil {
-					return nil, err
-				}
-
-				clientDelegators[j] = ClientDelegator{
-					ClientStaker:    apiStakerToClientStaker(apiDelegator.Staker),
-					RewardOwner:     rewardOwner,
-					PotentialReward: (*uint64)(apiDelegator.PotentialReward),
-				}
-			}
-		}
-
-		clientValidators[i] = ClientPermissionlessValidator{
-			ClientStaker:           apiStakerToClientStaker(apiValidator.Staker),
-			ValidationRewardOwner:  validationRewardOwner,
-			DelegationRewardOwner:  delegationRewardOwner,
-			PotentialReward:        (*uint64)(apiValidator.PotentialReward),
-			AccruedDelegateeReward: (*uint64)(apiValidator.AccruedDelegateeReward),
-			DelegationFee:          float32(apiValidator.DelegationFee),
-			Uptime:                 (*float32)(apiValidator.Uptime),
-			Connected:              apiValidator.Connected,
-			Signer:                 apiValidator.Signer,
-			DelegatorCount:         (*uint64)(apiValidator.DelegatorCount),
-			DelegatorWeight:        (*uint64)(apiValidator.DelegatorWeight),
-			Delegators:             clientDelegators,
-		}
+		clientValidators[i] = apiValidator
 	}
 	return clientValidators, nil
 }
