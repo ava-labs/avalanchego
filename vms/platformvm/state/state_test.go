@@ -34,7 +34,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx/fxmock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
@@ -1178,94 +1177,6 @@ func TestStateSubnetToL1Conversion(t *testing.T) {
 			require.Equal(expectedConversion, actualConversion)
 		})
 	}
-}
-
-func makeBlocks(require *require.Assertions) []block.Block {
-	var blks []block.Block
-	{
-		blk, err := block.NewApricotAbortBlock(ids.GenerateTestID(), 1000)
-		require.NoError(err)
-		blks = append(blks, blk)
-	}
-
-	{
-		blk, err := block.NewApricotAtomicBlock(ids.GenerateTestID(), 1000, &txs.Tx{
-			Unsigned: &txs.AdvanceTimeTx{
-				Time: 1000,
-			},
-		})
-		require.NoError(err)
-		blks = append(blks, blk)
-	}
-
-	{
-		blk, err := block.NewApricotCommitBlock(ids.GenerateTestID(), 1000)
-		require.NoError(err)
-		blks = append(blks, blk)
-	}
-
-	{
-		tx := &txs.Tx{
-			Unsigned: &txs.RewardValidatorTx{
-				TxID: ids.GenerateTestID(),
-			},
-		}
-		require.NoError(tx.Initialize(txs.Codec))
-		blk, err := block.NewApricotProposalBlock(ids.GenerateTestID(), 1000, tx)
-		require.NoError(err)
-		blks = append(blks, blk)
-	}
-
-	{
-		tx := &txs.Tx{
-			Unsigned: &txs.RewardValidatorTx{
-				TxID: ids.GenerateTestID(),
-			},
-		}
-		require.NoError(tx.Initialize(txs.Codec))
-		blk, err := block.NewApricotStandardBlock(ids.GenerateTestID(), 1000, []*txs.Tx{tx})
-		require.NoError(err)
-		blks = append(blks, blk)
-	}
-
-	{
-		blk, err := block.NewBanffAbortBlock(time.Now(), ids.GenerateTestID(), 1000)
-		require.NoError(err)
-		blks = append(blks, blk)
-	}
-
-	{
-		blk, err := block.NewBanffCommitBlock(time.Now(), ids.GenerateTestID(), 1000)
-		require.NoError(err)
-		blks = append(blks, blk)
-	}
-
-	{
-		tx := &txs.Tx{
-			Unsigned: &txs.RewardValidatorTx{
-				TxID: ids.GenerateTestID(),
-			},
-		}
-		require.NoError(tx.Initialize(txs.Codec))
-
-		blk, err := block.NewBanffProposalBlock(time.Now(), ids.GenerateTestID(), 1000, tx, []*txs.Tx{})
-		require.NoError(err)
-		blks = append(blks, blk)
-	}
-
-	{
-		tx := &txs.Tx{
-			Unsigned: &txs.RewardValidatorTx{
-				TxID: ids.GenerateTestID(),
-			},
-		}
-		require.NoError(tx.Initialize(txs.Codec))
-
-		blk, err := block.NewBanffStandardBlock(time.Now(), ids.GenerateTestID(), 1000, []*txs.Tx{tx})
-		require.NoError(err)
-		blks = append(blks, blk)
-	}
-	return blks
 }
 
 // Verify that committing the state writes the fee state to the database and
