@@ -253,6 +253,7 @@ func (p *GeneralProposalState) AddVote(voterAddress ids.ShortID, voteIntf Vote) 
 			Options: make([]SimpleVoteOption[[]byte], len(p.Options)),
 		},
 		TotalAllowedVoters: p.TotalAllowedVoters,
+		AllowEarlyFinish:   p.AllowEarlyFinish,
 	}
 	// we can't use the same slice, cause we need to change its elements
 	copy(updatedProposal.AllowedVoters, p.AllowedVoters[:voterAddrPos])
