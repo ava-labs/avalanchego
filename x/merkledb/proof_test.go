@@ -23,258 +23,196 @@ import (
 )
 
 func Test_Proof_Empty(t *testing.T) {
-	proof := &Proof{}
-	err := proof.Verify(context.Background(), ids.Empty, 4, DefaultHasher)
-	require.ErrorIs(t, err, ErrEmptyProof)
+	tests := []struct {
+		name   string
+		proof  *Proof
+		expect error
+	}{
+		{
+			name:   "empty proof",
+			proof:  &Proof{},
+			expect: ErrEmptyProof,
+		},
+		{
+			name:   "empty path",
+			proof:  &Proof{Path: []ProofNode{}},
+			expect: ErrEmptyProof,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			err := tt.proof.Verify(context.Background(), ids.Empty, 4, DefaultHasher)
+			require.ErrorIs(err, tt.expect)
+		})
+	}
 }
 
-func Test_Proof_Simple(t *testing.T) {
-	require := require.New(t)
+func Test_Proof_Exclusion(t *testing.T) {
+	tests := []struct {
+		name   string
+		modify func(*Proof)
+		expect error
+	}{
+		{
+			name:   "happy path",
+			modify: func(p *Proof) {},
+		},
+		{
+			name: "proof value not empty",
+			modify: func(p *Proof) {
+				p.Value = maybe.Some([]byte{})
+			},
+			expect: ErrExclusionProofUnexpectedValue,
+		},
+	}
 
-	db, err := getBasicDB()
-	require.NoError(err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
 
-	ctx := context.Background()
-	require.NoError(db.PutContext(ctx, []byte{}, []byte{1}))
-	require.NoError(db.PutContext(ctx, []byte{0}, []byte{2}))
+			db, err := getBasicDB()
+			require.NoError(err)
 
-	expectedRoot, err := db.GetMerkleRoot(ctx)
-	require.NoError(err)
+			writeBasicBatch(t, db)
 
-	proof, err := db.GetProof(ctx, []byte{})
-	require.NoError(err)
+			for _, k := range []byte{5, 6, 7, 8} {
+				proof, err := db.GetProof(context.Background(), []byte{k})
+				require.NoError(err)
+				require.NotNil(proof)
 
-	require.NoError(proof.Verify(ctx, expectedRoot, db.tokenSize, db.hasher))
+				tt.modify(proof)
+
+				err = proof.Verify(context.Background(), db.getMerkleRoot(), db.tokenSize, db.hasher)
+				require.ErrorIs(err, tt.expect)
+			}
+		})
+	}
 }
 
-func Test_Proof_Verify(t *testing.T) {
-	t.Run("empty proof", func(t *testing.T) {
-		db, err := getBasicDB()
-		require.NoError(t, err)
+func Test_Proof_Inclusion(t *testing.T) {
+	tests := []struct {
+		name   string
+		modify func(*Proof)
+		expect error
+	}{
+		{
+			name:   "happy path",
+			modify: func(p *Proof) {},
+		},
+		{
+			name: "last proof node with missing value",
+			modify: func(p *Proof) {
+				p.Path[len(p.Path)-1].ValueOrHash = maybe.Nothing[[]byte]()
+			},
+			expect: ErrProofValueDoesntMatch,
+		},
+		{
+			name: "missing value on proof node",
+			modify: func(p *Proof) {
+				p.Value = maybe.Nothing[[]byte]()
+			},
+			expect: ErrProofValueDoesntMatch,
+		},
+		{
+			name: "mismatched value on proof",
+			modify: func(p *Proof) {
+				p.Value = maybe.Some([]byte{5})
+			},
+			expect: ErrProofValueDoesntMatch,
+		},
+	}
 
-		writeBasicBatch(t, db)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
 
-		proof := Proof{
-			Path:  nil,
-			Key:   Key{},
-			Value: maybe.Maybe[[]byte]{},
-		}
+			db, err := getBasicDB()
+			require.NoError(err)
 
-		proof.Path = nil
-		err = proof.Verify(context.Background(), db.getMerkleRoot(), db.tokenSize, db.hasher)
-		require.ErrorIs(t, err, ErrEmptyProof)
+			writeBasicBatch(t, db)
 
-		proof.Path = []ProofNode{}
-		err = proof.Verify(context.Background(), db.getMerkleRoot(), db.tokenSize, db.hasher)
-		require.ErrorIs(t, err, ErrEmptyProof)
-	})
+			for _, k := range []byte{0, 1, 2, 3, 4} {
+				proof, err := db.GetProof(context.Background(), []byte{k})
+				require.NoError(err)
+				require.NotNil(proof)
 
-	t.Run("invalid proof", func(t *testing.T) {
+				tt.modify(proof)
+
+				err = proof.Verify(context.Background(), db.getMerkleRoot(), db.tokenSize, db.hasher)
+				require.ErrorIs(err, tt.expect)
+			}
+		})
+	}
+}
+
+func Test_Proof_Invalid_Proof(t *testing.T) {
+	setup := func(t *testing.T) *merkleDB {
+		require := require.New(t)
+
 		db, err := getBasicDBWithBranchFactor(BranchFactor256)
-		require.NoError(t, err)
+		require.NoError(err)
 
 		batch := db.NewBatch()
-		require.NoError(t, batch.Put([]byte{1}, []byte{0}))
-		require.NoError(t, batch.Put([]byte{1, 2}, []byte{0}))
-		require.NoError(t, batch.Put([]byte{1, 2, 3}, []byte{0}))
-		require.NoError(t, batch.Put([]byte{1, 2, 3, 4}, []byte{0}))
-		require.NoError(t, batch.Write())
+		require.NoError(batch.Put([]byte{1}, []byte{0}))
+		require.NoError(batch.Put([]byte{1, 2}, []byte{0}))
+		require.NoError(batch.Put([]byte{1, 2, 3}, []byte{0}))
+		require.NoError(batch.Put([]byte{1, 2, 3, 4}, []byte{0}))
+		require.NoError(batch.Write())
 
-		t.Run("inclusion", func(t *testing.T) {
-			proof, err := db.GetProof(context.Background(), []byte{1, 2, 3, 4})
-			require.NoError(t, err)
-			require.NotNil(t, proof)
+		return db
+	}
 
-			proof.Path[0].ValueOrHash = maybe.Some([]byte{10})
-
-			err = proof.Verify(context.Background(), db.getMerkleRoot(), db.tokenSize, db.hasher)
-			require.ErrorIs(t, err, ErrInvalidProof)
-		})
-
-		t.Run("exclusion", func(t *testing.T) {
-			proof, err := db.GetProof(context.Background(), []byte{1, 2, 3, 4, 5, 6})
-			require.NoError(t, err)
-			require.NotNil(t, proof)
-
-			proof.Path[0].ValueOrHash = maybe.Some([]byte{10})
-
-			err = proof.Verify(context.Background(), db.getMerkleRoot(), db.tokenSize, db.hasher)
-			require.ErrorIs(t, err, ErrInvalidProof)
-		})
-	})
-
-	t.Run("inclusion proof", func(t *testing.T) {
-		type test struct {
-			name        string
-			malform     func(proof *Proof)
-			expectedErr error
-		}
-
-		tests := []test{
-			{
-				name:        "happy path",
-				malform:     func(*Proof) {},
-				expectedErr: nil,
+	tests := []struct {
+		name   string
+		key    []byte
+		modify func(*Proof)
+		expect error
+	}{
+		{
+			name: "inclusion proof",
+			key:  []byte{1, 2, 3, 4},
+			modify: func(p *Proof) {
+				p.Path[0].ValueOrHash = maybe.Some([]byte{10})
 			},
-			{
-				name: "last proof node has missing value",
-				malform: func(proof *Proof) {
-					proof.Path[len(proof.Path)-1].ValueOrHash = maybe.Nothing[[]byte]()
-				},
-				expectedErr: ErrProofValueDoesntMatch,
-			},
-			{
-				name: "missing value on proof",
-				malform: func(proof *Proof) {
-					proof.Value = maybe.Nothing[[]byte]()
-				},
-				expectedErr: ErrProofValueDoesntMatch,
-			},
-			{
-				name: "mismatched value on proof",
-				malform: func(proof *Proof) {
-					proof.Value = maybe.Some([]byte{10})
-				},
-				expectedErr: ErrProofValueDoesntMatch,
-			},
-		}
-
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				db, err := getBasicDB()
-				require.NoError(t, err)
-
-				writeBasicBatch(t, db)
-
-				for _, i := range []byte{0, 1, 2, 3, 4} {
-					proof, err := db.GetProof(context.Background(), []byte{i})
-					require.NoError(t, err)
-					require.NotNil(t, proof)
-
-					require.Equal(t, ToKey([]byte{i}), proof.Key)
-					require.Equal(t, maybe.Some([]byte{i}), proof.Value)
-					require.NotZero(t, proof.Path)
-
-					tt.malform(proof)
-
-					err = proof.Verify(context.Background(), db.getMerkleRoot(), db.tokenSize, db.hasher)
-					require.ErrorIs(t, err, tt.expectedErr)
-				}
-			})
-		}
-	})
-
-	t.Run("exclusion proof", func(t *testing.T) {
-		type test struct {
-			name        string
-			malform     func(proof *Proof)
-			expectedErr error
-		}
-
-		tests := []test{
-			{
-				name:        "happy path",
-				malform:     func(*Proof) {},
-				expectedErr: nil,
-			},
-			{
-				name: "proof value not empty",
-				malform: func(proof *Proof) {
-					proof.Value = maybe.Some([]byte{})
-				},
-				expectedErr: ErrExclusionProofUnexpectedValue,
-			},
-		}
-
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				db, err := getBasicDB()
-				require.NoError(t, err)
-
-				writeBasicBatch(t, db)
-
-				for _, i := range []byte{5, 6, 7, 8} {
-					proof, err := db.GetProof(context.Background(), []byte{i})
-					require.NoError(t, err)
-					require.NotNil(t, proof)
-
-					require.Equal(t, ToKey([]byte{i}), proof.Key)
-					require.True(t, proof.Value.IsNothing())
-					require.NotZero(t, proof.Path)
-
-					tt.malform(proof)
-
-					err = proof.Verify(context.Background(), db.getMerkleRoot(), db.tokenSize, db.hasher)
-					require.ErrorIs(t, err, tt.expectedErr)
-				}
-			})
-		}
-	})
-}
-
-func Test_Proof(t *testing.T) {
-	require := require.New(t)
-
-	dbTrie, err := getBasicDB()
-	require.NoError(err)
-	require.NotNil(dbTrie)
-	trie, err := dbTrie.NewView(
-		context.Background(),
-		ViewChanges{
-			BatchOps: []database.BatchOp{
-				{
-					Key:   []byte("key"), // 6b 65 79
-					Value: []byte("value"),
-				},
-				{
-					Key:   []byte("key0"), // 6b 65 79 30
-					Value: []byte("value0"),
-				},
-				{
-					Key:   []byte("key1"), // 6b 65 79 31
-					Value: []byte("value1"),
-				},
-				{
-					Key:   []byte("key2"), // 6b 65 79 32
-					Value: []byte("value2"),
-				},
-				{
-					Key:   []byte("key3"), // 6b 65 79 33
-					Value: []byte("value3"),
-				},
-				{
-					Key:   []byte("key4"), // 6b 65 79 34
-					Value: []byte("value4"),
-				},
-			},
+			expect: ErrInvalidProof,
 		},
-	)
-	require.NoError(err)
+		{
+			name: "exclusion proof",
+			key:  []byte{1, 2, 3, 4, 5, 6},
+			modify: func(p *Proof) {
+				p.Path[0].ValueOrHash = maybe.Some([]byte{10})
+			},
+			expect: ErrInvalidProof,
+		},
+		{
+			name: "wrong prefix",
+			key:  []byte{1, 2, 3, 4, 5, 6},
+			modify: func(p *Proof) {
+				p.Path[0].Key = ToKey([]byte{7})
+			},
+			expect: ErrProofNodeNotForKey,
+		},
+	}
 
-	expectedRootID, err := trie.GetMerkleRoot(context.Background())
-	require.NoError(err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
 
-	proof, err := trie.GetProof(context.Background(), []byte("key1"))
-	require.NoError(err)
-	require.NotNil(proof)
+			db := setup(t)
 
-	require.Len(proof.Path, 3)
+			proof, err := db.GetProof(context.Background(), tt.key)
+			require.NoError(err)
+			require.NotNil(proof)
 
-	require.Equal(ToKey([]byte("key")), proof.Path[0].Key)
-	require.Equal(maybe.Some([]byte("value")), proof.Path[0].ValueOrHash)
+			tt.modify(proof)
 
-	k := ToKey(append([]byte("key"), byte(0x30))).Take(28) // 6b 65 79 3
-	require.Equal(k, proof.Path[1].Key)
-	require.True(proof.Path[1].ValueOrHash.IsNothing()) // intermediate node
-
-	require.Equal(ToKey([]byte("key1")), proof.Path[2].Key)
-	require.Equal(maybe.Some([]byte("value1")), proof.Path[2].ValueOrHash)
-
-	require.NoError(proof.Verify(context.Background(), expectedRootID, dbTrie.tokenSize, dbTrie.hasher))
-
-	proof.Path[0].Key = ToKey([]byte("key1"))
-	err = proof.Verify(context.Background(), expectedRootID, dbTrie.tokenSize, dbTrie.hasher)
-	require.ErrorIs(err, ErrProofNodeNotForKey)
+			err = proof.Verify(context.Background(), db.getMerkleRoot(), db.tokenSize, db.hasher)
+			require.ErrorIs(err, tt.expect)
+		})
+	}
 }
 
 func Test_Proof_ValueOrHashMatches(t *testing.T) {
@@ -413,6 +351,77 @@ func Test_RangeProof_MaxLength(t *testing.T) {
 
 	_, err = trie.GetRangeProof(context.Background(), maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 0)
 	require.ErrorIs(err, ErrInvalidMaxLength)
+}
+
+func Test_Proof_Path(t *testing.T) {
+	require := require.New(t)
+
+	dbTrie, err := getBasicDB()
+	require.NoError(err)
+	require.NotNil(dbTrie)
+
+	var (
+		key  = []byte{0x6B, 0x65, 0x79}
+		key0 = []byte{0x6B, 0x65, 0x79, 0x30}
+		key1 = []byte{0x6B, 0x65, 0x79, 0x31}
+		key2 = []byte{0x6B, 0x65, 0x79, 0x32}
+		key3 = []byte{0x6B, 0x65, 0x79, 0x33}
+		key4 = []byte{0x6B, 0x65, 0x79, 0x34}
+	)
+
+	trie, err := dbTrie.NewView(
+		context.Background(),
+		ViewChanges{
+			BatchOps: []database.BatchOp{
+				{
+					Key:   key,
+					Value: []byte("value"),
+				},
+				{
+					Key:   key0,
+					Value: []byte("value0"),
+				},
+				{
+					Key:   key1,
+					Value: []byte("value1"),
+				},
+				{
+					Key:   key2,
+					Value: []byte("value2"),
+				},
+				{
+					Key:   key3,
+					Value: []byte("value3"),
+				},
+				{
+					Key:   key4,
+					Value: []byte("value4"),
+				},
+			},
+		},
+	)
+	require.NoError(err)
+
+	expectedRootID, err := trie.GetMerkleRoot(context.Background())
+	require.NoError(err)
+
+	proof, err := trie.GetProof(context.Background(), key1)
+	require.NoError(err)
+	require.NotNil(proof)
+
+	require.NoError(proof.Verify(context.Background(), expectedRootID, dbTrie.tokenSize, dbTrie.hasher))
+
+	require.Len(proof.Path, 3)
+
+	require.Equal(ToKey(key), proof.Path[0].Key)
+	require.Equal(maybe.Some([]byte("value")), proof.Path[0].ValueOrHash)
+
+	k := ToKey([]byte{0x6B, 0x65, 0x79, 0x30}).Take(28)
+	require.Equal(k, proof.Path[1].Key)
+	require.True(proof.Path[1].ValueOrHash.IsNothing()) // intermediate node
+
+	require.Equal(ToKey(key1), proof.Path[2].Key)
+	require.Equal(maybe.Some([]byte("value1")), proof.Path[2].ValueOrHash)
 }
 
 func Test_RangeProof_Syntactic_Verify(t *testing.T) {
@@ -1477,8 +1486,10 @@ func TestVerifyProofPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
 			err := verifyProofPath(tt.path, tt.proofKey, tokenSize)
-			require.ErrorIs(t, err, tt.expectedErr)
+			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
 }
