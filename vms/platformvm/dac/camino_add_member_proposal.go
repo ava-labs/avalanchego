@@ -133,7 +133,7 @@ func (p *AddMemberProposalState) Result() (bool, uint32, bool) {
 }
 
 // Will return modified proposal with added vote, original proposal will not be modified!
-func (p *AddMemberProposalState) AddVote(voterAddress ids.ShortID, voteIntf Vote) (ProposalState, error) {
+func (p *AddMemberProposalState) AddVote(voterAddress ids.ShortID, voteIntf Vote, isCairoPhase bool) (ProposalState, error) {
 	vote, ok := voteIntf.(*SimpleVote)
 	if !ok {
 		return nil, ErrWrongVote

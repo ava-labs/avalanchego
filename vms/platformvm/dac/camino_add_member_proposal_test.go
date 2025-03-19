@@ -368,7 +368,7 @@ func TestAddMemberProposalStateAddVote(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			updatedProposal, err := tt.proposal.AddVote(tt.voterAddr, tt.vote)
+			updatedProposal, err := tt.proposal.AddVote(tt.voterAddr, tt.vote, true)
 			require.ErrorIs(t, err, tt.expectedErr)
 			require.Equal(t, tt.expectedUpdatedProposal, updatedProposal)
 			require.Equal(t, tt.expectedOriginalProposal, tt.proposal)

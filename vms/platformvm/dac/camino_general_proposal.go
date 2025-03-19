@@ -229,7 +229,7 @@ func (p *GeneralProposalState) Result() (types.JSONByteSlice, uint32, bool) {
 }
 
 // Will return modified proposal with added vote, original proposal will not be modified!
-func (p *GeneralProposalState) AddVote(voterAddress ids.ShortID, voteIntf Vote) (ProposalState, error) {
+func (p *GeneralProposalState) AddVote(voterAddress ids.ShortID, voteIntf Vote, isCairoPhase bool) (ProposalState, error) {
 	vote, ok := voteIntf.(*SimpleVote)
 	if !ok {
 		return nil, ErrWrongVote
@@ -245,16 +245,32 @@ func (p *GeneralProposalState) AddVote(voterAddress ids.ShortID, voteIntf Vote) 
 		return nil, ErrNotAllowedToVoteOnProposal
 	}
 
-	updatedProposal := &GeneralProposalState{
-		Start:         p.Start,
-		End:           p.End,
-		AllowedVoters: make([]ids.ShortID, len(p.AllowedVoters)-1),
-		SimpleVoteOptions: SimpleVoteOptions[[]byte]{
-			Options: make([]SimpleVoteOption[[]byte], len(p.Options)),
-		},
-		TotalAllowedVoters: p.TotalAllowedVoters,
-		AllowEarlyFinish:   p.AllowEarlyFinish,
+	var updatedProposal *GeneralProposalState
+	if isCairoPhase {
+		updatedProposal = &GeneralProposalState{
+			Start:         p.Start,
+			End:           p.End,
+			AllowedVoters: make([]ids.ShortID, len(p.AllowedVoters)-1),
+			SimpleVoteOptions: SimpleVoteOptions[[]byte]{
+				Options: make([]SimpleVoteOption[[]byte], len(p.Options)),
+			},
+			TotalAllowedVoters:          p.TotalAllowedVoters,
+			AllowEarlyFinish:            p.AllowEarlyFinish,
+			TotalVotedThreshold:         p.TotalVotedThreshold,
+			MostVotedThresholdNominator: p.MostVotedThresholdNominator,
+		}
+	} else {
+		updatedProposal = &GeneralProposalState{
+			Start:         p.Start,
+			End:           p.End,
+			AllowedVoters: make([]ids.ShortID, len(p.AllowedVoters)-1),
+			SimpleVoteOptions: SimpleVoteOptions[[]byte]{
+				Options: make([]SimpleVoteOption[[]byte], len(p.Options)),
+			},
+			TotalAllowedVoters: p.TotalAllowedVoters,
+		}
 	}
+
 	// we can't use the same slice, cause we need to change its elements
 	copy(updatedProposal.AllowedVoters, p.AllowedVoters[:voterAddrPos])
 	updatedProposal.AllowedVoters = append(updatedProposal.AllowedVoters[:voterAddrPos], p.AllowedVoters[voterAddrPos+1:]...)
@@ -281,7 +297,10 @@ func (p *GeneralProposalState) ForceAddVote(voteIntf Vote) (ProposalState, error
 		SimpleVoteOptions: SimpleVoteOptions[[]byte]{
 			Options: make([]SimpleVoteOption[[]byte], len(p.Options)),
 		},
-		TotalAllowedVoters: p.TotalAllowedVoters,
+		TotalAllowedVoters:          p.TotalAllowedVoters,
+		AllowEarlyFinish:            p.AllowEarlyFinish,
+		TotalVotedThreshold:         p.TotalVotedThreshold,
+		MostVotedThresholdNominator: p.MostVotedThresholdNominator,
 	}
 	// we can't use the same slice, cause we need to change its element
 	copy(updatedProposal.Options, p.Options)

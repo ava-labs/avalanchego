@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/dac"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
@@ -56,7 +57,7 @@ func TestNewAddressStateTx(t *testing.T) {
 	}}
 
 	tests := map[string]struct {
-		state       func(*gomock.Controller) state.State
+		state       func(*gomock.Controller, *config.Config) state.State
 		targetAddr  ids.ShortID
 		remove      bool
 		stateBit    as.AddressStateBit
@@ -68,10 +69,10 @@ func TestNewAddressStateTx(t *testing.T) {
 		expectedErr error
 	}{
 		"Empty address": {
-			state: func(ctrl *gomock.Controller) state.State {
+			state: func(ctrl *gomock.Controller, cfg *config.Config) state.State {
 				s := state.NewMockState(ctrl)
 				expect.Lock(t, s, map[ids.ShortID][]*avax.UTXO{fundsAddr: {feeUTXO}})
-				s.EXPECT().GetTimestamp().Return(test.LatestPhaseTime)
+				s.EXPECT().GetTimestamp().Return(test.PhaseTime(t, test.PhaseLast, cfg))
 				return s
 			},
 			stateBit:    as.AddressStateBitKYCVerified,
@@ -80,10 +81,10 @@ func TestNewAddressStateTx(t *testing.T) {
 			expectedErr: errEmptyAddress,
 		},
 		"OK": {
-			state: func(ctrl *gomock.Controller) state.State {
+			state: func(ctrl *gomock.Controller, cfg *config.Config) state.State {
 				s := state.NewMockState(ctrl)
 				expect.Lock(t, s, map[ids.ShortID][]*avax.UTXO{fundsAddr: {feeUTXO}})
-				s.EXPECT().GetTimestamp().Return(test.LatestPhaseTime)
+				s.EXPECT().GetTimestamp().Return(test.PhaseTime(t, test.PhaseLast, cfg))
 				return s
 			},
 			targetAddr: otherAddr,
@@ -97,10 +98,10 @@ func TestNewAddressStateTx(t *testing.T) {
 			signers: [][]*secp256k1.PrivateKey{{fundsKey}},
 		},
 		"OK: remove": {
-			state: func(ctrl *gomock.Controller) state.State {
+			state: func(ctrl *gomock.Controller, cfg *config.Config) state.State {
 				s := state.NewMockState(ctrl)
 				expect.Lock(t, s, map[ids.ShortID][]*avax.UTXO{fundsAddr: {feeUTXO}})
-				s.EXPECT().GetTimestamp().Return(test.LatestPhaseTime)
+				s.EXPECT().GetTimestamp().Return(test.PhaseTime(t, test.PhaseLast, cfg))
 				return s
 			},
 			targetAddr: otherAddr,
@@ -121,7 +122,8 @@ func TestNewAddressStateTx(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
 			// only tests pre-berlin upgrade version 0
-			b := newCaminoBuilder(t, tt.state(ctrl), nil, test.PhaseAthens)
+
+			b := newCaminoBuilder(t, tt.state(ctrl, test.Config(t, test.PhaseLast)), nil, test.PhaseAthens)
 
 			tx, err := b.NewAddressStateTx(
 				tt.targetAddr,

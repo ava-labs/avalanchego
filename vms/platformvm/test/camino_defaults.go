@@ -53,7 +53,7 @@ var (
 	CChainID                = ids.ID{'C', '-', 'C', 'H', 'A', 'I', 'N'}
 	NetworkID               = constants.UnitTestID
 	GenesisTime             = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
-	LatestPhaseTime         = GenesisTime.Add(time.Second * 10000)
+	PhaseOffsetDuration     = time.Second * 10000
 	ValidatorStartTime      = GenesisTime
 	ValidatorEndTime        = GenesisTime.Add(10 * MinStakingDuration)
 	GenesisTimestamp        = uint64(GenesisTime.Unix())
@@ -83,28 +83,48 @@ func Config(t *testing.T, phase Phase) *config.Config {
 		dTime             = mockable.MaxTime
 	)
 
+	activePhases := []Phase{}
+
 	switch phase {
 	case PhaseD:
-		dTime = LatestPhaseTime
+		activePhases = append(activePhases, PhaseD)
 		fallthrough
 	case PhaseCairo:
-		cairoTime = LatestPhaseTime
+		activePhases = append(activePhases, PhaseCairo)
 		fallthrough
 	case PhaseBerlin:
-		berlinTime = LatestPhaseTime
-		cortinaTime = LatestPhaseTime
+		activePhases = append(activePhases, PhaseBerlin)
+		activePhases = append(activePhases, PhaseCortina)
 		fallthrough
 	case PhaseAthens:
-		athensTime = LatestPhaseTime
+		activePhases = append(activePhases, PhaseAthens)
 		fallthrough
 	case PhaseSunrise:
-		banffTime = LatestPhaseTime
+		activePhases = append(activePhases, PhaseSunrise, PhaseBanff)
 		fallthrough
 	case PhaseApricot5:
-		apricotPhase5Time = LatestPhaseTime
-		apricotPhase3Time = LatestPhaseTime
+		activePhases = append(activePhases, PhaseApricot5)
 	default:
 		require.FailNowf(t, "", "unknown phase %d (%s)", phase)
+	}
+
+	for i := len(activePhases) - 1; i >= 0; i-- {
+		switch activePhases[i] {
+		case PhaseApricot5:
+			apricotPhase3Time = GenesisTime.Add(PhaseOffsetDuration)
+			apricotPhase5Time = apricotPhase3Time
+		case PhaseSunrise:
+			banffTime = apricotPhase5Time.Add(PhaseOffsetDuration)
+		case PhaseAthens:
+			athensTime = banffTime.Add(PhaseOffsetDuration)
+		case PhaseBerlin:
+			berlinTime = athensTime.Add(PhaseOffsetDuration)
+			cortinaTime = berlinTime
+		case PhaseCairo:
+			cairoTime = berlinTime.Add(PhaseOffsetDuration)
+		case PhaseD:
+			dTime = cairoTime.Add(PhaseOffsetDuration)
+		}
 	}
 
 	vdrs := validators.NewManager()

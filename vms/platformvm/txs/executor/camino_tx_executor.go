@@ -2221,7 +2221,7 @@ func (e *CaminoStandardTxExecutor) AddVoteTx(tx *txs.AddVoteTx) error {
 		return err
 	}
 
-	updatedProposal, err := proposal.AddVote(tx.VoterAddress, vote)
+	updatedProposal, err := proposal.AddVote(tx.VoterAddress, vote, e.Config.IsCairoPhaseActivated(chainTime))
 	if err != nil {
 		return err
 	}

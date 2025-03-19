@@ -266,6 +266,7 @@ func TestGeneralProposalStateAddVote(t *testing.T) {
 		proposal                 *GeneralProposalState
 		voterAddr                ids.ShortID
 		vote                     Vote
+		isCairoPhase             bool
 		expectedUpdatedProposal  ProposalState
 		expectedOriginalProposal *GeneralProposalState
 		expectedErr              error
@@ -286,6 +287,9 @@ func TestGeneralProposalStateAddVote(t *testing.T) {
 					mostVotedOptionIndex: 0,
 					unambiguous:          true,
 				},
+				TotalVotedThreshold:         1,
+				MostVotedThresholdNominator: 2,
+				AllowEarlyFinish:            true,
 			},
 			voterAddr: voterAddr1,
 			vote:      &DummyVote{}, // not *SimpleVote
@@ -304,6 +308,9 @@ func TestGeneralProposalStateAddVote(t *testing.T) {
 					mostVotedOptionIndex: 0,
 					unambiguous:          true,
 				},
+				TotalVotedThreshold:         1,
+				MostVotedThresholdNominator: 2,
+				AllowEarlyFinish:            true,
 			},
 			expectedErr: ErrWrongVote,
 		},
@@ -323,6 +330,9 @@ func TestGeneralProposalStateAddVote(t *testing.T) {
 					mostVotedOptionIndex: 0,
 					unambiguous:          true,
 				},
+				TotalVotedThreshold:         1,
+				MostVotedThresholdNominator: 2,
+				AllowEarlyFinish:            true,
 			},
 			voterAddr: ids.ShortID{3},
 			vote:      &SimpleVote{OptionIndex: 3},
@@ -341,6 +351,9 @@ func TestGeneralProposalStateAddVote(t *testing.T) {
 					mostVotedOptionIndex: 0,
 					unambiguous:          true,
 				},
+				TotalVotedThreshold:         1,
+				MostVotedThresholdNominator: 2,
+				AllowEarlyFinish:            true,
 			},
 			expectedErr: ErrWrongVote,
 		},
@@ -350,6 +363,9 @@ func TestGeneralProposalStateAddVote(t *testing.T) {
 				SimpleVoteOptions: SimpleVoteOptions[[]byte]{
 					Options: []SimpleVoteOption[[]byte]{{Value: []byte{1}}},
 				},
+				TotalVotedThreshold:         1,
+				MostVotedThresholdNominator: 2,
+				AllowEarlyFinish:            true,
 			},
 			voterAddr: ids.ShortID{3},
 			vote:      &SimpleVote{OptionIndex: 0},
@@ -358,6 +374,9 @@ func TestGeneralProposalStateAddVote(t *testing.T) {
 				SimpleVoteOptions: SimpleVoteOptions[[]byte]{
 					Options: []SimpleVoteOption[[]byte]{{Value: []byte{1}}},
 				},
+				TotalVotedThreshold:         1,
+				MostVotedThresholdNominator: 2,
+				AllowEarlyFinish:            true,
 			},
 			expectedErr: ErrNotAllowedToVoteOnProposal,
 		},
@@ -377,6 +396,9 @@ func TestGeneralProposalStateAddVote(t *testing.T) {
 					mostVotedOptionIndex: 0,
 					unambiguous:          true,
 				},
+				TotalVotedThreshold:         1,
+				MostVotedThresholdNominator: 2,
+				AllowEarlyFinish:            true,
 			},
 			voterAddr: voterAddr1,
 			vote:      &SimpleVote{OptionIndex: 1},
@@ -392,6 +414,9 @@ func TestGeneralProposalStateAddVote(t *testing.T) {
 						{Value: []byte{3}, Weight: 1}, // 2
 					},
 				},
+				TotalVotedThreshold:         1,
+				MostVotedThresholdNominator: 2,
+				AllowEarlyFinish:            true,
 			},
 			expectedOriginalProposal: &GeneralProposalState{
 				Start:              100,
@@ -408,6 +433,9 @@ func TestGeneralProposalStateAddVote(t *testing.T) {
 					mostVotedOptionIndex: 0,
 					unambiguous:          true,
 				},
+				TotalVotedThreshold:         1,
+				MostVotedThresholdNominator: 2,
+				AllowEarlyFinish:            true,
 			},
 		},
 		"OK: adding vote to already voted option": {
@@ -426,6 +454,9 @@ func TestGeneralProposalStateAddVote(t *testing.T) {
 					mostVotedOptionIndex: 0,
 					unambiguous:          true,
 				},
+				TotalVotedThreshold:         1,
+				MostVotedThresholdNominator: 2,
+				AllowEarlyFinish:            true,
 			},
 			voterAddr: voterAddr1,
 			vote:      &SimpleVote{OptionIndex: 2},
@@ -441,6 +472,9 @@ func TestGeneralProposalStateAddVote(t *testing.T) {
 						{Value: []byte{3}, Weight: 2}, // 2
 					},
 				},
+				TotalVotedThreshold:         1,
+				MostVotedThresholdNominator: 2,
+				AllowEarlyFinish:            true,
 			},
 			expectedOriginalProposal: &GeneralProposalState{
 				Start:              100,
@@ -457,6 +491,9 @@ func TestGeneralProposalStateAddVote(t *testing.T) {
 					mostVotedOptionIndex: 0,
 					unambiguous:          true,
 				},
+				TotalVotedThreshold:         1,
+				MostVotedThresholdNominator: 2,
+				AllowEarlyFinish:            true,
 			},
 		},
 		"OK: voter addr in the middle of allowedVoters array": {
@@ -468,6 +505,9 @@ func TestGeneralProposalStateAddVote(t *testing.T) {
 				SimpleVoteOptions: SimpleVoteOptions[[]byte]{
 					Options: []SimpleVoteOption[[]byte]{{Value: []byte{1}}},
 				},
+				TotalVotedThreshold:         1,
+				MostVotedThresholdNominator: 2,
+				AllowEarlyFinish:            true,
 			},
 			voterAddr: voterAddr2,
 			vote:      &SimpleVote{OptionIndex: 0},
@@ -479,6 +519,9 @@ func TestGeneralProposalStateAddVote(t *testing.T) {
 				SimpleVoteOptions: SimpleVoteOptions[[]byte]{
 					Options: []SimpleVoteOption[[]byte]{{Value: []byte{1}, Weight: 1}},
 				},
+				TotalVotedThreshold:         1,
+				MostVotedThresholdNominator: 2,
+				AllowEarlyFinish:            true,
 			},
 			expectedOriginalProposal: &GeneralProposalState{
 				Start:              100,
@@ -488,12 +531,15 @@ func TestGeneralProposalStateAddVote(t *testing.T) {
 				SimpleVoteOptions: SimpleVoteOptions[[]byte]{
 					Options: []SimpleVoteOption[[]byte]{{Value: []byte{1}}},
 				},
+				TotalVotedThreshold:         1,
+				MostVotedThresholdNominator: 2,
+				AllowEarlyFinish:            true,
 			},
 		},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			updatedProposal, err := tt.proposal.AddVote(tt.voterAddr, tt.vote)
+			updatedProposal, err := tt.proposal.AddVote(tt.voterAddr, tt.vote, tt.isCairoPhase)
 			require.ErrorIs(t, err, tt.expectedErr)
 			require.Equal(t, tt.expectedUpdatedProposal, updatedProposal)
 			require.Equal(t, tt.expectedOriginalProposal, tt.proposal)

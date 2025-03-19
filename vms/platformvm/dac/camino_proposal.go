@@ -87,7 +87,7 @@ type ProposalState interface {
 	// Visits getter and returns additional lock tx ids, that should be unbonded when this proposal is successfully finished.
 	GetBondTxIDsWith(BondTxIDsGetter) ([]ids.ID, error)
 	// Will return modified ProposalState with added vote, original ProposalState will not be modified!
-	AddVote(voterAddress ids.ShortID, vote Vote) (ProposalState, error)
+	AddVote(voterAddress ids.ShortID, vote Vote, isCairoPhase bool) (ProposalState, error)
 
 	// Returns modified proposal with added vote ignoring allowed voters, original proposal will not be modified!
 	// (used in magellan)

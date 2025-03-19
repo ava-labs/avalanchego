@@ -166,7 +166,7 @@ func (p *FeeDistributionProposalState) Result() ([FeeDistributionFractionsCount]
 }
 
 // Will return modified proposal with added vote, original proposal will not be modified!
-func (p *FeeDistributionProposalState) AddVote(voterAddress ids.ShortID, voteIntf Vote) (ProposalState, error) {
+func (p *FeeDistributionProposalState) AddVote(voterAddress ids.ShortID, voteIntf Vote, isCairoPhase bool) (ProposalState, error) {
 	vote, ok := voteIntf.(*SimpleVote)
 	if !ok {
 		return nil, ErrWrongVote

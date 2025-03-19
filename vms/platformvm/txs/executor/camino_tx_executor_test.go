@@ -7277,26 +7277,47 @@ func TestCaminoStandardTxExecutorAddVoteTx(t *testing.T) {
 	}}
 
 	proposalID := ids.ID{1, 1, 1, 1}
-	proposal := &dac.BaseFeeProposalState{
-		AllowedVoters: []ids.ShortID{voterAddr1, voterAddr3},
-		Start:         100, End: 102,
-		TotalAllowedVoters: 3,
-		SimpleVoteOptions: dac.SimpleVoteOptions[uint64]{Options: []dac.SimpleVoteOption[uint64]{
-			{Value: 555},
-			{Value: 123, Weight: 1},
-			{Value: 7},
-		}},
+	allowedVoters := []ids.ShortID{voterAddr1, voterAddr3}
+	utils.Sort(allowedVoters)
+
+	baseFeeProposal := func(startTime time.Time) *dac.BaseFeeProposalState {
+		return &dac.BaseFeeProposalState{
+			AllowedVoters: allowedVoters,
+			Start:         uint64(startTime.Unix()), End: uint64(startTime.Unix()) + 2,
+			TotalAllowedVoters: 3,
+			SimpleVoteOptions: dac.SimpleVoteOptions[uint64]{Options: []dac.SimpleVoteOption[uint64]{
+				{Value: 555},
+				{Value: 123, Weight: 1},
+				{Value: 7},
+			}},
+		}
 	}
-	utils.Sort(proposal.AllowedVoters)
+
+	generalProposal := func(startTime time.Time) *dac.GeneralProposalState {
+		return &dac.GeneralProposalState{
+			AllowedVoters: allowedVoters,
+			Start:         uint64(startTime.Unix()), End: uint64(startTime.Unix()) + 2,
+			TotalAllowedVoters: 3,
+			SimpleVoteOptions: dac.SimpleVoteOptions[[]byte]{Options: []dac.SimpleVoteOption[[]byte]{
+				{Value: []byte("1")},
+				{Value: []byte("2"), Weight: 1},
+				{Value: []byte("3")},
+			}},
+			TotalVotedThreshold:         1,
+			MostVotedThresholdNominator: 1,
+			AllowEarlyFinish:            false,
+		}
+	}
 
 	tests := map[string]struct {
-		state       func(*testing.T, *gomock.Controller, *txs.AddVoteTx, *config.Config) *state.MockDiff
+		state       func(*testing.T, *gomock.Controller, *txs.AddVoteTx, *config.Config, test.Phase) *state.MockDiff
 		utx         func(*config.Config) *txs.AddVoteTx
 		signers     [][]*secp256k1.PrivateKey
+		phase       test.Phase
 		expectedErr error
 	}{
 		"Wrong lockModeBondDeposit flag": {
-			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddVoteTx, cfg *config.Config) *state.MockDiff {
+			state: func(_ *testing.T, c *gomock.Controller, _ *txs.AddVoteTx, _ *config.Config, _ test.Phase) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: false}, nil)
 				return s
@@ -7313,13 +7334,14 @@ func TestCaminoStandardTxExecutorAddVoteTx(t *testing.T) {
 			signers: [][]*secp256k1.PrivateKey{
 				{feeOwnerKey}, {voterKey1},
 			},
+			phase:       test.PhaseLast,
 			expectedErr: errWrongLockMode,
 		},
 		"Not BerlinPhase": {
-			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddVoteTx, cfg *config.Config) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, _ *txs.AddVoteTx, cfg *config.Config, phase test.Phase) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
-				s.EXPECT().GetTimestamp().Return(cfg.BerlinPhaseTime.Add(-1 * time.Second))
+				s.EXPECT().GetTimestamp().Return(test.PhaseTime(t, phase, cfg))
 				return s
 			},
 			utx: func(cfg *config.Config) *txs.AddVoteTx {
@@ -7334,13 +7356,15 @@ func TestCaminoStandardTxExecutorAddVoteTx(t *testing.T) {
 			signers: [][]*secp256k1.PrivateKey{
 				{feeOwnerKey}, {voterKey1},
 			},
+			phase:       test.PhaseAthens,
 			expectedErr: errNotBerlinPhase,
 		},
-		"Proposal not exist": { // should be in case of already inactive or non-existing proposal
-			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddVoteTx, cfg *config.Config) *state.MockDiff {
+		// should be in case of already inactive or non-existing proposal
+		"Proposal not exist": {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddVoteTx, cfg *config.Config, phase test.Phase) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
-				s.EXPECT().GetTimestamp().Return(cfg.BerlinPhaseTime)
+				s.EXPECT().GetTimestamp().Return(test.PhaseTime(t, phase, cfg))
 				s.EXPECT().GetProposal(utx.ProposalID).Return(nil, database.ErrNotFound)
 				return s
 			},
@@ -7356,10 +7380,14 @@ func TestCaminoStandardTxExecutorAddVoteTx(t *testing.T) {
 			signers: [][]*secp256k1.PrivateKey{
 				{feeOwnerKey}, {voterKey1},
 			},
+			phase:       test.PhaseLast,
 			expectedErr: database.ErrNotFound,
 		},
-		"Proposal is already inactive": { // shouldn't be possible, inactive proposals are removed
-			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddVoteTx, cfg *config.Config) *state.MockDiff {
+		// shouldn't be possible, inactive proposals are removed
+		"Proposal is already inactive": {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddVoteTx, cfg *config.Config, phase test.Phase) *state.MockDiff {
+				proposal := baseFeeProposal(test.PhaseTime(t, phase, cfg))
+
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
 				s.EXPECT().GetTimestamp().Return(proposal.EndTime().Add(time.Second))
@@ -7378,10 +7406,13 @@ func TestCaminoStandardTxExecutorAddVoteTx(t *testing.T) {
 			signers: [][]*secp256k1.PrivateKey{
 				{feeOwnerKey}, {voterKey1},
 			},
+			phase:       test.PhaseLast,
 			expectedErr: ErrProposalInactive,
 		},
 		"Proposal is not active yet": {
-			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddVoteTx, cfg *config.Config) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddVoteTx, cfg *config.Config, phase test.Phase) *state.MockDiff {
+				proposal := baseFeeProposal(test.PhaseTime(t, phase, cfg))
+
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
 				s.EXPECT().GetTimestamp().Return(proposal.StartTime().Add(-1 * time.Second))
@@ -7400,10 +7431,13 @@ func TestCaminoStandardTxExecutorAddVoteTx(t *testing.T) {
 			signers: [][]*secp256k1.PrivateKey{
 				{feeOwnerKey}, {voterKey1},
 			},
+			phase:       test.PhaseLast,
 			expectedErr: ErrProposalInactive,
 		},
 		"Voter isn't consortium member": {
-			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddVoteTx, cfg *config.Config) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddVoteTx, cfg *config.Config, phase test.Phase) *state.MockDiff {
+				proposal := baseFeeProposal(test.PhaseTime(t, phase, cfg))
+
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
 				s.EXPECT().GetTimestamp().Return(proposal.StartTime())
@@ -7423,10 +7457,13 @@ func TestCaminoStandardTxExecutorAddVoteTx(t *testing.T) {
 			signers: [][]*secp256k1.PrivateKey{
 				{feeOwnerKey}, {voterKey1},
 			},
+			phase:       test.PhaseLast,
 			expectedErr: errNotConsortiumMember,
 		},
 		"Wrong voter credential": {
-			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddVoteTx, cfg *config.Config) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddVoteTx, cfg *config.Config, phase test.Phase) *state.MockDiff {
+				proposal := baseFeeProposal(test.PhaseTime(t, phase, cfg))
+
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
 				s.EXPECT().GetTimestamp().Return(proposal.StartTime())
@@ -7447,10 +7484,13 @@ func TestCaminoStandardTxExecutorAddVoteTx(t *testing.T) {
 			signers: [][]*secp256k1.PrivateKey{
 				{feeOwnerKey}, {feeOwnerKey},
 			},
+			phase:       test.PhaseLast,
 			expectedErr: errVoterCredentialMismatch,
 		},
 		"Wrong vote for this proposal (bad vote type)": {
-			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddVoteTx, cfg *config.Config) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddVoteTx, cfg *config.Config, phase test.Phase) *state.MockDiff {
+				proposal := baseFeeProposal(test.PhaseTime(t, phase, cfg))
+
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
 				s.EXPECT().GetTimestamp().Return(proposal.StartTime())
@@ -7476,10 +7516,13 @@ func TestCaminoStandardTxExecutorAddVoteTx(t *testing.T) {
 			signers: [][]*secp256k1.PrivateKey{
 				{feeOwnerKey}, {voterKey1},
 			},
+			phase:       test.PhaseLast,
 			expectedErr: dac.ErrWrongVote,
 		},
 		"Wrong vote for this proposal (bad option index)": {
-			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddVoteTx, cfg *config.Config) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddVoteTx, cfg *config.Config, phase test.Phase) *state.MockDiff {
+				proposal := baseFeeProposal(test.PhaseTime(t, phase, cfg))
+
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
 				s.EXPECT().GetTimestamp().Return(proposal.StartTime())
@@ -7505,10 +7548,13 @@ func TestCaminoStandardTxExecutorAddVoteTx(t *testing.T) {
 			signers: [][]*secp256k1.PrivateKey{
 				{feeOwnerKey}, {voterKey1},
 			},
+			phase:       test.PhaseLast,
 			expectedErr: dac.ErrWrongVote,
 		},
 		"Already voted": {
-			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddVoteTx, cfg *config.Config) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddVoteTx, cfg *config.Config, phase test.Phase) *state.MockDiff {
+				proposal := baseFeeProposal(test.PhaseTime(t, phase, cfg))
+
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
 				s.EXPECT().GetTimestamp().Return(proposal.StartTime())
@@ -7531,10 +7577,13 @@ func TestCaminoStandardTxExecutorAddVoteTx(t *testing.T) {
 			signers: [][]*secp256k1.PrivateKey{
 				{feeOwnerKey}, {voterKey2},
 			},
+			phase:       test.PhaseLast,
 			expectedErr: dac.ErrNotAllowedToVoteOnProposal,
 		},
 		"Not allowed to vote for this proposal (wasn't active validator at proposal creation)": {
-			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddVoteTx, cfg *config.Config) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddVoteTx, cfg *config.Config, phase test.Phase) *state.MockDiff {
+				proposal := baseFeeProposal(test.PhaseTime(t, phase, cfg))
+
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
 				s.EXPECT().GetTimestamp().Return(proposal.StartTime())
@@ -7557,15 +7606,17 @@ func TestCaminoStandardTxExecutorAddVoteTx(t *testing.T) {
 			signers: [][]*secp256k1.PrivateKey{
 				{feeOwnerKey}, {voterKey4},
 			},
+			phase:       test.PhaseLast,
 			expectedErr: dac.ErrNotAllowedToVoteOnProposal,
 		},
 		"OK": {
-			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddVoteTx, cfg *config.Config) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddVoteTx, cfg *config.Config, phase test.Phase) *state.MockDiff {
+				proposal := baseFeeProposal(test.PhaseTime(t, phase, cfg))
 				voteIntf, err := utx.Vote()
 				require.NoError(t, err)
 				vote, ok := voteIntf.(*dac.SimpleVote)
 				require.True(t, ok)
-				updatedProposal, err := proposal.AddVote(utx.VoterAddress, vote)
+				updatedProposal, err := proposal.AddVote(utx.VoterAddress, vote, true)
 				require.NoError(t, err)
 
 				s := state.NewMockDiff(c)
@@ -7592,14 +7643,16 @@ func TestCaminoStandardTxExecutorAddVoteTx(t *testing.T) {
 			signers: [][]*secp256k1.PrivateKey{
 				{feeOwnerKey}, {voterKey1},
 			},
+			phase: test.PhaseLast,
 		},
 		"OK: threshold is reached, proposal planned for execution": {
-			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddVoteTx, cfg *config.Config) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddVoteTx, cfg *config.Config, phase test.Phase) *state.MockDiff {
+				proposal := baseFeeProposal(test.PhaseTime(t, phase, cfg))
 				voteIntf, err := utx.Vote()
 				require.NoError(t, err)
 				vote, ok := voteIntf.(*dac.SimpleVote)
 				require.True(t, ok)
-				updatedProposal, err := proposal.AddVote(utx.VoterAddress, vote)
+				updatedProposal, err := proposal.AddVote(utx.VoterAddress, vote, true)
 				require.NoError(t, err)
 
 				s := state.NewMockDiff(c)
@@ -7630,13 +7683,84 @@ func TestCaminoStandardTxExecutorAddVoteTx(t *testing.T) {
 			signers: [][]*secp256k1.PrivateKey{
 				{feeOwnerKey}, {voterKey1},
 			},
+			phase: test.PhaseLast,
+		},
+		"OK: general proposal before Cairo": {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddVoteTx, cfg *config.Config, phase test.Phase) *state.MockDiff {
+				proposal := generalProposal(test.PhaseTime(t, phase, cfg))
+				voteIntf, err := utx.Vote()
+				require.NoError(t, err)
+				vote, ok := voteIntf.(*dac.SimpleVote)
+				require.True(t, ok)
+				updatedProposal, err := proposal.AddVote(utx.VoterAddress, vote, false)
+				require.NoError(t, err)
+
+				s := state.NewMockDiff(c)
+				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
+				s.EXPECT().GetTimestamp().Return(proposal.StartTime())
+				s.EXPECT().GetProposal(utx.ProposalID).Return(proposal, nil)
+				s.EXPECT().GetAddressStates(utx.VoterAddress).Return(as.AddressStateConsortium, nil)
+				expect.VerifyMultisigPermission(t, s, []ids.ShortID{utx.VoterAddress}, nil)
+				s.EXPECT().GetBaseFee().Return(test.TxFee, nil)
+				expect.VerifyLock(t, s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
+				s.EXPECT().ModifyProposal(utx.ProposalID, updatedProposal)
+				expect.ConsumeUTXOs(t, s, utx.Ins)
+				return s
+			},
+			utx: func(cfg *config.Config) *txs.AddVoteTx {
+				return &txs.AddVoteTx{
+					BaseTx:       baseTx,
+					ProposalID:   proposalID,
+					VotePayload:  voteBytes,
+					VoterAddress: voterAddr1,
+					VoterAuth:    &secp256k1fx.Input{SigIndices: []uint32{0}},
+				}
+			},
+			signers: [][]*secp256k1.PrivateKey{
+				{feeOwnerKey}, {voterKey1},
+			},
+			phase: test.PhaseBerlin,
+		},
+		"OK: general proposal after Cairo": {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddVoteTx, cfg *config.Config, phase test.Phase) *state.MockDiff {
+				proposal := generalProposal(test.PhaseTime(t, phase, cfg))
+				voteIntf, err := utx.Vote()
+				require.NoError(t, err)
+				vote, ok := voteIntf.(*dac.SimpleVote)
+				require.True(t, ok)
+				updatedProposal, err := proposal.AddVote(utx.VoterAddress, vote, true)
+				require.NoError(t, err)
+
+				s := state.NewMockDiff(c)
+				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
+				s.EXPECT().GetTimestamp().Return(proposal.StartTime())
+				s.EXPECT().GetProposal(utx.ProposalID).Return(proposal, nil)
+				s.EXPECT().GetAddressStates(utx.VoterAddress).Return(as.AddressStateConsortium, nil)
+				expect.VerifyMultisigPermission(t, s, []ids.ShortID{utx.VoterAddress}, nil)
+				s.EXPECT().GetBaseFee().Return(test.TxFee, nil)
+				expect.VerifyLock(t, s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
+				s.EXPECT().ModifyProposal(utx.ProposalID, updatedProposal)
+				expect.ConsumeUTXOs(t, s, utx.Ins)
+				return s
+			},
+			utx: func(cfg *config.Config) *txs.AddVoteTx {
+				return &txs.AddVoteTx{
+					BaseTx:       baseTx,
+					ProposalID:   proposalID,
+					VotePayload:  voteBytes,
+					VoterAddress: voterAddr1,
+					VoterAuth:    &secp256k1fx.Input{SigIndices: []uint32{0}},
+				}
+			},
+			signers: [][]*secp256k1.PrivateKey{
+				{feeOwnerKey}, {voterKey1},
+			},
+			phase: test.PhaseLast,
 		},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			backend := newExecutorBackend(t, caminoGenesisConf, test.PhaseLast, nil)
-
-			backend.Config.BerlinPhaseTime = proposal.StartTime().Add(-1 * time.Second)
+			backend := newExecutorBackend(t, caminoGenesisConf, tt.phase, nil)
 
 			utx := tt.utx(backend.Config)
 			avax.SortTransferableInputsWithSigners(utx.Ins, tt.signers)
@@ -7647,7 +7771,7 @@ func TestCaminoStandardTxExecutorAddVoteTx(t *testing.T) {
 			err = tx.Unsigned.Visit(&CaminoStandardTxExecutor{
 				StandardTxExecutor{
 					Backend: backend,
-					State:   tt.state(t, gomock.NewController(t), utx, backend.Config),
+					State:   tt.state(t, gomock.NewController(t), utx, backend.Config, tt.phase),
 					Tx:      tx,
 				},
 			})
