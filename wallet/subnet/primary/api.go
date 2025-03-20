@@ -179,7 +179,7 @@ func FetchPState(
 }
 
 type EthState struct {
-	Client   ethclient.Client
+	Client   BaseFeeEstimator
 	Accounts map[ethcommon.Address]*c.Account
 }
 
