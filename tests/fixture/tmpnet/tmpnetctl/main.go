@@ -10,13 +10,12 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/tests"
-	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
@@ -82,10 +81,7 @@ func main() {
 				Nodes: tmpnet.NewNodesOrPanic(int(nodeCount)),
 			}
 
-			// Extreme upper bound, should never take this long
-			networkStartTimeout := 2 * time.Minute
-
-			ctx, cancel := context.WithTimeout(context.Background(), networkStartTimeout)
+			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
 			defer cancel()
 			if err := tmpnet.BootstrapNewNetwork(
 				ctx,
@@ -124,7 +120,7 @@ func main() {
 	startNetworkCmd.PersistentFlags().StringVar(
 		&pluginDir,
 		"plugin-dir",
-		e2e.GetEnvWithDefault(tmpnet.AvalancheGoPluginDirEnvName, os.ExpandEnv("$HOME/.avalanchego/plugins")),
+		tmpnet.GetEnvWithDefault(tmpnet.AvalancheGoPluginDirEnvName, os.ExpandEnv("$HOME/.avalanchego/plugins")),
 		"[optional] the dir containing VM plugins",
 	)
 	startNetworkCmd.PersistentFlags().Uint8Var(&nodeCount, "node-count", tmpnet.DefaultNodeCount, "Number of nodes the network should initially consist of")
@@ -167,9 +163,118 @@ func main() {
 	}
 	rootCmd.AddCommand(restartNetworkCmd)
 
+	startCollectorsCmd := &cobra.Command{
+		Use:   "start-collectors",
+		Short: "Start log and metric collectors for local process-based nodes",
+		RunE: func(*cobra.Command, []string) error {
+			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
+			defer cancel()
+			log, err := tests.LoggerForFormat("", rawLogFormat)
+			if err != nil {
+				return err
+			}
+			return tmpnet.StartCollectors(ctx, log)
+		},
+	}
+	rootCmd.AddCommand(startCollectorsCmd)
+
+	stopCollectorsCmd := &cobra.Command{
+		Use:   "stop-collectors",
+		Short: "Stop log and metric collectors for local process-based nodes",
+		RunE: func(*cobra.Command, []string) error {
+			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
+			defer cancel()
+			log, err := tests.LoggerForFormat("", rawLogFormat)
+			if err != nil {
+				return err
+			}
+			return tmpnet.StopCollectors(ctx, log)
+		},
+	}
+	rootCmd.AddCommand(stopCollectorsCmd)
+
+	var networkUUID string
+
+	checkMetricsCmd := &cobra.Command{
+		Use:   "check-metrics",
+		Short: "Checks whether the default prometheus server has the expected metrics",
+		RunE: func(*cobra.Command, []string) error {
+			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
+			defer cancel()
+			log, err := tests.LoggerForFormat("", rawLogFormat)
+			if err != nil {
+				return err
+			}
+			return tmpnet.CheckMetricsExist(ctx, log, networkUUID)
+		},
+	}
+	checkMetricsCmd.PersistentFlags().StringVar(
+		&networkUUID,
+		"network-uuid",
+		"",
+		"[optional] The network UUID to check metrics for. Labels read from GH_* env vars will always be used.",
+	)
+	rootCmd.AddCommand(checkMetricsCmd)
+
+	checkLogsCmd := &cobra.Command{
+		Use:   "check-logs",
+		Short: "Checks whether the default loki server has the expected logs",
+		RunE: func(*cobra.Command, []string) error {
+			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
+			defer cancel()
+			log, err := tests.LoggerForFormat("", rawLogFormat)
+			if err != nil {
+				return err
+			}
+			return tmpnet.CheckLogsExist(ctx, log, networkUUID)
+		},
+	}
+	checkLogsCmd.PersistentFlags().StringVar(
+		&networkUUID,
+		"network-uuid",
+		"",
+		"[optional] The network UUID to check logs for. Labels read from GH_* env vars will always be used.",
+	)
+	rootCmd.AddCommand(checkLogsCmd)
+
+	var (
+		kubeConfigPath    string
+		kubeConfigContext string
+	)
+	startKindClusterCmd := &cobra.Command{
+		Use:   "start-kind-cluster",
+		Short: "Starts a local kind cluster with an integrated registry",
+		RunE: func(*cobra.Command, []string) error {
+			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
+			defer cancel()
+			log, err := tests.LoggerForFormat("", rawLogFormat)
+			if err != nil {
+				return err
+			}
+			return tmpnet.StartKindCluster(ctx, log, kubeConfigPath, kubeConfigContext)
+		},
+	}
+	SetKubeConfigFlags(startKindClusterCmd.PersistentFlags(), &kubeConfigPath, &kubeConfigContext)
+	rootCmd.AddCommand(startKindClusterCmd)
+
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "tmpnetctl failed: %v\n", err)
 		os.Exit(1)
 	}
 	os.Exit(0)
+}
+
+func SetKubeConfigFlags(flagSet *pflag.FlagSet, kubeConfigPath *string, kubeConfigContext *string) {
+	flagSet.StringVar(
+		kubeConfigPath,
+		"kubeconfig",
+		os.Getenv("KUBECONFIG"),
+		"The path to a kubernetes configuration file for the target cluster",
+	)
+	flagSet.StringVar(
+		kubeConfigContext,
+		"kubeconfig-context",
+		"",
+		"The path to a kubernetes configuration file for the target cluster",
+	)
 }

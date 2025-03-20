@@ -114,6 +114,20 @@ func (l *log) Verbo(msg string, fields ...zap.Field) {
 	l.log(Verbo, msg, fields...)
 }
 
+func (l *log) With(fields ...zap.Field) Logger {
+	return &log{
+		internalLogger: l.internalLogger.With(fields...),
+		wrappedCores:   l.wrappedCores,
+	}
+}
+
+func (l *log) WithOptions(opts ...zap.Option) Logger {
+	return &log{
+		internalLogger: l.internalLogger.WithOptions(opts...),
+		wrappedCores:   l.wrappedCores,
+	}
+}
+
 func (l *log) SetLevel(level Level) {
 	for _, core := range l.wrappedCores {
 		core.AtomicLevel.SetLevel(zapcore.Level(level))

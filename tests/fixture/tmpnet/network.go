@@ -121,6 +121,7 @@ type Network struct {
 
 func NewDefaultNetwork(owner string) *Network {
 	return &Network{
+		UUID:  uuid.NewString(),
 		Owner: owner,
 		Nodes: NewNodesOrPanic(DefaultNodeCount),
 	}

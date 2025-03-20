@@ -1,5 +1,14 @@
 # Release Notes
 
+## [v1.12.3] (pending)
+
+- Extended the network health check by also alerting if a primary network validator has no nodes connected to it. Runs a configurable time after startup or 10 minutes by default.
+
+### Configs
+-  How long after startup the aforementioned health check runs can be configured via:
+`--network-no-ingress-connections-grace-period`
+
+
 ## [v1.12.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.2)
 
 This version is backwards compatible to [v1.12.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0). It is optional, but encouraged.
