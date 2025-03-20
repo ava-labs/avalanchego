@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ava-labs/coreth/ethclient"
 	"github.com/ava-labs/coreth/plugin/evm/client"
 
 	"github.com/ava-labs/avalanchego/api/info"
@@ -193,7 +192,7 @@ func FetchEthState(
 		uri,
 		constants.ChainAliasPrefix,
 	)
-	client, err := ethclient.Dial(path)
+	client, err := newEthClient(ctx, path)
 	if err != nil {
 		return nil, err
 	}
