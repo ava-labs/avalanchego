@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/stretchr/testify/require"
 )
 
 var testKey, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
@@ -77,11 +78,11 @@ func TestWaitDeployed(t *testing.T) {
 		gasPrice := new(big.Int).Add(head.BaseFee, big.NewInt(params.GWei))
 
 		tx := types.NewContractCreation(0, big.NewInt(0), test.gas, gasPrice, common.FromHex(test.code))
-		tx, _ = types.SignTx(tx, types.LatestSignerForChainID(big.NewInt(1337)), testKey)
+		tx, err := types.SignTx(tx, types.LatestSignerForChainID(big.NewInt(1337)), testKey)
+		require.NoError(t, err, "types.SignTx")
 
 		// Wait for it to get mined in the background.
 		var (
-			err     error
 			address common.Address
 			mined   = make(chan struct{})
 			ctx     = context.Background()
@@ -125,7 +126,8 @@ func TestWaitDeployedCornerCases(t *testing.T) {
 	// Create a transaction to an account.
 	code := "6060604052600a8060106000396000f360606040526008565b00"
 	tx := types.NewTransaction(0, common.HexToAddress("0x01"), big.NewInt(0), 3000000, gasPrice, common.FromHex(code))
-	tx, _ = types.SignTx(tx, types.LatestSignerForChainID(big.NewInt(1337)), testKey)
+	tx, err := types.SignTx(tx, types.LatestSignerForChainID(big.NewInt(1337)), testKey)
+	require.NoError(t, err, "types.SignTx")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	if err := backend.Client().SendTransaction(ctx, tx); err != nil {
@@ -139,7 +141,8 @@ func TestWaitDeployedCornerCases(t *testing.T) {
 
 	// Create a transaction that is not mined.
 	tx = types.NewContractCreation(1, big.NewInt(0), 3000000, gasPrice, common.FromHex(code))
-	tx, _ = types.SignTx(tx, types.LatestSignerForChainID(big.NewInt(1337)), testKey)
+	tx, err = types.SignTx(tx, types.LatestSignerForChainID(big.NewInt(1337)), testKey)
+	require.NoError(t, err, "types.SignTx")
 
 	go func() {
 		contextCanceled := errors.New("context canceled")
