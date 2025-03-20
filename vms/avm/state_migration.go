@@ -171,7 +171,7 @@ func (g *GForkStateMigration) Migrate(
 			continue
 		}
 
-		g.log.Debug("commited migration progress", zap.Stringer("utxoID", utxoID))
+		g.log.Verbo("commited migration progress", zap.Stringer("utxoID", utxoID))
 	}
 
 	g.log.Debug("migrating txs")
@@ -211,7 +211,7 @@ func (g *GForkStateMigration) Migrate(
 			continue
 		}
 
-		g.log.Debug("commited migration progress", zap.Stringer("txID", txID))
+		g.log.Verbo("commited migration progress", zap.Stringer("txID", txID))
 	}
 
 	g.log.Debug("migrating blocks")
@@ -252,7 +252,7 @@ func (g *GForkStateMigration) Migrate(
 			continue
 		}
 
-		g.log.Debug("commited migration progress", zap.Stringer("blkID", blkID))
+		g.log.Verbo("commited migration progress", zap.Stringer("blkID", blkID))
 	}
 
 	g.log.Debug("migrating height index")
@@ -293,7 +293,7 @@ func (g *GForkStateMigration) Migrate(
 			continue
 		}
 
-		g.log.Debug("commited migration progress", zap.Uint64("height", height))
+		g.log.Verbo("commited migration progress", zap.Uint64("height", height))
 	}
 
 	g.log.Debug("migrating singletons")
@@ -318,7 +318,7 @@ func (g *GForkStateMigration) Migrate(
 		return nil, fmt.Errorf("failed to commit state: %w", err)
 	}
 
-	g.log.Debug("migration complete")
+	g.log.Info("migration complete")
 	return next, nil
 }
 
