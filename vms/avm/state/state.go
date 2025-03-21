@@ -333,14 +333,17 @@ func (s *state) InitializeChainState(stopVertexID ids.ID, genesisTimestamp time.
 	}
 	s.lastAccepted = lastAccepted
 	s.persistedLastAccepted = lastAccepted
-	if s.timestamp, err = database.GetTimestamp(
+
+	timestamp, err := database.GetTimestamp(
 		s.singletonDB,
 		timestampKey,
-	); err != nil {
+	)
+	if err != nil {
 		return fmt.Errorf("failed to get last accepted timestamp: %w", err)
 	}
 
-	s.persistedTimestamp = s.timestamp
+	s.timestamp = timestamp
+	s.persistedTimestamp = timestamp
 	return nil
 }
 
