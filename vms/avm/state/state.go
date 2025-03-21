@@ -341,6 +341,7 @@ func (s *state) InitializeChainState(stopVertexID ids.ID, genesisTimestamp time.
 
 	s.timestamp = timestamp
 	s.persistedTimestamp = timestamp
+
 	return nil
 }
 
