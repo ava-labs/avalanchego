@@ -73,11 +73,7 @@ func init() {
 		1,
 		time.Now(),
 		[]*txs.Tx{
-			{
-				Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
-					BlockchainID: ids.GenerateTestID(),
-				}},
-			},
+			populatedTx,
 		},
 		parser.Codec(),
 	)
