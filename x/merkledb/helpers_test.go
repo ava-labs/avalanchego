@@ -20,19 +20,18 @@ func getBasicDB() (*merkleDB, error) {
 	return newDatabase(
 		context.Background(),
 		memdb.New(),
-		newDefaultConfig(),
+		NewConfig(),
 		&mockMetrics{},
 	)
 }
 
-func getBasicDBWithBranchFactor(bf BranchFactor) (*merkleDB, error) {
-	config := newDefaultConfig()
+func getBasicDBWithBranchFactor(bf BranchFactor) (MerkleDB, error) {
+	config := NewConfig()
 	config.BranchFactor = bf
-	return newDatabase(
+	return New(
 		context.Background(),
 		memdb.New(),
 		config,
-		&mockMetrics{},
 	)
 }
 
