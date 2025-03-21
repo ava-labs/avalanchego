@@ -234,16 +234,6 @@ func (vm *VM) Initialize(
 	// Incrementing [awaitShutdown] would cause a deadlock since
 	// [periodicallyPruneMempool] grabs the context lock.
 	go vm.periodicallyPruneMempool(execConfig.MempoolPruneFrequency)
-
-	go func() {
-		err := vm.state.ReindexBlocks(&vm.ctx.Lock, vm.ctx.Log)
-		if err != nil {
-			vm.ctx.Log.Warn("reindexing blocks failed",
-				zap.Error(err),
-			)
-		}
-	}()
-
 	return nil
 }
 
