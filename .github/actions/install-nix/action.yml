@@ -10,7 +10,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: cachix/install-nix-action@v30
+    - uses: cachix/install-nix-action@08dcb3a5e62fa31e2da3d490afc4176ef55ecd72 #v30
       with:
         github_access_token: ${{ inputs.github_token }}
     - run: nix develop --command echo "dependencies installed"
