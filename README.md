@@ -3,6 +3,8 @@
 </div>
 
 ---
+[![](https://github.com/ava-labs/avalanchego/actions/workflows/ci.yml/badge.svg)](https://github.com/ava-labs/avalanchego/actions/workflows/ci.yml)
+[![](https://github.com/ava-labs/avalanchego/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/ava-labs/avalanchego/actions/workflows/codeql-analysis.yml)
 
 Node implementation for the [Avalanche](https://avax.network) network -
 a blockchains platform with high throughput, and blazing fast transactions.
