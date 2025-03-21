@@ -4,6 +4,7 @@
 package config
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -34,10 +35,12 @@ import (
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/rpcsigner"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
@@ -84,6 +87,7 @@ var (
 	errCannotReadDirectory                    = errors.New("cannot read directory")
 	errUnmarshalling                          = errors.New("unmarshalling failed")
 	errFileDoesNotExist                       = errors.New("file does not exist")
+	errInvalidSignerConfig                    = fmt.Errorf("only one of the following flags can be set: %s, %s, %s, %s", StakingEphemeralSignerEnabledKey, StakingSignerKeyContentKey, StakingSignerKeyPathKey, StakingRPCSignerKey)
 )
 
 func getConsensusConfig(v *viper.Viper) snowball.Parameters {
@@ -640,66 +644,120 @@ func getStakingTLSCert(v *viper.Viper) (tls.Certificate, error) {
 	}
 }
 
-func getStakingSigner(v *viper.Viper) (bls.Signer, error) {
-	if v.GetBool(StakingEphemeralSignerEnabledKey) {
-		key, err := localsigner.New()
-		if err != nil {
-			return nil, fmt.Errorf("couldn't generate ephemeral signing key: %w", err)
-		}
-		return key, nil
+func getStakingSigner(ctx context.Context, v *viper.Viper) (bls.Signer, func() error, error) {
+	ephemeralSignerEnabled := v.GetBool(StakingEphemeralSignerEnabledKey)
+	contentKeyIsSet := v.IsSet(StakingSignerKeyContentKey)
+	keyPathIsSet := v.IsSet(StakingSignerKeyPathKey)
+	rpcSignerURLIsSet := v.IsSet(StakingRPCSignerKey)
+
+	signingKeyPath := getExpandedArg(v, StakingSignerKeyPathKey)
+
+	bools := bag.Of(ephemeralSignerEnabled, contentKeyIsSet, keyPathIsSet, rpcSignerURLIsSet)
+	if bools.Count(true) > 1 {
+		return nil, nil, errInvalidSignerConfig
 	}
 
-	if v.IsSet(StakingSignerKeyContentKey) {
+	cleanup := func() error { return nil }
+
+	switch {
+	case ephemeralSignerEnabled:
+		signer, err := localsigner.New()
+		if err != nil {
+			return nil, nil, fmt.Errorf("couldn't generate ephemeral signing signer: %w", err)
+		}
+
+		return signer, cleanup, nil
+
+	case contentKeyIsSet:
 		signerKeyRawContent := v.GetString(StakingSignerKeyContentKey)
 		signerKeyContent, err := base64.StdEncoding.DecodeString(signerKeyRawContent)
 		if err != nil {
-			return nil, fmt.Errorf("unable to decode base64 content: %w", err)
+			return nil, nil, fmt.Errorf("unable to decode base64 content: %w", err)
 		}
-		key, err := localsigner.FromBytes(signerKeyContent)
+
+		signer, err := localsigner.FromBytes(signerKeyContent)
 		if err != nil {
-			return nil, fmt.Errorf("couldn't parse signing key: %w", err)
+			return nil, nil, fmt.Errorf("couldn't parse signing key: %w", err)
 		}
-		return key, nil
-	}
 
-	signingKeyPath := getExpandedArg(v, StakingSignerKeyPathKey)
-	_, err := os.Stat(signingKeyPath)
-	if !errors.Is(err, fs.ErrNotExist) {
-		signingKeyBytes, err := os.ReadFile(signingKeyPath)
+		return signer, cleanup, nil
+
+	case keyPathIsSet:
+		// If the key is set, but a user-file isn't provided, we don't create one.
+		// The siging key is only stored to the default file-location if it's created
+		// and saved by the current application run.
+		_, err := os.Stat(signingKeyPath)
+
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, nil, errMissingStakingSigningKeyFile
+		}
+
+		signer, err := createSignerFromFile(signingKeyPath)
 		if err != nil {
-			return nil, err
+			return nil, nil, fmt.Errorf("couldn't parse signing key: %w", err)
 		}
-		key, err := localsigner.FromBytes(signingKeyBytes)
+
+		return signer, cleanup, nil
+
+	case rpcSignerURLIsSet:
+		rpcSignerURL := v.GetString(StakingRPCSignerKey)
+
+		signer, cleanup, err := rpcsigner.NewClient(ctx, rpcSignerURL)
 		if err != nil {
-			return nil, fmt.Errorf("couldn't parse signing key: %w", err)
+			return nil, nil, fmt.Errorf("couldn't create rpc signer client: %w", err)
 		}
-		return key, nil
-	}
 
-	if v.IsSet(StakingSignerKeyPathKey) {
-		return nil, errMissingStakingSigningKeyFile
-	}
+		return signer, cleanup, nil
 
-	key, err := localsigner.New()
-	if err != nil {
-		return nil, fmt.Errorf("couldn't generate new signing key: %w", err)
-	}
+	default:
+		_, err := os.Stat(signingKeyPath)
 
-	if err := os.MkdirAll(filepath.Dir(signingKeyPath), perms.ReadWriteExecute); err != nil {
-		return nil, fmt.Errorf("couldn't create path for signing key at %s: %w", signingKeyPath, err)
-	}
+		// if the file exists, try to load the key from the file
+		if !errors.Is(err, fs.ErrNotExist) {
+			signer, err := createSignerFromFile(signingKeyPath)
+			if err != nil {
+				return nil, nil, errors.Join(err, cleanup())
+			}
+			return signer, cleanup, nil
+		}
 
-	keyBytes := key.ToBytes()
-	if err := os.WriteFile(signingKeyPath, keyBytes, perms.ReadWrite); err != nil {
-		return nil, fmt.Errorf("couldn't write new signing key to %s: %w", signingKeyPath, err)
+		signer, err := localsigner.New()
+		if err != nil {
+			return nil, nil, fmt.Errorf("couldn't generate new signing key: %w", err)
+		}
+
+		if err := os.MkdirAll(filepath.Dir(signingKeyPath), perms.ReadWriteExecute); err != nil {
+			return nil, nil, fmt.Errorf("couldn't create path for signing key at %s: %w", signingKeyPath, err)
+		}
+
+		keyBytes := signer.ToBytes()
+		if err := os.WriteFile(signingKeyPath, keyBytes, perms.ReadWrite); err != nil {
+			return nil, nil, fmt.Errorf("couldn't write new signing key to %s: %w", signingKeyPath, err)
+		}
+
+		if err := os.Chmod(signingKeyPath, perms.ReadOnly); err != nil {
+			return nil, nil, fmt.Errorf("couldn't restrict permissions on new signing key at %s: %w", signingKeyPath, err)
+		}
+
+		return signer, cleanup, nil
 	}
-	if err := os.Chmod(signingKeyPath, perms.ReadOnly); err != nil {
-		return nil, fmt.Errorf("couldn't restrict permissions on new signing key at %s: %w", signingKeyPath, err)
-	}
-	return key, nil
 }
 
-func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, error) {
+func createSignerFromFile(signingKeyPath string) (bls.Signer, error) {
+	signingKeyBytes, err := os.ReadFile(signingKeyPath)
+	if err != nil {
+		return nil, err
+	}
+
+	signer, err := localsigner.FromBytes(signingKeyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't parse signing key: %w", err)
+	}
+
+	return signer, nil
+}
+
+func getStakingConfig(ctx context.Context, v *viper.Viper, networkID uint32) (node.StakingConfig, func() error, error) {
 	config := node.StakingConfig{
 		SybilProtectionEnabled:        v.GetBool(SybilProtectionEnabledKey),
 		SybilProtectionDisabledWeight: v.GetUint64(SybilProtectionDisabledWeightKey),
@@ -707,24 +765,29 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 		StakingKeyPath:                getExpandedArg(v, StakingTLSKeyPathKey),
 		StakingCertPath:               getExpandedArg(v, StakingCertPathKey),
 		StakingSignerPath:             getExpandedArg(v, StakingSignerKeyPathKey),
+		StakingSignerRPC:              getExpandedArg(v, StakingRPCSignerKey),
 	}
+
 	if !config.SybilProtectionEnabled && config.SybilProtectionDisabledWeight == 0 {
-		return node.StakingConfig{}, errSybilProtectionDisabledStakerWeights
+		return node.StakingConfig{}, nil, errSybilProtectionDisabledStakerWeights
 	}
 
 	if !config.SybilProtectionEnabled && (networkID == constants.MainnetID || networkID == constants.FujiID) {
-		return node.StakingConfig{}, errSybilProtectionDisabledOnPublicNetwork
+		return node.StakingConfig{}, nil, errSybilProtectionDisabledOnPublicNetwork
 	}
 
 	var err error
 	config.StakingTLSCert, err = getStakingTLSCert(v)
 	if err != nil {
-		return node.StakingConfig{}, err
+		return node.StakingConfig{}, nil, err
 	}
-	config.StakingSigningKey, err = getStakingSigner(v)
+
+	var cleanup func() error
+	config.StakingSigningKey, cleanup, err = getStakingSigner(ctx, v)
 	if err != nil {
-		return node.StakingConfig{}, err
+		return node.StakingConfig{}, nil, err
 	}
+
 	if networkID != constants.MainnetID && networkID != constants.FujiID {
 		config.UptimeRequirement = v.GetFloat64(UptimeRequirementKey)
 		config.MinValidatorStake = v.GetUint64(MinValidatorStakeKey)
@@ -737,28 +800,35 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 		config.RewardConfig.MintingPeriod = v.GetDuration(StakeMintingPeriodKey)
 		config.RewardConfig.SupplyCap = v.GetUint64(StakeSupplyCapKey)
 		config.MinDelegationFee = v.GetUint32(MinDelegatorFeeKey)
+
+		var err error
 		switch {
 		case config.UptimeRequirement < 0 || config.UptimeRequirement > 1:
-			return node.StakingConfig{}, errInvalidUptimeRequirement
+			err = errInvalidUptimeRequirement
 		case config.MinValidatorStake > config.MaxValidatorStake:
-			return node.StakingConfig{}, errMinValidatorStakeAboveMax
+			err = errMinValidatorStakeAboveMax
 		case config.MinDelegationFee > 1_000_000:
-			return node.StakingConfig{}, errInvalidDelegationFee
+			err = errInvalidDelegationFee
 		case config.MinStakeDuration <= 0:
-			return node.StakingConfig{}, errInvalidMinStakeDuration
+			err = errInvalidMinStakeDuration
 		case config.MaxStakeDuration < config.MinStakeDuration:
-			return node.StakingConfig{}, errMinStakeDurationAboveMax
+			err = errMinStakeDurationAboveMax
 		case config.RewardConfig.MaxConsumptionRate > reward.PercentDenominator:
-			return node.StakingConfig{}, errStakeMaxConsumptionTooLarge
+			err = errStakeMaxConsumptionTooLarge
 		case config.RewardConfig.MaxConsumptionRate < config.RewardConfig.MinConsumptionRate:
-			return node.StakingConfig{}, errStakeMaxConsumptionBelowMin
+			err = errStakeMaxConsumptionBelowMin
 		case config.RewardConfig.MintingPeriod < config.MaxStakeDuration:
-			return node.StakingConfig{}, errStakeMintingPeriodBelowMin
+			err = errStakeMintingPeriodBelowMin
+		}
+
+		if err != nil {
+			return node.StakingConfig{}, nil, errors.Join(err, cleanup())
 		}
 	} else {
 		config.StakingConfig = genesis.GetStakingConfig(networkID)
 	}
-	return config, nil
+
+	return config, cleanup, nil
 }
 
 func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
@@ -1251,7 +1321,7 @@ func getPluginDir(v *viper.Viper) (string, error) {
 	return pluginDir, nil
 }
 
-func GetNodeConfig(v *viper.Viper) (node.Config, error) {
+func GetNodeConfig(ctx context.Context, v *viper.Viper) (node.Config, func() error, error) {
 	var (
 		nodeConfig node.Config
 		err        error
@@ -1259,24 +1329,24 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 
 	nodeConfig.PluginDir, err = getPluginDir(v)
 	if err != nil {
-		return node.Config{}, err
+		return node.Config{}, nil, err
 	}
 
 	nodeConfig.ConsensusShutdownTimeout = v.GetDuration(ConsensusShutdownTimeoutKey)
 	if nodeConfig.ConsensusShutdownTimeout < 0 {
-		return node.Config{}, fmt.Errorf("%q must be >= 0", ConsensusShutdownTimeoutKey)
+		return node.Config{}, nil, fmt.Errorf("%q must be >= 0", ConsensusShutdownTimeoutKey)
 	}
 
 	// Gossiping
 	nodeConfig.FrontierPollFrequency = v.GetDuration(ConsensusFrontierPollFrequencyKey)
 	if nodeConfig.FrontierPollFrequency < 0 {
-		return node.Config{}, fmt.Errorf("%s must be >= 0", ConsensusFrontierPollFrequencyKey)
+		return node.Config{}, nil, fmt.Errorf("%s must be >= 0", ConsensusFrontierPollFrequencyKey)
 	}
 
 	// App handling
 	nodeConfig.ConsensusAppConcurrency = int(v.GetUint(ConsensusAppConcurrencyKey))
 	if nodeConfig.ConsensusAppConcurrency <= 0 {
-		return node.Config{}, fmt.Errorf("%s must be > 0", ConsensusAppConcurrencyKey)
+		return node.Config{}, nil, fmt.Errorf("%s must be > 0", ConsensusAppConcurrencyKey)
 	}
 
 	nodeConfig.UseCurrentHeight = v.GetBool(ProposerVMUseCurrentHeightKey)
@@ -1284,60 +1354,63 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	// Logging
 	nodeConfig.LoggingConfig, err = getLoggingConfig(v)
 	if err != nil {
-		return node.Config{}, err
+		return node.Config{}, nil, err
 	}
 
 	// Network ID
 	nodeConfig.NetworkID, err = constants.NetworkID(v.GetString(NetworkNameKey))
 	if err != nil {
-		return node.Config{}, err
+		return node.Config{}, nil, err
 	}
 
 	// Database
 	nodeConfig.DatabaseConfig, err = getDatabaseConfig(v, nodeConfig.NetworkID)
 	if err != nil {
-		return node.Config{}, err
+		return node.Config{}, nil, err
 	}
 
 	// IP configuration
 	nodeConfig.IPConfig, err = getIPConfig(v)
 	if err != nil {
-		return node.Config{}, err
+		return node.Config{}, nil, err
 	}
 
 	// Staking
-	nodeConfig.StakingConfig, err = getStakingConfig(v, nodeConfig.NetworkID)
+	var cleanup func() error
+	nodeConfig.StakingConfig, cleanup, err = getStakingConfig(ctx, v, nodeConfig.NetworkID)
 	if err != nil {
-		return node.Config{}, err
+		return node.Config{}, nil, err
 	}
 
 	// Tracked Subnets
 	nodeConfig.TrackedSubnets, err = getTrackedSubnets(v)
 	if err != nil {
-		return node.Config{}, err
+		return node.Config{}, nil, errors.Join(err, cleanup())
 	}
 
 	// HTTP APIs
 	nodeConfig.HTTPConfig, err = getHTTPConfig(v)
 	if err != nil {
-		return node.Config{}, err
+		return node.Config{}, nil, errors.Join(err, cleanup())
 	}
 
 	// Health
 	nodeConfig.HealthCheckFreq = v.GetDuration(HealthCheckFreqKey)
 	if nodeConfig.HealthCheckFreq < 0 {
-		return node.Config{}, fmt.Errorf("%s must be positive", HealthCheckFreqKey)
+		err = fmt.Errorf("%s must be positive", HealthCheckFreqKey)
+		return node.Config{}, nil, errors.Join(err, cleanup())
 	}
 	// Halflife of continuous averager used in health checks
 	healthCheckAveragerHalflife := v.GetDuration(HealthCheckAveragerHalflifeKey)
 	if healthCheckAveragerHalflife <= 0 {
-		return node.Config{}, fmt.Errorf("%s must be positive", HealthCheckAveragerHalflifeKey)
+		err = fmt.Errorf("%s must be positive", HealthCheckAveragerHalflifeKey)
+		return node.Config{}, nil, errors.Join(err, cleanup())
 	}
 
 	// Router
 	nodeConfig.RouterHealthConfig, err = getRouterHealthConfig(v, healthCheckAveragerHalflife)
 	if err != nil {
-		return node.Config{}, err
+		return node.Config{}, nil, errors.Join(err, cleanup())
 	}
 
 	// Metrics
@@ -1346,13 +1419,13 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	// Adaptive Timeout Config
 	nodeConfig.AdaptiveTimeoutConfig, err = getAdaptiveTimeoutConfig(v)
 	if err != nil {
-		return node.Config{}, err
+		return node.Config{}, nil, errors.Join(err, cleanup())
 	}
 
 	// Upgrade config
 	nodeConfig.UpgradeConfig, err = getUpgradeConfig(v, nodeConfig.NetworkID)
 	if err != nil {
-		return node.Config{}, err
+		return node.Config{}, nil, errors.Join(err, cleanup())
 	}
 
 	// Network Config
@@ -1363,18 +1436,20 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 		healthCheckAveragerHalflife,
 	)
 	if err != nil {
-		return node.Config{}, err
+		return node.Config{}, nil, errors.Join(err, cleanup())
 	}
 
 	// Subnet Configs
 	subnetConfigs, err := getSubnetConfigs(v, nodeConfig.TrackedSubnets.List())
 	if err != nil {
-		return node.Config{}, fmt.Errorf("couldn't read subnet configs: %w", err)
+		err = fmt.Errorf("couldn't read subnet configs: %w", err)
+		return node.Config{}, nil, errors.Join(err, cleanup())
 	}
 
 	primaryNetworkConfig := getDefaultSubnetConfig(v)
 	if err := primaryNetworkConfig.Valid(); err != nil {
-		return node.Config{}, fmt.Errorf("invalid consensus parameters: %w", err)
+		err = fmt.Errorf("invalid consensus parameters: %w", err)
+		return node.Config{}, nil, errors.Join(err, cleanup())
 	}
 	subnetConfigs[constants.PrimaryNetworkID] = primaryNetworkConfig
 
@@ -1383,7 +1458,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	// Benchlist
 	nodeConfig.BenchlistConfig, err = getBenchlistConfig(v, primaryNetworkConfig.ConsensusParameters)
 	if err != nil {
-		return node.Config{}, err
+		return node.Config{}, nil, errors.Join(err, cleanup())
 	}
 
 	// File Descriptor Limit
@@ -1396,42 +1471,44 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	genesisStakingCfg := nodeConfig.StakingConfig.StakingConfig
 	nodeConfig.GenesisBytes, nodeConfig.AvaxAssetID, err = getGenesisData(v, nodeConfig.NetworkID, &genesisStakingCfg)
 	if err != nil {
-		return node.Config{}, fmt.Errorf("unable to load genesis file: %w", err)
+		err = fmt.Errorf("unable to load genesis file: %w", err)
+		return node.Config{}, nil, errors.Join(err, cleanup())
 	}
 
 	// StateSync Configs
 	nodeConfig.StateSyncConfig, err = getStateSyncConfig(v)
 	if err != nil {
-		return node.Config{}, err
+		return node.Config{}, nil, errors.Join(err, cleanup())
 	}
 
 	// Bootstrap Configs
 	nodeConfig.BootstrapConfig, err = getBootstrapConfig(v, nodeConfig.NetworkID)
 	if err != nil {
-		return node.Config{}, err
+		return node.Config{}, nil, errors.Join(err, cleanup())
 	}
 
 	// Chain Configs
 	nodeConfig.ChainConfigs, err = getChainConfigs(v)
 	if err != nil {
-		return node.Config{}, fmt.Errorf("couldn't read chain configs: %w", err)
+		err = fmt.Errorf("couldn't read chain configs: %w", err)
+		return node.Config{}, nil, errors.Join(err, cleanup())
 	}
 
 	// Profiler
 	nodeConfig.ProfilerConfig, err = getProfilerConfig(v)
 	if err != nil {
-		return node.Config{}, err
+		return node.Config{}, nil, errors.Join(err, cleanup())
 	}
 
 	// VM Aliases
 	nodeConfig.VMAliases, err = getVMAliases(v)
 	if err != nil {
-		return node.Config{}, err
+		return node.Config{}, nil, errors.Join(err, cleanup())
 	}
 	// Chain aliases
 	nodeConfig.ChainAliases, err = getChainAliases(v)
 	if err != nil {
-		return node.Config{}, err
+		return node.Config{}, nil, errors.Join(err, cleanup())
 	}
 
 	nodeConfig.SystemTrackerFrequency = v.GetDuration(SystemTrackerFrequencyKey)
@@ -1441,22 +1518,22 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 
 	nodeConfig.RequiredAvailableDiskSpace, nodeConfig.WarningThresholdAvailableDiskSpace, err = getDiskSpaceConfig(v)
 	if err != nil {
-		return node.Config{}, err
+		return node.Config{}, nil, errors.Join(err, cleanup())
 	}
 
 	nodeConfig.CPUTargeterConfig, err = getCPUTargeterConfig(v)
 	if err != nil {
-		return node.Config{}, err
+		return node.Config{}, nil, errors.Join(err, cleanup())
 	}
 
 	nodeConfig.DiskTargeterConfig, err = getDiskTargeterConfig(v)
 	if err != nil {
-		return node.Config{}, err
+		return node.Config{}, nil, errors.Join(err, cleanup())
 	}
 
 	nodeConfig.TraceConfig, err = getTraceConfig(v)
 	if err != nil {
-		return node.Config{}, err
+		return node.Config{}, nil, errors.Join(err, cleanup())
 	}
 
 	nodeConfig.ChainDataDir = getExpandedArg(v, ChainDataDirKey)
@@ -1464,7 +1541,8 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	nodeConfig.ProcessContextFilePath = getExpandedArg(v, ProcessContextFileKey)
 
 	nodeConfig.ProvidedFlags = providedFlags(v)
-	return nodeConfig, nil
+
+	return nodeConfig, cleanup, nil
 }
 
 func providedFlags(v *viper.Viper) map[string]interface{} {
