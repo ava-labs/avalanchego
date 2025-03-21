@@ -296,7 +296,7 @@ func (n *Network) Create(rootDir string) error {
 	n.Dir = canonicalDir
 
 	// Ensure the existence of the plugin directory or nodes won't be able to start.
-	pluginDir, err := n.getPluginDir()
+	pluginDir, err := n.GetPluginDir()
 	if err != nil {
 		return err
 	}
@@ -481,7 +481,7 @@ func (n *Network) Bootstrap(ctx context.Context, log logging.Logger) error {
 func (n *Network) StartNode(ctx context.Context, log logging.Logger, node *Node) error {
 	// This check is duplicative for a network that is starting, but ensures
 	// that individual node start/restart won't fail due to missing binaries.
-	pluginDir, err := n.getPluginDir()
+	pluginDir, err := n.GetPluginDir()
 	if err != nil {
 		return err
 	}
@@ -495,7 +495,7 @@ func (n *Network) StartNode(ctx context.Context, log logging.Logger, node *Node)
 		return err
 	}
 
-	bootstrapIPs, bootstrapIDs, err := n.getBootstrapIPsAndIDs(node)
+	bootstrapIPs, bootstrapIDs, err := n.GetBootstrapIPsAndIDs(node)
 	if err != nil {
 		return err
 	}
@@ -613,7 +613,7 @@ func (n *Network) EnsureNodeConfig(node *Node) error {
 		}
 
 		if n.Genesis != nil {
-			defaultFlags[config.GenesisFileKey] = n.getGenesisPath()
+			defaultFlags[config.GenesisFileKey] = n.GetGenesisPath()
 		}
 
 		// Only set the subnet dir if it exists or the node won't start.
@@ -844,7 +844,8 @@ func (n *Network) GetNodeURIs() []NodeURI {
 
 // Retrieves bootstrap IPs and IDs for all nodes except the skipped one (this supports
 // collecting the bootstrap details for restarting a node).
-func (n *Network) getBootstrapIPsAndIDs(skippedNode *Node) ([]string, []string, error) {
+// For consumption outside of avalanchego. Needs to be kept exported.
+func (n *Network) GetBootstrapIPsAndIDs(skippedNode *Node) ([]string, []string, error) {
 	// Collect staking addresses of non-ephemeral nodes for use in bootstrapping a node
 	nodes, err := ReadNodes(n.Dir, false /* includeEphemeral */)
 	if err != nil {
@@ -883,7 +884,8 @@ func (n *Network) GetNetworkID() uint32 {
 	return n.NetworkID
 }
 
-func (n *Network) getPluginDir() (string, error) {
+// For consumption outside of avalanchego. Needs to be kept exported.
+func (n *Network) GetPluginDir() (string, error) {
 	return n.DefaultFlags.GetStringVal(config.PluginDirKey)
 }
 
