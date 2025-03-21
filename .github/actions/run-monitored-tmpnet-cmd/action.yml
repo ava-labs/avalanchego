@@ -48,7 +48,7 @@ runs:
     - uses: cachix/install-nix-action@08dcb3a5e62fa31e2da3d490afc4176ef55ecd72 #v30
       with:
         github_access_token: ${{ inputs.github_token }}
-    - run: nix develop --command echo "dependencies installed"
+    - run: ${{ github.action_path }}/nix-develop.sh --command echo "dependencies installed"
       shell: bash
     - name: Notify of metrics availability
       if: (inputs.prometheus_username != '')
@@ -65,7 +65,7 @@ runs:
     - name: Run command
       shell: bash
       # --impure ensures the env vars are accessible to the command
-      run: ${{ inputs.run_env }} nix develop --impure --command bash -x ${{ inputs.run }}
+      run: ${{ inputs.run_env }} ${{ github.action_path }}/nix-develop.sh --impure --command bash -x ${{ inputs.run }}
       env:
         TMPNET_START_COLLECTORS: ${{ inputs.prometheus_username != '' }}
         TMPNET_CHECK_MONITORING: ${{ inputs.prometheus_username != '' }}
@@ -81,7 +81,7 @@ runs:
         GH_JOB_ID: ${{ inputs.job }}
     # This step is duplicated from upload-tmpnet-artifact for the same
     # reason as the nix installation. There doesn't appear to be an
-    # easy way to composee custom actions for use by other repos
+    # easy way to compose custom actions for use by other repos
     # without running into versioning issues.
     - name: Upload tmpnet data
       if: always()
