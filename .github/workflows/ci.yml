@@ -128,12 +128,13 @@ jobs:
       - name: Run static analysis tests
         shell: bash
         run: scripts/lint.sh
-      - name: Run shellcheck
-        shell: bash
-        run: scripts/shellcheck.sh
       - name: Run actionlint
         shell: bash
         run: scripts/actionlint.sh
+      - uses: ./.github/actions/install-nix
+      - name: Run shellcheck
+        shell: bash
+        run: nix develop --command bash -x scripts/shellcheck.sh
   buf-lint:
     name: Protobuf Lint
     runs-on: ubuntu-latest
