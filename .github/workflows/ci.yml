@@ -122,19 +122,18 @@ jobs:
       #     loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   Lint:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: nix develop --command bash -x {0}
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
+      - uses: ./.github/actions/install-nix
       - name: Run static analysis tests
-        shell: bash
         run: scripts/lint.sh
       - name: Run actionlint
-        shell: bash
-        run: scripts/actionlint.sh
-      - uses: ./.github/actions/install-nix
+        run: actionlint
       - name: Run shellcheck
-        shell: bash
-        run: nix develop --command bash -x scripts/shellcheck.sh
+        run: scripts/shellcheck.sh
   buf-lint:
     name: Protobuf Lint
     runs-on: ubuntu-latest
