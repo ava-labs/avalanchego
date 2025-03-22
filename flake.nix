@@ -33,6 +33,9 @@
         default = pkgs.mkShell {
           # The Nix packages provided in the environment
           packages = with pkgs; [
+            # Local Go package
+            (import ./nix/go.nix { inherit pkgs; })
+
             # Monitoring tools
             promtail                                   # Loki log shipper
             prometheus                                 # Metrics collector
@@ -49,6 +52,14 @@
             # macOS-specific frameworks
             darwin.apple_sdk.frameworks.Security
           ];
+
+          shellHook = ''
+            # Ensure golang bin is in the path
+            GOBIN="$(go env GOPATH)/bin"
+            if [[ ":$PATH:" != *":$GOBIN:"* ]]; then
+              export PATH="$GOBIN:$PATH"
+            fi
+          '';
         };
       });
 
