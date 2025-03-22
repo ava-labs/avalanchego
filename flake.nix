@@ -8,7 +8,7 @@
 
   # Flake inputs
   inputs = {
-    nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.2405.*.tar.gz";
+    nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.2411.*.tar.gz";
   };
 
   # Flake outputs
@@ -50,6 +50,11 @@
             (import ./nix/golangci-lint.nix { inherit pkgs; })
             actionlint
             shellcheck
+
+            # Protobuf
+            buf
+            protoc-gen-go
+            protoc-gen-go-grpc
           ] ++ lib.optionals stdenv.isDarwin [
             # macOS-specific frameworks
             darwin.apple_sdk.frameworks.Security
