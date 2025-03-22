@@ -3,6 +3,7 @@ module github.com/ava-labs/avalanchego
 // - Changes to the minimum golang version must also be replicated in:
 //   - CONTRIBUTING.md
 //   - README.md
+//   - nix/go.nix (update version and sha256 for supported arches)
 //   - go.mod (here)
 //
 // - If updating between minor versions (e.g. 1.23.x -> 1.24.x):
