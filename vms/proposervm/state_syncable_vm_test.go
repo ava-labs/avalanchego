@@ -571,5 +571,5 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 	}
 	status, err := summary.Accept(context.Background())
 	require.NoError(err)
-	require.Equal(block.StateSyncSkipped, status)
+	require.Equal(block.StateSyncStatic, status)
 }

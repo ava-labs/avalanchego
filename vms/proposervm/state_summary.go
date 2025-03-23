@@ -40,12 +40,6 @@ func (s *stateSummary) Height() uint64 {
 }
 
 func (s *stateSummary) Accept(ctx context.Context) (block.StateSyncMode, error) {
-	// If we have already synced up to or past this state summary, we do not
-	// want to sync to it.
-	if s.vm.lastAcceptedHeight >= s.Height() {
-		return block.StateSyncSkipped, nil
-	}
-
 	// set fork height first, before accepting proposerVM full block
 	// which updates height index (among other indices)
 	if err := s.vm.State.SetForkHeight(s.StateSummary.ForkHeight()); err != nil {
