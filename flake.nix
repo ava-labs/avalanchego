@@ -8,7 +8,7 @@
 
   # Flake inputs
   inputs = {
-    nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.2405.*.tar.gz";
+    nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.2411.*.tar.gz";
   };
 
   # Flake outputs
@@ -47,6 +47,8 @@
             self.packages.${system}.kind-with-registry # Script installing kind configured with a local registry
 
             # Linters
+            (import ./nix/golangci-lint.nix { inherit pkgs; })
+            actionlint
             shellcheck
           ] ++ lib.optionals stdenv.isDarwin [
             # macOS-specific frameworks
