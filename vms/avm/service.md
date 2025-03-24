@@ -177,11 +177,9 @@ curl -X POST --data '{
 
 ### `avm.getAddressTxs`
 
-:::caution
-
+<Callout type="warn">
 Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
-
-:::
+</Callout>
 
 Returns all transactions that change the balance of the given address. A transaction is said to
 change an address's balance if either is true:
@@ -189,9 +187,9 @@ change an address's balance if either is true:
 - A UTXO that the transaction consumes was at least partially owned by the address.
 - A UTXO that the transaction produces is at least partially owned by the address.
 
-:::tip
-Note: Indexing (`index-transactions`) must be enabled in the X-chain config.
-:::
+<Callout title="Note" type="note">
+Indexing (`index-transactions`) must be enabled in the X-chain config.
+</Callout>
 
 **Signature:**
 
@@ -249,11 +247,9 @@ curl -X POST --data '{
 
 ### `avm.getAllBalances`
 
-:::caution
-
+<Callout type="warn">
 Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
-
-:::
+</Callout>
 
 Get the balances of all assets controlled by a given address.
 
@@ -325,8 +321,7 @@ avm.getAssetDescription({assetID: string}) -> {
   of this asset are displayed as 10.0. If denomination is 2, 100 units of this asset are displays as
   .100, etc.
 
-:::note
-
+<Callout type="note">
 The AssetID for AVAX differs depending on the network you are on.
 
 Mainnet: FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z
@@ -335,8 +330,7 @@ Testnet: U8iRqJoiJm8xZHAacmvYyZVwqQx6uDNtQeP3CQ6fcgQk3JqnK
 
 For finding the `assetID` of other assets, this [info] might be useful.
 Also, `avm.getUTXOs` returns the `assetID` in its output.
-
-:::
+</Callout>
 
 **Example Call:**
 
@@ -368,11 +362,9 @@ curl -X POST --data '{
 
 ### `avm.getBalance`
 
-:::caution
-
+<Callout type="warn">
 Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
-
-:::
+</Callout>
 
 Get the balance of an asset controlled by a given address.
 
@@ -739,9 +731,9 @@ curl -X POST --data '{
 
 ### `avm.getTxStatus`
 
-:::caution
+<Callout type="warn">
 Deprecated as of **v1.10.0**.
-:::
+</Callout>
 
 Get the status of a transaction sent to the network.
 
