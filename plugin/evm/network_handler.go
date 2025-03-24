@@ -14,8 +14,8 @@ import (
 	"github.com/ava-labs/coreth/triedb"
 	"github.com/ava-labs/coreth/warp"
 	warpHandlers "github.com/ava-labs/coreth/warp/handlers"
+	"github.com/ava-labs/libevm/metrics"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/metrics"
 )
 
 var _ message.RequestHandler = &networkHandler{}

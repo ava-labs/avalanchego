@@ -1,4 +1,4 @@
-// (c) 2021-2025, Ava Labs, Inc. All rights reserved.
+// (c) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package prometheus
@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ethereum/go-ethereum/metrics"
+	"github.com/ava-labs/libevm/metrics"
 )
 
 func TestGatherer_Gather(t *testing.T) {
