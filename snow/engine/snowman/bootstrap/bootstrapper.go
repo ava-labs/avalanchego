@@ -68,7 +68,7 @@ var (
 // called, so it must be guaranteed the VM is not used until after Start.
 type Bootstrapper struct {
 	Config
-	shouldHalt func() bool
+
 	*metrics
 	TimeoutRegistrar common.TimeoutRegistrar
 	// list of NoOpsHandler for messages dropped by bootstrapper
@@ -120,7 +120,6 @@ type Bootstrapper struct {
 func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) error) (*Bootstrapper, error) {
 	metrics, err := newMetrics(config.Ctx.Registerer)
 	bs := &Bootstrapper{
-		shouldHalt:                  config.ShouldHalt,
 		nonVerifyingParser:          config.NonVerifyingParse,
 		Config:                      config,
 		metrics:                     metrics,
@@ -302,7 +301,7 @@ func (b *Bootstrapper) sendBootstrappingMessagesOrFinish(ctx context.Context) er
 			zap.String("reason", "no blocks accepted"),
 			zap.Int("numBeacons", b.Beacons.NumValidators(b.Ctx.SubnetID)),
 		)
-		// Invariant: These functions are mutualy recursive. However, when
+		// Invariant: These functions are mutually recursive. However, when
 		// [startBootstrapping] calls [sendMessagesOrFinish], it is guaranteed
 		// to exit when sending GetAcceptedFrontier requests.
 		return b.startBootstrapping(ctx)
@@ -662,7 +661,7 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 	numToExecute := b.tree.Len()
 	err = execute(
 		ctx,
-		b.ShouldHalt,
+		b.Halted,
 		log,
 		b.DB,
 		&parseAcceptor{
@@ -686,7 +685,7 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 			lastAccepted.Height(),
 		)
 	}
-	if b.shouldHalt() {
+	if b.Halted() {
 		return nil
 	}
 

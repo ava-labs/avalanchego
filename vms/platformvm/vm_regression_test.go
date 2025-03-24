@@ -1481,6 +1481,8 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	sk1, err := localsigner.New()
 	require.NoError(t, err)
 	pk1 := sk1.PublicKey()
+	pop1, err := signer.NewProofOfPossession(sk1)
+	require.NoError(t, err)
 
 	// build primary network validator with BLS key
 	primaryTx, err := wallet.IssueAddPermissionlessValidatorTx(
@@ -1493,7 +1495,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 			},
 			Subnet: constants.PrimaryNetworkID,
 		},
-		signer.NewProofOfPossession(sk1),
+		pop1,
 		vm.ctx.AVAXAssetID,
 		rewardsOwner,
 		rewardsOwner,
@@ -1587,6 +1589,8 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	sk2, err := localsigner.New()
 	require.NoError(t, err)
 	pk2 := sk2.PublicKey()
+	pop2, err := signer.NewProofOfPossession(sk2)
+	require.NoError(t, err)
 
 	primaryRestartTx, err := wallet.IssueAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
@@ -1598,7 +1602,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 			},
 			Subnet: constants.PrimaryNetworkID,
 		},
-		signer.NewProofOfPossession(sk2),
+		pop2,
 		vm.ctx.AVAXAssetID,
 		rewardsOwner,
 		rewardsOwner,
@@ -1752,6 +1756,8 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	// reinsert primary validator with a different BLS key
 	sk, err := localsigner.New()
 	require.NoError(err)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(err)
 
 	primaryRestartTx, err := wallet.IssueAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
@@ -1763,7 +1769,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 			},
 			Subnet: constants.PrimaryNetworkID,
 		},
-		signer.NewProofOfPossession(sk),
+		pop,
 		vm.ctx.AVAXAssetID,
 		rewardsOwner,
 		rewardsOwner,
@@ -1921,6 +1927,8 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	// reinsert primary validator with a different BLS key
 	sk2, err := localsigner.New()
 	require.NoError(err)
+	pop2, err := signer.NewProofOfPossession(sk2)
+	require.NoError(err)
 
 	primaryRestartTx, err := wallet.IssueAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
@@ -1932,7 +1940,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 			},
 			Subnet: constants.PrimaryNetworkID,
 		},
-		signer.NewProofOfPossession(sk2),
+		pop2,
 		vm.ctx.AVAXAssetID,
 		rewardsOwner,
 		rewardsOwner,
@@ -2170,6 +2178,56 @@ func TestValidatorSetRaceCondition(t *testing.T) {
 	cancel() // stop and wait for workers
 	require.NoError(eg.Wait())
 	vm.ctx.Lock.Lock()
+}
+
+func TestL1ValidatorDeactivationCausesTrackingOfInvalidBlock(t *testing.T) {
+	require := require.New(t)
+	vm, _, _ := defaultVM(t, upgradetest.Etna)
+	vm.ctx.Lock.Lock()
+	defer vm.ctx.Lock.Unlock()
+
+	subnetID := testSubnet1.TxID
+	wallet := newWallet(t, vm, walletConfig{
+		subnetIDs: []ids.ID{subnetID},
+	})
+
+	nodeID := ids.GenerateTestNodeID()
+	sk, err := localsigner.New()
+	require.NoError(err)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(err)
+
+	tx, err := wallet.IssueConvertSubnetToL1Tx(
+		subnetID,
+		ids.Empty,
+		nil,
+		[]*txs.ConvertSubnetToL1Validator{
+			{
+				NodeID: nodeID[:],
+				Weight: 1,
+				// Ensure that the validator is active for a 1 second and that
+				// it does not have sufficient balance to be active for 2
+				// seconds.
+				Balance: uint64(vm.ValidatorFeeConfig.MinPrice) + 1,
+				Signer:  *pop,
+			},
+		},
+	)
+	require.NoError(err)
+
+	vm.ctx.Lock.Unlock()
+	require.NoError(vm.issueTxFromRPC(tx))
+	vm.ctx.Lock.Lock()
+	require.NoError(buildAndAcceptStandardBlock(vm))
+
+	vm.clock.Set(vm.clock.Time().Add(1 * time.Minute))
+	blk, err := vm.BuildBlock(context.Background())
+	require.NoError(err)
+
+	for range 2 {
+		err = blk.Verify(context.Background())
+		require.ErrorIs(err, blockexecutor.ErrStandardBlockWithoutChanges)
+	}
 }
 
 func buildAndAcceptStandardBlock(vm *VM) error {

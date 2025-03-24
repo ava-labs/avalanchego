@@ -4,9 +4,11 @@
 package upgrade
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
@@ -22,6 +24,8 @@ func TestUpgrade(t *testing.T) {
 var (
 	avalancheGoExecPath            string
 	avalancheGoExecPathToUpgradeTo string
+	startCollectors                bool
+	checkMonitoring                bool
 )
 
 func init() {
@@ -37,6 +41,10 @@ func init() {
 		"",
 		"avalanchego executable path to upgrade to",
 	)
+	e2e.SetMonitoringFlags(
+		&startCollectors,
+		&checkMonitoring,
+	)
 }
 
 var _ = ginkgo.Describe("[Upgrade]", func() {
@@ -51,12 +59,27 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 		require.NoError(err)
 		network.Genesis = genesis
 
+		shutdownDelay := 0 * time.Second
+		if startCollectors {
+			require.NoError(tmpnet.StartCollectors(tc.DefaultContext(), tc.Log()))
+			shutdownDelay = tmpnet.NetworkShutdownDelay // Ensure a final metrics scrape
+		}
+		if checkMonitoring {
+			// Since cleanups are run in LIFO order, adding this cleanup before
+			// StartNetwork is called ensures network shutdown will be called first.
+			tc.DeferCleanup(func() {
+				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultTimeout)
+				defer cancel()
+				require.NoError(tmpnet.CheckMonitoring(ctx, tc.Log(), network.UUID))
+			})
+		}
+
 		e2e.StartNetwork(
 			tc,
 			network,
 			avalancheGoExecPath,
-			"",    /* pluginDir */
-			0,     /* shutdownDelay */
+			"", /* pluginDir */
+			shutdownDelay,
 			false, /* skipShutdown */
 			false, /* reuseNetwork */
 		)

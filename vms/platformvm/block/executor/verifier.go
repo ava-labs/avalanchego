@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -27,10 +28,10 @@ import (
 var (
 	_ block.Visitor = (*verifier)(nil)
 
-	ErrConflictingBlockTxs = errors.New("block contains conflicting transactions")
+	ErrConflictingBlockTxs         = errors.New("block contains conflicting transactions")
+	ErrStandardBlockWithoutChanges = errors.New("BanffStandardBlock performs no state changes")
 
 	errApricotBlockIssuedAfterFork           = errors.New("apricot block issued after fork")
-	errBanffStandardBlockWithoutChanges      = errors.New("BanffStandardBlock performs no state changes")
 	errIncorrectBlockHeight                  = errors.New("incorrect block height")
 	errOptionBlockTimestampNotMatchingParent = errors.New("option block proposed timestamp not matching parent block one")
 )
@@ -46,14 +47,14 @@ func (v *verifier) BanffAbortBlock(b *block.BanffAbortBlock) error {
 	if err := v.banffOptionBlock(b); err != nil {
 		return err
 	}
-	return v.abortBlock(b)
+	return v.abortBlock(b) // Must be the last validity check on the block
 }
 
 func (v *verifier) BanffCommitBlock(b *block.BanffCommitBlock) error {
 	if err := v.banffOptionBlock(b); err != nil {
 		return err
 	}
-	return v.commitBlock(b)
+	return v.commitBlock(b) // Must be the last validity check on the block
 }
 
 func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
@@ -74,7 +75,7 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 	}
 
 	feeCalculator := state.PickFeeCalculator(v.txExecutorBackend.Config, onDecisionState)
-	inputs, atomicRequests, onAcceptFunc, gasConsumed, err := v.processStandardTxs(
+	inputs, atomicRequests, onAcceptFunc, gasConsumed, _, err := v.processStandardTxs(
 		b.Transactions,
 		feeCalculator,
 		onDecisionState,
@@ -94,7 +95,7 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		return err
 	}
 
-	return v.proposalBlock(
+	return v.proposalBlock( // Must be the last validity check on the block
 		b,
 		b.Tx,
 		onDecisionState,
@@ -129,18 +130,13 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 		return err
 	}
 
-	// If this block doesn't perform any changes, then it should never have been
-	// issued.
-	if !changed && len(b.Transactions) == 0 {
-		return errBanffStandardBlockWithoutChanges
-	}
-
 	feeCalculator := state.PickFeeCalculator(v.txExecutorBackend.Config, onAcceptState)
-	return v.standardBlock(
+	return v.standardBlock( // Must be the last validity check on the block
 		b,
 		b.Transactions,
 		feeCalculator,
 		onAcceptState,
+		changed,
 	)
 }
 
@@ -148,14 +144,14 @@ func (v *verifier) ApricotAbortBlock(b *block.ApricotAbortBlock) error {
 	if err := v.apricotCommonBlock(b); err != nil {
 		return err
 	}
-	return v.abortBlock(b)
+	return v.abortBlock(b) // Must be the last validity check on the block
 }
 
 func (v *verifier) ApricotCommitBlock(b *block.ApricotCommitBlock) error {
 	if err := v.apricotCommonBlock(b); err != nil {
 		return err
 	}
-	return v.commitBlock(b)
+	return v.commitBlock(b) // Must be the last validity check on the block
 }
 
 func (v *verifier) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
@@ -174,7 +170,7 @@ func (v *verifier) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
 	}
 
 	feeCalculator := txfee.NewSimpleCalculator(0)
-	return v.proposalBlock(
+	return v.proposalBlock( // Must be the last validity check on the block
 		b,
 		b.Tx,
 		nil,
@@ -200,11 +196,12 @@ func (v *verifier) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
 	}
 
 	feeCalculator := txfee.NewSimpleCalculator(0)
-	return v.standardBlock(
+	return v.standardBlock( // Must be the last validity check on the block
 		b,
 		b.Transactions,
 		feeCalculator,
 		onAcceptState,
+		true,
 	)
 }
 
@@ -350,7 +347,10 @@ func (v *verifier) commonBlock(b block.Block) error {
 	return nil
 }
 
-// abortBlock populates the state of this block if [nil] is returned
+// abortBlock populates the state of this block if [nil] is returned.
+//
+// Invariant: The call to abortBlock must be the last validity check on the
+// block. If this function returns [nil], the block is cached as valid.
 func (v *verifier) abortBlock(b block.Block) error {
 	parentID := b.Parent()
 	onAbortState, ok := v.getOnAbortState(parentID)
@@ -374,7 +374,10 @@ func (v *verifier) abortBlock(b block.Block) error {
 	return nil
 }
 
-// commitBlock populates the state of this block if [nil] is returned
+// commitBlock populates the state of this block if [nil] is returned.
+//
+// Invariant: The call to commitBlock must be the last validity check on the
+// block. If this function returns [nil], the block is cached as valid.
 func (v *verifier) commitBlock(b block.Block) error {
 	parentID := b.Parent()
 	onCommitState, ok := v.getOnCommitState(parentID)
@@ -398,7 +401,10 @@ func (v *verifier) commitBlock(b block.Block) error {
 	return nil
 }
 
-// proposalBlock populates the state of this block if [nil] is returned
+// proposalBlock populates the state of this block if [nil] is returned.
+//
+// Invariant: The call to proposalBlock must be the last validity check on the
+// block. If this function returns [nil], the block is cached as valid.
 func (v *verifier) proposalBlock(
 	b block.Block,
 	tx *txs.Tx,
@@ -458,14 +464,18 @@ func (v *verifier) proposalBlock(
 	return nil
 }
 
-// standardBlock populates the state of this block if [nil] is returned
+// standardBlock populates the state of this block if [nil] is returned.
+//
+// Invariant: The call to standardBlock must be the last validity check on the
+// block. If this function returns [nil], the block is cached as valid.
 func (v *verifier) standardBlock(
 	b block.Block,
 	txs []*txs.Tx,
 	feeCalculator txfee.Calculator,
 	onAcceptState state.Diff,
+	changedDuringAdvanceTime bool,
 ) error {
-	inputs, atomicRequests, onAcceptFunc, gasConsumed, err := v.processStandardTxs(
+	inputs, atomicRequests, onAcceptFunc, gasConsumed, lowBalanceL1ValidatorsEvicted, err := v.processStandardTxs(
 		txs,
 		feeCalculator,
 		onAcceptState,
@@ -473,6 +483,25 @@ func (v *verifier) standardBlock(
 	)
 	if err != nil {
 		return err
+	}
+
+	// Verify that the block performs changes. If it does not, it never should
+	// have been issued. Prior to Fortuna, evicting L1 validators that don't
+	// have enough balance for the next second is not considered a change. After
+	// Fortuna, it is.
+	var (
+		hasPreFortunaChanges = changedDuringAdvanceTime || len(txs) > 0
+
+		timestamp = onAcceptState.GetTimestamp()
+		isFortuna = v.txExecutorBackend.Config.UpgradeConfig.IsFortunaActivated(timestamp)
+
+		includeFortunaChangesPreActivation = v.ctx.NetworkID == constants.FujiID
+		includePostFortunaChanges          = isFortuna || includeFortunaChangesPreActivation
+
+		hasChanges = hasPreFortunaChanges || (includePostFortunaChanges && lowBalanceL1ValidatorsEvicted)
+	)
+	if !hasChanges {
+		return ErrStandardBlockWithoutChanges
 	}
 
 	v.Mempool.Remove(txs...)
@@ -484,7 +513,7 @@ func (v *verifier) standardBlock(
 		onAcceptState: onAcceptState,
 		onAcceptFunc:  onAcceptFunc,
 
-		timestamp:       onAcceptState.GetTimestamp(),
+		timestamp:       timestamp,
 		inputs:          inputs,
 		atomicRequests:  atomicRequests,
 		verifiedHeights: set.Of(v.pChainHeight),
@@ -503,6 +532,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator txfee.Calcula
 	map[ids.ID]*atomic.Requests,
 	func(),
 	gas.Gas,
+	bool,
 	error,
 ) {
 	// Complexity is limited first to avoid processing too large of a block.
@@ -514,19 +544,19 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator txfee.Calcula
 			if err != nil {
 				txID := tx.ID()
 				v.MarkDropped(txID, err)
-				return nil, nil, nil, 0, err
+				return nil, nil, nil, 0, false, err
 			}
 
 			blockComplexity, err = blockComplexity.Add(&txComplexity)
 			if err != nil {
-				return nil, nil, nil, 0, fmt.Errorf("block complexity overflow: %w", err)
+				return nil, nil, nil, 0, false, fmt.Errorf("block complexity overflow: %w", err)
 			}
 		}
 
 		var err error
 		gasConsumed, err = blockComplexity.ToGas(v.txExecutorBackend.Config.DynamicFeeConfig.Weights)
 		if err != nil {
-			return nil, nil, nil, 0, fmt.Errorf("block gas overflow: %w", err)
+			return nil, nil, nil, 0, false, fmt.Errorf("block gas overflow: %w", err)
 		}
 
 		// If this block exceeds the available capacity, ConsumeGas will return
@@ -534,7 +564,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator txfee.Calcula
 		feeState := diff.GetFeeState()
 		feeState, err = feeState.ConsumeGas(gasConsumed)
 		if err != nil {
-			return nil, nil, nil, 0, err
+			return nil, nil, nil, 0, false, err
 		}
 
 		// Updating the fee state prior to executing the transactions is fine
@@ -558,11 +588,11 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator txfee.Calcula
 		if err != nil {
 			txID := tx.ID()
 			v.MarkDropped(txID, err) // cache tx as dropped
-			return nil, nil, nil, 0, err
+			return nil, nil, nil, 0, false, err
 		}
 		// ensure it doesn't overlap with current input batch
 		if inputs.Overlaps(txInputs) {
-			return nil, nil, nil, 0, ErrConflictingBlockTxs
+			return nil, nil, nil, 0, false, ErrConflictingBlockTxs
 		}
 		// Add UTXOs to batch
 		inputs.Union(txInputs)
@@ -586,7 +616,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator txfee.Calcula
 	}
 
 	if err := v.verifyUniqueInputs(parentID, inputs); err != nil {
-		return nil, nil, nil, 0, err
+		return nil, nil, nil, 0, false, err
 	}
 
 	if numFuncs := len(funcs); numFuncs == 1 {
@@ -603,15 +633,15 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator txfee.Calcula
 	// might not have sufficient fee to pay for the next second.
 	//
 	// This ensures that L1 validators are not undercharged for the next second.
-	err := deactivateLowBalanceL1Validators(
+	lowBalanceL1ValidatorsEvicted, err := deactivateLowBalanceL1Validators(
 		v.txExecutorBackend.Config.ValidatorFeeConfig,
 		diff,
 	)
 	if err != nil {
-		return nil, nil, nil, 0, fmt.Errorf("failed to deactivate low balance L1 validators: %w", err)
+		return nil, nil, nil, 0, false, fmt.Errorf("failed to deactivate low balance L1 validators: %w", err)
 	}
 
-	return inputs, atomicRequests, onAcceptFunc, gasConsumed, nil
+	return inputs, atomicRequests, onAcceptFunc, gasConsumed, lowBalanceL1ValidatorsEvicted, nil
 }
 
 func calculateBlockMetrics(
@@ -647,11 +677,12 @@ func calculateBlockMetrics(
 }
 
 // deactivateLowBalanceL1Validators deactivates any L1 validators that might not
-// have sufficient fees to pay for the next second.
+// have sufficient fees to pay for the next second. The returned bool will be
+// true if at least one L1 validator was deactivated.
 func deactivateLowBalanceL1Validators(
 	config validatorfee.Config,
 	diff state.Diff,
-) error {
+) (bool, error) {
 	var (
 		accruedFees       = diff.GetAccruedFees()
 		validatorFeeState = validatorfee.State{
@@ -665,13 +696,13 @@ func deactivateLowBalanceL1Validators(
 	)
 	potentialAccruedFees, err := math.Add(accruedFees, potentialCost)
 	if err != nil {
-		return fmt.Errorf("could not calculate potentially accrued fees: %w", err)
+		return false, fmt.Errorf("could not calculate potentially accrued fees: %w", err)
 	}
 
 	// Invariant: Proposal transactions do not impact L1 validator state.
 	l1ValidatorIterator, err := diff.GetActiveL1ValidatorsIterator()
 	if err != nil {
-		return fmt.Errorf("could not iterate over active L1 validators: %w", err)
+		return false, fmt.Errorf("could not iterate over active L1 validators: %w", err)
 	}
 
 	var l1ValidatorsToDeactivate []state.L1Validator
@@ -696,8 +727,8 @@ func deactivateLowBalanceL1Validators(
 	for _, l1Validator := range l1ValidatorsToDeactivate {
 		l1Validator.EndAccumulatedFee = 0
 		if err := diff.PutL1Validator(l1Validator); err != nil {
-			return fmt.Errorf("could not deactivate L1 validator %s: %w", l1Validator.ValidationID, err)
+			return false, fmt.Errorf("could not deactivate L1 validator %s: %w", l1Validator.ValidationID, err)
 		}
 	}
-	return nil
+	return len(l1ValidatorsToDeactivate) > 0, nil
 }

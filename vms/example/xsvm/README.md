@@ -74,7 +74,7 @@ Flags:
 Use "xsvm [command] --help" for more information about a command.
 ```
 
-### [Golang SDK](https://github.com/ava-labs/avalanchego/blob/master/vms/example/xsvm/client/client.go)
+### [Golang SDK](https://github.com/ava-labs/avalanchego/blob/master/vms/example/xsvm/api/client.go)
 
 ```golang
 // Client defines xsvm client operations.

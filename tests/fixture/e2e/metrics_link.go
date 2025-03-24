@@ -24,16 +24,12 @@ var EmitMetricsLink bool
 // will be emitted at the end of spec execution. If the test uses a
 // private network, it can disable this behavior by setting
 // EmitMetricsLink to false.
-//
-// TODO(marun) Make this conditional on metrics collection being enabled
 var _ = ginkgo.BeforeEach(func() {
 	EmitMetricsLink = true
 })
 
 // This event handler attempts to emit a metrics link scoped to the duration
 // of the current spec.
-//
-// TODO(marun) Make this conditional on metrics collection being enabled
 var _ = ginkgo.AfterEach(func() {
 	tc := NewTestContext()
 	env := GetEnv(tc)
@@ -49,7 +45,7 @@ var _ = ginkgo.AfterEach(func() {
 	// Extend the end time by the shutdown delay (a proxy for the metrics
 	// scrape interval) to maximize the chances of the specified duration
 	// including all metrics relevant to the current spec.
-	endTime := time.Now().Add(networkShutdownDelay).UnixMilli()
+	endTime := time.Now().Add(tmpnet.NetworkShutdownDelay).UnixMilli()
 	metricsLink := tmpnet.MetricsLinkForNetwork(
 		env.GetNetwork().UUID,
 		strconv.FormatInt(startTime, 10),

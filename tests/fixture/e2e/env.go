@@ -4,6 +4,7 @@
 package e2e
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"math/rand"
@@ -80,6 +81,26 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 	require := require.New(tc)
 
 	var network *tmpnet.Network
+
+	// Consider monitoring flags for any command but stop
+	if !flagVars.StopNetwork() {
+		if flagVars.StartCollectors() {
+			require.NoError(tmpnet.StartCollectors(tc.DefaultContext(), tc.Log()))
+		}
+		if flagVars.CheckMonitoring() {
+			// Register cleanup before network start to ensure it runs after the network is stopped (LIFO)
+			tc.DeferCleanup(func() {
+				if network == nil {
+					tc.Log().Warn("unable to check that logs and metrics were collected from an uninitialized network")
+					return
+				}
+				ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
+				defer cancel()
+				require.NoError(tmpnet.CheckMonitoring(ctx, tc.Log(), network.UUID))
+			})
+		}
+	}
+
 	// Need to load the network if it is being stopped or reused
 	if flagVars.StopNetwork() || flagVars.ReuseNetwork() {
 		networkDir := flagVars.NetworkDir()
@@ -133,15 +154,23 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 	// Start a new network
 	if network == nil {
 		network = desiredNetwork
+		avalancheBinaryPath, err := flagVars.AvalancheGoExecPath()
+		require.NoError(err)
+
 		StartNetwork(
 			tc,
 			network,
-			flagVars.AvalancheGoExecPath(),
+			avalancheBinaryPath,
 			flagVars.PluginDir(),
 			flagVars.NetworkShutdownDelay(),
 			flagVars.StartNetwork(),
 			flagVars.ReuseNetwork(),
 		)
+	}
+
+	// Once one or more nodes are running it should be safe to wait for promtail to report readiness
+	if flagVars.StartCollectors() {
+		require.NoError(tmpnet.WaitForPromtailReadiness(tc.DefaultContext(), tc.Log()))
 	}
 
 	if flagVars.StartNetwork() {
