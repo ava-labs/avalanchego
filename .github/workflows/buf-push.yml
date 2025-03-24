@@ -15,10 +15,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: bufbuild/buf-action@v1
+      - uses: bufbuild/buf-action@2232f407651f19e7e011fe9fe1dad409ae3c2e9b #v1
         with:
           input: "proto"
           # Breaking changes are managed by the rpcchainvm protocol version.
           breaking: false
           token: ${{ secrets.BUF_TOKEN }}
-          version: 1.35.0
+          version: 1.47.2

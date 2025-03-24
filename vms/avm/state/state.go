@@ -329,13 +329,20 @@ func (s *state) InitializeChainState(stopVertexID ids.ID, genesisTimestamp time.
 	if err == database.ErrNotFound {
 		return s.initializeChainState(stopVertexID, genesisTimestamp)
 	} else if err != nil {
-		return err
+		return fmt.Errorf("failed to get last accepted block: %w", err)
 	}
 	s.lastAccepted = lastAccepted
 	s.persistedLastAccepted = lastAccepted
-	s.timestamp, err = database.GetTimestamp(s.singletonDB, timestampKey)
-	s.persistedTimestamp = s.timestamp
-	return err
+
+	timestamp, err := database.GetTimestamp(s.singletonDB, timestampKey)
+	if err != nil {
+		return fmt.Errorf("failed to get last accepted timestamp: %w", err)
+	}
+
+	s.timestamp = timestamp
+	s.persistedTimestamp = timestamp
+
+	return nil
 }
 
 func (s *state) initializeChainState(stopVertexID ids.ID, genesisTimestamp time.Time) error {
@@ -347,13 +354,18 @@ func (s *state) initializeChainState(stopVertexID ids.ID, genesisTimestamp time.
 		s.parser.Codec(),
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to initialize genesis block: %w", err)
 	}
 
 	s.SetLastAccepted(genesis.ID())
 	s.SetTimestamp(genesis.Timestamp())
 	s.AddBlock(genesis)
-	return s.Commit()
+
+	if err := s.Commit(); err != nil {
+		return fmt.Errorf("failed to commit genesis block: %w", err)
+	}
+
+	return nil
 }
 
 func (s *state) IsInitialized() (bool, error) {
