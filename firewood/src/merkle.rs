@@ -763,8 +763,8 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                             return Ok((Some(leaf), removed_value));
                         };
 
-                        if children_iter.next().is_some() {
-                            // The branch has more than 1 child. Return the branch.
+                        // if there is more than one child or the branch has a value, return it
+                        if branch.value.is_some() || children_iter.next().is_some() {
                             return Ok((Some(node), removed_value));
                         }
 
@@ -913,8 +913,8 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                             return Ok(Some(leaf));
                         };
 
-                        if children_iter.next().is_some() {
-                            // The branch has more than 1 child. Return the branch.
+                        // if there is more than one child or the branch has a value, return it
+                        if branch.value.is_some() || children_iter.next().is_some() {
                             return Ok(Some(node));
                         }
 
@@ -1646,6 +1646,29 @@ mod tests {
 
         let got = merkle.get_value(&key_2).unwrap().unwrap();
         assert_eq!(*got, val_2);
+    }
+
+    #[test]
+    fn test_delete_one_child_with_branch_value() {
+        let mut merkle = create_in_memory_merkle();
+        // insert a parent with a value
+        merkle.insert(&[0], Box::new([42u8])).unwrap();
+        // insert child1 with a value
+        merkle.insert(&[0, 1], Box::new([43u8])).unwrap();
+        // insert child2 with a value
+        merkle.insert(&[0, 2], Box::new([44u8])).unwrap();
+
+        // now delete one of the children
+        let deleted = merkle.remove(&[0, 1]).unwrap();
+        assert_eq!(deleted, Some([43u8].to_vec().into_boxed_slice()));
+
+        // make sure the parent still has the correct value
+        let got = merkle.get_value(&[0]).unwrap().unwrap();
+        assert_eq!(*got, [42u8]);
+
+        // and check the remaining child
+        let other_child = merkle.get_value(&[0, 2]).unwrap().unwrap();
+        assert_eq!(*other_child, [44u8]);
     }
 
     //     #[test]
