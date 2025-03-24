@@ -9,9 +9,10 @@ use std::num::NonZero;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use storage::logger::warn;
+use storage::logger::{trace, trace_enabled, warn};
 use typed_builder::TypedBuilder;
 
+use crate::merkle::Merkle;
 use crate::v2::api::HashKey;
 
 pub use storage::CacheReadStrategy;
@@ -203,6 +204,11 @@ impl RevisionManager {
         // then reparent any proposals that have this proposal as a parent
         for p in self.proposals.iter() {
             proposal.commit_reparent(p);
+        }
+
+        if trace_enabled() {
+            let _merkle = Merkle::from(committed);
+            trace!("{}", _merkle.dump()?);
         }
 
         Ok(())
