@@ -42,6 +42,7 @@ var _ validators.ManagerCallbackListener = (*ipTracker)(nil)
 
 func newIPTracker(
 	trackedSubnets set.Set[ids.ID],
+	trackedSubnetsLock *sync.RWMutex,
 	log logging.Logger,
 	registerer prometheus.Registerer,
 	connectToAllValidators bool,
@@ -51,8 +52,9 @@ func newIPTracker(
 		return nil, err
 	}
 	tracker := &ipTracker{
-		trackedSubnets: trackedSubnets,
-		log:            log,
+		trackedSubnets:     trackedSubnets,
+		trackedSubnetsLock: trackedSubnetsLock,
+		log:                log,
 		numTrackedPeers: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "tracked_peers",
 			Help: "number of peers this node is monitoring",
@@ -100,7 +102,8 @@ type trackedNode struct {
 }
 
 func (n *trackedNode) wantsConnection() bool {
-	return n.manuallyTracked || n.trackedSubnets.Len() > 0
+	// hardcode true so we always track peers that match our validator set
+	return true
 }
 
 func (n *trackedNode) canDelete() bool {
@@ -207,12 +210,13 @@ func (s *gossipableSubnet) canDelete() bool {
 
 type ipTracker struct {
 	// trackedSubnets does not include the primary network.
-	trackedSubnets    set.Set[ids.ID]
-	log               logging.Logger
-	numTrackedPeers   prometheus.Gauge
-	numGossipableIPs  prometheus.Gauge // IPs are not deduplicated across subnets
-	numTrackedSubnets prometheus.Gauge
-	bloomMetrics      *bloom.Metrics
+	trackedSubnets     set.Set[ids.ID]
+	trackedSubnetsLock *sync.RWMutex
+	log                logging.Logger
+	numTrackedPeers    prometheus.Gauge
+	numGossipableIPs   prometheus.Gauge // IPs are not deduplicated across subnets
+	numTrackedSubnets  prometheus.Gauge
+	bloomMetrics       *bloom.Metrics
 
 	lock    sync.RWMutex
 	tracked map[ids.NodeID]*trackedNode
@@ -259,7 +263,11 @@ func (i *ipTracker) ManuallyGossip(subnetID ids.ID, nodeID ids.NodeID) {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
-	if subnetID == constants.PrimaryNetworkID || i.trackedSubnets.Contains(subnetID) {
+	i.trackedSubnetsLock.RLock()
+	weAreTracking := i.trackedSubnets.Contains(subnetID)
+	i.trackedSubnetsLock.RUnlock()
+
+	if subnetID == constants.PrimaryNetworkID || weAreTracking {
 		i.addTrackableID(nodeID, nil)
 	}
 
@@ -434,7 +442,11 @@ func (i *ipTracker) addTrackableID(nodeID ids.NodeID, subnetID *ids.ID) {
 		nodeTracker.manuallyTracked = true
 	} else {
 		nodeTracker.validatedSubnets.Add(*subnetID)
-		if *subnetID == constants.PrimaryNetworkID || i.trackedSubnets.Contains(*subnetID) || i.connectToAllValidators {
+		i.trackedSubnetsLock.RLock()
+		weAreTracking := i.trackedSubnets.Contains(*subnetID)
+		i.trackedSubnetsLock.RUnlock()
+
+		if *subnetID == constants.PrimaryNetworkID || weAreTracking || i.connectToAllValidators {
 			nodeTracker.trackedSubnets.Add(*subnetID)
 		}
 	}

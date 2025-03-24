@@ -4,6 +4,7 @@
 package network
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -21,6 +22,7 @@ import (
 func newTestIPTracker(t *testing.T, connectToAllValidators bool) *ipTracker {
 	tracker, err := newIPTracker(
 		nil,
+		&sync.RWMutex{},
 		logging.NoLog{},
 		prometheus.NewRegistry(),
 		connectToAllValidators,

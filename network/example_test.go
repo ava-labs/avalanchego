@@ -6,6 +6,7 @@ package network
 import (
 	"context"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -96,6 +97,7 @@ func ExampleNewTestNetwork() {
 		constants.FujiID,
 		validators,
 		trackedSubnets,
+		&sync.RWMutex{},
 	)
 	if err != nil {
 		log.Fatal(

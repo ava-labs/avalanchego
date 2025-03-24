@@ -4,6 +4,7 @@
 package peer
 
 import (
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -37,6 +38,7 @@ type Config struct {
 	MyNodeID             ids.NodeID
 	// MySubnets does not include the primary network ID
 	MySubnets          set.Set[ids.ID]
+	MySubnetsLock      *sync.RWMutex
 	Beacons            validators.Manager
 	Validators         validators.Manager
 	NetworkID          uint32

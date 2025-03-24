@@ -78,6 +78,7 @@ func NewTestNetworkConfig(
 	networkID uint32,
 	currentValidators validators.Manager,
 	trackedSubnets set.Set[ids.ID],
+	trackedSubnetsLock *sync.RWMutex,
 ) (*Config, error) {
 	tlsCert, err := staking.NewTLSCert()
 	if err != nil {
@@ -173,6 +174,7 @@ func NewTestNetworkConfig(
 		TLSKey:                       tlsCert.PrivateKey.(crypto.Signer),
 		BLSKey:                       blsKey,
 		TrackedSubnets:               trackedSubnets,
+		TrackedSubnetsLock:           trackedSubnetsLock,
 		Beacons:                      validators.NewManager(),
 		Validators:                   currentValidators,
 		UptimeCalculator:             uptime.NoOpCalculator,

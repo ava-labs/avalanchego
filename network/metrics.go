@@ -17,7 +17,8 @@ import (
 
 type metrics struct {
 	// trackedSubnets does not include the primary network ID
-	trackedSubnets set.Set[ids.ID]
+	trackedSubnets     set.Set[ids.ID]
+	trackedSubnetsLock *sync.RWMutex
 
 	numTracked                   prometheus.Gauge
 	numPeers                     prometheus.Gauge
@@ -43,9 +44,11 @@ type metrics struct {
 func newMetrics(
 	registerer prometheus.Registerer,
 	trackedSubnets set.Set[ids.ID],
+	trackedSubnetsLock *sync.RWMutex,
 ) (*metrics, error) {
 	m := &metrics{
-		trackedSubnets: trackedSubnets,
+		trackedSubnets:     trackedSubnets,
+		trackedSubnetsLock: trackedSubnetsLock,
 		numPeers: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "peers",
 			Help: "Number of network peers",
@@ -152,11 +155,14 @@ func (m *metrics) markConnected(peer peer.Peer) {
 	m.connected.Inc()
 
 	trackedSubnets := peer.TrackedSubnets()
+
+	m.trackedSubnetsLock.RLock()
 	for subnetID := range m.trackedSubnets {
 		if trackedSubnets.Contains(subnetID) {
 			m.numSubnetPeers.WithLabelValues(subnetID.String()).Inc()
 		}
 	}
+	m.trackedSubnetsLock.RUnlock()
 
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -171,11 +177,14 @@ func (m *metrics) markDisconnected(peer peer.Peer) {
 	m.disconnected.Inc()
 
 	trackedSubnets := peer.TrackedSubnets()
+
+	m.trackedSubnetsLock.RLock()
 	for subnetID := range m.trackedSubnets {
 		if trackedSubnets.Contains(subnetID) {
 			m.numSubnetPeers.WithLabelValues(subnetID.String()).Dec()
 		}
 	}
+	m.trackedSubnetsLock.RUnlock()
 
 	m.lock.Lock()
 	defer m.lock.Unlock()
