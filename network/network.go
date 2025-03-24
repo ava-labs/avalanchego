@@ -237,12 +237,12 @@ func NewNetwork(
 		return nil, fmt.Errorf("initializing peer metrics failed with: %w", err)
 	}
 
-	metrics, err := newMetrics(metricsRegisterer, config.TrackedSubnets)
+	metrics, err := newMetrics(metricsRegisterer, config.TrackedSubnets, config.TrackedSubnetsLock)
 	if err != nil {
 		return nil, fmt.Errorf("initializing network metrics failed with: %w", err)
 	}
 
-	ipTracker, err := newIPTracker(config.TrackedSubnets, log, metricsRegisterer)
+	ipTracker, err := newIPTracker(config.TrackedSubnets, config.TrackedSubnetsLock, log, metricsRegisterer)
 	if err != nil {
 		return nil, fmt.Errorf("initializing ip tracker failed with: %w", err)
 	}
@@ -271,6 +271,7 @@ func NewNetwork(
 		VersionCompatibility: version.GetCompatibility(minCompatibleTime),
 		MyNodeID:             config.MyNodeID,
 		MySubnets:            config.TrackedSubnets,
+		MySubnetsLock:        config.TrackedSubnetsLock,
 		Beacons:              config.Beacons,
 		Validators:           config.Validators,
 		NetworkID:            config.NetworkID,
@@ -507,9 +508,9 @@ func (n *network) AllowConnection(nodeID ids.NodeID) bool {
 }
 
 func (n *network) Track(claimedIPPorts []*ips.ClaimedIPPort) error {
-	_, areWeAPrimaryNetworkAValidator := n.config.Validators.GetValidator(constants.PrimaryNetworkID, n.config.MyNodeID)
 	for _, ip := range claimedIPPorts {
-		if err := n.track(ip, areWeAPrimaryNetworkAValidator); err != nil {
+		// hardcode true so we always track all subnets
+		if err := n.track(ip, true); err != nil {
 			return err
 		}
 	}
