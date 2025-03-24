@@ -3,7 +3,7 @@ package testutils
 import (
 	"testing"
 
-	"github.com/ethereum/go-ethereum/metrics"
+	"github.com/ava-labs/libevm/metrics"
 )
 
 // WithMetrics enables go-ethereum metrics globally for the test.
