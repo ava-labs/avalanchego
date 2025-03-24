@@ -7,6 +7,7 @@ import (
 	"crypto"
 	"crypto/tls"
 	"net/netip"
+	"sync"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -136,8 +137,9 @@ type Config struct {
 
 	// TrackedSubnets of the node.
 	// It must not include the primary network ID.
-	TrackedSubnets set.Set[ids.ID]    `json:"-"`
-	Beacons        validators.Manager `json:"-"`
+	TrackedSubnets     set.Set[ids.ID]    `json:"-"`
+	TrackedSubnetsLock *sync.RWMutex      `json:"-"`
+	Beacons            validators.Manager `json:"-"`
 
 	// Validators are the current validators in the Avalanche network
 	Validators validators.Manager `json:"-"`
