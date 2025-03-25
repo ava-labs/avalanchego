@@ -7,11 +7,11 @@
 
 * @StephenButtolph
 *.md @meaghanfitzgerald @StephenButtolph
-/.github/ @marun
-/.github/*.md @marun @meaghanfitzgerald
+/.github/ @maru-ava
+/.github/*.md @maru-ava @meaghanfitzgerald
 /network/p2p/ @joshua-kim
 /network/p2p/*.md @joshua-kim @meaghanfitzgerald
-/scripts/ @marun
-/scripts/*.md @marun @meaghanfitzgerald
-/tests/ @marun
-/tests/*.md @marun @meaghanfitzgerald
+/scripts/ @maru-ava
+/scripts/*.md @maru-ava @meaghanfitzgerald
+/tests/ @maru-ava
+/tests/*.md @maru-ava @meaghanfitzgerald

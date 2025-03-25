@@ -226,7 +226,12 @@ func (p *NodeProcess) getProcess() (*os.Process, error) {
 		return nil, nil
 	}
 
-	proc, err := os.FindProcess(p.pid)
+	return getProcess(p.pid)
+}
+
+// getProcess retrieves the process if it is running.
+func getProcess(pid int) (*os.Process, error) {
+	proc, err := os.FindProcess(pid)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find process: %w", err)
 	}
@@ -257,21 +262,8 @@ func (p *NodeProcess) writeMonitoringConfig() error {
 		"node_id":           p.node.NodeID,
 		"is_ephemeral_node": strconv.FormatBool(p.node.IsEphemeral),
 		"network_owner":     p.node.NetworkOwner,
-		// prometheus/promtail ignore empty values so including these
-		// labels with empty values outside of a github worker (where
-		// the env vars will not be set) should not be a problem.
-		"gh_repo":        os.Getenv("GH_REPO"),
-		"gh_workflow":    os.Getenv("GH_WORKFLOW"),
-		"gh_run_id":      os.Getenv("GH_RUN_ID"),
-		"gh_run_number":  os.Getenv("GH_RUN_NUMBER"),
-		"gh_run_attempt": os.Getenv("GH_RUN_ATTEMPT"),
-		"gh_job_id":      os.Getenv("GH_JOB_ID"),
 	}
-
-	tmpnetDir, err := getTmpnetPath()
-	if err != nil {
-		return err
-	}
+	commonLabels.SetDefaults(githubLabelsFromEnv())
 
 	prometheusConfig := []FlagsMap{
 		{
@@ -279,7 +271,7 @@ func (p *NodeProcess) writeMonitoringConfig() error {
 			"labels":  commonLabels,
 		},
 	}
-	if err := p.writeMonitoringConfigFile(tmpnetDir, "prometheus", prometheusConfig); err != nil {
+	if err := p.writeMonitoringConfigFile(prometheusCmd, prometheusConfig); err != nil {
 		return err
 	}
 
@@ -293,36 +285,40 @@ func (p *NodeProcess) writeMonitoringConfig() error {
 			"labels":  promtailLabels,
 		},
 	}
-	return p.writeMonitoringConfigFile(tmpnetDir, "promtail", promtailConfig)
+	return p.writeMonitoringConfigFile(promtailCmd, promtailConfig)
 }
 
 // Return the path for this node's prometheus configuration.
-func (p *NodeProcess) getMonitoringConfigPath(tmpnetDir string, name string) string {
+func (p *NodeProcess) getMonitoringConfigPath(name string) (string, error) {
 	// Ensure a unique filename to allow config files to be added and removed
 	// by multiple nodes without conflict.
-	return filepath.Join(tmpnetDir, name, "file_sd_configs", fmt.Sprintf("%s_%s.json", p.node.NetworkUUID, p.node.NodeID))
+	serviceDiscoveryDir, err := getServiceDiscoveryDir(name)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(serviceDiscoveryDir, fmt.Sprintf("%s_%s.json", p.node.NetworkUUID, p.node.NodeID)), nil
 }
 
-// Ensure the removal of the prometheus configuration file for this node.
+// Ensure the removal of the monitoring configuration files for this node.
 func (p *NodeProcess) removeMonitoringConfig() error {
-	tmpnetDir, err := getTmpnetPath()
-	if err != nil {
-		return err
-	}
-
-	for _, name := range []string{"promtail", "prometheus"} {
-		configPath := p.getMonitoringConfigPath(tmpnetDir, name)
+	for _, name := range []string{promtailCmd, prometheusCmd} {
+		configPath, err := p.getMonitoringConfigPath(name)
+		if err != nil {
+			return err
+		}
 		if err := os.Remove(configPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return fmt.Errorf("failed to remove %s config: %w", name, err)
 		}
 	}
-
 	return nil
 }
 
 // Write the configuration for a type of monitoring (e.g. prometheus, promtail).
-func (p *NodeProcess) writeMonitoringConfigFile(tmpnetDir string, name string, config []FlagsMap) error {
-	configPath := p.getMonitoringConfigPath(tmpnetDir, name)
+func (p *NodeProcess) writeMonitoringConfigFile(name string, config []FlagsMap) error {
+	configPath, err := p.getMonitoringConfigPath(name)
+	if err != nil {
+		return err
+	}
 
 	dir := filepath.Dir(configPath)
 	if err := os.MkdirAll(dir, perms.ReadWriteExecute); err != nil {
@@ -413,5 +409,19 @@ func watchLogFileForFatal(ctx context.Context, cancelWithCause context.CancelCau
 				return
 			}
 		}
+	}
+}
+
+func githubLabelsFromEnv() FlagsMap {
+	return FlagsMap{
+		// prometheus/promtail ignore empty values so including these
+		// labels with empty values outside of a github worker (where
+		// the env vars will not be set) should not be a problem.
+		"gh_repo":        os.Getenv("GH_REPO"),
+		"gh_workflow":    os.Getenv("GH_WORKFLOW"),
+		"gh_run_id":      os.Getenv("GH_RUN_ID"),
+		"gh_run_number":  os.Getenv("GH_RUN_NUMBER"),
+		"gh_run_attempt": os.Getenv("GH_RUN_ATTEMPT"),
+		"gh_job_id":      os.Getenv("GH_JOB_ID"),
 	}
 }

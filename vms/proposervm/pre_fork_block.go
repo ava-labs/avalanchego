@@ -192,7 +192,7 @@ func (b *preForkBlock) buildChild(ctx context.Context) (Block, error) {
 
 	// The child's P-Chain height is proposed as the optimal P-Chain height that
 	// is at least the minimum height
-	pChainHeight, err := b.vm.optimalPChainHeight(ctx, b.vm.Upgrades.ApricotPhase4MinPChainHeight)
+	pChainHeight, err := b.vm.selectChildPChainHeight(ctx, b.vm.Upgrades.ApricotPhase4MinPChainHeight)
 	if err != nil {
 		b.vm.ctx.Log.Error("unexpected build block failure",
 			zap.String("reason", "failed to calculate optimal P-chain height"),

@@ -145,6 +145,7 @@ func New(
 
 	logger.Info("initializing node",
 		zap.Stringer("version", version.CurrentApp),
+		zap.String("commit", version.GitCommit),
 		zap.Stringer("nodeID", n.ID),
 		zap.Stringer("stakingKeyType", tlsCert.PublicKeyAlgorithm),
 		zap.Reflect("nodePOP", pop),

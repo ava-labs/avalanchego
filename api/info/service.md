@@ -695,7 +695,7 @@ curl -X POST --data '{
     "cortinaXChainStopVertexID": "11111111111111111111111111111111LpoYY",
     "durangoTime": "2020-12-05T05:00:00Z",
     "etnaTime": "2024-10-09T20:00:00Z",
-    "fUpgradeTime": "9999-12-01T05:00:00Z"
+    "fortunaTime": "9999-12-01T05:00:00Z"
   },
   "id": 1
 }

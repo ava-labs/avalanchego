@@ -867,7 +867,7 @@ func convertNetworkUpgrades(pbUpgrades *vmpb.NetworkUpgrades) (upgrade.Config, e
 	if err != nil {
 		return upgrade.Config{}, err
 	}
-	fupgrade, err := grpcutils.TimestampAsTime(pbUpgrades.FUpgradeTime)
+	fortuna, err := grpcutils.TimestampAsTime(pbUpgrades.FortunaTime)
 	if err != nil {
 		return upgrade.Config{}, err
 	}
@@ -892,6 +892,6 @@ func convertNetworkUpgrades(pbUpgrades *vmpb.NetworkUpgrades) (upgrade.Config, e
 		CortinaXChainStopVertexID:    cortinaXChainStopVertexID,
 		DurangoTime:                  durango,
 		EtnaTime:                     etna,
-		FUpgradeTime:                 fupgrade,
+		FortunaTime:                  fortuna,
 	}, nil
 }

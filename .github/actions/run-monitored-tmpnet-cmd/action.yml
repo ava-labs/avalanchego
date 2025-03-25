@@ -3,9 +3,14 @@ description: 'Run the provided command in an environment configured to monitor t
 
 inputs:
   run:
-    description: "the bash command to run"
+    description: "the bash script to run e.g. ./scripts/my-script.sh"
     required: true
+  run_env:
+    description: 'a string containing env vars for the command e.g. "MY_VAR1=foo MY_VAR2=bar"'
+    default: ''
   filter_by_owner:
+    default: ''
+  artifact_prefix:
     default: ''
   prometheus_username:
     required: true
@@ -36,23 +41,15 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Start prometheus
-      # Only run for the original repo; a forked repo won't have access to the monitoring credentials
-      if: (inputs.prometheus_username != '')
+    # - Ensure promtail and prometheus are available
+    # - Avoid using the install-nix custom action since a relative
+    #   path wouldn't be resolveable from other repos and an absolute
+    #   path would require setting a version.
+    - uses: cachix/install-nix-action@v30
+      with:
+        github_access_token: ${{ inputs.github_token }}
+    - run: nix develop --command echo "dependencies installed"
       shell: bash
-      # Assumes calling project has a nix flake that ensures a compatible prometheus
-      run: nix develop --impure --command bash -x ./scripts/run_prometheus.sh
-      env:
-        PROMETHEUS_USERNAME: ${{ inputs.prometheus_username }}
-        PROMETHEUS_PASSWORD: ${{ inputs.prometheus_password }}
-    - name: Start promtail
-      if: (inputs.prometheus_username != '')
-      shell: bash
-      # Assumes calling project has a nix flake that ensures a compatible promtail
-      run: nix develop --impure --command bash -x ./scripts/run_promtail.sh
-      env:
-        LOKI_USERNAME: ${{ inputs.loki_username }}
-        LOKI_PASSWORD: ${{ inputs.loki_password }}
     - name: Notify of metrics availability
       if: (inputs.prometheus_username != '')
       shell: bash
@@ -61,10 +58,61 @@ runs:
         GRAFANA_URL: https://grafana-poc.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?orgId=1&refresh=10s&var-filter=is_ephemeral_node%7C%3D%7Cfalse&var-filter=gh_repo%7C%3D%7C${{ inputs.repository_owner }}%2F${{ inputs.repository_name }}&var-filter=gh_run_id%7C%3D%7C${{ inputs.run_id }}&var-filter=gh_run_attempt%7C%3D%7C${{ inputs.run_attempt }}
         GH_JOB_ID: ${{ inputs.job }}
         FILTER_BY_OWNER: ${{ inputs.filter_by_owner }}
+    - name: Warn that collection of metrics and logs will not be performed
+      if: (inputs.prometheus_username == '')
+      shell: bash
+      run: echo "::warning::Monitoring credentials not found. Skipping collector start. Is the PR from a fork branch?"
     - name: Run command
       shell: bash
-      run: ${{ inputs.run }}
+      # --impure ensures the env vars are accessible to the command
+      run: ${{ inputs.run_env }} nix develop --impure --command bash -x ${{ inputs.run }}
       env:
+        TMPNET_START_COLLECTORS: ${{ inputs.prometheus_username != '' }}
+        LOKI_USERNAME: ${{ inputs.loki_username }}
+        LOKI_PASSWORD: ${{ inputs.loki_password }}
+        PROMETHEUS_USERNAME: ${{ inputs.prometheus_username }}
+        PROMETHEUS_PASSWORD: ${{ inputs.prometheus_password }}
+        GH_REPO: ${{ inputs.repository_owner }}/${{ inputs.repository_name }}
+        GH_WORKFLOW: ${{ inputs.workflow }}
+        GH_RUN_ID: ${{ inputs.run_id }}
+        GH_RUN_NUMBER: ${{ inputs.run_number }}
+        GH_RUN_ATTEMPT: ${{ inputs.run_attempt }}
+        GH_JOB_ID: ${{ inputs.job }}
+    # This step is duplicated from upload-tmpnet-artifact for the same
+    # reason as the nix installation. There doesn't appear to be an
+    # easy way to composee custom actions for use by other repos
+    # without running into versioning issues.
+    - name: Upload tmpnet data
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact_prefix }}-tmpnet-data
+        path: |
+          ~/.tmpnet/networks
+          ~/.tmpnet/prometheus/prometheus.log
+          ~/.tmpnet/promtail/promtail.log
+        if-no-files-found: error
+    # TODO(marun) Maybe optionally run these checks in an AfterSuite step?
+    - name: Check that logs were collected
+      if: (inputs.prometheus_username != '')
+      shell: bash
+      run: go run github.com/ava-labs/avalanchego/tests/fixture/tmpnet/cmd check-logs
+      env:
+        LOKI_USERNAME: ${{ inputs.loki_username }}
+        LOKI_PASSWORD: ${{ inputs.loki_password }}
+        GH_REPO: ${{ inputs.repository_owner }}/${{ inputs.repository_name }}
+        GH_WORKFLOW: ${{ inputs.workflow }}
+        GH_RUN_ID: ${{ inputs.run_id }}
+        GH_RUN_NUMBER: ${{ inputs.run_number }}
+        GH_RUN_ATTEMPT: ${{ inputs.run_attempt }}
+        GH_JOB_ID: ${{ inputs.job }}
+    - name: Check that metrics were collected
+      if: (inputs.prometheus_username != '')
+      shell: bash
+      run: go run github.com/ava-labs/avalanchego/tests/fixture/tmpnet/cmd check-metrics
+      env:
+        PROMETHEUS_USERNAME: ${{ inputs.prometheus_username }}
+        PROMETHEUS_PASSWORD: ${{ inputs.prometheus_password }}
         GH_REPO: ${{ inputs.repository_owner }}/${{ inputs.repository_name }}
         GH_WORKFLOW: ${{ inputs.workflow }}
         GH_RUN_ID: ${{ inputs.run_id }}
