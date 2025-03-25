@@ -322,8 +322,10 @@ func (p *PullGossiper[_]) handleResponse(
 			continue
 		}
 	}
+	receivedBytes -= receivedDuplicateBytes
+	incomingGossibles := len(gossip) - duplicateGossip
 
-	if err := p.metrics.observeReceivedMessage(receivedPullLabels, len(gossip)-duplicateGossip, receivedBytes-receivedDuplicateBytes, duplicateGossip, receivedDuplicateBytes); err != nil {
+	if err := p.metrics.observeReceivedMessage(receivedPullLabels, incomingGossibles, receivedBytes, duplicateGossip, receivedDuplicateBytes); err != nil {
 		p.log.Error("failed to update metrics",
 			zap.Error(err),
 		)

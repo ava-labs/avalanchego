@@ -125,8 +125,10 @@ func (h Handler[_]) AppGossip(_ context.Context, nodeID ids.NodeID, gossipBytes 
 			)
 		}
 	}
+	receivedBytes -= receivedDuplicateBytes
+	incomingGossibles := len(gossip) - duplicateGossip
 
-	if err := h.metrics.observeReceivedMessage(receivedPushLabels, len(gossip)-duplicateGossip, receivedBytes-receivedDuplicateBytes, duplicateGossip, receivedDuplicateBytes); err != nil {
+	if err := h.metrics.observeReceivedMessage(receivedPushLabels, incomingGossibles, receivedBytes, duplicateGossip, receivedDuplicateBytes); err != nil {
 		h.log.Error("failed to update metrics",
 			zap.Error(err),
 		)
