@@ -784,11 +784,9 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
 
                         // The child's partial path is the concatenation of its (now removed) parent,
                         // its (former) child index, and its partial path.
-                        let branch_partial_path =
-                            std::mem::replace(&mut branch.partial_path, Path::new());
-
                         let child_partial_path = Path::from_nibbles_iterator(
-                            branch_partial_path
+                            branch
+                                .partial_path
                                 .iter()
                                 .chain(once(&(child_index as u8)))
                                 .chain(child.partial_path().iter())
@@ -934,11 +932,9 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
 
                         // The child's partial path is the concatenation of its (now removed) parent,
                         // its (former) child index, and its partial path.
-                        let branch_partial_path =
-                            std::mem::replace(&mut branch.partial_path, Path::new());
-
                         let child_partial_path = Path::from_nibbles_iterator(
-                            branch_partial_path
+                            branch
+                                .partial_path
                                 .iter()
                                 .chain(once(&(child_index as u8)))
                                 .chain(child.partial_path().iter())
