@@ -97,6 +97,8 @@ func (h Handler[_]) AppGossip(_ context.Context, nodeID ids.NodeID, gossipBytes 
 	}
 
 	receivedBytes := 0
+	receivedDuplicateBytes := 0
+	duplicateGossip := 0
 	for _, bytes := range gossip {
 		receivedBytes += len(bytes)
 		gossipable, err := h.marshaller.UnmarshalGossip(bytes)
@@ -108,17 +110,23 @@ func (h Handler[_]) AppGossip(_ context.Context, nodeID ids.NodeID, gossipBytes 
 			continue
 		}
 
+		gossipID := gossipable.GossipID()
+		if h.set.Has(gossipID) {
+			receivedDuplicateBytes += len(bytes)
+			duplicateGossip++
+			continue
+		}
 		if err := h.set.Add(gossipable); err != nil {
 			h.log.Debug(
 				"failed to add gossip to the known set",
 				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("id", gossipable.GossipID()),
+				zap.Stringer("id", gossipID),
 				zap.Error(err),
 			)
 		}
 	}
 
-	if err := h.metrics.observeMessage(receivedPushLabels, len(gossip), receivedBytes); err != nil {
+	if err := h.metrics.observeReceivedMessage(receivedPushLabels, len(gossip)-duplicateGossip, receivedBytes-receivedDuplicateBytes, duplicateGossip, receivedDuplicateBytes); err != nil {
 		h.log.Error("failed to update metrics",
 			zap.Error(err),
 		)

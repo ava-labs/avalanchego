@@ -100,6 +100,8 @@ type Metrics struct {
 	tracking                *prometheus.GaugeVec
 	trackingLifetimeAverage prometheus.Gauge
 	topValidators           *prometheus.GaugeVec
+	duplicateCount          *prometheus.CounterVec
+	duplicateBytes          *prometheus.CounterVec
 }
 
 // NewMetrics returns a common set of metrics
@@ -145,6 +147,22 @@ func NewMetrics(
 			},
 			typeLabels,
 		),
+		duplicateCount: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "gossip_duplicate_count",
+				Help:      "amount of duplicate gossip (n)",
+			},
+			ioTypeLabels,
+		),
+		duplicateBytes: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "gossip_duplicate_bytes",
+				Help:      "amount of duplicate gossip (bytes)",
+			},
+			ioTypeLabels,
+		),
 	}
 	err := errors.Join(
 		metrics.Register(m.count),
@@ -152,8 +170,31 @@ func NewMetrics(
 		metrics.Register(m.tracking),
 		metrics.Register(m.trackingLifetimeAverage),
 		metrics.Register(m.topValidators),
+		metrics.Register(m.duplicateCount),
+		metrics.Register(m.duplicateBytes),
 	)
 	return m, err
+}
+
+func (m *Metrics) observeReceivedMessage(labels prometheus.Labels, count int, bytes int, duplicateCount int, duplicateBytes int) error {
+	err := m.observeMessage(labels, count, bytes)
+	if err != nil {
+		return err
+	}
+
+	duplicateCountMetric, err := m.duplicateCount.GetMetricWith(labels)
+	if err != nil {
+		return fmt.Errorf("failed to get duplicate count metric: %w", err)
+	}
+
+	duplicateBytesMetric, err := m.duplicateBytes.GetMetricWith(labels)
+	if err != nil {
+		return fmt.Errorf("failed to get duplicate bytes metric: %w", err)
+	}
+
+	duplicateCountMetric.Add(float64(duplicateCount))
+	duplicateBytesMetric.Add(float64(duplicateBytes))
+	return nil
 }
 
 func (m *Metrics) observeMessage(labels prometheus.Labels, count int, bytes int) error {
@@ -245,6 +286,8 @@ func (p *PullGossiper[_]) handleResponse(
 	}
 
 	receivedBytes := 0
+	receivedDuplicateBytes := 0
+	duplicateGossip := 0
 	for _, bytes := range gossip {
 		receivedBytes += len(bytes)
 
@@ -264,6 +307,11 @@ func (p *PullGossiper[_]) handleResponse(
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("id", gossipID),
 		)
+		if p.set.Has(gossipID) {
+			receivedDuplicateBytes += len(bytes)
+			duplicateGossip++
+			continue
+		}
 		if err := p.set.Add(gossipable); err != nil {
 			p.log.Debug(
 				"failed to add gossip to the known set",
@@ -275,7 +323,7 @@ func (p *PullGossiper[_]) handleResponse(
 		}
 	}
 
-	if err := p.metrics.observeMessage(receivedPullLabels, len(gossip), receivedBytes); err != nil {
+	if err := p.metrics.observeReceivedMessage(receivedPullLabels, len(gossip)-duplicateGossip, receivedBytes-receivedDuplicateBytes, duplicateGossip, receivedDuplicateBytes); err != nil {
 		p.log.Error("failed to update metrics",
 			zap.Error(err),
 		)
