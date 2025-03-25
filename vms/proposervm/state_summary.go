@@ -56,5 +56,8 @@ func (s *stateSummary) Accept(ctx context.Context) (block.StateSyncMode, error) 
 	// innerSummary.Accept may fail with the proposerVM block and index already
 	// updated. The error would be treated as fatal and the chain would then be
 	// repaired upon the VM restart.
+	// After the inner summary is accepted, the engine transitions to bootstrapping
+	// and SetState is responsible for re-aligning the ProposerVM to the height reported
+	// by the inner VM after handling state sync.
 	return s.innerSummary.Accept(ctx)
 }
