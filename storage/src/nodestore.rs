@@ -899,21 +899,21 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
                         (unhashed, hashed)
                     },
                 );
-                if hashed.len() == 1 && !unhashed.is_empty() {
-                    // Previously, only one child was hashed, but now there are more, so
-                    // we must recompute the hash of that child without the magic prefix
-                    trace!("Rehashing account branch: hashed {hashed:?} unhashed {unhashed:?}");
+                trace!("hashed {hashed:?} unhashed {unhashed:?}");
+                if hashed.len() == 1 {
+                    // we were left with one hashed node that must be rehashed
                     let invalidated_node = hashed.first_mut().expect("hashed is not empty");
-                    let hashable_node = self.read_node(*invalidated_node.1 .0)?.deref().clone();
+                    let mut hashable_node = self.read_node(*invalidated_node.1 .0)?.deref().clone();
                     let original_length = path_prefix.len();
-                    path_prefix.0.extend(
-                        b.partial_path
-                            .0
-                            .iter()
-                            .copied()
-                            .chain(std::iter::once(invalidated_node.0 as u8)),
-                    );
-
+                    path_prefix.0.extend(b.partial_path.0.iter().copied());
+                    if !unhashed.is_empty() {
+                        path_prefix.0.push(invalidated_node.0 as u8);
+                    } else {
+                        hashable_node.update_partial_path(Path::from_nibbles_iterator(
+                            std::iter::once(invalidated_node.0 as u8)
+                                .chain(hashable_node.partial_path().0.iter().copied()),
+                        ));
+                    }
                     let hash = hash_node(&hashable_node, path_prefix);
                     path_prefix.0.truncate(original_length);
                     *invalidated_node.1 .1 = hash;
