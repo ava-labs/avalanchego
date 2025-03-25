@@ -6,11 +6,7 @@ pagination_label: AvalancheGo Configs and Flags
 sidebar_position: 0
 ---
 
-# AvalancheGo Configs and Flags
-
 <!-- markdownlint-disable MD001 -->
-
-You can specify the configuration of a node with the arguments below.
 
 ## APIs
 
