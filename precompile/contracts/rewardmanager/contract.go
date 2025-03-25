@@ -72,7 +72,7 @@ func EnableAllowFeeRecipients(stateDB contract.StateDB) {
 	stateDB.SetState(ContractAddress, rewardAddressStorageKey, allowFeeRecipientsAddressValue)
 }
 
-// DisableRewardAddress disables rewards and burns them by sending to Blackhole Address.
+// DisableFeeRewards disables rewards and burns them by sending to Blackhole Address.
 func DisableFeeRewards(stateDB contract.StateDB) {
 	stateDB.SetState(ContractAddress, rewardAddressStorageKey, common.BytesToHash(constants.BlackholeAddr.Bytes()))
 }

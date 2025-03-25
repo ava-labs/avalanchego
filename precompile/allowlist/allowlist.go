@@ -81,7 +81,7 @@ func UnpackModifyAllowListInput(input []byte, r Role, useStrictMode bool) (commo
 }
 
 // createAllowListRoleSetter returns an execution function for setting the allow list status of the input address argument to [role].
-// This execution function is speciifc to [precompileAddr].
+// This execution function is specific to [precompileAddr].
 func createAllowListRoleSetter(precompileAddr common.Address, role Role) contract.RunStatefulPrecompileFunc {
 	return func(evm contract.AccessibleState, callerAddr, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 		if remainingGas, err = contract.DeductGas(suppliedGas, ModifyAllowListGasCost); err != nil {

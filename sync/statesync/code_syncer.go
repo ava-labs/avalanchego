@@ -39,7 +39,7 @@ type CodeSyncerConfig struct {
 	DB ethdb.Database
 }
 
-// codeSyncer syncs code bytes from the network in a seprate thread.
+// codeSyncer syncs code bytes from the network in a separate thread.
 // Tracks outstanding requests in the DB, so that it will still fulfill them if interrupted.
 type codeSyncer struct {
 	lock sync.Mutex
@@ -193,7 +193,7 @@ func (c *codeSyncer) fulfillCodeRequest(ctx context.Context, codeHashes []common
 	c.lock.Unlock() // Release the lock before writing the batch
 
 	if err := batch.Write(); err != nil {
-		return fmt.Errorf("faild to write batch for fulfilled code requests: %w", err)
+		return fmt.Errorf("failed to write batch for fulfilled code requests: %w", err)
 	}
 	return nil
 }
@@ -223,7 +223,7 @@ func (c *codeSyncer) addCode(codeHashes []common.Hash) error {
 }
 
 // notifyAccountTrieCompleted notifies the code syncer that there will be no more incoming
-// code hashes from syncing the account trie, so it only needs to compelete its outstanding
+// code hashes from syncing the account trie, so it only needs to complete its outstanding
 // work.
 // Note: this allows the worker threads to exit and return a nil error.
 func (c *codeSyncer) notifyAccountTrieCompleted() {
