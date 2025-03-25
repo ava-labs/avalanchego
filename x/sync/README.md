@@ -3,7 +3,7 @@
 ## Overview
 
 This package implements a client and server that allows for the syncing of a [MerkleDB](../merkledb/README.md).
-The servers have an up to date version of the database, and the clients have an out of date version of the database or an empty database.
+The servers have an up-to-date version of the database, and the clients have an out of date version of the database or an empty database.
 
 It's planned that these client and server implementations will eventually be compatible with Firewood.
 
@@ -62,7 +62,7 @@ are in range [`start`, `end`] for the revision with root `root_hash`" for some k
 Note that `root_hash` is the root hash of the revision that the client is trying to sync to, not the 
 root hash of its own (incomplete) database.
 Tracking the revision associated with each downloaded key range, as well as using data in its own 
-(incomplete) database, allows the client to figure out which key ranges are not up to date and need to be synced.
+(incomplete) database, allows the client to figure out which key ranges are not up-to-date and need to be synced.
 The hash of the incomplete database on a client is never sent anywhere because it does not represent a root hash of any revision.
 
 When the client is created, it is given the root hash of the revision to sync to.
@@ -94,7 +94,7 @@ The sync client can be notified that the root hash of the database it's trying t
 Detecting that the root hash to sync to has changed is done outside this package.
 For example, if the database is being used to store blockchain state then the sync client would be 
 notified when a new block is accepted because that implies a commit to the database.
-If this occurs, the key-value pairs the client has learned about via range proofs may no longer be up to date.
+If this occurs, the key-value pairs the client has learned about via range proofs may no longer be up-to-date.
 
 We use change proofs as an optimization to correct the out of date key-value pairs.
 When the sync client is notified that the root hash to sync to has changed, it requests a change proof 
