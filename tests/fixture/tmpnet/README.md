@@ -7,6 +7,38 @@ written to disk. Using the filesystem to store configuration and
 process details allows for the `tmpnetctl` cli and e2e test fixture to
 orchestrate the same temporary networks without the use of an rpc daemon.
 
+## Table of Contents
+
+- [What's in a name?](#whats-in-a-name)
+- [Package details](#package-details)
+- [Usage](#usage)
+  - [Via tmpnetctl](#via-tmpnetctl)
+  - [Simplifying usage with direnv](#simplifying-usage-with-direnv)
+    - [Deprecated usage with e2e suite](#deprecated-usage-with-e2e-suite)
+  - [Via code](#via-code)
+- [Networking configuration](#networking-configuration)
+- [Configuration on disk](#configuration-on-disk)
+  - [Common networking configuration](#common-networking-configuration)
+  - [Genesis](#genesis)
+  - [Subnet configuration](#subnet-configuration)
+  - [Chain configuration](#chain-configuration)
+  - [Network env](#network-env)
+  - [Node configuration](#node-configuration)
+    - [Runtime config](#runtime-config)
+    - [Flags](#flags)
+    - [Process details](#process-details)
+  - [Monitoring](#monitoring)
+    - [Example usage](#example-usage)
+    - [Starting collectors](#starting-collectors)
+    - [Stopping collectors](#stopping-collectors)
+    - [Metrics collection](#metrics-collection)
+    - [Log collection](#log-collection)
+    - [Labels](#labels)
+    - [CI Collection](#ci-collection)
+    - [Viewing](#viewing)
+      - [Local networks](#local-networks)
+      - [CI](#ci)
+
 ## What's in a name?
 
 The name of this package was originally `testnet` and its cli was
