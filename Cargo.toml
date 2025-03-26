@@ -6,6 +6,7 @@ members = [
   "grpc-testtool", 
   "benchmark",
   "ffi",
+  "triehash",
 ]
 resolver = "2"
 
