@@ -271,7 +271,7 @@ type RangeProof struct {
 
 // Validate received data from change/range proof requests
 // using the requested range.
-func validateRangeChangeProof(
+func validateChangeProof(
 	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 	startProof []ProofNode,
@@ -292,17 +292,15 @@ func validateRangeChangeProof(
 		return ErrNoEndProof
 	}
 
-	var (
-		// [startProof] is an inclusion/exclusion proof of [start]
-		startProofKey = maybe.Bind(start, ToKey)
+	// [startProof] is an inclusion/exclusion proof of [start]
+	startProofKey := maybe.Bind(start, ToKey)
 
-		// [endProof] is an inclusion of the largest key in [keyValues].
-		//
-		// If [keyValues] is empty:
-		// - range proof: an exclusion proof of [end]
-		// - change proof: an inclusion/exclusion proof of [end].
-		endProofKey = maybe.Bind(end, ToKey)
-	)
+	// [endProof] is an inclusion of the largest key in [keyValues].
+	//
+	// If [keyValues] is empty:
+	// - range proof: an exclusion proof of [end]
+	// - change proof: an inclusion/exclusion proof of [end].
+	endProofKey := maybe.Bind(end, ToKey)
 
 	// Make sure the key-value pairs are sorted and in [start, end].
 	if err := verifyKeyValues(keys, startProofKey, endProofKey); err != nil {
@@ -316,13 +314,13 @@ func validateRangeChangeProof(
 	// Ensure that the start proof is valid.
 	// If [startProof] is non-empty, [end] is non-empty (length is checked inside verifyProofPath).
 	if err := verifyProofPath(startProof, startProofKey.Value(), tokenSize); err != nil {
-		return err
+		return fmt.Errorf("failed to verify start proof path: %w", err)
 	}
 
 	// Ensure that the end proof is valid.
 	// If [endProof] is non-empty, [end] is non-empty (length is checked inside verifyProofPath).
 	if err := verifyProofPath(endProof, endProofKey.Value(), tokenSize); err != nil {
-		return err
+		return fmt.Errorf("failed to verify end proof path: %w", err)
 	}
 
 	return nil
@@ -368,19 +366,16 @@ func (proof *RangeProof) Verify(
 	}
 
 	// Validate proof.
-	err := validateRangeChangeProof(start, end, proof.StartProof, proof.EndProof, keys, tokenSize)
-	if err != nil {
+	if err := validateChangeProof(start, end, proof.StartProof, proof.EndProof, keys, tokenSize); err != nil {
 		return err
 	}
 
-	var (
-		// [startProof] is an inclusion/exclusion proof of [startKey]
-		startProofKey = maybe.Bind(start, ToKey)
+	// [startProof] is an inclusion/exclusion proof of [startKey]
+	startProofKey := maybe.Bind(start, ToKey)
 
-		// [endProof] is an inclusion of the largest key in [keyValues],
-		// or an exclusion proof of [end] if [keyValues] is empty.
-		endProofKey = maybe.Bind(end, ToKey)
-	)
+	// [endProof] is an inclusion of the largest key in [keyValues],
+	// or an exclusion proof of [end] if [keyValues] is empty.
+	endProofKey := maybe.Bind(end, ToKey)
 
 	// Update [endProofKey] with the largest key in [keyValues].
 	if len(proof.KeyValues) > 0 {

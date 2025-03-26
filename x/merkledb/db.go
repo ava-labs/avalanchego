@@ -1111,19 +1111,16 @@ func (db *merkleDB) VerifyChangeProof(
 	}
 
 	// Validate proof.
-	err := validateRangeChangeProof(start, end, proof.StartProof, proof.EndProof, keys, db.tokenSize)
-	if err != nil {
+	if err := validateChangeProof(start, end, proof.StartProof, proof.EndProof, keys, db.tokenSize); err != nil {
 		return err
 	}
 
-	var (
-		// [startProof] is an inclusion/exclusion proof of [startKey]
-		startProofKey = maybe.Bind(start, ToKey)
+	// [startProof] is an inclusion/exclusion proof of [startKey]
+	startProofKey := maybe.Bind(start, ToKey)
 
-		// [endProof] is an inclusion of the largest key in [keyValues],
-		// or an exclusion proof of [end] if [keyValues] is empty.
-		endProofKey = maybe.Bind(end, ToKey)
-	)
+	// [endProof] is an inclusion of the largest key in [keyValues],
+	// or an exclusion proof of [end] if [keyValues] is empty.
+	endProofKey := maybe.Bind(end, ToKey)
 
 	// Update [endProofKey] with the largest key in [keyValues].
 	if len(proof.KeyChanges) > 0 {

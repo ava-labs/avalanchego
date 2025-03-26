@@ -360,14 +360,12 @@ func Test_Proof_Path(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(dbTrie)
 
-	var (
-		key  = []byte{0x6B, 0x65, 0x79}
-		key0 = []byte{0x6B, 0x65, 0x79, 0x30}
-		key1 = []byte{0x6B, 0x65, 0x79, 0x31}
-		key2 = []byte{0x6B, 0x65, 0x79, 0x32}
-		key3 = []byte{0x6B, 0x65, 0x79, 0x33}
-		key4 = []byte{0x6B, 0x65, 0x79, 0x34}
-	)
+	key := []byte("key")
+	key0 := []byte("key0")
+	key1 := []byte("key1")
+	key2 := []byte("key2")
+	key3 := []byte("key3")
+	key4 := []byte("key4")
 
 	trie, err := dbTrie.NewView(
 		context.Background(),
@@ -1282,8 +1280,6 @@ func TestVerifyKeyValues(t *testing.T) {
 }
 
 func TestVerifyProofPath(t *testing.T) {
-	tokenSize := 8
-
 	type test struct {
 		name        string
 		path        []ProofNode
@@ -1488,7 +1484,7 @@ func TestVerifyProofPath(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			err := verifyProofPath(tt.path, tt.proofKey, tokenSize)
+			err := verifyProofPath(tt.path, tt.proofKey, 8)
 			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
