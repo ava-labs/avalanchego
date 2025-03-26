@@ -18,7 +18,7 @@ if [[ -z ${AVALANCHE_VERSION:-} ]]; then
   # If not, the value is assumed to represent a tag
   if [[ "${AVALANCHE_VERSION}" =~ ^v.*[0-9]{14}-[0-9a-f]{12}$ ]]; then
     # Extract module hash from version
-    MODULE_HASH="$(echo "${AVALANCHE_VERSION}" | cut -d'-' -f3)"
+    MODULE_HASH="$(echo "${AVALANCHE_VERSION}" | grep -Eo '[0-9a-f]{12}$')"
 
     # The first 8 chars of the hash is used as the tag of avalanchego images
     AVALANCHE_VERSION="${MODULE_HASH::8}"
