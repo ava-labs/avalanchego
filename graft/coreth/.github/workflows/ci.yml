@@ -55,6 +55,11 @@ jobs:
       - name: Run actionlint
         shell: bash
         run: scripts/actionlint.sh
+      - name: Ensure consistent avalanchego version
+        shell: bash
+        run: |
+          ./scripts/update_avalanchego_version.sh
+          git diff --exit-code
   test:
     name: Golang Unit Tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -122,11 +127,11 @@ jobs:
         with:
           go-version-file: "go.mod"
       - name: Run e2e tests
-        run: E2E_SERIAL=1 ./scripts/tests.e2e.sh
-        shell: bash
-      - name: Upload tmpnet network dir
-        uses: actions/upload-artifact@v4
-        if: always()
+        uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@6c72dfc4254a3d157bba5c9c45135cb563b813e7
         with:
-          name: tmpnet-data
-          path: ~/.tmpnet/networks/1000
+          run: ./scripts/tests.e2e.sh
+          run_env: E2E_SERIAL=1
+          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_username: ${{ secrets.LOKI_ID || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
