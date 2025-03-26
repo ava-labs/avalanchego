@@ -22,9 +22,9 @@ import (
 	"strings"
 	"testing"
 
+	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/subnet-evm/core"
-	"github.com/ava-labs/subnet-evm/interfaces"
 	"github.com/ava-labs/subnet-evm/params"
 )
 
@@ -63,7 +63,7 @@ func TestWithCallGasLimitOption(t *testing.T) {
 	defer sim.Close()
 
 	client := sim.Client()
-	_, err := client.CallContract(context.Background(), interfaces.CallMsg{
+	_, err := client.CallContract(context.Background(), ethereum.CallMsg{
 		From: testAddr,
 		To:   &testAddr,
 		Gas:  21000,

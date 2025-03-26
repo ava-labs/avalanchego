@@ -35,13 +35,13 @@ import (
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
+	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/subnet-evm/cmd/simulator/key"
 	"github.com/ava-labs/subnet-evm/cmd/simulator/load"
 	"github.com/ava-labs/subnet-evm/cmd/simulator/metrics"
 	"github.com/ava-labs/subnet-evm/cmd/simulator/txs"
 	"github.com/ava-labs/subnet-evm/ethclient"
-	"github.com/ava-labs/subnet-evm/interfaces"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/warp"
 	"github.com/ava-labs/subnet-evm/predicate"
@@ -345,7 +345,7 @@ func (w *warpTest) sendMessageFromSendingSubnet() {
 	require.NoError(err)
 
 	log.Info("Fetching relevant warp logs from the newly produced block")
-	logs, err := client.FilterLogs(ctx, interfaces.FilterQuery{
+	logs, err := client.FilterLogs(ctx, ethereum.FilterQuery{
 		BlockHash: &blockHash,
 		Addresses: []common.Address{warp.Module.Address},
 	})
@@ -507,7 +507,7 @@ func (w *warpTest) deliverAddressedCallToReceivingSubnet() {
 	blockHash, _ := w.getBlockHashAndNumberFromTxReceipt(receiptCtx, client, signedTx)
 
 	log.Info("Fetching relevant warp logs and receipts from new block")
-	logs, err := client.FilterLogs(ctx, interfaces.FilterQuery{
+	logs, err := client.FilterLogs(ctx, ethereum.FilterQuery{
 		BlockHash: &blockHash,
 		Addresses: []common.Address{warp.Module.Address},
 	})
@@ -562,7 +562,7 @@ func (w *warpTest) deliverBlockHashPayload() {
 	defer cancel()
 	blockHash, _ := w.getBlockHashAndNumberFromTxReceipt(receiptCtx, client, signedTx)
 	log.Info("Fetching relevant warp logs and receipts from new block")
-	logs, err := client.FilterLogs(ctx, interfaces.FilterQuery{
+	logs, err := client.FilterLogs(ctx, ethereum.FilterQuery{
 		BlockHash: &blockHash,
 		Addresses: []common.Address{warp.Module.Address},
 	})
@@ -639,7 +639,7 @@ func (w *warpTest) warpLoad() {
 
 	log.Info("Subscribing to warp send events on sending subnet")
 	logs := make(chan types.Log, numWorkers*int(txsPerWorker))
-	sub, err := sendingClient.SubscribeFilterLogs(ctx, interfaces.FilterQuery{
+	sub, err := sendingClient.SubscribeFilterLogs(ctx, ethereum.FilterQuery{
 		Addresses: []common.Address{warp.Module.Address},
 	}, logs)
 	require.NoError(err)

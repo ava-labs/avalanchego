@@ -34,6 +34,7 @@ import (
 	"strings"
 	"testing"
 
+	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/types"
@@ -41,7 +42,6 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/subnet-evm/accounts/abi"
 	"github.com/ava-labs/subnet-evm/accounts/abi/bind"
-	"github.com/ava-labs/subnet-evm/interfaces"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -77,7 +77,7 @@ func (mt *mockTransactor) SuggestGasTipCap(ctx context.Context) (*big.Int, error
 	return mt.gasTipCap, nil
 }
 
-func (mt *mockTransactor) EstimateGas(ctx context.Context, call interfaces.CallMsg) (gas uint64, err error) {
+func (mt *mockTransactor) EstimateGas(ctx context.Context, call ethereum.CallMsg) (gas uint64, err error) {
 	return 0, nil
 }
 
@@ -99,7 +99,7 @@ func (mc *mockCaller) CodeAt(ctx context.Context, contract common.Address, block
 	return mc.codeAtBytes, mc.codeAtErr
 }
 
-func (mc *mockCaller) CallContract(ctx context.Context, call interfaces.CallMsg, blockNumber *big.Int) ([]byte, error) {
+func (mc *mockCaller) CallContract(ctx context.Context, call ethereum.CallMsg, blockNumber *big.Int) ([]byte, error) {
 	mc.callContractBlockNumber = blockNumber
 	return mc.callContractBytes, mc.callContractErr
 }
@@ -119,7 +119,7 @@ func (mc *mockAcceptedCaller) AcceptedCodeAt(ctx context.Context, contract commo
 	return mc.acceptedCodeAtBytes, mc.acceptedCodeAtErr
 }
 
-func (mc *mockAcceptedCaller) AcceptedCallContract(ctx context.Context, call interfaces.CallMsg) ([]byte, error) {
+func (mc *mockAcceptedCaller) AcceptedCallContract(ctx context.Context, call ethereum.CallMsg) ([]byte, error) {
 	mc.acceptedCallContractCalled = true
 	return mc.acceptedCallContractBytes, mc.acceptedCallContractErr
 }
@@ -139,7 +139,7 @@ func (mc *mockBlockHashCaller) CodeAtHash(ctx context.Context, contract common.A
 	return mc.codeAtHashBytes, mc.codeAtHashErr
 }
 
-func (mc *mockBlockHashCaller) CallContractAtHash(ctx context.Context, call interfaces.CallMsg, hash common.Hash) ([]byte, error) {
+func (mc *mockBlockHashCaller) CallContractAtHash(ctx context.Context, call ethereum.CallMsg, hash common.Hash) ([]byte, error) {
 	mc.callContractAtHashCalled = true
 	return mc.callContractAtHashBytes, mc.callContractAtHashErr
 }
