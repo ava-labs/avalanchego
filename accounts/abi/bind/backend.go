@@ -31,7 +31,7 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/ava-labs/coreth/interfaces"
+	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 )
@@ -64,7 +64,7 @@ type ContractCaller interface {
 
 	// CallContract executes an Ethereum contract call with the specified data as the
 	// input.
-	CallContract(ctx context.Context, call interfaces.CallMsg, blockNumber *big.Int) ([]byte, error)
+	CallContract(ctx context.Context, call ethereum.CallMsg, blockNumber *big.Int) ([]byte, error)
 }
 
 // AcceptedContractCaller defines methods to perform contract calls on the pending state.
@@ -75,7 +75,7 @@ type AcceptedContractCaller interface {
 	AcceptedCodeAt(ctx context.Context, contract common.Address) ([]byte, error)
 
 	// AcceptedCallContract executes an Ethereum contract call against the accepted state.
-	AcceptedCallContract(ctx context.Context, call interfaces.CallMsg) ([]byte, error)
+	AcceptedCallContract(ctx context.Context, call ethereum.CallMsg) ([]byte, error)
 }
 
 // BlockHashContractCaller defines methods to perform contract calls on a specific block hash.
@@ -86,7 +86,7 @@ type BlockHashContractCaller interface {
 	CodeAtHash(ctx context.Context, contract common.Address, blockHash common.Hash) ([]byte, error)
 
 	// CallContractAtHash executes an Ethereum contract call against the state at the specified block hash.
-	CallContractAtHash(ctx context.Context, call interfaces.CallMsg, blockHash common.Hash) ([]byte, error)
+	CallContractAtHash(ctx context.Context, call ethereum.CallMsg, blockHash common.Hash) ([]byte, error)
 }
 
 // ContractTransactor defines the methods needed to allow operating with a contract
@@ -94,10 +94,10 @@ type BlockHashContractCaller interface {
 // used when the user does not provide some needed values, but rather leaves it up
 // to the transactor to decide.
 type ContractTransactor interface {
-	interfaces.GasEstimator
-	interfaces.GasPricer
-	interfaces.GasPricer1559
-	interfaces.TransactionSender
+	ethereum.GasEstimator
+	ethereum.GasPricer
+	ethereum.GasPricer1559
+	ethereum.TransactionSender
 
 	// HeaderByNumber returns a block header from the current canonical chain. If
 	// number is nil, the latest known header is returned.
@@ -119,7 +119,7 @@ type DeployBackend interface {
 // ContractFilterer defines the methods needed to access log events using one-off
 // queries or continuous event subscriptions.
 type ContractFilterer interface {
-	interfaces.LogFilterer
+	ethereum.LogFilterer
 }
 
 // ContractBackend defines the methods needed to work with contracts on a read-write basis.

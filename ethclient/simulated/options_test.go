@@ -23,9 +23,9 @@ import (
 	"testing"
 
 	"github.com/ava-labs/coreth/core"
-	"github.com/ava-labs/coreth/interfaces"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/acp176"
+	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/core/types"
 )
 
@@ -64,7 +64,7 @@ func TestWithCallGasLimitOption(t *testing.T) {
 	defer sim.Close()
 
 	client := sim.Client()
-	_, err := client.CallContract(context.Background(), interfaces.CallMsg{
+	_, err := client.CallContract(context.Background(), ethereum.CallMsg{
 		From: testAddr,
 		To:   &testAddr,
 		Gas:  21000,
