@@ -9,7 +9,7 @@ use crate::sync::{
     GetRangeProofRequest, GetRangeProofResponse, VerifyChangeProofRequest,
     VerifyChangeProofResponse,
 };
-use tonic::{async_trait, Request, Response, Status};
+use tonic::{Request, Response, Status, async_trait};
 
 #[async_trait]
 impl DbServerTrait for Database {

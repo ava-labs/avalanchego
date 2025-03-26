@@ -61,7 +61,7 @@ fn generate_deletes(start: u64, count: u64) -> impl Iterator<Item = BatchOp<Box<
         .map(|key| {
             let digest = Sha256::digest(key.to_ne_bytes())[..].into();
             debug!("deleting {:?} with digest {}", key, hex::encode(&digest));
-            #[allow(clippy::let_and_return)]
+            #[expect(clippy::let_and_return)]
             digest
         })
         .map(|key| BatchOp::Delete { key })

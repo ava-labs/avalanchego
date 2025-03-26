@@ -31,8 +31,8 @@ use firewood::manager::{CacheReadStrategy, RevisionManagerConfig};
 
 use fastrace::collector::Config;
 
-use opentelemetry::trace::SpanKind;
 use opentelemetry::InstrumentationScope;
+use opentelemetry::trace::SpanKind;
 use opentelemetry_otlp::{SpanExporter, WithExportConfig};
 use opentelemetry_sdk::Resource;
 

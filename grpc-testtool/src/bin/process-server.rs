@@ -4,11 +4,11 @@
 use chrono::Local;
 use clap::Parser;
 use env_logger::Builder;
-use log::{info, LevelFilter};
+use log::{LevelFilter, info};
+use rpc::DatabaseService;
 use rpc::process_server::process_server_service_server::ProcessServerServiceServer;
 use rpc::rpcdb::database_server::DatabaseServer as RpcServer;
 use rpc::sync::db_server::DbServer as SyncServer;
-use rpc::DatabaseService;
 use serde::Deserialize;
 use std::error::Error;
 use std::io::Write;

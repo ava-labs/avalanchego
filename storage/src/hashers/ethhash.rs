@@ -7,9 +7,9 @@ use std::iter::once;
 
 use crate::logger::warn;
 use crate::{
+    HashType, Hashable, Preimage, TrieHash, ValueDigest,
     hashednode::HasUpdate,
     logger::{trace, trace_enabled},
-    HashType, Hashable, Preimage, TrieHash, ValueDigest,
 };
 use bitfield::bitfield;
 use bytes::BytesMut;

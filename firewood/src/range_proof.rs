@@ -9,10 +9,10 @@ use crate::proof::Proof;
 /// are in the trie with a given root hash.
 #[derive(Debug)]
 pub struct RangeProof<K: AsRef<[u8]>, V: AsRef<[u8]>, H: Hashable> {
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     pub(crate) start_proof: Option<Proof<H>>,
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     pub(crate) end_proof: Option<Proof<H>>,
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     pub(crate) key_values: Box<[(K, V)]>,
 }

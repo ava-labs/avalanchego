@@ -1,6 +1,18 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+use crate::logger::trace;
+use arc_swap::ArcSwap;
+use arc_swap::access::DynAccess;
+use bincode::{DefaultOptions, Options as _};
+use bytemuck_derive::{AnyBitPattern, NoUninit};
+use coarsetime::Instant;
+use fastrace::local::LocalSpan;
+use metrics::counter;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fmt::Debug;
+
 /// The [NodeStore] handles the serialization of nodes and
 /// free space management of nodes in the page store. It lays out the format
 /// of the [PageStore]. More specifically, it places a [FileIdentifyingMagic]
@@ -41,17 +53,6 @@
 /// I --> |commit|N("New commit NodeStore&lt;Committed, S&gt;")
 /// style E color:#FFFFFF, fill:#AA00FF, stroke:#AA00FF
 /// ```
-use crate::logger::trace;
-use arc_swap::access::DynAccess;
-use arc_swap::ArcSwap;
-use bincode::{DefaultOptions, Options as _};
-use bytemuck_derive::{AnyBitPattern, NoUninit};
-use coarsetime::Instant;
-use fastrace::local::LocalSpan;
-use metrics::counter;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::fmt::Debug;
 use std::io::{Error, ErrorKind, Write};
 use std::mem::{offset_of, take};
 use std::num::NonZeroU64;
@@ -193,7 +194,6 @@ struct StoredArea<T> {
 impl<T: ReadInMemoryNode, S: ReadableStorage> NodeStore<T, S> {
     /// Returns (index, area_size) for the [StoredArea] at `addr`.
     /// `index` is the index of `area_size` in [AREA_SIZES].
-    #[allow(dead_code)]
     fn area_index_and_size(&self, addr: LinearAddress) -> Result<(AreaIndex, u64), Error> {
         let mut area_stream = self.storage.stream_from(addr.get())?;
 
@@ -694,7 +694,6 @@ pub trait RootReader {
 /// A committed revision of a merkle trie.
 #[derive(Clone, Debug)]
 pub struct Committed {
-    #[allow(dead_code)]
     deleted: Box<[LinearAddress]>,
     root_hash: Option<TrieHash>,
 }
@@ -903,7 +902,7 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
                 if hashed.len() == 1 {
                     // we were left with one hashed node that must be rehashed
                     let invalidated_node = hashed.first_mut().expect("hashed is not empty");
-                    let mut hashable_node = self.read_node(*invalidated_node.1 .0)?.deref().clone();
+                    let mut hashable_node = self.read_node(*invalidated_node.1.0)?.deref().clone();
                     let original_length = path_prefix.len();
                     path_prefix.0.extend(b.partial_path.0.iter().copied());
                     if !unhashed.is_empty() {
@@ -916,7 +915,7 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
                     }
                     let hash = hash_node(&hashable_node, path_prefix);
                     path_prefix.0.truncate(original_length);
-                    *invalidated_node.1 .1 = hash;
+                    *invalidated_node.1.1 = hash;
                 }
                 // handle the single-child case for an account special below
                 if hashed.is_empty() && unhashed.len() == 1 {
@@ -1092,7 +1091,7 @@ impl NodeStore<Arc<ImmutableProposal>, FileBacked> {
                     // SAFETY: the submission_queue_entry's found buffer must not move or go out of scope
                     // until the operation has been completed. This is ensured by marking the slot busy,
                     // and not marking it !busy until the kernel has said it's done below.
-                    #[allow(unsafe_code)]
+                    #[expect(unsafe_code)]
                     while unsafe { ring.submission().push(&submission_queue_entry) }.is_err() {
                         ring.submitter().squeue_wait()?;
                         trace!("submission queue is full");
@@ -1291,7 +1290,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
+#[expect(clippy::unwrap_used)]
 mod tests {
     use std::array::from_fn;
 

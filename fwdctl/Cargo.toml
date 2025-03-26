@@ -1,7 +1,8 @@
 [package]
 name = "fwdctl"
 version = "0.0.4"
-edition = "2021"
+edition = "2024"
+rust-version = "1.85.0"
 
 [dependencies]
 firewood = { version = "0.0.4", path = "../firewood" }

@@ -295,14 +295,14 @@ impl BranchNode {
 
     /// Returns (index, hash) for each child that has a hash set.
     pub fn children_iter(&self) -> impl Iterator<Item = (usize, &HashType)> + Clone {
-        self.children.iter().enumerate().filter_map(
-            #[allow(clippy::indexing_slicing)]
-            |(i, child)| match child {
+        self.children
+            .iter()
+            .enumerate()
+            .filter_map(|(i, child)| match child {
                 None => None,
                 Some(Child::Node(_)) => unreachable!("TODO make unreachable"),
                 Some(Child::AddressWithHash(_, hash)) => Some((i, hash)),
-            },
-        )
+            })
     }
 }
 

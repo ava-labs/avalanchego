@@ -6,7 +6,7 @@ use bitflags::bitflags;
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use std::fmt::{self, Debug};
-use std::iter::{once, FusedIterator};
+use std::iter::{FusedIterator, once};
 
 static NIBBLES: [u8; 16] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
@@ -50,7 +50,7 @@ bitflags! {
 
 impl Path {
     /// Return an iterator over the encoded bytes
-    pub fn iter_encoded(&self) -> impl Iterator<Item = u8> + '_ {
+    pub fn iter_encoded(&self) -> impl Iterator<Item = u8> {
         let mut flags = Flags::empty();
 
         let has_odd_len = self.0.len() & 1 == 1;
@@ -170,10 +170,10 @@ impl Iterator for NibblesIterator<'_> {
             return None;
         }
         let result = if self.head % 2 == 0 {
-            #[allow(clippy::indexing_slicing)]
+            #[expect(clippy::indexing_slicing)]
             NIBBLES[(self.data[self.head / 2] >> 4) as usize]
         } else {
-            #[allow(clippy::indexing_slicing)]
+            #[expect(clippy::indexing_slicing)]
             NIBBLES[(self.data[self.head / 2] & 0xf) as usize]
         };
         self.head += 1;
@@ -220,10 +220,10 @@ impl DoubleEndedIterator for NibblesIterator<'_> {
         }
 
         let result = if self.tail % 2 == 0 {
-            #[allow(clippy::indexing_slicing)]
+            #[expect(clippy::indexing_slicing)]
             NIBBLES[(self.data[self.tail / 2 - 1] & 0xf) as usize]
         } else {
-            #[allow(clippy::indexing_slicing)]
+            #[expect(clippy::indexing_slicing)]
             NIBBLES[(self.data[self.tail / 2] >> 4) as usize]
         };
         self.tail -= 1;
@@ -238,7 +238,6 @@ impl DoubleEndedIterator for NibblesIterator<'_> {
 }
 
 #[cfg(test)]
-#[allow(clippy::indexing_slicing)]
 mod test {
     use super::*;
     use std::fmt::Debug;

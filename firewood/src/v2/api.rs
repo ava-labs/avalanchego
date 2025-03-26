@@ -149,7 +149,6 @@ impl From<RevisionManagerError> for Error {
         match err {
             RevisionManagerError::IO(io_err) => Error::IO(io_err),
             RevisionManagerError::NotLatest => Error::NotLatest,
-            RevisionManagerError::SiblingCommitted => Error::SiblingCommitted,
         }
     }
 }

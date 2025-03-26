@@ -245,7 +245,7 @@ fn get_iterator_intial_state<T: TrieReader>(
                         ),
                     });
 
-                    #[allow(clippy::indexing_slicing)]
+                    #[expect(clippy::indexing_slicing)]
                     let child = &branch.children[next_unmatched_key_nibble as usize];
                     node = match child {
                         None => return Ok(NodeStreamState::Iterating { iter_stack }),
@@ -466,7 +466,7 @@ impl<T: TrieReader> Iterator for PathIterator<'_, '_, T> {
                                     }));
                                 };
 
-                                #[allow(clippy::indexing_slicing)]
+                                #[expect(clippy::indexing_slicing)]
                                 let child = &branch.children[next_unmatched_key_nibble as usize];
                                 match child {
                                     None => {
@@ -555,7 +555,7 @@ where
 
 /// Returns an iterator that returns (`pos`,`child`) for each non-empty child of `branch`,
 /// where `pos` is the position of the child in `branch`'s children array.
-fn as_enumerated_children_iter(branch: &BranchNode) -> impl Iterator<Item = (u8, Child)> {
+fn as_enumerated_children_iter(branch: &BranchNode) -> impl Iterator<Item = (u8, Child)> + use<> {
     branch
         .children
         .clone()
@@ -581,7 +581,7 @@ fn key_from_nibble_iter<Iter: Iterator<Item = u8>>(mut nibbles: Iter) -> Key {
 }
 
 #[cfg(test)]
-#[allow(clippy::indexing_slicing, clippy::unwrap_used)]
+#[expect(clippy::indexing_slicing, clippy::unwrap_used)]
 mod tests {
     use std::sync::Arc;
 
@@ -942,7 +942,7 @@ mod tests {
         };
 
         // we iterate twice because we should get a None then start over
-        #[allow(clippy::indexing_slicing)]
+        #[expect(clippy::indexing_slicing)]
         for k in start.map(|r| r[0]).unwrap_or_default()..=u8::MAX {
             let next = stream.next().await.map(|kv| {
                 let (k, v) = kv.unwrap();

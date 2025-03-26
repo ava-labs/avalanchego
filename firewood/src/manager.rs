@@ -1,8 +1,6 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-#![allow(dead_code)]
-
 use std::collections::{HashMap, VecDeque};
 use std::io::Error;
 use std::num::NonZero;
@@ -44,9 +42,6 @@ pub(crate) struct RevisionManager {
     /// Maximum number of revisions to keep on disk
     max_revisions: usize,
 
-    /// The underlying file storage
-    filebacked: Arc<FileBacked>,
-
     /// The list of revisions that are on disk; these point to the different roots
     /// stored in the filebacked storage.
     historical: VecDeque<CommittedRevision>,
@@ -57,8 +52,6 @@ pub(crate) struct RevisionManager {
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum RevisionManagerError {
-    #[error("The proposal cannot be committed since a sibling was committed")]
-    SiblingCommitted,
     #[error(
         "The proposal cannot be committed since it is not a direct child of the most recent commit"
     )]
@@ -86,7 +79,6 @@ impl RevisionManager {
         };
         let mut manager = Self {
             max_revisions: config.max_revisions,
-            filebacked: storage,
             historical: VecDeque::from([nodestore.clone()]),
             by_hash: Default::default(),
             proposals: Default::default(),

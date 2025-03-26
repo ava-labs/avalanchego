@@ -1,7 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use assert_cmd::Command;
 use predicates::prelude::*;
 use serial_test::serial;

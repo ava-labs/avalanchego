@@ -1,7 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use clap::{value_parser, Args};
+use clap::{Args, value_parser};
 use firewood::db::{Db, DbConfig};
 use firewood::v2::api;
 

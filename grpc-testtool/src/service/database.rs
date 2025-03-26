@@ -13,7 +13,7 @@ use crate::rpcdb::{
 };
 use firewood::v2::api::{BatchOp, Db as _, DbView as _, Proposal as _};
 
-use tonic::{async_trait, Request, Response, Status};
+use tonic::{Request, Response, Status, async_trait};
 
 #[async_trait]
 impl Database for DatabaseService {

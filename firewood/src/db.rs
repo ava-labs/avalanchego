@@ -442,7 +442,7 @@ impl Proposal<'_> {
     }
 }
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
+#[expect(clippy::unwrap_used)]
 mod test {
     use std::ops::{Deref, DerefMut};
     use std::path::PathBuf;

@@ -1,14 +1,13 @@
-use std::{
-    collections::HashSet,
-    io::Write,
-    net::Ipv6Addr,
-    ops::Deref,
-    sync::{atomic::Ordering, Arc, Once},
-    time::SystemTime,
-};
+use std::collections::HashSet;
+use std::io::Write;
+use std::net::Ipv6Addr;
+use std::ops::Deref;
+use std::sync::atomic::Ordering;
+use std::sync::{Arc, Once};
+use std::time::SystemTime;
 
-use oxhttp::model::{Body, Response, StatusCode};
 use oxhttp::Server;
+use oxhttp::model::{Body, Response, StatusCode};
 use std::net::Ipv4Addr;
 use std::time::Duration;
 

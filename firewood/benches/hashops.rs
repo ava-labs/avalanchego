@@ -4,7 +4,7 @@
 // hash benchmarks; run with 'cargo bench'
 
 use criterion::profiler::Profiler;
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use firewood::db::{BatchOp, DbConfig};
 use firewood::merkle::Merkle;
 use firewood::v2::api::{Db as _, Proposal as _};
@@ -26,12 +26,12 @@ enum FlamegraphProfiler {
     Active(ProfilerGuard<'static>),
 }
 
-fn file_error_panic<T, U>(path: &Path) -> impl FnOnce(T) -> U + '_ {
+fn file_error_panic<T, U>(path: &Path) -> impl FnOnce(T) -> U {
     |_| panic!("Error on file `{}`", path.display())
 }
 
 impl Profiler for FlamegraphProfiler {
-    #[allow(clippy::unwrap_used)]
+    #[expect(clippy::unwrap_used)]
     fn start_profiling(&mut self, _benchmark_id: &str, _benchmark_dir: &Path) {
         if let Self::Init(frequency) = self {
             let guard = ProfilerGuard::new(*frequency).unwrap();
@@ -39,16 +39,15 @@ impl Profiler for FlamegraphProfiler {
         }
     }
 
-    #[allow(clippy::unwrap_used)]
+    #[expect(clippy::unwrap_used)]
     fn stop_profiling(&mut self, _benchmark_id: &str, benchmark_dir: &Path) {
         std::fs::create_dir_all(benchmark_dir).unwrap();
         let filename = "firewood-flamegraph.svg";
         let flamegraph_path = benchmark_dir.join(filename);
-        #[allow(clippy::unwrap_used)]
         let flamegraph_file =
             File::create(&flamegraph_path).unwrap_or_else(file_error_panic(&flamegraph_path));
 
-        #[allow(clippy::unwrap_used)]
+        #[expect(clippy::unwrap_used)]
         if let Self::Active(profiler) = self {
             profiler
                 .report()
@@ -62,7 +61,6 @@ impl Profiler for FlamegraphProfiler {
 
 // This benchmark peeks into the merkle layer and times how long it takes
 // to insert NKEYS with a key length of KEYSIZE
-#[allow(clippy::unwrap_used)]
 fn bench_merkle<const NKEYS: usize, const KEYSIZE: usize>(criterion: &mut Criterion) {
     let mut rng = StdRng::seed_from_u64(1234);
 
@@ -87,7 +85,7 @@ fn bench_merkle<const NKEYS: usize, const KEYSIZE: usize>(criterion: &mut Criter
 
                     (merkle, keys)
                 },
-                #[allow(clippy::unwrap_used)]
+                #[expect(clippy::unwrap_used)]
                 |(mut merkle, keys)| {
                     keys.into_iter()
                         .for_each(|key| merkle.insert(&key, Box::new(*b"v")).unwrap());
@@ -98,7 +96,7 @@ fn bench_merkle<const NKEYS: usize, const KEYSIZE: usize>(criterion: &mut Criter
         });
 }
 
-#[allow(clippy::unwrap_used)]
+#[expect(clippy::unwrap_used)]
 fn bench_db<const N: usize>(criterion: &mut Criterion) {
     const KEY_LEN: usize = 4;
     let mut rng = StdRng::seed_from_u64(1234);

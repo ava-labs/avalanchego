@@ -5,7 +5,7 @@ use std::error::Error;
 use std::time::Instant;
 
 use fastrace::prelude::SpanContext;
-use fastrace::{func_path, Span};
+use fastrace::{Span, func_path};
 use firewood::db::Db;
 use firewood::v2::api::{Db as _, Proposal as _};
 use log::info;

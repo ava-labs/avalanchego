@@ -50,7 +50,7 @@ impl ReadableStorage for MemStore {
     }
 }
 
-#[allow(clippy::unwrap_used)]
+#[expect(clippy::unwrap_used)]
 #[cfg(test)]
 mod test {
     use super::*;

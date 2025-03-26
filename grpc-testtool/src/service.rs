@@ -7,8 +7,8 @@ use firewood::v2::api::{Db as _, Error};
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::path::Path;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::sync::Mutex;
 use tonic::Status;
 

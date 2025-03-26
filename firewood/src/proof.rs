@@ -111,7 +111,7 @@ impl From<PathIterItem> for ProofNode {
 
         if let Some(branch) = item.node.as_branch() {
             // TODO danlaine: can we avoid indexing?
-            #[allow(clippy::indexing_slicing)]
+            #[expect(clippy::indexing_slicing)]
             for (i, hash) in branch.children_iter() {
                 child_hashes[i] = Some(hash.clone());
             }

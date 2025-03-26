@@ -47,7 +47,8 @@ impl FileBacked {
     pub(crate) fn make_op(&self, data: &[u8]) -> io_uring::opcode::Write {
         use std::os::fd::AsRawFd as _;
 
-        use io_uring::{opcode::Write, types};
+        use io_uring::opcode::Write;
+        use io_uring::types;
 
         Write::new(
             types::Fd(self.fd.as_raw_fd()),

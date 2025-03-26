@@ -1,9 +1,6 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-// TODO: remove this once we have code that uses it
-#![allow(dead_code)]
-
 //! A LinearStore provides a view of a set of bytes at
 //! a given time. A LinearStore has three different types,
 //! which refer to another base type, as follows:
