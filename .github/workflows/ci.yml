@@ -150,6 +150,7 @@ jobs:
           # which is never desirable for this job. The buf-push job is
           # responsible for pushes.
           push: false
+          # This version should match the version installed in the nix dev shell
           version: 1.47.2
   check_generated_protobuf:
     name: Up-to-date protobuf
@@ -157,11 +158,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
-      - uses: bufbuild/buf-action@1b8e0a0e793562b7850d7e6ff0228b5c0b16111c #v1.1.0
-        with:
-          setup_only: true
-          version: 1.47.2
-      - shell: bash
+      # Use the dev shell instead of bufbuild/buf-action to ensure the dev shell provides the expected versions
+      - uses: ./.github/actions/install-nix
+      - shell: nix develop --command bash -x {0}
         run: scripts/protobuf_codegen.sh
       - shell: bash
         run: .github/workflows/check-clean-branch.sh
