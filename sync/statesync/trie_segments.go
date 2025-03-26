@@ -11,8 +11,8 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/coreth/plugin/evm/customrawdb"
 	"github.com/ava-labs/coreth/plugin/evm/message"
-	customrawdb "github.com/ava-labs/coreth/plugin/evm/rawdb"
 	syncclient "github.com/ava-labs/coreth/sync/client"
 	"github.com/ava-labs/coreth/utils"
 	"github.com/ava-labs/libevm/common"

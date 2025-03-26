@@ -8,7 +8,7 @@ import (
 	"math/rand"
 	"testing"
 
-	customrawdb "github.com/ava-labs/coreth/plugin/evm/rawdb"
+	"github.com/ava-labs/coreth/plugin/evm/customrawdb"
 	"github.com/ava-labs/coreth/sync/syncutils"
 	"github.com/ava-labs/coreth/utils"
 	"github.com/ava-labs/libevm/common"

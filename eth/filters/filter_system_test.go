@@ -43,7 +43,7 @@ import (
 	"github.com/ava-labs/coreth/interfaces"
 	"github.com/ava-labs/coreth/internal/ethapi"
 	"github.com/ava-labs/coreth/params"
-	customrawdb "github.com/ava-labs/coreth/plugin/evm/rawdb"
+	"github.com/ava-labs/coreth/plugin/evm/customrawdb"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
