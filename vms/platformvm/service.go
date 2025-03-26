@@ -897,7 +897,6 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 				Connected:              connected,
 				PotentialReward:        &potentialReward,
 				AccruedDelegateeReward: &jsonDelegateeReward,
-				RewardOwner:            validationRewardOwner,
 				ValidationRewardOwner:  validationRewardOwner,
 				DelegationRewardOwner:  delegationRewardOwner,
 				DelegationFee:          delegationFee,
@@ -973,24 +972,8 @@ type GetL1ValidatorArgs struct {
 	ValidationID ids.ID `json:"validationID"`
 }
 
-type APIL1Validator struct {
-	ValidationID ids.ID     `json:"validationID"`
-	NodeID       ids.NodeID `json:"nodeID"`
-	// PublicKey is the compressed BLS public key of the validator
-	PublicKey             types.JSONByteSlice `json:"publicKey"`
-	RemainingBalanceOwner platformapi.Owner   `json:"remainingBalanceOwner"`
-	DeactivationOwner     platformapi.Owner   `json:"deactivationOwner"`
-	StartTime             avajson.Uint64      `json:"startTime"`
-	Weight                avajson.Uint64      `json:"weight"`
-	MinNonce              avajson.Uint64      `json:"minNonce"`
-	// Balance is the remaining amount of AVAX this L1 validator has for paying
-	// the continuous fee, according to the last accepted state. If the
-	// validator is inactive, the balance will be 0.
-	Balance avajson.Uint64 `json:"balance"`
-}
-
 type GetL1ValidatorReply struct {
-	APIL1Validator
+	platformapi.APIL1Validator
 	SubnetID ids.ID `json:"subnetID"`
 	// Height is the height of the last accepted block
 	Height avajson.Uint64 `json:"height"`
@@ -1028,46 +1011,52 @@ func (s *Service) GetL1Validator(r *http.Request, args *GetL1ValidatorArgs, repl
 	return nil
 }
 
-func (s *Service) convertL1ValidatorToAPI(vdr state.L1Validator) (APIL1Validator, error) {
+func (s *Service) convertL1ValidatorToAPI(vdr state.L1Validator) (platformapi.APIL1Validator, error) {
 	var remainingBalanceOwner message.PChainOwner
 	if _, err := txs.Codec.Unmarshal(vdr.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
-		return APIL1Validator{}, fmt.Errorf("failed unmarshalling remaining balance owner: %w", err)
+		return platformapi.APIL1Validator{}, fmt.Errorf("failed unmarshalling remaining balance owner: %w", err)
 	}
 	remainingBalanceAPIOwner, err := s.getAPIOwner(&secp256k1fx.OutputOwners{
 		Threshold: remainingBalanceOwner.Threshold,
 		Addrs:     remainingBalanceOwner.Addresses,
 	})
 	if err != nil {
-		return APIL1Validator{}, fmt.Errorf("failed formatting remaining balance owner: %w", err)
+		return platformapi.APIL1Validator{}, fmt.Errorf("failed formatting remaining balance owner: %w", err)
 	}
 
 	var deactivationOwner message.PChainOwner
 	if _, err := txs.Codec.Unmarshal(vdr.DeactivationOwner, &deactivationOwner); err != nil {
-		return APIL1Validator{}, fmt.Errorf("failed unmarshalling deactivation owner: %w", err)
+		return platformapi.APIL1Validator{}, fmt.Errorf("failed unmarshalling deactivation owner: %w", err)
 	}
 	deactivationAPIOwner, err := s.getAPIOwner(&secp256k1fx.OutputOwners{
 		Threshold: deactivationOwner.Threshold,
 		Addrs:     deactivationOwner.Addresses,
 	})
 	if err != nil {
-		return APIL1Validator{}, fmt.Errorf("failed formatting deactivation owner: %w", err)
+		return platformapi.APIL1Validator{}, fmt.Errorf("failed formatting deactivation owner: %w", err)
 	}
 
-	apiVdr := APIL1Validator{
-		ValidationID: vdr.ValidationID,
-		NodeID:       vdr.NodeID,
-		PublicKey: bls.PublicKeyToCompressedBytes(
-			bls.PublicKeyFromValidUncompressedBytes(vdr.PublicKey),
-		),
-		RemainingBalanceOwner: *remainingBalanceAPIOwner,
-		DeactivationOwner:     *deactivationAPIOwner,
-		StartTime:             avajson.Uint64(vdr.StartTime),
-		Weight:                avajson.Uint64(vdr.Weight),
-		MinNonce:              avajson.Uint64(vdr.MinNonce),
+	pubKey := types.JSONByteSlice(bls.PublicKeyToCompressedBytes(
+		bls.PublicKeyFromValidUncompressedBytes(vdr.PublicKey),
+	))
+	minNonce := avajson.Uint64(vdr.MinNonce)
+
+	apiVdr := platformapi.APIL1Validator{
+		NodeID:    vdr.NodeID,
+		StartTime: avajson.Uint64(vdr.StartTime),
+		Weight:    avajson.Uint64(vdr.Weight),
+		BaseL1Validator: platformapi.BaseL1Validator{
+			ValidationID:          &vdr.ValidationID,
+			PublicKey:             &pubKey,
+			RemainingBalanceOwner: remainingBalanceAPIOwner,
+			DeactivationOwner:     deactivationAPIOwner,
+			MinNonce:              &minNonce,
+		},
 	}
 	if vdr.EndAccumulatedFee != 0 {
 		accruedFees := s.vm.state.GetAccruedFees()
-		apiVdr.Balance = avajson.Uint64(vdr.EndAccumulatedFee - accruedFees)
+		balance := avajson.Uint64(vdr.EndAccumulatedFee - accruedFees)
+		apiVdr.Balance = &balance
 	}
 	return apiVdr, nil
 }
