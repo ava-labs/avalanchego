@@ -40,7 +40,7 @@ import (
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/eth/gasestimator"
 	"github.com/ava-labs/coreth/params"
-	customtypes "github.com/ava-labs/coreth/plugin/evm/types"
+	"github.com/ava-labs/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/libevm/accounts"
 	"github.com/ava-labs/libevm/accounts/keystore"

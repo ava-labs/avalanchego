@@ -42,7 +42,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 
 	// Side effect: registration of libevm extras.
-	_ "github.com/ava-labs/coreth/plugin/evm/types"
+	_ "github.com/ava-labs/coreth/plugin/evm/customtypes"
 )
 
 func TestNewID(t *testing.T) {

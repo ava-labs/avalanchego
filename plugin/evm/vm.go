@@ -23,7 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/upgrade"
 	avalanchegoConstants "github.com/ava-labs/avalanchego/utils/constants"
-	customtypes "github.com/ava-labs/coreth/plugin/evm/types"
+	"github.com/ava-labs/coreth/plugin/evm/customtypes"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/coreth/consensus/dummy"
