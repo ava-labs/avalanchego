@@ -24,7 +24,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package types_test
+package customtypes_test
 
 import (
 	"bytes"
@@ -39,7 +39,7 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/rlp"
 
-	. "github.com/ava-labs/coreth/plugin/evm/types"
+	. "github.com/ava-labs/coreth/plugin/evm/customtypes"
 
 	// TODO(arr4n) These tests were originally part of the `coreth/core/types`
 	// package so assume the presence of identifiers. A dot-import reduces PR
