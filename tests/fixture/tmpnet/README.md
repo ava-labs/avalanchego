@@ -469,60 +469,6 @@ Example usage:
     loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 ```
 
-The action requires a flake.nix file in the repo root that enables
-availability of promtail and prometheus. The following is a minimal
-flake that inherits from the avalanchego flake:
-
-```nix
-{
-  # To use:
-  #  - install nix: https://github.com/DeterminateSystems/nix-installer?tab=readme-ov-file#install-nix
-  #  - run `nix develop` or use direnv (https://direnv.net/)
-  #    - for quieter direnv output, set `export DIRENV_LOG_FORMAT=`
-
-  description = "VM development environment";
-
-  inputs = {
-    nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.2405.*.tar.gz";
-    # Make sure to set a SHA or tag to the desired version
-    avalanchego.url = "github:ava-labs/avalanchego?ref=[sha or tag]";
-  };
-
-  outputs = { self, nixpkgs, avalanchego, ... }:
-    let
-      allSystems = builtins.attrNames avalanchego.devShells;
-      forAllSystems = nixpkgs.lib.genAttrs allSystems;
-    in {
-      devShells = forAllSystems (system: {
-        default = avalanchego.devShells.${system}.default;
-      });
-    };
-}
-```
-
-The action expects to be able to run bin/tmpnetctl from the root of
-the repository. A suggested version of this script:
-
-```bash
-#!/usr/bin/env bash
-
-set -euo pipefail
-
-# Ensure the go command is run from the root of the repository
-REPO_ROOT=$(cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
-cd "${REPO_ROOT}"
-
-# Set AVALANCHE_VERSION
-source ./scripts/versions.sh
-
-# Install if not already available
-if ! command -v tmpnetctl &2> /dev/null; then
-  # An explicit version is required since a main package can't be included as a dependency of the go module.
-  go install github.com/ava-labs/avalanchego/tests/fixture/tmpnet/tmpnetctl@${AVALANCHE_VERSION}
-fi
-tmpnetctl "${@}"
-```
-
 ### Viewing
 
 #### Local networks
