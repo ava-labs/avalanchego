@@ -5,6 +5,7 @@ package gossip
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"go.uber.org/zap"
@@ -128,7 +129,11 @@ func (h Handler[_]) AppGossip(_ context.Context, nodeID ids.NodeID, gossipBytes 
 	receivedBytes -= receivedDuplicateBytes
 	incomingGossibles := len(gossip) - duplicateGossip
 
-	if err := h.metrics.observeReceivedMessage(receivedPushLabels, incomingGossibles, receivedBytes, duplicateGossip, receivedDuplicateBytes); err != nil {
+	err = errors.Join(
+		h.metrics.observeMessage(receivedNotDuplicatePushLabels, incomingGossibles, receivedBytes),
+		h.metrics.observeMessage(receivedDuplicatePushLabels, duplicateGossip, receivedDuplicateBytes),
+	)
+	if err != nil {
 		h.log.Error("failed to update metrics",
 			zap.Error(err),
 		)
