@@ -11,6 +11,7 @@ import (
 	"net/netip"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -25,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/subnets"
-	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
@@ -212,6 +212,7 @@ func NewTestNetwork(
 	metrics prometheus.Registerer,
 	cfg *Config,
 	router router.ExternalHandler,
+	minCompatibleTime time.Time,
 ) (Network, error) {
 	msgCreator, err := message.NewCreator(
 		metrics,
@@ -224,7 +225,7 @@ func NewTestNetwork(
 
 	return NewNetwork(
 		cfg,
-		upgrade.GetConfig(cfg.NetworkID).FortunaTime, // Must be updated for each network upgrade
+		minCompatibleTime,
 		msgCreator,
 		metrics,
 		log,
