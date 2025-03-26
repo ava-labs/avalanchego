@@ -8,7 +8,7 @@ use std::{
 
 use smallvec::SmallVec;
 
-use crate::{BranchNode, Child, HashType, LeafNode, Node, Path};
+use crate::{BranchNode, HashType, LeafNode, Node, Path};
 
 /// Returns the hash of `node`, which is at the given `path_prefix`.
 pub fn hash_node(node: &Node, path_prefix: &Path) -> HashType {
@@ -20,7 +20,7 @@ pub fn hash_node(node: &Node, path_prefix: &Path) -> HashType {
             debug_assert!(
                 node.children
                     .iter()
-                    .all(|c| !matches!(c, Some(Child::Node(_)))),
+                    .all(|c| !matches!(c, Some(crate::Child::Node(_)))),
                 "branch children: {:?}",
                 node.children
             );
