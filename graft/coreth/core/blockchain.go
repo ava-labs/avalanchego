@@ -45,7 +45,7 @@ import (
 	"github.com/ava-labs/coreth/core/state/snapshot"
 	"github.com/ava-labs/coreth/internal/version"
 	"github.com/ava-labs/coreth/params"
-	customrawdb "github.com/ava-labs/coreth/plugin/evm/rawdb"
+	"github.com/ava-labs/coreth/plugin/evm/customrawdb"
 	customtypes "github.com/ava-labs/coreth/plugin/evm/types"
 	"github.com/ava-labs/coreth/triedb/hashdb"
 	"github.com/ava-labs/coreth/triedb/pathdb"

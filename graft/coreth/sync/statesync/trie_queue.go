@@ -4,7 +4,7 @@
 package statesync
 
 import (
-	"github.com/ava-labs/coreth/plugin/evm/rawdb"
+	"github.com/ava-labs/coreth/plugin/evm/customrawdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/ethdb"
 )
@@ -26,21 +26,21 @@ func NewTrieQueue(db ethdb.Database) *trieQueue {
 // clearIfRootDoesNotMatch clears progress and segment markers if
 // the persisted root does not match the root we are syncing to.
 func (t *trieQueue) clearIfRootDoesNotMatch(root common.Hash) error {
-	persistedRoot, err := rawdb.ReadSyncRoot(t.db)
+	persistedRoot, err := customrawdb.ReadSyncRoot(t.db)
 	if err != nil {
 		return err
 	}
 	if persistedRoot != (common.Hash{}) && persistedRoot != root {
 		// if not resuming, clear all progress markers
-		if err := rawdb.ClearAllSyncStorageTries(t.db); err != nil {
+		if err := customrawdb.ClearAllSyncStorageTries(t.db); err != nil {
 			return err
 		}
-		if err := rawdb.ClearAllSyncSegments(t.db); err != nil {
+		if err := customrawdb.ClearAllSyncSegments(t.db); err != nil {
 			return err
 		}
 	}
 
-	return rawdb.WriteSyncRoot(t.db, root)
+	return customrawdb.WriteSyncRoot(t.db, root)
 }
 
 // RegisterStorageTrie is called by the main trie's leaf handling callbacks
@@ -48,13 +48,13 @@ func (t *trieQueue) clearIfRootDoesNotMatch(root common.Hash) error {
 // getNextTrie iterates this prefix to find storage tries and accounts
 // associated with them.
 func (t *trieQueue) RegisterStorageTrie(root common.Hash, account common.Hash) error {
-	return rawdb.WriteSyncStorageTrie(t.db, root, account)
+	return customrawdb.WriteSyncStorageTrie(t.db, root, account)
 }
 
 // StorageTrieDone is called when a storage trie has completed syncing.
 // This removes any progress markers for the trie.
 func (t *trieQueue) StorageTrieDone(root common.Hash) error {
-	return rawdb.ClearSyncStorageTrie(t.db, root)
+	return customrawdb.ClearSyncStorageTrie(t.db, root)
 }
 
 // getNextTrie returns the next storage trie to sync, along with a slice
@@ -63,7 +63,7 @@ func (t *trieQueue) StorageTrieDone(root common.Hash) error {
 // Note: if a non-nil root is returned, getNextTrie guarantees that there will be at least
 // one account hash in the returned slice.
 func (t *trieQueue) getNextTrie() (common.Hash, []common.Hash, bool, error) {
-	it := rawdb.NewSyncStorageTriesIterator(t.db, t.nextStorageRoot)
+	it := customrawdb.NewSyncStorageTriesIterator(t.db, t.nextStorageRoot)
 	defer it.Release()
 
 	var (
@@ -75,7 +75,7 @@ func (t *trieQueue) getNextTrie() (common.Hash, []common.Hash, bool, error) {
 	// Iterate over the keys to find the next storage trie root and all of the account hashes that contain the same storage root.
 	for it.Next() {
 		// Unpack the state root and account hash from the current key
-		nextRoot, nextAccount := rawdb.UnpackSyncStorageTrieKey(it.Key())
+		nextRoot, nextAccount := customrawdb.UnpackSyncStorageTrieKey(it.Key())
 		// Set the root for the first pass
 		if root == (common.Hash{}) {
 			root = nextRoot
@@ -95,7 +95,7 @@ func (t *trieQueue) getNextTrie() (common.Hash, []common.Hash, bool, error) {
 }
 
 func (t *trieQueue) countTries() (int, error) {
-	it := rawdb.NewSyncStorageTriesIterator(t.db, nil)
+	it := customrawdb.NewSyncStorageTriesIterator(t.db, nil)
 	defer it.Release()
 
 	var (
@@ -104,7 +104,7 @@ func (t *trieQueue) countTries() (int, error) {
 	)
 
 	for it.Next() {
-		nextRoot, _ := rawdb.UnpackSyncStorageTrieKey(it.Key())
+		nextRoot, _ := customrawdb.UnpackSyncStorageTrieKey(it.Key())
 		if root == (common.Hash{}) || root != nextRoot {
 			root = nextRoot
 			tries++
