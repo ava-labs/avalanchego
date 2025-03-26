@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -381,6 +382,31 @@ func (vm *VM) LastAccepted(context.Context) (ids.ID, error) {
 
 func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, error) {
 	return vm.state.GetBlockIDAtHeight(height)
+}
+
+func (vm *VM) StateSyncEnabled(context.Context) (bool, error) {
+	// TODO add config
+	return true, nil
+}
+
+func (vm *VM) GetOngoingSyncStateSummary(context.Context) (smblock.StateSummary, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (vm *VM) GetLastStateSummary(ctx context.Context) (smblock.StateSummary, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (vm *VM) ParseStateSummary(ctx context.Context, summaryBytes []byte) (smblock.StateSummary, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (vm *VM) GetStateSummary(ctx context.Context, summaryHeight uint64) (smblock.StateSummary, error) {
+	//TODO implement me
+	panic("implement me")
 }
 
 /*
