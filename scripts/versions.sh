@@ -24,5 +24,3 @@ if [[ -z ${AVALANCHE_VERSION:-} ]]; then
     AVALANCHE_VERSION="${MODULE_HASH::8}"
   fi
 fi
-
-GINKGO_VERSION=${GINKGO_VERSION:-'v2.2.0'}
