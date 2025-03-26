@@ -46,7 +46,7 @@ import (
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/ava-labs/subnet-evm/core/state/snapshot"
-	customrawdb "github.com/ava-labs/subnet-evm/plugin/evm/rawdb"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customrawdb"
 )
 
 const (

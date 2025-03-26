@@ -40,7 +40,7 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/params"
-	customrawdb "github.com/ava-labs/subnet-evm/plugin/evm/rawdb"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customrawdb"
 )
 
 func BenchmarkInsertChain_empty_memdb(b *testing.B) {

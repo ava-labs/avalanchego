@@ -48,7 +48,7 @@ import (
 	"github.com/ava-labs/subnet-evm/interfaces"
 	"github.com/ava-labs/subnet-evm/internal/ethapi"
 	"github.com/ava-labs/subnet-evm/params"
-	customrawdb "github.com/ava-labs/subnet-evm/plugin/evm/rawdb"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customrawdb"
 	"github.com/ava-labs/subnet-evm/rpc"
 	"github.com/stretchr/testify/require"
 )

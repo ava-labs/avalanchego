@@ -45,7 +45,7 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/params"
-	customrawdb "github.com/ava-labs/subnet-evm/plugin/evm/rawdb"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customrawdb"
 	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/legacy"
 	"github.com/ava-labs/subnet-evm/triedb/pathdb"
 	"github.com/holiman/uint256"
