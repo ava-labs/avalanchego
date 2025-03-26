@@ -1533,11 +1533,11 @@ func TestGetCurrentValidatorsForL1(t *testing.T) {
 					require.Equal(avajson.Uint64(validator.Weight), v.Weight)
 					require.Equal(validator.StartTime, uint64(v.StartTime))
 					accruedFees := service.vm.state.GetAccruedFees()
-					require.Equal(avajson.Uint64(validator.EndAccumulatedFee-accruedFees), v.Balance)
-					require.Equal(avajson.Uint64(validator.MinNonce), v.MinNonce)
+					require.Equal(avajson.Uint64(validator.EndAccumulatedFee-accruedFees), *v.Balance)
+					require.Equal(avajson.Uint64(validator.MinNonce), *v.MinNonce)
 					require.Equal(
 						types.JSONByteSlice(bls.PublicKeyToCompressedBytes(bls.PublicKeyFromValidUncompressedBytes(validator.PublicKey))),
-						v.PublicKey)
+						*v.PublicKey)
 					var expectedRemainingBalanceOwner message.PChainOwner
 					_, err := txs.Codec.Unmarshal(validator.RemainingBalanceOwner, &expectedRemainingBalanceOwner)
 					require.NoError(err)

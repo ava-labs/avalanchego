@@ -1053,6 +1053,8 @@ func (s *Service) convertL1ValidatorToAPI(vdr state.L1Validator) (platformapi.AP
 			MinNonce:              &minNonce,
 		},
 	}
+	zero := avajson.Uint64(0)
+	apiVdr.Balance = &zero
 	if vdr.EndAccumulatedFee != 0 {
 		accruedFees := s.vm.state.GetAccruedFees()
 		balance := avajson.Uint64(vdr.EndAccumulatedFee - accruedFees)
