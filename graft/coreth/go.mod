@@ -4,8 +4,8 @@ go 1.23.6
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.12.1
-	github.com/ava-labs/avalanchego v1.12.3-name-fortuna.0.0.20250325171534-e5413707e886
-	github.com/ava-labs/libevm v1.13.14-0.2.0.rc.3
+	github.com/ava-labs/avalanchego v1.12.3-name-fortuna.0.0.20250326131842-1e9f474dee74
+	github.com/ava-labs/libevm v1.13.14-0.2.0.rc.4
 	github.com/crate-crypto/go-ipa v0.0.0-20231025140028-3c0104f4b233
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set/v2 v2.1.0
@@ -109,7 +109,6 @@ require (
 	github.com/subosito/gotenv v1.3.0 // indirect
 	github.com/supranational/blst v0.3.13 // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a // indirect
-	github.com/thepudds/fzgen v0.4.3 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect

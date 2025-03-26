@@ -103,7 +103,7 @@ type Config struct {
 	ReadOnly       bool   // Flag whether the database is opened in read only mode.
 }
 
-func (c Config) BackendConstructor(diskdb ethdb.Database, _ *triedb.Config) triedb.DBOverride {
+func (c Config) BackendConstructor(diskdb ethdb.Database) triedb.DBOverride {
 	return New(diskdb, &c)
 }
 

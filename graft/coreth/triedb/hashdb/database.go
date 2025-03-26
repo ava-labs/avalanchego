@@ -114,15 +114,8 @@ type Config struct {
 	ReferenceRootAtomicallyOnUpdate bool   // Whether to reference the root node on update
 }
 
-func (c Config) BackendConstructor(diskdb ethdb.Database, config *triedb.Config) triedb.DBOverride {
-	var resolver ChildResolver
-	if config.IsVerkle {
-		// TODO define verkle resolver
-		log.Crit("Verkle node resolver is not defined")
-	} else {
-		resolver = trie.MerkleResolver{}
-	}
-	return New(diskdb, &c, resolver)
+func (c Config) BackendConstructor(diskdb ethdb.Database) triedb.DBOverride {
+	return New(diskdb, &c, trie.MerkleResolver{})
 }
 
 // Defaults is the default setting for database if it's not specified.
