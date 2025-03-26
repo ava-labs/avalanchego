@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/coreth/accounts/abi/bind"
 	"github.com/ava-labs/coreth/ethclient/simulated"
 	"github.com/ava-labs/coreth/interfaces"
+	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 )
@@ -42,14 +43,14 @@ var (
 	_ bind.ContractBackend        = (*SimulatedBackend)(nil)
 	_ bind.DeployBackend          = (*SimulatedBackend)(nil)
 
-	_ interfaces.ChainReader            = (*SimulatedBackend)(nil)
-	_ interfaces.ChainStateReader       = (*SimulatedBackend)(nil)
-	_ interfaces.TransactionReader      = (*SimulatedBackend)(nil)
-	_ interfaces.TransactionSender      = (*SimulatedBackend)(nil)
-	_ interfaces.ContractCaller         = (*SimulatedBackend)(nil)
-	_ interfaces.GasEstimator           = (*SimulatedBackend)(nil)
-	_ interfaces.GasPricer              = (*SimulatedBackend)(nil)
-	_ interfaces.LogFilterer            = (*SimulatedBackend)(nil)
+	_ ethereum.ChainReader              = (*SimulatedBackend)(nil)
+	_ ethereum.ChainStateReader         = (*SimulatedBackend)(nil)
+	_ ethereum.TransactionReader        = (*SimulatedBackend)(nil)
+	_ ethereum.TransactionSender        = (*SimulatedBackend)(nil)
+	_ ethereum.ContractCaller           = (*SimulatedBackend)(nil)
+	_ ethereum.GasEstimator             = (*SimulatedBackend)(nil)
+	_ ethereum.GasPricer                = (*SimulatedBackend)(nil)
+	_ ethereum.LogFilterer              = (*SimulatedBackend)(nil)
 	_ interfaces.AcceptedStateReader    = (*SimulatedBackend)(nil)
 	_ interfaces.AcceptedContractCaller = (*SimulatedBackend)(nil)
 )
