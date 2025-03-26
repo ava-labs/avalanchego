@@ -194,9 +194,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 .with_tonic()
                 .with_endpoint("http://127.0.0.1:4317".to_string())
                 .with_protocol(opentelemetry_otlp::Protocol::Grpc)
-                .with_timeout(Duration::from_secs(
-                    opentelemetry_otlp::OTEL_EXPORTER_OTLP_TIMEOUT_DEFAULT,
-                ))
+                .with_timeout(opentelemetry_otlp::OTEL_EXPORTER_OTLP_TIMEOUT_DEFAULT)
                 .build()
                 .expect("initialize oltp exporter"),
             SpanKind::Server,
