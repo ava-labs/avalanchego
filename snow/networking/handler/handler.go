@@ -435,6 +435,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 	h.resourceTracker.StartProcessing(nodeID, startTime)
 	h.ctx.Lock.Lock()
 	lockAcquiredTime := h.clock.Time()
+	time.Sleep(time.Millisecond * 100)
 	defer func() {
 		h.ctx.Lock.Unlock()
 
