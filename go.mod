@@ -4,7 +4,7 @@ go 1.23.6
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.12.1
-	github.com/ava-labs/avalanchego v1.12.3-name-fortuna.0
+	github.com/ava-labs/avalanchego v1.13.1-0.20250321174807-6c72dfc4254a
 	github.com/ava-labs/libevm v0.0.0-20250320152422-7be6bee7ab32
 	github.com/cespare/cp v0.1.0
 	github.com/crate-crypto/go-ipa v0.0.0-20231025140028-3c0104f4b233
@@ -33,23 +33,24 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.12.0
 	github.com/status-im/keycard-go v0.2.0
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/tyler-smith/go-bip39 v1.1.0
 	github.com/urfave/cli/v2 v2.25.7
 	go.uber.org/goleak v1.3.0
 	go.uber.org/mock v0.5.0
-	golang.org/x/crypto v0.31.0
-	golang.org/x/exp v0.0.0-20231127185646-65229373498e
-	golang.org/x/sync v0.10.0
-	golang.org/x/text v0.21.0
+	golang.org/x/crypto v0.35.0
+	golang.org/x/exp v0.0.0-20241215155358-4a5509556b9e
+	golang.org/x/sync v0.11.0
+	golang.org/x/text v0.22.0
 	golang.org/x/time v0.3.0
-	golang.org/x/tools v0.22.0
-	google.golang.org/protobuf v1.34.2
+	golang.org/x/tools v0.28.0
+	google.golang.org/protobuf v1.35.2
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
 
 require (
 	github.com/DataDog/zstd v1.5.2 // indirect
+	github.com/StephenButtolph/canoto v0.15.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.10.0 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
@@ -63,7 +64,7 @@ require (
 	github.com/cockroachdb/tokenbucket v0.0.0-20230807174530-cc333fc44b06 // indirect
 	github.com/consensys/bavard v0.1.13 // indirect
 	github.com/consensys/gnark-crypto v0.12.1 // indirect
-	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
 	github.com/crate-crypto/go-kzg-4844 v0.7.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.1.0 // indirect
 	github.com/dlclark/regexp2 v1.7.0 // indirect
@@ -120,10 +121,10 @@ require (
 	go.opentelemetry.io/proto/otlp v1.0.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.26.0 // indirect
-	golang.org/x/mod v0.18.0 // indirect
-	golang.org/x/net v0.33.0 // indirect
-	golang.org/x/sys v0.28.0 // indirect
-	golang.org/x/term v0.27.0 // indirect
+	golang.org/x/mod v0.22.0 // indirect
+	golang.org/x/net v0.36.0 // indirect
+	golang.org/x/sys v0.30.0 // indirect
+	golang.org/x/term v0.29.0 // indirect
 	gonum.org/v1/gonum v0.11.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240604185151-ef581f913117 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240827150818-7e3bb234dfed // indirect
