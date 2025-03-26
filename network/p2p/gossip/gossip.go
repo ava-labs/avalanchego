@@ -34,9 +34,12 @@ const (
 	unsentType = "unsent"
 	sentType   = "sent"
 
+	// duplicate indicate a reception of a duplicate gossipable element.
+	// for sent message, we'll use notReceive below.
 	duplicateLabel = "duplicate"
 	yesDuplicate   = "yes"
 	noDuplicate    = "no"
+	notReceive     = "n/a"
 
 	defaultGossipableCount = 64
 )
@@ -50,8 +53,9 @@ var (
 
 	ioTypeDuplicateLabels = []string{ioLabel, typeLabel, duplicateLabel}
 	sentPushLabels        = prometheus.Labels{
-		ioLabel:   sentIO,
-		typeLabel: pushType,
+		ioLabel:        sentIO,
+		typeLabel:      pushType,
+		duplicateLabel: notReceive,
 	}
 	receivedNotDuplicatePushLabels = prometheus.Labels{
 		ioLabel:        receivedIO,
@@ -64,8 +68,9 @@ var (
 		duplicateLabel: yesDuplicate,
 	}
 	sentPullLabels = prometheus.Labels{
-		ioLabel:   sentIO,
-		typeLabel: pullType,
+		ioLabel:        sentIO,
+		typeLabel:      pullType,
+		duplicateLabel: notReceive,
 	}
 	receivedNotDuplicatePullLabels = prometheus.Labels{
 		ioLabel:        receivedIO,
