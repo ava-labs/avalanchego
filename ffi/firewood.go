@@ -133,11 +133,16 @@ func extractBytesThenFree(v *C.struct_Value) []byte {
 }
 
 // Get retrieves the value for the given key. It always returns a nil error.
+// If the key is not found, the return value will be (nil, nil).
 func (db *Database) Get(key []byte) ([]byte, error) {
 	values, cleanup := newValueFactory()
 	defer cleanup()
 	val := C.fwd_get(db.handle, values.from(key))
-	return extractBytesThenFree(&val), nil
+	bytes := extractBytesThenFree(&val)
+	if len(bytes) == 0 {
+		return nil, nil
+	}
+	return bytes, nil
 }
 
 // Root returns the current root hash of the trie.

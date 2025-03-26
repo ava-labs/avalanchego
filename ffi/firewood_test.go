@@ -72,6 +72,13 @@ func TestInsert(t *testing.T) {
 	assert.Equal(t, val, string(got), "Recover lone batch-inserted value")
 }
 
+func TestGetNonExistent(t *testing.T) {
+	db := newTestDatabase(t)
+	got, err := db.Get([]byte("non-existent"))
+	require.NoError(t, err)
+	assert.Nil(t, got)
+}
+
 func keyForTest(i int) []byte {
 	return []byte("key" + strconv.Itoa(i))
 }
