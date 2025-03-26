@@ -24,7 +24,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package types_test
+package customtypes_test
 
 import (
 	"bytes"
@@ -43,7 +43,7 @@ import (
 	// This test file has to be in package types_test to avoid a circular
 	// dependency when importing `params`. We dot-import the package to mimic
 	// regular same-package behaviour.
-	. "github.com/ava-labs/subnet-evm/plugin/evm/types"
+	. "github.com/ava-labs/subnet-evm/plugin/evm/customtypes"
 )
 
 func TestBlockEncoding(t *testing.T) {

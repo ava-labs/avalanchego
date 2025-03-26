@@ -53,7 +53,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/eth/gasestimator"
 	"github.com/ava-labs/subnet-evm/params"
-	customtypes "github.com/ava-labs/subnet-evm/plugin/evm/types"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/subnet-evm/rpc"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/holiman/uint256"

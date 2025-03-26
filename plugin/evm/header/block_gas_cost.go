@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/plugin/evm/blockgascost"
-	customtypes "github.com/ava-labs/subnet-evm/plugin/evm/types"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customtypes"
 )
 
 var (

@@ -13,8 +13,8 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/subnet-evm/plugin/evm/header"
-	customtypes "github.com/ava-labs/subnet-evm/plugin/evm/types"
 	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/legacy"
 )
 

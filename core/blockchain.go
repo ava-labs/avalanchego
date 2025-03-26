@@ -58,7 +58,7 @@ import (
 	"github.com/ava-labs/subnet-evm/internal/version"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/plugin/evm/customrawdb"
-	customtypes "github.com/ava-labs/subnet-evm/plugin/evm/types"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/subnet-evm/triedb/hashdb"
 	"github.com/ava-labs/subnet-evm/triedb/pathdb"
 
