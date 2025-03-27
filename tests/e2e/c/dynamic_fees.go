@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/acp176"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/cortina"
 	"github.com/ava-labs/libevm/accounts/abi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/params"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -118,7 +118,8 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		var contractAddress common.Address
 		tc.By("deploying an expensive contract", func() {
 			// Create transaction
-			nonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), ethAddress)
+			blockNumber := (*big.Int)(nil)
+			nonce, err := ethClient.NonceAt(tc.DefaultContext(), ethAddress, blockNumber)
 			require.NoError(err)
 			compiledContract := common.Hex2Bytes(consumeGasCompiledContract)
 			tx := types.NewTx(&types.DynamicFeeTx{
@@ -182,7 +183,8 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 				)
 
 				// Create the transaction
-				nonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), ethAddress)
+				blockNumber := (*big.Int)(nil)
+				nonce, err := ethClient.NonceAt(tc.DefaultContext(), ethAddress, blockNumber)
 				require.NoError(err)
 				tx := types.NewTx(&types.DynamicFeeTx{
 					ChainID:   cChainID,
@@ -231,7 +233,8 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 				)
 
 				// Create the transaction
-				nonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), ethAddress)
+				blockNumber := (*big.Int)(nil)
+				nonce, err := ethClient.NonceAt(tc.DefaultContext(), ethAddress, blockNumber)
 				require.NoError(err)
 				tx := types.NewTx(&types.DynamicFeeTx{
 					ChainID:   cChainID,
