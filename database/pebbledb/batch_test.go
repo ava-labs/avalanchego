@@ -28,7 +28,7 @@ func TestBatch(t *testing.T) {
 
 	key1, value1 := []byte("key1"), []byte("value1")
 	require.NoError(batch.Put(key1, value1))
-	require.Equal(len(key1)+len(value1)+pebbleByteOverHead, batch.Size())
+	require.Equal(len(key1)+len(value1)+pebbleByteOverhead, batch.Size())
 
 	require.NoError(batch.Write())
 
