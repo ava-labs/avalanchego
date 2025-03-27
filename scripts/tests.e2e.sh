@@ -7,6 +7,7 @@ set -euo pipefail
 # e.g.,
 # ./scripts/tests.e2e.sh
 # AVALANCHE_VERSION=v1.10.x ./scripts/tests.e2e.sh
+# ./scripts/tests.e2e.sh --start-monitors          # All arguments are supplied to ginkgo
 if ! [[ "$0" =~ scripts/tests.e2e.sh ]]; then
   echo "must be run from repository root"
   exit 255
@@ -51,4 +52,4 @@ echo "building avalanchego"
 ./scripts/build.sh -r
 
 echo "running AvalancheGo e2e tests"
-E2E_SERIAL=1 ./scripts/tests.e2e.sh --ginkgo.label-filter='c || uses-c'
+E2E_SERIAL=1 ./scripts/tests.e2e.sh --ginkgo.label-filter='c || uses-c' "${@}"

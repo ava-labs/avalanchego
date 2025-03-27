@@ -9,8 +9,11 @@ import (
 	"testing"
 
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/upgrade/acp176"
+	"github.com/ava-labs/coreth/plugin/evm/upgrade/etna"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,7 +23,8 @@ type testSuggestPriceOptionsBackend struct {
 	estimateBaseFee  *big.Int
 	suggestGasTipCap *big.Int
 
-	cfg PriceOptionConfig
+	cfg      PriceOptionConfig
+	chainCfg *params.ChainConfig
 }
 
 func (b *testSuggestPriceOptionsBackend) EstimateBaseFee(context.Context) (*big.Int, error) {
@@ -35,6 +39,14 @@ func (b *testSuggestPriceOptionsBackend) PriceOptionsConfig() PriceOptionConfig 
 	return b.cfg
 }
 
+func (b *testSuggestPriceOptionsBackend) ChainConfig() *params.ChainConfig {
+	return b.chainCfg
+}
+
+func (b *testSuggestPriceOptionsBackend) CurrentHeader() *types.Header {
+	return &types.Header{Time: 1}
+}
+
 func TestSuggestPriceOptions(t *testing.T) {
 	testCfg := PriceOptionConfig{
 		SlowFeePercentage: 95,
@@ -42,6 +54,10 @@ func TestSuggestPriceOptions(t *testing.T) {
 		MaxBaseFee:        100 * params.GWei,
 		MaxTip:            20 * params.GWei,
 	}
+	minBaseFee := etna.MinBaseFee
+	bigMinBaseFee := big.NewInt(int64(minBaseFee))
+	fortunaMinBaseFee := acp176.MinGasPrice
+	bigFortunaMinBaseFee := big.NewInt(int64(fortunaMinBaseFee))
 	slowFeeNumerator := testCfg.SlowFeePercentage
 	fastFeeNumerator := testCfg.FastFeePercentage
 	maxNormalGasTip := testCfg.MaxTip
@@ -52,6 +68,7 @@ func TestSuggestPriceOptions(t *testing.T) {
 		estimateBaseFee  *big.Int
 		suggestGasTipCap *big.Int
 		cfg              PriceOptionConfig
+		chainCfg         *params.ChainConfig
 		want             *PriceOptions
 	}{
 		{
@@ -67,10 +84,11 @@ func TestSuggestPriceOptions(t *testing.T) {
 			want:             nil,
 		},
 		{
-			name:             "minimum_values",
+			name:             "minimum_values_etna",
 			estimateBaseFee:  bigMinBaseFee,
 			suggestGasTipCap: bigMinGasTip,
 			cfg:              testCfg,
+			chainCfg:         params.TestEtnaChainConfig,
 			want: &PriceOptions{
 				Slow: newPrice(
 					minGasTip,
@@ -87,6 +105,27 @@ func TestSuggestPriceOptions(t *testing.T) {
 			},
 		},
 		{
+			name:             "minimum_values_fortuna",
+			estimateBaseFee:  bigFortunaMinBaseFee,
+			suggestGasTipCap: bigMinGasTip,
+			cfg:              testCfg,
+			chainCfg:         params.TestFortunaChainConfig,
+			want: &PriceOptions{
+				Slow: newPrice(
+					minGasTip,
+					uint64(fortunaMinBaseFee+minGasTip),
+				),
+				Normal: newPrice(
+					minGasTip,
+					uint64(fortunaMinBaseFee+minGasTip),
+				),
+				Fast: newPrice(
+					minGasTip,
+					(fastFeeNumerator*uint64(fortunaMinBaseFee)/feeDenominator)+(fastFeeNumerator*uint64(minGasTip)/feeDenominator),
+				),
+			},
+		},
+		{
 			name:             "maximum_values_1_slow_perc_2_fast_perc",
 			estimateBaseFee:  new(big.Int).SetUint64(maxNormalBaseFee),
 			suggestGasTipCap: new(big.Int).SetUint64(maxNormalGasTip),
@@ -96,6 +135,7 @@ func TestSuggestPriceOptions(t *testing.T) {
 				MaxBaseFee:        100 * params.GWei,
 				MaxTip:            20 * params.GWei,
 			},
+			chainCfg: params.TestEtnaChainConfig,
 			want: &PriceOptions{
 				Slow: newPrice(
 					20*params.GWei,
@@ -114,6 +154,7 @@ func TestSuggestPriceOptions(t *testing.T) {
 		{
 			name:             "maximum_values",
 			cfg:              testCfg,
+			chainCfg:         params.TestEtnaChainConfig,
 			estimateBaseFee:  new(big.Int).SetUint64(maxNormalBaseFee),
 			suggestGasTipCap: new(big.Int).SetUint64(maxNormalGasTip),
 			want: &PriceOptions{
@@ -136,6 +177,7 @@ func TestSuggestPriceOptions(t *testing.T) {
 			estimateBaseFee:  big.NewInt(2 * int64(maxNormalBaseFee)),
 			suggestGasTipCap: big.NewInt(2 * int64(maxNormalGasTip)),
 			cfg:              testCfg,
+			chainCfg:         params.TestEtnaChainConfig,
 			want: &PriceOptions{
 				Slow: newPrice(
 					(slowFeeNumerator*maxNormalGasTip)/feeDenominator,
@@ -160,6 +202,7 @@ func TestSuggestPriceOptions(t *testing.T) {
 				estimateBaseFee:  test.estimateBaseFee,
 				suggestGasTipCap: test.suggestGasTipCap,
 				cfg:              test.cfg,
+				chainCfg:         test.chainCfg,
 			}
 			api := NewEthereumAPI(backend)
 
