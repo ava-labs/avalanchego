@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethclient"
 	"github.com/stretchr/testify/require"
@@ -29,6 +28,8 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+
+	ethereum "github.com/ava-labs/libevm"
 )
 
 const (
