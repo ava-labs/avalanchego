@@ -4,7 +4,7 @@
 ARG AVALANCHEGO_NODE_IMAGE="invalid-image"
 
 # ============= Compilation Stage ================
-FROM --platform=$BUILDPLATFORM golang:1.23.6-bullseye AS builder
+FROM --platform=$BUILDPLATFORM golang:1.23.6-bookworm AS builder
 
 WORKDIR /build
 
