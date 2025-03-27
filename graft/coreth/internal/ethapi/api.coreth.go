@@ -8,20 +8,19 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/upgrade/acp176"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/etna"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/common/math"
 )
 
 const (
-	minBaseFee = etna.MinBaseFee // 1 nAVAX
-	minGasTip  = 1               // 1 wei
-
+	minGasTip      = 1 // 1 wei
 	feeDenominator = 100
 )
 
 var (
-	bigMinBaseFee     = big.NewInt(minBaseFee)
 	bigMinGasTip      = big.NewInt(minGasTip)
 	bigFeeDenominator = big.NewInt(feeDenominator)
 )
@@ -63,12 +62,23 @@ func (s *EthereumAPI) SuggestPriceOptions(ctx context.Context) (*PriceOptions, e
 		return nil, nil
 	}
 
+	// Find min base fee based on chain config
+	// TODO: This can be removed after Fortuna is activated
+	time := s.b.CurrentHeader().Time
+	chainConfig := params.GetExtra(s.b.ChainConfig())
+	minBaseFee := new(big.Int)
+	if chainConfig.IsFortuna(time) {
+		minBaseFee.SetUint64(acp176.MinGasPrice)
+	} else {
+		minBaseFee.SetUint64(etna.MinBaseFee)
+	}
+
 	cfg := s.b.PriceOptionsConfig()
 	bigSlowFeePercent := new(big.Int).SetUint64(cfg.SlowFeePercentage)
 	bigFastFeePercent := new(big.Int).SetUint64(cfg.FastFeePercentage)
 
 	baseFees := calculateFeeSpeeds(
-		bigMinBaseFee,
+		minBaseFee,
 		baseFee,
 		big.NewInt(int64(cfg.MaxBaseFee)),
 		bigSlowFeePercent,
