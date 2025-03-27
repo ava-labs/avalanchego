@@ -37,5 +37,7 @@ var (
 	)
 
 	// ScheduledACPs are the ACPs included into the next upgrade.
-	ScheduledACPs = set.Of[uint32]()
+	ScheduledACPs = set.Of[uint32](
+		176, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/176-dynamic-evm-gas-limit-and-price-discovery-updates/README.md
+	)
 )

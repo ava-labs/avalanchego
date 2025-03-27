@@ -4,6 +4,7 @@
 package e2e
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"math/rand"
@@ -79,12 +80,27 @@ func (te *TestEnvironment) Marshal() []byte {
 func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork *tmpnet.Network) *TestEnvironment {
 	require := require.New(tc)
 
-	// Start collectors for any command but stop
-	if flagVars.StartCollectors() && !flagVars.StopNetwork() {
-		require.NoError(tmpnet.StartCollectors(tc.DefaultContext(), tc.Log()))
+	var network *tmpnet.Network
+
+	// Consider monitoring flags for any command but stop
+	if !flagVars.StopNetwork() {
+		if flagVars.StartCollectors() {
+			require.NoError(tmpnet.StartCollectors(tc.DefaultContext(), tc.Log()))
+		}
+		if flagVars.CheckMonitoring() {
+			// Register cleanup before network start to ensure it runs after the network is stopped (LIFO)
+			tc.DeferCleanup(func() {
+				if network == nil {
+					tc.Log().Warn("unable to check that logs and metrics were collected from an uninitialized network")
+					return
+				}
+				ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
+				defer cancel()
+				require.NoError(tmpnet.CheckMonitoring(ctx, tc.Log(), network.UUID))
+			})
+		}
 	}
 
-	var network *tmpnet.Network
 	// Need to load the network if it is being stopped or reused
 	if flagVars.StopNetwork() || flagVars.ReuseNetwork() {
 		networkDir := flagVars.NetworkDir()

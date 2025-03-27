@@ -59,7 +59,7 @@ func newMessageCreator(t *testing.T) message.Creator {
 	return mc
 }
 
-func newConfig(t *testing.T) Config {
+func newConfig(t *testing.T) *Config {
 	t.Helper()
 	require := require.New(t)
 
@@ -74,7 +74,7 @@ func newConfig(t *testing.T) Config {
 	)
 	require.NoError(err)
 
-	return Config{
+	return &Config{
 		ReadBufferSize:       constants.DefaultNetworkPeerReadBufferSize,
 		WriteBufferSize:      constants.DefaultNetworkPeerWriteBufferSize,
 		Metrics:              metrics,
@@ -97,7 +97,7 @@ func newConfig(t *testing.T) Config {
 	}
 }
 
-func newRawTestPeer(t *testing.T, config Config) *rawTestPeer {
+func newRawTestPeer(t *testing.T, config *Config) *rawTestPeer {
 	t.Helper()
 	require := require.New(t)
 
@@ -123,7 +123,7 @@ func newRawTestPeer(t *testing.T, config Config) *rawTestPeer {
 	})
 
 	return &rawTestPeer{
-		config:         &config,
+		config:         config,
 		cert:           cert,
 		inboundMsgChan: inboundMsgChan,
 	}
@@ -142,6 +142,7 @@ func startTestPeer(self *rawTestPeer, peer *rawTestPeer, conn net.Conn) *testPee
 				logging.NoLog{},
 				throttling.NewNoOutboundThrottler(),
 			),
+			false,
 		),
 		inboundMsgChan: self.inboundMsgChan,
 	}
@@ -174,10 +175,11 @@ func must[T any](t *testing.T) func(T, error) T {
 func TestReady(t *testing.T) {
 	require := require.New(t)
 
-	config := newConfig(t)
+	config0 := newConfig(t)
+	config1 := newConfig(t)
 
-	rawPeer0 := newRawTestPeer(t, config)
-	rawPeer1 := newRawTestPeer(t, config)
+	rawPeer0 := newRawTestPeer(t, config0)
+	rawPeer1 := newRawTestPeer(t, config1)
 
 	conn0, conn1 := net.Pipe()
 
@@ -195,15 +197,16 @@ func TestReady(t *testing.T) {
 func TestSend(t *testing.T) {
 	require := require.New(t)
 
-	sharedConfig := newConfig(t)
+	config0 := newConfig(t)
+	config1 := newConfig(t)
 
-	rawPeer0 := newRawTestPeer(t, sharedConfig)
-	rawPeer1 := newRawTestPeer(t, sharedConfig)
+	rawPeer0 := newRawTestPeer(t, config0)
+	rawPeer1 := newRawTestPeer(t, config1)
 
 	peer0, peer1 := startTestPeers(rawPeer0, rawPeer1)
 	awaitReady(t, peer0, peer1)
 
-	outboundGetMsg, err := sharedConfig.MessageCreator.Get(ids.Empty, 1, time.Second, ids.Empty)
+	outboundGetMsg, err := config0.MessageCreator.Get(ids.Empty, 1, time.Second, ids.Empty)
 	require.NoError(err)
 
 	require.True(peer0.Send(context.Background(), outboundGetMsg))
@@ -217,12 +220,13 @@ func TestSend(t *testing.T) {
 }
 
 func TestPingUptimes(t *testing.T) {
-	sharedConfig := newConfig(t)
+	config0 := newConfig(t)
+	config1 := newConfig(t)
 
 	// The raw peers are generated outside of the test cases to avoid generating
 	// many TLS keys.
-	rawPeer0 := newRawTestPeer(t, sharedConfig)
-	rawPeer1 := newRawTestPeer(t, sharedConfig)
+	rawPeer0 := newRawTestPeer(t, config0)
+	rawPeer1 := newRawTestPeer(t, config1)
 
 	require := require.New(t)
 
@@ -234,7 +238,7 @@ func TestPingUptimes(t *testing.T) {
 		require.NoError(peer0.AwaitClosed(context.Background()))
 		require.NoError(peer1.AwaitClosed(context.Background()))
 	}()
-	pingMsg, err := sharedConfig.MessageCreator.Ping(1)
+	pingMsg, err := config0.MessageCreator.Ping(1)
 	require.NoError(err)
 	require.True(peer0.Send(context.Background(), pingMsg))
 
@@ -249,9 +253,8 @@ func TestPingUptimes(t *testing.T) {
 }
 
 func TestTrackedSubnets(t *testing.T) {
-	sharedConfig := newConfig(t)
-	rawPeer0 := newRawTestPeer(t, sharedConfig)
-	rawPeer1 := newRawTestPeer(t, sharedConfig)
+	rawPeer0 := newRawTestPeer(t, newConfig(t))
+	rawPeer1 := newRawTestPeer(t, newConfig(t))
 
 	makeSubnetIDs := func(numSubnets int) []ids.ID {
 		subnetIDs := make([]ids.ID, numSubnets)
@@ -322,10 +325,11 @@ func TestTrackedSubnets(t *testing.T) {
 func TestInvalidBLSKeyDisconnects(t *testing.T) {
 	require := require.New(t)
 
-	sharedConfig := newConfig(t)
+	sharedConfig0 := newConfig(t)
+	sharedConfig1 := newConfig(t)
 
-	rawPeer0 := newRawTestPeer(t, sharedConfig)
-	rawPeer1 := newRawTestPeer(t, sharedConfig)
+	rawPeer0 := newRawTestPeer(t, sharedConfig0)
+	rawPeer1 := newRawTestPeer(t, sharedConfig1)
 
 	require.NoError(rawPeer0.config.Validators.AddStaker(
 		constants.PrimaryNetworkID,
