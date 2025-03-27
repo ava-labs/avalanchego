@@ -138,21 +138,6 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 		onAcceptState,
 		changed,
 	)
-	if err != nil {
-		return err
-	}
-
-	// Verify that the block performs changes. If it does not, it never should
-	// have been issued. Prior to the F upgrade, evicting L1 validators that
-	// don't have enough balance for the next second is not considered a change.
-	// After the F upgrade, it is.
-	if !changed &&
-		len(b.Transactions) == 0 &&
-		(!v.txExecutorBackend.Config.UpgradeConfig.IsFortunaActivated(b.Timestamp()) || !lowBalanceL1ValidatorsEvicted) {
-		return errBanffStandardBlockWithoutChanges
-	}
-
-	return nil
 }
 
 func (v *verifier) ApricotAbortBlock(b *block.ApricotAbortBlock) error {
