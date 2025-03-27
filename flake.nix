@@ -8,7 +8,7 @@
 
   # Flake inputs
   inputs = {
-    nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.2405.*.tar.gz";
+    nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.2411.*.tar.gz";
   };
 
   # Flake outputs
@@ -45,6 +45,11 @@
 
             # Linters
             shellcheck
+
+            # Protobuf
+            buf
+            protoc-gen-go
+            protoc-gen-go-grpc
           ] ++ lib.optionals stdenv.isDarwin [
             # macOS-specific frameworks
             darwin.apple_sdk.frameworks.Security
