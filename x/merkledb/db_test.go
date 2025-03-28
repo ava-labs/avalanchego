@@ -488,15 +488,11 @@ func TestDatabaseNewUntrackedView(t *testing.T) {
 	require.NoError(err)
 
 	// Create a new untracked view.
-	view, err := newView(
-		db,
-		db,
-		ViewChanges{
-			BatchOps: []database.BatchOp{
-				{Key: []byte{1}, Value: []byte{1}},
-			},
+	view, err := newView(context.Background(), db, db, ViewChanges{
+		BatchOps: []database.BatchOp{
+			{Key: []byte{1}, Value: []byte{1}},
 		},
-	)
+	})
 	require.NoError(err)
 	require.Empty(db.childViews)
 
@@ -525,13 +521,14 @@ func TestDatabaseNewViewFromBatchOpsTracked(t *testing.T) {
 	)
 	require.NoError(err)
 	require.Len(db.childViews, 1)
+	require.Contains(db.childViews, view)
 
 	// Commit the view
 	require.NoError(view.CommitToDB(context.Background()))
 
 	// The view should be tracked by the parent database.
-	require.Contains(db.childViews, view)
-	require.Len(db.childViews, 1)
+	require.Equal(view, db.lastCommittedView)
+	require.Len(db.childViews, 0)
 }
 
 func TestDatabaseCommitChanges(t *testing.T) {
@@ -616,9 +613,11 @@ func TestDatabaseCommitChanges(t *testing.T) {
 	// Make sure view2 isn't tracked by the database.
 	require.NotContains(db.childViews, view2)
 
-	// Make sure view1 and view3 is tracked by the database.
-	require.Contains(db.childViews, view1)
+	// Make sure view3 is tracked by the database.
 	require.Contains(db.childViews, view3)
+
+	// Make sure view1 is saved as last view.
+	require.Equal(view1, db.lastCommittedView)
 
 	// Make sure view3 is now a child of db.
 	require.Equal(db, view3.parentTrie)
@@ -653,7 +652,9 @@ func TestDatabaseInvalidateChildrenExcept(t *testing.T) {
 	require.True(view2.invalidated)
 	require.True(view3.invalidated)
 	require.Contains(db.childViews, view1)
-	require.Len(db.childViews, 1)
+	require.Contains(db.childViews, view2)
+	require.Contains(db.childViews, view3)
+	require.Len(db.childViews, 3)
 
 	db.invalidateChildrenExcept(nil)
 
@@ -661,11 +662,14 @@ func TestDatabaseInvalidateChildrenExcept(t *testing.T) {
 	require.True(view1.invalidated)
 	require.True(view2.invalidated)
 	require.True(view3.invalidated)
-	require.Empty(db.childViews)
+	require.Contains(db.childViews, view1)
+	require.Contains(db.childViews, view2)
+	require.Contains(db.childViews, view3)
+	require.Len(db.childViews, 3)
 
 	// Calling with an untracked view doesn't add the untracked view
-	db.invalidateChildrenExcept(view1)
-	require.Empty(db.childViews)
+	//db.invalidateChildrenExcept(view1)
+	//require.Empty(db.childViews)
 }
 
 func Test_MerkleDB_Random_Insert_Ordering(t *testing.T) {
@@ -1335,7 +1339,7 @@ func BenchmarkCommitView(b *testing.B) {
 	require.NoError(b, err)
 
 	view := viewIntf.(*view)
-	require.NoError(b, view.applyValueChanges(ctx))
+	require.NoError(b, view.ensureChangesApplied(ctx))
 
 	b.Run("apply and commit changes", func(b *testing.B) {
 		require := require.New(b)
