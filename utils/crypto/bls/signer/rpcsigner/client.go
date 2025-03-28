@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
@@ -28,6 +29,8 @@ func NewClient(ctx context.Context, url string) (*Client, func() error, error) {
 	// TODO: figure out the best parameters here given the target block-time
 	opts := grpc.WithConnectParams(grpc.ConnectParams{
 		Backoff: backoff.DefaultConfig,
+		// same as grpc default
+		MinConnectTimeout: 20 * time.Second,
 	})
 
 	// the rpc-signer client should call a proxy server (on the same machine) that forwards
