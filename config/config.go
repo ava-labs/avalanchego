@@ -663,7 +663,7 @@ func getStakingSigner(ctx context.Context, v *viper.Viper) (bls.Signer, func() e
 	case ephemeralSignerEnabled:
 		signer, err := localsigner.New()
 		if err != nil {
-			return nil, nil, fmt.Errorf("couldn't generate ephemeral signing signer: %w", err)
+			return nil, nil, fmt.Errorf("couldn't generate ephemeral signer: %w", err)
 		}
 
 		return signer, cleanup, nil
