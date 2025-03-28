@@ -3,6 +3,8 @@
 
 package warp
 
+//go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
+
 import (
 	"errors"
 	"fmt"
@@ -46,8 +48,10 @@ type Signature interface {
 type BitSetSignature struct {
 	// Signers is a big-endian byte slice encoding which validators signed this
 	// message.
-	Signers   []byte                 `serialize:"true"`
-	Signature [bls.SignatureLen]byte `serialize:"true"`
+	Signers   []byte                 `serialize:"true" canoto:"bytes,1"`
+	Signature [bls.SignatureLen]byte `serialize:"true" canoto:"fixed bytes,2"`
+
+	canotoData canotoData_BitSetSignature
 }
 
 func (s *BitSetSignature) NumSigners() (int, error) {
