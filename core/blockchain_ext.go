@@ -5,9 +5,9 @@ package core
 import "github.com/ava-labs/libevm/metrics"
 
 // getOrOverrideAsRegisteredCounter searches for a metric already registered
-// with`name`. If a metric is found and it is a Counter, it is returned. If a
-// metric is found and it is not a Counter, it is unregistered and replaced with
-// a new registered Counter. If no metric is found, a new Counter is constructed
+// with `name`. If a metric is found and it is a [metrics.Counter], it is returned. If a
+// metric is found and it is not a [metrics.Counter], it is unregistered and replaced with
+// a new registered [metrics.Counter]. If no metric is found, a new [metrics.Counter] is constructed
 // and registered.
 //
 // This is necessary for a metric defined in libevm with the same name but a
@@ -17,11 +17,10 @@ func getOrOverrideAsRegisteredCounter(name string, r metrics.Registry) metrics.C
 		r = metrics.DefaultRegistry
 	}
 
-	switch c := r.GetOrRegister(name, metrics.NewCounter).(type) {
-	case metrics.Counter:
+	if c, ok := r.GetOrRegister(name, metrics.NewCounter).(metrics.Counter); ok {
 		return c
-	default: // `name` must have already been registered to be any other type
-		r.Unregister(name)
-		return metrics.NewRegisteredCounter(name, r)
 	}
+	// `name` must have already been registered to be any other type
+	r.Unregister(name)
+	return metrics.NewRegisteredCounter(name, r)
 }

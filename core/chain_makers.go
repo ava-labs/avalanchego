@@ -373,12 +373,12 @@ func GenerateChainWithGenesis(genesis *Genesis, engine consensus.Engine, n int, 
 func (cm *chainMaker) makeHeader(parent *types.Block, gap uint64, state *state.StateDB, engine consensus.Engine) *types.Header {
 	time := parent.Time() + gap // block time is fixed at [gap] seconds
 
-	configExtra := params.GetExtra(cm.config)
-	gasLimit, err := header.GasLimit(configExtra, parent.Header(), time)
+	config := params.GetExtra(cm.config)
+	gasLimit, err := header.GasLimit(config, parent.Header(), time)
 	if err != nil {
 		panic(err)
 	}
-	baseFee, err := header.BaseFee(configExtra, parent.Header(), time)
+	baseFee, err := header.BaseFee(config, parent.Header(), time)
 	if err != nil {
 		panic(err)
 	}

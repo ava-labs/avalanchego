@@ -1,10 +1,12 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// (c) 2024-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package params
 
 import (
+	"maps"
 	"math/big"
+	"slices"
 
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/coreth/nativeasset"
@@ -18,7 +20,6 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/libevm/legacy"
-	"golang.org/x/exp/maps"
 )
 
 type RulesExtra extras.Rules
@@ -74,7 +75,7 @@ func (r RulesExtra) ActivePrecompiles(existing []common.Address) []common.Addres
 	}
 
 	var addresses []common.Address
-	addresses = append(addresses, maps.Keys(precompiles)...)
+	addresses = slices.AppendSeq(addresses, maps.Keys(precompiles))
 	addresses = append(addresses, existing...)
 	return addresses
 }
@@ -117,7 +118,7 @@ func makePrecompile(contract contract.StatefulPrecompiledContract) libevm.Precom
 				panic(err) // Should never happen, as results are already validated in block validation
 			}
 		}
-		accessableState := accessableState{
+		accessibleState := accessibleState{
 			env: env,
 			blockContext: &precompileBlockContext{
 				number:           env.BlockNumber(),
@@ -125,7 +126,7 @@ func makePrecompile(contract contract.StatefulPrecompiledContract) libevm.Precom
 				predicateResults: predicateResults,
 			},
 		}
-		return contract.Run(accessableState, env.Addresses().Caller, env.Addresses().Self, input, suppliedGas, env.ReadOnly())
+		return contract.Run(accessibleState, env.Addresses().Caller, env.Addresses().Self, input, suppliedGas, env.ReadOnly())
 	}
 	return vm.NewStatefulPrecompile(legacy.PrecompiledStatefulContract(run).Upgrade())
 }
@@ -145,13 +146,14 @@ func (r RulesExtra) PrecompileOverride(addr common.Address) (libevm.PrecompiledC
 	return makePrecompile(module.Contract), true
 }
 
-type accessableState struct {
+type accessibleState struct {
 	env          vm.PrecompileEnvironment
 	blockContext *precompileBlockContext
 }
 
-func (a accessableState) GetStateDB() contract.StateDB {
-	// XXX: this should be moved to the precompiles
+func (a accessibleState) GetStateDB() contract.StateDB {
+	// TODO the contracts should be refactored to call `env.ReadOnlyState`
+	// or `env.StateDB` based on the env.ReadOnly() flag
 	var state libevm.StateReader
 	if a.env.ReadOnly() {
 		state = a.env.ReadOnlyState()
@@ -161,19 +163,19 @@ func (a accessableState) GetStateDB() contract.StateDB {
 	return state.(contract.StateDB)
 }
 
-func (a accessableState) GetBlockContext() contract.BlockContext {
+func (a accessibleState) GetBlockContext() contract.BlockContext {
 	return a.blockContext
 }
 
-func (a accessableState) GetChainConfig() precompileconfig.ChainConfig {
+func (a accessibleState) GetChainConfig() precompileconfig.ChainConfig {
 	return GetExtra(a.env.ChainConfig())
 }
 
-func (a accessableState) GetSnowContext() *snow.Context {
+func (a accessibleState) GetSnowContext() *snow.Context {
 	return GetExtra(a.env.ChainConfig()).SnowCtx
 }
 
-func (a accessableState) GetPrecompileEnv() vm.PrecompileEnvironment {
+func (a accessibleState) GetPrecompileEnv() vm.PrecompileEnvironment {
 	return a.env
 }
 

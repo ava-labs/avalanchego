@@ -84,7 +84,7 @@ func NewDisableConfig(blockTimestamp *uint64) *Config {
 func (*Config) Key() string { return ConfigKey }
 
 // Verify tries to verify Config and returns an error accordingly.
-func (c Config) Verify(chainConfig precompileconfig.ChainConfig) error {
+func (c *Config) Verify(chainConfig precompileconfig.ChainConfig) error {
 	if c.Timestamp() != nil {
 		// If Warp attempts to activate before Durango, fail verification
 		timestamp := *c.Timestamp()

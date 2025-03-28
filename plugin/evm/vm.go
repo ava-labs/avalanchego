@@ -807,9 +807,8 @@ func (vm *VM) preBatchOnFinalizeAndAssemble(header *types.Header, state *state.S
 		// Note: snapshot is taken inside the loop because you cannot revert to the same snapshot more than
 		// once.
 		snapshot := state.Snapshot()
-		rules := vm.chainConfig.Rules(header.Number, params.IsMergeTODO, header.Time)
-		rulesExtra := params.GetRulesExtra(rules)
-		if err := vm.verifyTx(tx, header.ParentHash, header.BaseFee, state, *rulesExtra); err != nil {
+		rules := vm.rules(header.Number, header.Time)
+		if err := vm.verifyTx(tx, header.ParentHash, header.BaseFee, state, rules); err != nil {
 			// Discard the transaction from the mempool on failed verification.
 			log.Debug("discarding tx from mempool on failed verification", "txID", tx.ID(), "err", err)
 			vm.mempool.DiscardCurrentTx(tx.ID())
@@ -826,8 +825,8 @@ func (vm *VM) preBatchOnFinalizeAndAssemble(header *types.Header, state *state.S
 			return nil, nil, nil, fmt.Errorf("failed to marshal atomic transaction %s due to %w", tx.ID(), err)
 		}
 		var contribution, gasUsed *big.Int
-		if rulesExtra.IsApricotPhase4 {
-			contribution, gasUsed, err = tx.BlockFeeContribution(rulesExtra.IsApricotPhase5, vm.ctx.AVAXAssetID, header.BaseFee)
+		if rules.IsApricotPhase4 {
+			contribution, gasUsed, err = tx.BlockFeeContribution(rules.IsApricotPhase5, vm.ctx.AVAXAssetID, header.BaseFee)
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -855,8 +854,7 @@ func (vm *VM) postBatchOnFinalizeAndAssemble(
 		batchAtomicUTXOs  set.Set[ids.ID]
 		batchContribution *big.Int = new(big.Int).Set(common.Big0)
 		batchGasUsed      *big.Int = new(big.Int).Set(common.Big0)
-		rules                      = vm.chainConfig.Rules(header.Number, params.IsMergeTODO, header.Time)
-		rulesExtra                 = *params.GetRulesExtra(rules)
+		rules                      = vm.rules(header.Number, header.Time)
 		size              int
 	)
 
@@ -910,7 +908,7 @@ func (vm *VM) postBatchOnFinalizeAndAssemble(
 		}
 
 		snapshot := state.Snapshot()
-		if err := vm.verifyTx(tx, header.ParentHash, header.BaseFee, state, rulesExtra); err != nil {
+		if err := vm.verifyTx(tx, header.ParentHash, header.BaseFee, state, rules); err != nil {
 			// Discard the transaction from the mempool and reset the state to [snapshot]
 			// if it fails verification here.
 			// Note: prior to this point, we have not modified [state] so there is no need to
@@ -972,11 +970,10 @@ func (vm *VM) onExtraStateChange(block *types.Block, parent *types.Header, state
 		batchContribution *big.Int = big.NewInt(0)
 		batchGasUsed      *big.Int = big.NewInt(0)
 		header                     = block.Header()
-		rules                      = vm.chainConfig.Rules(header.Number, params.IsMergeTODO, header.Time)
-		rulesExtra                 = *params.GetRulesExtra(rules)
+		rules                      = vm.rules(header.Number, header.Time)
 	)
 
-	txs, err := atomic.ExtractAtomicTxs(customtypes.BlockExtData(block), rulesExtra.IsApricotPhase5, atomic.Codec)
+	txs, err := atomic.ExtractAtomicTxs(customtypes.BlockExtData(block), rules.IsApricotPhase5, atomic.Codec)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -987,7 +984,7 @@ func (vm *VM) onExtraStateChange(block *types.Block, parent *types.Header, state
 			log.Info("skipping atomic tx verification on bonus block", "block", block.Hash())
 		} else {
 			// Verify [txs] do not conflict with themselves or ancestor blocks.
-			if err := vm.verifyTxs(txs, block.ParentHash(), block.BaseFee(), block.NumberU64(), rulesExtra); err != nil {
+			if err := vm.verifyTxs(txs, block.ParentHash(), block.BaseFee(), block.NumberU64(), rules); err != nil {
 				return nil, nil, err
 			}
 		}
@@ -1011,8 +1008,8 @@ func (vm *VM) onExtraStateChange(block *types.Block, parent *types.Header, state
 			return nil, nil, err
 		}
 		// If ApricotPhase4 is enabled, calculate the block fee contribution
-		if rulesExtra.IsApricotPhase4 {
-			contribution, gasUsed, err := tx.BlockFeeContribution(rulesExtra.IsApricotPhase5, vm.ctx.AVAXAssetID, block.BaseFee())
+		if rules.IsApricotPhase4 {
+			contribution, gasUsed, err := tx.BlockFeeContribution(rules.IsApricotPhase5, vm.ctx.AVAXAssetID, block.BaseFee())
 			if err != nil {
 				return nil, nil, err
 			}
@@ -1024,7 +1021,7 @@ func (vm *VM) onExtraStateChange(block *types.Block, parent *types.Header, state
 
 	// If ApricotPhase5 is enabled, enforce that the atomic gas used does not exceed the
 	// atomic gas limit.
-	if rulesExtra.IsApricotPhase5 {
+	if rules.IsApricotPhase5 {
 		atomicGasLimit, err := customheader.RemainingAtomicGasCapacity(vm.chainConfigExtra(), parent, header)
 		if err != nil {
 			return nil, nil, err
@@ -1748,11 +1745,15 @@ func (vm *VM) chainConfigExtra() *extras.ChainConfig {
 	return params.GetExtra(vm.chainConfig)
 }
 
+func (vm *VM) rules(number *big.Int, time uint64) extras.Rules {
+	ethrules := vm.chainConfig.Rules(number, params.IsMergeTODO, time)
+	return *params.GetRulesExtra(ethrules)
+}
+
 // currentRules returns the chain rules for the current block.
 func (vm *VM) currentRules() extras.Rules {
 	header := vm.eth.APIBackend.CurrentHeader()
-	rules := vm.chainConfig.Rules(header.Number, params.IsMergeTODO, header.Time)
-	return *params.GetRulesExtra(rules)
+	return vm.rules(header.Number, header.Time)
 }
 
 // requirePrimaryNetworkSigners returns true if warp messages from the primary

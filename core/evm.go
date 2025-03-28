@@ -49,14 +49,14 @@ func init() {
 
 type hooks struct{}
 
-// OverrideNewEVMArgs is a hook that is called back when a new EVM is created.
+// OverrideNewEVMArgs is a hook that is called in [vm.NewEVM].
 // It allows for the modification of the EVM arguments before the EVM is created.
 // Specifically, we set Random to be the same as Difficulty since Shanghai.
 // This allows using the same jump table as upstream.
 // Then we set Difficulty to 0 as it is post Merge in upstream.
 // Additionally we wrap the StateDB with the appropriate StateDB wrapper,
 // which is used in coreth to process historical pre-AP1 blocks with the
-// GetCommittedState method as it was historically.
+// [StateDbAP1.GetCommittedState] method as it was historically.
 func (hooks) OverrideNewEVMArgs(args *vm.NewEVMArgs) *vm.NewEVMArgs {
 	rules := args.ChainConfig.Rules(args.BlockContext.BlockNumber, params.IsMergeTODO, args.BlockContext.Time)
 	args.StateDB = wrapStateDB(rules, args.StateDB)
@@ -79,7 +79,7 @@ func wrapStateDB(rules params.Rules, db vm.StateDB) vm.StateDB {
 	if params.GetRulesExtra(rules).IsApricotPhase1 {
 		db = &StateDbAP1{db.(extstate.VmStateDB)}
 	}
-	return &extstate.StateDB{VmStateDB: db.(extstate.VmStateDB)}
+	return extstate.New(db.(extstate.VmStateDB))
 }
 
 type StateDbAP1 struct {
@@ -121,7 +121,6 @@ func NewEVMBlockContext(header *types.Header, chain ChainContext, author *common
 	if header.ExcessBlobGas != nil {
 		blobBaseFee = eip4844.CalcBlobFee(*header.ExcessBlobGas)
 	}
-
 	return vm.BlockContext{
 		CanTransfer: CanTransfer,
 		Transfer:    Transfer,
@@ -144,14 +143,14 @@ func NewEVMBlockContext(header *types.Header, chain ChainContext, author *common
 // NewEVMBlockContextWithPredicateResults creates a new context for use in the
 // EVM with an override for the predicate results. The miner uses this to pass
 // predicate results to the EVM when header.Extra is not fully formed yet.
-func NewEVMBlockContextWithPredicateResults(rules extras.AvalancheRules, header *types.Header, chain ChainContext, author *common.Address, predicateResults []byte) vm.BlockContext {
+func NewEVMBlockContextWithPredicateResults(rules extras.AvalancheRules, header *types.Header, chain ChainContext, author *common.Address, predicateBytes []byte) vm.BlockContext {
 	blockCtx := NewEVMBlockContext(header, chain, author)
 	// Note this only sets the block context, which is the hand-off point for
 	// the EVM. The actual header is not modified.
 	blockCtx.Header.Extra = customheader.SetPredicateBytesInExtra(
 		rules,
 		bytes.Clone(header.Extra),
-		predicateResults,
+		predicateBytes,
 	)
 	return blockCtx
 }

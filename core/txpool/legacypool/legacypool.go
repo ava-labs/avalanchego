@@ -84,10 +84,10 @@ var (
 
 // ====== If resolving merge conflicts ======
 //
-// All calls to metrics.NewRegistered*() have been replaced with
-// metrics.GetOrRegister*() and this package's corresponding libevm package
-// imported above. Together these ensure that the metric here is the same as the
-// one with the same name in libevm.
+// All calls to metrics.NewRegistered*() for metrics also defined in libevm/core/txpool/legacypool
+// have been replaced with metrics.GetOrRegister*() to get metrics already registered in
+// libevm/core/txpool/legacypool or register them here otherwise. These replacements ensure the
+// same metrics are shared between the two packages.
 var (
 	// Metrics for the pending pool
 	pendingDiscardMeter   = metrics.GetOrRegisterMeter("txpool/pending/discard", nil)
@@ -1778,13 +1778,14 @@ func (pool *LegacyPool) demoteUnexecutables() {
 }
 
 func (pool *LegacyPool) startPeriodicFeeUpdate() {
-	if params.GetExtra(pool.chainconfig).ApricotPhase3BlockTimestamp == nil {
+	ap3Timestamp := params.GetExtra(pool.chainconfig).ApricotPhase3BlockTimestamp
+	if ap3Timestamp == nil {
 		return
 	}
 
 	// Call updateBaseFee here to ensure that there is not a [baseFeeUpdateInterval] delay
 	// when starting up in ApricotPhase3 before the base fee is updated.
-	if time.Now().After(utils.Uint64ToTime(params.GetExtra(pool.chainconfig).ApricotPhase3BlockTimestamp)) {
+	if time.Now().After(utils.Uint64ToTime(ap3Timestamp)) {
 		pool.updateBaseFee()
 	}
 
@@ -1796,8 +1797,9 @@ func (pool *LegacyPool) periodicBaseFeeUpdate() {
 	defer pool.wg.Done()
 
 	// Sleep until its time to start the periodic base fee update or the tx pool is shutting down
+	ap3Time := utils.Uint64ToTime(params.GetExtra(pool.chainconfig).ApricotPhase3BlockTimestamp)
 	select {
-	case <-time.After(time.Until(utils.Uint64ToTime(params.GetExtra(pool.chainconfig).ApricotPhase3BlockTimestamp))):
+	case <-time.After(time.Until(ap3Time)):
 	case <-pool.generalShutdownChan:
 		return // Return early if shutting down
 	}

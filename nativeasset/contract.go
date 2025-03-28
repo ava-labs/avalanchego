@@ -102,14 +102,14 @@ func UnpackNativeAssetCallInput(input []byte) (common.Address, common.Hash, *big
 	return to, assetID, assetAmount, callData, nil
 }
 
-// Run implements StatefulPrecompiledContract
+// Run implements [contract.StatefulPrecompiledContract]
 func (c *NativeAssetCall) Run(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	env := accessibleState.GetPrecompileEnv()
 	if !env.UseGas(c.GasCost) {
 		return nil, 0, vm.ErrOutOfGas
 	}
 	ret, err = c.run(env, accessibleState.GetStateDB(), caller, addr, input, readOnly)
-	// This precompile will be wrapped in a libevm `legacy` wrapper, which
+	// This precompile will be wrapped in a libevm `legacy.PrecompiledStatefulContract`, which
 	// allows for the deprecated pattern of returning remaining gas by calling
 	// env.UseGas() on the difference between gas in and gas out. Since we call
 	// UseGas() ourselves, we therefore return `suppliedGas` unchanged to stop
@@ -119,7 +119,7 @@ func (c *NativeAssetCall) Run(accessibleState contract.AccessibleState, caller c
 
 // run implements the contract logic, using `env.Gas()` and `env.UseGas()` in
 // place of `suppliedGas` and returning `remainingGas`, respectively. This
-// avoids mixing gas-accounting patterns when using env.Call().
+// avoids mixing gas-accounting patterns when using `env.Call()`.
 func (c *NativeAssetCall) run(env vm.PrecompileEnvironment, stateDB contract.StateDB, caller common.Address, addr common.Address, input []byte, readOnly bool) (ret []byte, err error) {
 	if readOnly {
 		return nil, vm.ErrExecutionReverted
@@ -131,8 +131,8 @@ func (c *NativeAssetCall) run(env vm.PrecompileEnvironment, stateDB contract.Sta
 		return nil, vm.ErrExecutionReverted
 	}
 
-	// Note: it is not possible for a negative assetAmount to be passed in here due to the fact that decoding a
-	// byte slice into a *big.Int type will always return a positive value, as documented on [big.Int.SetBytes].
+	// Note: it is not possible for a negative `assetAmount` to be passed in here due to the fact that decoding a
+	// byte slice into a [*big.Int] will always return a positive value, as documented on [big.Int.SetBytes].
 	if assetAmount.Sign() != 0 && stateDB.GetBalanceMultiCoin(caller, assetID).Cmp(assetAmount) < 0 {
 		return nil, vm.ErrInsufficientBalance
 	}
@@ -146,7 +146,7 @@ func (c *NativeAssetCall) run(env vm.PrecompileEnvironment, stateDB contract.Sta
 		stateDB.CreateAccount(to)
 	}
 
-	// Send [assetAmount] of [assetID] to [to] address
+	// Send `assetAmount` of `assetID` to `to` address
 	stateDB.SubBalanceMultiCoin(caller, assetID, assetAmount)
 	stateDB.AddBalanceMultiCoin(to, assetID, assetAmount)
 
@@ -159,9 +159,6 @@ func (c *NativeAssetCall) run(env vm.PrecompileEnvironment, stateDB contract.Sta
 		if err != vm.ErrExecutionReverted {
 			env.UseGas(env.Gas())
 		}
-		// TODO: consider clearing up unused snapshots:
-		//} else {
-		//	evm.StateDB.DiscardSnapshot(snapshot)
 	}
 	return ret, err
 }

@@ -45,6 +45,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/ethdb"
+	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/davecgh/go-spew/spew"
@@ -159,7 +160,7 @@ func testSetupGenesis(t *testing.T, scheme string) {
 			},
 			wantHash:   customghash,
 			wantConfig: customg.Config,
-			wantErr: &params.ConfigCompatError{
+			wantErr: &ethparams.ConfigCompatError{
 				What:         "ApricotPhase1 fork block timestamp",
 				StoredTime:   u64(90),
 				NewTime:      u64(100),

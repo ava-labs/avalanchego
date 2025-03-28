@@ -15,21 +15,15 @@ import (
 	"github.com/holiman/uint256"
 )
 
-type Log = ethtypes.Log
-
 // StatefulPrecompiledContract is the interface for executing a precompiled contract
 type StatefulPrecompiledContract interface {
 	// Run executes the precompiled contract.
 	Run(accessibleState AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error)
 }
 
-type StateReader interface {
-	GetState(common.Address, common.Hash) common.Hash
-}
-
 // StateDB is the interface for accessing EVM state
 type StateDB interface {
-	StateReader
+	GetState(common.Address, common.Hash) common.Hash
 	SetState(common.Address, common.Hash, common.Hash)
 
 	SetNonce(common.Address, uint64)
@@ -44,8 +38,8 @@ type StateDB interface {
 	CreateAccount(common.Address)
 	Exist(common.Address) bool
 
-	AddLog(*Log)
-	GetLogData() (topics [][]common.Hash, data [][]byte)
+	AddLog(*ethtypes.Log)
+	Logs() []*ethtypes.Log
 	GetPredicateStorageSlots(address common.Address, index int) ([]byte, bool)
 	SetPredicateStorageSlots(address common.Address, predicates [][]byte)
 

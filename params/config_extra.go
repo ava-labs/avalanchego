@@ -21,8 +21,6 @@ const (
 	IsMergeTODO = true
 )
 
-type ConfigCompatError = extras.ConfigCompatError
-
 // SetEthUpgrades enables Etheruem network upgrades using the same time as
 // the Avalanche network upgrade that enables them.
 func SetEthUpgrades(c *ChainConfig) {

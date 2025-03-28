@@ -35,11 +35,12 @@ import (
 
 // ====== If resolving merge conflicts ======
 //
-// All calls to metrics.NewRegistered*() have been replaced with
-// metrics.GetOrRegister*() and this package's corresponding libevm package
-// imported above. Together these ensure that the metric here is the same as the
-// one with the same name in libevm.
-// nolint: unused
+// All calls to metrics.NewRegistered*() for metrics also defined in libevm/triedb/pathdb
+// have been replaced with metrics.GetOrRegister*() to get metrics already registered in
+// libevm/triedb/pathdb or register them here otherwise. These replacements ensure the same
+// metrics are shared between the two packages.
+//
+//nolint:unused
 var (
 	cleanHitMeter   = metrics.GetOrRegisterMeter("pathdb/clean/hit", nil)
 	cleanMissMeter  = metrics.GetOrRegisterMeter("pathdb/clean/miss", nil)

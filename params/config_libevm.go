@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// (c) 2024-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package params
@@ -14,7 +14,7 @@ import (
 )
 
 // libevmInit would ideally be a regular init() function, but it MUST be run
-// before any calls to [ChainConfig.Rules]. See `config.go` for its call site.
+// before any calls to [params.ChainConfig.Rules]. See `config.go` for its call site.
 func libevmInit() any {
 	payloads = ethparams.RegisterExtras(ethparams.Extras[*extras.ChainConfig, RulesExtra]{
 		ReuseJSONRoot: true, // Reuse the root JSON input when unmarshalling the extra payload.
