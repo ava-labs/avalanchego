@@ -14,8 +14,6 @@ import (
 	"github.com/holiman/uint256"
 )
 
-type Log = ethtypes.Log
-
 // StatefulPrecompiledContract is the interface for executing a precompiled contract
 type StatefulPrecompiledContract interface {
 	// Run executes the precompiled contract.
@@ -40,7 +38,7 @@ type StateDB interface {
 	CreateAccount(common.Address)
 	Exist(common.Address) bool
 
-	AddLog(*Log)
+	AddLog(*ethtypes.Log)
 	GetLogData() (topics [][]common.Hash, data [][]byte)
 	GetPredicateStorageSlots(address common.Address, index int) ([]byte, bool)
 	SetPredicateStorageSlots(address common.Address, predicates [][]byte)

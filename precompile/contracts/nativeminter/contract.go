@@ -10,6 +10,7 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
@@ -106,7 +107,7 @@ func mintNativeCoin(accessibleState contract.AccessibleState, caller common.Addr
 		if err != nil {
 			return nil, remainingGas, err
 		}
-		stateDB.AddLog(&contract.Log{
+		stateDB.AddLog(&types.Log{
 			Address:     ContractAddress,
 			Topics:      topics,
 			Data:        data,

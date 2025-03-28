@@ -8,6 +8,7 @@ import (
 	"reflect"
 
 	"github.com/ava-labs/avalanchego/upgrade"
+	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/subnet-evm/utils"
 )
 
@@ -33,18 +34,18 @@ func (n *NetworkUpgrades) Equal(other *NetworkUpgrades) bool {
 	return reflect.DeepEqual(n, other)
 }
 
-func (n *NetworkUpgrades) checkNetworkUpgradesCompatible(newcfg *NetworkUpgrades, time uint64) *ConfigCompatError {
+func (n *NetworkUpgrades) checkNetworkUpgradesCompatible(newcfg *NetworkUpgrades, time uint64) *ethparams.ConfigCompatError {
 	if isForkTimestampIncompatible(n.SubnetEVMTimestamp, newcfg.SubnetEVMTimestamp, time) {
-		return newTimestampCompatError("SubnetEVM fork block timestamp", n.SubnetEVMTimestamp, newcfg.SubnetEVMTimestamp)
+		return ethparams.NewTimestampCompatError("SubnetEVM fork block timestamp", n.SubnetEVMTimestamp, newcfg.SubnetEVMTimestamp)
 	}
 	if isForkTimestampIncompatible(n.DurangoTimestamp, newcfg.DurangoTimestamp, time) {
-		return newTimestampCompatError("Durango fork block timestamp", n.DurangoTimestamp, newcfg.DurangoTimestamp)
+		return ethparams.NewTimestampCompatError("Durango fork block timestamp", n.DurangoTimestamp, newcfg.DurangoTimestamp)
 	}
 	if isForkTimestampIncompatible(n.EtnaTimestamp, newcfg.EtnaTimestamp, time) {
-		return newTimestampCompatError("Etna fork block timestamp", n.EtnaTimestamp, newcfg.EtnaTimestamp)
+		return ethparams.NewTimestampCompatError("Etna fork block timestamp", n.EtnaTimestamp, newcfg.EtnaTimestamp)
 	}
 	if isForkTimestampIncompatible(n.FortunaTimestamp, newcfg.FortunaTimestamp, time) {
-		return newTimestampCompatError("Fortuna fork block timestamp", n.FortunaTimestamp, newcfg.FortunaTimestamp)
+		return ethparams.NewTimestampCompatError("Fortuna fork block timestamp", n.FortunaTimestamp, newcfg.FortunaTimestamp)
 	}
 
 	return nil
@@ -59,7 +60,7 @@ func (n *NetworkUpgrades) forkOrder() []fork {
 	}
 }
 
-// setDefaults sets the default values for the network upgrades.
+// SetDefaults sets the default values for the network upgrades.
 // This overrides deactivating the network upgrade by providing a timestamp of nil value.
 func (n *NetworkUpgrades) SetDefaults(agoUpgrades upgrade.Config) {
 	defaults := getDefaultNetworkUpgrades(agoUpgrades)
@@ -189,4 +190,11 @@ func verifyWithDefault(configTimestamp *uint64, defaultTimestamp *uint64) error 
 		return fmt.Errorf("provided timestamp (%d) must be greater than or equal to the default timestamp (%d)", *configTimestamp, *defaultTimestamp)
 	}
 	return nil
+}
+
+func ptrToString(val *uint64) string {
+	if val == nil {
+		return "nil"
+	}
+	return fmt.Sprintf("%d", *val)
 }

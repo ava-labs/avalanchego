@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/subnet-evm/accounts/abi"
 	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
@@ -105,7 +106,7 @@ func allowFeeRecipients(accessibleState contract.AccessibleState, caller common.
 		if err != nil {
 			return nil, remainingGas, err
 		}
-		stateDB.AddLog(&contract.Log{
+		stateDB.AddLog(&types.Log{
 			Address:     ContractAddress,
 			Topics:      topics,
 			Data:        data,
@@ -233,7 +234,7 @@ func setRewardAddress(accessibleState contract.AccessibleState, caller common.Ad
 		if err != nil {
 			return nil, remainingGas, err
 		}
-		stateDB.AddLog(&contract.Log{
+		stateDB.AddLog(&types.Log{
 			Address:     ContractAddress,
 			Topics:      topics,
 			Data:        data,
@@ -296,7 +297,7 @@ func disableRewards(accessibleState contract.AccessibleState, caller common.Addr
 		if err != nil {
 			return nil, remainingGas, err
 		}
-		stateDB.AddLog(&contract.Log{
+		stateDB.AddLog(&types.Log{
 			Address:     ContractAddress,
 			Topics:      topics,
 			Data:        data,

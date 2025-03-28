@@ -4,19 +4,18 @@
 package warp
 
 import (
+	_ "embed"
 	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
-	"github.com/ava-labs/subnet-evm/accounts/abi"
-	"github.com/ava-labs/subnet-evm/precompile/contract"
-
-	_ "embed"
-
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
+	"github.com/ava-labs/subnet-evm/accounts/abi"
+	"github.com/ava-labs/subnet-evm/precompile/contract"
 )
 
 const (
@@ -280,7 +279,7 @@ func sendWarpMessage(accessibleState contract.AccessibleState, caller common.Add
 	if err != nil {
 		return nil, remainingGas, err
 	}
-	accessibleState.GetStateDB().AddLog(&contract.Log{
+	accessibleState.GetStateDB().AddLog(&types.Log{
 		Address:     ContractAddress,
 		Topics:      topics,
 		Data:        data,

@@ -45,11 +45,11 @@ type Results struct {
 }
 
 func (r Results) GetPredicateResults(txHash common.Hash, address common.Address) []byte {
-	tx, ok := r.Results[txHash]
+	results, ok := r.Results[txHash]
 	if !ok {
 		return nil
 	}
-	return tx[address]
+	return results[address]
 }
 
 // NewResults returns an empty predicate results.

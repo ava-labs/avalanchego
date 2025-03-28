@@ -14,25 +14,35 @@ import (
 type VmStateDB interface {
 	vm.StateDB
 	Logs() []*types.Log
-
 	GetTxHash() common.Hash
 }
 
+type vmStateDB = VmStateDB
+
 type StateDB struct {
-	VmStateDB
+	vmStateDB
 
 	// Ordered storage slots to be used in predicate verification as set in the tx access list.
-	// Only set in PrepareAccessList, and un-modified through execution.
+	// Only set in [StateDB.Prepare], and un-modified through execution.
 	predicateStorageSlots map[common.Address][][]byte
+}
+
+// New creates a new [*StateDB] with the given [VmStateDB], effectively wrapping it
+// with additional functionality.
+func New(vm VmStateDB) *StateDB {
+	return &StateDB{
+		vmStateDB:             vm,
+		predicateStorageSlots: make(map[common.Address][][]byte),
+	}
 }
 
 func (s *StateDB) Prepare(rules params.Rules, sender, coinbase common.Address, dst *common.Address, precompiles []common.Address, list types.AccessList) {
 	rulesExtra := params.GetRulesExtra(rules)
 	s.predicateStorageSlots = predicate.PreparePredicateStorageSlots(rulesExtra, list)
-	s.VmStateDB.Prepare(rules, sender, coinbase, dst, precompiles, list)
+	s.vmStateDB.Prepare(rules, sender, coinbase, dst, precompiles, list)
 }
 
-// GetLogData returns the underlying topics and data from each log included in the StateDB
+// GetLogData returns the underlying topics and data from each log included in the [StateDB].
 // Test helper function.
 func (s *StateDB) GetLogData() (topics [][]common.Hash, data [][]byte) {
 	for _, log := range s.Logs() {
@@ -54,10 +64,7 @@ func (s *StateDB) GetLogData() (topics [][]common.Hash, data [][]byte) {
 // GetPredicateStorageSlots(AddrA, 1) -> Predicate3
 func (s *StateDB) GetPredicateStorageSlots(address common.Address, index int) ([]byte, bool) {
 	predicates, exists := s.predicateStorageSlots[address]
-	if !exists {
-		return nil, false
-	}
-	if index >= len(predicates) {
+	if !exists || index >= len(predicates) {
 		return nil, false
 	}
 	return predicates[index], true
@@ -65,8 +72,5 @@ func (s *StateDB) GetPredicateStorageSlots(address common.Address, index int) ([
 
 // SetPredicateStorageSlots sets the predicate storage slots for the given address
 func (s *StateDB) SetPredicateStorageSlots(address common.Address, predicates [][]byte) {
-	if s.predicateStorageSlots == nil {
-		s.predicateStorageSlots = make(map[common.Address][][]byte)
-	}
 	s.predicateStorageSlots[address] = predicates
 }

@@ -1793,13 +1793,14 @@ func (pool *LegacyPool) demoteUnexecutables() {
 }
 
 func (pool *LegacyPool) startPeriodicFeeUpdate() {
-	if params.GetExtra(pool.chainconfig).SubnetEVMTimestamp == nil {
+	subnetEVMTimestamp := params.GetExtra(pool.chainconfig).SubnetEVMTimestamp
+	if subnetEVMTimestamp == nil {
 		return
 	}
 
 	// Call updateBaseFee here to ensure that there is not a [baseFeeUpdateInterval] delay
-	// when starting up in Subnet EVM before the base fee is updated.
-	if time.Now().After(utils.Uint64ToTime(params.GetExtra(pool.chainconfig).SubnetEVMTimestamp)) {
+	// when starting up in ApricotPhase3 before the base fee is updated.
+	if time.Now().After(utils.Uint64ToTime(subnetEVMTimestamp)) {
 		pool.updateBaseFee()
 	}
 
@@ -1811,8 +1812,9 @@ func (pool *LegacyPool) periodicBaseFeeUpdate() {
 	defer pool.wg.Done()
 
 	// Sleep until its time to start the periodic base fee update or the tx pool is shutting down
+	subnetEVMTime := utils.Uint64ToTime(params.GetExtra(pool.chainconfig).SubnetEVMTimestamp)
 	select {
-	case <-time.After(time.Until(utils.Uint64ToTime(params.GetExtra(pool.chainconfig).SubnetEVMTimestamp))):
+	case <-time.After(time.Until(subnetEVMTime)):
 	case <-pool.generalShutdownChan:
 		return // Return early if shutting down
 	}

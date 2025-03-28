@@ -6,7 +6,6 @@ package evm
 import (
 	"context"
 	"crypto/ecdsa"
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -362,10 +361,7 @@ func TestBuildEthTxBlock(t *testing.T) {
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
 	vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
 
-	key, err := utils.NewKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
+	key := utils.NewKey(t)
 
 	tx := types.NewTransaction(uint64(0), key.Address, firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
@@ -2951,10 +2947,7 @@ func TestSkipChainConfigCheckCompatible(t *testing.T) {
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
 	vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
 
-	key, err := utils.NewKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
+	key := utils.NewKey(t)
 
 	tx := types.NewTransaction(uint64(0), key.Address, firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])

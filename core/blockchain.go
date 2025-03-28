@@ -216,7 +216,7 @@ func (c *CacheConfig) triedbConfig() *triedb.Config {
 		config.DBOverride = hashdb.Config{
 			CleanCacheSize:                  c.TrieCleanLimit * 1024 * 1024,
 			StatsPrefix:                     trieCleanCacheStatsNamespace,
-			ReferenceRootAtomicallyOnUpdate: true, // Automatically reference root nodes when an update is made
+			ReferenceRootAtomicallyOnUpdate: true,
 		}.BackendConstructor
 	}
 	if c.StateScheme == rawdb.PathScheme {
@@ -1235,8 +1235,7 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, parentRoot common.
 	}
 
 	// Commit all cached state changes into underlying memory database.
-	var err error
-	_, err = bc.commitWithSnap(block, parentRoot, state)
+	_, err := bc.commitWithSnap(block, parentRoot, state)
 	if err != nil {
 		return err
 	}
@@ -1758,8 +1757,8 @@ func (bc *BlockChain) reprocessBlock(parent *types.Block, current *types.Block) 
 func (bc *BlockChain) commitWithSnap(
 	current *types.Block, parentRoot common.Hash, statedb *state.StateDB,
 ) (common.Hash, error) {
-	// blockHashes must be passed through Commit since snapshots are based on the
-	// block hash.
+	// blockHashes must be passed through [state.StateDB]'s Commit since snapshots
+	// are based on the block hash.
 	blockHashes := snapshot.WithBlockHashes(current.Hash(), current.ParentHash())
 	root, err := statedb.Commit(current.NumberU64(), bc.chainConfig.IsEIP158(current.Number()), blockHashes)
 	if err != nil {

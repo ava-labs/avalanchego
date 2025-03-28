@@ -36,7 +36,7 @@ import (
 	"github.com/ava-labs/subnet-evm/utils"
 )
 
-// Guarantees extras initialisation before a call to [ChainConfig.Rules].
+// Guarantees extras initialisation before a call to [params.ChainConfig.Rules].
 var _ = libevmInit()
 
 var (

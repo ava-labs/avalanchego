@@ -10,6 +10,7 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
 )
@@ -117,7 +118,7 @@ func createAllowListRoleSetter(precompileAddr common.Address, role Role) contrac
 			if err != nil {
 				return nil, remainingGas, err
 			}
-			stateDB.AddLog(&contract.Log{
+			stateDB.AddLog(&types.Log{
 				Address:     precompileAddr,
 				Topics:      topics,
 				Data:        data,

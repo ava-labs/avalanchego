@@ -64,8 +64,8 @@ func (b *Block) Accept(context.Context) error {
 	// Call Accept for relevant precompile logs. Note we do this prior to
 	// calling Accept on the blockChain so any side effects (eg warp signatures)
 	// take place before the accepted log is emitted to subscribers.
-	rules := b.vm.chainConfig.Rules(b.ethBlock.Number(), params.IsMergeTODO, b.ethBlock.Time())
-	if err := b.handlePrecompileAccept(*params.GetRulesExtra(rules)); err != nil {
+	rules := b.vm.rules(b.ethBlock.Number(), b.ethBlock.Time())
+	if err := b.handlePrecompileAccept(rules); err != nil {
 		return err
 	}
 	if err := vm.blockChain.Accept(b.ethBlock); err != nil {
@@ -155,7 +155,7 @@ func (b *Block) Verify(context.Context) error {
 
 // ShouldVerifyWithContext implements the block.WithVerifyContext interface
 func (b *Block) ShouldVerifyWithContext(context.Context) (bool, error) {
-	rules := params.GetRulesExtra(b.vm.chainConfig.Rules(b.ethBlock.Number(), params.IsMergeTODO, b.ethBlock.Time()))
+	rules := b.vm.rules(b.ethBlock.Number(), b.ethBlock.Time())
 	predicates := rules.Predicaters
 	// Short circuit early if there are no predicates to verify
 	if len(predicates) == 0 {

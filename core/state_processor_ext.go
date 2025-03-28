@@ -1,4 +1,5 @@
-// (c) 2025, Ava Labs, Inc.
+// (c) 2025, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
 
 package core
 
@@ -17,16 +18,17 @@ import (
 )
 
 // ApplyPrecompileActivations checks if any of the precompiles specified by the chain config are enabled or disabled by the block
-// transition from [parentTimestamp] to the timestamp set in [blockContext]. If this is the case, it calls [Configure]
+// transition from `parentTimestamp` to the timestamp set in `blockContext`. If this is the case, it calls [modules.Module]'s Configure
 // to apply the necessary state transitions for the upgrade.
 // This function is called within genesis setup to configure the starting state for precompiles enabled at genesis.
-// In block processing and building, ApplyUpgrades is called instead which also applies state upgrades.
+// In block processing and building, [ApplyUpgrades] is called instead which also applies state upgrades.
 func ApplyPrecompileActivations(c *params.ChainConfig, parentTimestamp *uint64, blockContext contract.ConfigurationBlockContext, statedb *state.StateDB) error {
 	blockTimestamp := blockContext.Timestamp()
-	// Note: RegisteredModules returns precompiles sorted by module addresses.
-	// This ensures that the order we call Configure for each precompile is consistent.
-	// This ensures even if precompiles read/write state other than their own they will observe
-	// an identical global state in a deterministic order when they are configured.
+	// Note: [modules.RegisteredModules] returns precompiles sorted by module addresses.
+	// This ensures:
+	// - the order we call [modules.Module]'s Configure for each precompile is consistent
+	// - even if precompiles read/write state other than their own they will observe
+	//   an identical global state in a deterministic order when they are configured.
 	extra := params.GetExtra(c)
 	for _, module := range modules.RegisteredModules() {
 		for _, activatingConfig := range extra.GetActivatingPrecompileConfigs(module.Address, parentTimestamp, blockTimestamp, extra.PrecompileUpgrades) {
@@ -35,32 +37,32 @@ func ApplyPrecompileActivations(c *params.ChainConfig, parentTimestamp *uint64, 
 			if activatingConfig.IsDisabled() {
 				log.Info("Disabling precompile", "name", module.ConfigKey)
 				statedb.SelfDestruct(module.Address)
-				// Calling Finalise here effectively commits Suicide call and wipes the contract state.
+				// Calling [state.StateDB]'s Finalise here effectively commits the SelfDestruct call and wipes the contract state.
 				// This enables re-configuration of the same contract state in the same block.
-				// Without an immediate Finalise call after the Suicide, a reconfigured precompiled state can be wiped out
-				// since Suicide will be committed after the reconfiguration.
+				// Without an immediate Finalise call after the SelfDestruct, a reconfigured precompiled state can be wiped out
+				// since SelfDestruct will be committed after the reconfiguration.
 				statedb.Finalise(true)
+				continue
+			}
+			var printIntf interface{}
+			marshalled, err := json.Marshal(activatingConfig)
+			if err == nil {
+				printIntf = string(marshalled)
 			} else {
-				var printIntf interface{}
-				marshalled, err := json.Marshal(activatingConfig)
-				if err == nil {
-					printIntf = string(marshalled)
-				} else {
-					printIntf = activatingConfig
-				}
+				printIntf = activatingConfig
+			}
 
-				log.Info("Activating new precompile", "name", module.ConfigKey, "config", printIntf)
-				// Set the nonce of the precompile's address (as is done when a contract is created) to ensure
-				// that it is marked as non-empty and will not be cleaned up when the statedb is finalized.
-				statedb.SetNonce(module.Address, 1)
-				// Set the code of the precompile's address to a non-zero length byte slice to ensure that the precompile
-				// can be called from within Solidity contracts. Solidity adds a check before invoking a contract to ensure
-				// that it does not attempt to invoke a non-existent contract.
-				statedb.SetCode(module.Address, []byte{0x1})
-				extstatedb := &extstate.StateDB{VmStateDB: statedb}
-				if err := module.Configure(params.GetExtra(c), activatingConfig, extstatedb, blockContext); err != nil {
-					return fmt.Errorf("could not configure precompile, name: %s, reason: %w", module.ConfigKey, err)
-				}
+			log.Info("Activating new precompile", "name", module.ConfigKey, "config", printIntf)
+			// Set the nonce of the precompile's address (as is done when a contract is created) to ensure
+			// that it is marked as non-empty and will not be cleaned up when the statedb is finalized.
+			statedb.SetNonce(module.Address, 1)
+			// Set the code of the precompile's address to a non-zero length byte slice to ensure that the precompile
+			// can be called from within Solidity contracts. Solidity adds a check before invoking a contract to ensure
+			// that it does not attempt to invoke a non-existent contract.
+			statedb.SetCode(module.Address, []byte{0x1})
+			extstatedb := extstate.New(statedb)
+			if err := module.Configure(params.GetExtra(c), activatingConfig, extstatedb, blockContext); err != nil {
+				return fmt.Errorf("could not configure precompile, name: %s, reason: %w", module.ConfigKey, err)
 			}
 		}
 	}
@@ -95,17 +97,22 @@ func ApplyUpgrades(c *params.ChainConfig, parentTimestamp *uint64, blockContext 
 	return applyStateUpgrades(c, parentTimestamp, blockContext, statedb)
 }
 
-type blockContext struct {
+// BlockContext implements [contract.ConfigurationBlockContext].
+type BlockContext struct {
 	number    *big.Int
 	timestamp uint64
 }
 
-func NewBlockContext(number *big.Int, timestamp uint64) *blockContext {
-	return &blockContext{
+// NewBlockContext creates a [BlockContext] using the block number
+// and block timestamp provided. This function is usually necessary to convert
+// a `*types.Block` to be passed as a [contract.ConfigurationBlockContext]
+// to [ApplyUpgrades].
+func NewBlockContext(number *big.Int, timestamp uint64) *BlockContext {
+	return &BlockContext{
 		number:    number,
 		timestamp: timestamp,
 	}
 }
 
-func (bc *blockContext) Number() *big.Int  { return bc.number }
-func (bc *blockContext) Timestamp() uint64 { return bc.timestamp }
+func (bc *BlockContext) Number() *big.Int  { return bc.number }
+func (bc *BlockContext) Timestamp() uint64 { return bc.timestamp }

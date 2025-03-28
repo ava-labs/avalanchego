@@ -35,6 +35,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
+	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/nativeminter"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/rewardmanager"
@@ -48,7 +49,7 @@ func TestCheckCompatible(t *testing.T) {
 		stored, new   *ChainConfig
 		headBlock     uint64
 		headTimestamp uint64
-		wantErr       *ConfigCompatError
+		wantErr       *ethparams.ConfigCompatError
 	}
 	tests := []test{
 		{stored: TestChainConfig, new: TestChainConfig, headBlock: 0, headTimestamp: 0, wantErr: nil},
@@ -66,7 +67,7 @@ func TestCheckCompatible(t *testing.T) {
 			new:           &ChainConfig{HomesteadBlock: nil},
 			headBlock:     3,
 			headTimestamp: 30,
-			wantErr: &ConfigCompatError{
+			wantErr: &ethparams.ConfigCompatError{
 				What:          "Homestead fork block",
 				StoredBlock:   big.NewInt(0),
 				NewBlock:      nil,
@@ -78,7 +79,7 @@ func TestCheckCompatible(t *testing.T) {
 			new:           &ChainConfig{HomesteadBlock: big.NewInt(1)},
 			headBlock:     3,
 			headTimestamp: 30,
-			wantErr: &ConfigCompatError{
+			wantErr: &ethparams.ConfigCompatError{
 				What:          "Homestead fork block",
 				StoredBlock:   big.NewInt(0),
 				NewBlock:      big.NewInt(1),
@@ -90,7 +91,7 @@ func TestCheckCompatible(t *testing.T) {
 			new:           &ChainConfig{HomesteadBlock: big.NewInt(25), EIP150Block: big.NewInt(20)},
 			headBlock:     25,
 			headTimestamp: 250,
-			wantErr: &ConfigCompatError{
+			wantErr: &ethparams.ConfigCompatError{
 				What:          "EIP150 fork block",
 				StoredBlock:   big.NewInt(10),
 				NewBlock:      big.NewInt(20),
@@ -109,7 +110,7 @@ func TestCheckCompatible(t *testing.T) {
 			new:           &ChainConfig{ConstantinopleBlock: big.NewInt(30), PetersburgBlock: big.NewInt(31)},
 			headBlock:     40,
 			headTimestamp: 400,
-			wantErr: &ConfigCompatError{
+			wantErr: &ethparams.ConfigCompatError{
 				What:          "Petersburg fork block",
 				StoredBlock:   nil,
 				NewBlock:      big.NewInt(31),
@@ -121,7 +122,7 @@ func TestCheckCompatible(t *testing.T) {
 			new:           TestPreSubnetEVMChainConfig,
 			headBlock:     0,
 			headTimestamp: 0,
-			wantErr: &ConfigCompatError{
+			wantErr: &ethparams.ConfigCompatError{
 				What:         "SubnetEVM fork block timestamp",
 				StoredTime:   utils.NewUint64(0),
 				NewTime:      GetExtra(TestPreSubnetEVMChainConfig).NetworkUpgrades.SubnetEVMTimestamp,
@@ -133,7 +134,7 @@ func TestCheckCompatible(t *testing.T) {
 			new:           TestPreSubnetEVMChainConfig,
 			headBlock:     10,
 			headTimestamp: 100,
-			wantErr: &ConfigCompatError{
+			wantErr: &ethparams.ConfigCompatError{
 				What:         "SubnetEVM fork block timestamp",
 				StoredTime:   utils.NewUint64(0),
 				NewTime:      GetExtra(TestPreSubnetEVMChainConfig).NetworkUpgrades.SubnetEVMTimestamp,

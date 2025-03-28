@@ -10,6 +10,7 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/subnet-evm/accounts/abi"
 	"github.com/ava-labs/subnet-evm/commontype"
@@ -241,7 +242,7 @@ func setFeeConfig(accessibleState contract.AccessibleState, caller common.Addres
 			return nil, remainingGas, err
 		}
 
-		stateDB.AddLog(&contract.Log{
+		stateDB.AddLog(&types.Log{
 			Address:     ContractAddress,
 			Topics:      topics,
 			Data:        data,

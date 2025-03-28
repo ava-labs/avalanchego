@@ -1159,11 +1159,15 @@ func (vm *VM) chainConfigExtra() *extras.ChainConfig {
 	return params.GetExtra(vm.chainConfig)
 }
 
+func (vm *VM) rules(number *big.Int, time uint64) extras.Rules {
+	ethrules := vm.chainConfig.Rules(number, params.IsMergeTODO, time)
+	return *params.GetRulesExtra(ethrules)
+}
+
 // currentRules returns the chain rules for the current block.
 func (vm *VM) currentRules() extras.Rules {
 	header := vm.eth.APIBackend.CurrentHeader()
-	rules := vm.chainConfig.Rules(header.Number, params.IsMergeTODO, header.Time)
-	return *params.GetRulesExtra(rules)
+	return vm.rules(header.Number, header.Time)
 }
 
 // requirePrimaryNetworkSigners returns true if warp messages from the primary

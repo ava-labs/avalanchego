@@ -34,7 +34,7 @@ func (r *Rules) PredicaterExists(addr common.Address) bool {
 	return ok
 }
 
-// IsPrecompileEnabled returns true if the precompile at [addr] is enabled for this rule set.
+// IsPrecompileEnabled returns true if the precompile at `addr` is enabled for this rule set.
 func (r *Rules) IsPrecompileEnabled(addr common.Address) bool {
 	_, ok := r.Precompiles[addr]
 	return ok
