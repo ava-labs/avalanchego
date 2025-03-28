@@ -16,6 +16,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/tests"
+	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
@@ -273,6 +274,7 @@ func main() {
 	)
 	rootCmd.AddCommand(checkLogsCmd)
 
+	var startCollectors bool
 	startKindClusterCmd := &cobra.Command{
 		Use:   "start-kind-cluster",
 		Short: "Starts a local kind cluster with an integrated registry",
@@ -283,10 +285,11 @@ func main() {
 			if err != nil {
 				return err
 			}
-			return tmpnet.StartKindCluster(ctx, log, kubeConfigPath, kubeConfigContext)
+			return tmpnet.StartKindCluster(ctx, log, kubeConfigPath, kubeConfigContext, startCollectors)
 		},
 	}
 	SetKubeFlags(startKindClusterCmd.PersistentFlags(), &kubeConfigPath, &kubeConfigContext, &kubeNamespace)
+	e2e.SetStartCollectorsFlag(startKindClusterCmd.PersistentFlags().BoolVar, &startCollectors)
 	rootCmd.AddCommand(startKindClusterCmd)
 
 	if err := rootCmd.Execute(); err != nil {

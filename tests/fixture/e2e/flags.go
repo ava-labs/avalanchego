@@ -203,12 +203,7 @@ func RegisterFlags() *FlagVars {
 
 // Enable reuse by the upgrade job
 func SetMonitoringFlags(startCollectors *bool, checkMonitoring *bool) {
-	flag.BoolVar(
-		startCollectors,
-		"start-collectors",
-		cast.ToBool(tmpnet.GetEnvWithDefault("TMPNET_START_COLLECTORS", "false")),
-		"[optional] whether to start collectors of logs and metrics from nodes of the temporary network.",
-	)
+	SetStartCollectorsFlag(flag.BoolVar, startCollectors)
 	flag.BoolVar(
 		checkMonitoring,
 		"check-monitoring",
@@ -237,5 +232,17 @@ func SetKubeFlags(stringVar StringVarFunc, kubeConfigPath *string, kubeConfigCon
 		"namespace",
 		tmpnet.DefaultTmpnetNamespace,
 		"The namespace in the target cluster to create nodes in",
+	)
+}
+
+// Enable reuse by tmpnetctl
+type BoolVarFunc func(p *bool, name string, value bool, usage string)
+
+func SetStartCollectorsFlag(boolVar BoolVarFunc, startCollectors *bool) {
+	boolVar(
+		startCollectors,
+		"start-collectors",
+		cast.ToBool(tmpnet.GetEnvWithDefault("TMPNET_START_COLLECTORS", "false")),
+		"[optional] whether to start collectors of logs and metrics from nodes of the temporary network.",
 	)
 }

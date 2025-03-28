@@ -87,7 +87,8 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 
 	// Consider monitoring flags for any command but stop
 	if !flagVars.StopNetwork() {
-		if flagVars.StartCollectors() {
+		// TODO(marun) Maybe unify collector deployment between process and kube runtimes?
+		if flagVars.StartCollectors() && flagVars.NodeRuntimeConfig().KubeRuntimeConfig == nil {
 			require.NoError(tmpnet.StartCollectors(tc.DefaultContext(), tc.Log()))
 		}
 		if flagVars.CheckMonitoring() {
@@ -175,7 +176,8 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 	}
 
 	// Once one or more nodes are running it should be safe to wait for promtail to report readiness
-	if flagVars.StartCollectors() {
+	// TODO(marun) Check the health of the kube collectors
+	if flagVars.StartCollectors() && flagVars.NodeRuntimeConfig().KubeRuntimeConfig == nil {
 		require.NoError(tmpnet.WaitForPromtailReadiness(tc.DefaultContext(), tc.Log()))
 	}
 
