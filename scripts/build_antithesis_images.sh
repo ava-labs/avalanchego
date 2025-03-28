@@ -41,7 +41,7 @@ GO_VERSION="$(go list -m -f '{{.GoVersion}}')"
 # Helper to simplify calling build_builder_image for test setups in this repo
 function build_builder_image_for_avalanchego {
   echo "Building builder image"
-  build_antithesis_builder_image "${GO_VERSION}" "antithesis-avalanchego-builder:${IMAGE_TAG}" "${AVALANCHE_PATH}" "${AVALANCHE_PATH}"
+  build_antithesis_builder_image "${GO_VERSION}" "${commit_hash}" "antithesis-avalanchego-builder:${IMAGE_TAG}" "${AVALANCHE_PATH}" "${AVALANCHE_PATH}"
 }
 
 # Helper to simplify calling build_antithesis_images for test setups in this repo

@@ -1,6 +1,7 @@
 # The version is supplied as a build argument rather than hard-coded
 # to minimize the cost of version changes.
 ARG GO_VERSION=INVALID # This value isn't intended to be used but silences a warning
+ARG COMMIT_HASH=""
 
 # Antithesis: Getting the Antithesis golang instrumentation library
 FROM docker.io/antithesishq/go-instrumentor AS instrumentor
@@ -21,7 +22,7 @@ COPY . .
 RUN [ -d ./build ] && rm -rf ./build/* || true
 
 # Keep the commit hash to easily verify the exact version that is running
-RUN git rev-parse HEAD > ./commit_hash.txt
+RUN echo "$COMMIT_HASH" > ./commit_hash.txt
 
 # Copy the instrumentor and supporting files to their correct locations
 COPY --from=instrumentor /opt/antithesis /opt/antithesis
