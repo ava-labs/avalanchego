@@ -5,6 +5,7 @@ package gossip
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"go.uber.org/zap"
@@ -97,6 +98,8 @@ func (h Handler[_]) AppGossip(_ context.Context, nodeID ids.NodeID, gossipBytes 
 	}
 
 	receivedBytes := 0
+	receivedDuplicateBytes := 0
+	duplicateGossip := 0
 	for _, bytes := range gossip {
 		receivedBytes += len(bytes)
 		gossipable, err := h.marshaller.UnmarshalGossip(bytes)
@@ -108,17 +111,29 @@ func (h Handler[_]) AppGossip(_ context.Context, nodeID ids.NodeID, gossipBytes 
 			continue
 		}
 
+		gossipID := gossipable.GossipID()
+		if h.set.Has(gossipID) {
+			receivedDuplicateBytes += len(bytes)
+			duplicateGossip++
+			continue
+		}
 		if err := h.set.Add(gossipable); err != nil {
 			h.log.Debug(
 				"failed to add gossip to the known set",
 				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("id", gossipable.GossipID()),
+				zap.Stringer("id", gossipID),
 				zap.Error(err),
 			)
 		}
 	}
+	receivedBytes -= receivedDuplicateBytes
+	incomingGossibles := len(gossip) - duplicateGossip
 
-	if err := h.metrics.observeMessage(receivedPushLabels, len(gossip), receivedBytes); err != nil {
+	err = errors.Join(
+		h.metrics.observeMessage(receivedNotDuplicatePushLabels, incomingGossibles, receivedBytes),
+		h.metrics.observeMessage(receivedDuplicatePushLabels, duplicateGossip, receivedDuplicateBytes),
+	)
+	if err != nil {
 		h.log.Error("failed to update metrics",
 			zap.Error(err),
 		)
