@@ -664,7 +664,7 @@ func TestGetStakingSigner(t *testing.T) {
 	}
 }
 
-func TestDefaultConfigInitializtionUsesExistingDefaultKey(t *testing.T) {
+func TestDefaultConfigInitializationUsesExistingDefaultKey(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
 	require := require.New(t)
