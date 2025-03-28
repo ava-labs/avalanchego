@@ -77,27 +77,35 @@ Since the predicate is encoded into the [Transaction Access List](https://eips.e
 
 Therefore, we use the [Predicate Utils](https://github.com/ava-labs/coreth/blob/master/predicate/Predicate.md) package to encode the actual byte slice of size N into the access list.
 
-### Performance Optimization: C-Chain to Avalanche L1
+### Performance Optimization: Primary Network to Avalanche L1
 
-For communication between the C-Chain and an L1, as well as broader interactions between the Primary Network and Avalanche L1s, we have implemented special handling for the C-Chain.
+The Primary Network has a large validator set compared to most Subnets and L1s, which makes Warp signature collection and verification from the entire Primary Network validator set costly. All Subnets and L1s track at least one blockchain of the Primary Network, so we can instead optimize this by using the validator set of the receiving L1 instead of the Primary Network for certain Warp messages.
 
-The Primary Network has a large validator set, which creates a unique challenge for Avalanche Warp messages. To reach the required stake threshold, numerous signatures would need to be collected and verifying messages from the Primary Network would be computationally costly. However, we have developed a more efficient solution.
+#### Subnets
 
-When an Avalanche L1 receives a message from a blockchain on the Primary Network, we use the validator set of the receiving L1 instead of the entire network when validating the message. Note this is NOT possible if an L1 does not validate the Primary Network, in which case the Warp precompile must be configured with `requirePrimaryNetworkSigners`.
+Recall that Avalanche Subnet validators must also validate the Primary Network, so it tracks all of the blockchains in the Primary Network (X, C, and P-Chains).
 
-Sending messages from the C-Chain remains unchanged.
-However, when L1 XYZ receives a message from the C-Chain, it changes the semantics to the following:
+When an Avalanche Subnet receives a message from a blockchain on the Primary Network, we use the validator set of the receiving Subnet instead of the entire network when validating the message. 
 
-1. Read the `SourceChainID` of the signed message (C-Chain)
-2. Look up the `SubnetID` that validates C-Chain: Primary Network
-3. Look up the validator set of L1 XYZ (instead of the Primary Network) and the registered BLS Public Keys of L1 XYZ at the P-Chain height specified by the ProposerVM header
-4. Continue Warp Message verification using the validator set of L1 XYZ instead of the Primary Network
+Sending messages from the X, C, or P-Chain remains unchanged.
+However, when the Subnet receives the message, it changes the semantics to the following:
 
-This means that C-Chain to L1 communication only requires a threshold of stake on the receiving L1 to sign the message instead of a threshold of stake for the entire Primary Network.
+1. Read the `SourceChainID` of the signed message
+2. Look up the `SubnetID` that validates `SourceChainID`. In this case it will be the Primary Network's `SubnetID`
+3. Look up the validator set of the Subnet (instead of the Primary Network) and the registered BLS Public Keys of the Subnet validators at the P-Chain height specified by the ProposerVM header
+4. Continue Warp Message verification using the validator set of the Subnet instead of the Primary Network
 
-This assumes that the security of L1 XYZ already depends on the validators of L1 XYZ to behave virtuously. Therefore, requiring a threshold of stake from the receiving L1's validator set instead of the whole Primary Network does not meaningfully change security of the receiving L1.
+This means that Primary Network to Subnet communication only requires a threshold of stake on the receiving Subnet to sign the message instead of a threshold of stake for the entire Primary Network.
 
-Note: this special case is ONLY applied during Warp Message verification. The message sent by the Primary Network will still contain the Avalanche C-Chain's blockchainID as the sourceChainID and signatures will be served by querying the C-Chain directly.
+Since the security of the Subnet is provided by trust in its validator set, requiring a threshold of stake from the receiving Subnet's validator set instead of the whole Primary Network does not meaningfully change the security of the receiving L1.
+
+Note: this special case is ONLY applied during Warp Message verification. The message sent by the Primary Network will still contain the blockchainID of the Primary Network chain that sent the message as the sourceChainID and signatures will be served by querying the source chain directly.
+
+#### L1s
+
+Avalanche L1s are only required to sync the P-Chain, but are not required to validate the Primary Network. Therefore, **for L1s, this optimization only applies to Warp messages sent by the P-Chain.** The rest of the description of this optimization in the above section applies to L1s.
+
+Note that **in order to properly verify messages from the C-Chain and X-Chain, the Warp precompile must be configured with `requirePrimaryNetworkSigners` set to `true`**. Otherwise, we will attempt to verify the message signature against the receiving L1's validator set, which is not required to track the C-Chain or X-Chain, and therefore will not in general be able to produce a valid Warp message.
 
 ## Design Considerations
 
