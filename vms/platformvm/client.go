@@ -5,6 +5,7 @@ package platformvm
 
 import (
 	"context"
+	goJson "encoding/json"
 	"time"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -349,11 +350,17 @@ func (c *client) GetCurrentL1Validators(
 
 	var l1Validators []APIL1Validator
 	for _, validator := range res.Validators {
-		switch v := validator.(type) {
-		case APIL1Validator:
-			l1Validators = append(l1Validators, v)
-		default:
+		validatorMapJSON, err := goJson.Marshal(validator)
+		if err != nil {
+			return nil, err
 		}
+
+		var apiValidator APIL1Validator
+		err = goJson.Unmarshal(validatorMapJSON, &apiValidator)
+		if err != nil {
+			continue
+		}
+		l1Validators = append(l1Validators, apiValidator)
 	}
 	return l1Validators, nil
 }
