@@ -34,38 +34,33 @@ func NewClient(ctx context.Context, url string) (*Client, func() error, error) {
 	// the request to the actual signer instead of relying on tls-credentials
 	conn, err := grpc.NewClient(url, opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		return nil, func() error { return nil }, fmt.Errorf("failed to create rpc signer client: %w", err)
-	}
-
-	cleanup := func() error {
-		return conn.Close()
+		return nil, nil, fmt.Errorf("failed to create rpc signer client: %w", err)
 	}
 
 	client := pb.NewSignerClient(conn)
 
 	pubkeyResponse, err := client.PublicKey(ctx, &pb.PublicKeyRequest{})
 	if err != nil {
-		return nil, nil, errors.Join(err, cleanup())
+		return nil, nil, errors.Join(err, conn.Close())
 	}
 
 	pkBytes := pubkeyResponse.GetPublicKey()
 	pk, err := bls.PublicKeyFromCompressedBytes(pkBytes)
 	if err != nil {
-		return nil, nil, errors.Join(err, cleanup())
+		return nil, nil, errors.Join(err, conn.Close())
 	}
 
 	return &Client{
 		client: client,
 		pk:     pk,
-	}, cleanup, nil
+	}, conn.Close, nil
 }
 
 func (c *Client) PublicKey() *bls.PublicKey {
 	return c.pk
 }
 
-// Sign a message. The [Client] already handles transient connection errors. If this method fails, it will
-// render the client in an unusable state and the client should be discarded.
+// Sign a message. The [Client] already handles transient connection errors.
 func (c *Client) Sign(message []byte) (*bls.Signature, error) {
 	resp, err := c.client.Sign(context.TODO(), &pb.SignRequest{Message: message})
 	if err != nil {
