@@ -710,15 +710,13 @@ func getStakingSigner(ctx context.Context, v *viper.Viper) (bls.Signer, func() e
 		return signer, cleanup, nil
 
 	default:
-		_, err := os.Stat(signingKeyPath)
+		signerFromFile, err := createSignerFromFile(signingKeyPath)
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return nil, nil, err
+		}
 
-		// if the file exists, try to load the key from the file
-		if !errors.Is(err, fs.ErrNotExist) {
-			signer, err := createSignerFromFile(signingKeyPath)
-			if err != nil {
-				return nil, nil, errors.Join(err, cleanup())
-			}
-			return signer, cleanup, nil
+		if signerFromFile != nil {
+			return signerFromFile, cleanup, nil
 		}
 
 		signer, err := localsigner.New()
