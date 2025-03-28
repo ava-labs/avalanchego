@@ -357,7 +357,7 @@ func (c *client) GetCurrentL1Validators(
 
 		var apiValidator APIL1Validator
 		err = goJson.Unmarshal(validatorMapJSON, &apiValidator)
-		if err != nil {
+		if err != nil || apiValidator.ValidationID == ids.Empty {
 			continue
 		}
 		l1Validators = append(l1Validators, apiValidator)
