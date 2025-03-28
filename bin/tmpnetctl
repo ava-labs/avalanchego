@@ -6,8 +6,5 @@ set -euo pipefail
 AVALANCHE_PATH=$(cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 cd "${AVALANCHE_PATH}"
 
-# Build if needed
-if [[ ! -f ./build/tmpnetctl ]]; then
-   ./scripts/build_tmpnetctl.sh
-fi
-./build/tmpnetctl "${@}"
+# Use go run to ensure the correct version is always used
+go run ./tests/fixture/tmpnet/tmpnetctl "${@}"

@@ -8,6 +8,8 @@ To start developing on AvalancheGo, you'll need a few things installed.
 - gcc
 - g++
 
+On MacOS, a modern version of bash is required (e.g. via [homebrew](https://brew.sh/) with `brew install bash`). The version installed by default is not compatible with AvalancheGo's [shell scripts](scripts).
+
 ## Issues
 
 ### Security
