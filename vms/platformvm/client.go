@@ -68,6 +68,8 @@ type Client interface {
 	GetStakingAssetID(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (ids.ID, error)
 	// GetCurrentValidators returns the list of current validators for subnet with ID [subnetID]
 	GetCurrentValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.NodeID, options ...rpc.Option) ([]ClientPermissionlessValidator, error)
+	// GetCurrentL1Validators returns the L1 validators for the L1 with ID [subnetID]. Non-L1 validators are omitted.
+	GetCurrentL1Validators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.NodeID, options ...rpc.Option) ([]APIL1Validator, error)
 	// GetL1Validator returns the requested L1 validator with [validationID] and
 	// the height at which it was calculated.
 	GetL1Validator(ctx context.Context, validationID ids.ID, options ...rpc.Option) (L1Validator, uint64, error)
@@ -328,6 +330,32 @@ func (c *client) GetCurrentValidators(
 		return nil, err
 	}
 	return getClientPermissionlessValidators(res.Validators)
+}
+
+func (c *client) GetCurrentL1Validators(
+	ctx context.Context,
+	subnetID ids.ID,
+	nodeIDs []ids.NodeID,
+	options ...rpc.Option,
+) ([]APIL1Validator, error) {
+	res := &GetCurrentValidatorsReply{}
+	err := c.requester.SendRequest(ctx, "platform.getCurrentValidators", &GetCurrentValidatorsArgs{
+		SubnetID: subnetID,
+		NodeIDs:  nodeIDs,
+	}, res, options...)
+	if err != nil {
+		return nil, err
+	}
+
+	var l1Validators []APIL1Validator
+	for _, validator := range res.Validators {
+		switch v := validator.(type) {
+		case APIL1Validator:
+			l1Validators = append(l1Validators, v)
+		default:
+		}
+	}
+	return l1Validators, nil
 }
 
 // L1Validator is the response from calling GetL1Validator on the API client.
