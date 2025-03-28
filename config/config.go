@@ -686,13 +686,11 @@ func getStakingSigner(ctx context.Context, v *viper.Viper) (bls.Signer, func() e
 		// If the key is set, but a user-file isn't provided, we don't create one.
 		// The siging key is only stored to the default file-location if it's created
 		// and saved by the current application run.
-		_, err := os.Stat(signingKeyPath)
-
+		signer, err := createSignerFromFile(signingKeyPath)
 		if errors.Is(err, fs.ErrNotExist) {
 			return nil, nil, errMissingStakingSigningKeyFile
 		}
 
-		signer, err := createSignerFromFile(signingKeyPath)
 		if err != nil {
 			return nil, nil, fmt.Errorf("couldn't parse signing key: %w", err)
 		}
