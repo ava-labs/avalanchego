@@ -162,7 +162,7 @@ func (s *StateDB) Copy() *StateDB {
 }
 
 // NormalizeCoinID ORs the 0th bit of the first byte in
-// [coinID], which ensures this bit will be 1 and all other
+// `coinID`, which ensures this bit will be 1 and all other
 // bits are left the same.
 // This partitions multicoin storage from normal state storage.
 func NormalizeCoinID(coinID *common.Hash) {
@@ -170,7 +170,7 @@ func NormalizeCoinID(coinID *common.Hash) {
 }
 
 // NormalizeStateKey ANDs the 0th bit of the first byte in
-// [key], which ensures this bit will be 0 and all other bits
+// `key`, which ensures this bit will be 0 and all other bits
 // are left the same.
 // This partitions normal state storage from multicoin storage.
 func NormalizeStateKey(key *common.Hash) {

@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/state/pruner"
 	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/plugin/evm/customrawdb"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap3"
 	"github.com/ava-labs/libevm/common"
@@ -425,11 +424,8 @@ func TestUngracefulAsyncShutdown(t *testing.T) {
 	// Ensure that key1 has some funds in the genesis block.
 	genesisBalance := big.NewInt(1000000)
 	gspec := &Genesis{
-		Config: params.WithExtra(
-			&params.ChainConfig{HomesteadBlock: new(big.Int)},
-			&extras.ChainConfig{},
-		),
-		Alloc: types.GenesisAlloc{addr1: {Balance: genesisBalance}},
+		Config: &params.ChainConfig{HomesteadBlock: new(big.Int)},
+		Alloc:  types.GenesisAlloc{addr1: {Balance: genesisBalance}},
 	}
 
 	blockchain, err := create(chainDB, gspec, common.Hash{})

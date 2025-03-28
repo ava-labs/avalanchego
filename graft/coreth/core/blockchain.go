@@ -67,13 +67,15 @@ import (
 
 // ====== If resolving merge conflicts ======
 //
-// All calls to metrics.NewRegistered*() have been replaced with
-// metrics.GetOrRegister*() and this package's corresponding libevm package
-// imported above. Together these ensure that the metric here is the same as the
-// one with the same name in libevm.
+// All calls to metrics.NewRegistered*() for metrics also defined in libevm/core have been
+// replaced either with:
+//   - metrics.GetOrRegister*() to get a metric already registered in libevm/core, or register it
+//     here otherwise
+//   - [getOrOverrideAsRegisteredCounter] to get a metric already registered in libevm/core
+//     only if it is a [metrics.Counter]. If it is not, the metric is unregistered and registered
+//     as a [metrics.Counter] here.
 //
-// Note, however, those that have had their types overridden as
-// [metrics.Counter].
+// These replacements ensure the same metrics are shared between the two packages.
 var (
 	accountReadTimer         = getOrOverrideAsRegisteredCounter("chain/account/reads", nil)
 	accountHashTimer         = getOrOverrideAsRegisteredCounter("chain/account/hashes", nil)
@@ -195,7 +197,7 @@ func (c *CacheConfig) triedbConfig() *triedb.Config {
 		config.DBOverride = hashdb.Config{
 			CleanCacheSize:                  c.TrieCleanLimit * 1024 * 1024,
 			StatsPrefix:                     trieCleanCacheStatsNamespace,
-			ReferenceRootAtomicallyOnUpdate: true, // Automatically reference root nodes when an update is made
+			ReferenceRootAtomicallyOnUpdate: true,
 		}.BackendConstructor
 	}
 	if c.StateScheme == rawdb.PathScheme {
@@ -1172,8 +1174,7 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, parentRoot common.
 	}
 
 	// Commit all cached state changes into underlying memory database.
-	var err error
-	_, err = bc.commitWithSnap(block, parentRoot, state)
+	_, err := bc.commitWithSnap(block, parentRoot, state)
 	if err != nil {
 		return err
 	}
@@ -1695,8 +1696,8 @@ func (bc *BlockChain) reprocessBlock(parent *types.Block, current *types.Block) 
 func (bc *BlockChain) commitWithSnap(
 	current *types.Block, parentRoot common.Hash, statedb *state.StateDB,
 ) (common.Hash, error) {
-	// blockHashes must be passed through Commit since snapshots are based on the
-	// block hash.
+	// blockHashes must be passed through [state.StateDB]'s Commit since snapshots
+	// are based on the block hash.
 	blockHashes := snapshot.WithBlockHashes(current.Hash(), current.ParentHash())
 	root, err := statedb.Commit(current.NumberU64(), bc.chainConfig.IsEIP158(current.Number()), blockHashes)
 	if err != nil {
@@ -1851,7 +1852,7 @@ func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64) error 
 		// Flatten snapshot if initialized, holding a reference to the state root until the next block
 		// is processed.
 		if err := bc.flattenSnapshot(func() error {
-			if previousRoot != (common.Hash{}) {
+			if previousRoot != (common.Hash{}) && previousRoot != root {
 				triedb.Dereference(previousRoot)
 			}
 			previousRoot = root

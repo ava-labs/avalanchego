@@ -115,9 +115,9 @@ func (bc *testBlockChain) CurrentBlock() *types.Header {
 			BaseFee:  mid,
 			Extra:    make([]byte, ap3.WindowSize),
 		}
-		configExtra := params.GetExtra(bc.config)
+		config := params.GetExtra(bc.config)
 		baseFee, err := header.BaseFee(
-			configExtra, parent, blockTime,
+			config, parent, blockTime,
 		)
 		if err != nil {
 			panic(err)

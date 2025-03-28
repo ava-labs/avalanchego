@@ -5,7 +5,6 @@ package evm
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1378,10 +1377,7 @@ func TestSetPreferenceRace(t *testing.T) {
 }
 
 func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
-	key, err := utils.NewKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
+	key := utils.NewKey(t)
 
 	key0 := testKeys[0]
 	addr0 := key0.Address()
@@ -3591,10 +3587,7 @@ func TestAtomicTxBuildBlockDropsConflicts(t *testing.T) {
 		testShortIDAddrs[1]: importAmount,
 		testShortIDAddrs[2]: importAmount,
 	})
-	conflictKey, err := utils.NewKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
+	conflictKey := utils.NewKey(t)
 	defer func() {
 		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)

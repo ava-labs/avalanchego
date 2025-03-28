@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/coreth/accounts/abi"
 	"github.com/ava-labs/coreth/precompile/contract"
+	"github.com/ava-labs/libevm/core/types"
 
 	_ "embed"
 
@@ -280,7 +281,7 @@ func sendWarpMessage(accessibleState contract.AccessibleState, caller common.Add
 	if err != nil {
 		return nil, remainingGas, err
 	}
-	accessibleState.GetStateDB().AddLog(&contract.Log{
+	accessibleState.GetStateDB().AddLog(&types.Log{
 		Address:     ContractAddress,
 		Topics:      topics,
 		Data:        data,

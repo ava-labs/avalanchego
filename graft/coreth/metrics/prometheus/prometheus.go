@@ -197,7 +197,6 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 				},
 			}},
 		}, nil
-
 	default:
 		return nil, fmt.Errorf("metric %q: type is not supported: %T", name, metric)
 	}

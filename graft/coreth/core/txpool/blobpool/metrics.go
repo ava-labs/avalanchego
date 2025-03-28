@@ -35,10 +35,10 @@ import (
 
 // ====== If resolving merge conflicts ======
 //
-// All calls to metrics.NewRegistered*() have been replaced with
-// metrics.GetOrRegister*() and this package's corresponding libevm package
-// imported above. Together these ensure that the metric here is the same as the
-// one with the same name in libevm.
+// All calls to metrics.NewRegistered*() for metrics also defined in libevm/core/txpool/blobpool
+// have been replaced with metrics.GetOrRegister*() to get metrics already registered in
+// libevm/core/txpool/blobpool or register them here otherwise. These replacements ensure the
+// same metrics are shared between the two packages.
 var (
 	// datacapGauge tracks the user's configured capacity for the blob pool. It
 	// is mostly a way to expose/debug issues.

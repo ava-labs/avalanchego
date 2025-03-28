@@ -16,6 +16,7 @@ import (
 	snow "github.com/ava-labs/avalanchego/snow"
 	precompileconfig "github.com/ava-labs/coreth/precompile/precompileconfig"
 	common "github.com/ava-labs/libevm/common"
+	types "github.com/ava-labs/libevm/core/types"
 	vm "github.com/ava-labs/libevm/core/vm"
 	uint256 "github.com/holiman/uint256"
 	gomock "go.uber.org/mock/gomock"
@@ -70,7 +71,7 @@ func (mr *MockStateDBMockRecorder) AddBalanceMultiCoin(arg0, arg1, arg2 any) *go
 }
 
 // AddLog mocks base method.
-func (m *MockStateDB) AddLog(arg0 *Log) {
+func (m *MockStateDB) AddLog(arg0 *types.Log) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "AddLog", arg0)
 }
@@ -135,21 +136,6 @@ func (mr *MockStateDBMockRecorder) GetBalanceMultiCoin(arg0, arg1 any) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBalanceMultiCoin", reflect.TypeOf((*MockStateDB)(nil).GetBalanceMultiCoin), arg0, arg1)
 }
 
-// GetLogData mocks base method.
-func (m *MockStateDB) GetLogData() ([][]common.Hash, [][]byte) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetLogData")
-	ret0, _ := ret[0].([][]common.Hash)
-	ret1, _ := ret[1].([][]byte)
-	return ret0, ret1
-}
-
-// GetLogData indicates an expected call of GetLogData.
-func (mr *MockStateDBMockRecorder) GetLogData() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLogData", reflect.TypeOf((*MockStateDB)(nil).GetLogData))
-}
-
 // GetNonce mocks base method.
 func (m *MockStateDB) GetNonce(arg0 common.Address) uint64 {
 	m.ctrl.T.Helper()
@@ -205,6 +191,20 @@ func (m *MockStateDB) GetTxHash() common.Hash {
 func (mr *MockStateDBMockRecorder) GetTxHash() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTxHash", reflect.TypeOf((*MockStateDB)(nil).GetTxHash))
+}
+
+// Logs mocks base method.
+func (m *MockStateDB) Logs() []*types.Log {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Logs")
+	ret0, _ := ret[0].([]*types.Log)
+	return ret0
+}
+
+// Logs indicates an expected call of Logs.
+func (mr *MockStateDBMockRecorder) Logs() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Logs", reflect.TypeOf((*MockStateDB)(nil).Logs))
 }
 
 // RevertToSnapshot mocks base method.

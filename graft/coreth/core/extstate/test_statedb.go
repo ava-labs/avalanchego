@@ -16,5 +16,5 @@ func NewTestStateDB(t testing.TB) contract.StateDB {
 	db := rawdb.NewMemoryDatabase()
 	statedb, err := state.New(common.Hash{}, state.NewDatabase(db), nil)
 	require.NoError(t, err)
-	return &StateDB{VmStateDB: statedb}
+	return New(statedb)
 }

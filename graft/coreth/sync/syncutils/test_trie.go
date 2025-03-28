@@ -4,7 +4,6 @@
 package syncutils
 
 import (
-	cryptoRand "crypto/rand"
 	"encoding/binary"
 	"math/rand"
 	"testing"
@@ -176,10 +175,7 @@ func FillAccounts(
 			t.Fatalf("failed to rlp encode account: %v", err)
 		}
 
-		key, err := utils.NewKey(cryptoRand.Reader)
-		if err != nil {
-			t.Fatal(err)
-		}
+		key := utils.NewKey(t)
 		tr.MustUpdate(key.Address[:], accBytes)
 		accounts[key] = &acc
 	}
