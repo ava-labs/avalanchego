@@ -64,3 +64,5 @@ vendor
 **/testdata
 
 .direnv
+# Personal extension to .envrc
+.envrc.local
