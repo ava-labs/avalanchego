@@ -20,8 +20,10 @@ COPY . .
 # Ensure pre-existing builds are not available for inclusion in the final image
 RUN [ -d ./build ] && rm -rf ./build/* || true
 
+# Commit hash should be passed as an arg, in case .git is not available
+ARG COMMIT_HASH=""
 # Keep the commit hash to easily verify the exact version that is running
-RUN git rev-parse HEAD > ./commit_hash.txt
+RUN echo "$COMMIT_HASH" > ./commit_hash.txt
 
 # Copy the instrumentor and supporting files to their correct locations
 COPY --from=instrumentor /opt/antithesis /opt/antithesis

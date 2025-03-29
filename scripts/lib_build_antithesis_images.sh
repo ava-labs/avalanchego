@@ -13,9 +13,10 @@ set -euo pipefail
 # on amd64 and non-instrumented binaries if built on arm64.
 function build_antithesis_builder_image {
   local go_version=$1
-  local image_name=$2
-  local avalanchego_path=$3
-  local target_path=$4
+  local commit_hash=$2
+  local image_name=$3
+  local avalanchego_path=$4
+  local target_path=$5
 
   local base_dockerfile="${avalanchego_path}/tests/antithesis/Dockerfile"
   local builder_dockerfile="${base_dockerfile}.builder-instrumented"
@@ -25,7 +26,7 @@ function build_antithesis_builder_image {
     builder_dockerfile="${base_dockerfile}.builder-uninstrumented"
   fi
 
-  docker buildx build --build-arg GO_VERSION="${go_version}" -t "${image_name}" -f "${builder_dockerfile}" "${target_path}"
+  docker buildx build --build-arg GO_VERSION="${go_version}" --build-arg COMMIT_HASH="${commit_hash}" -t "${image_name}" -f "${builder_dockerfile}" "${target_path}"
 }
 
 # Build the antithesis node, workload, and config images.

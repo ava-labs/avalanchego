@@ -54,19 +54,51 @@ func main() {
 	}
 	rootCmd.AddCommand(versionCmd)
 
+	// Vars common to network start and kind cluster start
+	var (
+		kubeConfigPath    string
+		kubeConfigContext string
+		kubeNamespace     string
+	)
+
 	var (
 		rootDir         string
 		networkOwner    string
+		runtime         string
 		avalancheGoPath string
 		pluginDir       string
+		imageName       string
 		nodeCount       uint8
 	)
 	startNetworkCmd := &cobra.Command{
 		Use:   "start-network",
 		Short: "Start a new temporary network",
 		RunE: func(*cobra.Command, []string) error {
-			if len(avalancheGoPath) == 0 {
-				return errAvalancheGoRequired
+			// TODO(marun) Make all errors constants
+			runtimeConfig := tmpnet.NodeRuntimeConfig{}
+			switch runtime {
+			case "process":
+				if len(avalancheGoPath) == 0 {
+					return errAvalancheGoRequired
+				}
+				runtimeConfig.AvalancheGoPath = avalancheGoPath
+			case "kube":
+				if len(kubeConfigPath) == 0 {
+					return errors.New("--kubeconfig is required")
+				}
+				if len(kubeNamespace) == 0 {
+					return errors.New("--namespace is required")
+				}
+				if len(imageName) == 0 {
+					return errors.New("--image-name is required")
+				}
+				runtimeConfig.KubeRuntimeConfig = &tmpnet.KubeRuntimeConfig{
+					Kubeconfig: kubeConfigPath,
+					Namespace:  kubeNamespace,
+					ImageName:  imageName,
+				}
+			default:
+				return errors.New("invalid runtime")
 			}
 
 			log, err := tests.LoggerForFormat("", rawLogFormat)
@@ -77,9 +109,12 @@ func main() {
 			// Root dir will be defaulted on start if not provided
 
 			network := &tmpnet.Network{
-				Owner: networkOwner,
-				Nodes: tmpnet.NewNodesOrPanic(int(nodeCount)),
+				Owner:                networkOwner,
+				Nodes:                tmpnet.NewNodesOrPanic(int(nodeCount)),
+				DefaultRuntimeConfig: runtimeConfig,
+				DefaultFlags:         tmpnet.FlagsMap{},
 			}
+			network.SetPluginDir(pluginDir)
 
 			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
 			defer cancel()
@@ -88,8 +123,6 @@ func main() {
 				log,
 				network,
 				rootDir,
-				avalancheGoPath,
-				pluginDir,
 			); err != nil {
 				log.Error("failed to bootstrap network", zap.Error(err))
 				return err
@@ -116,6 +149,7 @@ func main() {
 	}
 	// TODO(marun) Enable reuse of flags across tmpnetctl and e2e
 	startNetworkCmd.PersistentFlags().StringVar(&rootDir, "root-dir", os.Getenv(tmpnet.RootDirEnvName), "The path to the root directory for temporary networks")
+	startNetworkCmd.PersistentFlags().StringVar(&runtime, "runtime", "process", "[optional] the runtime to use to deploy nodes for the network. Valid options are 'process' and 'kube'.")
 	startNetworkCmd.PersistentFlags().StringVar(&avalancheGoPath, "avalanchego-path", os.Getenv(tmpnet.AvalancheGoPathEnvName), "The path to an avalanchego binary")
 	startNetworkCmd.PersistentFlags().StringVar(
 		&pluginDir,
@@ -123,6 +157,8 @@ func main() {
 		tmpnet.GetEnvWithDefault(tmpnet.AvalancheGoPluginDirEnvName, os.ExpandEnv("$HOME/.avalanchego/plugins")),
 		"[optional] the dir containing VM plugins",
 	)
+	SetKubeFlags(startNetworkCmd.PersistentFlags(), &kubeConfigPath, &kubeConfigContext, &kubeNamespace)
+	startNetworkCmd.PersistentFlags().StringVar(&imageName, "image-name", "avaplatform/avalanchego:latest", "The name of the docker image to use for creating nodes")
 	startNetworkCmd.PersistentFlags().Uint8Var(&nodeCount, "node-count", tmpnet.DefaultNodeCount, "Number of nodes the network should initially consist of")
 	startNetworkCmd.PersistentFlags().StringVar(&networkOwner, "network-owner", "", "The string identifying the intended owner of the network")
 	rootCmd.AddCommand(startNetworkCmd)
@@ -237,10 +273,6 @@ func main() {
 	)
 	rootCmd.AddCommand(checkLogsCmd)
 
-	var (
-		kubeConfigPath    string
-		kubeConfigContext string
-	)
 	startKindClusterCmd := &cobra.Command{
 		Use:   "start-kind-cluster",
 		Short: "Starts a local kind cluster with an integrated registry",
@@ -254,7 +286,7 @@ func main() {
 			return tmpnet.StartKindCluster(ctx, log, kubeConfigPath, kubeConfigContext)
 		},
 	}
-	SetKubeConfigFlags(startKindClusterCmd.PersistentFlags(), &kubeConfigPath, &kubeConfigContext)
+	SetKubeFlags(startKindClusterCmd.PersistentFlags(), &kubeConfigPath, &kubeConfigContext, &kubeNamespace)
 	rootCmd.AddCommand(startKindClusterCmd)
 
 	if err := rootCmd.Execute(); err != nil {
@@ -264,11 +296,11 @@ func main() {
 	os.Exit(0)
 }
 
-func SetKubeConfigFlags(flagSet *pflag.FlagSet, kubeConfigPath *string, kubeConfigContext *string) {
+func SetKubeFlags(flagSet *pflag.FlagSet, kubeConfigPath *string, kubeConfigContext *string, namespace *string) {
 	flagSet.StringVar(
 		kubeConfigPath,
 		"kubeconfig",
-		os.Getenv("KUBECONFIG"),
+		tmpnet.GetEnvWithDefault("KUBECONFIG", os.ExpandEnv("$HOME/.kube/config")),
 		"The path to a kubernetes configuration file for the target cluster",
 	)
 	flagSet.StringVar(
@@ -276,5 +308,11 @@ func SetKubeConfigFlags(flagSet *pflag.FlagSet, kubeConfigPath *string, kubeConf
 		"kubeconfig-context",
 		"",
 		"The path to a kubernetes configuration file for the target cluster",
+	)
+	flagSet.StringVar(
+		namespace,
+		"namespace",
+		tmpnet.DefaultTmpnetNamespace,
+		"The namespace in the target cluster to create nodes in",
 	)
 }
