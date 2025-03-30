@@ -906,6 +906,12 @@ func (n *Network) GetChainConfigContent() (string, error) {
 			Config: marshaledFlags,
 		}
 	}
+
+	// TODO(marun) Make debug or remove this line
+	n.Log.Info("collected primary chain configs",
+		zap.Any("chainConfigs", chainConfigs),
+	)
+
 	for _, subnet := range n.Subnets {
 		for _, chain := range subnet.Chains {
 			if chain.ChainID == ids.Empty {
@@ -920,7 +926,7 @@ func (n *Network) GetChainConfigContent() (string, error) {
 	}
 
 	// TODO(marun) Make debug or remove this line
-	n.Log.Info("collected configs",
+	n.Log.Info("collected primary and subnet chains",
 		zap.Any("chainConfigs", chainConfigs),
 	)
 

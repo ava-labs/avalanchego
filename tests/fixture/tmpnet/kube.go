@@ -74,11 +74,19 @@ func NewNodeStatefulSet(
 	podLabels := map[string]string{
 		"app": name,
 	}
-	ghRepo := ""
+	var (
+		ghRepo     string
+		ghWorkflow string
+	)
 	for label, value := range labels {
 		// gh_repo contains a slash so it is not a valid label. Set it as an annotation instead.
 		if label == "gh_repo" {
 			ghRepo = value
+			continue
+		}
+		// gh_workflow can contain spaces which is not valid in labels. Set it as an annotation instead.
+		if label == "gh_workflow" {
+			ghWorkflow = value
 			continue
 		}
 		podLabels[label] = value
@@ -89,6 +97,7 @@ func NewNodeStatefulSet(
 		"prometheus.io/path":   "/ext/metrics",
 		"promtail/collect":     "true",
 		"gh_repo":              ghRepo,
+		"gh_workflow":          ghWorkflow,
 	}
 
 	return &appsv1.StatefulSet{
