@@ -55,12 +55,9 @@ linters:
     - goconst
     - gocritic
     # - goerr113
-    - gofmt
-    - gofumpt
     # - gomnd
     - goprintffuncname
     - gosec
-    - gosimple
     - govet
     - importas
     - ineffassign
@@ -79,7 +76,6 @@ linters:
     - stylecheck
     - tagalign
     - testifylint
-    - typecheck
     - unconvert
     - unparam
     - unused
