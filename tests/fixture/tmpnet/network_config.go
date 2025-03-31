@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 
 	"github.com/ava-labs/avalanchego/genesis"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
@@ -39,9 +41,6 @@ func (n *Network) Write() error {
 	if err := n.writeGenesis(); err != nil {
 		return err
 	}
-	if err := n.writeChainConfigs(); err != nil {
-		return err
-	}
 	if err := n.writeNetworkConfig(); err != nil {
 		return err
 	}
@@ -54,9 +53,6 @@ func (n *Network) Write() error {
 // Read network configuration from disk.
 func (n *Network) readNetwork() error {
 	if err := n.readGenesis(); err != nil {
-		return err
-	}
-	if err := n.readChainConfigs(); err != nil {
 		return err
 	}
 	return n.readConfig()
@@ -110,65 +106,6 @@ func (n *Network) writeGenesis() error {
 	return nil
 }
 
-func (n *Network) GetChainConfigDir() string {
-	return filepath.Join(n.Dir, "chains")
-}
-
-func (n *Network) readChainConfigs() error {
-	baseChainConfigDir := n.GetChainConfigDir()
-	entries, err := os.ReadDir(baseChainConfigDir)
-	if err != nil {
-		return fmt.Errorf("failed to read chain config dir: %w", err)
-	}
-
-	// Clear the map of data that may end up stale (e.g. if a given
-	// chain is in the map but no longer exists on disk)
-	n.PrimaryChainConfigs = map[string]FlagsMap{}
-
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			// Chain config files are expected to be nested under a
-			// directory with the name of the chain alias.
-			continue
-		}
-		chainAlias := entry.Name()
-		configPath := filepath.Join(baseChainConfigDir, chainAlias, defaultConfigFilename)
-		if _, err := os.Stat(configPath); os.IsNotExist(err) {
-			// No config file present
-			continue
-		}
-		chainConfig, err := ReadFlagsMap(configPath, chainAlias+" chain config")
-		if err != nil {
-			return err
-		}
-		n.PrimaryChainConfigs[chainAlias] = chainConfig
-	}
-
-	return nil
-}
-
-func (n *Network) writeChainConfigs() error {
-	baseChainConfigDir := n.GetChainConfigDir()
-
-	for chainAlias, chainConfig := range n.PrimaryChainConfigs {
-		// Create the directory
-		chainConfigDir := filepath.Join(baseChainConfigDir, chainAlias)
-		if err := os.MkdirAll(chainConfigDir, perms.ReadWriteExecute); err != nil {
-			return fmt.Errorf("failed to create %s chain config dir: %w", chainAlias, err)
-		}
-
-		// Write the file
-		path := filepath.Join(chainConfigDir, defaultConfigFilename)
-		if err := chainConfig.Write(path, chainAlias+" chain config"); err != nil {
-			return err
-		}
-	}
-
-	// TODO(marun) Ensure the removal of chain aliases that aren't present in the map
-
-	return nil
-}
-
 func (n *Network) getConfigPath() string {
 	return filepath.Join(n.Dir, defaultConfigFilename)
 }
@@ -188,6 +125,8 @@ func (n *Network) readConfig() error {
 type serializedNetworkConfig struct {
 	UUID                 string
 	Owner                string
+	PrimarySubnetConfigs map[ids.ID]subnets.Config
+	PrimaryChainConfigs  map[string]FlagsMap
 	DefaultFlags         FlagsMap
 	DefaultRuntimeConfig NodeRuntimeConfig
 	PreFundedKeys        []*secp256k1.PrivateKey
@@ -197,6 +136,8 @@ func (n *Network) writeNetworkConfig() error {
 	config := &serializedNetworkConfig{
 		UUID:                 n.UUID,
 		Owner:                n.Owner,
+		PrimarySubnetConfigs: n.PrimarySubnetConfigs,
+		PrimaryChainConfigs:  n.PrimaryChainConfigs,
 		DefaultFlags:         n.DefaultFlags,
 		DefaultRuntimeConfig: n.DefaultRuntimeConfig,
 		PreFundedKeys:        n.PreFundedKeys,

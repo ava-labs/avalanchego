@@ -30,14 +30,20 @@ func ReadFlagsMap(path string, description string) (FlagsMap, error) {
 	return flagsMap, nil
 }
 
+// SetDefault ensures the effectiveness of a flag override by only
+// setting a value supplied whose key is not already explicitly set.
+func (f FlagsMap) SetDefault(key string, value any) {
+	if _, ok := f[key]; !ok {
+		f[key] = value
+	}
+}
+
 // SetDefaults ensures the effectiveness of flag overrides by only
 // setting values supplied in the defaults map that are not already
 // explicitly set.
 func (f FlagsMap) SetDefaults(defaults FlagsMap) {
 	for key, value := range defaults {
-		if _, ok := f[key]; !ok {
-			f[key] = value
-		}
+		f.SetDefault(key, value)
 	}
 }
 

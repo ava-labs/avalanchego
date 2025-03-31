@@ -50,6 +50,9 @@ func DefaultTestFlags() FlagsMap {
 func DefaultTmpnetFlags() FlagsMap {
 	// Supply only non-default configuration to ensure that default values will be used.
 	flags := FlagsMap{
+		// Default to dynamic port allocation
+		config.HTTPPortKey:    "0",
+		config.StakingPortKey: "0",
 		// Specific to tmpnet deployment
 		config.PublicIPKey:        "127.0.0.1",
 		config.HTTPHostKey:        "127.0.0.1",
