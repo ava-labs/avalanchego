@@ -81,12 +81,13 @@ func (n *Network) writeNodes() error {
 	return nil
 }
 
-func (n *Network) getGenesisPath() string {
+// For consumption outside of avalanchego. Needs to be kept exported.
+func (n *Network) GetGenesisPath() string {
 	return filepath.Join(n.Dir, "genesis.json")
 }
 
 func (n *Network) readGenesis() error {
-	bytes, err := os.ReadFile(n.getGenesisPath())
+	bytes, err := os.ReadFile(n.GetGenesisPath())
 	if err != nil {
 		return fmt.Errorf("failed to read genesis: %w", err)
 	}
@@ -103,7 +104,7 @@ func (n *Network) writeGenesis() error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal genesis: %w", err)
 	}
-	if err := os.WriteFile(n.getGenesisPath(), bytes, perms.ReadWrite); err != nil {
+	if err := os.WriteFile(n.GetGenesisPath(), bytes, perms.ReadWrite); err != nil {
 		return fmt.Errorf("failed to write genesis: %w", err)
 	}
 	return nil

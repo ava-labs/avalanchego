@@ -130,7 +130,7 @@ message NetworkUpgrades {
   bytes cortina_x_chain_stop_vertex_id = 12;
   google.protobuf.Timestamp durango_time = 13;
   google.protobuf.Timestamp etna_time = 14;
-  google.protobuf.Timestamp f_upgrade_time = 15;
+  google.protobuf.Timestamp fortuna_time = 15;
 }
 
 message InitializeResponse {

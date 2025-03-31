@@ -107,9 +107,12 @@ var (
 		ExcessConversionConstant: 5_000,
 	}
 	defaultValidatorFeeConfig = fee.Config{
-		Capacity:                 100,
-		Target:                   50,
-		MinPrice:                 1,
+		Capacity: 100,
+		Target:   50,
+		// The minimum price is set to 2 so that tests can include cases where
+		// L1 validator balances do not evenly divide into a timestamp granular
+		// to a second.
+		MinPrice:                 2,
 		ExcessConversionConstant: 100,
 	}
 
@@ -1327,9 +1330,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(err)
 
 	bootstrapConfig := bootstrap.Config{
-		ShouldHalt: func() bool {
-			return false
-		},
+		Haltable:                       &common.Halter{},
 		NonVerifyingParse:              vm.ParseBlock,
 		AllGetsServer:                  snowGetHandler,
 		Ctx:                            consensusCtx,

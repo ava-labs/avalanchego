@@ -388,9 +388,8 @@ func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, erro
 
 func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<- common.Message) error {
 	time := vm.Config.Upgrades.CortinaTime
-	err := vm.state.InitializeChainState(stopVertexID, time)
-	if err != nil {
-		return err
+	if err := vm.state.InitializeChainState(stopVertexID, time); err != nil {
+		return fmt.Errorf("failed to initialize chain state: %w", err)
 	}
 
 	mempool, err := xmempool.New("mempool", vm.registerer, toEngine)

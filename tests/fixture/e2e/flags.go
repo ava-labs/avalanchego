@@ -15,24 +15,18 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 )
 
-const (
-	// Ensure that this value takes into account the scrape_interval
-	// defined in scripts/run_prometheus.sh.
-	networkShutdownDelay = 12 * time.Second
-
-	delayNetworkShutdownEnvName = "TMPNET_DELAY_NETWORK_SHUTDOWN"
-)
-
 type FlagVars struct {
-	avalancheGoExecPath  string
-	pluginDir            string
-	networkDir           string
-	reuseNetwork         bool
-	delayNetworkShutdown bool
-	startNetwork         bool
-	stopNetwork          bool
-	restartNetwork       bool
-	nodeCount            int
+	avalancheGoExecPath string
+	pluginDir           string
+	networkDir          string
+	reuseNetwork        bool
+	startCollectors     bool
+	checkMonitoring     bool
+	startNetwork        bool
+	stopNetwork         bool
+	restartNetwork      bool
+	nodeCount           int
+	activateFortuna     bool
 }
 
 func (v *FlagVars) AvalancheGoExecPath() (string, error) {
@@ -80,10 +74,19 @@ func (v *FlagVars) RestartNetwork() bool {
 	return v.restartNetwork
 }
 
+func (v *FlagVars) StartCollectors() bool {
+	return v.startCollectors
+}
+
+func (v *FlagVars) CheckMonitoring() bool {
+	return v.checkMonitoring
+}
+
 func (v *FlagVars) NetworkShutdownDelay() time.Duration {
-	if v.delayNetworkShutdown {
-		// Only return a non-zero value if the delay is enabled.
-		return networkShutdownDelay
+	if v.startCollectors {
+		// Only return a non-zero value if we want to ensure the collectors have
+		// a chance to collect the metrics at the end of the test.
+		return tmpnet.NetworkShutdownDelay
 	}
 	return 0
 }
@@ -100,12 +103,8 @@ func (v *FlagVars) NodeCount() int {
 	return v.nodeCount
 }
 
-func GetEnvWithDefault(envVar, defaultVal string) string {
-	val := os.Getenv(envVar)
-	if len(val) == 0 {
-		return defaultVal
-	}
-	return val
+func (v *FlagVars) ActivateFortuna() bool {
+	return v.activateFortuna
 }
 
 func RegisterFlags() *FlagVars {
@@ -122,7 +121,7 @@ func RegisterFlags() *FlagVars {
 	flag.StringVar(
 		&vars.pluginDir,
 		"plugin-dir",
-		GetEnvWithDefault(tmpnet.AvalancheGoPluginDirEnvName, os.ExpandEnv("$HOME/.avalanchego/plugins")),
+		tmpnet.GetEnvWithDefault(tmpnet.AvalancheGoPluginDirEnvName, os.ExpandEnv("$HOME/.avalanchego/plugins")),
 		fmt.Sprintf(
 			"[optional] the dir containing VM plugins. Also possible to configure via the %s env variable.",
 			tmpnet.AvalancheGoPluginDirEnvName,
@@ -146,11 +145,9 @@ func RegisterFlags() *FlagVars {
 		false,
 		"[optional] restart an existing network previously started with --reuse-network. Useful for ensuring a network is running with the current state of binaries on disk. Ignored if a network is not already running or --stop-network is provided.",
 	)
-	flag.BoolVar(
-		&vars.delayNetworkShutdown,
-		"delay-network-shutdown",
-		cast.ToBool(GetEnvWithDefault(delayNetworkShutdownEnvName, "false")),
-		"[optional] whether to delay network shutdown to allow a final metrics scrape.",
+	SetMonitoringFlags(
+		&vars.startCollectors,
+		&vars.checkMonitoring,
 	)
 	flag.BoolVar(
 		&vars.startNetwork,
@@ -170,6 +167,28 @@ func RegisterFlags() *FlagVars {
 		tmpnet.DefaultNodeCount,
 		"number of nodes the network should initially consist of",
 	)
+	flag.BoolVar(
+		&vars.activateFortuna,
+		"activate-fortuna",
+		false,
+		"[optional] activate the fortuna upgrade",
+	)
 
 	return &vars
+}
+
+// Enable reuse by the upgrade job
+func SetMonitoringFlags(startCollectors *bool, checkMonitoring *bool) {
+	flag.BoolVar(
+		startCollectors,
+		"start-collectors",
+		cast.ToBool(tmpnet.GetEnvWithDefault("TMPNET_START_COLLECTORS", "false")),
+		"[optional] whether to start collectors of logs and metrics from nodes of the temporary network.",
+	)
+	flag.BoolVar(
+		checkMonitoring,
+		"check-monitoring",
+		cast.ToBool(tmpnet.GetEnvWithDefault("TMPNET_CHECK_MONITORING", "false")),
+		"[optional] whether to check that logs and metrics have been collected from nodes of the temporary network.",
+	)
 }

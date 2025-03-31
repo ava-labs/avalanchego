@@ -13,8 +13,6 @@ type testManager struct{}
 
 func (testManager) QueueChainCreation(ChainParameters) {}
 
-func (testManager) ForceCreateChain(ChainParameters) {}
-
 func (testManager) AddRegistrant(Registrant) {}
 
 func (testManager) Aliases(ids.ID) ([]string, error) {
@@ -39,10 +37,6 @@ func (testManager) Shutdown() {}
 
 func (testManager) StartChainCreator(ChainParameters) error {
 	return nil
-}
-
-func (testManager) SubnetID(ids.ID) (ids.ID, error) {
-	return ids.Empty, nil
 }
 
 func (testManager) IsBootstrapped(ids.ID) bool {

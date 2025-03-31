@@ -4,7 +4,7 @@ ARG GO_VERSION=INVALID # This value is not intended to be used but silences a wa
 
 # ============= Compilation Stage ================
 # Always use the native platform to ensure fast builds
-FROM --platform=$BUILDPLATFORM golang:$GO_VERSION-bullseye AS builder
+FROM --platform=$BUILDPLATFORM golang:$GO_VERSION-bookworm AS builder
 
 WORKDIR /build
 
@@ -54,7 +54,7 @@ RUN mkdir -p /avalanchego/build
 # ============= Cleanup Stage ================
 # Commands executed in this stage may be emulated (i.e. very slow) if TARGETPLATFORM and
 # BUILDPLATFORM have different arches.
-FROM debian:11-slim AS execution
+FROM debian:12-slim AS execution
 
 # Maintain compatibility with previous images
 COPY --from=builder /avalanchego/build /avalanchego/build
