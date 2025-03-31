@@ -38,11 +38,6 @@ jobs:
         run: |
           go mod tidy
           git diff --exit-code
-      - name: Ensure consistent avalanchego version
-        shell: bash
-        run: |
-          bash -x ./scripts/update_avalanchego_version.sh
-          git diff --exit-code
 
   unit_test:
     name: Golang Unit Tests (${{ matrix.os }})
@@ -151,15 +146,18 @@ jobs:
         shell: bash
         run: ./scripts/build.sh
       - name: Run Warp E2E Tests
-        uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@50f1601bf39a106d066012b4ef470c1058f5005a
+        uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@v1.11.13
         with:
-          run: ./scripts/run_ginkgo_warp.sh
-          run_env: AVALANCHEGO_BUILD_PATH=/tmp/e2e-test/avalanchego
-          artifact_prefix: warp
-          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+          run: AVALANCHEGO_BUILD_PATH=/tmp/e2e-test/avalanchego ./scripts/run_ginkgo_warp.sh
+          prometheus_id: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki_username: ${{ secrets.LOKI_ID || '' }}
+          loki_id: ${{ secrets.LOKI_ID || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+      - name: Upload tmpnet network dir for warp testing
+        uses: ava-labs/avalanchego/.github/actions/upload-tmpnet-artifact@v1-actions
+        if: always()
+        with:
+          name: warp-tmpnet-data
   e2e_load:
     name: e2e load tests
     runs-on: ubuntu-latest
@@ -179,15 +177,18 @@ jobs:
         shell: bash
         run: ./scripts/build.sh
       - name: Run E2E Load Tests
-        uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@50f1601bf39a106d066012b4ef470c1058f5005a
+        uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@v1.11.13
         with:
-          run: ./scripts/run_ginkgo_load.sh
-          run_env: AVALANCHEGO_BUILD_PATH=/tmp/e2e-test/avalanchego
-          artifact_prefix: load
-          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+          run: AVALANCHEGO_BUILD_PATH=/tmp/e2e-test/avalanchego ./scripts/run_ginkgo_load.sh
+          prometheus_id: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki_username: ${{ secrets.LOKI_ID || '' }}
+          loki_id: ${{ secrets.LOKI_ID || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+      - name: Upload tmpnet network dir for load testing
+        uses: ava-labs/avalanchego/.github/actions/upload-tmpnet-artifact@v1-actions
+        if: always()
+        with:
+          name: load-tmpnet-data
   test_build_image:
     name: Image build
     runs-on: ubuntu-latest

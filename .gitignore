@@ -58,5 +58,3 @@ diffs/
 
 # clone used for antithesis image builds
 avalanchego/
-
-.direnv
