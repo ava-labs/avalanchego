@@ -34,7 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/crypto"
-	"github.com/ava-labs/subnet-evm/metrics"
+	"github.com/ava-labs/libevm/metrics"
 )
 
 // The fields below define the low level database schema prefixing.

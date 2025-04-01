@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+	"github.com/ava-labs/subnet-evm/internal/testutils"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ava-labs/subnet-evm/warp"
@@ -22,6 +23,8 @@ import (
 )
 
 func TestMessageSignatureHandler(t *testing.T) {
+	testutils.WithMetrics(t)
+
 	database := memdb.New()
 	snowCtx := utils.TestSnowContext()
 	blsSecretKey, err := localsigner.New()
@@ -126,6 +129,8 @@ func TestMessageSignatureHandler(t *testing.T) {
 }
 
 func TestBlockSignatureHandler(t *testing.T) {
+	testutils.WithMetrics(t)
+
 	database := memdb.New()
 	snowCtx := utils.TestSnowContext()
 	blsSecretKey, err := localsigner.New()

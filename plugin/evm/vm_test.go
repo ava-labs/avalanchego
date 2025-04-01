@@ -37,6 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/constants"
@@ -44,7 +45,6 @@ import (
 	"github.com/ava-labs/subnet-evm/core/txpool"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/eth"
-	"github.com/ava-labs/subnet-evm/metrics"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/plugin/evm/config"
@@ -2938,9 +2938,6 @@ func TestSkipChainConfigCheckCompatible(t *testing.T) {
 	// disabling dynamic fees and causes a panic since some code assumes that this is enabled.
 	// TODO update this test when there is a future network upgrade that can be skipped in the config.
 	t.Skip("no skippable upgrades")
-	// Hack: registering metrics uses global variables, so we need to disable metrics here so that we can initialize the VM twice.
-	metrics.Enabled = false
-	defer func() { metrics.Enabled = true }()
 
 	issuer, vm, dbManager, appSender := GenesisVM(t, true, genesisJSONPreSubnetEVM, `{"pruning-enabled":true}`, "")
 
@@ -2985,9 +2982,15 @@ func TestSkipChainConfigCheckCompatible(t *testing.T) {
 	genesisWithUpgradeBytes, err := json.Marshal(genesisWithUpgrade)
 	require.NoError(t, err)
 
+	// Reset metrics to allow re-initialization
+	vm.ctx.Metrics = metrics.NewPrefixGatherer()
+
 	// this will not be allowed
 	err = reinitVM.Initialize(context.Background(), vm.ctx, dbManager, genesisWithUpgradeBytes, []byte{}, []byte{}, issuer, []*commonEng.Fx{}, appSender)
 	require.ErrorContains(t, err, "mismatching SubnetEVM fork block timestamp in database")
+
+	// Reset metrics to allow re-initialization
+	vm.ctx.Metrics = metrics.NewPrefixGatherer()
 
 	// try again with skip-upgrade-check
 	config := []byte(`{"skip-upgrade-check": true}`)

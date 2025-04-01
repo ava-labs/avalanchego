@@ -30,18 +30,27 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/subnet-evm/metrics"
+	"github.com/ava-labs/libevm/metrics"
+
+	// Force libevm metrics of the same name to be registered first.
+	_ "github.com/ava-labs/libevm/rpc"
 )
 
+// ====== If resolving merge conflicts ======
+//
+// All calls to metrics.NewRegistered*() for metrics also defined in libevm/rpc have
+// been replaced with metrics.GetOrRegister*() to get metrics already registered in
+// libevm/rpc or register them here otherwise. These replacements ensure the same
+// metrics are shared between the two packages.
 var (
-	rpcRequestGauge        = metrics.NewRegisteredGauge("rpc/requests", nil)
-	successfulRequestGauge = metrics.NewRegisteredGauge("rpc/success", nil)
-	failedRequestGauge     = metrics.NewRegisteredGauge("rpc/failure", nil)
+	rpcRequestGauge        = metrics.GetOrRegisterGauge("rpc/requests", nil)
+	successfulRequestGauge = metrics.GetOrRegisterGauge("rpc/success", nil)
+	failedRequestGauge     = metrics.GetOrRegisterGauge("rpc/failure", nil)
 
 	// serveTimeHistName is the prefix of the per-request serving time histograms.
 	serveTimeHistName = "rpc/duration"
 
-	rpcServingTimer = metrics.NewRegisteredTimer("rpc/duration/all", nil)
+	rpcServingTimer = metrics.GetOrRegisterTimer("rpc/duration/all", nil)
 )
 
 // updateServeTimeHistogram tracks the serving time of a remote RPC call.

@@ -26,36 +26,48 @@
 
 package pathdb
 
-import "github.com/ava-labs/subnet-evm/metrics"
+import (
+	"github.com/ava-labs/libevm/metrics"
 
-// nolint: unused
+	// Force libevm metrics of the same name to be registered first.
+	_ "github.com/ava-labs/libevm/triedb/pathdb"
+)
+
+// ====== If resolving merge conflicts ======
+//
+// All calls to metrics.NewRegistered*() for metrics also defined in libevm/triedb/pathdb
+// have been replaced with metrics.GetOrRegister*() to get metrics already registered in
+// libevm/triedb/pathdb or register them here otherwise. These replacements ensure the same
+// metrics are shared between the two packages.
+//
+//nolint:unused
 var (
-	cleanHitMeter   = metrics.NewRegisteredMeter("pathdb/clean/hit", nil)
-	cleanMissMeter  = metrics.NewRegisteredMeter("pathdb/clean/miss", nil)
-	cleanReadMeter  = metrics.NewRegisteredMeter("pathdb/clean/read", nil)
-	cleanWriteMeter = metrics.NewRegisteredMeter("pathdb/clean/write", nil)
+	cleanHitMeter   = metrics.GetOrRegisterMeter("pathdb/clean/hit", nil)
+	cleanMissMeter  = metrics.GetOrRegisterMeter("pathdb/clean/miss", nil)
+	cleanReadMeter  = metrics.GetOrRegisterMeter("pathdb/clean/read", nil)
+	cleanWriteMeter = metrics.GetOrRegisterMeter("pathdb/clean/write", nil)
 
-	dirtyHitMeter         = metrics.NewRegisteredMeter("pathdb/dirty/hit", nil)
-	dirtyMissMeter        = metrics.NewRegisteredMeter("pathdb/dirty/miss", nil)
-	dirtyReadMeter        = metrics.NewRegisteredMeter("pathdb/dirty/read", nil)
-	dirtyWriteMeter       = metrics.NewRegisteredMeter("pathdb/dirty/write", nil)
-	dirtyNodeHitDepthHist = metrics.NewRegisteredHistogram("pathdb/dirty/depth", nil, metrics.NewExpDecaySample(1028, 0.015))
+	dirtyHitMeter         = metrics.GetOrRegisterMeter("pathdb/dirty/hit", nil)
+	dirtyMissMeter        = metrics.GetOrRegisterMeter("pathdb/dirty/miss", nil)
+	dirtyReadMeter        = metrics.GetOrRegisterMeter("pathdb/dirty/read", nil)
+	dirtyWriteMeter       = metrics.GetOrRegisterMeter("pathdb/dirty/write", nil)
+	dirtyNodeHitDepthHist = metrics.GetOrRegisterHistogram("pathdb/dirty/depth", nil, metrics.NewExpDecaySample(1028, 0.015))
 
-	cleanFalseMeter = metrics.NewRegisteredMeter("pathdb/clean/false", nil)
-	dirtyFalseMeter = metrics.NewRegisteredMeter("pathdb/dirty/false", nil)
-	diskFalseMeter  = metrics.NewRegisteredMeter("pathdb/disk/false", nil)
+	cleanFalseMeter = metrics.GetOrRegisterMeter("pathdb/clean/false", nil)
+	dirtyFalseMeter = metrics.GetOrRegisterMeter("pathdb/dirty/false", nil)
+	diskFalseMeter  = metrics.GetOrRegisterMeter("pathdb/disk/false", nil)
 
-	commitTimeTimer  = metrics.NewRegisteredTimer("pathdb/commit/time", nil)
-	commitNodesMeter = metrics.NewRegisteredMeter("pathdb/commit/nodes", nil)
-	commitBytesMeter = metrics.NewRegisteredMeter("pathdb/commit/bytes", nil)
+	commitTimeTimer  = metrics.GetOrRegisterTimer("pathdb/commit/time", nil)
+	commitNodesMeter = metrics.GetOrRegisterMeter("pathdb/commit/nodes", nil)
+	commitBytesMeter = metrics.GetOrRegisterMeter("pathdb/commit/bytes", nil)
 
-	gcNodesMeter = metrics.NewRegisteredMeter("pathdb/gc/nodes", nil)
-	gcBytesMeter = metrics.NewRegisteredMeter("pathdb/gc/bytes", nil)
+	gcNodesMeter = metrics.GetOrRegisterMeter("pathdb/gc/nodes", nil)
+	gcBytesMeter = metrics.GetOrRegisterMeter("pathdb/gc/bytes", nil)
 
-	diffLayerBytesMeter = metrics.NewRegisteredMeter("pathdb/diff/bytes", nil)
-	diffLayerNodesMeter = metrics.NewRegisteredMeter("pathdb/diff/nodes", nil)
+	diffLayerBytesMeter = metrics.GetOrRegisterMeter("pathdb/diff/bytes", nil)
+	diffLayerNodesMeter = metrics.GetOrRegisterMeter("pathdb/diff/nodes", nil)
 
-	historyBuildTimeMeter  = metrics.NewRegisteredTimer("pathdb/history/time", nil)
-	historyDataBytesMeter  = metrics.NewRegisteredMeter("pathdb/history/bytes/data", nil)
-	historyIndexBytesMeter = metrics.NewRegisteredMeter("pathdb/history/bytes/index", nil)
+	historyBuildTimeMeter  = metrics.GetOrRegisterTimer("pathdb/history/time", nil)
+	historyDataBytesMeter  = metrics.GetOrRegisterMeter("pathdb/history/bytes/data", nil)
+	historyIndexBytesMeter = metrics.GetOrRegisterMeter("pathdb/history/bytes/index", nil)
 )

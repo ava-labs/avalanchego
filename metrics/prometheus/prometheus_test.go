@@ -1,4 +1,4 @@
-// (c) 2021, Ava Labs, Inc. All rights reserved.
+// (c) 2021-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package prometheus
@@ -7,81 +7,125 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/subnet-evm/internal/testutils"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/subnet-evm/metrics"
+	"github.com/ava-labs/libevm/metrics"
 )
 
-func TestGatherer(t *testing.T) {
+func TestGatherer_Gather(t *testing.T) {
+	testutils.WithMetrics(t)
+
 	registry := metrics.NewRegistry()
+	register := func(t *testing.T, name string, collector any) {
+		t.Helper()
+		err := registry.Register(name, collector)
+		require.NoErrorf(t, err, "registering collector %q", name)
+	}
 
 	counter := metrics.NewCounter()
 	counter.Inc(12345)
+	register(t, "test/counter", counter)
 
-	err := registry.Register("test/counter", counter)
-	assert.NoError(t, err)
+	counterFloat64 := metrics.NewCounterFloat64()
+	counterFloat64.Inc(1.1)
+	register(t, "test/counter_float64", counterFloat64)
 
 	gauge := metrics.NewGauge()
 	gauge.Update(23456)
-
-	err = registry.Register("test/gauge", gauge)
-	assert.NoError(t, err)
+	register(t, "test/gauge", gauge)
 
 	gaugeFloat64 := metrics.NewGaugeFloat64()
 	gaugeFloat64.Update(34567.89)
+	register(t, "test/gauge_float64", gaugeFloat64)
 
-	err = registry.Register("test/gauge_float64", gaugeFloat64)
-	assert.NoError(t, err)
+	gaugeInfo := metrics.NewGaugeInfo()
+	gaugeInfo.Update(metrics.GaugeInfoValue{"key": "value"})
+	register(t, "test/gauge_info", gaugeInfo) // skipped
 
 	sample := metrics.NewUniformSample(1028)
 	histogram := metrics.NewHistogram(sample)
-
-	err = registry.Register("test/histogram", histogram)
-	assert.NoError(t, err)
+	register(t, "test/histogram", histogram)
 
 	meter := metrics.NewMeter()
-	defer meter.Stop()
+	t.Cleanup(meter.Stop)
 	meter.Mark(9999999)
-
-	err = registry.Register("test/meter", meter)
-	assert.NoError(t, err)
+	register(t, "test/meter", meter)
 
 	timer := metrics.NewTimer()
-	defer timer.Stop()
+	t.Cleanup(timer.Stop)
 	timer.Update(20 * time.Millisecond)
 	timer.Update(21 * time.Millisecond)
 	timer.Update(22 * time.Millisecond)
 	timer.Update(120 * time.Millisecond)
 	timer.Update(23 * time.Millisecond)
 	timer.Update(24 * time.Millisecond)
-
-	err = registry.Register("test/timer", timer)
-	assert.NoError(t, err)
+	register(t, "test/timer", timer)
 
 	resettingTimer := metrics.NewResettingTimer()
-	resettingTimer.Update(10 * time.Millisecond)
-	resettingTimer.Update(11 * time.Millisecond)
-	resettingTimer.Update(12 * time.Millisecond)
-	resettingTimer.Update(120 * time.Millisecond)
-	resettingTimer.Update(13 * time.Millisecond)
-	resettingTimer.Update(14 * time.Millisecond)
-
-	err = registry.Register("test/resetting_timer", resettingTimer)
-	assert.NoError(t, err)
-
-	err = registry.Register("test/resetting_timer_snapshot", resettingTimer.Snapshot())
-	assert.NoError(t, err)
+	register(t, "test/resetting_timer", resettingTimer)
+	resettingTimer.Update(time.Second) // must be after register call
 
 	emptyResettingTimer := metrics.NewResettingTimer()
+	register(t, "test/empty_resetting_timer", emptyResettingTimer)
 
-	err = registry.Register("test/empty_resetting_timer", emptyResettingTimer)
-	assert.NoError(t, err)
+	emptyResettingTimer.Update(time.Second) // no effect because of snapshot below
+	register(t, "test/empty_resetting_timer_snapshot", emptyResettingTimer.Snapshot())
 
-	err = registry.Register("test/empty_resetting_timer_snapshot", emptyResettingTimer.Snapshot())
-	assert.NoError(t, err)
+	registerNilMetrics(t, register)
 
-	g := Gatherer(registry)
+	gatherer := NewGatherer(registry)
 
-	_, err = g.Gather()
-	assert.NoError(t, err)
+	families, err := gatherer.Gather()
+	require.NoError(t, err)
+	familyStrings := make([]string, len(families))
+	for i := range families {
+		familyStrings[i] = families[i].String()
+	}
+	want := []string{
+		`name:"test_counter" type:COUNTER metric:<counter:<value:12345 > > `,
+		`name:"test_counter_float64" type:COUNTER metric:<counter:<value:1.1 > > `,
+		`name:"test_gauge" type:GAUGE metric:<gauge:<value:23456 > > `,
+		`name:"test_gauge_float64" type:GAUGE metric:<gauge:<value:34567.89 > > `,
+		`name:"test_histogram" type:SUMMARY metric:<summary:<sample_count:0 sample_sum:0 quantile:<quantile:0.5 value:0 > quantile:<quantile:0.75 value:0 > quantile:<quantile:0.95 value:0 > quantile:<quantile:0.99 value:0 > quantile:<quantile:0.999 value:0 > quantile:<quantile:0.9999 value:0 > > > `,
+		`name:"test_meter" type:GAUGE metric:<gauge:<value:9.999999e+06 > > `,
+		`name:"test_resetting_timer" type:SUMMARY metric:<summary:<sample_count:1 quantile:<quantile:50 value:1e+09 > quantile:<quantile:95 value:1e+09 > quantile:<quantile:99 value:1e+09 > > > `,
+		`name:"test_timer" type:SUMMARY metric:<summary:<sample_count:6 sample_sum:2.3e+08 quantile:<quantile:0.5 value:2.25e+07 > quantile:<quantile:0.75 value:4.8e+07 > quantile:<quantile:0.95 value:1.2e+08 > quantile:<quantile:0.99 value:1.2e+08 > quantile:<quantile:0.999 value:1.2e+08 > quantile:<quantile:0.9999 value:1.2e+08 > > > `,
+	}
+	assert.Equal(t, want, familyStrings)
+
+	register(t, "unsupported", metrics.NewHealthcheck(nil))
+	families, err = gatherer.Gather()
+	assert.ErrorIs(t, err, errMetricTypeNotSupported)
+	assert.Empty(t, families)
+}
+
+func registerNilMetrics(t *testing.T, register func(t *testing.T, name string, collector any)) {
+	metrics.Enabled = false
+	defer func() { metrics.Enabled = true }()
+	nilCounter := metrics.NewCounter()
+	register(t, "nil/counter", nilCounter)
+	nilCounterFloat64 := metrics.NewCounterFloat64()
+	register(t, "nil/counter_float64", nilCounterFloat64)
+	nilEWMA := &metrics.NilEWMA{}
+	register(t, "nil/ewma", nilEWMA)
+	nilGauge := metrics.NewGauge()
+	register(t, "nil/gauge", nilGauge)
+	nilGaugeFloat64 := metrics.NewGaugeFloat64()
+	register(t, "nil/gauge_float64", nilGaugeFloat64)
+	nilGaugeInfo := metrics.NewGaugeInfo()
+	register(t, "nil/gauge_info", nilGaugeInfo)
+	nilHealthcheck := metrics.NewHealthcheck(nil)
+	register(t, "nil/healthcheck", nilHealthcheck)
+	nilHistogram := metrics.NewHistogram(nil)
+	register(t, "nil/histogram", nilHistogram)
+	nilMeter := metrics.NewMeter()
+	register(t, "nil/meter", nilMeter)
+	nilResettingTimer := metrics.NewResettingTimer()
+	register(t, "nil/resetting_timer", nilResettingTimer)
+	nilSample := metrics.NewUniformSample(1028)
+	register(t, "nil/sample", nilSample)
+	nilTimer := metrics.NewTimer()
+	register(t, "nil/timer", nilTimer)
 }

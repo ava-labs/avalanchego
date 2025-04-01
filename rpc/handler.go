@@ -39,7 +39,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/log"
-	"github.com/ava-labs/subnet-evm/metrics"
+	"github.com/ava-labs/libevm/metrics"
 	"golang.org/x/time/rate"
 )
 
