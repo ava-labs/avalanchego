@@ -123,7 +123,7 @@ func (n *Network) readChainConfigs() error {
 
 	// Clear the map of data that may end up stale (e.g. if a given
 	// chain is in the map but no longer exists on disk)
-	n.ChainConfigs = map[string]FlagsMap{}
+	n.PrimaryChainConfigs = map[string]FlagsMap{}
 
 	for _, entry := range entries {
 		if !entry.IsDir() {
@@ -141,7 +141,7 @@ func (n *Network) readChainConfigs() error {
 		if err != nil {
 			return err
 		}
-		n.ChainConfigs[chainAlias] = chainConfig
+		n.PrimaryChainConfigs[chainAlias] = chainConfig
 	}
 
 	return nil
@@ -150,7 +150,7 @@ func (n *Network) readChainConfigs() error {
 func (n *Network) writeChainConfigs() error {
 	baseChainConfigDir := n.GetChainConfigDir()
 
-	for chainAlias, chainConfig := range n.ChainConfigs {
+	for chainAlias, chainConfig := range n.PrimaryChainConfigs {
 		// Create the directory
 		chainConfigDir := filepath.Join(baseChainConfigDir, chainAlias)
 		if err := os.MkdirAll(chainConfigDir, perms.ReadWriteExecute); err != nil {

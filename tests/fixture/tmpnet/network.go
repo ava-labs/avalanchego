@@ -102,8 +102,7 @@ type Network struct {
 	Genesis *genesis.UnparsedConfig
 
 	// Configuration for primary network chains (P, X, C)
-	// TODO(marun) Rename to PrimaryChainConfigs
-	ChainConfigs map[string]FlagsMap
+	PrimaryChainConfigs map[string]FlagsMap
 
 	// Default configuration to use when creating new nodes
 	DefaultFlags         FlagsMap
@@ -236,15 +235,15 @@ func (n *Network) EnsureDefaultConfig(log logging.Logger, avalancheGoPath string
 	}
 
 	// Ensure primary chains are configured
-	if n.ChainConfigs == nil {
-		n.ChainConfigs = map[string]FlagsMap{}
+	if n.PrimaryChainConfigs == nil {
+		n.PrimaryChainConfigs = map[string]FlagsMap{}
 	}
 	defaultChainConfigs := DefaultChainConfigs()
 	for alias, chainConfig := range defaultChainConfigs {
-		if _, ok := n.ChainConfigs[alias]; !ok {
-			n.ChainConfigs[alias] = FlagsMap{}
+		if _, ok := n.PrimaryChainConfigs[alias]; !ok {
+			n.PrimaryChainConfigs[alias] = FlagsMap{}
 		}
-		n.ChainConfigs[alias].SetDefaults(chainConfig)
+		n.PrimaryChainConfigs[alias].SetDefaults(chainConfig)
 	}
 
 	// Ensure runtime is configured
