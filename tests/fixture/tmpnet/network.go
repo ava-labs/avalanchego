@@ -5,10 +5,12 @@ package tmpnet
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/netip"
 	"os"
 	"os/exec"
@@ -21,9 +23,11 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
@@ -100,6 +104,9 @@ type Network struct {
 
 	// Genesis for the network. If nil, NetworkID must be non-zero
 	Genesis *genesis.UnparsedConfig
+
+	// Configuration for primary subnets
+	PrimarySubnetConfigs map[ids.ID]subnets.Config
 
 	// Configuration for primary network chains (P, X, C)
 	PrimaryChainConfigs map[string]FlagsMap
@@ -213,6 +220,7 @@ func (n *Network) EnsureDefaultConfig(log logging.Logger, avalancheGoPath string
 
 	if len(n.Nodes) == 1 {
 		// Sybil protection needs to be disabled for a single node network to start
+		log.Info("starting a single-node network with sybil protection disabled")
 		n.DefaultFlags[config.SybilProtectionEnabledKey] = false
 	}
 
@@ -488,19 +496,16 @@ func (n *Network) StartNode(ctx context.Context, log logging.Logger, node *Node)
 	if err := n.EnsureNodeConfig(node); err != nil {
 		return err
 	}
+	if err := node.Write(); err != nil {
+		return err
+	}
 
 	// Check the VM binaries after EnsureNodeConfig to ensure node.RuntimeConfig is non-nil
 	if err := checkVMBinaries(log, n.Subnets, node.RuntimeConfig.AvalancheGoPath, pluginDir); err != nil {
 		return err
 	}
 
-	bootstrapIPs, bootstrapIDs, err := n.GetBootstrapIPsAndIDs(node)
-	if err != nil {
-		return err
-	}
-	node.SetNetworkingConfig(bootstrapIDs, bootstrapIPs)
-
-	if err := node.Write(); err != nil {
+	if err := n.writeNodeFlags(node); err != nil {
 		return err
 	}
 
@@ -584,57 +589,28 @@ func (n *Network) Restart(ctx context.Context, log logging.Logger) error {
 // no action will be taken.
 // TODO(marun) Reword or refactor to account for the differing behavior pre- vs post-start
 func (n *Network) EnsureNodeConfig(node *Node) error {
-	flags := node.Flags
-
 	// Ensure nodes can label their metrics with the network uuid
 	node.NetworkUUID = n.UUID
 
 	// Ensure nodes can label metrics with an indication of the shared/private nature of the network
 	node.NetworkOwner = n.Owner
 
-	// Set the network name if available
-	networkID := n.GetNetworkID()
-	if networkID > 0 {
-		// Convert the network id to a string to ensure consistency in JSON round-tripping.
-		flags[config.NetworkNameKey] = strconv.FormatUint(uint64(networkID), 10)
-	}
-
 	if err := node.EnsureKeys(); err != nil {
 		return err
 	}
 
-	flags.SetDefaults(n.DefaultFlags)
-
-	// Set fields including the network path
 	if len(n.Dir) > 0 {
-		defaultFlags := FlagsMap{
-			config.ChainConfigDirKey: n.GetChainConfigDir(),
-		}
-
-		if n.Genesis != nil {
-			defaultFlags[config.GenesisFileKey] = n.GetGenesisPath()
-		}
-
-		// Only set the subnet dir if it exists or the node won't start.
-		subnetDir := n.GetSubnetDir()
-		if _, err := os.Stat(subnetDir); err == nil {
-			defaultFlags[config.SubnetConfigDirKey] = subnetDir
-		} else if !errors.Is(err, os.ErrNotExist) {
-			return err
-		}
-
-		node.Flags.SetDefaults(defaultFlags)
-
 		// Ensure the node's data dir is configured
 		dataDir := node.GetDataDir()
 		if len(dataDir) == 0 {
 			// NodeID will have been set by EnsureKeys
 			dataDir = filepath.Join(n.Dir, node.NodeID.String())
-			flags[config.DataDirKey] = dataDir
+			node.Flags[config.DataDirKey] = dataDir
 		}
 	}
 
 	// Ensure the node runtime is configured
+	// TODO(marun) Do not set the runtime config - get it from the network if not present on the node.
 	if node.RuntimeConfig == nil {
 		node.RuntimeConfig = &NodeRuntimeConfig{
 			AvalancheGoPath: n.DefaultRuntimeConfig.AvalancheGoPath,
@@ -710,7 +686,7 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI 
 		)
 
 		// Persist the subnet configuration
-		if err := subnet.Write(n.GetSubnetDir(), n.GetChainConfigDir()); err != nil {
+		if err := subnet.Write(n.GetSubnetDir()); err != nil {
 			return err
 		}
 
@@ -793,11 +769,11 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI 
 			return err
 		}
 
-		// Persist the chain configuration
-		if err := subnet.Write(n.GetSubnetDir(), n.GetChainConfigDir()); err != nil {
+		// Persist the subnet
+		if err := subnet.Write(n.GetSubnetDir()); err != nil {
 			return err
 		}
-		log.Info("wrote chain configuration for subnet",
+		log.Info("wrote subnet",
 			zap.String("name", subnet.Name),
 		)
 
@@ -886,6 +862,141 @@ func (n *Network) GetNetworkID() uint32 {
 // For consumption outside of avalanchego. Needs to be kept exported.
 func (n *Network) GetPluginDir() (string, error) {
 	return n.DefaultFlags.GetStringVal(config.PluginDirKey)
+}
+
+// GetGenesisFileContent returns the network genesis in marshalled and
+// base64-encoded form.
+func (n *Network) GetGenesisFileContent() (string, error) {
+	bytes, err := json.Marshal(n.Genesis)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal genesis: %w", err)
+	}
+	return base64.StdEncoding.EncodeToString(bytes), nil
+}
+
+// GetSubnetConfigContent returns the base64-encoded map of subnetID
+// to marshalled subnet configuration.
+func (n *Network) GetSubnetConfigContent() (string, error) {
+	subnetConfigs := map[ids.ID]subnets.Config{}
+
+	// Collect configuration for primary subnets
+	for subnetID, config := range n.PrimarySubnetConfigs {
+		subnetConfigs[subnetID] = config
+	}
+
+	// Collect configuration for non-primary subnets
+	for _, subnet := range n.Subnets {
+		if subnet.SubnetID == ids.Empty {
+			// The subnet hasn't been created yet and it's not
+			// possible to supply configuration without an ID.
+			continue
+		}
+		if subnet.Config == nil {
+			// No configuration present
+			continue
+		}
+		subnetConfigs[subnet.SubnetID] = *subnet.Config
+	}
+
+	if len(subnetConfigs) == 0 {
+		return "", nil
+	}
+
+	marshaledConfigs, err := json.Marshal(subnetConfigs)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal subnet configs: %w", err)
+	}
+	return base64.StdEncoding.EncodeToString(marshaledConfigs), nil
+}
+
+// GetChainConfigContent returns the base64-encoded map of chain
+// alias/ID to marshalled chain configuration for both primary and
+// custom chains.
+func (n *Network) GetChainConfigContent() (string, error) {
+	// Collect the primary chain configuration
+	chainConfigs := map[string]chains.ChainConfig{}
+	for alias, flags := range n.PrimaryChainConfigs {
+		marshaledFlags, err := json.Marshal(flags)
+		if err != nil {
+			return "", fmt.Errorf("failed to marshal flags map for %s-Chain: %w", alias, err)
+		}
+		chainConfigs[alias] = chains.ChainConfig{
+			Config: marshaledFlags,
+		}
+	}
+
+	// Collect custom chain configuration
+	for _, subnet := range n.Subnets {
+		for _, chain := range subnet.Chains {
+			if chain.ChainID == ids.Empty {
+				// The chain hasn't been created yet and it's not possible to supply
+				// configuration without a chain ID.
+				continue
+			}
+			chainConfigs[chain.ChainID.String()] = chains.ChainConfig{
+				Config: []byte(chain.Config),
+			}
+		}
+	}
+
+	marshaledConfigs, err := json.Marshal(chainConfigs)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal chain configs: %w", err)
+	}
+	return base64.StdEncoding.EncodeToString(marshaledConfigs), nil
+}
+
+// writeNodeFlags determines the set of flags that should be used to
+// start the given node and writes them to a file in to the node path.
+func (n *Network) writeNodeFlags(node *Node) error {
+	// Start with the node's flags
+	flags := maps.Clone(node.Flags)
+
+	// Convert the network id to a string to ensure consistency in JSON round-tripping.
+	flags[config.NetworkNameKey] = strconv.FormatUint(uint64(n.GetNetworkID()), 10)
+
+	// Set the network defaults
+	flags.SetDefaults(n.DefaultFlags)
+
+	// Set the bootstrap configuration
+	bootstrapIPs, bootstrapIDs, err := n.GetBootstrapIPsAndIDs(node)
+	if err != nil {
+		return err
+	}
+	flags[config.BootstrapIDsKey] = strings.Join(bootstrapIDs, ",")
+	flags[config.BootstrapIPsKey] = strings.Join(bootstrapIPs, ",")
+
+	// TODO(marun) Maybe avoid computing content flags for each node start?
+
+	if n.Genesis != nil {
+		// Set the genesis
+		genesisFileContent, err := n.GetGenesisFileContent()
+		if err != nil {
+			return err
+		}
+		flags.SetDefault(config.GenesisFileContentKey, genesisFileContent)
+	}
+
+	// Set subnet config
+	subnetConfigContent, err := n.GetSubnetConfigContent()
+	if err != nil {
+		return err
+	}
+	if len(subnetConfigContent) > 0 {
+		flags.SetDefault(config.SubnetConfigContentKey, subnetConfigContent)
+	}
+
+	// Set chain config
+	chainConfigContent, err := n.GetChainConfigContent()
+	if err != nil {
+		return err
+	}
+	if len(chainConfigContent) > 0 {
+		flags.SetDefault(config.ChainConfigContentKey, chainConfigContent)
+	}
+
+	// Write the flags to disk
+	return node.writeFlags(flags)
 }
 
 // Waits until the provided nodes are healthy.
