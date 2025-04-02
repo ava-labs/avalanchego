@@ -6,7 +6,7 @@ ARG GO_VERSION=INVALID # This value is not intended to be used but silences a wa
 ARG AVALANCHEGO_NODE_IMAGE=INVALID # This value is not intended to be used but silences a warning
 
 # ============= Compilation Stage ================
-FROM golang:$GO_VERSION-bullseye AS builder
+FROM golang:$GO_VERSION-bookworm AS builder
 
 WORKDIR /build
 

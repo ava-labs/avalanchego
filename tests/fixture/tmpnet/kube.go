@@ -18,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
 	"k8s.io/utils/pointer"
@@ -298,4 +299,44 @@ func enableLocalForwardForPod(
 		return 0, nil, fmt.Errorf("failed to find at least one forwarded port: %w", err)
 	}
 	return forwardedPorts[0].Local, stopChan, nil
+}
+
+// GetClientConfig replicates the behavior of clientcmd.BuildConfigFromFlags with zap logging and
+// support for an optional config context. If path is not provided, use of in-cluster config will
+// be attempted.
+func GetClientConfig(log logging.Logger, path string, context string) (*restclient.Config, error) {
+	if len(path) == 0 {
+		log.Warn("--kubeconfig not set.  Using the inClusterConfig.  This might not work.")
+		kubeconfig, err := restclient.InClusterConfig()
+		if err == nil {
+			return kubeconfig, nil
+		}
+		log.Warn("failed to create inClusterConfig, falling back to default config",
+			zap.Error(err),
+		)
+	}
+	overrides := &clientcmd.ConfigOverrides{}
+	if len(context) > 0 {
+		overrides.CurrentContext = context
+	}
+	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{
+			ExplicitPath: path,
+		},
+		overrides,
+	).ClientConfig()
+}
+
+// GetClientset returns a kubernetes clientset for the provided kubeconfig path and context.
+func GetClientset(log logging.Logger, path string, context string) (*kubernetes.Clientset, error) {
+	clientConfig, err := GetClientConfig(log, path, context)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client config: %w", err)
+	}
+
+	clientset, err := kubernetes.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create clientset: %w", err)
+	}
+	return clientset, nil
 }

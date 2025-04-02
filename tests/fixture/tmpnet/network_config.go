@@ -81,12 +81,13 @@ func (n *Network) writeNodes() error {
 	return nil
 }
 
-func (n *Network) getGenesisPath() string {
+// For consumption outside of avalanchego. Needs to be kept exported.
+func (n *Network) GetGenesisPath() string {
 	return filepath.Join(n.Dir, "genesis.json")
 }
 
 func (n *Network) readGenesis() error {
-	bytes, err := os.ReadFile(n.getGenesisPath())
+	bytes, err := os.ReadFile(n.GetGenesisPath())
 	if err != nil {
 		return fmt.Errorf("failed to read genesis: %w", err)
 	}
@@ -103,7 +104,7 @@ func (n *Network) writeGenesis() error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal genesis: %w", err)
 	}
-	if err := os.WriteFile(n.getGenesisPath(), bytes, perms.ReadWrite); err != nil {
+	if err := os.WriteFile(n.GetGenesisPath(), bytes, perms.ReadWrite); err != nil {
 		return fmt.Errorf("failed to write genesis: %w", err)
 	}
 	return nil
@@ -122,7 +123,7 @@ func (n *Network) readChainConfigs() error {
 
 	// Clear the map of data that may end up stale (e.g. if a given
 	// chain is in the map but no longer exists on disk)
-	n.ChainConfigs = map[string]FlagsMap{}
+	n.PrimaryChainConfigs = map[string]FlagsMap{}
 
 	for _, entry := range entries {
 		if !entry.IsDir() {
@@ -140,7 +141,7 @@ func (n *Network) readChainConfigs() error {
 		if err != nil {
 			return err
 		}
-		n.ChainConfigs[chainAlias] = chainConfig
+		n.PrimaryChainConfigs[chainAlias] = chainConfig
 	}
 
 	return nil
@@ -149,7 +150,7 @@ func (n *Network) readChainConfigs() error {
 func (n *Network) writeChainConfigs() error {
 	baseChainConfigDir := n.GetChainConfigDir()
 
-	for chainAlias, chainConfig := range n.ChainConfigs {
+	for chainAlias, chainConfig := range n.PrimaryChainConfigs {
 		// Create the directory
 		chainConfigDir := filepath.Join(baseChainConfigDir, chainAlias)
 		if err := os.MkdirAll(chainConfigDir, perms.ReadWriteExecute); err != nil {

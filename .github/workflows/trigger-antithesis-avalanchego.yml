@@ -25,7 +25,7 @@ jobs:
     name: Run Antithesis Avalanchego Test Setup
     runs-on: ubuntu-latest
     steps:
-      - uses: antithesishq/antithesis-trigger-action@v0.7
+      - uses: antithesishq/antithesis-trigger-action@b7d0c9d1d9316bd4de73a44144c56636ea3a64ba #v0.8
         with:
           notebook_name: avalanche
           tenant: avalanche
