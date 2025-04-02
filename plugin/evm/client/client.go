@@ -50,12 +50,17 @@ type client struct {
 // NewClient returns a Client for interacting with EVM [chain]
 func NewClient(uri, chain string) Client {
 	requestUri := fmt.Sprintf("%s/ext/bc/%s", uri, chain)
+	return NewClientWithURL(requestUri)
+}
+
+// NewClientWithURL returns a Client for interacting with EVM [chain]
+func NewClientWithURL(url string) Client {
 	return &client{
 		adminRequester: rpc.NewEndpointRequester(
-			requestUri + "/admin",
+			url + "/admin",
 		),
 		validatorsRequester: rpc.NewEndpointRequester(
-			requestUri + "/validators",
+			url + "/validators",
 		),
 	}
 }

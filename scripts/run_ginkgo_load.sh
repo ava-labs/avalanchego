@@ -15,10 +15,6 @@ source "$SUBNET_EVM_PATH"/scripts/constants.sh
 
 source "$SUBNET_EVM_PATH"/scripts/versions.sh
 
-# Build ginkgo
-# to install the ginkgo binary (required for test build and run)
-go install -v github.com/onsi/ginkgo/v2/ginkgo@"${GINKGO_VERSION}"
-
 EXTRA_ARGS=()
 AVALANCHEGO_BUILD_PATH="${AVALANCHEGO_BUILD_PATH:-}"
 if [[ -n "${AVALANCHEGO_BUILD_PATH}" ]]; then
@@ -26,4 +22,4 @@ if [[ -n "${AVALANCHEGO_BUILD_PATH}" ]]; then
   echo "Running with extra args:" "${EXTRA_ARGS[@]}"
 fi
 
-ginkgo -vv --label-filter="${GINKGO_LABEL_FILTER:-}" ./tests/load -- "${EXTRA_ARGS[@]}"
+"${SUBNET_EVM_PATH}"/bin/ginkgo -vv --label-filter="${GINKGO_LABEL_FILTER:-}" ./tests/load -- "${EXTRA_ARGS[@]}"

@@ -2,6 +2,4 @@
 
 set -euo pipefail
 
-go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.1
-
-actionlint
+go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.1 "${@}"
