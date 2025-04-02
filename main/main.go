@@ -21,7 +21,7 @@ func main() {
 	fs := config.BuildFlagSet()
 	v, err := config.BuildViper(fs, os.Args[1:])
 
-	if errors.Is(err, pflag.ErrHelp) {
+	if err == pflag.ErrHelp {
 		os.Exit(0)
 	}
 
