@@ -1,3 +1,4 @@
+version: 2
 # ref. https://goreleaser.com/customization/build/
 builds:
   - id: subnet-evm
@@ -37,3 +38,8 @@ release:
   github:
     owner: ava-labs
     name: subnet-evm
+
+git:
+  # Avoid picking the wrong tag when there is an RC tag and a non-RC tag
+  # pointing to the same commit.
+  prerelease_suffix: "-rc"
