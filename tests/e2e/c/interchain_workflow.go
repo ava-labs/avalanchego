@@ -6,7 +6,7 @@ package c
 import (
 	"math/big"
 
-	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 
@@ -45,7 +45,8 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 
 		tc.By("sending funds from one address to another on the C-Chain", func() {
 			// Create transaction
-			acceptedNonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), senderEthAddress)
+			blockNumber := (*big.Int)(nil)
+			acceptedNonce, err := ethClient.NonceAt(tc.DefaultContext(), senderEthAddress, blockNumber)
 			require.NoError(err)
 			gasPrice := e2e.SuggestGasPrice(tc, ethClient)
 			tx := types.NewTransaction(
