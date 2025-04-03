@@ -27,10 +27,12 @@ import (
 // access to the shared env to GetEnv which adds a test context.
 var env *TestEnvironment
 
-func InitSharedTestEnvironment(t require.TestingT, envBytes []byte) {
-	require := require.New(t)
+func InitSharedTestEnvironment(tc tests.TestContext, envBytes []byte) {
+	require := require.New(tc)
 	require.Nil(env, "env already initialized")
-	env = &TestEnvironment{}
+	env = &TestEnvironment{
+		testContext: tc,
+	}
 	require.NoError(json.Unmarshal(envBytes, env))
 
 	// Ginkgo parallelization is at the process level, so a given key
@@ -79,6 +81,7 @@ func (te *TestEnvironment) Marshal() []byte {
 // Initialize a new test environment with a shared network (either pre-existing or newly created).
 func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork *tmpnet.Network) *TestEnvironment {
 	require := require.New(tc)
+	log := tc.Log()
 
 	var network *tmpnet.Network
 
@@ -121,9 +124,9 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 
 		if len(networkDir) > 0 {
 			var err error
-			network, err = tmpnet.ReadNetwork(networkDir)
+			network, err = tmpnet.ReadNetwork(tc.DefaultContext(), networkDir)
 			require.NoError(err)
-			tc.Log().Info("loaded a network",
+			log.Info("loaded a network",
 				zap.String("networkDir", networkDir),
 			)
 		}
@@ -131,7 +134,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 		if flagVars.StopNetwork() {
 			if len(networkSymlink) > 0 {
 				// Remove the symlink to avoid attempts to reuse the stopped network
-				tc.Log().Info("removing symlink",
+				log.Info("removing symlink",
 					zap.String("path", networkSymlink),
 				)
 				if err := os.Remove(networkSymlink); !errors.Is(err, os.ErrNotExist) {
@@ -139,28 +142,31 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 				}
 			}
 			if network != nil {
-				tc.Log().Info("stopping network")
+				log.Info("stopping network")
 				require.NoError(network.Stop(tc.DefaultContext()))
 			} else {
-				tc.Log().Warn("no network to stop")
+				log.Warn("no network to stop")
 			}
 			os.Exit(0)
 		} else if network != nil && flagVars.RestartNetwork() {
 			// A network is only restarted if it is already running and stop was not requested
-			require.NoError(network.Restart(tc.DefaultContext(), tc.Log()))
+			require.NoError(network.Restart(tc.DefaultContext(), log))
 		}
 	}
 
 	// Start a new network
 	if network == nil {
 		network = desiredNetwork
-		avalancheBinaryPath, err := flagVars.AvalancheGoExecPath()
-		require.NoError(err)
-
+		// TODO(marun) This is the wrong place given that this code is reused by other repos
+		if network.DefaultFlags == nil {
+			network.DefaultFlags = tmpnet.FlagsMap{}
+		}
+		network.DefaultFlags.SetDefaults(tmpnet.DefaultTestFlags())
+		network.DefaultFlags.SetDefaults(tmpnet.DefaultE2EFlags())
 		StartNetwork(
 			tc,
 			network,
-			avalancheBinaryPath,
+			flagVars.NodeRuntimeConfig(),
 			flagVars.PluginDir(),
 			flagVars.NetworkShutdownDelay(),
 			flagVars.StartNetwork(),
@@ -184,10 +190,20 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 		"not enough pre-funded keys for the requested number of parallel test processes",
 	)
 
-	uris := network.GetNodeURIs()
+	// TODO(marun) Maybe this should be part of tmpnet/network.go?
+	uris := make([]tmpnet.NodeURI, len(network.Nodes))
+	for i, node := range network.Nodes {
+		uri, cancel, err := node.GetLocalURI(tc.DefaultContext())
+		require.NoError(err)
+		tc.DeferCleanup(cancel)
+		uris[i] = tmpnet.NodeURI{
+			NodeID: node.NodeID,
+			URI:    uri,
+		}
+	}
 	require.NotEmpty(uris, "network contains no nodes")
-	tc.Log().Info("network nodes are available",
-		zap.Any("uris", uris),
+	log.Info("network nodes are available",
+		zap.Any("nodeURIs", uris),
 	)
 
 	return &TestEnvironment{
@@ -204,16 +220,16 @@ func (te *TestEnvironment) GetRandomNodeURI() tmpnet.NodeURI {
 	r := rand.New(rand.NewSource(time.Now().Unix())) //#nosec G404
 	nodeURI := te.URIs[r.Intn(len(te.URIs))]
 	te.testContext.Log().Info("targeting random node",
-		zap.Stringer("nodeID", nodeURI.NodeID),
-		zap.String("uri", nodeURI.URI),
+		zap.Any("nodeURI", nodeURI),
 	)
 	return nodeURI
 }
 
 // Retrieve the network to target for testing.
 func (te *TestEnvironment) GetNetwork() *tmpnet.Network {
-	network, err := tmpnet.ReadNetwork(te.NetworkDir)
+	network, err := tmpnet.ReadNetwork(te.testContext.DefaultContext(), te.NetworkDir)
 	require.NoError(te.testContext, err)
+	network.Log = te.testContext.Log()
 	return network
 }
 
@@ -226,7 +242,7 @@ func (te *TestEnvironment) NewKeychain() *secp256k1fx.Keychain {
 func (te *TestEnvironment) StartPrivateNetwork(network *tmpnet.Network) {
 	require := require.New(te.testContext)
 	// Use the same configuration as the shared network
-	sharedNetwork, err := tmpnet.ReadNetwork(te.NetworkDir)
+	sharedNetwork, err := tmpnet.ReadNetwork(te.testContext.DefaultContext(), te.NetworkDir)
 	require.NoError(err)
 
 	pluginDir, err := sharedNetwork.DefaultFlags.GetStringVal(config.PluginDirKey)
@@ -235,7 +251,7 @@ func (te *TestEnvironment) StartPrivateNetwork(network *tmpnet.Network) {
 	StartNetwork(
 		te.testContext,
 		network,
-		sharedNetwork.DefaultRuntimeConfig.AvalancheGoPath,
+		&sharedNetwork.DefaultRuntimeConfig,
 		pluginDir,
 		te.PrivateNetworkShutdownDelay,
 		false, /* skipShutdown */

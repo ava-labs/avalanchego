@@ -4,6 +4,7 @@
 package tmpnet
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -16,13 +17,17 @@ func TestNetworkSerialization(t *testing.T) {
 
 	tmpDir := t.TempDir()
 
-	network := NewDefaultNetwork("testnet")
-	require.NoError(network.EnsureDefaultConfig(logging.NoLog{}, "/path/to/avalanche/go", ""))
+	ctx := context.Background()
+
+	// TODO(marun) Need to configure the log in fewer places
+	network := NewDefaultNetwork(logging.NoLog{}, "testnet")
+	require.NoError(network.EnsureDefaultConfig(logging.NoLog{}))
 	require.NoError(network.Create(tmpDir))
 	// Ensure node runtime is initialized
-	require.NoError(network.readNodes())
+	require.NoError(network.readNodes(ctx))
 
-	loadedNetwork, err := ReadNetwork(network.Dir)
+	loadedNetwork, err := ReadNetwork(ctx, network.Dir)
+	loadedNetwork.Log = logging.NoLog{}
 	require.NoError(err)
 	for _, key := range loadedNetwork.PreFundedKeys {
 		// Address() enables comparison with the original network by
