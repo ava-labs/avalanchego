@@ -168,10 +168,9 @@ func (a *app) Start() error {
 		}()
 
 		err := a.node.Dispatch()
-		a.log.Debug("dispatch returned",
-			zap.Error(err),
-		)
-	}()
+		if err != nil {
+		a.log.Debug("dispatch returned an error", zap.Error(err))
+	}
 	return nil
 }
 
