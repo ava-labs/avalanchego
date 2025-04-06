@@ -47,6 +47,8 @@
             self.packages.${system}.kind-with-registry # Script installing kind configured with a local registry
 
             # Linters
+            (import ./nix/golangci-lint.nix { inherit pkgs; })
+            actionlint
             shellcheck
 
             # Protobuf
