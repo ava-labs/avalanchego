@@ -11,8 +11,28 @@ tasks:
     desc: Builds avalanchego
     cmd: ./scripts/build.sh
 
+  build-antithesis-images-avalanchego:
+    desc: Builds docker images for antithesis for the avalanchego test setup
+    env:
+      TEST_SETUP: avalanchego
+    cmd: bash -x ./scripts/build_antithesis_images.sh
+
+  build-antithesis-images-xsvm:
+    desc: Builds docker images for antithesis for the xsvm test setup
+    env:
+      TEST_SETUP: xsvm
+    cmd: bash -x ./scripts/build_antithesis_images.sh
+
+  build-bootstrap-monitor:
+    desc: Builds bootstrap-monitor
+    cmd: ./scripts/build_bootstrap_monitor.sh
+
+  build-bootstrap-monitor-image:
+    desc: Builds docker image for bootstrap-monitor
+    cmd: ./scripts/build_bootstrap_monitor_image.sh
+
   build-image:
-    desc: Builds avalanchego docker image
+    desc: Builds docker image for avalanchego
     cmd: ./scripts/build_image.sh
 
   build-race:
@@ -77,7 +97,7 @@ tasks:
     desc: Runs static analysis tests of golang code
     cmd: ./scripts/lint.sh
 
-  lint-actionlint:
+  lint-action:
     desc: Runs actionlint to check sanity of github action configuration
     cmd: ./scripts/actionlint.sh
 
@@ -85,17 +105,17 @@ tasks:
     desc: Runs all lint checks in parallel
     deps:
       - lint
-      - lint-actionlint
-      - lint-shellcheck
+      - lint-action
+      - lint-shell
 
   lint-all-ci:
     desc: Runs all lint checks one-by-one
     cmds:
       - task: lint
-      - task: lint-actionlint
-      - task: lint-shellcheck
+      - task: lint-action
+      - task: lint-shell
 
-  lint-shellcheck:
+  lint-shell:
     desc: Runs shellcheck to check sanity of shell scripts
     cmd: ./scripts/shellcheck.sh
 
@@ -153,13 +173,26 @@ tasks:
       - task: build-xsvm
       - cmd: bash -x ./scripts/tests.e2e.existing.sh {{.CLI_ARGS}}
 
+  # To use a different fuzz time, run `task test-fuzz FUZZTIME=[value in seconds]`.
+  # A value of `-1` will run until it encounters a failing output.
+
   test-fuzz:
-    # To use a different fuzz time, run `task test-fuzz FUZZTIME=[value in seconds]`.
-    # A value of `-1` will run until it encounters a failing output.
-    desc: Runs each fuzz test for 10 seconds.
+    desc: Runs each fuzz test for 10 seconds
     vars:
       FUZZTIME: '{{.FUZZTIME| default "10"}}'
     cmd: ./scripts/build_fuzz.sh {{.FUZZTIME}}
+
+  test-fuzz-long:
+    desc: Runs each fuzz test for 180 seconds
+    vars:
+      FUZZTIME: '{{.FUZZTIME| default "180"}}'
+    cmd: ./scripts/build_fuzz.sh {{.FUZZTIME}}
+
+  test-fuzz-merkledb:
+    desc: Runs each merkledb fuzz test for 15 minutes
+    vars:
+      FUZZTIME: '{{.FUZZTIME| default "900"}}'
+    cmd: ./scripts/build_fuzz.sh {{.FUZZTIME}} ./x/merkledb
 
   test-unit:
     desc: Runs unit tests
