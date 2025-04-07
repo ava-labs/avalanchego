@@ -864,8 +864,8 @@ func (n *Network) GetPluginDir() (string, error) {
 	return n.DefaultFlags.GetStringVal(config.PluginDirKey)
 }
 
-// GetGenesisFileContent returns the network genesis in marshalled and
-// base64-encoded form.
+// GetGenesisFileContent returns the base64 encoding of the JSON
+// encoding of the network genesis.
 func (n *Network) GetGenesisFileContent() (string, error) {
 	bytes, err := json.Marshal(n.Genesis)
 	if err != nil {
