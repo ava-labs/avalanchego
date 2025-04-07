@@ -25,16 +25,16 @@ while getopts 'r' flag; do
   esac
 done
 
-AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
+REPO_ROOT=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 # Configure the build environment
-source "$AVALANCHE_PATH"/scripts/constants.sh
+source "${REPO_ROOT}"/scripts/constants.sh
 # Determine the git commit hash to use for the build
-source "$AVALANCHE_PATH"/scripts/git_commit.sh
+source "${REPO_ROOT}"/scripts/git_commit.sh
 
 echo "Downloading dependencies..."
 go mod download
 
 echo "Building AvalancheGo with [$(go version)]..."
-go build $race -o "$avalanchego_path" \
+go build ${race} -o "${avalanchego_path}" \
    -ldflags "-X github.com/ava-labs/avalanchego/version.GitCommit=$git_commit $static_ld_flags" \
-   "$AVALANCHE_PATH/main/"*.go
+   "${REPO_ROOT}"/main
