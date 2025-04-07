@@ -907,7 +907,6 @@ func (n *Network) GetSubnetConfigContent() (string, error) {
 // alias/ID to marshalled chain configuration for both primary and
 // custom chains.
 func (n *Network) GetChainConfigContent() (string, error) {
-	// Collect the primary chain configuration
 	chainConfigs := map[string]chains.ChainConfig{}
 	for alias, flags := range n.PrimaryChainConfigs {
 		marshaledFlags, err := json.Marshal(flags)
