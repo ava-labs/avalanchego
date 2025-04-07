@@ -155,7 +155,6 @@ func ReadNodes(networkDir string, includeEphemeral bool) ([]*Node, error) {
 			continue
 		}
 
-		// Ensure the node ID is set
 		if err := node.EnsureNodeID(); err != nil {
 			return nil, err
 		}
