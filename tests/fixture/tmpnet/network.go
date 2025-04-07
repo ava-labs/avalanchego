@@ -961,7 +961,6 @@ func (n *Network) writeNodeFlags(node *Node) error {
 	// TODO(marun) Maybe avoid computing content flags for each node start?
 
 	if n.Genesis != nil {
-		// Set the genesis
 		genesisFileContent, err := n.GetGenesisFileContent()
 		if err != nil {
 			return err
