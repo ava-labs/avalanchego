@@ -940,7 +940,7 @@ func (n *Network) GetChainConfigContent() (string, error) {
 }
 
 // writeNodeFlags determines the set of flags that should be used to
-// start the given node and writes them to a file in to the node path.
+// start the given node and writes them to a file in the node path.
 func (n *Network) writeNodeFlags(node *Node) error {
 	flags := maps.Clone(node.Flags)
 
