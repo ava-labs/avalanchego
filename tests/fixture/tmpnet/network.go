@@ -877,12 +877,7 @@ func (n *Network) GetGenesisFileContent() (string, error) {
 // GetSubnetConfigContent returns the base64-encoded map of subnetID
 // to marshalled subnet configuration.
 func (n *Network) GetSubnetConfigContent() (string, error) {
-	subnetConfigs := map[ids.ID]subnets.Config{}
-
-	// Collect configuration for primary subnets
-	for subnetID, config := range n.PrimarySubnetConfigs {
-		subnetConfigs[subnetID] = config
-	}
+	subnetConfigs := maps.Clone(n.PrimarySubnetConfigs)
 
 	// Collect configuration for non-primary subnets
 	for _, subnet := range n.Subnets {
