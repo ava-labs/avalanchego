@@ -506,7 +506,7 @@ func (n *Network) StartNode(ctx context.Context, log logging.Logger, node *Node)
 	}
 
 	if err := n.writeNodeFlags(node); err != nil {
-		return err
+		return fmt.Errorf("writing node flags: %w", err)
 	}
 
 	if err := node.Start(log); err != nil {
