@@ -892,7 +892,6 @@ func (n *Network) GetSubnetConfigContent() (string, error) {
 			continue
 		}
 		if subnet.Config == nil {
-			// No configuration present
 			continue
 		}
 		subnetConfigs[subnet.SubnetID] = *subnet.Config
