@@ -864,8 +864,8 @@ func (n *Network) GetPluginDir() (string, error) {
 	return n.DefaultFlags.GetStringVal(config.PluginDirKey)
 }
 
-// GetGenesisFileContent returns the base64 encoding of the JSON
-// encoding of the network genesis.
+// GetGenesisFileContent returns the base64-encoded JSON-marshaled
+// network genesis.
 func (n *Network) GetGenesisFileContent() (string, error) {
 	bytes, err := json.Marshal(n.Genesis)
 	if err != nil {
@@ -874,8 +874,8 @@ func (n *Network) GetGenesisFileContent() (string, error) {
 	return base64.StdEncoding.EncodeToString(bytes), nil
 }
 
-// GetSubnetConfigContent returns the base64-encoded map of subnetID
-// to marshalled subnet configuration.
+// GetSubnetConfigContent returns the base64-encoded and
+// JSON-marshaled map of subnetID to subnet configuration.
 func (n *Network) GetSubnetConfigContent() (string, error) {
 	subnetConfigs := maps.Clone(n.PrimarySubnetConfigs)
 
@@ -903,9 +903,8 @@ func (n *Network) GetSubnetConfigContent() (string, error) {
 	return base64.StdEncoding.EncodeToString(marshaledConfigs), nil
 }
 
-// GetChainConfigContent returns the base64-encoded map of chain
-// alias/ID to marshalled chain configuration for both primary and
-// custom chains.
+// GetChainConfigContent returns the base64-encoded and JSON-marshaled map of chain alias/ID
+// to JSON-marshaled chain configuration for both primary and custom chains.
 func (n *Network) GetChainConfigContent() (string, error) {
 	chainConfigs := map[string]chains.ChainConfig{}
 	for alias, flags := range n.PrimaryChainConfigs {
@@ -953,7 +952,7 @@ func (n *Network) writeNodeFlags(node *Node) error {
 	// Set the bootstrap configuration
 	bootstrapIPs, bootstrapIDs, err := n.GetBootstrapIPsAndIDs(node)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to determine bootstrap configuration: %w", err)
 	}
 	flags[config.BootstrapIDsKey] = strings.Join(bootstrapIDs, ",")
 	flags[config.BootstrapIPsKey] = strings.Join(bootstrapIPs, ",")
@@ -963,14 +962,14 @@ func (n *Network) writeNodeFlags(node *Node) error {
 	if n.Genesis != nil {
 		genesisFileContent, err := n.GetGenesisFileContent()
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get genesis file content: %w", err)
 		}
 		flags.SetDefault(config.GenesisFileContentKey, genesisFileContent)
 	}
 
 	subnetConfigContent, err := n.GetSubnetConfigContent()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get subnet config content: %w", err)
 	}
 	if len(subnetConfigContent) > 0 {
 		flags.SetDefault(config.SubnetConfigContentKey, subnetConfigContent)
@@ -978,7 +977,7 @@ func (n *Network) writeNodeFlags(node *Node) error {
 
 	chainConfigContent, err := n.GetChainConfigContent()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get chain config content: %w", err)
 	}
 	if len(chainConfigContent) > 0 {
 		flags.SetDefault(config.ChainConfigContentKey, chainConfigContent)

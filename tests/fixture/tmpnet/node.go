@@ -156,7 +156,7 @@ func ReadNodes(networkDir string, includeEphemeral bool) ([]*Node, error) {
 		}
 
 		if err := node.EnsureNodeID(); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to ensure NodeID: %w", err)
 		}
 
 		nodes = append(nodes, node)
