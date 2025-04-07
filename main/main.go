@@ -19,8 +19,13 @@ import (
 
 func main() {
 	fs := config.BuildFlagSet()
-	v, err := config.BuildViper(fs, os.Args[1:])
 
+	if len(os.Args) < 2 {
+		fmt.Println("No arguments provided. Please provide the necessary arguments.")
+		os.Exit(1)
+	}
+
+	v, err := config.BuildViper(fs, os.Args[1:])
 	if errors.Is(err, pflag.ErrHelp) {
 		os.Exit(0)
 	}
