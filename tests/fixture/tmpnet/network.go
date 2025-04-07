@@ -971,7 +971,6 @@ func (n *Network) writeNodeFlags(node *Node) error {
 		flags.SetDefault(config.GenesisFileContentKey, genesisFileContent)
 	}
 
-	// Set subnet config
 	subnetConfigContent, err := n.GetSubnetConfigContent()
 	if err != nil {
 		return err
