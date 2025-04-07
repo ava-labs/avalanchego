@@ -985,7 +985,6 @@ func (n *Network) writeNodeFlags(node *Node) error {
 		flags.SetDefault(config.SubnetConfigContentKey, subnetConfigContent)
 	}
 
-	// Set chain config
 	chainConfigContent, err := n.GetChainConfigContent()
 	if err != nil {
 		return err
