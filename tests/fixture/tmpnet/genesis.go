@@ -10,8 +10,8 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ava-labs/coreth/core"
-	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/libevm/params"
 
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -145,7 +145,6 @@ func NewTestGenesis(
 			},
 		)
 	}
-
 	chainID := big.NewInt(int64(networkID))
 	// Define C-Chain genesis
 	cChainGenesis := &core.Genesis{

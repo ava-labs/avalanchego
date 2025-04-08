@@ -8,7 +8,6 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ava-labs/coreth/ethclient"
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/coreth/plugin/evm/client"
 
@@ -17,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
-	ethcommon "github.com/ethereum/go-ethereum/common"
+	ethcommon "github.com/ava-labs/libevm/common"
 )
 
 var _ Wallet = (*wallet)(nil)
@@ -68,7 +67,7 @@ func NewWallet(
 	builder Builder,
 	signer Signer,
 	avaxClient client.Client,
-	ethClient ethclient.Client,
+	ethClient BaseFeeEstimator,
 	backend Backend,
 ) Wallet {
 	return &wallet{
@@ -85,7 +84,7 @@ type wallet struct {
 	builder    Builder
 	signer     Signer
 	avaxClient client.Client
-	ethClient  ethclient.Client
+	ethClient  BaseFeeEstimator
 }
 
 func (w *wallet) Builder() Builder {
