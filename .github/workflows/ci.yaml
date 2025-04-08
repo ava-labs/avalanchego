@@ -203,3 +203,32 @@ jobs:
         working-directory: ffi
         # cgocheck2 is expensive but provides complete pointer checks
         run: GOEXPERIMENT=cgocheck2 go test ./...
+      
+  ethhash:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: arduino/setup-protoc@v2
+      - name: Restore Cargo Cache
+        id: cache-build-deps-restore
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ needs.build.outputs.cache-key }}
+      - name: Build Firewood FFI (with ethhash)
+        run: cargo build --release --features ethhash
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "ffi/tests/go.mod"
+          cache-dependency-path: "ffi/tests/go.sum"
+      - name: Test Ethereum hash compatability
+        working-directory: ffi/tests
+        run: go test ./...
