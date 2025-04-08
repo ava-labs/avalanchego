@@ -90,6 +90,7 @@ func (n *Network) readGenesis() error {
 	bytes, err := os.ReadFile(n.GetGenesisPath())
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
+			n.Genesis = nil
 			return nil
 		}
 		return fmt.Errorf("failed to read genesis: %w", err)
