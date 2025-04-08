@@ -34,6 +34,13 @@ const (
 	unsentType = "unsent"
 	sentType   = "sent"
 
+	// duplicate indicate a reception of a duplicate gossipable element.
+	// for sent message, we'll use notReceive below.
+	duplicateLabel = "duplicate"
+	yesDuplicate   = "yes"
+	noDuplicate    = "no"
+	notReceive     = "n/a"
+
 	defaultGossipableCount = 64
 )
 
@@ -44,22 +51,36 @@ var (
 
 	_ Set[*testTx] = (*FullSet[*testTx])(nil)
 
-	ioTypeLabels   = []string{ioLabel, typeLabel}
-	sentPushLabels = prometheus.Labels{
-		ioLabel:   sentIO,
-		typeLabel: pushType,
+	ioTypeDuplicateLabels = []string{ioLabel, typeLabel, duplicateLabel}
+	sentPushLabels        = prometheus.Labels{
+		ioLabel:        sentIO,
+		typeLabel:      pushType,
+		duplicateLabel: notReceive,
 	}
-	receivedPushLabels = prometheus.Labels{
-		ioLabel:   receivedIO,
-		typeLabel: pushType,
+	receivedNotDuplicatePushLabels = prometheus.Labels{
+		ioLabel:        receivedIO,
+		typeLabel:      pushType,
+		duplicateLabel: noDuplicate,
+	}
+	receivedDuplicatePushLabels = prometheus.Labels{
+		ioLabel:        receivedIO,
+		typeLabel:      pushType,
+		duplicateLabel: yesDuplicate,
 	}
 	sentPullLabels = prometheus.Labels{
-		ioLabel:   sentIO,
-		typeLabel: pullType,
+		ioLabel:        sentIO,
+		typeLabel:      pullType,
+		duplicateLabel: notReceive,
 	}
-	receivedPullLabels = prometheus.Labels{
-		ioLabel:   receivedIO,
-		typeLabel: pullType,
+	receivedNotDuplicatePullLabels = prometheus.Labels{
+		ioLabel:        receivedIO,
+		typeLabel:      pullType,
+		duplicateLabel: noDuplicate,
+	}
+	receivedDuplicatePullLabels = prometheus.Labels{
+		ioLabel:        receivedIO,
+		typeLabel:      pullType,
+		duplicateLabel: yesDuplicate,
 	}
 	typeLabels   = []string{typeLabel}
 	unsentLabels = prometheus.Labels{
@@ -114,7 +135,7 @@ func NewMetrics(
 				Name:      "gossip_count",
 				Help:      "amount of gossip (n)",
 			},
-			ioTypeLabels,
+			ioTypeDuplicateLabels,
 		),
 		bytes: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
@@ -122,7 +143,7 @@ func NewMetrics(
 				Name:      "gossip_bytes",
 				Help:      "amount of gossip (bytes)",
 			},
-			ioTypeLabels,
+			ioTypeDuplicateLabels,
 		),
 		tracking: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
@@ -245,6 +266,8 @@ func (p *PullGossiper[_]) handleResponse(
 	}
 
 	receivedBytes := 0
+	receivedDuplicateBytes := 0
+	duplicateGossip := 0
 	for _, bytes := range gossip {
 		receivedBytes += len(bytes)
 
@@ -264,6 +287,11 @@ func (p *PullGossiper[_]) handleResponse(
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("id", gossipID),
 		)
+		if p.set.Has(gossipID) {
+			receivedDuplicateBytes += len(bytes)
+			duplicateGossip++
+			continue
+		}
 		if err := p.set.Add(gossipable); err != nil {
 			p.log.Debug(
 				"failed to add gossip to the known set",
@@ -274,8 +302,14 @@ func (p *PullGossiper[_]) handleResponse(
 			continue
 		}
 	}
+	receivedBytes -= receivedDuplicateBytes
+	incomingGossibles := len(gossip) - duplicateGossip
 
-	if err := p.metrics.observeMessage(receivedPullLabels, len(gossip), receivedBytes); err != nil {
+	err = errors.Join(
+		p.metrics.observeMessage(receivedNotDuplicatePullLabels, incomingGossibles, receivedBytes),
+		p.metrics.observeMessage(receivedDuplicatePullLabels, duplicateGossip, receivedDuplicateBytes),
+	)
+	if err != nil {
 		p.log.Error("failed to update metrics",
 			zap.Error(err),
 		)
