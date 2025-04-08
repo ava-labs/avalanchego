@@ -946,12 +946,6 @@ func (n *Network) writeNodeFlags(log logging.Logger, node *Node) error {
 	// Convert the network id to a string to ensure consistency in JSON round-tripping.
 	flags.SetDefault(config.NetworkNameKey, strconv.FormatUint(uint64(n.GetNetworkID()), 10))
 
-	isSingleNodeNetwork := (len(n.Nodes) == 1 && n.Genesis != nil && len(n.Genesis.InitialStakers) == 1)
-	if isSingleNodeNetwork {
-		log.Info("defaulting to sybil protection disabled to enable a single-node network to start")
-		flags.SetDefault(config.SybilProtectionEnabledKey, false)
-	}
-
 	// Set the bootstrap configuration
 	bootstrapIPs, bootstrapIDs, err := n.GetBootstrapIPsAndIDs(node)
 	if err != nil {
@@ -968,6 +962,12 @@ func (n *Network) writeNodeFlags(log logging.Logger, node *Node) error {
 			return fmt.Errorf("failed to get genesis file content: %w", err)
 		}
 		flags.SetDefault(config.GenesisFileContentKey, genesisFileContent)
+
+		isSingleNodeNetwork := (len(n.Nodes) == 1 && len(n.Genesis.InitialStakers) == 1)
+		if isSingleNodeNetwork {
+			log.Info("defaulting to sybil protection disabled to enable a single-node network to start")
+			flags.SetDefault(config.SybilProtectionEnabledKey, false)
+		}
 	}
 
 	subnetConfigContent, err := n.GetSubnetConfigContent()
