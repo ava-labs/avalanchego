@@ -14,7 +14,7 @@ require (
 	github.com/NYTimes/gziphandler v1.1.1
 	github.com/StephenButtolph/canoto v0.15.0
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
-	github.com/ava-labs/coreth v0.14.1-rc.3.0.20250326124329-8ee70dc0f37c
+	github.com/ava-labs/coreth v0.15.0-rc.1.0.20250408160801-91be79b041ba
 	github.com/ava-labs/ledger-avalanche/go v0.0.0-20241009183145-e6f90a8a1a60
 	github.com/ava-labs/libevm v1.13.14-0.2.0.rc.4
 	github.com/btcsuite/btcd/btcutil v1.1.3
@@ -47,7 +47,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.12.0
 	github.com/stretchr/testify v1.10.0
-	github.com/supranational/blst v0.3.13
+	github.com/supranational/blst v0.3.14
 	github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a
 	github.com/thepudds/fzgen v0.4.3
 	github.com/tyler-smith/go-bip32 v1.0.0
