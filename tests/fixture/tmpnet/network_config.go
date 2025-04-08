@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/perms"
-	"github.com/ava-labs/avalanchego/utils/storage"
 )
 
 // The Network type is defined in this file (reading/writing configuration) and network.go
@@ -88,31 +87,31 @@ func (n *Network) GetGenesisPath() string {
 }
 
 func (n *Network) readGenesis() error {
-	if exists, err := storage.FileExists(n.GetGenesisPath()); err != nil {
-		return err
-	} else if exists {
-		bytes, err := os.ReadFile(n.GetGenesisPath())
-		if err != nil {
-			return fmt.Errorf("failed to read genesis: %w", err)
+	bytes, err := os.ReadFile(n.GetGenesisPath())
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
 		}
-		genesis := genesis.UnparsedConfig{}
-		if err := json.Unmarshal(bytes, &genesis); err != nil {
-			return fmt.Errorf("failed to unmarshal genesis: %w", err)
-		}
-		n.Genesis = &genesis
+		return fmt.Errorf("failed to read genesis: %w", err)
 	}
+	genesis := genesis.UnparsedConfig{}
+	if err := json.Unmarshal(bytes, &genesis); err != nil {
+		return fmt.Errorf("failed to unmarshal genesis: %w", err)
+	}
+	n.Genesis = &genesis
 	return nil
 }
 
 func (n *Network) writeGenesis() error {
-	if n.Genesis != nil {
-		bytes, err := DefaultJSONMarshal(n.Genesis)
-		if err != nil {
-			return fmt.Errorf("failed to marshal genesis: %w", err)
-		}
-		if err := os.WriteFile(n.GetGenesisPath(), bytes, perms.ReadWrite); err != nil {
-			return fmt.Errorf("failed to write genesis: %w", err)
-		}
+	if n.Genesis == nil {
+		return nil
+	}
+	bytes, err := DefaultJSONMarshal(n.Genesis)
+	if err != nil {
+		return fmt.Errorf("failed to marshal genesis: %w", err)
+	}
+	if err := os.WriteFile(n.GetGenesisPath(), bytes, perms.ReadWrite); err != nil {
+		return fmt.Errorf("failed to write genesis: %w", err)
 	}
 	return nil
 }
