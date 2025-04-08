@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/subnets"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
@@ -106,7 +107,7 @@ type Network struct {
 	Genesis *genesis.UnparsedConfig
 
 	// Configuration for primary subnets
-	PrimarySubnetConfigs map[ids.ID]subnets.Config
+	PrimarySubnetConfig *subnets.Config
 
 	// Configuration for primary network chains (P, X, C)
 	PrimaryChainConfigs map[string]FlagsMap
@@ -197,6 +198,9 @@ func ReadNetwork(dir string) (*Network, error) {
 	if err := network.Read(); err != nil {
 		return nil, fmt.Errorf("failed to read network: %w", err)
 	}
+	if network.DefaultFlags == nil {
+		network.DefaultFlags = FlagsMap{}
+	}
 	return network, nil
 }
 
@@ -212,16 +216,8 @@ func (n *Network) EnsureDefaultConfig(log logging.Logger, avalancheGoPath string
 		n.UUID = uuid.NewString()
 	}
 
-	// Ensure default flags
 	if n.DefaultFlags == nil {
 		n.DefaultFlags = FlagsMap{}
-	}
-	n.DefaultFlags.SetDefaults(DefaultTmpnetFlags())
-
-	if len(n.Nodes) == 1 {
-		// Sybil protection needs to be disabled for a single node network to start
-		log.Info("starting a single-node network with sybil protection disabled")
-		n.DefaultFlags[config.SybilProtectionEnabledKey] = false
 	}
 
 	// Only configure the plugin dir with a non-empty value to ensure
@@ -505,7 +501,7 @@ func (n *Network) StartNode(ctx context.Context, log logging.Logger, node *Node)
 		return err
 	}
 
-	if err := n.writeNodeFlags(node); err != nil {
+	if err := n.writeNodeFlags(log, node); err != nil {
 		return fmt.Errorf("writing node flags: %w", err)
 	}
 
@@ -769,12 +765,12 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI 
 			return err
 		}
 
-		// Persist the subnet
 		if err := subnet.Write(n.GetSubnetDir()); err != nil {
 			return err
 		}
-		log.Info("wrote subnet",
+		log.Info("wrote subnet configuration",
 			zap.String("name", subnet.Name),
+			zap.Stringer("id", subnet.SubnetID),
 		)
 
 		// If one or more of the subnets chains have explicit configuration, the
@@ -877,7 +873,11 @@ func (n *Network) GetGenesisFileContent() (string, error) {
 // GetSubnetConfigContent returns the base64-encoded and
 // JSON-marshaled map of subnetID to subnet configuration.
 func (n *Network) GetSubnetConfigContent() (string, error) {
-	subnetConfigs := maps.Clone(n.PrimarySubnetConfigs)
+	subnetConfigs := map[ids.ID]subnets.Config{}
+
+	if n.PrimarySubnetConfig != nil {
+		subnetConfigs[constants.PrimaryNetworkID] = *n.PrimarySubnetConfig
+	}
 
 	// Collect configuration for non-primary subnets
 	for _, subnet := range n.Subnets {
@@ -940,22 +940,25 @@ func (n *Network) GetChainConfigContent() (string, error) {
 
 // writeNodeFlags determines the set of flags that should be used to
 // start the given node and writes them to a file in the node path.
-func (n *Network) writeNodeFlags(node *Node) error {
+func (n *Network) writeNodeFlags(log logging.Logger, node *Node) error {
 	flags := maps.Clone(node.Flags)
 
 	// Convert the network id to a string to ensure consistency in JSON round-tripping.
-	flags[config.NetworkNameKey] = strconv.FormatUint(uint64(n.GetNetworkID()), 10)
+	flags.SetDefault(config.NetworkNameKey, strconv.FormatUint(uint64(n.GetNetworkID()), 10))
 
-	// Set the network defaults
-	flags.SetDefaults(n.DefaultFlags)
+	isSingleNodeNetwork := (len(n.Nodes) == 1 && n.Genesis != nil && len(n.Genesis.InitialStakers) == 1)
+	if isSingleNodeNetwork {
+		log.Info("defaulting to sybil protection disabled to enable a single-node network to start")
+		flags.SetDefault(config.SybilProtectionEnabledKey, false)
+	}
 
 	// Set the bootstrap configuration
 	bootstrapIPs, bootstrapIDs, err := n.GetBootstrapIPsAndIDs(node)
 	if err != nil {
 		return fmt.Errorf("failed to determine bootstrap configuration: %w", err)
 	}
-	flags[config.BootstrapIDsKey] = strings.Join(bootstrapIDs, ",")
-	flags[config.BootstrapIPsKey] = strings.Join(bootstrapIPs, ",")
+	flags.SetDefault(config.BootstrapIDsKey, strings.Join(bootstrapIDs, ","))
+	flags.SetDefault(config.BootstrapIPsKey, strings.Join(bootstrapIPs, ","))
 
 	// TODO(marun) Maybe avoid computing content flags for each node start?
 
@@ -982,6 +985,10 @@ func (n *Network) writeNodeFlags(node *Node) error {
 	if len(chainConfigContent) > 0 {
 		flags.SetDefault(config.ChainConfigContentKey, chainConfigContent)
 	}
+
+	// Set the network and tmpnet defaults last to ensure they can be overridden
+	flags.SetDefaults(n.DefaultFlags)
+	flags.SetDefaults(DefaultTmpnetFlags())
 
 	// Write the flags to disk
 	return node.writeFlags(flags)

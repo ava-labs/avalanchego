@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 
 	"github.com/ava-labs/avalanchego/genesis"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/perms"
@@ -123,20 +122,20 @@ func (n *Network) readConfig() error {
 
 // The subset of network fields to store in the network config file.
 type serializedNetworkConfig struct {
-	UUID                 string
-	Owner                string
-	PrimarySubnetConfigs map[ids.ID]subnets.Config
-	PrimaryChainConfigs  map[string]FlagsMap
-	DefaultFlags         FlagsMap
-	DefaultRuntimeConfig NodeRuntimeConfig
-	PreFundedKeys        []*secp256k1.PrivateKey
+	UUID                 string                  `json:",omitempty"`
+	Owner                string                  `json:",omitempty"`
+	PrimarySubnetConfig  *subnets.Config         `json:",omitempty"`
+	PrimaryChainConfigs  map[string]FlagsMap     `json:",omitempty"`
+	DefaultFlags         FlagsMap                `json:",omitempty"`
+	DefaultRuntimeConfig NodeRuntimeConfig       `json:",omitempty"`
+	PreFundedKeys        []*secp256k1.PrivateKey `json:",omitempty"`
 }
 
 func (n *Network) writeNetworkConfig() error {
 	config := &serializedNetworkConfig{
 		UUID:                 n.UUID,
 		Owner:                n.Owner,
-		PrimarySubnetConfigs: n.PrimarySubnetConfigs,
+		PrimarySubnetConfig:  n.PrimarySubnetConfig,
 		PrimaryChainConfigs:  n.PrimaryChainConfigs,
 		DefaultFlags:         n.DefaultFlags,
 		DefaultRuntimeConfig: n.DefaultRuntimeConfig,
