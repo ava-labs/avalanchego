@@ -179,7 +179,7 @@ pub unsafe extern "C" fn fwd_free_value(value: *const Value) {
 /// Common arguments, accepted by both `fwd_create_db()` and `fwd_open_db()`.
 ///
 /// * `path` - The path to the database file, which will be truncated if passed to `fwd_create_db()`
-///    otherwise should exist if passed to `fwd_open_db()`.
+///   otherwise should exist if passed to `fwd_open_db()`.
 /// * `cache_size` - The size of the node cache, panics if <= 0
 /// * `revisions` - The maximum number of revisions to keep; firewood currently requires this to be at least 2
 #[repr(C)]

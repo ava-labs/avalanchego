@@ -1016,7 +1016,7 @@ impl<T, S: WritableStorage> NodeStore<T, S> {
         let header_bytes = bytemuck::bytes_of(&self.header)
             .iter()
             .copied()
-            .chain(std::iter::repeat(0u8).take(NodeStoreHeader::EXTRA_BYTES))
+            .chain(std::iter::repeat_n(0u8, NodeStoreHeader::EXTRA_BYTES))
             .collect::<Box<[u8]>>();
         debug_assert_eq!(header_bytes.len(), NodeStoreHeader::SIZE as usize);
 

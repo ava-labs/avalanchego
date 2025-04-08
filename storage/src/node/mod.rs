@@ -7,7 +7,7 @@ use enum_as_inner::EnumAsInner;
 use integer_encoding::{VarIntReader as _, VarIntWriter as _};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-use std::io::{Error, ErrorKind, Read, Write};
+use std::io::{Error, Read, Write};
 use std::num::NonZero;
 use std::vec;
 
@@ -330,7 +330,7 @@ impl Node {
         match first_byte[0] {
             255 => {
                 // this is a freed area
-                Err(Error::new(ErrorKind::Other, "attempt to read freed area"))
+                Err(Error::other("attempt to read freed area"))
             }
             leaf_first_byte if leaf_first_byte & 1 == 1 => {
                 let partial_path_len = if leaf_first_byte < 255 {
