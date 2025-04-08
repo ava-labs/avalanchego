@@ -57,7 +57,8 @@ func (g *Gatherer) Gather() (mfs []*dto.MetricFamily, err error) {
 }
 
 var (
-	errMetricSkip = errors.New("metric skipped")
+	errMetricSkip             = errors.New("metric skipped")
+	errMetricTypeNotSupported = errors.New("metric type is not supported")
 )
 
 func ptrTo[T any](x T) *T { return &x }
@@ -197,7 +198,10 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 				},
 			}},
 		}, nil
+	case metrics.GaugeInfo:
+		// TODO(qdm12) handle this somehow maybe with dto.MetricType_UNTYPED
+		return nil, fmt.Errorf("%w: %q is a %T", errMetricSkip, name, metric)
 	default:
-		return nil, fmt.Errorf("metric %q: type is not supported: %T", name, metric)
+		return nil, fmt.Errorf("%w: metric %q type %T", errMetricTypeNotSupported, name, metric)
 	}
 }
