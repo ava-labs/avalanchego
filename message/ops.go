@@ -381,3 +381,58 @@ func ToOp(m *p2p.Message) (Op, error) {
 		return 0, fmt.Errorf("%w: %T", errUnknownMessageType, msg)
 	}
 }
+
+// ResponseOp returns the op that is the expected response to the given op.
+// [op] must be an inbound message
+func ResponseOp(op Op) (Op, error) {
+	switch op {
+	// Handshake
+	case PingOp:
+		return PongOp, nil
+	case HandshakeOp:
+		return PeerListOp, nil // not sure if this is correct
+	case GetPeerListOp:
+		return PeerListOp, nil
+	// State sync
+	case GetStateSummaryFrontierOp:
+		return StateSummaryFrontierOp, nil
+	case GetAcceptedStateSummaryOp:
+		return AcceptedFrontierOp, nil
+	// Bootstrapping
+	case GetAcceptedFrontierOp:
+		return AcceptedFrontierOp, nil
+	case GetAcceptedOp:
+		return AcceptedOp, nil
+	case GetAncestorsOp:
+		return AncestorsOp, nil
+	// Consensus
+	case GetOp:
+		return PutOp, nil
+	case PushQueryOp:
+		return PullQueryOp, nil
+	case PullQueryOp:
+		return PushQueryOp, nil
+	// case ChitsOp:
+	// 	return "chits"
+	// // Application
+	// case AppRequestOp:
+	// 	return "app_request"
+	// case AppErrorOp:
+	// 	return "app_error"
+	// case AppResponseOp:
+	// 	return "app_response"
+	// case AppGossipOp:
+	// 	return "app_gossip"
+	// // Internal
+	// case ConnectedOp:
+	// 	return "connected"
+	// case DisconnectedOp:
+	// 	return "disconnected"
+	// case NotifyOp:
+	// 	return "notify"
+	// case GossipRequestOp:
+	// 	return "gossip_request"
+	default:
+		return 0, fmt.Errorf("%w: %s", errUnknownMessageType, op)
+	}
+}

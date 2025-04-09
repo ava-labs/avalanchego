@@ -5,6 +5,7 @@ package network
 
 import (
 	"context"
+	"net/netip"
 	"os"
 	"time"
 
@@ -42,7 +43,7 @@ func (t *testExternalHandler) HandleInbound(_ context.Context, message message.I
 	)
 }
 
-func (t *testExternalHandler) Connected(nodeID ids.NodeID, version *version.Application, subnetID ids.ID) {
+func (t *testExternalHandler) Connected(nodeID ids.NodeID, ip netip.AddrPort, version *version.Application, subnetID ids.ID) {
 	t.log.Info(
 		"connected",
 		zap.Stringer("nodeID", nodeID),

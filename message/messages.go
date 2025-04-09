@@ -146,6 +146,43 @@ type msgBuilder struct {
 	maxMessageTimeout time.Duration
 }
 
+type MsgBuilder struct {
+	builder *msgBuilder
+}
+
+func NewMsgBuilder(
+	log logging.Logger,
+	metrics prometheus.Registerer,
+	compressionType compression.Type,
+	maxMessageTimeout time.Duration,
+) (*MsgBuilder, error) {
+	builder, err := newMsgBuilder(
+		log,
+		metrics,
+		maxMessageTimeout,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MsgBuilder{
+		builder: builder,
+	}, nil
+}
+
+
+func (mb *MsgBuilder) CreateOutbound(
+	m *p2p.Message,
+	compressionType compression.Type,
+	bypassThrottling bool,
+) (OutboundMessage, error) {
+	outboundMsg, err := mb.builder.createOutbound(m, compressionType, bypassThrottling)
+	if err != nil {
+		return nil, err
+	}
+	return outboundMsg, nil
+}
+
 func newMsgBuilder(
 	log logging.Logger,
 	metrics prometheus.Registerer,

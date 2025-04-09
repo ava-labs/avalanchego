@@ -69,7 +69,7 @@ func (d *dialer) Dial(ctx context.Context, ip netip.AddrPort) (net.Conn, error) 
 	d.log.Verbo("dialing",
 		zap.Stringer("ip", ip),
 	)
-	conn, err := d.dialer.DialContext(ctx, d.network, ip.String())
+		conn, err := d.dialer.DialContext(ctx, d.network, ip.String())
 	if err != nil {
 		return nil, fmt.Errorf("error while dialing %s: %w", ip, err)
 	}

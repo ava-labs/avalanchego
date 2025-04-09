@@ -252,6 +252,7 @@ func NewNetwork(
 	}
 	// Track all recent validators to optimistically connect to them before the
 	// P-chain has finished syncing.
+	log.Info("genesis.GetValidators(config.NetworkID)", zap.Int("len", len(genesis.GetValidators(config.NetworkID))))
 	for nodeID := range genesis.GetValidators(config.NetworkID) {
 		ipTracker.ManuallyTrack(nodeID)
 	}
@@ -465,10 +466,10 @@ func (n *network) Connected(nodeID ids.NodeID) {
 	n.metrics.markConnected(peer)
 
 	peerVersion := peer.Version()
-	n.router.Connected(nodeID, peerVersion, constants.PrimaryNetworkID)
+	n.router.Connected(nodeID, peerIP.AddrPort, peerVersion, constants.PrimaryNetworkID)
 	for subnetID := range n.peerConfig.MySubnets {
 		if trackedSubnets.Contains(subnetID) {
-			n.router.Connected(nodeID, peerVersion, subnetID)
+			n.router.Connected(nodeID, peerIP.AddrPort, peerVersion, subnetID)
 		}
 	}
 }
@@ -542,7 +543,7 @@ func (n *network) Peers(
 	salt []byte,
 ) []*ips.ClaimedIPPort {
 	_, areWeAPrimaryNetworkValidator := n.config.Validators.GetValidator(constants.PrimaryNetworkID, n.config.MyNodeID)
-
+	// fmt.Println("we areee!!!",  areWeAPrimaryNetworkValidator)
 	// Only return IPs for subnets that we are tracking.
 	var allowedSubnets func(ids.ID) bool
 	if areWeAPrimaryNetworkValidator {
@@ -669,6 +670,7 @@ func (n *network) ManuallyTrack(nodeID ids.NodeID, ip netip.AddrPort) {
 
 	_, isTracked := n.trackedIPs[nodeID]
 	if !isTracked {
+		fmt.Println("dailing")
 		tracked := newTrackedIP(ip)
 		n.trackedIPs[nodeID] = tracked
 		n.dial(nodeID, tracked)
@@ -776,7 +778,6 @@ func (n *network) samplePeers(
 	// [numValidatorsToSample], only attempt to sample [numValidatorsToSample]
 	// validators to potentially avoid iterating over the entire peer set.
 	numValidatorsToSample := min(config.Validators, n.config.Validators.NumValidators(subnetID))
-
 	n.peersLock.RLock()
 	defer n.peersLock.RUnlock()
 
@@ -957,9 +958,9 @@ func (n *network) dial(nodeID ids.NodeID, ip *trackedIP) {
 					zap.Stringer("peerIP", ip.ip),
 					zap.Duration("delay", ip.delay),
 				)
+				// fmt.Println("skipping connection dial", ip.ip.Addr())
 				continue
 			}
-
 			conn, err := n.dialer.Dial(n.onCloseCtx, ip.ip)
 			if err != nil {
 				n.peerConfig.Log.Verbo(
@@ -968,6 +969,7 @@ func (n *network) dial(nodeID ids.NodeID, ip *trackedIP) {
 					zap.Stringer("peerIP", ip.ip),
 					zap.Duration("delay", ip.delay),
 				)
+				// fmt.Println("failed to reach peer, attempting again", ip.ip.Addr())
 				continue
 			}
 
@@ -985,6 +987,7 @@ func (n *network) dial(nodeID ids.NodeID, ip *trackedIP) {
 					zap.Stringer("peerIP", ip.ip),
 					zap.Duration("delay", ip.delay),
 				)
+				// fmt.Println("failed to upgrade, attempting again", ip.ip.Addr())
 				continue
 			}
 			return
@@ -1032,7 +1035,6 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 
 	if nodeID == n.config.MyNodeID {
 		_ = tlsConn.Close()
-		n.peerConfig.Log.Verbo("dropping connection to myself")
 		return nil
 	}
 

@@ -5,6 +5,7 @@ package router
 
 import (
 	"context"
+	"net/netip"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -119,8 +120,8 @@ func (r *tracedRouter) AddChain(ctx context.Context, chain handler.Handler) {
 	r.router.AddChain(ctx, chain)
 }
 
-func (r *tracedRouter) Connected(nodeID ids.NodeID, nodeVersion *version.Application, subnetID ids.ID) {
-	r.router.Connected(nodeID, nodeVersion, subnetID)
+func (r *tracedRouter) Connected(nodeID ids.NodeID, ip netip.AddrPort, nodeVersion *version.Application, subnetID ids.ID) {
+	r.router.Connected(nodeID, ip, nodeVersion, subnetID)
 }
 
 func (r *tracedRouter) Disconnected(nodeID ids.NodeID) {
