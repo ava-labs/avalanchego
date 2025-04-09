@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -154,14 +153,13 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 	// Start a new network
 	if network == nil {
 		network = desiredNetwork
-		avalancheBinaryPath, err := flagVars.AvalancheGoExecPath()
+		runtimeConfig, err := flagVars.NodeRuntimeConfig()
 		require.NoError(err)
+		network.DefaultRuntimeConfig = *runtimeConfig
 
 		StartNetwork(
 			tc,
 			network,
-			avalancheBinaryPath,
-			flagVars.PluginDir(),
 			flagVars.NetworkShutdownDelay(),
 			flagVars.StartNetwork(),
 			flagVars.ReuseNetwork(),
@@ -228,15 +226,11 @@ func (te *TestEnvironment) StartPrivateNetwork(network *tmpnet.Network) {
 	// Use the same configuration as the shared network
 	sharedNetwork, err := tmpnet.ReadNetwork(te.NetworkDir)
 	require.NoError(err)
-
-	pluginDir, err := sharedNetwork.DefaultFlags.GetStringVal(config.PluginDirKey)
-	require.NoError(err)
+	network.DefaultRuntimeConfig = sharedNetwork.DefaultRuntimeConfig
 
 	StartNetwork(
 		te.testContext,
 		network,
-		sharedNetwork.DefaultRuntimeConfig.AvalancheGoPath,
-		pluginDir,
 		te.PrivateNetworkShutdownDelay,
 		false, /* skipShutdown */
 		false, /* reuseNetwork */

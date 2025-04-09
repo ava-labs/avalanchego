@@ -25,7 +25,7 @@ func TestNetworkSerialization(t *testing.T) {
 		ValidatorOnly: true,
 		AllowedNodes:  set.Set[ids.NodeID]{},
 	}
-	require.NoError(network.EnsureDefaultConfig(logging.NoLog{}, "/path/to/avalanche/go", ""))
+	require.NoError(network.EnsureDefaultConfig(logging.NoLog{}))
 	require.NoError(network.Create(tmpDir))
 	// Ensure node runtime is initialized
 	require.NoError(network.readNodes())
