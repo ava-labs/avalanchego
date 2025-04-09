@@ -26,3 +26,9 @@ values for this config are:
 Default values are overridden only if explicitly specified in the config.
 
 The parameters are as follows:
+
+### `checksums-enabled`
+
+_Boolean_
+
+Enables checksums if set to `true`.
