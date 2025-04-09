@@ -2,7 +2,6 @@ package tests
 
 import (
 	"encoding/binary"
-	"math/big"
 	"math/rand"
 	"path"
 	"slices"
@@ -13,19 +12,16 @@ import (
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/ethereum/go-ethereum/trie"
+	"github.com/ethereum/go-ethereum/trie/trienode"
+	"github.com/ethereum/go-ethereum/triedb"
+	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/sha3"
 )
 
 func hashData(input []byte) common.Hash {
-	var hasher = sha3.NewLegacyKeccak256()
-	var hash common.Hash
-	hasher.Reset()
-	hasher.Write(input)
-	hasher.Sum(hash[:0])
-	return hash
+	return crypto.Keccak256Hash(input)
 }
 
 func TestInsert(t *testing.T) {
@@ -70,13 +66,13 @@ func TestInsert(t *testing.T) {
 	}
 
 	memdb := rawdb.NewMemoryDatabase()
-	tdb := state.NewDatabase(memdb)
+	tdb := state.NewDatabase(triedb.NewDatabase(memdb, triedb.HashDefaults), nil)
 	ethRoot := types.EmptyRootHash
 
-	for i := 0; i < 10_000; i++ {
+	for i := range 10_000 {
 		tr, err := tdb.OpenTrie(ethRoot)
 		require.NoError(t, err)
-		mergeSet := trie.NewMergedNodeSet()
+		mergeSet := trienode.NewMergedNodeSet()
 
 		var fwKeys, fwVals [][]byte
 
@@ -85,7 +81,7 @@ func TestInsert(t *testing.T) {
 			addr := chooseAddr()
 			accHash := hashData(addr[:])
 
-			err = tr.TryDeleteAccount(addr)
+			err = tr.DeleteAccount(addr)
 			require.NoError(t, err)
 			deleteAccount(addr)
 
@@ -96,13 +92,13 @@ func TestInsert(t *testing.T) {
 			accHash := hashData(storageKey.addr[:])
 			keyHash := hashData(storageKey.key[:])
 
-			acc, err := tr.TryGetAccount(storageKey.addr)
+			acc, err := tr.GetAccount(storageKey.addr)
 			require.NoError(t, err)
 
-			str, err := tdb.OpenStorageTrie(ethRoot, accHash, acc.Root)
+			str, err := tdb.OpenStorageTrie(ethRoot, storageKey.addr, acc.Root, tr)
 			require.NoError(t, err)
 
-			err = str.TryDelete(storageKey.key[:])
+			err = str.DeleteStorage(storageKey.addr, storageKey.key[:])
 			require.NoError(t, err)
 			deleteStorage(storageKey)
 
@@ -110,7 +106,7 @@ func TestInsert(t *testing.T) {
 			err = mergeSet.Merge(set)
 			require.NoError(t, err)
 			acc.Root = strRoot
-			err = tr.TryUpdateAccount(storageKey.addr, acc)
+			err = tr.UpdateAccount(storageKey.addr, acc, 0)
 			require.NoError(t, err)
 
 			fwKeys = append(fwKeys, append(accHash[:], keyHash[:]...))
@@ -121,14 +117,14 @@ func TestInsert(t *testing.T) {
 			accHash := hashData(addr[:])
 			acc := &types.StateAccount{
 				Nonce:    1,
-				Balance:  new(big.Int).SetUint64(100),
+				Balance:  uint256.NewInt(100),
 				Root:     types.EmptyRootHash,
 				CodeHash: types.EmptyCodeHash[:],
 			}
 			enc, err := rlp.EncodeToBytes(acc)
 			require.NoError(t, err)
 
-			err = tr.TryUpdateAccount(addr, acc)
+			err = tr.UpdateAccount(addr, acc, 0)
 			require.NoError(t, err)
 			addrs = append(addrs, addr)
 
@@ -137,13 +133,13 @@ func TestInsert(t *testing.T) {
 		case i%4 == 1: // update acc
 			addr := chooseAddr()
 			accHash := hashData(addr[:])
-			acc, err := tr.TryGetAccount(addr)
+			acc, err := tr.GetAccount(addr)
 			require.NoError(t, err)
 			acc.Nonce++
 			enc, err := rlp.EncodeToBytes(acc)
 			require.NoError(t, err)
 
-			err = tr.TryUpdateAccount(addr, acc)
+			err = tr.UpdateAccount(addr, acc, 0)
 			require.NoError(t, err)
 
 			fwKeys = append(fwKeys, accHash[:])
@@ -157,13 +153,13 @@ func TestInsert(t *testing.T) {
 			val := hashData(binary.BigEndian.AppendUint64(nil, uint64(i+1)))
 			storageKey := storageKey{addr: addr, key: key}
 
-			acc, err := tr.TryGetAccount(addr)
+			acc, err := tr.GetAccount(addr)
 			require.NoError(t, err)
 
-			str, err := tdb.OpenStorageTrie(ethRoot, accHash, acc.Root)
+			str, err := tdb.OpenStorageTrie(ethRoot, addr, acc.Root, tr)
 			require.NoError(t, err)
 
-			err = str.TryUpdate(key[:], val[:])
+			err = str.UpdateStorage(addr, key[:], val[:])
 			require.NoError(t, err)
 			storages = append(storages, storageKey)
 
@@ -171,11 +167,15 @@ func TestInsert(t *testing.T) {
 			err = mergeSet.Merge(set)
 			require.NoError(t, err)
 			acc.Root = strRoot
-			err = tr.TryUpdateAccount(addr, acc)
+			err = tr.UpdateAccount(addr, acc, 0)
 			require.NoError(t, err)
 
 			fwKeys = append(fwKeys, append(accHash[:], keyHash[:]...))
-			fwVals = append(fwVals, val[:])
+			// UpdateStorage automatically encodes the value to rlp,
+			// so we need to encode prior to sending to firewood
+			encodedVal, err := rlp.EncodeToBytes(val[:])
+			require.NoError(t, err)
+			fwVals = append(fwVals, encodedVal)
 		case i%4 == 3: // update storage
 			storageKey := chooseStorage()
 			accHash := hashData(storageKey.addr[:])
@@ -183,30 +183,34 @@ func TestInsert(t *testing.T) {
 
 			val := hashData(binary.BigEndian.AppendUint64(nil, uint64(i+1)))
 
-			acc, err := tr.TryGetAccount(storageKey.addr)
+			acc, err := tr.GetAccount(storageKey.addr)
 			require.NoError(t, err)
 
-			str, err := tdb.OpenStorageTrie(ethRoot, accHash, acc.Root)
+			str, err := tdb.OpenStorageTrie(ethRoot, storageKey.addr, acc.Root, tr)
 			require.NoError(t, err)
 
-			err = str.TryUpdate(storageKey.key[:], val[:])
+			err = str.UpdateStorage(storageKey.addr, storageKey.key[:], val[:])
 			require.NoError(t, err)
 
 			strRoot, set := str.Commit(false)
 			err = mergeSet.Merge(set)
 			require.NoError(t, err)
 			acc.Root = strRoot
-			err = tr.TryUpdateAccount(storageKey.addr, acc)
+			err = tr.UpdateAccount(storageKey.addr, acc, 0)
 			require.NoError(t, err)
 
 			fwKeys = append(fwKeys, append(accHash[:], keyHash[:]...))
-			fwVals = append(fwVals, val[:])
+			// UpdateStorage automatically encodes the value to rlp,
+			// so we need to encode prior to sending to firewood
+			encodedVal, err := rlp.EncodeToBytes(val[:])
+			require.NoError(t, err)
+			fwVals = append(fwVals, encodedVal)
 		}
 		next, set := tr.Commit(true)
 		err = mergeSet.Merge(set)
 		require.NoError(t, err)
 
-		err = tdb.TrieDB().Update(mergeSet)
+		err = tdb.TrieDB().Update(next, ethRoot, uint64(i), mergeSet, nil)
 		require.NoError(t, err)
 
 		// update firewood db
