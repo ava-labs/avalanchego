@@ -12,91 +12,34 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    outputs:
-      cache-key: ${{ steps.cargo-cache.outputs.cache-primary-key }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - uses: arduino/setup-protoc@v2
-      # caution: this is the same restore as in gh-pages.yaml
-      - name: Restore Cargo Cache
-        id: cargo-cache
-        uses: actions/cache/restore@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          # We can do this now because we use specific version and update with Dependabot
-          # but if we make the deps any less specifc, we'll have to fix
-          key: ${{ runner.os }}-deps-${{ hashFiles('**/Cargo.toml') }}-${{ hashFiles('**/*.rs') }}
-          # start from the previous set of cached dependencies
-          restore-keys: |
-            ${{ runner.os }}-deps-${{ hashFiles('**/Cargo.toml') }}-
-            ${{ runner.os }}-deps-
+      - uses: arduino/setup-protoc@v3
+      - uses: Swatinem/rust-cache@v2
       - name: Check
         run: cargo check --workspace --tests --examples --benches
       - name: Build
         run: cargo build --workspace --tests --examples --benches
-        # Always update the cache
-      - name: Cleanup
-        run: |
-          gh extension install actions/gh-actions-cache
-
-          REPO=${{ github.repository }}
-          BRANCH="refs/pull/${{ github.event.pull_request.number }}/merge"
-
-          echo "Fetching list of cache key"
-          cacheKeysForPR=$(gh actions-cache list -R $REPO -B $BRANCH | cut -f 1 )
-
-          ## Setting this to not fail the workflow while deleting cache keys.
-          set +e
-          echo "Deleting caches..."
-          for cacheKey in $cacheKeysForPR
-          do
-              gh actions-cache delete $cacheKey -R $REPO -B $BRANCH --confirm
-          done
-          echo "Done"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Save Cargo Cache
-        uses: actions/cache/save@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ steps.cargo-cache.outputs.cache-primary-key }}
 
   lint:
     needs: build
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - uses: arduino/setup-protoc@v2
+      - uses: arduino/setup-protoc@v3
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: "false"
+          shared-key: "build"
       - name: Check license headers
         uses: viperproject/check-license-header@v2
         with:
           path: .
           config: .github/check-license-headers.yaml
           strict: true
-      - name: Restore Check Deps
-        id: cache-build-deps-restore
-        uses: actions/cache/restore@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ needs.build.outputs.cache-key }}
       - name: Format
         run: cargo fmt -- --check
       - name: Clippy
@@ -107,90 +50,61 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - uses: arduino/setup-protoc@v2
-      - name: Restore Check Deps
-        id: cache-build-deps-restore
-        uses: actions/cache/restore@v3
+      - uses: arduino/setup-protoc@v3
+      - uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ needs.build.outputs.cache-key }}
-      - name: Run tests with features enabled
-        run: cargo test --verbose --features logger,ethhash
+          save-if: "false"
+          shared-key: "build"
       - name: Run tests with ethhash disabled
         run: cargo test --verbose
+      - name: Run tests with features enabled
+        run: cargo test --verbose --features logger,ethhash
       # TODO: Enable testing with branch_factor_256
       # - name: Run tests with branch_factor_256
       #   run: cargo test --verbose --features branch_factor_256
 
   examples:
-    needs: build
+    needs: ethhash
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - uses: arduino/setup-protoc@v2
-      - name: Restore Check Deps
-        id: cache-build-deps-restore
-        uses: actions/cache/restore@v3
+      - uses: arduino/setup-protoc@v3
+      - uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ needs.build.outputs.cache-key }}
-  # benchmarks were not being done in --release mode, we can enable this again later
-  #     - name: Run benchmark example
-  #       run: RUST_BACKTRACE=1 cargo run --example benchmark -- --nbatch 100 --batch-size 1000
-  #   - name: Run insert example
-  #     run: RUST_BACKTRACE=1 cargo run --example insert
+          save-if: "false"
+          shared-key: "ethhash"
+      - name: Run benchmark example
+        run: RUST_BACKTRACE=1 cargo run --features ethhash --release --bin benchmark -- --number-of-batches 100 --batch-size 1000 create
+      - name: Run insert example
+        run: RUST_BACKTRACE=1 cargo run --features ethhash --release --example insert
 
   docs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - uses: arduino/setup-protoc@v2
-      - name: Restore Check Deps
-        id: cache-build-deps-restore
-        uses: actions/cache/restore@v3
+      - uses: arduino/setup-protoc@v3
+      - uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ needs.build.outputs.cache-key }}
+          save-if: "false"
+          shared-key: "build"
       - run: RUSTDOCFLAGS="-D warnings" cargo doc --document-private-items --no-deps
 
   ffi:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - uses: arduino/setup-protoc@v2
-      - name: Restore Cargo Cache
-        id: cache-build-deps-restore
-        uses: actions/cache/restore@v3
+      - uses: arduino/setup-protoc@v3
+      - uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ needs.build.outputs.cache-key }}
+          save-if: "false"
+          shared-key: "build"
       - name: Build Firewood FFI
         working-directory: ffi
         run: cargo build --release
@@ -205,23 +119,12 @@ jobs:
         run: GOEXPERIMENT=cgocheck2 go test ./...
       
   ethhash:
-    needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - uses: arduino/setup-protoc@v2
-      - name: Restore Cargo Cache
-        id: cache-build-deps-restore
-        uses: actions/cache/restore@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ needs.build.outputs.cache-key }}
+      - uses: arduino/setup-protoc@v3
+      - uses: Swatinem/rust-cache@v2
       - name: Build Firewood FFI (with ethhash)
         run: cargo build --release --features ethhash
       - name: Set up Go

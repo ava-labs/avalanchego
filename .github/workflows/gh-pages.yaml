@@ -12,27 +12,13 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v2
       - uses: dtolnay/rust-toolchain@stable
-      - uses: arduino/setup-protoc@v2
+      - uses: arduino/setup-protoc@v3
       # caution: this is the same restore as in ci.yaml
-      - name: Restore Cargo Cache
-        id: cargo-cache
-        uses: actions/cache/restore@v3
+      - uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          # We can do this now because we use specific verison and update with Dependabot
-          # but if we make the deps any less specifc, we'll have to fix
-          key: ${{ runner.os }}-deps-${{ hashFiles('**/Cargo.toml') }}-${{ hashFiles('**/*.rs') }}
-          # start from the previous set of cached dependencies
-          restore-keys: |
-            ${{ runner.os }}-deps-${{ hashFiles('**/Cargo.toml') }}-
-            ${{ runner.os }}-deps-
+          save-if: "false"
       - name: Build
         run: cargo doc --document-private-items --no-deps
       - name: Set up _site redirect to firewood
@@ -62,14 +48,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download pages artifact
-        uses: actions/download-artifact@v4.1.7
+        uses: actions/download-artifact@v4
         with:
           name: pages
           path: .
       - name: Setup Pages
         uses: actions/configure-pages@v3
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v2
+        uses: actions/upload-pages-artifact@v3
         with:
           path: .
       - name: Deploy to GitHub pages

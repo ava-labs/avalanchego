@@ -28,7 +28,7 @@ struct Args {
     batch_size: usize,
     #[arg(short, long, default_value_t = 100)]
     number_of_batches: usize,
-    #[arg(short, long, default_value_t = 0, value_parser = clap::value_parser!(u16).range(0..=100))]
+    #[arg(short = 'p', long, default_value_t = 0, value_parser = clap::value_parser!(u16).range(0..=100))]
     read_verify_percent: u16,
     #[arg(short, long)]
     seed: Option<u64>,

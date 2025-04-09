@@ -18,55 +18,11 @@ jobs:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
       - uses: arduino/setup-protoc@v2
-      - name: Restore Cargo Cache
-        id: cargo-cache
-        uses: actions/cache/restore@v3
+      - uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          # We can do this now because we use specific verison and update with Dependabot
-          # but if we make the deps any less specifc, we'll have to fix
-          key: ${{ runner.os }}-deps-${{ hashFiles('**/Cargo.toml') }}-${{ hashFiles('**/*.rs') }}
-          # start from the previous set of cached dependencies
-          restore-keys: |
-            ${{ runner.os }}-deps-${{ hashFiles('**/Cargo.toml') }}-
-            ${{ runner.os }}-deps-
-      # TODO: do a `cargo fetch` here first
+          save-if: "false"
+          shared-key: "build"
       - name: Check
         run: cargo check --workspace --tests --examples --benches
       - name: Build
         run: cargo build --workspace --tests --examples --benches
-      - name: Delete old cache
-        run: |
-          gh extension install actions/gh-actions-cache
-
-          REPO=${{ github.repository }}
-          BRANCH=${{ github.ref }}
-
-          echo "Fetching list of cache key"
-          cacheKeysForPR=$(gh actions-cache list -R $REPO -B $BRANCH | cut -f 1 )
-
-          ## Setting this to not fail the workflow while deleting cache keys.
-          set +e
-          echo "Deleting caches..."
-          for cacheKey in $cacheKeysForPR
-          do
-              gh actions-cache delete $cacheKey -R $REPO -B $BRANCH --confirm
-          done
-          echo "Done"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Save Cargo Cache
-        uses: actions/cache/save@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ steps.cargo-cache.outputs.cache-primary-key }}
