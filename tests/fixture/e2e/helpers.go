@@ -46,10 +46,6 @@ const (
 
 	DefaultGasLimit = uint64(21000) // Standard gas limit
 
-	// An empty string prompts the use of the default path which ensures a
-	// predictable target for github's upload-artifact action.
-	DefaultNetworkDir = ""
-
 	// Directory used to store private networks (specific to a single test)
 	// under the shared network dir.
 	PrivateNetworksDirName = "private_networks"
@@ -272,6 +268,7 @@ func CheckBootstrapIsPossible(tc tests.TestContext, network *tmpnet.Network) *tm
 func StartNetwork(
 	tc tests.TestContext,
 	network *tmpnet.Network,
+	rootNetworkDir string,
 	shutdownDelay time.Duration,
 	skipShutdown bool,
 	reuseNetwork bool,
@@ -282,7 +279,7 @@ func StartNetwork(
 		tc.DefaultContext(),
 		tc.Log(),
 		network,
-		DefaultNetworkDir,
+		rootNetworkDir,
 	)
 	if err != nil {
 		tc.DeferCleanup(func() {

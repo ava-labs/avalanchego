@@ -10,3 +10,5 @@ package flags
 type stringVarFunc func(p *string, name string, value string, usage string)
 
 type boolVarFunc func(p *bool, name string, value bool, usage string)
+
+type intVarFunc func(p *int, name string, value int, usage string)

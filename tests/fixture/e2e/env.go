@@ -41,6 +41,8 @@ func InitSharedTestEnvironment(t require.TestingT, envBytes []byte) {
 }
 
 type TestEnvironment struct {
+	// The parent directory of network directories
+	RootNetworkDir string
 	// The directory where the test network configuration is stored
 	NetworkDir string
 	// URIs used to access the API endpoints of nodes of the network
@@ -61,6 +63,7 @@ func GetEnv(tc tests.TestContext) *TestEnvironment {
 		return nil
 	}
 	return &TestEnvironment{
+		RootNetworkDir:              env.RootNetworkDir,
 		NetworkDir:                  env.NetworkDir,
 		URIs:                        env.URIs,
 		PreFundedKey:                env.PreFundedKey,
@@ -152,6 +155,9 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 
 	// Start a new network
 	if network == nil {
+		// TODO(marun) Maybe accept a factory function for the desired network
+		// that is only run when a new network will be started?
+
 		network = desiredNetwork
 		runtimeConfig, err := flagVars.NodeRuntimeConfig()
 		require.NoError(err)
@@ -160,6 +166,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 		StartNetwork(
 			tc,
 			network,
+			flagVars.RootNetworkDir(),
 			flagVars.NetworkShutdownDelay(),
 			flagVars.StartNetwork(),
 			flagVars.ReuseNetwork(),
@@ -189,6 +196,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 	)
 
 	return &TestEnvironment{
+		RootNetworkDir:              flagVars.RootNetworkDir(),
 		NetworkDir:                  network.Dir,
 		URIs:                        uris,
 		PrivateNetworkShutdownDelay: flagVars.NetworkShutdownDelay(),
@@ -231,6 +239,7 @@ func (te *TestEnvironment) StartPrivateNetwork(network *tmpnet.Network) {
 	StartNetwork(
 		te.testContext,
 		network,
+		te.RootNetworkDir,
 		te.PrivateNetworkShutdownDelay,
 		false, /* skipShutdown */
 		false, /* reuseNetwork */
