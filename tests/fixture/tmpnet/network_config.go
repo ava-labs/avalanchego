@@ -59,7 +59,7 @@ func (n *Network) readNetwork() error {
 
 // Read the non-ephemeral nodes associated with the network from disk.
 func (n *Network) readNodes() error {
-	nodes, err := ReadNodes(n.Dir, false /* includeEphemeral */)
+	nodes, err := ReadNodes(n, false /* includeEphemeral */)
 	if err != nil {
 		return err
 	}
