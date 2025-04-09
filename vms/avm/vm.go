@@ -570,7 +570,6 @@ func (vm *VM) lookupAssetID(asset string) (ids.ID, error) {
 
 // Invariant: onAccept is called when [tx] is being marked as accepted, but
 // before its state changes are applied.
-// Invariant: any error returned by onAccept should be considered fatal.
 // TODO: Remove [onAccept] once the deprecated APIs this powers are removed.
 func (vm *VM) onAccept(tx *txs.Tx) {
 	vm.walletService.decided(tx.ID())
