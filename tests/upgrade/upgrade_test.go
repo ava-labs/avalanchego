@@ -83,6 +83,7 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 		e2e.StartNetwork(
 			tc,
 			network,
+			"", /* rootNetworkDir */
 			shutdownDelay,
 			false, /* skipShutdown */
 			false, /* reuseNetwork */
