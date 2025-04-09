@@ -37,7 +37,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/utxo"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/index"
 	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 
 	blockbuilder "github.com/ava-labs/avalanchego/vms/avm/block/builder"
@@ -102,8 +101,6 @@ type VM struct {
 	fxs           []*extensions.ParsedFx
 
 	walletService WalletService
-
-	addressTxsIndexer index.AddressTxsIndexer
 
 	txBackend *txexecutor.Backend
 
@@ -239,21 +236,6 @@ func (vm *VM) Initialize(
 
 	vm.walletService.vm = vm
 	vm.walletService.pendingTxs = linked.NewHashmap[ids.ID, *txs.Tx]()
-
-	// use no op impl when disabled in config
-	if avmConfig.IndexTransactions {
-		vm.ctx.Log.Warn("deprecated address transaction indexing is enabled")
-		vm.addressTxsIndexer, err = index.NewIndexer(vm.db, vm.ctx.Log, "", vm.registerer, avmConfig.IndexAllowIncomplete)
-		if err != nil {
-			return fmt.Errorf("failed to initialize address transaction indexer: %w", err)
-		}
-	} else {
-		vm.ctx.Log.Info("address transaction indexing is disabled")
-		vm.addressTxsIndexer, err = index.NewNoIndexer(vm.db, avmConfig.IndexAllowIncomplete)
-		if err != nil {
-			return fmt.Errorf("failed to initialize disabled indexer: %w", err)
-		}
-	}
 
 	vm.txBackend = &txexecutor.Backend{
 		Ctx:           ctx,
@@ -616,12 +598,6 @@ func (vm *VM) onAccept(tx *txs.Tx) error {
 			return fmt.Errorf("error finding UTXO %s: %w", utxoID, err)
 		}
 		inputUTXOs = append(inputUTXOs, utxo)
-	}
-
-	outputUTXOs := tx.UTXOs()
-	// index input and output UTXOs
-	if err := vm.addressTxsIndexer.Accept(txID, inputUTXOs, outputUTXOs); err != nil {
-		return fmt.Errorf("error indexing tx: %w", err)
 	}
 
 	vm.walletService.decided(txID)
