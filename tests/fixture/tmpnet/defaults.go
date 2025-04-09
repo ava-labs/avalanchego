@@ -50,6 +50,9 @@ func DefaultTestFlags() FlagsMap {
 func DefaultTmpnetFlags() FlagsMap {
 	// Supply only non-default configuration to ensure that default values will be used.
 	flags := FlagsMap{
+		// Default to dynamic port allocation
+		config.HTTPPortKey:    "0",
+		config.StakingPortKey: "0",
 		// Specific to tmpnet deployment
 		config.PublicIPKey:        "127.0.0.1",
 		config.HTTPHostKey:        "127.0.0.1",
@@ -57,8 +60,9 @@ func DefaultTmpnetFlags() FlagsMap {
 		config.LogDisplayLevelKey: logging.Off.String(), // Display logging not needed since nodes run headless
 		config.LogLevelKey:        logging.Debug.String(),
 		// Specific to e2e testing
-		config.MinStakeDurationKey:           DefaultMinStakeDuration.String(),
 		config.ProposerVMUseCurrentHeightKey: true,
+		// Reducing this from the 1s default speeds up tx acceptance
+		config.ProposerVMMinBlockDelayKey: "0s",
 	}
 	flags.SetDefaults(DefaultTestFlags())
 	return flags

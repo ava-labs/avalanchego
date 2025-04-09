@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -44,7 +45,7 @@ func (v *testValidator) Compare(o *testValidator) int {
 }
 
 func newTestValidator() *testValidator {
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
 	if err != nil {
 		panic(err)
 	}
@@ -155,13 +156,14 @@ func TestSignatureVerification(t *testing.T) {
 	}
 
 	tests := []struct {
-		name      string
-		networkID uint32
-		stateF    func(*gomock.Controller) validators.State
-		quorumNum uint64
-		quorumDen uint64
-		msgF      func(*require.Assertions) *Message
-		err       error
+		name         string
+		networkID    uint32
+		stateF       func(*gomock.Controller) validators.State
+		quorumNum    uint64
+		quorumDen    uint64
+		msgF         func(*require.Assertions) *Message
+		verifyErr    error
+		canonicalErr error
 	}{
 		{
 			name:      "can't get subnetID",
@@ -188,7 +190,7 @@ func TestSignatureVerification(t *testing.T) {
 				require.NoError(err)
 				return msg
 			},
-			err: errTest,
+			canonicalErr: errTest,
 		},
 		{
 			name:      "can't get validator set",
@@ -216,7 +218,7 @@ func TestSignatureVerification(t *testing.T) {
 				require.NoError(err)
 				return msg
 			},
-			err: errTest,
+			canonicalErr: errTest,
 		},
 		{
 			name:      "weight overflow",
@@ -251,7 +253,7 @@ func TestSignatureVerification(t *testing.T) {
 					},
 				}
 			},
-			err: ErrWeightOverflow,
+			canonicalErr: ErrWeightOverflow,
 		},
 		{
 			name:      "invalid bit set index",
@@ -282,7 +284,7 @@ func TestSignatureVerification(t *testing.T) {
 				require.NoError(err)
 				return msg
 			},
-			err: ErrInvalidBitSet,
+			verifyErr: ErrInvalidBitSet,
 		},
 		{
 			name:      "unknown index",
@@ -316,7 +318,7 @@ func TestSignatureVerification(t *testing.T) {
 				require.NoError(err)
 				return msg
 			},
-			err: ErrUnknownValidator,
+			verifyErr: ErrUnknownValidator,
 		},
 		{
 			name:      "insufficient weight",
@@ -344,8 +346,10 @@ func TestSignatureVerification(t *testing.T) {
 				signers.Add(1)
 
 				unsignedBytes := unsignedMsg.Bytes()
-				vdr0Sig := testVdrs[0].sk.Sign(unsignedBytes)
-				vdr1Sig := testVdrs[1].sk.Sign(unsignedBytes)
+				vdr0Sig, err := testVdrs[0].sk.Sign(unsignedBytes)
+				require.NoError(err)
+				vdr1Sig, err := testVdrs[1].sk.Sign(unsignedBytes)
+				require.NoError(err)
 				aggSig, err := bls.AggregateSignatures([]*bls.Signature{vdr0Sig, vdr1Sig})
 				require.NoError(err)
 				aggSigBytes := [bls.SignatureLen]byte{}
@@ -361,7 +365,7 @@ func TestSignatureVerification(t *testing.T) {
 				require.NoError(err)
 				return msg
 			},
-			err: ErrInsufficientWeight,
+			verifyErr: ErrInsufficientWeight,
 		},
 		{
 			name:      "can't parse sig",
@@ -396,7 +400,7 @@ func TestSignatureVerification(t *testing.T) {
 				require.NoError(err)
 				return msg
 			},
-			err: ErrParseSignature,
+			verifyErr: ErrParseSignature,
 		},
 		{
 			name:      "no validators",
@@ -418,7 +422,8 @@ func TestSignatureVerification(t *testing.T) {
 				require.NoError(err)
 
 				unsignedBytes := unsignedMsg.Bytes()
-				vdr0Sig := testVdrs[0].sk.Sign(unsignedBytes)
+				vdr0Sig, err := testVdrs[0].sk.Sign(unsignedBytes)
+				require.NoError(err)
 				aggSigBytes := [bls.SignatureLen]byte{}
 				copy(aggSigBytes[:], bls.SignatureToBytes(vdr0Sig))
 
@@ -432,7 +437,7 @@ func TestSignatureVerification(t *testing.T) {
 				require.NoError(err)
 				return msg
 			},
-			err: bls.ErrNoPublicKeys,
+			verifyErr: bls.ErrNoPublicKeys,
 		},
 		{
 			name:      "invalid signature (substitute)",
@@ -458,10 +463,12 @@ func TestSignatureVerification(t *testing.T) {
 				signers.Add(1)
 
 				unsignedBytes := unsignedMsg.Bytes()
-				vdr0Sig := testVdrs[0].sk.Sign(unsignedBytes)
+				vdr0Sig, err := testVdrs[0].sk.Sign(unsignedBytes)
+				require.NoError(err)
 				// Give sig from vdr[2] even though the bit vector says it
 				// should be from vdr[1]
-				vdr2Sig := testVdrs[2].sk.Sign(unsignedBytes)
+				vdr2Sig, err := testVdrs[2].sk.Sign(unsignedBytes)
+				require.NoError(err)
 				aggSig, err := bls.AggregateSignatures([]*bls.Signature{vdr0Sig, vdr2Sig})
 				require.NoError(err)
 				aggSigBytes := [bls.SignatureLen]byte{}
@@ -477,7 +484,7 @@ func TestSignatureVerification(t *testing.T) {
 				require.NoError(err)
 				return msg
 			},
-			err: ErrInvalidSignature,
+			verifyErr: ErrInvalidSignature,
 		},
 		{
 			name:      "invalid signature (missing one)",
@@ -503,7 +510,8 @@ func TestSignatureVerification(t *testing.T) {
 				signers.Add(1)
 
 				unsignedBytes := unsignedMsg.Bytes()
-				vdr0Sig := testVdrs[0].sk.Sign(unsignedBytes)
+				vdr0Sig, err := testVdrs[0].sk.Sign(unsignedBytes)
+				require.NoError(err)
 				// Don't give the sig from vdr[1]
 				aggSigBytes := [bls.SignatureLen]byte{}
 				copy(aggSigBytes[:], bls.SignatureToBytes(vdr0Sig))
@@ -518,7 +526,7 @@ func TestSignatureVerification(t *testing.T) {
 				require.NoError(err)
 				return msg
 			},
-			err: ErrInvalidSignature,
+			verifyErr: ErrInvalidSignature,
 		},
 		{
 			name:      "invalid signature (extra one)",
@@ -544,11 +552,14 @@ func TestSignatureVerification(t *testing.T) {
 				signers.Add(1)
 
 				unsignedBytes := unsignedMsg.Bytes()
-				vdr0Sig := testVdrs[0].sk.Sign(unsignedBytes)
-				vdr1Sig := testVdrs[1].sk.Sign(unsignedBytes)
+				vdr0Sig, err := testVdrs[0].sk.Sign(unsignedBytes)
+				require.NoError(err)
+				vdr1Sig, err := testVdrs[1].sk.Sign(unsignedBytes)
+				require.NoError(err)
 				// Give sig from vdr[2] even though the bit vector doesn't have
 				// it
-				vdr2Sig := testVdrs[2].sk.Sign(unsignedBytes)
+				vdr2Sig, err := testVdrs[2].sk.Sign(unsignedBytes)
+				require.NoError(err)
 				aggSig, err := bls.AggregateSignatures([]*bls.Signature{vdr0Sig, vdr1Sig, vdr2Sig})
 				require.NoError(err)
 				aggSigBytes := [bls.SignatureLen]byte{}
@@ -564,7 +575,7 @@ func TestSignatureVerification(t *testing.T) {
 				require.NoError(err)
 				return msg
 			},
-			err: ErrInvalidSignature,
+			verifyErr: ErrInvalidSignature,
 		},
 		{
 			name:      "valid signature",
@@ -592,8 +603,10 @@ func TestSignatureVerification(t *testing.T) {
 				signers.Add(2)
 
 				unsignedBytes := unsignedMsg.Bytes()
-				vdr1Sig := testVdrs[1].sk.Sign(unsignedBytes)
-				vdr2Sig := testVdrs[2].sk.Sign(unsignedBytes)
+				vdr1Sig, err := testVdrs[1].sk.Sign(unsignedBytes)
+				require.NoError(err)
+				vdr2Sig, err := testVdrs[2].sk.Sign(unsignedBytes)
+				require.NoError(err)
 				aggSig, err := bls.AggregateSignatures([]*bls.Signature{vdr1Sig, vdr2Sig})
 				require.NoError(err)
 				aggSigBytes := [bls.SignatureLen]byte{}
@@ -609,7 +622,7 @@ func TestSignatureVerification(t *testing.T) {
 				require.NoError(err)
 				return msg
 			},
-			err: nil,
+			verifyErr: nil,
 		},
 		{
 			name:      "valid signature (boundary)",
@@ -637,8 +650,10 @@ func TestSignatureVerification(t *testing.T) {
 				signers.Add(2)
 
 				unsignedBytes := unsignedMsg.Bytes()
-				vdr1Sig := testVdrs[1].sk.Sign(unsignedBytes)
-				vdr2Sig := testVdrs[2].sk.Sign(unsignedBytes)
+				vdr1Sig, err := testVdrs[1].sk.Sign(unsignedBytes)
+				require.NoError(err)
+				vdr2Sig, err := testVdrs[2].sk.Sign(unsignedBytes)
+				require.NoError(err)
 				aggSig, err := bls.AggregateSignatures([]*bls.Signature{vdr1Sig, vdr2Sig})
 				require.NoError(err)
 				aggSigBytes := [bls.SignatureLen]byte{}
@@ -654,7 +669,7 @@ func TestSignatureVerification(t *testing.T) {
 				require.NoError(err)
 				return msg
 			},
-			err: nil,
+			verifyErr: nil,
 		},
 		{
 			name:      "valid signature (missing key)",
@@ -699,8 +714,10 @@ func TestSignatureVerification(t *testing.T) {
 				signers.Add(1) // vdr[2]
 
 				unsignedBytes := unsignedMsg.Bytes()
-				vdr1Sig := testVdrs[1].sk.Sign(unsignedBytes)
-				vdr2Sig := testVdrs[2].sk.Sign(unsignedBytes)
+				vdr1Sig, err := testVdrs[1].sk.Sign(unsignedBytes)
+				require.NoError(err)
+				vdr2Sig, err := testVdrs[2].sk.Sign(unsignedBytes)
+				require.NoError(err)
 				aggSig, err := bls.AggregateSignatures([]*bls.Signature{vdr1Sig, vdr2Sig})
 				require.NoError(err)
 				aggSigBytes := [bls.SignatureLen]byte{}
@@ -716,7 +733,7 @@ func TestSignatureVerification(t *testing.T) {
 				require.NoError(err)
 				return msg
 			},
-			err: nil,
+			verifyErr: nil,
 		},
 		{
 			name:      "valid signature (duplicate key)",
@@ -762,7 +779,8 @@ func TestSignatureVerification(t *testing.T) {
 
 				unsignedBytes := unsignedMsg.Bytes()
 				// Because vdr[1] and vdr[2] share a key, only one of them sign.
-				vdr2Sig := testVdrs[2].sk.Sign(unsignedBytes)
+				vdr2Sig, err := testVdrs[2].sk.Sign(unsignedBytes)
+				require.NoError(err)
 				aggSigBytes := [bls.SignatureLen]byte{}
 				copy(aggSigBytes[:], bls.SignatureToBytes(vdr2Sig))
 
@@ -776,13 +794,31 @@ func TestSignatureVerification(t *testing.T) {
 				require.NoError(err)
 				return msg
 			},
-			err: nil,
+			verifyErr: nil,
 		},
 		{
 			name:      "incorrect networkID",
 			networkID: constants.UnitTestID,
 			stateF: func(ctrl *gomock.Controller) validators.State {
 				state := validatorsmock.NewState(ctrl)
+				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(subnetID, nil)
+				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return(map[ids.NodeID]*validators.GetValidatorOutput{
+					testVdrs[0].nodeID: {
+						NodeID:    testVdrs[0].nodeID,
+						PublicKey: nil,
+						Weight:    testVdrs[0].vdr.Weight,
+					},
+					testVdrs[1].nodeID: {
+						NodeID:    testVdrs[1].nodeID,
+						PublicKey: testVdrs[1].vdr.PublicKey,
+						Weight:    testVdrs[1].vdr.Weight,
+					},
+					testVdrs[2].nodeID: {
+						NodeID:    testVdrs[2].nodeID,
+						PublicKey: testVdrs[2].vdr.PublicKey,
+						Weight:    testVdrs[2].vdr.Weight,
+					},
+				}, nil)
 				return state
 			},
 			quorumNum: 1,
@@ -802,8 +838,10 @@ func TestSignatureVerification(t *testing.T) {
 				signers.Add(2)
 
 				unsignedBytes := unsignedMsg.Bytes()
-				vdr1Sig := testVdrs[1].sk.Sign(unsignedBytes)
-				vdr2Sig := testVdrs[2].sk.Sign(unsignedBytes)
+				vdr1Sig, err := testVdrs[1].sk.Sign(unsignedBytes)
+				require.NoError(err)
+				vdr2Sig, err := testVdrs[2].sk.Sign(unsignedBytes)
+				require.NoError(err)
 				aggSig, err := bls.AggregateSignatures([]*bls.Signature{vdr1Sig, vdr2Sig})
 				require.NoError(err)
 				aggSigBytes := [bls.SignatureLen]byte{}
@@ -819,7 +857,7 @@ func TestSignatureVerification(t *testing.T) {
 				require.NoError(err)
 				return msg
 			},
-			err: ErrWrongNetworkID,
+			verifyErr: ErrWrongNetworkID,
 		},
 	}
 
@@ -831,16 +869,25 @@ func TestSignatureVerification(t *testing.T) {
 			msg := tt.msgF(require)
 			pChainState := tt.stateF(ctrl)
 
-			err := msg.Signature.Verify(
+			validators, err := GetCanonicalValidatorSetFromChainID(
 				context.Background(),
-				&msg.UnsignedMessage,
-				tt.networkID,
 				pChainState,
 				pChainHeight,
+				msg.SourceChainID,
+			)
+			require.ErrorIs(err, tt.canonicalErr)
+			if tt.canonicalErr != nil {
+				return
+			}
+
+			err = msg.Signature.Verify(
+				&msg.UnsignedMessage,
+				tt.networkID,
+				validators,
 				tt.quorumNum,
 				tt.quorumDen,
 			)
-			require.ErrorIs(err, tt.err)
+			require.ErrorIs(err, tt.verifyErr)
 		})
 	}
 }

@@ -42,5 +42,5 @@ type Config struct {
 
 	Bootstrapped func()
 
-	ShouldHalt func() bool
+	common.Haltable
 }

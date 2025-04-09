@@ -16,13 +16,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/api"
-	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -31,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
@@ -46,40 +46,22 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/vms/types"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
-	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
 	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
-var (
-	// Test user username
-	testUsername = "ScoobyUser"
-
-	// Test user password, must meet minimum complexity/length requirements
-	testPassword = "ShaggyPassword1Zoinks!"
-
-	// Bytes decoded from CB58 "ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"
-	testPrivateKey = []byte{
-		0x56, 0x28, 0x9e, 0x99, 0xc9, 0x4b, 0x69, 0x12,
-		0xbf, 0xc1, 0x2a, 0xdc, 0x09, 0x3c, 0x9b, 0x51,
-		0x12, 0x4f, 0x0d, 0xc5, 0x4a, 0xc7, 0xa7, 0x66,
-		0xb2, 0xbc, 0x5c, 0xcf, 0x55, 0x8d, 0x80, 0x27,
-	}
-
-	// 3cb7d3842e8cee6a0ebd09f1fe884f6861e1b29c
-	// Platform address resulting from the above private key
-	testAddress = "P-testing18jma8ppw3nhx5r4ap8clazz0dps7rv5umpc36y"
-
-	encodings = []formatting.Encoding{
-		formatting.JSON, formatting.Hex,
-	}
-)
+var encodings = []formatting.Encoding{
+	formatting.JSON, formatting.Hex,
+}
 
 func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
 	vm, _, mutableSharedMemory := defaultVM(t, upgradetest.Latest)
@@ -154,36 +136,6 @@ func TestGetProposedHeight(t *testing.T) {
 	// Confirm that the proposed height has updated to the latest block height
 	require.NoError(service.GetProposedHeight(&http.Request{}, nil, &reply))
 	require.Equal(latestBlock.Height(), uint64(reply.Height))
-}
-
-func TestExportKey(t *testing.T) {
-	require := require.New(t)
-
-	service, _ := defaultService(t)
-	service.vm.ctx.Lock.Lock()
-
-	ks := keystore.New(logging.NoLog{}, memdb.New())
-	require.NoError(ks.CreateUser(testUsername, testPassword))
-	service.vm.ctx.Keystore = ks.NewBlockchainKeyStore(service.vm.ctx.ChainID)
-
-	user, err := vmkeystore.NewUserFromKeystore(service.vm.ctx.Keystore, testUsername, testPassword)
-	require.NoError(err)
-
-	pk, err := secp256k1.ToPrivateKey(testPrivateKey)
-	require.NoError(err)
-
-	require.NoError(user.PutKeys(pk, genesistest.DefaultFundedKeys[0]))
-
-	service.vm.ctx.Lock.Unlock()
-
-	jsonString := `{"username":"` + testUsername + `","password":"` + testPassword + `","address":"` + testAddress + `"}`
-	args := ExportKeyArgs{}
-	require.NoError(json.Unmarshal([]byte(jsonString), &args))
-
-	reply := ExportKeyReply{}
-	require.NoError(service.ExportKey(nil, &args, &reply))
-
-	require.Equal(testPrivateKey, reply.PrivateKey.Bytes())
 }
 
 // Test issuing a tx and accepted
@@ -312,7 +264,9 @@ func TestGetTx(t *testing.T) {
 			func(t testing.TB, s *Service) *txs.Tx {
 				wallet := newWallet(t, s.vm, walletConfig{})
 
-				sk, err := bls.NewSigner()
+				sk, err := localsigner.New()
+				require.NoError(t, err)
+				pop, err := signer.NewProofOfPossession(sk)
 				require.NoError(t, err)
 
 				rewardsOwner := &secp256k1fx.OutputOwners{
@@ -329,7 +283,7 @@ func TestGetTx(t *testing.T) {
 						},
 						Subnet: constants.PrimaryNetworkID,
 					},
-					signer.NewProofOfPossession(sk),
+					pop,
 					s.vm.ctx.AVAXAssetID,
 					rewardsOwner,
 					rewardsOwner,
@@ -848,7 +802,9 @@ func TestGetValidatorsAt(t *testing.T) {
 		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 	}
 
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
+	require.NoError(err)
+	pop, err := signer.NewProofOfPossession(sk)
 	require.NoError(err)
 
 	tx, err := wallet.IssueAddPermissionlessValidatorTx(
@@ -861,7 +817,7 @@ func TestGetValidatorsAt(t *testing.T) {
 			},
 			Subnet: constants.PrimaryNetworkID,
 		},
-		signer.NewProofOfPossession(sk),
+		pop,
 		service.vm.ctx.AVAXAssetID,
 		rewardsOwner,
 		rewardsOwner,
@@ -1071,7 +1027,7 @@ func TestGetValidatorsAtReplyMarshalling(t *testing.T) {
 	}
 	{
 		nodeID := ids.GenerateTestNodeID()
-		sk, err := bls.NewSigner()
+		sk, err := localsigner.New()
 		require.NoError(err)
 		reply.Validators[nodeID] = &validators.GetValidatorOutput{
 			NodeID:    nodeID,
@@ -1333,34 +1289,13 @@ func TestServiceGetSubnets(t *testing.T) {
 }
 
 func TestGetFeeConfig(t *testing.T) {
-	tests := []struct {
-		name     string
-		etnaTime time.Time
-		expected gas.Config
-	}{
-		{
-			name:     "pre-etna",
-			etnaTime: time.Now().Add(time.Hour),
-			expected: gas.Config{},
-		},
-		{
-			name:     "post-etna",
-			etnaTime: time.Now().Add(-time.Hour),
-			expected: defaultDynamicFeeConfig,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
+	require := require.New(t)
 
-			service, _ := defaultService(t)
-			service.vm.Internal.UpgradeConfig.EtnaTime = test.etnaTime
+	service, _ := defaultService(t)
 
-			var reply gas.Config
-			require.NoError(service.GetFeeConfig(nil, nil, &reply))
-			require.Equal(test.expected, reply)
-		})
-	}
+	var reply gas.Config
+	require.NoError(service.GetFeeConfig(nil, nil, &reply))
+	require.Equal(defaultDynamicFeeConfig, reply)
 }
 
 func FuzzGetFeeState(f *testing.F) {
@@ -1393,6 +1328,306 @@ func FuzzGetFeeState(f *testing.F) {
 
 		var reply GetFeeStateReply
 		require.NoError(service.GetFeeState(nil, nil, &reply))
+		require.Equal(expectedReply, reply)
+	})
+}
+
+func TestGetCurrentValidatorsForL1(t *testing.T) {
+	subnetID := ids.GenerateTestID()
+
+	sk, err := localsigner.New()
+	require.NoError(t, err)
+	pk := sk.PublicKey()
+	pkBytes := bls.PublicKeyToUncompressedBytes(pk)
+
+	otherSK, err := localsigner.New()
+	require.NoError(t, err)
+	otherPK := otherSK.PublicKey()
+	otherPKBytes := bls.PublicKeyToUncompressedBytes(otherPK)
+
+	tests := []struct {
+		name         string
+		initial      []*state.Staker
+		l1Validators []state.L1Validator
+	}{
+		{
+			name: "empty_noop",
+		},
+		{
+			name: "initial_stakers",
+			initial: []*state.Staker{
+				{
+					TxID:      ids.GenerateTestID(),
+					SubnetID:  subnetID,
+					NodeID:    ids.GenerateTestNodeID(),
+					PublicKey: pk,
+					Weight:    1,
+					StartTime: time.Unix(0, 0),
+				},
+				{
+					TxID:      ids.GenerateTestID(),
+					SubnetID:  subnetID,
+					NodeID:    ids.GenerateTestNodeID(),
+					PublicKey: otherPK,
+					Weight:    1,
+					StartTime: time.Unix(1, 0),
+				},
+			},
+		},
+		{
+			name: "l1_validators",
+			l1Validators: []state.L1Validator{
+				{
+					ValidationID: ids.GenerateTestID(),
+					SubnetID:     subnetID,
+					NodeID:       ids.GenerateTestNodeID(),
+					StartTime:    0,
+					PublicKey:    pkBytes,
+					Weight:       1,
+				},
+				{
+					ValidationID: ids.GenerateTestID(),
+					SubnetID:     subnetID,
+					NodeID:       ids.GenerateTestNodeID(),
+					PublicKey:    otherPKBytes,
+					StartTime:    1,
+					Weight:       1,
+				},
+			},
+		},
+		{
+			name: "initial_stakers_l1_validators_mixed",
+			initial: []*state.Staker{
+				{
+					TxID:      ids.GenerateTestID(),
+					SubnetID:  subnetID,
+					NodeID:    ids.GenerateTestNodeID(),
+					PublicKey: pk,
+					Weight:    123123,
+					StartTime: time.Unix(0, 0),
+				},
+				{
+					TxID:      ids.GenerateTestID(),
+					SubnetID:  subnetID,
+					NodeID:    ids.GenerateTestNodeID(),
+					PublicKey: otherPK,
+					Weight:    0,
+					StartTime: time.Unix(2, 0),
+				},
+			},
+			l1Validators: []state.L1Validator{
+				{
+					ValidationID:      ids.GenerateTestID(),
+					SubnetID:          subnetID,
+					NodeID:            ids.GenerateTestNodeID(),
+					StartTime:         0,
+					PublicKey:         pkBytes,
+					Weight:            1,
+					EndAccumulatedFee: 1,
+					MinNonce:          2,
+				},
+				{
+					ValidationID:      ids.GenerateTestID(),
+					SubnetID:          subnetID,
+					NodeID:            ids.GenerateTestNodeID(),
+					PublicKey:         pkBytes,
+					StartTime:         2,
+					Weight:            1,
+					EndAccumulatedFee: 0,
+				},
+				{
+					ValidationID:      ids.GenerateTestID(),
+					SubnetID:          subnetID,
+					NodeID:            ids.GenerateTestNodeID(),
+					PublicKey:         otherPKBytes,
+					StartTime:         3,
+					Weight:            0,
+					EndAccumulatedFee: 1,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			service, _ := defaultService(t)
+			service.vm.ctx.Lock.Lock()
+			stakersByTxID := make(map[ids.ID]*state.Staker)
+			for _, staker := range test.initial {
+				primaryStaker := &state.Staker{
+					TxID:      ids.GenerateTestID(),
+					SubnetID:  constants.PrimaryNetworkID,
+					NodeID:    staker.NodeID,
+					PublicKey: staker.PublicKey,
+					Weight:    5,
+					// start primary network staker 1 second before the subnet staker
+					StartTime: staker.StartTime.Add(-time.Second),
+					Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
+				}
+				require.NoError(service.vm.state.PutCurrentValidator(primaryStaker))
+				staker.Priority = txs.SubnetPermissionedValidatorCurrentPriority
+				require.NoError(service.vm.state.PutCurrentValidator(staker))
+
+				stakersByTxID[staker.TxID] = staker
+			}
+
+			l1ValidatorsByVID := make(map[ids.ID]state.L1Validator)
+			if len(test.l1Validators) != 0 {
+				service.vm.state.SetSubnetToL1Conversion(subnetID,
+					state.SubnetToL1Conversion{
+						ConversionID: ids.GenerateTestID(),
+						ChainID:      ids.GenerateTestID(),
+						Addr:         []byte{'a', 'd', 'd', 'r'},
+					})
+			}
+
+			for _, l1Validator := range test.l1Validators {
+				deactivationOwner := message.PChainOwner{
+					Threshold: 1,
+					Addresses: []ids.ShortID{
+						ids.GenerateTestShortID(),
+					},
+				}
+
+				remainingBalanceOwner := message.PChainOwner{
+					Threshold: 1,
+					Addresses: []ids.ShortID{
+						ids.GenerateTestShortID(),
+					},
+				}
+
+				remainingBalanceOwnerBytes, err := txs.Codec.Marshal(txs.CodecVersion, remainingBalanceOwner)
+				require.NoError(err)
+				deactivationOwnerBytes, err := txs.Codec.Marshal(txs.CodecVersion, deactivationOwner)
+				require.NoError(err)
+				l1Validator.RemainingBalanceOwner = remainingBalanceOwnerBytes
+				l1Validator.DeactivationOwner = deactivationOwnerBytes
+
+				require.NoError(service.vm.state.PutL1Validator(l1Validator))
+
+				if l1Validator.Weight == 0 {
+					continue
+				}
+				l1ValidatorsByVID[l1Validator.ValidationID] = l1Validator
+			}
+
+			service.vm.state.SetHeight(0)
+			require.NoError(service.vm.state.Commit())
+			service.vm.ctx.Lock.Unlock()
+
+			testValidator := func(vdr any) ids.NodeID {
+				switch v := vdr.(type) {
+				case pchainapi.Staker:
+					staker, exists := stakersByTxID[v.TxID]
+					require.True(exists, "unexpected validator: %s", vdr)
+					require.Equal(staker.NodeID, v.NodeID)
+					require.Equal(avajson.Uint64(staker.Weight), v.Weight)
+					require.Equal(staker.StartTime.Unix(), int64(v.StartTime))
+					return v.NodeID
+				case APIL1Validator:
+					validator, exists := l1ValidatorsByVID[v.ValidationID]
+					require.True(exists, "unexpected validator: %s", vdr)
+					require.Equal(validator.NodeID, v.NodeID)
+					require.Equal(avajson.Uint64(validator.Weight), v.Weight)
+					require.Equal(validator.StartTime, uint64(v.StartTime))
+					accruedFees := service.vm.state.GetAccruedFees()
+					require.Equal(avajson.Uint64(validator.EndAccumulatedFee-accruedFees), v.Balance)
+					require.Equal(avajson.Uint64(validator.MinNonce), v.MinNonce)
+					require.Equal(
+						types.JSONByteSlice(bls.PublicKeyToCompressedBytes(bls.PublicKeyFromValidUncompressedBytes(validator.PublicKey))),
+						v.PublicKey)
+					var expectedRemainingBalanceOwner message.PChainOwner
+					_, err := txs.Codec.Unmarshal(validator.RemainingBalanceOwner, &expectedRemainingBalanceOwner)
+					require.NoError(err)
+					formattedRemainingBalanceOwner, err := service.addrManager.FormatLocalAddress(expectedRemainingBalanceOwner.Addresses[0])
+					require.NoError(err)
+					require.Equal(formattedRemainingBalanceOwner, v.RemainingBalanceOwner.Addresses[0])
+					require.Equal(avajson.Uint32(expectedRemainingBalanceOwner.Threshold), v.RemainingBalanceOwner.Threshold)
+					var expectedDeactivationOwner message.PChainOwner
+					_, err = txs.Codec.Unmarshal(validator.DeactivationOwner, &expectedDeactivationOwner)
+					require.NoError(err)
+					formattedDeactivationOwner, err := service.addrManager.FormatLocalAddress(expectedDeactivationOwner.Addresses[0])
+					require.NoError(err)
+					require.Equal(formattedDeactivationOwner, v.DeactivationOwner.Addresses[0])
+					require.Equal(avajson.Uint32(expectedDeactivationOwner.Threshold), v.DeactivationOwner.Threshold)
+					return v.NodeID
+				default:
+					require.Fail("unexpected validator type: %T", vdr)
+					return ids.NodeID{}
+				}
+			}
+
+			args := GetCurrentValidatorsArgs{
+				SubnetID: subnetID,
+			}
+			reply := GetCurrentValidatorsReply{}
+			require.NoError(service.GetCurrentValidators(&http.Request{}, &args, &reply))
+			require.Len(reply.Validators, len(stakersByTxID)+len(l1ValidatorsByVID))
+			for _, vdr := range reply.Validators {
+				testValidator(vdr)
+			}
+
+			// Test with a specific node ID
+			var nodeIDs []ids.NodeID
+			if len(stakersByTxID) > 0 {
+				// pick the first staker
+				nodeIDs = append(nodeIDs, maps.Values(stakersByTxID)[0].NodeID)
+			}
+			if len(l1ValidatorsByVID) > 0 {
+				nodeIDs = append(nodeIDs, maps.Values(l1ValidatorsByVID)[0].NodeID)
+			}
+
+			args.NodeIDs = nodeIDs
+			reply = GetCurrentValidatorsReply{}
+			require.NoError(service.GetCurrentValidators(&http.Request{}, &args, &reply))
+			require.Len(reply.Validators, len(nodeIDs))
+			for i, vdr := range reply.Validators {
+				nodeID := testValidator(vdr)
+				require.Equal(args.NodeIDs[i], nodeID)
+			}
+		})
+	}
+}
+
+func TestGetValidatorFeeConfig(t *testing.T) {
+	require := require.New(t)
+
+	service, _ := defaultService(t)
+
+	var reply fee.Config
+	require.NoError(service.GetValidatorFeeConfig(nil, nil, &reply))
+	require.Equal(defaultValidatorFeeConfig, reply)
+}
+
+func FuzzGetValidatorFeeState(f *testing.F) {
+	f.Fuzz(func(t *testing.T, l1ValidatorExcess uint64) {
+		require := require.New(t)
+
+		service, _ := defaultService(t)
+
+		var (
+			expectedL1ValidatorExcess = gas.Gas(l1ValidatorExcess)
+			expectedTime              = time.Now()
+			expectedReply             = GetValidatorFeeStateReply{
+				Excess: expectedL1ValidatorExcess,
+				Price: gas.CalculatePrice(
+					defaultValidatorFeeConfig.MinPrice,
+					expectedL1ValidatorExcess,
+					defaultValidatorFeeConfig.ExcessConversionConstant,
+				),
+				Time: expectedTime,
+			}
+		)
+
+		service.vm.ctx.Lock.Lock()
+		service.vm.state.SetL1ValidatorExcess(expectedL1ValidatorExcess)
+		service.vm.state.SetTimestamp(expectedTime)
+		service.vm.ctx.Lock.Unlock()
+
+		var reply GetValidatorFeeStateReply
+		require.NoError(service.GetValidatorFeeState(nil, nil, &reply))
 		require.Equal(expectedReply, reply)
 	})
 }

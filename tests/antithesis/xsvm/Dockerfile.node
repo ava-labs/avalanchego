@@ -1,8 +1,8 @@
 # BUILDER_IMAGE_TAG should identify the builder image
-ARG BUILDER_IMAGE_TAG
+ARG BUILDER_IMAGE_TAG=INVALID # This value is not intended to be used but silences a warning
 
 # AVALANCHEGO_NODE_IMAGE needs to identify an existing avalanchego node image and should include the tag
-ARG AVALANCHEGO_NODE_IMAGE
+ARG AVALANCHEGO_NODE_IMAGE="invalid-image" # This value is not intended to be used but silences a warning
 
 # ============= Compilation Stage ================
 FROM antithesis-avalanchego-builder:$BUILDER_IMAGE_TAG AS builder
@@ -23,9 +23,11 @@ FROM $AVALANCHEGO_NODE_IMAGE AS execution
 # The builder workdir will vary between instrumented and non-instrumented builders
 ARG BUILDER_WORKDIR
 
+# Configure the node with the location of the xsvm plugin
+ENV AVAGO_PLUGIN_DIR=/avalanchego/build/plugins
+
 # Copy the executable into the container
-RUN mkdir -p /root/.avalanchego/plugins
 COPY --from=builder $BUILDER_WORKDIR/build/xsvm \
-    /root/.avalanchego/plugins/v3m4wPxaHpvGr8qfMeyK6PRW3idZrPHmYcMTt7oXdK47yurVH
+    $AVAGO_PLUGIN_DIR/v3m4wPxaHpvGr8qfMeyK6PRW3idZrPHmYcMTt7oXdK47yurVH
 
 # The node image's entrypoint will be reused.

@@ -150,10 +150,6 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	if currentTime := vm.state.GetTimestamp(); vm.Internal.UpgradeConfig.IsEtnaActivated(currentTime) {
-		blockexecutor.EtnaActivationWasLogged.Set(true)
-	}
-
 	validatorManager := pvalidators.NewManager(chainCtx.Log, vm.Internal, vm.state, vm.metrics, &vm.clock)
 	vm.State = validatorManager
 	utxoVerifier := utxo.NewVerifier(vm.ctx, &vm.clock, vm.fx)
@@ -238,16 +234,6 @@ func (vm *VM) Initialize(
 	// Incrementing [awaitShutdown] would cause a deadlock since
 	// [periodicallyPruneMempool] grabs the context lock.
 	go vm.periodicallyPruneMempool(execConfig.MempoolPruneFrequency)
-
-	go func() {
-		err := vm.state.ReindexBlocks(&vm.ctx.Lock, vm.ctx.Log)
-		if err != nil {
-			vm.ctx.Log.Warn("reindexing blocks failed",
-				zap.Error(err),
-			)
-		}
-	}()
-
 	return nil
 }
 

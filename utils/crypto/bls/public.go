@@ -74,7 +74,7 @@ func AggregatePublicKeys(pks []*PublicKey) (*PublicKey, error) {
 // The [sig] and [pk] may have been an aggregation of other signatures and keys.
 // Invariant: [pk] and [sig] have both been validated.
 func Verify(pk *PublicKey, sig *Signature, msg []byte) bool {
-	return sig.Verify(false, pk, false, msg, ciphersuiteSignature)
+	return sig.Verify(false, pk, false, msg, CiphersuiteSignature.Bytes())
 }
 
 // Verify the possession of the secret pre-image of [sk] by verifying a [sig] of
@@ -82,5 +82,5 @@ func Verify(pk *PublicKey, sig *Signature, msg []byte) bool {
 // The [sig] and [pk] may have been an aggregation of other signatures and keys.
 // Invariant: [pk] and [sig] have both been validated.
 func VerifyProofOfPossession(pk *PublicKey, sig *Signature, msg []byte) bool {
-	return sig.Verify(false, pk, false, msg, ciphersuiteProofOfPossession)
+	return sig.Verify(false, pk, false, msg, CiphersuiteProofOfPossession.Bytes())
 }

@@ -35,11 +35,6 @@ available. Defaults to `false`. See
 If set to `false`, this node will not expose the Info API. Defaults to `true`. See
 [here](docs.avax.network/reference/avalanchego/info-api) for more information.
 
-#### `--api-keystore-enabled` (boolean)
-
-If set to `true`, this node will expose the Keystore API. Defaults to `false`.
-See [here](docs.avax.network/reference/avalanchego/keystore-api) for more information.
-
 #### `--api-metrics-enabled` (boolean)
 
 If set to `false`, this node will not expose the Metrics API. Defaults to
@@ -957,6 +952,12 @@ The value must be greater than `0`. Defaults to `2m`.
 #### `--proposervm-use-current-height` (bool)
 
 Have the ProposerVM always report the last accepted P-chain block height. Defaults to `false`.
+
+### `--proposervm-min-block-duration` (duration)
+
+The minimum delay to enforce when building a snowman++ block for the primary network
+chains and the default minimum delay for subnets. Defaults to `1s`. A non-default
+value is only suggested for non-production nodes.
 
 ### Continuous Profiling
 

@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 )
 
-// fileExists checks if a file exists before we
+// FileExists checks if a file exists before we
 // try using it to prevent further errors.
 func FileExists(filePath string) (bool, error) {
 	info, err := os.Stat(filePath)
@@ -41,7 +41,7 @@ func ReadFileWithName(parentDir string, fileNameNoExt string) ([]byte, error) {
 	}
 }
 
-// folderExists checks if a folder exists before we
+// FolderExists checks if a folder exists before we
 // try using it to prevent further errors.
 func FolderExists(filePath string) (bool, error) {
 	info, err := os.Stat(filePath)

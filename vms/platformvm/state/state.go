@@ -8,8 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
-	"sync"
 	"time"
 
 	"github.com/google/btree"
@@ -25,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/upgrade"
@@ -33,9 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/iterator"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
-	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -94,7 +89,6 @@ var (
 	InactivePrefix                = []byte("inactive")
 	SingletonPrefix               = []byte("singleton")
 
-	EtnaHeightKey        = []byte("etna height")
 	TimestampKey         = []byte("timestamp")
 	FeeStateKey          = []byte("fee state")
 	L1ValidatorExcessKey = []byte("l1Validator excess")
@@ -103,7 +97,6 @@ var (
 	LastAcceptedKey      = []byte("last accepted")
 	HeightsIndexedKey    = []byte("heights indexed")
 	InitializedKey       = []byte("initialized")
-	BlocksReindexedKey   = []byte("blocks reindexed")
 
 	emptyL1ValidatorCache = &cache.Empty[ids.ID, maybe.Maybe[L1Validator]]{}
 )
@@ -156,9 +149,6 @@ type State interface {
 	Chain
 	uptime.State
 	avax.UTXOReader
-
-	// TODO: Remove after Etna is activated
-	GetEtnaHeight() (uint64, error)
 
 	GetLastAccepted() ids.ID
 	SetLastAccepted(blkID ids.ID)
@@ -214,18 +204,16 @@ type State interface {
 
 	SetHeight(height uint64)
 
-	GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error)
+	// GetCurrentValidators returns subnet and L1 validators for the given
+	// subnetID along with the current P-chain height.
+	// This method works for both subnets and L1s. Depending of the requested
+	// subnet/L1 validator schema, the return values can include only subnet
+	// validator, only L1 validators or both if there are initial stakers in the
+	// L1 conversion.
+	GetCurrentValidators(ctx context.Context, subnetID ids.ID) ([]*Staker, []L1Validator, uint64, error)
 
 	// Discard uncommitted changes to the database.
 	Abort()
-
-	// ReindexBlocks converts any block indices using the legacy storage format
-	// to the new format. If this database has already updated the indices,
-	// this function will return immediately, without iterating over the
-	// database.
-	//
-	// TODO: Remove after v1.12.x is activated
-	ReindexBlocks(lock sync.Locker, log logging.Logger) error
 
 	// Commit changes to the base database.
 	Commit() error
@@ -237,16 +225,6 @@ type State interface {
 	Checksum() ids.ID
 
 	Close() error
-}
-
-// Prior to https://github.com/ava-labs/avalanchego/pull/1719, blocks were
-// stored as a map from blkID to stateBlk. Nodes synced prior to this PR may
-// still have blocks partially stored using this legacy format.
-//
-// TODO: Remove after v1.12.x is activated
-type stateBlk struct {
-	Bytes  []byte         `serialize:"true"`
-	Status choices.Status `serialize:"true"`
 }
 
 /*
@@ -318,8 +296,6 @@ type stateBlk struct {
  * | '-- timestamp + validationID -> nil
  * '-. singletons
  *   |-- initializedKey -> nil
- *   |-- blocksReindexedKey -> nil
- *   |-- etnaHeightKey -> height
  *   |-- timestampKey -> timestamp
  *   |-- feeStateKey -> feeState
  *   |-- l1ValidatorExcessKey -> l1ValidatorExcess
@@ -834,29 +810,16 @@ func (s *state) DeleteExpiry(entry ExpiryEntry) {
 	s.expiryDiff.DeleteExpiry(entry)
 }
 
-func (s *state) GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
-	result := make(map[ids.ID]*validators.GetCurrentValidatorOutput)
+func (s *state) GetCurrentValidators(ctx context.Context, subnetID ids.ID) ([]*Staker, []L1Validator, uint64, error) {
 	// First add the current validators (non-L1)
-	for _, staker := range s.currentStakers.validators[subnetID] {
-		if err := ctx.Err(); err != nil {
-			return nil, 0, err
-		}
-		validator := staker.validator
-		result[validator.TxID] = &validators.GetCurrentValidatorOutput{
-			ValidationID:  validator.TxID,
-			NodeID:        validator.NodeID,
-			PublicKey:     validator.PublicKey,
-			Weight:        validator.Weight,
-			StartTime:     uint64(validator.StartTime.Unix()),
-			MinNonce:      0,
-			IsActive:      true,
-			IsL1Validator: false,
-		}
+	legacyBaseStakers := s.currentStakers.validators[subnetID]
+	legacyStakers := make([]*Staker, 0, len(legacyBaseStakers))
+	for _, staker := range legacyBaseStakers {
+		legacyStakers = append(legacyStakers, staker.validator)
 	}
 
-	// Then iterate over subnetIDNodeID DB and add the L1 validators (if any)
-	// TODO: consider optimizing this to avoid hitting the subnetIDNodeIDDB and read from actives lookup
-	// if all validators are active (inactive weight is 0)
+	// Then iterate over subnetIDNodeID DB and add the L1 validators
+	var l1Validators []L1Validator
 	validationIDIter := s.subnetIDNodeIDDB.NewIteratorWithPrefix(
 		subnetID[:],
 	)
@@ -864,32 +827,22 @@ func (s *state) GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (ma
 
 	for validationIDIter.Next() {
 		if err := ctx.Err(); err != nil {
-			return nil, 0, err
+			return nil, nil, 0, err
 		}
 
 		validationID, err := ids.ToID(validationIDIter.Value())
 		if err != nil {
-			return nil, 0, fmt.Errorf("failed to parse validation ID: %w", err)
+			return nil, nil, 0, fmt.Errorf("failed to parse validation ID: %w", err)
 		}
 
 		vdr, err := s.GetL1Validator(validationID)
 		if err != nil {
-			return nil, 0, fmt.Errorf("failed to get validator: %w", err)
+			return nil, nil, 0, fmt.Errorf("failed to get validator: %w", err)
 		}
-
-		result[validationID] = &validators.GetCurrentValidatorOutput{
-			ValidationID:  validationID,
-			NodeID:        vdr.NodeID,
-			PublicKey:     bls.PublicKeyFromValidUncompressedBytes(vdr.PublicKey),
-			Weight:        vdr.Weight,
-			StartTime:     vdr.StartTime,
-			IsActive:      vdr.isActive(),
-			MinNonce:      vdr.MinNonce,
-			IsL1Validator: true,
-		}
+		l1Validators = append(l1Validators, vdr)
 	}
 
-	return result, s.currentHeight, nil
+	return legacyStakers, l1Validators, s.currentHeight, nil
 }
 
 func (s *state) GetActiveL1ValidatorsIterator() (iterator.Iterator[L1Validator], error) {
@@ -1324,10 +1277,6 @@ func (s *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 		return time.Time{}, err
 	}
 	return staker.StartTime, nil
-}
-
-func (s *state) GetEtnaHeight() (uint64, error) {
-	return database.GetUInt64(s.singletonDB, EtnaHeightKey)
 }
 
 // GetTimestamp allows for concurrent reads.
@@ -2127,7 +2076,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 		s.writeTransformedSubnets(),
 		s.writeSubnetSupplies(),
 		s.writeChains(),
-		s.writeMetadata(height),
+		s.writeMetadata(),
 	)
 }
 
@@ -2309,7 +2258,7 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (block.Block, error) {
 		return nil, err
 	}
 
-	blk, _, err := parseStoredBlock(blkBytes)
+	blk, err := block.Parse(block.GenesisCodec, blkBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -2475,7 +2424,7 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 		switch err {
 		case nil:
 			// Modifying an existing validator
-			if priorL1Validator.isActive() == l1Validator.isActive() {
+			if priorL1Validator.IsActive() == l1Validator.IsActive() {
 				// This validator's active status isn't changing. This means
 				// the effectiveNodeIDs are equal.
 				nodeID := l1Validator.effectiveNodeID()
@@ -2871,7 +2820,7 @@ func (s *state) writeL1Validators() error {
 
 		// Add the new validator
 		var err error
-		if l1Validator.isActive() {
+		if l1Validator.IsActive() {
 			s.activeL1Validators.put(l1Validator)
 			err = putL1Validator(s.activeDB, emptyL1ValidatorCache, l1Validator)
 		} else {
@@ -3041,13 +2990,7 @@ func (s *state) writeChains() error {
 	return nil
 }
 
-func (s *state) writeMetadata(height uint64) error {
-	if !s.upgrades.IsEtnaActivated(s.persistedTimestamp) && s.upgrades.IsEtnaActivated(s.timestamp) {
-		if err := database.PutUInt64(s.singletonDB, EtnaHeightKey, height); err != nil {
-			return fmt.Errorf("failed to write etna height: %w", err)
-		}
-	}
-
+func (s *state) writeMetadata() error {
 	if !s.persistedTimestamp.Equal(s.timestamp) {
 		if err := database.PutTimestamp(s.singletonDB, TimestampKey, s.timestamp); err != nil {
 			return fmt.Errorf("failed to write timestamp: %w", err)
@@ -3094,162 +3037,6 @@ func (s *state) writeMetadata(height uint64) error {
 		}
 	}
 	return nil
-}
-
-// Returns the block and whether it is a [stateBlk].
-// Invariant: blkBytes is safe to parse with blocks.GenesisCodec
-//
-// TODO: Remove after v1.12.x is activated
-func parseStoredBlock(blkBytes []byte) (block.Block, bool, error) {
-	// Attempt to parse as blocks.Block
-	blk, err := block.Parse(block.GenesisCodec, blkBytes)
-	if err == nil {
-		return blk, false, nil
-	}
-
-	// Fallback to [stateBlk]
-	blkState := stateBlk{}
-	if _, err := block.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
-		return nil, false, err
-	}
-
-	blk, err = block.Parse(block.GenesisCodec, blkState.Bytes)
-	return blk, true, err
-}
-
-func (s *state) ReindexBlocks(lock sync.Locker, log logging.Logger) error {
-	has, err := s.singletonDB.Has(BlocksReindexedKey)
-	if err != nil {
-		return err
-	}
-	if has {
-		log.Info("blocks already reindexed")
-		return nil
-	}
-
-	// It is possible that new blocks are added after grabbing this iterator.
-	// New blocks are guaranteed to be persisted in the new format, so we don't
-	// need to check them.
-	blockIterator := s.blockDB.NewIterator()
-	// Releasing is done using a closure to ensure that updating blockIterator
-	// will result in having the most recent iterator released when executing
-	// the deferred function.
-	defer func() {
-		blockIterator.Release()
-	}()
-
-	log.Info("starting block reindexing")
-
-	var (
-		startTime         = time.Now()
-		lastCommit        = startTime
-		nextUpdate        = startTime.Add(indexLogFrequency)
-		numIndicesChecked = 0
-		numIndicesUpdated = 0
-	)
-
-	for blockIterator.Next() {
-		valueBytes := blockIterator.Value()
-		blk, isStateBlk, err := parseStoredBlock(valueBytes)
-		if err != nil {
-			return fmt.Errorf("failed to parse block: %w", err)
-		}
-
-		blkID := blk.ID()
-
-		// This block was previously stored using the legacy format, update the
-		// index to remove the usage of stateBlk.
-		if isStateBlk {
-			blkBytes := blk.Bytes()
-			if err := s.blockDB.Put(blkID[:], blkBytes); err != nil {
-				return fmt.Errorf("failed to write block: %w", err)
-			}
-
-			numIndicesUpdated++
-		}
-
-		numIndicesChecked++
-
-		now := time.Now()
-		if now.After(nextUpdate) {
-			nextUpdate = now.Add(indexLogFrequency)
-
-			progress := timer.ProgressFromHash(blkID[:])
-			eta := timer.EstimateETA(
-				startTime,
-				progress,
-				math.MaxUint64,
-			)
-
-			log.Info("reindexing blocks",
-				zap.Int("numIndicesUpdated", numIndicesUpdated),
-				zap.Int("numIndicesChecked", numIndicesChecked),
-				zap.Duration("eta", eta),
-			)
-		}
-
-		if numIndicesChecked%indexIterationLimit == 0 {
-			// We must hold the lock during committing to make sure we don't
-			// attempt to commit to disk while a block is concurrently being
-			// accepted.
-			lock.Lock()
-			err := errors.Join(
-				s.Commit(),
-				blockIterator.Error(),
-			)
-			lock.Unlock()
-			if err != nil {
-				return err
-			}
-
-			// We release the iterator here to allow the underlying database to
-			// clean up deleted state.
-			blockIterator.Release()
-
-			// We take the minimum here because it's possible that the node is
-			// currently bootstrapping. This would mean that grabbing the lock
-			// could take an extremely long period of time; which we should not
-			// delay processing for.
-			indexDuration := now.Sub(lastCommit)
-			sleepDuration := min(
-				indexIterationSleepMultiplier*indexDuration,
-				indexIterationSleepCap,
-			)
-			time.Sleep(sleepDuration)
-
-			// Make sure not to include the sleep duration into the next index
-			// duration.
-			lastCommit = time.Now()
-
-			blockIterator = s.blockDB.NewIteratorWithStart(blkID[:])
-		}
-	}
-
-	// Ensure we fully iterated over all blocks before writing that indexing has
-	// finished.
-	//
-	// Note: This is needed because a transient read error could cause the
-	// iterator to stop early.
-	if err := blockIterator.Error(); err != nil {
-		return fmt.Errorf("failed to iterate over historical blocks: %w", err)
-	}
-
-	if err := s.singletonDB.Put(BlocksReindexedKey, nil); err != nil {
-		return fmt.Errorf("failed to put marked blocks as reindexed: %w", err)
-	}
-
-	// We must hold the lock during committing to make sure we don't attempt to
-	// commit to disk while a block is concurrently being accepted.
-	lock.Lock()
-	defer lock.Unlock()
-
-	log.Info("finished block reindexing",
-		zap.Int("numIndicesUpdated", numIndicesUpdated),
-		zap.Int("numIndicesChecked", numIndicesChecked),
-		zap.Duration("duration", time.Since(startTime)),
-	)
-
-	return s.Commit()
 }
 
 func (s *state) GetUptime(vdrID ids.NodeID) (time.Duration, time.Time, error) {

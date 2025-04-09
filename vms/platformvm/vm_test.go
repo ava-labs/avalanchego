@@ -38,7 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
@@ -58,6 +58,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/wallet"
 
@@ -105,6 +106,15 @@ var (
 		MinPrice:                 1,
 		ExcessConversionConstant: 5_000,
 	}
+	defaultValidatorFeeConfig = fee.Config{
+		Capacity: 100,
+		Target:   50,
+		// The minimum price is set to 2 so that tests can include cases where
+		// L1 validator balances do not evenly divide into a timestamp granular
+		// to a second.
+		MinPrice:                 2,
+		ExcessConversionConstant: 100,
+	}
 
 	// subnet that exists at genesis in defaultVM
 	testSubnet1 *txs.Tx
@@ -126,6 +136,7 @@ func defaultVM(t *testing.T, f upgradetest.Fork) (*VM, database.Database, *mutab
 		SybilProtectionEnabled: true,
 		Validators:             validators.NewManager(),
 		DynamicFeeConfig:       defaultDynamicFeeConfig,
+		ValidatorFeeConfig:     defaultValidatorFeeConfig,
 		MinValidatorStake:      defaultMinValidatorStake,
 		MaxValidatorStake:      defaultMaxValidatorStake,
 		MinDelegatorStake:      defaultMinDelegatorStake,
@@ -309,7 +320,9 @@ func TestAddValidatorCommit(t *testing.T) {
 		}
 	)
 
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
+	require.NoError(err)
+	pop, err := signer.NewProofOfPossession(sk)
 	require.NoError(err)
 
 	// create valid tx
@@ -322,7 +335,7 @@ func TestAddValidatorCommit(t *testing.T) {
 			},
 			Subnet: constants.PrimaryNetworkID,
 		},
-		signer.NewProofOfPossession(sk),
+		pop,
 		vm.ctx.AVAXAssetID,
 		rewardsOwner,
 		rewardsOwner,
@@ -465,7 +478,9 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	startTime := latestForkTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
+	require.NoError(err)
+	pop, err := signer.NewProofOfPossession(sk)
 	require.NoError(err)
 
 	rewardsOwner := &secp256k1fx.OutputOwners{
@@ -484,7 +499,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 			},
 			Subnet: constants.PrimaryNetworkID,
 		},
-		signer.NewProofOfPossession(sk),
+		pop,
 		vm.ctx.AVAXAssetID,
 		rewardsOwner,
 		rewardsOwner,
@@ -629,7 +644,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 	rewardTx := blk.(block.Block).Txs()[0].Unsigned
 	require.IsType(&txs.RewardValidatorTx{}, rewardTx)
 
-	// Verify options and accept commmit block
+	// Verify options and accept commit block
 	require.NoError(commit.Verify(context.Background()))
 	require.NoError(abort.Verify(context.Background()))
 	txID := blk.(block.Block).Txs()[0].ID()
@@ -1315,9 +1330,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(err)
 
 	bootstrapConfig := bootstrap.Config{
-		ShouldHalt: func() bool {
-			return false
-		},
+		Haltable:                       &common.Halter{},
 		NonVerifyingParse:              vm.ParseBlock,
 		AllGetsServer:                  snowGetHandler,
 		Ctx:                            consensusCtx,
@@ -1372,7 +1385,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 			MaxOutstandingItems:   1,
 			MaxItemProcessingTime: 1,
 		},
-		Consensus: &smcon.Topological{},
+		Consensus: &smcon.Topological{Factory: snowball.SnowflakeFactory},
 	}
 	engine, err := smeng.New(engineConfig)
 	require.NoError(err)
@@ -1900,8 +1913,11 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	wallet := newWallet(t, vm, walletConfig{})
 
 	nodeID := ids.GenerateTestNodeID()
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(err)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(err)
+
 	rewardsOwner := &secp256k1fx.OutputOwners{
 		Threshold: 1,
 		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
@@ -1917,7 +1933,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 			},
 			Subnet: constants.PrimaryNetworkID,
 		},
-		signer.NewProofOfPossession(sk),
+		pop,
 		vm.ctx.AVAXAssetID,
 		rewardsOwner,
 		rewardsOwner,
@@ -2116,7 +2132,9 @@ func TestPruneMempool(t *testing.T) {
 		endTime   = startTime.Add(vm.MinStakeDuration)
 	)
 
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
+	require.NoError(err)
+	pop, err := signer.NewProofOfPossession(sk)
 	require.NoError(err)
 
 	rewardsOwner := &secp256k1fx.OutputOwners{
@@ -2133,7 +2151,7 @@ func TestPruneMempool(t *testing.T) {
 			},
 			Subnet: constants.PrimaryNetworkID,
 		},
-		signer.NewProofOfPossession(sk),
+		pop,
 		vm.ctx.AVAXAssetID,
 		rewardsOwner,
 		rewardsOwner,

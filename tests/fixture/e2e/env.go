@@ -4,6 +4,7 @@
 package e2e
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"math/rand"
@@ -14,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
@@ -81,6 +81,26 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 	require := require.New(tc)
 
 	var network *tmpnet.Network
+
+	// Consider monitoring flags for any command but stop
+	if !flagVars.StopNetwork() {
+		if flagVars.StartCollectors() {
+			require.NoError(tmpnet.StartCollectors(tc.DefaultContext(), tc.Log()))
+		}
+		if flagVars.CheckMonitoring() {
+			// Register cleanup before network start to ensure it runs after the network is stopped (LIFO)
+			tc.DeferCleanup(func() {
+				if network == nil {
+					tc.Log().Warn("unable to check that logs and metrics were collected from an uninitialized network")
+					return
+				}
+				ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
+				defer cancel()
+				require.NoError(tmpnet.CheckMonitoring(ctx, tc.Log(), network.UUID))
+			})
+		}
+	}
+
 	// Need to load the network if it is being stopped or reused
 	if flagVars.StopNetwork() || flagVars.ReuseNetwork() {
 		networkDir := flagVars.NetworkDir()
@@ -134,34 +154,23 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 	// Start a new network
 	if network == nil {
 		network = desiredNetwork
+		avalancheBinaryPath, err := flagVars.AvalancheGoExecPath()
+		require.NoError(err)
+
 		StartNetwork(
 			tc,
 			network,
-			flagVars.AvalancheGoExecPath(),
+			avalancheBinaryPath,
 			flagVars.PluginDir(),
 			flagVars.NetworkShutdownDelay(),
 			flagVars.StartNetwork(),
 			flagVars.ReuseNetwork(),
 		)
+	}
 
-		// Wait for chains to have bootstrapped on all nodes
-		tc.Eventually(func() bool {
-			for _, subnet := range network.Subnets {
-				for _, validatorID := range subnet.ValidatorIDs {
-					uri, err := network.GetURIForNodeID(validatorID)
-					require.NoError(err)
-					infoClient := info.NewClient(uri)
-					for _, chain := range subnet.Chains {
-						isBootstrapped, err := infoClient.IsBootstrapped(tc.DefaultContext(), chain.ChainID.String())
-						// Ignore errors since a chain id that is not yet known will result in a recoverable error.
-						if err != nil || !isBootstrapped {
-							return false
-						}
-					}
-				}
-			}
-			return true
-		}, DefaultTimeout, DefaultPollingInterval, "failed to see all chains bootstrap before timeout")
+	// Once one or more nodes are running it should be safe to wait for promtail to report readiness
+	if flagVars.StartCollectors() {
+		require.NoError(tmpnet.WaitForPromtailReadiness(tc.DefaultContext(), tc.Log()))
 	}
 
 	if flagVars.StartNetwork() {

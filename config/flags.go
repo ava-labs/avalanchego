@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/proposervm"
 )
 
 const (
@@ -168,7 +169,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Duration(NetworkReadHandshakeTimeoutKey, constants.DefaultNetworkReadHandshakeTimeout, "Timeout value for reading handshake messages")
 	fs.Duration(NetworkPingTimeoutKey, constants.DefaultPingPongTimeout, "Timeout value for Ping-Pong with a peer")
 	fs.Duration(NetworkPingFrequencyKey, constants.DefaultPingFrequency, "Frequency of pinging other peers")
-
+	fs.Duration(NetworkNoIngressValidatorConnectionsGracePeriodKey, constants.DefaultNoIngressValidatorConnectionGracePeriod, "Time after which nodes are expected to be connected to us if we are a primary network validator, otherwise a health check fails")
 	fs.String(NetworkCompressionTypeKey, constants.DefaultNetworkCompressionType.String(), fmt.Sprintf("Compression type for outbound messages. Must be one of [%s, %s]", compression.TypeZstd, compression.TypeNone))
 
 	fs.Duration(NetworkMaxClockDifferenceKey, constants.DefaultNetworkMaxClockDifference, "Max allowed clock difference value between this node and peers")
@@ -235,7 +236,6 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	// Enable/Disable APIs
 	fs.Bool(AdminAPIEnabledKey, false, "If true, this node exposes the Admin API")
 	fs.Bool(InfoAPIEnabledKey, true, "If true, this node exposes the Info API")
-	fs.Bool(KeystoreAPIEnabledKey, false, "If true, this node exposes the Keystore API")
 	fs.Bool(MetricsAPIEnabledKey, true, "If true, this node exposes the Metrics API")
 	fs.Bool(HealthAPIEnabledKey, true, "If true, this node exposes the Health API")
 
@@ -316,6 +316,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 
 	// ProposerVM
 	fs.Bool(ProposerVMUseCurrentHeightKey, false, "Have the ProposerVM always report the last accepted P-chain block height")
+	fs.Duration(ProposerVMMinBlockDelayKey, proposervm.DefaultMinBlockDelay, "Minimum delay to enforce when building a snowman++ block for the primary network chains and the default minimum delay for subnets")
 
 	// Metrics
 	fs.Bool(MeterVMsEnabledKey, true, "Enable Meter VMs to track VM performance with more granularity")
@@ -387,20 +388,13 @@ func BuildFlagSet() *pflag.FlagSet {
 	return fs
 }
 
-// GetExpandedArg gets the string in viper corresponding to [key] and expands
+// getExpandedArg gets the string in viper corresponding to [key] and expands
 // any variables using the OS env. If the [AvalancheGoDataDirVar] var is used,
 // we expand the value of the variable with the string in viper corresponding to
 // [DataDirKey].
-func GetExpandedArg(v *viper.Viper, key string) string {
-	return GetExpandedString(v, v.GetString(key))
-}
-
-// GetExpandedString expands [s] with any variables using the OS env. If the
-// [AvalancheGoDataDirVar] var is used, we expand the value of the variable with
-// the string in viper corresponding to [DataDirKey].
-func GetExpandedString(v *viper.Viper, s string) string {
+func getExpandedArg(v *viper.Viper, key string) string {
 	return os.Expand(
-		s,
+		v.GetString(key),
 		func(strVar string) string {
 			if strVar == AvalancheGoDataDirVar {
 				return os.ExpandEnv(v.GetString(DataDirKey))

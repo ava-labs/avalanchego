@@ -45,8 +45,17 @@ func New(t testing.TB, c Config) state.State {
 	if c.DB == nil {
 		c.DB = memdb.New()
 	}
+	if c.Context == nil {
+		c.Context = &snow.Context{
+			NetworkID: constants.UnitTestID,
+			NodeID:    DefaultNodeID,
+			Log:       logging.NoLog{},
+		}
+	}
 	if len(c.Genesis) == 0 {
-		c.Genesis = genesistest.NewBytes(t, genesistest.Config{})
+		c.Genesis = genesistest.NewBytes(t, genesistest.Config{
+			NetworkID: c.Context.NetworkID,
+		})
 	}
 	if c.Registerer == nil {
 		c.Registerer = prometheus.NewRegistry()
@@ -59,13 +68,6 @@ func New(t testing.TB, c Config) state.State {
 	}
 	if c.Config == (config.Config{}) {
 		c.Config = config.Default
-	}
-	if c.Context == nil {
-		c.Context = &snow.Context{
-			NetworkID: constants.UnitTestID,
-			NodeID:    DefaultNodeID,
-			Log:       logging.NoLog{},
-		}
 	}
 	if c.Metrics == nil {
 		c.Metrics = metrics.Noop

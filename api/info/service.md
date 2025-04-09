@@ -382,6 +382,73 @@ curl -X POST --data '{
 }
 ```
 
+### `info.getTxFee`
+
+<Callout type="warn">
+Deprecated as of [v1.12.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.2).
+</Callout>
+
+Get the fees of the network.
+
+**Signature**:
+
+```
+info.getTxFee() ->
+{
+  txFee: uint64,
+  createAssetTxFee: uint64,
+  createSubnetTxFee: uint64,
+  transformSubnetTxFee: uint64,
+  createBlockchainTxFee: uint64,
+  addPrimaryNetworkValidatorFee: uint64,
+  addPrimaryNetworkDelegatorFee: uint64,
+  addSubnetValidatorFee: uint64,
+  addSubnetDelegatorFee: uint64
+}
+```
+
+- `txFee` is the default fee for issuing X-Chain transactions.
+- `createAssetTxFee` is the fee for issuing a `CreateAssetTx` on the X-Chain.
+- `createSubnetTxFee` is no longer used.
+- `transformSubnetTxFee` is no longer used.
+- `createBlockchainTxFee` is no longer used.
+- `addPrimaryNetworkValidatorFee` is no longer used.
+- `addPrimaryNetworkDelegatorFee` is no longer used.
+- `addSubnetValidatorFee` is no longer used.
+- `addSubnetDelegatorFee` is no longer used.
+
+All fees are denominated in nAVAX.
+
+**Example Call**:
+
+```sh
+curl -X POST --data '{
+    "jsonrpc":"2.0",
+    "id"     :1,
+    "method" :"info.getTxFee"
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/info
+```
+
+**Example Response**:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "txFee": "1000000",
+    "createAssetTxFee": "10000000",
+    "createSubnetTxFee": "1000000000",
+    "transformSubnetTxFee": "10000000000",
+    "createBlockchainTxFee": "1000000000",
+    "addPrimaryNetworkValidatorFee": "0",
+    "addPrimaryNetworkDelegatorFee": "0",
+    "addSubnetValidatorFee": "1000000",
+    "addSubnetDelegatorFee": "1000000"
+  }
+}
+```
+
 ### `info.getVMs`
 
 Get the virtual machines installed on this node.
@@ -627,7 +694,8 @@ curl -X POST --data '{
     "cortinaTime": "2020-12-05T05:00:00Z",
     "cortinaXChainStopVertexID": "11111111111111111111111111111111LpoYY",
     "durangoTime": "2020-12-05T05:00:00Z",
-    "etnaTime": "2024-10-09T20:00:00Z"
+    "etnaTime": "2024-10-09T20:00:00Z",
+    "fortunaTime": "9999-12-01T05:00:00Z"
   },
   "id": 1
 }

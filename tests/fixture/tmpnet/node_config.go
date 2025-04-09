@@ -17,29 +17,17 @@ import (
 // The Node type is defined in this file node_config.go
 // (reading/writing configuration) and node.go (orchestration).
 
-func (n *Node) getFlagsPath() string {
+// For consumption outside of avalanchego. Needs to be kept exported.
+func (n *Node) GetFlagsPath() string {
 	return filepath.Join(n.GetDataDir(), "flags.json")
 }
 
-func (n *Node) readFlags() error {
-	bytes, err := os.ReadFile(n.getFlagsPath())
-	if err != nil {
-		return fmt.Errorf("failed to read node flags: %w", err)
-	}
-	flags := FlagsMap{}
-	if err := json.Unmarshal(bytes, &flags); err != nil {
-		return fmt.Errorf("failed to unmarshal node flags: %w", err)
-	}
-	n.Flags = flags
-	return n.EnsureNodeID()
-}
-
-func (n *Node) writeFlags() error {
-	bytes, err := DefaultJSONMarshal(n.Flags)
+func (n *Node) writeFlags(flags FlagsMap) error {
+	bytes, err := DefaultJSONMarshal(flags)
 	if err != nil {
 		return fmt.Errorf("failed to marshal node flags: %w", err)
 	}
-	if err := os.WriteFile(n.getFlagsPath(), bytes, perms.ReadWrite); err != nil {
+	if err := os.WriteFile(n.GetFlagsPath(), bytes, perms.ReadWrite); err != nil {
 		return fmt.Errorf("failed to write node flags: %w", err)
 	}
 	return nil
@@ -64,6 +52,7 @@ type serializedNodeConfig struct {
 	NetworkUUID   string
 	NetworkOwner  string
 	IsEphemeral   bool
+	Flags         FlagsMap
 	RuntimeConfig *NodeRuntimeConfig
 }
 
@@ -72,6 +61,7 @@ func (n *Node) writeConfig() error {
 		NetworkUUID:   n.NetworkUUID,
 		NetworkOwner:  n.NetworkOwner,
 		IsEphemeral:   n.IsEphemeral,
+		Flags:         n.Flags,
 		RuntimeConfig: n.RuntimeConfig,
 	}
 	bytes, err := DefaultJSONMarshal(config)
@@ -85,9 +75,6 @@ func (n *Node) writeConfig() error {
 }
 
 func (n *Node) Read() error {
-	if err := n.readFlags(); err != nil {
-		return err
-	}
 	if err := n.readConfig(); err != nil {
 		return err
 	}
@@ -97,10 +84,6 @@ func (n *Node) Read() error {
 func (n *Node) Write() error {
 	if err := os.MkdirAll(n.GetDataDir(), perms.ReadWriteExecute); err != nil {
 		return fmt.Errorf("failed to create node dir: %w", err)
-	}
-
-	if err := n.writeFlags(); err != nil {
-		return err
 	}
 	return n.writeConfig()
 }
