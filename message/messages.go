@@ -170,7 +170,6 @@ func NewMsgBuilder(
 	}, nil
 }
 
-
 func (mb *MsgBuilder) CreateOutbound(
 	m *p2p.Message,
 	compressionType compression.Type,

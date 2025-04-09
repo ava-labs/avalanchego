@@ -220,7 +220,7 @@ func NewTestNetwork(
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return NewNetwork(
 		cfg,
 		upgrade.InitiallyActiveTime,
