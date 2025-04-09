@@ -145,34 +145,6 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 	assertLatestIdx(t, env.vm.db, addr, txAssetID.ID, 1)
 }
 
-func TestIndexer_Read(t *testing.T) {
-	require := require.New(t)
-
-	env := setup(t, &envConfig{fork: upgradetest.Durango})
-	defer env.vm.ctx.Lock.Unlock()
-
-	// generate test address and asset IDs
-	assetID := ids.GenerateTestID()
-	addr := ids.GenerateTestShortID()
-
-	// setup some fake txs under the above generated address and asset IDs
-	testTxs := initTestTxIndex(t, env.vm.db, addr, assetID, 25)
-	require.Len(testTxs, 25)
-
-	// read the pages, 5 items at a time
-	var (
-		cursor   uint64
-		pageSize uint64 = 5
-	)
-	for cursor < 25 {
-		txIDs, err := env.vm.addressTxsIndexer.Read(addr[:], assetID, cursor, pageSize)
-		require.NoError(err)
-		require.Len(txIDs, 5)
-		require.Equal(txIDs, testTxs[cursor:cursor+pageSize])
-		cursor += pageSize
-	}
-}
-
 func TestIndexingNewInitWithIndexingEnabled(t *testing.T) {
 	require := require.New(t)
 

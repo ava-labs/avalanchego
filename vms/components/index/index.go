@@ -4,7 +4,6 @@
 package index
 
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -49,12 +48,6 @@ type AddressTxsIndexer interface {
 		inputUTXOs []*avax.UTXO,
 		outputUTXOs []*avax.UTXO,
 	) error
-
-	// Read returns the IDs of transactions that changed [address]'s balance of [assetID].
-	// The returned transactions are in order of increasing acceptance time.
-	// The length of the returned slice <= [pageSize].
-	// [cursor] is the offset to start reading from.
-	Read(address []byte, assetID ids.ID, cursor, pageSize uint64) ([]ids.ID, error)
 }
 
 type indexer struct {
@@ -172,43 +165,6 @@ func (i *indexer) Accept(txID ids.ID, inputUTXOs []*avax.UTXO, outputUTXOs []*av
 	return nil
 }
 
-// Read returns IDs of transactions that changed [address]'s balance of [assetID],
-// starting at [cursor], in order of transaction acceptance. e.g. if [cursor] == 1, does
-// not return the first transaction that changed the balance. (This is for pagination.)
-// Returns at most [pageSize] elements.
-// See AddressTxsIndexer
-func (i *indexer) Read(address []byte, assetID ids.ID, cursor, pageSize uint64) ([]ids.ID, error) {
-	// setup prefix DBs
-	addressTxDB := prefixdb.New(address, i.db)
-	assetPrefixDB := prefixdb.New(assetID[:], addressTxDB)
-
-	// get cursor in bytes
-	cursorBytes := make([]byte, wrappers.LongLen)
-	binary.BigEndian.PutUint64(cursorBytes, cursor)
-
-	// start reading from the cursor bytes, numeric keys maintain the order (see Accept)
-	iter := assetPrefixDB.NewIteratorWithStart(cursorBytes)
-	defer iter.Release()
-
-	var txIDs []ids.ID
-	for uint64(len(txIDs)) < pageSize && iter.Next() {
-		if bytes.Equal(idxKey, iter.Key()) {
-			// This key has the next index to use, not a tx ID
-			continue
-		}
-
-		// get the value and try to convert it to ID
-		txIDBytes := iter.Value()
-		txID, err := ids.ToID(txIDBytes)
-		if err != nil {
-			return nil, err
-		}
-
-		txIDs = append(txIDs, txID)
-	}
-	return txIDs, nil
-}
-
 // checkIndexStatus checks the indexing status in the database, returning error if the state
 // with respect to provided parameters is invalid
 func checkIndexStatus(db database.KeyValueReaderWriter, enableIndexing, allowIncomplete bool) error {
@@ -254,8 +210,4 @@ func NewNoIndexer(db database.Database, allowIncomplete bool) (AddressTxsIndexer
 
 func (*noIndexer) Accept(ids.ID, []*avax.UTXO, []*avax.UTXO) error {
 	return nil
-}
-
-func (*noIndexer) Read([]byte, ids.ID, uint64, uint64) ([]ids.ID, error) {
-	return nil, nil
 }
