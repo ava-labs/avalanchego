@@ -573,33 +573,6 @@ func (vm *VM) lookupAssetID(asset string) (ids.ID, error) {
 // Invariant: any error returned by onAccept should be considered fatal.
 // TODO: Remove [onAccept] once the deprecated APIs this powers are removed.
 func (vm *VM) onAccept(tx *txs.Tx) error {
-	// Fetch the input UTXOs
-	txID := tx.ID()
-	inputUTXOIDs := tx.Unsigned.InputUTXOs()
-	inputUTXOs := make([]*avax.UTXO, 0, len(inputUTXOIDs))
-	for _, utxoID := range inputUTXOIDs {
-		// Don't bother fetching the input UTXO if its symbolic
-		if utxoID.Symbolic() {
-			continue
-		}
-
-		utxo, err := vm.state.GetUTXO(utxoID.InputID())
-		if err == database.ErrNotFound {
-			vm.ctx.Log.Debug("dropping utxo from index",
-				zap.Stringer("txID", txID),
-				zap.Stringer("utxoTxID", utxoID.TxID),
-				zap.Uint32("utxoOutputIndex", utxoID.OutputIndex),
-			)
-			continue
-		}
-		if err != nil {
-			// should never happen because the UTXO was previously verified to
-			// exist
-			return fmt.Errorf("error finding UTXO %s: %w", utxoID, err)
-		}
-		inputUTXOs = append(inputUTXOs, utxo)
-	}
-
-	vm.walletService.decided(txID)
+	vm.walletService.decided(tx.ID())
 	return nil
 }
