@@ -20,8 +20,7 @@ orchestrate the same temporary networks without the use of an rpc daemon.
 - [Configuration on disk](#configuration-on-disk)
   - [Common networking configuration](#common-networking-configuration)
   - [Genesis](#genesis)
-  - [Subnet configuration](#subnet-configuration)
-  - [Chain configuration](#chain-configuration)
+  - [Subnet and Chain configuration](#subnet-and-chain-configuration)
   - [Network env](#network-env)
   - [Node configuration](#node-configuration)
     - [Runtime config](#runtime-config)
@@ -216,19 +215,13 @@ HOME
             │   ├── plugins
             │   │   └── ...
             │   └── process.json                         // Node process details (PID, API URI, staking address)
-            ├── chains
-            │   ├── C
-            │   │   └── config.json                      // C-Chain config for all nodes
-            │   └── raZ51bwfepaSaZ1MNSRNYNs3ZPfj...U7pa3
-            │       └── config.json                      // Custom chain configuration for all nodes
-            ├── config.json                              // Common configuration (including defaults and pre-funded keys)
+            ├── config.json                              // tmpnet configuration for the network
             ├── genesis.json                             // Genesis for all nodes
             ├── metrics.txt                              // Link for metrics and logs collected from the network (see: Monitoring)
             ├── network.env                              // Sets network dir env var to simplify network usage
-            └── subnets                                  // Directory containing subnet config for both avalanchego and tmpnet
+            └── subnets                                  // Directory containing tmpnet subnet configuration
                 ├── subnet-a.json                        // tmpnet configuration for subnet-a and its chain(s)
-                ├── subnet-b.json                        // tmpnet configuration for subnet-b and its chain(s)
-                └── 2jRbWtaonb2RP8DEM5DBsd7...RqNs9.json // avalanchego configuration for subnet with ID 2jRbWtao...RqNs9
+                └── subnet-b.json                        // tmpnet configuration for subnet-b and its chain(s)
 ```
 
 ### Common networking configuration
@@ -236,45 +229,29 @@ HOME
 
 Network configuration such as default flags (e.g. `--log-level=`),
 runtime defaults (e.g. avalanchego path) and pre-funded private keys
-are stored at `[network-dir]/config.json`. A given default will only
-be applied to a new node on its addition to the network if the node
-does not explicitly set a given value.
+are stored at `[network-dir]/config.json`. A default for a given flag
+will only be applied to a node if that node does not itself set a
+value for that flag.
 
 ### Genesis
 [Top](#table-of-contents)
 
-The genesis file is stored at `[network-dir]/genesis.json` and
-referenced by default by all nodes in the network. The genesis file
-content will be generated with reasonable defaults if not
-supplied. Each node in the network can override the default by setting
-an explicit value for `--genesis-file` or `--genesis-file-content`.
+The genesis file is stored at `[network-dir]/genesis.json`. The
+genesis file content will be generated with reasonable defaults if
+not supplied. The content of the file is provided to each node via
+the `--genesis-file-content` flag if a node does not set a value for
+the flag.
 
-### Subnet configuration
+### Subnet and chain configuration
 [Top](#table-of-contents)
 
-The subnet configuration for a temporary network is stored at
-`[network-dir]/subnets/[subnet ID].json` and referenced by all
-nodes in the network.
-
-Each node in the network can override network-level subnet
-configuration by setting `--subnet-config-dir` to an explicit value
-and ensuring that configuration files for all chains exist at
-`[custom-subnet-config-dir]/[subnet ID].json`.
-
-### Chain configuration
-[Top](#table-of-contents)
-
-The chain configuration for a temporary network is stored at
-`[network-dir]/chains/[chain alias or ID]/config.json` and referenced
-by all nodes in the network. The C-Chain config will be generated with
-reasonable defaults if not supplied. X-Chain and P-Chain will use
-implicit defaults. The configuration for custom chains can be provided
-with subnet configuration and will be written to the appropriate path.
-
-Each node in the network can override network-level chain
-configuration by setting `--chain-config-dir` to an explicit value and
-ensuring that configuration files for all chains exist at
-`[custom-chain-config-dir]/[chain alias or ID]/config.json`.
+tmpnet configuration for a given subnet and its chain(s) is stored at
+`[network-dir]/subnets/[subnet name].json`. Subnet configuration for
+all subnets is provided to each node via the
+`--subnet-config-content` flag if a node does not set a value for the
+flag. Chain configuration for all chains is provided to each node via
+the `--chain-config-content` flag where a node does not set a value
+for the flag.
 
 ### Network env
 [Top](#table-of-contents)

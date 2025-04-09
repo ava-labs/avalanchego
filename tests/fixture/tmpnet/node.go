@@ -72,7 +72,8 @@ type Node struct {
 	// Set by EnsureNodeID which is also called when the node is read.
 	NodeID ids.NodeID
 
-	// Flags that will be supplied to the node at startup
+	// The set of flags used to start whose values are intended to deviate from the
+	// default set of flags configured for the network.
 	Flags FlagsMap
 
 	// An ephemeral node is not expected to be a persistent member of the network and
@@ -152,6 +153,10 @@ func ReadNodes(networkDir string, includeEphemeral bool) ([]*Node, error) {
 
 		if !includeEphemeral && node.IsEphemeral {
 			continue
+		}
+
+		if err := node.EnsureNodeID(); err != nil {
+			return nil, fmt.Errorf("failed to ensure NodeID: %w", err)
 		}
 
 		nodes = append(nodes, node)
@@ -241,21 +246,6 @@ func (n *Node) Stop(ctx context.Context) error {
 		return err
 	}
 	return n.WaitForStopped(ctx)
-}
-
-// Sets networking configuration for the node.
-// Convenience method for setting networking flags.
-func (n *Node) SetNetworkingConfig(bootstrapIDs []string, bootstrapIPs []string) {
-	if _, ok := n.Flags[config.HTTPPortKey]; !ok {
-		// Default to dynamic port allocation
-		n.Flags[config.HTTPPortKey] = 0
-	}
-	if _, ok := n.Flags[config.StakingPortKey]; !ok {
-		// Default to dynamic port allocation
-		n.Flags[config.StakingPortKey] = 0
-	}
-	n.Flags[config.BootstrapIDsKey] = strings.Join(bootstrapIDs, ",")
-	n.Flags[config.BootstrapIPsKey] = strings.Join(bootstrapIPs, ",")
 }
 
 // Ensures staking and signing keys are generated if not already present and
