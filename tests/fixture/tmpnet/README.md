@@ -63,6 +63,7 @@ the following non-test files:
 | flags/common.go             |             | Defines type definitions common across other files                     |
 | flags/process_runtime.go    |             | Defines flags configuring the process node runtime                     |
 | flags/runtime.go            |             | Defines flags configuring node runtime                                 |
+| flags/start_network.go      |             | Defines flags configuring network start                                |
 | tmpnetctl/                  |             | Directory containing main entrypoint for tmpnetctl command             |
 | check_monitoring.go         |             | Enables checking if logs and metrics were collected                    |
 | defaults.go                 |             | Defines common default configuration                                   |
@@ -269,12 +270,12 @@ this file (i.e. `source network.env`) in a shell will configure ginkgo
 e2e and the `tmpnetctl` cli to target the network path specified in
 the env var.
 
-Set `TMPNET_ROOT_DIR` to specify the root directory in which to create
-the configuration directory of new networks
-(e.g. `$TMPNET_ROOT_DIR/[network-dir]`). The default root directory is
-`~/.tmpdir/networks`. Configuring the root directory is only relevant
-when creating new networks as the path of existing networks will
-already have been set.
+Set `TMPNET_ROOT_NETWORK_DIR` to specify the root network directory in
+which to create the configuration directory of new networks
+(e.g. `TMPNET_ROOT_NETWORK_DIR/[network-dir]`). The default network
+root directory is `~/.tmpdir/networks`. Configuring the network root
+directory is only relevant when creating new networks as the path of
+existing networks will already have been set.
 
 ### Node configuration
 [Top](#table-of-contents)

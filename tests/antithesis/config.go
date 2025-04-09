@@ -89,7 +89,9 @@ func configForNewNetwork(
 	duration time.Duration,
 ) *Config {
 	if defaultNetwork.Nodes == nil {
-		defaultNetwork.Nodes = tmpnet.NewNodesOrPanic(flagVars.NodeCount())
+		nodeCount, err := flagVars.NodeCount()
+		require.NoError(tc, err)
+		defaultNetwork.Nodes = tmpnet.NewNodesOrPanic(nodeCount)
 	}
 	if defaultNetwork.Subnets == nil && getSubnets != nil {
 		defaultNetwork.Subnets = getSubnets(defaultNetwork.Nodes...)
