@@ -256,7 +256,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				// tx1 is added to the block first, so tx2 should be dropped.
 				inputID := ids.GenerateTestID()
 				unsignedTx1 := txsmock.NewUnsignedTx(ctrl)
-				unsignedTx1.EXPECT().Visit(gomock.Any()).Return(nil) // Pass semantic verification
+				unsignedTx1.EXPECT().Visit(gomock.Any()).Return(nil)  // Pass semantic verification
 				unsignedTx1.EXPECT().Visit(gomock.Any()).DoAndReturn( // Pass execution
 					func(visitor txs.Visitor) error {
 						require.IsType(t, &txexecutor.Executor{}, visitor)
