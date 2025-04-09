@@ -2,7 +2,7 @@
 
 ## [v1.13.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.1)
 
-This version is backwards compatible to [v1.12.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0). It is optional, but encouraged. The supported plugin version is `39`.
+This version is backwards compatible to [v1.13.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.0). It is optional, but encouraged. The supported plugin version is `39`.
 
 ### AVM
 
