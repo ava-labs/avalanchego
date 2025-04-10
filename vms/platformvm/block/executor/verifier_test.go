@@ -695,6 +695,7 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			// Create mocked dependencies.
 			s := state.NewMockState(ctrl)
 			mempool, err := mempool.New(
+				ids.ID{},
 				gas.Dimensions{},
 				"",
 				prometheus.NewRegistry(),
@@ -801,6 +802,7 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			// Create mocked dependencies.
 			s := state.NewMockState(ctrl)
 			mempool, err := mempool.New(
+				ids.ID{},
 				gas.Dimensions{},
 				"",
 				prometheus.NewRegistry(),

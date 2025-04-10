@@ -27,6 +27,7 @@ var (
 
 type Tx struct {
 	*txs.Tx
+	Complexity gas.Dimensions
 	Gas gas.Gas
 }
 
@@ -81,7 +82,7 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 	default:
 	}
 
-	gas, err := m.meter(tx.Unsigned)
+	complexity, gas, err := m.meter(tx.Unsigned)
 	if err != nil {
 		return err
 	}
@@ -92,6 +93,7 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 
 	heapTx := Tx{
 		Tx:  tx,
+		Complexity: complexity,
 		Gas: gas,
 	}
 
@@ -171,16 +173,16 @@ func (m *Mempool) RequestBuildBlock(emptyBlockPermitted bool) {
 	}
 }
 
-func (m *Mempool) meter(tx txs.UnsignedTx) (gas.Gas, error) {
+func (m *Mempool) meter(tx txs.UnsignedTx) (gas.Dimensions, gas.Gas, error) {
 	c, err := fee.TxComplexity(tx)
 	if err != nil {
-		return 0, err
+		return gas.Dimensions{}, 0, err
 	}
 
 	g, err := c.ToGas(m.weights)
 	if err != nil {
-		return 0, err
+		return gas.Dimensions{}, 0, err
 	}
 
-	return g, nil
+	return c, g, nil
 }
