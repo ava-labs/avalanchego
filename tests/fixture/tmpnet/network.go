@@ -1027,7 +1027,7 @@ func getRPCVersion(log logging.Logger, command string, versionArgs ...string) (u
 
 	// Ignore output before the opening brace to tolerate the case of a command being invoked
 	// with `go run` and the go toolchain emitting diagnostic logging before the version output.
-	if idx := bytes.IndexByte(output, '{'); idx != -1 {
+	if idx := bytes.IndexByte(output, '{'); idx > 0 {
 		log.Info("ignoring leading bytes of JSON version output in advance of opening `{`",
 			zap.String("command", command),
 			zap.String("ignoredLeadingBytes", string(output[:idx])),
