@@ -10,17 +10,13 @@ import (
 )
 
 var DefaultConfig = Config{
-	Network:              network.DefaultConfig,
-	IndexTransactions:    false,
-	IndexAllowIncomplete: false,
-	ChecksumsEnabled:     false,
+	Network:          network.DefaultConfig,
+	ChecksumsEnabled: false,
 }
 
 type Config struct {
-	Network              network.Config `json:"network"`
-	IndexTransactions    bool           `json:"index-transactions"`
-	IndexAllowIncomplete bool           `json:"index-allow-incomplete"`
-	ChecksumsEnabled     bool           `json:"checksums-enabled"`
+	Network          network.Config `json:"network"`
+	ChecksumsEnabled bool           `json:"checksums-enabled"`
 }
 
 func ParseConfig(configBytes []byte) (Config, error) {

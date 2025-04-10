@@ -27,10 +27,8 @@ func TestParseConfig(t *testing.T) {
 			name:        "manually specified checksums enabled",
 			configBytes: []byte(`{"checksums-enabled":true}`),
 			expectedConfig: Config{
-				Network:              network.DefaultConfig,
-				IndexTransactions:    DefaultConfig.IndexTransactions,
-				IndexAllowIncomplete: DefaultConfig.IndexAllowIncomplete,
-				ChecksumsEnabled:     true,
+				Network:          network.DefaultConfig,
+				ChecksumsEnabled: true,
 			},
 		},
 		{
@@ -56,9 +54,7 @@ func TestParseConfig(t *testing.T) {
 					ExpectedBloomFilterFalsePositiveProbability: network.DefaultConfig.ExpectedBloomFilterFalsePositiveProbability,
 					MaxBloomFilterFalsePositiveProbability:      network.DefaultConfig.MaxBloomFilterFalsePositiveProbability,
 				},
-				IndexTransactions:    DefaultConfig.IndexTransactions,
-				IndexAllowIncomplete: DefaultConfig.IndexAllowIncomplete,
-				ChecksumsEnabled:     DefaultConfig.ChecksumsEnabled,
+				ChecksumsEnabled: DefaultConfig.ChecksumsEnabled,
 			},
 		},
 	}
