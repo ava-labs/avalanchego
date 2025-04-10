@@ -288,10 +288,13 @@ func StartNetwork(
 		pluginDir,
 	)
 	if err != nil {
-		// Ensure nodes are stopped if bootstrap fails. The network configuration
-		// will remain on disk to enable troubleshooting.
-		err := network.Stop(tc.DefaultContext())
-		require.NoError(err, "failed to stop network after bootstrap failure")
+		tc.DeferCleanup(func() {
+			tc.Log().Info("shutting down network")
+			ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
+			defer cancel()
+			require.NoError(network.Stop(ctx))
+		})
+		require.NoError(err, "failed to bootstrap network")
 	}
 
 	tc.Log().Info("network started successfully")
