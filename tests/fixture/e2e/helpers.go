@@ -13,9 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/ethclient"
-	"github.com/ava-labs/coreth/interfaces"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
@@ -29,6 +28,8 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+
+	ethereum "github.com/ava-labs/libevm"
 )
 
 const (
@@ -178,7 +179,7 @@ func SendEthTransaction(tc tests.TestContext, ethClient ethclient.Client, signed
 	tc.Eventually(func() bool {
 		var err error
 		receipt, err = ethClient.TransactionReceipt(tc.DefaultContext(), txID)
-		if errors.Is(err, interfaces.NotFound) {
+		if errors.Is(err, ethereum.NotFound) {
 			return false // Transaction is still pending
 		}
 		require.NoError(err)
