@@ -6,6 +6,7 @@ package mempool
 import (
 	"errors"
 	"fmt"
+	"math/big"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -13,9 +14,11 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/heap"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	txmempool "github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
@@ -33,21 +36,23 @@ type Tx struct {
 
 type Mempool struct {
 	avaxAssetID ids.ID
+	utxos avax.UTXOState
 	weights     gas.Dimensions
 	toEngine    chan<- common.Message
 
 	mempool txmempool.Mempool[*txs.Tx]
 
-	lock sync.Mutex
-	heap heap.Map[ids.ID, Tx]
+	lock  sync.Mutex
+	heap  heap.Map[ids.ID, Tx]
 }
 
 func New(
-	avaxAssetID ids.ID,
 	weights gas.Dimensions,
 	namespace string,
 	registerer prometheus.Registerer,
 	toEngine chan<- common.Message,
+	avaxAssetID ids.ID,
+	utxos avax.UTXOState,
 ) (*Mempool, error) {
 	metrics, err := txmempool.NewMetrics(namespace, registerer)
 	if err != nil {
@@ -59,6 +64,7 @@ func New(
 
 	return &Mempool{
 		avaxAssetID: avaxAssetID,
+		utxos: utxos,
 		weights:     weights,
 		mempool:     pool,
 		heap: heap.NewMap[ids.ID, Tx](
@@ -74,10 +80,49 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	complexity, gas, err := m.meter(tx.Unsigned)
+	complexity, gasUsed, err := m.meter(tx.Unsigned)
 	if err != nil {
 		return err
 	}
+
+	totalConsumedAvax := &big.Int{}
+	for utxo := range tx.InputIDs() {
+		if utxo != m.avaxAssetID {
+			continue
+		}
+
+		consumedAvax, err := m.utxos.GetUTXO(utxo)
+		if err != nil {
+			return fmt.Errorf("failed to get utxo: %w", err)
+		}
+
+		output, ok  := consumedAvax.Out.(*secp256k1fx.TransferOutput)
+		if !ok {
+			return errors.New("unexpected output type")
+		}
+
+		totalConsumedAvax.Add(totalConsumedAvax, big.NewInt(int64(output.Amt)))
+	}
+
+	totalProducedAvax := &big.Int{}
+	for _, utxo := range tx.UTXOs() {
+		if utxo.AssetID() != m.avaxAssetID {
+			continue
+		}
+
+		output, ok  := utxo.Out.(*secp256k1fx.TransferOutput)
+		if !ok {
+			return errors.New("unexpected output type")
+		}
+
+		totalProducedAvax.Add(totalConsumedAvax, big.NewInt(int64(output.Amt)))
+	}
+
+	feesPaid := &big.Int{}
+	feesPaid.Sub(totalConsumedAvax, totalProducedAvax)
+
+	gasPrice := &big.Int{}
+	gasPrice.Div(feesPaid, big.NewInt(int64(gasUsed)))
 
 	if err := m.mempool.Add(tx); err != nil {
 		return fmt.Errorf("failed to add tx to mempool: %w", err)
@@ -86,7 +131,7 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 	heapTx := Tx{
 		Tx:  tx,
 		Complexity: complexity,
-		GasPrice: gas,
+		GasPrice: gas.Gas(gasPrice.Uint64()),
 	}
 
 	m.heap.Push(tx.TxID, heapTx)

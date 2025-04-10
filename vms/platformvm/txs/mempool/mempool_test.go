@@ -21,8 +21,16 @@ import (
 func TestMempoolOrdering(t *testing.T) {
 	require := require.New(t)
 
+	avaxAssetID := ids.ID{1, 2, 3}
 	weights := gas.Dimensions{gas.Bandwidth: 1}
-	m, err := New(ids.ID{}, weights, "", prometheus.NewRegistry(), nil)
+	m, err := New(
+		weights,
+		"",
+		prometheus.NewRegistry(),
+		nil,
+		avaxAssetID,
+		nil,
+	)
 	require.NoError(err)
 
 	lowTx := &txs.Tx{
@@ -33,9 +41,21 @@ func TestMempoolOrdering(t *testing.T) {
 						UTXOID: avax.UTXOID{
 							TxID: ids.ID{1, 2, 3},
 						},
-						Asset: avax.Asset{},
+						Asset: avax.Asset{
+							ID: avaxAssetID,
+						},
 						In: &secp256k1fx.TransferInput{
-							Amt: 1,
+							Amt: 2,
+						},
+					},
+				},
+				Outs: []*avax.TransferableOutput{
+					{
+						Asset: avax.Asset{
+							ID: avaxAssetID,
+						},
+						Out:   &secp256k1fx.TransferOutput{
+							Amt:          1,
 						},
 					},
 				},
@@ -52,11 +72,23 @@ func TestMempoolOrdering(t *testing.T) {
 				Ins: []*avax.TransferableInput{
 					{
 						UTXOID: avax.UTXOID{
-							TxID: ids.ID{4, 5, 6},
+							TxID: ids.ID{1, 2, 3},
 						},
-						Asset: avax.Asset{},
+						Asset: avax.Asset{
+							ID: avaxAssetID,
+						},
 						In: &secp256k1fx.TransferInput{
-							Amt: 2,
+							Amt: 3,
+						},
+					},
+				},
+				Outs: []*avax.TransferableOutput{
+					{
+						Asset: avax.Asset{
+							ID: avaxAssetID,
+						},
+						Out:   &secp256k1fx.TransferOutput{
+							Amt:      1,
 						},
 					},
 				},
@@ -76,7 +108,7 @@ func TestMempoolOrdering(t *testing.T) {
 	require.Equal(wantComplexity, gotTx.Complexity)
 	wantGas, err := wantComplexity.ToGas(weights)
 	require.NoError(err)
-	require.Equal(wantGas, gotTx.Gas)
+	require.Equal(wantGas, gotTx.GasPrice)
 
 	m.Remove(gotTx.Tx)
 
@@ -89,5 +121,5 @@ func TestMempoolOrdering(t *testing.T) {
 	require.Equal(wantComplexity, gotTx.Complexity)
 	wantGas, err = wantComplexity.ToGas(weights)
 	require.NoError(err)
-	require.Equal(wantGas, gotTx.Gas)
+	require.Equal(wantGas, gotTx.GasPrice)
 }

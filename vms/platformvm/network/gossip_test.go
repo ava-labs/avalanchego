@@ -31,10 +31,11 @@ func TestGossipMempoolAddVerificationError(t *testing.T) {
 	}
 
 	mempool, err := pmempool.New(
-		ids.ID{},
 		gas.Dimensions{},
 		"",
 		prometheus.NewRegistry(),
+		nil,
+		ids.ID{},
 		nil,
 	)
 	require.NoError(err)
@@ -61,10 +62,11 @@ func TestMempoolDuplicate(t *testing.T) {
 	require := require.New(t)
 
 	testMempool, err := pmempool.New(
-		ids.ID{},
 		gas.Dimensions{},
 		"",
 		prometheus.NewRegistry(),
+		nil,
+		ids.ID{},
 		nil,
 	)
 	require.NoError(err)
@@ -105,10 +107,11 @@ func TestGossipAddBloomFilter(t *testing.T) {
 
 	txVerifier := testTxVerifier{}
 	mempool, err := pmempool.New(
-		ids.ID{},
 		gas.Dimensions{},
 		"",
 		prometheus.NewRegistry(),
+		nil,
+		ids.ID{},
 		nil,
 	)
 	require.NoError(err)

@@ -75,10 +75,11 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			name: "mempool has transaction",
 			mempool: func() *pmempool.Mempool {
 				mempool, err := pmempool.New(
-					ids.ID{},
 					gas.Dimensions{},
 					"",
 					prometheus.NewRegistry(),
+					nil,
+					ids.ID{},
 					nil,
 				)
 				require.NoError(t, err)
@@ -95,10 +96,11 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			name: "transaction marked as dropped in mempool",
 			mempool: func() *pmempool.Mempool {
 				mempool, err := pmempool.New(
-					ids.ID{},
 					gas.Dimensions{},
 					"",
 					prometheus.NewRegistry(),
+					nil,
+					ids.ID{},
 					nil,
 				)
 				require.NoError(t, err)
@@ -116,10 +118,11 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			name: "tx dropped",
 			mempool: func() *pmempool.Mempool {
 				mempool, err := pmempool.New(
-					ids.ID{},
 					gas.Dimensions{},
 					"",
 					prometheus.NewRegistry(),
+					nil,
+					ids.ID{},
 					nil,
 				)
 				require.NoError(t, err)
@@ -137,10 +140,11 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			name: "tx too big",
 			mempool: func() *pmempool.Mempool {
 				mempool, err := pmempool.New(
-					ids.ID{},
 					gas.Dimensions{},
 					"",
 					prometheus.NewRegistry(),
+					nil,
+					ids.ID{},
 					nil,
 				)
 				require.NoError(t, err)
@@ -162,10 +166,11 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			name: "tx conflicts",
 			mempool: func() *pmempool.Mempool {
 				mempool, err := pmempool.New(
-					ids.ID{},
 					gas.Dimensions{},
 					"",
 					prometheus.NewRegistry(),
+					nil,
+					ids.ID{},
 					nil,
 				)
 				require.NoError(t, err)
@@ -212,10 +217,11 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			name: "mempool full",
 			mempool: func() *pmempool.Mempool {
 				m, err := pmempool.New(
-					ids.ID{},
 					gas.Dimensions{},
 					"",
 					prometheus.NewRegistry(),
+					nil,
+					ids.ID{},
 					nil,
 				)
 				require.NoError(t, err)
@@ -245,10 +251,11 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			name: "happy path",
 			mempool: func() *pmempool.Mempool {
 				mempool, err := pmempool.New(
-					ids.ID{},
 					gas.Dimensions{},
 					"",
 					prometheus.NewRegistry(),
+					nil,
+					ids.ID{},
 					nil,
 				)
 				require.NoError(t, err)

@@ -122,10 +122,11 @@ func TestRejectBlock(t *testing.T) {
 			require.NoError(err)
 
 			mempool, err := mempool.New(
-				ids.ID{},
 				gas.Dimensions{},
 				"",
 				prometheus.NewRegistry(),
+				nil,
+				ids.ID{},
 				nil,
 			)
 			require.NoError(err)
