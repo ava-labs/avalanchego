@@ -27,35 +27,17 @@ var (
 
 type Tx struct {
 	*txs.Tx
-	Complexity gas.Dimensions
-	Gas        gas.Gas
-}
-
-type meter struct {
-	weights gas.Dimensions
-}
-
-func (m meter) Meter(tx txs.UnsignedTx) (gas.Dimensions, gas.Gas, error) {
-	c, err := fee.TxComplexity(tx)
-	if err != nil {
-		return gas.Dimensions{}, 0, err
-	}
-
-	g, err := c.ToGas(m.weights)
-	if err != nil {
-		return gas.Dimensions{}, 0, err
-	}
-
-	return c, g, nil
+	Gas gas.Gas
 }
 
 type Mempool struct {
-	mempool  txmempool.Mempool[*txs.Tx]
+	weights  gas.Dimensions
 	toEngine chan<- common.Message
 
-	meter meter
-	lock  sync.Mutex
-	heap  heap.Map[ids.ID, Tx]
+	mempool txmempool.Mempool[*txs.Tx]
+
+	lock sync.Mutex
+	heap heap.Map[ids.ID, Tx]
 }
 
 func New(
@@ -73,10 +55,8 @@ func New(
 	)
 
 	return &Mempool{
+		weights: weights,
 		mempool: pool,
-		meter: meter{
-			weights: weights,
-		},
 		heap: heap.NewMap[ids.ID, Tx](func(a, b Tx) bool {
 			return a.Gas > b.Gas
 		}),
@@ -96,7 +76,7 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 	default:
 	}
 
-	complexity, gas, err := m.meter.Meter(tx.Unsigned)
+	gas, err := m.meter(tx.Unsigned)
 	if err != nil {
 		return err
 	}
@@ -106,9 +86,8 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 	}
 
 	heapTx := Tx{
-		Tx:         tx,
-		Complexity: complexity,
-		Gas:        gas,
+		Tx:  tx,
+		Gas: gas,
 	}
 
 	m.heap.Push(tx.TxID, heapTx)
@@ -185,4 +164,18 @@ func (m *Mempool) RequestBuildBlock(emptyBlockPermitted bool) {
 	case m.toEngine <- common.PendingTxs:
 	default:
 	}
+}
+
+func (m *Mempool) meter(tx txs.UnsignedTx) (gas.Gas, error) {
+	c, err := fee.TxComplexity(tx)
+	if err != nil {
+		return 0, err
+	}
+
+	g, err := c.ToGas(m.weights)
+	if err != nil {
+		return 0, err
+	}
+
+	return g, nil
 }
