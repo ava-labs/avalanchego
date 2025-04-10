@@ -84,6 +84,10 @@ func (n *Network) GetGenesisPath() string {
 func (n *Network) readGenesis() error {
 	bytes, err := os.ReadFile(n.GetGenesisPath())
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			n.Genesis = nil
+			return nil
+		}
 		return fmt.Errorf("failed to read genesis: %w", err)
 	}
 	genesis := genesis.UnparsedConfig{}
@@ -95,6 +99,9 @@ func (n *Network) readGenesis() error {
 }
 
 func (n *Network) writeGenesis() error {
+	if n.Genesis == nil {
+		return nil
+	}
 	bytes, err := DefaultJSONMarshal(n.Genesis)
 	if err != nil {
 		return fmt.Errorf("failed to marshal genesis: %w", err)
