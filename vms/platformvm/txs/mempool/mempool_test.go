@@ -34,19 +34,9 @@ func TestMempoolOrdering(t *testing.T) {
 							TxID: ids.ID{1, 2, 3},
 						},
 						Asset: avax.Asset{},
-						FxID:  ids.ID{},
 						In: &secp256k1fx.TransferInput{
 							Amt: 1,
 						},
-					},
-				},
-				Outs: []*avax.TransferableOutput{
-					{
-						Asset: avax.Asset{
-							ID: ids.ID{},
-						},
-						FxID: ids.ID{},
-						Out:  &secp256k1fx.TransferOutput{},
 					},
 				},
 			},
@@ -65,19 +55,9 @@ func TestMempoolOrdering(t *testing.T) {
 							TxID: ids.ID{4, 5, 6},
 						},
 						Asset: avax.Asset{},
-						FxID:  ids.ID{},
 						In: &secp256k1fx.TransferInput{
-							Amt: 1,
+							Amt: 2,
 						},
-					},
-				},
-				Outs: []*avax.TransferableOutput{
-					{
-						Asset: avax.Asset{
-							ID: ids.ID{},
-						},
-						FxID: ids.ID{},
-						Out:  &secp256k1fx.TransferOutput{},
 					},
 				},
 			},

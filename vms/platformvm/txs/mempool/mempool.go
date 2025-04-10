@@ -28,7 +28,7 @@ var (
 type Tx struct {
 	*txs.Tx
 	Complexity gas.Dimensions
-	Gas gas.Gas
+	GasPrice gas.Gas
 }
 
 type Mempool struct {
@@ -63,7 +63,7 @@ func New(
 		mempool:     pool,
 		heap: heap.NewMap[ids.ID, Tx](
 			func(a, b Tx) bool {
-				return a.Gas > b.Gas
+				return a.GasPrice > b.GasPrice
 			},
 		),
 		toEngine: toEngine,
@@ -73,14 +73,6 @@ func New(
 func (m *Mempool) Add(tx *txs.Tx) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
-
-	switch tx.Unsigned.(type) {
-	case *txs.AdvanceTimeTx:
-		return ErrCantIssueAdvanceTimeTx
-	case *txs.RewardValidatorTx:
-		return ErrCantIssueRewardValidatorTx
-	default:
-	}
 
 	complexity, gas, err := m.meter(tx.Unsigned)
 	if err != nil {
@@ -94,7 +86,7 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 	heapTx := Tx{
 		Tx:  tx,
 		Complexity: complexity,
-		Gas: gas,
+		GasPrice: gas,
 	}
 
 	m.heap.Push(tx.TxID, heapTx)
