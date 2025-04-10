@@ -6,15 +6,13 @@ package network
 import (
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 
@@ -33,14 +31,9 @@ func TestGossipMempoolAddVerificationError(t *testing.T) {
 	}
 
 	mempool, err := pmempool.New(
-		&config.Internal{
-			UpgradeConfig: upgrade.Config{
-				EtnaTime: time.UnixMilli(1),
-			},
-		},
+		gas.Dimensions{},
 		"",
 		prometheus.NewRegistry(),
-		time.Time{},
 		nil,
 	)
 	require.NoError(err)
@@ -67,14 +60,9 @@ func TestMempoolDuplicate(t *testing.T) {
 	require := require.New(t)
 
 	testMempool, err := pmempool.New(
-		&config.Internal{
-			UpgradeConfig: upgrade.Config{
-				EtnaTime: time.UnixMilli(1),
-			},
-		},
+		gas.Dimensions{},
 		"",
 		prometheus.NewRegistry(),
-		time.Time{},
 		nil,
 	)
 	require.NoError(err)
@@ -115,14 +103,9 @@ func TestGossipAddBloomFilter(t *testing.T) {
 
 	txVerifier := testTxVerifier{}
 	mempool, err := pmempool.New(
-		&config.Internal{
-			UpgradeConfig: upgrade.Config{
-				EtnaTime: time.UnixMilli(1),
-			},
-		},
+		gas.Dimensions{},
 		"",
 		prometheus.NewRegistry(),
-		time.Time{},
 		nil,
 	)
 	require.NoError(err)

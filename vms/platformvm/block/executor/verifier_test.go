@@ -72,10 +72,9 @@ func newTestVerifier(t testing.TB, c testVerifierConfig) *verifier {
 	}
 
 	mempool, err := mempool.New(
-		&config.Internal{UpgradeConfig: c.Upgrades},
+		gas.Dimensions{},
 		"",
 		prometheus.NewRegistry(),
-		time.Time{},
 		nil,
 	)
 	require.NoError(err)
@@ -457,14 +456,9 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
 	mempool, err := mempool.New(
-		&config.Internal{
-			UpgradeConfig: upgrade.Config{
-				EtnaTime: time.UnixMilli(1),
-			},
-		},
+		gas.Dimensions{},
 		"",
 		prometheus.NewRegistry(),
-		time.Time{},
 		nil,
 	)
 	require.NoError(err)
@@ -541,14 +535,9 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
 	mempool, err := mempool.New(
-		&config.Internal{
-			UpgradeConfig: upgrade.Config{
-				EtnaTime: time.UnixMilli(1),
-			},
-		},
+		gas.Dimensions{},
 		"",
 		prometheus.NewRegistry(),
-		time.Time{},
 		nil,
 	)
 	require.NoError(err)
@@ -626,14 +615,9 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
 	mempool, err := mempool.New(
-		&config.Internal{
-			UpgradeConfig: upgrade.Config{
-				EtnaTime: time.UnixMilli(1),
-			},
-		},
+		gas.Dimensions{},
 		"",
 		prometheus.NewRegistry(),
-		time.Time{},
 		nil,
 	)
 	require.NoError(err)
@@ -707,14 +691,9 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			// Create mocked dependencies.
 			s := state.NewMockState(ctrl)
 			mempool, err := mempool.New(
-				&config.Internal{
-					UpgradeConfig: upgrade.Config{
-						EtnaTime: time.UnixMilli(1),
-					},
-				},
+				gas.Dimensions{},
 				"",
 				prometheus.NewRegistry(),
-				time.Time{},
 				nil,
 			)
 			require.NoError(err)
@@ -818,14 +797,9 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			// Create mocked dependencies.
 			s := state.NewMockState(ctrl)
 			mempool, err := mempool.New(
-				&config.Internal{
-					UpgradeConfig: upgrade.Config{
-						EtnaTime: time.UnixMilli(1),
-					},
-				},
+				gas.Dimensions{},
 				"",
 				prometheus.NewRegistry(),
-				time.Time{},
 				nil,
 			)
 			require.NoError(err)
@@ -897,14 +871,9 @@ func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
 	mempool, err := mempool.New(
-		&config.Internal{
-			UpgradeConfig: upgrade.Config{
-				EtnaTime: time.UnixMilli(1),
-			},
-		},
+		gas.Dimensions{},
 		"",
 		prometheus.NewRegistry(),
-		time.Time{},
 		nil,
 	)
 	require.NoError(err)
@@ -964,14 +933,9 @@ func TestVerifierVisitBanffStandardBlockWithProposalBlockParent(t *testing.T) {
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
 	mempool, err := mempool.New(
-		&config.Internal{
-			UpgradeConfig: upgrade.Config{
-				EtnaTime: time.UnixMilli(1),
-			},
-		},
+		gas.Dimensions{},
 		"",
 		prometheus.NewRegistry(),
-		time.Time{},
 		nil,
 	)
 	require.NoError(err)

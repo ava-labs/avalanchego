@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 
@@ -25,8 +23,6 @@ import (
 var (
 	ErrCantIssueAdvanceTimeTx     = errors.New("can not issue an advance time tx")
 	ErrCantIssueRewardValidatorTx = errors.New("can not issue a reward validator tx")
-
-	_ meterer = (*noMeter)(nil)
 )
 
 type Tx struct {
@@ -35,27 +31,17 @@ type Tx struct {
 	Gas        gas.Gas
 }
 
-type meterer interface {
-	Meter(tx txs.UnsignedTx) (gas.Dimensions, gas.Gas, error)
-}
-
-type noMeter struct{}
-
-func (noMeter) Meter(txs.UnsignedTx) (gas.Dimensions, gas.Gas, error) {
-	return gas.Dimensions{}, 0, nil
-}
-
-type dynamicMeter struct {
+type meter struct {
 	weights gas.Dimensions
 }
 
-func (d dynamicMeter) Meter(tx txs.UnsignedTx) (gas.Dimensions, gas.Gas, error) {
+func (m meter) Meter(tx txs.UnsignedTx) (gas.Dimensions, gas.Gas, error) {
 	c, err := fee.TxComplexity(tx)
 	if err != nil {
 		return gas.Dimensions{}, 0, err
 	}
 
-	g, err := c.ToGas(d.weights)
+	g, err := c.ToGas(m.weights)
 	if err != nil {
 		return gas.Dimensions{}, 0, err
 	}
@@ -67,16 +53,15 @@ type Mempool struct {
 	mempool  txmempool.Mempool[*txs.Tx]
 	toEngine chan<- common.Message
 
-	meterer meterer
-	lock    sync.Mutex
-	heap    heap.Map[ids.ID, Tx]
+	meter meter
+	lock  sync.Mutex
+	heap  heap.Map[ids.ID, Tx]
 }
 
 func New(
-	cfg *config.Internal,
+	weights gas.Dimensions,
 	namespace string,
 	registerer prometheus.Registerer,
-	timestamp time.Time,
 	toEngine chan<- common.Message,
 ) (*Mempool, error) {
 	metrics, err := txmempool.NewMetrics(namespace, registerer)
@@ -87,16 +72,11 @@ func New(
 		metrics,
 	)
 
-	var meterer meterer = noMeter{}
-	if cfg.UpgradeConfig.IsEtnaActivated(timestamp) {
-		meterer = dynamicMeter{
-			weights: cfg.DynamicFeeConfig.Weights,
-		}
-	}
-
 	return &Mempool{
 		mempool: pool,
-		meterer: meterer,
+		meter: meter{
+			weights: weights,
+		},
 		heap: heap.NewMap[ids.ID, Tx](func(a, b Tx) bool {
 			return a.Gas > b.Gas
 		}),
@@ -116,7 +96,7 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 	default:
 	}
 
-	complexity, gas, err := m.meterer.Meter(tx.Unsigned)
+	complexity, gas, err := m.meter.Meter(tx.Unsigned)
 	if err != nil {
 		return err
 	}

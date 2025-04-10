@@ -172,10 +172,9 @@ func (vm *VM) Initialize(
 	}
 
 	mempool, err := pmempool.New(
-		&vm.Internal,
+		vm.Internal.DynamicFeeConfig.Weights,
 		"mempool",
 		registerer,
-		time.Time{},
 		toEngine,
 	)
 	if err != nil {

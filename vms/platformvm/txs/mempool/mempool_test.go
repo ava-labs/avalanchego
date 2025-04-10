@@ -5,7 +5,6 @@ package mempool
 
 import (
 	"testing"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
@@ -13,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -25,14 +23,9 @@ func TestMempoolOrdering(t *testing.T) {
 
 	weights := gas.Dimensions{gas.Bandwidth: 1}
 	m, err := New(
-		&config.Internal{
-			DynamicFeeConfig: gas.Config{
-				Weights: gas.Dimensions{1},
-			},
-		},
+		weights,
 		"",
 		prometheus.NewRegistry(),
-		time.Time{},
 		nil,
 	)
 	require.NoError(err)

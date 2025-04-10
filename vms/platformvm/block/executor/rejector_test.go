@@ -13,11 +13,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -123,14 +122,9 @@ func TestRejectBlock(t *testing.T) {
 			require.NoError(err)
 
 			mempool, err := mempool.New(
-				&config.Internal{
-					UpgradeConfig: upgrade.Config{
-						EtnaTime: time.UnixMilli(1),
-					},
-				},
+				gas.Dimensions{},
 				"",
 				prometheus.NewRegistry(),
-				time.Time{},
 				nil,
 			)
 			require.NoError(err)
