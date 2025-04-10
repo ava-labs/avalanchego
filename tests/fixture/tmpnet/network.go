@@ -4,6 +4,7 @@
 package tmpnet
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/hex"
@@ -1066,7 +1067,7 @@ func checkVMBinaries(log logging.Logger, subnets []*Subnet, avalanchegoPath stri
 		return nil
 	}
 
-	avalanchegoRPCVersion, err := getRPCVersion(avalanchegoPath, "--version-json")
+	avalanchegoRPCVersion, err := getRPCVersion(log, avalanchegoPath, "--version-json")
 	if err != nil {
 		log.Warn("unable to check rpcchainvm version for avalanchego", zap.Error(err))
 		return nil
@@ -1092,7 +1093,7 @@ func checkVMBinaries(log logging.Logger, subnets []*Subnet, avalanchegoPath stri
 			}
 
 			// Check that the VM's rpcchainvm version matches avalanchego's version
-			vmRPCVersion, err := getRPCVersion(vmPath, chain.VersionArgs...)
+			vmRPCVersion, err := getRPCVersion(log, vmPath, chain.VersionArgs...)
 			if err != nil {
 				log.Warn("unable to check rpcchainvm version for VM Binary",
 					zap.String("subnet", subnet.Name),
@@ -1123,12 +1124,23 @@ type RPCChainVMVersion struct {
 
 // getRPCVersion attempts to invoke the given command with the specified version arguments and
 // retrieve an rpcchainvm version from its output.
-func getRPCVersion(command string, versionArgs ...string) (uint64, error) {
+func getRPCVersion(log logging.Logger, command string, versionArgs ...string) (uint64, error) {
 	cmd := exec.Command(command, versionArgs...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return 0, fmt.Errorf("command %q failed with output: %s", command, output)
 	}
+
+	// Ignore output before the opening brace to tolerate the case of a command being invoked
+	// with `go run` and the go toolchain emitting diagnostic logging before the version output.
+	if idx := bytes.IndexByte(output, '{'); idx > 0 {
+		log.Info("ignoring leading bytes of JSON version output in advance of opening `{`",
+			zap.String("command", command),
+			zap.String("ignoredLeadingBytes", string(output[:idx])),
+		)
+		output = output[idx:]
+	}
+
 	version := &RPCChainVMVersion{}
 	if err := json.Unmarshal(output, version); err != nil {
 		return 0, fmt.Errorf("failed to unmarshal output from command %q: %w, output: %s", command, err, output)
