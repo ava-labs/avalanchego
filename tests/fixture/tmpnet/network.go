@@ -458,10 +458,6 @@ func (n *Network) StartNode(ctx context.Context, log logging.Logger, node *Node)
 		return err
 	}
 
-	if err := n.writeNodeFlags(ctx, log, node); err != nil {
-		return fmt.Errorf("writing node flags: %w", err)
-	}
-
 	if err := node.Start(ctx, log); err != nil {
 		// Attempt to stop an unhealthy node to provide some assurance to the caller
 		// that an error condition will not result in a lingering process.
@@ -920,8 +916,6 @@ func (n *Network) composeNodeFlags(ctx context.Context, log logging.Logger, node
 
 	// Convert the network id to a string to ensure consistency in JSON round-tripping.
 	flags.SetDefault(config.NetworkNameKey, strconv.FormatUint(uint64(n.GetNetworkID()), 10))
-
-	flags.SetDefault(config.LogLevelKey, logging.Debug.String())
 
 	// Set the bootstrap configuration
 	bootstrapIPs, bootstrapIDs, err := n.getBootstrapIPsAndIDs(ctx, node)

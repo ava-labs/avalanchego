@@ -20,4 +20,4 @@ if [[ -z "${SKIP_BUILD_IMAGE:-}" ]]; then
   bash -x ./scripts/build_xsvm_image.sh
 fi
 
-E2E_SERIAL=1 PATH="${PWD}/bin:$PATH" bash -x ./scripts/tests.e2e.sh --runtime=kube --image-name=localhost:5001/avalanchego-xsvm
+E2E_SERIAL=1 PATH="${PWD}/bin:$PATH" bash -x ./scripts/tests.e2e.sh --runtime=kube --kube-image=localhost:5001/avalanchego-xsvm

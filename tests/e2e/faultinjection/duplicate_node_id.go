@@ -26,7 +26,7 @@ var _ = ginkgo.Describe("Duplicate node handling", func() {
 	ginkgo.It("should ensure that a given Node ID (i.e. staking keypair) can be used at most once on a network", func() {
 		network := e2e.GetEnv(tc).GetNetwork()
 
-		if network.DefaultRuntimeConfig.KubeRuntimeConfig != nil {
+		if network.DefaultRuntimeConfig.Kube != nil {
 			// Enabling this test for kube requires supporting a flexible name mapping
 			ginkgo.Skip("This test is not supported on kube to avoid having to deviate from composing the statefulset name with the network uuid + nodeid")
 		}

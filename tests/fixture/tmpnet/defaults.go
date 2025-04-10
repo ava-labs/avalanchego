@@ -31,7 +31,7 @@ const (
 	DefaultPreFundedKeyCount = 50
 
 	// A short minimum stake duration enables testing of staking logic.
-	DefaultMinStakeDuration = time.Second
+	DefaultMinStakeDuration = "1s"
 
 	defaultConfigFilename = "config.json"
 )

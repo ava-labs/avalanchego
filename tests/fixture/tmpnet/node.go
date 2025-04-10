@@ -54,27 +54,27 @@ type NodeRuntime interface {
 
 // Configuration required to configure a node runtime. Only one of the fields should be set.
 type NodeRuntimeConfig struct {
-	Process *ProcessRuntimeConfig
-	Kube    *KubeRuntimeConfig
+	Process *ProcessRuntimeConfig `json:"process,omitempty"`
+	Kube    *KubeRuntimeConfig    `json:"kube,omitempty"`
 }
 
 type ProcessRuntimeConfig struct {
-	AvalancheGoPath   string
-	PluginDir         string
-	ReuseDynamicPorts bool
+	AvalancheGoPath   string `json:"avalanchegoPath,omitempty"`
+	PluginDir         string `json:"pluginDir,omitempty"`
+	ReuseDynamicPorts bool   `json:"reuseDynamicPorts,omitempty"`
 }
 
 type KubeRuntimeConfig struct {
 	// Path to the kubeconfig file identifying the target cluster
-	ConfigPath string
+	ConfigPath string `json:"configPath,omitempty"`
 	// The context of the kubeconfig file to use
-	ConfigContext string
+	ConfigContext string `json:"configContext,omitempty"`
 	// Namespace in the target cluster in which resources will be
 	// created. For simplicity all nodes are assumed to be deployed to
 	// the same namespace to ensure network connectivity.
-	Namespace string
+	Namespace string `json:"namespace,omitempty"`
 	// The docker image to run for the node
-	Image string
+	Image string `json:"image,omitempty"`
 }
 
 // Node supports configuring and running a node participating in a temporary network.

@@ -80,7 +80,7 @@ func (p *NodeProcess) readState(_ context.Context) error {
 // its staking port. The network will start faster with this
 // synchronization due to the avoidance of exponential backoff
 // if a node tries to connect to a beacon that is not ready.
-func (p *NodeProcess) Start(_ context.Context, log logging.Logger) error {
+func (p *NodeProcess) Start(ctx context.Context, log logging.Logger) error {
 	// Avoid attempting to start an already running node.
 	proc, err := p.getProcess()
 	if err != nil {
@@ -104,6 +104,10 @@ func (p *NodeProcess) Start(_ context.Context, log logging.Logger) error {
 	// creation of a new file can indicate node start.
 	if err := os.Remove(p.getProcessContextPath()); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("failed to remove stale process context file: %w", err)
+	}
+
+	if err := p.node.network.writeNodeFlags(ctx, log, p.node); err != nil {
+		return fmt.Errorf("writing node flags: %w", err)
 	}
 
 	// All arguments are provided in the flags file
