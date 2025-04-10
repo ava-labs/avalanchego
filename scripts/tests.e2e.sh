@@ -20,10 +20,6 @@ fi
 # the instructions to build non-portable BLST.
 source ./scripts/constants.sh
 
-# Enable subnet testing by building xsvm
-./scripts/build_xsvm.sh
-echo ""
-
 # Ensure an absolute path to avoid dependency on the working directory
 # of script execution.
 AVALANCHEGO_PATH="$(realpath "${AVALANCHEGO_PATH:-./build/avalanchego}")"
