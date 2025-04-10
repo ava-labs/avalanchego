@@ -543,7 +543,7 @@ func (n *Network) RestartNode(ctx context.Context, log logging.Logger, node *Nod
 // Stops all nodes in the network.
 func (n *Network) Stop(ctx context.Context) error {
 	// Target all nodes, including the ephemeral ones
-	nodes, err := ReadNodes(n.Dir, true /* includeEphemeral */)
+	nodes, err := ReadNodes(n, true /* includeEphemeral */)
 	if err != nil {
 		return err
 	}
@@ -586,11 +586,8 @@ func (n *Network) Restart(ctx context.Context, log logging.Logger) error {
 // no action will be taken.
 // TODO(marun) Reword or refactor to account for the differing behavior pre- vs post-start
 func (n *Network) EnsureNodeConfig(node *Node) error {
-	// Ensure nodes can label their metrics with the network uuid
-	node.NetworkUUID = n.UUID
-
-	// Ensure nodes can label metrics with an indication of the shared/private nature of the network
-	node.NetworkOwner = n.Owner
+	// Ensure the node has access to network configuration
+	node.network = n
 
 	if err := node.EnsureKeys(); err != nil {
 		return err
@@ -819,7 +816,7 @@ func (n *Network) GetNodeURIs() []NodeURI {
 // For consumption outside of avalanchego. Needs to be kept exported.
 func (n *Network) GetBootstrapIPsAndIDs(skippedNode *Node) ([]string, []string, error) {
 	// Collect staking addresses of non-ephemeral nodes for use in bootstrapping a node
-	nodes, err := ReadNodes(n.Dir, false /* includeEphemeral */)
+	nodes, err := ReadNodes(n, false /* includeEphemeral */)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to read network's nodes: %w", err)
 	}
