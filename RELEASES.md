@@ -2,6 +2,11 @@
 
 ## Pending Release
 
+- Major refactor to use [`libevm`](https://github.com/ava-labs/libevm) for EVM execution, database access, types & chain configuration. This improves maintainability and enables keeping up with upstream changes more easily.
+- Add metrics for ACP-176
+
+## [v0.15.0](https://github.com/ava-labs/coreth/releases/tag/v0.15.0)
+
 - Bump golang version to v1.23.6
 - Bump golangci-lint to v1.63 and add linters
 - Implement ACP-176
