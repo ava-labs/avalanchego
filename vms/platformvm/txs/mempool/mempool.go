@@ -31,8 +31,9 @@ type Tx struct {
 }
 
 type Mempool struct {
-	weights  gas.Dimensions
-	toEngine chan<- common.Message
+	avaxAssetID ids.ID
+	weights     gas.Dimensions
+	toEngine    chan<- common.Message
 
 	mempool txmempool.Mempool[*txs.Tx]
 
@@ -41,6 +42,7 @@ type Mempool struct {
 }
 
 func New(
+	avaxAssetID ids.ID,
 	weights gas.Dimensions,
 	namespace string,
 	registerer prometheus.Registerer,
@@ -55,11 +57,14 @@ func New(
 	)
 
 	return &Mempool{
-		weights: weights,
-		mempool: pool,
-		heap: heap.NewMap[ids.ID, Tx](func(a, b Tx) bool {
-			return a.Gas > b.Gas
-		}),
+		avaxAssetID: avaxAssetID,
+		weights:     weights,
+		mempool:     pool,
+		heap: heap.NewMap[ids.ID, Tx](
+			func(a, b Tx) bool {
+				return a.Gas > b.Gas
+			},
+		),
 		toEngine: toEngine,
 	}, nil
 }

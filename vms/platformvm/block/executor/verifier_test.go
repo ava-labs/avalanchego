@@ -72,6 +72,7 @@ func newTestVerifier(t testing.TB, c testVerifierConfig) *verifier {
 	}
 
 	mempool, err := mempool.New(
+		ids.ID{},
 		gas.Dimensions{},
 		"",
 		prometheus.NewRegistry(),
@@ -456,6 +457,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
 	mempool, err := mempool.New(
+		ids.ID{},
 		gas.Dimensions{},
 		"",
 		prometheus.NewRegistry(),
@@ -535,6 +537,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
 	mempool, err := mempool.New(
+		ids.ID{},
 		gas.Dimensions{},
 		"",
 		prometheus.NewRegistry(),
@@ -615,6 +618,7 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
 	mempool, err := mempool.New(
+		ids.ID{},
 		gas.Dimensions{},
 		"",
 		prometheus.NewRegistry(),
@@ -871,6 +875,7 @@ func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
 	mempool, err := mempool.New(
+		ids.ID{},
 		gas.Dimensions{},
 		"",
 		prometheus.NewRegistry(),
@@ -933,6 +938,7 @@ func TestVerifierVisitBanffStandardBlockWithProposalBlockParent(t *testing.T) {
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
 	mempool, err := mempool.New(
+		ids.ID{},
 		gas.Dimensions{},
 		"",
 		prometheus.NewRegistry(),

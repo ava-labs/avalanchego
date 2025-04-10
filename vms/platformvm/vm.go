@@ -172,6 +172,7 @@ func (vm *VM) Initialize(
 	}
 
 	mempool, err := pmempool.New(
+		ids.ID{},
 		vm.Internal.DynamicFeeConfig.Weights,
 		"mempool",
 		registerer,

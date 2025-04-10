@@ -22,12 +22,7 @@ func TestMempoolOrdering(t *testing.T) {
 	require := require.New(t)
 
 	weights := gas.Dimensions{gas.Bandwidth: 1}
-	m, err := New(
-		weights,
-		"",
-		prometheus.NewRegistry(),
-		nil,
-	)
+	m, err := New(ids.ID{}, weights, "", prometheus.NewRegistry(), nil)
 	require.NoError(err)
 
 	lowTx := &txs.Tx{

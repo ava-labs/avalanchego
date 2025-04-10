@@ -154,6 +154,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 
 	var err error
 	res.mempool, err = mempool.New(
+		ids.ID{},
 		res.config.DynamicFeeConfig.Weights,
 		"mempool",
 		registerer,
