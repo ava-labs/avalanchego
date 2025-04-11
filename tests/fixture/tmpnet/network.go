@@ -1031,6 +1031,7 @@ func checkVMBinaries(log logging.Logger, subnets []*Subnet, config *ProcessRunti
 
 	if config == nil {
 		log.Info("skipping rpcchainvm version check because the process runtime is not configured")
+		return nil
 	}
 
 	avalanchegoRPCVersion, err := getRPCVersion(log, config.AvalancheGoPath, "--version-json")
