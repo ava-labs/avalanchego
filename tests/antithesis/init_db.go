@@ -45,7 +45,7 @@ func initBootstrapDB(network *tmpnet.Network, destPath string) error {
 	}
 
 	// Copy the db state from the bootstrap node to the compose volume path.
-	sourcePath := filepath.Join(network.Nodes[0].GetDataDir(), "db")
+	sourcePath := filepath.Join(network.Nodes[0].DataDir, "db")
 	if err := os.MkdirAll(destPath, perms.ReadWriteExecute); err != nil {
 		return fmt.Errorf("failed to create db path %q: %w", destPath, err)
 	}

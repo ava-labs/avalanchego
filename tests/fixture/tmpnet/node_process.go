@@ -121,7 +121,7 @@ func (p *NodeProcess) Start(log logging.Logger) error {
 	// that includes the log entry.
 	ctx, cancelWithCause := context.WithCancelCause(context.Background())
 	defer cancelWithCause(nil)
-	logPath := p.node.GetDataDir() + "/logs/main.log"
+	logPath := p.node.DataDir + "/logs/main.log"
 	go watchLogFileForFatal(ctx, cancelWithCause, log, logPath)
 
 	// A node writes a process context file on start. If the file is not
@@ -133,7 +133,7 @@ func (p *NodeProcess) Start(log logging.Logger) error {
 
 	log.Info("started local node",
 		zap.Stringer("nodeID", p.node.NodeID),
-		zap.String("dataDir", p.node.GetDataDir()),
+		zap.String("dataDir", p.node.DataDir),
 		zap.Bool("isEphemeral", p.node.IsEphemeral),
 	)
 
@@ -198,7 +198,7 @@ func (p *NodeProcess) IsHealthy(ctx context.Context) (bool, error) {
 }
 
 func (p *NodeProcess) getProcessContextPath() string {
-	return filepath.Join(p.node.GetDataDir(), config.DefaultProcessContextFilename)
+	return filepath.Join(p.node.DataDir, config.DefaultProcessContextFilename)
 }
 
 func (p *NodeProcess) waitForProcessContext(ctx context.Context) error {
@@ -287,7 +287,7 @@ func (p *NodeProcess) writeMonitoringConfig() error {
 	}
 
 	promtailLabels := FlagsMap{
-		"__path__": filepath.Join(p.node.GetDataDir(), "logs", "*.log"),
+		"__path__": filepath.Join(p.node.DataDir, "logs", "*.log"),
 	}
 	promtailLabels.SetDefaults(commonLabels)
 	promtailConfig := []FlagsMap{

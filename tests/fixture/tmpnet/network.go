@@ -239,13 +239,6 @@ func (n *Network) EnsureDefaultConfig(log logging.Logger) error {
 		n.PrimaryChainConfigs[alias].SetDefaults(chainConfig)
 	}
 
-	// Ensure nodes are configured
-	for i := range n.Nodes {
-		if err := n.EnsureNodeConfig(n.Nodes[i]); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
@@ -503,23 +496,22 @@ func (n *Network) RestartNode(ctx context.Context, log logging.Logger, node *Nod
 
 // Stops all nodes in the network.
 func (n *Network) Stop(ctx context.Context) error {
-	// Target all nodes, including the ephemeral ones
-	nodes, err := ReadNodes(n, true /* includeEphemeral */)
-	if err != nil {
+	// Ensure the node state is up-to-date
+	if err := n.readNodes(); err != nil {
 		return err
 	}
 
 	var errs []error
 
 	// Initiate stop on all nodes
-	for _, node := range nodes {
+	for _, node := range n.Nodes {
 		if err := node.InitiateStop(ctx); err != nil {
 			errs = append(errs, fmt.Errorf("failed to stop node %s: %w", node.NodeID, err))
 		}
 	}
 
 	// Wait for stop to complete on all nodes
-	for _, node := range nodes {
+	for _, node := range n.Nodes {
 		if err := node.WaitForStopped(ctx); err != nil {
 			errs = append(errs, fmt.Errorf("failed to wait for node %s to stop: %w", node.NodeID, err))
 		}
@@ -543,8 +535,7 @@ func (n *Network) Restart(ctx context.Context, log logging.Logger) error {
 }
 
 // Ensures the provided node has the configuration it needs to start. If the data dir is not
-// set, it will be defaulted to [nodeParentDir]/[node ID]. For a not-yet-created network,
-// no action will be taken.
+// set, it will be defaulted to [nodeParentDir]/[node ID].
 func (n *Network) EnsureNodeConfig(node *Node) error {
 	// Ensure the node has access to network configuration
 	node.network = n
@@ -553,14 +544,9 @@ func (n *Network) EnsureNodeConfig(node *Node) error {
 		return err
 	}
 
-	if len(n.Dir) > 0 {
-		// Ensure the node's data dir is configured
-		dataDir := node.GetDataDir()
-		if len(dataDir) == 0 {
-			// NodeID will have been set by EnsureKeys
-			dataDir = filepath.Join(n.Dir, node.NodeID.String())
-			node.Flags[config.DataDirKey] = dataDir
-		}
+	// Ensure a data directory if not already set
+	if len(node.DataDir) == 0 {
+		node.DataDir = filepath.Join(n.Dir, node.NodeID.String())
 	}
 
 	return nil
@@ -767,16 +753,13 @@ func (n *Network) GetNodeURIs() []NodeURI {
 // collecting the bootstrap details for restarting a node).
 // For consumption outside of avalanchego. Needs to be kept exported.
 func (n *Network) GetBootstrapIPsAndIDs(skippedNode *Node) ([]string, []string, error) {
-	// Collect staking addresses of non-ephemeral nodes for use in bootstrapping a node
-	nodes, err := ReadNodes(n, false /* includeEphemeral */)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to read network's nodes: %w", err)
-	}
-	var (
-		bootstrapIPs = make([]string, 0, len(nodes))
-		bootstrapIDs = make([]string, 0, len(nodes))
-	)
-	for _, node := range nodes {
+	bootstrapIPs := []string{}
+	bootstrapIDs := []string{}
+	for _, node := range n.Nodes {
+		if node.IsEphemeral {
+			// Ephemeral nodes are not guaranteed to stay running
+			continue
+		}
 		if skippedNode != nil && node.NodeID == skippedNode.NodeID {
 			continue
 		}
@@ -934,12 +917,16 @@ func (n *Network) writeNodeFlags(log logging.Logger, node *Node) error {
 	// Only configure the plugin dir with a non-empty value to ensure the use of
 	// the default value (`[datadir]/plugins`) when no plugin dir is configured.
 	processConfig := node.getRuntimeConfig().Process
-	if processConfig != nil && len(processConfig.PluginDir) > 0 {
-		// Ensure the plugin directory exists or the node will fail to start
-		if err := os.MkdirAll(processConfig.PluginDir, perms.ReadWriteExecute); err != nil {
-			return fmt.Errorf("failed to create plugin dir: %w", err)
+	if processConfig != nil {
+		if len(processConfig.PluginDir) > 0 {
+			// Ensure the plugin directory exists or the node will fail to start
+			if err := os.MkdirAll(processConfig.PluginDir, perms.ReadWriteExecute); err != nil {
+				return fmt.Errorf("failed to create plugin dir: %w", err)
+			}
+			flags.SetDefault(config.PluginDirKey, processConfig.PluginDir)
 		}
-		flags.SetDefault(config.PluginDirKey, processConfig.PluginDir)
+
+		flags.SetDefault(config.DataDirKey, node.DataDir)
 	}
 
 	// Set the network and tmpnet defaults last to ensure they can be overridden

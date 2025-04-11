@@ -56,13 +56,35 @@ func (n *Network) readNetwork() error {
 	return n.readConfig()
 }
 
-// Read the non-ephemeral nodes associated with the network from disk.
+// Read the nodes associated with the network from disk.
 func (n *Network) readNodes() error {
-	nodes, err := ReadNodes(n, false /* includeEphemeral */)
+	nodes := []*Node{}
+
+	// Node configuration is stored in child directories
+	entries, err := os.ReadDir(n.Dir)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read dir: %w", err)
 	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		node := NewNode()
+		dataDir := filepath.Join(n.Dir, entry.Name())
+		err := node.Read(n, dataDir)
+		if errors.Is(err, os.ErrNotExist) {
+			// If no config file exists, assume this is not the path of a node
+			continue
+		} else if err != nil {
+			return err
+		}
+
+		nodes = append(nodes, node)
+	}
+
 	n.Nodes = nodes
+
 	return nil
 }
 
@@ -128,13 +150,13 @@ func (n *Network) readConfig() error {
 
 // The subset of network fields to store in the network config file.
 type serializedNetworkConfig struct {
-	UUID                 string                  `json:",omitempty"`
-	Owner                string                  `json:",omitempty"`
-	PrimarySubnetConfig  FlagsMap                `json:",omitempty"`
-	PrimaryChainConfigs  map[string]FlagsMap     `json:",omitempty"`
-	DefaultFlags         FlagsMap                `json:",omitempty"`
-	DefaultRuntimeConfig NodeRuntimeConfig       `json:",omitempty"`
-	PreFundedKeys        []*secp256k1.PrivateKey `json:",omitempty"`
+	UUID                 string                  `json:"uuid,omitempty"`
+	Owner                string                  `json:"owner,omitempty"`
+	PrimarySubnetConfig  FlagsMap                `json:"primarySubnetConfig,omitempty"`
+	PrimaryChainConfigs  map[string]FlagsMap     `json:"primaryChainConfigs,omitempty"`
+	DefaultFlags         FlagsMap                `json:"defaultFlags,omitempty"`
+	DefaultRuntimeConfig NodeRuntimeConfig       `json:"defaultRuntimeConfig,omitempty"`
+	PreFundedKeys        []*secp256k1.PrivateKey `json:"preFundedKeys,omitempty"`
 }
 
 func (n *Network) writeNetworkConfig() error {
