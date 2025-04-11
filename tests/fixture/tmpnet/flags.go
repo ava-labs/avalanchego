@@ -47,6 +47,14 @@ func (f FlagsMap) SetDefaults(defaults FlagsMap) {
 	}
 }
 
+func (f FlagsMap) Copy() FlagsMap {
+	newFlags := make(FlagsMap, len(f))
+	for k, v := range f {
+		newFlags[k] = v
+	}
+	return newFlags
+}
+
 // GetStringVal simplifies retrieving a map value as a string.
 func (f FlagsMap) GetStringVal(key string) (string, error) {
 	rawVal, ok := f[key]

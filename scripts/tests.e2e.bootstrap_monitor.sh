@@ -9,6 +9,8 @@ if ! [[ "$0" =~ scripts/tests.e2e.bootstrap_monitor.sh ]]; then
   exit 255
 fi
 
+export KUBECONFIG="$HOME/.kube/config"
+
 ./bin/tmpnetctl start-kind-cluster
 
-KUBECONFIG="$HOME/.kube/config" ./bin/ginkgo -v ./tests/fixture/bootstrapmonitor/e2e
+./bin/ginkgo -v ./tests/fixture/bootstrapmonitor/e2e

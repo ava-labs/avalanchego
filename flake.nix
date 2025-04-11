@@ -39,6 +39,7 @@
 
             # Kube tools
             kubectl                                    # Kubernetes CLI
+            k9s                                        # Kubernetes TUI
             kind                                       # Kubernetes-in-Docker
             kubernetes-helm                            # Helm CLI (Kubernetes package manager)
             self.packages.${system}.kind-with-registry # Script installing kind configured with a local registry

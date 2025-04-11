@@ -38,6 +38,12 @@ var (
 // simplify usage by main entrypoints. If the provided network includes a subnet, the initial DB state for
 // the subnet will be created and written to the target path.
 func GenerateComposeConfig(network *tmpnet.Network, baseImageName string) error {
+	// TODO(marun) Is there a better way to ensure parity between the configuration that initializes the database and the configuration used at runtime?
+	if network.DefaultFlags == nil {
+		network.DefaultFlags = tmpnet.FlagsMap{}
+	}
+	network.DefaultFlags.SetDefaults(tmpnet.DefaultTmpnetFlags())
+
 	targetPath := os.Getenv(targetPathEnvName)
 	if len(targetPath) == 0 {
 		return errTargetPathEnvVarNotSet
@@ -174,7 +180,7 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 		}
 
 		// Apply configuration appropriate to a test network
-		for k, v := range tmpnet.DefaultTestFlags() {
+		for k, v := range tmpnet.DefaultTmpnetFlags() {
 			switch value := v.(type) {
 			case string:
 				env[k] = value

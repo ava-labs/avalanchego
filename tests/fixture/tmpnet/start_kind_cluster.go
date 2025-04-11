@@ -12,7 +12,12 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
+
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+const DefaultTmpnetNamespace = "tmpnet"
 
 // CheckClusterRunning checks if the configured cluster is accessible.
 // TODO(marun) Maybe differentiate between configuration and endpoint errors
@@ -52,5 +57,23 @@ func StartKindCluster(ctx context.Context, log logging.Logger, configPath string
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to run kind-with-registry.sh: %w", err)
 	}
+
+	// Ensure the tmpnet namespace exists
+	clientset, err := GetClientset(log, configPath, configContext)
+	if err != nil {
+		return fmt.Errorf("failed to get clientset: %w", err)
+	}
+	_, err = clientset.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: DefaultTmpnetNamespace,
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to create namespace %s: %w", DefaultTmpnetNamespace, err)
+	}
+	log.Info("created namespace",
+		zap.String("namespace", DefaultTmpnetNamespace),
+	)
+
 	return nil
 }
