@@ -23,27 +23,22 @@ import (
 	txmempool "github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
-var (
-	ErrCantIssueAdvanceTimeTx     = errors.New("can not issue an advance time tx")
-	ErrCantIssueRewardValidatorTx = errors.New("can not issue a reward validator tx")
-)
-
 type Tx struct {
 	*txs.Tx
 	Complexity gas.Dimensions
-	GasPrice gas.Gas
+	GasPrice   *big.Rat
 }
 
 type Mempool struct {
 	avaxAssetID ids.ID
-	utxos avax.UTXOState
+	utxos       avax.UTXOState
 	weights     gas.Dimensions
 	toEngine    chan<- common.Message
 
 	mempool txmempool.Mempool[*txs.Tx]
 
-	lock  sync.Mutex
-	heap  heap.Map[ids.ID, Tx]
+	lock sync.Mutex
+	heap heap.Map[ids.ID, Tx]
 }
 
 func New(
@@ -64,12 +59,12 @@ func New(
 
 	return &Mempool{
 		avaxAssetID: avaxAssetID,
-		utxos: utxos,
+		utxos:       utxos,
 		weights:     weights,
 		mempool:     pool,
 		heap: heap.NewMap[ids.ID, Tx](
 			func(a, b Tx) bool {
-				return a.GasPrice > b.GasPrice
+				return a.GasPrice.Cmp(b.GasPrice) == 1
 			},
 		),
 		toEngine: toEngine,
@@ -86,17 +81,17 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 	}
 
 	totalConsumedAvax := &big.Int{}
-	for utxo := range tx.InputIDs() {
-		if utxo != m.avaxAssetID {
-			continue
-		}
-
-		consumedAvax, err := m.utxos.GetUTXO(utxo)
+	for utxoID := range tx.InputIDs() {
+		utxo, err := m.utxos.GetUTXO(utxoID)
 		if err != nil {
 			return fmt.Errorf("failed to get utxo: %w", err)
 		}
 
-		output, ok  := consumedAvax.Out.(*secp256k1fx.TransferOutput)
+		if utxo.AssetID() != m.avaxAssetID {
+			continue
+		}
+
+		output, ok := utxo.Out.(*secp256k1fx.TransferOutput)
 		if !ok {
 			return errors.New("unexpected output type")
 		}
@@ -110,28 +105,32 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 			continue
 		}
 
-		output, ok  := utxo.Out.(*secp256k1fx.TransferOutput)
+		output, ok := utxo.Out.(*secp256k1fx.TransferOutput)
 		if !ok {
 			return errors.New("unexpected output type")
 		}
 
-		totalProducedAvax.Add(totalConsumedAvax, big.NewInt(int64(output.Amt)))
+		totalProducedAvax.Add(totalProducedAvax, big.NewInt(int64(output.Amt)))
 	}
 
 	feesPaid := &big.Int{}
 	feesPaid.Sub(totalConsumedAvax, totalProducedAvax)
 
-	gasPrice := &big.Int{}
-	gasPrice.Div(feesPaid, big.NewInt(int64(gasUsed)))
+	if feesPaid.Cmp(big.NewInt(0)) <= 0 {
+		return errors.New("fees must be greater than zero")
+	}
+
+	gasPrice := &big.Rat{}
+	gasPrice.SetFrac(feesPaid, big.NewInt(int64(gasUsed)))
 
 	if err := m.mempool.Add(tx); err != nil {
 		return fmt.Errorf("failed to add tx to mempool: %w", err)
 	}
 
 	heapTx := Tx{
-		Tx:  tx,
+		Tx:         tx,
 		Complexity: complexity,
-		GasPrice: gas.Gas(gasPrice.Uint64()),
+		GasPrice:   gasPrice,
 	}
 
 	m.heap.Push(tx.TxID, heapTx)
@@ -170,12 +169,14 @@ func (m *Mempool) Iterate(f func(tx Tx) bool) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.mempool.Iterate(func(tx *txs.Tx) bool {
-		// The gas heap is guaranteed to be in-sync with the mempool
-		heapTx, _ := m.heap.Get(tx.ID())
+	m.mempool.Iterate(
+		func(tx *txs.Tx) bool {
+			// The gas heap is guaranteed to be in-sync with the mempool
+			heapTx, _ := m.heap.Get(tx.ID())
 
-		return f(heapTx)
-	})
+			return f(heapTx)
+		},
+	)
 }
 
 func (m *Mempool) MarkDropped(txID ids.ID, reason error) {
