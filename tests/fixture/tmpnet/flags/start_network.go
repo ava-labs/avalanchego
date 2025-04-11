@@ -38,7 +38,7 @@ func NewStartNetworkFlagSetVars(flagSet *pflag.FlagSet, defaultNetworkOwner stri
 	return v
 }
 
-func (v *StartNetworkVars) register(stringVar stringVarFunc, intVar intVarFunc) {
+func (v *StartNetworkVars) register(stringVar varFunc[string], intVar varFunc[int]) {
 	stringVar(
 		&v.RootNetworkDir,
 		"root-network-dir",

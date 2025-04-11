@@ -270,8 +270,7 @@ func StartNetwork(
 	network *tmpnet.Network,
 	rootNetworkDir string,
 	shutdownDelay time.Duration,
-	skipShutdown bool,
-	reuseNetwork bool,
+	networkCmd NetworkCmd,
 ) {
 	require := require.New(tc)
 
@@ -296,7 +295,7 @@ func StartNetwork(
 	symlinkPath, err := tmpnet.GetReusableNetworkPathForOwner(network.Owner)
 	require.NoError(err)
 
-	if reuseNetwork {
+	if networkCmd == ReuseNetworkCmd || networkCmd == RestartNetworkCmd {
 		// Symlink the path of the created network to the default owner path (e.g. latest_avalanchego-e2e)
 		// to enable easy discovery for reuse.
 		require.NoError(os.Symlink(network.Dir, symlinkPath))
@@ -307,7 +306,7 @@ func StartNetwork(
 	}
 
 	tc.DeferCleanup(func() {
-		if reuseNetwork {
+		if networkCmd == ReuseNetworkCmd || networkCmd == RestartNetworkCmd {
 			tc.Log().Info("skipping shutdown for network intended for reuse",
 				zap.String("networkDir", network.Dir),
 				zap.String("symlinkPath", symlinkPath),
@@ -315,8 +314,8 @@ func StartNetwork(
 			return
 		}
 
-		if skipShutdown {
-			tc.Log().Info("skipping shutdown for network",
+		if networkCmd == StartNetworkCmd {
+			tc.Log().Info("skipping shutdown for --start-network",
 				zap.String("networkDir", network.Dir),
 			)
 			return
