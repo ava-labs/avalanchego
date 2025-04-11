@@ -7,53 +7,29 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/spf13/cast"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet/flags"
 )
 
 type FlagVars struct {
-	avalancheGoExecPath string
-	pluginDir           string
-	networkDir          string
-	reuseNetwork        bool
-	startCollectors     bool
-	checkMonitoring     bool
-	startNetwork        bool
-	stopNetwork         bool
-	restartNetwork      bool
-	nodeCount           int
-	activateFortuna     bool
+	runtimeConfigVars *flags.RuntimeConfigVars
+	networkDir        string
+	reuseNetwork      bool
+	startCollectors   bool
+	checkMonitoring   bool
+	startNetwork      bool
+	stopNetwork       bool
+	restartNetwork    bool
+	nodeCount         int
+	activateFortuna   bool
 }
 
-func (v *FlagVars) AvalancheGoExecPath() (string, error) {
-	if err := v.validateAvalancheGoExecPath(); err != nil {
-		return "", err
-	}
-	return v.avalancheGoExecPath, nil
-}
-
-func (v *FlagVars) validateAvalancheGoExecPath() error {
-	if !filepath.IsAbs(v.avalancheGoExecPath) {
-		absPath, err := filepath.Abs(v.avalancheGoExecPath)
-		if err != nil {
-			return fmt.Errorf("avalanchego-path (%s) is a relative path but its absolute path cannot be determined: %w",
-				v.avalancheGoExecPath, err)
-		}
-
-		// If the absolute path file doesn't exist, it means it won't work out of the box.
-		if _, err := os.Stat(absPath); err != nil {
-			return fmt.Errorf("avalanchego-path (%s) is a relative path but must be an absolute path", v.avalancheGoExecPath)
-		}
-	}
-	return nil
-}
-
-func (v *FlagVars) PluginDir() string {
-	return v.pluginDir
+func (v *FlagVars) NodeRuntimeConfig() (*tmpnet.NodeRuntimeConfig, error) {
+	return v.runtimeConfigVars.GetNodeRuntimeConfig()
 }
 
 func (v *FlagVars) NetworkDir() string {
@@ -109,24 +85,7 @@ func (v *FlagVars) ActivateFortuna() bool {
 
 func RegisterFlags() *FlagVars {
 	vars := FlagVars{}
-	flag.StringVar(
-		&vars.avalancheGoExecPath,
-		"avalanchego-path",
-		os.Getenv(tmpnet.AvalancheGoPathEnvName),
-		fmt.Sprintf(
-			"[optional] avalanchego executable path if creating a new network. Also possible to configure via the %s env variable.",
-			tmpnet.AvalancheGoPathEnvName,
-		),
-	)
-	flag.StringVar(
-		&vars.pluginDir,
-		"plugin-dir",
-		tmpnet.GetEnvWithDefault(tmpnet.AvalancheGoPluginDirEnvName, os.ExpandEnv("$HOME/.avalanchego/plugins")),
-		fmt.Sprintf(
-			"[optional] the dir containing VM plugins. Also possible to configure via the %s env variable.",
-			tmpnet.AvalancheGoPluginDirEnvName,
-		),
-	)
+	vars.runtimeConfigVars = flags.NewRuntimeConfigFlagVars()
 	flag.StringVar(
 		&vars.networkDir,
 		"network-dir",
