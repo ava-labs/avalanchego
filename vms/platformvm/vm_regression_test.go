@@ -2186,42 +2186,21 @@ func TestL1ValidatorDeactivationCausesTrackingOfInvalidBlock(t *testing.T) {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
-	subnetID := testSubnet1.TxID
-	wallet := newWallet(t, vm, walletConfig{
-		subnetIDs: []ids.ID{subnetID},
-	})
-
-	nodeID := ids.GenerateTestNodeID()
-	sk, err := localsigner.New()
-	require.NoError(err)
-	pop, err := signer.NewProofOfPossession(sk)
+	lastAcceptedID, err := vm.LastAccepted(context.Background())
 	require.NoError(err)
 
-	tx, err := wallet.IssueConvertSubnetToL1Tx(
-		subnetID,
-		ids.Empty,
+	lastAccepted, err := vm.GetBlock(context.Background(), lastAcceptedID)
+	require.NoError(err)
+
+	statelessBlk, err := block.NewBanffStandardBlock(
+		lastAccepted.Timestamp(),
+		lastAcceptedID,
+		lastAccepted.Height()+1,
 		nil,
-		[]*txs.ConvertSubnetToL1Validator{
-			{
-				NodeID: nodeID[:],
-				Weight: 1,
-				// Ensure that the validator is active for a 1 second and that
-				// it does not have sufficient balance to be active for 2
-				// seconds.
-				Balance: uint64(vm.ValidatorFeeConfig.MinPrice) + 1,
-				Signer:  *pop,
-			},
-		},
 	)
 	require.NoError(err)
 
-	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTxFromRPC(tx))
-	vm.ctx.Lock.Lock()
-	require.NoError(buildAndAcceptStandardBlock(vm))
-
-	vm.clock.Set(vm.clock.Time().Add(1 * time.Minute))
-	blk, err := vm.BuildBlock(context.Background())
+	blk, err := vm.ParseBlock(context.Background(), statelessBlk.Bytes())
 	require.NoError(err)
 
 	for range 2 {
