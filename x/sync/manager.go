@@ -541,8 +541,8 @@ func (m *Manager) handleRangeProofResponse(
 		return nil
 	}
 
-	if len(rangeProof.KeyValues) > 0 {
-		largestHandledKey = maybe.Some(rangeProof.KeyValues[len(rangeProof.KeyValues)-1].Key)
+	if len(rangeProof.KeyChanges) > 0 {
+		largestHandledKey = maybe.Some(rangeProof.KeyChanges[len(rangeProof.KeyChanges)-1].Key)
 	}
 
 	m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, rangeProof.EndProof)
@@ -634,13 +634,13 @@ func (m *Manager) handleChangeProofResponse(
 		}
 
 		largestHandledKey := work.end
-		if len(rangeProof.KeyValues) > 0 {
+		if len(rangeProof.KeyChanges) > 0 {
 			// Add all the key-value pairs we got to the database.
 			if err := m.config.DB.CommitRangeProof(ctx, work.start, work.end, &rangeProof); err != nil {
 				m.setError(err)
 				return nil
 			}
-			largestHandledKey = maybe.Some(rangeProof.KeyValues[len(rangeProof.KeyValues)-1].Key)
+			largestHandledKey = maybe.Some(rangeProof.KeyChanges[len(rangeProof.KeyChanges)-1].Key)
 		}
 
 		m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, rangeProof.EndProof)
@@ -1155,10 +1155,10 @@ func verifyRangeProof(
 	}
 
 	// Ensure the response does not contain more than the maximum requested number of leaves.
-	if len(rangeProof.KeyValues) > keyLimit {
+	if len(rangeProof.KeyChanges) > keyLimit {
 		return fmt.Errorf(
 			"%w: (%d) > %d)",
-			errTooManyKeys, len(rangeProof.KeyValues), keyLimit,
+			errTooManyKeys, len(rangeProof.KeyChanges), keyLimit,
 		)
 	}
 

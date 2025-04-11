@@ -442,19 +442,19 @@ func (db *merkleDB) CommitRangeProof(ctx context.Context, start, end maybe.Maybe
 		return database.ErrClosed
 	}
 
-	ops := make([]database.BatchOp, len(proof.KeyValues))
-	keys := set.NewSet[string](len(proof.KeyValues))
-	for i, kv := range proof.KeyValues {
+	ops := make([]database.BatchOp, len(proof.KeyChanges))
+	keys := set.NewSet[string](len(proof.KeyChanges))
+	for i, kv := range proof.KeyChanges {
 		keys.Add(string(kv.Key))
 		ops[i] = database.BatchOp{
 			Key:   kv.Key,
-			Value: kv.Value,
+			Value: kv.Value.Value(),
 		}
 	}
 
 	largestKey := end
-	if len(proof.KeyValues) > 0 {
-		largestKey = maybe.Some(proof.KeyValues[len(proof.KeyValues)-1].Key)
+	if len(proof.KeyChanges) > 0 {
+		largestKey = maybe.Some(proof.KeyChanges[len(proof.KeyChanges)-1].Key)
 	}
 	keysToDelete, err := db.getKeysNotInSet(start, largestKey, keys)
 	if err != nil {
@@ -1098,39 +1098,28 @@ func (db *merkleDB) VerifyChangeProof(
 		return ErrEmptyProof
 	}
 
-	keyChanges := make(map[Key]maybe.Maybe[[]byte], len(proof.KeyChanges))
-	keys := make([]Key, len(proof.KeyChanges))
-	for i, keyValue := range proof.KeyChanges {
-		k := ToKey(keyValue.Key)
-		if k.hasPartialByte() {
-			return ErrProofKeyPartialByte
-		}
-
-		keyChanges[k] = keyValue.Value
-		keys[i] = k
-	}
-
-	// Validate proof.
-	if err := validateChangeProof(start, end, proof.StartProof, proof.EndProof, keys, db.tokenSize); err != nil {
-		return err
-	}
-
-	// [startProof] is an inclusion/exclusion proof of [startKey]
 	startProofKey := maybe.Bind(start, ToKey)
-
-	// [endProof] is an inclusion of the largest key in [keyValues],
-	// or an exclusion proof of [end] if [keyValues] is empty.
 	endProofKey := maybe.Bind(end, ToKey)
 
 	// Update [endProofKey] with the largest key in [keyValues].
 	if len(proof.KeyChanges) > 0 {
-		// If [proof] has key-value pairs, we should insert children
-		// greater than [largestProvenKey] to ancestors of the node containing
-		// [largestProvenKey] so that we get the expected root ID.
 		endProofKey = maybe.Some(ToKey(proof.KeyChanges[len(proof.KeyChanges)-1].Key))
 	}
 
-	// want to prevent commit writes to DB, but not prevent DB reads
+	// Validate proof.
+	if err := validateChangeProof(
+		startProofKey,
+		maybe.Bind(end, ToKey),
+		proof.StartProof,
+		proof.EndProof,
+		proof.KeyChanges,
+		endProofKey,
+		db.tokenSize,
+	); err != nil {
+		return err
+	}
+
+	// Prevent commit writes to DB, but not prevent DB reads
 	db.commitLock.RLock()
 	defer db.commitLock.RUnlock()
 
@@ -1138,31 +1127,33 @@ func (db *merkleDB) VerifyChangeProof(
 		return database.ErrClosed
 	}
 
-	// Ensure that the [startProof] contains values that match the key/values that were sent.
-	if err := verifyAllChangeProofKeyValuesPresent(
+	// Ensure that the [startProof] has correct values.
+	if err := verifyChangeProofKeyValues(
 		ctx,
 		db,
+		proof.KeyChanges,
 		proof.StartProof,
 		startProofKey,
 		endProofKey,
-		keyChanges,
+		db.hasher,
 	); err != nil {
-		return err
+		return fmt.Errorf("failed to verify start proof nodes: %w", err)
 	}
 
-	// Ensure that the [endProof] contains values that match the key/values that were sent.
-	if err := verifyAllChangeProofKeyValuesPresent(
+	// Ensure that the [endProof] has correct values.
+	if err := verifyChangeProofKeyValues(
 		ctx,
 		db,
+		proof.KeyChanges,
 		proof.EndProof,
 		startProofKey,
 		endProofKey,
-		keyChanges,
+		db.hasher,
 	); err != nil {
-		return err
+		return fmt.Errorf("failed to validate end proof nodes: %w", err)
 	}
 
-	// Insert the key-value pairs into the trie.
+	// Prepare ops for the creation of the view.
 	ops := make([]database.BatchOp, len(proof.KeyChanges))
 	for i, kv := range proof.KeyChanges {
 		ops[i] = database.BatchOp{
@@ -1178,7 +1169,7 @@ func (db *merkleDB) VerifyChangeProof(
 		return err
 	}
 
-	// For all the nodes along the edges of the proof, insert the children whose
+	// For all the nodes along the edges of the proofs, insert the children whose
 	// keys are less than [insertChildrenLessThan] or whose keys are greater
 	// than [insertChildrenGreaterThan] into the trie so that we get the
 	// expected root ID (if this proof is valid).
@@ -1188,15 +1179,16 @@ func (db *merkleDB) VerifyChangeProof(
 		startProofKey,
 		endProofKey,
 	); err != nil {
-		return err
+		return fmt.Errorf("failed to add start proof path info: %w", err)
 	}
+
 	if err := addPathInfo(
 		view,
 		proof.EndProof,
 		startProofKey,
 		endProofKey,
 	); err != nil {
-		return err
+		return fmt.Errorf("failed to end end proof path info: %w", err)
 	}
 
 	// Make sure we get the expected root.
