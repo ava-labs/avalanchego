@@ -35,7 +35,7 @@ func (v *processRuntimeVars) registerWithFlagSet(flagSet *pflag.FlagSet) {
 	v.register(flagSet.StringVar, flagSet.BoolVar)
 }
 
-func (v *processRuntimeVars) register(stringVar stringVarFunc, boolVar boolVarFunc) {
+func (v *processRuntimeVars) register(stringVar varFunc[string], boolVar varFunc[bool]) {
 	stringVar(
 		&v.config.AvalancheGoPath,
 		avalanchegoPathFlag,

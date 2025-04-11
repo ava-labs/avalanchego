@@ -4,6 +4,7 @@
 package e2e
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -15,6 +16,16 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet/flags"
 )
 
+type NetworkCmd int
+
+const (
+	EmptyNetworkCmd NetworkCmd = iota
+	StartNetworkCmd
+	StopNetworkCmd
+	RestartNetworkCmd
+	ReuseNetworkCmd
+)
+
 type FlagVars struct {
 	startNetwork     bool
 	startNetworkVars *flags.StartNetworkVars
@@ -24,14 +35,36 @@ type FlagVars struct {
 
 	networkDir     string
 	reuseNetwork   bool
-	restartNetwork bool
 	stopNetwork    bool
+	restartNetwork bool
 
 	activateFortuna bool
 }
 
-func (v *FlagVars) StartNetwork() bool {
-	return v.startNetwork
+func (v *FlagVars) NetworkCmd() (NetworkCmd, error) {
+	cmd := EmptyNetworkCmd
+	count := 0
+	if v.startNetwork {
+		cmd = StartNetworkCmd
+		count++
+	}
+	if v.stopNetwork {
+		cmd = StopNetworkCmd
+		count++
+	}
+	if v.restartNetwork {
+		cmd = RestartNetworkCmd
+		count++
+	}
+	if v.reuseNetwork {
+		cmd = ReuseNetworkCmd
+		count++
+	}
+	if count > 1 {
+		return EmptyNetworkCmd, errors.New("only one of --start-network, --stop-network, --restart-network, or --reuse-network can be specified")
+	}
+
+	return cmd, nil
 }
 
 func (v *FlagVars) RootNetworkDir() string {
@@ -68,18 +101,6 @@ func (v *FlagVars) NetworkDir() string {
 	return os.Getenv(tmpnet.NetworkDirEnvName)
 }
 
-func (v *FlagVars) ReuseNetwork() bool {
-	return v.reuseNetwork
-}
-
-func (v *FlagVars) RestartNetwork() bool {
-	return v.restartNetwork
-}
-
-func (v *FlagVars) StopNetwork() bool {
-	return v.stopNetwork
-}
-
 func (v *FlagVars) NetworkShutdownDelay() time.Duration {
 	if v.startCollectors {
 		// Only return a non-zero value if we want to ensure the collectors have
@@ -104,7 +125,7 @@ func RegisterFlagsWithDefaultOwner(defaultOwner string) *FlagVars {
 		&vars.startNetwork,
 		"start-network",
 		false,
-		"[optional] start a new network and exit without executing any tests. The new network cannot be reused with --reuse-network. Ignored if either --reuse-network or --stop-network is provided.",
+		"[optional] start a new network and exit without executing any tests. The new network cannot be reused with --reuse-network.",
 	)
 
 	vars.startNetworkVars = flags.NewStartNetworkFlagVars(defaultOwner)
@@ -117,7 +138,7 @@ func RegisterFlagsWithDefaultOwner(defaultOwner string) *FlagVars {
 	flag.StringVar(
 		&vars.networkDir,
 		"network-dir",
-		"",
+		tmpnet.GetEnvWithDefault(tmpnet.NetworkDirEnvName, ""),
 		fmt.Sprintf("[optional] the dir containing the configuration of an existing network. Will only be used if --reuse-network, --restart-network or --stop-network are specified. Also possible to configure via the %s env variable.", tmpnet.NetworkDirEnvName),
 	)
 
@@ -125,14 +146,14 @@ func RegisterFlagsWithDefaultOwner(defaultOwner string) *FlagVars {
 		&vars.reuseNetwork,
 		"reuse-network",
 		false,
-		"[optional] reuse an existing network previously started with --reuse-network. If a network is not already running, create a new one and leave it running for subsequent usage. Ignored if --stop-network is provided.",
+		"[optional] run tests against an existing network previously started with --reuse-network. If a network is not already running, create a new one and leave it running for subsequent usage.",
 	)
 
 	flag.BoolVar(
 		&vars.restartNetwork,
 		"restart-network",
 		false,
-		"[optional] restart an existing network previously started with --reuse-network. Useful for ensuring a network is running with the current state of binaries on disk. Ignored if a network is not already running or --stop-network is provided.",
+		"[optional] like --reuse-network except an already running network is restarted before running tests to ensure the network represents the current state of binaries on disk.",
 	)
 
 	flag.BoolVar(

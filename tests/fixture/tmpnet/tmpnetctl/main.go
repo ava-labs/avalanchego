@@ -109,7 +109,7 @@ func main() {
 			return nil
 		},
 	}
-	startNetworkVars = flags.NewStartNetworkFlagSetVars(startNetworkCmd.PersistentFlags(), "")
+	startNetworkVars = flags.NewStartNetworkFlagSetVars(startNetworkCmd.PersistentFlags(), "" /* defaultNetworkOwner */)
 	rootCmd.AddCommand(startNetworkCmd)
 
 	stopNetworkCmd := &cobra.Command{

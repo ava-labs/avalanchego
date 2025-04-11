@@ -37,7 +37,7 @@ func NewRuntimeConfigFlagSetVars(flagSet *pflag.FlagSet) *RuntimeConfigVars {
 	return v
 }
 
-func (v *RuntimeConfigVars) register(stringVar stringVarFunc) {
+func (v *RuntimeConfigVars) register(stringVar varFunc[string]) {
 	stringVar(
 		&v.runtime,
 		"runtime",
