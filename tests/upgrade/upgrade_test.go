@@ -85,8 +85,7 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 			network,
 			"", /* rootNetworkDir */
 			shutdownDelay,
-			false, /* skipShutdown */
-			false, /* reuseNetwork */
+			e2e.EmptyNetworkCmd,
 		)
 
 		tc.By(fmt.Sprintf("restarting all nodes with %q binary", avalancheGoExecPathToUpgradeTo))
