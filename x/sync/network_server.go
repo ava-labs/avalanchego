@@ -290,7 +290,7 @@ func getRangeProof(
 		}
 
 		// The proof was too large. Try to shrink it.
-		keyLimit = len(rangeProof.KeyValues) / 2
+		keyLimit = len(rangeProof.KeyChanges) / 2
 	}
 	return nil, ErrMinProofSizeIsTooLarge
 }

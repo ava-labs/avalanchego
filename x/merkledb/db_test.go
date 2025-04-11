@@ -337,7 +337,7 @@ func Test_MerkleDB_CommitRangeProof_DeletesValuesInRange(t *testing.T) {
 	require.NoError(err)
 
 	// confirm there are no key.values in the proof
-	require.Empty(proof.KeyValues)
+	require.Empty(proof.KeyChanges)
 
 	// add values to be deleted by proof commit
 	batch := db.NewBatch()
@@ -958,7 +958,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 				continue
 			}
 			require.NoError(err)
-			require.LessOrEqual(len(rangeProof.KeyValues), maxProofLen)
+			require.LessOrEqual(len(rangeProof.KeyChanges), maxProofLen)
 
 			require.NoError(rangeProof.Verify(
 				context.Background(),

@@ -175,7 +175,7 @@ func (s *DBServer) GetRangeProof(
 		Proof: &pb.RangeProof{
 			StartProof: make([]*pb.ProofNode, len(proof.StartProof)),
 			EndProof:   make([]*pb.ProofNode, len(proof.EndProof)),
-			KeyValues:  make([]*pb.KeyValue, len(proof.KeyValues)),
+			KeyValues:  make([]*pb.KeyValue, len(proof.KeyChanges)),
 		},
 	}
 	for i, node := range proof.StartProof {
@@ -184,10 +184,10 @@ func (s *DBServer) GetRangeProof(
 	for i, node := range proof.EndProof {
 		protoProof.Proof.EndProof[i] = node.ToProto()
 	}
-	for i, kv := range proof.KeyValues {
+	for i, kv := range proof.KeyChanges {
 		protoProof.Proof.KeyValues[i] = &pb.KeyValue{
 			Key:   kv.Key,
-			Value: kv.Value,
+			Value: kv.Value.Value(),
 		}
 	}
 

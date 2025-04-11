@@ -211,14 +211,14 @@ func getRangeProof(
 	}
 
 	result := RangeProof{
-		KeyValues: make([]KeyValue, 0, initKeyValuesSize),
+		KeyChanges: make([]KeyChange, 0, initKeyValuesSize),
 	}
 	it := t.NewIteratorWithStart(start.Value())
-	for it.Next() && len(result.KeyValues) < maxLength && (end.IsNothing() || bytes.Compare(it.Key(), end.Value()) <= 0) {
+	for it.Next() && len(result.KeyChanges) < maxLength && (end.IsNothing() || bytes.Compare(it.Key(), end.Value()) <= 0) {
 		// clone the value to prevent editing of the values stored within the trie
-		result.KeyValues = append(result.KeyValues, KeyValue{
+		result.KeyChanges = append(result.KeyChanges, KeyChange{
 			Key:   it.Key(),
-			Value: slices.Clone(it.Value()),
+			Value: maybe.Some(slices.Clone(it.Value())),
 		})
 	}
 	it.Release()
@@ -233,9 +233,9 @@ func getRangeProof(
 		endProof *Proof
 		err      error
 	)
-	if len(result.KeyValues) > 0 {
+	if len(result.KeyChanges) > 0 {
 		// [endProof] => inclusion proof for the largest key
-		greatestKey := result.KeyValues[len(result.KeyValues)-1].Key
+		greatestKey := result.KeyChanges[len(result.KeyChanges)-1].Key
 		endProof, err = getProof(t, greatestKey)
 		if err != nil {
 			return nil, err

@@ -251,7 +251,7 @@ func Test_RangeProof_Extra_Value(t *testing.T) {
 		db.hasher,
 	))
 
-	proof.KeyValues = append(proof.KeyValues, KeyValue{Key: []byte{5}, Value: []byte{5}})
+	proof.KeyChanges = append(proof.KeyChanges, KeyChange{Key: []byte{5}, Value: maybe.Some([]byte{5})})
 
 	err = proof.Verify(
 		context.Background(),
@@ -280,7 +280,7 @@ func Test_RangeProof_Verify_Bad_Data(t *testing.T) {
 		{
 			name: "empty",
 			malform: func(proof *RangeProof) {
-				proof.KeyValues = nil
+				proof.KeyChanges = nil
 				proof.StartProof = nil
 				proof.EndProof = nil
 			},
@@ -310,7 +310,7 @@ func Test_RangeProof_Verify_Bad_Data(t *testing.T) {
 		{
 			name: "missing key/value",
 			malform: func(proof *RangeProof) {
-				proof.KeyValues = proof.KeyValues[1:]
+				proof.KeyChanges = proof.KeyChanges[1:]
 			},
 			expectedErr: ErrProofNodeHasUnincludedValue,
 		},
@@ -479,7 +479,7 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 			start: maybe.Nothing[[]byte](),
 			end:   maybe.Nothing[[]byte](),
 			proof: &RangeProof{
-				KeyValues: []KeyValue{{}},
+				KeyChanges: []KeyChange{{}},
 			},
 			expectedErr: ErrNoEndProof,
 		},
@@ -488,9 +488,9 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 			start: maybe.Nothing[[]byte](),
 			end:   maybe.Nothing[[]byte](),
 			proof: &RangeProof{
-				KeyValues: []KeyValue{
-					{Key: []byte{1}, Value: []byte{1}},
-					{Key: []byte{0}, Value: []byte{0}},
+				KeyChanges: []KeyChange{
+					{Key: []byte{1}, Value: maybe.Some([]byte{1})},
+					{Key: []byte{0}, Value: maybe.Some([]byte{0})},
 				},
 				EndProof: []ProofNode{{}},
 			},
@@ -501,8 +501,8 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 			start: maybe.Some([]byte{1}),
 			end:   maybe.Nothing[[]byte](),
 			proof: &RangeProof{
-				KeyValues: []KeyValue{
-					{Key: []byte{0}, Value: []byte{0}},
+				KeyChanges: []KeyChange{
+					{Key: []byte{0}, Value: maybe.Some([]byte{0})},
 				},
 				StartProof: []ProofNode{{}},
 				EndProof:   []ProofNode{{}},
@@ -514,8 +514,8 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 			start: maybe.Nothing[[]byte](),
 			end:   maybe.Some([]byte{1}),
 			proof: &RangeProof{
-				KeyValues: []KeyValue{
-					{Key: []byte{2}, Value: []byte{0}},
+				KeyChanges: []KeyChange{
+					{Key: []byte{2}, Value: maybe.Some([]byte{0})},
 				},
 				EndProof: []ProofNode{{}},
 			},
@@ -526,8 +526,8 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 			start: maybe.Some([]byte{1}),
 			end:   maybe.Nothing[[]byte](),
 			proof: &RangeProof{
-				KeyValues: []KeyValue{
-					{Key: []byte{1, 2}, Value: []byte{1}},
+				KeyChanges: []KeyChange{
+					{Key: []byte{1, 2}, Value: maybe.Some([]byte{1})},
 				},
 				StartProof: []ProofNode{
 					{
@@ -546,8 +546,8 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 			start: maybe.Some([]byte{1, 2}),
 			end:   maybe.Nothing[[]byte](),
 			proof: &RangeProof{
-				KeyValues: []KeyValue{
-					{Key: []byte{1, 2}, Value: []byte{1}},
+				KeyChanges: []KeyChange{
+					{Key: []byte{1, 2}, Value: maybe.Some([]byte{1})},
 				},
 				StartProof: []ProofNode{
 					{
@@ -569,8 +569,8 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 			start: maybe.Nothing[[]byte](),
 			end:   maybe.Some([]byte{1, 2}),
 			proof: &RangeProof{
-				KeyValues: []KeyValue{
-					{Key: []byte{1, 2}, Value: []byte{1}},
+				KeyChanges: []KeyChange{
+					{Key: []byte{1, 2}, Value: maybe.Some([]byte{1})},
 				},
 				EndProof: []ProofNode{
 					{
@@ -608,7 +608,7 @@ func Test_RangeProof(t *testing.T) {
 	require.NotNil(proof)
 	require.Empty(proof.StartProof)
 	require.Len(proof.EndProof, 2)
-	require.Len(proof.KeyValues, 1)
+	require.Len(proof.KeyChanges, 1)
 
 	require.NoError(proof.Verify(
 		context.Background(),
@@ -622,15 +622,15 @@ func Test_RangeProof(t *testing.T) {
 	proof, err = db.GetRangeProof(context.Background(), maybe.Some([]byte{1}), maybe.Some([]byte{3, 5}), 10)
 	require.NoError(err)
 	require.NotNil(proof)
-	require.Len(proof.KeyValues, 3)
+	require.Len(proof.KeyChanges, 3)
 
-	require.Equal([]byte{1}, proof.KeyValues[0].Key)
-	require.Equal([]byte{2}, proof.KeyValues[1].Key)
-	require.Equal([]byte{3}, proof.KeyValues[2].Key)
+	require.Equal([]byte{1}, proof.KeyChanges[0].Key)
+	require.Equal([]byte{2}, proof.KeyChanges[1].Key)
+	require.Equal([]byte{3}, proof.KeyChanges[2].Key)
 
-	require.Equal([]byte{1}, proof.KeyValues[0].Value)
-	require.Equal([]byte{2}, proof.KeyValues[1].Value)
-	require.Equal([]byte{3}, proof.KeyValues[2].Value)
+	require.Equal(maybe.Some([]byte{1}), proof.KeyChanges[0].Value)
+	require.Equal(maybe.Some([]byte{2}), proof.KeyChanges[1].Value)
+	require.Equal(maybe.Some([]byte{3}), proof.KeyChanges[2].Value)
 
 	require.Len(proof.EndProof, 2)
 	require.Equal([]byte{0}, proof.EndProof[0].Key.Bytes())
@@ -684,13 +684,13 @@ func Test_RangeProof_NilStart(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(proof)
 
-	require.Len(proof.KeyValues, 2)
+	require.Len(proof.KeyChanges, 2)
 
-	require.Equal([]byte("key1"), proof.KeyValues[0].Key)
-	require.Equal([]byte("key2"), proof.KeyValues[1].Key)
+	require.Equal([]byte("key1"), proof.KeyChanges[0].Key)
+	require.Equal([]byte("key2"), proof.KeyChanges[1].Key)
 
-	require.Equal([]byte("value1"), proof.KeyValues[0].Value)
-	require.Equal([]byte("value2"), proof.KeyValues[1].Value)
+	require.Equal(maybe.Some([]byte("value1")), proof.KeyChanges[0].Value)
+	require.Equal(maybe.Some([]byte("value2")), proof.KeyChanges[1].Value)
 
 	require.Equal(ToKey([]byte("key2")), proof.EndProof[1].Key, db.tokenSize)
 	require.Equal(ToKey([]byte("key2")).Take(28), proof.EndProof[0].Key)
@@ -723,13 +723,13 @@ func Test_RangeProof_NilEnd(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(proof)
 
-	require.Len(proof.KeyValues, 2)
+	require.Len(proof.KeyChanges, 2)
 
-	require.Equal([]byte{1}, proof.KeyValues[0].Key)
-	require.Equal([]byte{2}, proof.KeyValues[1].Key)
+	require.Equal([]byte{1}, proof.KeyChanges[0].Key)
+	require.Equal([]byte{2}, proof.KeyChanges[1].Key)
 
-	require.Equal([]byte{1}, proof.KeyValues[0].Value)
-	require.Equal([]byte{2}, proof.KeyValues[1].Value)
+	require.Equal(maybe.Some([]byte{1}), proof.KeyChanges[0].Value)
+	require.Equal(maybe.Some([]byte{2}), proof.KeyChanges[1].Value)
 
 	require.Equal([]byte{1}, proof.StartProof[0].Key.Bytes())
 
@@ -765,13 +765,13 @@ func Test_RangeProof_EmptyValues(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(proof)
 
-	require.Len(proof.KeyValues, 3)
-	require.Equal([]byte("key1"), proof.KeyValues[0].Key)
-	require.Empty(proof.KeyValues[0].Value)
-	require.Equal([]byte("key12"), proof.KeyValues[1].Key)
-	require.Equal([]byte("value1"), proof.KeyValues[1].Value)
-	require.Equal([]byte("key2"), proof.KeyValues[2].Key)
-	require.Empty(proof.KeyValues[2].Value)
+	require.Len(proof.KeyChanges, 3)
+	require.Equal([]byte("key1"), proof.KeyChanges[0].Key)
+	require.Equal(maybe.Some([]byte{}), proof.KeyChanges[0].Value)
+	require.Equal([]byte("key12"), proof.KeyChanges[1].Key)
+	require.Equal(maybe.Some([]byte("value1")), proof.KeyChanges[1].Value)
+	require.Equal([]byte("key2"), proof.KeyChanges[2].Key)
+	require.Equal(maybe.Some([]byte{}), proof.KeyChanges[2].Value)
 
 	require.Len(proof.StartProof, 1)
 	require.Equal(ToKey([]byte("key1")), proof.StartProof[0].Key)
@@ -977,7 +977,7 @@ func Test_ChangeProof_Verify_Bad_Data(t *testing.T) {
 			malform: func(proof *ChangeProof) {
 				proof.KeyChanges = proof.KeyChanges[1:]
 			},
-			expectedErr: ErrProofValueDoesntMatch,
+			expectedErr: ErrProofNodeHasUnincludedValue,
 		},
 	}
 
@@ -1200,7 +1200,7 @@ func TestVerifyKeyValues(t *testing.T) {
 		name        string
 		start       maybe.Maybe[Key]
 		end         maybe.Maybe[Key]
-		kvs         []Key
+		keyChanges  []KeyChange
 		expectedErr error
 	}
 
@@ -1209,15 +1209,15 @@ func TestVerifyKeyValues(t *testing.T) {
 			name:        "empty",
 			start:       maybe.Nothing[Key](),
 			end:         maybe.Nothing[Key](),
-			kvs:         nil,
+			keyChanges:  nil,
 			expectedErr: nil,
 		},
 		{
 			name:  "1 key",
 			start: maybe.Nothing[Key](),
 			end:   maybe.Nothing[Key](),
-			kvs: []Key{
-				ToKey([]byte{0}),
+			keyChanges: []KeyChange{
+				{Key: []byte{0}},
 			},
 			expectedErr: nil,
 		},
@@ -1225,9 +1225,9 @@ func TestVerifyKeyValues(t *testing.T) {
 			name:  "non-increasing keys",
 			start: maybe.Nothing[Key](),
 			end:   maybe.Nothing[Key](),
-			kvs: []Key{
-				ToKey([]byte{0}),
-				ToKey([]byte{0}),
+			keyChanges: []KeyChange{
+				{Key: []byte{0}},
+				{Key: []byte{0}},
 			},
 			expectedErr: ErrNonIncreasingValues,
 		},
@@ -1235,9 +1235,9 @@ func TestVerifyKeyValues(t *testing.T) {
 			name:  "key before start",
 			start: maybe.Some(ToKey([]byte{1, 2})),
 			end:   maybe.Nothing[Key](),
-			kvs: []Key{
-				ToKey([]byte{1}),
-				ToKey([]byte{1, 2}),
+			keyChanges: []KeyChange{
+				{Key: []byte{1}},
+				{Key: []byte{1, 2}},
 			},
 			expectedErr: ErrStateFromOutsideOfRange,
 		},
@@ -1245,10 +1245,10 @@ func TestVerifyKeyValues(t *testing.T) {
 			name:  "key after end",
 			start: maybe.Nothing[Key](),
 			end:   maybe.Some(ToKey([]byte{1, 2})),
-			kvs: []Key{
-				ToKey([]byte{1}),
-				ToKey([]byte{1, 2}),
-				ToKey([]byte{1, 2, 3}),
+			keyChanges: []KeyChange{
+				{Key: []byte{1}},
+				{Key: []byte{1, 2}},
+				{Key: []byte{1, 2, 3}},
 			},
 			expectedErr: ErrStateFromOutsideOfRange,
 		},
@@ -1256,9 +1256,9 @@ func TestVerifyKeyValues(t *testing.T) {
 			name:  "happy path",
 			start: maybe.Nothing[Key](),
 			end:   maybe.Some(ToKey([]byte{1, 2, 3})),
-			kvs: []Key{
-				ToKey([]byte{1}),
-				ToKey([]byte{1, 2}),
+			keyChanges: []KeyChange{
+				{Key: []byte{1}},
+				{Key: []byte{1, 2}},
 			},
 			expectedErr: nil,
 		},
@@ -1266,7 +1266,7 @@ func TestVerifyKeyValues(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := verifyKeyValues(tt.kvs, tt.start, tt.end)
+			err := verifySortedKeyChanges(tt.keyChanges, tt.start, tt.end)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
@@ -1629,7 +1629,7 @@ func FuzzRangeProofProtoMarshalUnmarshal(f *testing.F) {
 		}
 
 		numKeyValues := rand.Intn(128)
-		keyValues := make([]KeyValue, numKeyValues)
+		keyValues := make([]KeyChange, numKeyValues)
 		for i := 0; i < numKeyValues; i++ {
 			keyLen := rand.Intn(32)
 			key := make([]byte, keyLen)
@@ -1639,16 +1639,16 @@ func FuzzRangeProofProtoMarshalUnmarshal(f *testing.F) {
 			value := make([]byte, valueLen)
 			_, _ = rand.Read(value)
 
-			keyValues[i] = KeyValue{
+			keyValues[i] = KeyChange{
 				Key:   key,
-				Value: value,
+				Value: maybe.Some(value),
 			}
 		}
 
 		proof := RangeProof{
 			StartProof: startProof,
 			EndProof:   endProof,
-			KeyValues:  keyValues,
+			KeyChanges: keyValues,
 		}
 
 		// Marshal and unmarshal it.
@@ -1977,7 +1977,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 		// Make sure the EndProof invariant is maintained
 		switch {
 		case end.IsNothing():
-			if len(rangeProof.KeyValues) == 0 {
+			if len(rangeProof.KeyChanges) == 0 {
 				if len(rangeProof.StartProof) == 0 {
 					require.Len(rangeProof.EndProof, 1) // Just the root
 					require.Empty(rangeProof.EndProof[0].Key.Bytes())
@@ -1985,7 +1985,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 					require.Empty(rangeProof.EndProof)
 				}
 			}
-		case len(rangeProof.KeyValues) == 0:
+		case len(rangeProof.KeyChanges) == 0:
 			require.NotEmpty(rangeProof.EndProof)
 
 			// EndProof should be a proof for upper range bound.
@@ -2010,12 +2010,12 @@ func FuzzRangeProofInvariants(f *testing.F) {
 		default:
 			require.NotEmpty(rangeProof.EndProof)
 
-			greatestKV := rangeProof.KeyValues[len(rangeProof.KeyValues)-1]
+			greatestKV := rangeProof.KeyChanges[len(rangeProof.KeyChanges)-1]
 			// EndProof should be a proof for largest key-value.
 			proof := Proof{
 				Path:  rangeProof.EndProof,
 				Key:   ToKey(greatestKV.Key),
-				Value: maybe.Some(greatestKV.Value),
+				Value: greatestKV.Value,
 			}
 
 			rootID, err := db.GetMerkleRoot(context.Background())

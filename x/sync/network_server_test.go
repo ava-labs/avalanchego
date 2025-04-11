@@ -138,7 +138,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 			require.NoError(proof.UnmarshalProto(&proofProto))
 
 			if test.expectedResponseLen > 0 {
-				require.LessOrEqual(len(proof.KeyValues), test.expectedResponseLen)
+				require.LessOrEqual(len(proof.KeyChanges), test.expectedResponseLen)
 			}
 
 			bytes, err := proto.Marshal(proof.ToProto())
