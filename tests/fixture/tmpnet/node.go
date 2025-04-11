@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
 
@@ -45,11 +44,11 @@ type NodeRuntime interface {
 	readState(ctx context.Context) error
 	GetLocalURI(ctx context.Context) (string, func(), error)
 	GetLocalStakingAddress(ctx context.Context) (netip.AddrPort, func(), error)
-	Start(ctx context.Context, log logging.Logger) error
+	Start(ctx context.Context) error
 	InitiateStop(ctx context.Context) error
 	WaitForStopped(ctx context.Context) error
-	Restart(ctx context.Context, log logging.Logger) error
-	IsHealthy(ctx context.Context, log logging.Logger) (bool, error)
+	Restart(ctx context.Context) error
+	IsHealthy(ctx context.Context) (bool, error)
 }
 
 // Configuration required to configure a node runtime. Only one of the fields should be set.
@@ -185,18 +184,14 @@ func ReadNodes(ctx context.Context, network *Network, includeEphemeral bool) ([]
 // Retrieves the runtime for the node.
 func (n *Node) getRuntime() NodeRuntime {
 	if n.runtime == nil {
-		config := n.getRuntimeConfig()
-		if config.Process != nil {
-			n.runtime = &NodeProcess{
-				node: n,
-			}
-		} else if config.Kube != nil {
+		if n.getRuntimeConfig().Kube != nil {
 			n.runtime = &NodePod{
 				node: n,
 			}
 		} else {
-			// This *should* be impossible but just in case
-			panic("node has no configured runtime")
+			n.runtime = &NodeProcess{
+				node: n,
+			}
 		}
 	}
 	return n.runtime
@@ -213,12 +208,12 @@ func (n *Node) getRuntimeConfig() NodeRuntimeConfig {
 
 // Runtime methods
 
-func (n *Node) IsHealthy(ctx context.Context, log logging.Logger) (bool, error) {
-	return n.getRuntime().IsHealthy(ctx, log)
+func (n *Node) IsHealthy(ctx context.Context) (bool, error) {
+	return n.getRuntime().IsHealthy(ctx)
 }
 
-func (n *Node) Start(ctx context.Context, log logging.Logger) error {
-	return n.getRuntime().Start(ctx, log)
+func (n *Node) Start(ctx context.Context) error {
+	return n.getRuntime().Start(ctx)
 }
 
 func (n *Node) InitiateStop(ctx context.Context) error {
@@ -232,8 +227,8 @@ func (n *Node) WaitForStopped(ctx context.Context) error {
 	return n.getRuntime().WaitForStopped(ctx)
 }
 
-func (n *Node) Restart(ctx context.Context, log logging.Logger) error {
-	return n.getRuntime().Restart(ctx, log)
+func (n *Node) Restart(ctx context.Context) error {
+	return n.getRuntime().Restart(ctx)
 }
 
 func (n *Node) readState(ctx context.Context) error {

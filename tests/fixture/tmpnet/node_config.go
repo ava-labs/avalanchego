@@ -46,7 +46,8 @@ func (n *Node) readConfig() error {
 	if err := json.Unmarshal(bytes, n); err != nil {
 		return fmt.Errorf("failed to unmarshal node config: %w", err)
 	}
-	return nil
+	// TODO(marun) Is there ever a good reason that the node keys wouldn't be in the config?
+	return n.EnsureNodeID()
 }
 
 type serializedNodeConfig struct {

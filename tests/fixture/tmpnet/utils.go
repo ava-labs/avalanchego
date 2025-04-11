@@ -59,7 +59,7 @@ func WaitForHealthyNode(ctx context.Context, log logging.Logger, node *Node) err
 	defer ticker.Stop()
 
 	for {
-		healthy, err := node.IsHealthy(ctx, log)
+		healthy, err := node.IsHealthy(ctx)
 		switch {
 		case errors.Is(err, ErrUnrecoverableNodeHealthCheck):
 			return fmt.Errorf("%w for node %q", err, node.NodeID)

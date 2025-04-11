@@ -23,7 +23,7 @@ func TestNetworkSerialization(t *testing.T) {
 	ctx := context.Background()
 
 	// TODO(marun) Need to configure the log in fewer places
-	network := NewDefaultNetwork(logging.NoLog{}, "testnet")
+	network := NewDefaultNetwork("testnet")
 	// Validate round-tripping of primary subnet configuration
 	network.PrimarySubnetConfig = &subnets.Config{
 		ValidatorOnly: true,
@@ -34,7 +34,7 @@ func TestNetworkSerialization(t *testing.T) {
 	// Ensure node runtime is initialized
 	require.NoError(network.readNodes(ctx))
 
-	loadedNetwork, err := ReadNetwork(ctx, network.Dir)
+	loadedNetwork, err := ReadNetwork(ctx, logging.NoLog{}, network.Dir)
 	require.NoError(err)
 	for _, key := range loadedNetwork.PreFundedKeys {
 		// Address() enables comparison with the original network by

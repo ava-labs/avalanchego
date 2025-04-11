@@ -80,7 +80,9 @@ func (p *NodeProcess) readState(_ context.Context) error {
 // its staking port. The network will start faster with this
 // synchronization due to the avoidance of exponential backoff
 // if a node tries to connect to a beacon that is not ready.
-func (p *NodeProcess) Start(ctx context.Context, log logging.Logger) error {
+func (p *NodeProcess) Start(_ context.Context) error {
+	log := p.node.network.log
+
 	// Avoid attempting to start an already running node.
 	proc, err := p.getProcess()
 	if err != nil {
@@ -106,7 +108,7 @@ func (p *NodeProcess) Start(ctx context.Context, log logging.Logger) error {
 		return fmt.Errorf("failed to remove stale process context file: %w", err)
 	}
 
-	if err := p.node.network.writeNodeFlags(ctx, log, p.node); err != nil {
+	if err := p.node.network.writeNodeFlags(p.node); err != nil {
 		return fmt.Errorf("writing node flags: %w", err)
 	}
 
@@ -183,7 +185,7 @@ func (p *NodeProcess) WaitForStopped(ctx context.Context) error {
 }
 
 // Restarts the node
-func (p *NodeProcess) Restart(ctx context.Context, log logging.Logger) error {
+func (p *NodeProcess) Restart(ctx context.Context) error {
 	if p.node.getRuntimeConfig().Process.ReuseDynamicPorts {
 		// Attempt to save the API port currently being used so the
 		// restarted node can reuse it. This may result in the node
@@ -196,13 +198,13 @@ func (p *NodeProcess) Restart(ctx context.Context, log logging.Logger) error {
 	if err := p.node.Stop(ctx); err != nil {
 		return fmt.Errorf("failed to stop node %s: %w", p.node.NodeID, err)
 	}
-	if err := p.node.network.StartNode(ctx, log, p.node); err != nil {
+	if err := p.node.network.StartNode(ctx, p.node); err != nil {
 		return fmt.Errorf("failed to start node %s: %w", p.node.NodeID, err)
 	}
 	return nil
 }
 
-func (p *NodeProcess) IsHealthy(ctx context.Context, log logging.Logger) (bool, error) {
+func (p *NodeProcess) IsHealthy(ctx context.Context) (bool, error) {
 	// Check that the node process is running as a precondition for
 	// checking health. getProcess will also ensure that the node's
 	// API URI is current.
@@ -225,7 +227,7 @@ func (p *NodeProcess) IsHealthy(ctx context.Context, log logging.Logger) (bool, 
 		return false, err
 	}
 	if err != nil {
-		log.Debug("failed to check node health",
+		p.node.network.log.Debug("failed to check node health",
 			zap.Stringer("nodeID", p.node.NodeID),
 			zap.Error(err),
 		)

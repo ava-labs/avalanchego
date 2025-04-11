@@ -22,7 +22,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/ava-labs/avalanchego/config"
-	"github.com/ava-labs/avalanchego/utils/logging"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -72,6 +71,7 @@ func (p *NodePod) readState(ctx context.Context) error {
 	// Check if the statefulset exists
 	scale, err := clientset.AppsV1().StatefulSets(namespace).GetScale(ctx, statefulSetName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
+		p.node.network.log.Info("statefulset not found")
 		p.setNotRunning()
 		return nil
 	}
@@ -81,6 +81,7 @@ func (p *NodePod) readState(ctx context.Context) error {
 
 	// Wait for the statefulset to have replicas?
 	if scale.Spec.Replicas == 0 {
+		p.node.network.log.Info("statefulset has no replicas")
 		p.setNotRunning()
 		return nil
 	}
@@ -117,8 +118,9 @@ func (p *NodePod) getStatefulSetName() string {
 	return p.node.network.UUID + "-" + strings.ToLower(nodeIDString[startIndex:endIndex])
 }
 
-func (p *NodePod) getFlagsForPod(ctx context.Context, log logging.Logger) (FlagsMap, error) {
-	flags, err := p.node.network.composeNodeFlags(ctx, log, p.node)
+func (p *NodePod) getFlagsForPod() (FlagsMap, error) {
+	n := p.node.network
+	flags, err := n.composeNodeFlags(p.node)
 	if err != nil {
 		return nil, err
 	}
@@ -128,10 +130,12 @@ func (p *NodePod) getFlagsForPod(ctx context.Context, log logging.Logger) (Flags
 }
 
 // Start the node as a kubernetes statefulset.
-func (p *NodePod) Start(ctx context.Context, log logging.Logger) error {
+func (p *NodePod) Start(ctx context.Context) error {
 	// TODO(marun) Handle the case where the target namespace doesn't exist
 
-	flags, err := p.getFlagsForPod(ctx, log)
+	log := p.node.network.log
+
+	flags, err := p.getFlagsForPod()
 	if err != nil {
 		return err
 	}
@@ -167,7 +171,25 @@ func (p *NodePod) Start(ctx context.Context, log logging.Logger) error {
 		zap.String("name", createdStatefulSet.Name),
 	)
 
-	return nil
+	bootstrapIPs, _ := p.node.network.getBootstrapIPsAndIDs(nil)
+	if len(bootstrapIPs) > 0 {
+		return nil
+	}
+
+	log.Info("waiting for node pod to start running so that subsequent nodes will have a bootstrap target",
+		zap.String("nodeID", p.node.NodeID.String()),
+	)
+
+	return wait.PollImmediateInfiniteWithContext(ctx, statusCheckInterval, func(_ context.Context) (bool, error) {
+		err := p.checkRunning(ctx)
+		if err != nil {
+			log.Debug("failed to check if node is running",
+				zap.String("nodeID", p.node.NodeID.String()),
+				zap.Error(err),
+			)
+		}
+		return err == nil, nil
+	})
 }
 
 // Stop the pod by setting the replicas to zero on the statefulset.
@@ -230,7 +252,9 @@ func (p *NodePod) WaitForStopped(ctx context.Context) error {
 }
 
 // Restarts the node
-func (p *NodePod) Restart(ctx context.Context, log logging.Logger) error {
+func (p *NodePod) Restart(ctx context.Context) error {
+	log := p.node.network.log
+
 	// Save node to disk
 	if err := p.node.Write(); err != nil {
 		return err
@@ -252,7 +276,7 @@ func (p *NodePod) Restart(ctx context.Context, log logging.Logger) error {
 	// TODO(marun) Reconsider usage of FlagsMap instead of just map[string]string
 	container := statefulset.Spec.Template.Spec.Containers[0]
 	sortEnvVars(container.Env) // Ensure both are sorted
-	flags, err := p.getFlagsForPod(ctx, log)
+	flags, err := p.getFlagsForPod()
 	if err != nil {
 		return err
 	}
@@ -333,8 +357,9 @@ func (p *NodePod) Restart(ctx context.Context, log logging.Logger) error {
 		return fmt.Errorf("failed to wait for statefulset to finish rolling out: %w", err)
 	}
 
+	// TODO(marun) Poll loops like this need to use contexts
 	if err := wait.PollImmediateInfinite(statusCheckInterval, func() (bool, error) {
-		_, err := p.IsHealthy(ctx, log)
+		_, err := p.IsHealthy(ctx)
 		// If no error is returned, the node must be accepting api
 		// calls which means it might become healthy if the other
 		// validators in the network are started.
@@ -346,13 +371,21 @@ func (p *NodePod) Restart(ctx context.Context, log logging.Logger) error {
 	return nil
 }
 
-func (p *NodePod) IsHealthy(ctx context.Context, log logging.Logger) (bool, error) {
+func (p *NodePod) checkRunning(ctx context.Context) error {
 	err := p.readState(ctx)
 	if err != nil {
-		return false, err
+		return err
 	}
 	if len(p.node.URI) == 0 {
-		return false, errNotRunning
+		return errNotRunning
+	}
+	return nil
+}
+
+func (p *NodePod) IsHealthy(ctx context.Context) (bool, error) {
+	err := p.checkRunning(ctx)
+	if err != nil {
+		return false, err
 	}
 
 	// TODO(marun) Reuse this forwarded connection for more than a single health check

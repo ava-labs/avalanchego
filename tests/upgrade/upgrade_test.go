@@ -52,7 +52,7 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 	require := require.New(tc)
 
 	ginkgo.It("can upgrade versions", func() {
-		network := tmpnet.NewDefaultNetwork(tc.Log(), "avalanchego-upgrade")
+		network := tmpnet.NewDefaultNetwork("avalanchego-upgrade")
 
 		network.DefaultRuntimeConfig = tmpnet.NodeRuntimeConfig{
 			Process: &tmpnet.ProcessRuntimeConfig{
@@ -99,7 +99,7 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 				},
 			}
 
-			require.NoError(network.StartNode(tc.DefaultContext(), tc.Log(), node))
+			require.NoError(network.StartNode(tc.DefaultContext(), node))
 
 			tc.By(fmt.Sprintf("waiting for node %q to report healthy after restart", node.NodeID))
 			e2e.WaitForHealthy(tc, node)
