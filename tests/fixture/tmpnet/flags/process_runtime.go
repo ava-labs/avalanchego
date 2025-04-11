@@ -96,7 +96,13 @@ func (v *processRuntimeVars) validate() error {
 
 	// The absolute path must exist
 	if _, err := os.Stat(absPath); err != nil {
-		return fmt.Errorf("--%s (%s) is a relative path but must be an absolute path", avalanchegoPathFlag, path)
+		return fmt.Errorf(
+			"--%s (%s) is a relative path but its absolute path (%s) is not found: %w",
+			avalanchegoPathFlag,
+			path,
+			absPath,
+			err,
+		)
 	}
 	return nil
 }
