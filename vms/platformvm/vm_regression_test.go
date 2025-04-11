@@ -2180,7 +2180,7 @@ func TestValidatorSetRaceCondition(t *testing.T) {
 	vm.ctx.Lock.Lock()
 }
 
-func TestL1ValidatorDeactivationCausesTrackingOfInvalidBlock(t *testing.T) {
+func TestBanffStandardBlockWithNoChangesRemainsInvalid(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t, upgradetest.Etna)
 	vm.ctx.Lock.Lock()
