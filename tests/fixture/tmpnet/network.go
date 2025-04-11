@@ -1024,8 +1024,13 @@ const invalidRPCVersion = 0
 // checkVMBinaries checks that VM binaries for the given subnets exist and optionally checks that VM
 // binaries have the same rpcchainvm version as the indicated avalanchego binary.
 func checkVMBinaries(log logging.Logger, subnets []*Subnet, config *ProcessRuntimeConfig) error {
-	if len(subnets) == 0 || config == nil {
+	if len(subnets) == 0 {
+		// Without subnets there are no VM binaries to check
 		return nil
+	}
+
+	if config == nil {
+		log.Info("skipping rpcchainvm version check because the process runtime is not configured")
 	}
 
 	avalanchegoRPCVersion, err := getRPCVersion(log, config.AvalancheGoPath, "--version-json")
