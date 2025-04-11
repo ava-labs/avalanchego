@@ -3,5 +3,7 @@
 
 package customtypes
 
+import ethtypes "github.com/ava-labs/libevm/core/types"
+
 // EmptyExtDataHash is the known hash of empty extdata bytes.
-var EmptyExtDataHash = rlpHash([]byte(nil))
+var EmptyExtDataHash = ethtypes.RLPHash([]byte(nil))

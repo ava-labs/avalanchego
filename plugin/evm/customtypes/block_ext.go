@@ -132,7 +132,7 @@ func CalcExtDataHash(extdata []byte) common.Hash {
 	if len(extdata) == 0 {
 		return EmptyExtDataHash
 	}
-	return rlpHash(extdata)
+	return ethtypes.RLPHash(extdata)
 }
 
 func NewBlockWithExtData(
