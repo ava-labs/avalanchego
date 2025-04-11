@@ -65,9 +65,9 @@ type mutableSharedMemory struct {
 }
 
 type environment struct {
-	Builder
+	*Builder
 	blkManager blockexecutor.Manager
-	mempool    mempool.Mempool
+	mempool    *mempool.Mempool
 	network    *network.Network
 	sender     *enginetest.Sender
 
@@ -142,7 +142,14 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 	metrics, err := metrics.New(registerer)
 	require.NoError(err)
 
-	res.mempool, err = mempool.New("mempool", registerer, nil)
+	res.mempool, err = mempool.New(
+		res.config.DynamicFeeConfig.Weights,
+		"mempool",
+		registerer,
+		nil,
+		ids.ID{},
+		nil,
+	)
 	require.NoError(err)
 
 	res.blkManager = blockexecutor.NewManager(

@@ -68,7 +68,7 @@ func (txMarshaller) UnmarshalGossip(bytes []byte) (*txs.Tx, error) {
 }
 
 func newGossipMempool(
-	mempool pmempool.Mempool,
+	mempool *pmempool.Mempool,
 	registerer prometheus.Registerer,
 	log logging.Logger,
 	txVerifier TxVerifier,
@@ -86,7 +86,7 @@ func newGossipMempool(
 }
 
 type gossipMempool struct {
-	pmempool.Mempool
+	*pmempool.Mempool
 	log        logging.Logger
 	txVerifier TxVerifier
 
@@ -134,8 +134,8 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 
 	if reset {
 		g.log.Debug("resetting bloom filter")
-		g.Mempool.Iterate(func(tx *txs.Tx) bool {
-			g.bloom.Add(tx)
+		g.Mempool.Iterate(func(tx pmempool.Tx) bool {
+			g.bloom.Add(tx.Tx)
 			return true
 		})
 	}
@@ -147,6 +147,12 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 func (g *gossipMempool) Has(txID ids.ID) bool {
 	_, ok := g.Mempool.Get(txID)
 	return ok
+}
+
+func (g *gossipMempool) Iterate(f func(gossipable *txs.Tx) bool) {
+	g.Mempool.Iterate(func(tx pmempool.Tx) bool {
+		return f(tx.Tx)
+	})
 }
 
 func (g *gossipMempool) GetFilter() (bloom []byte, salt []byte) {
