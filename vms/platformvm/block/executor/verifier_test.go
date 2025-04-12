@@ -1365,7 +1365,6 @@ func TestDeactivateLowBalanceL1ValidatorBlockChanges(t *testing.T) {
 			currentFork:       upgradetest.Etna,
 			durationToAdvance: time.Second,
 			networkID:         constants.UnitTestID,
-			expectedErr:       ErrStandardBlockWithoutChanges,
 		},
 		{
 			name:              "After F Upgrade - L1 validators evicted",

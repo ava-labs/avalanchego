@@ -51,8 +51,6 @@ keys/staker.*
 !*.go
 !*.proto
 
-plugins/
-
 scripts/ansible/*inventory.yml
 scripts/.build_image_gopath/
 
