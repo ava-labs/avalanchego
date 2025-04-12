@@ -55,7 +55,7 @@ func (v *RuntimeConfigVars) GetNodeRuntimeConfig() (*tmpnet.NodeRuntimeConfig, e
 	case processRuntime:
 		processRuntimeConfig, err := v.processRuntimeVars.getProcessRuntimeConfig()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to configure %s runtime: %w", processRuntime, err)
 		}
 		return &tmpnet.NodeRuntimeConfig{
 			Process: processRuntimeConfig,
