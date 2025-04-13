@@ -150,13 +150,13 @@ func (n *Network) readConfig() error {
 
 // The subset of network fields to store in the network config file.
 type serializedNetworkConfig struct {
-	UUID                 string                  `json:"uuid,omitempty"`
-	Owner                string                  `json:"owner,omitempty"`
-	PrimarySubnetConfig  FlagsMap                `json:"primarySubnetConfig,omitempty"`
-	PrimaryChainConfigs  map[string]FlagsMap     `json:"primaryChainConfigs,omitempty"`
-	DefaultFlags         FlagsMap                `json:"defaultFlags,omitempty"`
-	DefaultRuntimeConfig NodeRuntimeConfig       `json:"defaultRuntimeConfig,omitempty"`
-	PreFundedKeys        []*secp256k1.PrivateKey `json:"preFundedKeys,omitempty"`
+	UUID                 string                    `json:"uuid,omitempty"`
+	Owner                string                    `json:"owner,omitempty"`
+	PrimarySubnetConfig  map[string]any            `json:"primarySubnetConfig,omitempty"`
+	PrimaryChainConfigs  map[string]ChainConfigMap `json:"primaryChainConfigs,omitempty"`
+	DefaultFlags         FlagsMap                  `json:"defaultFlags,omitempty"`
+	DefaultRuntimeConfig NodeRuntimeConfig         `json:"defaultRuntimeConfig,omitempty"`
+	PreFundedKeys        []*secp256k1.PrivateKey   `json:"preFundedKeys,omitempty"`
 }
 
 func (n *Network) writeNetworkConfig() error {

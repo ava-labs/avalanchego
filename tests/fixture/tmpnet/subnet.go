@@ -55,7 +55,7 @@ type Subnet struct {
 	// networks (since the SubnetID will be different every time the subnet is created)
 	Name string
 
-	Config FlagsMap
+	Config map[string]any
 
 	// The ID of the transaction that created the subnet
 	SubnetID ids.ID
