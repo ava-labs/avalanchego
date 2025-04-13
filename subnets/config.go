@@ -24,7 +24,7 @@ type Config struct {
 	// AllowedNodes is the set of node IDs that are explicitly allowed to connect to this Subnet when
 	// ValidatorOnly is enabled.
 	AllowedNodes        set.Set[ids.NodeID] `json:"allowedNodes"        yaml:"allowedNodes"`
-	ConsensusParameters snowball.Parameters `json:"consensusParameters" yaml:"consensusParameters"`
+	ConsensusParameters snowball.Parameters `json:"consensusParameters" yaml:"consensusParameters,omitempty"`
 
 	// ProposerMinBlockDelay is the minimum delay this node will enforce when
 	// building a snowman++ block.

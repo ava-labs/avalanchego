@@ -17,7 +17,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
@@ -105,7 +104,7 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 
 		ginkgo.By("Configuring a kubernetes client")
 		kubeconfigPath := os.Getenv("KUBECONFIG")
-		kubeconfig, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+		kubeconfig, err := tmpnet.GetClientConfig(tc.Log(), kubeconfigPath, "")
 		require.NoError(err)
 		clientset, err := kubernetes.NewForConfig(kubeconfig)
 		require.NoError(err)

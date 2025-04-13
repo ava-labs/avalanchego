@@ -96,7 +96,7 @@ func (p *NodeProcess) Start(log logging.Logger) error {
 	}
 
 	// All arguments are provided in the flags file
-	cmd := exec.Command(p.node.RuntimeConfig.AvalancheGoPath, "--config-file", p.node.getFlagsPath()) // #nosec G204
+	cmd := exec.Command(p.node.RuntimeConfig.AvalancheGoPath, "--config-file", p.node.GetFlagsPath()) // #nosec G204
 	// Ensure process is detached from the parent process so that an error in the parent will not affect the child
 	configureDetachedProcess(cmd)
 
@@ -258,10 +258,10 @@ func (p *NodeProcess) writeMonitoringConfig() error {
 		// behavior of using the node's URI since the URI isn't
 		// guaranteed stable (e.g. port may change after restart).
 		"instance":          p.node.GetUniqueID(),
-		"network_uuid":      p.node.NetworkUUID,
+		"network_uuid":      p.node.network.UUID,
 		"node_id":           p.node.NodeID,
 		"is_ephemeral_node": strconv.FormatBool(p.node.IsEphemeral),
-		"network_owner":     p.node.NetworkOwner,
+		"network_owner":     p.node.network.Owner,
 	}
 	commonLabels.SetDefaults(githubLabelsFromEnv())
 
@@ -296,7 +296,7 @@ func (p *NodeProcess) getMonitoringConfigPath(name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(serviceDiscoveryDir, fmt.Sprintf("%s_%s.json", p.node.NetworkUUID, p.node.NodeID)), nil
+	return filepath.Join(serviceDiscoveryDir, fmt.Sprintf("%s_%s.json", p.node.network.UUID, p.node.NodeID)), nil
 }
 
 // Ensure the removal of the monitoring configuration files for this node.

@@ -1343,38 +1343,57 @@ func TestDeactivateLowBalanceL1ValidatorBlockChanges(t *testing.T) {
 		name              string
 		currentFork       upgradetest.Fork
 		durationToAdvance time.Duration
+		networkID         uint32
 		expectedErr       error
 	}{
 		{
 			name:              "Before F Upgrade - no L1 validators evicted",
 			currentFork:       upgradetest.Etna,
 			durationToAdvance: 0,
-			expectedErr:       errBanffStandardBlockWithoutChanges,
+			networkID:         constants.UnitTestID,
+			expectedErr:       ErrStandardBlockWithoutChanges,
 		},
 		{
 			name:              "After F Upgrade - no L1 validators evicted",
-			currentFork:       upgradetest.FUpgrade,
+			currentFork:       upgradetest.Fortuna,
 			durationToAdvance: 0,
-			expectedErr:       errBanffStandardBlockWithoutChanges,
+			networkID:         constants.UnitTestID,
+			expectedErr:       ErrStandardBlockWithoutChanges,
 		},
 		{
 			name:              "Before F Upgrade - L1 validators evicted",
 			currentFork:       upgradetest.Etna,
 			durationToAdvance: time.Second,
-			expectedErr:       errBanffStandardBlockWithoutChanges,
+			networkID:         constants.UnitTestID,
 		},
 		{
 			name:              "After F Upgrade - L1 validators evicted",
-			currentFork:       upgradetest.FUpgrade,
+			currentFork:       upgradetest.Fortuna,
 			durationToAdvance: time.Second,
+			networkID:         constants.UnitTestID,
+		},
+		{
+			name:              "Before F Upgrade - L1 validators evicted - on Fuji",
+			currentFork:       upgradetest.Etna,
+			durationToAdvance: time.Second,
+			networkID:         constants.FujiID,
+		},
+		{
+			name:              "After F Upgrade - L1 validators evicted - on Fuji",
+			currentFork:       upgradetest.Fortuna,
+			durationToAdvance: time.Second,
+			networkID:         constants.FujiID,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
+			ctx := snowtest.Context(t, constants.PlatformChainID)
+			ctx.NetworkID = test.networkID
 			verifier := newTestVerifier(t, testVerifierConfig{
 				Upgrades: upgradetest.GetConfig(test.currentFork),
+				Context:  ctx,
 				ValidatorFeeConfig: validatorfee.Config{
 					Capacity:                 genesis.LocalParams.ValidatorFeeConfig.Capacity,
 					Target:                   genesis.LocalParams.ValidatorFeeConfig.Target,

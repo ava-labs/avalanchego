@@ -47,9 +47,9 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 
 	upgrades := upgrade.Default
 	if flagVars.ActivateFortuna() {
-		upgrades.FUpgradeTime = upgrade.InitiallyActiveTime
+		upgrades.FortunaTime = upgrade.InitiallyActiveTime
 	} else {
-		upgrades.FUpgradeTime = upgrade.UnscheduledActivationTime
+		upgrades.FortunaTime = upgrade.UnscheduledActivationTime
 	}
 	tc.Log().Info("setting upgrades",
 		zap.Reflect("upgrades", upgrades),
@@ -66,6 +66,8 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 			Owner: "avalanchego-e2e",
 			DefaultFlags: tmpnet.FlagsMap{
 				config.UpgradeFileContentKey: upgradeBase64,
+				// Ensure a min stake duration compatible with testing staking logic
+				config.MinStakeDurationKey: tmpnet.DefaultMinStakeDuration,
 			},
 			Nodes:   nodes,
 			Subnets: subnets,

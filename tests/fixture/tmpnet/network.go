@@ -4,11 +4,14 @@
 package tmpnet
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/netip"
 	"os"
 	"os/exec"
@@ -21,9 +24,12 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/subnets"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
@@ -101,9 +107,11 @@ type Network struct {
 	// Genesis for the network. If nil, NetworkID must be non-zero
 	Genesis *genesis.UnparsedConfig
 
+	// Configuration for primary subnets
+	PrimarySubnetConfig *subnets.Config
+
 	// Configuration for primary network chains (P, X, C)
-	// TODO(marun) Rename to PrimaryChainConfigs
-	ChainConfigs map[string]FlagsMap
+	PrimaryChainConfigs map[string]FlagsMap
 
 	// Default configuration to use when creating new nodes
 	DefaultFlags         FlagsMap
@@ -121,6 +129,7 @@ type Network struct {
 
 func NewDefaultNetwork(owner string) *Network {
 	return &Network{
+		UUID:  uuid.NewString(),
 		Owner: owner,
 		Nodes: NewNodesOrPanic(DefaultNodeCount),
 	}
@@ -190,6 +199,9 @@ func ReadNetwork(dir string) (*Network, error) {
 	if err := network.Read(); err != nil {
 		return nil, fmt.Errorf("failed to read network: %w", err)
 	}
+	if network.DefaultFlags == nil {
+		network.DefaultFlags = FlagsMap{}
+	}
 	return network, nil
 }
 
@@ -205,15 +217,8 @@ func (n *Network) EnsureDefaultConfig(log logging.Logger, avalancheGoPath string
 		n.UUID = uuid.NewString()
 	}
 
-	// Ensure default flags
 	if n.DefaultFlags == nil {
 		n.DefaultFlags = FlagsMap{}
-	}
-	n.DefaultFlags.SetDefaults(DefaultTmpnetFlags())
-
-	if len(n.Nodes) == 1 {
-		// Sybil protection needs to be disabled for a single node network to start
-		n.DefaultFlags[config.SybilProtectionEnabledKey] = false
 	}
 
 	// Only configure the plugin dir with a non-empty value to ensure
@@ -235,15 +240,15 @@ func (n *Network) EnsureDefaultConfig(log logging.Logger, avalancheGoPath string
 	}
 
 	// Ensure primary chains are configured
-	if n.ChainConfigs == nil {
-		n.ChainConfigs = map[string]FlagsMap{}
+	if n.PrimaryChainConfigs == nil {
+		n.PrimaryChainConfigs = map[string]FlagsMap{}
 	}
 	defaultChainConfigs := DefaultChainConfigs()
 	for alias, chainConfig := range defaultChainConfigs {
-		if _, ok := n.ChainConfigs[alias]; !ok {
-			n.ChainConfigs[alias] = FlagsMap{}
+		if _, ok := n.PrimaryChainConfigs[alias]; !ok {
+			n.PrimaryChainConfigs[alias] = FlagsMap{}
 		}
-		n.ChainConfigs[alias].SetDefaults(chainConfig)
+		n.PrimaryChainConfigs[alias].SetDefaults(chainConfig)
 	}
 
 	// Ensure runtime is configured
@@ -295,7 +300,7 @@ func (n *Network) Create(rootDir string) error {
 	n.Dir = canonicalDir
 
 	// Ensure the existence of the plugin directory or nodes won't be able to start.
-	pluginDir, err := n.getPluginDir()
+	pluginDir, err := n.GetPluginDir()
 	if err != nil {
 		return err
 	}
@@ -480,12 +485,15 @@ func (n *Network) Bootstrap(ctx context.Context, log logging.Logger) error {
 func (n *Network) StartNode(ctx context.Context, log logging.Logger, node *Node) error {
 	// This check is duplicative for a network that is starting, but ensures
 	// that individual node start/restart won't fail due to missing binaries.
-	pluginDir, err := n.getPluginDir()
+	pluginDir, err := n.GetPluginDir()
 	if err != nil {
 		return err
 	}
 
 	if err := n.EnsureNodeConfig(node); err != nil {
+		return err
+	}
+	if err := node.Write(); err != nil {
 		return err
 	}
 
@@ -494,14 +502,8 @@ func (n *Network) StartNode(ctx context.Context, log logging.Logger, node *Node)
 		return err
 	}
 
-	bootstrapIPs, bootstrapIDs, err := n.getBootstrapIPsAndIDs(node)
-	if err != nil {
-		return err
-	}
-	node.SetNetworkingConfig(bootstrapIDs, bootstrapIPs)
-
-	if err := node.Write(); err != nil {
-		return err
+	if err := n.writeNodeFlags(log, node); err != nil {
+		return fmt.Errorf("writing node flags: %w", err)
 	}
 
 	if err := node.Start(log); err != nil {
@@ -541,7 +543,7 @@ func (n *Network) RestartNode(ctx context.Context, log logging.Logger, node *Nod
 // Stops all nodes in the network.
 func (n *Network) Stop(ctx context.Context) error {
 	// Target all nodes, including the ephemeral ones
-	nodes, err := ReadNodes(n.Dir, true /* includeEphemeral */)
+	nodes, err := ReadNodes(n, true /* includeEphemeral */)
 	if err != nil {
 		return err
 	}
@@ -584,57 +586,25 @@ func (n *Network) Restart(ctx context.Context, log logging.Logger) error {
 // no action will be taken.
 // TODO(marun) Reword or refactor to account for the differing behavior pre- vs post-start
 func (n *Network) EnsureNodeConfig(node *Node) error {
-	flags := node.Flags
-
-	// Ensure nodes can label their metrics with the network uuid
-	node.NetworkUUID = n.UUID
-
-	// Ensure nodes can label metrics with an indication of the shared/private nature of the network
-	node.NetworkOwner = n.Owner
-
-	// Set the network name if available
-	networkID := n.GetNetworkID()
-	if networkID > 0 {
-		// Convert the network id to a string to ensure consistency in JSON round-tripping.
-		flags[config.NetworkNameKey] = strconv.FormatUint(uint64(networkID), 10)
-	}
+	// Ensure the node has access to network configuration
+	node.network = n
 
 	if err := node.EnsureKeys(); err != nil {
 		return err
 	}
 
-	flags.SetDefaults(n.DefaultFlags)
-
-	// Set fields including the network path
 	if len(n.Dir) > 0 {
-		defaultFlags := FlagsMap{
-			config.ChainConfigDirKey: n.GetChainConfigDir(),
-		}
-
-		if n.Genesis != nil {
-			defaultFlags[config.GenesisFileKey] = n.getGenesisPath()
-		}
-
-		// Only set the subnet dir if it exists or the node won't start.
-		subnetDir := n.GetSubnetDir()
-		if _, err := os.Stat(subnetDir); err == nil {
-			defaultFlags[config.SubnetConfigDirKey] = subnetDir
-		} else if !errors.Is(err, os.ErrNotExist) {
-			return err
-		}
-
-		node.Flags.SetDefaults(defaultFlags)
-
 		// Ensure the node's data dir is configured
 		dataDir := node.GetDataDir()
 		if len(dataDir) == 0 {
 			// NodeID will have been set by EnsureKeys
 			dataDir = filepath.Join(n.Dir, node.NodeID.String())
-			flags[config.DataDirKey] = dataDir
+			node.Flags[config.DataDirKey] = dataDir
 		}
 	}
 
 	// Ensure the node runtime is configured
+	// TODO(marun) Do not set the runtime config - get it from the network if not present on the node.
 	if node.RuntimeConfig == nil {
 		node.RuntimeConfig = &NodeRuntimeConfig{
 			AvalancheGoPath: n.DefaultRuntimeConfig.AvalancheGoPath,
@@ -710,7 +680,7 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI 
 		)
 
 		// Persist the subnet configuration
-		if err := subnet.Write(n.GetSubnetDir(), n.GetChainConfigDir()); err != nil {
+		if err := subnet.Write(n.GetSubnetDir()); err != nil {
 			return err
 		}
 
@@ -793,12 +763,12 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI 
 			return err
 		}
 
-		// Persist the chain configuration
-		if err := subnet.Write(n.GetSubnetDir(), n.GetChainConfigDir()); err != nil {
+		if err := subnet.Write(n.GetSubnetDir()); err != nil {
 			return err
 		}
-		log.Info("wrote chain configuration for subnet",
+		log.Info("wrote subnet configuration",
 			zap.String("name", subnet.Name),
+			zap.Stringer("id", subnet.SubnetID),
 		)
 
 		// If one or more of the subnets chains have explicit configuration, the
@@ -843,9 +813,10 @@ func (n *Network) GetNodeURIs() []NodeURI {
 
 // Retrieves bootstrap IPs and IDs for all nodes except the skipped one (this supports
 // collecting the bootstrap details for restarting a node).
-func (n *Network) getBootstrapIPsAndIDs(skippedNode *Node) ([]string, []string, error) {
+// For consumption outside of avalanchego. Needs to be kept exported.
+func (n *Network) GetBootstrapIPsAndIDs(skippedNode *Node) ([]string, []string, error) {
 	// Collect staking addresses of non-ephemeral nodes for use in bootstrapping a node
-	nodes, err := ReadNodes(n.Dir, false /* includeEphemeral */)
+	nodes, err := ReadNodes(n, false /* includeEphemeral */)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to read network's nodes: %w", err)
 	}
@@ -882,8 +853,143 @@ func (n *Network) GetNetworkID() uint32 {
 	return n.NetworkID
 }
 
-func (n *Network) getPluginDir() (string, error) {
+// For consumption outside of avalanchego. Needs to be kept exported.
+func (n *Network) GetPluginDir() (string, error) {
 	return n.DefaultFlags.GetStringVal(config.PluginDirKey)
+}
+
+// GetGenesisFileContent returns the base64-encoded JSON-marshaled
+// network genesis.
+func (n *Network) GetGenesisFileContent() (string, error) {
+	bytes, err := json.Marshal(n.Genesis)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal genesis: %w", err)
+	}
+	return base64.StdEncoding.EncodeToString(bytes), nil
+}
+
+// GetSubnetConfigContent returns the base64-encoded and
+// JSON-marshaled map of subnetID to subnet configuration.
+func (n *Network) GetSubnetConfigContent() (string, error) {
+	subnetConfigs := map[ids.ID]subnets.Config{}
+
+	if n.PrimarySubnetConfig != nil {
+		subnetConfigs[constants.PrimaryNetworkID] = *n.PrimarySubnetConfig
+	}
+
+	// Collect configuration for non-primary subnets
+	for _, subnet := range n.Subnets {
+		if subnet.SubnetID == ids.Empty {
+			// The subnet hasn't been created yet and it's not
+			// possible to supply configuration without an ID.
+			continue
+		}
+		if subnet.Config == nil {
+			continue
+		}
+		subnetConfigs[subnet.SubnetID] = *subnet.Config
+	}
+
+	if len(subnetConfigs) == 0 {
+		return "", nil
+	}
+
+	marshaledConfigs, err := json.Marshal(subnetConfigs)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal subnet configs: %w", err)
+	}
+	return base64.StdEncoding.EncodeToString(marshaledConfigs), nil
+}
+
+// GetChainConfigContent returns the base64-encoded and JSON-marshaled map of chain alias/ID
+// to JSON-marshaled chain configuration for both primary and custom chains.
+func (n *Network) GetChainConfigContent() (string, error) {
+	chainConfigs := map[string]chains.ChainConfig{}
+	for alias, flags := range n.PrimaryChainConfigs {
+		marshaledFlags, err := json.Marshal(flags)
+		if err != nil {
+			return "", fmt.Errorf("failed to marshal flags map for %s-Chain: %w", alias, err)
+		}
+		chainConfigs[alias] = chains.ChainConfig{
+			Config: marshaledFlags,
+		}
+	}
+
+	// Collect custom chain configuration
+	for _, subnet := range n.Subnets {
+		for _, chain := range subnet.Chains {
+			if chain.ChainID == ids.Empty {
+				// The chain hasn't been created yet and it's not possible to supply
+				// configuration without a chain ID.
+				continue
+			}
+			chainConfigs[chain.ChainID.String()] = chains.ChainConfig{
+				Config: []byte(chain.Config),
+			}
+		}
+	}
+
+	marshaledConfigs, err := json.Marshal(chainConfigs)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal chain configs: %w", err)
+	}
+	return base64.StdEncoding.EncodeToString(marshaledConfigs), nil
+}
+
+// writeNodeFlags determines the set of flags that should be used to
+// start the given node and writes them to a file in the node path.
+func (n *Network) writeNodeFlags(log logging.Logger, node *Node) error {
+	flags := maps.Clone(node.Flags)
+
+	// Convert the network id to a string to ensure consistency in JSON round-tripping.
+	flags.SetDefault(config.NetworkNameKey, strconv.FormatUint(uint64(n.GetNetworkID()), 10))
+
+	// Set the bootstrap configuration
+	bootstrapIPs, bootstrapIDs, err := n.GetBootstrapIPsAndIDs(node)
+	if err != nil {
+		return fmt.Errorf("failed to determine bootstrap configuration: %w", err)
+	}
+	flags.SetDefault(config.BootstrapIDsKey, strings.Join(bootstrapIDs, ","))
+	flags.SetDefault(config.BootstrapIPsKey, strings.Join(bootstrapIPs, ","))
+
+	// TODO(marun) Maybe avoid computing content flags for each node start?
+
+	if n.Genesis != nil {
+		genesisFileContent, err := n.GetGenesisFileContent()
+		if err != nil {
+			return fmt.Errorf("failed to get genesis file content: %w", err)
+		}
+		flags.SetDefault(config.GenesisFileContentKey, genesisFileContent)
+
+		isSingleNodeNetwork := (len(n.Nodes) == 1 && len(n.Genesis.InitialStakers) == 1)
+		if isSingleNodeNetwork {
+			log.Info("defaulting to sybil protection disabled to enable a single-node network to start")
+			flags.SetDefault(config.SybilProtectionEnabledKey, false)
+		}
+	}
+
+	subnetConfigContent, err := n.GetSubnetConfigContent()
+	if err != nil {
+		return fmt.Errorf("failed to get subnet config content: %w", err)
+	}
+	if len(subnetConfigContent) > 0 {
+		flags.SetDefault(config.SubnetConfigContentKey, subnetConfigContent)
+	}
+
+	chainConfigContent, err := n.GetChainConfigContent()
+	if err != nil {
+		return fmt.Errorf("failed to get chain config content: %w", err)
+	}
+	if len(chainConfigContent) > 0 {
+		flags.SetDefault(config.ChainConfigContentKey, chainConfigContent)
+	}
+
+	// Set the network and tmpnet defaults last to ensure they can be overridden
+	flags.SetDefaults(n.DefaultFlags)
+	flags.SetDefaults(DefaultTmpnetFlags())
+
+	// Write the flags to disk
+	return node.writeFlags(flags)
 }
 
 // Waits until the provided nodes are healthy.
@@ -958,7 +1064,7 @@ func checkVMBinaries(log logging.Logger, subnets []*Subnet, avalanchegoPath stri
 		return nil
 	}
 
-	avalanchegoRPCVersion, err := getRPCVersion(avalanchegoPath, "--version-json")
+	avalanchegoRPCVersion, err := getRPCVersion(log, avalanchegoPath, "--version-json")
 	if err != nil {
 		log.Warn("unable to check rpcchainvm version for avalanchego", zap.Error(err))
 		return nil
@@ -984,7 +1090,7 @@ func checkVMBinaries(log logging.Logger, subnets []*Subnet, avalanchegoPath stri
 			}
 
 			// Check that the VM's rpcchainvm version matches avalanchego's version
-			vmRPCVersion, err := getRPCVersion(vmPath, chain.VersionArgs...)
+			vmRPCVersion, err := getRPCVersion(log, vmPath, chain.VersionArgs...)
 			if err != nil {
 				log.Warn("unable to check rpcchainvm version for VM Binary",
 					zap.String("subnet", subnet.Name),
@@ -1015,12 +1121,23 @@ type RPCChainVMVersion struct {
 
 // getRPCVersion attempts to invoke the given command with the specified version arguments and
 // retrieve an rpcchainvm version from its output.
-func getRPCVersion(command string, versionArgs ...string) (uint64, error) {
+func getRPCVersion(log logging.Logger, command string, versionArgs ...string) (uint64, error) {
 	cmd := exec.Command(command, versionArgs...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return 0, fmt.Errorf("command %q failed with output: %s", command, output)
 	}
+
+	// Ignore output before the opening brace to tolerate the case of a command being invoked
+	// with `go run` and the go toolchain emitting diagnostic logging before the version output.
+	if idx := bytes.IndexByte(output, '{'); idx > 0 {
+		log.Info("ignoring leading bytes of JSON version output in advance of opening `{`",
+			zap.String("command", command),
+			zap.String("ignoredLeadingBytes", string(output[:idx])),
+		)
+		output = output[idx:]
+	}
+
 	version := &RPCChainVMVersion{}
 	if err := json.Unmarshal(output, version); err != nil {
 		return 0, fmt.Errorf("failed to unmarshal output from command %q: %w, output: %s", command, err, output)

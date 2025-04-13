@@ -22,7 +22,7 @@ func Test_History_Simple(t *testing.T) {
 	db, err := newDB(
 		context.Background(),
 		memdb.New(),
-		newDefaultConfig(),
+		NewConfig(),
 	)
 	require.NoError(err)
 	batch := db.NewBatch()
@@ -87,7 +87,7 @@ func Test_History_Large(t *testing.T) {
 	numIters := 250
 
 	for i := 1; i < 5; i++ {
-		config := newDefaultConfig()
+		config := NewConfig()
 		// History must be large enough to get the change proof
 		// after this loop.
 		config.HistoryLength = uint(numIters)
@@ -149,7 +149,7 @@ func Test_History_Large(t *testing.T) {
 func Test_History_Bad_GetValueChanges_Input(t *testing.T) {
 	require := require.New(t)
 
-	config := newDefaultConfig()
+	config := NewConfig()
 	config.HistoryLength = 5
 
 	db, err := newDB(
@@ -215,7 +215,7 @@ func Test_History_Bad_GetValueChanges_Input(t *testing.T) {
 func Test_History_Trigger_History_Queue_Looping(t *testing.T) {
 	require := require.New(t)
 
-	config := newDefaultConfig()
+	config := NewConfig()
 	config.HistoryLength = 2
 
 	db, err := newDB(
@@ -274,7 +274,7 @@ func Test_History_Trigger_History_Queue_Looping(t *testing.T) {
 func Test_History_Values_Lookup_Over_Queue_Break(t *testing.T) {
 	require := require.New(t)
 
-	config := newDefaultConfig()
+	config := NewConfig()
 	config.HistoryLength = 4
 	db, err := newDB(
 		context.Background(),
@@ -327,7 +327,7 @@ func Test_History_RepeatedRoot(t *testing.T) {
 	db, err := newDB(
 		context.Background(),
 		memdb.New(),
-		newDefaultConfig(),
+		NewConfig(),
 	)
 	require.NoError(err)
 	batch := db.NewBatch()
@@ -371,7 +371,7 @@ func Test_History_ExcessDeletes(t *testing.T) {
 	db, err := newDB(
 		context.Background(),
 		memdb.New(),
-		newDefaultConfig(),
+		NewConfig(),
 	)
 	require.NoError(err)
 	batch := db.NewBatch()
@@ -403,7 +403,7 @@ func Test_History_DontIncludeAllNodes(t *testing.T) {
 	db, err := newDB(
 		context.Background(),
 		memdb.New(),
-		newDefaultConfig(),
+		NewConfig(),
 	)
 	require.NoError(err)
 	batch := db.NewBatch()
@@ -431,7 +431,7 @@ func Test_History_Branching2Nodes(t *testing.T) {
 	db, err := newDB(
 		context.Background(),
 		memdb.New(),
-		newDefaultConfig(),
+		NewConfig(),
 	)
 	require.NoError(err)
 	batch := db.NewBatch()
@@ -459,7 +459,7 @@ func Test_History_Branching3Nodes(t *testing.T) {
 	db, err := newDB(
 		context.Background(),
 		memdb.New(),
-		newDefaultConfig(),
+		NewConfig(),
 	)
 	require.NoError(err)
 	batch := db.NewBatch()
@@ -484,7 +484,7 @@ func Test_History_Branching3Nodes(t *testing.T) {
 func Test_History_MaxLength(t *testing.T) {
 	require := require.New(t)
 
-	config := newDefaultConfig()
+	config := NewConfig()
 	config.HistoryLength = 2
 	db, err := newDB(
 		context.Background(),
@@ -519,7 +519,7 @@ func Test_Change_List(t *testing.T) {
 	db, err := newDB(
 		context.Background(),
 		memdb.New(),
-		newDefaultConfig(),
+		NewConfig(),
 	)
 	require.NoError(err)
 

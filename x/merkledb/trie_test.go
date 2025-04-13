@@ -917,7 +917,7 @@ func Test_Trie_MultipleStates(t *testing.T) {
 			db, err := New(
 				context.Background(),
 				rdb,
-				newDefaultConfig(),
+				NewConfig(),
 			)
 			require.NoError(err)
 			defer db.Close()

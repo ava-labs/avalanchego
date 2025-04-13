@@ -2180,6 +2180,35 @@ func TestValidatorSetRaceCondition(t *testing.T) {
 	vm.ctx.Lock.Lock()
 }
 
+func TestBanffStandardBlockWithNoChangesRemainsInvalid(t *testing.T) {
+	require := require.New(t)
+	vm, _, _ := defaultVM(t, upgradetest.Etna)
+	vm.ctx.Lock.Lock()
+	defer vm.ctx.Lock.Unlock()
+
+	lastAcceptedID, err := vm.LastAccepted(context.Background())
+	require.NoError(err)
+
+	lastAccepted, err := vm.GetBlock(context.Background(), lastAcceptedID)
+	require.NoError(err)
+
+	statelessBlk, err := block.NewBanffStandardBlock(
+		lastAccepted.Timestamp(),
+		lastAcceptedID,
+		lastAccepted.Height()+1,
+		nil,
+	)
+	require.NoError(err)
+
+	blk, err := vm.ParseBlock(context.Background(), statelessBlk.Bytes())
+	require.NoError(err)
+
+	for range 2 {
+		err = blk.Verify(context.Background())
+		require.ErrorIs(err, blockexecutor.ErrStandardBlockWithoutChanges)
+	}
+}
+
 func buildAndAcceptStandardBlock(vm *VM) error {
 	blk, err := vm.Builder.BuildBlock(context.Background())
 	if err != nil {

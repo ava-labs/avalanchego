@@ -59,20 +59,11 @@ type NodeRuntimeConfig struct {
 
 // Node supports configuring and running a node participating in a temporary network.
 type Node struct {
-	// Uniquely identifies the network the node is part of to enable monitoring.
-	NetworkUUID string
-
-	// Identify the entity associated with this network. This is
-	// intended to be used to label metrics to enable filtering
-	// results for a test run between the primary/shared network used
-	// by the majority of tests and private networks used by
-	// individual tests.
-	NetworkOwner string
-
 	// Set by EnsureNodeID which is also called when the node is read.
 	NodeID ids.NodeID
 
-	// Flags that will be supplied to the node at startup
+	// The set of flags used to start whose values are intended to deviate from the
+	// default set of flags configured for the network.
 	Flags FlagsMap
 
 	// An ephemeral node is not expected to be a persistent member of the network and
@@ -88,6 +79,9 @@ type Node struct {
 
 	// Initialized on demand
 	runtime NodeRuntime
+
+	// Intended to be set by the network
+	network *Network
 }
 
 // Initializes a new node with only the data dir set
@@ -128,11 +122,11 @@ func ReadNode(dataDir string) (*Node, error) {
 }
 
 // Reads nodes from the specified network directory.
-func ReadNodes(networkDir string, includeEphemeral bool) ([]*Node, error) {
+func ReadNodes(network *Network, includeEphemeral bool) ([]*Node, error) {
 	nodes := []*Node{}
 
 	// Node configuration is stored in child directories
-	entries, err := os.ReadDir(networkDir)
+	entries, err := os.ReadDir(network.Dir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read dir: %w", err)
 	}
@@ -141,7 +135,7 @@ func ReadNodes(networkDir string, includeEphemeral bool) ([]*Node, error) {
 			continue
 		}
 
-		nodeDir := filepath.Join(networkDir, entry.Name())
+		nodeDir := filepath.Join(network.Dir, entry.Name())
 		node, err := ReadNode(nodeDir)
 		if errors.Is(err, os.ErrNotExist) {
 			// If no config file exists, assume this is not the path of a node
@@ -153,6 +147,12 @@ func ReadNodes(networkDir string, includeEphemeral bool) ([]*Node, error) {
 		if !includeEphemeral && node.IsEphemeral {
 			continue
 		}
+
+		if err := node.EnsureNodeID(); err != nil {
+			return nil, fmt.Errorf("failed to ensure NodeID: %w", err)
+		}
+
+		node.network = network
 
 		nodes = append(nodes, node)
 	}
@@ -241,21 +241,6 @@ func (n *Node) Stop(ctx context.Context) error {
 		return err
 	}
 	return n.WaitForStopped(ctx)
-}
-
-// Sets networking configuration for the node.
-// Convenience method for setting networking flags.
-func (n *Node) SetNetworkingConfig(bootstrapIDs []string, bootstrapIPs []string) {
-	if _, ok := n.Flags[config.HTTPPortKey]; !ok {
-		// Default to dynamic port allocation
-		n.Flags[config.HTTPPortKey] = 0
-	}
-	if _, ok := n.Flags[config.StakingPortKey]; !ok {
-		// Default to dynamic port allocation
-		n.Flags[config.StakingPortKey] = 0
-	}
-	n.Flags[config.BootstrapIDsKey] = strings.Join(bootstrapIDs, ",")
-	n.Flags[config.BootstrapIPsKey] = strings.Join(bootstrapIPs, ",")
 }
 
 // Ensures staking and signing keys are generated if not already present and
@@ -392,7 +377,7 @@ func (n *Node) GetUniqueID() string {
 	nodeIDString := n.NodeID.String()
 	startIndex := len(ids.NodeIDPrefix)
 	endIndex := startIndex + 8 // 8 characters should be enough to identify a node in the context of its network
-	return n.NetworkUUID + "-" + strings.ToLower(nodeIDString[startIndex:endIndex])
+	return n.network.UUID + "-" + strings.ToLower(nodeIDString[startIndex:endIndex])
 }
 
 // Saves the currently allocated API port to the node's configuration

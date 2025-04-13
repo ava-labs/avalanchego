@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/acp176"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/cortina"
-	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/ava-labs/libevm/accounts/abi"
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -105,7 +105,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 			require.NoError(err)
 
 			now := time.Now()
-			if upgrades.IsFUpgradeActivated(now) {
+			if upgrades.IsFortunaActivated(now) {
 				gasLimit = acp176.MinMaxCapacity
 			} else {
 				gasLimit = cortina.GasLimit
