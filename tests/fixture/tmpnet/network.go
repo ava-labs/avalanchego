@@ -806,11 +806,6 @@ func (n *Network) GetNetworkID() uint32 {
 	return n.NetworkID
 }
 
-// For consumption outside of avalanchego. Needs to be kept exported.
-func (n *Network) GetPluginDir() (string, error) {
-	return n.DefaultFlags.GetStringVal(config.PluginDirKey)
-}
-
 // GetGenesisFileContent returns the base64-encoded JSON-marshaled
 // network genesis.
 func (n *Network) GetGenesisFileContent() (string, error) {
