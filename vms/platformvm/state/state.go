@@ -102,7 +102,7 @@ var (
 	LastAcceptedKey      = []byte("last accepted")
 	HeightsIndexedKey    = []byte("heights indexed")
 	InitializedKey       = []byte("initialized")
-	BlocksReindexedKey   = []byte("blocks reindexed")
+	BlocksReindexedKey   = []byte("blocks reindexed.2")
 
 	emptyL1ValidatorCache = &cache.Empty[ids.ID, maybe.Maybe[L1Validator]]{}
 )
@@ -226,7 +226,7 @@ type State interface {
 	// this function will return immediately, without iterating over the
 	// database.
 	//
-	// TODO: Remove after v1.12.x is activated
+	// TODO: Remove after v1.14.x is activated
 	ReindexBlocks(lock sync.Locker, log logging.Logger) error
 
 	// Commit changes to the base database.
@@ -245,7 +245,7 @@ type State interface {
 // stored as a map from blkID to stateBlk. Nodes synced prior to this PR may
 // still have blocks partially stored using this legacy format.
 //
-// TODO: Remove after v1.12.x is activated
+// TODO: Remove after v1.14.x is activated
 type stateBlk struct {
 	Bytes  []byte         `serialize:"true"`
 	Status choices.Status `serialize:"true"`
@@ -3067,7 +3067,7 @@ func (s *state) writeMetadata() error {
 // Returns the block and whether it is a [stateBlk].
 // Invariant: blkBytes is safe to parse with blocks.GenesisCodec
 //
-// TODO: Remove after v1.12.x is activated
+// TODO: Remove after v1.14.x is activated
 func parseStoredBlock(blkBytes []byte) (block.Block, bool, error) {
 	// Attempt to parse as blocks.Block
 	blk, err := block.Parse(block.GenesisCodec, blkBytes)
