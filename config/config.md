@@ -98,7 +98,7 @@ them into the VM on initialization.
 #### `--chain-config-dir` (string)
 
 Specifies the directory that contains chain configs, as described
-[here](build.avax.network/docs/nodes/configure/chain-configs/chain-config-flags). Defaults to `$HOME/.avalanchego/configs/chains`.
+[here](https://build.avax.network/docs/nodes/chain-configs). Defaults to `$HOME/.avalanchego/configs/chains`.
 If this flag is not provided and the default directory does not exist,
 AvalancheGo will not exit since custom configs are optional. However, if the
 flag is set, the specified folder must exist, or AvalancheGo will exit with an
@@ -126,10 +126,10 @@ The chain configuration is intended to provide optional configuration parameters
 and the VM will use default values if nothing is passed in.
 
 Full reference for all configuration options for some standard chains can be
-found in a separate [chain config flags](build.avax.network/docs/nodes/configure/chain-configs/chain-config-flags) document.
+found in a separate [chain config flags](https://build.avax.network/docs/nodes/chain-configs) document.
 
 Full reference for `subnet-evm` upgrade configuration can be found in a separate
-[Customize a Subnet](build.avax.network/docs/build/subnet/upgrade/customize-a-subnet) document.
+[Customize a Subnet](https://build.avax.network/docs/avalanche-l1s/upgrade/customize-avalanche-l1) document.
 
 #### `--chain-config-content` (string)
 
@@ -1352,3 +1352,4 @@ Node reports unhealthy if the router drops more than this portion of messages. D
 
 Node reports unhealthy if there are more than this many outstanding consensus requests
 (Get, PullQuery, etc.) over all chains. Defaults to `1024`.
+
