@@ -60,6 +60,7 @@ the following non-test files:
 | Filename                    | Types          | Purpose                                                                |
 |:----------------------------|:---------------|:-----------------------------------------------------------------------|
 | flags/                      |                | Directory defining flags usable with both stdlib flags and spf13/pflag |
+| flags/collector.go          |                | Defines flags configuring collection of logs and metrics               |
 | flags/common.go             |                | Defines type definitions common across other files                     |
 | flags/kube_config.go        |                | Defines flags configuring the kubeconfig of the kube runtime           |
 | flags/kube_runtime.go       |                | Defines flags configuring the kube node runtime                        |
