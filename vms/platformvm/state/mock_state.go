@@ -12,12 +12,14 @@ package state
 import (
 	context "context"
 	reflect "reflect"
+	sync "sync"
 	time "time"
 
 	database "github.com/ava-labs/avalanchego/database"
 	ids "github.com/ava-labs/avalanchego/ids"
 	validators "github.com/ava-labs/avalanchego/snow/validators"
 	iterator "github.com/ava-labs/avalanchego/utils/iterator"
+	logging "github.com/ava-labs/avalanchego/utils/logging"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
 	gas "github.com/ava-labs/avalanchego/vms/components/gas"
 	block "github.com/ava-labs/avalanchego/vms/platformvm/block"
@@ -858,6 +860,20 @@ func (m *MockState) PutPendingValidator(staker *Staker) error {
 func (mr *MockStateMockRecorder) PutPendingValidator(staker any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutPendingValidator", reflect.TypeOf((*MockState)(nil).PutPendingValidator), staker)
+}
+
+// ReindexBlocks mocks base method.
+func (m *MockState) ReindexBlocks(lock sync.Locker, log logging.Logger) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReindexBlocks", lock, log)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ReindexBlocks indicates an expected call of ReindexBlocks.
+func (mr *MockStateMockRecorder) ReindexBlocks(lock, log any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReindexBlocks", reflect.TypeOf((*MockState)(nil).ReindexBlocks), lock, log)
 }
 
 // SetAccruedFees mocks base method.
