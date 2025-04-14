@@ -49,9 +49,9 @@ func (n *Node) readConfig() error {
 }
 
 type serializedNodeConfig struct {
-	IsEphemeral   bool
-	Flags         FlagsMap
-	RuntimeConfig *NodeRuntimeConfig
+	IsEphemeral   bool               `json:",omitempty"`
+	Flags         FlagsMap           `json:",omitempty"`
+	RuntimeConfig *NodeRuntimeConfig `json:",omitempty"`
 }
 
 func (n *Node) writeConfig() error {

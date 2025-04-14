@@ -53,7 +53,12 @@ type NodeRuntime interface {
 
 // Configuration required to configure a node runtime.
 type NodeRuntimeConfig struct {
+	Process *ProcessRuntimeConfig
+}
+
+type ProcessRuntimeConfig struct {
 	AvalancheGoPath   string
+	PluginDir         string
 	ReuseDynamicPorts bool
 }
 
@@ -70,7 +75,8 @@ type Node struct {
 	// should therefore not be used as for bootstrapping purposes.
 	IsEphemeral bool
 
-	// The configuration used to initialize the node runtime.
+	// Optional, the configuration used to initialize the node runtime.
+	// If not set, the network default will be used.
 	RuntimeConfig *NodeRuntimeConfig
 
 	// Runtime state, intended to be set by NodeRuntime
@@ -168,6 +174,15 @@ func (n *Node) getRuntime() NodeRuntime {
 		}
 	}
 	return n.runtime
+}
+
+// Retrieves the runtime configuration for the node, defaulting to the
+// runtime configuration from the network if none is set for the node.
+func (n *Node) getRuntimeConfig() NodeRuntimeConfig {
+	if n.RuntimeConfig != nil {
+		return *n.RuntimeConfig
+	}
+	return n.network.DefaultRuntimeConfig
 }
 
 // Runtime methods
