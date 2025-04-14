@@ -158,14 +158,15 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 		}
 	}
 
+	runtimeConfig, err := flagVars.NodeRuntimeConfig()
+	require.NoError(err)
+
 	// Start a new network
 	if network == nil {
 		// TODO(marun) Maybe accept a factory function for the desired network
 		// that is only run when a new network will be started?
 
 		network = desiredNetwork
-		runtimeConfig, err := flagVars.NodeRuntimeConfig()
-		require.NoError(err)
 		network.DefaultRuntimeConfig = *runtimeConfig
 
 		StartNetwork(
@@ -178,7 +179,11 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 	}
 
 	// Once one or more nodes are running it should be safe to wait for promtail to report readiness
-	if flagVars.StartCollectors() {
+	// Disable for kube since nodes won't have written service discovery configuration to the local path
+	//
+	// TODO(marun) Maybe make this configurable to enable the check for a test suite that writes service
+	// discovery configuration for its own metrics endpoint?
+	if flagVars.StartCollectors() && runtimeConfig.Kube == nil {
 		require.NoError(tmpnet.WaitForPromtailReadiness(tc.DefaultContext(), tc.Log()))
 	}
 
