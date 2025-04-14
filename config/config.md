@@ -190,9 +190,9 @@ Example JSON config file:
 ```
 
 :::tip
-[Install Script](https://docs.avax.network/tooling/avalanche-go-installer) creates the
+[Install Script](https://build.avax.network/docs/tooling/avalanche-go-installer) creates the
 node config file at `~/.avalanchego/configs/node.json`. No default file is
-created if [AvalancheGo is built from source](https://docs.avax.network/nodes/run-a-node/manually), you
+created if [AvalancheGo is built from source](https://build.avax.network/docs/nodes/run-a-node/from-source), you
 would need to create it manually if needed.
 :::
 
@@ -709,7 +709,7 @@ configs for Subnets specified in
 `--track-subnets` parameter.
 
 Full reference for all configuration options for a Subnet can be found in a
-separate [Subnet Configs](https://docs.avax.network/nodes/configure/avalanche-l1-configs) document.
+separate [Subnet Configs](https://build.avax.network/docs/nodes/configure/avalanche-l1-configs) document.
 
 #### `--subnet-config-dir` (`string`)
 
@@ -1307,7 +1307,7 @@ GiB).
 
 #### `--plugin-dir` (string)
 
-Sets the directory for [VM plugins](https://docs.avax.network/virtual-machines). The default value is `$HOME/.avalanchego/plugins`.
+Sets the directory for [VM plugins](https://build.avax.network/docs/virtual-machines). The default value is `$HOME/.avalanchego/plugins`.
 
 ### Virtual Machine (VM) Configs
 
