@@ -39,9 +39,6 @@ func (n *Network) Write() error {
 	if err := n.writeGenesis(); err != nil {
 		return err
 	}
-	if err := n.writeChainConfigs(); err != nil {
-		return err
-	}
 	if err := n.writeNetworkConfig(); err != nil {
 		return err
 	}
@@ -56,15 +53,12 @@ func (n *Network) readNetwork() error {
 	if err := n.readGenesis(); err != nil {
 		return err
 	}
-	if err := n.readChainConfigs(); err != nil {
-		return err
-	}
 	return n.readConfig()
 }
 
 // Read the non-ephemeral nodes associated with the network from disk.
 func (n *Network) readNodes() error {
-	nodes, err := ReadNodes(n.Dir, false /* includeEphemeral */)
+	nodes, err := ReadNodes(n, false /* includeEphemeral */)
 	if err != nil {
 		return err
 	}
@@ -89,6 +83,10 @@ func (n *Network) GetGenesisPath() string {
 func (n *Network) readGenesis() error {
 	bytes, err := os.ReadFile(n.GetGenesisPath())
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			n.Genesis = nil
+			return nil
+		}
 		return fmt.Errorf("failed to read genesis: %w", err)
 	}
 	genesis := genesis.UnparsedConfig{}
@@ -100,6 +98,9 @@ func (n *Network) readGenesis() error {
 }
 
 func (n *Network) writeGenesis() error {
+	if n.Genesis == nil {
+		return nil
+	}
 	bytes, err := DefaultJSONMarshal(n.Genesis)
 	if err != nil {
 		return fmt.Errorf("failed to marshal genesis: %w", err)
@@ -107,65 +108,6 @@ func (n *Network) writeGenesis() error {
 	if err := os.WriteFile(n.GetGenesisPath(), bytes, perms.ReadWrite); err != nil {
 		return fmt.Errorf("failed to write genesis: %w", err)
 	}
-	return nil
-}
-
-func (n *Network) GetChainConfigDir() string {
-	return filepath.Join(n.Dir, "chains")
-}
-
-func (n *Network) readChainConfigs() error {
-	baseChainConfigDir := n.GetChainConfigDir()
-	entries, err := os.ReadDir(baseChainConfigDir)
-	if err != nil {
-		return fmt.Errorf("failed to read chain config dir: %w", err)
-	}
-
-	// Clear the map of data that may end up stale (e.g. if a given
-	// chain is in the map but no longer exists on disk)
-	n.ChainConfigs = map[string]FlagsMap{}
-
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			// Chain config files are expected to be nested under a
-			// directory with the name of the chain alias.
-			continue
-		}
-		chainAlias := entry.Name()
-		configPath := filepath.Join(baseChainConfigDir, chainAlias, defaultConfigFilename)
-		if _, err := os.Stat(configPath); os.IsNotExist(err) {
-			// No config file present
-			continue
-		}
-		chainConfig, err := ReadFlagsMap(configPath, chainAlias+" chain config")
-		if err != nil {
-			return err
-		}
-		n.ChainConfigs[chainAlias] = chainConfig
-	}
-
-	return nil
-}
-
-func (n *Network) writeChainConfigs() error {
-	baseChainConfigDir := n.GetChainConfigDir()
-
-	for chainAlias, chainConfig := range n.ChainConfigs {
-		// Create the directory
-		chainConfigDir := filepath.Join(baseChainConfigDir, chainAlias)
-		if err := os.MkdirAll(chainConfigDir, perms.ReadWriteExecute); err != nil {
-			return fmt.Errorf("failed to create %s chain config dir: %w", chainAlias, err)
-		}
-
-		// Write the file
-		path := filepath.Join(chainConfigDir, defaultConfigFilename)
-		if err := chainConfig.Write(path, chainAlias+" chain config"); err != nil {
-			return err
-		}
-	}
-
-	// TODO(marun) Ensure the removal of chain aliases that aren't present in the map
-
 	return nil
 }
 
@@ -186,17 +128,21 @@ func (n *Network) readConfig() error {
 
 // The subset of network fields to store in the network config file.
 type serializedNetworkConfig struct {
-	UUID                 string
-	Owner                string
-	DefaultFlags         FlagsMap
-	DefaultRuntimeConfig NodeRuntimeConfig
-	PreFundedKeys        []*secp256k1.PrivateKey
+	UUID                 string                  `json:",omitempty"`
+	Owner                string                  `json:",omitempty"`
+	PrimarySubnetConfig  FlagsMap                `json:",omitempty"`
+	PrimaryChainConfigs  map[string]FlagsMap     `json:",omitempty"`
+	DefaultFlags         FlagsMap                `json:",omitempty"`
+	DefaultRuntimeConfig NodeRuntimeConfig       `json:",omitempty"`
+	PreFundedKeys        []*secp256k1.PrivateKey `json:",omitempty"`
 }
 
 func (n *Network) writeNetworkConfig() error {
 	config := &serializedNetworkConfig{
 		UUID:                 n.UUID,
 		Owner:                n.Owner,
+		PrimarySubnetConfig:  n.PrimarySubnetConfig,
+		PrimaryChainConfigs:  n.PrimaryChainConfigs,
 		DefaultFlags:         n.DefaultFlags,
 		DefaultRuntimeConfig: n.DefaultRuntimeConfig,
 		PreFundedKeys:        n.PreFundedKeys,

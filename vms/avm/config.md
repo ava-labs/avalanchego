@@ -19,8 +19,6 @@ values for this config are:
 
 ```json
 {
-  "index-transactions": false,
-  "index-allow-incomplete": false,
   "checksums-enabled": false
 }
 ```
@@ -28,31 +26,6 @@ values for this config are:
 Default values are overridden only if explicitly specified in the config.
 
 The parameters are as follows:
-
-## Transaction Indexing
-
-### `index-transactions`
-
-_Boolean_
-
-Enables AVM transaction indexing if set to `true`.
-When set to `true`, AVM transactions are indexed against the `address` and
-`assetID` involved. This data is available via `avm.getAddressTxs`
-[API](/reference/avalanchego/x-chain/api.md#avmgetaddresstxs).
-
-:::note
-If `index-transactions` is set to true, it must always be set to true
-for the node's lifetime. If set to `false` after having been set to `true`, the
-node will refuse to start unless `index-allow-incomplete` is also set to `true`
-(see below).
-:::
-
-### `index-allow-incomplete`
-
-_Boolean_
-
-Allows incomplete indices. This config value is ignored if there is no X-Chain indexed data in the DB and
-`index-transactions` is set to `false`.
 
 ### `checksums-enabled`
 

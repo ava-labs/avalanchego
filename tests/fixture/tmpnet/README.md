@@ -20,8 +20,7 @@ orchestrate the same temporary networks without the use of an rpc daemon.
 - [Configuration on disk](#configuration-on-disk)
   - [Common networking configuration](#common-networking-configuration)
   - [Genesis](#genesis)
-  - [Subnet configuration](#subnet-configuration)
-  - [Chain configuration](#chain-configuration)
+  - [Subnet and Chain configuration](#subnet-and-chain-configuration)
   - [Network env](#network-env)
   - [Node configuration](#node-configuration)
     - [Runtime config](#runtime-config)
@@ -58,26 +57,31 @@ repositories.
 The functionality in this package is grouped by logical purpose into
 the following non-test files:
 
-| Filename                    | Types       | Purpose                                                     |
-|:----------------------------|:------------|:------------------------------------------------------------|
-| check_monitoring.go         |             | Enables checking if logs and metrics were collected         |
-| defaults.go                 |             | Defines common default configuration                        |
-| detached_process_default.go |             | Configures detached processes for darwin and linux          |
-| detached_process_windows.go |             | No-op detached process configuration for windows            |
-| flags.go                    | FlagsMap    | Simplifies configuration of avalanchego flags               |
-| genesis.go                  |             | Creates test genesis                                        |
-| kube.go                     |             | Library for Kubernetes interaction                          |
-| local_network.go            |             | Defines configuration for the default local network         |
-| monitor_processes.go        |             | Enables collection of logs and metrics from local processes |
-| network.go                  | Network     | Orchestrates and configures temporary networks              |
-| network_config.go           | Network     | Reads and writes network configuration                      |
-| network_test.go             |             | Simple test round-tripping Network serialization            |
-| node.go                     | Node        | Orchestrates and configures nodes                           |
-| node_config.go              | Node        | Reads and writes node configuration                         |
-| node_process.go             | NodeProcess | Orchestrates node processes                                 |
-| start_kind_cluster.go       |             | Starts a local kind cluster                                 |
-| subnet.go                   | Subnet      | Orchestrates subnets                                        |
-| utils.go                    |             | Defines shared utility functions                            |
+| Filename                    | Types       | Purpose                                                                |
+|:----------------------------|:------------|:-----------------------------------------------------------------------|
+| flags/                      |             | Directory defining flags usable with both stdlib flags and spf13/pflag |
+| flags/common.go             |             | Defines type definitions common across other files                     |
+| flags/process_runtime.go    |             | Defines flags configuring the process node runtime                     |
+| flags/runtime.go            |             | Defines flags configuring node runtime                                 |
+| tmpnetctl/                  |             | Directory containing main entrypoint for tmpnetctl command             |
+| check_monitoring.go         |             | Enables checking if logs and metrics were collected                    |
+| defaults.go                 |             | Defines common default configuration                                   |
+| detached_process_default.go |             | Configures detached processes for darwin and linux                     |
+| detached_process_windows.go |             | No-op detached process configuration for windows                       |
+| flags.go                    | FlagsMap    | Simplifies configuration of avalanchego flags                          |
+| genesis.go                  |             | Creates test genesis                                                   |
+| kube.go                     |             | Library for Kubernetes interaction                                     |
+| local_network.go            |             | Defines configuration for the default local network                    |
+| monitor_processes.go        |             | Enables collection of logs and metrics from local processes            |
+| network.go                  | Network     | Orchestrates and configures temporary networks                         |
+| network_config.go           | Network     | Reads and writes network configuration                                 |
+| network_test.go             |             | Simple test round-tripping Network serialization                       |
+| node.go                     | Node        | Orchestrates and configures nodes                                      |
+| node_config.go              | Node        | Reads and writes node configuration                                    |
+| node_process.go             | NodeProcess | Orchestrates node processes                                            |
+| start_kind_cluster.go       |             | Starts a local kind cluster                                            |
+| subnet.go                   | Subnet      | Orchestrates subnets                                                   |
+| utils.go                    |             | Defines shared utility functions                                       |
 
 ## Usage
 
@@ -134,17 +138,19 @@ flags.
 A temporary network can be managed in code:
 
 ```golang
-network := &tmpnet.Network{                   // Configure non-default values for the new network
-    DefaultRuntimeConfig{
-        ReuseDynamicPorts: true,              // Configure process-based nodes to reuse a dynamically allocated API port when restarting
-    },
+network := &tmpnet.Network{                         // Configure non-default values for the new network
+    DefaultRuntimeConfig: tmpnet.NodeRuntimeConfig{
+        Process: &tmpnet.ProcessRuntimeConfig{
+            ReuseDynamicPorts: true,                // Configure process-based nodes to reuse a dynamically allocated API port when restarting
+        },
+    }
     DefaultFlags: tmpnet.FlagsMap{
-        config.LogLevelKey: "INFO",           // Change one of the network's defaults
+        config.LogLevelKey: "INFO",                 // Change one of the network's defaults
     },
-    Nodes: tmpnet.NewNodesOrPanic(5),         // Number of initial validating nodes
-    Subnets: []*tmpnet.Subnet{                // Subnets to create on the new network once it is running
+    Nodes: tmpnet.NewNodesOrPanic(5),               // Number of initial validating nodes
+    Subnets: []*tmpnet.Subnet{                      // Subnets to create on the new network once it is running
         {
-            Name: "xsvm-a",                   // User-defined name used to reference subnet in code and on disk
+            Name: "xsvm-a",                         // User-defined name used to reference subnet in code and on disk
             Chains: []*tmpnet.Chain{
                 {
                     VMName: "xsvm",              // Name of the VM the chain will run, will be used to derive the name of the VM binary
@@ -216,19 +222,13 @@ HOME
             │   ├── plugins
             │   │   └── ...
             │   └── process.json                         // Node process details (PID, API URI, staking address)
-            ├── chains
-            │   ├── C
-            │   │   └── config.json                      // C-Chain config for all nodes
-            │   └── raZ51bwfepaSaZ1MNSRNYNs3ZPfj...U7pa3
-            │       └── config.json                      // Custom chain configuration for all nodes
-            ├── config.json                              // Common configuration (including defaults and pre-funded keys)
+            ├── config.json                              // tmpnet configuration for the network
             ├── genesis.json                             // Genesis for all nodes
             ├── metrics.txt                              // Link for metrics and logs collected from the network (see: Monitoring)
             ├── network.env                              // Sets network dir env var to simplify network usage
-            └── subnets                                  // Directory containing subnet config for both avalanchego and tmpnet
+            └── subnets                                  // Directory containing tmpnet subnet configuration
                 ├── subnet-a.json                        // tmpnet configuration for subnet-a and its chain(s)
-                ├── subnet-b.json                        // tmpnet configuration for subnet-b and its chain(s)
-                └── 2jRbWtaonb2RP8DEM5DBsd7...RqNs9.json // avalanchego configuration for subnet with ID 2jRbWtao...RqNs9
+                └── subnet-b.json                        // tmpnet configuration for subnet-b and its chain(s)
 ```
 
 ### Common networking configuration
@@ -236,45 +236,29 @@ HOME
 
 Network configuration such as default flags (e.g. `--log-level=`),
 runtime defaults (e.g. avalanchego path) and pre-funded private keys
-are stored at `[network-dir]/config.json`. A given default will only
-be applied to a new node on its addition to the network if the node
-does not explicitly set a given value.
+are stored at `[network-dir]/config.json`. A default for a given flag
+will only be applied to a node if that node does not itself set a
+value for that flag.
 
 ### Genesis
 [Top](#table-of-contents)
 
-The genesis file is stored at `[network-dir]/genesis.json` and
-referenced by default by all nodes in the network. The genesis file
-content will be generated with reasonable defaults if not
-supplied. Each node in the network can override the default by setting
-an explicit value for `--genesis-file` or `--genesis-file-content`.
+The genesis file is stored at `[network-dir]/genesis.json`. The
+genesis file content will be generated with reasonable defaults if
+not supplied. The content of the file is provided to each node via
+the `--genesis-file-content` flag if a node does not set a value for
+the flag.
 
-### Subnet configuration
+### Subnet and chain configuration
 [Top](#table-of-contents)
 
-The subnet configuration for a temporary network is stored at
-`[network-dir]/subnets/[subnet ID].json` and referenced by all
-nodes in the network.
-
-Each node in the network can override network-level subnet
-configuration by setting `--subnet-config-dir` to an explicit value
-and ensuring that configuration files for all chains exist at
-`[custom-subnet-config-dir]/[subnet ID].json`.
-
-### Chain configuration
-[Top](#table-of-contents)
-
-The chain configuration for a temporary network is stored at
-`[network-dir]/chains/[chain alias or ID]/config.json` and referenced
-by all nodes in the network. The C-Chain config will be generated with
-reasonable defaults if not supplied. X-Chain and P-Chain will use
-implicit defaults. The configuration for custom chains can be provided
-with subnet configuration and will be written to the appropriate path.
-
-Each node in the network can override network-level chain
-configuration by setting `--chain-config-dir` to an explicit value and
-ensuring that configuration files for all chains exist at
-`[custom-chain-config-dir]/[chain alias or ID]/config.json`.
+tmpnet configuration for a given subnet and its chain(s) is stored at
+`[network-dir]/subnets/[subnet name].json`. Subnet configuration for
+all subnets is provided to each node via the
+`--subnet-config-content` flag if a node does not set a value for the
+flag. Chain configuration for all chains is provided to each node via
+the `--chain-config-content` flag where a node does not set a value
+for the flag.
 
 ### Network env
 [Top](#table-of-contents)
@@ -467,60 +451,6 @@ Example usage:
     prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
     loki_username: ${{ secrets.LOKI_ID || '' }}
     loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-```
-
-The action requires a flake.nix file in the repo root that enables
-availability of promtail and prometheus. The following is a minimal
-flake that inherits from the avalanchego flake:
-
-```nix
-{
-  # To use:
-  #  - install nix: https://github.com/DeterminateSystems/nix-installer?tab=readme-ov-file#install-nix
-  #  - run `nix develop` or use direnv (https://direnv.net/)
-  #    - for quieter direnv output, set `export DIRENV_LOG_FORMAT=`
-
-  description = "VM development environment";
-
-  inputs = {
-    nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.2405.*.tar.gz";
-    # Make sure to set a SHA or tag to the desired version
-    avalanchego.url = "github:ava-labs/avalanchego?ref=[sha or tag]";
-  };
-
-  outputs = { self, nixpkgs, avalanchego, ... }:
-    let
-      allSystems = builtins.attrNames avalanchego.devShells;
-      forAllSystems = nixpkgs.lib.genAttrs allSystems;
-    in {
-      devShells = forAllSystems (system: {
-        default = avalanchego.devShells.${system}.default;
-      });
-    };
-}
-```
-
-The action expects to be able to run bin/tmpnetctl from the root of
-the repository. A suggested version of this script:
-
-```bash
-#!/usr/bin/env bash
-
-set -euo pipefail
-
-# Ensure the go command is run from the root of the repository
-REPO_ROOT=$(cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
-cd "${REPO_ROOT}"
-
-# Set AVALANCHE_VERSION
-source ./scripts/versions.sh
-
-# Install if not already available
-if ! command -v tmpnetctl &2> /dev/null; then
-  # An explicit version is required since a main package can't be included as a dependency of the go module.
-  go install github.com/ava-labs/avalanchego/tests/fixture/tmpnet/tmpnetctl@${AVALANCHE_VERSION}
-fi
-tmpnetctl "${@}"
 ```
 
 ### Viewing

@@ -28,7 +28,7 @@ func getBootstrapVolumePath(targetPath string) (string, error) {
 // Bootstraps a local process-based network, creates its subnets and chains, and copies
 // the resulting db state from one of the nodes to the provided path. The path will be
 // created if it does not already exist.
-func initBootstrapDB(network *tmpnet.Network, avalancheGoPath string, pluginDir string, destPath string) error {
+func initBootstrapDB(network *tmpnet.Network, destPath string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
 	defer cancel()
 	if err := tmpnet.BootstrapNewNetwork(
@@ -36,8 +36,6 @@ func initBootstrapDB(network *tmpnet.Network, avalancheGoPath string, pluginDir 
 		tests.NewDefaultLogger(""),
 		network,
 		"",
-		avalancheGoPath,
-		pluginDir,
 	); err != nil {
 		return fmt.Errorf("failed to bootstrap network: %w", err)
 	}

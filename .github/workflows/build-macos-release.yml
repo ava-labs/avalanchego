@@ -32,7 +32,7 @@ jobs:
 
       # Runs a single command using the runners shell
       - name: Build the avalanchego binary
-        run: ./scripts/build.sh
+        run: ./scripts/run_task.sh build
 
       - name: Try to get tag from git
         if: "${{ github.event.inputs.tag == '' }}"

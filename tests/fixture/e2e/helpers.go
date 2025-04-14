@@ -13,9 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/ethclient"
-	"github.com/ava-labs/coreth/interfaces"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
@@ -29,6 +28,8 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+
+	ethereum "github.com/ava-labs/libevm"
 )
 
 const (
@@ -178,7 +179,7 @@ func SendEthTransaction(tc tests.TestContext, ethClient ethclient.Client, signed
 	tc.Eventually(func() bool {
 		var err error
 		receipt, err = ethClient.TransactionReceipt(tc.DefaultContext(), txID)
-		if errors.Is(err, interfaces.NotFound) {
+		if errors.Is(err, ethereum.NotFound) {
 			return false // Transaction is still pending
 		}
 		require.NoError(err)
@@ -271,8 +272,6 @@ func CheckBootstrapIsPossible(tc tests.TestContext, network *tmpnet.Network) *tm
 func StartNetwork(
 	tc tests.TestContext,
 	network *tmpnet.Network,
-	avalancheGoExecPath string,
-	pluginDir string,
 	shutdownDelay time.Duration,
 	skipShutdown bool,
 	reuseNetwork bool,
@@ -284,14 +283,15 @@ func StartNetwork(
 		tc.Log(),
 		network,
 		DefaultNetworkDir,
-		avalancheGoExecPath,
-		pluginDir,
 	)
 	if err != nil {
-		// Ensure nodes are stopped if bootstrap fails. The network configuration
-		// will remain on disk to enable troubleshooting.
-		err := network.Stop(tc.DefaultContext())
-		require.NoError(err, "failed to stop network after bootstrap failure")
+		tc.DeferCleanup(func() {
+			tc.Log().Info("shutting down network")
+			ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
+			defer cancel()
+			require.NoError(network.Stop(ctx))
+		})
+		require.NoError(err, "failed to bootstrap network")
 	}
 
 	tc.Log().Info("network started successfully")

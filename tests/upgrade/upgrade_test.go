@@ -54,6 +54,12 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 	ginkgo.It("can upgrade versions", func() {
 		network := tmpnet.NewDefaultNetwork("avalanchego-upgrade")
 
+		network.DefaultRuntimeConfig = tmpnet.NodeRuntimeConfig{
+			Process: &tmpnet.ProcessRuntimeConfig{
+				AvalancheGoPath: avalancheGoExecPath,
+			},
+		}
+
 		// Get the default genesis so we can modify it
 		genesis, err := network.DefaultGenesis()
 		require.NoError(err)
@@ -77,8 +83,6 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 		e2e.StartNetwork(
 			tc,
 			network,
-			avalancheGoExecPath,
-			"", /* pluginDir */
 			shutdownDelay,
 			false, /* skipShutdown */
 			false, /* reuseNetwork */
@@ -89,7 +93,11 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 			tc.By(fmt.Sprintf("restarting node %q with %q binary", node.NodeID, avalancheGoExecPathToUpgradeTo))
 			require.NoError(node.Stop(tc.DefaultContext()))
 
-			node.RuntimeConfig.AvalancheGoPath = avalancheGoExecPathToUpgradeTo
+			node.RuntimeConfig = &tmpnet.NodeRuntimeConfig{
+				Process: &tmpnet.ProcessRuntimeConfig{
+					AvalancheGoPath: avalancheGoExecPathToUpgradeTo,
+				},
+			}
 
 			require.NoError(network.StartNode(tc.DefaultContext(), tc.Log(), node))
 

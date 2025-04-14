@@ -22,21 +22,8 @@ func (n *Node) GetFlagsPath() string {
 	return filepath.Join(n.GetDataDir(), "flags.json")
 }
 
-func (n *Node) readFlags() error {
-	bytes, err := os.ReadFile(n.GetFlagsPath())
-	if err != nil {
-		return fmt.Errorf("failed to read node flags: %w", err)
-	}
-	flags := FlagsMap{}
-	if err := json.Unmarshal(bytes, &flags); err != nil {
-		return fmt.Errorf("failed to unmarshal node flags: %w", err)
-	}
-	n.Flags = flags
-	return n.EnsureNodeID()
-}
-
-func (n *Node) writeFlags() error {
-	bytes, err := DefaultJSONMarshal(n.Flags)
+func (n *Node) writeFlags(flags FlagsMap) error {
+	bytes, err := DefaultJSONMarshal(flags)
 	if err != nil {
 		return fmt.Errorf("failed to marshal node flags: %w", err)
 	}
@@ -62,17 +49,15 @@ func (n *Node) readConfig() error {
 }
 
 type serializedNodeConfig struct {
-	NetworkUUID   string
-	NetworkOwner  string
-	IsEphemeral   bool
-	RuntimeConfig *NodeRuntimeConfig
+	IsEphemeral   bool               `json:",omitempty"`
+	Flags         FlagsMap           `json:",omitempty"`
+	RuntimeConfig *NodeRuntimeConfig `json:",omitempty"`
 }
 
 func (n *Node) writeConfig() error {
 	config := serializedNodeConfig{
-		NetworkUUID:   n.NetworkUUID,
-		NetworkOwner:  n.NetworkOwner,
 		IsEphemeral:   n.IsEphemeral,
+		Flags:         n.Flags,
 		RuntimeConfig: n.RuntimeConfig,
 	}
 	bytes, err := DefaultJSONMarshal(config)
@@ -86,9 +71,6 @@ func (n *Node) writeConfig() error {
 }
 
 func (n *Node) Read() error {
-	if err := n.readFlags(); err != nil {
-		return err
-	}
 	if err := n.readConfig(); err != nil {
 		return err
 	}
@@ -98,10 +80,6 @@ func (n *Node) Read() error {
 func (n *Node) Write() error {
 	if err := os.MkdirAll(n.GetDataDir(), perms.ReadWriteExecute); err != nil {
 		return fmt.Errorf("failed to create node dir: %w", err)
-	}
-
-	if err := n.writeFlags(); err != nil {
-		return err
 	}
 	return n.writeConfig()
 }
