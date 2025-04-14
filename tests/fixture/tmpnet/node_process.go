@@ -37,8 +37,9 @@ const (
 var (
 	AvalancheGoPluginDirEnvName = config.EnvVarName(config.EnvPrefix, config.PluginDirKey)
 
-	errNodeAlreadyRunning = errors.New("failed to start node: node is already running")
-	errNotRunning         = errors.New("node is not running")
+	errNodeAlreadyRunning   = errors.New("failed to start node: node is already running")
+	errNotRunning           = errors.New("node is not running")
+	errMissingRuntimeConfig = errors.New("node is missing runtime configuration")
 )
 
 // Defines local-specific node configuration. Supports setting default
@@ -89,6 +90,16 @@ func (p *NodeProcess) Start(log logging.Logger) error {
 		return errNodeAlreadyRunning
 	}
 
+	runtimeConfig := p.node.getRuntimeConfig().Process
+	if runtimeConfig == nil {
+		return errMissingRuntimeConfig
+	}
+
+	// Attempt to check for rpc version compatibility
+	if err := checkVMBinaries(log, p.node.network.Subnets, runtimeConfig); err != nil {
+		return err
+	}
+
 	// Ensure a stale process context file is removed so that the
 	// creation of a new file can indicate node start.
 	if err := os.Remove(p.getProcessContextPath()); err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -96,7 +107,7 @@ func (p *NodeProcess) Start(log logging.Logger) error {
 	}
 
 	// All arguments are provided in the flags file
-	cmd := exec.Command(p.node.RuntimeConfig.AvalancheGoPath, "--config-file", p.node.GetFlagsPath()) // #nosec G204
+	cmd := exec.Command(runtimeConfig.AvalancheGoPath, "--config-file", p.node.GetFlagsPath()) // #nosec G204
 	// Ensure process is detached from the parent process so that an error in the parent will not affect the child
 	configureDetachedProcess(cmd)
 

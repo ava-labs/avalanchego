@@ -21,7 +21,7 @@ func TestNetworkSerialization(t *testing.T) {
 	network.PrimarySubnetConfig = FlagsMap{
 		"validatorOnly": true,
 	}
-	require.NoError(network.EnsureDefaultConfig(logging.NoLog{}, "/path/to/avalanche/go", ""))
+	require.NoError(network.EnsureDefaultConfig(logging.NoLog{}))
 	require.NoError(network.Create(tmpDir))
 	// Ensure node runtime is initialized
 	require.NoError(network.readNodes())
