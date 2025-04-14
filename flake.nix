@@ -1,6 +1,6 @@
 {
   # To use:
-  #  - install nix: https://github.com/DeterminateSystems/nix-installer?tab=readme-ov-file#install-nix
+  #  - install nix: `./scripts/run_task.sh install-nix`
   #  - run `nix develop` or use direnv (https://direnv.net/)
   #    - for quieter direnv output, set `export DIRENV_LOG_FORMAT=`
 
@@ -33,6 +33,9 @@
         default = pkgs.mkShell {
           # The Nix packages provided in the environment
           packages = with pkgs; [
+            # Task runner
+            go-task
+
             # Monitoring tools
             promtail                                   # Loki log shipper
             prometheus                                 # Metrics collector
