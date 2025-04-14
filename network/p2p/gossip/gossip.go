@@ -34,15 +34,15 @@ const (
 	unsentType = "unsent"
 	sentType   = "sent"
 
-	// ommitted indicate that the gossipable element was not added to the set due to some reason.
+	// omitted indicate that the gossipable element was not added to the set due to some reason.
 	// for sent message, we'll use notReceive below.
-	ommittedLabel = "ommitted"
+	omittedLabel = "omitted"
 
-	ommittedDuplicate = "duplicate"
-	ommittedMalformed = "malformed"
-	ommittedOther     = "other"
-	ommittedNot       = "not"
-	notReceive        = "n/a"
+	omittedDuplicate = "duplicate"
+	omittedMalformed = "malformed"
+	omittedOther     = "other"
+	omittedNot       = "not"
+	notReceive       = "n/a"
 
 	defaultGossipableCount = 64
 )
@@ -54,56 +54,56 @@ var (
 
 	_ Set[*testTx] = (*FullSet[*testTx])(nil)
 
-	ioTypeDuplicateLabels = []string{ioLabel, typeLabel, ommittedLabel}
+	ioTypeDuplicateLabels = []string{ioLabel, typeLabel, omittedLabel}
 	sentPushLabels        = prometheus.Labels{
-		ioLabel:       sentIO,
-		typeLabel:     pushType,
-		ommittedLabel: notReceive,
+		ioLabel:      sentIO,
+		typeLabel:    pushType,
+		omittedLabel: notReceive,
 	}
 	receivedPushLabels = prometheus.Labels{
-		ioLabel:       receivedIO,
-		typeLabel:     pushType,
-		ommittedLabel: ommittedNot,
+		ioLabel:      receivedIO,
+		typeLabel:    pushType,
+		omittedLabel: omittedNot,
 	}
 	receivedDuplicatePushLabels = prometheus.Labels{
-		ioLabel:       receivedIO,
-		typeLabel:     pushType,
-		ommittedLabel: ommittedDuplicate,
+		ioLabel:      receivedIO,
+		typeLabel:    pushType,
+		omittedLabel: omittedDuplicate,
 	}
 	receivedMalformedPushLabels = prometheus.Labels{
-		ioLabel:       receivedIO,
-		typeLabel:     pushType,
-		ommittedLabel: ommittedMalformed,
+		ioLabel:      receivedIO,
+		typeLabel:    pushType,
+		omittedLabel: omittedMalformed,
 	}
 	receivedOtherPushLabels = prometheus.Labels{
-		ioLabel:       receivedIO,
-		typeLabel:     pushType,
-		ommittedLabel: ommittedOther,
+		ioLabel:      receivedIO,
+		typeLabel:    pushType,
+		omittedLabel: omittedOther,
 	}
 	sentPullLabels = prometheus.Labels{
-		ioLabel:       sentIO,
-		typeLabel:     pullType,
-		ommittedLabel: notReceive,
+		ioLabel:      sentIO,
+		typeLabel:    pullType,
+		omittedLabel: notReceive,
 	}
 	receivedPullLabels = prometheus.Labels{
-		ioLabel:       receivedIO,
-		typeLabel:     pullType,
-		ommittedLabel: ommittedNot,
+		ioLabel:      receivedIO,
+		typeLabel:    pullType,
+		omittedLabel: omittedNot,
 	}
 	receivedDuplicatePullLabels = prometheus.Labels{
-		ioLabel:       receivedIO,
-		typeLabel:     pullType,
-		ommittedLabel: ommittedDuplicate,
+		ioLabel:      receivedIO,
+		typeLabel:    pullType,
+		omittedLabel: omittedDuplicate,
 	}
 	receivedMalformedPullLabels = prometheus.Labels{
-		ioLabel:       receivedIO,
-		typeLabel:     pullType,
-		ommittedLabel: ommittedMalformed,
+		ioLabel:      receivedIO,
+		typeLabel:    pullType,
+		omittedLabel: omittedMalformed,
 	}
 	receivedOtherPullLabels = prometheus.Labels{
-		ioLabel:       receivedIO,
-		typeLabel:     pullType,
-		ommittedLabel: ommittedOther,
+		ioLabel:      receivedIO,
+		typeLabel:    pullType,
+		omittedLabel: omittedOther,
 	}
 	typeLabels   = []string{typeLabel}
 	unsentLabels = prometheus.Labels{
