@@ -8,10 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 func TestNetworkSerialization(t *testing.T) {
@@ -21,9 +18,8 @@ func TestNetworkSerialization(t *testing.T) {
 
 	network := NewDefaultNetwork("testnet")
 	// Validate round-tripping of primary subnet configuration
-	network.PrimarySubnetConfig = &subnets.Config{
-		ValidatorOnly: true,
-		AllowedNodes:  set.Set[ids.NodeID]{},
+	network.PrimarySubnetConfig = FlagsMap{
+		"validatorOnly": true,
 	}
 	require.NoError(network.EnsureDefaultConfig(logging.NoLog{}, "/path/to/avalanche/go", ""))
 	require.NoError(network.Create(tmpDir))

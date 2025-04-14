@@ -15,7 +15,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -56,7 +55,7 @@ type Subnet struct {
 	// networks (since the SubnetID will be different every time the subnet is created)
 	Name string
 
-	Config *subnets.Config
+	Config FlagsMap
 
 	// The ID of the transaction that created the subnet
 	SubnetID ids.ID
