@@ -1,6 +1,6 @@
 {
   # To use:
-  #  - install nix: `./scripts/run_task.sh install_nix`
+  #  - install nix: `./scripts/run_task.sh install-nix`
   #  - run `nix develop` or use direnv (https://direnv.net/)
   #    - for quieter direnv output, set `export DIRENV_LOG_FORMAT=`
 
