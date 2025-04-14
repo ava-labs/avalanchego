@@ -34,12 +34,15 @@ const (
 	unsentType = "unsent"
 	sentType   = "sent"
 
-	// duplicate indicate a reception of a duplicate gossipable element.
+	// ommitted indicate that the gossipable element was not added to the set due to some reason.
 	// for sent message, we'll use notReceive below.
-	duplicateLabel = "duplicate"
-	yesDuplicate   = "yes"
-	noDuplicate    = "no"
-	notReceive     = "n/a"
+	ommittedLabel = "ommitted"
+
+	ommittedDuplicate = "duplicate"
+	ommittedMalformed = "malformed"
+	ommittedOther     = "other"
+	ommittedNot       = "not"
+	notReceive        = "n/a"
 
 	defaultGossipableCount = 64
 )
@@ -51,36 +54,56 @@ var (
 
 	_ Set[*testTx] = (*FullSet[*testTx])(nil)
 
-	ioTypeDuplicateLabels = []string{ioLabel, typeLabel, duplicateLabel}
+	ioTypeDuplicateLabels = []string{ioLabel, typeLabel, ommittedLabel}
 	sentPushLabels        = prometheus.Labels{
-		ioLabel:        sentIO,
-		typeLabel:      pushType,
-		duplicateLabel: notReceive,
+		ioLabel:       sentIO,
+		typeLabel:     pushType,
+		ommittedLabel: notReceive,
 	}
-	receivedNotDuplicatePushLabels = prometheus.Labels{
-		ioLabel:        receivedIO,
-		typeLabel:      pushType,
-		duplicateLabel: noDuplicate,
+	receivedPushLabels = prometheus.Labels{
+		ioLabel:       receivedIO,
+		typeLabel:     pushType,
+		ommittedLabel: ommittedNot,
 	}
 	receivedDuplicatePushLabels = prometheus.Labels{
-		ioLabel:        receivedIO,
-		typeLabel:      pushType,
-		duplicateLabel: yesDuplicate,
+		ioLabel:       receivedIO,
+		typeLabel:     pushType,
+		ommittedLabel: ommittedDuplicate,
+	}
+	receivedMalformedPushLabels = prometheus.Labels{
+		ioLabel:       receivedIO,
+		typeLabel:     pushType,
+		ommittedLabel: ommittedMalformed,
+	}
+	receivedOtherPushLabels = prometheus.Labels{
+		ioLabel:       receivedIO,
+		typeLabel:     pushType,
+		ommittedLabel: ommittedOther,
 	}
 	sentPullLabels = prometheus.Labels{
-		ioLabel:        sentIO,
-		typeLabel:      pullType,
-		duplicateLabel: notReceive,
+		ioLabel:       sentIO,
+		typeLabel:     pullType,
+		ommittedLabel: notReceive,
 	}
-	receivedNotDuplicatePullLabels = prometheus.Labels{
-		ioLabel:        receivedIO,
-		typeLabel:      pullType,
-		duplicateLabel: noDuplicate,
+	receivedPullLabels = prometheus.Labels{
+		ioLabel:       receivedIO,
+		typeLabel:     pullType,
+		ommittedLabel: ommittedNot,
 	}
 	receivedDuplicatePullLabels = prometheus.Labels{
-		ioLabel:        receivedIO,
-		typeLabel:      pullType,
-		duplicateLabel: yesDuplicate,
+		ioLabel:       receivedIO,
+		typeLabel:     pullType,
+		ommittedLabel: ommittedDuplicate,
+	}
+	receivedMalformedPullLabels = prometheus.Labels{
+		ioLabel:       receivedIO,
+		typeLabel:     pullType,
+		ommittedLabel: ommittedMalformed,
+	}
+	receivedOtherPullLabels = prometheus.Labels{
+		ioLabel:       receivedIO,
+		typeLabel:     pullType,
+		ommittedLabel: ommittedOther,
 	}
 	typeLabels   = []string{typeLabel}
 	unsentLabels = prometheus.Labels{
@@ -97,6 +120,10 @@ var (
 	ErrInvalidDiscardedSize     = errors.New("discarded size cannot be negative")
 	ErrInvalidTargetGossipSize  = errors.New("target gossip size cannot be negative")
 	ErrInvalidRegossipFrequency = errors.New("re-gossip frequency cannot be negative")
+	// ErrGossipableAlreadyKnown is returned by the Set's Add method if the gossipable is already present.
+	ErrGossipableAlreadyKnown = errors.New("gossipable already known")
+	// ErrGossipableMalformed indicates a gossipable with invalid structure or content.
+	ErrGossipableMalformed = errors.New("gossipable malformed")
 )
 
 // Gossiper gossips Gossipables to other nodes
@@ -265,15 +292,39 @@ func (p *PullGossiper[_]) handleResponse(
 		return
 	}
 
-	receivedBytes := 0
-	receivedDuplicateBytes := 0
-	duplicateGossip := 0
-	for _, bytes := range gossip {
-		receivedBytes += len(bytes)
+	addIncomingGossipable(p.log,
+		p.marshaller,
+		gossip,
+		nodeID,
+		p.set,
+		p.metrics,
+		&receivedPullLabels,
+		&receivedDuplicatePullLabels,
+		&receivedMalformedPullLabels,
+		&receivedOtherPullLabels,
+	)
+}
 
-		gossipable, err := p.marshaller.UnmarshalGossip(bytes)
+func addIncomingGossipable[T Gossipable](
+	log logging.Logger,
+	marshaller Marshaller[T],
+	gossip [][]byte,
+	nodeID ids.NodeID,
+	set Set[T],
+	metrics Metrics,
+	receivedLabel *prometheus.Labels,
+	receivedDuplicateLabel *prometheus.Labels,
+	receivedMalformedLabel *prometheus.Labels,
+	receivedOtherLabel *prometheus.Labels,
+) {
+	receivedBytes := make(map[*prometheus.Labels]int, 4)
+	receivedCount := make(map[*prometheus.Labels]int, 4)
+	for _, bytes := range gossip {
+		gossipable, err := marshaller.UnmarshalGossip(bytes)
 		if err != nil {
-			p.log.Debug(
+			receivedBytes[receivedOtherLabel] += len(bytes)
+			receivedCount[receivedOtherLabel]++
+			log.Debug(
 				"failed to unmarshal gossip",
 				zap.Stringer("nodeID", nodeID),
 				zap.Error(err),
@@ -282,18 +333,25 @@ func (p *PullGossiper[_]) handleResponse(
 		}
 
 		gossipID := gossipable.GossipID()
-		p.log.Debug(
+		log.Debug(
 			"received gossip",
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("id", gossipID),
 		)
-		if p.set.Has(gossipID) {
-			receivedDuplicateBytes += len(bytes)
-			duplicateGossip++
-			continue
-		}
-		if err := p.set.Add(gossipable); err != nil {
-			p.log.Debug(
+		if err := set.Add(gossipable); err != nil {
+			if errors.Is(err, ErrGossipableAlreadyKnown) {
+				receivedBytes[receivedDuplicateLabel] += len(bytes)
+				receivedCount[receivedDuplicateLabel]++
+				continue
+			}
+			if errors.Is(err, ErrGossipableMalformed) {
+				receivedBytes[receivedMalformedLabel] += len(bytes)
+				receivedCount[receivedMalformedLabel]++
+				continue
+			}
+			receivedBytes[receivedOtherLabel] += len(bytes)
+			receivedCount[receivedOtherLabel]++
+			log.Debug(
 				"failed to add gossip to the known set",
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("id", gossipID),
@@ -301,18 +359,17 @@ func (p *PullGossiper[_]) handleResponse(
 			)
 			continue
 		}
+		receivedBytes[receivedLabel] += len(bytes)
+		receivedCount[receivedLabel]++
 	}
-	receivedBytes -= receivedDuplicateBytes
-	incomingGossibles := len(gossip) - duplicateGossip
 
-	err = errors.Join(
-		p.metrics.observeMessage(receivedNotDuplicatePullLabels, incomingGossibles, receivedBytes),
-		p.metrics.observeMessage(receivedDuplicatePullLabels, duplicateGossip, receivedDuplicateBytes),
-	)
-	if err != nil {
-		p.log.Error("failed to update metrics",
-			zap.Error(err),
-		)
+	for label, receivedBytes := range receivedBytes {
+		err := metrics.observeMessage(*label, receivedCount[label], receivedBytes)
+		if err != nil {
+			log.Error("failed to update metrics",
+				zap.Error(err),
+			)
+		}
 	}
 }
 
