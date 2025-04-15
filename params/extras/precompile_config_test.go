@@ -246,7 +246,9 @@ func TestVerifyPrecompiles(t *testing.T) {
 
 func TestVerifyRequiresSortedTimestamps(t *testing.T) {
 	admins := []common.Address{{1}}
-	config := &ChainConfig{}
+	config := &ChainConfig{
+		FeeConfig: DefaultFeeConfig,
+	}
 	config.PrecompileUpgrades = []PrecompileUpgrade{
 		{
 			Config: txallowlist.NewConfig(utils.NewUint64(2), admins, nil, nil),

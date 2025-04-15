@@ -16,7 +16,9 @@ import (
 
 func TestVerifyUpgradeConfig(t *testing.T) {
 	admins := []common.Address{{1}}
-	chainConfig := &ChainConfig{}
+	chainConfig := &ChainConfig{
+		FeeConfig: DefaultFeeConfig,
+	}
 	chainConfig.GenesisPrecompiles = Precompiles{
 		txallowlist.ConfigKey: txallowlist.NewConfig(utils.NewUint64(1), admins, nil, nil),
 	}

@@ -184,6 +184,13 @@ func SetupGenesisBlock(
 		customrawdb.WriteChainConfig(db, stored, newcfg)
 		return newcfg, stored, nil
 	}
+
+	// Notes on the following line:
+	// - this is needed in coreth to handle the case where existing nodes do not
+	//   have the Berlin or London forks initialized by block number on disk.
+	//   See https://github.com/ava-labs/coreth/pull/667/files
+	// - this is not needed in subnet-evm but it does not impact it either
+	params.SetEthUpgrades(storedcfg, params.GetExtra(storedcfg).NetworkUpgrades)
 	// Check config compatibility and write the config. Compatibility errors
 	// are returned to the caller unless we're already at block zero.
 	// we use last accepted block for cfg compatibility check. Note this allows

@@ -176,6 +176,15 @@ func (c *ChainConfig) Description() string {
 	}
 	banner += fmt.Sprintf("Upgrade Config: %s", string(upgradeConfigBytes))
 	banner += "\n"
+
+	feeBytes, err := json.Marshal(c.FeeConfig)
+	if err != nil {
+		feeBytes = []byte("cannot marshal FeeConfig")
+	}
+	banner += fmt.Sprintf("Fee Config: %s\n", string(feeBytes))
+
+	banner += fmt.Sprintf("Allow Fee Recipients: %v\n", c.AllowFeeRecipients)
+
 	return banner
 }
 
@@ -318,6 +327,10 @@ func checkForks(forks []fork, blockFork bool) error {
 
 // Verify verifies chain config.
 func (c *ChainConfig) Verify() error {
+	if err := c.FeeConfig.Verify(); err != nil {
+		return fmt.Errorf("invalid fee config: %w", err)
+	}
+
 	// Verify the precompile upgrades are internally consistent given the existing chainConfig.
 	if err := c.verifyPrecompileUpgrades(); err != nil {
 		return fmt.Errorf("invalid precompile upgrades: %w", err)
