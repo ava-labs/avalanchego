@@ -1,4 +1,4 @@
-The [X-Chain](/learn/avalanche/avalanche-platform.md#x-chain),
+The [X-Chain](https://build.avax.network/docs/quick-start/primary-network#x-chain),
 Avalanche's native platform for creating and trading assets, is an instance of the Avalanche Virtual
 Machine (AVM). This API allows clients to create and trade assets on the X-Chain and other instances
 of the AVM.
@@ -6,7 +6,7 @@ of the AVM.
 ## Format
 
 This API uses the `json 2.0` RPC format. For more information on making JSON RPC calls, see
-[here](/reference/standards/guides/issuing-api-calls.md).
+[here](https://build.avax.network/docs/api-reference/guides/issuing-api-calls).
 
 ## Endpoints
 
