@@ -43,7 +43,7 @@ const (
 	droppedMalformed          = "malformed"
 	droppedOther              = "other"
 	droppedNot                = "not"
-	notReceive                = "n/a"
+	notReceive                = "not_receive"
 
 	defaultGossipableCount = 64
 )
