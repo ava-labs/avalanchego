@@ -114,7 +114,7 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 		)
 
 		g.Mempool.MarkDropped(txID, err)
-		return fmt.Errorf("failed verification: %w", gossip.ErrGossipableMalformed)
+		return fmt.Errorf("%w: failed verification: %s", gossip.ErrGossipableMalformed, err.Error())
 	}
 
 	if err := g.Mempool.Add(tx); err != nil {
