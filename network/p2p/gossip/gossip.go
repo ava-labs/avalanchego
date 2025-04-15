@@ -54,8 +54,8 @@ var (
 
 	_ Set[*testTx] = (*FullSet[*testTx])(nil)
 
-	ioTypeDuplicateLabels = []string{ioLabel, typeLabel, omittedLabel}
-	sentPushLabels        = prometheus.Labels{
+	ioTypeOmittedLabels = []string{ioLabel, typeLabel, omittedLabel}
+	sentPushLabels      = prometheus.Labels{
 		ioLabel:      sentIO,
 		typeLabel:    pushType,
 		omittedLabel: notReceive,
@@ -162,7 +162,7 @@ func NewMetrics(
 				Name:      "gossip_count",
 				Help:      "amount of gossip (n)",
 			},
-			ioTypeDuplicateLabels,
+			ioTypeOmittedLabels,
 		),
 		bytes: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
@@ -170,7 +170,7 @@ func NewMetrics(
 				Name:      "gossip_bytes",
 				Help:      "amount of gossip (bytes)",
 			},
-			ioTypeDuplicateLabels,
+			ioTypeOmittedLabels,
 		),
 		tracking: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{

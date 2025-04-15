@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
-	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 
 	xmempool "github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 )
@@ -105,7 +104,7 @@ type gossipMempool struct {
 func (g *gossipMempool) Add(tx *txs.Tx) error {
 	txID := tx.ID()
 	if _, ok := g.Mempool.Get(txID); ok {
-		return fmt.Errorf("attempted to issue %w: %s ", mempool.ErrDuplicateTx, txID)
+		return fmt.Errorf("attempted to issue %w: %s ", gossip.ErrGossipableAlreadyKnown, txID)
 	}
 
 	if reason := g.Mempool.GetDropReason(txID); reason != nil {
@@ -119,7 +118,7 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 	// Verify the tx at the currently preferred state
 	if err := g.txVerifier.VerifyTx(tx); err != nil {
 		g.Mempool.MarkDropped(txID, err)
-		return err
+		return fmt.Errorf("%w: verification failed %v", gossip.ErrGossipableMalformed, err)
 	}
 
 	return g.AddWithoutVerification(tx)
