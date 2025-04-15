@@ -34,15 +34,15 @@ const (
 	unsentType = "unsent"
 	sentType   = "sent"
 
-	// omitted indicate that the gossipable element was not added to the set due to some reason.
+	// dropped indicate that the gossipable element was not added to the set due to some reason.
 	// for sent message, we'll use notReceive below.
-	omittedLabel = "omitted"
+	droppedLabel = "dropped"
 
-	omittedFailedVerification = "failed-verification"
-	omittedDuplicate          = "duplicate"
-	omittedMalformed          = "malformed"
-	omittedOther              = "other"
-	omittedNot                = "not"
+	droppedFailedVerification = "failed_verification"
+	droppedDuplicate          = "duplicate"
+	droppedMalformed          = "malformed"
+	droppedOther              = "other"
+	droppedNot                = "not"
 	notReceive                = "n/a"
 
 	defaultGossipableCount = 64
@@ -55,66 +55,66 @@ var (
 
 	_ Set[*testTx] = (*FullSet[*testTx])(nil)
 
-	ioTypeOmittedLabels = []string{ioLabel, typeLabel, omittedLabel}
+	ioTypeDroppedLabels = []string{ioLabel, typeLabel, droppedLabel}
 	sentPushLabels      = prometheus.Labels{
 		ioLabel:      sentIO,
 		typeLabel:    pushType,
-		omittedLabel: notReceive,
+		droppedLabel: notReceive,
 	}
 	receivedPushLabels = prometheus.Labels{
 		ioLabel:      receivedIO,
 		typeLabel:    pushType,
-		omittedLabel: omittedNot,
+		droppedLabel: droppedNot,
 	}
 	receivedDuplicatePushLabels = prometheus.Labels{
 		ioLabel:      receivedIO,
 		typeLabel:    pushType,
-		omittedLabel: omittedDuplicate,
+		droppedLabel: droppedDuplicate,
 	}
 	receivedMalformedPushLabels = prometheus.Labels{
 		ioLabel:      receivedIO,
 		typeLabel:    pushType,
-		omittedLabel: omittedMalformed,
+		droppedLabel: droppedMalformed,
 	}
 	receivedFailedVerificationPushLabels = prometheus.Labels{
 		ioLabel:      receivedIO,
 		typeLabel:    pushType,
-		omittedLabel: omittedFailedVerification,
+		droppedLabel: droppedFailedVerification,
 	}
 	receivedOtherPushLabels = prometheus.Labels{
 		ioLabel:      receivedIO,
 		typeLabel:    pushType,
-		omittedLabel: omittedOther,
+		droppedLabel: droppedOther,
 	}
 	sentPullLabels = prometheus.Labels{
 		ioLabel:      sentIO,
 		typeLabel:    pullType,
-		omittedLabel: notReceive,
+		droppedLabel: notReceive,
 	}
 	receivedPullLabels = prometheus.Labels{
 		ioLabel:      receivedIO,
 		typeLabel:    pullType,
-		omittedLabel: omittedNot,
+		droppedLabel: droppedNot,
 	}
 	receivedDuplicatePullLabels = prometheus.Labels{
 		ioLabel:      receivedIO,
 		typeLabel:    pullType,
-		omittedLabel: omittedDuplicate,
+		droppedLabel: droppedDuplicate,
 	}
 	receivedMalformedPullLabels = prometheus.Labels{
 		ioLabel:      receivedIO,
 		typeLabel:    pullType,
-		omittedLabel: omittedMalformed,
+		droppedLabel: droppedMalformed,
 	}
 	receivedFailedVerificationPullLabels = prometheus.Labels{
 		ioLabel:      receivedIO,
 		typeLabel:    pullType,
-		omittedLabel: omittedFailedVerification,
+		droppedLabel: droppedFailedVerification,
 	}
 	receivedOtherPullLabels = prometheus.Labels{
 		ioLabel:      receivedIO,
 		typeLabel:    pullType,
-		omittedLabel: omittedOther,
+		droppedLabel: droppedOther,
 	}
 	typeLabels   = []string{typeLabel}
 	unsentLabels = prometheus.Labels{
@@ -173,7 +173,7 @@ func NewMetrics(
 				Name:      "gossip_count",
 				Help:      "amount of gossip (n)",
 			},
-			ioTypeOmittedLabels,
+			ioTypeDroppedLabels,
 		),
 		bytes: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
@@ -181,7 +181,7 @@ func NewMetrics(
 				Name:      "gossip_bytes",
 				Help:      "amount of gossip (bytes)",
 			},
-			ioTypeOmittedLabels,
+			ioTypeDroppedLabels,
 		),
 		tracking: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
