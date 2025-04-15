@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 
 	pmempool "github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
@@ -45,7 +46,7 @@ func TestGossipMempoolAddVerificationError(t *testing.T) {
 	require.NoError(err)
 
 	err = gossipMempool.Add(tx)
-	require.ErrorContains(err, errFoo.Error())
+	require.ErrorIs(err, errFoo)
 	require.False(gossipMempool.bloom.Has(tx))
 }
 
@@ -76,6 +77,7 @@ func TestMempoolDuplicate(t *testing.T) {
 	require.NoError(err)
 
 	err = gossipMempool.Add(tx)
+	require.ErrorIs(err, mempool.ErrDuplicateTx)
 	require.ErrorIs(err, gossip.ErrGossipableAlreadyKnown)
 	require.False(gossipMempool.bloom.Has(tx))
 }

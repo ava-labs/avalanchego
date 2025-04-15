@@ -14,7 +14,6 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/commonmock"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -82,7 +81,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				return commonmock.NewSender(ctrl)
 			},
 			tx:          &txs.Tx{Unsigned: &txs.BaseTx{}},
-			expectedErr: gossip.ErrGossipableAlreadyKnown,
+			expectedErr: mempool.ErrDuplicateTx,
 		},
 		{
 			name: "transaction marked as dropped in mempool",
@@ -243,9 +242,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			require.NoError(err)
 
 			err = n.IssueTxFromRPC(tt.tx)
-			if err != nil {
-				require.ErrorContains(err, tt.expectedErr.Error())
-			}
+			require.ErrorIs(err, tt.expectedErr)
 
 			require.NoError(n.txPushGossiper.Gossip(context.Background()))
 		})

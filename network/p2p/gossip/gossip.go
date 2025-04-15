@@ -38,11 +38,12 @@ const (
 	// for sent message, we'll use notReceive below.
 	omittedLabel = "omitted"
 
-	omittedDuplicate = "duplicate"
-	omittedMalformed = "malformed"
-	omittedOther     = "other"
-	omittedNot       = "not"
-	notReceive       = "n/a"
+	omittedFailedVerification = "failed-verification"
+	omittedDuplicate          = "duplicate"
+	omittedMalformed          = "malformed"
+	omittedOther              = "other"
+	omittedNot                = "not"
+	notReceive                = "n/a"
 
 	defaultGossipableCount = 64
 )
@@ -75,6 +76,11 @@ var (
 		typeLabel:    pushType,
 		omittedLabel: omittedMalformed,
 	}
+	receivedFailedVerificationPushLabels = prometheus.Labels{
+		ioLabel:      receivedIO,
+		typeLabel:    pushType,
+		omittedLabel: omittedFailedVerification,
+	}
 	receivedOtherPushLabels = prometheus.Labels{
 		ioLabel:      receivedIO,
 		typeLabel:    pushType,
@@ -100,6 +106,11 @@ var (
 		typeLabel:    pullType,
 		omittedLabel: omittedMalformed,
 	}
+	receivedFailedVerificationPullLabels = prometheus.Labels{
+		ioLabel:      receivedIO,
+		typeLabel:    pullType,
+		omittedLabel: omittedFailedVerification,
+	}
 	receivedOtherPullLabels = prometheus.Labels{
 		ioLabel:      receivedIO,
 		typeLabel:    pullType,
@@ -122,8 +133,8 @@ var (
 	ErrInvalidRegossipFrequency = errors.New("re-gossip frequency cannot be negative")
 	// ErrGossipableAlreadyKnown is returned by the Set's Add method if the gossipable is already present.
 	ErrGossipableAlreadyKnown = errors.New("gossipable already known")
-	// ErrGossipableMalformed indicates a gossipable with invalid structure or content.
-	ErrGossipableMalformed = errors.New("gossipable malformed")
+	// ErrGossipableFailedVerification indicates a gossipable failed verification.
+	ErrGossipableFailedVerification = errors.New("gossipable failed verification")
 )
 
 // Gossiper gossips Gossipables to other nodes
@@ -301,6 +312,7 @@ func (p *PullGossiper[_]) handleResponse(
 		&receivedPullLabels,
 		&receivedDuplicatePullLabels,
 		&receivedMalformedPullLabels,
+		&receivedFailedVerificationPullLabels,
 		&receivedOtherPullLabels,
 	)
 }
@@ -315,15 +327,16 @@ func addIncomingGossipable[T Gossipable](
 	receivedLabel *prometheus.Labels,
 	receivedDuplicateLabel *prometheus.Labels,
 	receivedMalformedLabel *prometheus.Labels,
+	receivedFailedVerificationLabel *prometheus.Labels,
 	receivedOtherLabel *prometheus.Labels,
 ) {
-	receivedBytes := make(map[*prometheus.Labels]int, 4)
-	receivedCount := make(map[*prometheus.Labels]int, 4)
+	receivedBytes := make(map[*prometheus.Labels]int, 5)
+	receivedCount := make(map[*prometheus.Labels]int, 5)
 	for _, bytes := range gossip {
 		gossipable, err := marshaller.UnmarshalGossip(bytes)
 		if err != nil {
-			receivedBytes[receivedOtherLabel] += len(bytes)
-			receivedCount[receivedOtherLabel]++
+			receivedBytes[receivedMalformedLabel] += len(bytes)
+			receivedCount[receivedMalformedLabel]++
 			log.Debug(
 				"failed to unmarshal gossip",
 				zap.Stringer("nodeID", nodeID),
@@ -344,9 +357,9 @@ func addIncomingGossipable[T Gossipable](
 				receivedCount[receivedDuplicateLabel]++
 				continue
 			}
-			if errors.Is(err, ErrGossipableMalformed) {
-				receivedBytes[receivedMalformedLabel] += len(bytes)
-				receivedCount[receivedMalformedLabel]++
+			if errors.Is(err, ErrGossipableFailedVerification) {
+				receivedBytes[receivedFailedVerificationLabel] += len(bytes)
+				receivedCount[receivedFailedVerificationLabel]++
 				continue
 			}
 			receivedBytes[receivedOtherLabel] += len(bytes)
