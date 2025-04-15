@@ -55,7 +55,7 @@ struct Value fwd_batch(void *db,
                        const struct KeyValue *values);
 
 /**
- * Close iand free the memory for a database handle
+ * Close and free the memory for a database handle
  *
  * # Safety
  *

@@ -289,7 +289,7 @@ fn manager_config(cache_size: usize, revisions: usize, strategy: u8) -> Revision
         .build()
 }
 
-/// Close iand free the memory for a database handle
+/// Close and free the memory for a database handle
 ///
 /// # Safety
 ///
