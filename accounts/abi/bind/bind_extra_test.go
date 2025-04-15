@@ -37,7 +37,7 @@ func TestGetSenderNativeAssetCall(t *testing.T) {
 	// }
 	const rawABI = `[
 			{
-					"inputs": [],
+				"inputs": [],
 				"name": "getSender",
 				"outputs": [ { "internalType": "address", "name": "", "type": "address" } ],
 				"stateMutability": "view",
