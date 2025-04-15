@@ -103,9 +103,7 @@ func (h Handler[_]) AppGossip(_ context.Context, nodeID ids.NodeID, gossipBytes 
 		h.set,
 		h.metrics,
 		&receivedPushLabels,
-		&receivedDuplicatePushLabels,
 		&receivedMalformedPushLabels,
-		&receivedFailedVerificationPushLabels,
 		&receivedOtherPushLabels,
 	)
 }

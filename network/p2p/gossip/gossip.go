@@ -38,12 +38,10 @@ const (
 	// for sent message, we'll use notReceive below.
 	droppedLabel = "dropped"
 
-	droppedFailedVerification = "failed_verification"
-	droppedDuplicate          = "duplicate"
-	droppedMalformed          = "malformed"
-	droppedOther              = "other"
-	droppedNot                = "not"
-	notReceive                = "not_receive"
+	droppedMalformed = "malformed"
+	droppedOther     = "other"
+	droppedNot       = "not"
+	notReceive       = "not_receive"
 
 	defaultGossipableCount = 64
 )
@@ -66,20 +64,10 @@ var (
 		typeLabel:    pushType,
 		droppedLabel: droppedNot,
 	}
-	receivedDuplicatePushLabels = prometheus.Labels{
-		ioLabel:      receivedIO,
-		typeLabel:    pushType,
-		droppedLabel: droppedDuplicate,
-	}
 	receivedMalformedPushLabels = prometheus.Labels{
 		ioLabel:      receivedIO,
 		typeLabel:    pushType,
 		droppedLabel: droppedMalformed,
-	}
-	receivedFailedVerificationPushLabels = prometheus.Labels{
-		ioLabel:      receivedIO,
-		typeLabel:    pushType,
-		droppedLabel: droppedFailedVerification,
 	}
 	receivedOtherPushLabels = prometheus.Labels{
 		ioLabel:      receivedIO,
@@ -96,20 +84,10 @@ var (
 		typeLabel:    pullType,
 		droppedLabel: droppedNot,
 	}
-	receivedDuplicatePullLabels = prometheus.Labels{
-		ioLabel:      receivedIO,
-		typeLabel:    pullType,
-		droppedLabel: droppedDuplicate,
-	}
 	receivedMalformedPullLabels = prometheus.Labels{
 		ioLabel:      receivedIO,
 		typeLabel:    pullType,
 		droppedLabel: droppedMalformed,
-	}
-	receivedFailedVerificationPullLabels = prometheus.Labels{
-		ioLabel:      receivedIO,
-		typeLabel:    pullType,
-		droppedLabel: droppedFailedVerification,
 	}
 	receivedOtherPullLabels = prometheus.Labels{
 		ioLabel:      receivedIO,
@@ -131,10 +109,6 @@ var (
 	ErrInvalidDiscardedSize     = errors.New("discarded size cannot be negative")
 	ErrInvalidTargetGossipSize  = errors.New("target gossip size cannot be negative")
 	ErrInvalidRegossipFrequency = errors.New("re-gossip frequency cannot be negative")
-	// ErrGossipableAlreadyKnown is returned by the Set's Add method if the gossipable is already present.
-	ErrGossipableAlreadyKnown = errors.New("gossipable already known")
-	// ErrGossipableFailedVerification indicates a gossipable failed verification.
-	ErrGossipableFailedVerification = errors.New("gossipable failed verification")
 )
 
 // Gossiper gossips Gossipables to other nodes
@@ -149,6 +123,29 @@ type ValidatorGossiper struct {
 
 	NodeID     ids.NodeID
 	Validators p2p.ValidatorSet
+}
+
+// ErrDroppedGossipableReason is used by the Set.Add method to describe reason for which a gossipable was dropped.
+// it allows the VM's mempool to speficy a reason that would be used as a prometheus label, creating VM-specific
+// drop reasons.
+type ErrDroppedGossipableReason struct {
+	e      error
+	reason string
+}
+
+func WrapDroppedGossipableReason(innerError error, reason string) *ErrDroppedGossipableReason {
+	return &ErrDroppedGossipableReason{
+		e:      innerError,
+		reason: reason,
+	}
+}
+
+func (e ErrDroppedGossipableReason) Error() string {
+	return e.e.Error()
+}
+
+func (e ErrDroppedGossipableReason) Unwrap() error {
+	return e.e
 }
 
 // Metrics that are tracked across a gossip protocol. A given protocol should
@@ -310,9 +307,7 @@ func (p *PullGossiper[_]) handleResponse(
 		p.set,
 		p.metrics,
 		&receivedPullLabels,
-		&receivedDuplicatePullLabels,
 		&receivedMalformedPullLabels,
-		&receivedFailedVerificationPullLabels,
 		&receivedOtherPullLabels,
 	)
 }
@@ -325,13 +320,13 @@ func addIncomingGossipable[T Gossipable](
 	set Set[T],
 	metrics Metrics,
 	receivedLabel *prometheus.Labels,
-	receivedDuplicateLabel *prometheus.Labels,
 	receivedMalformedLabel *prometheus.Labels,
-	receivedFailedVerificationLabel *prometheus.Labels,
 	receivedOtherLabel *prometheus.Labels,
 ) {
-	receivedBytes := make(map[*prometheus.Labels]int, 5)
-	receivedCount := make(map[*prometheus.Labels]int, 5)
+	droppedLabels := make(map[string]*prometheus.Labels)
+	receivedBytes := make(map[*prometheus.Labels]int)
+	receivedCount := make(map[*prometheus.Labels]int)
+	var droppedReasonErr ErrDroppedGossipableReason
 	for _, bytes := range gossip {
 		gossipable, err := marshaller.UnmarshalGossip(bytes)
 		if err != nil {
@@ -352,16 +347,22 @@ func addIncomingGossipable[T Gossipable](
 			zap.Stringer("id", gossipID),
 		)
 		if err := set.Add(gossipable); err != nil {
-			if errors.Is(err, ErrGossipableAlreadyKnown) {
-				receivedBytes[receivedDuplicateLabel] += len(bytes)
-				receivedCount[receivedDuplicateLabel]++
+			if errors.As(err, &droppedReasonErr) {
+				dropLabel := droppedLabels[droppedReasonErr.reason]
+				if dropLabel == nil {
+					// allocate a new label for this reason.
+					dropLabel = &prometheus.Labels{
+						ioLabel:      (*receivedLabel)[ioLabel],
+						typeLabel:    (*receivedLabel)[typeLabel],
+						droppedLabel: droppedReasonErr.reason,
+					}
+					droppedLabels[droppedReasonErr.reason] = dropLabel
+				}
+				receivedBytes[dropLabel] += len(bytes)
+				receivedCount[dropLabel]++
 				continue
 			}
-			if errors.Is(err, ErrGossipableFailedVerification) {
-				receivedBytes[receivedFailedVerificationLabel] += len(bytes)
-				receivedCount[receivedFailedVerificationLabel]++
-				continue
-			}
+
 			receivedBytes[receivedOtherLabel] += len(bytes)
 			receivedCount[receivedOtherLabel]++
 			log.Debug(

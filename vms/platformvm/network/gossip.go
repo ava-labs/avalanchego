@@ -31,7 +31,12 @@ var (
 
 // bloomChurnMultiplier is the number used to multiply the size of the mempool
 // to determine how large of a bloom filter to create.
-const bloomChurnMultiplier = 3
+const (
+	bloomChurnMultiplier          = 3
+	droppedDuplicate              = "duplicate"
+	droppedFailedVerification     = "failed_verification"
+	droppedFailedResetBloomFilter = "failed_reset_bloom_filter"
+)
 
 // txGossipHandler is the handler called when serving gossip messages
 type txGossipHandler struct {
@@ -97,7 +102,7 @@ type gossipMempool struct {
 func (g *gossipMempool) Add(tx *txs.Tx) error {
 	txID := tx.ID()
 	if _, ok := g.Mempool.Get(txID); ok {
-		return fmt.Errorf("%w: tx %s dropped: %w", gossip.ErrGossipableAlreadyKnown, txID, mempool.ErrDuplicateTx)
+		return gossip.WrapDroppedGossipableReason(fmt.Errorf("tx %s dropped: %w", txID, mempool.ErrDuplicateTx), droppedDuplicate)
 	}
 
 	if reason := g.Mempool.GetDropReason(txID); reason != nil {
@@ -115,7 +120,7 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 		)
 
 		g.Mempool.MarkDropped(txID, err)
-		return fmt.Errorf("%w: failed verification: %w", gossip.ErrGossipableFailedVerification, err)
+		return gossip.WrapDroppedGossipableReason(fmt.Errorf("failed verification: %w", err), droppedFailedVerification)
 	}
 
 	if err := g.Mempool.Add(tx); err != nil {
@@ -129,7 +134,7 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 	g.bloom.Add(tx)
 	reset, err := gossip.ResetBloomFilterIfNeeded(g.bloom, g.Mempool.Len()*bloomChurnMultiplier)
 	if err != nil {
-		return err
+		return gossip.WrapDroppedGossipableReason(err, droppedFailedResetBloomFilter)
 	}
 
 	if reset {
