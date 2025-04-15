@@ -118,7 +118,7 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 	// Verify the tx at the currently preferred state
 	if err := g.txVerifier.VerifyTx(tx); err != nil {
 		g.Mempool.MarkDropped(txID, err)
-		return fmt.Errorf("%w: verification failed %v", gossip.ErrGossipableMalformed, err)
+		return fmt.Errorf("%w: transaction %s verification failed - %s", gossip.ErrGossipableMalformed, txID, err.Error())
 	}
 
 	return g.AddWithoutVerification(tx)

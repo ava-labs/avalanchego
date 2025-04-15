@@ -68,6 +68,36 @@ func TestUniformDistribution(t *testing.T) {
 	require.Equal([]uint64{0, 1, 2}, val)
 }
 
+func TestUniformDistribution2(t *testing.T) {
+	require := require.New(t)
+	const sampleCount = 10000
+	sampleResultsCounter := make(map[uint64]int, sampleCount)
+
+	for range sampleCount {
+		s := NewUniform()
+
+		s.Initialize(100)
+
+		val, ok := s.Sample(1)
+		require.True(ok)
+
+		sampleResultsCounter[val[0]]++
+	}
+	// find the smaller counter in the map, and the greatest element in the map.
+	smallestCount := math.MaxInt
+	greatestCount := math.MinInt
+	for _, v := range sampleResultsCounter {
+		if v > greatestCount {
+			greatestCount = v
+		}
+		if v < smallestCount {
+			smallestCount = v
+		}
+	}
+	require.Less(greatestCount, 500)
+	require.Greater(smallestCount, 50)
+}
+
 func TestUniformOverSample(t *testing.T) {
 	s := NewUniform()
 	s.Initialize(3)
