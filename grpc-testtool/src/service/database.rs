@@ -19,9 +19,13 @@ use tonic::{Request, Response, Status, async_trait};
 impl Database for DatabaseService {
     async fn has(&self, request: Request<HasRequest>) -> Result<Response<HasResponse>, Status> {
         let key = request.into_inner().key;
-        let revision = self.latest().await.into_status_result()?;
+        let revision = self.latest().await.into_status_result().map_err(|e| *e)?;
 
-        let val = revision.val(key).await.into_status_result()?;
+        let val = revision
+            .val(key)
+            .await
+            .into_status_result()
+            .map_err(|e| *e)?;
 
         let response = HasResponse {
             has: val.is_some(),
@@ -33,12 +37,13 @@ impl Database for DatabaseService {
 
     async fn get(&self, request: Request<GetRequest>) -> Result<Response<GetResponse>, Status> {
         let key = request.into_inner().key;
-        let revision = self.latest().await.into_status_result()?;
+        let revision = self.latest().await.into_status_result().map_err(|e| *e)?;
 
         let value = revision
             .val(key)
             .await
-            .into_status_result()?
+            .into_status_result()
+            .map_err(|e| *e)?
             .map(|v| v.to_vec());
 
         let Some(value) = value else {
@@ -56,8 +61,17 @@ impl Database for DatabaseService {
     async fn put(&self, request: Request<PutRequest>) -> Result<Response<PutResponse>, Status> {
         let PutRequest { key, value } = request.into_inner();
         let batch = BatchOp::Put { key, value };
-        let proposal = self.db.propose(vec![batch]).await.into_status_result()?;
-        let _ = proposal.commit().await.into_status_result()?;
+        let proposal = self
+            .db
+            .propose(vec![batch])
+            .await
+            .into_status_result()
+            .map_err(|e| *e)?;
+        let _ = proposal
+            .commit()
+            .await
+            .into_status_result()
+            .map_err(|e| *e)?;
 
         Ok(Response::new(PutResponse::default()))
     }
@@ -68,8 +82,17 @@ impl Database for DatabaseService {
     ) -> Result<Response<DeleteResponse>, Status> {
         let DeleteRequest { key } = request.into_inner();
         let batch = BatchOp::<_, Vec<u8>>::Delete { key };
-        let proposal = self.db.propose(vec![batch]).await.into_status_result()?;
-        let _ = proposal.commit().await.into_status_result()?;
+        let proposal = self
+            .db
+            .propose(vec![batch])
+            .await
+            .into_status_result()
+            .map_err(|e| *e)?;
+        let _ = proposal
+            .commit()
+            .await
+            .into_status_result()
+            .map_err(|e| *e)?;
 
         Ok(Response::new(DeleteResponse::default()))
     }
@@ -106,8 +129,17 @@ impl Database for DatabaseService {
             .map(from_put_request)
             .chain(deletes.into_iter().map(from_delete_request))
             .collect();
-        let proposal = self.db.propose(batch).await.into_status_result()?;
-        let _ = proposal.commit().await.into_status_result()?;
+        let proposal = self
+            .db
+            .propose(batch)
+            .await
+            .into_status_result()
+            .map_err(|e| *e)?;
+        let _ = proposal
+            .commit()
+            .await
+            .into_status_result()
+            .map_err(|e| *e)?;
 
         Ok(Response::new(WriteBatchResponse::default()))
     }

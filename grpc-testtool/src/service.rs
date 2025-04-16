@@ -17,18 +17,20 @@ pub mod db;
 pub mod process;
 
 trait IntoStatusResultExt<T> {
-    fn into_status_result(self) -> Result<T, Status>;
+    fn into_status_result(self) -> Result<T, Box<Status>>;
 }
 
 impl<T> IntoStatusResultExt<T> for Result<T, Error> {
     // We map errors from bad arguments into Status::invalid_argument; all other errors are Status::internal errors
-    fn into_status_result(self) -> Result<T, Status> {
+    fn into_status_result(self) -> Result<T, Box<Status>> {
         self.map_err(|err| match err {
             Error::IncorrectRootHash { .. } | Error::HashNotFound { .. } | Error::RangeTooSmall => {
-                Status::invalid_argument(err.to_string())
+                Box::new(Status::invalid_argument(err.to_string()))
             }
-            Error::IO { .. } | Error::InternalError { .. } => Status::internal(err.to_string()),
-            _ => Status::internal(err.to_string()),
+            Error::IO { .. } | Error::InternalError { .. } => {
+                Box::new(Status::internal(err.to_string()))
+            }
+            _ => Box::new(Status::internal(err.to_string())),
         })
     }
 }

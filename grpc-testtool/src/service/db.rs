@@ -19,7 +19,7 @@ impl DbServerTrait for Database {
         _request: Request<()>,
     ) -> Result<Response<GetMerkleRootResponse>, Status> {
         todo!()
-        // let root_hash = self.db.root_hash().await.into_status_result()?.to_vec();
+        // let root_hash = self.db.root_hash().await.into_status_result().map_err(|e| *e)?.to_vec();
         //
         // let response = GetMerkleRootResponse { root_hash };
         //
@@ -33,7 +33,7 @@ impl DbServerTrait for Database {
     ) -> Result<Response<GetProofResponse>, Status> {
         todo!()
         // let GetProofRequest { key: _ } = request.into_inner();
-        // let _revision = self.latest().await.into_status_result()?;
+        // let _revision = self.latest().await.into_status_result().map_err(|e| *e)?;
     }
 
     #[tracing::instrument(level = "trace")]
@@ -50,7 +50,7 @@ impl DbServerTrait for Database {
         //     key_limit: _,
         // } = request.into_inner();
 
-        // let _revision = self.latest().await.into_status_result()?;
+        // let _revision = self.latest().await.into_status_result().map_err(|e| *e)?;
     }
 
     #[tracing::instrument(level = "trace")]
@@ -66,7 +66,7 @@ impl DbServerTrait for Database {
         //     expected_root_hash: _,
         // } = request.into_inner();
 
-        // let _revision = self.latest().await.into_status_result()?;
+        // let _revision = self.latest().await.into_status_result().map_err(|e| *e)?;
     }
 
     #[tracing::instrument(level = "trace")]
