@@ -134,8 +134,19 @@ func (p *ProcessRuntime) Start(ctx context.Context) error {
 	// that includes the log entry.
 	ctx, cancelWithCause := context.WithCancelCause(ctx)
 	defer cancelWithCause(nil)
-	logPath := p.node.DataDir + "/logs/main.log"
-	go watchLogFileForFatal(ctx, cancelWithCause, log, logPath)
+
+	logPath := filepath.Base(p.node.DataDir) + ".log"
+	//	go watchLogFileForFatal(ctx, cancelWithCause, log, logPath)
+
+	fmt.Println(">>>>>>>>>> Log file is", logPath)
+
+	out, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to open log file %s: %w", logPath, err)
+	}
+
+	cmd.Stdout = out
+	cmd.Stderr = out
 
 	// A node writes a process context file on start. If the file is not
 	// found in a reasonable amount of time, the node is unlikely to have

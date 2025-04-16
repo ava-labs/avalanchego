@@ -26,7 +26,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type MessengerClient interface {
-	Notify(ctx context.Context, in *NotifyRequest, opts ...grpc.CallOption) (*NotifyResponse, error)
+	Notify(ctx context.Context, opts ...grpc.CallOption) (Messenger_NotifyClient, error)
 }
 
 type messengerClient struct {
@@ -37,20 +37,42 @@ func NewMessengerClient(cc grpc.ClientConnInterface) MessengerClient {
 	return &messengerClient{cc}
 }
 
-func (c *messengerClient) Notify(ctx context.Context, in *NotifyRequest, opts ...grpc.CallOption) (*NotifyResponse, error) {
-	out := new(NotifyResponse)
-	err := c.cc.Invoke(ctx, Messenger_Notify_FullMethodName, in, out, opts...)
+func (c *messengerClient) Notify(ctx context.Context, opts ...grpc.CallOption) (Messenger_NotifyClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Messenger_ServiceDesc.Streams[0], Messenger_Notify_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
+	x := &messengerNotifyClient{stream}
+	return x, nil
+}
+
+type Messenger_NotifyClient interface {
+	Send(*Event) error
+	Recv() (*EventRequest, error)
+	grpc.ClientStream
+}
+
+type messengerNotifyClient struct {
+	grpc.ClientStream
+}
+
+func (x *messengerNotifyClient) Send(m *Event) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *messengerNotifyClient) Recv() (*EventRequest, error) {
+	m := new(EventRequest)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 // MessengerServer is the server API for Messenger service.
 // All implementations must embed UnimplementedMessengerServer
 // for forward compatibility
 type MessengerServer interface {
-	Notify(context.Context, *NotifyRequest) (*NotifyResponse, error)
+	Notify(Messenger_NotifyServer) error
 	mustEmbedUnimplementedMessengerServer()
 }
 
@@ -58,8 +80,8 @@ type MessengerServer interface {
 type UnimplementedMessengerServer struct {
 }
 
-func (UnimplementedMessengerServer) Notify(context.Context, *NotifyRequest) (*NotifyResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Notify not implemented")
+func (UnimplementedMessengerServer) Notify(Messenger_NotifyServer) error {
+	return status.Errorf(codes.Unimplemented, "method Notify not implemented")
 }
 func (UnimplementedMessengerServer) mustEmbedUnimplementedMessengerServer() {}
 
@@ -74,22 +96,30 @@ func RegisterMessengerServer(s grpc.ServiceRegistrar, srv MessengerServer) {
 	s.RegisterService(&Messenger_ServiceDesc, srv)
 }
 
-func _Messenger_Notify_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(NotifyRequest)
-	if err := dec(in); err != nil {
+func _Messenger_Notify_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(MessengerServer).Notify(&messengerNotifyServer{stream})
+}
+
+type Messenger_NotifyServer interface {
+	Send(*EventRequest) error
+	Recv() (*Event, error)
+	grpc.ServerStream
+}
+
+type messengerNotifyServer struct {
+	grpc.ServerStream
+}
+
+func (x *messengerNotifyServer) Send(m *EventRequest) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *messengerNotifyServer) Recv() (*Event, error) {
+	m := new(Event)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
-	if interceptor == nil {
-		return srv.(MessengerServer).Notify(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Messenger_Notify_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MessengerServer).Notify(ctx, req.(*NotifyRequest))
-	}
-	return interceptor(ctx, in, info, handler)
+	return m, nil
 }
 
 // Messenger_ServiceDesc is the grpc.ServiceDesc for Messenger service.
@@ -98,12 +128,14 @@ func _Messenger_Notify_Handler(srv interface{}, ctx context.Context, dec func(in
 var Messenger_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "messenger.Messenger",
 	HandlerType: (*MessengerServer)(nil),
-	Methods: []grpc.MethodDesc{
+	Methods:     []grpc.MethodDesc{},
+	Streams: []grpc.StreamDesc{
 		{
-			MethodName: "Notify",
-			Handler:    _Messenger_Notify_Handler,
+			StreamName:    "Notify",
+			Handler:       _Messenger_Notify_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
 	Metadata: "messenger/messenger.proto",
 }

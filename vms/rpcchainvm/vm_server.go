@@ -8,7 +8,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"go.uber.org/zap"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -78,8 +80,10 @@ type VMServer struct {
 	serverCloser grpcutils.ServerCloser
 	connCloser   wrappers.Closer
 
-	ctx    *snow.Context
-	closed chan struct{}
+	ctx       *snow.Context
+	closed    chan struct{}
+	lock      sync.Mutex
+	cancelSub func()
 }
 
 // NewServer returns a vm instance connected to a remote vm instance
@@ -137,18 +141,21 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		"process",
 	)
 	if err != nil {
+		vm.log.Error("failed to register process metrics", zap.Error(err))
 		return nil, err
 	}
 
 	// Current state of process metrics
 	processCollector := collectors.NewProcessCollector(collectors.ProcessCollectorOpts{})
 	if err := processMetrics.Register(processCollector); err != nil {
+		vm.log.Error("failed to register process collector", zap.Error(err))
 		return nil, err
 	}
 
 	// Go process metrics using debug.GCStats
 	goCollector := collectors.NewGoCollector()
 	if err := processMetrics.Register(goCollector); err != nil {
+		vm.log.Error("failed to register go collector", zap.Error(err))
 		return nil, err
 	}
 
@@ -157,6 +164,7 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		"grpc",
 	)
 	if err != nil {
+		vm.log.Error("failed to register gRPC metrics", zap.Error(err))
 		return nil, err
 	}
 
@@ -178,6 +186,7 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		grpcutils.WithChainStreamInterceptor(grpcClientMetrics.StreamClientInterceptor()),
 	)
 	if err != nil {
+		vm.log.Error("failed to dial db client", zap.Error(err))
 		return nil, err
 	}
 	vm.connCloser.Add(dbClientConn)
@@ -205,34 +214,27 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 	if err != nil {
 		// Ignore closing errors to return the original error
 		_ = vm.connCloser.Close()
+		vm.log.Error("failed to dial vm client", zap.Error(err))
 		return nil, err
 	}
 
 	vm.connCloser.Add(clientConn)
 
-	msgClient := messenger.NewClient(messengerpb.NewMessengerClient(clientConn))
+	subscribe := func(ctx context.Context) messengerpb.Message {
+		msg := vm.vm.SubscribeToEvents(ctx)
+		return messengerpb.Message(msg)
+	}
+	msgClient := messenger.NewClient(messengerpb.NewMessengerClient(clientConn), vm.log, subscribe)
+	defer func() {
+		go msgClient.Run()
+	}()
 	sharedMemoryClient := gsharedmemory.NewClient(sharedmemorypb.NewSharedMemoryClient(clientConn))
 	bcLookupClient := galiasreader.NewClient(aliasreaderpb.NewAliasReaderClient(clientConn))
 	appSenderClient := appsender.NewClient(appsenderpb.NewAppSenderClient(clientConn))
 	validatorStateClient := gvalidators.NewClient(validatorstatepb.NewValidatorStateClient(clientConn))
 	warpSignerClient := gwarp.NewClient(warppb.NewSignerClient(clientConn))
 
-	toEngine := make(chan common.Message, 1)
 	vm.closed = make(chan struct{})
-	go func() {
-		for {
-			select {
-			case msg, ok := <-toEngine:
-				if !ok {
-					return
-				}
-				// Nothing to do with the error within the goroutine
-				_ = msgClient.Notify(msg)
-			case <-vm.closed:
-				return
-			}
-		}
-	}()
 
 	vm.ctx = &snow.Context{
 		NetworkID:       req.NetworkId,
@@ -260,10 +262,12 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		ChainDataDir: req.ChainDataDir,
 	}
 
-	if err := vm.vm.Initialize(ctx, vm.ctx, vm.db, req.GenesisBytes, req.UpgradeBytes, req.ConfigBytes, toEngine, nil, appSenderClient); err != nil {
+	if err := vm.vm.Initialize(ctx, vm.ctx, vm.db, req.GenesisBytes, req.UpgradeBytes, req.ConfigBytes, nil, appSenderClient); err != nil {
 		// Ignore errors closing resources to return the original error
 		_ = vm.connCloser.Close()
 		close(vm.closed)
+		vm.abortSubscription()
+		vm.log.Error("failed to initialize vm", zap.Error(err))
 		return nil, err
 	}
 
@@ -273,6 +277,8 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		_ = vm.vm.Shutdown(ctx)
 		_ = vm.connCloser.Close()
 		close(vm.closed)
+		vm.abortSubscription()
+		vm.log.Error("failed to get last accepted block", zap.Error(err))
 		return nil, err
 	}
 
@@ -282,9 +288,12 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		_ = vm.vm.Shutdown(ctx)
 		_ = vm.connCloser.Close()
 		close(vm.closed)
+		vm.abortSubscription()
+		vm.log.Error("failed to get last accepted block", zap.Error(err))
 		return nil, err
 	}
 	parentID := blk.Parent()
+	vm.log.Info("initialized vm")
 	return &vmpb.InitializeResponse{
 		LastAcceptedId:       lastAccepted[:],
 		LastAcceptedParentId: parentID[:],
@@ -292,6 +301,14 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		Bytes:                blk.Bytes(),
 		Timestamp:            grpcutils.TimestampFromTime(blk.Timestamp()),
 	}, nil
+}
+
+func (vm *VMServer) getContext() context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+	vm.lock.Lock()
+	vm.cancelSub = cancel
+	vm.lock.Unlock()
+	return ctx
 }
 
 func (vm *VMServer) SetState(ctx context.Context, stateReq *vmpb.SetStateRequest) (*vmpb.SetStateResponse, error) {
@@ -328,9 +345,19 @@ func (vm *VMServer) Shutdown(ctx context.Context, _ *emptypb.Empty) (*emptypb.Em
 	errs := wrappers.Errs{}
 	errs.Add(vm.vm.Shutdown(ctx))
 	close(vm.closed)
+	vm.abortSubscription()
 	vm.serverCloser.Stop()
 	errs.Add(vm.connCloser.Close())
 	return &emptypb.Empty{}, errs.Err
+}
+
+func (vm *VMServer) abortSubscription() {
+	vm.lock.Lock()
+	if vm.cancelSub != nil {
+		vm.cancelSub()
+		vm.cancelSub = nil
+	}
+	vm.lock.Unlock()
 }
 
 func (vm *VMServer) CreateHandlers(ctx context.Context, _ *emptypb.Empty) (*vmpb.CreateHandlersResponse, error) {

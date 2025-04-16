@@ -86,9 +86,7 @@ type handler struct {
 	ctx *snow.ConsensusContext
 	// TODO: consider using peerTracker instead of validators
 	// since peerTracker is already tracking validators
-	validators validators.Manager
-	// Receives messages from the VM
-	msgFromVMChan   <-chan common.Message
+	validators      validators.Manager
 	gossipFrequency time.Duration
 
 	engineManager *EngineManager
@@ -129,7 +127,6 @@ type handler struct {
 func New(
 	ctx *snow.ConsensusContext,
 	validators validators.Manager,
-	msgFromVMChan <-chan common.Message,
 	gossipFrequency time.Duration,
 	threadPoolSize int,
 	resourceTracker tracker.ResourceTracker,
@@ -143,7 +140,6 @@ func New(
 		haltBootstrapping: haltBootstrapping,
 		ctx:               ctx,
 		validators:        validators,
-		msgFromVMChan:     msgFromVMChan,
 		gossipFrequency:   gossipFrequency,
 		closingChan:       make(chan struct{}),
 		closed:            make(chan struct{}),
@@ -390,9 +386,6 @@ func (h *handler) dispatchChans(ctx context.Context) {
 		select {
 		case <-h.closingChan:
 			return
-
-		case vmMSG := <-h.msgFromVMChan:
-			msg = message.InternalVMMessage(h.ctx.NodeID, uint32(vmMSG))
 
 		case <-gossiper.C:
 			msg = message.InternalGossipRequest(h.ctx.NodeID)
@@ -908,10 +901,7 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 		)
 	}
 
-	switch msg := body.(type) {
-	case *message.VMMessage:
-		return engine.Notify(context.TODO(), common.Message(msg.Notification))
-
+	switch body.(type) {
 	case *message.GossipRequest:
 		return engine.Gossip(context.TODO())
 

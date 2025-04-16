@@ -107,7 +107,6 @@ func TestShutdown(t *testing.T) {
 	h, err := handler.New(
 		chainCtx,
 		vdrs,
-		nil,
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
@@ -232,7 +231,6 @@ func TestConnectedAfterShutdownErrorLogRegression(t *testing.T) {
 
 	h, err := handler.New(
 		chainCtx,
-		nil,
 		nil,
 		time.Second,
 		testThreadPoolSize,
@@ -366,7 +364,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	h, err := handler.New(
 		ctx,
 		vdrs,
-		nil,
+
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
@@ -535,7 +533,6 @@ func TestRouterTimeout(t *testing.T) {
 	h, err := handler.New(
 		ctx,
 		vdrs,
-		nil,
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
@@ -1067,7 +1064,6 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	h, err := handler.New(
 		ctx,
 		vdrs,
-		nil,
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
@@ -1233,7 +1229,6 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 	h, err := handler.New(
 		ctx,
 		vdrs,
-		nil,
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
@@ -1485,7 +1480,6 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *enginetest.Engine) {
 	h, err := handler.New(
 		ctx,
 		vdrs,
-		nil,
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,

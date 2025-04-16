@@ -21,7 +21,6 @@ import (
 	_ "github.com/ava-labs/avalanchego/tests/e2e/x/transfer"
 
 	"github.com/ava-labs/avalanchego/config"
-	"github.com/ava-labs/avalanchego/tests/e2e/vms"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/upgrade"
@@ -45,7 +44,11 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	nodeCount, err := flagVars.NodeCount()
 	require.NoError(tc, err)
 	nodes := tmpnet.NewNodesOrPanic(nodeCount)
-	subnets := vms.XSVMSubnetsOrPanic(nodes...)
+	//subnets := vms.XSVMSubnetsOrPanic(nodes...)
+
+	for _, node := range nodes {
+		node.Flags[config.LogLevelKey] = "debug"
+	}
 
 	upgrades := upgrade.Default
 	if flagVars.ActivateGranite() {
@@ -76,7 +79,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 			Owner:        flagVars.NetworkOwner(),
 			DefaultFlags: defaultFlags,
 			Nodes:        nodes,
-			Subnets:      subnets,
+			//Subnets:      subnets,
 		},
 	).Marshal()
 }, func(envBytes []byte) {

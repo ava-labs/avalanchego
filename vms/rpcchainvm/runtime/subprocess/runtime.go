@@ -140,6 +140,8 @@ func Bootstrap(
 		return nil, nil, fmt.Errorf("%w: %w", runtime.ErrHandshakeFailed, intitializer.err)
 	}
 
+	fmt.Println(">>>>> YEAH WE SUCEEDED")
+	fmt.Fprintf(os.Stderr, "WOOHOOO")
 	log.Info("plugin handshake succeeded",
 		zap.String("addr", intitializer.vmAddr),
 	)
