@@ -9,9 +9,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/collectors"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
@@ -78,8 +80,10 @@ type VMServer struct {
 	serverCloser grpcutils.ServerCloser
 	connCloser   wrappers.Closer
 
-	ctx    *snow.Context
-	closed chan struct{}
+	ctx       *snow.Context
+	closed    chan struct{}
+	lock      sync.Mutex
+	cancelSub func()
 }
 
 // NewServer returns a vm instance connected to a remote vm instance
@@ -210,29 +214,21 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 
 	vm.connCloser.Add(clientConn)
 
-	msgClient := messenger.NewClient(messengerpb.NewMessengerClient(clientConn))
+	subscribe := func(ctx context.Context) messengerpb.Message {
+		msg := vm.vm.SubscribeToEvents(ctx)
+		return messengerpb.Message(msg)
+	}
+	msgClient := messenger.NewClient(messengerpb.NewMessengerClient(clientConn), vm.log, subscribe)
+	defer func() {
+		go msgClient.Run()
+	}()
 	sharedMemoryClient := gsharedmemory.NewClient(sharedmemorypb.NewSharedMemoryClient(clientConn))
 	bcLookupClient := galiasreader.NewClient(aliasreaderpb.NewAliasReaderClient(clientConn))
 	appSenderClient := appsender.NewClient(appsenderpb.NewAppSenderClient(clientConn))
 	validatorStateClient := gvalidators.NewClient(validatorstatepb.NewValidatorStateClient(clientConn))
 	warpSignerClient := gwarp.NewClient(warppb.NewSignerClient(clientConn))
 
-	toEngine := make(chan common.Message, 1)
 	vm.closed = make(chan struct{})
-	go func() {
-		for {
-			select {
-			case msg, ok := <-toEngine:
-				if !ok {
-					return
-				}
-				// Nothing to do with the error within the goroutine
-				_ = msgClient.Notify(msg)
-			case <-vm.closed:
-				return
-			}
-		}
-	}()
 
 	vm.ctx = &snow.Context{
 		NetworkID:       req.NetworkId,
@@ -260,10 +256,12 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		ChainDataDir: req.ChainDataDir,
 	}
 
-	if err := vm.vm.Initialize(ctx, vm.ctx, vm.db, req.GenesisBytes, req.UpgradeBytes, req.ConfigBytes, toEngine, nil, appSenderClient); err != nil {
+	if err := vm.vm.Initialize(ctx, vm.ctx, vm.db, req.GenesisBytes, req.UpgradeBytes, req.ConfigBytes, nil, appSenderClient); err != nil {
 		// Ignore errors closing resources to return the original error
 		_ = vm.connCloser.Close()
 		close(vm.closed)
+		vm.abortSubscription()
+		vm.log.Error("failed to initialize vm", zap.Error(err))
 		return nil, err
 	}
 
@@ -273,6 +271,8 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		_ = vm.vm.Shutdown(ctx)
 		_ = vm.connCloser.Close()
 		close(vm.closed)
+		vm.abortSubscription()
+		vm.log.Error("failed to get last accepted block", zap.Error(err))
 		return nil, err
 	}
 
@@ -282,9 +282,12 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		_ = vm.vm.Shutdown(ctx)
 		_ = vm.connCloser.Close()
 		close(vm.closed)
+		vm.abortSubscription()
+		vm.log.Error("failed to get last accepted block", zap.Error(err))
 		return nil, err
 	}
 	parentID := blk.Parent()
+	vm.log.Info("initialized vm")
 	return &vmpb.InitializeResponse{
 		LastAcceptedId:       lastAccepted[:],
 		LastAcceptedParentId: parentID[:],
@@ -328,9 +331,19 @@ func (vm *VMServer) Shutdown(ctx context.Context, _ *emptypb.Empty) (*emptypb.Em
 	errs := wrappers.Errs{}
 	errs.Add(vm.vm.Shutdown(ctx))
 	close(vm.closed)
+	vm.abortSubscription()
 	vm.serverCloser.Stop()
 	errs.Add(vm.connCloser.Close())
 	return &emptypb.Empty{}, errs.Err
+}
+
+func (vm *VMServer) abortSubscription() {
+	vm.lock.Lock()
+	if vm.cancelSub != nil {
+		vm.cancelSub()
+		vm.cancelSub = nil
+	}
+	vm.lock.Unlock()
 }
 
 func (vm *VMServer) CreateHandlers(ctx context.Context, _ *emptypb.Empty) (*vmpb.CreateHandlersResponse, error) {
