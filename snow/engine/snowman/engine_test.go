@@ -2419,7 +2419,6 @@ func TestEngineVoteStallRegression(t *testing.T) {
 				[]byte,
 				[]byte,
 				[]byte,
-				chan<- common.Message,
 				[]*common.Fx,
 				common.AppSender,
 			) error {
@@ -2644,7 +2643,6 @@ func TestEngineEarlyTerminateVoterRegression(t *testing.T) {
 				[]byte,
 				[]byte,
 				[]byte,
-				chan<- common.Message,
 				[]*common.Fx,
 				common.AppSender,
 			) error {
@@ -2795,7 +2793,6 @@ func TestEngineRegistersInvalidVoterDependencyRegression(t *testing.T) {
 				[]byte,
 				[]byte,
 				[]byte,
-				chan<- common.Message,
 				[]*common.Fx,
 				common.AppSender,
 			) error {
@@ -3234,7 +3231,10 @@ func TestEngineAbortQueryWhenInPartition(t *testing.T) {
 	// Gossip will cause a pull query if enough stake is connected
 	engine.sendQuery(context.Background(), ids.ID{}, nil, false)
 
+	// The lock is needed because the engine logs into the log asynchronously
+	conf.Ctx.Lock.Lock()
 	require.Contains(buff.String(), errInsufficientStake)
+	conf.Ctx.Lock.Unlock()
 }
 
 func TestEngineAcceptedHeight(t *testing.T) {

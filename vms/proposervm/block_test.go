@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmanmock"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blockmock"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -386,6 +387,10 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 
 	pk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(err)
+
+	chainVM := blockmock.NewChainVM(ctrl)
+	chainVM.EXPECT().SubscribeToEvents(gomock.Any()).Return(common.PendingTxs).AnyTimes()
+
 	vm := &VM{
 		Config: Config{
 			Upgrades:          upgradetest.GetConfig(upgradetest.Latest),
@@ -393,7 +398,7 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 			StakingLeafSigner: pk,
 			Registerer:        prometheus.NewRegistry(),
 		},
-		ChainVM: blockmock.NewChainVM(ctrl),
+		ChainVM: chainVM,
 		ctx: &snow.Context{
 			NodeID:         thisNodeID,
 			ValidatorState: vdrState,
@@ -403,6 +408,10 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 		Scheduler:              scheduler,
 		proposerBuildSlotGauge: prometheus.NewGauge(prometheus.GaugeOpts{}),
 	}
+
+	vm.subscriber = common.NewSubscriptionProxy(vm.ChainVM.SubscribeToEvents)
+	defer vm.subscriber.Close()
+
 	vm.Clock.Set(now)
 
 	blk := &postForkCommonComponents{

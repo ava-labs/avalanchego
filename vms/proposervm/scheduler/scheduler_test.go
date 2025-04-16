@@ -4,58 +4,83 @@
 package scheduler
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 func TestDelayFromNew(t *testing.T) {
-	toEngine := make(chan common.Message, 10)
 	startTime := time.Now().Add(50 * time.Millisecond)
 
-	s, fromVM := New(logging.NoLog{}, toEngine)
+	msgs := make(chan common.Message, 1)
+	sub := func(ctx context.Context) common.Message {
+		select {
+		case msg := <-msgs:
+			return msg
+		case <-ctx.Done():
+			return 0
+		}
+	}
+	s, fromVM := New(sub)
 	defer s.Close()
 	go s.Dispatch(startTime)
 
-	fromVM <- common.PendingTxs
+	msgs <- common.PendingTxs
+	fromVM.SubscribeToEvents(context.Background())
 
-	<-toEngine
 	require.LessOrEqual(t, time.Until(startTime), time.Duration(0))
 }
 
 func TestDelayFromSetTime(t *testing.T) {
-	toEngine := make(chan common.Message, 10)
 	now := time.Now()
 	startTime := now.Add(50 * time.Millisecond)
 
-	s, fromVM := New(logging.NoLog{}, toEngine)
+	msgs := make(chan common.Message, 1)
+	sub := func(ctx context.Context) common.Message {
+		select {
+		case msg := <-msgs:
+			return msg
+		case <-ctx.Done():
+			return 0
+		}
+	}
+	s, fromVM := New(sub)
 	defer s.Close()
 	go s.Dispatch(now)
 
 	s.SetBuildBlockTime(startTime)
 
-	fromVM <- common.PendingTxs
+	msgs <- common.PendingTxs
 
-	<-toEngine
+	msg := fromVM.SubscribeToEvents(context.Background())
+	require.Equal(t, common.PendingTxs, msg)
 	require.LessOrEqual(t, time.Until(startTime), time.Duration(0))
 }
 
 func TestReceipt(*testing.T) {
-	toEngine := make(chan common.Message, 10)
+	msgs := make(chan common.Message, 1)
+	sub := func(ctx context.Context) common.Message {
+		select {
+		case msg := <-msgs:
+			return msg
+		case <-ctx.Done():
+			return 0
+		}
+	}
 	now := time.Now()
 	startTime := now.Add(50 * time.Millisecond)
 
-	s, fromVM := New(logging.NoLog{}, toEngine)
+	s, fromVM := New(sub)
 	defer s.Close()
 	go s.Dispatch(now)
 
-	fromVM <- common.PendingTxs
+	msgs <- common.PendingTxs
 
 	s.SetBuildBlockTime(startTime)
 
-	<-toEngine
+	fromVM.SubscribeToEvents(context.Background())
 }
