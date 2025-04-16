@@ -46,6 +46,12 @@ const (
 	innerBlkCacheSize = 64 * units.MiB
 )
 
+type SelfSubscriber interface {
+	SubscribeToEvents(ctx context.Context) common.Message
+	SetAbsorbedMsgAndHeight(msg common.Message)
+	Close()
+}
+
 var (
 	_ block.ChainVM         = (*VM)(nil)
 	_ block.BatchedChainVM  = (*VM)(nil)
@@ -72,9 +78,10 @@ type VM struct {
 	scheduler.Scheduler
 	mockable.Clock
 
-	ctx         *snow.Context
-	db          *versiondb.Database
-	toScheduler chan<- common.Message
+	subscriber SelfSubscriber
+
+	ctx *snow.Context
+	db  *versiondb.Database
 
 	// Block ID --> Block
 	// Each element is a block that passed verification but
@@ -87,6 +94,8 @@ type VM struct {
 	innerBlkCache  cache.Cacher[ids.ID, snowman.Block]
 	preferred      ids.ID
 	consensusState snow.State
+	context        context.Context
+	onShutdown     func()
 
 	// lastAcceptedTime is set to the last accepted PostForkBlock's timestamp
 	// if the last accepted block has been a PostForkOption block since having
@@ -134,7 +143,6 @@ func (vm *VM) Initialize(
 	genesisBytes []byte,
 	upgradeBytes []byte,
 	configBytes []byte,
-	toEngine chan<- common.Message,
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
@@ -157,15 +165,11 @@ func (vm *VM) Initialize(
 	}
 	vm.innerBlkCache = innerBlkCache
 
-	scheduler, vmToEngine := scheduler.New(vm.ctx.Log, toEngine)
-	vm.Scheduler = scheduler
-	vm.toScheduler = vmToEngine
-
-	go chainCtx.Log.RecoverAndPanic(func() {
-		scheduler.Dispatch(time.Now())
-	})
-
 	vm.verifiedBlocks = make(map[ids.ID]PostForkBlock)
+	detachedCtx := context.WithoutCancel(ctx)
+	context, cancel := context.WithCancel(detachedCtx)
+	vm.context = context
+	vm.onShutdown = cancel
 
 	err = vm.ChainVM.Initialize(
 		ctx,
@@ -174,13 +178,20 @@ func (vm *VM) Initialize(
 		genesisBytes,
 		upgradeBytes,
 		configBytes,
-		vmToEngine,
 		fxs,
 		appSender,
 	)
 	if err != nil {
 		return err
 	}
+
+	scheduler, subscriber := scheduler.New(vm.ctx.Log, vm.ChainVM.SubscribeToEvents)
+	vm.Scheduler = scheduler
+	vm.subscriber = subscriber
+
+	go chainCtx.Log.RecoverAndPanic(func() {
+		scheduler.Dispatch(time.Now())
+	})
 
 	if err := vm.repairAcceptedChainByHeight(ctx); err != nil {
 		return fmt.Errorf("failed to repair accepted chain by height: %w", err)
@@ -241,9 +252,16 @@ func (vm *VM) Initialize(
 	)
 }
 
+func (vm *VM) SubscribeToEvents(ctx context.Context) common.Message {
+	return vm.subscriber.SubscribeToEvents(ctx)
+}
+
 // shutdown ops then propagate shutdown to innerVM
 func (vm *VM) Shutdown(ctx context.Context) error {
+	vm.onShutdown()
+
 	vm.Scheduler.Close()
+	vm.subscriber.Close()
 
 	if err := vm.db.Commit(); err != nil {
 		return err
@@ -712,11 +730,7 @@ func (vm *VM) verifyAndRecordInnerBlk(ctx context.Context, blockCtx *block.Conte
 // notifyInnerBlockReady tells the scheduler that the inner VM is ready to build
 // a new block
 func (vm *VM) notifyInnerBlockReady() {
-	select {
-	case vm.toScheduler <- common.PendingTxs:
-	default:
-		vm.ctx.Log.Debug("dropping message to consensus engine")
-	}
+	vm.subscriber.SetAbsorbedMsgAndHeight(common.PendingTxs)
 }
 
 // fujiOverridePChainHeightUntilHeight is the P-chain height at which the

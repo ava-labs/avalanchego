@@ -847,7 +847,7 @@ func TestBlockReject(t *testing.T) {
 					executionFailsTx,
 				})
 
-				mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+				mempool, err := mempool.New("", prometheus.NewRegistry(), func() {})
 				require.NoError(t, err)
 
 				lastAcceptedID := ids.GenerateTestID()
@@ -900,7 +900,7 @@ func TestBlockReject(t *testing.T) {
 					tx2,
 				})
 
-				mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+				mempool, err := mempool.New("", prometheus.NewRegistry(), func() {})
 				require.NoError(t, err)
 
 				lastAcceptedID := ids.GenerateTestID()

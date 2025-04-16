@@ -23,6 +23,7 @@ func init() {
 }
 
 func main() {
+	fmt.Println("Starting XSVM...")
 	cmd := run.Command()
 	cmd.AddCommand(
 		account.Command(),
