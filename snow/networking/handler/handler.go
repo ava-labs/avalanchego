@@ -78,6 +78,10 @@ type Handler interface {
 type handler struct {
 	haltBootstrapping func()
 
+	// the NotificationForwarder is used to forward messages received from the VM's SubscribeToEvents
+	// into the Notify() call of the engine.
+	nf *common.NotificationForwarder
+
 	metrics *metrics
 
 	// Useful for faking time in tests
@@ -88,7 +92,7 @@ type handler struct {
 	// since peerTracker is already tracking validators
 	validators validators.Manager
 	// Receives messages from the VM
-	msgFromVMChan   <-chan common.Message
+	msgFromVMChan   chan common.Message
 	gossipFrequency time.Duration
 
 	engineManager *EngineManager
@@ -128,8 +132,8 @@ type handler struct {
 // [engine] must be initialized before initializing this handler
 func New(
 	ctx *snow.ConsensusContext,
+	subscriber common.Subscriber,
 	validators validators.Manager,
-	msgFromVMChan <-chan common.Message,
 	gossipFrequency time.Duration,
 	threadPoolSize int,
 	resourceTracker tracker.ResourceTracker,
@@ -140,10 +144,10 @@ func New(
 	haltBootstrapping func(),
 ) (Handler, error) {
 	h := &handler{
+		msgFromVMChan:     make(chan common.Message),
 		haltBootstrapping: haltBootstrapping,
 		ctx:               ctx,
 		validators:        validators,
-		msgFromVMChan:     msgFromVMChan,
 		gossipFrequency:   gossipFrequency,
 		closingChan:       make(chan struct{}),
 		closed:            make(chan struct{}),
@@ -153,6 +157,12 @@ func New(
 		p2pTracker:        p2pTracker,
 	}
 	h.asyncMessagePool.SetLimit(threadPoolSize)
+
+	h.nf = &common.NotificationForwarder{
+		Subscribe: subscriber.SubscribeToEvents,
+		Log:       h.ctx.Log,
+		Notifier:  h,
+	}
 
 	var err error
 
@@ -276,6 +286,13 @@ func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 		go h.ctx.Log.RecoverAndPanic(dispatchAsync)
 		go h.ctx.Log.RecoverAndPanic(dispatchChans)
 	}
+
+	h.nf.Start()
+}
+
+func (h *handler) Notify(_ context.Context, msg common.Message) error {
+	h.msgFromVMChan <- msg
+	return nil
 }
 
 // Push the message onto the handler's queue
@@ -305,6 +322,7 @@ func (h *handler) Stop(_ context.Context) {
 		h.asyncMessageQueue.Shutdown()
 		close(h.closingChan)
 		h.haltBootstrapping()
+		h.nf.Close()
 	})
 }
 

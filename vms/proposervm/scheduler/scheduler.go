@@ -4,12 +4,10 @@
 package scheduler
 
 import (
+	"context"
 	"time"
 
-	"go.uber.org/zap"
-
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 type Scheduler interface {
@@ -26,27 +24,22 @@ type Scheduler interface {
 // when the engine should call BuildBlock. Namely, when this node is allowed to
 // propose a block under the congestion control mechanism.
 type scheduler struct {
-	log logging.Logger
-	// The VM sends a message on this channel when it wants to tell the engine
-	// that the engine should call the VM's BuildBlock method
-	fromVM <-chan common.Message
-	// The scheduler sends a message on this channel to notify the engine that
-	// it should call its VM's BuildBlock method
-	toEngine chan<- common.Message
+	subscriptionDelayer *common.SubscriptionProxy
+
 	// When we receive a message on this channel, it means that we must refrain
 	// from telling the engine to call its VM's BuildBlock method until the
 	// given time
 	newBuildBlockTime chan time.Time
+	onClose           context.CancelFunc
 }
 
-func New(log logging.Logger, toEngine chan<- common.Message) (Scheduler, chan<- common.Message) {
-	vmToEngine := make(chan common.Message, cap(toEngine))
+func New(subscription common.Subscription) (Scheduler, *common.SubscriptionProxy) {
+	sp := common.NewSubscriptionProxy(subscription)
 	return &scheduler{
-		log:               log,
-		fromVM:            vmToEngine,
-		toEngine:          toEngine,
-		newBuildBlockTime: make(chan time.Time),
-	}, vmToEngine
+		onClose:             sp.Close,
+		subscriptionDelayer: sp,
+		newBuildBlockTime:   make(chan time.Time),
+	}, sp
 }
 
 func (s *scheduler) Dispatch(buildBlockTime time.Time) {
@@ -73,21 +66,13 @@ waitloop:
 		}
 
 		for {
+			ctx, cancel := context.WithCancel(context.Background())
+
 			select {
-			case msg := <-s.fromVM:
-				// Give the engine the message from the VM asking the engine to
-				// build a block
-				select {
-				case s.toEngine <- msg:
-				default:
-					// If the channel to the engine is full, drop the message
-					// from the VM to avoid deadlock
-					s.log.Debug("dropping message from VM",
-						zap.String("reason", "channel to engine is full"),
-						zap.Stringer("messageString", msg),
-					)
-				}
+			case <-s.subscriptionDelayer.Forward(ctx):
+				cancel()
 			case buildBlockTime, ok := <-s.newBuildBlockTime:
+				cancel()
 				// The time at which we should notify the engine that it should
 				// try to build a block has changed
 				if !ok {
@@ -109,4 +94,5 @@ func (s *scheduler) SetBuildBlockTime(t time.Time) {
 
 func (s *scheduler) Close() {
 	close(s.newBuildBlockTime)
+	s.onClose()
 }

@@ -6,7 +6,6 @@ package mempool
 import (
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 
 	txmempool "github.com/ava-labs/avalanchego/vms/txs/mempool"
@@ -26,13 +25,13 @@ type Mempool interface {
 type mempool struct {
 	txmempool.Mempool[*txs.Tx]
 
-	toEngine chan<- common.Message
+	notify func()
 }
 
 func New(
 	namespace string,
 	registerer prometheus.Registerer,
-	toEngine chan<- common.Message,
+	notify func(),
 ) (Mempool, error) {
 	metrics, err := txmempool.NewMetrics(namespace, registerer)
 	if err != nil {
@@ -42,8 +41,8 @@ func New(
 		metrics,
 	)
 	return &mempool{
-		Mempool:  pool,
-		toEngine: toEngine,
+		Mempool: pool,
+		notify:  notify,
 	}, nil
 }
 
@@ -52,8 +51,5 @@ func (m *mempool) RequestBuildBlock() {
 		return
 	}
 
-	select {
-	case m.toEngine <- common.PendingTxs:
-	default:
-	}
+	m.notify()
 }

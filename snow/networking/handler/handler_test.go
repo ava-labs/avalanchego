@@ -66,10 +66,12 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	)
 	require.NoError(err)
 
+	subscriber := common.NewSimpleSubscriber()
+
 	handlerIntf, err := New(
 		ctx,
+		subscriber,
 		vdrs,
-		nil,
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
@@ -173,10 +175,12 @@ func TestHandlerClosesOnError(t *testing.T) {
 	)
 	require.NoError(err)
 
+	subscriber := common.NewSimpleSubscriber()
+
 	handlerIntf, err := New(
 		ctx,
+		subscriber,
 		vdrs,
-		nil,
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
@@ -276,10 +280,12 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	)
 	require.NoError(err)
 
+	subscriber := common.NewSimpleSubscriber()
+
 	handlerIntf, err := New(
 		ctx,
+		subscriber,
 		vdrs,
-		nil,
 		1,
 		testThreadPoolSize,
 		resourceTracker,
@@ -346,7 +352,6 @@ func TestHandlerDispatchInternal(t *testing.T) {
 
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 	ctx := snowtest.ConsensusContext(snowCtx)
-	msgFromVMChan := make(chan common.Message)
 	vdrs := validators.NewManager()
 	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
@@ -367,10 +372,12 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	)
 	require.NoError(err)
 
+	subscriber := common.NewSimpleSubscriber()
+
 	handler, err := New(
 		ctx,
+		subscriber,
 		vdrs,
-		msgFromVMChan,
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
@@ -419,7 +426,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 
 	wg.Add(1)
 	handler.Start(context.Background(), false)
-	msgFromVMChan <- 0
+	subscriber.Publish(common.PendingTxs)
 	wg.Wait()
 }
 
@@ -543,10 +550,12 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 			)
 			require.NoError(err)
 
+			subscriber := common.NewSimpleSubscriber()
+
 			handler, err := New(
 				ctx,
+				subscriber,
 				vdrs,
-				nil,
 				time.Second,
 				testThreadPoolSize,
 				resourceTracker,
@@ -626,10 +635,12 @@ func TestHandlerStartError(t *testing.T) {
 	)
 	require.NoError(err)
 
+	subscriber := common.NewSimpleSubscriber()
+
 	handler, err := New(
 		ctx,
+		subscriber,
 		validators.NewManager(),
-		nil,
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
