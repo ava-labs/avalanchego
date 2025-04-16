@@ -126,7 +126,6 @@ func (vm *VMClient) Initialize(
 	genesisBytes []byte,
 	upgradeBytes []byte,
 	configBytes []byte,
-	toEngine chan<- common.Message,
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
@@ -165,7 +164,7 @@ func (vm *VMClient) Initialize(
 		zap.String("address", dbServerAddr),
 	)
 
-	vm.messenger = messenger.NewServer(toEngine)
+	vm.messenger = messenger.NewServer()
 	vm.sharedMemory = gsharedmemory.NewServer(chainCtx.SharedMemory, db)
 	vm.bcLookup = galiasreader.NewServer(chainCtx.BCLookup)
 	vm.appSender = appsender.NewServer(appSender)
@@ -289,6 +288,10 @@ func (vm *VMClient) newDBServer(db database.Database) *grpc.Server {
 	grpc_prometheus.Register(server)
 
 	return server
+}
+
+func (vm *VMClient) SubscribeToEvents(ctx context.Context) common.Message {
+	return vm.messenger.SubscribeToEvents(ctx)
 }
 
 func (vm *VMClient) newInitServer() *grpc.Server {
