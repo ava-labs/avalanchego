@@ -46,7 +46,7 @@ type VM struct {
 	CantHealthCheck, CantConnected, CantDisconnected, CantVersion,
 	CantAppRequest, CantAppResponse, CantAppGossip, CantAppRequestFailed bool
 
-	InitializeF         func(ctx context.Context, chainCtx *snow.Context, db database.Database, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, msgChan chan<- common.Message, fxs []*common.Fx, appSender common.AppSender) error
+	InitializeF         func(ctx context.Context, chainCtx *snow.Context, db database.Database, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, fxs []*common.Fx, appSender common.AppSender) error
 	SetStateF           func(ctx context.Context, state snow.State) error
 	ShutdownF           func(context.Context) error
 	CreateHandlersF     func(context.Context) (map[string]http.Handler, error)
@@ -59,6 +59,14 @@ type VM struct {
 	AppGossipF          func(ctx context.Context, nodeID ids.NodeID, msg []byte) error
 	AppRequestFailedF   func(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *common.AppError) error
 	VersionF            func(context.Context) (string, error)
+	SubscribeToEventsF  func(context.Context) common.Message
+}
+
+func (vm *VM) SubscribeToEvents(_ context.Context) common.Message {
+	if vm.SubscribeToEventsF != nil {
+		return vm.SubscribeToEventsF(context.Background())
+	}
+	return common.Message(0)
 }
 
 func (vm *VM) Default(cant bool) {
@@ -83,7 +91,6 @@ func (vm *VM) Initialize(
 	genesisBytes,
 	upgradeBytes,
 	configBytes []byte,
-	msgChan chan<- common.Message,
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
@@ -95,7 +102,6 @@ func (vm *VM) Initialize(
 			genesisBytes,
 			upgradeBytes,
 			configBytes,
-			msgChan,
 			fxs,
 			appSender,
 		)

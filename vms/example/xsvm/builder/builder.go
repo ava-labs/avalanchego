@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/chain"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/execute"
@@ -32,21 +31,20 @@ type Builder interface {
 
 type builder struct {
 	chainContext *snow.Context
-	engineChan   chan<- common.Message
 	chain        chain.Chain
 
 	pendingTxs *linked.Hashmap[ids.ID, *tx.Tx]
+	notify     func()
 	preference ids.ID
 }
 
-func New(chainContext *snow.Context, engineChan chan<- common.Message, chain chain.Chain) Builder {
+func New(chainContext *snow.Context, notify func(), chain chain.Chain) Builder {
 	return &builder{
 		chainContext: chainContext,
-		engineChan:   engineChan,
 		chain:        chain,
-
-		pendingTxs: linked.NewHashmap[ids.ID, *tx.Tx](),
-		preference: chain.LastAccepted(),
+		notify:       notify,
+		pendingTxs:   linked.NewHashmap[ids.ID, *tx.Tx](),
+		preference:   chain.LastAccepted(),
 	}
 }
 
@@ -61,10 +59,7 @@ func (b *builder) AddTx(_ context.Context, newTx *tx.Tx) error {
 		return err
 	}
 	b.pendingTxs.Put(txID, newTx)
-	select {
-	case b.engineChan <- common.PendingTxs:
-	default:
-	}
+	b.notify()
 	return nil
 }
 
@@ -83,10 +78,7 @@ func (b *builder) BuildBlock(ctx context.Context, blockContext *smblock.Context)
 		if b.pendingTxs.Len() == 0 {
 			return
 		}
-		select {
-		case b.engineChan <- common.PendingTxs:
-		default:
-		}
+		b.notify()
 	}()
 
 	parentTimestamp := preferredBlk.Timestamp()

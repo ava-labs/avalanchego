@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -58,9 +57,8 @@ func TestGossipMempoolAdd(t *testing.T) {
 	require := require.New(t)
 
 	metrics := prometheus.NewRegistry()
-	toEngine := make(chan common.Message, 1)
 
-	baseMempool, err := mempool.New("", metrics, toEngine)
+	baseMempool, err := mempool.New("", metrics, func() {})
 	require.NoError(err)
 
 	mempool, err := newGossipMempool(
@@ -91,9 +89,8 @@ func TestGossipMempoolAddVerified(t *testing.T) {
 	require := require.New(t)
 
 	metrics := prometheus.NewRegistry()
-	toEngine := make(chan common.Message, 1)
 
-	baseMempool, err := mempool.New("", metrics, toEngine)
+	baseMempool, err := mempool.New("", metrics, func() {})
 	require.NoError(err)
 
 	mempool, err := newGossipMempool(
