@@ -50,6 +50,7 @@ type VM struct {
 
 	chain   chain.Chain
 	builder builder.Builder
+	common.Subscriber
 }
 
 func (vm *VM) Initialize(
@@ -59,7 +60,6 @@ func (vm *VM) Initialize(
 	genesisBytes []byte,
 	_ []byte,
 	_ []byte,
-	engineChan chan<- common.Message,
 	_ []*common.Fx,
 	appSender common.AppSender,
 ) error {
@@ -115,7 +115,15 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("failed to initialize chain manager: %w", err)
 	}
 
-	vm.builder = builder.New(chainContext, engineChan, vm.chain)
+	subscriber := common.NewSimpleSubscriber()
+
+	notify := func() {
+		subscriber.Publish(common.PendingTxs)
+	}
+
+	vm.Subscriber = subscriber
+
+	vm.builder = builder.New(chainContext, notify, vm.chain)
 
 	chainContext.Log.Info("initialized xsvm",
 		zap.Stringer("lastAcceptedID", vm.chain.LastAccepted()),

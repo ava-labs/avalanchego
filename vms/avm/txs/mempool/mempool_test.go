@@ -10,26 +10,30 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
-func newMempool(toEngine chan<- common.Message) (Mempool, error) {
-	return New("mempool", prometheus.NewRegistry(), toEngine)
+func newMempool(notify func()) (Mempool, error) {
+	return New("mempool", prometheus.NewRegistry(), notify)
 }
 
 func TestRequestBuildBlock(t *testing.T) {
 	require := require.New(t)
 
-	toEngine := make(chan common.Message, 1)
-	mempool, err := newMempool(toEngine)
+	notifications := make(chan struct{}, 1)
+	mempool, err := newMempool(func() {
+		select {
+		case notifications <- struct{}{}:
+		default:
+		}
+	})
 	require.NoError(err)
 
 	mempool.RequestBuildBlock()
 	select {
-	case <-toEngine:
+	case <-notifications:
 		require.FailNow("should not have sent message to engine")
 	default:
 	}
@@ -40,12 +44,12 @@ func TestRequestBuildBlock(t *testing.T) {
 	mempool.RequestBuildBlock()
 	mempool.RequestBuildBlock() // Must not deadlock
 	select {
-	case <-toEngine:
+	case <-notifications:
 	default:
 		require.FailNow("should have sent message to engine")
 	}
 	select {
-	case <-toEngine:
+	case <-notifications:
 		require.FailNow("should have only sent one message to engine")
 	default:
 	}
