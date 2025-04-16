@@ -150,7 +150,6 @@ func defaultVM(t *testing.T, f upgradetest.Fork) (*VM, database.Database, *mutab
 	atomicDB := prefixdb.New([]byte{1}, db)
 
 	vm.clock.Set(latestForkTime)
-	msgChan := make(chan common.Message, 1)
 	ctx := snowtest.Context(t, snowtest.PChainID)
 
 	m := atomic.NewMemory(atomicDB)
@@ -178,7 +177,6 @@ func defaultVM(t *testing.T, f upgradetest.Fork) (*VM, database.Database, *mutab
 		genesistest.NewBytes(t, genesistest.Config{}),
 		nil,
 		dynamicConfigBytes,
-		msgChan,
 		nil,
 		appSender,
 	))
@@ -1051,7 +1049,6 @@ func TestRestartFullyAccepted(t *testing.T) {
 	firstVM.clock.Set(initialClkTime)
 	firstCtx.Lock.Lock()
 
-	firstMsgChan := make(chan common.Message, 1)
 	require.NoError(firstVM.Initialize(
 		context.Background(),
 		firstCtx,
@@ -1059,7 +1056,6 @@ func TestRestartFullyAccepted(t *testing.T) {
 		genesisBytes,
 		nil,
 		nil,
-		firstMsgChan,
 		nil,
 		nil,
 	))
@@ -1133,7 +1129,6 @@ func TestRestartFullyAccepted(t *testing.T) {
 	}()
 
 	secondDB := prefixdb.New([]byte{}, db)
-	secondMsgChan := make(chan common.Message, 1)
 	require.NoError(secondVM.Initialize(
 		context.Background(),
 		secondCtx,
@@ -1141,7 +1136,6 @@ func TestRestartFullyAccepted(t *testing.T) {
 		genesisBytes,
 		nil,
 		nil,
-		secondMsgChan,
 		nil,
 		nil,
 	))
@@ -1177,7 +1171,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	ctx := snowtest.Context(t, snowtest.PChainID)
 	ctx.Lock.Lock()
 
-	toEngine := make(chan common.Message, 1)
 	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
@@ -1185,7 +1178,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		genesistest.NewBytes(t, genesistest.Config{}),
 		nil,
 		nil,
-		toEngine,
 		nil,
 		nil,
 	))
@@ -1313,7 +1305,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	h, err := handler.New(
 		bootstrapConfig.Ctx,
 		beacons,
-		toEngine,
 		time.Hour,
 		2,
 		cpuTracker,
@@ -1527,7 +1518,6 @@ func TestUnverifiedParent(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	msgChan := make(chan common.Message, 1)
 	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
@@ -1535,7 +1525,6 @@ func TestUnverifiedParent(t *testing.T) {
 		genesistest.NewBytes(t, genesistest.Config{}),
 		nil,
 		nil,
-		msgChan,
 		nil,
 		nil,
 	))
@@ -1679,7 +1668,6 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 	genesisBytes := genesistest.NewBytes(t, genesistest.Config{})
 
-	firstMsgChan := make(chan common.Message, 1)
 	require.NoError(firstVM.Initialize(
 		context.Background(),
 		firstCtx,
@@ -1687,7 +1675,6 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		genesisBytes,
 		nil,
 		nil,
-		firstMsgChan,
 		nil,
 		nil,
 	))
@@ -1731,7 +1718,6 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	m := atomic.NewMemory(atomicDB)
 	secondCtx.SharedMemory = m.NewSharedMemory(secondCtx.ChainID)
 
-	secondMsgChan := make(chan common.Message, 1)
 	require.NoError(secondVM.Initialize(
 		context.Background(),
 		secondCtx,
@@ -1739,7 +1725,6 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		genesisBytes,
 		nil,
 		nil,
-		secondMsgChan,
 		nil,
 		nil,
 	))
@@ -1824,7 +1809,6 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	m := atomic.NewMemory(atomicDB)
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
-	msgChan := make(chan common.Message, 1)
 	appSender := &enginetest.Sender{T: t}
 	require.NoError(vm.Initialize(
 		context.Background(),
@@ -1833,7 +1817,6 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		genesistest.NewBytes(t, genesistest.Config{}),
 		nil,
 		nil,
-		msgChan,
 		nil,
 		appSender,
 	))

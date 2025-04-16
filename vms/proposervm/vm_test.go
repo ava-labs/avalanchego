@@ -9,6 +9,8 @@ import (
 	"crypto"
 	"errors"
 	"fmt"
+	"github.com/ava-labs/avalanchego/vms/proposervm/scheduler/schedulermock"
+	"github.com/ava-labs/avalanchego/vms/proposervm/subscribermock"
 	"testing"
 	"time"
 
@@ -106,7 +108,7 @@ func initTestProposerVM(
 	}
 
 	coreVM.InitializeF = func(context.Context, *snow.Context, database.Database,
-		[]byte, []byte, []byte, chan<- common.Message,
+		[]byte, []byte, []byte,
 		[]*common.Fx, common.AppSender,
 	) error {
 		return nil
@@ -194,7 +196,6 @@ func initTestProposerVM(
 		ctx,
 		db,
 		initialState,
-		nil,
 		nil,
 		nil,
 		nil,
@@ -845,9 +846,6 @@ func TestExpiredBuildBlock(t *testing.T) {
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
-	toEngine := make(chan common.Message, 1)
-	var toScheduler chan<- common.Message
-
 	coreVM.InitializeF = func(
 		_ context.Context,
 		_ *snow.Context,
@@ -855,11 +853,9 @@ func TestExpiredBuildBlock(t *testing.T) {
 		_ []byte,
 		_ []byte,
 		_ []byte,
-		toEngineChan chan<- common.Message,
 		_ []*common.Fx,
 		_ common.AppSender,
 	) error {
-		toScheduler = toEngineChan
 		return nil
 	}
 
@@ -871,7 +867,6 @@ func TestExpiredBuildBlock(t *testing.T) {
 		nil,
 		nil,
 		nil,
-		toEngine,
 		nil,
 		nil,
 	))
@@ -882,13 +877,26 @@ func TestExpiredBuildBlock(t *testing.T) {
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
 
+	testEnd := make(chan struct{})
+	defer close(testEnd)
+
+	events := make(chan common.Message, 1)
+	coreVM.SubscribeToEventsF = func(ctx context.Context, pChainHeight uint64) (common.Message, uint64) {
+		select {
+		case <-testEnd:
+			return 0, 0
+		case event := <-events:
+			return event, 0
+		}
+	}
+
 	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
 	require.NoError(proVM.SetPreference(context.Background(), snowmantest.GenesisID))
 
 	// Notify the proposer VM of a new block on the inner block side
-	toScheduler <- common.PendingTxs
+	events <- common.PendingTxs
 	// The first notification will be read from the consensus engine
-	<-toEngine
+	proVM.SubscribeToEvents(context.Background(), 0)
 
 	// Before calling BuildBlock, verify a remote block and set it as the
 	// preferred block.
@@ -947,7 +955,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 	// the window has started again. This is to guarantee that the inner VM has
 	// build block called after it sent a pendingTxs message on its internal
 	// engine channel.
-	<-toEngine
+	proVM.SubscribeToEvents(context.Background(), 0)
 }
 
 type wrappedBlock struct {
@@ -1092,7 +1100,6 @@ func TestInnerVMRollback(t *testing.T) {
 				[]byte,
 				[]byte,
 				[]byte,
-				chan<- common.Message,
 				[]*common.Fx,
 				common.AppSender,
 			) error {
@@ -1142,7 +1149,6 @@ func TestInnerVMRollback(t *testing.T) {
 		context.Background(),
 		ctx,
 		db,
-		nil,
 		nil,
 		nil,
 		nil,
@@ -1220,7 +1226,6 @@ func TestInnerVMRollback(t *testing.T) {
 		context.Background(),
 		ctx,
 		db,
-		nil,
 		nil,
 		nil,
 		nil,
@@ -1565,7 +1570,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	}
 
 	coreVM.InitializeF = func(context.Context, *snow.Context, database.Database,
-		[]byte, []byte, []byte, chan<- common.Message,
+		[]byte, []byte, []byte,
 		[]*common.Fx, common.AppSender,
 	) error {
 		return nil
@@ -1647,7 +1652,6 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		ctx,
 		prefixdb.New([]byte{}, memdb.New()), // make sure that DBs are compressed correctly
 		initialState,
-		nil,
 		nil,
 		nil,
 		nil,
@@ -1734,7 +1738,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	}
 
 	coreVM.InitializeF = func(context.Context, *snow.Context, database.Database,
-		[]byte, []byte, []byte, chan<- common.Message,
+		[]byte, []byte, []byte,
 		[]*common.Fx, common.AppSender,
 	) error {
 		return nil
@@ -1816,7 +1820,6 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		ctx,
 		prefixdb.New([]byte{}, memdb.New()), // make sure that DBs are compressed correctly
 		initialState,
-		nil,
 		nil,
 		nil,
 		nil,
@@ -1904,8 +1907,9 @@ func TestVMInnerBlkCache(t *testing.T) {
 		},
 	)
 
+	innerVM.EXPECT().SubscribeToEvents(gomock.Any(), gomock.Any()).Return(common.PendingTxs, uint64(0)).AnyTimes()
+
 	innerVM.EXPECT().Initialize(
-		gomock.Any(),
 		gomock.Any(),
 		gomock.Any(),
 		gomock.Any(),
@@ -1931,7 +1935,6 @@ func TestVMInnerBlkCache(t *testing.T) {
 		context.Background(),
 		ctx,
 		prefixdb.New([]byte{}, memdb.New()), // make sure that DBs are compressed correctly
-		nil,
 		nil,
 		nil,
 		nil,
@@ -2000,6 +2003,8 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 
 	// Create a VM
 	innerVM := blockmock.NewChainVM(ctrl)
+	innerVM.EXPECT().SubscribeToEvents(gomock.Any(), gomock.Any()).Return(common.Message(0), uint64(0)).AnyTimes()
+
 	vm := New(
 		innerVM,
 		Config{
@@ -2016,7 +2021,6 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 	db := prefixdb.New([]byte{}, memdb.New())
 
 	innerVM.EXPECT().Initialize(
-		gomock.Any(),
 		gomock.Any(),
 		gomock.Any(),
 		gomock.Any(),
@@ -2042,7 +2046,6 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		context.Background(),
 		snowCtx,
 		db,
-		nil,
 		nil,
 		nil,
 		nil,
@@ -2151,7 +2154,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	coreVM := &blocktest.VM{
 		VM: enginetest.VM{
 			T: t,
-			InitializeF: func(context.Context, *snow.Context, database.Database, []byte, []byte, []byte, chan<- common.Message, []*common.Fx, common.AppSender) error {
+			InitializeF: func(context.Context, *snow.Context, database.Database, []byte, []byte, []byte, []*common.Fx, common.AppSender) error {
 				return nil
 			},
 		},
@@ -2217,7 +2220,6 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 		ctx,
 		db,
 		initialState,
-		nil,
 		nil,
 		nil,
 		nil,
@@ -2311,7 +2313,6 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 		nil,
 		nil,
 		nil,
-		nil,
 	))
 
 	lastAcceptedID, err = proVM.LastAccepted(context.Background())
@@ -2350,7 +2351,6 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 		ctx,
 		db,
 		initialState,
-		nil,
 		nil,
 		nil,
 		nil,
@@ -2453,6 +2453,10 @@ func TestLocalParse(t *testing.T) {
 		},
 	}
 
+	innerVM.VM.SubscribeToEventsF = func(_ context.Context, _ uint64) (common.Message, uint64) {
+		return common.PendingTxs, 0
+	}
+
 	chainID := ids.GenerateTestID()
 
 	tlsCert, err := staking.NewTLSCert()
@@ -2488,6 +2492,16 @@ func TestLocalParse(t *testing.T) {
 	}
 
 	vm := New(innerVM, conf)
+	ctrl := gomock.NewController(t)
+	scheduler := schedulermock.NewScheduler(ctrl)
+	scheduler.EXPECT().Close().AnyTimes()
+
+	subscriber := subscribermock.NewSelfSubscriber(ctrl)
+	subscriber.EXPECT().Close().AnyTimes()
+
+	vm.Scheduler = scheduler
+	vm.subscriber = subscriber
+
 	defer func() {
 		require.NoError(t, vm.Shutdown(context.Background()))
 	}()
@@ -2497,7 +2511,7 @@ func TestLocalParse(t *testing.T) {
 	_ = vm.Initialize(context.Background(), &snow.Context{
 		Log:     logging.NoLog{},
 		ChainID: chainID,
-	}, db, nil, nil, nil, nil, nil, nil)
+	}, db, nil, nil, nil, nil, nil)
 
 	tests := []struct {
 		name           string
@@ -2537,6 +2551,7 @@ func TestTimestampMetrics(t *testing.T) {
 	ctx := context.Background()
 
 	coreVM, _, proVM, _ := initTestProposerVM(t, time.Unix(0, 0), mockable.MaxTime, 0)
+
 	defer func() {
 		require.NoError(t, proVM.Shutdown(ctx))
 	}()
@@ -2674,12 +2689,10 @@ func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
 		snowmantest.Genesis,
 	}
 
-	var innerToEngine chan<- common.Message
 	coreVM := &blocktest.VM{
 		VM: enginetest.VM{
 			T: t,
-			InitializeF: func(_ context.Context, _ *snow.Context, _ database.Database, _ []byte, _ []byte, _ []byte, toEngine chan<- common.Message, _ []*common.Fx, _ common.AppSender) error {
-				innerToEngine = toEngine
+			InitializeF: func(_ context.Context, _ *snow.Context, _ database.Database, _ []byte, _ []byte, _ []byte, _ []*common.Fx, _ common.AppSender) error {
 				return nil
 			},
 		},
@@ -2760,7 +2773,6 @@ func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
 
 	db := prefixdb.New([]byte{0}, memdb.New())
 
-	toEngine := make(chan common.Message, 1)
 	require.NoError(proVM.Initialize(
 		context.Background(),
 		ctx,
@@ -2768,7 +2780,6 @@ func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
 		nil,
 		nil,
 		nil,
-		toEngine,
 		nil,
 		nil,
 	))
@@ -2828,8 +2839,8 @@ func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
 	// message to the consensus engine. This is really the source of the issue,
 	// as the proposervm is not currently in a state where it can correctly
 	// build any blocks.
-	innerToEngine <- common.PendingTxs
-	require.Equal(common.PendingTxs, <-toEngine)
+	msg, _ := proVM.SubscribeToEvents(context.Background(), 0)
+	require.Equal(common.PendingTxs, msg)
 
 	innerBlock3 := snowmantest.BuildChild(innerBlock2)
 	innerVMBlks = append(innerVMBlks, innerBlock3)
