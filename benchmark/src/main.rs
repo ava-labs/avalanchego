@@ -1,15 +1,8 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
-
-// The idea behind this benchmark:
-// Phase 1: (setup) Generate known keys from the SHA256 of the row number, starting at 0, for 1B keys
-// Phase 2: (steady-state) Continuously insert, delete, and update keys in the database
-
-// Phase 2 consists of:
-// 1. 25% of batch size is inserting more rows like phase 1
-// 2. 25% of batch size is deleting rows from the beginning
-// 3. 50% of batch size is updating rows in the middle, but setting the value to the hash of the first row inserted
 //
+
+#![doc = include_str!("../README.md")]
 
 use clap::{Parser, Subcommand, ValueEnum};
 use fastrace_opentelemetry::OpenTelemetryReporter;

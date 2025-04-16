@@ -1,6 +1,8 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+#![doc = include_str!("../README.md")]
+
 use clap::{Parser, Subcommand};
 use firewood::v2::api;
 

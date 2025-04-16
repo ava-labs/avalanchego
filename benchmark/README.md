@@ -132,16 +132,16 @@ If you want to install grafana and prometheus on an AWS host (using Ubuntu as a 
 3. ssh ubuntu@AWS-IP
 4. Run the script in setup.sh on the instance as root
 5. Log in to grafana on <http://YOUR-AWS-IP>
-  a. username: admin, password: admin
+   a. username: admin, password: admin
 6. When prompted, change the password (firewood_is_fast)
 7. On the left panel, click "Data Sources"
-  a. Select "Prometheus"
-  b. For the URL, use <http://localhost:9090>
-  c. click "Save and test"
+   a. Select "Prometheus"
+   b. For the URL, use <http://localhost:9090>
+   c. click "Save and test"
 8. On the left panel, click Dashboards
-  a. On the right top pulldown, click New->Import
-  b. Import the dashboard from the Grafana-dashboard.json file
-  c. Set the data source to Prometheus
+   a. On the right top pulldown, click New->Import
+   b. Import the dashboard from the Grafana-dashboard.json file
+   c. Set the data source to Prometheus
 9. \[optional] Install a stock dashboard from [here](https://grafana.com/grafana/dashboards/1860-node-exporter-full/)
 
 ## Usage

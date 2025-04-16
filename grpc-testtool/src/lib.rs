@@ -1,6 +1,8 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+#![doc = include_str!("../README.md")]
+
 pub mod sync {
     #![expect(clippy::missing_const_for_fn)]
     tonic::include_proto!("sync");

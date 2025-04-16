@@ -30,19 +30,19 @@ $ fwdctl create firewood
 # Look inside, there are several folders representing different components of firewood, including the WAL.
 $ ls firewood
 ```
-* fwdctl get <KEY>
+* fwdctl get KEY
 ```
 Get the value associated with a key in the database, if it exists.
-fwdctl get <KEY>
+fwdctl get KEY
 ```
-* fwdctl insert <KEY> <VALUE>
+* fwdctl insert KEY VALUE
 ```
 Insert a key/value pair into the database.
-fwdctl insert <KEY> <VALUE>
+fwdctl insert KEY VALUE
 ```
-* fwdctl delete <KEY>
+* fwdctl delete KEY
 ```
 Delete a key from the database, along with the associated value.
-fwdctl delete <KEY>
+fwdctl delete KEY
 ```
 
