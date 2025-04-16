@@ -45,7 +45,6 @@ func New(
 	vdrs validators.State,
 	txVerifier TxVerifier,
 	mempool mempool.Mempool[*txs.Tx],
-	toEngine chan<- common.Message,
 	partialSyncPrimaryNetwork bool,
 	appSender common.AppSender,
 	stateLock sync.Locker,
@@ -53,6 +52,7 @@ func New(
 	signer warp.Signer,
 	registerer prometheus.Registerer,
 	config config.Network,
+	notify func(),
 ) (*Network, error) {
 	p2pNetwork, err := p2p.NewNetwork(log, appSender, registerer, "p2p")
 	if err != nil {
@@ -78,13 +78,13 @@ func New(
 
 	gossipMempool, err := newGossipMempool(
 		mempool,
-		toEngine,
 		registerer,
 		log,
 		txVerifier,
 		config.ExpectedBloomFilterElements,
 		config.ExpectedBloomFilterFalsePositiveProbability,
 		config.MaxBloomFilterFalsePositiveProbability,
+		notify,
 	)
 	if err != nil {
 		return nil, err

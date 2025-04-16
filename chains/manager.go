@@ -727,10 +727,6 @@ func (m *manager) createAvalancheChain(
 		},
 	)
 
-	// The channel through which a VM may send messages to the consensus engine
-	// VM uses this channel to notify engine that a block is ready to be made
-	msgChan := make(chan common.Message, defaultChannelSize)
-
 	// The only difference between using avalancheMessageSender and
 	// snowmanMessageSender here is where the metrics will be placed. Because we
 	// end up using this sender after the linearization, we pass in
@@ -742,7 +738,6 @@ func (m *manager) createAvalancheChain(
 		genesisData,
 		chainConfig.Upgrade,
 		chainConfig.Config,
-		msgChan,
 		fxs,
 		snowmanMessageSender,
 	)
@@ -823,7 +818,6 @@ func (m *manager) createAvalancheChain(
 		genesisBytes: genesisData,
 		upgradeBytes: chainConfig.Upgrade,
 		configBytes:  chainConfig.Config,
-		toEngine:     msgChan,
 		fxs:          fxs,
 		appSender:    snowmanMessageSender,
 	}
@@ -885,8 +879,8 @@ func (m *manager) createAvalancheChain(
 	// Asynchronously passes messages from the network to the consensus engine
 	h, err := handler.New(
 		ctx,
+		linearizableVM,
 		vdrs,
-		msgChan,
 		m.FrontierPollFrequency,
 		m.ConsensusAppConcurrency,
 		m.ResourceTracker,
@@ -1202,10 +1196,6 @@ func (m *manager) createSnowmanChain(
 		vm = tracedvm.NewBlockVM(vm, "proposervm", m.Tracer)
 	}
 
-	// The channel through which a VM may send messages to the consensus engine
-	// VM uses this channel to notify engine that a block is ready to be made
-	msgChan := make(chan common.Message, defaultChannelSize)
-
 	if err := vm.Initialize(
 		context.TODO(),
 		ctx.Context,
@@ -1213,7 +1203,6 @@ func (m *manager) createSnowmanChain(
 		genesisData,
 		chainConfig.Upgrade,
 		chainConfig.Config,
-		msgChan,
 		fxs,
 		messageSender,
 	); err != nil {
@@ -1277,8 +1266,8 @@ func (m *manager) createSnowmanChain(
 	// Asynchronously passes messages from the network to the consensus engine
 	h, err := handler.New(
 		ctx,
+		vm,
 		vdrs,
-		msgChan,
 		m.FrontierPollFrequency,
 		m.ConsensusAppConcurrency,
 		m.ResourceTracker,
