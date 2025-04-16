@@ -10,6 +10,7 @@ use coarsetime::Instant;
 use fastrace::local::LocalSpan;
 use metrics::counter;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::fmt::Debug;
 
@@ -97,6 +98,14 @@ const AREA_SIZES: [u64; 23] = [
 
 fn serializer() -> impl bincode::Options {
     DefaultOptions::new().with_varint_encoding()
+}
+
+fn area_size_hash() -> TrieHash {
+    let mut hasher = Sha256::new();
+    for size in AREA_SIZES {
+        hasher.update(size.to_ne_bytes());
+    }
+    hasher.finalize().into()
 }
 
 // TODO: automate this, must stay in sync with above
@@ -264,6 +273,29 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
             return Err(Error::new(
                 ErrorKind::InvalidData,
                 "Database cannot be opened due to difference in endianness",
+            ));
+        }
+
+        if header.area_size_hash != area_size_hash().as_slice() {
+            return Err(Error::new(
+                ErrorKind::InvalidData,
+                "Database cannot be opened due to difference in area size hash",
+            ));
+        }
+
+        #[cfg(not(feature = "ethhash"))]
+        if header.ethhash != 0 {
+            return Err(Error::new(
+                ErrorKind::InvalidData,
+                "Database cannot be opened as it was created with ethhash enabled",
+            ));
+        }
+
+        #[cfg(feature = "ethhash")]
+        if header.ethhash != 1 {
+            return Err(Error::new(
+                ErrorKind::InvalidData,
+                "Database cannot be opened as it was created without ethhash enabled",
             ));
         }
 
@@ -612,6 +644,11 @@ struct NodeStoreHeader {
     /// Element i is the pointer to the first free block of size `BLOCK_SIZES[i]`.
     free_lists: FreeLists,
     root_address: Option<LinearAddress>,
+    /// The hash of the area sizes used in this database to prevent someone from changing the
+    /// area sizes and trying to read old databases with the wrong area sizes.
+    area_size_hash: [u8; 32],
+    /// Whether ethhash was enabled when this database was created.
+    ethhash: u64,
 }
 
 impl NodeStoreHeader {
@@ -633,6 +670,11 @@ impl NodeStoreHeader {
             root_address: None,
             version: Version::new(),
             free_lists: Default::default(),
+            area_size_hash: area_size_hash().as_slice().try_into().unwrap(),
+            #[cfg(feature = "ethhash")]
+            ethhash: 1,
+            #[cfg(not(feature = "ethhash"))]
+            ethhash: 0,
         }
     }
 }
