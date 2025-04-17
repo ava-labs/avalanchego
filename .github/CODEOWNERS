@@ -7,8 +7,16 @@
 
 * @StephenButtolph
 *.md @meaghanfitzgerald @StephenButtolph
+/.dockerignore @maru-ava
+/.envrc @maru-ava
 /.github/ @maru-ava
 /.github/*.md @maru-ava @meaghanfitzgerald
+/.gitignore @maru-ava @Stephenbuttolph
+/.golangci.yml @maru-ava
+/Dockerfile @maru-ava
+/Taskfile.yml @maru-ava
+/flake.lock @maru-ava
+/flake.nix @maru-ava
 /network/p2p/ @joshua-kim
 /network/p2p/*.md @joshua-kim @meaghanfitzgerald
 /scripts/ @maru-ava
