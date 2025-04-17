@@ -44,20 +44,20 @@ var (
 
 // Defines local-specific node configuration. Supports setting default
 // and node-specific values.
-type NodeProcess struct {
+type ProcessRuntime struct {
 	node *Node
 
 	// PID of the node process
 	pid int
 }
 
-func (p *NodeProcess) setProcessContext(processContext node.ProcessContext) {
+func (p *ProcessRuntime) setProcessContext(processContext node.ProcessContext) {
 	p.pid = processContext.PID
 	p.node.URI = processContext.URI
 	p.node.StakingAddress = processContext.StakingAddress
 }
 
-func (p *NodeProcess) readState() error {
+func (p *ProcessRuntime) readState() error {
 	path := p.getProcessContextPath()
 	bytes, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -80,7 +80,7 @@ func (p *NodeProcess) readState() error {
 // its staking port. The network will start faster with this
 // synchronization due to the avoidance of exponential backoff
 // if a node tries to connect to a beacon that is not ready.
-func (p *NodeProcess) Start(log logging.Logger) error {
+func (p *ProcessRuntime) Start(log logging.Logger) error {
 	// Avoid attempting to start an already running node.
 	proc, err := p.getProcess()
 	if err != nil {
@@ -142,7 +142,7 @@ func (p *NodeProcess) Start(log logging.Logger) error {
 }
 
 // Signals the node process to stop.
-func (p *NodeProcess) InitiateStop() error {
+func (p *ProcessRuntime) InitiateStop() error {
 	proc, err := p.getProcess()
 	if err != nil {
 		return fmt.Errorf("failed to retrieve process to stop: %w", err)
@@ -158,7 +158,7 @@ func (p *NodeProcess) InitiateStop() error {
 }
 
 // Waits for the node process to stop.
-func (p *NodeProcess) WaitForStopped(ctx context.Context) error {
+func (p *ProcessRuntime) WaitForStopped(ctx context.Context) error {
 	ticker := time.NewTicker(defaultNodeTickerInterval)
 	defer ticker.Stop()
 	for {
@@ -178,7 +178,7 @@ func (p *NodeProcess) WaitForStopped(ctx context.Context) error {
 	}
 }
 
-func (p *NodeProcess) IsHealthy(ctx context.Context) (bool, error) {
+func (p *ProcessRuntime) IsHealthy(ctx context.Context) (bool, error) {
 	// Check that the node process is running as a precondition for
 	// checking health. getProcess will also ensure that the node's
 	// API URI is current.
@@ -197,11 +197,11 @@ func (p *NodeProcess) IsHealthy(ctx context.Context) (bool, error) {
 	return healthReply.Healthy, nil
 }
 
-func (p *NodeProcess) getProcessContextPath() string {
+func (p *ProcessRuntime) getProcessContextPath() string {
 	return filepath.Join(p.node.DataDir, config.DefaultProcessContextFilename)
 }
 
-func (p *NodeProcess) waitForProcessContext(ctx context.Context) error {
+func (p *ProcessRuntime) waitForProcessContext(ctx context.Context) error {
 	ticker := time.NewTicker(defaultNodeTickerInterval)
 	defer ticker.Stop()
 
@@ -225,7 +225,7 @@ func (p *NodeProcess) waitForProcessContext(ctx context.Context) error {
 // Retrieve the node process if it is running. As part of determining
 // process liveness, the node's process context will be refreshed if
 // live or cleared if not running.
-func (p *NodeProcess) getProcess() (*os.Process, error) {
+func (p *ProcessRuntime) getProcess() (*os.Process, error) {
 	// Read the process context to ensure freshness. The node may have
 	// stopped or been restarted since last read.
 	if err := p.readState(); err != nil {
@@ -262,7 +262,7 @@ func getProcess(pid int) (*os.Process, error) {
 }
 
 // Write monitoring configuration enabling collection of metrics and logs from the node.
-func (p *NodeProcess) writeMonitoringConfig() error {
+func (p *ProcessRuntime) writeMonitoringConfig() error {
 	// Ensure labeling that uniquely identifies the node and its network
 	commonLabels := FlagsMap{
 		// Explicitly setting an instance label avoids the default
@@ -300,7 +300,7 @@ func (p *NodeProcess) writeMonitoringConfig() error {
 }
 
 // Return the path for this node's prometheus configuration.
-func (p *NodeProcess) getMonitoringConfigPath(name string) (string, error) {
+func (p *ProcessRuntime) getMonitoringConfigPath(name string) (string, error) {
 	// Ensure a unique filename to allow config files to be added and removed
 	// by multiple nodes without conflict.
 	serviceDiscoveryDir, err := getServiceDiscoveryDir(name)
@@ -311,7 +311,7 @@ func (p *NodeProcess) getMonitoringConfigPath(name string) (string, error) {
 }
 
 // Ensure the removal of the monitoring configuration files for this node.
-func (p *NodeProcess) removeMonitoringConfig() error {
+func (p *ProcessRuntime) removeMonitoringConfig() error {
 	for _, name := range []string{promtailCmd, prometheusCmd} {
 		configPath, err := p.getMonitoringConfigPath(name)
 		if err != nil {
@@ -325,7 +325,7 @@ func (p *NodeProcess) removeMonitoringConfig() error {
 }
 
 // Write the configuration for a type of monitoring (e.g. prometheus, promtail).
-func (p *NodeProcess) writeMonitoringConfigFile(name string, config []FlagsMap) error {
+func (p *ProcessRuntime) writeMonitoringConfigFile(name string, config []FlagsMap) error {
 	configPath, err := p.getMonitoringConfigPath(name)
 	if err != nil {
 		return err
@@ -348,11 +348,11 @@ func (p *NodeProcess) writeMonitoringConfigFile(name string, config []FlagsMap) 
 	return nil
 }
 
-func (p *NodeProcess) GetLocalURI(_ context.Context) (string, func(), error) {
+func (p *ProcessRuntime) GetLocalURI(_ context.Context) (string, func(), error) {
 	return p.node.URI, func() {}, nil
 }
 
-func (p *NodeProcess) GetLocalStakingAddress(_ context.Context) (netip.AddrPort, func(), error) {
+func (p *ProcessRuntime) GetLocalStakingAddress(_ context.Context) (netip.AddrPort, func(), error) {
 	return p.node.StakingAddress, func() {}, nil
 }
 
