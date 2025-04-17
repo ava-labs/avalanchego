@@ -133,10 +133,9 @@ func NewEthClient(tc tests.TestContext, nodeURI tmpnet.NodeURI) ethclient.Client
 }
 
 // Adds an ephemeral node intended to be used by a single test.
-func AddEphemeralNode(tc tests.TestContext, network *tmpnet.Network, flags tmpnet.FlagsMap) *tmpnet.Node {
+func AddEphemeralNode(tc tests.TestContext, network *tmpnet.Network, node *tmpnet.Node) *tmpnet.Node {
 	require := require.New(tc)
 
-	node := tmpnet.NewEphemeralNode(flags)
 	require.NoError(network.StartNode(tc.DefaultContext(), tc.Log(), node))
 
 	tc.DeferCleanup(func() {
