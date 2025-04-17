@@ -11,7 +11,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 	"net/netip"
 	"os"
 	"os/exec"
@@ -65,7 +64,8 @@ var (
 	// TODO(marun) Remove when subnet-evm configures the genesis with this key.
 	HardhatKey *secp256k1.PrivateKey
 
-	errInsufficientNodes = errors.New("at least one node is required")
+	errInsufficientNodes    = errors.New("at least one node is required")
+	errMissingRuntimeConfig = errors.New("DefaultRuntimeConfig must not be empty")
 )
 
 func init() {
@@ -251,6 +251,11 @@ func (n *Network) EnsureDefaultConfig(log logging.Logger) error {
 				primaryChainConfig[key] = value
 			}
 		}
+	}
+
+	emptyRuntime := NodeRuntimeConfig{}
+	if n.DefaultRuntimeConfig == emptyRuntime {
+		return errMissingRuntimeConfig
 	}
 
 	return nil
@@ -469,10 +474,6 @@ func (n *Network) StartNode(ctx context.Context, node *Node) error {
 	}
 	if err := node.Write(); err != nil {
 		return err
-	}
-
-	if err := n.writeNodeFlags(node); err != nil {
-		return fmt.Errorf("writing node flags: %w", err)
 	}
 
 	if err := node.Start(ctx); err != nil {
@@ -762,10 +763,11 @@ func (n *Network) GetNodeURIs() []NodeURI {
 	return GetNodeURIs(n.Nodes)
 }
 
-// Retrieves bootstrap IPs and IDs for all nodes except the skipped one (this supports
-// collecting the bootstrap details for restarting a node).
+// Retrieves bootstrap IPs and IDs for all non-ephemeral nodes except the skipped one
+// (this supports collecting the bootstrap details for restarting a node).
+//
 // For consumption outside of avalanchego. Needs to be kept exported.
-func (n *Network) GetBootstrapIPsAndIDs(skippedNode *Node) ([]string, []string, error) {
+func (n *Network) GetBootstrapIPsAndIDs(skippedNode *Node) ([]string, []string) {
 	bootstrapIPs := []string{}
 	bootstrapIDs := []string{}
 	for _, node := range n.Nodes {
@@ -786,7 +788,7 @@ func (n *Network) GetBootstrapIPsAndIDs(skippedNode *Node) ([]string, []string, 
 		bootstrapIDs = append(bootstrapIDs, node.NodeID.String())
 	}
 
-	return bootstrapIPs, bootstrapIDs, nil
+	return bootstrapIPs, bootstrapIDs
 }
 
 // GetNetworkID returns the effective ID of the network. If the network
@@ -877,77 +879,6 @@ func (n *Network) GetChainConfigContent() (string, error) {
 		return "", fmt.Errorf("failed to marshal chain configs: %w", err)
 	}
 	return base64.StdEncoding.EncodeToString(marshaledConfigs), nil
-}
-
-// writeNodeFlags determines the set of flags that should be used to
-// start the given node and writes them to a file in the node path.
-func (n *Network) writeNodeFlags(node *Node) error {
-	flags := maps.Clone(node.Flags)
-
-	// Convert the network id to a string to ensure consistency in JSON round-tripping.
-	flags.SetDefault(config.NetworkNameKey, strconv.FormatUint(uint64(n.GetNetworkID()), 10))
-
-	// Set the bootstrap configuration
-	bootstrapIPs, bootstrapIDs, err := n.GetBootstrapIPsAndIDs(node)
-	if err != nil {
-		return fmt.Errorf("failed to determine bootstrap configuration: %w", err)
-	}
-	flags.SetDefault(config.BootstrapIDsKey, strings.Join(bootstrapIDs, ","))
-	flags.SetDefault(config.BootstrapIPsKey, strings.Join(bootstrapIPs, ","))
-
-	// TODO(marun) Maybe avoid computing content flags for each node start?
-
-	if n.Genesis != nil {
-		genesisFileContent, err := n.GetGenesisFileContent()
-		if err != nil {
-			return fmt.Errorf("failed to get genesis file content: %w", err)
-		}
-		flags.SetDefault(config.GenesisFileContentKey, genesisFileContent)
-
-		isSingleNodeNetwork := (len(n.Nodes) == 1 && len(n.Genesis.InitialStakers) == 1)
-		if isSingleNodeNetwork {
-			n.log.Info("defaulting to sybil protection disabled to enable a single-node network to start")
-			flags.SetDefault(config.SybilProtectionEnabledKey, "false")
-		}
-	}
-
-	subnetConfigContent, err := n.GetSubnetConfigContent()
-	if err != nil {
-		return fmt.Errorf("failed to get subnet config content: %w", err)
-	}
-	if len(subnetConfigContent) > 0 {
-		flags.SetDefault(config.SubnetConfigContentKey, subnetConfigContent)
-	}
-
-	chainConfigContent, err := n.GetChainConfigContent()
-	if err != nil {
-		return fmt.Errorf("failed to get chain config content: %w", err)
-	}
-	if len(chainConfigContent) > 0 {
-		flags.SetDefault(config.ChainConfigContentKey, chainConfigContent)
-	}
-
-	// Only configure the plugin dir with a non-empty value to ensure the use of
-	// the default value (`[datadir]/plugins`) when no plugin dir is configured.
-	processConfig := node.getRuntimeConfig().Process
-	if processConfig != nil {
-		if len(processConfig.PluginDir) > 0 {
-			// Ensure the plugin directory exists or the node will fail to start
-			if err := os.MkdirAll(processConfig.PluginDir, perms.ReadWriteExecute); err != nil {
-				return fmt.Errorf("failed to create plugin dir: %w", err)
-			}
-			flags.SetDefault(config.PluginDirKey, processConfig.PluginDir)
-		}
-
-		flags.SetDefault(config.DataDirKey, node.DataDir)
-	}
-
-	// Set the network and tmpnet defaults last to ensure they can be overridden
-	flags.SetDefaults(n.DefaultFlags)
-	flags.SetDefaults(DefaultTmpnetFlags())
-
-	// Write the flags to disk
-	return node.writeFlags(flags)
 }
 
 // Waits until the provided nodes are healthy.
