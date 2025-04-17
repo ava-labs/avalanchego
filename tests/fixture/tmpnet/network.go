@@ -79,6 +79,10 @@ func init() {
 	}
 }
 
+// ConfigMap enables defining configuration in a format appropriate
+// for round-tripping through JSON back to golang structs.
+type ConfigMap map[string]any
+
 // Collects the configuration for running a temporary avalanchego network
 type Network struct {
 	// Uniquely identifies the temporary network for metrics
@@ -107,10 +111,10 @@ type Network struct {
 	Genesis *genesis.UnparsedConfig
 
 	// Configuration for primary subnets
-	PrimarySubnetConfig map[string]any
+	PrimarySubnetConfig ConfigMap
 
 	// Configuration for primary network chains (P, X, C)
-	PrimaryChainConfigs map[string]ChainConfigMap
+	PrimaryChainConfigs map[string]ConfigMap
 
 	// Default configuration to use when creating new nodes
 	DefaultFlags         FlagsMap
@@ -229,12 +233,12 @@ func (n *Network) EnsureDefaultConfig(log logging.Logger) error {
 
 	// Ensure primary chains are configured
 	if n.PrimaryChainConfigs == nil {
-		n.PrimaryChainConfigs = map[string]ChainConfigMap{}
+		n.PrimaryChainConfigs = map[string]ConfigMap{}
 	}
 	defaultChainConfigs := DefaultChainConfigs()
 	for alias, defaultChainConfig := range defaultChainConfigs {
 		if _, ok := n.PrimaryChainConfigs[alias]; !ok {
-			n.PrimaryChainConfigs[alias] = ChainConfigMap{}
+			n.PrimaryChainConfigs[alias] = ConfigMap{}
 		}
 		primaryChainConfig := n.PrimaryChainConfigs[alias]
 		for key, value := range defaultChainConfig {
@@ -806,7 +810,7 @@ func (n *Network) GetGenesisFileContent() (string, error) {
 // GetSubnetConfigContent returns the base64-encoded and
 // JSON-marshaled map of subnetID to subnet configuration.
 func (n *Network) GetSubnetConfigContent() (string, error) {
-	subnetConfigs := map[ids.ID]map[string]any{}
+	subnetConfigs := map[ids.ID]ConfigMap{}
 
 	if len(n.PrimarySubnetConfig) > 0 {
 		subnetConfigs[constants.PrimaryNetworkID] = n.PrimarySubnetConfig

@@ -68,13 +68,9 @@ func DefaultTmpnetFlags() FlagsMap {
 	return flags
 }
 
-// Chain config values need to be any to enable unmarshaling to golang
-// (vs flags which are parsed with viper).
-type ChainConfigMap map[string]any
-
 // A set of chain configurations appropriate for testing.
-func DefaultChainConfigs() map[string]ChainConfigMap {
-	return map[string]ChainConfigMap{
+func DefaultChainConfigs() map[string]ConfigMap {
+	return map[string]ConfigMap{
 		// Supply only non-default configuration to ensure that default
 		// values will be used. Available C-Chain configuration options are
 		// defined in the `github.com/ava-labs/coreth/evm` package.

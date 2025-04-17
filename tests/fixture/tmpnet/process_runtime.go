@@ -277,7 +277,7 @@ func (p *ProcessRuntime) writeMonitoringConfig() error {
 	}
 	commonLabels.SetDefaults(githubLabelsFromEnv())
 
-	prometheusConfig := []map[string]any{
+	prometheusConfig := []ConfigMap{
 		{
 			"targets": []string{strings.TrimPrefix(p.node.URI, "http://")},
 			"labels":  commonLabels,
@@ -290,7 +290,7 @@ func (p *ProcessRuntime) writeMonitoringConfig() error {
 	promtailLabels := map[string]string{}
 	maps.Copy(promtailLabels, commonLabels)
 	promtailLabels["__path__"] = filepath.Join(p.node.DataDir, "logs", "*.log")
-	promtailConfig := []map[string]any{
+	promtailConfig := []ConfigMap{
 		{
 			"targets": []string{"localhost"},
 			"labels":  promtailLabels,
@@ -325,7 +325,7 @@ func (p *ProcessRuntime) removeMonitoringConfig() error {
 }
 
 // Write the configuration for a type of monitoring (e.g. prometheus, promtail).
-func (p *ProcessRuntime) writeMonitoringConfigFile(name string, config []map[string]any) error {
+func (p *ProcessRuntime) writeMonitoringConfigFile(name string, config []ConfigMap) error {
 	configPath, err := p.getMonitoringConfigPath(name)
 	if err != nil {
 		return err

@@ -18,7 +18,7 @@ func TestNetworkSerialization(t *testing.T) {
 
 	network := NewDefaultNetwork("testnet")
 	// Validate round-tripping of primary subnet configuration
-	network.PrimarySubnetConfig = map[string]any{
+	network.PrimarySubnetConfig = ConfigMap{
 		"validatorOnly": true,
 	}
 	require.NoError(network.EnsureDefaultConfig(logging.NoLog{}))

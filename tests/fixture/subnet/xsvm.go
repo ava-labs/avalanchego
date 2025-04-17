@@ -33,7 +33,7 @@ func NewXSVMOrPanic(name string, key *secp256k1.PrivateKey, nodes ...*tmpnet.Nod
 
 	return &tmpnet.Subnet{
 		Name: name,
-		Config: map[string]any{
+		Config: tmpnet.ConfigMap{
 			// Reducing this from the 1s default speeds up tx acceptance
 			"proposerMinBlockDelay": 0,
 		},
