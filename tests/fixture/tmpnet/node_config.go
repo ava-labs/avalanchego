@@ -4,6 +4,7 @@
 package tmpnet
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -70,7 +71,7 @@ func (n *Node) writeConfig() error {
 	return nil
 }
 
-func (n *Node) Read(network *Network, dataDir string) error {
+func (n *Node) Read(ctx context.Context, network *Network, dataDir string) error {
 	n.network = network
 	n.DataDir = dataDir
 
@@ -80,7 +81,7 @@ func (n *Node) Read(network *Network, dataDir string) error {
 	if err := n.EnsureNodeID(); err != nil {
 		return err
 	}
-	return n.readState()
+	return n.readState(ctx)
 }
 
 func (n *Node) Write() error {
