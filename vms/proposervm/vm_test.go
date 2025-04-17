@@ -499,6 +499,7 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.StakingLeafSigner,
+		nil,
 	)
 	require.NoError(err)
 	proBlk := postForkBlock{
@@ -543,6 +544,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.StakingLeafSigner,
+		nil,
 	)
 	require.NoError(err)
 	proBlk1 := postForkBlock{
@@ -561,6 +563,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.StakingLeafSigner,
+		nil,
 	)
 	require.NoError(err)
 	proBlk2 := postForkBlock{
@@ -630,6 +633,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 		proVM.Time(),
 		pChainHeight,
 		netcoreBlk.Bytes(),
+		nil,
 	)
 	require.NoError(err)
 	netProBlk := postForkBlock{
@@ -898,6 +902,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 		proVM.Time(),
 		0,
 		coreBlk.Bytes(),
+		nil,
 	)
 	require.NoError(err)
 
@@ -994,6 +999,7 @@ func TestInnerBlockDeduplication(t *testing.T) {
 		coreBlk.Timestamp(),
 		0,
 		coreBlk.Bytes(),
+		nil,
 	)
 	require.NoError(err)
 	statelessBlock1, err := statelessblock.BuildUnsigned(
@@ -1001,6 +1007,7 @@ func TestInnerBlockDeduplication(t *testing.T) {
 		coreBlk.Timestamp(),
 		1,
 		coreBlk.Bytes(),
+		nil,
 	)
 	require.NoError(err)
 
@@ -1159,6 +1166,7 @@ func TestInnerVMRollback(t *testing.T) {
 		coreBlk.Timestamp(),
 		0,
 		coreBlk.Bytes(),
+		nil,
 	)
 	require.NoError(err)
 
@@ -1264,6 +1272,7 @@ func TestBuildBlockDuringWindow(t *testing.T) {
 		proVM.Time(),
 		0,
 		coreBlk0.Bytes(),
+		nil,
 	)
 	require.NoError(err)
 
@@ -1356,6 +1365,7 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 		proVM.Time(),
 		defaultPChainHeight,
 		yBlock.Bytes(),
+		nil,
 	)
 	require.NoError(err)
 
@@ -1424,6 +1434,7 @@ func TestTooFarAdvanced(t *testing.T) {
 		aBlock.Timestamp().Add(maxSkew),
 		defaultPChainHeight,
 		yBlock.Bytes(),
+		nil,
 	)
 	require.NoError(err)
 
@@ -1443,6 +1454,7 @@ func TestTooFarAdvanced(t *testing.T) {
 		aBlock.Timestamp().Add(proposer.MaxVerifyDelay),
 		defaultPChainHeight,
 		yBlock.Bytes(),
+		nil,
 	)
 
 	require.NoError(err)
@@ -1684,6 +1696,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		snowmantest.GenesisTimestamp,
 		defaultPChainHeight,
 		yBlock.Bytes(),
+		nil,
 	)
 	require.NoError(err)
 
@@ -1952,6 +1965,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 		blkNearTipInnerBytes, // inner blk bytes
 		vm.ctx.ChainID,       // chain ID
 		vm.StakingLeafSigner, // key
+		nil,
 	)
 	require.NoError(err)
 
@@ -2404,6 +2418,7 @@ func TestGetPostDurangoSlotTimeWithNoValidators(t *testing.T) {
 		proVM.Time(),
 		0,
 		coreBlk.Bytes(),
+		nil,
 	)
 	require.NoError(err)
 
@@ -2470,6 +2485,7 @@ func TestLocalParse(t *testing.T) {
 		[]byte{1, 2, 3},
 		chainID,
 		key,
+		nil,
 	)
 	require.NoError(t, err)
 

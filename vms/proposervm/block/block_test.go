@@ -6,11 +6,11 @@ package block
 import (
 	"bytes"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
@@ -36,11 +36,12 @@ func TestBlockSizeLimit(t *testing.T) {
 	require := require.New(t)
 
 	parentID := ids.ID{1}
-	timestamp := time.Unix(123, 0)
+	timestamp := upgrade.InitiallyActiveTime
 	pChainHeight := uint64(2)
 	innerBlockBytes := bytes.Repeat([]byte{0}, 270*units.KiB)
+	parentBlockSig := []byte{}
 
 	// with the large limit, it should be able to build large blocks
-	_, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes)
+	_, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes, parentBlockSig)
 	require.NoError(err)
 }
