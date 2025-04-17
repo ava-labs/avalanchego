@@ -30,7 +30,7 @@ func TestManagerGetStatelessBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	state := statemock.NewState(ctrl)
+	state := statemock.NewMockInterface(ctrl)
 	m := &manager{
 		state:        state,
 		blkIDToState: map[ids.ID]*blockState{},
@@ -72,7 +72,7 @@ func TestManagerGetState(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	s := statemock.NewState(ctrl)
+	s := statemock.NewMockInterface(ctrl)
 	m := &manager{
 		state:        s,
 		blkIDToState: map[ids.ID]*blockState{},
@@ -160,7 +160,7 @@ func TestManagerVerifyTx(t *testing.T) {
 				lastAcceptedID := ids.GenerateTestID()
 
 				// These values don't matter for this test
-				state := statemock.NewState(ctrl)
+				state := statemock.NewMockInterface(ctrl)
 				state.EXPECT().GetLastAccepted().Return(lastAcceptedID)
 				state.EXPECT().GetTimestamp().Return(time.Time{})
 
@@ -190,7 +190,7 @@ func TestManagerVerifyTx(t *testing.T) {
 				lastAcceptedID := ids.GenerateTestID()
 
 				// These values don't matter for this test
-				state := statemock.NewState(ctrl)
+				state := statemock.NewMockInterface(ctrl)
 				state.EXPECT().GetLastAccepted().Return(lastAcceptedID)
 				state.EXPECT().GetTimestamp().Return(time.Time{})
 
@@ -220,7 +220,7 @@ func TestManagerVerifyTx(t *testing.T) {
 				lastAcceptedID := ids.GenerateTestID()
 
 				// These values don't matter for this test
-				state := statemock.NewState(ctrl)
+				state := statemock.NewMockInterface(ctrl)
 				state.EXPECT().GetLastAccepted().Return(lastAcceptedID)
 				state.EXPECT().GetTimestamp().Return(time.Time{})
 

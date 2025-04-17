@@ -83,7 +83,8 @@ type VM struct {
 	appSender common.AppSender
 
 	// State management
-	state state.State
+	legacyState *state.State
+	state       state.Interface
 
 	// Set to true once this VM is marked as `Bootstrapped` by the engine
 	bootstrapped bool
@@ -115,6 +116,8 @@ type VM struct {
 	blockbuilder.Builder
 	chainManager blockexecutor.Manager
 	network      *network.Network
+
+	StateMigrationFactory StateMigrationFactory
 }
 
 func (vm *VM) Connected(ctx context.Context, nodeID ids.NodeID, version *version.Application) error {
@@ -218,7 +221,7 @@ func (vm *VM) Initialize(
 	codec := vm.parser.Codec()
 	vm.Spender = utxo.NewSpender(&vm.clock, codec)
 
-	state, err := state.New(
+	vm.legacyState, err = state.New(
 		vm.db,
 		vm.parser,
 		vm.registerer,
@@ -228,7 +231,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	vm.state = state
+	vm.state = vm.legacyState
 
 	if err := vm.initGenesis(genesisBytes); err != nil {
 		return err
@@ -369,8 +372,37 @@ func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, erro
  */
 
 func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<- common.Message) error {
-	time := vm.Config.Upgrades.CortinaTime
-	if err := vm.state.InitializeChainState(stopVertexID, time); err != nil {
+	if err := vm.legacyState.InitializeChainState(
+		stopVertexID,
+		vm.Config.Upgrades.CortinaTime,
+	); err != nil {
+		return fmt.Errorf("failed to initialize legacy chain state: %w", err)
+	}
+
+	stateMigration := vm.StateMigrationFactory.New(
+		vm.ctx.Log,
+		vm.parser,
+		vm.registerer,
+	)
+
+	state, err := stateMigration.Migrate(
+		ctx,
+		vm.legacyState,
+		vm.db,
+		vm.legacyState.UTXODB,
+		vm.legacyState.TxDB,
+		vm.legacyState.BlockIDDB,
+		vm.legacyState.BlockDB,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to migrate state: %w", err)
+	}
+	vm.state = state
+
+	if err := vm.state.InitializeChainState(
+		stopVertexID,
+		vm.Config.Upgrades.CortinaTime,
+	); err != nil {
 		return fmt.Errorf("failed to initialize chain state: %w", err)
 	}
 
@@ -463,6 +495,14 @@ func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
 		vm: vm,
 		tx: tx,
 	}, nil
+}
+
+func (vm *VM) GetTx(txID ids.ID) (*txs.Tx, error) {
+	return vm.state.GetTx(txID)
+}
+
+func (vm *VM) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
+	return vm.state.GetUTXO(utxoID)
 }
 
 /*

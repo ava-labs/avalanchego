@@ -31,7 +31,7 @@ func New(
 	ctx *snow.Context,
 	cfg *config.Config,
 	feeAssetID ids.ID,
-	state state.State,
+	state state.Interface,
 ) *Builder {
 	utxos := newUTXOs(ctx, state, ctx.SharedMemory, codec)
 	return &Builder{

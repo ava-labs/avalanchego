@@ -5,6 +5,7 @@ package memdb
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"strings"
 	"sync"
@@ -36,6 +37,21 @@ type Database struct {
 // New returns a map with the Database interface methods implemented.
 func New() *Database {
 	return NewWithSize(DefaultSize)
+}
+
+// Copy returns a Database with the same key-value pairs as db
+func Copy(db *Database) (*Database, error) {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
+	result := New()
+	for k, v := range db.db {
+		if err := result.Put([]byte(k), v); err != nil {
+			return nil, fmt.Errorf("failed to insert key: %w", err)
+		}
+	}
+
+	return result, nil
 }
 
 // NewWithSize returns a map pre-allocated to the provided size with the
