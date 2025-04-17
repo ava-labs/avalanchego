@@ -16,7 +16,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -324,17 +323,7 @@ func getProcess(pid int) (*os.Process, error) {
 // Write monitoring configuration enabling collection of metrics and logs from the node.
 func (p *ProcessRuntime) writeMonitoringConfig() error {
 	// Ensure labeling that uniquely identifies the node and its network
-	commonLabels := FlagsMap{
-		// Explicitly setting an instance label avoids the default
-		// behavior of using the node's URI since the URI isn't
-		// guaranteed stable (e.g. port may change after restart).
-		"instance":          p.node.GetUniqueID(),
-		"network_uuid":      p.node.network.UUID,
-		"node_id":           p.node.NodeID.String(),
-		"is_ephemeral_node": strconv.FormatBool(p.node.IsEphemeral),
-		"network_owner":     p.node.network.Owner,
-	}
-	commonLabels.SetDefaults(githubLabelsFromEnv())
+	commonLabels := p.node.getMonitoringLabels()
 
 	prometheusConfig := []ConfigMap{
 		{
@@ -479,19 +468,5 @@ func watchLogFileForFatal(ctx context.Context, cancelWithCause context.CancelCau
 				return
 			}
 		}
-	}
-}
-
-func githubLabelsFromEnv() map[string]string {
-	return map[string]string{
-		// prometheus/promtail ignore empty values so including these
-		// labels with empty values outside of a github worker (where
-		// the env vars will not be set) should not be a problem.
-		"gh_repo":        os.Getenv("GH_REPO"),
-		"gh_workflow":    os.Getenv("GH_WORKFLOW"),
-		"gh_run_id":      os.Getenv("GH_RUN_ID"),
-		"gh_run_number":  os.Getenv("GH_RUN_NUMBER"),
-		"gh_run_attempt": os.Getenv("GH_RUN_ATTEMPT"),
-		"gh_job_id":      os.Getenv("GH_JOB_ID"),
 	}
 }
