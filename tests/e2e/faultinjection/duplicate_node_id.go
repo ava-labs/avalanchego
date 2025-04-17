@@ -44,7 +44,7 @@ var _ = ginkgo.Describe("Duplicate node handling", func() {
 		_ = e2e.AddEphemeralNode(tc, network, node2)
 
 		tc.By("checking that the second new node fails to become healthy before timeout")
-		err := tmpnet.WaitForHealthy(tc.DefaultContext(), node2)
+		err := node2.WaitForHealthy(tc.DefaultContext())
 		require.ErrorIs(err, context.DeadlineExceeded)
 
 		tc.By("stopping the first new node")
