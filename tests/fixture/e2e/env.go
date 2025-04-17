@@ -193,10 +193,20 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 		"not enough pre-funded keys for the requested number of parallel test processes",
 	)
 
-	uris := network.GetNodeURIs()
+	// TODO(marun) Maybe this should be part of tmpnet/network.go?
+	uris := make([]tmpnet.NodeURI, len(network.Nodes))
+	for i, node := range network.Nodes {
+		uri, cancel, err := node.GetLocalURI(tc.DefaultContext())
+		require.NoError(err)
+		tc.DeferCleanup(cancel)
+		uris[i] = tmpnet.NodeURI{
+			NodeID: node.NodeID,
+			URI:    uri,
+		}
+	}
 	require.NotEmpty(uris, "network contains no nodes")
 	tc.Log().Info("network nodes are available",
-		zap.Any("uris", uris),
+		zap.Any("nodeURIs", uris),
 	)
 
 	return &TestEnvironment{
@@ -214,8 +224,7 @@ func (te *TestEnvironment) GetRandomNodeURI() tmpnet.NodeURI {
 	r := rand.New(rand.NewSource(time.Now().Unix())) //#nosec G404
 	nodeURI := te.URIs[r.Intn(len(te.URIs))]
 	te.testContext.Log().Info("targeting random node",
-		zap.Stringer("nodeID", nodeURI.NodeID),
-		zap.String("uri", nodeURI.URI),
+		zap.Any("nodeURI", nodeURI),
 	)
 	return nodeURI
 }

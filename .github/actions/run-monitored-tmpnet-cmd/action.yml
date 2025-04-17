@@ -8,6 +8,9 @@ inputs:
   run_env:
     description: 'a string containing env vars for the command e.g. "MY_VAR1=foo MY_VAR2=bar"'
     default: ''
+  runtime:
+    description: 'the tmpnet runtime being used'
+    default: 'process'
   filter_by_owner:
     default: ''
   artifact_prefix:
@@ -84,7 +87,7 @@ runs:
     # easy way to compose custom actions for use by other repos
     # without running into versioning issues.
     - name: Upload tmpnet data
-      if: always()
+      if: always() && (inputs.runtime == 'process')
       uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.artifact_prefix }}-tmpnet-data
@@ -92,4 +95,15 @@ runs:
           ~/.tmpnet/networks
           ~/.tmpnet/prometheus/prometheus.log
           ~/.tmpnet/promtail/promtail.log
+        if-no-files-found: error
+    - name: Export kind logs
+      if: always() && (inputs.runtime == 'kube')
+      shell: bash
+      run: kind export logs /tmp/kind-logs
+    - name: Upload kind logs
+      if: always() && (inputs.runtime == 'kube')
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact_prefix }}-kind-logs
+        path: /tmp/kind-logs
         if-no-files-found: error

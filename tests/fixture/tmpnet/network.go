@@ -901,6 +901,7 @@ func waitForHealthy(ctx context.Context, log logging.Logger, nodes []*Node) erro
 			unhealthyNodes.Remove(node)
 			log.Info("node is healthy",
 				zap.Stringer("nodeID", node.NodeID),
+				// TODO(marun) This would need to be a local URI for kube.
 				zap.String("uri", node.URI),
 			)
 		}

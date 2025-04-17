@@ -175,6 +175,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		subnetGenesisNode := e2e.AddEphemeralNode(tc, env.GetNetwork(), tmpnet.NewEphemeralNode(tmpnet.FlagsMap{
 			config.TrackSubnetsKey: subnetID.String(),
 		}))
+		e2e.WaitForHealthy(tc, subnetGenesisNode)
 
 		genesisNodePoP, err := subnetGenesisNode.GetProofOfPossession()
 		require.NoError(err)
@@ -351,17 +352,13 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		subnetRegisterNode := e2e.AddEphemeralNode(tc, env.GetNetwork(), tmpnet.NewEphemeralNode(tmpnet.FlagsMap{
 			config.TrackSubnetsKey: subnetID.String(),
 		}))
+		e2e.WaitForHealthy(tc, subnetRegisterNode)
 
 		registerNodePoP, err := subnetRegisterNode.GetProofOfPossession()
 		require.NoError(err)
 
 		registerNodePK, err := bls.PublicKeyFromCompressedBytes(registerNodePoP.PublicKey[:])
 		require.NoError(err)
-
-		tc.By("ensuring the subnet nodes are healthy", func() {
-			e2e.WaitForHealthy(tc, subnetGenesisNode)
-			e2e.WaitForHealthy(tc, subnetRegisterNode)
-		})
 
 		tc.By("creating the RegisterL1ValidatorMessage")
 		expiry := uint64(time.Now().Add(expiryDelay).Unix()) // This message will expire in 5 minutes

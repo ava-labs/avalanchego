@@ -87,5 +87,5 @@ else
                                 "${AVALANCHE_PATH}/build/antithesis/xsvm" \
                                 "AVALANCHEGO_PATH=${AVALANCHE_PATH}/build/avalanchego AVAGO_PLUGIN_DIR=${AVALANCHE_PATH}/build/plugins"
 
-  build_antithesis_images_for_avalanchego "${TEST_SETUP}" "${IMAGE_PREFIX}" "${AVALANCHE_PATH}/vms/example/xsvm/Dockerfile"
+  build_antithesis_images_for_avalanchego "${TEST_SETUP}" "${IMAGE_PREFIX}" "${AVALANCHE_PATH}/tests/antithesis/xsvm/Dockerfile.node"
 fi
