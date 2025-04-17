@@ -175,7 +175,7 @@ func BootstrapNewNetwork(
 
 // Stops the nodes of the network configured in the provided directory.
 func StopNetwork(ctx context.Context, log logging.Logger, dir string) error {
-	network, err := ReadNetwork(log, dir)
+	network, err := ReadNetwork(ctx, log, dir)
 	if err != nil {
 		return err
 	}
@@ -184,7 +184,7 @@ func StopNetwork(ctx context.Context, log logging.Logger, dir string) error {
 
 // Restarts the nodes of the network configured in the provided directory.
 func RestartNetwork(ctx context.Context, log logging.Logger, dir string) error {
-	network, err := ReadNetwork(log, dir)
+	network, err := ReadNetwork(ctx, log, dir)
 	if err != nil {
 		return err
 	}
@@ -192,7 +192,7 @@ func RestartNetwork(ctx context.Context, log logging.Logger, dir string) error {
 }
 
 // Reads a network from the provided directory.
-func ReadNetwork(log logging.Logger, dir string) (*Network, error) {
+func ReadNetwork(ctx context.Context, log logging.Logger, dir string) (*Network, error) {
 	canonicalDir, err := toCanonicalDir(dir)
 	if err != nil {
 		return nil, err
@@ -201,7 +201,7 @@ func ReadNetwork(log logging.Logger, dir string) (*Network, error) {
 		Dir: canonicalDir,
 		log: log,
 	}
-	if err := network.Read(); err != nil {
+	if err := network.Read(ctx); err != nil {
 		return nil, fmt.Errorf("failed to read network: %w", err)
 	}
 	if network.DefaultFlags == nil {
@@ -475,7 +475,7 @@ func (n *Network) StartNode(ctx context.Context, node *Node) error {
 		return fmt.Errorf("writing node flags: %w", err)
 	}
 
-	if err := node.Start(); err != nil {
+	if err := node.Start(ctx); err != nil {
 		// Attempt to stop an unhealthy node to provide some assurance to the caller
 		// that an error condition will not result in a lingering process.
 		err = errors.Join(err, node.Stop(ctx))
@@ -513,7 +513,7 @@ func (n *Network) RestartNode(ctx context.Context, node *Node) error {
 // Stops all nodes in the network.
 func (n *Network) Stop(ctx context.Context) error {
 	// Ensure the node state is up-to-date
-	if err := n.readNodes(); err != nil {
+	if err := n.readNodes(ctx); err != nil {
 		return err
 	}
 

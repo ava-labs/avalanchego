@@ -127,7 +127,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 
 		if len(networkDir) > 0 {
 			var err error
-			network, err = tmpnet.ReadNetwork(tc.Log(), networkDir)
+			network, err = tmpnet.ReadNetwork(tc.DefaultContext(), tc.Log(), networkDir)
 			require.NoError(err)
 			tc.Log().Info("loaded a network",
 				zap.String("networkDir", networkDir),
@@ -223,7 +223,7 @@ func (te *TestEnvironment) GetRandomNodeURI() tmpnet.NodeURI {
 // Retrieve the network to target for testing.
 func (te *TestEnvironment) GetNetwork() *tmpnet.Network {
 	tc := te.testContext
-	network, err := tmpnet.ReadNetwork(tc.Log(), te.NetworkDir)
+	network, err := tmpnet.ReadNetwork(tc.DefaultContext(), tc.Log(), te.NetworkDir)
 	require.NoError(tc, err)
 	return network
 }
@@ -238,7 +238,7 @@ func (te *TestEnvironment) StartPrivateNetwork(network *tmpnet.Network) {
 	tc := te.testContext
 	require := require.New(tc)
 	// Use the same configuration as the shared network
-	sharedNetwork, err := tmpnet.ReadNetwork(tc.Log(), te.NetworkDir)
+	sharedNetwork, err := tmpnet.ReadNetwork(tc.DefaultContext(), tc.Log(), te.NetworkDir)
 	require.NoError(err)
 	network.DefaultRuntimeConfig = sharedNetwork.DefaultRuntimeConfig
 
