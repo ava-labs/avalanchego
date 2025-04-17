@@ -83,12 +83,16 @@ func (v *FlagVars) NodeRuntimeConfig() (*tmpnet.NodeRuntimeConfig, error) {
 	return v.startNetworkVars.GetNodeRuntimeConfig()
 }
 
+// TODO(marun) Rename to StartLocalCollector
 func (v *FlagVars) StartCollectors() bool {
+	// This only prompts the deployment of local collectors.
+	// TODO(marun) Maybe differentiate between type of collector?
 	return v.startCollectors
 }
 
 func (v *FlagVars) CheckMonitoring() bool {
-	return v.checkMonitoring
+	// TODO(marun) Enable this check for kube in a subsequent PR
+	return v.startNetworkVars.ProcessRuntimeConfigured() && v.checkMonitoring
 }
 
 func (v *FlagVars) NetworkDir() string {
