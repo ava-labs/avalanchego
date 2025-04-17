@@ -119,7 +119,7 @@ func NewNodesOrPanic(count int) []*Node {
 // Retrieves the runtime for the node.
 func (n *Node) getRuntime() NodeRuntime {
 	if n.runtime == nil {
-		n.runtime = &NodeProcess{
+		n.runtime = &ProcessRuntime{
 			node: n,
 		}
 	}
