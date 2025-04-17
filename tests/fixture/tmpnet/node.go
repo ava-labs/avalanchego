@@ -6,18 +6,13 @@ package tmpnet
 import (
 	"context"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/netip"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/spf13/cast"
 
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
@@ -53,8 +48,13 @@ type NodeRuntime interface {
 
 // Configuration required to configure a node runtime.
 type NodeRuntimeConfig struct {
-	AvalancheGoPath   string
-	ReuseDynamicPorts bool
+	Process *ProcessRuntimeConfig `json:"process,omitempty"`
+}
+
+type ProcessRuntimeConfig struct {
+	AvalancheGoPath   string `json:"avalancheGoPath,omitempty"`
+	PluginDir         string `json:"pluginDir,omitempty"`
+	ReuseDynamicPorts bool   `json:"reuseDynamicPorts,omitempty"`
 }
 
 // Node supports configuring and running a node participating in a temporary network.
@@ -70,32 +70,33 @@ type Node struct {
 	// should therefore not be used as for bootstrapping purposes.
 	IsEphemeral bool
 
-	// The configuration used to initialize the node runtime.
+	// Optional, the configuration used to initialize the node runtime.
+	// If not set, the network default will be used.
 	RuntimeConfig *NodeRuntimeConfig
 
 	// Runtime state, intended to be set by NodeRuntime
 	URI            string
 	StakingAddress netip.AddrPort
 
+	// Defaults to [network dir]/[node id] if not set
+	DataDir string
+
 	// Initialized on demand
 	runtime NodeRuntime
 
-	// Intended to be set by the network
 	network *Network
 }
 
 // Initializes a new node with only the data dir set
-func NewNode(dataDir string) *Node {
+func NewNode() *Node {
 	return &Node{
-		Flags: FlagsMap{
-			config.DataDirKey: dataDir,
-		},
+		Flags: FlagsMap{},
 	}
 }
 
 // Initializes an ephemeral node using the provided config flags
 func NewEphemeralNode(flags FlagsMap) *Node {
-	node := NewNode("")
+	node := NewNode()
 	node.Flags = flags
 	node.IsEphemeral = true
 
@@ -106,7 +107,7 @@ func NewEphemeralNode(flags FlagsMap) *Node {
 func NewNodesOrPanic(count int) []*Node {
 	nodes := make([]*Node, count)
 	for i := range nodes {
-		node := NewNode("")
+		node := NewNode()
 		if err := node.EnsureKeys(); err != nil {
 			panic(err)
 		}
@@ -115,59 +116,23 @@ func NewNodesOrPanic(count int) []*Node {
 	return nodes
 }
 
-// Reads a node's configuration from the specified directory.
-func ReadNode(dataDir string) (*Node, error) {
-	node := NewNode(dataDir)
-	return node, node.Read()
-}
-
-// Reads nodes from the specified network directory.
-func ReadNodes(network *Network, includeEphemeral bool) ([]*Node, error) {
-	nodes := []*Node{}
-
-	// Node configuration is stored in child directories
-	entries, err := os.ReadDir(network.Dir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read dir: %w", err)
-	}
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-
-		nodeDir := filepath.Join(network.Dir, entry.Name())
-		node, err := ReadNode(nodeDir)
-		if errors.Is(err, os.ErrNotExist) {
-			// If no config file exists, assume this is not the path of a node
-			continue
-		} else if err != nil {
-			return nil, err
-		}
-
-		if !includeEphemeral && node.IsEphemeral {
-			continue
-		}
-
-		if err := node.EnsureNodeID(); err != nil {
-			return nil, fmt.Errorf("failed to ensure NodeID: %w", err)
-		}
-
-		node.network = network
-
-		nodes = append(nodes, node)
-	}
-
-	return nodes, nil
-}
-
 // Retrieves the runtime for the node.
 func (n *Node) getRuntime() NodeRuntime {
 	if n.runtime == nil {
-		n.runtime = &NodeProcess{
+		n.runtime = &ProcessRuntime{
 			node: n,
 		}
 	}
 	return n.runtime
+}
+
+// Retrieves the runtime configuration for the node, defaulting to the
+// runtime configuration from the network if none is set for the node.
+func (n *Node) getRuntimeConfig() NodeRuntimeConfig {
+	if n.RuntimeConfig != nil {
+		return *n.RuntimeConfig
+	}
+	return n.network.DefaultRuntimeConfig
 }
 
 // Runtime methods
@@ -193,10 +158,6 @@ func (n *Node) WaitForStopped(ctx context.Context) error {
 
 func (n *Node) readState() error {
 	return n.getRuntime().readState()
-}
-
-func (n *Node) GetDataDir() string {
-	return cast.ToString(n.Flags[config.DataDirKey])
 }
 
 func (n *Node) GetLocalURI(ctx context.Context) (string, func(), error) {

@@ -55,9 +55,9 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		})
 
 		tc.By("adding alpha node, whose uptime should result in a staking reward")
-		alphaNode := e2e.AddEphemeralNode(tc, network, tmpnet.FlagsMap{})
+		alphaNode := e2e.AddEphemeralNode(tc, network, tmpnet.NewEphemeralNode(tmpnet.FlagsMap{}))
 		tc.By("adding beta node, whose uptime should not result in a staking reward")
-		betaNode := e2e.AddEphemeralNode(tc, network, tmpnet.FlagsMap{})
+		betaNode := e2e.AddEphemeralNode(tc, network, tmpnet.NewEphemeralNode(tmpnet.FlagsMap{}))
 
 		// Wait to check health until both nodes have started to minimize the duration
 		// required for both nodes to report healthy.

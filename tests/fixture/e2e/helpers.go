@@ -46,10 +46,6 @@ const (
 
 	DefaultGasLimit = uint64(21000) // Standard gas limit
 
-	// An empty string prompts the use of the default path which ensures a
-	// predictable target for github's upload-artifact action.
-	DefaultNetworkDir = ""
-
 	// Directory used to store private networks (specific to a single test)
 	// under the shared network dir.
 	PrivateNetworksDirName = "private_networks"
@@ -137,10 +133,9 @@ func NewEthClient(tc tests.TestContext, nodeURI tmpnet.NodeURI) ethclient.Client
 }
 
 // Adds an ephemeral node intended to be used by a single test.
-func AddEphemeralNode(tc tests.TestContext, network *tmpnet.Network, flags tmpnet.FlagsMap) *tmpnet.Node {
+func AddEphemeralNode(tc tests.TestContext, network *tmpnet.Network, node *tmpnet.Node) *tmpnet.Node {
 	require := require.New(tc)
 
-	node := tmpnet.NewEphemeralNode(flags)
 	require.NoError(network.StartNode(tc.DefaultContext(), tc.Log(), node))
 
 	tc.DeferCleanup(func() {
@@ -272,11 +267,9 @@ func CheckBootstrapIsPossible(tc tests.TestContext, network *tmpnet.Network) *tm
 func StartNetwork(
 	tc tests.TestContext,
 	network *tmpnet.Network,
-	avalancheGoExecPath string,
-	pluginDir string,
+	rootNetworkDir string,
 	shutdownDelay time.Duration,
-	skipShutdown bool,
-	reuseNetwork bool,
+	networkCmd NetworkCmd,
 ) {
 	require := require.New(tc)
 
@@ -284,9 +277,7 @@ func StartNetwork(
 		tc.DefaultContext(),
 		tc.Log(),
 		network,
-		DefaultNetworkDir,
-		avalancheGoExecPath,
-		pluginDir,
+		rootNetworkDir,
 	)
 	if err != nil {
 		tc.DeferCleanup(func() {
@@ -303,7 +294,7 @@ func StartNetwork(
 	symlinkPath, err := tmpnet.GetReusableNetworkPathForOwner(network.Owner)
 	require.NoError(err)
 
-	if reuseNetwork {
+	if networkCmd == ReuseNetworkCmd || networkCmd == RestartNetworkCmd {
 		// Symlink the path of the created network to the default owner path (e.g. latest_avalanchego-e2e)
 		// to enable easy discovery for reuse.
 		require.NoError(os.Symlink(network.Dir, symlinkPath))
@@ -314,7 +305,7 @@ func StartNetwork(
 	}
 
 	tc.DeferCleanup(func() {
-		if reuseNetwork {
+		if networkCmd == ReuseNetworkCmd || networkCmd == RestartNetworkCmd {
 			tc.Log().Info("skipping shutdown for network intended for reuse",
 				zap.String("networkDir", network.Dir),
 				zap.String("symlinkPath", symlinkPath),
@@ -322,8 +313,8 @@ func StartNetwork(
 			return
 		}
 
-		if skipShutdown {
-			tc.Log().Info("skipping shutdown for network",
+		if networkCmd == StartNetworkCmd {
+			tc.Log().Info("skipping shutdown for --start-network",
 				zap.String("networkDir", network.Dir),
 			)
 			return

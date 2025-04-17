@@ -28,7 +28,6 @@ import (
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -43,8 +42,8 @@ import (
 const (
 	// Constants defining the names of shell variables whose value can
 	// configure network orchestration.
-	NetworkDirEnvName = "TMPNET_NETWORK_DIR"
-	RootDirEnvName    = "TMPNET_ROOT_DIR"
+	RootNetworkDirEnvName = "TMPNET_ROOT_NETWORK_DIR"
+	NetworkDirEnvName     = "TMPNET_NETWORK_DIR"
 
 	// Message to log indicating where to look for metrics and logs for network
 	MetricsAvailableMessage = "metrics and logs available via grafana (collectors must be running)"
@@ -108,7 +107,7 @@ type Network struct {
 	Genesis *genesis.UnparsedConfig
 
 	// Configuration for primary subnets
-	PrimarySubnetConfig *subnets.Config
+	PrimarySubnetConfig FlagsMap
 
 	// Configuration for primary network chains (P, X, C)
 	PrimaryChainConfigs map[string]FlagsMap
@@ -151,16 +150,15 @@ func BootstrapNewNetwork(
 	log logging.Logger,
 	network *Network,
 	rootNetworkDir string,
-	avalancheGoExecPath string,
-	pluginDir string,
 ) error {
 	if len(network.Nodes) == 0 {
 		return errInsufficientNodes
 	}
-	if err := checkVMBinaries(log, network.Subnets, avalancheGoExecPath, pluginDir); err != nil {
+
+	if err := checkVMBinaries(log, network.Subnets, network.DefaultRuntimeConfig.Process); err != nil {
 		return err
 	}
-	if err := network.EnsureDefaultConfig(log, avalancheGoExecPath, pluginDir); err != nil {
+	if err := network.EnsureDefaultConfig(log); err != nil {
 		return err
 	}
 	if err := network.Create(rootNetworkDir); err != nil {
@@ -206,10 +204,9 @@ func ReadNetwork(dir string) (*Network, error) {
 }
 
 // Initializes a new network with default configuration.
-func (n *Network) EnsureDefaultConfig(log logging.Logger, avalancheGoPath string, pluginDir string) error {
+func (n *Network) EnsureDefaultConfig(log logging.Logger) error {
 	log.Info("preparing configuration for new network",
-		zap.String("avalanchegoPath", avalancheGoPath),
-		zap.String("pluginDir", pluginDir),
+		zap.Any("runtimeConfig", n.DefaultRuntimeConfig),
 	)
 
 	// A UUID supports centralized metrics collection
@@ -219,15 +216,6 @@ func (n *Network) EnsureDefaultConfig(log logging.Logger, avalancheGoPath string
 
 	if n.DefaultFlags == nil {
 		n.DefaultFlags = FlagsMap{}
-	}
-
-	// Only configure the plugin dir with a non-empty value to ensure
-	// the use of the default value (`[datadir]/plugins`) when
-	// no plugin dir is configured.
-	if len(pluginDir) > 0 {
-		if _, ok := n.DefaultFlags[config.PluginDirKey]; !ok {
-			n.DefaultFlags[config.PluginDirKey] = pluginDir
-		}
 	}
 
 	// Ensure pre-funded keys if the genesis is not predefined
@@ -249,18 +237,6 @@ func (n *Network) EnsureDefaultConfig(log logging.Logger, avalancheGoPath string
 			n.PrimaryChainConfigs[alias] = FlagsMap{}
 		}
 		n.PrimaryChainConfigs[alias].SetDefaults(chainConfig)
-	}
-
-	// Ensure runtime is configured
-	if len(n.DefaultRuntimeConfig.AvalancheGoPath) == 0 {
-		n.DefaultRuntimeConfig.AvalancheGoPath = avalancheGoPath
-	}
-
-	// Ensure nodes are configured
-	for i := range n.Nodes {
-		if err := n.EnsureNodeConfig(n.Nodes[i]); err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -298,17 +274,6 @@ func (n *Network) Create(rootDir string) error {
 		return err
 	}
 	n.Dir = canonicalDir
-
-	// Ensure the existence of the plugin directory or nodes won't be able to start.
-	pluginDir, err := n.GetPluginDir()
-	if err != nil {
-		return err
-	}
-	if len(pluginDir) > 0 {
-		if err := os.MkdirAll(pluginDir, perms.ReadWriteExecute); err != nil {
-			return fmt.Errorf("failed to create plugin dir: %w", err)
-		}
-	}
 
 	if n.NetworkID == 0 && n.Genesis == nil {
 		genesis, err := n.DefaultGenesis()
@@ -483,22 +448,10 @@ func (n *Network) Bootstrap(ctx context.Context, log logging.Logger) error {
 
 // Starts the provided node after configuring it for the network.
 func (n *Network) StartNode(ctx context.Context, log logging.Logger, node *Node) error {
-	// This check is duplicative for a network that is starting, but ensures
-	// that individual node start/restart won't fail due to missing binaries.
-	pluginDir, err := n.GetPluginDir()
-	if err != nil {
-		return err
-	}
-
 	if err := n.EnsureNodeConfig(node); err != nil {
 		return err
 	}
 	if err := node.Write(); err != nil {
-		return err
-	}
-
-	// Check the VM binaries after EnsureNodeConfig to ensure node.RuntimeConfig is non-nil
-	if err := checkVMBinaries(log, n.Subnets, node.RuntimeConfig.AvalancheGoPath, pluginDir); err != nil {
 		return err
 	}
 
@@ -518,7 +471,8 @@ func (n *Network) StartNode(ctx context.Context, log logging.Logger, node *Node)
 
 // Restart a single node.
 func (n *Network) RestartNode(ctx context.Context, log logging.Logger, node *Node) error {
-	if node.RuntimeConfig.ReuseDynamicPorts {
+	runtimeConfig := node.getRuntimeConfig()
+	if runtimeConfig.Process != nil && runtimeConfig.Process.ReuseDynamicPorts {
 		// Attempt to save the API port currently being used so the
 		// restarted node can reuse it. This may result in the node
 		// failing to start if the operating system allocates the port
@@ -542,23 +496,22 @@ func (n *Network) RestartNode(ctx context.Context, log logging.Logger, node *Nod
 
 // Stops all nodes in the network.
 func (n *Network) Stop(ctx context.Context) error {
-	// Target all nodes, including the ephemeral ones
-	nodes, err := ReadNodes(n, true /* includeEphemeral */)
-	if err != nil {
+	// Ensure the node state is up-to-date
+	if err := n.readNodes(); err != nil {
 		return err
 	}
 
 	var errs []error
 
 	// Initiate stop on all nodes
-	for _, node := range nodes {
+	for _, node := range n.Nodes {
 		if err := node.InitiateStop(ctx); err != nil {
 			errs = append(errs, fmt.Errorf("failed to stop node %s: %w", node.NodeID, err))
 		}
 	}
 
 	// Wait for stop to complete on all nodes
-	for _, node := range nodes {
+	for _, node := range n.Nodes {
 		if err := node.WaitForStopped(ctx); err != nil {
 			errs = append(errs, fmt.Errorf("failed to wait for node %s to stop: %w", node.NodeID, err))
 		}
@@ -582,9 +535,7 @@ func (n *Network) Restart(ctx context.Context, log logging.Logger) error {
 }
 
 // Ensures the provided node has the configuration it needs to start. If the data dir is not
-// set, it will be defaulted to [nodeParentDir]/[node ID]. For a not-yet-created network,
-// no action will be taken.
-// TODO(marun) Reword or refactor to account for the differing behavior pre- vs post-start
+// set, it will be defaulted to [nodeParentDir]/[node ID].
 func (n *Network) EnsureNodeConfig(node *Node) error {
 	// Ensure the node has access to network configuration
 	node.network = n
@@ -593,22 +544,9 @@ func (n *Network) EnsureNodeConfig(node *Node) error {
 		return err
 	}
 
-	if len(n.Dir) > 0 {
-		// Ensure the node's data dir is configured
-		dataDir := node.GetDataDir()
-		if len(dataDir) == 0 {
-			// NodeID will have been set by EnsureKeys
-			dataDir = filepath.Join(n.Dir, node.NodeID.String())
-			node.Flags[config.DataDirKey] = dataDir
-		}
-	}
-
-	// Ensure the node runtime is configured
-	// TODO(marun) Do not set the runtime config - get it from the network if not present on the node.
-	if node.RuntimeConfig == nil {
-		node.RuntimeConfig = &NodeRuntimeConfig{
-			AvalancheGoPath: n.DefaultRuntimeConfig.AvalancheGoPath,
-		}
+	// Ensure a data directory if not already set
+	if len(node.DataDir) == 0 {
+		node.DataDir = filepath.Join(n.Dir, node.NodeID.String())
 	}
 
 	return nil
@@ -815,16 +753,13 @@ func (n *Network) GetNodeURIs() []NodeURI {
 // collecting the bootstrap details for restarting a node).
 // For consumption outside of avalanchego. Needs to be kept exported.
 func (n *Network) GetBootstrapIPsAndIDs(skippedNode *Node) ([]string, []string, error) {
-	// Collect staking addresses of non-ephemeral nodes for use in bootstrapping a node
-	nodes, err := ReadNodes(n, false /* includeEphemeral */)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to read network's nodes: %w", err)
-	}
-	var (
-		bootstrapIPs = make([]string, 0, len(nodes))
-		bootstrapIDs = make([]string, 0, len(nodes))
-	)
-	for _, node := range nodes {
+	bootstrapIPs := []string{}
+	bootstrapIDs := []string{}
+	for _, node := range n.Nodes {
+		if node.IsEphemeral {
+			// Ephemeral nodes are not guaranteed to stay running
+			continue
+		}
 		if skippedNode != nil && node.NodeID == skippedNode.NodeID {
 			continue
 		}
@@ -853,11 +788,6 @@ func (n *Network) GetNetworkID() uint32 {
 	return n.NetworkID
 }
 
-// For consumption outside of avalanchego. Needs to be kept exported.
-func (n *Network) GetPluginDir() (string, error) {
-	return n.DefaultFlags.GetStringVal(config.PluginDirKey)
-}
-
 // GetGenesisFileContent returns the base64-encoded JSON-marshaled
 // network genesis.
 func (n *Network) GetGenesisFileContent() (string, error) {
@@ -871,10 +801,10 @@ func (n *Network) GetGenesisFileContent() (string, error) {
 // GetSubnetConfigContent returns the base64-encoded and
 // JSON-marshaled map of subnetID to subnet configuration.
 func (n *Network) GetSubnetConfigContent() (string, error) {
-	subnetConfigs := map[ids.ID]subnets.Config{}
+	subnetConfigs := map[ids.ID]FlagsMap{}
 
-	if n.PrimarySubnetConfig != nil {
-		subnetConfigs[constants.PrimaryNetworkID] = *n.PrimarySubnetConfig
+	if len(n.PrimarySubnetConfig) > 0 {
+		subnetConfigs[constants.PrimaryNetworkID] = n.PrimarySubnetConfig
 	}
 
 	// Collect configuration for non-primary subnets
@@ -884,10 +814,10 @@ func (n *Network) GetSubnetConfigContent() (string, error) {
 			// possible to supply configuration without an ID.
 			continue
 		}
-		if subnet.Config == nil {
+		if len(subnet.Config) == 0 {
 			continue
 		}
-		subnetConfigs[subnet.SubnetID] = *subnet.Config
+		subnetConfigs[subnet.SubnetID] = subnet.Config
 	}
 
 	if len(subnetConfigs) == 0 {
@@ -984,6 +914,21 @@ func (n *Network) writeNodeFlags(log logging.Logger, node *Node) error {
 		flags.SetDefault(config.ChainConfigContentKey, chainConfigContent)
 	}
 
+	// Only configure the plugin dir with a non-empty value to ensure the use of
+	// the default value (`[datadir]/plugins`) when no plugin dir is configured.
+	processConfig := node.getRuntimeConfig().Process
+	if processConfig != nil {
+		if len(processConfig.PluginDir) > 0 {
+			// Ensure the plugin directory exists or the node will fail to start
+			if err := os.MkdirAll(processConfig.PluginDir, perms.ReadWriteExecute); err != nil {
+				return fmt.Errorf("failed to create plugin dir: %w", err)
+			}
+			flags.SetDefault(config.PluginDirKey, processConfig.PluginDir)
+		}
+
+		flags.SetDefault(config.DataDirKey, node.DataDir)
+	}
+
 	// Set the network and tmpnet defaults last to ensure they can be overridden
 	flags.SetDefaults(n.DefaultFlags)
 	flags.SetDefaults(DefaultTmpnetFlags())
@@ -1059,12 +1004,18 @@ const invalidRPCVersion = 0
 
 // checkVMBinaries checks that VM binaries for the given subnets exist and optionally checks that VM
 // binaries have the same rpcchainvm version as the indicated avalanchego binary.
-func checkVMBinaries(log logging.Logger, subnets []*Subnet, avalanchegoPath string, pluginDir string) error {
+func checkVMBinaries(log logging.Logger, subnets []*Subnet, config *ProcessRuntimeConfig) error {
 	if len(subnets) == 0 {
+		// Without subnets there are no VM binaries to check
 		return nil
 	}
 
-	avalanchegoRPCVersion, err := getRPCVersion(log, avalanchegoPath, "--version-json")
+	if config == nil {
+		log.Info("skipping rpcchainvm version check because the process runtime is not configured")
+		return nil
+	}
+
+	avalanchegoRPCVersion, err := getRPCVersion(log, config.AvalancheGoPath, "--version-json")
 	if err != nil {
 		log.Warn("unable to check rpcchainvm version for avalanchego", zap.Error(err))
 		return nil
@@ -1073,7 +1024,7 @@ func checkVMBinaries(log logging.Logger, subnets []*Subnet, avalanchegoPath stri
 	var incompatibleChains bool
 	for _, subnet := range subnets {
 		for _, chain := range subnet.Chains {
-			vmPath := filepath.Join(pluginDir, chain.VMID.String())
+			vmPath := filepath.Join(config.PluginDir, chain.VMID.String())
 
 			// Check that the path exists
 			if _, err := os.Stat(vmPath); err != nil {
@@ -1099,7 +1050,7 @@ func checkVMBinaries(log logging.Logger, subnets []*Subnet, avalanchegoPath stri
 			} else if avalanchegoRPCVersion != vmRPCVersion {
 				log.Error("unexpected rpcchainvm version for VM binary",
 					zap.String("subnet", subnet.Name),
-					zap.String("avalanchegoPath", avalanchegoPath),
+					zap.String("avalanchegoPath", config.AvalancheGoPath),
 					zap.Uint64("avalanchegoRPCVersion", avalanchegoRPCVersion),
 					zap.String("vmPath", vmPath),
 					zap.Uint64("vmRPCVersion", vmRPCVersion),
