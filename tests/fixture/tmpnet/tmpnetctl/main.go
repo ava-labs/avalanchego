@@ -121,7 +121,11 @@ func main() {
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
 			defer cancel()
-			if err := tmpnet.StopNetwork(ctx, networkDir); err != nil {
+			log, err := tests.LoggerForFormat("", rawLogFormat)
+			if err != nil {
+				return err
+			}
+			if err := tmpnet.StopNetwork(ctx, log, networkDir); err != nil {
 				return err
 			}
 			fmt.Fprintf(os.Stdout, "Stopped network configured at: %s\n", networkDir)
