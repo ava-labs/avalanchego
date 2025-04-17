@@ -128,6 +128,8 @@ type Network struct {
 
 	// Subnets that have been enabled on the network
 	Subnets []*Subnet
+
+	log logging.Logger
 }
 
 func NewDefaultNetwork(owner string) *Network {
@@ -172,8 +174,8 @@ func BootstrapNewNetwork(
 }
 
 // Stops the nodes of the network configured in the provided directory.
-func StopNetwork(ctx context.Context, dir string) error {
-	network, err := ReadNetwork(dir)
+func StopNetwork(ctx context.Context, log logging.Logger, dir string) error {
+	network, err := ReadNetwork(log, dir)
 	if err != nil {
 		return err
 	}
@@ -182,21 +184,22 @@ func StopNetwork(ctx context.Context, dir string) error {
 
 // Restarts the nodes of the network configured in the provided directory.
 func RestartNetwork(ctx context.Context, log logging.Logger, dir string) error {
-	network, err := ReadNetwork(dir)
+	network, err := ReadNetwork(log, dir)
 	if err != nil {
 		return err
 	}
-	return network.Restart(ctx, log)
+	return network.Restart(ctx)
 }
 
 // Reads a network from the provided directory.
-func ReadNetwork(dir string) (*Network, error) {
+func ReadNetwork(log logging.Logger, dir string) (*Network, error) {
 	canonicalDir, err := toCanonicalDir(dir)
 	if err != nil {
 		return nil, err
 	}
 	network := &Network{
 		Dir: canonicalDir,
+		log: log,
 	}
 	if err := network.Read(); err != nil {
 		return nil, fmt.Errorf("failed to read network: %w", err)
@@ -212,6 +215,8 @@ func (n *Network) EnsureDefaultConfig(log logging.Logger) error {
 	log.Info("preparing configuration for new network",
 		zap.Any("runtimeConfig", n.DefaultRuntimeConfig),
 	)
+
+	n.log = log
 
 	// A UUID supports centralized metrics collection
 	if len(n.UUID) == 0 {
@@ -342,9 +347,8 @@ func (n *Network) StartNodes(ctx context.Context, log logging.Logger, nodesToSta
 	// Record the time before nodes are started to ensure visibility of subsequently collected metrics via the emitted link
 	startTime := time.Now()
 
-	// Configure the networking for each node and start
 	for _, node := range nodesToStart {
-		if err := n.StartNode(ctx, log, node); err != nil {
+		if err := n.StartNode(ctx, node); err != nil {
 			return err
 		}
 	}
@@ -438,7 +442,7 @@ func (n *Network) Bootstrap(ctx context.Context, log logging.Logger) error {
 
 	if len(n.Nodes) == 1 {
 		// Ensure the node is restarted to pick up subnet and chain configuration
-		return n.RestartNode(ctx, log, bootstrapNode)
+		return n.RestartNode(ctx, bootstrapNode)
 	}
 
 	// TODO(marun) This last restart of the bootstrap node might be unnecessary if:
@@ -450,7 +454,7 @@ func (n *Network) Bootstrap(ctx context.Context, log logging.Logger) error {
 	if err := bootstrapNode.Stop(ctx); err != nil {
 		return fmt.Errorf("failed to stop node %s: %w", bootstrapNode.NodeID, err)
 	}
-	if err := n.StartNode(ctx, log, bootstrapNode); err != nil {
+	if err := n.StartNode(ctx, bootstrapNode); err != nil {
 		return fmt.Errorf("failed to start node %s: %w", bootstrapNode.NodeID, err)
 	}
 
@@ -459,7 +463,7 @@ func (n *Network) Bootstrap(ctx context.Context, log logging.Logger) error {
 }
 
 // Starts the provided node after configuring it for the network.
-func (n *Network) StartNode(ctx context.Context, log logging.Logger, node *Node) error {
+func (n *Network) StartNode(ctx context.Context, node *Node) error {
 	if err := n.EnsureNodeConfig(node); err != nil {
 		return err
 	}
@@ -467,11 +471,11 @@ func (n *Network) StartNode(ctx context.Context, log logging.Logger, node *Node)
 		return err
 	}
 
-	if err := n.writeNodeFlags(log, node); err != nil {
+	if err := n.writeNodeFlags(node); err != nil {
 		return fmt.Errorf("writing node flags: %w", err)
 	}
 
-	if err := node.Start(log); err != nil {
+	if err := node.Start(); err != nil {
 		// Attempt to stop an unhealthy node to provide some assurance to the caller
 		// that an error condition will not result in a lingering process.
 		err = errors.Join(err, node.Stop(ctx))
@@ -482,7 +486,7 @@ func (n *Network) StartNode(ctx context.Context, log logging.Logger, node *Node)
 }
 
 // Restart a single node.
-func (n *Network) RestartNode(ctx context.Context, log logging.Logger, node *Node) error {
+func (n *Network) RestartNode(ctx context.Context, node *Node) error {
 	runtimeConfig := node.getRuntimeConfig()
 	if runtimeConfig.Process != nil && runtimeConfig.Process.ReuseDynamicPorts {
 		// Attempt to save the API port currently being used so the
@@ -497,10 +501,10 @@ func (n *Network) RestartNode(ctx context.Context, log logging.Logger, node *Nod
 	if err := node.Stop(ctx); err != nil {
 		return fmt.Errorf("failed to stop node %s: %w", node.NodeID, err)
 	}
-	if err := n.StartNode(ctx, log, node); err != nil {
+	if err := n.StartNode(ctx, node); err != nil {
 		return fmt.Errorf("failed to start node %s: %w", node.NodeID, err)
 	}
-	log.Info("waiting for node to report healthy",
+	n.log.Info("waiting for node to report healthy",
 		zap.Stringer("nodeID", node.NodeID),
 	)
 	return WaitForHealthy(ctx, node)
@@ -535,11 +539,11 @@ func (n *Network) Stop(ctx context.Context) error {
 	return nil
 }
 
-// Restarts all non-ephemeral nodes in the network.
-func (n *Network) Restart(ctx context.Context, log logging.Logger) error {
-	log.Info("restarting network")
+// Restarts all nodes in the network.
+func (n *Network) Restart(ctx context.Context) error {
+	n.log.Info("restarting network")
 	for _, node := range n.Nodes {
-		if err := n.RestartNode(ctx, log, node); err != nil {
+		if err := n.RestartNode(ctx, node); err != nil {
 			return err
 		}
 	}
@@ -669,7 +673,7 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI 
 				// Only running nodes should be restarted
 				continue
 			}
-			if err := n.RestartNode(ctx, log, node); err != nil {
+			if err := n.RestartNode(ctx, node); err != nil {
 				return err
 			}
 		}
@@ -737,7 +741,7 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI 
 		if !validatorsToRestart.Contains(node.NodeID) {
 			continue
 		}
-		if err := n.RestartNode(ctx, log, node); err != nil {
+		if err := n.RestartNode(ctx, node); err != nil {
 			return err
 		}
 	}
@@ -877,7 +881,7 @@ func (n *Network) GetChainConfigContent() (string, error) {
 
 // writeNodeFlags determines the set of flags that should be used to
 // start the given node and writes them to a file in the node path.
-func (n *Network) writeNodeFlags(log logging.Logger, node *Node) error {
+func (n *Network) writeNodeFlags(node *Node) error {
 	flags := maps.Clone(node.Flags)
 
 	// Convert the network id to a string to ensure consistency in JSON round-tripping.
@@ -902,7 +906,7 @@ func (n *Network) writeNodeFlags(log logging.Logger, node *Node) error {
 
 		isSingleNodeNetwork := (len(n.Nodes) == 1 && len(n.Genesis.InitialStakers) == 1)
 		if isSingleNodeNetwork {
-			log.Info("defaulting to sybil protection disabled to enable a single-node network to start")
+			n.log.Info("defaulting to sybil protection disabled to enable a single-node network to start")
 			flags.SetDefault(config.SybilProtectionEnabledKey, "false")
 		}
 	}

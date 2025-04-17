@@ -81,7 +81,9 @@ func (p *ProcessRuntime) readState() error {
 // its staking port. The network will start faster with this
 // synchronization due to the avoidance of exponential backoff
 // if a node tries to connect to a beacon that is not ready.
-func (p *ProcessRuntime) Start(log logging.Logger) error {
+func (p *ProcessRuntime) Start() error {
+	log := p.node.network.log
+
 	// Avoid attempting to start an already running node.
 	proc, err := p.getProcess()
 	if err != nil {

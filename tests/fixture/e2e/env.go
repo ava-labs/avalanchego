@@ -26,11 +26,12 @@ import (
 // access to the shared env to GetEnv which adds a test context.
 var env *TestEnvironment
 
-func InitSharedTestEnvironment(t require.TestingT, envBytes []byte) {
-	require := require.New(t)
+func InitSharedTestEnvironment(tc tests.TestContext, envBytes []byte) {
+	require := require.New(tc)
 	require.Nil(env, "env already initialized")
 	env = &TestEnvironment{}
 	require.NoError(json.Unmarshal(envBytes, env))
+	env.testContext = tc
 
 	// Ginkgo parallelization is at the process level, so a given key
 	// can safely be used by all tests in a given process without fear
@@ -126,7 +127,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 
 		if len(networkDir) > 0 {
 			var err error
-			network, err = tmpnet.ReadNetwork(networkDir)
+			network, err = tmpnet.ReadNetwork(tc.Log(), networkDir)
 			require.NoError(err)
 			tc.Log().Info("loaded a network",
 				zap.String("networkDir", networkDir),
@@ -153,7 +154,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 		}
 
 		if network != nil && networkCmd == RestartNetworkCmd {
-			require.NoError(network.Restart(tc.DefaultContext(), tc.Log()))
+			require.NoError(network.Restart(tc.DefaultContext()))
 		}
 	}
 
@@ -221,8 +222,9 @@ func (te *TestEnvironment) GetRandomNodeURI() tmpnet.NodeURI {
 
 // Retrieve the network to target for testing.
 func (te *TestEnvironment) GetNetwork() *tmpnet.Network {
-	network, err := tmpnet.ReadNetwork(te.NetworkDir)
-	require.NoError(te.testContext, err)
+	tc := te.testContext
+	network, err := tmpnet.ReadNetwork(tc.Log(), te.NetworkDir)
+	require.NoError(tc, err)
 	return network
 }
 
@@ -233,14 +235,15 @@ func (te *TestEnvironment) NewKeychain() *secp256k1fx.Keychain {
 
 // Create a new private network that is not shared with other tests.
 func (te *TestEnvironment) StartPrivateNetwork(network *tmpnet.Network) {
-	require := require.New(te.testContext)
+	tc := te.testContext
+	require := require.New(tc)
 	// Use the same configuration as the shared network
-	sharedNetwork, err := tmpnet.ReadNetwork(te.NetworkDir)
+	sharedNetwork, err := tmpnet.ReadNetwork(tc.Log(), te.NetworkDir)
 	require.NoError(err)
 	network.DefaultRuntimeConfig = sharedNetwork.DefaultRuntimeConfig
 
 	StartNetwork(
-		te.testContext,
+		tc,
 		network,
 		te.RootNetworkDir,
 		te.PrivateNetworkShutdownDelay,
