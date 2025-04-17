@@ -42,8 +42,8 @@ import (
 const (
 	// Constants defining the names of shell variables whose value can
 	// configure network orchestration.
-	NetworkDirEnvName = "TMPNET_NETWORK_DIR"
-	RootDirEnvName    = "TMPNET_ROOT_DIR"
+	RootNetworkDirEnvName = "TMPNET_ROOT_NETWORK_DIR"
+	NetworkDirEnvName     = "TMPNET_NETWORK_DIR"
 
 	// Message to log indicating where to look for metrics and logs for network
 	MetricsAvailableMessage = "metrics and logs available via grafana (collectors must be running)"

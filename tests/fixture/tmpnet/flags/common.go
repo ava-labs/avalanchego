@@ -3,10 +3,7 @@
 
 package flags
 
-// The following function signatures are common across flag and
-// spf13/pflag. They can be used to define a single registration method that
-// supports both flag libraries.
-
-type stringVarFunc func(p *string, name string, value string, usage string)
-
-type boolVarFunc func(p *bool, name string, value bool, usage string)
+// The following function signature is common across flag and
+// spf13/pflag. It can be used to define a single registration method
+// that supports both flag libraries.
+type varFunc[T any] func(p *T, name string, value T, usage string)
