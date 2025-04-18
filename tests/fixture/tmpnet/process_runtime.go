@@ -58,7 +58,7 @@ func (p *ProcessRuntime) setProcessContext(processContext node.ProcessContext) {
 	p.node.StakingAddress = processContext.StakingAddress
 }
 
-func (p *ProcessRuntime) readState() error {
+func (p *ProcessRuntime) readState(_ context.Context) error {
 	path := p.getProcessContextPath()
 	bytes, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -81,7 +81,7 @@ func (p *ProcessRuntime) readState() error {
 // its staking port. The network will start faster with this
 // synchronization due to the avoidance of exponential backoff
 // if a node tries to connect to a beacon that is not ready.
-func (p *ProcessRuntime) Start() error {
+func (p *ProcessRuntime) Start(ctx context.Context) error {
 	log := p.node.network.log
 
 	// Avoid attempting to start an already running node.
@@ -122,7 +122,7 @@ func (p *ProcessRuntime) Start() error {
 	// a configuration error preventing startup. Such a log entry will be provided to the
 	// cancelWithCause function so that waitForProcessContext can exit early with an error
 	// that includes the log entry.
-	ctx, cancelWithCause := context.WithCancelCause(context.Background())
+	ctx, cancelWithCause := context.WithCancelCause(ctx)
 	defer cancelWithCause(nil)
 	logPath := p.node.DataDir + "/logs/main.log"
 	go watchLogFileForFatal(ctx, cancelWithCause, log, logPath)
@@ -145,7 +145,7 @@ func (p *ProcessRuntime) Start() error {
 }
 
 // Signals the node process to stop.
-func (p *ProcessRuntime) InitiateStop() error {
+func (p *ProcessRuntime) InitiateStop(_ context.Context) error {
 	proc, err := p.getProcess()
 	if err != nil {
 		return fmt.Errorf("failed to retrieve process to stop: %w", err)
@@ -211,7 +211,7 @@ func (p *ProcessRuntime) waitForProcessContext(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, defaultNodeInitTimeout)
 	defer cancel()
 	for len(p.node.URI) == 0 {
-		err := p.readState()
+		err := p.readState(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to read process context for node %q: %w", p.node.NodeID, err)
 		}
@@ -229,9 +229,11 @@ func (p *ProcessRuntime) waitForProcessContext(ctx context.Context) error {
 // process liveness, the node's process context will be refreshed if
 // live or cleared if not running.
 func (p *ProcessRuntime) getProcess() (*os.Process, error) {
+	// This context is not used but a non-nil value must be supplied to satisfy the linter
+	ctx := context.TODO()
 	// Read the process context to ensure freshness. The node may have
 	// stopped or been restarted since last read.
-	if err := p.readState(); err != nil {
+	if err := p.readState(ctx); err != nil {
 		return nil, fmt.Errorf("failed to read process context: %w", err)
 	}
 
