@@ -60,7 +60,7 @@ var (
 
 type VM struct {
 	config.Internal
-	blockbuilder.Builder
+	*blockbuilder.Builder
 	*network.Network
 	validators.State
 
@@ -167,7 +167,14 @@ func (vm *VM) Initialize(
 		Bootstrapped: &vm.bootstrapped,
 	}
 
-	mempool, err := pmempool.New("mempool", registerer, toEngine)
+	mempool, err := pmempool.New(
+		"mempool",
+		vm.Internal.DynamicFeeConfig.Weights,
+		1_000_000,
+		vm.ctx.AVAXAssetID,
+		registerer,
+		toEngine,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}

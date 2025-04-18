@@ -45,7 +45,7 @@ func New(
 	subnetID ids.ID,
 	vdrs validators.State,
 	txVerifier TxVerifier,
-	mempool mempool.Mempool,
+	mempool *mempool.Mempool,
 	partialSyncPrimaryNetwork bool,
 	appSender common.AppSender,
 	stateLock sync.Locker,
