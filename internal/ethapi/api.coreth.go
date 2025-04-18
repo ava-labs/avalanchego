@@ -8,9 +8,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/coreth/plugin/evm/upgrade/acp176"
-	"github.com/ava-labs/coreth/plugin/evm/upgrade/etna"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/common/math"
 )
@@ -28,7 +25,6 @@ var (
 type PriceOptionConfig struct {
 	SlowFeePercentage uint64
 	FastFeePercentage uint64
-	MaxBaseFee        uint64
 	MaxTip            uint64
 }
 
@@ -62,38 +58,21 @@ func (s *EthereumAPI) SuggestPriceOptions(ctx context.Context) (*PriceOptions, e
 		return nil, nil
 	}
 
-	// Find min base fee based on chain config
-	// TODO: This can be removed after Fortuna is activated
-	time := s.b.CurrentHeader().Time
-	chainConfig := params.GetExtra(s.b.ChainConfig())
-	minBaseFee := new(big.Int)
-	if chainConfig.IsFortuna(time) {
-		minBaseFee.SetUint64(acp176.MinGasPrice)
-	} else {
-		minBaseFee.SetUint64(etna.MinBaseFee)
-	}
-
 	cfg := s.b.PriceOptionsConfig()
-	bigSlowFeePercent := new(big.Int).SetUint64(cfg.SlowFeePercentage)
-	bigFastFeePercent := new(big.Int).SetUint64(cfg.FastFeePercentage)
-
-	baseFees := calculateFeeSpeeds(
-		minBaseFee,
-		baseFee,
-		big.NewInt(int64(cfg.MaxBaseFee)),
-		bigSlowFeePercent,
-		bigFastFeePercent,
-	)
 	gasTips := calculateFeeSpeeds(
 		bigMinGasTip,
 		gasTip,
-		big.NewInt(int64(cfg.MaxTip)),
-		bigSlowFeePercent,
-		bigFastFeePercent,
+		new(big.Int).SetUint64(cfg.MaxTip),
+		new(big.Int).SetUint64(cfg.SlowFeePercentage),
+		new(big.Int).SetUint64(cfg.FastFeePercentage),
 	)
-	slowGasFee := new(big.Int).Add(baseFees.slow, gasTips.slow)
-	normalGasFee := new(big.Int).Add(baseFees.normal, gasTips.normal)
-	fastGasFee := new(big.Int).Add(baseFees.fast, gasTips.fast)
+
+	// Double the baseFee estimate without modifying the original variable.
+	baseFeeDouble := new(big.Int).Lsh(baseFee, 1)
+
+	slowGasFee := new(big.Int).Add(baseFeeDouble, gasTips.slow)
+	normalGasFee := new(big.Int).Add(baseFeeDouble, gasTips.normal)
+	fastGasFee := new(big.Int).Add(baseFeeDouble, gasTips.fast)
 	return &PriceOptions{
 		Slow: &Price{
 			GasTip: (*hexutil.Big)(gasTips.slow),
