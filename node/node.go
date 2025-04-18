@@ -34,7 +34,6 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/config/node"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/corruptabledb"
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/pebbledb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -767,22 +766,8 @@ func (n *Node) initDatabase() error {
 		dbFolderName = "db"
 	}
 
-<<<<<<< Updated upstream
-	// Wrap with corruptable DB
-	n.DB = corruptabledb.New(n.DB)
-
-	if n.Config.ReadOnly && n.Config.DatabaseConfig.Name != memdb.Name {
-		n.DB = versiondb.New(n.DB)
-	}
-
-	meterDBReg, err := metrics.MakeAndRegister(
-		n.MeterDBMetricsGatherer,
-		"all",
-	)
-=======
 	var err error
 	n.DB, err = databasefactory.NewDatabase(n.Config.DatabaseConfig, n.MetricsGatherer, n.Log, dbFolderName, dbNamespace, "all")
->>>>>>> Stashed changes
 	if err != nil {
 		return fmt.Errorf("couldn't create database: %w", err)
 	}
