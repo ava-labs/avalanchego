@@ -108,14 +108,10 @@ This test repeatedly updates the first row.
 
 To install the Firewood Benchmark, follow these steps:
 
-1. Clone the repository: `git clone https://github.com/ava-labs/firewood.git`
-2. Navigate to the firewood directory: `cd firewood`
-3. Build the executable: `cargo build --release`
-4. Create the benchmark database: `nohup time cargo run --profile maxperf --bin benchmark -- create`. For a larger database, add `--number-of-batches=10000` before the subcommand 'create' for a 100M row database (each batch by default is 10K rows).
-5. \[Optional] Save the benchmark database in rev_db
-6. Run the benchmark you want: `nohup time cargo run --profile maxperf --bin benchmark -- NAME` (selecting NAME from the list above). If you're not using the default database size, make sure you specify the number of batches here as well.
-
-As the benchmark is running, statistics for prometheus are availble on port 3000 (by default).
+1. Install the build prerequisites: `sudo bash setup-scripts/build-environment.sh`
+2. \[Optional\] Install grafana: `sudo bash setup-scripts/install-grafana.sh`
+3. Build firewood: `bash setup-scripts/build-firewood.sh`
+4. Create the benchmark database: `nohup time cargo run --profile maxperf --bin benchmark -- create`. For a larger database, add `--number-of-batches=10000` before the subcommand 'create' for a 100M row database (each batch by default is 10K rows). Additional options are documented in setup-scripts/run-benchmarks.sh
 
 If you want to install grafana and prometheus on an AWS host (using Ubuntu as a base), do the following:
 
@@ -130,7 +126,7 @@ If you want to install grafana and prometheus on an AWS host (using Ubuntu as a 
    7. \[optional] Save money by selecting 'spot instance' in advanced
    8. Launch the instance
 3. ssh ubuntu@AWS-IP
-4. Run the script in setup.sh on the instance as root
+4. Run the scripts as described above, including the grafana installation.
 5. Log in to grafana on <http://YOUR-AWS-IP>
    a. username: admin, password: admin
 6. When prompted, change the password (firewood_is_fast)
