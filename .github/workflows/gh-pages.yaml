@@ -30,7 +30,7 @@ jobs:
         run: |
           cp -rv target/doc/* ./_site
           cp -rv docs/assets ./_site
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v3
         with:
           name: pages
           path: _site
