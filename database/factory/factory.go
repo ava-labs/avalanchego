@@ -5,7 +5,6 @@ package factory
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database"
@@ -35,10 +34,9 @@ type DatabaseConfig struct {
 // NewDatabase creates a new database instance based on the provided configuration.
 // It supports LevelDB, MemDB, and PebbleDB as database types.
 // It also wraps the database with a corruptable DB and a meter DB.
-// [dbFolderName] is used to create the database path, it's appended to the [dbConfig.Path] to get the full path.
 // [dbMetricsPrefix] is used to create a new metrics registerer for the database.
 // [meterDBRegName] is used to create a new metrics registerer for the meter DB.
-func NewDatabase(dbConfig DatabaseConfig, gatherer metrics.MultiGatherer, logger logging.Logger, dbFolderName, dbMetricsPrefix, meterDBRegName string) (database.Database, error) {
+func NewDatabase(dbConfig DatabaseConfig, gatherer metrics.MultiGatherer, logger logging.Logger, dbMetricsPrefix, meterDBRegName string) (database.Database, error) {
 	dbRegisterer, err := metrics.MakeAndRegister(
 		gatherer,
 		dbMetricsPrefix,
@@ -50,18 +48,16 @@ func NewDatabase(dbConfig DatabaseConfig, gatherer metrics.MultiGatherer, logger
 	// start the db
 	switch dbConfig.Name {
 	case leveldb.Name:
-		dbPath := filepath.Join(dbConfig.Path, dbFolderName)
-		db, err = leveldb.New(dbPath, dbConfig.Config, logger, dbRegisterer)
+		db, err = leveldb.New(dbConfig.Path, dbConfig.Config, logger, dbRegisterer)
 		if err != nil {
-			return nil, fmt.Errorf("couldn't create %s at %s: %w", leveldb.Name, dbPath, err)
+			return nil, fmt.Errorf("couldn't create %s at %s: %w", leveldb.Name, dbConfig.Path, err)
 		}
 	case memdb.Name:
 		db = memdb.New()
 	case pebbledb.Name:
-		dbPath := filepath.Join(dbConfig.Path, dbFolderName)
-		db, err = pebbledb.New(dbPath, dbConfig.Config, logger, dbRegisterer)
+		db, err = pebbledb.New(dbConfig.Path, dbConfig.Config, logger, dbRegisterer)
 		if err != nil {
-			return nil, fmt.Errorf("couldn't create %s at %s: %w", pebbledb.Name, dbPath, err)
+			return nil, fmt.Errorf("couldn't create %s at %s: %w", pebbledb.Name, dbConfig.Path, err)
 		}
 	default:
 		return nil, fmt.Errorf(
