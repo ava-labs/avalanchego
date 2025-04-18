@@ -229,9 +229,11 @@ func (p *ProcessRuntime) waitForProcessContext(ctx context.Context) error {
 // process liveness, the node's process context will be refreshed if
 // live or cleared if not running.
 func (p *ProcessRuntime) getProcess() (*os.Process, error) {
+	// This context is not used but a non-nil value must be supplied to satisfy the linter
+	ctx := context.TODO()
 	// Read the process context to ensure freshness. The node may have
 	// stopped or been restarted since last read.
-	if err := p.readState(context.Background()); err != nil {
+	if err := p.readState(ctx); err != nil {
 		return nil, fmt.Errorf("failed to read process context: %w", err)
 	}
 
