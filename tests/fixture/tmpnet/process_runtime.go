@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"net/netip"
 	"os"
 	"os/exec"
@@ -270,13 +271,13 @@ func (p *ProcessRuntime) writeMonitoringConfig() error {
 		// guaranteed stable (e.g. port may change after restart).
 		"instance":          p.node.GetUniqueID(),
 		"network_uuid":      p.node.network.UUID,
-		"node_id":           p.node.NodeID,
+		"node_id":           p.node.NodeID.String(),
 		"is_ephemeral_node": strconv.FormatBool(p.node.IsEphemeral),
 		"network_owner":     p.node.network.Owner,
 	}
 	commonLabels.SetDefaults(githubLabelsFromEnv())
 
-	prometheusConfig := []FlagsMap{
+	prometheusConfig := []ConfigMap{
 		{
 			"targets": []string{strings.TrimPrefix(p.node.URI, "http://")},
 			"labels":  commonLabels,
@@ -286,11 +287,10 @@ func (p *ProcessRuntime) writeMonitoringConfig() error {
 		return err
 	}
 
-	promtailLabels := FlagsMap{
-		"__path__": filepath.Join(p.node.DataDir, "logs", "*.log"),
-	}
-	promtailLabels.SetDefaults(commonLabels)
-	promtailConfig := []FlagsMap{
+	promtailLabels := map[string]string{}
+	maps.Copy(promtailLabels, commonLabels)
+	promtailLabels["__path__"] = filepath.Join(p.node.DataDir, "logs", "*.log")
+	promtailConfig := []ConfigMap{
 		{
 			"targets": []string{"localhost"},
 			"labels":  promtailLabels,
@@ -325,7 +325,7 @@ func (p *ProcessRuntime) removeMonitoringConfig() error {
 }
 
 // Write the configuration for a type of monitoring (e.g. prometheus, promtail).
-func (p *ProcessRuntime) writeMonitoringConfigFile(name string, config []FlagsMap) error {
+func (p *ProcessRuntime) writeMonitoringConfigFile(name string, config []ConfigMap) error {
 	configPath, err := p.getMonitoringConfigPath(name)
 	if err != nil {
 		return err
@@ -423,8 +423,8 @@ func watchLogFileForFatal(ctx context.Context, cancelWithCause context.CancelCau
 	}
 }
 
-func githubLabelsFromEnv() FlagsMap {
-	return FlagsMap{
+func githubLabelsFromEnv() map[string]string {
+	return map[string]string{
 		// prometheus/promtail ignore empty values so including these
 		// labels with empty values outside of a github worker (where
 		// the env vars will not be set) should not be a problem.

@@ -8,7 +8,6 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/onsi/ginkgo/v2"
-	"github.com/spf13/cast"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
@@ -50,8 +49,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		)
 
 		tc.By("checking that the network has a compatible minimum stake duration", func() {
-			minStakeDuration := cast.ToDuration(network.DefaultFlags[config.MinStakeDurationKey])
-			require.Equal(tmpnet.DefaultMinStakeDuration, minStakeDuration)
+			require.Equal(tmpnet.DefaultMinStakeDuration, network.DefaultFlags[config.MinStakeDurationKey])
 		})
 
 		tc.By("adding alpha node, whose uptime should result in a staking reward")
