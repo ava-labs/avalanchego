@@ -10,10 +10,8 @@ import (
 
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/acp176"
-	"github.com/ava-labs/coreth/plugin/evm/upgrade/etna"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
-	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,8 +21,7 @@ type testSuggestPriceOptionsBackend struct {
 	estimateBaseFee  *big.Int
 	suggestGasTipCap *big.Int
 
-	cfg      PriceOptionConfig
-	chainCfg *params.ChainConfig
+	cfg PriceOptionConfig
 }
 
 func (b *testSuggestPriceOptionsBackend) EstimateBaseFee(context.Context) (*big.Int, error) {
@@ -39,36 +36,21 @@ func (b *testSuggestPriceOptionsBackend) PriceOptionsConfig() PriceOptionConfig 
 	return b.cfg
 }
 
-func (b *testSuggestPriceOptionsBackend) ChainConfig() *params.ChainConfig {
-	return b.chainCfg
-}
-
-func (b *testSuggestPriceOptionsBackend) CurrentHeader() *types.Header {
-	return &types.Header{Time: 1}
-}
-
 func TestSuggestPriceOptions(t *testing.T) {
 	testCfg := PriceOptionConfig{
 		SlowFeePercentage: 95,
 		FastFeePercentage: 105,
-		MaxBaseFee:        100 * params.GWei,
 		MaxTip:            20 * params.GWei,
 	}
-	minBaseFee := etna.MinBaseFee
-	bigMinBaseFee := big.NewInt(int64(minBaseFee))
-	fortunaMinBaseFee := acp176.MinGasPrice
-	bigFortunaMinBaseFee := big.NewInt(int64(fortunaMinBaseFee))
 	slowFeeNumerator := testCfg.SlowFeePercentage
 	fastFeeNumerator := testCfg.FastFeePercentage
 	maxNormalGasTip := testCfg.MaxTip
-	maxNormalBaseFee := testCfg.MaxBaseFee
 
 	tests := []struct {
 		name             string
 		estimateBaseFee  *big.Int
 		suggestGasTipCap *big.Int
 		cfg              PriceOptionConfig
-		chainCfg         *params.ChainConfig
 		want             *PriceOptions
 	}{
 		{
@@ -84,66 +66,42 @@ func TestSuggestPriceOptions(t *testing.T) {
 			want:             nil,
 		},
 		{
-			name:             "minimum_values_etna",
-			estimateBaseFee:  bigMinBaseFee,
+			name:             "minimum_values",
+			estimateBaseFee:  big.NewInt(acp176.MinGasPrice),
 			suggestGasTipCap: bigMinGasTip,
 			cfg:              testCfg,
-			chainCfg:         params.TestEtnaChainConfig,
 			want: &PriceOptions{
 				Slow: newPrice(
 					minGasTip,
-					uint64(minBaseFee+minGasTip),
+					2*acp176.MinGasPrice+minGasTip,
 				),
 				Normal: newPrice(
 					minGasTip,
-					uint64(minBaseFee+minGasTip),
+					2*acp176.MinGasPrice+minGasTip,
 				),
 				Fast: newPrice(
 					minGasTip,
-					(fastFeeNumerator*uint64(minBaseFee)/feeDenominator)+(fastFeeNumerator*uint64(minGasTip)/feeDenominator),
+					2*acp176.MinGasPrice+(fastFeeNumerator*minGasTip/feeDenominator),
 				),
 			},
 		},
 		{
-			name:             "minimum_values_fortuna",
-			estimateBaseFee:  bigFortunaMinBaseFee,
-			suggestGasTipCap: bigMinGasTip,
-			cfg:              testCfg,
-			chainCfg:         params.TestFortunaChainConfig,
-			want: &PriceOptions{
-				Slow: newPrice(
-					minGasTip,
-					uint64(fortunaMinBaseFee+minGasTip),
-				),
-				Normal: newPrice(
-					minGasTip,
-					uint64(fortunaMinBaseFee+minGasTip),
-				),
-				Fast: newPrice(
-					minGasTip,
-					(fastFeeNumerator*uint64(fortunaMinBaseFee)/feeDenominator)+(fastFeeNumerator*uint64(minGasTip)/feeDenominator),
-				),
-			},
-		},
-		{
-			name:             "maximum_values_1_slow_perc_2_fast_perc",
-			estimateBaseFee:  new(big.Int).SetUint64(maxNormalBaseFee),
+			name:             "maximum_values_1_slow_2_fast",
+			estimateBaseFee:  big.NewInt(100 * params.GWei),
 			suggestGasTipCap: new(big.Int).SetUint64(maxNormalGasTip),
 			cfg: PriceOptionConfig{
 				SlowFeePercentage: 100,
 				FastFeePercentage: 200,
-				MaxBaseFee:        100 * params.GWei,
 				MaxTip:            20 * params.GWei,
 			},
-			chainCfg: params.TestEtnaChainConfig,
 			want: &PriceOptions{
 				Slow: newPrice(
 					20*params.GWei,
-					120*params.GWei,
+					220*params.GWei,
 				),
 				Normal: newPrice(
 					20*params.GWei,
-					120*params.GWei,
+					220*params.GWei,
 				),
 				Fast: newPrice(
 					40*params.GWei,
@@ -152,44 +110,42 @@ func TestSuggestPriceOptions(t *testing.T) {
 			},
 		},
 		{
-			name:             "maximum_values",
+			name:             "maximum_value",
 			cfg:              testCfg,
-			chainCfg:         params.TestEtnaChainConfig,
-			estimateBaseFee:  new(big.Int).SetUint64(maxNormalBaseFee),
+			estimateBaseFee:  big.NewInt(100 * params.GWei),
 			suggestGasTipCap: new(big.Int).SetUint64(maxNormalGasTip),
 			want: &PriceOptions{
 				Slow: newPrice(
 					(slowFeeNumerator*maxNormalGasTip)/feeDenominator,
-					(slowFeeNumerator*maxNormalBaseFee)/feeDenominator+(slowFeeNumerator*maxNormalGasTip)/feeDenominator,
+					2*100*params.GWei+(slowFeeNumerator*maxNormalGasTip)/feeDenominator,
 				),
 				Normal: newPrice(
 					maxNormalGasTip,
-					maxNormalBaseFee+maxNormalGasTip,
+					2*100*params.GWei+maxNormalGasTip,
 				),
 				Fast: newPrice(
 					(fastFeeNumerator*maxNormalGasTip)/feeDenominator,
-					(fastFeeNumerator*maxNormalBaseFee)/feeDenominator+(fastFeeNumerator*maxNormalGasTip)/feeDenominator,
+					2*100*params.GWei+(fastFeeNumerator*maxNormalGasTip)/feeDenominator,
 				),
 			},
 		},
 		{
 			name:             "double_maximum_values",
-			estimateBaseFee:  big.NewInt(2 * int64(maxNormalBaseFee)),
+			estimateBaseFee:  big.NewInt(100 * params.GWei),
 			suggestGasTipCap: big.NewInt(2 * int64(maxNormalGasTip)),
 			cfg:              testCfg,
-			chainCfg:         params.TestEtnaChainConfig,
 			want: &PriceOptions{
 				Slow: newPrice(
 					(slowFeeNumerator*maxNormalGasTip)/feeDenominator,
-					(slowFeeNumerator*maxNormalBaseFee)/feeDenominator+(slowFeeNumerator*maxNormalGasTip)/feeDenominator,
+					2*100*params.GWei+(slowFeeNumerator*maxNormalGasTip)/feeDenominator,
 				),
 				Normal: newPrice(
 					maxNormalGasTip,
-					maxNormalBaseFee+maxNormalGasTip,
+					2*100*params.GWei+maxNormalGasTip,
 				),
 				Fast: newPrice(
 					(fastFeeNumerator*2*maxNormalGasTip)/feeDenominator,
-					(fastFeeNumerator*2*maxNormalBaseFee)/feeDenominator+(fastFeeNumerator*2*maxNormalGasTip)/feeDenominator,
+					2*100*params.GWei+(fastFeeNumerator*2*maxNormalGasTip)/feeDenominator,
 				),
 			},
 		},
@@ -202,7 +158,6 @@ func TestSuggestPriceOptions(t *testing.T) {
 				estimateBaseFee:  test.estimateBaseFee,
 				suggestGasTipCap: test.suggestGasTipCap,
 				cfg:              test.cfg,
-				chainCfg:         test.chainCfg,
 			}
 			api := NewEthereumAPI(backend)
 

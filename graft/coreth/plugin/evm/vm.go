@@ -476,7 +476,6 @@ func (vm *VM) Initialize(
 	vm.ethConfig.RPCTxFeeCap = vm.config.RPCTxFeeCap
 	vm.ethConfig.PriceOptionConfig.SlowFeePercentage = vm.config.PriceOptionSlowFeePercentage
 	vm.ethConfig.PriceOptionConfig.FastFeePercentage = vm.config.PriceOptionFastFeePercentage
-	vm.ethConfig.PriceOptionConfig.MaxBaseFee = vm.config.PriceOptionMaxBaseFee
 	vm.ethConfig.PriceOptionConfig.MaxTip = vm.config.PriceOptionMaxTip
 
 	vm.ethConfig.TxPool.NoLocals = !vm.config.LocalTxsEnabled
