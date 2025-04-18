@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
 
@@ -40,8 +39,8 @@ type NodeRuntime interface {
 	readState() error
 	GetLocalURI(ctx context.Context) (string, func(), error)
 	GetLocalStakingAddress(ctx context.Context) (netip.AddrPort, func(), error)
-	Start(log logging.Logger) error
 	InitiateStop() error
+	Start() error
 	WaitForStopped(ctx context.Context) error
 	IsHealthy(ctx context.Context) (bool, error)
 }
@@ -141,8 +140,8 @@ func (n *Node) IsHealthy(ctx context.Context) (bool, error) {
 	return n.getRuntime().IsHealthy(ctx)
 }
 
-func (n *Node) Start(log logging.Logger) error {
-	return n.getRuntime().Start(log)
+func (n *Node) Start() error {
+	return n.getRuntime().Start()
 }
 
 func (n *Node) InitiateStop(ctx context.Context) error {
