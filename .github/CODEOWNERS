@@ -12,7 +12,7 @@
 /.github/ @maru-ava
 /.github/*.md @maru-ava @meaghanfitzgerald
 /.gitignore @maru-ava @Stephenbuttolph
-/.golangci.yml @maru-ava
+/.golangci.yml @maru-ava @Stephenbuttolph
 /Dockerfile @maru-ava
 /Taskfile.yml @maru-ava
 /flake.lock @maru-ava
