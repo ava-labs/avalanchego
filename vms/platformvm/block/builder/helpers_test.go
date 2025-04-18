@@ -143,11 +143,12 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 	require.NoError(err)
 
 	res.mempool, err = mempool.New(
-		res.config.DynamicFeeConfig.Weights,
 		"mempool",
+		res.config.DynamicFeeConfig.Weights,
+		1_000_000,
+		ids.ID{},
 		registerer,
 		nil,
-		ids.ID{},
 	)
 	require.NoError(err)
 

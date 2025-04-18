@@ -504,7 +504,9 @@ func (v *verifier) standardBlock(
 		return ErrStandardBlockWithoutChanges
 	}
 
-	v.Mempool.Remove(txs...)
+	for _, tx := range txs {
+		v.Mempool.Remove(tx)
+	}
 
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{

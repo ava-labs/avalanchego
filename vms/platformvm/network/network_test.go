@@ -75,11 +75,12 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			name: "mempool has transaction",
 			mempool: func() *pmempool.Mempool {
 				mempool, err := pmempool.New(
-					gas.Dimensions{},
 					"",
+					gas.Dimensions{},
+					1_000_000,
+					ids.ID{},
 					prometheus.NewRegistry(),
 					nil,
-					ids.ID{},
 				)
 				require.NoError(t, err)
 				require.NoError(t, mempool.Add(&txs.Tx{Unsigned: &txs.BaseTx{}}))
@@ -95,11 +96,12 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			name: "transaction marked as dropped in mempool",
 			mempool: func() *pmempool.Mempool {
 				mempool, err := pmempool.New(
-					gas.Dimensions{},
 					"",
+					gas.Dimensions{},
+					1_000_000,
+					ids.ID{},
 					prometheus.NewRegistry(),
 					nil,
-					ids.ID{},
 				)
 				require.NoError(t, err)
 				mempool.MarkDropped(ids.Empty, errTest)
@@ -116,11 +118,12 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			name: "tx dropped",
 			mempool: func() *pmempool.Mempool {
 				mempool, err := pmempool.New(
-					gas.Dimensions{},
 					"",
+					gas.Dimensions{},
+					1_000_000,
+					ids.ID{},
 					prometheus.NewRegistry(),
 					nil,
-					ids.ID{},
 				)
 				require.NoError(t, err)
 				return mempool
@@ -137,11 +140,12 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			name: "tx too big",
 			mempool: func() *pmempool.Mempool {
 				mempool, err := pmempool.New(
-					gas.Dimensions{},
 					"",
+					gas.Dimensions{},
+					1_000_000,
+					ids.ID{},
 					prometheus.NewRegistry(),
 					nil,
-					ids.ID{},
 				)
 				require.NoError(t, err)
 				return mempool
@@ -162,11 +166,12 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			name: "tx conflicts",
 			mempool: func() *pmempool.Mempool {
 				mempool, err := pmempool.New(
-					gas.Dimensions{},
 					"",
+					gas.Dimensions{},
+					1_000_000,
+					ids.ID{},
 					prometheus.NewRegistry(),
 					nil,
-					ids.ID{},
 				)
 				require.NoError(t, err)
 
@@ -212,11 +217,12 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			name: "mempool full",
 			mempool: func() *pmempool.Mempool {
 				m, err := pmempool.New(
-					gas.Dimensions{},
 					"",
+					gas.Dimensions{},
+					1_000_000,
+					ids.ID{},
 					prometheus.NewRegistry(),
 					nil,
-					ids.ID{},
 				)
 				require.NoError(t, err)
 
@@ -245,11 +251,12 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			name: "happy path",
 			mempool: func() *pmempool.Mempool {
 				mempool, err := pmempool.New(
-					gas.Dimensions{},
 					"",
+					gas.Dimensions{},
+					1_000_000,
+					ids.ID{},
 					prometheus.NewRegistry(),
 					nil,
-					ids.ID{},
 				)
 				require.NoError(t, err)
 				return mempool

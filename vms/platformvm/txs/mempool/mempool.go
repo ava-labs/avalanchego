@@ -10,60 +10,89 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/heap"
+	"github.com/ava-labs/avalanchego/utils/setmap"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
-
-	txmempool "github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
-var _ txs.Visitor = (*utxoGetter)(nil)
+var (
+	errConflictingUTXO     = errors.New("conflicting utxo")
+	errGasCapacityExceeded = errors.New("gas capacity exceeded")
+
+	_ txs.Visitor = (*utxoGetter)(nil)
+)
 
 type Tx struct {
 	*txs.Tx
 	Complexity gas.Dimensions
 	GasPrice   float64
+
+	gasUsed gas.Gas
 }
 
 type Mempool struct {
-	avaxAssetID ids.ID
 	weights     gas.Dimensions
+	gasCapacity gas.Gas
+	avaxAssetID ids.ID
 	toEngine    chan<- common.Message
 
-	mempool txmempool.Mempool[*txs.Tx]
-
-	lock sync.Mutex
-	heap heap.Map[ids.ID, Tx]
+	lock               sync.Mutex
+	maxHeap            heap.Map[ids.ID, Tx]
+	minHeap            heap.Map[ids.ID, Tx]
+	consumedUTXOs      *setmap.SetMap[ids.ID, ids.ID]
+	droppedTxIDs       *cache.LRU[ids.ID, error]
+	currentGas         gas.Gas
+	numTxsMetric       prometheus.Gauge
+	gasAvailableMetric prometheus.Gauge
 }
 
 func New(
-	weights gas.Dimensions,
 	namespace string,
+	weights gas.Dimensions,
+	gasCapacity gas.Gas,
+	avaxAssetID ids.ID,
 	registerer prometheus.Registerer,
 	toEngine chan<- common.Message,
-	avaxAssetID ids.ID,
 ) (*Mempool, error) {
-	metrics, err := txmempool.NewMetrics(namespace, registerer)
-	if err != nil {
-		return nil, err
+	numTxsMetric := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "count",
+		Help:      "number of transactions in the mempool",
+	})
+
+	gasAvailableMetric := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "gas_available",
+		Help:      "amount of remaining gas available",
+	})
+
+	if err := errors.Join(
+		registerer.Register(numTxsMetric),
+		registerer.Register(gasAvailableMetric),
+	); err != nil {
+		return nil, fmt.Errorf("failed to register metrics: %w", err)
 	}
-	pool := txmempool.New[*txs.Tx](
-		metrics,
-	)
 
 	return &Mempool{
-		avaxAssetID: avaxAssetID,
 		weights:     weights,
-		mempool:     pool,
-		heap: heap.NewMap[ids.ID, Tx](
-			func(a, b Tx) bool {
-				return a.GasPrice > b.GasPrice
-			},
-		),
-		toEngine: toEngine,
+		gasCapacity: gasCapacity,
+		avaxAssetID: avaxAssetID,
+		toEngine:    toEngine,
+		maxHeap: heap.NewMap[ids.ID, Tx](func(a, b Tx) bool {
+			return a.GasPrice > b.GasPrice
+		}),
+		minHeap: heap.NewMap[ids.ID, Tx](func(a, b Tx) bool {
+			return a.GasPrice < b.GasPrice
+		}),
+		consumedUTXOs:      setmap.New[ids.ID, ids.ID](),
+		droppedTxIDs:       &cache.LRU[ids.ID, error]{Size: 64},
+		numTxsMetric:       numTxsMetric,
+		gasAvailableMetric: gasAvailableMetric,
 	}, nil
 }
 
@@ -73,7 +102,7 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 
 	complexity, gasUsed, err := m.meter(tx.Unsigned)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to meter tx: %w", err)
 	}
 
 	consumedAVAX, producedAVAX, err := getUTXOs(m.avaxAssetID, tx.Unsigned)
@@ -89,44 +118,70 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 		gasPrice = float64(feesPaid) / float64(gasUsed)
 	}
 
-	if err := m.mempool.Add(tx); err != nil {
-		return fmt.Errorf("failed to add tx to mempool: %w", err)
+	// Evict a lower paying tx if we do not have enough remaining gas capacity
+	next := m.currentGas + gasUsed
+	if next > m.gasCapacity {
+		_, low, ok := m.minHeap.Peek()
+
+		if ok &&
+			low.GasPrice < gasPrice &&
+			float64(next)-low.GasPrice < float64(m.gasCapacity) {
+			_, _, _ = m.minHeap.Pop()
+		}
 	}
 
 	heapTx := Tx{
 		Tx:         tx,
 		Complexity: complexity,
+		gasUsed:    gasUsed,
 		GasPrice:   gasPrice,
 	}
 
-	m.heap.Push(tx.TxID, heapTx)
+	if m.consumedUTXOs.HasOverlap(tx.InputIDs()) {
+		return fmt.Errorf("failed to add tx: %w", errConflictingUTXO)
+	}
+
+	m.maxHeap.Push(tx.TxID, heapTx)
+	m.minHeap.Push(tx.TxID, heapTx)
+	m.droppedTxIDs.Evict(tx.TxID)
+	m.currentGas += gasUsed
+
+	m.updateMetrics()
 
 	return nil
+}
+
+func (m *Mempool) updateMetrics() {
+	m.numTxsMetric.Set(float64(m.maxHeap.Len()))
+	m.gasAvailableMetric.Set(float64(m.gasCapacity - m.currentGas))
 }
 
 func (m *Mempool) Get(txID ids.ID) (Tx, bool) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	return m.heap.Get(txID)
+	return m.maxHeap.Get(txID)
 }
 
-func (m *Mempool) Remove(txs ...*txs.Tx) {
+func (m *Mempool) Remove(tx *txs.Tx) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.mempool.Remove(txs...)
-
-	for _, tx := range txs {
-		m.heap.Remove(tx.TxID)
+	heapTx, ok := m.maxHeap.Remove(tx.TxID)
+	if !ok {
+		return
 	}
+
+	m.minHeap.Remove(tx.TxID)
+	m.currentGas -= heapTx.gasUsed
+	m.updateMetrics()
 }
 
 func (m *Mempool) Peek() (Tx, bool) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	_, tx, ok := m.heap.Peek()
+	_, tx, ok := m.maxHeap.Peek()
 
 	return tx, ok
 }
@@ -135,35 +190,37 @@ func (m *Mempool) Iterate(f func(tx Tx) bool) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.mempool.Iterate(
-		func(tx *txs.Tx) bool {
-			// The gas heap is guaranteed to be in-sync with the mempool
-			heapTx, _ := m.heap.Get(tx.ID())
-
-			return f(heapTx)
-		},
-	)
+	for _, v := range m.maxHeap.Elements() {
+		if !f(v) {
+			return
+		}
+	}
 }
 
 func (m *Mempool) MarkDropped(txID ids.ID, reason error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.mempool.MarkDropped(txID, reason)
+	if _, ok := m.maxHeap.Get(txID); ok {
+		return
+	}
+
+	m.droppedTxIDs.Put(txID, reason)
 }
 
 func (m *Mempool) GetDropReason(txID ids.ID) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	return m.mempool.GetDropReason(txID)
+	err, _ := m.droppedTxIDs.Get(txID)
+	return err
 }
 
 func (m *Mempool) Len() int {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	return m.mempool.Len()
+	return m.maxHeap.Len()
 }
 
 func (m *Mempool) RequestBuildBlock(emptyBlockPermitted bool) {

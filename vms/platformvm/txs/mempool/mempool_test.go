@@ -35,7 +35,14 @@ func TestMempoolOrdering(t *testing.T) {
 	utxos, err := avax.NewUTXOState(memdb.New(), codecManager, false)
 
 	require.NoError(err)
-	m, err := New(weights, "", prometheus.NewRegistry(), nil, avaxAssetID)
+	m, err := New(
+		"",
+		weights,
+		1_000_000,
+		avaxAssetID,
+		prometheus.NewRegistry(),
+		nil,
+	)
 	require.NoError(err)
 
 	require.NoError(utxos.PutUTXO(
@@ -158,7 +165,14 @@ func TestMempoolMetering(t *testing.T) {
 	utxos, err := avax.NewUTXOState(memdb.New(), codecManager, false)
 
 	require.NoError(err)
-	m, err := New(weights, "", prometheus.NewRegistry(), nil, avaxAssetID)
+	m, err := New(
+		"",
+		weights,
+		1_000_000,
+		avaxAssetID,
+		prometheus.NewRegistry(),
+		nil,
+	)
 	require.NoError(err)
 
 	require.NoError(utxos.PutUTXO(

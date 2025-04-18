@@ -122,11 +122,12 @@ func TestRejectBlock(t *testing.T) {
 			require.NoError(err)
 
 			mempool, err := mempool.New(
-				gas.Dimensions{},
 				"",
+				gas.Dimensions{},
+				1_000_000,
+				ids.ID{},
 				prometheus.NewRegistry(),
 				nil,
-				ids.ID{},
 			)
 			require.NoError(err)
 			state := state.NewMockState(ctrl)

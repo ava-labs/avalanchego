@@ -168,11 +168,12 @@ func (vm *VM) Initialize(
 	}
 
 	mempool, err := pmempool.New(
-		vm.Internal.DynamicFeeConfig.Weights,
 		"mempool",
+		vm.Internal.DynamicFeeConfig.Weights,
+		1_000_000,
+		vm.ctx.AVAXAssetID,
 		registerer,
 		toEngine,
-		vm.ctx.AVAXAssetID,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)

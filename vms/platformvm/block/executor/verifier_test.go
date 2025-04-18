@@ -76,11 +76,12 @@ func newTestVerifier(t testing.TB, c testVerifierConfig) *verifier {
 	}
 
 	mempool, err := mempool.New(
-		gas.Dimensions{},
 		"",
+		gas.Dimensions{},
+		1_000_000,
+		ids.ID{},
 		prometheus.NewRegistry(),
 		nil,
-		ids.ID{},
 	)
 	require.NoError(err)
 
@@ -461,11 +462,12 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
 	mempool, err := mempool.New(
-		gas.Dimensions{},
 		"",
+		gas.Dimensions{},
+		1_000_000,
+		ids.ID{},
 		prometheus.NewRegistry(),
 		nil,
-		ids.ID{},
 	)
 	require.NoError(err)
 	parentID := ids.GenerateTestID()
@@ -541,11 +543,12 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
 	mempool, err := mempool.New(
-		gas.Dimensions{},
 		"",
+		gas.Dimensions{},
+		1_000_000,
+		ids.ID{},
 		prometheus.NewRegistry(),
 		nil,
-		ids.ID{},
 	)
 	require.NoError(err)
 	parentID := ids.GenerateTestID()
@@ -622,11 +625,12 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
 	mempool, err := mempool.New(
-		gas.Dimensions{},
 		"",
+		gas.Dimensions{},
+		1_000_000,
+		ids.ID{},
 		prometheus.NewRegistry(),
 		nil,
-		ids.ID{},
 	)
 	require.NoError(err)
 	parentID := ids.GenerateTestID()
@@ -699,11 +703,12 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			// Create mocked dependencies.
 			s := state.NewMockState(ctrl)
 			mempool, err := mempool.New(
-				gas.Dimensions{},
 				"",
+				gas.Dimensions{},
+				1_000_000,
+				ids.ID{},
 				prometheus.NewRegistry(),
 				nil,
-				ids.ID{},
 			)
 			require.NoError(err)
 			parentID := ids.GenerateTestID()
@@ -806,11 +811,12 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			// Create mocked dependencies.
 			s := state.NewMockState(ctrl)
 			mempool, err := mempool.New(
-				gas.Dimensions{},
 				"",
+				gas.Dimensions{},
+				1_000_000,
+				ids.ID{},
 				prometheus.NewRegistry(),
 				nil,
-				ids.ID{},
 			)
 			require.NoError(err)
 			parentID := ids.GenerateTestID()
@@ -881,11 +887,12 @@ func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
 	mempool, err := mempool.New(
-		gas.Dimensions{},
 		"",
+		gas.Dimensions{},
+		1_000_000,
+		ids.ID{},
 		prometheus.NewRegistry(),
 		nil,
-		ids.ID{},
 	)
 	require.NoError(err)
 	parentID := ids.GenerateTestID()
@@ -944,11 +951,12 @@ func TestVerifierVisitBanffStandardBlockWithProposalBlockParent(t *testing.T) {
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
 	mempool, err := mempool.New(
-		gas.Dimensions{},
 		"",
+		gas.Dimensions{},
+		1_000_000,
+		ids.ID{},
 		prometheus.NewRegistry(),
 		nil,
-		ids.ID{},
 	)
 	require.NoError(err)
 	parentID := ids.GenerateTestID()
