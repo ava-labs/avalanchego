@@ -34,6 +34,15 @@ const (
 	unsentType = "unsent"
 	sentType   = "sent"
 
+	// dropped indicate that the gossipable element was not added to the set due to some reason.
+	// for sent message, we'll use notReceive below.
+	droppedLabel = "dropped"
+
+	droppedMalformed = "malformed"
+	droppedOther     = "other"
+	droppedNot       = "not"
+	notReceive       = "not_receive"
+
 	defaultGossipableCount = 64
 )
 
@@ -44,22 +53,46 @@ var (
 
 	_ Set[*testTx] = (*FullSet[*testTx])(nil)
 
-	ioTypeLabels   = []string{ioLabel, typeLabel}
-	sentPushLabels = prometheus.Labels{
-		ioLabel:   sentIO,
-		typeLabel: pushType,
+	ioTypeDroppedLabels = []string{ioLabel, typeLabel, droppedLabel}
+	sentPushLabels      = prometheus.Labels{
+		ioLabel:      sentIO,
+		typeLabel:    pushType,
+		droppedLabel: notReceive,
 	}
 	receivedPushLabels = prometheus.Labels{
-		ioLabel:   receivedIO,
-		typeLabel: pushType,
+		ioLabel:      receivedIO,
+		typeLabel:    pushType,
+		droppedLabel: droppedNot,
+	}
+	receivedMalformedPushLabels = prometheus.Labels{
+		ioLabel:      receivedIO,
+		typeLabel:    pushType,
+		droppedLabel: droppedMalformed,
+	}
+	receivedOtherPushLabels = prometheus.Labels{
+		ioLabel:      receivedIO,
+		typeLabel:    pushType,
+		droppedLabel: droppedOther,
 	}
 	sentPullLabels = prometheus.Labels{
-		ioLabel:   sentIO,
-		typeLabel: pullType,
+		ioLabel:      sentIO,
+		typeLabel:    pullType,
+		droppedLabel: notReceive,
 	}
 	receivedPullLabels = prometheus.Labels{
-		ioLabel:   receivedIO,
-		typeLabel: pullType,
+		ioLabel:      receivedIO,
+		typeLabel:    pullType,
+		droppedLabel: droppedNot,
+	}
+	receivedMalformedPullLabels = prometheus.Labels{
+		ioLabel:      receivedIO,
+		typeLabel:    pullType,
+		droppedLabel: droppedMalformed,
+	}
+	receivedOtherPullLabels = prometheus.Labels{
+		ioLabel:      receivedIO,
+		typeLabel:    pullType,
+		droppedLabel: droppedOther,
 	}
 	typeLabels   = []string{typeLabel}
 	unsentLabels = prometheus.Labels{
@@ -92,6 +125,29 @@ type ValidatorGossiper struct {
 	Validators p2p.ValidatorSet
 }
 
+// ErrDroppedGossipableReason is used by the Set.Add method to describe reason for which a gossipable was dropped.
+// it allows the VM's mempool to speficy a reason that would be used as a prometheus label, creating VM-specific
+// drop reasons.
+type ErrDroppedGossipableReason struct {
+	e      error
+	reason string
+}
+
+func WrapDroppedGossipableReason(innerError error, reason string) *ErrDroppedGossipableReason {
+	return &ErrDroppedGossipableReason{
+		e:      innerError,
+		reason: reason,
+	}
+}
+
+func (e ErrDroppedGossipableReason) Error() string {
+	return e.e.Error()
+}
+
+func (e ErrDroppedGossipableReason) Unwrap() error {
+	return e.e
+}
+
 // Metrics that are tracked across a gossip protocol. A given protocol should
 // only use a single instance of Metrics.
 type Metrics struct {
@@ -114,7 +170,7 @@ func NewMetrics(
 				Name:      "gossip_count",
 				Help:      "amount of gossip (n)",
 			},
-			ioTypeLabels,
+			ioTypeDroppedLabels,
 		),
 		bytes: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
@@ -122,7 +178,7 @@ func NewMetrics(
 				Name:      "gossip_bytes",
 				Help:      "amount of gossip (bytes)",
 			},
-			ioTypeLabels,
+			ioTypeDroppedLabels,
 		),
 		tracking: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
@@ -244,13 +300,39 @@ func (p *PullGossiper[_]) handleResponse(
 		return
 	}
 
-	receivedBytes := 0
-	for _, bytes := range gossip {
-		receivedBytes += len(bytes)
+	addIncomingGossipable(p.log,
+		p.marshaller,
+		gossip,
+		nodeID,
+		p.set,
+		p.metrics,
+		&receivedPullLabels,
+		&receivedMalformedPullLabels,
+		&receivedOtherPullLabels,
+	)
+}
 
-		gossipable, err := p.marshaller.UnmarshalGossip(bytes)
+func addIncomingGossipable[T Gossipable](
+	log logging.Logger,
+	marshaller Marshaller[T],
+	gossip [][]byte,
+	nodeID ids.NodeID,
+	set Set[T],
+	metrics Metrics,
+	receivedLabel *prometheus.Labels,
+	receivedMalformedLabel *prometheus.Labels,
+	receivedOtherLabel *prometheus.Labels,
+) {
+	droppedLabels := make(map[string]*prometheus.Labels)
+	receivedBytes := make(map[*prometheus.Labels]int)
+	receivedCount := make(map[*prometheus.Labels]int)
+	var droppedReasonErr ErrDroppedGossipableReason
+	for _, bytes := range gossip {
+		gossipable, err := marshaller.UnmarshalGossip(bytes)
 		if err != nil {
-			p.log.Debug(
+			receivedBytes[receivedMalformedLabel] += len(bytes)
+			receivedCount[receivedMalformedLabel]++
+			log.Debug(
 				"failed to unmarshal gossip",
 				zap.Stringer("nodeID", nodeID),
 				zap.Error(err),
@@ -259,13 +341,31 @@ func (p *PullGossiper[_]) handleResponse(
 		}
 
 		gossipID := gossipable.GossipID()
-		p.log.Debug(
+		log.Debug(
 			"received gossip",
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("id", gossipID),
 		)
-		if err := p.set.Add(gossipable); err != nil {
-			p.log.Debug(
+		if err := set.Add(gossipable); err != nil {
+			if errors.As(err, &droppedReasonErr) {
+				dropLabel := droppedLabels[droppedReasonErr.reason]
+				if dropLabel == nil {
+					// allocate a new label for this reason.
+					dropLabel = &prometheus.Labels{
+						ioLabel:      (*receivedLabel)[ioLabel],
+						typeLabel:    (*receivedLabel)[typeLabel],
+						droppedLabel: droppedReasonErr.reason,
+					}
+					droppedLabels[droppedReasonErr.reason] = dropLabel
+				}
+				receivedBytes[dropLabel] += len(bytes)
+				receivedCount[dropLabel]++
+				continue
+			}
+
+			receivedBytes[receivedOtherLabel] += len(bytes)
+			receivedCount[receivedOtherLabel]++
+			log.Debug(
 				"failed to add gossip to the known set",
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("id", gossipID),
@@ -273,12 +373,17 @@ func (p *PullGossiper[_]) handleResponse(
 			)
 			continue
 		}
+		receivedBytes[receivedLabel] += len(bytes)
+		receivedCount[receivedLabel]++
 	}
 
-	if err := p.metrics.observeMessage(receivedPullLabels, len(gossip), receivedBytes); err != nil {
-		p.log.Error("failed to update metrics",
-			zap.Error(err),
-		)
+	for label, receivedBytes := range receivedBytes {
+		err := metrics.observeMessage(*label, receivedCount[label], receivedBytes)
+		if err != nil {
+			log.Error("failed to update metrics",
+				zap.Error(err),
+			)
+		}
 	}
 }
 
