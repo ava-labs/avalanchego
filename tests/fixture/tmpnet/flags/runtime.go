@@ -14,17 +14,20 @@ import (
 
 var validRuntimes = []string{
 	processRuntime,
+	kubeRuntime,
 }
 
 type RuntimeConfigVars struct {
 	runtime            string
 	processRuntimeVars processRuntimeVars
+	kubeRuntimeVars    kubeRuntimeVars
 }
 
 // NewRuntimeConfigFlagVars registers runtime config flag variables for stdlib flag
 func NewRuntimeConfigFlagVars() *RuntimeConfigVars {
 	v := &RuntimeConfigVars{}
 	v.processRuntimeVars.registerWithFlag()
+	v.kubeRuntimeVars.registerWithFlag()
 	v.register(flag.StringVar)
 	return v
 }
@@ -33,6 +36,7 @@ func NewRuntimeConfigFlagVars() *RuntimeConfigVars {
 func NewRuntimeConfigFlagSetVars(flagSet *pflag.FlagSet) *RuntimeConfigVars {
 	v := &RuntimeConfigVars{}
 	v.processRuntimeVars.registerWithFlagSet(flagSet)
+	v.kubeRuntimeVars.registerWithFlagSet(flagSet)
 	v.register(flagSet.StringVar)
 	return v
 }
@@ -59,6 +63,14 @@ func (v *RuntimeConfigVars) GetNodeRuntimeConfig() (*tmpnet.NodeRuntimeConfig, e
 		}
 		return &tmpnet.NodeRuntimeConfig{
 			Process: processRuntimeConfig,
+		}, nil
+	case kubeRuntime:
+		kubeRuntimeConfig, err := v.kubeRuntimeVars.getKubeRuntimeConfig()
+		if err != nil {
+			return nil, err
+		}
+		return &tmpnet.NodeRuntimeConfig{
+			Kube: kubeRuntimeConfig,
 		}, nil
 	default:
 		return nil, fmt.Errorf("--runtime expected one of %v, got: %s", validRuntimes, v.runtime)

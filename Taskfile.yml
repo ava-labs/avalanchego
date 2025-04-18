@@ -173,6 +173,18 @@ tasks:
       - task: build-xsvm
       - cmd: bash -x ./scripts/tests.e2e.existing.sh {{.CLI_ARGS}}
 
+  test-e2e-kube:
+    desc: Runs e2e tests against a network deployed to kube
+    cmds:
+      - cmd: bash -x ./scripts/tests.e2e.kube.sh {{.CLI_ARGS}}
+
+  test-e2e-kube-ci:
+    desc: Runs e2e tests against a network deployed to kube [serially]
+    env:
+      E2E_SERIAL: 1
+    cmds:
+      - task: test-e2e-kube
+
   # To use a different fuzz time, run `task test-fuzz FUZZTIME=[value in seconds]`.
   # A value of `-1` will run until it encounters a failing output.
 
