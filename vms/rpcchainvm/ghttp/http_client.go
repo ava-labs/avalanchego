@@ -7,10 +7,12 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/grequest"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gresponsewriter"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
 	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
+	requestpb "github.com/ava-labs/avalanchego/proto/pb/http/request"
 	responsewriterpb "github.com/ava-labs/avalanchego/proto/pb/http/responsewriter"
 )
 
@@ -34,7 +36,10 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// to specify a communication protocols it supports and would like to
 	// use. Upgrade (e.g. websockets) is a more expensive transaction and
 	// if not required use the less expensive HTTPSimple.
-	if !isUpgradeRequest(r) {
+	//
+	// Http/2 explicitly does not allow the use of the Upgrade header.
+	// (ref: https://httpwg.org/specs/rfc9113.html#informational-responses)
+	if !isUpgradeRequest(r) && !isHTTP2Request(r) {
 		c.serveHTTPSimple(w, r)
 		return
 	}
@@ -54,15 +59,10 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	server := grpcutils.NewServer()
 	closer.Add(server)
 	responsewriterpb.RegisterWriterServer(server, gresponsewriter.NewServer(w))
+	requestpb.RegisterRequestServer(server, grequest.NewServer(r.Body))
 
 	// Start responsewriter gRPC service.
 	go grpcutils.Serve(serverListener, server)
-
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 
 	req := &httppb.HTTPRequest{
 		ResponseWriter: &httppb.ResponseWriter{
@@ -75,7 +75,6 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			ProtoMajor:       int32(r.ProtoMajor),
 			ProtoMinor:       int32(r.ProtoMinor),
 			Header:           make([]*httppb.Element, 0, len(r.Header)),
-			Body:             body,
 			ContentLength:    r.ContentLength,
 			TransferEncoding: r.TransferEncoding,
 			Host:             r.Host,
@@ -160,7 +159,20 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	_, err = c.client.Handle(r.Context(), req)
+	reply, err := c.client.Handle(r.Context(), req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Copy headers from the plugin process
+	header := w.Header()
+	clear(header)
+
+	for _, h := range reply.Header {
+		header[h.Key] = h.Values
+	}
+
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -218,4 +230,8 @@ func convertWriteResponse(w http.ResponseWriter, resp *httppb.HandleSimpleHTTPRe
 // isUpgradeRequest returns true if the upgrade key exists in header and value is non empty.
 func isUpgradeRequest(req *http.Request) bool {
 	return req.Header.Get("Upgrade") != ""
+}
+
+func isHTTP2Request(req *http.Request) bool {
+	return req.ProtoMajor == 2
 }

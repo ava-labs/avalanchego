@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package http.request;
+
+option go_package = "github.com/ava-labs/avalanchego/proto/pb/http/request";
+
+service Request {
+  rpc Body(BodyRequest) returns (BodyReply);
+}
+
+message BodyRequest {
+  uint32 n = 1;
+}
+
+message BodyReply {
+  bytes body = 1;
+}
