@@ -19,7 +19,7 @@ There are currently three different benchmarks, as follows:
 
 1. `tenkrandom` which does transactions of size 10k, 5k updates, 2.5k inserts, and 2.5k deletes
 2. `zipf` which uses a zipf distribution across the database to perform updates
-3. `single` which only updates a single row (row 1) repeatedly in a tiny transactoin
+3. `single` which only updates a single row (row 1) repeatedly in a tiny transaction
 
 There is also a `create` benchmark which creates the database to begin with. The defaults will create
 a 10M row database. If you want a larger one, increase the number of batches.
