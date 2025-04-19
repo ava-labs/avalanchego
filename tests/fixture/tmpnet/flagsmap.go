@@ -8,14 +8,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spf13/cast"
-
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
 // Defines a mapping of flag keys to values intended to be supplied to
 // an invocation of an AvalancheGo node.
-type FlagsMap map[string]interface{}
+type FlagsMap map[string]string
 
 // Utility function simplifying construction of a FlagsMap from a file.
 func ReadFlagsMap(path string, description string) (FlagsMap, error) {
@@ -32,7 +30,7 @@ func ReadFlagsMap(path string, description string) (FlagsMap, error) {
 
 // SetDefault ensures the effectiveness of a flag override by only
 // setting a value supplied whose key is not already explicitly set.
-func (f FlagsMap) SetDefault(key string, value any) {
+func (f FlagsMap) SetDefault(key string, value string) {
 	if _, ok := f[key]; !ok {
 		f[key] = value
 	}
@@ -45,34 +43,6 @@ func (f FlagsMap) SetDefaults(defaults FlagsMap) {
 	for key, value := range defaults {
 		f.SetDefault(key, value)
 	}
-}
-
-// GetStringVal simplifies retrieving a map value as a string.
-func (f FlagsMap) GetStringVal(key string) (string, error) {
-	rawVal, ok := f[key]
-	if !ok {
-		return "", nil
-	}
-
-	val, err := cast.ToStringE(rawVal)
-	if err != nil {
-		return "", fmt.Errorf("failed to cast value for %q: %w", key, err)
-	}
-	return val, nil
-}
-
-// GetBoolVal simplifies retrieving a map value as a bool.
-func (f FlagsMap) GetBoolVal(key string, defaultVal bool) (bool, error) {
-	rawVal, ok := f[key]
-	if !ok {
-		return defaultVal, nil
-	}
-
-	val, err := cast.ToBoolE(rawVal)
-	if err != nil {
-		return false, fmt.Errorf("failed to cast value for %q: %w", key, err)
-	}
-	return val, nil
 }
 
 // Write simplifies writing a FlagsMap to the provided path. The

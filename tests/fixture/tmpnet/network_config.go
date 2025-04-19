@@ -4,6 +4,7 @@
 package tmpnet
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,11 +22,11 @@ import (
 var errMissingNetworkDir = errors.New("failed to write network: missing network directory")
 
 // Read network and node configuration from disk.
-func (n *Network) Read() error {
+func (n *Network) Read(ctx context.Context) error {
 	if err := n.readNetwork(); err != nil {
 		return err
 	}
-	if err := n.readNodes(); err != nil {
+	if err := n.readNodes(ctx); err != nil {
 		return err
 	}
 	return n.readSubnets()
@@ -57,7 +58,7 @@ func (n *Network) readNetwork() error {
 }
 
 // Read the nodes associated with the network from disk.
-func (n *Network) readNodes() error {
+func (n *Network) readNodes(ctx context.Context) error {
 	nodes := []*Node{}
 
 	// Node configuration is stored in child directories
@@ -72,7 +73,7 @@ func (n *Network) readNodes() error {
 
 		node := NewNode()
 		dataDir := filepath.Join(n.Dir, entry.Name())
-		err := node.Read(n, dataDir)
+		err := node.Read(ctx, n, dataDir)
 		if errors.Is(err, os.ErrNotExist) {
 			// If no config file exists, assume this is not the path of a node
 			continue
@@ -152,8 +153,8 @@ func (n *Network) readConfig() error {
 type serializedNetworkConfig struct {
 	UUID                 string                  `json:"uuid,omitempty"`
 	Owner                string                  `json:"owner,omitempty"`
-	PrimarySubnetConfig  FlagsMap                `json:"primarySubnetConfig,omitempty"`
-	PrimaryChainConfigs  map[string]FlagsMap     `json:"primaryChainConfigs,omitempty"`
+	PrimarySubnetConfig  ConfigMap               `json:"primarySubnetConfig,omitempty"`
+	PrimaryChainConfigs  map[string]ConfigMap    `json:"primaryChainConfigs,omitempty"`
 	DefaultFlags         FlagsMap                `json:"defaultFlags,omitempty"`
 	DefaultRuntimeConfig NodeRuntimeConfig       `json:"defaultRuntimeConfig,omitempty"`
 	PreFundedKeys        []*secp256k1.PrivateKey `json:"preFundedKeys,omitempty"`

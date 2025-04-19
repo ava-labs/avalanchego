@@ -136,7 +136,7 @@ func NewEthClient(tc tests.TestContext, nodeURI tmpnet.NodeURI) ethclient.Client
 func AddEphemeralNode(tc tests.TestContext, network *tmpnet.Network, node *tmpnet.Node) *tmpnet.Node {
 	require := require.New(tc)
 
-	require.NoError(network.StartNode(tc.DefaultContext(), tc.Log(), node))
+	require.NoError(network.StartNode(tc.DefaultContext(), node))
 
 	tc.DeferCleanup(func() {
 		tc.Log().Info("shutting down ephemeral node",
@@ -154,7 +154,7 @@ func WaitForHealthy(t require.TestingT, node *tmpnet.Node) {
 	// Need to use explicit context (vs DefaultContext()) to support use with DeferCleanup
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	defer cancel()
-	require.NoError(t, tmpnet.WaitForHealthy(ctx, node))
+	require.NoError(t, node.WaitForHealthy(ctx))
 }
 
 // Sends an eth transaction and waits for the transaction receipt from the
@@ -236,7 +236,7 @@ func CheckBootstrapIsPossible(tc tests.TestContext, network *tmpnet.Network) *tm
 	}
 
 	node := tmpnet.NewEphemeralNode(flags)
-	require.NoError(network.StartNode(tc.DefaultContext(), tc.Log(), node))
+	require.NoError(network.StartNode(tc.DefaultContext(), node))
 	// StartNode will initiate node stop if an error is encountered during start,
 	// so no further cleanup effort is required if an error is seen here.
 
@@ -248,7 +248,7 @@ func CheckBootstrapIsPossible(tc tests.TestContext, network *tmpnet.Network) *tm
 	})
 
 	// Check that the node becomes healthy within timeout
-	require.NoError(tmpnet.WaitForHealthy(tc.DefaultContext(), node))
+	require.NoError(node.WaitForHealthy(tc.DefaultContext()))
 
 	// Ensure that the primary validators are still healthy
 	for _, node := range network.Nodes {
