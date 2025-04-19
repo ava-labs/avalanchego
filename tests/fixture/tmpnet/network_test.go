@@ -20,6 +20,8 @@ func TestNetworkSerialization(t *testing.T) {
 	ctx := context.Background()
 
 	network := NewDefaultNetwork("testnet")
+	// Runtime configuration is required
+	network.DefaultRuntimeConfig.Process = &ProcessRuntimeConfig{}
 	// Validate round-tripping of primary subnet configuration
 	network.PrimarySubnetConfig = ConfigMap{
 		"validatorOnly": true,
