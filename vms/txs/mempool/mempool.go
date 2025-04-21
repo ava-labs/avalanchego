@@ -10,7 +10,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/setmap"
@@ -109,7 +108,7 @@ func (m *mempool[T]) Add(tx T) error {
 	defer m.lock.Unlock()
 
 	if _, ok := m.unissuedTxs.Get(txID); ok {
-		return gossip.WrapDroppedGossipableReason(fmt.Errorf("%w: %s", ErrDuplicateTx, txID), droppedDuplicate)
+		return fmt.Errorf("%w: %s", ErrDuplicateTx, txID)
 	}
 
 	txSize := tx.Size()
@@ -120,7 +119,7 @@ func (m *mempool[T]) Add(tx T) error {
 			txSize,
 			MaxTxSize,
 		)
-		return gossip.WrapDroppedGossipableReason(err, droppedTxTooLarge)
+		return err
 	}
 	if txSize > m.bytesAvailable {
 		err := fmt.Errorf("%w: %s size (%d) > available space (%d)",
@@ -129,13 +128,13 @@ func (m *mempool[T]) Add(tx T) error {
 			txSize,
 			m.bytesAvailable,
 		)
-		return gossip.WrapDroppedGossipableReason(err, droppedMempoolFull)
+		return err
 	}
 
 	inputs := tx.InputIDs()
 	if m.consumedUTXOs.HasOverlap(inputs) {
 		err := fmt.Errorf("%w: %s", ErrConflictsWithOtherTx, txID)
-		return gossip.WrapDroppedGossipableReason(err, droppedConflictingTx)
+		return err
 	}
 
 	m.bytesAvailable -= txSize

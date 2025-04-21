@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/txs/mempool"
@@ -33,6 +34,9 @@ func TestGossipMempoolAddVerificationError(t *testing.T) {
 	require.NoError(err)
 	txVerifier := testTxVerifier{err: errFoo}
 
+	gossipMetrics, err := gossip.NewMetrics(prometheus.NewRegistry(), "")
+	require.NoError(err)
+
 	gossipMempool, err := newGossipMempool(
 		mempool,
 		prometheus.NewRegistry(),
@@ -41,6 +45,7 @@ func TestGossipMempoolAddVerificationError(t *testing.T) {
 		testConfig.ExpectedBloomFilterElements,
 		testConfig.ExpectedBloomFilterFalsePositiveProbability,
 		testConfig.MaxBloomFilterFalsePositiveProbability,
+		gossipMetrics,
 	)
 	require.NoError(err)
 
@@ -63,6 +68,9 @@ func TestMempoolDuplicate(t *testing.T) {
 		TxID:     txID,
 	}
 
+	gossipMetrics, err := gossip.NewMetrics(prometheus.NewRegistry(), "")
+	require.NoError(err)
+
 	require.NoError(testMempool.Add(tx))
 	gossipMempool, err := newGossipMempool(
 		testMempool,
@@ -72,6 +80,7 @@ func TestMempoolDuplicate(t *testing.T) {
 		testConfig.ExpectedBloomFilterElements,
 		testConfig.ExpectedBloomFilterFalsePositiveProbability,
 		testConfig.MaxBloomFilterFalsePositiveProbability,
+		gossipMetrics,
 	)
 	require.NoError(err)
 
@@ -94,6 +103,9 @@ func TestGossipAddBloomFilter(t *testing.T) {
 	mempool, err := pmempool.New("", prometheus.NewRegistry(), nil)
 	require.NoError(err)
 
+	gossipMetrics, err := gossip.NewMetrics(prometheus.NewRegistry(), "")
+	require.NoError(err)
+
 	gossipMempool, err := newGossipMempool(
 		mempool,
 		prometheus.NewRegistry(),
@@ -102,6 +114,7 @@ func TestGossipAddBloomFilter(t *testing.T) {
 		testConfig.ExpectedBloomFilterElements,
 		testConfig.ExpectedBloomFilterFalsePositiveProbability,
 		testConfig.MaxBloomFilterFalsePositiveProbability,
+		gossipMetrics,
 	)
 	require.NoError(err)
 

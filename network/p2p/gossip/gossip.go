@@ -39,6 +39,7 @@ const (
 	droppedLabel = "dropped"
 
 	droppedMalformed = "malformed"
+	droppedDuplicate = "duplicate"
 	droppedOther     = "other"
 	droppedNot       = "not"
 	notReceive       = "not_receive"
@@ -51,7 +52,7 @@ var (
 	_ Gossiper = (*PullGossiper[*testTx])(nil)
 	_ Gossiper = (*NoOpGossiper)(nil)
 
-	_ Set[*testTx] = (*FullSet[*testTx])(nil)
+	//_ Set[*testTx] = (*FullSet[*testTx])(nil)
 
 	ioTypeDroppedLabels = []string{ioLabel, typeLabel, droppedLabel}
 	sentPushLabels      = prometheus.Labels{
@@ -68,6 +69,11 @@ var (
 		ioLabel:      receivedIO,
 		typeLabel:    pushType,
 		droppedLabel: droppedMalformed,
+	}
+	receivedDuplicatePushLabels = prometheus.Labels{
+		ioLabel:      receivedIO,
+		typeLabel:    pushType,
+		droppedLabel: droppedDuplicate,
 	}
 	receivedOtherPushLabels = prometheus.Labels{
 		ioLabel:      receivedIO,
@@ -88,6 +94,11 @@ var (
 		ioLabel:      receivedIO,
 		typeLabel:    pullType,
 		droppedLabel: droppedMalformed,
+	}
+	receivedDuplicatePullLabels = prometheus.Labels{
+		ioLabel:      receivedIO,
+		typeLabel:    pullType,
+		droppedLabel: droppedDuplicate,
 	}
 	receivedOtherPullLabels = prometheus.Labels{
 		ioLabel:      receivedIO,
@@ -123,29 +134,6 @@ type ValidatorGossiper struct {
 
 	NodeID     ids.NodeID
 	Validators p2p.ValidatorSet
-}
-
-// ErrDroppedGossipableReason is used by the Set.Add method to describe reason for which a gossipable was dropped.
-// it allows the VM's mempool to speficy a reason that would be used as a prometheus label, creating VM-specific
-// drop reasons.
-type ErrDroppedGossipableReason struct {
-	e      error
-	reason string
-}
-
-func WrapDroppedGossipableReason(innerError error, reason string) *ErrDroppedGossipableReason {
-	return &ErrDroppedGossipableReason{
-		e:      innerError,
-		reason: reason,
-	}
-}
-
-func (e ErrDroppedGossipableReason) Error() string {
-	return e.e.Error()
-}
-
-func (e ErrDroppedGossipableReason) Unwrap() error {
-	return e.e
 }
 
 // Metrics that are tracked across a gossip protocol. A given protocol should
@@ -308,6 +296,7 @@ func (p *PullGossiper[_]) handleResponse(
 		p.metrics,
 		&receivedPullLabels,
 		&receivedMalformedPullLabels,
+		&receivedDuplicatePullLabels,
 		&receivedOtherPullLabels,
 	)
 }
@@ -321,12 +310,11 @@ func addIncomingGossipable[T Gossipable](
 	metrics Metrics,
 	receivedLabel *prometheus.Labels,
 	receivedMalformedLabel *prometheus.Labels,
+	receivedDuplicateLabel *prometheus.Labels,
 	receivedOtherLabel *prometheus.Labels,
 ) {
-	droppedLabels := make(map[string]*prometheus.Labels)
 	receivedBytes := make(map[*prometheus.Labels]int)
 	receivedCount := make(map[*prometheus.Labels]int)
-	var droppedReasonErr ErrDroppedGossipableReason
 	for _, bytes := range gossip {
 		gossipable, err := marshaller.UnmarshalGossip(bytes)
 		if err != nil {
@@ -347,19 +335,9 @@ func addIncomingGossipable[T Gossipable](
 			zap.Stringer("id", gossipID),
 		)
 		if err := set.Add(gossipable); err != nil {
-			if errors.As(err, &droppedReasonErr) {
-				dropLabel := droppedLabels[droppedReasonErr.reason]
-				if dropLabel == nil {
-					// allocate a new label for this reason.
-					dropLabel = &prometheus.Labels{
-						ioLabel:      (*receivedLabel)[ioLabel],
-						typeLabel:    (*receivedLabel)[typeLabel],
-						droppedLabel: droppedReasonErr.reason,
-					}
-					droppedLabels[droppedReasonErr.reason] = dropLabel
-				}
-				receivedBytes[dropLabel] += len(bytes)
-				receivedCount[dropLabel]++
+			if errors.Is(err, ErrDuplicateTx) {
+				receivedBytes[receivedDuplicateLabel] += len(bytes)
+				receivedCount[receivedDuplicateLabel]++
 				continue
 			}
 
@@ -390,7 +368,7 @@ func addIncomingGossipable[T Gossipable](
 // NewPushGossiper returns an instance of PushGossiper
 func NewPushGossiper[T Gossipable](
 	marshaller Marshaller[T],
-	mempool Set[T],
+	set Set[T],
 	validators p2p.ValidatorSubset,
 	client *p2p.Client,
 	metrics Metrics,
@@ -417,7 +395,7 @@ func NewPushGossiper[T Gossipable](
 
 	return &PushGossiper[T]{
 		marshaller:           marshaller,
-		set:                  mempool,
+		set:                  set,
 		validators:           validators,
 		client:               client,
 		metrics:              metrics,
