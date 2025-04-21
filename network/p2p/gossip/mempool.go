@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
+
 	xmempool "github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
