@@ -1,13 +1,1 @@
-#!/usr/bin/env bash
-
-set -euo pipefail
-
-# Ensure the go command is run from the root of the repository
-AVALANCHE_PATH=$(cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
-cd "${AVALANCHE_PATH}"
-
-# Build if needed
-if [[ ! -f ./build/tmpnetctl ]]; then
-   ./scripts/build_tmpnetctl.sh
-fi
-./build/tmpnetctl "${@}"
+../scripts/run_tmpnetctl.sh

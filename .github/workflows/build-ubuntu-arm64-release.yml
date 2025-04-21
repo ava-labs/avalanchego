@@ -23,7 +23,7 @@ jobs:
       - run: go version
 
       - name: Build the avalanchego binaries
-        run: ./scripts/build.sh
+        run: ./scripts/run_task.sh build
 
       - name: Install aws cli
         run: sudo snap install aws-cli --classic
@@ -81,7 +81,7 @@ jobs:
       - run: go version
 
       - name: Build the avalanchego binaries
-        run: ./scripts/build.sh
+        run: ./scripts/run_task.sh build
 
       - name: Install aws cli
         run: sudo snap install aws-cli --classic

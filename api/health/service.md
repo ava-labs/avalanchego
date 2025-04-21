@@ -1,14 +1,14 @@
 The Health API can be used for measuring node health.
 
 <Callout title="Note">
-This API set is for a specific node; it is unavailable on the [public server](/tooling/rpc-providers).
+This API set is for a specific node; it is unavailable on the [public server](https://build.avax.network/docs/tooling/rpc-providers).
 </Callout>
 
 ## Health Checks
 
 The node periodically runs all health checks, including health checks for each chain.
 
-The frequency at which health checks are run can be specified with the [\--health-check-frequency](/nodes/configure/configs-flags) flag.
+The frequency at which health checks are run can be specified with the [\--health-check-frequency](https://build.avax.network/docs/nodes/configure/configs-flags) flag.
 
 ## Filterable Health Checks
 
@@ -51,7 +51,7 @@ The available endpoints for GET requests are:
 
 ### Format
 
-This API uses the `json 2.0` RPC format. For more information on making JSON RPC calls, see [here](/api-reference/standards/guides/issuing-api-calls).
+This API uses the `json 2.0` RPC format. For more information on making JSON RPC calls, see [here](https://build.avax.network/docs/api-reference/guides/issuing-api-calls).
 
 ### Endpoint
 

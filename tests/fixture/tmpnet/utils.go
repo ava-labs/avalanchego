@@ -47,35 +47,6 @@ func CheckNodeHealth(ctx context.Context, uri string) (*health.APIReply, error) 
 	return nil, fmt.Errorf("%w: %w", ErrUnrecoverableNodeHealthCheck, err)
 }
 
-// WaitForHealthy blocks until Node.IsHealthy returns true or an error (including context timeout) is observed.
-func WaitForHealthy(ctx context.Context, node *Node) error {
-	if _, ok := ctx.Deadline(); !ok {
-		return fmt.Errorf("unable to wait for health for node %q with a context without a deadline", node.NodeID)
-	}
-	ticker := time.NewTicker(DefaultNodeTickerInterval)
-	defer ticker.Stop()
-
-	for {
-		healthy, err := node.IsHealthy(ctx)
-		switch {
-		case errors.Is(err, ErrUnrecoverableNodeHealthCheck):
-			return fmt.Errorf("%w for node %q", err, node.NodeID)
-		case err != nil:
-			// Error is recoverable
-			// TODO(marun) Log the error to aid in troubleshooting once a logger is available
-			continue
-		case healthy:
-			return nil
-		}
-
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("failed to wait for health of node %q before timeout: %w", node.NodeID, ctx.Err())
-		case <-ticker.C:
-		}
-	}
-}
-
 // NodeURI associates a node ID with its API URI.
 type NodeURI struct {
 	NodeID ids.NodeID

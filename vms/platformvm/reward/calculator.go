@@ -63,11 +63,7 @@ func (c *calculator) Calculate(stakedDuration time.Duration, stakedAmount, curre
 	}
 
 	finalReward := reward.Uint64()
-	if finalReward > remainingSupply {
-		return remainingSupply
-	}
-
-	return finalReward
+	return min(remainingSupply, finalReward)
 }
 
 // Split [totalAmount] into [totalAmount * shares percentage] and the remainder.

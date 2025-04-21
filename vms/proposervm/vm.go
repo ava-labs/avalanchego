@@ -42,8 +42,7 @@ const (
 	// blocks.
 	DefaultNumHistoricalBlocks uint64 = 0
 
-	checkIndexedFrequency = 10 * time.Second
-	innerBlkCacheSize     = 64 * units.MiB
+	innerBlkCacheSize = 64 * units.MiB
 )
 
 var (

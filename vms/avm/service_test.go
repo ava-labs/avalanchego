@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/btcutil/bech32"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
@@ -34,7 +33,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/state/statemock"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/index"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
@@ -251,46 +249,6 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 	// The balance should not include the UTXO since it is only partly owned by [addr]
 	require.Zero(balanceReply.Balance)
 	require.Empty(balanceReply.UTXOIDs)
-}
-
-func TestServiceGetTxs(t *testing.T) {
-	require := require.New(t)
-	env := setup(t, &envConfig{
-		fork: upgradetest.Latest,
-	})
-	service := &Service{vm: env.vm}
-
-	var err error
-	env.vm.addressTxsIndexer, err = index.NewIndexer(env.vm.db, env.vm.ctx.Log, "", prometheus.NewRegistry(), false)
-	require.NoError(err)
-
-	assetID := ids.GenerateTestID()
-	addr := ids.GenerateTestShortID()
-	addrStr, err := env.vm.FormatLocalAddress(addr)
-	require.NoError(err)
-
-	testTxCount := 25
-	testTxs := initTestTxIndex(t, env.vm.db, addr, assetID, testTxCount)
-
-	env.vm.ctx.Lock.Unlock()
-
-	// get the first page
-	getTxsArgs := &GetAddressTxsArgs{
-		PageSize:    10,
-		JSONAddress: api.JSONAddress{Address: addrStr},
-		AssetID:     assetID.String(),
-	}
-	getTxsReply := &GetAddressTxsReply{}
-	require.NoError(service.GetAddressTxs(nil, getTxsArgs, getTxsReply))
-	require.Len(getTxsReply.TxIDs, 10)
-	require.Equal(getTxsReply.TxIDs, testTxs[:10])
-
-	// get the second page
-	getTxsArgs.Cursor = getTxsReply.Cursor
-	getTxsReply = &GetAddressTxsReply{}
-	require.NoError(service.GetAddressTxs(nil, getTxsArgs, getTxsReply))
-	require.Len(getTxsReply.TxIDs, 10)
-	require.Equal(getTxsReply.TxIDs, testTxs[10:20])
 }
 
 func TestServiceGetAllBalances(t *testing.T) {

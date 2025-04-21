@@ -519,7 +519,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	require.NoError(err)
 
 	clk := &mockable.Clock{}
-	onAccept := func(*txs.Tx) error { return nil }
+	onAccept := func(*txs.Tx) {}
 	now := time.Now()
 	parentTimestamp := now.Add(-2 * time.Second)
 	parentID := ids.GenerateTestID()

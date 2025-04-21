@@ -273,10 +273,7 @@ func getSelectors(networkUUID string) (string, error) {
 	selectors := []string{}
 	githubLabels := githubLabelsFromEnv()
 	for label := range githubLabels {
-		value, err := githubLabels.GetStringVal(label)
-		if err != nil {
-			return "", err
-		}
+		value := githubLabels[label]
 		if len(value) == 0 {
 			continue
 		}

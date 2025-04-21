@@ -1,5 +1,19 @@
 # Release Notes
 
+## [v1.13.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.1)
+
+This version is backwards compatible to [v1.13.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.0). It is optional, but encouraged. The supported plugin version is `39`.
+
+### AVM
+
+- Removed indexer config flags
+  - `--index-transactions`
+  - `--index-allow-incomplete`
+
+### APIs
+
+- Removed `avm.getAddressTxs` api
+
 ## [v1.13.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.0)
 
 This upgrade consists of the following Avalanche Community Proposal (ACP):

@@ -215,13 +215,7 @@ func (b *Block) Accept(context.Context) error {
 
 	txs := b.Txs()
 	for _, tx := range txs {
-		if err := b.manager.onAccept(tx); err != nil {
-			return fmt.Errorf(
-				"failed to mark tx %q as accepted: %w",
-				blkID,
-				err,
-			)
-		}
+		b.manager.onAccept(tx)
 	}
 
 	b.manager.lastAccepted = blkID
