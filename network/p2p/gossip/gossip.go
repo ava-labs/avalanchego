@@ -52,7 +52,7 @@ var (
 	_ Gossiper = (*PullGossiper[*testTx])(nil)
 	_ Gossiper = (*NoOpGossiper)(nil)
 
-	//_ Set[*testTx] = (*FullSet[*testTx])(nil)
+	_ Set[*testTx] = (*FullSet[*testTx])(nil)
 
 	ioTypeDroppedLabels = []string{ioLabel, typeLabel, droppedLabel}
 	sentPushLabels      = prometheus.Labels{

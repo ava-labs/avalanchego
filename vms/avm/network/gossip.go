@@ -123,12 +123,11 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 
 	g.gossipMempoolLock.Lock()
 	if g.mempool.Has(txID) {
-
 		defer g.gossipMempoolLock.Unlock()
 		// adding an entry would fail, and an error would be returned.
 		return g.mempool.Add(tx)
 	}
-	// we can release the lock here, as it would get re-aquired and tested in AddWithoutVerification
+	// we can release the lock here, as it would get re-acquired and tested in AddWithoutVerification
 	g.gossipMempoolLock.Unlock()
 
 	if reason := g.Mempool.GetDropReason(txID); reason != nil {

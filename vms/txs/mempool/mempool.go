@@ -33,11 +33,6 @@ var (
 	ErrTxTooLarge           = errors.New("tx too large")
 	ErrMempoolFull          = errors.New("mempool is full")
 	ErrConflictsWithOtherTx = errors.New("tx conflicts with other tx")
-
-	droppedDuplicate     = "duplicate"
-	droppedTxTooLarge    = "tx_too_large"
-	droppedMempoolFull   = "mempool_full"
-	droppedConflictingTx = "tx_conflicts_with_another"
 )
 
 type Tx interface {
