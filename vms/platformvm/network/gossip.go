@@ -30,12 +30,7 @@ var (
 
 // bloomChurnMultiplier is the number used to multiply the size of the mempool
 // to determine how large of a bloom filter to create.
-const (
-	bloomChurnMultiplier          = 3
-	droppedDuplicate              = "duplicate"
-	droppedFailedVerification     = "failed_verification"
-	droppedFailedResetBloomFilter = "failed_reset_bloom_filter"
-)
+const bloomChurnMultiplier = 3
 
 // txGossipHandler is the handler called when serving gossip messages
 type txGossipHandler struct {
