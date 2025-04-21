@@ -4,14 +4,14 @@
 package gossip
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	xmempool "github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
-var ErrDuplicateTx = errors.New("duplicate tx")
+var ErrDuplicateTx = xmempool.ErrDuplicateTx
 
 type Mempool[T Gossipable] interface {
 	Add(tx T) error

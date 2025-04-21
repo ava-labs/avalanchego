@@ -247,6 +247,10 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				prometheus.NewRegistry(),
 				testConfig,
 			)
+			tt.mempool.Iterate(func(tx *txs.Tx) bool {
+				n.mempool.mempool.Add(tx)
+				return true
+			})
 			require.NoError(err)
 			err = n.IssueTxFromRPC(tt.tx)
 			require.ErrorIs(err, tt.expectedErr)
