@@ -248,7 +248,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				testConfig,
 			)
 			tt.mempool.Iterate(func(tx *txs.Tx) bool {
-				n.mempool.mempool.Add(tx)
+				require.NoError(n.mempool.mempool.Add(tx))
 				return true
 			})
 			require.NoError(err)
