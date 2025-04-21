@@ -108,28 +108,25 @@ func (m *mempool[T]) Add(tx T) error {
 
 	txSize := tx.Size()
 	if txSize > MaxTxSize {
-		err := fmt.Errorf("%w: %s size (%d) > max size (%d)",
+		return fmt.Errorf("%w: %s size (%d) > max size (%d)",
 			ErrTxTooLarge,
 			txID,
 			txSize,
 			MaxTxSize,
 		)
-		return err
 	}
 	if txSize > m.bytesAvailable {
-		err := fmt.Errorf("%w: %s size (%d) > available space (%d)",
+		return fmt.Errorf("%w: %s size (%d) > available space (%d)",
 			ErrMempoolFull,
 			txID,
 			txSize,
 			m.bytesAvailable,
 		)
-		return err
 	}
 
 	inputs := tx.InputIDs()
 	if m.consumedUTXOs.HasOverlap(inputs) {
-		err := fmt.Errorf("%w: %s", ErrConflictsWithOtherTx, txID)
-		return err
+		return fmt.Errorf("%w: %s", ErrConflictsWithOtherTx, txID)
 	}
 
 	m.bytesAvailable -= txSize
