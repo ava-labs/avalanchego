@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -42,7 +43,10 @@ const (
 	// blocks.
 	DefaultNumHistoricalBlocks uint64 = 0
 
-	innerBlkCacheSize = 64 * units.MiB
+	checkIndexedFrequency = 10 * time.Second
+	innerBlkCacheSize     = 64 * units.MiB
+
+	pChainPostBootstrapSyncPollInterval = time.Millisecond * 100
 )
 
 var (
@@ -71,9 +75,11 @@ type VM struct {
 	scheduler.Scheduler
 	mockable.Clock
 
-	ctx         *snow.Context
-	db          *versiondb.Database
-	toScheduler chan<- common.Message
+	ctx                 *snow.Context
+	db                  *versiondb.Database
+	toScheduler         chan<- common.Message
+	schedulerDispatched atomic.Bool
+	normalState         atomic.Bool
 
 	// Block ID --> Block
 	// Each element is a block that passed verification but
@@ -161,13 +167,7 @@ func (vm *VM) Initialize(
 	}
 	vm.innerBlkCache = innerBlkCache
 
-	scheduler, vmToEngine := scheduler.New(vm.ctx.Log, toEngine)
-	vm.Scheduler = scheduler
-	vm.toScheduler = vmToEngine
-
-	go chainCtx.Log.RecoverAndPanic(func() {
-		scheduler.Dispatch(time.Now())
-	})
+	defer vm.dispatchScheduler(toEngine)
 
 	vm.verifiedBlocks = make(map[ids.ID]PostForkBlock)
 	detachedCtx := context.WithoutCancel(ctx)
@@ -182,7 +182,7 @@ func (vm *VM) Initialize(
 		genesisBytes,
 		upgradeBytes,
 		configBytes,
-		vmToEngine,
+		vm.toScheduler,
 		fxs,
 		appSender,
 	)
@@ -249,6 +249,74 @@ func (vm *VM) Initialize(
 	)
 }
 
+func (vm *VM) dispatchScheduler(toEngine chan<- common.Message) {
+	scheduler, vmToEngine := scheduler.New(vm.ctx.Log, toEngine)
+	vm.Scheduler = scheduler
+	vm.toScheduler = vmToEngine
+
+	platformChain := vm.ctx.ChainID == constants.PlatformChainID
+
+	go vm.ctx.Log.RecoverAndPanic(func() {
+		// Since new blocks built must have a P-chain height that is at least the P-chain height
+		// of their ancestors, if our local P-chain height is behind the P-chain height of our inner VM,
+		// we cannot build blocks.
+		// We therefore wait until the local P-chain has caught up with the P-chain height of the last block
+		// of our inner VM.
+		for !vm.isLocalPlatformChainInSync() && !platformChain {
+			select {
+			case <-vm.context.Done():
+				return
+			default:
+			}
+			time.Sleep(pChainPostBootstrapSyncPollInterval)
+		}
+		vm.schedulerDispatched.Store(true)
+		scheduler.Dispatch(time.Now())
+	})
+}
+
+func (vm *VM) isLocalPlatformChainInSync() bool {
+	vm.ctx.Lock.Lock()
+	defer vm.ctx.Lock.Unlock()
+
+	if !vm.normalState.Load() {
+		vm.ctx.Log.Verbo("not yet in normal operation state")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	lastAcceptedID, err := vm.GetLastAccepted()
+	if err != nil {
+		vm.ctx.Log.Debug("failed getting last accepted block ID", zap.Error(err))
+		return false
+	}
+
+	lastAccepted, err := vm.getPostForkBlock(ctx, lastAcceptedID)
+	if err != nil {
+		vm.ctx.Log.Debug("failed getting block with last accepted ID",
+			zap.Stringer("ID", lastAcceptedID), zap.Error(err))
+		return false
+	}
+
+	localPchainHeight, err := vm.ctx.ValidatorState.GetCurrentHeight(ctx)
+	if err != nil {
+		vm.ctx.Log.Debug("failed getting local P-Chain block height", zap.Error(err))
+		return false
+	}
+
+	attestedPchainHeight, err := lastAccepted.pChainHeight(ctx)
+	if err != nil {
+		vm.ctx.Log.Debug("failed getting P-Chain height of last accepted block", zap.Uint64("block height", lastAccepted.Height()), zap.Error(err))
+		return false
+	}
+
+	vm.ctx.Log.Debug("checking if local platform chain is in sync",
+		zap.Uint64("local P-chain height", localPchainHeight), zap.Uint64("attested P-chain height", attestedPchainHeight))
+
+	return localPchainHeight >= attestedPchainHeight
+}
+
 // shutdown ops then propagate shutdown to innerVM
 func (vm *VM) Shutdown(ctx context.Context) error {
 	vm.onShutdown()
@@ -264,6 +332,10 @@ func (vm *VM) Shutdown(ctx context.Context) error {
 func (vm *VM) SetState(ctx context.Context, newState snow.State) error {
 	if err := vm.ChainVM.SetState(ctx, newState); err != nil {
 		return err
+	}
+
+	if newState == snow.NormalOp {
+		vm.normalState.Store(true)
 	}
 
 	oldState := vm.consensusState
@@ -369,13 +441,20 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 		// until the P-chain's height has advanced.
 		return nil
 	}
-	vm.Scheduler.SetBuildBlockTime(nextStartTime)
 
 	vm.ctx.Log.Debug("set preference",
 		zap.Stringer("blkID", blk.ID()),
 		zap.Time("blockTimestamp", parentTimestamp),
 		zap.Time("nextStartTime", nextStartTime),
 	)
+
+	if !vm.schedulerDispatched.Load() {
+		vm.ctx.Log.Debug("Skipping setting block build time because local P-chain has not caught up yet")
+		return nil
+	}
+
+	vm.Scheduler.SetBuildBlockTime(nextStartTime)
+
 	return nil
 }
 
