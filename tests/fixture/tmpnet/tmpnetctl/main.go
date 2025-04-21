@@ -52,13 +52,7 @@ func main() {
 	}
 	rootCmd.AddCommand(versionCmd)
 
-	var (
-		rootDir           string
-		networkOwner      string
-		runtimeConfigVars *flags.RuntimeConfigVars
-		nodeCount         uint8
-	)
-
+	var startNetworkVars *flags.StartNetworkVars
 	startNetworkCmd := &cobra.Command{
 		Use:   "start-network",
 		Short: "Start a new temporary network",
@@ -68,14 +62,19 @@ func main() {
 				return err
 			}
 
-			nodeRuntimeConfig, err := runtimeConfigVars.GetNodeRuntimeConfig()
+			nodeCount, err := startNetworkVars.GetNodeCount()
+			if err != nil {
+				return err
+			}
+
+			nodeRuntimeConfig, err := startNetworkVars.GetNodeRuntimeConfig()
 			if err != nil {
 				return err
 			}
 
 			network := &tmpnet.Network{
-				Owner:                networkOwner,
-				Nodes:                tmpnet.NewNodesOrPanic(int(nodeCount)),
+				Owner:                startNetworkVars.NetworkOwner,
+				Nodes:                tmpnet.NewNodesOrPanic(nodeCount),
 				DefaultRuntimeConfig: *nodeRuntimeConfig,
 			}
 
@@ -85,7 +84,7 @@ func main() {
 				ctx,
 				log,
 				network,
-				rootDir,
+				startNetworkVars.RootNetworkDir,
 			); err != nil {
 				log.Error("failed to bootstrap network", zap.Error(err))
 				return err
@@ -110,11 +109,7 @@ func main() {
 			return nil
 		},
 	}
-	// TODO(marun) Enable reuse of flags across tmpnetctl and e2e
-	startNetworkCmd.PersistentFlags().StringVar(&rootDir, "root-dir", os.Getenv(tmpnet.RootDirEnvName), "The path to the root directory for temporary networks")
-	runtimeConfigVars = flags.NewRuntimeConfigFlagSetVars(startNetworkCmd.PersistentFlags())
-	startNetworkCmd.PersistentFlags().Uint8Var(&nodeCount, "node-count", tmpnet.DefaultNodeCount, "Number of nodes the network should initially consist of")
-	startNetworkCmd.PersistentFlags().StringVar(&networkOwner, "network-owner", "", "The string identifying the intended owner of the network")
+	startNetworkVars = flags.NewStartNetworkFlagSetVars(startNetworkCmd.PersistentFlags(), "" /* defaultNetworkOwner */)
 	rootCmd.AddCommand(startNetworkCmd)
 
 	stopNetworkCmd := &cobra.Command{
@@ -126,7 +121,11 @@ func main() {
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
 			defer cancel()
-			if err := tmpnet.StopNetwork(ctx, networkDir); err != nil {
+			log, err := tests.LoggerForFormat("", rawLogFormat)
+			if err != nil {
+				return err
+			}
+			if err := tmpnet.StopNetwork(ctx, log, networkDir); err != nil {
 				return err
 			}
 			fmt.Fprintf(os.Stdout, "Stopped network configured at: %s\n", networkDir)

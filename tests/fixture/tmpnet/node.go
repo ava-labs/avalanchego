@@ -12,18 +12,15 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/spf13/cast"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
 
@@ -42,24 +39,24 @@ var (
 
 // NodeRuntime defines the methods required to support running a node.
 type NodeRuntime interface {
-	readState() error
+	readState(ctx context.Context) error
 	GetLocalURI(ctx context.Context) (string, func(), error)
 	GetLocalStakingAddress(ctx context.Context) (netip.AddrPort, func(), error)
-	Start(log logging.Logger) error
-	InitiateStop() error
+	Start(ctx context.Context) error
+	InitiateStop(ctx context.Context) error
 	WaitForStopped(ctx context.Context) error
 	IsHealthy(ctx context.Context) (bool, error)
 }
 
 // Configuration required to configure a node runtime.
 type NodeRuntimeConfig struct {
-	Process *ProcessRuntimeConfig
+	Process *ProcessRuntimeConfig `json:"process,omitempty"`
 }
 
 type ProcessRuntimeConfig struct {
-	AvalancheGoPath   string
-	PluginDir         string
-	ReuseDynamicPorts bool
+	AvalancheGoPath   string `json:"avalancheGoPath,omitempty"`
+	PluginDir         string `json:"pluginDir,omitempty"`
+	ReuseDynamicPorts bool   `json:"reuseDynamicPorts,omitempty"`
 }
 
 // Node supports configuring and running a node participating in a temporary network.
@@ -83,25 +80,25 @@ type Node struct {
 	URI            string
 	StakingAddress netip.AddrPort
 
+	// Defaults to [network dir]/[node id] if not set
+	DataDir string
+
 	// Initialized on demand
 	runtime NodeRuntime
 
-	// Intended to be set by the network
 	network *Network
 }
 
 // Initializes a new node with only the data dir set
-func NewNode(dataDir string) *Node {
+func NewNode() *Node {
 	return &Node{
-		Flags: FlagsMap{
-			config.DataDirKey: dataDir,
-		},
+		Flags: FlagsMap{},
 	}
 }
 
 // Initializes an ephemeral node using the provided config flags
 func NewEphemeralNode(flags FlagsMap) *Node {
-	node := NewNode("")
+	node := NewNode()
 	node.Flags = flags
 	node.IsEphemeral = true
 
@@ -112,7 +109,7 @@ func NewEphemeralNode(flags FlagsMap) *Node {
 func NewNodesOrPanic(count int) []*Node {
 	nodes := make([]*Node, count)
 	for i := range nodes {
-		node := NewNode("")
+		node := NewNode()
 		if err := node.EnsureKeys(); err != nil {
 			panic(err)
 		}
@@ -121,55 +118,10 @@ func NewNodesOrPanic(count int) []*Node {
 	return nodes
 }
 
-// Reads a node's configuration from the specified directory.
-func ReadNode(dataDir string) (*Node, error) {
-	node := NewNode(dataDir)
-	return node, node.Read()
-}
-
-// Reads nodes from the specified network directory.
-func ReadNodes(network *Network, includeEphemeral bool) ([]*Node, error) {
-	nodes := []*Node{}
-
-	// Node configuration is stored in child directories
-	entries, err := os.ReadDir(network.Dir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read dir: %w", err)
-	}
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-
-		nodeDir := filepath.Join(network.Dir, entry.Name())
-		node, err := ReadNode(nodeDir)
-		if errors.Is(err, os.ErrNotExist) {
-			// If no config file exists, assume this is not the path of a node
-			continue
-		} else if err != nil {
-			return nil, err
-		}
-
-		if !includeEphemeral && node.IsEphemeral {
-			continue
-		}
-
-		if err := node.EnsureNodeID(); err != nil {
-			return nil, fmt.Errorf("failed to ensure NodeID: %w", err)
-		}
-
-		node.network = network
-
-		nodes = append(nodes, node)
-	}
-
-	return nodes, nil
-}
-
 // Retrieves the runtime for the node.
 func (n *Node) getRuntime() NodeRuntime {
 	if n.runtime == nil {
-		n.runtime = &NodeProcess{
+		n.runtime = &ProcessRuntime{
 			node: n,
 		}
 	}
@@ -191,27 +143,23 @@ func (n *Node) IsHealthy(ctx context.Context) (bool, error) {
 	return n.getRuntime().IsHealthy(ctx)
 }
 
-func (n *Node) Start(log logging.Logger) error {
-	return n.getRuntime().Start(log)
+func (n *Node) Start(ctx context.Context) error {
+	return n.getRuntime().Start(ctx)
 }
 
 func (n *Node) InitiateStop(ctx context.Context) error {
 	if err := n.SaveMetricsSnapshot(ctx); err != nil {
 		return err
 	}
-	return n.getRuntime().InitiateStop()
+	return n.getRuntime().InitiateStop(ctx)
 }
 
 func (n *Node) WaitForStopped(ctx context.Context) error {
 	return n.getRuntime().WaitForStopped(ctx)
 }
 
-func (n *Node) readState() error {
-	return n.getRuntime().readState()
-}
-
-func (n *Node) GetDataDir() string {
-	return cast.ToString(n.Flags[config.DataDirKey])
+func (n *Node) readState(ctx context.Context) error {
+	return n.getRuntime().readState(ctx)
 }
 
 func (n *Node) GetLocalURI(ctx context.Context) (string, func(), error) {
@@ -273,10 +221,7 @@ func (n *Node) EnsureKeys() error {
 // Ensures a BLS signing key is generated if not already present.
 func (n *Node) EnsureBLSSigningKey() error {
 	// Attempt to retrieve an existing key
-	existingKey, err := n.Flags.GetStringVal(config.StakingSignerKeyContentKey)
-	if err != nil {
-		return err
-	}
+	existingKey := n.Flags[config.StakingSignerKeyContentKey]
 	if len(existingKey) > 0 {
 		// Nothing to do
 		return nil
@@ -296,16 +241,8 @@ func (n *Node) EnsureStakingKeypair() error {
 	keyKey := config.StakingTLSKeyContentKey
 	certKey := config.StakingCertContentKey
 
-	key, err := n.Flags.GetStringVal(keyKey)
-	if err != nil {
-		return err
-	}
-
-	cert, err := n.Flags.GetStringVal(certKey)
-	if err != nil {
-		return err
-	}
-
+	key := n.Flags[keyKey]
+	cert := n.Flags[certKey]
 	if len(key) == 0 && len(cert) == 0 {
 		// Generate new keypair
 		tlsCertBytes, tlsKeyBytes, err := staking.NewCertAndKeyBytes()
@@ -325,10 +262,7 @@ func (n *Node) EnsureStakingKeypair() error {
 // Derives the nodes proof-of-possession. Requires the node to have a
 // BLS signing key.
 func (n *Node) GetProofOfPossession() (*signer.ProofOfPossession, error) {
-	signingKey, err := n.Flags.GetStringVal(config.StakingSignerKeyContentKey)
-	if err != nil {
-		return nil, err
-	}
+	signingKey := n.Flags[config.StakingSignerKeyContentKey]
 	signingKeyBytes, err := base64.StdEncoding.DecodeString(signingKey)
 	if err != nil {
 		return nil, err
@@ -350,10 +284,7 @@ func (n *Node) EnsureNodeID() error {
 	keyKey := config.StakingTLSKeyContentKey
 	certKey := config.StakingCertContentKey
 
-	key, err := n.Flags.GetStringVal(keyKey)
-	if err != nil {
-		return err
-	}
+	key := n.Flags[keyKey]
 	if len(key) == 0 {
 		return errMissingTLSKeyForNodeID
 	}
@@ -362,10 +293,7 @@ func (n *Node) EnsureNodeID() error {
 		return fmt.Errorf("failed to ensure node ID: failed to base64 decode value for %q: %w", keyKey, err)
 	}
 
-	cert, err := n.Flags.GetStringVal(certKey)
-	if err != nil {
-		return err
-	}
+	cert := n.Flags[certKey]
 	if len(cert) == 0 {
 		return errMissingCertForNodeID
 	}
@@ -409,4 +337,35 @@ func (n *Node) SaveAPIPort() error {
 	}
 	n.Flags[config.HTTPPortKey] = port
 	return nil
+}
+
+// WaitForHealthy blocks until node health is true or an error (including context timeout) is observed.
+func (n *Node) WaitForHealthy(ctx context.Context) error {
+	if _, ok := ctx.Deadline(); !ok {
+		return fmt.Errorf("unable to wait for health for node %q with a context without a deadline", n.NodeID)
+	}
+	ticker := time.NewTicker(DefaultNodeTickerInterval)
+	defer ticker.Stop()
+
+	for {
+		healthy, err := n.IsHealthy(ctx)
+		switch {
+		case errors.Is(err, ErrUnrecoverableNodeHealthCheck):
+			return fmt.Errorf("%w for node %q", err, n.NodeID)
+		case err != nil:
+			n.network.log.Verbo("failed to query node health",
+				zap.Stringer("nodeID", n.NodeID),
+				zap.Error(err),
+			)
+			continue
+		case healthy:
+			return nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("failed to wait for health of node %q before timeout: %w", n.NodeID, ctx.Err())
+		case <-ticker.C:
+		}
+	}
 }
