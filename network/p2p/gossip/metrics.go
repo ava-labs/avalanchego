@@ -158,7 +158,7 @@ func (m *Metrics) trackGossipable(txID ids.ID, gossipableBytes int) {
 	m.gossipables[txID] = gossipableBytes
 }
 
-func (m *Metrics) ObserveIncomingTransaction(txID ids.ID, label string) {
+func (m *Metrics) ObserveIncomingGossipable(txID ids.ID, label string) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	size, ok := m.gossipables[txID]

@@ -166,7 +166,7 @@ func addIncomingGossipable[T Gossipable](
 		)
 		metrics.trackGossipable(gossipID, len(bytes))
 		if err := set.Add(gossipable); err != nil {
-			metrics.ObserveIncomingTransaction(gossipID, droppedOther)
+			metrics.ObserveIncomingGossipable(gossipID, droppedOther)
 			log.Debug(
 				"failed to add gossip to the known set",
 				zap.Stringer("nodeID", nodeID),
@@ -175,7 +175,7 @@ func addIncomingGossipable[T Gossipable](
 			)
 			continue
 		}
-		metrics.ObserveIncomingTransaction(gossipID, droppedNot)
+		metrics.ObserveIncomingGossipable(gossipID, droppedNot)
 	}
 
 	metrics.observeReceivedMessage(typeLabel)

@@ -46,7 +46,7 @@ func NewMempool[T Gossipable](
 func (m *mempool[T]) Add(tx T) error {
 	txID := tx.GossipID()
 	if m.Has(txID) {
-		m.metrics.ObserveIncomingTransaction(txID, droppedDuplicate)
+		m.metrics.ObserveIncomingGossipable(txID, droppedDuplicate)
 		return fmt.Errorf("%w: %s", ErrDuplicateTx, txID)
 	}
 
