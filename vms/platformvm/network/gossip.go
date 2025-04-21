@@ -74,7 +74,7 @@ func newGossipMempool(
 	minTargetElements int,
 	targetFalsePositiveProbability,
 	resetFalsePositiveProbability float64,
-	gossipMetrics gossip.Metrics,
+	gossipMetrics *gossip.Metrics,
 ) (*gossipMempool, error) {
 	bloom, err := gossip.NewBloomFilter(registerer, "mempool_bloom_filter", minTargetElements, targetFalsePositiveProbability, resetFalsePositiveProbability)
 	if err != nil {

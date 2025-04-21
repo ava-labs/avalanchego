@@ -23,29 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-const (
-	ioLabel    = "io"
-	sentIO     = "sent"
-	receivedIO = "received"
-
-	typeLabel  = "type"
-	pushType   = "push"
-	pullType   = "pull"
-	unsentType = "unsent"
-	sentType   = "sent"
-
-	// dropped indicate that the gossipable element was not added to the set due to some reason.
-	// for sent message, we'll use notReceive below.
-	droppedLabel = "dropped"
-
-	droppedMalformed = "malformed"
-	droppedDuplicate = "duplicate"
-	droppedOther     = "other"
-	droppedNot       = "not"
-	notReceive       = "not_receive"
-
-	defaultGossipableCount = 64
-)
+const defaultGossipableCount = 64
 
 var (
 	_ Gossiper = (*ValidatorGossiper)(nil)
@@ -53,65 +31,6 @@ var (
 	_ Gossiper = (*NoOpGossiper)(nil)
 
 	_ Set[*testTx] = (*FullSet[*testTx])(nil)
-
-	ioTypeDroppedLabels = []string{ioLabel, typeLabel, droppedLabel}
-	sentPushLabels      = prometheus.Labels{
-		ioLabel:      sentIO,
-		typeLabel:    pushType,
-		droppedLabel: notReceive,
-	}
-	receivedPushLabels = prometheus.Labels{
-		ioLabel:      receivedIO,
-		typeLabel:    pushType,
-		droppedLabel: droppedNot,
-	}
-	receivedMalformedPushLabels = prometheus.Labels{
-		ioLabel:      receivedIO,
-		typeLabel:    pushType,
-		droppedLabel: droppedMalformed,
-	}
-	receivedDuplicatePushLabels = prometheus.Labels{
-		ioLabel:      receivedIO,
-		typeLabel:    pushType,
-		droppedLabel: droppedDuplicate,
-	}
-	receivedOtherPushLabels = prometheus.Labels{
-		ioLabel:      receivedIO,
-		typeLabel:    pushType,
-		droppedLabel: droppedOther,
-	}
-	sentPullLabels = prometheus.Labels{
-		ioLabel:      sentIO,
-		typeLabel:    pullType,
-		droppedLabel: notReceive,
-	}
-	receivedPullLabels = prometheus.Labels{
-		ioLabel:      receivedIO,
-		typeLabel:    pullType,
-		droppedLabel: droppedNot,
-	}
-	receivedMalformedPullLabels = prometheus.Labels{
-		ioLabel:      receivedIO,
-		typeLabel:    pullType,
-		droppedLabel: droppedMalformed,
-	}
-	receivedDuplicatePullLabels = prometheus.Labels{
-		ioLabel:      receivedIO,
-		typeLabel:    pullType,
-		droppedLabel: droppedDuplicate,
-	}
-	receivedOtherPullLabels = prometheus.Labels{
-		ioLabel:      receivedIO,
-		typeLabel:    pullType,
-		droppedLabel: droppedOther,
-	}
-	typeLabels   = []string{typeLabel}
-	unsentLabels = prometheus.Labels{
-		typeLabel: unsentType,
-	}
-	sentLabels = prometheus.Labels{
-		typeLabel: sentType,
-	}
 
 	ErrInvalidNumValidators     = errors.New("num validators cannot be negative")
 	ErrInvalidNumNonValidators  = errors.New("num non-validators cannot be negative")
@@ -136,86 +55,6 @@ type ValidatorGossiper struct {
 	Validators p2p.ValidatorSet
 }
 
-// Metrics that are tracked across a gossip protocol. A given protocol should
-// only use a single instance of Metrics.
-type Metrics struct {
-	count                   *prometheus.CounterVec
-	bytes                   *prometheus.CounterVec
-	tracking                *prometheus.GaugeVec
-	trackingLifetimeAverage prometheus.Gauge
-	topValidators           *prometheus.GaugeVec
-}
-
-// NewMetrics returns a common set of metrics
-func NewMetrics(
-	metrics prometheus.Registerer,
-	namespace string,
-) (Metrics, error) {
-	m := Metrics{
-		count: prometheus.NewCounterVec(
-			prometheus.CounterOpts{
-				Namespace: namespace,
-				Name:      "gossip_count",
-				Help:      "amount of gossip (n)",
-			},
-			ioTypeDroppedLabels,
-		),
-		bytes: prometheus.NewCounterVec(
-			prometheus.CounterOpts{
-				Namespace: namespace,
-				Name:      "gossip_bytes",
-				Help:      "amount of gossip (bytes)",
-			},
-			ioTypeDroppedLabels,
-		),
-		tracking: prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "gossip_tracking",
-				Help:      "number of gossipables being tracked",
-			},
-			typeLabels,
-		),
-		trackingLifetimeAverage: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "gossip_tracking_lifetime_average",
-			Help:      "average duration a gossipable has been tracked (ns)",
-		}),
-		topValidators: prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "top_validators",
-				Help:      "number of validators gossipables are sent to due to stake",
-			},
-			typeLabels,
-		),
-	}
-	err := errors.Join(
-		metrics.Register(m.count),
-		metrics.Register(m.bytes),
-		metrics.Register(m.tracking),
-		metrics.Register(m.trackingLifetimeAverage),
-		metrics.Register(m.topValidators),
-	)
-	return m, err
-}
-
-func (m *Metrics) observeMessage(labels prometheus.Labels, count int, bytes int) error {
-	countMetric, err := m.count.GetMetricWith(labels)
-	if err != nil {
-		return fmt.Errorf("failed to get count metric: %w", err)
-	}
-
-	bytesMetric, err := m.bytes.GetMetricWith(labels)
-	if err != nil {
-		return fmt.Errorf("failed to get bytes metric: %w", err)
-	}
-
-	countMetric.Add(float64(count))
-	bytesMetric.Add(float64(bytes))
-	return nil
-}
-
 func (v ValidatorGossiper) Gossip(ctx context.Context) error {
 	if !v.Validators.Has(ctx, v.NodeID) {
 		return nil
@@ -229,7 +68,7 @@ func NewPullGossiper[T Gossipable](
 	marshaller Marshaller[T],
 	set Set[T],
 	client *p2p.Client,
-	metrics Metrics,
+	metrics *Metrics,
 	pollSize int,
 ) *PullGossiper[T] {
 	return &PullGossiper[T]{
@@ -247,7 +86,7 @@ type PullGossiper[T Gossipable] struct {
 	marshaller Marshaller[T]
 	set        Set[T]
 	client     *p2p.Client
-	metrics    Metrics
+	metrics    *Metrics
 	pollSize   int
 }
 
@@ -294,10 +133,7 @@ func (p *PullGossiper[_]) handleResponse(
 		nodeID,
 		p.set,
 		p.metrics,
-		&receivedPullLabels,
-		&receivedMalformedPullLabels,
-		&receivedDuplicatePullLabels,
-		&receivedOtherPullLabels,
+		pullType,
 	)
 }
 
@@ -307,19 +143,13 @@ func addIncomingGossipable[T Gossipable](
 	gossip [][]byte,
 	nodeID ids.NodeID,
 	set Set[T],
-	metrics Metrics,
-	receivedLabel *prometheus.Labels,
-	receivedMalformedLabel *prometheus.Labels,
-	receivedDuplicateLabel *prometheus.Labels,
-	receivedOtherLabel *prometheus.Labels,
+	metrics *Metrics,
+	typeLabel string,
 ) {
-	receivedBytes := make(map[*prometheus.Labels]int)
-	receivedCount := make(map[*prometheus.Labels]int)
 	for _, bytes := range gossip {
 		gossipable, err := marshaller.UnmarshalGossip(bytes)
 		if err != nil {
-			receivedBytes[receivedMalformedLabel] += len(bytes)
-			receivedCount[receivedMalformedLabel]++
+			metrics.observeIncomingMalformedGossipable(len(bytes))
 			log.Debug(
 				"failed to unmarshal gossip",
 				zap.Stringer("nodeID", nodeID),
@@ -334,15 +164,9 @@ func addIncomingGossipable[T Gossipable](
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("id", gossipID),
 		)
+		metrics.trackGossipable(gossipID, len(bytes))
 		if err := set.Add(gossipable); err != nil {
-			if errors.Is(err, ErrDuplicateTx) {
-				receivedBytes[receivedDuplicateLabel] += len(bytes)
-				receivedCount[receivedDuplicateLabel]++
-				continue
-			}
-
-			receivedBytes[receivedOtherLabel] += len(bytes)
-			receivedCount[receivedOtherLabel]++
+			metrics.ObserveIncomingTransaction(gossipID, droppedOther)
 			log.Debug(
 				"failed to add gossip to the known set",
 				zap.Stringer("nodeID", nodeID),
@@ -351,18 +175,10 @@ func addIncomingGossipable[T Gossipable](
 			)
 			continue
 		}
-		receivedBytes[receivedLabel] += len(bytes)
-		receivedCount[receivedLabel]++
+		metrics.ObserveIncomingTransaction(gossipID, droppedNot)
 	}
 
-	for label, receivedBytes := range receivedBytes {
-		err := metrics.observeMessage(*label, receivedCount[label], receivedBytes)
-		if err != nil {
-			log.Error("failed to update metrics",
-				zap.Error(err),
-			)
-		}
-	}
+	metrics.observeReceivedMessage(typeLabel)
 }
 
 // NewPushGossiper returns an instance of PushGossiper
@@ -371,7 +187,7 @@ func NewPushGossiper[T Gossipable](
 	set Set[T],
 	validators p2p.ValidatorSubset,
 	client *p2p.Client,
-	metrics Metrics,
+	metrics *Metrics,
 	gossipParams BranchingFactor,
 	regossipParams BranchingFactor,
 	discardedSize int,
@@ -417,7 +233,7 @@ type PushGossiper[T Gossipable] struct {
 	set        Set[T]
 	validators p2p.ValidatorSubset
 	client     *p2p.Client
-	metrics    Metrics
+	metrics    *Metrics
 
 	gossipParams         BranchingFactor
 	regossipParams       BranchingFactor

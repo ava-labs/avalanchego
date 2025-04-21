@@ -22,7 +22,7 @@ func NewHandler[T Gossipable](
 	log logging.Logger,
 	marshaller Marshaller[T],
 	set Set[T],
-	metrics Metrics,
+	metrics *Metrics,
 	targetResponseSize int,
 ) *Handler[T] {
 	return &Handler[T]{
@@ -40,7 +40,7 @@ type Handler[T Gossipable] struct {
 	marshaller         Marshaller[T]
 	log                logging.Logger
 	set                Set[T]
-	metrics            Metrics
+	metrics            *Metrics
 	targetResponseSize int
 }
 
@@ -102,9 +102,6 @@ func (h Handler[_]) AppGossip(_ context.Context, nodeID ids.NodeID, gossipBytes 
 		nodeID,
 		h.set,
 		h.metrics,
-		&receivedPushLabels,
-		&receivedMalformedPushLabels,
-		&receivedDuplicatePushLabels,
-		&receivedOtherPushLabels,
+		pushType,
 	)
 }

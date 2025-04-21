@@ -28,12 +28,12 @@ type Mempool[T Gossipable] interface {
 type mempool[T Gossipable] struct {
 	Txs     map[ids.ID]bool
 	log     logging.Logger
-	metrics Metrics
+	metrics *Metrics
 }
 
 func NewMempool[T Gossipable](
 	log logging.Logger,
-	metrics Metrics,
+	metrics *Metrics,
 ) (*mempool[T], error) {
 	m := &mempool[T]{
 		Txs:     make(map[ids.ID]bool),
@@ -46,6 +46,7 @@ func NewMempool[T Gossipable](
 func (m *mempool[T]) Add(tx T) error {
 	txID := tx.GossipID()
 	if m.Has(txID) {
+		m.metrics.ObserveIncomingTransaction(txID, droppedDuplicate)
 		return fmt.Errorf("%w: %s", ErrDuplicateTx, txID)
 	}
 

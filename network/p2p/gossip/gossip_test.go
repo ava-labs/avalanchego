@@ -32,7 +32,7 @@ func TestGossiperShutdown(*testing.T) {
 		nil,
 		nil,
 		nil,
-		Metrics{},
+		&Metrics{},
 		0,
 	)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -363,7 +363,7 @@ func TestPushGossiperNew(t *testing.T) {
 				nil,
 				nil,
 				nil,
-				Metrics{},
+				&Metrics{},
 				tt.gossipParams,
 				tt.regossipParams,
 				tt.discardedSize,
