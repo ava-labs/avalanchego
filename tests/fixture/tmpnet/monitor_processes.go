@@ -246,6 +246,18 @@ func getServiceDiscoveryDir(cmdName string) (string, error) {
 	return filepath.Join(tmpnetDir, cmdName, "file_sd_configs"), nil
 }
 
+func getLogFilename(cmdName string) string {
+	return cmdName + ".log"
+}
+
+func getLogPath(cmdName string) (string, error) {
+	tmpnetDir, err := getTmpnetPath()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(tmpnetDir, cmdName, getLogFilename(cmdName)), nil
+}
+
 func getPIDPath(workingDir string) string {
 	return filepath.Join(workingDir, "run.pid")
 }
@@ -399,12 +411,13 @@ func startCollectorProcess(
 	workingDir string,
 	pidPath string,
 ) error {
-	logFilename := cmdName + ".log"
+	logFilename := getLogFilename(cmdName)
 	fullCmd := "nohup " + cmdName + " " + args + " > " + logFilename + " 2>&1 & echo -n \"$!\" > " + pidPath
 	log.Info("starting collector",
 		zap.String("cmd", cmdName),
 		zap.String("workingDir", workingDir),
 		zap.String("fullCmd", fullCmd),
+		zap.String("logPath", filepath.Join(workingDir, logFilename)),
 	)
 
 	cmd := exec.Command("bash", "-c", fullCmd)
@@ -482,11 +495,16 @@ func checkReadiness(ctx context.Context, url string) (bool, string, error) {
 
 // waitForReadiness waits until the given readiness URL returns 200
 func waitForReadiness(ctx context.Context, log logging.Logger, cmdName string, readinessURL string) error {
+	logPath, err := getLogPath(cmdName)
+	if err != nil {
+		return err
+	}
 	log.Info("waiting for collector readiness",
 		zap.String("cmd", cmdName),
 		zap.String("url", readinessURL),
+		zap.String("logPath", logPath),
 	)
-	err := pollUntilContextCancel(
+	err = pollUntilContextCancel(
 		ctx,
 		func(_ context.Context) (bool, error) {
 			ready, body, err := checkReadiness(ctx, readinessURL)

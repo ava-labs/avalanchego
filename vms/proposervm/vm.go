@@ -42,8 +42,7 @@ const (
 	// blocks.
 	DefaultNumHistoricalBlocks uint64 = 0
 
-	checkIndexedFrequency = 10 * time.Second
-	innerBlkCacheSize     = 64 * units.MiB
+	innerBlkCacheSize = 64 * units.MiB
 )
 
 var (
@@ -192,15 +191,15 @@ func (vm *VM) Initialize(
 	}
 
 	if err := vm.repairAcceptedChainByHeight(ctx); err != nil {
-		return err
+		return fmt.Errorf("failed to repair accepted chain by height: %w", err)
 	}
 
 	if err := vm.setLastAcceptedMetadata(ctx); err != nil {
-		return err
+		return fmt.Errorf("failed to set last accepted metadata: %w", err)
 	}
 
 	if err := vm.pruneOldBlocks(); err != nil {
-		return err
+		return fmt.Errorf("failed to prune old blocks: %w", err)
 	}
 
 	forkHeight, err := vm.GetForkHeight()
@@ -216,7 +215,7 @@ func (vm *VM) Initialize(
 			zap.String("state", "before fork"),
 		)
 	default:
-		return err
+		return fmt.Errorf("failed to get fork height: %w", err)
 	}
 
 	vm.proposerBuildSlotGauge = prometheus.NewGauge(prometheus.GaugeOpts{
@@ -278,7 +277,7 @@ func (vm *VM) SetState(ctx context.Context, newState snow.State) error {
 	// accepted block. If state sync has completed successfully, this call is a
 	// no-op.
 	if err := vm.repairAcceptedChainByHeight(ctx); err != nil {
-		return err
+		return fmt.Errorf("failed to repair accepted chain height: %w", err)
 	}
 	return vm.setLastAcceptedMetadata(ctx)
 }
@@ -443,11 +442,11 @@ func (vm *VM) LastAccepted(ctx context.Context) (ids.ID, error) {
 func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 	innerLastAcceptedID, err := vm.ChainVM.LastAccepted(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get inner last accepted: %w", err)
 	}
 	innerLastAccepted, err := vm.ChainVM.GetBlock(ctx, innerLastAcceptedID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get inner last accepted block: %w", err)
 	}
 	proLastAcceptedID, err := vm.State.GetLastAccepted()
 	if err == database.ErrNotFound {
@@ -456,11 +455,11 @@ func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 		return nil
 	}
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get last accepted: %w", err)
 	}
 	proLastAccepted, err := vm.getPostForkBlock(ctx, proLastAcceptedID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get last accepted block: %w", err)
 	}
 
 	proLastAcceptedHeight := proLastAccepted.Height()
@@ -482,14 +481,14 @@ func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 	// proposervm back.
 	forkHeight, err := vm.State.GetForkHeight()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get fork height: %w", err)
 	}
 
 	if forkHeight > innerLastAcceptedHeight {
 		// We are rolling back past the fork, so we should just forget about all
 		// of our proposervm indices.
 		if err := vm.State.DeleteLastAccepted(); err != nil {
-			return err
+			return fmt.Errorf("failed to delete last accepted: %w", err)
 		}
 		return vm.db.Commit()
 	}
@@ -503,9 +502,14 @@ func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 	}
 
 	if err := vm.State.SetLastAccepted(newProLastAcceptedID); err != nil {
-		return err
+		return fmt.Errorf("failed to set last accepted: %w", err)
 	}
-	return vm.db.Commit()
+
+	if err := vm.db.Commit(); err != nil {
+		return fmt.Errorf("failed to commit db: %w", err)
+	}
+
+	return nil
 }
 
 func (vm *VM) setLastAcceptedMetadata(ctx context.Context) error {

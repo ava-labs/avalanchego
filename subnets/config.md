@@ -1,11 +1,3 @@
----
-tags: [Nodes]
-description: Reference for all available Subnet config options and flags.
-sidebar_label: Subnet Configs
-pagination_label: Subnet Configs
-sidebar_position: 2
----
-
 # Subnet Configs
 
 It is possible to provide parameters for a Subnet. Parameters here apply to all
