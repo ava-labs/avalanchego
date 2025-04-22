@@ -113,6 +113,7 @@ func (c *ChainIndex[T]) GetLastAcceptedHeight(_ context.Context) (uint64, error)
 
 // UpdateLastAccepted writes blk to disk and updates the last accepted height
 func (c *ChainIndex[T]) UpdateLastAccepted(ctx context.Context, blk T) error {
+	c.metrics.indexedBlocks.Inc()
 	batch := c.db.NewBatch()
 
 	var (

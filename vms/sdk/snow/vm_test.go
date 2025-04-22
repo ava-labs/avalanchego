@@ -30,8 +30,8 @@ import (
 )
 
 var (
-	_ Block                                     = (*TestBlock)(nil)
-	_ Chain[*TestBlock, *TestBlock, *TestBlock] = (*TestChain)(nil)
+	_ ConcreteBlock                                  = (*TestBlock)(nil)
+	_ ConcreteVM[*TestBlock, *TestBlock, *TestBlock] = (*TestChain)(nil)
 )
 
 var errVerifyInvalidBlock = errors.New("verified invalid block")
@@ -194,11 +194,11 @@ type TestConsensusEngine struct {
 	chain   *TestChain
 	vm      *SnowVM[*TestBlock, *TestBlock, *TestBlock]
 
-	lastAccepted *StatefulBlock[*TestBlock, *TestBlock, *TestBlock]
-	preferred    *StatefulBlock[*TestBlock, *TestBlock, *TestBlock]
-	verified     map[ids.ID]*StatefulBlock[*TestBlock, *TestBlock, *TestBlock]
+	lastAccepted *Block[*TestBlock, *TestBlock, *TestBlock]
+	preferred    *Block[*TestBlock, *TestBlock, *TestBlock]
+	verified     map[ids.ID]*Block[*TestBlock, *TestBlock, *TestBlock]
 	children     map[ids.ID]set.Set[ids.ID]
-	accepted     []*StatefulBlock[*TestBlock, *TestBlock, *TestBlock]
+	accepted     []*Block[*TestBlock, *TestBlock, *TestBlock]
 }
 
 func NewTestConsensusEngine(t *testing.T, initLastAcceptedBlock *TestBlock) *TestConsensusEngine {
@@ -218,7 +218,7 @@ func NewTestConsensusEngineWithRand(t *testing.T, rand *rand.Rand, initLastAccep
 		rand:     rand,
 		chain:    chain,
 		vm:       vm,
-		verified: make(map[ids.ID]*StatefulBlock[*TestBlock, *TestBlock, *TestBlock]),
+		verified: make(map[ids.ID]*Block[*TestBlock, *TestBlock, *TestBlock]),
 		children: make(map[ids.ID]set.Set[ids.ID]),
 	}
 	snowCtx := snowtest.Context(t, ids.GenerateTestID())
@@ -241,7 +241,7 @@ func NewTestConsensusEngineWithRand(t *testing.T, rand *rand.Rand, initLastAccep
 
 // BuildBlock copies the expected behavior of the consensus engine when building a block
 // and assumes the VM always builds a correct block.
-func (ce *TestConsensusEngine) BuildBlock(ctx context.Context) (*StatefulBlock[*TestBlock, *TestBlock, *TestBlock], bool) {
+func (ce *TestConsensusEngine) BuildBlock(ctx context.Context) (*Block[*TestBlock, *TestBlock, *TestBlock], bool) {
 	preferredID := ce.preferred.ID()
 	blk, err := ce.vm.VM.BuildBlock(ctx)
 
@@ -263,7 +263,7 @@ func (ce *TestConsensusEngine) BuildBlock(ctx context.Context) (*StatefulBlock[*
 	return blk, true
 }
 
-func (ce *TestConsensusEngine) verifyValidBlock(ctx context.Context, blk *StatefulBlock[*TestBlock, *TestBlock, *TestBlock]) {
+func (ce *TestConsensusEngine) verifyValidBlock(ctx context.Context, blk *Block[*TestBlock, *TestBlock, *TestBlock]) {
 	ce.require.NoError(blk.Verify(ctx))
 	ce.verified[blk.ID()] = blk
 
@@ -275,7 +275,7 @@ func (ce *TestConsensusEngine) verifyValidBlock(ctx context.Context, blk *Statef
 	children.Add(blk.ID())
 }
 
-func (ce *TestConsensusEngine) selectRandomVerifiedBlock() (*StatefulBlock[*TestBlock, *TestBlock, *TestBlock], bool) {
+func (ce *TestConsensusEngine) selectRandomVerifiedBlock() (*Block[*TestBlock, *TestBlock, *TestBlock], bool) {
 	for _, blk := range ce.verified {
 		return blk, true
 	}
@@ -285,12 +285,12 @@ func (ce *TestConsensusEngine) selectRandomVerifiedBlock() (*StatefulBlock[*Test
 // getLastAcceptedToBlk returns the chain of blocks in the range (lastAcceptedBlk, blk]
 // If lastAcceptedBlk == blk, this returns an empty chain
 // Assumes that blk and its ancestors tracing back to lastAcceptedBlk are in verified
-func (ce *TestConsensusEngine) getLastAcceptedToBlk(_ context.Context, blk *StatefulBlock[*TestBlock, *TestBlock, *TestBlock]) []*StatefulBlock[*TestBlock, *TestBlock, *TestBlock] {
+func (ce *TestConsensusEngine) getLastAcceptedToBlk(_ context.Context, blk *Block[*TestBlock, *TestBlock, *TestBlock]) []*Block[*TestBlock, *TestBlock, *TestBlock] {
 	if blk.ID() == ce.lastAccepted.ID() {
 		return nil
 	}
 
-	chain := make([]*StatefulBlock[*TestBlock, *TestBlock, *TestBlock], 0)
+	chain := make([]*Block[*TestBlock, *TestBlock, *TestBlock], 0)
 	for {
 		// Add the block to the chain and check for the next block
 		chain = append(chain, blk)
@@ -310,7 +310,7 @@ func (ce *TestConsensusEngine) getLastAcceptedToBlk(_ context.Context, blk *Stat
 
 // acceptChain should mimic the accept behavior of acceptPreferredChild in the Snow consensus engine
 // Ref. https://github.com/ava-labs/avalanchego/blob/f6a5c1cd9e0fce911fb2367d1e69b8bb9af1fceb/snow/consensus/snowman/topological.go#L578
-func (ce *TestConsensusEngine) acceptChain(ctx context.Context, chain []*StatefulBlock[*TestBlock, *TestBlock, *TestBlock]) {
+func (ce *TestConsensusEngine) acceptChain(ctx context.Context, chain []*Block[*TestBlock, *TestBlock, *TestBlock]) {
 	for _, blk := range chain {
 		_, ok := ce.verified[blk.ID()]
 		ce.require.True(ok)
@@ -342,7 +342,7 @@ func (ce *TestConsensusEngine) rejectTransitively(ctx context.Context, toReject 
 	}
 }
 
-func (ce *TestConsensusEngine) AcceptPreferredChain(ctx context.Context) (*StatefulBlock[*TestBlock, *TestBlock, *TestBlock], bool) {
+func (ce *TestConsensusEngine) AcceptPreferredChain(ctx context.Context) (*Block[*TestBlock, *TestBlock, *TestBlock], bool) {
 	preferredChain := ce.getLastAcceptedToBlk(ctx, ce.preferred)
 
 	if len(preferredChain) == 0 {
@@ -386,7 +386,7 @@ func (ce *TestConsensusEngine) ParseFutureBlock(ctx context.Context) {
 	ce.require.Equal(tBlk.GetHeight(), blk.Height())
 }
 
-func (ce *TestConsensusEngine) ParseAndVerifyNewBlock(ctx context.Context, parent *StatefulBlock[*TestBlock, *TestBlock, *TestBlock]) *StatefulBlock[*TestBlock, *TestBlock, *TestBlock] {
+func (ce *TestConsensusEngine) ParseAndVerifyNewBlock(ctx context.Context, parent *Block[*TestBlock, *TestBlock, *TestBlock]) *Block[*TestBlock, *TestBlock, *TestBlock] {
 	newBlk := NewTestBlockFromParent(parent.Input)
 	parsedBlk, err := ce.vm.VM.ParseBlock(ctx, newBlk.GetBytes())
 	ce.require.NoError(err)
@@ -395,7 +395,7 @@ func (ce *TestConsensusEngine) ParseAndVerifyNewBlock(ctx context.Context, paren
 	return parsedBlk
 }
 
-func (ce *TestConsensusEngine) ParseAndVerifyNewRandomBlock(ctx context.Context) *StatefulBlock[*TestBlock, *TestBlock, *TestBlock] {
+func (ce *TestConsensusEngine) ParseAndVerifyNewRandomBlock(ctx context.Context) *Block[*TestBlock, *TestBlock, *TestBlock] {
 	blk, ok := ce.selectRandomVerifiedBlock()
 	if !ok {
 		blk = ce.lastAccepted
@@ -404,7 +404,7 @@ func (ce *TestConsensusEngine) ParseAndVerifyNewRandomBlock(ctx context.Context)
 	return ce.ParseAndVerifyNewBlock(ctx, blk)
 }
 
-func (ce *TestConsensusEngine) ParseVerifiedBlk(ctx context.Context) (*StatefulBlock[*TestBlock, *TestBlock, *TestBlock], bool) {
+func (ce *TestConsensusEngine) ParseVerifiedBlk(ctx context.Context) (*Block[*TestBlock, *TestBlock, *TestBlock], bool) {
 	blk, ok := ce.selectRandomVerifiedBlock()
 	if !ok {
 		return nil, false
@@ -433,7 +433,7 @@ func (ce *TestConsensusEngine) ParseAndVerifyInvalidBlock(ctx context.Context) {
 	ce.require.False(ok)
 }
 
-func (ce *TestConsensusEngine) SwapRandomPreference(ctx context.Context) (*StatefulBlock[*TestBlock, *TestBlock, *TestBlock], *StatefulBlock[*TestBlock, *TestBlock, *TestBlock], bool) {
+func (ce *TestConsensusEngine) SwapRandomPreference(ctx context.Context) (*Block[*TestBlock, *TestBlock, *TestBlock], *Block[*TestBlock, *TestBlock, *TestBlock], bool) {
 	selectedBlk, ok := ce.selectRandomVerifiedBlock()
 	if !ok {
 		selectedBlk = ce.lastAccepted
@@ -446,7 +446,7 @@ func (ce *TestConsensusEngine) SwapRandomPreference(ctx context.Context) (*State
 	return oldPreference, newPreference, changed
 }
 
-func (ce *TestConsensusEngine) SetPreference(ctx context.Context, blkID ids.ID) (*StatefulBlock[*TestBlock, *TestBlock, *TestBlock], *StatefulBlock[*TestBlock, *TestBlock, *TestBlock], bool) {
+func (ce *TestConsensusEngine) SetPreference(ctx context.Context, blkID ids.ID) (*Block[*TestBlock, *TestBlock, *TestBlock], *Block[*TestBlock, *TestBlock, *TestBlock], bool) {
 	selectedBlk, ok := ce.verified[blkID]
 	if !ok && ce.lastAccepted.ID() == blkID {
 		selectedBlk = ce.lastAccepted
@@ -469,7 +469,7 @@ func (ce *TestConsensusEngine) AcceptNonPreferredBlock(ctx context.Context) {
 		preferredSet.Add(blk.ID())
 	}
 
-	var selectedBlk *StatefulBlock[*TestBlock, *TestBlock, *TestBlock]
+	var selectedBlk *Block[*TestBlock, *TestBlock, *TestBlock]
 	for _, blk := range ce.verified {
 		if !preferredSet.Contains(blk.ID()) {
 			selectedBlk = blk
@@ -487,7 +487,7 @@ func (ce *TestConsensusEngine) AcceptNonPreferredBlock(ctx context.Context) {
 	ce.require.True(changedPref)
 }
 
-func (ce *TestConsensusEngine) GetVerifiedBlock(ctx context.Context) (*StatefulBlock[*TestBlock, *TestBlock, *TestBlock], bool) {
+func (ce *TestConsensusEngine) GetVerifiedBlock(ctx context.Context) (*Block[*TestBlock, *TestBlock, *TestBlock], bool) {
 	selectedBlk, ok := ce.selectRandomVerifiedBlock()
 	if !ok {
 		return nil, false
@@ -510,7 +510,7 @@ func (ce *TestConsensusEngine) StartStateSync(ctx context.Context, target *TestB
 	ce.require.NoError(ce.vm.StartStateSync(ctx, target))
 }
 
-func (ce *TestConsensusEngine) FinishStateSync(ctx context.Context, blk *StatefulBlock[*TestBlock, *TestBlock, *TestBlock]) {
+func (ce *TestConsensusEngine) FinishStateSync(ctx context.Context, blk *Block[*TestBlock, *TestBlock, *TestBlock]) {
 	ce.vm.snowCtx.Lock.Lock()
 	defer ce.vm.snowCtx.Lock.Unlock()
 

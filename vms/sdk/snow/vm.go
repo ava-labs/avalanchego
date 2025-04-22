@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/avalanchego/api/metrics"
+	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -29,7 +29,7 @@ import (
 	hcontext "github.com/ava-labs/avalanchego/vms/sdk/context"
 )
 
-var _ block.StateSyncableVM = (*VM[Block, Block, Block])(nil)
+var _ block.StateSyncableVM = (*VM[ConcreteBlock, ConcreteBlock, ConcreteBlock])(nil)
 
 type ChainInput struct {
 	SnowCtx                    *snow.Context
@@ -40,22 +40,31 @@ type ChainInput struct {
 	Config                     hcontext.Config
 }
 
-// Chain provides a reduced interface for chain / VM developers to implement.
-// The snow package implements the full AvalancheGo VM interface, so that the chain implementation
-// only needs to provide a way to initialize itself with all of the provided inputs, define concrete types
-// for each state that a block could be in from the perspective of the consensus engine, and state
-// transition functions between each of those types.
-type Chain[I Block, O Block, A Block] interface {
-	// Initialize initializes the chain, optionally configures the VM via app, and returns
+// ConcreteVM provides a reduced interface for VM developers using golang generics and the exact
+// AvalancheGo consensus invariants to provide VM developers EXACTLY what the information that is
+// guaranteed to be available during each state transition it needs to handle.
+// The consensus engine can see blocks in four different states:
+// - bytes
+// - Input - parsed, but not verified in consensus, no guarantee of state availability
+// - Output - parsed and verified successfully, will eventually be either Accepted or Rejected
+// - Accepted -
+//
+// Finally, the snow package breaks down the VM interface from a single conglomerate type to expose
+// all VM functionality to AvalancheGo into setters, so that the ConcreteVM can override the
+// defaults where desired, but does not need to supply boilerplate where it can rely on a default
+// behavior.
+type ConcreteVM[I ConcreteBlock, O ConcreteBlock, A ConcreteBlock] interface {
+	// Initialize the chain, optionally configures the VM via vm, and returns
 	// a persistent index of the chain's input block type, the last output and accetped block,
-	// and whether or not the VM is currently in a valid state. If stateReady is false, the VM
-	// must be mid-state sync, such that it does not have a valid last output or accepted block.
+	// and whether or not the VM currently has a valid state.
+	// If stateReady is false, the VM must be mid-state sync, such that it does not have a valid
+	// last output or accepted block.
 	Initialize(
 		ctx context.Context,
 		chainInput ChainInput,
 		vm *VM[I, O, A],
 	) (inputChainIndex ChainIndex[I], lastOutput O, lastAccepted A, stateReady bool, err error)
-	// SetConsensusIndex sets the ChainIndex[I, O, A} on the VM to provide the
+	// SetConsensusIndex sets the ChainIndex[I, O, A] on the VM to provide the
 	// VM with:
 	// 1. A cached index of the chain
 	// 2. The ability to fetch the latest consensus state (preferred output block and last accepted block)
@@ -83,7 +92,7 @@ type namedCloser struct {
 	close func() error
 }
 
-type VM[I Block, O Block, A Block] struct {
+type VM[I ConcreteBlock, O ConcreteBlock, A ConcreteBlock] struct {
 	handlers        map[string]http.Handler
 	network         *p2p.Network
 	stateSyncableVM block.StateSyncableVM
@@ -117,7 +126,7 @@ type VM[I Block, O Block, A Block] struct {
 	//
 	// During this time, we must not allow any new blocks to be verified/accepted.
 	chainLock sync.Mutex
-	chain     Chain[I, O, A]
+	chain     ConcreteVM[I, O, A]
 	ready     bool
 
 	inputChainIndex ChainIndex[I]
@@ -130,18 +139,18 @@ type VM[I Block, O Block, A Block] struct {
 	// Each element is a block that passed verification but
 	// hasn't yet been accepted/rejected
 	verifiedL      sync.RWMutex
-	verifiedBlocks map[ids.ID]*StatefulBlock[I, O, A]
+	verifiedBlocks map[ids.ID]*Block[I, O, A]
 
 	// We store the last [AcceptedBlockWindowCache] blocks in memory
 	// to avoid reading blocks from disk.
-	acceptedBlocksByID     *cache.FIFO[ids.ID, *StatefulBlock[I, O, A]]
+	acceptedBlocksByID     *cache.FIFO[ids.ID, *Block[I, O, A]]
 	acceptedBlocksByHeight *cache.FIFO[uint64, ids.ID]
 
 	metaLock          sync.Mutex
-	lastAcceptedBlock *StatefulBlock[I, O, A]
+	lastAcceptedBlock *Block[I, O, A]
 	preferredBlkID    ids.ID
 
-	metrics *Metrics
+	metrics *metrics
 	log     logging.Logger
 	tracer  trace.Tracer
 
@@ -150,11 +159,12 @@ type VM[I Block, O Block, A Block] struct {
 	healthCheckers sync.Map
 }
 
-func NewVM[I Block, O Block, A Block](version string, chain Chain[I, O, A]) *VM[I, O, A] {
+func NewVM[I ConcreteBlock, O ConcreteBlock, A ConcreteBlock](version string, chain ConcreteVM[I, O, A]) *VM[I, O, A] {
 	return &VM[I, O, A]{
-		handlers: make(map[string]http.Handler),
-		version:  version,
-		chain:    chain,
+		handlers:        make(map[string]http.Handler),
+		stateSyncableVM: block.StateSyncableVMDisabled{},
+		version:         version,
+		chain:           chain,
 	}
 }
 
@@ -194,7 +204,7 @@ func (v *VM[I, O, A]) Initialize(
 		return fmt.Errorf("failed to parse vm config: %w", err)
 	}
 
-	defaultRegistry, err := metrics.MakeAndRegister(v.snowCtx.Metrics, "snow")
+	defaultRegistry, err := apimetrics.MakeAndRegister(v.snowCtx.Metrics, "snow")
 	if err != nil {
 		return err
 	}
@@ -227,7 +237,7 @@ func (v *VM[I, O, A]) Initialize(
 		return fmt.Errorf("failed to initialize p2p: %w", err)
 	}
 
-	acceptedBlocksByIDCache, err := cache.NewFIFO[ids.ID, *StatefulBlock[I, O, A]](v.vmConfig.AcceptedBlockWindowCache)
+	acceptedBlocksByIDCache, err := cache.NewFIFO[ids.ID, *Block[I, O, A]](v.vmConfig.AcceptedBlockWindowCache)
 	if err != nil {
 		return err
 	}
@@ -237,7 +247,7 @@ func (v *VM[I, O, A]) Initialize(
 		return err
 	}
 	v.acceptedBlocksByHeight = acceptedBlocksByHeightCache
-	v.verifiedBlocks = make(map[ids.ID]*StatefulBlock[I, O, A])
+	v.verifiedBlocks = make(map[ids.ID]*Block[I, O, A])
 
 	chainInput := ChainInput{
 		SnowCtx:      chainCtx,
@@ -273,7 +283,7 @@ func (v *VM[I, O, A]) Initialize(
 	return nil
 }
 
-func (v *VM[I, O, A]) setLastAccepted(lastAcceptedBlock *StatefulBlock[I, O, A]) {
+func (v *VM[I, O, A]) setLastAccepted(lastAcceptedBlock *Block[I, O, A]) {
 	v.metaLock.Lock()
 	defer v.metaLock.Unlock()
 
@@ -282,7 +292,7 @@ func (v *VM[I, O, A]) setLastAccepted(lastAcceptedBlock *StatefulBlock[I, O, A])
 	v.acceptedBlocksByID.Put(v.lastAcceptedBlock.ID(), v.lastAcceptedBlock)
 }
 
-func (v *VM[I, O, A]) getBlockFromCache(blkID ids.ID) (*StatefulBlock[I, O, A], bool) {
+func (v *VM[I, O, A]) getBlockFromCache(blkID ids.ID) (*Block[I, O, A], bool) {
 	if blk, ok := v.acceptedBlocksByID.Get(blkID); ok {
 		return blk, true
 	}
@@ -295,7 +305,7 @@ func (v *VM[I, O, A]) getBlockFromCache(blkID ids.ID) (*StatefulBlock[I, O, A], 
 	return nil, false
 }
 
-func (v *VM[I, O, A]) GetBlock(ctx context.Context, blkID ids.ID) (*StatefulBlock[I, O, A], error) {
+func (v *VM[I, O, A]) GetBlock(ctx context.Context, blkID ids.ID) (*Block[I, O, A], error) {
 	ctx, span := v.tracer.Start(ctx, "VM.GetBlock")
 	defer span.End()
 
@@ -315,7 +325,7 @@ func (v *VM[I, O, A]) GetBlock(ctx context.Context, blkID ids.ID) (*StatefulBloc
 	return NewInputBlock(v, blk), nil
 }
 
-func (v *VM[I, O, A]) GetBlockByHeight(ctx context.Context, height uint64) (*StatefulBlock[I, O, A], error) {
+func (v *VM[I, O, A]) GetBlockByHeight(ctx context.Context, height uint64) (*Block[I, O, A], error) {
 	ctx, span := v.tracer.Start(ctx, "VM.GetBlockByHeight")
 	defer span.End()
 
@@ -340,7 +350,7 @@ func (v *VM[I, O, A]) GetBlockByHeight(ctx context.Context, height uint64) (*Sta
 	return v.GetBlock(ctx, blkID)
 }
 
-func (v *VM[I, O, A]) ParseBlock(ctx context.Context, bytes []byte) (*StatefulBlock[I, O, A], error) {
+func (v *VM[I, O, A]) ParseBlock(ctx context.Context, bytes []byte) (*Block[I, O, A], error) {
 	ctx, span := v.tracer.Start(ctx, "VM.ParseBlock")
 	defer span.End()
 
@@ -362,15 +372,15 @@ func (v *VM[I, O, A]) ParseBlock(ctx context.Context, bytes []byte) (*StatefulBl
 	return NewInputBlock(v, inputBlk), nil
 }
 
-func (v *VM[I, O, A]) BuildBlockWithContext(ctx context.Context, blockCtx *block.Context) (*StatefulBlock[I, O, A], error) {
+func (v *VM[I, O, A]) BuildBlockWithContext(ctx context.Context, blockCtx *block.Context) (*Block[I, O, A], error) {
 	return v.buildBlock(ctx, blockCtx)
 }
 
-func (v *VM[I, O, A]) BuildBlock(ctx context.Context) (*StatefulBlock[I, O, A], error) {
+func (v *VM[I, O, A]) BuildBlock(ctx context.Context) (*Block[I, O, A], error) {
 	return v.buildBlock(ctx, nil)
 }
 
-func (v *VM[I, O, A]) buildBlock(ctx context.Context, blockCtx *block.Context) (*StatefulBlock[I, O, A], error) {
+func (v *VM[I, O, A]) buildBlock(ctx context.Context, blockCtx *block.Context) (*Block[I, O, A], error) {
 	v.chainLock.Lock()
 	defer v.chainLock.Unlock()
 
@@ -386,16 +396,17 @@ func (v *VM[I, O, A]) buildBlock(ctx context.Context, blockCtx *block.Context) (
 	if err != nil {
 		return nil, fmt.Errorf("failed to get preferred block %s to build: %w", v.preferredBlkID, err)
 	}
+	// This is the only place where we call in to the chain while holding a lock
+	// and it's also unclear if we need to hold the lock here?
 	inputBlock, outputBlock, err := v.chain.BuildBlock(ctx, blockCtx, preferredBlk.Output)
 	if err != nil {
 		return nil, err
 	}
 	sb := NewVerifiedBlock[I, O, A](v, inputBlock, outputBlock)
-
 	return sb, nil
 }
 
-func (v *VM[I, O, A]) LastAcceptedBlock(_ context.Context) *StatefulBlock[I, O, A] {
+func (v *VM[I, O, A]) LastAcceptedBlock(_ context.Context) *Block[I, O, A] {
 	return v.lastAcceptedBlock
 }
 

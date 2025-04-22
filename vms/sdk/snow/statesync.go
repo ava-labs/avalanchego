@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/sdk/event"
 )
 
-var _ block.StateSyncableVM = (*VM[Block, Block, Block])(nil)
+var _ block.StateSyncableVM = (*VM[ConcreteBlock, ConcreteBlock, ConcreteBlock])(nil)
 
 func (v *VM[I, O, A]) SetStateSyncableVM(stateSyncableVM block.StateSyncableVM) {
 	v.stateSyncableVM = stateSyncableVM
@@ -80,12 +80,12 @@ func (v *VM[I, O, A]) verifyProcessingBlocks(ctx context.Context) error {
 	// Sort processing blocks by height
 	v.verifiedL.Lock()
 	v.log.Info("Verifying processing blocks after state sync", zap.Int("numBlocks", len(v.verifiedBlocks)))
-	processingBlocks := make([]*StatefulBlock[I, O, A], 0, len(v.verifiedBlocks))
+	processingBlocks := make([]*Block[I, O, A], 0, len(v.verifiedBlocks))
 	for _, blk := range v.verifiedBlocks {
 		processingBlocks = append(processingBlocks, blk)
 	}
 	v.verifiedL.Unlock()
-	slices.SortFunc(processingBlocks, func(a *StatefulBlock[I, O, A], b *StatefulBlock[I, O, A]) int {
+	slices.SortFunc(processingBlocks, func(a *Block[I, O, A], b *Block[I, O, A]) int {
 		switch {
 		case a.Height() < b.Height():
 			return -1

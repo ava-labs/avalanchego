@@ -12,19 +12,19 @@ import (
 )
 
 var (
-	_ block.ChainVM                      = (*SnowVM[Block, Block, Block])(nil)
-	_ block.StateSyncableVM              = (*SnowVM[Block, Block, Block])(nil)
-	_ block.BuildBlockWithContextChainVM = (*SnowVM[Block, Block, Block])(nil)
+	_ block.ChainVM                      = (*SnowVM[ConcreteBlock, ConcreteBlock, ConcreteBlock])(nil)
+	_ block.StateSyncableVM              = (*SnowVM[ConcreteBlock, ConcreteBlock, ConcreteBlock])(nil)
+	_ block.BuildBlockWithContextChainVM = (*SnowVM[ConcreteBlock, ConcreteBlock, ConcreteBlock])(nil)
 )
 
 // SnowVM wraps the VM and completes the implementation of block.ChainVM by providing
 // alternative block handler functions that provide the snowman.Block type to the
 // consensus engine.
-type SnowVM[I Block, O Block, A Block] struct {
+type SnowVM[I ConcreteBlock, O ConcreteBlock, A ConcreteBlock] struct {
 	*VM[I, O, A]
 }
 
-func NewSnowVM[I Block, O Block, A Block](version string, chain Chain[I, O, A]) *SnowVM[I, O, A] {
+func NewSnowVM[I ConcreteBlock, O ConcreteBlock, A ConcreteBlock](version string, chain ConcreteVM[I, O, A]) *SnowVM[I, O, A] {
 	return &SnowVM[I, O, A]{VM: NewVM(version, chain)}
 }
 

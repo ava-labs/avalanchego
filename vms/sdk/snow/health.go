@@ -22,6 +22,10 @@ const (
 var (
 	errUnresolvedBlocks = errors.New("unresolved invalid blocks in processing")
 	errVMNotReady       = errors.New("vm not ready")
+
+	_ health.Checker = (*vmReadinessHealthCheck)(nil)
+	_ health.Checker = (*unresolvedBlockHealthCheck[ConcreteBlock])(nil)
+	_ health.Checker = (*VM[ConcreteBlock, ConcreteBlock, ConcreteBlock])(nil)
 )
 
 func (v *VM[I, O, A]) HealthCheck(ctx context.Context) (any, error) {
@@ -76,18 +80,15 @@ func (v *vmReadinessHealthCheck) HealthCheck(_ context.Context) (any, error) {
 	return ready, nil
 }
 
-// unresolvedBlockHealthCheck
-// During state sync, blocks are vacuously marked as verified because the VM lacks the state required
-// to properly verify them.
-// Assuming a correct validator set and consensus, any invalid blocks will eventually be rejected by
-// the network and this node.
-// This check reports unhealthy until any such blocks have been cleared from the processing set.
-type unresolvedBlockHealthCheck[I Block] struct {
+// unresolvedBlockHealthCheck implements [health.Checker] by providing a health check which reports healthy
+// after any blocks that failed verification during the transition from dynamic state sync to normal operation
+// have been cleared from the processing set.
+type unresolvedBlockHealthCheck[I ConcreteBlock] struct {
 	lock             sync.RWMutex
 	unresolvedBlocks set.Set[ids.ID]
 }
 
-func newUnresolvedBlocksHealthCheck[I Block](unresolvedBlkIDs set.Set[ids.ID]) *unresolvedBlockHealthCheck[I] {
+func newUnresolvedBlocksHealthCheck[I ConcreteBlock](unresolvedBlkIDs set.Set[ids.ID]) *unresolvedBlockHealthCheck[I] {
 	return &unresolvedBlockHealthCheck[I]{
 		unresolvedBlocks: unresolvedBlkIDs,
 	}
@@ -102,9 +103,9 @@ func (u *unresolvedBlockHealthCheck[I]) Resolve(blkID ids.ID) {
 
 func (u *unresolvedBlockHealthCheck[I]) HealthCheck(_ context.Context) (any, error) {
 	u.lock.RLock()
-	unresolvedBlocks := u.unresolvedBlocks.Len()
-	u.lock.RUnlock()
+	defer u.lock.RUnlock()
 
+	unresolvedBlocks := u.unresolvedBlocks.Len()
 	if unresolvedBlocks > 0 {
 		return unresolvedBlocks, fmt.Errorf("%w: %d", errUnresolvedBlocks, unresolvedBlocks)
 	}

@@ -15,9 +15,10 @@ import (
 // by the VM.
 // ChainIndex must serve the last accepted block, it is up to the implementation
 // how large of a window of accepted blocks to maintain in its index.
-// The VM provides a caching layer on top of ChainIndex, so the implementation
-// does not need to provide its own caching layer.
-type ChainIndex[T Block] interface {
+// The VM provides a consensus-aware caching layer on top of ChainIndex (FIFO to
+// maintain cache of most useful data), so the implementation does not need to
+// provide its own caching layer.
+type ChainIndex[T ConcreteBlock] interface {
 	UpdateLastAccepted(ctx context.Context, blk T) error
 	GetLastAcceptedHeight(ctx context.Context) (uint64, error)
 	GetBlock(ctx context.Context, blkID ids.ID) (T, error)
@@ -43,7 +44,7 @@ func (v *VM[I, O, A]) makeConsensusIndex(
 		return err
 	}
 
-	var lastAcceptedBlock *StatefulBlock[I, O, A]
+	var lastAcceptedBlock *Block[I, O, A]
 	if stateReady {
 		v.ready = true
 		lastAcceptedBlock, err = v.reprocessFromOutputToInput(ctx, inputBlock, outputBlock, acceptedBlock)
@@ -70,7 +71,7 @@ func (v *VM[I, O, A]) GetConsensusIndex() *ConsensusIndex[I, O, A] {
 // reprocessFromOutputToInput re-processes blocks from output/accepted to align with the supplied input block.
 // assumes that outputBlock and acceptedBlock represent the same block and that all blocks in the range
 // [output/accepted, input] have been added to the inputChainIndex.
-func (v *VM[I, O, A]) reprocessFromOutputToInput(ctx context.Context, targetInputBlock I, outputBlock O, acceptedBlock A) (*StatefulBlock[I, O, A], error) {
+func (v *VM[I, O, A]) reprocessFromOutputToInput(ctx context.Context, targetInputBlock I, outputBlock O, acceptedBlock A) (*Block[I, O, A], error) {
 	if targetInputBlock.GetHeight() < outputBlock.GetHeight() || outputBlock.GetID() != acceptedBlock.GetID() {
 		return nil, fmt.Errorf("invalid initial accepted state (Input = %s, Output = %s, Accepted = %s)", targetInputBlock, outputBlock, acceptedBlock)
 	}
@@ -101,7 +102,7 @@ func (v *VM[I, O, A]) reprocessFromOutputToInput(ctx context.Context, targetInpu
 // accessors to the latest type of the frontier.
 // ie. last accepted block is guaranteed to have Accepted type available, whereas the preferred block
 // is only guaranteed to have the Output type available.
-type ConsensusIndex[I Block, O Block, A Block] struct {
+type ConsensusIndex[I ConcreteBlock, O ConcreteBlock, A ConcreteBlock] struct {
 	vm *VM[I, O, A]
 }
 

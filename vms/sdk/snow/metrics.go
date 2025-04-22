@@ -8,16 +8,16 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-type Metrics struct {
+type metrics struct {
 	blockBuild  metric.Averager
 	blockParse  metric.Averager
 	blockVerify metric.Averager
 	blockAccept metric.Averager
 }
 
-func newMetrics(r *prometheus.Registry) (*Metrics, error) {
+func newMetrics(r *prometheus.Registry) (*metrics, error) {
 	blockBuild, err := metric.NewAverager(
-		"snow_block_build",
+		"block_build",
 		"time spent building blocks",
 		r,
 	)
@@ -25,7 +25,7 @@ func newMetrics(r *prometheus.Registry) (*Metrics, error) {
 		return nil, err
 	}
 	blockParse, err := metric.NewAverager(
-		"snow_block_parse",
+		"block_parse",
 		"time spent parsing blocks",
 		r,
 	)
@@ -33,7 +33,7 @@ func newMetrics(r *prometheus.Registry) (*Metrics, error) {
 		return nil, err
 	}
 	blockVerify, err := metric.NewAverager(
-		"snow_block_verify",
+		"block_verify",
 		"time spent verifying blocks",
 		r,
 	)
@@ -41,7 +41,7 @@ func newMetrics(r *prometheus.Registry) (*Metrics, error) {
 		return nil, err
 	}
 	blockAccept, err := metric.NewAverager(
-		"snow_block_accept",
+		"block_accept",
 		"time spent accepting blocks",
 		r,
 	)
@@ -52,7 +52,7 @@ func newMetrics(r *prometheus.Registry) (*Metrics, error) {
 		return nil, err
 	}
 
-	m := &Metrics{
+	m := &metrics{
 		blockBuild:  blockBuild,
 		blockParse:  blockParse,
 		blockVerify: blockVerify,

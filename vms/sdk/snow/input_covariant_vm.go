@@ -10,9 +10,9 @@ import (
 )
 
 // InputCovariantVM provides basic VM functionality that only returns the input block type
-// Input is the only field guaranteed to be set for each consensus block, so we provide
-// a wrapper that only exposes the input block type.
-type InputCovariantVM[I Block, O Block, A Block] struct {
+// Since Input is the only field guaranteed to be populated for each consensus block, we provide
+// this wrapper for convenience.
+type InputCovariantVM[I ConcreteBlock, O ConcreteBlock, A ConcreteBlock] struct {
 	vm *VM[I, O, A]
 }
 

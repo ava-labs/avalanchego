@@ -20,14 +20,14 @@ import (
 )
 
 var (
-	_ snowman.Block           = (*StatefulBlock[Block, Block, Block])(nil)
-	_ block.WithVerifyContext = (*StatefulBlock[Block, Block, Block])(nil)
+	_ snowman.Block           = (*Block[ConcreteBlock, ConcreteBlock, ConcreteBlock])(nil)
+	_ block.WithVerifyContext = (*Block[ConcreteBlock, ConcreteBlock, ConcreteBlock])(nil)
 
 	errParentFailedVerification = errors.New("parent failed verification")
 	errMismatchedPChainContext  = errors.New("mismatched P-Chain context")
 )
 
-type Block interface {
+type ConcreteBlock interface {
 	fmt.Stringer
 	GetID() ids.ID
 	GetParent() ids.ID
@@ -42,7 +42,7 @@ type Block interface {
 	GetContext() *block.Context
 }
 
-// StatefulBlock implements snowman.Block and abstracts away the caching
+// Block implements snowman.Block and abstracts away the caching
 // and block pinning required by the AvalancheGo Consensus engine.
 // This converts the VM DevX from implementing the consensus engine specific invariants
 // to implementing an input/output/accepted block type and handling the state transitions
@@ -52,36 +52,36 @@ type Block interface {
 // 2. Accept is always called against a verified block
 // 3. Reject is always called against a verified block
 //
-// StatefulBlock additionally handles DynamicStateSync where blocks are vacuously
+// Block additionally handles DynamicStateSync where blocks are vacuously
 // verified/accepted to update a moving state sync target.
 // After FinishStateSync is called, the snow package guarantees the same invariants
 // as applied during normal consensus.
-type StatefulBlock[I Block, O Block, A Block] struct {
-	Input    I
-	Output   O
+type Block[Input ConcreteBlock, Output ConcreteBlock, Accepted ConcreteBlock] struct {
+	Input    Input
+	Output   Output
 	verified bool
-	Accepted A
+	Accepted Accepted
 	accepted bool
 
-	vm *VM[I, O, A]
+	vm *VM[Input, Output, Accepted]
 }
 
-func NewInputBlock[I Block, O Block, A Block](
-	vm *VM[I, O, A],
-	input I,
-) *StatefulBlock[I, O, A] {
-	return &StatefulBlock[I, O, A]{
+func NewInputBlock[Input ConcreteBlock, Output ConcreteBlock, Accepted ConcreteBlock](
+	vm *VM[Input, Output, Accepted],
+	input Input,
+) *Block[Input, Output, Accepted] {
+	return &Block[Input, Output, Accepted]{
 		Input: input,
 		vm:    vm,
 	}
 }
 
-func NewVerifiedBlock[I Block, O Block, A Block](
-	vm *VM[I, O, A],
-	input I,
-	output O,
-) *StatefulBlock[I, O, A] {
-	return &StatefulBlock[I, O, A]{
+func NewVerifiedBlock[Input ConcreteBlock, Output ConcreteBlock, Accepted ConcreteBlock](
+	vm *VM[Input, Output, Accepted],
+	input Input,
+	output Output,
+) *Block[Input, Output, Accepted] {
+	return &Block[Input, Output, Accepted]{
 		Input:    input,
 		Output:   output,
 		verified: true,
@@ -89,13 +89,13 @@ func NewVerifiedBlock[I Block, O Block, A Block](
 	}
 }
 
-func NewAcceptedBlock[I Block, O Block, A Block](
-	vm *VM[I, O, A],
-	input I,
-	output O,
-	accepted A,
-) *StatefulBlock[I, O, A] {
-	return &StatefulBlock[I, O, A]{
+func NewAcceptedBlock[Input ConcreteBlock, Output ConcreteBlock, Accepted ConcreteBlock](
+	vm *VM[Input, Output, Accepted],
+	input Input,
+	output Output,
+	accepted Accepted,
+) *Block[Input, Output, Accepted] {
+	return &Block[Input, Output, Accepted]{
 		Input:    input,
 		Output:   output,
 		verified: true,
@@ -105,7 +105,7 @@ func NewAcceptedBlock[I Block, O Block, A Block](
 	}
 }
 
-func (b *StatefulBlock[I, O, A]) setAccepted(output O, accepted A) {
+func (b *Block[I, O, A]) setAccepted(output O, accepted A) {
 	b.Output = output
 	b.verified = true
 	b.Accepted = accepted
@@ -114,7 +114,7 @@ func (b *StatefulBlock[I, O, A]) setAccepted(output O, accepted A) {
 
 // verify the block against the provided parent output and set the
 // required Output/verified fields.
-func (b *StatefulBlock[I, O, A]) verify(ctx context.Context, parentOutput O) error {
+func (b *Block[I, O, A]) verify(ctx context.Context, parentOutput O) error {
 	output, err := b.vm.chain.VerifyBlock(ctx, parentOutput, b.Input)
 	if err != nil {
 		return err
@@ -126,7 +126,7 @@ func (b *StatefulBlock[I, O, A]) verify(ctx context.Context, parentOutput O) err
 
 // accept the block and set the required Accepted/accepted fields.
 // Assumes verify has already been called.
-func (b *StatefulBlock[I, O, A]) accept(ctx context.Context, parentAccepted A) error {
+func (b *Block[I, O, A]) accept(ctx context.Context, parentAccepted A) error {
 	acceptedBlk, err := b.vm.chain.AcceptBlock(ctx, parentAccepted, b.Output)
 	if err != nil {
 		return err
@@ -136,19 +136,19 @@ func (b *StatefulBlock[I, O, A]) accept(ctx context.Context, parentAccepted A) e
 	return nil
 }
 
-func (*StatefulBlock[I, O, A]) ShouldVerifyWithContext(context.Context) (bool, error) {
+func (*Block[I, O, A]) ShouldVerifyWithContext(context.Context) (bool, error) {
 	return true, nil
 }
 
-func (b *StatefulBlock[I, O, A]) VerifyWithContext(ctx context.Context, pChainCtx *block.Context) error {
+func (b *Block[I, O, A]) VerifyWithContext(ctx context.Context, pChainCtx *block.Context) error {
 	return b.verifyWithContext(ctx, pChainCtx)
 }
 
-func (b *StatefulBlock[I, O, A]) Verify(ctx context.Context) error {
+func (b *Block[I, O, A]) Verify(ctx context.Context) error {
 	return b.verifyWithContext(ctx, nil)
 }
 
-func (b *StatefulBlock[I, O, A]) verifyWithContext(ctx context.Context, pChainCtx *block.Context) error {
+func (b *Block[I, O, A]) verifyWithContext(ctx context.Context, pChainCtx *block.Context) error {
 	b.vm.chainLock.Lock()
 	defer b.vm.chainLock.Unlock()
 
@@ -159,7 +159,7 @@ func (b *StatefulBlock[I, O, A]) verifyWithContext(ctx context.Context, pChainCt
 
 	ready := b.vm.ready
 	ctx, span := b.vm.tracer.Start(
-		ctx, "StatefulBlock.Verify",
+		ctx, "Block.Verify",
 		trace.WithAttributes(
 			attribute.Int("size", len(b.Input.GetBytes())),
 			attribute.Int64("height", int64(b.Input.GetHeight())),
@@ -173,9 +173,8 @@ func (b *StatefulBlock[I, O, A]) verifyWithContext(ctx context.Context, pChainCt
 	case !ready:
 		// If the VM is not ready (dynamic state sync), skip verifying the block.
 		b.vm.log.Info(
-			"skipping verification, state not ready",
-			zap.Uint64("height", b.Input.GetHeight()),
-			zap.Stringer("blkID", b.Input.GetID()),
+			"skipping block verification in dynamic state sync",
+			zap.Stringer("blk", b.Input),
 		)
 	case b.verified:
 		// Defensive: verify the inner and wrapper block contexts match to ensure
@@ -191,11 +190,12 @@ func (b *StatefulBlock[I, O, A]) verifyWithContext(ctx context.Context, pChainCt
 		// necessary to re-verify).
 		b.vm.log.Info(
 			"skipping verification of locally built block",
-			zap.Uint64("height", b.Input.GetHeight()),
-			zap.Stringer("blkID", b.Input.GetID()),
+			zap.Stringer("blk", b),
 		)
 	default:
-		b.vm.log.Info("Verifying block", zap.Stringer("block", b))
+		b.vm.log.Info("Verifying block",
+			zap.Stringer("block", b),
+		)
 		// Fetch my parent to verify against
 		parent, err := b.vm.GetBlock(ctx, b.Parent())
 		if err != nil {
@@ -203,13 +203,9 @@ func (b *StatefulBlock[I, O, A]) verifyWithContext(ctx context.Context, pChainCt
 		}
 
 		// If my parent has not been verified and we're no longer in dynamic state sync,
-		// we must be transitioning to normal consensus.
-		// Attempt to verify from the last accepted block through to this block to
-		// compute my parent's Output state.
+		// then my parent must have failed verification during the transition to normal operation.
 		if !parent.verified {
 			return errParentFailedVerification
-		} else {
-			b.vm.log.Info("parent was already verified")
 		}
 
 		// Verify the inner and wrapper block contexts match
@@ -230,17 +226,6 @@ func (b *StatefulBlock[I, O, A]) verifyWithContext(ctx context.Context, pChainCt
 	b.vm.verifiedBlocks[b.Input.GetID()] = b
 	b.vm.verifiedL.Unlock()
 
-	if b.verified {
-		b.vm.log.Debug("verified block",
-			zap.Stringer("blk", b.Output),
-			zap.Bool("ready", ready),
-		)
-	} else {
-		b.vm.log.Debug("skipped block verification",
-			zap.Stringer("blk", b.Input),
-			zap.Bool("ready", ready),
-		)
-	}
 	return nil
 }
 
@@ -262,7 +247,7 @@ func verifyPChainCtx(providedCtx, innerCtx *block.Context) error {
 // markAccepted marks the block and updates the required VM state.
 // iff parent is non-nil, it will request the chain to Accept the block.
 // The caller is responsible to provide the accepted parent if the VM is in a ready state.
-func (b *StatefulBlock[I, O, A]) markAccepted(ctx context.Context, parent *StatefulBlock[I, O, A]) error {
+func (b *Block[I, O, A]) markAccepted(ctx context.Context, parent *Block[I, O, A]) error {
 	if err := b.vm.inputChainIndex.UpdateLastAccepted(ctx, b.Input); err != nil {
 		return err
 	}
@@ -282,17 +267,16 @@ func (b *StatefulBlock[I, O, A]) markAccepted(ctx context.Context, parent *State
 	return b.notifyAccepted(ctx)
 }
 
-func (b *StatefulBlock[I, O, A]) notifyAccepted(ctx context.Context) error {
+func (b *Block[I, O, A]) notifyAccepted(ctx context.Context) error {
 	// If I was not actually marked accepted, notify pre ready subs
 	if !b.accepted {
 		return event.NotifyAll(ctx, b.Input, b.vm.preReadyAcceptedSubs...)
 	}
-
 	return event.NotifyAll(ctx, b.Accepted, b.vm.acceptedSubs...)
 }
 
 // implements "snowman.Block.choices.Decidable"
-func (b *StatefulBlock[I, O, A]) Accept(ctx context.Context) error {
+func (b *Block[I, O, A]) Accept(ctx context.Context) error {
 	b.vm.chainLock.Lock()
 	defer b.vm.chainLock.Unlock()
 
@@ -301,7 +285,7 @@ func (b *StatefulBlock[I, O, A]) Accept(ctx context.Context) error {
 		b.vm.metrics.blockAccept.Observe(float64(time.Since(start)))
 	}()
 
-	ctx, span := b.vm.tracer.Start(ctx, "StatefulBlock.Accept")
+	ctx, span := b.vm.tracer.Start(ctx, "Block.Accept")
 	defer span.End()
 
 	defer b.vm.log.Info("accepting block", zap.Stringer("block", b))
@@ -313,7 +297,7 @@ func (b *StatefulBlock[I, O, A]) Accept(ctx context.Context) error {
 	}
 
 	// If I'm ready and not verified, then I or my ancestor must have failed
-	// verification after completing dynamic state sync. This indicates
+	// verification during the transition from dynamic state sync. This indicates
 	// an invalid block has been accepted, which should be prevented by consensus.
 	// If we hit this case, return a fatal error here.
 	if !b.verified {
@@ -330,8 +314,8 @@ func (b *StatefulBlock[I, O, A]) Accept(ctx context.Context) error {
 }
 
 // implements "snowman.Block.choices.Decidable"
-func (b *StatefulBlock[I, O, A]) Reject(ctx context.Context) error {
-	ctx, span := b.vm.tracer.Start(ctx, "StatefulBlock.Reject")
+func (b *Block[I, O, A]) Reject(ctx context.Context) error {
+	ctx, span := b.vm.tracer.Start(ctx, "Block.Reject")
 	defer span.End()
 
 	b.vm.verifiedL.Lock()
@@ -347,20 +331,20 @@ func (b *StatefulBlock[I, O, A]) Reject(ctx context.Context) error {
 }
 
 // implements "snowman.Block"
-func (b *StatefulBlock[I, O, A]) ID() ids.ID           { return b.Input.GetID() }
-func (b *StatefulBlock[I, O, A]) Parent() ids.ID       { return b.Input.GetParent() }
-func (b *StatefulBlock[I, O, A]) Height() uint64       { return b.Input.GetHeight() }
-func (b *StatefulBlock[I, O, A]) Timestamp() time.Time { return time.UnixMilli(b.Input.GetTimestamp()) }
-func (b *StatefulBlock[I, O, A]) Bytes() []byte        { return b.Input.GetBytes() }
+func (b *Block[I, O, A]) ID() ids.ID           { return b.Input.GetID() }
+func (b *Block[I, O, A]) Parent() ids.ID       { return b.Input.GetParent() }
+func (b *Block[I, O, A]) Height() uint64       { return b.Input.GetHeight() }
+func (b *Block[I, O, A]) Timestamp() time.Time { return time.UnixMilli(b.Input.GetTimestamp()) }
+func (b *Block[I, O, A]) Bytes() []byte        { return b.Input.GetBytes() }
 
 // Implements GetXXX for internal consistency
-func (b *StatefulBlock[I, O, A]) GetID() ids.ID       { return b.Input.GetID() }
-func (b *StatefulBlock[I, O, A]) GetParent() ids.ID   { return b.Input.GetParent() }
-func (b *StatefulBlock[I, O, A]) GetHeight() uint64   { return b.Input.GetHeight() }
-func (b *StatefulBlock[I, O, A]) GetTimestamp() int64 { return b.Input.GetTimestamp() }
-func (b *StatefulBlock[I, O, A]) GetBytes() []byte    { return b.Input.GetBytes() }
+func (b *Block[I, O, A]) GetID() ids.ID       { return b.Input.GetID() }
+func (b *Block[I, O, A]) GetParent() ids.ID   { return b.Input.GetParent() }
+func (b *Block[I, O, A]) GetHeight() uint64   { return b.Input.GetHeight() }
+func (b *Block[I, O, A]) GetTimestamp() int64 { return b.Input.GetTimestamp() }
+func (b *Block[I, O, A]) GetBytes() []byte    { return b.Input.GetBytes() }
 
 // implements "fmt.Stringer"
-func (b *StatefulBlock[I, O, A]) String() string {
-	return fmt.Sprintf("(%s, verified = %t, accepted = %t)", b.Input, b.verified, b.accepted)
+func (b *Block[I, O, A]) String() string {
+	return fmt.Sprintf("Block(Input = %s, verified = %t, accepted = %t)", b.Input, b.verified, b.accepted)
 }
