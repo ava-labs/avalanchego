@@ -32,15 +32,19 @@ func (s SubscriptionFuncFactory[T]) New() (Subscription[T], error) {
 	return SubscriptionFunc[T](s), nil
 }
 
+// SubscriptionFunc implements Subscription[T] using anonymous functions
 type SubscriptionFunc[T any] struct {
 	NotifyF func(ctx context.Context, t T) error
 	Closer  func() error
 }
 
+// Notify invokes the anonymous NotifyF function of the subscription
 func (s SubscriptionFunc[T]) Notify(ctx context.Context, t T) error {
 	return s.NotifyF(ctx, t)
 }
 
+// Close invokes the anonymous Closer function of the subscription if
+// non-nil
 func (s SubscriptionFunc[_]) Close() error {
 	if s.Closer == nil {
 		return nil
@@ -48,6 +52,8 @@ func (s SubscriptionFunc[_]) Close() error {
 	return s.Closer()
 }
 
+// NotifyAll notifies all subs with the event e and joins any errors returned
+// by the combined subs.
 func NotifyAll[T any](ctx context.Context, e T, subs ...Subscription[T]) error {
 	var errs []error
 	for _, sub := range subs {
@@ -58,6 +64,7 @@ func NotifyAll[T any](ctx context.Context, e T, subs ...Subscription[T]) error {
 	return errors.Join(errs...)
 }
 
+// Aggregate combines the subs into a single subscription instance
 func Aggregate[T any](subs ...Subscription[T]) Subscription[T] {
 	return SubscriptionFunc[T]{
 		NotifyF: func(ctx context.Context, t T) error {
@@ -75,10 +82,11 @@ func Aggregate[T any](subs ...Subscription[T]) Subscription[T] {
 	}
 }
 
-func Map[I any, O any](f func(I) O, sub Subscription[O]) Subscription[I] {
-	return SubscriptionFunc[I]{
-		NotifyF: func(ctx context.Context, t I) error {
-			return sub.Notify(ctx, f(t))
+// Map transforms a subscription from an output sub to an input typed sub
+func Map[Input any, Output any](mapF func(Input) Output, sub Subscription[Output]) Subscription[Input] {
+	return SubscriptionFunc[Input]{
+		NotifyF: func(ctx context.Context, t Input) error {
+			return sub.Notify(ctx, mapF(t))
 		},
 		Closer: sub.Close,
 	}
