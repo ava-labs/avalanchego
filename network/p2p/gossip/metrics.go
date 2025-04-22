@@ -1,3 +1,6 @@
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package gossip
 
 import (
@@ -5,8 +8,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 const (
@@ -25,7 +29,7 @@ const (
 	droppedLabel = "dropped"
 
 	droppedMalformed = "malformed"
-	droppedDuplicate = "duplicate"
+	DroppedDuplicate = "duplicate"
 	droppedOther     = "other"
 	droppedNot       = "not"
 	notReceive       = "not_receive"
@@ -61,16 +65,8 @@ type Metrics struct {
 	trackingLifetimeAverage prometheus.Gauge
 	topValidators           *prometheus.GaugeVec
 
-	lock               sync.Mutex
-	malformedCount     int
-	malformedBytes     int
-	gossipables        map[ids.ID]int
-	labeledGossipables map[string][]labeledGossipable
-}
-
-type labeledGossipable struct {
-	ids.ID
-	size int
+	labelsLock        sync.Mutex
+	gossipablesLabels map[ids.ID]string
 }
 
 // NewMetrics returns a common set of metrics
@@ -116,8 +112,7 @@ func NewMetrics(
 			},
 			typeLabels,
 		),
-		gossipables:        make(map[ids.ID]int),
-		labeledGossipables: make(map[string][]labeledGossipable),
+		gossipablesLabels: make(map[ids.ID]string),
 	}
 	err := errors.Join(
 		metrics.Register(m.count),
@@ -145,55 +140,46 @@ func (m *Metrics) observeMessage(labels prometheus.Labels, count int, bytes int)
 	return nil
 }
 
-func (m *Metrics) observeIncomingMalformedGossipable(txBytes int) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.malformedCount++
-	m.malformedBytes += txBytes
-}
-
-func (m *Metrics) trackGossipable(txID ids.ID, gossipableBytes int) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.gossipables[txID] = gossipableBytes
-}
-
+// ObserveIncomingGossipable allows external-package mempools to label a custom gossipable drop-reason and have it
+// included in the gossip metrics.
 func (m *Metrics) ObserveIncomingGossipable(txID ids.ID, label string) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	size, ok := m.gossipables[txID]
-	if !ok {
+	m.labelsLock.Lock()
+	defer m.labelsLock.Unlock()
+	_, ok := m.gossipablesLabels[txID]
+	if ok {
+		// we already have this gossipable labeled; don't re-label.
 		return
 	}
-	delete(m.gossipables, txID)
-	m.labeledGossipables[label] = append(m.labeledGossipables[label], labeledGossipable{ID: txID, size: size})
+	m.gossipablesLabels[txID] = label
 }
 
-func (m *Metrics) observeReceivedMessage(typeLabel string) error {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	for label, gossipables := range m.labeledGossipables {
+// observeReceivedMessage summarizes the metrics for a given received gossip message and update the metrics accordingly.
+func (m *Metrics) observeReceivedMessage(typeLabel string, gossipables map[ids.ID]int, malformedBytes int, malformedCount int) error {
+	labelBytes := make(map[string]int, len(gossipables))
+	labelCount := make(map[string]int, len(gossipables))
+
+	labelBytes[droppedMalformed] = malformedBytes
+	labelCount[droppedMalformed] = malformedCount
+
+	m.labelsLock.Lock()
+	for gossipable, size := range gossipables {
+		if label, ok := m.gossipablesLabels[gossipable]; ok {
+			labelBytes[label] += size
+			labelCount[label]++
+			delete(m.gossipablesLabels, gossipable)
+		}
+	}
+	m.labelsLock.Unlock()
+
+	for label, gossipableSize := range labelBytes {
 		prometheusLabel := prometheus.Labels{
 			ioLabel:      receivedIO,
 			typeLabel:    typeLabel,
 			droppedLabel: label,
 		}
-		count := len(gossipables)
-		gossipableSize := 0
-		for _, gossipable := range gossipables {
-			gossipableSize += gossipable.size
+		if err := m.observeMessage(prometheusLabel, labelCount[label], gossipableSize); err != nil {
+			return err
 		}
-		m.observeMessage(prometheusLabel, count, gossipableSize)
-		delete(m.labeledGossipables, label)
 	}
-	// add another label for the malformed entries ( since these doesn't have gossip id )
-	prometheusLabel := prometheus.Labels{
-		ioLabel:      receivedIO,
-		typeLabel:    typeLabel,
-		droppedLabel: droppedMalformed,
-	}
-	m.observeMessage(prometheusLabel, m.malformedCount, m.malformedBytes)
-	m.malformedCount = 0
-	m.malformedBytes = 0
 	return nil
 }

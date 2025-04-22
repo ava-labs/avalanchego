@@ -146,10 +146,14 @@ func addIncomingGossipable[T Gossipable](
 	metrics *Metrics,
 	typeLabel string,
 ) {
+	malformedBytes := 0
+	malformedCount := 0
+	gossipableSizes := make(map[ids.ID]int, len(gossip))
 	for _, bytes := range gossip {
 		gossipable, err := marshaller.UnmarshalGossip(bytes)
 		if err != nil {
-			metrics.observeIncomingMalformedGossipable(len(bytes))
+			malformedBytes += len(bytes)
+			malformedCount++
 			log.Debug(
 				"failed to unmarshal gossip",
 				zap.Stringer("nodeID", nodeID),
@@ -164,7 +168,7 @@ func addIncomingGossipable[T Gossipable](
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("id", gossipID),
 		)
-		metrics.trackGossipable(gossipID, len(bytes))
+		gossipableSizes[gossipID] = len(bytes)
 		if err := set.Add(gossipable); err != nil {
 			metrics.ObserveIncomingGossipable(gossipID, droppedOther)
 			log.Debug(
@@ -178,7 +182,11 @@ func addIncomingGossipable[T Gossipable](
 		metrics.ObserveIncomingGossipable(gossipID, droppedNot)
 	}
 
-	metrics.observeReceivedMessage(typeLabel)
+	if err := metrics.observeReceivedMessage(typeLabel, gossipableSizes, malformedBytes, malformedCount); err != nil {
+		log.Error("failed to update metrics",
+			zap.Error(err),
+		)
+	}
 }
 
 // NewPushGossiper returns an instance of PushGossiper
