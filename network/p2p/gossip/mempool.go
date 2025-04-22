@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/logging"
 
 	xmempool "github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
@@ -27,17 +26,14 @@ type Mempool[T Gossipable] interface {
 
 type mempool[T Gossipable] struct {
 	Txs     map[ids.ID]bool
-	log     logging.Logger
 	metrics *Metrics
 }
 
 func NewMempool[T Gossipable](
-	log logging.Logger,
 	metrics *Metrics,
 ) (*mempool[T], error) {
 	m := &mempool[T]{
 		Txs:     make(map[ids.ID]bool),
-		log:     log,
 		metrics: metrics,
 	}
 	return m, nil

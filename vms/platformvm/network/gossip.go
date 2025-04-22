@@ -80,7 +80,7 @@ func newGossipMempool(
 	if err != nil {
 		return nil, err
 	}
-	gMempool, err := gossip.NewMempool[*txs.Tx](log, gossipMetrics)
+	gMempool, err := gossip.NewMempool[*txs.Tx](gossipMetrics)
 	if err != nil {
 		return nil, err
 	}
