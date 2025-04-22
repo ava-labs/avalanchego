@@ -169,6 +169,7 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 func (g *gossipMempool) Has(txID ids.ID) bool {
 	g.gossipMempoolLock.RLock()
 	defer g.gossipMempoolLock.RUnlock()
+
 	return g.mempool.Has(txID)
 }
 

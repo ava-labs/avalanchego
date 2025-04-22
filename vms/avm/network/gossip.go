@@ -151,6 +151,7 @@ func (g *gossipMempool) Has(txID ids.ID) bool {
 
 func (g *gossipMempool) AddWithoutVerification(tx *txs.Tx) error {
 	txID := tx.ID()
+
 	g.gossipMempoolLock.Lock()
 	if g.mempool.Has(txID) {
 		// adding an entry would fail, and an error would be returned.
