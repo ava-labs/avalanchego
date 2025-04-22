@@ -96,12 +96,12 @@ func (h Handler[_]) AppGossip(_ context.Context, nodeID ids.NodeID, gossipBytes 
 		return
 	}
 
-	addIncomingGossipable(h.log,
+	handleIncomingGossipables(h.log,
 		h.marshaller,
-		gossip,
-		nodeID,
 		h.set,
 		h.metrics,
+		gossip,
+		nodeID,
 		pushType,
 	)
 }

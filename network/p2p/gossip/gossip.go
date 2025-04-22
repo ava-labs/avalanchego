@@ -127,23 +127,23 @@ func (p *PullGossiper[_]) handleResponse(
 		return
 	}
 
-	addIncomingGossipable(p.log,
+	handleIncomingGossipables(p.log,
 		p.marshaller,
-		gossip,
-		nodeID,
 		p.set,
 		p.metrics,
+		gossip,
+		nodeID,
 		pullType,
 	)
 }
 
-func addIncomingGossipable[T Gossipable](
+func handleIncomingGossipables[T Gossipable](
 	log logging.Logger,
 	marshaller Marshaller[T],
-	gossip [][]byte,
-	nodeID ids.NodeID,
 	set Set[T],
 	metrics *Metrics,
+	gossip [][]byte,
+	nodeID ids.NodeID,
 	typeLabel string,
 ) {
 	malformedBytes := 0
