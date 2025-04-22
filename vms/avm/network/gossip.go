@@ -204,17 +204,7 @@ func (g *gossipMempool) GetFilter() (bloom []byte, salt []byte) {
 func (g *gossipMempool) Remove(removeTxs ...*txs.Tx) {
 	g.gossipMempoolLock.Lock()
 	defer g.gossipMempoolLock.Unlock()
-	beforeEntries := make(map[*txs.Tx]bool, g.Mempool.Len())
-	g.Mempool.Iterate(func(tx *txs.Tx) bool {
-		beforeEntries[tx] = true
-		return true
-	})
-	g.Mempool.Remove(removeTxs...)
 
-	// we need to syncronize with the underlying mempool to find out which of the transction were removed.
-	for tx := range beforeEntries {
-		if _, ok := g.Mempool.Get(tx.GossipID()); !ok {
-			g.mempool.Remove(tx)
-		}
-	}
+	g.Mempool.Remove(removeTxs...)
+	g.mempool.Remove(removeTxs...)
 }
