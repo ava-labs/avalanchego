@@ -2,8 +2,8 @@
 // See the file LICENSE.md for licensing terms.
 
 use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
-use rand::distributions::Alphanumeric;
 use rand::{Rng, SeedableRng};
+use rand_distr::Alphanumeric;
 use std::borrow::BorrowMut as _;
 use std::cell::RefCell;
 use std::env;

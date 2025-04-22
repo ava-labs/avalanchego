@@ -34,7 +34,8 @@ tonic-build = "0.13.0"
 
 [dev-dependencies]
 criterion = {version = "0.5.1", features = ["async_tokio"]}
-rand = "0.8.5"
+rand = "0.9.1"
+rand_distr = "0.5.0"
 
 [lints.rust]
 unsafe_code = "deny"
