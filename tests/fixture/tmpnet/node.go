@@ -6,6 +6,7 @@ package tmpnet
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -14,11 +15,12 @@ import (
 	"strings"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
 
@@ -37,11 +39,11 @@ var (
 
 // NodeRuntime defines the methods required to support running a node.
 type NodeRuntime interface {
-	readState() error
+	readState(ctx context.Context) error
 	GetLocalURI(ctx context.Context) (string, func(), error)
 	GetLocalStakingAddress(ctx context.Context) (netip.AddrPort, func(), error)
-	Start(log logging.Logger) error
-	InitiateStop() error
+	Start(ctx context.Context) error
+	InitiateStop(ctx context.Context) error
 	WaitForStopped(ctx context.Context) error
 	IsHealthy(ctx context.Context) (bool, error)
 }
@@ -141,23 +143,23 @@ func (n *Node) IsHealthy(ctx context.Context) (bool, error) {
 	return n.getRuntime().IsHealthy(ctx)
 }
 
-func (n *Node) Start(log logging.Logger) error {
-	return n.getRuntime().Start(log)
+func (n *Node) Start(ctx context.Context) error {
+	return n.getRuntime().Start(ctx)
 }
 
 func (n *Node) InitiateStop(ctx context.Context) error {
 	if err := n.SaveMetricsSnapshot(ctx); err != nil {
 		return err
 	}
-	return n.getRuntime().InitiateStop()
+	return n.getRuntime().InitiateStop(ctx)
 }
 
 func (n *Node) WaitForStopped(ctx context.Context) error {
 	return n.getRuntime().WaitForStopped(ctx)
 }
 
-func (n *Node) readState() error {
-	return n.getRuntime().readState()
+func (n *Node) readState(ctx context.Context) error {
+	return n.getRuntime().readState(ctx)
 }
 
 func (n *Node) GetLocalURI(ctx context.Context) (string, func(), error) {
@@ -219,10 +221,7 @@ func (n *Node) EnsureKeys() error {
 // Ensures a BLS signing key is generated if not already present.
 func (n *Node) EnsureBLSSigningKey() error {
 	// Attempt to retrieve an existing key
-	existingKey, err := n.Flags.GetStringVal(config.StakingSignerKeyContentKey)
-	if err != nil {
-		return err
-	}
+	existingKey := n.Flags[config.StakingSignerKeyContentKey]
 	if len(existingKey) > 0 {
 		// Nothing to do
 		return nil
@@ -242,16 +241,8 @@ func (n *Node) EnsureStakingKeypair() error {
 	keyKey := config.StakingTLSKeyContentKey
 	certKey := config.StakingCertContentKey
 
-	key, err := n.Flags.GetStringVal(keyKey)
-	if err != nil {
-		return err
-	}
-
-	cert, err := n.Flags.GetStringVal(certKey)
-	if err != nil {
-		return err
-	}
-
+	key := n.Flags[keyKey]
+	cert := n.Flags[certKey]
 	if len(key) == 0 && len(cert) == 0 {
 		// Generate new keypair
 		tlsCertBytes, tlsKeyBytes, err := staking.NewCertAndKeyBytes()
@@ -271,10 +262,7 @@ func (n *Node) EnsureStakingKeypair() error {
 // Derives the nodes proof-of-possession. Requires the node to have a
 // BLS signing key.
 func (n *Node) GetProofOfPossession() (*signer.ProofOfPossession, error) {
-	signingKey, err := n.Flags.GetStringVal(config.StakingSignerKeyContentKey)
-	if err != nil {
-		return nil, err
-	}
+	signingKey := n.Flags[config.StakingSignerKeyContentKey]
 	signingKeyBytes, err := base64.StdEncoding.DecodeString(signingKey)
 	if err != nil {
 		return nil, err
@@ -296,10 +284,7 @@ func (n *Node) EnsureNodeID() error {
 	keyKey := config.StakingTLSKeyContentKey
 	certKey := config.StakingCertContentKey
 
-	key, err := n.Flags.GetStringVal(keyKey)
-	if err != nil {
-		return err
-	}
+	key := n.Flags[keyKey]
 	if len(key) == 0 {
 		return errMissingTLSKeyForNodeID
 	}
@@ -308,10 +293,7 @@ func (n *Node) EnsureNodeID() error {
 		return fmt.Errorf("failed to ensure node ID: failed to base64 decode value for %q: %w", keyKey, err)
 	}
 
-	cert, err := n.Flags.GetStringVal(certKey)
-	if err != nil {
-		return err
-	}
+	cert := n.Flags[certKey]
 	if len(cert) == 0 {
 		return errMissingCertForNodeID
 	}
@@ -355,4 +337,35 @@ func (n *Node) SaveAPIPort() error {
 	}
 	n.Flags[config.HTTPPortKey] = port
 	return nil
+}
+
+// WaitForHealthy blocks until node health is true or an error (including context timeout) is observed.
+func (n *Node) WaitForHealthy(ctx context.Context) error {
+	if _, ok := ctx.Deadline(); !ok {
+		return fmt.Errorf("unable to wait for health for node %q with a context without a deadline", n.NodeID)
+	}
+	ticker := time.NewTicker(DefaultNodeTickerInterval)
+	defer ticker.Stop()
+
+	for {
+		healthy, err := n.IsHealthy(ctx)
+		switch {
+		case errors.Is(err, ErrUnrecoverableNodeHealthCheck):
+			return fmt.Errorf("%w for node %q", err, n.NodeID)
+		case err != nil:
+			n.network.log.Verbo("failed to query node health",
+				zap.Stringer("nodeID", n.NodeID),
+				zap.Error(err),
+			)
+			continue
+		case healthy:
+			return nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("failed to wait for health of node %q before timeout: %w", n.NodeID, ctx.Err())
+		case <-ticker.C:
+		}
+	}
 }
