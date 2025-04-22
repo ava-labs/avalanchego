@@ -294,10 +294,6 @@ func (proof *RangeProof) UnmarshalProto(pbProof *pb.RangeProof) error {
 	return nil
 }
 
-func (proof *RangeProof) AsChangeProof() *ChangeProof {
-	return (*ChangeProof)(proof)
-}
-
 // Validate received data from change/range proof requests
 // using the requested range.
 func validateChangeProof(
@@ -378,7 +374,7 @@ func (proof *RangeProof) Verify(
 		return err
 	}
 
-	return db.VerifyChangeProof(ctx, proof.AsChangeProof(), start, end, expectedRootID)
+	return db.VerifyChangeProof(ctx, (*ChangeProof)(proof), start, end, expectedRootID)
 }
 
 type KeyChange struct {
