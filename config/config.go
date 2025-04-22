@@ -50,8 +50,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 	"github.com/ava-labs/avalanchego/vms/proposervm"
-
-	databasefactory "github.com/ava-labs/avalanchego/database/factory"
 )
 
 const (
@@ -868,7 +866,7 @@ func getTrackedSubnets(v *viper.Viper) (set.Set[ids.ID], error) {
 	return trackedSubnetIDs, nil
 }
 
-func getDatabaseConfig(v *viper.Viper, networkID uint32) (databasefactory.DatabaseConfig, error) {
+func getDatabaseConfig(v *viper.Viper, networkID uint32) (node.DatabaseConfig, error) {
 	var (
 		configBytes []byte
 		err         error
@@ -877,17 +875,17 @@ func getDatabaseConfig(v *viper.Viper, networkID uint32) (databasefactory.Databa
 		dbConfigContent := v.GetString(DBConfigContentKey)
 		configBytes, err = base64.StdEncoding.DecodeString(dbConfigContent)
 		if err != nil {
-			return databasefactory.DatabaseConfig{}, fmt.Errorf("unable to decode base64 content: %w", err)
+			return node.DatabaseConfig{}, fmt.Errorf("unable to decode base64 content: %w", err)
 		}
 	} else if v.IsSet(DBConfigFileKey) {
 		path := getExpandedArg(v, DBConfigFileKey)
 		configBytes, err = os.ReadFile(path)
 		if err != nil {
-			return databasefactory.DatabaseConfig{}, err
+			return node.DatabaseConfig{}, err
 		}
 	}
 
-	return databasefactory.DatabaseConfig{
+	return node.DatabaseConfig{
 		Name:     v.GetString(DBTypeKey),
 		ReadOnly: v.GetBool(DBReadOnlyKey),
 		Path: filepath.Join(

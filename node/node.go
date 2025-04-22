@@ -765,10 +765,20 @@ func (n *Node) initDatabase() error {
 	default:
 		dbFolderName = "db"
 	}
-	n.Config.DatabaseConfig.Path = filepath.Join(n.Config.DatabaseConfig.Path, dbFolderName)
+	// dbFolderName is appended to the database path given in the config
+	dbFullPath := filepath.Join(n.Config.DatabaseConfig.Path, dbFolderName)
 
 	var err error
-	n.DB, err = databasefactory.NewDatabase(n.Config.DatabaseConfig, n.MetricsGatherer, n.Log, dbNamespace, "all")
+	n.DB, err = databasefactory.NewDatabase(
+		n.Config.DatabaseConfig.Name,
+		dbFullPath,
+		n.Config.DatabaseConfig.ReadOnly,
+		n.Config.DatabaseConfig.Config,
+		n.MetricsGatherer,
+		n.Log,
+		dbNamespace,
+		"all",
+	)
 	if err != nil {
 		return fmt.Errorf("couldn't create database: %w", err)
 	}

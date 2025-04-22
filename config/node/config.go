@@ -24,8 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
-
-	databasefactory "github.com/ava-labs/avalanchego/database/factory"
 )
 
 type APIIndexerConfig struct {
@@ -109,15 +107,29 @@ type BootstrapConfig struct {
 	Bootstrappers []genesis.Bootstrapper `json:"bootstrappers"`
 }
 
+type DatabaseConfig struct {
+	// If true, all writes are to memory and are discarded at node shutdown.
+	ReadOnly bool `json:"readOnly"`
+
+	// Path to database
+	Path string `json:"path"`
+
+	// Name of the database type to use
+	Name string `json:"name"`
+
+	// Path to config file
+	Config []byte `json:"-"`
+}
+
 // Config contains all of the configurations of an Avalanche node.
 type Config struct {
-	HTTPConfig                     `json:"httpConfig"`
-	IPConfig                       `json:"ipConfig"`
-	StakingConfig                  `json:"stakingConfig"`
-	genesis.TxFeeConfig            `json:"txFeeConfig"`
-	StateSyncConfig                `json:"stateSyncConfig"`
-	BootstrapConfig                `json:"bootstrapConfig"`
-	databasefactory.DatabaseConfig `json:"databaseConfig"`
+	HTTPConfig          `json:"httpConfig"`
+	IPConfig            `json:"ipConfig"`
+	StakingConfig       `json:"stakingConfig"`
+	genesis.TxFeeConfig `json:"txFeeConfig"`
+	StateSyncConfig     `json:"stateSyncConfig"`
+	BootstrapConfig     `json:"bootstrapConfig"`
+	DatabaseConfig      `json:"databaseConfig"`
 
 	UpgradeConfig upgrade.Config `json:"upgradeConfig"`
 
