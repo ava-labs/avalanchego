@@ -20,9 +20,9 @@ service Writer {
 }
 
 message Header {
-  // key is a element key in a key value pair
+  // key is an element key in a key value pair
   string key = 1;
-  // values are a list of strings coresponding to the key
+  // values are a list of strings corresponding to the key
   repeated string values = 2;
 }
 
