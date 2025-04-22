@@ -769,7 +769,7 @@ func (n *Node) initDatabase() error {
 	dbFullPath := filepath.Join(n.Config.DatabaseConfig.Path, dbFolderName)
 
 	var err error
-	n.DB, err = databasefactory.NewDatabase(
+	n.DB, err = databasefactory.New(
 		n.Config.DatabaseConfig.Name,
 		dbFullPath,
 		n.Config.DatabaseConfig.ReadOnly,

@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-// NewDatabase creates a new database instance based on the provided configuration.
+// New creates a new database instance based on the provided configuration.
 // It supports LevelDB, MemDB, and PebbleDB as database types.
 // It also wraps the database with a corruptable DB and a meter DB.
 // [dbName] is the name of the database.
@@ -26,35 +26,35 @@ import (
 // [dbConfig] is the database configuration in JSON format.
 // [dbMetricsPrefix] is used to create a new metrics registerer for the database.
 // [meterDBRegName] is used to create a new metrics registerer for the meter DB.
-func NewDatabase(dbName string, dbPath string, readOnly bool, dbConfig []byte,
-	gatherer metrics.MultiGatherer, logger logging.Logger, dbMetricsPrefix, meterDBRegName string,
+func New(name string, path string, readOnly bool, config []byte,
+	gatherer metrics.MultiGatherer, logger logging.Logger, metricsPrefix, meterDBRegName string,
 ) (database.Database, error) {
 	dbRegisterer, err := metrics.MakeAndRegister(
 		gatherer,
-		dbMetricsPrefix,
+		metricsPrefix,
 	)
 	if err != nil {
 		return nil, err
 	}
 	var db database.Database
 	// start the db
-	switch dbName {
+	switch name {
 	case leveldb.Name:
-		db, err = leveldb.New(dbPath, dbConfig, logger, dbRegisterer)
+		db, err = leveldb.New(path, config, logger, dbRegisterer)
 		if err != nil {
-			return nil, fmt.Errorf("couldn't create %s at %s: %w", leveldb.Name, dbPath, err)
+			return nil, fmt.Errorf("couldn't create %s at %s: %w", leveldb.Name, path, err)
 		}
 	case memdb.Name:
 		db = memdb.New()
 	case pebbledb.Name:
-		db, err = pebbledb.New(dbPath, dbConfig, logger, dbRegisterer)
+		db, err = pebbledb.New(path, config, logger, dbRegisterer)
 		if err != nil {
-			return nil, fmt.Errorf("couldn't create %s at %s: %w", pebbledb.Name, dbPath, err)
+			return nil, fmt.Errorf("couldn't create %s at %s: %w", pebbledb.Name, path, err)
 		}
 	default:
 		return nil, fmt.Errorf(
 			"db-type was %q but should have been one of {%s, %s, %s}",
-			dbName,
+			name,
 			leveldb.Name,
 			memdb.Name,
 			pebbledb.Name,
@@ -64,7 +64,7 @@ func NewDatabase(dbName string, dbPath string, readOnly bool, dbConfig []byte,
 	// Wrap with corruptable DB
 	db = corruptabledb.New(db)
 
-	if readOnly && dbName != memdb.Name {
+	if readOnly && name != memdb.Name {
 		db = versiondb.New(db)
 	}
 
