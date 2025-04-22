@@ -21,9 +21,6 @@ func TestFIFOCacheInsertion(t *testing.T) {
 		ok bool
 	}
 
-	// insert less than limit
-	// insert limit
-	// exceed limit removes in correct order
 	tests := []struct {
 		name string
 		ops  []interface{}
