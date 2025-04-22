@@ -48,8 +48,5 @@ echo "updating coreth dependency to point to ${CORETH_PATH}"
 go mod edit -replace "github.com/ava-labs/coreth=${CORETH_PATH}"
 go mod tidy
 
-echo "building avalanchego"
-./scripts/build.sh -r
-
 echo "running AvalancheGo e2e tests"
-E2E_SERIAL=1 ./scripts/tests.e2e.sh --ginkgo.label-filter='c || uses-c' "${@}"
+./scripts/run_task.sh test-e2e-ci -- --ginkgo.label-filter='c || uses-c' "${@}"
