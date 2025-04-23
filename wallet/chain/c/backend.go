@@ -10,14 +10,14 @@ import (
 	"math/big"
 	"sync"
 
-	"github.com/ava-labs/coreth/plugin/evm"
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
-	ethcommon "github.com/ethereum/go-ethereum/common"
+	ethcommon "github.com/ava-labs/libevm/common"
 )
 
 var (
@@ -32,7 +32,7 @@ type Backend interface {
 	BuilderBackend
 	SignerBackend
 
-	AcceptAtomicTx(ctx context.Context, tx *evm.Tx) error
+	AcceptAtomicTx(ctx context.Context, tx *atomic.Tx) error
 }
 
 type backend struct {
@@ -57,9 +57,9 @@ func NewBackend(
 	}
 }
 
-func (b *backend) AcceptAtomicTx(ctx context.Context, tx *evm.Tx) error {
+func (b *backend) AcceptAtomicTx(ctx context.Context, tx *atomic.Tx) error {
 	switch tx := tx.UnsignedAtomicTx.(type) {
-	case *evm.UnsignedImportTx:
+	case *atomic.UnsignedImportTx:
 		for _, input := range tx.ImportedInputs {
 			utxoID := input.InputID()
 			if err := b.RemoveUTXO(ctx, tx.SourceChain, utxoID); err != nil {
@@ -80,7 +80,7 @@ func (b *backend) AcceptAtomicTx(ctx context.Context, tx *evm.Tx) error {
 			balance.Mul(balance, avaxConversionRate)
 			account.Balance.Add(account.Balance, balance)
 		}
-	case *evm.UnsignedExportTx:
+	case *atomic.UnsignedExportTx:
 		txID := tx.ID()
 		for i, out := range tx.ExportedOutputs {
 			err := b.AddUTXO(

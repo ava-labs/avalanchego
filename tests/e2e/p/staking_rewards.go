@@ -8,7 +8,6 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/onsi/ginkgo/v2"
-	"github.com/spf13/cast"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
@@ -50,14 +49,13 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		)
 
 		tc.By("checking that the network has a compatible minimum stake duration", func() {
-			minStakeDuration := cast.ToDuration(network.DefaultFlags[config.MinStakeDurationKey])
-			require.Equal(tmpnet.DefaultMinStakeDuration, minStakeDuration)
+			require.Equal(tmpnet.DefaultMinStakeDuration, network.DefaultFlags[config.MinStakeDurationKey])
 		})
 
 		tc.By("adding alpha node, whose uptime should result in a staking reward")
-		alphaNode := e2e.AddEphemeralNode(tc, network, tmpnet.FlagsMap{})
+		alphaNode := e2e.AddEphemeralNode(tc, network, tmpnet.NewEphemeralNode(tmpnet.FlagsMap{}))
 		tc.By("adding beta node, whose uptime should not result in a staking reward")
-		betaNode := e2e.AddEphemeralNode(tc, network, tmpnet.FlagsMap{})
+		betaNode := e2e.AddEphemeralNode(tc, network, tmpnet.NewEphemeralNode(tmpnet.FlagsMap{}))
 
 		// Wait to check health until both nodes have started to minimize the duration
 		// required for both nodes to report healthy.
@@ -67,12 +65,14 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		e2e.WaitForHealthy(tc, betaNode)
 
 		tc.By("retrieving alpha node id and pop")
-		alphaInfoClient := info.NewClient(alphaNode.URI)
+		alphaNodeURI := e2e.GetLocalURI(tc, alphaNode)
+		alphaInfoClient := info.NewClient(alphaNodeURI)
 		alphaNodeID, alphaPOP, err := alphaInfoClient.GetNodeID(tc.DefaultContext())
 		require.NoError(err)
 
 		tc.By("retrieving beta node id and pop")
-		betaInfoClient := info.NewClient(betaNode.URI)
+		betaNodeURI := e2e.GetLocalURI(tc, betaNode)
+		betaInfoClient := info.NewClient(betaNodeURI)
 		betaNodeID, betaPOP, err := betaInfoClient.GetNodeID(tc.DefaultContext())
 		require.NoError(err)
 
@@ -97,14 +97,14 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			keychain = env.NewKeychain()
 			nodeURI  = tmpnet.NodeURI{
 				NodeID: alphaNodeID,
-				URI:    alphaNode.URI,
+				URI:    alphaNodeURI,
 			}
 			baseWallet = e2e.NewWallet(tc, keychain, nodeURI)
 			pWallet    = baseWallet.P()
 			pBuilder   = pWallet.Builder()
 			pContext   = pBuilder.Context()
 
-			pvmClient = platformvm.NewClient(alphaNode.URI)
+			pvmClient = platformvm.NewClient(alphaNodeURI)
 		)
 
 		tc.By("retrieving supply before adding alpha node as a validator")

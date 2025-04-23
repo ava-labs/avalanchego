@@ -47,7 +47,7 @@ func awaitLiveness(t *testing.T, r Reporter, liveness bool) {
 	}, awaitTimeout, awaitFreq)
 }
 
-func TestDuplicatedRegistations(t *testing.T) {
+func TestDuplicatedRegistrations(t *testing.T) {
 	require := require.New(t)
 
 	check := CheckerFunc(func(context.Context) (interface{}, error) {

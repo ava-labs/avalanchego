@@ -8,7 +8,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
@@ -43,9 +42,13 @@ type Context struct {
 	CChainID    ids.ID
 	AVAXAssetID ids.ID
 
-	Log          logging.Logger
+	Log logging.Logger
+	// Deprecated: This lock should not be used unless absolutely necessary.
+	// This lock will be removed in a future release once it is replaced with
+	// more granular locks.
+	//
+	// Warning: This lock is not correctly implemented over the rpcchainvm.
 	Lock         sync.RWMutex
-	Keystore     keystore.BlockchainKeystore
 	SharedMemory atomic.SharedMemory
 	BCLookup     ids.AliaserReader
 	Metrics      metrics.MultiGatherer

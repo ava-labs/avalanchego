@@ -30,7 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
@@ -175,7 +175,7 @@ func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []id
 		require.NoError(t, err)
 		nodeID := ids.NodeIDFromCert(cert)
 
-		blsKey, err := bls.NewSecretKey()
+		blsKey, err := localsigner.New()
 		require.NoError(t, err)
 
 		config := defaultConfig
@@ -231,8 +231,6 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 			require.NoError(vdrs.AddStaker(constants.PrimaryNetworkID, nodeID, nil, ids.GenerateTestID(), 1))
 		}
 
-		config := config
-
 		config.Beacons = beacons
 		config.Validators = vdrs
 
@@ -284,6 +282,11 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 		if i != 0 {
 			config := configs[0]
 			net.ManuallyTrack(config.MyNodeID, config.MyIPPort.Get())
+			// Wait until the node is connected to the first node.
+			// This forces nodes to connect to each other in a deterministic order.
+			require.Eventually(func() bool {
+				return len(net.PeerInfo([]ids.NodeID{config.MyNodeID})) > 0
+			}, 10*time.Second, time.Millisecond)
 		}
 
 		go func(net Network) {
@@ -306,6 +309,53 @@ func TestNewNetwork(t *testing.T) {
 		net.StartClose()
 	}
 	wg.Wait()
+}
+
+func TestIngressConnCount(t *testing.T) {
+	require := require.New(t)
+
+	emptyHandler := func(context.Context, message.InboundMessage) {}
+
+	_, networks, wg := newFullyConnectedTestNetwork(
+		t, []router.InboundHandler{
+			router.InboundHandlerFunc(emptyHandler),
+			router.InboundHandlerFunc(emptyHandler),
+			router.InboundHandlerFunc(emptyHandler),
+		})
+
+	wg.Done()
+
+	for _, net := range networks {
+		net.config.NoIngressValidatorConnectionGracePeriod = 0
+		net.config.HealthConfig.Enabled = true
+	}
+
+	require.Eventually(func() bool {
+		result := true
+		for _, net := range networks {
+			result = result && len(net.PeerInfo(nil)) == len(networks)-1
+		}
+		return result
+	}, time.Minute, time.Millisecond*10)
+
+	ingressConnCount := set.Of[int]()
+
+	for _, net := range networks {
+		connCount := net.IngressConnCount()
+		ingressConnCount.Add(connCount)
+		_, err := net.HealthCheck(context.Background())
+		if connCount == 0 {
+			require.ErrorContains(err, ErrNoIngressConnections.Error()) //nolint
+		} else {
+			require.NoError(err)
+		}
+	}
+
+	// Some node has all nodes connected to it.
+	// Some other node has only the remaining last node connected to it.
+	// The remaining last node has no node connected to it, as it connects to the first and second node.
+	// Since it has no one connecting to it, its health check fails.
+	require.Equal(set.Of(0, 1, 2), ingressConnCount)
 }
 
 func TestSend(t *testing.T) {
@@ -461,8 +511,6 @@ func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 			require.NoError(vdrs.AddStaker(constants.PrimaryNetworkID, nodeID, nil, ids.GenerateTestID(), 1))
 		}
 
-		config := config
-
 		config.Beacons = beacons
 		config.Validators = vdrs
 		config.AllowPrivateIPs = false
@@ -540,8 +588,6 @@ func TestDialDeletesNonValidators(t *testing.T) {
 
 		beacons := validators.NewManager()
 		require.NoError(beacons.AddStaker(constants.PrimaryNetworkID, nodeIDs[0], nil, ids.GenerateTestID(), 1))
-
-		config := config
 
 		config.Beacons = beacons
 		config.Validators = vdrs
@@ -695,8 +741,6 @@ func TestAllowConnectionAsAValidator(t *testing.T) {
 
 		vdrs := validators.NewManager()
 		require.NoError(vdrs.AddStaker(constants.PrimaryNetworkID, nodeIDs[0], nil, ids.GenerateTestID(), 1))
-
-		config := config
 
 		config.Beacons = beacons
 		config.Validators = vdrs

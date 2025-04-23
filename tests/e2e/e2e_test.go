@@ -10,11 +10,11 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	// ensure test packages are scanned by ginkgo
 	_ "github.com/ava-labs/avalanchego/tests/e2e/banff"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/c"
-	_ "github.com/ava-labs/avalanchego/tests/e2e/etna"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/faultinjection"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/p"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/x"
@@ -34,23 +34,28 @@ func TestE2E(t *testing.T) {
 var flagVars *e2e.FlagVars
 
 func init() {
-	flagVars = e2e.RegisterFlags()
+	flagVars = e2e.RegisterFlagsWithDefaultOwner("avalanchego-e2e")
 }
 
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run only once in the first ginkgo process
 
-	tc := e2e.NewTestContext()
+	tc := e2e.NewEventHandlerTestContext()
 
-	nodes := tmpnet.NewNodesOrPanic(flagVars.NodeCount())
+	nodeCount, err := flagVars.NodeCount()
+	require.NoError(tc, err)
+	nodes := tmpnet.NewNodesOrPanic(nodeCount)
 	subnets := vms.XSVMSubnetsOrPanic(nodes...)
 
 	upgrades := upgrade.Default
-	if flagVars.ActivateEtna() {
-		upgrades.EtnaTime = upgrade.InitiallyActiveTime
+	if flagVars.ActivateFortuna() {
+		upgrades.FortunaTime = upgrade.InitiallyActiveTime
 	} else {
-		upgrades.EtnaTime = upgrade.UnscheduledActivationTime
+		upgrades.FortunaTime = upgrade.UnscheduledActivationTime
 	}
+	tc.Log().Info("setting upgrades",
+		zap.Reflect("upgrades", upgrades),
+	)
 
 	upgradeJSON, err := json.Marshal(upgrades)
 	require.NoError(tc, err)
@@ -60,9 +65,11 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 		tc,
 		flagVars,
 		&tmpnet.Network{
-			Owner: "avalanchego-e2e",
+			Owner: flagVars.NetworkOwner(),
 			DefaultFlags: tmpnet.FlagsMap{
 				config.UpgradeFileContentKey: upgradeBase64,
+				// Ensure a min stake duration compatible with testing staking logic
+				config.MinStakeDurationKey: tmpnet.DefaultMinStakeDuration,
 			},
 			Nodes:   nodes,
 			Subnets: subnets,
@@ -72,5 +79,5 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run in every ginkgo process
 
 	// Initialize the local test environment from the global state
-	e2e.InitSharedTestEnvironment(ginkgo.GinkgoT(), envBytes)
+	e2e.InitSharedTestEnvironment(e2e.NewTestContext(), envBytes)
 })

@@ -57,7 +57,7 @@ func BuildViper(fs *pflag.FlagSet, args []string) (*viper.Viper, error) {
 		}
 
 	case v.IsSet(ConfigFileKey):
-		filename := GetExpandedArg(v, ConfigFileKey)
+		filename := getExpandedArg(v, ConfigFileKey)
 		v.SetConfigFile(filename)
 		if err := v.ReadInConfig(); err != nil {
 			return nil, err

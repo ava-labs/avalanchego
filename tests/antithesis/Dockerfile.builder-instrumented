@@ -1,12 +1,12 @@
 # The version is supplied as a build argument rather than hard-coded
 # to minimize the cost of version changes.
-ARG GO_VERSION
+ARG GO_VERSION=INVALID # This value isn't intended to be used but silences a warning
 
 # Antithesis: Getting the Antithesis golang instrumentation library
 FROM docker.io/antithesishq/go-instrumentor AS instrumentor
 
 # ============= Instrumentation Stage ================
-FROM golang:$GO_VERSION-bullseye
+FROM golang:$GO_VERSION-bookworm
 
 WORKDIR /build
 # Copy and download dependencies using go mod

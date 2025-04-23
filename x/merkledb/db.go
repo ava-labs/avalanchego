@@ -151,12 +151,27 @@ type Prefetcher interface {
 type MerkleDB interface {
 	database.Database
 	Clearer
-	Trie
+	View
 	MerkleRootGetter
 	ProofGetter
 	ChangeProofer
 	RangeProofer
 	Prefetcher
+}
+
+func NewConfig() Config {
+	return Config{
+		BranchFactor:                BranchFactor16,
+		Hasher:                      DefaultHasher,
+		RootGenConcurrency:          0,
+		HistoryLength:               300,
+		ValueNodeCacheSize:          units.MiB,
+		IntermediateNodeCacheSize:   units.MiB,
+		IntermediateWriteBufferSize: units.KiB,
+		IntermediateWriteBatchSize:  256 * units.KiB,
+		TraceLevel:                  InfoTrace,
+		Tracer:                      trace.Noop,
+	}
 }
 
 type Config struct {
@@ -190,6 +205,7 @@ type Config struct {
 	// Prometheus.
 	// This may be useful for testing.
 	Reg        prometheus.Registerer
+	Namespace  string
 	TraceLevel TraceLevel
 	Tracer     trace.Tracer
 }
@@ -245,7 +261,7 @@ type merkleDB struct {
 
 // New returns a new merkle database.
 func New(ctx context.Context, db database.Database, config Config) (MerkleDB, error) {
-	metrics, err := newMetrics("merkledb", config.Reg)
+	metrics, err := newMetrics(config.Namespace, config.Reg)
 	if err != nil {
 		return nil, err
 	}
