@@ -1,14 +1,14 @@
 The Admin API can be used for measuring node health and debugging.
 
 <Callout title="Note">
-The Admin API is disabled by default for security reasons. To run a node with the Admin API enabled, use [`config flag --api-admin-enabled=true`](/nodes/configure/configs-flags#--api-admin-enabled-boolean).
+The Admin API is disabled by default for security reasons. To run a node with the Admin API enabled, use [`config flag --api-admin-enabled=true`](https://build.avax.network/docs/nodes/configure/configs-flags#--api-admin-enabled-boolean).
 
-This API set is for a specific node, it is unavailable on the [public server](/tooling/rpc-providers).
+This API set is for a specific node, it is unavailable on the [public server](https://build.avax.network/docs/tooling/rpc-providers).
 </Callout>
 
 ## Format
 
-This API uses the `json 2.0` RPC format. For details, see [here](/api-reference/standards/guides/issuing-api-calls).
+This API uses the `json 2.0` RPC format. For details, see [here](https://build.avax.network/docs/api-reference/guides/issuing-api-calls).
 
 ## Endpoint
 
@@ -63,7 +63,7 @@ Now, calls to the X-Chain can be made to either `/ext/bc/X` or, equivalently, to
 Give a blockchain an alias, a different name that can be used any place the blockchain's ID is used.
 
 <Callout title="Note">
-Aliasing a chain can also be done via the [Node API](/nodes/configure/configs-flags#--chain-aliases-file-string).
+Aliasing a chain can also be done via the [Node API](https://build.avax.network/docs/nodes/configure/configs-flags#--chain-aliases-file-string).
 
 Note that the alias is set for each chain on each node individually. In a multi-node Avalanche L1, the same alias should be configured on each node to use an alias across an Avalanche L1 successfully. Setting an alias for a chain on one node does not register that alias with other nodes automatically.
 </Callout>
@@ -208,7 +208,7 @@ curl -X POST --data '{
 
 ### `admin.loadVMs`
 
-Dynamically loads any virtual machines installed on the node as plugins. See [here](/virtual-machines#installing-a-vm) for more information on how to install a virtual machine on a node.
+Dynamically loads any virtual machines installed on the node as plugins. See [here](https://build.avax.network/docs/virtual-machines#installing-a-vm) for more information on how to install a virtual machine on a node.
 
 **Signature**:
 
