@@ -40,12 +40,6 @@ func (s *stateSummary) Height() uint64 {
 }
 
 func (s *stateSummary) Accept(ctx context.Context) (block.StateSyncMode, error) {
-	// If we have already synced up to or past this state summary, we do not
-	// want to sync to it.
-	if s.vm.lastAcceptedHeight >= s.Height() {
-		return block.StateSyncSkipped, nil
-	}
-
 	// set fork height first, before accepting proposerVM full block
 	// which updates height index (among other indices)
 	if err := s.vm.State.SetForkHeight(s.StateSummary.ForkHeight()); err != nil {
@@ -62,5 +56,8 @@ func (s *stateSummary) Accept(ctx context.Context) (block.StateSyncMode, error) 
 	// innerSummary.Accept may fail with the proposerVM block and index already
 	// updated. The error would be treated as fatal and the chain would then be
 	// repaired upon the VM restart.
+	// After the inner summary is accepted, the engine transitions to bootstrapping
+	// and SetState is responsible for re-aligning the ProposerVM to the height reported
+	// by the inner VM after handling state sync.
 	return s.innerSummary.Accept(ctx)
 }

@@ -172,9 +172,9 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		})
 
 		tc.By("creating the genesis validator")
-		subnetGenesisNode := e2e.AddEphemeralNode(tc, env.GetNetwork(), tmpnet.FlagsMap{
+		subnetGenesisNode := e2e.AddEphemeralNode(tc, env.GetNetwork(), tmpnet.NewEphemeralNode(tmpnet.FlagsMap{
 			config.TrackSubnetsKey: subnetID.String(),
-		})
+		}))
 
 		genesisNodePoP, err := subnetGenesisNode.GetProofOfPossession()
 		require.NoError(err)
@@ -348,9 +348,9 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		tc.By("advancing the proposervm P-chain height", advanceProposerVMPChainHeight)
 
 		tc.By("creating the validator to register")
-		subnetRegisterNode := e2e.AddEphemeralNode(tc, env.GetNetwork(), tmpnet.FlagsMap{
+		subnetRegisterNode := e2e.AddEphemeralNode(tc, env.GetNetwork(), tmpnet.NewEphemeralNode(tmpnet.FlagsMap{
 			config.TrackSubnetsKey: subnetID.String(),
-		})
+		}))
 
 		registerNodePoP, err := subnetRegisterNode.GetProofOfPossession()
 		require.NoError(err)
