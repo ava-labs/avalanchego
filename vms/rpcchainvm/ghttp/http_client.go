@@ -7,10 +7,12 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/grequest"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gresponsewriter"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
 	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
+	requestpb "github.com/ava-labs/avalanchego/proto/pb/http/request"
 	responsewriterpb "github.com/ava-labs/avalanchego/proto/pb/http/responsewriter"
 )
 
@@ -54,15 +56,10 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	server := grpcutils.NewServer()
 	closer.Add(server)
 	responsewriterpb.RegisterWriterServer(server, gresponsewriter.NewServer(w))
+	requestpb.RegisterRequestServer(server, grequest.NewServer(r.Body))
 
 	// Start responsewriter gRPC service.
 	go grpcutils.Serve(serverListener, server)
-
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 
 	req := &httppb.HTTPRequest{
 		ResponseWriter: &httppb.ResponseWriter{
@@ -75,7 +72,6 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			ProtoMajor:       int32(r.ProtoMajor),
 			ProtoMinor:       int32(r.ProtoMinor),
 			Header:           make([]*httppb.Element, 0, len(r.Header)),
-			Body:             body,
 			ContentLength:    r.ContentLength,
 			TransferEncoding: r.TransferEncoding,
 			Host:             r.Host,

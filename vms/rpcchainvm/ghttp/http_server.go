@@ -8,15 +8,16 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"net/http"
 	"net/url"
 
-	"google.golang.org/protobuf/types/known/emptypb"
-
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/grequest"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gresponsewriter"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
 	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
+	requestpb "github.com/ava-labs/avalanchego/proto/pb/http/request"
 	responsewriterpb "github.com/ava-labs/avalanchego/proto/pb/http/responsewriter"
 )
 
@@ -50,13 +51,14 @@ func (s *Server) Handle(ctx context.Context, req *httppb.HTTPRequest) (*emptypb.
 	}
 
 	writer := gresponsewriter.NewClient(writerHeaders, responsewriterpb.NewWriterClient(clientConn))
+	body := grequest.NewClient(ctx, requestpb.NewRequestClient(clientConn))
 
 	// create the request with the current context
 	request, err := http.NewRequestWithContext(
 		ctx,
 		req.Request.Method,
 		req.Request.RequestUri,
-		bytes.NewBuffer(req.Request.Body),
+		body,
 	)
 	if err != nil {
 		return nil, err
