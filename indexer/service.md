@@ -1,4 +1,4 @@
-AvalancheGo can be configured to run with an indexer. That is, it saves (indexes) every container (a block, vertex or transaction) it accepts on the X-Chain, P-Chain and C-Chain. To run AvalancheGo with indexing enabled, set command line flag [\--index-enabled](https://docs.avax.network/nodes/configure/configs-flags#--index-enabled-boolean) to true.
+AvalancheGo can be configured to run with an indexer. That is, it saves (indexes) every container (a block, vertex or transaction) it accepts on the X-Chain, P-Chain and C-Chain. To run AvalancheGo with indexing enabled, set command line flag [\--index-enabled](https://build.avax.network/docs/nodes/configure/configs-flags#--index-enabled-boolean) to true.
 
 **AvalancheGo will only index containers that are accepted when running with `--index-enabled` set to true.** To ensure your node has a complete index, run a node with a fresh database and `--index-enabled` set to true. The node will accept every block, vertex and transaction in the network history during bootstrapping, ensuring your index is complete.
 
@@ -16,7 +16,7 @@ There is a Go implementation of an Index API client. See documentation [here](ht
 
 ## Format
 
-This API uses the `json 2.0` RPC format. For more information on making JSON RPC calls, see [here](https://docs.avax.network/api-reference/standards/guides/issuing-api-calls).
+This API uses the `json 2.0` RPC format. For more information on making JSON RPC calls, see [here](https://build.avax.network/docs/api-reference/guides/issuing-api-calls).
 
 ## Endpoints
 
