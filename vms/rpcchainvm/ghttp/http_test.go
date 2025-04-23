@@ -4,12 +4,23 @@
 package ghttp
 
 import (
+	"context"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/test/bufconn"
+	"io"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
+	"github.com/ava-labs/avalanchego/proto/pb/test"
+)
+
+var (
+	_ test.FooServer = (*fooServer)(nil)
+	_ io.Reader      = (*infiniteStream)(nil)
 )
 
 func TestConvertWriteResponse(t *testing.T) {
@@ -48,4 +59,45 @@ func TestConvertWriteResponse(t *testing.T) {
 			require.NoError(t, convertWriteResponse(w, scenerio.resp))
 		})
 	}
+}
+
+func TestArbitrarilyLongResponse(t *testing.T) {
+	require := require.New(t)
+
+	listener := bufconn.Listen(1)
+	server := grpc.NewServer()
+	test.RegisterFooServer(server, fooServer{})
+
+	go func() {
+		require.NoError(server.Serve(listener))
+	}()
+
+	conn, err := grpc.NewClient(listener.Addr().String(), grpc.WithInsecure())
+	require.NoError(err)
+
+	client := NewClient(httppb.NewHTTPClient(conn))
+
+	w := &httptest.ResponseRecorder{}
+	r := &http.Request{
+		Header: map[string][]string{
+			"Upgrade": {"foo"},
+		},
+		Body: io.NopCloser(infiniteStream{}),
+	}
+
+	client.ServeHTTP(w, r)
+}
+
+type fooServer struct {
+	test.UnimplementedFooServer
+}
+
+func (fooServer) Foo(context.Context, *test.FooRequest) (*test.FooResponse, error) {
+	return &test.FooResponse{}, nil
+}
+
+type infiniteStream struct{}
+
+func (i infiniteStream) Read(p []byte) (n int, err error) {
+	return len(p), nil
 }
