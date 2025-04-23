@@ -139,10 +139,9 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 			contractAddress = receipt.ContractAddress
 		})
 
-		gasPrice, err := ethClient.EstimateBaseFee(tc.DefaultContext())
+		initialGasPrice, err := ethClient.EstimateBaseFee(tc.DefaultContext())
 		require.NoError(err)
 
-		initialGasPrice := gasPrice
 		targetGasPrice := new(big.Int).Set(initialGasPrice)
 		targetGasPrice.Mul(targetGasPrice, bigExpectedGasPriceIncreaseNumerator)
 		targetGasPrice.Add(targetGasPrice, bigExpectedGasPriceIncreaseDenominatorMinus1)
