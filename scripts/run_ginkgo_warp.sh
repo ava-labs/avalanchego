@@ -6,15 +6,12 @@ set -euo pipefail
 # within the $GOPATH
 # The AvalancheGo and PluginDir paths can be specified via the environment variables used in ./scripts/run.sh.
 
-# Load the versions
 SUBNET_EVM_PATH=$(
   cd "$(dirname "${BASH_SOURCE[0]}")"
   cd .. && pwd
 )
 
 source "$SUBNET_EVM_PATH"/scripts/constants.sh
-
-source "$SUBNET_EVM_PATH"/scripts/versions.sh
 
 EXTRA_ARGS=()
 AVALANCHEGO_BUILD_PATH="${AVALANCHEGO_BUILD_PATH:-}"

@@ -11,9 +11,6 @@ SUBNET_EVM_PATH=$(
     cd .. && pwd
 )
 
-# Load the versions
-source "$SUBNET_EVM_PATH"/scripts/versions.sh
-
 # Load the constants
 source "$SUBNET_EVM_PATH"/scripts/constants.sh
 

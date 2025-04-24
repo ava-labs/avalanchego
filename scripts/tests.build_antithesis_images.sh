@@ -18,7 +18,7 @@ SUBNET_EVM_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 
 # Discover the default tag that will be used for the image
 source "${SUBNET_EVM_PATH}"/scripts/constants.sh
-export IMAGE_TAG="${SUBNET_EVM_COMMIT::8}"
+export IMAGE_TAG="${DOCKERHUB_TAG}"
 
 # Build the images
 bash -x "${SUBNET_EVM_PATH}"/scripts/build_antithesis_images.sh

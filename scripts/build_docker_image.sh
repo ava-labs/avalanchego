@@ -25,11 +25,10 @@ SUBNET_EVM_PATH=$(
 # Load the constants
 source "$SUBNET_EVM_PATH"/scripts/constants.sh
 
-# Load the versions
-source "$SUBNET_EVM_PATH"/scripts/versions.sh
-
-# WARNING: this will use the most recent commit even if there are un-committed changes present
-BUILD_IMAGE_ID=${BUILD_IMAGE_ID:-"${CURRENT_BRANCH}"}
+# ALLOW_TAG_LATEST is used to tag the image as 'latest' if set to true.
+# It only works if the image is built from the master branch. This is to avoid
+# tagging images from a manual triggered build as 'latest' with older avalanchego versions.
+ALLOW_TAG_LATEST="${ALLOW_TAG_LATEST:-}"
 
 # buildx (BuildKit) improves the speed and UI of builds over the legacy builder and
 # simplifies creation of multi-arch images.
@@ -70,9 +69,6 @@ else
 fi
 
 VM_ID=${VM_ID:-"${DEFAULT_VM_ID}"}
-if [[ "${VM_ID}" != "${DEFAULT_VM_ID}" ]]; then
-  DOCKERHUB_TAG="${VM_ID}-${DOCKERHUB_TAG}"
-fi
 
 # Default to the release image. Will need to be overridden when testing against unreleased versions.
 AVALANCHEGO_NODE_IMAGE="${AVALANCHEGO_NODE_IMAGE:-${AVALANCHEGO_IMAGE_NAME}:${AVALANCHE_VERSION}}"
@@ -112,7 +108,7 @@ ${DOCKER_CMD} -t "$IMAGE_NAME:$BUILD_IMAGE_ID" -t "$IMAGE_NAME:${DOCKERHUB_TAG}"
   --build-arg CURRENT_BRANCH="$CURRENT_BRANCH" \
   --build-arg VM_ID="$VM_ID"
 
-if [[ -n "${PUBLISH}" && $CURRENT_BRANCH == "master" ]]; then
+if [[ -n "${PUBLISH}" && $CURRENT_BRANCH == "master" && $ALLOW_TAG_LATEST == true ]]; then
   echo "Tagging current image as $IMAGE_NAME:latest"
   docker buildx imagetools create -t "$IMAGE_NAME:latest" "$IMAGE_NAME:$BUILD_IMAGE_ID"
 fi

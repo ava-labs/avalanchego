@@ -4,15 +4,20 @@ on:
   workflow_dispatch:
     inputs:
       vm_id:
-        description: 'The ID of the VM (binary dst in Docker image)'
-        default: ''
+        description: "The ID of the VM (binary dst in Docker image)"
+        default: ""
         required: false
         type: string
       avalanche_version:
-        description: 'The SHA or tag of avalanchego to use for the base image (must be compatible with the version in go.mod)'
-        default: ''
+        description: "The SHA or tag of avalanchego to use for the base image (must be compatible with the version in go.mod)"
+        default: ""
         required: false
         type: string
+      allow_tag_latest:
+        description: "Whether or not allowing to tag the image created as latest (only works for master branch)"
+        default: false
+        required: false
+        type: boolean
 
   push:
     tags:
@@ -31,9 +36,9 @@ jobs:
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
-          IMAGE_NAME: "avaplatform/subnet-evm"
           VM_ID: ${{ inputs.vm_id }}
           PUBLISH: 1
           PLATFORMS: "linux/amd64,linux/arm64"
           AVALANCHE_VERSION: ${{ inputs.avalanche_version }}
+          ALLOW_TAG_LATEST: ${{ github.event_name != 'workflow_dispatch' || inputs.allow_tag_latest }}
         run: scripts/build_docker_image.sh

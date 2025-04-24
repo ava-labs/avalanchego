@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
 set -e
 
-# Load the versions
 SUBNET_EVM_PATH=$(
   cd "$(dirname "${BASH_SOURCE[0]}")"
   cd .. && pwd
 )
-source "$SUBNET_EVM_PATH"/scripts/versions.sh
 
 # Load the constants
 source "$SUBNET_EVM_PATH"/scripts/constants.sh
@@ -51,7 +49,7 @@ if [[ -f ${AVAGO_DOWNLOAD_PATH} ]]; then
   extract_archive
 else
   # try to download the archive if it exists
-  if curl -s --head --request GET "${AVAGO_DOWNLOAD_URL}" | grep "302" > /dev/null; then
+  if curl -s --head --request GET "${AVAGO_DOWNLOAD_URL}" | grep "302" >/dev/null; then
     echo "${AVAGO_DOWNLOAD_URL} found"
     echo "downloading to ${AVAGO_DOWNLOAD_PATH}"
     curl -L "${AVAGO_DOWNLOAD_URL}" -o "${AVAGO_DOWNLOAD_PATH}"
@@ -79,14 +77,14 @@ else
 
     set +e
     # try to checkout the branch
-    git checkout origin/"${AVALANCHE_VERSION}" > /dev/null 2>&1
+    git checkout origin/"${AVALANCHE_VERSION}" >/dev/null 2>&1
     CHECKOUT_STATUS=$?
     set -e
 
     # if it's not a branch, try to checkout the commit
     if [[ $CHECKOUT_STATUS -ne 0 ]]; then
       set +e
-      git checkout "${AVALANCHE_VERSION}" > /dev/null 2>&1
+      git checkout "${AVALANCHE_VERSION}" >/dev/null 2>&1
       CHECKOUT_STATUS=$?
       set -e
 
@@ -120,7 +118,6 @@ AVALANCHEGO_PATH=${AVALANCHEGO_BUILD_PATH}/avalanchego
 mkdir -p "${AVALANCHEGO_BUILD_PATH}"
 
 cp "${BUILD_DIR}"/avalanchego "${AVALANCHEGO_PATH}"
-
 
 echo "Installed AvalancheGo release ${AVALANCHE_VERSION}"
 echo "AvalancheGo Path: ${AVALANCHEGO_PATH}"

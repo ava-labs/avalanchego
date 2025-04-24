@@ -2,10 +2,44 @@
 
 ## Pending Release
 
-* * IMPORTANT: `eth_getProof` calls for historical state will be rejected by default.
-  * On archive nodes (`"pruning-enabled": false`): queries for historical proofs for state older than approximately 24 hours preceding the last accepted block will be rejected by default. This can be adjusted with the new option `historical-proof-query-window` which defines the number of blocks before the last accepted block which should be accepted for state proof queries, or set to `0` to accept any block number state query (previous behavior).
-  * On `pruning` nodes: queries for proofs past the tip buffer (32 blocks) will be rejected. This is in support of moving to a path based storage scheme, which does not support historical state proofs.
-* Added `Fortuna` upgrade as optional and defaulting to a `nil` timestamp.
+- Updated dockerhub image name to `avaplatform/subnet-evm_avalanchego` and tags to accommodate the new versioning scheme: {subnet-evm version}_{avalanchego version}
+
+## [v0.7.3](https://github.com/ava-labs/subnet-evm/releases/tag/v0.7.3)
+
+This version is backwards compatible to v0.7.0. It is optional, but encouraged.
+
+### AvalancheGo Compatibility
+
+The plugin version is unchanged at 39 and is compatible with AvalancheGo version v1.13.0.
+
+### Breaking changes
+
+- `eth_getProof` calls for historical state will be rejected by default (#1494: 4e5b9d86c617f046fd7ce36b9cbd76a6e27b4bc5)
+  - On archive nodes (`"pruning-enabled": false`): queries for historical proofs for state older than approximately 24 hours preceding the last accepted block will be rejected by default. This can be adjusted with the new option `historical-proof-query-window` which defines the number of blocks before the last accepted block which should be accepted for state proof queries, or set to `0` to accept any block number state query (previous behavior).
+  - On `pruning` nodes: queries for proofs past the tip buffer (32 blocks) will be rejected. This is in support of moving to a path based storage scheme, which does not support historical state proofs.
+
+### Features
+
+- Add `Fortuna` upgrade as optional and defaulting to a `nil` timestamp  (#1494, #1498)
+- Docker images Debian base upgraded from Bullseye (11) to Bookworm (12) (#1497)
+- AvalancheGo version upgraded from `v1.12.3-0.20250218154446-f1ec9a13b90a` to `v1.13.0`
+- plugin/evm/client: add `NewClientWithURL` function (#1509)
+
+### Fixes
+
+- Fix nil block possible bug in debug APIs (#1494: 0af9717087e6adafccf3486c770ae08cba09b751)
+
+### Documentation
+
+- plugin/evm: add local API docs (#1513)
+- 2023 Least Authority Audit (#1499)
+- precompile/contracts/warp:
+  - changes for 9000 upgrade (#1494)
+  - differentiate between L1 and Subnet self-signing optimization cases (#1529)
+- simulator: fix wrong flag name `staking-enabled` -> `--sybil-protection-enabled=false` (#1476)
+- typo fixes (#1491, #1506)
+
+**Full Changelog**: <https://github.com/ava-labs/subnet-evm/compare/v0.7.2...v0.7.3>
 
 ## [v0.7.2](https://github.com/ava-labs/subnet-evm/releases/tag/v0.7.2)
 

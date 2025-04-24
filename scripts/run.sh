@@ -8,13 +8,10 @@ if ! [[ "$0" =~ scripts/run.sh ]]; then
   exit 255
 fi
 
-# Load the versions
 SUBNET_EVM_PATH=$(
   cd "$(dirname "${BASH_SOURCE[0]}")"
   cd .. && pwd
 )
-source "$SUBNET_EVM_PATH"/scripts/versions.sh
-
 # Load the constants
 source "$SUBNET_EVM_PATH"/scripts/constants.sh
 
