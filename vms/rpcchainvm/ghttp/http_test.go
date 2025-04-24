@@ -61,7 +61,7 @@ func TestConvertWriteResponse(t *testing.T) {
 	}
 }
 
-func TestArbitrarilyLongResponse(t *testing.T) {
+func TestRequestClientArbitrarilyLongBody(t *testing.T) {
 	require := require.New(t)
 
 	listener := bufconn.Listen(0)
