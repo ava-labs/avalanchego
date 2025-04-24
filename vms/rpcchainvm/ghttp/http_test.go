@@ -5,14 +5,14 @@ package ghttp
 
 import (
 	"context"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/test/bufconn"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/test/bufconn"
 
 	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
 	"github.com/ava-labs/avalanchego/proto/pb/test"
