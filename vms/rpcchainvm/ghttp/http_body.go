@@ -57,5 +57,5 @@ func (b *bodyClient) Read(p []byte) (int, error) {
 		err = errors.New(*response.Error)
 	}
 
-	return len(response.Read), nil
+	return len(response.Read), err
 }
