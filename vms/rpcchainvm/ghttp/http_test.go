@@ -4,7 +4,6 @@
 package ghttp
 
 import (
-	"context"
 	"google.golang.org/grpc/credentials/insecure"
 	"io"
 	"net/http"
@@ -14,8 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
-
-	"github.com/ava-labs/avalanchego/proto/pb/test"
 
 	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
 )

@@ -5,14 +5,15 @@ package grequest
 
 import (
 	"context"
+	"errors"
 	"io"
 
-	"github.com/ava-labs/avalanchego/proto/pb/http/request"
+	"github.com/ava-labs/avalanchego/proto/pb/io/reader"
 )
 
 var _ io.Reader = (*Client)(nil)
 
-func NewClient(ctx context.Context, client request.RequestClient) *Client {
+func NewClient(ctx context.Context, client reader.ReaderClient) *Client {
 	return &Client{
 		ctx:    ctx,
 		client: client,
@@ -21,14 +22,23 @@ func NewClient(ctx context.Context, client request.RequestClient) *Client {
 
 type Client struct {
 	ctx    context.Context
-	client request.RequestClient
+	client reader.ReaderClient
 }
 
-func (c *Client) Read(p []byte) (n int, err error) {
-	reply, err := c.client.Body(c.ctx, &request.BodyRequest{N: uint32(len(p))})
+func (c *Client) Read(p []byte) (int, error) {
+	response, err := c.client.Read(
+		c.ctx,
+		&reader.ReadRequest{Length: int32(len(p))},
+	)
 	if err != nil {
 		return 0, err
 	}
 
-	return copy(p, reply.Body), nil
+	copy(p, response.Read)
+
+	if response.Error != nil {
+		err = errors.New(*response.Error)
+	}
+
+	return len(response.Read), nil
 }
