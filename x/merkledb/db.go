@@ -1188,7 +1188,7 @@ func (db *merkleDB) VerifyChangeProof(
 		startProofKey,
 		endProofKey,
 	); err != nil {
-		return fmt.Errorf("failed to end end proof path info: %w", err)
+		return fmt.Errorf("failed to add end proof path info: %w", err)
 	}
 
 	// Make sure we get the expected root.

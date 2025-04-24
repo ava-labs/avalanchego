@@ -96,7 +96,7 @@ func Test_Proof_Inclusion(t *testing.T) {
 	}{
 		{
 			name:   "happy path",
-			modify: func(p *Proof) {},
+			modify: func(_ *Proof) {},
 		},
 		{
 			name: "last proof node with missing value",
