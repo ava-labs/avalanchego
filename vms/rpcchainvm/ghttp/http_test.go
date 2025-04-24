@@ -67,13 +67,13 @@ func TestRequestClientArbitrarilyLongBody(t *testing.T) {
 
 	listener := bufconn.Listen(0)
 	server := grpc.NewServer()
-	test.RegisterFooServer(server, fooServer{})
+	httppb.RegisterHTTPServer(server, &httppb.UnimplementedHTTPServer{})
 
 	go func() {
 		require.NoError(server.Serve(listener))
 	}()
 
-	conn, err := grpc.NewClient(listener.Addr().String(), grpc.WithInsecure())
+	conn, err := grpc.NewClient(listener.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.NoError(err)
 
 	client := NewClient(httppb.NewHTTPClient(conn))
@@ -86,19 +86,11 @@ func TestRequestClientArbitrarilyLongBody(t *testing.T) {
 		Body: io.NopCloser(infiniteStream{}),
 	}
 
-	client.ServeHTTP(w, r)
-}
-
-type fooServer struct {
-	test.UnimplementedFooServer
-}
-
-func (fooServer) Foo(context.Context, *test.FooRequest) (*test.FooResponse, error) {
-	return &test.FooResponse{}, nil
+	client.ServeHTTP(w, r) // Shouldn't block forever reading the body
 }
 
 type infiniteStream struct{}
 
-func (i infiniteStream) Read(p []byte) (n int, err error) {
+func (infiniteStream) Read(p []byte) (n int, err error) {
 	return len(p), nil
 }
