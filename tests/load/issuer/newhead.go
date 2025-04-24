@@ -6,10 +6,8 @@ package issuer
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/log"
 
 	ethereum "github.com/ava-labs/libevm"
 )
@@ -31,7 +29,7 @@ func newHeadNotifier(client NewHeadSubscriber) *headNotifier {
 	}
 }
 
-func (n *headNotifier) start(ctx context.Context) (newHead <-chan struct{}, runError <-chan error) {
+func (n *headNotifier) start(ctx context.Context) (newHead <-chan struct{}, runError <-chan error, err error) {
 	newHeadSignal := make(chan struct{})
 
 	listenStop := make(chan struct{})
@@ -43,41 +41,18 @@ func (n *headNotifier) start(ctx context.Context) (newHead <-chan struct{}, runE
 	subscriptionCh := make(chan *types.Header)
 	subscription, err := n.client.SubscribeNewHead(ctx, subscriptionCh)
 	if err != nil {
-		log.Debug("failed to subscribe new heads, falling back to polling", "err", err)
-		go periodicNotify(listenStop, listenDone, ready, newHeadSignal)
-		<-ready
-		return newHeadSignal, nil // no possible error at runtime
+		return nil, nil, fmt.Errorf("subscribing to new head: %w", err)
 	}
 	go subscriptionChToSignal(listenStop, listenDone, ready, subscriptionCh, newHeadSignal)
 	<-ready
 	n.subscription = subscription
-	return newHeadSignal, n.makeRunErrCh()
+	return newHeadSignal, n.makeRunErrCh(), nil
 }
 
 func (n *headNotifier) stop() {
-	if n.subscription != nil {
-		n.subscription.Unsubscribe()
-	}
+	n.subscription.Unsubscribe()
 	close(n.listenStop)
 	<-n.listenDone
-}
-
-// periodicNotify is the fallback if the connection is not a websocket.
-func periodicNotify(listenStop <-chan struct{}, listenDone, ready chan<- struct{},
-	newHeadSignal chan<- struct{},
-) {
-	defer close(listenDone)
-	ticker := time.NewTicker(time.Second)
-	close(ready)
-	for {
-		select {
-		case <-listenStop:
-			ticker.Stop()
-			return
-		case <-ticker.C:
-			newHeadSignal <- struct{}{}
-		}
-	}
 }
 
 func subscriptionChToSignal(listenStop <-chan struct{}, listenDone, ready chan<- struct{},

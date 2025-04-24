@@ -11,6 +11,7 @@ import (
 	"math/big"
 	"slices"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/ava-labs/coreth/ethclient"
@@ -29,6 +30,7 @@ import (
 // ensureMinimumFunds ensures that each key has at least `minFundsPerAddr` by sending funds
 // from the key with the highest starting balance to keys with balances below the minimum.
 func ensureMinimumFunds(ctx context.Context, endpoint string, keys []*ecdsa.PrivateKey, minFundsPerAddr *big.Int) error {
+	websocket := strings.HasPrefix(endpoint, "ws") || strings.HasPrefix(endpoint, "wss")
 	client, err := ethclient.DialContext(ctx, endpoint)
 	if err != nil {
 		return fmt.Errorf("dialing %s: %w", endpoint, err)
@@ -71,7 +73,7 @@ func ensureMinimumFunds(ctx context.Context, endpoint string, keys []*ecdsa.Priv
 		return fmt.Errorf("creating distribution generator: %w", err)
 	}
 	tracker := tracker.NewCounter()
-	issuer := issuer.New(client, tracker, maxFundsAddress)
+	issuer := issuer.New(client, websocket, tracker, maxFundsAddress)
 	agents := []*agent.Agent[*types.Transaction, common.Hash]{
 		agent.New(txTarget, generator, issuer, tracker),
 	}
