@@ -5,6 +5,7 @@ package ghttp
 
 import (
 	"context"
+	"google.golang.org/grpc/credentials/insecure"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -19,10 +20,7 @@ import (
 	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
 )
 
-var (
-	_ test.FooServer = (*fooServer)(nil)
-	_ io.Reader      = (*infiniteStream)(nil)
-)
+var _ io.Reader = (*infiniteStream)(nil)
 
 func TestConvertWriteResponse(t *testing.T) {
 	scenerios := map[string]struct {
