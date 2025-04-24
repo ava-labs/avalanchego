@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/ava-labs/avalanchego/proto/pb/io/reader"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greader"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gresponsewriter"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
@@ -55,7 +56,7 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	server := grpcutils.NewServer()
 	closer.Add(server)
 	responsewriterpb.RegisterWriterServer(server, gresponsewriter.NewServer(w))
-	reader.RegisterReaderServer(server, &bodyServer{body: r.Body})
+	reader.RegisterReaderServer(server, greader.NewServer(r.Body))
 
 	// Start responsewriter gRPC service.
 	go grpcutils.Serve(serverListener, server)
