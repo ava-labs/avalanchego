@@ -64,7 +64,7 @@ func TestConvertWriteResponse(t *testing.T) {
 func TestArbitrarilyLongResponse(t *testing.T) {
 	require := require.New(t)
 
-	listener := bufconn.Listen(1)
+	listener := bufconn.Listen(0)
 	server := grpc.NewServer()
 	test.RegisterFooServer(server, fooServer{})
 
@@ -80,7 +80,7 @@ func TestArbitrarilyLongResponse(t *testing.T) {
 	w := &httptest.ResponseRecorder{}
 	r := &http.Request{
 		Header: map[string][]string{
-			"Upgrade": {"foo"},
+			"Upgrade": {"foo"}, // Make this look like a streaming request
 		},
 		Body: io.NopCloser(infiniteStream{}),
 	}
