@@ -14,8 +14,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
 
-	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
 	"github.com/ava-labs/avalanchego/proto/pb/test"
+
+	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
 )
 
 var (
