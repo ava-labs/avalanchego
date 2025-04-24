@@ -153,9 +153,10 @@ impl From<RevisionManagerError> for Error {
     }
 }
 
-/// The database interface, which includes a type for a static view of
-/// the database (the DbView). The most common implementation of the DbView
-/// is the api::DbView trait defined next.
+/// The database interface. The methods here operate on the most
+/// recently committed revision, and allow the creation of a new
+/// [Proposal] or a new [DbView] based on a specific historical
+/// revision.
 #[async_trait]
 pub trait Db {
     /// The type of a historical revision
@@ -197,15 +198,14 @@ pub trait Db {
         Self: 'p;
 }
 
-/// A view of the database at a specific time. These are wrapped with
-/// a Weak reference when fetching via a call to [Db::revision], as these
-/// can disappear because they became too old.
+/// A view of the database at a specific time.
 ///
-/// You only need a DbView if you need to read from a snapshot at a given
-/// root. Don't hold a strong reference to the DbView as it prevents older
-/// views from being cleaned up.
-///
-/// A [Proposal] requires implementing DbView
+/// There are a few ways to create a [DbView]:
+/// 1. From [Db::revision] which gives you a view for a specific
+///    historical revision
+/// 2. From [Db::propose] which is a view on top of the most recently
+///    committed revision with changes applied; or
+/// 3. From [Proposal::propose] which is a view on top of another proposal.
 #[async_trait]
 pub trait DbView {
     /// The type of a stream of key/value pairs
