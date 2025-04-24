@@ -8,9 +8,10 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"google.golang.org/protobuf/types/known/emptypb"
 	"net/http"
 	"net/url"
+
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/grequest"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gresponsewriter"
