@@ -4,18 +4,17 @@
 package gossip
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
-
-	xmempool "github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
-var ErrDuplicateTx = xmempool.ErrDuplicateTx
+var ErrDuplicateTx = errors.New("duplicate tx")
 
 type Mempool[T Gossipable] interface {
-	Add(tx T) error
-	Remove(txs ...T)
+	Add(gossipable T) error
+	Remove(gossipables ...T)
 
 	// Len returns the number of txs in the mempool.
 	Len() int
@@ -31,15 +30,15 @@ type mempool[T Gossipable] struct {
 
 func NewMempool[T Gossipable](
 	metrics *Metrics,
-) (*mempool[T], error) {
+) (Mempool[T], error) {
 	return &mempool[T]{
 		Txs:     make(map[ids.ID]bool),
 		metrics: metrics,
 	}, nil
 }
 
-func (m *mempool[T]) Add(tx T) error {
-	txID := tx.GossipID()
+func (m *mempool[T]) Add(gossipable T) error {
+	txID := gossipable.GossipID()
 	if m.Has(txID) {
 		m.metrics.ObserveIncomingGossipable(txID, DroppedDuplicate)
 		return fmt.Errorf("%w: %s", ErrDuplicateTx, txID)
@@ -49,8 +48,8 @@ func (m *mempool[T]) Add(tx T) error {
 	return nil
 }
 
-func (m *mempool[T]) Remove(txs ...T) {
-	for _, tx := range txs {
+func (m *mempool[T]) Remove(gossipables ...T) {
+	for _, tx := range gossipables {
 		delete(m.Txs, tx.GossipID())
 	}
 }

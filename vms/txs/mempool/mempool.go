@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/setmap"
@@ -29,7 +30,6 @@ const (
 )
 
 var (
-	ErrDuplicateTx          = errors.New("duplicate tx")
 	ErrTxTooLarge           = errors.New("tx too large")
 	ErrMempoolFull          = errors.New("mempool is full")
 	ErrConflictsWithOtherTx = errors.New("tx conflicts with other tx")
@@ -103,7 +103,7 @@ func (m *mempool[T]) Add(tx T) error {
 	defer m.lock.Unlock()
 
 	if _, ok := m.unissuedTxs.Get(txID); ok {
-		return fmt.Errorf("%w: %s", ErrDuplicateTx, txID)
+		return fmt.Errorf("%w: %s", gossip.ErrDuplicateTx, txID)
 	}
 
 	txSize := tx.Size()

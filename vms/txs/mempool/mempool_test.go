@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -62,7 +63,7 @@ func TestAdd(t *testing.T) {
 			name:       "attempt adding duplicate tx",
 			initialTxs: []*dummyTx{tx0},
 			tx:         tx0,
-			err:        ErrDuplicateTx,
+			err:        gossip.ErrDuplicateTx,
 			dropReason: nil,
 		},
 		{
