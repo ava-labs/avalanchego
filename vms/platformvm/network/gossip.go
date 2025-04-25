@@ -98,18 +98,16 @@ type gossipMempool struct {
 	log        logging.Logger
 	txVerifier TxVerifier
 
-	bloomLock sync.RWMutex
-	bloom     *gossip.BloomFilter
-
-	gossipMempoolLock sync.RWMutex
-	mempool           gossip.Mempool[*txs.Tx]
+	lock    sync.RWMutex
+	bloom   *gossip.BloomFilter
+	mempool *gossip.Mempool[*txs.Tx]
 }
 
 func (g *gossipMempool) Add(tx *txs.Tx) error {
 	txID := tx.ID()
 
-	g.gossipMempoolLock.Lock()
-	defer g.gossipMempoolLock.Unlock()
+	g.lock.Lock()
+	defer g.lock.Unlock()
 	if g.mempool.Has(txID) {
 		// adding an entry would fail, and an error would be returned.
 		return g.mempool.Add(tx)
@@ -142,9 +140,6 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 		return err
 	}
 
-	g.bloomLock.Lock()
-	defer g.bloomLock.Unlock()
-
 	g.bloom.Add(tx)
 	reset, err := gossip.ResetBloomFilterIfNeeded(g.bloom, g.Mempool.Len()*bloomChurnMultiplier)
 	if err != nil {
@@ -164,22 +159,22 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 }
 
 func (g *gossipMempool) Has(txID ids.ID) bool {
-	g.gossipMempoolLock.RLock()
-	defer g.gossipMempoolLock.RUnlock()
+	g.lock.RLock()
+	defer g.lock.RUnlock()
 
 	return g.mempool.Has(txID)
 }
 
 func (g *gossipMempool) GetFilter() (bloom []byte, salt []byte) {
-	g.bloomLock.RLock()
-	defer g.bloomLock.RUnlock()
+	g.lock.RLock()
+	defer g.lock.RUnlock()
 
 	return g.bloom.Marshal()
 }
 
 func (g *gossipMempool) Remove(removeTxs ...*txs.Tx) {
-	g.gossipMempoolLock.Lock()
-	defer g.gossipMempoolLock.Unlock()
+	g.lock.Lock()
+	defer g.lock.Unlock()
 
 	g.Mempool.Remove(removeTxs...)
 	g.mempool.Remove(removeTxs...)

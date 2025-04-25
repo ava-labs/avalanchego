@@ -155,13 +155,15 @@ func (m *Metrics) ObserveIncomingGossipable(txID ids.ID, label string) {
 
 // observeReceivedMessage summarizes the metrics for a given received gossip message and update the metrics accordingly.
 func (m *Metrics) observeReceivedMessage(typeLabel string, gossipables map[ids.ID]int, malformedBytes int, malformedCount int) error {
+	m.labelsLock.Lock()
+	defer m.labelsLock.Unlock()
+
 	labelBytes := make(map[string]int, len(gossipables))
 	labelCount := make(map[string]int, len(gossipables))
 
 	labelBytes[droppedMalformed] = malformedBytes
 	labelCount[droppedMalformed] = malformedCount
 
-	m.labelsLock.Lock()
 	for gossipable, size := range gossipables {
 		if label, ok := m.gossipablesLabels[gossipable]; ok {
 			labelBytes[label] += size
@@ -169,7 +171,6 @@ func (m *Metrics) observeReceivedMessage(typeLabel string, gossipables map[ids.I
 			delete(m.gossipablesLabels, gossipable)
 		}
 	}
-	m.labelsLock.Unlock()
 
 	for label, gossipableSize := range labelBytes {
 		prometheusLabel := prometheus.Labels{
