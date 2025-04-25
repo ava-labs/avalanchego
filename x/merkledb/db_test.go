@@ -1346,8 +1346,10 @@ func BenchmarkCommitView(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			db.baseDB = memdb.New() // Keep each iteration independent
 
-			valueNodeBatch := db.baseDB.NewBatch()
-			require.NoError(db.applyChanges(ctx, valueNodeBatch, view.changes))
+			valueNodeBatch := db.valueNodeDB.baseDB.NewBatch()
+			intermediateNodeBatch := db.intermediateNodeDB.baseDB.NewBatch()
+
+			require.NoError(db.applyChanges(ctx, valueNodeBatch, intermediateNodeBatch, view.changes))
 			require.NoError(db.commitValueChanges(ctx, valueNodeBatch))
 		}
 	})
