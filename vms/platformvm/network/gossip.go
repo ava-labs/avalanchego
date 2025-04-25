@@ -84,9 +84,6 @@ func newGossipMempool(
 	if err != nil {
 		return nil, err
 	}
-	if err != nil {
-		return nil, err
-	}
 	return &gossipMempool{
 		Mempool:    mempool,
 		log:        log,
