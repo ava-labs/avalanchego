@@ -30,7 +30,6 @@ const (
 
 	droppedMalformed = "malformed"
 	DroppedDuplicate = "duplicate"
-	droppedOther     = "other"
 	droppedNot       = "not"
 	notReceive       = "not_receive"
 )

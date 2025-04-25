@@ -170,7 +170,6 @@ func handleIncomingGossipables[T Gossipable](
 		)
 		gossipableSizes[gossipID] = len(bytes)
 		if err := set.Add(gossipable); err != nil {
-			metrics.ObserveIncomingGossipable(gossipID, droppedOther)
 			log.Debug(
 				"failed to add gossip to the known set",
 				zap.Stringer("nodeID", nodeID),
