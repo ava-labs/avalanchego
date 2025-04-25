@@ -32,11 +32,10 @@ type mempool[T Gossipable] struct {
 func NewMempool[T Gossipable](
 	metrics *Metrics,
 ) (*mempool[T], error) {
-	m := &mempool[T]{
+	return &mempool[T]{
 		Txs:     make(map[ids.ID]bool),
 		metrics: metrics,
-	}
-	return m, nil
+	}, nil
 }
 
 func (m *mempool[T]) Add(tx T) error {
