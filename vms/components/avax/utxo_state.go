@@ -4,6 +4,9 @@
 package avax
 
 import (
+	"errors"
+	"iter"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -13,16 +16,12 @@ import (
 	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/metric"
 )
 
 const (
 	utxoCacheSize  = 8192
 	indexCacheSize = 64
-)
-
-var (
-	utxoPrefix  = []byte("utxo")
-	indexPrefix = []byte("index")
 )
 
 // UTXOState is a thin wrapper around a database to provide, caching,
@@ -43,7 +42,10 @@ type UTXOReader interface {
 	// [previous].
 	// If [previous] is not in the list, starts at beginning.
 	// Returns at most [limit] IDs.
+	// TODO replace with 1.23 iterator
 	UTXOIDs(addr []byte, previous ids.ID, limit int) ([]ids.ID, error)
+	// UTXOs returns an iterator starting at startingUTXOID
+	UTXOs(startingUTXOID ids.ID) iter.Seq2[*UTXO, error]
 }
 
 // UTXOGetter is a thin wrapper around a database to provide fetching of a UTXO.
@@ -85,32 +87,32 @@ type utxoState struct {
 }
 
 func NewUTXOState(
-	db database.Database,
+	utxoDB database.Database,
+	indexDB database.Database,
 	codec codec.Manager,
 	trackChecksum bool,
 ) (UTXOState, error) {
 	s := &utxoState{
-		codec: codec,
-
-		utxoCache: &cache.LRU[ids.ID, *UTXO]{Size: utxoCacheSize},
-		utxoDB:    prefixdb.New(utxoPrefix, db),
-
-		indexDB:    prefixdb.New(indexPrefix, db),
-		indexCache: &cache.LRU[string, linkeddb.LinkedDB]{Size: indexCacheSize},
-
+		codec:         codec,
+		utxoCache:     &cache.LRU[ids.ID, *UTXO]{Size: utxoCacheSize},
+		utxoDB:        utxoDB,
+		indexDB:       indexDB,
+		indexCache:    &cache.LRU[string, linkeddb.LinkedDB]{Size: indexCacheSize},
 		trackChecksum: trackChecksum,
 	}
 	return s, s.initChecksum()
 }
 
 func NewMeteredUTXOState(
-	db database.Database,
+	namespace string,
+	utxoDB database.Database,
+	indexDB database.Database,
 	codec codec.Manager,
 	metrics prometheus.Registerer,
 	trackChecksum bool,
 ) (UTXOState, error) {
 	utxoCache, err := metercacher.New[ids.ID, *UTXO](
-		"utxo_cache",
+		metric.AppendNamespace(namespace, "utxo_cache"),
 		metrics,
 		&cache.LRU[ids.ID, *UTXO]{Size: utxoCacheSize},
 	)
@@ -119,7 +121,7 @@ func NewMeteredUTXOState(
 	}
 
 	indexCache, err := metercacher.New[string, linkeddb.LinkedDB](
-		"index_cache",
+		metric.AppendNamespace(namespace, "index_cache"),
 		metrics,
 		&cache.LRU[string, linkeddb.LinkedDB]{
 			Size: indexCacheSize,
@@ -130,14 +132,11 @@ func NewMeteredUTXOState(
 	}
 
 	s := &utxoState{
-		codec: codec,
-
-		utxoCache: utxoCache,
-		utxoDB:    prefixdb.New(utxoPrefix, db),
-
-		indexDB:    prefixdb.New(indexPrefix, db),
-		indexCache: indexCache,
-
+		codec:         codec,
+		utxoCache:     utxoCache,
+		utxoDB:        utxoDB,
+		indexDB:       indexDB,
+		indexCache:    indexCache,
 		trackChecksum: trackChecksum,
 	}
 	return s, s.initChecksum()
@@ -249,6 +248,32 @@ func (s *utxoState) UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, err
 		utxoIDs = append(utxoIDs, utxoID)
 	}
 	return utxoIDs, iter.Error()
+}
+
+func (s *utxoState) UTXOs(startingUTXOID ids.ID) iter.Seq2[*UTXO, error] {
+	return func(yield func(*UTXO, error) bool) {
+		var itr database.Iterator
+
+		if startingUTXOID != ids.Empty {
+			itr = s.utxoDB.NewIteratorWithStart(startingUTXOID[:])
+		} else {
+			itr = s.utxoDB.NewIterator()
+		}
+
+		defer itr.Release()
+
+		for itr.Next() {
+			u := &UTXO{}
+			_, err := s.codec.Unmarshal(itr.Value(), u)
+			if err != nil {
+				return
+			}
+
+			if !yield(u, errors.Join(err, itr.Error())) {
+				return
+			}
+		}
+	}
 }
 
 func (s *utxoState) Checksum() ids.ID {

@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"time"
 
 	"github.com/google/btree"
@@ -88,6 +89,7 @@ var (
 	ActivePrefix                  = []byte("active")
 	InactivePrefix                = []byte("inactive")
 	SingletonPrefix               = []byte("singleton")
+	indexPrefix                   = []byte("index")
 
 	TimestampKey         = []byte("timestamp")
 	FeeStateKey          = []byte("fee state")
@@ -614,7 +616,14 @@ func New(
 	}
 
 	utxoDB := prefixdb.New(UTXOPrefix, baseDB)
-	utxoState, err := avax.NewMeteredUTXOState(utxoDB, txs.GenesisCodec, metricsReg, execCfg.ChecksumsEnabled)
+	utxoState, err := avax.NewMeteredUTXOState(
+		"",
+		prefixdb.New(UTXOPrefix, utxoDB),
+		prefixdb.New(indexPrefix, utxoDB),
+		txs.GenesisCodec,
+		metricsReg,
+		execCfg.ChecksumsEnabled,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -3045,6 +3054,10 @@ func (s *state) GetUptime(vdrID ids.NodeID) (time.Duration, time.Time, error) {
 
 func (s *state) SetUptime(vdrID ids.NodeID, upDuration time.Duration, lastUpdated time.Time) error {
 	return s.validatorState.SetUptime(vdrID, constants.PrimaryNetworkID, upDuration, lastUpdated)
+}
+
+func (s *state) UTXOs(startingUTXOID ids.ID) iter.Seq2[*avax.UTXO, error] {
+	return s.utxoState.UTXOs(startingUTXOID)
 }
 
 func markInitialized(db database.KeyValueWriter) error {

@@ -161,7 +161,7 @@ func TestBlockVerify(t *testing.T) {
 				parentID := ids.GenerateTestID()
 				mockBlock.EXPECT().Parent().Return(parentID).AnyTimes()
 
-				mockState := statemock.NewState(ctrl)
+				mockState := statemock.NewMockInterface(ctrl)
 				mockState.EXPECT().GetBlock(parentID).Return(nil, errTest)
 				return &Block{
 					Block: mockBlock,
@@ -195,7 +195,7 @@ func TestBlockVerify(t *testing.T) {
 				parentID := ids.GenerateTestID()
 				mockBlock.EXPECT().Parent().Return(parentID).AnyTimes()
 
-				mockState := statemock.NewState(ctrl)
+				mockState := statemock.NewMockInterface(ctrl)
 				mockParentBlock := block.NewMockBlock(ctrl)
 				mockParentBlock.EXPECT().Height().Return(blockHeight) // Should be blockHeight - 1
 				mockState.EXPECT().GetBlock(parentID).Return(mockParentBlock, nil)
@@ -626,7 +626,7 @@ func TestBlockAccept(t *testing.T) {
 				mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
 				require.NoError(t, err)
 
-				mockManagerState := statemock.NewState(ctrl)
+				mockManagerState := statemock.NewMockInterface(ctrl)
 				mockManagerState.EXPECT().CommitBatch().Return(nil, errTest)
 				mockManagerState.EXPECT().Abort()
 
@@ -660,7 +660,7 @@ func TestBlockAccept(t *testing.T) {
 				mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
 				require.NoError(t, err)
 
-				mockManagerState := statemock.NewState(ctrl)
+				mockManagerState := statemock.NewMockInterface(ctrl)
 				// Note the returned batch is nil but not used
 				// because we mock the call to shared memory
 				mockManagerState.EXPECT().CommitBatch().Return(nil, nil)
@@ -699,7 +699,7 @@ func TestBlockAccept(t *testing.T) {
 				mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
 				require.NoError(t, err)
 
-				mockManagerState := statemock.NewState(ctrl)
+				mockManagerState := statemock.NewMockInterface(ctrl)
 				// Note the returned batch is nil but not used
 				// because we mock the call to shared memory
 				mockManagerState.EXPECT().CommitBatch().Return(nil, nil)
@@ -744,12 +744,12 @@ func TestBlockAccept(t *testing.T) {
 				mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
 				require.NoError(t, err)
 
-				mockManagerState := statemock.NewState(ctrl)
+				mockManagerState := statemock.NewMockInterface(ctrl)
 				// Note the returned batch is nil but not used
 				// because we mock the call to shared memory
 				mockManagerState.EXPECT().CommitBatch().Return(nil, nil)
 				mockManagerState.EXPECT().Abort()
-				mockManagerState.EXPECT().Checksum().Return(ids.Empty)
+				mockManagerState.EXPECT().Checksum(gomock.Any()).Return(ids.Empty, nil)
 
 				mockSharedMemory := atomicmock.NewSharedMemory(ctrl)
 				mockSharedMemory.EXPECT().Apply(gomock.Any(), gomock.Any()).Return(nil)
@@ -851,7 +851,7 @@ func TestBlockReject(t *testing.T) {
 				require.NoError(t, err)
 
 				lastAcceptedID := ids.GenerateTestID()
-				mockState := statemock.NewState(ctrl)
+				mockState := statemock.NewMockInterface(ctrl)
 				mockState.EXPECT().GetLastAccepted().Return(lastAcceptedID).AnyTimes()
 				mockState.EXPECT().GetTimestamp().Return(time.Now()).AnyTimes()
 
@@ -904,7 +904,7 @@ func TestBlockReject(t *testing.T) {
 				require.NoError(t, err)
 
 				lastAcceptedID := ids.GenerateTestID()
-				mockState := statemock.NewState(ctrl)
+				mockState := statemock.NewMockInterface(ctrl)
 				mockState.EXPECT().GetLastAccepted().Return(lastAcceptedID).AnyTimes()
 				mockState.EXPECT().GetTimestamp().Return(time.Now()).AnyTimes()
 

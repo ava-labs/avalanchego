@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -52,7 +53,11 @@ func TestUTXOState(t *testing.T) {
 	require.NoError(manager.RegisterCodec(codecVersion, c))
 
 	db := memdb.New()
-	s, err := NewUTXOState(db, manager, trackChecksum)
+	s, err := NewUTXOState(
+		prefixdb.New([]byte("foo"), db),
+		prefixdb.New([]byte("bar"), db),
+		manager,
+		trackChecksum)
 	require.NoError(err)
 
 	_, err = s.GetUTXO(utxoID)
@@ -80,7 +85,12 @@ func TestUTXOState(t *testing.T) {
 
 	require.NoError(s.PutUTXO(utxo))
 
-	s, err = NewUTXOState(db, manager, trackChecksum)
+	s, err = NewUTXOState(
+		prefixdb.New([]byte("foo"), db),
+		prefixdb.New([]byte("bar"), db),
+		manager,
+		trackChecksum,
+	)
 	require.NoError(err)
 
 	readUTXO, err = s.GetUTXO(utxoID)
