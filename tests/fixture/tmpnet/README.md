@@ -69,7 +69,7 @@ the following non-test files:
 | defaults.go                 |                | Defines common default configuration                                   |
 | detached_process_default.go |                | Configures detached processes for darwin and linux                     |
 | detached_process_windows.go |                | No-op detached process configuration for windows                       |
-| flags.go                    | FlagsMap       | Simplifies configuration of avalanchego flags                          |
+| flagsmap.go                 | FlagsMap       | Simplifies configuration of avalanchego flags                          |
 | genesis.go                  |                | Creates test genesis                                                   |
 | kube.go                     |                | Library for Kubernetes interaction                                     |
 | local_network.go            |                | Defines configuration for the default local network                    |
