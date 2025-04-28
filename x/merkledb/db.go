@@ -934,7 +934,8 @@ func (db *merkleDB) commitBatch(ctx context.Context, ops []database.BatchOp) err
 	if err != nil {
 		return err
 	}
-	return view.commitToDB(context.Background())
+
+	return view.commitToDB(ctx)
 }
 
 // commitView commits the changes in [trieToCommit] to [db].

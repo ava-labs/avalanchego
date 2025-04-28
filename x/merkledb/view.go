@@ -563,10 +563,6 @@ func (v *view) GetProof(ctx context.Context, key []byte) (*Proof, error) {
 			return
 		}
 
-		// todo: what if the parentTrie is changing?
-		//		Maybe v2 <- v1 <- DB. What if v1 is committed, and I try to query the parentTrie, which is invalidated v1.
-		//		Answer: is invalidated only after v2 is committed, so it shouldn't be an issue.
-		//		But maybe there are some possible issues.
 		proof, err := getProof(v, key)
 		if err != nil {
 			ch <- proofErr{err: err}
