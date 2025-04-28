@@ -346,7 +346,7 @@ func (n *Node) composeFlags() (FlagsMap, error) {
 		}
 		flags.SetDefault(config.GenesisFileContentKey, genesisFileContent)
 
-		isSingleNodeNetwork := (len(n.network.Nodes) == 1 && len(n.network.Genesis.InitialStakers) == 1)
+		isSingleNodeNetwork := len(n.network.Nodes) == 1 && len(n.network.Genesis.InitialStakers) == 1
 		if isSingleNodeNetwork {
 			n.network.log.Info("defaulting to sybil protection disabled to enable a single-node network to start")
 			flags.SetDefault(config.SybilProtectionEnabledKey, "false")
