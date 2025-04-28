@@ -59,6 +59,10 @@ func ensureMinimumFunds(ctx context.Context, endpoint string, keys []*ecdsa.Priv
 		needFundsKeys[key] = diff
 	}
 
+	if len(needFundsKeys) == 0 {
+		return nil
+	}
+
 	maxFundsKey := keys[len(keys)-1]
 	maxFundsBalance := keyToBalance[maxFundsKey]
 	if maxFundsBalance.Cmp(totalFundsRequired) < 0 {
