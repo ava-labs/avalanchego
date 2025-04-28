@@ -28,27 +28,27 @@ import (
 	ethcrypto "github.com/ava-labs/libevm/crypto"
 )
 
-type Config struct {
-	Endpoints   []string `json:"endpoints"`
-	MaxFeeCap   int64    `json:"max-fee-cap"`
-	MaxTipCap   int64    `json:"max-tip-cap"`
-	Agents      uint     `json:"agents"`
-	TxsPerAgent uint64   `json:"txs-per-agent"`
+type config struct {
+	endpoints   []string
+	maxFeeCap   int64
+	maxTipCap   int64
+	agents      uint
+	txsPerAgent uint64
 }
 
-func Execute(ctx context.Context, preFundedKey *ecdsa.PrivateKey, config Config) error {
+func execute(ctx context.Context, preFundedKey *ecdsa.PrivateKey, config config) error {
 	logger := log.NewLogger(log.NewTerminalHandlerWithLevel(os.Stderr, log.LevelInfo, true))
 	log.SetDefault(logger)
 
-	keys, err := generateKeys(config.Agents - 1)
+	keys, err := generateKeys(config.agents - 1)
 	if err != nil {
 		return fmt.Errorf("generating keys: %w", err)
 	}
 	keys = append(keys, preFundedKey)
 
 	// Minimum to fund gas for all of the transactions for an address:
-	minFundsPerAddr := new(big.Int).SetUint64(params.GWei * uint64(config.MaxFeeCap) * params.TxGas * config.TxsPerAgent)
-	err = ensureMinimumFunds(ctx, config.Endpoints[0], keys, minFundsPerAddr)
+	minFundsPerAddr := new(big.Int).SetUint64(params.GWei * uint64(config.maxFeeCap) * params.TxGas * config.txsPerAgent)
+	err = ensureMinimumFunds(ctx, config.endpoints[0], keys, minFundsPerAddr)
 	if err != nil {
 		return fmt.Errorf("ensuring minimum funds: %w", err)
 	}
@@ -57,22 +57,22 @@ func Execute(ctx context.Context, preFundedKey *ecdsa.PrivateKey, config Config)
 	metricsServer := tracker.NewMetricsServer("127.0.0.1:8082", registry)
 	tracker := tracker.New(registry)
 
-	agents := make([]*agent.Agent[*types.Transaction, common.Hash], config.Agents)
+	agents := make([]*agent.Agent[*types.Transaction, common.Hash], config.agents)
 	for i := range agents {
-		endpoint := config.Endpoints[i%len(config.Endpoints)]
+		endpoint := config.endpoints[i%len(config.endpoints)]
 		websocket := strings.HasPrefix(endpoint, "ws://") || strings.HasPrefix(endpoint, "wss://")
 		client, err := ethclient.DialContext(ctx, endpoint)
 		if err != nil {
 			return fmt.Errorf("dialing %s: %w", endpoint, err)
 		}
 		generator, err := generator.NewSelf(ctx, client,
-			big.NewInt(config.MaxTipCap), big.NewInt(config.MaxFeeCap), keys[i])
+			big.NewInt(config.maxTipCap), big.NewInt(config.maxFeeCap), keys[i])
 		if err != nil {
 			return fmt.Errorf("creating generator: %w", err)
 		}
 		address := ethcrypto.PubkeyToAddress(keys[i].PublicKey)
 		issuer := issuer.New(client, websocket, tracker, address)
-		agents[i] = agent.New[*types.Transaction, common.Hash](config.TxsPerAgent, generator, issuer, tracker)
+		agents[i] = agent.New[*types.Transaction, common.Hash](config.txsPerAgent, generator, issuer, tracker)
 	}
 
 	metricsErrCh, err := metricsServer.Start()

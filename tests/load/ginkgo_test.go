@@ -76,14 +76,14 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 		const blockchainID = "C"
 		endpoints, err := tmpnet.GetNodeWebsocketURIs(nodes, blockchainID)
 		require.NoError(ginkgo.GinkgoT(), err, "getting node websocket URIs")
-		config := Config{
-			Endpoints:   endpoints,
-			MaxFeeCap:   50,
-			MaxTipCap:   1,
-			Agents:      1,
-			TxsPerAgent: 100,
+		config := config{
+			endpoints:   endpoints,
+			maxFeeCap:   50,
+			maxTipCap:   1,
+			agents:      1,
+			txsPerAgent: 100,
 		}
-		err = Execute(ctx, preFundedKey, config)
+		err = execute(ctx, preFundedKey, config)
 		if err != nil {
 			ginkgo.GinkgoT().Error(err)
 		}
