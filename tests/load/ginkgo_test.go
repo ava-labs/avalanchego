@@ -5,11 +5,8 @@ package load
 
 import (
 	"context"
-	"crypto/ecdsa"
-	"os"
 	"testing"
 
-	"github.com/ava-labs/libevm/log"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 
@@ -86,16 +83,9 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 			Agents:      1,
 			TxsPerAgent: 100,
 		}
-		err = run(ctx, preFundedKey, config)
+		err = Execute(ctx, preFundedKey, config)
 		if err != nil {
 			ginkgo.GinkgoT().Error(err)
 		}
 	})
 })
-
-func run(ctx context.Context, preFundedKey *ecdsa.PrivateKey, config Config) error {
-	logger := log.NewLogger(log.NewTerminalHandlerWithLevel(os.Stderr, log.LevelInfo, true))
-	log.SetDefault(logger)
-
-	return Execute(ctx, preFundedKey, config)
-}

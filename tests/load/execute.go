@@ -8,6 +8,7 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
+	"os"
 	"strings"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethclient"
+	"github.com/ava-labs/libevm/log"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/tests/load/agent"
@@ -35,6 +37,9 @@ type Config struct {
 }
 
 func Execute(ctx context.Context, preFundedKey *ecdsa.PrivateKey, config Config) error {
+	logger := log.NewLogger(log.NewTerminalHandlerWithLevel(os.Stderr, log.LevelInfo, true))
+	log.SetDefault(logger)
+
 	keys, err := generateKeys(config.Agents - 1)
 	if err != nil {
 		return fmt.Errorf("generating keys: %w", err)
