@@ -29,8 +29,8 @@ func newHeadNotifier(client NewHeadSubscriber) *headNotifier {
 	}
 }
 
-func (n *headNotifier) start(ctx context.Context) (newHead <-chan struct{}, runError <-chan error, err error) {
-	newHeadSignal := make(chan struct{})
+func (n *headNotifier) start(ctx context.Context) (newHead <-chan uint64, runError <-chan error, err error) {
+	newHeadCh := make(chan uint64)
 
 	listenStop := make(chan struct{})
 	n.listenStop = listenStop
@@ -43,10 +43,10 @@ func (n *headNotifier) start(ctx context.Context) (newHead <-chan struct{}, runE
 	if err != nil {
 		return nil, nil, fmt.Errorf("subscribing to new head: %w", err)
 	}
-	go subscriptionChToSignal(listenStop, listenDone, ready, subscriptionCh, newHeadSignal)
+	go subscriptionChToSignal(listenStop, listenDone, ready, subscriptionCh, newHeadCh)
 	<-ready
 	n.subscription = subscription
-	return newHeadSignal, n.makeRunErrCh(), nil
+	return newHeadCh, n.makeRunErrCh(), nil
 }
 
 func (n *headNotifier) stop() {
@@ -56,7 +56,7 @@ func (n *headNotifier) stop() {
 }
 
 func subscriptionChToSignal(listenStop <-chan struct{}, listenDone, ready chan<- struct{},
-	subCh <-chan *types.Header, newHeadSignal chan<- struct{},
+	subCh <-chan *types.Header, newHeadCh chan<- uint64,
 ) {
 	defer close(listenDone)
 	close(ready)
@@ -64,8 +64,8 @@ func subscriptionChToSignal(listenStop <-chan struct{}, listenDone, ready chan<-
 		select {
 		case <-listenStop:
 			return
-		case <-subCh:
-			newHeadSignal <- struct{}{}
+		case header := <-subCh:
+			newHeadCh <- header.Number.Uint64()
 		}
 	}
 }

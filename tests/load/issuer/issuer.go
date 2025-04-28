@@ -22,6 +22,12 @@ type Tracker interface {
 	IssueStart(txHash common.Hash)
 	IssueEnd(txHash common.Hash)
 	ObserveConfirmed(txHash common.Hash)
+	// ObserveBlock observes a new block with the given number.
+	// It should be called when a new block is received.
+	// It should ignore the block if the number has already been observed.
+	// It may also ignore the first block observed when it comes to time,
+	// given the missing information on the time start for the first block.
+	ObserveBlock(number uint64)
 }
 
 // Issuer issues transactions to a node and waits for them to be accepted (or failed).

@@ -13,6 +13,7 @@ import (
 )
 
 type EthClientPoll interface {
+	BlockNumber(ctx context.Context) (uint64, error)
 	NonceAt(ctx context.Context, addr common.Address, blockNumber *big.Int) (uint64, error)
 }
 
@@ -22,14 +23,15 @@ func (i *Issuer) listenPoll(ctx context.Context) error {
 	defer ticker.Stop()
 
 	for {
-		blockNumber := (*big.Int)(nil)
-		nonce, err := i.client.NonceAt(ctx, i.address, blockNumber)
+		blockNumber, nonce, err := pollParallel(ctx, i.client, i.address)
 		if err != nil {
 			if ctx.Err() != nil {
 				return nil
 			}
-			return fmt.Errorf("checking last block account nonce for address %s: %w", i.address, err)
+			return fmt.Errorf("polling node: %w", err)
 		}
+
+		i.tracker.ObserveBlock(blockNumber)
 
 		i.mutex.Lock()
 		confirmed := uint64(len(i.inFlightTxHashes))
@@ -55,4 +57,64 @@ func (i *Issuer) listenPoll(ctx context.Context) error {
 		case <-ticker.C:
 		}
 	}
+}
+
+type blockNumResult struct {
+	blockNumber uint64
+	err         error
+}
+
+type nonceResult struct {
+	nonce uint64
+	err   error
+}
+
+func pollParallel(ctx context.Context, client EthClientPoll, address common.Address) (
+	blockNumber, nonce uint64, err error,
+) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	blockNumberCh := make(chan blockNumResult)
+	go func() {
+		number, err := client.BlockNumber(ctx)
+		if err != nil {
+			err = fmt.Errorf("getting block number: %w", err)
+		}
+		blockNumberCh <- blockNumResult{blockNumber: number, err: err}
+	}()
+
+	nonceCh := make(chan nonceResult)
+	go func() {
+		nonceQueryBlock := (*big.Int)(nil)
+		nonce, err = client.NonceAt(ctx, address, nonceQueryBlock)
+		if err != nil {
+			err = fmt.Errorf("checking last block account nonce for address %s: %w", address, err)
+		}
+		nonceCh <- nonceResult{nonce: nonce, err: err}
+	}()
+
+	const numGoroutines = 2
+	for range numGoroutines {
+		select {
+		case <-blockNumberCh:
+			result := <-blockNumberCh
+			if err == nil && result.err != nil {
+				err = result.err
+				cancel()
+				continue
+			}
+			blockNumber = result.blockNumber
+		case <-nonceCh:
+			result := <-nonceCh
+			if err == nil && result.err != nil {
+				err = result.err
+				cancel()
+				continue
+			}
+			nonce = result.nonce
+		}
+	}
+
+	return blockNumber, nonce, err
 }

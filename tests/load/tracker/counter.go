@@ -22,5 +22,6 @@ func (*Counter) IssueStart(_ common.Hash)         {}
 func (*Counter) IssueEnd(_ common.Hash)           {}
 func (c *Counter) ObserveConfirmed(_ common.Hash) { c.confirmed++ }
 func (c *Counter) ObserveFailed(_ common.Hash)    { c.failed++ }
+func (*Counter) ObserveBlock(_ uint64)            {}
 func (c *Counter) GetObservedConfirmed() uint64   { return c.confirmed }
 func (c *Counter) GetObservedFailed() uint64      { return c.failed }

@@ -18,7 +18,7 @@ type EthClientSubscriber interface {
 
 func (i *Issuer) listenSub(ctx context.Context) error {
 	headNotifier := newHeadNotifier(i.client)
-	newHeadSignal, notifierErrCh, err := headNotifier.start(ctx)
+	newHeadCh, notifierErrCh, err := headNotifier.start(ctx)
 	if err != nil {
 		return fmt.Errorf("starting new head notifier: %w", err)
 	}
@@ -57,7 +57,8 @@ func (i *Issuer) listenSub(ctx context.Context) error {
 			return nil
 		case err := <-notifierErrCh:
 			return fmt.Errorf("new head notifier failed: %w", err)
-		case <-newHeadSignal:
+		case blockNumber := <-newHeadCh:
+			i.tracker.ObserveBlock(blockNumber)
 		}
 	}
 }
