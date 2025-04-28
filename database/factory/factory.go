@@ -18,16 +18,24 @@ import (
 )
 
 // New creates a new database instance based on the provided configuration.
-// It supports LevelDB, MemDB, and PebbleDB as database types.
+//
 // It also wraps the database with a corruptable DB and a meter DB.
-// [dbName] is the name of the database.
-// [dbPath] is the path to the database folder.
-// [readOnly] indicates if the database should be read-only.
-// [dbConfig] is the database configuration in JSON format.
-// [dbMetricsPrefix] is used to create a new metrics registerer for the database.
-// [meterDBRegName] is used to create a new metrics registerer for the meter DB.
-func New(name string, path string, readOnly bool, config []byte,
-	gatherer metrics.MultiGatherer, logger logging.Logger, metricsPrefix, meterDBRegName string,
+//
+// dbName is the name of the database, either leveldb, memdb, or pebbledb.
+// dbPath is the path to the database folder.
+// readOnly indicates if the database should be read-only.
+// dbConfig is the database configuration in JSON format.
+// dbMetricsPrefix is used to create a new metrics registerer for the database.
+// meterDBRegName is used to create a new metrics registerer for the meter DB.
+func New(
+	name string,
+	path string,
+	readOnly bool,
+	config []byte,
+	gatherer metrics.MultiGatherer,
+	logger logging.Logger,
+	metricsPrefix string,
+	meterDBRegName string,
 ) (database.Database, error) {
 	dbRegisterer, err := metrics.MakeAndRegister(
 		gatherer,
