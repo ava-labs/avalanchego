@@ -76,7 +76,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 		env.StartPrivateNetwork(privateNetwork)
 	})
 
-	ginkgo.It("C-Chain", func() {
+	ginkgo.It("C-Chain", func(ctx context.Context) {
 		nodes := privateNetwork.Nodes
 		preFundedKey := privateNetwork.PreFundedKeys[0].ToECDSA()
 		const blockchainID = "C"
@@ -89,7 +89,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 			Agents:      1,
 			TxsPerAgent: 100,
 		}
-		err = run(preFundedKey, config)
+		err = run(ctx, preFundedKey, config)
 		if err != nil {
 			log.Error(err.Error())
 			os.Exit(1)
@@ -97,14 +97,14 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 	})
 })
 
-func run(preFundedKey *ecdsa.PrivateKey, config Config) error {
+func run(ctx context.Context, preFundedKey *ecdsa.PrivateKey, config Config) error {
 	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
 
 	logger := log.NewLogger(log.NewTerminalHandlerWithLevel(os.Stderr, log.LevelInfo, true))
 	log.SetDefault(logger)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	runError := make(chan error)
