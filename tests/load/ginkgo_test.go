@@ -72,7 +72,6 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 
 	ginkgo.It("C-Chain", func(ctx context.Context) {
 		nodes := privateNetwork.Nodes
-		preFundedKey := privateNetwork.PreFundedKeys[0].ToECDSA()
 		const blockchainID = "C"
 		endpoints, err := tmpnet.GetNodeWebsocketURIs(nodes, blockchainID)
 		require.NoError(ginkgo.GinkgoT(), err, "getting node websocket URIs")
@@ -83,7 +82,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 			agents:      1,
 			txsPerAgent: 100,
 		}
-		err = execute(ctx, preFundedKey, config)
+		err = execute(ctx, privateNetwork.PreFundedKeys, config)
 		if err != nil {
 			ginkgo.GinkgoT().Error(err)
 		}

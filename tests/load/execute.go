@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests/load/issuer"
 	"github.com/ava-labs/avalanchego/tests/load/orchestrate"
 	"github.com/ava-labs/avalanchego/tests/load/tracker"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 
 	ethcrypto "github.com/ava-labs/libevm/crypto"
 )
@@ -36,15 +37,14 @@ type config struct {
 	txsPerAgent uint64
 }
 
-func execute(ctx context.Context, preFundedKey *ecdsa.PrivateKey, config config) error {
+func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config config) error {
 	logger := log.NewLogger(log.NewTerminalHandlerWithLevel(os.Stderr, log.LevelInfo, true))
 	log.SetDefault(logger)
 
-	keys, err := generateKeys(config.agents - 1)
+	keys, err := fixKeysCount(preFundedKeys, int(config.agents))
 	if err != nil {
-		return fmt.Errorf("generating keys: %w", err)
+		return fmt.Errorf("fixing keys count: %w", err)
 	}
-	keys = append(keys, preFundedKey)
 
 	// Minimum to fund gas for all of the transactions for an address:
 	minFundsPerAddr := new(big.Int).SetUint64(params.GWei * uint64(config.maxFeeCap) * params.TxGas * config.txsPerAgent)
@@ -106,14 +106,20 @@ func execute(ctx context.Context, preFundedKey *ecdsa.PrivateKey, config config)
 	}
 }
 
-func generateKeys(target uint) ([]*ecdsa.PrivateKey, error) {
-	keys := make([]*ecdsa.PrivateKey, target, target+1)
-	for i := range target {
+func fixKeysCount(preFundedKeys []*secp256k1.PrivateKey, target int) ([]*ecdsa.PrivateKey, error) {
+	keys := make([]*ecdsa.PrivateKey, 0, target)
+	for i := 0; i < min(target, len(preFundedKeys)); i++ {
+		keys = append(keys, preFundedKeys[i].ToECDSA())
+	}
+	if len(keys) == target {
+		return keys, nil
+	}
+	for i := len(keys); i < target; i++ {
 		key, err := ethcrypto.GenerateKey()
 		if err != nil {
 			return nil, fmt.Errorf("generating key at index %d: %w", i, err)
 		}
-		keys[i] = key
+		keys = append(keys, key)
 	}
 	return keys, nil
 }
