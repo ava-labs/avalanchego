@@ -21,7 +21,7 @@ type Tracker struct {
 		confirmed uint64
 		failed    uint64
 	}
-	statsMutex sync.RWMutex
+	mutex sync.Mutex
 }
 
 // New creates a new Tracker instance.
@@ -37,6 +37,9 @@ func New(registry PrometheusRegistry) *Tracker {
 
 // IssueStart records a transaction that is being issued.
 func (t *Tracker) IssueStart(txHash common.Hash) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
 	t.metrics.InFlightIssuances.Inc()
 	t.metrics.InFlightTxs.Inc()
 	t.txHashToLastTime[txHash] = t.timeNow()
@@ -45,8 +48,10 @@ func (t *Tracker) IssueStart(txHash common.Hash) {
 // IssueEnd records a transaction that was issued, but whose final status is
 // not yet known.
 func (t *Tracker) IssueEnd(txHash common.Hash) {
-	t.metrics.InFlightIssuances.Dec()
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
 
+	t.metrics.InFlightIssuances.Dec()
 	start := t.txHashToLastTime[txHash]
 	now := t.timeNow()
 	diff := now.Sub(start)
@@ -56,6 +61,9 @@ func (t *Tracker) IssueEnd(txHash common.Hash) {
 
 // ObserveConfirmed records a transaction that was confirmed.
 func (t *Tracker) ObserveConfirmed(txHash common.Hash) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
 	t.metrics.InFlightTxs.Dec()
 	t.metrics.Confirmed.Inc()
 	issuedTime := t.txHashToLastTime[txHash]
@@ -63,27 +71,27 @@ func (t *Tracker) ObserveConfirmed(txHash common.Hash) {
 	diff := now.Sub(issuedTime)
 	t.metrics.ConfirmationTxTimes.Observe(diff.Seconds())
 	delete(t.txHashToLastTime, txHash)
-
-	t.statsMutex.Lock()
 	t.stats.confirmed++
-	t.statsMutex.Unlock()
 }
 
 // ObserveFailed records a transaction that failed (e.g. expired)
 func (t *Tracker) ObserveFailed(txHash common.Hash) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
 	t.metrics.InFlightTxs.Dec()
 	t.metrics.Failed.Inc()
 	delete(t.txHashToLastTime, txHash)
-
-	t.statsMutex.Lock()
 	t.stats.failed++
-	t.statsMutex.Unlock()
 }
 
 // ObserveBlock records a new block with the given number.
 // Note it ignores the first block, to avoid misleading metrics due to the
 // absence of information on when the previous block was created.
 func (t *Tracker) ObserveBlock(number uint64) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
 	now := t.timeNow()
 	if t.lastBlockNumber == 0 {
 		t.lastBlockTime = now
@@ -109,15 +117,15 @@ func (t *Tracker) ObserveBlock(number uint64) {
 // GetObservedConfirmed returns the number of transactions that the tracker has
 // confirmed were accepted.
 func (t *Tracker) GetObservedConfirmed() uint64 {
-	t.statsMutex.RLock()
-	defer t.statsMutex.RUnlock()
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
 	return t.stats.confirmed
 }
 
 // GetObservedFailed returns the number of transactions that the tracker has
 // confirmed failed.
 func (t *Tracker) GetObservedFailed() uint64 {
-	t.statsMutex.RLock()
-	defer t.statsMutex.RUnlock()
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
 	return t.stats.failed
 }
