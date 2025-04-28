@@ -11,7 +11,8 @@ import (
 )
 
 func (i *Issuer) listenPoll(ctx context.Context) error {
-	ticker := time.NewTicker(time.Second)
+	const period = 50 * time.Millisecond
+	ticker := time.NewTicker(period)
 	defer ticker.Stop()
 
 	for {
