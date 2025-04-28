@@ -91,8 +91,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 		}
 		err = run(ctx, preFundedKey, config)
 		if err != nil {
-			log.Error(err.Error())
-			os.Exit(1)
+			ginkgo.GinkgoT().Error(err)
 		}
 	})
 })
