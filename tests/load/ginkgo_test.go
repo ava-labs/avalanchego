@@ -6,10 +6,7 @@ package load
 import (
 	"context"
 	"crypto/ecdsa"
-	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
 	"testing"
 
 	"github.com/ava-labs/libevm/log"
@@ -97,29 +94,8 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 })
 
 func run(ctx context.Context, preFundedKey *ecdsa.PrivateKey, config Config) error {
-	signalCh := make(chan os.Signal, 1)
-	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
-
 	logger := log.NewLogger(log.NewTerminalHandlerWithLevel(os.Stderr, log.LevelInfo, true))
 	log.SetDefault(logger)
 
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	runError := make(chan error)
-	go func() {
-		runError <- Execute(ctx, preFundedKey, config)
-	}()
-
-	select {
-	case signal := <-signalCh:
-		cancel()
-		<-runError
-		return fmt.Errorf("received OS signal %s", signal)
-	case err := <-runError:
-		if err != nil {
-			return fmt.Errorf("execution failed: %w", err)
-		}
-		return nil
-	}
+	return Execute(ctx, preFundedKey, config)
 }
