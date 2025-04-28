@@ -161,7 +161,7 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 		}
 
 		// Apply configuration appropriate to a test network
-		for k, v := range tmpnet.DefaultTestFlags() {
+		for k, v := range tmpnet.DefaultTmpnetFlags() {
 			env[k] = v
 		}
 
