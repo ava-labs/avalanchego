@@ -7,7 +7,14 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+
+	"github.com/ava-labs/libevm/common"
 )
+
+type EthClientSubscriber interface {
+	NonceAt(ctx context.Context, addr common.Address, blockNumber *big.Int) (uint64, error)
+	NewHeadSubscriber
+}
 
 func (i *Issuer) listenSub(ctx context.Context) error {
 	headNotifier := newHeadNotifier(i.client)

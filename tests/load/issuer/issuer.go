@@ -6,7 +6,6 @@ package issuer
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"sync"
 
 	"github.com/ava-labs/libevm/common"
@@ -14,9 +13,9 @@ import (
 )
 
 type EthClient interface {
-	NewHeadSubscriber
 	SendTransaction(ctx context.Context, tx *types.Transaction) error
-	NonceAt(ctx context.Context, addr common.Address, blockNumber *big.Int) (uint64, error)
+	EthClientPoll
+	EthClientSubscriber
 }
 
 type Tracker interface {

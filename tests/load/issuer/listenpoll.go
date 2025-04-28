@@ -8,7 +8,13 @@ import (
 	"fmt"
 	"math/big"
 	"time"
+
+	"github.com/ava-labs/libevm/common"
 )
+
+type EthClientPoll interface {
+	NonceAt(ctx context.Context, addr common.Address, blockNumber *big.Int) (uint64, error)
+}
 
 func (i *Issuer) listenPoll(ctx context.Context) error {
 	const period = 50 * time.Millisecond
