@@ -8,7 +8,6 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -27,10 +26,6 @@ import (
 	ethcrypto "github.com/ava-labs/libevm/crypto"
 )
 
-const (
-	keyDir = "./keys"
-)
-
 type Config struct {
 	Endpoints   []string `json:"endpoints"`
 	MaxFeeCap   int64    `json:"max-fee-cap"`
@@ -39,16 +34,12 @@ type Config struct {
 	TxsPerAgent uint64   `json:"txs-per-agent"`
 }
 
-func Execute(ctx context.Context, config Config) error {
-	keys, err := loadKeysFromDir(keyDir)
+func Execute(ctx context.Context, preFundedKey *ecdsa.PrivateKey, config Config) error {
+	keys, err := generateKeys(config.Agents - 1)
 	if err != nil {
-		return fmt.Errorf("loading keys: %w", err)
+		return fmt.Errorf("generating keys: %w", err)
 	}
-
-	keys, err = ensureKeysNumber(keys, config.Agents)
-	if err != nil {
-		return fmt.Errorf("ensuring keys number: %w", err)
-	}
+	keys = append(keys, preFundedKey)
 
 	// Minimum to fund gas for all of the transactions for an address:
 	minFundsPerAddr := new(big.Int).SetUint64(params.GWei * uint64(config.MaxFeeCap) * params.TxGas * config.TxsPerAgent)
@@ -110,20 +101,14 @@ func Execute(ctx context.Context, config Config) error {
 	}
 }
 
-func ensureKeysNumber(keys []*ecdsa.PrivateKey, target uint) ([]*ecdsa.PrivateKey, error) {
-	for len(keys) < int(target) {
-		newKey, err := ethcrypto.GenerateKey()
+func generateKeys(target uint) ([]*ecdsa.PrivateKey, error) {
+	keys := make([]*ecdsa.PrivateKey, target, target+1)
+	for i := range target {
+		key, err := ethcrypto.GenerateKey()
 		if err != nil {
-			return nil, fmt.Errorf("generating key: %w", err)
+			return nil, fmt.Errorf("generating key at index %d: %w", i, err)
 		}
-
-		address := ethcrypto.PubkeyToAddress(newKey.PublicKey).Hex()
-		filePath := filepath.Join(keyDir, address)
-		err = ethcrypto.SaveECDSA(filePath, newKey)
-		if err != nil {
-			return nil, fmt.Errorf("saving key at index %d: %w", len(keys)-1, err)
-		}
-		keys = append(keys, newKey)
+		keys[i] = key
 	}
 	return keys, nil
 }
