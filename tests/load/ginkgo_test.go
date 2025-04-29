@@ -51,10 +51,10 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 })
 
 var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
+	tc := e2e.NewTestContext()
 	var privateNetwork *tmpnet.Network
 
 	ginkgo.BeforeAll(func() {
-		tc := e2e.NewTestContext()
 		env := e2e.GetEnv(tc)
 		privateNetwork = tmpnet.NewDefaultNetwork("avalanchego-load-test")
 		privateNetwork.DefaultFlags = tmpnet.FlagsMap{}
@@ -68,6 +68,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 			privateNetwork.Nodes[i] = node
 		}
 		env.StartPrivateNetwork(privateNetwork)
+		tc.Log().Info("confirming we're here")
 	})
 
 	ginkgo.It("C-Chain", func(ctx context.Context) {
@@ -82,7 +83,8 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 			agents:      1,
 			txsPerAgent: 100,
 		}
-		err = execute(ctx, privateNetwork.PreFundedKeys, config)
+		tc.Log().Info("Starting transaction load execution")
+		err = execute(tc, ctx, privateNetwork.PreFundedKeys, config)
 		if err != nil {
 			ginkgo.GinkgoT().Error(err)
 		}

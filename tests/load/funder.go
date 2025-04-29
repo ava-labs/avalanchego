@@ -17,7 +17,9 @@ import (
 	"github.com/ava-labs/coreth/ethclient"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
+	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/load/agent"
 	"github.com/ava-labs/avalanchego/tests/load/generator"
 	"github.com/ava-labs/avalanchego/tests/load/issuer"
@@ -29,7 +31,7 @@ import (
 
 // ensureMinimumFunds ensures that each key has at least `minFundsPerAddr` by sending funds
 // from the key with the highest starting balance to keys with balances below the minimum.
-func ensureMinimumFunds(ctx context.Context, endpoint string, keys []*ecdsa.PrivateKey, minFundsPerAddr *big.Int) error {
+func ensureMinimumFunds(tc tests.TestContext, ctx context.Context, endpoint string, keys []*ecdsa.PrivateKey, minFundsPerAddr *big.Int) error {
 	websocket := strings.HasPrefix(endpoint, "ws") || strings.HasPrefix(endpoint, "wss")
 	client, err := ethclient.DialContext(ctx, endpoint)
 	if err != nil {
@@ -60,6 +62,7 @@ func ensureMinimumFunds(ctx context.Context, endpoint string, keys []*ecdsa.Priv
 	}
 
 	if len(needFundsKeys) == 0 {
+		tc.Log().Info("all keys have sufficient funds")
 		return nil
 	}
 
@@ -70,20 +73,30 @@ func ensureMinimumFunds(ctx context.Context, endpoint string, keys []*ecdsa.Priv
 			maxFundsBalance, totalFundsRequired, len(needFundsKeys))
 	}
 
-	maxFundsAddress := ethcrypto.PubkeyToAddress(maxFundsKey.PublicKey)
-	txTarget := uint64(len(needFundsKeys))
 	generator, err := generator.NewDistributor(ctx, client, maxFundsKey, needFundsKeys)
 	if err != nil {
 		return fmt.Errorf("creating distribution generator: %w", err)
 	}
 	tracker := tracker.NewCounter()
+
+	maxFundsAddress := ethcrypto.PubkeyToAddress(maxFundsKey.PublicKey)
 	issuer := issuer.New(client, websocket, tracker, maxFundsAddress)
+
+	txTarget := uint64(len(needFundsKeys))
 	agents := []*agent.Agent[*types.Transaction, common.Hash]{
 		agent.New(txTarget, generator, issuer, tracker),
 	}
-	orchestrator := orchestrate.NewBurstOrchestrator(agents, time.Second)
+	orchestrator := orchestrate.NewBurstOrchestrator(agents, time.Second*30)
 
-	err = orchestrator.Execute(ctx)
+	tc.Log().Info("distributing funds to keys",
+		zap.Uint64("needFundsKeys", txTarget),
+		zap.String("maxFundsAddress", maxFundsAddress.Hex()),
+		zap.String("minFundsPerAddr", minFundsPerAddr.String()),
+		zap.String("totalFundsRequired", totalFundsRequired.String()),
+		zap.String("maxFundsBalance", maxFundsBalance.String()),
+	)
+
+	err = orchestrator.Execute(tc, ctx)
 	if err != nil {
 		return fmt.Errorf("executing fund distribution transactions: %w", err)
 	}
@@ -92,6 +105,14 @@ func ensureMinimumFunds(ctx context.Context, endpoint string, keys []*ecdsa.Priv
 	if err != nil {
 		return fmt.Errorf("checking balances after funding: %w", err)
 	}
+	tc.Log().Info("distributed funds to keys",
+		zap.String("maxFundsAddress", maxFundsAddress.Hex()),
+		zap.String("minFundsPerAddr", minFundsPerAddr.String()),
+		zap.String("totalFundsRequired", totalFundsRequired.String()),
+		zap.String("maxFundsBalance", maxFundsBalance.String()),
+		zap.String("needFundsKeys", fmt.Sprintf("%v", needFundsKeys)),
+		zap.String("keyToBalance", fmt.Sprintf("%v", keyToBalance)),
+	)
 
 	return nil
 }

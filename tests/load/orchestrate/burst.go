@@ -10,6 +10,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/load/agent"
 )
 
@@ -32,14 +33,14 @@ func NewBurstOrchestrator[T, U comparable](
 	}
 }
 
-func (o *BurstOrchestrator[T, U]) Execute(ctx context.Context) error {
+func (o *BurstOrchestrator[T, U]) Execute(tc tests.TestContext, ctx context.Context) error {
 	observerCtx, observerCancel := context.WithCancel(ctx)
 	defer observerCancel()
 
 	// start a goroutine to confirm each issuer's transactions
 	observerGroup := errgroup.Group{}
 	for _, loader := range o.agents {
-		observerGroup.Go(func() error { return loader.Issuer.Listen(observerCtx) })
+		observerGroup.Go(func() error { return loader.Issuer.Listen(tc, observerCtx) })
 	}
 
 	// start issuing transactions sequentially from each issuer
@@ -53,7 +54,7 @@ func (o *BurstOrchestrator[T, U]) Execute(ctx context.Context) error {
 				if err != nil {
 					return fmt.Errorf("generating transaction: %w", err)
 				}
-				if err := agent.Issuer.IssueTx(ctx, tx); err != nil {
+				if err := agent.Issuer.IssueTx(tc, ctx, tx); err != nil {
 					return fmt.Errorf("issuing transaction: %w", err)
 				}
 			}

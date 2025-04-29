@@ -12,13 +12,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ava-labs/coreth/ethclient"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/log"
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/load/agent"
 	"github.com/ava-labs/avalanchego/tests/load/generator"
 	"github.com/ava-labs/avalanchego/tests/load/issuer"
@@ -37,7 +38,7 @@ type config struct {
 	txsPerAgent uint64
 }
 
-func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config config) error {
+func execute(tc tests.TestContext, ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config config) error {
 	logger := log.NewLogger(log.NewTerminalHandlerWithLevel(os.Stderr, log.LevelInfo, true))
 	log.SetDefault(logger)
 
@@ -48,7 +49,7 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 
 	// Minimum to fund gas for all of the transactions for an address:
 	minFundsPerAddr := new(big.Int).SetUint64(params.GWei * uint64(config.maxFeeCap) * params.TxGas * config.txsPerAgent)
-	err = ensureMinimumFunds(ctx, config.endpoints[0], keys, minFundsPerAddr)
+	err = ensureMinimumFunds(tc, ctx, config.endpoints[0], keys, minFundsPerAddr)
 	if err != nil {
 		return fmt.Errorf("ensuring minimum funds: %w", err)
 	}
@@ -82,14 +83,15 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 
 	orchestratorCtx, orchestratorCancel := context.WithCancel(ctx)
 	defer orchestratorCancel()
-	orchestrator := orchestrate.NewBurstOrchestrator(agents, time.Second)
+	orchestrator := orchestrate.NewBurstOrchestrator(agents, time.Second*5)
 	orchestratorErrCh := make(chan error)
 	go func() {
-		orchestratorErrCh <- orchestrator.Execute(orchestratorCtx)
+		orchestratorErrCh <- orchestrator.Execute(tc, orchestratorCtx)
 	}()
 
 	select {
 	case err := <-orchestratorErrCh:
+		tc.Log().Info("orchestrator finished")
 		if err != nil {
 			_ = metricsServer.Stop()
 			return fmt.Errorf("orchestrator error: %w", err)

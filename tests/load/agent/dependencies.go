@@ -3,7 +3,11 @@
 
 package agent
 
-import "context"
+import (
+	"context"
+
+	"github.com/ava-labs/avalanchego/tests"
+)
 
 type TxGenerator[T comparable] interface {
 	// GenerateTx returns a valid transaction.
@@ -15,7 +19,7 @@ type Issuer[T comparable] interface {
 	// Listen stops if the context is done, an error occurs, or if the issuer
 	// has sent all their transactions.
 	// Listen MUST return a nil error if the context is canceled.
-	Listen(ctx context.Context) error
+	Listen(tc tests.TestContext, ctx context.Context) error
 
 	// Stop notifies the issuer that no further transactions will be issued.
 	// If a transaction is issued after Stop has been called, the issuer should error.
@@ -23,7 +27,7 @@ type Issuer[T comparable] interface {
 
 	// Issue sends a tx to the network, and informs the tracker that its sent
 	// said transaction.
-	IssueTx(ctx context.Context, tx T) error
+	IssueTx(tc tests.TestContext, ctx context.Context, tx T) error
 }
 
 // Tracker keeps track of the status of transactions.

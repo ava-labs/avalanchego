@@ -10,18 +10,13 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/coreth/ethclient"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 
 	ethcrypto "github.com/ava-labs/libevm/crypto"
 )
-
-type DistributorClient interface {
-	SelfClient
-	EstimateBaseFee(ctx context.Context) (*big.Int, error)
-	SuggestGasTipCap(ctx context.Context) (*big.Int, error)
-}
 
 // Distributor
 type Distributor struct {
@@ -36,7 +31,10 @@ type Distributor struct {
 	gasFeeCap *big.Int
 }
 
-func NewDistributor(ctx context.Context, client DistributorClient, from *ecdsa.PrivateKey,
+func NewDistributor(
+	ctx context.Context,
+	client ethclient.Client,
+	from *ecdsa.PrivateKey,
 	to map[*ecdsa.PrivateKey]*big.Int,
 ) (*Distributor, error) {
 	address := ethcrypto.PubkeyToAddress(from.PublicKey)
@@ -64,7 +62,7 @@ func NewDistributor(ctx context.Context, client DistributorClient, from *ecdsa.P
 	return &Distributor{
 		from:      from,
 		address:   address,
-		nonce:     nonce + 1,
+		nonce:     nonce,
 		to:        to,
 		signer:    types.LatestSignerForChainID(chainID),
 		chainID:   chainID,

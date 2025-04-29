@@ -8,15 +8,12 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/ava-labs/avalanchego/tests"
+	"github.com/ava-labs/coreth/ethclient"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
+	"go.uber.org/zap"
 )
-
-type EthClient interface {
-	SendTransaction(ctx context.Context, tx *types.Transaction) error
-	EthClientPoll
-	EthClientSubscriber
-}
 
 type Tracker interface {
 	IssueStart(txHash common.Hash)
@@ -34,7 +31,7 @@ type Tracker interface {
 // It
 type Issuer struct {
 	// Injected parameters
-	client    EthClient
+	client    ethclient.Client
 	websocket bool
 	tracker   Tracker
 	address   common.Address
@@ -47,7 +44,7 @@ type Issuer struct {
 	allIssued        bool
 }
 
-func New(client EthClient, websocket bool, tracker Tracker, address common.Address) *Issuer {
+func New(client ethclient.Client, websocket bool, tracker Tracker, address common.Address) *Issuer {
 	return &Issuer{
 		client:    client,
 		websocket: websocket,
@@ -56,7 +53,7 @@ func New(client EthClient, websocket bool, tracker Tracker, address common.Addre
 	}
 }
 
-func (i *Issuer) IssueTx(ctx context.Context, tx *types.Transaction) error {
+func (i *Issuer) IssueTx(tc tests.TestContext, ctx context.Context, tx *types.Transaction) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
@@ -68,6 +65,11 @@ func (i *Issuer) IssueTx(ctx context.Context, tx *types.Transaction) error {
 	if err := i.client.SendTransaction(ctx, tx); err != nil {
 		return err
 	}
+	tc.Log().Info("issued transaction",
+		zap.String("sender", i.address.Hex()),
+		zap.Uint64("nonce", tx.Nonce()),
+		zap.String("txHash", txHash.Hex()))
+
 	i.tracker.IssueEnd(txHash)
 	i.inFlightTxHashes = append(i.inFlightTxHashes, txHash)
 	i.issuedTxs++
@@ -75,11 +77,8 @@ func (i *Issuer) IssueTx(ctx context.Context, tx *types.Transaction) error {
 	return nil
 }
 
-func (i *Issuer) Listen(ctx context.Context) error {
-	if i.websocket {
-		return i.listenSub(ctx)
-	}
-	return i.listenPoll(ctx)
+func (i *Issuer) Listen(tc tests.TestContext, ctx context.Context) error {
+	return i.listenPoll(tc, ctx)
 }
 
 func (i *Issuer) Stop() {
