@@ -20,18 +20,19 @@ import (
 )
 
 var (
-	errInitialize       = errors.New("unexpectedly called Initialize")
-	errSetState         = errors.New("unexpectedly called SetState")
-	errShutdown         = errors.New("unexpectedly called Shutdown")
-	errCreateHandlers   = errors.New("unexpectedly called CreateHandlers")
-	errHealthCheck      = errors.New("unexpectedly called HealthCheck")
-	errConnected        = errors.New("unexpectedly called Connected")
-	errDisconnected     = errors.New("unexpectedly called Disconnected")
-	errVersion          = errors.New("unexpectedly called Version")
-	errAppRequest       = errors.New("unexpectedly called AppRequest")
-	errAppResponse      = errors.New("unexpectedly called AppResponse")
-	errAppRequestFailed = errors.New("unexpectedly called AppRequestFailed")
-	errAppGossip        = errors.New("unexpectedly called AppGossip")
+	errInitialize         = errors.New("unexpectedly called Initialize")
+	errSetState           = errors.New("unexpectedly called SetState")
+	errShutdown           = errors.New("unexpectedly called Shutdown")
+	errCreateHandlers     = errors.New("unexpectedly called CreateHandlers")
+	errCreateGRPCHandlers = errors.New("unexpectedly called CreateGRPCHandlers")
+	errHealthCheck        = errors.New("unexpectedly called HealthCheck")
+	errConnected          = errors.New("unexpectedly called Connected")
+	errDisconnected       = errors.New("unexpectedly called Disconnected")
+	errVersion            = errors.New("unexpectedly called Version")
+	errAppRequest         = errors.New("unexpectedly called AppRequest")
+	errAppResponse        = errors.New("unexpectedly called AppResponse")
+	errAppRequestFailed   = errors.New("unexpectedly called AppRequestFailed")
+	errAppGossip          = errors.New("unexpectedly called AppGossip")
 
 	_ common.VM = (*VM)(nil)
 )
@@ -41,22 +42,23 @@ type VM struct {
 	T *testing.T
 
 	CantInitialize, CantSetState,
-	CantShutdown, CantCreateHandlers,
+	CantShutdown, CantCreateHandlers, CantCreateGRPCService,
 	CantHealthCheck, CantConnected, CantDisconnected, CantVersion,
 	CantAppRequest, CantAppResponse, CantAppGossip, CantAppRequestFailed bool
 
-	InitializeF       func(ctx context.Context, chainCtx *snow.Context, db database.Database, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, msgChan chan<- common.Message, fxs []*common.Fx, appSender common.AppSender) error
-	SetStateF         func(ctx context.Context, state snow.State) error
-	ShutdownF         func(context.Context) error
-	CreateHandlersF   func(context.Context) (map[string]http.Handler, error)
-	ConnectedF        func(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error
-	DisconnectedF     func(ctx context.Context, nodeID ids.NodeID) error
-	HealthCheckF      func(context.Context) (interface{}, error)
-	AppRequestF       func(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, msg []byte) error
-	AppResponseF      func(ctx context.Context, nodeID ids.NodeID, requestID uint32, msg []byte) error
-	AppGossipF        func(ctx context.Context, nodeID ids.NodeID, msg []byte) error
-	AppRequestFailedF func(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *common.AppError) error
-	VersionF          func(context.Context) (string, error)
+	InitializeF        func(ctx context.Context, chainCtx *snow.Context, db database.Database, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, msgChan chan<- common.Message, fxs []*common.Fx, appSender common.AppSender) error
+	SetStateF          func(ctx context.Context, state snow.State) error
+	ShutdownF          func(context.Context) error
+	CreateHandlersF    func(context.Context) (map[string]http.Handler, error)
+	CreateGRPCServiceF func(context.Context) (string, http.Handler, error)
+	ConnectedF         func(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error
+	DisconnectedF      func(ctx context.Context, nodeID ids.NodeID) error
+	HealthCheckF       func(context.Context) (interface{}, error)
+	AppRequestF        func(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, msg []byte) error
+	AppResponseF       func(ctx context.Context, nodeID ids.NodeID, requestID uint32, msg []byte) error
+	AppGossipF         func(ctx context.Context, nodeID ids.NodeID, msg []byte) error
+	AppRequestFailedF  func(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *common.AppError) error
+	VersionF           func(context.Context) (string, error)
 }
 
 func (vm *VM) Default(cant bool) {
@@ -138,6 +140,17 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 		require.FailNow(vm.T, errCreateHandlers.Error())
 	}
 	return nil, nil
+}
+
+func (vm *VM) CreateGRPCService(ctx context.Context) (string, http.Handler, error) {
+	if vm.CreateHandlersF != nil {
+		return vm.CreateGRPCServiceF(ctx)
+	}
+	if vm.CantCreateGRPCService && vm.T != nil {
+		require.FailNow(vm.T, errCreateGRPCHandlers.Error())
+	}
+
+	return "", nil, nil
 }
 
 func (vm *VM) HealthCheck(ctx context.Context) (interface{}, error) {
