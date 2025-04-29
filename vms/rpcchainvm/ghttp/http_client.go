@@ -156,9 +156,17 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	_, err = c.client.Handle(r.Context(), req)
+	reply, err := c.client.Handle(r.Context(), req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	header := w.Header()
+	clear(header)
+
+	for _, h := range reply.Header {
+		header[h.Key] = h.Values
 	}
 }
 

@@ -11,8 +11,6 @@ import (
 	"net/http"
 	"net/url"
 
-	"google.golang.org/protobuf/types/known/emptypb"
-
 	"github.com/ava-labs/avalanchego/proto/pb/io/reader"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greader"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gresponsewriter"
@@ -40,7 +38,7 @@ func NewServer(handler http.Handler) *Server {
 	}
 }
 
-func (s *Server) Handle(ctx context.Context, req *httppb.HTTPRequest) (*emptypb.Empty, error) {
+func (s *Server) Handle(ctx context.Context, req *httppb.HTTPRequest) (*httppb.HttpResponse, error) {
 	clientConn, err := grpcutils.Dial(req.ResponseWriter.ServerAddr)
 	if err != nil {
 		return nil, err
@@ -142,7 +140,21 @@ func (s *Server) Handle(ctx context.Context, req *httppb.HTTPRequest) (*emptypb.
 
 	s.handler.ServeHTTP(writer, request)
 
-	return &emptypb.Empty{}, clientConn.Close()
+	if err := clientConn.Close(); err != nil {
+		return nil, err
+	}
+
+	header := make([]*httppb.Element, len(writerHeaders))
+	for k, v := range writerHeaders {
+		header = append(header, &httppb.Element{
+			Key:    k,
+			Values: v,
+		})
+	}
+
+	return &httppb.HttpResponse{
+		Header: header,
+	}, nil
 }
 
 // HandleSimple handles http requests over http2 using a simple request response model.

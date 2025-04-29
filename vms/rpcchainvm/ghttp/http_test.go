@@ -4,17 +4,19 @@
 package ghttp
 
 import (
-	"io"
-	"net/http"
-	"net/http/httptest"
-	"testing"
-
+	"bytes"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
 
 	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 )
 
 var _ io.Reader = (*infiniteStream)(nil)
@@ -82,6 +84,58 @@ func TestRequestClientArbitrarilyLongBody(t *testing.T) {
 	}
 
 	client.ServeHTTP(w, r) // Shouldn't block forever reading the body
+}
+
+// Tests that writes to the http response in the server are propagated to the
+// client
+func TestHttpRequest(t *testing.T) {
+	require := require.New(t)
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(123)
+		w.Header()["foo"] = []string{"bar"}
+		_, err := w.Write([]byte{1, 2, 3})
+		require.NoError(err)
+	})
+
+	listener, err := grpcutils.NewListener()
+	require.NoError(err)
+	server := grpc.NewServer()
+	httppb.RegisterHTTPServer(server, NewServer(handler))
+
+	go func() {
+		require.NoError(server.Serve(listener))
+	}()
+
+	conn, err := grpc.NewClient(
+		listener.Addr().String(),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	require.NoError(err)
+
+	client := NewClient(httppb.NewHTTPClient(conn))
+
+	recorder := &httptest.ResponseRecorder{
+		Body: bytes.NewBuffer(nil),
+	}
+
+	request := &http.Request{
+		Body: io.NopCloser(strings.NewReader("bar")),
+		Header: http.Header{
+			"Upgrade": {"upgrade"},
+			"bar":     {"bar"},
+		},
+		Trailer: http.Header{
+			"bar": {"bar"},
+		},
+		RemoteAddr: "bar",
+	}
+
+	client.ServeHTTP(recorder, request)
+
+	require.Equal(123, recorder.Code)
+	require.Equal([]string{"bar"}, recorder.Header()["foo"])
+	require.Equal([]byte{1, 2, 3}, recorder.Body.Bytes())
 }
 
 type infiniteStream struct{}
