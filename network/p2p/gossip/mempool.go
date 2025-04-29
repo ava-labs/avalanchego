@@ -13,37 +13,37 @@ import (
 var ErrDuplicateTx = errors.New("duplicate tx")
 
 type Mempool[T Gossipable] struct {
-	Txs     map[ids.ID]bool
-	metrics *Metrics
+	Gossipables map[ids.ID]struct{}
+	metrics     *Metrics
 }
 
 func NewMempool[T Gossipable](
 	metrics *Metrics,
 ) (*Mempool[T], error) {
 	return &Mempool[T]{
-		Txs:     make(map[ids.ID]bool),
-		metrics: metrics,
+		Gossipables: make(map[ids.ID]struct{}),
+		metrics:     metrics,
 	}, nil
 }
 
 func (m *Mempool[T]) Add(gossipable T) error {
-	txID := gossipable.GossipID()
-	if m.Has(txID) {
-		m.metrics.ObserveIncomingGossipable(txID, DroppedDuplicate)
-		return fmt.Errorf("%w: %s", ErrDuplicateTx, txID)
+	gossipableID := gossipable.GossipID()
+	if m.Has(gossipableID) {
+		m.metrics.AddDropMetric(gossipableID, DroppedDuplicate)
+		return fmt.Errorf("%w: %s", ErrDuplicateTx, gossipableID)
 	}
 
-	m.Txs[txID] = true
+	m.Gossipables[gossipableID] = struct{}{}
 	return nil
 }
 
-func (m *Mempool[T]) Remove(gossipables ...T) {
-	for _, tx := range gossipables {
-		delete(m.Txs, tx.GossipID())
-	}
+// Remove removes the given gossipableID from the Gossipables map.
+func (m *Mempool[T]) Remove(gossipableID ids.ID) {
+	delete(m.Gossipables, gossipableID)
 }
 
 // Has returns true if the gossipable is in the set.
 func (m *Mempool[T]) Has(gossipID ids.ID) bool {
-	return m.Txs[gossipID]
+	_, ok := m.Gossipables[gossipID]
+	return ok
 }

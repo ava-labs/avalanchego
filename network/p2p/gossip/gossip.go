@@ -178,10 +178,10 @@ func handleIncomingGossipables[T Gossipable](
 			)
 			continue
 		}
-		metrics.ObserveIncomingGossipable(gossipID, droppedNot)
+		metrics.AddDropMetric(gossipID, droppedNot)
 	}
 
-	if err := metrics.observeReceivedMessage(typeLabel, gossipableSizes, malformedBytes, malformedCount); err != nil {
+	if err := metrics.updateReceivedMetrics(typeLabel, gossipableSizes, malformedBytes, malformedCount); err != nil {
 		log.Error("failed to update metrics",
 			zap.Error(err),
 		)
@@ -398,7 +398,7 @@ func (p *PushGossiper[T]) gossip(
 		return err
 	}
 
-	if err := p.metrics.observeMessage(sentPushLabels, len(gossip), sentBytes); err != nil {
+	if err := p.metrics.updateSentMetrics(sentPushLabels, len(gossip), sentBytes); err != nil {
 		return err
 	}
 

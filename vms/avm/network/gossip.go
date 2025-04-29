@@ -201,5 +201,7 @@ func (g *gossipMempool) Remove(removeTxs ...*txs.Tx) {
 	defer g.lock.Unlock()
 
 	g.Mempool.Remove(removeTxs...)
-	g.mempool.Remove(removeTxs...)
+	for _, tx := range removeTxs {
+		g.mempool.Remove(tx.GossipID())
+	}
 }

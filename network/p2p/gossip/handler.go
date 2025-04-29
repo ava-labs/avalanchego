@@ -77,7 +77,7 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 		return nil, p2p.ErrUnexpected
 	}
 
-	if err := h.metrics.observeMessage(sentPullLabels, len(gossipBytes), responseSize); err != nil {
+	if err := h.metrics.updateSentMetrics(sentPullLabels, len(gossipBytes), responseSize); err != nil {
 		return nil, p2p.ErrUnexpected
 	}
 

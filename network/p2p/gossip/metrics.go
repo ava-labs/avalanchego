@@ -25,26 +25,23 @@ const (
 	sentType   = "sent"
 
 	// dropped indicate that the gossipable element was not added to the set due to some reason.
-	// for sent message, we'll use notReceive below.
 	droppedLabel = "dropped"
 
 	droppedMalformed = "malformed"
 	DroppedDuplicate = "duplicate"
 	droppedNot       = "not"
-	notReceive       = "not_receive"
 )
 
 var (
+	ioTypeLabels        = []string{ioLabel, typeLabel}
 	ioTypeDroppedLabels = []string{ioLabel, typeLabel, droppedLabel}
 	sentPushLabels      = prometheus.Labels{
-		ioLabel:      sentIO,
-		typeLabel:    pushType,
-		droppedLabel: notReceive,
+		ioLabel:   sentIO,
+		typeLabel: pushType,
 	}
 	sentPullLabels = prometheus.Labels{
-		ioLabel:      sentIO,
-		typeLabel:    pullType,
-		droppedLabel: notReceive,
+		ioLabel:   sentIO,
+		typeLabel: pullType,
 	}
 	typeLabels   = []string{typeLabel}
 	unsentLabels = prometheus.Labels{
@@ -58,8 +55,10 @@ var (
 // Metrics that are tracked across a gossip protocol. A given protocol should
 // only use a single instance of Metrics.
 type Metrics struct {
-	count                   *prometheus.CounterVec
-	bytes                   *prometheus.CounterVec
+	sentCount               *prometheus.CounterVec
+	sentBytes               *prometheus.CounterVec
+	receivedCount           *prometheus.CounterVec
+	receivedBytes           *prometheus.CounterVec
 	tracking                *prometheus.GaugeVec
 	trackingLifetimeAverage prometheus.Gauge
 	topValidators           *prometheus.GaugeVec
@@ -74,19 +73,35 @@ func NewMetrics(
 	namespace string,
 ) (*Metrics, error) {
 	m := &Metrics{
-		count: prometheus.NewCounterVec(
+		sentCount: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Namespace: namespace,
-				Name:      "gossip_count",
-				Help:      "amount of gossip (n)",
+				Name:      "sent_gossip_count",
+				Help:      "amount of sent gossip (n)",
+			},
+			ioTypeLabels,
+		),
+		sentBytes: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "sent_gossip_bytes",
+				Help:      "amount of sent gossip (bytes)",
+			},
+			ioTypeLabels,
+		),
+		receivedCount: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "received_gossip_count",
+				Help:      "amount of received gossip (n)",
 			},
 			ioTypeDroppedLabels,
 		),
-		bytes: prometheus.NewCounterVec(
+		receivedBytes: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Namespace: namespace,
-				Name:      "gossip_bytes",
-				Help:      "amount of gossip (bytes)",
+				Name:      "received_gossip_bytes",
+				Help:      "amount of received gossip (bytes)",
 			},
 			ioTypeDroppedLabels,
 		),
@@ -114,8 +129,10 @@ func NewMetrics(
 		gossipablesLabels: make(map[ids.ID]string),
 	}
 	err := errors.Join(
-		metrics.Register(m.count),
-		metrics.Register(m.bytes),
+		metrics.Register(m.sentCount),
+		metrics.Register(m.sentBytes),
+		metrics.Register(m.receivedCount),
+		metrics.Register(m.receivedBytes),
 		metrics.Register(m.tracking),
 		metrics.Register(m.trackingLifetimeAverage),
 		metrics.Register(m.topValidators),
@@ -123,13 +140,14 @@ func NewMetrics(
 	return m, err
 }
 
-func (m *Metrics) observeMessage(labels prometheus.Labels, count int, bytes int) error {
-	countMetric, err := m.count.GetMetricWith(labels)
+// updateMetrics update the provided metric counters after matching them with the provided labels.
+func updateMetrics(gossipableCounter *prometheus.CounterVec, gossipableBytes *prometheus.CounterVec, labels prometheus.Labels, count int, bytes int) error {
+	countMetric, err := gossipableCounter.GetMetricWith(labels)
 	if err != nil {
 		return fmt.Errorf("failed to get count metric: %w", err)
 	}
 
-	bytesMetric, err := m.bytes.GetMetricWith(labels)
+	bytesMetric, err := gossipableBytes.GetMetricWith(labels)
 	if err != nil {
 		return fmt.Errorf("failed to get bytes metric: %w", err)
 	}
@@ -139,21 +157,20 @@ func (m *Metrics) observeMessage(labels prometheus.Labels, count int, bytes int)
 	return nil
 }
 
-// ObserveIncomingGossipable allows external-package mempools to label a custom gossipable drop-reason and have it
-// included in the gossip metrics.
-func (m *Metrics) ObserveIncomingGossipable(txID ids.ID, label string) {
-	m.labelsLock.Lock()
-	defer m.labelsLock.Unlock()
-	_, ok := m.gossipablesLabels[txID]
-	if ok {
-		// we already have this gossipable labeled; don't re-label.
-		return
-	}
-	m.gossipablesLabels[txID] = label
+func (m *Metrics) updateSentMetrics(labels prometheus.Labels, count int, bytes int) error {
+	return updateMetrics(m.sentCount, m.sentBytes, labels, count, bytes)
 }
 
-// observeReceivedMessage summarizes the metrics for a given received gossip message and update the metrics accordingly.
-func (m *Metrics) observeReceivedMessage(typeLabel string, gossipables map[ids.ID]int, malformedBytes int, malformedCount int) error {
+// AddDropMetric allows external-package mempools to label a custom gossipable drop-reason and have it
+// included in the gossip metrics.
+func (m *Metrics) AddDropMetric(gossipableID ids.ID, label string) {
+	m.labelsLock.Lock()
+	defer m.labelsLock.Unlock()
+	m.gossipablesLabels[gossipableID] = label
+}
+
+// updateReceivedMetrics summarizes the metrics for a given received gossip message and update the metrics accordingly.
+func (m *Metrics) updateReceivedMetrics(messageType string, gossipables map[ids.ID]int, malformedBytes int, malformedCount int) error {
 	m.labelsLock.Lock()
 	defer m.labelsLock.Unlock()
 
@@ -174,10 +191,10 @@ func (m *Metrics) observeReceivedMessage(typeLabel string, gossipables map[ids.I
 	for label, gossipableSize := range labelBytes {
 		prometheusLabel := prometheus.Labels{
 			ioLabel:      receivedIO,
-			typeLabel:    typeLabel,
+			typeLabel:    messageType,
 			droppedLabel: label,
 		}
-		if err := m.observeMessage(prometheusLabel, labelCount[label], gossipableSize); err != nil {
+		if err := updateMetrics(m.receivedCount, m.receivedBytes, prometheusLabel, labelCount[label], gossipableSize); err != nil {
 			return err
 		}
 	}
