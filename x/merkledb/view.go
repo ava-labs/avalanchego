@@ -31,11 +31,10 @@ var (
 	ErrPartialByteLengthWithValue = errors.New(
 		"the underlying db only supports whole number of byte keys, so cannot record changes with partial byte lengths",
 	)
-	ErrVisitPathToKey         = errors.New("failed to visit expected node during insertion")
-	ErrStartAfterEnd          = errors.New("start key > end key")
-	ErrNoChanges              = errors.New("no changes provided")
-	ErrParentNotDatabase      = errors.New("parent trie is not database")
-	ErrNodesAlreadyCalculated = errors.New("cannot modify the trie after the node changes have been calculated")
+	ErrVisitPathToKey    = errors.New("failed to visit expected node during insertion")
+	ErrStartAfterEnd     = errors.New("start key > end key")
+	ErrNoChanges         = errors.New("no changes provided")
+	ErrParentNotDatabase = errors.New("parent trie is not database")
 )
 
 type view struct {
@@ -43,7 +42,6 @@ type view struct {
 	// [commitLock] must be held while accessing this field.
 	committed  bool
 	commitLock sync.RWMutex
-	//notifyCommitted chan struct{}
 
 	// valueChangesApplied is used to enforce that no changes are made to the
 	// trie after the nodes have been calculated
