@@ -23,17 +23,6 @@ func (n *Node) GetFlagsPath() string {
 	return filepath.Join(n.DataDir, "flags.json")
 }
 
-func (n *Node) writeFlags(flags FlagsMap) error {
-	bytes, err := DefaultJSONMarshal(flags)
-	if err != nil {
-		return fmt.Errorf("failed to marshal node flags: %w", err)
-	}
-	if err := os.WriteFile(n.GetFlagsPath(), bytes, perms.ReadWrite); err != nil {
-		return fmt.Errorf("failed to write node flags: %w", err)
-	}
-	return nil
-}
-
 func (n *Node) getConfigPath() string {
 	return filepath.Join(n.DataDir, defaultConfigFilename)
 }
