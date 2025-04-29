@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/NYTimes/gziphandler"
@@ -17,6 +18,7 @@ import (
 	"github.com/rs/cors"
 	"go.uber.org/zap"
 	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
@@ -88,7 +90,8 @@ type server struct {
 	metrics *metrics
 
 	// Maps endpoints to handlers
-	router *router
+	router     *router
+	grpcRouter *grpcRouter
 
 	srv *http.Server
 
@@ -115,32 +118,26 @@ func New(
 	}
 
 	router := newRouter()
-	allowedHostsHandler := filterInvalidHosts(router, allowedHosts)
-	corsHandler := cors.New(cors.Options{
-		AllowedOrigins:   allowedOrigins,
-		AllowCredentials: true,
-	}).Handler(allowedHostsHandler)
-	gzipHandler := gziphandler.GzipHandler(corsHandler)
-	var handler http.Handler = http.HandlerFunc(
-		func(w http.ResponseWriter, r *http.Request) {
-			// Attach this node's ID as a header
-			w.Header().Set("node-id", nodeID.String())
-			gzipHandler.ServeHTTP(w, r)
-		},
-	)
+	handler := wrapHandler(router, nodeID, allowedOrigins, allowedHosts)
+
+	grpcRouter := newGRPCRouter()
+	grpcHandler := wrapHandler(grpcRouter, nodeID, allowedOrigins, allowedHosts)
 
 	httpServer := &http.Server{
-		Handler:           handler,
+		Handler: h2c.NewHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.ProtoMajor == 2 && strings.Contains(r.Header.Get("Content-Type"), "application/grpc") {
+				grpcHandler.ServeHTTP(w, r)
+				return
+			}
+
+			handler.ServeHTTP(w, r)
+		}), &http2.Server{
+			MaxConcurrentStreams: maxConcurrentStreams,
+		}),
 		ReadTimeout:       httpConfig.ReadTimeout,
 		ReadHeaderTimeout: httpConfig.ReadHeaderTimeout,
 		WriteTimeout:      httpConfig.WriteTimeout,
 		IdleTimeout:       httpConfig.IdleTimeout,
-	}
-	err = http2.ConfigureServer(httpServer, &http2.Server{
-		MaxConcurrentStreams: maxConcurrentStreams,
-	})
-	if err != nil {
-		return nil, err
 	}
 
 	log.Info("API created",
@@ -154,6 +151,7 @@ func New(
 		tracer:          tracer,
 		metrics:         m,
 		router:          router,
+		grpcRouter:      grpcRouter,
 		srv:             httpServer,
 		listener:        listener,
 	}, nil
@@ -199,6 +197,26 @@ func (s *server) RegisterChain(chainName string, ctx *snow.ConsensusContext, vm 
 			)
 		}
 	}
+
+	ctx.Lock.Lock()
+	serviceName, grpcHandler, err := vm.CreateGRPCService(context.TODO())
+	ctx.Lock.Unlock()
+	if err != nil {
+		s.log.Error("failed to create grpc service",
+			zap.String("chainName", chainName),
+			zap.Error(err),
+		)
+		return
+	}
+
+	if serviceName == "" && grpcHandler == nil {
+		return
+	}
+
+	grpcHandler = s.wrapMiddleware(chainName, grpcHandler, ctx)
+	if !s.grpcRouter.Add(serviceName, grpcHandler) {
+		s.log.Error("failed to add route to grpc service")
+	}
 }
 
 func (s *server) addChainRoute(chainName string, handler http.Handler, ctx *snow.ConsensusContext, base, endpoint string) error {
@@ -207,13 +225,17 @@ func (s *server) addChainRoute(chainName string, handler http.Handler, ctx *snow
 		zap.String("url", url),
 		zap.String("endpoint", endpoint),
 	)
+	handler = s.wrapMiddleware(chainName, handler, ctx)
+	return s.router.AddRouter(url, endpoint, handler)
+}
+
+func (s *server) wrapMiddleware(chainName string, handler http.Handler, ctx *snow.ConsensusContext) http.Handler {
 	if s.tracingEnabled {
 		handler = api.TraceHandler(handler, chainName, s.tracer)
 	}
 	// Apply middleware to reject calls to the handler before the chain finishes bootstrapping
 	handler = rejectMiddleware(handler, ctx)
-	handler = s.metrics.wrapHandler(chainName, handler)
-	return s.router.AddRouter(url, endpoint, handler)
+	return s.metrics.wrapHandler(chainName, handler)
 }
 
 func (s *server) AddRoute(handler http.Handler, base, endpoint string) error {
@@ -298,4 +320,20 @@ func (a readPathAdder) AddRoute(handler http.Handler, base, endpoint string) err
 
 func (a readPathAdder) AddAliases(endpoint string, aliases ...string) error {
 	return a.pather.AddAliasesWithReadLock(endpoint, aliases...)
+}
+
+func wrapHandler(handler http.Handler, nodeID ids.NodeID, allowedOrigins []string, allowedHosts []string) http.Handler {
+	allowedHostsHandler := filterInvalidHosts(handler, allowedHosts)
+	corsHandler := cors.New(cors.Options{
+		AllowedOrigins:   allowedOrigins,
+		AllowCredentials: true,
+	}).Handler(allowedHostsHandler)
+	gzipHandler := gziphandler.GzipHandler(corsHandler)
+	return http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			// Attach this node's ID as a header
+			w.Header().Set("node-id", nodeID.String())
+			gzipHandler.ServeHTTP(w, r)
+		},
+	)
 }

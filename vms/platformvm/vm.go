@@ -466,6 +466,10 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	}, err
 }
 
+func (*VM) CreateGRPCService(context.Context) (string, http.Handler, error) {
+	return "", nil, nil
+}
+
 func (vm *VM) Connected(ctx context.Context, nodeID ids.NodeID, version *version.Application) error {
 	if err := vm.uptimeManager.Connect(nodeID); err != nil {
 		return err

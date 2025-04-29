@@ -77,4 +77,9 @@ type VM interface {
 	// it have an extension called `accounts`, where clients could get
 	// information about their accounts.
 	CreateHandlers(context.Context) (map[string]http.Handler, error)
+
+	// CreateGRPCService returns the gRPC service to register into the
+	// avalanchego api server. The gRPC service name must contain the chainID to
+	// support multiple instances of the same vmID.
+	CreateGRPCService(ctx context.Context) (string, http.Handler, error)
 }
