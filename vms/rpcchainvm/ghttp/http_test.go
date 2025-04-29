@@ -5,18 +5,20 @@ package ghttp
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/test/bufconn"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
-	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/test/bufconn"
+
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
+
+	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
 )
 
 var _ io.Reader = (*infiniteStream)(nil)
@@ -91,9 +93,9 @@ func TestRequestClientArbitrarilyLongBody(t *testing.T) {
 func TestHttpResponse(t *testing.T) {
 	require := require.New(t)
 
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(123)
-		w.Header()["foo"] = []string{"bar"}
+		w.Header()["Foo"] = []string{"bar"}
 		_, err := w.Write([]byte{1, 2, 3})
 		require.NoError(err)
 	})
@@ -134,7 +136,7 @@ func TestHttpResponse(t *testing.T) {
 	client.ServeHTTP(recorder, request)
 
 	require.Equal(123, recorder.Code)
-	require.Equal([]string{"bar"}, recorder.Header()["foo"])
+	require.Equal([]string{"bar"}, recorder.Header()["Foo"])
 	require.Equal([]byte{1, 2, 3}, recorder.Body.Bytes())
 }
 
