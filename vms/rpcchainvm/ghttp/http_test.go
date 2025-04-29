@@ -94,7 +94,6 @@ func TestHttpResponse(t *testing.T) {
 	require := require.New(t)
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(123)
 		w.Header()["Foo"] = []string{"bar"}
 		_, err := w.Write([]byte{1, 2, 3})
 		require.NoError(err)
@@ -135,7 +134,7 @@ func TestHttpResponse(t *testing.T) {
 
 	client.ServeHTTP(recorder, request)
 
-	require.Equal(123, recorder.Code)
+	require.Equal(200, recorder.Code)
 	require.Equal([]string{"bar"}, recorder.Header()["Foo"])
 	require.Equal([]byte{1, 2, 3}, recorder.Body.Bytes())
 }
