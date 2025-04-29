@@ -88,7 +88,7 @@ func TestRequestClientArbitrarilyLongBody(t *testing.T) {
 
 // Tests that writes to the http response in the server are propagated to the
 // client
-func TestHttpRequest(t *testing.T) {
+func TestHttpResponse(t *testing.T) {
 	require := require.New(t)
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
