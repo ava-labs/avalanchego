@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"net/http"
 	"net/url"
 
@@ -141,7 +142,7 @@ func (s *Server) Handle(ctx context.Context, req *httppb.HTTPRequest) (*httppb.H
 	s.handler.ServeHTTP(writer, request)
 
 	if err := clientConn.Close(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to close client conn: %w", err)
 	}
 
 	header := make([]*httppb.Element, len(writerHeaders))
