@@ -98,16 +98,14 @@ func pollParallel(ctx context.Context, client EthClientPoll, address common.Addr
 	const numGoroutines = 2
 	for range numGoroutines {
 		select {
-		case <-blockNumberCh:
-			result := <-blockNumberCh
+		case result := <-blockNumberCh:
 			if err == nil && result.err != nil {
 				err = result.err
 				cancel()
 				continue
 			}
 			blockNumber = result.blockNumber
-		case <-nonceCh:
-			result := <-nonceCh
+		case result := <-nonceCh:
 			if err == nil && result.err != nil {
 				err = result.err
 				cancel()
