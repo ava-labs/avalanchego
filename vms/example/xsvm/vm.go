@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
+	"github.com/ava-labs/avalanchego/proto/pb/xsvm"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -28,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/execute"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/state"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
 	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	xsblock "github.com/ava-labs/avalanchego/vms/example/xsvm/block"
@@ -150,6 +152,12 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	return map[string]http.Handler{
 		"": server,
 	}, server.RegisterService(api, constants.XSVMName)
+}
+
+func (vm *VM) CreateGRPCService(context.Context) (string, http.Handler, error) {
+	server := grpcutils.NewServer()
+	server.RegisterService(&xsvm.Ping_ServiceDesc, &grpcService{Log: vm.chainContext.Log})
+	return xsvm.Ping_ServiceDesc.ServiceName, server, nil
 }
 
 func (*VM) HealthCheck(context.Context) (interface{}, error) {

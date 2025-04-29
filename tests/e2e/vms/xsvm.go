@@ -5,6 +5,8 @@ package vms
 
 import (
 	"fmt"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -12,6 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/xsvm"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/subnet"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
@@ -21,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/export"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/importtx"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/transfer"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 )
 
 const pollingInterval = 50 * time.Millisecond
@@ -177,6 +181,58 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		require.Equal(units.Schmeckle, destinationBalance)
 
 		_ = e2e.CheckBootstrapIsPossible(tc, network)
+	})
+
+	ginkgo.It("should serve grpc api requests", func() {
+		tc.By("establishing connection")
+		uri := strings.TrimPrefix(e2e.GetEnv(tc).GetRandomNodeURI().URI, "http://")
+		conn, err := grpcutils.Dial(uri)
+		require.NoError(err)
+
+		tc.By("serving unary rpc")
+		client := xsvm.NewPingClient(conn)
+
+		msg := "foobar"
+		reply, err := client.Ping(tc.DefaultContext(), &xsvm.PingRequest{
+			Message: msg,
+		})
+		require.NoError(err)
+		require.Equal(msg, reply.Message)
+
+		tc.By("serving bidirectional streaming rpc")
+		stream, err := client.StreamPing(tc.DefaultContext())
+		require.NoError(err)
+
+		// Stream pings to the server and block until all events are received
+		// back.
+		wg := &sync.WaitGroup{}
+		wg.Add(2)
+
+		n := 1_000
+		go func() {
+			defer wg.Done()
+
+			for i := 0; i < n; i++ {
+				msg := fmt.Sprintf("ping-%d", i)
+				require.NoError(stream.Send(&xsvm.StreamPingRequest{
+					Message: msg,
+				}))
+			}
+		}()
+
+		go func() {
+			defer wg.Done()
+
+			for i := 0; i < n; i++ {
+				reply, err := stream.Recv()
+				require.NoError(err)
+				require.Equal(fmt.Sprintf("ping-%d", i), reply.Message)
+			}
+		}()
+
+		wg.Wait()
+
+		require.NoError(stream.CloseSend())
 	})
 })
 
