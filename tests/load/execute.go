@@ -20,8 +20,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/tests/load/agent"
-	"github.com/ava-labs/avalanchego/tests/load/generator"
-	"github.com/ava-labs/avalanchego/tests/load/issuer"
+	"github.com/ava-labs/avalanchego/tests/load/generate"
+	"github.com/ava-labs/avalanchego/tests/load/issue"
 	"github.com/ava-labs/avalanchego/tests/load/listen"
 	"github.com/ava-labs/avalanchego/tests/load/orchestrate"
 	"github.com/ava-labs/avalanchego/tests/load/tracker"
@@ -66,13 +66,13 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 		if err != nil {
 			return fmt.Errorf("dialing %s: %w", endpoint, err)
 		}
-		generator, err := generator.NewSelf(ctx, client,
+		generator, err := generate.NewSelf(ctx, client,
 			big.NewInt(config.maxTipCap), big.NewInt(config.maxFeeCap), keys[i])
 		if err != nil {
 			return fmt.Errorf("creating generator: %w", err)
 		}
 		address := ethcrypto.PubkeyToAddress(keys[i].PublicKey)
-		issuer := issuer.New(client, tracker, address)
+		issuer := issue.New(client, tracker, address)
 		listener := listen.New(client, websocket, tracker, config.txsPerAgent, address)
 		agents[i] = agent.New[*types.Transaction, common.Hash](config.txsPerAgent, generator, issuer, listener, tracker)
 	}

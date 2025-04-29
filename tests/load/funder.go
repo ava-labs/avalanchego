@@ -19,8 +19,8 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 
 	"github.com/ava-labs/avalanchego/tests/load/agent"
-	"github.com/ava-labs/avalanchego/tests/load/generator"
-	"github.com/ava-labs/avalanchego/tests/load/issuer"
+	"github.com/ava-labs/avalanchego/tests/load/generate"
+	"github.com/ava-labs/avalanchego/tests/load/issue"
 	"github.com/ava-labs/avalanchego/tests/load/listen"
 	"github.com/ava-labs/avalanchego/tests/load/orchestrate"
 	"github.com/ava-labs/avalanchego/tests/load/tracker"
@@ -73,12 +73,12 @@ func ensureMinimumFunds(ctx context.Context, endpoint string, keys []*ecdsa.Priv
 
 	maxFundsAddress := ethcrypto.PubkeyToAddress(maxFundsKey.PublicKey)
 	txTarget := uint64(len(needFundsKeys))
-	generator, err := generator.NewDistributor(ctx, client, maxFundsKey, needFundsKeys)
+	generator, err := generate.NewDistributor(ctx, client, maxFundsKey, needFundsKeys)
 	if err != nil {
 		return fmt.Errorf("creating distribution generator: %w", err)
 	}
 	tracker := tracker.NewCounter()
-	issuer := issuer.New(client, tracker, maxFundsAddress)
+	issuer := issue.New(client, tracker, maxFundsAddress)
 	listener := listen.New(client, websocket, tracker, txTarget, maxFundsAddress)
 	agents := []*agent.Agent[*types.Transaction, common.Hash]{
 		agent.New(txTarget, generator, issuer, listener, tracker),
