@@ -75,6 +75,7 @@ func newMetrics(registry PrometheusRegistry) *metrics {
 	return &metrics{
 		registry:            registry,
 		Confirmed:           confirmed,
+		Failed:              failed,
 		InFlightIssuances:   inFlightIssuances,
 		InFlightTxs:         inFlightTxs,
 		IssuanceTxTimes:     issuanceTxTimes,

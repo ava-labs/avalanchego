@@ -23,6 +23,7 @@ func (l *Listener) listenSub(ctx context.Context) error {
 		return fmt.Errorf("starting new head notifier: %w", err)
 	}
 	defer headNotifier.stop()
+	defer l.markRemainingAsFailed()
 
 	for {
 		blockNumber := (*big.Int)(nil)

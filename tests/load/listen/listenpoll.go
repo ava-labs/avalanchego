@@ -21,6 +21,7 @@ func (l *Listener) listenPoll(ctx context.Context) error {
 	const period = 50 * time.Millisecond
 	ticker := time.NewTicker(period)
 	defer ticker.Stop()
+	defer l.markRemainingAsFailed()
 
 	for {
 		blockNumber, nonce, err := pollParallel(ctx, l.client, l.address)

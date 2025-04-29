@@ -18,6 +18,7 @@ type EthClient interface {
 
 type Tracker interface {
 	ObserveConfirmed(txHash common.Hash)
+	ObserveFailed(txHash common.Hash)
 	// ObserveBlock observes a new block with the given number.
 	// It should be called when a new block is received.
 	// It should ignore the block if the number has already been observed.
@@ -65,4 +66,13 @@ func (l *Listener) RegisterIssued(tx *types.Transaction) {
 	l.issued++
 	l.lastIssuedNonce = tx.Nonce()
 	l.inFlightTxHashes = append(l.inFlightTxHashes, tx.Hash())
+}
+
+func (l *Listener) markRemainingAsFailed() {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	for _, txHash := range l.inFlightTxHashes {
+		l.tracker.ObserveFailed(txHash)
+	}
+	l.inFlightTxHashes = nil
 }
