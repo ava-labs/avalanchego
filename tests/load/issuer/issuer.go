@@ -6,7 +6,6 @@ package issuer
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
@@ -14,54 +13,36 @@ import (
 
 type EthClient interface {
 	SendTransaction(ctx context.Context, tx *types.Transaction) error
-	EthClientPoll
-	EthClientSubscriber
 }
 
 type Tracker interface {
 	IssueStart(txHash common.Hash)
 	IssueEnd(txHash common.Hash)
-	ObserveConfirmed(txHash common.Hash)
-	// ObserveBlock observes a new block with the given number.
-	// It should be called when a new block is received.
-	// It should ignore the block if the number has already been observed.
-	// It may also ignore the first block observed when it comes to time,
-	// given the missing information on the time start for the first block.
-	ObserveBlock(number uint64)
 }
 
-// Issuer issues transactions to a node and waits for them to be accepted (or failed).
-// It
+// Issuer issues transactions to a node.
 type Issuer struct {
 	// Injected parameters
-	client    EthClient
-	websocket bool
-	tracker   Tracker
-	address   common.Address
+	client  EthClient
+	tracker Tracker
+	address common.Address
 
-	// Internal state
-	mutex            sync.Mutex
-	issuedTxs        uint64
-	lastIssuedNonce  uint64
-	inFlightTxHashes []common.Hash
-	allIssued        bool
+	// State
+	lastIssuedNonce uint64 // for programming assumptions checks only
 }
 
-func New(client EthClient, websocket bool, tracker Tracker, address common.Address) *Issuer {
+func New(client EthClient, tracker Tracker, address common.Address) *Issuer {
 	return &Issuer{
-		client:    client,
-		websocket: websocket,
-		tracker:   tracker,
-		address:   address,
+		client:  client,
+		tracker: tracker,
+		address: address,
 	}
 }
 
 func (i *Issuer) IssueTx(ctx context.Context, tx *types.Transaction) error {
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
-
 	txHash, txNonce := tx.Hash(), tx.Nonce()
 	if txNonce > 0 && txNonce != i.lastIssuedNonce+1 {
+		// the listener relies on this being true
 		return fmt.Errorf("transaction nonce %d is not equal to the last issued nonce %d plus one", txNonce, i.lastIssuedNonce)
 	}
 	i.tracker.IssueStart(txHash)
@@ -69,21 +50,6 @@ func (i *Issuer) IssueTx(ctx context.Context, tx *types.Transaction) error {
 		return err
 	}
 	i.tracker.IssueEnd(txHash)
-	i.inFlightTxHashes = append(i.inFlightTxHashes, txHash)
-	i.issuedTxs++
 	i.lastIssuedNonce = txNonce
 	return nil
-}
-
-func (i *Issuer) Listen(ctx context.Context) error {
-	if i.websocket {
-		return i.listenSub(ctx)
-	}
-	return i.listenPoll(ctx)
-}
-
-func (i *Issuer) Stop() {
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
-	i.allIssued = true
 }

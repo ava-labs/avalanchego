@@ -38,16 +38,14 @@ func (o *BurstOrchestrator[T, U]) Execute(ctx context.Context) error {
 
 	// start a goroutine to confirm each issuer's transactions
 	observerGroup := errgroup.Group{}
-	for _, loader := range o.agents {
-		observerGroup.Go(func() error { return loader.Issuer.Listen(observerCtx) })
+	for _, agent := range o.agents {
+		observerGroup.Go(func() error { return agent.Listener.Listen(observerCtx) })
 	}
 
 	// start issuing transactions sequentially from each issuer
 	issuerGroup := errgroup.Group{}
 	for _, agent := range o.agents {
 		issuerGroup.Go(func() error {
-			defer agent.Issuer.Stop()
-
 			for range agent.TxTarget {
 				tx, err := agent.Generator.GenerateTx()
 				if err != nil {
@@ -56,6 +54,8 @@ func (o *BurstOrchestrator[T, U]) Execute(ctx context.Context) error {
 				if err := agent.Issuer.IssueTx(ctx, tx); err != nil {
 					return fmt.Errorf("issuing transaction: %w", err)
 				}
+
+				agent.Listener.RegisterIssued(tx)
 			}
 			return nil
 		})

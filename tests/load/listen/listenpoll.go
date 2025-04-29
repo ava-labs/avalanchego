@@ -1,7 +1,7 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package issuer
+package listen
 
 import (
 	"context"
@@ -17,13 +17,13 @@ type EthClientPoll interface {
 	NonceAt(ctx context.Context, addr common.Address, blockNumber *big.Int) (uint64, error)
 }
 
-func (i *Issuer) listenPoll(ctx context.Context) error {
+func (l *Listener) listenPoll(ctx context.Context) error {
 	const period = 50 * time.Millisecond
 	ticker := time.NewTicker(period)
 	defer ticker.Stop()
 
 	for {
-		blockNumber, nonce, err := pollParallel(ctx, i.client, i.address)
+		blockNumber, nonce, err := pollParallel(ctx, l.client, l.address)
 		if err != nil {
 			if ctx.Err() != nil {
 				return nil
@@ -31,25 +31,25 @@ func (i *Issuer) listenPoll(ctx context.Context) error {
 			return fmt.Errorf("polling node: %w", err)
 		}
 
-		i.tracker.ObserveBlock(blockNumber)
+		l.tracker.ObserveBlock(blockNumber)
 
-		i.mutex.Lock()
-		confirmed := uint64(len(i.inFlightTxHashes))
-		if nonce < i.lastIssuedNonce { // lagging behind last issued nonce
-			lag := i.lastIssuedNonce - nonce
+		l.mutex.Lock()
+		confirmed := uint64(len(l.inFlightTxHashes))
+		if nonce < l.lastIssuedNonce { // lagging behind last issued nonce
+			lag := l.lastIssuedNonce - nonce
 			confirmed -= lag
 		}
 		for index := range confirmed {
-			txHash := i.inFlightTxHashes[index]
-			i.tracker.ObserveConfirmed(txHash)
+			txHash := l.inFlightTxHashes[index]
+			l.tracker.ObserveConfirmed(txHash)
 		}
-		i.inFlightTxHashes = i.inFlightTxHashes[confirmed:]
-		finished := i.allIssued && len(i.inFlightTxHashes) == 0
+		l.inFlightTxHashes = l.inFlightTxHashes[confirmed:]
+		finished := l.issued == l.txTarget && len(l.inFlightTxHashes) == 0
 		if finished {
-			i.mutex.Unlock()
+			l.mutex.Unlock()
 			return nil
 		}
-		i.mutex.Unlock()
+		l.mutex.Unlock()
 
 		select {
 		case <-ctx.Done():

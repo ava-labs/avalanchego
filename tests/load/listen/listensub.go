@@ -1,7 +1,7 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package issuer
+package listen
 
 import (
 	"context"
@@ -16,8 +16,8 @@ type EthClientSubscriber interface {
 	NewHeadSubscriber
 }
 
-func (i *Issuer) listenSub(ctx context.Context) error {
-	headNotifier := newHeadNotifier(i.client)
+func (l *Listener) listenSub(ctx context.Context) error {
+	headNotifier := newHeadNotifier(l.client)
 	newHeadCh, notifierErrCh, err := headNotifier.start(ctx)
 	if err != nil {
 		return fmt.Errorf("starting new head notifier: %w", err)
@@ -26,31 +26,31 @@ func (i *Issuer) listenSub(ctx context.Context) error {
 
 	for {
 		blockNumber := (*big.Int)(nil)
-		nonce, err := i.client.NonceAt(ctx, i.address, blockNumber)
+		nonce, err := l.client.NonceAt(ctx, l.address, blockNumber)
 		if err != nil {
 			if ctx.Err() != nil {
 				return nil
 			}
-			return fmt.Errorf("checking last block account nonce for address %s: %w", i.address, err)
+			return fmt.Errorf("checking last block account nonce for address %s: %w", l.address, err)
 		}
 
-		i.mutex.Lock()
-		confirmed := uint64(len(i.inFlightTxHashes))
-		if nonce < i.lastIssuedNonce { // lagging behind last issued nonce
-			lag := i.lastIssuedNonce - nonce
+		l.mutex.Lock()
+		confirmed := uint64(len(l.inFlightTxHashes))
+		if nonce < l.lastIssuedNonce { // lagging behind last issued nonce
+			lag := l.lastIssuedNonce - nonce
 			confirmed -= lag
 		}
 		for index := range confirmed {
-			txHash := i.inFlightTxHashes[index]
-			i.tracker.ObserveConfirmed(txHash)
+			txHash := l.inFlightTxHashes[index]
+			l.tracker.ObserveConfirmed(txHash)
 		}
-		i.inFlightTxHashes = i.inFlightTxHashes[confirmed:]
-		finished := i.allIssued && len(i.inFlightTxHashes) == 0
+		l.inFlightTxHashes = l.inFlightTxHashes[confirmed:]
+		finished := l.issued == l.txTarget && len(l.inFlightTxHashes) == 0
 		if finished {
-			i.mutex.Unlock()
+			l.mutex.Unlock()
 			return nil
 		}
-		i.mutex.Unlock()
+		l.mutex.Unlock()
 
 		select {
 		case <-ctx.Done():
@@ -58,7 +58,7 @@ func (i *Issuer) listenSub(ctx context.Context) error {
 		case err := <-notifierErrCh:
 			return fmt.Errorf("new head notifier failed: %w", err)
 		case blockNumber := <-newHeadCh:
-			i.tracker.ObserveBlock(blockNumber)
+			l.tracker.ObserveBlock(blockNumber)
 		}
 	}
 }

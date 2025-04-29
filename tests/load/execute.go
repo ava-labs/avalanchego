@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests/load/agent"
 	"github.com/ava-labs/avalanchego/tests/load/generator"
 	"github.com/ava-labs/avalanchego/tests/load/issuer"
+	"github.com/ava-labs/avalanchego/tests/load/listen"
 	"github.com/ava-labs/avalanchego/tests/load/orchestrate"
 	"github.com/ava-labs/avalanchego/tests/load/tracker"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -71,8 +72,9 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 			return fmt.Errorf("creating generator: %w", err)
 		}
 		address := ethcrypto.PubkeyToAddress(keys[i].PublicKey)
-		issuer := issuer.New(client, websocket, tracker, address)
-		agents[i] = agent.New[*types.Transaction, common.Hash](config.txsPerAgent, generator, issuer, tracker)
+		issuer := issuer.New(client, tracker, address)
+		listener := listen.New(client, websocket, tracker, config.txsPerAgent, address)
+		agents[i] = agent.New[*types.Transaction, common.Hash](config.txsPerAgent, generator, issuer, listener, tracker)
 	}
 
 	metricsErrCh, err := metricsServer.Start()
