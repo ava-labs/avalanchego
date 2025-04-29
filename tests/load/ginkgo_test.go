@@ -26,11 +26,13 @@ func init() {
 	flagVars = e2e.RegisterFlagsWithDefaultOwner("avalanchego-load")
 }
 
+const nodesCount = 1
+
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run only once in the first ginkgo process
 
 	tc := e2e.NewTestContext()
-	nodes := tmpnet.NewNodesOrPanic(tmpnet.DefaultNodeCount)
+	nodes := tmpnet.NewNodesOrPanic(nodesCount)
 	network := &tmpnet.Network{
 		Owner: "avalanchego-load-test",
 		Nodes: nodes,
@@ -60,7 +62,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 		privateNetwork.DefaultFlags = tmpnet.FlagsMap{}
 		publicNetwork := env.GetNetwork()
 		privateNetwork.DefaultFlags.SetDefaults(publicNetwork.DefaultFlags)
-		privateNetwork.Nodes = privateNetwork.Nodes[:tmpnet.DefaultNodeCount]
+		privateNetwork.Nodes = privateNetwork.Nodes[:nodesCount]
 		for _, node := range privateNetwork.Nodes {
 			err := node.EnsureKeys()
 			require.NoError(tc, err, "ensuring keys for node %s", node.NodeID)
