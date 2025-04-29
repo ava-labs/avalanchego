@@ -60,12 +60,10 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 		privateNetwork.DefaultFlags = tmpnet.FlagsMap{}
 		publicNetwork := env.GetNetwork()
 		privateNetwork.DefaultFlags.SetDefaults(publicNetwork.DefaultFlags)
-		privateNetwork.Nodes = make([]*tmpnet.Node, tmpnet.DefaultNodeCount)
-		for i := range privateNetwork.Nodes {
-			node := tmpnet.NewNode()
+		privateNetwork.Nodes = privateNetwork.Nodes[:tmpnet.DefaultNodeCount]
+		for _, node := range privateNetwork.Nodes {
 			err := node.EnsureKeys()
 			require.NoError(tc, err, "ensuring keys for node %s", node.NodeID)
-			privateNetwork.Nodes[i] = node
 		}
 		env.StartPrivateNetwork(privateNetwork)
 	})
