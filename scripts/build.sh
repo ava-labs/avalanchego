@@ -31,9 +31,6 @@ source "${REPO_ROOT}"/scripts/constants.sh
 # Determine the git commit hash to use for the build
 source "${REPO_ROOT}"/scripts/git_commit.sh
 
-echo "Downloading dependencies..."
-go mod download
-
 echo "Building AvalancheGo with [$(go version)]..."
 go build ${race} -o "${avalanchego_path}" \
    -ldflags "-X github.com/ava-labs/avalanchego/version.GitCommit=$git_commit $static_ld_flags" \

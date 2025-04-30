@@ -57,26 +57,32 @@ repositories.
 The functionality in this package is grouped by logical purpose into
 the following non-test files:
 
-| Filename                    | Types       | Purpose                                                     |
-|:----------------------------|:------------|:------------------------------------------------------------|
-| check_monitoring.go         |             | Enables checking if logs and metrics were collected         |
-| defaults.go                 |             | Defines common default configuration                        |
-| detached_process_default.go |             | Configures detached processes for darwin and linux          |
-| detached_process_windows.go |             | No-op detached process configuration for windows            |
-| flags.go                    | FlagsMap    | Simplifies configuration of avalanchego flags               |
-| genesis.go                  |             | Creates test genesis                                        |
-| kube.go                     |             | Library for Kubernetes interaction                          |
-| local_network.go            |             | Defines configuration for the default local network         |
-| monitor_processes.go        |             | Enables collection of logs and metrics from local processes |
-| network.go                  | Network     | Orchestrates and configures temporary networks              |
-| network_config.go           | Network     | Reads and writes network configuration                      |
-| network_test.go             |             | Simple test round-tripping Network serialization            |
-| node.go                     | Node        | Orchestrates and configures nodes                           |
-| node_config.go              | Node        | Reads and writes node configuration                         |
-| node_process.go             | NodeProcess | Orchestrates node processes                                 |
-| start_kind_cluster.go       |             | Starts a local kind cluster                                 |
-| subnet.go                   | Subnet      | Orchestrates subnets                                        |
-| utils.go                    |             | Defines shared utility functions                            |
+| Filename                    | Types          | Purpose                                                                |
+|:----------------------------|:---------------|:-----------------------------------------------------------------------|
+| flags/                      |                | Directory defining flags usable with both stdlib flags and spf13/pflag |
+| flags/common.go             |                | Defines type definitions common across other files                     |
+| flags/process_runtime.go    |                | Defines flags configuring the process node runtime                     |
+| flags/runtime.go            |                | Defines flags configuring node runtime                                 |
+| flags/start_network.go      |                | Defines flags configuring network start                                |
+| tmpnetctl/                  |                | Directory containing main entrypoint for tmpnetctl command             |
+| check_monitoring.go         |                | Enables checking if logs and metrics were collected                    |
+| defaults.go                 |                | Defines common default configuration                                   |
+| detached_process_default.go |                | Configures detached processes for darwin and linux                     |
+| detached_process_windows.go |                | No-op detached process configuration for windows                       |
+| flagsmap.go                 | FlagsMap       | Simplifies configuration of avalanchego flags                          |
+| genesis.go                  |                | Creates test genesis                                                   |
+| kube.go                     |                | Library for Kubernetes interaction                                     |
+| local_network.go            |                | Defines configuration for the default local network                    |
+| monitor_processes.go        |                | Enables collection of logs and metrics from local processes            |
+| network.go                  | Network        | Orchestrates and configures temporary networks                         |
+| network_config.go           | Network        | Reads and writes network configuration                                 |
+| network_test.go             |                | Simple test round-tripping Network serialization                       |
+| node.go                     | Node           | Orchestrates and configures nodes                                      |
+| node_config.go              | Node           | Reads and writes node configuration                                    |
+| process_runtime.go          | ProcessRuntime | Orchestrates node processes                                            |
+| start_kind_cluster.go       |                | Starts a local kind cluster                                            |
+| subnet.go                   | Subnet         | Orchestrates subnets                                                   |
+| utils.go                    |                | Defines shared utility functions                                       |
 
 ## Usage
 
@@ -133,17 +139,19 @@ flags.
 A temporary network can be managed in code:
 
 ```golang
-network := &tmpnet.Network{                   // Configure non-default values for the new network
-    DefaultRuntimeConfig{
-        ReuseDynamicPorts: true,              // Configure process-based nodes to reuse a dynamically allocated API port when restarting
-    },
+network := &tmpnet.Network{                         // Configure non-default values for the new network
+    DefaultRuntimeConfig: tmpnet.NodeRuntimeConfig{
+        Process: &tmpnet.ProcessRuntimeConfig{
+            ReuseDynamicPorts: true,                // Configure process-based nodes to reuse a dynamically allocated API port when restarting
+        },
+    }
     DefaultFlags: tmpnet.FlagsMap{
-        config.LogLevelKey: "INFO",           // Change one of the network's defaults
+        config.LogLevelKey: "INFO",                 // Change one of the network's defaults
     },
-    Nodes: tmpnet.NewNodesOrPanic(5),         // Number of initial validating nodes
-    Subnets: []*tmpnet.Subnet{                // Subnets to create on the new network once it is running
+    Nodes: tmpnet.NewNodesOrPanic(5),               // Number of initial validating nodes
+    Subnets: []*tmpnet.Subnet{                      // Subnets to create on the new network once it is running
         {
-            Name: "xsvm-a",                   // User-defined name used to reference subnet in code and on disk
+            Name: "xsvm-a",                         // User-defined name used to reference subnet in code and on disk
             Chains: []*tmpnet.Chain{
                 {
                     VMName: "xsvm",              // Name of the VM the chain will run, will be used to derive the name of the VM binary
@@ -262,12 +270,12 @@ this file (i.e. `source network.env`) in a shell will configure ginkgo
 e2e and the `tmpnetctl` cli to target the network path specified in
 the env var.
 
-Set `TMPNET_ROOT_DIR` to specify the root directory in which to create
-the configuration directory of new networks
-(e.g. `$TMPNET_ROOT_DIR/[network-dir]`). The default root directory is
-`~/.tmpdir/networks`. Configuring the root directory is only relevant
-when creating new networks as the path of existing networks will
-already have been set.
+Set `TMPNET_ROOT_NETWORK_DIR` to specify the root network directory in
+which to create the configuration directory of new networks
+(e.g. `TMPNET_ROOT_NETWORK_DIR/[network-dir]`). The default network
+root directory is `~/.tmpdir/networks`. Configuring the network root
+directory is only relevant when creating new networks as the path of
+existing networks will already have been set.
 
 ### Node configuration
 [Top](#table-of-contents)

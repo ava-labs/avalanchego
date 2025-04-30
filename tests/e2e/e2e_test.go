@@ -34,7 +34,7 @@ func TestE2E(t *testing.T) {
 var flagVars *e2e.FlagVars
 
 func init() {
-	flagVars = e2e.RegisterFlags()
+	flagVars = e2e.RegisterFlagsWithDefaultOwner("avalanchego-e2e")
 }
 
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
@@ -42,7 +42,9 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 
 	tc := e2e.NewEventHandlerTestContext()
 
-	nodes := tmpnet.NewNodesOrPanic(flagVars.NodeCount())
+	nodeCount, err := flagVars.NodeCount()
+	require.NoError(tc, err)
+	nodes := tmpnet.NewNodesOrPanic(nodeCount)
 	subnets := vms.XSVMSubnetsOrPanic(nodes...)
 
 	upgrades := upgrade.Default
@@ -59,23 +61,27 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	require.NoError(tc, err)
 
 	upgradeBase64 := base64.StdEncoding.EncodeToString(upgradeJSON)
+
+	defaultFlags := tmpnet.FlagsMap{
+		config.UpgradeFileContentKey: upgradeBase64,
+		// Ensure a min stake duration compatible with testing staking logic
+		config.MinStakeDurationKey: "1s",
+	}
+	defaultFlags.SetDefaults(tmpnet.DefaultE2EFlags())
+
 	return e2e.NewTestEnvironment(
 		tc,
 		flagVars,
 		&tmpnet.Network{
-			Owner: "avalanchego-e2e",
-			DefaultFlags: tmpnet.FlagsMap{
-				config.UpgradeFileContentKey: upgradeBase64,
-				// Ensure a min stake duration compatible with testing staking logic
-				config.MinStakeDurationKey: tmpnet.DefaultMinStakeDuration,
-			},
-			Nodes:   nodes,
-			Subnets: subnets,
+			Owner:        flagVars.NetworkOwner(),
+			DefaultFlags: defaultFlags,
+			Nodes:        nodes,
+			Subnets:      subnets,
 		},
 	).Marshal()
 }, func(envBytes []byte) {
 	// Run in every ginkgo process
 
 	// Initialize the local test environment from the global state
-	e2e.InitSharedTestEnvironment(ginkgo.GinkgoT(), envBytes)
+	e2e.InitSharedTestEnvironment(e2e.NewTestContext(), envBytes)
 })

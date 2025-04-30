@@ -1,10 +1,1 @@
-#!/usr/bin/env bash
-
-set -euo pipefail
-
-# Ensure the go command is run from the root of the repository
-AVALANCHE_PATH=$(cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
-cd "${AVALANCHE_PATH}"
-
-# Use go run to ensure the correct version is always used
-go run ./tests/fixture/tmpnet/tmpnetctl "${@}"
+../scripts/run_tmpnetctl.sh
