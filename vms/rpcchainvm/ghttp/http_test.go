@@ -98,28 +98,28 @@ func TestHttpResponse(t *testing.T) {
 		{
 			name: "upgrade header specified",
 			request: http.Request{
-				Body: io.NopCloser(strings.NewReader("bar")),
+				Body: io.NopCloser(strings.NewReader("foo")),
 				Header: http.Header{
-					"bar": {"bar"},
+					"foo": {"foo"},
 				},
 				Trailer: http.Header{
-					"bar": {"bar"},
+					"foo": {"foo"},
 				},
-				RemoteAddr: "bar",
+				RemoteAddr: "foo",
 			},
 		},
 		{
 			name: "arbitrary headers",
 			request: http.Request{
-				Body: io.NopCloser(strings.NewReader("bar")),
+				Body: io.NopCloser(strings.NewReader("foo")),
 				Header: http.Header{
 					"Upgrade": {"upgrade"},
-					"bar":     {"bar"},
+					"foo":     {"foo"},
 				},
 				Trailer: http.Header{
-					"bar": {"bar"},
+					"foo": {"foo"},
 				},
-				RemoteAddr: "bar",
+				RemoteAddr: "foo",
 			},
 		},
 	}
@@ -129,7 +129,7 @@ func TestHttpResponse(t *testing.T) {
 			require := require.New(t)
 
 			handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				w.Header()["Foo"] = []string{"bar"}
+				w.Header()["Bar"] = []string{"bar"}
 				_, err := w.Write([]byte{1, 2, 3})
 				require.NoError(err)
 			})
@@ -160,7 +160,7 @@ func TestHttpResponse(t *testing.T) {
 			require.Equal(http.StatusOK, recorder.Code)
 			require.Equal(
 				http.Header{
-					"Foo": []string{"bar"},
+					"Bar": []string{"bar"},
 				},
 				recorder.Header(),
 			)
