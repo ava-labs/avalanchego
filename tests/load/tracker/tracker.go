@@ -18,8 +18,9 @@ type Tracker struct {
 	metrics          *metrics
 
 	stats struct {
-		confirmed uint64
-		failed    uint64
+		confirmed        uint64
+		failed           uint64
+		durationPerBlock []time.Duration
 	}
 	mutex sync.Mutex
 }
@@ -108,8 +109,9 @@ func (t *Tracker) ObserveBlock(number uint64) {
 	// when polling the node periodically instead of using a subscription.
 	numberDiff := number - t.lastBlockNumber
 	timeDiff := now.Sub(t.lastBlockTime)
-	secondsPerBlock := timeDiff.Seconds() / float64(numberDiff)
-	t.metrics.BlockTimes.Observe(secondsPerBlock)
+	durationPerBlock := timeDiff / time.Duration(numberDiff)
+	t.stats.durationPerBlock = append(t.stats.durationPerBlock, durationPerBlock)
+	t.metrics.BlockTimes.Observe(durationPerBlock.Seconds())
 	t.lastBlockTime = now
 	t.lastBlockNumber = number
 }
@@ -128,4 +130,15 @@ func (t *Tracker) GetObservedFailed() uint64 {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 	return t.stats.failed
+}
+
+// GetAverageDurationPerBlock returns the average duration per block.
+func (t *Tracker) GetAverageDurationPerBlock() time.Duration {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+	var average time.Duration
+	for _, durationPerBlock := range t.stats.durationPerBlock {
+		average += durationPerBlock
+	}
+	return average / time.Duration(len(t.stats.durationPerBlock))
 }
