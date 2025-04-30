@@ -6,16 +6,21 @@ package lru
 import (
 	"sync"
 
-	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/utils/linked"
 )
 
-var _ cache.Deduplicator[struct{}, cache.Evictable[struct{}]] = (*Deduplicator[struct{}, cache.Evictable[struct{}]])(nil)
+// Evictable allows the object to be notified when it is evicted
+//
+// Deprecated: Remove this once the vertex state no longer uses it.
+type Evictable[K comparable] interface {
+	Key() K
+	Evict()
+}
 
 // Deduplicator is an LRU cache that notifies the objects when they are evicted.
 //
 // Deprecated: Remove this once the vertex state no longer uses it.
-type Deduplicator[K comparable, V cache.Evictable[K]] struct {
+type Deduplicator[K comparable, V Evictable[K]] struct {
 	lock      sync.Mutex
 	entryMap  map[K]*linked.ListElement[V]
 	entryList *linked.List[V]
@@ -23,7 +28,7 @@ type Deduplicator[K comparable, V cache.Evictable[K]] struct {
 }
 
 // Deprecated: Remove this once the vertex state no longer uses it.
-func NewDeduplicator[K comparable, V cache.Evictable[K]](size int) *Deduplicator[K, V] {
+func NewDeduplicator[K comparable, V Evictable[K]](size int) *Deduplicator[K, V] {
 	return &Deduplicator[K, V]{
 		entryMap:  make(map[K]*linked.ListElement[V]),
 		entryList: linked.NewList[V](),
@@ -31,6 +36,8 @@ func NewDeduplicator[K comparable, V cache.Evictable[K]](size int) *Deduplicator
 	}
 }
 
+// Deduplicate returns either the provided value, or a previously provided value
+// with the same ID that hasn't yet been evicted
 func (d *Deduplicator[_, V]) Deduplicate(value V) V {
 	d.lock.Lock()
 	defer d.lock.Unlock()
@@ -60,6 +67,7 @@ func (d *Deduplicator[_, V]) Deduplicate(value V) V {
 	return value
 }
 
+// Flush removes all entries from the cache
 func (d *Deduplicator[_, _]) Flush() {
 	d.lock.Lock()
 	defer d.lock.Unlock()
