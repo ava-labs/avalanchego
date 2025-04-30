@@ -10,25 +10,25 @@ import (
 )
 
 const (
-	NoOp ExporterType = iota
+	Disabled ExporterType = iota
 	GRPC
 	HTTP
+
+	nullStr = "null"
 )
 
 var (
 	errUnknownExporterType = errors.New("unknown exporter type")
-	errInvalidFormat       = errors.New("invalid format")
+	errMissingQuotes       = errors.New("first and last characters should be quotes")
 )
 
 func ExporterTypeFromString(exporterTypeStr string) (ExporterType, error) {
 	switch strings.ToLower(exporterTypeStr) {
-	case NoOp.String():
-		return 0, nil
-	case "null":
-		return 0, nil
-	case GRPC.String():
+	case "disabled":
+		return Disabled, nil
+	case "grpc":
 		return GRPC, nil
-	case HTTP.String():
+	case "http":
 		return HTTP, nil
 	default:
 		return 0, fmt.Errorf("%w: %q", errUnknownExporterType, exporterTypeStr)
@@ -38,15 +38,28 @@ func ExporterTypeFromString(exporterTypeStr string) (ExporterType, error) {
 type ExporterType byte
 
 func (t ExporterType) MarshalJSON() ([]byte, error) {
-	return []byte(`"` + t.String() + `"`), nil
+	str, ok := t.toString()
+	if !ok {
+		return nil, fmt.Errorf("%w: %d", errUnknownExporterType, t)
+	}
+	return []byte(`"` + str + `"`), nil
 }
 
 func (t *ExporterType) UnmarshalJSON(b []byte) error {
-	exporterTypeStr, err := stripQuotes(string(b))
-	if err != nil {
-		return err
+	str := string(b)
+	if str == nullStr { // If "null", do nothing
+		return nil
 	}
-	exporterType, err := ExporterTypeFromString(exporterTypeStr)
+	if len(str) < 2 {
+		return errMissingQuotes
+	}
+
+	lastIndex := len(str) - 1
+	if str[0] != '"' || str[lastIndex] != '"' {
+		return errMissingQuotes
+	}
+
+	exporterType, err := ExporterTypeFromString(str[1:lastIndex])
 	if err != nil {
 		return err
 	}
@@ -55,21 +68,19 @@ func (t *ExporterType) UnmarshalJSON(b []byte) error {
 }
 
 func (t ExporterType) String() string {
-	switch t {
-	case NoOp:
-		return ""
-	case GRPC:
-		return "grpc"
-	case HTTP:
-		return "http"
-	default:
-		return "unknown"
-	}
+	str, _ := t.toString()
+	return str
 }
 
-func stripQuotes(s string) (string, error) {
-	if len(s) < 2 || s[0] != '"' || s[len(s)-1] != '"' {
-		return "", errInvalidFormat
+func (t ExporterType) toString() (string, bool) {
+	switch t {
+	case Disabled:
+		return "disabled", true
+	case GRPC:
+		return "grpc", true
+	case HTTP:
+		return "http", true
+	default:
+		return "unknown", false
 	}
-	return s[1 : len(s)-1], nil
 }

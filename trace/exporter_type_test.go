@@ -4,93 +4,117 @@
 package trace
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
-func TestMarshalUnmarshal(t *testing.T) {
+func TestMarshal(t *testing.T) {
 	tests := []struct {
-		Name         string
-		ExporterType ExporterType
-		ExpectedErr  error
+		name          string
+		exporter      ExporterType
+		expected      string
+		expectedError error
 	}{
 		{
-			Name:         "GRPC",
-			ExporterType: GRPC,
+			name:          "unknown_type",
+			exporter:      255,
+			expectedError: errUnknownExporterType,
 		},
 		{
-			Name:         "HTTP",
-			ExporterType: HTTP,
+			name:     "disabled",
+			exporter: Disabled,
+			expected: `"disabled"`,
 		},
 		{
-			Name:         "NoOp",
-			ExporterType: NoOp,
+			name:     "grpc",
+			exporter: GRPC,
+			expected: `"grpc"`,
+		},
+		{
+			name:     "http",
+			exporter: HTTP,
+			expected: `"http"`,
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.Name, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			b, err := json.Marshal(tt.ExporterType)
-			require.NoError(err)
-
-			var et ExporterType
-			require.NoError(json.Unmarshal(b, &et))
-
-			require.Equal(tt.ExporterType, et)
+			actual, err := tt.exporter.MarshalJSON()
+			require.ErrorIs(err, tt.expectedError)
+			require.Equal(tt.expected, string(actual))
 		})
 	}
 }
 
 func TestUnmarshal(t *testing.T) {
 	tests := []struct {
-		Name          string
-		Str           string
-		ExpectedError error
+		name          string
+		json          string
+		expected      ExporterType
+		expectedError error
 	}{
 		{
-			Name:          "NoQuotes",
-			Str:           "grpc",
-			ExpectedError: errInvalidFormat,
+			name:          "no_quotes",
+			json:          "grpc",
+			expectedError: errMissingQuotes,
 		},
 		{
-			Name:          "SingleLeftQuote",
-			Str:           "\"grpc",
-			ExpectedError: errInvalidFormat,
+			name:          "single_left_quote",
+			json:          `"grpc`,
+			expectedError: errMissingQuotes,
 		},
 		{
-			Name:          "SingleRightQuote",
-			Str:           "grpc\"",
-			ExpectedError: errInvalidFormat,
+			name:          "single_right_quote",
+			json:          `grpc"`,
+			expectedError: errMissingQuotes,
 		},
 		{
-			Name:          "MultipleQuotes",
-			Str:           "\"\"grpc\"\"\"",
-			ExpectedError: errUnknownExporterType,
+			name:          "only_one_quote",
+			json:          `"`,
+			expectedError: errMissingQuotes,
 		},
 		{
-			Name:          "NullString",
-			Str:           "\"null\"",
-			ExpectedError: nil,
+			name:          "multiple_quotes",
+			json:          `""grpc"""`,
+			expectedError: errUnknownExporterType,
 		},
 		{
-			Name:          "EmptyString",
-			Str:           "\"\"",
-			ExpectedError: nil,
+			name:          "empty_string",
+			json:          `""`,
+			expectedError: errUnknownExporterType,
+		},
+		{
+			name: "null",
+			json: `null`,
+		},
+		{
+			name:     "disabled",
+			json:     `"disabled"`,
+			expected: Disabled,
+		},
+		{
+			name:     "grpc",
+			json:     `"grpc"`,
+			expected: GRPC,
+		},
+		{
+			name:     "http",
+			json:     `"http"`,
+			expected: HTTP,
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.Name, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			var et ExporterType
-
-			err := et.UnmarshalJSON([]byte(tt.Str))
-			require.ErrorIs(err, tt.ExpectedError)
+			var actual ExporterType
+			err := actual.UnmarshalJSON([]byte(tt.json))
+			require.ErrorIs(err, tt.expectedError)
+			require.Equal(tt.expected, actual)
 		})
 	}
 }
