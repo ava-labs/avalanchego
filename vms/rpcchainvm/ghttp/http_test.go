@@ -103,10 +103,6 @@ func TestHttpResponse(t *testing.T) {
 					"Upgrade": {"upgrade"},
 					"foo":     {"foo"},
 				},
-				Trailer: http.Header{
-					"foo": {"foo"},
-				},
-				RemoteAddr: "foo",
 			},
 		},
 		{
@@ -116,10 +112,6 @@ func TestHttpResponse(t *testing.T) {
 				Header: http.Header{
 					"foo": {"foo"},
 				},
-				Trailer: http.Header{
-					"foo": {"foo"},
-				},
-				RemoteAddr: "foo",
 			},
 		},
 	}
