@@ -145,7 +145,7 @@ func (s *Server) Handle(ctx context.Context, req *httppb.HTTPRequest) (*httppb.H
 		return nil, fmt.Errorf("failed to close client conn: %w", err)
 	}
 
-	header := make([]*httppb.Element, len(writerHeaders))
+	header := make([]*httppb.Element, 0, len(writerHeaders))
 	for k, v := range writerHeaders {
 		header = append(header, &httppb.Element{
 			Key:    k,
