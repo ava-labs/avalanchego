@@ -162,12 +162,7 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	header := w.Header()
-	clear(header)
-
-	for _, h := range reply.Header {
-		header[h.Key] = h.Values
-	}
+	grpcutils.SetHeaders(w.Header(), reply.Header)
 }
 
 // serveHTTPSimple converts an http request to a gRPC HTTPRequest and returns the
@@ -213,7 +208,7 @@ func getHTTPSimpleRequest(r *http.Request) (*httppb.HandleSimpleHTTPRequest, err
 
 // convertWriteResponse converts a gRPC HandleSimpleHTTPResponse to an HTTP response.
 func convertWriteResponse(w http.ResponseWriter, resp *httppb.HandleSimpleHTTPResponse) error {
-	grpcutils.MergeHTTPHeader(resp.Headers, w.Header())
+	grpcutils.SetHeaders(w.Header(), resp.Headers)
 	w.WriteHeader(grpcutils.EnsureValidResponseCode(int(resp.Code)))
 	_, err := w.Write(resp.Body)
 	return err

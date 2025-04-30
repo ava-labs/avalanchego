@@ -160,7 +160,7 @@ func (s *Server) HandleSimple(ctx context.Context, r *httppb.HandleSimpleHTTPReq
 		return nil, err
 	}
 
-	grpcutils.MergeHTTPHeader(r.Headers, req.Header)
+	grpcutils.SetHeaders(req.Header, r.Headers)
 
 	req = req.WithContext(ctx)
 	req.RequestURI = r.Url
