@@ -529,7 +529,7 @@ func TestDatabaseNewViewFromBatchOpsTracked(t *testing.T) {
 
 	// The view should be tracked by the parent database.
 	require.Equal(view, db.lastCommittedView)
-	require.Len(db.childViews, 0)
+	require.Empty(db.childViews)
 }
 
 func TestDatabaseCommitChanges(t *testing.T) {
@@ -667,10 +667,6 @@ func TestDatabaseInvalidateChildrenExcept(t *testing.T) {
 	require.Contains(db.childViews, view2)
 	require.Contains(db.childViews, view3)
 	require.Len(db.childViews, 3)
-
-	// Calling with an untracked view doesn't add the untracked view
-	//db.invalidateChildrenExcept(view1)
-	//require.Empty(db.childViews)
 }
 
 func Test_MerkleDB_Random_Insert_Ordering(t *testing.T) {

@@ -682,14 +682,6 @@ func (v *view) isInvalid() bool {
 	return v.invalidated
 }
 
-//// Assumes [v.commitLock] isn't held.
-//func (v *view) isCommitted() bool {
-//	v.commitLock.RLock()
-//	defer v.commitLock.RUnlock()
-//
-//	return v.committed
-//}
-
 // Invalidates this view and all descendants.
 // Assumes [v.validityTrackingLock] isn't held.
 func (v *view) invalidate() {
@@ -1056,24 +1048,6 @@ func (v *view) recordKeyChange(key Key, after *node, hadValue bool, newNode bool
 		after:  after,
 	}
 	return nil
-}
-
-func (v *view) getBeforeValue(key Key) (maybe.Maybe[[]byte], error) {
-	if existing, ok := v.changes.values[key]; ok {
-		return existing.before, nil
-	}
-
-	before, err := v.getParentTrie().getValue(key)
-	if err != nil && !errors.Is(err, database.ErrNotFound) {
-		return maybe.Nothing[[]byte](), err
-	}
-
-	beforeMaybe := maybe.Nothing[[]byte]()
-	if before != nil {
-		beforeMaybe = maybe.Some(before)
-	}
-
-	return beforeMaybe, nil
 }
 
 // Retrieves a node with the given [key].
