@@ -135,7 +135,12 @@ func TestHttpResponse(t *testing.T) {
 	client.ServeHTTP(recorder, request)
 
 	require.Equal(200, recorder.Code)
-	require.Equal([]string{"bar"}, recorder.Header()["Foo"])
+	require.Equal(
+		http.Header{
+			"Foo": []string{"bar"},
+		},
+		recorder.Header(),
+	)
 	require.Equal([]byte{1, 2, 3}, recorder.Body.Bytes())
 }
 
