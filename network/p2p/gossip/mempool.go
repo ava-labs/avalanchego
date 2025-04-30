@@ -8,12 +8,13 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var ErrDuplicateTx = errors.New("duplicate tx")
 
 type Mempool[T Gossipable] struct {
-	Gossipables map[ids.ID]struct{}
+	Gossipables set.Set[ids.ID]
 	metrics     *Metrics
 }
 
@@ -21,7 +22,7 @@ func NewMempool[T Gossipable](
 	metrics *Metrics,
 ) (*Mempool[T], error) {
 	return &Mempool[T]{
-		Gossipables: make(map[ids.ID]struct{}),
+		Gossipables: set.NewSet[ids.ID](0),
 		metrics:     metrics,
 	}, nil
 }
@@ -33,17 +34,16 @@ func (m *Mempool[T]) Add(gossipable T) error {
 		return fmt.Errorf("%w: %s", ErrDuplicateTx, gossipableID)
 	}
 
-	m.Gossipables[gossipableID] = struct{}{}
+	m.Gossipables.Add(gossipableID)
 	return nil
 }
 
-// Remove removes the given gossipableID from the Gossipables map.
+// Remove removes the given gossipableID from the Gossipables set.
 func (m *Mempool[T]) Remove(gossipableID ids.ID) {
-	delete(m.Gossipables, gossipableID)
+	m.Gossipables.Remove(gossipableID)
 }
 
 // Has returns true if the gossipable is in the set.
 func (m *Mempool[T]) Has(gossipID ids.ID) bool {
-	_, ok := m.Gossipables[gossipID]
-	return ok
+	return m.Gossipables.Contains(gossipID)
 }
