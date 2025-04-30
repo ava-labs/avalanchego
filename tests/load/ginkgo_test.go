@@ -53,36 +53,31 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 })
 
 var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
-	var privateNetwork *tmpnet.Network
+	var network *tmpnet.Network
 
 	ginkgo.BeforeAll(func() {
 		tc := e2e.NewTestContext()
 		env := e2e.GetEnv(tc)
-		privateNetwork = tmpnet.NewDefaultNetwork("avalanchego-load-test")
-		privateNetwork.DefaultFlags = tmpnet.FlagsMap{}
-		publicNetwork := env.GetNetwork()
-		privateNetwork.DefaultFlags.SetDefaults(publicNetwork.DefaultFlags)
-		privateNetwork.Nodes = privateNetwork.Nodes[:nodesCount]
-		for _, node := range privateNetwork.Nodes {
+		network = env.GetNetwork()
+		network.Nodes = network.Nodes[:nodesCount]
+		for _, node := range network.Nodes {
 			err := node.EnsureKeys()
 			require.NoError(tc, err, "ensuring keys for node %s", node.NodeID)
 		}
-		env.StartPrivateNetwork(privateNetwork)
 	})
 
 	ginkgo.It("C-Chain", func(ctx context.Context) {
-		nodes := privateNetwork.Nodes
 		const blockchainID = "C"
-		endpoints, err := tmpnet.GetNodeWebsocketURIs(nodes, blockchainID)
+		endpoints, err := tmpnet.GetNodeWebsocketURIs(network.Nodes, blockchainID)
 		require.NoError(ginkgo.GinkgoT(), err, "getting node websocket URIs")
 		config := config{
 			endpoints:   endpoints,
 			maxFeeCap:   50,
 			maxTipCap:   1,
-			agents:      1,
-			txsPerAgent: 100,
+			agents:      10,
+			txsPerAgent: 1000,
 		}
-		err = execute(ctx, privateNetwork.PreFundedKeys, config)
+		err = execute(ctx, network.PreFundedKeys, config)
 		if err != nil {
 			ginkgo.GinkgoT().Error(err)
 		}
