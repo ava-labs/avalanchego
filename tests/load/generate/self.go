@@ -53,7 +53,7 @@ func NewSelf(ctx context.Context, client SelfClient,
 	return &Self{
 		key:       key,
 		address:   address,
-		nonce:     nonce + 1,
+		nonce:     nonce,
 		signer:    types.LatestSignerForChainID(chainID),
 		chainID:   chainID,
 		gasTipCap: gasTipCap,

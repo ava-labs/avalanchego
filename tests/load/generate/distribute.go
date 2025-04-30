@@ -64,7 +64,7 @@ func NewDistributor(ctx context.Context, client DistributorClient, from *ecdsa.P
 	return &Distributor{
 		from:      from,
 		address:   address,
-		nonce:     nonce + 1,
+		nonce:     nonce,
 		to:        to,
 		signer:    types.LatestSignerForChainID(chainID),
 		chainID:   chainID,
