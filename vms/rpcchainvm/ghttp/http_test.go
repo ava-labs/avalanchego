@@ -100,7 +100,8 @@ func TestHttpResponse(t *testing.T) {
 			request: http.Request{
 				Body: io.NopCloser(strings.NewReader("foo")),
 				Header: http.Header{
-					"foo": {"foo"},
+					"Upgrade": {"upgrade"},
+					"foo":     {"foo"},
 				},
 				Trailer: http.Header{
 					"foo": {"foo"},
@@ -113,8 +114,7 @@ func TestHttpResponse(t *testing.T) {
 			request: http.Request{
 				Body: io.NopCloser(strings.NewReader("foo")),
 				Header: http.Header{
-					"Upgrade": {"upgrade"},
-					"foo":     {"foo"},
+					"foo": {"foo"},
 				},
 				Trailer: http.Header{
 					"foo": {"foo"},
