@@ -19,7 +19,12 @@ type batch struct {
 
 // Assumes [b.db.lock] isn't held.
 func (b *batch) Write() error {
-	return b.db.commitBatch(context.TODO(), b.Ops)
+	return b.WriteContext(context.TODO())
+}
+
+// Assumes [b.db.lock] isn't held.
+func (b *batch) WriteContext(ctx context.Context) error {
+	return b.db.commitBatch(ctx, b.Ops)
 }
 
 func (b *batch) Inner() database.Batch {
