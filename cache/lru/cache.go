@@ -23,12 +23,9 @@ type Cache[K comparable, V any] struct {
 }
 
 func NewCache[K comparable, V any](size int) *Cache[K, V] {
-	if size <= 0 {
-		size = 1
-	}
 	return &Cache[K, V]{
 		elements: linked.NewHashmap[K, V](),
-		size:     size,
+		size:     max(size, 1),
 	}
 }
 
