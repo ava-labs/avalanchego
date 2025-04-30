@@ -646,7 +646,7 @@ func verifyProofPath(proof []ProofNode, key Key, tokenSize int) error {
 		// exclusionProof
 
 		if key.HasPrefix(lastNode.Key) {
-			// [lastNode] is the parent of the node
+			// [lastNode] is an ancestor of the node
 			nextIndex := key.Token(lastNode.Key.length, tokenSize)
 
 			if _, ok := lastNode.Children[nextIndex]; ok {
