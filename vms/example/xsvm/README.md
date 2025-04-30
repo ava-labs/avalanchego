@@ -14,7 +14,7 @@ Cross Subnet Asset Transfers README Overview
 
 ## Avalanche Subnets and Custom VMs
 
-Avalanche is a network composed of multiple sub-networks (called [subnets][Subnet]) that each contain any number of blockchains. Each blockchain is an instance of a [Virtual Machine (VM)](https://docs.avax.network/learn/platform-overview#virtual-machines), much like an object in an object-oriented language is an instance of a class. That is, the VM defines the behavior of the blockchain where it is instantiated. For example, [Coreth (EVM)][Coreth] is a VM that is instantiated by the [C-Chain]. Likewise, one could deploy another instance of the EVM as their own blockchain (to take this to its logical conclusion).
+Avalanche is a network composed of multiple sub-networks (called [subnets][Subnet]) that each contain any number of blockchains. Each blockchain is an instance of a [Virtual Machine (VM)](https://build.avax.network/docs/quick-start/virtual-machines), much like an object in an object-oriented language is an instance of a class. That is, the VM defines the behavior of the blockchain where it is instantiated. For example, [Coreth (EVM)][Coreth] is a VM that is instantiated by the [C-Chain]. Likewise, one could deploy another instance of the EVM as their own blockchain (to take this to its logical conclusion).
 
 ## Introduction
 
@@ -66,6 +66,7 @@ Available Commands:
   help        Help about any command
   issue       Issues transactions
   version     Prints out the version
+  versionjson Prints out the version in json format
 
 Flags:
   -h, --help   help for xsvm
@@ -73,7 +74,7 @@ Flags:
 Use "xsvm [command] --help" for more information about a command.
 ```
 
-### [Golang SDK](https://github.com/ava-labs/avalanchego/blob/master/vms/example/xsvm/client/client.go)
+### [Golang SDK](https://github.com/ava-labs/avalanchego/blob/master/vms/example/xsvm/api/client.go)
 
 ```golang
 // Client defines xsvm client operations.
@@ -283,11 +284,10 @@ P-Chain.
 You can do this by following the [subnet tutorial] or by using the [subnet-cli].
 
 [teleporter]: https://github.com/ava-labs/avalanchego/tree/master/vms/platformvm/teleporter
-[subnet tutorial]: https://docs.avax.network/build/tutorials/platform/subnets/create-a-subnet
-[subnet-cli]: https://github.com/ava-labs/subnet-cli
+[subnet tutorial]: https://build.avax.network/docs/tooling/create-avalanche-l1
 [Coreth]: https://github.com/ava-labs/coreth
-[C-Chain]: https://docs.avax.network/learn/platform-overview/#contract-chain-c-chain
-[Subnet]: https://docs.avax.network/learn/platform-overview/#subnets
+[C-Chain]: https://build.avax.network/docs/quick-start/primary-network#c-chain
+[Subnet]: https://build.avax.network/docs/avalanche-l1s
 
 ## Cross Subnet Transaction Example
 

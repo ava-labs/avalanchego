@@ -12,10 +12,15 @@ import (
 
 // SendConfig is used to specify who to send messages to over the p2p network.
 type SendConfig struct {
-	NodeIDs       set.Set[ids.NodeID]
-	Validators    int
+	NodeIDs set.Set[ids.NodeID]
+	// If Validators >= number of connected validators, the message will be sent to all
+	// connected validators.
+	Validators int
+	// If NonValidators >= number of connected non-validators, the message will be sent to
+	// all connected non-validators.
 	NonValidators int
-	Peers         int
+	// If Peers >= number of connected peers, the message will be sent to all connected peers.
+	Peers int
 }
 
 // Sender defines how a consensus engine sends messages and requests to other
@@ -161,11 +166,12 @@ type QuerySender interface {
 		preferredID ids.ID,
 		preferredIDAtHeight ids.ID,
 		acceptedID ids.ID,
+		acceptedHeight uint64,
 	)
 }
 
-// NetworkAppSender sends VM-level messages to nodes in the network.
-type NetworkAppSender interface {
+// AppSender sends VM-level messages to nodes in the network.
+type AppSender interface {
 	// Send an application-level request.
 	//
 	// The VM corresponding to this AppSender may receive either:
@@ -190,38 +196,4 @@ type NetworkAppSender interface {
 		config SendConfig,
 		appGossipBytes []byte,
 	) error
-}
-
-// CrossChainAppSender sends local VM-level messages to another VM.
-type CrossChainAppSender interface {
-	// SendCrossChainAppRequest sends an application-level request to a
-	// specific chain.
-	//
-	// The VM corresponding to this CrossChainAppSender may receive either:
-	// * A CrossChainAppResponse from [chainID] with ID [requestID]
-	// * A CrossChainAppRequestFailed from [chainID] with ID [requestID]
-	//
-	// A nil return value guarantees that the VM corresponding to this
-	// CrossChainAppSender will eventually receive exactly one of the above
-	// messages.
-	//
-	// A non-nil return value guarantees that the VM corresponding to this
-	// CrossChainAppSender will receive at most one of the above messages.
-	SendCrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, appRequestBytes []byte) error
-	// SendCrossChainAppResponse sends an application-level response to a
-	// specific chain
-	//
-	// This response must be in response to a CrossChainAppRequest that the VM
-	// corresponding to this CrossChainAppSender received from [chainID] with ID
-	// [requestID].
-	SendCrossChainAppResponse(ctx context.Context, chainID ids.ID, requestID uint32, appResponseBytes []byte) error
-	// SendCrossChainAppError sends an application-level error to a CrossChainAppRequest
-	SendCrossChainAppError(ctx context.Context, chainID ids.ID, requestID uint32, errorCode int32, errorMessage string) error
-}
-
-// AppSender sends application (VM) level messages.
-// See also common.AppHandler.
-type AppSender interface {
-	NetworkAppSender
-	CrossChainAppSender
 }

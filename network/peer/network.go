@@ -7,6 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/ips"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // Network defines the interface that is used by a peer to help establish a well
@@ -35,6 +36,8 @@ type Network interface {
 	// Peers returns peers that are not known.
 	Peers(
 		peerID ids.NodeID,
+		trackedSubnets set.Set[ids.ID],
+		requestAllPeers bool,
 		knownPeers *bloom.ReadFilter,
 		peerSalt []byte,
 	) []*ips.ClaimedIPPort

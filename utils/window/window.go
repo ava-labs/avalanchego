@@ -33,7 +33,7 @@ type window[T any] struct {
 	minSize int
 
 	// mutex for synchronization
-	lock sync.RWMutex
+	lock sync.Mutex
 	// elements in the window
 	elements buffer.Deque[node[T]]
 }
@@ -77,8 +77,9 @@ func (w *window[T]) Add(value T) {
 
 // Oldest returns the oldest element in the window.
 func (w *window[T]) Oldest() (T, bool) {
-	w.lock.RLock()
-	defer w.lock.RUnlock()
+	w.lock.Lock()
+	defer w.lock.Unlock()
+	w.removeStaleNodes()
 
 	oldest, ok := w.elements.PeekLeft()
 	if !ok {
@@ -89,8 +90,9 @@ func (w *window[T]) Oldest() (T, bool) {
 
 // Length returns the number of elements in the window.
 func (w *window[T]) Length() int {
-	w.lock.RLock()
-	defer w.lock.RUnlock()
+	w.lock.Lock()
+	defer w.lock.Unlock()
+	w.removeStaleNodes()
 
 	return w.elements.Len()
 }
@@ -100,13 +102,9 @@ func (w *window[T]) removeStaleNodes() {
 	// If we're beyond the expiry threshold, removeStaleNodes this node from our
 	// window. Nodes are guaranteed to be strictly increasing in entry time,
 	// so we can break this loop once we find the first non-stale one.
-	newest, ok := w.elements.PeekRight()
-	if !ok {
-		return
-	}
 	for w.elements.Len() > w.minSize {
 		oldest, ok := w.elements.PeekLeft()
-		if !ok || newest.entryTime.Sub(oldest.entryTime) <= w.ttl {
+		if !ok || w.clock.Time().Sub(oldest.entryTime) <= w.ttl {
 			return
 		}
 		_, _ = w.elements.PopLeft()

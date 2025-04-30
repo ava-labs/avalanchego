@@ -13,12 +13,22 @@ import (
 
 var _ cache.Cacher[struct{}, any] = (*SizedCache[struct{}, any])(nil)
 
+// sizedElement is used to store the element with its size, so we don't
+// calculate the size multiple times.
+//
+// This ensures that any inconsistencies returned by the size function can not
+// corrupt the cache.
+type sizedElement[V any] struct {
+	value V
+	size  int
+}
+
 // SizedCache is a key value store with bounded size. If the size is attempted
 // to be exceeded, then elements are removed from the cache until the bound is
 // honored, based on evicting the least recently used value.
 type SizedCache[K comparable, V any] struct {
 	lock        sync.Mutex
-	elements    *linked.Hashmap[K, V]
+	elements    *linked.Hashmap[K, *sizedElement[V]]
 	maxSize     int
 	currentSize int
 	size        func(K, V) int
@@ -26,7 +36,7 @@ type SizedCache[K comparable, V any] struct {
 
 func NewSizedCache[K comparable, V any](maxSize int, size func(K, V) int) *SizedCache[K, V] {
 	return &SizedCache[K, V]{
-		elements: linked.NewHashmap[K, V](),
+		elements: linked.NewHashmap[K, *sizedElement[V]](),
 		maxSize:  maxSize,
 		size:     size,
 	}
@@ -81,35 +91,38 @@ func (c *SizedCache[K, V]) put(key K, value V) {
 		return
 	}
 
-	if oldValue, ok := c.elements.Get(key); ok {
-		c.currentSize -= c.size(key, oldValue)
+	if oldElement, ok := c.elements.Get(key); ok {
+		c.currentSize -= oldElement.size
 	}
 
 	// Remove elements until the size of elements in the cache <= [c.maxSize].
 	for c.currentSize > c.maxSize-newEntrySize {
-		oldestKey, oldestValue, _ := c.elements.Oldest()
+		oldestKey, oldestElement, _ := c.elements.Oldest()
 		c.elements.Delete(oldestKey)
-		c.currentSize -= c.size(oldestKey, oldestValue)
+		c.currentSize -= oldestElement.size
 	}
 
-	c.elements.Put(key, value)
+	c.elements.Put(key, &sizedElement[V]{
+		value: value,
+		size:  newEntrySize,
+	})
 	c.currentSize += newEntrySize
 }
 
 func (c *SizedCache[K, V]) get(key K) (V, bool) {
-	value, ok := c.elements.Get(key)
+	element, ok := c.elements.Get(key)
 	if !ok {
 		return utils.Zero[V](), false
 	}
 
-	c.elements.Put(key, value) // Mark [k] as MRU.
-	return value, true
+	c.elements.Put(key, element) // Mark [k] as MRU.
+	return element.value, true
 }
 
 func (c *SizedCache[K, _]) evict(key K) {
-	if value, ok := c.elements.Get(key); ok {
+	if element, ok := c.elements.Get(key); ok {
 		c.elements.Delete(key)
-		c.currentSize -= c.size(key, value)
+		c.currentSize -= element.size
 	}
 }
 

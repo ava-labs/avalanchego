@@ -4,7 +4,6 @@
 package sampler
 
 import (
-	"fmt"
 	"math"
 	"testing"
 
@@ -13,87 +12,15 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-var (
-	weightedSamplers = []struct {
-		name    string
-		sampler Weighted
-	}{
-		{
-			name:    "inverse uniform cdf",
-			sampler: &weightedArray{},
-		},
-		{
-			name:    "heap division",
-			sampler: &weightedHeap{},
-		},
-		{
-			name:    "linear scan",
-			sampler: &weightedLinear{},
-		},
-		{
-			name: "lookup",
-			sampler: &weightedUniform{
-				maxWeight: 1024,
-			},
-		},
-		{
-			name: "best with k=30",
-			sampler: &weightedBest{
-				samplers: []Weighted{
-					&weightedArray{},
-					&weightedHeap{},
-					&weightedUniform{
-						maxWeight: 1024,
-					},
-				},
-				benchmarkIterations: 30,
-			},
-		},
-	}
-	weightedTests = []struct {
-		name string
-		test func(*testing.T, Weighted)
-	}{
-		{
-			name: "initialize overflow",
-			test: WeightedInitializeOverflowTest,
-		},
-		{
-			name: "out of range",
-			test: WeightedOutOfRangeTest,
-		},
-		{
-			name: "singleton",
-			test: WeightedSingletonTest,
-		},
-		{
-			name: "with zero",
-			test: WeightedWithZeroTest,
-		},
-		{
-			name: "distribution",
-			test: WeightedDistributionTest,
-		},
-	}
-)
-
-func TestAllWeighted(t *testing.T) {
-	for _, s := range weightedSamplers {
-		for _, test := range weightedTests {
-			t.Run(fmt.Sprintf("sampler %s test %s", s.name, test.name), func(t *testing.T) {
-				test.test(t, s.sampler)
-			})
-		}
-	}
-}
-
-func WeightedInitializeOverflowTest(t *testing.T, s Weighted) {
+func TestWeightedInitializeOverflow(t *testing.T) {
+	s := &weightedHeap{}
 	err := s.Initialize([]uint64{1, math.MaxUint64})
 	require.ErrorIs(t, err, safemath.ErrOverflow)
 }
 
-func WeightedOutOfRangeTest(t *testing.T, s Weighted) {
+func TestWeightedOutOfRange(t *testing.T) {
 	require := require.New(t)
+	s := &weightedHeap{}
 
 	require.NoError(s.Initialize([]uint64{1}))
 
@@ -101,8 +28,9 @@ func WeightedOutOfRangeTest(t *testing.T, s Weighted) {
 	require.False(ok)
 }
 
-func WeightedSingletonTest(t *testing.T, s Weighted) {
+func TestWeightedSingleton(t *testing.T) {
 	require := require.New(t)
+	s := &weightedHeap{}
 
 	require.NoError(s.Initialize([]uint64{1}))
 
@@ -111,8 +39,9 @@ func WeightedSingletonTest(t *testing.T, s Weighted) {
 	require.Zero(index)
 }
 
-func WeightedWithZeroTest(t *testing.T, s Weighted) {
+func TestWeightedWithZero(t *testing.T) {
 	require := require.New(t)
+	s := &weightedHeap{}
 
 	require.NoError(s.Initialize([]uint64{0, 1}))
 
@@ -121,8 +50,9 @@ func WeightedWithZeroTest(t *testing.T, s Weighted) {
 	require.Equal(1, index)
 }
 
-func WeightedDistributionTest(t *testing.T, s Weighted) {
+func TestWeightedDistribution(t *testing.T) {
 	require := require.New(t)
+	s := &weightedHeap{}
 
 	require.NoError(s.Initialize([]uint64{1, 1, 2, 3, 4}))
 

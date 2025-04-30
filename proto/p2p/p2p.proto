@@ -64,16 +64,7 @@ message Message {
 message Ping {
   // Uptime percentage on the primary network [0, 100]
   uint32 uptime = 1;
-  // Uptime percentage on subnets
-  repeated SubnetUptime subnet_uptimes = 2;
-}
-
-// SubnetUptime is a descriptor for a peer's perceived uptime on a subnet.
-message SubnetUptime {
-  // Subnet the peer is validating
-  bytes subnet_id = 1;
-  // Uptime percentage on the subnet [0, 100]
-  uint32 uptime = 2;
+  reserved 2; // Until Etna upgrade is activated.
 }
 
 // Pong is sent in response to a Ping.
@@ -112,6 +103,9 @@ message Handshake {
   // Signature of the peer IP port pair at a provided timestamp with the BLS
   // key.
   bytes ip_bls_sig = 13;
+  // To avoid sending IPs that the client isn't interested in tracking, the
+  // server expects the client to confirm that it is tracking all subnets.
+  bool all_subnets = 14;
 }
 
 // Metadata about a peer's P2P client used to determine compatibility
@@ -154,6 +148,7 @@ message ClaimedIpPort {
 // filter.
 message GetPeerList {
   BloomFilter known_peers = 1;
+  bool all_subnets = 2;
 }
 
 // PeerList contains network-level metadata for a set of validators.
@@ -193,7 +188,7 @@ message StateSummaryFrontier {
 // GetAcceptedStateSummary requests a set of state summaries at a set of
 // block heights
 message GetAcceptedStateSummary {
-  // Chain bein requested from
+  // Chain being requested from
   bytes chain_id = 1;
   // Unique identifier for this request
   uint32 request_id = 2;
@@ -368,14 +363,16 @@ message PullQuery {
 message Chits {
   // Chain being responded from
   bytes chain_id = 1;
-  // Request id of the original PushQuery/PullQuery request
+  // Request ID of the original PushQuery/PullQuery request
   uint32 request_id = 2;
-  // Currently preferred block
+  // ID of the currently preferred block
   bytes preferred_id = 3;
-  // Last accepted block
+  // ID of the last accepted block
   bytes accepted_id = 4;
-  // Currently preferred block at the requested height
+  // ID of the currently preferred block at the requested height
   bytes preferred_id_at_height = 5;
+  // Last accepted block's height
+  uint64 accepted_height = 6;
 }
 
 // AppRequest is a VM-defined request.

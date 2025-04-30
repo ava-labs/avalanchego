@@ -10,17 +10,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/upgrade"
 )
 
 type Config struct {
-	// Time at which proposerVM activates its congestion control mechanism
-	ActivationTime time.Time
-
-	// Durango fork activation time
-	DurangoTime time.Time
-
-	// Minimal P-chain height referenced upon block building
-	MinimumPChainHeight uint64
+	Upgrades upgrade.Config
 
 	// Configurable minimal delay among blocks issued consecutively
 	MinBlkDelay time.Duration
@@ -37,8 +31,4 @@ type Config struct {
 
 	// Registerer for prometheus metrics
 	Registerer prometheus.Registerer
-}
-
-func (c *Config) IsDurangoActivated(timestamp time.Time) bool {
-	return !timestamp.Before(c.DurangoTime)
 }

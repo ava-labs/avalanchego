@@ -75,6 +75,7 @@ func (b *BatchOps) Size() int {
 }
 
 func (b *BatchOps) Reset() {
+	clear(b.Ops)
 	b.Ops = b.Ops[:0]
 	b.size = 0
 }

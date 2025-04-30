@@ -90,8 +90,8 @@ type State interface {
 	// pending changes to the base database.
 	CommitBatch() (database.Batch, error)
 
-	// Checksums returns the current TxChecksum and UTXOChecksum.
-	Checksums() (txChecksum ids.ID, utxoChecksum ids.ID)
+	// Checksum returns the current state checksum.
+	Checksum() ids.ID
 
 	Close() error
 }
@@ -135,9 +135,6 @@ type state struct {
 	lastAccepted, persistedLastAccepted ids.ID
 	timestamp, persistedTimestamp       time.Time
 	singletonDB                         database.Database
-
-	trackChecksum bool
-	txChecksum    ids.ID
 }
 
 func New(
@@ -184,7 +181,7 @@ func New(
 		return nil, err
 	}
 
-	s := &state{
+	return &state{
 		parser: parser,
 		db:     db,
 
@@ -205,10 +202,7 @@ func New(
 		blockDB:     blockDB,
 
 		singletonDB: singletonDB,
-
-		trackChecksum: trackChecksums,
-	}
-	return s, s.initTxChecksum()
+	}, nil
 }
 
 func (s *state) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
@@ -265,7 +259,6 @@ func (s *state) GetTx(txID ids.ID) (*txs.Tx, error) {
 
 func (s *state) AddTx(tx *txs.Tx) {
 	txID := tx.ID()
-	s.updateTxChecksum(txID)
 	s.addedTxs[txID] = tx
 }
 
@@ -337,13 +330,20 @@ func (s *state) InitializeChainState(stopVertexID ids.ID, genesisTimestamp time.
 	if err == database.ErrNotFound {
 		return s.initializeChainState(stopVertexID, genesisTimestamp)
 	} else if err != nil {
-		return err
+		return fmt.Errorf("failed to get last accepted block: %w", err)
 	}
 	s.lastAccepted = lastAccepted
 	s.persistedLastAccepted = lastAccepted
-	s.timestamp, err = database.GetTimestamp(s.singletonDB, timestampKey)
-	s.persistedTimestamp = s.timestamp
-	return err
+
+	timestamp, err := database.GetTimestamp(s.singletonDB, timestampKey)
+	if err != nil {
+		return fmt.Errorf("failed to get last accepted timestamp: %w", err)
+	}
+
+	s.timestamp = timestamp
+	s.persistedTimestamp = timestamp
+
+	return nil
 }
 
 func (s *state) initializeChainState(stopVertexID ids.ID, genesisTimestamp time.Time) error {
@@ -355,13 +355,18 @@ func (s *state) initializeChainState(stopVertexID ids.ID, genesisTimestamp time.
 		s.parser.Codec(),
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to initialize genesis block: %w", err)
 	}
 
 	s.SetLastAccepted(genesis.ID())
 	s.SetTimestamp(genesis.Timestamp())
 	s.AddBlock(genesis)
-	return s.Commit()
+
+	if err := s.Commit(); err != nil {
+		return fmt.Errorf("failed to commit genesis block: %w", err)
+	}
+
+	return nil
 }
 
 func (s *state) IsInitialized() (bool, error) {
@@ -448,7 +453,6 @@ func (s *state) writeUTXOs() error {
 
 func (s *state) writeTxs() error {
 	for txID, tx := range s.addedTxs {
-		txID := txID
 		txBytes := tx.Bytes()
 
 		delete(s.addedTxs, txID)
@@ -475,7 +479,6 @@ func (s *state) writeBlockIDs() error {
 
 func (s *state) writeBlocks() error {
 	for blkID, blk := range s.addedBlocks {
-		blkID := blkID
 		blkBytes := blk.Bytes()
 
 		delete(s.addedBlocks, blkID)
@@ -503,36 +506,6 @@ func (s *state) writeMetadata() error {
 	return nil
 }
 
-func (s *state) Checksums() (ids.ID, ids.ID) {
-	return s.txChecksum, s.utxoState.Checksum()
-}
-
-func (s *state) initTxChecksum() error {
-	if !s.trackChecksum {
-		return nil
-	}
-
-	txIt := s.txDB.NewIterator()
-	defer txIt.Release()
-
-	for txIt.Next() {
-		txIDBytes := txIt.Key()
-
-		txID, err := ids.ToID(txIDBytes)
-		if err != nil {
-			return err
-		}
-
-		s.updateTxChecksum(txID)
-	}
-
-	return txIt.Error()
-}
-
-func (s *state) updateTxChecksum(modifiedID ids.ID) {
-	if !s.trackChecksum {
-		return
-	}
-
-	s.txChecksum = s.txChecksum.XOR(modifiedID)
+func (s *state) Checksum() ids.ID {
+	return s.utxoState.Checksum()
 }

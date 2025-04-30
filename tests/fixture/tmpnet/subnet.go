@@ -6,15 +6,18 @@ package tmpnet
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -25,37 +28,26 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-const defaultSubnetDirName = "subnets"
+const (
+	defaultSubnetDirName = "subnets"
+	jsonFileSuffix       = ".json"
+)
 
 type Chain struct {
 	// Set statically
 	VMID    ids.ID
 	Config  string
 	Genesis []byte
+	// VersionArgs are the argument(s) to pass to the VM binary to receive
+	// version details in json format (e.g. `--version-json`). This
+	// supports checking that the rpcchainvm version of the VM binary
+	// matches the version used by the configured avalanchego binary. If
+	// empty, the version check will be skipped.
+	VersionArgs []string
 
 	// Set at runtime
 	ChainID      ids.ID
 	PreFundedKey *secp256k1.PrivateKey
-}
-
-// Write the chain configuration to the specified directory.
-func (c *Chain) WriteConfig(chainDir string) error {
-	// TODO(marun) Ensure removal of an existing file if no configuration should be provided
-	if len(c.Config) == 0 {
-		return nil
-	}
-
-	chainConfigDir := filepath.Join(chainDir, c.ChainID.String())
-	if err := os.MkdirAll(chainConfigDir, perms.ReadWriteExecute); err != nil {
-		return fmt.Errorf("failed to create chain config dir: %w", err)
-	}
-
-	path := filepath.Join(chainConfigDir, defaultConfigFilename)
-	if err := os.WriteFile(path, []byte(c.Config), perms.ReadWrite); err != nil {
-		return fmt.Errorf("failed to write chain config: %w", err)
-	}
-
-	return nil
 }
 
 type Subnet struct {
@@ -63,7 +55,7 @@ type Subnet struct {
 	// networks (since the SubnetID will be different every time the subnet is created)
 	Name string
 
-	Config FlagsMap
+	Config ConfigMap
 
 	// The ID of the transaction that created the subnet
 	SubnetID ids.ID
@@ -78,22 +70,25 @@ type Subnet struct {
 }
 
 // Retrieves a wallet configured for use with the subnet
-func (s *Subnet) GetWallet(ctx context.Context, uri string) (primary.Wallet, error) {
+func (s *Subnet) GetWallet(ctx context.Context, uri string) (*primary.Wallet, error) {
 	keychain := secp256k1fx.NewKeychain(s.OwningKey)
 
 	// Only fetch the subnet transaction if a subnet ID is present. This won't be true when
 	// the wallet is first used to create the subnet.
-	txIDs := set.Set[ids.ID]{}
+	subnetIDs := []ids.ID{}
 	if s.SubnetID != ids.Empty {
-		txIDs.Add(s.SubnetID)
+		subnetIDs = append(subnetIDs, s.SubnetID)
 	}
 
-	return primary.MakeWallet(ctx, &primary.WalletConfig{
-		URI:              uri,
-		AVAXKeychain:     keychain,
-		EthKeychain:      keychain,
-		PChainTxsToFetch: txIDs,
-	})
+	return primary.MakeWallet(
+		ctx,
+		uri,
+		keychain,
+		keychain,
+		primary.WalletConfig{
+			SubnetIDs: subnetIDs,
+		},
+	)
 }
 
 // Issues the subnet creation transaction and retains the result. The URI of a node is
@@ -122,16 +117,16 @@ func (s *Subnet) Create(ctx context.Context, uri string) error {
 	return nil
 }
 
-func (s *Subnet) CreateChains(ctx context.Context, w io.Writer, uri string) error {
+func (s *Subnet) CreateChains(ctx context.Context, log logging.Logger, uri string) error {
 	wallet, err := s.GetWallet(ctx, uri)
 	if err != nil {
 		return err
 	}
 	pWallet := wallet.P()
 
-	if _, err := fmt.Fprintf(w, "Creating chains for subnet %q\n", s.Name); err != nil {
-		return err
-	}
+	log.Info("creating chains for subnet",
+		zap.String("subnet", s.Name),
+	)
 
 	for _, chain := range s.Chains {
 		createChainTx, err := pWallet.IssueCreateChainTx(
@@ -147,15 +142,17 @@ func (s *Subnet) CreateChains(ctx context.Context, w io.Writer, uri string) erro
 		}
 		chain.ChainID = createChainTx.ID()
 
-		if _, err := fmt.Fprintf(w, " created chain %q for VM %q on subnet %q\n", chain.ChainID, chain.VMID, s.Name); err != nil {
-			return err
-		}
+		log.Info("created chain",
+			zap.Stringer("chain", chain.ChainID),
+			zap.String("subnet", s.Name),
+			zap.Stringer("vm", chain.VMID),
+		)
 	}
 	return nil
 }
 
 // Add validators to the subnet
-func (s *Subnet) AddValidators(ctx context.Context, w io.Writer, apiURI string, nodes ...*Node) error {
+func (s *Subnet) AddValidators(ctx context.Context, log logging.Logger, apiURI string, nodes ...*Node) error {
 	wallet, err := s.GetWallet(ctx, apiURI)
 	if err != nil {
 		return err
@@ -196,20 +193,22 @@ func (s *Subnet) AddValidators(ctx context.Context, w io.Writer, apiURI string, 
 			return err
 		}
 
-		if _, err := fmt.Fprintf(w, " added %s as validator for subnet `%s`\n", node.NodeID, s.Name); err != nil {
-			return err
-		}
+		log.Info("added validator to subnet",
+			zap.String("subnet", s.Name),
+			zap.Stringer("nodeID", node.NodeID),
+		)
 	}
 
 	return nil
 }
 
 // Write the subnet configuration to disk
-func (s *Subnet) Write(subnetDir string, chainDir string) error {
+func (s *Subnet) Write(subnetDir string) error {
 	if err := os.MkdirAll(subnetDir, perms.ReadWriteExecute); err != nil {
 		return fmt.Errorf("failed to create subnet dir: %w", err)
 	}
-	tmpnetConfigPath := filepath.Join(subnetDir, s.Name+".json")
+
+	tmpnetConfigPath := filepath.Join(subnetDir, s.Name+jsonFileSuffix)
 
 	// Since subnets are expected to be serialized for the first time
 	// without their chains having been created (i.e. chains will have
@@ -234,38 +233,6 @@ func (s *Subnet) Write(subnetDir string, chainDir string) error {
 		return fmt.Errorf("failed to write tmpnet subnet config %s: %w", s.Name, err)
 	}
 
-	// The subnet and chain configurations for avalanchego can only be written once
-	// they have been created since the id of the creating transaction must be
-	// included in the path.
-	if s.SubnetID == ids.Empty {
-		return nil
-	}
-
-	// TODO(marun) Ensure removal of an existing file if no configuration should be provided
-	if len(s.Config) > 0 {
-		// Write subnet configuration for avalanchego
-		bytes, err = DefaultJSONMarshal(s.Config)
-		if err != nil {
-			return fmt.Errorf("failed to marshal avalanchego subnet config %s: %w", s.Name, err)
-		}
-
-		avgoConfigDir := filepath.Join(subnetDir, s.SubnetID.String())
-		if err := os.MkdirAll(avgoConfigDir, perms.ReadWriteExecute); err != nil {
-			return fmt.Errorf("failed to create avalanchego subnet config dir: %w", err)
-		}
-
-		avgoConfigPath := filepath.Join(avgoConfigDir, defaultConfigFilename)
-		if err := os.WriteFile(avgoConfigPath, bytes, perms.ReadWrite); err != nil {
-			return fmt.Errorf("failed to write avalanchego subnet config %s: %w", s.Name, err)
-		}
-	}
-
-	for _, chain := range s.Chains {
-		if err := chain.WriteConfig(chainDir); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
@@ -284,25 +251,18 @@ func (s *Subnet) HasChainConfig() bool {
 
 func WaitForActiveValidators(
 	ctx context.Context,
-	w io.Writer,
+	log logging.Logger,
 	pChainClient platformvm.Client,
 	subnet *Subnet,
 ) error {
 	ticker := time.NewTicker(DefaultPollingInterval)
 	defer ticker.Stop()
 
-	if _, err := fmt.Fprintf(w, "Waiting for validators of subnet %q to become active\n", subnet.Name); err != nil {
-		return err
-	}
-
-	if _, err := fmt.Fprint(w, " "); err != nil {
-		return err
-	}
+	log.Info("waiting for subnet validators to become active",
+		zap.String("subnet", subnet.Name),
+	)
 
 	for {
-		if _, err := fmt.Fprint(w, "."); err != nil {
-			return err
-		}
 		validators, err := pChainClient.GetCurrentValidators(ctx, subnet.SubnetID, nil)
 		if err != nil {
 			return err
@@ -318,15 +278,15 @@ func WaitForActiveValidators(
 			}
 		}
 		if allActive {
-			if _, err := fmt.Fprintf(w, "\n saw the expected active validators of subnet %q\n", subnet.Name); err != nil {
-				return err
-			}
+			log.Info("saw the expected active validators of the subnet",
+				zap.String("subnet", subnet.Name),
+			)
 			return nil
 		}
 
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("failed to see the expected active validators of subnet %q before timeout", subnet.Name)
+			return fmt.Errorf("failed to see the expected active validators of subnet %q before timeout: %w", subnet.Name, ctx.Err())
 		case <-ticker.C:
 		}
 	}
@@ -334,14 +294,10 @@ func WaitForActiveValidators(
 
 // Reads subnets from [network dir]/subnets/[subnet name].json
 func readSubnets(subnetDir string) ([]*Subnet, error) {
-	if _, err := os.Stat(subnetDir); os.IsNotExist(err) {
+	entries, err := os.ReadDir(subnetDir)
+	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	} else if err != nil {
-		return nil, err
-	}
-
-	entries, err := os.ReadDir(subnetDir)
-	if err != nil {
 		return nil, fmt.Errorf("failed to read subnet dir: %w", err)
 	}
 
@@ -351,12 +307,13 @@ func readSubnets(subnetDir string) ([]*Subnet, error) {
 			// Looking only for files
 			continue
 		}
-		if filepath.Ext(entry.Name()) != ".json" {
+		fileName := entry.Name()
+		if filepath.Ext(fileName) != jsonFileSuffix {
 			// Subnet files should have a .json extension
 			continue
 		}
 
-		subnetPath := filepath.Join(subnetDir, entry.Name())
+		subnetPath := filepath.Join(subnetDir, fileName)
 		bytes, err := os.ReadFile(subnetPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read subnet file %s: %w", subnetPath, err)

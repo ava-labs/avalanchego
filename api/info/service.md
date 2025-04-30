@@ -1,22 +1,12 @@
----
-tags: [AvalancheGo APIs]
-description: This page is an overview of the Info API associated with AvalancheGo.
-sidebar_label: Info API
-pagination_label: Info API
----
-
-# Info API
-
-This API can be used to access basic information about the node.
+The Info API can be used to access basic information about an Avalanche node.
 
 ## Format
 
-This API uses the `json 2.0` RPC format. For more information on making JSON RPC calls, see
-[here](/reference/standards/guides/issuing-api-calls.md).
+This API uses the `json 2.0` RPC format. For more information on making JSON RPC calls, see [here](https://build.avax.network/docs/api-reference/guides/issuing-api-calls).
 
 ## Endpoint
 
-```text
+```
 /ext/info
 ```
 
@@ -26,21 +16,21 @@ This API uses the `json 2.0` RPC format. For more information on making JSON RPC
 
 Returns peer preferences for Avalanche Community Proposals (ACPs)
 
-**Signature:**
+**Signature**:
 
-```go
+```
 info.acps() -> {
-    acps: map[uint32]{
-        supportWeight: uint64
-        supporters:    set[string]
-        objectWeight:  uint64
-        objectors:     set[string]
-        abstainWeight: uint64
-    }
+  acps: map[uint32]{
+    supportWeight: uint64
+    supporters:    set[string]
+    objectWeight:  uint64
+    objectors:     set[string]
+    abstainWeight: uint64
+  }
 }
 ```
 
-**Example Call:**
+**Example Call**:
 
 ```sh
 curl -sX POST --data '{
@@ -51,7 +41,7 @@ curl -sX POST --data '{
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/info
 ```
 
-**Example Response:**
+**Example Response**:
 
 ```json
 {
@@ -117,15 +107,15 @@ curl -sX POST --data '{
 
 Check whether a given chain is done bootstrapping
 
-**Signature:**
+**Signature**:
 
-```sh
+```
 info.isBootstrapped({chain: string}) -> {isBootstrapped: bool}
 ```
 
 `chain` is the ID or alias of a chain.
 
-**Example Call:**
+**Example Call**:
 
 ```sh
 curl -X POST --data '{
@@ -138,7 +128,7 @@ curl -X POST --data '{
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/info
 ```
 
-**Example Response:**
+**Example Response**:
 
 ```json
 {
@@ -152,15 +142,15 @@ curl -X POST --data '{
 
 ### `info.getBlockchainID`
 
-Given a blockchain’s alias, get its ID. (See [`admin.aliasChain`](/reference/avalanchego/admin-api.md#adminaliaschain).)
+Given a blockchain's alias, get its ID. (See [`admin.aliasChain`](https://build.avax.network/docs/api-reference/admin-api#adminaliaschain).)
 
-**Signature:**
+**Signature**:
 
-```sh
+```
 info.getBlockchainID({alias:string}) -> {blockchainID:string}
 ```
 
-**Example Call:**
+**Example Call**:
 
 ```sh
 curl -X POST --data '{
@@ -173,7 +163,7 @@ curl -X POST --data '{
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/info
 ```
 
-**Example Response:**
+**Example Response**:
 
 ```json
 {
@@ -189,13 +179,13 @@ curl -X POST --data '{
 
 Get the ID of the network this node is participating in.
 
-**Signature:**
+**Signature**:
 
-```sh
-info.getNetworkID() -> {networkID:int}
+```
+info.getNetworkID() -> { networkID: int }
 ```
 
-**Example Call:**
+**Example Call**:
 
 ```sh
 curl -X POST --data '{
@@ -205,7 +195,7 @@ curl -X POST --data '{
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/info
 ```
 
-**Example Response:**
+**Example Response**:
 
 ```json
 {
@@ -217,20 +207,19 @@ curl -X POST --data '{
 }
 ```
 
-Network ID of 1 = Mainnet
-Network ID of 5 = Fuji (testnet)
+Network ID of 1 = Mainnet Network ID of 5 = Fuji (testnet)
 
 ### `info.getNetworkName`
 
 Get the name of the network this node is participating in.
 
-**Signature:**
+**Signature**:
 
-```sh
-info.getNetworkName() -> {networkName:string}
+```
+info.getNetworkName() -> { networkName:string }
 ```
 
-**Example Call:**
+**Example Call**:
 
 ```sh
 curl -X POST --data '{
@@ -240,7 +229,7 @@ curl -X POST --data '{
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/info
 ```
 
-**Example Response:**
+**Example Response**:
 
 ```json
 {
@@ -256,13 +245,13 @@ curl -X POST --data '{
 
 Get the ID, the BLS key, and the proof of possession(BLS signature) of this node.
 
-:::info
-This endpoint set is for a specific node, it is unavailable on the [public server](/tooling/rpc-providers.md).
-:::
+<Callout title="Note">
+This endpoint set is for a specific node, it is unavailable on the [public server](https://build.avax.network/docs/tooling/rpc-providers).
+</Callout>
 
-**Signature:**
+**Signature**:
 
-```sh
+```
 info.getNodeID() -> {
     nodeID: string,
     nodePOP: {
@@ -272,14 +261,12 @@ info.getNodeID() -> {
 }
 ```
 
-- `nodeID` Node ID is the unique identifier of the node that you set to act as a validator on the
-  Primary Network.
-- `nodePOP` is this node's BLS key and proof of possession. Nodes must register a BLS key to act as
-  a validator on the Primary Network. Your node's POP is logged on startup and is accessible over this endpoint.
+- `nodeID` Node ID is the unique identifier of the node that you set to act as a validator on the Primary Network.
+- `nodePOP` is this node's BLS key and proof of possession. Nodes must register a BLS key to act as a validator on the Primary Network. Your node's POP is logged on startup and is accessible over this endpoint.
   - `publicKey` is the 48 byte hex representation of the BLS key.
   - `proofOfPossession` is the 96 byte hex representation of the BLS signature.
 
-**Example Call:**
+**Example Call**:
 
 ```sh
 curl -X POST --data '{
@@ -289,7 +276,7 @@ curl -X POST --data '{
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/info
 ```
 
-**Example Response:**
+**Example Response**:
 
 ```json
 {
@@ -309,17 +296,17 @@ curl -X POST --data '{
 
 Get the IP of this node.
 
-:::info
-This endpoint set is for a specific node, it is unavailable on the [public server](/tooling/rpc-providers.md).
-:::
+<Callout title="Note">
+This endpoint set is for a specific node, it is unavailable on the [public server](https://build.avax.network/docs/tooling/rpc-providers).
+</Callout>
 
-**Signature:**
+**Signature**:
 
-```text
+```
 info.getNodeIP() -> {ip: string}
 ```
 
-**Example Call:**
+**Example Call**:
 
 ```sh
 curl -X POST --data '{
@@ -329,7 +316,7 @@ curl -X POST --data '{
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/info
 ```
 
-**Example Response:**
+**Example Response**:
 
 ```json
 {
@@ -345,15 +332,15 @@ curl -X POST --data '{
 
 Get the version of this node.
 
-**Signature:**
+**Signature**:
 
-```sh
+```
 info.getNodeVersion() -> {
-    version: string,
-    databaseVersion: string,
-    gitCommit: string,
-    vmVersions: map[string]string,
-    rpcProtocolVersion: string,
+  version: string,
+  databaseVersion: string,
+  gitCommit: string,
+  vmVersions: map[string]string,
+  rpcProtocolVersion: string,
 }
 ```
 
@@ -362,11 +349,10 @@ where:
 - `version` is this node's version
 - `databaseVersion` is the version of the database this node is using
 - `gitCommit` is the Git commit that this node was built from
-- `vmVersions` is map where each key/value pair is the name of a VM, and the version of that VM this
-  node runs
+- `vmVersions` is map where each key/value pair is the name of a VM, and the version of that VM this node runs
 - `rpcProtocolVersion` is the RPCChainVM protocol version
 
-**Example Call:**
+**Example Call**:
 
 ```sh
 curl -X POST --data '{
@@ -376,7 +362,7 @@ curl -X POST --data '{
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/info
 ```
 
-**Example Response:**
+**Example Response**:
 
 ```json
 {
@@ -398,38 +384,42 @@ curl -X POST --data '{
 
 ### `info.getTxFee`
 
+<Callout type="warn">
+Deprecated as of [v1.12.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.2).
+</Callout>
+
 Get the fees of the network.
 
-**Signature:**
+**Signature**:
 
-```sh
+```
 info.getTxFee() ->
 {
-    txFee: uint64,
-    createAssetTxFee: uint64,
-    createSubnetTxFee: uint64,
-    transformSubnetTxFee: uint64,
-    createBlockchainTxFee: uint64,
-    addPrimaryNetworkValidatorFee: uint64,
-    addPrimaryNetworkDelegatorFee: uint64,
-    addSubnetValidatorFee: uint64,
-    addSubnetDelegatorFee: uint64
+  txFee: uint64,
+  createAssetTxFee: uint64,
+  createSubnetTxFee: uint64,
+  transformSubnetTxFee: uint64,
+  createBlockchainTxFee: uint64,
+  addPrimaryNetworkValidatorFee: uint64,
+  addPrimaryNetworkDelegatorFee: uint64,
+  addSubnetValidatorFee: uint64,
+  addSubnetDelegatorFee: uint64
 }
 ```
 
-- `txFee` is the default fee for making transactions.
-- `createAssetTxFee` is the fee for creating a new asset.
-- `createSubnetTxFee` is the fee for creating a new Subnet.
-- `transformSubnetTxFee` is the fee for converting a PoA Subnet into a PoS Subnet.
-- `createBlockchainTxFee` is the fee for creating a new blockchain.
-- `addPrimaryNetworkValidatorFee` is the fee for adding a new primary network validator.
-- `addPrimaryNetworkDelegatorFee` is the fee for adding a new primary network delegator.
-- `addSubnetValidatorFee` is the fee for adding a new Subnet validator.
-- `addSubnetDelegatorFee` is the fee for adding a new Subnet delegator.
+- `txFee` is the default fee for issuing X-Chain transactions.
+- `createAssetTxFee` is the fee for issuing a `CreateAssetTx` on the X-Chain.
+- `createSubnetTxFee` is no longer used.
+- `transformSubnetTxFee` is no longer used.
+- `createBlockchainTxFee` is no longer used.
+- `addPrimaryNetworkValidatorFee` is no longer used.
+- `addPrimaryNetworkDelegatorFee` is no longer used.
+- `addSubnetValidatorFee` is no longer used.
+- `addSubnetDelegatorFee` is no longer used.
 
 All fees are denominated in nAVAX.
 
-**Example Call:**
+**Example Call**:
 
 ```sh
 curl -X POST --data '{
@@ -439,7 +429,7 @@ curl -X POST --data '{
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/info
 ```
 
-**Example Response:**
+**Example Response**:
 
 ```json
 {
@@ -463,21 +453,21 @@ curl -X POST --data '{
 
 Get the virtual machines installed on this node.
 
-:::info
-This endpoint set is for a specific node, it is unavailable on the [public server](/tooling/rpc-providers.md).
-:::
+<Callout title="Note">
+This endpoint set is for a specific node, it is unavailable on the [public server](https://build.avax.network/docs/tooling/rpc-providers).
+</Callout>
 
-**Signature:**
+**Signature**:
 
-```sh
+```
 info.getVMs() -> {
-    vms: map[string][]string
+  vms: map[string][]string
 }
 ```
 
-**Example Call:**
+**Example Call**:
 
-```bash
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -486,7 +476,7 @@ curl -X POST --data '{
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/info
 ```
 
-**Example Response:**
+**Example Response**:
 
 ```json
 {
@@ -509,42 +499,38 @@ curl -X POST --data '{
 
 Get a description of peer connections.
 
-**Signature:**
+**Signature**:
 
-```sh
+```
 info.peers({
-    nodeIDs: string[] // optional
+  nodeIDs: string[] // optional
 }) ->
 {
-    numPeers: int,
-    peers:[]{
-        ip: string,
-        publicIP: string,
-        nodeID: string,
-        version: string,
-        lastSent: string,
-        lastReceived: string,
-        benched: string[],
-        observedUptime: int,
-        observedSubnetUptime: map[string]int,
-    }
+  numPeers: int,
+  peers:[]{
+    ip: string,
+    publicIP: string,
+    nodeID: string,
+    version: string,
+    lastSent: string,
+    lastReceived: string,
+    benched: string[],
+    observedUptime: int,
+  }
 }
 ```
 
-- `nodeIDs` is an optional parameter to specify what NodeID's descriptions should be returned. If
-  this parameter is left empty, descriptions for all active connections will be returned. If the
-  node is not connected to a specified NodeID, it will be omitted from the response.
+- `nodeIDs` is an optional parameter to specify what NodeID's descriptions should be returned. If this parameter is left empty, descriptions for all active connections will be returned. If the node is not connected to a specified NodeID, it will be omitted from the response.
 - `ip` is the remote IP of the peer.
 - `publicIP` is the public IP of the peer.
 - `nodeID` is the prefixed Node ID of the peer.
 - `version` shows which version the peer runs on.
 - `lastSent` is the timestamp of last message sent to the peer.
 - `lastReceived` is the timestamp of last message received from the peer.
-- `benched` shows chain IDs that the peer is being benched.
+- `benched` shows chain IDs that the peer is currently benched on.
 - `observedUptime` is this node's primary network uptime, observed by the peer.
-- `observedSubnetUptime` is a map of Subnet IDs to this node's Subnet uptimes, observed by the peer.
 
-**Example Call:**
+**Example Call**:
 
 ```sh
 curl -X POST --data '{
@@ -557,7 +543,7 @@ curl -X POST --data '{
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/info
 ```
 
-**Example Response:**
+**Example Response**:
 
 ```json
 {
@@ -575,7 +561,6 @@ curl -X POST --data '{
         "lastReceived": "2020-06-01T15:22:57Z",
         "benched": [],
         "observedUptime": "99",
-        "observedSubnetUptimes": {},
         "trackedSubnets": [],
         "benched": []
       },
@@ -588,9 +573,6 @@ curl -X POST --data '{
         "lastReceived": "2020-06-01T15:22:34Z",
         "benched": [],
         "observedUptime": "75",
-        "observedSubnetUptimes": {
-          "29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL": "100"
-        },
         "trackedSubnets": [
           "29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL"
         ],
@@ -605,7 +587,6 @@ curl -X POST --data '{
         "lastReceived": "2020-06-01T15:22:55Z",
         "benched": [],
         "observedUptime": "95",
-        "observedSubnetUptimes": {},
         "trackedSubnets": [],
         "benched": []
       }
@@ -616,30 +597,22 @@ curl -X POST --data '{
 
 ### `info.uptime`
 
-Returns the network's observed uptime of this node.
-This is the only reliable source of data for your node's uptime.
-Other sources may be using data gathered with incomplete (limited) information.
+Returns the network's observed uptime of this node. This is the only reliable source of data for your node's uptime. Other sources may be using data gathered with incomplete (limited) information.
 
-**Signature:**
+**Signature**:
 
-```sh
-info.uptime({
-    subnetID: string // optional
-}) ->
+```
+info.uptime() ->
 {
-    rewardingStakePercentage: float64,
-    weightedAveragePercentage: float64
+  rewardingStakePercentage: float64,
+  weightedAveragePercentage: float64
 }
 ```
 
-- `subnetID` is the Subnet to get the uptime of. If not provided, returns the uptime of the node on
-  the primary network.
-
-- `rewardingStakePercentage` is the percent of stake which thinks this node is above the uptime
-  requirement.
+- `rewardingStakePercentage` is the percent of stake which thinks this node is above the uptime requirement.
 - `weightedAveragePercentage` is the stake-weighted average of all observed uptimes for this node.
 
-**Example Call:**
+**Example Call**:
 
 ```sh
 curl -X POST --data '{
@@ -649,7 +622,7 @@ curl -X POST --data '{
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/info
 ```
 
-**Example Response:**
+**Example Response**:
 
 ```json
 {
@@ -662,7 +635,7 @@ curl -X POST --data '{
 }
 ```
 
-#### **Example Subnet Call**
+#### Example Avalanche L1 Call
 
 ```sh
 curl -X POST --data '{
@@ -675,7 +648,7 @@ curl -X POST --data '{
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/info
 ```
 
-#### **Example Subnet Response**
+#### Example Avalanche L1 Response
 
 ```json
 {
@@ -685,5 +658,45 @@ curl -X POST --data '{
     "rewardingStakePercentage": "74.0741",
     "weightedAveragePercentage": "72.4074"
   }
+}
+```
+
+### `info.upgrades`
+
+Returns the upgrade history and configuration of the network.
+
+**Example Call**:
+
+```sh
+curl -X POST --data '{
+    "jsonrpc":"2.0",
+    "id"     :1,
+    "method" :"info.upgrades"
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/info
+```
+
+**Example Response**:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "apricotPhase1Time": "2020-12-05T05:00:00Z",
+    "apricotPhase2Time": "2020-12-05T05:00:00Z",
+    "apricotPhase3Time": "2020-12-05T05:00:00Z",
+    "apricotPhase4Time": "2020-12-05T05:00:00Z",
+    "apricotPhase4MinPChainHeight": 0,
+    "apricotPhase5Time": "2020-12-05T05:00:00Z",
+    "apricotPhasePre6Time": "2020-12-05T05:00:00Z",
+    "apricotPhase6Time": "2020-12-05T05:00:00Z",
+    "apricotPhasePost6Time": "2020-12-05T05:00:00Z",
+    "banffTime": "2020-12-05T05:00:00Z",
+    "cortinaTime": "2020-12-05T05:00:00Z",
+    "cortinaXChainStopVertexID": "11111111111111111111111111111111LpoYY",
+    "durangoTime": "2020-12-05T05:00:00Z",
+    "etnaTime": "2024-10-09T20:00:00Z",
+    "fortunaTime": "9999-12-01T05:00:00Z"
+  },
+  "id": 1
 }
 ```

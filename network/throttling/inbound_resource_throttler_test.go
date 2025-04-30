@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
+	"github.com/ava-labs/avalanchego/snow/networking/tracker/trackermock"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -33,7 +34,7 @@ func TestNewSystemThrottler(t *testing.T) {
 		Clock:           clock,
 		MaxRecheckDelay: time.Second,
 	}
-	targeter := tracker.NewMockTargeter(ctrl)
+	targeter := trackermock.NewTargeter(ctrl)
 	throttlerIntf, err := NewSystemThrottler("", reg, config, cpuTracker, targeter)
 	require.NoError(err)
 	require.IsType(&systemThrottler{}, throttlerIntf)
@@ -49,13 +50,13 @@ func TestSystemThrottler(t *testing.T) {
 	require := require.New(t)
 
 	// Setup
-	mockTracker := tracker.NewMockTracker(ctrl)
+	mockTracker := trackermock.NewTracker(ctrl)
 	maxRecheckDelay := 100 * time.Millisecond
 	config := SystemThrottlerConfig{
 		MaxRecheckDelay: maxRecheckDelay,
 	}
 	vdrID, nonVdrID := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
-	targeter := tracker.NewMockTargeter(ctrl)
+	targeter := trackermock.NewTargeter(ctrl)
 	throttler, err := NewSystemThrottler("", prometheus.NewRegistry(), config, mockTracker, targeter)
 	require.NoError(err)
 
@@ -131,13 +132,13 @@ func TestSystemThrottlerContextCancel(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	// Setup
-	mockTracker := tracker.NewMockTracker(ctrl)
+	mockTracker := trackermock.NewTracker(ctrl)
 	maxRecheckDelay := 10 * time.Second
 	config := SystemThrottlerConfig{
 		MaxRecheckDelay: maxRecheckDelay,
 	}
 	vdrID := ids.GenerateTestNodeID()
-	targeter := tracker.NewMockTargeter(ctrl)
+	targeter := trackermock.NewTargeter(ctrl)
 	throttler, err := NewSystemThrottler("", prometheus.NewRegistry(), config, mockTracker, targeter)
 	require.NoError(err)
 

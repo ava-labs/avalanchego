@@ -4,6 +4,7 @@
 package peer
 
 import (
+	"sync/atomic"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -33,6 +34,7 @@ type Config struct {
 	Network              Network
 	Router               router.InboundHandler
 	VersionCompatibility version.Compatibility
+	MyNodeID             ids.NodeID
 	// MySubnets does not include the primary network ID
 	MySubnets          set.Set[ids.ID]
 	Beacons            validators.Manager
@@ -57,4 +59,7 @@ type Config struct {
 
 	// Signs my IP so I can send my signed IP address in the Handshake message
 	IPSigner *IPSigner
+
+	// IngressConnectionCount counts the ingress (to us) connections.
+	IngressConnectionCount atomic.Int64
 }

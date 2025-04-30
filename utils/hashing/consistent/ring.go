@@ -213,8 +213,8 @@ func (h *hashRing) get(key Hashable) (Hashable, error) {
 	// If found nothing ascending the tree, we need to wrap around the ring to
 	// the left-most (min) node.
 	if result == nil {
-		min, _ := h.ring.Min()
-		result = min.value
+		minNode, _ := h.ring.Min()
+		result = minNode.value
 	}
 	return result, nil
 }

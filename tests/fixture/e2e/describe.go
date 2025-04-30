@@ -3,9 +3,7 @@
 
 package e2e
 
-import (
-	ginkgo "github.com/onsi/ginkgo/v2"
-)
+import "github.com/onsi/ginkgo/v2"
 
 const (
 	// For label usage in ginkgo invocation, see: https://onsi.github.io/ginkgo/#spec-labels

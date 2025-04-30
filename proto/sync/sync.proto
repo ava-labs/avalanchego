@@ -6,14 +6,6 @@ import "google/protobuf/empty.proto";
 
 option go_package = "github.com/ava-labs/avalanchego/proto/pb/sync";
 
-// Request represents a request for information during syncing.
-message Request {
-  oneof message {
-    SyncGetRangeProofRequest range_proof_request = 1;
-    SyncGetChangeProofRequest change_proof_request = 2;
-  }
-}
-
 // The interface required by an x/sync/SyncManager for syncing.
 // Note this service definition only exists for use in tests.
 // A database shouldn't expose this over the internet, as it

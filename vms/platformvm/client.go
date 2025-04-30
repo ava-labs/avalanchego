@@ -11,12 +11,18 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
 var _ Client = (*client)(nil)
@@ -25,18 +31,12 @@ var _ Client = (*client)(nil)
 type Client interface {
 	// GetHeight returns the current block height of the P Chain
 	GetHeight(ctx context.Context, options ...rpc.Option) (uint64, error)
-	// ExportKey returns the private key corresponding to [address] from [user]'s account
-	//
-	// Deprecated: Keys should no longer be stored on the node.
-	ExportKey(ctx context.Context, user api.UserPass, address ids.ShortID, options ...rpc.Option) (*secp256k1.PrivateKey, error)
+	// GetProposedHeight returns the current height of this node's proposer VM.
+	GetProposedHeight(ctx context.Context, options ...rpc.Option) (uint64, error)
 	// GetBalance returns the balance of [addrs] on the P Chain
 	//
 	// Deprecated: GetUTXOs should be used instead.
 	GetBalance(ctx context.Context, addrs []ids.ShortID, options ...rpc.Option) (*GetBalanceResponse, error)
-	// ListAddresses returns an array of platform addresses controlled by [user]
-	//
-	// Deprecated: Keys should no longer be stored on the node.
-	ListAddresses(ctx context.Context, user api.UserPass, options ...rpc.Option) ([]ids.ShortID, error)
 	// GetUTXOs returns the byte representation of the UTXOs controlled by [addrs]
 	GetUTXOs(
 		ctx context.Context,
@@ -68,6 +68,9 @@ type Client interface {
 	GetStakingAssetID(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (ids.ID, error)
 	// GetCurrentValidators returns the list of current validators for subnet with ID [subnetID]
 	GetCurrentValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.NodeID, options ...rpc.Option) ([]ClientPermissionlessValidator, error)
+	// GetL1Validator returns the requested L1 validator with [validationID] and
+	// the height at which it was calculated.
+	GetL1Validator(ctx context.Context, validationID ids.ID, options ...rpc.Option) (L1Validator, uint64, error)
 	// GetCurrentSupply returns an upper bound on the supply of AVAX in the system along with the P-chain height
 	GetCurrentSupply(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (uint64, uint64, error)
 	// SampleValidators returns the nodeIDs of a sample of [sampleSize] validators from the current validator set for subnet with ID [subnetID]
@@ -110,17 +113,37 @@ type Client interface {
 	// GetTimestamp returns the current chain timestamp
 	GetTimestamp(ctx context.Context, options ...rpc.Option) (time.Time, error)
 	// GetValidatorsAt returns the weights of the validator set of a provided
-	// subnet at the specified height.
+	// subnet at the specified height or at proposerVM height if set to
+	// [platformapi.ProposedHeight]
 	GetValidatorsAt(
 		ctx context.Context,
 		subnetID ids.ID,
-		height uint64,
+		height platformapi.Height,
 		options ...rpc.Option,
 	) (map[ids.NodeID]*validators.GetValidatorOutput, error)
 	// GetBlock returns the block with the given id.
 	GetBlock(ctx context.Context, blockID ids.ID, options ...rpc.Option) ([]byte, error)
 	// GetBlockByHeight returns the block at the given [height].
 	GetBlockByHeight(ctx context.Context, height uint64, options ...rpc.Option) ([]byte, error)
+	// GetFeeConfig returns the dynamic fee config of the chain.
+	GetFeeConfig(ctx context.Context, options ...rpc.Option) (*gas.Config, error)
+	// GetFeeState returns the current fee state of the chain.
+	GetFeeState(ctx context.Context, options ...rpc.Option) (
+		gas.State,
+		gas.Price,
+		time.Time,
+		error,
+	)
+	// GetValidatorFeeConfig returns the validator fee config of the chain.
+	GetValidatorFeeConfig(ctx context.Context, options ...rpc.Option) (*fee.Config, error)
+	// GetValidatorFeeState returns the current validator fee state of the
+	// chain.
+	GetValidatorFeeState(ctx context.Context, options ...rpc.Option) (
+		gas.Gas,
+		gas.Price,
+		time.Time,
+		error,
+	)
 }
 
 // Client implementation for interacting with the P Chain endpoint
@@ -141,13 +164,10 @@ func (c *client) GetHeight(ctx context.Context, options ...rpc.Option) (uint64, 
 	return uint64(res.Height), err
 }
 
-func (c *client) ExportKey(ctx context.Context, user api.UserPass, address ids.ShortID, options ...rpc.Option) (*secp256k1.PrivateKey, error) {
-	res := &ExportKeyReply{}
-	err := c.requester.SendRequest(ctx, "platform.exportKey", &ExportKeyArgs{
-		UserPass: user,
-		Address:  address.String(),
-	}, res, options...)
-	return res.PrivateKey, err
+func (c *client) GetProposedHeight(ctx context.Context, options ...rpc.Option) (uint64, error) {
+	res := &api.GetHeightResponse{}
+	err := c.requester.SendRequest(ctx, "platform.getProposedHeight", struct{}{}, res, options...)
+	return uint64(res.Height), err
 }
 
 func (c *client) GetBalance(ctx context.Context, addrs []ids.ShortID, options ...rpc.Option) (*GetBalanceResponse, error) {
@@ -156,15 +176,6 @@ func (c *client) GetBalance(ctx context.Context, addrs []ids.ShortID, options ..
 		Addresses: ids.ShortIDsToStrings(addrs),
 	}, res, options...)
 	return res, err
-}
-
-func (c *client) ListAddresses(ctx context.Context, user api.UserPass, options ...rpc.Option) ([]ids.ShortID, error) {
-	res := &api.JSONAddresses{}
-	err := c.requester.SendRequest(ctx, "platform.listAddresses", &user, res, options...)
-	if err != nil {
-		return nil, err
-	}
-	return address.ParseToIDs(res.Addresses)
 }
 
 func (c *client) GetUTXOs(
@@ -228,6 +239,10 @@ type GetSubnetClientResponse struct {
 	Locktime    uint64
 	// subnet transformation tx ID for a permissionless subnet
 	SubnetTransformationTxID ids.ID
+	// subnet conversion information for an L1
+	ConversionID   ids.ID
+	ManagerChainID ids.ID
+	ManagerAddress []byte
 }
 
 func (c *client) GetSubnet(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (GetSubnetClientResponse, error) {
@@ -249,6 +264,9 @@ func (c *client) GetSubnet(ctx context.Context, subnetID ids.ID, options ...rpc.
 		Threshold:                uint32(res.Threshold),
 		Locktime:                 uint64(res.Locktime),
 		SubnetTransformationTxID: res.SubnetTransformationTxID,
+		ConversionID:             res.ConversionID,
+		ManagerChainID:           res.ManagerChainID,
+		ManagerAddress:           res.ManagerAddress,
 	}, nil
 }
 
@@ -310,6 +328,71 @@ func (c *client) GetCurrentValidators(
 		return nil, err
 	}
 	return getClientPermissionlessValidators(res.Validators)
+}
+
+// L1Validator is the response from calling GetL1Validator on the API client.
+type L1Validator struct {
+	SubnetID              ids.ID
+	NodeID                ids.NodeID
+	PublicKey             *bls.PublicKey
+	RemainingBalanceOwner *secp256k1fx.OutputOwners
+	DeactivationOwner     *secp256k1fx.OutputOwners
+	StartTime             uint64
+	Weight                uint64
+	MinNonce              uint64
+	// Balance is the remaining amount of AVAX this L1 validator has for paying
+	// the continuous fee.
+	Balance uint64
+}
+
+func (c *client) GetL1Validator(
+	ctx context.Context,
+	validationID ids.ID,
+	options ...rpc.Option,
+) (L1Validator, uint64, error) {
+	res := &GetL1ValidatorReply{}
+	err := c.requester.SendRequest(ctx, "platform.getL1Validator",
+		&GetL1ValidatorArgs{
+			ValidationID: validationID,
+		},
+		res, options...,
+	)
+	if err != nil {
+		return L1Validator{}, 0, err
+	}
+
+	pk, err := bls.PublicKeyFromCompressedBytes(res.PublicKey)
+	if err != nil {
+		return L1Validator{}, 0, err
+	}
+	remainingBalanceOwnerAddrs, err := address.ParseToIDs(res.RemainingBalanceOwner.Addresses)
+	if err != nil {
+		return L1Validator{}, 0, err
+	}
+	deactivationOwnerAddrs, err := address.ParseToIDs(res.DeactivationOwner.Addresses)
+	if err != nil {
+		return L1Validator{}, 0, err
+	}
+
+	return L1Validator{
+		SubnetID:  res.SubnetID,
+		NodeID:    res.NodeID,
+		PublicKey: pk,
+		RemainingBalanceOwner: &secp256k1fx.OutputOwners{
+			Locktime:  uint64(res.RemainingBalanceOwner.Locktime),
+			Threshold: uint32(res.RemainingBalanceOwner.Threshold),
+			Addrs:     remainingBalanceOwnerAddrs,
+		},
+		DeactivationOwner: &secp256k1fx.OutputOwners{
+			Locktime:  uint64(res.DeactivationOwner.Locktime),
+			Threshold: uint32(res.DeactivationOwner.Threshold),
+			Addrs:     deactivationOwnerAddrs,
+		},
+		StartTime: uint64(res.StartTime),
+		Weight:    uint64(res.Weight),
+		MinNonce:  uint64(res.MinNonce),
+		Balance:   uint64(res.Balance),
+	}, uint64(res.Height), err
 }
 
 func (c *client) GetCurrentSupply(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (uint64, uint64, error) {
@@ -481,13 +564,13 @@ func (c *client) GetTimestamp(ctx context.Context, options ...rpc.Option) (time.
 func (c *client) GetValidatorsAt(
 	ctx context.Context,
 	subnetID ids.ID,
-	height uint64,
+	height platformapi.Height,
 	options ...rpc.Option,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 	res := &GetValidatorsAtReply{}
 	err := c.requester.SendRequest(ctx, "platform.getValidatorsAt", &GetValidatorsAtArgs{
 		SubnetID: subnetID,
-		Height:   json.Uint64(height),
+		Height:   height,
 	}, res, options...)
 	return res.Validators, err
 }
@@ -513,6 +596,40 @@ func (c *client) GetBlockByHeight(ctx context.Context, height uint64, options ..
 		return nil, err
 	}
 	return formatting.Decode(res.Encoding, res.Block)
+}
+
+func (c *client) GetFeeConfig(ctx context.Context, options ...rpc.Option) (*gas.Config, error) {
+	res := &gas.Config{}
+	err := c.requester.SendRequest(ctx, "platform.getFeeConfig", struct{}{}, res, options...)
+	return res, err
+}
+
+func (c *client) GetFeeState(ctx context.Context, options ...rpc.Option) (
+	gas.State,
+	gas.Price,
+	time.Time,
+	error,
+) {
+	res := &GetFeeStateReply{}
+	err := c.requester.SendRequest(ctx, "platform.getFeeState", struct{}{}, res, options...)
+	return res.State, res.Price, res.Time, err
+}
+
+func (c *client) GetValidatorFeeConfig(ctx context.Context, options ...rpc.Option) (*fee.Config, error) {
+	res := &fee.Config{}
+	err := c.requester.SendRequest(ctx, "platform.getValidatorFeeConfig", struct{}{}, res, options...)
+	return res, err
+}
+
+func (c *client) GetValidatorFeeState(ctx context.Context, options ...rpc.Option) (
+	gas.Gas,
+	gas.Price,
+	time.Time,
+	error,
+) {
+	res := &GetValidatorFeeStateReply{}
+	err := c.requester.SendRequest(ctx, "platform.getValidatorFeeState", struct{}{}, res, options...)
+	return res.Excess, res.Price, res.Time, err
 }
 
 func AwaitTxAccepted(
@@ -542,4 +659,68 @@ func AwaitTxAccepted(
 			return ctx.Err()
 		}
 	}
+}
+
+// GetSubnetOwners returns a map of subnet ID to current subnet's owner
+func GetSubnetOwners(
+	c Client,
+	ctx context.Context,
+	subnetIDs ...ids.ID,
+) (map[ids.ID]fx.Owner, error) {
+	subnetOwners := make(map[ids.ID]fx.Owner, len(subnetIDs))
+	for _, subnetID := range subnetIDs {
+		subnetInfo, err := c.GetSubnet(ctx, subnetID)
+		if err != nil {
+			return nil, err
+		}
+		subnetOwners[subnetID] = &secp256k1fx.OutputOwners{
+			Locktime:  subnetInfo.Locktime,
+			Threshold: subnetInfo.Threshold,
+			Addrs:     subnetInfo.ControlKeys,
+		}
+	}
+	return subnetOwners, nil
+}
+
+// GetDeactivationOwners returns a map of validation ID to deactivation owners
+func GetDeactivationOwners(
+	c Client,
+	ctx context.Context,
+	validationIDs ...ids.ID,
+) (map[ids.ID]fx.Owner, error) {
+	deactivationOwners := make(map[ids.ID]fx.Owner, len(validationIDs))
+	for _, validationID := range validationIDs {
+		l1Validator, _, err := c.GetL1Validator(ctx, validationID)
+		if err != nil {
+			return nil, err
+		}
+		deactivationOwners[validationID] = l1Validator.DeactivationOwner
+	}
+	return deactivationOwners, nil
+}
+
+// GetOwners returns the union of GetSubnetOwners and GetDeactivationOwners.
+func GetOwners(
+	c Client,
+	ctx context.Context,
+	subnetIDs []ids.ID,
+	validationIDs []ids.ID,
+) (map[ids.ID]fx.Owner, error) {
+	subnetOwners, err := GetSubnetOwners(c, ctx, subnetIDs...)
+	if err != nil {
+		return nil, err
+	}
+	deactivationOwners, err := GetDeactivationOwners(c, ctx, validationIDs...)
+	if err != nil {
+		return nil, err
+	}
+
+	owners := make(map[ids.ID]fx.Owner, len(subnetOwners)+len(deactivationOwners))
+	for id, owner := range subnetOwners {
+		owners[id] = owner
+	}
+	for id, owner := range deactivationOwners {
+		owners[id] = owner
+	}
+	return owners, nil
 }

@@ -37,7 +37,7 @@ func TestInterface(t *testing.T) {
 	}
 
 	for _, scenario := range scenarios {
-		for _, test := range cachetest.Suite {
+		for _, test := range cachetest.Tests {
 			baseCache := scenario.setup(test.Size)
 			c, err := New("", prometheus.NewRegistry(), baseCache)
 			require.NoError(t, err)

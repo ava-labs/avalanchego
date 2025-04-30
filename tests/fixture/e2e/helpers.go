@@ -8,30 +8,32 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"net/netip"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/ethclient"
-	"github.com/ava-labs/coreth/interfaces"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
-	ginkgo "github.com/onsi/ginkgo/v2"
+	ethereum "github.com/ava-labs/libevm"
 )
 
 const (
-	// A long default timeout used to timeout failed operations but
-	// unlikely to induce flaking due to unexpected resource
-	// contention.
-	DefaultTimeout = 2 * time.Minute
+	DefaultTimeout = tests.DefaultTimeout
 
 	DefaultPollingInterval = tmpnet.DefaultPollingInterval
 
@@ -44,88 +46,102 @@ const (
 
 	DefaultGasLimit = uint64(21000) // Standard gas limit
 
-	// An empty string prompts the use of the default path which ensures a
-	// predictable target for github's upload-artifact action.
-	DefaultNetworkDir = ""
-
 	// Directory used to store private networks (specific to a single test)
 	// under the shared network dir.
 	PrivateNetworksDirName = "private_networks"
 )
 
+// NewPrivateKey returns a new private key.
+func NewPrivateKey(tc tests.TestContext) *secp256k1.PrivateKey {
+	key, err := secp256k1.NewPrivateKey()
+	require.NoError(tc, err)
+	return key
+}
+
 // Create a new wallet for the provided keychain against the specified node URI.
-func NewWallet(keychain *secp256k1fx.Keychain, nodeURI tmpnet.NodeURI) primary.Wallet {
-	tests.Outf("{{blue}} initializing a new wallet for node %s with URI: %s {{/}}\n", nodeURI.NodeID, nodeURI.URI)
-	baseWallet, err := primary.MakeWallet(DefaultContext(), &primary.WalletConfig{
-		URI:          nodeURI.URI,
-		AVAXKeychain: keychain,
-		EthKeychain:  keychain,
-	})
-	require.NoError(ginkgo.GinkgoT(), err)
-	return primary.NewWalletWithOptions(
+func NewWallet(tc tests.TestContext, keychain *secp256k1fx.Keychain, nodeURI tmpnet.NodeURI) *primary.Wallet {
+	tc.Log().Info("initializing a new wallet",
+		zap.Stringer("nodeID", nodeURI.NodeID),
+		zap.String("URI", nodeURI.URI),
+	)
+	baseWallet, err := primary.MakeWallet(
+		tc.DefaultContext(),
+		nodeURI.URI,
+		keychain,
+		keychain,
+		primary.WalletConfig{},
+	)
+	require.NoError(tc, err)
+	wallet := primary.NewWalletWithOptions(
 		baseWallet,
 		common.WithPostIssuanceFunc(
 			func(id ids.ID) {
-				tests.Outf(" issued transaction with ID: %s\n", id)
+				tc.Log().Info("issued transaction",
+					zap.Stringer("txID", id),
+				)
 			},
 		),
+		// Reducing the default from 100ms speeds up detection of tx acceptance
+		common.WithPollFrequency(10*time.Millisecond),
 	)
+	OutputWalletBalances(tc, wallet)
+	return wallet
+}
+
+// OutputWalletBalances outputs the X-Chain and P-Chain balances of the provided wallet.
+func OutputWalletBalances(tc tests.TestContext, wallet *primary.Wallet) {
+	_, _ = GetWalletBalances(tc, wallet)
+}
+
+// GetWalletBalances retrieves the X-Chain and P-Chain balances of the provided wallet.
+func GetWalletBalances(tc tests.TestContext, wallet *primary.Wallet) (uint64, uint64) {
+	require := require.New(tc)
+	var (
+		xWallet  = wallet.X()
+		xBuilder = xWallet.Builder()
+		pWallet  = wallet.P()
+		pBuilder = pWallet.Builder()
+	)
+	xBalances, err := xBuilder.GetFTBalance()
+	require.NoError(err, "failed to fetch X-chain balances")
+	pBalances, err := pBuilder.GetBalance()
+	require.NoError(err, "failed to fetch P-chain balances")
+	var (
+		xContext    = xBuilder.Context()
+		avaxAssetID = xContext.AVAXAssetID
+		xAVAX       = xBalances[avaxAssetID]
+		pAVAX       = pBalances[avaxAssetID]
+	)
+	tc.Log().Info("wallet balances in nAVAX",
+		zap.Uint64("xChain", xAVAX),
+		zap.Uint64("pChain", pAVAX),
+	)
+	return xAVAX, pAVAX
 }
 
 // Create a new eth client targeting the specified node URI.
-func NewEthClient(nodeURI tmpnet.NodeURI) ethclient.Client {
-	tests.Outf("{{blue}} initializing a new eth client for node %s with URI: %s {{/}}\n", nodeURI.NodeID, nodeURI.URI)
+func NewEthClient(tc tests.TestContext, nodeURI tmpnet.NodeURI) ethclient.Client {
+	tc.Log().Info("initializing a new eth client",
+		zap.Stringer("nodeID", nodeURI.NodeID),
+		zap.String("URI", nodeURI.URI),
+	)
 	nodeAddress := strings.Split(nodeURI.URI, "//")[1]
 	uri := fmt.Sprintf("ws://%s/ext/bc/C/ws", nodeAddress)
 	client, err := ethclient.Dial(uri)
-	require.NoError(ginkgo.GinkgoT(), err)
+	require.NoError(tc, err)
 	return client
 }
 
-// Helper simplifying use of a timed context by canceling the context on ginkgo teardown.
-func ContextWithTimeout(duration time.Duration) context.Context {
-	ctx, cancel := context.WithTimeout(context.Background(), duration)
-	ginkgo.DeferCleanup(cancel)
-	return ctx
-}
-
-// Helper simplifying use of a timed context configured with the default timeout.
-func DefaultContext() context.Context {
-	return ContextWithTimeout(DefaultTimeout)
-}
-
-// Helper simplifying use via an option of a timed context configured with the default timeout.
-func WithDefaultContext() common.Option {
-	return common.WithContext(DefaultContext())
-}
-
-// Re-implementation of testify/require.Eventually that is compatible with ginkgo. testify's
-// version calls the condition function with a goroutine and ginkgo assertions don't work
-// properly in goroutines.
-func Eventually(condition func() bool, waitFor time.Duration, tick time.Duration, msg string) {
-	ticker := time.NewTicker(tick)
-	defer ticker.Stop()
-
-	ctx, cancel := context.WithTimeout(context.Background(), waitFor)
-	defer cancel()
-	for !condition() {
-		select {
-		case <-ctx.Done():
-			require.Fail(ginkgo.GinkgoT(), msg)
-		case <-ticker.C:
-		}
-	}
-}
-
 // Adds an ephemeral node intended to be used by a single test.
-func AddEphemeralNode(network *tmpnet.Network, flags tmpnet.FlagsMap) *tmpnet.Node {
-	require := require.New(ginkgo.GinkgoT())
+func AddEphemeralNode(tc tests.TestContext, network *tmpnet.Network, node *tmpnet.Node) *tmpnet.Node {
+	require := require.New(tc)
 
-	node := tmpnet.NewEphemeralNode(flags)
-	require.NoError(network.StartNode(DefaultContext(), ginkgo.GinkgoWriter, node))
+	require.NoError(network.StartNode(tc.DefaultContext(), node))
 
-	ginkgo.DeferCleanup(func() {
-		tests.Outf("shutting down ephemeral node %q\n", node.NodeID)
+	tc.DeferCleanup(func() {
+		tc.Log().Info("shutting down ephemeral node",
+			zap.Stringer("nodeID", node.NodeID),
+		)
 		ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 		defer cancel()
 		require.NoError(node.Stop(ctx))
@@ -134,44 +150,56 @@ func AddEphemeralNode(network *tmpnet.Network, flags tmpnet.FlagsMap) *tmpnet.No
 }
 
 // Wait for the given node to report healthy.
-func WaitForHealthy(node *tmpnet.Node) {
+func WaitForHealthy(t require.TestingT, node *tmpnet.Node) {
 	// Need to use explicit context (vs DefaultContext()) to support use with DeferCleanup
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	defer cancel()
-	require.NoError(ginkgo.GinkgoT(), tmpnet.WaitForHealthy(ctx, node))
+	require.NoError(t, node.WaitForHealthy(ctx))
 }
 
-// Sends an eth transaction, waits for the transaction receipt to be issued
-// and checks that the receipt indicates success.
-func SendEthTransaction(ethClient ethclient.Client, signedTx *types.Transaction) *types.Receipt {
-	require := require.New(ginkgo.GinkgoT())
+// Sends an eth transaction and waits for the transaction receipt from the
+// execution of the transaction.
+func SendEthTransaction(tc tests.TestContext, ethClient ethclient.Client, signedTx *types.Transaction) *types.Receipt {
+	require := require.New(tc)
 
 	txID := signedTx.Hash()
-	tests.Outf(" sending eth transaction with ID: %s\n", txID)
+	tc.Log().Info("sending eth transaction",
+		zap.Stringer("txID", txID),
+	)
 
-	require.NoError(ethClient.SendTransaction(DefaultContext(), signedTx))
+	require.NoError(ethClient.SendTransaction(tc.DefaultContext(), signedTx))
 
 	// Wait for the receipt
 	var receipt *types.Receipt
-	Eventually(func() bool {
+	tc.Eventually(func() bool {
 		var err error
-		receipt, err = ethClient.TransactionReceipt(DefaultContext(), txID)
-		if errors.Is(err, interfaces.NotFound) {
+		receipt, err = ethClient.TransactionReceipt(tc.DefaultContext(), txID)
+		if errors.Is(err, ethereum.NotFound) {
 			return false // Transaction is still pending
 		}
 		require.NoError(err)
 		return true
 	}, DefaultTimeout, DefaultPollingInterval, "failed to see transaction acceptance before timeout")
 
-	require.Equal(types.ReceiptStatusSuccessful, receipt.Status)
+	tc.Log().Info("eth transaction accepted",
+		zap.Stringer("txID", txID),
+		zap.Uint64("gasUsed", receipt.GasUsed),
+		zap.Stringer("gasPrice", receipt.EffectiveGasPrice),
+		zap.Stringer("blockNumber", receipt.BlockNumber),
+	)
 	return receipt
 }
 
 // Determines the suggested gas price for the configured client that will
 // maximize the chances of transaction acceptance.
-func SuggestGasPrice(ethClient ethclient.Client) *big.Int {
-	gasPrice, err := ethClient.SuggestGasPrice(DefaultContext())
-	require.NoError(ginkgo.GinkgoT(), err)
+func SuggestGasPrice(tc tests.TestContext, ethClient ethclient.Client) *big.Int {
+	gasPrice, err := ethClient.SuggestGasPrice(tc.DefaultContext())
+	require.NoError(tc, err)
+
+	tc.Log().Info("suggested gas price",
+		zap.Stringer("price", gasPrice),
+	)
+
 	// Double the suggested gas price to maximize the chances of
 	// acceptance. Maybe this can be revisited pending resolution of
 	// https://github.com/ava-labs/coreth/issues/314.
@@ -180,88 +208,179 @@ func SuggestGasPrice(ethClient ethclient.Client) *big.Int {
 }
 
 // Helper simplifying use via an option of a gas price appropriate for testing.
-func WithSuggestedGasPrice(ethClient ethclient.Client) common.Option {
-	baseFee := SuggestGasPrice(ethClient)
+func WithSuggestedGasPrice(tc tests.TestContext, ethClient ethclient.Client) common.Option {
+	baseFee := SuggestGasPrice(tc, ethClient)
 	return common.WithBaseFee(baseFee)
 }
 
-// Verify that a new node can bootstrap into the network. This function is safe to call
-// from `Teardown` by virtue of not depending on ginkgo.DeferCleanup.
-func CheckBootstrapIsPossible(network *tmpnet.Network) {
-	require := require.New(ginkgo.GinkgoT())
+// Verify that a new node can bootstrap into the network. If the check wasn't skipped,
+// the node will be returned to the caller.
+func CheckBootstrapIsPossible(tc tests.TestContext, network *tmpnet.Network) *tmpnet.Node {
+	require := require.New(tc)
 
 	if len(os.Getenv(SkipBootstrapChecksEnvName)) > 0 {
-		tests.Outf("{{yellow}}Skipping bootstrap check due to the %s env var being set", SkipBootstrapChecksEnvName)
-		return
+		tc.Log().Info("skipping bootstrap check due to env var being set",
+			zap.String("envVar", SkipBootstrapChecksEnvName),
+		)
+		return nil
 	}
-	ginkgo.By("checking if bootstrap is possible with the current network state")
+	tc.By("checking if bootstrap is possible with the current network state")
 
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
-	defer cancel()
+	// Ensure all subnets are bootstrapped
+	subnetIDs := make([]string, len(network.Subnets))
+	for i, subnet := range network.Subnets {
+		subnetIDs[i] = subnet.SubnetID.String()
+	}
+	flags := tmpnet.FlagsMap{
+		config.TrackSubnetsKey: strings.Join(subnetIDs, ","),
+	}
 
-	node := tmpnet.NewEphemeralNode(tmpnet.FlagsMap{})
-	require.NoError(network.StartNode(ctx, ginkgo.GinkgoWriter, node))
+	node := tmpnet.NewEphemeralNode(flags)
+	require.NoError(network.StartNode(tc.DefaultContext(), node))
 	// StartNode will initiate node stop if an error is encountered during start,
 	// so no further cleanup effort is required if an error is seen here.
 
-	// Ensure the node is always stopped at the end of the check
-	defer func() {
-		ctx, cancel = context.WithTimeout(context.Background(), DefaultTimeout)
+	// Register a cleanup to ensure the node is stopped at the end of the test
+	tc.DeferCleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 		defer cancel()
 		require.NoError(node.Stop(ctx))
-	}()
+	})
 
 	// Check that the node becomes healthy within timeout
-	require.NoError(tmpnet.WaitForHealthy(ctx, node))
+	require.NoError(node.WaitForHealthy(tc.DefaultContext()))
+
+	// Ensure that the primary validators are still healthy
+	for _, node := range network.Nodes {
+		if node.IsEphemeral {
+			continue
+		}
+		healthy, err := node.IsHealthy(tc.DefaultContext())
+		require.NoError(err)
+		require.True(healthy, "primary validator %s is not healthy", node.NodeID)
+	}
+
+	return node
 }
 
 // Start a temporary network with the provided avalanchego binary.
 func StartNetwork(
+	tc tests.TestContext,
 	network *tmpnet.Network,
-	avalancheGoExecPath string,
-	pluginDir string,
+	rootNetworkDir string,
 	shutdownDelay time.Duration,
-	reuseNetwork bool,
+	networkCmd NetworkCmd,
 ) {
-	require := require.New(ginkgo.GinkgoT())
+	require := require.New(tc)
 
-	require.NoError(
-		tmpnet.BootstrapNewNetwork(
-			DefaultContext(),
-			ginkgo.GinkgoWriter,
-			network,
-			DefaultNetworkDir,
-			avalancheGoExecPath,
-			pluginDir,
-		),
+	err := tmpnet.BootstrapNewNetwork(
+		tc.DefaultContext(),
+		tc.Log(),
+		network,
+		rootNetworkDir,
 	)
+	if err != nil {
+		tc.DeferCleanup(func() {
+			tc.Log().Info("shutting down network")
+			ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
+			defer cancel()
+			require.NoError(network.Stop(ctx))
+		})
+		require.NoError(err, "failed to bootstrap network")
+	}
 
-	tests.Outf("{{green}}Successfully started network{{/}}\n")
+	tc.Log().Info("network started successfully")
 
 	symlinkPath, err := tmpnet.GetReusableNetworkPathForOwner(network.Owner)
 	require.NoError(err)
 
-	if reuseNetwork {
+	if networkCmd == ReuseNetworkCmd || networkCmd == RestartNetworkCmd {
 		// Symlink the path of the created network to the default owner path (e.g. latest_avalanchego-e2e)
 		// to enable easy discovery for reuse.
 		require.NoError(os.Symlink(network.Dir, symlinkPath))
-		tests.Outf("{{green}}Symlinked %s to %s to enable reuse{{/}}\n", network.Dir, symlinkPath)
+		tc.Log().Info("symlinked network dir for reuse",
+			zap.String("networkDir", network.Dir),
+			zap.String("symlinkPath", symlinkPath),
+		)
 	}
 
-	ginkgo.DeferCleanup(func() {
-		if reuseNetwork {
-			tests.Outf("{{yellow}}Skipping shutdown for network %s (symlinked to %s) to enable reuse{{/}}\n", network.Dir, symlinkPath)
+	tc.DeferCleanup(func() {
+		if networkCmd == ReuseNetworkCmd || networkCmd == RestartNetworkCmd {
+			tc.Log().Info("skipping shutdown for network intended for reuse",
+				zap.String("networkDir", network.Dir),
+				zap.String("symlinkPath", symlinkPath),
+			)
+			return
+		}
+
+		if networkCmd == StartNetworkCmd {
+			tc.Log().Info("skipping shutdown for --start-network",
+				zap.String("networkDir", network.Dir),
+			)
 			return
 		}
 
 		if shutdownDelay > 0 {
-			tests.Outf("Waiting %s before network shutdown to ensure final metrics scrape\n", shutdownDelay)
+			tc.Log().Info("delaying network shutdown to ensure final metrics scrape",
+				zap.Duration("delay", shutdownDelay),
+			)
 			time.Sleep(shutdownDelay)
 		}
 
-		tests.Outf("Shutting down network\n")
+		tc.Log().Info("shutting down network")
 		ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 		defer cancel()
 		require.NoError(network.Stop(ctx))
 	})
+}
+
+// NewPChainFeeCalculatorFromContext returns either a static or dynamic fee
+// calculator depending on the provided context.
+func NewPChainFeeCalculatorFromContext(context *builder.Context) fee.Calculator {
+	if context.GasPrice != 0 {
+		return fee.NewDynamicCalculator(context.ComplexityWeights, context.GasPrice)
+	}
+	return fee.NewSimpleCalculator(0)
+}
+
+// GetRepoRootPath strips the provided suffix from the current working
+// directory. If the test binary is executed from the root of the repo, the
+// result will be the repo root.
+func GetRepoRootPath(suffix string) (string, error) {
+	// - When executed via a test binary, the working directory will be wherever
+	// the binary is executed from, but scripts should require execution from
+	// the repo root.
+	//
+	// - When executed via ginkgo (nicer for development + supports
+	// parallel execution) the working directory will always be the
+	// target path (e.g. [repo root]./tests/bootstrap/e2e) and getting the repo
+	// root will require stripping the target path suffix.
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSuffix(cwd, suffix), nil
+}
+
+// GetLocalURI retrieves the locally-accessible URI of the provided node. When a node
+// is running as a local process, this will be the URI exposed by the node. For a
+// node running remotely in kube, the URI will be a local address whose port is
+// forwarded to the node's URI through the kube API server.
+func GetLocalURI(tc tests.TestContext, node *tmpnet.Node) string {
+	uri, cancel, err := node.GetLocalURI(tc.DefaultContext())
+	require.NoError(tc, err)
+	tc.DeferCleanup(cancel)
+	return uri
+}
+
+// GetLocalStakingAddress retrieves the locally-accessible staking address of the
+// provided node. When a node is a local process, this will be the staking address
+// exposed by the node. For a node running remotely in kube, the staking address will
+// be a local address whose port will be forwarded to the node's staking address
+// through the kube API server.
+func GetLocalStakingAddress(tc tests.TestContext, node *tmpnet.Node) netip.AddrPort {
+	stakingAddress, cancel, err := node.GetLocalStakingAddress(tc.DefaultContext())
+	require.NoError(tc, err)
+	tc.DeferCleanup(cancel)
+	return stakingAddress
 }

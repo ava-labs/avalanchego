@@ -15,7 +15,7 @@ type WeightedWithoutReplacement interface {
 func NewDeterministicWeightedWithoutReplacement(source Source) WeightedWithoutReplacement {
 	return &weightedWithoutReplacementGeneric{
 		u: NewDeterministicUniform(source),
-		w: NewDeterministicWeighted(),
+		w: NewWeighted(),
 	}
 }
 
@@ -23,16 +23,6 @@ func NewDeterministicWeightedWithoutReplacement(source Source) WeightedWithoutRe
 func NewWeightedWithoutReplacement() WeightedWithoutReplacement {
 	return &weightedWithoutReplacementGeneric{
 		u: NewUniform(),
-		w: NewWeighted(),
-	}
-}
-
-// NewBestWeightedWithoutReplacement returns a new sampler
-func NewBestWeightedWithoutReplacement(
-	expectedSampleSize int,
-) WeightedWithoutReplacement {
-	return &weightedWithoutReplacementGeneric{
-		u: NewBestUniform(expectedSampleSize),
 		w: NewWeighted(),
 	}
 }

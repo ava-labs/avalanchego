@@ -14,9 +14,12 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/node"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
+
+	nodeconfig "github.com/ava-labs/avalanchego/config/node"
 )
 
 const Header = `     _____               .__                       .__
@@ -43,7 +46,7 @@ type App interface {
 	ExitCode() (int, error)
 }
 
-func New(config node.Config) (App, error) {
+func New(config nodeconfig.Config) (App, error) {
 	// Set the data directory permissions to be read write.
 	if err := perms.ChmodR(config.DatabaseConfig.Path, true, perms.ReadWriteExecute); err != nil {
 		return nil, fmt.Errorf("failed to restrict the permissions of the database directory with: %w", err)
@@ -71,6 +74,7 @@ func New(config node.Config) (App, error) {
 
 	n, err := node.New(&config, logFactory, log)
 	if err != nil {
+		log.Fatal("failed to initialize node", zap.Error(err))
 		log.Stop()
 		logFactory.Close()
 		return nil, fmt.Errorf("failed to initialize node: %w", err)
@@ -89,26 +93,40 @@ func Run(app App) int {
 		return 1
 	}
 
-	// register signals to kill the application
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT)
-	signal.Notify(signals, syscall.SIGTERM)
+	// register terminationSignals to kill the application
+	terminationSignals := make(chan os.Signal, 1)
+	signal.Notify(terminationSignals, syscall.SIGINT, syscall.SIGTERM)
+
+	stackTraceSignal := make(chan os.Signal, 1)
+	signal.Notify(stackTraceSignal, syscall.SIGABRT)
 
 	// start up a new go routine to handle attempts to kill the application
 	var eg errgroup.Group
 	eg.Go(func() error {
-		for range signals {
+		for range terminationSignals {
 			return app.Stop()
 		}
 		return nil
 	})
 
+	// start a goroutine to listen on SIGABRT signals,
+	// to print the stack trace to standard error.
+	go func() {
+		for range stackTraceSignal {
+			fmt.Fprint(os.Stderr, utils.GetStacktrace(true))
+		}
+	}()
+
 	// wait for the app to exit and get the exit code response
 	exitCode, err := app.ExitCode()
 
-	// shut down the signal go routine
-	signal.Stop(signals)
-	close(signals)
+	// shut down the termination signal go routine
+	signal.Stop(terminationSignals)
+	close(terminationSignals)
+
+	// shut down the stack trace go routine
+	signal.Stop(stackTraceSignal)
+	close(stackTraceSignal)
 
 	// if there was an error closing or running the application, report that error
 	if eg.Wait() != nil || err != nil {

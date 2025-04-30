@@ -296,7 +296,7 @@ func testAtomicTx() (*txs.Tx, error) {
 					Amt: uint64(1234),
 					OutputOwners: secp256k1fx.OutputOwners{
 						Threshold: 1,
-						Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+						Addrs:     []ids.ShortID{preFundedKeys[0].Address()},
 					},
 				},
 			}},
@@ -345,7 +345,7 @@ func testDecisionTxs() ([]*txs.Tx, error) {
 						Amt: uint64(1234),
 						OutputOwners: secp256k1fx.OutputOwners{
 							Threshold: 1,
-							Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+							Addrs:     []ids.ShortID{preFundedKeys[0].Address()},
 						},
 					},
 				}},

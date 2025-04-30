@@ -70,13 +70,13 @@ func (a *acceptor) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 	blkID := b.ID()
 	defer a.free(blkID)
 
-	if err := a.commonAccept(b); err != nil {
-		return err
-	}
-
 	blkState, ok := a.blkIDToState[blkID]
 	if !ok {
 		return fmt.Errorf("%w %s", errMissingBlockState, blkID)
+	}
+
+	if err := a.commonAccept(blkState); err != nil {
+		return err
 	}
 
 	// Update the state to reflect the changes made in [onAcceptState].
@@ -110,7 +110,7 @@ func (a *acceptor) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", b.Parent()),
-		zap.Stringer("utxoChecksum", a.state.Checksum()),
+		zap.Stringer("checksum", a.state.Checksum()),
 	)
 
 	return nil
@@ -132,11 +132,7 @@ func (a *acceptor) optionBlock(b block.Block, blockType string) error {
 	}()
 
 	// Note that the parent must be accepted first.
-	if err := a.commonAccept(parentState.statelessBlock); err != nil {
-		return err
-	}
-
-	if err := a.commonAccept(b); err != nil {
+	if err := a.commonAccept(parentState); err != nil {
 		return err
 	}
 
@@ -150,6 +146,11 @@ func (a *acceptor) optionBlock(b block.Block, blockType string) error {
 	if !ok {
 		return fmt.Errorf("%w %s", errMissingBlockState, blkID)
 	}
+
+	if err := a.commonAccept(blkState); err != nil {
+		return err
+	}
+
 	if err := blkState.onAcceptState.Apply(a.state); err != nil {
 		return err
 	}
@@ -179,7 +180,7 @@ func (a *acceptor) optionBlock(b block.Block, blockType string) error {
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", parentID),
-		zap.Stringer("utxoChecksum", a.state.Checksum()),
+		zap.Stringer("checksum", a.state.Checksum()),
 	)
 
 	return nil
@@ -211,7 +212,7 @@ func (a *acceptor) proposalBlock(b block.Block, blockType string) {
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", b.Parent()),
-		zap.Stringer("utxoChecksum", a.state.Checksum()),
+		zap.Stringer("checksum", a.state.Checksum()),
 	)
 }
 
@@ -219,13 +220,13 @@ func (a *acceptor) standardBlock(b block.Block, blockType string) error {
 	blkID := b.ID()
 	defer a.free(blkID)
 
-	if err := a.commonAccept(b); err != nil {
-		return err
-	}
-
 	blkState, ok := a.blkIDToState[blkID]
 	if !ok {
 		return fmt.Errorf("%w %s", errMissingBlockState, blkID)
+	}
+
+	if err := a.commonAccept(blkState); err != nil {
+		return err
 	}
 
 	// Update the state to reflect the changes made in [onAcceptState].
@@ -258,23 +259,24 @@ func (a *acceptor) standardBlock(b block.Block, blockType string) error {
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", b.Parent()),
-		zap.Stringer("utxoChecksum", a.state.Checksum()),
+		zap.Stringer("checksum", a.state.Checksum()),
 	)
 
 	return nil
 }
 
-func (a *acceptor) commonAccept(b block.Block) error {
-	blkID := b.ID()
+func (a *acceptor) commonAccept(b *blockState) error {
+	blk := b.statelessBlock
+	blkID := blk.ID()
 
-	if err := a.metrics.MarkAccepted(b); err != nil {
+	if err := a.metrics.MarkAccepted(b.metrics); err != nil {
 		return fmt.Errorf("failed to accept block %s: %w", blkID, err)
 	}
 
 	a.backend.lastAccepted = blkID
 	a.state.SetLastAccepted(blkID)
-	a.state.SetHeight(b.Height())
-	a.state.AddStatelessBlock(b)
+	a.state.SetHeight(blk.Height())
+	a.state.AddStatelessBlock(blk)
 	a.validators.OnAcceptedBlockID(blkID)
 	return nil
 }

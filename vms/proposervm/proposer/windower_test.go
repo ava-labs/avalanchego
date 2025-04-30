@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -25,28 +26,49 @@ var (
 )
 
 func TestWindowerNoValidators(t *testing.T) {
-	require := require.New(t)
+	tests := []struct {
+		name       string
+		validators []ids.NodeID
+	}{
+		{
+			name: "no validators",
+		},
+		{
+			name: "only inactive validators",
+			validators: []ids.NodeID{
+				ids.EmptyNodeID,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
 
-	_, vdrState := makeValidators(t, 0)
-	w := New(vdrState, subnetID, randomChainID)
+			w := New(
+				makeValidatorState(t, test.validators),
+				subnetID,
+				randomChainID,
+			)
 
-	var (
-		chainHeight  uint64 = 1
-		pChainHeight uint64 = 0
-		nodeID              = ids.GenerateTestNodeID()
-		slot         uint64 = 1
-	)
-	delay, err := w.Delay(context.Background(), chainHeight, pChainHeight, nodeID, MaxVerifyWindows)
-	require.NoError(err)
-	require.Zero(delay)
+			var (
+				chainHeight  uint64 = 1
+				pChainHeight uint64 = 0
+				nodeID              = ids.GenerateTestNodeID()
+				slot         uint64 = 1
+			)
+			delay, err := w.Delay(context.Background(), chainHeight, pChainHeight, nodeID, MaxVerifyWindows)
+			require.NoError(err)
+			require.Zero(delay)
 
-	proposer, err := w.ExpectedProposer(context.Background(), chainHeight, pChainHeight, slot)
-	require.ErrorIs(err, ErrAnyoneCanPropose)
-	require.Equal(ids.EmptyNodeID, proposer)
+			proposer, err := w.ExpectedProposer(context.Background(), chainHeight, pChainHeight, slot)
+			require.ErrorIs(err, ErrAnyoneCanPropose)
+			require.Equal(ids.EmptyNodeID, proposer)
 
-	delay, err = w.MinDelayForProposer(context.Background(), chainHeight, pChainHeight, nodeID, slot)
-	require.ErrorIs(err, ErrAnyoneCanPropose)
-	require.Zero(delay)
+			delay, err = w.MinDelayForProposer(context.Background(), chainHeight, pChainHeight, nodeID, slot)
+			require.ErrorIs(err, ErrAnyoneCanPropose)
+			require.Zero(delay)
+		})
+	}
 }
 
 func TestWindowerRepeatedValidator(t *testing.T) {
@@ -57,7 +79,7 @@ func TestWindowerRepeatedValidator(t *testing.T) {
 		nonValidatorID = ids.GenerateTestNodeID()
 	)
 
-	vdrState := &validators.TestState{
+	vdrState := &validatorstest.State{
 		T: t,
 		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 			return map[ids.NodeID]*validators.GetValidatorOutput{
@@ -444,13 +466,16 @@ func TestProposerDistribution(t *testing.T) {
 	require.Less(maxSTDDeviation, 3.)
 }
 
-func makeValidators(t testing.TB, count int) ([]ids.NodeID, *validators.TestState) {
+func makeValidators(t testing.TB, count int) ([]ids.NodeID, *validatorstest.State) {
 	validatorIDs := make([]ids.NodeID, count)
 	for i := range validatorIDs {
 		validatorIDs[i] = ids.BuildTestNodeID([]byte{byte(i) + 1})
 	}
+	return validatorIDs, makeValidatorState(t, validatorIDs)
+}
 
-	vdrState := &validators.TestState{
+func makeValidatorState(t testing.TB, validatorIDs []ids.NodeID) *validatorstest.State {
+	vdrState := &validatorstest.State{
 		T: t,
 		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 			vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, MaxVerifyWindows)
@@ -463,5 +488,5 @@ func makeValidators(t testing.TB, count int) ([]ids.NodeID, *validators.TestStat
 			return vdrs, nil
 		},
 	}
-	return validatorIDs, vdrState
+	return vdrState
 }

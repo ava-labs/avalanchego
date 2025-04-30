@@ -20,12 +20,11 @@ run:
   build-tags:
     - test
 
-output:
+issues:
   # Make issues output unique by line.
   # Default: true
   uniq-by-line: false
 
-issues:
   # Maximum issues count per one linter.
   # Set to 0 to disable.
   # Default: 50
@@ -46,11 +45,11 @@ linters:
   enable:
     - asciicheck
     - bodyclose
+    - copyloopvar
     - depguard
     - dupword
     - errcheck
     - errorlint
-    - exportloopref
     - forbidigo
     - gci
     - goconst
@@ -120,14 +119,15 @@ linters-settings:
       - standard
       - default
       - blank
-      - dot
       - prefix(github.com/ava-labs/avalanchego)
       - alias
+      - dot
     skip-generated: true
     custom-order: true
   gosec:
     excludes:
       - G107 # Url provided to HTTP request as taint input https://securego.io/docs/rules/g107
+      - G115 # TODO(marun) Enable this ruleset in a follow-up PR
   importas:
     # Do not allow unaliased imports of aliased packages.
     no-unaliased: false
@@ -170,16 +170,10 @@ linters-settings:
         disabled: false
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unhandled-error
       - name: unhandled-error
-        disabled: false
-        arguments:
-          - "fmt\\.Fprint"
-          - "fmt\\.Fprintf"
-          - "fmt\\.Fprintln"
-          - "fmt\\.Print"
-          - "fmt\\.Printf"
-          - "fmt\\.Println"
-          - "math/rand\\.Read"
-          - "strings\\.Builder\\.WriteString"
+        # prefer the errcheck linter since it can be disabled directly with nolint directive
+        # but revive's disable directive (e.g. //revive:disable:unhandled-error) is not
+        # supported when run under golangci_lint
+        disabled: true
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unused-parameter
       - name: unused-parameter
         disabled: false

@@ -239,7 +239,7 @@ func TestVisitPathToKey(t *testing.T) {
 	require.Equal(trie.root.Value(), nodePath[0])
 }
 
-func Test_Trie_ViewOnCommitedView(t *testing.T) {
+func Test_Trie_ViewOnCommittedView(t *testing.T) {
 	require := require.New(t)
 
 	dbTrie, err := getBasicDB()
@@ -917,7 +917,7 @@ func Test_Trie_MultipleStates(t *testing.T) {
 			db, err := New(
 				context.Background(),
 				rdb,
-				newDefaultConfig(),
+				NewConfig(),
 			)
 			require.NoError(err)
 			defer db.Close()

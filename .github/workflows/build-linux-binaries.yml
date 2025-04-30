@@ -12,7 +12,10 @@ on:
 
 jobs:
   build-x86_64-binaries-tarball:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
+    permissions:
+      id-token: write
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
@@ -22,18 +25,16 @@ jobs:
       - run: go version
 
       - name: Build the avalanchego binaries
-        run: ./scripts/build.sh
+        run: ./scripts/run_task.sh build
 
       - name: Install aws cli
-        run: |
-          sudo apt update
-          sudo apt -y install awscli
+        run: sudo snap install aws-cli --classic
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_SA_ROLE_ARN }}
+          role-session-name: githubrolesession
           aws-region: us-east-1
 
       - name: Try to get tag from git
@@ -57,7 +58,7 @@ jobs:
           TAG: ${{ env.TAG }}
           BUCKET: ${{ secrets.BUCKET }}
           ARCH: "amd64"
-          RELEASE: "focal"
+          RELEASE: "jammy"
 
       - name: Save as Github artifact
         uses: actions/upload-artifact@v4
@@ -71,30 +72,29 @@ jobs:
           rm -rf /tmp/avalanchego
 
   build-arm64-binaries-tarball:
-    runs-on: custom-arm64-focal
+    runs-on: custom-arm64-jammy
+    permissions:
+      id-token: write
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: ./.github/actions/install-focal-deps
-
-      - uses: ./.github/actions/setup-go-for-project-v3
+      - uses: ./.github/actions/setup-go-for-project
 
       - run: go version
 
       - name: Build the avalanchego binaries
-        run: ./scripts/build.sh
+        run: ./scripts/run_task.sh build
 
       - name: Install aws cli
-        run: |
-          sudo apt update
-          sudo apt -y install awscli
+        run: sudo snap install aws-cli --classic
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_SA_ROLE_ARN }}
+          role-session-name: githubrolesession
           aws-region: us-east-1
 
       - name: Try to get tag from git
@@ -118,7 +118,7 @@ jobs:
           TAG: ${{ env.TAG }}
           BUCKET: ${{ secrets.BUCKET }}
           ARCH: "arm64"
-          RELEASE: "focal"
+          RELEASE: "jammy"
 
       - name: Save as Github artifact
         uses: actions/upload-artifact@v4

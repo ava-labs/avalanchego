@@ -174,3 +174,11 @@ func (b *Bag[T]) PrefixedString(prefix string) string {
 func (b *Bag[_]) String() string {
 	return b.PrefixedString("")
 }
+
+func (b *Bag[T]) Clone() Bag[T] {
+	var clone Bag[T]
+	for id, count := range b.counts {
+		clone.AddCount(id, count)
+	}
+	return clone
+}

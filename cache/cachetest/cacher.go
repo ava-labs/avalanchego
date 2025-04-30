@@ -18,8 +18,8 @@ func IntSizeFunc(ids.ID, int64) int {
 	return IntSize
 }
 
-// Suite is the list of all Cacher tests
-var Suite = []struct {
+// Tests is a list of all Cacher tests
+var Tests = []struct {
 	Size int
 	Func func(t *testing.T, c cache.Cacher[ids.ID, int64])
 }{

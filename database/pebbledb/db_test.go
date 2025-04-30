@@ -10,7 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/dbtest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -22,7 +22,7 @@ func newDB(t testing.TB) *Database {
 }
 
 func TestInterface(t *testing.T) {
-	for name, test := range database.Tests {
+	for name, test := range dbtest.Tests {
 		t.Run(name, func(t *testing.T) {
 			db := newDB(t)
 			test(t, db)
@@ -33,26 +33,26 @@ func TestInterface(t *testing.T) {
 
 func FuzzKeyValue(f *testing.F) {
 	db := newDB(f)
-	database.FuzzKeyValue(f, db)
+	dbtest.FuzzKeyValue(f, db)
 	_ = db.Close()
 }
 
 func FuzzNewIteratorWithPrefix(f *testing.F) {
 	db := newDB(f)
-	database.FuzzNewIteratorWithPrefix(f, db)
+	dbtest.FuzzNewIteratorWithPrefix(f, db)
 	_ = db.Close()
 }
 
 func FuzzNewIteratorWithStartAndPrefix(f *testing.F) {
 	db := newDB(f)
-	database.FuzzNewIteratorWithStartAndPrefix(f, db)
+	dbtest.FuzzNewIteratorWithStartAndPrefix(f, db)
 	_ = db.Close()
 }
 
 func BenchmarkInterface(b *testing.B) {
-	for _, size := range database.BenchmarkSizes {
-		keys, values := database.SetupBenchmark(b, size[0], size[1], size[2])
-		for name, bench := range database.Benchmarks {
+	for _, size := range dbtest.BenchmarkSizes {
+		keys, values := dbtest.SetupBenchmark(b, size[0], size[1], size[2])
+		for name, bench := range dbtest.Benchmarks {
 			b.Run(fmt.Sprintf("pebble_%d_pairs_%d_keys_%d_values_%s", size[0], size[1], size[2], name), func(b *testing.B) {
 				db := newDB(b)
 				bench(b, db, keys, values)

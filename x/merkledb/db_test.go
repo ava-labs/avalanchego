@@ -14,20 +14,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/dbtest"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
-
-const defaultHistoryLength = 300
 
 // newDB returns a new merkle database with the underlying type so that tests can access unexported fields
 func newDB(ctx context.Context, db database.Database, config Config) (*merkleDB, error) {
@@ -36,22 +33,6 @@ func newDB(ctx context.Context, db database.Database, config Config) (*merkleDB,
 		return nil, err
 	}
 	return db.(*merkleDB), nil
-}
-
-func newDefaultConfig() Config {
-	return Config{
-		BranchFactor:                BranchFactor16,
-		Hasher:                      DefaultHasher,
-		RootGenConcurrency:          0,
-		HistoryLength:               defaultHistoryLength,
-		ValueNodeCacheSize:          units.MiB,
-		IntermediateNodeCacheSize:   units.MiB,
-		IntermediateWriteBufferSize: units.KiB,
-		IntermediateWriteBatchSize:  256 * units.KiB,
-		Reg:                         prometheus.NewRegistry(),
-		TraceLevel:                  InfoTrace,
-		Tracer:                      trace.Noop,
-	}
 }
 
 func Test_MerkleDB_Get_Safety(t *testing.T) {
@@ -100,7 +81,7 @@ func Test_MerkleDB_GetValues_Safety(t *testing.T) {
 
 func Test_MerkleDB_DB_Interface(t *testing.T) {
 	for _, bf := range validBranchFactors {
-		for name, test := range database.Tests {
+		for name, test := range dbtest.Tests {
 			t.Run(fmt.Sprintf("%s_%d", name, bf), func(t *testing.T) {
 				db, err := getBasicDBWithBranchFactor(bf)
 				require.NoError(t, err)
@@ -111,10 +92,10 @@ func Test_MerkleDB_DB_Interface(t *testing.T) {
 }
 
 func Benchmark_MerkleDB_DBInterface(b *testing.B) {
-	for _, size := range database.BenchmarkSizes {
-		keys, values := database.SetupBenchmark(b, size[0], size[1], size[2])
+	for _, size := range dbtest.BenchmarkSizes {
+		keys, values := dbtest.SetupBenchmark(b, size[0], size[1], size[2])
 		for _, bf := range validBranchFactors {
-			for name, bench := range database.Benchmarks {
+			for name, bench := range dbtest.Benchmarks {
 				b.Run(fmt.Sprintf("merkledb_%d_%d_pairs_%d_keys_%d_values_%s", bf, size[0], size[1], size[2], name), func(b *testing.B) {
 					db, err := getBasicDBWithBranchFactor(bf)
 					require.NoError(b, err)
@@ -133,7 +114,7 @@ func Test_MerkleDB_DB_Load_Root_From_DB(t *testing.T) {
 	db, err := New(
 		context.Background(),
 		baseDB,
-		newDefaultConfig(),
+		NewConfig(),
 	)
 	require.NoError(err)
 
@@ -161,7 +142,7 @@ func Test_MerkleDB_DB_Load_Root_From_DB(t *testing.T) {
 	db, err = New(
 		context.Background(),
 		baseDB,
-		newDefaultConfig(),
+		NewConfig(),
 	)
 	require.NoError(err)
 
@@ -175,7 +156,7 @@ func Test_MerkleDB_DB_Rebuild(t *testing.T) {
 
 	initialSize := 5_000
 
-	config := newDefaultConfig()
+	config := NewConfig()
 	config.ValueNodeCacheSize = uint(initialSize)
 	config.IntermediateNodeCacheSize = uint(initialSize)
 
@@ -232,7 +213,7 @@ func Test_MerkleDB_Failed_Batch_Commit(t *testing.T) {
 	db, err := New(
 		context.Background(),
 		memDB,
-		newDefaultConfig(),
+		NewConfig(),
 	)
 	require.NoError(err)
 
@@ -253,7 +234,7 @@ func Test_MerkleDB_Value_Cache(t *testing.T) {
 	db, err := New(
 		context.Background(),
 		memDB,
-		newDefaultConfig(),
+		NewConfig(),
 	)
 	require.NoError(err)
 
@@ -336,7 +317,7 @@ func Test_MerkleDB_CommitRangeProof_DeletesValuesInRange(t *testing.T) {
 	require.NoError(err)
 
 	// confirm there are no key.values in the proof
-	require.Empty(proof.KeyValues)
+	require.Empty(proof.KeyChanges)
 
 	// add values to be deleted by proof commit
 	batch := db.NewBatch()
@@ -902,13 +883,13 @@ const (
 )
 
 func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, tokenSize int) {
-	db, err := getBasicDBWithBranchFactor(tokenSizeToBranchFactor[tokenSize])
+	config := NewConfig()
+	config.BranchFactor = tokenSizeToBranchFactor[tokenSize]
+	db, err := New(context.Background(), memdb.New(), config)
 	require.NoError(err)
 
-	const (
-		maxProofLen  = 100
-		maxPastRoots = defaultHistoryLength
-	)
+	maxProofLen := 100
+	maxPastRoots := int(config.HistoryLength)
 
 	var (
 		values               = make(map[Key][]byte) // tracks content of the trie
@@ -957,7 +938,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 				continue
 			}
 			require.NoError(err)
-			require.LessOrEqual(len(rangeProof.KeyValues), maxProofLen)
+			require.LessOrEqual(len(rangeProof.KeyChanges), maxProofLen)
 
 			require.NoError(rangeProof.Verify(
 				context.Background(),
@@ -965,7 +946,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 				end,
 				root,
 				tokenSize,
-				db.hasher,
+				config.Hasher,
 			))
 		case opGenerateChangeProof:
 			root, err := db.GetMerkleRoot(context.Background())
@@ -1300,7 +1281,7 @@ func TestCrashRecovery(t *testing.T) {
 	merkleDB, err := newDatabase(
 		context.Background(),
 		baseDB,
-		newDefaultConfig(),
+		NewConfig(),
 		&mockMetrics{},
 	)
 	require.NoError(err)
@@ -1318,7 +1299,7 @@ func TestCrashRecovery(t *testing.T) {
 	newMerkleDB, err := newDatabase(
 		context.Background(),
 		baseDB,
-		newDefaultConfig(),
+		NewConfig(),
 		&mockMetrics{},
 	)
 	require.NoError(err)

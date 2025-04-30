@@ -8,8 +8,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
+	"os"
+	"syscall"
 	"time"
 
+	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 )
@@ -18,31 +22,29 @@ const (
 	DefaultNodeTickerInterval = 50 * time.Millisecond
 )
 
-var ErrNotRunning = errors.New("not running")
+var ErrUnrecoverableNodeHealthCheck = errors.New("failed to query node health")
 
-// WaitForHealthy blocks until Node.IsHealthy returns true or an error (including context timeout) is observed.
-func WaitForHealthy(ctx context.Context, node *Node) error {
-	if _, ok := ctx.Deadline(); !ok {
-		return fmt.Errorf("unable to wait for health for node %q with a context without a deadline", node.NodeID)
+func CheckNodeHealth(ctx context.Context, uri string) (*health.APIReply, error) {
+	// Check that the node is reporting healthy
+	healthReply, err := health.NewClient(uri).Health(ctx, nil)
+	if err == nil {
+		return healthReply, nil
 	}
-	ticker := time.NewTicker(DefaultNodeTickerInterval)
-	defer ticker.Stop()
 
-	for {
-		healthy, err := node.IsHealthy(ctx)
-		if err != nil && !errors.Is(err, ErrNotRunning) {
-			return fmt.Errorf("failed to wait for health of node %q: %w", node.NodeID, err)
+	switch t := err.(type) {
+	case *net.OpError:
+		if t.Op == "read" {
+			// Connection refused - potentially recoverable
+			return nil, err
 		}
-		if healthy {
-			return nil
-		}
-
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("failed to wait for health of node %q before timeout: %w", node.NodeID, ctx.Err())
-		case <-ticker.C:
+	case syscall.Errno:
+		if t == syscall.ECONNREFUSED {
+			// Connection refused - potentially recoverable
+			return nil, err
 		}
 	}
+	// Assume all other errors are not recoverable
+	return nil, fmt.Errorf("%w: %w", ErrUnrecoverableNodeHealthCheck, err)
 }
 
 // NodeURI associates a node ID with its API URI.
@@ -94,4 +96,12 @@ func NodesToIDs(nodes ...*Node) []ids.NodeID {
 		nodeIDs[i] = node.NodeID
 	}
 	return nodeIDs
+}
+
+func GetEnvWithDefault(envVar, defaultVal string) string {
+	val := os.Getenv(envVar)
+	if len(val) == 0 {
+		return defaultVal
+	}
+	return val
 }

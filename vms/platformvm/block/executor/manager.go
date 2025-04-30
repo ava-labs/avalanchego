@@ -4,7 +4,9 @@
 package executor
 
 import (
+	"context"
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -14,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
@@ -21,7 +24,8 @@ import (
 var (
 	_ Manager = (*manager)(nil)
 
-	ErrChainNotSynced = errors.New("chain not synced")
+	ErrChainNotSynced              = errors.New("chain not synced")
+	ErrImportTxWhilePartialSyncing = errors.New("issuing an import tx is not allowed while partial syncing")
 )
 
 type Manager interface {
@@ -64,10 +68,6 @@ func NewManager(
 
 	return &manager{
 		backend: backend,
-		verifier: &verifier{
-			backend:           backend,
-			txExecutorBackend: txExecutorBackend,
-		},
 		acceptor: &acceptor{
 			backend:      backend,
 			metrics:      metrics,
@@ -85,7 +85,6 @@ func NewManager(
 
 type manager struct {
 	*backend
-	verifier block.Visitor
 	acceptor block.Visitor
 	rejector block.Visitor
 
@@ -127,32 +126,78 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return ErrChainNotSynced
 	}
 
-	stateDiff, err := state.NewDiff(m.preferred, m)
-	if err != nil {
-		return err
+	// If partial sync is enabled, this node isn't guaranteed to have the full
+	// UTXO set from shared memory. To avoid issuing invalid transactions,
+	// issuance of an ImportTx during this state is completely disallowed.
+	if m.txExecutorBackend.Config.PartialSyncPrimaryNetwork {
+		if _, isImportTx := tx.Unsigned.(*txs.ImportTx); isImportTx {
+			return ErrImportTxWhilePartialSyncing
+		}
 	}
 
-	nextBlkTime, _, err := state.NextBlockTime(stateDiff, m.txExecutorBackend.Clk)
+	recommendedPChainHeight, err := m.ctx.ValidatorState.GetMinimumHeight(context.TODO())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to fetch P-chain height: %w", err)
+	}
+	err = executor.VerifyWarpMessages(
+		context.TODO(),
+		m.ctx.NetworkID,
+		m.ctx.ValidatorState,
+		recommendedPChainHeight,
+		tx.Unsigned,
+	)
+	if err != nil {
+		return fmt.Errorf("failed verifying warp messages: %w", err)
+	}
+
+	stateDiff, err := state.NewDiff(m.preferred, m)
+	if err != nil {
+		return fmt.Errorf("failed creating state diff: %w", err)
+	}
+
+	nextBlkTime, _, err := state.NextBlockTime(
+		m.txExecutorBackend.Config.ValidatorFeeConfig,
+		stateDiff,
+		m.txExecutorBackend.Clk,
+	)
+	if err != nil {
+		return fmt.Errorf("failed selecting next block time: %w", err)
 	}
 
 	_, err = executor.AdvanceTimeTo(m.txExecutorBackend, stateDiff, nextBlkTime)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to advance the chain time: %w", err)
 	}
 
-	feeCalculator, err := state.PickFeeCalculator(m.txExecutorBackend.Config, stateDiff)
+	if timestamp := stateDiff.GetTimestamp(); m.txExecutorBackend.Config.UpgradeConfig.IsEtnaActivated(timestamp) {
+		complexity, err := fee.TxComplexity(tx.Unsigned)
+		if err != nil {
+			return fmt.Errorf("failed to calculate tx complexity: %w", err)
+		}
+		gas, err := complexity.ToGas(m.txExecutorBackend.Config.DynamicFeeConfig.Weights)
+		if err != nil {
+			return fmt.Errorf("failed to calculate tx gas: %w", err)
+		}
+
+		// TODO: After the mempool is updated, convert this check to use the
+		// maximum mempool capacity.
+		feeState := stateDiff.GetFeeState()
+		if gas > feeState.Capacity {
+			return fmt.Errorf("tx exceeds current gas capacity: %d > %d", gas, feeState.Capacity)
+		}
+	}
+
+	feeCalculator := state.PickFeeCalculator(m.txExecutorBackend.Config, stateDiff)
+	_, _, _, err = executor.StandardTx(
+		m.txExecutorBackend,
+		feeCalculator,
+		tx,
+		stateDiff,
+	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed execution: %w", err)
 	}
-
-	return tx.Unsigned.Visit(&executor.StandardTxExecutor{
-		Backend:       m.txExecutorBackend,
-		State:         stateDiff,
-		FeeCalculator: feeCalculator,
-		Tx:            tx,
-	})
+	return nil
 }
 
 func (m *manager) VerifyUniqueInputs(blkID ids.ID, inputs set.Set[ids.ID]) error {
