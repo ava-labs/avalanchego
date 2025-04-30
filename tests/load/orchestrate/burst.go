@@ -76,7 +76,7 @@ func (o *BurstOrchestrator[T, U]) Execute(ctx context.Context) error {
 		observerCancel()
 	}()
 
-	// blocks until either all of the issuers have finished or our context
+	// blocks until either all of the observers have finished or our context
 	// is cancelled signalling for early termination (with an error)
 	if err := observerGroup.Wait(); err != nil {
 		return fmt.Errorf("observers: %w", err)

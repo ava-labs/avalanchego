@@ -74,7 +74,7 @@ func subscriptionChToSignal(listenStop <-chan struct{}, listenDone, ready chan<-
 	}
 }
 
-// makeRunErrCh makes sure the [newHeadNotifyer] fully stops when
+// makeRunErrCh makes sure the [headNotifier] fully stops when
 // a subscription error is encountered.
 func (n *headNotifier) makeRunErrCh() <-chan error {
 	errCh := make(chan error)
