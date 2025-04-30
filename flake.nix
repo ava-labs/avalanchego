@@ -33,6 +33,9 @@
         default = pkgs.mkShell {
           # The Nix packages provided in the environment
           packages = with pkgs; [
+            # Build requirements
+            git
+
             # Task runner
             go-task
 
