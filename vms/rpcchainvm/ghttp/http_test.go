@@ -149,12 +149,11 @@ func TestHttpResponse(t *testing.T) {
 			)
 			require.NoError(err)
 
-			client := NewClient(httppb.NewHTTPClient(conn))
-
 			recorder := &httptest.ResponseRecorder{
 				Body: bytes.NewBuffer(nil),
 			}
 
+			client := NewClient(httppb.NewHTTPClient(conn))
 			client.ServeHTTP(recorder, &tt.request)
 
 			require.Equal(http.StatusOK, recorder.Code)
