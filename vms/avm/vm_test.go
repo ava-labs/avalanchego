@@ -517,9 +517,6 @@ func TestIssueImportTx(t *testing.T) {
 
 	env.vm.ctx.Lock.Lock()
 
-	assertIndexedTX(t, env.vm.db, 0, key.PublicKey().Address(), txAssetID.AssetID(), tx.ID())
-	assertLatestIdx(t, env.vm.db, key.PublicKey().Address(), avaxID, 1)
-
 	id := utxoID.InputID()
 	_, err = env.vm.ctx.SharedMemory.Get(constants.PlatformChainID, [][]byte{id[:]})
 	require.ErrorIs(err, database.ErrNotFound)
@@ -583,9 +580,6 @@ func TestForceAcceptImportTx(t *testing.T) {
 
 	require.NoError(parsedTx.Verify(context.Background()))
 	require.NoError(parsedTx.Accept(context.Background()))
-
-	assertIndexedTX(t, env.vm.db, 0, key.PublicKey().Address(), txAssetID.AssetID(), tx.ID())
-	assertLatestIdx(t, env.vm.db, key.PublicKey().Address(), avaxID, 1)
 
 	id := utxoID.InputID()
 	_, err = env.vm.ctx.SharedMemory.Get(constants.PlatformChainID, [][]byte{id[:]})
@@ -671,7 +665,6 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 
 	var (
 		avaxID     = genesisTx.ID()
-		assetID    = avax.Asset{ID: avaxID}
 		key        = keys[0]
 		kc         = secp256k1fx.NewKeychain(key)
 		to         = key.PublicKey().Address()
@@ -712,7 +705,4 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 
 	_, err = peerSharedMemory.Get(env.vm.ctx.ChainID, [][]byte{utxoID[:]})
 	require.ErrorIs(err, database.ErrNotFound)
-
-	assertIndexedTX(t, env.vm.db, 0, key.PublicKey().Address(), assetID.AssetID(), tx.ID())
-	assertLatestIdx(t, env.vm.db, key.PublicKey().Address(), assetID.AssetID(), 1)
 }

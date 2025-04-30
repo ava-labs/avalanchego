@@ -14,7 +14,7 @@ import (
 
 var _ runtime.Initializer = (*initializer)(nil)
 
-// Subprocess VM Runtime intializer.
+// Subprocess VM Runtime initializer.
 type initializer struct {
 	path string
 

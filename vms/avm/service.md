@@ -1,4 +1,4 @@
-The [X-Chain](/learn/avalanche/avalanche-platform.md#x-chain),
+The [X-Chain](https://build.avax.network/docs/quick-start/primary-network#x-chain),
 Avalanche's native platform for creating and trading assets, is an instance of the Avalanche Virtual
 Machine (AVM). This API allows clients to create and trade assets on the X-Chain and other instances
 of the AVM.
@@ -6,7 +6,7 @@ of the AVM.
 ## Format
 
 This API uses the `json 2.0` RPC format. For more information on making JSON RPC calls, see
-[here](/reference/standards/guides/issuing-api-calls.md).
+[here](https://build.avax.network/docs/api-reference/guides/issuing-api-calls).
 
 ## Endpoints
 
@@ -170,76 +170,6 @@ curl -X POST --data '{
   "result": {
     "bytes": "0x0000000000010006617373657431000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000f6d794669786564436170417373657400044d464341000000000100000000000000010000000700000000000186a10000000000000000000000010000000152b219bc1b9ab0a9f2e3f9216e4460bd5db8d153bfa57c3c",
     "encoding": "hex"
-  },
-  "id": 1
-}
-```
-
-### `avm.getAddressTxs`
-
-<Callout type="warn">
-Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
-</Callout>
-
-Returns all transactions that change the balance of the given address. A transaction is said to
-change an address's balance if either is true:
-
-- A UTXO that the transaction consumes was at least partially owned by the address.
-- A UTXO that the transaction produces is at least partially owned by the address.
-
-<Callout title="Note" type="note">
-Indexing (`index-transactions`) must be enabled in the X-chain config.
-</Callout>
-
-**Signature:**
-
-```sh
-avm.getAddressTxs({
-    address: string,
-    cursor: uint64,     // optional, leave empty to get the first page
-    assetID: string,
-    pageSize: uint64    // optional, defaults to 1024
-}) -> {
-    txIDs: []string,
-    cursor: uint64,
-}
-```
-
-**Request Parameters:**
-
-- `address`: The address for which we're fetching related transactions
-- `assetID`: Only return transactions that changed the balance of this asset. Must be an ID or an
-  alias for an asset.
-- `pageSize`: Number of items to return per page. Optional. Defaults to 1024.
-
-**Response Parameter:**
-
-- `txIDs`: List of transaction IDs that affected the balance of this address.
-- `cursor`: Page number or offset. Use this in request to get the next page.
-
-**Example Call:**
-
-```sh
-curl -X POST --data '{
-  "jsonrpc":"2.0",
-  "id"     : 1,
-  "method" :"avm.getAddressTxs",
-  "params" :{
-      "address":"X-local1kpprmfpzzm5lxyene32f6lr7j0aj7gxsu6hp9y",
-      "assetID":"AVAX",
-      "pageSize":20
-  }
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/X
-```
-
-**Example Response:**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "result": {
-    "txIDs": ["SsJF7KKwxiUJkczygwmgLqo3XVRotmpKP8rMp74cpLuNLfwf6"],
-    "cursor": "1"
   },
   "id": 1
 }
