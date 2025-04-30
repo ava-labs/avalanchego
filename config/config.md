@@ -563,13 +563,13 @@ The identity of the network the node should connect to. Can be one of:
 AvalancheGo supports collecting and exporting [OpenTelemetry](https://opentelemetry.io/) traces.
 This might be useful for debugging, performance analysis, or monitoring.
 
-#### `--tracing-exporter-type`(string)
-
-Type of exporter to use for tracing. Options are [`disabled`,`grpc`,`http`]. Defaults to `disabled`.
-
 #### `--tracing-endpoint` (string)
 
 The endpoint to export trace data to. Defaults to `localhost:4317` if `--tracing-exporter-type` is set to `grpc` and `localhost:4318` if `--tracing-exporter-type` is set to `http`.
+
+#### `--tracing-exporter-type`(string)
+
+Type of exporter to use for tracing. Options are [`disabled`,`grpc`,`http`]. Defaults to `disabled`.
 
 #### `--tracing-insecure` (string)
 
