@@ -4,12 +4,10 @@
 package warp
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"math/big"
 
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -37,11 +35,9 @@ type Signature interface {
 	//
 	// Invariant: [msg] is correctly initialized.
 	Verify(
-		ctx context.Context,
 		msg *UnsignedMessage,
 		networkID uint32,
-		pChainState validators.State,
-		pChainHeight uint64,
+		validators CanonicalValidatorSet,
 		quorumNum uint64,
 		quorumDen uint64,
 	) error
@@ -68,26 +64,14 @@ func (s *BitSetSignature) NumSigners() (int, error) {
 }
 
 func (s *BitSetSignature) Verify(
-	ctx context.Context,
 	msg *UnsignedMessage,
 	networkID uint32,
-	pChainState validators.State,
-	pChainHeight uint64,
+	validators CanonicalValidatorSet,
 	quorumNum uint64,
 	quorumDen uint64,
 ) error {
 	if msg.NetworkID != networkID {
 		return ErrWrongNetworkID
-	}
-
-	subnetID, err := pChainState.GetSubnetID(ctx, msg.SourceChainID)
-	if err != nil {
-		return err
-	}
-
-	vdrs, totalWeight, err := GetCanonicalValidatorSet(ctx, pChainState, pChainHeight, subnetID)
-	if err != nil {
-		return err
 	}
 
 	// Parse signer bit vector
@@ -101,18 +85,18 @@ func (s *BitSetSignature) Verify(
 	}
 
 	// Get the validators that (allegedly) signed the message.
-	signers, err := FilterValidators(signerIndices, vdrs)
+	signers, err := FilterValidators(signerIndices, validators.Validators)
 	if err != nil {
 		return err
 	}
 
-	// Because [signers] is a subset of [vdrs], this can never error.
+	// Because [signers] is a subset of [validators.Validators], this can never error.
 	sigWeight, _ := SumWeight(signers)
 
 	// Make sure the signature's weight is sufficient.
 	err = VerifyWeight(
 		sigWeight,
-		totalWeight,
+		validators.TotalWeight,
 		quorumNum,
 		quorumDen,
 	)

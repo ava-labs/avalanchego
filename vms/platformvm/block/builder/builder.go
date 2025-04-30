@@ -355,6 +355,9 @@ func buildBlock(
 		)
 	}
 	if err != nil {
+		builder.txExecutorBackend.Ctx.Log.Warn("failed to pack block transactions",
+			zap.Error(err),
+		)
 		return nil, fmt.Errorf("failed to pack block txs: %w", err)
 	}
 
@@ -485,9 +488,26 @@ func packEtnaBlockTxs(
 		blockComplexity gas.Dimensions
 		feeCalculator   = state.PickFeeCalculator(backend.Config, stateDiff)
 	)
+
+	backend.Ctx.Log.Debug("starting to pack block txs",
+		zap.Stringer("parentID", parentID),
+		zap.Time("blockTimestamp", timestamp),
+		zap.Uint64("capacity", uint64(capacity)),
+		zap.Int("mempoolLen", mempool.Len()),
+	)
 	for {
+		currentBlockGas, err := blockComplexity.ToGas(backend.Config.DynamicFeeConfig.Weights)
+		if err != nil {
+			return nil, err
+		}
+
 		tx, exists := mempool.Peek()
 		if !exists {
+			backend.Ctx.Log.Debug("mempool is empty",
+				zap.Uint64("capacity", uint64(capacity)),
+				zap.Uint64("blockGas", uint64(currentBlockGas)),
+				zap.Int("blockLen", len(blockTxs)),
+			)
 			break
 		}
 
@@ -504,6 +524,12 @@ func packEtnaBlockTxs(
 			return nil, err
 		}
 		if newBlockGas > capacity {
+			backend.Ctx.Log.Debug("block is full",
+				zap.Uint64("nextBlockGas", uint64(newBlockGas)),
+				zap.Uint64("capacity", uint64(capacity)),
+				zap.Uint64("blockGas", uint64(currentBlockGas)),
+				zap.Int("blockLen", len(blockTxs)),
+			)
 			break
 		}
 
@@ -549,6 +575,7 @@ func executeTx(
 
 	// Invariant: [tx] has already been syntactically verified.
 
+	txID := tx.ID()
 	err := txexecutor.VerifyWarpMessages(
 		ctx,
 		backend.Ctx.NetworkID,
@@ -557,7 +584,11 @@ func executeTx(
 		tx.Unsigned,
 	)
 	if err != nil {
-		txID := tx.ID()
+		backend.Ctx.Log.Debug("transaction failed warp verification",
+			zap.Stringer("txID", txID),
+			zap.Error(err),
+		)
+
 		mempool.MarkDropped(txID, err)
 		return false, nil
 	}
@@ -574,23 +605,41 @@ func executeTx(
 		txDiff,
 	)
 	if err != nil {
-		txID := tx.ID()
+		backend.Ctx.Log.Debug("transaction failed execution",
+			zap.Stringer("txID", txID),
+			zap.Error(err),
+		)
+
 		mempool.MarkDropped(txID, err)
 		return false, nil
 	}
 
 	if inputs.Overlaps(txInputs) {
-		txID := tx.ID()
+		// This log is a warn because the mempool should not have allowed this
+		// transaction to be included.
+		backend.Ctx.Log.Warn("transaction conflicts with prior transaction",
+			zap.Stringer("txID", txID),
+			zap.Error(err),
+		)
+
 		mempool.MarkDropped(txID, blockexecutor.ErrConflictingBlockTxs)
 		return false, nil
 	}
 	if err := manager.VerifyUniqueInputs(parentID, txInputs); err != nil {
-		txID := tx.ID()
+		backend.Ctx.Log.Debug("transaction conflicts with ancestor's import transaction",
+			zap.Stringer("txID", txID),
+			zap.Error(err),
+		)
+
 		mempool.MarkDropped(txID, err)
 		return false, nil
 	}
 	inputs.Union(txInputs)
 
+	backend.Ctx.Log.Debug("successfully executed transaction",
+		zap.Stringer("txID", txID),
+		zap.Error(err),
+	)
 	txDiff.AddTx(tx, status.Committed)
 	return true, txDiff.Apply(stateDiff)
 }

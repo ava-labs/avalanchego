@@ -5,7 +5,6 @@ package faultinjection
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
@@ -27,26 +26,25 @@ var _ = ginkgo.Describe("Duplicate node handling", func() {
 		network := e2e.GetEnv(tc).GetNetwork()
 
 		tc.By("creating new node")
-		node1 := e2e.AddEphemeralNode(tc, network, tmpnet.FlagsMap{})
+		node1 := e2e.AddEphemeralNode(tc, network, tmpnet.NewEphemeralNode(tmpnet.FlagsMap{}))
 		e2e.WaitForHealthy(tc, node1)
 
 		tc.By("checking that the new node is connected to its peers")
 		checkConnectedPeers(tc, network.Nodes, node1)
 
 		tc.By("creating a second new node with the same staking keypair as the first new node")
-		node1Flags := node1.Flags
-		node2Flags := tmpnet.FlagsMap{
-			config.StakingTLSKeyContentKey: node1Flags[config.StakingTLSKeyContentKey],
-			config.StakingCertContentKey:   node1Flags[config.StakingCertContentKey],
-			// Construct a unique data dir to ensure the two nodes' data will be stored
-			// separately. Usually the dir name is the node ID but in this one case the nodes have
-			// the same node ID.
-			config.DataDirKey: fmt.Sprintf("%s-second", node1Flags[config.DataDirKey]),
-		}
-		node2 := e2e.AddEphemeralNode(tc, network, node2Flags)
+		node2 := tmpnet.NewEphemeralNode(tmpnet.FlagsMap{
+			config.StakingTLSKeyContentKey: node1.Flags[config.StakingTLSKeyContentKey],
+			config.StakingCertContentKey:   node1.Flags[config.StakingCertContentKey],
+		})
+		// Construct a unique data dir to ensure the two nodes' data will be stored
+		// separately. Usually the dir name is the node ID but in this one case the nodes have
+		// the same node ID.
+		node2.DataDir = node1.DataDir + "-second"
+		_ = e2e.AddEphemeralNode(tc, network, node2)
 
 		tc.By("checking that the second new node fails to become healthy before timeout")
-		err := tmpnet.WaitForHealthy(tc.DefaultContext(), node2)
+		err := node2.WaitForHealthy(tc.DefaultContext())
 		require.ErrorIs(err, context.DeadlineExceeded)
 
 		tc.By("stopping the first new node")
@@ -62,7 +60,8 @@ var _ = ginkgo.Describe("Duplicate node handling", func() {
 	})
 })
 
-// Check that a new node is connected to existing nodes and vice versa
+// Check that a new node is connected to existing nodes and vice versa.
+// Safe to use Node.URI directly as long as this test isn't running against kube-hosted nodes.
 func checkConnectedPeers(tc tests.TestContext, existingNodes []*tmpnet.Node, newNode *tmpnet.Node) {
 	require := require.New(tc)
 
@@ -76,6 +75,11 @@ func checkConnectedPeers(tc tests.TestContext, existingNodes []*tmpnet.Node, new
 	}
 
 	for _, existingNode := range existingNodes {
+		if existingNode.IsEphemeral {
+			// Ephemeral nodes may not be running
+			continue
+		}
+
 		// Check that the existing node is a peer of the new node
 		require.True(peerIDs.Contains(existingNode.NodeID))
 

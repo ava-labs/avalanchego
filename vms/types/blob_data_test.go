@@ -38,7 +38,7 @@ func TestJSON(t *testing.T) {
 
 			jsonBytes, err := json.Marshal(test.value)
 			require.NoError(err)
-			require.Equal(test.expectedJSON, string(jsonBytes))
+			require.JSONEq(test.expectedJSON, string(jsonBytes))
 
 			var unmarshaled JSONByteSlice
 			require.NoError(json.Unmarshal(jsonBytes, &unmarshaled))

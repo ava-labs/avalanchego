@@ -37,9 +37,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/utxo"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/index"
-	"github.com/ava-labs/avalanchego/vms/components/keystore"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 
 	blockbuilder "github.com/ava-labs/avalanchego/vms/avm/block/builder"
@@ -104,8 +101,6 @@ type VM struct {
 	fxs           []*extensions.ParsedFx
 
 	walletService WalletService
-
-	addressTxsIndexer index.AddressTxsIndexer
 
 	txBackend *txexecutor.Backend
 
@@ -242,21 +237,6 @@ func (vm *VM) Initialize(
 	vm.walletService.vm = vm
 	vm.walletService.pendingTxs = linked.NewHashmap[ids.ID, *txs.Tx]()
 
-	// use no op impl when disabled in config
-	if avmConfig.IndexTransactions {
-		vm.ctx.Log.Warn("deprecated address transaction indexing is enabled")
-		vm.addressTxsIndexer, err = index.NewIndexer(vm.db, vm.ctx.Log, "", vm.registerer, avmConfig.IndexAllowIncomplete)
-		if err != nil {
-			return fmt.Errorf("failed to initialize address transaction indexer: %w", err)
-		}
-	} else {
-		vm.ctx.Log.Info("address transaction indexing is disabled")
-		vm.addressTxsIndexer, err = index.NewNoIndexer(vm.db, avmConfig.IndexAllowIncomplete)
-		if err != nil {
-			return fmt.Errorf("failed to initialize disabled indexer: %w", err)
-		}
-	}
-
 	vm.txBackend = &txexecutor.Backend{
 		Ctx:           ctx,
 		Config:        &vm.Config,
@@ -390,9 +370,8 @@ func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, erro
 
 func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<- common.Message) error {
 	time := vm.Config.Upgrades.CortinaTime
-	err := vm.state.InitializeChainState(stopVertexID, time)
-	if err != nil {
-		return err
+	if err := vm.state.InitializeChainState(stopVertexID, time); err != nil {
+		return fmt.Errorf("failed to initialize chain state: %w", err)
 	}
 
 	mempool, err := xmempool.New("mempool", vm.registerer, toEngine)
@@ -577,54 +556,6 @@ func (vm *VM) initState(tx *txs.Tx) {
 	}
 }
 
-// LoadUser returns:
-// 1) The UTXOs that reference one or more addresses controlled by the given user
-// 2) A keychain that contains this user's keys
-// If [addrsToUse] has positive length, returns UTXOs that reference one or more
-// addresses controlled by the given user that are also in [addrsToUse].
-func (vm *VM) LoadUser(
-	username string,
-	password string,
-	addrsToUse set.Set[ids.ShortID],
-) (
-	[]*avax.UTXO,
-	*secp256k1fx.Keychain,
-	error,
-) {
-	user, err := keystore.NewUserFromKeystore(vm.ctx.Keystore, username, password)
-	if err != nil {
-		return nil, nil, err
-	}
-	// Drop any potential error closing the database to report the original
-	// error
-	defer user.Close()
-
-	kc, err := keystore.GetKeychain(user, addrsToUse)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	utxos, err := avax.GetAllUTXOs(vm.state, kc.Addresses())
-	if err != nil {
-		return nil, nil, fmt.Errorf("problem retrieving user's UTXOs: %w", err)
-	}
-
-	return utxos, kc, user.Close()
-}
-
-// selectChangeAddr returns the change address to be used for [kc] when [changeAddr] is given
-// as the optional change address argument
-func (vm *VM) selectChangeAddr(defaultAddr ids.ShortID, changeAddr string) (ids.ShortID, error) {
-	if changeAddr == "" {
-		return defaultAddr, nil
-	}
-	addr, err := avax.ParseServiceAddress(vm, changeAddr)
-	if err != nil {
-		return ids.ShortID{}, fmt.Errorf("couldn't parse changeAddr: %w", err)
-	}
-	return addr, nil
-}
-
 // lookupAssetID looks for an ID aliased by [asset] and if it fails
 // attempts to parse [asset] into an ID
 func (vm *VM) lookupAssetID(asset string) (ids.ID, error) {
@@ -639,42 +570,7 @@ func (vm *VM) lookupAssetID(asset string) (ids.ID, error) {
 
 // Invariant: onAccept is called when [tx] is being marked as accepted, but
 // before its state changes are applied.
-// Invariant: any error returned by onAccept should be considered fatal.
 // TODO: Remove [onAccept] once the deprecated APIs this powers are removed.
-func (vm *VM) onAccept(tx *txs.Tx) error {
-	// Fetch the input UTXOs
-	txID := tx.ID()
-	inputUTXOIDs := tx.Unsigned.InputUTXOs()
-	inputUTXOs := make([]*avax.UTXO, 0, len(inputUTXOIDs))
-	for _, utxoID := range inputUTXOIDs {
-		// Don't bother fetching the input UTXO if its symbolic
-		if utxoID.Symbolic() {
-			continue
-		}
-
-		utxo, err := vm.state.GetUTXO(utxoID.InputID())
-		if err == database.ErrNotFound {
-			vm.ctx.Log.Debug("dropping utxo from index",
-				zap.Stringer("txID", txID),
-				zap.Stringer("utxoTxID", utxoID.TxID),
-				zap.Uint32("utxoOutputIndex", utxoID.OutputIndex),
-			)
-			continue
-		}
-		if err != nil {
-			// should never happen because the UTXO was previously verified to
-			// exist
-			return fmt.Errorf("error finding UTXO %s: %w", utxoID, err)
-		}
-		inputUTXOs = append(inputUTXOs, utxo)
-	}
-
-	outputUTXOs := tx.UTXOs()
-	// index input and output UTXOs
-	if err := vm.addressTxsIndexer.Accept(txID, inputUTXOs, outputUTXOs); err != nil {
-		return fmt.Errorf("error indexing tx: %w", err)
-	}
-
-	vm.walletService.decided(txID)
-	return nil
+func (vm *VM) onAccept(tx *txs.Tx) {
+	vm.walletService.decided(tx.ID())
 }

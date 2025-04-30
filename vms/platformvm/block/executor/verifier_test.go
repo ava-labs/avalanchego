@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -43,7 +44,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool/mempoolmock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -53,9 +53,10 @@ import (
 )
 
 type testVerifierConfig struct {
-	DB       database.Database
-	Upgrades upgrade.Config
-	Context  *snow.Context
+	DB                 database.Database
+	Upgrades           upgrade.Config
+	Context            *snow.Context
+	ValidatorFeeConfig validatorfee.Config
 }
 
 func newTestVerifier(t testing.TB, c testVerifierConfig) *verifier {
@@ -69,6 +70,9 @@ func newTestVerifier(t testing.TB, c testVerifierConfig) *verifier {
 	}
 	if c.Context == nil {
 		c.Context = snowtest.Context(t, constants.PlatformChainID)
+	}
+	if c.ValidatorFeeConfig == (validatorfee.Config{}) {
+		c.ValidatorFeeConfig = genesis.LocalParams.ValidatorFeeConfig
 	}
 
 	mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
@@ -98,10 +102,8 @@ func newTestVerifier(t testing.TB, c testVerifierConfig) *verifier {
 		},
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Internal{
-				CreateAssetTxFee:       genesis.LocalParams.CreateAssetTxFee,
-				StaticFeeConfig:        genesis.LocalParams.StaticFeeConfig,
 				DynamicFeeConfig:       genesis.LocalParams.DynamicFeeConfig,
-				ValidatorFeeConfig:     genesis.LocalParams.ValidatorFeeConfig,
+				ValidatorFeeConfig:     c.ValidatorFeeConfig,
 				SybilProtectionEnabled: true,
 				UpgradeConfig:          c.Upgrades,
 			},
@@ -452,7 +454,8 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
-	mempool := mempoolmock.NewMempool(ctrl)
+	mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+	require.NoError(err)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	parentOnDecisionState := state.NewMockDiff(ctrl)
@@ -525,7 +528,8 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
-	mempool := mempoolmock.NewMempool(ctrl)
+	mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+	require.NoError(err)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	parentOnDecisionState := state.NewMockDiff(ctrl)
@@ -599,7 +603,8 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
-	mempool := mempoolmock.NewMempool(ctrl)
+	mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+	require.NoError(err)
 	parentID := ids.GenerateTestID()
 
 	backend := &backend{
@@ -669,7 +674,8 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 
 			// Create mocked dependencies.
 			s := state.NewMockState(ctrl)
-			mempool := mempoolmock.NewMempool(ctrl)
+			mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+			require.NoError(err)
 			parentID := ids.GenerateTestID()
 			parentStatelessBlk := block.NewMockBlock(ctrl)
 			parentHeight := uint64(1)
@@ -769,7 +775,8 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 
 			// Create mocked dependencies.
 			s := state.NewMockState(ctrl)
-			mempool := mempoolmock.NewMempool(ctrl)
+			mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+			require.NoError(err)
 			parentID := ids.GenerateTestID()
 			parentStatelessBlk := block.NewMockBlock(ctrl)
 			parentHeight := uint64(1)
@@ -837,7 +844,8 @@ func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) 
 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
-	mempool := mempoolmock.NewMempool(ctrl)
+	mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+	require.NoError(err)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	parentOnCommitState := state.NewMockDiff(ctrl)
@@ -893,7 +901,8 @@ func TestVerifierVisitBanffStandardBlockWithProposalBlockParent(t *testing.T) {
 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
-	mempool := mempoolmock.NewMempool(ctrl)
+	mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+	require.NoError(err)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	parentTime := time.Now()
@@ -1218,11 +1227,11 @@ func TestBlockExecutionWithComplexity(t *testing.T) {
 }
 
 func TestDeactivateLowBalanceL1Validators(t *testing.T) {
-	sk, err := bls.NewSecretKey()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 
 	var (
-		pk      = bls.PublicFromSecretKey(sk)
+		pk      = sk.PublicKey()
 		pkBytes = bls.PublicKeyToUncompressedBytes(pk)
 
 		newL1Validator = func(endAccumulatedFee uint64) state.L1Validator {
@@ -1241,9 +1250,10 @@ func TestDeactivateLowBalanceL1Validators(t *testing.T) {
 	)
 
 	tests := []struct {
-		name                 string
-		initialL1Validators  []state.L1Validator
-		expectedL1Validators []state.L1Validator
+		name                                  string
+		initialL1Validators                   []state.L1Validator
+		expectedL1Validators                  []state.L1Validator
+		expectedLowBalanceL1ValidatorsEvicted bool
 	}{
 		{
 			name: "no L1 validators",
@@ -1253,6 +1263,7 @@ func TestDeactivateLowBalanceL1Validators(t *testing.T) {
 			initialL1Validators: []state.L1Validator{
 				fractionalTimeL1Validator0,
 			},
+			expectedLowBalanceL1ValidatorsEvicted: true,
 		},
 		{
 			name: "fractional L1 validators are not undercharged",
@@ -1260,6 +1271,7 @@ func TestDeactivateLowBalanceL1Validators(t *testing.T) {
 				fractionalTimeL1Validator0,
 				fractionalTimeL1Validator1,
 			},
+			expectedLowBalanceL1ValidatorsEvicted: true,
 		},
 		{
 			name: "whole L1 validators are not overcharged",
@@ -1279,6 +1291,7 @@ func TestDeactivateLowBalanceL1Validators(t *testing.T) {
 			expectedL1Validators: []state.L1Validator{
 				wholeTimeL1Validator,
 			},
+			expectedLowBalanceL1ValidatorsEvicted: true,
 		},
 	}
 	for _, test := range tests {
@@ -1299,7 +1312,9 @@ func TestDeactivateLowBalanceL1Validators(t *testing.T) {
 				MinPrice:                 gas.Price(2 * units.NanoAvax), // Min price is increased to allow fractional fees
 				ExcessConversionConstant: genesis.LocalParams.ValidatorFeeConfig.ExcessConversionConstant,
 			}
-			require.NoError(deactivateLowBalanceL1Validators(config, diff))
+			lowBalanceL1ValidatorsEvicted, err := deactivateLowBalanceL1Validators(config, diff)
+			require.NoError(err)
+			require.Equal(test.expectedLowBalanceL1ValidatorsEvicted, lowBalanceL1ValidatorsEvicted)
 
 			l1Validators, err := diff.GetActiveL1ValidatorsIterator()
 			require.NoError(err)
@@ -1307,6 +1322,98 @@ func TestDeactivateLowBalanceL1Validators(t *testing.T) {
 				test.expectedL1Validators,
 				iterator.ToSlice(l1Validators),
 			)
+		})
+	}
+}
+
+func TestDeactivateLowBalanceL1ValidatorBlockChanges(t *testing.T) {
+	signer, err := localsigner.New()
+	require.NoError(t, err)
+
+	fractionalTimeL1Validator := state.L1Validator{
+		ValidationID:      ids.GenerateTestID(),
+		SubnetID:          ids.GenerateTestID(),
+		NodeID:            ids.GenerateTestNodeID(),
+		PublicKey:         bls.PublicKeyToUncompressedBytes(signer.PublicKey()),
+		Weight:            1,
+		EndAccumulatedFee: 3 * units.NanoAvax, // lasts 1.5 seconds
+	}
+
+	tests := []struct {
+		name              string
+		currentFork       upgradetest.Fork
+		durationToAdvance time.Duration
+		networkID         uint32
+		expectedErr       error
+	}{
+		{
+			name:              "Before F Upgrade - no L1 validators evicted",
+			currentFork:       upgradetest.Etna,
+			durationToAdvance: 0,
+			networkID:         constants.UnitTestID,
+			expectedErr:       ErrStandardBlockWithoutChanges,
+		},
+		{
+			name:              "After F Upgrade - no L1 validators evicted",
+			currentFork:       upgradetest.Fortuna,
+			durationToAdvance: 0,
+			networkID:         constants.UnitTestID,
+			expectedErr:       ErrStandardBlockWithoutChanges,
+		},
+		{
+			name:              "Before F Upgrade - L1 validators evicted",
+			currentFork:       upgradetest.Etna,
+			durationToAdvance: time.Second,
+			networkID:         constants.UnitTestID,
+		},
+		{
+			name:              "After F Upgrade - L1 validators evicted",
+			currentFork:       upgradetest.Fortuna,
+			durationToAdvance: time.Second,
+			networkID:         constants.UnitTestID,
+		},
+		{
+			name:              "Before F Upgrade - L1 validators evicted - on Fuji",
+			currentFork:       upgradetest.Etna,
+			durationToAdvance: time.Second,
+			networkID:         constants.FujiID,
+		},
+		{
+			name:              "After F Upgrade - L1 validators evicted - on Fuji",
+			currentFork:       upgradetest.Fortuna,
+			durationToAdvance: time.Second,
+			networkID:         constants.FujiID,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			ctx := snowtest.Context(t, constants.PlatformChainID)
+			ctx.NetworkID = test.networkID
+			verifier := newTestVerifier(t, testVerifierConfig{
+				Upgrades: upgradetest.GetConfig(test.currentFork),
+				Context:  ctx,
+				ValidatorFeeConfig: validatorfee.Config{
+					Capacity:                 genesis.LocalParams.ValidatorFeeConfig.Capacity,
+					Target:                   genesis.LocalParams.ValidatorFeeConfig.Target,
+					MinPrice:                 gas.Price(2 * units.NanoAvax), // Min price is increased to allow fractional fees
+					ExcessConversionConstant: genesis.LocalParams.ValidatorFeeConfig.ExcessConversionConstant,
+				},
+			})
+
+			require.NoError(verifier.state.PutL1Validator(fractionalTimeL1Validator))
+
+			blk, err := block.NewBanffStandardBlock(
+				genesistest.DefaultValidatorStartTime.Add(test.durationToAdvance),
+				verifier.state.GetLastAccepted(),
+				1,   // This block is built on top of the genesis
+				nil, // There are no transactions in the block
+			)
+			require.NoError(err)
+
+			err = verifier.BanffStandardBlock(blk)
+			require.ErrorIs(err, test.expectedErr)
 		})
 	}
 }

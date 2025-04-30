@@ -1,57 +1,36 @@
----
-tags: [Nodes]
-description: This document lists all available configuration and flags for AvalancheGo.
-sidebar_label: AvalancheGo Configs + Flags
-pagination_label: AvalancheGo Configs and Flags
-sidebar_position: 0
----
-
 # AvalancheGo Configs and Flags
 
 <!-- markdownlint-disable MD001 -->
 
 You can specify the configuration of a node with the arguments below.
 
-## Data Directory
+## APIs
 
-#### `--data-dir` (string)
+#### `--api-admin-enabled` (boolean)
 
-Sets the base data directory where default sub-directories will be placed unless otherwise specified.
-Defaults to `$HOME/.avalanchego`.
+If set to `true`, this node will expose the Admin API. Defaults to `false`.
+See [here](https://build.avax.network/docs/api-reference/admin-api) for more information.
 
-## Config File
+#### `--api-health-enabled` (boolean)
 
-#### `--config-file` (string)
+If set to `false`, this node will not expose the Health API. Defaults to `true`. See
+[here](https://build.avax.network/docs/api-reference/health-api) for more information.
 
-Path to a JSON file that specifies this node's configuration. Command line
-arguments will override arguments set in the config file. This flag is ignored
-if `--config-file-content` is specified.
+#### `--index-enabled` (boolean)
 
-Example JSON config file:
+If set to `true`, this node will enable the indexer and the Index API will be
+available. Defaults to `false`. See
+[here](https://build.avax.network/docs/api-reference/index-api) for more information.
 
-```json
-{
-  "log-level": "debug"
-}
-```
+#### `--api-info-enabled` (boolean)
 
-:::tip
-[Install Script](/nodes/run/with-installer/installing-avalanchego.md) creates the
-node config file at `~/.avalanchego/configs/node.json`. No default file is
-created if [AvalancheGo is built from source](/nodes/run/node-manually.md), you
-would need to create it manually if needed.
-:::
+If set to `false`, this node will not expose the Info API. Defaults to `true`. See
+[here](https://build.avax.network/docs/api-reference/info-api) for more information.
 
-#### `--config-file-content` (string)
+#### `--api-metrics-enabled` (boolean)
 
-As an alternative to `--config-file`, it allows specifying base64 encoded config
-content.
-
-#### `--config-file-content-type` (string)
-
-Specifies the format of the base64 encoded config content. JSON, TOML, YAML are
-among currently supported file format (see
-[here](https://github.com/spf13/viper#reading-config-files) for full list). Defaults to `JSON`.
+If set to `false`, this node will not expose the Metrics API. Defaults to
+`true`. See [here](https://build.avax.network/docs/api-reference/metrics-api) for more information.
 
 ## Avalanche Community Proposals
 
@@ -65,51 +44,15 @@ set of [Avalanche Community Proposals](https://github.com/avalanche-foundation/A
 The `--acp-object` flag allows an AvalancheGo node to indicate objection for a
 set of [Avalanche Community Proposals](https://github.com/avalanche-foundation/ACPs).
 
-## APIs
-
-#### `--api-admin-enabled` (boolean)
-
-If set to `true`, this node will expose the Admin API. Defaults to `false`.
-See [here](/reference/avalanchego/admin-api.md) for more information.
-
-#### `--api-health-enabled` (boolean)
-
-If set to `false`, this node will not expose the Health API. Defaults to `true`. See
-[here](/reference/avalanchego/health-api.md) for more information.
-
-#### `--index-enabled` (boolean)
-
-If set to `true`, this node will enable the indexer and the Index API will be
-available. Defaults to `false`. See
-[here](/reference/avalanchego/index-api.md) for more information.
-
-#### `--api-info-enabled` (boolean)
-
-If set to `false`, this node will not expose the Info API. Defaults to `true`. See
-[here](/reference/avalanchego/info-api.md) for more information.
-
-#### `--api-keystore-enabled` (boolean)
-
-If set to `true`, this node will expose the Keystore API. Defaults to `false`.
-See [here](/reference/avalanchego/keystore-api.md) for more information.
-
-#### `--api-metrics-enabled` (boolean)
-
-If set to `false`, this node will not expose the Metrics API. Defaults to
-`true`. See [here](/reference/avalanchego/metrics-api.md) for more information.
-
-#### `--http-shutdown-wait` (duration)
-
-Duration to wait after receiving SIGTERM or SIGINT before initiating shutdown.
-The `/health` endpoint will return unhealthy during this duration (if the Health
-API is enabled.) Defaults to `0s`.
-
-#### `--http-shutdown-timeout` (duration)
-
-Maximum duration to wait for existing connections to complete during node
-shutdown. Defaults to `10s`.
-
 ## Bootstrapping
+
+#### `--bootstrap-ancestors-max-containers-sent` (uint)
+
+Max number of containers in an `Ancestors` message sent by this node. Defaults to `2000`.
+
+#### `--bootstrap-ancestors-max-containers-received` (unit)
+
+This node reads at most this many containers from an incoming `Ancestors` message. Defaults to `2000`.
 
 #### `--bootstrap-beacon-connection-timeout` (duration)
 
@@ -131,6 +74,11 @@ this field would be `--bootstrap-ips="127.0.0.1:12345,1.2.3.4:5678"`. The number
 of given IPs here must be same with number of given `--bootstrap-ids`. The
 default value depends on the network ID.
 
+#### `--bootstrap-max-time-get-ancestors` (duration)
+
+Max Time to spend fetching a container and its ancestors when responding to a GetAncestors message.
+Defaults to `50ms`.
+
 #### `--bootstrap-retry-enabled` (boolean)
 
 If set to `false`, will not retry bootstrapping if it fails. Defaults to `true`.
@@ -138,47 +86,6 @@ If set to `false`, will not retry bootstrapping if it fails. Defaults to `true`.
 #### `--bootstrap-retry-warn-frequency` (uint)
 
 Specifies how many times bootstrap should be retried before warning the operator. Defaults to `50`.
-
-#### `--bootstrap-ancestors-max-containers-sent` (uint)
-
-Max number of containers in an `Ancestors` message sent by this node. Defaults to `2000`.
-
-#### `--bootstrap-ancestors-max-containers-received` (unit)
-
-This node reads at most this many containers from an incoming `Ancestors` message. Defaults to `2000`.
-
-#### `--bootstrap-max-time-get-ancestors` (duration)
-
-Max Time to spend fetching a container and its ancestors when responding to a GetAncestors message.
-Defaults to `50ms`.
-
-## State Syncing
-
-#### `--state-sync-ids` (string)
-
-State sync IDs is a comma-separated list of validator IDs. The specified
-validators will be contacted to get and authenticate the starting point (state
-summary) for state sync. An example setting of this field would be
-`--state-sync-ids="NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg,NodeID-MFrZFVCXPv5iCn6M9K6XduxGTYp891xXZ"`.
-The number of given IDs here must be same with number of given
-`--state-sync-ips`. The default value is empty, which results in all validators
-being sampled.
-
-#### `--state-sync-ips` (string)
-
-State sync IPs is a comma-separated list of IP:port pairs. These IP Addresses
-will be contacted to get and authenticate the starting point (state summary) for
-state sync. An example setting of this field would be
-`--state-sync-ips="127.0.0.1:12345,1.2.3.4:5678"`. The number of given IPs here
-must be the same with the number of given `--state-sync-ids`.
-
-## Partial Sync Primary Network
-
-#### `--partial-sync-primary-network` (string)
-
-Partial sync enables nodes that are not primary network validators to optionally sync
-only the P-chain on the primary network. Nodes that use this option can still track 
-Subnets. After the Etna upgrade, nodes that use this option can also validate L1s.
 
 ## Chain Configs
 
@@ -191,7 +98,7 @@ them into the VM on initialization.
 #### `--chain-config-dir` (string)
 
 Specifies the directory that contains chain configs, as described
-[here](/nodes/configure/chain-configs/chain-config-flags.md). Defaults to `$HOME/.avalanchego/configs/chains`.
+[here](https://build.avax.network/docs/nodes/chain-configs). Defaults to `$HOME/.avalanchego/configs/chains`.
 If this flag is not provided and the default directory does not exist,
 AvalancheGo will not exit since custom configs are optional. However, if the
 flag is set, the specified folder must exist, or AvalancheGo will exit with an
@@ -219,10 +126,10 @@ The chain configuration is intended to provide optional configuration parameters
 and the VM will use default values if nothing is passed in.
 
 Full reference for all configuration options for some standard chains can be
-found in a separate [chain config flags](/nodes/configure/chain-configs/chain-config-flags.md) document.
+found in a separate [chain config flags](https://build.avax.network/docs/nodes/chain-configs) document.
 
 Full reference for `subnet-evm` upgrade configuration can be found in a separate
-[Customize a Subnet](/build/subnet/upgrade/customize-a-subnet.md) document.
+[Customize a Subnet](https://build.avax.network/docs/avalanche-l1s/upgrade/customize-avalanche-l1) document.
 
 #### `--chain-config-content` (string)
 
@@ -266,6 +173,47 @@ aliases for Blockchains.
 
 Chain specific data directory. Defaults to `$HOME/.avalanchego/chainData`.
 
+## Config File
+
+#### `--config-file` (string)
+
+Path to a JSON file that specifies this node's configuration. Command line
+arguments will override arguments set in the config file. This flag is ignored
+if `--config-file-content` is specified.
+
+Example JSON config file:
+
+```json
+{
+  "log-level": "debug"
+}
+```
+
+:::tip
+[Install Script](https://build.avax.network/docs/tooling/avalanche-go-installer) creates the
+node config file at `~/.avalanchego/configs/node.json`. No default file is
+created if [AvalancheGo is built from source](https://build.avax.network/docs/nodes/run-a-node/from-source), you
+would need to create it manually if needed.
+:::
+
+#### `--config-file-content` (string)
+
+As an alternative to `--config-file`, it allows specifying base64 encoded config
+content.
+
+#### `--config-file-content-type` (string)
+
+Specifies the format of the base64 encoded config content. JSON, TOML, YAML are
+among currently supported file format (see
+[here](https://github.com/spf13/viper#reading-config-files) for full list). Defaults to `JSON`.
+
+## Data Directory
+
+#### `--data-dir` (string)
+
+Sets the base data directory where default sub-directories will be placed unless otherwise specified.
+Defaults to `$HOME/.avalanchego`.
+
 ## Database
 
 ##### `--db-dir` (string, file path)
@@ -308,39 +256,39 @@ Any keys not given will receive the default value.
 	// Use -1 for zero.
 	//
 	// The default value is 12MiB.
-	"blockCacheCapacity": int
+	"blockCacheCapacity": int,
 
 	// BlockSize is the minimum uncompressed size in bytes of each 'sorted table'
 	// block.
 	//
 	// The default value is 4KiB.
-	"blockSize": int
+	"blockSize": int,
 
 	// CompactionExpandLimitFactor limits compaction size after expanded.
 	// This will be multiplied by table size limit at compaction target level.
 	//
 	// The default value is 25.
-	"compactionExpandLimitFactor": int
+	"compactionExpandLimitFactor": int,
 
 	// CompactionGPOverlapsFactor limits overlaps in grandparent (Level + 2)
 	// that a single 'sorted table' generates.  This will be multiplied by
 	// table size limit at grandparent level.
 	//
 	// The default value is 10.
-	"compactionGPOverlapsFactor": int
+	"compactionGPOverlapsFactor": int,
 
 	// CompactionL0Trigger defines number of 'sorted table' at level-0 that will
 	// trigger compaction.
 	//
 	// The default value is 4.
-	"compactionL0Trigger": int
+	"compactionL0Trigger": int,
 
 	// CompactionSourceLimitFactor limits compaction source size. This doesn't apply to
 	// level-0.
 	// This will be multiplied by table size limit at compaction target level.
 	//
 	// The default value is 1.
-	"compactionSourceLimitFactor": int
+	"compactionSourceLimitFactor": int,
 
 	// CompactionTableSize limits size of 'sorted table' that compaction generates.
 	// The limits for each level will be calculated as:
@@ -348,19 +296,19 @@ Any keys not given will receive the default value.
 	// The multiplier for each level can also fine-tuned using CompactionTableSizeMultiplierPerLevel.
 	//
 	// The default value is 2MiB.
-	"compactionTableSize": int
+	"compactionTableSize": int,
 
 	// CompactionTableSizeMultiplier defines multiplier for CompactionTableSize.
 	//
 	// The default value is 1.
-	"compactionTableSizeMultiplier": float
+	"compactionTableSizeMultiplier": float,
 
 	// CompactionTableSizeMultiplierPerLevel defines per-level multiplier for
 	// CompactionTableSize.
 	// Use zero to skip a level.
 	//
 	// The default value is nil.
-	"compactionTableSizeMultiplierPerLevel": []float
+	"compactionTableSizeMultiplierPerLevel": []float,
 
 	// CompactionTotalSize limits total size of 'sorted table' for each level.
 	// The limits for each level will be calculated as:
@@ -369,12 +317,12 @@ Any keys not given will receive the default value.
 	// CompactionTotalSizeMultiplierPerLevel.
 	//
 	// The default value is 10MiB.
-	"compactionTotalSize": int
+	"compactionTotalSize": int,
 
 	// CompactionTotalSizeMultiplier defines multiplier for CompactionTotalSize.
 	//
 	// The default value is 10.
-	"compactionTotalSizeMultiplier": float
+	"compactionTotalSizeMultiplier": float,
 
 	// DisableSeeksCompaction allows disabling 'seeks triggered compaction'.
 	// The purpose of 'seeks triggered compaction' is to optimize database so
@@ -382,13 +330,13 @@ Any keys not given will receive the default value.
 	// small compaction which may not preferable.
 	//
 	// The default is true.
-	"disableSeeksCompaction": bool
+	"disableSeeksCompaction": bool,
 
 	// OpenFilesCacheCapacity defines the capacity of the open files caching.
 	// Use -1 for zero, this has same effect as specifying NoCacher to OpenFilesCacher.
 	//
 	// The default value is 1024.
-	"openFilesCacheCapacity": int
+	"openFilesCacheCapacity": int,
 
 	// WriteBuffer defines maximum size of a 'memdb' before flushed to
 	// 'sorted table'. 'memdb' is an in-memory DB backed by an on-disk
@@ -397,29 +345,36 @@ Any keys not given will receive the default value.
 	// LevelDB may held up to two 'memdb' at the same time.
 	//
 	// The default value is 6MiB.
-	"writeBuffer": int
+	"writeBuffer": int,
 
 	// FilterBitsPerKey is the number of bits to add to the bloom filter per
 	// key.
 	//
 	// The default value is 10.
-	"filterBitsPerKey": int
+	"filterBitsPerKey": int,
 
 	// MaxManifestFileSize is the maximum size limit of the MANIFEST-****** file.
 	// When the MANIFEST-****** file grows beyond this size, LevelDB will create
 	// a new MANIFEST file.
 	//
 	// The default value is infinity.
-	"maxManifestFileSize": int
+	"maxManifestFileSize": int,
 
 	// MetricUpdateFrequency is the frequency to poll LevelDB metrics in
 	// nanoseconds.
 	// If <= 0, LevelDB metrics aren't polled.
 	//
 	// The default value is 10s.
-	"metricUpdateFrequency": int
+	"metricUpdateFrequency": int,
 }
 ```
+
+## File Descriptor Limit
+
+#### `--fd-limit` (int)
+
+Attempts to raise the process file descriptor limit to at least this value and
+error if the value is above the system max. Linux default `32768`.
 
 ## Genesis
 
@@ -429,29 +384,26 @@ Path to a JSON file containing the genesis data to use. Ignored when running
 standard networks (Mainnet, Fuji Testnet), or when `--genesis-content` is
 specified. If not given, uses default genesis data.
 
-These are the main properties in the JSON file:
+See the documentation for the genesis JSON format [here](https://github.com/ava-labs/avalanchego/blob/master/genesis/README.md) and an example used for the local network genesis [here](https://github.com/ava-labs/avalanchego/blob/master/genesis/).
 
-- `networkID`: A unique identifier for the blockchain, must be a number in the range [0, 2^32).
-- `allocations`: The list of initial addresses, their initial balances and the unlock schedule for each.
-- `startTime`: The time of the beginning of the blockchain, it must be a Unix
-  timestamp and it can't be a time in the future.
-- `initialStakeDuration`: The stake duration, in seconds, of the validators that exist at network genesis.
-- `initialStakeDurationOffset`: The offset, in seconds, between the start times
-  of the validators that exist at genesis.
-- `initialStakedFunds`: A list of addresses that own the funds staked at genesis
-  (each address must be present in `allocations` as well)
-- `initialStakers`: The validators that exist at genesis. Each element contains
-  the `rewardAddress`, NodeID and the `delegationFee` of the validator.
-- `cChainGenesis`: The genesis info to be passed to the C-Chain.
-- `message`: A message to include in the genesis. Not required.
-
-For an example of a JSON representation of genesis data, see [genesis_local.json](https://github.com/ava-labs/avalanchego/blob/master/genesis/genesis_local.json).
 
 #### `--genesis-file-content` (string)
 
 As an alternative to `--genesis-file`, it allows specifying base64 encoded genesis data to use.
 
 ## HTTP Server
+
+#### `--http-allowed-hosts` (string)
+
+List of acceptable host names in API requests. Provide the wildcard (`'*'`) to accept
+requests from all hosts. API requests where the `Host` field is empty or an IP address
+will always be accepted. An API call whose HTTP `Host` field isn't acceptable will
+receive a 403 error code. Defaults to `localhost`.
+
+#### `--http-allowed-origins` (string)
+
+Origins to allow on the HTTP port. Defaults to `*` which allows all origins. Example:
+`"https://*.avax.network https://*.avax-test.network"`
 
 #### `--http-host` (string)
 
@@ -460,11 +412,39 @@ by default, your node can only handle API calls made from the same machine. To
 allow API calls from other machines, use `--http-host=`. You can also enter
 domain names as parameter.
 
+#### `--http-idle-timeout` (string)
+
+Maximum duration to wait for the next request when keep-alives are enabled. If
+`--http-idle-timeout` is zero, the value of `--http-read-timeout` is used. If both are zero,
+there is no timeout.
+
 #### `--http-port` (int)
 
 Each node runs an HTTP server that provides the APIs for interacting with the
 node and the Avalanche network. This argument specifies the port that the HTTP
 server will listen on. The default value is `9650`.
+
+#### `--http-read-timeout` (string)
+
+Maximum duration for reading the entire request, including the body. A zero or
+negative value means there will be no timeout.
+
+#### `--http-read-header-timeout` (string)
+
+Maximum duration to read request headers. The connection’s read deadline is
+reset after reading the headers. If `--http-read-header-timeout` is zero, the
+value of `--http-read-timeout` is used. If both are zero, there is no timeout.
+
+#### `--http-shutdown-timeout` (duration)
+
+Maximum duration to wait for existing connections to complete during node
+shutdown. Defaults to `10s`.
+
+#### `--http-shutdown-wait` (duration)
+
+Duration to wait after receiving SIGTERM or SIGINT before initiating shutdown.
+The `/health` endpoint will return unhealthy during this duration (if the Health
+API is enabled.) Defaults to `0s`.
 
 #### `--http-tls-cert-file` (string, file path)
 
@@ -498,47 +478,11 @@ content of the TLS private key used by the node for the HTTPS server. Note that
 full private key content, with the leading and trailing header, must be base64
 encoded. This must be specified when `--http-tls-enabled=true`.
 
-#### `--http-read-timeout` (string)
-
-Maximum duration for reading the entire request, including the body. A zero or
-negative value means there will be no timeout.
-
-#### `--http-read-header-timeout` (string)
-
-Maximum duration to read request headers. The connection’s read deadline is
-reset after reading the headers. If `--http-read-header-timeout` is zero, the
-value of `--http-read-timeout` is used. If both are zero, there is no timeout.
-
 #### `--http-write-timeout` (string)
 
 Maximum duration before timing out writes of the response. It is reset whenever
 a new request’s header is read. A zero or negative value means there will be no
 timeout.
-
-#### `--http-idle-timeout` (string)
-
-Maximum duration to wait for the next request when keep-alives are enabled. If
-`--http-idle-timeout` is zero, the value of `--http-read-timeout` is used. If both are zero,
-there is no timeout.
-
-#### `--http-allowed-origins` (string)
-
-Origins to allow on the HTTP port. Defaults to `*` which allows all origins. Example:
-`"https://*.avax.network https://*.avax-test.network"`
-
-#### `--http-allowed-hosts` (string)
-
-List of acceptable host names in API requests. Provide the wildcard (`'*'`) to accept
-requests from all hosts. API requests where the `Host` field is empty or an IP address
-will always be accepted. An API call whose HTTP `Host` field isn't acceptable will
-receive a 403 error code. Defaults to `localhost`.
-
-## File Descriptor Limit
-
-#### `--fd-limit` (int)
-
-Attempts to raise the process file descriptor limit to at least this value and
-error if the value is above the system max. Linux default `32768`.
 
 ## Logging
 
@@ -640,6 +584,15 @@ Defaults to `0.1`.
 
 Type of exporter to use for tracing. Options are [`grpc`,`http`]. Defaults to `grpc`.
 
+## Partial Sync Primary Network
+
+#### `--partial-sync-primary-network` (string)
+
+Partial sync enables nodes that are not primary network validators to optionally sync
+only the P-chain on the primary network. Nodes that use this option can still track
+Subnets. After the Etna upgrade, nodes that use this option can also validate L1s.
+This config defaults to `false`.
+
 ## Public IP
 
 Validators must know one of their public facing IP addresses so they can enable
@@ -665,6 +618,26 @@ mappings, if applicable. Default to 5 minutes.
 
 When provided, the node will use that service to periodically resolve/update its
 public IP. Only acceptable values are `ifconfigCo`, `opendns` or `ifconfigMe`.
+
+## State Syncing
+
+#### `--state-sync-ids` (string)
+
+State sync IDs is a comma-separated list of validator IDs. The specified
+validators will be contacted to get and authenticate the starting point (state
+summary) for state sync. An example setting of this field would be
+`--state-sync-ids="NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg,NodeID-MFrZFVCXPv5iCn6M9K6XduxGTYp891xXZ"`.
+The number of given IDs here must be same with number of given
+`--state-sync-ips`. The default value is empty, which results in all validators
+being sampled.
+
+#### `--state-sync-ips` (string)
+
+State sync IPs is a comma-separated list of IP:port pairs. These IP Addresses
+will be contacted to get and authenticate the starting point (state summary) for
+state sync. An example setting of this field would be
+`--state-sync-ips="127.0.0.1:12345,1.2.3.4:5678"`. The number of given IPs here
+must be the same with the number of given `--state-sync-ids`.
 
 ## Staking
 
@@ -736,7 +709,7 @@ configs for Subnets specified in
 `--track-subnets` parameter.
 
 Full reference for all configuration options for a Subnet can be found in a
-separate [Subnet Configs](./subnet-configs) document.
+separate [Subnet Configs](https://build.avax.network/docs/nodes/configure/avalanche-l1-configs) document.
 
 #### `--subnet-config-dir` (`string`)
 
@@ -840,43 +813,6 @@ Timeout before killing an unresponsive chain. Defaults to `5s`.
 Transaction fee, in nAVAX, for transactions that create new assets. Defaults to
 `10000000` nAVAX (.01 AVAX) per transaction. This can only be changed on a local
 network.
-
-#### `--create-subnet-tx-fee` (int)
-
-Transaction fee, in nAVAX, for transactions that create new Subnets. Defaults to
-`1000000000` nAVAX (1 AVAX) per transaction. This can only be changed on a local
-network.
-
-#### `--create-blockchain-tx-fee` (int)
-
-Transaction fee, in nAVAX, for transactions that create new blockchains.
-Defaults to `1000000000` nAVAX (1 AVAX) per transaction. This can only be
-changed on a local network.
-
-#### `--transform-subnet-tx-fee` (int)
-
-Transaction fee, in nAVAX, for transactions that transform Subnets. Defaults to
-`1000000000` nAVAX (1 AVAX) per transaction. This can only be changed on a local network.
-
-#### `--add-primary-network-validator-fee` (int)
-
-Transaction fee, in nAVAX, for transactions that add new primary network validators. Defaults to 0.
-This can only be changed on a local network.
-
-#### `--add-primary-network-delegator-fee` (int)
-
-Transaction fee, in nAVAX, for transactions that add new primary network delegators. Defaults to 0.
-This can only be changed on a local network.
-
-#### `--add-subnet-validator-fee` (int)
-
-Transaction fee, in nAVAX, for transactions that add new Subnet validators.
-Defaults to `10000000` nAVAX (.01 AVAX).
-
-#### `--add-subnet-delegator-fee` (int)
-
-Transaction fee, in nAVAX, for transactions that add new Subnet delegators.
-Defaults to `10000000` nAVAX (.01 AVAX).
 
 #### `--min-delegator-stake` (int)
 
@@ -1008,6 +944,12 @@ The value must be greater than `0`. Defaults to `2m`.
 #### `--proposervm-use-current-height` (bool)
 
 Have the ProposerVM always report the last accepted P-chain block height. Defaults to `false`.
+
+### `--proposervm-min-block-delay` (duration)
+
+The minimum delay to enforce when building a snowman++ block for the primary network
+chains and the default minimum delay for subnets. Defaults to `1s`. A non-default
+value is only suggested for non-production nodes.
 
 ### Continuous Profiling
 
@@ -1312,7 +1254,7 @@ Defaults to `0`.
 
 Frequency to gossip peers to other nodes. Defaults to `1m`.
 
-#### ` --network-peer-read-buffer-size` (int)
+#### `--network-peer-read-buffer-size` (int)
 
 Size of the buffer that peer messages are read into (there is one buffer per
 peer), defaults to `8` KiB (8192 Bytes).
@@ -1365,7 +1307,7 @@ GiB).
 
 #### `--plugin-dir` (string)
 
-Sets the directory for [VM plugins](/build/vm/intro.md). The default value is `$HOME/.avalanchego/plugins`.
+Sets the directory for [VM plugins](https://build.avax.network/docs/virtual-machines). The default value is `$HOME/.avalanchego/plugins`.
 
 ### Virtual Machine (VM) Configs
 
@@ -1410,3 +1352,4 @@ Node reports unhealthy if the router drops more than this portion of messages. D
 
 Node reports unhealthy if there are more than this many outstanding consensus requests
 (Get, PullQuery, etc.) over all chains. Defaults to `1024`.
+

@@ -75,7 +75,6 @@ func (node *ProofNode) ToProto() *pb.ProofNode {
 	}
 
 	for childIndex, childID := range node.Children {
-		childID := childID
 		pbNode.Children[uint32(childIndex)] = childID[:]
 	}
 
@@ -318,7 +317,7 @@ func (proof *RangeProof) Verify(
 		largestProvenKey = maybe.Some(ToKey(proof.KeyValues[len(proof.KeyValues)-1].Key))
 	}
 
-	// The key-value pairs (allegedly) proven by [proof].
+	// The key-value pairs (allegedly) are proven by [proof].
 	keyValues := make(map[Key][]byte, len(proof.KeyValues))
 	for _, keyValue := range proof.KeyValues {
 		keyValues[ToKey(keyValue.Key)] = keyValue.Value

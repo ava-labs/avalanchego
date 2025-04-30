@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -228,7 +229,7 @@ func TestAdvanceTimeTo_RemovesStaleExpiries(t *testing.T) {
 }
 
 func TestAdvanceTimeTo_UpdateL1Validators(t *testing.T) {
-	sk, err := bls.NewSecretKey()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 
 	const (
@@ -237,7 +238,7 @@ func TestAdvanceTimeTo_UpdateL1Validators(t *testing.T) {
 	)
 
 	var (
-		pk      = bls.PublicFromSecretKey(sk)
+		pk      = sk.PublicKey()
 		pkBytes = bls.PublicKeyToUncompressedBytes(pk)
 
 		newL1Validator = func(endAccumulatedFee uint64) state.L1Validator {

@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/set"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -214,10 +215,10 @@ func TestGet(t *testing.T) {
 	_, ok := m.GetValidator(subnetID, nodeID)
 	require.False(ok)
 
-	sk, err := bls.NewSecretKey()
+	sk, err := localsigner.New()
 	require.NoError(err)
 
-	pk := bls.PublicFromSecretKey(sk)
+	pk := sk.PublicKey()
 	require.NoError(m.AddStaker(subnetID, nodeID, pk, ids.Empty, 1))
 
 	vdr0, ok := m.GetValidator(subnetID, nodeID)
@@ -304,10 +305,10 @@ func TestGetMap(t *testing.T) {
 	mp := m.GetMap(subnetID)
 	require.Empty(mp)
 
-	sk, err := bls.NewSecretKey()
+	sk, err := localsigner.New()
 	require.NoError(err)
 
-	pk := bls.PublicFromSecretKey(sk)
+	pk := sk.PublicKey()
 	nodeID0 := ids.GenerateTestNodeID()
 	require.NoError(m.AddStaker(subnetID, nodeID0, pk, ids.Empty, 2))
 
@@ -404,11 +405,11 @@ func TestSample(t *testing.T) {
 	require.NoError(err)
 	require.Empty(sampled)
 
-	sk, err := bls.NewSecretKey()
+	sk, err := localsigner.New()
 	require.NoError(err)
 
 	nodeID0 := ids.GenerateTestNodeID()
-	pk := bls.PublicFromSecretKey(sk)
+	pk := sk.PublicKey()
 	require.NoError(m.AddStaker(subnetID, nodeID0, pk, ids.Empty, 1))
 
 	sampled, err = m.Sample(subnetID, 1)
@@ -464,12 +465,12 @@ func TestString(t *testing.T) {
 func TestAddCallback(t *testing.T) {
 	require := require.New(t)
 
-	expectedSK, err := bls.NewSecretKey()
+	expectedSK, err := localsigner.New()
 	require.NoError(err)
 
 	var (
 		expectedNodeID           = ids.GenerateTestNodeID()
-		expectedPK               = bls.PublicFromSecretKey(expectedSK)
+		expectedPK               = expectedSK.PublicKey()
 		expectedTxID             = ids.GenerateTestID()
 		expectedWeight    uint64 = 1
 		expectedSubnetID0        = ids.GenerateTestID()
@@ -512,12 +513,12 @@ func TestAddCallback(t *testing.T) {
 func TestAddWeightCallback(t *testing.T) {
 	require := require.New(t)
 
-	expectedSK, err := bls.NewSecretKey()
+	expectedSK, err := localsigner.New()
 	require.NoError(err)
 
 	var (
 		expectedNodeID             = ids.GenerateTestNodeID()
-		expectedPK                 = bls.PublicFromSecretKey(expectedSK)
+		expectedPK                 = expectedSK.PublicKey()
 		expectedTxID               = ids.GenerateTestID()
 		expectedOldWeight   uint64 = 1
 		expectedAddedWeight uint64 = 10
@@ -595,12 +596,12 @@ func TestAddWeightCallback(t *testing.T) {
 func TestRemoveWeightCallback(t *testing.T) {
 	require := require.New(t)
 
-	expectedSK, err := bls.NewSecretKey()
+	expectedSK, err := localsigner.New()
 	require.NoError(err)
 
 	var (
 		expectedNodeID               = ids.GenerateTestNodeID()
-		expectedPK                   = bls.PublicFromSecretKey(expectedSK)
+		expectedPK                   = expectedSK.PublicKey()
 		expectedTxID                 = ids.GenerateTestID()
 		expectedNewWeight     uint64 = 1
 		expectedRemovedWeight uint64 = 10
@@ -678,12 +679,12 @@ func TestRemoveWeightCallback(t *testing.T) {
 func TestRemoveCallback(t *testing.T) {
 	require := require.New(t)
 
-	expectedSK, err := bls.NewSecretKey()
+	expectedSK, err := localsigner.New()
 	require.NoError(err)
 
 	var (
 		expectedNodeID           = ids.GenerateTestNodeID()
-		expectedPK               = bls.PublicFromSecretKey(expectedSK)
+		expectedPK               = expectedSK.PublicKey()
 		expectedTxID             = ids.GenerateTestID()
 		expectedWeight    uint64 = 1
 		expectedSubnetID0        = ids.GenerateTestID()

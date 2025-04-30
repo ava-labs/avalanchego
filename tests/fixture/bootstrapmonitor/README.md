@@ -1,7 +1,7 @@
 # bootstrap-monitor
 
 Code rooted at this package implements a `bootstrap-monitor` binary
-intended to enable continous bootstrap testing for avalanchego
+intended to enable continuous bootstrap testing for avalanchego
 networks.
 
 ## Bootstrap testing
@@ -41,7 +41,7 @@ processed. This is configured by including
 
 The intention of `bootstrap-monitor` is to enable a Kubernetes
 [StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/)
-to perform continous bootstrap testing for a given avalanchego
+to perform continuous bootstrap testing for a given avalanchego
 configuration. It ensures that a testing pod either starts or resumes
 a test, and upon completion of a test, polls for a new image to test
 and initiates a new test when one is found.
@@ -170,7 +170,7 @@ and initiates a new test when one is found.
 to the available storage of 30GB being insufficient for even state
 sync bootstrap.
  - Self-hosted github workers are not compatible with bootstrap testing
-due to the 5 day maximum duration for a job running on a self-hosted
+due to the 5-day maximum duration for a job running on a self-hosted
 runner. State sync bootstrap usually completes within 5 days, but full
 sync bootstrap usually takes much longer.
 
@@ -178,7 +178,7 @@ sync bootstrap usually takes much longer.
 
 If avalanchego supported a `--bootstrap-mode` flag that exited on
 successful bootstrap, and a pod configured with this flag used an
-image with a `latest` tag, the pod would continously bootstrap, exit,
+image with a `latest` tag, the pod would continuously bootstrap, exit,
 and restart with the current latest image. While appealingly simple,
 this approach doesn't directly support:
 

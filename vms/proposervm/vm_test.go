@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
@@ -36,6 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
@@ -2527,6 +2529,134 @@ func TestLocalParse(t *testing.T) {
 			block, err := test.f(context.Background(), test.block)
 			require.NoError(t, err)
 			require.IsType(t, test.resultingBlock, block)
+		})
+	}
+}
+
+func TestTimestampMetrics(t *testing.T) {
+	ctx := context.Background()
+
+	coreVM, _, proVM, _ := initTestProposerVM(t, time.Unix(0, 0), mockable.MaxTime, 0)
+	defer func() {
+		require.NoError(t, proVM.Shutdown(ctx))
+	}()
+
+	innerBlock := snowmantest.BuildChild(snowmantest.Genesis)
+
+	outerTime := time.Unix(314159, 0)
+	innerTime := time.Unix(142857, 0)
+	proVM.Clock.Set(outerTime)
+	innerBlock.TimestampV = innerTime
+
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return innerBlock, nil
+	}
+	outerBlock, err := proVM.BuildBlock(ctx)
+	require.NoError(t, err)
+	require.IsType(t, &postForkBlock{}, outerBlock)
+	require.NoError(t, outerBlock.Accept(ctx))
+
+	gaugeVec := proVM.lastAcceptedTimestampGaugeVec
+	tests := []struct {
+		blockType string
+		want      time.Time
+	}{
+		{innerBlockTypeMetricLabel, innerTime},
+		{outerBlockTypeMetricLabel, outerTime},
+	}
+	for _, tt := range tests {
+		t.Run(tt.blockType, func(t *testing.T) {
+			gauge, err := gaugeVec.GetMetricWithLabelValues(tt.blockType)
+			require.NoError(t, err)
+			require.Equal(t, float64(tt.want.Unix()), testutil.ToFloat64(gauge))
+		})
+	}
+}
+
+func TestSelectChildPChainHeight(t *testing.T) {
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
+
+		beforeOverrideEnds = fujiOverridePChainHeightUntilTimestamp.Add(-time.Minute)
+	)
+	for _, test := range []struct {
+		name                 string
+		time                 time.Time
+		networkID            uint32
+		subnetID             ids.ID
+		currentPChainHeight  uint64
+		minPChainHeight      uint64
+		expectedPChainHeight uint64
+	}{
+		{
+			name:                 "no override - mainnet",
+			time:                 beforeOverrideEnds,
+			networkID:            constants.MainnetID,
+			subnetID:             ids.GenerateTestID(),
+			currentPChainHeight:  fujiOverridePChainHeightUntilHeight + 2,
+			minPChainHeight:      fujiOverridePChainHeightUntilHeight - 5,
+			expectedPChainHeight: fujiOverridePChainHeightUntilHeight + 2,
+		},
+		{
+			name:                 "no override - primary network",
+			time:                 beforeOverrideEnds,
+			networkID:            constants.FujiID,
+			subnetID:             constants.PrimaryNetworkID,
+			currentPChainHeight:  fujiOverridePChainHeightUntilHeight + 2,
+			minPChainHeight:      fujiOverridePChainHeightUntilHeight - 5,
+			expectedPChainHeight: fujiOverridePChainHeightUntilHeight + 2,
+		},
+		{
+			name:                 "no override - expired network",
+			time:                 fujiOverridePChainHeightUntilTimestamp,
+			networkID:            constants.FujiID,
+			subnetID:             ids.GenerateTestID(),
+			currentPChainHeight:  fujiOverridePChainHeightUntilHeight + 2,
+			minPChainHeight:      fujiOverridePChainHeightUntilHeight - 5,
+			expectedPChainHeight: fujiOverridePChainHeightUntilHeight + 2,
+		},
+		{
+			name:                 "no override - chain previously advanced",
+			time:                 beforeOverrideEnds,
+			networkID:            constants.FujiID,
+			subnetID:             ids.GenerateTestID(),
+			currentPChainHeight:  fujiOverridePChainHeightUntilHeight + 2,
+			minPChainHeight:      fujiOverridePChainHeightUntilHeight + 1,
+			expectedPChainHeight: fujiOverridePChainHeightUntilHeight + 2,
+		},
+		{
+			name:                 "override",
+			time:                 beforeOverrideEnds,
+			networkID:            constants.FujiID,
+			subnetID:             ids.GenerateTestID(),
+			currentPChainHeight:  fujiOverridePChainHeightUntilHeight + 2,
+			minPChainHeight:      fujiOverridePChainHeightUntilHeight - 5,
+			expectedPChainHeight: fujiOverridePChainHeightUntilHeight - 5,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			_, vdrState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+			defer func() {
+				require.NoError(proVM.Shutdown(context.Background()))
+			}()
+
+			proVM.Clock.Set(test.time)
+			proVM.ctx.NetworkID = test.networkID
+			proVM.ctx.SubnetID = test.subnetID
+
+			vdrState.GetMinimumHeightF = func(context.Context) (uint64, error) {
+				return test.currentPChainHeight, nil
+			}
+
+			actualPChainHeight, err := proVM.selectChildPChainHeight(
+				context.Background(),
+				test.minPChainHeight,
+			)
+			require.NoError(err)
+			require.Equal(test.expectedPChainHeight, actualPChainHeight)
 		})
 	}
 }

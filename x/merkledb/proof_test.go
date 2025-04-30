@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/maybe"
@@ -675,11 +676,17 @@ func Test_ChangeProof_Missing_History_For_EndRoot(t *testing.T) {
 	t.Logf("Seed: %d", seed)
 	rand := rand.New(rand.NewSource(seed)) // #nosec G404
 
-	db, err := getBasicDB()
+	config := NewConfig()
+	db, err := newDatabase(
+		context.Background(),
+		memdb.New(),
+		config,
+		&mockMetrics{},
+	)
 	require.NoError(err)
 
 	roots := []ids.ID{}
-	for i := 0; i < defaultHistoryLength+1; i++ {
+	for i := 0; i < int(config.HistoryLength)+1; i++ {
 		key := make([]byte, 16)
 		_, _ = rand.Read(key)
 		require.NoError(db.Put(key, nil))
@@ -1879,11 +1886,6 @@ func FuzzProofVerification(f *testing.F) {
 
 // Generate change proofs and verify that they are valid.
 func FuzzChangeProofVerification(f *testing.F) {
-	const (
-		numKeyValues  = defaultHistoryLength / 2
-		deletePortion = 0.25
-	)
-
 	f.Fuzz(func(
 		t *testing.T,
 		startBytes []byte,
@@ -1894,7 +1896,13 @@ func FuzzChangeProofVerification(f *testing.F) {
 		require := require.New(t)
 		rand := rand.New(rand.NewSource(randSeed)) // #nosec G404
 
-		db, err := getBasicDB()
+		config := NewConfig()
+		db, err := newDatabase(
+			context.Background(),
+			memdb.New(),
+			config,
+			&mockMetrics{},
+		)
 		require.NoError(err)
 
 		startRootID, err := db.GetMerkleRoot(context.Background())
@@ -1906,8 +1914,8 @@ func FuzzChangeProofVerification(f *testing.F) {
 			require,
 			rand,
 			[]database.Database{db},
-			numKeyValues,
-			deletePortion,
+			config.HistoryLength/2,
+			0.25,
 		)
 
 		endRootID, err := db.GetMerkleRoot(context.Background())

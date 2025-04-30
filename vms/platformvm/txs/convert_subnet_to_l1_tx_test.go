@@ -6,7 +6,6 @@ package txs
 import (
 	"encoding/hex"
 	"encoding/json"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -18,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -38,7 +38,9 @@ var (
 func TestConvertSubnetToL1TxSerialization(t *testing.T) {
 	skBytes, err := hex.DecodeString("6668fecd4595b81e4d568398c820bbf3f073cb222902279fa55ebb84764ed2e3")
 	require.NoError(t, err)
-	sk, err := bls.SecretKeyFromBytes(skBytes)
+	sk, err := localsigner.FromBytes(skBytes)
+	require.NoError(t, err)
+	pop, err := signer.NewProofOfPossession(sk)
 	require.NoError(t, err)
 
 	var (
@@ -301,7 +303,7 @@ func TestConvertSubnetToL1TxSerialization(t *testing.T) {
 						NodeID:  nodeID[:],
 						Weight:  0x0102030405060708,
 						Balance: units.Avax,
-						Signer:  *signer.NewProofOfPossession(sk),
+						Signer:  *pop,
 						RemainingBalanceOwner: message.PChainOwner{
 							Threshold: 1,
 							Addresses: []ids.ShortID{
@@ -540,17 +542,15 @@ func TestConvertSubnetToL1TxSerialization(t *testing.T) {
 
 			txJSON, err := json.MarshalIndent(test.tx, "", "\t")
 			require.NoError(err)
-			require.Equal(
-				// Normalize newlines for Windows
-				strings.ReplaceAll(string(test.expectedJSON), "\r\n", "\n"),
-				string(txJSON),
-			)
+			require.JSONEq(string(test.expectedJSON), string(txJSON))
 		})
 	}
 }
 
 func TestConvertSubnetToL1TxSyntacticVerify(t *testing.T) {
-	sk, err := bls.NewSecretKey()
+	sk, err := localsigner.New()
+	require.NoError(t, err)
+	pop, err := signer.NewProofOfPossession(sk)
 	require.NoError(t, err)
 
 	var (
@@ -568,7 +568,7 @@ func TestConvertSubnetToL1TxSyntacticVerify(t *testing.T) {
 				NodeID:                utils.RandomBytes(ids.NodeIDLen),
 				Weight:                1,
 				Balance:               1,
-				Signer:                *signer.NewProofOfPossession(sk),
+				Signer:                *pop,
 				RemainingBalanceOwner: message.PChainOwner{},
 				DeactivationOwner:     message.PChainOwner{},
 			},
@@ -669,7 +669,7 @@ func TestConvertSubnetToL1TxSyntacticVerify(t *testing.T) {
 					{
 						NodeID:                utils.RandomBytes(ids.NodeIDLen),
 						Weight:                0,
-						Signer:                *signer.NewProofOfPossession(sk),
+						Signer:                *pop,
 						RemainingBalanceOwner: message.PChainOwner{},
 						DeactivationOwner:     message.PChainOwner{},
 					},
@@ -687,7 +687,7 @@ func TestConvertSubnetToL1TxSyntacticVerify(t *testing.T) {
 					{
 						NodeID:                utils.RandomBytes(ids.NodeIDLen + 1),
 						Weight:                1,
-						Signer:                *signer.NewProofOfPossession(sk),
+						Signer:                *pop,
 						RemainingBalanceOwner: message.PChainOwner{},
 						DeactivationOwner:     message.PChainOwner{},
 					},
@@ -705,7 +705,7 @@ func TestConvertSubnetToL1TxSyntacticVerify(t *testing.T) {
 					{
 						NodeID:                ids.EmptyNodeID[:],
 						Weight:                1,
-						Signer:                *signer.NewProofOfPossession(sk),
+						Signer:                *pop,
 						RemainingBalanceOwner: message.PChainOwner{},
 						DeactivationOwner:     message.PChainOwner{},
 					},
@@ -741,7 +741,7 @@ func TestConvertSubnetToL1TxSyntacticVerify(t *testing.T) {
 					{
 						NodeID: utils.RandomBytes(ids.NodeIDLen),
 						Weight: 1,
-						Signer: *signer.NewProofOfPossession(sk),
+						Signer: *pop,
 						RemainingBalanceOwner: message.PChainOwner{
 							Threshold: 1,
 						},
@@ -761,7 +761,7 @@ func TestConvertSubnetToL1TxSyntacticVerify(t *testing.T) {
 					{
 						NodeID:                utils.RandomBytes(ids.NodeIDLen),
 						Weight:                1,
-						Signer:                *signer.NewProofOfPossession(sk),
+						Signer:                *pop,
 						RemainingBalanceOwner: message.PChainOwner{},
 						DeactivationOwner: message.PChainOwner{
 							Threshold: 1,

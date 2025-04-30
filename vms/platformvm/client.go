@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -20,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
@@ -33,18 +33,10 @@ type Client interface {
 	GetHeight(ctx context.Context, options ...rpc.Option) (uint64, error)
 	// GetProposedHeight returns the current height of this node's proposer VM.
 	GetProposedHeight(ctx context.Context, options ...rpc.Option) (uint64, error)
-	// ExportKey returns the private key corresponding to [address] from [user]'s account
-	//
-	// Deprecated: Keys should no longer be stored on the node.
-	ExportKey(ctx context.Context, user api.UserPass, address ids.ShortID, options ...rpc.Option) (*secp256k1.PrivateKey, error)
 	// GetBalance returns the balance of [addrs] on the P Chain
 	//
 	// Deprecated: GetUTXOs should be used instead.
 	GetBalance(ctx context.Context, addrs []ids.ShortID, options ...rpc.Option) (*GetBalanceResponse, error)
-	// ListAddresses returns an array of platform addresses controlled by [user]
-	//
-	// Deprecated: Keys should no longer be stored on the node.
-	ListAddresses(ctx context.Context, user api.UserPass, options ...rpc.Option) ([]ids.ShortID, error)
 	// GetUTXOs returns the byte representation of the UTXOs controlled by [addrs]
 	GetUTXOs(
 		ctx context.Context,
@@ -136,7 +128,22 @@ type Client interface {
 	// GetFeeConfig returns the dynamic fee config of the chain.
 	GetFeeConfig(ctx context.Context, options ...rpc.Option) (*gas.Config, error)
 	// GetFeeState returns the current fee state of the chain.
-	GetFeeState(ctx context.Context, options ...rpc.Option) (gas.State, gas.Price, time.Time, error)
+	GetFeeState(ctx context.Context, options ...rpc.Option) (
+		gas.State,
+		gas.Price,
+		time.Time,
+		error,
+	)
+	// GetValidatorFeeConfig returns the validator fee config of the chain.
+	GetValidatorFeeConfig(ctx context.Context, options ...rpc.Option) (*fee.Config, error)
+	// GetValidatorFeeState returns the current validator fee state of the
+	// chain.
+	GetValidatorFeeState(ctx context.Context, options ...rpc.Option) (
+		gas.Gas,
+		gas.Price,
+		time.Time,
+		error,
+	)
 }
 
 // Client implementation for interacting with the P Chain endpoint
@@ -163,30 +170,12 @@ func (c *client) GetProposedHeight(ctx context.Context, options ...rpc.Option) (
 	return uint64(res.Height), err
 }
 
-func (c *client) ExportKey(ctx context.Context, user api.UserPass, address ids.ShortID, options ...rpc.Option) (*secp256k1.PrivateKey, error) {
-	res := &ExportKeyReply{}
-	err := c.requester.SendRequest(ctx, "platform.exportKey", &ExportKeyArgs{
-		UserPass: user,
-		Address:  address.String(),
-	}, res, options...)
-	return res.PrivateKey, err
-}
-
 func (c *client) GetBalance(ctx context.Context, addrs []ids.ShortID, options ...rpc.Option) (*GetBalanceResponse, error) {
 	res := &GetBalanceResponse{}
 	err := c.requester.SendRequest(ctx, "platform.getBalance", &GetBalanceRequest{
 		Addresses: ids.ShortIDsToStrings(addrs),
 	}, res, options...)
 	return res, err
-}
-
-func (c *client) ListAddresses(ctx context.Context, user api.UserPass, options ...rpc.Option) ([]ids.ShortID, error) {
-	res := &api.JSONAddresses{}
-	err := c.requester.SendRequest(ctx, "platform.listAddresses", &user, res, options...)
-	if err != nil {
-		return nil, err
-	}
-	return address.ParseToIDs(res.Addresses)
 }
 
 func (c *client) GetUTXOs(
@@ -615,10 +604,32 @@ func (c *client) GetFeeConfig(ctx context.Context, options ...rpc.Option) (*gas.
 	return res, err
 }
 
-func (c *client) GetFeeState(ctx context.Context, options ...rpc.Option) (gas.State, gas.Price, time.Time, error) {
+func (c *client) GetFeeState(ctx context.Context, options ...rpc.Option) (
+	gas.State,
+	gas.Price,
+	time.Time,
+	error,
+) {
 	res := &GetFeeStateReply{}
 	err := c.requester.SendRequest(ctx, "platform.getFeeState", struct{}{}, res, options...)
 	return res.State, res.Price, res.Time, err
+}
+
+func (c *client) GetValidatorFeeConfig(ctx context.Context, options ...rpc.Option) (*fee.Config, error) {
+	res := &fee.Config{}
+	err := c.requester.SendRequest(ctx, "platform.getValidatorFeeConfig", struct{}{}, res, options...)
+	return res, err
+}
+
+func (c *client) GetValidatorFeeState(ctx context.Context, options ...rpc.Option) (
+	gas.Gas,
+	gas.Price,
+	time.Time,
+	error,
+) {
+	res := &GetValidatorFeeStateReply{}
+	err := c.requester.SendRequest(ctx, "platform.getValidatorFeeState", struct{}{}, res, options...)
+	return res.Excess, res.Price, res.Time, err
 }
 
 func AwaitTxAccepted(

@@ -23,7 +23,7 @@ const DefaultFDLimit = 10 * 1024
 // privileges. Bumping the Max limit further would require superuser privileges.
 // If the value is below the recommendation warn on start.
 // see: http://0pointer.net/blog/file-descriptor-limits.html
-func Set(max uint64, log logging.Logger) error {
+func Set(limit uint64, log logging.Logger) error {
 	var rLimit syscall.Rlimit
 	err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rLimit)
 	if err != nil {
@@ -34,11 +34,11 @@ func Set(max uint64, log logging.Logger) error {
 	// The max file limit is 10240, even though the max returned by
 	// Getrlimit is 1<<63-1. This is OPEN_MAX in sys/syslimits.h.
 	// See https://github.com/golang/go/issues/30401
-	if max > DefaultFDLimit {
-		return fmt.Errorf("error fd-limit: (%d) greater than max: (%d)", max, DefaultFDLimit)
+	if limit > DefaultFDLimit {
+		return fmt.Errorf("error fd-limit: (%d) greater than max: (%d)", limit, DefaultFDLimit)
 	}
 
-	rLimit.Cur = max
+	rLimit.Cur = limit
 
 	// set new limit
 	if err := syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rLimit); err != nil {

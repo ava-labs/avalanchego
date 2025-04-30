@@ -23,7 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
@@ -101,7 +101,7 @@ func StartTestPeer(
 	}
 
 	tlsKey := tlsCert.PrivateKey.(crypto.Signer)
-	blsKey, err := bls.NewSecretKey()
+	blsKey, err := localsigner.New()
 	if err != nil {
 		return nil, err
 	}
@@ -141,6 +141,7 @@ func StartTestPeer(
 			logging.NoLog{},
 			maxMessageToSend,
 		),
+		false,
 	)
 	return peer, peer.AwaitReady(ctx)
 }

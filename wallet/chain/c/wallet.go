@@ -9,14 +9,15 @@ import (
 	"time"
 
 	"github.com/ava-labs/coreth/ethclient"
-	"github.com/ava-labs/coreth/plugin/evm"
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
+	"github.com/ava-labs/coreth/plugin/evm/client"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
-	ethcommon "github.com/ethereum/go-ethereum/common"
+	ethcommon "github.com/ava-labs/libevm/common"
 )
 
 var _ Wallet = (*wallet)(nil)
@@ -37,7 +38,7 @@ type Wallet interface {
 		chainID ids.ID,
 		to ethcommon.Address,
 		options ...common.Option,
-	) (*evm.Tx, error)
+	) (*atomic.Tx, error)
 
 	// IssueExportTx creates, signs, and issues an export transaction that
 	// attempts to send all the provided [outputs] to the requested [chainID].
@@ -48,17 +49,17 @@ type Wallet interface {
 		chainID ids.ID,
 		outputs []*secp256k1fx.TransferOutput,
 		options ...common.Option,
-	) (*evm.Tx, error)
+	) (*atomic.Tx, error)
 
 	// IssueUnsignedAtomicTx signs and issues the unsigned tx.
 	IssueUnsignedAtomicTx(
-		utx evm.UnsignedAtomicTx,
+		utx atomic.UnsignedAtomicTx,
 		options ...common.Option,
-	) (*evm.Tx, error)
+	) (*atomic.Tx, error)
 
 	// IssueAtomicTx issues the signed tx.
 	IssueAtomicTx(
-		tx *evm.Tx,
+		tx *atomic.Tx,
 		options ...common.Option,
 	) error
 }
@@ -66,7 +67,7 @@ type Wallet interface {
 func NewWallet(
 	builder Builder,
 	signer Signer,
-	avaxClient evm.Client,
+	avaxClient client.Client,
 	ethClient ethclient.Client,
 	backend Backend,
 ) Wallet {
@@ -83,7 +84,7 @@ type wallet struct {
 	Backend
 	builder    Builder
 	signer     Signer
-	avaxClient evm.Client
+	avaxClient client.Client
 	ethClient  ethclient.Client
 }
 
@@ -99,7 +100,7 @@ func (w *wallet) IssueImportTx(
 	chainID ids.ID,
 	to ethcommon.Address,
 	options ...common.Option,
-) (*evm.Tx, error) {
+) (*atomic.Tx, error) {
 	baseFee, err := w.baseFee(options)
 	if err != nil {
 		return nil, err
@@ -116,7 +117,7 @@ func (w *wallet) IssueExportTx(
 	chainID ids.ID,
 	outputs []*secp256k1fx.TransferOutput,
 	options ...common.Option,
-) (*evm.Tx, error) {
+) (*atomic.Tx, error) {
 	baseFee, err := w.baseFee(options)
 	if err != nil {
 		return nil, err
@@ -130,9 +131,9 @@ func (w *wallet) IssueExportTx(
 }
 
 func (w *wallet) IssueUnsignedAtomicTx(
-	utx evm.UnsignedAtomicTx,
+	utx atomic.UnsignedAtomicTx,
 	options ...common.Option,
-) (*evm.Tx, error) {
+) (*atomic.Tx, error) {
 	ops := common.NewOptions(options)
 	ctx := ops.Context()
 	tx, err := SignUnsignedAtomic(ctx, w.signer, utx)
@@ -144,7 +145,7 @@ func (w *wallet) IssueUnsignedAtomicTx(
 }
 
 func (w *wallet) IssueAtomicTx(
-	tx *evm.Tx,
+	tx *atomic.Tx,
 	options ...common.Option,
 ) error {
 	ops := common.NewOptions(options)
@@ -182,7 +183,7 @@ func (w *wallet) baseFee(options []common.Option) (*big.Int, error) {
 
 // TODO: Upstream this function into coreth.
 func awaitTxAccepted(
-	c evm.Client,
+	c client.Client,
 	ctx context.Context,
 	txID ids.ID,
 	freq time.Duration,
@@ -197,7 +198,7 @@ func awaitTxAccepted(
 			return err
 		}
 
-		if status == evm.Accepted {
+		if status == atomic.Accepted {
 			return nil
 		}
 

@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorsmock"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/validatorstate"
@@ -135,19 +136,19 @@ func TestGetValidatorSet(t *testing.T) {
 	state := setupState(t, ctrl)
 
 	// Happy path
-	sk0, err := bls.NewSecretKey()
+	sk0, err := localsigner.New()
 	require.NoError(err)
 	vdr0 := &validators.GetValidatorOutput{
 		NodeID:    ids.GenerateTestNodeID(),
-		PublicKey: bls.PublicFromSecretKey(sk0),
+		PublicKey: sk0.PublicKey(),
 		Weight:    1,
 	}
 
-	sk1, err := bls.NewSecretKey()
+	sk1, err := localsigner.New()
 	require.NoError(err)
 	vdr1 := &validators.GetValidatorOutput{
 		NodeID:    ids.GenerateTestNodeID(),
-		PublicKey: bls.PublicFromSecretKey(sk1),
+		PublicKey: sk1.PublicKey(),
 		Weight:    2,
 	}
 
@@ -181,9 +182,9 @@ func TestGetValidatorSet(t *testing.T) {
 func TestPublicKeyDeserialize(t *testing.T) {
 	require := require.New(t)
 
-	sk, err := bls.NewSecretKey()
+	sk, err := localsigner.New()
 	require.NoError(err)
-	pk := bls.PublicFromSecretKey(sk)
+	pk := sk.PublicKey()
 
 	pkBytes := bls.PublicKeyToUncompressedBytes(pk)
 	pkDe := bls.PublicKeyFromValidUncompressedBytes(pkBytes)
@@ -222,9 +223,9 @@ func setupValidatorSet(b *testing.B, size int) map[ids.NodeID]*validators.GetVal
 	b.Helper()
 
 	set := make(map[ids.NodeID]*validators.GetValidatorOutput, size)
-	sk, err := bls.NewSecretKey()
+	sk, err := localsigner.New()
 	require.NoError(b, err)
-	pk := bls.PublicFromSecretKey(sk)
+	pk := sk.PublicKey()
 	for i := 0; i < size; i++ {
 		id := ids.GenerateTestNodeID()
 		set[id] = &validators.GetValidatorOutput{

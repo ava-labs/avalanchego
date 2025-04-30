@@ -28,18 +28,15 @@ import (
 	"github.com/ava-labs/avalanchego/api/admin"
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/api/info"
-	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/config/node"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
-	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/database/meterdb"
 	"github.com/ava-labs/avalanchego/database/pebbledb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/indexer"
@@ -80,6 +77,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
+	databasefactory "github.com/ava-labs/avalanchego/database/factory"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
 	coreth "github.com/ava-labs/coreth/plugin/evm"
@@ -109,8 +107,7 @@ var (
 	genesisHashKey     = []byte("genesisID")
 	ungracefulShutdown = []byte("ungracefulShutdown")
 
-	indexerDBPrefix  = []byte{0x00}
-	keystoreDBPrefix = []byte("keystore")
+	indexerDBPrefix = []byte{0x00}
 
 	errInvalidTLSKey = errors.New("invalid TLS key")
 	errShuttingDown  = errors.New("server shutting down")
@@ -118,7 +115,7 @@ var (
 
 // New returns an instance of Node
 func New(
-	config *Config,
+	config *node.Config,
 	logFactory logging.Factory,
 	logger logging.Logger,
 ) (*Node, error) {
@@ -139,9 +136,14 @@ func New(
 
 	n.DoneShuttingDown.Add(1)
 
-	pop := signer.NewProofOfPossession(n.Config.StakingSigningKey)
+	pop, err := signer.NewProofOfPossession(n.Config.StakingSigningKey)
+	if err != nil {
+		return nil, fmt.Errorf("problem creating proof of possession: %w", err)
+	}
+
 	logger.Info("initializing node",
 		zap.Stringer("version", version.CurrentApp),
+		zap.String("commit", version.GitCommit),
 		zap.Stringer("nodeID", n.ID),
 		zap.Stringer("stakingKeyType", tlsCert.PublicKeyAlgorithm),
 		zap.Reflect("nodePOP", pop),
@@ -189,10 +191,6 @@ func New(
 
 	if err := n.initDatabase(); err != nil { // Set up the node's database
 		return nil, fmt.Errorf("problem initializing database: %w", err)
-	}
-
-	if err := n.initKeystoreAPI(); err != nil { // Start the Keystore API
-		return nil, fmt.Errorf("couldn't initialize keystore API: %w", err)
 	}
 
 	n.initSharedMemory() // Initialize shared memory
@@ -305,9 +303,6 @@ type Node struct {
 	// Indexes blocks, transactions and blocks
 	indexer indexer.Indexer
 
-	// Handles calls to Keystore API
-	keystore keystore.Keystore
-
 	// Manages shared memory
 	sharedMemory *atomic.Memory
 
@@ -357,7 +352,7 @@ type Node struct {
 	APIServer server.Server
 
 	// This node's configuration
-	Config *Config
+	Config *node.Config
 
 	tracer trace.Tracer
 
@@ -583,7 +578,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 		err := n.vdrs.AddStaker(
 			constants.PrimaryNetworkID,
 			n.ID,
-			bls.PublicFromSecretKey(n.Config.StakingSigningKey),
+			n.Config.StakingSigningKey.PublicKey(),
 			dummyTxID,
 			n.Config.SybilProtectionDisabledWeight,
 		)
@@ -632,7 +627,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 
 	n.Net, err = network.NewNetwork(
 		&n.Config.NetworkConfig,
-		n.Config.UpgradeConfig.DurangoTime,
+		n.Config.UpgradeConfig.FortunaTime,
 		n.msgCreator,
 		reg,
 		n.Log,
@@ -650,7 +645,7 @@ func (n *Node) writeProcessContext() error {
 	n.Log.Info("writing process context", zap.String("path", n.Config.ProcessContextFilePath))
 
 	// Write the process context to disk
-	processContext := &ProcessContext{
+	processContext := &node.ProcessContext{
 		PID:            os.Getpid(),
 		URI:            n.apiURI,
 		StakingAddress: n.stakingAddress, // Set by network initialization
@@ -759,57 +754,33 @@ func (n *Node) Dispatch() error {
  */
 
 func (n *Node) initDatabase() error {
-	dbRegisterer, err := metrics.MakeAndRegister(
-		n.MetricsGatherer,
-		dbNamespace,
-	)
-	if err != nil {
-		return err
-	}
-
-	// start the db
+	var dbFolderName string
 	switch n.Config.DatabaseConfig.Name {
 	case leveldb.Name:
 		// Prior to v1.10.15, the only on-disk database was leveldb, and its
 		// files went to [dbPath]/[networkID]/v1.4.5.
-		dbPath := filepath.Join(n.Config.DatabaseConfig.Path, version.CurrentDatabase.String())
-		n.DB, err = leveldb.New(dbPath, n.Config.DatabaseConfig.Config, n.Log, dbRegisterer)
-		if err != nil {
-			return fmt.Errorf("couldn't create %s at %s: %w", leveldb.Name, dbPath, err)
-		}
-	case memdb.Name:
-		n.DB = memdb.New()
+		dbFolderName = version.CurrentDatabase.String()
 	case pebbledb.Name:
-		dbPath := filepath.Join(n.Config.DatabaseConfig.Path, "pebble")
-		n.DB, err = pebbledb.New(dbPath, n.Config.DatabaseConfig.Config, n.Log, dbRegisterer)
-		if err != nil {
-			return fmt.Errorf("couldn't create %s at %s: %w", pebbledb.Name, dbPath, err)
-		}
+		dbFolderName = "pebble"
 	default:
-		return fmt.Errorf(
-			"db-type was %q but should have been one of {%s, %s, %s}",
-			n.Config.DatabaseConfig.Name,
-			leveldb.Name,
-			memdb.Name,
-			pebbledb.Name,
-		)
+		dbFolderName = "db"
 	}
+	// dbFolderName is appended to the database path given in the config
+	dbFullPath := filepath.Join(n.Config.DatabaseConfig.Path, dbFolderName)
 
-	if n.Config.ReadOnly && n.Config.DatabaseConfig.Name != memdb.Name {
-		n.DB = versiondb.New(n.DB)
-	}
-
-	meterDBReg, err := metrics.MakeAndRegister(
-		n.MeterDBMetricsGatherer,
+	var err error
+	n.DB, err = databasefactory.New(
+		n.Config.DatabaseConfig.Name,
+		dbFullPath,
+		n.Config.DatabaseConfig.ReadOnly,
+		n.Config.DatabaseConfig.Config,
+		n.MetricsGatherer,
+		n.Log,
+		dbNamespace,
 		"all",
 	)
 	if err != nil {
-		return err
-	}
-
-	n.DB, err = meterdb.New(meterDBReg, n.DB)
-	if err != nil {
-		return err
+		return fmt.Errorf("couldn't create database: %w", err)
 	}
 
 	rawExpectedGenesisHash := hashing.ComputeHash256(n.Config.GenesisBytes)
@@ -1154,7 +1125,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			NodeID:                                  n.ID,
 			NetworkID:                               n.Config.NetworkID,
 			Server:                                  n.APIServer,
-			Keystore:                                n.keystore,
 			AtomicMemory:                            n.sharedMemory,
 			AVAXAssetID:                             avaxAssetID,
 			XChainID:                                xChainID,
@@ -1214,8 +1184,6 @@ func (n *Node) initVMs() error {
 				SybilProtectionEnabled:    n.Config.SybilProtectionEnabled,
 				PartialSyncPrimaryNetwork: n.Config.PartialSyncPrimaryNetwork,
 				TrackedSubnets:            n.Config.TrackedSubnets,
-				CreateAssetTxFee:          n.Config.CreateAssetTxFee,
-				StaticFeeConfig:           n.Config.StaticFeeConfig,
 				DynamicFeeConfig:          n.Config.DynamicFeeConfig,
 				ValidatorFeeConfig:        n.Config.ValidatorFeeConfig,
 				UptimePercentage:          n.Config.UptimeRequirement,
@@ -1233,7 +1201,7 @@ func (n *Node) initVMs() error {
 		n.VMManager.RegisterFactory(context.TODO(), constants.AVMID, &avm.Factory{
 			Config: avmconfig.Config{
 				Upgrades:         n.Config.UpgradeConfig,
-				TxFee:            n.Config.StaticFeeConfig.TxFee,
+				TxFee:            n.Config.TxFee,
 				CreateAssetTxFee: n.Config.CreateAssetTxFee,
 			},
 		}),
@@ -1280,23 +1248,6 @@ func (n *Node) initSharedMemory() {
 	n.Log.Info("initializing SharedMemory")
 	sharedMemoryDB := prefixdb.New([]byte("shared memory"), n.DB)
 	n.sharedMemory = atomic.NewMemory(sharedMemoryDB)
-}
-
-// initKeystoreAPI initializes the keystore service, which is an on-node wallet.
-// Assumes n.APIServer is already set
-func (n *Node) initKeystoreAPI() error {
-	n.Log.Info("initializing keystore")
-	n.keystore = keystore.New(n.Log, prefixdb.New(keystoreDBPrefix, n.DB))
-	handler, err := n.keystore.CreateHandler()
-	if err != nil {
-		return err
-	}
-	if !n.Config.KeystoreAPIEnabled {
-		n.Log.Info("skipping keystore API initialization because it has been disabled")
-		return nil
-	}
-	n.Log.Warn("initializing deprecated keystore API")
-	return n.APIServer.AddRoute(handler, "keystore", "")
 }
 
 // initMetricsAPI initializes the Metrics API
@@ -1402,15 +1353,22 @@ func (n *Node) initInfoAPI() error {
 
 	n.Log.Info("initializing info API")
 
+	pop, err := signer.NewProofOfPossession(n.Config.StakingSigningKey)
+	if err != nil {
+		return fmt.Errorf("problem creating proof of possession: %w", err)
+	}
+
 	service, err := info.NewService(
 		info.Parameters{
-			Version:     version.CurrentApp,
-			NodeID:      n.ID,
-			NodePOP:     signer.NewProofOfPossession(n.Config.StakingSigningKey),
-			NetworkID:   n.Config.NetworkID,
-			TxFeeConfig: n.Config.TxFeeConfig,
-			VMManager:   n.VMManager,
-			Upgrades:    n.Config.UpgradeConfig,
+			Version:   version.CurrentApp,
+			NodeID:    n.ID,
+			NodePOP:   pop,
+			NetworkID: n.Config.NetworkID,
+			VMManager: n.VMManager,
+			Upgrades:  n.Config.UpgradeConfig,
+
+			TxFee:            n.Config.TxFee,
+			CreateAssetTxFee: n.Config.CreateAssetTxFee,
 		},
 		n.Log,
 		n.vdrs,
@@ -1493,6 +1451,32 @@ func (n *Node) initHealthAPI() error {
 	err = n.health.RegisterHealthCheck("diskspace", diskSpaceCheck, health.ApplicationTag)
 	if err != nil {
 		return fmt.Errorf("couldn't register resource health check: %w", err)
+	}
+
+	wrongBLSKeyCheck := health.CheckerFunc(func(context.Context) (interface{}, error) {
+		vdr, ok := n.vdrs.GetValidator(constants.PrimaryNetworkID, n.ID)
+		if !ok {
+			return "node is not a validator", nil
+		}
+
+		vdrPK := vdr.PublicKey
+		if vdrPK == nil {
+			return "validator doesn't have a BLS key", nil
+		}
+
+		nodePK := n.Config.StakingSigningKey.PublicKey()
+		if nodePK.Equals(vdrPK) {
+			return "node has the correct BLS key", nil
+		}
+		return nil, fmt.Errorf("node has BLS key 0x%x, but is registered to the validator set with 0x%x",
+			bls.PublicKeyToCompressedBytes(nodePK),
+			bls.PublicKeyToCompressedBytes(vdrPK),
+		)
+	})
+
+	err = n.health.RegisterHealthCheck("bls", wrongBLSKeyCheck, health.ApplicationTag)
+	if err != nil {
+		return fmt.Errorf("couldn't register bls health check: %w", err)
 	}
 
 	handler, err := health.NewGetAndPostHandler(n.Log, n.health)
