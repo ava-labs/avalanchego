@@ -161,33 +161,33 @@ func (v L1Validator) isDeleted() bool {
 	return v.Weight == 0
 }
 
-func (v L1Validator) isActive() bool {
+func (v L1Validator) IsActive() bool {
 	return v.Weight != 0 && v.EndAccumulatedFee != 0
 }
 
 func (v L1Validator) effectiveValidationID() ids.ID {
-	if v.isActive() {
+	if v.IsActive() {
 		return v.ValidationID
 	}
 	return ids.Empty
 }
 
 func (v L1Validator) effectiveNodeID() ids.NodeID {
-	if v.isActive() {
+	if v.IsActive() {
 		return v.NodeID
 	}
 	return ids.EmptyNodeID
 }
 
 func (v L1Validator) effectivePublicKey() *bls.PublicKey {
-	if v.isActive() {
+	if v.IsActive() {
 		return bls.PublicKeyFromValidUncompressedBytes(v.PublicKey)
 	}
 	return nil
 }
 
 func (v L1Validator) effectivePublicKeyBytes() []byte {
-	if v.isActive() {
+	if v.IsActive() {
 		return v.PublicKey
 	}
 	return nil
@@ -298,7 +298,7 @@ func (d *l1ValidatorsDiff) putL1Validator(state Chain, l1Validator L1Validator) 
 	var (
 		prevWeight uint64
 		prevActive bool
-		newActive  = l1Validator.isActive()
+		newActive  = l1Validator.IsActive()
 	)
 	switch priorL1Validator, err := state.GetL1Validator(l1Validator.ValidationID); err {
 	case nil:
@@ -307,7 +307,7 @@ func (d *l1ValidatorsDiff) putL1Validator(state Chain, l1Validator L1Validator) 
 		}
 
 		prevWeight = priorL1Validator.Weight
-		prevActive = priorL1Validator.isActive()
+		prevActive = priorL1Validator.IsActive()
 	case database.ErrNotFound:
 		// Verify that there is not a legacy subnet validator with the same
 		// subnetID+nodeID as this L1 validator.
@@ -365,7 +365,7 @@ func (d *l1ValidatorsDiff) putL1Validator(state Chain, l1Validator L1Validator) 
 		nodeID:   l1Validator.NodeID,
 	}
 	d.modifiedHasNodeIDs[subnetIDNodeID] = !l1Validator.isDeleted()
-	if l1Validator.isActive() {
+	if l1Validator.IsActive() {
 		d.active.ReplaceOrInsert(l1Validator)
 	}
 	return nil

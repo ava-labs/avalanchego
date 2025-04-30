@@ -26,6 +26,10 @@ type HealthConfig struct {
 	// Marks if the health check should be enabled
 	Enabled bool `json:"-"`
 
+	// NoIngressValidatorConnectionGracePeriod denotes the time after which the health check fails
+	// for primary network validators with no ingress connections.
+	NoIngressValidatorConnectionGracePeriod time.Duration
+
 	// MinConnectedPeers is the minimum number of peers that the network should
 	// be connected to be considered healthy.
 	MinConnectedPeers uint `json:"minConnectedPeers"`
@@ -128,7 +132,7 @@ type Config struct {
 	// TLSKey is this node's TLS key that is used to sign IPs.
 	TLSKey crypto.Signer `json:"-"`
 	// BLSKey is this node's BLS key that is used to sign IPs.
-	BLSKey *bls.SecretKey `json:"-"`
+	BLSKey bls.Signer `json:"-"`
 
 	// TrackedSubnets of the node.
 	// It must not include the primary network ID.

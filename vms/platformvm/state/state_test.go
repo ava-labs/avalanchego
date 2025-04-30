@@ -9,7 +9,6 @@ import (
 	"maps"
 	"math"
 	"math/rand"
-	"sync"
 	"testing"
 	"time"
 
@@ -22,12 +21,12 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -35,7 +34,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx/fxmock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
@@ -545,9 +543,10 @@ func TestState_writeStakers(t *testing.T) {
 func createPermissionlessValidatorTx(t testing.TB, subnetID ids.ID, validatorsData txs.Validator) *txs.AddPermissionlessValidatorTx {
 	var sig signer.Signer = &signer.Empty{}
 	if subnetID == constants.PrimaryNetworkID {
-		sk, err := bls.NewSecretKey()
+		sk, err := localsigner.New()
 		require.NoError(t, err)
-		sig = signer.NewProofOfPossession(sk)
+		sig, err = signer.NewProofOfPossession(sk)
+		require.NoError(t, err)
 	}
 
 	return &txs.AddPermissionlessValidatorTx{
@@ -785,14 +784,14 @@ func TestState_ApplyValidatorDiffs(t *testing.T) {
 		subnetStakers  = make([]Staker, numNodes)
 	)
 	for i := range primaryStakers {
-		sk, err := bls.NewSecretKey()
+		sk, err := localsigner.New()
 		require.NoError(err)
 
 		timeOffset := time.Duration(i) * time.Second
 		primaryStakers[i] = Staker{
 			TxID:            ids.GenerateTestID(),
 			NodeID:          ids.GenerateTestNodeID(),
-			PublicKey:       bls.PublicFromSecretKey(sk),
+			PublicKey:       sk.PublicKey(),
 			SubnetID:        constants.PrimaryNetworkID,
 			Weight:          uint64(i + 1),
 			StartTime:       startTime.Add(timeOffset),
@@ -1099,74 +1098,6 @@ func copyValidatorSet(
 	return result
 }
 
-func TestParsedStateBlock(t *testing.T) {
-	var (
-		require = require.New(t)
-		blks    = makeBlocks(require)
-	)
-
-	for _, blk := range blks {
-		stBlk := stateBlk{
-			Bytes:  blk.Bytes(),
-			Status: choices.Accepted,
-		}
-
-		stBlkBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &stBlk)
-		require.NoError(err)
-
-		gotBlk, isStateBlk, err := parseStoredBlock(stBlkBytes)
-		require.NoError(err)
-		require.True(isStateBlk)
-		require.Equal(blk.ID(), gotBlk.ID())
-
-		gotBlk, isStateBlk, err = parseStoredBlock(blk.Bytes())
-		require.NoError(err)
-		require.False(isStateBlk)
-		require.Equal(blk.ID(), gotBlk.ID())
-	}
-}
-
-func TestReindexBlocks(t *testing.T) {
-	var (
-		require = require.New(t)
-		s       = newTestState(t, memdb.New())
-		blks    = makeBlocks(require)
-	)
-
-	// Populate the blocks using the legacy format.
-	for _, blk := range blks {
-		stBlk := stateBlk{
-			Bytes:  blk.Bytes(),
-			Status: choices.Accepted,
-		}
-		stBlkBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &stBlk)
-		require.NoError(err)
-
-		blkID := blk.ID()
-		require.NoError(s.blockDB.Put(blkID[:], stBlkBytes))
-	}
-
-	// Convert the indices to the new format.
-	require.NoError(s.ReindexBlocks(&sync.Mutex{}, logging.NoLog{}))
-
-	// Verify that the blocks are stored in the new format.
-	for _, blk := range blks {
-		blkID := blk.ID()
-		blkBytes, err := s.blockDB.Get(blkID[:])
-		require.NoError(err)
-
-		parsedBlk, err := block.Parse(block.GenesisCodec, blkBytes)
-		require.NoError(err)
-		require.Equal(blkID, parsedBlk.ID())
-	}
-
-	// Verify that the flag has been written to disk to allow skipping future
-	// reindexings.
-	reindexed, err := s.singletonDB.Has(BlocksReindexedKey)
-	require.NoError(err)
-	require.True(reindexed)
-}
-
 func TestStateSubnetOwner(t *testing.T) {
 	require := require.New(t)
 
@@ -1246,94 +1177,6 @@ func TestStateSubnetToL1Conversion(t *testing.T) {
 			require.Equal(expectedConversion, actualConversion)
 		})
 	}
-}
-
-func makeBlocks(require *require.Assertions) []block.Block {
-	var blks []block.Block
-	{
-		blk, err := block.NewApricotAbortBlock(ids.GenerateTestID(), 1000)
-		require.NoError(err)
-		blks = append(blks, blk)
-	}
-
-	{
-		blk, err := block.NewApricotAtomicBlock(ids.GenerateTestID(), 1000, &txs.Tx{
-			Unsigned: &txs.AdvanceTimeTx{
-				Time: 1000,
-			},
-		})
-		require.NoError(err)
-		blks = append(blks, blk)
-	}
-
-	{
-		blk, err := block.NewApricotCommitBlock(ids.GenerateTestID(), 1000)
-		require.NoError(err)
-		blks = append(blks, blk)
-	}
-
-	{
-		tx := &txs.Tx{
-			Unsigned: &txs.RewardValidatorTx{
-				TxID: ids.GenerateTestID(),
-			},
-		}
-		require.NoError(tx.Initialize(txs.Codec))
-		blk, err := block.NewApricotProposalBlock(ids.GenerateTestID(), 1000, tx)
-		require.NoError(err)
-		blks = append(blks, blk)
-	}
-
-	{
-		tx := &txs.Tx{
-			Unsigned: &txs.RewardValidatorTx{
-				TxID: ids.GenerateTestID(),
-			},
-		}
-		require.NoError(tx.Initialize(txs.Codec))
-		blk, err := block.NewApricotStandardBlock(ids.GenerateTestID(), 1000, []*txs.Tx{tx})
-		require.NoError(err)
-		blks = append(blks, blk)
-	}
-
-	{
-		blk, err := block.NewBanffAbortBlock(time.Now(), ids.GenerateTestID(), 1000)
-		require.NoError(err)
-		blks = append(blks, blk)
-	}
-
-	{
-		blk, err := block.NewBanffCommitBlock(time.Now(), ids.GenerateTestID(), 1000)
-		require.NoError(err)
-		blks = append(blks, blk)
-	}
-
-	{
-		tx := &txs.Tx{
-			Unsigned: &txs.RewardValidatorTx{
-				TxID: ids.GenerateTestID(),
-			},
-		}
-		require.NoError(tx.Initialize(txs.Codec))
-
-		blk, err := block.NewBanffProposalBlock(time.Now(), ids.GenerateTestID(), 1000, tx, []*txs.Tx{})
-		require.NoError(err)
-		blks = append(blks, blk)
-	}
-
-	{
-		tx := &txs.Tx{
-			Unsigned: &txs.RewardValidatorTx{
-				TxID: ids.GenerateTestID(),
-			},
-		}
-		require.NoError(tx.Initialize(txs.Codec))
-
-		blk, err := block.NewBanffStandardBlock(time.Now(), ids.GenerateTestID(), 1000, []*txs.Tx{tx})
-		require.NoError(err)
-		blks = append(blks, blk)
-	}
-	return blks
 }
 
 // Verify that committing the state writes the fee state to the database and
@@ -1514,14 +1357,14 @@ func TestL1Validators(t *testing.T) {
 		NodeID:       ids.GenerateTestNodeID(),
 	}
 
-	sk, err := bls.NewSecretKey()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
-	pk := bls.PublicFromSecretKey(sk)
+	pk := sk.PublicKey()
 	pkBytes := bls.PublicKeyToUncompressedBytes(pk)
 
-	otherSK, err := bls.NewSecretKey()
+	otherSK, err := localsigner.New()
 	require.NoError(t, err)
-	otherPK := bls.PublicFromSecretKey(otherSK)
+	otherPK := otherSK.PublicKey()
 	otherPKBytes := bls.PublicKeyToUncompressedBytes(otherPK)
 
 	tests := []struct {
@@ -1866,7 +1709,7 @@ func TestL1Validators(t *testing.T) {
 					require.True(has)
 
 					weights[l1Validator.SubnetID] += l1Validator.Weight
-					if expectedL1Validator.isActive() {
+					if expectedL1Validator.IsActive() {
 						expectedActive = append(expectedActive, expectedL1Validator)
 					}
 				}
@@ -2016,9 +1859,9 @@ func TestLoadL1ValidatorAndLegacy(t *testing.T) {
 	}
 	require.NoError(state.PutCurrentValidator(legacyStaker))
 
-	sk, err := bls.NewSecretKey()
+	sk, err := localsigner.New()
 	require.NoError(err)
-	pk := bls.PublicFromSecretKey(sk)
+	pk := sk.PublicKey()
 	pkBytes := bls.PublicKeyToUncompressedBytes(pk)
 
 	l1Validator := L1Validator{
@@ -2094,14 +1937,14 @@ func TestGetCurrentValidators(t *testing.T) {
 	subnetID2 := ids.GenerateTestID()
 	subnetIDs := []ids.ID{subnetID1, subnetID2}
 
-	sk, err := bls.NewSecretKey()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
-	pk := bls.PublicFromSecretKey(sk)
+	pk := sk.PublicKey()
 	pkBytes := bls.PublicKeyToUncompressedBytes(pk)
 
-	otherSK, err := bls.NewSecretKey()
+	otherSK, err := localsigner.New()
 	require.NoError(t, err)
-	otherPK := bls.PublicFromSecretKey(otherSK)
+	otherPK := otherSK.PublicKey()
 	otherPKBytes := bls.PublicKeyToUncompressedBytes(otherPK)
 	now := time.Now()
 
@@ -2130,7 +1973,7 @@ func TestGetCurrentValidators(t *testing.T) {
 					NodeID:    ids.GenerateTestNodeID(),
 					PublicKey: otherPK,
 					Weight:    1,
-					StartTime: now,
+					StartTime: now.Add(1 * time.Second),
 				},
 			},
 		},
@@ -2151,7 +1994,7 @@ func TestGetCurrentValidators(t *testing.T) {
 					NodeID:    ids.GenerateTestNodeID(),
 					PublicKey: otherPK,
 					Weight:    1,
-					StartTime: now,
+					StartTime: now.Add(1 * time.Second),
 				},
 			},
 		},
@@ -2171,7 +2014,7 @@ func TestGetCurrentValidators(t *testing.T) {
 					SubnetID:     subnetID1,
 					NodeID:       ids.GenerateTestNodeID(),
 					PublicKey:    otherPKBytes,
-					StartTime:    uint64(now.Unix()),
+					StartTime:    uint64(now.Unix()) + 1,
 					Weight:       1,
 				},
 			},
@@ -2192,7 +2035,7 @@ func TestGetCurrentValidators(t *testing.T) {
 					SubnetID:     subnetID2,
 					NodeID:       ids.GenerateTestNodeID(),
 					PublicKey:    otherPKBytes,
-					StartTime:    uint64(now.Unix()),
+					StartTime:    uint64(now.Unix()) + 1,
 					Weight:       1,
 				},
 			},
@@ -2205,7 +2048,7 @@ func TestGetCurrentValidators(t *testing.T) {
 					SubnetID:  subnetID1,
 					NodeID:    ids.GenerateTestNodeID(),
 					PublicKey: pk,
-					Weight:    uint64(now.Unix()),
+					Weight:    123123,
 					StartTime: now,
 				},
 				{
@@ -2214,7 +2057,7 @@ func TestGetCurrentValidators(t *testing.T) {
 					NodeID:    ids.GenerateTestNodeID(),
 					PublicKey: pk,
 					Weight:    1,
-					StartTime: now,
+					StartTime: now.Add(1 * time.Second),
 				},
 				{
 					TxID:      ids.GenerateTestID(),
@@ -2222,7 +2065,7 @@ func TestGetCurrentValidators(t *testing.T) {
 					NodeID:    ids.GenerateTestNodeID(),
 					PublicKey: otherPK,
 					Weight:    0,
-					StartTime: now,
+					StartTime: now.Add(2 * time.Second),
 				},
 			},
 			l1Validators: []L1Validator{
@@ -2241,7 +2084,7 @@ func TestGetCurrentValidators(t *testing.T) {
 					SubnetID:          subnetID2,
 					NodeID:            ids.GenerateTestNodeID(),
 					PublicKey:         otherPKBytes,
-					StartTime:         uint64(now.Unix()),
+					StartTime:         uint64(now.Unix()) + 1,
 					Weight:            0,
 					EndAccumulatedFee: 0,
 				},
@@ -2250,7 +2093,7 @@ func TestGetCurrentValidators(t *testing.T) {
 					SubnetID:          subnetID1,
 					NodeID:            ids.GenerateTestNodeID(),
 					PublicKey:         pkBytes,
-					StartTime:         uint64(now.Unix()),
+					StartTime:         uint64(now.Unix()) + 2,
 					Weight:            1,
 					EndAccumulatedFee: 0,
 				},
@@ -2259,7 +2102,7 @@ func TestGetCurrentValidators(t *testing.T) {
 					SubnetID:          subnetID1,
 					NodeID:            ids.GenerateTestNodeID(),
 					PublicKey:         otherPKBytes,
-					StartTime:         uint64(now.Unix()),
+					StartTime:         uint64(now.Unix()) + 3,
 					Weight:            0,
 					EndAccumulatedFee: 1,
 				},
@@ -2274,6 +2117,8 @@ func TestGetCurrentValidators(t *testing.T) {
 			db := memdb.New()
 			state := newTestState(t, db)
 
+			stakersLenBySubnetID := make(map[ids.ID]int)
+			stakersByTxID := make(map[ids.ID]*Staker)
 			for _, staker := range test.initial {
 				primaryStaker := &Staker{
 					TxID:      ids.GenerateTestID(),
@@ -2286,8 +2131,13 @@ func TestGetCurrentValidators(t *testing.T) {
 				}
 				require.NoError(state.PutCurrentValidator(primaryStaker))
 				require.NoError(state.PutCurrentValidator(staker))
+
+				stakersByTxID[staker.TxID] = staker
+				stakersLenBySubnetID[staker.SubnetID]++
 			}
 
+			l1ValidatorsLenBySubnetID := make(map[ids.ID]int)
+			l1ValidatorsByVID := make(map[ids.ID]L1Validator)
 			for _, l1Validator := range test.l1Validators {
 				// The codec creates zero length slices rather than leaving them
 				// as nil, so we need to populate the slices for later reflect
@@ -2296,57 +2146,30 @@ func TestGetCurrentValidators(t *testing.T) {
 				l1Validator.DeactivationOwner = []byte{}
 
 				require.NoError(state.PutL1Validator(l1Validator))
+
+				if l1Validator.Weight == 0 {
+					continue
+				}
+				l1ValidatorsByVID[l1Validator.ValidationID] = l1Validator
+				l1ValidatorsLenBySubnetID[l1Validator.SubnetID]++
 			}
 
 			state.SetHeight(0)
 			require.NoError(state.Commit())
 
-			stakersBySubnetID := make(map[ids.ID][]*Staker)
-			for _, staker := range test.initial {
-				stakers := stakersBySubnetID[staker.SubnetID]
-				stakersBySubnetID[staker.SubnetID] = append(stakers, staker)
-			}
-
-			l1ValidatorsBySubnetID := make(map[ids.ID][]L1Validator)
-			for _, l1Validator := range test.l1Validators {
-				if l1Validator.Weight == 0 {
-					continue
-				}
-				l1Validators := l1ValidatorsBySubnetID[l1Validator.SubnetID]
-				l1ValidatorsBySubnetID[l1Validator.SubnetID] = append(l1Validators, l1Validator)
-			}
-
 			for _, subnetID := range subnetIDs {
-				currentValidators, height, err := state.GetCurrentValidatorSet(context.Background(), subnetID)
+				baseStakers, currentValidators, height, err := state.GetCurrentValidators(context.Background(), subnetID)
 				require.NoError(err)
 				require.Equal(uint64(0), height)
-				totalLen := len(stakersBySubnetID[subnetID]) + len(l1ValidatorsBySubnetID[subnetID])
-				require.Len(currentValidators, totalLen)
+				require.Len(baseStakers, stakersLenBySubnetID[subnetID])
+				require.Len(currentValidators, l1ValidatorsLenBySubnetID[subnetID])
 
-				for _, expectedStaker := range stakersBySubnetID[subnetID] {
-					currentValidator, ok := currentValidators[expectedStaker.TxID]
-					require.True(ok)
-					require.Equal(expectedStaker.TxID, currentValidator.ValidationID)
-					require.Equal(expectedStaker.NodeID, currentValidator.NodeID)
-					require.Equal(expectedStaker.PublicKey, currentValidator.PublicKey)
-					require.Equal(expectedStaker.Weight, currentValidator.Weight)
-					require.Equal(uint64(expectedStaker.StartTime.Unix()), currentValidator.StartTime)
-					require.Equal(uint64(0), currentValidator.MinNonce)
-					require.True(currentValidator.IsActive)
-					require.False(currentValidator.IsL1Validator)
+				for i, currentStaker := range baseStakers {
+					require.Equalf(stakersByTxID[currentStaker.TxID], currentStaker, "index %d", i)
 				}
 
-				for _, expectedL1Validator := range l1ValidatorsBySubnetID[subnetID] {
-					currentValidator, ok := currentValidators[expectedL1Validator.ValidationID]
-					require.True(ok)
-					require.Equal(expectedL1Validator.ValidationID, currentValidator.ValidationID)
-					require.Equal(expectedL1Validator.NodeID, currentValidator.NodeID)
-					require.Equal(expectedL1Validator.PublicKey, currentValidator.PublicKey.Serialize())
-					require.Equal(expectedL1Validator.Weight, currentValidator.Weight)
-					require.Equal(expectedL1Validator.StartTime, currentValidator.StartTime)
-					require.Equal(expectedL1Validator.MinNonce, currentValidator.MinNonce)
-					require.Equal(expectedL1Validator.isActive(), currentValidator.IsActive)
-					require.True(currentValidator.IsL1Validator)
+				for i, currentValidator := range currentValidators {
+					require.Equalf(l1ValidatorsByVID[currentValidator.ValidationID], currentValidator, "index %d", i)
 				}
 			}
 		})

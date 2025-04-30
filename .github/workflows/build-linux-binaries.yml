@@ -12,7 +12,7 @@ on:
 
 jobs:
   build-x86_64-binaries-tarball:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     permissions:
       id-token: write
       contents: read
@@ -25,7 +25,7 @@ jobs:
       - run: go version
 
       - name: Build the avalanchego binaries
-        run: ./scripts/build.sh
+        run: ./scripts/run_task.sh build
 
       - name: Install aws cli
         run: sudo snap install aws-cli --classic
@@ -58,7 +58,7 @@ jobs:
           TAG: ${{ env.TAG }}
           BUCKET: ${{ secrets.BUCKET }}
           ARCH: "amd64"
-          RELEASE: "focal"
+          RELEASE: "jammy"
 
       - name: Save as Github artifact
         uses: actions/upload-artifact@v4
@@ -85,7 +85,7 @@ jobs:
       - run: go version
 
       - name: Build the avalanchego binaries
-        run: ./scripts/build.sh
+        run: ./scripts/run_task.sh build
 
       - name: Install aws cli
         run: sudo snap install aws-cli --classic

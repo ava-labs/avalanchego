@@ -12,14 +12,15 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 func newBLSPublicKey(t *testing.T) [bls.PublicKeyLen]byte {
-	sk, err := bls.NewSecretKey()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 
-	pk := bls.PublicFromSecretKey(sk)
+	pk := sk.PublicKey()
 	pkBytes := bls.PublicKeyToCompressedBytes(pk)
 	return [bls.PublicKeyLen]byte(pkBytes)
 }

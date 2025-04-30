@@ -691,7 +691,7 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 	votesFor3 := bag.Of(block3.ID())
 	require.NoError(sm.RecordPoll(context.Background(), votesFor3))
 	require.Equal(2, sm.NumProcessing())
-	require.Equal(block2.ID(), sm.Preference())
+	require.Equal(block3.ID(), sm.Preference())
 
 	require.NoError(sm.RecordPoll(context.Background(), votesFor3))
 	require.Zero(sm.NumProcessing())

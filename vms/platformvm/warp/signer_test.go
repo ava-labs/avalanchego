@@ -10,7 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/signertest"
 )
@@ -18,7 +18,7 @@ import (
 func TestSigner(t *testing.T) {
 	for name, test := range signertest.SignerTests {
 		t.Run(name, func(t *testing.T) {
-			sk, err := bls.NewSecretKey()
+			sk, err := localsigner.New()
 			require.NoError(t, err)
 
 			chainID := ids.GenerateTestID()

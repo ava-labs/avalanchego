@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
@@ -177,7 +178,7 @@ func TestSignatureRequestVerifySubnetToL1Conversion(t *testing.T) {
 }
 
 func TestSignatureRequestVerifyL1ValidatorRegistrationRegistered(t *testing.T) {
-	sk, err := bls.NewSecretKey()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 
 	var (
@@ -185,7 +186,7 @@ func TestSignatureRequestVerifyL1ValidatorRegistrationRegistered(t *testing.T) {
 			ValidationID: ids.GenerateTestID(),
 			SubnetID:     ids.GenerateTestID(),
 			NodeID:       ids.GenerateTestNodeID(),
-			PublicKey:    bls.PublicKeyToUncompressedBytes(bls.PublicFromSecretKey(sk)),
+			PublicKey:    bls.PublicKeyToUncompressedBytes(sk.PublicKey()),
 			Weight:       1,
 		}
 		state = statetest.New(t, statetest.Config{})
@@ -240,7 +241,7 @@ func TestSignatureRequestVerifyL1ValidatorRegistrationNotRegistered(t *testing.T
 	skBytes, err := hex.DecodeString("36a33c536d283dfa599d0a70839c67ded6c954e346c5e8e5b4794e2299907887")
 	require.NoError(t, err)
 
-	sk, err := bls.SecretKeyFromBytes(skBytes)
+	sk, err := localsigner.FromBytes(skBytes)
 	require.NoError(t, err)
 
 	var (
@@ -250,7 +251,7 @@ func TestSignatureRequestVerifyL1ValidatorRegistrationNotRegistered(t *testing.T
 		nodeID1                    = ids.NodeID{5}
 		nodeID2                    = ids.NodeID{6}
 		nodeID3                    = ids.NodeID{6}
-		pk                         = bls.PublicFromSecretKey(sk)
+		pk                         = sk.PublicKey()
 		expiry                     = genesistest.DefaultValidatorStartTimeUnix + 1
 		weight              uint64 = 1
 	)
@@ -544,7 +545,7 @@ func TestSignatureRequestVerifyL1ValidatorRegistrationNotRegistered(t *testing.T
 }
 
 func TestSignatureRequestVerifyL1ValidatorWeight(t *testing.T) {
-	sk, err := bls.NewSecretKey()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 
 	const (
@@ -556,7 +557,7 @@ func TestSignatureRequestVerifyL1ValidatorWeight(t *testing.T) {
 			ValidationID: ids.GenerateTestID(),
 			SubnetID:     ids.GenerateTestID(),
 			NodeID:       ids.GenerateTestNodeID(),
-			PublicKey:    bls.PublicKeyToUncompressedBytes(bls.PublicFromSecretKey(sk)),
+			PublicKey:    bls.PublicKeyToUncompressedBytes(sk.PublicKey()),
 			Weight:       weight,
 			MinNonce:     nonce + 1,
 		}

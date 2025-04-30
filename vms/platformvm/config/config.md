@@ -1,226 +1,61 @@
----
-tags: [Configs]
-description: Reference for all available configuration options and parameters for the PlatformVM.
-pagination_label: P-Chain Configs
-sidebar_position: 1
----
-
-# P-Chain
-
 This document provides details about the configuration options available for the PlatformVM.
+
+## Standard Configurations
 
 In order to specify a configuration for the PlatformVM, you need to define a `Config` struct and its parameters. The default values for these parameters are:
 
-```json
-{
-  "Chains": null,
-  "Validators": null,
-  "UptimeLockedCalculator": null,
-  "SybilProtectionEnabled": false,
-  "PartialSyncPrimaryNetwork": false,
-  "TrackedSubnets": [],
-  "TxFee": 0,
-  "CreateAssetTxFee": 0,
-  "CreateSubnetTxFee": 0,
-  "TransformSubnetTxFee": 0,
-  "CreateBlockchainTxFee": 0,
-  "AddPrimaryNetworkValidatorFee": 0,
-  "AddPrimaryNetworkDelegatorFee": 0,
-  "AddSubnetValidatorFee": 0,
-  "AddSubnetDelegatorFee": 0,
-  "MinValidatorStake": 0,
-  "MaxValidatorStake": 0,
-  "MinDelegatorStake": 0,
-  "MinDelegationFee": 0,
-  "UptimePercentage": 0,
-  "MinStakeDuration": "0s",
-  "MaxStakeDuration": "0s",
-  "RewardConfig": {},
-  "ApricotPhase3Time": "0001-01-01T00:00:00Z",
-  "ApricotPhase5Time": "0001-01-01T00:00:00Z",
-  "BanffTime": "0001-01-01T00:00:00Z",
-  "CortinaTime": "0001-01-01T00:00:00Z",
-  "DurangoTime": "0001-01-01T00:00:00Z",
-  "EUpgradeTime": "0001-01-01T00:00:00Z",
-  "UseCurrentHeight": false
-}
-```
+| Option                   | Type     | Default |
+| ------------------------ | -------- | ------- |
+| `network`                          | `Network`       | `DefaultNetwork` |
+| `block-cache-size`                 | `int`          | `64 * units.MiB` |
+| `tx-cache-size`                    | `int`          | `128 * units.MiB` |
+| `transformed-subnet-tx-cache-size` | `int`          | `4 * units.MiB` |
+| `reward-utxos-cache-size`         | `int`          | `2048` |
+| `chain-cache-size`                | `int`          | `2048` |
+| `chain-db-cache-size`             | `int`          | `2048` |
+| `block-id-cache-size`             | `int`          | `8192` |
+| `fx-owner-cache-size`             | `int`          | `4 * units.MiB` |
+| `subnet-to-l1-conversion-cache-size` | `int`          | `4 * units.MiB` |
+| `l1-weights-cache-size`           | `int`          | `16 * units.KiB` |
+| `l1-inactive-validators-cache-size` | `int`          | `256 * units.KiB` |
+| `l1-subnet-id-node-id-cache-size` | `int`          | `16 * units.KiB` |
+| `checksums-enabled`               | `bool`         | `false` |
+| `mempool-prune-frequency`         | `time.Duration` | `30 * time.Minute` |
 
 Default values are overridden only if explicitly specified in the config.
 
-## Parameters
-
-The parameters are as follows:
-
-### `Chains`
-
-The node's chain manager
-
-### `Validators`
-
-Node's validator set maps SubnetID to validators of the Subnet
-
-- The primary network's validator set should have been added to the manager before calling VM.Initialize.
-- The primary network's validator set should be empty before calling VM.Initialize.
-
-### `UptimeLockedCalculator`
-
-Provides access to the uptime manager as a thread-safe data structure
-
-### `SybilProtectionEnabled`
-
-_Boolean_
-
-True if the node is being run with staking enabled
-
-### `PartialSyncPrimaryNetwork`
-
-_Boolean_
-
-If true, only the P-chain will be instantiated on the primary network.
-
-### `TrackedSubnets`
-
-Set of Subnets that this node is validating
-
-### `TxFee`
-
-_Uint64_
-
-Fee that is burned by every non-state creating transaction
-
-### `CreateAssetTxFee`
-
-_Uint64_
-
-Fee that must be burned by every state creating transaction before AP3
-
-### `CreateSubnetTxFee`
-
-_Uint64_
-
-Fee that must be burned by every Subnet creating transaction after AP3
-
-### `TransformSubnetTxFee`
-
-_Uint64_
-
-Fee that must be burned by every transform Subnet transaction
-
-### `CreateBlockchainTxFee`
-
-_Uint64_
-
-Fee that must be burned by every blockchain creating transaction after AP3
-
-### `AddPrimaryNetworkValidatorFee`
-
-_Uint64_
-
-Transaction fee for adding a primary network validator
-
-### `AddPrimaryNetworkDelegatorFee`
-
-_Uint64_
-
-Transaction fee for adding a primary network delegator
-
-### `AddSubnetValidatorFee`
-
-_Uint64_
-
-Transaction fee for adding a Subnet validator
-
-### `AddSubnetDelegatorFee`
-
-_Uint64_
-
-Transaction fee for adding a Subnet delegator
-
-### `MinValidatorStake`
-
-_Uint64_
-
-The minimum amount of tokens one must bond to be a validator
-
-### `MaxValidatorStake`
-
-_Uint64_
-
-The maximum amount of tokens that can be bonded on a validator
-
-### `MinDelegatorStake`
-
-_Uint64_
-
-Minimum stake, in nAVAX, that can be delegated on the primary network
-
-### `MinDelegationFee`
-
-_Uint32_
-
-Minimum fee that can be charged for delegation
-
-### `UptimePercentage`
-
-_Float64_
-
-UptimePercentage is the minimum uptime required to be rewarded for staking
-
-### `MinStakeDuration`
-
-_Duration_
-
-Minimum amount of time to allow a staker to stake
-
-### `MaxStakeDuration`
-
-_Duration_
-
-Maximum amount of time to allow a staker to stake
-
-### `RewardConfig`
-
-Config for the minting function
-
-### `ApricotPhase3Time`
-
-_Time_
-
-Time of the AP3 network upgrade
-
-### `ApricotPhase5Time`
-
-_Time_
-
-Time of the AP5 network upgrade
-
-### `BanffTime`
-
-_Time_
-
-Time of the Banff network upgrade
-
-### `CortinaTime`
-
-_Time_
-
-Time of the Cortina network upgrade
-
-### `DurangoTime`
-
-_Time_
-
-Time of the Durango network upgrade
-
-### `EUpgradeTime`
-
-_Time_
-
-Time of the E network upgrade
-
-### `UseCurrentHeight`
-
-_Boolean_
-
-UseCurrentHeight forces `GetMinimumHeight` to return the current height of the P-Chain instead of the oldest block in the `recentlyAccepted` window. This config is particularly useful for triggering proposervm activation on recently created Subnets (without this, users need to wait for `recentlyAcceptedWindowTTL` to pass for activation to occur).
+## Network Configuration
+
+The Network configuration defines parameters that control the network's gossip and validator behavior.
+
+### Parameters
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `max-validator-set-staleness` | `time.Duration` | `1 minute` | Maximum age of a validator set used for peer sampling and rate limiting |
+| `target-gossip-size` | `int` | `20 * units.KiB` | Target number of bytes to send when pushing transactions or responding to transaction pull requests |
+| `push-gossip-percent-stake` | `float64` | `0.9` | Percentage of total stake to target in the initial gossip round. Higher stake nodes are prioritized to minimize network messages |
+| `push-gossip-num-validators` | `int` | `100` | Number of validators to push transactions to in the initial gossip round |
+| `push-gossip-num-peers` | `int` | `0` | Number of peers to push transactions to in the initial gossip round |
+| `push-regossip-num-validators` | `int` | `10` | Number of validators for subsequent gossip rounds after the initial push |
+| `push-regossip-num-peers` | `int` | `0` | Number of peers for subsequent gossip rounds after the initial push |
+| `push-gossip-discarded-cache-size` | `int` | `16384` | Size of the cache storing recently dropped transaction IDs from mempool to avoid re-pushing |
+| `push-gossip-max-regossip-frequency` | `time.Duration` | `30 * time.Second` | Maximum frequency limit for re-gossiping a transaction |
+| `push-gossip-frequency` | `time.Duration` | `500 * time.Millisecond` | Frequency of push gossip rounds |
+| `pull-gossip-poll-size` | `int` | `1` | Number of validators to sample during pull gossip rounds |
+| `pull-gossip-frequency` | `time.Duration` | `1500 * time.Millisecond` | Frequency of pull gossip rounds |
+| `pull-gossip-throttling-period` | `time.Duration` | `10 * time.Second` | Time window for throttling pull requests |
+| `pull-gossip-throttling-limit` | `int` | `2` | Maximum number of pull queries allowed per validator within the throttling window |
+| `expected-bloom-filter-elements` | `int` | `8 * 1024` | Expected number of elements when creating a new bloom filter. Larger values increase filter size |
+| `expected-bloom-filter-false-positive-probability` | `float64` | `0.01` | Target probability of false positives after inserting the expected number of elements. Lower values increase filter size |
+| `max-bloom-filter-false-positive-probability` | `float64` | `0.05` | Threshold for bloom filter regeneration. Filter is refreshed when false positive probability exceeds this value |
+
+### Details
+
+The configuration is divided into several key areas:
+
+- **Validator Set Management**: Controls how fresh the validator set must be for network operations. The staleness setting ensures the network operates with reasonably current validator information.
+- **Gossip Size Controls**: Manages the size of gossip messages to maintain efficient network usage while ensuring reliable transaction propagation.
+- **Push Gossip Configuration**: Defines how transactions are initially propagated through the network, with emphasis on reaching high-stake validators first to optimize network coverage.
+- **Pull Gossip Configuration**: Controls how nodes request transactions they may have missed, including throttling mechanisms to prevent network overload.
+- **Bloom Filter Settings**: Configures the trade-off between memory usage and false positive rates in transaction filtering, with automatic filter regeneration when accuracy degrades.

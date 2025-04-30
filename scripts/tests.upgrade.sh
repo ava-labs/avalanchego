@@ -16,8 +16,8 @@ fi
 # local network, this flag must be updated to the last compatible
 # version with the latest code.
 #
-# v1.11.3 fixes a regression in Coreth genesis for custom networks.
-DEFAULT_VERSION="1.11.3"
+# v1.12.0 is the earliest version that supports Etna.
+DEFAULT_VERSION="1.12.0"
 
 VERSION="${1:-${DEFAULT_VERSION}}"
 if [[ -z "${VERSION}" ]]; then
@@ -63,16 +63,8 @@ find "/tmp/avalanchego-v${VERSION}"
 source ./scripts/constants.sh
 
 #################################
-echo "building upgrade.test"
-# to install the ginkgo binary (required for test build and run)
-go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.13.1
-ACK_GINKGO_RC=true ginkgo build ./tests/upgrade
-./tests/upgrade/upgrade.test --help
-
-#################################
 # By default, it runs all upgrade test cases!
 echo "running upgrade tests against the local cluster with ${AVALANCHEGO_PATH}"
-./tests/upgrade/upgrade.test \
-  --ginkgo.v \
+./bin/ginkgo -v ./tests/upgrade -- \
   --avalanchego-path="/tmp/avalanchego-v${VERSION}/avalanchego" \
   --avalanchego-path-to-upgrade-to="${AVALANCHEGO_PATH}"

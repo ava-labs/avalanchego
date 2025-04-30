@@ -75,7 +75,6 @@ func New(
 // not used until after the Bootstrapper has been Started.
 type Bootstrapper struct {
 	Config
-	common.Halter
 
 	// list of NoOpsHandler for messages dropped by Bootstrapper
 	common.StateSummaryFrontierHandler
