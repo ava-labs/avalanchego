@@ -81,12 +81,23 @@ func ensureMinimumFunds(ctx context.Context, endpoint string, keys []*ecdsa.Priv
 	agents := []*agent.Agent[*types.Transaction, common.Hash]{
 		agent.New(txTarget, generator, issuer, listener, tracker),
 	}
-	const timeout = 3 * time.Second
-	orchestrator := orchestrate.NewBurstOrchestrator(agents, timeout)
+	orchestrator := orchestrate.NewBurstOrchestrator(agents, time.Second)
 
 	err = orchestrator.Execute(ctx)
 	if err != nil {
 		return fmt.Errorf("executing fund distribution transactions: %w", err)
+	}
+
+	// Wait for transactions to be taken into account, especially because
+	// the orchestrator Execute method does not wait for all transactions
+	// to be confirmed.
+	const timeout = 3 * time.Second
+	timer := time.NewTimer(timeout)
+	select {
+	case <-ctx.Done():
+		timer.Stop()
+		return ctx.Err()
+	case <-timer.C:
 	}
 
 	err = checkBalancesHaveMin(ctx, client, slices.Collect(maps.Keys(needFundsKeys)), minFundsPerAddr)
