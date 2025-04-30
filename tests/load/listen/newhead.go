@@ -65,7 +65,11 @@ func subscriptionChToSignal(listenStop <-chan struct{}, listenDone, ready chan<-
 		case <-listenStop:
 			return
 		case header := <-subCh:
-			newHeadCh <- header.Number.Uint64()
+			select {
+			case newHeadCh <- header.Number.Uint64():
+			case <-listenStop:
+				return
+			}
 		}
 	}
 }
