@@ -7,7 +7,7 @@ option go_package = "github.com/ava-labs/avalanchego/proto/pb/http";
 service HTTP {
   // Handle wraps http1 over http2 and provides support for websockets by implementing
   // net conn and responsewriter in http2.
-  rpc Handle(HTTPRequest) returns (HttpResponse);
+  rpc Handle(HTTPRequest) returns (HTTPResponse);
   // HandleSimple wraps http1 requests over http2 similar to Handle but only passes headers
   // and body bytes. Because the request and response are single protos with no inline
   // gRPC servers the CPU cost as well as file descriptor overhead is less

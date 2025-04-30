@@ -39,7 +39,7 @@ func NewServer(handler http.Handler) *Server {
 	}
 }
 
-func (s *Server) Handle(ctx context.Context, req *httppb.HTTPRequest) (*httppb.HttpResponse, error) {
+func (s *Server) Handle(ctx context.Context, req *httppb.HTTPRequest) (*httppb.HTTPResponse, error) {
 	clientConn, err := grpcutils.Dial(req.ResponseWriter.ServerAddr)
 	if err != nil {
 		return nil, err
@@ -153,7 +153,7 @@ func (s *Server) Handle(ctx context.Context, req *httppb.HTTPRequest) (*httppb.H
 		})
 	}
 
-	return &httppb.HttpResponse{
+	return &httppb.HTTPResponse{
 		Header: header,
 	}, nil
 }

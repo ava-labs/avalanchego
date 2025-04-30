@@ -29,7 +29,7 @@ const (
 type HTTPClient interface {
 	// Handle wraps http1 over http2 and provides support for websockets by implementing
 	// net conn and responsewriter in http2.
-	Handle(ctx context.Context, in *HTTPRequest, opts ...grpc.CallOption) (*HttpResponse, error)
+	Handle(ctx context.Context, in *HTTPRequest, opts ...grpc.CallOption) (*HTTPResponse, error)
 	// HandleSimple wraps http1 requests over http2 similar to Handle but only passes headers
 	// and body bytes. Because the request and response are single protos with no inline
 	// gRPC servers the CPU cost as well as file descriptor overhead is less
@@ -45,8 +45,8 @@ func NewHTTPClient(cc grpc.ClientConnInterface) HTTPClient {
 	return &hTTPClient{cc}
 }
 
-func (c *hTTPClient) Handle(ctx context.Context, in *HTTPRequest, opts ...grpc.CallOption) (*HttpResponse, error) {
-	out := new(HttpResponse)
+func (c *hTTPClient) Handle(ctx context.Context, in *HTTPRequest, opts ...grpc.CallOption) (*HTTPResponse, error) {
+	out := new(HTTPResponse)
 	err := c.cc.Invoke(ctx, HTTP_Handle_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -69,7 +69,7 @@ func (c *hTTPClient) HandleSimple(ctx context.Context, in *HandleSimpleHTTPReque
 type HTTPServer interface {
 	// Handle wraps http1 over http2 and provides support for websockets by implementing
 	// net conn and responsewriter in http2.
-	Handle(context.Context, *HTTPRequest) (*HttpResponse, error)
+	Handle(context.Context, *HTTPRequest) (*HTTPResponse, error)
 	// HandleSimple wraps http1 requests over http2 similar to Handle but only passes headers
 	// and body bytes. Because the request and response are single protos with no inline
 	// gRPC servers the CPU cost as well as file descriptor overhead is less
@@ -82,7 +82,7 @@ type HTTPServer interface {
 type UnimplementedHTTPServer struct {
 }
 
-func (UnimplementedHTTPServer) Handle(context.Context, *HTTPRequest) (*HttpResponse, error) {
+func (UnimplementedHTTPServer) Handle(context.Context, *HTTPRequest) (*HTTPResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Handle not implemented")
 }
 func (UnimplementedHTTPServer) HandleSimple(context.Context, *HandleSimpleHTTPRequest) (*HandleSimpleHTTPResponse, error) {
