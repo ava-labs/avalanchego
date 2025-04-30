@@ -29,7 +29,7 @@ func newHeadNotifier(client NewHeadSubscriber) *headNotifier {
 	}
 }
 
-func (n *headNotifier) start(ctx context.Context) (newHead <-chan uint64, runError <-chan error, err error) {
+func (n *headNotifier) start() (newHead <-chan uint64, runError <-chan error, err error) {
 	newHeadCh := make(chan uint64)
 
 	listenStop := make(chan struct{})
@@ -39,7 +39,9 @@ func (n *headNotifier) start(ctx context.Context) (newHead <-chan uint64, runErr
 	ready := make(chan struct{})
 
 	subscriptionCh := make(chan *types.Header)
-	subscription, err := n.client.SubscribeNewHead(ctx, subscriptionCh)
+	// Note the subscription gets stopped with subscription.Unsubscribe() and does
+	// not rely on its subscribe context cancelation.
+	subscription, err := n.client.SubscribeNewHead(context.Background(), subscriptionCh)
 	if err != nil {
 		return nil, nil, fmt.Errorf("subscribing to new head: %w", err)
 	}
