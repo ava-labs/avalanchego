@@ -99,10 +99,7 @@ func New(config Config) (*Engine, error) {
 	nonVerifiedCache, err := metercacher.New[ids.ID, snowman.Block](
 		"non_verified_cache",
 		config.Ctx.Registerer,
-		lru.NewSizedCache(
-			nonVerifiedCacheSize,
-			cachedBlockSize,
-		),
+		lru.NewSizedCache(nonVerifiedCacheSize, cachedBlockSize),
 	)
 	if err != nil {
 		return nil, err

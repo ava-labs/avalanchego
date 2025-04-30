@@ -552,7 +552,7 @@ func New(
 	weightsCache, err := metercacher.New(
 		"l1_validator_weights_cache",
 		metricsReg,
-		lru.NewSizedCache[ids.ID, uint64](execCfg.L1WeightsCacheSize, func(ids.ID, uint64) int {
+		lru.NewSizedCache(execCfg.L1WeightsCacheSize, func(ids.ID, uint64) int {
 			return ids.IDLen + wrappers.LongLen
 		}),
 	)
@@ -563,7 +563,7 @@ func New(
 	inactiveL1ValidatorsCache, err := metercacher.New(
 		"l1_validator_inactive_cache",
 		metricsReg,
-		lru.NewSizedCache[ids.ID, maybe.Maybe[L1Validator]](
+		lru.NewSizedCache(
 			execCfg.L1InactiveValidatorsCacheSize,
 			func(_ ids.ID, maybeL1Validator maybe.Maybe[L1Validator]) int {
 				const (
@@ -587,7 +587,7 @@ func New(
 	subnetIDNodeIDCache, err := metercacher.New(
 		"l1_validator_subnet_id_node_id_cache",
 		metricsReg,
-		lru.NewSizedCache[subnetIDNodeID, bool](execCfg.L1SubnetIDNodeIDCacheSize, func(subnetIDNodeID, bool) int {
+		lru.NewSizedCache(execCfg.L1SubnetIDNodeIDCacheSize, func(subnetIDNodeID, bool) int {
 			return ids.IDLen + ids.NodeIDLen + wrappers.BoolLen
 		}),
 	)
@@ -638,7 +638,7 @@ func New(
 	subnetToL1ConversionCache, err := metercacher.New[ids.ID, SubnetToL1Conversion](
 		"subnet_conversion_cache",
 		metricsReg,
-		lru.NewSizedCache[ids.ID, SubnetToL1Conversion](execCfg.SubnetToL1ConversionCacheSize, func(_ ids.ID, c SubnetToL1Conversion) int {
+		lru.NewSizedCache(execCfg.SubnetToL1ConversionCacheSize, func(_ ids.ID, c SubnetToL1Conversion) int {
 			return 3*ids.IDLen + len(c.Addr)
 		}),
 	)

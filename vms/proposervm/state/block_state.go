@@ -59,11 +59,8 @@ func cachedBlockSize(_ ids.ID, bw *blockWrapper) int {
 
 func NewBlockState(db database.Database) BlockState {
 	return &blockState{
-		blkCache: lru.NewSizedCache(
-			blockCacheSize,
-			cachedBlockSize,
-		),
-		db: db,
+		blkCache: lru.NewSizedCache(blockCacheSize, cachedBlockSize),
+		db:       db,
 	}
 }
 
@@ -71,10 +68,7 @@ func NewMeteredBlockState(db database.Database, namespace string, metrics promet
 	blkCache, err := metercacher.New[ids.ID, *blockWrapper](
 		metric.AppendNamespace(namespace, "block_cache"),
 		metrics,
-		lru.NewSizedCache(
-			blockCacheSize,
-			cachedBlockSize,
-		),
+		lru.NewSizedCache(blockCacheSize, cachedBlockSize),
 	)
 
 	return &blockState{

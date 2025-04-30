@@ -152,10 +152,7 @@ func (vm *VM) Initialize(
 	innerBlkCache, err := metercacher.New(
 		"inner_block_cache",
 		vm.Config.Registerer,
-		lru.NewSizedCache(
-			innerBlkCacheSize,
-			cachedBlockSize,
-		),
+		lru.NewSizedCache(innerBlkCacheSize, cachedBlockSize),
 	)
 	if err != nil {
 		return err
