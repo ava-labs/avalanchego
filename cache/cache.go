@@ -27,12 +27,16 @@ type Cacher[K comparable, V any] interface {
 }
 
 // Evictable allows the object to be notified when it is evicted
+//
+// Deprecated: Remove this once the vertex state no longer uses it.
 type Evictable[K comparable] interface {
 	Key() K
 	Evict()
 }
 
 // Deduplicator acts as a best effort deduplication service
+//
+// Deprecated: Remove this once the vertex state no longer uses it.
 type Deduplicator[K comparable, V Evictable[K]] interface {
 	// Deduplicate returns either the provided value, or a previously provided
 	// value with the same ID that hasn't yet been evicted

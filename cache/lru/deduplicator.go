@@ -12,9 +12,9 @@ import (
 
 var _ cache.Deduplicator[struct{}, cache.Evictable[struct{}]] = (*Deduplicator[struct{}, cache.Evictable[struct{}]])(nil)
 
-// TODO: Remove this once the vertex state no longer uses it.
-//
 // Deduplicator is an LRU cache that notifies the objects when they are evicted.
+//
+// Deprecated: Remove this once the vertex state no longer uses it.
 type Deduplicator[K comparable, V cache.Evictable[K]] struct {
 	lock      sync.Mutex
 	entryMap  map[K]*linked.ListElement[V]
@@ -22,6 +22,7 @@ type Deduplicator[K comparable, V cache.Evictable[K]] struct {
 	size      int
 }
 
+// Deprecated: Remove this once the vertex state no longer uses it.
 func NewDeduplicator[K comparable, V cache.Evictable[K]](size int) *Deduplicator[K, V] {
 	return &Deduplicator[K, V]{
 		entryMap:  make(map[K]*linked.ListElement[V]),
