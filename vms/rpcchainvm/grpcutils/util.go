@@ -12,10 +12,9 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
 	spb "google.golang.org/genproto/googleapis/rpc/status"
 	tspb "google.golang.org/protobuf/types/known/timestamppb"
-
-	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
 )
 
 // GetGRPCErrorFromHTTPResponse takes an HandleSimpleHTTPResponse as input and returns a gRPC error.
