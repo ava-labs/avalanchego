@@ -13,8 +13,6 @@ const (
 	Disabled ExporterType = iota
 	GRPC
 	HTTP
-
-	nullStr = "null"
 )
 
 var (
@@ -47,7 +45,7 @@ func (t ExporterType) MarshalJSON() ([]byte, error) {
 
 func (t *ExporterType) UnmarshalJSON(b []byte) error {
 	str := string(b)
-	if str == nullStr { // If "null", do nothing
+	if str == "null" { // If "null", do nothing
 		return nil
 	}
 	if len(str) < 2 {
