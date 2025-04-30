@@ -1039,7 +1039,7 @@ func TestNewViewOnCommittedView(t *testing.T) {
 	//   |
 	//  db
 
-	require.Len(db.childViews, 0)
+	require.Empty(db.childViews)
 	require.Equal(db, view1.parentTrie)
 
 	// Create a new view on the committed view
@@ -1105,7 +1105,7 @@ func TestNewViewOnCommittedView(t *testing.T) {
 
 	// view3 being committed invalidates view2
 	require.True(view2.invalidated)
-	require.Len(db.childViews, 0)
+	require.Empty(db.childViews)
 	require.Equal(db, view3.parentTrie)
 }
 
