@@ -91,57 +91,82 @@ func TestRequestClientArbitrarilyLongBody(t *testing.T) {
 // Tests that writes to the http response in the server are propagated to the
 // client
 func TestHttpResponse(t *testing.T) {
-	require := require.New(t)
-
-	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header()["Foo"] = []string{"bar"}
-		_, err := w.Write([]byte{1, 2, 3})
-		require.NoError(err)
-	})
-
-	listener, err := grpcutils.NewListener()
-	require.NoError(err)
-	server := grpc.NewServer()
-	httppb.RegisterHTTPServer(server, NewServer(handler))
-
-	go func() {
-		require.NoError(server.Serve(listener))
-	}()
-
-	conn, err := grpc.NewClient(
-		listener.Addr().String(),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
-	require.NoError(err)
-
-	client := NewClient(httppb.NewHTTPClient(conn))
-
-	recorder := &httptest.ResponseRecorder{
-		Body: bytes.NewBuffer(nil),
+	tests := []struct {
+		name    string
+		request http.Request
+	}{
+		{
+			name: "upgrade header specified",
+			request: http.Request{
+				Body: io.NopCloser(strings.NewReader("bar")),
+				Header: http.Header{
+					"bar": {"bar"},
+				},
+				Trailer: http.Header{
+					"bar": {"bar"},
+				},
+				RemoteAddr: "bar",
+			},
+		},
+		{
+			name: "arbitrary headers",
+			request: http.Request{
+				Body: io.NopCloser(strings.NewReader("bar")),
+				Header: http.Header{
+					"Upgrade": {"upgrade"},
+					"bar":     {"bar"},
+				},
+				Trailer: http.Header{
+					"bar": {"bar"},
+				},
+				RemoteAddr: "bar",
+			},
+		},
 	}
 
-	request := &http.Request{
-		Body: io.NopCloser(strings.NewReader("bar")),
-		Header: http.Header{
-			"Upgrade": {"upgrade"},
-			"bar":     {"bar"},
-		},
-		Trailer: http.Header{
-			"bar": {"bar"},
-		},
-		RemoteAddr: "bar",
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header()["Foo"] = []string{"bar"}
+				_, err := w.Write([]byte{1, 2, 3})
+				require.NoError(err)
+			})
+
+			listener, err := grpcutils.NewListener()
+			require.NoError(err)
+			server := grpc.NewServer()
+			httppb.RegisterHTTPServer(server, NewServer(handler))
+
+			go func() {
+				require.NoError(server.Serve(listener))
+			}()
+
+			conn, err := grpc.NewClient(
+				listener.Addr().String(),
+				grpc.WithTransportCredentials(insecure.NewCredentials()),
+			)
+			require.NoError(err)
+
+			client := NewClient(httppb.NewHTTPClient(conn))
+
+			recorder := &httptest.ResponseRecorder{
+				Body: bytes.NewBuffer(nil),
+			}
+
+			client.ServeHTTP(recorder, &tt.request)
+
+			require.Equal(200, recorder.Code)
+			require.Equal(
+				http.Header{
+					"Foo": []string{"bar"},
+				},
+				recorder.Header(),
+			)
+			require.Equal([]byte{1, 2, 3}, recorder.Body.Bytes())
+		})
 	}
-
-	client.ServeHTTP(recorder, request)
-
-	require.Equal(200, recorder.Code)
-	require.Equal(
-		http.Header{
-			"Foo": []string{"bar"},
-		},
-		recorder.Header(),
-	)
-	require.Equal([]byte{1, 2, 3}, recorder.Body.Bytes())
 }
 
 type infiniteStream struct{}
