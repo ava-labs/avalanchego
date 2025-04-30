@@ -83,7 +83,8 @@ func ensureMinimumFunds(ctx context.Context, endpoint string, keys []*ecdsa.Priv
 	agents := []*agent.Agent[*types.Transaction, common.Hash]{
 		agent.New(txTarget, generator, issuer, listener, tracker),
 	}
-	orchestrator := orchestrate.NewBurstOrchestrator(agents, time.Second)
+	const timeout = 3 * time.Second
+	orchestrator := orchestrate.NewBurstOrchestrator(agents, timeout)
 
 	err = orchestrator.Execute(ctx)
 	if err != nil {

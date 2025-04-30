@@ -41,7 +41,7 @@ func New(client EthClient, tracker Tracker, address common.Address) *Issuer {
 
 func (i *Issuer) IssueTx(ctx context.Context, tx *types.Transaction) error {
 	txHash, txNonce := tx.Hash(), tx.Nonce()
-	if txNonce > 0 && txNonce != i.lastIssuedNonce+1 {
+	if i.lastIssuedNonce > 0 && txNonce != i.lastIssuedNonce+1 {
 		// the listener relies on this being true
 		return fmt.Errorf("transaction nonce %d is not equal to the last issued nonce %d plus one", txNonce, i.lastIssuedNonce)
 	}

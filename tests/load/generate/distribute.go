@@ -8,6 +8,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"maps"
 	"math/big"
 
 	"github.com/ava-labs/coreth/params"
@@ -29,7 +30,6 @@ type Distributor struct {
 	address   common.Address // corresponding to `from`
 	nonce     uint64
 	to        map[*ecdsa.PrivateKey]*big.Int
-	toIndex   int
 	signer    types.Signer
 	chainID   *big.Int
 	gasTipCap *big.Int
@@ -65,7 +65,7 @@ func NewDistributor(ctx context.Context, client DistributorClient, from *ecdsa.P
 		from:      from,
 		address:   address,
 		nonce:     nonce,
-		to:        to,
+		to:        maps.Clone(to), // need to clone the map to avoid modifying the original
 		signer:    types.LatestSignerForChainID(chainID),
 		chainID:   chainID,
 		gasTipCap: gasTipCap,
@@ -74,7 +74,7 @@ func NewDistributor(ctx context.Context, client DistributorClient, from *ecdsa.P
 }
 
 func (d *Distributor) GenerateTx() (*types.Transaction, error) {
-	if d.toIndex == len(d.to) {
+	if len(d.to) == 0 {
 		// The caller of this function should prevent this error from being
 		// returned by bounding the number of transactions generated.
 		return nil, errors.New("no more keys to distribute funds to")
@@ -102,6 +102,5 @@ func (d *Distributor) GenerateTx() (*types.Transaction, error) {
 		return nil, err
 	}
 	d.nonce++
-	d.toIndex++
 	return tx, nil
 }
