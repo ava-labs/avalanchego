@@ -25,8 +25,6 @@ type metrics struct {
 	// ConfirmationTxTimes is the summary of the quantiles of individual confirmation tx times.
 	// Failed transactions do not show in this metric.
 	ConfirmationTxTimes prometheus.Summary
-	// BlockTimes is the summary of the quantiles of individual block times.
-	BlockTimes prometheus.Summary
 
 	registry PrometheusRegistry
 }
@@ -63,14 +61,9 @@ func newMetrics(registry PrometheusRegistry) *metrics {
 		Help:       "Individual Tx Confirmation Times for a Load Test",
 		Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
 	})
-	blockTimes := prometheus.NewSummary(prometheus.SummaryOpts{
-		Name:       "block_time",
-		Help:       "Individual block times for a load test",
-		Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
-	})
 
 	registry.MustRegister(confirmed, failed, inFlightIssuances, inFlightTxs,
-		issuanceTxTimes, confirmationTxTimes, blockTimes)
+		issuanceTxTimes, confirmationTxTimes)
 
 	return &metrics{
 		registry:            registry,
@@ -80,7 +73,6 @@ func newMetrics(registry PrometheusRegistry) *metrics {
 		InFlightTxs:         inFlightTxs,
 		IssuanceTxTimes:     issuanceTxTimes,
 		ConfirmationTxTimes: confirmationTxTimes,
-		BlockTimes:          blockTimes,
 	}
 }
 

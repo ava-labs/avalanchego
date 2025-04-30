@@ -56,9 +56,6 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 	registry := prometheus.NewRegistry()
 	metricsServer := tracker.NewMetricsServer("127.0.0.1:8082", registry)
 	tracker := tracker.New(registry)
-	defer func() {
-		log.Info("average duration per block", "value", tracker.GetAverageDurationPerBlock().String())
-	}()
 
 	agents := make([]*agent.Agent[*types.Transaction, common.Hash], config.agents)
 	for i := range agents {

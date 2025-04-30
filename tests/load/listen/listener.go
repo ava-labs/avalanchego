@@ -21,12 +21,6 @@ type EthClient interface {
 type Tracker interface {
 	ObserveConfirmed(txHash common.Hash)
 	ObserveFailed(txHash common.Hash)
-	// ObserveBlock observes a new block with the given number.
-	// It should be called when a new block is received.
-	// It should ignore the block if the number has already been observed.
-	// It may also ignore the first block observed when it comes to time,
-	// given the missing information on the time start for the first block.
-	ObserveBlock(number uint64)
 }
 
 // Listener listens for transaction confirmations from a node.
@@ -95,8 +89,7 @@ func (l *Listener) Listen(ctx context.Context) error {
 			return nil
 		case err := <-notifierErrCh:
 			return fmt.Errorf("new head notifier failed: %w", err)
-		case blockNumber := <-newHeadCh:
-			l.tracker.ObserveBlock(blockNumber)
+		case <-newHeadCh:
 		}
 	}
 }

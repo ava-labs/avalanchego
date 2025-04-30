@@ -13,14 +13,11 @@ import (
 type Tracker struct {
 	timeNow          func() time.Time
 	txHashToLastTime map[common.Hash]time.Time
-	lastBlockNumber  uint64
-	lastBlockTime    time.Time
 	metrics          *metrics
 
 	stats struct {
-		confirmed        uint64
-		failed           uint64
-		durationPerBlock []time.Duration
+		confirmed uint64
+		failed    uint64
 	}
 	mutex sync.Mutex
 }
@@ -86,36 +83,6 @@ func (t *Tracker) ObserveFailed(txHash common.Hash) {
 	t.stats.failed++
 }
 
-// ObserveBlock records a new block with the given number.
-// Note it ignores the first block, to avoid misleading metrics due to the
-// absence of information on when the previous block was created.
-func (t *Tracker) ObserveBlock(number uint64) {
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
-
-	now := t.timeNow()
-	if t.lastBlockNumber == 0 {
-		t.lastBlockTime = now
-		t.lastBlockNumber = number
-		return
-	}
-
-	if number == t.lastBlockNumber {
-		// No new block. This can happen when polling the node periodically.
-		return
-	}
-
-	// Usually numberDiff should be 1, but it may happen it is bigger, especially
-	// when polling the node periodically instead of using a subscription.
-	numberDiff := number - t.lastBlockNumber
-	timeDiff := now.Sub(t.lastBlockTime)
-	durationPerBlock := timeDiff / time.Duration(numberDiff)
-	t.stats.durationPerBlock = append(t.stats.durationPerBlock, durationPerBlock)
-	t.metrics.BlockTimes.Observe(durationPerBlock.Seconds())
-	t.lastBlockTime = now
-	t.lastBlockNumber = number
-}
-
 // GetObservedConfirmed returns the number of transactions that the tracker has
 // confirmed were accepted.
 func (t *Tracker) GetObservedConfirmed() uint64 {
@@ -130,15 +97,4 @@ func (t *Tracker) GetObservedFailed() uint64 {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 	return t.stats.failed
-}
-
-// GetAverageDurationPerBlock returns the average duration per block.
-func (t *Tracker) GetAverageDurationPerBlock() time.Duration {
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
-	var average time.Duration
-	for _, durationPerBlock := range t.stats.durationPerBlock {
-		average += durationPerBlock
-	}
-	return average / time.Duration(len(t.stats.durationPerBlock))
 }
