@@ -122,7 +122,7 @@ func TestHttpResponse(t *testing.T) {
 
 			handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				w.Header()["Bar"] = []string{"bar"}
-				_, err := w.Write([]byte{1, 2, 3})
+				_, err := w.Write([]byte("baz"))
 				require.NoError(err)
 			})
 
@@ -155,7 +155,7 @@ func TestHttpResponse(t *testing.T) {
 				},
 				recorder.Header(),
 			)
-			require.Equal([]byte{1, 2, 3}, recorder.Body.Bytes())
+			require.Equal("baz", recorder.Body.String())
 		})
 	}
 }
