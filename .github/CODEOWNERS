@@ -23,4 +23,5 @@
 /scripts/*.md @maru-ava @meaghanfitzgerald
 /tests/ @maru-ava
 /tests/*.md @maru-ava @meaghanfitzgerald
+/x/merkledb @joshua-kim @rrazvan1
 /x/sync @joshua-kim @rrazvan1
