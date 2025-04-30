@@ -145,7 +145,7 @@ message HTTPRequest {
   Request request = 2;
 }
 
-message HttpResponse {
+message HTTPResponse {
   // header is the http headers for the response
   repeated Element header = 1;
 }
