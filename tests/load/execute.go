@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"math/big"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/ava-labs/coreth/params"
@@ -64,7 +63,6 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 	agents := make([]*agent.Agent[*types.Transaction, common.Hash], config.agents)
 	for i := range agents {
 		endpoint := config.endpoints[i%len(config.endpoints)]
-		websocket := strings.HasPrefix(endpoint, "ws://") || strings.HasPrefix(endpoint, "wss://")
 		client, err := ethclient.DialContext(ctx, endpoint)
 		if err != nil {
 			return fmt.Errorf("dialing %s: %w", endpoint, err)
@@ -76,7 +74,7 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 		}
 		address := ethcrypto.PubkeyToAddress(keys[i].PublicKey)
 		issuer := issue.New(client, tracker, address)
-		listener := listen.New(client, websocket, tracker, config.txsPerAgent, address)
+		listener := listen.New(client, tracker, config.txsPerAgent, address)
 		agents[i] = agent.New[*types.Transaction, common.Hash](config.txsPerAgent, generator, issuer, listener, tracker)
 	}
 
