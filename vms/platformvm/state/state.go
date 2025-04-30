@@ -102,7 +102,7 @@ var (
 	LastAcceptedKey      = []byte("last accepted")
 	HeightsIndexedKey    = []byte("heights indexed")
 	InitializedKey       = []byte("initialized")
-	BlocksReindexedKey   = []byte("blocks reindexed.2")
+	BlocksReindexedKey   = []byte("blocks reindexed.3")
 
 	emptyL1ValidatorCache = &cache.Empty[ids.ID, maybe.Maybe[L1Validator]]{}
 )
