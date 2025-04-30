@@ -65,7 +65,7 @@ func GetHTTPHeader(hs http.Header) []*httppb.Element {
 	return result
 }
 
-// SetHeaders sets http headers to next
+// SetHeaders sets headers to next
 func SetHeaders(headers http.Header, next []*httppb.Element) {
 	clear(headers)
 
