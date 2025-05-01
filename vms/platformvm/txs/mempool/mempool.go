@@ -14,21 +14,15 @@ import (
 )
 
 var (
-	_ Mempool = (*mempool)(nil)
-
 	ErrCantIssueAdvanceTimeTx     = errors.New("can not issue an advance time tx")
 	ErrCantIssueRewardValidatorTx = errors.New("can not issue a reward validator tx")
 )
 
-type Mempool interface {
+type Mempool struct {
 	txmempool.Mempool[*txs.Tx]
 }
 
-type mempool struct {
-	txmempool.Mempool[*txs.Tx]
-}
-
-func New(namespace string, registerer prometheus.Registerer) (Mempool, error) {
+func New(namespace string, registerer prometheus.Registerer) (*Mempool, error) {
 	metrics, err := txmempool.NewMetrics(namespace, registerer)
 	if err != nil {
 		return nil, err
@@ -36,10 +30,10 @@ func New(namespace string, registerer prometheus.Registerer) (Mempool, error) {
 	pool := txmempool.New[*txs.Tx](
 		metrics,
 	)
-	return &mempool{Mempool: pool}, nil
+	return &Mempool{Mempool: pool}, nil
 }
 
-func (m *mempool) Add(tx *txs.Tx) error {
+func (m *Mempool) Add(tx *txs.Tx) error {
 	switch tx.Unsigned.(type) {
 	case *txs.AdvanceTimeTx:
 		return ErrCantIssueAdvanceTimeTx

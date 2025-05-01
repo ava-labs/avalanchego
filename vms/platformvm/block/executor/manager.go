@@ -18,8 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
+	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
 var (
@@ -52,7 +52,7 @@ type Manager interface {
 }
 
 func NewManager(
-	mempool mempool.Mempool,
+	mempool mempool.Mempool[*txs.Tx],
 	toEngine chan<- common.Message,
 	metrics metrics.Metrics,
 	s state.State,

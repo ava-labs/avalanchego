@@ -19,8 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/txs/mempool"
-
-	pmempool "github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
 var (
@@ -68,7 +66,7 @@ func (txMarshaller) UnmarshalGossip(bytes []byte) (*txs.Tx, error) {
 }
 
 func newGossipMempool(
-	mempool pmempool.Mempool,
+	mempool mempool.Mempool[*txs.Tx],
 	toEngine chan<- common.Message,
 	registerer prometheus.Registerer,
 	log logging.Logger,
@@ -88,7 +86,7 @@ func newGossipMempool(
 }
 
 type gossipMempool struct {
-	pmempool.Mempool
+	mempool.Mempool[*txs.Tx]
 	toEngine   chan<- common.Message
 	log        logging.Logger
 	txVerifier TxVerifier

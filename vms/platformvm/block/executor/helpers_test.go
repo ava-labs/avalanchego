@@ -48,6 +48,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/wallet"
+
+	txmempool "github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
 const (
@@ -81,7 +83,7 @@ type test struct {
 
 type environment struct {
 	blkManager Manager
-	mempool    mempool.Mempool
+	mempool    txmempool.Mempool[*txs.Tx]
 	sender     *enginetest.Sender
 
 	isBootstrapped *utils.Atomic[bool]
