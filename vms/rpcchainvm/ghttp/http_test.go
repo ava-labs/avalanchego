@@ -96,6 +96,8 @@ func TestHttpResponse(t *testing.T) {
 		request http.Request
 	}{
 		{
+			// Requests with an upgrade header do not use the "Simple*" http response
+			// apis and must be separately tested
 			name: "upgrade header specified",
 			request: http.Request{
 				Body: io.NopCloser(strings.NewReader("foo")),
