@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/cachetest"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -24,13 +25,13 @@ func TestInterface(t *testing.T) {
 		{
 			description: "cache LRU",
 			setup: func(size int) cache.Cacher[ids.ID, int64] {
-				return &cache.LRU[ids.ID, int64]{Size: size}
+				return lru.NewCache[ids.ID, int64](size)
 			},
 		},
 		{
 			description: "sized cache LRU",
 			setup: func(size int) cache.Cacher[ids.ID, int64] {
-				return cache.NewSizedLRU[ids.ID, int64](size*cachetest.IntSize, cachetest.IntSizeFunc)
+				return lru.NewSizedCache(size*cachetest.IntSize, cachetest.IntSizeFunc)
 			},
 		},
 	}

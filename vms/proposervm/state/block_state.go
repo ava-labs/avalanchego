@@ -9,6 +9,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -58,11 +59,8 @@ func cachedBlockSize(_ ids.ID, bw *blockWrapper) int {
 
 func NewBlockState(db database.Database) BlockState {
 	return &blockState{
-		blkCache: cache.NewSizedLRU[ids.ID, *blockWrapper](
-			blockCacheSize,
-			cachedBlockSize,
-		),
-		db: db,
+		blkCache: lru.NewSizedCache(blockCacheSize, cachedBlockSize),
+		db:       db,
 	}
 }
 
@@ -70,10 +68,7 @@ func NewMeteredBlockState(db database.Database, namespace string, metrics promet
 	blkCache, err := metercacher.New[ids.ID, *blockWrapper](
 		metric.AppendNamespace(namespace, "block_cache"),
 		metrics,
-		cache.NewSizedLRU[ids.ID, *blockWrapper](
-			blockCacheSize,
-			cachedBlockSize,
-		),
+		lru.NewSizedCache(blockCacheSize, cachedBlockSize),
 	)
 
 	return &blockState{

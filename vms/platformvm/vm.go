@@ -14,7 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
-	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
@@ -453,11 +453,9 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	server.RegisterInterceptFunc(vm.metrics.InterceptRequest)
 	server.RegisterAfterFunc(vm.metrics.AfterRequest)
 	service := &Service{
-		vm:          vm,
-		addrManager: avax.NewAddressManager(vm.ctx),
-		stakerAttributesCache: &cache.LRU[ids.ID, *stakerAttributes]{
-			Size: stakerAttributesCacheSize,
-		},
+		vm:                    vm,
+		addrManager:           avax.NewAddressManager(vm.ctx),
+		stakerAttributesCache: lru.NewCache[ids.ID, *stakerAttributes](stakerAttributesCacheSize),
 	}
 	err := server.RegisterService(service, "platform")
 	return map[string]http.Handler{
