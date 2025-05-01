@@ -337,27 +337,15 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 	var (
 		childBlockHeight = blk.Height() + 1
 		parentTimestamp  = blk.Timestamp()
-		nextStartTime    time.Time
+		currentTime      = vm.Clock.Time().Truncate(time.Second)
 	)
-	if vm.Upgrades.IsDurangoActivated(parentTimestamp) {
-		currentTime := vm.Clock.Time().Truncate(time.Second)
-		if nextStartTime, err = vm.getPostDurangoSlotTime(
-			ctx,
-			childBlockHeight,
-			pChainHeight,
-			proposer.TimeToSlot(parentTimestamp, currentTime),
-			parentTimestamp,
-		); err == nil {
-			vm.proposerBuildSlotGauge.Set(float64(proposer.TimeToSlot(parentTimestamp, nextStartTime)))
-		}
-	} else {
-		nextStartTime, err = vm.getPreDurangoSlotTime(
-			ctx,
-			childBlockHeight,
-			pChainHeight,
-			parentTimestamp,
-		)
-	}
+	nextStartTime, err := vm.getSlotTime(
+		ctx,
+		childBlockHeight,
+		pChainHeight,
+		proposer.TimeToSlot(parentTimestamp, currentTime),
+		parentTimestamp,
+	)
 	if err != nil {
 		vm.ctx.Log.Debug("failed to fetch the expected delay",
 			zap.Error(err),
@@ -369,6 +357,8 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 		// until the P-chain's height has advanced.
 		return nil
 	}
+
+	vm.proposerBuildSlotGauge.Set(float64(proposer.TimeToSlot(parentTimestamp, nextStartTime)))
 	vm.Scheduler.SetBuildBlockTime(nextStartTime)
 
 	vm.ctx.Log.Debug("set preference",
@@ -379,28 +369,7 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 	return nil
 }
 
-func (vm *VM) getPreDurangoSlotTime(
-	ctx context.Context,
-	blkHeight,
-	pChainHeight uint64,
-	parentTimestamp time.Time,
-) (time.Time, error) {
-	delay, err := vm.Windower.Delay(ctx, blkHeight, pChainHeight, vm.ctx.NodeID, proposer.MaxBuildWindows)
-	if err != nil {
-		return time.Time{}, err
-	}
-
-	// Note: The P-chain does not currently try to target any block time. It
-	// notifies the consensus engine as soon as a new block may be built. To
-	// avoid fast runs of blocks there is an additional minimum delay that
-	// validators can specify. This delay may be an issue for high performance,
-	// custom VMs. Until the P-chain is modified to target a specific block
-	// time, ProposerMinBlockDelay can be configured in the subnet config.
-	delay = max(delay, vm.MinBlkDelay)
-	return parentTimestamp.Add(delay), nil
-}
-
-func (vm *VM) getPostDurangoSlotTime(
+func (vm *VM) getSlotTime(
 	ctx context.Context,
 	blkHeight,
 	pChainHeight,

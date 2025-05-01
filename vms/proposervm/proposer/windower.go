@@ -14,21 +14,13 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 // Proposer list constants
 const (
-	WindowDuration = 5 * time.Second
-
-	MaxVerifyWindows = 6
-	MaxVerifyDelay   = MaxVerifyWindows * WindowDuration // 30 seconds
-
-	MaxBuildWindows = 60
-	MaxBuildDelay   = MaxBuildWindows * WindowDuration // 5 minutes
-
+	WindowDuration     = 5 * time.Second
 	MaxLookAheadSlots  = 720
 	MaxLookAheadWindow = MaxLookAheadSlots * WindowDuration // 1 hour
 )
@@ -41,33 +33,9 @@ var (
 )
 
 type Windower interface {
-	// Proposers returns the proposer list for building a block at [blockHeight]
-	// when the validator set is defined at [pChainHeight]. The list is returned
-	// in order. The minimum delay of a validator is the index they appear times
-	// [WindowDuration].
-	Proposers(
-		ctx context.Context,
-		blockHeight,
-		pChainHeight uint64,
-		maxWindows int,
-	) ([]ids.NodeID, error)
-
-	// Delay returns the amount of time that [validatorID] must wait before
-	// building a block at [blockHeight] when the validator set is defined at
-	// [pChainHeight].
-	Delay(
-		ctx context.Context,
-		blockHeight,
-		pChainHeight uint64,
-		validatorID ids.NodeID,
-		maxWindows int,
-	) (time.Duration, error)
-
-	// In the Post-Durango windowing scheme, every validator active at
-	// [pChainHeight] gets specific slots it can propose in (instead of being
-	// able to propose from a given time on as it happens Pre-Durango).
-	// [ExpectedProposer] calculates which nodeID is scheduled to propose a
-	// block of height [blockHeight] at [slot].
+	// ExpectedProposer calculates which nodeID is scheduled to propose for a
+	// blockHeight at a slot.
+	//
 	// If no validators are currently available, [ErrAnyoneCanPropose] is
 	// returned.
 	ExpectedProposer(
@@ -77,13 +45,12 @@ type Windower interface {
 		slot uint64,
 	) (ids.NodeID, error)
 
-	// In the Post-Durango windowing scheme, every validator active at
-	// [pChainHeight] gets specific slots it can propose in (instead of being
-	// able to propose from a given time on as it happens Pre-Durango).
-	// [MinDelayForProposer] specifies how long [nodeID] needs to wait for its
-	// slot to start. Delay is specified as starting from slot zero start.
-	// (which is parent timestamp). For efficiency reasons, we cap the slot
-	// search to [MaxLookAheadSlots].
+	// MinDelayForProposer calculates how long nodeID needs to wait for its slot
+	// to start. Delay is specified as starting from slot zero (which is the
+	// parent timestamp).
+	//
+	// For efficiency reasons, the search is capped to [MaxLookAheadSlots].
+	//
 	// If no validators are currently available, [ErrAnyoneCanPropose] is
 	// returned.
 	MinDelayForProposer(
@@ -110,58 +77,6 @@ func New(state validators.State, subnetID, chainID ids.ID) Windower {
 		subnetID:    subnetID,
 		chainSource: w.UnpackLong(),
 	}
-}
-
-func (w *windower) Proposers(ctx context.Context, blockHeight, pChainHeight uint64, maxWindows int) ([]ids.NodeID, error) {
-	// Note: The 32-bit prng is used here for legacy reasons. All other usages
-	// of a prng in this file should use the 64-bit version.
-	source := prng.NewMT19937()
-	sampler, validators, err := w.makeSampler(ctx, pChainHeight, source)
-	if err != nil {
-		return nil, err
-	}
-
-	var totalWeight uint64
-	for _, validator := range validators {
-		totalWeight, err = math.Add(totalWeight, validator.weight)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	source.Seed(w.chainSource ^ blockHeight)
-
-	numToSample := int(min(uint64(maxWindows), totalWeight))
-	indices, ok := sampler.Sample(numToSample)
-	if !ok {
-		return nil, ErrUnexpectedSamplerFailure
-	}
-
-	nodeIDs := make([]ids.NodeID, numToSample)
-	for i, index := range indices {
-		nodeIDs[i] = validators[index].id
-	}
-	return nodeIDs, nil
-}
-
-func (w *windower) Delay(ctx context.Context, blockHeight, pChainHeight uint64, validatorID ids.NodeID, maxWindows int) (time.Duration, error) {
-	if validatorID == ids.EmptyNodeID {
-		return time.Duration(maxWindows) * WindowDuration, nil
-	}
-
-	proposers, err := w.Proposers(ctx, blockHeight, pChainHeight, maxWindows)
-	if err != nil {
-		return 0, err
-	}
-
-	delay := time.Duration(0)
-	for _, nodeID := range proposers {
-		if nodeID == validatorID {
-			return delay, nil
-		}
-		delay += WindowDuration
-	}
-	return delay, nil
 }
 
 func (w *windower) ExpectedProposer(

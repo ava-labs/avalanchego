@@ -2435,7 +2435,7 @@ func TestGetPostDurangoSlotTimeWithNoValidators(t *testing.T) {
 
 	currentTime := proVM.Clock.Time().Truncate(time.Second)
 	parentTimestamp := statefulBlock.Timestamp()
-	slotTime, err := proVM.getPostDurangoSlotTime(
+	slotTime, err := proVM.getSlotTime(
 		context.Background(),
 		statefulBlock.Height()+1,
 		statelessBlock.PChainHeight(),
