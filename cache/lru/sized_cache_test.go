@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package cache_test
+package lru
 
 import (
 	"testing"
@@ -10,26 +10,22 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache/cachetest"
 	"github.com/ava-labs/avalanchego/ids"
-
-	. "github.com/ava-labs/avalanchego/cache"
 )
 
-func TestSizedLRU(t *testing.T) {
-	cache := NewSizedLRU[ids.ID, int64](cachetest.IntSize, cachetest.IntSizeFunc)
-
-	cachetest.TestBasic(t, cache)
+func TestSizedCache(t *testing.T) {
+	c := NewSizedCache[ids.ID, int64](cachetest.IntSize, cachetest.IntSizeFunc)
+	cachetest.Basic(t, c)
 }
 
-func TestSizedLRUEviction(t *testing.T) {
-	cache := NewSizedLRU[ids.ID, int64](2*cachetest.IntSize, cachetest.IntSizeFunc)
-
-	cachetest.TestEviction(t, cache)
+func TestSizedCacheEviction(t *testing.T) {
+	c := NewSizedCache[ids.ID, int64](2*cachetest.IntSize, cachetest.IntSizeFunc)
+	cachetest.Eviction(t, c)
 }
 
-func TestSizedLRUWrongKeyEvictionRegression(t *testing.T) {
+func TestSizedCacheWrongKeyEvictionRegression(t *testing.T) {
 	require := require.New(t)
 
-	cache := NewSizedLRU[string, struct{}](
+	cache := NewSizedCache[string, struct{}](
 		3,
 		func(key string, _ struct{}) int {
 			return len(key)
@@ -57,7 +53,7 @@ func TestSizedLRUWrongKeyEvictionRegression(t *testing.T) {
 func TestSizedLRUSizeAlteringRegression(t *testing.T) {
 	require := require.New(t)
 
-	cache := NewSizedLRU[string, *string](
+	cache := NewSizedCache[string, *string](
 		5,
 		func(key string, val *string) int {
 			if val != nil {
