@@ -150,13 +150,19 @@ func (w *wallet) IssueAtomicTx(
 ) error {
 	ops := common.NewOptions(options)
 	ctx := ops.Context()
+	startTime := time.Now()
 	txID, err := w.avaxClient.IssueTx(ctx, tx.SignedBytes())
 	if err != nil {
 		return err
 	}
 
-	if f := ops.PostIssuanceFunc(); f != nil {
-		f(txID)
+	issuanceDuration := time.Since(startTime)
+	if f := ops.IssuanceHandler(); f != nil {
+		f(common.IssuanceReceipt{
+			ChainAlias: Alias,
+			TxID:       txID,
+			Duration:   issuanceDuration,
+		})
 	}
 
 	if ops.AssumeDecided() {
@@ -165,6 +171,18 @@ func (w *wallet) IssueAtomicTx(
 
 	if err := awaitTxAccepted(w.avaxClient, ctx, txID, ops.PollFrequency()); err != nil {
 		return err
+	}
+
+	if f := ops.ConfirmationHandler(); f != nil {
+		totalDuration := time.Since(startTime)
+		confirmationDuration := totalDuration - issuanceDuration
+
+		f(common.ConfirmationReceipt{
+			ChainAlias:           Alias,
+			TxID:                 txID,
+			TotalDuration:        totalDuration,
+			ConfirmationDuration: confirmationDuration,
+		})
 	}
 
 	return w.Backend.AcceptAtomicTx(ctx, tx)

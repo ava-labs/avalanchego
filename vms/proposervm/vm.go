@@ -13,6 +13,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -151,10 +152,7 @@ func (vm *VM) Initialize(
 	innerBlkCache, err := metercacher.New(
 		"inner_block_cache",
 		vm.Config.Registerer,
-		cache.NewSizedLRU(
-			innerBlkCacheSize,
-			cachedBlockSize,
-		),
+		lru.NewSizedCache(innerBlkCacheSize, cachedBlockSize),
 	)
 	if err != nil {
 		return err
