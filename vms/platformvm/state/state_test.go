@@ -1628,6 +1628,29 @@ func TestL1Validators(t *testing.T) {
 			},
 		},
 		{
+			name: "increase inactive weight",
+			initial: []L1Validator{
+				{
+					ValidationID:      l1Validator.ValidationID,
+					SubnetID:          l1Validator.SubnetID,
+					NodeID:            l1Validator.NodeID,
+					PublicKey:         pkBytes,
+					Weight:            1, // Not removed
+					EndAccumulatedFee: 0, // Inactive
+				},
+			},
+			l1Validators: []L1Validator{
+				{
+					ValidationID:      l1Validator.ValidationID,
+					SubnetID:          l1Validator.SubnetID,
+					NodeID:            l1Validator.NodeID,
+					PublicKey:         pkBytes,
+					Weight:            2, // Increased
+					EndAccumulatedFee: 0, // Inactive
+				},
+			},
+		},
+		{
 			name: "decrease active weight",
 			initial: []L1Validator{
 				{
