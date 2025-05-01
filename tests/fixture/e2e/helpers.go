@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethclient"
 	"github.com/stretchr/testify/require"

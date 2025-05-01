@@ -85,6 +85,8 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 			URI:    e2e.GetLocalURI(tc, node),
 		}
 		ethClient := e2e.NewEthClient(tc, nodeURI)
+		ethCustomClient, err := newCustomEthClient(tc.DefaultContext(), nodeURI.URI)
+		require.NoError(err)
 
 		tc.By("initializing a transaction signer")
 		cChainID, err := ethClient.ChainID(tc.DefaultContext())
@@ -140,7 +142,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 			contractAddress = receipt.ContractAddress
 		})
 
-		initialGasPrice, err := ethClient.EstimateBaseFee(tc.DefaultContext())
+		initialGasPrice, err := ethCustomClient.EstimateBaseFee(tc.DefaultContext())
 		require.NoError(err)
 
 		targetGasPrice := new(big.Int).Set(initialGasPrice)
@@ -162,7 +164,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 
 			tc.Eventually(func() bool {
 				// Check the gas price
-				gasPrice, err := ethClient.EstimateBaseFee(tc.DefaultContext())
+				gasPrice, err := ethCustomClient.EstimateBaseFee(tc.DefaultContext())
 				require.NoError(err)
 
 				// If the gas price has increased, stop the loop.
@@ -214,7 +216,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		tc.By("sending small transactions until a sufficient gas price decrease is detected", func() {
 			tc.Eventually(func() bool {
 				// Check the gas price
-				gasPrice, err := ethClient.EstimateBaseFee(tc.DefaultContext())
+				gasPrice, err := ethCustomClient.EstimateBaseFee(tc.DefaultContext())
 				require.NoError(err)
 
 				// If the gas price has decreased, stop the loop.
