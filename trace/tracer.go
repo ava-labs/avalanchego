@@ -26,9 +26,6 @@ const (
 type Config struct {
 	ExporterConfig `json:"exporterConfig"`
 
-	// Used to flag if tracing should be performed
-	Enabled bool `json:"enabled"`
-
 	// The fraction of traces to sample.
 	// If >= 1 always samples.
 	// If <= 0 never samples.
@@ -56,7 +53,7 @@ func (t *tracer) Close() error {
 }
 
 func New(config Config) (Tracer, error) {
-	if !config.Enabled {
+	if config.ExporterConfig.Type == Disabled {
 		return Noop, nil
 	}
 

@@ -563,13 +563,13 @@ The identity of the network the node should connect to. Can be one of:
 AvalancheGo supports collecting and exporting [OpenTelemetry](https://opentelemetry.io/) traces.
 This might be useful for debugging, performance analysis, or monitoring.
 
-#### `--tracing-enabled` (boolean)
-
-If true, enable OpenTelemetry tracing. Defaults to `false`.
-
 #### `--tracing-endpoint` (string)
 
-The endpoint to export trace data to. Defaults to `localhost:4317`.
+The endpoint to export trace data to. Defaults to `localhost:4317` if `--tracing-exporter-type` is set to `grpc` and `localhost:4318` if `--tracing-exporter-type` is set to `http`.
+
+#### `--tracing-exporter-type`(string)
+
+Type of exporter to use for tracing. Options are [`disabled`,`grpc`,`http`]. Defaults to `disabled`.
 
 #### `--tracing-insecure` (string)
 
@@ -579,10 +579,6 @@ If true, don't use TLS when exporting trace data. Defaults to `true`.
 
 The fraction of traces to sample. If >= 1, always sample. If `<= 0`, never sample.
 Defaults to `0.1`.
-
-#### `--tracing-exporter-type`(string)
-
-Type of exporter to use for tracing. Options are [`grpc`,`http`]. Defaults to `grpc`.
 
 ## Partial Sync Primary Network
 
@@ -945,7 +941,7 @@ The value must be greater than `0`. Defaults to `2m`.
 
 Have the ProposerVM always report the last accepted P-chain block height. Defaults to `false`.
 
-### `--proposervm-min-block-duration` (duration)
+### `--proposervm-min-block-delay` (duration)
 
 The minimum delay to enforce when building a snowman++ block for the primary network
 chains and the default minimum delay for subnets. Defaults to `1s`. A non-default
