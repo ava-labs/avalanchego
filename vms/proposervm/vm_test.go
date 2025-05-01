@@ -2664,7 +2664,7 @@ func TestSelectChildPChainHeight(t *testing.T) {
 // This tests the case where a chain has bootstrapped to a last accepted block
 // which references a P-Chain height that is not locally accepted yet.
 func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
-	t.Skip("TODO: FIXME")
+	t.Skip("FIXME")
 
 	require := require.New(t)
 
