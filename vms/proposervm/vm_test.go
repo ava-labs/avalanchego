@@ -2381,7 +2381,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	requireNumHeights(newNumHistoricalBlocks)
 }
 
-func TestGetPostDurangoSlotTimeWithNoValidators(t *testing.T) {
+func TestGetSlotTimeWithNoValidators(t *testing.T) {
 	require := require.New(t)
 
 	var (
