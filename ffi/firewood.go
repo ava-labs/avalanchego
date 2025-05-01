@@ -5,6 +5,7 @@ package firewood
 
 // // Note that -lm is required on Linux but not on Mac.
 // #cgo LDFLAGS: -L${SRCDIR}/../target/release -L/usr/local/lib -lfirewood_ffi -lm
+// #include <stdlib.h>
 // #include "firewood.h"
 import "C"
 
@@ -84,6 +85,9 @@ func New(filePath string, conf *Config) (*Database, error) {
 	} else {
 		db = C.fwd_open_db(args)
 	}
+
+	// After creating the db, we can safely free the path string.
+	C.free(unsafe.Pointer(args.path))
 	return &Database{handle: db}, nil
 }
 
