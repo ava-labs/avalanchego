@@ -2662,19 +2662,14 @@ func TestSelectChildPChainHeight(t *testing.T) {
 }
 
 func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
+	// t.Skip("TODO: FIXME")
+
 	require := require.New(t)
 
-	genesisBlock := &snowmantest.Block{
-		Decidable: snowtest.Decidable{
-			IDV:    ids.GenerateTestID(),
-			Status: snowtest.Accepted,
-		},
-		HeightV:    0,
-		TimestampV: time.Unix(0, 0),
-		BytesV:     []byte{0},
-	}
+	// innerVMBlks is appended to throughout the test, which modifies the
+	// behavior of coreVM.
 	innerVMBlks := []*snowmantest.Block{
-		genesisBlock,
+		snowmantest.Genesis,
 	}
 
 	var innerToEngine chan<- common.Message
@@ -2721,9 +2716,9 @@ func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
 		coreVM,
 		Config{
 			Upgrades: upgrade.Config{
-				ApricotPhase4Time:            genesisBlock.Timestamp(),
+				ApricotPhase4Time:            snowmantest.GenesisTimestamp,
 				ApricotPhase4MinPChainHeight: 0,
-				DurangoTime:                  genesisBlock.Timestamp(),
+				DurangoTime:                  snowmantest.GenesisTimestamp,
 			},
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
@@ -2732,9 +2727,9 @@ func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
 			Registerer:          prometheus.NewRegistry(),
 		},
 	)
-	proVM.Set(genesisBlock.Timestamp())
+	proVM.Set(snowmantest.GenesisTimestamp)
 
-	currentPChainHeight := uint64(1)
+	const currentPChainHeight = 1
 	valState := &validatorstest.State{
 		T: t,
 		GetMinimumHeightF: func(context.Context) (uint64, error) {
@@ -2780,20 +2775,12 @@ func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
 
 	require.NoError(proVM.SetState(context.Background(), snow.Bootstrapping))
 
-	innerBlock1 := &snowmantest.Block{
-		Decidable: snowtest.Decidable{
-			IDV: ids.GenerateTestID(),
-		},
-		BytesV:     []byte{1},
-		ParentV:    genesisBlock.ID(),
-		HeightV:    genesisBlock.Height() + 1,
-		TimestampV: genesisBlock.Timestamp(),
-	}
+	innerBlock1 := snowmantest.BuildChild(snowmantest.Genesis)
 	innerVMBlks = append(innerVMBlks, innerBlock1)
 
 	statelessBlock1, err := statelessblock.BuildUnsigned(
-		genesisBlock.ID(),
-		genesisBlock.Timestamp(),
+		snowmantest.GenesisID,
+		snowmantest.GenesisTimestamp,
 		currentPChainHeight,
 		innerBlock1.Bytes(),
 	)
@@ -2805,15 +2792,7 @@ func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
 	require.NoError(block1.Verify(context.Background()))
 	require.NoError(block1.Accept(context.Background()))
 
-	innerBlock2 := &snowmantest.Block{
-		Decidable: snowtest.Decidable{
-			IDV: ids.GenerateTestID(),
-		},
-		BytesV:     []byte{2},
-		ParentV:    innerBlock1.ID(),
-		HeightV:    innerBlock1.Height() + 1,
-		TimestampV: innerBlock1.Timestamp(),
-	}
+	innerBlock2 := snowmantest.BuildChild(innerBlock1)
 	innerVMBlks = append(innerVMBlks, innerBlock2)
 
 	statelessBlock2, err := statelessblock.Build(
@@ -2840,15 +2819,7 @@ func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
 	innerToEngine <- common.PendingTxs
 	require.Equal(common.PendingTxs, <-toEngine)
 
-	innerBlock3 := &snowmantest.Block{
-		Decidable: snowtest.Decidable{
-			IDV: ids.GenerateTestID(),
-		},
-		BytesV:     []byte{3},
-		ParentV:    innerBlock2.ID(),
-		HeightV:    innerBlock2.Height() + 1,
-		TimestampV: innerBlock2.Timestamp(),
-	}
+	innerBlock3 := snowmantest.BuildChild(innerBlock2)
 	innerVMBlks = append(innerVMBlks, innerBlock3)
 
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
