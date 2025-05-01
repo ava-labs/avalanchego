@@ -1,4 +1,4 @@
-The P-Chain API allows clients to interact with the [P-Chain](/learn/avalanche/avalanche-platform.md#p-chain), which maintains Avalanche’s validator set and handles blockchain creation.
+The P-Chain API allows clients to interact with the [P-Chain](https://build.avax.network/docs/quick-start/primary-network#p-chain), which maintains Avalanche’s validator set and handles blockchain creation.
 
 ## Endpoint
 
@@ -11,63 +11,6 @@ The P-Chain API allows clients to interact with the [P-Chain](/learn/avalanche/a
 This API uses the `json 2.0` RPC format.
 
 ## Methods
-
-### `platform.exportKey`
-
-<Callout title="Caution" type="warn">
-
-Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
-
-</Callout>
-
-<Callout title="Warning" type="warn">
-
-Not recommended for use on Mainnet. See warning notice in [Keystore API](/api-reference/keystore-api).
-
-</Callout>
-
-Get the private key that controls a given address.
-
-**Signature:**
-
-```
-platform.exportKey({
-    username: string,
-    password: string,
-    address: string
-}) -> {privateKey: string}
-```
-
-- `username` is the user that controls `address`.
-- `password` is `username`‘s password.
-- `privateKey` is the string representation of the private key that controls `address`.
-
-**Example Call:**
-
-```sh
-curl -X POST --data '{
-    "jsonrpc":"2.0",
-    "id"     :1,
-    "method" :"platform.exportKey",
-    "params" :{
-        "username" :"myUsername",
-        "password": "myPassword",
-        "address": "P-avax18jma8ppw3nhx5r4ap8clazz0dps7rv5ukulre5"
-    }
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
-```
-
-**Example Response:**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": {
-    "privateKey": "PrivateKey-Lf49kAJw3CbaL783vmbeAJvhscJqC7vi5yBYLxw2XfbzNS5RS"
-  }
-}
-```
 
 ### `platform.getBalance`
 
@@ -619,9 +562,22 @@ platform.getCurrentValidators({
         txID: string,
         startTime: string,
         endTime: string,
-        stakeAmount: string,
         nodeID: string,
         weight: string,
+        validationID: string,
+        publicKey: string,
+        remainingBalanceOwner: {
+            locktime: string,
+            threshold: string,
+            addresses: string[]
+        },
+        deactivationOwner: {
+            locktime: string,
+            threshold: string,
+            addresses: string[]
+        },
+        minNonce: string,
+        balance: string,
         validationRewardOwner: {
             locktime: string,
             threshold: string,
@@ -646,7 +602,7 @@ platform.getCurrentValidators({
             txID: string,
             startTime: string,
             endTime: string,
-            stakeAmount: string,
+            weight: string,
             nodeID: string,
             rewardOwner: {
                 locktime: string,
@@ -664,45 +620,46 @@ platform.getCurrentValidators({
 - `nodeIDs` is a list of the NodeIDs of current validators to request. If omitted, all current
   validators are returned. If a specified NodeID is not in the set of current validators, it will
   not be included in the response.
-- `validators`:
+- `validators` can include different fields based on the subnet type (L1, PoA Subnets, the Primary Network):
   - `txID` is the validator transaction.
   - `startTime` is the Unix time when the validator starts validating the Subnet.
-  - `endTime` is the Unix time when the validator stops validating the Subnet.
-  - `stakeAmount` is the amount of tokens this validator staked. Omitted if `subnetID` is not a PoS
-    Subnet.
+  - `endTime` is the Unix time when the validator stops validating the Subnet. Ommitted if `subnetID` is a L1 Subnet.
   - `nodeID` is the validator’s node ID.
-  - `weight` is the validator’s weight when sampling validators. Omitted if `subnetID` is a PoS
-    Subnet.
+  - `weight` is the validator’s weight (stake) when sampling validators.
+  - `validationID` is the ID for L1 subnet validator registration transaction. Omitted if `subnetID` is not an L1 Subnet.
+  - `publicKey` is the compressed BLS public key of the validator. Omitted if `subnetID` is not an L1 Subnet.
+  - `remainingBalanceOwner` is an `OutputOwners` which includes a `locktime`, `threshold`, and an array of `addresses`. It specifies the owner that will receive any withdrawn balance. Omitted if `subnetID` is not an L1 Subnet.
+  - `deactivationOwner` is an `OutputOwners` which includes a `locktime`, `threshold`, and an array of `addresses`. It specifies the owner that can withdraw the balance. Omitted if `subnetID` is not an L1 Subnet.
+  - `minNonce` is minimum nonce that must be included in a `SetL1ValidatorWeightTx` for the transaction to be valid. Omitted if `subnetID` is not an L1 Subnet.
+  - `balance` is current remaining balance that can be used to pay for the validators continuous fee. Omitted if `subnetID` is not an L1 Subnet.
   - `validationRewardOwner` is an `OutputOwners` output which includes `locktime`, `threshold` and
     array of `addresses`. Specifies the owner of the potential reward earned from staking. Omitted
-    if `subnetID` is not a PoS Subnet.
+    if `subnetID` is not the Primary Network.
   - `delegationRewardOwner` is an `OutputOwners` output which includes `locktime`, `threshold` and
-    array of `addresses`. Specifies the owner of the potential reward earned from delegations.
-    Omitted if `subnetID` is not a PoS Subnet.
-  - `potentialReward` is the potential reward earned from staking. Omitted if `subnetID` is not a
-    PoS Subnet.
+    array of `addresses`. Specifies the owner of the potential reward earned from delegations. Omitted if `subnetID` is not the Primary Network.
+  - `potentialReward` is the potential reward earned from staking. Omitted if `subnetID` is not the Primary Network.
   - `delegationFeeRate` is the percent fee this validator charges when others delegate stake to
-    them. Omitted if `subnetID` is not a PoS Subnet.
+    them. Omitted if `subnetID` is not the Primary Network.
   - `uptime` is the % of time the queried node has reported the peer as online and validating the
-    Subnet. Omitted if `subnetID` is not a PoS Subnet. (Deprecated: uptime is deprecated for Subnet Validators. It will be available only for Primary Network Validators.)
-  - `connected` is if the node is connected and tracks the Subnet. (Deprecated: connected is deprecated for Subnet Validators. It will be available only for Primary Network Validators.)
+    Subnet. Omitted if `subnetID` is not the Primary Network.
+  - `connected` is if the node is connected and tracks the Subnet. Omitted if `subnetID` is not the Primary Network.
   - `signer` is the node's BLS public key and proof of possession. Omitted if the validator doesn't
-    have a BLS public key.
+    have a BLS public key. Omitted if `subnetID` is not the Primary Network.
   - `delegatorCount` is the number of delegators on this validator.
-    Omitted if `subnetID` is not a PoS Subnet.
+    Omitted if `subnetID` is not the Primary Network.
   - `delegatorWeight` is total weight of delegators on this validator.
-    Omitted if `subnetID` is not a PoS Subnet.
-  - `delegators` is the list of delegators to this validator.
-    Omitted if `subnetID` is not a PoS Subnet.
-    Omitted unless `nodeIDs` specifies a single NodeID.
+    Omitted if `subnetID` is not the Primary Network.
+  - `delegators` is the list of delegators to this validator. Omitted if `subnetID` is not the Primary Network. Omitted unless `nodeIDs` specifies a single NodeID.
     - `txID` is the delegator transaction.
     - `startTime` is the Unix time when the delegator started.
     - `endTime` is the Unix time when the delegator stops.
-    - `stakeAmount` is the amount of nAVAX this delegator staked.
+    - `weight` is the amount of nAVAX this delegator staked.
     - `nodeID` is the validating node’s node ID.
     - `rewardOwner` is an `OutputOwners` output which includes `locktime`, `threshold` and array of
       `addresses`.
     - `potentialReward` is the potential reward earned from staking
+
+Note: An L1 Subnet can include both initial legacy PoA validators (before L1 conversion) and L1 validators. The response will include both types of validators.
 
 **Example Call:**
 
@@ -717,7 +674,7 @@ curl -X POST --data '{
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
 ```
 
-**Example Response:**
+**Example Response (Primary Network):**
 
 ```json
 {
@@ -728,7 +685,7 @@ curl -X POST --data '{
         "txID": "2NNkpYTGfTFLSGXJcHtVv6drwVU2cczhmjK2uhvwDyxwsjzZMm",
         "startTime": "1600368632",
         "endTime": "1602960455",
-        "stakeAmount": "2000000000000",
+        "weight": "2000000000000",
         "nodeID": "NodeID-5mb46qkSBj81k9g9e4VFjGGSbaaSLFRzD",
         "validationRewardOwner": {
           "locktime": "0",
@@ -751,7 +708,7 @@ curl -X POST --data '{
             "txID": "Bbai8nzGVcyn2VmeYcbS74zfjJLjDacGNVuzuvAQkHn1uWfoV",
             "startTime": "1600368523",
             "endTime": "1602960342",
-            "stakeAmount": "25000000000",
+            "weight": "25000000000",
             "nodeID": "NodeID-5mb46qkSBj81k9g9e4VFjGGSbaaSLFRzD",
             "rewardOwner": {
               "locktime": "0",
@@ -768,9 +725,45 @@ curl -X POST --data '{
 }
 ```
 
+**Example Response (L1):**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "validators": [
+      {
+        "validationID": "2wTscvX3JUsMbZHFRd9t8Ywz2q9j2BmETg8cTvgUHgawjbSvZX",
+        "nodeID": "NodeID-5mb46qkSBj81k9g9e4VFjGGSbaaSLFRzD",
+        "publicKey": "0x91951771ff32b1a985a4936592bce8512a986353c4c2eb5a0f12dbb76bda3a0a0c975e26413ff44c0ee9d8d689eff8ed",
+        "remainingBalanceOwner": {
+          "locktime": "0",
+          "threshold": "1",
+          "addresses": [
+            "P-fuji1ywzvrftfqexh5g6qa9zyrytj6pqdfetza2hqln"
+          ]
+        },
+        "deactivationOwner": {
+          "locktime": "0",
+          "threshold": "1",
+          "addresses": [
+            "P-fuji1ywzvrftfqexh5g6qa9zyrytj6pqdfetza2hqln"
+          ]
+        },
+        "startTime": "1734034648",
+        "weight": "20",
+        "minNonce": "0",
+        "balance": "8780477952"
+      }
+    ]
+  },
+  "id": 1
+}
+```
+
 ### `platform.getFeeConfig`
 
-Returns the dynamic fees configuration of the P-chain.
+Returns the dynamic fee configuration of the P-chain.
 
 **Signature:**
 
@@ -807,16 +800,16 @@ curl -X POST --data '{
 
 ```json
 {
-    "jsonrpc": "2.0",
-    "result": {
-        "weights": [1,1000,1000,4],
-        "maxCapacity": 1000000,
-        "maxPerSecond": 100000,
-        "targetPerSecond": 50000,
-        "minPrice": 1,
-        "excessConversionConstant": 2164043
-    },
-    "id": 1
+  "jsonrpc": "2.0",
+  "result": {
+    "weights": [1, 1000, 1000, 4],
+    "maxCapacity": 1000000,
+    "maxPerSecond": 100000,
+    "targetPerSecond": 50000,
+    "minPrice": 1,
+    "excessConversionConstant": 2164043
+  },
+  "id": 1
 }
 ```
 
@@ -840,7 +833,7 @@ platform.getFeeState() -> {
 ```sh
 curl -X POST --data '{
     "jsonrpc": "2.0",
-    "method": "platform.getFeeConfig",
+    "method": "platform.getFeeState",
     "params": {},
     "id": 1
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
@@ -850,100 +843,14 @@ curl -X POST --data '{
 
 ```json
 {
-    "jsonrpc": "2.0",
-    "result": {
-        "weights": [1,1000,1000,4],
-        "maxCapacity": 1000000,
-        "maxPerSecond": 100000,
-        "targetPerSecond": 50000,
-        "minPrice": 1,
-        "excessConversionConstant": 2164043
-    },
-    "id": 1
-}
-```
-
-### `platform.getL1Validator`
-
-Returns a current L1 validator.
-
-**Signature:**
-
-```
-platform.getL1Validator({
-    validationID: string,
-}) -> {
-    subnetID: string,
-    nodeID: string,
-    publicKey: string,
-    remainingBalanceOwner: {
-      locktime: string,
-      threshold: string,
-      addresses: string[]
-    },
-    deactivationOwner: {
-      locktime: string,
-      threshold: string,
-      addresses: string[]
-    },
-    startTime: string,
-    weight: string,
-    minNonce: string,
-    balance: string,
-    height: string
-}
-```
-
-- `subnetID` is the L1 this validator is validating.
-- `nodeID` is the node ID of the validator.
-- `publicKey` is the compressed BLS public key of the validator.
-- `remainingBalanceOwner` is an `OutputOwners` which includes a `locktime`, `threshold`, and an array of `addresses`. It specifies the owner that will receive any withdrawn balance.
-- `deactivationOwner` is an `OutputOwners` which includes a `locktime`, `threshold`, and an array of `addresses`. It specifies the owner that can withdraw the balance.
-- `startTime` is the unix timestamp, in seconds, of when this validator was added to the validator set.
-- `weight` is weight of this validator used for consensus voting and ICM.
-- `minNonce` is minimum nonce that must be included in a `SetL1ValidatorWeightTx` for the transaction to be valid.
-- `balance` is current remaining balance that can be used to pay for the validators continuous fee.
-- `height` is height of the last accepted block.
-
-**Example Call:**
-
-```sh
-curl -X POST --data '{
-    "jsonrpc": "2.0",
-    "method": "platform.getL1Validator",
-    "params": {
-      "validationID": ["9FAftNgNBrzHUMMApsSyV6RcFiL9UmCbvsCu28xdLV2mQ7CMo"]
-    },
-    "id": 1
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
-```
-
-**Example Response:**
-
-```json
-{
-    "jsonrpc": "2.0",
-    "result": {
-        "subnetID": "2DeHa7Qb6sufPkmQcFWG2uCd4pBPv9WB6dkzroiMQhd1NSRtof",
-        "nodeID": "NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg",
-        "publicKey": "0x900c9b119b5c82d781d4b49be78c3fc7ae65f2b435b7ed9e3a8b9a03e475edff86d8a64827fec8db23a6f236afbf127d",
-        "remainingBalanceOwner": {
-            "locktime": "0",
-            "threshold": "0",
-            "addresses": []
-        },
-        "deactivationOwner": {
-            "locktime": "0",
-            "threshold": "0",
-            "addresses": []
-        },
-        "startTime": "1731445206",
-        "weight": "49463",
-        "minNonce": "0",
-        "balance": "1000000000",
-        "height": "3"
-    },
-    "id": 1
+  "jsonrpc": "2.0",
+  "result": {
+    "capacity": 973044,
+    "excess": 26956,
+    "price": 1,
+    "timestamp": "2024-12-16T17:19:07Z"
+  },
+  "id": 1
 }
 ```
 
@@ -983,6 +890,93 @@ curl -X POST --data '{
 }
 ```
 
+### `platform.getL1Validator`
+
+Returns a current L1 validator.
+
+**Signature:**
+
+```
+platform.getL1Validator({
+    validationID: string,
+}) -> {
+    validationID: string,
+    subnetID: string,
+    nodeID: string,
+    publicKey: string,
+    remainingBalanceOwner: {
+      locktime: string,
+      threshold: string,
+      addresses: string[]
+    },
+    deactivationOwner: {
+      locktime: string,
+      threshold: string,
+      addresses: string[]
+    },
+    startTime: string,
+    weight: string,
+    minNonce: string,
+    balance: string,
+    height: string
+}
+```
+
+- `validationID` is the ID for L1 subnet validator registration transaction.
+- `subnetID` is the L1 this validator is validating.
+- `nodeID` is the node ID of the validator.
+- `publicKey` is the compressed BLS public key of the validator.
+- `remainingBalanceOwner` is an `OutputOwners` which includes a `locktime`, `threshold`, and an array of `addresses`. It specifies the owner that will receive any withdrawn balance.
+- `deactivationOwner` is an `OutputOwners` which includes a `locktime`, `threshold`, and an array of `addresses`. It specifies the owner that can withdraw the balance.
+- `startTime` is the unix timestamp, in seconds, of when this validator was added to the validator set.
+- `weight` is weight of this validator used for consensus voting and ICM.
+- `minNonce` is minimum nonce that must be included in a `SetL1ValidatorWeightTx` for the transaction to be valid.
+- `balance` is current remaining balance that can be used to pay for the validators continuous fee.
+- `height` is height of the last accepted block.
+
+**Example Call:**
+
+```sh
+curl -X POST --data '{
+    "jsonrpc": "2.0",
+    "method": "platform.getL1Validator",
+    "params": {
+      "validationID": ["9FAftNgNBrzHUMMApsSyV6RcFiL9UmCbvsCu28xdLV2mQ7CMo"]
+    },
+    "id": 1
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
+```
+
+**Example Response:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "subnetID": "2DeHa7Qb6sufPkmQcFWG2uCd4pBPv9WB6dkzroiMQhd1NSRtof",
+    "nodeID": "NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg",
+    "validationID": "9FAftNgNBrzHUMMApsSyV6RcFiL9UmCbvsCu28xdLV2mQ7CMo",
+    "publicKey": "0x900c9b119b5c82d781d4b49be78c3fc7ae65f2b435b7ed9e3a8b9a03e475edff86d8a64827fec8db23a6f236afbf127d",
+    "remainingBalanceOwner": {
+      "locktime": "0",
+      "threshold": "0",
+      "addresses": []
+    },
+    "deactivationOwner": {
+      "locktime": "0",
+      "threshold": "0",
+      "addresses": []
+    },
+    "startTime": "1731445206",
+    "weight": "49463",
+    "minNonce": "0",
+    "balance": "1000000000",
+    "height": "3"
+  },
+  "id": 1
+}
+```
+
 ### `platform.getProposedHeight`
 
 Returns this node's current proposer VM height
@@ -1014,64 +1008,6 @@ curl -X POST --data '{
   "jsonrpc": "2.0",
   "result": {
     "height": "56"
-  },
-  "id": 1
-}
-```
-
-### `platform.getMaxStakeAmount`
-
-<Callout title="Caution" type="warn">
-
-Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
-
-</Callout>
-
-Returns the maximum amount of nAVAX staking to the named node during a particular time period.
-
-**Signature:**
-
-```
-platform.getMaxStakeAmount (
-{
-  subnetID: string,
-  nodeID: string,
-  startTime: int,
-  endTime: int
-}) -> { amount: uint64 }
-```
-
-- `subnetID` is a Buffer or cb58 string representing Subnet
-- `nodeID` is a string representing ID of the node whose stake amount is required during the given
-  duration
-- `startTime` is a big number denoting start time of the duration during which stake amount of the
-  node is required.
-- `endTime` is a big number denoting end time of the duration during which stake amount of the node
-  is required.
-
-**Example Call:**
-
-```sh
-curl -X POST --data '{
-    "jsonrpc": "2.0",
-    "method": "platform.getMaxStakeAmount",
-    "params": {
-        "subnetID":"11111111111111111111111111111111LpoYY",
-        "nodeID":"NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg",
-        "startTime": 1644240334,
-        "endTime": 1644240634
-    },
-    "id": 1
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
-```
-
-**Example Response:**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "result": {
-    "amount": "2000000000000000"
   },
   "id": 1
 }
@@ -1115,108 +1051,6 @@ curl -X POST --data '{
   "result": {
     "minValidatorStake": "2000000000000",
     "minDelegatorStake": "25000000000"
-  },
-  "id": 1
-}
-```
-
-### `platform.getPendingValidators`
-
-List the validators in the pending validator set of the specified Subnet. Each validator is not
-currently validating the Subnet but will in the future.
-
-**Signature:**
-
-```
-platform.getPendingValidators({
-  subnetID: string, // optional
-  nodeIDs: string[], // optional
-}) -> {
-    validators: []{
-        txID: string,
-        startTime: string,
-        endTime: string,
-        stakeAmount: string,
-        nodeID: string,
-        delegationFee: string,
-        connected: bool,
-        signer: {
-            publicKey: string,
-            proofOfPosession: string
-        },
-        weight: string,
-    },
-    delegators: []{
-        txID: string,
-        startTime: string,
-        endTime: string,
-        stakeAmount: string,
-        nodeID: string
-    }
-}
-```
-
-- `subnetID` is the Subnet whose current validators are returned. If omitted, returns the current
-  validators of the Primary Network.
-- `nodeIDs` is a list of the NodeIDs of pending validators to request. If omitted, all pending
-  validators are returned. If a specified NodeID is not in the set of pending validators, it will
-  not be included in the response.
-- `validators`:
-  - `txID` is the validator transaction.
-  - `startTime` is the Unix time when the validator starts validating the Subnet.
-  - `endTime` is the Unix time when the validator stops validating the Subnet.
-  - `stakeAmount` is the amount of tokens this validator staked. Omitted if `subnetID` is not a PoS
-    Subnet.
-  - `nodeID` is the validator’s node ID.
-  - `connected` if the node is connected and tracks the Subnet.
-  - `signer` is the node's BLS public key and proof of possession. Omitted if the validator doesn't
-    have a BLS public key.
-  - `weight` is the validator’s weight when sampling validators. Omitted if `subnetID` is a PoS
-    Subnet.
-- `delegators`:
-  - `txID` is the delegator transaction.
-  - `startTime` is the Unix time when the delegator starts.
-  - `endTime` is the Unix time when the delegator stops.
-  - `stakeAmount` is the amount of tokens this delegator staked.
-  - `nodeID` is the validating node’s node ID.
-
-**Example Call:**
-
-```sh
-curl -X POST --data '{
-    "jsonrpc": "2.0",
-    "method": "platform.getPendingValidators",
-    "params": {},
-    "id": 1
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
-```
-
-**Example Response:**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "result": {
-    "validators": [
-      {
-        "txID": "2NNkpYTGfTFLSGXJcHtVv6drwVU2cczhmjK2uhvwDyxwsjzZMm",
-        "startTime": "1600368632",
-        "endTime": "1602960455",
-        "stakeAmount": "200000000000",
-        "nodeID": "NodeID-5mb46qkSBj81k9g9e4VFjGGSbaaSLFRzD",
-        "delegationFee": "10.0000",
-        "connected": false
-      }
-    ],
-    "delegators": [
-      {
-        "txID": "Bbai8nzGVcyn2VmeYcbS74zfjJLjDacGNVuzuvAQkHn1uWfoV",
-        "startTime": "1600368523",
-        "endTime": "1602960342",
-        "stakeAmount": "20000000000",
-        "nodeID": "NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg"
-      }
-    ]
   },
   "id": 1
 }
@@ -1425,7 +1259,7 @@ platform.getSubnet({
 
 - `subnetID` is the ID of the Subnet to get information about. If omitted, fails.
 - `threshold` signatures from addresses in `controlKeys` are needed to make changes to
-  a permissioned subnet. If the Subnet is a PoS Subnet, then `threshold` will be `0` and `controlKeys`
+  a permissioned subnet. If the Subnet is not a PoA Subnet, then `threshold` will be `0` and `controlKeys`
   will be empty.
 - changes can not be made into the subnet until `locktime` is in the past.
 - `subnetTransformationTxID` is the ID of the transaction that changed the subnet into an elastic one, if it exists.
@@ -1451,7 +1285,10 @@ curl -X POST --data '{
   "jsonrpc": "2.0",
   "result": {
     "isPermissioned": true,
-    "controlKeys": ["P-fuji1ztvstx6naeg6aarfd047fzppdt8v4gsah88e0c","P-fuji193kvt4grqewv6ce2x59wnhydr88xwdgfcedyr3"],
+    "controlKeys": [
+      "P-fuji1ztvstx6naeg6aarfd047fzppdt8v4gsah88e0c",
+      "P-fuji193kvt4grqewv6ce2x59wnhydr88xwdgfcedyr3"
+    ],
     "threshold": "1",
     "locktime": "0",
     "subnetTransformationTxID": "11111111111111111111111111111111LpoYY",
@@ -1492,11 +1329,8 @@ platform.getSubnets({
   Subnets.
 - `id` is the Subnet’s ID.
 - `threshold` signatures from addresses in `controlKeys` are needed to add a validator to the
-  Subnet. If the Subnet is a PoS Subnet, then `threshold` will be `0` and `controlKeys` will be
+  Subnet. If the Subnet is not a PoA Subnet, then `threshold` will be `0` and `controlKeys` will be
   empty.
-
-See [here](/nodes/validate/add-a-validator.md) for information on adding a validator to a
-Subnet.
 
 **Example Call:**
 
@@ -1977,7 +1811,7 @@ platform.getValidatorsAt(
 ```
 
 - `height` is the P-Chain height to get the validator set at, or the string literal "proposed"
-  to return the validator set at this node's ProposerVM height. 
+  to return the validator set at this node's ProposerVM height.
 - `subnetID` is the Subnet ID to get the validator set of. If not given, gets validator set of the
   Primary Network.
 
@@ -2007,6 +1841,92 @@ curl -X POST --data '{
       "NodeID-NFBbbJ4qCmNaCzeW7sxErhvWqvEQMnYcN": 2000000000000000,
       "NodeID-P7oB2McjBGgW2NXXWVYjV8JEDFoW9xDE5": 2000000000000000
     }
+  },
+  "id": 1
+}
+```
+
+### `platform.getValidatorFeeConfig`
+
+Returns the validator fee configuration of the P-Chain.
+
+**Signature:**
+
+```
+platform.getValidatorFeeConfig() -> {
+  capacity: uint64,
+  target: uint64,
+  minPrice: uint64,
+  excessConversionConstant: uint64
+}
+```
+
+- `capacity` is the maximum number of L1 validators the chain is allowed to have at any given time
+- `target` is the target number of L1 validators the chain should have to keep fees stable
+- `minPrice` is the minimum price per L1 validator
+- `excessConversionConstant` is used to convert excess L1 validators to a gas price
+
+**Example Call:**
+
+```sh
+curl -X POST --data '{
+    "jsonrpc": "2.0",
+    "method": "platform.getValidatorFeeConfig",
+    "params": {},
+    "id": 1
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
+```
+
+**Example Response:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "capacity": 20000,
+    "target": 10000,
+    "targetPerSecond": 50000,
+    "minPrice": 512,
+    "excessConversionConstant": 1246488515
+  },
+  "id": 1
+}
+```
+
+### `platform.getValidatorFeeState`
+
+Returns the current validator fee state of the P-Chain.
+
+**Signature:**
+
+```
+platform.getValidatorFeeState() -> {
+  excess: uint64,
+  price: uint64,
+  timestamp: string
+}
+```
+
+**Example Call:**
+
+```sh
+curl -X POST --data '{
+    "jsonrpc": "2.0",
+    "method": "platform.getValidatorFeeState",
+    "params": {},
+    "id": 1
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
+```
+
+**Example Response:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "excess": 26956,
+    "price": 512,
+    "timestamp": "2024-12-16T17:19:07Z"
   },
   "id": 1
 }
@@ -2051,57 +1971,6 @@ curl -X POST --data '{
   "jsonrpc": "2.0",
   "result": {
     "txID": "G3BuH6ytQ2averrLxJJugjWZHTRubzCrUZEXoheG5JMqL5ccY"
-  },
-  "id": 1
-}
-```
-
-### `platform.listAddresses`
-
-<Callout title="Caution" type="warn">
-
-Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
-
-</Callout>
-
-<Callout title="Warning" type="warn">
-
-Not recommended for use on Mainnet. See warning notice in [Keystore API](/api-reference/keystore-api).
-
-</Callout>
-
-List addresses controlled by the given user.
-
-**Signature:**
-
-```
-platform.listAddresses({
-    username: string,
-    password: string
-}) -> { addresses: []string }
-```
-
-**Example Call:**
-
-```sh
-curl -X POST --data '{
-    "jsonrpc": "2.0",
-    "method": "platform.listAddresses",
-    "params": {
-        "username":"myUsername",
-        "password":"myPassword"
-    },
-    "id": 1
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
-```
-
-**Example Response:**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "result": {
-    "addresses": ["P-avax18jma8ppw3nhx5r4ap8clazz0dps7rv5ukulre5"]
   },
   "id": 1
 }

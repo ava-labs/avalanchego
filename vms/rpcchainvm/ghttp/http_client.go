@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/ava-labs/avalanchego/proto/pb/io/reader"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greader"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gresponsewriter"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
@@ -54,15 +56,10 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	server := grpcutils.NewServer()
 	closer.Add(server)
 	responsewriterpb.RegisterWriterServer(server, gresponsewriter.NewServer(w))
+	reader.RegisterReaderServer(server, greader.NewServer(r.Body))
 
 	// Start responsewriter gRPC service.
 	go grpcutils.Serve(serverListener, server)
-
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 
 	req := &httppb.HTTPRequest{
 		ResponseWriter: &httppb.ResponseWriter{
@@ -75,7 +72,6 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			ProtoMajor:       int32(r.ProtoMajor),
 			ProtoMinor:       int32(r.ProtoMinor),
 			Header:           make([]*httppb.Element, 0, len(r.Header)),
-			Body:             body,
 			ContentLength:    r.ContentLength,
 			TransferEncoding: r.TransferEncoding,
 			Host:             r.Host,
@@ -160,10 +156,13 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	_, err = c.client.Handle(r.Context(), req)
+	reply, err := c.client.Handle(r.Context(), req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
+
+	grpcutils.SetHeaders(w.Header(), reply.Header)
 }
 
 // serveHTTPSimple converts an http request to a gRPC HTTPRequest and returns the
@@ -209,7 +208,7 @@ func getHTTPSimpleRequest(r *http.Request) (*httppb.HandleSimpleHTTPRequest, err
 
 // convertWriteResponse converts a gRPC HandleSimpleHTTPResponse to an HTTP response.
 func convertWriteResponse(w http.ResponseWriter, resp *httppb.HandleSimpleHTTPResponse) error {
-	grpcutils.MergeHTTPHeader(resp.Headers, w.Header())
+	grpcutils.SetHeaders(w.Header(), resp.Headers)
 	w.WriteHeader(grpcutils.EnsureValidResponseCode(int(resp.Code)))
 	_, err := w.Write(resp.Body)
 	return err

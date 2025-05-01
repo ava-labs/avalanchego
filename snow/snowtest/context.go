@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -52,7 +52,7 @@ func ConsensusContext(ctx *snow.Context) *snow.ConsensusContext {
 func Context(tb testing.TB, chainID ids.ID) *snow.Context {
 	require := require.New(tb)
 
-	secretKey, err := bls.NewSigner()
+	secretKey, err := localsigner.New()
 	require.NoError(err)
 	publicKey := secretKey.PublicKey()
 
@@ -98,6 +98,6 @@ func Context(tb testing.TB, chainID ids.ID) *snow.Context {
 		Metrics:  metrics.NewPrefixGatherer(),
 
 		ValidatorState: validatorState,
-		ChainDataDir:   "",
+		ChainDataDir:   tb.TempDir(),
 	}
 }

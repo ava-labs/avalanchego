@@ -18,7 +18,7 @@ import (
 var _ Poll = (*Majority)(nil)
 
 // Majority implements the bootstrapping poll to filter the initial set of
-// potentially accaptable blocks into a set of accepted blocks to sync to.
+// potentially acceptable blocks into a set of accepted blocks to sync to.
 //
 // Once the last accepted blocks have been fetched from the initial set of
 // peers, the set of blocks are sent to all peers. Each peer is expected to

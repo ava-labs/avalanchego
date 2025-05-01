@@ -94,7 +94,6 @@ var (
 	InactivePrefix                = []byte("inactive")
 	SingletonPrefix               = []byte("singleton")
 
-	EtnaHeightKey        = []byte("etna height")
 	TimestampKey         = []byte("timestamp")
 	FeeStateKey          = []byte("fee state")
 	L1ValidatorExcessKey = []byte("l1Validator excess")
@@ -103,7 +102,7 @@ var (
 	LastAcceptedKey      = []byte("last accepted")
 	HeightsIndexedKey    = []byte("heights indexed")
 	InitializedKey       = []byte("initialized")
-	BlocksReindexedKey   = []byte("blocks reindexed")
+	BlocksReindexedKey   = []byte("blocks reindexed.3")
 
 	emptyL1ValidatorCache = &cache.Empty[ids.ID, maybe.Maybe[L1Validator]]{}
 )
@@ -156,9 +155,6 @@ type State interface {
 	Chain
 	uptime.State
 	avax.UTXOReader
-
-	// TODO: Remove after Etna is activated
-	GetEtnaHeight() (uint64, error)
 
 	GetLastAccepted() ids.ID
 	SetLastAccepted(blkID ids.ID)
@@ -214,7 +210,13 @@ type State interface {
 
 	SetHeight(height uint64)
 
-	GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error)
+	// GetCurrentValidators returns subnet and L1 validators for the given
+	// subnetID along with the current P-chain height.
+	// This method works for both subnets and L1s. Depending of the requested
+	// subnet/L1 validator schema, the return values can include only subnet
+	// validator, only L1 validators or both if there are initial stakers in the
+	// L1 conversion.
+	GetCurrentValidators(ctx context.Context, subnetID ids.ID) ([]*Staker, []L1Validator, uint64, error)
 
 	// Discard uncommitted changes to the database.
 	Abort()
@@ -224,7 +226,7 @@ type State interface {
 	// this function will return immediately, without iterating over the
 	// database.
 	//
-	// TODO: Remove after v1.12.x is activated
+	// TODO: Remove after v1.14.x is activated
 	ReindexBlocks(lock sync.Locker, log logging.Logger) error
 
 	// Commit changes to the base database.
@@ -243,7 +245,7 @@ type State interface {
 // stored as a map from blkID to stateBlk. Nodes synced prior to this PR may
 // still have blocks partially stored using this legacy format.
 //
-// TODO: Remove after v1.12.x is activated
+// TODO: Remove after v1.14.x is activated
 type stateBlk struct {
 	Bytes  []byte         `serialize:"true"`
 	Status choices.Status `serialize:"true"`
@@ -319,7 +321,6 @@ type stateBlk struct {
  * '-. singletons
  *   |-- initializedKey -> nil
  *   |-- blocksReindexedKey -> nil
- *   |-- etnaHeightKey -> height
  *   |-- timestampKey -> timestamp
  *   |-- feeStateKey -> feeState
  *   |-- l1ValidatorExcessKey -> l1ValidatorExcess
@@ -834,29 +835,16 @@ func (s *state) DeleteExpiry(entry ExpiryEntry) {
 	s.expiryDiff.DeleteExpiry(entry)
 }
 
-func (s *state) GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
-	result := make(map[ids.ID]*validators.GetCurrentValidatorOutput)
+func (s *state) GetCurrentValidators(ctx context.Context, subnetID ids.ID) ([]*Staker, []L1Validator, uint64, error) {
 	// First add the current validators (non-L1)
-	for _, staker := range s.currentStakers.validators[subnetID] {
-		if err := ctx.Err(); err != nil {
-			return nil, 0, err
-		}
-		validator := staker.validator
-		result[validator.TxID] = &validators.GetCurrentValidatorOutput{
-			ValidationID:  validator.TxID,
-			NodeID:        validator.NodeID,
-			PublicKey:     validator.PublicKey,
-			Weight:        validator.Weight,
-			StartTime:     uint64(validator.StartTime.Unix()),
-			MinNonce:      0,
-			IsActive:      true,
-			IsL1Validator: false,
-		}
+	legacyBaseStakers := s.currentStakers.validators[subnetID]
+	legacyStakers := make([]*Staker, 0, len(legacyBaseStakers))
+	for _, staker := range legacyBaseStakers {
+		legacyStakers = append(legacyStakers, staker.validator)
 	}
 
-	// Then iterate over subnetIDNodeID DB and add the L1 validators (if any)
-	// TODO: consider optimizing this to avoid hitting the subnetIDNodeIDDB and read from actives lookup
-	// if all validators are active (inactive weight is 0)
+	// Then iterate over subnetIDNodeID DB and add the L1 validators
+	var l1Validators []L1Validator
 	validationIDIter := s.subnetIDNodeIDDB.NewIteratorWithPrefix(
 		subnetID[:],
 	)
@@ -864,32 +852,22 @@ func (s *state) GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (ma
 
 	for validationIDIter.Next() {
 		if err := ctx.Err(); err != nil {
-			return nil, 0, err
+			return nil, nil, 0, err
 		}
 
 		validationID, err := ids.ToID(validationIDIter.Value())
 		if err != nil {
-			return nil, 0, fmt.Errorf("failed to parse validation ID: %w", err)
+			return nil, nil, 0, fmt.Errorf("failed to parse validation ID: %w", err)
 		}
 
 		vdr, err := s.GetL1Validator(validationID)
 		if err != nil {
-			return nil, 0, fmt.Errorf("failed to get validator: %w", err)
+			return nil, nil, 0, fmt.Errorf("failed to get validator: %w", err)
 		}
-
-		result[validationID] = &validators.GetCurrentValidatorOutput{
-			ValidationID:  validationID,
-			NodeID:        vdr.NodeID,
-			PublicKey:     bls.PublicKeyFromValidUncompressedBytes(vdr.PublicKey),
-			Weight:        vdr.Weight,
-			StartTime:     vdr.StartTime,
-			IsActive:      vdr.isActive(),
-			MinNonce:      vdr.MinNonce,
-			IsL1Validator: true,
-		}
+		l1Validators = append(l1Validators, vdr)
 	}
 
-	return result, s.currentHeight, nil
+	return legacyStakers, l1Validators, s.currentHeight, nil
 }
 
 func (s *state) GetActiveL1ValidatorsIterator() (iterator.Iterator[L1Validator], error) {
@@ -1324,10 +1302,6 @@ func (s *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 		return time.Time{}, err
 	}
 	return staker.StartTime, nil
-}
-
-func (s *state) GetEtnaHeight() (uint64, error) {
-	return database.GetUInt64(s.singletonDB, EtnaHeightKey)
 }
 
 // GetTimestamp allows for concurrent reads.
@@ -2127,7 +2101,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 		s.writeTransformedSubnets(),
 		s.writeSubnetSupplies(),
 		s.writeChains(),
-		s.writeMetadata(height),
+		s.writeMetadata(),
 	)
 }
 
@@ -2266,7 +2240,6 @@ func (s *state) CommitBatch() (database.Batch, error) {
 
 func (s *state) writeBlocks() error {
 	for blkID, blk := range s.addedBlocks {
-		blkID := blkID
 		blkBytes := blk.Bytes()
 		blkHeight := blk.Height()
 		heightKey := database.PackUInt64(blkHeight)
@@ -2476,7 +2449,7 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 		switch err {
 		case nil:
 			// Modifying an existing validator
-			if priorL1Validator.isActive() == l1Validator.isActive() {
+			if priorL1Validator.IsActive() == l1Validator.IsActive() {
 				// This validator's active status isn't changing. This means
 				// the effectiveNodeIDs are equal.
 				nodeID := l1Validator.effectiveNodeID()
@@ -2872,7 +2845,7 @@ func (s *state) writeL1Validators() error {
 
 		// Add the new validator
 		var err error
-		if l1Validator.isActive() {
+		if l1Validator.IsActive() {
 			s.activeL1Validators.put(l1Validator)
 			err = putL1Validator(s.activeDB, emptyL1ValidatorCache, l1Validator)
 		} else {
@@ -2889,8 +2862,6 @@ func (s *state) writeL1Validators() error {
 
 func (s *state) writeTXs() error {
 	for txID, txStatus := range s.addedTxs {
-		txID := txID
-
 		stx := txBytesAndStatus{
 			Tx:     txStatus.tx.Bytes(),
 			Status: txStatus.status,
@@ -2965,8 +2936,6 @@ func (s *state) writeSubnets() error {
 
 func (s *state) writeSubnetOwners() error {
 	for subnetID, owner := range s.subnetOwners {
-		subnetID := subnetID
-		owner := owner
 		delete(s.subnetOwners, subnetID)
 
 		ownerBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &owner)
@@ -3022,7 +2991,6 @@ func (s *state) writeTransformedSubnets() error {
 
 func (s *state) writeSubnetSupplies() error {
 	for subnetID, supply := range s.modifiedSupplies {
-		supply := supply
 		delete(s.modifiedSupplies, subnetID)
 		s.supplyCache.Put(subnetID, &supply)
 		if err := database.PutUInt64(s.supplyDB, subnetID[:], supply); err != nil {
@@ -3047,13 +3015,7 @@ func (s *state) writeChains() error {
 	return nil
 }
 
-func (s *state) writeMetadata(height uint64) error {
-	if !s.upgrades.IsEtnaActivated(s.persistedTimestamp) && s.upgrades.IsEtnaActivated(s.timestamp) {
-		if err := database.PutUInt64(s.singletonDB, EtnaHeightKey, height); err != nil {
-			return fmt.Errorf("failed to write etna height: %w", err)
-		}
-	}
-
+func (s *state) writeMetadata() error {
 	if !s.persistedTimestamp.Equal(s.timestamp) {
 		if err := database.PutTimestamp(s.singletonDB, TimestampKey, s.timestamp); err != nil {
 			return fmt.Errorf("failed to write timestamp: %w", err)
@@ -3105,7 +3067,7 @@ func (s *state) writeMetadata(height uint64) error {
 // Returns the block and whether it is a [stateBlk].
 // Invariant: blkBytes is safe to parse with blocks.GenesisCodec
 //
-// TODO: Remove after v1.12.x is activated
+// TODO: Remove after v1.14.x is activated
 func parseStoredBlock(blkBytes []byte) (block.Block, bool, error) {
 	// Attempt to parse as blocks.Block
 	blk, err := block.Parse(block.GenesisCodec, blkBytes)

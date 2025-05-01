@@ -19,7 +19,7 @@ set -euo pipefail
 AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 
 # Discover the default tag that will be used for the image
-source "${AVALANCHE_PATH}"/scripts/constants.sh
+source "${AVALANCHE_PATH}"/scripts/git_commit.sh
 export IMAGE_TAG="${commit_hash}"
 
 # Build the images for the specified test setup

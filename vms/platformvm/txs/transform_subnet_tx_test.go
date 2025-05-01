@@ -370,7 +370,7 @@ func TestTransformSubnetTxSerialization(t *testing.T) {
 		0x00, 0x00, 0x00, 0x16,
 		// Locktime
 		0x00, 0x00, 0x00, 0x00, 0x05, 0x39, 0x7f, 0xb1,
-		// seck256k1fx tranfer output type ID
+		// seck256k1fx transfer output type ID
 		0x00, 0x00, 0x00, 0x07,
 		// amount
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
@@ -390,7 +390,7 @@ func TestTransformSubnetTxSerialization(t *testing.T) {
 		0x00, 0x00, 0x00, 0x16,
 		// Locktime
 		0x00, 0x00, 0x00, 0x00, 0x34, 0x3e, 0xfc, 0xea,
-		// seck256k1fx tranfer output type ID
+		// seck256k1fx transfer output type ID
 		0x00, 0x00, 0x00, 0x07,
 		// amount
 		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
@@ -535,7 +535,7 @@ func TestTransformSubnetTxSerialization(t *testing.T) {
 
 	unsignedComplexTransformTxJSONBytes, err := json.MarshalIndent(unsignedComplexTransformTx, "", "\t")
 	require.NoError(err)
-	require.Equal(`{
+	require.JSONEq(`{
 	"networkID": 1,
 	"blockchainID": "11111111111111111111111111111111LpoYY",
 	"outputs": [

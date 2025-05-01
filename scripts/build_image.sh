@@ -12,15 +12,17 @@ set -euo pipefail
 # DOCKER_IMAGE=localhost:5001/avalanchego FORCE_TAG_LATEST=1 ./scripts/build_image.sh # Build and push image to private registry with tag `latest`
 
 # Multi-arch builds require Docker Buildx and QEMU. buildx should be enabled by
-# default in the verson of docker included with Ubuntu 22.04, and qemu can be
+# default in the version of docker included with Ubuntu 22.04, and qemu can be
 # installed as follows:
 #
 #  sudo apt-get install qemu qemu-user-static
 #
-# After installing qemu, it will also be necessary to start a new builder that can
-# support multiplatform builds:
+# After installing qemu, it will also be necessary to start a new builder that
+# supports multiplatform builds and can use the host's network:
 #
-#  docker buildx create --use
+#  docker buildx create --use --driver-opt network=host
+#
+# Without `network=host`, the builder will timeout running `go mod download`.
 #
 # Reference: https://docs.docker.com/buildx/working-with-buildx/
 
@@ -35,6 +37,8 @@ FORCE_TAG_LATEST="${FORCE_TAG_LATEST:-}"
 
 # Load the constants
 source "$AVALANCHE_PATH"/scripts/constants.sh
+source "$AVALANCHE_PATH"/scripts/git_commit.sh
+source "$AVALANCHE_PATH"/scripts/image_tag.sh
 
 if [[ -z "${SKIP_BUILD_RACE}" && $image_tag == *"-r" ]]; then
   echo "Branch name must not end in '-r'"
@@ -68,6 +72,12 @@ DOCKER_CMD="docker buildx build ${*}"
 # provided as an argument.
 GO_VERSION="$(go list -m -f '{{.GoVersion}}')"
 DOCKER_CMD="${DOCKER_CMD} --build-arg GO_VERSION=${GO_VERSION}"
+
+# Provide the git commit as a build argument to avoid requiring this
+# to be discovered within the image. This enables image builds from
+# git worktrees since a non-primary worktree won't have a .git
+# directory to copy into the image.
+DOCKER_CMD="${DOCKER_CMD} --build-arg AVALANCHEGO_COMMIT=${git_commit}"
 
 if [[ "${DOCKER_IMAGE}" == *"/"* ]]; then
   # Default to pushing when the image name includes a slash which indicates the

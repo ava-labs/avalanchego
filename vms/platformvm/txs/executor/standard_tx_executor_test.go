@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -1450,7 +1451,9 @@ func TestDurangoMemoField(t *testing.T) {
 					chainTime = env.state.GetTimestamp()
 					endTime   = chainTime.Add(defaultMaxStakingDuration)
 				)
-				sk, err := bls.NewSigner()
+				sk, err := localsigner.New()
+				require.NoError(err)
+				pop, err := signer.NewProofOfPossession(sk)
 				require.NoError(err)
 
 				wallet := newWallet(t, env, walletConfig{})
@@ -1464,7 +1467,7 @@ func TestDurangoMemoField(t *testing.T) {
 						},
 						Subnet: constants.PrimaryNetworkID,
 					},
-					signer.NewProofOfPossession(sk),
+					pop,
 					env.ctx.AVAXAssetID,
 					owners,
 					owners,
@@ -1765,7 +1768,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Etna, env.latestForkTime),
 				}
-				feeCalculator := state.NewStaticFeeCalculator(cfg, env.state.GetTimestamp())
+				feeCalculator := txfee.NewSimpleCalculator(0)
 				e := &standardTxExecutor{
 					backend: &Backend{
 						Config:       cfg,
@@ -2492,14 +2495,6 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 			expectedErr: errIsImmutable,
 		},
 		{
-			name: "invalid fee calculation",
-			updateExecutor: func(e *standardTxExecutor) error {
-				e.feeCalculator = txfee.NewStaticCalculator(e.backend.Config.StaticFeeConfig)
-				return nil
-			},
-			expectedErr: txfee.ErrUnsupportedTx,
-		},
-		{
 			name: "too many active validators",
 			updateExecutor: func(e *standardTxExecutor) error {
 				e.backend.Config = &config.Internal{
@@ -2547,7 +2542,9 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			sk, err := bls.NewSigner()
+			sk, err := localsigner.New()
+			require.NoError(err)
+			pop, err := signer.NewProofOfPossession(sk)
 			require.NoError(err)
 
 			// Create the ConvertSubnetToL1Tx
@@ -2568,7 +2565,6 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 				)
 				chainID   = ids.GenerateTestID()
 				address   = utils.RandomBytes(32)
-				pop       = signer.NewProofOfPossession(sk)
 				validator = &txs.ConvertSubnetToL1Validator{
 					NodeID:                nodeID.Bytes(),
 					Weight:                weight,
@@ -2748,7 +2744,9 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create the subnet conversion
-	initialSK, err := bls.NewSigner()
+	initialSK, err := localsigner.New()
+	require.NoError(t, err)
+	initialPoP, err := signer.NewProofOfPossession(initialSK)
 	require.NoError(t, err)
 
 	const (
@@ -2760,7 +2758,6 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 		chainID       = ids.GenerateTestID()
 		address       = utils.RandomBytes(32)
 		initialNodeID = ids.GenerateTestNodeID()
-		initialPoP    = signer.NewProofOfPossession(initialSK)
 		validator     = &txs.ConvertSubnetToL1Validator{
 			NodeID:                initialNodeID.Bytes(),
 			Weight:                initialWeight,
@@ -2801,9 +2798,10 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 	const weight = 1
 
 	// Create the Warp message
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
-	pop := signer.NewProofOfPossession(sk)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(t, err)
 	pk := sk.PublicKey()
 	pkBytes := bls.PublicKeyToUncompressedBytes(pk)
 
@@ -2832,11 +2830,11 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 			addressedCallPayload.Bytes(),
 		)).Bytes(),
 	))
+	sig, err := sk.Sign(unsignedWarp.Bytes())
+	require.NoError(t, err)
 	warpSignature := &warp.BitSetSignature{
-		Signers: set.NewBits(0).Bytes(),
-		Signature: ([bls.SignatureLen]byte)(bls.SignatureToBytes(
-			sk.Sign(unsignedWarp.Bytes()),
-		)),
+		Signers:   set.NewBits(0).Bytes(),
+		Signature: ([bls.SignatureLen]byte)(bls.SignatureToBytes(sig)),
 	}
 	warpMessage := must[*warp.Message](t)(warp.NewMessage(
 		unsignedWarp,
@@ -2877,14 +2875,6 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 				common.WithMemo([]byte("memo!")),
 			},
 			expectedErr: avax.ErrMemoTooLarge,
-		},
-		{
-			name: "invalid fee calculation",
-			updateExecutor: func(e *standardTxExecutor) error {
-				e.feeCalculator = txfee.NewStaticCalculator(e.backend.Config.StaticFeeConfig)
-				return nil
-			},
-			expectedErr: txfee.ErrUnsupportedTx,
 		},
 		{
 			name: "fee calculation overflow",
@@ -3278,7 +3268,9 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create the subnet conversion
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
+	require.NoError(t, err)
+	pop, err := signer.NewProofOfPossession(sk)
 	require.NoError(t, err)
 
 	const (
@@ -3293,7 +3285,7 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 			NodeID:  ids.GenerateTestNodeID().Bytes(),
 			Weight:  initialWeight,
 			Balance: balance,
-			Signer:  *signer.NewProofOfPossession(sk),
+			Signer:  *pop,
 			// RemainingBalanceOwner and DeactivationOwner are initialized so
 			// that later reflect based equality checks pass.
 			RemainingBalanceOwner: message.PChainOwner{
@@ -3349,11 +3341,13 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 			)).Bytes(),
 		)).Bytes(),
 	))
+
+	sig, err := sk.Sign(unsignedIncreaseWeightWarpMessage.Bytes())
+	require.NoError(t, err)
+
 	warpSignature := &warp.BitSetSignature{
-		Signers: set.NewBits(0).Bytes(),
-		Signature: ([bls.SignatureLen]byte)(bls.SignatureToBytes(
-			sk.Sign(unsignedIncreaseWeightWarpMessage.Bytes()),
-		)),
+		Signers:   set.NewBits(0).Bytes(),
+		Signature: ([bls.SignatureLen]byte)(bls.SignatureToBytes(sig)),
 	}
 	increaseWeightWarpMessage := must[*warp.Message](t)(warp.NewMessage(
 		unsignedIncreaseWeightWarpMessage,
@@ -3419,14 +3413,6 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 				common.WithMemo([]byte("memo!")),
 			},
 			expectedErr: avax.ErrMemoTooLarge,
-		},
-		{
-			name: "invalid fee calculation",
-			updateExecutor: func(e *standardTxExecutor) error {
-				e.feeCalculator = txfee.NewStaticCalculator(e.backend.Config.StaticFeeConfig)
-				return nil
-			},
-			expectedErr: txfee.ErrUnsupportedTx,
 		},
 		{
 			name: "insufficient fee",
@@ -3781,7 +3767,9 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create the subnet conversion
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
+	require.NoError(t, err)
+	pop, err := signer.NewProofOfPossession(sk)
 	require.NoError(t, err)
 
 	const (
@@ -3796,7 +3784,7 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 			NodeID:  ids.GenerateTestNodeID().Bytes(),
 			Weight:  weight,
 			Balance: initialBalance,
-			Signer:  *signer.NewProofOfPossession(sk),
+			Signer:  *pop,
 			// RemainingBalanceOwner and DeactivationOwner are initialized so
 			// that later reflect based equality checks pass.
 			RemainingBalanceOwner: message.PChainOwner{
@@ -3869,14 +3857,6 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 				common.WithMemo([]byte("memo!")),
 			},
 			expectedErr: avax.ErrMemoTooLarge,
-		},
-		{
-			name: "invalid fee calculation",
-			updateExecutor: func(e *standardTxExecutor) error {
-				e.feeCalculator = txfee.NewStaticCalculator(e.backend.Config.StaticFeeConfig)
-				return nil
-			},
-			expectedErr: txfee.ErrUnsupportedTx,
 		},
 		{
 			name: "fee overflow",
@@ -4077,7 +4057,9 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create the subnet conversion
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
+	require.NoError(t, err)
+	pop, err := signer.NewProofOfPossession(sk)
 	require.NoError(t, err)
 
 	const (
@@ -4092,7 +4074,7 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 			NodeID:  ids.GenerateTestNodeID().Bytes(),
 			Weight:  weight,
 			Balance: initialBalance,
-			Signer:  *signer.NewProofOfPossession(sk),
+			Signer:  *pop,
 			// RemainingBalanceOwner and DeactivationOwner are initialized so
 			// that later reflect based equality checks pass.
 			RemainingBalanceOwner: message.PChainOwner{
@@ -4181,15 +4163,6 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 				tx.DisableAuth.(*secp256k1fx.Input).SigIndices[0]++
 			},
 			expectedErr: errUnauthorizedModification,
-		},
-		{
-			name:         "invalid fee calculation",
-			validationID: validationID,
-			updateExecutor: func(e *standardTxExecutor) error {
-				e.feeCalculator = txfee.NewStaticCalculator(e.backend.Config.StaticFeeConfig)
-				return nil
-			},
-			expectedErr: txfee.ErrUnsupportedTx,
 		},
 		{
 			name:         "already deactivated",

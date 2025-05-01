@@ -64,10 +64,12 @@ func GetHTTPHeader(hs http.Header) []*httppb.Element {
 	return result
 }
 
-// MergeHTTPHeader takes a slice of Header and merges with http.Header map.
-func MergeHTTPHeader(hs []*httppb.Element, header http.Header) {
-	for _, h := range hs {
-		header[h.Key] = h.Values
+// SetHeaders sets headers to next
+func SetHeaders(headers http.Header, next []*httppb.Element) {
+	clear(headers)
+
+	for _, h := range next {
+		headers[h.Key] = h.Values
 	}
 }
 

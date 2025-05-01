@@ -297,13 +297,17 @@ func (w *wallet) IssueTx(
 	ctx := ops.Context()
 	startTime := time.Now()
 	txID, err := w.client.IssueTx(ctx, tx.Bytes())
-	issuanceDuration := time.Since(startTime)
 	if err != nil {
 		return err
 	}
 
-	if f := ops.PostIssuanceHandler(); f != nil {
-		f(common.XChainAlias, txID, issuanceDuration)
+	issuanceDuration := time.Since(startTime)
+	if f := ops.IssuanceHandler(); f != nil {
+		f(common.IssuanceReceipt{
+			ChainAlias: builder.Alias,
+			TxID:       txID,
+			Duration:   issuanceDuration,
+		})
 	}
 
 	if ops.AssumeDecided() {
@@ -313,11 +317,17 @@ func (w *wallet) IssueTx(
 	if err := avm.AwaitTxAccepted(w.client, ctx, txID, ops.PollFrequency()); err != nil {
 		return err
 	}
-	totalDuration := time.Since(startTime)
-	issuanceToConfirmationDuration := totalDuration - issuanceDuration
 
-	if f := ops.PostConfirmationHandler(); f != nil {
-		f(common.XChainAlias, txID, totalDuration, issuanceToConfirmationDuration)
+	if f := ops.ConfirmationHandler(); f != nil {
+		totalDuration := time.Since(startTime)
+		confirmationDuration := totalDuration - issuanceDuration
+
+		f(common.ConfirmationReceipt{
+			ChainAlias:           builder.Alias,
+			TxID:                 txID,
+			TotalDuration:        totalDuration,
+			ConfirmationDuration: confirmationDuration,
+		})
 	}
 
 	return w.backend.AcceptTx(ctx, tx)

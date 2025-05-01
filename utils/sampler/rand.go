@@ -61,9 +61,9 @@ func (r *rng) Uint64Inclusive(n uint64) uint64 {
 	//
 	// ref: https://github.com/golang/go/blob/ce10e9d84574112b224eae88dc4e0f43710808de/src/math/rand/rand.go#L127-L132
 	default:
-		max := (1 << 63) - 1 - (1<<63)%(n+1)
+		maximum := (1 << 63) - 1 - (1<<63)%(n+1)
 		v := r.uint63()
-		for v > max {
+		for v > maximum {
 			v = r.uint63()
 		}
 		return v % (n + 1)

@@ -1,8 +1,8 @@
 # The version is supplied as a build argument rather than hard-coded
 # to minimize the cost of version changes.
-ARG GO_VERSION
+ARG GO_VERSION=INVALID # This value is not intended to be used but silences a warning
 
-FROM golang:$GO_VERSION-bullseye
+FROM golang:$GO_VERSION-bookworm
 
 WORKDIR /build
 # Copy and download dependencies using go mod

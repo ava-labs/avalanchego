@@ -7,7 +7,6 @@ import (
 	"context"
 	"math"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -127,9 +126,17 @@ func (c *client) IssueTx(
 	options ...common.Option,
 ) error {
 	ops := common.NewOptions(options)
-	if f := ops.PostIssuanceHandler(); f != nil {
-		txID := tx.ID()
-		f(common.PChainAlias, txID, time.Duration(0))
+	if f := ops.IssuanceHandler(); f != nil {
+		f(common.IssuanceReceipt{
+			ChainAlias: builder.Alias,
+			TxID:       tx.ID(),
+		})
+	}
+	if f := ops.ConfirmationHandler(); f != nil {
+		f(common.ConfirmationReceipt{
+			ChainAlias: builder.Alias,
+			TxID:       tx.ID(),
+		})
 	}
 	ctx := ops.Context()
 	return c.backend.AcceptTx(ctx, tx)

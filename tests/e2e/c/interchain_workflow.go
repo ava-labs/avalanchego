@@ -6,8 +6,7 @@ package c
 import (
 	"math/big"
 
-	"github.com/ava-labs/coreth/core/types"
-	"github.com/ava-labs/coreth/plugin/evm"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 
@@ -39,9 +38,9 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 		tc.By("allocating a pre-funded key to send from and a recipient key to deliver to")
 		var (
 			senderKey           = env.PreFundedKey
-			senderEthAddress    = evm.GetEthAddress(senderKey)
+			senderEthAddress    = senderKey.EthAddress()
 			recipientKey        = e2e.NewPrivateKey(tc)
-			recipientEthAddress = evm.GetEthAddress(recipientKey)
+			recipientEthAddress = recipientKey.EthAddress()
 		)
 
 		tc.By("sending funds from one address to another on the C-Chain", func() {
@@ -65,7 +64,8 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 			signedTx, err := types.SignTx(tx, signer, senderKey.ToECDSA())
 			require.NoError(err)
 
-			_ = e2e.SendEthTransaction(tc, ethClient, signedTx)
+			receipt := e2e.SendEthTransaction(tc, ethClient, signedTx)
+			require.Equal(types.ReceiptStatusSuccessful, receipt.Status)
 
 			tc.By("waiting for the C-Chain recipient address to have received the sent funds")
 			tc.Eventually(func() bool {
