@@ -92,28 +92,22 @@ func TestRequestClientArbitrarilyLongBody(t *testing.T) {
 // client
 func TestHttpResponse(t *testing.T) {
 	tests := []struct {
-		name    string
-		request http.Request
+		name   string
+		header http.Header
 	}{
 		{
 			// Requests with an upgrade header do not use the "Simple*" http response
 			// apis and must be separately tested
 			name: "upgrade header specified",
-			request: http.Request{
-				Body: io.NopCloser(strings.NewReader("foo")),
-				Header: http.Header{
-					"Upgrade": {"upgrade"},
-					"foo":     {"foo"},
-				},
+			header: http.Header{
+				"Upgrade": {"upgrade"},
+				"foo":     {"foo"},
 			},
 		},
 		{
 			name: "arbitrary headers",
-			request: http.Request{
-				Body: io.NopCloser(strings.NewReader("foo")),
-				Header: http.Header{
-					"foo": {"foo"},
-				},
+			header: http.Header{
+				"foo": {"foo"},
 			},
 		},
 	}
@@ -148,7 +142,10 @@ func TestHttpResponse(t *testing.T) {
 			}
 
 			client := NewClient(httppb.NewHTTPClient(conn))
-			client.ServeHTTP(recorder, &tt.request)
+			client.ServeHTTP(recorder, &http.Request{
+				Body:   io.NopCloser(strings.NewReader("foo")),
+				Header: tt.header,
+			})
 
 			require.Equal(http.StatusOK, recorder.Code)
 			require.Equal(
