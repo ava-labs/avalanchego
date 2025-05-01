@@ -54,7 +54,7 @@ func TestGossipMempoolAddVerificationError(t *testing.T) {
 func TestMempoolDuplicate(t *testing.T) {
 	require := require.New(t)
 
-	testMempool, err := pmempool.New("", prometheus.NewRegistry(), nil)
+	testMempool, err := pmempool.New("", prometheus.NewRegistry())
 	require.NoError(err)
 	txVerifier := testTxVerifier{}
 
