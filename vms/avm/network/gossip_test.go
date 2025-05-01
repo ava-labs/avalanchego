@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
@@ -66,6 +67,9 @@ func TestGossipMempoolAdd(t *testing.T) {
 	parser, err := txs.NewParser(nil)
 	require.NoError(err)
 
+	gossipMetrics, err := gossip.NewMetrics(metrics, "")
+	require.NoError(err)
+
 	mempool, err := newGossipMempool(
 		baseMempool,
 		metrics,
@@ -75,6 +79,7 @@ func TestGossipMempoolAdd(t *testing.T) {
 		DefaultConfig.ExpectedBloomFilterElements,
 		DefaultConfig.ExpectedBloomFilterFalsePositiveProbability,
 		DefaultConfig.MaxBloomFilterFalsePositiveProbability,
+		gossipMetrics,
 	)
 	require.NoError(err)
 
@@ -103,6 +108,9 @@ func TestGossipMempoolAddVerified(t *testing.T) {
 	parser, err := txs.NewParser(nil)
 	require.NoError(err)
 
+	gossipMetrics, err := gossip.NewMetrics(metrics, "")
+	require.NoError(err)
+
 	mempool, err := newGossipMempool(
 		baseMempool,
 		metrics,
@@ -114,6 +122,7 @@ func TestGossipMempoolAddVerified(t *testing.T) {
 		DefaultConfig.ExpectedBloomFilterElements,
 		DefaultConfig.ExpectedBloomFilterFalsePositiveProbability,
 		DefaultConfig.MaxBloomFilterFalsePositiveProbability,
+		gossipMetrics,
 	)
 	require.NoError(err)
 

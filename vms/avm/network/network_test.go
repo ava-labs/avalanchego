@@ -14,6 +14,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/commonmock"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -74,7 +75,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				return mempool
 			}(),
 			tx:          &txs.Tx{Unsigned: &txs.BaseTx{}},
-			expectedErr: mempool.ErrDuplicateTx,
+			expectedErr: gossip.ErrDuplicateTx,
 		},
 		{
 			name: "transaction marked as dropped in mempool",
@@ -247,6 +248,10 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				prometheus.NewRegistry(),
 				testConfig,
 			)
+			tt.mempool.Iterate(func(tx *txs.Tx) bool {
+				require.NoError(n.mempool.mempool.Add(tx))
+				return true
+			})
 			require.NoError(err)
 			err = n.IssueTxFromRPC(tt.tx)
 			require.ErrorIs(err, tt.expectedErr)

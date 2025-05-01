@@ -23,19 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-const (
-	ioLabel    = "io"
-	sentIO     = "sent"
-	receivedIO = "received"
-
-	typeLabel  = "type"
-	pushType   = "push"
-	pullType   = "pull"
-	unsentType = "unsent"
-	sentType   = "sent"
-
-	defaultGossipableCount = 64
-)
+const defaultGossipableCount = 64
 
 var (
 	_ Gossiper = (*ValidatorGossiper)(nil)
@@ -43,31 +31,6 @@ var (
 	_ Gossiper = (*NoOpGossiper)(nil)
 
 	_ Set[*testTx] = (*FullSet[*testTx])(nil)
-
-	ioTypeLabels   = []string{ioLabel, typeLabel}
-	sentPushLabels = prometheus.Labels{
-		ioLabel:   sentIO,
-		typeLabel: pushType,
-	}
-	receivedPushLabels = prometheus.Labels{
-		ioLabel:   receivedIO,
-		typeLabel: pushType,
-	}
-	sentPullLabels = prometheus.Labels{
-		ioLabel:   sentIO,
-		typeLabel: pullType,
-	}
-	receivedPullLabels = prometheus.Labels{
-		ioLabel:   receivedIO,
-		typeLabel: pullType,
-	}
-	typeLabels   = []string{typeLabel}
-	unsentLabels = prometheus.Labels{
-		typeLabel: unsentType,
-	}
-	sentLabels = prometheus.Labels{
-		typeLabel: sentType,
-	}
 
 	ErrInvalidNumValidators     = errors.New("num validators cannot be negative")
 	ErrInvalidNumNonValidators  = errors.New("num non-validators cannot be negative")
@@ -92,86 +55,6 @@ type ValidatorGossiper struct {
 	Validators p2p.ValidatorSet
 }
 
-// Metrics that are tracked across a gossip protocol. A given protocol should
-// only use a single instance of Metrics.
-type Metrics struct {
-	count                   *prometheus.CounterVec
-	bytes                   *prometheus.CounterVec
-	tracking                *prometheus.GaugeVec
-	trackingLifetimeAverage prometheus.Gauge
-	topValidators           *prometheus.GaugeVec
-}
-
-// NewMetrics returns a common set of metrics
-func NewMetrics(
-	metrics prometheus.Registerer,
-	namespace string,
-) (Metrics, error) {
-	m := Metrics{
-		count: prometheus.NewCounterVec(
-			prometheus.CounterOpts{
-				Namespace: namespace,
-				Name:      "gossip_count",
-				Help:      "amount of gossip (n)",
-			},
-			ioTypeLabels,
-		),
-		bytes: prometheus.NewCounterVec(
-			prometheus.CounterOpts{
-				Namespace: namespace,
-				Name:      "gossip_bytes",
-				Help:      "amount of gossip (bytes)",
-			},
-			ioTypeLabels,
-		),
-		tracking: prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "gossip_tracking",
-				Help:      "number of gossipables being tracked",
-			},
-			typeLabels,
-		),
-		trackingLifetimeAverage: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "gossip_tracking_lifetime_average",
-			Help:      "average duration a gossipable has been tracked (ns)",
-		}),
-		topValidators: prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "top_validators",
-				Help:      "number of validators gossipables are sent to due to stake",
-			},
-			typeLabels,
-		),
-	}
-	err := errors.Join(
-		metrics.Register(m.count),
-		metrics.Register(m.bytes),
-		metrics.Register(m.tracking),
-		metrics.Register(m.trackingLifetimeAverage),
-		metrics.Register(m.topValidators),
-	)
-	return m, err
-}
-
-func (m *Metrics) observeMessage(labels prometheus.Labels, count int, bytes int) error {
-	countMetric, err := m.count.GetMetricWith(labels)
-	if err != nil {
-		return fmt.Errorf("failed to get count metric: %w", err)
-	}
-
-	bytesMetric, err := m.bytes.GetMetricWith(labels)
-	if err != nil {
-		return fmt.Errorf("failed to get bytes metric: %w", err)
-	}
-
-	countMetric.Add(float64(count))
-	bytesMetric.Add(float64(bytes))
-	return nil
-}
-
 func (v ValidatorGossiper) Gossip(ctx context.Context) error {
 	if !v.Validators.Has(ctx, v.NodeID) {
 		return nil
@@ -185,7 +68,7 @@ func NewPullGossiper[T Gossipable](
 	marshaller Marshaller[T],
 	set Set[T],
 	client *p2p.Client,
-	metrics Metrics,
+	metrics *Metrics,
 	pollSize int,
 ) *PullGossiper[T] {
 	return &PullGossiper[T]{
@@ -203,7 +86,7 @@ type PullGossiper[T Gossipable] struct {
 	marshaller Marshaller[T]
 	set        Set[T]
 	client     *p2p.Client
-	metrics    Metrics
+	metrics    *Metrics
 	pollSize   int
 }
 
@@ -244,13 +127,34 @@ func (p *PullGossiper[_]) handleResponse(
 		return
 	}
 
-	receivedBytes := 0
-	for _, bytes := range gossip {
-		receivedBytes += len(bytes)
+	handleIncomingGossipables(p.log,
+		p.marshaller,
+		p.set,
+		p.metrics,
+		gossip,
+		nodeID,
+		pullType,
+	)
+}
 
-		gossipable, err := p.marshaller.UnmarshalGossip(bytes)
+func handleIncomingGossipables[T Gossipable](
+	log logging.Logger,
+	marshaller Marshaller[T],
+	set Set[T],
+	metrics *Metrics,
+	gossip [][]byte,
+	nodeID ids.NodeID,
+	typeLabel string,
+) {
+	malformedBytes := 0
+	malformedCount := 0
+	gossipableSizes := make(map[ids.ID]int, len(gossip))
+	for _, bytes := range gossip {
+		gossipable, err := marshaller.UnmarshalGossip(bytes)
 		if err != nil {
-			p.log.Debug(
+			malformedBytes += len(bytes)
+			malformedCount++
+			log.Debug(
 				"failed to unmarshal gossip",
 				zap.Stringer("nodeID", nodeID),
 				zap.Error(err),
@@ -259,13 +163,14 @@ func (p *PullGossiper[_]) handleResponse(
 		}
 
 		gossipID := gossipable.GossipID()
-		p.log.Debug(
+		log.Debug(
 			"received gossip",
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("id", gossipID),
 		)
-		if err := p.set.Add(gossipable); err != nil {
-			p.log.Debug(
+		gossipableSizes[gossipID] = len(bytes)
+		if err := set.Add(gossipable); err != nil {
+			log.Debug(
 				"failed to add gossip to the known set",
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("id", gossipID),
@@ -273,10 +178,11 @@ func (p *PullGossiper[_]) handleResponse(
 			)
 			continue
 		}
+		metrics.AddDropMetric(gossipID, droppedNot)
 	}
 
-	if err := p.metrics.observeMessage(receivedPullLabels, len(gossip), receivedBytes); err != nil {
-		p.log.Error("failed to update metrics",
+	if err := metrics.updateReceivedMetrics(typeLabel, gossipableSizes, malformedBytes, malformedCount); err != nil {
+		log.Error("failed to update metrics",
 			zap.Error(err),
 		)
 	}
@@ -285,10 +191,10 @@ func (p *PullGossiper[_]) handleResponse(
 // NewPushGossiper returns an instance of PushGossiper
 func NewPushGossiper[T Gossipable](
 	marshaller Marshaller[T],
-	mempool Set[T],
+	set Set[T],
 	validators p2p.ValidatorSubset,
 	client *p2p.Client,
-	metrics Metrics,
+	metrics *Metrics,
 	gossipParams BranchingFactor,
 	regossipParams BranchingFactor,
 	discardedSize int,
@@ -312,7 +218,7 @@ func NewPushGossiper[T Gossipable](
 
 	return &PushGossiper[T]{
 		marshaller:           marshaller,
-		set:                  mempool,
+		set:                  set,
 		validators:           validators,
 		client:               client,
 		metrics:              metrics,
@@ -334,7 +240,7 @@ type PushGossiper[T Gossipable] struct {
 	set        Set[T]
 	validators p2p.ValidatorSubset
 	client     *p2p.Client
-	metrics    Metrics
+	metrics    *Metrics
 
 	gossipParams         BranchingFactor
 	regossipParams       BranchingFactor
@@ -492,7 +398,7 @@ func (p *PushGossiper[T]) gossip(
 		return err
 	}
 
-	if err := p.metrics.observeMessage(sentPushLabels, len(gossip), sentBytes); err != nil {
+	if err := p.metrics.updateSentMetrics(sentPushLabels, len(gossip), sentBytes); err != nil {
 		return err
 	}
 

@@ -12,11 +12,11 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
-	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
 type WalletService struct {
@@ -45,7 +45,7 @@ func (w *WalletService) decided(txID ids.ID) {
 			)
 			return
 		}
-		if errors.Is(err, mempool.ErrDuplicateTx) {
+		if errors.Is(err, gossip.ErrDuplicateTx) {
 			return
 		}
 
@@ -75,7 +75,7 @@ func (w *WalletService) issue(tx *txs.Tx) (ids.ID, error) {
 			w.vm.ctx.Log.Info("issued tx to mempool over wallet API",
 				zap.Stringer("txID", txID),
 			)
-		} else if !errors.Is(err, mempool.ErrDuplicateTx) {
+		} else if !errors.Is(err, gossip.ErrDuplicateTx) {
 			w.vm.ctx.Log.Warn("failed to issue tx over wallet API",
 				zap.Stringer("txID", txID),
 				zap.Error(err),

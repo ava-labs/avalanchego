@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 
 	pmempool "github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
@@ -75,14 +74,23 @@ func newGossipMempool(
 	minTargetElements int,
 	targetFalsePositiveProbability,
 	resetFalsePositiveProbability float64,
+	gossipMetrics *gossip.Metrics,
 ) (*gossipMempool, error) {
 	bloom, err := gossip.NewBloomFilter(registerer, "mempool_bloom_filter", minTargetElements, targetFalsePositiveProbability, resetFalsePositiveProbability)
+	if err != nil {
+		return nil, err
+	}
+	gMempool, err := gossip.NewMempool[*txs.Tx](gossipMetrics)
+	if err != nil {
+		return nil, err
+	}
 	return &gossipMempool{
 		Mempool:    mempool,
 		log:        log,
 		txVerifier: txVerifier,
 		bloom:      bloom,
-	}, err
+		mempool:    gMempool,
+	}, nil
 }
 
 type gossipMempool struct {
@@ -90,14 +98,19 @@ type gossipMempool struct {
 	log        logging.Logger
 	txVerifier TxVerifier
 
-	lock  sync.RWMutex
-	bloom *gossip.BloomFilter
+	lock    sync.RWMutex
+	bloom   *gossip.BloomFilter
+	mempool *gossip.Mempool[*txs.Tx]
 }
 
 func (g *gossipMempool) Add(tx *txs.Tx) error {
 	txID := tx.ID()
-	if _, ok := g.Mempool.Get(txID); ok {
-		return fmt.Errorf("tx %s dropped: %w", txID, mempool.ErrDuplicateTx)
+
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	if g.mempool.Has(txID) {
+		// adding an entry would fail, and an error would be returned.
+		return g.mempool.Add(tx)
 	}
 
 	if reason := g.Mempool.GetDropReason(txID); reason != nil {
@@ -123,8 +136,9 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 		return err
 	}
 
-	g.lock.Lock()
-	defer g.lock.Unlock()
+	if err := g.mempool.Add(tx); err != nil {
+		return err
+	}
 
 	g.bloom.Add(tx)
 	reset, err := gossip.ResetBloomFilterIfNeeded(g.bloom, g.Mempool.Len()*bloomChurnMultiplier)
@@ -145,8 +159,10 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 }
 
 func (g *gossipMempool) Has(txID ids.ID) bool {
-	_, ok := g.Mempool.Get(txID)
-	return ok
+	g.lock.RLock()
+	defer g.lock.RUnlock()
+
+	return g.mempool.Has(txID)
 }
 
 func (g *gossipMempool) GetFilter() (bloom []byte, salt []byte) {
@@ -154,4 +170,14 @@ func (g *gossipMempool) GetFilter() (bloom []byte, salt []byte) {
 	defer g.lock.RUnlock()
 
 	return g.bloom.Marshal()
+}
+
+func (g *gossipMempool) Remove(removeTxs ...*txs.Tx) {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
+	g.Mempool.Remove(removeTxs...)
+	for _, tx := range removeTxs {
+		g.mempool.Remove(tx.GossipID())
+	}
 }

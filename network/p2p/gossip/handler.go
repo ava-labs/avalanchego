@@ -22,7 +22,7 @@ func NewHandler[T Gossipable](
 	log logging.Logger,
 	marshaller Marshaller[T],
 	set Set[T],
-	metrics Metrics,
+	metrics *Metrics,
 	targetResponseSize int,
 ) *Handler[T] {
 	return &Handler[T]{
@@ -40,7 +40,7 @@ type Handler[T Gossipable] struct {
 	marshaller         Marshaller[T]
 	log                logging.Logger
 	set                Set[T]
-	metrics            Metrics
+	metrics            *Metrics
 	targetResponseSize int
 }
 
@@ -77,7 +77,7 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 		return nil, p2p.ErrUnexpected
 	}
 
-	if err := h.metrics.observeMessage(sentPullLabels, len(gossipBytes), responseSize); err != nil {
+	if err := h.metrics.updateSentMetrics(sentPullLabels, len(gossipBytes), responseSize); err != nil {
 		return nil, p2p.ErrUnexpected
 	}
 
@@ -96,31 +96,12 @@ func (h Handler[_]) AppGossip(_ context.Context, nodeID ids.NodeID, gossipBytes 
 		return
 	}
 
-	receivedBytes := 0
-	for _, bytes := range gossip {
-		receivedBytes += len(bytes)
-		gossipable, err := h.marshaller.UnmarshalGossip(bytes)
-		if err != nil {
-			h.log.Debug("failed to unmarshal gossip",
-				zap.Stringer("nodeID", nodeID),
-				zap.Error(err),
-			)
-			continue
-		}
-
-		if err := h.set.Add(gossipable); err != nil {
-			h.log.Debug(
-				"failed to add gossip to the known set",
-				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("id", gossipable.GossipID()),
-				zap.Error(err),
-			)
-		}
-	}
-
-	if err := h.metrics.observeMessage(receivedPushLabels, len(gossip), receivedBytes); err != nil {
-		h.log.Error("failed to update metrics",
-			zap.Error(err),
-		)
-	}
+	handleIncomingGossipables(h.log,
+		h.marshaller,
+		h.set,
+		h.metrics,
+		gossip,
+		nodeID,
+		pushType,
+	)
 }

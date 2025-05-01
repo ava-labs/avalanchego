@@ -84,6 +84,7 @@ func New(
 		config.ExpectedBloomFilterElements,
 		config.ExpectedBloomFilterFalsePositiveProbability,
 		config.MaxBloomFilterFalsePositiveProbability,
+		txGossipMetrics,
 	)
 	if err != nil {
 		return nil, err

@@ -17,14 +17,12 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
-	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 
 	xmempool "github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 )
 
 var (
 	_ p2p.Handler                = (*txGossipHandler)(nil)
-	_ gossip.Set[*txs.Tx]        = (*gossipMempool)(nil)
 	_ gossip.Marshaller[*txs.Tx] = (*txParser)(nil)
 )
 
@@ -77,15 +75,24 @@ func newGossipMempool(
 	minTargetElements int,
 	targetFalsePositiveProbability,
 	resetFalsePositiveProbability float64,
+	gossipMetrics *gossip.Metrics,
 ) (*gossipMempool, error) {
 	bloom, err := gossip.NewBloomFilter(registerer, "mempool_bloom_filter", minTargetElements, targetFalsePositiveProbability, resetFalsePositiveProbability)
+	if err != nil {
+		return nil, err
+	}
+	gMempool, err := gossip.NewMempool[*txs.Tx](gossipMetrics)
+	if err != nil {
+		return nil, err
+	}
 	return &gossipMempool{
 		Mempool:    mempool,
 		log:        log,
 		txVerifier: txVerifier,
 		parser:     parser,
 		bloom:      bloom,
-	}, err
+		mempool:    gMempool,
+	}, nil
 }
 
 type gossipMempool struct {
@@ -94,8 +101,9 @@ type gossipMempool struct {
 	txVerifier TxVerifier
 	parser     txs.Parser
 
-	lock  sync.RWMutex
-	bloom *gossip.BloomFilter
+	lock    sync.RWMutex
+	bloom   *gossip.BloomFilter
+	mempool *gossip.Mempool[*txs.Tx]
 }
 
 // Add is called by the p2p SDK when handling transactions that were pushed to
@@ -104,8 +112,12 @@ type gossipMempool struct {
 // transaction to push gossip as well.
 func (g *gossipMempool) Add(tx *txs.Tx) error {
 	txID := tx.ID()
-	if _, ok := g.Mempool.Get(txID); ok {
-		return fmt.Errorf("attempted to issue %w: %s ", mempool.ErrDuplicateTx, txID)
+
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	if g.mempool.Has(txID) {
+		// adding an entry would fail, and an error would be returned.
+		return g.mempool.Add(tx)
 	}
 
 	if reason := g.Mempool.GetDropReason(txID); reason != nil {
@@ -119,25 +131,41 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 	// Verify the tx at the currently preferred state
 	if err := g.txVerifier.VerifyTx(tx); err != nil {
 		g.Mempool.MarkDropped(txID, err)
-		return err
+		return fmt.Errorf("transaction %s verification failed: %w", txID, err)
 	}
 
-	return g.AddWithoutVerification(tx)
+	return g.addWithoutVerification(tx)
 }
 
 func (g *gossipMempool) Has(txID ids.ID) bool {
-	_, ok := g.Mempool.Get(txID)
-	return ok
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
+	return g.mempool.Has(txID)
 }
 
 func (g *gossipMempool) AddWithoutVerification(tx *txs.Tx) error {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	return g.addWithoutVerification(tx)
+}
+
+func (g *gossipMempool) addWithoutVerification(tx *txs.Tx) error {
+	txID := tx.ID()
+
+	if g.mempool.Has(txID) {
+		// adding an entry would fail, and an error would be returned.
+		err := g.mempool.Add(tx)
+		return err
+	}
+
 	if err := g.Mempool.Add(tx); err != nil {
 		g.Mempool.MarkDropped(tx.ID(), err)
 		return err
 	}
-
-	g.lock.Lock()
-	defer g.lock.Unlock()
+	if err := g.mempool.Add(tx); err != nil {
+		return err
+	}
 
 	g.bloom.Add(tx)
 	reset, err := gossip.ResetBloomFilterIfNeeded(g.bloom, g.Mempool.Len()*bloomChurnMultiplier)
@@ -166,4 +194,14 @@ func (g *gossipMempool) GetFilter() (bloom []byte, salt []byte) {
 	defer g.lock.RUnlock()
 
 	return g.bloom.Marshal()
+}
+
+func (g *gossipMempool) Remove(removeTxs ...*txs.Tx) {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
+	g.Mempool.Remove(removeTxs...)
+	for _, tx := range removeTxs {
+		g.mempool.Remove(tx.GossipID())
+	}
 }
