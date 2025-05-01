@@ -14,10 +14,9 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common/hexutil"
-	"github.com/ava-labs/libevm/rpc"
-
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethclient"
+	"github.com/ava-labs/libevm/rpc"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
