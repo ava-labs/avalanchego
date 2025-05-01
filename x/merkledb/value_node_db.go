@@ -7,6 +7,7 @@ import (
 	"errors"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils"
 )
@@ -45,7 +46,7 @@ func newValueNodeDB(
 		metrics:    metrics,
 		baseDB:     db,
 		bufferPool: bufferPool,
-		nodeCache:  cache.NewSizedLRU(cacheSize, cacheEntrySize),
+		nodeCache:  lru.NewSizedCache(cacheSize, cacheEntrySize),
 		hasher:     hasher,
 	}
 }

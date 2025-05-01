@@ -8,8 +8,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/cache"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 
@@ -45,7 +43,7 @@ func TestCachedRecover(t *testing.T) {
 	sig, err := key.Sign(msg)
 	require.NoError(err)
 
-	r := RecoverCache{LRU: cache.LRU[ids.ID, *PublicKey]{Size: 1}}
+	r := NewRecoverCache(1)
 	pub1, err := r.RecoverPublicKey(msg, sig)
 	require.NoError(err)
 	pub2, err := r.RecoverPublicKey(msg, sig)

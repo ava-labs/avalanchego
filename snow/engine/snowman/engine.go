@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
@@ -98,10 +99,7 @@ func New(config Config) (*Engine, error) {
 	nonVerifiedCache, err := metercacher.New[ids.ID, snowman.Block](
 		"non_verified_cache",
 		config.Ctx.Registerer,
-		cache.NewSizedLRU[ids.ID, snowman.Block](
-			nonVerifiedCacheSize,
-			cachedBlockSize,
-		),
+		lru.NewSizedCache(nonVerifiedCacheSize, cachedBlockSize),
 	)
 	if err != nil {
 		return nil, err
