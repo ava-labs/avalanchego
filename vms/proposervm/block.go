@@ -33,7 +33,6 @@ var (
 	errPChainHeightNotMonotonic = errors.New("non monotonically increasing P-chain height")
 	errPChainHeightNotReached   = errors.New("block P-chain height larger than current P-chain height")
 	errTimeTooAdvanced          = errors.New("time is too far advanced")
-	errProposerWindowNotStarted = errors.New("proposer window hasn't started")
 	errUnexpectedProposer       = errors.New("unexpected proposer for current window")
 	errProposerMismatch         = errors.New("proposer mismatch")
 	errProposersNotActivated    = errors.New("proposers haven't been activated yet")
