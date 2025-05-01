@@ -118,8 +118,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		var contractAddress common.Address
 		tc.By("deploying an expensive contract", func() {
 			// Create transaction
-			blockNumber := (*big.Int)(nil)
-			nonce, err := ethClient.NonceAt(tc.DefaultContext(), ethAddress, blockNumber)
+			nonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), ethAddress)
 			require.NoError(err)
 			compiledContract := common.Hex2Bytes(consumeGasCompiledContract)
 			tx := types.NewTx(&types.DynamicFeeTx{
@@ -182,8 +181,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 				)
 
 				// Create the transaction
-				blockNumber := (*big.Int)(nil)
-				nonce, err := ethClient.NonceAt(tc.DefaultContext(), ethAddress, blockNumber)
+				nonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), ethAddress)
 				require.NoError(err)
 				tx := types.NewTx(&types.DynamicFeeTx{
 					ChainID:   cChainID,
@@ -232,8 +230,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 				)
 
 				// Create the transaction
-				blockNumber := (*big.Int)(nil)
-				nonce, err := ethClient.NonceAt(tc.DefaultContext(), ethAddress, blockNumber)
+				nonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), ethAddress)
 				require.NoError(err)
 				tx := types.NewTx(&types.DynamicFeeTx{
 					ChainID:   cChainID,

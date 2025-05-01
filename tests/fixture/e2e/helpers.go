@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	ethereum "github.com/ava-labs/libevm"
+	ethcommon "github.com/ava-labs/libevm/common"
 )
 
 const (
@@ -152,6 +153,11 @@ func (ec *EthClient) EstimateBaseFee(ctx context.Context) (*big.Int, error) {
 		return nil, err
 	}
 	return (*big.Int)(&hex), nil
+}
+
+func (ec *EthClient) AcceptedNonceAt(ctx context.Context, addr ethcommon.Address) (uint64, error) {
+	blockNumber := (*big.Int)(nil)
+	return ec.NonceAt(ctx, addr, blockNumber)
 }
 
 // Adds an ephemeral node intended to be used by a single test.
