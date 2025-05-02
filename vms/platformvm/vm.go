@@ -167,13 +167,14 @@ func (vm *VM) Initialize(
 		Bootstrapped: &vm.bootstrapped,
 	}
 
-	mempool, err := pmempool.New("mempool", registerer, toEngine)
+	mempool, err := pmempool.New("mempool", registerer)
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}
 
 	vm.manager = blockexecutor.NewManager(
 		mempool,
+		toEngine,
 		vm.metrics,
 		vm.state,
 		txExecutorBackend,
@@ -191,6 +192,7 @@ func (vm *VM) Initialize(
 		),
 		txVerifier,
 		mempool,
+		toEngine,
 		txExecutorBackend.Config.PartialSyncPrimaryNetwork,
 		appSender,
 		chainCtx.Lock.RLocker(),
@@ -211,6 +213,7 @@ func (vm *VM) Initialize(
 
 	vm.Builder = blockbuilder.New(
 		mempool,
+		toEngine,
 		txExecutorBackend,
 		vm.manager,
 	)
