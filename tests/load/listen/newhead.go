@@ -6,6 +6,7 @@ package listen
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/ava-labs/libevm/core/types"
 
@@ -21,6 +22,9 @@ type headNotifier struct {
 	listenStop   chan<- struct{}
 	listenDone   <-chan struct{}
 	subscription ethereum.Subscription
+
+	stopMutex sync.Mutex
+	stopped   bool
 }
 
 func newHeadNotifier(client NewHeadSubscriber) *headNotifier {
@@ -52,8 +56,13 @@ func (n *headNotifier) start() (newHead <-chan struct{}, runError <-chan error, 
 }
 
 func (n *headNotifier) stop() {
-	n.subscription.Unsubscribe()
-	close(n.listenStop)
+	n.stopMutex.Lock()
+	defer n.stopMutex.Unlock()
+	if !n.stopped {
+		n.subscription.Unsubscribe()
+		close(n.listenStop)
+		n.stopped = true
+	}
 	<-n.listenDone
 }
 
