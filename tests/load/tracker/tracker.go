@@ -39,7 +39,6 @@ func (t *Tracker) IssueStart(txHash common.Hash) {
 	defer t.mutex.Unlock()
 
 	t.metrics.InFlightIssuances.Inc()
-	t.metrics.InFlightTxs.Inc()
 	t.txHashToLastTime[txHash] = t.timeNow()
 }
 
@@ -49,6 +48,7 @@ func (t *Tracker) IssueEnd(txHash common.Hash) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
+	t.metrics.Issued.Inc()
 	t.metrics.InFlightIssuances.Dec()
 	start := t.txHashToLastTime[txHash]
 	now := t.timeNow()
@@ -62,7 +62,6 @@ func (t *Tracker) ObserveConfirmed(txHash common.Hash) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	t.metrics.InFlightTxs.Dec()
 	t.metrics.Confirmed.Inc()
 	issuedTime := t.txHashToLastTime[txHash]
 	now := t.timeNow()
@@ -77,7 +76,6 @@ func (t *Tracker) ObserveFailed(txHash common.Hash) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	t.metrics.InFlightTxs.Dec()
 	t.metrics.Failed.Inc()
 	delete(t.txHashToLastTime, txHash)
 	t.stats.failed++

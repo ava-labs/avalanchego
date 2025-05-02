@@ -10,6 +10,8 @@ import (
 )
 
 type metrics struct {
+	// Issued is the number of issued transactions.
+	Issued prometheus.Counter
 	// Confirmed is the number of confirmed transactions.
 	Confirmed prometheus.Counter
 	// Failed is the number of failed transactions.
@@ -17,9 +19,6 @@ type metrics struct {
 	// InFlightIssuances is the number of transactions that are being issued, from issuance start
 	// to issuance end.
 	InFlightIssuances prometheus.Gauge
-	// InFlightTxs is the number of transactions that are in-flight, from issuance start
-	// to confirmation end or failure.
-	InFlightTxs prometheus.Gauge
 	// IssuanceTxTimes is the summary of the quantiles of individual issuance tx times.
 	IssuanceTxTimes prometheus.Summary
 	// ConfirmationTxTimes is the summary of the quantiles of individual confirmation tx times.
@@ -35,6 +34,10 @@ type PrometheusRegistry interface {
 }
 
 func newMetrics(registry PrometheusRegistry) *metrics {
+	issued := prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "tx_issued",
+		Help: "Number of issued transactions",
+	})
 	confirmed := prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "tx_confirmed",
 		Help: "Number of confirmed transactions",
@@ -47,10 +50,6 @@ func newMetrics(registry PrometheusRegistry) *metrics {
 		Name: "tx_in_flight_issuances",
 		Help: "Number of transactions in flight issuances",
 	})
-	inFlightTxs := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "tx_in_flight_txs",
-		Help: "Number of transactions in flight",
-	})
 	issuanceTxTimes := prometheus.NewSummary(prometheus.SummaryOpts{
 		Name:       "tx_issuance_time",
 		Help:       "Individual Tx Issuance Times for a Load Test",
@@ -62,15 +61,15 @@ func newMetrics(registry PrometheusRegistry) *metrics {
 		Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
 	})
 
-	registry.MustRegister(confirmed, failed, inFlightIssuances, inFlightTxs,
+	registry.MustRegister(issued, confirmed, failed, inFlightIssuances,
 		issuanceTxTimes, confirmationTxTimes)
 
 	return &metrics{
 		registry:            registry,
+		Issued:              issued,
 		Confirmed:           confirmed,
 		Failed:              failed,
 		InFlightIssuances:   inFlightIssuances,
-		InFlightTxs:         inFlightTxs,
 		IssuanceTxTimes:     issuanceTxTimes,
 		ConfirmationTxTimes: confirmationTxTimes,
 	}
