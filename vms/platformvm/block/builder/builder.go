@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -25,7 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
+	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 
 	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
@@ -53,7 +54,7 @@ var (
 
 type Builder interface {
 	smblock.BuildBlockWithContextChainVM
-	mempool.Mempool
+	mempool.Mempool[*txs.Tx]
 
 	// StartBlockTimer starts to issue block creation requests to advance the
 	// chain timestamp.
@@ -82,8 +83,9 @@ type Builder interface {
 
 // builder implements a simple builder to convert txs into valid blocks
 type builder struct {
-	mempool.Mempool
+	mempool.Mempool[*txs.Tx]
 
+	toEngine          chan<- common.Message
 	txExecutorBackend *txexecutor.Backend
 	blkManager        blockexecutor.Manager
 
@@ -95,12 +97,14 @@ type builder struct {
 }
 
 func New(
-	mempool mempool.Mempool,
+	mempool mempool.Mempool[*txs.Tx],
+	toEngine chan<- common.Message,
 	txExecutorBackend *txexecutor.Backend,
 	blkManager blockexecutor.Manager,
 ) Builder {
 	return &builder{
 		Mempool:           mempool,
+		toEngine:          toEngine,
 		txExecutorBackend: txExecutorBackend,
 		blkManager:        blkManager,
 		resetTimer:        make(chan struct{}, 1),
@@ -143,7 +147,10 @@ func (b *builder) StartBlockTimer() {
 				}
 
 				// Block needs to be issued to advance time.
-				b.Mempool.RequestBuildBlock(true /*=emptyBlockPermitted*/)
+				select {
+				case b.toEngine <- common.PendingTxs:
+				default:
+				}
 
 				// Invariant: ResetBlockTimer is guaranteed to be called after
 				// [durationToSleep] returns a value <= 0. This is because we
@@ -225,7 +232,16 @@ func (b *builder) BuildBlockWithContext(
 ) (snowman.Block, error) {
 	// If there are still transactions in the mempool, then we need to
 	// re-trigger block building.
-	defer b.Mempool.RequestBuildBlock(false /*=emptyBlockPermitted*/)
+	defer func() {
+		if b.Mempool.Len() == 0 {
+			return
+		}
+
+		select {
+		case b.toEngine <- common.PendingTxs:
+		default:
+		}
+	}()
 
 	b.txExecutorBackend.Ctx.Log.Debug("starting to attempt to build a block")
 
@@ -402,7 +418,7 @@ func packDurangoBlockTxs(
 	ctx context.Context,
 	parentID ids.ID,
 	parentState state.Chain,
-	mempool mempool.Mempool,
+	mempool mempool.Mempool[*txs.Tx],
 	backend *txexecutor.Backend,
 	manager blockexecutor.Manager,
 	timestamp time.Time,
@@ -463,7 +479,7 @@ func packEtnaBlockTxs(
 	ctx context.Context,
 	parentID ids.ID,
 	parentState state.Chain,
-	mempool mempool.Mempool,
+	mempool mempool.Mempool[*txs.Tx],
 	backend *txexecutor.Backend,
 	manager blockexecutor.Manager,
 	timestamp time.Time,
@@ -563,7 +579,7 @@ func executeTx(
 	ctx context.Context,
 	parentID ids.ID,
 	stateDiff state.Diff,
-	mempool mempool.Mempool,
+	mempool mempool.Mempool[*txs.Tx],
 	backend *txexecutor.Backend,
 	manager blockexecutor.Manager,
 	pChainHeight uint64,
