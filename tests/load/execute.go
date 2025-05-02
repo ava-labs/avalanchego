@@ -11,11 +11,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/log"
+	"github.com/ava-labs/libevm/params"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/tests/load/agent"
@@ -46,7 +46,10 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 	}
 
 	// Minimum to fund gas for all of the transactions for an address:
-	minFundsPerAddr := new(big.Int).SetUint64(params.GWei * uint64(config.maxFeeCap) * params.TxGas * config.txsPerAgent)
+	minFundsPerAddr := big.NewInt(params.GWei)
+	minFundsPerAddr = minFundsPerAddr.Mul(minFundsPerAddr, big.NewInt(config.maxFeeCap))
+	minFundsPerAddr = minFundsPerAddr.Mul(minFundsPerAddr, new(big.Int).SetUint64(params.TxGas))
+	minFundsPerAddr = minFundsPerAddr.Mul(minFundsPerAddr, new(big.Int).SetUint64(config.txsPerAgent))
 	err = ensureMinimumFunds(ctx, config.endpoints[0], keys, minFundsPerAddr)
 	if err != nil {
 		return fmt.Errorf("ensuring minimum funds: %w", err)
