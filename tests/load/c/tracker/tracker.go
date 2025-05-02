@@ -7,14 +7,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/tests/load/agent"
 	"github.com/ava-labs/libevm/common"
 )
+
+var _ agent.Tracker[common.Hash] = (*Tracker)(nil)
 
 type Tracker struct {
 	timeNow          func() time.Time
 	txHashToLastTime map[common.Hash]time.Time
-	lastBlockNumber  uint64
-	lastBlockTime    time.Time
 	metrics          *metrics
 
 	stats struct {
@@ -83,35 +84,6 @@ func (t *Tracker) ObserveFailed(txHash common.Hash) {
 	t.metrics.Failed.Inc()
 	delete(t.txHashToLastTime, txHash)
 	t.stats.failed++
-}
-
-// ObserveBlock records a new block with the given number.
-// Note it ignores the first block, to avoid misleading metrics due to the
-// absence of information on when the previous block was created.
-func (t *Tracker) ObserveBlock(number uint64) {
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
-
-	now := t.timeNow()
-	if t.lastBlockNumber == 0 {
-		t.lastBlockTime = now
-		t.lastBlockNumber = number
-		return
-	}
-
-	if number == t.lastBlockNumber {
-		// No new block. This can happen when polling the node periodically.
-		return
-	}
-
-	// Usually numberDiff should be 1, but it may happen it is bigger, especially
-	// when polling the node periodically instead of using a subscription.
-	numberDiff := number - t.lastBlockNumber
-	timeDiff := now.Sub(t.lastBlockTime)
-	secondsPerBlock := timeDiff.Seconds() / float64(numberDiff)
-	t.metrics.BlockTimes.Observe(secondsPerBlock)
-	t.lastBlockTime = now
-	t.lastBlockNumber = number
 }
 
 // GetObservedConfirmed returns the number of transactions that the tracker has

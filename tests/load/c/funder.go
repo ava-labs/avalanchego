@@ -11,20 +11,20 @@ import (
 	"math/big"
 	"slices"
 	"sort"
-	"strings"
 	"time"
 
-	"github.com/ava-labs/coreth/ethclient"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/ethclient"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/load/agent"
-	"github.com/ava-labs/avalanchego/tests/load/generator"
-	"github.com/ava-labs/avalanchego/tests/load/issuer"
+	"github.com/ava-labs/avalanchego/tests/load/c/generate"
+	"github.com/ava-labs/avalanchego/tests/load/c/issue"
+	"github.com/ava-labs/avalanchego/tests/load/c/listen"
+	"github.com/ava-labs/avalanchego/tests/load/c/tracker"
 	"github.com/ava-labs/avalanchego/tests/load/orchestrate"
-	"github.com/ava-labs/avalanchego/tests/load/tracker"
 
 	ethcrypto "github.com/ava-labs/libevm/crypto"
 )
@@ -32,7 +32,6 @@ import (
 // ensureMinimumFunds ensures that each key has at least `minFundsPerAddr` by sending funds
 // from the key with the highest starting balance to keys with balances below the minimum.
 func ensureMinimumFunds(tc tests.TestContext, ctx context.Context, endpoint string, keys []*ecdsa.PrivateKey, minFundsPerAddr *big.Int) error {
-	websocket := strings.HasPrefix(endpoint, "ws") || strings.HasPrefix(endpoint, "wss")
 	client, err := ethclient.DialContext(ctx, endpoint)
 	if err != nil {
 		return fmt.Errorf("dialing %s: %w", endpoint, err)
@@ -73,18 +72,17 @@ func ensureMinimumFunds(tc tests.TestContext, ctx context.Context, endpoint stri
 			maxFundsBalance, totalFundsRequired, len(needFundsKeys))
 	}
 
-	generator, err := generator.NewDistributor(ctx, client, maxFundsKey, needFundsKeys)
+	maxFundsAddress := ethcrypto.PubkeyToAddress(maxFundsKey.PublicKey)
+	txTarget := uint64(len(needFundsKeys))
+	generator, err := generate.NewDistributor(ctx, client, maxFundsKey, needFundsKeys)
 	if err != nil {
 		return fmt.Errorf("creating distribution generator: %w", err)
 	}
 	tracker := tracker.NewCounter()
-
-	maxFundsAddress := ethcrypto.PubkeyToAddress(maxFundsKey.PublicKey)
-	issuer := issuer.New(client, websocket, tracker, maxFundsAddress)
-
-	txTarget := uint64(len(needFundsKeys))
+	issuer := issue.New(client, tracker, maxFundsAddress)
+	listener := listen.New(client, tracker, txTarget, maxFundsAddress)
 	agents := []*agent.Agent[*types.Transaction, common.Hash]{
-		agent.New(txTarget, generator, issuer, tracker),
+		agent.New(txTarget, generator, issuer, listener, tracker),
 	}
 	orchestrator := orchestrate.NewBurstOrchestrator(agents, time.Second*30)
 
@@ -99,6 +97,18 @@ func ensureMinimumFunds(tc tests.TestContext, ctx context.Context, endpoint stri
 	err = orchestrator.Execute(tc, ctx)
 	if err != nil {
 		return fmt.Errorf("executing fund distribution transactions: %w", err)
+	}
+
+	// Wait for transactions to be taken into account, especially because
+	// the orchestrator Execute method does not wait for all transactions
+	// to be confirmed.
+	const timeout = 3 * time.Second
+	timer := time.NewTimer(timeout)
+	select {
+	case <-ctx.Done():
+		timer.Stop()
+		return ctx.Err()
+	case <-timer.C:
 	}
 
 	err = checkBalancesHaveMin(ctx, client, slices.Collect(maps.Keys(needFundsKeys)), minFundsPerAddr)

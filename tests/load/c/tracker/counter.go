@@ -4,8 +4,11 @@
 package tracker
 
 import (
+	"github.com/ava-labs/avalanchego/tests/load/agent"
 	"github.com/ava-labs/libevm/common"
 )
+
+var _ agent.Tracker[common.Hash] = (*Counter)(nil)
 
 // Counter only counts the number of transactions confirmed or failed,
 // so that it is accessible through Go code.

@@ -9,22 +9,23 @@ import (
 	"fmt"
 	"math/big"
 	"os"
-	"strings"
 	"time"
 
-	"github.com/ava-labs/coreth/ethclient"
-	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/log"
+	"github.com/ava-labs/libevm/params"
 	"github.com/prometheus/client_golang/prometheus"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/load/agent"
-	"github.com/ava-labs/avalanchego/tests/load/generator"
-	"github.com/ava-labs/avalanchego/tests/load/issuer"
+	"github.com/ava-labs/avalanchego/tests/load/c/generate"
+	"github.com/ava-labs/avalanchego/tests/load/c/issue"
+	"github.com/ava-labs/avalanchego/tests/load/c/listen"
+	"github.com/ava-labs/avalanchego/tests/load/c/tracker"
 	"github.com/ava-labs/avalanchego/tests/load/orchestrate"
-	"github.com/ava-labs/avalanchego/tests/load/tracker"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 
 	ethcrypto "github.com/ava-labs/libevm/crypto"
@@ -48,7 +49,7 @@ func execute(tc tests.TestContext, ctx context.Context, preFundedKeys []*secp256
 	}
 
 	// Minimum to fund gas for all of the transactions for an address:
-	minFundsPerAddr := new(big.Int).SetUint64(params.GWei * uint64(config.maxFeeCap) * params.TxGas * config.txsPerAgent)
+	minFundsPerAddr := new(big.Int).SetUint64(params.GWei * uint64(config.maxFeeCap) * 1_000_000 * config.txsPerAgent)
 	err = ensureMinimumFunds(tc, ctx, config.endpoints[0], keys, minFundsPerAddr)
 	if err != nil {
 		return fmt.Errorf("ensuring minimum funds: %w", err)
@@ -61,19 +62,23 @@ func execute(tc tests.TestContext, ctx context.Context, preFundedKeys []*secp256
 	agents := make([]*agent.Agent[*types.Transaction, common.Hash], config.agents)
 	for i := range agents {
 		endpoint := config.endpoints[i%len(config.endpoints)]
-		websocket := strings.HasPrefix(endpoint, "ws://") || strings.HasPrefix(endpoint, "wss://")
 		client, err := ethclient.DialContext(ctx, endpoint)
 		if err != nil {
 			return fmt.Errorf("dialing %s: %w", endpoint, err)
 		}
-		generator, err := generator.NewSelf(ctx, client,
-			big.NewInt(config.maxTipCap), big.NewInt(config.maxFeeCap), keys[i])
+		generator, err := generate.NewOpCodeSimulator(
+			ctx,
+			client,
+			big.NewInt(config.maxTipCap),
+			big.NewInt(config.maxFeeCap),
+			keys[i])
 		if err != nil {
 			return fmt.Errorf("creating generator: %w", err)
 		}
 		address := ethcrypto.PubkeyToAddress(keys[i].PublicKey)
-		issuer := issuer.New(client, websocket, tracker, address)
-		agents[i] = agent.New[*types.Transaction, common.Hash](config.txsPerAgent, generator, issuer, tracker)
+		issuer := issue.New(client, tracker, address)
+		listener := listen.New(client, tracker, config.txsPerAgent, address)
+		agents[i] = agent.New[*types.Transaction, common.Hash](config.txsPerAgent, generator, issuer, listener, tracker)
 	}
 
 	metricsErrCh, err := metricsServer.Start()
@@ -83,7 +88,7 @@ func execute(tc tests.TestContext, ctx context.Context, preFundedKeys []*secp256
 
 	orchestratorCtx, orchestratorCancel := context.WithCancel(ctx)
 	defer orchestratorCancel()
-	orchestrator := orchestrate.NewBurstOrchestrator(agents, time.Second*5)
+	orchestrator := orchestrate.NewBurstOrchestrator(agents, time.Minute*5)
 	orchestratorErrCh := make(chan error)
 	go func() {
 		orchestratorErrCh <- orchestrator.Execute(tc, orchestratorCtx)
@@ -93,6 +98,7 @@ func execute(tc tests.TestContext, ctx context.Context, preFundedKeys []*secp256
 	case err := <-orchestratorErrCh:
 		tc.Log().Info("orchestrator finished")
 		if err != nil {
+			tc.Log().Info("orchestrator error", zap.Error(err))
 			_ = metricsServer.Stop()
 			return fmt.Errorf("orchestrator error: %w", err)
 		}

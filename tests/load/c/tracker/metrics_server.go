@@ -34,7 +34,7 @@ func (*MetricsServer) String() string {
 }
 
 func (s *MetricsServer) Start() (runError <-chan error, err error) {
-	const metricsPattern = "/metrics"
+	const metricsPattern = "/ext/metrics"
 
 	mux := http.NewServeMux()
 	handlerOpts := promhttp.HandlerOpts{Registry: s.registry}

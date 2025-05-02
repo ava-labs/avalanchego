@@ -1,22 +1,26 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package generator
+package generate
 
 import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"maps"
 	"math/big"
 
-	"github.com/ava-labs/coreth/ethclient"
-	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/avalanchego/tests/load/agent"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/ethclient"
+	"github.com/ava-labs/libevm/params"
 
 	ethcrypto "github.com/ava-labs/libevm/crypto"
 )
+
+var _ agent.TxGenerator[*types.Transaction] = (*Distributor)(nil)
 
 // Distributor
 type Distributor struct {
@@ -24,7 +28,6 @@ type Distributor struct {
 	address   common.Address // corresponding to `from`
 	nonce     uint64
 	to        map[*ecdsa.PrivateKey]*big.Int
-	toIndex   int
 	signer    types.Signer
 	chainID   *big.Int
 	gasTipCap *big.Int
@@ -33,7 +36,7 @@ type Distributor struct {
 
 func NewDistributor(
 	ctx context.Context,
-	client ethclient.Client,
+	client *ethclient.Client,
 	from *ecdsa.PrivateKey,
 	to map[*ecdsa.PrivateKey]*big.Int,
 ) (*Distributor, error) {
@@ -54,16 +57,17 @@ func NewDistributor(
 		return nil, fmt.Errorf("getting suggested gas tip cap: %w", err)
 	}
 
-	gasFeeCap, err := client.EstimateBaseFee(ctx)
+	gasFeeCap, err := client.SuggestGasPrice(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("getting estimated base fee: %w", err)
+		return nil, fmt.Errorf("getting suggested gas price: %w", err)
 	}
+	gasFeeCap = gasFeeCap.Mul(gasFeeCap, big.NewInt(2)) // double the gas price to ensure the transaction is mined
 
 	return &Distributor{
 		from:      from,
 		address:   address,
 		nonce:     nonce,
-		to:        to,
+		to:        maps.Clone(to), // need to clone the map to avoid modifying the original
 		signer:    types.LatestSignerForChainID(chainID),
 		chainID:   chainID,
 		gasTipCap: gasTipCap,
@@ -72,7 +76,7 @@ func NewDistributor(
 }
 
 func (d *Distributor) GenerateTx() (*types.Transaction, error) {
-	if d.toIndex == len(d.to) {
+	if len(d.to) == 0 {
 		// The caller of this function should prevent this error from being
 		// returned by bounding the number of transactions generated.
 		return nil, errors.New("no more keys to distribute funds to")
@@ -100,6 +104,5 @@ func (d *Distributor) GenerateTx() (*types.Transaction, error) {
 		return nil, err
 	}
 	d.nonce++
-	d.toIndex++
 	return tx, nil
 }

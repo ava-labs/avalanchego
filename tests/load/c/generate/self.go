@@ -1,7 +1,7 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package generator
+package generate
 
 import (
 	"context"
@@ -9,12 +9,15 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/avalanchego/tests/load/agent"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 
 	ethcrypto "github.com/ava-labs/libevm/crypto"
 )
+
+var _ agent.TxGenerator[*types.Transaction] = (*Self)(nil)
 
 type SelfClient interface {
 	ChainID(ctx context.Context) (*big.Int, error)
@@ -32,8 +35,12 @@ type Self struct {
 	gasFeeCap *big.Int
 }
 
-func NewSelf(ctx context.Context, client SelfClient,
-	maxTipCap, maxFeeCap *big.Int, key *ecdsa.PrivateKey,
+func NewSelf(
+	ctx context.Context,
+	client SelfClient,
+	maxTipCap *big.Int,
+	maxFeeCap *big.Int,
+	key *ecdsa.PrivateKey,
 ) (*Self, error) {
 	address := ethcrypto.PubkeyToAddress(key.PublicKey)
 	blockNumber := (*big.Int)(nil)

@@ -39,16 +39,14 @@ func (o *BurstOrchestrator[T, U]) Execute(tc tests.TestContext, ctx context.Cont
 
 	// start a goroutine to confirm each issuer's transactions
 	observerGroup := errgroup.Group{}
-	for _, loader := range o.agents {
-		observerGroup.Go(func() error { return loader.Issuer.Listen(tc, observerCtx) })
+	for _, agent := range o.agents {
+		observerGroup.Go(func() error { return agent.Listener.Listen(tc, observerCtx) })
 	}
 
 	// start issuing transactions sequentially from each issuer
 	issuerGroup := errgroup.Group{}
 	for _, agent := range o.agents {
 		issuerGroup.Go(func() error {
-			defer agent.Issuer.Stop()
-
 			for range agent.TxTarget {
 				tx, err := agent.Generator.GenerateTx()
 				if err != nil {
@@ -57,6 +55,8 @@ func (o *BurstOrchestrator[T, U]) Execute(tc tests.TestContext, ctx context.Cont
 				if err := agent.Issuer.IssueTx(tc, ctx, tx); err != nil {
 					return fmt.Errorf("issuing transaction: %w", err)
 				}
+
+				agent.Listener.RegisterIssued(tx)
 			}
 			return nil
 		})
@@ -77,7 +77,7 @@ func (o *BurstOrchestrator[T, U]) Execute(tc tests.TestContext, ctx context.Cont
 		observerCancel()
 	}()
 
-	// blocks until either all of the issuers have finished or our context
+	// blocks until either all of the observers have finished or our context
 	// is cancelled signalling for early termination (with an error)
 	if err := observerGroup.Wait(); err != nil {
 		return fmt.Errorf("observers: %w", err)
