@@ -39,7 +39,7 @@ func (t *Tracker) Issue(txHash common.Hash) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	t.metrics.Issued.Inc()
+	t.metrics.issued.Inc()
 	t.txHashToLastTime[txHash] = t.timeNow()
 }
 
@@ -48,11 +48,11 @@ func (t *Tracker) ObserveConfirmed(txHash common.Hash) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	t.metrics.Confirmed.Inc()
+	t.metrics.confirmed.Inc()
 	issuedTime := t.txHashToLastTime[txHash]
 	now := t.timeNow()
 	diff := now.Sub(issuedTime)
-	t.metrics.ConfirmationTxTimes.Observe(diff.Seconds())
+	t.metrics.confirmationTxTimes.Observe(diff.Seconds())
 	delete(t.txHashToLastTime, txHash)
 	t.stats.confirmed++
 }
@@ -62,7 +62,7 @@ func (t *Tracker) ObserveFailed(txHash common.Hash) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	t.metrics.Failed.Inc()
+	t.metrics.failed.Inc()
 	delete(t.txHashToLastTime, txHash)
 	t.stats.failed++
 }

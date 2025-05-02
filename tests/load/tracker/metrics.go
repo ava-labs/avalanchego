@@ -10,15 +10,15 @@ import (
 )
 
 type metrics struct {
-	// Issued is the number of issued transactions.
-	Issued prometheus.Counter
-	// Confirmed is the number of confirmed transactions.
-	Confirmed prometheus.Counter
-	// Failed is the number of failed transactions.
-	Failed prometheus.Counter
-	// ConfirmationTxTimes is the summary of the quantiles of individual confirmation tx times.
+	// issued is the number of issued transactions.
+	issued prometheus.Counter
+	// confirmed is the number of confirmed transactions.
+	confirmed prometheus.Counter
+	// failed is the number of failed transactions.
+	failed prometheus.Counter
+	// confirmationTxTimes is the summary of the quantiles of individual confirmation tx times.
 	// Failed transactions do not show in this metric.
-	ConfirmationTxTimes prometheus.Summary
+	confirmationTxTimes prometheus.Summary
 
 	registry PrometheusRegistry
 }
@@ -52,10 +52,10 @@ func newMetrics(registry PrometheusRegistry) *metrics {
 
 	return &metrics{
 		registry:            registry,
-		Issued:              issued,
-		Confirmed:           confirmed,
-		Failed:              failed,
-		ConfirmationTxTimes: confirmationTxTimes,
+		issued:              issued,
+		confirmed:           confirmed,
+		failed:              failed,
+		confirmationTxTimes: confirmationTxTimes,
 	}
 }
 
