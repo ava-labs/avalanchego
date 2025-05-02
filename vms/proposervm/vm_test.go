@@ -2664,7 +2664,7 @@ func TestSelectChildPChainHeight(t *testing.T) {
 // This tests the case where a chain has bootstrapped to a last accepted block
 // which references a P-Chain height that is not locally accepted yet.
 func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
-	t.Skip("FIXME")
+	// t.Skip("FIXME")
 
 	require := require.New(t)
 
@@ -2731,6 +2731,7 @@ func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
 	)
 	proVM.Set(snowmantest.GenesisTimestamp)
 
+	// We mark the P-chain as having synced to height=1.
 	const currentPChainHeight = 1
 	valState := &validatorstest.State{
 		T: t,
@@ -2777,9 +2778,10 @@ func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
 
 	require.NoError(proVM.SetState(context.Background(), snow.Bootstrapping))
 
+	// During bootstrapping, the first post-fork block is verified against the
+	// P-chain height, so we provide a valid height.
 	innerBlock1 := snowmantest.BuildChild(snowmantest.Genesis)
 	innerVMBlks = append(innerVMBlks, innerBlock1)
-
 	statelessBlock1, err := statelessblock.BuildUnsigned(
 		snowmantest.GenesisID,
 		snowmantest.GenesisTimestamp,
@@ -2794,9 +2796,11 @@ func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
 	require.NoError(block1.Verify(context.Background()))
 	require.NoError(block1.Accept(context.Background()))
 
+	// During bootstrapping, the additional post-fork blocks are not verified
+	// against the local P-chain height, so even if we provide a height higher
+	// than our P-chain height, verification will succeed.
 	innerBlock2 := snowmantest.BuildChild(innerBlock1)
 	innerVMBlks = append(innerVMBlks, innerBlock2)
-
 	statelessBlock2, err := statelessblock.Build(
 		statelessBlock1.ID(),
 		statelessBlock1.Timestamp(),
@@ -2816,8 +2820,14 @@ func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
 
 	require.NoError(proVM.SetPreference(context.Background(), statelessBlock2.ID()))
 
+	// At this point, the VM has a last accepted block with a P-chain height
+	// greater than our locally accepted P-chain.
 	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
 
+	// If the inner VM requests building a block, the proposervm passes that
+	// message to the consensus engine. This is really the source of the issue,
+	// as the proposervm is not currently in a state where it can correctly
+	// build any blocks.
 	innerToEngine <- common.PendingTxs
 	require.Equal(common.PendingTxs, <-toEngine)
 
@@ -2827,6 +2837,11 @@ func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return innerBlock3, nil
 	}
+
+	// Attempting to build a block now errors with an unexpected error. This
+	// results in dropping the build block request, which breaks the invariant
+	// that BuildBlock will be called at least once after sending a PendingTxs
+	// message on the ToEngine channel.
 	_, err = proVM.BuildBlock(context.Background())
 	require.NoError(err)
 }
