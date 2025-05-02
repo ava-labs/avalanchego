@@ -32,7 +32,6 @@ import (
 type config struct {
 	endpoints   []string
 	maxFeeCap   int64
-	maxTipCap   int64
 	agents      uint
 	txsPerAgent uint64
 }
@@ -65,7 +64,7 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 			return fmt.Errorf("dialing %s: %w", endpoint, err)
 		}
 		generator, err := generate.NewSelf(ctx, client,
-			big.NewInt(config.maxTipCap), big.NewInt(config.maxFeeCap), keys[i])
+			big.NewInt(config.maxFeeCap), keys[i])
 		if err != nil {
 			return fmt.Errorf("creating generator: %w", err)
 		}

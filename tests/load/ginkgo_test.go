@@ -73,7 +73,6 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 		config := config{
 			endpoints:   endpoints,
 			maxFeeCap:   5000,
-			maxTipCap:   1,
 			agents:      60,
 			txsPerAgent: 100000,
 		}

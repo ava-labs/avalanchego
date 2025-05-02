@@ -33,7 +33,7 @@ type Self struct {
 }
 
 func NewSelf(ctx context.Context, client SelfClient,
-	maxTipCap, maxFeeCap *big.Int, key *ecdsa.PrivateKey,
+	maxFeeCap *big.Int, key *ecdsa.PrivateKey,
 ) (*Self, error) {
 	address := ethcrypto.PubkeyToAddress(key.PublicKey)
 	blockNumber := (*big.Int)(nil)
@@ -43,7 +43,7 @@ func NewSelf(ctx context.Context, client SelfClient,
 	}
 
 	bigGwei := big.NewInt(params.GWei)
-	gasTipCap := new(big.Int).Mul(bigGwei, maxTipCap)
+	gasTipCap := new(big.Int).Mul(bigGwei, big.NewInt(1))
 	gasFeeCap := new(big.Int).Mul(bigGwei, maxFeeCap)
 	chainID, err := client.ChainID(ctx)
 	if err != nil {
