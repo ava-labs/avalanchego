@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
+
 	txmempool "github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
