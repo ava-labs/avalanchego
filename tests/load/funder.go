@@ -57,6 +57,7 @@ func ensureMinimumFunds(ctx context.Context, endpoint string, keys []*ecdsa.Priv
 		totalFundsRequired.Add(totalFundsRequired, diff)
 		needFundsKeys[key] = diff
 	}
+	totalFundsRequired.Add(totalFundsRequired, minFundsPerAddr) // for largest balance key
 
 	if len(needFundsKeys) == 0 {
 		return nil
