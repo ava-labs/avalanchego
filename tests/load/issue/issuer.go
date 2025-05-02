@@ -16,8 +16,7 @@ type EthClient interface {
 }
 
 type Tracker interface {
-	IssueStart(txHash common.Hash)
-	IssueEnd(txHash common.Hash)
+	Issue(txHash common.Hash)
 }
 
 // Issuer issues transactions to a node.
@@ -45,11 +44,10 @@ func (i *Issuer) IssueTx(ctx context.Context, tx *types.Transaction) error {
 		// the listener relies on this being true
 		return fmt.Errorf("transaction nonce %d is not equal to the last issued nonce %d plus one", txNonce, i.lastIssuedNonce)
 	}
-	i.tracker.IssueStart(txHash)
 	if err := i.client.SendTransaction(ctx, tx); err != nil {
 		return err
 	}
-	i.tracker.IssueEnd(txHash)
+	i.tracker.Issue(txHash)
 	i.lastIssuedNonce = txNonce
 	return nil
 }

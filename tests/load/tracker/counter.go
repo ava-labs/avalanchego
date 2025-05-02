@@ -18,8 +18,7 @@ func NewCounter() *Counter {
 	return &Counter{}
 }
 
-func (*Counter) IssueStart(_ common.Hash)         {}
-func (*Counter) IssueEnd(_ common.Hash)           {}
+func (*Counter) Issue(_ common.Hash)              {}
 func (c *Counter) ObserveConfirmed(_ common.Hash) { c.confirmed++ }
 func (c *Counter) ObserveFailed(_ common.Hash)    { c.failed++ }
 func (*Counter) ObserveBlock(_ uint64)            {}

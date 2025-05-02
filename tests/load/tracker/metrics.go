@@ -16,11 +16,6 @@ type metrics struct {
 	Confirmed prometheus.Counter
 	// Failed is the number of failed transactions.
 	Failed prometheus.Counter
-	// InFlightIssuances is the number of transactions that are being issued, from issuance start
-	// to issuance end.
-	InFlightIssuances prometheus.Gauge
-	// IssuanceTxTimes is the summary of the quantiles of individual issuance tx times.
-	IssuanceTxTimes prometheus.Summary
 	// ConfirmationTxTimes is the summary of the quantiles of individual confirmation tx times.
 	// Failed transactions do not show in this metric.
 	ConfirmationTxTimes prometheus.Summary
@@ -46,31 +41,20 @@ func newMetrics(registry PrometheusRegistry) *metrics {
 		Name: "tx_failed",
 		Help: "Number of failed transactions",
 	})
-	inFlightIssuances := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "tx_in_flight_issuances",
-		Help: "Number of transactions in flight issuances",
-	})
-	issuanceTxTimes := prometheus.NewSummary(prometheus.SummaryOpts{
-		Name:       "tx_issuance_time",
-		Help:       "Individual Tx Issuance Times for a Load Test",
-		Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
-	})
 	confirmationTxTimes := prometheus.NewSummary(prometheus.SummaryOpts{
 		Name:       "tx_confirmation_time",
 		Help:       "Individual Tx Confirmation Times for a Load Test",
 		Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
 	})
 
-	registry.MustRegister(issued, confirmed, failed, inFlightIssuances,
-		issuanceTxTimes, confirmationTxTimes)
+	registry.MustRegister(issued, confirmed, failed,
+		confirmationTxTimes)
 
 	return &metrics{
 		registry:            registry,
 		Issued:              issued,
 		Confirmed:           confirmed,
 		Failed:              failed,
-		InFlightIssuances:   inFlightIssuances,
-		IssuanceTxTimes:     issuanceTxTimes,
 		ConfirmationTxTimes: confirmationTxTimes,
 	}
 }

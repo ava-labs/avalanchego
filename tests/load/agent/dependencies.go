@@ -28,11 +28,9 @@ type Listener[T comparable] interface {
 // Tracker keeps track of the status of transactions.
 // This must be thread-safe, so it can be called in parallel by the issuer(s) or orchestrator.
 type Tracker[T comparable] interface {
-	// IssueStart records a transaction that is being issued.
-	IssueStart(T)
-	// IssueEnd records a transaction that was issued, but whose final status is
+	// Issue records a transaction that was issued, but whose final status is
 	// not yet known.
-	IssueEnd(T)
+	Issue(T)
 	// ObserveConfirmed records a transaction that was confirmed.
 	ObserveConfirmed(T)
 	// ObserveFailed records a transaction that failed (e.g. expired)

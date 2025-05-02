@@ -33,27 +33,13 @@ func New(registry PrometheusRegistry) *Tracker {
 	}
 }
 
-// IssueStart records a transaction that is being issued.
-func (t *Tracker) IssueStart(txHash common.Hash) {
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
-
-	t.metrics.InFlightIssuances.Inc()
-	t.txHashToLastTime[txHash] = t.timeNow()
-}
-
-// IssueEnd records a transaction that was issued, but whose final status is
+// Issue records a transaction that was issued, but whose final status is
 // not yet known.
-func (t *Tracker) IssueEnd(txHash common.Hash) {
+func (t *Tracker) Issue(txHash common.Hash) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
 	t.metrics.Issued.Inc()
-	t.metrics.InFlightIssuances.Dec()
-	start := t.txHashToLastTime[txHash]
-	now := t.timeNow()
-	diff := now.Sub(start)
-	t.metrics.IssuanceTxTimes.Observe(diff.Seconds())
 	t.txHashToLastTime[txHash] = t.timeNow()
 }
 
