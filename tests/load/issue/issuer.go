@@ -24,17 +24,15 @@ type Issuer struct {
 	// Injected parameters
 	client  EthClient
 	tracker Tracker
-	address common.Address
 
 	// State
 	lastIssuedNonce uint64 // for programming assumptions checks only
 }
 
-func New(client EthClient, tracker Tracker, address common.Address) *Issuer {
+func New(client EthClient, tracker Tracker) *Issuer {
 	return &Issuer{
 		client:  client,
 		tracker: tracker,
-		address: address,
 	}
 }
 

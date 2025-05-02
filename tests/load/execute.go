@@ -69,8 +69,8 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 		if err != nil {
 			return fmt.Errorf("creating generator: %w", err)
 		}
+		issuer := issue.New(client, tracker)
 		address := ethcrypto.PubkeyToAddress(keys[i].PublicKey)
-		issuer := issue.New(client, tracker, address)
 		listener := listen.New(client, tracker, config.txsPerAgent, address)
 		agents[i] = agent.New[*types.Transaction, common.Hash](config.txsPerAgent, generator, issuer, listener, tracker)
 	}

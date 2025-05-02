@@ -72,10 +72,10 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 		require.NoError(ginkgo.GinkgoT(), err, "getting node websocket URIs")
 		config := config{
 			endpoints:   endpoints,
-			maxFeeCap:   50,
+			maxFeeCap:   5000,
 			maxTipCap:   1,
-			agents:      10,
-			txsPerAgent: 1000,
+			agents:      60,
+			txsPerAgent: 100000,
 		}
 		err = execute(ctx, network.PreFundedKeys, config)
 		if err != nil {

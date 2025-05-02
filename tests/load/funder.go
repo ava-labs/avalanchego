@@ -76,7 +76,7 @@ func ensureMinimumFunds(ctx context.Context, endpoint string, keys []*ecdsa.Priv
 		return fmt.Errorf("creating distribution generator: %w", err)
 	}
 	tracker := tracker.NewCounter()
-	issuer := issue.New(client, tracker, maxFundsAddress)
+	issuer := issue.New(client, tracker)
 	listener := listen.New(client, tracker, txTarget, maxFundsAddress)
 	agents := []*agent.Agent[*types.Transaction, common.Hash]{
 		agent.New(txTarget, generator, issuer, listener, tracker),
