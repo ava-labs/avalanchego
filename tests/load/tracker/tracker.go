@@ -50,9 +50,8 @@ func (t *Tracker) ObserveConfirmed(txHash common.Hash) {
 
 	t.metrics.confirmed.Inc()
 	issuedTime := t.txHashToLastTime[txHash]
-	now := t.timeNow()
-	diff := now.Sub(issuedTime)
-	t.metrics.confirmationTxTimes.Observe(diff.Seconds())
+	diff := t.timeNow().Sub(issuedTime)
+	t.metrics.txLatency.Observe(float64(diff.Milliseconds()))
 	delete(t.txHashToLastTime, txHash)
 	t.stats.confirmed++
 }

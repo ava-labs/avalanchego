@@ -16,9 +16,9 @@ type metrics struct {
 	confirmed prometheus.Counter
 	// failed is the number of failed transactions.
 	failed prometheus.Counter
-	// confirmationTxTimes is the summary of the quantiles of individual confirmation tx times.
+	// txLatency is a histogram of individual tx times.
 	// Failed transactions do not show in this metric.
-	confirmationTxTimes prometheus.Summary
+	txLatency prometheus.Histogram
 
 	registry PrometheusRegistry
 }
@@ -30,32 +30,31 @@ type PrometheusRegistry interface {
 
 func newMetrics(registry PrometheusRegistry) *metrics {
 	issued := prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "tx_issued",
+		Name: "txs_issued",
 		Help: "Number of issued transactions",
 	})
 	confirmed := prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "tx_confirmed",
+		Name: "txs_confirmed",
 		Help: "Number of confirmed transactions",
 	})
 	failed := prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "tx_failed",
+		Name: "txs_failed",
 		Help: "Number of failed transactions",
 	})
-	confirmationTxTimes := prometheus.NewSummary(prometheus.SummaryOpts{
-		Name:       "tx_confirmation_time",
-		Help:       "Individual Tx Confirmation Times for a Load Test",
-		Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
+	txLatency := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name: "tx_latency",
+		Help: "Latency of transactions",
 	})
 
 	registry.MustRegister(issued, confirmed, failed,
-		confirmationTxTimes)
+		txLatency)
 
 	return &metrics{
-		registry:            registry,
-		issued:              issued,
-		confirmed:           confirmed,
-		failed:              failed,
-		confirmationTxTimes: confirmationTxTimes,
+		registry:  registry,
+		issued:    issued,
+		confirmed: confirmed,
+		failed:    failed,
+		txLatency: txLatency,
 	}
 }
 
