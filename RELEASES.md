@@ -33,7 +33,7 @@ The plugin version is unchanged at `39` and is compatible with version `v1.12.2`
 ### Configs
 
 - Added:
-  - `--proposervm-min-block-duration`
+  - `--proposervm-min-block-delay`
   - `--network-no-ingress-connections-grace-period` to configure how long after startup it is expected for a Mainnet validator to have received an ingress connection.
 
 ### What's Changed
