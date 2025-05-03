@@ -4,17 +4,12 @@
 package tx
 
 import (
-	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-var secpCache = secp256k1.RecoverCache{
-	LRU: cache.LRU[ids.ID, *secp256k1.PublicKey]{
-		Size: 2048,
-	},
-}
+var secpCache = secp256k1.NewRecoverCache(2048)
 
 type Tx struct {
 	Unsigned  `serialize:"true" json:"unsigned"`

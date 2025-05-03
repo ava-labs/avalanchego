@@ -14,7 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
-	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
@@ -167,13 +167,14 @@ func (vm *VM) Initialize(
 		Bootstrapped: &vm.bootstrapped,
 	}
 
-	mempool, err := pmempool.New("mempool", registerer, toEngine)
+	mempool, err := pmempool.New("mempool", registerer)
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}
 
 	vm.manager = blockexecutor.NewManager(
 		mempool,
+		toEngine,
 		vm.metrics,
 		vm.state,
 		txExecutorBackend,
@@ -191,6 +192,7 @@ func (vm *VM) Initialize(
 		),
 		txVerifier,
 		mempool,
+		toEngine,
 		txExecutorBackend.Config.PartialSyncPrimaryNetwork,
 		appSender,
 		chainCtx.Lock.RLocker(),
@@ -211,6 +213,7 @@ func (vm *VM) Initialize(
 
 	vm.Builder = blockbuilder.New(
 		mempool,
+		toEngine,
 		txExecutorBackend,
 		vm.manager,
 	)
@@ -234,6 +237,16 @@ func (vm *VM) Initialize(
 	// Incrementing [awaitShutdown] would cause a deadlock since
 	// [periodicallyPruneMempool] grabs the context lock.
 	go vm.periodicallyPruneMempool(execConfig.MempoolPruneFrequency)
+
+	go func() {
+		err := vm.state.ReindexBlocks(&vm.ctx.Lock, vm.ctx.Log)
+		if err != nil {
+			vm.ctx.Log.Warn("reindexing blocks failed",
+				zap.Error(err),
+			)
+		}
+	}()
+
 	return nil
 }
 
@@ -443,11 +456,9 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	server.RegisterInterceptFunc(vm.metrics.InterceptRequest)
 	server.RegisterAfterFunc(vm.metrics.AfterRequest)
 	service := &Service{
-		vm:          vm,
-		addrManager: avax.NewAddressManager(vm.ctx),
-		stakerAttributesCache: &cache.LRU[ids.ID, *stakerAttributes]{
-			Size: stakerAttributesCacheSize,
-		},
+		vm:                    vm,
+		addrManager:           avax.NewAddressManager(vm.ctx),
+		stakerAttributesCache: lru.NewCache[ids.ID, *stakerAttributes](stakerAttributesCacheSize),
 	}
 	err := server.RegisterService(service, "platform")
 	return map[string]http.Handler{

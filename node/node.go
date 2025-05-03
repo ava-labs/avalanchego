@@ -546,7 +546,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 
 	// Create chain router
 	n.chainRouter = &router.ChainRouter{}
-	if n.Config.TraceConfig.Enabled {
+	if n.Config.TraceConfig.ExporterConfig.Type != trace.Disabled {
 		n.chainRouter = router.Trace(n.chainRouter, n.tracer)
 	}
 
@@ -1009,7 +1009,7 @@ func (n *Node) initAPIServer() error {
 		n.Config.HTTPAllowedOrigins,
 		n.Config.ShutdownTimeout,
 		n.ID,
-		n.Config.TraceConfig.Enabled,
+		n.Config.TraceConfig.ExporterConfig.Type != trace.Disabled,
 		n.tracer,
 		apiRegisterer,
 		n.Config.HTTPConfig.HTTPConfig,
@@ -1146,7 +1146,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			Upgrades:                                n.Config.UpgradeConfig,
 			ResourceTracker:                         n.resourceTracker,
 			StateSyncBeacons:                        n.Config.StateSyncIDs,
-			TracingEnabled:                          n.Config.TraceConfig.Enabled,
+			TracingEnabled:                          n.Config.TraceConfig.ExporterConfig.Type != trace.Disabled,
 			Tracer:                                  n.tracer,
 			ChainDataDir:                            n.Config.ChainDataDir,
 			Subnets:                                 subnets,
@@ -1704,7 +1704,7 @@ func (n *Node) shutdown() {
 		}
 	}
 
-	if n.Config.TraceConfig.Enabled {
+	if n.Config.TraceConfig.ExporterConfig.Type != trace.Disabled {
 		n.Log.Info("shutting down tracing")
 	}
 

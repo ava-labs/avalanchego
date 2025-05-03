@@ -19,7 +19,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/config"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -60,7 +59,8 @@ func NewPrivateKey(tc tests.TestContext) *secp256k1.PrivateKey {
 
 // Create a new wallet for the provided keychain against the specified node URI.
 func NewWallet(tc tests.TestContext, keychain *secp256k1fx.Keychain, nodeURI tmpnet.NodeURI) *primary.Wallet {
-	tc.Log().Info("initializing a new wallet",
+	log := tc.Log()
+	log.Info("initializing a new wallet",
 		zap.Stringer("nodeID", nodeURI.NodeID),
 		zap.String("URI", nodeURI.URI),
 	)
@@ -74,13 +74,21 @@ func NewWallet(tc tests.TestContext, keychain *secp256k1fx.Keychain, nodeURI tmp
 	require.NoError(tc, err)
 	wallet := primary.NewWalletWithOptions(
 		baseWallet,
-		common.WithPostIssuanceFunc(
-			func(id ids.ID) {
-				tc.Log().Info("issued transaction",
-					zap.Stringer("txID", id),
-				)
-			},
-		),
+		common.WithIssuanceHandler(func(r common.IssuanceReceipt) {
+			log.Info("issued transaction",
+				zap.String("chainAlias", r.ChainAlias),
+				zap.Stringer("txID", r.TxID),
+				zap.Duration("duration", r.Duration),
+			)
+		}),
+		common.WithConfirmationHandler(func(r common.ConfirmationReceipt) {
+			log.Info("confirmed transaction",
+				zap.String("chainAlias", r.ChainAlias),
+				zap.Stringer("txID", r.TxID),
+				zap.Duration("totalDuration", r.TotalDuration),
+				zap.Duration("confirmationDuration", r.ConfirmationDuration),
+			)
+		}),
 		// Reducing the default from 100ms speeds up detection of tx acceptance
 		common.WithPollFrequency(10*time.Millisecond),
 	)
