@@ -61,7 +61,7 @@ func TestMustNotImport(t *testing.T) {
 		// Importing these packages configures libevm globally and it is not
 		// possible to do so for both coreth and subnet-evm, where the client may
 		// wish to connect to multiple chains.
-		"tests/fixture/...": {"core", "core/vm", "params"},
+		"tests/fixture/...": {"plugin/evm/customtypes", "params"},
 	}
 
 	for packageName, forbiddenImports := range mustNotImport {
