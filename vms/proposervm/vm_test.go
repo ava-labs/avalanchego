@@ -2660,3 +2660,188 @@ func TestSelectChildPChainHeight(t *testing.T) {
 		})
 	}
 }
+
+// This tests the case where a chain has bootstrapped to a last accepted block
+// which references a P-Chain height that is not locally accepted yet.
+func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
+	t.Skip("FIXME")
+
+	require := require.New(t)
+
+	// innerVMBlks is appended to throughout the test, which modifies the
+	// behavior of coreVM.
+	innerVMBlks := []*snowmantest.Block{
+		snowmantest.Genesis,
+	}
+
+	var innerToEngine chan<- common.Message
+	coreVM := &blocktest.VM{
+		VM: enginetest.VM{
+			T: t,
+			InitializeF: func(_ context.Context, _ *snow.Context, _ database.Database, _ []byte, _ []byte, _ []byte, toEngine chan<- common.Message, _ []*common.Fx, _ common.AppSender) error {
+				innerToEngine = toEngine
+				return nil
+			},
+		},
+		ParseBlockF: func(_ context.Context, blkBytes []byte) (snowman.Block, error) {
+			for _, blk := range innerVMBlks {
+				if bytes.Equal(blk.Bytes(), blkBytes) {
+					return blk, nil
+				}
+			}
+			return nil, errUnknownBlock
+		},
+		GetBlockF: func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+			for _, blk := range innerVMBlks {
+				if blk.Status == snowtest.Accepted && blk.ID() == blkID {
+					return blk, nil
+				}
+			}
+			return nil, database.ErrNotFound
+		},
+		LastAcceptedF: func(context.Context) (ids.ID, error) {
+			var (
+				lastAcceptedID     ids.ID
+				lastAcceptedHeight uint64
+			)
+			for _, blk := range innerVMBlks {
+				if blk.Status == snowtest.Accepted && blk.Height() >= lastAcceptedHeight {
+					lastAcceptedID = blk.ID()
+					lastAcceptedHeight = blk.Height()
+				}
+			}
+			return lastAcceptedID, nil
+		},
+	}
+
+	proVM := New(
+		coreVM,
+		Config{
+			Upgrades: upgrade.Config{
+				ApricotPhase4Time:            snowmantest.GenesisTimestamp,
+				ApricotPhase4MinPChainHeight: 0,
+				DurangoTime:                  snowmantest.GenesisTimestamp,
+			},
+			MinBlkDelay:         DefaultMinBlockDelay,
+			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
+			StakingLeafSigner:   pTestSigner,
+			StakingCertLeaf:     pTestCert,
+			Registerer:          prometheus.NewRegistry(),
+		},
+	)
+	proVM.Set(snowmantest.GenesisTimestamp)
+
+	// We mark the P-chain as having synced to height=1.
+	const currentPChainHeight = 1
+	valState := &validatorstest.State{
+		T: t,
+		GetMinimumHeightF: func(context.Context) (uint64, error) {
+			return currentPChainHeight, nil
+		},
+		GetCurrentHeightF: func(context.Context) (uint64, error) {
+			return currentPChainHeight, nil
+		},
+		GetValidatorSetF: func(_ context.Context, height uint64, _ ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+			if height > currentPChainHeight {
+				return nil, fmt.Errorf("requested height (%d) > current P-chain height (%d)", height, currentPChainHeight)
+			}
+			return map[ids.NodeID]*validators.GetValidatorOutput{
+				proVM.ctx.NodeID: {
+					NodeID: proVM.ctx.NodeID,
+					Weight: 10,
+				},
+			}, nil
+		},
+	}
+
+	ctx := snowtest.Context(t, ids.ID{1})
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
+	ctx.ValidatorState = valState
+
+	db := prefixdb.New([]byte{0}, memdb.New())
+
+	toEngine := make(chan common.Message, 1)
+	require.NoError(proVM.Initialize(
+		context.Background(),
+		ctx,
+		db,
+		nil,
+		nil,
+		nil,
+		toEngine,
+		nil,
+		nil,
+	))
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
+
+	require.NoError(proVM.SetState(context.Background(), snow.Bootstrapping))
+
+	// During bootstrapping, the first post-fork block is verified against the
+	// P-chain height, so we provide a valid height.
+	innerBlock1 := snowmantest.BuildChild(snowmantest.Genesis)
+	innerVMBlks = append(innerVMBlks, innerBlock1)
+	statelessBlock1, err := statelessblock.BuildUnsigned(
+		snowmantest.GenesisID,
+		snowmantest.GenesisTimestamp,
+		currentPChainHeight,
+		innerBlock1.Bytes(),
+	)
+	require.NoError(err)
+
+	block1, err := proVM.ParseBlock(context.Background(), statelessBlock1.Bytes())
+	require.NoError(err)
+
+	require.NoError(block1.Verify(context.Background()))
+	require.NoError(block1.Accept(context.Background()))
+
+	// During bootstrapping, the additional post-fork blocks are not verified
+	// against the local P-chain height, so even if we provide a height higher
+	// than our P-chain height, verification will succeed.
+	innerBlock2 := snowmantest.BuildChild(innerBlock1)
+	innerVMBlks = append(innerVMBlks, innerBlock2)
+	statelessBlock2, err := statelessblock.Build(
+		statelessBlock1.ID(),
+		statelessBlock1.Timestamp(),
+		currentPChainHeight+1,
+		pTestCert,
+		innerBlock2.Bytes(),
+		ctx.ChainID,
+		pTestSigner,
+	)
+	require.NoError(err)
+
+	block2, err := proVM.ParseBlock(context.Background(), statelessBlock2.Bytes())
+	require.NoError(err)
+
+	require.NoError(block2.Verify(context.Background()))
+	require.NoError(block2.Accept(context.Background()))
+
+	require.NoError(proVM.SetPreference(context.Background(), statelessBlock2.ID()))
+
+	// At this point, the VM has a last accepted block with a P-chain height
+	// greater than our locally accepted P-chain.
+	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
+
+	// If the inner VM requests building a block, the proposervm passes that
+	// message to the consensus engine. This is really the source of the issue,
+	// as the proposervm is not currently in a state where it can correctly
+	// build any blocks.
+	innerToEngine <- common.PendingTxs
+	require.Equal(common.PendingTxs, <-toEngine)
+
+	innerBlock3 := snowmantest.BuildChild(innerBlock2)
+	innerVMBlks = append(innerVMBlks, innerBlock3)
+
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return innerBlock3, nil
+	}
+
+	// Attempting to build a block now errors with an unexpected error. This
+	// results in dropping the build block request, which breaks the invariant
+	// that BuildBlock will be called at least once after sending a PendingTxs
+	// message on the ToEngine channel.
+	_, err = proVM.BuildBlock(context.Background())
+	require.NoError(err)
+}

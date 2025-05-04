@@ -14,6 +14,10 @@ This version is backwards compatible to [v1.13.0](https://github.com/ava-labs/av
 
 - Removed `avm.getAddressTxs` api
 
+### Configs
+
+- Removed `--tracing-enabled` and added `disabled` as an option to `--tracing-exporter-type`
+
 ## [v1.13.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.0)
 
 This upgrade consists of the following Avalanche Community Proposal (ACP):

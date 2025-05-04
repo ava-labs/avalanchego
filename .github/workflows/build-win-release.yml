@@ -60,7 +60,12 @@ jobs:
 
       # Runs a single command using the runners shell
       - name: Build the avalanchego binary
-        run: ./scripts/run_task.sh build
+        # This is the only permitted instance of using a script other
+        # than run_task.sh in a github workflow. The build script is
+        # known to work on windows but invoking `task build` fails and
+        # without a windows host to test on it's not worth
+        # troubleshooting.
+        run: ./scripts/build.sh
         shell: bash
 
       - name: Create zip
