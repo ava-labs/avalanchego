@@ -4,13 +4,20 @@
 package ghttp
 
 import (
+	"io"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/test/bufconn"
 
 	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
 )
+
+var _ io.Reader = (*infiniteStream)(nil)
 
 func TestConvertWriteResponse(t *testing.T) {
 	scenerios := map[string]struct {
@@ -48,4 +55,37 @@ func TestConvertWriteResponse(t *testing.T) {
 			require.NoError(t, convertWriteResponse(w, scenerio.resp))
 		})
 	}
+}
+
+func TestRequestClientArbitrarilyLongBody(t *testing.T) {
+	require := require.New(t)
+
+	listener := bufconn.Listen(0)
+	server := grpc.NewServer()
+	httppb.RegisterHTTPServer(server, &httppb.UnimplementedHTTPServer{})
+
+	go func() {
+		require.NoError(server.Serve(listener))
+	}()
+
+	conn, err := grpc.NewClient(listener.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	require.NoError(err)
+
+	client := NewClient(httppb.NewHTTPClient(conn))
+
+	w := &httptest.ResponseRecorder{}
+	r := &http.Request{
+		Header: map[string][]string{
+			"Upgrade": {"foo"}, // Make this look like a streaming request
+		},
+		Body: io.NopCloser(infiniteStream{}),
+	}
+
+	client.ServeHTTP(w, r) // Shouldn't block forever reading the body
+}
+
+type infiniteStream struct{}
+
+func (infiniteStream) Read(p []byte) (n int, err error) {
+	return len(p), nil
 }

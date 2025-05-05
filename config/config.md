@@ -1,11 +1,3 @@
----
-tags: [Nodes]
-description: This document lists all available configuration and flags for AvalancheGo.
-sidebar_label: AvalancheGo Configs + Flags
-pagination_label: AvalancheGo Configs and Flags
-sidebar_position: 0
----
-
 # AvalancheGo Configs and Flags
 
 <!-- markdownlint-disable MD001 -->
@@ -17,28 +9,28 @@ You can specify the configuration of a node with the arguments below.
 #### `--api-admin-enabled` (boolean)
 
 If set to `true`, this node will expose the Admin API. Defaults to `false`.
-See [here](docs.avax.network/reference/avalanchego/admin-api) for more information.
+See [here](https://build.avax.network/docs/api-reference/admin-api) for more information.
 
 #### `--api-health-enabled` (boolean)
 
 If set to `false`, this node will not expose the Health API. Defaults to `true`. See
-[here](docs.avax.network/reference/avalanchego/health-api) for more information.
+[here](https://build.avax.network/docs/api-reference/health-api) for more information.
 
 #### `--index-enabled` (boolean)
 
 If set to `true`, this node will enable the indexer and the Index API will be
 available. Defaults to `false`. See
-[here](docs.avax.network/reference/avalanchego/index-api) for more information.
+[here](https://build.avax.network/docs/api-reference/index-api) for more information.
 
 #### `--api-info-enabled` (boolean)
 
 If set to `false`, this node will not expose the Info API. Defaults to `true`. See
-[here](docs.avax.network/reference/avalanchego/info-api) for more information.
+[here](https://build.avax.network/docs/api-reference/info-api) for more information.
 
 #### `--api-metrics-enabled` (boolean)
 
 If set to `false`, this node will not expose the Metrics API. Defaults to
-`true`. See [here](docs.avax.network/reference/avalanchego/metrics-api) for more information.
+`true`. See [here](https://build.avax.network/docs/api-reference/metrics-api) for more information.
 
 ## Avalanche Community Proposals
 
@@ -106,7 +98,7 @@ them into the VM on initialization.
 #### `--chain-config-dir` (string)
 
 Specifies the directory that contains chain configs, as described
-[here](docs.avax.network/nodes/configure/chain-configs/chain-config-flags). Defaults to `$HOME/.avalanchego/configs/chains`.
+[here](https://build.avax.network/docs/nodes/chain-configs). Defaults to `$HOME/.avalanchego/configs/chains`.
 If this flag is not provided and the default directory does not exist,
 AvalancheGo will not exit since custom configs are optional. However, if the
 flag is set, the specified folder must exist, or AvalancheGo will exit with an
@@ -134,10 +126,10 @@ The chain configuration is intended to provide optional configuration parameters
 and the VM will use default values if nothing is passed in.
 
 Full reference for all configuration options for some standard chains can be
-found in a separate [chain config flags](docs.avax.network/nodes/configure/chain-configs/chain-config-flags) document.
+found in a separate [chain config flags](https://build.avax.network/docs/nodes/chain-configs) document.
 
 Full reference for `subnet-evm` upgrade configuration can be found in a separate
-[Customize a Subnet](docs.avax.network/build/subnet/upgrade/customize-a-subnet) document.
+[Customize a Subnet](https://build.avax.network/docs/avalanche-l1s/upgrade/customize-avalanche-l1) document.
 
 #### `--chain-config-content` (string)
 
@@ -198,9 +190,9 @@ Example JSON config file:
 ```
 
 :::tip
-[Install Script](https://docs.avax.network/tooling/avalanche-go-installer) creates the
+[Install Script](https://build.avax.network/docs/tooling/avalanche-go-installer) creates the
 node config file at `~/.avalanchego/configs/node.json`. No default file is
-created if [AvalancheGo is built from source](https://docs.avax.network/nodes/run-a-node/manually), you
+created if [AvalancheGo is built from source](https://build.avax.network/docs/nodes/run-a-node/from-source), you
 would need to create it manually if needed.
 :::
 
@@ -717,7 +709,7 @@ configs for Subnets specified in
 `--track-subnets` parameter.
 
 Full reference for all configuration options for a Subnet can be found in a
-separate [Subnet Configs](https://docs.avax.network/nodes/configure/avalanche-l1-configs) document.
+separate [Subnet Configs](https://build.avax.network/docs/nodes/configure/avalanche-l1-configs) document.
 
 #### `--subnet-config-dir` (`string`)
 
@@ -953,7 +945,7 @@ The value must be greater than `0`. Defaults to `2m`.
 
 Have the ProposerVM always report the last accepted P-chain block height. Defaults to `false`.
 
-### `--proposervm-min-block-duration` (duration)
+### `--proposervm-min-block-delay` (duration)
 
 The minimum delay to enforce when building a snowman++ block for the primary network
 chains and the default minimum delay for subnets. Defaults to `1s`. A non-default
@@ -1315,7 +1307,7 @@ GiB).
 
 #### `--plugin-dir` (string)
 
-Sets the directory for [VM plugins](https://docs.avax.network/virtual-machines). The default value is `$HOME/.avalanchego/plugins`.
+Sets the directory for [VM plugins](https://build.avax.network/docs/virtual-machines). The default value is `$HOME/.avalanchego/plugins`.
 
 ### Virtual Machine (VM) Configs
 
@@ -1360,3 +1352,4 @@ Node reports unhealthy if the router drops more than this portion of messages. D
 
 Node reports unhealthy if there are more than this many outstanding consensus requests
 (Get, PullQuery, etc.) over all chains. Defaults to `1024`.
+

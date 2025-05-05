@@ -35,11 +35,8 @@ import (
 	"github.com/ava-labs/avalanchego/config/node"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
-	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/database/meterdb"
 	"github.com/ava-labs/avalanchego/database/pebbledb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/indexer"
@@ -80,6 +77,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
+	databasefactory "github.com/ava-labs/avalanchego/database/factory"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
 	coreth "github.com/ava-labs/coreth/plugin/evm"
@@ -756,57 +754,33 @@ func (n *Node) Dispatch() error {
  */
 
 func (n *Node) initDatabase() error {
-	dbRegisterer, err := metrics.MakeAndRegister(
-		n.MetricsGatherer,
-		dbNamespace,
-	)
-	if err != nil {
-		return err
-	}
-
-	// start the db
+	var dbFolderName string
 	switch n.Config.DatabaseConfig.Name {
 	case leveldb.Name:
 		// Prior to v1.10.15, the only on-disk database was leveldb, and its
 		// files went to [dbPath]/[networkID]/v1.4.5.
-		dbPath := filepath.Join(n.Config.DatabaseConfig.Path, version.CurrentDatabase.String())
-		n.DB, err = leveldb.New(dbPath, n.Config.DatabaseConfig.Config, n.Log, dbRegisterer)
-		if err != nil {
-			return fmt.Errorf("couldn't create %s at %s: %w", leveldb.Name, dbPath, err)
-		}
-	case memdb.Name:
-		n.DB = memdb.New()
+		dbFolderName = version.CurrentDatabase.String()
 	case pebbledb.Name:
-		dbPath := filepath.Join(n.Config.DatabaseConfig.Path, "pebble")
-		n.DB, err = pebbledb.New(dbPath, n.Config.DatabaseConfig.Config, n.Log, dbRegisterer)
-		if err != nil {
-			return fmt.Errorf("couldn't create %s at %s: %w", pebbledb.Name, dbPath, err)
-		}
+		dbFolderName = "pebble"
 	default:
-		return fmt.Errorf(
-			"db-type was %q but should have been one of {%s, %s, %s}",
-			n.Config.DatabaseConfig.Name,
-			leveldb.Name,
-			memdb.Name,
-			pebbledb.Name,
-		)
+		dbFolderName = "db"
 	}
+	// dbFolderName is appended to the database path given in the config
+	dbFullPath := filepath.Join(n.Config.DatabaseConfig.Path, dbFolderName)
 
-	if n.Config.ReadOnly && n.Config.DatabaseConfig.Name != memdb.Name {
-		n.DB = versiondb.New(n.DB)
-	}
-
-	meterDBReg, err := metrics.MakeAndRegister(
-		n.MeterDBMetricsGatherer,
+	var err error
+	n.DB, err = databasefactory.New(
+		n.Config.DatabaseConfig.Name,
+		dbFullPath,
+		n.Config.DatabaseConfig.ReadOnly,
+		n.Config.DatabaseConfig.Config,
+		n.MetricsGatherer,
+		n.Log,
+		dbNamespace,
 		"all",
 	)
 	if err != nil {
-		return err
-	}
-
-	n.DB, err = meterdb.New(meterDBReg, n.DB)
-	if err != nil {
-		return err
+		return fmt.Errorf("couldn't create database: %w", err)
 	}
 
 	rawExpectedGenesisHash := hashing.ComputeHash256(n.Config.GenesisBytes)

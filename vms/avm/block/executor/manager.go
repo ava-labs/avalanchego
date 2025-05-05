@@ -54,7 +54,7 @@ func NewManager(
 	state state.State,
 	backend *executor.Backend,
 	clk *mockable.Clock,
-	onAccept func(*txs.Tx) error,
+	onAccept func(*txs.Tx),
 ) Manager {
 	lastAccepted := state.GetLastAccepted()
 	return &manager{
@@ -78,8 +78,7 @@ type manager struct {
 	clk     *mockable.Clock
 	// Invariant: onAccept is called when [tx] is being marked as accepted, but
 	// before its state changes are applied.
-	// Invariant: any error returned by onAccept should be considered fatal.
-	onAccept func(*txs.Tx) error
+	onAccept func(*txs.Tx)
 
 	// blkIDToState is a map from a block's ID to the state of the block.
 	// Blocks are put into this map when they are verified.
