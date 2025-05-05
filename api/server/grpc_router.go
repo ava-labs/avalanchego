@@ -4,17 +4,12 @@
 package server
 
 import (
-	"errors"
 	"net/http"
 	"strings"
 	"sync"
 )
 
-var (
-	_ http.Handler = (*grpcRouter)(nil)
-
-	ErrDuplicateHandler = errors.New("duplicate handler")
-)
+var _ http.Handler = (*grpcRouter)(nil)
 
 func newGRPCRouter() *grpcRouter {
 	return &grpcRouter{
