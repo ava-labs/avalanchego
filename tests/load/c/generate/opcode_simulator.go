@@ -32,6 +32,7 @@ const (
 	Hashing
 	Memory
 	CallDepth
+	ContractCreation
 )
 
 // OpCodeSimulator generates transactions that randomly call the external functions
@@ -93,7 +94,7 @@ func NewOpCodeSimulator(
 
 func (ocs *OpCodeSimulator) GenerateTx() (*types.Transaction, error) {
 	// Generate a random simulated load type
-	loadType := SimulatedLoadType(rand.Intn(int(RandomReads) + 1))
+	loadType := SimulatedLoadType(rand.Intn(int(ContractCreation) + 1))
 	var res *types.Transaction
 	var err error
 
@@ -124,6 +125,8 @@ func (ocs *OpCodeSimulator) GenerateTx() (*types.Transaction, error) {
 		maxDepth := int64(5)
 		depth := big.NewInt(rand.Int63n(maxDepth))
 		res, err = ocs.simulatorContractInstance.SimulateCallDepth(ocs.txOpts, depth)
+	case ContractCreation:
+		res, err = ocs.simulatorContractInstance.SimulateContractCreation(ocs.txOpts)
 	default:
 		return nil, fmt.Errorf("invalid simulated load type: %d", loadType)
 	}

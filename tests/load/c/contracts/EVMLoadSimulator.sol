@@ -1,6 +1,46 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+/**
+ * @notice This is a placeholder contract meant to be used for simulating the load
+ * of contract creation operations in the EVM. It is a basic contract with some state
+ * variables, a constructor, and simple functions in order to have a semi-realistic
+ * contract deployment size.
+ */
+contract PlaceholderContract {
+    // State variables
+    uint256 public value;
+    address public owner;
+    mapping(uint256 => uint256) public data;
+
+    // Events
+    event ValueUpdated(uint256 newValue);
+    event DataWritten(uint256 key, uint256 value);
+
+    // Constructor
+    constructor() {
+        value = 42;
+        owner = msg.sender;
+    }
+
+    // Function to update the value
+    function updateValue(uint256 newValue) external {
+        value = newValue;
+        emit ValueUpdated(newValue);
+    }
+
+    // Function to write to the mapping
+    function writeData(uint256 key, uint256 val) external {
+        data[key] = val;
+        emit DataWritten(key, val);
+    }
+
+    // Function to read from the mapping
+    function readData(uint256 key) external view returns (uint256) {
+        return data[key];
+    }
+}
+
 contract EVMLoadSimulator {
     // Storage mappings for read/write simulations
     mapping(uint256 => uint256) private balances;
@@ -68,5 +108,9 @@ contract EVMLoadSimulator {
         if (depth > 0) {
             this.simulateCallDepth(depth - 1);
         }
+    }
+
+    function simulateContractCreation() external {
+        new PlaceholderContract();
     }
 }
