@@ -79,6 +79,30 @@ func TestGetNonExistent(t *testing.T) {
 	assert.Nil(t, got)
 }
 
+// Attempt to make a call to a nil or invalid handle.
+// Each function should return an error and not panic.
+func TestGetBadHandle(t *testing.T) {
+	db := &Database{handle: nil}
+
+	// This ignores error, but still shouldn't panic.
+	_, err := db.Get([]byte("non-existent"))
+	assert.ErrorIs(t, err, dbClosedErr)
+
+	// We ignore the error, but it shouldn't panic.
+	_, err = db.Root()
+	assert.ErrorIs(t, err, dbClosedErr)
+
+	root, err := db.Update(
+		[][]byte{[]byte("key")},
+		[][]byte{[]byte("value")},
+	)
+	assert.Empty(t, root)
+	assert.ErrorIs(t, err, dbClosedErr)
+
+	err = db.Close()
+	require.ErrorIs(t, err, dbClosedErr)
+}
+
 func keyForTest(i int) []byte {
 	return []byte("key" + strconv.Itoa(i))
 }
@@ -102,7 +126,7 @@ func TestInsert100(t *testing.T) {
 		{
 			name: "Batch",
 			insert: func(db *Database, kvs []KeyValue) ([]byte, error) {
-				return db.Batch(kvs), nil
+				return db.Batch(kvs)
 			},
 		},
 		{
@@ -137,7 +161,8 @@ func TestInsert100(t *testing.T) {
 				assert.Equal(t, want, string(got), "Recover nth batch-inserted value")
 			}
 
-			hash := db.Root()
+			hash, err := db.Root()
+			assert.NoError(t, err, "%T.Root()", db)
 			assert.Lenf(t, hash, 32, "%T.Root()", db)
 			// we know the hash starts with 0xf8
 			assert.Equalf(t, byte(0xf8), hash[0], "First byte of %T.Root()", db)
@@ -175,8 +200,9 @@ func TestRangeDelete(t *testing.T) {
 
 func TestInvariants(t *testing.T) {
 	db := newTestDatabase(t)
-
-	assert.Equalf(t, make([]byte, 32), db.Root(), "%T.Root() of empty trie")
+	hash, err := db.Root()
+	require.NoError(t, err, "%T.Root()", db)
+	assert.Equalf(t, make([]byte, 32), hash, "%T.Root() of empty trie")
 
 	got, err := db.Get([]byte("non-existent"))
 	require.NoError(t, err)

@@ -1,7 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use std::ffi::{CStr, OsStr};
+use std::ffi::{CStr, CString, OsStr, c_char};
 use std::fmt::{self, Display, Formatter};
 use std::os::unix::ffi::OsStrExt as _;
 use std::path::Path;
@@ -43,20 +43,33 @@ impl Display for Value {
 ///  * call `free_value` to free the memory associated with the returned `Value`
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fwd_get(db: *mut Db, key: Value) -> Value {
-    let db = unsafe { db.as_ref() }.expect("db should be non-null");
-    let root = db.root_hash_sync();
-    let Ok(Some(root)) = root else {
-        return Value {
-            len: 0,
-            data: std::ptr::null(),
-        };
-    };
-    let rev = db.revision_sync(root).expect("revision should exist");
+    get(db, key).unwrap_or_else(|e| e.into())
+}
+
+/// cbindgen::ignore
+///
+/// This function is not exposed to the C API.
+/// Internal call for `fwd_get` to remove error handling from the C API
+fn get(db: *mut Db, key: Value) -> Result<Value, String> {
+    // Check db is valid.
+    let db = unsafe { db.as_ref() }.ok_or_else(|| String::from("db should be non-null"))?;
+
+    // Find root hash.
+    // Matches `hash` function but we use the TrieHash type here
+    let root = db
+        .root_hash_sync()
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| String::from("unexpected None from db.root_hash_sync"))?;
+
+    // Find revision assoicated with root.
+    let rev = db.revision_sync(root).map_err(|e| e.to_string())?;
+
+    // Get value associated with key.
     let value = rev
         .val_sync(key.as_slice())
-        .expect("get should succeed")
-        .unwrap_or_default();
-    value.into()
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| String::from("key not found"))?;
+    Ok(value.into())
 }
 
 /// A `KeyValue` struct that represents a key-value pair in the database.
@@ -84,11 +97,23 @@ pub struct KeyValue {
 ///
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fwd_batch(db: *mut Db, nkeys: usize, values: *const KeyValue) -> Value {
+    batch(db, nkeys, values).unwrap_or_else(|e| e.into())
+}
+
+/// cbindgen::ignore
+///
+/// This function is not exposed to the C API.
+/// Internal call for `fwd_batch` to remove error handling from the C API
+fn batch(db: *mut Db, nkeys: usize, values: *const KeyValue) -> Result<Value, String> {
     let start = coarsetime::Instant::now();
-    let db = unsafe { db.as_ref() }.expect("db should be non-null");
+    // Check db is valid.
+    let db = unsafe { db.as_ref() }.ok_or_else(|| String::from("db should be non-null"))?;
+
+    // Create a batch of operations to perform.
     let mut batch = Vec::with_capacity(nkeys);
     for i in 0..nkeys {
-        let kv = unsafe { values.add(i).as_ref() }.expect("values should be non-null");
+        let kv = unsafe { values.add(i).as_ref() }
+            .ok_or_else(|| String::from("couldn't get key-value pair"))?;
         if kv.value.len == 0 {
             batch.push(DbBatchOp::DeleteRange {
                 prefix: kv.key.as_slice(),
@@ -100,16 +125,22 @@ pub unsafe extern "C" fn fwd_batch(db: *mut Db, nkeys: usize, values: *const Key
             value: kv.value.as_slice(),
         });
     }
-    let proposal = db.propose_sync(batch).expect("proposal should succeed");
+
+    // Propose the batch of operations.
+    let proposal = db.propose_sync(batch).map_err(|e| e.to_string())?;
     let propose_time = start.elapsed().as_millis();
     counter!("firewood.ffi.propose_ms").increment(propose_time);
-    proposal.commit_sync().expect("commit should succeed");
-    let hash = hash(db);
+
+    // Commit the proposal.
+    proposal.commit_sync().map_err(|e| e.to_string())?;
+
+    // Get the root hash of the database post-commit.
+    let hash_val = hash(db)?;
     let propose_plus_commit_time = start.elapsed().as_millis();
     counter!("firewood.ffi.batch_ms").increment(propose_plus_commit_time);
     counter!("firewood.ffi.commit_ms").increment(propose_plus_commit_time - propose_time);
     counter!("firewood.ffi.batch").increment(1);
-    hash
+    Ok(hash_val)
 }
 
 /// Get the root hash of the latest version of the database
@@ -121,7 +152,19 @@ pub unsafe extern "C" fn fwd_batch(db: *mut Db, nkeys: usize, values: *const Key
 /// The caller must ensure that `db` is a valid pointer returned by `open_db`
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fwd_root_hash(db: *mut Db) -> Value {
-    let db = unsafe { db.as_ref() }.expect("db should be non-null");
+    // Check db is valid.
+    root_hash(db).unwrap_or_else(|e| e.into())
+}
+
+/// cbindgen::ignore
+///
+/// This function is not exposed to the C API.
+/// Internal call for `fwd_root_hash` to remove error handling from the C API
+fn root_hash(db: *mut Db) -> Result<Value, String> {
+    // Check db is valid.
+    let db = unsafe { db.as_ref() }.ok_or_else(|| String::from("db should be non-null"))?;
+
+    // Get the root hash of the database.
     hash(db)
 }
 
@@ -129,9 +172,11 @@ pub unsafe extern "C" fn fwd_root_hash(db: *mut Db) -> Value {
 ///
 /// This function is not exposed to the C API.
 /// It returns the current hash of an already-fetched database handle
-fn hash(db: &Db) -> Value {
-    let root = db.root_hash_sync().unwrap_or_default().unwrap_or_default();
-    Value::from(root.as_slice())
+fn hash(db: &Db) -> Result<Value, String> {
+    db.root_hash_sync()
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| String::from("unexpected None from db.root_hash_sync"))
+        .map(|root| Value::from(root.as_slice()))
 }
 
 impl Value {
@@ -155,6 +200,17 @@ impl From<Box<[u8]>> for Value {
     }
 }
 
+impl From<String> for Value {
+    fn from(s: String) -> Self {
+        // Create empty CString if s is null.
+        let cstr = CString::new(s).unwrap_or_default().into_raw();
+        Value {
+            len: 0,
+            data: cstr.cast::<u8>(),
+        }
+    }
+}
+
 /// Frees the memory associated with a `Value`.
 ///
 /// # Safety
@@ -163,17 +219,24 @@ impl From<Box<[u8]>> for Value {
 /// The caller must ensure that `value` is a valid pointer.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fwd_free_value(value: *const Value) {
+    // Create a Rust reference to the pointer.
+    // Unsafe because we are dereferencing a raw pointer - possible another thread
+    // has a mutable reference to the same memory.
     let value = unsafe { &*value as &Value };
-    if value.len == 0 {
-        return;
+    // We assume that if the length is 0, then the data is a null-terminated string.
+    if value.len > 0 {
+        let recreated_box = unsafe {
+            Box::from_raw(std::slice::from_raw_parts_mut(
+                value.data as *mut u8,
+                value.len,
+            ))
+        };
+        drop(recreated_box);
+    } else {
+        let raw_str = value.data as *mut c_char;
+        let cstr = unsafe { CString::from_raw(raw_str) };
+        drop(cstr);
     }
-    let recreated_box = unsafe {
-        Box::from_raw(std::slice::from_raw_parts_mut(
-            value.data as *mut u8,
-            value.len,
-        ))
-    };
-    drop(recreated_box);
 }
 
 /// Common arguments, accepted by both `fwd_create_db()` and `fwd_open_db()`.

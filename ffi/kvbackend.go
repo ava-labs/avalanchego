@@ -10,7 +10,7 @@ type kVBackend interface {
 	// Returns the current root hash of the trie.
 	// Empty trie must return common.Hash{}.
 	// Length of the returned slice must be common.HashLength.
-	Root() []byte
+	Root() ([]byte, error)
 
 	// Get retrieves the value for the given key.
 	// If the key does not exist, it must return (nil, nil).
@@ -41,21 +41,33 @@ type kVBackend interface {
 }
 
 // Prefetch is a no-op since we don't need to prefetch for Firewood.
-func (*Database) Prefetch(key []byte) ([]byte, error) {
+func (db *Database) Prefetch(key []byte) ([]byte, error) {
+	if db.handle == nil {
+		return nil, dbClosedErr
+	}
+
 	return nil, nil
 }
 
 // Commit is a no-op, since [Database.Update] already persists changes.
-func (*Database) Commit(root []byte) error {
+func (db *Database) Commit(root []byte) error {
+	if db.handle == nil {
+		return dbClosedErr
+	}
+
 	return nil
 }
 
 // Update batches all the keys and values and applies them to the
 // database.
 func (db *Database) Update(keys, vals [][]byte) ([]byte, error) {
+	if db.handle == nil {
+		return nil, dbClosedErr
+	}
+
 	ops := make([]KeyValue, len(keys))
 	for i := range keys {
 		ops[i] = KeyValue{keys[i], vals[i]}
 	}
-	return db.Batch(ops), nil
+	return db.Batch(ops)
 }
