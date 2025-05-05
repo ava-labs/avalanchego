@@ -183,6 +183,7 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 	vm.connCloser.Add(dbClientConn)
 	vm.db = corruptabledb.New(
 		rpcdb.NewClient(rpcdbpb.NewDatabaseClient(dbClientConn)),
+		logging.NoLog{},
 	)
 
 	// TODO: Allow the logger to be configured by the client

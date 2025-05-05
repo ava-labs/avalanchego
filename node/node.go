@@ -770,6 +770,7 @@ func (n *Node) initDatabase() error {
 
 	var err error
 	n.DB, err = databasefactory.New(
+		n.Log,
 		n.Config.DatabaseConfig.Name,
 		dbFullPath,
 		n.Config.DatabaseConfig.ReadOnly,
