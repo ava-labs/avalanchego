@@ -6,6 +6,7 @@ package load
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
@@ -75,6 +76,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 			maxFeeCap:   5000,
 			agents:      60,
 			txsPerAgent: 100000,
+			issuePeriod: 20 * time.Millisecond,
 		}
 		err = execute(ctx, network.PreFundedKeys, config)
 		if err != nil {

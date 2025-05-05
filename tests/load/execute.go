@@ -34,6 +34,7 @@ type config struct {
 	maxFeeCap   int64
 	agents      uint
 	txsPerAgent uint64
+	issuePeriod time.Duration
 }
 
 func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config config) error {
@@ -71,7 +72,7 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 		if err != nil {
 			return fmt.Errorf("creating generator: %w", err)
 		}
-		issuer := issue.New(client, tracker)
+		issuer := issue.New(client, tracker, config.issuePeriod)
 		address := ethcrypto.PubkeyToAddress(keys[i].PublicKey)
 		listener := listen.New(client, tracker, config.txsPerAgent, address)
 		agents[i] = agent.New[*types.Transaction, common.Hash](config.txsPerAgent, generator, issuer, listener, tracker)
