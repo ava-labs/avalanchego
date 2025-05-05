@@ -181,10 +181,6 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		return nil, err
 	}
 	vm.connCloser.Add(dbClientConn)
-	vm.db = corruptabledb.New(
-		rpcdb.NewClient(rpcdbpb.NewDatabaseClient(dbClientConn)),
-		logging.NoLog{},
-	)
 
 	// TODO: Allow the logger to be configured by the client
 	vm.log = logging.NewLogger(
@@ -194,6 +190,11 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 			originalStderr,
 			logging.Colors.ConsoleEncoder(),
 		),
+	)
+
+	vm.db = corruptabledb.New(
+		rpcdb.NewClient(rpcdbpb.NewDatabaseClient(dbClientConn)),
+		vm.log,
 	)
 
 	clientConn, err := grpcutils.Dial(
