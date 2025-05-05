@@ -70,7 +70,7 @@ func New(
 	}
 
 	// Wrap with corruptable DB
-	db = corruptabledb.New(db)
+	db = corruptabledb.New(db, logger)
 
 	if readOnly && name != memdb.Name {
 		db = versiondb.New(db)
