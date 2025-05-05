@@ -42,4 +42,7 @@ type Tracker[T comparable] interface {
 	// GetObservedFailed returns the number of transactions that the tracker has
 	// confirmed failed.
 	GetObservedFailed() uint64
+
+	// Log logs the current state of the tracker.
+	Log()
 }

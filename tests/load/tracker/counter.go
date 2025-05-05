@@ -24,3 +24,4 @@ func (c *Counter) ObserveFailed(_ common.Hash)    { c.failed++ }
 func (*Counter) ObserveBlock(_ uint64)            {}
 func (c *Counter) GetObservedConfirmed() uint64   { return c.confirmed }
 func (c *Counter) GetObservedFailed() uint64      { return c.failed }
+func (*Counter) Log()                             {}

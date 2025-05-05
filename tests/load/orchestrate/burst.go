@@ -42,6 +42,9 @@ func (o *BurstOrchestrator[T, U]) Execute(ctx context.Context) error {
 		observerGroup.Go(func() error { return agent.Listener.Listen(observerCtx) })
 	}
 
+	const logInterval = 10 * time.Second
+	logTicker := time.NewTicker(logInterval)
+
 	// start issuing transactions sequentially from each issuer
 	issuerGroup := errgroup.Group{}
 	for _, agent := range o.agents {
@@ -56,6 +59,12 @@ func (o *BurstOrchestrator[T, U]) Execute(ctx context.Context) error {
 				}
 
 				agent.Listener.RegisterIssued(tx)
+
+				select {
+				case <-logTicker.C:
+					agent.Tracker.Log()
+				default:
+				}
 			}
 			return nil
 		})

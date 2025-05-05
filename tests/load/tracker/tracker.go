@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/log"
 )
 
 type Tracker struct {
@@ -16,6 +17,7 @@ type Tracker struct {
 	metrics          *metrics
 
 	stats struct {
+		issued    uint64
 		confirmed uint64
 		failed    uint64
 	}
@@ -40,6 +42,7 @@ func (t *Tracker) Issue(txHash common.Hash) {
 	defer t.mutex.Unlock()
 
 	t.metrics.issued.Inc()
+	t.stats.issued++
 	t.txHashToLastTime[txHash] = t.timeNow()
 }
 
@@ -80,4 +83,16 @@ func (t *Tracker) GetObservedFailed() uint64 {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 	return t.stats.failed
+}
+
+func (t *Tracker) Log() {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	log.Info("Tracker stats",
+		"issued", t.stats.issued,
+		"confirmed", t.stats.confirmed,
+		"failed", t.stats.failed,
+		"inflight", len(t.txHashToLastTime),
+	)
 }
