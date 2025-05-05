@@ -28,7 +28,6 @@ import (
 // dbMetricsPrefix is used to create a new metrics registerer for the database.
 // meterDBRegName is used to create a new metrics registerer for the meter DB.
 func New(
-	log logging.Logger,
 	name string,
 	path string,
 	readOnly bool,
@@ -71,7 +70,7 @@ func New(
 	}
 
 	// Wrap with corruptable DB
-	db = corruptabledb.New(db, log)
+	db = corruptabledb.New(db, logger)
 
 	if readOnly && name != memdb.Name {
 		db = versiondb.New(db)
