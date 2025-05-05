@@ -50,7 +50,7 @@ if [[ -n "${PLATFORMS}" ]]; then
   DOCKER_CMD="${DOCKER_CMD} --platform=${PLATFORMS}"
   if [[ "$PLATFORMS" == *,* ]]; then ## Multi-arch
     if [[ "${IMAGE_NAME}" != *"/"* ]]; then
-      echo "ERROR: Multi-arch images must be pushed to a registry."
+      echo "ERROR: Multi-arch images (multi-platform) must be pushed to a registry."
       exit 1
     fi
     ispush=1
