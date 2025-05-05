@@ -30,11 +30,12 @@ import (
 )
 
 type config struct {
-	endpoints   []string
-	maxFeeCap   int64
-	agents      uint
-	txsPerAgent uint64
-	issuePeriod time.Duration
+	endpoints    []string
+	maxFeeCap    int64
+	agents       uint
+	txsPerAgent  uint64
+	issuePeriod  time.Duration
+	finalTimeout time.Duration
 }
 
 func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config config) error {
@@ -85,7 +86,7 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 
 	orchestratorCtx, orchestratorCancel := context.WithCancel(ctx)
 	defer orchestratorCancel()
-	orchestrator := orchestrate.NewBurstOrchestrator(agents, time.Second)
+	orchestrator := orchestrate.NewBurstOrchestrator(agents, config.finalTimeout)
 	orchestratorErrCh := make(chan error)
 	go func() {
 		orchestratorErrCh <- orchestrator.Execute(orchestratorCtx)
