@@ -440,3 +440,7 @@ func (n *Node) getMonitoringLabels() map[string]string {
 	}
 	return labels
 }
+
+func (n *Node) IsRunning() bool {
+	return len(n.URI) > 0
+}

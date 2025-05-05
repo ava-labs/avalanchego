@@ -519,10 +519,17 @@ func (n *Network) Stop(ctx context.Context) error {
 	return nil
 }
 
-// Restarts all non-ephemeral nodes in the network.
+// Restarts all running nodes in the network.
 func (n *Network) Restart(ctx context.Context) error {
 	n.log.Info("restarting network")
-	if err := restartNodes(ctx, n.Nodes); err != nil {
+	nodes := make([]*Node, 0, len(n.Nodes))
+	for _, node := range n.Nodes {
+		if !node.IsRunning() {
+			continue
+		}
+		nodes = append(nodes, node)
+	}
+	if err := restartNodes(ctx, nodes); err != nil {
 		return err
 	}
 	return WaitForHealthyNodes(ctx, n.log, n.Nodes)
@@ -661,7 +668,7 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI 
 
 		runningNodes := make([]*Node, 0, len(reconfiguredNodes))
 		for _, node := range reconfiguredNodes {
-			if len(node.URI) > 0 {
+			if node.IsRunning() {
 				runningNodes = append(runningNodes, node)
 			}
 		}
