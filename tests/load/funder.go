@@ -76,7 +76,7 @@ func ensureMinimumFunds(ctx context.Context, endpoint string, keys []*ecdsa.Priv
 	if err != nil {
 		return fmt.Errorf("creating distribution generator: %w", err)
 	}
-	tracker := tracker.NewCounter()
+	tracker := tracker.NewNoop()
 	const issuePeriod = 0 // no delay between transaction issuance
 	issuer := issue.New(client, tracker, issuePeriod)
 	listener := listen.New(client, tracker, txTarget, maxFundsAddress)
