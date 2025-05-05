@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
@@ -57,7 +58,7 @@ type backend struct {
 	warpSigner                avalancheWarp.Signer
 	blockClient               BlockClient
 	signatureCache            cache.Cacher[ids.ID, []byte]
-	messageCache              *cache.LRU[ids.ID, *avalancheWarp.UnsignedMessage]
+	messageCache              *lru.Cache[ids.ID, *avalancheWarp.UnsignedMessage]
 	offchainAddressedCallMsgs map[ids.ID]*avalancheWarp.UnsignedMessage
 	stats                     *verifierStats
 }
@@ -79,7 +80,7 @@ func NewBackend(
 		warpSigner:                warpSigner,
 		blockClient:               blockClient,
 		signatureCache:            signatureCache,
-		messageCache:              &cache.LRU[ids.ID, *avalancheWarp.UnsignedMessage]{Size: messageCacheSize},
+		messageCache:              lru.NewCache[ids.ID, *avalancheWarp.UnsignedMessage](messageCacheSize),
 		stats:                     newVerifierStats(),
 		offchainAddressedCallMsgs: make(map[ids.ID]*avalancheWarp.UnsignedMessage),
 	}

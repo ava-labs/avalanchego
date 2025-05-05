@@ -919,7 +919,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 			Rules:        test.rules,
 			Bootstrapped: vm.bootstrapped.Get(),
 			BlockFetcher: vm,
-			SecpCache:    &vm.secpCache,
+			SecpCache:    vm.secpCache,
 		}
 
 		t.Run(test.name, func(t *testing.T) {
@@ -1786,7 +1786,7 @@ func TestNewExportTx(t *testing.T) {
 				Rules:        vm.currentRules(),
 				Bootstrapped: vm.bootstrapped.Get(),
 				BlockFetcher: vm,
-				SecpCache:    &vm.secpCache,
+				SecpCache:    vm.secpCache,
 			}
 
 			if err := exportTx.SemanticVerify(backend, tx, parent, parent.ethBlock.BaseFee()); err != nil {
@@ -1994,7 +1994,7 @@ func TestNewExportTxMulticoin(t *testing.T) {
 				Rules:        vm.currentRules(),
 				Bootstrapped: vm.bootstrapped.Get(),
 				BlockFetcher: vm,
-				SecpCache:    &vm.secpCache,
+				SecpCache:    vm.secpCache,
 			}
 
 			if err := exportTx.SemanticVerify(backend, tx, parent, parent.ethBlock.BaseFee()); err != nil {

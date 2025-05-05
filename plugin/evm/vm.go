@@ -47,6 +47,7 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap5"
 	"github.com/ava-labs/coreth/triedb/hashdb"
 	"github.com/ava-labs/coreth/utils"
+
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/metrics"
@@ -78,7 +79,7 @@ import (
 
 	avalancheRPC "github.com/gorilla/rpc/v2"
 
-	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
@@ -279,7 +280,7 @@ type VM struct {
 	shutdownWg   sync.WaitGroup
 
 	fx        secp256k1fx.Fx
-	secpCache secp256k1.RecoverCache
+	secpCache *secp256k1.RecoverCache
 
 	// Continuous Profiler
 	profiler profiler.ContinuousProfiler
@@ -513,11 +514,7 @@ func (vm *VM) Initialize(
 
 	vm.chainConfig = g.Config
 	vm.networkID = vm.ethConfig.NetworkId
-	vm.secpCache = secp256k1.RecoverCache{
-		LRU: cache.LRU[ids.ID, *secp256k1.PublicKey]{
-			Size: secpCacheSize,
-		},
-	}
+	vm.secpCache = secp256k1.NewRecoverCache(secpCacheSize)
 
 	if err := configExtra.Verify(); err != nil {
 		return fmt.Errorf("failed to verify chain config: %w", err)
@@ -549,7 +546,7 @@ func (vm *VM) Initialize(
 	for i, hexMsg := range vm.config.WarpOffChainMessages {
 		offchainWarpMessages[i] = []byte(hexMsg)
 	}
-	warpSignatureCache := &cache.LRU[ids.ID, []byte]{Size: warpSignatureCacheSize}
+	warpSignatureCache := lru.NewCache[ids.ID, []byte](warpSignatureCacheSize)
 	meteredCache, err := metercacher.New("warp_signature_cache", vm.sdkMetrics, warpSignatureCache)
 	if err != nil {
 		return fmt.Errorf("failed to create warp signature cache: %w", err)
@@ -1628,7 +1625,7 @@ func (vm *VM) verifyTx(tx *atomic.Tx, parentHash common.Hash, baseFee *big.Int, 
 		Rules:        rules,
 		Bootstrapped: vm.bootstrapped.Get(),
 		BlockFetcher: vm,
-		SecpCache:    &vm.secpCache,
+		SecpCache:    vm.secpCache,
 	}
 	if err := tx.UnsignedAtomicTx.SemanticVerify(atomicBackend, tx, parent, baseFee); err != nil {
 		return err
@@ -1667,7 +1664,7 @@ func (vm *VM) verifyTxs(txs []*atomic.Tx, parentHash common.Hash, baseFee *big.I
 		Rules:        rules,
 		Bootstrapped: vm.bootstrapped.Get(),
 		BlockFetcher: vm,
-		SecpCache:    &vm.secpCache,
+		SecpCache:    vm.secpCache,
 	}
 	for _, atomicTx := range txs {
 		utx := atomicTx.UnsignedAtomicTx

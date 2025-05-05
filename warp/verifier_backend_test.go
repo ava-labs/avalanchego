@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
@@ -97,7 +98,7 @@ func TestAddressedCallSignatures(t *testing.T) {
 			t.Run(name, func(t *testing.T) {
 				var sigCache cache.Cacher[ids.ID, []byte]
 				if withCache {
-					sigCache = &cache.LRU[ids.ID, []byte]{Size: 100}
+					sigCache = lru.NewCache[ids.ID, []byte](100)
 				} else {
 					sigCache = &cache.Empty[ids.ID, []byte]{}
 				}
@@ -209,7 +210,7 @@ func TestBlockSignatures(t *testing.T) {
 			t.Run(name, func(t *testing.T) {
 				var sigCache cache.Cacher[ids.ID, []byte]
 				if withCache {
-					sigCache = &cache.LRU[ids.ID, []byte]{Size: 100}
+					sigCache = lru.NewCache[ids.ID, []byte](100)
 				} else {
 					sigCache = &cache.Empty[ids.ID, []byte]{}
 				}
