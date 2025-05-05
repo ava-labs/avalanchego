@@ -192,7 +192,7 @@ func RestartNetwork(ctx context.Context, log logging.Logger, dir string) error {
 }
 
 // Restart the provided nodes. Blocks on the nodes accepting API requests but not their health.
-func restartNodes(ctx context.Context, nodes ...*Node) error {
+func restartNodes(ctx context.Context, nodes []*Node) error {
 	for _, node := range nodes {
 		if err := node.Restart(ctx); err != nil {
 			return fmt.Errorf("failed to restart node %s: %w", node.NodeID, err)
@@ -522,14 +522,14 @@ func (n *Network) Stop(ctx context.Context) error {
 // Restarts all non-ephemeral nodes in the network.
 func (n *Network) Restart(ctx context.Context) error {
 	n.log.Info("restarting network")
-	if err := restartNodes(ctx, n.Nodes...); err != nil {
+	if err := restartNodes(ctx, n.Nodes); err != nil {
 		return err
 	}
-	return WaitForHealthyNodes(ctx, n.log, n.Nodes...)
+	return WaitForHealthyNodes(ctx, n.log, n.Nodes)
 }
 
 // Waits for the provided nodes to become healthy.
-func WaitForHealthyNodes(ctx context.Context, log logging.Logger, nodes ...*Node) error {
+func WaitForHealthyNodes(ctx context.Context, log logging.Logger, nodes []*Node) error {
 	for _, node := range nodes {
 		log.Info("waiting for node to become healthy",
 			zap.Stringer("nodeID", node.NodeID),
@@ -666,11 +666,11 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI 
 			}
 		}
 
-		if err := restartNodes(ctx, runningNodes...); err != nil {
+		if err := restartNodes(ctx, runningNodes); err != nil {
 			return err
 		}
 
-		if err := WaitForHealthyNodes(ctx, n.log, runningNodes...); err != nil {
+		if err := WaitForHealthyNodes(ctx, n.log, runningNodes); err != nil {
 			return err
 		}
 	}
@@ -740,11 +740,11 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI 
 		}
 	}
 
-	if err := restartNodes(ctx, nodesToRestart...); err != nil {
+	if err := restartNodes(ctx, nodesToRestart); err != nil {
 		return err
 	}
 
-	if err := WaitForHealthyNodes(ctx, log, nodesToRestart...); err != nil {
+	if err := WaitForHealthyNodes(ctx, log, nodesToRestart); err != nil {
 		return err
 	}
 
