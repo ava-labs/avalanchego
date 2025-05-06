@@ -11,6 +11,7 @@ import (
 	"github.com/gorilla/rpc/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -29,7 +30,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/execute"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/state"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
 	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	xsblock "github.com/ava-labs/avalanchego/vms/example/xsvm/block"
@@ -155,7 +155,7 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 }
 
 func (vm *VM) CreateGRPCService(context.Context) (string, http.Handler, error) {
-	server := grpcutils.NewServer()
+	server := grpc.NewServer()
 	server.RegisterService(&xsvm.Ping_ServiceDesc, &grpcService{Log: vm.chainContext.Log})
 	return xsvm.Ping_ServiceDesc.ServiceName, server, nil
 }
