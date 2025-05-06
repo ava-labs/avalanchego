@@ -33,6 +33,9 @@ var (
 		"networkID": 9999}}}}
 	}`)
 
+	//go:embed genesis_test_invalid_allocations.json
+	customGenesisConfigInvalidAllocationsJSON []byte
+
 	genesisStakingCfg = &StakingConfig{
 		MaxStakeDuration: 365 * 24 * time.Hour,
 	}
@@ -117,29 +120,6 @@ func TestValidateConfig(t *testing.T) {
 				return &thisConfig
 			}(),
 			expectedErr: errInitialStakeDurationTooLow,
-		},
-		"locked allocations amount too low": {
-			networkID: 12345,
-			config: func() *Config {
-				thisConfig := LocalConfig
-				alloc := thisConfig.Allocations[0]
-				alloc.InitialAmount = 1000
-				alloc.UnlockSchedule = []LockedAmount{
-					{Amount: 3, Locktime: 0},
-				}
-				thisConfig.Allocations = []Allocation{alloc}
-				return &thisConfig
-			}(),
-			expectedErr: errAllocationsLockedAmountTooLow,
-		},
-		"empty initial staked funds": {
-			networkID: 12345,
-			config: func() *Config {
-				thisConfig := LocalConfig
-				thisConfig.InitialStakedFunds = []ids.ShortID(nil)
-				return &thisConfig
-			}(),
-			expectedErr: errNoInitiallyStakedFunds,
 		},
 		"duplicate initial staked funds": {
 			networkID: 12345,
@@ -240,6 +220,11 @@ func TestGenesisFromFile(t *testing.T) {
 			networkID:       9999,
 			missingFilepath: "missing.json",
 			expectedErr:     os.ErrNotExist,
+		},
+		"custom (locked allocations amount too low)": {
+			networkID:    9999,
+			customConfig: customGenesisConfigInvalidAllocationsJSON,
+			expectedErr:  errAllocationsLockedAmountTooLow,
 		},
 	}
 
