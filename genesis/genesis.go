@@ -559,10 +559,7 @@ func splitAllocations(allocations []Allocation, numSplits int) [][]Allocation {
 		}
 	}
 
-	if len(currentNodeAllocation) > 0 {
-		allNodeAllocations = append(allNodeAllocations, currentNodeAllocation)
-	}
-	return allNodeAllocations
+	return append(allNodeAllocations, currentNodeAllocation)
 }
 
 func VMGenesis(genesisBytes []byte, vmID ids.ID) (*pchaintxs.Tx, error) {
