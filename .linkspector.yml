@@ -1,0 +1,8 @@
+dirs:
+  - .
+excludedFiles:
+  - RELEASES.md # This file has too many links to efficiently check
+ignorePatterns:
+  - pattern: '^http://localhost.*$'              # Localhost links are used during tutorials
+  - pattern: "^https://.+\\.avax-dev\\.network$" # This check doesn't have the correct credentials
+useGitIgnore: true
