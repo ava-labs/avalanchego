@@ -15,7 +15,7 @@ Please find installation instructions on
 Any changes made to proto definition can be updated by running
 `protobuf_codegen.sh` located in the `scripts/` directory of AvalancheGo.
 
-Introduction to `buf`
+`buf` Quickstart
 [https://buf.build/docs/get-started](https://buf.build/docs/cli/quickstart/)
 
 ## Protocol Version Compatibility
