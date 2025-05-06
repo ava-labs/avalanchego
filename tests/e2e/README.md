@@ -135,4 +135,4 @@ until stopped by `tmpnetctl stop-collectors`.
 The results of collection will be viewable at
 https://grafana-poc.avax-dev.network.
 
-For more detail, see the [tmpnet docs](../tmpnet/README.md#monitoring).
+For more detail, see the [tmpnet docs](../fixture/tmpnet/README.md##monitoring).
