@@ -206,7 +206,7 @@ func (m *Mempool) Iterate(f func(tx Tx) bool) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	for _, v := range m.maxHeap.Elements() {
+	for _, v := range m.maxHeap.UnorderedIterator() {
 		if !f(v) {
 			return
 		}

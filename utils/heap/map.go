@@ -100,8 +100,8 @@ func (m *Map[K, V]) Fix(k K) {
 	}
 }
 
-func (m *Map[K, V]) Elements() iter.Seq2[K, V] {
-	return m.queue.Elements()
+func (m *Map[K, V]) UnorderedIterator() iter.Seq2[K, V] {
+	return m.queue.UnorderedIterator()
 }
 
 type indexedQueue[K comparable, V any] struct {
@@ -131,7 +131,7 @@ func (h *indexedQueue[K, V]) Pop() any {
 	return popped
 }
 
-func (h *indexedQueue[K, V]) Elements() iter.Seq2[K, V] {
+func (h *indexedQueue[K, V]) UnorderedIterator() iter.Seq2[K, V] {
 	return func(yield func(K, V) bool) {
 		for _, e := range h.entries {
 			if !yield(e.k, e.v) {
