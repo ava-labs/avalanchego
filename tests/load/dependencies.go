@@ -3,9 +3,7 @@
 
 package load
 
-import (
-	"context"
-)
+import "context"
 
 type Issuer[T comparable] interface {
 	// GenerateAndIssueTx generates and sends a tx to the network, and informs the

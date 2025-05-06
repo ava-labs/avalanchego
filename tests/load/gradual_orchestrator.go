@@ -10,9 +10,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var (
