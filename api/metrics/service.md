@@ -20,6 +20,6 @@ curl -X POST 127.0.0.1:9650/ext/metrics
 
 ## Format
 
-This API produces Prometheus compatible metrics. See [here](https://github.com/prometheus/docs/blob/master/content/docs/instrumenting/exposition_formats.md) for information on Prometheus' formatting.
+This API produces Prometheus compatible metrics. See [here](https://github.com/prometheus/docs/blob/main/content/docs/instrumenting/exposition_formats.md) for information on Prometheus' formatting.
 
 [Here](https://build.avax.network/docs/nodes/maintain/monitoring) is a tutorial that shows how to set up Prometheus and Grafana to monitor AvalancheGo node using the Metrics API.
