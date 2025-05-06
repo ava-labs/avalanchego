@@ -121,6 +121,15 @@ func TestValidateConfig(t *testing.T) {
 			}(),
 			expectedErr: errInitialStakeDurationTooLow,
 		},
+		"empty initial staked funds": {
+			networkID: 12345,
+			config: func() *Config {
+				thisConfig := LocalConfig
+				thisConfig.InitialStakedFunds = []ids.ShortID(nil)
+				return &thisConfig
+			}(),
+			expectedErr: errNoInitiallyStakedFunds,
+		},
 		"duplicate initial staked funds": {
 			networkID: 12345,
 			config: func() *Config {
