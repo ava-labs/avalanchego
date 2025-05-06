@@ -137,8 +137,8 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 
 	if reset {
 		g.log.Debug("resetting bloom filter")
-		g.Mempool.Iterate(func(tx mempool.Tx) bool {
-			g.bloom.Add(tx.Tx)
+		g.Mempool.Iterate(func(tx *txs.Tx) bool {
+			g.bloom.Add(tx)
 			return true
 		})
 	}
@@ -161,8 +161,8 @@ func (g *gossipMempool) Has(txID ids.ID) bool {
 }
 
 func (g *gossipMempool) Iterate(f func(gossipable *txs.Tx) bool) {
-	g.Mempool.Iterate(func(tx mempool.Tx) bool {
-		return f(tx.Tx)
+	g.Mempool.Iterate(func(tx *txs.Tx) bool {
+		return f(tx)
 	})
 }
 

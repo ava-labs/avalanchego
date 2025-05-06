@@ -60,7 +60,7 @@ var (
 
 type VM struct {
 	config.Internal
-	*blockbuilder.Builder
+	blockbuilder.Builder
 	*network.Network
 	validators.State
 

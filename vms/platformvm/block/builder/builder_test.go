@@ -86,7 +86,7 @@ func TestBuildBlockDoesNotBuildWithEmptyMempool(t *testing.T) {
 
 	tx, exists := env.mempool.Peek()
 	require.False(exists)
-	require.Zero(tx)
+	require.Nil(tx)
 
 	// [BuildBlock] should not build an empty block
 	blk, err := env.Builder.BuildBlock(context.Background())

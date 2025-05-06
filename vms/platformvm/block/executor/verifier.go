@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/math"
@@ -243,8 +245,9 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 		return err
 	}
 
-	v.Mempool.Remove(b.Tx.ID())
+	v.Mempool.Remove(b.Tx)
 
+	prometheus.NewRegistry()
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
@@ -432,7 +435,7 @@ func (v *verifier) proposalBlock(
 	onCommitState.AddTx(tx, status.Committed)
 	onAbortState.AddTx(tx, status.Aborted)
 
-	v.Mempool.Remove(tx.ID())
+	v.Mempool.Remove(tx)
 
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
@@ -490,9 +493,7 @@ func (v *verifier) standardBlock(
 		return ErrStandardBlockWithoutChanges
 	}
 
-	for _, tx := range txs {
-		v.Mempool.Remove(tx.ID())
-	}
+	v.Mempool.Remove(txs...)
 
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{

@@ -166,18 +166,28 @@ func (m *Mempool) updateMetrics() {
 	m.gasAvailableMetric.Set(float64(m.gasCapacity - m.currentGas))
 }
 
-func (m *Mempool) Get(txID ids.ID) (Tx, bool) {
+func (m *Mempool) Get(txID ids.ID) (*txs.Tx, bool) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	return m.maxHeap.Get(txID)
+	tx, ok := m.maxHeap.Get(txID)
+	if !ok {
+		return nil, false
+	}
+
+	return tx.Tx, true
 }
 
-func (m *Mempool) Remove(txID ids.ID) {
+// TODO remove variadic param
+// TODO support removal by inputs
+// TODO remove conflicts of tx
+func (m *Mempool) Remove(txs ...*txs.Tx) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.remove(txID)
+	for _, tx := range txs {
+		m.remove(tx.ID())
+	}
 }
 
 func (m *Mempool) remove(txID ids.ID) {
@@ -194,20 +204,20 @@ func (m *Mempool) remove(txID ids.ID) {
 	m.updateMetrics()
 }
 
-func (m *Mempool) Peek() (Tx, bool) {
+func (m *Mempool) Peek() (*txs.Tx, bool) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	_, tx, ok := m.maxHeap.Peek()
-	return tx, ok
+	return tx.Tx, ok
 }
 
-func (m *Mempool) Iterate(f func(tx Tx) bool) {
+func (m *Mempool) Iterate(f func(tx *txs.Tx) bool) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	for _, v := range m.maxHeap.UnorderedIterator() {
-		if !f(v) {
+	for _, v := range m.maxHeap.UnsortedIterator() {
+		if !f(v.Tx) {
 			return
 		}
 	}
