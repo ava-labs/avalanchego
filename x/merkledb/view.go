@@ -73,8 +73,7 @@ type view struct {
 	// during the code that accessed ancestor state and the result of that work is still valid
 	//
 	// [validityTrackingLock] must be held when reading/writing this field.
-	invalidated       bool
-	notifyInvalidated chan struct{}
+	invalidated bool
 
 	// the uncommitted parent trie of this view OR the db itself
 	// [validityTrackingLock] must be held when reading/writing this field.
@@ -116,60 +115,36 @@ func (v *view) NewView(
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	type viewErr struct {
-		view View
-		err  error
-	}
-
-	ch := make(chan viewErr)
-	go func(ctx context.Context) {
-		v.commitLock.RLock()
-		defer v.commitLock.RUnlock()
-		if v.committed {
-			// v.getParentTrie() is the db itself
-			view, err := v.getParentTrie().NewView(ctx, changes)
-			if err != nil {
-				ch <- viewErr{err: err}
-				return
-			}
-
-			ch <- viewErr{view: view}
-			return
-		}
-
-		if err := v.ensureChangesApplied(ctx); err != nil {
-			ch <- viewErr{err: err}
-			return
-		}
-
-		view, err := newView(ctx, v.db, v, changes)
+	v.commitLock.RLock()
+	defer v.commitLock.RUnlock()
+	if v.committed {
+		// v.getParentTrie() is the db itself
+		view, err := v.getParentTrie().NewView(ctx, changes)
 		if err != nil {
-			ch <- viewErr{err: err}
-			return
+			return nil, err
 		}
 
-		v.validityTrackingLock.Lock()
-		defer v.validityTrackingLock.Unlock()
-		if v.invalidated {
-			// if this happens, it should early return in the select below using [notifyInvalidated].
-			ch <- viewErr{err: ErrInvalid}
-			return
-		}
-
-		v.childViews = append(v.childViews, view)
-		ch <- viewErr{view: view}
-	}(ctx)
-
-	select {
-	case <-v.notifyInvalidated:
-		return nil, ErrInvalid
-
-	case <-ctx.Done():
-		return nil, ctx.Err()
-
-	case viewErr := <-ch:
-		return viewErr.view, viewErr.err
+		return view, nil
 	}
+
+	if err := v.ensureChangesApplied(ctx); err != nil {
+		return nil, err
+	}
+
+	view, err := newView(ctx, v.db, v, changes)
+	if err != nil {
+		return nil, err
+	}
+
+	v.validityTrackingLock.Lock()
+	defer v.validityTrackingLock.Unlock()
+	if v.invalidated {
+		return nil, ErrInvalid
+	}
+
+	v.childViews = append(v.childViews, view)
+
+	return view, nil
 }
 
 // Creates a new view with the given [parentTrie].
@@ -183,59 +158,42 @@ func newView(
 		return nil, err
 	}
 
-	type viewErr struct {
-		view *view
-		err  error
+	v := &view{
+		root:       maybe.Bind(parentTrie.getRoot(), (*node).clone),
+		db:         db,
+		parentTrie: parentTrie,
+		changes:    newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),
+		tokenSize:  db.tokenSize,
 	}
 
-	ch := make(chan viewErr)
-	go func() {
-		v := &view{
-			root:       maybe.Bind(parentTrie.getRoot(), (*node).clone),
-			db:         db,
-			parentTrie: parentTrie,
-			changes:    newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),
-			tokenSize:  db.tokenSize,
+	for _, op := range changes.BatchOps {
+		key := op.Key
+		if !changes.ConsumeBytes {
+			key = slices.Clone(op.Key)
 		}
 
-		for _, op := range changes.BatchOps {
-			key := op.Key
+		newVal := maybe.Nothing[[]byte]()
+		if !op.Delete {
+			newVal = maybe.Some(op.Value)
 			if !changes.ConsumeBytes {
-				key = slices.Clone(op.Key)
-			}
-
-			newVal := maybe.Nothing[[]byte]()
-			if !op.Delete {
-				newVal = maybe.Some(op.Value)
-				if !changes.ConsumeBytes {
-					newVal = maybe.Some(slices.Clone(op.Value))
-				}
-			}
-			if err := v.recordValueChange(toKey(key), newVal); err != nil {
-				ch <- viewErr{err: err}
-				return
+				newVal = maybe.Some(slices.Clone(op.Value))
 			}
 		}
-
-		for key, val := range changes.MapOps {
-			if !changes.ConsumeBytes {
-				val = maybe.Bind(val, slices.Clone[[]byte])
-			}
-			if err := v.recordValueChange(toKey(stringToByteSlice(key)), val); err != nil {
-				ch <- viewErr{err: err}
-				return
-			}
+		if err := v.recordValueChange(toKey(key), newVal); err != nil {
+			return nil, err
 		}
-
-		ch <- viewErr{view: v}
-	}()
-
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case viewErr := <-ch:
-		return viewErr.view, viewErr.err
 	}
+
+	for key, val := range changes.MapOps {
+		if !changes.ConsumeBytes {
+			val = maybe.Bind(val, slices.Clone[[]byte])
+		}
+		if err := v.recordValueChange(toKey(stringToByteSlice(key)), val); err != nil {
+			return nil, err
+		}
+	}
+
+	return v, nil
 }
 
 func (v *view) recordValueChange(key Key, value maybe.Maybe[[]byte]) error {
@@ -321,31 +279,20 @@ func (v *view) applyChanges(ctx context.Context) error {
 		return err
 	}
 
-	ch := make(chan error)
-	go func() {
-		oldRoot := maybe.Bind(v.root, (*node).clone)
+	oldRoot := maybe.Bind(v.root, (*node).clone)
 
-		if err := v.calculateNodeChanges(ctx); err != nil {
-			ch <- err
-			return
-		}
-
-		v.hashChangedNodes(ctx)
-
-		v.changes.rootChange = change[maybe.Maybe[*node]]{
-			before: oldRoot,
-			after:  v.root,
-		}
-
-		ch <- nil
-	}()
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case err := <-ch:
+	if err := v.calculateNodeChanges(ctx); err != nil {
 		return err
 	}
+
+	v.hashChangedNodes(ctx)
+
+	v.changes.rootChange = change[maybe.Maybe[*node]]{
+		before: oldRoot,
+		after:  v.root,
+	}
+
+	return nil
 }
 
 func (v *view) calculateNodeChanges(ctx context.Context) error {
@@ -534,39 +481,20 @@ func (v *view) GetProof(ctx context.Context, key []byte) (*Proof, error) {
 		return nil, ctx.Err()
 	}
 
+	if err := v.ensureChangesApplied(ctx); err != nil {
+		return nil, err
+	}
+
+	proof, err := getProof(v, key)
+	if err != nil {
+		return nil, err
+	}
+
 	if v.isInvalid() {
 		return nil, ErrInvalid
 	}
 
-	type proofErr struct {
-		proof *Proof
-		err   error
-	}
-
-	ch := make(chan proofErr)
-	go func() {
-		if err := v.ensureChangesApplied(ctx); err != nil {
-			ch <- proofErr{err: err}
-			return
-		}
-
-		proof, err := getProof(v, key)
-		if err != nil {
-			ch <- proofErr{err: err}
-			return
-		}
-
-		ch <- proofErr{proof: proof}
-	}()
-
-	select {
-	case <-v.notifyInvalidated:
-		return nil, ErrInvalid
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case proofErr := <-ch:
-		return proofErr.proof, proofErr.err
-	}
+	return proof, nil
 }
 
 // GetRangeProof returns a range proof for (at least part of) the key range [start, end].
@@ -585,40 +513,20 @@ func (v *view) GetRangeProof(
 		return nil, err
 	}
 
+	if err := v.ensureChangesApplied(ctx); err != nil {
+		return nil, err
+	}
+
+	result, err := getRangeProof(v, start, end, maxLength)
+	if err != nil {
+		return nil, err
+	}
+
 	if v.isInvalid() {
 		return nil, ErrInvalid
 	}
 
-	type proofErr struct {
-		proof *RangeProof
-		err   error
-	}
-
-	ch := make(chan proofErr)
-
-	go func() {
-		if err := v.ensureChangesApplied(ctx); err != nil {
-			ch <- proofErr{err: err}
-			return
-		}
-
-		result, err := getRangeProof(v, start, end, maxLength)
-		if err != nil {
-			ch <- proofErr{err: err}
-			return
-		}
-
-		ch <- proofErr{proof: result}
-	}()
-
-	select {
-	case <-v.notifyInvalidated:
-		return nil, ErrInvalid
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case result := <-ch:
-		return result.proof, result.err
-	}
+	return result, nil
 }
 
 // CommitToDB commits changes from this view to the underlying DB.
