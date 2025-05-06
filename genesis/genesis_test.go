@@ -118,6 +118,20 @@ func TestValidateConfig(t *testing.T) {
 			}(),
 			expectedErr: errInitialStakeDurationTooLow,
 		},
+		"locked allocations amount too low": {
+			networkID: 12345,
+			config: func() *Config {
+				thisConfig := LocalConfig
+				alloc := thisConfig.Allocations[0]
+				alloc.InitialAmount = 1000
+				alloc.UnlockSchedule = []LockedAmount{
+					{Amount: 3, Locktime: 0},
+				}
+				thisConfig.Allocations = []Allocation{alloc}
+				return &thisConfig
+			}(),
+			expectedErr: errAllocationsLockedAmountTooLow,
+		},
 		"empty initial staked funds": {
 			networkID: 12345,
 			config: func() *Config {
