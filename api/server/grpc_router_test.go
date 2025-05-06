@@ -50,19 +50,19 @@ func TestGRPCRouterServeHTTP(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			g := newGRPCRouter()
-			h := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
-			w := httptest.NewRecorder()
-			r := httptest.NewRequest("", "/", nil)
+			grpcRouter := newGRPCRouter()
+			handler := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
+			writer := httptest.NewRecorder()
+			request := httptest.NewRequest("", "/", nil)
 
-			r.RequestURI = tt.uri
+			request.RequestURI = tt.uri
 
-			for _, handler := range tt.handlers {
-				require.True(g.Add(handler, h))
+			for _, h := range tt.handlers {
+				require.True(grpcRouter.Add(h, handler))
 			}
 
-			g.ServeHTTP(w, r)
-			require.Equal(tt.wantCode, w.Code)
+			grpcRouter.ServeHTTP(writer, request)
+			require.Equal(tt.wantCode, writer.Code)
 		})
 	}
 }
