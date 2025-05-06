@@ -71,7 +71,6 @@ func ensureMinimumFunds(ctx context.Context, endpoint string, keys []*ecdsa.Priv
 
 	maxFundsAddress := ethcrypto.PubkeyToAddress(maxFundsKey.PublicKey)
 	txTarget := uint64(len(needFundsKeys))
-	const issuePeriod = 0 // no delay between transaction issuance
 	issuer, err := issue.NewDistributor(ctx, client, maxFundsKey, needFundsKeys)
 	if err != nil {
 		return fmt.Errorf("creating issuer: %w", err)
