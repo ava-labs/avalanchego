@@ -1,12 +1,11 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package generate
+package issue
 
 import (
 	"context"
 	"crypto/ecdsa"
-	"errors"
 	"fmt"
 	"maps"
 	"math/big"
@@ -19,36 +18,37 @@ import (
 )
 
 type DistributorClient interface {
-	SelfClient
+	EthClient
 	EstimateBaseFee(ctx context.Context) (*big.Int, error)
 	SuggestGasTipCap(ctx context.Context) (*big.Int, error)
 }
 
-// Distributor
+// Issuer issues transactions to a node.
 type Distributor struct {
-	from      *ecdsa.PrivateKey
-	address   common.Address // corresponding to `from`
-	nonce     uint64
-	to        map[*ecdsa.PrivateKey]*big.Int
+	// Injected parameters
+	client EthClient
+	from   *ecdsa.PrivateKey
+	to     map[*ecdsa.PrivateKey]*big.Int
+
+	// Determined by constructor
+	address   common.Address // corresponding to key
 	signer    types.Signer
 	chainID   *big.Int
-	gasTipCap *big.Int
 	gasFeeCap *big.Int
+	gasTipCap *big.Int
+
+	// State
+	nonce uint64
 }
 
-func NewDistributor(ctx context.Context, client DistributorClient, from *ecdsa.PrivateKey,
-	to map[*ecdsa.PrivateKey]*big.Int,
+func NewDistributor(ctx context.Context, client DistributorClient,
+	from *ecdsa.PrivateKey, to map[*ecdsa.PrivateKey]*big.Int,
 ) (*Distributor, error) {
 	address := ethcrypto.PubkeyToAddress(from.PublicKey)
 	blockNumber := (*big.Int)(nil)
 	nonce, err := client.NonceAt(ctx, address, blockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("getting nonce for address %s: %w", address, err)
-	}
-
-	chainID, err := client.ChainID(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("getting chain ID: %w", err)
 	}
 
 	gasTipCap, err := client.SuggestGasTipCap(ctx)
@@ -61,25 +61,25 @@ func NewDistributor(ctx context.Context, client DistributorClient, from *ecdsa.P
 		return nil, fmt.Errorf("getting estimated base fee: %w", err)
 	}
 
+	chainID, err := client.ChainID(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting chain id: %w", err)
+	}
+
 	return &Distributor{
+		client:    client,
 		from:      from,
 		address:   address,
 		nonce:     nonce,
 		to:        maps.Clone(to), // need to clone the map to avoid modifying the original
 		signer:    types.LatestSignerForChainID(chainID),
 		chainID:   chainID,
-		gasTipCap: gasTipCap,
 		gasFeeCap: gasFeeCap,
+		gasTipCap: gasTipCap,
 	}, nil
 }
 
-func (d *Distributor) GenerateTx() (*types.Transaction, error) {
-	if len(d.to) == 0 {
-		// The caller of this function should prevent this error from being
-		// returned by bounding the number of transactions generated.
-		return nil, errors.New("no more keys to distribute funds to")
-	}
-
+func (d *Distributor) GenerateAndIssueTx(ctx context.Context) (*types.Transaction, error) {
 	var toKey *ecdsa.PrivateKey
 	var funds *big.Int
 	for toKey, funds = range d.to {
@@ -100,6 +100,10 @@ func (d *Distributor) GenerateTx() (*types.Transaction, error) {
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	if err := d.client.SendTransaction(ctx, tx); err != nil {
+		return nil, fmt.Errorf("issuing transaction with nonce %d: %w", d.nonce, err)
 	}
 	d.nonce++
 	return tx, nil

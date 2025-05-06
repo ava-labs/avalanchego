@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 
 	"github.com/ava-labs/avalanchego/tests/load/agent"
-	"github.com/ava-labs/avalanchego/tests/load/generate"
 	"github.com/ava-labs/avalanchego/tests/load/issue"
 	"github.com/ava-labs/avalanchego/tests/load/listen"
 	"github.com/ava-labs/avalanchego/tests/load/orchestrate"
@@ -72,16 +71,15 @@ func ensureMinimumFunds(ctx context.Context, endpoint string, keys []*ecdsa.Priv
 
 	maxFundsAddress := ethcrypto.PubkeyToAddress(maxFundsKey.PublicKey)
 	txTarget := uint64(len(needFundsKeys))
-	generator, err := generate.NewDistributor(ctx, client, maxFundsKey, needFundsKeys)
+	const issuePeriod = 0 // no delay between transaction issuance
+	issuer, err := issue.NewDistributor(ctx, client, maxFundsKey, needFundsKeys)
 	if err != nil {
-		return fmt.Errorf("creating distribution generator: %w", err)
+		return fmt.Errorf("creating issuer: %w", err)
 	}
 	tracker := tracker.NewNoop()
-	const issuePeriod = 0 // no delay between transaction issuance
-	issuer := issue.New(client, tracker, issuePeriod)
 	listener := listen.New(client, tracker, txTarget, maxFundsAddress)
 	agents := []*agent.Agent[*types.Transaction, common.Hash]{
-		agent.New(txTarget, generator, issuer, listener, tracker),
+		agent.New(txTarget, issuer, listener, tracker),
 	}
 	orchestrator := orchestrate.NewBurstOrchestrator(agents, time.Second)
 

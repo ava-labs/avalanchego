@@ -50,12 +50,9 @@ func (o *BurstOrchestrator[T, U]) Execute(ctx context.Context) error {
 	for _, agent := range o.agents {
 		issuerGroup.Go(func() error {
 			for range agent.TxTarget {
-				tx, err := agent.Generator.GenerateTx()
+				tx, err := agent.Issuer.GenerateAndIssueTx(ctx)
 				if err != nil {
-					return fmt.Errorf("generating transaction: %w", err)
-				}
-				if err := agent.Issuer.IssueTx(ctx, tx); err != nil {
-					return fmt.Errorf("issuing transaction: %w", err)
+					return fmt.Errorf("generating and issuing transaction: %w", err)
 				}
 
 				agent.Listener.RegisterIssued(tx)
