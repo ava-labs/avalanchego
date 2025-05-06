@@ -36,6 +36,7 @@ type SignedBlock interface {
 
 	PChainHeight() uint64
 	PChainEpochHeight() uint64
+	EpochNumber() uint64
 	Timestamp() time.Time
 
 	// Proposer returns the ID of the node that proposed this block. If no node
@@ -48,6 +49,7 @@ type statelessUnsignedBlock struct {
 	Timestamp         int64  `serialize:"true"`
 	PChainHeight      uint64 `serialize:"true"`
 	PChainEpochHeight uint64 `serialize:"true"`
+	EpochNumber       uint64 `serialize:"true"`
 	Certificate       []byte `serialize:"true"`
 	Block             []byte `serialize:"true"`
 }
@@ -131,6 +133,10 @@ func (b *statelessBlock) PChainHeight() uint64 {
 
 func (b *statelessBlock) PChainEpochHeight() uint64 {
 	return b.StatelessBlock.PChainEpochHeight
+}
+
+func (b *statelessBlock) EpochNumber() uint64 {
+	return b.StatelessBlock.EpochNumber
 }
 
 func (b *statelessBlock) Timestamp() time.Time {

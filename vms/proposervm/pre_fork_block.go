@@ -243,3 +243,7 @@ func (*preForkBlock) pChainHeight(context.Context) (uint64, error) {
 func (*preForkBlock) pChainEpochHeight(context.Context) (uint64, error) {
 	return 0, nil
 }
+
+func (b *preForkBlock) epochNumber(context.Context) (uint64, error) {
+	return 0, nil
+}
