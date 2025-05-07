@@ -89,6 +89,10 @@ tasks:
     desc: Generates protobuf
     cmd: ./scripts/protobuf_codegen.sh
 
+  ginkgo-build:
+    desc: Runs ginkgo against the current working directory
+    cmd: ./bin/ginkgo build {{.USER_WORKING_DIR}}
+
   install-nix:
     desc: Installs nix with the determinate systems installer
     cmd: curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
