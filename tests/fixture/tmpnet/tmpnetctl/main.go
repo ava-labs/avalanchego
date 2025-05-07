@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/tests"
@@ -24,7 +23,10 @@ import (
 
 const cliVersion = "0.0.1"
 
-var errNetworkDirRequired = fmt.Errorf("--network-dir or %s are required", tmpnet.NetworkDirEnvName)
+var (
+	errNetworkDirRequired = fmt.Errorf("--network-dir or %s is required", tmpnet.NetworkDirEnvName)
+	errKubeconfigRequired = errors.New("--kubeconfig is required")
+)
 
 func main() {
 	var (
@@ -226,10 +228,7 @@ func main() {
 	)
 	rootCmd.AddCommand(checkLogsCmd)
 
-	var (
-		kubeConfigPath    string
-		kubeConfigContext string
-	)
+	var kubeconfigVars *flags.KubeconfigVars
 	startKindClusterCmd := &cobra.Command{
 		Use:   "start-kind-cluster",
 		Short: "Starts a local kind cluster with an integrated registry",
@@ -240,10 +239,15 @@ func main() {
 			if err != nil {
 				return err
 			}
-			return tmpnet.StartKindCluster(ctx, log, kubeConfigPath, kubeConfigContext)
+			// A valid kubeconfig is required for local kind usage but this is not validated by KubeconfigVars
+			// since unlike kind, tmpnet usage may involve an implicit in-cluster config.
+			if len(kubeconfigVars.Path) == 0 {
+				return errKubeconfigRequired
+			}
+			return tmpnet.StartKindCluster(ctx, log, kubeconfigVars.Path, kubeconfigVars.Context)
 		},
 	}
-	SetKubeConfigFlags(startKindClusterCmd.PersistentFlags(), &kubeConfigPath, &kubeConfigContext)
+	kubeconfigVars = flags.NewKubeconfigFlagSetVars(startKindClusterCmd.PersistentFlags())
 	rootCmd.AddCommand(startKindClusterCmd)
 
 	if err := rootCmd.Execute(); err != nil {
@@ -251,19 +255,4 @@ func main() {
 		os.Exit(1)
 	}
 	os.Exit(0)
-}
-
-func SetKubeConfigFlags(flagSet *pflag.FlagSet, kubeConfigPath *string, kubeConfigContext *string) {
-	flagSet.StringVar(
-		kubeConfigPath,
-		"kubeconfig",
-		os.Getenv("KUBECONFIG"),
-		"The path to a kubernetes configuration file for the target cluster",
-	)
-	flagSet.StringVar(
-		kubeConfigContext,
-		"kubeconfig-context",
-		"",
-		"The path to a kubernetes configuration file for the target cluster",
-	)
 }
