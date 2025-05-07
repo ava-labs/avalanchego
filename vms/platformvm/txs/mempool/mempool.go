@@ -43,7 +43,7 @@ type Mempool struct {
 	maxHeap            heap.Map[ids.ID, Tx]
 	minHeap            heap.Map[ids.ID, Tx]
 	consumedUTXOs      *setmap.SetMap[ids.ID, ids.ID]
-	droppedTxIDs       *lru.SizedCache[ids.ID, error]
+	droppedTxIDs       *lru.Cache[ids.ID, error]
 	currentGas         gas.Gas
 	numTxsMetric       prometheus.Gauge
 	gasAvailableMetric prometheus.Gauge
@@ -85,10 +85,8 @@ func New(
 		minHeap: heap.NewMap[ids.ID, Tx](func(a, b Tx) bool {
 			return a.GasPrice < b.GasPrice
 		}),
-		consumedUTXOs: setmap.New[ids.ID, ids.ID](),
-		droppedTxIDs: lru.NewSizedCache[ids.ID, error](64, func(ids.ID, error) int {
-			return 1
-		}),
+		consumedUTXOs:      setmap.New[ids.ID, ids.ID](),
+		droppedTxIDs:       lru.NewCache[ids.ID, error](64),
 		numTxsMetric:       numTxsMetric,
 		gasAvailableMetric: gasAvailableMetric,
 	}, nil
