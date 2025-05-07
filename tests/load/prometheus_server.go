@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ava-labs/libevm/log"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -20,12 +20,14 @@ type MetricsServer struct {
 	addr     string
 	registry *prometheus.Registry
 	server   http.Server
+	logger   logging.Logger
 }
 
-func NewPrometheusServer(addr string, registry *prometheus.Registry) *MetricsServer {
+func NewPrometheusServer(addr string, registry *prometheus.Registry, logger logging.Logger) *MetricsServer {
 	return &MetricsServer{
 		addr:     addr,
 		registry: registry,
+		logger:   logger,
 	}
 }
 
@@ -65,7 +67,7 @@ func (s *MetricsServer) Start() (runError <-chan error, err error) {
 	}()
 	<-ready
 
-	log.Info(fmt.Sprintf("Metrics server available at http://%s%s", listener.Addr(), metricsPattern))
+	s.logger.Info(fmt.Sprintf("Metrics server available at http://%s%s", listener.Addr(), metricsPattern))
 
 	return runError, nil
 }

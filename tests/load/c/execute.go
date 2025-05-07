@@ -8,6 +8,7 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
+	"os"
 	"time"
 
 	"github.com/ava-labs/libevm/core/types"
@@ -34,7 +35,7 @@ type config struct {
 }
 
 func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config config) error {
-	logger := logging.NewLogger("")
+	logger := logging.NewLogger("", logging.NewWrappedCore(logging.Info, os.Stdout, logging.Auto.ConsoleEncoder()))
 
 	keys, err := fixKeysCount(preFundedKeys, int(config.agents))
 	if err != nil {
@@ -52,7 +53,7 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 	}
 
 	registry := prometheus.NewRegistry()
-	metricsServer := load.NewPrometheusServer("127.0.0.1:8082", registry)
+	metricsServer := load.NewPrometheusServer("127.0.0.1:8082", registry, logger)
 	tracker, err := load.NewPrometheusTracker[*types.Transaction](registry, logger)
 	if err != nil {
 		return fmt.Errorf("creating tracker: %w", err)
