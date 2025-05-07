@@ -26,7 +26,7 @@ flags.
 In cases where a change can be verified against only a subset of
 tests, it is possible to filter the tests that will be executed by the
 declarative labels that have been applied to them. Available labels
-are defined as constants in [`describe.go`](./describe.go) with names
+are defined as constants in [`describe.go`](../fixture/e2e/describe.go) with names
 of the form `*Label`. The following example runs only those tests that
 primarily target the X-Chain:
 
@@ -40,7 +40,7 @@ queries](https://onsi.github.io/ginkgo/#spec-labels).
 
 ## Adding tests
 
-Define any flags/configurations in [`e2e.go`](./e2e.go).
+Define any flags/configurations in [`flags.go`](../fixture/e2e/flags.go).
 
 Create a new package to implement feature-specific tests, or add tests to an existing package. For example:
 
@@ -135,4 +135,4 @@ until stopped by `tmpnetctl stop-collectors`.
 The results of collection will be viewable at
 https://grafana-poc.avax-dev.network.
 
-For more detail, see the [tmpnet docs](../tmpnet/README.md#monitoring).
+For more detail, see the [tmpnet docs](../fixture/tmpnet/README.md##monitoring).

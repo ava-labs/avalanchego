@@ -22,7 +22,7 @@ Just as [Coreth] powers the [C-Chain], XSVM can be used to power its own blockch
 
 ## How it Works
 
-XSVM utilizes AvalancheGo's [teleporter] package to create and authenticate Subnet Messages.
+XSVM utilizes AvalancheGo's [interchain messaging] package to create and authenticate Subnet Messages.
 
 ### Transfer
 
@@ -121,7 +121,7 @@ type Client interface {
     ctx context.Context,
     txID ids.ID,
     options ...rpc.Option,
-  ) (*teleporter.UnsignedMessage, []byte, error)
+  ) (*warp.UnsignedMessage, []byte, error)
 }
 ```
 
@@ -283,7 +283,7 @@ P-Chain.
 
 You can do this by following the [subnet tutorial] or by using the [subnet-cli].
 
-[teleporter]: https://github.com/ava-labs/avalanchego/tree/master/vms/platformvm/teleporter
+[interchain messaging]: https://github.com/ava-labs/avalanchego/tree/master/vms/platformvm/warp/README.md
 [subnet tutorial]: https://build.avax.network/docs/tooling/create-avalanche-l1
 [Coreth]: https://github.com/ava-labs/coreth
 [C-Chain]: https://build.avax.network/docs/quick-start/primary-network#c-chain
