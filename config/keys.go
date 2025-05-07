@@ -203,7 +203,6 @@ const (
 	VMAliasesContentKey                                = "vm-aliases-file-content"
 	ChainAliasesFileKey                                = "chain-aliases-file"
 	ChainAliasesContentKey                             = "chain-aliases-file-content"
-	TracingEnabledKey                                  = "tracing-enabled"
 	TracingEndpointKey                                 = "tracing-endpoint"
 	TracingInsecureKey                                 = "tracing-insecure"
 	TracingSampleRateKey                               = "tracing-sample-rate"

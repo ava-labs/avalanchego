@@ -48,6 +48,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/wallet"
+
+	txmempool "github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
 const (
@@ -81,7 +83,7 @@ type test struct {
 
 type environment struct {
 	blkManager Manager
-	mempool    mempool.Mempool
+	mempool    txmempool.Mempool[*txs.Tx]
 	sender     *enginetest.Sender
 
 	isBootstrapped *utils.Atomic[bool]
@@ -153,7 +155,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 	metrics := metrics.Noop
 
 	var err error
-	res.mempool, err = mempool.New("mempool", registerer, nil)
+	res.mempool, err = mempool.New("mempool", registerer)
 	if err != nil {
 		panic(fmt.Errorf("failed to create mempool: %w", err))
 	}
@@ -161,6 +163,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 	if ctrl == nil {
 		res.blkManager = NewManager(
 			res.mempool,
+			nil,
 			metrics,
 			res.state,
 			res.backend,
@@ -170,6 +173,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 	} else {
 		res.blkManager = NewManager(
 			res.mempool,
+			nil,
 			metrics,
 			res.mockedState,
 			res.backend,
