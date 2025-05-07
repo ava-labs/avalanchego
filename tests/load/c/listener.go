@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 )
 
-type EthClientListener interface {
+type EthClient interface {
 	NonceAt(ctx context.Context, addr common.Address, blockNumber *big.Int) (uint64, error)
 	NewHeadSubscriber
 }
@@ -26,7 +26,7 @@ type Observer interface {
 // Listener listens for transaction confirmations from a node.
 type Listener struct {
 	// Injected parameters
-	client  EthClientListener
+	client  EthClient
 	tracker Observer
 	address common.Address
 
@@ -37,7 +37,7 @@ type Listener struct {
 	inFlightTxs     []*types.Transaction
 }
 
-func NewListener(client EthClientListener, tracker Observer, address common.Address) *Listener {
+func NewListener(client EthClient, tracker Observer, address common.Address) *Listener {
 	return &Listener{
 		client:  client,
 		tracker: tracker,

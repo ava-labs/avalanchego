@@ -1,7 +1,7 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package c
+package issuers
 
 import (
 	"context"
@@ -16,22 +16,23 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rpc"
 
-	evmloadsimulator "github.com/ava-labs/avalanchego/tests/load/c/contracts"
+	"github.com/ava-labs/avalanchego/tests/load/c/contracts"
+
 	ethcrypto "github.com/ava-labs/libevm/crypto"
 )
 
-type EthClientOpcodeIssuer interface {
-	EthClientSimpleIssuer
+type EthClientOpcoder interface {
+	EthClientSimple
 	bind.DeployBackend
 	bind.ContractBackend
 }
 
-// OpcodeIssuer generates and issues transactions that randomly call the
-// external functions of the [evmloadsimulator.EVMLoadSimulator] contract
+// Opcoder generates and issues transactions that randomly call the
+// external functions of the [contracts.EVMLoadSimulator] contract
 // instance that it deploys.
-type OpcodeIssuer struct {
+type Opcoder struct {
 	// Injected parameters
-	client      EthClientOpcodeIssuer
+	client      EthClientOpcoder
 	tracker     IssueTracker
 	senderKey   *ecdsa.PrivateKey
 	maxFeeCap   *big.Int
@@ -41,21 +42,21 @@ type OpcodeIssuer struct {
 	chainID          *big.Int
 	maxTipCap        *big.Int
 	contractAddress  common.Address
-	contractInstance *evmloadsimulator.EVMLoadSimulator
+	contractInstance *contracts.EVMLoadSimulator
 
 	// State
 	nonce     uint64
 	lastIssue time.Time
 }
 
-func NewOpCodeSimulator(
+func NewOpcoder(
 	ctx context.Context,
-	client EthClientOpcodeIssuer,
+	client EthClientOpcoder,
 	tracker IssueTracker,
 	maxFeeCap *big.Int,
 	key *ecdsa.PrivateKey,
 	issuePeriod time.Duration,
-) (*OpcodeIssuer, error) {
+) (*Opcoder, error) {
 	chainID, err := client.ChainID(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting chain id: %w", err)
@@ -71,7 +72,7 @@ func NewOpCodeSimulator(
 	if err != nil {
 		return nil, fmt.Errorf("creating transaction opts: %w", err)
 	}
-	_, simulatorDeploymentTx, simulatorInstance, err := evmloadsimulator.DeployEVMLoadSimulator(txOpts, client)
+	_, simulatorDeploymentTx, simulatorInstance, err := contracts.DeployEVMLoadSimulator(txOpts, client)
 	if err != nil {
 		return nil, fmt.Errorf("deploying simulator contract: %w", err)
 	}
@@ -82,7 +83,7 @@ func NewOpCodeSimulator(
 		return nil, fmt.Errorf("waiting for simulator contract to be mined: %w", err)
 	}
 
-	return &OpcodeIssuer{
+	return &Opcoder{
 		client:           client,
 		tracker:          tracker,
 		senderKey:        key,
@@ -96,7 +97,7 @@ func NewOpCodeSimulator(
 	}, nil
 }
 
-func (o *OpcodeIssuer) GenerateAndIssueTx(ctx context.Context) (tx *types.Transaction, err error) {
+func (o *Opcoder) GenerateAndIssueTx(ctx context.Context) (tx *types.Transaction, err error) {
 	if o.issuePeriod > 0 && !o.lastIssue.IsZero() &&
 		time.Since(o.lastIssue) < o.issuePeriod {
 		timer := time.NewTimer(o.issuePeriod - time.Since(o.lastIssue))
@@ -175,7 +176,7 @@ func allLoadTypes() []string {
 	}
 }
 
-func (o *OpcodeIssuer) newTxOpts(ctx context.Context) (*bind.TransactOpts, error) {
+func (o *Opcoder) newTxOpts(ctx context.Context) (*bind.TransactOpts, error) {
 	return newTxOpts(ctx, o.senderKey, o.chainID, o.maxFeeCap, o.maxTipCap, o.nonce)
 }
 

@@ -1,7 +1,7 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package c
+package issuers
 
 import (
 	"context"
@@ -17,7 +17,7 @@ import (
 	ethcrypto "github.com/ava-labs/libevm/crypto"
 )
 
-type EthClientSimpleIssuer interface {
+type EthClientSimple interface {
 	ChainID(ctx context.Context) (*big.Int, error)
 	NonceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (uint64, error)
 	SendTransaction(ctx context.Context, tx *types.Transaction) error
@@ -27,10 +27,10 @@ type IssueTracker interface {
 	Issue(tx *types.Transaction)
 }
 
-// SimplerIssuer generates and issues transactions sending 0 fund to the sender.
-type SimplerIssuer struct {
+// Simple generates and issues transactions sending 0 fund to the sender.
+type Simple struct {
 	// Injected parameters
-	client      EthClientSimpleIssuer
+	client      EthClientSimple
 	tracker     IssueTracker
 	key         *ecdsa.PrivateKey
 	gasFeeCap   *big.Int
@@ -47,9 +47,9 @@ type SimplerIssuer struct {
 	lastIssue time.Time
 }
 
-func NewSimpleIssuer(ctx context.Context, client EthClientSimpleIssuer, tracker IssueTracker,
+func NewSimple(ctx context.Context, client EthClientSimple, tracker IssueTracker,
 	maxFeeCap *big.Int, key *ecdsa.PrivateKey, issuePeriod time.Duration,
-) (*SimplerIssuer, error) {
+) (*Simple, error) {
 	address := ethcrypto.PubkeyToAddress(key.PublicKey)
 	blockNumber := (*big.Int)(nil)
 	nonce, err := client.NonceAt(ctx, address, blockNumber)
@@ -66,7 +66,7 @@ func NewSimpleIssuer(ctx context.Context, client EthClientSimpleIssuer, tracker 
 		return nil, fmt.Errorf("getting chain id: %w", err)
 	}
 
-	return &SimplerIssuer{
+	return &Simple{
 		client:      client,
 		tracker:     tracker,
 		key:         key,
@@ -80,14 +80,14 @@ func NewSimpleIssuer(ctx context.Context, client EthClientSimpleIssuer, tracker 
 	}, nil
 }
 
-func (i *SimplerIssuer) GenerateAndIssueTx(ctx context.Context) (*types.Transaction, error) {
-	tx, err := types.SignNewTx(i.key, i.signer, &types.DynamicFeeTx{
-		ChainID:   i.chainID,
-		Nonce:     i.nonce,
-		GasTipCap: i.gasTipCap,
-		GasFeeCap: i.gasFeeCap,
+func (s *Simple) GenerateAndIssueTx(ctx context.Context) (*types.Transaction, error) {
+	tx, err := types.SignNewTx(s.key, s.signer, &types.DynamicFeeTx{
+		ChainID:   s.chainID,
+		Nonce:     s.nonce,
+		GasTipCap: s.gasTipCap,
+		GasFeeCap: s.gasFeeCap,
 		Gas:       params.TxGas,
-		To:        &i.address, // self
+		To:        &s.address, // self
 		Data:      nil,
 		Value:     common.Big0,
 	})
@@ -95,9 +95,9 @@ func (i *SimplerIssuer) GenerateAndIssueTx(ctx context.Context) (*types.Transact
 		return nil, err
 	}
 
-	if i.issuePeriod > 0 && !i.lastIssue.IsZero() &&
-		time.Since(i.lastIssue) < i.issuePeriod {
-		timer := time.NewTimer(i.issuePeriod - time.Since(i.lastIssue))
+	if s.issuePeriod > 0 && !s.lastIssue.IsZero() &&
+		time.Since(s.lastIssue) < s.issuePeriod {
+		timer := time.NewTimer(s.issuePeriod - time.Since(s.lastIssue))
 		select {
 		case <-timer.C:
 		case <-ctx.Done():
@@ -106,11 +106,11 @@ func (i *SimplerIssuer) GenerateAndIssueTx(ctx context.Context) (*types.Transact
 		}
 	}
 
-	if err := i.client.SendTransaction(ctx, tx); err != nil {
-		return nil, fmt.Errorf("issuing transaction with nonce %d: %w", i.nonce, err)
+	if err := s.client.SendTransaction(ctx, tx); err != nil {
+		return nil, fmt.Errorf("issuing transaction with nonce %d: %w", s.nonce, err)
 	}
-	i.nonce++
-	i.tracker.Issue(tx)
-	i.lastIssue = time.Now()
+	s.nonce++
+	s.tracker.Issue(tx)
+	s.lastIssue = time.Now()
 	return tx, nil
 }

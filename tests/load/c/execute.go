@@ -16,6 +16,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/tests/load"
+	"github.com/ava-labs/avalanchego/tests/load/c/issuers"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
@@ -63,7 +64,7 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 		if err != nil {
 			return fmt.Errorf("dialing %s: %w", endpoint, err)
 		}
-		issuer, err := NewSimpleIssuer(ctx, client, tracker,
+		issuer, err := issuers.NewSimple(ctx, client, tracker,
 			big.NewInt(config.maxFeeCap), keys[i], config.issuePeriod)
 		if err != nil {
 			return fmt.Errorf("creating issuer: %w", err)

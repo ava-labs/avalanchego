@@ -1,7 +1,7 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package c
+package issuers
 
 import (
 	"context"
@@ -17,16 +17,17 @@ import (
 	ethcrypto "github.com/ava-labs/libevm/crypto"
 )
 
-type DistributorClient interface {
-	EthClientSimpleIssuer
+type EthClientDistributor interface {
+	EthClientSimple
 	EstimateBaseFee(ctx context.Context) (*big.Int, error)
 	SuggestGasTipCap(ctx context.Context) (*big.Int, error)
 }
 
-// Issuer issues transactions to a node.
-type DistributingIssuer struct {
+// Distributor issues transactions to a node to distribute funds from a single address
+// to multiple addresses.
+type Distributor struct {
 	// Injected parameters
-	client DistributorClient
+	client EthClientDistributor
 	from   *ecdsa.PrivateKey
 	to     map[*ecdsa.PrivateKey]*big.Int
 
@@ -41,9 +42,9 @@ type DistributingIssuer struct {
 	nonce uint64
 }
 
-func NewDistributingIssuer(ctx context.Context, client DistributorClient,
+func NewDistributor(ctx context.Context, client EthClientDistributor,
 	from *ecdsa.PrivateKey, to map[*ecdsa.PrivateKey]*big.Int,
-) (*DistributingIssuer, error) {
+) (*Distributor, error) {
 	address := ethcrypto.PubkeyToAddress(from.PublicKey)
 	blockNumber := (*big.Int)(nil)
 	nonce, err := client.NonceAt(ctx, address, blockNumber)
@@ -66,7 +67,7 @@ func NewDistributingIssuer(ctx context.Context, client DistributorClient,
 		return nil, fmt.Errorf("getting chain id: %w", err)
 	}
 
-	return &DistributingIssuer{
+	return &Distributor{
 		client:    client,
 		from:      from,
 		address:   address,
@@ -79,7 +80,7 @@ func NewDistributingIssuer(ctx context.Context, client DistributorClient,
 	}, nil
 }
 
-func (d *DistributingIssuer) GenerateAndIssueTx(ctx context.Context) (*types.Transaction, error) {
+func (d *Distributor) GenerateAndIssueTx(ctx context.Context) (*types.Transaction, error) {
 	var toKey *ecdsa.PrivateKey
 	var funds *big.Int
 	for toKey, funds = range d.to {

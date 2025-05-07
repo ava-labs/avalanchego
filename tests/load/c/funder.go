@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 
 	"github.com/ava-labs/avalanchego/tests/load"
+	"github.com/ava-labs/avalanchego/tests/load/c/issuers"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	ethcrypto "github.com/ava-labs/libevm/crypto"
@@ -67,7 +68,7 @@ func ensureMinimumFunds(ctx context.Context, endpoint string, keys []*ecdsa.Priv
 	}
 
 	maxFundsAddress := ethcrypto.PubkeyToAddress(maxFundsKey.PublicKey)
-	issuer, err := NewDistributingIssuer(ctx, client, maxFundsKey, needFundsKeys)
+	issuer, err := issuers.NewDistributor(ctx, client, maxFundsKey, needFundsKeys)
 	if err != nil {
 		return fmt.Errorf("creating issuer: %w", err)
 	}
