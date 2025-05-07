@@ -114,6 +114,10 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 		gasPrice = float64(feesPaid) / float64(gasUsed)
 	}
 
+	if m.consumedUTXOs.HasOverlap(tx.InputIDs()) {
+		return fmt.Errorf("failed to add tx: %w", mempool.ErrConflictsWithOtherTx)
+	}
+
 	// Evict a lower paying tx if we do not have enough remaining gas capacity
 	if next := m.currentGas + gasUsed; next > m.gasCapacity {
 		if err := m.tryEvictTx(next, gasPrice); err != nil {
@@ -126,10 +130,6 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 		Complexity: complexity,
 		gasUsed:    gasUsed,
 		GasPrice:   gasPrice,
-	}
-
-	if m.consumedUTXOs.HasOverlap(tx.InputIDs()) {
-		return fmt.Errorf("failed to add tx: %w", mempool.ErrConflictsWithOtherTx)
 	}
 
 	m.maxHeap.Push(tx.TxID, heapTx)
