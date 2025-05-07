@@ -1,7 +1,7 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package c
+package listener
 
 import (
 	"context"
@@ -37,7 +37,7 @@ type Listener struct {
 	inFlightTxs     []*types.Transaction
 }
 
-func NewListener(client EthClient, tracker Observer, address common.Address) *Listener {
+func New(client EthClient, tracker Observer, address common.Address) *Listener {
 	return &Listener{
 		client:  client,
 		tracker: tracker,

@@ -17,6 +17,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/tests/load"
 	"github.com/ava-labs/avalanchego/tests/load/c/issuers"
+	"github.com/ava-labs/avalanchego/tests/load/c/listener"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
@@ -70,7 +71,7 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 			return fmt.Errorf("creating issuer: %w", err)
 		}
 		address := ethcrypto.PubkeyToAddress(keys[i].PublicKey)
-		listener := NewListener(client, tracker, address)
+		listener := listener.New(client, tracker, address)
 		agents[i] = load.NewAgent(issuer, listener)
 	}
 

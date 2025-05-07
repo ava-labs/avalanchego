@@ -19,6 +19,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/tests/load"
 	"github.com/ava-labs/avalanchego/tests/load/c/issuers"
+	"github.com/ava-labs/avalanchego/tests/load/c/listener"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	ethcrypto "github.com/ava-labs/libevm/crypto"
@@ -73,7 +74,7 @@ func ensureMinimumFunds(ctx context.Context, endpoint string, keys []*ecdsa.Priv
 		return fmt.Errorf("creating issuer: %w", err)
 	}
 	tracker := load.NewNoopTracker[*types.Transaction]()
-	listener := NewListener(client, tracker, maxFundsAddress)
+	listener := listener.New(client, tracker, maxFundsAddress)
 	agents := []load.Agent[*types.Transaction]{
 		load.NewAgent(issuer, listener),
 	}
