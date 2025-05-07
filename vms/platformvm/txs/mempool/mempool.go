@@ -199,7 +199,6 @@ func (m *Mempool) Peek() (Tx, bool) {
 	defer m.lock.Unlock()
 
 	_, tx, ok := m.maxHeap.Peek()
-
 	return tx, ok
 }
 
