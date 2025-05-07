@@ -26,10 +26,9 @@ var (
 	_ txs.Visitor = (*utxoGetter)(nil)
 )
 
-type Tx struct {
+type heapTx struct {
 	*txs.Tx
-	Complexity gas.Dimensions
-	GasPrice   float64
+	GasPrice float64
 
 	gasUsed gas.Gas
 }
@@ -40,8 +39,8 @@ type Mempool struct {
 	avaxAssetID ids.ID
 
 	lock               sync.Mutex
-	maxHeap            heap.Map[ids.ID, Tx]
-	minHeap            heap.Map[ids.ID, Tx]
+	maxHeap            heap.Map[ids.ID, heapTx]
+	minHeap            heap.Map[ids.ID, heapTx]
 	consumedUTXOs      *setmap.SetMap[ids.ID, ids.ID]
 	droppedTxIDs       *lru.Cache[ids.ID, error]
 	currentGas         gas.Gas
@@ -79,10 +78,10 @@ func New(
 		weights:     weights,
 		gasCapacity: gasCapacity,
 		avaxAssetID: avaxAssetID,
-		maxHeap: heap.NewMap[ids.ID, Tx](func(a, b Tx) bool {
+		maxHeap: heap.NewMap[ids.ID, heapTx](func(a, b heapTx) bool {
 			return a.GasPrice > b.GasPrice
 		}),
-		minHeap: heap.NewMap[ids.ID, Tx](func(a, b Tx) bool {
+		minHeap: heap.NewMap[ids.ID, heapTx](func(a, b heapTx) bool {
 			return a.GasPrice < b.GasPrice
 		}),
 		consumedUTXOs:      setmap.New[ids.ID, ids.ID](),
@@ -96,7 +95,7 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	complexity, gasUsed, err := m.meter(tx.Unsigned)
+	_, gasUsed, err := m.meter(tx.Unsigned)
 	if err != nil {
 		return fmt.Errorf("failed to meter tx: %w", err)
 	}
@@ -106,30 +105,18 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 		return fmt.Errorf("failed to get utxos: %w", err)
 	}
 
-	feesPaid := consumedAVAX - producedAVAX
-	gasPrice := float64(0)
-	if gasUsed == 0 {
-		gasPrice = 0
-	} else {
-		gasPrice = float64(feesPaid) / float64(gasUsed)
+	heapTx := heapTx{
+		Tx:       tx,
+		gasUsed:  gasUsed,
+		GasPrice: float64(consumedAVAX-producedAVAX) / float64(gasUsed),
 	}
 
-	if m.consumedUTXOs.HasOverlap(tx.InputIDs()) {
-		return fmt.Errorf("failed to add tx: %w", mempool.ErrConflictsWithOtherTx)
-	}
-
-	// Evict a lower paying tx if we do not have enough remaining gas capacity
+	// Try to evict a lower paying tx if we do not have enough remaining gas
+	// capacity
 	if next := m.currentGas + gasUsed; next > m.gasCapacity {
-		if err := m.tryEvictTx(next, gasPrice); err != nil {
+		if err := m.tryEvictTx(next, heapTx); err != nil {
 			return err
 		}
-	}
-
-	heapTx := Tx{
-		Tx:         tx,
-		Complexity: complexity,
-		gasUsed:    gasUsed,
-		GasPrice:   gasPrice,
 	}
 
 	m.maxHeap.Push(tx.TxID, heapTx)
@@ -145,12 +132,23 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 
 // Evict a tx if it is lower paying and the resulting total gas is within
 // capacity
-func (m *Mempool) tryEvictTx(next gas.Gas, gasPrice float64) error {
-	if _, low, ok := m.minHeap.Peek(); ok &&
-		low.GasPrice < gasPrice &&
-		next-low.gasUsed <= m.gasCapacity {
-		evictedTxID, _, _ := m.minHeap.Pop()
+func (m *Mempool) tryEvictTx(next gas.Gas, tx heapTx) error {
+	_, low, ok := m.minHeap.Peek()
+	if !ok {
+		return nil
+	}
 
+	// Check if evicting the lowest paying tx would give us enough capacity to fit
+	// this tx
+	if low.GasPrice < tx.GasPrice && next-low.gasUsed <= m.gasCapacity {
+		// Check to see if this conflicts with any remaining txs
+		evictedUTXOs, _ := m.consumedUTXOs.DeleteKey(low.TxID)
+		if m.consumedUTXOs.HasOverlap(tx.InputIDs()) {
+			m.consumedUTXOs.Put(low.TxID, evictedUTXOs)
+			return mempool.ErrConflictsWithOtherTx
+		}
+
+		evictedTxID, _, _ := m.minHeap.Pop()
 		m.remove(evictedTxID)
 
 		return nil

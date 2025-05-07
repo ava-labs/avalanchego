@@ -51,7 +51,6 @@ import (
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	txmempool "github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
 const (
@@ -68,7 +67,7 @@ type mutableSharedMemory struct {
 type environment struct {
 	Builder
 	blkManager blockexecutor.Manager
-	mempool    txmempool.Mempool[*txs.Tx]
+	mempool    *mempool.Mempool
 	network    *network.Network
 	sender     *enginetest.Sender
 
