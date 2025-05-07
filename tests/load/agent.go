@@ -3,28 +3,17 @@
 
 package load
 
-type Agent[T, U comparable] struct {
+type Agent[T comparable] struct {
 	Issuer   Issuer[T]
 	Listener Listener[T]
-	Tracker  Tracker[U]
 }
 
-func NewAgent[T, U comparable](
+func NewAgent[T comparable](
 	issuer Issuer[T],
 	listener Listener[T],
-	tracker Tracker[U],
-) Agent[T, U] {
-	return Agent[T, U]{
+) Agent[T] {
+	return Agent[T]{
 		Issuer:   issuer,
 		Listener: listener,
-		Tracker:  tracker,
 	}
-}
-
-func GetTotalObservedConfirmed[T, U comparable](agents []Agent[T, U]) uint64 {
-	total := uint64(0)
-	for _, agent := range agents {
-		total += agent.Tracker.GetObservedConfirmed()
-	}
-	return total
 }

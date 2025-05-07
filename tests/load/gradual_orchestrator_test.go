@@ -64,7 +64,7 @@ func TestGradualOrchestratorTPS(t *testing.T) {
 			tracker, err := NewPrometheusTracker[ids.ID](prometheus.NewRegistry())
 			r.NoError(err)
 
-			agents := []Agent[ids.ID, ids.ID]{
+			agents := []Agent[ids.ID]{
 				NewAgent(
 					&mockIssuer{
 						generateTxF: func() (ids.ID, error) {
@@ -74,12 +74,12 @@ func TestGradualOrchestratorTPS(t *testing.T) {
 						maxTxs:  tt.serverTPS,
 					},
 					&mockListener{},
-					tracker,
 				),
 			}
 
 			orchestrator, err := NewGradualOrchestrator(
 				agents,
+				tracker,
 				logging.NoLog{},
 				tt.config,
 			)
@@ -108,28 +108,27 @@ func TestGradualOrchestratorExecution(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		agents      []Agent[ids.ID, ids.ID]
+		agents      []Agent[ids.ID]
 		expectedErr error
 	}{
 		{
 			name: "generator error",
-			agents: []Agent[ids.ID, ids.ID]{
-				NewAgent[ids.ID, ids.ID](
+			agents: []Agent[ids.ID]{
+				NewAgent[ids.ID](
 					&mockIssuer{
 						generateTxF: func() (ids.ID, error) {
 							return ids.Empty, errMockTxGenerator
 						},
 					},
 					&mockListener{},
-					tracker,
 				),
 			},
 			expectedErr: errMockTxGenerator,
 		},
 		{
 			name: "issuer error",
-			agents: []Agent[ids.ID, ids.ID]{
-				NewAgent[ids.ID, ids.ID](
+			agents: []Agent[ids.ID]{
+				NewAgent[ids.ID](
 					&mockIssuer{
 						generateTxF: func() (ids.ID, error) {
 							return ids.GenerateTestID(), nil
@@ -137,7 +136,6 @@ func TestGradualOrchestratorExecution(t *testing.T) {
 						issueTxErr: errMockIssuer,
 					},
 					&mockListener{},
-					tracker,
 				),
 			},
 			expectedErr: errMockIssuer,
@@ -152,6 +150,7 @@ func TestGradualOrchestratorExecution(t *testing.T) {
 
 			orchestrator, err := NewGradualOrchestrator(
 				tt.agents,
+				tracker,
 				logging.NoLog{},
 				DefaultGradualOrchestratorConfig(),
 			)
