@@ -1,7 +1,7 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package load
+package c
 
 import (
 	"context"
@@ -17,11 +17,8 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 
-	"github.com/ava-labs/avalanchego/tests/load/agent"
-	"github.com/ava-labs/avalanchego/tests/load/issue"
-	"github.com/ava-labs/avalanchego/tests/load/listen"
-	"github.com/ava-labs/avalanchego/tests/load/orchestrate"
-	"github.com/ava-labs/avalanchego/tests/load/tracker"
+	"github.com/ava-labs/avalanchego/tests/load"
+	"github.com/ava-labs/avalanchego/utils/logging"
 
 	ethcrypto "github.com/ava-labs/libevm/crypto"
 )
@@ -70,17 +67,23 @@ func ensureMinimumFunds(ctx context.Context, endpoint string, keys []*ecdsa.Priv
 	}
 
 	maxFundsAddress := ethcrypto.PubkeyToAddress(maxFundsKey.PublicKey)
-	txTarget := uint64(len(needFundsKeys))
-	issuer, err := issue.NewDistributor(ctx, client, maxFundsKey, needFundsKeys)
+	issuer, err := NewDistributingIssuer(ctx, client, maxFundsKey, needFundsKeys)
 	if err != nil {
 		return fmt.Errorf("creating issuer: %w", err)
 	}
-	tracker := tracker.NewNoop()
-	listener := listen.New(client, tracker, txTarget, maxFundsAddress)
-	agents := []*agent.Agent[*types.Transaction, common.Hash]{
-		agent.New(txTarget, issuer, listener, tracker),
+	tracker := load.NewNoopTracker[*types.Transaction]()
+	listener := NewListener(client, tracker, maxFundsAddress)
+	agents := []load.Agent[*types.Transaction]{
+		load.NewAgent(issuer, listener),
 	}
-	orchestrator := orchestrate.NewBurstOrchestrator(agents, time.Second)
+	orchestratorConfig := load.BurstOrchestratorConfig{
+		TxsPerIssuer: uint64(len(needFundsKeys)),
+		Timeout:      time.Second,
+	}
+	orchestrator, err := load.NewBurstOrchestrator(agents, logging.NoLog{}, orchestratorConfig)
+	if err != nil {
+		return fmt.Errorf("creating orchestrator: %w", err)
+	}
 
 	err = orchestrator.Execute(ctx)
 	if err != nil {

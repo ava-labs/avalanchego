@@ -1,7 +1,7 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package issue
+package c
 
 import (
 	"context"
@@ -16,23 +16,23 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rpc"
 
-	evmloadsimulator "github.com/ava-labs/avalanchego/tests/load/issue/contracts"
+	evmloadsimulator "github.com/ava-labs/avalanchego/tests/load/c/contracts"
 	ethcrypto "github.com/ava-labs/libevm/crypto"
 )
 
-type BindEthClient interface {
-	EthClient
+type EthClientOpcodeIssuer interface {
+	EthClientSimpleIssuer
 	bind.DeployBackend
 	bind.ContractBackend
 }
 
-// OpCodeSimulator generates and issues transactions that randomly call the
+// OpcodeIssuer generates and issues transactions that randomly call the
 // external functions of the [evmloadsimulator.EVMLoadSimulator] contract
 // instance that it deploys.
-type OpCodeSimulator struct {
+type OpcodeIssuer struct {
 	// Injected parameters
-	client      BindEthClient
-	tracker     Tracker
+	client      EthClientOpcodeIssuer
+	tracker     IssueTracker
 	senderKey   *ecdsa.PrivateKey
 	maxFeeCap   *big.Int
 	issuePeriod time.Duration
@@ -50,12 +50,12 @@ type OpCodeSimulator struct {
 
 func NewOpCodeSimulator(
 	ctx context.Context,
-	client BindEthClient,
-	tracker Tracker,
+	client EthClientOpcodeIssuer,
+	tracker IssueTracker,
 	maxFeeCap *big.Int,
 	key *ecdsa.PrivateKey,
 	issuePeriod time.Duration,
-) (*OpCodeSimulator, error) {
+) (*OpcodeIssuer, error) {
 	chainID, err := client.ChainID(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting chain id: %w", err)
@@ -82,7 +82,7 @@ func NewOpCodeSimulator(
 		return nil, fmt.Errorf("waiting for simulator contract to be mined: %w", err)
 	}
 
-	return &OpCodeSimulator{
+	return &OpcodeIssuer{
 		client:           client,
 		tracker:          tracker,
 		senderKey:        key,
@@ -96,7 +96,7 @@ func NewOpCodeSimulator(
 	}, nil
 }
 
-func (o *OpCodeSimulator) GenerateAndIssueTx(ctx context.Context) (tx *types.Transaction, err error) {
+func (o *OpcodeIssuer) GenerateAndIssueTx(ctx context.Context) (tx *types.Transaction, err error) {
 	if o.issuePeriod > 0 && !o.lastIssue.IsZero() &&
 		time.Since(o.lastIssue) < o.issuePeriod {
 		timer := time.NewTimer(o.issuePeriod - time.Since(o.lastIssue))
@@ -150,7 +150,7 @@ func (o *OpCodeSimulator) GenerateAndIssueTx(ctx context.Context) (tx *types.Tra
 	}
 
 	o.nonce++
-	o.tracker.Issue(tx.Hash())
+	o.tracker.Issue(tx)
 	o.lastIssue = time.Now()
 	return tx, err
 }
@@ -175,7 +175,7 @@ func allLoadTypes() []string {
 	}
 }
 
-func (o *OpCodeSimulator) newTxOpts(ctx context.Context) (*bind.TransactOpts, error) {
+func (o *OpcodeIssuer) newTxOpts(ctx context.Context) (*bind.TransactOpts, error) {
 	return newTxOpts(ctx, o.senderKey, o.chainID, o.maxFeeCap, o.maxTipCap, o.nonce)
 }
 

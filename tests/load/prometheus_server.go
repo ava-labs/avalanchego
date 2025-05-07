@@ -1,7 +1,7 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package tracker
+package load
 
 import (
 	"context"
@@ -22,7 +22,7 @@ type MetricsServer struct {
 	server   http.Server
 }
 
-func NewMetricsServer(addr string, registry *prometheus.Registry) *MetricsServer {
+func NewPrometheusServer(addr string, registry *prometheus.Registry) *MetricsServer {
 	return &MetricsServer{
 		addr:     addr,
 		registry: registry,

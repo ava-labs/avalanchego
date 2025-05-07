@@ -1,29 +1,23 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package load
+package c
 
 import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
-	"os"
 	"time"
 
-	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethclient"
-	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/params"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/tests/load/agent"
-	"github.com/ava-labs/avalanchego/tests/load/issue"
-	"github.com/ava-labs/avalanchego/tests/load/listen"
-	"github.com/ava-labs/avalanchego/tests/load/orchestrate"
-	"github.com/ava-labs/avalanchego/tests/load/tracker"
+	"github.com/ava-labs/avalanchego/tests/load"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/logging"
 
 	ethcrypto "github.com/ava-labs/libevm/crypto"
 )
@@ -38,8 +32,7 @@ type config struct {
 }
 
 func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config config) error {
-	logger := log.NewLogger(log.NewTerminalHandlerWithLevel(os.Stderr, log.LevelInfo, true))
-	log.SetDefault(logger)
+	logger := logging.NewLogger("")
 
 	keys, err := fixKeysCount(preFundedKeys, int(config.agents))
 	if err != nil {
@@ -57,24 +50,27 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 	}
 
 	registry := prometheus.NewRegistry()
-	metricsServer := tracker.NewMetricsServer("127.0.0.1:8082", registry)
-	tracker := tracker.New(registry)
+	metricsServer := load.NewPrometheusServer("127.0.0.1:8082", registry)
+	tracker, err := load.NewPrometheusTracker[*types.Transaction](registry, logger)
+	if err != nil {
+		return fmt.Errorf("creating tracker: %w", err)
+	}
 
-	agents := make([]*agent.Agent[*types.Transaction, common.Hash], config.agents)
+	agents := make([]load.Agent[*types.Transaction], config.agents)
 	for i := range agents {
 		endpoint := config.endpoints[i%len(config.endpoints)]
 		client, err := ethclient.DialContext(ctx, endpoint)
 		if err != nil {
 			return fmt.Errorf("dialing %s: %w", endpoint, err)
 		}
-		issuer, err := issue.NewSelf(ctx, client, tracker,
+		issuer, err := NewSimpleIssuer(ctx, client, tracker,
 			big.NewInt(config.maxFeeCap), keys[i], config.issuePeriod)
 		if err != nil {
 			return fmt.Errorf("creating issuer: %w", err)
 		}
 		address := ethcrypto.PubkeyToAddress(keys[i].PublicKey)
-		listener := listen.New(client, tracker, config.txsPerAgent, address)
-		agents[i] = agent.New[*types.Transaction, common.Hash](config.txsPerAgent, issuer, listener, tracker)
+		listener := NewListener(client, tracker, address)
+		agents[i] = load.NewAgent(issuer, listener)
 	}
 
 	metricsErrCh, err := metricsServer.Start()
@@ -84,7 +80,16 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 
 	orchestratorCtx, orchestratorCancel := context.WithCancel(ctx)
 	defer orchestratorCancel()
-	orchestrator := orchestrate.NewBurstOrchestrator(agents, config.finalTimeout)
+	orchestratorConfig := load.BurstOrchestratorConfig{
+		TxsPerIssuer: config.txsPerAgent,
+		Timeout:      config.finalTimeout,
+	}
+	orchestrator, err := load.NewBurstOrchestrator(agents, logger, orchestratorConfig)
+	if err != nil {
+		_ = metricsServer.Stop()
+		return fmt.Errorf("creating orchestrator: %w", err)
+	}
+
 	orchestratorErrCh := make(chan error)
 	go func() {
 		orchestratorErrCh <- orchestrator.Execute(orchestratorCtx)

@@ -2,7 +2,7 @@
 
 ## Prometheus
 
-1. Navigate to this directory with `cd tests/load`.
+1. Navigate to this directory with `cd tests/load/c`.
 1. Setup the Prometheus configuration file: `envsubst < prometheus.template.yml > prometheus.yml`
 1. Launch Prometheus using the dev shell:
 
@@ -39,5 +39,5 @@
 From the root of the repository:
 
 ```bash
-./bin/ginkgo -v tests/load -- --avalanchego-path=$PWD/build/avalanchego
+./bin/ginkgo -v tests/load/c -- --avalanchego-path=$PWD/build/avalanchego
 ```

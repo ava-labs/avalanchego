@@ -1,7 +1,7 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package issue
+package c
 
 import (
 	"context"
@@ -17,21 +17,21 @@ import (
 	ethcrypto "github.com/ava-labs/libevm/crypto"
 )
 
-type EthClient interface {
+type EthClientSimpleIssuer interface {
 	ChainID(ctx context.Context) (*big.Int, error)
 	NonceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (uint64, error)
 	SendTransaction(ctx context.Context, tx *types.Transaction) error
 }
 
-type Tracker interface {
-	Issue(txHash common.Hash)
+type IssueTracker interface {
+	Issue(tx *types.Transaction)
 }
 
-// Self generates and issues transactions sending 0 fund to the sender.
-type Self struct {
+// SimplerIssuer generates and issues transactions sending 0 fund to the sender.
+type SimplerIssuer struct {
 	// Injected parameters
-	client      EthClient
-	tracker     Tracker
+	client      EthClientSimpleIssuer
+	tracker     IssueTracker
 	key         *ecdsa.PrivateKey
 	gasFeeCap   *big.Int
 	issuePeriod time.Duration
@@ -47,9 +47,9 @@ type Self struct {
 	lastIssue time.Time
 }
 
-func NewSelf(ctx context.Context, client EthClient, tracker Tracker,
+func NewSimpleIssuer(ctx context.Context, client EthClientSimpleIssuer, tracker IssueTracker,
 	maxFeeCap *big.Int, key *ecdsa.PrivateKey, issuePeriod time.Duration,
-) (*Self, error) {
+) (*SimplerIssuer, error) {
 	address := ethcrypto.PubkeyToAddress(key.PublicKey)
 	blockNumber := (*big.Int)(nil)
 	nonce, err := client.NonceAt(ctx, address, blockNumber)
@@ -66,7 +66,7 @@ func NewSelf(ctx context.Context, client EthClient, tracker Tracker,
 		return nil, fmt.Errorf("getting chain id: %w", err)
 	}
 
-	return &Self{
+	return &SimplerIssuer{
 		client:      client,
 		tracker:     tracker,
 		key:         key,
@@ -80,7 +80,7 @@ func NewSelf(ctx context.Context, client EthClient, tracker Tracker,
 	}, nil
 }
 
-func (i *Self) GenerateAndIssueTx(ctx context.Context) (*types.Transaction, error) {
+func (i *SimplerIssuer) GenerateAndIssueTx(ctx context.Context) (*types.Transaction, error) {
 	tx, err := types.SignNewTx(i.key, i.signer, &types.DynamicFeeTx{
 		ChainID:   i.chainID,
 		Nonce:     i.nonce,
@@ -110,7 +110,7 @@ func (i *Self) GenerateAndIssueTx(ctx context.Context) (*types.Transaction, erro
 		return nil, fmt.Errorf("issuing transaction with nonce %d: %w", i.nonce, err)
 	}
 	i.nonce++
-	i.tracker.Issue(tx.Hash())
+	i.tracker.Issue(tx)
 	i.lastIssue = time.Now()
 	return tx, nil
 }

@@ -1,7 +1,7 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package listen
+package c
 
 import (
 	"context"
@@ -13,37 +13,35 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 )
 
-type EthClient interface {
+type EthClientListener interface {
 	NonceAt(ctx context.Context, addr common.Address, blockNumber *big.Int) (uint64, error)
 	NewHeadSubscriber
 }
 
-type Tracker interface {
-	ObserveConfirmed(txHash common.Hash)
-	ObserveFailed(txHash common.Hash)
+type Observer interface {
+	ObserveConfirmed(tx *types.Transaction)
+	ObserveFailed(tx *types.Transaction)
 }
 
 // Listener listens for transaction confirmations from a node.
 type Listener struct {
 	// Injected parameters
-	client   EthClient
-	tracker  Tracker
-	txTarget uint64
-	address  common.Address
+	client  EthClientListener
+	tracker Observer
+	address common.Address
 
 	// Internal state
-	mutex            sync.Mutex
-	issued           uint64
-	lastIssuedNonce  uint64
-	inFlightTxHashes []common.Hash
+	mutex           sync.Mutex
+	allIssued       bool
+	lastIssuedNonce uint64
+	inFlightTxs     []*types.Transaction
 }
 
-func New(client EthClient, tracker Tracker, txTarget uint64, address common.Address) *Listener {
+func NewListener(client EthClientListener, tracker Observer, address common.Address) *Listener {
 	return &Listener{
-		client:   client,
-		tracker:  tracker,
-		txTarget: txTarget,
-		address:  address,
+		client:  client,
+		tracker: tracker,
+		address: address,
 	}
 }
 
@@ -67,18 +65,17 @@ func (l *Listener) Listen(ctx context.Context) error {
 		}
 
 		l.mutex.Lock()
-		confirmed := uint64(len(l.inFlightTxHashes))
+		confirmed := uint64(len(l.inFlightTxs))
 		if nonce < l.lastIssuedNonce { // lagging behind last issued nonce
 			lag := l.lastIssuedNonce - nonce
 			confirmed -= lag
 		}
 		for index := range confirmed {
-			txHash := l.inFlightTxHashes[index]
-			l.tracker.ObserveConfirmed(txHash)
+			tx := l.inFlightTxs[index]
+			l.tracker.ObserveConfirmed(tx)
 		}
-		l.inFlightTxHashes = l.inFlightTxHashes[confirmed:]
-		finished := l.issued == l.txTarget && len(l.inFlightTxHashes) == 0
-		if finished {
+		l.inFlightTxs = l.inFlightTxs[confirmed:]
+		if l.allIssued && len(l.inFlightTxs) == 0 {
 			l.mutex.Unlock()
 			return nil
 		}
@@ -97,16 +94,21 @@ func (l *Listener) Listen(ctx context.Context) error {
 func (l *Listener) RegisterIssued(tx *types.Transaction) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
-	l.issued++
 	l.lastIssuedNonce = tx.Nonce()
-	l.inFlightTxHashes = append(l.inFlightTxHashes, tx.Hash())
+	l.inFlightTxs = append(l.inFlightTxs, tx)
+}
+
+func (l *Listener) IssuingDone() {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	l.allIssued = true
 }
 
 func (l *Listener) markRemainingAsFailed() {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
-	for _, txHash := range l.inFlightTxHashes {
+	for _, txHash := range l.inFlightTxs {
 		l.tracker.ObserveFailed(txHash)
 	}
-	l.inFlightTxHashes = nil
+	l.inFlightTxs = nil
 }
