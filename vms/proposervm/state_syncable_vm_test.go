@@ -4,6 +4,7 @@
 package proposervm
 
 import (
+	"bytes"
 	"context"
 	"testing"
 
@@ -52,7 +53,10 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 	innerVM.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
 		[]*snowmantest.Block{snowmantest.Genesis},
 	)
-	innerVM.GetBlockF = func(context.Context, ids.ID) (snowman.Block, error) {
+	innerVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		if blkID != snowmantest.Genesis.ID() {
+			return nil, database.ErrNotFound
+		}
 		return snowmantest.Genesis, nil
 	}
 
@@ -589,4 +593,133 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 	lastAcceptedID, err := vm.LastAccepted(context.Background())
 	require.NoError(err)
 	require.Equal(proBlk.ID(), lastAcceptedID)
+}
+
+func TestStateSummaryAcceptSkipOlderBlockInnerVM(t *testing.T) {
+	require := require.New(t)
+
+	innerVM, vm := helperBuildStateSyncTestObjects(t)
+	defer func() {
+		require.NoError(vm.Shutdown(context.Background()))
+	}()
+
+	// store post fork block associated with summary
+	innerBlk1 := &snowmantest.Block{
+		Decidable: snowtest.Decidable{
+			IDV: ids.GenerateTestID(),
+		},
+		BytesV:  []byte{1},
+		ParentV: ids.GenerateTestID(),
+		HeightV: 1969,
+	}
+	innerBlk2 := &snowmantest.Block{
+		Decidable: snowtest.Decidable{
+			IDV: ids.GenerateTestID(),
+		},
+		BytesV:  []byte{2},
+		ParentV: innerBlk1.ID(),
+		HeightV: 1970,
+	}
+
+	innerSummary1 := &blocktest.StateSummary{
+		IDV:     innerBlk1.ID(),
+		HeightV: innerBlk1.Height(),
+		BytesV:  innerBlk1.BytesV,
+	}
+
+	require.NoError(vm.SetForkHeight(innerSummary1.Height() - 1))
+
+	// Set the last accepted block height to be higher that the state summary
+	// we are going to attempt to accept
+	vm.lastAcceptedHeight = innerBlk2.Height()
+
+	innerVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return innerBlk2.IDV, nil
+	}
+
+	innerVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		switch {
+		case blkID == snowmantest.GenesisID:
+			return snowmantest.Genesis, nil
+		case blkID == innerBlk1.ID():
+			return innerBlk1, nil
+		case blkID == innerBlk2.ID():
+			return innerBlk2, nil
+		default:
+			return nil, database.ErrNotFound
+		}
+	}
+	innerVM.GetStateSummaryF = func(_ context.Context, h uint64) (block.StateSummary, error) {
+		return innerSummary1, nil
+	}
+	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, innerBlk1.BytesV):
+			return innerBlk1, nil
+		case bytes.Equal(b, innerBlk2.BytesV):
+			return innerBlk2, nil
+		default:
+			panic("unexpected parse block")
+		}
+	}
+	// Setup innerSummary.AcceptF to return StateSyncSkipped and check it was called
+	calledInnerAccept := false
+	innerSummary1.AcceptF = func(context.Context) (block.StateSyncMode, error) {
+		calledInnerAccept = true
+		return block.StateSyncSkipped, nil
+	}
+
+	slb1, err := statelessblock.Build(
+		vm.preferred,
+		innerBlk1.Timestamp(),
+		100, // pChainHeight,
+		vm.StakingCertLeaf,
+		innerBlk1.Bytes(),
+		vm.ctx.ChainID,
+		vm.StakingLeafSigner,
+	)
+	require.NoError(err)
+	proBlk1 := &postForkBlock{
+		SignedBlock: slb1,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       vm,
+			innerBlk: innerBlk1,
+		},
+	}
+	require.NoError(vm.acceptPostForkBlock(proBlk1))
+
+	slb2, err := statelessblock.Build(
+		vm.preferred,
+		innerBlk2.Timestamp(),
+		100, // pChainHeight,
+		vm.StakingCertLeaf,
+		innerBlk2.Bytes(),
+		vm.ctx.ChainID,
+		vm.StakingLeafSigner,
+	)
+	require.NoError(err)
+	proBlk2 := &postForkBlock{
+		SignedBlock: slb2,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       vm,
+			innerBlk: innerBlk2,
+		},
+	}
+	require.NoError(vm.acceptPostForkBlock(proBlk2))
+
+	summary, err := vm.GetStateSummary(context.Background(), innerBlk1.Height())
+	require.NoError(err)
+	require.Equal(summary.Height(), innerBlk1.Height())
+
+	// Process a state summary that would rewind the chain
+	status, err := summary.Accept(context.Background())
+	require.NoError(err)
+	require.Equal(block.StateSyncSkipped, status)
+	require.True(calledInnerAccept)
+
+	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+	require.Equal(innerBlk2.Height(), vm.lastAcceptedHeight)
+	lastAcceptedID, err := vm.LastAccepted(context.Background())
+	require.NoError(err)
+	require.Equal(proBlk2.ID(), lastAcceptedID)
 }
