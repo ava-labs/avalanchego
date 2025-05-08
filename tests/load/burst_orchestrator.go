@@ -23,7 +23,6 @@ type BurstOrchestratorConfig struct {
 // transactions en masse in a short timeframe.
 type BurstOrchestrator[T any] struct {
 	agents []Agent[T]
-	log    logging.Logger
 
 	config BurstOrchestratorConfig
 }
@@ -35,7 +34,6 @@ func NewBurstOrchestrator[T any](
 ) (*BurstOrchestrator[T], error) {
 	return &BurstOrchestrator[T]{
 		agents: agents,
-		log:    log,
 		config: config,
 	}, nil
 }
