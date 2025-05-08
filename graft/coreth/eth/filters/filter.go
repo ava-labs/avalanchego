@@ -33,7 +33,7 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/coreth/core/bloombits"
-	"github.com/ava-labs/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/coreth/plugin/evm/customlogs"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
@@ -342,7 +342,7 @@ func (f *Filter) checkMatches(ctx context.Context, header *types.Header) ([]*typ
 		return nil, err
 	}
 
-	unfiltered := customtypes.FlattenLogs(logsList)
+	unfiltered := customlogs.FlattenLogs(logsList)
 	logs := filterLogs(unfiltered, nil, nil, f.addresses, f.topics)
 	if len(logs) == 0 {
 		return nil, nil
