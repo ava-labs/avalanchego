@@ -86,13 +86,13 @@ func NewGradualOrchestrator[T, U any](
 	tracker Tracker[U],
 	log logging.Logger,
 	config GradualOrchestratorConfig,
-) (*GradualOrchestrator[T, U], error) {
+) *GradualOrchestrator[T, U] {
 	return &GradualOrchestrator[T, U]{
 		agents:  agents,
 		tracker: tracker,
 		log:     log,
 		config:  config,
-	}, nil
+	}
 }
 
 func (o *GradualOrchestrator[T, U]) Execute(ctx context.Context) error {

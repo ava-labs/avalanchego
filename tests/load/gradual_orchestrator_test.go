@@ -77,13 +77,12 @@ func TestGradualOrchestratorTPS(t *testing.T) {
 				),
 			}
 
-			orchestrator, err := NewGradualOrchestrator(
+			orchestrator := NewGradualOrchestrator(
 				agents,
 				tracker,
 				logging.NoLog{},
 				tt.config,
 			)
-			r.NoError(err)
 
 			r.ErrorIs(orchestrator.Execute(ctx), tt.expectedErr)
 
@@ -148,7 +147,7 @@ func TestGradualOrchestratorExecution(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			orchestrator, err := NewGradualOrchestrator(
+			orchestrator := NewGradualOrchestrator(
 				tt.agents,
 				tracker,
 				logging.NoLog{},

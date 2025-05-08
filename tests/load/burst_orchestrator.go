@@ -28,11 +28,11 @@ type BurstOrchestrator[T any] struct {
 func NewBurstOrchestrator[T any](
 	agents []Agent[T],
 	config BurstOrchestratorConfig,
-) (*BurstOrchestrator[T], error) {
+) *BurstOrchestrator[T] {
 	return &BurstOrchestrator[T]{
 		agents: agents,
 		config: config,
-	}, nil
+	}
 }
 
 // Execute orders issuers to send a fixed number of transactions and then waits
