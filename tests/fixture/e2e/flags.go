@@ -96,7 +96,8 @@ func (v *FlagVars) StartLogCollector() bool {
 }
 
 func (v *FlagVars) CheckMonitoring() bool {
-	return v.checkMonitoring
+	// TODO(marun) Enable this check for kube in a subsequent PR
+	return v.startNetworkVars.ProcessRuntimeConfigured() && v.checkMonitoring
 }
 
 func (v *FlagVars) NetworkDir() string {
