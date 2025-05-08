@@ -649,7 +649,7 @@ func TestStateSummaryAcceptSkipOlderBlockInnerVM(t *testing.T) {
 			return nil, database.ErrNotFound
 		}
 	}
-	innerVM.GetStateSummaryF = func(_ context.Context, h uint64) (block.StateSummary, error) {
+	innerVM.GetStateSummaryF = func(context.Context, uint64) (block.StateSummary, error) {
 		return innerSummary1, nil
 	}
 	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
@@ -716,8 +716,8 @@ func TestStateSummaryAcceptSkipOlderBlockInnerVM(t *testing.T) {
 	require.NoError(err)
 	require.Equal(block.StateSyncSkipped, status)
 	require.True(calledInnerAccept)
-
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+
 	require.Equal(innerBlk2.Height(), vm.lastAcceptedHeight)
 	lastAcceptedID, err := vm.LastAccepted(context.Background())
 	require.NoError(err)
