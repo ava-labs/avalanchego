@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
@@ -46,13 +45,6 @@ var (
 	_ verify.Verifiable = (*propertyfx.Credential)(nil)
 )
 
-// StaticService defines the base service for the asset vm
-type StaticService struct{}
-
-func CreateStaticService() *StaticService {
-	return &StaticService{}
-}
-
 // BuildGenesisArgs are arguments for BuildGenesis
 type BuildGenesisArgs struct {
 	NetworkID   avajson.Uint32             `json:"networkID"`
@@ -88,7 +80,7 @@ type BuildGenesisReply struct {
 
 // BuildGenesis returns the UTXOs such that at least one address in [args.Addresses] is
 // referenced in the UTXO.
-func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
+func BuildGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error {
 	parser, err := txs.NewParser(
 		[]fxs.Fx{
 			&secp256k1fx.Fx{},

@@ -55,8 +55,7 @@ func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 	}
 	reply := BuildGenesisReply{}
 
-	ss := StaticService{}
-	err = ss.BuildGenesis(nil, &args, &reply)
+	err = BuildGenesis(&args, &reply)
 	require.ErrorIs(err, errUTXOHasNoValue)
 }
 
@@ -99,8 +98,7 @@ func TestBuildGenesisInvalidStakeWeight(t *testing.T) {
 	}
 	reply := BuildGenesisReply{}
 
-	ss := StaticService{}
-	err = ss.BuildGenesis(nil, &args, &reply)
+	err = BuildGenesis(&args, &reply)
 	require.ErrorIs(err, errValidatorHasNoWeight)
 }
 
@@ -144,8 +142,7 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 	}
 	reply := BuildGenesisReply{}
 
-	ss := StaticService{}
-	err = ss.BuildGenesis(nil, &args, &reply)
+	err = BuildGenesis(&args, &reply)
 	require.ErrorIs(err, errValidatorAlreadyExited)
 }
 
@@ -224,8 +221,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 	}
 	reply := BuildGenesisReply{}
 
-	ss := StaticService{}
-	require.NoError(ss.BuildGenesis(nil, &args, &reply))
+	require.NoError(BuildGenesis(&args, &reply))
 
 	genesisBytes, err := formatting.Decode(reply.Encoding, reply.Bytes)
 	require.NoError(err)

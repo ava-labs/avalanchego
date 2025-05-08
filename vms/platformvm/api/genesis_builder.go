@@ -7,7 +7,6 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
-	"net/http"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
@@ -38,9 +37,6 @@ var (
 
 	_ utils.Sortable[UTXO] = UTXO{}
 )
-
-// StaticService defines the static API methods exposed by the platform VM
-type StaticService struct{}
 
 // UTXO is a UTXO on the Platform Chain that exists at the chain's genesis.
 type UTXO struct {
@@ -194,7 +190,7 @@ func bech32ToID(addrStr string) (ids.ShortID, error) {
 }
 
 // BuildGenesis build the genesis state of the Platform Chain (and thereby the Avalanche network.)
-func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
+func BuildGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error {
 	// Specify the UTXOs on the Platform chain that exist at genesis.
 	utxos := make([]*genesis.UTXO, 0, len(args.UTXOs))
 	for i, apiUTXO := range args.UTXOs {

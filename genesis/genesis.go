@@ -346,8 +346,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	}
 	avmReply := avm.BuildGenesisReply{}
 
-	avmSS := avm.CreateStaticService()
-	err := avmSS.BuildGenesis(nil, &avmArgs, &avmReply)
+	err := avm.BuildGenesis(&avmArgs, &avmReply)
 	if err != nil {
 		return nil, ids.Empty, err
 	}
@@ -487,8 +486,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	}
 
 	platformvmReply := api.BuildGenesisReply{}
-	platformvmSS := api.StaticService{}
-	if err := platformvmSS.BuildGenesis(nil, &platformvmArgs, &platformvmReply); err != nil {
+	if err := api.BuildGenesis(&platformvmArgs, &platformvmReply); err != nil {
 		return nil, ids.Empty, fmt.Errorf("problem while building platform chain's genesis state: %w", err)
 	}
 

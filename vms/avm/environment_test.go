@@ -227,10 +227,8 @@ func buildGenesisTest(tb testing.TB) []byte {
 func buildGenesisTestWithArgs(tb testing.TB, args *BuildGenesisArgs) []byte {
 	require := require.New(tb)
 
-	ss := CreateStaticService()
-
 	reply := BuildGenesisReply{}
-	require.NoError(ss.BuildGenesis(nil, args, &reply))
+	require.NoError(BuildGenesis(args, &reply))
 
 	b, err := formatting.Decode(reply.Encoding, reply.Bytes)
 	require.NoError(err)
