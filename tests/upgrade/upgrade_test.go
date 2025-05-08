@@ -41,7 +41,7 @@ func init() {
 		"",
 		"avalanchego executable path to upgrade to",
 	)
-	e2e.SetMonitoringFlags(
+	e2e.SetSimpleMonitoringFlags(
 		&startCollectors,
 		&checkMonitoring,
 	)

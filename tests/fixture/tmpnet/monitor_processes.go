@@ -48,23 +48,37 @@ const (
 
 // StartCollectors ensures collectors are running to collect logs and metrics from local nodes.
 func StartCollectors(ctx context.Context, log logging.Logger) error {
+	if err := StartPrometheus(ctx, log); err != nil {
+		return err
+	}
+	return StartPromtail(ctx, log)
+}
+
+// StartPrometheus ensures a collector is running to collect metrics from local nodes.
+func StartPrometheus(ctx context.Context, log logging.Logger) error {
+	if _, ok := ctx.Deadline(); !ok {
+		return errors.New("unable to start prometheus with a context without a deadline")
+	}
+	if err := startPrometheus(ctx, log); err != nil {
+		return err
+	}
+	if err := waitForReadiness(ctx, log, prometheusCmd, prometheusReadinessURL); err != nil {
+		return err
+	}
+	log.Info("To stop: tmpnetctl stop-collectors")
+	return nil
+}
+
+// StartPromtail ensures a collector is running to collect logs from local nodes.
+func StartPromtail(ctx context.Context, log logging.Logger) error {
 	if _, ok := ctx.Deadline(); !ok {
 		return errors.New("unable to start collectors with a context without a deadline")
 	}
 	if err := startPromtail(ctx, log); err != nil {
 		return err
 	}
-	if err := startPrometheus(ctx, log); err != nil {
-		return err
-	}
-
 	log.Info("skipping promtail readiness check until one or more nodes have written their service discovery configuration")
-	if err := waitForReadiness(ctx, log, prometheusCmd, prometheusReadinessURL); err != nil {
-		return err
-	}
-
 	log.Info("To stop: tmpnetctl stop-collectors")
-
 	return nil
 }
 
