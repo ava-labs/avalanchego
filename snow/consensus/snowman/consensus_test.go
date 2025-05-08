@@ -521,6 +521,10 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 
 	firstBlock := snowmantest.BuildChild(snowmantest.Genesis)
 	secondBlock := snowmantest.BuildChild(snowmantest.Genesis)
+	// Ensure that the blocks have at least one bit as a common prefix
+	for firstBlock.IDV.Bit(0) != secondBlock.IDV.Bit(0) {
+		secondBlock = snowmantest.BuildChild(snowmantest.Genesis)
+	}
 
 	require.NoError(sm.Add(firstBlock))
 	require.NoError(sm.Add(secondBlock))
