@@ -36,7 +36,6 @@ import (
 
 	"github.com/ava-labs/coreth/accounts/abi/bind"
 	"github.com/ava-labs/coreth/interfaces"
-	"github.com/ava-labs/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/coreth/rpc"
 	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/common"
@@ -194,11 +193,9 @@ func (ec *client) BlockReceipts(ctx context.Context, blockNrOrHash rpc.BlockNumb
 }
 
 type rpcBlock struct {
-	Hash           common.Hash      `json:"hash"`
-	Transactions   []rpcTransaction `json:"transactions"`
-	UncleHashes    []common.Hash    `json:"uncles"`
-	Version        uint32           `json:"version"`
-	BlockExtraData *hexutil.Bytes   `json:"blockExtraData"`
+	Hash         common.Hash      `json:"hash"`
+	Transactions []rpcTransaction `json:"transactions"`
+	UncleHashes  []common.Hash    `json:"uncles"`
 }
 
 func (ec *client) getBlock(ctx context.Context, method string, args ...interface{}) (*types.Block, error) {
@@ -267,18 +264,10 @@ func (ec *client) getBlock(ctx context.Context, method string, args ...interface
 		}
 		txs[i] = tx.tx
 	}
-
-	block := types.NewBlockWithHeader(head).WithBody(
-		types.Body{
-			Transactions: txs,
-			Uncles:       uncles,
-		})
-	extra := &customtypes.BlockBodyExtra{
-		Version: body.Version,
-		ExtData: (*[]byte)(body.BlockExtraData),
-	}
-	customtypes.SetBlockExtra(block, extra)
-	return block, nil
+	return types.NewBlockWithHeader(head).WithBody(types.Body{
+		Transactions: txs,
+		Uncles:       uncles,
+	}), nil
 }
 
 // HeaderByHash returns the block header with the given hash.
