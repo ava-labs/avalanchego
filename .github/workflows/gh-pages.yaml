@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@v2
       - uses: dtolnay/rust-toolchain@stable
       - uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
       # caution: this is the same restore as in ci.yaml
       - uses: Swatinem/rust-cache@v2
         with:
