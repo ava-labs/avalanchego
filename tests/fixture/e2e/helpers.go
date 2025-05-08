@@ -13,8 +13,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ava-labs/coreth/ethclient"
+	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/ethclient"
+	"github.com/ava-labs/libevm/rpc"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
@@ -29,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	ethereum "github.com/ava-labs/libevm"
+	ethcommon "github.com/ava-labs/libevm/common"
 )
 
 const (
@@ -128,16 +131,41 @@ func GetWalletBalances(tc tests.TestContext, wallet *primary.Wallet) (uint64, ui
 }
 
 // Create a new eth client targeting the specified node URI.
-func NewEthClient(tc tests.TestContext, nodeURI tmpnet.NodeURI) ethclient.Client {
+func NewEthClient(tc tests.TestContext, nodeURI tmpnet.NodeURI) *EthClient {
 	tc.Log().Info("initializing a new eth client",
 		zap.Stringer("nodeID", nodeURI.NodeID),
 		zap.String("URI", nodeURI.URI),
 	)
 	nodeAddress := strings.Split(nodeURI.URI, "//")[1]
 	uri := fmt.Sprintf("ws://%s/ext/bc/C/ws", nodeAddress)
-	client, err := ethclient.Dial(uri)
-	require.NoError(tc, err)
-	return client
+	c, err := rpc.DialContext(tc.DefaultContext(), uri)
+	require.NoError(tc, err, "failed to create eth client")
+	return &EthClient{
+		Client: ethclient.NewClient(c),
+		c:      c,
+	}
+}
+
+type EthClient struct {
+	*ethclient.Client
+	c *rpc.Client
+}
+
+// EstimateBaseFee tries to estimate the base fee for the next block if it were created
+// immediately. There is no guarantee that this will be the base fee used in the next block
+// or that the next base fee will be higher or lower than the returned value.
+func (ec *EthClient) EstimateBaseFee(ctx context.Context) (*big.Int, error) {
+	var hex hexutil.Big
+	err := ec.c.CallContext(ctx, &hex, "eth_baseFee")
+	if err != nil {
+		return nil, err
+	}
+	return (*big.Int)(&hex), nil
+}
+
+func (ec *EthClient) AcceptedNonceAt(ctx context.Context, addr ethcommon.Address) (uint64, error) {
+	blockNumber := (*big.Int)(nil)
+	return ec.NonceAt(ctx, addr, blockNumber)
 }
 
 // Adds an ephemeral node intended to be used by a single test.
@@ -167,7 +195,7 @@ func WaitForHealthy(t require.TestingT, node *tmpnet.Node) {
 
 // Sends an eth transaction and waits for the transaction receipt from the
 // execution of the transaction.
-func SendEthTransaction(tc tests.TestContext, ethClient ethclient.Client, signedTx *types.Transaction) *types.Receipt {
+func SendEthTransaction(tc tests.TestContext, ethClient *EthClient, signedTx *types.Transaction) *types.Receipt {
 	require := require.New(tc)
 
 	txID := signedTx.Hash()
@@ -200,7 +228,7 @@ func SendEthTransaction(tc tests.TestContext, ethClient ethclient.Client, signed
 
 // Determines the suggested gas price for the configured client that will
 // maximize the chances of transaction acceptance.
-func SuggestGasPrice(tc tests.TestContext, ethClient ethclient.Client) *big.Int {
+func SuggestGasPrice(tc tests.TestContext, ethClient *EthClient) *big.Int {
 	gasPrice, err := ethClient.SuggestGasPrice(tc.DefaultContext())
 	require.NoError(tc, err)
 
@@ -216,7 +244,7 @@ func SuggestGasPrice(tc tests.TestContext, ethClient ethclient.Client) *big.Int 
 }
 
 // Helper simplifying use via an option of a gas price appropriate for testing.
-func WithSuggestedGasPrice(tc tests.TestContext, ethClient ethclient.Client) common.Option {
+func WithSuggestedGasPrice(tc tests.TestContext, ethClient *EthClient) common.Option {
 	baseFee := SuggestGasPrice(tc, ethClient)
 	return common.WithBaseFee(baseFee)
 }
