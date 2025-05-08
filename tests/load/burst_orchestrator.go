@@ -8,8 +8,6 @@ import (
 	"time"
 
 	"golang.org/x/sync/errgroup"
-
-	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var _ orchestrator = (*BurstOrchestrator[any])(nil)
@@ -29,7 +27,6 @@ type BurstOrchestrator[T any] struct {
 
 func NewBurstOrchestrator[T any](
 	agents []Agent[T],
-	log logging.Logger,
 	config BurstOrchestratorConfig,
 ) (*BurstOrchestrator[T], error) {
 	return &BurstOrchestrator[T]{
