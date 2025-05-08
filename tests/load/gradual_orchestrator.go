@@ -182,10 +182,9 @@ func (o *GradualOrchestrator[T, U]) run(ctx context.Context) bool {
 				if o.config.Terminate {
 					o.log.Info("terminating orchestrator")
 					break // Case 2
-				} else {
-					o.log.Info("orchestrator will now continue running at max TPS")
-					continue
 				}
+				o.log.Info("orchestrator will now continue running at max TPS")
+				continue
 			}
 			o.log.Info(
 				"increasing TPS",
