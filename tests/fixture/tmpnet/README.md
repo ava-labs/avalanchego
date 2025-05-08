@@ -61,6 +61,8 @@ the following non-test files:
 |:----------------------------|:---------------|:-----------------------------------------------------------------------|
 | flags/                      |                | Directory defining flags usable with both stdlib flags and spf13/pflag |
 | flags/common.go             |                | Defines type definitions common across other files                     |
+| flags/kube_config.go        |                | Defines flags configuring the kubeconfig of the kube runtime           |
+| flags/kube_runtime.go       |                | Defines flags configuring the kube node runtime                        |
 | flags/process_runtime.go    |                | Defines flags configuring the process node runtime                     |
 | flags/runtime.go            |                | Defines flags configuring node runtime                                 |
 | flags/start_network.go      |                | Defines flags configuring network start                                |
@@ -72,6 +74,7 @@ the following non-test files:
 | flagsmap.go                 | FlagsMap       | Simplifies configuration of avalanchego flags                          |
 | genesis.go                  |                | Creates test genesis                                                   |
 | kube.go                     |                | Library for Kubernetes interaction                                     |
+| kube_runtime.go             |                | Orchestrates nodes running in Kubernetes                               |
 | local_network.go            |                | Defines configuration for the default local network                    |
 | monitor_processes.go        |                | Enables collection of logs and metrics from local processes            |
 | network.go                  | Network        | Orchestrates and configures temporary networks                         |
@@ -293,6 +296,8 @@ The details required to configure a node's execution are written to
 runtime-specific details like the path of the avalanchego binary to
 start the node with.
 
+TODO(marun) Separate process from kube-based network deployment
+
 #### Flags
 [Top](#table-of-contents)
 
@@ -310,6 +315,12 @@ The process details of a node are written by avalanchego to
 `[base-data-dir]/process.json`. The file contains the PID of the node
 process, the URI of the node's API, and the address other nodes can
 use to bootstrap themselves (aka staking address).
+
+## Kube-based networks
+
+- `tmpnet` supports deploying nodes to kubernetes.
+- Each node will be deployed as a stateful set.
+- The naming convention for statefulsets will be [network uuid]-[first 8 characters of node ID excluding NodeID-]
 
 ## Monitoring
 [Top](#table-of-contents)
@@ -484,3 +495,12 @@ github action with `filter_by_owner` set to the owner string for the
 shared network. This ensures that the link emitted by the annotation
 displays results for only the shared network of the job rather than
 mixing results from all the networks started for the job.
+
+## Concurrent usage
+
+The types (networks, nodes, etc) that tmpnet defines are not safe for
+concurrent usage. To avoid requiring an rpc daemon, tmpnet stores data
+on diskData is shared via the filesystem, and new instances can just
+be created for every usage. Since the Add to this that tmpnet isn't
+intended to be multi-user either. Maybe not optimal in terms of
+scalability, but much simpler to work with for that lack.
