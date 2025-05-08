@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/subnets"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ips"
@@ -175,7 +176,7 @@ type network struct {
 // NewNetwork returns a new Network implementation with the provided parameters.
 func NewNetwork(
 	config *Config,
-	minCompatibleTime time.Time,
+	upgradeConfig upgrade.Config,
 	msgCreator message.Creator,
 	metricsRegisterer prometheus.Registerer,
 	log logging.Logger,
@@ -268,7 +269,7 @@ func NewNetwork(
 		InboundMsgThrottler:  inboundMsgThrottler,
 		Network:              nil, // This is set below.
 		Router:               router,
-		VersionCompatibility: version.GetCompatibility(minCompatibleTime),
+		VersionCompatibility: version.GetCompatibility(upgradeConfig.FortunaTime), // Must be updated for each upgrade
 		MyNodeID:             config.MyNodeID,
 		MySubnets:            config.TrackedSubnets,
 		Beacons:              config.Beacons,
