@@ -46,11 +46,16 @@ func (s *stateSummary) Accept(ctx context.Context) (block.StateSyncMode, error) 
 		return block.StateSyncSkipped, err
 	}
 
-	// We store the full proposerVM block associated with the summary
-	// and update height index with it, so that state sync could resume
-	// after a shutdown.
-	if err := s.block.acceptOuterBlk(); err != nil {
-		return block.StateSyncSkipped, err
+	// Mark the summary as accepted on the outerVM iff it rolls forward.
+	// We refuse to roll the proposerVM backward because it violates the invariant
+	// that the proposerVM index is always >= the innerVM index.
+	if s.vm.lastAcceptedHeight < s.Height() {
+		// We store the full proposerVM block associated with the summary
+		// and update height index with it, so that state sync could resume
+		// after a shutdown.
+		if err := s.block.acceptOuterBlk(); err != nil {
+			return block.StateSyncSkipped, err
+		}
 	}
 
 	// innerSummary.Accept may fail with the proposerVM block and index already
