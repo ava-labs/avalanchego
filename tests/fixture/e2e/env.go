@@ -90,8 +90,11 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 
 	// Consider monitoring flags for any command but stop
 	if networkCmd != StopNetworkCmd {
-		if flagVars.StartCollectors() {
-			require.NoError(tmpnet.StartCollectors(tc.DefaultContext(), tc.Log()))
+		if flagVars.StartMetricCollector() {
+			require.NoError(tmpnet.StartPrometheus(tc.DefaultContext(), tc.Log()))
+		}
+		if flagVars.StartLogCollector() {
+			require.NoError(tmpnet.StartPromtail(tc.DefaultContext(), tc.Log()))
 		}
 		if flagVars.CheckMonitoring() {
 			// Register cleanup before network start to ensure it runs after the network is stopped (LIFO)
@@ -178,7 +181,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 	}
 
 	// Once one or more nodes are running it should be safe to wait for promtail to report readiness
-	if flagVars.StartCollectors() {
+	if flagVars.StartLogCollector() {
 		require.NoError(tmpnet.WaitForPromtailReadiness(tc.DefaultContext(), tc.Log()))
 	}
 
