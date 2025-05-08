@@ -75,7 +75,7 @@ type GradualOrchestrator[T, U any] struct {
 
 	maxObservedTPS atomic.Uint64
 
-	observerGroup errgroup.Group
+	observerGroup *errgroup.Group
 	issuerGroup   *errgroup.Group
 
 	config GradualOrchestratorConfig
@@ -99,6 +99,7 @@ func (o *GradualOrchestrator[T, U]) Execute(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 
 	// start a goroutine to confirm each issuer's transactions
+	o.observerGroup = &errgroup.Group{}
 	for _, agent := range o.agents {
 		o.observerGroup.Go(func() error { return agent.Listener.Listen(ctx) })
 	}
