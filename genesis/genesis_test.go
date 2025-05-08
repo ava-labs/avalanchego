@@ -33,6 +33,9 @@ var (
 		"networkID": 9999}}}}
 	}`)
 
+	//go:embed genesis_test_invalid_allocations.json
+	customGenesisConfigInvalidAllocationsJSON []byte
+
 	genesisStakingCfg = &StakingConfig{
 		MaxStakeDuration: 365 * 24 * time.Hour,
 	}
@@ -226,6 +229,11 @@ func TestGenesisFromFile(t *testing.T) {
 			networkID:       9999,
 			missingFilepath: "missing.json",
 			expectedErr:     os.ErrNotExist,
+		},
+		"custom (locked allocations amount too low)": {
+			networkID:    9999,
+			customConfig: customGenesisConfigInvalidAllocationsJSON,
+			expectedErr:  errAllocationsLockedAmountTooLow,
 		},
 	}
 
