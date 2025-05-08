@@ -225,7 +225,7 @@ func (o *GradualOrchestrator[T, U]) GetMaxObservedTPS() uint64 {
 	return o.maxObservedTPS.Load()
 }
 
-// start a goroutine to each issuer to continuously send transactions
+// start a goroutine to each issuer to continuously send transactions.
 // if an issuer errors, all other issuers will stop as well.
 func (o *GradualOrchestrator[T, U]) issueTxs(ctx context.Context, currTargetTPS *atomic.Uint64) {
 	for _, agent := range o.agents {
