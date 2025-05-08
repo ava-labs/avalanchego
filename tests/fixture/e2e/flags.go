@@ -110,7 +110,7 @@ func (v *FlagVars) NetworkDir() string {
 }
 
 func (v *FlagVars) NetworkShutdownDelay() time.Duration {
-	if v.startCollectors {
+	if v.StartLogCollector() || v.StartMetricCollector() {
 		// Only return a non-zero value if we want to ensure the collectors have
 		// a chance to collect the metrics at the end of the test.
 		return tmpnet.NetworkShutdownDelay
@@ -189,10 +189,15 @@ func SetSimpleMonitoringFlags(startCollectors *bool, checkMonitoring *bool) {
 }
 
 func SetAllMonitoringFlags(startCollectors *bool, startMetricCollector *bool, startLogCollector *bool, checkMonitoring *bool) {
+	// Ensure the upgrade job is configured to start both collectors if they are individually configured
+	defaultStartMetricCollector := cast.ToBool(tmpnet.GetEnvWithDefault("TMPNET_START_METRIC_COLLECTOR", "false"))
+	defaultStartLogCollector := cast.ToBool(tmpnet.GetEnvWithDefault("TMPNET_START_LOG_COLLECTOR", "false"))
+	defaultStartCollectors := cast.ToBool(tmpnet.GetEnvWithDefault("TMPNET_START_COLLECTORS", "false")) || (defaultStartMetricCollector && defaultStartLogCollector)
+
 	flag.BoolVar(
 		startCollectors,
 		"start-collectors",
-		cast.ToBool(tmpnet.GetEnvWithDefault("TMPNET_START_COLLECTORS", "false")),
+		defaultStartCollectors,
 		"[optional] whether to start local collectors of logs and metrics from nodes of the temporary network.",
 	)
 	// These 2 flags are not used by the upgrade job
@@ -200,7 +205,7 @@ func SetAllMonitoringFlags(startCollectors *bool, startMetricCollector *bool, st
 		flag.BoolVar(
 			startMetricCollector,
 			"start-metric-collector",
-			cast.ToBool(tmpnet.GetEnvWithDefault("TMPNET_START_METRIC_COLLECTOR", "false")),
+			defaultStartMetricCollector,
 			"[optional] whether to start a local collector of metrics from nodes of the temporary network. Can also be enabled by --start-collectors.",
 		)
 	}
@@ -208,7 +213,7 @@ func SetAllMonitoringFlags(startCollectors *bool, startMetricCollector *bool, st
 		flag.BoolVar(
 			startMetricCollector,
 			"start-log-collector",
-			cast.ToBool(tmpnet.GetEnvWithDefault("TMPNET_START_LOG_COLLECTOR", "false")),
+			defaultStartLogCollector,
 			"[optional] whether to start a local collector of metrics from nodes of the temporary network. Can also be enabled by --start-collectors.",
 		)
 	}
