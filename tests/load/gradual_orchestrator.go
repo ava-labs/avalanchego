@@ -245,7 +245,13 @@ func (o *GradualOrchestrator[T, U]) issueTxs(ctx context.Context, currTargetTPS 
 				}
 				diff := time.Second - time.Since(currTime)
 				if diff > 0 {
-					time.Sleep(diff)
+					timer := time.NewTimer(diff)
+					select {
+					case <-ctx.Done():
+						timer.Stop()
+						return nil
+					case <-timer.C:
+					}
 				}
 			}
 		})
