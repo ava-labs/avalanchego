@@ -195,7 +195,7 @@ func SetAllMonitoringFlags(startCollectors *bool, startMetricCollector *bool, st
 		cast.ToBool(tmpnet.GetEnvWithDefault("TMPNET_START_COLLECTORS", "false")),
 		"[optional] whether to start local collectors of logs and metrics from nodes of the temporary network.",
 	)
-	// These 2 flags are not reuired by the upgrade job
+	// These 2 flags are not used by the upgrade job
 	if startMetricCollector != nil {
 		flag.BoolVar(
 			startMetricCollector,
