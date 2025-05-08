@@ -151,7 +151,7 @@ func TestGradualOrchestratorExecution(t *testing.T) {
 				tt.agents,
 				tracker,
 				logging.NoLog{},
-				DefaultGradualOrchestratorConfig(),
+				NewGradualOrchestratorConfig(),
 			)
 			r.NoError(err)
 

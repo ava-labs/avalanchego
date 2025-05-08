@@ -51,7 +51,7 @@ type GradualOrchestratorConfig struct {
 	Terminate bool
 }
 
-func DefaultGradualOrchestratorConfig() GradualOrchestratorConfig {
+func NewGradualOrchestratorConfig() GradualOrchestratorConfig {
 	return GradualOrchestratorConfig{
 		MaxTPS:           5_000,
 		MinTPS:           1_000,
