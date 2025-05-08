@@ -11,12 +11,14 @@ import (
 	"github.com/gorilla/rpc/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
+	"github.com/ava-labs/avalanchego/proto/pb/xsvm"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -152,6 +154,12 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	return map[string]http.Handler{
 		"": server,
 	}, server.RegisterService(api, constants.XSVMName)
+}
+
+func (vm *VM) CreateGRPCService(context.Context) (string, http.Handler, error) {
+	server := grpc.NewServer()
+	server.RegisterService(&xsvm.Ping_ServiceDesc, &grpcService{Log: vm.chainContext.Log})
+	return xsvm.Ping_ServiceDesc.ServiceName, server, nil
 }
 
 func (*VM) HealthCheck(context.Context) (interface{}, error) {
