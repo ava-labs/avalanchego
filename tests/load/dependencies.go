@@ -8,7 +8,7 @@ import "context"
 type Issuer[T any] interface {
 	// GenerateAndIssueTx generates and sends a tx to the network, and informs the
 	// tracker that it sent said transaction. It returns the sent transaction.
-	GenerateAndIssueTx(ctx context.Context) (tx T, err error)
+	GenerateAndIssueTx(ctx context.Context) (T, error)
 }
 
 type Listener[T any] interface {
