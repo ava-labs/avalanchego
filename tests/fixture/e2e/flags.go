@@ -30,7 +30,11 @@ type FlagVars struct {
 	startNetwork     bool
 	startNetworkVars *flags.StartNetworkVars
 
-	startCollectors bool
+	// The collectors configured by these flags run as local processes
+	startCollectors      bool
+	startMetricCollector bool
+	startLogCollector    bool
+
 	checkMonitoring bool
 
 	networkDir     string
@@ -83,8 +87,12 @@ func (v *FlagVars) NodeRuntimeConfig() (*tmpnet.NodeRuntimeConfig, error) {
 	return v.startNetworkVars.GetNodeRuntimeConfig()
 }
 
-func (v *FlagVars) StartCollectors() bool {
-	return v.startCollectors
+func (v *FlagVars) StartMetricCollector() bool {
+	return v.startCollectors || v.startMetricCollector
+}
+
+func (v *FlagVars) StartLogCollector() bool {
+	return v.startCollectors || v.startLogCollector
 }
 
 func (v *FlagVars) CheckMonitoring() bool {
@@ -130,8 +138,10 @@ func RegisterFlagsWithDefaultOwner(defaultOwner string) *FlagVars {
 
 	vars.startNetworkVars = flags.NewStartNetworkFlagVars(defaultOwner)
 
-	SetMonitoringFlags(
+	SetAllMonitoringFlags(
 		&vars.startCollectors,
+		&vars.startMetricCollector,
+		&vars.startLogCollector,
 		&vars.checkMonitoring,
 	)
 
@@ -173,14 +183,35 @@ func RegisterFlagsWithDefaultOwner(defaultOwner string) *FlagVars {
 	return &vars
 }
 
-// Enable reuse by the upgrade job
-func SetMonitoringFlags(startCollectors *bool, checkMonitoring *bool) {
+// Enable reuse by the upgrade job which doesn't need fine-grained control over collector start since it never runs in kube.
+func SetSimpleMonitoringFlags(startCollectors *bool, checkMonitoring *bool) {
+	SetAllMonitoringFlags(startCollectors, nil, nil, checkMonitoring)
+}
+
+func SetAllMonitoringFlags(startCollectors *bool, startMetricCollector *bool, startLogCollector *bool, checkMonitoring *bool) {
 	flag.BoolVar(
 		startCollectors,
 		"start-collectors",
 		cast.ToBool(tmpnet.GetEnvWithDefault("TMPNET_START_COLLECTORS", "false")),
-		"[optional] whether to start collectors of logs and metrics from nodes of the temporary network.",
+		"[optional] whether to start local collectors of logs and metrics from nodes of the temporary network.",
 	)
+	// These 2 flags are not reuired by the upgrade job
+	if startMetricCollector != nil {
+		flag.BoolVar(
+			startMetricCollector,
+			"start-metric-collector",
+			cast.ToBool(tmpnet.GetEnvWithDefault("TMPNET_START_METRIC_COLLECTOR", "false")),
+			"[optional] whether to start a local collector of metrics from nodes of the temporary network. Can also be enabled by --start-collectors.",
+		)
+	}
+	if startLogCollector != nil {
+		flag.BoolVar(
+			startMetricCollector,
+			"start-log-collector",
+			cast.ToBool(tmpnet.GetEnvWithDefault("TMPNET_START_LOG_COLLECTOR", "false")),
+			"[optional] whether to start a local collector of metrics from nodes of the temporary network. Can also be enabled by --start-collectors.",
+		)
+	}
 	flag.BoolVar(
 		checkMonitoring,
 		"check-monitoring",
