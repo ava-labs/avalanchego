@@ -21,14 +21,14 @@ type BurstOrchestratorConfig struct {
 
 // BurstOrchestrator tests the network by sending a fixed number of
 // transactions en masse in a short timeframe.
-type BurstOrchestrator[T comparable] struct {
+type BurstOrchestrator[T any] struct {
 	agents []Agent[T]
 	log    logging.Logger
 
 	config BurstOrchestratorConfig
 }
 
-func NewBurstOrchestrator[T comparable](
+func NewBurstOrchestrator[T any](
 	agents []Agent[T],
 	log logging.Logger,
 	config BurstOrchestratorConfig,

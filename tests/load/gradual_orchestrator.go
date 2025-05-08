@@ -67,7 +67,7 @@ func DefaultGradualOrchestratorConfig() GradualOrchestratorConfig {
 // transactions at a given rate (currTargetTPS) and increasing that rate until it detects that
 // the network can no longer make progress (i.e. the rate at the network accepts
 // transactions is less than currTargetTPS).
-type GradualOrchestrator[T, U comparable] struct {
+type GradualOrchestrator[T, U any] struct {
 	agents  []Agent[T]
 	tracker Tracker[U]
 
@@ -81,7 +81,7 @@ type GradualOrchestrator[T, U comparable] struct {
 	config GradualOrchestratorConfig
 }
 
-func NewGradualOrchestrator[T, U comparable](
+func NewGradualOrchestrator[T, U any](
 	agents []Agent[T],
 	tracker Tracker[U],
 	log logging.Logger,

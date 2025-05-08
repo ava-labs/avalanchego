@@ -3,12 +3,12 @@
 
 package load
 
-type Agent[T comparable] struct {
+type Agent[T any] struct {
 	Issuer   Issuer[T]
 	Listener Listener[T]
 }
 
-func NewAgent[T comparable](
+func NewAgent[T any](
 	issuer Issuer[T],
 	listener Listener[T],
 ) Agent[T] {
