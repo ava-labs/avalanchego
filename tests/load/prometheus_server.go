@@ -11,9 +11,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 type MetricsServer struct {
