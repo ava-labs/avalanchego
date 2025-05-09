@@ -45,8 +45,8 @@ var (
 	_ verify.Verifiable = (*propertyfx.Credential)(nil)
 )
 
-// BuildGenesisArgs are arguments for BuildGenesis
-type BuildGenesisArgs struct {
+// BuildGenesisParams are arguments for BuildGenesis
+type BuildGenesisParams struct {
 	NetworkID   avajson.Uint32             `json:"networkID"`
 	GenesisData map[string]AssetDefinition `json:"genesisData"`
 	Encoding    formatting.Encoding        `json:"encoding"`
@@ -72,15 +72,9 @@ type Owners struct {
 	Minters   []string       `json:"minters"`
 }
 
-// BuildGenesisReply is the reply from BuildGenesis
-type BuildGenesisReply struct {
-	Bytes    string              `json:"bytes"`
-	Encoding formatting.Encoding `json:"encoding"`
-}
-
-// BuildGenesis returns the UTXOs such that at least one address in [args.Addresses] is
+// BuildGenesis returns the UTXOs such that at least one address in [addresses] is
 // referenced in the UTXO.
-func BuildGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error {
+func BuildGenesis(params BuildGenesisParams) (string, error) {
 	parser, err := txs.NewParser(
 		[]fxs.Fx{
 			&secp256k1fx.Fx{},
@@ -89,21 +83,21 @@ func BuildGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error {
 		},
 	)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	g := Genesis{}
 	genesisCodec := parser.GenesisCodec()
-	for assetAlias, assetDefinition := range args.GenesisData {
-		assetMemo, err := formatting.Decode(args.Encoding, assetDefinition.Memo)
+	for assetAlias, assetDefinition := range params.GenesisData {
+		assetMemo, err := formatting.Decode(params.Encoding, assetDefinition.Memo)
 		if err != nil {
-			return fmt.Errorf("problem formatting asset definition memo due to: %w", err)
+			return "", fmt.Errorf("problem formatting asset definition memo due to: %w", err)
 		}
 		asset := GenesisAsset{
 			Alias: assetAlias,
 			CreateAssetTx: txs.CreateAssetTx{
 				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    uint32(args.NetworkID),
+					NetworkID:    uint32(params.NetworkID),
 					BlockchainID: ids.Empty,
 					Memo:         assetMemo,
 				}},
@@ -122,19 +116,19 @@ func BuildGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error {
 					for _, state := range initialStates {
 						b, err := json.Marshal(state)
 						if err != nil {
-							return fmt.Errorf("problem marshaling state: %w", err)
+							return "", fmt.Errorf("problem marshaling state: %w", err)
 						}
 						holder := Holder{}
 						if err := json.Unmarshal(b, &holder); err != nil {
-							return fmt.Errorf("problem unmarshaling holder: %w", err)
+							return "", fmt.Errorf("problem unmarshaling holder: %w", err)
 						}
 						_, addrbuff, err := address.ParseBech32(holder.Address)
 						if err != nil {
-							return fmt.Errorf("problem parsing holder address: %w", err)
+							return "", fmt.Errorf("problem parsing holder address: %w", err)
 						}
 						addr, err := ids.ToShortID(addrbuff)
 						if err != nil {
-							return fmt.Errorf("problem parsing holder address: %w", err)
+							return "", fmt.Errorf("problem parsing holder address: %w", err)
 						}
 						initialState.Outs = append(initialState.Outs, &secp256k1fx.TransferOutput{
 							Amt: uint64(holder.Amount),
@@ -148,11 +142,11 @@ func BuildGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error {
 					for _, state := range initialStates {
 						b, err := json.Marshal(state)
 						if err != nil {
-							return fmt.Errorf("problem marshaling state: %w", err)
+							return "", fmt.Errorf("problem marshaling state: %w", err)
 						}
 						owners := Owners{}
 						if err := json.Unmarshal(b, &owners); err != nil {
-							return fmt.Errorf("problem unmarshaling Owners: %w", err)
+							return "", fmt.Errorf("problem unmarshaling Owners: %w", err)
 						}
 
 						out := &secp256k1fx.MintOutput{
@@ -163,11 +157,11 @@ func BuildGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error {
 						for _, addrStr := range owners.Minters {
 							_, addrBytes, err := address.ParseBech32(addrStr)
 							if err != nil {
-								return fmt.Errorf("problem parsing minters address: %w", err)
+								return "", fmt.Errorf("problem parsing minters address: %w", err)
 							}
 							addr, err := ids.ToShortID(addrBytes)
 							if err != nil {
-								return fmt.Errorf("problem parsing minters address: %w", err)
+								return "", fmt.Errorf("problem parsing minters address: %w", err)
 							}
 							out.Addrs = append(out.Addrs, addr)
 						}
@@ -176,7 +170,7 @@ func BuildGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error {
 						initialState.Outs = append(initialState.Outs, out)
 					}
 				default:
-					return errUnknownAssetType
+					return "", errUnknownAssetType
 				}
 			}
 			initialState.Sort(genesisCodec)
@@ -189,13 +183,12 @@ func BuildGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error {
 
 	b, err := genesisCodec.Marshal(txs.CodecVersion, &g)
 	if err != nil {
-		return fmt.Errorf("problem marshaling genesis: %w", err)
+		return "", fmt.Errorf("problem marshaling genesis: %w", err)
 	}
 
-	reply.Bytes, err = formatting.Encode(args.Encoding, b)
+	bytes, err := formatting.Encode(params.Encoding, b)
 	if err != nil {
-		return fmt.Errorf("couldn't encode genesis as string: %w", err)
+		return "", fmt.Errorf("couldn't encode genesis as string: %w", err)
 	}
-	reply.Encoding = args.Encoding
-	return nil
+	return bytes, nil
 }

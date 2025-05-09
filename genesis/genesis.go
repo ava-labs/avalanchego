@@ -301,7 +301,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	amount := uint64(0)
 
 	// Specify the genesis state of the AVM
-	avmArgs := avm.BuildGenesisArgs{
+	avmParams := avm.BuildGenesisParams{
 		NetworkID: json.Uint32(config.NetworkID),
 		Encoding:  defaultEncoding,
 	}
@@ -340,18 +340,17 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		if err != nil {
 			return nil, ids.Empty, fmt.Errorf("couldn't parse memo bytes to string: %w", err)
 		}
-		avmArgs.GenesisData = map[string]avm.AssetDefinition{
+		avmParams.GenesisData = map[string]avm.AssetDefinition{
 			"AVAX": avax, // The AVM starts out with one asset: AVAX
 		}
 	}
-	avmReply := avm.BuildGenesisReply{}
 
-	err := avm.BuildGenesis(&avmArgs, &avmReply)
+	avmGenesis, err := avm.BuildGenesis(avmParams)
 	if err != nil {
 		return nil, ids.Empty, err
 	}
 
-	bytes, err := formatting.Decode(defaultEncoding, avmReply.Bytes)
+	bytes, err := formatting.Decode(defaultEncoding, avmGenesis)
 	if err != nil {
 		return nil, ids.Empty, fmt.Errorf("couldn't parse avm genesis reply: %w", err)
 	}
@@ -370,7 +369,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	skippedAllocations := []Allocation(nil)
 
 	// Specify the initial state of the Platform Chain
-	platformvmArgs := api.BuildGenesisArgs{
+	platformvmParams := api.BuildGenesisParams{
 		AvaxAssetID:   avaxAssetID,
 		NetworkID:     json.Uint32(config.NetworkID),
 		Time:          json.Uint64(config.StartTime),
@@ -393,7 +392,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 				if err != nil {
 					return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
 				}
-				platformvmArgs.UTXOs = append(platformvmArgs.UTXOs,
+				platformvmParams.UTXOs = append(platformvmParams.UTXOs,
 					api.UTXO{
 						Locktime: json.Uint64(unlock.Locktime),
 						Amount:   json.Uint64(unlock.Amount),
@@ -442,7 +441,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 
 		delegationFee := json.Uint32(staker.DelegationFee)
 
-		platformvmArgs.Validators = append(platformvmArgs.Validators,
+		platformvmParams.Validators = append(platformvmParams.Validators,
 			api.GenesisPermissionlessValidator{
 				GenesisValidator: api.GenesisValidator{
 					StartTime: json.Uint64(genesisTime.Unix()),
@@ -461,13 +460,13 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	}
 
 	// Specify the chains that exist upon this network's creation
-	genesisStr, err := formatting.Encode(defaultEncoding, []byte(config.CChainGenesis))
+	cChainGenesis, err := formatting.Encode(defaultEncoding, []byte(config.CChainGenesis))
 	if err != nil {
 		return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
 	}
-	platformvmArgs.Chains = []api.Chain{
+	platformvmParams.Chains = []api.Chain{
 		{
-			GenesisData: avmReply.Bytes,
+			GenesisData: avmGenesis,
 			SubnetID:    constants.PrimaryNetworkID,
 			VMID:        constants.AVMID,
 			FxIDs: []ids.ID{
@@ -478,19 +477,19 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 			Name: "X-Chain",
 		},
 		{
-			GenesisData: genesisStr,
+			GenesisData: cChainGenesis,
 			SubnetID:    constants.PrimaryNetworkID,
 			VMID:        constants.EVMID,
 			Name:        "C-Chain",
 		},
 	}
 
-	platformvmReply := api.BuildGenesisReply{}
-	if err := api.BuildGenesis(&platformvmArgs, &platformvmReply); err != nil {
+	pChainGenesis, err := api.BuildGenesis(platformvmParams)
+	if err != nil {
 		return nil, ids.Empty, fmt.Errorf("problem while building platform chain's genesis state: %w", err)
 	}
 
-	genesisBytes, err := formatting.Decode(platformvmReply.Encoding, platformvmReply.Bytes)
+	genesisBytes, err := formatting.Decode(platformvmParams.Encoding, pChainGenesis)
 	if err != nil {
 		return nil, ids.Empty, fmt.Errorf("problem parsing platformvm genesis bytes: %w", err)
 	}

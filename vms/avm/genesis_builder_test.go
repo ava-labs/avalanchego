@@ -32,7 +32,7 @@ func TestBuildGenesis(t *testing.T) {
 		addrMap[addrStr], err = address.FormatBech32(constants.UnitTestHRP, addr[:])
 		require.NoError(err)
 	}
-	args := BuildGenesisArgs{
+	params := BuildGenesisParams{
 		Encoding: formatting.Hex,
 		GenesisData: map[string]AssetDefinition{
 			"asset1": {
@@ -97,6 +97,7 @@ func TestBuildGenesis(t *testing.T) {
 			},
 		},
 	}
-	reply := BuildGenesisReply{}
-	require.NoError(BuildGenesis(&args, &reply))
+	result, err := BuildGenesis(params)
+	require.NoError(err)
+	require.NotEmpty(result)
 }
