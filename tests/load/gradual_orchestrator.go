@@ -18,6 +18,26 @@ import (
 
 var ErrFailedToReachTargetTPS = errors.New("failed to reach target TPS")
 
+type Issuer[T any] interface {
+	// GenerateAndIssueTx generates and sends a tx to the network, and informs the
+	// tracker that it sent said transaction. It returns the sent transaction.
+	GenerateAndIssueTx(ctx context.Context) (T, error)
+}
+
+type Listener[T any] interface {
+	// Listen for the final status of transactions and notify the tracker
+	// Listen stops if the context is done, an error occurs, or if it received
+	// all the transactions issued and the issuer no longer issues any.
+	// Listen MUST return a nil error if the context is canceled.
+	Listen(ctx context.Context) error
+
+	// RegisterIssued informs the listener that a transaction was issued.
+	RegisterIssued(tx T)
+
+	// IssuingDone informs the listener that no more transactions will be issued.
+	IssuingDone()
+}
+
 type GradualOrchestratorConfig struct {
 	// The maximum TPS the orchestrator should aim for.
 	//
