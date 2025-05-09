@@ -71,6 +71,8 @@ type OrchestratorConfig struct {
 	Terminate bool
 }
 
+// NewOrchestratorConfig returns a default OrchestratorConfig with pre-set parameters
+// for gradual load testing.
 func NewOrchestratorConfig() OrchestratorConfig {
 	return OrchestratorConfig{
 		MaxTPS:           5_000,
