@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	_ orchestrator = (*GradualOrchestrator[any, any])(nil)
+	_ orchestrator = (*GradualOrchestrator[any])(nil)
 
 	ErrFailedToReachTargetTPS = errors.New("failed to reach target TPS")
 )
@@ -67,9 +67,9 @@ func NewGradualOrchestratorConfig() GradualOrchestratorConfig {
 // transactions at a given rate (currTargetTPS) and increasing that rate until it detects that
 // the network can no longer make progress (i.e. the rate at the network accepts
 // transactions is less than currTargetTPS).
-type GradualOrchestrator[T any, U comparable] struct {
+type GradualOrchestrator[T comparable] struct {
 	agents  []Agent[T]
-	tracker *Tracker[U]
+	tracker *Tracker[T]
 
 	log logging.Logger
 
@@ -81,13 +81,13 @@ type GradualOrchestrator[T any, U comparable] struct {
 	config GradualOrchestratorConfig
 }
 
-func NewGradualOrchestrator[T any, U comparable](
+func NewGradualOrchestrator[T comparable](
 	agents []Agent[T],
-	tracker *Tracker[U],
+	tracker *Tracker[T],
 	log logging.Logger,
 	config GradualOrchestratorConfig,
-) *GradualOrchestrator[T, U] {
-	return &GradualOrchestrator[T, U]{
+) *GradualOrchestrator[T] {
+	return &GradualOrchestrator[T]{
 		agents:  agents,
 		tracker: tracker,
 		log:     log,
@@ -95,7 +95,7 @@ func NewGradualOrchestrator[T any, U comparable](
 	}
 }
 
-func (o *GradualOrchestrator[T, U]) Execute(ctx context.Context) error {
+func (o *GradualOrchestrator[T]) Execute(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 
 	// start a goroutine to confirm each issuer's transactions
@@ -127,7 +127,7 @@ func (o *GradualOrchestrator[T, U]) Execute(ctx context.Context) error {
 // 1. an issuer has errored
 // 2. the max TPS target has been reached and we can terminate
 // 3. the maximum number of attempts to reach a target TPS has been reached
-func (o *GradualOrchestrator[T, U]) run(ctx context.Context) bool {
+func (o *GradualOrchestrator[T]) run(ctx context.Context) bool {
 	var (
 		prevConfirmed        = o.tracker.GetObservedConfirmed()
 		prevTime             = time.Now()
@@ -221,13 +221,13 @@ func (o *GradualOrchestrator[T, U]) run(ctx context.Context) bool {
 }
 
 // GetObservedIssued returns the max TPS the orchestrator observed
-func (o *GradualOrchestrator[T, U]) GetMaxObservedTPS() uint64 {
+func (o *GradualOrchestrator[T]) GetMaxObservedTPS() uint64 {
 	return o.maxObservedTPS.Load()
 }
 
 // start a goroutine to each issuer to continuously send transactions.
 // if an issuer errors, all other issuers will stop as well.
-func (o *GradualOrchestrator[T, U]) issueTxs(ctx context.Context, currTargetTPS *atomic.Uint64) {
+func (o *GradualOrchestrator[T]) issueTxs(ctx context.Context, currTargetTPS *atomic.Uint64) {
 	for _, agent := range o.agents {
 		o.issuerGroup.Go(func() error {
 			for {
@@ -261,7 +261,7 @@ func (o *GradualOrchestrator[T, U]) issueTxs(ctx context.Context, currTargetTPS 
 }
 
 // setMaxObservedTPS only if tps > the current max observed TPS.
-func (o *GradualOrchestrator[T, U]) setMaxObservedTPS(tps uint64) {
+func (o *GradualOrchestrator[T]) setMaxObservedTPS(tps uint64) {
 	if tps > o.maxObservedTPS.Load() {
 		o.maxObservedTPS.Store(tps)
 	}
