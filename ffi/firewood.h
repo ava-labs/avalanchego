@@ -6,17 +6,31 @@
 
 
 /**
- * A handle to the database, which contains a reference to the database and a map of proposals.
+ * A handle to the database, returned by `fwd_create_db` and `fwd_open_db`.
+ *
+ * These handles are passed to the other FFI functions.
+ *
  */
 typedef struct DatabaseHandle DatabaseHandle;
 
+/**
+ * A value returned by the FFI.
+ *
+ * This is used in several different ways:
+ *
+ * - When returning data, the length is the length of the data and the data is a pointer to the data.
+ * - When returning an error, the length is 0 and the data is a null-terminated C-style string.
+ * - When returning an ID, the length is the ID and the data is null.
+ *
+ * A `Value` with length 0 and a null data pointer indicates that the data was not found.
+ */
 typedef struct Value {
   size_t len;
   const uint8_t *data;
 } Value;
 
 /**
- * A `KeyValue` struct that represents a key-value pair in the database.
+ * A `KeyValue` represents a key-value pair, passed to the FFI.
  */
 typedef struct KeyValue {
   struct Value key;
@@ -52,6 +66,13 @@ typedef struct CreateOrOpenArgs {
  *
  * The new root hash of the database, in Value form.
  * A `Value` containing {0, "error message"} if the commit failed.
+ *
+ * # Errors
+ *
+ * * `"key-value pair is null"` - A `KeyValue` struct is null
+ * * `"db should be non-null"` - The database handle is null
+ * * `"couldn't get key-value pair"` - A `KeyValue` struct is null
+ * * `"proposed revision is empty"` - The proposed revision is empty
  *
  * # Safety
  *
@@ -154,7 +175,7 @@ void fwd_free_value(const struct Value *value);
  * There are two error cases that may be expected to be nil by the caller,
  * but should be handled externally:
  * * The database has no entries - "IO error: Root hash not found"
- * * The key is not found in the database - "key not found"
+ * * The key is not found in the database returns a `Value` with length 0 and a null data pointer.
  *
  * # Safety
  *

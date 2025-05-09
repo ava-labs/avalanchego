@@ -82,11 +82,8 @@ func extractIdThenFree(v *C.struct_Value) (uint32, error) {
 // the `Value`, and returns the extracted slice.
 // Generates error if the error term is nonnull.
 func extractBytesThenFree(v *C.struct_Value) (buf []byte, err error) {
-	if v == nil {
-		return nil, errNilBuffer
-	}
-	if v.data == nil {
-		return nil, errBadValue
+	if v == nil || v.data == nil {
+		return nil, nil
 	}
 
 	buf = C.GoBytes(unsafe.Pointer(v.data), C.int(v.len))

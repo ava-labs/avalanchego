@@ -179,9 +179,10 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 	bytes, err := extractBytesThenFree(&val)
 
 	// If the root hash or key is not found, return nil.
-	if err != nil && (strings.Contains(err.Error(), rootHashNotFound) || strings.Contains(err.Error(), keyNotFound)) {
+	if err != nil && strings.Contains(err.Error(), rootHashNotFound) {
 		return nil, nil
 	}
+
 	return bytes, err
 }
 
