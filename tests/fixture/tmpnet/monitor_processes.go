@@ -46,25 +46,31 @@ const (
 	NetworkShutdownDelay = prometheusScrapeInterval + 2*time.Second
 )
 
-// StartCollectors ensures collectors are running to collect logs and metrics from local nodes.
-func StartCollectors(ctx context.Context, log logging.Logger) error {
+// StartPrometheus ensures prometheus is running to collect metrics from local nodes.
+func StartPrometheus(ctx context.Context, log logging.Logger) error {
 	if _, ok := ctx.Deadline(); !ok {
-		return errors.New("unable to start collectors with a context without a deadline")
-	}
-	if err := startPromtail(ctx, log); err != nil {
-		return err
+		return errors.New("unable to start prometheus with a context without a deadline")
 	}
 	if err := startPrometheus(ctx, log); err != nil {
 		return err
 	}
-
-	log.Info("skipping promtail readiness check until one or more nodes have written their service discovery configuration")
 	if err := waitForReadiness(ctx, log, prometheusCmd, prometheusReadinessURL); err != nil {
 		return err
 	}
-
 	log.Info("To stop: tmpnetctl stop-collectors")
+	return nil
+}
 
+// StartPromtail ensures promtail is running to collect logs from local nodes.
+func StartPromtail(ctx context.Context, log logging.Logger) error {
+	if _, ok := ctx.Deadline(); !ok {
+		return errors.New("unable to start promtail with a context without a deadline")
+	}
+	if err := startPromtail(ctx, log); err != nil {
+		return err
+	}
+	log.Info("skipping promtail readiness check until one or more nodes have written their service discovery configuration")
+	log.Info("To stop: tmpnetctl stop-collectors")
 	return nil
 }
 
@@ -74,70 +80,79 @@ func WaitForPromtailReadiness(ctx context.Context, log logging.Logger) error {
 	return waitForReadiness(ctx, log, promtailCmd, promtailReadinessURL)
 }
 
-// EnsureCollectorsStopped ensures collectors are not running.
-func StopCollectors(ctx context.Context, log logging.Logger) error {
+// StopMetricsCollector ensures prometheus is not running.
+func StopMetricsCollector(ctx context.Context, log logging.Logger) error {
+	return stopCollector(ctx, log, prometheusCmd)
+}
+
+// StopLogsCollector ensures promtail is not running.
+func StopLogsCollector(ctx context.Context, log logging.Logger) error {
+	return stopCollector(ctx, log, promtailCmd)
+}
+
+// stopCollector stops the collector process if it is running.
+func stopCollector(ctx context.Context, log logging.Logger, cmdName string) error {
 	if _, ok := ctx.Deadline(); !ok {
 		return errors.New("unable to start collectors with a context without a deadline")
 	}
-	for _, cmdName := range []string{promtailCmd, prometheusCmd} {
-		// Determine if the process is running
-		workingDir, err := getWorkingDir(cmdName)
-		if err != nil {
-			return err
-		}
-		pidPath := getPIDPath(workingDir)
-		proc, err := processFromPIDFile(workingDir, pidPath)
-		if err != nil {
-			return err
-		}
-		if proc == nil {
-			log.Info("collector not running",
-				zap.String("cmd", cmdName),
-			)
-			continue
-		}
 
-		log.Info("sending SIGTERM to collector process",
-			zap.String("cmd", cmdName),
-			zap.Int("pid", proc.Pid),
-		)
-		if err := proc.Signal(syscall.SIGTERM); err != nil {
-			return fmt.Errorf("failed to send SIGTERM to pid %d: %w", proc.Pid, err)
-		}
-
-		log.Info("waiting for collector process to stop",
-			zap.String("cmd", cmdName),
-			zap.Int("pid", proc.Pid),
-		)
-		err = pollUntilContextCancel(
-			ctx,
-			func(_ context.Context) (bool, error) {
-				p, err := getProcess(proc.Pid)
-				if err != nil {
-					return false, fmt.Errorf("failed to retrieve process: %w", err)
-				}
-				if p == nil {
-					// Process is no longer running
-
-					// Attempt to clear the PID file. Not critical that it is removed, just good housekeeping.
-					if err := clearStalePIDFile(log, cmdName, pidPath); err != nil {
-						log.Warn("failed to remove stale PID file",
-							zap.String("cmd", cmdName),
-							zap.String("pidFile", pidPath),
-							zap.Error(err),
-						)
-					}
-				}
-				return p == nil, nil
-			},
-		)
-		if err != nil {
-			return err
-		}
-		log.Info("collector stopped",
-			zap.String("cmdName", cmdName),
-		)
+	// Determine if the process is running
+	workingDir, err := getWorkingDir(cmdName)
+	if err != nil {
+		return err
 	}
+	pidPath := getPIDPath(workingDir)
+	proc, err := processFromPIDFile(workingDir, pidPath)
+	if err != nil {
+		return err
+	}
+	if proc == nil {
+		log.Info("collector not running",
+			zap.String("cmd", cmdName),
+		)
+		return nil
+	}
+
+	log.Info("sending SIGTERM to collector process",
+		zap.String("cmd", cmdName),
+		zap.Int("pid", proc.Pid),
+	)
+	if err := proc.Signal(syscall.SIGTERM); err != nil {
+		return fmt.Errorf("failed to send SIGTERM to pid %d: %w", proc.Pid, err)
+	}
+
+	log.Info("waiting for collector process to stop",
+		zap.String("cmd", cmdName),
+		zap.Int("pid", proc.Pid),
+	)
+	err = pollUntilContextCancel(
+		ctx,
+		func(_ context.Context) (bool, error) {
+			p, err := getProcess(proc.Pid)
+			if err != nil {
+				return false, fmt.Errorf("failed to retrieve process: %w", err)
+			}
+			if p == nil {
+				// Process is no longer running
+
+				// Attempt to clear the PID file. Not critical that it is removed, just good housekeeping.
+				if err := clearStalePIDFile(log, cmdName, pidPath); err != nil {
+					log.Warn("failed to remove stale PID file",
+						zap.String("cmd", cmdName),
+						zap.String("pidFile", pidPath),
+						zap.Error(err),
+					)
+				}
+			}
+			return p == nil, nil
+		},
+	)
+	if err != nil {
+		return err
+	}
+	log.Info("collector stopped",
+		zap.String("cmdName", cmdName),
+	)
 
 	return nil
 }

@@ -113,9 +113,10 @@ E2E_SKIP_BOOTSTRAP_CHECKS=1 ./bin/ginkgo -v ./tests/e2e ...
 It is possible to enable collection of logs and metrics from the
 temporary networks used for e2e testing by:
 
- - Supplying `--start-collectors` as an argument to the test suite
+ - Supplying `--start-metrics-collector` and `--start-logs-collector`
+   as arguments to the test suite
  - Starting collectors in advance of a test run with `tmpnetctl
-   start-collectors`
+   start-metrics-collector` and ` tmpnetctl start-logs-collector`
 
 Both methods require:
 
@@ -126,11 +127,11 @@ Both methods require:
    - `LOKI_PASSWORD`
  - The availability in the path of binaries for promtail and prometheus
    - Starting a development shell with `nix develop` is one way to
-     ensure this and requires the [installation of
-     nix](https://github.com/DeterminateSystems/nix-installer?tab=readme-ov-file#install-nix).
+     ensure this and requires the installation of nix
+     (e.g. `./scripts/run_task.sh install-nix`).
 
 Once started, the collectors will continue to run in the background
-until stopped by `tmpnetctl stop-collectors`.
+until stopped by `tmpnetctl stop-metrics-collector` and `tmpnetctl stop-logs-collector`.
 
 The results of collection will be viewable at
 https://grafana-poc.avax-dev.network.
