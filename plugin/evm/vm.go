@@ -184,6 +184,7 @@ var (
 	errNilBaseFeeApricotPhase3       = errors.New("nil base fee is invalid after apricotPhase3")
 	errNilBlockGasCostApricotPhase4  = errors.New("nil blockGasCost is invalid after apricotPhase4")
 	errInvalidHeaderPredicateResults = errors.New("invalid header predicate results")
+	errInitializingLogger            = errors.New("failed to initialize logger")
 )
 
 var originalStderr *os.File
@@ -372,7 +373,7 @@ func (vm *VM) Initialize(
 
 	corethLogger, err := InitLogger(vm.chainAlias, vm.config.LogLevel, vm.config.LogJSONFormat, writer)
 	if err != nil {
-		return fmt.Errorf("failed to initialize logger due to: %w ", err)
+		return fmt.Errorf("%w: %w ", errInitializingLogger, err)
 	}
 	vm.logger = corethLogger
 
