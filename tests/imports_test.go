@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package tmpnet
+package tests
 
 import (
 	"fmt"
@@ -61,7 +61,7 @@ func TestMustNotImport(t *testing.T) {
 		// Importing these packages configures libevm globally and it is not
 		// possible to do so for both coreth and subnet-evm, where the client may
 		// wish to connect to multiple chains.
-		"tests/fixture/...": {"plugin/evm/customtypes", "params"},
+		"tests/...": {"plugin/evm/customtypes", "params"},
 	}
 
 	for packageName, forbiddenImports := range mustNotImport {
