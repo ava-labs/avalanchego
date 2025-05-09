@@ -90,22 +90,36 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 
 	// Consider monitoring flags for any command but stop
 	if networkCmd != StopNetworkCmd {
-		if flagVars.StartMetricCollector() {
+		if flagVars.StartMetricsCollector() {
 			require.NoError(tmpnet.StartPrometheus(tc.DefaultContext(), tc.Log()))
 		}
-		if flagVars.StartLogCollector() {
+		if flagVars.StartLogsCollector() {
 			require.NoError(tmpnet.StartPromtail(tc.DefaultContext(), tc.Log()))
 		}
-		if flagVars.CheckMonitoring() {
-			// Register cleanup before network start to ensure it runs after the network is stopped (LIFO)
+
+		// Register cleanups before network start to ensure they run after the network is stopped (LIFO)
+
+		if flagVars.CheckMetricsCollected() {
 			tc.DeferCleanup(func() {
 				if network == nil {
-					tc.Log().Warn("unable to check that logs and metrics were collected from an uninitialized network")
+					tc.Log().Warn("unable to check that metrics were collected from an uninitialized network")
 					return
 				}
 				ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 				defer cancel()
-				require.NoError(tmpnet.CheckMonitoring(ctx, tc.Log(), network.UUID))
+				require.NoError(tmpnet.CheckMetricsExist(ctx, tc.Log(), network.UUID))
+			})
+		}
+
+		if flagVars.CheckLogsCollected() {
+			tc.DeferCleanup(func() {
+				if network == nil {
+					tc.Log().Warn("unable to check that logs were collected from an uninitialized network")
+					return
+				}
+				ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
+				defer cancel()
+				require.NoError(tmpnet.CheckLogsExist(ctx, tc.Log(), network.UUID))
 			})
 		}
 	}
@@ -181,7 +195,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 	}
 
 	// Once one or more nodes are running it should be safe to wait for promtail to report readiness
-	if flagVars.StartLogCollector() {
+	if flagVars.StartLogsCollector() {
 		require.NoError(tmpnet.WaitForPromtailReadiness(tc.DefaultContext(), tc.Log()))
 	}
 

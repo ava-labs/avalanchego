@@ -28,10 +28,9 @@ orchestrate the same temporary networks without the use of an rpc daemon.
     - [Process details](#process-details)
 - [Monitoring](#monitoring)
   - [Example usage](#example-usage)
-  - [Starting collectors](#starting-collectors)
-  - [Stopping collectors](#stopping-collectors)
-  - [Metrics collection](#metrics-collection)
-  - [Log collection](#log-collection)
+  - [Running collectors](#running-collectors)
+  - [Metric collection configuration](#metric-collection-configuration)
+  - [Log collection configuration](#log-collection-configuration)
   - [Labels](#labels)
   - [CI Collection](#ci-collection)
   - [Viewing](#viewing)
@@ -332,49 +331,50 @@ PROMETHEUS_USERNAME=<username> \
 PROMETHEUS_PASSWORD=<password> \
 LOKI_USERNAME=<username> \
 LOKI_PASSWORD=<password> \
-./bin/tmpnetctl start-collectors
+./bin/tmpnetctl start-metrics-collector
+./bin/tmpnetctl start-logs-collector
 
 # Network start emits link to grafana displaying collected logs and metrics
 ./bin/tmpnetctl start-network
 
 # When done with the network, stop the collectors
-./bin/tmpnetctl stop-collectors
+./bin/tmpnetctl stop-metrics-collector
+./bin/tmpnetctl stop-logs-collector
 ```
 
-### Starting collectors
+### Running collectors
 [Top](#table-of-contents)
 
-Collectors for logs and metrics can be started by `tmpnetctl
-start-collectors`:
+ - `tmpnetctl start-metrics-collector` starts `prometheus` in agent mode
+   configured to scrape metrics from configured nodes and forward
+   them to https://prometheus-poc.avax-dev.network.
+   - Requires:
+     - Credentials supplied as env vars:
+       - `PROMETHEUS_USERNAME`
+       - `PROMETHEUS_PASSWORD`
+     - A `prometheus` binary available in the path
+   - Once started, `prometheus` can be stopped by `tmpnetctl stop-metrics-collector`
+ - `tmpnetctl start-logs-collector` starts `promtail` configured to collect logs
+   from configured nodes and forward them to
+   https://loki-poc.avax-dev.network.
+   - Requires:
+     - Credentials supplied as env vars:
+       - `LOKI_USERNAME`
+       - `LOKI_PASSWORD`
+     - A `promtail` binary available in the path
+   - Once started, `promtail` can be stopped by `tmpnetctl stop-logs-collector`
+ - Starting a development shell with `nix develop` is one way to
+   ensure availability of the necessary binaries and requires the
+   installation of nix (e.g. `./scripts/run_task.sh install-nix`).
 
- - Requires that the following env vars be set
-   - `PROMETHEUS_USERNAME`
-   - `PROMETHEUS_PASSWORD`
-   - `LOKI_USERNAME`
-   - `LOKI_PASSWORD`
- - Requires that binaries for promtail and prometheus be available in the path
-   - Starting a development shell with `nix develop` is one way to
-     ensure this and requires the [installation of
-     nix](https://github.com/DeterminateSystems/nix-installer?tab=readme-ov-file#install-nix).
- - Starts prometheus in agent mode configured to scrape metrics from
-   configured nodes and forward them to
-   https://prometheus-poc.avax-dev.network.
- - Starts promtail configured to collect logs from configured nodes
-   and forward them to https://loki-poc.avax-dev.network.
-
-### Stopping collectors
-
-Collectors for logs and metrics can be stopped by `tmpnetctl
-stop-collectors`:
-
-### Metrics collection
+### Metric collection configuration
 [Top](#table-of-contents)
 
 When a node is started, configuration enabling collection of metrics
 from the node is written to
 `~/.tmpnet/prometheus/file_sd_configs/[network uuid]-[node id].json`.
 
-### Log collection
+### Log collection configuration
 [Top](#table-of-contents)
 
 Nodes log are stored at `~/.tmpnet/networks/[network id]/[node
