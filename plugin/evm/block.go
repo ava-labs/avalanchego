@@ -148,7 +148,12 @@ func (b *Block) Accept(context.Context) error {
 	// practice to cleanup the batch we were modifying in the case of an error.
 	defer vm.versiondb.Abort()
 
-	log.Debug(fmt.Sprintf("Accepting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
+	blkID := b.ID()
+	log.Debug("accepting block",
+		"hash", blkID.Hex(),
+		"id", blkID,
+		"height", b.Height(),
+	)
 
 	// Call Accept for relevant precompile logs. Note we do this prior to
 	// calling Accept on the blockChain so any side effects (eg warp signatures)
@@ -158,11 +163,11 @@ func (b *Block) Accept(context.Context) error {
 		return err
 	}
 	if err := vm.blockChain.Accept(b.ethBlock); err != nil {
-		return fmt.Errorf("chain could not accept %s: %w", b.ID(), err)
+		return fmt.Errorf("chain could not accept %s: %w", blkID, err)
 	}
 
-	if err := vm.acceptedBlockDB.Put(lastAcceptedKey, b.id[:]); err != nil {
-		return fmt.Errorf("failed to put %s as the last accepted block: %w", b.ID(), err)
+	if err := vm.acceptedBlockDB.Put(lastAcceptedKey, blkID[:]); err != nil {
+		return fmt.Errorf("failed to put %s as the last accepted block: %w", blkID, err)
 	}
 
 	for _, tx := range b.atomicTxs {
@@ -172,7 +177,7 @@ func (b *Block) Accept(context.Context) error {
 
 	// Update VM state for atomic txs in this block. This includes updating the
 	// atomic tx repo, atomic trie, and shared memory.
-	atomicState, err := b.vm.atomicBackend.GetVerifiedAtomicState(common.Hash(b.ID()))
+	atomicState, err := b.vm.atomicBackend.GetVerifiedAtomicState(common.Hash(blkID))
 	if err != nil {
 		// should never occur since [b] must be verified before calling Accept
 		return err
@@ -181,7 +186,7 @@ func (b *Block) Accept(context.Context) error {
 	// with the shared memory changes.
 	vdbBatch, err := b.vm.versiondb.CommitBatch()
 	if err != nil {
-		return fmt.Errorf("could not create commit batch processing block[%s]: %w", b.ID(), err)
+		return fmt.Errorf("could not create commit batch processing block[%s]: %w", blkID, err)
 	}
 
 	// Apply any shared memory changes atomically with other pending changes to
@@ -226,7 +231,13 @@ func (b *Block) handlePrecompileAccept(rules extras.Rules) error {
 // Reject implements the snowman.Block interface
 // If [b] contains an atomic transaction, attempt to re-issue it
 func (b *Block) Reject(context.Context) error {
-	log.Debug(fmt.Sprintf("Rejecting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
+	blkID := b.ID()
+	log.Debug("rejecting block",
+		"hash", blkID.Hex(),
+		"id", blkID,
+		"height", b.Height(),
+	)
+
 	for _, tx := range b.atomicTxs {
 		// Re-issue the transaction in the mempool, continue even if it fails
 		b.vm.mempool.RemoveTx(tx)
@@ -234,7 +245,7 @@ func (b *Block) Reject(context.Context) error {
 			log.Debug("Failed to re-issue transaction in rejected block", "txID", tx.ID(), "err", err)
 		}
 	}
-	atomicState, err := b.vm.atomicBackend.GetVerifiedAtomicState(common.Hash(b.ID()))
+	atomicState, err := b.vm.atomicBackend.GetVerifiedAtomicState(common.Hash(blkID))
 	if err != nil {
 		// should never occur since [b] must be verified before calling Reject
 		return err
