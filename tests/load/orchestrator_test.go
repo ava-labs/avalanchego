@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-var _ Issuer = (*mockIssuer)(nil)
+var _ Issuer[ids.ID] = (*mockIssuer)(nil)
 
 func TestOrchestratorTPS(t *testing.T) {
 	tests := []struct {
@@ -61,10 +61,10 @@ func TestOrchestratorTPS(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			tracker, err := NewTracker(prometheus.NewRegistry())
+			tracker, err := NewTracker[ids.ID](prometheus.NewRegistry())
 			r.NoError(err)
 
-			agents := []Agent{
+			agents := []Agent[ids.ID]{
 				NewAgent(
 					&mockIssuer{
 						generateTxF: func() (ids.ID, error) {
@@ -102,17 +102,17 @@ func TestOrchestratorExecution(t *testing.T) {
 		errMockIssuer      = errors.New("mock issuer error")
 	)
 
-	tracker, err := NewTracker(prometheus.NewRegistry())
+	tracker, err := NewTracker[ids.ID](prometheus.NewRegistry())
 	require.NoError(t, err, "creating tracker")
 
 	tests := []struct {
 		name        string
-		agents      []Agent
+		agents      []Agent[ids.ID]
 		expectedErr error
 	}{
 		{
 			name: "generator error",
-			agents: []Agent{
+			agents: []Agent[ids.ID]{
 				NewAgent(
 					&mockIssuer{
 						generateTxF: func() (ids.ID, error) {
@@ -126,7 +126,7 @@ func TestOrchestratorExecution(t *testing.T) {
 		},
 		{
 			name: "issuer error",
-			agents: []Agent{
+			agents: []Agent[ids.ID]{
 				NewAgent(
 					&mockIssuer{
 						generateTxF: func() (ids.ID, error) {
@@ -164,13 +164,13 @@ type mockIssuer struct {
 	generateTxF   func() (ids.ID, error)
 	currTxsIssued uint64
 	maxTxs        uint64
-	tracker       *Tracker
+	tracker       *Tracker[ids.ID]
 	issueTxErr    error
 }
 
 // GenerateAndIssueTx immediately generates, issues and confirms a tx.
 // To simulate TPS, the number of txs IssueTx can issue/confirm is capped by maxTxs
-func (m *mockIssuer) GenerateAndIssueTx(_ context.Context) ([32]byte, error) {
+func (m *mockIssuer) GenerateAndIssueTx(_ context.Context) (ids.ID, error) {
 	id, err := m.generateTxF()
 	if err != nil {
 		return id, err
@@ -196,6 +196,6 @@ func (*mockListener) Listen(context.Context) error {
 	return nil
 }
 
-func (*mockListener) RegisterIssued([32]byte) {}
+func (*mockListener) RegisterIssued(ids.ID) {}
 
 func (*mockListener) IssuingDone() {}
