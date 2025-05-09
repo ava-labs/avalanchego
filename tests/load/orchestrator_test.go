@@ -19,17 +19,17 @@ import (
 
 var _ Issuer[ids.ID] = (*mockIssuer)(nil)
 
-func TestGradualOrchestratorTPS(t *testing.T) {
+func TestOrchestratorTPS(t *testing.T) {
 	tests := []struct {
 		name        string
 		serverTPS   uint64
-		config      GradualOrchestratorConfig
+		config      OrchestratorConfig
 		expectedErr error
 	}{
 		{
 			name:      "orchestrator achieves max TPS",
 			serverTPS: math.MaxUint64,
-			config: GradualOrchestratorConfig{
+			config: OrchestratorConfig{
 				MaxTPS:           2_000,
 				MinTPS:           1_000,
 				Step:             1_000,
@@ -42,7 +42,7 @@ func TestGradualOrchestratorTPS(t *testing.T) {
 		{
 			name:      "orchestrator TPS limited by network",
 			serverTPS: 1_000,
-			config: GradualOrchestratorConfig{
+			config: OrchestratorConfig{
 				MaxTPS:           2_000,
 				MinTPS:           1_000,
 				Step:             1_000,
@@ -77,7 +77,7 @@ func TestGradualOrchestratorTPS(t *testing.T) {
 				),
 			}
 
-			orchestrator := NewGradualOrchestrator(
+			orchestrator := NewOrchestrator(
 				agents,
 				tracker,
 				logging.NoLog{},
@@ -96,7 +96,7 @@ func TestGradualOrchestratorTPS(t *testing.T) {
 }
 
 // test that the orchestrator returns early if the txGenerators or the issuers error
-func TestGradualOrchestratorExecution(t *testing.T) {
+func TestOrchestratorExecution(t *testing.T) {
 	var (
 		errMockTxGenerator = errors.New("mock tx generator error")
 		errMockIssuer      = errors.New("mock issuer error")
@@ -147,11 +147,11 @@ func TestGradualOrchestratorExecution(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			orchestrator := NewGradualOrchestrator(
+			orchestrator := NewOrchestrator(
 				tt.agents,
 				tracker,
 				logging.NoLog{},
-				NewGradualOrchestratorConfig(),
+				NewOrchestratorConfig(),
 			)
 			r.NoError(err)
 
