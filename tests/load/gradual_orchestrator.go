@@ -16,11 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-var (
-	_ orchestrator = (*GradualOrchestrator[any])(nil)
-
-	ErrFailedToReachTargetTPS = errors.New("failed to reach target TPS")
-)
+var ErrFailedToReachTargetTPS = errors.New("failed to reach target TPS")
 
 type GradualOrchestratorConfig struct {
 	// The maximum TPS the orchestrator should aim for.

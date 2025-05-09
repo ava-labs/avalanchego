@@ -24,10 +24,3 @@ type Listener[T any] interface {
 	// IssuingDone informs the listener that no more transactions will be issued.
 	IssuingDone()
 }
-
-// orchestrator executes the load test by coordinating the issuers to send
-// transactions, in a manner depending on the implementation.
-type orchestrator interface {
-	// Execute the load test
-	Execute(ctx context.Context) error
-}
