@@ -43,7 +43,7 @@ type kVBackend interface {
 // Prefetch is a no-op since we don't need to prefetch for Firewood.
 func (db *Database) Prefetch(key []byte) ([]byte, error) {
 	if db.handle == nil {
-		return nil, dbClosedErr
+		return nil, errDbClosed
 	}
 
 	return nil, nil
@@ -52,7 +52,7 @@ func (db *Database) Prefetch(key []byte) ([]byte, error) {
 // Commit is a no-op, since [Database.Update] already persists changes.
 func (db *Database) Commit(root []byte) error {
 	if db.handle == nil {
-		return dbClosedErr
+		return errDbClosed
 	}
 
 	return nil
@@ -62,7 +62,7 @@ func (db *Database) Commit(root []byte) error {
 // database.
 func (db *Database) Update(keys, vals [][]byte) ([]byte, error) {
 	if db.handle == nil {
-		return nil, dbClosedErr
+		return nil, errDbClosed
 	}
 
 	ops := make([]KeyValue, len(keys))

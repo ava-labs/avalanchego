@@ -12,7 +12,6 @@ import "C"
 import (
 	"errors"
 	"fmt"
-	"runtime"
 	"strings"
 	"unsafe"
 )
@@ -24,7 +23,7 @@ const (
 	keyNotFound      = "key not found"
 )
 
-var dbClosedErr = errors.New("firewood database already closed")
+var errDbClosed = errors.New("firewood database already closed")
 
 // A Database is a handle to a Firewood database.
 // It is not safe to call these methods with a nil handle.
@@ -32,7 +31,7 @@ type Database struct {
 	// handle is returned and accepted by cgo functions. It MUST be treated as
 	// an opaque value without special meaning.
 	// https://en.wikipedia.org/wiki/Blinkenlights
-	handle unsafe.Pointer
+	handle *C.DatabaseHandle
 }
 
 // Config configures the opening of a [Database].
@@ -91,7 +90,7 @@ func New(filePath string, conf *Config) (*Database, error) {
 		metrics_port: C.uint16_t(conf.MetricsPort),
 	}
 
-	var db unsafe.Pointer
+	var db *C.DatabaseHandle
 	if conf.Create {
 		db = C.fwd_create_db(args)
 	} else {
@@ -101,12 +100,6 @@ func New(filePath string, conf *Config) (*Database, error) {
 	// After creating the db, we can safely free the path string.
 	C.free(unsafe.Pointer(args.path))
 	return &Database{handle: db}, nil
-}
-
-// KeyValue is a key-value pair.
-type KeyValue struct {
-	Key   []byte
-	Value []byte
 }
 
 // Batch applies a batch of updates to the database, returning the hash of the
@@ -140,27 +133,44 @@ func (db *Database) Batch(ops []KeyValue) ([]byte, error) {
 	return extractBytesThenFree(&hash)
 }
 
-// extractBytesThenFree converts the cgo `Value` payload to a byte slice, frees
-// the `Value`, and returns the extracted slice.
-// Generates error if the error term is nonnull.
-func extractBytesThenFree(v *C.struct_Value) (buf []byte, err error) {
-	buf = C.GoBytes(unsafe.Pointer(v.data), C.int(v.len))
-	if v.len == 0 {
-		errStr := C.GoString((*C.char)(unsafe.Pointer(v.data)))
-		err = fmt.Errorf("firewood error: %s", errStr)
+func (db *Database) Propose(keys, vals [][]byte) (*Proposal, error) {
+	if db.handle == nil {
+		return nil, errDbClosed
 	}
-	C.fwd_free_value(v)
 
-	// Pin the returned value to prevent it from being garbage collected.
-	runtime.KeepAlive(v)
-	return
+	values, cleanup := newValueFactory()
+	defer cleanup()
+
+	ffiOps := make([]C.struct_KeyValue, len(keys))
+	for i := range keys {
+		ffiOps[i] = C.struct_KeyValue{
+			key:   values.from(keys[i]),
+			value: values.from(vals[i]),
+		}
+	}
+	id_or_err := C.fwd_propose_on_db(
+		db.handle,
+		C.size_t(len(ffiOps)),
+		(*C.struct_KeyValue)(unsafe.SliceData(ffiOps)), // implicitly pinned
+	)
+	id, err := extractIdThenFree(&id_or_err)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// The C function will never create an id of 0, unless it is an error.
+	return &Proposal{
+		handle: db.handle,
+		id:     id,
+	}, nil
 }
 
 // Get retrieves the value for the given key. It always returns a nil error.
 // If the key is not found, the return value will be (nil, nil).
 func (db *Database) Get(key []byte) ([]byte, error) {
 	if db.handle == nil {
-		return nil, dbClosedErr
+		return nil, errDbClosed
 	}
 
 	values, cleanup := newValueFactory()
@@ -179,7 +189,7 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 // Empty trie must return common.Hash{}.
 func (db *Database) Root() ([]byte, error) {
 	if db.handle == nil {
-		return nil, dbClosedErr
+		return nil, errDbClosed
 	}
 	hash := C.fwd_root_hash(db.handle)
 	bytes, err := extractBytesThenFree(&hash)
@@ -196,31 +206,9 @@ func (db *Database) Root() ([]byte, error) {
 // Returns an error if already closed.
 func (db *Database) Close() error {
 	if db.handle == nil {
-		return dbClosedErr
+		return errDbClosed
 	}
 	C.fwd_close_db(db.handle)
 	db.handle = nil
 	return nil
-}
-
-// newValueFactory returns a factory for converting byte slices into cgo `Value`
-// structs that can be passed as arguments to cgo functions. The returned
-// cleanup function MUST be called when the constructed values are no longer
-// required, after which they can no longer be used as cgo arguments.
-func newValueFactory() (*valueFactory, func()) {
-	f := new(valueFactory)
-	return f, func() { f.pin.Unpin() }
-}
-
-type valueFactory struct {
-	pin runtime.Pinner
-}
-
-func (f *valueFactory) from(data []byte) C.struct_Value {
-	if len(data) == 0 {
-		return C.struct_Value{0, nil}
-	}
-	ptr := (*C.uchar)(unsafe.SliceData(data))
-	f.pin.Pin(ptr)
-	return C.struct_Value{C.size_t(len(data)), ptr}
 }

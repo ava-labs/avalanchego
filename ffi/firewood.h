@@ -5,6 +5,11 @@
 #include <stdlib.h>
 
 
+/**
+ * A handle to the database, which contains a reference to the database and a map of proposals.
+ */
+typedef struct DatabaseHandle DatabaseHandle;
+
 typedef struct Value {
   size_t len;
   const uint8_t *data;
@@ -37,9 +42,16 @@ typedef struct CreateOrOpenArgs {
 /**
  * Puts the given key-value pairs into the database.
  *
+ * # Arguments
+ *
+ * * `db` - The database handle returned by `open_db`
+ * * `nkeys` - The number of key-value pairs to put
+ * * `values` - A pointer to an array of `KeyValue` structs
+ *
  * # Returns
  *
- * The current root hash of the database, in Value form.
+ * The new root hash of the database, in Value form.
+ * A `Value` containing {0, "error message"} if the commit failed.
  *
  * # Safety
  *
@@ -50,7 +62,7 @@ typedef struct CreateOrOpenArgs {
  *  * ensure that the `Value` fields of the `KeyValue` structs are valid pointers.
  *
  */
-struct Value fwd_batch(void *db,
+struct Value fwd_batch(const struct DatabaseHandle *db,
                        size_t nkeys,
                        const struct KeyValue *values);
 
@@ -67,7 +79,28 @@ struct Value fwd_batch(void *db,
  *
  * * `db` - The database handle to close, previously returned from a call to open_db()
  */
-void fwd_close_db(void *db);
+void fwd_close_db(struct DatabaseHandle *db);
+
+/**
+ * Commits a proposal to the database.
+ *
+ * # Arguments
+ *
+ * * `db` - The database handle returned by `open_db`
+ * * `proposal_id` - The ID of the proposal to commit
+ *
+ * # Returns
+ *
+ * A `Value` containing {0, null} if the commit was successful.
+ * A `Value` containing {0, "error message"} if the commit failed.
+ *
+ * # Safety
+ *
+ * This function is unsafe because it dereferences raw pointers.
+ * The caller must ensure that `db` is a valid pointer returned by `open_db`
+ *
+ */
+struct Value fwd_commit(const struct DatabaseHandle *db, uint32_t proposal_id);
 
 /**
  * Create a database with the given cache size and maximum number of revisions, as well
@@ -89,15 +122,20 @@ void fwd_close_db(void *db);
  * The caller must call `close` to free the memory associated with the returned database handle.
  *
  */
-void *fwd_create_db(struct CreateOrOpenArgs args);
+const struct DatabaseHandle *fwd_create_db(struct CreateOrOpenArgs args);
 
 /**
  * Frees the memory associated with a `Value`.
+ *
+ * # Arguments
+ *
+ * * `value` - The `Value` to free, previously returned from any Rust function.
  *
  * # Safety
  *
  * This function is unsafe because it dereferences raw pointers.
  * The caller must ensure that `value` is a valid pointer.
+ *
  */
 void fwd_free_value(const struct Value *value);
 
@@ -107,6 +145,16 @@ void fwd_free_value(const struct Value *value);
  * # Arguments
  *
  * * `db` - The database handle returned by `open_db`
+ * * `key` - The key to look up, in `Value` form
+ *
+ * # Returns
+ *
+ * A `Value` containing the root hash of the database.
+ * A `Value` containing {0, "error message"} if the get failed.
+ * There are two error cases that may be expected to be nil by the caller,
+ * but should be handled externally:
+ * * The database has no entries - "IO error: Root hash not found"
+ * * The key is not found in the database - "key not found"
  *
  * # Safety
  *
@@ -115,7 +163,7 @@ void fwd_free_value(const struct Value *value);
  *  * ensure that `key` is a valid pointer to a `Value` struct
  *  * call `free_value` to free the memory associated with the returned `Value`
  */
-struct Value fwd_get(void *db, struct Value key);
+struct Value fwd_get(const struct DatabaseHandle *db, struct Value key);
 
 /**
  * Open a database with the given cache size and maximum number of revisions
@@ -136,15 +184,53 @@ struct Value fwd_get(void *db, struct Value key);
  * The caller must call `close` to free the memory associated with the returned database handle.
  *
  */
-void *fwd_open_db(struct CreateOrOpenArgs args);
+const struct DatabaseHandle *fwd_open_db(struct CreateOrOpenArgs args);
+
+/**
+ * Proposes a batch of operations to the database.
+ *
+ * # Arguments
+ *
+ * * `db` - The database handle returned by `open_db`
+ * * `nkeys` - The number of key-value pairs to put
+ * * `values` - A pointer to an array of `KeyValue` structs
+ *
+ * # Returns
+ *
+ * The new root hash of the database, in Value form.
+ * A `Value` containing {0, "error message"} if creating the proposal failed.
+ *
+ * # Safety
+ *
+ * This function is unsafe because it dereferences raw pointers.
+ * The caller must:
+ *  * ensure that `db` is a valid pointer returned by `open_db`
+ *  * ensure that `values` is a valid pointer and that it points to an array of `KeyValue` structs of length `nkeys`.
+ *  * ensure that the `Value` fields of the `KeyValue` structs are valid pointers.
+ *
+ */
+struct Value fwd_propose_on_db(const struct DatabaseHandle *db,
+                               size_t nkeys,
+                               const struct KeyValue *values);
 
 /**
  * Get the root hash of the latest version of the database
  * Don't forget to call `free_value` to free the memory associated with the returned `Value`.
+ *
+ * # Argument
+ *
+ * * `db` - The database handle returned by `open_db`
+ *
+ * # Returns
+ *
+ * A `Value` containing the root hash of the database.
+ * A `Value` containing {0, "error message"} if the root hash could not be retrieved.
+ * One expected error is "IO error: Root hash not found" if the database is empty.
+ * This should be handled by the caller.
  *
  * # Safety
  *
  * This function is unsafe because it dereferences raw pointers.
  * The caller must ensure that `db` is a valid pointer returned by `open_db`
  */
-struct Value fwd_root_hash(void *db);
+struct Value fwd_root_hash(const struct DatabaseHandle *db);

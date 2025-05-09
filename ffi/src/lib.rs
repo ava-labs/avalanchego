@@ -1,12 +1,16 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+use std::collections::HashMap;
 use std::ffi::{CStr, CString, OsStr, c_char};
 use std::fmt::{self, Display, Formatter};
+use std::ops::Deref;
 use std::os::unix::ffi::OsStrExt as _;
 use std::path::Path;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::{Arc, RwLock};
 
-use firewood::db::{BatchOp as DbBatchOp, Db, DbConfig, DbViewSync as _};
+use firewood::db::{BatchOp as DbBatchOp, Db, DbConfig, DbViewSync as _, Proposal};
 use firewood::manager::{CacheReadStrategy, RevisionManagerConfig};
 
 mod metrics_setup;
@@ -15,6 +19,37 @@ use metrics::counter;
 
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
+type ProposalId = u32;
+static ID_COUNTER: AtomicU32 = AtomicU32::new(1);
+fn next_id() -> ProposalId {
+    ID_COUNTER.fetch_add(1, Ordering::Relaxed)
+}
+
+/// A handle to the database, which contains a reference to the database and a map of proposals.
+// All proposals must be dropped before the database handle is dropped due to lifetime
+// guarantees defined during database creation.
+pub struct DatabaseHandle<'p> {
+    proposals: RwLock<HashMap<ProposalId, Arc<Proposal<'p>>>>,
+    db: Db,
+}
+
+impl From<Db> for DatabaseHandle<'_> {
+    fn from(db: Db) -> Self {
+        Self {
+            db,
+            proposals: RwLock::new(HashMap::new()),
+        }
+    }
+}
+
+impl Deref for DatabaseHandle<'_> {
+    type Target = Db;
+
+    fn deref(&self) -> &Self::Target {
+        &self.db
+    }
+}
 
 #[derive(Debug)]
 #[repr(C)]
@@ -34,6 +69,16 @@ impl Display for Value {
 /// # Arguments
 ///
 /// * `db` - The database handle returned by `open_db`
+/// * `key` - The key to look up, in `Value` form
+///
+/// # Returns
+///
+/// A `Value` containing the root hash of the database.
+/// A `Value` containing {0, "error message"} if the get failed.
+/// There are two error cases that may be expected to be nil by the caller,
+/// but should be handled externally:
+/// * The database has no entries - "IO error: Root hash not found"
+/// * The key is not found in the database - "key not found"
 ///
 /// # Safety
 ///
@@ -42,7 +87,7 @@ impl Display for Value {
 ///  * ensure that `key` is a valid pointer to a `Value` struct
 ///  * call `free_value` to free the memory associated with the returned `Value`
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fwd_get(db: *mut Db, key: Value) -> Value {
+pub unsafe extern "C" fn fwd_get(db: *const DatabaseHandle, key: Value) -> Value {
     get(db, key).unwrap_or_else(|e| e.into())
 }
 
@@ -50,7 +95,7 @@ pub unsafe extern "C" fn fwd_get(db: *mut Db, key: Value) -> Value {
 ///
 /// This function is not exposed to the C API.
 /// Internal call for `fwd_get` to remove error handling from the C API
-fn get(db: *mut Db, key: Value) -> Result<Value, String> {
+fn get(db: *const DatabaseHandle, key: Value) -> Result<Value, String> {
     // Check db is valid.
     let db = unsafe { db.as_ref() }.ok_or_else(|| String::from("db should be non-null"))?;
 
@@ -83,9 +128,16 @@ pub struct KeyValue {
 
 /// Puts the given key-value pairs into the database.
 ///
+/// # Arguments
+///
+/// * `db` - The database handle returned by `open_db`
+/// * `nkeys` - The number of key-value pairs to put
+/// * `values` - A pointer to an array of `KeyValue` structs
+///
 /// # Returns
 ///
-/// The current root hash of the database, in Value form.
+/// The new root hash of the database, in Value form.
+/// A `Value` containing {0, "error message"} if the commit failed.
 ///
 /// # Safety
 ///
@@ -96,7 +148,11 @@ pub struct KeyValue {
 ///  * ensure that the `Value` fields of the `KeyValue` structs are valid pointers.
 ///
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fwd_batch(db: *mut Db, nkeys: usize, values: *const KeyValue) -> Value {
+pub unsafe extern "C" fn fwd_batch(
+    db: *const DatabaseHandle,
+    nkeys: usize,
+    values: *const KeyValue,
+) -> Value {
     batch(db, nkeys, values).unwrap_or_else(|e| e.into())
 }
 
@@ -104,7 +160,11 @@ pub unsafe extern "C" fn fwd_batch(db: *mut Db, nkeys: usize, values: *const Key
 ///
 /// This function is not exposed to the C API.
 /// Internal call for `fwd_batch` to remove error handling from the C API
-fn batch(db: *mut Db, nkeys: usize, values: *const KeyValue) -> Result<Value, String> {
+fn batch(
+    db: *const DatabaseHandle,
+    nkeys: usize,
+    values: *const KeyValue,
+) -> Result<Value, String> {
     let start = coarsetime::Instant::now();
     // Check db is valid.
     let db = unsafe { db.as_ref() }.ok_or_else(|| String::from("db should be non-null"))?;
@@ -113,7 +173,7 @@ fn batch(db: *mut Db, nkeys: usize, values: *const KeyValue) -> Result<Value, St
     let mut batch = Vec::with_capacity(nkeys);
     for i in 0..nkeys {
         let kv = unsafe { values.add(i).as_ref() }
-            .ok_or_else(|| String::from("couldn't get key-value pair"))?;
+            .ok_or_else(|| String::from("key-value pair is null"))?;
         if kv.value.len == 0 {
             batch.push(DbBatchOp::DeleteRange {
                 prefix: kv.key.as_slice(),
@@ -143,15 +203,128 @@ fn batch(db: *mut Db, nkeys: usize, values: *const KeyValue) -> Result<Value, St
     Ok(hash_val)
 }
 
+/// Proposes a batch of operations to the database.
+///
+/// # Arguments
+///
+/// * `db` - The database handle returned by `open_db`
+/// * `nkeys` - The number of key-value pairs to put
+/// * `values` - A pointer to an array of `KeyValue` structs
+///
+/// # Returns
+///
+/// The new root hash of the database, in Value form.
+/// A `Value` containing {0, "error message"} if creating the proposal failed.
+///
+/// # Safety
+///
+/// This function is unsafe because it dereferences raw pointers.
+/// The caller must:
+///  * ensure that `db` is a valid pointer returned by `open_db`
+///  * ensure that `values` is a valid pointer and that it points to an array of `KeyValue` structs of length `nkeys`.
+///  * ensure that the `Value` fields of the `KeyValue` structs are valid pointers.
+///
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fwd_propose_on_db(
+    db: *const DatabaseHandle,
+    nkeys: usize,
+    values: *const KeyValue,
+) -> Value {
+    // Note: the id is guaranteed to be non-zero
+    // because we use an atomic counter that starts at 1.
+    propose_on_db(db, nkeys, values)
+        .map(|id| id.into())
+        .unwrap_or_else(|e| e.into())
+}
+
+/// cbindgen::ignore
+///
+/// This function is not exposed to the C API.
+/// Internal call for `fwd_propose_on_db` to remove error handling from the C API
+fn propose_on_db(
+    db: *const DatabaseHandle,
+    nkeys: usize,
+    values: *const KeyValue,
+) -> Result<ProposalId, String> {
+    let db = unsafe { db.as_ref() }.ok_or_else(|| String::from("db should be non-null"))?;
+
+    // Create a batch of operations to perform.
+    let mut batch = Vec::with_capacity(nkeys);
+    for i in 0..nkeys {
+        let kv = unsafe { values.add(i).as_ref() }
+            .ok_or_else(|| String::from("couldn't get key-value pair"))?;
+        if kv.value.len == 0 {
+            batch.push(DbBatchOp::DeleteRange {
+                prefix: kv.key.as_slice(),
+            });
+            continue;
+        }
+        batch.push(DbBatchOp::Put {
+            key: kv.key.as_slice(),
+            value: kv.value.as_slice(),
+        });
+    }
+    let proposal = db.propose_sync(batch).map_err(|e| e.to_string())?;
+    let proposal_id = next_id(); // Guaranteed to be non-zero
+    db.proposals.write().unwrap().insert(proposal_id, proposal);
+    Ok(proposal_id)
+}
+
+/// Commits a proposal to the database.
+///
+/// # Arguments
+///
+/// * `db` - The database handle returned by `open_db`
+/// * `proposal_id` - The ID of the proposal to commit
+///
+/// # Returns
+///
+/// A `Value` containing {0, null} if the commit was successful.
+/// A `Value` containing {0, "error message"} if the commit failed.
+///
+/// # Safety
+///
+/// This function is unsafe because it dereferences raw pointers.
+/// The caller must ensure that `db` is a valid pointer returned by `open_db`
+///
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fwd_commit(db: *const DatabaseHandle, proposal_id: u32) -> Value {
+    commit(db, proposal_id)
+        .map(|e| e.into())
+        .unwrap_or_else(|e| e.into())
+}
+
+fn commit(db: *const DatabaseHandle, proposal_id: u32) -> Result<(), String> {
+    let db = unsafe { db.as_ref() }.ok_or_else(|| String::from("db should be non-null"))?;
+    let proposal = db
+        .proposals
+        .write()
+        .unwrap()
+        .remove(&proposal_id)
+        .ok_or_else(|| String::from("proposal not found"))?;
+    proposal.commit_sync().map_err(|e| e.to_string())
+}
+
 /// Get the root hash of the latest version of the database
 /// Don't forget to call `free_value` to free the memory associated with the returned `Value`.
+///
+/// # Argument
+///
+/// * `db` - The database handle returned by `open_db`
+///
+/// # Returns
+///
+/// A `Value` containing the root hash of the database.
+/// A `Value` containing {0, "error message"} if the root hash could not be retrieved.
+/// One expected error is "IO error: Root hash not found" if the database is empty.
+/// This should be handled by the caller.
 ///
 /// # Safety
 ///
 /// This function is unsafe because it dereferences raw pointers.
 /// The caller must ensure that `db` is a valid pointer returned by `open_db`
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fwd_root_hash(db: *mut Db) -> Value {
+pub unsafe extern "C" fn fwd_root_hash(db: *const DatabaseHandle) -> Value {
     // Check db is valid.
     root_hash(db).unwrap_or_else(|e| e.into())
 }
@@ -160,7 +333,7 @@ pub unsafe extern "C" fn fwd_root_hash(db: *mut Db) -> Value {
 ///
 /// This function is not exposed to the C API.
 /// Internal call for `fwd_root_hash` to remove error handling from the C API
-fn root_hash(db: *mut Db) -> Result<Value, String> {
+fn root_hash(db: *const DatabaseHandle) -> Result<Value, String> {
     // Check db is valid.
     let db = unsafe { db.as_ref() }.ok_or_else(|| String::from("db should be non-null"))?;
 
@@ -211,18 +384,48 @@ impl From<String> for Value {
     }
 }
 
+impl From<u32> for Value {
+    fn from(v: u32) -> Self {
+        // WARNING: This should only be called with values >= 1.
+        // In much of the Go code, v.len == 0 is used to indicate a null-terminated string.
+        // This may cause a panic or memory corruption if used incorrectly.
+        assert_ne!(v, 0);
+        Self {
+            len: v as usize,
+            data: std::ptr::null(),
+        }
+    }
+}
+
+impl From<()> for Value {
+    fn from(_: ()) -> Self {
+        Self {
+            len: 0,
+            data: std::ptr::null(),
+        }
+    }
+}
+
 /// Frees the memory associated with a `Value`.
+///
+/// # Arguments
+///
+/// * `value` - The `Value` to free, previously returned from any Rust function.
 ///
 /// # Safety
 ///
 /// This function is unsafe because it dereferences raw pointers.
 /// The caller must ensure that `value` is a valid pointer.
+///
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fwd_free_value(value: *const Value) {
-    // Create a Rust reference to the pointer.
-    // Unsafe because we are dereferencing a raw pointer - possible another thread
-    // has a mutable reference to the same memory.
-    let value = unsafe { &*value as &Value };
+    // Check value is valid.
+    let value = unsafe { value.as_ref() }.expect("value should be non-null");
+
+    if value.data.is_null() {
+        return; // nothing to free, but valid behavior.
+    }
+
     // We assume that if the length is 0, then the data is a null-terminated string.
     if value.len > 0 {
         let recreated_box = unsafe {
@@ -273,7 +476,7 @@ pub struct CreateOrOpenArgs {
 /// The caller must call `close` to free the memory associated with the returned database handle.
 ///
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fwd_create_db(args: CreateOrOpenArgs) -> *mut Db {
+pub unsafe extern "C" fn fwd_create_db(args: CreateOrOpenArgs) -> *const DatabaseHandle<'static> {
     let cfg = DbConfig::builder()
         .truncate(true)
         .manager(manager_config(
@@ -303,7 +506,7 @@ pub unsafe extern "C" fn fwd_create_db(args: CreateOrOpenArgs) -> *mut Db {
 /// The caller must call `close` to free the memory associated with the returned database handle.
 ///
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fwd_open_db(args: CreateOrOpenArgs) -> *mut Db {
+pub unsafe extern "C" fn fwd_open_db(args: CreateOrOpenArgs) -> *const DatabaseHandle<'static> {
     let cfg = DbConfig::builder()
         .truncate(false)
         .manager(manager_config(
@@ -319,7 +522,7 @@ unsafe fn common_create(
     path: *const std::ffi::c_char,
     metrics_port: u16,
     cfg: DbConfig,
-) -> *mut Db {
+) -> *const DatabaseHandle<'static> {
     #[cfg(feature = "logger")]
     let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
         .try_init();
@@ -329,9 +532,8 @@ unsafe fn common_create(
     if metrics_port > 0 {
         metrics_setup::setup_metrics(metrics_port);
     }
-    Box::into_raw(Box::new(
-        Db::new_sync(path, cfg).expect("db initialization should succeed"),
-    ))
+    let db = Db::new_sync(path, cfg).expect("db initialization should succeed");
+    Box::into_raw(Box::new(db.into()))
 }
 
 fn manager_config(cache_size: usize, revisions: usize, strategy: u8) -> RevisionManagerConfig {
@@ -364,6 +566,6 @@ fn manager_config(cache_size: usize, revisions: usize, strategy: u8) -> Revision
 ///
 /// * `db` - The database handle to close, previously returned from a call to open_db()
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fwd_close_db(db: *mut Db) {
+pub unsafe extern "C" fn fwd_close_db(db: *mut DatabaseHandle) {
     let _ = unsafe { Box::from_raw(db) };
 }
