@@ -81,17 +81,17 @@ func setup(tb testing.TB, c *envConfig) *environment {
 	require := require.New(tb)
 
 	var (
-		genesisArgs *BuildGenesisArgs
-		assetName   = "AVAX"
+		genesisParams BuildGenesisParams
+		assetName     = "AVAX"
 	)
 	if c.isCustomFeeAsset {
-		genesisArgs = makeCustomAssetGenesis(tb)
+		genesisParams = makeCustomAssetGenesis(tb)
 		assetName = feeAssetName
 	} else {
-		genesisArgs = makeDefaultGenesis(tb)
+		genesisParams = makeDefaultGenesis(tb)
 	}
 
-	genesisBytes := buildGenesisTestWithArgs(tb, genesisArgs)
+	genesisBytes := buildGenesisTestWithParams(tb, genesisParams)
 
 	ctx := snowtest.Context(tb, snowtest.XChainID)
 
@@ -220,19 +220,18 @@ func getCreateTxFromGenesisTest(tb testing.TB, genesisBytes []byte, assetName st
 // buildGenesisTest is the common Genesis builder for most tests
 func buildGenesisTest(tb testing.TB) []byte {
 	defaultArgs := makeDefaultGenesis(tb)
-	return buildGenesisTestWithArgs(tb, defaultArgs)
+	return buildGenesisTestWithParams(tb, defaultArgs)
 }
 
-// buildGenesisTestWithArgs allows building the genesis while injecting different starting points (args)
-func buildGenesisTestWithArgs(tb testing.TB, args *BuildGenesisArgs) []byte {
+// buildGenesisTestWithParams allows building the genesis while injecting different starting points (args)
+func buildGenesisTestWithParams(tb testing.TB, params BuildGenesisParams) []byte {
 	require := require.New(tb)
 
-	ss := CreateStaticService()
+	result, err := BuildGenesis(params)
+	require.NoError(err)
+	require.NotEmpty(result)
 
-	reply := BuildGenesisReply{}
-	require.NoError(ss.BuildGenesis(nil, args, &reply))
-
-	b, err := formatting.Decode(reply.Encoding, reply.Bytes)
+	b, err := formatting.Decode(params.Encoding, result)
 	require.NoError(err)
 	return b
 }
@@ -266,7 +265,7 @@ func newTx(tb testing.TB, genesisBytes []byte, chainID ids.ID, parser txs.Parser
 	return tx
 }
 
-func makeDefaultGenesis(tb testing.TB) *BuildGenesisArgs {
+func makeDefaultGenesis(tb testing.TB) BuildGenesisParams {
 	require := require.New(tb)
 
 	addr0Str, err := address.FormatBech32(constants.UnitTestHRP, addrs[0].Bytes())
@@ -278,7 +277,7 @@ func makeDefaultGenesis(tb testing.TB) *BuildGenesisArgs {
 	addr2Str, err := address.FormatBech32(constants.UnitTestHRP, addrs[2].Bytes())
 	require.NoError(err)
 
-	return &BuildGenesisArgs{
+	return BuildGenesisParams{
 		Encoding: formatting.Hex,
 		GenesisData: map[string]AssetDefinition{
 			"asset1": {
@@ -356,7 +355,7 @@ func makeDefaultGenesis(tb testing.TB) *BuildGenesisArgs {
 	}
 }
 
-func makeCustomAssetGenesis(tb testing.TB) *BuildGenesisArgs {
+func makeCustomAssetGenesis(tb testing.TB) BuildGenesisParams {
 	require := require.New(tb)
 
 	addr0Str, err := address.FormatBech32(constants.UnitTestHRP, addrs[0].Bytes())
@@ -368,7 +367,7 @@ func makeCustomAssetGenesis(tb testing.TB) *BuildGenesisArgs {
 	addr2Str, err := address.FormatBech32(constants.UnitTestHRP, addrs[2].Bytes())
 	require.NoError(err)
 
-	return &BuildGenesisArgs{
+	return BuildGenesisParams{
 		Encoding: formatting.Hex,
 		GenesisData: map[string]AssetDefinition{
 			"asset1": {

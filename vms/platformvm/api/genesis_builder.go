@@ -7,7 +7,6 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
-	"net/http"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
@@ -38,9 +37,6 @@ var (
 
 	_ utils.Sortable[UTXO] = UTXO{}
 )
-
-// StaticService defines the static API methods exposed by the platform VM
-type StaticService struct{}
 
 // UTXO is a UTXO on the Platform Chain that exists at the chain's genesis.
 type UTXO struct {
@@ -159,14 +155,14 @@ type Chain struct {
 	SubnetID    ids.ID   `json:"subnetID"`
 }
 
-// BuildGenesisArgs are the arguments used to create
+// BuildGenesisParams are the arguments used to create
 // the genesis data of the Platform Chain.
 // [NetworkID] is the ID of the network
 // [UTXOs] are the UTXOs on the Platform Chain that exist at genesis.
 // [Validators] are the validators of the primary network at genesis.
 // [Chains] are the chains that exist at genesis.
 // [Time] is the Platform Chain's time at network genesis.
-type BuildGenesisArgs struct {
+type BuildGenesisParams struct {
 	AvaxAssetID   ids.ID                           `json:"avaxAssetID"`
 	NetworkID     json.Uint32                      `json:"networkID"`
 	UTXOs         []UTXO                           `json:"utxos"`
@@ -176,12 +172,6 @@ type BuildGenesisArgs struct {
 	InitialSupply json.Uint64                      `json:"initialSupply"`
 	Message       string                           `json:"message"`
 	Encoding      formatting.Encoding              `json:"encoding"`
-}
-
-// BuildGenesisReply is the reply from BuildGenesis
-type BuildGenesisReply struct {
-	Bytes    string              `json:"bytes"`
-	Encoding formatting.Encoding `json:"encoding"`
 }
 
 // bech32ToID takes bech32 address and produces a shortID
@@ -194,16 +184,16 @@ func bech32ToID(addrStr string) (ids.ShortID, error) {
 }
 
 // BuildGenesis build the genesis state of the Platform Chain (and thereby the Avalanche network.)
-func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
+func BuildGenesis(params BuildGenesisParams) (string, error) {
 	// Specify the UTXOs on the Platform chain that exist at genesis.
-	utxos := make([]*genesis.UTXO, 0, len(args.UTXOs))
-	for i, apiUTXO := range args.UTXOs {
+	utxos := make([]*genesis.UTXO, 0, len(params.UTXOs))
+	for i, apiUTXO := range params.UTXOs {
 		if apiUTXO.Amount == 0 {
-			return errUTXOHasNoValue
+			return "", errUTXOHasNoValue
 		}
 		addrID, err := bech32ToID(apiUTXO.Address)
 		if err != nil {
-			return err
+			return "", err
 		}
 
 		utxo := avax.UTXO{
@@ -211,7 +201,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 				TxID:        ids.Empty,
 				OutputIndex: uint32(i),
 			},
-			Asset: avax.Asset{ID: args.AvaxAssetID},
+			Asset: avax.Asset{ID: params.AvaxAssetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: uint64(apiUTXO.Amount),
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -221,15 +211,15 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 				},
 			},
 		}
-		if apiUTXO.Locktime > args.Time {
+		if apiUTXO.Locktime > params.Time {
 			utxo.Out = &stakeable.LockOut{
 				Locktime:        uint64(apiUTXO.Locktime),
 				TransferableOut: utxo.Out.(avax.TransferableOut),
 			}
 		}
-		messageBytes, err := formatting.Decode(args.Encoding, apiUTXO.Message)
+		messageBytes, err := formatting.Decode(params.Encoding, apiUTXO.Message)
 		if err != nil {
-			return fmt.Errorf("problem decoding UTXO message bytes: %w", err)
+			return "", fmt.Errorf("problem decoding UTXO message bytes: %w", err)
 		}
 		utxos = append(utxos, &genesis.UTXO{
 			UTXO:    utxo,
@@ -239,18 +229,18 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 
 	// Specify the validators that are validating the primary network at genesis.
 	vdrs := txheap.NewByEndTime()
-	for _, vdr := range args.Validators {
+	for _, vdr := range params.Validators {
 		weight := uint64(0)
 		stake := make([]*avax.TransferableOutput, len(vdr.Staked))
 		utils.Sort(vdr.Staked)
 		for i, apiUTXO := range vdr.Staked {
 			addrID, err := bech32ToID(apiUTXO.Address)
 			if err != nil {
-				return err
+				return "", err
 			}
 
 			utxo := &avax.TransferableOutput{
-				Asset: avax.Asset{ID: args.AvaxAssetID},
+				Asset: avax.Asset{ID: params.AvaxAssetID},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: uint64(apiUTXO.Amount),
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -260,7 +250,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 					},
 				},
 			}
-			if apiUTXO.Locktime > args.Time {
+			if apiUTXO.Locktime > params.Time {
 				utxo.Out = &stakeable.LockOut{
 					Locktime:        uint64(apiUTXO.Locktime),
 					TransferableOut: utxo.Out,
@@ -270,16 +260,16 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 
 			newWeight, err := math.Add(weight, uint64(apiUTXO.Amount))
 			if err != nil {
-				return errStakeOverflow
+				return "", errStakeOverflow
 			}
 			weight = newWeight
 		}
 
 		if weight == 0 {
-			return errValidatorHasNoWeight
+			return "", errValidatorHasNoWeight
 		}
-		if uint64(vdr.EndTime) <= uint64(args.Time) {
-			return errValidatorAlreadyExited
+		if uint64(vdr.EndTime) <= uint64(params.Time) {
+			return "", errValidatorAlreadyExited
 		}
 
 		owner := &secp256k1fx.OutputOwners{
@@ -289,7 +279,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 		for _, addrStr := range vdr.RewardOwner.Addresses {
 			addrID, err := bech32ToID(addrStr)
 			if err != nil {
-				return err
+				return "", err
 			}
 			owner.Addrs = append(owner.Addrs, addrID)
 		}
@@ -302,12 +292,12 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 
 		var (
 			baseTx = txs.BaseTx{BaseTx: avax.BaseTx{
-				NetworkID:    uint32(args.NetworkID),
+				NetworkID:    uint32(params.NetworkID),
 				BlockchainID: ids.Empty,
 			}}
 			validator = txs.Validator{
 				NodeID: vdr.NodeID,
-				Start:  uint64(args.Time),
+				Start:  uint64(params.Time),
 				End:    uint64(vdr.EndTime),
 				Wght:   weight,
 			}
@@ -334,7 +324,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 		}
 
 		if err := tx.Initialize(txs.GenesisCodec); err != nil {
-			return err
+			return "", err
 		}
 
 		vdrs.Add(tx)
@@ -342,14 +332,14 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 
 	// Specify the chains that exist at genesis.
 	chains := []*txs.Tx{}
-	for _, chain := range args.Chains {
-		genesisBytes, err := formatting.Decode(args.Encoding, chain.GenesisData)
+	for _, chain := range params.Chains {
+		genesisBytes, err := formatting.Decode(params.Encoding, chain.GenesisData)
 		if err != nil {
-			return fmt.Errorf("problem decoding chain genesis data: %w", err)
+			return "", fmt.Errorf("problem decoding chain genesis data: %w", err)
 		}
 		tx := &txs.Tx{Unsigned: &txs.CreateChainTx{
 			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-				NetworkID:    uint32(args.NetworkID),
+				NetworkID:    uint32(params.NetworkID),
 				BlockchainID: ids.Empty,
 			}},
 			SubnetID:    chain.SubnetID,
@@ -360,7 +350,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 			SubnetAuth:  &secp256k1fx.Input{},
 		}}
 		if err := tx.Initialize(txs.GenesisCodec); err != nil {
-			return err
+			return "", err
 		}
 
 		chains = append(chains, tx)
@@ -373,20 +363,19 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 		UTXOs:         utxos,
 		Validators:    validatorTxs,
 		Chains:        chains,
-		Timestamp:     uint64(args.Time),
-		InitialSupply: uint64(args.InitialSupply),
-		Message:       args.Message,
+		Timestamp:     uint64(params.Time),
+		InitialSupply: uint64(params.InitialSupply),
+		Message:       params.Message,
 	}
 
 	// Marshal genesis to bytes
 	bytes, err := genesis.Codec.Marshal(genesis.CodecVersion, g)
 	if err != nil {
-		return fmt.Errorf("couldn't marshal genesis: %w", err)
+		return "", fmt.Errorf("couldn't marshal genesis: %w", err)
 	}
-	reply.Bytes, err = formatting.Encode(args.Encoding, bytes)
+	encodedBytes, err := formatting.Encode(params.Encoding, bytes)
 	if err != nil {
-		return fmt.Errorf("couldn't encode genesis as string: %w", err)
+		return "", fmt.Errorf("couldn't encode genesis as string: %w", err)
 	}
-	reply.Encoding = args.Encoding
-	return nil
+	return encodedBytes, nil
 }

@@ -43,21 +43,19 @@ func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 		}},
 	}
 
-	args := BuildGenesisArgs{
-		UTXOs: []UTXO{
-			utxo,
-		},
-		Validators: []GenesisPermissionlessValidator{
-			validator,
-		},
-		Time:     5,
-		Encoding: formatting.Hex,
+	params := BuildGenesisParams{
+		AvaxAssetID: ids.Empty,
+		NetworkID:   0,
+		UTXOs:       []UTXO{utxo},
+		Validators:  []GenesisPermissionlessValidator{validator},
+		Chains:      nil,
+		Time:        5,
+		Encoding:    formatting.Hex,
 	}
-	reply := BuildGenesisReply{}
 
-	ss := StaticService{}
-	err = ss.BuildGenesis(nil, &args, &reply)
+	result, err := BuildGenesis(params)
 	require.ErrorIs(err, errUTXOHasNoValue)
+	require.Empty(result)
 }
 
 func TestBuildGenesisInvalidStakeWeight(t *testing.T) {
@@ -87,21 +85,19 @@ func TestBuildGenesisInvalidStakeWeight(t *testing.T) {
 		}},
 	}
 
-	args := BuildGenesisArgs{
-		UTXOs: []UTXO{
-			utxo,
-		},
-		Validators: []GenesisPermissionlessValidator{
-			validator,
-		},
-		Time:     5,
-		Encoding: formatting.Hex,
+	params := BuildGenesisParams{
+		AvaxAssetID: ids.Empty,
+		NetworkID:   0,
+		UTXOs:       []UTXO{utxo},
+		Validators:  []GenesisPermissionlessValidator{validator},
+		Chains:      nil,
+		Time:        5,
+		Encoding:    formatting.Hex,
 	}
-	reply := BuildGenesisReply{}
 
-	ss := StaticService{}
-	err = ss.BuildGenesis(nil, &args, &reply)
+	result, err := BuildGenesis(params)
 	require.ErrorIs(err, errValidatorHasNoWeight)
+	require.Empty(result)
 }
 
 func TestBuildGenesisInvalidEndtime(t *testing.T) {
@@ -132,21 +128,19 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 		}},
 	}
 
-	args := BuildGenesisArgs{
-		UTXOs: []UTXO{
-			utxo,
-		},
-		Validators: []GenesisPermissionlessValidator{
-			validator,
-		},
-		Time:     5,
-		Encoding: formatting.Hex,
+	params := BuildGenesisParams{
+		AvaxAssetID: ids.Empty,
+		NetworkID:   0,
+		UTXOs:       []UTXO{utxo},
+		Validators:  []GenesisPermissionlessValidator{validator},
+		Chains:      nil,
+		Time:        5,
+		Encoding:    formatting.Hex,
 	}
-	reply := BuildGenesisReply{}
 
-	ss := StaticService{}
-	err = ss.BuildGenesis(nil, &args, &reply)
+	result, err := BuildGenesis(params)
 	require.ErrorIs(err, errValidatorAlreadyExited)
+	require.Empty(result)
 }
 
 func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
@@ -209,25 +203,26 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 		}},
 	}
 
-	args := BuildGenesisArgs{
-		AvaxAssetID: ids.ID{'d', 'u', 'm', 'm', 'y', ' ', 'I', 'D'},
-		UTXOs: []UTXO{
-			utxo,
-		},
+	avaxAssetID := ids.ID{'d', 'u', 'm', 'm', 'y', ' ', 'I', 'D'}
+	params := BuildGenesisParams{
+		AvaxAssetID: avaxAssetID,
+		NetworkID:   0,
+		UTXOs:       []UTXO{utxo},
 		Validators: []GenesisPermissionlessValidator{
 			validator1,
 			validator2,
 			validator3,
 		},
+		Chains:   nil,
 		Time:     5,
 		Encoding: formatting.Hex,
 	}
-	reply := BuildGenesisReply{}
 
-	ss := StaticService{}
-	require.NoError(ss.BuildGenesis(nil, &args, &reply))
+	result, err := BuildGenesis(params)
+	require.NoError(err)
+	require.NotEmpty(result)
 
-	genesisBytes, err := formatting.Decode(reply.Encoding, reply.Bytes)
+	genesisBytes, err := formatting.Decode(params.Encoding, result)
 	require.NoError(err)
 
 	genesis, err := genesis.Parse(genesisBytes)
