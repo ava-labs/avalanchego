@@ -130,6 +130,14 @@ jobs:
           push: false
           # This version should match the version installed in the nix dev shell
           version: 1.47.2
+  links-lint:
+    name: Markdown Links Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: umbrelladocs/action-linkspector@a0567ce1c7c13de4a2358587492ed43cab5d0102 #v1.3.4
+        with:
+          fail_level: any
   check_generated_protobuf:
     name: Up-to-date protobuf
     runs-on: ubuntu-latest

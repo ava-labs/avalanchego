@@ -191,6 +191,16 @@ func RestartNetwork(ctx context.Context, log logging.Logger, dir string) error {
 	return network.Restart(ctx)
 }
 
+// Restart the provided nodes. Blocks on the nodes accepting API requests but not their health.
+func restartNodes(ctx context.Context, nodes []*Node) error {
+	for _, node := range nodes {
+		if err := node.Restart(ctx); err != nil {
+			return fmt.Errorf("failed to restart node %s: %w", node.NodeID, err)
+		}
+	}
+	return nil
+}
+
 // Reads a network from the provided directory.
 func ReadNetwork(ctx context.Context, log logging.Logger, dir string) (*Network, error) {
 	canonicalDir, err := toCanonicalDir(dir)
@@ -441,26 +451,20 @@ func (n *Network) Bootstrap(ctx context.Context, log logging.Logger) error {
 		bootstrapNode.Flags[config.SybilProtectionEnabledKey] = *existingSybilProtectionValue
 	}
 
+	// Ensure the bootstrap node is restarted to pick up subnet and chain configuration
+	//
+	// TODO(marun) This restart might be unnecessary if:
+	// - sybil protection didn't change
+	// - the node is not a subnet validator
 	log.Info("restarting bootstrap node",
 		zap.Stringer("nodeID", bootstrapNode.NodeID),
 	)
+	if err := bootstrapNode.Restart(ctx); err != nil {
+		return err
+	}
 
 	if len(n.Nodes) == 1 {
-		// Ensure the node is restarted to pick up subnet and chain configuration
-		return n.RestartNode(ctx, bootstrapNode)
-	}
-
-	// TODO(marun) This last restart of the bootstrap node might be unnecessary if:
-	// - sybil protection didn't change
-	// - the node is not a subnet validator
-
-	// Ensure the bootstrap node is restarted to pick up configuration changes. Avoid using
-	// RestartNode since the node won't be able to report healthy until other nodes are started.
-	if err := bootstrapNode.Stop(ctx); err != nil {
-		return fmt.Errorf("failed to stop node %s: %w", bootstrapNode.NodeID, err)
-	}
-	if err := n.StartNode(ctx, bootstrapNode); err != nil {
-		return fmt.Errorf("failed to start node %s: %w", bootstrapNode.NodeID, err)
+		return nil
 	}
 
 	log.Info("starting remaining nodes")
@@ -484,31 +488,6 @@ func (n *Network) StartNode(ctx context.Context, node *Node) error {
 	}
 
 	return nil
-}
-
-// Restart a single node.
-func (n *Network) RestartNode(ctx context.Context, node *Node) error {
-	runtimeConfig := node.getRuntimeConfig()
-	if runtimeConfig.Process != nil && runtimeConfig.Process.ReuseDynamicPorts {
-		// Attempt to save the API port currently being used so the
-		// restarted node can reuse it. This may result in the node
-		// failing to start if the operating system allocates the port
-		// to a different process between node stop and start.
-		if err := node.SaveAPIPort(); err != nil {
-			return err
-		}
-	}
-
-	if err := node.Stop(ctx); err != nil {
-		return fmt.Errorf("failed to stop node %s: %w", node.NodeID, err)
-	}
-	if err := n.StartNode(ctx, node); err != nil {
-		return fmt.Errorf("failed to start node %s: %w", node.NodeID, err)
-	}
-	n.log.Info("waiting for node to report healthy",
-		zap.Stringer("nodeID", node.NodeID),
-	)
-	return node.WaitForHealthy(ctx)
 }
 
 // Stops all nodes in the network.
@@ -540,11 +519,29 @@ func (n *Network) Stop(ctx context.Context) error {
 	return nil
 }
 
-// Restarts all nodes in the network.
+// Restarts all running nodes in the network.
 func (n *Network) Restart(ctx context.Context) error {
 	n.log.Info("restarting network")
+	nodes := make([]*Node, 0, len(n.Nodes))
 	for _, node := range n.Nodes {
-		if err := n.RestartNode(ctx, node); err != nil {
+		if !node.IsRunning() {
+			continue
+		}
+		nodes = append(nodes, node)
+	}
+	if err := restartNodes(ctx, nodes); err != nil {
+		return err
+	}
+	return WaitForHealthyNodes(ctx, n.log, n.Nodes)
+}
+
+// Waits for the provided nodes to become healthy.
+func WaitForHealthyNodes(ctx context.Context, log logging.Logger, nodes []*Node) error {
+	for _, node := range nodes {
+		log.Info("waiting for node to become healthy",
+			zap.Stringer("nodeID", node.NodeID),
+		)
+		if err := node.WaitForHealthy(ctx); err != nil {
 			return err
 		}
 	}
@@ -669,14 +666,19 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI 
 	if restartRequired {
 		log.Info("restarting node(s) to enable them to track the new subnet(s)")
 
+		runningNodes := make([]*Node, 0, len(reconfiguredNodes))
 		for _, node := range reconfiguredNodes {
-			if len(node.URI) == 0 {
-				// Only running nodes should be restarted
-				continue
+			if node.IsRunning() {
+				runningNodes = append(runningNodes, node)
 			}
-			if err := n.RestartNode(ctx, node); err != nil {
-				return err
-			}
+		}
+
+		if err := restartNodes(ctx, runningNodes); err != nil {
+			return err
+		}
+
+		if err := WaitForHealthyNodes(ctx, n.log, runningNodes); err != nil {
+			return err
 		}
 	}
 
@@ -738,13 +740,19 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI 
 	log.Info("restarting node(s) to pick up chain configuration")
 
 	// Restart nodes to allow configuration for the new chains to take effect
+	nodesToRestart := make([]*Node, 0, len(n.Nodes))
 	for _, node := range n.Nodes {
-		if !validatorsToRestart.Contains(node.NodeID) {
-			continue
+		if validatorsToRestart.Contains(node.NodeID) {
+			nodesToRestart = append(nodesToRestart, node)
 		}
-		if err := n.RestartNode(ctx, node); err != nil {
-			return err
-		}
+	}
+
+	if err := restartNodes(ctx, nodesToRestart); err != nil {
+		return err
+	}
+
+	if err := WaitForHealthyNodes(ctx, log, nodesToRestart); err != nil {
+		return err
 	}
 
 	return nil

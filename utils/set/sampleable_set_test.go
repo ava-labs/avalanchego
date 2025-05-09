@@ -99,25 +99,25 @@ func TestSampleableSetUnmarshalJSON(t *testing.T) {
 	id2JSON, err := json.Marshal(id2)
 	require.NoError(err)
 	{
-		require.NoError(set.UnmarshalJSON([]byte(fmt.Sprintf("[%s]", string(id1JSON)))))
+		require.NoError(set.UnmarshalJSON(fmt.Appendf(nil, "[%s]", string(id1JSON))))
 		require.Equal(1, set.Len())
 		require.True(set.Contains(id1))
 	}
 	{
-		require.NoError(set.UnmarshalJSON([]byte(fmt.Sprintf("[%s,%s]", string(id1JSON), string(id2JSON)))))
+		require.NoError(set.UnmarshalJSON(fmt.Appendf(nil, "[%s,%s]", string(id1JSON), string(id2JSON))))
 		require.Equal(2, set.Len())
 		require.True(set.Contains(id1))
 		require.True(set.Contains(id2))
 	}
 	{
-		require.NoError(set.UnmarshalJSON([]byte(fmt.Sprintf("[%d,%d,%d]", 3, 4, 5))))
+		require.NoError(set.UnmarshalJSON(fmt.Appendf(nil, "[%d,%d,%d]", 3, 4, 5)))
 		require.Equal(3, set.Len())
 		require.True(set.Contains(3))
 		require.True(set.Contains(4))
 		require.True(set.Contains(5))
 	}
 	{
-		require.NoError(set.UnmarshalJSON([]byte(fmt.Sprintf("[%d,%d,%d, %d]", 3, 4, 5, 3))))
+		require.NoError(set.UnmarshalJSON(fmt.Appendf(nil, "[%d,%d,%d, %d]", 3, 4, 5, 3)))
 		require.Equal(3, set.Len())
 		require.True(set.Contains(3))
 		require.True(set.Contains(4))
@@ -126,8 +126,8 @@ func TestSampleableSetUnmarshalJSON(t *testing.T) {
 	{
 		set1 := SampleableSet[int]{}
 		set2 := SampleableSet[int]{}
-		require.NoError(set1.UnmarshalJSON([]byte(fmt.Sprintf("[%s,%s]", string(id1JSON), string(id2JSON)))))
-		require.NoError(set2.UnmarshalJSON([]byte(fmt.Sprintf("[%s,%s]", string(id2JSON), string(id1JSON)))))
+		require.NoError(set1.UnmarshalJSON(fmt.Appendf(nil, "[%s,%s]", string(id1JSON), string(id2JSON))))
+		require.NoError(set2.UnmarshalJSON(fmt.Appendf(nil, "[%s,%s]", string(id2JSON), string(id1JSON))))
 		require.True(set1.Equals(set2))
 	}
 }
