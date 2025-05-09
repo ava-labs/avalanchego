@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"go.opentelemetry.io/otel/attribute"
+	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -178,6 +179,16 @@ func newView(
 			return nil, err
 		}
 	}
+
+	sortedKeys := maps.Keys(v.changes.values)
+	slices.SortFunc(sortedKeys, func(a, b Key) int {
+		return a.Compare(b)
+	})
+
+	for _, key := range sortedKeys {
+		v.changes.sortedKeyChanges = append(v.changes.sortedKeyChanges, v.changes.values[key])
+	}
+
 	return v, nil
 }
 
@@ -959,10 +970,14 @@ func (v *view) recordValueChange(key Key, value maybe.Maybe[[]byte]) error {
 		return err
 	}
 
-	v.changes.values[key] = &change[maybe.Maybe[[]byte]]{
-		before: beforeMaybe,
-		after:  value,
+	v.changes.values[key] = &keyChange{
+		change: &change[maybe.Maybe[[]byte]]{
+			before: beforeMaybe,
+			after:  value,
+		},
+		key: key,
 	}
+
 	return nil
 }
 
