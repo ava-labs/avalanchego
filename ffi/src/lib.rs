@@ -13,15 +13,24 @@ use std::sync::{Arc, RwLock};
 use firewood::db::{BatchOp as DbBatchOp, Db, DbConfig, DbViewSync as _, Proposal};
 use firewood::manager::{CacheReadStrategy, RevisionManagerConfig};
 
-mod metrics_setup;
-
 use metrics::counter;
 
+#[doc(hidden)]
+mod metrics_setup;
+
 #[global_allocator]
+#[doc(hidden)]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
+/// A proposal ID is a 32-bit unsigned integer.
+/// It is used to identify proposals internally.
 type ProposalId = u32;
+
+#[doc(hidden)]
 static ID_COUNTER: AtomicU32 = AtomicU32::new(1);
+
+/// Atomically retrieves the next proposal ID.
+#[doc(hidden)]
 fn next_id() -> ProposalId {
     ID_COUNTER.fetch_add(1, Ordering::Relaxed)
 }
@@ -85,6 +94,7 @@ pub unsafe extern "C" fn fwd_get(db: *const DatabaseHandle, key: Value) -> Value
 
 /// This function is not exposed to the C API.
 /// Internal call for `fwd_get` to remove error handling from the C API
+#[doc(hidden)]
 fn get(db: *const DatabaseHandle, key: Value) -> Result<Value, String> {
     // Check db is valid.
     let db = unsafe { db.as_ref() }.ok_or_else(|| String::from("db should be non-null"))?;
@@ -571,6 +581,7 @@ unsafe fn common_create(
     Box::into_raw(Box::new(db.into()))
 }
 
+#[doc(hidden)]
 fn manager_config(cache_size: usize, revisions: usize, strategy: u8) -> RevisionManagerConfig {
     let cache_read_strategy = match strategy {
         0 => CacheReadStrategy::WritesOnly,
