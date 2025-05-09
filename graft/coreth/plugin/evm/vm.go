@@ -458,7 +458,10 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return err
 	}
-	log.Info(fmt.Sprintf("lastAccepted = %s", lastAcceptedHash))
+	log.Info("read last accepted",
+		"hash", lastAcceptedHash,
+		"height", lastAcceptedHeight,
+	)
 
 	// Set minimum price for mining and default gas price oracle value to the min
 	// gas price to prevent so transactions and blocks all use the correct fees
@@ -1333,7 +1336,9 @@ func (vm *VM) buildBlockWithContext(ctx context.Context, proposerVMBlockCtx *blo
 		return nil, fmt.Errorf("block failed verification due to: %w", err)
 	}
 
-	log.Debug(fmt.Sprintf("Built block %s", blk.ID()))
+	log.Debug("built block",
+		"id", blk.ID(),
+	)
 	// Marks the current transactions from the mempool as being successfully issued
 	// into a block.
 	vm.mempool.IssueCurrentTxs()
@@ -1492,7 +1497,9 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 		enabledAPIs = append(enabledAPIs, "warp")
 	}
 
-	log.Info(fmt.Sprintf("Enabled APIs: %s", strings.Join(enabledAPIs, ", ")))
+	log.Info("enabling apis",
+		"apis", enabledAPIs,
+	)
 	apis[ethRPCEndpoint] = handler
 	apis[ethWSEndpoint] = handler.WebsocketHandlerWithDuration(
 		[]string{"*"},
