@@ -25,28 +25,6 @@ type Listener[T any] interface {
 	IssuingDone()
 }
 
-// Tracker keeps track of the status of transactions.
-// This must be thread-safe, so it can be called in parallel by the issuer(s) or orchestrator.
-type Tracker[T any] interface {
-	// Issue records a transaction that was submitted, but whose final status is
-	// not yet known.
-	Issue(T)
-	// ObserveConfirmed records a transaction that was confirmed.
-	ObserveConfirmed(T)
-	// ObserveFailed records a transaction that failed (e.g. expired)
-	ObserveFailed(T)
-
-	// GetObservedIssued returns the number of transactions that the tracker has
-	// confirmed were issued.
-	GetObservedIssued() uint64
-	// GetObservedConfirmed returns the number of transactions that the tracker has
-	// confirmed were accepted.
-	GetObservedConfirmed() uint64
-	// GetObservedFailed returns the number of transactions that the tracker has
-	// confirmed failed.
-	GetObservedFailed() uint64
-}
-
 // orchestrator executes the load test by coordinating the issuers to send
 // transactions, in a manner depending on the implementation.
 type orchestrator interface {

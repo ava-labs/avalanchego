@@ -61,7 +61,7 @@ func TestGradualOrchestratorTPS(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			tracker, err := NewPrometheusTracker[ids.ID](prometheus.NewRegistry())
+			tracker, err := NewTracker[ids.ID](prometheus.NewRegistry())
 			r.NoError(err)
 
 			agents := []Agent[ids.ID]{
@@ -102,7 +102,7 @@ func TestGradualOrchestratorExecution(t *testing.T) {
 		errMockIssuer      = errors.New("mock issuer error")
 	)
 
-	tracker, err := NewPrometheusTracker[ids.ID](prometheus.NewRegistry())
+	tracker, err := NewTracker[ids.ID](prometheus.NewRegistry())
 	require.NoError(t, err, "creating tracker")
 
 	tests := []struct {
@@ -164,7 +164,7 @@ type mockIssuer struct {
 	generateTxF   func() (ids.ID, error)
 	currTxsIssued uint64
 	maxTxs        uint64
-	tracker       Tracker[ids.ID]
+	tracker       *Tracker[ids.ID]
 	issueTxErr    error
 }
 
