@@ -18,13 +18,13 @@ import (
 
 var ErrFailedToReachTargetTPS = errors.New("failed to reach target TPS")
 
-type Issuer[T any] interface {
+type Issuer interface {
 	// GenerateAndIssueTx generates and sends a tx to the network, and informs the
 	// tracker that it sent said transaction. It returns the sent transaction.
-	GenerateAndIssueTx(ctx context.Context) (T, error)
+	GenerateAndIssueTx(ctx context.Context) ([32]byte, error)
 }
 
-type Listener[T any] interface {
+type Listener interface {
 	// Listen for the final status of transactions and notify the tracker
 	// Listen stops if the context is done, an error occurs, or if it received
 	// all the transactions issued and the issuer no longer issues any.
@@ -32,7 +32,7 @@ type Listener[T any] interface {
 	Listen(ctx context.Context) error
 
 	// RegisterIssued informs the listener that a transaction was issued.
-	RegisterIssued(tx T)
+	RegisterIssued(txID [32]byte)
 
 	// IssuingDone informs the listener that no more transactions will be issued.
 	IssuingDone()
@@ -89,13 +89,13 @@ func NewOrchestratorConfig() OrchestratorConfig {
 // transactions at a given rate (currTargetTPS) and increasing that rate until it detects that
 // the network can no longer make progress (i.e. the rate at the network accepts
 // transactions is less than currTargetTPS).
-type Orchestrator[T comparable] struct {
-	agents  []Agent[T]
-	tracker *Tracker[T]
+type Orchestrator struct {
+	agents  []Agent
+	tracker *Tracker
 
 	log logging.Logger
 
-	maxObservedTPS atomic.Uint64
+	maxObservedTPS atomic.Int64
 
 	observerGroup *errgroup.Group
 	issuerGroup   *errgroup.Group
@@ -103,13 +103,13 @@ type Orchestrator[T comparable] struct {
 	config OrchestratorConfig
 }
 
-func NewOrchestrator[T comparable](
-	agents []Agent[T],
-	tracker *Tracker[T],
+func NewOrchestrator(
+	agents []Agent,
+	tracker *Tracker,
 	log logging.Logger,
 	config OrchestratorConfig,
-) *Orchestrator[T] {
-	return &Orchestrator[T]{
+) *Orchestrator {
+	return &Orchestrator{
 		agents:  agents,
 		tracker: tracker,
 		log:     log,
@@ -117,7 +117,7 @@ func NewOrchestrator[T comparable](
 	}
 }
 
-func (o *Orchestrator[T]) Execute(ctx context.Context) error {
+func (o *Orchestrator) Execute(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 
 	// start a goroutine to confirm each issuer's transactions
@@ -149,7 +149,7 @@ func (o *Orchestrator[T]) Execute(ctx context.Context) error {
 // 1. an issuer has errored
 // 2. the max TPS target has been reached and we can terminate
 // 3. the maximum number of attempts to reach a target TPS has been reached
-func (o *Orchestrator[T]) run(ctx context.Context) bool {
+func (o *Orchestrator) run(ctx context.Context) bool {
 	var (
 		prevConfirmed        = o.tracker.GetObservedConfirmed()
 		prevTime             = time.Now()
@@ -185,7 +185,7 @@ func (o *Orchestrator[T]) run(ctx context.Context) bool {
 		}
 
 		tps := computeTPS(prevConfirmed, currConfirmed, currTime.Sub(prevTime))
-		o.setMaxObservedTPS(tps)
+		o.setMaxObservedTPS(int64(tps))
 
 		// if max TPS target has been reached and we don't terminate, then continue here
 		// so we do not keep increasing the target TPS
@@ -193,7 +193,7 @@ func (o *Orchestrator[T]) run(ctx context.Context) bool {
 			o.log.Info(
 				"current network state",
 				zap.Uint64("current TPS", tps),
-				zap.Uint64("max observed TPS", o.maxObservedTPS.Load()),
+				zap.Int64("max observed TPS", o.maxObservedTPS.Load()),
 			)
 			continue
 		}
@@ -247,13 +247,13 @@ func (o *Orchestrator[T]) run(ctx context.Context) bool {
 }
 
 // GetObservedIssued returns the max TPS the orchestrator observed
-func (o *Orchestrator[T]) GetMaxObservedTPS() uint64 {
+func (o *Orchestrator) GetMaxObservedTPS() int64 {
 	return o.maxObservedTPS.Load()
 }
 
 // start a goroutine to each issuer to continuously send transactions.
 // if an issuer errors, all other issuers will stop as well.
-func (o *Orchestrator[T]) issueTxs(ctx context.Context, currTargetTPS *atomic.Int64) {
+func (o *Orchestrator) issueTxs(ctx context.Context, currTargetTPS *atomic.Int64) {
 	for _, agent := range o.agents {
 		o.issuerGroup.Go(func() error {
 			for {
@@ -293,7 +293,7 @@ func (o *Orchestrator[T]) issueTxs(ctx context.Context, currTargetTPS *atomic.In
 }
 
 // setMaxObservedTPS only if tps > the current max observed TPS.
-func (o *Orchestrator[T]) setMaxObservedTPS(tps uint64) {
+func (o *Orchestrator) setMaxObservedTPS(tps int64) {
 	if tps > o.maxObservedTPS.Load() {
 		o.maxObservedTPS.Store(tps)
 	}

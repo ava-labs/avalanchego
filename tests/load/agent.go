@@ -3,16 +3,16 @@
 
 package load
 
-type Agent[T any] struct {
-	Issuer   Issuer[T]
-	Listener Listener[T]
+type Agent struct {
+	Issuer   Issuer
+	Listener Listener
 }
 
-func NewAgent[T any](
-	issuer Issuer[T],
-	listener Listener[T],
-) Agent[T] {
-	return Agent[T]{
+func NewAgent(
+	issuer Issuer,
+	listener Listener,
+) Agent {
+	return Agent{
 		Issuer:   issuer,
 		Listener: listener,
 	}

@@ -16,10 +16,10 @@ const namespace = "load"
 
 // Tracker keeps track of the status of transactions.
 // This is thread-safe and can be called in parallel by the issuer(s) or orchestrator.
-type Tracker[T comparable] struct {
+type Tracker struct {
 	lock sync.RWMutex
 
-	outstandingTxs map[T]time.Time
+	outstandingTxs map[[32]byte]time.Time
 
 	txsIssued    uint64
 	txsConfirmed uint64
@@ -35,9 +35,9 @@ type Tracker[T comparable] struct {
 // NewTracker returns a new Tracker instance which records metrics for the number
 // of transactions issued, confirmed, and failed. It also tracks the latency of
 // transactions.
-func NewTracker[T comparable](reg *prometheus.Registry) (*Tracker[T], error) {
-	tracker := &Tracker[T]{
-		outstandingTxs: make(map[T]time.Time),
+func NewTracker(reg *prometheus.Registry) (*Tracker, error) {
+	tracker := &Tracker{
+		outstandingTxs: make(map[[32]byte]time.Time),
 		txsIssuedCounter: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "txs_issued",
@@ -72,7 +72,7 @@ func NewTracker[T comparable](reg *prometheus.Registry) (*Tracker[T], error) {
 
 // GetObservedConfirmed returns the number of transactions that the tracker has
 // confirmed were accepted.
-func (p *Tracker[T]) GetObservedConfirmed() uint64 {
+func (p *Tracker) GetObservedConfirmed() uint64 {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
@@ -81,7 +81,7 @@ func (p *Tracker[T]) GetObservedConfirmed() uint64 {
 
 // GetObservedFailed returns the number of transactions that the tracker has
 // confirmed failed.
-func (p *Tracker[T]) GetObservedFailed() uint64 {
+func (p *Tracker) GetObservedFailed() uint64 {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
@@ -90,7 +90,7 @@ func (p *Tracker[T]) GetObservedFailed() uint64 {
 
 // GetObservedIssued returns the number of transactions that the tracker has
 // confirmed were issued.
-func (p *Tracker[T]) GetObservedIssued() uint64 {
+func (p *Tracker) GetObservedIssued() uint64 {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
@@ -99,22 +99,22 @@ func (p *Tracker[T]) GetObservedIssued() uint64 {
 
 // Issue records a transaction that was submitted, but whose final status is
 // not yet known.
-func (p *Tracker[T]) Issue(tx T) {
+func (p *Tracker) Issue(txID [32]byte) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	p.outstandingTxs[tx] = time.Now()
+	p.outstandingTxs[txID] = time.Now()
 	p.txsIssued++
 	p.txsIssuedCounter.Inc()
 }
 
 // ObserveConfirmed records a transaction that was confirmed.
-func (p *Tracker[T]) ObserveConfirmed(tx T) {
+func (p *Tracker) ObserveConfirmed(txID [32]byte) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	startTime := p.outstandingTxs[tx]
-	delete(p.outstandingTxs, tx)
+	startTime := p.outstandingTxs[txID]
+	delete(p.outstandingTxs, txID)
 
 	p.txsConfirmed++
 	p.txsConfirmedCounter.Inc()
@@ -122,12 +122,12 @@ func (p *Tracker[T]) ObserveConfirmed(tx T) {
 }
 
 // ObserveFailed records a transaction that failed (e.g. expired)
-func (p *Tracker[T]) ObserveFailed(tx T) {
+func (p *Tracker) ObserveFailed(txID [32]byte) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	startTime := p.outstandingTxs[tx]
-	delete(p.outstandingTxs, tx)
+	startTime := p.outstandingTxs[txID]
+	delete(p.outstandingTxs, txID)
 
 	p.txsFailed++
 	p.txsFailedCounter.Inc()
