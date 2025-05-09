@@ -335,16 +335,24 @@ func (b *Block) verify(predicateContext *precompileconfig.PredicateContext, writ
 		return fmt.Errorf("syntactic block verification failed: %w", err)
 	}
 
-	// verify UTXOs named in import txs are present in shared memory.
-	if err := b.verifyUTXOsPresent(); err != nil {
-		return err
-	}
-
-	// Only enforce predicates if the chain has already bootstrapped.
-	// If the chain is still bootstrapping, we can assume that all blocks we are verifying have
-	// been accepted by the network (so the predicate was validated by the network when the
-	// block was originally verified).
+	// If the VM is not marked as bootstrapped the other chains may also be
+	// bootstrapping and not have populated the required indices. Since
+	// bootstrapping only verifies blocks that have been canonically accepted by
+	// the network, these checks would be guaranteed to pass on a synced node.
 	if b.vm.bootstrapped.Get() {
+		// Verify that the UTXOs named in import txs are present in shared
+		// memory.
+		//
+		// This does not fully verify that this block can spend these UTXOs.
+		// However, it guarantees that any block that fails the later checks was
+		// built by an incorrect block proposer. This ensures that we only mark
+		// blocks as BAD BLOCKs if they were incorrectly generated.
+		if err := b.verifyUTXOsPresent(); err != nil {
+			return err
+		}
+
+		// Verify that all the ICM messages are correctly marked as either valid
+		// or invalid.
 		if err := b.verifyPredicates(predicateContext); err != nil {
 			return fmt.Errorf("failed to verify predicates: %w", err)
 		}
@@ -405,8 +413,8 @@ func (b *Block) verifyPredicates(predicateContext *precompileconfig.PredicateCon
 	return nil
 }
 
-// verifyUTXOsPresent returns an error if any of the atomic transactions name UTXOs that
-// are not present in shared memory.
+// verifyUTXOsPresent verifies all atomic UTXOs consumed by the block are
+// present in shared memory.
 func (b *Block) verifyUTXOsPresent() error {
 	blockHash := common.Hash(b.ID())
 	if b.vm.atomicBackend.IsBonus(b.Height(), blockHash) {
@@ -414,11 +422,6 @@ func (b *Block) verifyUTXOsPresent() error {
 		return nil
 	}
 
-	if !b.vm.bootstrapped.Get() {
-		return nil
-	}
-
-	// verify UTXOs named in import txs are present in shared memory.
 	for _, atomicTx := range b.atomicTxs {
 		utx := atomicTx.UnsignedAtomicTx
 		chainID, requests, err := utx.AtomicOps()
