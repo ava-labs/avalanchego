@@ -28,16 +28,6 @@ import (
 
 type getCountFunc func() (int, error)
 
-// CheckMonitoring checks if logs and metrics exist for the given network. If no network
-// UUID is provided, an attempt will be made to derive selectors from env vars (GH_*)
-// identifying a github actions run.
-func CheckMonitoring(ctx context.Context, log logging.Logger, networkUUID string) error {
-	return errors.Join(
-		CheckLogsExist(ctx, log, networkUUID),
-		CheckMetricsExist(ctx, log, networkUUID),
-	)
-}
-
 // waitForCount waits until the provided function returns greater than zero.
 func waitForCount(ctx context.Context, log logging.Logger, name string, getCount getCountFunc) error {
 	err := pollUntilContextCancel(

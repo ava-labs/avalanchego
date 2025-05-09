@@ -67,9 +67,10 @@ runs:
       # --impure ensures the env vars are accessible to the command
       run: ${{ inputs.run_env }} ${{ github.action_path }}/nix-develop.sh --impure --command bash -x ${{ inputs.run }}
       env:
-        TMPNET_START_METRIC_COLLECTOR: ${{ inputs.prometheus_username != '' }}
-        TMPNET_START_LOG_COLLECTOR: ${{ inputs.loki_username != '' }}
-        TMPNET_CHECK_MONITORING: ${{ inputs.prometheus_username != '' }}
+        TMPNET_START_METRICS_COLLECTOR: ${{ inputs.prometheus_username != '' }}
+        TMPNET_START_LOGS_COLLECTOR: ${{ inputs.loki_username != '' }}
+        TMPNET_CHECK_METRICS_COLLECTED: ${{ inputs.prometheus_username != '' }}
+        TMPNET_CHECK_LOGS_COLLECTED: ${{ inputs.loki_username != '' }}
         LOKI_USERNAME: ${{ inputs.loki_username }}
         LOKI_PASSWORD: ${{ inputs.loki_password }}
         PROMETHEUS_USERNAME: ${{ inputs.prometheus_username }}
