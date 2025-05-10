@@ -1466,6 +1466,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	frontier := set.Of(advanceTimeBlkID)
 	require.NoError(bootstrapper.Accepted(context.Background(), peerID, reqID, frontier))
+	require.Equal(ids.ID{0xce, 0x2e, 0xe4, 0x9f, 0xee, 0x03, 0x47, 0xd9, 0x3b, 0xce, 0x9d, 0x9d, 0x8b, 0x20, 0x71, 0x58, 0x68, 0xf4, 0xcc, 0x67, 0x21, 0xef, 0x4a, 0x2f, 0xbe, 0x78, 0x40, 0xac, 0xd2, 0x46, 0x25, 0xec}, vm.manager.Preferred())
 
 	externalSender.SendF = func(msg message.OutboundMessage, config common.SendConfig, _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
 		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
