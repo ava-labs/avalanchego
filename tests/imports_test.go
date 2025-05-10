@@ -4,54 +4,15 @@
 package tests
 
 import (
-	"fmt"
+	"path"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"golang.org/x/tools/go/packages"
+
+	"github.com/ava-labs/avalanchego/utils/packages"
 )
 
-// getDependencies takes a fully qualified package name and returns a map of all
-// its recursive package imports (including itself) in the same format.
-func getDependencies(packageName string) (map[string]struct{}, error) {
-	// Configure the load mode to include dependencies
-	cfg := &packages.Config{Mode: packages.NeedImports | packages.NeedName}
-	pkgs, err := packages.Load(cfg, packageName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load package: %w", err)
-	}
-
-	if len(pkgs) == 0 {
-		return nil, fmt.Errorf("no packages found for %s", packageName)
-	}
-
-	if pkgs[0].Errors != nil {
-		return nil, fmt.Errorf("failed to load package %s, %v", packageName, pkgs[0].Errors)
-	}
-
-	deps := make(map[string]struct{})
-	var collectDeps func(pkg *packages.Package)
-	collectDeps = func(pkg *packages.Package) {
-		if _, ok := deps[pkg.PkgPath]; ok {
-			return // Avoid re-processing the same dependency
-		}
-		deps[pkg.PkgPath] = struct{}{}
-		for _, dep := range pkg.Imports {
-			collectDeps(dep)
-		}
-	}
-
-	// Start collecting dependencies
-	for _, pkg := range pkgs {
-		collectDeps(pkg)
-	}
-	return deps, nil
-}
-
 func TestMustNotImport(t *testing.T) {
-	withRepo := func(pkg string, repo string) string {
-		return fmt.Sprintf("%s/%s", repo, pkg)
-	}
 	sourceRepo := "github.com/ava-labs/avalanchego"
 	targetRepo := "github.com/ava-labs/coreth"
 	mustNotImport := map[string][]string{
@@ -65,13 +26,13 @@ func TestMustNotImport(t *testing.T) {
 	}
 
 	for packageName, forbiddenImports := range mustNotImport {
-		imports, err := getDependencies(withRepo(packageName, sourceRepo))
+		fullPkgPath := path.Join(sourceRepo, packageName)
+		imports, err := packages.GetDependencies(fullPkgPath)
 		require.NoError(t, err)
 
 		for _, forbiddenImport := range forbiddenImports {
-			fullForbiddenImport := withRepo(forbiddenImport, targetRepo)
-			_, found := imports[fullForbiddenImport]
-			require.False(t, found, "package %s must not import %s, check output of go list -f '{{ .Deps }}' \"%s\" ", packageName, fullForbiddenImport, withRepo(packageName, sourceRepo))
+			fullForbiddenImport := path.Join(targetRepo, forbiddenImport)
+			require.NotContains(t, imports, fullForbiddenImport, "package %s must not import %s, check output of go list -f '{{ .Deps }}' \"%s\" ", packageName, fullForbiddenImport, fullPkgPath)
 		}
 	}
 }
