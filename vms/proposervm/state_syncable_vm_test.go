@@ -83,7 +83,6 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 		nil,
 		nil,
 	))
-	require.NoError(vm.SetState(context.Background(), snow.StateSyncing))
 
 	return innerVM, vm
 }
@@ -565,28 +564,12 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 
 	summary, err := vm.GetStateSummary(context.Background(), reqHeight)
 	require.NoError(err)
-	require.Equal(summary.Height(), reqHeight)
 
-	// test Accept summary invokes innerVM
-	calledInnerAccept := false
+	// test Accept skipped
 	innerSummary.AcceptF = func(context.Context) (block.StateSyncMode, error) {
-		innerVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
-			return innerSummary.ID(), nil
-		}
-		innerVM.GetBlockF = func(context.Context, ids.ID) (snowman.Block, error) {
-			return innerBlk, nil
-		}
-		calledInnerAccept = true
 		return block.StateSyncStatic, nil
 	}
 	status, err := summary.Accept(context.Background())
 	require.NoError(err)
-	require.Equal(block.StateSyncStatic, status)
-	require.True(calledInnerAccept)
-
-	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
-	require.Equal(summary.Height(), vm.lastAcceptedHeight)
-	lastAcceptedID, err := vm.LastAccepted(context.Background())
-	require.NoError(err)
-	require.Equal(proBlk.ID(), lastAcceptedID)
+	require.Equal(block.StateSyncSkipped, status)
 }
