@@ -13,26 +13,23 @@ import (
 )
 
 func TestMustNotImport(t *testing.T) {
-	sourceRepo := "github.com/ava-labs/avalanchego"
-	targetRepo := "github.com/ava-labs/coreth"
-	mustNotImport := map[string][]string{
-		// The following packages must not import core, core/vm
-		// so clients (e.g., wallets, e2e tests) can import them without pulling in
-		// the entire VM logic.
-		// Importing these packages configures libevm globally and it is not
-		// possible to do so for both coreth and subnet-evm, where the client may
-		// wish to connect to multiple chains.
-		"tests/...": {"plugin/evm/customtypes", "params"},
-	}
+	require := require.New(t)
 
+	mustNotImport := map[string][]string{
+		// Importing these packages configures libevm globally. This must not be
+		// done to support both coreth and subnet-evm.
+		"tests/...": {
+			"github.com/ava-labs/coreth/params",
+			"github.com/ava-labs/coreth/plugin/evm/customtypes",
+		},
+	}
 	for packageName, forbiddenImports := range mustNotImport {
-		fullPkgPath := path.Join(sourceRepo, packageName)
-		imports, err := packages.GetDependencies(fullPkgPath)
-		require.NoError(t, err)
+		packagePath := path.Join("github.com/ava-labs/avalanchego", packageName)
+		imports, err := packages.GetDependencies(packagePath)
+		require.NoError(err)
 
 		for _, forbiddenImport := range forbiddenImports {
-			fullForbiddenImport := path.Join(targetRepo, forbiddenImport)
-			require.NotContains(t, imports, fullForbiddenImport, "package %s must not import %s, check output of go list -f '{{ .Deps }}' \"%s\" ", packageName, fullForbiddenImport, fullPkgPath)
+			require.NotContains(imports, forbiddenImport, "package %s must not import %s, check output of: go list -f '{{ .Deps }}' %q", packageName, forbiddenImport, packagePath)
 		}
 	}
 }

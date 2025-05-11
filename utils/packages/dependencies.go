@@ -7,11 +7,13 @@ import (
 	"fmt"
 
 	"golang.org/x/tools/go/packages"
+
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // GetDependencies takes a fully qualified package name and returns a map of all
 // its recursive package imports (including itself) in the same format.
-func GetDependencies(packageName string) (map[string]struct{}, error) {
+func GetDependencies(packageName string) (set.Set[string], error) {
 	// Configure the load mode to include dependencies
 	cfg := &packages.Config{Mode: packages.NeedImports | packages.NeedName}
 	pkgs, err := packages.Load(cfg, packageName)
@@ -23,13 +25,15 @@ func GetDependencies(packageName string) (map[string]struct{}, error) {
 		return nil, fmt.Errorf("no packages found for %s", packageName)
 	}
 
-	deps := make(map[string]struct{})
-	var collectDeps func(pkg *packages.Package)
+	var (
+		deps        set.Set[string]
+		collectDeps func(pkg *packages.Package) // collectDeps is recursive
+	)
 	collectDeps = func(pkg *packages.Package) {
-		if _, ok := deps[pkg.PkgPath]; ok {
+		if deps.Contains(pkg.PkgPath) {
 			return // Avoid re-processing the same dependency
 		}
-		deps[pkg.PkgPath] = struct{}{}
+		deps.Add(pkg.PkgPath)
 		for _, dep := range pkg.Imports {
 			collectDeps(dep)
 		}
