@@ -66,16 +66,36 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 		}
 	})
 
-	ginkgo.It("C-Chain", func(ctx context.Context) {
+	ginkgo.It("C-Chain simple", func(ctx context.Context) {
 		const blockchainID = "C"
 		endpoints, err := tmpnet.GetNodeWebsocketURIs(network.Nodes, blockchainID)
 		require.NoError(ginkgo.GinkgoT(), err, "getting node websocket URIs")
 		config := config{
 			endpoints: endpoints,
-			maxFeeCap: 5000,
+			issuer:    issuerSimple,
+			maxFeeCap: 3000,
 			agents:    1,
-			minTPS:    10,
-			maxTPS:    100,
+			minTPS:    50,
+			maxTPS:    90,
+			step:      10,
+		}
+		err = execute(ctx, network.PreFundedKeys, config)
+		if err != nil {
+			ginkgo.GinkgoT().Error(err)
+		}
+	})
+
+	ginkgo.It("C-Chain opcoder", func(ctx context.Context) {
+		const blockchainID = "C"
+		endpoints, err := tmpnet.GetNodeWebsocketURIs(network.Nodes, blockchainID)
+		require.NoError(ginkgo.GinkgoT(), err, "getting node websocket URIs")
+		config := config{
+			endpoints: endpoints,
+			issuer:    issuerOpcoder,
+			maxFeeCap: 300000000000,
+			agents:    1,
+			minTPS:    30,
+			maxTPS:    60,
 			step:      5,
 		}
 		err = execute(ctx, network.PreFundedKeys, config)
