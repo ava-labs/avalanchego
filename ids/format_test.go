@@ -9,17 +9,11 @@ import (
 )
 
 func TestFormat(t *testing.T) {
-	type (
-		idInterface interface {
-			String() string
-			Hex() string
-		}
-		test struct {
-			id   idInterface
-			want map[string]string // format -> output
-		}
-	)
-	makeTestCase := func(id idInterface) test {
+	type test struct {
+		id   idForFormatting
+		want map[string]string // format -> output
+	}
+	makeTestCase := func(id idForFormatting) test {
 		return test{
 			id: id,
 			want: map[string]string{

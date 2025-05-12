@@ -17,10 +17,15 @@ func (id ShortID) Format(s fmt.State, verb rune) {
 	format(s, verb, id)
 }
 
-// format implements the [fmt.Formatter] interface for [ID] and [ShortID].
-func format[T interface {
+type idForFormatting interface {
 	String() string
 	Hex() string
+}
+
+// format implements the [fmt.Formatter] interface for [ID] and [ShortID].
+func format[T interface {
+	idForFormatting
+	ID | ShortID
 }](s fmt.State, verb rune, id T) {
 	switch verb {
 	case 'x':
