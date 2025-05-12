@@ -44,6 +44,7 @@ func newTestDatabase(t *testing.T) *Database {
 	t.Helper()
 
 	conf := DefaultConfig()
+	conf.MetricsPort = 0
 	conf.Create = true
 	// The TempDir directory is automatically cleaned up so there's no need to
 	// remove test.db.
