@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 )
 
-const KubeConfigPathEnvVar = "KUBECONFIG"
+const KubeconfigPathEnvVar = "KUBECONFIG"
 
 type KubeconfigVars struct {
 	Path    string
@@ -48,10 +48,10 @@ func (v *KubeconfigVars) register(stringVar varFunc[string], docPrefix string) {
 	stringVar(
 		&v.Path,
 		"kubeconfig",
-		tmpnet.GetEnvWithDefault(KubeConfigPathEnvVar, os.ExpandEnv("$HOME/.kube/config")),
+		tmpnet.GetEnvWithDefault(KubeconfigPathEnvVar, os.ExpandEnv("$HOME/.kube/config")),
 		docPrefix+fmt.Sprintf(
 			"The path to a kubernetes configuration file for the target cluster. Also possible to configure via the %s env variable.",
-			KubeConfigPathEnvVar,
+			KubeconfigPathEnvVar,
 		),
 	)
 	stringVar(

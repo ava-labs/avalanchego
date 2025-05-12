@@ -222,6 +222,6 @@ func getLatestImageDetails(
 
 func getClientset(log logging.Logger) (*kubernetes.Clientset, error) {
 	log.Info("Initializing clientset")
-	kubeConfigPath := os.Getenv(flags.KubeConfigPathEnvVar)
-	return tmpnet.GetClientset(log, kubeConfigPath, "")
+	kubeconfigPath := os.Getenv(flags.KubeconfigPathEnvVar)
+	return tmpnet.GetClientset(log, kubeconfigPath, "")
 }
