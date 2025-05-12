@@ -24,17 +24,16 @@ type EthClientSimple interface {
 }
 
 type IssueTracker interface {
-	Issue(tx *types.Transaction)
+	Issue(tx common.Hash)
 }
 
 // Simple generates and issues transactions sending 0 fund to the sender.
 type Simple struct {
 	// Injected parameters
-	client      EthClientSimple
-	tracker     IssueTracker
-	key         *ecdsa.PrivateKey
-	gasFeeCap   *big.Int
-	issuePeriod time.Duration
+	client    EthClientSimple
+	tracker   IssueTracker
+	key       *ecdsa.PrivateKey
+	gasFeeCap *big.Int
 
 	// Determined by constructor
 	address   common.Address // corresponding to key
@@ -48,14 +47,9 @@ type Simple struct {
 }
 
 func NewSimple(ctx context.Context, client EthClientSimple, tracker IssueTracker,
-	maxFeeCap *big.Int, key *ecdsa.PrivateKey, issuePeriod time.Duration,
+	nonce uint64, maxFeeCap *big.Int, key *ecdsa.PrivateKey,
 ) (*Simple, error) {
 	address := ethcrypto.PubkeyToAddress(key.PublicKey)
-	blockNumber := (*big.Int)(nil)
-	nonce, err := client.NonceAt(ctx, address, blockNumber)
-	if err != nil {
-		return nil, fmt.Errorf("getting nonce for address %s: %w", address, err)
-	}
 
 	bigGwei := big.NewInt(params.GWei)
 	gasTipCap := new(big.Int).Mul(bigGwei, big.NewInt(1))
@@ -67,20 +61,19 @@ func NewSimple(ctx context.Context, client EthClientSimple, tracker IssueTracker
 	}
 
 	return &Simple{
-		client:      client,
-		tracker:     tracker,
-		key:         key,
-		address:     address,
-		nonce:       nonce,
-		signer:      types.LatestSignerForChainID(chainID),
-		chainID:     chainID,
-		gasTipCap:   gasTipCap,
-		gasFeeCap:   gasFeeCap,
-		issuePeriod: issuePeriod,
+		client:    client,
+		tracker:   tracker,
+		key:       key,
+		address:   address,
+		nonce:     nonce,
+		signer:    types.LatestSignerForChainID(chainID),
+		chainID:   chainID,
+		gasTipCap: gasTipCap,
+		gasFeeCap: gasFeeCap,
 	}, nil
 }
 
-func (s *Simple) GenerateAndIssueTx(ctx context.Context) (*types.Transaction, error) {
+func (s *Simple) GenerateAndIssueTx(ctx context.Context) (common.Hash, error) {
 	tx, err := types.SignNewTx(s.key, s.signer, &types.DynamicFeeTx{
 		ChainID:   s.chainID,
 		Nonce:     s.nonce,
@@ -92,25 +85,15 @@ func (s *Simple) GenerateAndIssueTx(ctx context.Context) (*types.Transaction, er
 		Value:     common.Big0,
 	})
 	if err != nil {
-		return nil, err
-	}
-
-	if s.issuePeriod > 0 && !s.lastIssue.IsZero() &&
-		time.Since(s.lastIssue) < s.issuePeriod {
-		timer := time.NewTimer(s.issuePeriod - time.Since(s.lastIssue))
-		select {
-		case <-timer.C:
-		case <-ctx.Done():
-			timer.Stop()
-			return nil, ctx.Err()
-		}
+		return common.Hash{}, err
 	}
 
 	if err := s.client.SendTransaction(ctx, tx); err != nil {
-		return nil, fmt.Errorf("issuing transaction with nonce %d: %w", s.nonce, err)
+		return common.Hash{}, fmt.Errorf("issuing transaction with nonce %d: %w", s.nonce, err)
 	}
 	s.nonce++
-	s.tracker.Issue(tx)
+	txHash := tx.Hash()
+	s.tracker.Issue(txHash)
 	s.lastIssue = time.Now()
-	return tx, nil
+	return txHash, nil
 }

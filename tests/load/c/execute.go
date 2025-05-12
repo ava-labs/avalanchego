@@ -11,9 +11,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/ethclient"
-	"github.com/ava-labs/libevm/params"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/tests/load"
@@ -26,12 +25,12 @@ import (
 )
 
 type config struct {
-	endpoints    []string
-	maxFeeCap    int64
-	agents       uint
-	txsPerAgent  uint64
-	issuePeriod  time.Duration
-	finalTimeout time.Duration
+	endpoints []string
+	maxFeeCap int64
+	agents    uint
+	minTPS    int64
+	maxTPS    int64
+	step      int64
 }
 
 func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config config) error {
@@ -42,37 +41,39 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 		return fmt.Errorf("fixing keys count: %w", err)
 	}
 
-	// Minimum to fund gas for all of the transactions for an address:
-	minFundsPerAddr := big.NewInt(params.GWei)
-	minFundsPerAddr = minFundsPerAddr.Mul(minFundsPerAddr, big.NewInt(config.maxFeeCap))
-	minFundsPerAddr = minFundsPerAddr.Mul(minFundsPerAddr, new(big.Int).SetUint64(params.TxGas))
-	minFundsPerAddr = minFundsPerAddr.Mul(minFundsPerAddr, new(big.Int).SetUint64(config.txsPerAgent))
-	err = ensureMinimumFunds(ctx, config.endpoints[0], keys, minFundsPerAddr)
+	err = Distribute(ctx, config.endpoints[0], keys)
 	if err != nil {
 		return fmt.Errorf("ensuring minimum funds: %w", err)
 	}
 
 	registry := prometheus.NewRegistry()
 	metricsServer := load.NewPrometheusServer("127.0.0.1:8082", registry, logger)
-	tracker, err := load.NewPrometheusTracker[*types.Transaction](registry, logger)
+	tracker, err := load.NewTracker[common.Hash](registry, logger)
 	if err != nil {
 		return fmt.Errorf("creating tracker: %w", err)
 	}
 
-	agents := make([]load.Agent[*types.Transaction], config.agents)
+	agents := make([]load.Agent[common.Hash], config.agents)
 	for i := range agents {
 		endpoint := config.endpoints[i%len(config.endpoints)]
 		client, err := ethclient.DialContext(ctx, endpoint)
 		if err != nil {
 			return fmt.Errorf("dialing %s: %w", endpoint, err)
 		}
+
+		address := ethcrypto.PubkeyToAddress(keys[i].PublicKey)
+		blockNumber := (*big.Int)(nil)
+		nonce, err := client.NonceAt(ctx, address, blockNumber)
+		if err != nil {
+			return fmt.Errorf("getting nonce for address %s: %w", address, err)
+		}
+
 		issuer, err := issuers.NewSimple(ctx, client, tracker,
-			big.NewInt(config.maxFeeCap), keys[i], config.issuePeriod)
+			nonce, big.NewInt(config.maxFeeCap), keys[i])
 		if err != nil {
 			return fmt.Errorf("creating issuer: %w", err)
 		}
-		address := ethcrypto.PubkeyToAddress(keys[i].PublicKey)
-		listener := listener.New(client, tracker, address)
+		listener := listener.New(client, tracker, address, nonce)
 		agents[i] = load.NewAgent(issuer, listener)
 	}
 
@@ -83,20 +84,18 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 
 	orchestratorCtx, orchestratorCancel := context.WithCancel(ctx)
 	defer orchestratorCancel()
-	orchestratorConfig := load.BurstOrchestratorConfig{
-		TxsPerIssuer: config.txsPerAgent,
-		Timeout:      config.finalTimeout,
-	}
-	orchestrator, err := load.NewBurstOrchestrator(agents, logger, orchestratorConfig)
-	if err != nil {
-		_ = metricsServer.Stop()
-		return fmt.Errorf("creating orchestrator: %w", err)
-	}
-
+	orchestratorConfig := load.NewOrchestratorConfig()
+	orchestratorConfig.MinTPS = config.minTPS
+	orchestratorConfig.MaxTPS = config.maxTPS
+	orchestratorConfig.Step = config.step
+	orchestratorConfig.SustainedTime = 10 * time.Second
+	orchestrator := load.NewOrchestrator(agents, tracker, logger, orchestratorConfig)
 	orchestratorErrCh := make(chan error)
 	go func() {
 		orchestratorErrCh <- orchestrator.Execute(orchestratorCtx)
 	}()
+
+	go tracker.LogPeriodically(orchestratorCtx)
 
 	select {
 	case err := <-orchestratorErrCh:

@@ -14,11 +14,8 @@ import (
 	"github.com/ava-labs/libevm/accounts/abi/bind"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/rpc"
 
 	"github.com/ava-labs/avalanchego/tests/load/c/contracts"
-
-	ethcrypto "github.com/ava-labs/libevm/crypto"
 )
 
 type EthClientOpcoder interface {
@@ -32,11 +29,10 @@ type EthClientOpcoder interface {
 // instance that it deploys.
 type Opcoder struct {
 	// Injected parameters
-	client      EthClientOpcoder
-	tracker     IssueTracker
-	senderKey   *ecdsa.PrivateKey
-	maxFeeCap   *big.Int
-	issuePeriod time.Duration
+	client    EthClientOpcoder
+	tracker   IssueTracker
+	senderKey *ecdsa.PrivateKey
+	maxFeeCap *big.Int
 
 	// Determined by constructor
 	chainID          *big.Int
@@ -53,18 +49,13 @@ func NewOpcoder(
 	ctx context.Context,
 	client EthClientOpcoder,
 	tracker IssueTracker,
+	nonce uint64,
 	maxFeeCap *big.Int,
 	key *ecdsa.PrivateKey,
-	issuePeriod time.Duration,
 ) (*Opcoder, error) {
 	chainID, err := client.ChainID(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting chain id: %w", err)
-	}
-
-	nonce, err := client.NonceAt(ctx, ethcrypto.PubkeyToAddress(key.PublicKey), big.NewInt(int64(rpc.PendingBlockNumber)))
-	if err != nil {
-		return nil, fmt.Errorf("getting nonce: %w", err)
 	}
 
 	maxTipCap := big.NewInt(1)
@@ -88,7 +79,6 @@ func NewOpcoder(
 		tracker:          tracker,
 		senderKey:        key,
 		maxFeeCap:        maxFeeCap,
-		issuePeriod:      issuePeriod,
 		chainID:          chainID,
 		maxTipCap:        maxTipCap,
 		contractAddress:  simulatorAddress,
@@ -97,26 +87,16 @@ func NewOpcoder(
 	}, nil
 }
 
-func (o *Opcoder) GenerateAndIssueTx(ctx context.Context) (tx *types.Transaction, err error) {
-	if o.issuePeriod > 0 && !o.lastIssue.IsZero() &&
-		time.Since(o.lastIssue) < o.issuePeriod {
-		timer := time.NewTimer(o.issuePeriod - time.Since(o.lastIssue))
-		select {
-		case <-timer.C:
-		case <-ctx.Done():
-			timer.Stop()
-			return nil, ctx.Err()
-		}
-	}
-
+func (o *Opcoder) GenerateAndIssueTx(ctx context.Context) (common.Hash, error) {
 	txOpts, err := o.newTxOpts(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("creating transaction opts: %w", err)
+		return common.Hash{}, fmt.Errorf("creating transaction opts: %w", err)
 	}
 
 	loadTypes := allLoadTypes()
 	loadType := loadTypes[rand.IntN(len(loadTypes))] //nolint:gosec
 
+	var tx *types.Transaction
 	switch loadType {
 	case randomWrite:
 		const maxWriteSizeBytes = 5
@@ -143,17 +123,18 @@ func (o *Opcoder) GenerateAndIssueTx(ctx context.Context) (tx *types.Transaction
 		depth := big.NewInt(rand.Int64N(maxDepth)) //nolint:gosec
 		tx, err = o.contractInstance.SimulateCallDepth(txOpts, depth)
 	default:
-		return nil, fmt.Errorf("invalid load type: %s", loadType)
+		return common.Hash{}, fmt.Errorf("invalid load type: %s", loadType)
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("calling simulator contract with load type %s: %w", loadType, err)
+		return common.Hash{}, fmt.Errorf("calling simulator contract with load type %s: %w", loadType, err)
 	}
 
 	o.nonce++
-	o.tracker.Issue(tx)
+	txHash := tx.Hash()
+	o.tracker.Issue(txHash)
 	o.lastIssue = time.Now()
-	return tx, err
+	return txHash, err
 }
 
 const (

@@ -10,7 +10,6 @@ import (
 	"sync"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/types"
 )
 
 type EthClient interface {
@@ -19,8 +18,8 @@ type EthClient interface {
 }
 
 type Observer interface {
-	ObserveConfirmed(tx *types.Transaction)
-	ObserveFailed(tx *types.Transaction)
+	ObserveConfirmed(hash common.Hash)
+	ObserveFailed(hash common.Hash)
 }
 
 // Listener listens for transaction confirmations from a node.
@@ -31,17 +30,18 @@ type Listener struct {
 	address common.Address
 
 	// Internal state
-	mutex           sync.Mutex
-	allIssued       bool
-	lastIssuedNonce uint64
-	inFlightTxs     []*types.Transaction
+	mutex       sync.Mutex
+	allIssued   bool
+	nonce       uint64
+	inFlightTxs []common.Hash
 }
 
-func New(client EthClient, tracker Observer, address common.Address) *Listener {
+func New(client EthClient, tracker Observer, address common.Address, nonce uint64) *Listener {
 	return &Listener{
 		client:  client,
 		tracker: tracker,
 		address: address,
+		nonce:   nonce,
 	}
 }
 
@@ -66,13 +66,13 @@ func (l *Listener) Listen(ctx context.Context) error {
 
 		l.mutex.Lock()
 		confirmed := uint64(len(l.inFlightTxs))
-		if nonce < l.lastIssuedNonce { // lagging behind last issued nonce
-			lag := l.lastIssuedNonce - nonce
+		if nonce < l.nonce { // lagging behind last issued nonce
+			lag := l.nonce - nonce
 			confirmed -= lag
 		}
 		for index := range confirmed {
-			tx := l.inFlightTxs[index]
-			l.tracker.ObserveConfirmed(tx)
+			txHash := l.inFlightTxs[index]
+			l.tracker.ObserveConfirmed(txHash)
 		}
 		l.inFlightTxs = l.inFlightTxs[confirmed:]
 		if l.allIssued && len(l.inFlightTxs) == 0 {
@@ -91,11 +91,11 @@ func (l *Listener) Listen(ctx context.Context) error {
 	}
 }
 
-func (l *Listener) RegisterIssued(tx *types.Transaction) {
+func (l *Listener) RegisterIssued(txHash common.Hash) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
-	l.lastIssuedNonce = tx.Nonce()
-	l.inFlightTxs = append(l.inFlightTxs, tx)
+	l.nonce++
+	l.inFlightTxs = append(l.inFlightTxs, txHash)
 }
 
 func (l *Listener) IssuingDone() {

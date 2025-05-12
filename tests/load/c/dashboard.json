@@ -225,7 +225,7 @@
             "targets": [
                 {
                     "editorMode": "code",
-                    "expr": "sum(txs_issued)",
+                    "expr": "sum(load_txs_issued)",
                     "legendFormat": "Confirmed",
                     "range": true,
                     "refId": "A"
@@ -291,7 +291,7 @@
             "targets": [
                 {
                     "editorMode": "code",
-                    "expr": "sum(txs_confirmed)",
+                    "expr": "sum(load_txs_confirmed)",
                     "legendFormat": "Confirmed",
                     "range": true,
                     "refId": "A"
@@ -357,7 +357,7 @@
             "targets": [
                 {
                     "editorMode": "code",
-                    "expr": "sum(txs_failed)",
+                    "expr": "sum(load_txs_failed)",
                     "legendFormat": "Confirmed",
                     "range": true,
                     "refId": "A"
@@ -423,7 +423,7 @@
             "targets": [
                 {
                     "editorMode": "code",
-                    "expr": "sum(txs_issued)-sum(txs_confirmed)-sum(txs_failed)",
+                    "expr": "sum(load_txs_issued)-sum(load_txs_confirmed)-sum(load_txs_failed)",
                     "legendFormat": "Confirmed",
                     "range": true,
                     "refId": "A"
@@ -988,12 +988,12 @@
         ]
     },
     "time": {
-        "from": "now-30m",
+        "from": "now-15m",
         "to": "now"
     },
     "timepicker": {},
     "timezone": "browser",
     "title": "Load testing",
     "uid": "aejze3k4d0mpsb",
-    "version": 15
+    "version": 16
 }

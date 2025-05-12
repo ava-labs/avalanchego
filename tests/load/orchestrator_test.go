@@ -19,17 +19,17 @@ import (
 
 var _ Issuer[ids.ID] = (*mockIssuer)(nil)
 
-func TestGradualOrchestratorTPS(t *testing.T) {
+func TestOrchestratorTPS(t *testing.T) {
 	tests := []struct {
 		name        string
 		serverTPS   uint64
-		config      GradualOrchestratorConfig
+		config      OrchestratorConfig
 		expectedErr error
 	}{
 		{
 			name:      "orchestrator achieves max TPS",
 			serverTPS: math.MaxUint64,
-			config: GradualOrchestratorConfig{
+			config: OrchestratorConfig{
 				MaxTPS:           2_000,
 				MinTPS:           1_000,
 				Step:             1_000,
@@ -42,7 +42,7 @@ func TestGradualOrchestratorTPS(t *testing.T) {
 		{
 			name:      "orchestrator TPS limited by network",
 			serverTPS: 1_000,
-			config: GradualOrchestratorConfig{
+			config: OrchestratorConfig{
 				MaxTPS:           2_000,
 				MinTPS:           1_000,
 				Step:             1_000,
@@ -61,7 +61,7 @@ func TestGradualOrchestratorTPS(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			tracker, err := NewPrometheusTracker[ids.ID](prometheus.NewRegistry(), logging.NoLog{})
+			tracker, err := NewTracker[ids.ID](prometheus.NewRegistry(), logging.NoLog{})
 			r.NoError(err)
 
 			agents := []Agent[ids.ID]{
@@ -77,13 +77,12 @@ func TestGradualOrchestratorTPS(t *testing.T) {
 				),
 			}
 
-			orchestrator, err := NewGradualOrchestrator(
+			orchestrator := NewOrchestrator(
 				agents,
 				tracker,
 				logging.NoLog{},
 				tt.config,
 			)
-			r.NoError(err)
 
 			r.ErrorIs(orchestrator.Execute(ctx), tt.expectedErr)
 
@@ -97,13 +96,13 @@ func TestGradualOrchestratorTPS(t *testing.T) {
 }
 
 // test that the orchestrator returns early if the txGenerators or the issuers error
-func TestGradualOrchestratorExecution(t *testing.T) {
+func TestOrchestratorExecution(t *testing.T) {
 	var (
 		errMockTxGenerator = errors.New("mock tx generator error")
 		errMockIssuer      = errors.New("mock issuer error")
 	)
 
-	tracker, err := NewPrometheusTracker[ids.ID](prometheus.NewRegistry(), logging.NoLog{})
+	tracker, err := NewTracker[ids.ID](prometheus.NewRegistry(), logging.NoLog{})
 	require.NoError(t, err, "creating tracker")
 
 	tests := []struct {
@@ -114,7 +113,7 @@ func TestGradualOrchestratorExecution(t *testing.T) {
 		{
 			name: "generator error",
 			agents: []Agent[ids.ID]{
-				NewAgent[ids.ID](
+				NewAgent(
 					&mockIssuer{
 						generateTxF: func() (ids.ID, error) {
 							return ids.Empty, errMockTxGenerator
@@ -128,7 +127,7 @@ func TestGradualOrchestratorExecution(t *testing.T) {
 		{
 			name: "issuer error",
 			agents: []Agent[ids.ID]{
-				NewAgent[ids.ID](
+				NewAgent(
 					&mockIssuer{
 						generateTxF: func() (ids.ID, error) {
 							return ids.GenerateTestID(), nil
@@ -148,11 +147,11 @@ func TestGradualOrchestratorExecution(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			orchestrator, err := NewGradualOrchestrator(
+			orchestrator := NewOrchestrator(
 				tt.agents,
 				tracker,
 				logging.NoLog{},
-				DefaultGradualOrchestratorConfig(),
+				NewOrchestratorConfig(),
 			)
 			r.NoError(err)
 
@@ -165,7 +164,7 @@ type mockIssuer struct {
 	generateTxF   func() (ids.ID, error)
 	currTxsIssued uint64
 	maxTxs        uint64
-	tracker       Tracker[ids.ID]
+	tracker       *Tracker[ids.ID]
 	issueTxErr    error
 }
 

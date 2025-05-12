@@ -17,9 +17,9 @@ import (
 
 const namespace = "load"
 
-var _ Tracker[any] = (*PrometheusTracker[any])(nil)
-
-type PrometheusTracker[T comparable] struct {
+// Tracker keeps track of the status of transactions.
+// This is thread-safe and can be called in parallel by the issuer(s) or orchestrator.
+type Tracker[T TxID] struct {
 	lock sync.RWMutex
 
 	outstandingTxs map[T]time.Time
@@ -37,8 +37,12 @@ type PrometheusTracker[T comparable] struct {
 	logger logging.Logger
 }
 
-func NewPrometheusTracker[T comparable](reg *prometheus.Registry, logger logging.Logger) (*PrometheusTracker[T], error) {
-	prometheusTracker := &PrometheusTracker[T]{
+// NewTracker returns a new Tracker instance which records metrics for the number
+// of transactions issued, confirmed, and failed. It also tracks the latency of
+// transactions.
+func NewTracker[T TxID](reg prometheus.Registerer, logger logging.Logger,
+) (*Tracker[T], error) {
+	tracker := &Tracker[T]{
 		outstandingTxs: make(map[T]time.Time),
 		txsIssuedCounter: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
@@ -65,69 +69,79 @@ func NewPrometheusTracker[T comparable](reg *prometheus.Registry, logger logging
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		reg.Register(prometheusTracker.txsIssuedCounter),
-		reg.Register(prometheusTracker.txsConfirmedCounter),
-		reg.Register(prometheusTracker.txsFailedCounter),
-		reg.Register(prometheusTracker.txLatency),
+		reg.Register(tracker.txsIssuedCounter),
+		reg.Register(tracker.txsConfirmedCounter),
+		reg.Register(tracker.txsFailedCounter),
+		reg.Register(tracker.txLatency),
 	)
-	return prometheusTracker, errs.Err
+	return tracker, errs.Err
 }
 
-func (p *PrometheusTracker[T]) GetObservedConfirmed() uint64 {
+// GetObservedConfirmed returns the number of transactions that the tracker has
+// confirmed were accepted.
+func (p *Tracker[_]) GetObservedConfirmed() uint64 {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
 	return p.txsConfirmed
 }
 
-func (p *PrometheusTracker[T]) GetObservedFailed() uint64 {
+// GetObservedFailed returns the number of transactions that the tracker has
+// confirmed failed.
+func (p *Tracker[_]) GetObservedFailed() uint64 {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
 	return p.txsFailed
 }
 
-func (p *PrometheusTracker[T]) GetObservedIssued() uint64 {
+// GetObservedIssued returns the number of transactions that the tracker has
+// confirmed were issued.
+func (p *Tracker[_]) GetObservedIssued() uint64 {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
 	return p.txsIssued
 }
 
-func (p *PrometheusTracker[T]) Issue(tx T) {
+// Issue records a transaction that was submitted, but whose final status is
+// not yet known.
+func (p *Tracker[T]) Issue(txID T) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	p.outstandingTxs[tx] = time.Now()
+	p.outstandingTxs[txID] = time.Now()
 	p.txsIssued++
 	p.txsIssuedCounter.Inc()
 }
 
-func (p *PrometheusTracker[T]) ObserveConfirmed(tx T) {
+// ObserveConfirmed records a transaction that was confirmed.
+func (p *Tracker[T]) ObserveConfirmed(txID T) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	startTime := p.outstandingTxs[tx]
-	delete(p.outstandingTxs, tx)
+	startTime := p.outstandingTxs[txID]
+	delete(p.outstandingTxs, txID)
 
 	p.txsConfirmed++
 	p.txsConfirmedCounter.Inc()
 	p.txLatency.Observe(float64(time.Since(startTime).Milliseconds()))
 }
 
-func (p *PrometheusTracker[T]) ObserveFailed(tx T) {
+// ObserveFailed records a transaction that failed (e.g. expired)
+func (p *Tracker[T]) ObserveFailed(txID T) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	startTime := p.outstandingTxs[tx]
-	delete(p.outstandingTxs, tx)
+	startTime := p.outstandingTxs[txID]
+	delete(p.outstandingTxs, txID)
 
 	p.txsFailed++
 	p.txsFailedCounter.Inc()
 	p.txLatency.Observe(float64(time.Since(startTime).Milliseconds()))
 }
 
-func (t *PrometheusTracker[T]) LogPeriodically(ctx context.Context) {
+func (t *Tracker[T]) LogPeriodically(ctx context.Context) {
 	const period = 10 * time.Second
 
 	ticker := time.NewTicker(period)

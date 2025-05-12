@@ -6,7 +6,6 @@ package c
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
@@ -72,12 +71,12 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 		endpoints, err := tmpnet.GetNodeWebsocketURIs(network.Nodes, blockchainID)
 		require.NoError(ginkgo.GinkgoT(), err, "getting node websocket URIs")
 		config := config{
-			endpoints:    endpoints,
-			maxFeeCap:    5000,
-			agents:       5,
-			txsPerAgent:  100000,
-			issuePeriod:  20 * time.Millisecond,
-			finalTimeout: time.Minute,
+			endpoints: endpoints,
+			maxFeeCap: 5000,
+			agents:    1,
+			minTPS:    10,
+			maxTPS:    100,
+			step:      5,
 		}
 		err = execute(ctx, network.PreFundedKeys, config)
 		if err != nil {
