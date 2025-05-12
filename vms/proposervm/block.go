@@ -96,6 +96,15 @@ func (p *postForkCommonComponents) getPChainEpoch(ctx context.Context, parentID 
 	if err != nil {
 		return 0, 0, time.Time{}, fmt.Errorf("failed to get epoch start time: %w", err)
 	}
+	if epochStartTime.IsZero() {
+		// If the parent was not assigned an epoch, then the child is the first block of
+		// the initial epoch.
+		height, err := parent.pChainHeight(ctx)
+		if err != nil {
+			return 0, 0, time.Time{}, fmt.Errorf("failed to get P-Chain height: %w", err)
+		}
+		return height, 0, childTimestamp, nil
+	}
 
 	if parent.Timestamp().After(epochStartTime.Add(time.Duration(p.vm.Upgrades.GUpgradeEpochDuration) * time.Second)) {
 		// If the parent crossed the epoch boundary, then it sealed the previous epoch. The child
