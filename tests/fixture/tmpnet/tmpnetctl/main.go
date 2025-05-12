@@ -154,9 +154,9 @@ func main() {
 	}
 	rootCmd.AddCommand(restartNetworkCmd)
 
-	startCollectorsCmd := &cobra.Command{
-		Use:   "start-collectors",
-		Short: "Start log and metric collectors for local process-based nodes",
+	startMetricsCollectorCmd := &cobra.Command{
+		Use:   "start-metrics-collector",
+		Short: "Start metrics collector for local process-based nodes",
 		RunE: func(*cobra.Command, []string) error {
 			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
 			defer cancel()
@@ -164,14 +164,14 @@ func main() {
 			if err != nil {
 				return err
 			}
-			return tmpnet.StartCollectors(ctx, log)
+			return tmpnet.StartPrometheus(ctx, log)
 		},
 	}
-	rootCmd.AddCommand(startCollectorsCmd)
+	rootCmd.AddCommand(startMetricsCollectorCmd)
 
-	stopCollectorsCmd := &cobra.Command{
-		Use:   "stop-collectors",
-		Short: "Stop log and metric collectors for local process-based nodes",
+	startLogsCollectorCmd := &cobra.Command{
+		Use:   "start-logs-collector",
+		Short: "Start logs collector for local process-based nodes",
 		RunE: func(*cobra.Command, []string) error {
 			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
 			defer cancel()
@@ -179,10 +179,40 @@ func main() {
 			if err != nil {
 				return err
 			}
-			return tmpnet.StopCollectors(ctx, log)
+			return tmpnet.StartPromtail(ctx, log)
 		},
 	}
-	rootCmd.AddCommand(stopCollectorsCmd)
+	rootCmd.AddCommand(startLogsCollectorCmd)
+
+	stopMetricsCollectorCmd := &cobra.Command{
+		Use:   "stop-metrics-collector",
+		Short: "Stop metrics collector for local process-based nodes",
+		RunE: func(*cobra.Command, []string) error {
+			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
+			defer cancel()
+			log, err := tests.LoggerForFormat("", rawLogFormat)
+			if err != nil {
+				return err
+			}
+			return tmpnet.StopMetricsCollector(ctx, log)
+		},
+	}
+	rootCmd.AddCommand(stopMetricsCollectorCmd)
+
+	stopLogsCollectorCmd := &cobra.Command{
+		Use:   "stop-logs-collector",
+		Short: "Stop logs collector for local process-based nodes",
+		RunE: func(*cobra.Command, []string) error {
+			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
+			defer cancel()
+			log, err := tests.LoggerForFormat("", rawLogFormat)
+			if err != nil {
+				return err
+			}
+			return tmpnet.StopLogsCollector(ctx, log)
+		},
+	}
+	rootCmd.AddCommand(stopLogsCollectorCmd)
 
 	var networkUUID string
 
