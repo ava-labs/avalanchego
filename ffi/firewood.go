@@ -175,10 +175,10 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 
 	values, cleanup := newValueFactory()
 	defer cleanup()
-	val := C.fwd_get(db.handle, values.from(key))
+	val := C.fwd_get_latest(db.handle, values.from(key))
 	bytes, err := extractBytesThenFree(&val)
 
-	// If the root hash or key is not found, return nil.
+	// If the root hash is not found, return nil.
 	if err != nil && strings.Contains(err.Error(), rootHashNotFound) {
 		return nil, nil
 	}

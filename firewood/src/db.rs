@@ -447,6 +447,12 @@ impl Proposal<'_> {
             None => Err(api::Error::CannotCommitClonedProposal),
         }
     }
+
+    /// Get a value from the proposal synchronously
+    pub fn val_sync<K: KeyType>(&self, key: K) -> Result<Option<Box<[u8]>>, api::Error> {
+        let merkle = Merkle::from(self.nodestore.clone());
+        merkle.get_value(key.as_ref()).map_err(api::Error::from)
+    }
 }
 #[cfg(test)]
 #[expect(clippy::unwrap_used)]

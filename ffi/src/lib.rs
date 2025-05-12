@@ -22,8 +22,6 @@ mod metrics_setup;
 #[doc(hidden)]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-/// A proposal ID is a 32-bit unsigned integer.
-/// It is used to identify proposals internally.
 type ProposalId = u32;
 
 #[doc(hidden)]
@@ -76,10 +74,9 @@ impl Deref for DatabaseHandle<'_> {
 ///
 /// A `Value` containing the root hash of the database.
 /// A `Value` containing {0, "error message"} if the get failed.
-/// There are two error cases that may be expected to be nil by the caller,
-/// but should be handled externally:
-/// * The database has no entries - "IO error: Root hash not found"
-/// * The key is not found in the database returns a `Value` with length 0 and a null data pointer.
+/// There is one error case that may be expected to be nil by the caller,
+/// but should be handled externally: The database has no entries - "IO error: Root hash not found"
+/// This is expected behavior if the database is empty.
 ///
 /// # Safety
 ///
@@ -88,14 +85,14 @@ impl Deref for DatabaseHandle<'_> {
 ///  * ensure that `key` is a valid pointer to a `Value` struct
 ///  * call `free_value` to free the memory associated with the returned `Value`
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fwd_get(db: *const DatabaseHandle, key: Value) -> Value {
-    get(db, key).unwrap_or_else(|e| e.into())
+pub unsafe extern "C" fn fwd_get_latest(db: *const DatabaseHandle, key: Value) -> Value {
+    get_latest(db, key).unwrap_or_else(|e| e.into())
 }
 
 /// This function is not exposed to the C API.
-/// Internal call for `fwd_get` to remove error handling from the C API
+/// Internal call for `fwd_get_latest` to remove error handling from the C API
 #[doc(hidden)]
-fn get(db: *const DatabaseHandle, key: Value) -> Result<Value, String> {
+fn get_latest(db: *const DatabaseHandle, key: Value) -> Result<Value, String> {
     // Check db is valid.
     let db = unsafe { db.as_ref() }.ok_or_else(|| String::from("db should be non-null"))?;
 
@@ -111,6 +108,59 @@ fn get(db: *const DatabaseHandle, key: Value) -> Result<Value, String> {
 
     // Get value associated with key.
     let value = rev
+        .val_sync(key.as_slice())
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| String::from(""))?;
+    Ok(value.into())
+}
+
+/// Gets the value associated with the given key from the proposal provided.
+///
+/// # Arguments
+///
+/// * `db` - The database handle returned by `open_db`
+/// * `id` - The ID of the proposal to get the value from
+/// * `key` - The key to look up, in `Value` form
+///
+/// # Returns
+///
+/// A `Value` containing the root hash of the database.
+/// A `Value` containing {0, "error message"} if the get failed.
+///
+/// # Safety
+///
+/// The caller must:
+///  * ensure that `db` is a valid pointer returned by `open_db`
+///  * ensure that `key` is a valid pointer to a `Value` struct
+///  * call `free_value` to free the memory associated with the returned `Value`
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fwd_get_from_proposal(
+    db: *const DatabaseHandle,
+    id: ProposalId,
+    key: Value,
+) -> Value {
+    get_from_proposal(db, id, key).unwrap_or_else(|e| e.into())
+}
+
+/// This function is not exposed to the C API.
+/// Internal call for `fwd_get_from_proposal` to remove error handling from the C API
+#[doc(hidden)]
+fn get_from_proposal(
+    db: *const DatabaseHandle,
+    id: ProposalId,
+    key: Value,
+) -> Result<Value, String> {
+    // Check db is valid.
+    let db = unsafe { db.as_ref() }.ok_or_else(|| String::from("db should be non-null"))?;
+
+    // Get proposal from ID.
+    let proposals = db.proposals.read().unwrap();
+    let proposal = proposals
+        .get(&id)
+        .ok_or_else(|| String::from("proposal not found"))?;
+
+    // Get value associated with key.
+    let value = proposal
         .val_sync(key.as_slice())
         .map_err(|e| e.to_string())?
         .ok_or_else(|| String::from(""))?;

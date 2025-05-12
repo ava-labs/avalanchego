@@ -25,6 +25,22 @@ type Proposal struct {
 	id uint32
 }
 
+func (p *Proposal) Get(key []byte) ([]byte, error) {
+	if p.handle == nil {
+		return nil, errDbClosed
+	}
+
+	if p.id == 0 {
+		return nil, errDroppedProposal
+	}
+	values, cleanup := newValueFactory()
+	defer cleanup()
+
+	// Get the value for the given key.
+	val := C.fwd_get_from_proposal(p.handle, C.uint32_t(p.id), values.from(key))
+	return extractBytesThenFree(&val)
+}
+
 func (p *Proposal) Commit() error {
 	if p.handle == nil {
 		return errDbClosed

@@ -53,6 +53,8 @@ typedef struct CreateOrOpenArgs {
   uint16_t metrics_port;
 } CreateOrOpenArgs;
 
+typedef uint32_t ProposalId;
+
 /**
  * Puts the given key-value pairs into the database.
  *
@@ -161,6 +163,31 @@ const struct DatabaseHandle *fwd_create_db(struct CreateOrOpenArgs args);
 void fwd_free_value(const struct Value *value);
 
 /**
+ * Gets the value associated with the given key from the proposal provided.
+ *
+ * # Arguments
+ *
+ * * `db` - The database handle returned by `open_db`
+ * * `id` - The ID of the proposal to get the value from
+ * * `key` - The key to look up, in `Value` form
+ *
+ * # Returns
+ *
+ * A `Value` containing the root hash of the database.
+ * A `Value` containing {0, "error message"} if the get failed.
+ *
+ * # Safety
+ *
+ * The caller must:
+ *  * ensure that `db` is a valid pointer returned by `open_db`
+ *  * ensure that `key` is a valid pointer to a `Value` struct
+ *  * call `free_value` to free the memory associated with the returned `Value`
+ */
+struct Value fwd_get_from_proposal(const struct DatabaseHandle *db,
+                                   ProposalId id,
+                                   struct Value key);
+
+/**
  * Gets the value associated with the given key from the database.
  *
  * # Arguments
@@ -172,10 +199,9 @@ void fwd_free_value(const struct Value *value);
  *
  * A `Value` containing the root hash of the database.
  * A `Value` containing {0, "error message"} if the get failed.
- * There are two error cases that may be expected to be nil by the caller,
- * but should be handled externally:
- * * The database has no entries - "IO error: Root hash not found"
- * * The key is not found in the database returns a `Value` with length 0 and a null data pointer.
+ * There is one error case that may be expected to be nil by the caller,
+ * but should be handled externally: The database has no entries - "IO error: Root hash not found"
+ * This is expected behavior if the database is empty.
  *
  * # Safety
  *
@@ -184,7 +210,7 @@ void fwd_free_value(const struct Value *value);
  *  * ensure that `key` is a valid pointer to a `Value` struct
  *  * call `free_value` to free the memory associated with the returned `Value`
  */
-struct Value fwd_get(const struct DatabaseHandle *db, struct Value key);
+struct Value fwd_get_latest(const struct DatabaseHandle *db, struct Value key);
 
 /**
  * Open a database with the given cache size and maximum number of revisions
