@@ -6,6 +6,8 @@ package ids
 import (
 	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestFormat(t *testing.T) {
@@ -38,10 +40,7 @@ func TestFormat(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.id.String(), func(t *testing.T) {
 			for format, want := range tt.want {
-				if got := fmt.Sprintf(format, tt.id); got != want {
-					//nolint:forbidigo // require.Equal() is inappropriate as it unnecessarily stops future tests and `assert.Equal()` isn't allowed
-					t.Errorf("fmt.Sprintf(%q, %T) got %q; want %q", format, tt.id, got, want)
-				}
+				require.Equalf(t, want, fmt.Sprintf(format, tt.id), "fmt.Sprintf(%q, %T)", format, tt.id)
 			}
 		})
 	}
