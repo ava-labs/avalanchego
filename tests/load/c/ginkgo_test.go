@@ -132,6 +132,7 @@ func writeCollectorConfig(metricsFilePath string, config []byte) error {
 	if err != nil {
 		return err
 	}
+
 	defer func() {
 		_ = file.Close()
 	}()
