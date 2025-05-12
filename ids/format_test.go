@@ -45,10 +45,3 @@ func TestFormat(t *testing.T) {
 		})
 	}
 }
-
-func BenchmarkFormat(*testing.B) {
-	// %q uses a []byte so this is just to demonstrate that it's on the stack
-	// otherwise someone, not naming any names, might want to "fix" it.
-	_ = fmt.Sprintf("%q", ID{})
-	_ = fmt.Sprintf("%q", ShortID{})
-}
