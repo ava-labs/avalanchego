@@ -177,7 +177,7 @@ tasks:
     desc: Runs e2e load tests
     cmds:
       - task: build
-      - cmd: ./bin/ginkgo -v ./tests/load -- --avalanchego-path=$PWD/build/avalanchego
+      - cmd: ./bin/ginkgo -v ./tests/load/c -- --avalanchego-path=$PWD/build/avalanchego
 
   # To use a different fuzz time, run `task test-fuzz FUZZTIME=[value in seconds]`.
   # A value of `-1` will run until it encounters a failing output.
