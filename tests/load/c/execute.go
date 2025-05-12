@@ -1,4 +1,4 @@
-// Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package c
@@ -25,12 +25,13 @@ import (
 )
 
 type config struct {
-	endpoints []string
-	maxFeeCap int64
-	agents    uint
-	minTPS    int64
-	maxTPS    int64
-	step      int64
+	endpoints  []string
+	maxFeeCap  int64
+	agents     uint
+	minTPS     int64
+	maxTPS     int64
+	step       int64
+	metricsURI string
 }
 
 func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config config) error {
@@ -47,7 +48,7 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 	}
 
 	registry := prometheus.NewRegistry()
-	metricsServer := load.NewPrometheusServer("127.0.0.1:8082", registry, logger)
+	metricsServer := load.NewPrometheusServer(config.metricsURI, registry, logger)
 	tracker, err := load.NewTracker[common.Hash](registry, logger)
 	if err != nil {
 		return fmt.Errorf("creating tracker: %w", err)
