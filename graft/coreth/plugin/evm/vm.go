@@ -407,8 +407,8 @@ func (vm *VM) Initialize(
 		}
 	}
 
-	g := new(core.Genesis)
-	if err := json.Unmarshal(genesisBytes, g); err != nil {
+	g, err := parseGenesis(chainCtx, genesisBytes)
+	if err != nil {
 		return err
 	}
 
@@ -420,25 +420,6 @@ func (vm *VM) Initialize(
 	case avalanchegoConstants.FujiID:
 		extDataHashes = fujiExtDataHashes
 	}
-
-	// if the chainCtx.NetworkUpgrades is not empty, set the chain config
-	// normally it should not be empty, but some tests may not set it
-	if chainCtx.NetworkUpgrades != (upgrade.Config{}) {
-		params.GetExtra(g.Config).NetworkUpgrades = extras.GetNetworkUpgrades(chainCtx.NetworkUpgrades)
-	}
-
-	// If the Durango is activated, activate the Warp Precompile at the same time
-	configExtra := params.GetExtra(g.Config)
-	if configExtra.DurangoBlockTimestamp != nil {
-		configExtra.PrecompileUpgrades = append(configExtra.PrecompileUpgrades, extras.PrecompileUpgrade{
-			Config: warpcontract.NewDefaultConfig(configExtra.DurangoBlockTimestamp),
-		})
-	}
-
-	// Set the Avalanche Context on the ChainConfig
-	configExtra.AvalancheContext = extras.AvalancheContext{
-		SnowCtx: chainCtx,
-	}
 	vm.syntacticBlockValidator = NewBlockValidator(extDataHashes)
 
 	// Free the memory of the extDataHash map that is not used (i.e. if mainnet
@@ -447,8 +428,6 @@ func (vm *VM) Initialize(
 	mainnetExtDataHashes = nil
 
 	vm.chainID = g.Config.ChainID
-
-	params.SetEthUpgrades(g.Config)
 
 	vm.ethConfig = ethconfig.NewDefaultConfig()
 	vm.ethConfig.Genesis = g
@@ -519,10 +498,6 @@ func (vm *VM) Initialize(
 	vm.chainConfig = g.Config
 	vm.networkID = vm.ethConfig.NetworkId
 	vm.secpCache = secp256k1.NewRecoverCache(secpCacheSize)
-
-	if err := configExtra.Verify(); err != nil {
-		return fmt.Errorf("failed to verify chain config: %w", err)
-	}
 
 	// TODO: read size from settings
 	vm.mempool, err = atomic.NewMempool(chainCtx, vm.sdkMetrics, defaultMempoolSize, vm.verifyTxAtTip)
@@ -627,6 +602,42 @@ func (vm *VM) Initialize(
 		SyncableInterval: vm.config.StateSyncCommitInterval,
 	})
 	return vm.initializeStateSyncClient(lastAcceptedHeight)
+}
+
+func parseGenesis(ctx *snow.Context, bytes []byte) (*core.Genesis, error) {
+	g := new(core.Genesis)
+	if err := json.Unmarshal(bytes, g); err != nil {
+		return nil, fmt.Errorf("parsing genesis: %w", err)
+	}
+
+	// Populate the Avalanche config extras.
+	configExtra := params.GetExtra(g.Config)
+	configExtra.AvalancheContext = extras.AvalancheContext{
+		SnowCtx: ctx,
+	}
+
+	// TODO: This check should be removed. The upgrade config is always provided
+	// in production. All tests should be updated to correctly provide the
+	// upgrade config.
+	if ctx.NetworkUpgrades != (upgrade.Config{}) {
+		configExtra.NetworkUpgrades = extras.GetNetworkUpgrades(ctx.NetworkUpgrades)
+	}
+
+	// If Durango is scheduled, schedule the Warp Precompile at the same time.
+	if configExtra.DurangoBlockTimestamp != nil {
+		configExtra.PrecompileUpgrades = append(configExtra.PrecompileUpgrades, extras.PrecompileUpgrade{
+			Config: warpcontract.NewDefaultConfig(configExtra.DurangoBlockTimestamp),
+		})
+	}
+	if err := configExtra.Verify(); err != nil {
+		return nil, fmt.Errorf("invalid chain config: %w", err)
+	}
+
+	// Align all the Ethereum upgrades to the Avalanche upgrades
+	if err := params.SetEthUpgrades(g.Config); err != nil {
+		return nil, fmt.Errorf("setting eth upgrades: %w", err)
+	}
+	return g, nil
 }
 
 func (vm *VM) initializeMetrics() error {
