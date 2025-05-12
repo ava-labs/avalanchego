@@ -41,7 +41,7 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 		return fmt.Errorf("fixing keys count: %w", err)
 	}
 
-	err = Distribute(ctx, config.endpoints[0], keys)
+	err = distribute(ctx, config.endpoints[0], keys)
 	if err != nil {
 		return fmt.Errorf("ensuring minimum funds: %w", err)
 	}
@@ -68,7 +68,7 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 			return fmt.Errorf("getting nonce for address %s: %w", address, err)
 		}
 
-		issuer, err := issuers.NewSimple(ctx, client, tracker,
+		issuer, err := issuers.NewOpcoder(ctx, client, tracker,
 			nonce, big.NewInt(config.maxFeeCap), keys[i])
 		if err != nil {
 			return fmt.Errorf("creating issuer: %w", err)

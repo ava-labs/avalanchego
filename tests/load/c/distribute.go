@@ -18,11 +18,11 @@ import (
 	ethcrypto "github.com/ava-labs/libevm/crypto"
 )
 
-// Distribute distributes as close to equally the funds for each given key.
+// distribute distributes as close to equally the funds for each given key.
 // It is not exact because of the gas fees for each transaction, so a minimum
 // balance required for each key is calculated as follows:
 // minBalance = averageBalance - (numberOfKeys * txCost)
-func Distribute(ctx context.Context, endpoint string, keys []*ecdsa.PrivateKey) error {
+func distribute(ctx context.Context, endpoint string, keys []*ecdsa.PrivateKey) error {
 	client, err := ethclient.DialContext(ctx, endpoint)
 	if err != nil {
 		return fmt.Errorf("dialing %s: %w", endpoint, err)
