@@ -595,7 +595,12 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 	require.Equal(proBlk.ID(), lastAcceptedID)
 }
 
-func TestStateSummaryAcceptSkipOlderBlockInnerVM(t *testing.T) {
+// TestStateSummaryAcceptOlderBlockSkipStateSync tests the case where we accept
+// a state summary older than the last accepted block. In this case, we should not
+// roll the ProposerVM back to match the state summary, but we should invoke the
+// innerVM to accept the state summary and re-align the ProposerVM with the innerVM
+// during the transition out of state sync.
+func TestStateSummaryAcceptOlderBlockSkipStateSync(t *testing.T) {
 	require := require.New(t)
 
 	innerVM, vm := helperBuildStateSyncTestObjects(t)
@@ -612,14 +617,7 @@ func TestStateSummaryAcceptSkipOlderBlockInnerVM(t *testing.T) {
 		ParentV: ids.GenerateTestID(),
 		HeightV: 1969,
 	}
-	innerBlk2 := &snowmantest.Block{
-		Decidable: snowtest.Decidable{
-			IDV: ids.GenerateTestID(),
-		},
-		BytesV:  []byte{2},
-		ParentV: innerBlk1.ID(),
-		HeightV: 1970,
-	}
+	innerBlk2 := snowmantest.BuildChild(innerBlk1)
 
 	innerSummary1 := &blocktest.StateSummary{
 		IDV:     innerBlk1.ID(),
@@ -638,12 +636,12 @@ func TestStateSummaryAcceptSkipOlderBlockInnerVM(t *testing.T) {
 	}
 
 	innerVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		switch {
-		case blkID == snowmantest.GenesisID:
+		switch blkID {
+		case snowmantest.GenesisID:
 			return snowmantest.Genesis, nil
-		case blkID == innerBlk1.ID():
+		case innerBlk1.ID():
 			return innerBlk1, nil
-		case blkID == innerBlk2.ID():
+		case innerBlk2.ID():
 			return innerBlk2, nil
 		default:
 			return nil, database.ErrNotFound
@@ -712,6 +710,10 @@ func TestStateSummaryAcceptSkipOlderBlockInnerVM(t *testing.T) {
 	require.Equal(summary.Height(), innerBlk1.Height())
 
 	// Process a state summary that would rewind the chain
+	// ProposerVM should ignore the rollback and accept the inner state summary to
+	// notify the innerVM.
+	// This can result in the ProposerVM and innerVM diverging their last accepted block,
+	// which should be rolled forward and re-aligned in SetState.
 	status, err := summary.Accept(context.Background())
 	require.NoError(err)
 	require.Equal(block.StateSyncSkipped, status)
