@@ -42,6 +42,7 @@ func TestFormat(t *testing.T) {
 		t.Run(tt.id.String(), func(t *testing.T) {
 			for format, want := range tt.want {
 				if got := fmt.Sprintf(format, tt.id); got != want {
+					//nolint:forbidigo // require.Equal() is inappropriate as it unnecessarily stops future tests and `assert.Equal()` isn't allowed
 					t.Errorf("fmt.Sprintf(%q, %T) got %q; want %q", format, tt.id, got, want)
 				}
 			}
@@ -49,7 +50,7 @@ func TestFormat(t *testing.T) {
 	}
 }
 
-func BenchmarkFormat(b *testing.B) {
+func BenchmarkFormat(*testing.B) {
 	// %q uses a []byte so this is just to demonstrate that it's on the stack
 	// otherwise someone, not naming any names, might want to "fix" it.
 	_ = fmt.Sprintf("%q", ID{})
