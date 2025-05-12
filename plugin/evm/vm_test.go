@@ -3688,7 +3688,7 @@ func TestExtraStateChangeAtomicGasLimitExceeded(t *testing.T) {
 
 func TestSkipChainConfigCheckCompatible(t *testing.T) {
 	importAmount := uint64(50000000)
-	issuer, vm, dbManager, _, appSender := GenesisVMWithUTXOs(t, true, genesisJSONApricotPhase1, "", "", map[ids.ShortID]uint64{
+	issuer, vm, dbManager, _, appSender := GenesisVMWithUTXOs(t, true, genesisJSONDurango, "", "", map[ids.ShortID]uint64{
 		testShortIDAddrs[0]: importAmount,
 	})
 	defer func() { require.NoError(t, vm.Shutdown(context.Background())) }()
@@ -3710,8 +3710,8 @@ func TestSkipChainConfigCheckCompatible(t *testing.T) {
 	// use the block's timestamp instead of 0 since rewind to genesis
 	// is hardcoded to be allowed in core/genesis.go.
 	genesisWithUpgrade := &core.Genesis{}
-	require.NoError(t, json.Unmarshal([]byte(genesisJSONApricotPhase1), genesisWithUpgrade))
-	params.GetExtra(genesisWithUpgrade.Config).ApricotPhase2BlockTimestamp = utils.TimeToNewUint64(blk.Timestamp())
+	require.NoError(t, json.Unmarshal([]byte(genesisJSONDurango), genesisWithUpgrade))
+	params.GetExtra(genesisWithUpgrade.Config).EtnaTimestamp = utils.TimeToNewUint64(blk.Timestamp())
 	genesisWithUpgradeBytes, err := json.Marshal(genesisWithUpgrade)
 	require.NoError(t, err)
 
@@ -3719,7 +3719,7 @@ func TestSkipChainConfigCheckCompatible(t *testing.T) {
 
 	// this will not be allowed
 	err = reinitVM.Initialize(context.Background(), vm.ctx, dbManager, genesisWithUpgradeBytes, []byte{}, []byte{}, issuer, []*commonEng.Fx{}, appSender)
-	require.ErrorContains(t, err, "mismatching ApricotPhase2 fork block timestamp in database")
+	require.ErrorContains(t, err, "mismatching Cancun fork timestamp in database")
 
 	resetMetrics(vm)
 
