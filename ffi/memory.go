@@ -26,76 +26,110 @@ type KeyValue struct {
 	Value []byte
 }
 
-// extractErrorThenFree converts the cgo `Value` payload to a string, frees the
-// `Value` if an error is returned, and returns the extracted value.
-// If the data is not formatted for a string, and non-null it returns an error.
+// extractErrorThenFree converts the cgo `Value` payload to either:
+// 1. a nil value, indicating no error, or
+// 2. a non-nil error, indicating an error occurred.
+// This should only be called when the `Value` is expected to only contain an error.
+// Otherwise, an error is returned.
 func extractErrorThenFree(v *C.struct_Value) error {
+	// Pin the returned value to prevent it from being garbage collected.
+	defer runtime.KeepAlive(v)
+
 	if v == nil {
 		return errNilBuffer
 	}
 
-	// The length isn't expected to be set in either case.
-	// May indicate a bug.
-	if v.len != 0 {
-		// We should still attempt to free the value.
-		C.fwd_free_value(v)
-		return errBadValue
-	}
-
 	// Expected empty case for Rust's `()`
+	// Ignores the length.
 	if v.data == nil {
 		return nil
 	}
 
 	// If the value is an error string, it should be freed and an error
 	// returned.
-	go_str := C.GoString((*C.char)(unsafe.Pointer(v.data)))
+	if v.len == 0 {
+		errStr := C.GoString((*C.char)(unsafe.Pointer(v.data)))
+		C.fwd_free_value(v)
+		return fmt.Errorf("firewood error: %s", errStr)
+	}
+
+	// The value is formatted incorrectly.
+	// We should still attempt to free the value.
 	C.fwd_free_value(v)
-	// Pin the returned value to prevent it from being garbage collected.
-	runtime.KeepAlive(v)
-	return fmt.Errorf("firewood error: %s", go_str)
+	return errBadValue
+
 }
 
-// extractIdThenFree converts the cgo `Value` payload to a uint32, frees the
-// `Value` if an error is returned, and returns the extracted value.
+// extractIdThenFree converts the cgo `Value` payload to either:
+// 1. a nonzero uint32 and nil error, indicating a valid int
+// 2. a zero uint32 and a non-nil error, indicating an error occurred.
+// This should only be called when the `Value` is expected to only contain an error or an ID.
+// Otherwise, an error is returned.
 func extractIdThenFree(v *C.struct_Value) (uint32, error) {
+	// Pin the returned value to prevent it from being garbage collected.
+	defer runtime.KeepAlive(v)
+
 	if v == nil {
 		return 0, errNilBuffer
 	}
-	if v.len == 0 && v.data == nil {
-		return 0, errBadValue
+
+	// Normal case, length is non-zero and data is nil.
+	if v.len != 0 && v.data == nil {
+		return uint32(v.len), nil
 	}
+
 	// If the value is an error string, it should be freed and an error
 	// returned.
-	// Any valid ID should be non-zero.
-	if v.len == 0 {
-		go_str := C.GoString((*C.char)(unsafe.Pointer(v.data)))
+	if v.len == 0 && v.data != nil {
+		errStr := C.GoString((*C.char)(unsafe.Pointer(v.data)))
 		C.fwd_free_value(v)
-		// Pin the returned value to prevent it from being garbage collected.
-		runtime.KeepAlive(v)
-		return 0, fmt.Errorf("firewood error: %s", go_str)
+		return 0, fmt.Errorf("firewood error: %s", errStr)
 	}
-	return uint32(v.len), nil
+
+	// The value is formatted incorrectly.
+	// We should still attempt to free the value.
+	C.fwd_free_value(v)
+	return 0, errBadValue
 }
 
-// extractBytesThenFree converts the cgo `Value` payload to a byte slice, frees
-// the `Value`, and returns the extracted slice.
-// Generates error if the error term is nonnull.
-func extractBytesThenFree(v *C.struct_Value) (buf []byte, err error) {
-	if v == nil || v.data == nil {
+// extractBytesThenFree converts the cgo `Value` payload to either:
+// 1. a non-nil byte slice and nil error, indicating a valid byte slice
+// 2. a nil byte slice and nil error, indicating an empty byte slice
+// 3. a nil byte slice and a non-nil error, indicating an error occurred.
+// This should only be called when the `Value` is expected to only contain an error or a byte slice.
+// Otherwise, an error is returned.
+func extractBytesThenFree(v *C.struct_Value) ([]byte, error) {
+	// Pin the returned value to prevent it from being garbage collected.
+	defer runtime.KeepAlive(v)
+
+	if v == nil {
+		return nil, errNilBuffer
+	}
+
+	// Expected behavior - no data and length is zero.
+	if v.len == 0 && v.data == nil {
 		return nil, nil
 	}
 
-	buf = C.GoBytes(unsafe.Pointer(v.data), C.int(v.len))
+	// Normal case, data is non-nil and length is non-zero.
+	if v.len != 0 && v.data != nil {
+		buf := C.GoBytes(unsafe.Pointer(v.data), C.int(v.len))
+		C.fwd_free_value(v)
+		return buf, nil
+	}
+
+	// Data non-nil but length is zero indcates an error.
 	if v.len == 0 {
 		errStr := C.GoString((*C.char)(unsafe.Pointer(v.data)))
-		err = fmt.Errorf("firewood error: %s", errStr)
+		C.fwd_free_value(v)
+		return nil, fmt.Errorf("firewood error: %s", errStr)
 	}
-	C.fwd_free_value(v)
 
-	// Pin the returned value to prevent it from being garbage collected.
-	runtime.KeepAlive(v)
-	return
+	// The value is formatted incorrectly.
+	// We should still attempt to free the value.
+	C.fwd_free_value(v)
+	return nil, errBadValue
+
 }
 
 // newValueFactory returns a factory for converting byte slices into cgo `Value`
