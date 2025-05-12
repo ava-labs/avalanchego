@@ -12,14 +12,15 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
 var errConflictingParentTxs = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
 
 // Shared fields used by visitors.
 type backend struct {
-	mempool.Mempool
+	mempool.Mempool[*txs.Tx]
 	// lastAccepted is the ID of the last block that had Accept() called on it.
 	lastAccepted ids.ID
 

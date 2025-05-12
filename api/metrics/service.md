@@ -1,7 +1,7 @@
 The Metrics API allows clients to get statistics about a node's health and performance.
 
 <Callout title="Note">
-This API set is for a specific node, it is unavailable on the [public server](/tooling/rpc-providers).
+This API set is for a specific node, it is unavailable on the [public server](https://build.avax.network/docs/tooling/rpc-providers).
 </Callout>
 
 ## Endpoint
@@ -20,6 +20,6 @@ curl -X POST 127.0.0.1:9650/ext/metrics
 
 ## Format
 
-This API produces Prometheus compatible metrics. See [here](https://github.com/prometheus/docs/blob/master/content/docs/instrumenting/exposition_formats.md) for information on Prometheus' formatting.
+This API produces Prometheus compatible metrics. See [here](https://prometheus.io/docs/instrumenting/exposition_formats) for information on Prometheus' formatting.
 
-[Here](/nodes/maintain/monitoring) is a tutorial that shows how to set up Prometheus and Grafana to monitor AvalancheGo node using the Metrics API.
+[Here](https://build.avax.network/docs/nodes/maintain/monitoring) is a tutorial that shows how to set up Prometheus and Grafana to monitor AvalancheGo node using the Metrics API.

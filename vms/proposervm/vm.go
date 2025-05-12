@@ -13,6 +13,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -42,8 +43,7 @@ const (
 	// blocks.
 	DefaultNumHistoricalBlocks uint64 = 0
 
-	checkIndexedFrequency = 10 * time.Second
-	innerBlkCacheSize     = 64 * units.MiB
+	innerBlkCacheSize = 64 * units.MiB
 )
 
 var (
@@ -105,6 +105,10 @@ type VM struct {
 	// acceptedBlocksSlotHistogram reports the slots that accepted blocks were
 	// proposed in.
 	acceptedBlocksSlotHistogram prometheus.Histogram
+
+	// lastAcceptedTimestampGaugeVec reports timestamps for the last-accepted
+	// [postForkBlock] and its inner block.
+	lastAcceptedTimestampGaugeVec *prometheus.GaugeVec
 }
 
 // New performs best when [minBlkDelay] is whole seconds. This is because block
@@ -148,10 +152,7 @@ func (vm *VM) Initialize(
 	innerBlkCache, err := metercacher.New(
 		"inner_block_cache",
 		vm.Config.Registerer,
-		cache.NewSizedLRU(
-			innerBlkCacheSize,
-			cachedBlockSize,
-		),
+		lru.NewSizedCache(innerBlkCacheSize, cachedBlockSize),
 	)
 	if err != nil {
 		return err
@@ -188,15 +189,15 @@ func (vm *VM) Initialize(
 	}
 
 	if err := vm.repairAcceptedChainByHeight(ctx); err != nil {
-		return err
+		return fmt.Errorf("failed to repair accepted chain by height: %w", err)
 	}
 
 	if err := vm.setLastAcceptedMetadata(ctx); err != nil {
-		return err
+		return fmt.Errorf("failed to set last accepted metadata: %w", err)
 	}
 
 	if err := vm.pruneOldBlocks(); err != nil {
-		return err
+		return fmt.Errorf("failed to prune old blocks: %w", err)
 	}
 
 	forkHeight, err := vm.GetForkHeight()
@@ -212,7 +213,7 @@ func (vm *VM) Initialize(
 			zap.String("state", "before fork"),
 		)
 	default:
-		return err
+		return fmt.Errorf("failed to get fork height: %w", err)
 	}
 
 	vm.proposerBuildSlotGauge = prometheus.NewGauge(prometheus.GaugeOpts{
@@ -231,10 +232,18 @@ func (vm *VM) Initialize(
 		// of comparing floating point of the same numerical value.
 		Buckets: []float64{0.5, 1.5, 2.5},
 	})
+	vm.lastAcceptedTimestampGaugeVec = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "last_accepted_timestamp",
+			Help: "timestamp of the last block accepted",
+		},
+		[]string{"block_type"},
+	)
 
 	return errors.Join(
 		vm.Config.Registerer.Register(vm.proposerBuildSlotGauge),
 		vm.Config.Registerer.Register(vm.acceptedBlocksSlotHistogram),
+		vm.Config.Registerer.Register(vm.lastAcceptedTimestampGaugeVec),
 	)
 }
 
@@ -266,7 +275,7 @@ func (vm *VM) SetState(ctx context.Context, newState snow.State) error {
 	// accepted block. If state sync has completed successfully, this call is a
 	// no-op.
 	if err := vm.repairAcceptedChainByHeight(ctx); err != nil {
-		return err
+		return fmt.Errorf("failed to repair accepted chain height: %w", err)
 	}
 	return vm.setLastAcceptedMetadata(ctx)
 }
@@ -431,11 +440,11 @@ func (vm *VM) LastAccepted(ctx context.Context) (ids.ID, error) {
 func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 	innerLastAcceptedID, err := vm.ChainVM.LastAccepted(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get inner last accepted: %w", err)
 	}
 	innerLastAccepted, err := vm.ChainVM.GetBlock(ctx, innerLastAcceptedID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get inner last accepted block: %w", err)
 	}
 	proLastAcceptedID, err := vm.State.GetLastAccepted()
 	if err == database.ErrNotFound {
@@ -444,11 +453,11 @@ func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 		return nil
 	}
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get last accepted: %w", err)
 	}
 	proLastAccepted, err := vm.getPostForkBlock(ctx, proLastAcceptedID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get last accepted block: %w", err)
 	}
 
 	proLastAcceptedHeight := proLastAccepted.Height()
@@ -470,14 +479,14 @@ func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 	// proposervm back.
 	forkHeight, err := vm.State.GetForkHeight()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get fork height: %w", err)
 	}
 
 	if forkHeight > innerLastAcceptedHeight {
 		// We are rolling back past the fork, so we should just forget about all
 		// of our proposervm indices.
 		if err := vm.State.DeleteLastAccepted(); err != nil {
-			return err
+			return fmt.Errorf("failed to delete last accepted: %w", err)
 		}
 		return vm.db.Commit()
 	}
@@ -491,9 +500,14 @@ func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 	}
 
 	if err := vm.State.SetLastAccepted(newProLastAcceptedID); err != nil {
-		return err
+		return fmt.Errorf("failed to set last accepted: %w", err)
 	}
-	return vm.db.Commit()
+
+	if err := vm.db.Commit(); err != nil {
+		return fmt.Errorf("failed to commit db: %w", err)
+	}
+
+	return nil
 }
 
 func (vm *VM) setLastAcceptedMetadata(ctx context.Context) error {
@@ -713,13 +727,31 @@ func (vm *VM) notifyInnerBlockReady() {
 	}
 }
 
-func (vm *VM) optimalPChainHeight(ctx context.Context, minPChainHeight uint64) (uint64, error) {
-	minimumHeight, err := vm.ctx.ValidatorState.GetMinimumHeight(ctx)
+// fujiOverridePChainHeightUntilHeight is the P-chain height at which the
+// proposervm will no longer attempt to keep the P-chain height the same.
+const fujiOverridePChainHeightUntilHeight = 200041
+
+// fujiOverridePChainHeightUntilTimestamp is the timestamp at which the
+// proposervm will no longer attempt to keep the P-chain height the same.
+var fujiOverridePChainHeightUntilTimestamp = time.Date(2025, time.March, 7, 17, 0, 0, 0, time.UTC) // noon ET
+
+func (vm *VM) selectChildPChainHeight(ctx context.Context, minPChainHeight uint64) (uint64, error) {
+	var (
+		now            = vm.Clock.Time()
+		shouldOverride = vm.ctx.NetworkID == constants.FujiID &&
+			vm.ctx.SubnetID != constants.PrimaryNetworkID &&
+			now.Before(fujiOverridePChainHeightUntilTimestamp) &&
+			minPChainHeight < fujiOverridePChainHeightUntilHeight
+	)
+	if shouldOverride {
+		return minPChainHeight, nil
+	}
+
+	recommendedHeight, err := vm.ctx.ValidatorState.GetMinimumHeight(ctx)
 	if err != nil {
 		return 0, err
 	}
-
-	return max(minimumHeight, minPChainHeight), nil
+	return max(recommendedHeight, minPChainHeight), nil
 }
 
 // parseInnerBlock attempts to parse the provided bytes as an inner block. If

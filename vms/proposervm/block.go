@@ -97,7 +97,7 @@ func (p *postForkCommonComponents) getPChainEpoch(ctx context.Context, parentID 
 		return 0, 0, time.Time{}, fmt.Errorf("failed to get epoch start time: %w", err)
 	}
 
-	if parent.Timestamp().After(epochStartTime.Add(time.Duration(p.vm.Upgrades.FUpgradeEpochDuration) * time.Second)) {
+	if parent.Timestamp().After(epochStartTime.Add(time.Duration(p.vm.Upgrades.GUpgradeEpochDuration) * time.Second)) {
 		// If the parent crossed the epoch boundary, then it sealed the previous epoch. The child
 		// is the first block of the new epoch, so should use the parent's P-Chain height, increment
 		// the epoch number, and set the epoch start time to its timestamp.
@@ -202,7 +202,7 @@ func (p *postForkCommonComponents) Verify(
 	}
 
 	var contextPChainHeight uint64
-	if p.vm.Upgrades.IsFUpgradeActivated(childTimestamp) {
+	if p.vm.Upgrades.IsGUpgradeActivated(childTimestamp) {
 		pChainEpochHeight, _, _, err := p.getPChainEpoch(ctx, child.Parent(), childTimestamp)
 		if err != nil {
 			p.vm.ctx.Log.Error("unexpected build verification failure",
@@ -245,7 +245,7 @@ func (p *postForkCommonComponents) buildChild(
 
 	// The child's P-Chain height is proposed as the optimal P-Chain height that
 	// is at least the parent's P-Chain height
-	pChainHeight, err := p.vm.optimalPChainHeight(ctx, parentPChainHeight)
+	pChainHeight, err := p.vm.selectChildPChainHeight(ctx, parentPChainHeight)
 	if err != nil {
 		p.vm.ctx.Log.Error("unexpected build block failure",
 			zap.String("reason", "failed to calculate optimal P-chain height"),
@@ -281,7 +281,7 @@ func (p *postForkCommonComponents) buildChild(
 		contextPChainHeight, pChainEpochHeight, epochNumber uint64
 		epochStartTime                                      time.Time
 	)
-	if p.vm.Upgrades.IsFUpgradeActivated(newTimestamp) {
+	if p.vm.Upgrades.IsGUpgradeActivated(newTimestamp) {
 		pChainEpochHeight, epochNumber, epochStartTime, err = p.getPChainEpoch(ctx, parentID, newTimestamp)
 		if err != nil {
 			p.vm.ctx.Log.Error("unexpected build block failure",

@@ -11,7 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
@@ -65,7 +65,7 @@ func New(
 		outstandingRequests:     bimap.New[common.Request, ids.ID](),
 		outstandingRequestTimes: make(map[common.Request]time.Time),
 
-		processedCache: &cache.LRU[ids.ID, struct{}]{Size: cacheSize},
+		processedCache: lru.NewCache[ids.ID, struct{}](cacheSize),
 		onFinished:     onFinished,
 	}
 	return b, b.metrics.Initialize(reg)
@@ -75,7 +75,6 @@ func New(
 // not used until after the Bootstrapper has been Started.
 type Bootstrapper struct {
 	Config
-	common.Halter
 
 	// list of NoOpsHandler for messages dropped by Bootstrapper
 	common.StateSummaryFrontierHandler
@@ -98,7 +97,7 @@ type Bootstrapper struct {
 	needToFetch set.Set[ids.ID]
 
 	// Contains IDs of vertices that have recently been processed
-	processedCache *cache.LRU[ids.ID, struct{}]
+	processedCache *lru.Cache[ids.ID, struct{}]
 
 	// Tracks the last requestID that was used in a request
 	requestID uint32

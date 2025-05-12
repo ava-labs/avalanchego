@@ -530,7 +530,7 @@ func FuzzStateSecondsRemaining(f *testing.F) {
 	)
 }
 
-// unoptimizedCalculateCost is a naive implementation of CostOf that is used for
+// unoptimizedCostOf is a naive implementation of CostOf that is used for
 // differential fuzzing.
 func (s State) unoptimizedCostOf(c Config, seconds uint64) uint64 {
 	var (

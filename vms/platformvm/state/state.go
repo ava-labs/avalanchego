@@ -18,6 +18,7 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/linkeddb"
@@ -102,7 +103,7 @@ var (
 	LastAcceptedKey      = []byte("last accepted")
 	HeightsIndexedKey    = []byte("heights indexed")
 	InitializedKey       = []byte("initialized")
-	BlocksReindexedKey   = []byte("blocks reindexed")
+	BlocksReindexedKey   = []byte("blocks reindexed.3")
 
 	emptyL1ValidatorCache = &cache.Empty[ids.ID, maybe.Maybe[L1Validator]]{}
 )
@@ -226,7 +227,7 @@ type State interface {
 	// this function will return immediately, without iterating over the
 	// database.
 	//
-	// TODO: Remove after v1.12.x is activated
+	// TODO: Remove after v1.14.x is activated
 	ReindexBlocks(lock sync.Locker, log logging.Logger) error
 
 	// Commit changes to the base database.
@@ -245,7 +246,7 @@ type State interface {
 // stored as a map from blkID to stateBlk. Nodes synced prior to this PR may
 // still have blocks partially stored using this legacy format.
 //
-// TODO: Remove after v1.12.x is activated
+// TODO: Remove after v1.14.x is activated
 type stateBlk struct {
 	Bytes  []byte         `serialize:"true"`
 	Status choices.Status `serialize:"true"`
@@ -537,7 +538,7 @@ func New(
 	blockIDCache, err := metercacher.New[uint64, ids.ID](
 		"block_id_cache",
 		metricsReg,
-		&cache.LRU[uint64, ids.ID]{Size: execCfg.BlockIDCacheSize},
+		lru.NewCache[uint64, ids.ID](execCfg.BlockIDCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -546,7 +547,7 @@ func New(
 	blockCache, err := metercacher.New[ids.ID, block.Block](
 		"block_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, block.Block](execCfg.BlockCacheSize, blockSize),
+		lru.NewSizedCache(execCfg.BlockCacheSize, blockSize),
 	)
 	if err != nil {
 		return nil, err
@@ -576,7 +577,7 @@ func New(
 	weightsCache, err := metercacher.New(
 		"l1_validator_weights_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, uint64](execCfg.L1WeightsCacheSize, func(ids.ID, uint64) int {
+		lru.NewSizedCache(execCfg.L1WeightsCacheSize, func(ids.ID, uint64) int {
 			return ids.IDLen + wrappers.LongLen
 		}),
 	)
@@ -587,7 +588,7 @@ func New(
 	inactiveL1ValidatorsCache, err := metercacher.New(
 		"l1_validator_inactive_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, maybe.Maybe[L1Validator]](
+		lru.NewSizedCache(
 			execCfg.L1InactiveValidatorsCacheSize,
 			func(_ ids.ID, maybeL1Validator maybe.Maybe[L1Validator]) int {
 				const (
@@ -611,7 +612,7 @@ func New(
 	subnetIDNodeIDCache, err := metercacher.New(
 		"l1_validator_subnet_id_node_id_cache",
 		metricsReg,
-		cache.NewSizedLRU[subnetIDNodeID, bool](execCfg.L1SubnetIDNodeIDCacheSize, func(subnetIDNodeID, bool) int {
+		lru.NewSizedCache(execCfg.L1SubnetIDNodeIDCacheSize, func(subnetIDNodeID, bool) int {
 			return ids.IDLen + ids.NodeIDLen + wrappers.BoolLen
 		}),
 	)
@@ -622,7 +623,7 @@ func New(
 	txCache, err := metercacher.New(
 		"tx_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, *txAndStatus](execCfg.TxCacheSize, txAndStatusSize),
+		lru.NewSizedCache(execCfg.TxCacheSize, txAndStatusSize),
 	)
 	if err != nil {
 		return nil, err
@@ -632,7 +633,7 @@ func New(
 	rewardUTXOsCache, err := metercacher.New[ids.ID, []*avax.UTXO](
 		"reward_utxos_cache",
 		metricsReg,
-		&cache.LRU[ids.ID, []*avax.UTXO]{Size: execCfg.RewardUTXOsCacheSize},
+		lru.NewCache[ids.ID, []*avax.UTXO](execCfg.RewardUTXOsCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -650,7 +651,7 @@ func New(
 	subnetOwnerCache, err := metercacher.New[ids.ID, fxOwnerAndSize](
 		"subnet_owner_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, fxOwnerAndSize](execCfg.FxOwnerCacheSize, func(_ ids.ID, f fxOwnerAndSize) int {
+		lru.NewSizedCache(execCfg.FxOwnerCacheSize, func(_ ids.ID, f fxOwnerAndSize) int {
 			return ids.IDLen + f.size
 		}),
 	)
@@ -662,7 +663,7 @@ func New(
 	subnetToL1ConversionCache, err := metercacher.New[ids.ID, SubnetToL1Conversion](
 		"subnet_conversion_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, SubnetToL1Conversion](execCfg.SubnetToL1ConversionCacheSize, func(_ ids.ID, c SubnetToL1Conversion) int {
+		lru.NewSizedCache(execCfg.SubnetToL1ConversionCacheSize, func(_ ids.ID, c SubnetToL1Conversion) int {
 			return 3*ids.IDLen + len(c.Addr)
 		}),
 	)
@@ -673,7 +674,7 @@ func New(
 	transformedSubnetCache, err := metercacher.New(
 		"transformed_subnet_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, *txs.Tx](execCfg.TransformedSubnetTxCacheSize, txSize),
+		lru.NewSizedCache(execCfg.TransformedSubnetTxCacheSize, txSize),
 	)
 	if err != nil {
 		return nil, err
@@ -682,7 +683,7 @@ func New(
 	supplyCache, err := metercacher.New[ids.ID, *uint64](
 		"supply_cache",
 		metricsReg,
-		&cache.LRU[ids.ID, *uint64]{Size: execCfg.ChainCacheSize},
+		lru.NewCache[ids.ID, *uint64](execCfg.ChainCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -691,7 +692,7 @@ func New(
 	chainCache, err := metercacher.New[ids.ID, []*txs.Tx](
 		"chain_cache",
 		metricsReg,
-		&cache.LRU[ids.ID, []*txs.Tx]{Size: execCfg.ChainCacheSize},
+		lru.NewCache[ids.ID, []*txs.Tx](execCfg.ChainCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -700,7 +701,7 @@ func New(
 	chainDBCache, err := metercacher.New[ids.ID, linkeddb.LinkedDB](
 		"chain_db_cache",
 		metricsReg,
-		&cache.LRU[ids.ID, linkeddb.LinkedDB]{Size: execCfg.ChainDBCacheSize},
+		lru.NewCache[ids.ID, linkeddb.LinkedDB](execCfg.ChainDBCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -3067,7 +3068,7 @@ func (s *state) writeMetadata() error {
 // Returns the block and whether it is a [stateBlk].
 // Invariant: blkBytes is safe to parse with blocks.GenesisCodec
 //
-// TODO: Remove after v1.12.x is activated
+// TODO: Remove after v1.14.x is activated
 func parseStoredBlock(blkBytes []byte) (block.Block, bool, error) {
 	// Attempt to parse as blocks.Block
 	blk, err := block.Parse(block.GenesisCodec, blkBytes)

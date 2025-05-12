@@ -17,9 +17,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/commonmock"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool/mempoolmock"
 	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 
 	pmempool "github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -59,92 +59,161 @@ func (t testTxVerifier) VerifyTx(*txs.Tx) error {
 }
 
 func TestNetworkIssueTxFromRPC(t *testing.T) {
-	tx := &txs.Tx{}
-
 	type test struct {
 		name          string
-		mempoolFunc   func(*gomock.Controller) pmempool.Mempool
+		mempool       *pmempool.Mempool
 		txVerifier    testTxVerifier
 		appSenderFunc func(*gomock.Controller) common.AppSender
+		tx            *txs.Tx
 		expectedErr   error
 	}
 
 	tests := []test{
 		{
 			name: "mempool has transaction",
-			mempoolFunc: func(ctrl *gomock.Controller) pmempool.Mempool {
-				mempool := mempoolmock.NewMempool(ctrl)
-				mempool.EXPECT().Get(gomock.Any()).Return(tx, true)
+			mempool: func() *pmempool.Mempool {
+				mempool, err := pmempool.New("", prometheus.NewRegistry())
+				require.NoError(t, err)
+				require.NoError(t, mempool.Add(&txs.Tx{Unsigned: &txs.BaseTx{}}))
 				return mempool
-			},
+			}(),
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				return commonmock.NewSender(ctrl)
 			},
+			tx:          &txs.Tx{Unsigned: &txs.BaseTx{}},
 			expectedErr: mempool.ErrDuplicateTx,
 		},
 		{
 			name: "transaction marked as dropped in mempool",
-			mempoolFunc: func(ctrl *gomock.Controller) pmempool.Mempool {
-				mempool := mempoolmock.NewMempool(ctrl)
-				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
-				mempool.EXPECT().GetDropReason(gomock.Any()).Return(errTest)
+			mempool: func() *pmempool.Mempool {
+				mempool, err := pmempool.New("", prometheus.NewRegistry())
+				require.NoError(t, err)
+				mempool.MarkDropped(ids.Empty, errTest)
 				return mempool
-			},
+			}(),
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				// Shouldn't gossip the tx
 				return commonmock.NewSender(ctrl)
 			},
+			tx:          &txs.Tx{Unsigned: &txs.BaseTx{}},
 			expectedErr: errTest,
 		},
 		{
-			name: "transaction invalid",
-			mempoolFunc: func(ctrl *gomock.Controller) pmempool.Mempool {
-				mempool := mempoolmock.NewMempool(ctrl)
-				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
-				mempool.EXPECT().GetDropReason(gomock.Any()).Return(nil)
-				mempool.EXPECT().MarkDropped(gomock.Any(), gomock.Any())
+			name: "tx dropped",
+			mempool: func() *pmempool.Mempool {
+				mempool, err := pmempool.New("", prometheus.NewRegistry())
+				require.NoError(t, err)
 				return mempool
-			},
+			}(),
 			txVerifier: testTxVerifier{err: errTest},
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				// Shouldn't gossip the tx
 				return commonmock.NewSender(ctrl)
 			},
+			tx:          &txs.Tx{Unsigned: &txs.BaseTx{}},
 			expectedErr: errTest,
 		},
 		{
-			name: "can't add transaction to mempool",
-			mempoolFunc: func(ctrl *gomock.Controller) pmempool.Mempool {
-				mempool := mempoolmock.NewMempool(ctrl)
-				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
-				mempool.EXPECT().GetDropReason(gomock.Any()).Return(nil)
-				mempool.EXPECT().Add(gomock.Any()).Return(errTest)
-				mempool.EXPECT().MarkDropped(gomock.Any(), gomock.Any())
+			name: "tx too big",
+			mempool: func() *pmempool.Mempool {
+				mempool, err := pmempool.New("", prometheus.NewRegistry())
+				require.NoError(t, err)
 				return mempool
-			},
+			}(),
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				// Shouldn't gossip the tx
 				return commonmock.NewSender(ctrl)
 			},
-			expectedErr: errTest,
+			tx: func() *txs.Tx {
+				tx := &txs.Tx{Unsigned: &txs.BaseTx{}}
+				bytes := make([]byte, mempool.MaxTxSize+1)
+				tx.SetBytes(bytes, bytes)
+				return tx
+			}(),
+			expectedErr: mempool.ErrTxTooLarge,
+		},
+		{
+			name: "tx conflicts",
+			mempool: func() *pmempool.Mempool {
+				mempool, err := pmempool.New("", prometheus.NewRegistry())
+				require.NoError(t, err)
+
+				tx := &txs.Tx{
+					Unsigned: &txs.BaseTx{
+						BaseTx: avax.BaseTx{
+							Ins: []*avax.TransferableInput{
+								{
+									UTXOID: avax.UTXOID{},
+								},
+							},
+						},
+					},
+				}
+
+				require.NoError(t, mempool.Add(tx))
+				return mempool
+			}(),
+			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
+				// Shouldn't gossip the tx
+				return commonmock.NewSender(ctrl)
+			},
+			tx: func() *txs.Tx {
+				tx := &txs.Tx{
+					Unsigned: &txs.BaseTx{
+						BaseTx: avax.BaseTx{
+							Ins: []*avax.TransferableInput{
+								{
+									UTXOID: avax.UTXOID{},
+								},
+							},
+						},
+					},
+					TxID: ids.ID{1},
+				}
+				return tx
+			}(),
+			expectedErr: mempool.ErrConflictsWithOtherTx,
+		},
+		{
+			name: "mempool full",
+			mempool: func() *pmempool.Mempool {
+				m, err := pmempool.New("", prometheus.NewRegistry())
+				require.NoError(t, err)
+
+				for i := 0; i < 1024; i++ {
+					tx := &txs.Tx{Unsigned: &txs.BaseTx{}}
+					bytes := make([]byte, mempool.MaxTxSize)
+					tx.SetBytes(bytes, bytes)
+					tx.TxID = ids.GenerateTestID()
+					require.NoError(t, m.Add(tx))
+				}
+
+				return m
+			}(),
+			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
+				// Shouldn't gossip the tx
+				return commonmock.NewSender(ctrl)
+			},
+			tx: func() *txs.Tx {
+				tx := &txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{}}}
+				tx.SetBytes([]byte{1, 2, 3}, []byte{1, 2, 3})
+				return tx
+			}(),
+			expectedErr: mempool.ErrMempoolFull,
 		},
 		{
 			name: "happy path",
-			mempoolFunc: func(ctrl *gomock.Controller) pmempool.Mempool {
-				mempool := mempoolmock.NewMempool(ctrl)
-				mempool.EXPECT().Get(gomock.Any()).Return(nil, false)
-				mempool.EXPECT().GetDropReason(gomock.Any()).Return(nil)
-				mempool.EXPECT().Add(gomock.Any()).Return(nil)
-				mempool.EXPECT().Len().Return(0)
-				mempool.EXPECT().RequestBuildBlock(false)
-				mempool.EXPECT().Get(gomock.Any()).Return(nil, true).Times(2)
+			mempool: func() *pmempool.Mempool {
+				mempool, err := pmempool.New("", prometheus.NewRegistry())
+				require.NoError(t, err)
 				return mempool
-			},
+			}(),
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				appSender := commonmock.NewSender(ctrl)
 				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 				return appSender
 			},
+			tx:          &txs.Tx{Unsigned: &txs.BaseTx{}},
 			expectedErr: nil,
 		},
 	}
@@ -161,7 +230,8 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				snowCtx.SubnetID,
 				snowCtx.ValidatorState,
 				tt.txVerifier,
-				tt.mempoolFunc(ctrl),
+				tt.mempool,
+				nil,
 				false,
 				tt.appSenderFunc(ctrl),
 				nil,
@@ -172,7 +242,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			)
 			require.NoError(err)
 
-			err = n.IssueTxFromRPC(tx)
+			err = n.IssueTxFromRPC(tt.tx)
 			require.ErrorIs(err, tt.expectedErr)
 
 			require.NoError(n.txPushGossiper.Gossip(context.Background()))

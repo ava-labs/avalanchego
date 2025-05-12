@@ -31,24 +31,24 @@ func (*ginkgoWriteCloser) Close() error {
 // Define a simple encoder config appropriate for logging with ginkgo
 var ginkgoEncoderConfig = zapcore.EncoderConfig{
 	// Time, name and caller are omitted for consistency with previous output.
-	// TODO(marun) Maybe revisit this decision
-	TimeKey:       "",
-	LevelKey:      "level",
-	NameKey:       "",
-	CallerKey:     "",
-	MessageKey:    "msg",
-	StacktraceKey: "stacktrace",
-	EncodeLevel:   logging.ConsoleColorLevelEncoder,
+	TimeKey:        "",
+	LevelKey:       "level",
+	NameKey:        "",
+	CallerKey:      "",
+	MessageKey:     "msg",
+	StacktraceKey:  "stacktrace",
+	EncodeLevel:    logging.ConsoleColorLevelEncoder,
+	EncodeDuration: zapcore.StringDurationEncoder,
 }
 
 // NewGinkgoLogger returns a logger with limited output
-func newGinkgoLogger() logging.Logger {
+func newGinkgoLogger(cfg zapcore.Encoder) logging.Logger {
 	return logging.NewLogger(
 		"",
 		logging.NewWrappedCore(
 			logging.Verbo,
 			&ginkgoWriteCloser{},
-			zapcore.NewConsoleEncoder(ginkgoEncoderConfig),
+			cfg,
 		),
 	)
 }
@@ -57,9 +57,22 @@ type GinkgoTestContext struct {
 	logger logging.Logger
 }
 
+// NewEventHandlerTestContext provides a logger with full output to
+// account for the limited context otherwise provided in an event
+// handler e.g. SynchronizedBeforeSuite.
+func NewEventHandlerTestContext() *GinkgoTestContext {
+	return &GinkgoTestContext{
+		logger: newGinkgoLogger(logging.Auto.ConsoleEncoder()),
+	}
+}
+
+// NewTestContext provides a logger with limited output to account for
+// the context already provided by ginkgo for test logging.
 func NewTestContext() *GinkgoTestContext {
 	return &GinkgoTestContext{
-		logger: newGinkgoLogger(),
+		logger: newGinkgoLogger(
+			zapcore.NewConsoleEncoder(ginkgoEncoderConfig),
+		),
 	}
 }
 

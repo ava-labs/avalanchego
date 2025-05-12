@@ -1,12 +1,23 @@
 # The version is supplied as a build argument rather than hard-coded
 # to minimize the cost of version changes.
-ARG GO_VERSION=INVALID # This value isn't intended to be used but silences a warning
+ARG GO_VERSION=INVALID # This value is not intended to be used but silences a warning
 
 # ============= Compilation Stage ================
 # Always use the native platform to ensure fast builds
-FROM --platform=$BUILDPLATFORM golang:$GO_VERSION-bullseye AS builder
+FROM --platform=$BUILDPLATFORM golang:$GO_VERSION-bookworm AS builder
 
 WORKDIR /build
+
+# Copy and download avalanche dependencies using go mod
+COPY go.mod .
+COPY go.sum .
+RUN go mod download
+
+# Copy the code into the container
+COPY . .
+
+# Ensure pre-existing builds are not available for inclusion in the final image
+RUN [ -d ./build ] && rm -rf ./build/* || true
 
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
@@ -24,17 +35,6 @@ RUN if [ "$TARGETPLATFORM" = "linux/arm64" ] && [ "$BUILDPLATFORM" != "linux/arm
     ; else \
     echo "export CC=gcc" > ./build_env.sh \
     ; fi
-
-# Copy and download avalanche dependencies using go mod
-COPY go.mod .
-COPY go.sum .
-RUN go mod download
-
-# Copy the code into the container
-COPY . .
-
-# Ensure pre-existing builds are not available for inclusion in the final image
-RUN [ -d ./build ] && rm -rf ./build/* || true
 
 # Build avalanchego. The build environment is configured with build_env.sh from the step
 # enabling cross-compilation.
@@ -54,7 +54,7 @@ RUN mkdir -p /avalanchego/build
 # ============= Cleanup Stage ================
 # Commands executed in this stage may be emulated (i.e. very slow) if TARGETPLATFORM and
 # BUILDPLATFORM have different arches.
-FROM debian:11-slim AS execution
+FROM debian:12-slim AS execution
 
 # Maintain compatibility with previous images
 COPY --from=builder /avalanchego/build /avalanchego/build

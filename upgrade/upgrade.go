@@ -35,7 +35,7 @@ var (
 		CortinaXChainStopVertexID: ids.FromStringOrPanic("jrGWDh5Po9FMj54depyunNixpia5PN4aAYxfmNzU8n752Rjga"),
 		DurangoTime:               time.Date(2024, time.March, 6, 16, 0, 0, 0, time.UTC),
 		EtnaTime:                  time.Date(2024, time.December, 16, 17, 0, 0, 0, time.UTC),
-		FUpgradeTime:              UnscheduledActivationTime,
+		FortunaTime:               time.Date(2025, time.April, 8, 15, 0, 0, 0, time.UTC),
 	}
 	Fuji = Config{
 		ApricotPhase1Time:            time.Date(2021, time.March, 26, 14, 0, 0, 0, time.UTC),
@@ -56,7 +56,7 @@ var (
 		CortinaXChainStopVertexID: ids.FromStringOrPanic("2D1cmbiG36BqQMRyHt4kFhWarmatA1ighSpND3FeFgz3vFVtCZ"),
 		DurangoTime:               time.Date(2024, time.February, 13, 16, 0, 0, 0, time.UTC),
 		EtnaTime:                  time.Date(2024, time.November, 25, 16, 0, 0, 0, time.UTC),
-		FUpgradeTime:              UnscheduledActivationTime,
+		FortunaTime:               time.Date(2025, time.March, 13, 15, 0, 0, 0, time.UTC),
 	}
 	Default = Config{
 		ApricotPhase1Time:            InitiallyActiveTime,
@@ -73,8 +73,9 @@ var (
 		CortinaXChainStopVertexID:    ids.Empty,
 		DurangoTime:                  InitiallyActiveTime,
 		EtnaTime:                     InitiallyActiveTime,
-		FUpgradeTime:                 InitiallyActiveTime,
-		FUpgradeEpochDuration:        30,
+		FortunaTime:                  InitiallyActiveTime,
+		GUpgradeTime:                 InitiallyActiveTime,
+		GUpgradeEpochDuration:        30,
 	}
 
 	ErrInvalidUpgradeTimes = errors.New("invalid upgrade configuration")
@@ -95,8 +96,9 @@ type Config struct {
 	CortinaXChainStopVertexID    ids.ID    `json:"cortinaXChainStopVertexID"`
 	DurangoTime                  time.Time `json:"durangoTime"`
 	EtnaTime                     time.Time `json:"etnaTime"`
-	FUpgradeTime                 time.Time `json:"fUpgradeTime"`
-	FUpgradeEpochDuration        uint64    `json:"fUpgradeEpochDuration"`
+	FortunaTime                  time.Time `json:"fortunaTime"`
+	GUpgradeTime                 time.Time `json:"gUpgradeTime"`
+	GUpgradeEpochDuration        uint64    `json:"gUpgradeEpochDuration"`
 }
 
 func (c *Config) Validate() error {
@@ -113,7 +115,7 @@ func (c *Config) Validate() error {
 		c.CortinaTime,
 		c.DurangoTime,
 		c.EtnaTime,
-		c.FUpgradeTime,
+		c.FortunaTime,
 	}
 	for i := 0; i < len(upgrades)-1; i++ {
 		if upgrades[i].After(upgrades[i+1]) {
@@ -177,8 +179,12 @@ func (c *Config) IsEtnaActivated(t time.Time) bool {
 	return !t.Before(c.EtnaTime)
 }
 
-func (c *Config) IsFUpgradeActivated(t time.Time) bool {
-	return !t.Before(c.FUpgradeTime)
+func (c *Config) IsFortunaActivated(t time.Time) bool {
+	return !t.Before(c.FortunaTime)
+}
+
+func (c *Config) IsGUpgradeActivated(t time.Time) bool {
+	return !t.Before(c.GUpgradeTime)
 }
 
 func GetConfig(networkID uint32) Config {

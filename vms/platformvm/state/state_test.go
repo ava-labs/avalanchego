@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -545,9 +546,10 @@ func TestState_writeStakers(t *testing.T) {
 func createPermissionlessValidatorTx(t testing.TB, subnetID ids.ID, validatorsData txs.Validator) *txs.AddPermissionlessValidatorTx {
 	var sig signer.Signer = &signer.Empty{}
 	if subnetID == constants.PrimaryNetworkID {
-		sk, err := bls.NewSigner()
+		sk, err := localsigner.New()
 		require.NoError(t, err)
-		sig = signer.NewProofOfPossession(sk)
+		sig, err = signer.NewProofOfPossession(sk)
+		require.NoError(t, err)
 	}
 
 	return &txs.AddPermissionlessValidatorTx{
@@ -785,7 +787,7 @@ func TestState_ApplyValidatorDiffs(t *testing.T) {
 		subnetStakers  = make([]Staker, numNodes)
 	)
 	for i := range primaryStakers {
-		sk, err := bls.NewSigner()
+		sk, err := localsigner.New()
 		require.NoError(err)
 
 		timeOffset := time.Duration(i) * time.Second
@@ -1514,12 +1516,12 @@ func TestL1Validators(t *testing.T) {
 		NodeID:       ids.GenerateTestNodeID(),
 	}
 
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 	pk := sk.PublicKey()
 	pkBytes := bls.PublicKeyToUncompressedBytes(pk)
 
-	otherSK, err := bls.NewSigner()
+	otherSK, err := localsigner.New()
 	require.NoError(t, err)
 	otherPK := otherSK.PublicKey()
 	otherPKBytes := bls.PublicKeyToUncompressedBytes(otherPK)
@@ -1622,6 +1624,29 @@ func TestL1Validators(t *testing.T) {
 					PublicKey:         pkBytes,
 					Weight:            2, // Increased
 					EndAccumulatedFee: 1, // Active
+				},
+			},
+		},
+		{
+			name: "increase inactive weight",
+			initial: []L1Validator{
+				{
+					ValidationID:      l1Validator.ValidationID,
+					SubnetID:          l1Validator.SubnetID,
+					NodeID:            l1Validator.NodeID,
+					PublicKey:         pkBytes,
+					Weight:            1, // Not removed
+					EndAccumulatedFee: 0, // Inactive
+				},
+			},
+			l1Validators: []L1Validator{
+				{
+					ValidationID:      l1Validator.ValidationID,
+					SubnetID:          l1Validator.SubnetID,
+					NodeID:            l1Validator.NodeID,
+					PublicKey:         pkBytes,
+					Weight:            2, // Increased
+					EndAccumulatedFee: 0, // Inactive
 				},
 			},
 		},
@@ -2016,7 +2041,7 @@ func TestLoadL1ValidatorAndLegacy(t *testing.T) {
 	}
 	require.NoError(state.PutCurrentValidator(legacyStaker))
 
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(err)
 	pk := sk.PublicKey()
 	pkBytes := bls.PublicKeyToUncompressedBytes(pk)
@@ -2094,12 +2119,12 @@ func TestGetCurrentValidators(t *testing.T) {
 	subnetID2 := ids.GenerateTestID()
 	subnetIDs := []ids.ID{subnetID1, subnetID2}
 
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 	pk := sk.PublicKey()
 	pkBytes := bls.PublicKeyToUncompressedBytes(pk)
 
-	otherSK, err := bls.NewSigner()
+	otherSK, err := localsigner.New()
 	require.NoError(t, err)
 	otherPK := otherSK.PublicKey()
 	otherPKBytes := bls.PublicKeyToUncompressedBytes(otherPK)

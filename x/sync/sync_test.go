@@ -39,8 +39,8 @@ func Test_Creation(t *testing.T) {
 	ctx := context.Background()
 	syncer, err := NewManager(ManagerConfig{
 		DB:                    db,
-		RangeProofClient:      p2ptest.NewClient(t, ctx, NewGetRangeProofHandler(logging.NoLog{}, db), ids.GenerateTestNodeID(), ids.GenerateTestNodeID()),
-		ChangeProofClient:     p2ptest.NewClient(t, ctx, NewGetChangeProofHandler(logging.NoLog{}, db), ids.GenerateTestNodeID(), ids.GenerateTestNodeID()),
+		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(logging.NoLog{}, db)),
+		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(logging.NoLog{}, db)),
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
 		BranchFactor:          merkledb.BranchFactor16,
@@ -72,8 +72,8 @@ func Test_Completion(t *testing.T) {
 	ctx := context.Background()
 	syncer, err := NewManager(ManagerConfig{
 		DB:                    db,
-		RangeProofClient:      p2ptest.NewClient(t, ctx, NewGetRangeProofHandler(logging.NoLog{}, emptyDB), ids.GenerateTestNodeID(), ids.GenerateTestNodeID()),
-		ChangeProofClient:     p2ptest.NewClient(t, ctx, NewGetChangeProofHandler(logging.NoLog{}, emptyDB), ids.GenerateTestNodeID(), ids.GenerateTestNodeID()),
+		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(logging.NoLog{}, emptyDB)),
+		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(logging.NoLog{}, emptyDB)),
 		TargetRoot:            emptyRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
@@ -177,8 +177,8 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 	ctx := context.Background()
 	syncer, err := NewManager(ManagerConfig{
 		DB:                    db,
-		RangeProofClient:      p2ptest.NewClient(t, ctx, NewGetRangeProofHandler(logging.NoLog{}, dbToSync), ids.GenerateTestNodeID(), ids.GenerateTestNodeID()),
-		ChangeProofClient:     p2ptest.NewClient(t, ctx, NewGetChangeProofHandler(logging.NoLog{}, dbToSync), ids.GenerateTestNodeID(), ids.GenerateTestNodeID()),
+		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(logging.NoLog{}, dbToSync)),
+		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(logging.NoLog{}, dbToSync)),
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
@@ -194,7 +194,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 	require.NoError(err)
 
 	// the two dbs should be in sync, so next key should be nil
-	lastKey := proof.KeyValues[len(proof.KeyValues)-1].Key
+	lastKey := proof.KeyChanges[len(proof.KeyChanges)-1].Key
 	nextKey, err := syncer.findNextKey(context.Background(), lastKey, maybe.Nothing[[]byte](), proof.EndProof)
 	require.NoError(err)
 	require.True(nextKey.IsNothing())
@@ -253,8 +253,8 @@ func Test_Sync_FindNextKey_Deleted(t *testing.T) {
 	ctx := context.Background()
 	syncer, err := NewManager(ManagerConfig{
 		DB:                    db,
-		RangeProofClient:      p2ptest.NewClient(t, ctx, NewGetRangeProofHandler(logging.NoLog{}, db), ids.GenerateTestNodeID(), ids.GenerateTestNodeID()),
-		ChangeProofClient:     p2ptest.NewClient(t, ctx, NewGetChangeProofHandler(logging.NoLog{}, db), ids.GenerateTestNodeID(), ids.GenerateTestNodeID()),
+		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(logging.NoLog{}, db)),
+		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(logging.NoLog{}, db)),
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
@@ -303,8 +303,8 @@ func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
 	ctx := context.Background()
 	syncer, err := NewManager(ManagerConfig{
 		DB:                    db,
-		RangeProofClient:      p2ptest.NewClient(t, ctx, NewGetRangeProofHandler(logging.NoLog{}, db), ids.GenerateTestNodeID(), ids.GenerateTestNodeID()),
-		ChangeProofClient:     p2ptest.NewClient(t, ctx, NewGetChangeProofHandler(logging.NoLog{}, db), ids.GenerateTestNodeID(), ids.GenerateTestNodeID()),
+		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(logging.NoLog{}, db)),
+		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(logging.NoLog{}, db)),
 		TargetRoot:            targetRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
@@ -340,8 +340,8 @@ func Test_Sync_FindNextKey_BranchInReceived(t *testing.T) {
 	ctx := context.Background()
 	syncer, err := NewManager(ManagerConfig{
 		DB:                    db,
-		RangeProofClient:      p2ptest.NewClient(t, ctx, NewGetRangeProofHandler(logging.NoLog{}, db), ids.GenerateTestNodeID(), ids.GenerateTestNodeID()),
-		ChangeProofClient:     p2ptest.NewClient(t, ctx, NewGetChangeProofHandler(logging.NoLog{}, db), ids.GenerateTestNodeID(), ids.GenerateTestNodeID()),
+		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(logging.NoLog{}, db)),
+		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(logging.NoLog{}, db)),
 		TargetRoot:            targetRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
@@ -376,8 +376,8 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 	ctx := context.Background()
 	syncer, err := NewManager(ManagerConfig{
 		DB:                    db,
-		RangeProofClient:      p2ptest.NewClient(t, ctx, NewGetRangeProofHandler(logging.NoLog{}, dbToSync), ids.GenerateTestNodeID(), ids.GenerateTestNodeID()),
-		ChangeProofClient:     p2ptest.NewClient(t, ctx, NewGetChangeProofHandler(logging.NoLog{}, dbToSync), ids.GenerateTestNodeID(), ids.GenerateTestNodeID()),
+		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(logging.NoLog{}, dbToSync)),
+		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(logging.NoLog{}, dbToSync)),
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
@@ -393,7 +393,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 	require.NoError(err)
 
 	// add an extra value to local db
-	lastKey := proof.KeyValues[len(proof.KeyValues)-1].Key
+	lastKey := proof.KeyChanges[len(proof.KeyChanges)-1].Key
 	midpoint := midPoint(maybe.Some(lastKey), maybe.Nothing[[]byte]())
 	midPointVal := midpoint.Value()
 
@@ -438,8 +438,8 @@ func TestFindNextKeyEmptyEndProof(t *testing.T) {
 	ctx := context.Background()
 	syncer, err := NewManager(ManagerConfig{
 		DB:                    db,
-		RangeProofClient:      p2ptest.NewClient(t, ctx, NewGetRangeProofHandler(logging.NoLog{}, db), ids.GenerateTestNodeID(), ids.GenerateTestNodeID()),
-		ChangeProofClient:     p2ptest.NewClient(t, ctx, NewGetChangeProofHandler(logging.NoLog{}, db), ids.GenerateTestNodeID(), ids.GenerateTestNodeID()),
+		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(logging.NoLog{}, db)),
+		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(logging.NoLog{}, db)),
 		TargetRoot:            ids.Empty,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
@@ -507,8 +507,8 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 	ctx := context.Background()
 	syncer, err := NewManager(ManagerConfig{
 		DB:                    db,
-		RangeProofClient:      p2ptest.NewClient(t, ctx, NewGetRangeProofHandler(logging.NoLog{}, dbToSync), ids.GenerateTestNodeID(), ids.GenerateTestNodeID()),
-		ChangeProofClient:     p2ptest.NewClient(t, ctx, NewGetChangeProofHandler(logging.NoLog{}, dbToSync), ids.GenerateTestNodeID(), ids.GenerateTestNodeID()),
+		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(logging.NoLog{}, dbToSync)),
+		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(logging.NoLog{}, dbToSync)),
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
@@ -521,7 +521,7 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 
 	proof, err := dbToSync.GetRangeProof(context.Background(), maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 100)
 	require.NoError(err)
-	lastKey := proof.KeyValues[len(proof.KeyValues)-1].Key
+	lastKey := proof.KeyChanges[len(proof.KeyChanges)-1].Key
 
 	// local db has a different child than remote db
 	lastKey = append(lastKey, 16)
@@ -529,10 +529,10 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 
 	require.NoError(dbToSync.Put(lastKey, []byte{2}))
 
-	proof, err = dbToSync.GetRangeProof(context.Background(), maybe.Nothing[[]byte](), maybe.Some(proof.KeyValues[len(proof.KeyValues)-1].Key), 100)
+	proof, err = dbToSync.GetRangeProof(context.Background(), maybe.Nothing[[]byte](), maybe.Some(proof.KeyChanges[len(proof.KeyChanges)-1].Key), 100)
 	require.NoError(err)
 
-	nextKey, err := syncer.findNextKey(context.Background(), proof.KeyValues[len(proof.KeyValues)-1].Key, maybe.Nothing[[]byte](), proof.EndProof)
+	nextKey, err := syncer.findNextKey(context.Background(), proof.KeyChanges[len(proof.KeyChanges)-1].Key, maybe.Nothing[[]byte](), proof.EndProof)
 	require.NoError(err)
 	require.True(nextKey.HasValue())
 	require.Equal(lastKey, nextKey.Value())
@@ -616,10 +616,10 @@ func TestFindNextKeyRandom(t *testing.T) {
 		)
 		require.NoError(err)
 
-		if len(remoteProof.KeyValues) == 0 {
+		if len(remoteProof.KeyChanges) == 0 {
 			continue
 		}
-		lastReceivedKey := remoteProof.KeyValues[len(remoteProof.KeyValues)-1].Key
+		lastReceivedKey := remoteProof.KeyChanges[len(remoteProof.KeyChanges)-1].Key
 
 		// Commit the proof to the local database as we do
 		// in the actual syncer.
@@ -730,8 +730,8 @@ func TestFindNextKeyRandom(t *testing.T) {
 		ctx := context.Background()
 		syncer, err := NewManager(ManagerConfig{
 			DB:                    localDB,
-			RangeProofClient:      p2ptest.NewClient(t, ctx, NewGetRangeProofHandler(logging.NoLog{}, remoteDB), ids.GenerateTestNodeID(), ids.GenerateTestNodeID()),
-			ChangeProofClient:     p2ptest.NewClient(t, ctx, NewGetChangeProofHandler(logging.NoLog{}, remoteDB), ids.GenerateTestNodeID(), ids.GenerateTestNodeID()),
+			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(logging.NoLog{}, remoteDB)),
+			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(logging.NoLog{}, remoteDB)),
 			TargetRoot:            ids.GenerateTestID(),
 			SimultaneousWorkLimit: 5,
 			Log:                   logging.NoLog{},
@@ -774,31 +774,31 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			name: "range proof bad response - too many leaves in response",
 			rangeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
 				handler := newFlakyRangeProofHandler(t, db, func(response *merkledb.RangeProof) {
-					response.KeyValues = append(response.KeyValues, merkledb.KeyValue{})
+					response.KeyChanges = append(response.KeyChanges, merkledb.KeyChange{})
 				})
 
-				return p2ptest.NewClient(t, context.Background(), handler, ids.GenerateTestNodeID(), ids.GenerateTestNodeID())
+				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "range proof bad response - removed first key in response",
 			rangeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
 				handler := newFlakyRangeProofHandler(t, db, func(response *merkledb.RangeProof) {
-					response.KeyValues = response.KeyValues[min(1, len(response.KeyValues)):]
+					response.KeyChanges = response.KeyChanges[min(1, len(response.KeyChanges)):]
 				})
 
-				return p2ptest.NewClient(t, context.Background(), handler, ids.GenerateTestNodeID(), ids.GenerateTestNodeID())
+				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "range proof bad response - removed first key in response and replaced proof",
 			rangeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
 				handler := newFlakyRangeProofHandler(t, db, func(response *merkledb.RangeProof) {
-					response.KeyValues = response.KeyValues[min(1, len(response.KeyValues)):]
-					response.KeyValues = []merkledb.KeyValue{
+					response.KeyChanges = response.KeyChanges[min(1, len(response.KeyChanges)):]
+					response.KeyChanges = []merkledb.KeyChange{
 						{
 							Key:   []byte("foo"),
-							Value: []byte("bar"),
+							Value: maybe.Some([]byte("bar")),
 						},
 					}
 					response.StartProof = []merkledb.ProofNode{
@@ -813,18 +813,18 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					}
 				})
 
-				return p2ptest.NewClient(t, context.Background(), handler, ids.GenerateTestNodeID(), ids.GenerateTestNodeID())
+				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "range proof bad response - removed key from middle of response",
 			rangeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
 				handler := newFlakyRangeProofHandler(t, db, func(response *merkledb.RangeProof) {
-					i := rand.Intn(max(1, len(response.KeyValues)-1)) // #nosec G404
-					_ = slices.Delete(response.KeyValues, i, min(len(response.KeyValues), i+1))
+					i := rand.Intn(max(1, len(response.KeyChanges)-1)) // #nosec G404
+					_ = slices.Delete(response.KeyChanges, i, min(len(response.KeyChanges), i+1))
 				})
 
-				return p2ptest.NewClient(t, context.Background(), handler, ids.GenerateTestNodeID(), ids.GenerateTestNodeID())
+				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -835,7 +835,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					response.EndProof = nil
 				})
 
-				return p2ptest.NewClient(t, context.Background(), handler, ids.GenerateTestNodeID(), ids.GenerateTestNodeID())
+				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -845,7 +845,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					response.EndProof = nil
 				})
 
-				return p2ptest.NewClient(t, context.Background(), handler, ids.GenerateTestNodeID(), ids.GenerateTestNodeID())
+				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -854,19 +854,19 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 				handler := newFlakyRangeProofHandler(t, db, func(response *merkledb.RangeProof) {
 					response.StartProof = nil
 					response.EndProof = nil
-					response.KeyValues = nil
+					response.KeyChanges = nil
 				})
 
-				return p2ptest.NewClient(t, context.Background(), handler, ids.GenerateTestNodeID(), ids.GenerateTestNodeID())
+				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "range proof server flake",
 			rangeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
-				return p2ptest.NewClient(t, context.Background(), &flakyHandler{
+				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, &flakyHandler{
 					Handler: NewGetRangeProofHandler(logging.NoLog{}, db),
 					c:       &counter{m: 2},
-				}, ids.GenerateTestNodeID(), ids.GenerateTestNodeID())
+				})
 			},
 		},
 		{
@@ -876,7 +876,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					response.KeyChanges = append(response.KeyChanges, make([]merkledb.KeyChange, defaultRequestKeyLimit)...)
 				})
 
-				return p2ptest.NewClient(t, context.Background(), handler, ids.GenerateTestNodeID(), ids.GenerateTestNodeID())
+				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -886,7 +886,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					response.KeyChanges = response.KeyChanges[min(1, len(response.KeyChanges)):]
 				})
 
-				return p2ptest.NewClient(t, context.Background(), handler, ids.GenerateTestNodeID(), ids.GenerateTestNodeID())
+				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -897,7 +897,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					_ = slices.Delete(response.KeyChanges, i, min(len(response.KeyChanges), i+1))
 				})
 
-				return p2ptest.NewClient(t, context.Background(), handler, ids.GenerateTestNodeID(), ids.GenerateTestNodeID())
+				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -908,16 +908,16 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					response.EndProof = nil
 				})
 
-				return p2ptest.NewClient(t, context.Background(), handler, ids.GenerateTestNodeID(), ids.GenerateTestNodeID())
+				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "change proof flaky server",
 			changeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
-				return p2ptest.NewClient(t, context.Background(), &flakyHandler{
+				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, &flakyHandler{
 					Handler: NewGetChangeProofHandler(logging.NoLog{}, db),
 					c:       &counter{m: 2},
-				}, ids.GenerateTestNodeID(), ids.GenerateTestNodeID())
+				})
 			},
 		},
 	}
@@ -946,13 +946,13 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			)
 
 			rangeProofHandler := NewGetRangeProofHandler(logging.NoLog{}, dbToSync)
-			rangeProofClient = p2ptest.NewClient(t, ctx, rangeProofHandler, ids.GenerateTestNodeID(), ids.GenerateTestNodeID())
+			rangeProofClient = p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, rangeProofHandler)
 			if tt.rangeProofClient != nil {
 				rangeProofClient = tt.rangeProofClient(dbToSync)
 			}
 
 			changeProofHandler := NewGetChangeProofHandler(logging.NoLog{}, dbToSync)
-			changeProofClient = p2ptest.NewClient(t, ctx, changeProofHandler, ids.GenerateTestNodeID(), ids.GenerateTestNodeID())
+			changeProofClient = p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, changeProofHandler)
 			if tt.changeProofClient != nil {
 				changeProofClient = tt.changeProofClient(dbToSync)
 			}
@@ -1031,8 +1031,8 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	ctx := context.Background()
 	syncer, err := NewManager(ManagerConfig{
 		DB:                    db,
-		RangeProofClient:      p2ptest.NewClient(t, ctx, NewGetRangeProofHandler(logging.NoLog{}, dbToSync), ids.GenerateTestNodeID(), ids.GenerateTestNodeID()),
-		ChangeProofClient:     p2ptest.NewClient(t, ctx, NewGetChangeProofHandler(logging.NoLog{}, dbToSync), ids.GenerateTestNodeID(), ids.GenerateTestNodeID()),
+		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(logging.NoLog{}, dbToSync)),
+		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(logging.NoLog{}, dbToSync)),
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
@@ -1058,8 +1058,8 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 
 	newSyncer, err := NewManager(ManagerConfig{
 		DB:                    db,
-		RangeProofClient:      p2ptest.NewClient(t, ctx, NewGetRangeProofHandler(logging.NoLog{}, dbToSync), ids.GenerateTestNodeID(), ids.GenerateTestNodeID()),
-		ChangeProofClient:     p2ptest.NewClient(t, ctx, NewGetChangeProofHandler(logging.NoLog{}, dbToSync), ids.GenerateTestNodeID(), ids.GenerateTestNodeID()),
+		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(logging.NoLog{}, dbToSync)),
+		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(logging.NoLog{}, dbToSync)),
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
@@ -1130,15 +1130,15 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	updatedRootChan <- struct{}{}
 
 	ctx := context.Background()
-	rangeProofClient := p2ptest.NewClient(t, ctx, &waitingHandler{
+	rangeProofClient := p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, &waitingHandler{
 		handler:         NewGetRangeProofHandler(logging.NoLog{}, dbToSync),
 		updatedRootChan: updatedRootChan,
-	}, ids.GenerateTestNodeID(), ids.GenerateTestNodeID())
+	})
 
-	changeProofClient := p2ptest.NewClient(t, ctx, &waitingHandler{
+	changeProofClient := p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, &waitingHandler{
 		handler:         NewGetChangeProofHandler(logging.NoLog{}, dbToSync),
 		updatedRootChan: updatedRootChan,
-	}, ids.GenerateTestNodeID(), ids.GenerateTestNodeID())
+	})
 
 	syncer, err := NewManager(ManagerConfig{
 		DB:                    db,
@@ -1189,8 +1189,8 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	ctx := context.Background()
 	m, err := NewManager(ManagerConfig{
 		DB:                    db,
-		RangeProofClient:      p2ptest.NewClient(t, ctx, NewGetRangeProofHandler(logging.NoLog{}, db), ids.GenerateTestNodeID(), ids.GenerateTestNodeID()),
-		ChangeProofClient:     p2ptest.NewClient(t, ctx, NewGetChangeProofHandler(logging.NoLog{}, db), ids.GenerateTestNodeID(), ids.GenerateTestNodeID()),
+		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(logging.NoLog{}, db)),
+		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(logging.NoLog{}, db)),
 		TargetRoot:            ids.Empty,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},

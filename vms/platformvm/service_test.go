@@ -19,7 +19,7 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/api"
-	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
@@ -65,11 +66,9 @@ var encodings = []formatting.Encoding{
 func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
 	vm, _, mutableSharedMemory := defaultVM(t, upgradetest.Latest)
 	return &Service{
-		vm:          vm,
-		addrManager: avax.NewAddressManager(vm.ctx),
-		stakerAttributesCache: &cache.LRU[ids.ID, *stakerAttributes]{
-			Size: stakerAttributesCacheSize,
-		},
+		vm:                    vm,
+		addrManager:           avax.NewAddressManager(vm.ctx),
+		stakerAttributesCache: lru.NewCache[ids.ID, *stakerAttributes](stakerAttributesCacheSize),
 	}, mutableSharedMemory
 }
 
@@ -263,7 +262,9 @@ func TestGetTx(t *testing.T) {
 			func(t testing.TB, s *Service) *txs.Tx {
 				wallet := newWallet(t, s.vm, walletConfig{})
 
-				sk, err := bls.NewSigner()
+				sk, err := localsigner.New()
+				require.NoError(t, err)
+				pop, err := signer.NewProofOfPossession(sk)
 				require.NoError(t, err)
 
 				rewardsOwner := &secp256k1fx.OutputOwners{
@@ -280,7 +281,7 @@ func TestGetTx(t *testing.T) {
 						},
 						Subnet: constants.PrimaryNetworkID,
 					},
-					signer.NewProofOfPossession(sk),
+					pop,
 					s.vm.ctx.AVAXAssetID,
 					rewardsOwner,
 					rewardsOwner,
@@ -799,7 +800,9 @@ func TestGetValidatorsAt(t *testing.T) {
 		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 	}
 
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
+	require.NoError(err)
+	pop, err := signer.NewProofOfPossession(sk)
 	require.NoError(err)
 
 	tx, err := wallet.IssueAddPermissionlessValidatorTx(
@@ -812,7 +815,7 @@ func TestGetValidatorsAt(t *testing.T) {
 			},
 			Subnet: constants.PrimaryNetworkID,
 		},
-		signer.NewProofOfPossession(sk),
+		pop,
 		service.vm.ctx.AVAXAssetID,
 		rewardsOwner,
 		rewardsOwner,
@@ -1022,7 +1025,7 @@ func TestGetValidatorsAtReplyMarshalling(t *testing.T) {
 	}
 	{
 		nodeID := ids.GenerateTestNodeID()
-		sk, err := bls.NewSigner()
+		sk, err := localsigner.New()
 		require.NoError(err)
 		reply.Validators[nodeID] = &validators.GetValidatorOutput{
 			NodeID:    nodeID,
@@ -1330,12 +1333,12 @@ func FuzzGetFeeState(f *testing.F) {
 func TestGetCurrentValidatorsForL1(t *testing.T) {
 	subnetID := ids.GenerateTestID()
 
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.New()
 	require.NoError(t, err)
 	pk := sk.PublicKey()
 	pkBytes := bls.PublicKeyToUncompressedBytes(pk)
 
-	otherSK, err := bls.NewSigner()
+	otherSK, err := localsigner.New()
 	require.NoError(t, err)
 	otherPK := otherSK.PublicKey()
 	otherPKBytes := bls.PublicKeyToUncompressedBytes(otherPK)

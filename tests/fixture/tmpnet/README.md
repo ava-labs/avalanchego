@@ -7,7 +7,39 @@ written to disk. Using the filesystem to store configuration and
 process details allows for the `tmpnetctl` cli and e2e test fixture to
 orchestrate the same temporary networks without the use of an rpc daemon.
 
+## Table of Contents
+
+- [What's in a name?](#whats-in-a-name)
+- [Package details](#package-details)
+- [Usage](#usage)
+  - [Via tmpnetctl](#via-tmpnetctl)
+  - [Simplifying usage with direnv](#simplifying-usage-with-direnv)
+    - [Deprecated usage with e2e suite](#deprecated-usage-with-e2e-suite)
+  - [Via code](#via-code)
+- [Networking configuration](#networking-configuration)
+- [Configuration on disk](#configuration-on-disk)
+  - [Common networking configuration](#common-networking-configuration)
+  - [Genesis](#genesis)
+  - [Subnet and Chain configuration](#subnet-and-chain-configuration)
+  - [Network env](#network-env)
+  - [Node configuration](#node-configuration)
+    - [Runtime config](#runtime-config)
+    - [Flags](#flags)
+    - [Process details](#process-details)
+- [Monitoring](#monitoring)
+  - [Example usage](#example-usage)
+  - [Starting collectors](#starting-collectors)
+  - [Stopping collectors](#stopping-collectors)
+  - [Metrics collection](#metrics-collection)
+  - [Log collection](#log-collection)
+  - [Labels](#labels)
+  - [CI Collection](#ci-collection)
+  - [Viewing](#viewing)
+    - [Local networks](#local-networks)
+    - [CI](#ci)
+
 ## What's in a name?
+[Top](#table-of-contents)
 
 The name of this package was originally `testnet` and its cli was
 `testnetctl`. This name was chosen in ignorance that `testnet`
@@ -20,26 +52,42 @@ support of the development and testing of avalanchego and its related
 repositories.
 
 ## Package details
+[Top](#table-of-contents)
 
 The functionality in this package is grouped by logical purpose into
 the following non-test files:
 
-| Filename          | Types       | Purpose                                        |
-|:------------------|:------------|:-----------------------------------------------|
-| defaults.go       |             | Defines common default configuration           |
-| flags.go          | FlagsMap    | Simplifies configuration of avalanchego flags  |
-| genesis.go        |             | Creates test genesis                           |
-| network.go        | Network     | Orchestrates and configures temporary networks |
-| network_config.go | Network     | Reads and writes network configuration         |
-| node.go           | Node        | Orchestrates and configures nodes              |
-| node_config.go    | Node        | Reads and writes node configuration            |
-| node_process.go   | NodeProcess | Orchestrates node processes                    |
-| subnet.go         | Subnet      | Orchestrates subnets                           |
-| utils.go          |             | Defines shared utility functions               |
+| Filename                    | Types          | Purpose                                                                |
+|:----------------------------|:---------------|:-----------------------------------------------------------------------|
+| flags/                      |                | Directory defining flags usable with both stdlib flags and spf13/pflag |
+| flags/common.go             |                | Defines type definitions common across other files                     |
+| flags/process_runtime.go    |                | Defines flags configuring the process node runtime                     |
+| flags/runtime.go            |                | Defines flags configuring node runtime                                 |
+| flags/start_network.go      |                | Defines flags configuring network start                                |
+| tmpnetctl/                  |                | Directory containing main entrypoint for tmpnetctl command             |
+| check_monitoring.go         |                | Enables checking if logs and metrics were collected                    |
+| defaults.go                 |                | Defines common default configuration                                   |
+| detached_process_default.go |                | Configures detached processes for darwin and linux                     |
+| detached_process_windows.go |                | No-op detached process configuration for windows                       |
+| flagsmap.go                 | FlagsMap       | Simplifies configuration of avalanchego flags                          |
+| genesis.go                  |                | Creates test genesis                                                   |
+| kube.go                     |                | Library for Kubernetes interaction                                     |
+| local_network.go            |                | Defines configuration for the default local network                    |
+| monitor_processes.go        |                | Enables collection of logs and metrics from local processes            |
+| network.go                  | Network        | Orchestrates and configures temporary networks                         |
+| network_config.go           | Network        | Reads and writes network configuration                                 |
+| network_test.go             |                | Simple test round-tripping Network serialization                       |
+| node.go                     | Node           | Orchestrates and configures nodes                                      |
+| node_config.go              | Node           | Reads and writes node configuration                                    |
+| process_runtime.go          | ProcessRuntime | Orchestrates node processes                                            |
+| start_kind_cluster.go       |                | Starts a local kind cluster                                            |
+| subnet.go                   | Subnet         | Orchestrates subnets                                                   |
+| utils.go                    |                | Defines shared utility functions                                       |
 
 ## Usage
 
 ### Via tmpnetctl
+[Top](#table-of-contents)
 
 A temporary network can be managed by the `tmpnetctl` cli tool:
 
@@ -66,15 +114,8 @@ the `TMPNET_NETWORK_DIR` env var to this symlink ensures that
 `tmpnetctl` commands target the most recently deployed temporary
 network.
 
-### Simplifying usage with direnv
-
-The repo includes a [.envrc](../../../.envrc) that can be applied by
-[direnv](https://direnv.net/) when in a shell. This will enable
-`tmpnetctl` to be invoked directly (without a `./bin/` prefix ) and
-without having to specify the `--avalanchego-path` or `--plugin-dir`
-flags.
-
 #### Deprecated usage with e2e suite
+[Top](#table-of-contents)
 
 `tmpnetctl` was previously used to create temporary networks for use
 across multiple e2e test runs. As the usage of temporary networks has
@@ -83,19 +124,34 @@ expanded to require subnets, that usage has been supplanted by the
 support defining subnet configuration in the e2e suite in code than to
 extend a cli tool like `tmpnetctl` to support similar capabilities.
 
+### Simplifying usage with direnv
+[Top](#table-of-contents)
+
+The repo includes a [.envrc](../../../.envrc) that can be applied by
+[direnv](https://direnv.net/) when in a shell. This will enable
+`tmpnetctl` to be invoked directly (without a `./bin/` prefix ) and
+without having to specify the `--avalanchego-path` or `--plugin-dir`
+flags.
+
 ### Via code
+[Top](#table-of-contents)
 
 A temporary network can be managed in code:
 
 ```golang
-network := &tmpnet.Network{                   // Configure non-default values for the new network
+network := &tmpnet.Network{                         // Configure non-default values for the new network
+    DefaultRuntimeConfig: tmpnet.NodeRuntimeConfig{
+        Process: &tmpnet.ProcessRuntimeConfig{
+            ReuseDynamicPorts: true,                // Configure process-based nodes to reuse a dynamically allocated API port when restarting
+        },
+    }
     DefaultFlags: tmpnet.FlagsMap{
-        config.LogLevelKey: "INFO",           // Change one of the network's defaults
+        config.LogLevelKey: "INFO",                 // Change one of the network's defaults
     },
-    Nodes: tmpnet.NewNodesOrPanic(5),           // Number of initial validating nodes
-    Subnets: []*tmpnet.Subnet{                // Subnets to create on the new network once it is running
+    Nodes: tmpnet.NewNodesOrPanic(5),               // Number of initial validating nodes
+    Subnets: []*tmpnet.Subnet{                      // Subnets to create on the new network once it is running
         {
-            Name: "xsvm-a",                   // User-defined name used to reference subnet in code and on disk
+            Name: "xsvm-a",                         // User-defined name used to reference subnet in code and on disk
             Chains: []*tmpnet.Chain{
                 {
                     VMName: "xsvm",              // Name of the VM the chain will run, will be used to derive the name of the VM binary
@@ -131,6 +187,7 @@ network.Stop(context.Background())
 ```
 
 ## Networking configuration
+[Top](#table-of-contents)
 
 By default, nodes in a temporary network will be started with staking and
 API ports set to `0` to ensure that ports will be dynamically
@@ -141,6 +198,7 @@ with many temporary networks without having to manually select compatible
 port ranges.
 
 ## Configuration on disk
+[Top](#table-of-contents)
 
 A temporary network relies on configuration written to disk in the following structure:
 
@@ -165,53 +223,46 @@ HOME
             │   ├── plugins
             │   │   └── ...
             │   └── process.json                         // Node process details (PID, API URI, staking address)
-            ├── chains
-            │   ├── C
-            │   │   └── config.json                      // C-Chain config for all nodes
-            │   └── raZ51bwfepaSaZ1MNSRNYNs3ZPfj...U7pa3
-            │       └── config.json                      // Custom chain configuration for all nodes
-            ├── config.json                              // Common configuration (including defaults and pre-funded keys)
+            ├── config.json                              // tmpnet configuration for the network
             ├── genesis.json                             // Genesis for all nodes
             ├── metrics.txt                              // Link for metrics and logs collected from the network (see: Monitoring)
             ├── network.env                              // Sets network dir env var to simplify network usage
-            └── subnets                                  // Directory containing subnet config for both avalanchego and tmpnet
+            └── subnets                                  // Directory containing tmpnet subnet configuration
                 ├── subnet-a.json                        // tmpnet configuration for subnet-a and its chain(s)
-                ├── subnet-b.json                        // tmpnet configuration for subnet-b and its chain(s)
-                └── 2jRbWtaonb2RP8DEM5DBsd7o2o8d...RqNs9 // The ID of a subnet is the name of its configuration dir
-                    └── config.json                      // avalanchego configuration for subnet
+                └── subnet-b.json                        // tmpnet configuration for subnet-b and its chain(s)
 ```
 
 ### Common networking configuration
+[Top](#table-of-contents)
 
 Network configuration such as default flags (e.g. `--log-level=`),
 runtime defaults (e.g. avalanchego path) and pre-funded private keys
-are stored at `[network-dir]/config.json`. A given default will only
-be applied to a new node on its addition to the network if the node
-does not explicitly set a given value.
+are stored at `[network-dir]/config.json`. A default for a given flag
+will only be applied to a node if that node does not itself set a
+value for that flag.
 
 ### Genesis
+[Top](#table-of-contents)
 
-The genesis file is stored at `[network-dir]/genesis.json` and
-referenced by default by all nodes in the network. The genesis file
-content will be generated with reasonable defaults if not
-supplied. Each node in the network can override the default by setting
-an explicit value for `--genesis-file` or `--genesis-file-content`.
+The genesis file is stored at `[network-dir]/genesis.json`. The
+genesis file content will be generated with reasonable defaults if
+not supplied. The content of the file is provided to each node via
+the `--genesis-file-content` flag if a node does not set a value for
+the flag.
 
-### Chain configuration
+### Subnet and chain configuration
+[Top](#table-of-contents)
 
-The chain configuration for a temporary network is stored at
-`[network-dir]/chains/[chain alias or ID]/config.json` and referenced
-by all nodes in the network. The C-Chain config will be generated with
-reasonable defaults if not supplied. X-Chain and P-Chain will use
-implicit defaults. The configuration for custom chains can be provided
-with subnet configuration and will be written to the appropriate path.
-
-Each node in the network can override network-level chain
-configuration by setting `--chain-config-dir` to an explicit value and
-ensuring that configuration files for all chains exist at
-`[custom-chain-config-dir]/[chain alias or ID]/config.json`.
+tmpnet configuration for a given subnet and its chain(s) is stored at
+`[network-dir]/subnets/[subnet name].json`. Subnet configuration for
+all subnets is provided to each node via the
+`--subnet-config-content` flag if a node does not set a value for the
+flag. Chain configuration for all chains is provided to each node via
+the `--chain-config-content` flag where a node does not set a value
+for the flag.
 
 ### Network env
+[Top](#table-of-contents)
 
 A shell script that sets the `TMPNET_NETWORK_DIR` env var to the
 path of the network is stored at `[network-dir]/network.env`. Sourcing
@@ -219,14 +270,15 @@ this file (i.e. `source network.env`) in a shell will configure ginkgo
 e2e and the `tmpnetctl` cli to target the network path specified in
 the env var.
 
-Set `TMPNET_ROOT_DIR` to specify the root directory in which to create
-the configuration directory of new networks
-(e.g. `$TMPNET_ROOT_DIR/[network-dir]`). The default root directory is
-`~/.tmpdir/networks`. Configuring the root directory is only relevant
-when creating new networks as the path of existing networks will
-already have been set.
+Set `TMPNET_ROOT_NETWORK_DIR` to specify the root network directory in
+which to create the configuration directory of new networks
+(e.g. `TMPNET_ROOT_NETWORK_DIR/[network-dir]`). The default network
+root directory is `~/.tmpdir/networks`. Configuring the network root
+directory is only relevant when creating new networks as the path of
+existing networks will already have been set.
 
 ### Node configuration
+[Top](#table-of-contents)
 
 The data dir for a node is set by default to
 `[network-path]/[node-id]`. A node can be configured to use a
@@ -234,6 +286,7 @@ non-default path by explicitly setting the `--data-dir`
 flag.
 
 #### Runtime config
+[Top](#table-of-contents)
 
 The details required to configure a node's execution are written to
 `[network-path]/[node-id]/config.json`. This file contains the
@@ -241,6 +294,7 @@ runtime-specific details like the path of the avalanchego binary to
 start the node with.
 
 #### Flags
+[Top](#table-of-contents)
 
 All flags used to configure a node are written to
 `[network-path]/[node-id]/flags.json` so that a node can be
@@ -250,6 +304,7 @@ ensures all parameters used to launch a node can be modified by
 editing the config file.
 
 #### Process details
+[Top](#table-of-contents)
 
 The process details of a node are written by avalanchego to
 `[base-data-dir]/process.json`. The file contains the PID of the node
@@ -257,6 +312,7 @@ process, the URI of the node's API, and the address other nodes can
 use to bootstrap themselves (aka staking address).
 
 ## Monitoring
+[Top](#table-of-contents)
 
 Monitoring is an essential part of understanding the workings of a
 distributed system such as avalanchego. The tmpnet fixture enables
@@ -265,38 +321,61 @@ stack (prometheus+loki+grafana) to enable results to be analyzed and
 shared.
 
 ### Example usage
+[Top](#table-of-contents)
 
 ```bash
-# Start prometheus to collect metrics
-PROMETHEUS_USERNAME=<username> PROMETHEUS_PASSWORD=<password> ./scripts/run_prometheus.sh
+# Start a nix shell to ensure the availability of promtail and prometheus.
+nix develop
 
-# Start promtail to collect logs
-LOKI_USERNAME=<username> LOKI_PASSWORD=<password> ./scripts/run_promtail.sh
+# Enable collection of logs and metrics
+PROMETHEUS_USERNAME=<username> \
+PROMETHEUS_PASSWORD=<password> \
+LOKI_USERNAME=<username> \
+LOKI_PASSWORD=<password> \
+./bin/tmpnetctl start-collectors
 
 # Network start emits link to grafana displaying collected logs and metrics
 ./bin/tmpnetctl start-network
 
-# Configure metrics collection from a local node binding to the default API
-# port of 9650 and storing its logs in ~/.avalanchego/logs. The script will
-# also emit a link to grafana.
-./scripts/configure-local-metrics-collection.sh
+# When done with the network, stop the collectors
+./bin/tmpnetctl stop-collectors
 ```
 
+### Starting collectors
+[Top](#table-of-contents)
+
+Collectors for logs and metrics can be started by `tmpnetctl
+start-collectors`:
+
+ - Requires that the following env vars be set
+   - `PROMETHEUS_USERNAME`
+   - `PROMETHEUS_PASSWORD`
+   - `LOKI_USERNAME`
+   - `LOKI_PASSWORD`
+ - Requires that binaries for promtail and prometheus be available in the path
+   - Starting a development shell with `nix develop` is one way to
+     ensure this and requires the [installation of
+     nix](https://github.com/DeterminateSystems/nix-installer?tab=readme-ov-file#install-nix).
+ - Starts prometheus in agent mode configured to scrape metrics from
+   configured nodes and forward them to
+   https://prometheus-poc.avax-dev.network.
+ - Starts promtail configured to collect logs from configured nodes
+   and forward them to https://loki-poc.avax-dev.network.
+
+### Stopping collectors
+
+Collectors for logs and metrics can be stopped by `tmpnetctl
+stop-collectors`:
+
 ### Metrics collection
+[Top](#table-of-contents)
 
 When a node is started, configuration enabling collection of metrics
 from the node is written to
 `~/.tmpnet/prometheus/file_sd_configs/[network uuid]-[node id].json`.
 
-The `scripts/run_prometheus.sh` script starts prometheus in agent mode
-configured to scrape metrics from configured nodes and forward the
-metrics to a persistent prometheus instance. The script requires that
-the `PROMETHEUS_USERNAME` and `PROMETHEUS_PASSWORD` env vars be set. By
-default the prometheus instance at
-https://prometheus-poc.avax-dev.network will be targeted and
-this can be overridden via the `PROMETHEUS_URL` env var.
-
 ### Log collection
+[Top](#table-of-contents)
 
 Nodes log are stored at `~/.tmpnet/networks/[network id]/[node
 id]/logs` by default, and can optionally be forwarded to loki with
@@ -307,14 +386,8 @@ collection of logs for the node is written to
 `~/.tmpnet/promtail/file_sd_configs/[network
 uuid]-[node id].json`.
 
-The `scripts/run_promtail.sh` script starts promtail configured to
-collect logs from configured nodes and forward the results to loki. The
-script requires that the `LOKI_USERNAME` and `LOKI_PASSWORD` env vars be
-set. By default the loki instance at
-https://loki-poc.avax-dev.network will be targeted and this
-can be overridden via the `LOKI_URL` env var.
-
 ### Labels
+[Top](#table-of-contents)
 
 The logs and metrics collected for temporary networks will have the
 following labels applied:
@@ -342,9 +415,49 @@ additional labels will be applied:
 These labels are sourced from Github Actions' `github` context as per
 https://docs.github.com/en/actions/learn-github-actions/contexts#github-context.
 
+### CI Collection
+[Top](#table-of-contents)
+
+A [custom github
+action](../../../.github/actions/run-monitored-tmpnet-cmd/action.yml)
+exists to simplify collection of logs and metrics from CI. The action
+takes care of invoking a nix shell to ensure the availability of
+binary dependencies, configures tmpnet to collect metrics and ensures
+that the tmpnet path is collected as a github artifact to aid in troubleshooting.
+
+Example usage:
+
+```yaml
+- name: Run e2e tests
+
+  # A qualified path is required for use outside of avalanchego
+  # e.g. `ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@[sha or tag]`
+  uses: ./.github/actions/run-monitored-tmpnet-cmd #
+
+  with:
+    # This needs to be the path to a bash script
+    run: ./scripts/tests.e2e.sh
+
+    # Env vars for the script need to be provided via run_env as a space-separated string
+    # e.g. `MY_VAR1=foo MY_VAR2=bar`
+    run_env: E2E_SERIAL=1
+
+    # Sets the prefix of the artifact containing the tmpnet network dir for this job.
+    # Only required if a workflow uses this action more than once so that each artifact
+    # will have a unique name.
+    artifact_prefix: e2e
+
+    # These credentials are mandatory
+    prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+    prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+    loki_username: ${{ secrets.LOKI_ID || '' }}
+    loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+```
+
 ### Viewing
 
 #### Local networks
+[Top](#table-of-contents)
 
 When a network is started with tmpnet, a link to the [default grafana
 instance](https://grafana-poc.avax-dev.network) will be
@@ -353,10 +466,21 @@ promtail are running locally (as per previous sections) to collect
 metrics and logs.
 
 #### CI
+[Top](#table-of-contents)
 
 Collection of logs and metrics is enabled for CI jobs that use
-tmpnet. Each job will execute a step titled `Notify of metrics
-availability` that emits a link to grafana parametized to show results
-for the job. Additional links to grafana parametized to show results
-for individual network will appear in the logs displaying the start of
+tmpnet. Each job will execute a step including the script
+`notify-metrics-availability.sh` that emits a link to grafana
+parameterized to show results for the job.
+
+Additional links to grafana parameterized to show results for
+individual network will appear in the logs displaying the start of
 those networks.
+
+In cases where a given job uses private networks in addition to the
+usual shared network, it may be useful to parameterize the
+[run_monitored_tmpnet_action](../../../.github/actions/run-monitored-tmpnet-cmd/action.yml)
+github action with `filter_by_owner` set to the owner string for the
+shared network. This ensures that the link emitted by the annotation
+displays results for only the shared network of the job rather than
+mixing results from all the networks started for the job.

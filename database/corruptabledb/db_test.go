@@ -15,13 +15,14 @@ import (
 	"github.com/ava-labs/avalanchego/database/databasemock"
 	"github.com/ava-labs/avalanchego/database/dbtest"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var errTest = errors.New("non-nil error")
 
 func newDB() *Database {
 	baseDB := memdb.New()
-	return New(baseDB)
+	return New(baseDB, logging.NoLog{})
 }
 
 func TestInterface(t *testing.T) {
@@ -184,7 +185,7 @@ func TestIterator(t *testing.T) {
 			// Put a key-value pair in the database.
 			require.NoError(corruptableDB.Put([]byte{0}, []byte{1}))
 
-			// Mark database as corupted, if applicable
+			// Mark database as corrupted, if applicable
 			_ = corruptableDB.handleError(tt.databaseErrBefore)
 
 			// Make an iterator

@@ -11,6 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -89,20 +90,11 @@ func (s *State) initialize(config *Config) {
 
 func NewState(config *Config) *State {
 	c := &State{
-		verifiedBlocks: make(map[ids.ID]*BlockWrapper),
-		decidedBlocks: cache.NewSizedLRU[ids.ID, *BlockWrapper](
-			config.DecidedCacheSize,
-			cachedBlockSize,
-		),
-		missingBlocks: &cache.LRU[ids.ID, struct{}]{Size: config.MissingCacheSize},
-		unverifiedBlocks: cache.NewSizedLRU[ids.ID, *BlockWrapper](
-			config.UnverifiedCacheSize,
-			cachedBlockSize,
-		),
-		bytesToIDCache: cache.NewSizedLRU[string, ids.ID](
-			config.BytesToIDCacheSize,
-			cachedBlockBytesSize,
-		),
+		verifiedBlocks:   make(map[ids.ID]*BlockWrapper),
+		decidedBlocks:    lru.NewSizedCache(config.DecidedCacheSize, cachedBlockSize),
+		missingBlocks:    lru.NewCache[ids.ID, struct{}](config.MissingCacheSize),
+		unverifiedBlocks: lru.NewSizedCache(config.UnverifiedCacheSize, cachedBlockSize),
+		bytesToIDCache:   lru.NewSizedCache(config.BytesToIDCacheSize, cachedBlockBytesSize),
 	}
 	c.initialize(config)
 	return c
@@ -115,10 +107,7 @@ func NewMeteredState(
 	decidedCache, err := metercacher.New[ids.ID, *BlockWrapper](
 		"decided_cache",
 		registerer,
-		cache.NewSizedLRU[ids.ID, *BlockWrapper](
-			config.DecidedCacheSize,
-			cachedBlockSize,
-		),
+		lru.NewSizedCache(config.DecidedCacheSize, cachedBlockSize),
 	)
 	if err != nil {
 		return nil, err
@@ -126,7 +115,7 @@ func NewMeteredState(
 	missingCache, err := metercacher.New[ids.ID, struct{}](
 		"missing_cache",
 		registerer,
-		&cache.LRU[ids.ID, struct{}]{Size: config.MissingCacheSize},
+		lru.NewCache[ids.ID, struct{}](config.MissingCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -134,10 +123,7 @@ func NewMeteredState(
 	unverifiedCache, err := metercacher.New[ids.ID, *BlockWrapper](
 		"unverified_cache",
 		registerer,
-		cache.NewSizedLRU[ids.ID, *BlockWrapper](
-			config.UnverifiedCacheSize,
-			cachedBlockSize,
-		),
+		lru.NewSizedCache(config.UnverifiedCacheSize, cachedBlockSize),
 	)
 	if err != nil {
 		return nil, err
@@ -145,10 +131,7 @@ func NewMeteredState(
 	bytesToIDCache, err := metercacher.New[string, ids.ID](
 		"bytes_to_id_cache",
 		registerer,
-		cache.NewSizedLRU[string, ids.ID](
-			config.BytesToIDCacheSize,
-			cachedBlockBytesSize,
-		),
+		lru.NewSizedCache(config.BytesToIDCacheSize, cachedBlockBytesSize),
 	)
 	if err != nil {
 		return nil, err

@@ -11,8 +11,8 @@ import "github.com/ava-labs/avalanchego/utils/logging"
 const DefaultFDLimit = 16384
 
 // Set is a no-op for windows and will warn if the default is not used.
-func Set(max uint64, log logging.Logger) error {
-	if max != DefaultFDLimit {
+func Set(limit uint64, log logging.Logger) error {
+	if limit != DefaultFDLimit {
 		log.Warn("fd-limit is not supported for windows")
 	}
 	return nil

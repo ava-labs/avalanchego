@@ -46,6 +46,7 @@ var (
 	errFutureStartTime                 = errors.New("startTime cannot be in the future")
 	errInitialStakeDurationTooLow      = errors.New("initial stake duration is too low")
 	errOverridesStandardNetworkConfig  = errors.New("overrides standard network genesis config")
+	errAllocationsLockedAmountTooLow   = errors.New("total allocations locked amount is too low")
 )
 
 // validateInitialStakedFunds ensures all staked
@@ -113,6 +114,27 @@ func validateInitialStakedFunds(config *Config) error {
 	return nil
 }
 
+// validateAllocationsLockedAmount ensures that the sum of all locked
+// allocation amounts is at least the number of initial stakers.
+func validateAllocationsLockedAmount(config *Config) error {
+	totalLocked := uint64(0)
+	for _, allocation := range config.Allocations {
+		for _, unlock := range allocation.UnlockSchedule {
+			totalLocked += unlock.Amount
+		}
+	}
+	stakersCount := len(config.InitialStakers)
+	if totalLocked < uint64(stakersCount) {
+		return fmt.Errorf(
+			"%w: %d locked < %d stakers",
+			errAllocationsLockedAmountTooLow,
+			totalLocked,
+			stakersCount,
+		)
+	}
+	return nil
+}
+
 // validateConfig returns an error if the provided
 // *Config is not considered valid.
 func validateConfig(networkID uint32, config *Config, stakingCfg *StakingConfig) error {
@@ -171,6 +193,10 @@ func validateConfig(networkID uint32, config *Config, stakingCfg *StakingConfig)
 
 	if err := validateInitialStakedFunds(config); err != nil {
 		return fmt.Errorf("initial staked funds validation failed: %w", err)
+	}
+
+	if err := validateAllocationsLockedAmount(config); err != nil {
+		return err
 	}
 
 	if len(config.CChainGenesis) == 0 {

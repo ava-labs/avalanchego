@@ -38,7 +38,19 @@ func (b *postForkBlock) Accept(ctx context.Context) error {
 	if b.slot != nil {
 		b.vm.acceptedBlocksSlotHistogram.Observe(float64(*b.slot))
 	}
+	b.updateLastAcceptedTimestampMetric(outerBlockTypeMetricLabel, b.Timestamp())
+	b.updateLastAcceptedTimestampMetric(innerBlockTypeMetricLabel, b.innerBlk.Timestamp())
 	return nil
+}
+
+const (
+	innerBlockTypeMetricLabel = "inner"
+	outerBlockTypeMetricLabel = "proposervm"
+)
+
+func (b *postForkBlock) updateLastAcceptedTimestampMetric(blockTypeLabel string, t time.Time) {
+	g := b.vm.lastAcceptedTimestampGaugeVec.WithLabelValues(blockTypeLabel)
+	g.Set(float64(t.Unix()))
 }
 
 func (b *postForkBlock) acceptOuterBlk() error {

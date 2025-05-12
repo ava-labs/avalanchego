@@ -181,9 +181,6 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		return nil, err
 	}
 	vm.connCloser.Add(dbClientConn)
-	vm.db = corruptabledb.New(
-		rpcdb.NewClient(rpcdbpb.NewDatabaseClient(dbClientConn)),
-	)
 
 	// TODO: Allow the logger to be configured by the client
 	vm.log = logging.NewLogger(
@@ -193,6 +190,11 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 			originalStderr,
 			logging.Colors.ConsoleEncoder(),
 		),
+	)
+
+	vm.db = corruptabledb.New(
+		rpcdb.NewClient(rpcdbpb.NewDatabaseClient(dbClientConn)),
+		vm.log,
 	)
 
 	clientConn, err := grpcutils.Dial(
@@ -867,7 +869,7 @@ func convertNetworkUpgrades(pbUpgrades *vmpb.NetworkUpgrades) (upgrade.Config, e
 	if err != nil {
 		return upgrade.Config{}, err
 	}
-	fupgrade, err := grpcutils.TimestampAsTime(pbUpgrades.FUpgradeTime)
+	fortuna, err := grpcutils.TimestampAsTime(pbUpgrades.FortunaTime)
 	if err != nil {
 		return upgrade.Config{}, err
 	}
@@ -892,6 +894,6 @@ func convertNetworkUpgrades(pbUpgrades *vmpb.NetworkUpgrades) (upgrade.Config, e
 		CortinaXChainStopVertexID:    cortinaXChainStopVertexID,
 		DurangoTime:                  durango,
 		EtnaTime:                     etna,
-		FUpgradeTime:                 fupgrade,
+		FortunaTime:                  fortuna,
 	}, nil
 }

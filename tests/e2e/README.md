@@ -8,7 +8,7 @@
 ```bash
 ./scripts/build.sh        # Builds avalanchego for use in deploying a test network
 ./scripts/build_xsvm.sh   # Builds xsvm for use in deploying a test network with a subnet
-./bin/ginkgo -v ./tests/e2e -- --avalanchego-path=./build/avalanchego
+./bin/ginkgo -v ./tests/e2e -- --avalanchego-path=$PWD/build/avalanchego # Note that the path given for --avalanchego-path must be an absolute and not a relative path.
 ```
 
 See [`tests.e2e.sh`](../../scripts/tests.e2e.sh) for an example.
@@ -26,13 +26,13 @@ flags.
 In cases where a change can be verified against only a subset of
 tests, it is possible to filter the tests that will be executed by the
 declarative labels that have been applied to them. Available labels
-are defined as constants in [`describe.go`](./describe.go) with names
+are defined as constants in [`describe.go`](../fixture/e2e/describe.go) with names
 of the form `*Label`. The following example runs only those tests that
 primarily target the X-Chain:
 
 
 ```bash
-./bin/ginkgo -v --label-filter=x ./tests/e2e -- --avalanchego-path=./build/avalanchego
+./bin/ginkgo -v --label-filter=x ./tests/e2e -- --avalanchego-path=$PWD/build/avalanchego
 ```
 
 The ginkgo docs provide further detail on [how to compose label
@@ -40,7 +40,7 @@ queries](https://onsi.github.io/ginkgo/#spec-labels).
 
 ## Adding tests
 
-Define any flags/configurations in [`e2e.go`](./e2e.go).
+Define any flags/configurations in [`flags.go`](../fixture/e2e/flags.go).
 
 Create a new package to implement feature-specific tests, or add tests to an existing package. For example:
 
@@ -107,3 +107,32 @@ these bootstrap checks during development, set the
 ```bash
 E2E_SKIP_BOOTSTRAP_CHECKS=1 ./bin/ginkgo -v ./tests/e2e ...
 ```
+
+## Monitoring
+
+It is possible to enable collection of logs and metrics from the
+temporary networks used for e2e testing by:
+
+ - Supplying `--start-collectors` as an argument to the test suite
+ - Starting collectors in advance of a test run with `tmpnetctl
+   start-collectors`
+
+Both methods require:
+
+ - Auth credentials to be supplied as env vars:
+   - `PROMETHEUS_USERNAME`
+   - `PROMETHEUS_PASSWORD`
+   - `LOKI_USERNAME`
+   - `LOKI_PASSWORD`
+ - The availability in the path of binaries for promtail and prometheus
+   - Starting a development shell with `nix develop` is one way to
+     ensure this and requires the [installation of
+     nix](https://github.com/DeterminateSystems/nix-installer?tab=readme-ov-file#install-nix).
+
+Once started, the collectors will continue to run in the background
+until stopped by `tmpnetctl stop-collectors`.
+
+The results of collection will be viewable at
+https://grafana-poc.avax-dev.network.
+
+For more detail, see the [tmpnet docs](../fixture/tmpnet/README.md##monitoring).

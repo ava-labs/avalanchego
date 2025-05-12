@@ -9,13 +9,13 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool/mempoolmock"
 	"github.com/ava-labs/avalanchego/vms/txs/mempool"
+
+	pmempool "github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
 var errFoo = errors.New("foo")
@@ -23,56 +23,19 @@ var errFoo = errors.New("foo")
 // Add should error if verification errors
 func TestGossipMempoolAddVerificationError(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
 
 	txID := ids.GenerateTestID()
 	tx := &txs.Tx{
 		TxID: txID,
 	}
 
-	mempool := mempoolmock.NewMempool(ctrl)
+	mempool, err := pmempool.New("", prometheus.NewRegistry())
+	require.NoError(err)
 	txVerifier := testTxVerifier{err: errFoo}
 
-	mempool.EXPECT().Get(txID).Return(nil, false)
-	mempool.EXPECT().GetDropReason(txID).Return(nil)
-	mempool.EXPECT().MarkDropped(txID, errFoo)
-
 	gossipMempool, err := newGossipMempool(
 		mempool,
-		prometheus.NewRegistry(),
-		logging.NoLog{},
-		txVerifier,
-		testConfig.ExpectedBloomFilterElements,
-		testConfig.ExpectedBloomFilterFalsePositiveProbability,
-		testConfig.MaxBloomFilterFalsePositiveProbability,
-	)
-	require.NoError(err)
-
-	err = gossipMempool.Add(tx)
-	require.ErrorIs(err, errFoo)
-	require.False(gossipMempool.bloom.Has(tx))
-}
-
-// Add should error if adding to the mempool errors
-func TestGossipMempoolAddError(t *testing.T) {
-	require := require.New(t)
-	ctrl := gomock.NewController(t)
-
-	txID := ids.GenerateTestID()
-	tx := &txs.Tx{
-		TxID: txID,
-	}
-
-	txVerifier := testTxVerifier{}
-	mempool := mempoolmock.NewMempool(ctrl)
-
-	mempool.EXPECT().Get(txID).Return(nil, false)
-	mempool.EXPECT().GetDropReason(txID).Return(nil)
-	mempool.EXPECT().Add(tx).Return(errFoo)
-	mempool.EXPECT().MarkDropped(txID, errFoo).AnyTimes()
-
-	gossipMempool, err := newGossipMempool(
-		mempool,
+		nil,
 		prometheus.NewRegistry(),
 		logging.NoLog{},
 		txVerifier,
@@ -90,20 +53,21 @@ func TestGossipMempoolAddError(t *testing.T) {
 // Adding a duplicate to the mempool should return an error
 func TestMempoolDuplicate(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
 
-	testMempool := mempoolmock.NewMempool(ctrl)
+	testMempool, err := pmempool.New("", prometheus.NewRegistry())
+	require.NoError(err)
 	txVerifier := testTxVerifier{}
 
 	txID := ids.GenerateTestID()
 	tx := &txs.Tx{
-		TxID: txID,
+		Unsigned: &txs.BaseTx{},
+		TxID:     txID,
 	}
 
-	testMempool.EXPECT().Get(txID).Return(tx, true)
-
+	require.NoError(testMempool.Add(tx))
 	gossipMempool, err := newGossipMempool(
 		testMempool,
+		nil,
 		prometheus.NewRegistry(),
 		logging.NoLog{},
 		txVerifier,
@@ -121,24 +85,20 @@ func TestMempoolDuplicate(t *testing.T) {
 // Adding a tx to the mempool should add it to the bloom filter
 func TestGossipAddBloomFilter(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
 
 	txID := ids.GenerateTestID()
 	tx := &txs.Tx{
-		TxID: txID,
+		Unsigned: &txs.BaseTx{},
+		TxID:     txID,
 	}
 
 	txVerifier := testTxVerifier{}
-	mempool := mempoolmock.NewMempool(ctrl)
-
-	mempool.EXPECT().Get(txID).Return(nil, false)
-	mempool.EXPECT().GetDropReason(txID).Return(nil)
-	mempool.EXPECT().Add(tx).Return(nil)
-	mempool.EXPECT().Len().Return(0)
-	mempool.EXPECT().RequestBuildBlock(false)
+	mempool, err := pmempool.New("", prometheus.NewRegistry())
+	require.NoError(err)
 
 	gossipMempool, err := newGossipMempool(
 		mempool,
+		nil,
 		prometheus.NewRegistry(),
 		logging.NoLog{},
 		txVerifier,
