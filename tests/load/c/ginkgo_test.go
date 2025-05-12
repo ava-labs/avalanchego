@@ -1,10 +1,13 @@
-// Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package c
 
 import (
 	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/onsi/ginkgo/v2"
@@ -26,7 +29,12 @@ func init() {
 	flagVars = e2e.RegisterFlagsWithDefaultOwner("avalanchego-load")
 }
 
-const nodesCount = 1
+const (
+	nodesCount = 1
+	metricsURI = "127.0.0.1:8082"
+	// relative to the user home directory
+	metricsFilePath = ".tmpnet/prometheus/file_sd_configs/c-chain-load-test.json"
+)
 
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run only once in the first ginkgo process
@@ -58,12 +66,30 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 	ginkgo.BeforeAll(func() {
 		tc := e2e.NewTestContext()
 		env := e2e.GetEnv(tc)
+		r := require.New(tc)
+
 		network = env.GetNetwork()
 		network.Nodes = network.Nodes[:nodesCount]
 		for _, node := range network.Nodes {
 			err := node.EnsureKeys()
-			require.NoError(tc, err, "ensuring keys for node %s", node.NodeID)
+			r.NoError(err, "ensuring keys for node %s", node.NodeID)
 		}
+
+		collectorConfigBytes, err := generateCollectorConfig(
+			[]string{metricsURI},
+			e2e.GetEnv(tc).GetNetwork().UUID,
+		)
+		r.NoError(err, "failed to generate collector config for network %s", e2e.GetEnv(tc).GetNetwork().UUID)
+
+		homedir, err := os.UserHomeDir()
+		r.NoError(err, "failed to get user home dir")
+
+		collectorFilePath := filepath.Join(homedir, metricsFilePath)
+		r.NoError(writeCollectorConfig(collectorFilePath, collectorConfigBytes), "failed to write collector config at path %s", collectorFilePath)
+
+		ginkgo.DeferCleanup(func() {
+			r.NoError(os.Remove(collectorFilePath))
+		})
 	})
 
 	ginkgo.It("C-Chain", func(ctx context.Context) {
@@ -71,12 +97,13 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 		endpoints, err := tmpnet.GetNodeWebsocketURIs(network.Nodes, blockchainID)
 		require.NoError(ginkgo.GinkgoT(), err, "getting node websocket URIs")
 		config := config{
-			endpoints: endpoints,
-			maxFeeCap: 5000,
-			agents:    1,
-			minTPS:    10,
-			maxTPS:    100,
-			step:      5,
+			metricsURI: metricsURI,
+			endpoints:  endpoints,
+			maxFeeCap:  5000,
+			agents:     1,
+			minTPS:     10,
+			maxTPS:     100,
+			step:       5,
 		}
 		err = execute(ctx, network.PreFundedKeys, config)
 		if err != nil {
@@ -84,3 +111,34 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 		}
 	})
 })
+
+func generateCollectorConfig(targets []string, uuid string) ([]byte, error) {
+	nodeLabels := map[string]string{
+		"network_owner": "c-chain-load-test",
+		"network_uuid":  uuid,
+	}
+	cfg := []map[string]any{
+		{
+			"labels":  nodeLabels,
+			"targets": targets,
+		},
+	}
+
+	return json.MarshalIndent(cfg, "", " ")
+}
+
+func writeCollectorConfig(metricsFilePath string, config []byte) error {
+	file, err := os.OpenFile(metricsFilePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	if _, err := file.Write(config); err != nil {
+		return err
+	}
+
+	return nil
+}
