@@ -138,6 +138,14 @@ func (b *postForkOption) epochNumber(ctx context.Context) (uint64, error) {
 	return parent.epochNumber(ctx)
 }
 
+func (b *postForkOption) epochStartTime(ctx context.Context) (time.Time, error) {
+	parent, err := b.vm.getBlock(ctx, b.ParentID())
+	if err != nil {
+		return time.Time{}, err
+	}
+	return parent.epochStartTime(ctx)
+}
+
 func (b *postForkOption) getStatelessBlk() block.Block {
 	return b.Block
 }

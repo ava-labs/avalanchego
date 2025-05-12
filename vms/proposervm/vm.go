@@ -107,15 +107,6 @@ type VM struct {
 	acceptedBlocksSlotHistogram prometheus.Histogram
 }
 
-// Epochs are numbered starting from 0.
-// The 0th epoch is defined as ending at FUpgradeTime + FUpgradeEpochDuration
-func (vm *VM) GetEpoch(timestamp time.Time) uint64 {
-	if timestamp.Before(vm.Upgrades.FUpgradeTime) {
-		return 0
-	}
-	return uint64(timestamp.Sub(vm.Upgrades.FUpgradeTime).Seconds()) / vm.Upgrades.FUpgradeEpochDuration
-}
-
 // New performs best when [minBlkDelay] is whole seconds. This is because block
 // timestamps are only specific to the second.
 func New(
