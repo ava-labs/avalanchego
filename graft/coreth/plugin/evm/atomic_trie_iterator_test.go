@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/libevm/common"
@@ -19,7 +20,7 @@ import (
 
 func testSharedMemory() avalancheatomic.SharedMemory {
 	m := avalancheatomic.NewMemory(memdb.New())
-	return m.NewSharedMemory(testCChainID)
+	return m.NewSharedMemory(snowtest.CChainID)
 }
 
 func TestIteratorCanIterate(t *testing.T) {

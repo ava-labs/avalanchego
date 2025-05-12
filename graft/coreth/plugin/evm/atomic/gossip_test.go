@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/prometheus/client_golang/prometheus"
@@ -91,7 +91,8 @@ func TestAtomicMempoolIterate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			m, err := NewMempool(&snow.Context{}, prometheus.NewRegistry(), 10, nil)
+			ctx := snowtest.Context(t, snowtest.CChainID)
+			m, err := NewMempool(ctx, prometheus.NewRegistry(), 10, nil)
 			require.NoError(err)
 
 			for _, add := range tt.add {

@@ -16,7 +16,6 @@ import (
 
 var (
 	TestChainConfig = &ChainConfig{
-		AvalancheContext: AvalancheContext{SnowCtx: utils.TestSnowContext()},
 		NetworkUpgrades: NetworkUpgrades{
 			ApricotPhase1BlockTimestamp:     utils.NewUint64(0),
 			ApricotPhase2BlockTimestamp:     utils.NewUint64(0),
@@ -34,9 +33,7 @@ var (
 		},
 	}
 
-	TestLaunchConfig = &ChainConfig{
-		AvalancheContext: AvalancheContext{SnowCtx: utils.TestSnowContext()},
-	}
+	TestLaunchConfig = &ChainConfig{}
 
 	TestApricotPhase1Config = copyAndSet(TestLaunchConfig, func(c *ChainConfig) {
 		c.NetworkUpgrades.ApricotPhase1BlockTimestamp = utils.NewUint64(0)

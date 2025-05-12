@@ -15,11 +15,10 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/coreth/plugin/evm/testutils"
-	"github.com/ava-labs/coreth/utils"
 	"github.com/ava-labs/coreth/warp/warptest"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -29,16 +28,13 @@ func TestAddressedCallSignatures(t *testing.T) {
 	testutils.WithMetrics(t)
 
 	database := memdb.New()
-	snowCtx := utils.TestSnowContext()
-	blsSecretKey, err := localsigner.New()
-	require.NoError(t, err)
-	warpSigner := avalancheWarp.NewSigner(blsSecretKey, snowCtx.NetworkID, snowCtx.ChainID)
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
 
 	offChainPayload, err := payload.NewAddressedCall([]byte{1, 2, 3}, []byte{1, 2, 3})
 	require.NoError(t, err)
 	offchainMessage, err := avalancheWarp.NewUnsignedMessage(snowCtx.NetworkID, snowCtx.ChainID, offChainPayload.Bytes())
 	require.NoError(t, err)
-	offchainSignature, err := warpSigner.Sign(offchainMessage)
+	offchainSignature, err := snowCtx.WarpSigner.Sign(offchainMessage)
 	require.NoError(t, err)
 
 	tests := map[string]struct {
@@ -52,7 +48,7 @@ func TestAddressedCallSignatures(t *testing.T) {
 				require.NoError(t, err)
 				msg, err := avalancheWarp.NewUnsignedMessage(snowCtx.NetworkID, snowCtx.ChainID, knownPayload.Bytes())
 				require.NoError(t, err)
-				signature, err := warpSigner.Sign(msg)
+				signature, err := snowCtx.WarpSigner.Sign(msg)
 				require.NoError(t, err)
 
 				backend.AddMessage(msg)
@@ -102,9 +98,9 @@ func TestAddressedCallSignatures(t *testing.T) {
 				} else {
 					sigCache = &cache.Empty[ids.ID, []byte]{}
 				}
-				warpBackend, err := NewBackend(snowCtx.NetworkID, snowCtx.ChainID, warpSigner, warptest.EmptyBlockClient, database, sigCache, [][]byte{offchainMessage.Bytes()})
+				warpBackend, err := NewBackend(snowCtx.NetworkID, snowCtx.ChainID, snowCtx.WarpSigner, warptest.EmptyBlockClient, database, sigCache, [][]byte{offchainMessage.Bytes()})
 				require.NoError(t, err)
-				handler := acp118.NewCachedHandler(sigCache, warpBackend, warpSigner)
+				handler := acp118.NewCachedHandler(sigCache, warpBackend, snowCtx.WarpSigner)
 
 				requestBytes, expectedResponse := test.setup(warpBackend)
 				protoMsg := &sdk.SignatureRequest{Message: requestBytes}
@@ -145,11 +141,8 @@ func TestBlockSignatures(t *testing.T) {
 	testutils.WithMetrics(t)
 
 	database := memdb.New()
-	snowCtx := utils.TestSnowContext()
-	blsSecretKey, err := localsigner.New()
-	require.NoError(t, err)
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
 
-	warpSigner := avalancheWarp.NewSigner(blsSecretKey, snowCtx.NetworkID, snowCtx.ChainID)
 	knownBlkID := ids.GenerateTestID()
 	blockClient := warptest.MakeBlockClient(knownBlkID)
 
@@ -178,7 +171,7 @@ func TestBlockSignatures(t *testing.T) {
 				require.NoError(t, err)
 				unsignedMessage, err := avalancheWarp.NewUnsignedMessage(snowCtx.NetworkID, snowCtx.ChainID, hashPayload.Bytes())
 				require.NoError(t, err)
-				signature, err := warpSigner.Sign(unsignedMessage)
+				signature, err := snowCtx.WarpSigner.Sign(unsignedMessage)
 				require.NoError(t, err)
 				return toMessageBytes(knownBlkID), signature[:]
 			},
@@ -217,14 +210,14 @@ func TestBlockSignatures(t *testing.T) {
 				warpBackend, err := NewBackend(
 					snowCtx.NetworkID,
 					snowCtx.ChainID,
-					warpSigner,
+					snowCtx.WarpSigner,
 					blockClient,
 					database,
 					sigCache,
 					nil,
 				)
 				require.NoError(t, err)
-				handler := acp118.NewCachedHandler(sigCache, warpBackend, warpSigner)
+				handler := acp118.NewCachedHandler(sigCache, warpBackend, snowCtx.WarpSigner)
 
 				requestBytes, expectedResponse := test.setup()
 				protoMsg := &sdk.SignatureRequest{Message: requestBytes}

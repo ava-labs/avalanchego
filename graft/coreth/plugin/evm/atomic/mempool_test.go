@@ -7,14 +7,15 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 )
 
 func TestMempoolAddTx(t *testing.T) {
 	require := require.New(t)
-	m, err := NewMempool(&snow.Context{}, prometheus.NewRegistry(), 5_000, nil)
+	ctx := snowtest.Context(t, snowtest.CChainID)
+	m, err := NewMempool(ctx, prometheus.NewRegistry(), 5_000, nil)
 	require.NoError(err)
 
 	txs := make([]*GossipAtomicTx, 0)
@@ -39,7 +40,8 @@ func TestMempoolAddTx(t *testing.T) {
 // Add should return an error if a tx is already known
 func TestMempoolAdd(t *testing.T) {
 	require := require.New(t)
-	m, err := NewMempool(&snow.Context{}, prometheus.NewRegistry(), 5_000, nil)
+	ctx := snowtest.Context(t, snowtest.CChainID)
+	m, err := NewMempool(ctx, prometheus.NewRegistry(), 5_000, nil)
 	require.NoError(err)
 
 	tx := &GossipAtomicTx{

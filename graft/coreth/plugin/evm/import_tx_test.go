@@ -15,6 +15,8 @@ import (
 
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	avalancheutils "github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -67,7 +69,7 @@ func createImportTxOptions(t *testing.T, vm *VM, sharedMemory *avalancheatomic.M
 }
 
 func TestImportTxVerify(t *testing.T) {
-	ctx := NewContext()
+	ctx := snowtest.Context(t, snowtest.CChainID)
 
 	var importAmount uint64 = 10000000
 	txID := ids.GenerateTestID()
@@ -317,7 +319,7 @@ func TestImportTxVerify(t *testing.T) {
 					{
 						Address: testEthAddrs[0],
 						Amount:  0,
-						AssetID: testAvaxAssetID,
+						AssetID: snowtest.AVAXAssetID,
 					},
 				}
 				return &tx
@@ -506,24 +508,24 @@ func TestNewImportTx(t *testing.T) {
 	}
 	tests2 := map[string]atomicTxTest{
 		"apricot phase 0": {
-			setup:       createNewImportAVAXTx,
-			checkState:  checkState,
-			genesisJSON: genesisJSONApricotPhase0,
+			setup:      createNewImportAVAXTx,
+			checkState: checkState,
+			fork:       upgradetest.NoUpgrades,
 		},
 		"apricot phase 1": {
-			setup:       createNewImportAVAXTx,
-			checkState:  checkState,
-			genesisJSON: genesisJSONApricotPhase1,
+			setup:      createNewImportAVAXTx,
+			checkState: checkState,
+			fork:       upgradetest.ApricotPhase1,
 		},
 		"apricot phase 2": {
-			setup:       createNewImportAVAXTx,
-			checkState:  checkState,
-			genesisJSON: genesisJSONApricotPhase2,
+			setup:      createNewImportAVAXTx,
+			checkState: checkState,
+			fork:       upgradetest.ApricotPhase2,
 		},
 		"apricot phase 3": {
-			setup:       createNewImportAVAXTx,
-			checkState:  checkState,
-			genesisJSON: genesisJSONApricotPhase3,
+			setup:      createNewImportAVAXTx,
+			checkState: checkState,
+			fork:       upgradetest.ApricotPhase3,
 		},
 	}
 
@@ -1174,7 +1176,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 				}
 				return tx
 			},
-			genesisJSON:       genesisJSONApricotPhase3,
+			fork:              upgradetest.ApricotPhase3,
 			semanticVerifyErr: atomic.ErrOutputsNotSortedUnique.Error(),
 		},
 	}
