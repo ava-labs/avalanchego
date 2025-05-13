@@ -7,21 +7,21 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"go.uber.org/zap"
 	"net"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/tests/load"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/libevm/common"
 )
 
 // Run this using the command:
@@ -173,10 +173,10 @@ func writeCollectorConfiguration(r *require.Assertions, metricsURI, networkUUID 
 	collectorConfig, err := generateCollectorConfig([]string{metricsURI}, networkUUID)
 	r.NoError(err, "generating collector configuration")
 
-	err = os.MkdirAll(filepath.Dir(collectorFilePath), 0755)
+	err = os.MkdirAll(filepath.Dir(collectorFilePath), 0o755)
 	r.NoError(err, "creating collector directory")
 
-	err = os.WriteFile(collectorFilePath, collectorConfig, 0644)
+	err = os.WriteFile(collectorFilePath, collectorConfig, 0o600)
 	r.NoError(err, "writing collector configuration")
 
 	logger.Info("Collector configuration written",
