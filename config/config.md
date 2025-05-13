@@ -384,7 +384,7 @@ Path to a JSON file containing the genesis data to use. Ignored when running
 standard networks (Mainnet, Fuji Testnet), or when `--genesis-content` is
 specified. If not given, uses default genesis data.
 
-See the documentation for the genesis JSON format [here](https://github.com/ava-labs/avalanchego/blob/master/genesis/README.md) and an example used for the local network genesis [here](https://github.com/ava-labs/avalanchego/blob/master/genesis/).
+See the documentation for the genesis JSON format [here](../genesis/README.md) and an example used for the local network genesis [here](../genesis/genesis_local.json).
 
 
 #### `--genesis-file-content` (string)
@@ -563,13 +563,13 @@ The identity of the network the node should connect to. Can be one of:
 AvalancheGo supports collecting and exporting [OpenTelemetry](https://opentelemetry.io/) traces.
 This might be useful for debugging, performance analysis, or monitoring.
 
-#### `--tracing-enabled` (boolean)
-
-If true, enable OpenTelemetry tracing. Defaults to `false`.
-
 #### `--tracing-endpoint` (string)
 
-The endpoint to export trace data to. Defaults to `localhost:4317`.
+The endpoint to export trace data to. Defaults to `localhost:4317` if `--tracing-exporter-type` is set to `grpc` and `localhost:4318` if `--tracing-exporter-type` is set to `http`.
+
+#### `--tracing-exporter-type`(string)
+
+Type of exporter to use for tracing. Options are [`disabled`,`grpc`,`http`]. Defaults to `disabled`.
 
 #### `--tracing-insecure` (string)
 
@@ -579,10 +579,6 @@ If true, don't use TLS when exporting trace data. Defaults to `true`.
 
 The fraction of traces to sample. If >= 1, always sample. If `<= 0`, never sample.
 Defaults to `0.1`.
-
-#### `--tracing-exporter-type`(string)
-
-Type of exporter to use for tracing. Options are [`grpc`,`http`]. Defaults to `grpc`.
 
 ## Partial Sync Primary Network
 

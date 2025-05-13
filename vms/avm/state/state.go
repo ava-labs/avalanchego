@@ -11,6 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -151,7 +152,7 @@ func New(
 	txCache, err := metercacher.New[ids.ID, *txs.Tx](
 		"tx_cache",
 		metrics,
-		&cache.LRU[ids.ID, *txs.Tx]{Size: txCacheSize},
+		lru.NewCache[ids.ID, *txs.Tx](txCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -160,7 +161,7 @@ func New(
 	blockIDCache, err := metercacher.New[uint64, ids.ID](
 		"block_id_cache",
 		metrics,
-		&cache.LRU[uint64, ids.ID]{Size: blockIDCacheSize},
+		lru.NewCache[uint64, ids.ID](blockIDCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -169,7 +170,7 @@ func New(
 	blockCache, err := metercacher.New[ids.ID, block.Block](
 		"block_cache",
 		metrics,
-		&cache.LRU[ids.ID, block.Block]{Size: blockCacheSize},
+		lru.NewCache[ids.ID, block.Block](blockCacheSize),
 	)
 	if err != nil {
 		return nil, err

@@ -62,7 +62,7 @@ func GetNodeURIs(nodes []*Node) []NodeURI {
 		}
 		// Only append URIs that are not empty. A node may have an
 		// empty URI if it is not currently running.
-		if len(node.URI) > 0 {
+		if node.IsRunning() {
 			uris = append(uris, NodeURI{
 				NodeID: node.NodeID,
 				URI:    node.URI,
