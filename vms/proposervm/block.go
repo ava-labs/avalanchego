@@ -83,11 +83,12 @@ func (p *postForkCommonComponents) Height() uint64 {
 }
 
 // Calculates a block's P-Chain epoch height based on its ancestor's epoch membership
-func (p *postForkCommonComponents) getPChainEpoch(ctx context.Context, parentID ids.ID, childTimestamp time.Time) (uint64, uint64, time.Time, error) {
+func (p *postForkCommonComponents) getPChainEpoch(ctx context.Context, parentID ids.ID) (uint64, uint64, time.Time, error) {
 	parent, err := p.vm.getBlock(ctx, parentID)
 	if err != nil {
 		return 0, 0, time.Time{}, err
 	}
+	parentTimestamp := parent.Timestamp()
 	epoch, err := parent.epochNumber(ctx)
 	if err != nil {
 		return 0, 0, time.Time{}, fmt.Errorf("failed to get epoch number: %w", err)
@@ -103,18 +104,18 @@ func (p *postForkCommonComponents) getPChainEpoch(ctx context.Context, parentID 
 		if err != nil {
 			return 0, 0, time.Time{}, fmt.Errorf("failed to get P-Chain height: %w", err)
 		}
-		return height, 0, childTimestamp, nil
+		return height, 0, parentTimestamp, nil
 	}
 
-	if parent.Timestamp().After(epochStartTime.Add(time.Duration(p.vm.Upgrades.GUpgradeEpochDuration) * time.Second)) {
+	if parentTimestamp.After(epochStartTime.Add(time.Duration(p.vm.Upgrades.GUpgradeEpochDuration) * time.Second)) {
 		// If the parent crossed the epoch boundary, then it sealed the previous epoch. The child
 		// is the first block of the new epoch, so should use the parent's P-Chain height, increment
-		// the epoch number, and set the epoch start time to its timestamp.
+		// the epoch number, and set the epoch start time to the parent's timestamp.
 		height, err := parent.pChainHeight(ctx)
 		if err != nil {
 			return 0, 0, time.Time{}, fmt.Errorf("failed to get P-Chain height: %w", err)
 		}
-		return height, epoch + 1, childTimestamp, nil
+		return height, epoch + 1, parentTimestamp, nil
 	}
 	// Otherwise, the parent did not seal the previous epoch, so the child should use the parent's
 	// epoch information. This is true even if the child crosses the epoch boundary, since sealing
@@ -212,7 +213,7 @@ func (p *postForkCommonComponents) Verify(
 
 	var contextPChainHeight uint64
 	if p.vm.Upgrades.IsGUpgradeActivated(childTimestamp) {
-		pChainEpochHeight, _, _, err := p.getPChainEpoch(ctx, child.Parent(), childTimestamp)
+		pChainEpochHeight, _, _, err := p.getPChainEpoch(ctx, child.Parent())
 		if err != nil {
 			p.vm.ctx.Log.Error("unexpected build verification failure",
 				zap.String("reason", "failed to get P-Chain epoch height"),
@@ -291,7 +292,7 @@ func (p *postForkCommonComponents) buildChild(
 		epochStartTime                                      time.Time
 	)
 	if p.vm.Upgrades.IsGUpgradeActivated(newTimestamp) {
-		pChainEpochHeight, epochNumber, epochStartTime, err = p.getPChainEpoch(ctx, parentID, newTimestamp)
+		pChainEpochHeight, epochNumber, epochStartTime, err = p.getPChainEpoch(ctx, parentID)
 		if err != nil {
 			p.vm.ctx.Log.Error("unexpected build block failure",
 				zap.String("reason", "failed to get P-Chain epoch height"),
