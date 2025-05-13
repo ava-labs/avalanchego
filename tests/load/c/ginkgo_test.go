@@ -26,7 +26,7 @@ func init() {
 	flagVars = e2e.RegisterFlagsWithDefaultOwner("avalanchego-load")
 }
 
-const nodesCount = 1
+const nodesCount = 3
 
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run only once in the first ginkgo process
