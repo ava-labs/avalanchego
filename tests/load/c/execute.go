@@ -25,14 +25,22 @@ import (
 )
 
 type config struct {
-	endpoints  []string
-	maxFeeCap  int64
-	agents     uint
-	minTPS     int64
-	maxTPS     int64
-	step       int64
+	endpoints []string
+	maxFeeCap int64
+	agents    uint
+	minTPS    int64
+	maxTPS    int64
+	step      int64
+	issuer    issuerType
 	metricsURI string
 }
+
+type issuerType string
+
+const (
+	issuerSimple  issuerType = "simple"
+	issuerOpcoder issuerType = "opcoder"
+)
 
 func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config config) error {
 	logger := logging.NewLogger("", logging.NewWrappedCore(logging.Info, os.Stdout, logging.Auto.ConsoleEncoder()))
@@ -69,8 +77,8 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 			return fmt.Errorf("getting nonce for address %s: %w", address, err)
 		}
 
-		issuer, err := issuers.NewOpcoder(ctx, client, tracker,
-			nonce, big.NewInt(config.maxFeeCap), keys[i])
+		issuer, err := createIssuer(ctx, config.issuer,
+			client, tracker, config.maxFeeCap, nonce, keys[i])
 		if err != nil {
 			return fmt.Errorf("creating issuer: %w", err)
 		}
@@ -89,14 +97,12 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 	orchestratorConfig.MinTPS = config.minTPS
 	orchestratorConfig.MaxTPS = config.maxTPS
 	orchestratorConfig.Step = config.step
-	orchestratorConfig.SustainedTime = 10 * time.Second
+	orchestratorConfig.TxRateMultiplier = 1.05
 	orchestrator := load.NewOrchestrator(agents, tracker, logger, orchestratorConfig)
 	orchestratorErrCh := make(chan error)
 	go func() {
 		orchestratorErrCh <- orchestrator.Execute(orchestratorCtx)
 	}()
-
-	go tracker.LogPeriodically(orchestratorCtx)
 
 	select {
 	case err := <-orchestratorErrCh:
@@ -132,4 +138,20 @@ func fixKeysCount(preFundedKeys []*secp256k1.PrivateKey, target int) ([]*ecdsa.P
 		keys = append(keys, key)
 	}
 	return keys, nil
+}
+
+func createIssuer(ctx context.Context, typ issuerType,
+	client *ethclient.Client, tracker *load.Tracker[common.Hash],
+	maxFeeCap int64, nonce uint64, key *ecdsa.PrivateKey,
+) (load.Issuer[common.Hash], error) {
+	switch typ {
+	case issuerSimple:
+		return issuers.NewSimple(ctx, client, tracker,
+			nonce, big.NewInt(maxFeeCap), key)
+	case issuerOpcoder:
+		return issuers.NewOpcoder(ctx, client, tracker,
+			nonce, big.NewInt(maxFeeCap), key)
+	default:
+		return nil, fmt.Errorf("unknown issuer type %s", typ)
+	}
 }

@@ -4,14 +4,11 @@
 package load
 
 import (
-	"context"
 	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -33,15 +30,12 @@ type Tracker[T TxID] struct {
 	txsConfirmedCounter prometheus.Counter
 	txsFailedCounter    prometheus.Counter
 	txLatency           prometheus.Histogram
-
-	logger logging.Logger
 }
 
 // NewTracker returns a new Tracker instance which records metrics for the number
 // of transactions issued, confirmed, and failed. It also tracks the latency of
 // transactions.
-func NewTracker[T TxID](reg prometheus.Registerer, logger logging.Logger,
-) (*Tracker[T], error) {
+func NewTracker[T TxID](reg prometheus.Registerer) (*Tracker[T], error) {
 	tracker := &Tracker[T]{
 		outstandingTxs: make(map[T]time.Time),
 		txsIssuedCounter: prometheus.NewCounter(prometheus.CounterOpts{
@@ -64,7 +58,6 @@ func NewTracker[T TxID](reg prometheus.Registerer, logger logging.Logger,
 			Name:      "tx_latency",
 			Help:      "Latency of transactions",
 		}),
-		logger: logger,
 	}
 
 	errs := wrappers.Errs{}
@@ -139,27 +132,4 @@ func (p *Tracker[T]) ObserveFailed(txID T) {
 	p.txsFailed++
 	p.txsFailedCounter.Inc()
 	p.txLatency.Observe(float64(time.Since(startTime).Milliseconds()))
-}
-
-func (t *Tracker[T]) LogPeriodically(ctx context.Context) {
-	const period = 10 * time.Second
-
-	ticker := time.NewTicker(period)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-		}
-		t.lock.RLock()
-		t.logger.Info("Tracker stats",
-			zap.Uint64("issued", t.txsIssued),
-			zap.Uint64("confirmed", t.txsConfirmed),
-			zap.Uint64("failed", t.txsFailed),
-			zap.Int("inflight", len(t.outstandingTxs)),
-		)
-		t.lock.RUnlock()
-	}
 }

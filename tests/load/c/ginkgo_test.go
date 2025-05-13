@@ -18,7 +18,7 @@ import (
 )
 
 // Run this using the command:
-// ./bin/ginkgo -v ./tests/load -- --avalanchego-path=$PWD/build/avalanchego
+// ./bin/ginkgo -v ./tests/load/c -- --avalanchego-path=$PWD/build/avalanchego
 func TestLoad(t *testing.T) {
 	ginkgo.RunSpecs(t, "load tests")
 }
@@ -30,7 +30,7 @@ func init() {
 }
 
 const (
-	nodesCount = 1
+	nodesCount = 3
 	metricsURI = "127.0.0.1:8082"
 	// relative to the user home directory
 	metricsFilePath = ".tmpnet/prometheus/file_sd_configs/c-chain-load-test.json"
@@ -92,18 +92,37 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 		})
 	})
 
-	ginkgo.It("C-Chain", func(ctx context.Context) {
+	ginkgo.It("C-Chain simple", func(ctx context.Context) {
 		const blockchainID = "C"
 		endpoints, err := tmpnet.GetNodeWebsocketURIs(network.Nodes, blockchainID)
 		require.NoError(ginkgo.GinkgoT(), err, "getting node websocket URIs")
 		config := config{
-			metricsURI: metricsURI,
-			endpoints:  endpoints,
-			maxFeeCap:  325000000000,
-			agents:     1,
-			minTPS:     10,
-			maxTPS:     100,
-			step:       5,
+			endpoints: endpoints,
+			issuer:    issuerSimple,
+			maxFeeCap: 3000,
+			agents:    1,
+			minTPS:    50,
+			maxTPS:    90,
+			step:      10,
+		}
+		err = execute(ctx, network.PreFundedKeys, config)
+		if err != nil {
+			ginkgo.GinkgoT().Error(err)
+		}
+	})
+
+	ginkgo.It("C-Chain opcoder", func(ctx context.Context) {
+		const blockchainID = "C"
+		endpoints, err := tmpnet.GetNodeWebsocketURIs(network.Nodes, blockchainID)
+		require.NoError(ginkgo.GinkgoT(), err, "getting node websocket URIs")
+		config := config{
+			endpoints: endpoints,
+			issuer:    issuerOpcoder,
+			maxFeeCap: 300000000000,
+			agents:    1,
+			minTPS:    30,
+			maxTPS:    60,
+			step:      5,
 		}
 		err = execute(ctx, network.PreFundedKeys, config)
 		if err != nil {
