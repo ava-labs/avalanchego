@@ -268,11 +268,11 @@ func (o *Orchestrator[_]) issueTxs(ctx context.Context, currTargetTPS *atomic.In
 				txsPerIssuer := uint64(math.Ceil(float64(currTargetTPS.Load())/float64(len(o.agents))) * o.config.TxRateMultiplier)
 				// always listen until listener context is cancelled, do not call agent.Listener.IssuingDone().
 				for range txsPerIssuer {
-					tx, err := agent.Issuer.GenerateAndIssueTx(ctx)
+					txID, err := agent.Issuer.GenerateAndIssueTx(ctx)
 					if err != nil {
 						return err
 					}
-					agent.Listener.RegisterIssued(tx)
+					agent.Listener.RegisterIssued(txID)
 				}
 
 				if o.config.MaxTPS == -1 {
