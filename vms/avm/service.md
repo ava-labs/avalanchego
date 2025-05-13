@@ -1,4 +1,4 @@
-The [X-Chain](/learn/avalanche/avalanche-platform.md#x-chain),
+The [X-Chain](https://build.avax.network/docs/quick-start/primary-network#x-chain),
 Avalanche's native platform for creating and trading assets, is an instance of the Avalanche Virtual
 Machine (AVM). This API allows clients to create and trade assets on the X-Chain and other instances
 of the AVM.
@@ -6,7 +6,7 @@ of the AVM.
 ## Format
 
 This API uses the `json 2.0` RPC format. For more information on making JSON RPC calls, see
-[here](/reference/standards/guides/issuing-api-calls.md).
+[here](https://build.avax.network/docs/api-reference/guides/issuing-api-calls).
 
 ## Endpoints
 
@@ -175,85 +175,11 @@ curl -X POST --data '{
 }
 ```
 
-### `avm.getAddressTxs`
-
-:::caution
-
-Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
-
-:::
-
-Returns all transactions that change the balance of the given address. A transaction is said to
-change an address's balance if either is true:
-
-- A UTXO that the transaction consumes was at least partially owned by the address.
-- A UTXO that the transaction produces is at least partially owned by the address.
-
-:::tip
-Note: Indexing (`index-transactions`) must be enabled in the X-chain config.
-:::
-
-**Signature:**
-
-```sh
-avm.getAddressTxs({
-    address: string,
-    cursor: uint64,     // optional, leave empty to get the first page
-    assetID: string,
-    pageSize: uint64    // optional, defaults to 1024
-}) -> {
-    txIDs: []string,
-    cursor: uint64,
-}
-```
-
-**Request Parameters:**
-
-- `address`: The address for which we're fetching related transactions
-- `assetID`: Only return transactions that changed the balance of this asset. Must be an ID or an
-  alias for an asset.
-- `pageSize`: Number of items to return per page. Optional. Defaults to 1024.
-
-**Response Parameter:**
-
-- `txIDs`: List of transaction IDs that affected the balance of this address.
-- `cursor`: Page number or offset. Use this in request to get the next page.
-
-**Example Call:**
-
-```sh
-curl -X POST --data '{
-  "jsonrpc":"2.0",
-  "id"     : 1,
-  "method" :"avm.getAddressTxs",
-  "params" :{
-      "address":"X-local1kpprmfpzzm5lxyene32f6lr7j0aj7gxsu6hp9y",
-      "assetID":"AVAX",
-      "pageSize":20
-  }
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/X
-```
-
-**Example Response:**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "result": {
-    "txIDs": ["SsJF7KKwxiUJkczygwmgLqo3XVRotmpKP8rMp74cpLuNLfwf6"],
-    "cursor": "1"
-  },
-  "id": 1
-}
-```
-
 ### `avm.getAllBalances`
 
-:::caution
-
+<Callout type="warn">
 Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
-
-:::
+</Callout>
 
 Get the balances of all assets controlled by a given address.
 
@@ -325,8 +251,7 @@ avm.getAssetDescription({assetID: string}) -> {
   of this asset are displayed as 10.0. If denomination is 2, 100 units of this asset are displays as
   .100, etc.
 
-:::note
-
+<Callout type="note">
 The AssetID for AVAX differs depending on the network you are on.
 
 Mainnet: FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z
@@ -335,8 +260,7 @@ Testnet: U8iRqJoiJm8xZHAacmvYyZVwqQx6uDNtQeP3CQ6fcgQk3JqnK
 
 For finding the `assetID` of other assets, this [info] might be useful.
 Also, `avm.getUTXOs` returns the `assetID` in its output.
-
-:::
+</Callout>
 
 **Example Call:**
 
@@ -368,11 +292,9 @@ curl -X POST --data '{
 
 ### `avm.getBalance`
 
-:::caution
-
+<Callout type="warn">
 Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
-
-:::
+</Callout>
 
 Get the balance of an asset controlled by a given address.
 
@@ -739,9 +661,9 @@ curl -X POST --data '{
 
 ### `avm.getTxStatus`
 
-:::caution
+<Callout type="warn">
 Deprecated as of **v1.10.0**.
-:::
+</Callout>
 
 Get the status of a transaction sent to the network.
 

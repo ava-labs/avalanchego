@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/corruptabledb"
 	"github.com/ava-labs/avalanchego/database/dbtest"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
 	rpcdbpb "github.com/ava-labs/avalanchego/proto/pb/rpcdb"
@@ -120,7 +121,7 @@ func TestHealthCheck(t *testing.T) {
 			require := require.New(t)
 
 			baseDB := setupDB(t)
-			db := corruptabledb.New(baseDB.server)
+			db := corruptabledb.New(baseDB.server, logging.NoLog{})
 			defer db.Close()
 			require.NoError(scenario.testFn(db))
 

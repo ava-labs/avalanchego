@@ -19,7 +19,7 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/api"
-	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -66,11 +66,9 @@ var encodings = []formatting.Encoding{
 func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
 	vm, _, mutableSharedMemory := defaultVM(t, upgradetest.Latest)
 	return &Service{
-		vm:          vm,
-		addrManager: avax.NewAddressManager(vm.ctx),
-		stakerAttributesCache: &cache.LRU[ids.ID, *stakerAttributes]{
-			Size: stakerAttributesCacheSize,
-		},
+		vm:                    vm,
+		addrManager:           avax.NewAddressManager(vm.ctx),
+		stakerAttributesCache: lru.NewCache[ids.ID, *stakerAttributes](stakerAttributesCacheSize),
 	}, mutableSharedMemory
 }
 

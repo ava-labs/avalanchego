@@ -13,6 +13,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -26,16 +27,6 @@ import (
 )
 
 type getCountFunc func() (int, error)
-
-// CheckMonitoring checks if logs and metrics exist for the given network. If no network
-// UUID is provided, an attempt will be made to derive selectors from env vars (GH_*)
-// identifying a github actions run.
-func CheckMonitoring(ctx context.Context, log logging.Logger, networkUUID string) error {
-	return errors.Join(
-		CheckLogsExist(ctx, log, networkUUID),
-		CheckMetricsExist(ctx, log, networkUUID),
-	)
-}
 
 // waitForCount waits until the provided function returns greater than zero.
 func waitForCount(ctx context.Context, log logging.Logger, name string, getCount getCountFunc) error {
@@ -271,16 +262,11 @@ func getSelectors(networkUUID string) (string, error) {
 
 	// Fall back to using Github labels as selectors
 	selectors := []string{}
-	githubLabels := githubLabelsFromEnv()
-	for label := range githubLabels {
-		value, err := githubLabels.GetStringVal(label)
-		if err != nil {
-			return "", err
+	for _, label := range githubLabels {
+		value := os.Getenv(strings.ToUpper(label))
+		if len(value) > 0 {
+			selectors = append(selectors, fmt.Sprintf(`%s="%s"`, label, value))
 		}
-		if len(value) == 0 {
-			continue
-		}
-		selectors = append(selectors, fmt.Sprintf(`%s="%s"`, label, value))
 	}
 	if len(selectors) == 0 {
 		return "", errors.New("no GH_* env vars set to use for selectors")

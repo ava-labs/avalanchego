@@ -1,16 +1,17 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package cache
+package lru
 
 import (
 	"sync"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/linked"
 )
 
-var _ Cacher[struct{}, any] = (*sizedLRU[struct{}, any])(nil)
+var _ cache.Cacher[struct{}, any] = (*SizedCache[struct{}, any])(nil)
 
 // sizedElement is used to store the element with its size, so we don't
 // calculate the size multiple times.
@@ -22,10 +23,10 @@ type sizedElement[V any] struct {
 	size  int
 }
 
-// sizedLRU is a key value store with bounded size. If the size is attempted to
-// be exceeded, then elements are removed from the cache until the bound is
+// SizedCache is a key value store with bounded size. If the size is attempted
+// to be exceeded, then elements are removed from the cache until the bound is
 // honored, based on evicting the least recently used value.
-type sizedLRU[K comparable, V any] struct {
+type SizedCache[K comparable, V any] struct {
 	lock        sync.Mutex
 	elements    *linked.Hashmap[K, *sizedElement[V]]
 	maxSize     int
@@ -33,57 +34,57 @@ type sizedLRU[K comparable, V any] struct {
 	size        func(K, V) int
 }
 
-func NewSizedLRU[K comparable, V any](maxSize int, size func(K, V) int) Cacher[K, V] {
-	return &sizedLRU[K, V]{
+func NewSizedCache[K comparable, V any](maxSize int, size func(K, V) int) *SizedCache[K, V] {
+	return &SizedCache[K, V]{
 		elements: linked.NewHashmap[K, *sizedElement[V]](),
 		maxSize:  maxSize,
 		size:     size,
 	}
 }
 
-func (c *sizedLRU[K, V]) Put(key K, value V) {
+func (c *SizedCache[K, V]) Put(key K, value V) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	c.put(key, value)
 }
 
-func (c *sizedLRU[K, V]) Get(key K) (V, bool) {
+func (c *SizedCache[K, V]) Get(key K) (V, bool) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	return c.get(key)
 }
 
-func (c *sizedLRU[K, V]) Evict(key K) {
+func (c *SizedCache[K, V]) Evict(key K) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	c.evict(key)
 }
 
-func (c *sizedLRU[K, V]) Flush() {
+func (c *SizedCache[K, V]) Flush() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	c.flush()
 }
 
-func (c *sizedLRU[_, _]) Len() int {
+func (c *SizedCache[_, _]) Len() int {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	return c.len()
 }
 
-func (c *sizedLRU[_, _]) PortionFilled() float64 {
+func (c *SizedCache[_, _]) PortionFilled() float64 {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	return c.portionFilled()
 }
 
-func (c *sizedLRU[K, V]) put(key K, value V) {
+func (c *SizedCache[K, V]) put(key K, value V) {
 	newEntrySize := c.size(key, value)
 	if newEntrySize > c.maxSize {
 		c.flush()
@@ -108,7 +109,7 @@ func (c *sizedLRU[K, V]) put(key K, value V) {
 	c.currentSize += newEntrySize
 }
 
-func (c *sizedLRU[K, V]) get(key K) (V, bool) {
+func (c *SizedCache[K, V]) get(key K) (V, bool) {
 	element, ok := c.elements.Get(key)
 	if !ok {
 		return utils.Zero[V](), false
@@ -118,22 +119,22 @@ func (c *sizedLRU[K, V]) get(key K) (V, bool) {
 	return element.value, true
 }
 
-func (c *sizedLRU[K, _]) evict(key K) {
+func (c *SizedCache[K, _]) evict(key K) {
 	if element, ok := c.elements.Get(key); ok {
 		c.elements.Delete(key)
 		c.currentSize -= element.size
 	}
 }
 
-func (c *sizedLRU[K, V]) flush() {
+func (c *SizedCache[K, V]) flush() {
 	c.elements.Clear()
 	c.currentSize = 0
 }
 
-func (c *sizedLRU[_, _]) len() int {
+func (c *SizedCache[_, _]) len() int {
 	return c.elements.Len()
 }
 
-func (c *sizedLRU[_, _]) portionFilled() float64 {
+func (c *SizedCache[_, _]) portionFilled() float64 {
 	return float64(c.currentSize) / float64(c.maxSize)
 }

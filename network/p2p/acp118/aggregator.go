@@ -154,7 +154,7 @@ func (s *SignatureAggregator) AggregateSignatures(
 				s.log.Debug(
 					"dropping response",
 					zap.Stringer("nodeID", result.NodeID),
-					zap.Error(err),
+					zap.Error(result.Err),
 				)
 				continue
 			}

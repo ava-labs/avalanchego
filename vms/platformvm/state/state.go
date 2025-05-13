@@ -8,6 +8,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
+	"sync"
 	"time"
 
 	"github.com/google/btree"
@@ -16,6 +18,7 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/linkeddb"
@@ -23,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/upgrade"
@@ -30,7 +34,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/iterator"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
+	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -97,6 +103,7 @@ var (
 	LastAcceptedKey      = []byte("last accepted")
 	HeightsIndexedKey    = []byte("heights indexed")
 	InitializedKey       = []byte("initialized")
+	BlocksReindexedKey   = []byte("blocks reindexed.3")
 
 	emptyL1ValidatorCache = &cache.Empty[ids.ID, maybe.Maybe[L1Validator]]{}
 )
@@ -215,6 +222,14 @@ type State interface {
 	// Discard uncommitted changes to the database.
 	Abort()
 
+	// ReindexBlocks converts any block indices using the legacy storage format
+	// to the new format. If this database has already updated the indices,
+	// this function will return immediately, without iterating over the
+	// database.
+	//
+	// TODO: Remove after v1.14.x is activated
+	ReindexBlocks(lock sync.Locker, log logging.Logger) error
+
 	// Commit changes to the base database.
 	Commit() error
 
@@ -225,6 +240,16 @@ type State interface {
 	Checksum() ids.ID
 
 	Close() error
+}
+
+// Prior to https://github.com/ava-labs/avalanchego/pull/1719, blocks were
+// stored as a map from blkID to stateBlk. Nodes synced prior to this PR may
+// still have blocks partially stored using this legacy format.
+//
+// TODO: Remove after v1.14.x is activated
+type stateBlk struct {
+	Bytes  []byte         `serialize:"true"`
+	Status choices.Status `serialize:"true"`
 }
 
 /*
@@ -296,6 +321,7 @@ type State interface {
  * | '-- timestamp + validationID -> nil
  * '-. singletons
  *   |-- initializedKey -> nil
+ *   |-- blocksReindexedKey -> nil
  *   |-- timestampKey -> timestamp
  *   |-- feeStateKey -> feeState
  *   |-- l1ValidatorExcessKey -> l1ValidatorExcess
@@ -512,7 +538,7 @@ func New(
 	blockIDCache, err := metercacher.New[uint64, ids.ID](
 		"block_id_cache",
 		metricsReg,
-		&cache.LRU[uint64, ids.ID]{Size: execCfg.BlockIDCacheSize},
+		lru.NewCache[uint64, ids.ID](execCfg.BlockIDCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -521,7 +547,7 @@ func New(
 	blockCache, err := metercacher.New[ids.ID, block.Block](
 		"block_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, block.Block](execCfg.BlockCacheSize, blockSize),
+		lru.NewSizedCache(execCfg.BlockCacheSize, blockSize),
 	)
 	if err != nil {
 		return nil, err
@@ -551,7 +577,7 @@ func New(
 	weightsCache, err := metercacher.New(
 		"l1_validator_weights_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, uint64](execCfg.L1WeightsCacheSize, func(ids.ID, uint64) int {
+		lru.NewSizedCache(execCfg.L1WeightsCacheSize, func(ids.ID, uint64) int {
 			return ids.IDLen + wrappers.LongLen
 		}),
 	)
@@ -562,7 +588,7 @@ func New(
 	inactiveL1ValidatorsCache, err := metercacher.New(
 		"l1_validator_inactive_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, maybe.Maybe[L1Validator]](
+		lru.NewSizedCache(
 			execCfg.L1InactiveValidatorsCacheSize,
 			func(_ ids.ID, maybeL1Validator maybe.Maybe[L1Validator]) int {
 				const (
@@ -586,7 +612,7 @@ func New(
 	subnetIDNodeIDCache, err := metercacher.New(
 		"l1_validator_subnet_id_node_id_cache",
 		metricsReg,
-		cache.NewSizedLRU[subnetIDNodeID, bool](execCfg.L1SubnetIDNodeIDCacheSize, func(subnetIDNodeID, bool) int {
+		lru.NewSizedCache(execCfg.L1SubnetIDNodeIDCacheSize, func(subnetIDNodeID, bool) int {
 			return ids.IDLen + ids.NodeIDLen + wrappers.BoolLen
 		}),
 	)
@@ -597,7 +623,7 @@ func New(
 	txCache, err := metercacher.New(
 		"tx_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, *txAndStatus](execCfg.TxCacheSize, txAndStatusSize),
+		lru.NewSizedCache(execCfg.TxCacheSize, txAndStatusSize),
 	)
 	if err != nil {
 		return nil, err
@@ -607,7 +633,7 @@ func New(
 	rewardUTXOsCache, err := metercacher.New[ids.ID, []*avax.UTXO](
 		"reward_utxos_cache",
 		metricsReg,
-		&cache.LRU[ids.ID, []*avax.UTXO]{Size: execCfg.RewardUTXOsCacheSize},
+		lru.NewCache[ids.ID, []*avax.UTXO](execCfg.RewardUTXOsCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -625,7 +651,7 @@ func New(
 	subnetOwnerCache, err := metercacher.New[ids.ID, fxOwnerAndSize](
 		"subnet_owner_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, fxOwnerAndSize](execCfg.FxOwnerCacheSize, func(_ ids.ID, f fxOwnerAndSize) int {
+		lru.NewSizedCache(execCfg.FxOwnerCacheSize, func(_ ids.ID, f fxOwnerAndSize) int {
 			return ids.IDLen + f.size
 		}),
 	)
@@ -637,7 +663,7 @@ func New(
 	subnetToL1ConversionCache, err := metercacher.New[ids.ID, SubnetToL1Conversion](
 		"subnet_conversion_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, SubnetToL1Conversion](execCfg.SubnetToL1ConversionCacheSize, func(_ ids.ID, c SubnetToL1Conversion) int {
+		lru.NewSizedCache(execCfg.SubnetToL1ConversionCacheSize, func(_ ids.ID, c SubnetToL1Conversion) int {
 			return 3*ids.IDLen + len(c.Addr)
 		}),
 	)
@@ -648,7 +674,7 @@ func New(
 	transformedSubnetCache, err := metercacher.New(
 		"transformed_subnet_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, *txs.Tx](execCfg.TransformedSubnetTxCacheSize, txSize),
+		lru.NewSizedCache(execCfg.TransformedSubnetTxCacheSize, txSize),
 	)
 	if err != nil {
 		return nil, err
@@ -657,7 +683,7 @@ func New(
 	supplyCache, err := metercacher.New[ids.ID, *uint64](
 		"supply_cache",
 		metricsReg,
-		&cache.LRU[ids.ID, *uint64]{Size: execCfg.ChainCacheSize},
+		lru.NewCache[ids.ID, *uint64](execCfg.ChainCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -666,7 +692,7 @@ func New(
 	chainCache, err := metercacher.New[ids.ID, []*txs.Tx](
 		"chain_cache",
 		metricsReg,
-		&cache.LRU[ids.ID, []*txs.Tx]{Size: execCfg.ChainCacheSize},
+		lru.NewCache[ids.ID, []*txs.Tx](execCfg.ChainCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -675,7 +701,7 @@ func New(
 	chainDBCache, err := metercacher.New[ids.ID, linkeddb.LinkedDB](
 		"chain_db_cache",
 		metricsReg,
-		&cache.LRU[ids.ID, linkeddb.LinkedDB]{Size: execCfg.ChainDBCacheSize},
+		lru.NewCache[ids.ID, linkeddb.LinkedDB](execCfg.ChainDBCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -2258,7 +2284,7 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (block.Block, error) {
 		return nil, err
 	}
 
-	blk, err := block.Parse(block.GenesisCodec, blkBytes)
+	blk, _, err := parseStoredBlock(blkBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -3037,6 +3063,162 @@ func (s *state) writeMetadata() error {
 		}
 	}
 	return nil
+}
+
+// Returns the block and whether it is a [stateBlk].
+// Invariant: blkBytes is safe to parse with blocks.GenesisCodec
+//
+// TODO: Remove after v1.14.x is activated
+func parseStoredBlock(blkBytes []byte) (block.Block, bool, error) {
+	// Attempt to parse as blocks.Block
+	blk, err := block.Parse(block.GenesisCodec, blkBytes)
+	if err == nil {
+		return blk, false, nil
+	}
+
+	// Fallback to [stateBlk]
+	blkState := stateBlk{}
+	if _, err := block.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
+		return nil, false, err
+	}
+
+	blk, err = block.Parse(block.GenesisCodec, blkState.Bytes)
+	return blk, true, err
+}
+
+func (s *state) ReindexBlocks(lock sync.Locker, log logging.Logger) error {
+	has, err := s.singletonDB.Has(BlocksReindexedKey)
+	if err != nil {
+		return err
+	}
+	if has {
+		log.Info("blocks already reindexed")
+		return nil
+	}
+
+	// It is possible that new blocks are added after grabbing this iterator.
+	// New blocks are guaranteed to be persisted in the new format, so we don't
+	// need to check them.
+	blockIterator := s.blockDB.NewIterator()
+	// Releasing is done using a closure to ensure that updating blockIterator
+	// will result in having the most recent iterator released when executing
+	// the deferred function.
+	defer func() {
+		blockIterator.Release()
+	}()
+
+	log.Info("starting block reindexing")
+
+	var (
+		startTime         = time.Now()
+		lastCommit        = startTime
+		nextUpdate        = startTime.Add(indexLogFrequency)
+		numIndicesChecked = 0
+		numIndicesUpdated = 0
+	)
+
+	for blockIterator.Next() {
+		valueBytes := blockIterator.Value()
+		blk, isStateBlk, err := parseStoredBlock(valueBytes)
+		if err != nil {
+			return fmt.Errorf("failed to parse block: %w", err)
+		}
+
+		blkID := blk.ID()
+
+		// This block was previously stored using the legacy format, update the
+		// index to remove the usage of stateBlk.
+		if isStateBlk {
+			blkBytes := blk.Bytes()
+			if err := s.blockDB.Put(blkID[:], blkBytes); err != nil {
+				return fmt.Errorf("failed to write block: %w", err)
+			}
+
+			numIndicesUpdated++
+		}
+
+		numIndicesChecked++
+
+		now := time.Now()
+		if now.After(nextUpdate) {
+			nextUpdate = now.Add(indexLogFrequency)
+
+			progress := timer.ProgressFromHash(blkID[:])
+			eta := timer.EstimateETA(
+				startTime,
+				progress,
+				math.MaxUint64,
+			)
+
+			log.Info("reindexing blocks",
+				zap.Int("numIndicesUpdated", numIndicesUpdated),
+				zap.Int("numIndicesChecked", numIndicesChecked),
+				zap.Duration("eta", eta),
+			)
+		}
+
+		if numIndicesChecked%indexIterationLimit == 0 {
+			// We must hold the lock during committing to make sure we don't
+			// attempt to commit to disk while a block is concurrently being
+			// accepted.
+			lock.Lock()
+			err := errors.Join(
+				s.Commit(),
+				blockIterator.Error(),
+			)
+			lock.Unlock()
+			if err != nil {
+				return err
+			}
+
+			// We release the iterator here to allow the underlying database to
+			// clean up deleted state.
+			blockIterator.Release()
+
+			// We take the minimum here because it's possible that the node is
+			// currently bootstrapping. This would mean that grabbing the lock
+			// could take an extremely long period of time; which we should not
+			// delay processing for.
+			indexDuration := now.Sub(lastCommit)
+			sleepDuration := min(
+				indexIterationSleepMultiplier*indexDuration,
+				indexIterationSleepCap,
+			)
+			time.Sleep(sleepDuration)
+
+			// Make sure not to include the sleep duration into the next index
+			// duration.
+			lastCommit = time.Now()
+
+			blockIterator = s.blockDB.NewIteratorWithStart(blkID[:])
+		}
+	}
+
+	// Ensure we fully iterated over all blocks before writing that indexing has
+	// finished.
+	//
+	// Note: This is needed because a transient read error could cause the
+	// iterator to stop early.
+	if err := blockIterator.Error(); err != nil {
+		return fmt.Errorf("failed to iterate over historical blocks: %w", err)
+	}
+
+	if err := s.singletonDB.Put(BlocksReindexedKey, nil); err != nil {
+		return fmt.Errorf("failed to put marked blocks as reindexed: %w", err)
+	}
+
+	// We must hold the lock during committing to make sure we don't attempt to
+	// commit to disk while a block is concurrently being accepted.
+	lock.Lock()
+	defer lock.Unlock()
+
+	log.Info("finished block reindexing",
+		zap.Int("numIndicesUpdated", numIndicesUpdated),
+		zap.Int("numIndicesChecked", numIndicesChecked),
+		zap.Duration("duration", time.Since(startTime)),
+	)
+
+	return s.Commit()
 }
 
 func (s *state) GetUptime(vdrID ids.NodeID) (time.Duration, time.Time, error) {

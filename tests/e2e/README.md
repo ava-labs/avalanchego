@@ -26,7 +26,7 @@ flags.
 In cases where a change can be verified against only a subset of
 tests, it is possible to filter the tests that will be executed by the
 declarative labels that have been applied to them. Available labels
-are defined as constants in [`describe.go`](./describe.go) with names
+are defined as constants in [`describe.go`](../fixture/e2e/describe.go) with names
 of the form `*Label`. The following example runs only those tests that
 primarily target the X-Chain:
 
@@ -40,7 +40,7 @@ queries](https://onsi.github.io/ginkgo/#spec-labels).
 
 ## Adding tests
 
-Define any flags/configurations in [`e2e.go`](./e2e.go).
+Define any flags/configurations in [`flags.go`](../fixture/e2e/flags.go).
 
 Create a new package to implement feature-specific tests, or add tests to an existing package. For example:
 
@@ -113,9 +113,10 @@ E2E_SKIP_BOOTSTRAP_CHECKS=1 ./bin/ginkgo -v ./tests/e2e ...
 It is possible to enable collection of logs and metrics from the
 temporary networks used for e2e testing by:
 
- - Supplying `--start-collectors` as an argument to the test suite
+ - Supplying `--start-metrics-collector` and `--start-logs-collector`
+   as arguments to the test suite
  - Starting collectors in advance of a test run with `tmpnetctl
-   start-collectors`
+   start-metrics-collector` and ` tmpnetctl start-logs-collector`
 
 Both methods require:
 
@@ -126,13 +127,13 @@ Both methods require:
    - `LOKI_PASSWORD`
  - The availability in the path of binaries for promtail and prometheus
    - Starting a development shell with `nix develop` is one way to
-     ensure this and requires the [installation of
-     nix](https://github.com/DeterminateSystems/nix-installer?tab=readme-ov-file#install-nix).
+     ensure this and requires the installation of nix
+     (e.g. `./scripts/run_task.sh install-nix`).
 
 Once started, the collectors will continue to run in the background
-until stopped by `tmpnetctl stop-collectors`.
+until stopped by `tmpnetctl stop-metrics-collector` and `tmpnetctl stop-logs-collector`.
 
 The results of collection will be viewable at
 https://grafana-poc.avax-dev.network.
 
-For more detail, see the [tmpnet docs](../tmpnet/README.md#monitoring).
+For more detail, see the [tmpnet docs](../fixture/tmpnet/README.md##monitoring).

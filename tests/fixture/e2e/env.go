@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -27,11 +26,12 @@ import (
 // access to the shared env to GetEnv which adds a test context.
 var env *TestEnvironment
 
-func InitSharedTestEnvironment(t require.TestingT, envBytes []byte) {
-	require := require.New(t)
+func InitSharedTestEnvironment(tc tests.TestContext, envBytes []byte) {
+	require := require.New(tc)
 	require.Nil(env, "env already initialized")
 	env = &TestEnvironment{}
 	require.NoError(json.Unmarshal(envBytes, env))
+	env.testContext = tc
 
 	// Ginkgo parallelization is at the process level, so a given key
 	// can safely be used by all tests in a given process without fear
@@ -42,6 +42,8 @@ func InitSharedTestEnvironment(t require.TestingT, envBytes []byte) {
 }
 
 type TestEnvironment struct {
+	// The parent directory of network directories
+	RootNetworkDir string
 	// The directory where the test network configuration is stored
 	NetworkDir string
 	// URIs used to access the API endpoints of nodes of the network
@@ -62,6 +64,7 @@ func GetEnv(tc tests.TestContext) *TestEnvironment {
 		return nil
 	}
 	return &TestEnvironment{
+		RootNetworkDir:              env.RootNetworkDir,
 		NetworkDir:                  env.NetworkDir,
 		URIs:                        env.URIs,
 		PreFundedKey:                env.PreFundedKey,
@@ -82,27 +85,47 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 
 	var network *tmpnet.Network
 
+	networkCmd, err := flagVars.NetworkCmd()
+	require.NoError(err)
+
 	// Consider monitoring flags for any command but stop
-	if !flagVars.StopNetwork() {
-		if flagVars.StartCollectors() {
-			require.NoError(tmpnet.StartCollectors(tc.DefaultContext(), tc.Log()))
+	if networkCmd != StopNetworkCmd {
+		if flagVars.StartMetricsCollector() {
+			require.NoError(tmpnet.StartPrometheus(tc.DefaultContext(), tc.Log()))
 		}
-		if flagVars.CheckMonitoring() {
-			// Register cleanup before network start to ensure it runs after the network is stopped (LIFO)
+		if flagVars.StartLogsCollector() {
+			require.NoError(tmpnet.StartPromtail(tc.DefaultContext(), tc.Log()))
+		}
+
+		// Register cleanups before network start to ensure they run after the network is stopped (LIFO)
+
+		if flagVars.CheckMetricsCollected() {
 			tc.DeferCleanup(func() {
 				if network == nil {
-					tc.Log().Warn("unable to check that logs and metrics were collected from an uninitialized network")
+					tc.Log().Warn("unable to check that metrics were collected from an uninitialized network")
 					return
 				}
 				ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 				defer cancel()
-				require.NoError(tmpnet.CheckMonitoring(ctx, tc.Log(), network.UUID))
+				require.NoError(tmpnet.CheckMetricsExist(ctx, tc.Log(), network.UUID))
+			})
+		}
+
+		if flagVars.CheckLogsCollected() {
+			tc.DeferCleanup(func() {
+				if network == nil {
+					tc.Log().Warn("unable to check that logs were collected from an uninitialized network")
+					return
+				}
+				ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
+				defer cancel()
+				require.NoError(tmpnet.CheckLogsExist(ctx, tc.Log(), network.UUID))
 			})
 		}
 	}
 
-	// Need to load the network if it is being stopped or reused
-	if flagVars.StopNetwork() || flagVars.ReuseNetwork() {
+	// Attempt to load the network if it may already be running
+	if networkCmd == StopNetworkCmd || networkCmd == ReuseNetworkCmd || networkCmd == RestartNetworkCmd {
 		networkDir := flagVars.NetworkDir()
 		var networkSymlink string // If populated, prompts removal of the referenced symlink if --stop-network is specified
 		if len(networkDir) == 0 {
@@ -121,14 +144,14 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 
 		if len(networkDir) > 0 {
 			var err error
-			network, err = tmpnet.ReadNetwork(networkDir)
+			network, err = tmpnet.ReadNetwork(tc.DefaultContext(), tc.Log(), networkDir)
 			require.NoError(err)
 			tc.Log().Info("loaded a network",
 				zap.String("networkDir", networkDir),
 			)
 		}
 
-		if flagVars.StopNetwork() {
+		if networkCmd == StopNetworkCmd {
 			if len(networkSymlink) > 0 {
 				// Remove the symlink to avoid attempts to reuse the stopped network
 				tc.Log().Info("removing symlink",
@@ -145,35 +168,38 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 				tc.Log().Warn("no network to stop")
 			}
 			os.Exit(0)
-		} else if network != nil && flagVars.RestartNetwork() {
-			// A network is only restarted if it is already running and stop was not requested
-			require.NoError(network.Restart(tc.DefaultContext(), tc.Log()))
+		}
+
+		if network != nil && networkCmd == RestartNetworkCmd {
+			require.NoError(network.Restart(tc.DefaultContext()))
 		}
 	}
 
 	// Start a new network
 	if network == nil {
+		// TODO(marun) Maybe accept a factory function for the desired network
+		// that is only run when a new network will be started?
+
 		network = desiredNetwork
-		avalancheBinaryPath, err := flagVars.AvalancheGoExecPath()
+		runtimeConfig, err := flagVars.NodeRuntimeConfig()
 		require.NoError(err)
+		network.DefaultRuntimeConfig = *runtimeConfig
 
 		StartNetwork(
 			tc,
 			network,
-			avalancheBinaryPath,
-			flagVars.PluginDir(),
+			flagVars.RootNetworkDir(),
 			flagVars.NetworkShutdownDelay(),
-			flagVars.StartNetwork(),
-			flagVars.ReuseNetwork(),
+			networkCmd,
 		)
 	}
 
 	// Once one or more nodes are running it should be safe to wait for promtail to report readiness
-	if flagVars.StartCollectors() {
+	if flagVars.StartLogsCollector() {
 		require.NoError(tmpnet.WaitForPromtailReadiness(tc.DefaultContext(), tc.Log()))
 	}
 
-	if flagVars.StartNetwork() {
+	if networkCmd == StartNetworkCmd {
 		os.Exit(0)
 	}
 
@@ -191,6 +217,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 	)
 
 	return &TestEnvironment{
+		RootNetworkDir:              flagVars.RootNetworkDir(),
 		NetworkDir:                  network.Dir,
 		URIs:                        uris,
 		PrivateNetworkShutdownDelay: flagVars.NetworkShutdownDelay(),
@@ -212,8 +239,9 @@ func (te *TestEnvironment) GetRandomNodeURI() tmpnet.NodeURI {
 
 // Retrieve the network to target for testing.
 func (te *TestEnvironment) GetNetwork() *tmpnet.Network {
-	network, err := tmpnet.ReadNetwork(te.NetworkDir)
-	require.NoError(te.testContext, err)
+	tc := te.testContext
+	network, err := tmpnet.ReadNetwork(tc.DefaultContext(), tc.Log(), te.NetworkDir)
+	require.NoError(tc, err)
 	return network
 }
 
@@ -224,21 +252,18 @@ func (te *TestEnvironment) NewKeychain() *secp256k1fx.Keychain {
 
 // Create a new private network that is not shared with other tests.
 func (te *TestEnvironment) StartPrivateNetwork(network *tmpnet.Network) {
-	require := require.New(te.testContext)
+	tc := te.testContext
+	require := require.New(tc)
 	// Use the same configuration as the shared network
-	sharedNetwork, err := tmpnet.ReadNetwork(te.NetworkDir)
+	sharedNetwork, err := tmpnet.ReadNetwork(tc.DefaultContext(), tc.Log(), te.NetworkDir)
 	require.NoError(err)
-
-	pluginDir, err := sharedNetwork.DefaultFlags.GetStringVal(config.PluginDirKey)
-	require.NoError(err)
+	network.DefaultRuntimeConfig = sharedNetwork.DefaultRuntimeConfig
 
 	StartNetwork(
-		te.testContext,
+		tc,
 		network,
-		sharedNetwork.DefaultRuntimeConfig.AvalancheGoPath,
-		pluginDir,
+		te.RootNetworkDir,
 		te.PrivateNetworkShutdownDelay,
-		false, /* skipShutdown */
-		false, /* reuseNetwork */
+		EmptyNetworkCmd,
 	)
 }

@@ -16,7 +16,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
-	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -37,7 +37,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/utxo"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/index"
 	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 
 	blockbuilder "github.com/ava-labs/avalanchego/vms/avm/block/builder"
@@ -93,7 +92,7 @@ type VM struct {
 	feeAssetID ids.ID
 
 	// Asset ID --> Bit set with fx IDs the asset supports
-	assetToFxCache *cache.LRU[ids.ID, set.Bits64]
+	assetToFxCache *lru.Cache[ids.ID, set.Bits64]
 
 	baseDB database.Database
 	db     *versiondb.Database
@@ -102,8 +101,6 @@ type VM struct {
 	fxs           []*extensions.ParsedFx
 
 	walletService WalletService
-
-	addressTxsIndexer index.AddressTxsIndexer
 
 	txBackend *txexecutor.Backend
 
@@ -188,7 +185,7 @@ func (vm *VM) Initialize(
 	vm.appSender = appSender
 	vm.baseDB = db
 	vm.db = versiondb.New(db)
-	vm.assetToFxCache = &cache.LRU[ids.ID, set.Bits64]{Size: assetToFxCacheSize}
+	vm.assetToFxCache = lru.NewCache[ids.ID, set.Bits64](assetToFxCacheSize)
 
 	typedFxs := make([]extensions.Fx, len(fxs))
 	vm.fxs = make([]*extensions.ParsedFx, len(fxs))
@@ -239,21 +236,6 @@ func (vm *VM) Initialize(
 
 	vm.walletService.vm = vm
 	vm.walletService.pendingTxs = linked.NewHashmap[ids.ID, *txs.Tx]()
-
-	// use no op impl when disabled in config
-	if avmConfig.IndexTransactions {
-		vm.ctx.Log.Warn("deprecated address transaction indexing is enabled")
-		vm.addressTxsIndexer, err = index.NewIndexer(vm.db, vm.ctx.Log, "", vm.registerer, avmConfig.IndexAllowIncomplete)
-		if err != nil {
-			return fmt.Errorf("failed to initialize address transaction indexer: %w", err)
-		}
-	} else {
-		vm.ctx.Log.Info("address transaction indexing is disabled")
-		vm.addressTxsIndexer, err = index.NewNoIndexer(vm.db, avmConfig.IndexAllowIncomplete)
-		if err != nil {
-			return fmt.Errorf("failed to initialize disabled indexer: %w", err)
-		}
-	}
 
 	vm.txBackend = &txexecutor.Backend{
 		Ctx:           ctx,
@@ -588,42 +570,7 @@ func (vm *VM) lookupAssetID(asset string) (ids.ID, error) {
 
 // Invariant: onAccept is called when [tx] is being marked as accepted, but
 // before its state changes are applied.
-// Invariant: any error returned by onAccept should be considered fatal.
 // TODO: Remove [onAccept] once the deprecated APIs this powers are removed.
-func (vm *VM) onAccept(tx *txs.Tx) error {
-	// Fetch the input UTXOs
-	txID := tx.ID()
-	inputUTXOIDs := tx.Unsigned.InputUTXOs()
-	inputUTXOs := make([]*avax.UTXO, 0, len(inputUTXOIDs))
-	for _, utxoID := range inputUTXOIDs {
-		// Don't bother fetching the input UTXO if its symbolic
-		if utxoID.Symbolic() {
-			continue
-		}
-
-		utxo, err := vm.state.GetUTXO(utxoID.InputID())
-		if err == database.ErrNotFound {
-			vm.ctx.Log.Debug("dropping utxo from index",
-				zap.Stringer("txID", txID),
-				zap.Stringer("utxoTxID", utxoID.TxID),
-				zap.Uint32("utxoOutputIndex", utxoID.OutputIndex),
-			)
-			continue
-		}
-		if err != nil {
-			// should never happen because the UTXO was previously verified to
-			// exist
-			return fmt.Errorf("error finding UTXO %s: %w", utxoID, err)
-		}
-		inputUTXOs = append(inputUTXOs, utxo)
-	}
-
-	outputUTXOs := tx.UTXOs()
-	// index input and output UTXOs
-	if err := vm.addressTxsIndexer.Accept(txID, inputUTXOs, outputUTXOs); err != nil {
-		return fmt.Errorf("error indexing tx: %w", err)
-	}
-
-	vm.walletService.decided(txID)
-	return nil
+func (vm *VM) onAccept(tx *txs.Tx) {
+	vm.walletService.decided(tx.ID())
 }
