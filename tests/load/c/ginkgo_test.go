@@ -15,7 +15,7 @@ import (
 )
 
 // Run this using the command:
-// ./bin/ginkgo -v ./tests/load -- --avalanchego-path=$PWD/build/avalanchego
+// ./bin/ginkgo -v ./tests/load/c -- --avalanchego-path=$PWD/build/avalanchego
 func TestLoad(t *testing.T) {
 	ginkgo.RunSpecs(t, "load tests")
 }

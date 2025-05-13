@@ -2,7 +2,7 @@
 # To run on a system without task installed, `./scripts/run_task.sh` will execute it with `go run`.
 # If in the nix dev shell, `task` is available.
 
-version: '3'
+version: "3"
 
 tasks:
   default: ./scripts/run_task.sh --list
@@ -177,7 +177,7 @@ tasks:
     desc: Runs e2e load tests
     cmds:
       - task: build
-      - cmd: ./bin/ginkgo -v ./tests/load -- --avalanchego-path=$PWD/build/avalanchego
+      - cmd: ./bin/ginkgo -v ./tests/load/c -- --avalanchego-path=$PWD/build/avalanchego
 
   # To use a different fuzz time, run `task test-fuzz FUZZTIME=[value in seconds]`.
   # A value of `-1` will run until it encounters a failing output.
