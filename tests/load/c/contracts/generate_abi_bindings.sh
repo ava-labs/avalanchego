@@ -24,7 +24,7 @@ for FILE in "${CONTRACTS_DIR}"/*.sol; do
     --abi="${CONTRACTS_DIR}/${CONTRACT_NAME}.abi" \
     --type $CONTRACT_NAME \
     --pkg=contracts \
-    --out="${CONTRACTS_DIR}/${CONTRACT_NAME}.go"
+    --out="${CONTRACTS_DIR}/${CONTRACT_NAME}.bindings.go"
   rm "${CONTRACTS_DIR}/${CONTRACT_NAME}.bin" "${CONTRACTS_DIR}/${CONTRACT_NAME}.abi"
-  echo "Generated ${CONTRACT_NAME}.go"
+  echo "Generated ${CONTRACT_NAME}.bindings.go"
 done
