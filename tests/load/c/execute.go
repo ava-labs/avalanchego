@@ -97,6 +97,7 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 	orchestratorConfig.MaxTPS = config.maxTPS
 	orchestratorConfig.Step = config.step
 	orchestratorConfig.SustainedTime = 10 * time.Second
+	orchestratorConfig.TxRateMultiplier = 1.05
 	orchestrator := load.NewOrchestrator(agents, tracker, logger, orchestratorConfig)
 	orchestratorErrCh := make(chan error)
 	go func() {
