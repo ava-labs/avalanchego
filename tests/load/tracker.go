@@ -9,7 +9,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -31,15 +30,12 @@ type Tracker[T TxID] struct {
 	txsConfirmedCounter prometheus.Counter
 	txsFailedCounter    prometheus.Counter
 	txLatency           prometheus.Histogram
-
-	logger logging.Logger
 }
 
 // NewTracker returns a new Tracker instance which records metrics for the number
 // of transactions issued, confirmed, and failed. It also tracks the latency of
 // transactions.
-func NewTracker[T TxID](reg prometheus.Registerer, logger logging.Logger,
-) (*Tracker[T], error) {
+func NewTracker[T TxID](reg prometheus.Registerer) (*Tracker[T], error) {
 	tracker := &Tracker[T]{
 		outstandingTxs: make(map[T]time.Time),
 		txsIssuedCounter: prometheus.NewCounter(prometheus.CounterOpts{
@@ -62,7 +58,6 @@ func NewTracker[T TxID](reg prometheus.Registerer, logger logging.Logger,
 			Name:      "tx_latency",
 			Help:      "Latency of transactions",
 		}),
-		logger: logger,
 	}
 
 	errs := wrappers.Errs{}

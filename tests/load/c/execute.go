@@ -55,7 +55,7 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 
 	registry := prometheus.NewRegistry()
 	metricsServer := load.NewPrometheusServer("127.0.0.1:8082", registry, logger)
-	tracker, err := load.NewTracker[common.Hash](registry, logger)
+	tracker, err := load.NewTracker[common.Hash](registry)
 	if err != nil {
 		return fmt.Errorf("creating tracker: %w", err)
 	}
