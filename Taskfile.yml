@@ -75,6 +75,12 @@ tasks:
       - cmd: go mod tidy
       - task: check-clean-branch
 
+  check-generate-load-contract-bindings:
+    desc: Checks that generated load contract bindings are up-to-date (requires a clean git working tree)
+    cmds:
+      - task: generate-load-contract-bindings
+      - task: check-clean-branch
+
   generate-mocks:
     desc: Generates testing mocks
     cmds:
@@ -88,6 +94,12 @@ tasks:
   generate-protobuf:
     desc: Generates protobuf
     cmd: ./scripts/protobuf_codegen.sh
+
+  generate-load-contract-bindings:
+    desc: Generates load contract bindings
+    cmds:
+      - cmd: grep -lr -E '^// Code generated - DO NOT EDIT\.$' tests/load | xargs -r rm
+      - cmd: go generate ./tests/load/...
 
   install-nix:
     desc: Installs nix with the determinate systems installer
