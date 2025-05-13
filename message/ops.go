@@ -320,8 +320,8 @@ func Unwrap(m *p2p.Message) (fmt.Stringer, error) {
 	case *p2p.Message_Chits:
 		return msg.Chits, nil
 	// Simplex Consensus:
-	case *p2p.Message_Simplex:
-		return msg.Simplex, nil
+	case *p2p.Message_SimplexMessage:
+		return msg.SimplexMessage, nil
 	// Application:
 	case *p2p.Message_AppRequest:
 		return msg.AppRequest, nil
@@ -386,7 +386,7 @@ func ToOp(m *p2p.Message) (Op, error) {
 		return AppErrorOp, nil
 	case *p2p.Message_AppGossip:
 		return AppGossipOp, nil
-	case *p2p.Message_Simplex:
+	case *p2p.Message_SimplexMessage:
 		return SimplexOp, nil
 	default:
 		return 0, fmt.Errorf("%w: %T", errUnknownMessageType, msg)

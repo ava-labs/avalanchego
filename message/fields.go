@@ -63,7 +63,7 @@ var (
 	_ deadlineGetter = (*p2p.PullQuery)(nil)
 	_ deadlineGetter = (*p2p.AppRequest)(nil)
 
-	_ chainIDGetter = (*p2p.SimplexMessage)(nil)
+	_ chainIDGetter = (*p2p.Simplex)(nil)
 )
 
 type chainIDGetter interface {

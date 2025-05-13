@@ -57,7 +57,7 @@ message Message {
     AppError app_error = 34;
 
     // Simplex messages:
-    SimplexMessage simplex_message = 36;
+    Simplex simplex_message = 36;
   }
 }
 
@@ -423,7 +423,7 @@ message AppGossip {
   bytes app_bytes = 2;
 }
 
-message SimplexMessage {
+message Simplex {
   // Chain being responded from
   bytes chain_id = 1;
 

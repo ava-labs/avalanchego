@@ -233,7 +233,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 		return
 	}
 
-	if !ok && op == message.Simplex {
+	if !ok && op == message.SimplexOp {
 		cr.log.Warn("dropping simplex message",
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("messageOp", op),
