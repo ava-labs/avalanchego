@@ -62,6 +62,8 @@ var (
 	_ deadlineGetter = (*p2p.PushQuery)(nil)
 	_ deadlineGetter = (*p2p.PullQuery)(nil)
 	_ deadlineGetter = (*p2p.AppRequest)(nil)
+
+	_ chainIDGetter = (*p2p.SimplexMessage)(nil)
 )
 
 type chainIDGetter interface {

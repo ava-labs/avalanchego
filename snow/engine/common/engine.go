@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -426,4 +427,8 @@ type InternalHandler interface {
 
 	// Notify this engine of a message from the virtual machine.
 	Notify(context.Context, Message) error
+}
+
+type SimplexHandler interface {
+	SimplexMessage(nodeID ids.NodeID, message *p2p.SimplexMessage) error
 }

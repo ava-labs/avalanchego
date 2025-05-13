@@ -729,6 +729,8 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		}
 		h.p2pTracker.Disconnected(nodeID)
 		return engine.Disconnected(ctx, nodeID)
+	case *p2ppb.SimplexMessage:
+		return engine.(common.SimplexHandler).SimplexMessage(nodeID, msg)
 
 	default:
 		return fmt.Errorf(
