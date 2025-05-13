@@ -6,6 +6,9 @@ package c
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"go.uber.org/zap"
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
@@ -35,7 +38,6 @@ func init() {
 
 const (
 	nodesCount = 3
-	metricsURI = "localhost:8080"
 	// relative to the user home directory
 	metricsFilePath = ".tmpnet/prometheus/file_sd_configs/load-test.json"
 )
@@ -66,16 +68,23 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 
 var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 	var (
-		network       *tmpnet.Network
-		tracker       *load.Tracker[common.Hash]
-		metricsServer *load.MetricsServer
-		logger        = logging.NewLogger("", logging.NewWrappedCore(logging.Info, os.Stdout, logging.Auto.ConsoleEncoder()))
+		network    *tmpnet.Network
+		tracker    *load.Tracker[common.Hash]
+		logger     = logging.NewLogger("c-chain-load-testing", logging.NewWrappedCore(logging.Info, os.Stdout, logging.Auto.ConsoleEncoder()))
+		tc         = e2e.NewTestContext()
+		r          = require.New(tc)
+		registry   = prometheus.NewRegistry()
+		metricsURI string
+		cleanup    func()
 	)
+
+	tracker, err := load.NewTracker[common.Hash](registry)
+	r.NoError(err)
 
 	ginkgo.BeforeAll(func() {
 		tc := e2e.NewTestContext()
-		env := e2e.GetEnv(tc)
 		r := require.New(tc)
+		env := e2e.GetEnv(tc)
 
 		network = env.GetNetwork()
 		network.Nodes = network.Nodes[:nodesCount]
@@ -84,32 +93,10 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 			r.NoError(err, "ensuring keys for node %s", node.NodeID)
 		}
 
-		registry := prometheus.NewRegistry()
-		metricsServer = load.NewPrometheusServer(metricsURI, registry, logger)
-		var err error
-		tracker, err = load.NewTracker[common.Hash](registry)
-		r.NoError(err)
+		metricsURI, cleanup = setupMetricsServer(r, registry, logger)
+		writeCollectorConfiguration(r, metricsURI, e2e.GetEnv(tc).GetNetwork().UUID, logger)
 
-		_, err = metricsServer.Start()
-		r.NoError(err, "failed to start metrics server")
-
-		collectorConfigBytes, err := generateCollectorConfig(
-			[]string{metricsURI},
-			e2e.GetEnv(tc).GetNetwork().UUID,
-		)
-		r.NoError(err, "failed to generate collector config for network %s", e2e.GetEnv(tc).GetNetwork().UUID)
-
-		homedir, err := os.UserHomeDir()
-		r.NoError(err, "failed to get user home dir")
-
-		collectorFilePath := filepath.Join(homedir, metricsFilePath)
-		r.NoError(writeCollectorConfig(collectorFilePath, collectorConfigBytes), "failed to write collector config at path %s", collectorFilePath)
-
-		// Add cleanup for metrics server
-		ginkgo.DeferCleanup(func() {
-			r.NoError(os.Remove(collectorFilePath))
-			r.NoError(metricsServer.Stop(), "stopping metrics server")
-		})
+		ginkgo.DeferCleanup(cleanup)
 	})
 
 	ginkgo.It("C-Chain simple", func(ctx context.Context) {
@@ -151,34 +138,66 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 	})
 })
 
-func generateCollectorConfig(targets []string, uuid string) ([]byte, error) {
-	nodeLabels := map[string]string{
-		"network_owner": "load-test",
-		"network_uuid":  uuid,
-	}
-	cfg := []map[string]any{
-		{
-			"labels":  nodeLabels,
-			"targets": targets,
-		},
-	}
+// setupMetricsServer creates Prometheus server with a dynamically allocated port
+func setupMetricsServer(r *require.Assertions, registry *prometheus.Registry, logger logging.Logger) (string, func()) {
+	// Allocate a port dynamically
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	r.NoError(err, "allocating dynamic port")
 
-	return json.MarshalIndent(cfg, "", " ")
+	tcpAddr, ok := listener.Addr().(*net.TCPAddr)
+	r.True(ok, "allocating dynamic port")
+	port := tcpAddr.Port
+	r.NoError(listener.Close(), "closing listener on port %d", port)
+
+	metricsURI := fmt.Sprintf("127.0.0.1:%d", port)
+
+	metricsServer := load.NewPrometheusServer(metricsURI, registry, logger)
+	_, err = metricsServer.Start()
+	r.NoError(err, "failed to start metrics server")
+
+	// Return a cleanup function
+	return metricsURI, func() {
+		logger.Info("Stopping metrics server")
+		r.NoError(metricsServer.Stop(), "stopping metrics server")
+	}
 }
 
-func writeCollectorConfig(metricsFilePath string, config []byte) error {
-	file, err := os.OpenFile(metricsFilePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
-	if err != nil {
-		return err
-	}
+// writeCollectorConfiguration generates and writes the Prometheus collector configuration
+// so tmpnet can dynamically discover new scrape target via file-based service discovery
+func writeCollectorConfiguration(r *require.Assertions, metricsURI, networkUUID string, logger logging.Logger) {
+	homedir, err := os.UserHomeDir()
+	r.NoError(err, "getting user home directory")
 
-	defer func() {
-		_ = file.Close()
-	}()
+	collectorFilePath := filepath.Join(homedir, metricsFilePath)
 
-	if _, err := file.Write(config); err != nil {
-		return err
-	}
+	collectorConfig, err := generateCollectorConfig([]string{metricsURI}, networkUUID)
+	r.NoError(err, "generating collector configuration")
 
-	return nil
+	err = os.MkdirAll(filepath.Dir(collectorFilePath), 0755)
+	r.NoError(err, "creating collector directory")
+
+	err = os.WriteFile(collectorFilePath, collectorConfig, 0644)
+	r.NoError(err, "writing collector configuration")
+
+	logger.Info("Collector configuration written",
+		zap.String("path", collectorFilePath),
+		zap.String("target", metricsURI))
+
+	// Register cleanup for the file
+	ginkgo.DeferCleanup(func() {
+		r.NoError(os.Remove(collectorFilePath))
+	})
+}
+
+// generateCollectorConfig creates the Prometheus service discovery configuration
+func generateCollectorConfig(targets []string, uuid string) ([]byte, error) {
+	return json.MarshalIndent([]map[string]any{
+		{
+			"targets": targets,
+			"labels": map[string]string{
+				"network_owner": "load-test",
+				"network_uuid":  uuid,
+			},
+		},
+	}, "", "  ")
 }
