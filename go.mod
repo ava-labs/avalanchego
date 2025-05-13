@@ -7,7 +7,7 @@ module github.com/ava-labs/avalanchego
 //
 // - If updating between minor versions (e.g. 1.23.x -> 1.24.x):
 //   - Consider updating the version of golangci-lint (in scripts/lint.sh).
-go 1.23.6
+go 1.23.9
 
 require (
 	github.com/DataDog/zstd v1.5.2
@@ -67,6 +67,7 @@ require (
 	golang.org/x/sync v0.12.0
 	golang.org/x/term v0.30.0
 	golang.org/x/time v0.3.0
+	golang.org/x/tools v0.29.0
 	gonum.org/v1/gonum v0.11.0
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240827150818-7e3bb234dfed
 	google.golang.org/grpc v1.66.0
@@ -186,7 +187,6 @@ require (
 	golang.org/x/oauth2 v0.21.0 // indirect
 	golang.org/x/sys v0.31.0 // indirect
 	golang.org/x/text v0.23.0 // indirect
-	golang.org/x/tools v0.29.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240604185151-ef581f913117 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect

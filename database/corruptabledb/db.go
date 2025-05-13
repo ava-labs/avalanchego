@@ -8,7 +8,10 @@ import (
 	"fmt"
 	"sync"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var (
@@ -21,6 +24,7 @@ var (
 type Database struct {
 	database.Database
 
+	log logging.Logger
 	// initialError stores the error other than "not found" or "closed" while
 	// performing a db operation. If not nil, Has, Get, Put, Delete and batch
 	// writes will fail with initialError.
@@ -29,8 +33,11 @@ type Database struct {
 }
 
 // New returns a new prefixed database
-func New(db database.Database) *Database {
-	return &Database{Database: db}
+func New(db database.Database, log logging.Logger) *Database {
+	return &Database{
+		Database: db,
+		log:      log,
+	}
 }
 
 // Has returns if the key is set in the database
@@ -136,6 +143,11 @@ func (db *Database) handleError(err error) error {
 		// Set the initial error to the first unexpected error. Don't call
 		// corrupted() here since it would deadlock.
 		if db.initialError == nil {
+			db.log.Error(
+				"closing database to avoid possible corruption",
+				zap.Error(err),
+			)
+
 			db.initialError = fmt.Errorf("closed to avoid possible corruption, init error: %w", err)
 		}
 	}

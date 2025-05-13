@@ -384,7 +384,7 @@ Path to a JSON file containing the genesis data to use. Ignored when running
 standard networks (Mainnet, Fuji Testnet), or when `--genesis-content` is
 specified. If not given, uses default genesis data.
 
-See the documentation for the genesis JSON format [here](https://github.com/ava-labs/avalanchego/blob/master/genesis/README.md) and an example used for the local network genesis [here](https://github.com/ava-labs/avalanchego/blob/master/genesis/).
+See the documentation for the genesis JSON format [here](../genesis/README.md) and an example used for the local network genesis [here](../genesis/genesis_local.json).
 
 
 #### `--genesis-file-content` (string)
