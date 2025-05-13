@@ -56,6 +56,9 @@
             buf
             protoc-gen-go
             protoc-gen-go-grpc
+
+            # Solidity compiler (v0.8.21)
+            solc
           ] ++ lib.optionals stdenv.isDarwin [
             # macOS-specific frameworks
             darwin.apple_sdk.frameworks.Security

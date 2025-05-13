@@ -5,12 +5,8 @@ set -euo pipefail
 
 # Ensure required tools are installed
 if ! command -v solc &> /dev/null; then
-  echo "Error: solc (Solidity compiler) is not installed, trying to install with brew."
-  brew install solidity
-  if ! command -v solc &> /dev/null; then
-    echo "Error: solc installation failed. Please install it manually."
-    exit 1
-  fi
+  echo "Error: solc installation failed. Run this command within Nix shell."
+  exit 1
 fi
 
 CONTRACTS_DIR="$(dirname "$0")"
