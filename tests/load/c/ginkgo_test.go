@@ -11,10 +11,14 @@ import (
 	"testing"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/tests/load"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/libevm/common"
 )
 
 // Run this using the command:
@@ -31,9 +35,9 @@ func init() {
 
 const (
 	nodesCount = 3
-	metricsURI = "127.0.0.1:8082"
+	metricsURI = "localhost:8080"
 	// relative to the user home directory
-	metricsFilePath = ".tmpnet/prometheus/file_sd_configs/c-chain-load-test.json"
+	metricsFilePath = ".tmpnet/prometheus/file_sd_configs/load-test.json"
 )
 
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
@@ -61,7 +65,12 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 })
 
 var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
-	var network *tmpnet.Network
+	var (
+		network       *tmpnet.Network
+		tracker       *load.Tracker[common.Hash]
+		metricsServer *load.MetricsServer
+		logger        = logging.NewLogger("", logging.NewWrappedCore(logging.Info, os.Stdout, logging.Auto.ConsoleEncoder()))
+	)
 
 	ginkgo.BeforeAll(func() {
 		tc := e2e.NewTestContext()
@@ -75,6 +84,15 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 			r.NoError(err, "ensuring keys for node %s", node.NodeID)
 		}
 
+		registry := prometheus.NewRegistry()
+		metricsServer = load.NewPrometheusServer(metricsURI, registry, logger)
+		var err error
+		tracker, err = load.NewTracker[common.Hash](registry)
+		r.NoError(err)
+
+		_, err = metricsServer.Start()
+		r.NoError(err, "failed to start metrics server")
+
 		collectorConfigBytes, err := generateCollectorConfig(
 			[]string{metricsURI},
 			e2e.GetEnv(tc).GetNetwork().UUID,
@@ -87,8 +105,10 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 		collectorFilePath := filepath.Join(homedir, metricsFilePath)
 		r.NoError(writeCollectorConfig(collectorFilePath, collectorConfigBytes), "failed to write collector config at path %s", collectorFilePath)
 
+		// Add cleanup for metrics server
 		ginkgo.DeferCleanup(func() {
 			r.NoError(os.Remove(collectorFilePath))
+			r.NoError(metricsServer.Stop(), "stopping metrics server")
 		})
 	})
 
@@ -105,7 +125,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 			maxTPS:    90,
 			step:      10,
 		}
-		err = execute(ctx, network.PreFundedKeys, config)
+		err = execute(ctx, tracker, network.PreFundedKeys, config, logger)
 		if err != nil {
 			ginkgo.GinkgoT().Error(err)
 		}
@@ -124,7 +144,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 			maxTPS:    60,
 			step:      5,
 		}
-		err = execute(ctx, network.PreFundedKeys, config)
+		err = execute(ctx, tracker, network.PreFundedKeys, config, logger)
 		if err != nil {
 			ginkgo.GinkgoT().Error(err)
 		}
@@ -133,7 +153,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 
 func generateCollectorConfig(targets []string, uuid string) ([]byte, error) {
 	nodeLabels := map[string]string{
-		"network_owner": "c-chain-load-test",
+		"network_owner": "load-test",
 		"network_uuid":  uuid,
 	}
 	cfg := []map[string]any{

@@ -8,18 +8,14 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
-	"os"
-	"time"
-
-	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/ethclient"
-	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/tests/load"
 	"github.com/ava-labs/avalanchego/tests/load/c/issuers"
 	"github.com/ava-labs/avalanchego/tests/load/c/listener"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/ethclient"
 
 	ethcrypto "github.com/ava-labs/libevm/crypto"
 )
@@ -32,7 +28,6 @@ type config struct {
 	maxTPS    int64
 	step      int64
 	issuer    issuerType
-	metricsURI string
 }
 
 type issuerType string
@@ -42,9 +37,7 @@ const (
 	issuerOpcoder issuerType = "opcoder"
 )
 
-func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config config) error {
-	logger := logging.NewLogger("", logging.NewWrappedCore(logging.Info, os.Stdout, logging.Auto.ConsoleEncoder()))
-
+func execute(ctx context.Context, tracker *load.Tracker[common.Hash], preFundedKeys []*secp256k1.PrivateKey, config config, logger logging.Logger) error {
 	keys, err := fixKeysCount(preFundedKeys, int(config.agents))
 	if err != nil {
 		return fmt.Errorf("fixing keys count: %w", err)
@@ -53,13 +46,6 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 	err = distribute(ctx, config.endpoints[0], keys)
 	if err != nil {
 		return fmt.Errorf("ensuring minimum funds: %w", err)
-	}
-
-	registry := prometheus.NewRegistry()
-	metricsServer := load.NewPrometheusServer(config.metricsURI, registry, logger)
-	tracker, err := load.NewTracker[common.Hash](registry, logger)
-	if err != nil {
-		return fmt.Errorf("creating tracker: %w", err)
 	}
 
 	agents := make([]load.Agent[common.Hash], config.agents)
@@ -86,11 +72,6 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 		agents[i] = load.NewAgent(issuer, listener)
 	}
 
-	metricsErrCh, err := metricsServer.Start()
-	if err != nil {
-		return fmt.Errorf("starting metrics server: %w", err)
-	}
-
 	orchestratorCtx, orchestratorCancel := context.WithCancel(ctx)
 	defer orchestratorCancel()
 	orchestratorConfig := load.NewOrchestratorConfig()
@@ -99,27 +80,8 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 	orchestratorConfig.Step = config.step
 	orchestratorConfig.TxRateMultiplier = 1.05
 	orchestrator := load.NewOrchestrator(agents, tracker, logger, orchestratorConfig)
-	orchestratorErrCh := make(chan error)
-	go func() {
-		orchestratorErrCh <- orchestrator.Execute(orchestratorCtx)
-	}()
 
-	select {
-	case err := <-orchestratorErrCh:
-		if err != nil {
-			_ = metricsServer.Stop()
-			return fmt.Errorf("orchestrator error: %w", err)
-		}
-		err = metricsServer.Stop()
-		if err != nil {
-			return fmt.Errorf("stopping metrics server: %w", err)
-		}
-		return nil
-	case err := <-metricsErrCh:
-		orchestratorCancel()
-		<-orchestratorErrCh
-		return fmt.Errorf("metrics server error: %w", err)
-	}
+	return orchestrator.Execute(orchestratorCtx)
 }
 
 func fixKeysCount(preFundedKeys []*secp256k1.PrivateKey, target int) ([]*ecdsa.PrivateKey, error) {
