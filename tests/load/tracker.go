@@ -4,12 +4,10 @@
 package load
 
 import (
-	"context"
 	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -139,27 +137,4 @@ func (p *Tracker[T]) ObserveFailed(txID T) {
 	p.txsFailed++
 	p.txsFailedCounter.Inc()
 	p.txLatency.Observe(float64(time.Since(startTime).Milliseconds()))
-}
-
-func (t *Tracker[T]) LogPeriodically(ctx context.Context) {
-	const period = 10 * time.Second
-
-	ticker := time.NewTicker(period)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-		}
-		t.lock.RLock()
-		t.logger.Info("Tracker stats",
-			zap.Uint64("issued", t.txsIssued),
-			zap.Uint64("confirmed", t.txsConfirmed),
-			zap.Uint64("failed", t.txsFailed),
-			zap.Int("inflight", len(t.outstandingTxs)),
-		)
-		t.lock.RUnlock()
-	}
 }

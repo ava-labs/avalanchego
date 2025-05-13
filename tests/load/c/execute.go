@@ -103,8 +103,6 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 		orchestratorErrCh <- orchestrator.Execute(orchestratorCtx)
 	}()
 
-	go tracker.LogPeriodically(orchestratorCtx)
-
 	select {
 	case err := <-orchestratorErrCh:
 		if err != nil {
