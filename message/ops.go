@@ -49,6 +49,8 @@ const (
 	PullQueryOp
 	QueryFailedOp
 	ChitsOp
+	// Simplex Consensus:
+	SimplexOp
 	// Application:
 	AppRequestOp
 	AppErrorOp
@@ -59,6 +61,7 @@ const (
 	DisconnectedOp
 	NotifyOp
 	GossipRequestOp
+
 )
 
 var (
@@ -244,6 +247,9 @@ func (op Op) String() string {
 		return "query_failed"
 	case ChitsOp:
 		return "chits"
+	// Simplex Consensus
+	case SimplexOp:
+		return "simplex"
 	// Application
 	case AppRequestOp:
 		return "app_request"
@@ -313,6 +319,9 @@ func Unwrap(m *p2p.Message) (fmt.Stringer, error) {
 		return msg.PullQuery, nil
 	case *p2p.Message_Chits:
 		return msg.Chits, nil
+	// Simplex Consensus:
+	case *p2p.Message_Simplex:
+		return msg.Simplex, nil
 	// Application:
 	case *p2p.Message_AppRequest:
 		return msg.AppRequest, nil
@@ -377,6 +386,8 @@ func ToOp(m *p2p.Message) (Op, error) {
 		return AppErrorOp, nil
 	case *p2p.Message_AppGossip:
 		return AppGossipOp, nil
+	case *p2p.Message_Simplex:
+		return SimplexOp, nil
 	default:
 		return 0, fmt.Errorf("%w: %T", errUnknownMessageType, msg)
 	}
