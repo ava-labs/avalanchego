@@ -35,7 +35,7 @@ type Tracker[T TxID] struct {
 // NewTracker returns a new Tracker instance which records metrics for the number
 // of transactions issued, confirmed, and failed. It also tracks the latency of
 // transactions.
-func NewTracker[T TxID](reg *prometheus.Registry) (*Tracker[T], error) {
+func NewTracker[T TxID](reg prometheus.Registerer) (*Tracker[T], error) {
 	tracker := &Tracker[T]{
 		outstandingTxs: make(map[T]time.Time),
 		txsIssuedCounter: prometheus.NewCounter(prometheus.CounterOpts{
