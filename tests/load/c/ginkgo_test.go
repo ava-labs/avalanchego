@@ -37,7 +37,8 @@ func init() {
 }
 
 const (
-	nodesCount = 3
+	blockchainID = "C"
+	nodesCount   = 3
 	// relative to the user home directory
 	metricsFilePath = ".tmpnet/prometheus/file_sd_configs/load-test.json"
 )
@@ -94,13 +95,12 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 		}
 
 		metricsURI, cleanup = setupMetricsServer(r, registry, logger)
-		writeCollectorConfiguration(r, metricsURI, e2e.GetEnv(tc).GetNetwork().UUID, logger)
+		writeCollectorConfiguration(r, metricsURI, e2e.GetEnv(tc).GetNetwork().UUID, blockchainID, logger)
 
 		ginkgo.DeferCleanup(cleanup)
 	})
 
 	ginkgo.It("C-Chain simple", func(ctx context.Context) {
-		const blockchainID = "C"
 		endpoints, err := tmpnet.GetNodeWebsocketURIs(network.Nodes, blockchainID)
 		require.NoError(ginkgo.GinkgoT(), err, "getting node websocket URIs")
 		config := config{
@@ -119,7 +119,6 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 	})
 
 	ginkgo.It("C-Chain opcoder", func(ctx context.Context) {
-		const blockchainID = "C"
 		endpoints, err := tmpnet.GetNodeWebsocketURIs(network.Nodes, blockchainID)
 		require.NoError(ginkgo.GinkgoT(), err, "getting node websocket URIs")
 		config := config{
@@ -164,13 +163,13 @@ func setupMetricsServer(r *require.Assertions, registry *prometheus.Registry, lo
 
 // writeCollectorConfiguration generates and writes the Prometheus collector configuration
 // so tmpnet can dynamically discover new scrape target via file-based service discovery
-func writeCollectorConfiguration(r *require.Assertions, metricsURI, networkUUID string, logger logging.Logger) {
+func writeCollectorConfiguration(r *require.Assertions, metricsURI, networkUUID, chain string, logger logging.Logger) {
 	homedir, err := os.UserHomeDir()
 	r.NoError(err, "getting user home directory")
 
 	collectorFilePath := filepath.Join(homedir, metricsFilePath)
 
-	collectorConfig, err := generateCollectorConfig([]string{metricsURI}, networkUUID)
+	collectorConfig, err := generateCollectorConfig([]string{metricsURI}, networkUUID, chain)
 	r.NoError(err, "generating collector configuration")
 
 	err = os.WriteFile(collectorFilePath, collectorConfig, 0o644)
@@ -186,14 +185,15 @@ func writeCollectorConfiguration(r *require.Assertions, metricsURI, networkUUID 
 	})
 }
 
-// generateCollectorConfig creates the Prometheus service discovery configuration
-func generateCollectorConfig(targets []string, uuid string) ([]byte, error) {
+// generateCollectorConfig creates the Prometheus configuration
+func generateCollectorConfig(targets []string, uuid, chain string) ([]byte, error) {
 	return json.MarshalIndent([]map[string]any{
 		{
 			"targets": targets,
 			"labels": map[string]string{
 				"network_owner": "load-test",
 				"network_uuid":  uuid,
+				"chain":         chain,
 			},
 		},
 	}, "", "  ")
