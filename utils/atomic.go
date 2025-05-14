@@ -38,12 +38,12 @@ func (a *Atomic[T]) Set(value T) {
 	a.value = value
 }
 
-func (a *Atomic[T]) Swap(new T) T {
+func (a *Atomic[T]) Swap(value T) T {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
 	old := a.value
-	a.value = new
+	a.value = value
 
 	return old
 }

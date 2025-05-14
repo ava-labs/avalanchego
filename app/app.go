@@ -169,7 +169,6 @@ func (a *app) Start() {
 			zap.Error(err),
 		)
 	}()
-	return
 }
 
 // Stop attempts to shutdown the currently running node. This function will
