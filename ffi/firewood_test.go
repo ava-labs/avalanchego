@@ -653,8 +653,8 @@ func TestRevision(t *testing.T) {
 	require.NoError(t, err, "%T.Root()", db)
 
 	// Create a revision from this root.
-	revision, err := NewRevision(db.handle, root)
-	require.NoError(t, err, "NewRevision")
+	revision, err := db.Revision(root)
+	require.NoError(t, err, "Revision")
 	// Check that all keys can be retrieved from the revision.
 	for i := range keys {
 		got, err := revision.Get(keys[i])
@@ -677,7 +677,7 @@ func TestRevision(t *testing.T) {
 
 	// Create a "new" revision from the first old root.
 	revision, err = db.Revision(root)
-	require.NoError(t, err, "NewRevision")
+	require.NoError(t, err, "Revision")
 	// Check that all keys can be retrieved from the revision.
 	for i := range keys {
 		got, err := revision.Get(keys[i])
@@ -690,28 +690,17 @@ func TestFakeRevision(t *testing.T) {
 	db := newTestDatabase(t)
 
 	// Create a nil revision.
-	revision, err := db.Revision(nil)
-	require.ErrorIs(t, err, errInvalidRoot, "NewRevision(nil)")
-	assert.Nil(t, revision, "NewRevision(nil)")
+	_, err := db.Revision(nil)
+	require.ErrorIs(t, err, errInvalidRootLength, "Revision(nil)")
 
 	// Create a fake revision with an invalid root.
 	invalidRoot := []byte("not a valid root")
-	revision, err = db.Revision(invalidRoot)
-	require.ErrorIs(t, err, errInvalidRoot, "NewRevision(invalid root)")
-	require.Nil(t, revision, "NewRevision(invalid root)")
+	_, err = db.Revision(invalidRoot)
+	require.ErrorIs(t, err, errInvalidRootLength, "Revision(invalid root)")
 
 	// Create a fake revision with an valid root.
 	validRoot := []byte("counting 32 bytes to make a hash")
 	assert.Len(t, validRoot, 32, "valid root")
-	revision, err = db.Revision(validRoot)
-	require.NoError(t, err, "NewRevision(valid root)")
-	require.NotNil(t, revision, "NewRevision(valid root)")
-
-	// Attempt to get a value from the fake revision.
-	_, err = revision.Get([]byte("non-existent"))
-	require.Contains(t, err.Error(), "Revision not found", "Get(non-existent)")
-
-	// Attempt to get from the now invalid revision.
-	_, err = revision.Get([]byte("non-existent"))
-	require.ErrorIs(t, err, errRevisionClosed, "Get(non-existent)")
+	_, err = db.Revision(validRoot)
+	require.ErrorIs(t, err, errRevisionNotFound, "Revision(valid root)")
 }

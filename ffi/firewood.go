@@ -206,7 +206,7 @@ func (db *Database) Root() ([]byte, error) {
 
 // Revision returns a historical revision of the database.
 func (db *Database) Revision(root []byte) (*Revision, error) {
-	return NewRevision(db.handle, root)
+	return newRevision(db.handle, root)
 }
 
 // Close closes the database and releases all held resources.
