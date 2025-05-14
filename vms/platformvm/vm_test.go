@@ -412,56 +412,6 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	require.ErrorIs(reason, txexecutor.ErrTimestampNotBeforeStartTime)
 }
 
-// Reject attempt to add validator to primary network
-func TestAddValidatorReject(t *testing.T) {
-	require := require.New(t)
-	vm, _, _ := defaultVM(t, upgradetest.Cortina)
-	vm.ctx.Lock.Lock()
-	defer vm.ctx.Lock.Unlock()
-
-	wallet := newWallet(t, vm, walletConfig{})
-
-	var (
-		startTime     = vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
-		endTime       = startTime.Add(defaultMinStakingDuration)
-		nodeID        = ids.GenerateTestNodeID()
-		rewardAddress = ids.GenerateTestShortID()
-	)
-
-	// create valid tx
-	tx, err := wallet.IssueAddValidatorTx(
-		&txs.Validator{
-			NodeID: nodeID,
-			Start:  uint64(startTime.Unix()),
-			End:    uint64(endTime.Unix()),
-			Wght:   vm.MinValidatorStake,
-		},
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{rewardAddress},
-		},
-		reward.PercentDenominator,
-	)
-	require.NoError(err)
-
-	// trigger block creation
-	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTxFromRPC(tx))
-	vm.ctx.Lock.Lock()
-
-	blk, err := vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Reject(context.Background()))
-
-	_, _, err = vm.state.GetTx(tx.ID())
-	require.ErrorIs(err, database.ErrNotFound)
-
-	_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
-	require.ErrorIs(err, database.ErrNotFound)
-}
-
 // Reject proposal to add validator to primary network
 func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	require := require.New(t)

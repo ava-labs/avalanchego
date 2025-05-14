@@ -51,7 +51,6 @@ import (
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	txmempool "github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
 const (
@@ -68,7 +67,7 @@ type mutableSharedMemory struct {
 type environment struct {
 	Builder
 	blkManager blockexecutor.Manager
-	mempool    txmempool.Mempool[*txs.Tx]
+	mempool    *mempool.Mempool
 	network    *network.Network
 	sender     *enginetest.Sender
 
@@ -143,7 +142,13 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 	metrics, err := metrics.New(registerer)
 	require.NoError(err)
 
-	res.mempool, err = mempool.New("mempool", registerer)
+	res.mempool, err = mempool.New(
+		"mempool",
+		res.config.DynamicFeeConfig.Weights,
+		1_000_000,
+		ids.ID{},
+		registerer,
+	)
 	require.NoError(err)
 
 	res.blkManager = blockexecutor.NewManager(
