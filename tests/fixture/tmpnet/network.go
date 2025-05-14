@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -57,6 +58,9 @@ const (
 
 	// eth address: 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
 	HardHatKeyStr = "56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027"
+
+	// grafanaURI is remote Grafana URI
+	grafanaURI = "grafana-poc.avax-dev.network"
 )
 
 var (
@@ -1052,9 +1056,89 @@ func MetricsLinkForNetwork(networkUUID string, startTime string, endTime string)
 		endTime = "now"
 	}
 	return fmt.Sprintf(
-		"https://grafana-poc.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?&var-filter=network_uuid%%7C%%3D%%7C%s&var-filter=is_ephemeral_node%%7C%%3D%%7Cfalse&from=%s&to=%s",
+		"https://%s/d/kBQpRdWnk/avalanche-main-dashboard?&var-filter=network_uuid%%7C%%3D%%7C%s&var-filter=is_ephemeral_node%%7C%%3D%%7Cfalse&from=%s&to=%s",
+		grafanaURI,
 		networkUUID,
 		startTime,
 		endTime,
 	)
+}
+
+// GrafanaLinkOption configures metrics link options
+type GrafanaLinkOption func(*grafanaLinkConfig)
+
+// grafanaLinkConfig holds all configurable options to generate appropriate Grafana metrics link
+type grafanaLinkConfig struct {
+	dashboardID   string
+	dashboardName string
+	filters       map[string]string
+}
+
+// WithDashboard sets a custom dashboard ID and name
+func WithDashboard(id, name string) GrafanaLinkOption {
+	return func(c *grafanaLinkConfig) {
+		c.dashboardID = id
+		c.dashboardName = name
+	}
+}
+
+// WithFilters adds multiple custom filters
+func WithFilters(filters map[string]string) GrafanaLinkOption {
+	return func(c *grafanaLinkConfig) {
+		for k, v := range filters {
+			c.filters[k] = v
+		}
+	}
+}
+
+// WithoutEphemeralNodeFilter removes the is_ephemeral_node filter
+func WithoutEphemeralNodeFilter() GrafanaLinkOption {
+	return func(c *grafanaLinkConfig) {
+		delete(c.filters, "is_ephemeral_node")
+	}
+}
+
+// CustomMetricsLinkForNetwork returns a Grafana dashboard link for the network
+func CustomMetricsLinkForNetwork(networkUUID, startTime, endTime string, opts ...GrafanaLinkOption) string {
+	if startTime == "" {
+		startTime = "now-1h"
+	}
+	if endTime == "" {
+		endTime = "now"
+	}
+
+	// Default configuration
+	cfg := &grafanaLinkConfig{
+		dashboardID:   "kBQpRdWnk",
+		dashboardName: "avalanche-main-dashboard",
+		filters: map[string]string{
+			"network_uuid":      networkUUID,
+			"is_ephemeral_node": "false",
+		},
+	}
+
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
+	baseURL := url.URL{
+		Scheme: "https",
+		Host:   grafanaURI,
+		Path:   fmt.Sprintf("/d/%s/%s", cfg.dashboardID, cfg.dashboardName),
+	}
+
+	query := baseURL.Query()
+
+	// Add all filters
+	for key, value := range cfg.filters {
+		query.Add("var-filter", fmt.Sprintf("%s|=|%s", key, value))
+	}
+
+	// Add time range
+	query.Add("from", startTime)
+	query.Add("to", endTime)
+
+	baseURL.RawQuery = query.Encode()
+
+	return baseURL.String()
 }
