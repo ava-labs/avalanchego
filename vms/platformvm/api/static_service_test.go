@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 )
 
 func TestNewGenesisBytesInvalidUTXOBalance(t *testing.T) {
@@ -215,7 +214,7 @@ func TestNewGenesisBytesReturnsSortedValidators(t *testing.T) {
 	)
 	require.NoError(err)
 	require.NotEmpty(genesisBytes)
-	genesis, err := genesis.Parse(genesisBytes)
+	genesis, err := Parse(genesisBytes)
 	require.NoError(err)
 
 	validators := genesis.Validators

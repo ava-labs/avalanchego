@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -526,7 +525,7 @@ func splitAllocations(allocations []Allocation, numSplits int) [][]Allocation {
 }
 
 func VMGenesis(genesisBytes []byte, vmID ids.ID) (*pchaintxs.Tx, error) {
-	genesis, err := genesis.Parse(genesisBytes)
+	genesis, err := api.Parse(genesisBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse genesis: %w", err)
 	}

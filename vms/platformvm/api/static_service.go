@@ -36,6 +36,40 @@ var (
 	_ utils.Sortable[Allocation] = Allocation{}
 )
 
+// UTXO adds messages to UTXOs
+type GenesisUTXO struct {
+	avax.UTXO `serialize:"true"`
+	Message   []byte `serialize:"true" json:"message"`
+}
+
+// Genesis represents a genesis state of the platform chain
+type Genesis struct {
+	UTXOs         []*GenesisUTXO `serialize:"true"`
+	Validators    []*txs.Tx      `serialize:"true"`
+	Chains        []*txs.Tx      `serialize:"true"`
+	Timestamp     uint64         `serialize:"true"`
+	InitialSupply uint64         `serialize:"true"`
+	Message       string         `serialize:"true"`
+}
+
+func Parse(genesisBytes []byte) (*Genesis, error) {
+	gen := &Genesis{}
+	if _, err := genesis.Codec.Unmarshal(genesisBytes, gen); err != nil {
+		return nil, err
+	}
+	for _, tx := range gen.Validators {
+		if err := tx.Initialize(txs.GenesisCodec); err != nil {
+			return nil, err
+		}
+	}
+	for _, tx := range gen.Chains {
+		if err := tx.Initialize(txs.GenesisCodec); err != nil {
+			return nil, err
+		}
+	}
+	return gen, nil
+}
+
 // Allocation is a UTXO on the Platform Chain that exists at the chain's genesis
 type Allocation struct {
 	Locktime uint64
@@ -136,7 +170,7 @@ func NewGenesisBytes(
 	message string,
 ) ([]byte, error) {
 	// Specify the UTXOs on the Platform chain that exist at genesis
-	utxos := make([]*genesis.UTXO, 0, len(allocations))
+	utxos := make([]*GenesisUTXO, 0, len(allocations))
 	for i, allocation := range allocations {
 		if allocation.Amount == 0 {
 			return nil, errUTXOHasNoValue
@@ -170,7 +204,7 @@ func NewGenesisBytes(
 		if err != nil {
 			return nil, fmt.Errorf("problem decoding UTXO message bytes: %w", err)
 		}
-		utxos = append(utxos, &genesis.UTXO{
+		utxos = append(utxos, &GenesisUTXO{
 			UTXO:    utxo,
 			Message: allocation.Message,
 		})
@@ -301,7 +335,7 @@ func NewGenesisBytes(
 	validatorTxs := vdrs.List()
 
 	// genesis holds the genesis state
-	g := genesis.Genesis{
+	g := Genesis{
 		UTXOs:         utxos,
 		Validators:    validatorTxs,
 		Chains:        chainsTxs,

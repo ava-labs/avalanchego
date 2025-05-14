@@ -40,10 +40,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -1527,7 +1527,7 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 	return diffIter.Error()
 }
 
-func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) error {
+func (s *state) syncGenesis(genesisBlk block.Block, genesis *api.Genesis) error {
 	genesisBlkID := genesisBlk.ID()
 	s.SetLastAccepted(genesisBlkID)
 	s.SetTimestamp(time.Unix(int64(genesis.Timestamp), 0))
@@ -2178,7 +2178,7 @@ func (s *state) init(genesisBytes []byte) error {
 		return err
 	}
 
-	genesis, err := genesis.Parse(genesisBytes)
+	genesis, err := api.Parse(genesisBytes)
 	if err != nil {
 		return err
 	}

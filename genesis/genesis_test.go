@@ -23,7 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/perms"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
+	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
 var (
@@ -258,7 +258,7 @@ func TestGenesisFromFile(t *testing.T) {
 				genesisHash := hex.EncodeToString(hashing.ComputeHash256(genesisBytes))
 				require.Equal(test.expectedHash, genesisHash, "genesis hash mismatch")
 
-				_, err = genesis.Parse(genesisBytes)
+				_, err = api.Parse(genesisBytes)
 				require.NoError(err)
 			}
 		})
@@ -344,7 +344,7 @@ func TestGenesisFromFlag(t *testing.T) {
 				genesisHash := hex.EncodeToString(hashing.ComputeHash256(genesisBytes))
 				require.Equal(test.expectedHash, genesisHash, "genesis hash mismatch")
 
-				_, err = genesis.Parse(genesisBytes)
+				_, err = api.Parse(genesisBytes)
 				require.NoError(err)
 			}
 		})
