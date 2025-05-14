@@ -711,7 +711,7 @@ func (n *Node) Dispatch() error {
 	}
 
 	// Start P2P connections
-	err := n.Net.Dispatch()
+	retErr := n.Net.Dispatch()
 
 	// If the P2P server isn't running, shut down the node.
 	// If node is already shutting down, this does not tigger shutdown again,
@@ -737,7 +737,7 @@ func (n *Node) Dispatch() error {
 		)
 	}
 
-	return err
+	return retErr
 }
 
 /*
