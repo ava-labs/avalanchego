@@ -1629,10 +1629,9 @@ func (n *Node) initDiskTargeter(
 // Shutdown this node
 // May be called multiple times
 func (n *Node) Shutdown(exitCode int) {
-	if !n.shuttingDown.Get() { // only set the exit code once
+	if !n.shuttingDown.Swap(true) { // only set the exit code once
 		n.shuttingDownExitCode.Set(exitCode)
 	}
-	n.shuttingDown.Set(true)
 	n.shutdownOnce.Do(n.shutdown)
 }
 

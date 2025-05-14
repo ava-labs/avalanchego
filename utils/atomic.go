@@ -38,6 +38,16 @@ func (a *Atomic[T]) Set(value T) {
 	a.value = value
 }
 
+func (a *Atomic[T]) Swap(new T) T {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+
+	old := a.value
+	a.value = new
+
+	return old
+}
+
 func (a *Atomic[T]) MarshalJSON() ([]byte, error) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
