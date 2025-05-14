@@ -4,9 +4,8 @@
 package load
 
 import (
-	"fmt"
-	"net/url"
-	"strings"
+	"strconv"
+	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"go.uber.org/zap"
@@ -15,59 +14,39 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 )
 
-// keyToFilter is the label name to remove from Grafana dashboard URLs.
-// Load metrics don't have this label, so removing it prevents "No Data" errors.
-const keyToFilter = "is_ephemeral_node"
+const (
+	dashboardID   = "eabddd1d-0a06-4ba1-8e68-a44504e37535"
+	dashboardName = "C-Chain Load"
+)
 
-var _ = ginkgo.BeforeEach(func() {
-	// Disable default metrics link generation
-	e2e.EmitMetricsLink = false
+var (
+	// Disable default metrics link generation to prevent duplicate links.
+	// We generate load specific links.
+	_ = ginkgo.BeforeAll(func() {
+		e2e.EmitMetricsLink = false
+	})
 
-	tc := e2e.NewTestContext()
-	env := e2e.GetEnv(tc)
+	_ = ginkgo.AfterEach(func() {
+		tc := e2e.NewTestContext()
+		env := e2e.GetEnv(tc)
 
-	if env == nil {
-		return
-	}
-
-	specReport := ginkgo.CurrentSpecReport()
-	startTimeMs := specReport.StartTime.UnixMilli()
-	metricsLink, err := removeQueryFilter(e2e.MetricsLink(startTimeMs))
-	if err != nil {
-		tc.Log().Error("Failed to modify metrics link", zap.Error(err))
-		tc.FailNow()
-	}
-
-	tc.Log().Info(tmpnet.MetricsAvailableMessage,
-		zap.String("uri", metricsLink),
-	)
-})
-
-// removeQueryFilter removes specified label filters from Grafana dashboard URLs.
-// This prevents "No Data" errors when metrics lack expected labels.
-func removeQueryFilter(metricsURL string) (string, error) {
-	parsedURL, err := url.Parse(metricsURL)
-	if err != nil {
-		return "", fmt.Errorf("parsing URL: %w", err)
-	}
-
-	query := parsedURL.Query()
-	filters := query["var-filter"]
-	if len(filters) == 0 {
-		return metricsURL, nil
-	}
-
-	newFilters := make([]string, 0, len(filters))
-	for _, filter := range filters {
-		if !strings.Contains(filter, keyToFilter+"|=|") {
-			newFilters = append(newFilters, filter)
+		if env == nil {
+			return
 		}
-	}
 
-	if len(newFilters) != len(filters) {
-		query["var-filter"] = newFilters
-		parsedURL.RawQuery = query.Encode()
-	}
+		specReport := ginkgo.CurrentSpecReport()
+		startTimeMs := specReport.StartTime.UnixMilli()
 
-	return parsedURL.String(), nil
-}
+		metricsLink := tmpnet.CustomMetricsLinkForNetwork(
+			env.GetNetwork().UUID,
+			strconv.FormatInt(startTimeMs, 10),
+			strconv.FormatInt(time.Now().Add(tmpnet.NetworkShutdownDelay).UnixMilli(), 10),
+			tmpnet.WithDashboard(dashboardID, dashboardName),
+			tmpnet.WithoutEphemeralNodeFilter(),
+		)
+
+		tc.Log().Info(tmpnet.MetricsAvailableMessage,
+			zap.String("uri", metricsLink),
+		)
+	})
+)
