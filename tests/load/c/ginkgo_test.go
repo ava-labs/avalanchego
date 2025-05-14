@@ -26,11 +26,12 @@ func init() {
 	flagVars = e2e.RegisterFlagsWithDefaultOwner("avalanchego-load")
 }
 
-const nodesCount = 3
+const nodesCount = 5
 
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run only once in the first ginkgo process
 
+	require.GreaterOrEqual(ginkgo.GinkgoT(), nodesCount, 5, "number of nodes must be at least 5")
 	tc := e2e.NewTestContext()
 	nodes := tmpnet.NewNodesOrPanic(nodesCount)
 	network := &tmpnet.Network{
