@@ -134,8 +134,6 @@ func New(
 		Config:           config,
 	}
 
-	n.DoneShuttingDown.Add(1)
-
 	pop, err := signer.NewProofOfPossession(n.Config.StakingSigningKey)
 	if err != nil {
 		return nil, fmt.Errorf("problem creating proof of possession: %w", err)
@@ -364,10 +362,6 @@ type Node struct {
 
 	// Sets the exit code
 	shuttingDownExitCode utils.Atomic[int]
-
-	// Incremented only once on initialization.
-	// Decremented when node is done shutting down.
-	DoneShuttingDown sync.WaitGroup
 
 	// Metrics Registerer
 	MetricsGatherer        metrics.MultiGatherer
@@ -682,7 +676,8 @@ func (n *Node) Dispatch() error {
 			)
 		}
 		// If the API server isn't running, shut down the node.
-		// If node is already shutting down, this does nothing.
+		// If node is already shutting down, this does not tigger shutdown again,
+		// and blocks until the shutdown is complete.
 		n.Shutdown(1)
 	})
 
@@ -719,7 +714,8 @@ func (n *Node) Dispatch() error {
 	err := n.Net.Dispatch()
 
 	// If the P2P server isn't running, shut down the node.
-	// If node is already shutting down, this does nothing.
+	// If node is already shutting down, this does not tigger shutdown again,
+	// and blocks until the shutdown is complete.
 	n.Shutdown(1)
 
 	if n.tlsKeyLogWriterCloser != nil {
@@ -731,9 +727,6 @@ func (n *Node) Dispatch() error {
 			)
 		}
 	}
-
-	// Wait until the node is done shutting down before returning
-	n.DoneShuttingDown.Wait()
 
 	// Remove the process context file to communicate to an orchestrator
 	// that the node is no longer running.
@@ -1713,7 +1706,6 @@ func (n *Node) shutdown() {
 		)
 	}
 
-	n.DoneShuttingDown.Done()
 	n.Log.Info("finished node shutdown")
 }
 
