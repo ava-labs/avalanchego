@@ -23,9 +23,9 @@ impl<T> KeyType for T where T: AsRef<[u8]> + Send + Sync + Debug {}
 /// This also means that the type of all the keys for a single
 /// API call must be the same, as well as the type of all values
 /// must be the same.
-pub trait ValueType: AsRef<[u8]> + Send + Sync + Debug + 'static {}
+pub trait ValueType: AsRef<[u8]> + Send + Sync + Debug {}
 
-impl<T> ValueType for T where T: AsRef<[u8]> + Send + Sync + Debug + 'static {}
+impl<T> ValueType for T where T: AsRef<[u8]> + Send + Sync + Debug {}
 
 /// The type and size of a single hash key
 /// These are 256-bit hashes that are used for a variety of reasons:

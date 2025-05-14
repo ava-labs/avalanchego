@@ -216,7 +216,7 @@ func TestInvariants(t *testing.T) {
 	assert.Emptyf(t, got, "%T.Get([non-existent key])", db)
 }
 
-func TestMultipleProposals(t *testing.T) {
+func TestParallelProposals(t *testing.T) {
 	db := newTestDatabase(t)
 
 	// Create 10 proposals, each with 10 keys.
@@ -328,7 +328,7 @@ func TestDeleteAll(t *testing.T) {
 }
 
 // Tests that a proposal with an invalid ID cannot be committed.
-func TestFakeProposal(t *testing.T) {
+func TestCommitFakeProposal(t *testing.T) {
 	db := newTestDatabase(t)
 
 	// Create a fake proposal with an invalid ID.
@@ -340,8 +340,291 @@ func TestFakeProposal(t *testing.T) {
 	// Attempt to get a value from the fake proposal.
 	_, err := proposal.Get([]byte("non-existent"))
 	require.Contains(t, err.Error(), "proposal not found", "Get(fake proposal)")
+}
+
+func TestDropProposal(t *testing.T) {
+	db := newTestDatabase(t)
+
+	// Create a proposal with 10 keys.
+	keys := make([][]byte, 10)
+	vals := make([][]byte, 10)
+	for i := range keys {
+		keys[i] = keyForTest(i)
+		vals[i] = valForTest(i)
+	}
+	proposal, err := db.Propose(keys, vals)
+	require.NoError(t, err, "Propose")
+
+	// Drop the proposal.
+	err = proposal.Drop()
+	require.NoError(t, err, "Drop")
+
+	// Attempt to commit the dropped proposal.
+	err = proposal.Commit()
+	require.ErrorIs(t, err, errDroppedProposal, "Commit(dropped proposal)")
+
+	// Attempt to get a value from the dropped proposal.
+	_, err = proposal.Get([]byte("non-existent"))
+	require.ErrorIs(t, err, errDroppedProposal, "Get(dropped proposal)")
+
+	// Attempt to "emulate" the proposal to ensure it isn't internally available still.
+	proposal = &Proposal{
+		handle: db.handle,
+		id:     1,
+	}
+	_, err = proposal.Get([]byte("non-existent"))
+	require.Contains(t, err.Error(), "proposal not found", "Get(fake proposal)")
+
+	// Attempt to create a new proposal from the fake proposal.
+	_, err = proposal.Propose([][]byte{[]byte("key")}, [][]byte{[]byte("value")})
+	require.Contains(t, err.Error(), "proposal not found", "Propose(fake proposal)")
 
 	// Attempt to commit the fake proposal.
 	err = proposal.Commit()
 	require.Contains(t, err.Error(), "proposal not found", "Commit(fake proposal)")
+}
+
+// Tests that a proposal can be created from another proposal, and both can be
+// committed sequentially.
+func TestProposeFromProposal(t *testing.T) {
+	db := newTestDatabase(t)
+
+	// Create two sets of keys and values.
+	keys1 := make([][]byte, 10)
+	vals1 := make([][]byte, 10)
+	keys2 := make([][]byte, 10)
+	vals2 := make([][]byte, 10)
+	for i := range keys1 {
+		keys1[i] = keyForTest(i)
+		vals1[i] = valForTest(i)
+	}
+	for i := range keys2 {
+		keys2[i] = keyForTest(i + 10)
+		vals2[i] = valForTest(i + 10)
+	}
+
+	// Create the first proposal.
+	proposal1, err := db.Propose(keys1, vals1)
+	require.NoError(t, err, "Propose")
+	// Create the second proposal from the first.
+	proposal2, err := proposal1.Propose(keys2, vals2)
+	require.NoError(t, err, "Propose")
+
+	// Assert that the first proposal doesn't have keys from the second.
+	for i := range keys2 {
+		got, err := proposal1.Get(keys2[i])
+		require.NoError(t, err, "Get(%d)", i)
+		assert.Empty(t, got, "Get(%d)", i)
+	}
+	// Assert that the second proposal has keys from the first.
+	for i := range keys1 {
+		got, err := proposal2.Get(keys1[i])
+		require.NoError(t, err, "Get(%d)", i)
+		assert.Equal(t, vals1[i], got, "Get(%d)", i)
+	}
+
+	// Commit the first proposal.
+	err = proposal1.Commit()
+	require.NoError(t, err, "Commit")
+
+	// Assert that the second proposal has keys from the first and second.
+	for i := range keys1 {
+		got, err := db.Get(keys1[i])
+		require.NoError(t, err, "Get(%d)", i)
+		assert.Equal(t, vals1[i], got, "Get(%d)", i)
+	}
+	for i := range keys2 {
+		got, err := proposal2.Get(keys2[i])
+		require.NoError(t, err, "Get(%d)", i)
+		assert.Equal(t, vals2[i], got, "Get(%d)", i)
+	}
+
+	// Commit the second proposal.
+	err = proposal2.Commit()
+	require.NoError(t, err, "Commit")
+
+	// Assert that the database has keys from both proposals.
+	for i := range keys1 {
+		got, err := db.Get(keys1[i])
+		require.NoError(t, err, "Get(%d)", i)
+		assert.Equal(t, vals1[i], got, "Get(%d)", i)
+	}
+	for i := range keys2 {
+		got, err := db.Get(keys2[i])
+		require.NoError(t, err, "Get(%d)", i)
+		assert.Equal(t, vals2[i], got, "Get(%d)", i)
+	}
+}
+
+func TestDeepPropose(t *testing.T) {
+	db := newTestDatabase(t)
+
+	// Create a chain of two proposals, each with 10 keys.
+	const numKeys = 10
+	const numProposals = 10
+	proposals := make([]*Proposal, numProposals)
+	keys := make([][]byte, numKeys*numProposals)
+	vals := make([][]byte, numKeys*numProposals)
+	for i := range keys {
+		keys[i] = keyForTest(i)
+		vals[i] = valForTest(i)
+	}
+
+	for i := range proposals {
+		var (
+			p   *Proposal
+			err error
+		)
+		if i == 0 {
+			p, err = db.Propose(keys[i:(i+1)*numKeys], vals[i:(i+1)*numKeys])
+			require.NoError(t, err, "Propose(%d)", i)
+		} else {
+			p, err = proposals[i-1].Propose(keys[i:(i+1)*numKeys], vals[i:(i+1)*numKeys])
+			require.NoError(t, err, "Propose(%d)", i)
+		}
+		proposals[i] = p
+	}
+
+	// Check that each value is present in the final proposal.
+	for i := range keys {
+		got, err := proposals[numProposals-1].Get(keys[i])
+		require.NoError(t, err, "Get(%d)", i)
+		assert.Equal(t, vals[i], got, "Get(%d)", i)
+	}
+
+	// Commit each proposal sequentially, and ensure that the values are
+	// present in the database after each commit.
+	for i := range proposals {
+		err := proposals[i].Commit()
+		require.NoError(t, err, "Commit(%d)", i)
+
+		for j := i * numKeys; j < (i+1)*numKeys; j++ {
+			got, err := db.Get(keys[j])
+			require.NoError(t, err, "Get(%d)", j)
+			assert.Equal(t, vals[j], got, "Get(%d)", j)
+		}
+	}
+}
+
+// Tests that dropping a proposal and committing another one still allows
+// access to the data of children proposals
+func TestDropProposalAndCommit(t *testing.T) {
+	db := newTestDatabase(t)
+
+	// Create a chain of three proposals, each with 10 keys.
+	const numKeys = 10
+	const numProposals = 3
+	proposals := make([]*Proposal, numProposals)
+	keys := make([][]byte, numKeys*numProposals)
+	vals := make([][]byte, numKeys*numProposals)
+	for i := range keys {
+		keys[i] = keyForTest(i)
+		vals[i] = valForTest(i)
+	}
+	for i := range proposals {
+		var (
+			p   *Proposal
+			err error
+		)
+		if i == 0 {
+			p, err = db.Propose(keys[i:(i+1)*numKeys], vals[i:(i+1)*numKeys])
+			require.NoError(t, err, "Propose(%d)", i)
+		} else {
+			p, err = proposals[i-1].Propose(keys[i:(i+1)*numKeys], vals[i:(i+1)*numKeys])
+			require.NoError(t, err, "Propose(%d)", i)
+		}
+		proposals[i] = p
+	}
+
+	// drop the second proposal
+	err := proposals[1].Drop()
+	require.NoError(t, err, "Drop(%d)", 1)
+	// Commit the first proposal
+	err = proposals[0].Commit()
+	require.NoError(t, err, "Commit(%d)", 0)
+
+	// Check that the second proposal is dropped
+	_, err = proposals[1].Get(keys[0])
+	require.ErrorIs(t, err, errDroppedProposal, "Get(%d)", 0)
+
+	// Check that all keys can be accessed from the final proposal
+	for i := range keys {
+		got, err := proposals[numProposals-1].Get(keys[i])
+		require.NoError(t, err, "Get(%d)", i)
+		assert.Equal(t, vals[i], got, "Get(%d)", i)
+	}
+}
+
+// Create two proposals with the same root, and ensure that these proposals
+// are identified as unique in the backend.
+/*
+ /- P1 -\  /- P4
+R1       P2
+ \- P2 -/  \- P5
+*/
+func TestProposeSameRoot(t *testing.T) {
+	db := newTestDatabase(t)
+
+	// Create two chains of proposals, resulting in the same root.
+	keys := make([][]byte, 10)
+	vals := make([][]byte, 10)
+	for i := range keys {
+		keys[i] = keyForTest(i)
+		vals[i] = valForTest(i)
+	}
+
+	// Create the first proposal chain.
+	proposal1, err := db.Propose(keys[0:5], vals[0:5])
+	require.NoError(t, err, "Propose")
+	proposal3_top, err := proposal1.Propose(keys[5:10], vals[5:10])
+	require.NoError(t, err, "Propose")
+	// Create the second proposal chain.
+	proposal2, err := db.Propose(keys[5:10], vals[5:10])
+	require.NoError(t, err, "Propose")
+	proposal3_bottom, err := proposal2.Propose(keys[0:5], vals[0:5])
+	require.NoError(t, err, "Propose")
+	// Because the proposals are identical, they should have the same root.
+
+	// Create a unique proposal from each of the two chains.
+	top_keys := make([][]byte, 5)
+	top_vals := make([][]byte, 5)
+	for i := range top_keys {
+		top_keys[i] = keyForTest(i + 10)
+		top_vals[i] = valForTest(i + 10)
+	}
+	bot_keys := make([][]byte, 5)
+	bot_vals := make([][]byte, 5)
+	for i := range bot_keys {
+		bot_keys[i] = keyForTest(i + 20)
+		bot_vals[i] = valForTest(i + 20)
+	}
+	proposal4, err := proposal3_top.Propose(top_keys, top_vals)
+	require.NoError(t, err, "Propose")
+	proposal5, err := proposal3_bottom.Propose(bot_keys, bot_vals)
+	require.NoError(t, err, "Propose")
+
+	// Now we will commit the top chain, and check that the bottom chain is still valid.
+	err = proposal1.Commit()
+	require.NoError(t, err, "Commit")
+	err = proposal3_top.Commit()
+	require.NoError(t, err, "Commit")
+
+	// Check that both final proposals are valid.
+	for i := range keys {
+		got, err := proposal4.Get(keys[i])
+		require.NoError(t, err, "P4 Get(%d)", i)
+		assert.Equal(t, vals[i], got, "P4 Get(%d)", i)
+		got, err = proposal5.Get(keys[i])
+		require.NoError(t, err, "P5 Get(%d)", i)
+		assert.Equal(t, vals[i], got, "P5 Get(%d)", i)
+	}
+
+	// Attempt to commit P5. Since this isn't in the canonical chain, it should
+	// fail.
+	err = proposal5.Commit()
+	require.Error(t, err, "Commit P5") // this error is internal to firewood
+
+	// We should be able to commit P4, since it is in the canonical chain.
+	err = proposal4.Commit()
+	require.NoError(t, err, "Commit P4")
 }

@@ -148,6 +148,23 @@ struct Value fwd_commit(const struct DatabaseHandle *db, uint32_t proposal_id);
 const struct DatabaseHandle *fwd_create_db(struct CreateOrOpenArgs args);
 
 /**
+ * Drops a proposal from the database.
+ * The propopsal's data is now inaccessible, and can be freed by the RevisionManager.
+ *
+ * # Arguments
+ *
+ * * `db` - The database handle returned by `open_db`
+ * * `proposal_id` - The ID of the proposal to drop
+ *
+ * # Safety
+ *
+ * This function is unsafe because it dereferences raw pointers.
+ * The caller must ensure that `db` is a valid pointer returned by `open_db`
+ *
+ */
+struct Value fwd_drop_proposal(const struct DatabaseHandle *db, uint32_t proposal_id);
+
+/**
  * Frees the memory associated with a `Value`.
  *
  * # Arguments
@@ -199,7 +216,7 @@ struct Value fwd_get_from_proposal(const struct DatabaseHandle *db,
  *
  * A `Value` containing the root hash of the database.
  * A `Value` containing {0, "error message"} if the get failed.
- * There is one error case that may be expected to be nil by the caller,
+ * There is one error case that may be expected to be null by the caller,
  * but should be handled externally: The database has no entries - "IO error: Root hash not found"
  * This is expected behavior if the database is empty.
  *
@@ -244,7 +261,7 @@ const struct DatabaseHandle *fwd_open_db(struct CreateOrOpenArgs args);
  *
  * # Returns
  *
- * The new root hash of the database, in Value form.
+ * A `Value` containing {id, null} if creating the proposal succeeded.
  * A `Value` containing {0, "error message"} if creating the proposal failed.
  *
  * # Safety
@@ -261,8 +278,36 @@ struct Value fwd_propose_on_db(const struct DatabaseHandle *db,
                                const struct KeyValue *values);
 
 /**
+ * Proposes a batch of operations to the database on top of an existing proposal.
+ *
+ * # Arguments
+ *
+ * * `db` - The database handle returned by `open_db`
+ * * `proposal_id` - The ID of the proposal to propose on
+ * * `nkeys` - The number of key-value pairs to put
+ * * `values` - A pointer to an array of `KeyValue` structs
+ *
+ * # Returns
+ *
+ * A `Value` containing {id, nil} if creating the proposal succeeded.
+ * A `Value` containing {0, "error message"} if creating the proposal failed.
+ *
+ * # Safety
+ *
+ * This function is unsafe because it dereferences raw pointers.
+ * The caller must:
+ *  * ensure that `db` is a valid pointer returned by `open_db`
+ *  * ensure that `values` is a valid pointer and that it points to an array of `KeyValue` structs of length `nkeys`.
+ *  * ensure that the `Value` fields of the `KeyValue` structs are valid pointers.
+ *
+ */
+struct Value fwd_propose_on_proposal(const struct DatabaseHandle *db,
+                                     ProposalId proposal_id,
+                                     size_t nkeys,
+                                     const struct KeyValue *values);
+
+/**
  * Get the root hash of the latest version of the database
- * Don't forget to call `free_value` to free the memory associated with the returned `Value`.
  *
  * # Argument
  *
@@ -279,5 +324,6 @@ struct Value fwd_propose_on_db(const struct DatabaseHandle *db,
  *
  * This function is unsafe because it dereferences raw pointers.
  * The caller must ensure that `db` is a valid pointer returned by `open_db`
+ *
  */
 struct Value fwd_root_hash(const struct DatabaseHandle *db);

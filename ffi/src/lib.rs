@@ -74,7 +74,7 @@ impl Deref for DatabaseHandle<'_> {
 ///
 /// A `Value` containing the root hash of the database.
 /// A `Value` containing {0, "error message"} if the get failed.
-/// There is one error case that may be expected to be nil by the caller,
+/// There is one error case that may be expected to be null by the caller,
 /// but should be handled externally: The database has no entries - "IO error: Root hash not found"
 /// This is expected behavior if the database is empty.
 ///
@@ -154,7 +154,10 @@ fn get_from_proposal(
     let db = unsafe { db.as_ref() }.ok_or_else(|| String::from("db should be non-null"))?;
 
     // Get proposal from ID.
-    let proposals = db.proposals.read().unwrap();
+    let proposals = db
+        .proposals
+        .read()
+        .map_err(|_| "proposal lock is poisoned")?;
     let proposal = proposals
         .get(&id)
         .ok_or_else(|| String::from("proposal not found"))?;
@@ -213,6 +216,30 @@ pub unsafe extern "C" fn fwd_batch(
     batch(db, nkeys, values).unwrap_or_else(|e| e.into())
 }
 
+/// Converts a slice of `KeyValue` structs to a vector of `DbBatchOp` structs.
+///
+/// # Arguments
+///
+/// * `values` - A slice of `KeyValue` structs
+///
+/// # Returns
+fn convert_to_batch(values: &[KeyValue]) -> Vec<DbBatchOp<&[u8], &[u8]>> {
+    let mut batch = Vec::with_capacity(values.len());
+    for kv in values {
+        if kv.value.len == 0 {
+            batch.push(DbBatchOp::DeleteRange {
+                prefix: kv.key.as_slice(),
+            });
+        } else {
+            batch.push(DbBatchOp::Put {
+                key: kv.key.as_slice(),
+                value: kv.value.as_slice(),
+            });
+        }
+    }
+    batch
+}
+
 /// Internal call for `fwd_batch` to remove error handling from the C API
 #[doc(hidden)]
 fn batch(
@@ -225,21 +252,8 @@ fn batch(
     let db = unsafe { db.as_ref() }.ok_or_else(|| String::from("db should be non-null"))?;
 
     // Create a batch of operations to perform.
-    let mut batch = Vec::with_capacity(nkeys);
-    for i in 0..nkeys {
-        let kv = unsafe { values.add(i).as_ref() }
-            .ok_or_else(|| String::from("key-value pair is null"))?;
-        if kv.value.len == 0 {
-            batch.push(DbBatchOp::DeleteRange {
-                prefix: kv.key.as_slice(),
-            });
-            continue;
-        }
-        batch.push(DbBatchOp::Put {
-            key: kv.key.as_slice(),
-            value: kv.value.as_slice(),
-        });
-    }
+    let key_value_ref = unsafe { std::slice::from_raw_parts(values, nkeys) };
+    let batch = convert_to_batch(key_value_ref);
 
     // Propose the batch of operations.
     let proposal = db.propose_sync(batch).map_err(|e| e.to_string())?;
@@ -249,7 +263,7 @@ fn batch(
     let hash_val = proposal
         .root_hash_sync()
         .map_err(|e| e.to_string())?
-        .ok_or(String::from("Proposed revision is empty"))?
+        .ok_or_else(|| String::from("Proposed revision is empty"))?
         .as_slice()
         .into();
 
@@ -274,7 +288,7 @@ fn batch(
 ///
 /// # Returns
 ///
-/// The new root hash of the database, in Value form.
+/// A `Value` containing {id, null} if creating the proposal succeeded.
 /// A `Value` containing {0, "error message"} if creating the proposal failed.
 ///
 /// # Safety
@@ -308,25 +322,85 @@ fn propose_on_db(
     let db = unsafe { db.as_ref() }.ok_or_else(|| String::from("db should be non-null"))?;
 
     // Create a batch of operations to perform.
-    let mut batch = Vec::with_capacity(nkeys);
-    for i in 0..nkeys {
-        let kv = unsafe { values.add(i).as_ref() }
-            .ok_or_else(|| String::from("couldn't get key-value pair"))?;
-        if kv.value.len == 0 {
-            batch.push(DbBatchOp::DeleteRange {
-                prefix: kv.key.as_slice(),
-            });
-            continue;
-        }
-        batch.push(DbBatchOp::Put {
-            key: kv.key.as_slice(),
-            value: kv.value.as_slice(),
-        });
-    }
+    let key_value_ref = unsafe { std::slice::from_raw_parts(values, nkeys) };
+    let batch = convert_to_batch(key_value_ref);
+
+    // Propose the batch of operations.
     let proposal = db.propose_sync(batch).map_err(|e| e.to_string())?;
     let proposal_id = next_id(); // Guaranteed to be non-zero
-    db.proposals.write().unwrap().insert(proposal_id, proposal);
+    db.proposals
+        .write()
+        .map_err(|_| "proposal lock is poisoned")?
+        .insert(proposal_id, proposal);
     Ok(proposal_id)
+}
+
+/// Proposes a batch of operations to the database on top of an existing proposal.
+///
+/// # Arguments
+///
+/// * `db` - The database handle returned by `open_db`
+/// * `proposal_id` - The ID of the proposal to propose on
+/// * `nkeys` - The number of key-value pairs to put
+/// * `values` - A pointer to an array of `KeyValue` structs
+///
+/// # Returns
+///
+/// A `Value` containing {id, nil} if creating the proposal succeeded.
+/// A `Value` containing {0, "error message"} if creating the proposal failed.
+///
+/// # Safety
+///
+/// This function is unsafe because it dereferences raw pointers.
+/// The caller must:
+///  * ensure that `db` is a valid pointer returned by `open_db`
+///  * ensure that `values` is a valid pointer and that it points to an array of `KeyValue` structs of length `nkeys`.
+///  * ensure that the `Value` fields of the `KeyValue` structs are valid pointers.
+///
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fwd_propose_on_proposal(
+    db: *const DatabaseHandle,
+    proposal_id: ProposalId,
+    nkeys: usize,
+    values: *const KeyValue,
+) -> Value {
+    // Note: the id is guaranteed to be non-zero
+    // because we use an atomic counter that starts at 1.
+    propose_on_proposal(db, proposal_id, nkeys, values)
+        .map(|id| id.into())
+        .unwrap_or_else(|e| e.into())
+}
+
+/// Internal call for `fwd_propose_on_proposal` to remove error handling from the C API
+#[doc(hidden)]
+fn propose_on_proposal(
+    db: *const DatabaseHandle,
+    proposal_id: ProposalId,
+    nkeys: usize,
+    values: *const KeyValue,
+) -> Result<ProposalId, String> {
+    let db = unsafe { db.as_ref() }.ok_or_else(|| String::from("db should be non-null"))?;
+
+    // Create a batch of operations to perform.
+    let key_value_ref = unsafe { std::slice::from_raw_parts(values, nkeys) };
+    let batch = convert_to_batch(key_value_ref);
+
+    // Get proposal from ID.
+    // We need write access to add the proposal after we create it.
+    let guard = db.proposals.write().unwrap();
+    let proposal = guard
+        .get(&proposal_id)
+        .ok_or_else(|| String::from("proposal not found"))?;
+    let new_proposal = proposal.propose_sync(batch).map_err(|e| e.to_string())?;
+    drop(guard); // Drop the read lock before we get the write lock.
+
+    // Store the proposal in the map. We need the write lock instead.
+    let new_id = next_id(); // Guaranteed to be non-zero
+    db.proposals
+        .write()
+        .map_err(|_| "proposal lock is poisoned")?
+        .insert(new_id, new_proposal);
+    Ok(new_id)
 }
 
 /// Commits a proposal to the database.
@@ -360,14 +434,47 @@ fn commit(db: *const DatabaseHandle, proposal_id: u32) -> Result<(), String> {
     let proposal = db
         .proposals
         .write()
-        .unwrap()
+        .map_err(|_| "proposal lock is poisoned")?
         .remove(&proposal_id)
         .ok_or_else(|| String::from("proposal not found"))?;
     proposal.commit_sync().map_err(|e| e.to_string())
 }
 
+/// Drops a proposal from the database.
+/// The propopsal's data is now inaccessible, and can be freed by the RevisionManager.
+///
+/// # Arguments
+///
+/// * `db` - The database handle returned by `open_db`
+/// * `proposal_id` - The ID of the proposal to drop
+///
+/// # Safety
+///
+/// This function is unsafe because it dereferences raw pointers.
+/// The caller must ensure that `db` is a valid pointer returned by `open_db`
+///
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fwd_drop_proposal(db: *const DatabaseHandle, proposal_id: u32) -> Value {
+    drop_proposal(db, proposal_id)
+        .map(|e| e.into())
+        .unwrap_or_else(|e| e.into())
+}
+
+/// Internal call for `fwd_drop_proposal` to remove error handling from the C API
+#[doc(hidden)]
+fn drop_proposal(db: *const DatabaseHandle, proposal_id: u32) -> Result<(), String> {
+    let db = unsafe { db.as_ref() }.ok_or_else(|| String::from("db should be non-null"))?;
+    let mut proposals = db
+        .proposals
+        .write()
+        .map_err(|_| "proposal lock is poisoned")?;
+    proposals
+        .remove(&proposal_id)
+        .ok_or_else(|| String::from("proposal not found"))?;
+    Ok(())
+}
+
 /// Get the root hash of the latest version of the database
-/// Don't forget to call `free_value` to free the memory associated with the returned `Value`.
 ///
 /// # Argument
 ///
@@ -384,6 +491,7 @@ fn commit(db: *const DatabaseHandle, proposal_id: u32) -> Result<(), String> {
 ///
 /// This function is unsafe because it dereferences raw pointers.
 /// The caller must ensure that `db` is a valid pointer returned by `open_db`
+///
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fwd_root_hash(db: *const DatabaseHandle) -> Value {
     // Check db is valid.
