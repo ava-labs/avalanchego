@@ -1,13 +1,12 @@
 // (c) 2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evm
+package log
 
 import (
 	"os"
 	"testing"
 
-	"github.com/ava-labs/libevm/log"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,8 +25,27 @@ func TestTrimPrefixes(t *testing.T) {
 }
 
 func TestInitLogger(t *testing.T) {
-	require := require.New(t)
-	_, err := InitLogger("alias", "info", true, os.Stderr)
-	require.NoError(err)
-	log.Info("test")
+	tests := []struct {
+		logLevel    string
+		expectedErr bool
+	}{
+		{
+			logLevel: "info",
+		},
+		{
+			logLevel:    "cchain", // invalid
+			expectedErr: true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.logLevel, func(t *testing.T) {
+			require := require.New(t)
+			_, err := InitLogger("alias", test.logLevel, true, os.Stderr)
+			if test.expectedErr {
+				require.Error(err)
+			} else {
+				require.NoError(err)
+			}
+		})
+	}
 }
