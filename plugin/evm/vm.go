@@ -41,6 +41,7 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/coreth/plugin/evm/config"
 	customheader "github.com/ava-labs/coreth/plugin/evm/header"
+	corethlog "github.com/ava-labs/coreth/plugin/evm/log"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/acp176"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap5"
@@ -296,7 +297,7 @@ type VM struct {
 	bootstrapped avalancheUtils.Atomic[bool]
 	IsPlugin     bool
 
-	logger CorethLogger
+	logger corethlog.Logger
 	// State sync server and client
 	StateSyncServer
 	StateSyncClient
@@ -369,7 +370,7 @@ func (vm *VM) Initialize(
 		writer = originalStderr
 	}
 
-	corethLogger, err := InitLogger(vm.chainAlias, vm.config.LogLevel, vm.config.LogJSONFormat, writer)
+	corethLogger, err := corethlog.InitLogger(vm.chainAlias, vm.config.LogLevel, vm.config.LogJSONFormat, writer)
 	if err != nil {
 		return fmt.Errorf("%w: %w ", errInitializingLogger, err)
 	}
