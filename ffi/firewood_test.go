@@ -384,6 +384,7 @@ func TestDropProposal(t *testing.T) {
 	require.Contains(t, err.Error(), "proposal not found", "Commit(fake proposal)")
 }
 
+// Create a proposal with 10 key-value pairs.
 // Tests that a proposal can be created from another proposal, and both can be
 // committed sequentially.
 func TestProposeFromProposal(t *testing.T) {
@@ -627,4 +628,90 @@ func TestProposeSameRoot(t *testing.T) {
 	// We should be able to commit P4, since it is in the canonical chain.
 	err = proposal4.Commit()
 	require.NoError(t, err, "Commit P4")
+}
+
+// Tests that an empty revision can be retrieved.
+func TestRevision(t *testing.T) {
+	db := newTestDatabase(t)
+
+	keys := make([][]byte, 10)
+	vals := make([][]byte, 10)
+	for i := range keys {
+		keys[i] = keyForTest(i)
+		vals[i] = valForTest(i)
+	}
+
+	// Create a proposal with 10 key-value pairs.
+	proposal, err := db.Propose(keys, vals)
+	require.NoError(t, err, "Propose")
+
+	// Commit the proposal.
+	err = proposal.Commit()
+	require.NoError(t, err, "Commit")
+
+	root, err := db.Root()
+	require.NoError(t, err, "%T.Root()", db)
+
+	// Create a revision from this root.
+	revision, err := NewRevision(db.handle, root)
+	require.NoError(t, err, "NewRevision")
+	// Check that all keys can be retrieved from the revision.
+	for i := range keys {
+		got, err := revision.Get(keys[i])
+		require.NoError(t, err, "Get(%d)", i)
+		assert.Equal(t, valForTest(i), got, "Get(%d)", i)
+	}
+
+	// Create a second proposal with 10 key-value pairs.
+	keys2 := make([][]byte, 10)
+	vals2 := make([][]byte, 10)
+	for i := range keys2 {
+		keys2[i] = keyForTest(i + 10)
+		vals2[i] = valForTest(i + 10)
+	}
+	proposal2, err := db.Propose(keys2, vals2)
+	require.NoError(t, err, "Propose")
+	// Commit the proposal.
+	err = proposal2.Commit()
+	require.NoError(t, err, "Commit")
+
+	// Create a "new" revision from the first old root.
+	revision, err = db.Revision(root)
+	require.NoError(t, err, "NewRevision")
+	// Check that all keys can be retrieved from the revision.
+	for i := range keys {
+		got, err := revision.Get(keys[i])
+		require.NoError(t, err, "Get(%d)", i)
+		assert.Equal(t, valForTest(i), got, "Get(%d)", i)
+	}
+}
+
+func TestFakeRevision(t *testing.T) {
+	db := newTestDatabase(t)
+
+	// Create a nil revision.
+	revision, err := db.Revision(nil)
+	require.ErrorIs(t, err, errInvalidRoot, "NewRevision(nil)")
+	assert.Nil(t, revision, "NewRevision(nil)")
+
+	// Create a fake revision with an invalid root.
+	invalidRoot := []byte("not a valid root")
+	revision, err = db.Revision(invalidRoot)
+	require.ErrorIs(t, err, errInvalidRoot, "NewRevision(invalid root)")
+	require.Nil(t, revision, "NewRevision(invalid root)")
+
+	// Create a fake revision with an valid root.
+	validRoot := []byte("counting 32 bytes to make a hash")
+	assert.Len(t, validRoot, 32, "valid root")
+	revision, err = db.Revision(validRoot)
+	require.NoError(t, err, "NewRevision(valid root)")
+	require.NotNil(t, revision, "NewRevision(valid root)")
+
+	// Attempt to get a value from the fake revision.
+	_, err = revision.Get([]byte("non-existent"))
+	require.Contains(t, err.Error(), "Revision not found", "Get(non-existent)")
+
+	// Attempt to get from the now invalid revision.
+	_, err = revision.Get([]byte("non-existent"))
+	require.ErrorIs(t, err, errRevisionClosed, "Get(non-existent)")
 }

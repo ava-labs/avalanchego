@@ -72,7 +72,7 @@ impl Deref for DatabaseHandle<'_> {
 ///
 /// # Returns
 ///
-/// A `Value` containing the root hash of the database.
+/// A `Value` containing the requested value.
 /// A `Value` containing {0, "error message"} if the get failed.
 /// There is one error case that may be expected to be null by the caller,
 /// but should be handled externally: The database has no entries - "IO error: Root hash not found"
@@ -124,7 +124,7 @@ fn get_latest(db: *const DatabaseHandle, key: Value) -> Result<Value, String> {
 ///
 /// # Returns
 ///
-/// A `Value` containing the root hash of the database.
+/// A `Value` containing the requested value.
 /// A `Value` containing {0, "error message"} if the get failed.
 ///
 /// # Safety
@@ -164,6 +164,54 @@ fn get_from_proposal(
 
     // Get value associated with key.
     let value = proposal
+        .val_sync(key.as_slice())
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| String::from(""))?;
+    Ok(value.into())
+}
+
+/// Gets a value assoicated with the given historical root hash and key.
+///
+/// # Arguments
+///
+/// * `db` - The database handle returned by `open_db`
+/// * `root` - The root hash to look up, in `Value` form
+/// * `key` - The key to look up, in `Value` form
+///
+/// # Returns
+///
+/// A `Value` containing the requested value.
+/// A `Value` containing {0, "error message"} if the get failed.
+///
+/// # Safety
+///
+/// The caller must:
+/// * ensure that `db` is a valid pointer returned by `open_db`
+/// * ensure that `key` is a valid pointer to a `Value` struct
+/// * ensure that `root` is a valid pointer to a `Value` struct
+/// * call `free_value` to free the memory associated with the returned `Value`
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fwd_get_from_root(
+    db: *const DatabaseHandle,
+    root: Value,
+    key: Value,
+) -> Value {
+    get_from_root(db, root, key).unwrap_or_else(|e| e.into())
+}
+
+/// Internal call for `fwd_get_from_root` to remove error handling from the C API
+#[doc(hidden)]
+fn get_from_root(db: *const DatabaseHandle, root: Value, key: Value) -> Result<Value, String> {
+    // Check db is valid.
+    let db = unsafe { db.as_ref() }.ok_or_else(|| String::from("db should be non-null"))?;
+
+    // Get the revision associated with the root hash.
+    let rev = db
+        .revision_sync(root.as_slice().try_into()?)
+        .map_err(|e| e.to_string())?;
+
+    // Get value associated with key.
+    let value = rev
         .val_sync(key.as_slice())
         .map_err(|e| e.to_string())?
         .ok_or_else(|| String::from(""))?;

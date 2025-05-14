@@ -190,7 +190,7 @@ void fwd_free_value(const struct Value *value);
  *
  * # Returns
  *
- * A `Value` containing the root hash of the database.
+ * A `Value` containing the requested value.
  * A `Value` containing {0, "error message"} if the get failed.
  *
  * # Safety
@@ -205,6 +205,32 @@ struct Value fwd_get_from_proposal(const struct DatabaseHandle *db,
                                    struct Value key);
 
 /**
+ * Gets a value assoicated with the given historical root hash and key.
+ *
+ * # Arguments
+ *
+ * * `db` - The database handle returned by `open_db`
+ * * `root` - The root hash to look up, in `Value` form
+ * * `key` - The key to look up, in `Value` form
+ *
+ * # Returns
+ *
+ * A `Value` containing the requested value.
+ * A `Value` containing {0, "error message"} if the get failed.
+ *
+ * # Safety
+ *
+ * The caller must:
+ * * ensure that `db` is a valid pointer returned by `open_db`
+ * * ensure that `key` is a valid pointer to a `Value` struct
+ * * ensure that `root` is a valid pointer to a `Value` struct
+ * * call `free_value` to free the memory associated with the returned `Value`
+ */
+struct Value fwd_get_from_root(const struct DatabaseHandle *db,
+                               struct Value root,
+                               struct Value key);
+
+/**
  * Gets the value associated with the given key from the database.
  *
  * # Arguments
@@ -214,7 +240,7 @@ struct Value fwd_get_from_proposal(const struct DatabaseHandle *db,
  *
  * # Returns
  *
- * A `Value` containing the root hash of the database.
+ * A `Value` containing the requested value.
  * A `Value` containing {0, "error message"} if the get failed.
  * There is one error case that may be expected to be null by the caller,
  * but should be handled externally: The database has no entries - "IO error: Root hash not found"

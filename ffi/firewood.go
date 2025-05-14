@@ -19,6 +19,7 @@ import (
 // These constants are used to identify errors returned by the Firewood Rust FFI.
 // These must be changed if the Rust FFI changes - should be reported by tests.
 const (
+	RootLength       = 32
 	rootHashNotFound = "IO error: Root hash not found"
 	keyNotFound      = "key not found"
 )
@@ -197,10 +198,15 @@ func (db *Database) Root() ([]byte, error) {
 
 	// If the root hash is not found, return a zeroed slice.
 	if err != nil && strings.Contains(err.Error(), rootHashNotFound) {
-		bytes = make([]byte, 32)
+		bytes = make([]byte, RootLength)
 		err = nil
 	}
 	return bytes, err
+}
+
+// Revision returns a historical revision of the database.
+func (db *Database) Revision(root []byte) (*Revision, error) {
+	return NewRevision(db.handle, root)
 }
 
 // Close closes the database and releases all held resources.
