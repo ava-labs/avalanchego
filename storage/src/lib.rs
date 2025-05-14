@@ -60,3 +60,16 @@ impl std::fmt::Display for CacheReadStrategy {
         write!(f, "{self:?}")
     }
 }
+
+/// Returns the hash of an empty trie, which is the Keccak256 hash of the RLP encoding of an empty byte array.
+///
+/// This function is slow, so callers should cache the result
+#[cfg(feature = "ethhash")]
+pub fn empty_trie_hash() -> TrieHash {
+    use sha3::Digest as _;
+
+    sha3::Keccak256::digest(rlp::NULL_RLP)
+        .as_slice()
+        .try_into()
+        .expect("empty trie hash is 32 bytes")
+}
