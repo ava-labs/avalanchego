@@ -1064,80 +1064,35 @@ func MetricsLinkForNetwork(networkUUID string, startTime string, endTime string)
 	)
 }
 
-// GrafanaLinkOption configures metrics link options
-type GrafanaLinkOption func(*grafanaLinkConfig)
-
-// grafanaLinkConfig holds all configurable options to generate appropriate Grafana metrics link
-type grafanaLinkConfig struct {
-	dashboardID   string
-	dashboardName string
-	filters       map[string]string
+// GrafanaFilterOptions contains filters to apply to Grafana link in form of a query
+// Example: https://grafana-poc.avax-dev.network/?start_time=now-1h&endTime=now
+type GrafanaFilterOptions struct {
+	StartTime string
+	EndTime   string
+	Filters   map[string]string
 }
 
-// WithDashboard sets a custom dashboard ID and name
-func WithDashboard(id, name string) GrafanaLinkOption {
-	return func(c *grafanaLinkConfig) {
-		c.dashboardID = id
-		c.dashboardName = name
-	}
-}
+func BuildMetricsLinkForNetwork(dashboardID, dashboardName, networkUUID string, options *GrafanaFilterOptions) string {
+	// Set defaults for options if not provided
+	startTime := "now-1h"
+	endTime := "now"
 
-// WithFilters adds multiple custom filters
-func WithFilters(filters map[string]string) GrafanaLinkOption {
-	return func(c *grafanaLinkConfig) {
-		for k, v := range filters {
-			c.filters[k] = v
-		}
-	}
-}
-
-// WithoutEphemeralNodeFilter removes the is_ephemeral_node filter
-func WithoutEphemeralNodeFilter() GrafanaLinkOption {
-	return func(c *grafanaLinkConfig) {
-		delete(c.filters, "is_ephemeral_node")
-	}
-}
-
-// CustomMetricsLinkForNetwork returns a Grafana dashboard link for the network
-func CustomMetricsLinkForNetwork(networkUUID, startTime, endTime string, opts ...GrafanaLinkOption) string {
-	if startTime == "" {
-		startTime = "now-1h"
-	}
-	if endTime == "" {
-		endTime = "now"
-	}
-
-	// Default configuration
-	cfg := &grafanaLinkConfig{
-		dashboardID:   "kBQpRdWnk",
-		dashboardName: "avalanche-main-dashboard",
-		filters: map[string]string{
-			"network_uuid":      networkUUID,
-			"is_ephemeral_node": "false",
-		},
-	}
-
-	for _, opt := range opts {
-		opt(cfg)
-	}
-
+	// Build the base URL
 	baseURL := url.URL{
 		Scheme: "https",
 		Host:   grafanaURI,
-		Path:   fmt.Sprintf("/d/%s/%s", cfg.dashboardID, cfg.dashboardName),
+		Path:   fmt.Sprintf("/d/%s/%s", dashboardID, dashboardName),
 	}
 
 	query := baseURL.Query()
 
-	// Add all filters
-	for key, value := range cfg.filters {
-		query.Add("var-filter", fmt.Sprintf("%s|=|%s", key, value))
-	}
-
-	// Add time range
 	query.Add("from", startTime)
 	query.Add("to", endTime)
+	query.Add("var-filter", "network_uuid|=|"+networkUUID)
 
+	for key, value := range options.Filters {
+		query.Add("var-filter", fmt.Sprintf("%s|=|%s", key, value))
+	}
 	baseURL.RawQuery = query.Encode()
 
 	return baseURL.String()

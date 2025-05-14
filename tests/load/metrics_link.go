@@ -37,16 +37,13 @@ var (
 		specReport := ginkgo.CurrentSpecReport()
 		startTimeMs := specReport.StartTime.UnixMilli()
 
-		metricsLink := tmpnet.CustomMetricsLinkForNetwork(
-			env.GetNetwork().UUID,
-			strconv.FormatInt(startTimeMs, 10),
-			strconv.FormatInt(time.Now().Add(tmpnet.NetworkShutdownDelay).UnixMilli(), 10),
-			tmpnet.WithDashboard(dashboardID, dashboardName),
-			tmpnet.WithoutEphemeralNodeFilter(),
-		)
+		grafanaLink := tmpnet.BuildMetricsLinkForNetwork(dashboardID, dashboardName, env.GetNetwork().UUID, &tmpnet.GrafanaFilterOptions{
+			StartTime: strconv.FormatInt(startTimeMs, 10),
+			EndTime:   strconv.FormatInt(time.Now().Add(tmpnet.NetworkShutdownDelay).UnixMilli(), 10),
+		})
 
 		tc.Log().Info(tmpnet.MetricsAvailableMessage,
-			zap.String("uri", metricsLink),
+			zap.String("uri", grafanaLink),
 		)
 	})
 )
