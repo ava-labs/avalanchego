@@ -21,7 +21,9 @@ const (
 	// seconds provides a buffer in case of any delay in processing.
 	DefaultValidatorStartTimeDiff = executor.SyncBound + 20*time.Second
 
-	DefaultNetworkTimeout = 2 * time.Minute
+	// TODO(marun) Vary this between kube and process-based nodes
+	// since the timing will be different
+	DefaultNetworkTimeout = 4 * time.Minute
 
 	// Minimum required to ensure connectivity-based health checks will pass
 	DefaultNodeCount = 2
