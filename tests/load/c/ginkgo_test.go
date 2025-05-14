@@ -95,7 +95,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 		}
 
 		metricsURI, cleanup = setupMetricsServer(r, registry, logger)
-		writeCollectorConfiguration(r, metricsURI, e2e.GetEnv(tc).GetNetwork().UUID, blockchainID, logger)
+		writeCollectorConfiguration(r, metricsURI, e2e.GetEnv(tc).GetNetwork().UUID, logger)
 
 		ginkgo.DeferCleanup(cleanup)
 	})
@@ -163,13 +163,13 @@ func setupMetricsServer(r *require.Assertions, registry *prometheus.Registry, lo
 
 // writeCollectorConfiguration generates and writes the Prometheus collector configuration
 // so tmpnet can dynamically discover new scrape target via file-based service discovery
-func writeCollectorConfiguration(r *require.Assertions, metricsURI, networkUUID, chain string, logger logging.Logger) {
+func writeCollectorConfiguration(r *require.Assertions, metricsURI, networkUUID string, logger logging.Logger) {
 	homedir, err := os.UserHomeDir()
 	r.NoError(err, "getting user home directory")
 
 	collectorFilePath := filepath.Join(homedir, metricsFilePath)
 
-	collectorConfig, err := generateCollectorConfig([]string{metricsURI}, networkUUID, chain)
+	collectorConfig, err := generateCollectorConfig([]string{metricsURI}, networkUUID)
 	r.NoError(err, "generating collector configuration")
 
 	err = os.WriteFile(collectorFilePath, collectorConfig, 0o644)
@@ -186,14 +186,14 @@ func writeCollectorConfiguration(r *require.Assertions, metricsURI, networkUUID,
 }
 
 // generateCollectorConfig creates the Prometheus configuration
-func generateCollectorConfig(targets []string, uuid, chain string) ([]byte, error) {
+func generateCollectorConfig(targets []string, uuid string) ([]byte, error) {
 	return json.MarshalIndent([]map[string]any{
 		{
 			"targets": targets,
 			"labels": map[string]string{
-				"network_owner": "load-test",
-				"network_uuid":  uuid,
-				"chain":         chain,
+				"network_uuid":      uuid,
+				"network_owner":     "load-test",
+				"is_ephemeral_node": "false", // IMPORTANT: This hardcoded value prevents "No Data" in Grafana. Tmpnet generates URL with `is_ephemeral_node=false` by default (see: github.com/ava-labs/avalanchego/blob/e0304c57d/tests/fixture/tmpnet/network.go#L1055) but some metrics like load_* don't need it.
 			},
 		},
 	}, "", "  ")
