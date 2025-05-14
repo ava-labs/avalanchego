@@ -529,7 +529,7 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 
 	require.NoError(vm.SetForkHeight(innerSummary.Height() - 1))
 
-	// Set the last accepted block height to be higher that the state summary
+	// Set the last accepted block height to be higher than the state summary
 	// we are going to attempt to accept
 	vm.lastAcceptedHeight = innerSummary.Height() + 1
 
@@ -627,7 +627,7 @@ func TestStateSummaryAcceptOlderBlockSkipStateSync(t *testing.T) {
 
 	require.NoError(vm.SetForkHeight(innerSummary1.Height() - 1))
 
-	// Set the last accepted block height to be higher that the state summary
+	// Set the last accepted block height to be higher than the state summary
 	// we are going to attempt to accept
 	vm.lastAcceptedHeight = innerBlk2.Height()
 
@@ -657,10 +657,12 @@ func TestStateSummaryAcceptOlderBlockSkipStateSync(t *testing.T) {
 		case bytes.Equal(b, innerBlk2.BytesV):
 			return innerBlk2, nil
 		default:
-			panic("unexpected parse block")
+			require.FailNow("unexpected parse block")
+			// Unreachable, but required to satisfy the compiler
+			// since we use FailNow instead of panic
+			return nil, nil
 		}
 	}
-	// Setup innerSummary.AcceptF to return StateSyncSkipped and check it was called
 	calledInnerAccept := false
 	innerSummary1.AcceptF = func(context.Context) (block.StateSyncMode, error) {
 		calledInnerAccept = true
@@ -707,7 +709,7 @@ func TestStateSummaryAcceptOlderBlockSkipStateSync(t *testing.T) {
 
 	summary, err := vm.GetStateSummary(context.Background(), innerBlk1.Height())
 	require.NoError(err)
-	require.Equal(summary.Height(), innerBlk1.Height())
+	require.Equal(innerBlk1.Height(), summary.Height())
 
 	// Process a state summary that would rewind the chain
 	// ProposerVM should ignore the rollback and accept the inner state summary to
