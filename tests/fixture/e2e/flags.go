@@ -96,11 +96,13 @@ func (v *FlagVars) StartLogsCollector() bool {
 }
 
 func (v *FlagVars) CheckMetricsCollected() bool {
-	return v.checkMetricsCollected
+	// TODO(marun) Enable this check for kube in a subsequent PR
+	return v.startNetworkVars.ProcessRuntimeConfigured() && v.checkMetricsCollected
 }
 
 func (v *FlagVars) CheckLogsCollected() bool {
-	return v.checkLogsCollected
+	// TODO(marun) Enable this check for kube in a subsequent PR
+	return v.startNetworkVars.ProcessRuntimeConfigured() && v.checkLogsCollected
 }
 
 func (v *FlagVars) NetworkDir() string {
