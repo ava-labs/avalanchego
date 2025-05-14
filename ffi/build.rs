@@ -3,7 +3,7 @@ use std::env;
 extern crate cbindgen;
 
 fn main() {
-    let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+    let crate_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
 
     let config = cbindgen::Config::from_file("cbindgen.toml").expect("cbindgen.toml is present");
 
@@ -15,7 +15,7 @@ fn main() {
         .map_or_else(
             |error| match error {
                 cbindgen::Error::ParseSyntaxError { .. } => {}
-                e => panic!("{:?}", e),
+                e => panic!("{e:?}"),
             },
             |bindings| {
                 bindings.write_to_file("firewood.h");

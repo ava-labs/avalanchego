@@ -29,16 +29,16 @@ pub(crate) fn setup_metrics(metrics_port: u16) {
         metrics::set_global_recorder(recorder.clone()).expect("failed to set recorder");
 
         Server::new(move |request| {
-            if request.method() != "GET" {
-                Response::builder()
-                    .status(StatusCode::METHOD_NOT_ALLOWED)
-                    .body(Body::from("Method not allowed"))
-                    .expect("failed to build response")
-            } else {
+            if request.method() == "GET" {
                 Response::builder()
                     .status(StatusCode::OK)
                     .header("Content-Type", "text/plain")
                     .body(Body::from(recorder.stats()))
+                    .expect("failed to build response")
+            } else {
+                Response::builder()
+                    .status(StatusCode::METHOD_NOT_ALLOWED)
+                    .body(Body::from("Method not allowed"))
                     .expect("failed to build response")
             }
         })
@@ -68,9 +68,9 @@ impl TextRecorder {
         let utc_now: DateTime<Utc> = systemtime_now.into();
         let epoch_duration = systemtime_now
             .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap();
-        let epoch_ms = epoch_duration.as_secs() * 1000 + epoch_duration.subsec_millis() as u64;
-        writeln!(output, "# {}", utc_now).unwrap();
+            .expect("system time is before Unix epoch");
+        let epoch_ms = epoch_duration.as_secs() * 1000 + u64::from(epoch_duration.subsec_millis());
+        writeln!(output, "# {utc_now}").unwrap();
 
         let counters = self.registry.get_counter_handles();
         let mut seen = HashSet::new();

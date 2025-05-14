@@ -23,3 +23,10 @@ logger = ["dep:env_logger", "firewood/logger"]
 
 [build-dependencies]
 cbindgen = "0.28.0"
+
+[lints.clippy]
+unwrap_used = "warn"
+indexing_slicing = "warn"
+explicit_deref_methods = "warn"
+missing_const_for_fn = "warn"
+pedantic = "warn"

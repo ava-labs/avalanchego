@@ -86,13 +86,13 @@ impl Deref for DatabaseHandle<'_> {
 ///  * call `free_value` to free the memory associated with the returned `Value`
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fwd_get_latest(db: *const DatabaseHandle, key: Value) -> Value {
-    get_latest(db, key).unwrap_or_else(|e| e.into())
+    get_latest(db, &key).unwrap_or_else(Into::into)
 }
 
 /// This function is not exposed to the C API.
 /// Internal call for `fwd_get_latest` to remove error handling from the C API
 #[doc(hidden)]
-fn get_latest(db: *const DatabaseHandle, key: Value) -> Result<Value, String> {
+fn get_latest(db: *const DatabaseHandle, key: &Value) -> Result<Value, String> {
     // Check db is valid.
     let db = unsafe { db.as_ref() }.ok_or_else(|| String::from("db should be non-null"))?;
 
@@ -110,7 +110,7 @@ fn get_latest(db: *const DatabaseHandle, key: Value) -> Result<Value, String> {
     let value = rev
         .val_sync(key.as_slice())
         .map_err(|e| e.to_string())?
-        .ok_or_else(|| String::from(""))?;
+        .ok_or_else(String::new)?;
     Ok(value.into())
 }
 
@@ -139,7 +139,7 @@ pub unsafe extern "C" fn fwd_get_from_proposal(
     id: ProposalId,
     key: Value,
 ) -> Value {
-    get_from_proposal(db, id, key).unwrap_or_else(|e| e.into())
+    get_from_proposal(db, id, &key).unwrap_or_else(Into::into)
 }
 
 /// This function is not exposed to the C API.
@@ -148,7 +148,7 @@ pub unsafe extern "C" fn fwd_get_from_proposal(
 fn get_from_proposal(
     db: *const DatabaseHandle,
     id: ProposalId,
-    key: Value,
+    key: &Value,
 ) -> Result<Value, String> {
     // Check db is valid.
     let db = unsafe { db.as_ref() }.ok_or_else(|| String::from("db should be non-null"))?;
@@ -166,7 +166,7 @@ fn get_from_proposal(
     let value = proposal
         .val_sync(key.as_slice())
         .map_err(|e| e.to_string())?
-        .ok_or_else(|| String::from(""))?;
+        .ok_or_else(String::new)?;
     Ok(value.into())
 }
 
@@ -196,12 +196,12 @@ pub unsafe extern "C" fn fwd_get_from_root(
     root: Value,
     key: Value,
 ) -> Value {
-    get_from_root(db, root, key).unwrap_or_else(|e| e.into())
+    get_from_root(db, &root, &key).unwrap_or_else(Into::into)
 }
 
 /// Internal call for `fwd_get_from_root` to remove error handling from the C API
 #[doc(hidden)]
-fn get_from_root(db: *const DatabaseHandle, root: Value, key: Value) -> Result<Value, String> {
+fn get_from_root(db: *const DatabaseHandle, root: &Value, key: &Value) -> Result<Value, String> {
     // Check db is valid.
     let db = unsafe { db.as_ref() }.ok_or_else(|| String::from("db should be non-null"))?;
 
@@ -214,7 +214,7 @@ fn get_from_root(db: *const DatabaseHandle, root: Value, key: Value) -> Result<V
     let value = rev
         .val_sync(key.as_slice())
         .map_err(|e| e.to_string())?
-        .ok_or_else(|| String::from(""))?;
+        .ok_or_else(String::new)?;
     Ok(value.into())
 }
 
@@ -261,7 +261,7 @@ pub unsafe extern "C" fn fwd_batch(
     nkeys: usize,
     values: *const KeyValue,
 ) -> Value {
-    batch(db, nkeys, values).unwrap_or_else(|e| e.into())
+    batch(db, nkeys, values).unwrap_or_else(Into::into)
 }
 
 /// Converts a slice of `KeyValue` structs to a vector of `DbBatchOp` structs.
@@ -355,9 +355,7 @@ pub unsafe extern "C" fn fwd_propose_on_db(
 ) -> Value {
     // Note: the id is guaranteed to be non-zero
     // because we use an atomic counter that starts at 1.
-    propose_on_db(db, nkeys, values)
-        .map(|id| id.into())
-        .unwrap_or_else(|e| e.into())
+    propose_on_db(db, nkeys, values).map_or_else(Into::into, Into::into)
 }
 
 /// Internal call for `fwd_propose_on_db` to remove error handling from the C API
@@ -414,9 +412,7 @@ pub unsafe extern "C" fn fwd_propose_on_proposal(
 ) -> Value {
     // Note: the id is guaranteed to be non-zero
     // because we use an atomic counter that starts at 1.
-    propose_on_proposal(db, proposal_id, nkeys, values)
-        .map(|id| id.into())
-        .unwrap_or_else(|e| e.into())
+    propose_on_proposal(db, proposal_id, nkeys, values).map_or_else(Into::into, Into::into)
 }
 
 /// Internal call for `fwd_propose_on_proposal` to remove error handling from the C API
@@ -435,7 +431,10 @@ fn propose_on_proposal(
 
     // Get proposal from ID.
     // We need write access to add the proposal after we create it.
-    let guard = db.proposals.write().unwrap();
+    let guard = db
+        .proposals
+        .write()
+        .expect("failed to acquire write lock on proposals");
     let proposal = guard
         .get(&proposal_id)
         .ok_or_else(|| String::from("proposal not found"))?;
@@ -470,9 +469,7 @@ fn propose_on_proposal(
 ///
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fwd_commit(db: *const DatabaseHandle, proposal_id: u32) -> Value {
-    commit(db, proposal_id)
-        .map(|e| e.into())
-        .unwrap_or_else(|e| e.into())
+    commit(db, proposal_id).map_or_else(Into::into, Into::into)
 }
 
 /// Internal call for `fwd_commit` to remove error handling from the C API
@@ -489,7 +486,7 @@ fn commit(db: *const DatabaseHandle, proposal_id: u32) -> Result<(), String> {
 }
 
 /// Drops a proposal from the database.
-/// The propopsal's data is now inaccessible, and can be freed by the RevisionManager.
+/// The propopsal's data is now inaccessible, and can be freed by the `RevisionManager`.
 ///
 /// # Arguments
 ///
@@ -503,9 +500,7 @@ fn commit(db: *const DatabaseHandle, proposal_id: u32) -> Result<(), String> {
 ///
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fwd_drop_proposal(db: *const DatabaseHandle, proposal_id: u32) -> Value {
-    drop_proposal(db, proposal_id)
-        .map(|e| e.into())
-        .unwrap_or_else(|e| e.into())
+    drop_proposal(db, proposal_id).map_or_else(Into::into, Into::into)
 }
 
 /// Internal call for `fwd_drop_proposal` to remove error handling from the C API
@@ -543,7 +538,7 @@ fn drop_proposal(db: *const DatabaseHandle, proposal_id: u32) -> Result<(), Stri
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fwd_root_hash(db: *const DatabaseHandle) -> Value {
     // Check db is valid.
-    root_hash(db).unwrap_or_else(|e| e.into())
+    root_hash(db).unwrap_or_else(Into::into)
 }
 
 /// This function is not exposed to the C API.
@@ -588,16 +583,17 @@ impl Display for Value {
         match (self.len, self.data.is_null()) {
             (0, true) => write!(f, "[not found]"),
             (0, false) => write!(f, "[error] {}", unsafe {
-                CStr::from_ptr(self.data as *const i8).to_string_lossy()
+                CStr::from_ptr(self.data.cast::<i8>()).to_string_lossy()
             }),
-            (len, true) => write!(f, "[id] {}", len),
+            (len, true) => write!(f, "[id] {len}"),
             (_, false) => write!(f, "[data] {:?}", self.as_slice()),
         }
     }
 }
 
 impl Value {
-    pub fn as_slice(&self) -> &[u8] {
+    #[must_use]
+    pub const fn as_slice(&self) -> &[u8] {
         unsafe { std::slice::from_raw_parts(self.data, self.len) }
     }
 }
@@ -647,7 +643,7 @@ impl From<u32> for Value {
 }
 
 impl From<()> for Value {
-    fn from(_: ()) -> Self {
+    fn from((): ()) -> Self {
         Self {
             len: 0,
             data: std::ptr::null(),
@@ -666,6 +662,9 @@ impl From<()> for Value {
 /// This function is unsafe because it dereferences raw pointers.
 /// The caller must ensure that `value` is a valid pointer.
 ///
+/// # Panics
+///
+/// This function panics if `value` is `null`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fwd_free_value(value: *const Value) {
     // Check value is valid.
@@ -679,7 +678,7 @@ pub unsafe extern "C" fn fwd_free_value(value: *const Value) {
     if value.len > 0 {
         let recreated_box = unsafe {
             Box::from_raw(std::slice::from_raw_parts_mut(
-                value.data as *mut u8,
+                value.data.cast_mut(),
                 value.len,
             ))
         };
@@ -816,13 +815,14 @@ fn manager_config(cache_size: usize, revisions: usize, strategy: u8) -> Revision
 ///
 /// # Arguments
 ///
-/// * `db` - The database handle to close, previously returned from a call to open_db()
+/// * `db` - The database handle to close, previously returned from a call to `open_db()`
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fwd_close_db(db: *mut DatabaseHandle) {
     let _ = unsafe { Box::from_raw(db) };
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 
@@ -832,7 +832,7 @@ mod tests {
             len: 0,
             data: std::ptr::null(),
         };
-        assert_eq!(format!("{}", value), "[not found]");
+        assert_eq!(format!("{value}"), "[not found]");
     }
 
     #[test]
@@ -842,7 +842,7 @@ mod tests {
             len: 0,
             data: cstr.as_ptr().cast::<u8>(),
         };
-        assert_eq!(format!("{}", value), "[error] test");
+        assert_eq!(format!("{value}"), "[error] test");
     }
 
     #[test]
@@ -851,7 +851,7 @@ mod tests {
             len: 4,
             data: Box::leak(b"test".to_vec().into_boxed_slice()).as_ptr(),
         };
-        assert_eq!(format!("{}", value), "[data] [116, 101, 115, 116]");
+        assert_eq!(format!("{value}"), "[data] [116, 101, 115, 116]");
     }
 
     #[test]
@@ -860,6 +860,6 @@ mod tests {
             len: 4,
             data: std::ptr::null(),
         };
-        assert_eq!(format!("{}", value), "[id] 4");
+        assert_eq!(format!("{value}"), "[id] 4");
     }
 }

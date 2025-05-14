@@ -100,7 +100,7 @@ struct Value fwd_batch(const struct DatabaseHandle *db,
  *
  * # Arguments
  *
- * * `db` - The database handle to close, previously returned from a call to open_db()
+ * * `db` - The database handle to close, previously returned from a call to `open_db()`
  */
 void fwd_close_db(struct DatabaseHandle *db);
 
@@ -149,7 +149,7 @@ const struct DatabaseHandle *fwd_create_db(struct CreateOrOpenArgs args);
 
 /**
  * Drops a proposal from the database.
- * The propopsal's data is now inaccessible, and can be freed by the RevisionManager.
+ * The propopsal's data is now inaccessible, and can be freed by the `RevisionManager`.
  *
  * # Arguments
  *
@@ -176,6 +176,9 @@ struct Value fwd_drop_proposal(const struct DatabaseHandle *db, uint32_t proposa
  * This function is unsafe because it dereferences raw pointers.
  * The caller must ensure that `value` is a valid pointer.
  *
+ * # Panics
+ *
+ * This function panics if `value` is `null`.
  */
 void fwd_free_value(const struct Value *value);
 

@@ -15,7 +15,6 @@ use crate::v2::api::HashKey;
 
 pub use storage::CacheReadStrategy;
 use storage::{Committed, FileBacked, ImmutableProposal, NodeStore, Parentable, TrieHash};
-
 #[derive(Clone, Debug, TypedBuilder)]
 /// Revision manager configuratoin
 pub struct RevisionManagerConfig {
