@@ -360,7 +360,7 @@ func (c *client) GetL1Validator(
 	if err != nil {
 		return L1Validator{}, 0, err
 	}
-	pk := new(bls.PublicKey)
+	var pk *bls.PublicKey
 	if res.PublicKey != nil {
 		pk, err = bls.PublicKeyFromCompressedBytes(*res.PublicKey)
 		if err != nil {
