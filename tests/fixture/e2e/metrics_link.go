@@ -41,24 +41,17 @@ var _ = ginkgo.AfterEach(func() {
 	}
 
 	specReport := ginkgo.CurrentSpecReport()
-	startTimeMs := specReport.StartTime.UnixMilli()
-	metricsLink := MetricsLink(startTimeMs)
+	startTime := specReport.StartTime.UnixMilli()
+	// Extend the end time by the shutdown delay (a proxy for the metrics
+	// scrape interval) to maximize the chances of the specified duration
+	// including all metrics relevant to the current spec.
+	endTime := time.Now().Add(tmpnet.NetworkShutdownDelay).UnixMilli()
+	metricsLink := tmpnet.MetricsLinkForNetwork(
+		env.GetNetwork().UUID,
+		strconv.FormatInt(startTime, 10),
+		strconv.FormatInt(endTime, 10),
+	)
 	tc.Log().Info(tmpnet.MetricsAvailableMessage,
 		zap.String("uri", metricsLink),
 	)
 })
-
-// MetricsLink generates a URL spanning from provided start time to now plus shutdown delay to capture all relevant metrics for the Grafana dashboard
-func MetricsLink(startTimeMs int64) string {
-	// Extend the end time by the shutdown delay (a proxy for the metrics
-	// scrape interval) to maximize the chances of the specified duration
-	// including all metrics relevant to the current spec.
-	endTimeMs := time.Now().Add(tmpnet.NetworkShutdownDelay).UnixMilli()
-	metricsLink := tmpnet.MetricsLinkForNetwork(
-		env.GetNetwork().UUID,
-		strconv.FormatInt(startTimeMs, 10),
-		strconv.FormatInt(endTimeMs, 10),
-	)
-
-	return metricsLink
-}
