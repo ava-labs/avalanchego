@@ -712,8 +712,8 @@ func TestStateSummaryAcceptOlderBlockSkipStateSync(t *testing.T) {
 	// Process a state summary that would rewind the chain
 	// ProposerVM should ignore the rollback and accept the inner state summary to
 	// notify the innerVM.
-	// This can result in the ProposerVM and innerVM diverging their last accepted block,
-	// which should be rolled forward and re-aligned in SetState.
+	// This can result in the ProposerVM and innerVM diverging their last accepted block.
+	// These are re-aligned in SetState before transitioning to consensus.
 	status, err := summary.Accept(context.Background())
 	require.NoError(err)
 	require.Equal(block.StateSyncSkipped, status)
