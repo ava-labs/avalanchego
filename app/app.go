@@ -11,7 +11,6 @@ import (
 	"syscall"
 
 	"go.uber.org/zap"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils"
@@ -34,16 +33,16 @@ var _ App = (*app)(nil)
 type App interface {
 	// Start kicks off the application and returns immediately.
 	// Start should only be called once.
-	Start() error
+	Start()
 
 	// Stop notifies the application to exit and returns immediately.
 	// Stop should only be called after [Start].
 	// It is safe to call Stop multiple times.
-	Stop() error
+	Stop()
 
 	// ExitCode should only be called after [Start] returns with no error. It
 	// should block until the application finishes
-	ExitCode() (int, error)
+	ExitCode() int
 }
 
 func New(config nodeconfig.Config) (App, error) {
@@ -89,9 +88,7 @@ func New(config nodeconfig.Config) (App, error) {
 
 func Run(app App) int {
 	// start running the application
-	if err := app.Start(); err != nil {
-		return 1
-	}
+	app.Start()
 
 	// register terminationSignals to kill the application
 	terminationSignals := make(chan os.Signal, 1)
@@ -101,13 +98,15 @@ func Run(app App) int {
 	signal.Notify(stackTraceSignal, syscall.SIGABRT)
 
 	// start up a new go routine to handle attempts to kill the application
-	var eg errgroup.Group
-	eg.Go(func() error {
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
 		for range terminationSignals {
-			return app.Stop()
+			app.Stop()
+			return
 		}
-		return nil
-	})
+	}()
 
 	// start a goroutine to listen on SIGABRT signals,
 	// to print the stack trace to standard error.
@@ -118,7 +117,7 @@ func Run(app App) int {
 	}()
 
 	// wait for the app to exit and get the exit code response
-	exitCode, err := app.ExitCode()
+	exitCode := app.ExitCode()
 
 	// shut down the termination signal go routine
 	signal.Stop(terminationSignals)
@@ -129,9 +128,7 @@ func Run(app App) int {
 	close(stackTraceSignal)
 
 	// if there was an error closing or running the application, report that error
-	if eg.Wait() != nil || err != nil {
-		return 1
-	}
+	wg.Wait()
 
 	// return the exit code that the application reported
 	return exitCode
@@ -148,7 +145,7 @@ type app struct {
 // Start the business logic of the node (as opposed to config reading, etc).
 // Does not block until the node is done. Errors returned from this method
 // are not logged.
-func (a *app) Start() error {
+func (a *app) Start() {
 	// [p.ExitCode] will block until [p.exitWG.Done] is called
 	a.exitWG.Add(1)
 	go func() {
@@ -172,19 +169,18 @@ func (a *app) Start() error {
 			zap.Error(err),
 		)
 	}()
-	return nil
+	return
 }
 
 // Stop attempts to shutdown the currently running node. This function will
-// return immediately.
-func (a *app) Stop() error {
+// block until shutdown is complete.
+func (a *app) Stop() {
 	a.node.Shutdown(0)
-	return nil
 }
 
 // ExitCode returns the exit code that the node is reporting. This function
 // blocks until the node has been shut down.
-func (a *app) ExitCode() (int, error) {
+func (a *app) ExitCode() int {
 	a.exitWG.Wait()
-	return a.node.ExitCode(), nil
+	return a.node.ExitCode()
 }
