@@ -172,7 +172,7 @@ func writeCollectorConfiguration(r *require.Assertions, metricsURI, networkUUID 
 	collectorConfig, err := generateCollectorConfig([]string{metricsURI}, networkUUID)
 	r.NoError(err, "generating collector configuration")
 
-	err = os.WriteFile(collectorFilePath, collectorConfig, 0o644)
+	err = os.WriteFile(collectorFilePath, collectorConfig, 0o600)
 	r.NoError(err, "writing collector configuration")
 
 	logger.Info("Collector configuration written",
