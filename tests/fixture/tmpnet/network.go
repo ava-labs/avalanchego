@@ -1075,7 +1075,14 @@ type GrafanaFilterOptions struct {
 func BuildMetricsLinkForNetwork(dashboardID, dashboardName, networkUUID string, options *GrafanaFilterOptions) string {
 	// Set defaults for options if not provided
 	startTime := "now-1h"
+	if options.StartTime != "" {
+		startTime = options.StartTime
+	}
+
 	endTime := "now"
+	if options.EndTime != "" {
+		endTime = options.EndTime
+	}
 
 	// Build the base URL
 	baseURL := url.URL{
