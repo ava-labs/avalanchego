@@ -22,7 +22,7 @@ const (
 var (
 	// Disable default metrics link generation to prevent duplicate links.
 	// We generate load specific links.
-	_ = ginkgo.BeforeAll(func() {
+	_ = ginkgo.JustBeforeEach(func() {
 		e2e.EmitMetricsLink = false
 	})
 
