@@ -134,8 +134,6 @@ func New(
 		Config:           config,
 	}
 
-	n.DoneShuttingDown.Add(1)
-
 	pop, err := signer.NewProofOfPossession(n.Config.StakingSigningKey)
 	if err != nil {
 		return nil, fmt.Errorf("problem creating proof of possession: %w", err)
@@ -364,10 +362,6 @@ type Node struct {
 
 	// Sets the exit code
 	shuttingDownExitCode utils.Atomic[int]
-
-	// Incremented only once on initialization.
-	// Decremented when node is done shutting down.
-	DoneShuttingDown sync.WaitGroup
 
 	// Metrics Registerer
 	MetricsGatherer        metrics.MultiGatherer
@@ -682,7 +676,8 @@ func (n *Node) Dispatch() error {
 			)
 		}
 		// If the API server isn't running, shut down the node.
-		// If node is already shutting down, this does nothing.
+		// If node is already shutting down, this does not tigger shutdown again,
+		// and blocks until the shutdown is complete.
 		n.Shutdown(1)
 	})
 
@@ -716,10 +711,11 @@ func (n *Node) Dispatch() error {
 	}
 
 	// Start P2P connections
-	err := n.Net.Dispatch()
+	retErr := n.Net.Dispatch()
 
 	// If the P2P server isn't running, shut down the node.
-	// If node is already shutting down, this does nothing.
+	// If node is already shutting down, this does not tigger shutdown again,
+	// and blocks until the shutdown is complete.
 	n.Shutdown(1)
 
 	if n.tlsKeyLogWriterCloser != nil {
@@ -732,9 +728,6 @@ func (n *Node) Dispatch() error {
 		}
 	}
 
-	// Wait until the node is done shutting down before returning
-	n.DoneShuttingDown.Wait()
-
 	// Remove the process context file to communicate to an orchestrator
 	// that the node is no longer running.
 	if err := os.Remove(n.Config.ProcessContextFilePath); err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -744,7 +737,7 @@ func (n *Node) Dispatch() error {
 		)
 	}
 
-	return err
+	return retErr
 }
 
 /*
@@ -1629,10 +1622,9 @@ func (n *Node) initDiskTargeter(
 // Shutdown this node
 // May be called multiple times
 func (n *Node) Shutdown(exitCode int) {
-	if !n.shuttingDown.Get() { // only set the exit code once
+	if !n.shuttingDown.Swap(true) { // only set the exit code once
 		n.shuttingDownExitCode.Set(exitCode)
 	}
-	n.shuttingDown.Set(true)
 	n.shutdownOnce.Do(n.shutdown)
 }
 
@@ -1714,7 +1706,6 @@ func (n *Node) shutdown() {
 		)
 	}
 
-	n.DoneShuttingDown.Done()
 	n.Log.Info("finished node shutdown")
 }
 
