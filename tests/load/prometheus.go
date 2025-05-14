@@ -5,16 +5,25 @@ package load
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/logging"
+)
+
+const (
+	// relative to the user home directory
+	metricsFilePath = ".tmpnet/prometheus/file_sd_configs/load-test.json"
 )
 
 type MetricsServer struct {
@@ -78,4 +87,29 @@ func (s *MetricsServer) Stop() (err error) {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	return s.server.Shutdown(shutdownCtx)
+}
+
+// GenerateMonitoringConfig generates and writes the Prometheus collector configuration
+// so tmpnet can dynamically discover new scrape target via file-based service discovery
+func (s *MetricsServer) GenerateMonitoringConfig(networkUUID, networkOwner string) (string, error) {
+	homedir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+
+	collectorFilePath := filepath.Join(homedir, metricsFilePath)
+	config, err := json.MarshalIndent([]tmpnet.ConfigMap{
+		{
+			"targets": []string{s.addr},
+			"labels": map[string]string{
+				"network_uuid":  networkUUID,
+				"network_owner": networkOwner,
+			},
+		},
+	}, "", "  ")
+	if err != nil {
+		return "", err
+	}
+
+	return collectorFilePath, os.WriteFile(collectorFilePath, config, 0o600)
 }

@@ -5,18 +5,15 @@ package c
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net"
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
@@ -39,8 +36,6 @@ func init() {
 const (
 	blockchainID = "C"
 	nodesCount   = 3
-	// relative to the user home directory
-	metricsFilePath = ".tmpnet/prometheus/file_sd_configs/load-test.json"
 )
 
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
@@ -69,14 +64,12 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 
 var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 	var (
-		network    *tmpnet.Network
-		tracker    *load.Tracker[common.Hash]
-		logger     = logging.NewLogger("c-chain-load-testing", logging.NewWrappedCore(logging.Info, os.Stdout, logging.Auto.ConsoleEncoder()))
-		tc         = e2e.NewTestContext()
-		r          = require.New(tc)
-		registry   = prometheus.NewRegistry()
-		metricsURI string
-		cleanup    func()
+		network  *tmpnet.Network
+		tracker  *load.Tracker[common.Hash]
+		logger   = logging.NewLogger("c-chain-load-testing", logging.NewWrappedCore(logging.Info, os.Stdout, logging.Auto.ConsoleEncoder()))
+		tc       = e2e.NewTestContext()
+		r        = require.New(tc)
+		registry = prometheus.NewRegistry()
 	)
 
 	tracker, err := load.NewTracker[common.Hash](registry)
@@ -94,9 +87,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 			r.NoError(err, "ensuring keys for node %s", node.NodeID)
 		}
 
-		metricsURI, cleanup = setupMetricsServer(r, registry, logger)
-		writeCollectorConfiguration(r, metricsURI, e2e.GetEnv(tc).GetNetwork().UUID, logger)
-
+		cleanup := setupMetricsServer(r, registry, network.UUID, network.Owner, logger)
 		ginkgo.DeferCleanup(cleanup)
 	})
 
@@ -138,7 +129,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 })
 
 // setupMetricsServer creates Prometheus server with a dynamically allocated port
-func setupMetricsServer(r *require.Assertions, registry *prometheus.Registry, logger logging.Logger) (string, func()) {
+func setupMetricsServer(r *require.Assertions, registry *prometheus.Registry, networkUUID, networkOwner string, logger logging.Logger) func() {
 	// Allocate a port dynamically
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	r.NoError(err, "allocating dynamic port")
@@ -154,47 +145,12 @@ func setupMetricsServer(r *require.Assertions, registry *prometheus.Registry, lo
 	_, err = metricsServer.Start()
 	r.NoError(err, "failed to start metrics server")
 
+	monitoringConfigFilePath, err := metricsServer.GenerateMonitoringConfig(networkUUID, networkOwner)
+	r.NoError(err, "failed to generate monitoring config file")
+
 	// Return a cleanup function
-	return metricsURI, func() {
-		logger.Info("Stopping metrics server")
+	return func() {
 		r.NoError(metricsServer.Stop(), "stopping metrics server")
+		r.NoError(os.Remove(monitoringConfigFilePath))
 	}
-}
-
-// writeCollectorConfiguration generates and writes the Prometheus collector configuration
-// so tmpnet can dynamically discover new scrape target via file-based service discovery
-func writeCollectorConfiguration(r *require.Assertions, metricsURI, networkUUID string, logger logging.Logger) {
-	homedir, err := os.UserHomeDir()
-	r.NoError(err, "getting user home directory")
-
-	collectorFilePath := filepath.Join(homedir, metricsFilePath)
-
-	collectorConfig, err := generateCollectorConfig([]string{metricsURI}, networkUUID)
-	r.NoError(err, "generating collector configuration")
-
-	err = os.WriteFile(collectorFilePath, collectorConfig, 0o600)
-	r.NoError(err, "writing collector configuration")
-
-	logger.Info("Collector configuration written",
-		zap.String("path", collectorFilePath),
-		zap.String("target", metricsURI))
-
-	// Register cleanup for the file
-	ginkgo.DeferCleanup(func() {
-		r.NoError(os.Remove(collectorFilePath))
-	})
-}
-
-// generateCollectorConfig creates the Prometheus configuration
-func generateCollectorConfig(targets []string, uuid string) ([]byte, error) {
-	return json.MarshalIndent([]map[string]any{
-		{
-			"targets": targets,
-			"labels": map[string]string{
-				"network_uuid":      uuid,
-				"network_owner":     "load-test",
-				"is_ephemeral_node": "false", // IMPORTANT: This hardcoded value prevents "No Data" in Grafana. Tmpnet generates URL with `is_ephemeral_node=false` by default (see: github.com/ava-labs/avalanchego/blob/e0304c57d/tests/fixture/tmpnet/network.go#L1055) but some metrics like load_* don't need it.
-			},
-		},
-	}, "", "  ")
 }
