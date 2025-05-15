@@ -376,7 +376,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	}
 
 	// Build validators for the Platform Chain
-	validators := []genesis.GenesisPermissionlessValidator{}
+	validators := []genesis.PermissionlessValidator{}
 	allNodeAllocations := splitAllocations(skippedAllocations, len(config.InitialStakers))
 	endStakingTime := genesisTime.Add(time.Duration(config.InitialStakeDuration) * time.Second)
 	stakingOffset := time.Duration(0)
@@ -406,13 +406,13 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 			}
 		}
 
-		validators = append(validators, genesis.GenesisPermissionlessValidator{
-			GenesisValidator: genesis.GenesisValidator{
+		validators = append(validators, genesis.PermissionlessValidator{
+			Validator: genesis.Validator{
 				StartTime: uint64(genesisTime.Unix()),
 				EndTime:   uint64(endStakingTime.Unix()),
 				NodeID:    staker.NodeID,
 			},
-			RewardOwner: &genesis.GenesisOwner{
+			RewardOwner: &genesis.Owner{
 				Threshold: 1,
 				Addresses: []string{destAddrStr},
 			},

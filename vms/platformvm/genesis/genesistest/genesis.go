@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	platformmvgenesis "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
+	platformvmgenesis "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 )
 
 const (
@@ -68,7 +68,7 @@ type Config struct {
 	InitialBalance uint64
 }
 
-func New(t testing.TB, c Config) *platformmvgenesis.Genesis {
+func New(t testing.TB, c Config) *platformvmgenesis.Genesis {
 	if c.NetworkID == 0 {
 		c.NetworkID = constants.UnitTestID
 	}
@@ -93,14 +93,14 @@ func New(t testing.TB, c Config) *platformmvgenesis.Genesis {
 
 	require := require.New(t)
 
-	genesis := &platformmvgenesis.Genesis{
-		UTXOs:         make([]*platformmvgenesis.GenesisUTXO, len(c.FundedKeys)),
+	genesis := &platformvmgenesis.Genesis{
+		UTXOs:         make([]*platformvmgenesis.UTXO, len(c.FundedKeys)),
 		Validators:    make([]*txs.Tx, len(c.NodeIDs)),
 		Timestamp:     uint64(c.ValidatorStartTime.Unix()),
 		InitialSupply: InitialSupply,
 	}
 	for i, key := range c.FundedKeys {
-		genesis.UTXOs[i] = &platformmvgenesis.GenesisUTXO{UTXO: avax.UTXO{
+		genesis.UTXOs[i] = &platformvmgenesis.UTXO{UTXO: avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID:        snowtest.AVAXAssetID,
 				OutputIndex: uint32(i),
@@ -173,7 +173,7 @@ func New(t testing.TB, c Config) *platformmvgenesis.Genesis {
 
 func NewBytes(t testing.TB, c Config) []byte {
 	g := New(t, c)
-	genesisBytes, err := platformmvgenesis.Codec.Marshal(platformmvgenesis.CodecVersion, g)
+	genesisBytes, err := platformvmgenesis.Codec.Marshal(platformvmgenesis.CodecVersion, g)
 	require.NoError(t, err)
 	return genesisBytes
 }

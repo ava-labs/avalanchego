@@ -22,13 +22,13 @@ func createTestGenesis(t *testing.T) *Genesis {
 	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 	require.NoError(err)
 
-	validator := GenesisPermissionlessValidator{
-		GenesisValidator: GenesisValidator{
+	validator := PermissionlessValidator{
+		Validator: Validator{
 			StartTime: 0,
 			EndTime:   20,
 			NodeID:    nodeID,
 		},
-		RewardOwner: &GenesisOwner{
+		RewardOwner: &Owner{
 			Threshold: 1,
 			Addresses: []string{addr},
 		},
@@ -47,7 +47,7 @@ func createTestGenesis(t *testing.T) *Genesis {
 				Amount:  123456789,
 			},
 		},
-		[]GenesisPermissionlessValidator{validator},
+		[]PermissionlessValidator{validator},
 		nil,
 		5,
 		0,
@@ -69,13 +69,13 @@ func TestNewGenesisInvalidUTXOBalance(t *testing.T) {
 		Amount:  0,
 	}
 	weight := uint64(987654321)
-	validator := GenesisPermissionlessValidator{
-		GenesisValidator: GenesisValidator{
+	validator := PermissionlessValidator{
+		Validator: Validator{
 			EndTime: 15,
 			Weight:  weight,
 			NodeID:  nodeID,
 		},
-		RewardOwner: &GenesisOwner{
+		RewardOwner: &Owner{
 			Threshold: 1,
 			Addresses: []string{addr},
 		},
@@ -89,7 +89,7 @@ func TestNewGenesisInvalidUTXOBalance(t *testing.T) {
 		ids.Empty,
 		constants.UnitTestID,
 		[]Allocation{utxo},
-		[]GenesisPermissionlessValidator{validator},
+		[]PermissionlessValidator{validator},
 		nil,
 		5,
 		0,
@@ -110,13 +110,13 @@ func TestNewGenesisInvalidStakeWeight(t *testing.T) {
 		Amount:  123456789,
 	}
 
-	validator := GenesisPermissionlessValidator{
-		GenesisValidator: GenesisValidator{
+	validator := PermissionlessValidator{
+		Validator: Validator{
 			StartTime: 0,
 			EndTime:   15,
 			NodeID:    nodeID,
 		},
-		RewardOwner: &GenesisOwner{
+		RewardOwner: &Owner{
 			Threshold: 1,
 			Addresses: []string{addr},
 		},
@@ -130,7 +130,7 @@ func TestNewGenesisInvalidStakeWeight(t *testing.T) {
 		ids.Empty,
 		0,
 		[]Allocation{utxo},
-		[]GenesisPermissionlessValidator{validator},
+		[]PermissionlessValidator{validator},
 		nil,
 		5,
 		0,
@@ -152,13 +152,13 @@ func TestNewGenesisInvalidEndtime(t *testing.T) {
 	}
 
 	weight := uint64(987654321)
-	validator := GenesisPermissionlessValidator{
-		GenesisValidator: GenesisValidator{
+	validator := PermissionlessValidator{
+		Validator: Validator{
 			StartTime: 0,
 			EndTime:   5,
 			NodeID:    nodeID,
 		},
-		RewardOwner: &GenesisOwner{
+		RewardOwner: &Owner{
 			Threshold: 1,
 			Addresses: []string{addr},
 		},
@@ -172,7 +172,7 @@ func TestNewGenesisInvalidEndtime(t *testing.T) {
 		ids.Empty,
 		constants.UnitTestID,
 		[]Allocation{utxo},
-		[]GenesisPermissionlessValidator{validator},
+		[]PermissionlessValidator{validator},
 		nil,
 		5,
 		0,
@@ -237,13 +237,13 @@ func TestNewGenesisReturnsSortedValidators(t *testing.T) {
 	}
 
 	weight := uint64(987654321)
-	validator1 := GenesisPermissionlessValidator{
-		GenesisValidator: GenesisValidator{
+	validator1 := PermissionlessValidator{
+		Validator: Validator{
 			StartTime: 0,
 			EndTime:   20,
 			NodeID:    nodeID,
 		},
-		RewardOwner: &GenesisOwner{
+		RewardOwner: &Owner{
 			Threshold: 1,
 			Addresses: []string{addr},
 		},
@@ -253,13 +253,13 @@ func TestNewGenesisReturnsSortedValidators(t *testing.T) {
 		}},
 	}
 
-	validator2 := GenesisPermissionlessValidator{
-		GenesisValidator: GenesisValidator{
+	validator2 := PermissionlessValidator{
+		Validator: Validator{
 			StartTime: 3,
 			EndTime:   15,
 			NodeID:    nodeID,
 		},
-		RewardOwner: &GenesisOwner{
+		RewardOwner: &Owner{
 			Threshold: 1,
 			Addresses: []string{addr},
 		},
@@ -269,13 +269,13 @@ func TestNewGenesisReturnsSortedValidators(t *testing.T) {
 		}},
 	}
 
-	validator3 := GenesisPermissionlessValidator{
-		GenesisValidator: GenesisValidator{
+	validator3 := PermissionlessValidator{
+		Validator: Validator{
 			StartTime: 1,
 			EndTime:   10,
 			NodeID:    nodeID,
 		},
-		RewardOwner: &GenesisOwner{
+		RewardOwner: &Owner{
 			Threshold: 1,
 			Addresses: []string{addr},
 		},
@@ -290,7 +290,7 @@ func TestNewGenesisReturnsSortedValidators(t *testing.T) {
 		avaxAssetID,
 		constants.UnitTestID,
 		[]Allocation{allocation},
-		[]GenesisPermissionlessValidator{
+		[]PermissionlessValidator{
 			validator1,
 			validator2,
 			validator3,

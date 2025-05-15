@@ -36,19 +36,19 @@ var (
 )
 
 // UTXO adds messages to UTXOs
-type GenesisUTXO struct {
+type UTXO struct {
 	avax.UTXO `serialize:"true"`
 	Message   []byte `serialize:"true" json:"message"`
 }
 
 // Genesis represents a genesis state of the platform chain
 type Genesis struct {
-	UTXOs         []*GenesisUTXO `serialize:"true"`
-	Validators    []*txs.Tx      `serialize:"true"`
-	Chains        []*txs.Tx      `serialize:"true"`
-	Timestamp     uint64         `serialize:"true"`
-	InitialSupply uint64         `serialize:"true"`
-	Message       string         `serialize:"true"`
+	UTXOs         []*UTXO   `serialize:"true"`
+	Validators    []*txs.Tx `serialize:"true"`
+	Chains        []*txs.Tx `serialize:"true"`
+	Timestamp     uint64    `serialize:"true"`
+	InitialSupply uint64    `serialize:"true"`
+	Message       string    `serialize:"true"`
 }
 
 func Parse(genesisBytes []byte) (*Genesis, error) {
@@ -99,8 +99,8 @@ func (a Allocation) Compare(other Allocation) int {
 	return addr.Compare(otherAddr)
 }
 
-// GenesisValidator represents a validator at genesis
-type GenesisValidator struct {
+// Validator represents a validator at genesis
+type Validator struct {
 	TxID      ids.ID
 	StartTime uint64
 	EndTime   uint64
@@ -108,17 +108,17 @@ type GenesisValidator struct {
 	NodeID    ids.NodeID
 }
 
-// GenesisOwner is the repr. of a reward owner at genesis
-type GenesisOwner struct {
+// Owner is the repr. of a reward owner at genesis
+type Owner struct {
 	Locktime  uint64
 	Threshold uint32
 	Addresses []string
 }
 
 // GenesisPermissionlessValidator represents a permissionless validator at genesis
-type GenesisPermissionlessValidator struct {
-	GenesisValidator
-	RewardOwner        *GenesisOwner
+type PermissionlessValidator struct {
+	Validator
+	RewardOwner        *Owner
 	DelegationFee      float32
 	ExactDelegationFee uint32
 	Staked             []Allocation
@@ -161,14 +161,14 @@ func NewGenesis(
 	avaxAssetID ids.ID,
 	networkID uint32,
 	allocations []Allocation,
-	validators []GenesisPermissionlessValidator,
+	validators []PermissionlessValidator,
 	chains []Chain,
 	time uint64,
 	initialSupply uint64,
 	message string,
 ) (*Genesis, error) {
 	// Specify the UTXOs on the Platform chain that exist at genesis
-	utxos := make([]*GenesisUTXO, 0, len(allocations))
+	utxos := make([]*UTXO, 0, len(allocations))
 	for i, allocation := range allocations {
 		if allocation.Amount == 0 {
 			return nil, errUTXOHasNoValue
@@ -202,7 +202,7 @@ func NewGenesis(
 		if err != nil {
 			return nil, fmt.Errorf("problem decoding UTXO message bytes: %w", err)
 		}
-		utxos = append(utxos, &GenesisUTXO{
+		utxos = append(utxos, &UTXO{
 			UTXO:    utxo,
 			Message: allocation.Message,
 		})
