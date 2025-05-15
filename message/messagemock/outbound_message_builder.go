@@ -390,6 +390,21 @@ func (mr *OutboundMsgBuilderMockRecorder) Put(chainID, requestID, container any)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Put", reflect.TypeOf((*OutboundMsgBuilder)(nil).Put), chainID, requestID, container)
 }
 
+// Simplex mocks base method.
+func (m *OutboundMsgBuilder) Simplex(chainID ids.ID, message *p2p.Simplex) (message.OutboundMessage, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Simplex", chainID, message)
+	ret0, _ := ret[0].(message.OutboundMessage)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Simplex indicates an expected call of Simplex.
+func (mr *OutboundMsgBuilderMockRecorder) Simplex(chainID, message any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Simplex", reflect.TypeOf((*OutboundMsgBuilder)(nil).Simplex), chainID, message)
+}
+
 // StateSummaryFrontier mocks base method.
 func (m *OutboundMsgBuilder) StateSummaryFrontier(chainID ids.ID, requestID uint32, summary []byte) (message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
