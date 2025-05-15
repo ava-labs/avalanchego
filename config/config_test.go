@@ -4,30 +4,22 @@
 package config
 
 import (
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
-	"net"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/proto/pb/signer"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
-	"github.com/ava-labs/avalanchego/subnets"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/rpcsigner"
-	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
 const chainConfigFilenameExtension = ".ex"
@@ -555,130 +547,6 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 			test.testF(require, subnetConfigs)
 		})
 	}
-}
-
-type signerServer struct {
-	signer.UnimplementedSignerServer
-}
-
-func (*signerServer) PublicKey(context.Context, *signer.PublicKeyRequest) (*signer.PublicKeyResponse, error) {
-	// for tests to pass, this must be the base64 encoding of a 32 byte public key
-	// but it does not need to be associated with any private key
-	bytes, err := base64.StdEncoding.DecodeString("j8Ndzc1I6EYWYUWAdhcwpQ1I2xX/i4fdwgJIaxbHlf9yQKMT0jlReiiLYsydgaS1")
-	if err != nil {
-		return nil, err
-	}
-
-	return &signer.PublicKeyResponse{
-		PublicKey: bytes,
-	}, nil
-}
-
-func TestGetStakingSigner(t *testing.T) {
-	testKey := "HLimS3vRibTMk9lZD4b+Z+GLuSBShvgbsu0WTLt2Kd4="
-	rpcServer := grpc.NewServer()
-	defer rpcServer.GracefulStop()
-
-	signer.RegisterSignerServer(rpcServer, &signerServer{})
-
-	listener, err := net.Listen("tcp", "[::1]:0")
-	require.NoError(t, err)
-
-	go func() {
-		require.NoError(t, rpcServer.Serve(listener))
-	}()
-
-	type config map[string]any
-
-	tests := []struct {
-		name               string
-		viperKeys          string
-		config             config
-		expectedSignerType bls.Signer
-		expectedErr        error
-	}{
-		{
-			name:               "default-signer",
-			expectedSignerType: &localsigner.LocalSigner{},
-		},
-		{
-			name:               "ephemeral-signer",
-			config:             config{StakingEphemeralSignerEnabledKey: true},
-			expectedSignerType: &localsigner.LocalSigner{},
-		},
-		{
-			name:               "content-key",
-			config:             config{StakingSignerKeyContentKey: testKey},
-			expectedSignerType: &localsigner.LocalSigner{},
-		},
-		{
-			name: "file-key",
-			config: config{
-				StakingSignerKeyPathKey: func() string {
-					filePath := filepath.Join(t.TempDir(), "signer.key")
-					bytes, err := base64.StdEncoding.DecodeString(testKey)
-					require.NoError(t, err)
-					require.NoError(t, os.WriteFile(filePath, bytes, perms.ReadWrite))
-					return filePath
-				}(),
-			},
-			expectedSignerType: &localsigner.LocalSigner{},
-		},
-		{
-			name:               "rpc-signer",
-			config:             config{StakingRPCSignerKey: listener.Addr().String()},
-			expectedSignerType: &rpcsigner.Client{},
-		},
-		{
-			name: "multiple-configurations-set",
-			config: config{
-				StakingEphemeralSignerEnabledKey: true,
-				StakingSignerKeyContentKey:       testKey,
-			},
-			expectedErr: errInvalidSignerConfig,
-		},
-	}
-
-	// required for proper write permissions for the default signer-key location
-	t.Setenv("HOME", t.TempDir())
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-			v := setupViperFlags()
-
-			for key, value := range tt.config {
-				v.Set(key, value)
-			}
-
-			config, cleanup, err := GetNodeConfig(context.Background(), v)
-			defer func() {
-				if err == nil {
-					_ = cleanup()
-				}
-			}()
-
-			require.ErrorIs(err, tt.expectedErr)
-			require.IsType(tt.expectedSignerType, config.StakingSigningKey)
-		})
-	}
-}
-
-func TestDefaultConfigInitializationUsesExistingDefaultKey(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-
-	require := require.New(t)
-	v := setupViperFlags()
-
-	config1, cleanup1, err := GetNodeConfig(context.Background(), v)
-	defer func() { _ = cleanup1() }()
-	require.NoError(err)
-
-	config2, cleanup2, err := GetNodeConfig(context.Background(), v)
-	defer func() { _ = cleanup2() }()
-	require.NoError(err)
-
-	require.Equal(config1.StakingSigningKey.PublicKey(), config2.StakingSigningKey.PublicKey())
 }
 
 // setups config json file and writes content

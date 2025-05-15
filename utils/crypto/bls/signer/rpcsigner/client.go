@@ -21,11 +21,12 @@ import (
 var _ bls.Signer = (*Client)(nil)
 
 type Client struct {
-	client pb.SignerClient
-	pk     *bls.PublicKey
+	client     pb.SignerClient
+	pk         *bls.PublicKey
+	connection *grpc.ClientConn
 }
 
-func NewClient(ctx context.Context, url string) (*Client, func() error, error) {
+func NewClient(ctx context.Context, url string) (*Client, error) {
 	// TODO: figure out the best parameters here given the target block-time
 	opts := grpc.WithConnectParams(grpc.ConnectParams{
 		Backoff: backoff.DefaultConfig,
@@ -37,26 +38,27 @@ func NewClient(ctx context.Context, url string) (*Client, func() error, error) {
 	// the request to the actual signer instead of relying on tls-credentials
 	conn, err := grpc.NewClient(url, opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create rpc signer client: %w", err)
+		return nil, fmt.Errorf("failed to create rpc signer client: %w", err)
 	}
 
 	client := pb.NewSignerClient(conn)
 
 	pubkeyResponse, err := client.PublicKey(ctx, &pb.PublicKeyRequest{})
 	if err != nil {
-		return nil, nil, errors.Join(err, conn.Close())
+		return nil, errors.Join(fmt.Errorf("failed to get pubkey response: %w", err), conn.Close())
 	}
 
 	pkBytes := pubkeyResponse.GetPublicKey()
 	pk, err := bls.PublicKeyFromCompressedBytes(pkBytes)
 	if err != nil {
-		return nil, nil, errors.Join(err, conn.Close())
+		return nil, errors.Join(fmt.Errorf("failed to uncompress public key bytes: %w", err), conn.Close())
 	}
 
 	return &Client{
-		client: client,
-		pk:     pk,
-	}, conn.Close, nil
+		client:     client,
+		pk:         pk,
+		connection: conn,
+	}, nil
 }
 
 func (c *Client) PublicKey() *bls.PublicKey {
@@ -67,7 +69,7 @@ func (c *Client) PublicKey() *bls.PublicKey {
 func (c *Client) Sign(message []byte) (*bls.Signature, error) {
 	resp, err := c.client.Sign(context.TODO(), &pb.SignRequest{Message: message})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to sign message: %w", err)
 	}
 
 	sigBytes := resp.GetSignature()
@@ -79,9 +81,13 @@ func (c *Client) Sign(message []byte) (*bls.Signature, error) {
 func (c *Client) SignProofOfPossession(message []byte) (*bls.Signature, error) {
 	resp, err := c.client.SignProofOfPossession(context.TODO(), &pb.SignProofOfPossessionRequest{Message: message})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to sign proof of possession: %w", err)
 	}
 
 	sigBytes := resp.GetSignature()
 	return bls.SignatureFromBytes(sigBytes)
+}
+
+func (c *Client) Shutdown() error {
+	return c.connection.Close()
 }

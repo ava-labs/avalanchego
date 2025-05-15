@@ -58,6 +58,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	blssigner "github.com/ava-labs/avalanchego/utils/crypto/bls/signer"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/filesystem"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -125,18 +126,23 @@ func New(
 		return nil, fmt.Errorf("invalid staking certificate: %w", err)
 	}
 
+	stakingSigner, err := blssigner.GetStakingSigner(
+		config.StakingSignerConfig,
+	)
+
 	n := &Node{
 		Log:              logger,
 		LogFactory:       logFactory,
 		StakingTLSSigner: config.StakingTLSCert.PrivateKey.(crypto.Signer),
 		StakingTLSCert:   stakingCert,
 		ID:               ids.NodeIDFromCert(stakingCert),
+		StakingSigner:    stakingSigner,
 		Config:           config,
 	}
 
 	n.DoneShuttingDown.Add(1)
 
-	pop, err := signer.NewProofOfPossession(n.Config.StakingSigningKey)
+	pop, err := signer.NewProofOfPossession(n.StakingSigner)
 	if err != nil {
 		return nil, fmt.Errorf("problem creating proof of possession: %w", err)
 	}
@@ -287,6 +293,7 @@ type Node struct {
 
 	StakingTLSSigner crypto.Signer
 	StakingTLSCert   *staking.Certificate
+	StakingSigner    bls.Signer
 
 	// Storage for this node
 	DB database.Database
@@ -578,7 +585,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 		err := n.vdrs.AddStaker(
 			constants.PrimaryNetworkID,
 			n.ID,
-			n.Config.StakingSigningKey.PublicKey(),
+			n.StakingSigner.PublicKey(),
 			dummyTxID,
 			n.Config.SybilProtectionDisabledWeight,
 		)
@@ -617,7 +624,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	n.Config.NetworkConfig.Beacons = n.bootstrappers
 	n.Config.NetworkConfig.TLSConfig = tlsConfig
 	n.Config.NetworkConfig.TLSKey = tlsKey
-	n.Config.NetworkConfig.BLSKey = n.Config.StakingSigningKey
+	n.Config.NetworkConfig.BLSKey = n.StakingSigner
 	n.Config.NetworkConfig.TrackedSubnets = n.Config.TrackedSubnets
 	n.Config.NetworkConfig.UptimeCalculator = n.uptimeCalculator
 	n.Config.NetworkConfig.UptimeRequirement = n.Config.UptimeRequirement
@@ -1109,7 +1116,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			SybilProtectionEnabled:                  n.Config.SybilProtectionEnabled,
 			StakingTLSSigner:                        n.StakingTLSSigner,
 			StakingTLSCert:                          n.StakingTLSCert,
-			StakingBLSKey:                           n.Config.StakingSigningKey,
+			StakingBLSKey:                           n.StakingSigner,
 			Log:                                     n.Log,
 			LogFactory:                              n.LogFactory,
 			VMManager:                               n.VMManager,
@@ -1353,7 +1360,7 @@ func (n *Node) initInfoAPI() error {
 
 	n.Log.Info("initializing info API")
 
-	pop, err := signer.NewProofOfPossession(n.Config.StakingSigningKey)
+	pop, err := signer.NewProofOfPossession(n.StakingSigner)
 	if err != nil {
 		return fmt.Errorf("problem creating proof of possession: %w", err)
 	}
@@ -1464,7 +1471,7 @@ func (n *Node) initHealthAPI() error {
 			return "validator doesn't have a BLS key", nil
 		}
 
-		nodePK := n.Config.StakingSigningKey.PublicKey()
+		nodePK := n.StakingSigner.PublicKey()
 		if nodePK.Equals(vdrPK) {
 			return "node has the correct BLS key", nil
 		}
@@ -1659,6 +1666,14 @@ func (n *Node) shutdown() {
 		time.Sleep(n.Config.ShutdownWait)
 	}
 
+	if n.StakingSigner != nil {
+		if err := n.StakingSigner.Shutdown(); err != nil {
+			n.Log.Debug(
+				"error during staking signer shutdown",
+				zap.Error(err),
+			)
+		}
+	}
 	if n.resourceManager != nil {
 		n.resourceManager.Shutdown()
 	}

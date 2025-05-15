@@ -4,12 +4,10 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/spf13/pflag"
 	"golang.org/x/term"
@@ -53,9 +51,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	nodeConfig, cleanup, err := config.GetNodeConfig(ctx, v)
-	cancel()
+	nodeConfig, err := config.GetNodeConfig(v)
 	if err != nil {
 		fmt.Printf("couldn't load node config: %s\n", err)
 		os.Exit(1)
@@ -68,15 +64,9 @@ func main() {
 	nodeApp, err := app.New(nodeConfig)
 	if err != nil {
 		fmt.Printf("couldn't start node: %s\n", err)
-		if err := cleanup(); err != nil {
-			fmt.Printf("error cleaning up: %s\n", err)
-		}
 		os.Exit(1)
 	}
 
 	exitCode := app.Run(nodeApp)
-	if err := cleanup(); err != nil {
-		fmt.Printf("error cleaning up: %s\n", err)
-	}
 	os.Exit(exitCode)
 }
