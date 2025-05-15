@@ -181,6 +181,11 @@ type OutboundMsgBuilder interface {
 		chainID ids.ID,
 		msg []byte,
 	) (OutboundMessage, error)
+
+	Simplex(
+		chainID ids.ID,
+		message *p2p.Simplex,
+	) (OutboundMessage, error)
 }
 
 type outMsgBuilder struct {
@@ -719,6 +724,21 @@ func (b *outMsgBuilder) AppGossip(chainID ids.ID, msg []byte) (OutboundMessage, 
 					ChainId:  chainID[:],
 					AppBytes: msg,
 				},
+			},
+		},
+		b.compressionType,
+		false,
+	)
+}
+
+func (b *outMsgBuilder) Simplex(
+	chainID ids.ID,
+	message *p2p.Simplex,
+) (OutboundMessage, error) {
+	return b.builder.createOutbound(
+		&p2p.Message{
+			Message: &p2p.Message_SimplexMessage{
+				SimplexMessage: message,
 			},
 		},
 		b.compressionType,

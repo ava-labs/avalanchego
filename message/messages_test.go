@@ -631,10 +631,9 @@ func TestMessage(t *testing.T) {
 			bypassThrottling: true,
 			bytesSaved:       true,
 		},
-		
 		{
 			desc: "simplex message with no compression",
-			op:   GetAcceptedFrontierOp,
+			op:   SimplexOp,
 			msg: &p2p.Message{
 				Message: &p2p.Message_SimplexMessage{
 					SimplexMessage: &p2p.Simplex{
@@ -654,7 +653,7 @@ func TestMessage(t *testing.T) {
 		},
 		{
 			desc: "Simplex message with zstd compression",
-			op:   AppGossipOp,
+			op:   SimplexOp,
 			msg: &p2p.Message{
 				Message: &p2p.Message_SimplexMessage{
 					SimplexMessage: &p2p.Simplex{
