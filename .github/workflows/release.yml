@@ -6,13 +6,12 @@ on:
       tag:
         description: "Tag to checkout & release"
         required: true
-  push:
-    tags:
-      - "v[0-9]+.[0-9]+.[0-9]+"
+  release:
+    types:
+      - released
 
 jobs:
   release:
-    # needs: [lint_test, unit_test, e2e_test, simulator_test]
     runs-on: ubuntu-22.04
     steps:
       - name: Git checkout

@@ -89,3 +89,7 @@ There are two options when using the Avalanche-CLI:
 
 1. Use an official Subnet-EVM release: <https://docs.avax.network/subnets/build-first-subnet>
 2. Build and deploy a locally built (and optionally modified) version of Subnet-EVM: <https://docs.avax.network/subnets/create-custom-subnet>
+
+## Releasing
+
+You can refer to the [`docs/releasing/README.md`](docs/releasing/README.md) file for the release process.
