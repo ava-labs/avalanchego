@@ -64,10 +64,9 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 
 var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 	var (
-		network  *tmpnet.Network
-		tc       *e2e.GinkgoTestContext
-		tracker  *load.Tracker[common.Hash]
-		registry *prometheus.Registry
+		network *tmpnet.Network
+		tc      *e2e.GinkgoTestContext
+		tracker *load.Tracker[common.Hash]
 
 		logger = logging.NewLogger("c-chain-load-testing", logging.NewWrappedCore(logging.Info, os.Stdout, logging.Auto.ConsoleEncoder()))
 	)
@@ -84,20 +83,18 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 			err := node.EnsureKeys()
 			require.NoError(tc, err, "ensuring keys for node %s", node.NodeID)
 		}
-
-		cleanup := setupMetricsServer(tc, registry, network.UUID, network.Owner, logger)
-		ginkgo.DeferCleanup(cleanup)
 	})
 
 	// Setup metrics server and load tracker before each test run
 	// ensuring isolation
 	ginkgo.BeforeEach(func() {
 		promRegistry := prometheus.NewRegistry()
-		registry = promRegistry
-
-		loadTracker, err := load.NewTracker[common.Hash](registry)
+		loadTracker, err := load.NewTracker[common.Hash](promRegistry)
 		require.NoError(tc, err)
 		tracker = loadTracker
+
+		cleanup := setupMetricsServer(tc, promRegistry, network.UUID, network.Owner, logger)
+		ginkgo.DeferCleanup(cleanup)
 	})
 
 	ginkgo.It("C-Chain simple", func(ctx context.Context) {
