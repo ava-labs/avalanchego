@@ -1096,21 +1096,20 @@ func BuildMetricsURLForNetwork(dashboardID, dashboardName, networkUUID string, o
 	query.Add("from", startTime)
 	query.Add("to", endTime)
 
-	var filters map[string]string
+	filters := make(map[string]string)
 	if options.Filters != nil {
 		filters = maps.Clone(options.Filters)
-	} else {
-		filters = make(map[string]string)
 	}
 
-	if _, ok := filters["network_uuid"]; !ok {
+	// Ensure network_uuid is set
+	if _, exists := filters["network_uuid"]; !exists {
 		filters["network_uuid"] = networkUUID
 	}
 
-	for key, value := range options.Filters {
+	for key, value := range filters {
 		query.Add("var-filter", fmt.Sprintf("%s|=|%s", key, value))
 	}
-	baseURL.RawQuery = query.Encode()
 
+	baseURL.RawQuery = query.Encode()
 	return baseURL.String()
 }
