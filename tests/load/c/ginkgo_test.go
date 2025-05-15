@@ -65,30 +65,39 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 	var (
 		network  *tmpnet.Network
+		tc       *e2e.GinkgoTestContext
 		tracker  *load.Tracker[common.Hash]
-		logger   = logging.NewLogger("c-chain-load-testing", logging.NewWrappedCore(logging.Info, os.Stdout, logging.Auto.ConsoleEncoder()))
-		tc       = e2e.NewTestContext()
-		r        = require.New(tc)
-		registry = prometheus.NewRegistry()
+		registry *prometheus.Registry
+
+		logger = logging.NewLogger("c-chain-load-testing", logging.NewWrappedCore(logging.Info, os.Stdout, logging.Auto.ConsoleEncoder()))
 	)
 
-	tracker, err := load.NewTracker[common.Hash](registry)
-	r.NoError(err)
-
 	ginkgo.BeforeAll(func() {
-		tc := e2e.NewTestContext()
-		r := require.New(tc)
-		env := e2e.GetEnv(tc)
+		var (
+			tc  = e2e.NewTestContext()
+			env = e2e.GetEnv(tc)
+		)
 
 		network = env.GetNetwork()
 		network.Nodes = network.Nodes[:nodesCount]
 		for _, node := range network.Nodes {
 			err := node.EnsureKeys()
-			r.NoError(err, "ensuring keys for node %s", node.NodeID)
+			require.NoError(tc, err, "ensuring keys for node %s", node.NodeID)
 		}
 
-		cleanup := setupMetricsServer(r, registry, network.UUID, network.Owner, logger)
+		cleanup := setupMetricsServer(tc, registry, network.UUID, network.Owner, logger)
 		ginkgo.DeferCleanup(cleanup)
+	})
+
+	// Setup metrics server and load tracker before each test run
+	// ensuring isolation
+	ginkgo.BeforeEach(func() {
+		promRegistry := prometheus.NewRegistry()
+		registry = promRegistry
+
+		loadTracker, err := load.NewTracker[common.Hash](registry)
+		require.NoError(tc, err)
+		tracker = loadTracker
 	})
 
 	ginkgo.It("C-Chain simple", func(ctx context.Context) {
@@ -129,7 +138,9 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 })
 
 // setupMetricsServer creates Prometheus server with a dynamically allocated port
-func setupMetricsServer(r *require.Assertions, registry *prometheus.Registry, networkUUID, networkOwner string, logger logging.Logger) func() {
+func setupMetricsServer(tc *e2e.GinkgoTestContext, registry *prometheus.Registry, networkUUID, networkOwner string, logger logging.Logger) func() {
+	r := require.New(tc)
+
 	// Allocate a port dynamically
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	r.NoError(err, "allocating dynamic port")
