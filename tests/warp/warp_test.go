@@ -116,7 +116,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 
 	// Initialize the local test environment from the global state
 	if len(envBytes) > 0 {
-		e2e.InitSharedTestEnvironment(ginkgo.GinkgoT(), envBytes)
+		e2e.InitSharedTestEnvironment(tc, envBytes)
 	}
 
 	network := e2e.GetEnv(tc).GetNetwork()

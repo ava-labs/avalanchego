@@ -61,7 +61,7 @@ func NewStandaloneDatabase(dbConfig avalanchenode.DatabaseConfig, gatherer metri
 		)
 	}
 
-	db = corruptabledb.New(db)
+	db = corruptabledb.New(db, logger)
 
 	if dbConfig.ReadOnly && dbConfig.Name != memdb.Name {
 		db = versiondb.New(db)

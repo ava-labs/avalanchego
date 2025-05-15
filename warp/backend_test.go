@@ -7,7 +7,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -44,7 +44,7 @@ func TestAddAndGetValidMessage(t *testing.T) {
 	sk, err := localsigner.New()
 	require.NoError(t, err)
 	warpSigner := avalancheWarp.NewSigner(sk, networkID, sourceChainID)
-	messageSignatureCache := &cache.LRU[ids.ID, []byte]{Size: 500}
+	messageSignatureCache := lru.NewCache[ids.ID, []byte](500)
 	backend, err := NewBackend(networkID, sourceChainID, warpSigner, nil, warptest.NoOpValidatorReader{}, db, messageSignatureCache, nil)
 	require.NoError(t, err)
 
@@ -67,7 +67,7 @@ func TestAddAndGetUnknownMessage(t *testing.T) {
 	sk, err := localsigner.New()
 	require.NoError(t, err)
 	warpSigner := avalancheWarp.NewSigner(sk, networkID, sourceChainID)
-	messageSignatureCache := &cache.LRU[ids.ID, []byte]{Size: 500}
+	messageSignatureCache := lru.NewCache[ids.ID, []byte](500)
 	backend, err := NewBackend(networkID, sourceChainID, warpSigner, nil, warptest.NoOpValidatorReader{}, db, messageSignatureCache, nil)
 	require.NoError(t, err)
 
@@ -86,7 +86,7 @@ func TestGetBlockSignature(t *testing.T) {
 	sk, err := localsigner.New()
 	require.NoError(err)
 	warpSigner := avalancheWarp.NewSigner(sk, networkID, sourceChainID)
-	messageSignatureCache := &cache.LRU[ids.ID, []byte]{Size: 500}
+	messageSignatureCache := lru.NewCache[ids.ID, []byte](500)
 	backend, err := NewBackend(networkID, sourceChainID, warpSigner, blockClient, warptest.NoOpValidatorReader{}, db, messageSignatureCache, nil)
 	require.NoError(err)
 
@@ -113,7 +113,7 @@ func TestZeroSizedCache(t *testing.T) {
 	warpSigner := avalancheWarp.NewSigner(sk, networkID, sourceChainID)
 
 	// Verify zero sized cache works normally, because the lru cache will be initialized to size 1 for any size parameter <= 0.
-	messageSignatureCache := &cache.LRU[ids.ID, []byte]{Size: 0}
+	messageSignatureCache := lru.NewCache[ids.ID, []byte](0)
 	backend, err := NewBackend(networkID, sourceChainID, warpSigner, nil, warptest.NoOpValidatorReader{}, db, messageSignatureCache, nil)
 	require.NoError(t, err)
 
@@ -173,7 +173,7 @@ func TestOffChainMessages(t *testing.T) {
 			require := require.New(t)
 			db := memdb.New()
 
-			messageSignatureCache := &cache.LRU[ids.ID, []byte]{Size: 0}
+			messageSignatureCache := lru.NewCache[ids.ID, []byte](0)
 			backend, err := NewBackend(networkID, sourceChainID, warpSigner, nil, warptest.NoOpValidatorReader{}, db, messageSignatureCache, test.offchainMessages)
 			require.ErrorIs(err, test.err)
 			if test.check != nil {

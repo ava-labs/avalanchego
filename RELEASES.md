@@ -3,6 +3,7 @@
 ## Pending Release
 
 - Updated dockerhub image name to `avaplatform/subnet-evm_avalanchego` and tags to accommodate the new versioning scheme: {subnet-evm version}_{avalanchego version}
+- Updated golang version to 1.23.9
 
 ## [v0.7.3](https://github.com/ava-labs/subnet-evm/releases/tag/v0.7.3)
 
