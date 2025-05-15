@@ -24,8 +24,8 @@ import (
 
 	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/core/types"
+	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/subnet-evm/core"
-	"github.com/ava-labs/subnet-evm/params"
 )
 
 // Tests that the simulator starts with the initial gas limit in the genesis block,
@@ -59,7 +59,7 @@ func TestWithCallGasLimitOption(t *testing.T) {
 	// Construct a simulator, targeting a different gas limit
 	sim := NewBackend(types.GenesisAlloc{
 		testAddr: {Balance: big.NewInt(10000000000000000)},
-	}, WithCallGasLimit(params.TxGas-1))
+	}, WithCallGasLimit(ethparams.TxGas-1))
 	defer sim.Close()
 
 	client := sim.Client()

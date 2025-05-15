@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/event"
+	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/core"
@@ -234,7 +235,7 @@ func testGenBlock(t *testing.T, tip int64, numTx int) func(int, *core.BlockGen) 
 				ChainID:   params.TestChainConfig.ChainID,
 				Nonce:     b.TxNonce(addr),
 				To:        &common.Address{},
-				Gas:       params.TxGas,
+				Gas:       ethparams.TxGas,
 				GasFeeCap: feeCap,
 				GasTipCap: txTip,
 				Data:      []byte{},
@@ -295,7 +296,7 @@ func TestSuggestTipCapSmallTips(t *testing.T) {
 					ChainID:   params.TestChainConfig.ChainID,
 					Nonce:     b.TxNonce(addr),
 					To:        &common.Address{},
-					Gas:       params.TxGas,
+					Gas:       ethparams.TxGas,
 					GasFeeCap: feeCap,
 					GasTipCap: tip,
 					Data:      []byte{},
@@ -309,7 +310,7 @@ func TestSuggestTipCapSmallTips(t *testing.T) {
 					ChainID:   params.TestChainConfig.ChainID,
 					Nonce:     b.TxNonce(addr),
 					To:        &common.Address{},
-					Gas:       params.TxGas,
+					Gas:       ethparams.TxGas,
 					GasFeeCap: feeCap,
 					GasTipCap: common.Big1,
 					Data:      []byte{},
@@ -350,7 +351,7 @@ func TestSuggestGasPriceSubnetEVM(t *testing.T) {
 			tx := types.NewTx(&types.LegacyTx{
 				Nonce:    b.TxNonce(addr),
 				To:       &common.Address{},
-				Gas:      params.TxGas,
+				Gas:      ethparams.TxGas,
 				GasPrice: gasPrice,
 				Data:     []byte{},
 			})

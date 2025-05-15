@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
+	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/params/extras"
@@ -88,7 +89,7 @@ func TestBadTxAllowListBlock(t *testing.T) {
 	}{
 		{ // Nonwhitelisted address
 			txs: []*types.Transaction{
-				mkDynamicTx(0, common.Address{}, params.TxGas, big.NewInt(0), big.NewInt(225000000000)),
+				mkDynamicTx(0, common.Address{}, ethparams.TxGas, big.NewInt(0), big.NewInt(225000000000)),
 			},
 			want: "could not apply tx 0 [0xc5725e8baac950b2925dd4fea446ccddead1cc0affdae18b31a7d910629d9225]: cannot issue transaction from non-allow listed address: 0x71562b71999873DB5b286dF957af199Ec94617F7",
 		},

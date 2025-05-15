@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
+	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/subnet-evm/accounts/abi/bind"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/rpc"
@@ -266,7 +267,7 @@ func TestCommitReturnValue(t *testing.T) {
 	// Create a block in the original chain (containing a transaction to force different block hashes)
 	head, _ := client.HeaderByNumber(ctx, nil) // Should be child's, good enough
 	gasPrice := new(big.Int).Add(head.BaseFee, big.NewInt(1))
-	_tx := types.NewTransaction(0, testAddr, big.NewInt(1000), params.TxGas, gasPrice, nil)
+	_tx := types.NewTransaction(0, testAddr, big.NewInt(1000), ethparams.TxGas, gasPrice, nil)
 	tx, _ := types.SignTx(_tx, types.LatestSignerForChainID(chainid), testKey)
 	if err := client.SendTransaction(ctx, tx); err != nil {
 		t.Fatalf("sending transaction: %v", err)

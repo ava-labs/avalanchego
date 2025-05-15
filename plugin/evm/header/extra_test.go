@@ -187,13 +187,13 @@ func TestVerifyExtra(t *testing.T) {
 		{
 			name:     "initial_valid",
 			rules:    extras.AvalancheRules{},
-			extra:    make([]byte, extras.MaximumExtraDataSize),
+			extra:    make([]byte, maximumExtraDataSize),
 			expected: nil,
 		},
 		{
 			name:     "initial_invalid",
 			rules:    extras.AvalancheRules{},
-			extra:    make([]byte, extras.MaximumExtraDataSize+1),
+			extra:    make([]byte, maximumExtraDataSize+1),
 			expected: errInvalidExtraLength,
 		},
 		{

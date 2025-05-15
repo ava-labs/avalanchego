@@ -13,6 +13,10 @@ import (
 	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/subnetevm"
 )
 
+const (
+	maximumExtraDataSize = 64 // Maximum size extra data may be after Genesis.
+)
+
 var (
 	errInvalidExtraPrefix = errors.New("invalid header.Extra prefix")
 	errInvalidExtraLength = errors.New("invalid header.Extra length")
@@ -89,11 +93,11 @@ func VerifyExtra(rules extras.AvalancheRules, extra []byte) error {
 			)
 		}
 	default:
-		if uint64(extraLen) > extras.MaximumExtraDataSize {
+		if uint64(extraLen) > maximumExtraDataSize {
 			return fmt.Errorf(
 				"%w: expected <= %d but got %d",
 				errInvalidExtraLength,
-				extras.MaximumExtraDataSize,
+				maximumExtraDataSize,
 				extraLen,
 			)
 		}

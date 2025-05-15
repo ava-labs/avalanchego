@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
+	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/core"
@@ -74,7 +75,7 @@ func TestGetCode(t *testing.T) {
 		},
 		"code size is too large": {
 			setupRequest: func() (requestHashes []common.Hash, mockResponse message.CodeResponse, expectedCode [][]byte) {
-				oversizedCode := make([]byte, params.MaxCodeSize+1)
+				oversizedCode := make([]byte, ethparams.MaxCodeSize+1)
 				codeHash := crypto.Keccak256Hash(oversizedCode)
 				return []common.Hash{codeHash}, message.CodeResponse{
 					Data: [][]byte{oversizedCode},

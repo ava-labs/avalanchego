@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/eth/tracers/logger"
+	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/internal/ethapi"
 	"github.com/ava-labs/subnet-evm/params"
@@ -64,7 +65,7 @@ func TestTraceBlockPrecompileActivation(t *testing.T) {
 		// Transfer from account[0] to account[1]
 		//    value: 1000 wei
 		//    fee:   0 wei
-		tx, _ := types.SignTx(types.NewTransaction(uint64(i), accounts[1].addr, big.NewInt(1000), params.TxGas, b.BaseFee(), nil), signer, accounts[0].key)
+		tx, _ := types.SignTx(types.NewTransaction(uint64(i), accounts[1].addr, big.NewInt(1000), ethparams.TxGas, b.BaseFee(), nil), signer, accounts[0].key)
 		b.AddTx(tx)
 		txHashes[i] = tx.Hash()
 	})
@@ -170,7 +171,7 @@ func TestTraceTransactionPrecompileActivation(t *testing.T) {
 		// Transfer from account[0] to account[1]
 		//    value: 1000 wei
 		//    fee:   0 wei
-		tx, _ := types.SignTx(types.NewTransaction(uint64(i), accounts[1].addr, big.NewInt(1000), params.TxGas, new(big.Int).Add(b.BaseFee(), big.NewInt(int64(500*params.GWei))), nil), signer, accounts[0].key)
+		tx, _ := types.SignTx(types.NewTransaction(uint64(i), accounts[1].addr, big.NewInt(1000), ethparams.TxGas, new(big.Int).Add(b.BaseFee(), big.NewInt(int64(500*params.GWei))), nil), signer, accounts[0].key)
 		b.AddTx(tx)
 		blockNoTxMap[uint64(i)] = tx.Hash()
 	})
@@ -186,7 +187,7 @@ func TestTraceTransactionPrecompileActivation(t *testing.T) {
 			err = json.Unmarshal(result.(json.RawMessage), &have)
 			require.NoError(err)
 			expected := &logger.ExecutionResult{
-				Gas:         params.TxGas,
+				Gas:         ethparams.TxGas,
 				Failed:      false,
 				ReturnValue: "",
 				StructLogs:  []logger.StructLogRes{},
@@ -240,7 +241,7 @@ func TestTraceChainPrecompileActivation(t *testing.T) {
 		//    value: 1000 wei
 		//    fee:   0 wei
 		for j := 0; j < i+1; j++ {
-			tx, _ := types.SignTx(types.NewTransaction(nonce, accounts[1].addr, big.NewInt(1000), params.TxGas, b.BaseFee(), nil), signer, accounts[0].key)
+			tx, _ := types.SignTx(types.NewTransaction(nonce, accounts[1].addr, big.NewInt(1000), ethparams.TxGas, b.BaseFee(), nil), signer, accounts[0].key)
 			b.AddTx(tx)
 			nonce += 1
 		}
@@ -331,7 +332,7 @@ func TestTraceCallWithOverridesStateUpgrade(t *testing.T) {
 		// Transfer from account[0] to account[1]
 		//    value: 1000 wei
 		//    fee:   0 wei
-		tx, _ := types.SignTx(types.NewTransaction(uint64(i), accounts[1].addr, big.NewInt(1000), params.TxGas, b.BaseFee(), nil), signer, accounts[0].key)
+		tx, _ := types.SignTx(types.NewTransaction(uint64(i), accounts[1].addr, big.NewInt(1000), ethparams.TxGas, b.BaseFee(), nil), signer, accounts[0].key)
 		b.AddTx(tx)
 	})
 	defer backend.teardown()

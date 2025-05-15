@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/core/types"
+	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/stretchr/testify/require"
@@ -104,10 +105,10 @@ func VerifyGasLimitTest(t *testing.T, feeConfig commontype.FeeConfig) {
 			name:     "pre_subnet_evm_too_low",
 			upgrades: extras.TestPreSubnetEVMChainConfig.NetworkUpgrades,
 			parent: &types.Header{
-				GasLimit: extras.MinGasLimit,
+				GasLimit: ethparams.MinGasLimit,
 			},
 			header: &types.Header{
-				GasLimit: extras.MinGasLimit - 1,
+				GasLimit: ethparams.MinGasLimit - 1,
 			},
 			want: errInvalidGasLimit,
 		},
@@ -115,10 +116,10 @@ func VerifyGasLimitTest(t *testing.T, feeConfig commontype.FeeConfig) {
 			name:     "pre_subnet_evm_too_high",
 			upgrades: extras.TestPreSubnetEVMChainConfig.NetworkUpgrades,
 			parent: &types.Header{
-				GasLimit: extras.MaxGasLimit,
+				GasLimit: ethparams.MaxGasLimit,
 			},
 			header: &types.Header{
-				GasLimit: extras.MaxGasLimit + 1,
+				GasLimit: ethparams.MaxGasLimit + 1,
 			},
 			want: errInvalidGasLimit,
 		},
@@ -126,10 +127,10 @@ func VerifyGasLimitTest(t *testing.T, feeConfig commontype.FeeConfig) {
 			name:     "pre_subnet_evm_too_large",
 			upgrades: extras.TestPreSubnetEVMChainConfig.NetworkUpgrades,
 			parent: &types.Header{
-				GasLimit: extras.MinGasLimit,
+				GasLimit: ethparams.MinGasLimit,
 			},
 			header: &types.Header{
-				GasLimit: extras.MaxGasLimit,
+				GasLimit: ethparams.MaxGasLimit,
 			},
 			want: errInvalidGasLimit,
 		},

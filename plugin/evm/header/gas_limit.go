@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/libevm/core/types"
+	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/params/extras"
 )
@@ -81,18 +82,18 @@ func VerifyGasLimit(
 			)
 		}
 	default:
-		if header.GasLimit < extras.MinGasLimit || header.GasLimit > extras.MaxGasLimit {
+		if header.GasLimit < ethparams.MinGasLimit || header.GasLimit > ethparams.MaxGasLimit {
 			return fmt.Errorf("%w: %d not in range [%d, %d]",
 				errInvalidGasLimit,
 				header.GasLimit,
-				extras.MinGasLimit,
-				extras.MaxGasLimit,
+				ethparams.MinGasLimit,
+				ethparams.MaxGasLimit,
 			)
 		}
 
 		// Verify that the gas limit remains within allowed bounds
 		diff := math.AbsDiff(parent.GasLimit, header.GasLimit)
-		limit := parent.GasLimit / extras.GasLimitBoundDivisor
+		limit := parent.GasLimit / ethparams.GasLimitBoundDivisor
 		if diff >= limit {
 			return fmt.Errorf("%w: have %d, want %d += %d",
 				errInvalidGasLimit,

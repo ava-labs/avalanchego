@@ -12,8 +12,8 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/log"
+	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/subnet-evm/ethclient"
-	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/legacy"
 )
 
@@ -46,7 +46,7 @@ func IssueTxsToActivateProposerVMFork(
 	txSigner := types.LatestSignerForChainID(chainID)
 	for i := 0; i < numTriggerTxs; i++ {
 		tx := types.NewTransaction(
-			nonce, addr, common.Big1, params.TxGas, gasPrice, nil)
+			nonce, addr, common.Big1, ethparams.TxGas, gasPrice, nil)
 		triggerTx, err := types.SignTx(tx, txSigner, fundedKey)
 		if err != nil {
 			return err

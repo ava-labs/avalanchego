@@ -25,9 +25,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	"github.com/ava-labs/libevm/core/types"
+	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/subnet-evm/accounts/abi/bind"
 	"github.com/ava-labs/subnet-evm/ethclient"
-	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/tests"
 	"github.com/ava-labs/subnet-evm/tests/utils"
 
@@ -189,7 +189,7 @@ func transferFunds(ctx context.Context, client ethclient.Client, key *ecdsa.Priv
 		Nonce:     acceptedNonce,
 		GasTipCap: gasTipCap,
 		GasFeeCap: gasFeeCap,
-		Gas:       params.TxGas,
+		Gas:       ethparams.TxGas,
 		To:        &recipientAddress,
 		Value:     big.NewInt(int64(txAmount)),
 	})
