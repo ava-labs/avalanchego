@@ -119,17 +119,48 @@ func fixKeysCount(preFundedKeys []*secp256k1.PrivateKey, target int) ([]*ecdsa.P
 	return keys, nil
 }
 
+// createAgents creates agents for the given configuration and keys.
+// It creates them in parallel because creating issuers can sometimes take a while,
+// and this adds up for many agents. For example, deploying the Opcoder contract
+// takes a few seconds. Running the creation in parallel can reduce the time significantly.
 func createAgents(ctx context.Context, config config, keys []*ecdsa.PrivateKey,
 	tracker *load.Tracker[common.Hash],
 ) ([]load.Agent[common.Hash], error) {
-	agents := make([]load.Agent[common.Hash], config.agents)
-	var err error
-	for i := range agents {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	type result struct {
+		agent load.Agent[common.Hash]
+		err   error
+	}
+	ch := make(chan result)
+	for i := range int(config.agents) {
+		key := keys[i]
 		endpoint := config.endpoints[i%len(config.endpoints)]
-		agents[i], err = createAgent(ctx, endpoint, keys[i], config.issuer, tracker, config.maxFeeCap)
-		if err != nil {
-			return nil, err
+		go func(key *ecdsa.PrivateKey, endpoint string) {
+			agent, err := createAgent(ctx, endpoint, key, config.issuer, tracker, config.maxFeeCap)
+			ch <- result{agent: agent, err: err}
+		}(key, endpoint)
+	}
+
+	var err error
+	agents := make([]load.Agent[common.Hash], 0, int(config.agents))
+	for range int(config.agents) {
+		result := <-ch
+		switch {
+		case result.err == nil && err == nil: // no previous error or new error
+			agents = append(agents, result.agent)
+		case err != nil: // error already occurred
+			continue
+		case result.err != nil: // first error
+			err = result.err
+			cancel()
+		default:
+			panic("unreachable")
 		}
+	}
+
+	if err != nil {
+		return nil, err
 	}
 	return agents, nil
 }
