@@ -27,10 +27,8 @@ var (
 type Network struct {
 	*p2p.Network
 
-	log       logging.Logger
-	parser    txs.Parser
-	mempool   *gossipMempool
-	appSender common.AppSender
+	log     logging.Logger
+	mempool *gossipMempool
 
 	txPushGossiper        *gossip.PushGossiper[*txs.Tx]
 	txPushGossipFrequency time.Duration
@@ -79,7 +77,6 @@ func New(
 		registerer,
 		log,
 		txVerifier,
-		parser,
 		config.ExpectedBloomFilterElements,
 		config.ExpectedBloomFilterFalsePositiveProbability,
 		config.MaxBloomFilterFalsePositiveProbability,
@@ -162,9 +159,7 @@ func New(
 	return &Network{
 		Network:               p2pNetwork,
 		log:                   log,
-		parser:                parser,
 		mempool:               gossipMempool,
-		appSender:             appSender,
 		txPushGossiper:        txPushGossiper,
 		txPushGossipFrequency: config.PushGossipFrequency,
 		txPullGossiper:        txPullGossiper,

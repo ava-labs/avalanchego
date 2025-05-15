@@ -95,12 +95,11 @@ func NewWallet(
 		}
 	}
 
-	builderContext := newContext(ctx, config, state)
 	backend := wallet.NewBackend(
-		builderContext,
 		common.NewChainUTXOs(constants.PlatformChainID, utxos),
 		owners,
 	)
+	builderContext := newContext(ctx, config, state)
 	return wallet.New(
 		&client{
 			backend: backend,
