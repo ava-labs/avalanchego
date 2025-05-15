@@ -5,16 +5,12 @@ package evm
 
 import (
 	"context"
-	"math/big"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
-	"github.com/prometheus/client_golang/prometheus"
+	atomictxpool "github.com/ava-labs/coreth/plugin/evm/atomic/txpool"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -59,7 +55,7 @@ func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 
 			// try to add a conflicting tx
 			err = tvm.vm.mempool.AddLocalTx(conflictingTx)
-			assert.ErrorIs(err, atomic.ErrConflictingAtomicTx)
+			assert.ErrorIs(err, atomictxpool.ErrConflictingAtomicTx)
 			has = mempool.Has(conflictingTxID)
 			assert.False(has, "conflicting tx in mempool")
 
@@ -91,74 +87,4 @@ func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 			assert.False(has, "tx shouldn't be in mempool after block is accepted")
 		})
 	}
-}
-
-// a valid tx shouldn't be added to the mempool if this would exceed the
-// mempool's max size
-func TestMempoolMaxMempoolSizeHandling(t *testing.T) {
-	assert := assert.New(t)
-
-	ctx := snowtest.Context(t, snowtest.CChainID)
-	mempool, err := atomic.NewMempool(ctx, prometheus.NewRegistry(), 1, nil)
-	assert.NoError(err)
-	// create candidate tx (we will drop before validation)
-	tx := atomic.GenerateTestImportTx()
-
-	assert.NoError(mempool.AddRemoteTx(tx))
-	assert.True(mempool.Has(tx.ID()))
-	// promote tx to be issued
-	_, ok := mempool.NextTx()
-	assert.True(ok)
-	mempool.IssueCurrentTxs()
-
-	// try to add one more tx
-	tx2 := atomic.GenerateTestImportTx()
-	assert.ErrorIs(mempool.AddRemoteTx(tx2), atomic.ErrTooManyAtomicTx)
-	assert.False(mempool.Has(tx2.ID()))
-}
-
-// mempool will drop transaction with the lowest fee
-func TestMempoolPriorityDrop(t *testing.T) {
-	assert := assert.New(t)
-
-	// we use AP3 here to not trip any block fees
-	importAmount := uint64(50000000)
-	fork := upgradetest.ApricotPhase3
-	vm := newVM(t, testVMConfig{
-		fork: &fork,
-		utxos: map[ids.ShortID]uint64{
-			testShortIDAddrs[0]: importAmount,
-			testShortIDAddrs[1]: importAmount,
-		},
-	}).vm
-	defer func() {
-		err := vm.Shutdown(context.Background())
-		assert.NoError(err)
-	}()
-	mempool, err := atomic.NewMempool(vm.ctx, prometheus.NewRegistry(), 1, vm.verifyTxAtTip)
-	assert.NoError(err)
-
-	tx1, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.NoError(mempool.AddRemoteTx(tx1))
-	assert.True(mempool.Has(tx1.ID()))
-
-	tx2, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[1], initialBaseFee, []*secp256k1.PrivateKey{testKeys[1]})
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.ErrorIs(mempool.AddRemoteTx(tx2), atomic.ErrInsufficientAtomicTxFee)
-	assert.True(mempool.Has(tx1.ID()))
-	assert.False(mempool.Has(tx2.ID()))
-
-	tx3, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[1], new(big.Int).Mul(initialBaseFee, big.NewInt(2)), []*secp256k1.PrivateKey{testKeys[1]})
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.NoError(mempool.AddRemoteTx(tx3))
-	assert.False(mempool.Has(tx1.ID()))
-	assert.False(mempool.Has(tx2.ID()))
-	assert.True(mempool.Has(tx3.ID()))
 }
