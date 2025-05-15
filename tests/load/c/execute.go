@@ -60,13 +60,9 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 		return fmt.Errorf("creating tracker: %w", err)
 	}
 
-	agents := make([]load.Agent[common.Hash], config.agents)
-	for i := range agents {
-		endpoint := config.endpoints[i%len(config.endpoints)]
-		agents[i], err = createAgent(ctx, endpoint, keys[i], config.issuer, tracker, config.maxFeeCap)
-		if err != nil {
-			return fmt.Errorf("creating agent: %w", err)
-		}
+	agents, err := createAgents(ctx, config, keys, tracker)
+	if err != nil {
+		return fmt.Errorf("creating agents: %w", err)
 	}
 
 	metricsErrCh, err := metricsServer.Start()
@@ -121,6 +117,21 @@ func fixKeysCount(preFundedKeys []*secp256k1.PrivateKey, target int) ([]*ecdsa.P
 		keys = append(keys, key)
 	}
 	return keys, nil
+}
+
+func createAgents(ctx context.Context, config config, keys []*ecdsa.PrivateKey,
+	tracker *load.Tracker[common.Hash],
+) ([]load.Agent[common.Hash], error) {
+	agents := make([]load.Agent[common.Hash], config.agents)
+	var err error
+	for i := range agents {
+		endpoint := config.endpoints[i%len(config.endpoints)]
+		agents[i], err = createAgent(ctx, endpoint, keys[i], config.issuer, tracker, config.maxFeeCap)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return agents, nil
 }
 
 func createAgent(ctx context.Context, endpoint string, key *ecdsa.PrivateKey,
