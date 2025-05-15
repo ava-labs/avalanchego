@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
-	"github.com/ava-labs/avalanchego/vms/platformvm/api"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -43,7 +43,7 @@ func Aliases(genesisBytes []byte) (map[string][]string, map[ids.ID][]string, err
 		constants.PlatformChainID: PChainAliases,
 	}
 
-	genesis, err := api.Parse(genesisBytes) // TODO let's not re-create genesis to do aliasing
+	genesis, err := genesis.Parse(genesisBytes) // TODO let's not re-create genesis to do aliasing
 	if err != nil {
 		return nil, nil, err
 	}

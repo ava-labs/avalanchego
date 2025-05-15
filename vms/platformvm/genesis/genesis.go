@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package api
+package genesis
 
 import (
 	"cmp"
@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -54,7 +53,7 @@ type Genesis struct {
 
 func Parse(genesisBytes []byte) (*Genesis, error) {
 	gen := &Genesis{}
-	if _, err := genesis.Codec.Unmarshal(genesisBytes, gen); err != nil {
+	if _, err := Codec.Unmarshal(genesisBytes, gen); err != nil {
 		return nil, err
 	}
 	for _, tx := range gen.Validators {
@@ -347,5 +346,5 @@ func NewGenesis(
 
 // Bytes serializes the Genesis to bytes using the PlatformVM genesis codec
 func (g *Genesis) Bytes() ([]byte, error) {
-	return genesis.Codec.Marshal(genesis.CodecVersion, g)
+	return Codec.Marshal(CodecVersion, g)
 }
