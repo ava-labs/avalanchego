@@ -250,7 +250,7 @@ func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 		h.shutdown(ctx, h.clock.Time())
 		return
 	}
-
+	fmt.Println("starting")
 	detachedCtx := context.WithoutCancel(ctx)
 	dispatchSync := func() {
 		h.dispatchSync(detachedCtx)
@@ -336,6 +336,7 @@ func (h *handler) dispatchSync(ctx context.Context) {
 
 	// Handle sync messages from the router
 	for {
+		fmt.Println("handling sync messages")
 		// Get the next message we should process. If the handler is shutting
 		// down, we may fail to pop a message.
 		ctx, msg, ok := h.popUnexpiredMsg(h.syncMessageQueue)
@@ -730,7 +731,8 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		h.p2pTracker.Disconnected(nodeID)
 		return engine.Disconnected(ctx, nodeID)
 	case *p2ppb.Simplex:
-		return engine.(common.SimplexHandler).SimplexMessage(nodeID, msg)
+		fmt.Println("Simplex message, not handled(************)")
+		return engine.(common.SimplexHandler).SimplexMessage(ctx, nodeID, msg)
 
 	default:
 		return fmt.Errorf(

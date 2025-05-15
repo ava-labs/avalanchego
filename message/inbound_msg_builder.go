@@ -276,6 +276,19 @@ func InboundAppRequest(
 	}
 }
 
+func InboundSimplexMessage(
+	chainID ids.ID,
+	nodeID ids.NodeID,
+	simplexMessage *p2p.Simplex,
+) InboundMessage {
+	return &inboundMessage{
+		nodeID: nodeID,
+		op:     SimplexOp,
+		message: simplexMessage,
+		expiration: mockable.MaxTime,
+	}
+}
+
 func InboundAppError(
 	nodeID ids.NodeID,
 	chainID ids.ID,

@@ -32,6 +32,7 @@ var (
 	errAppResponse      = errors.New("unexpectedly called AppResponse")
 	errAppRequestFailed = errors.New("unexpectedly called AppRequestFailed")
 	errAppGossip        = errors.New("unexpectedly called AppGossip")
+	errSimplex        = errors.New("unexpectedly called Simplex")
 
 	_ common.VM = (*VM)(nil)
 )

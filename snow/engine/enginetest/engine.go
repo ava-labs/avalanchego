@@ -6,12 +6,14 @@ package enginetest
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -91,6 +93,7 @@ type Engine struct {
 	CantPullQuery,
 	CantQueryFailed,
 	CantChits,
+	CantSimplex,
 
 	CantConnected,
 	CantDisconnected,
@@ -132,6 +135,7 @@ type Engine struct {
 	AppRequestF              func(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, msg []byte) error
 	AppResponseF             func(ctx context.Context, nodeID ids.NodeID, requestID uint32, msg []byte) error
 	AppGossipF               func(ctx context.Context, nodeID ids.NodeID, msg []byte) error
+	SimplexF 				 func(ctx context.Context, nodeID ids.NodeID, msg *p2p.Simplex) error
 }
 
 func (e *Engine) Default(cant bool) {
@@ -173,6 +177,7 @@ func (e *Engine) Default(cant bool) {
 	e.CantAppResponse = cant
 	e.CantAppGossip = cant
 	e.CantGetVM = cant
+	e.CantSimplex = cant
 }
 
 func (e *Engine) Start(ctx context.Context, startReqID uint32) error {
@@ -564,6 +569,21 @@ func (e *Engine) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32,
 	}
 	return errChits
 }
+
+func (e *Engine) SimplexMessage(ctx context.Context, nodeID ids.NodeID, msg *p2p.Simplex) error {
+	fmt.Println("SimplexMethod called")
+	if e.SimplexF != nil {
+		return e.SimplexF(ctx, nodeID, msg)
+	}
+	if !e.CantSimplex {
+		return nil
+	}
+	if e.T != nil {
+		require.FailNow(e.T, errSimplex.Error())
+	}
+	return errSimplex
+}
+
 
 func (e *Engine) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
 	if e.ConnectedF != nil {

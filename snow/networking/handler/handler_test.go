@@ -6,6 +6,7 @@ package handler
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/p2p"
+
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
@@ -652,4 +654,119 @@ func TestHandlerStartError(t *testing.T) {
 
 	_, err = handler.AwaitStopped(context.Background())
 	require.NoError(err)
+}
+
+
+// Test that messages from the VM are handled
+func TestHandlerRoutesSimplexMessages(t *testing.T) {
+	require := require.New(t)
+
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
+	msgFromVMChan := make(chan common.Message)
+	vdrs := validators.NewManager()
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
+
+	resourceTracker, err := tracker.NewResourceTracker(
+		prometheus.NewRegistry(),
+		resource.NoUsage,
+		meter.ContinuousFactory{},
+		time.Second,
+	)
+	require.NoError(err)
+
+	peerTracker, err := p2p.NewPeerTracker(
+		logging.NoLog{},
+		"",
+		prometheus.NewRegistry(),
+		nil,
+		version.CurrentApp,
+	)
+	require.NoError(err)
+
+	handler, err := New(
+		ctx,
+		vdrs,
+		msgFromVMChan,
+		time.Second,
+		testThreadPoolSize,
+		resourceTracker,
+		subnets.New(ctx.NodeID, subnets.Config{}),
+		commontracker.NewPeers(),
+		peerTracker,
+		prometheus.NewRegistry(),
+		func() {},
+	)
+	require.NoError(err)
+
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine: enginetest.Engine{
+			T: t,
+		},
+	}
+	bootstrapper.Default(false)
+
+	wg := &sync.WaitGroup{}
+	engine := &enginetest.Engine{T: t}
+
+	engine.SimplexF = func(context.Context, ids.NodeID, *p2ppb.Simplex) error {
+		wg.Done()
+		fmt.Println("SimplexF called")
+		return nil
+	}
+
+	engine.Default(false)
+	engine.ContextF = func() *snow.ConsensusContext {
+		return ctx
+	}
+
+	engine.NotifyF = func(context.Context, common.Message) error {
+		wg.Done()
+		return nil
+	}
+
+	handler.SetEngineManager(&EngineManager{
+		Snowman: &Engine{
+			Bootstrapper: bootstrapper,
+			Consensus:    engine,
+		},
+	})
+
+	ctx.State.Set(snow.EngineState{
+		Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
+		State: snow.NormalOp, // assumed bootstrap is done
+	})
+
+	bootstrapper.StartF = func(context.Context, uint32) error {
+		return nil
+	}
+
+	wg.Add(1)
+	handler.Start(context.Background(), false)
+	msgFromVMChan <- 0
+	wg.Wait()
+
+
+	time.Sleep(100 * time.Millisecond)
+
+	simplexMsg := &p2ppb.Simplex{
+		ChainId: ids.Empty[:],
+		Message: &p2ppb.Simplex_ReplicationRequest{
+			ReplicationRequest: &p2ppb.ReplicationRequest{
+				Seqs:        []uint64{1, 2, 3},
+				LatestRound: 1,
+			},
+		},
+	}
+	
+	msg := Message{
+		EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
+		InboundMessage: message.InboundSimplexMessage(ids.Empty, ids.EmptyNodeID, simplexMsg),
+	}
+
+	wg.Add(1)
+	handler.Push(context.Background(), msg)
+	wg.Wait()
+
+	time.Sleep(100 * time.Millisecond)
 }
