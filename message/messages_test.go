@@ -17,14 +17,12 @@ import (
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/compression"
-	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 func TestMessage(t *testing.T) {
 	t.Parallel()
 
 	mb, err := newMsgBuilder(
-		logging.NoLog{},
 		prometheus.NewRegistry(),
 		5*time.Second,
 	)
@@ -661,7 +659,6 @@ func TestInboundMessageToString(t *testing.T) {
 	require := require.New(t)
 
 	mb, err := newMsgBuilder(
-		logging.NoLog{},
 		prometheus.NewRegistry(),
 		5*time.Second,
 	)
@@ -691,7 +688,6 @@ func TestEmptyInboundMessage(t *testing.T) {
 	require := require.New(t)
 
 	mb, err := newMsgBuilder(
-		logging.NoLog{},
 		prometheus.NewRegistry(),
 		5*time.Second,
 	)
@@ -711,7 +707,6 @@ func TestNilInboundMessage(t *testing.T) {
 	require := require.New(t)
 
 	mb, err := newMsgBuilder(
-		logging.NoLog{},
 		prometheus.NewRegistry(),
 		5*time.Second,
 	)

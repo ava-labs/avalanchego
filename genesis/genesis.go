@@ -298,8 +298,6 @@ func FromFlag(networkID uint32, genesisContent string, stakingCfg *StakingConfig
 func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	hrp := constants.GetHRP(config.NetworkID)
 
-	amount := uint64(0)
-
 	// Specify the genesis state of the AVM
 	avmArgs := avm.BuildGenesisArgs{
 		NetworkID: json.Uint32(config.NetworkID),
@@ -332,7 +330,6 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 				Address: addr,
 			})
 			memoBytes = append(memoBytes, allocation.ETHAddr.Bytes()...)
-			amount += allocation.InitialAmount
 		}
 
 		var err error
@@ -402,7 +399,6 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 						Message:  msgStr,
 					},
 				)
-				amount += unlock.Amount
 			}
 		}
 	}
@@ -437,7 +433,6 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 					Address:  addr,
 					Message:  msgStr,
 				})
-				amount += unlock.Amount
 			}
 		}
 
