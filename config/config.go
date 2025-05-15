@@ -680,28 +680,23 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 		config.RewardConfig.SupplyCap = v.GetUint64(StakeSupplyCapKey)
 		config.MinDelegationFee = v.GetUint32(MinDelegatorFeeKey)
 
-		var err error
 		switch {
 		case config.UptimeRequirement < 0 || config.UptimeRequirement > 1:
-			err = errInvalidUptimeRequirement
+			return node.StakingConfig{}, errInvalidUptimeRequirement
 		case config.MinValidatorStake > config.MaxValidatorStake:
-			err = errMinValidatorStakeAboveMax
+			return node.StakingConfig{}, errMinValidatorStakeAboveMax
 		case config.MinDelegationFee > 1_000_000:
-			err = errInvalidDelegationFee
+			return node.StakingConfig{}, errInvalidDelegationFee
 		case config.MinStakeDuration <= 0:
-			err = errInvalidMinStakeDuration
+			return node.StakingConfig{}, errInvalidMinStakeDuration
 		case config.MaxStakeDuration < config.MinStakeDuration:
-			err = errMinStakeDurationAboveMax
+			return node.StakingConfig{}, errMinStakeDurationAboveMax
 		case config.RewardConfig.MaxConsumptionRate > reward.PercentDenominator:
-			err = errStakeMaxConsumptionTooLarge
+			return node.StakingConfig{}, errStakeMaxConsumptionTooLarge
 		case config.RewardConfig.MaxConsumptionRate < config.RewardConfig.MinConsumptionRate:
-			err = errStakeMaxConsumptionBelowMin
+			return node.StakingConfig{}, errStakeMaxConsumptionBelowMin
 		case config.RewardConfig.MintingPeriod < config.MaxStakeDuration:
-			err = errStakeMintingPeriodBelowMin
-		}
-
-		if err != nil {
-			return node.StakingConfig{}, err
+			return node.StakingConfig{}, errStakeMintingPeriodBelowMin
 		}
 	} else {
 		config.StakingConfig = genesis.GetStakingConfig(networkID)
@@ -1377,8 +1372,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	genesisStakingCfg := nodeConfig.StakingConfig.StakingConfig
 	nodeConfig.GenesisBytes, nodeConfig.AvaxAssetID, err = getGenesisData(v, nodeConfig.NetworkID, &genesisStakingCfg)
 	if err != nil {
-		err = fmt.Errorf("unable to load genesis file: %w", err)
-		return node.Config{}, err
+		return node.Config{}, fmt.Errorf("unable to load genesis file: %w", err)
 	}
 
 	// StateSync Configs
@@ -1396,8 +1390,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	// Chain Configs
 	nodeConfig.ChainConfigs, err = getChainConfigs(v)
 	if err != nil {
-		err = fmt.Errorf("couldn't read chain configs: %w", err)
-		return node.Config{}, err
+		return node.Config{}, fmt.Errorf("couldn't read chain configs: %w", err)
 	}
 
 	// Profiler

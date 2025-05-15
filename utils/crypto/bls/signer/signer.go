@@ -22,8 +22,6 @@ var (
 )
 
 // GetStakingSigner returns a BLS signer based on the provided configuration.
-// Valdiation should be done on the config before calling this function so that at most one of the
-// ephemeralSignerEnabled, signerKeyRawContent, stakingSignerPath, or stakingSignerRPC is set.
 func GetStakingSigner(
 	config interface{},
 ) (bls.Signer, error) {
