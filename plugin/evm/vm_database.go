@@ -5,16 +5,20 @@ package evm
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/ava-labs/avalanchego/config/node"
+	"github.com/ava-labs/avalanchego/api/metrics"
 	avalanchedatabase "github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/factory"
+	"github.com/ava-labs/avalanchego/database/pebbledb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
-	avalancheconstants "github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/log"
@@ -22,13 +26,33 @@ import (
 	"github.com/ava-labs/subnet-evm/plugin/evm/database"
 )
 
+const (
+	dbMetricsPrefix = "db"
+	meterDBGatherer = "meterdb"
+)
+
+type DatabaseConfig struct {
+	// If true, all writes are to memory and are discarded at shutdown.
+	ReadOnly bool `json:"readOnly"`
+
+	// Path to database
+	Path string `json:"path"`
+
+	// Name of the database type to use
+	Name string `json:"name"`
+
+	// Config bytes (JSON) for the database
+	// See relevant (pebbledb, leveldb) config options
+	Config []byte `json:"-"`
+}
+
 // initializeDBs initializes the databases used by the VM.
 // If [useStandaloneDB] is true, the chain will use a standalone database for its state.
 // Otherwise, the chain will use the provided [avaDB] for its state.
 func (vm *VM) initializeDBs(avaDB avalanchedatabase.Database) error {
 	db := avaDB
 	// skip standalone database initialization if we are running in unit tests
-	if vm.ctx.NetworkID != avalancheconstants.UnitTestID {
+	if vm.ctx.NetworkID != constants.UnitTestID {
 		// first initialize the accepted block database to check if we need to use a standalone database
 		acceptedDB := prefixdb.New(acceptedPrefix, avaDB)
 		useStandAloneDB, err := vm.useStandaloneDatabase(acceptedDB)
@@ -43,7 +67,7 @@ func (vm *VM) initializeDBs(avaDB avalanchedatabase.Database) error {
 				return err
 			}
 			log.Info("Using standalone database for the chain state", "DatabaseConfig", dbConfig)
-			db, err = database.NewStandaloneDatabase(dbConfig, vm.ctx.Metrics, vm.ctx.Log)
+			db, err = newStandaloneDatabase(dbConfig, vm.ctx.Metrics, vm.ctx.Log)
 			if err != nil {
 				return err
 			}
@@ -111,7 +135,7 @@ func (vm *VM) useStandaloneDatabase(acceptedDB avalanchedatabase.Database) (bool
 
 // getDatabaseConfig returns the database configuration for the chain
 // to be used by separate, standalone database.
-func getDatabaseConfig(config config.Config, chainDataDir string) (node.DatabaseConfig, error) {
+func getDatabaseConfig(config config.Config, chainDataDir string) (DatabaseConfig, error) {
 	var (
 		configBytes []byte
 		err         error
@@ -120,13 +144,13 @@ func getDatabaseConfig(config config.Config, chainDataDir string) (node.Database
 		dbConfigContent := config.DatabaseConfigContent
 		configBytes, err = base64.StdEncoding.DecodeString(dbConfigContent)
 		if err != nil {
-			return node.DatabaseConfig{}, fmt.Errorf("unable to decode base64 content: %w", err)
+			return DatabaseConfig{}, fmt.Errorf("unable to decode base64 content: %w", err)
 		}
 	} else if len(config.DatabaseConfigFile) != 0 {
 		configPath := config.DatabaseConfigFile
 		configBytes, err = os.ReadFile(configPath)
 		if err != nil {
-			return node.DatabaseConfig{}, err
+			return DatabaseConfig{}, err
 		}
 	}
 
@@ -135,7 +159,7 @@ func getDatabaseConfig(config config.Config, chainDataDir string) (node.Database
 		dbPath = config.DatabasePath
 	}
 
-	return node.DatabaseConfig{
+	return DatabaseConfig{
 		Name:     config.DatabaseType,
 		ReadOnly: config.DatabaseReadOnly,
 		Path:     dbPath,
@@ -171,4 +195,44 @@ func inspectDB(db avalanchedatabase.Database, label string) error {
 	// Display the database statistic.
 	log.Info("Database statistics", "label", label, "total", total.String(), "count", count)
 	return nil
+}
+
+func newStandaloneDatabase(dbConfig DatabaseConfig, gatherer metrics.MultiGatherer, logger logging.Logger) (avalanchedatabase.Database, error) {
+	dbPath := filepath.Join(dbConfig.Path, dbConfig.Name)
+
+	dbConfigBytes := dbConfig.Config
+	// If the database is pebble, we need to set the config
+	// to use no sync. Sync mode in pebble has an issue with OSs like MacOS.
+	if dbConfig.Name == pebbledb.Name {
+		cfg := pebbledb.DefaultConfig
+		// Default to "no sync" for pebble db
+		cfg.Sync = false
+		if len(dbConfigBytes) > 0 {
+			if err := json.Unmarshal(dbConfigBytes, &cfg); err != nil {
+				return nil, err
+			}
+		}
+		var err error
+		// Marshal the config back to bytes to ensure that new defaults are applied
+		dbConfigBytes, err = json.Marshal(cfg)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	db, err := factory.New(
+		dbConfig.Name,
+		dbPath,
+		dbConfig.ReadOnly,
+		dbConfigBytes,
+		gatherer,
+		logger,
+		dbMetricsPrefix,
+		meterDBGatherer,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't create database: %w", err)
+	}
+
+	return db, nil
 }
