@@ -75,3 +75,8 @@ func (s *LocalSigner) Sign(msg []byte) (*bls.Signature, error) {
 func (s *LocalSigner) SignProofOfPossession(msg []byte) (*bls.Signature, error) {
 	return new(bls.Signature).Sign(s.sk, msg, bls.CiphersuiteProofOfPossession.Bytes()), nil
 }
+
+// Sign [msg] to prove the ownership
+func (s *LocalSigner) Shutdown() error {
+	return nil
+}
