@@ -5,7 +5,7 @@ set -euo pipefail
 
 # Ensure required tools are installed
 if ! command -v solc &> /dev/null; then
-  echo "Error: solc installation failed. Run this command within Nix shell."
+  echo "Error: solc not found. Run this command within Nix shell."
   exit 1
 fi
 
