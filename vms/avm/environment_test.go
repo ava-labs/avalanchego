@@ -89,7 +89,9 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		genesisData = makeDefaultGenesisData(tb)
 	}
 
-	genesisBytes, err := NewGenesisBytes(networkID, genesisData)
+	genesis, err := NewGenesis(networkID, genesisData)
+	require.NoError(err)
+	genesisBytes, err := genesis.Bytes()
 	require.NoError(err)
 
 	ctx := snowtest.Context(tb, snowtest.XChainID)
@@ -219,10 +221,12 @@ func getCreateTxFromGenesisTest(tb testing.TB, genesisBytes []byte, assetName st
 func newGenesisBytesTest(tb testing.TB) []byte {
 	require := require.New(tb)
 	genesisData := makeDefaultGenesisData(tb)
-	b, err := NewGenesisBytes(
+	genesis, err := NewGenesis(
 		constants.UnitTestID,
 		genesisData,
 	)
+	require.NoError(err)
+	b, err := genesis.Bytes()
 	require.NoError(err)
 	require.NotEmpty(b)
 	return b

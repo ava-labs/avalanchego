@@ -11,9 +11,54 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-func TestNewGenesisBytesInvalidUTXOBalance(t *testing.T) {
+func createTestGenesis(t *testing.T) *Genesis {
+	require := require.New(t)
+
+	nodeID := ids.BuildTestNodeID([]byte{1})
+	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
+	require.NoError(err)
+
+	validator := GenesisPermissionlessValidator{
+		GenesisValidator: GenesisValidator{
+			StartTime: 0,
+			EndTime:   20,
+			NodeID:    nodeID,
+		},
+		RewardOwner: &GenesisOwner{
+			Threshold: 1,
+			Addresses: []string{addr},
+		},
+		Staked: []Allocation{{
+			Amount:  987654321,
+			Address: addr,
+		}},
+	}
+
+	genesis, err := NewGenesis(
+		ids.ID{'d', 'u', 'm', 'm', 'y', ' ', 'I', 'D'},
+		constants.UnitTestID,
+		[]Allocation{
+			{
+				Address: addr,
+				Amount:  123456789,
+			},
+		},
+		[]GenesisPermissionlessValidator{validator},
+		nil,
+		5,
+		0,
+		"Test Genesis",
+	)
+	require.NoError(err)
+
+	return genesis
+}
+
+func TestNewGenesisInvalidUTXOBalance(t *testing.T) {
 	require := require.New(t)
 	nodeID := ids.BuildTestNodeID([]byte{1, 2, 3})
 	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
@@ -40,7 +85,7 @@ func TestNewGenesisBytesInvalidUTXOBalance(t *testing.T) {
 		}},
 	}
 
-	result, err := NewGenesisBytes(
+	genesis, err := NewGenesis(
 		ids.Empty,
 		constants.UnitTestID,
 		[]Allocation{utxo},
@@ -51,10 +96,10 @@ func TestNewGenesisBytesInvalidUTXOBalance(t *testing.T) {
 		"",
 	)
 	require.ErrorIs(err, errUTXOHasNoValue)
-	require.Empty(result)
+	require.Nil(genesis)
 }
 
-func TestNewGenesisBytesInvalidStakeWeight(t *testing.T) {
+func TestNewGenesisInvalidStakeWeight(t *testing.T) {
 	require := require.New(t)
 	nodeID := ids.BuildTestNodeID([]byte{1, 2, 3})
 	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
@@ -81,7 +126,7 @@ func TestNewGenesisBytesInvalidStakeWeight(t *testing.T) {
 		}},
 	}
 
-	result, err := NewGenesisBytes(
+	genesis, err := NewGenesis(
 		ids.Empty,
 		0,
 		[]Allocation{utxo},
@@ -92,10 +137,10 @@ func TestNewGenesisBytesInvalidStakeWeight(t *testing.T) {
 		"",
 	)
 	require.ErrorIs(err, errValidatorHasNoWeight)
-	require.Empty(result)
+	require.Nil(genesis)
 }
 
-func TestNewGenesisBytesInvalidEndtime(t *testing.T) {
+func TestNewGenesisInvalidEndtime(t *testing.T) {
 	require := require.New(t)
 	nodeID := ids.BuildTestNodeID([]byte{1, 2, 3})
 	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
@@ -123,7 +168,7 @@ func TestNewGenesisBytesInvalidEndtime(t *testing.T) {
 		}},
 	}
 
-	result, err := NewGenesisBytes(
+	genesis, err := NewGenesis(
 		ids.Empty,
 		constants.UnitTestID,
 		[]Allocation{utxo},
@@ -134,10 +179,53 @@ func TestNewGenesisBytesInvalidEndtime(t *testing.T) {
 		"",
 	)
 	require.ErrorIs(err, errValidatorAlreadyExited)
-	require.Empty(result)
+	require.Nil(genesis)
 }
 
-func TestNewGenesisBytesReturnsSortedValidators(t *testing.T) {
+func TestGenesisBytes(t *testing.T) {
+	require := require.New(t)
+	genesis := createTestGenesis(t)
+	bytes, err := genesis.Bytes()
+	require.NoError(err)
+	require.NotEmpty(bytes)
+}
+
+func TestGenesis(t *testing.T) {
+	require := require.New(t)
+	genesis := createTestGenesis(t)
+
+	avaxAssetID := ids.ID{'d', 'u', 'm', 'm', 'y', ' ', 'I', 'D'}
+	nodeID := ids.BuildTestNodeID([]byte{1})
+	require.Equal("Test Genesis", genesis.Message)
+
+	// Validate allocations
+	require.Len(genesis.UTXOs, 1)
+	utxo := genesis.UTXOs[0]
+	require.Equal(avaxAssetID, utxo.Asset.ID)
+	output, ok := utxo.Out.(*secp256k1fx.TransferOutput)
+	require.True(ok)
+	require.Equal(uint64(123456789), output.Amt)
+	require.Len(output.OutputOwners.Addrs, 1)
+
+	// Validate validator
+	require.Len(genesis.Validators, 1)
+	validator := genesis.Validators[0]
+	txValidator, ok := validator.Unsigned.(*txs.AddValidatorTx)
+	require.True(ok)
+	require.Equal(nodeID, txValidator.Validator.NodeID)
+	require.Equal(uint64(20), txValidator.Validator.End)
+	require.Len(txValidator.StakeOuts, 1)
+	stakeOut := txValidator.StakeOuts[0]
+	stakeOutput, ok := stakeOut.Out.(*secp256k1fx.TransferOutput)
+	require.True(ok)
+	require.Equal(uint64(987654321), stakeOutput.Amt)
+
+	require.Empty(genesis.Chains)
+	require.Equal(uint64(5), genesis.Timestamp)
+	require.Equal(uint64(0), genesis.InitialSupply)
+}
+
+func TestNewGenesisReturnsSortedValidators(t *testing.T) {
 	require := require.New(t)
 	nodeID := ids.BuildTestNodeID([]byte{1})
 	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
@@ -198,7 +286,7 @@ func TestNewGenesisBytesReturnsSortedValidators(t *testing.T) {
 	}
 
 	avaxAssetID := ids.ID{'d', 'u', 'm', 'm', 'y', ' ', 'I', 'D'}
-	genesisBytes, err := NewGenesisBytes(
+	genesis, err := NewGenesis(
 		avaxAssetID,
 		constants.UnitTestID,
 		[]Allocation{allocation},
@@ -213,12 +301,10 @@ func TestNewGenesisBytesReturnsSortedValidators(t *testing.T) {
 		"",
 	)
 	require.NoError(err)
-	require.NotEmpty(genesisBytes)
-	genesis, err := Parse(genesisBytes)
+	genesisBytes, err := genesis.Bytes()
 	require.NoError(err)
-
-	validators := genesis.Validators
-	require.Len(validators, 3)
+	require.NotEmpty(genesisBytes)
+	require.Len(genesis.Validators, 3)
 }
 
 func TestAllocationCompare(t *testing.T) {

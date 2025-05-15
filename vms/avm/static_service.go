@@ -7,6 +7,7 @@ import (
 	"cmp"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
@@ -81,28 +82,13 @@ type Owners struct {
 	Minters   []string
 }
 
-// NewGenesisBytes creates a new genesis bytes from genesis data
-func NewGenesisBytes(
+// NewGenesis creates a new Genesis from genesis data
+func NewGenesis(
 	networkID uint32,
 	genesisData map[string]AssetDefinition,
-) ([]byte, error) {
-	parser, err := txs.NewParser(
-		[]fxs.Fx{
-			&secp256k1fx.Fx{},
-			&nftfx.Fx{},
-			&propertyfx.Fx{},
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	g := Genesis{}
-	genesisCodec := parser.GenesisCodec()
+) (*Genesis, error) {
+	g := &Genesis{}
 	for assetAlias, assetDefinition := range genesisData {
-		if err != nil {
-			return nil, fmt.Errorf("problem formatting asset definition memo due to: %w", err)
-		}
 		asset := GenesisAsset{
 			Alias: assetAlias,
 			CreateAssetTx: txs.CreateAssetTx{
@@ -120,51 +106,51 @@ func NewGenesisBytes(
 		initialState := &txs.InitialState{
 			FxIndex: 0, // TODO: Should lookup secp256k1fx FxID
 		}
-		if len(assetDefinition.InitialState.FixedCap) > 0 {
-			for _, holder := range assetDefinition.InitialState.FixedCap {
-				_, addrbuff, err := address.ParseBech32(holder.Address)
-				if err != nil {
-					return nil, fmt.Errorf("problem parsing holder address: %w", err)
-				}
-				addr, err := ids.ToShortID(addrbuff)
-				if err != nil {
-					return nil, fmt.Errorf("problem parsing holder address: %w", err)
-				}
-				initialState.Outs = append(initialState.Outs, &secp256k1fx.TransferOutput{
-					Amt: holder.Amount,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{addr},
-					},
-				})
+		for _, holder := range assetDefinition.InitialState.FixedCap {
+			_, addrbuff, err := address.ParseBech32(holder.Address)
+			if err != nil {
+				return nil, fmt.Errorf("problem parsing holder address: %w", err)
 			}
+			addr, err := ids.ToShortID(addrbuff)
+			if err != nil {
+				return nil, fmt.Errorf("problem parsing holder address: %w", err)
+			}
+			initialState.Outs = append(initialState.Outs, &secp256k1fx.TransferOutput{
+				Amt: holder.Amount,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{addr},
+				},
+			})
 		}
-		if len(assetDefinition.InitialState.VariableCap) > 0 {
-			for _, owners := range assetDefinition.InitialState.VariableCap {
-				out := &secp256k1fx.MintOutput{
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-					},
-				}
-				for _, addrStr := range owners.Minters {
-					_, addrBytes, err := address.ParseBech32(addrStr)
-					if err != nil {
-						return nil, fmt.Errorf("problem parsing minters address: %w", err)
-					}
-					addr, err := ids.ToShortID(addrBytes)
-					if err != nil {
-						return nil, fmt.Errorf("problem parsing minters address: %w", err)
-					}
-					out.Addrs = append(out.Addrs, addr)
-				}
-				out.Sort()
-
-				initialState.Outs = append(initialState.Outs, out)
+		for _, owners := range assetDefinition.InitialState.VariableCap {
+			out := &secp256k1fx.MintOutput{
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+				},
 			}
+			for _, addrStr := range owners.Minters {
+				_, addrBytes, err := address.ParseBech32(addrStr)
+				if err != nil {
+					return nil, fmt.Errorf("problem parsing minters address: %w", err)
+				}
+				addr, err := ids.ToShortID(addrBytes)
+				if err != nil {
+					return nil, fmt.Errorf("problem parsing minters address: %w", err)
+				}
+				out.Addrs = append(out.Addrs, addr)
+			}
+			out.Sort()
+
+			initialState.Outs = append(initialState.Outs, out)
 		}
 
 		if len(initialState.Outs) > 0 {
-			initialState.Sort(genesisCodec)
+			codec, err := newGenesisCodec()
+			if err != nil {
+				return nil, err
+			}
+			initialState.Sort(codec)
 			asset.States = append(asset.States, initialState)
 		}
 
@@ -173,9 +159,28 @@ func NewGenesisBytes(
 	}
 	utils.Sort(g.Txs)
 
-	genesisBytes, err := genesisCodec.Marshal(txs.CodecVersion, &g)
+	return g, nil
+}
+
+// Bytes serializes the Genesis to bytes using the AVM genesis codec
+func (g *Genesis) Bytes() ([]byte, error) {
+	codec, err := newGenesisCodec()
 	if err != nil {
-		return nil, fmt.Errorf("problem marshaling genesis: %w", err)
+		return nil, err
 	}
-	return genesisBytes, nil
+	return codec.Marshal(txs.CodecVersion, g)
+}
+
+func newGenesisCodec() (codec.Manager, error) {
+	parser, err := txs.NewParser(
+		[]fxs.Fx{
+			&secp256k1fx.Fx{},
+			&nftfx.Fx{},
+			&propertyfx.Fx{},
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("problem creating parser: %w", err)
+	}
+	return parser.GenesisCodec(), nil
 }

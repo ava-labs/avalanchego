@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm"
@@ -26,7 +25,6 @@ import (
 )
 
 const (
-	defaultEncoding    = formatting.Hex
 	configChainIDAlias = "X"
 )
 
@@ -326,8 +324,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	}
 	avax.Memo = memoBytes
 
-	var err error
-	avmGenesis, err := avm.NewGenesisBytes(
+	avmGenesis, err := avm.NewGenesis(
 		config.NetworkID,
 		map[string]avm.AssetDefinition{
 			"AVAX": avax, // The AVM starts out with one asset: AVAX
@@ -336,8 +333,12 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	if err != nil {
 		return nil, ids.Empty, err
 	}
+	avmGenesisBytes, err := avmGenesis.Bytes()
+	if err != nil {
+		return nil, ids.Empty, err
+	}
 
-	avaxAssetID, err := AVAXAssetID(avmGenesis)
+	avaxAssetID, err := AVAXAssetID(avmGenesisBytes)
 	if err != nil {
 		return nil, ids.Empty, fmt.Errorf("couldn't generate AVAX asset ID: %w", err)
 	}
@@ -427,7 +428,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	}
 	chains := []api.Chain{
 		{
-			GenesisData: avmGenesis,
+			GenesisData: avmGenesisBytes,
 			SubnetID:    constants.PrimaryNetworkID,
 			VMID:        constants.AVMID,
 			FxIDs: []ids.ID{
@@ -445,7 +446,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		},
 	}
 
-	pChainGenesis, err := api.NewGenesisBytes(
+	pChainGenesis, err := api.NewGenesis(
 		avaxAssetID,
 		config.NetworkID,
 		platformAllocations,
@@ -458,8 +459,11 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	if err != nil {
 		return nil, ids.Empty, fmt.Errorf("problem while building platform chain's genesis state: %w", err)
 	}
-
-	return pChainGenesis, avaxAssetID, nil
+	pChainGenesisBytes, err := pChainGenesis.Bytes()
+	if err != nil {
+		return nil, ids.Empty, fmt.Errorf("problem while serializing platform chain's genesis state: %w", err)
+	}
+	return pChainGenesisBytes, avaxAssetID, nil
 }
 
 func splitAllocations(allocations []Allocation, numSplits int) [][]Allocation {

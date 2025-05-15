@@ -149,7 +149,7 @@ func bech32ToID(addrStr string) (ids.ShortID, error) {
 	return ids.ToShortID(addrBytes)
 }
 
-// NewGenesisBytes builds the genesis state of the P-Chain (and thereby the Avalanche network.)
+// NewGenesis builds the genesis state of the P-Chain (and thereby the Avalanche network.)
 // [avaxAssetID] is the ID of the AVAX asset
 // [networkID] is the ID of the network
 // [allocations] are the UTXOs on the Platform Chain that exist at genesis.
@@ -158,8 +158,7 @@ func bech32ToID(addrStr string) (ids.ShortID, error) {
 // [time] is the Platform Chain's time at network genesis.
 // [initialSupply] is the initial supply of the AVAX asset.
 // [message] is the message to be sent to the genesis UTXOs.
-// [encoding] is the encoding of the message & chains genesis data.
-func NewGenesisBytes(
+func NewGenesis(
 	avaxAssetID ids.ID,
 	networkID uint32,
 	allocations []Allocation,
@@ -168,7 +167,7 @@ func NewGenesisBytes(
 	time uint64,
 	initialSupply uint64,
 	message string,
-) ([]byte, error) {
+) (*Genesis, error) {
 	// Specify the UTXOs on the Platform chain that exist at genesis
 	utxos := make([]*GenesisUTXO, 0, len(allocations))
 	for i, allocation := range allocations {
@@ -334,8 +333,7 @@ func NewGenesisBytes(
 
 	validatorTxs := vdrs.List()
 
-	// genesis holds the genesis state
-	g := Genesis{
+	g := &Genesis{
 		UTXOs:         utxos,
 		Validators:    validatorTxs,
 		Chains:        chainsTxs,
@@ -344,10 +342,10 @@ func NewGenesisBytes(
 		Message:       message,
 	}
 
-	// Marshal genesis to bytes
-	genesisBytes, err := genesis.Codec.Marshal(genesis.CodecVersion, g)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't marshal genesis: %w", err)
-	}
-	return genesisBytes, nil
+	return g, nil
+}
+
+// Bytes serializes the Genesis to bytes using the PlatformVM genesis codec
+func (g *Genesis) Bytes() ([]byte, error) {
+	return genesis.Codec.Marshal(genesis.CodecVersion, g)
 }
