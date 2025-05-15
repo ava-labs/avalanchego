@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txheap"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/vms/types"
 )
 
 // Note that since an Avalanche network has exactly one Platform Chain,
@@ -72,16 +73,11 @@ func (utxo UTXO) Compare(other UTXO) int {
 	return utxoAddr.Compare(otherAddr)
 }
 
-// TODO: Refactor APIStaker, APIValidators and merge them together for
-//       PermissionedValidators + PermissionlessValidators.
-
-// APIStaker is the representation of a staker sent via APIs.
+// Staker is the representation of a staker sent via APIs.
 // [TxID] is the txID of the transaction that added this staker.
-// [Amount] is the amount of tokens being staked.
-// [StartTime] is the Unix time when they start staking
 // [Endtime] is the Unix time repr. of when they are done staking
 // [NodeID] is the node ID of the staker
-// [Uptime] is the observed uptime of this staker
+// [Weight] is the validator weight (stake) when sampling validators
 type Staker struct {
 	TxID      ids.ID      `json:"txID"`
 	StartTime json.Uint64 `json:"startTime"`
@@ -100,13 +96,33 @@ type Owner struct {
 	Addresses []string    `json:"addresses"`
 }
 
+// APIL1Validator is the representation of a L1 validator sent over APIs.
+type APIL1Validator struct {
+	NodeID    ids.NodeID  `json:"nodeID"`
+	Weight    json.Uint64 `json:"weight"`
+	StartTime json.Uint64 `json:"startTime"`
+	BaseL1Validator
+}
+
+// BaseL1Validator is the representation of a base L1 validator without the common parts with a staker.
+type BaseL1Validator struct {
+	ValidationID *ids.ID `json:"validationID,omitempty"`
+	// PublicKey is the compressed BLS public key of the validator
+	PublicKey             *types.JSONByteSlice `json:"publicKey,omitempty"`
+	RemainingBalanceOwner *Owner               `json:"remainingBalanceOwner,omitempty"`
+	DeactivationOwner     *Owner               `json:"deactivationOwner,omitempty"`
+	MinNonce              *json.Uint64         `json:"minNonce,omitempty"`
+	// Balance is the remaining amount of AVAX this L1 validator has for paying
+	// the continuous fee, according to the last accepted state. If the
+	// validator is inactive, the balance will be 0.
+	Balance *json.Uint64 `json:"balance,omitempty"`
+}
+
 // PermissionlessValidator is the repr. of a permissionless validator sent over
 // APIs.
 type PermissionlessValidator struct {
 	Staker
-	// Deprecated: RewardOwner has been replaced by ValidationRewardOwner and
-	//             DelegationRewardOwner.
-	RewardOwner *Owner `json:"rewardOwner,omitempty"`
+	BaseL1Validator
 	// The owner of the rewards from the validation period, if applicable.
 	ValidationRewardOwner *Owner `json:"validationRewardOwner,omitempty"`
 	// The owner of the rewards from delegations during the validation period,
