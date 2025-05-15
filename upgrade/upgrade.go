@@ -74,6 +74,8 @@ var (
 		DurangoTime:                  InitiallyActiveTime,
 		EtnaTime:                     InitiallyActiveTime,
 		FortunaTime:                  InitiallyActiveTime,
+		GUpgradeTime:                 InitiallyActiveTime,
+		GUpgradeEpochDuration:        30,
 	}
 
 	ErrInvalidUpgradeTimes = errors.New("invalid upgrade configuration")
@@ -95,6 +97,8 @@ type Config struct {
 	DurangoTime                  time.Time `json:"durangoTime"`
 	EtnaTime                     time.Time `json:"etnaTime"`
 	FortunaTime                  time.Time `json:"fortunaTime"`
+	GUpgradeTime                 time.Time `json:"gUpgradeTime"`
+	GUpgradeEpochDuration        uint64    `json:"gUpgradeEpochDuration"`
 }
 
 func (c *Config) Validate() error {
@@ -177,6 +181,10 @@ func (c *Config) IsEtnaActivated(t time.Time) bool {
 
 func (c *Config) IsFortunaActivated(t time.Time) bool {
 	return !t.Before(c.FortunaTime)
+}
+
+func (c *Config) IsGUpgradeActivated(t time.Time) bool {
+	return !t.Before(c.GUpgradeTime)
 }
 
 func GetConfig(networkID uint32) Config {
