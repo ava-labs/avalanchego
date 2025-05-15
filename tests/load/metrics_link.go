@@ -37,7 +37,7 @@ var (
 		specReport := ginkgo.CurrentSpecReport()
 		startTimeMs := specReport.StartTime.UnixMilli()
 
-		grafanaLink := tmpnet.BuildMetricsLinkForNetwork(dashboardID, dashboardName, env.GetNetwork().UUID, &tmpnet.GrafanaFilterOptions{
+		grafanaLink := tmpnet.BuildMetricsURLForNetwork(dashboardID, dashboardName, env.GetNetwork().UUID, &tmpnet.GrafanaFilterOptions{
 			StartTime: strconv.FormatInt(startTimeMs, 10),
 			EndTime:   strconv.FormatInt(time.Now().Add(tmpnet.NetworkShutdownDelay).UnixMilli(), 10),
 		})

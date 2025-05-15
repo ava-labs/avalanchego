@@ -1072,7 +1072,7 @@ type GrafanaFilterOptions struct {
 	Filters   map[string]string
 }
 
-func BuildMetricsLinkForNetwork(dashboardID, dashboardName, networkUUID string, options *GrafanaFilterOptions) string {
+func BuildMetricsURLForNetwork(dashboardID, dashboardName, networkUUID string, options *GrafanaFilterOptions) string {
 	// Set defaults for options if not provided
 	startTime := "now-1h"
 	if options.StartTime != "" {
