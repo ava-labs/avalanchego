@@ -2,7 +2,6 @@ name: ci
 
 on:
   pull_request:
-    branches: ['*']
   push:
     branches: [main]
 
@@ -106,7 +105,10 @@ jobs:
 
   ffi:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable

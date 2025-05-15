@@ -1,13 +1,52 @@
-# A firewood golang interface
+# Firewood Golang FFI
 
-This allows calling into firewood from golang
+The FFI package provides a golang FFI layer for Firewood.
 
-## Building
+## Building Firewood Golang FFI
 
-First, build the release version (`cargo build --release`). This creates the ffi
-interface file "firewood.h" as a side effect.
+The Golang FFI layer uses a CGO directive to locate a C-API compatible binary built from Firewood. Firewood supports both seamless local development and a single-step compilation process for Go projects that depend or transitively depend on Firewood.
 
-Then, you can run the tests in go, using `go test .`
+To do this, [firewood.go](./firewood.go) includes CGO directives to include multiple search paths for the Firewood binary in the local `target/` build directory and `ffi/libs`. For the latter, [attach-static-libs](../.github/workflows/attach-static-libs.yaml) GitHub Action pushes an FFI package with static libraries attached for the following supported architectures:
+
+- x86_64-unknown-linux-gnu
+- aarch64-unknown-linux-gnu
+- aarch64-apple-darwin
+- x86_64-apple-darwin
+
+to a separate repo [firewood-go](https://github.com/ava-labs/firewood-go) (to avoid including binaries in the Firewood repo).
+
+### Local Development
+
+[firewood.go](./firewood.go) includes CGO directives to include builds in the `target/` directory.
+
+Firewood prioritizes builds in the following order:
+
+1. maxperf
+2. release
+3. debug
+
+To use and test the Firewood FFI locally, you can run:
+
+```bash
+cargo build --profile maxperf
+cd ffi
+go test
+```
+
+To use a local build of Firewood for a project that depends on Firewood, you must redirect the `go.mod` to use the local version of Firewood FFI, for example:
+
+```bash
+go mod edit -replace github.com/ava-labs/firewood-go/ffi=/path/to/firewood/ffi
+go mod tidy
+```
+
+### Production Development Flow
+
+Firewood pushes the FFI source code and attached static libraries to [firewood-go](https://github.com/ava-labs/firewood-go) via [attach-static-libs](../.github/workflows/attach-static-libs.yaml).
+
+This enables consumers to utilize it directly without forcing them to compile Firewood locally. Go programs running on supported architectures can utilize `firewood-go/ffi` just like any other dependency.
+
+To trigger this build, [attach-static-libs](../.github/workflows/attach-static-libs.yaml) supports triggers for both manual GitHub Actions and tags, so you can create a mirror branch/tag on [firewood-go](https://github.com/ava-labs/firewood-go) by either trigger a manual GitHub Action and selecting your branch or pushing a tag to Firewood.
 
 ## Development
 Iterative building is unintuitive for the ffi and some common sources of confusion are listed below.
