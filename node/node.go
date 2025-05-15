@@ -126,17 +126,12 @@ func New(
 		return nil, fmt.Errorf("invalid staking certificate: %w", err)
 	}
 
-	stakingSigner, err := blssigner.GetStakingSigner(
-		config.StakingSignerConfig,
-	)
-
 	n := &Node{
 		Log:              logger,
 		LogFactory:       logFactory,
 		StakingTLSSigner: config.StakingTLSCert.PrivateKey.(crypto.Signer),
 		StakingTLSCert:   stakingCert,
 		ID:               ids.NodeIDFromCert(stakingCert),
-		StakingSigner:    stakingSigner,
 		Config:           config,
 	}
 
@@ -156,6 +151,11 @@ func New(
 		zap.Reflect("providedFlags", n.Config.ProvidedFlags),
 		zap.Reflect("config", n.Config),
 	)
+
+	n.StakingSigner, err = blssigner.GetStakingSigner(config.StakingSignerConfig)
+	if err != nil {
+		return nil, fmt.Errorf("problem initializing staking signer: %w", err)
+	}
 
 	n.VMFactoryLog, err = logFactory.Make("vm-factory")
 	if err != nil {

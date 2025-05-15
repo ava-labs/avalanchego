@@ -662,43 +662,9 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 		return node.StakingConfig{}, err
 	}
 
-	// A maximum of one signer option can be set
-	bools := bag.Of(
-		v.GetBool(StakingEphemeralSignerEnabledKey),
-		v.IsSet(StakingSignerKeyContentKey),
-		v.IsSet(StakingSignerKeyPathKey),
-		v.IsSet(StakingRPCSignerKey),
-	)
-	if bools.Count(true) > 1 {
-		return node.StakingConfig{}, errInvalidSignerConfig
-	}
-
-	if v.GetBool(StakingEphemeralSignerEnabledKey) {
-		config.StakingSignerConfig = node.EphemeralSignerConfig{}
-	}
-
-	if v.IsSet(StakingSignerKeyContentKey) {
-		config.StakingSignerConfig = node.ContentKeyConfig{
-			SignerKeyRawContent: getExpandedArg(v, StakingSignerKeyContentKey),
-		}
-	}
-
-	if v.IsSet(StakingRPCSignerKey) {
-		config.StakingSignerConfig = node.RPCSignerConfig{
-			StakingSignerRPC: getExpandedArg(v, StakingRPCSignerKey),
-		}
-	}
-
-	if v.IsSet(StakingSignerKeyPathKey) {
-		config.StakingSignerConfig = node.SignerPathConfig{
-			SigningKeyPath: getExpandedArg(v, StakingSignerKeyPathKey),
-			SignerPathIsSet:   true,
-		}
-	} else {
-		config.StakingSignerConfig = node.SignerPathConfig{
-			SigningKeyPath: getExpandedArg(v, StakingSignerKeyPathKey),
-			SignerPathIsSet:   false,
-		}
+	config.StakingSignerConfig, err = getStakingSignerConfig(v)
+	if err != nil {
+		return node.StakingConfig{}, err
 	}
 
 	if networkID != constants.MainnetID && networkID != constants.FujiID {
@@ -742,6 +708,47 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 	}
 
 	return config, nil
+}
+
+func getStakingSignerConfig(v *viper.Viper) (interface{}, error) {
+	// A maximum of one signer option can be set
+	bools := bag.Of(
+		v.GetBool(StakingEphemeralSignerEnabledKey),
+		v.IsSet(StakingSignerKeyContentKey),
+		v.IsSet(StakingSignerKeyPathKey),
+		v.IsSet(StakingRPCSignerKey),
+	)
+	if bools.Count(true) > 1 {
+		return node.StakingConfig{}, errInvalidSignerConfig
+	}
+
+	switch {
+	case v.GetBool(StakingEphemeralSignerEnabledKey):
+		return node.EphemeralSignerConfig{}, nil
+
+	case v.IsSet(StakingSignerKeyContentKey):
+		return node.ContentKeyConfig{
+			SignerKeyRawContent: getExpandedArg(v, StakingSignerKeyContentKey),
+		}, nil
+
+	case v.IsSet(StakingRPCSignerKey):
+		return node.RPCSignerConfig{
+			StakingSignerRPC: getExpandedArg(v, StakingRPCSignerKey),
+		}, nil
+
+	case v.IsSet(StakingSignerKeyPathKey):
+		return node.SignerPathConfig{
+			SigningKeyPath:  getExpandedArg(v, StakingSignerKeyPathKey),
+			SignerPathIsSet: true,
+		}, nil
+
+	default:
+		return node.SignerPathConfig{
+			SigningKeyPath:  getExpandedArg(v, StakingSignerKeyPathKey),
+			SignerPathIsSet: false,
+		}, nil
+
+	}
 }
 
 func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
