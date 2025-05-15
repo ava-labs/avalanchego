@@ -54,7 +54,9 @@ contract EVMLoadSimulator {
     }
 
     // Simulate dynamic memory allocation and usage
-    function simulateMemory(uint256 sizeInWords) external returns (uint256 sum) {
+    function simulateMemory(
+        uint256 sizeInWords
+    ) external returns (uint256 sum) {
         uint256[] memory arr = new uint256[](sizeInWords);
         for (uint256 i = 0; i < sizeInWords; i++) {
             arr[i] = i;
