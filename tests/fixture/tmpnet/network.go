@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/netip"
 	"net/url"
 	"os"
@@ -1084,7 +1085,6 @@ func BuildMetricsURLForNetwork(dashboardID, dashboardName, networkUUID string, o
 		endTime = options.EndTime
 	}
 
-	// Build the base URL
 	baseURL := url.URL{
 		Scheme: "https",
 		Host:   grafanaURI,
@@ -1095,7 +1095,17 @@ func BuildMetricsURLForNetwork(dashboardID, dashboardName, networkUUID string, o
 
 	query.Add("from", startTime)
 	query.Add("to", endTime)
-	query.Add("var-filter", "network_uuid|=|"+networkUUID)
+
+	var filters map[string]string
+	if options.Filters != nil {
+		filters = maps.Clone(options.Filters)
+	} else {
+		filters = make(map[string]string)
+	}
+
+	if _, ok := filters["network_uuid"]; !ok {
+		filters["network_uuid"] = networkUUID
+	}
 
 	for key, value := range options.Filters {
 		query.Add("var-filter", fmt.Sprintf("%s|=|%s", key, value))
