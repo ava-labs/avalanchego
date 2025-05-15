@@ -52,7 +52,8 @@ func (s *StateDB) GetLogData() (topics [][]common.Hash, data [][]byte) {
 	return topics, data
 }
 
-// GetPredicateStorageSlots returns the storage slots associated with the address, index pair.
+// GetPredicateStorageSlots returns the storage slots associated with the address+index pair as
+// a byte slice as well as a boolean indicating if the address+index pair exists.
 // A list of access tuples can be included within transaction types post EIP-2930. The address
 // is declared directly on the access tuple and the index is the i'th occurrence of an access
 // tuple with the specified address.

@@ -37,12 +37,12 @@ import (
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/core"
+	"github.com/ava-labs/subnet-evm/internal/testutils"
 	"github.com/ava-labs/subnet-evm/plugin/evm/customrawdb"
 	"github.com/ava-labs/subnet-evm/plugin/evm/database"
 	"github.com/ava-labs/subnet-evm/predicate"
 	statesyncclient "github.com/ava-labs/subnet-evm/sync/client"
 	"github.com/ava-labs/subnet-evm/sync/statesync"
-	"github.com/ava-labs/subnet-evm/utils"
 )
 
 func TestSkipStateSync(t *testing.T) {
@@ -369,7 +369,7 @@ type syncVMSetup struct {
 	serverVM        *VM
 	serverAppSender *enginetest.Sender
 
-	fundedAccounts map[*utils.Key]*types.StateAccount
+	fundedAccounts map[*testutils.Key]*types.StateAccount
 
 	syncerVM             *VM
 	syncerDB             avalanchedatabase.Database

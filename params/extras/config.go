@@ -126,16 +126,16 @@ type ChainConfig struct {
 	UpgradeConfig      `json:"-"`           // Config specified in upgradeBytes (avalanche network upgrades or enable/disabling precompiles). Not serialized.
 }
 
-func (c *ChainConfig) CheckConfigCompatible(newcfg_ *ethparams.ChainConfig, headNumber *big.Int, headTimestamp uint64) *ethparams.ConfigCompatError {
+func (c *ChainConfig) CheckConfigCompatible(newConfig *ethparams.ChainConfig, headNumber *big.Int, headTimestamp uint64) *ethparams.ConfigCompatError {
 	if c == nil {
 		return nil
 	}
-	newcfg, ok := newcfg_.Hooks().(*ChainConfig)
+	newcfg, ok := newConfig.Hooks().(*ChainConfig)
 	if !ok {
 		// Proper registration of the extras on the libevm side should prevent this from happening.
 		// Return an error to prevent the chain from starting, just in case.
 		return ethparams.NewTimestampCompatError(
-			fmt.Sprintf("ChainConfig.Hooks() is not of the expected type *extras.ChainConfig, got %T", newcfg_.Hooks()),
+			fmt.Sprintf("ChainConfig.Hooks() is not of the expected type *extras.ChainConfig, got %T", newConfig.Hooks()),
 			utils.NewUint64(0),
 			nil,
 		)
