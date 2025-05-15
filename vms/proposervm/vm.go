@@ -87,8 +87,6 @@ type VM struct {
 	innerBlkCache  cache.Cacher[ids.ID, snowman.Block]
 	preferred      ids.ID
 	consensusState snow.State
-	context        context.Context
-	onShutdown     func()
 
 	// lastAcceptedTime is set to the last accepted PostForkBlock's timestamp
 	// if the last accepted block has been a PostForkOption block since having
@@ -168,10 +166,6 @@ func (vm *VM) Initialize(
 	})
 
 	vm.verifiedBlocks = make(map[ids.ID]PostForkBlock)
-	detachedCtx := context.WithoutCancel(ctx)
-	context, cancel := context.WithCancel(detachedCtx)
-	vm.context = context
-	vm.onShutdown = cancel
 
 	err = vm.ChainVM.Initialize(
 		ctx,
@@ -249,8 +243,6 @@ func (vm *VM) Initialize(
 
 // shutdown ops then propagate shutdown to innerVM
 func (vm *VM) Shutdown(ctx context.Context) error {
-	vm.onShutdown()
-
 	vm.Scheduler.Close()
 
 	if err := vm.db.Commit(); err != nil {

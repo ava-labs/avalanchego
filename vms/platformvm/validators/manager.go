@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
@@ -104,14 +103,12 @@ type State interface {
 }
 
 func NewManager(
-	log logging.Logger,
 	cfg config.Internal,
 	state State,
 	metrics metrics.Metrics,
 	clk *mockable.Clock,
 ) Manager {
 	return &manager{
-		log:     log,
 		cfg:     cfg,
 		state:   state,
 		metrics: metrics,
@@ -131,7 +128,6 @@ func NewManager(
 // TODO: Remove requirement for the P-chain's context lock to be held when
 // calling exported functions.
 type manager struct {
-	log     logging.Logger
 	cfg     config.Internal
 	state   State
 	metrics metrics.Metrics

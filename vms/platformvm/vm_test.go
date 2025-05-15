@@ -1222,7 +1222,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	))
 
 	mc, err := message.NewCreator(
-		ctx.Log,
 		prometheus.NewRegistry(),
 		constants.DefaultNetworkCompressionType,
 		10*time.Second,

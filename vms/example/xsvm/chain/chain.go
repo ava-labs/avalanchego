@@ -31,9 +31,8 @@ type chain struct {
 	// chain state as driven by the consensus engine
 	chainState snow.State
 
-	lastAcceptedID     ids.ID
-	lastAcceptedHeight uint64
-	verifiedBlocks     map[ids.ID]*block
+	lastAcceptedID ids.ID
+	verifiedBlocks map[ids.ID]*block
 }
 
 func New(ctx *snow.Context, db database.Database) (Chain, error) {
@@ -56,7 +55,6 @@ func New(ctx *snow.Context, db database.Database) (Chain, error) {
 		return nil, err
 	}
 
-	c.lastAcceptedHeight = lastAccepted.Height()
 	c.verifiedBlocks = map[ids.ID]*block{
 		lastAcceptedID: lastAccepted,
 	}
