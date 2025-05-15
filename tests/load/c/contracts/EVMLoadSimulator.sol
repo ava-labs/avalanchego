@@ -67,8 +67,10 @@ contract EVMLoadSimulator {
 
     // Simulate deep call stack
     function simulateCallDepth(uint256 depth) external {
-        if (depth > 0) {
-            this.simulateCallDepth(depth - 1);
+        if (depth == 0) {
+            emit StorageUpdate(0, 0); // Emit an event to indicate completion
+            return;
         }
+        this.simulateCallDepth(depth - 1);
     }
 }
