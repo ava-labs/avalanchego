@@ -63,25 +63,10 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 	agents := make([]load.Agent[common.Hash], config.agents)
 	for i := range agents {
 		endpoint := config.endpoints[i%len(config.endpoints)]
-		client, err := ethclient.DialContext(ctx, endpoint)
+		agents[i], err = createAgent(ctx, endpoint, keys[i], config.issuer, tracker, config.maxFeeCap)
 		if err != nil {
-			return fmt.Errorf("dialing %s: %w", endpoint, err)
+			return fmt.Errorf("creating agent: %w", err)
 		}
-
-		address := ethcrypto.PubkeyToAddress(keys[i].PublicKey)
-		blockNumber := (*big.Int)(nil)
-		nonce, err := client.NonceAt(ctx, address, blockNumber)
-		if err != nil {
-			return fmt.Errorf("getting nonce for address %s: %w", address, err)
-		}
-
-		issuer, err := createIssuer(ctx, config.issuer,
-			client, tracker, config.maxFeeCap, nonce, keys[i])
-		if err != nil {
-			return fmt.Errorf("creating issuer: %w", err)
-		}
-		listener := listener.New(client, tracker, address, nonce)
-		agents[i] = load.NewAgent(issuer, listener)
 	}
 
 	metricsErrCh, err := metricsServer.Start()
@@ -136,6 +121,30 @@ func fixKeysCount(preFundedKeys []*secp256k1.PrivateKey, target int) ([]*ecdsa.P
 		keys = append(keys, key)
 	}
 	return keys, nil
+}
+
+func createAgent(ctx context.Context, endpoint string, key *ecdsa.PrivateKey,
+	issuerType issuerType, tracker *load.Tracker[common.Hash], maxFeeCap int64,
+) (load.Agent[common.Hash], error) {
+	client, err := ethclient.DialContext(ctx, endpoint)
+	if err != nil {
+		return load.Agent[common.Hash]{}, fmt.Errorf("dialing %s: %w", endpoint, err)
+	}
+
+	address := ethcrypto.PubkeyToAddress(key.PublicKey)
+	blockNumber := (*big.Int)(nil)
+	nonce, err := client.NonceAt(ctx, address, blockNumber)
+	if err != nil {
+		return load.Agent[common.Hash]{}, fmt.Errorf("getting nonce for address %s: %w", address, err)
+	}
+
+	issuer, err := createIssuer(ctx, issuerType,
+		client, tracker, maxFeeCap, nonce, key)
+	if err != nil {
+		return load.Agent[common.Hash]{}, fmt.Errorf("creating issuer: %w", err)
+	}
+	listener := listener.New(client, tracker, address, nonce)
+	return load.NewAgent(issuer, listener), nil
 }
 
 func createIssuer(ctx context.Context, typ issuerType,
