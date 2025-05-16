@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package api
+package genesis
 
 import (
 	"testing"
@@ -22,13 +22,13 @@ func createTestGenesis(t *testing.T) *Genesis {
 	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 	require.NoError(err)
 
-	validator := GenesisPermissionlessValidator{
-		GenesisValidator: GenesisValidator{
+	validator := PermissionlessValidator{
+		Validator: Validator{
 			StartTime: 0,
 			EndTime:   20,
 			NodeID:    nodeID,
 		},
-		RewardOwner: &GenesisOwner{
+		RewardOwner: &Owner{
 			Threshold: 1,
 			Addresses: []string{addr},
 		},
@@ -38,7 +38,7 @@ func createTestGenesis(t *testing.T) *Genesis {
 		}},
 	}
 
-	genesis, err := NewGenesis(
+	genesis, err := New(
 		ids.ID{'d', 'u', 'm', 'm', 'y', ' ', 'I', 'D'},
 		constants.UnitTestID,
 		[]Allocation{
@@ -47,7 +47,7 @@ func createTestGenesis(t *testing.T) *Genesis {
 				Amount:  123456789,
 			},
 		},
-		[]GenesisPermissionlessValidator{validator},
+		[]PermissionlessValidator{validator},
 		nil,
 		5,
 		0,
@@ -58,7 +58,7 @@ func createTestGenesis(t *testing.T) *Genesis {
 	return genesis
 }
 
-func TestNewGenesisInvalidUTXOBalance(t *testing.T) {
+func TestNewInvalidUTXOBalance(t *testing.T) {
 	require := require.New(t)
 	nodeID := ids.BuildTestNodeID([]byte{1, 2, 3})
 	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
@@ -69,13 +69,13 @@ func TestNewGenesisInvalidUTXOBalance(t *testing.T) {
 		Amount:  0,
 	}
 	weight := uint64(987654321)
-	validator := GenesisPermissionlessValidator{
-		GenesisValidator: GenesisValidator{
+	validator := PermissionlessValidator{
+		Validator: Validator{
 			EndTime: 15,
 			Weight:  weight,
 			NodeID:  nodeID,
 		},
-		RewardOwner: &GenesisOwner{
+		RewardOwner: &Owner{
 			Threshold: 1,
 			Addresses: []string{addr},
 		},
@@ -85,11 +85,11 @@ func TestNewGenesisInvalidUTXOBalance(t *testing.T) {
 		}},
 	}
 
-	genesis, err := NewGenesis(
+	genesis, err := New(
 		ids.Empty,
 		constants.UnitTestID,
 		[]Allocation{utxo},
-		[]GenesisPermissionlessValidator{validator},
+		[]PermissionlessValidator{validator},
 		nil,
 		5,
 		0,
@@ -99,7 +99,7 @@ func TestNewGenesisInvalidUTXOBalance(t *testing.T) {
 	require.Nil(genesis)
 }
 
-func TestNewGenesisInvalidStakeWeight(t *testing.T) {
+func TestNewInvalidStakeWeight(t *testing.T) {
 	require := require.New(t)
 	nodeID := ids.BuildTestNodeID([]byte{1, 2, 3})
 	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
@@ -110,13 +110,13 @@ func TestNewGenesisInvalidStakeWeight(t *testing.T) {
 		Amount:  123456789,
 	}
 
-	validator := GenesisPermissionlessValidator{
-		GenesisValidator: GenesisValidator{
+	validator := PermissionlessValidator{
+		Validator: Validator{
 			StartTime: 0,
 			EndTime:   15,
 			NodeID:    nodeID,
 		},
-		RewardOwner: &GenesisOwner{
+		RewardOwner: &Owner{
 			Threshold: 1,
 			Addresses: []string{addr},
 		},
@@ -126,11 +126,11 @@ func TestNewGenesisInvalidStakeWeight(t *testing.T) {
 		}},
 	}
 
-	genesis, err := NewGenesis(
+	genesis, err := New(
 		ids.Empty,
 		0,
 		[]Allocation{utxo},
-		[]GenesisPermissionlessValidator{validator},
+		[]PermissionlessValidator{validator},
 		nil,
 		5,
 		0,
@@ -140,7 +140,7 @@ func TestNewGenesisInvalidStakeWeight(t *testing.T) {
 	require.Nil(genesis)
 }
 
-func TestNewGenesisInvalidEndtime(t *testing.T) {
+func TestNewInvalidEndtime(t *testing.T) {
 	require := require.New(t)
 	nodeID := ids.BuildTestNodeID([]byte{1, 2, 3})
 	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
@@ -152,13 +152,13 @@ func TestNewGenesisInvalidEndtime(t *testing.T) {
 	}
 
 	weight := uint64(987654321)
-	validator := GenesisPermissionlessValidator{
-		GenesisValidator: GenesisValidator{
+	validator := PermissionlessValidator{
+		Validator: Validator{
 			StartTime: 0,
 			EndTime:   5,
 			NodeID:    nodeID,
 		},
-		RewardOwner: &GenesisOwner{
+		RewardOwner: &Owner{
 			Threshold: 1,
 			Addresses: []string{addr},
 		},
@@ -168,11 +168,11 @@ func TestNewGenesisInvalidEndtime(t *testing.T) {
 		}},
 	}
 
-	genesis, err := NewGenesis(
+	genesis, err := New(
 		ids.Empty,
 		constants.UnitTestID,
 		[]Allocation{utxo},
-		[]GenesisPermissionlessValidator{validator},
+		[]PermissionlessValidator{validator},
 		nil,
 		5,
 		0,
@@ -225,7 +225,7 @@ func TestGenesis(t *testing.T) {
 	require.Equal(uint64(0), genesis.InitialSupply)
 }
 
-func TestNewGenesisReturnsSortedValidators(t *testing.T) {
+func TestNewReturnsSortedValidators(t *testing.T) {
 	require := require.New(t)
 	nodeID := ids.BuildTestNodeID([]byte{1})
 	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
@@ -237,13 +237,13 @@ func TestNewGenesisReturnsSortedValidators(t *testing.T) {
 	}
 
 	weight := uint64(987654321)
-	validator1 := GenesisPermissionlessValidator{
-		GenesisValidator: GenesisValidator{
+	validator1 := PermissionlessValidator{
+		Validator: Validator{
 			StartTime: 0,
 			EndTime:   20,
 			NodeID:    nodeID,
 		},
-		RewardOwner: &GenesisOwner{
+		RewardOwner: &Owner{
 			Threshold: 1,
 			Addresses: []string{addr},
 		},
@@ -253,13 +253,13 @@ func TestNewGenesisReturnsSortedValidators(t *testing.T) {
 		}},
 	}
 
-	validator2 := GenesisPermissionlessValidator{
-		GenesisValidator: GenesisValidator{
+	validator2 := PermissionlessValidator{
+		Validator: Validator{
 			StartTime: 3,
 			EndTime:   15,
 			NodeID:    nodeID,
 		},
-		RewardOwner: &GenesisOwner{
+		RewardOwner: &Owner{
 			Threshold: 1,
 			Addresses: []string{addr},
 		},
@@ -269,13 +269,13 @@ func TestNewGenesisReturnsSortedValidators(t *testing.T) {
 		}},
 	}
 
-	validator3 := GenesisPermissionlessValidator{
-		GenesisValidator: GenesisValidator{
+	validator3 := PermissionlessValidator{
+		Validator: Validator{
 			StartTime: 1,
 			EndTime:   10,
 			NodeID:    nodeID,
 		},
-		RewardOwner: &GenesisOwner{
+		RewardOwner: &Owner{
 			Threshold: 1,
 			Addresses: []string{addr},
 		},
@@ -286,11 +286,11 @@ func TestNewGenesisReturnsSortedValidators(t *testing.T) {
 	}
 
 	avaxAssetID := ids.ID{'d', 'u', 'm', 'm', 'y', ' ', 'I', 'D'}
-	genesis, err := NewGenesis(
+	genesis, err := New(
 		avaxAssetID,
 		constants.UnitTestID,
 		[]Allocation{allocation},
-		[]GenesisPermissionlessValidator{
+		[]PermissionlessValidator{
 			validator1,
 			validator2,
 			validator3,

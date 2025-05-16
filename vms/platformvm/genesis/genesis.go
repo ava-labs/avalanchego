@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package api
+package genesis
 
 import (
 	"cmp"
@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -37,24 +36,24 @@ var (
 )
 
 // UTXO adds messages to UTXOs
-type GenesisUTXO struct {
+type UTXO struct {
 	avax.UTXO `serialize:"true"`
 	Message   []byte `serialize:"true" json:"message"`
 }
 
 // Genesis represents a genesis state of the platform chain
 type Genesis struct {
-	UTXOs         []*GenesisUTXO `serialize:"true"`
-	Validators    []*txs.Tx      `serialize:"true"`
-	Chains        []*txs.Tx      `serialize:"true"`
-	Timestamp     uint64         `serialize:"true"`
-	InitialSupply uint64         `serialize:"true"`
-	Message       string         `serialize:"true"`
+	UTXOs         []*UTXO   `serialize:"true"`
+	Validators    []*txs.Tx `serialize:"true"`
+	Chains        []*txs.Tx `serialize:"true"`
+	Timestamp     uint64    `serialize:"true"`
+	InitialSupply uint64    `serialize:"true"`
+	Message       string    `serialize:"true"`
 }
 
 func Parse(genesisBytes []byte) (*Genesis, error) {
 	gen := &Genesis{}
-	if _, err := genesis.Codec.Unmarshal(genesisBytes, gen); err != nil {
+	if _, err := Codec.Unmarshal(genesisBytes, gen); err != nil {
 		return nil, err
 	}
 	for _, tx := range gen.Validators {
@@ -100,8 +99,8 @@ func (a Allocation) Compare(other Allocation) int {
 	return addr.Compare(otherAddr)
 }
 
-// GenesisValidator represents a validator at genesis
-type GenesisValidator struct {
+// Validator represents a validator at genesis
+type Validator struct {
 	TxID      ids.ID
 	StartTime uint64
 	EndTime   uint64
@@ -109,17 +108,17 @@ type GenesisValidator struct {
 	NodeID    ids.NodeID
 }
 
-// GenesisOwner is the repr. of a reward owner at genesis
-type GenesisOwner struct {
+// Owner is the repr. of a reward owner at genesis
+type Owner struct {
 	Locktime  uint64
 	Threshold uint32
 	Addresses []string
 }
 
 // GenesisPermissionlessValidator represents a permissionless validator at genesis
-type GenesisPermissionlessValidator struct {
-	GenesisValidator
-	RewardOwner        *GenesisOwner
+type PermissionlessValidator struct {
+	Validator
+	RewardOwner        *Owner
 	DelegationFee      float32
 	ExactDelegationFee uint32
 	Staked             []Allocation
@@ -149,7 +148,7 @@ func bech32ToID(addrStr string) (ids.ShortID, error) {
 	return ids.ToShortID(addrBytes)
 }
 
-// NewGenesis builds the genesis state of the P-Chain (and thereby the Avalanche network.)
+// New builds the genesis state of the P-Chain (and thereby the Avalanche network.)
 // [avaxAssetID] is the ID of the AVAX asset
 // [networkID] is the ID of the network
 // [allocations] are the UTXOs on the Platform Chain that exist at genesis.
@@ -158,18 +157,18 @@ func bech32ToID(addrStr string) (ids.ShortID, error) {
 // [time] is the Platform Chain's time at network genesis.
 // [initialSupply] is the initial supply of the AVAX asset.
 // [message] is the message to be sent to the genesis UTXOs.
-func NewGenesis(
+func New(
 	avaxAssetID ids.ID,
 	networkID uint32,
 	allocations []Allocation,
-	validators []GenesisPermissionlessValidator,
+	validators []PermissionlessValidator,
 	chains []Chain,
 	time uint64,
 	initialSupply uint64,
 	message string,
 ) (*Genesis, error) {
 	// Specify the UTXOs on the Platform chain that exist at genesis
-	utxos := make([]*GenesisUTXO, 0, len(allocations))
+	utxos := make([]*UTXO, 0, len(allocations))
 	for i, allocation := range allocations {
 		if allocation.Amount == 0 {
 			return nil, errUTXOHasNoValue
@@ -203,7 +202,7 @@ func NewGenesis(
 		if err != nil {
 			return nil, fmt.Errorf("problem decoding UTXO message bytes: %w", err)
 		}
-		utxos = append(utxos, &GenesisUTXO{
+		utxos = append(utxos, &UTXO{
 			UTXO:    utxo,
 			Message: allocation.Message,
 		})
@@ -347,5 +346,5 @@ func NewGenesis(
 
 // Bytes serializes the Genesis to bytes using the PlatformVM genesis codec
 func (g *Genesis) Bytes() ([]byte, error) {
-	return genesis.Codec.Marshal(genesis.CodecVersion, g)
+	return Codec.Marshal(CodecVersion, g)
 }

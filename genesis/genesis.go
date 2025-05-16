@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
-	"github.com/ava-labs/avalanchego/vms/platformvm/api"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -353,7 +353,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	skippedAllocations := []Allocation(nil)
 
 	// Build UTXOs for the Platform Chain
-	platformAllocations := []api.Allocation{}
+	platformAllocations := []genesis.Allocation{}
 	for _, allocation := range config.Allocations {
 		if initiallyStaked.Contains(allocation.AVAXAddr) {
 			skippedAllocations = append(skippedAllocations, allocation)
@@ -365,7 +365,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		}
 		for _, unlock := range allocation.UnlockSchedule {
 			if unlock.Amount > 0 {
-				platformAllocations = append(platformAllocations, api.Allocation{
+				platformAllocations = append(platformAllocations, genesis.Allocation{
 					Locktime: unlock.Locktime,
 					Amount:   unlock.Amount,
 					Address:  addr,
@@ -376,7 +376,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	}
 
 	// Build validators for the Platform Chain
-	validators := []api.GenesisPermissionlessValidator{}
+	validators := []genesis.PermissionlessValidator{}
 	allNodeAllocations := splitAllocations(skippedAllocations, len(config.InitialStakers))
 	endStakingTime := genesisTime.Add(time.Duration(config.InitialStakeDuration) * time.Second)
 	stakingOffset := time.Duration(0)
@@ -390,14 +390,14 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 			return nil, ids.Empty, err
 		}
 
-		allocations := []api.Allocation(nil)
+		allocations := []genesis.Allocation(nil)
 		for _, allocation := range nodeAllocations {
 			addr, err := address.FormatBech32(hrp, allocation.AVAXAddr.Bytes())
 			if err != nil {
 				return nil, ids.Empty, err
 			}
 			for _, unlock := range allocation.UnlockSchedule {
-				allocations = append(allocations, api.Allocation{
+				allocations = append(allocations, genesis.Allocation{
 					Locktime: unlock.Locktime,
 					Amount:   unlock.Amount,
 					Address:  addr,
@@ -406,13 +406,13 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 			}
 		}
 
-		validators = append(validators, api.GenesisPermissionlessValidator{
-			GenesisValidator: api.GenesisValidator{
+		validators = append(validators, genesis.PermissionlessValidator{
+			Validator: genesis.Validator{
 				StartTime: uint64(genesisTime.Unix()),
 				EndTime:   uint64(endStakingTime.Unix()),
 				NodeID:    staker.NodeID,
 			},
-			RewardOwner: &api.GenesisOwner{
+			RewardOwner: &genesis.Owner{
 				Threshold: 1,
 				Addresses: []string{destAddrStr},
 			},
@@ -426,7 +426,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	if err != nil {
 		return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
 	}
-	chains := []api.Chain{
+	chains := []genesis.Chain{
 		{
 			GenesisData: avmGenesisBytes,
 			SubnetID:    constants.PrimaryNetworkID,
@@ -446,7 +446,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		},
 	}
 
-	pChainGenesis, err := api.NewGenesis(
+	pChainGenesis, err := genesis.New(
 		avaxAssetID,
 		config.NetworkID,
 		platformAllocations,
@@ -529,7 +529,7 @@ func splitAllocations(allocations []Allocation, numSplits int) [][]Allocation {
 }
 
 func VMGenesis(genesisBytes []byte, vmID ids.ID) (*pchaintxs.Tx, error) {
-	genesis, err := api.Parse(genesisBytes)
+	genesis, err := genesis.Parse(genesisBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse genesis: %w", err)
 	}
