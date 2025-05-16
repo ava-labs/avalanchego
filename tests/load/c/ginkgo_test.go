@@ -64,15 +64,16 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 	var (
 		network *tmpnet.Network
+		metrics *load.Metrics
 
-		registry = prometheus.NewRegistry()
-		logger   = logging.NewLogger("c-chain-load-testing", logging.NewWrappedCore(logging.Info, os.Stdout, logging.Auto.ConsoleEncoder()))
+		logger = logging.NewLogger("c-chain-load-testing", logging.NewWrappedCore(logging.Info, os.Stdout, logging.Auto.ConsoleEncoder()))
 	)
 
 	ginkgo.BeforeAll(func() {
 		var (
-			tc  = e2e.NewTestContext()
-			env = e2e.GetEnv(tc)
+			tc       = e2e.NewTestContext()
+			env      = e2e.GetEnv(tc)
+			registry = prometheus.NewRegistry()
 		)
 
 		network = env.GetNetwork()
@@ -81,6 +82,10 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 			err := node.EnsureKeys()
 			require.NoError(tc, err, "ensuring keys for node %s", node.NodeID)
 		}
+
+		loadMetrics, err := load.NewMetrics(registry)
+		require.NoError(tc, err, "failed to register load metrics")
+		metrics = loadMetrics
 
 		cleanup := setupMetricsServer(tc, registry, network.UUID, network.Owner, logger)
 		ginkgo.DeferCleanup(cleanup)
@@ -98,7 +103,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 			maxTPS:    90,
 			step:      10,
 		}
-		err = execute(ctx, registry, network.PreFundedKeys, config, logger)
+		err = execute(ctx, network.PreFundedKeys, config, metrics, logger)
 		if err != nil {
 			ginkgo.GinkgoT().Error(err)
 		}
@@ -116,7 +121,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 			maxTPS:    60,
 			step:      5,
 		}
-		err = execute(ctx, registry, network.PreFundedKeys, config, logger)
+		err = execute(ctx, network.PreFundedKeys, config, metrics, logger)
 		if err != nil {
 			ginkgo.GinkgoT().Error(err)
 		}

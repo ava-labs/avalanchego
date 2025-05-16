@@ -11,7 +11,6 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/ethclient"
-	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/tests/load"
 	"github.com/ava-labs/avalanchego/tests/load/c/issuers"
@@ -39,7 +38,7 @@ const (
 	issuerOpcoder issuerType = "opcoder"
 )
 
-func execute(ctx context.Context, registry *prometheus.Registry, preFundedKeys []*secp256k1.PrivateKey, config config, logger logging.Logger) error {
+func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config config, metrics *load.Metrics, logger logging.Logger) error {
 	keys, err := fixKeysCount(preFundedKeys, int(config.agents))
 	if err != nil {
 		return fmt.Errorf("fixing keys count: %w", err)
@@ -50,11 +49,7 @@ func execute(ctx context.Context, registry *prometheus.Registry, preFundedKeys [
 		return fmt.Errorf("ensuring minimum funds: %w", err)
 	}
 
-	tracker, err := load.NewTracker[common.Hash](registry)
-	if err != nil {
-		return fmt.Errorf("creating tracker: %w", err)
-	}
-
+	tracker := load.NewTracker[common.Hash](metrics)
 	agents := make([]load.Agent[common.Hash], config.agents)
 	for i := range agents {
 		endpoint := config.endpoints[i%len(config.endpoints)]
