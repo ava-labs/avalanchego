@@ -61,10 +61,6 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 		env := e2e.GetEnv(tc)
 		network = env.GetNetwork()
 		network.Nodes = network.Nodes[:nodesCount]
-		for _, node := range network.Nodes {
-			err := node.EnsureKeys()
-			require.NoError(tc, err, "ensuring keys for node %s", node.NodeID)
-		}
 	})
 
 	ginkgo.It("C-Chain simple", func(ctx context.Context) {
