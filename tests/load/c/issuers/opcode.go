@@ -124,6 +124,9 @@ func (o *Opcoder) GenerateAndIssueTx(ctx context.Context) (common.Hash, error) {
 		tx, err = o.contractInstance.SimulateCallDepth(txOpts, depth)
 	case contractCreation:
 		tx, err = o.contractInstance.SimulateContractCreation(txOpts)
+	case pureCompute:
+		const iterations = 100
+		tx, err = o.contractInstance.SimulatePureCompute(txOpts, big.NewInt(iterations))
 	default:
 		return common.Hash{}, fmt.Errorf("invalid load type: %s", loadType)
 	}
@@ -147,6 +150,7 @@ const (
 	memory            = "memory"
 	callDepth         = "call depth"
 	contractCreation  = "contract creation"
+	pureCompute       = "pure compute"
 )
 
 func allLoadTypes() []string {
@@ -158,6 +162,7 @@ func allLoadTypes() []string {
 		memory,
 		callDepth,
 		contractCreation,
+		pureCompute,
 	}
 }
 

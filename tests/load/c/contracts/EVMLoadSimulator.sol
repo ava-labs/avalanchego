@@ -79,4 +79,16 @@ contract EVMLoadSimulator {
     function simulateContractCreation() external {
         new Dummy();
     }
+
+    // Measure pure computation cost without memory/storage overhead.
+    // Don't mark this function as pure, in order to generate a transaction
+    // for the load test orchestrator.
+    function simulatePureCompute(
+        uint256 iterations
+    ) external returns (uint256 result) {
+        for (uint256 i = 0; i < iterations; i++) {
+            result += (((i * i) / 2) + i) % (i + 1);
+        }
+        emit StorageUpdate(0, 0); // Emit an event to indicate completion
+    }
 }
