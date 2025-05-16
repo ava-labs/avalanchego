@@ -296,8 +296,10 @@ fn batch(
     values: *const KeyValue,
 ) -> Result<Value, String> {
     let start = coarsetime::Instant::now();
-    // Check db is valid.
     let db = unsafe { db.as_ref() }.ok_or_else(|| String::from("db should be non-null"))?;
+    if values.is_null() {
+        return Err(String::from("key-value list is null"));
+    }
 
     // Create a batch of operations to perform.
     let key_value_ref = unsafe { std::slice::from_raw_parts(values, nkeys) };
@@ -366,6 +368,9 @@ fn propose_on_db(
     values: *const KeyValue,
 ) -> Result<ProposalId, String> {
     let db = unsafe { db.as_ref() }.ok_or_else(|| String::from("db should be non-null"))?;
+    if values.is_null() {
+        return Err(String::from("key-value list is null"));
+    }
 
     // Create a batch of operations to perform.
     let key_value_ref = unsafe { std::slice::from_raw_parts(values, nkeys) };
@@ -424,6 +429,9 @@ fn propose_on_proposal(
     values: *const KeyValue,
 ) -> Result<ProposalId, String> {
     let db = unsafe { db.as_ref() }.ok_or_else(|| String::from("db should be non-null"))?;
+    if values.is_null() {
+        return Err(String::from("key-value list is null"));
+    }
 
     // Create a batch of operations to perform.
     let key_value_ref = unsafe { std::slice::from_raw_parts(values, nkeys) };
@@ -594,7 +602,11 @@ impl Display for Value {
 impl Value {
     #[must_use]
     pub const fn as_slice(&self) -> &[u8] {
-        unsafe { std::slice::from_raw_parts(self.data, self.len) }
+        if self.data.is_null() {
+            &[]
+        } else {
+            unsafe { std::slice::from_raw_parts(self.data, self.len) }
+        }
     }
 }
 

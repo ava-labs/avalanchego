@@ -704,3 +704,43 @@ func TestFakeRevision(t *testing.T) {
 	_, err = db.Revision(validRoot)
 	require.ErrorIs(t, err, errRevisionNotFound, "Revision(valid root)")
 }
+
+// Tests that edge case `Get` calls are handled correctly.
+func TestGetNilCases(t *testing.T) {
+	db := newTestDatabase(t)
+
+	// Commit 10 key-value pairs.
+	keys := make([][]byte, 20)
+	vals := make([][]byte, 20)
+	for i := range keys {
+		keys[i] = keyForTest(i)
+		vals[i] = valForTest(i)
+	}
+	root, err := db.Update(keys[:10], vals[:10])
+	require.NoError(t, err, "Update")
+
+	// Create the other views
+	proposal, err := db.Propose(keys[10:], vals[10:])
+	require.NoError(t, err, "Propose")
+	revision, err := db.Revision(root)
+	require.NoError(t, err, "Revision")
+
+	// Create edge case keys.
+	specialKeys := [][]byte{
+		nil,
+		{}, // empty slice
+	}
+	for _, k := range specialKeys {
+		got, err := db.Get(k)
+		require.NoError(t, err, "db.Get(%q)", k)
+		assert.Empty(t, got, "db.Get(%q)", k)
+
+		got, err = revision.Get(k)
+		require.NoError(t, err, "Revision.Get(%q)", k)
+		assert.Empty(t, got, "Revision.Get(%q)", k)
+
+		got, err = proposal.Get(k)
+		require.NoError(t, err, "Proposal.Get(%q)", k)
+		assert.Empty(t, got, "Proposal.Get(%q)", k)
+	}
+}
