@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {Dummy} from "./Dummy.sol";
+
 contract EVMLoadSimulator {
     // Storage mappings for read/write simulations
     mapping(uint256 => uint256) private balances;
@@ -72,5 +74,9 @@ contract EVMLoadSimulator {
             return;
         }
         this.simulateCallDepth(depth - 1);
+    }
+
+    function simulateContractCreation() external {
+        new Dummy();
     }
 }

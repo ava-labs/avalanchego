@@ -122,6 +122,8 @@ func (o *Opcoder) GenerateAndIssueTx(ctx context.Context) (common.Hash, error) {
 		const maxDepth = 5
 		depth := big.NewInt(rand.Int64N(maxDepth)) //nolint:gosec
 		tx, err = o.contractInstance.SimulateCallDepth(txOpts, depth)
+	case contractCreation:
+		tx, err = o.contractInstance.SimulateContractCreation(txOpts)
 	default:
 		return common.Hash{}, fmt.Errorf("invalid load type: %s", loadType)
 	}
@@ -144,6 +146,7 @@ const (
 	hashing           = "hashing"
 	memory            = "memory"
 	callDepth         = "call depth"
+	contractCreation  = "contract creation"
 )
 
 func allLoadTypes() []string {
@@ -154,6 +157,7 @@ func allLoadTypes() []string {
 		hashing,
 		memory,
 		callDepth,
+		contractCreation,
 	}
 }
 
