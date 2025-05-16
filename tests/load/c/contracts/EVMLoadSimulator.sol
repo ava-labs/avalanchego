@@ -13,6 +13,7 @@ contract EVMLoadSimulator {
     event SumCalculated(uint256 sum);
     event HashCalculates(bytes32 hash);
     event MemoryWritten(uint256[] arr);
+    event LargeLog(bytes largeData);
 
     // Simulate random storage writes
     function simulateRandomWrite(uint256 count) external {
@@ -90,5 +91,13 @@ contract EVMLoadSimulator {
             result += (((i * i) / 2) + i) % (i + 1);
         }
         emit StorageUpdate(0, 0); // Emit an event to indicate completion
+    }
+
+    function simulateLargeEvent(uint256 size) external {
+        bytes memory data = new bytes(size);
+        for (uint256 i = 0; i < size; i++) {
+            data[i] = bytes1(uint8(i));
+        }
+        emit LargeLog(data);
     }
 }
