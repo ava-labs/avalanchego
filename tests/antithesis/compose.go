@@ -124,6 +124,15 @@ func initComposeConfig(
 			if err := os.MkdirAll(volumePath, perms.ReadWriteExecute); err != nil {
 				return fmt.Errorf("failed to create volume path %q: %w", volumePath, err)
 			}
+			if filepath.Base(volumePath) == "C" &&
+				filepath.Base(filepath.Dir(volumePath)) == "chains" &&
+				filepath.Base(filepath.Dir(filepath.Dir(volumePath))) == "configs" {
+				configFilePath := filepath.Join(volumePath, "config.json")
+				configContent := []byte("{\n  \"log-json-format\": true\n}\n")
+				if err := os.WriteFile(configFilePath, configContent, perms.ReadWrite); err != nil {
+					return fmt.Errorf("failed to write config.json to %q: %w", configFilePath, err)
+				}
+			}
 		}
 	}
 	return nil
@@ -172,6 +181,11 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 				Type:   types.VolumeTypeBind,
 				Source: fmt.Sprintf("./volumes/%s/logs", serviceName),
 				Target: "/root/.avalanchego/logs",
+			},
+			{
+				Type:   types.VolumeTypeBind,
+				Source: fmt.Sprintf("./volumes/%s/configs/chains/C", serviceName),
+				Target: "/root/.avalanchego/configs/chains/C",
 			},
 		}
 
