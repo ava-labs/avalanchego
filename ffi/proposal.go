@@ -8,6 +8,7 @@ package firewood
 // #include <stdlib.h>
 // #include "firewood.h"
 import "C"
+
 import (
 	"errors"
 	"unsafe"
@@ -30,7 +31,7 @@ type Proposal struct {
 // If the key does not exist, it returns (nil, nil).
 func (p *Proposal) Get(key []byte) ([]byte, error) {
 	if p.handle == nil {
-		return nil, errDbClosed
+		return nil, errDBClosed
 	}
 
 	if p.id == 0 {
@@ -48,7 +49,7 @@ func (p *Proposal) Get(key []byte) ([]byte, error) {
 // The proposal is not committed until Commit is called.
 func (p *Proposal) Propose(keys, vals [][]byte) (*Proposal, error) {
 	if p.handle == nil {
-		return nil, errDbClosed
+		return nil, errDBClosed
 	}
 
 	if p.id == 0 {
@@ -74,9 +75,9 @@ func (p *Proposal) Propose(keys, vals [][]byte) (*Proposal, error) {
 	// Propose the keys and values.
 	val := C.fwd_propose_on_proposal(p.handle, C.uint32_t(p.id),
 		C.size_t(len(ffiOps)),
-		(*C.struct_KeyValue)(unsafe.SliceData(ffiOps)),
+		unsafe.SliceData(ffiOps),
 	)
-	id, err := extractIdThenFree(&val)
+	id, err := extractUintThenFree(&val)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +92,7 @@ func (p *Proposal) Propose(keys, vals [][]byte) (*Proposal, error) {
 // If an error occurs, the proposal is dropped and no longer valid.
 func (p *Proposal) Commit() error {
 	if p.handle == nil {
-		return errDbClosed
+		return errDBClosed
 	}
 
 	if p.id == 0 {
@@ -99,8 +100,8 @@ func (p *Proposal) Commit() error {
 	}
 
 	// Commit the proposal and return the hash.
-	err_val := C.fwd_commit(p.handle, C.uint32_t(p.id))
-	err := extractErrorThenFree(&err_val)
+	errVal := C.fwd_commit(p.handle, C.uint32_t(p.id))
+	err := extractErrorThenFree(&errVal)
 	if err != nil {
 		// this is unrecoverable due to Rust's ownership model
 		// The underlying proposal is no longer valid.
@@ -114,7 +115,7 @@ func (p *Proposal) Commit() error {
 // An error is returned if the proposal was already dropped.
 func (p *Proposal) Drop() error {
 	if p.handle == nil {
-		return errDbClosed
+		return errDBClosed
 	}
 
 	if p.id == 0 {

@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,7 +21,6 @@ func TestMain(m *testing.M) {
 		switch strings.TrimSpace(kv) {
 		case "cgocheck=1":
 			hasCgoCheck = true
-			break
 		case "cgocheck=0":
 			fmt.Fprint(os.Stderr, "GODEBUG=cgocheck=0; MUST be 1 for Firewood cgo tests")
 			os.Exit(1)
@@ -66,13 +64,15 @@ func TestInsert(t *testing.T) {
 		key = "abc"
 		val = "def"
 	)
-	db.Batch([]KeyValue{
+
+	_, err := db.Batch([]KeyValue{
 		{[]byte(key), []byte(val)},
 	})
+	require.NoError(t, err, "Batch(%q)", key)
 
 	got, err := db.Get([]byte(key))
 	require.NoErrorf(t, err, "%T.Get(%q)", db, key)
-	assert.Equal(t, val, string(got), "Recover lone batch-inserted value")
+	require.Equal(t, val, string(got), "Recover lone batch-inserted value")
 }
 
 // Attempt to make a call to a nil or invalid handle.
@@ -82,21 +82,21 @@ func TestGetBadHandle(t *testing.T) {
 
 	// This ignores error, but still shouldn't panic.
 	_, err := db.Get([]byte("non-existent"))
-	assert.ErrorIs(t, err, errDbClosed)
+	require.ErrorIs(t, err, errDBClosed)
 
 	// We ignore the error, but it shouldn't panic.
 	_, err = db.Root()
-	assert.ErrorIs(t, err, errDbClosed)
+	require.ErrorIs(t, err, errDBClosed)
 
 	root, err := db.Update(
 		[][]byte{[]byte("key")},
 		[][]byte{[]byte("value")},
 	)
-	assert.Empty(t, root)
-	assert.ErrorIs(t, err, errDbClosed)
+	require.Empty(t, root)
+	require.ErrorIs(t, err, errDBClosed)
 
 	err = db.Close()
-	require.ErrorIs(t, err, errDbClosed)
+	require.ErrorIs(t, err, errDBClosed)
 }
 
 func keyForTest(i int) []byte {
@@ -163,15 +163,15 @@ func TestInsert100(t *testing.T) {
 				require.NoErrorf(t, err, "%T.Get(%q)", db, keys[i])
 				// Cast as strings to improve debug messages.
 				want := string(vals[i])
-				assert.Equal(t, want, string(got), "Recover nth batch-inserted value")
+				require.Equal(t, want, string(got), "Recover nth batch-inserted value")
 			}
 
 			hash, err := db.Root()
-			assert.NoError(t, err, "%T.Root()", db)
-			assert.Lenf(t, hash, 32, "%T.Root()", db)
+			require.NoError(t, err, "%T.Root()", db)
+			require.Lenf(t, hash, 32, "%T.Root()", db)
 			// we know the hash starts with 0xf8
-			assert.Equalf(t, byte(0xf8), hash[0], "First byte of %T.Root()", db)
-			assert.Equalf(t, rootFromInsert, hash, "%T.Root() matches value returned by insertion", db)
+			require.Equalf(t, byte(0xf8), hash[0], "First byte of %T.Root()", db)
+			require.Equalf(t, rootFromInsert, hash, "%T.Root() matches value returned by insertion", db)
 		})
 	}
 }
@@ -183,23 +183,25 @@ func TestRangeDelete(t *testing.T) {
 	for i := range ops {
 		ops[i] = kvForTest(i)
 	}
-	db.Batch(ops)
+	_, err := db.Batch(ops)
+	require.NoError(t, err, "Batch")
 
 	const deletePrefix = 1
-	db.Batch([]KeyValue{{
+	_, err = db.Batch([]KeyValue{{
 		Key: keyForTest(deletePrefix),
 		// delete all keys that start with "key1"
 		Value: nil,
 	}})
+	require.NoError(t, err, "Batch")
 
 	for _, op := range ops {
 		got, err := db.Get(op.Key)
 		require.NoError(t, err)
 
 		if deleted := bytes.HasPrefix(op.Key, keyForTest(deletePrefix)); deleted {
-			assert.Empty(t, err, got)
+			require.NoError(t, err, got)
 		} else {
-			assert.Equal(t, op.Value, got)
+			require.Equal(t, op.Value, got)
 		}
 	}
 }
@@ -209,11 +211,11 @@ func TestInvariants(t *testing.T) {
 	db := newTestDatabase(t)
 	hash, err := db.Root()
 	require.NoError(t, err, "%T.Root()", db)
-	assert.Equalf(t, make([]byte, 32), hash, "%T.Root() of empty trie")
+	require.Equalf(t, make([]byte, 32), hash, "%T.Root() of empty trie", db)
 
 	got, err := db.Get([]byte("non-existent"))
 	require.NoError(t, err)
-	assert.Emptyf(t, got, "%T.Get([non-existent key])", db)
+	require.Emptyf(t, got, "%T.Get([non-existent key])", db)
 }
 
 func TestParallelProposals(t *testing.T) {
@@ -240,7 +242,7 @@ func TestParallelProposals(t *testing.T) {
 		for j := 0; j < numKeys; j++ {
 			got, err := p.Get(keyForTest(i*numKeys + j))
 			require.NoError(t, err, "Get(%d)", i*numKeys+j)
-			assert.Equal(t, valForTest(i*numKeys+j), got, "Get(%d)", i*numKeys+j)
+			require.Equal(t, valForTest(i*numKeys+j), got, "Get(%d)", i*numKeys+j)
 		}
 	}
 
@@ -251,14 +253,14 @@ func TestParallelProposals(t *testing.T) {
 	for j := 0; j < numKeys; j++ {
 		got, err := db.Get(keyForTest(j))
 		require.NoError(t, err, "Get(%d)", j)
-		assert.Equal(t, valForTest(j), got, "Get(%d)", j)
+		require.Equal(t, valForTest(j), got, "Get(%d)", j)
 	}
 	// Check that the other proposals' keys are not present.
 	for i := 1; i < numProposals; i++ {
 		for j := 0; j < numKeys; j++ {
 			got, err := db.Get(keyForTest(i*numKeys + j))
 			require.NoError(t, err, "Get(%d)", i*numKeys+j)
-			assert.Empty(t, got, "Get(%d)", i*numKeys+j)
+			require.Empty(t, got, "Get(%d)", i*numKeys+j)
 		}
 	}
 
@@ -267,7 +269,7 @@ func TestParallelProposals(t *testing.T) {
 		for j := 0; j < numKeys; j++ {
 			got, err := proposals[i].Get(keyForTest(i*numKeys + j))
 			require.NoError(t, err, "Get(%d)", i*numKeys+j)
-			assert.Equal(t, valForTest(i*numKeys+j), got, "Get(%d)", i*numKeys+j)
+			require.Equal(t, valForTest(i*numKeys+j), got, "Get(%d)", i*numKeys+j)
 		}
 	}
 
@@ -288,7 +290,7 @@ func TestParallelProposals(t *testing.T) {
 		for j := 0; j < numKeys; j++ {
 			got, err := proposals[i].Get(keyForTest(i*numKeys + j))
 			require.ErrorIs(t, err, errDroppedProposal, "Get(%d)", i*numKeys+j)
-			assert.Empty(t, got, "Get(%d)", i*numKeys+j)
+			require.Empty(t, got, "Get(%d)", i*numKeys+j)
 		}
 	}
 }
@@ -304,7 +306,8 @@ func TestDeleteAll(t *testing.T) {
 		vals[i] = valForTest(i)
 	}
 	// Insert 10 key-value pairs.
-	db.Update(keys, vals)
+	_, err := db.Update(keys, vals)
+	require.NoError(t, err, "Update")
 
 	// Create a proposal that deletes all keys.
 	proposal, err := db.Propose([][]byte{[]byte("key")}, [][]byte{nil})
@@ -314,7 +317,7 @@ func TestDeleteAll(t *testing.T) {
 	for i := range keys {
 		got, err := proposal.Get(keys[i])
 		require.NoError(t, err, "Get(%d)", i)
-		assert.Empty(t, got, "Get(%d)", i)
+		require.Empty(t, got, "Get(%d)", i)
 	}
 
 	// Commit the proposal.
@@ -324,7 +327,7 @@ func TestDeleteAll(t *testing.T) {
 	// Check that the database is empty.
 	hash, err := db.Root()
 	require.NoError(t, err, "%T.Root()", db)
-	assert.Equalf(t, make([]byte, 32), hash, "%T.Root() of empty trie")
+	require.Equalf(t, make([]byte, 32), hash, "%T.Root() of empty trie", db)
 }
 
 // Tests that a proposal with an invalid ID cannot be committed.
@@ -415,13 +418,13 @@ func TestProposeFromProposal(t *testing.T) {
 	for i := range keys2 {
 		got, err := proposal1.Get(keys2[i])
 		require.NoError(t, err, "Get(%d)", i)
-		assert.Empty(t, got, "Get(%d)", i)
+		require.Empty(t, got, "Get(%d)", i)
 	}
 	// Assert that the second proposal has keys from the first.
 	for i := range keys1 {
 		got, err := proposal2.Get(keys1[i])
 		require.NoError(t, err, "Get(%d)", i)
-		assert.Equal(t, vals1[i], got, "Get(%d)", i)
+		require.Equal(t, vals1[i], got, "Get(%d)", i)
 	}
 
 	// Commit the first proposal.
@@ -432,12 +435,12 @@ func TestProposeFromProposal(t *testing.T) {
 	for i := range keys1 {
 		got, err := db.Get(keys1[i])
 		require.NoError(t, err, "Get(%d)", i)
-		assert.Equal(t, vals1[i], got, "Get(%d)", i)
+		require.Equal(t, vals1[i], got, "Get(%d)", i)
 	}
 	for i := range keys2 {
 		got, err := proposal2.Get(keys2[i])
 		require.NoError(t, err, "Get(%d)", i)
-		assert.Equal(t, vals2[i], got, "Get(%d)", i)
+		require.Equal(t, vals2[i], got, "Get(%d)", i)
 	}
 
 	// Commit the second proposal.
@@ -448,12 +451,12 @@ func TestProposeFromProposal(t *testing.T) {
 	for i := range keys1 {
 		got, err := db.Get(keys1[i])
 		require.NoError(t, err, "Get(%d)", i)
-		assert.Equal(t, vals1[i], got, "Get(%d)", i)
+		require.Equal(t, vals1[i], got, "Get(%d)", i)
 	}
 	for i := range keys2 {
 		got, err := db.Get(keys2[i])
 		require.NoError(t, err, "Get(%d)", i)
-		assert.Equal(t, vals2[i], got, "Get(%d)", i)
+		require.Equal(t, vals2[i], got, "Get(%d)", i)
 	}
 }
 
@@ -490,7 +493,7 @@ func TestDeepPropose(t *testing.T) {
 	for i := range keys {
 		got, err := proposals[numProposals-1].Get(keys[i])
 		require.NoError(t, err, "Get(%d)", i)
-		assert.Equal(t, vals[i], got, "Get(%d)", i)
+		require.Equal(t, vals[i], got, "Get(%d)", i)
 	}
 
 	// Commit each proposal sequentially, and ensure that the values are
@@ -502,7 +505,7 @@ func TestDeepPropose(t *testing.T) {
 		for j := i * numKeys; j < (i+1)*numKeys; j++ {
 			got, err := db.Get(keys[j])
 			require.NoError(t, err, "Get(%d)", j)
-			assert.Equal(t, vals[j], got, "Get(%d)", j)
+			require.Equal(t, vals[j], got, "Get(%d)", j)
 		}
 	}
 }
@@ -552,7 +555,7 @@ func TestDropProposalAndCommit(t *testing.T) {
 	for i := range keys {
 		got, err := proposals[numProposals-1].Get(keys[i])
 		require.NoError(t, err, "Get(%d)", i)
-		assert.Equal(t, vals[i], got, "Get(%d)", i)
+		require.Equal(t, vals[i], got, "Get(%d)", i)
 	}
 }
 
@@ -577,53 +580,53 @@ func TestProposeSameRoot(t *testing.T) {
 	// Create the first proposal chain.
 	proposal1, err := db.Propose(keys[0:5], vals[0:5])
 	require.NoError(t, err, "Propose")
-	proposal3_top, err := proposal1.Propose(keys[5:10], vals[5:10])
+	proposal3Top, err := proposal1.Propose(keys[5:10], vals[5:10])
 	require.NoError(t, err, "Propose")
 	// Create the second proposal chain.
 	proposal2, err := db.Propose(keys[5:10], vals[5:10])
 	require.NoError(t, err, "Propose")
-	proposal3_bottom, err := proposal2.Propose(keys[0:5], vals[0:5])
+	proposal3Bottom, err := proposal2.Propose(keys[0:5], vals[0:5])
 	require.NoError(t, err, "Propose")
 	// Because the proposals are identical, they should have the same root.
 
 	// Create a unique proposal from each of the two chains.
-	top_keys := make([][]byte, 5)
-	top_vals := make([][]byte, 5)
-	for i := range top_keys {
-		top_keys[i] = keyForTest(i + 10)
-		top_vals[i] = valForTest(i + 10)
+	topKeys := make([][]byte, 5)
+	topVals := make([][]byte, 5)
+	for i := range topKeys {
+		topKeys[i] = keyForTest(i + 10)
+		topVals[i] = valForTest(i + 10)
 	}
-	bot_keys := make([][]byte, 5)
-	bot_vals := make([][]byte, 5)
-	for i := range bot_keys {
-		bot_keys[i] = keyForTest(i + 20)
-		bot_vals[i] = valForTest(i + 20)
+	bottomKeys := make([][]byte, 5)
+	bottomVals := make([][]byte, 5)
+	for i := range bottomKeys {
+		bottomKeys[i] = keyForTest(i + 20)
+		bottomVals[i] = valForTest(i + 20)
 	}
-	proposal4, err := proposal3_top.Propose(top_keys, top_vals)
+	proposal4, err := proposal3Top.Propose(topKeys, topVals)
 	require.NoError(t, err, "Propose")
-	proposal5, err := proposal3_bottom.Propose(bot_keys, bot_vals)
+	proposal5, err := proposal3Bottom.Propose(bottomKeys, bottomVals)
 	require.NoError(t, err, "Propose")
 
 	// Now we will commit the top chain, and check that the bottom chain is still valid.
 	err = proposal1.Commit()
 	require.NoError(t, err, "Commit")
-	err = proposal3_top.Commit()
+	err = proposal3Top.Commit()
 	require.NoError(t, err, "Commit")
 
 	// Check that both final proposals are valid.
 	for i := range keys {
 		got, err := proposal4.Get(keys[i])
 		require.NoError(t, err, "P4 Get(%d)", i)
-		assert.Equal(t, vals[i], got, "P4 Get(%d)", i)
+		require.Equal(t, vals[i], got, "P4 Get(%d)", i)
 		got, err = proposal5.Get(keys[i])
 		require.NoError(t, err, "P5 Get(%d)", i)
-		assert.Equal(t, vals[i], got, "P5 Get(%d)", i)
+		require.Equal(t, vals[i], got, "P5 Get(%d)", i)
 	}
 
 	// Attempt to commit P5. Since this isn't in the canonical chain, it should
 	// fail.
 	err = proposal5.Commit()
-	require.Error(t, err, "Commit P5") // this error is internal to firewood
+	require.Contains(t, err.Error(), "commit the parents of this proposal first", "Commit P5") // this error is internal to firewood
 
 	// We should be able to commit P4, since it is in the canonical chain.
 	err = proposal4.Commit()
@@ -659,7 +662,7 @@ func TestRevision(t *testing.T) {
 	for i := range keys {
 		got, err := revision.Get(keys[i])
 		require.NoError(t, err, "Get(%d)", i)
-		assert.Equal(t, valForTest(i), got, "Get(%d)", i)
+		require.Equal(t, valForTest(i), got, "Get(%d)", i)
 	}
 
 	// Create a second proposal with 10 key-value pairs.
@@ -682,7 +685,7 @@ func TestRevision(t *testing.T) {
 	for i := range keys {
 		got, err := revision.Get(keys[i])
 		require.NoError(t, err, "Get(%d)", i)
-		assert.Equal(t, valForTest(i), got, "Get(%d)", i)
+		require.Equal(t, valForTest(i), got, "Get(%d)", i)
 	}
 }
 
@@ -700,7 +703,7 @@ func TestFakeRevision(t *testing.T) {
 
 	// Create a fake revision with an valid root.
 	validRoot := []byte("counting 32 bytes to make a hash")
-	assert.Len(t, validRoot, 32, "valid root")
+	require.Len(t, validRoot, 32, "valid root")
 	_, err = db.Revision(validRoot)
 	require.ErrorIs(t, err, errRevisionNotFound, "Revision(valid root)")
 }
@@ -733,14 +736,14 @@ func TestGetNilCases(t *testing.T) {
 	for _, k := range specialKeys {
 		got, err := db.Get(k)
 		require.NoError(t, err, "db.Get(%q)", k)
-		assert.Empty(t, got, "db.Get(%q)", k)
+		require.Empty(t, got, "db.Get(%q)", k)
 
 		got, err = revision.Get(k)
 		require.NoError(t, err, "Revision.Get(%q)", k)
-		assert.Empty(t, got, "Revision.Get(%q)", k)
+		require.Empty(t, got, "Revision.Get(%q)", k)
 
 		got, err = proposal.Get(k)
 		require.NoError(t, err, "Proposal.Get(%q)", k)
-		assert.Empty(t, got, "Proposal.Get(%q)", k)
+		require.Empty(t, got, "Proposal.Get(%q)", k)
 	}
 }

@@ -33,7 +33,7 @@ const (
 	keyNotFound      = "key not found"
 )
 
-var errDbClosed = errors.New("firewood database already closed")
+var errDBClosed = errors.New("firewood database already closed")
 
 // A Database is a handle to a Firewood database.
 // It is not safe to call these methods with a nil handle.
@@ -138,14 +138,14 @@ func (db *Database) Batch(ops []KeyValue) ([]byte, error) {
 	hash := C.fwd_batch(
 		db.handle,
 		C.size_t(len(ffiOps)),
-		(*C.struct_KeyValue)(unsafe.SliceData(ffiOps)), // implicitly pinned
+		unsafe.SliceData(ffiOps), // implicitly pinned
 	)
 	return extractBytesThenFree(&hash)
 }
 
 func (db *Database) Propose(keys, vals [][]byte) (*Proposal, error) {
 	if db.handle == nil {
-		return nil, errDbClosed
+		return nil, errDBClosed
 	}
 
 	values, cleanup := newValueFactory()
@@ -158,13 +158,12 @@ func (db *Database) Propose(keys, vals [][]byte) (*Proposal, error) {
 			value: values.from(vals[i]),
 		}
 	}
-	id_or_err := C.fwd_propose_on_db(
+	idOrErr := C.fwd_propose_on_db(
 		db.handle,
 		C.size_t(len(ffiOps)),
-		(*C.struct_KeyValue)(unsafe.SliceData(ffiOps)), // implicitly pinned
+		unsafe.SliceData(ffiOps), // implicitly pinned
 	)
-	id, err := extractIdThenFree(&id_or_err)
-
+	id, err := extractUintThenFree(&idOrErr)
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +179,7 @@ func (db *Database) Propose(keys, vals [][]byte) (*Proposal, error) {
 // If the key is not found, the return value will be (nil, nil).
 func (db *Database) Get(key []byte) ([]byte, error) {
 	if db.handle == nil {
-		return nil, errDbClosed
+		return nil, errDBClosed
 	}
 
 	values, cleanup := newValueFactory()
@@ -200,7 +199,7 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 // Empty trie must return common.Hash{}.
 func (db *Database) Root() ([]byte, error) {
 	if db.handle == nil {
-		return nil, errDbClosed
+		return nil, errDBClosed
 	}
 	hash := C.fwd_root_hash(db.handle)
 	bytes, err := extractBytesThenFree(&hash)
@@ -222,7 +221,7 @@ func (db *Database) Revision(root []byte) (*Revision, error) {
 // Returns an error if already closed.
 func (db *Database) Close() error {
 	if db.handle == nil {
-		return errDbClosed
+		return errDBClosed
 	}
 	C.fwd_close_db(db.handle)
 	db.handle = nil

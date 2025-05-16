@@ -8,6 +8,7 @@ package firewood
 // #include <stdlib.h>
 // #include "firewood.h"
 import "C"
+
 import (
 	"errors"
 	"fmt"
@@ -58,7 +59,7 @@ func newRevision(handle *C.DatabaseHandle, root []byte) (*Revision, error) {
 
 func (r *Revision) Get(key []byte) ([]byte, error) {
 	if r.handle == nil {
-		return nil, errDbClosed
+		return nil, errDBClosed
 	}
 	if r.root == nil {
 		return nil, errRevisionNotFound

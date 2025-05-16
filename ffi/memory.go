@@ -8,6 +8,7 @@ package firewood
 // #include <stdlib.h>
 // #include "firewood.h"
 import "C"
+
 import (
 	"errors"
 	"fmt"
@@ -57,15 +58,14 @@ func extractErrorThenFree(v *C.struct_Value) error {
 	// We should still attempt to free the value.
 	C.fwd_free_value(v)
 	return errBadValue
-
 }
 
-// extractIdThenFree converts the cgo `Value` payload to either:
+// extractUintThenFree converts the cgo `Value` payload to either:
 // 1. a nonzero uint32 and nil error, indicating a valid int
 // 2. a zero uint32 and a non-nil error, indicating an error occurred.
 // This should only be called when the `Value` is expected to only contain an error or an ID.
 // Otherwise, an error is returned.
-func extractIdThenFree(v *C.struct_Value) (uint32, error) {
+func extractUintThenFree(v *C.struct_Value) (uint32, error) {
 	// Pin the returned value to prevent it from being garbage collected.
 	defer runtime.KeepAlive(v)
 
@@ -129,7 +129,6 @@ func extractBytesThenFree(v *C.struct_Value) ([]byte, error) {
 	// We should still attempt to free the value.
 	C.fwd_free_value(v)
 	return nil, errBadValue
-
 }
 
 // newValueFactory returns a factory for converting byte slices into cgo `Value`
