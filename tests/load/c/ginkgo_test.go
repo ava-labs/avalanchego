@@ -10,7 +10,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/ava-labs/libevm/common"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
@@ -65,10 +64,9 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 	var (
 		network *tmpnet.Network
-		tc      *e2e.GinkgoTestContext
-		tracker *load.Tracker[common.Hash]
 
-		logger = logging.NewLogger("c-chain-load-testing", logging.NewWrappedCore(logging.Info, os.Stdout, logging.Auto.ConsoleEncoder()))
+		registry = prometheus.NewRegistry()
+		logger   = logging.NewLogger("c-chain-load-testing", logging.NewWrappedCore(logging.Info, os.Stdout, logging.Auto.ConsoleEncoder()))
 	)
 
 	ginkgo.BeforeAll(func() {
@@ -83,17 +81,8 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 			err := node.EnsureKeys()
 			require.NoError(tc, err, "ensuring keys for node %s", node.NodeID)
 		}
-	})
 
-	// Setup metrics server and load tracker before each test run
-	// ensuring isolation
-	ginkgo.BeforeEach(func() {
-		promRegistry := prometheus.NewRegistry()
-		loadTracker, err := load.NewTracker[common.Hash](promRegistry)
-		require.NoError(tc, err)
-		tracker = loadTracker
-
-		cleanup := setupMetricsServer(tc, promRegistry, network.UUID, network.Owner, logger)
+		cleanup := setupMetricsServer(tc, registry, network.UUID, network.Owner, logger)
 		ginkgo.DeferCleanup(cleanup)
 	})
 
@@ -109,7 +98,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 			maxTPS:    90,
 			step:      10,
 		}
-		err = execute(ctx, tracker, network.PreFundedKeys, config, logger)
+		err = execute(ctx, registry, network.PreFundedKeys, config, logger)
 		if err != nil {
 			ginkgo.GinkgoT().Error(err)
 		}
@@ -127,7 +116,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 			maxTPS:    60,
 			step:      5,
 		}
-		err = execute(ctx, tracker, network.PreFundedKeys, config, logger)
+		err = execute(ctx, registry, network.PreFundedKeys, config, logger)
 		if err != nil {
 			ginkgo.GinkgoT().Error(err)
 		}
