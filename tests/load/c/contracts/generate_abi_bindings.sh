@@ -5,12 +5,8 @@ set -euo pipefail
 
 # Ensure required tools are installed
 if ! command -v solc &> /dev/null; then
-  echo "Error: solc (Solidity compiler) is not installed, trying to install with brew."
-  brew install solidity
-  if ! command -v solc &> /dev/null; then
-    echo "Error: solc installation failed. Please install it manually."
-    exit 1
-  fi
+  echo "Error: solc not found. Run this command from Nix shell."
+  exit 1
 fi
 
 CONTRACTS_DIR="$(dirname "$0")"
@@ -22,9 +18,10 @@ for FILE in "${CONTRACTS_DIR}"/*.sol; do
   go run github.com/ava-labs/libevm/cmd/abigen@latest \
     --bin="${CONTRACTS_DIR}/${CONTRACT_NAME}.bin" \
     --abi="${CONTRACTS_DIR}/${CONTRACT_NAME}.abi" \
-    --type $CONTRACT_NAME \
+    --type "${CONTRACT_NAME}" \
     --pkg=contracts \
     --out="${CONTRACTS_DIR}/${CONTRACT_NAME}.bindings.go"
   rm "${CONTRACTS_DIR}/${CONTRACT_NAME}.bin" "${CONTRACTS_DIR}/${CONTRACT_NAME}.abi"
   echo "Generated ${CONTRACT_NAME}.bindings.go"
 done
+

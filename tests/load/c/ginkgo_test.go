@@ -1,17 +1,23 @@
-// Co// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package c
 
 import (
 	"context"
+	"fmt"
+	"net"
+	"os"
 	"testing"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/tests/load"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 // Run this using the command:
@@ -26,7 +32,10 @@ func init() {
 	flagVars = e2e.RegisterFlagsWithDefaultOwner("avalanchego-load")
 }
 
-const nodesCount = 3
+const (
+	blockchainID = "C"
+	nodesCount   = 3
+)
 
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run only once in the first ginkgo process
@@ -53,21 +62,34 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 })
 
 var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
-	var network *tmpnet.Network
+	var (
+		network *tmpnet.Network
+		metrics *load.Metrics
+
+		logger = logging.NewLogger("c-chain-load-testing", logging.NewWrappedCore(logging.Info, os.Stdout, logging.Auto.ConsoleEncoder()))
+	)
 
 	ginkgo.BeforeAll(func() {
 		tc := e2e.NewTestContext()
 		env := e2e.GetEnv(tc)
+		registry := prometheus.NewRegistry()
+
 		network = env.GetNetwork()
 		network.Nodes = network.Nodes[:nodesCount]
 		for _, node := range network.Nodes {
 			err := node.EnsureKeys()
 			require.NoError(tc, err, "ensuring keys for node %s", node.NodeID)
 		}
+
+		loadMetrics, err := load.NewMetrics(registry)
+		require.NoError(tc, err, "failed to register load metrics")
+		metrics = loadMetrics
+
+		cleanup := setupMetricsServer(tc, registry, network.UUID, network.Owner, logger)
+		ginkgo.DeferCleanup(cleanup)
 	})
 
 	ginkgo.It("C-Chain simple", func(ctx context.Context) {
-		const blockchainID = "C"
 		endpoints, err := tmpnet.GetNodeWebsocketURIs(network.Nodes, blockchainID)
 		require.NoError(ginkgo.GinkgoT(), err, "getting node websocket URIs")
 		config := config{
@@ -79,14 +101,13 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 			maxTPS:    90,
 			step:      10,
 		}
-		err = execute(ctx, network.PreFundedKeys, config)
+		err = execute(ctx, network.PreFundedKeys, config, metrics, logger)
 		if err != nil {
 			ginkgo.GinkgoT().Error(err)
 		}
 	})
 
 	ginkgo.It("C-Chain opcoder", func(ctx context.Context) {
-		const blockchainID = "C"
 		endpoints, err := tmpnet.GetNodeWebsocketURIs(network.Nodes, blockchainID)
 		require.NoError(ginkgo.GinkgoT(), err, "getting node websocket URIs")
 		config := config{
@@ -98,9 +119,38 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 			maxTPS:    60,
 			step:      5,
 		}
-		err = execute(ctx, network.PreFundedKeys, config)
+		err = execute(ctx, network.PreFundedKeys, config, metrics, logger)
 		if err != nil {
 			ginkgo.GinkgoT().Error(err)
 		}
 	})
 })
+
+// setupMetricsServer creates Prometheus server with a dynamically allocated port
+func setupMetricsServer(tc *e2e.GinkgoTestContext, registry *prometheus.Registry, networkUUID, networkOwner string, logger logging.Logger) func() {
+	r := require.New(tc)
+
+	// Allocate a port dynamically
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	r.NoError(err, "allocating dynamic port")
+
+	tcpAddr, ok := listener.Addr().(*net.TCPAddr)
+	r.True(ok, "allocating dynamic port")
+	port := tcpAddr.Port
+	r.NoError(listener.Close(), "closing listener on port %d", port)
+
+	metricsURI := fmt.Sprintf("127.0.0.1:%d", port)
+
+	metricsServer := load.NewPrometheusServer(metricsURI, registry, logger)
+	_, err = metricsServer.Start()
+	r.NoError(err, "failed to start metrics server")
+
+	monitoringConfigFilePath, err := metricsServer.GenerateMonitoringConfig(networkUUID, networkOwner)
+	r.NoError(err, "failed to generate monitoring config file")
+
+	// Return a cleanup function
+	return func() {
+		r.NoError(metricsServer.Stop(), "stopping metrics server")
+		r.NoError(os.Remove(monitoringConfigFilePath))
+	}
+}
