@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand/v2"
-	"time"
 
 	"github.com/ava-labs/libevm/accounts/abi/bind"
 	"github.com/ava-labs/libevm/common"
@@ -41,8 +40,7 @@ type Opcoder struct {
 	contractInstance *contracts.EVMLoadSimulator
 
 	// State
-	nonce     uint64
-	lastIssue time.Time
+	nonce uint64
 }
 
 func NewOpcoder(
@@ -138,7 +136,6 @@ func (o *Opcoder) GenerateAndIssueTx(ctx context.Context) (common.Hash, error) {
 	o.nonce++
 	txHash := tx.Hash()
 	o.tracker.Issue(txHash)
-	o.lastIssue = time.Now()
 	return txHash, err
 }
 
