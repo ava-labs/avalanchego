@@ -4,6 +4,7 @@
 package antithesis
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -32,6 +33,10 @@ var (
 	errAvalancheGoEvVarNotSet = errors.New(tmpnet.AvalancheGoPathEnvName + " environment variable not set")
 	errPluginDirEnvVarNotSet  = errors.New(tmpnet.AvalancheGoPluginDirEnvName + " environment variable not set")
 )
+
+type cChainConfig struct {
+	LogJSONFormat bool `json:"log-json-format"`
+}
 
 // Creates docker compose configuration for an antithesis test setup. Configuration is via env vars to
 // simplify usage by main entrypoints. If the provided network includes a subnet, the initial DB state for
@@ -127,7 +132,11 @@ func initComposeConfig(
 			// Write config.json if this is the C-Chain config directory
 			if isCChainConfigDir(volumePath) {
 				configFilePath := filepath.Join(volumePath, "config.json")
-				configContent := []byte("{\n  \"log-json-format\": true\n}\n")
+				cfg := cChainConfig{LogJSONFormat: true}
+				configContent, err := json.MarshalIndent(cfg, "", "  ")
+				if err != nil {
+					return fmt.Errorf("failed to marshal config.json: %w", err)
+				}
 				if err := os.WriteFile(configFilePath, configContent, perms.ReadWrite); err != nil {
 					return fmt.Errorf("failed to write config.json to %q: %w", configFilePath, err)
 				}
