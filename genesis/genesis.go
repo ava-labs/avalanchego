@@ -446,7 +446,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		},
 	}
 
-	pChainGenesis, err := genesis.NewGenesis(
+	pChainGenesis, err := genesis.New(
 		avaxAssetID,
 		config.NetworkID,
 		platformAllocations,

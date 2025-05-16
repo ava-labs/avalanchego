@@ -38,7 +38,7 @@ func createTestGenesis(t *testing.T) *Genesis {
 		}},
 	}
 
-	genesis, err := NewGenesis(
+	genesis, err := New(
 		ids.ID{'d', 'u', 'm', 'm', 'y', ' ', 'I', 'D'},
 		constants.UnitTestID,
 		[]Allocation{
@@ -58,7 +58,7 @@ func createTestGenesis(t *testing.T) *Genesis {
 	return genesis
 }
 
-func TestNewGenesisInvalidUTXOBalance(t *testing.T) {
+func TestNewInvalidUTXOBalance(t *testing.T) {
 	require := require.New(t)
 	nodeID := ids.BuildTestNodeID([]byte{1, 2, 3})
 	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
@@ -85,7 +85,7 @@ func TestNewGenesisInvalidUTXOBalance(t *testing.T) {
 		}},
 	}
 
-	genesis, err := NewGenesis(
+	genesis, err := New(
 		ids.Empty,
 		constants.UnitTestID,
 		[]Allocation{utxo},
@@ -99,7 +99,7 @@ func TestNewGenesisInvalidUTXOBalance(t *testing.T) {
 	require.Nil(genesis)
 }
 
-func TestNewGenesisInvalidStakeWeight(t *testing.T) {
+func TestNewInvalidStakeWeight(t *testing.T) {
 	require := require.New(t)
 	nodeID := ids.BuildTestNodeID([]byte{1, 2, 3})
 	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
@@ -126,7 +126,7 @@ func TestNewGenesisInvalidStakeWeight(t *testing.T) {
 		}},
 	}
 
-	genesis, err := NewGenesis(
+	genesis, err := New(
 		ids.Empty,
 		0,
 		[]Allocation{utxo},
@@ -140,7 +140,7 @@ func TestNewGenesisInvalidStakeWeight(t *testing.T) {
 	require.Nil(genesis)
 }
 
-func TestNewGenesisInvalidEndtime(t *testing.T) {
+func TestNewInvalidEndtime(t *testing.T) {
 	require := require.New(t)
 	nodeID := ids.BuildTestNodeID([]byte{1, 2, 3})
 	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
@@ -168,7 +168,7 @@ func TestNewGenesisInvalidEndtime(t *testing.T) {
 		}},
 	}
 
-	genesis, err := NewGenesis(
+	genesis, err := New(
 		ids.Empty,
 		constants.UnitTestID,
 		[]Allocation{utxo},
@@ -225,7 +225,7 @@ func TestGenesis(t *testing.T) {
 	require.Equal(uint64(0), genesis.InitialSupply)
 }
 
-func TestNewGenesisReturnsSortedValidators(t *testing.T) {
+func TestNewReturnsSortedValidators(t *testing.T) {
 	require := require.New(t)
 	nodeID := ids.BuildTestNodeID([]byte{1})
 	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
@@ -286,7 +286,7 @@ func TestNewGenesisReturnsSortedValidators(t *testing.T) {
 	}
 
 	avaxAssetID := ids.ID{'d', 'u', 'm', 'm', 'y', ' ', 'I', 'D'}
-	genesis, err := NewGenesis(
+	genesis, err := New(
 		avaxAssetID,
 		constants.UnitTestID,
 		[]Allocation{allocation},
