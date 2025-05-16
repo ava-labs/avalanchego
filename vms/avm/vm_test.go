@@ -61,7 +61,7 @@ func TestInvalidFx(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	genesisBytes := buildGenesisTest(t)
+	genesisBytes := newGenesisBytesTest(t)
 	err := vm.Initialize(
 		context.Background(),
 		ctx,                          // context
@@ -89,7 +89,7 @@ func TestFxInitializationFailure(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	genesisBytes := buildGenesisTest(t)
+	genesisBytes := newGenesisBytesTest(t)
 	err := vm.Initialize(
 		context.Background(),
 		ctx,                          // context
