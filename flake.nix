@@ -57,7 +57,7 @@
             protoc-gen-go
             protoc-gen-go-grpc
 
-            # Solidity compiler (v0.8.21)
+            # Solidity compiler from nixpkgs 24.11
             solc
           ] ++ lib.optionals stdenv.isDarwin [
             # macOS-specific frameworks

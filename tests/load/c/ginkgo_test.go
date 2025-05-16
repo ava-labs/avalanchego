@@ -70,11 +70,9 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 	)
 
 	ginkgo.BeforeAll(func() {
-		var (
-			tc       = e2e.NewTestContext()
-			env      = e2e.GetEnv(tc)
-			registry = prometheus.NewRegistry()
-		)
+		tc := e2e.NewTestContext()
+		env := e2e.GetEnv(tc)
+		registry := prometheus.NewRegistry()
 
 		network = env.GetNetwork()
 		network.Nodes = network.Nodes[:nodesCount]
