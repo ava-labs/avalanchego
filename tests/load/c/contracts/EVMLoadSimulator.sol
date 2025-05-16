@@ -15,6 +15,9 @@ contract EVMLoadSimulator {
     event MemoryWritten(uint256[] arr);
     event LargeLog(bytes largeData);
 
+    // Dummy contract
+    Dummy public dummy;
+
     // Simulate random storage writes
     function simulateRandomWrite(uint256 count) external {
         for (uint256 i = 1; i <= count; i++) {
@@ -78,7 +81,7 @@ contract EVMLoadSimulator {
     }
 
     function simulateContractCreation() external {
-        new Dummy();
+        dummy = new Dummy();
     }
 
     // Measure pure computation cost without memory/storage overhead.
@@ -99,5 +102,12 @@ contract EVMLoadSimulator {
             data[i] = bytes1(uint8(i));
         }
         emit LargeLog(data);
+    }
+
+    function simulateExternalCall() external {
+        if (dummy == Dummy(address(0))) {
+            dummy = new Dummy();
+        }
+        dummy.updateValue(42);
     }
 }

@@ -19,7 +19,6 @@ contract Dummy {
 
     function updateValue(uint256 newValue) external {
         value = newValue;
-        emit ValueUpdated(newValue);
     }
 
     function writeData(uint256 key, uint256 val) external {

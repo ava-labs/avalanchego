@@ -128,6 +128,8 @@ func (o *Opcoder) GenerateAndIssueTx(ctx context.Context) (common.Hash, error) {
 	case largeEvent:
 		const maxEventSize = 100
 		tx, err = o.contractInstance.SimulateLargeEvent(txOpts, big.NewInt(maxEventSize))
+	case externalCall:
+		tx, err = o.contractInstance.SimulateExternalCall(txOpts)
 	default:
 		return common.Hash{}, fmt.Errorf("invalid load type: %s", loadType)
 	}
@@ -152,6 +154,7 @@ const (
 	contractCreation  = "contract creation"
 	pureCompute       = "pure compute"
 	largeEvent        = "large event"
+	externalCall      = "external call"
 )
 
 func allLoadTypes() []string {
@@ -165,6 +168,7 @@ func allLoadTypes() []string {
 		contractCreation,
 		pureCompute,
 		largeEvent,
+		externalCall,
 	}
 }
 
