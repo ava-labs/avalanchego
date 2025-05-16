@@ -4,6 +4,7 @@
 package antithesis
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -32,6 +33,10 @@ var (
 	errAvalancheGoEvVarNotSet = errors.New(tmpnet.AvalancheGoPathEnvName + " environment variable not set")
 	errPluginDirEnvVarNotSet  = errors.New(tmpnet.AvalancheGoPluginDirEnvName + " environment variable not set")
 )
+
+type cChainConfig struct {
+	LogJSONFormat bool `json:"log-json-format"`
+}
 
 // Creates docker compose configuration for an antithesis test setup. Configuration is via env vars to
 // simplify usage by main entrypoints. If the provided network includes a subnet, the initial DB state for
@@ -124,6 +129,18 @@ func initComposeConfig(
 			if err := os.MkdirAll(volumePath, perms.ReadWriteExecute); err != nil {
 				return fmt.Errorf("failed to create volume path %q: %w", volumePath, err)
 			}
+			// Write config.json if this is the C-Chain config directory
+			if isCChainConfigDir(volumePath) {
+				configFilePath := filepath.Join(volumePath, "config.json")
+				cfg := cChainConfig{LogJSONFormat: true}
+				configContent, err := json.MarshalIndent(cfg, "", "  ")
+				if err != nil {
+					return fmt.Errorf("failed to marshal config.json: %w", err)
+				}
+				if err := os.WriteFile(configFilePath, configContent, perms.ReadWrite); err != nil {
+					return fmt.Errorf("failed to write config.json to %q: %w", configFilePath, err)
+				}
+			}
 		}
 	}
 	return nil
@@ -172,6 +189,11 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 				Type:   types.VolumeTypeBind,
 				Source: fmt.Sprintf("./volumes/%s/logs", serviceName),
 				Target: "/root/.avalanchego/logs",
+			},
+			{
+				Type:   types.VolumeTypeBind,
+				Source: fmt.Sprintf("./volumes/%s/configs/chains/C", serviceName),
+				Target: "/root/.avalanchego/configs/chains/C",
 			},
 		}
 
@@ -281,4 +303,12 @@ func getServiceName(index int) string {
 		return baseName + "-bootstrap-node"
 	}
 	return fmt.Sprintf("%s-node-%d", baseName, index)
+}
+
+// isCChainConfigDir returns true if the given path matches the expected C-Chain config directory structure:
+// .../volumes/<serviceName>/configs/chains/C
+func isCChainConfigDir(path string) bool {
+	return filepath.Base(path) == "C" &&
+		filepath.Base(filepath.Dir(path)) == "chains" &&
+		filepath.Base(filepath.Dir(filepath.Dir(path))) == "configs"
 }
