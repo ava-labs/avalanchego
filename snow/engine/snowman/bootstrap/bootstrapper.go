@@ -789,3 +789,8 @@ func (b *Bootstrapper) Shutdown(ctx context.Context) error {
 func (*Bootstrapper) Gossip(context.Context) error {
 	return nil
 }
+
+func (*Bootstrapper) SimplexMessage(ctx context.Context, node ids.NodeID, msg *p2p.Simplex) error {
+	fmt.Println("Received simplex message from node:", node, "message:", msg)
+	return nil
+}

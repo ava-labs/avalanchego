@@ -1196,3 +1196,8 @@ func (e *Engine) isDecided(blk snowman.Block) bool {
 	parentID := blk.Parent()
 	return parentHeight == lastAcceptedHeight && parentID != lastAcceptedID // the parent was rejected
 }
+
+func (e *Engine) SimplexMessage(ctx context.Context, node ids.NodeID, msg *p2p.Simplex) error {
+	fmt.Println("inside SimplexMessage")
+	return nil
+}

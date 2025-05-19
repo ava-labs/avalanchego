@@ -43,6 +43,7 @@ type Handler interface {
 	ChitsHandler
 	AppHandler
 	InternalHandler
+	SimplexHandler
 }
 
 type AllGetsServer interface {

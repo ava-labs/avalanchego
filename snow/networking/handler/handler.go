@@ -732,7 +732,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		return engine.Disconnected(ctx, nodeID)
 	case *p2ppb.Simplex:
 		fmt.Println("Simplex message, not handled(************)")
-		return engine.(common.SimplexHandler).SimplexMessage(ctx, nodeID, msg)
+		return engine.SimplexMessage(ctx, nodeID, msg)
 
 	default:
 		return fmt.Errorf(

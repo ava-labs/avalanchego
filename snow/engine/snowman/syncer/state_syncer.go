@@ -47,7 +47,7 @@ type stateSyncer struct {
 	common.QueryHandler
 	common.ChitsHandler
 	common.AppHandler
-
+	common.SimplexHandler
 	started bool
 
 	// Tracks the last requestID that was used in a request
@@ -627,3 +627,9 @@ func (ss *stateSyncer) IsEnabled(ctx context.Context) (bool, error) {
 
 	return ss.stateSyncVM.StateSyncEnabled(ctx)
 }
+
+
+// func (ss *stateSyncer) SimplexMessage(ctx context.Context, node ids.NodeID, msg *p2p.Simplex) error {
+// 	fmt.Println("Received simplex message from node:", node, "message:", msg)
+// 	return nil
+// }

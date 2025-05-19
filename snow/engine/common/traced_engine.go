@@ -10,6 +10,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
@@ -308,6 +309,16 @@ func (e *tracedEngine) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []b
 	defer span.End()
 
 	return e.engine.AppGossip(ctx, nodeID, msg)
+}
+
+func (e *tracedEngine) SimplexMessage(ctx context.Context, nodeID ids.NodeID, msg *p2p.Simplex) error {
+	ctx, span := e.tracer.Start(ctx, "tracedEngine.Simplex", oteltrace.WithAttributes(
+		attribute.Stringer("nodeID", nodeID),
+		attribute.Stringer("message", msg),
+	))
+	defer span.End()
+
+	return e.engine.SimplexMessage(ctx, nodeID, msg)
 }
 
 func (e *tracedEngine) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {

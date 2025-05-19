@@ -654,3 +654,9 @@ func vertexLess(i, j avalanche.Vertex) bool {
 
 	return heightI > heightJ
 }
+
+
+func (*Bootstrapper) SimplexMessage(ctx context.Context, node ids.NodeID, msg *p2p.Simplex) error {
+	fmt.Println("Received simplex message from node:", node, "message:", msg)
+	return nil
+}
