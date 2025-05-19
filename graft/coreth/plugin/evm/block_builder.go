@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/txpool"
-	"github.com/ava-labs/coreth/params"
 	atomictxpool "github.com/ava-labs/coreth/plugin/evm/atomic/txpool"
 	"github.com/holiman/uint256"
 
@@ -26,8 +25,7 @@ const (
 )
 
 type blockBuilder struct {
-	ctx         *snow.Context
-	chainConfig *params.ChainConfig
+	ctx *snow.Context
 
 	txPool  *txpool.TxPool
 	mempool *atomictxpool.Mempool
@@ -56,7 +54,6 @@ type blockBuilder struct {
 func (vm *VM) NewBlockBuilder(notifyBuildBlockChan chan<- commonEng.Message) *blockBuilder {
 	b := &blockBuilder{
 		ctx:                  vm.ctx,
-		chainConfig:          vm.chainConfig,
 		txPool:               vm.txPool,
 		mempool:              vm.mempool,
 		shutdownChan:         vm.shutdownChan,
