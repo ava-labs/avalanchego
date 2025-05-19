@@ -23,7 +23,7 @@ import (
 	ethcrypto "github.com/ava-labs/libevm/crypto"
 )
 
-type config struct {
+type loadConfig struct {
 	endpoints []string
 	maxFeeCap int64
 	agents    uint
@@ -40,7 +40,7 @@ const (
 	issuerOpcoder issuerType = "opcoder"
 )
 
-func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config config) error {
+func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config loadConfig) error {
 	logger := logging.NewLogger("", logging.NewWrappedCore(logging.Info, os.Stdout, logging.Auto.ConsoleEncoder()))
 
 	keys, err := fixKeysCount(preFundedKeys, int(config.agents))
@@ -123,7 +123,7 @@ func fixKeysCount(preFundedKeys []*secp256k1.PrivateKey, target int) ([]*ecdsa.P
 // It creates them in parallel because creating issuers can sometimes take a while,
 // and this adds up for many agents. For example, deploying the Opcoder contract
 // takes a few seconds. Running the creation in parallel can reduce the time significantly.
-func createAgents(ctx context.Context, config config, keys []*ecdsa.PrivateKey,
+func createAgents(ctx context.Context, config loadConfig, keys []*ecdsa.PrivateKey,
 	tracker *load.Tracker[common.Hash],
 ) ([]load.Agent[common.Hash], error) {
 	ctx, cancel := context.WithCancel(ctx)
