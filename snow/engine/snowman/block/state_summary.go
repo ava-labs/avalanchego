@@ -21,14 +21,8 @@ type StateSummary interface {
 	// Bytes returns a byte slice than can be used to reconstruct this summary.
 	Bytes() []byte
 
-	// Accept notifies the VM that this is a canonically accepted state summary.
-	// The VM is expected to return how it plans on handling this summary via
-	// the [StateSyncMode].
+	// Accept triggers the VM to start state syncing to this summary.
 	//
-	// Invariant: The VM must be able to correctly handle the acceptance of a
-	// state summary that is older than its current state.
-	//
-	// See [StateSyncSkipped], [StateSyncStatic], and [StateSyncDynamic] for the
-	// expected invariants the VM must maintain based on the return value.
+	// It returns the state sync mode selected by the VM.
 	Accept(context.Context) (StateSyncMode, error)
 }
