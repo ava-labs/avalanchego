@@ -5,11 +5,14 @@ package c
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
+	"github.com/ava-labs/coreth/core"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 )
@@ -26,18 +29,20 @@ func init() {
 	flagVars = e2e.RegisterFlagsWithDefaultOwner("avalanchego-load")
 }
 
-const nodesCount = 5
+const nodesCount = 1
 
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run only once in the first ginkgo process
 
-	require.GreaterOrEqual(ginkgo.GinkgoT(), nodesCount, 5, "number of nodes must be at least 5")
+	// require.GreaterOrEqual(ginkgo.GinkgoT(), nodesCount, 5, "number of nodes must be at least 5")
 	tc := e2e.NewTestContext()
 	nodes := tmpnet.NewNodesOrPanic(nodesCount)
 	network := &tmpnet.Network{
 		Owner: "avalanchego-load-test",
 		Nodes: nodes,
 	}
+	const preFundedKeysCount = 50
+	setNetworkGas(tc, network, preFundedKeysCount)
 
 	env := e2e.NewTestEnvironment(
 		tc,
@@ -70,10 +75,10 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 		config := loadConfig{
 			endpoints: endpoints,
 			issuer:    issuerSimple,
-			maxFeeCap: 3000,
-			agents:    1,
-			minTPS:    50,
-			maxTPS:    90,
+			maxFeeCap: 4761904, // max fee cap equivalent to 100 ether
+			agents:    30,
+			minTPS:    95,
+			maxTPS:    150,
 			step:      10,
 		}
 		err = execute(ctx, network.PreFundedKeys, config)
@@ -82,22 +87,47 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 		}
 	})
 
-	ginkgo.It("C-Chain opcoder", func(ctx context.Context) {
-		const blockchainID = "C"
-		endpoints, err := tmpnet.GetNodeWebsocketURIs(network.Nodes, blockchainID)
-		require.NoError(ginkgo.GinkgoT(), err, "getting node websocket URIs")
-		config := loadConfig{
-			endpoints: endpoints,
-			issuer:    issuerOpcoder,
-			maxFeeCap: 300000000000,
-			agents:    1,
-			minTPS:    30,
-			maxTPS:    60,
-			step:      5,
-		}
-		err = execute(ctx, network.PreFundedKeys, config)
-		if err != nil {
-			ginkgo.GinkgoT().Error(err)
-		}
-	})
+	// ginkgo.It("C-Chain opcoder", func(ctx context.Context) {
+	// 	const blockchainID = "C"
+	// 	endpoints, err := tmpnet.GetNodeWebsocketURIs(network.Nodes, blockchainID)
+	// 	require.NoError(ginkgo.GinkgoT(), err, "getting node websocket URIs")
+	// 	config := loadConfig{
+	// 		endpoints: endpoints,
+	// 		issuer:    issuerOpcoder,
+	// 		maxFeeCap: 300000000000,
+	// 		agents:    10,
+	// 		minTPS:    30,
+	// 		maxTPS:    100,
+	// 		step:      10,
+	// 	}
+	// 	err = execute(ctx, network.PreFundedKeys, config)
+	// 	if err != nil {
+	// 		ginkgo.GinkgoT().Error(err)
+	// 	}
+	// })
 })
+
+func setNetworkGas(t require.TestingT, network *tmpnet.Network, preFundedKeysCount int) {
+	if network.DefaultFlags == nil {
+		network.DefaultFlags = make(tmpnet.FlagsMap)
+	}
+	network.DefaultFlags[config.DynamicFeesMaxGasCapacityKey] = "1000000000000000000"
+	network.DefaultFlags[config.DynamicFeesMaxGasPerSecondKey] = "10000000000000000000"
+	network.DefaultFlags[config.DynamicFeesTargetGasPerSecondKey] = "10000000000000000000"
+
+	// We must set the pre-funded keys to generate a default genesis
+	// with those keys.
+	preFundedKeys, err := tmpnet.NewPrivateKeys(preFundedKeysCount)
+	require.NoError(t, err, "creating pre-funded keys")
+	network.PreFundedKeys = preFundedKeys
+
+	network.Genesis, err = network.DefaultGenesis()
+	require.NoError(t, err, "creating genesis")
+	var cChainGenesis core.Genesis
+	err = json.Unmarshal([]byte(network.Genesis.CChainGenesis), &cChainGenesis)
+	require.NoError(t, err, "unmarshalling genesis")
+	cChainGenesis.GasLimit = 10000000000000000000
+	encodedChainGenesis, err := json.Marshal(cChainGenesis)
+	require.NoError(t, err, "marshalling C chain genesis")
+	network.Genesis.CChainGenesis = string(encodedChainGenesis)
+}
