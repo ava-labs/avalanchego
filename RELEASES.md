@@ -899,7 +899,6 @@ The plugin version is unchanged at `35` and is compatible with versions `v1.11.3
 - Use gauges for time metrics by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3009
 - Chore: fix typos. by @cocoyeal in https://github.com/ava-labs/avalanchego/pull/3010
 - [antithesis] Refactor existing job to support xsvm test setup by @marun in https://github.com/ava-labs/avalanchego/pull/2976
-- chore: fix some function names by @cartnavoy in https://github.com/ava-labs/avalanchego/pull/3015
 - Mark nodes as connected to the P-chain networking stack by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2981
 - [antithesis] Ensure images with a prefix are pushed by @marun in https://github.com/ava-labs/avalanchego/pull/3016
 - boostrapper: compact blocks before iterating them by @a1k0n in https://github.com/ava-labs/avalanchego/pull/2997
@@ -933,7 +932,6 @@ The plugin version is unchanged at `35` and is compatible with versions `v1.11.3
 - @a1k0n made their first contribution in https://github.com/ava-labs/avalanchego/pull/3000
 - @lebdron made their first contribution in https://github.com/ava-labs/avalanchego/pull/2994
 - @cocoyeal made their first contribution in https://github.com/ava-labs/avalanchego/pull/3010
-- @cartnavoy made their first contribution in https://github.com/ava-labs/avalanchego/pull/3015
 - @tsachiherman made their first contribution in https://github.com/ava-labs/avalanchego/pull/3023
 
 **Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.11.5...v1.11.6
