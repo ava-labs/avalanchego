@@ -265,7 +265,14 @@ func (o *Orchestrator[_]) issueTxs(ctx context.Context, currTargetTPS *atomic.In
 					return nil //nolint:nilerr
 				}
 				currTime := time.Now()
-				txsPerIssuer := uint64(math.Ceil(float64(currTargetTPS.Load())/float64(len(o.agents))) * o.config.TxRateMultiplier)
+				targetTPSPerAgent := math.Ceil(float64(currTargetTPS.Load()) / float64(len(o.agents)))
+				txsPerIssuer := uint64(targetTPSPerAgent * o.config.TxRateMultiplier)
+				if txsPerIssuer == uint64(targetTPSPerAgent) {
+					// For low target TPS and rate multiplier, the rate multiplier can have no effect.
+					// For example, for 50 TPS target, 5 agents, and rate multiplier of 1.05, we have
+					// uint64(10*1.05) = 10 therefore we add 1 to force an increase in txs issued.
+					txsPerIssuer++
+				}
 				// always listen until listener context is cancelled, do not call agent.Listener.IssuingDone().
 				for range txsPerIssuer {
 					txID, err := agent.Issuer.GenerateAndIssueTx(ctx)
