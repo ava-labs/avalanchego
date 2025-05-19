@@ -21,13 +21,14 @@ var _ ethclient.BlockHook = (*extBlockHook)(nil)
 // Client wraps the ethclient.Client interface to provide extra data types (in header, block body).
 // If you want to use the standardized Ethereum RPC functionality without extra types, use [ethclient.Client] instead.
 type Client struct {
-	c *rpc.Client
 	ethclient.Client
 }
 
 // New creates a client that uses the given RPC client.
 func New(c *rpc.Client) *Client {
-	return &Client{c: c, Client: ethclient.NewClientWithHook(c, &extBlockHook{})}
+	return &Client{
+		Client: ethclient.NewClientWithHook(c, &extBlockHook{}),
+	}
 }
 
 // Dial connects a client to the given URL.
