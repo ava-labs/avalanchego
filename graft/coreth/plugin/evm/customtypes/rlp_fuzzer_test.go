@@ -1,3 +1,6 @@
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 // Copyright 2019 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //

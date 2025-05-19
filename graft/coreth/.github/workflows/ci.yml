@@ -39,16 +39,12 @@ jobs:
         run: |
           go mod edit -replace github.com/ava-labs/avalanchego=./avalanchego
           go mod tidy
-          go clean -modcache # avoid conflicts with the golangci-lint-action cache
+          go clean -modcache
       - run: ./scripts/lint_allowed_eth_imports.sh
         shell: bash
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@3a919529898de77ec3da873e3063ca4b10e7f5cc #v3
-        with:
-          version: v1.63
-          working-directory: .
-          args: --timeout 3m
-          skip-pkg-cache: true
+      - name: Run linters
+        shell: bash
+        run: ./scripts/lint.sh
       - name: Run shellcheck
         shell: bash
         run: scripts/shellcheck.sh
