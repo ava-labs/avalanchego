@@ -272,6 +272,7 @@ func (o *Orchestrator[_]) issueTxs(ctx context.Context, currTargetTPS *atomic.In
 					if err != nil {
 						return err
 					}
+					o.tracker.Issue(txID)
 					agent.Listener.RegisterIssued(txID)
 				}
 
