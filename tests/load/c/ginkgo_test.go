@@ -5,8 +5,6 @@ package c
 
 import (
 	"context"
-	"fmt"
-	"net"
 	"os"
 	"testing"
 
@@ -85,8 +83,22 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 		require.NoError(tc, err, "failed to register load metrics")
 		metrics = loadMetrics
 
-		cleanup := setupMetricsServer(tc, registry, network.UUID, network.Owner, logger)
-		ginkgo.DeferCleanup(cleanup)
+		metricsServer := load.NewPrometheusServer("127.0.0.1:0", registry, logger)
+		metricsErrCh, err := metricsServer.Start()
+		require.NoError(tc, err, "failed to start load metrics server")
+
+		monitoringConfigFilePath, err := metricsServer.GenerateMonitoringConfig(network.UUID, network.Owner)
+		require.NoError(tc, err, "failed to generate monitoring config file")
+
+		ginkgo.DeferCleanup(func() {
+			select {
+			case err := <-metricsErrCh:
+				require.NoError(tc, err, "metrics server exited with error")
+			default:
+				require.NoError(tc, metricsServer.Stop(), "failed to stop metrics server")
+			}
+			require.NoError(tc, os.Remove(monitoringConfigFilePath), "failed to remove monitoring config file")
+		})
 	})
 
 	ginkgo.It("C-Chain simple", func(ctx context.Context) {
@@ -125,32 +137,3 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 		}
 	})
 })
-
-// setupMetricsServer creates Prometheus server with a dynamically allocated port
-func setupMetricsServer(tc *e2e.GinkgoTestContext, registry *prometheus.Registry, networkUUID, networkOwner string, logger logging.Logger) func() {
-	r := require.New(tc)
-
-	// Allocate a port dynamically
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	r.NoError(err, "allocating dynamic port")
-
-	tcpAddr, ok := listener.Addr().(*net.TCPAddr)
-	r.True(ok, "allocating dynamic port")
-	port := tcpAddr.Port
-	r.NoError(listener.Close(), "closing listener on port %d", port)
-
-	metricsURI := fmt.Sprintf("127.0.0.1:%d", port)
-
-	metricsServer := load.NewPrometheusServer(metricsURI, registry, logger)
-	_, err = metricsServer.Start()
-	r.NoError(err, "failed to start metrics server")
-
-	monitoringConfigFilePath, err := metricsServer.GenerateMonitoringConfig(networkUUID, networkOwner)
-	r.NoError(err, "failed to generate monitoring config file")
-
-	// Return a cleanup function
-	return func() {
-		r.NoError(metricsServer.Stop(), "stopping metrics server")
-		r.NoError(os.Remove(monitoringConfigFilePath))
-	}
-}

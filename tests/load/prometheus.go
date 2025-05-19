@@ -21,11 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-const (
-	// relative to the user home directory
-	metricsFilePath = ".tmpnet/prometheus/file_sd_configs/load-test.json"
-)
-
 type MetricsServer struct {
 	addr     string
 	registry *prometheus.Registry
@@ -92,6 +87,8 @@ func (s *MetricsServer) Stop() (err error) {
 // GenerateMonitoringConfig generates and writes the Prometheus collector configuration
 // so tmpnet can dynamically discover new scrape target via file-based service discovery
 func (s *MetricsServer) GenerateMonitoringConfig(networkUUID, networkOwner string) (string, error) {
+	const metricsFilePath = ".tmpnet/prometheus/file_sd_configs/load-test.json"
+
 	homedir, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
