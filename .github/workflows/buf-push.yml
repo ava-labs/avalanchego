@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: bufbuild/buf-action@5150a1eef5c10b6a5cf8a69fc872f24a09473195 #v1.1.1
+      - uses: bufbuild/buf-action@dfda68eacb65895184c76b9ae522b977636a2c47 #v1.1.4
         with:
           input: "proto"
           # Breaking changes are managed by the rpcchainvm protocol version.
