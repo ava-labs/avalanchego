@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand/v2"
-	"time"
 
 	"github.com/ava-labs/libevm/accounts/abi/bind"
 	"github.com/ava-labs/libevm/common"
@@ -41,8 +40,7 @@ type Opcoder struct {
 	contractInstance *contracts.EVMLoadSimulator
 
 	// State
-	nonce     uint64
-	lastIssue time.Time
+	nonce uint64
 }
 
 func NewOpcoder(
@@ -122,6 +120,16 @@ func (o *Opcoder) GenerateAndIssueTx(ctx context.Context) (common.Hash, error) {
 		const maxDepth = 5
 		depth := big.NewInt(rand.Int64N(maxDepth)) //nolint:gosec
 		tx, err = o.contractInstance.SimulateCallDepth(txOpts, depth)
+	case contractCreation:
+		tx, err = o.contractInstance.SimulateContractCreation(txOpts)
+	case pureCompute:
+		const iterations = 100
+		tx, err = o.contractInstance.SimulatePureCompute(txOpts, big.NewInt(iterations))
+	case largeEvent:
+		const maxEventSize = 100
+		tx, err = o.contractInstance.SimulateLargeEvent(txOpts, big.NewInt(maxEventSize))
+	case externalCall:
+		tx, err = o.contractInstance.SimulateExternalCall(txOpts)
 	default:
 		return common.Hash{}, fmt.Errorf("invalid load type: %s", loadType)
 	}
@@ -133,7 +141,6 @@ func (o *Opcoder) GenerateAndIssueTx(ctx context.Context) (common.Hash, error) {
 	o.nonce++
 	txHash := tx.Hash()
 	o.tracker.Issue(txHash)
-	o.lastIssue = time.Now()
 	return txHash, err
 }
 
@@ -144,6 +151,10 @@ const (
 	hashing           = "hashing"
 	memory            = "memory"
 	callDepth         = "call depth"
+	contractCreation  = "contract creation"
+	pureCompute       = "pure compute"
+	largeEvent        = "large event"
+	externalCall      = "external call"
 )
 
 func allLoadTypes() []string {
@@ -154,6 +165,10 @@ func allLoadTypes() []string {
 		hashing,
 		memory,
 		callDepth,
+		contractCreation,
+		pureCompute,
+		largeEvent,
+		externalCall,
 	}
 }
 

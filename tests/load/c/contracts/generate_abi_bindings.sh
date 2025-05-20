@@ -9,19 +9,24 @@ if ! command -v solc &> /dev/null; then
   exit 1
 fi
 
-CONTRACTS_DIR="$(dirname "$0")"
+if ! command -v solhint &> /dev/null; then
+  echo "Error: solhint not found. Run this command within Nix shell."
+  exit 1
+fi
 
+CONTRACTS_DIR="$(dirname "$0")"
+TEMPDIR=$(mktemp -d)
 for FILE in "${CONTRACTS_DIR}"/*.sol; do
+  solhint --config ${CONTRACTS_DIR}/.solhint.json "${FILE}"
   echo "Generating Go bindings from Solidity contract $FILE..."
   CONTRACT_NAME=$(basename "$FILE" .sol)
-  solc --abi --bin --overwrite -o "$CONTRACTS_DIR" "${CONTRACTS_DIR}/${CONTRACT_NAME}.sol"
+  solc --abi --bin --overwrite -o "$TEMPDIR" "${CONTRACTS_DIR}/${CONTRACT_NAME}.sol"
   go run github.com/ava-labs/libevm/cmd/abigen@latest \
-    --bin="${CONTRACTS_DIR}/${CONTRACT_NAME}.bin" \
-    --abi="${CONTRACTS_DIR}/${CONTRACT_NAME}.abi" \
-    --type "${CONTRACT_NAME}" \
+    --bin="${TEMPDIR}/${CONTRACT_NAME}.bin" \
+    --abi="${TEMPDIR}/${CONTRACT_NAME}.abi" \
+    --type $CONTRACT_NAME \
     --pkg=contracts \
     --out="${CONTRACTS_DIR}/${CONTRACT_NAME}.bindings.go"
-  rm "${CONTRACTS_DIR}/${CONTRACT_NAME}.bin" "${CONTRACTS_DIR}/${CONTRACT_NAME}.abi"
   echo "Generated ${CONTRACT_NAME}.bindings.go"
 done
-
+rm -r "${TEMPDIR}"
