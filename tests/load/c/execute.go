@@ -43,14 +43,9 @@ const (
 func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config loadConfig) error {
 	logger := logging.NewLogger("", logging.NewWrappedCore(logging.Info, os.Stdout, logging.Auto.ConsoleEncoder()))
 
-	keys, err := fixKeysCount(preFundedKeys, int(config.agents))
-	if err != nil {
-		return fmt.Errorf("fixing keys count: %w", err)
-	}
-
-	err = distribute(ctx, config.endpoints[0], keys)
-	if err != nil {
-		return fmt.Errorf("ensuring minimum funds: %w", err)
+	keys := make([]*ecdsa.PrivateKey, len(preFundedKeys))
+	for i, key := range preFundedKeys {
+		keys[i] = key.ToECDSA()
 	}
 
 	registry := prometheus.NewRegistry()
@@ -99,24 +94,6 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 		<-orchestratorErrCh
 		return fmt.Errorf("metrics server error: %w", err)
 	}
-}
-
-func fixKeysCount(preFundedKeys []*secp256k1.PrivateKey, target int) ([]*ecdsa.PrivateKey, error) {
-	keys := make([]*ecdsa.PrivateKey, 0, target)
-	for i := 0; i < min(target, len(preFundedKeys)); i++ {
-		keys = append(keys, preFundedKeys[i].ToECDSA())
-	}
-	if len(keys) == target {
-		return keys, nil
-	}
-	for i := len(keys); i < target; i++ {
-		key, err := ethcrypto.GenerateKey()
-		if err != nil {
-			return nil, fmt.Errorf("generating key at index %d: %w", i, err)
-		}
-		keys = append(keys, key)
-	}
-	return keys, nil
 }
 
 // createAgents creates agents for the given configuration and keys.
