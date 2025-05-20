@@ -212,8 +212,8 @@ jobs:
       - name: Run e2e tests
         shell: bash
         run: nix develop --command ./scripts/run_task.sh test-bootstrap-monitor-e2e
-  e2e_load:
-    name: e2e load tests
+  load_tests:
+    name: load tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
