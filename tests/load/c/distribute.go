@@ -28,12 +28,9 @@ func distribute(ctx context.Context, endpoint string, keys []*ecdsa.PrivateKey) 
 		return fmt.Errorf("dialing %s: %w", endpoint, err)
 	}
 
-	gasFeeCap, err := client.EstimateBaseFee(ctx)
-	if err != nil {
-		return fmt.Errorf("getting estimated base fee: %w", err)
-	}
+	maxGasFeeCap := new(big.Int).SetInt64(4761904) // equivalent to 100 ether
 	txCost := big.NewInt(params.GWei)
-	txCost.Mul(txCost, gasFeeCap)
+	txCost.Mul(txCost, maxGasFeeCap)
 	txCost.Mul(txCost, new(big.Int).SetUint64(params.TxGas))
 
 	keyToBalance, err := getKeyToBalance(ctx, client, keys)
@@ -43,7 +40,7 @@ func distribute(ctx context.Context, endpoint string, keys []*ecdsa.PrivateKey) 
 
 	minBalance := determineMinBalance(keyToBalance, txCost)
 
-	txs, err := createTxs(ctx, client, keyToBalance, minBalance, txCost, gasFeeCap)
+	txs, err := createTxs(ctx, client, keyToBalance, minBalance, txCost, maxGasFeeCap)
 	if err != nil {
 		return fmt.Errorf("creating transactions: %w", err)
 	} else if len(txs) == 0 {
