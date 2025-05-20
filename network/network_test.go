@@ -236,7 +236,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 		var connected set.Set[ids.NodeID]
 		net, err := NewNetwork(
 			config,
-			upgrade.InitiallyActiveTime,
+			upgrade.Default,
 			msgCreator,
 			registry,
 			logging.NoLog{},
@@ -516,7 +516,7 @@ func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 
 		net, err := NewNetwork(
 			config,
-			upgrade.InitiallyActiveTime,
+			upgrade.Default,
 			msgCreator,
 			registry,
 			logging.NoLog{},
@@ -594,7 +594,7 @@ func TestDialDeletesNonValidators(t *testing.T) {
 
 		net, err := NewNetwork(
 			config,
-			upgrade.InitiallyActiveTime,
+			upgrade.Default,
 			msgCreator,
 			registry,
 			logging.NoLog{},
@@ -747,7 +747,7 @@ func TestAllowConnectionAsAValidator(t *testing.T) {
 
 		net, err := NewNetwork(
 			config,
-			upgrade.InitiallyActiveTime,
+			upgrade.Default,
 			msgCreator,
 			registry,
 			logging.NoLog{},
@@ -808,7 +808,7 @@ func TestGetAllPeers(t *testing.T) {
 	configs[0].Validators = validators.NewManager()
 	nonValidatorNetwork, err := NewNetwork(
 		configs[0],
-		upgrade.InitiallyActiveTime,
+		upgrade.Default,
 		newMessageCreator(t),
 		prometheus.NewRegistry(),
 		logging.NoLog{},

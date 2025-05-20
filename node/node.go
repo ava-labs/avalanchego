@@ -626,7 +626,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 
 	n.Net, err = network.NewNetwork(
 		&n.Config.NetworkConfig,
-		n.Config.UpgradeConfig.FortunaTime,
+		n.Config.UpgradeConfig,
 		n.msgCreator,
 		reg,
 		n.Log,
