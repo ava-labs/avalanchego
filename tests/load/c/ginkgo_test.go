@@ -113,9 +113,9 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 			issuer:    issuerSimple,
 			maxFeeCap: 4761904, // max fee cap equivalent to 100 ether
 			agents:    agentsPerNode,
-			minTPS:    50,
-			maxTPS:    90,
-			step:      10,
+			minTPS:    2400,
+			maxTPS:    3000,
+			step:      100,
 		}
 		err = execute(ctx, network.PreFundedKeys, config, metrics, logger)
 		if err != nil {
@@ -131,9 +131,9 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 			issuer:    issuerOpcoder,
 			maxFeeCap: 300000000000,
 			agents:    agentsCount,
-			minTPS:    30,
-			maxTPS:    60,
-			step:      5,
+			minTPS:    1000,
+			maxTPS:    1600,
+			step:      50,
 		}
 		err = execute(ctx, network.PreFundedKeys, config, metrics, logger)
 		if err != nil {
