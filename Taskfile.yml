@@ -185,8 +185,8 @@ tasks:
       - task: build-xsvm
       - cmd: bash -x ./scripts/tests.e2e.existing.sh {{.CLI_ARGS}}
 
-  test-e2e-load:
-    desc: Runs e2e load tests
+  test-load:
+    desc: Runs load tests
     cmds:
       - task: build
       - cmd: ./bin/ginkgo -v ./tests/load/c -- --avalanchego-path=$PWD/build/avalanchego
