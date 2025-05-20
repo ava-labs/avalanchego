@@ -48,7 +48,7 @@ func execute(ctx context.Context, keys []*secp256k1.PrivateKey, config loadConfi
 	orchestratorConfig.MinTPS = config.minTPS
 	orchestratorConfig.MaxTPS = config.maxTPS
 	orchestratorConfig.Step = config.step
-	orchestratorConfig.TxRateMultiplier = 1.05
+	orchestratorConfig.TxRateMultiplier = 1.1
 	orchestrator := load.NewOrchestrator(agents, tracker, logger, orchestratorConfig)
 
 	return orchestrator.Execute(orchestratorCtx)
