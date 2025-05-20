@@ -18,7 +18,7 @@ for FILE in "${CONTRACTS_DIR}"/*.sol; do
   go run github.com/ava-labs/libevm/cmd/abigen@latest \
     --bin="${TEMPDIR}/${CONTRACT_NAME}.bin" \
     --abi="${TEMPDIR}/${CONTRACT_NAME}.abi" \
-    --type $CONTRACT_NAME \
+    --type "$CONTRACT_NAME" \
     --pkg=contracts \
     --out="${CONTRACTS_DIR}/${CONTRACT_NAME}.bindings.go"
   echo "Generated ${CONTRACT_NAME}.bindings.go"
