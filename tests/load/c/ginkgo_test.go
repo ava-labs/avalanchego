@@ -82,10 +82,6 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 
 		network = env.GetNetwork()
 		network.Nodes = network.Nodes[:nodesCount]
-		for _, node := range network.Nodes {
-			err := node.EnsureKeys()
-			require.NoError(tc, err, "ensuring keys for node %s", node.NodeID)
-		}
 
 		loadMetrics, err := load.NewMetrics(registry)
 		require.NoError(tc, err, "failed to register load metrics")
