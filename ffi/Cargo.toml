@@ -20,6 +20,7 @@ tikv-jemallocator = "0.6.0"
 
 [features]
 logger = ["dep:env_logger", "firewood/logger"]
+ethhash = ["firewood/ethhash"]
 
 [build-dependencies]
 cbindgen = "0.28.0"

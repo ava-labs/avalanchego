@@ -48,6 +48,18 @@ This enables consumers to utilize it directly without forcing them to compile Fi
 
 To trigger this build, [attach-static-libs](../.github/workflows/attach-static-libs.yaml) supports triggers for both manual GitHub Actions and tags, so you can create a mirror branch/tag on [firewood-go](https://github.com/ava-labs/firewood-go) by either trigger a manual GitHub Action and selecting your branch or pushing a tag to Firewood.
 
+### Hash Mode
+
+Firewood implemented its own optimized merkle trie structure. To support Ethereum Merkle Trie hash compatibility, it also provides a feature flag `ethhash`.
+
+This is an optional feature (disabled by default). To enable it for a local build, compile with:
+
+```
+cargo build -p firewood-ffi --features ethhash
+```
+
+To support development in [Coreth](https://github.com/ava-labs/coreth), Firewood pushes static libraries to [firewood-go](https://github.com/ava-labs/firewood-go) with `ethhash` enabled by default.
+
 ## Development
 Iterative building is unintuitive for the ffi and some common sources of confusion are listed below.
 

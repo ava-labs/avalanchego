@@ -2,6 +2,7 @@ package firewood
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +12,68 @@ import (
 
 	"github.com/stretchr/testify/require"
 )
+
+const (
+	ethhashKey        = "ethhash"
+	firewoodKey       = "firewood"
+	emptyKey          = "empty"
+	insert100Key      = "100"
+	emptyEthhashRoot  = "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"
+	emptyFirewoodRoot = "0000000000000000000000000000000000000000000000000000000000000000"
+)
+
+// expectedRoots contains the expected root hashes for different use cases across both default
+// firewood hashing and ethhash.
+// By default, TestMain infers which mode Firewood is operating in and selects the expected roots
+// accordingly (this does turn test empty database into an effective no-op).
+//
+// To test a specific hashing mode explicitly, set the environment variable:
+// TEST_FIREWOOD_HASH_MODE=ethhash or TEST_FIREWOOD_HASH_MODE=firewood
+// This will skip the inference step and enforce we use the expected roots for the specified mode.
+var (
+	// expectedRoots contains a mapping of expected root hashes for different test
+	// vectors.
+	expectedRootModes = map[string]map[string]string{
+		ethhashKey: {
+			emptyKey:     emptyEthhashRoot,
+			insert100Key: "c25a0076e0337d7c982c3c9dfa445c8088242a0a607f9d9def3762765bcb0fde",
+		},
+		firewoodKey: {
+			emptyKey:     emptyFirewoodRoot,
+			insert100Key: "f858b51ada79c4abeb6566ef1204a453030dba1cca3526d174e2cb3ce2aadc57",
+		},
+	}
+	expectedEmptyRootToMode = map[string]string{
+		emptyEthhashRoot:  ethhashKey,
+		emptyFirewoodRoot: firewoodKey,
+	}
+	expectedRoots map[string]string
+)
+
+func inferHashingMode() (string, error) {
+	dbFile := filepath.Join(os.TempDir(), "test.db")
+	db, closeDB, err := newDatabase(dbFile)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		_ = closeDB()
+		_ = os.Remove(dbFile)
+	}()
+
+	actualEmptyRoot, err := db.Root()
+	if err != nil {
+		return "", fmt.Errorf("failed to get root of empty database: %w", err)
+	}
+	actualEmptyRootHex := hex.EncodeToString(actualEmptyRoot)
+
+	actualFwMode, ok := expectedEmptyRootToMode[actualEmptyRootHex]
+	if !ok {
+		return "", fmt.Errorf("unknown empty root %q, cannot infer mode", actualEmptyRootHex)
+	}
+
+	return actualFwMode, nil
+}
 
 func TestMain(m *testing.M) {
 	// The cgocheck debugging flag checks that all pointers are pinned.
@@ -35,25 +98,49 @@ func TestMain(m *testing.M) {
 		}
 	}
 
+	// If TEST_FIREWOOD_HASH_MODE is set, use it to select the expected roots.
+	// Otherwise, infer the hash mode from an empty database.
+	hashMode := os.Getenv("TEST_FIREWOOD_HASH_MODE")
+	if hashMode == "" {
+		inferredHashMode, err := inferHashingMode()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to infer hash mode %v\n", err)
+			os.Exit(1)
+		}
+		hashMode = inferredHashMode
+	}
+	selectedExpectedRoots, ok := expectedRootModes[hashMode]
+	if !ok {
+		fmt.Fprintf(os.Stderr, "unknown hash mode %q\n", hashMode)
+		os.Exit(1)
+	}
+	expectedRoots = selectedExpectedRoots
+
 	os.Exit(m.Run())
 }
 
 func newTestDatabase(t *testing.T) *Database {
 	t.Helper()
 
+	dbFile := filepath.Join(t.TempDir(), "test.db")
+	db, closeDB, err := newDatabase(dbFile)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, closeDB())
+	})
+	return db
+}
+
+func newDatabase(dbFile string) (*Database, func() error, error) {
 	conf := DefaultConfig()
 	conf.MetricsPort = 0
 	conf.Create = true
-	// The TempDir directory is automatically cleaned up so there's no need to
-	// remove test.db.
-	dbFile := filepath.Join(t.TempDir(), "test.db")
 
 	f, err := New(dbFile, conf)
-	require.NoErrorf(t, err, "NewDatabase(%+v)", conf)
-	// Close() always returns nil, its signature returning an error only to
-	// conform with an externally required interface.
-	t.Cleanup(func() { f.Close() })
-	return f
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create new database at filepath %q: %w", dbFile, err)
+	}
+	return f, f.Close, nil
 }
 
 // Tests that a single key-value pair can be inserted and retrieved.
@@ -168,9 +255,15 @@ func TestInsert100(t *testing.T) {
 
 			hash, err := db.Root()
 			require.NoError(t, err, "%T.Root()", db)
-			require.Lenf(t, hash, 32, "%T.Root()", db)
-			// we know the hash starts with 0xf8
-			require.Equalf(t, byte(0xf8), hash[0], "First byte of %T.Root()", db)
+
+			// Assert the hash is exactly as expected. Test failure indicates a
+			// non-hash compatible change has been made since the string was set.
+			// If that's expected, update the string at the top of the file to
+			// fix this test.
+			expectedHashHex := expectedRoots[insert100Key]
+			expectedHash, err := hex.DecodeString(expectedHashHex)
+			require.NoError(t, err, "failed to decode expected hash")
+			require.Equal(t, expectedHash, hash, "Root hash mismatch.\nExpected (hex): %x\nActual (hex): %x", expectedHash, hash)
 			require.Equalf(t, rootFromInsert, hash, "%T.Root() matches value returned by insertion", db)
 		})
 	}
@@ -211,7 +304,11 @@ func TestInvariants(t *testing.T) {
 	db := newTestDatabase(t)
 	hash, err := db.Root()
 	require.NoError(t, err, "%T.Root()", db)
-	require.Equalf(t, make([]byte, 32), hash, "%T.Root() of empty trie", db)
+
+	emptyRootStr := expectedRoots[emptyKey]
+	expectedHash, err := hex.DecodeString(emptyRootStr)
+	require.NoError(t, err)
+	require.Equalf(t, expectedHash, hash, "expected %x, got %x", expectedHash, hash)
 
 	got, err := db.Get([]byte("non-existent"))
 	require.NoError(t, err)
@@ -327,7 +424,10 @@ func TestDeleteAll(t *testing.T) {
 	// Check that the database is empty.
 	hash, err := db.Root()
 	require.NoError(t, err, "%T.Root()", db)
-	require.Equalf(t, make([]byte, 32), hash, "%T.Root() of empty trie", db)
+	expectedHashHex := expectedRoots[emptyKey]
+	expectedHash, err := hex.DecodeString(expectedHashHex)
+	require.NoError(t, err)
+	require.Equalf(t, expectedHash, hash, "%T.Root() of empty trie", db)
 }
 
 // Tests that a proposal with an invalid ID cannot be committed.

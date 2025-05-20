@@ -135,7 +135,7 @@ jobs:
       - name: Test Go FFI bindings
         working-directory: ffi
         # cgocheck2 is expensive but provides complete pointer checks
-        run: GOEXPERIMENT=cgocheck2 go test ./...
+        run: GOEXPERIMENT=cgocheck2 TEST_FIREWOOD_HASH_MODE=firewood go test ./...
       
   ethhash:
     runs-on: ubuntu-latest
@@ -153,6 +153,10 @@ jobs:
         with:
           go-version-file: "ffi/tests/go.mod"
           cache-dependency-path: "ffi/tests/go.sum"
+      - name: Test Go FFI bindings
+        working-directory: ffi
+        # cgocheck2 is expensive but provides complete pointer checks
+        run: GOEXPERIMENT=cgocheck2 TEST_FIREWOOD_HASH_MODE=ethhash go test ./...
       - name: Test Ethereum hash compatability
         working-directory: ffi/tests
         run: go test ./...

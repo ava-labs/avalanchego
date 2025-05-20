@@ -47,8 +47,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Build for ${{ matrix.target }}
-      # TODO: add ethhash feature flag after updating FFI tests
-        run: cargo build --profile maxperf --features logger --target ${{ matrix.target }} -p firewood-ffi
+        run: cargo build --profile maxperf --features ethhash,logger --target ${{ matrix.target }} -p firewood-ffi
         
       - name: Upload binary
         uses: actions/upload-artifact@v4
@@ -152,7 +151,7 @@ jobs:
       - name: Test Go FFI bindings
         working-directory: ffi
         # cgocheck2 is expensive but provides complete pointer checks
-        run: GOEXPERIMENT=cgocheck2 go test ./...
+        run: GOEXPERIMENT=cgocheck2 TEST_FIREWOOD_HASH_MODE=ethhash go test ./...
 
   remove-if-pr-only:
     runs-on: ubuntu-latest

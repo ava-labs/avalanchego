@@ -37,7 +37,7 @@ func TestInsert(t *testing.T) {
 		key  common.Hash
 	}
 
-	rand.Seed(0)
+	rand := rand.New(rand.NewSource(0))
 
 	addrs := make([]common.Address, 0)
 	storages := make([]storageKey, 0)
