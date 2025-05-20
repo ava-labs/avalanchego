@@ -26,7 +26,11 @@ func init() {
 	flagVars = e2e.RegisterFlagsWithDefaultOwner("avalanchego-load")
 }
 
-const nodesCount = 5
+const (
+	nodesCount    = 5
+	agentsPerNode = 50
+	agentsCount   = nodesCount * agentsPerNode
+)
 
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run only once in the first ginkgo process
@@ -38,6 +42,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 		Owner: "avalanchego-load-test",
 		Nodes: nodes,
 	}
+	setPrefundedKeys(tc, network, agentsCount)
 
 	env := e2e.NewTestEnvironment(
 		tc,
@@ -71,7 +76,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 			endpoints: endpoints,
 			issuer:    issuerSimple,
 			maxFeeCap: 4761904, // max fee cap equivalent to 100 ether
-			agents:    1,
+			agents:    agentsPerNode,
 			minTPS:    50,
 			maxTPS:    90,
 			step:      10,
@@ -90,7 +95,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 			endpoints: endpoints,
 			issuer:    issuerOpcoder,
 			maxFeeCap: 300000000000,
-			agents:    1,
+			agents:    agentsCount,
 			minTPS:    30,
 			maxTPS:    60,
 			step:      5,
@@ -101,3 +106,15 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 		}
 	})
 })
+
+// setPrefundedKeys sets the pre-funded keys for the network, and keeps
+// keys already set if any. If there are more keys than required, it
+// keeps the already set keys as they are.
+func setPrefundedKeys(t require.TestingT, network *tmpnet.Network, minKeys int) {
+	if len(network.PreFundedKeys) >= minKeys {
+		return
+	}
+	missingPreFundedKeys, err := tmpnet.NewPrivateKeys(minKeys - len(network.PreFundedKeys))
+	require.NoError(t, err, "creating pre-funded keys")
+	network.PreFundedKeys = append(network.PreFundedKeys, missingPreFundedKeys...)
+}
