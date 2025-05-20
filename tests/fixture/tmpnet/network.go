@@ -11,7 +11,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/netip"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -57,6 +59,9 @@ const (
 
 	// eth address: 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
 	HardHatKeyStr = "56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027"
+
+	// grafanaURI is remote Grafana URI
+	grafanaURI = "grafana-poc.avax-dev.network"
 )
 
 var (
@@ -1052,9 +1057,59 @@ func MetricsLinkForNetwork(networkUUID string, startTime string, endTime string)
 		endTime = "now"
 	}
 	return fmt.Sprintf(
-		"https://grafana-poc.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?&var-filter=network_uuid%%7C%%3D%%7C%s&var-filter=is_ephemeral_node%%7C%%3D%%7Cfalse&from=%s&to=%s",
+		"https://%s/d/kBQpRdWnk/avalanche-main-dashboard?&var-filter=network_uuid%%7C%%3D%%7C%s&var-filter=is_ephemeral_node%%7C%%3D%%7Cfalse&from=%s&to=%s",
+		grafanaURI,
 		networkUUID,
 		startTime,
 		endTime,
 	)
+}
+
+// GrafanaFilterOptions contains filters to apply to Grafana link in form of a query
+// Example: https://grafana-poc.avax-dev.network/?start_time=now-1h&endTime=now
+type GrafanaFilterOptions struct {
+	StartTime string
+	EndTime   string
+	Filters   map[string]string
+}
+
+func BuildMetricsURLForNetwork(dashboardID, dashboardName, networkUUID string, options GrafanaFilterOptions) string {
+	// Set defaults for options if not provided
+	startTime := "now-1h"
+	if options.StartTime != "" {
+		startTime = options.StartTime
+	}
+
+	endTime := "now"
+	if options.EndTime != "" {
+		endTime = options.EndTime
+	}
+
+	baseURL := url.URL{
+		Scheme: "https",
+		Host:   grafanaURI,
+		Path:   fmt.Sprintf("/d/%s/%s", dashboardID, dashboardName),
+	}
+
+	query := baseURL.Query()
+
+	query.Add("from", startTime)
+	query.Add("to", endTime)
+
+	filters := make(map[string]string)
+	if options.Filters != nil {
+		filters = maps.Clone(options.Filters)
+	}
+
+	// Ensure network_uuid is set
+	if _, exists := filters["network_uuid"]; !exists {
+		filters["network_uuid"] = networkUUID
+	}
+
+	for key, value := range filters {
+		query.Add("var-filter", fmt.Sprintf("%s|=|%s", key, value))
+	}
+
+	baseURL.RawQuery = query.Encode()
+	return baseURL.String()
 }

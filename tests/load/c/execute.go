@@ -1,4 +1,4 @@
-// Co// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package c
@@ -7,11 +7,9 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"os"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/ethclient"
-	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/tests/load"
 	"github.com/ava-labs/avalanchego/tests/load/c/issuers"
@@ -37,24 +35,11 @@ const (
 	issuerOpcoder issuerType = "opcoder"
 )
 
-func execute(ctx context.Context, keys []*secp256k1.PrivateKey, config loadConfig) error {
-	logger := logging.NewLogger("", logging.NewWrappedCore(logging.Info, os.Stdout, logging.Auto.ConsoleEncoder()))
-
-	registry := prometheus.NewRegistry()
-	metricsServer := load.NewPrometheusServer("127.0.0.1:8082", registry, logger)
-	tracker, err := load.NewTracker[common.Hash](registry)
-	if err != nil {
-		return fmt.Errorf("creating tracker: %w", err)
-	}
-
+func execute(ctx context.Context, keys []*secp256k1.PrivateKey, config loadConfig, metrics *load.Metrics, logger logging.Logger) error {
+	tracker := load.NewTracker[common.Hash](metrics)
 	agents, err := createAgents(ctx, config, keys, tracker)
 	if err != nil {
 		return fmt.Errorf("creating agents: %w", err)
-	}
-
-	metricsErrCh, err := metricsServer.Start()
-	if err != nil {
-		return fmt.Errorf("starting metrics server: %w", err)
 	}
 
 	orchestratorCtx, orchestratorCancel := context.WithCancel(ctx)
@@ -65,27 +50,8 @@ func execute(ctx context.Context, keys []*secp256k1.PrivateKey, config loadConfi
 	orchestratorConfig.Step = config.step
 	orchestratorConfig.TxRateMultiplier = 1.05
 	orchestrator := load.NewOrchestrator(agents, tracker, logger, orchestratorConfig)
-	orchestratorErrCh := make(chan error)
-	go func() {
-		orchestratorErrCh <- orchestrator.Execute(orchestratorCtx)
-	}()
 
-	select {
-	case err := <-orchestratorErrCh:
-		if err != nil {
-			_ = metricsServer.Stop()
-			return fmt.Errorf("orchestrator error: %w", err)
-		}
-		err = metricsServer.Stop()
-		if err != nil {
-			return fmt.Errorf("stopping metrics server: %w", err)
-		}
-		return nil
-	case err := <-metricsErrCh:
-		orchestratorCancel()
-		<-orchestratorErrCh
-		return fmt.Errorf("metrics server error: %w", err)
-	}
+	return orchestrator.Execute(orchestratorCtx)
 }
 
 // createAgents creates agents for the given configuration and keys.
