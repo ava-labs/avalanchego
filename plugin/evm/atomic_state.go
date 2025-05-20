@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/libevm/log"
 )
 
-var _ AtomicState = &atomicState{}
+var _ AtomicState = (*atomicState)(nil)
 
 // AtomicState is an abstraction created through AtomicBackend
 // and can be used to apply the VM's state change for atomic txs

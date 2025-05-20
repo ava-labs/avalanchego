@@ -17,8 +17,8 @@ import (
 )
 
 var (
-	_ syncTask = &mainTrieTask{}
-	_ syncTask = &storageTrieTask{}
+	_ syncTask = (*mainTrieTask)(nil)
+	_ syncTask = (*storageTrieTask)(nil)
 )
 
 type syncTask interface {

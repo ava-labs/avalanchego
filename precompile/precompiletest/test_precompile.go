@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package testutils
+package precompiletest
 
 import (
 	"math/big"
@@ -112,8 +112,7 @@ func (test PrecompileTest) setup(t testing.TB, module modules.Module, state cont
 	accessibleState.EXPECT().GetChainConfig().Return(chainConfig).AnyTimes()
 
 	if test.Config != nil {
-		err := module.Configure(chainConfig, test.Config, state, blockContext)
-		require.NoError(t, err)
+		require.NoError(t, module.Configure(chainConfig, test.Config, state, blockContext))
 	}
 
 	input := test.Input

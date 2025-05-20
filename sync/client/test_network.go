@@ -13,44 +13,43 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-var _ peer.NetworkClient = &mockNetwork{}
+var _ peer.NetworkClient = (*testNetwork)(nil)
 
-// TODO replace with gomock library
-type mockNetwork struct {
+type testNetwork struct {
 	// captured request data
 	numCalls         uint
 	requestedVersion *version.Application
 	request          []byte
 
-	// response mocking for RequestAny and Request calls
+	// response testing for RequestAny and Request calls
 	response       [][]byte
-	callback       func() // callback is called prior to processing each mock call
+	callback       func() // callback is called prior to processing each test call
 	requestErr     []error
 	nodesRequested []ids.NodeID
 }
 
-func (t *mockNetwork) SendAppRequestAny(ctx context.Context, minVersion *version.Application, request []byte) ([]byte, ids.NodeID, error) {
+func (t *testNetwork) SendAppRequestAny(ctx context.Context, minVersion *version.Application, request []byte) ([]byte, ids.NodeID, error) {
 	if len(t.response) == 0 {
-		return nil, ids.EmptyNodeID, errors.New("no mocked response to return in mockNetwork")
+		return nil, ids.EmptyNodeID, errors.New("no tested response to return in testNetwork")
 	}
 
 	t.requestedVersion = minVersion
 
-	response, err := t.processMock(request)
+	response, err := t.processTest(request)
 	return response, ids.EmptyNodeID, err
 }
 
-func (t *mockNetwork) SendAppRequest(ctx context.Context, nodeID ids.NodeID, request []byte) ([]byte, error) {
+func (t *testNetwork) SendAppRequest(ctx context.Context, nodeID ids.NodeID, request []byte) ([]byte, error) {
 	if len(t.response) == 0 {
-		return nil, errors.New("no mocked response to return in mockNetwork")
+		return nil, errors.New("no tested response to return in testNetwork")
 	}
 
 	t.nodesRequested = append(t.nodesRequested, nodeID)
 
-	return t.processMock(request)
+	return t.processTest(request)
 }
 
-func (t *mockNetwork) processMock(request []byte) ([]byte, error) {
+func (t *testNetwork) processTest(request []byte) ([]byte, error) {
 	t.request = request
 	t.numCalls++
 
@@ -74,11 +73,11 @@ func (t *mockNetwork) processMock(request []byte) ([]byte, error) {
 	return response, err
 }
 
-func (t *mockNetwork) Gossip([]byte) error {
+func (t *testNetwork) Gossip([]byte) error {
 	panic("not implemented") // we don't care about this function for this test
 }
 
-func (t *mockNetwork) mockResponse(times uint8, callback func(), response []byte) {
+func (t *testNetwork) testResponse(times uint8, callback func(), response []byte) {
 	t.response = make([][]byte, times)
 	for i := uint8(0); i < times; i++ {
 		t.response[i] = response
@@ -87,10 +86,10 @@ func (t *mockNetwork) mockResponse(times uint8, callback func(), response []byte
 	t.numCalls = 0
 }
 
-func (t *mockNetwork) mockResponses(callback func(), responses ...[]byte) {
+func (t *testNetwork) testResponses(callback func(), responses ...[]byte) {
 	t.response = responses
 	t.callback = callback
 	t.numCalls = 0
 }
 
-func (t *mockNetwork) TrackBandwidth(ids.NodeID, float64) {}
+func (t *testNetwork) TrackBandwidth(ids.NodeID, float64) {}

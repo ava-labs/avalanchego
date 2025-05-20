@@ -52,7 +52,7 @@ var (
 	errInvalidCodeResponseLen = errors.New("number of code bytes in response does not match requested hashes")
 	errMaxCodeSizeExceeded    = errors.New("max code size exceeded")
 )
-var _ Client = &client{}
+var _ Client = (*client)(nil)
 
 // Client synchronously fetches data from the network to fulfill state sync requests.
 // Repeatedly requests failed requests until the context to the request is expired.

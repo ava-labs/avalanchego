@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	_ ClientSyncerStats = &clientSyncerStats{}
-	_ ClientSyncerStats = &noopStats{}
+	_ ClientSyncerStats = (*clientSyncerStats)(nil)
+	_ ClientSyncerStats = (*noopStats)(nil)
 )
 
 type ClientSyncerStats interface {

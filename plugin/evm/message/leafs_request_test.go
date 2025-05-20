@@ -171,7 +171,7 @@ func TestLeafsRequestValidation(t *testing.T) {
 	}
 }
 
-var _ RequestHandler = &mockHandler{}
+var _ RequestHandler = (*mockHandler)(nil)
 
 type mockHandler struct {
 	handleStateTrieCalled,
@@ -206,6 +206,7 @@ func (m *mockHandler) HandleMessageSignatureRequest(ctx context.Context, nodeID 
 	m.handleMessageSignatureCalled = true
 	return nil, nil
 }
+
 func (m *mockHandler) HandleBlockSignatureRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, signatureRequest BlockSignatureRequest) ([]byte, error) {
 	m.handleBlockSignatureCalled = true
 	return nil, nil

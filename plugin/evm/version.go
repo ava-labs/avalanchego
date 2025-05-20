@@ -3,9 +3,7 @@
 
 package evm
 
-import (
-	"fmt"
-)
+import "fmt"
 
 var (
 	// GitCommit is set by the build script

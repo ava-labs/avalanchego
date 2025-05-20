@@ -20,8 +20,8 @@ import (
 )
 
 var (
-	_ Syncer                  = &atomicSyncer{}
-	_ syncclient.LeafSyncTask = &atomicSyncerLeafTask{}
+	_ Syncer                  = (*atomicSyncer)(nil)
+	_ syncclient.LeafSyncTask = (*atomicSyncerLeafTask)(nil)
 )
 
 // atomicSyncer is used to sync the atomic trie from the network. The CallbackLeafSyncer

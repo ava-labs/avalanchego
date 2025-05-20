@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 )
 
-var _ message.RequestHandler = &networkHandler{}
+var _ message.RequestHandler = (*networkHandler)(nil)
 
 type networkHandler struct {
 	stateTrieLeafsRequestHandler  *syncHandlers.LeafsRequestHandler

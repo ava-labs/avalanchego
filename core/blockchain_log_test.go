@@ -89,8 +89,7 @@ func TestAcceptedLogsSubscription(t *testing.T) {
 	require.NoError(err)
 
 	for _, block := range blocks {
-		err := chain.Accept(block)
-		require.NoError(err)
+		require.NoError(chain.Accept(block))
 	}
 	chain.DrainAcceptorQueue()
 

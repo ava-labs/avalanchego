@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package syncutils
+package statesynctest
 
 import (
 	"encoding/binary"
@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/coreth/utils"
+	"github.com/ava-labs/coreth/utils/utilstest"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/trie/trienode"
@@ -146,12 +146,12 @@ func CorruptTrie(t *testing.T, diskdb ethdb.Batcher, tr *trie.Trie, n int) {
 func FillAccounts(
 	t *testing.T, trieDB *triedb.Database, root common.Hash, numAccounts int,
 	onAccount func(*testing.T, int, types.StateAccount) types.StateAccount,
-) (common.Hash, map[*utils.Key]*types.StateAccount) {
+) (common.Hash, map[*utilstest.Key]*types.StateAccount) {
 	var (
 		minBalance  = uint256.NewInt(3000000000000000000)
 		randBalance = uint256.NewInt(1000000000000000000)
 		maxNonce    = 10
-		accounts    = make(map[*utils.Key]*types.StateAccount, numAccounts)
+		accounts    = make(map[*utilstest.Key]*types.StateAccount, numAccounts)
 	)
 
 	tr, err := trie.NewStateTrie(trie.TrieID(root), trieDB)
@@ -175,7 +175,7 @@ func FillAccounts(
 			t.Fatalf("failed to rlp encode account: %v", err)
 		}
 
-		key := utils.NewKey(t)
+		key := utilstest.NewKey(t)
 		tr.MustUpdate(key.Address[:], accBytes)
 		accounts[key] = &acc
 	}

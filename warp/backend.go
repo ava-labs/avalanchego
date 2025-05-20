@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	_                         Backend = &backend{}
+	_                         Backend = (*backend)(nil)
 	errParsingOffChainMessage         = errors.New("failed to parse off-chain message")
 
 	messageCacheSize = 500
