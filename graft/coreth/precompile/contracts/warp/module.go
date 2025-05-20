@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 )
 
-var _ contract.Configurator = &configurator{}
+var _ contract.Configurator = (*configurator)(nil)
 
 // ConfigKey is the key used in json config files to specify this precompile config.
 // must be unique across all precompiles.

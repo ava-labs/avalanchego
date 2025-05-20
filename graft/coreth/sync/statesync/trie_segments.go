@@ -23,8 +23,8 @@ import (
 )
 
 var (
-	_ syncclient.LeafSyncTask = &trieSegment{}
-	_ fmt.Stringer            = &trieSegment{}
+	_ syncclient.LeafSyncTask = (*trieSegment)(nil)
+	_ fmt.Stringer            = (*trieSegment)(nil)
 )
 
 // trieToSync keeps the state of a single trie syncing

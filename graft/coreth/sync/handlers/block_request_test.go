@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	"github.com/ava-labs/coreth/sync/handlers/stats"
+	"github.com/ava-labs/coreth/sync/handlers/stats/statstest"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -35,11 +36,11 @@ type blockRequestTest struct {
 	requestedParents  uint16
 	expectedBlocks    int
 	expectNilResponse bool
-	assertResponse    func(t testing.TB, stats *stats.MockHandlerStats, b []byte)
+	assertResponse    func(t testing.TB, stats *statstest.TestHandlerStats, b []byte)
 }
 
 func executeBlockRequestTest(t testing.TB, test blockRequestTest, blocks []*types.Block) {
-	mockHandlerStats := &stats.MockHandlerStats{}
+	testHandlerStats := &statstest.TestHandlerStats{}
 
 	// convert into map
 	blocksDB := make(map[common.Hash]*types.Block, len(blocks))
@@ -55,7 +56,7 @@ func executeBlockRequestTest(t testing.TB, test blockRequestTest, blocks []*type
 			return blk
 		},
 	}
-	blockRequestHandler := NewBlockRequestHandler(blockProvider, message.Codec, mockHandlerStats)
+	blockRequestHandler := NewBlockRequestHandler(blockProvider, message.Codec, testHandlerStats)
 
 	var blockRequest message.BlockRequest
 	if test.startBlockHash != (common.Hash{}) {
@@ -73,7 +74,7 @@ func executeBlockRequestTest(t testing.TB, test blockRequestTest, blocks []*type
 		t.Fatal("unexpected error during block request", err)
 	}
 	if test.assertResponse != nil {
-		test.assertResponse(t, mockHandlerStats, responseBytes)
+		test.assertResponse(t, testHandlerStats, responseBytes)
 	}
 
 	if test.expectNilResponse {
@@ -98,11 +99,11 @@ func executeBlockRequestTest(t testing.TB, test blockRequestTest, blocks []*type
 		assert.Equal(t, blocks[test.startBlockIndex].Hash(), block.Hash())
 		test.startBlockIndex--
 	}
-	mockHandlerStats.Reset()
+	testHandlerStats.Reset()
 }
 
 func TestBlockRequestHandler(t *testing.T) {
-	var gspec = &core.Genesis{
+	gspec := &core.Genesis{
 		Config: params.TestChainConfig,
 	}
 	memdb := rawdb.NewMemoryDatabase()
@@ -140,8 +141,8 @@ func TestBlockRequestHandler(t *testing.T) {
 			startBlockHeight:  1_000_000,
 			requestedParents:  64,
 			expectNilResponse: true,
-			assertResponse: func(t testing.TB, mockHandlerStats *stats.MockHandlerStats, _ []byte) {
-				assert.Equal(t, uint32(1), mockHandlerStats.MissingBlockHashCount)
+			assertResponse: func(t testing.TB, testHandlerStats *statstest.TestHandlerStats, _ []byte) {
+				assert.Equal(t, uint32(1), testHandlerStats.MissingBlockHashCount)
 			},
 		},
 	}
@@ -214,7 +215,7 @@ func TestBlockRequestHandlerLargeBlocks(t *testing.T) {
 }
 
 func TestBlockRequestHandlerCtxExpires(t *testing.T) {
-	var gspec = &core.Genesis{
+	gspec := &core.Genesis{
 		Config: params.TestChainConfig,
 	}
 	memdb := rawdb.NewMemoryDatabase()

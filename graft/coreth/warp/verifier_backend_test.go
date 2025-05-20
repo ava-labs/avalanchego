@@ -18,14 +18,14 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
-	"github.com/ava-labs/coreth/plugin/evm/testutils"
+	"github.com/ava-labs/coreth/metrics/metricstest"
 	"github.com/ava-labs/coreth/warp/warptest"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 )
 
 func TestAddressedCallSignatures(t *testing.T) {
-	testutils.WithMetrics(t)
+	metricstest.WithMetrics(t)
 
 	database := memdb.New()
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
@@ -138,7 +138,7 @@ func TestAddressedCallSignatures(t *testing.T) {
 }
 
 func TestBlockSignatures(t *testing.T) {
-	testutils.WithMetrics(t)
+	metricstest.WithMetrics(t)
 
 	database := memdb.New()
 	snowCtx := snowtest.Context(t, snowtest.CChainID)

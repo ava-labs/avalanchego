@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/message"
 )
 
-var _ message.ResponseHandler = &waitingResponseHandler{}
+var _ message.ResponseHandler = (*waitingResponseHandler)(nil)
 
 // waitingResponseHandler implements the ResponseHandler interface
 // Internally used to wait for response after making a request synchronously

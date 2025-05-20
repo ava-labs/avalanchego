@@ -10,8 +10,8 @@ import (
 )
 
 var (
-	_ BlockProvider    = &TestBlockProvider{}
-	_ SnapshotProvider = &TestSnapshotProvider{}
+	_ BlockProvider    = (*TestBlockProvider)(nil)
+	_ SnapshotProvider = (*TestSnapshotProvider)(nil)
 )
 
 type TestBlockProvider struct {

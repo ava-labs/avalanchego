@@ -109,11 +109,11 @@ import (
 )
 
 var (
-	_ block.ChainVM                      = &VM{}
-	_ block.BuildBlockWithContextChainVM = &VM{}
-	_ block.StateSyncableVM              = &VM{}
-	_ statesyncclient.EthBlockParser     = &VM{}
-	_ secp256k1fx.VM                     = &VM{}
+	_ block.ChainVM                      = (*VM)(nil)
+	_ block.BuildBlockWithContextChainVM = (*VM)(nil)
+	_ block.StateSyncableVM              = (*VM)(nil)
+	_ statesyncclient.EthBlockParser     = (*VM)(nil)
+	_ secp256k1fx.VM                     = (*VM)(nil)
 )
 
 const (

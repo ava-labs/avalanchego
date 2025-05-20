@@ -19,7 +19,11 @@ import (
 	"github.com/ava-labs/coreth/params/extras"
 )
 
-var TestTxCodec codec.Manager
+var (
+	_ UnsignedAtomicTx = (*TestUnsignedTx)(nil)
+
+	TestTxCodec codec.Manager
+)
 
 func init() {
 	TestTxCodec = codec.NewDefaultManager()
@@ -49,8 +53,6 @@ type TestUnsignedTx struct {
 	SemanticVerifyV             error
 	EVMStateTransferV           error
 }
-
-var _ UnsignedAtomicTx = &TestUnsignedTx{}
 
 // GasUsed implements the UnsignedAtomicTx interface
 func (t *TestUnsignedTx) GasUsed(fixedFee bool) (uint64, error) { return t.GasUsedV, nil }

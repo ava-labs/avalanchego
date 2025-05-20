@@ -25,9 +25,9 @@ const (
 )
 
 var (
-	_ precompileconfig.Config     = &Config{}
-	_ precompileconfig.Predicater = &Config{}
-	_ precompileconfig.Accepter   = &Config{}
+	_ precompileconfig.Config     = (*Config)(nil)
+	_ precompileconfig.Predicater = (*Config)(nil)
+	_ precompileconfig.Accepter   = (*Config)(nil)
 )
 
 var (

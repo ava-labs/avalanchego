@@ -31,8 +31,8 @@ import (
 )
 
 var (
-	_                             UnsignedAtomicTx       = &UnsignedExportTx{}
-	_                             secp256k1fx.UnsignedTx = &UnsignedExportTx{}
+	_                             UnsignedAtomicTx       = (*UnsignedExportTx)(nil)
+	_                             secp256k1fx.UnsignedTx = (*UnsignedExportTx)(nil)
 	ErrExportNonAVAXInputBanff                           = errors.New("export input cannot contain non-AVAX in Banff")
 	ErrExportNonAVAXOutputBanff                          = errors.New("export output cannot contain non-AVAX in Banff")
 	ErrNoExportOutputs                                   = errors.New("tx has no export outputs")

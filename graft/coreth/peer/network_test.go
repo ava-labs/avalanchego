@@ -41,18 +41,18 @@ var (
 		Patch: 0,
 	}
 
-	_ message.Request = &HelloRequest{}
-	_                 = &HelloResponse{}
-	_                 = &GreetingRequest{}
-	_                 = &GreetingResponse{}
-	_                 = &TestMessage{}
+	_ message.Request = (*HelloRequest)(nil)
+	_                 = (*HelloResponse)(nil)
+	_                 = (*GreetingRequest)(nil)
+	_                 = (*GreetingResponse)(nil)
+	_                 = (*TestMessage)(nil)
 
-	_ message.RequestHandler = &HelloGreetingRequestHandler{}
-	_ message.RequestHandler = &testRequestHandler{}
+	_ message.RequestHandler = (*HelloGreetingRequestHandler)(nil)
+	_ message.RequestHandler = (*testRequestHandler)(nil)
 
-	_ common.AppSender = testAppSender{}
+	_ common.AppSender = (*testAppSender)(nil)
 
-	_ p2p.Handler = &testSDKHandler{}
+	_ p2p.Handler = (*testSDKHandler)(nil)
 )
 
 func TestNetworkDoesNotConnectToItself(t *testing.T) {
@@ -375,8 +375,11 @@ func TestAppRequestAnyOnCtxCancellation(t *testing.T) {
 	<-doneChan
 	// Should still be able to process a response after cancelling.
 	assert.Len(t, net.(*network).outstandingRequestHandlers, 1) // context cancellation SendAppRequestAny failure doesn't clear
-	err = net.AppResponse(context.Background(), sentAppRequestInfo.nodeID, sentAppRequestInfo.requestID, []byte{})
-	assert.NoError(t, err)
+	assert.NoError(t, net.AppResponse(
+		context.Background(),
+		sentAppRequestInfo.nodeID,
+		sentAppRequestInfo.requestID,
+		[]byte{}))
 	assert.Empty(t, net.(*network).outstandingRequestHandlers) // Received response
 }
 
@@ -399,8 +402,7 @@ func TestRequestMinVersion(t *testing.T) {
 				if err != nil {
 					panic(err)
 				}
-				err = net.AppResponse(context.Background(), nodeID, reqID, responseBytes)
-				assert.NoError(t, err)
+				assert.NoError(t, net.AppResponse(context.Background(), nodeID, reqID, responseBytes))
 			}()
 			return nil
 		},
@@ -481,14 +483,12 @@ func TestOnRequestHonoursDeadline(t *testing.T) {
 
 	requestHandler.response, err = marshalStruct(codecManager, TestMessage{Message: "hi there"})
 	assert.NoError(t, err)
-	err = net.AppRequest(context.Background(), nodeID, 1, time.Now().Add(1*time.Millisecond), requestBytes)
-	assert.NoError(t, err)
+	assert.NoError(t, net.AppRequest(context.Background(), nodeID, 1, time.Now().Add(1*time.Millisecond), requestBytes))
 	// ensure the handler didn't get called (as peer.Network would've dropped the request)
 	assert.EqualValues(t, requestHandler.calls, 0)
 
 	requestHandler.processingDuration = 0
-	err = net.AppRequest(context.Background(), nodeID, 2, time.Now().Add(250*time.Millisecond), requestBytes)
-	assert.NoError(t, err)
+	assert.NoError(t, net.AppRequest(context.Background(), nodeID, 2, time.Now().Add(250*time.Millisecond), requestBytes))
 	assert.True(t, responded)
 	assert.EqualValues(t, requestHandler.calls, 1)
 }
@@ -599,8 +599,7 @@ func TestNetworkRouting(t *testing.T) {
 
 	nodeID := ids.GenerateTestNodeID()
 	foobar := append([]byte{byte(protocol)}, []byte("foobar")...)
-	err = network.AppRequest(context.Background(), nodeID, 0, time.Time{}, foobar)
-	require.NoError(err)
+	require.NoError(network.AppRequest(context.Background(), nodeID, 0, time.Time{}, foobar))
 	require.True(handler.appRequested)
 
 	err = network.AppResponse(context.Background(), ids.GenerateTestNodeID(), 0, foobar)

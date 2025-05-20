@@ -36,7 +36,7 @@ const (
 )
 
 var (
-	_                            AtomicTrie = &atomicTrie{}
+	_                            AtomicTrie = (*atomicTrie)(nil)
 	lastCommittedKey                        = []byte("atomicTrieLastCommittedBlock")
 	appliedSharedMemoryCursorKey            = []byte("atomicTrieLastAppliedToSharedMemory")
 )

@@ -21,7 +21,7 @@ import (
 	"github.com/ava-labs/libevm/log"
 )
 
-var _ AtomicBackend = &atomicBackend{}
+var _ AtomicBackend = (*atomicBackend)(nil)
 
 // AtomicBackend abstracts the verification and processing
 // of atomic transactions

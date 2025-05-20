@@ -3,9 +3,7 @@
 
 package warp
 
-import (
-	"github.com/ava-labs/libevm/metrics"
-)
+import "github.com/ava-labs/libevm/metrics"
 
 type verifierStats struct {
 	messageParseFail metrics.Counter

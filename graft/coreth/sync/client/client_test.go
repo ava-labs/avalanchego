@@ -22,7 +22,7 @@ import (
 	clientstats "github.com/ava-labs/coreth/sync/client/stats"
 	"github.com/ava-labs/coreth/sync/handlers"
 	handlerstats "github.com/ava-labs/coreth/sync/handlers/stats"
-	"github.com/ava-labs/coreth/sync/syncutils"
+	"github.com/ava-labs/coreth/sync/statesync/statesynctest"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -31,10 +31,10 @@ import (
 )
 
 func TestGetCode(t *testing.T) {
-	mockNetClient := &mockNetwork{}
+	testNetClient := &testNetwork{}
 
 	tests := map[string]struct {
-		setupRequest func() (requestHashes []common.Hash, mockResponse message.CodeResponse, expectedCode [][]byte)
+		setupRequest func() (requestHashes []common.Hash, testResponse message.CodeResponse, expectedCode [][]byte)
 		expectedErr  error
 	}{
 		"normal": {
@@ -49,7 +49,7 @@ func TestGetCode(t *testing.T) {
 			expectedErr: nil,
 		},
 		"unexpected code bytes": {
-			setupRequest: func() (requestHashes []common.Hash, mockResponse message.CodeResponse, expectedCode [][]byte) {
+			setupRequest: func() (requestHashes []common.Hash, testResponse message.CodeResponse, expectedCode [][]byte) {
 				return []common.Hash{{1}}, message.CodeResponse{
 					Data: [][]byte{{1}},
 				}, nil
@@ -57,7 +57,7 @@ func TestGetCode(t *testing.T) {
 			expectedErr: errHashMismatch,
 		},
 		"too many code elements returned": {
-			setupRequest: func() (requestHashes []common.Hash, mockResponse message.CodeResponse, expectedCode [][]byte) {
+			setupRequest: func() (requestHashes []common.Hash, testResponse message.CodeResponse, expectedCode [][]byte) {
 				return []common.Hash{{1}}, message.CodeResponse{
 					Data: [][]byte{{1}, {2}},
 				}, nil
@@ -65,7 +65,7 @@ func TestGetCode(t *testing.T) {
 			expectedErr: errInvalidCodeResponseLen,
 		},
 		"too few code elements returned": {
-			setupRequest: func() (requestHashes []common.Hash, mockResponse message.CodeResponse, expectedCode [][]byte) {
+			setupRequest: func() (requestHashes []common.Hash, testResponse message.CodeResponse, expectedCode [][]byte) {
 				return []common.Hash{{1}}, message.CodeResponse{
 					Data: [][]byte{},
 				}, nil
@@ -73,7 +73,7 @@ func TestGetCode(t *testing.T) {
 			expectedErr: errInvalidCodeResponseLen,
 		},
 		"code size is too large": {
-			setupRequest: func() (requestHashes []common.Hash, mockResponse message.CodeResponse, expectedCode [][]byte) {
+			setupRequest: func() (requestHashes []common.Hash, testResponse message.CodeResponse, expectedCode [][]byte) {
 				oversizedCode := make([]byte, params.MaxCodeSize+1)
 				codeHash := crypto.Keccak256Hash(oversizedCode)
 				return []common.Hash{codeHash}, message.CodeResponse{
@@ -85,11 +85,11 @@ func TestGetCode(t *testing.T) {
 	}
 
 	stateSyncClient := NewClient(&ClientConfig{
-		NetworkClient:    mockNetClient,
+		NetworkClient:    testNetClient,
 		Codec:            message.Codec,
 		Stats:            clientstats.NewNoOpStats(),
 		StateSyncNodeIDs: nil,
-		BlockParser:      mockBlockParser,
+		BlockParser:      newTestBlockParser(),
 	})
 
 	for name, test := range tests {
@@ -106,9 +106,9 @@ func TestGetCode(t *testing.T) {
 			// an error.
 			attempted := false
 			if test.expectedErr == nil {
-				mockNetClient.mockResponse(1, nil, responseBytes)
+				testNetClient.testResponse(1, nil, responseBytes)
 			} else {
-				mockNetClient.mockResponse(2, func() {
+				testNetClient.testResponse(2, func() {
 					// Cancel before the second attempt is processed.
 					if attempted {
 						cancel()
@@ -121,7 +121,7 @@ func TestGetCode(t *testing.T) {
 			// If we expect an error, assert that one occurred and return
 			if test.expectedErr != nil {
 				assert.ErrorIs(t, err, test.expectedErr)
-				assert.EqualValues(t, 2, mockNetClient.numCalls)
+				assert.EqualValues(t, 2, testNetClient.numCalls)
 				return
 			}
 			// Otherwise, assert there was no error and that the result is as expected
@@ -130,7 +130,7 @@ func TestGetCode(t *testing.T) {
 			for i, code := range codeBytes {
 				assert.Equal(t, expectedCode[i], code)
 			}
-			assert.Equal(t, uint(1), mockNetClient.numCalls)
+			assert.Equal(t, uint(1), testNetClient.numCalls)
 		})
 	}
 }
@@ -139,7 +139,7 @@ func TestGetBlocks(t *testing.T) {
 	// set random seed for deterministic tests
 	rand.Seed(1)
 
-	var gspec = &core.Genesis{
+	gspec := &core.Genesis{
 		Config: params.TestChainConfig,
 	}
 	memdb := rawdb.NewMemoryDatabase()
@@ -154,13 +154,13 @@ func TestGetBlocks(t *testing.T) {
 	assert.Equal(t, numBlocks, len(blocks))
 
 	// Construct client
-	mockNetClient := &mockNetwork{}
+	testNetClient := &testNetwork{}
 	stateSyncClient := NewClient(&ClientConfig{
-		NetworkClient:    mockNetClient,
+		NetworkClient:    testNetClient,
 		Codec:            message.Codec,
 		Stats:            clientstats.NewNoOpStats(),
 		StateSyncNodeIDs: nil,
-		BlockParser:      mockBlockParser,
+		BlockParser:      newTestBlockParser(),
 	})
 
 	blocksRequestHandler := handlers.NewBlockRequestHandler(buildGetter(blocks), message.Codec, handlerstats.NewNoopHandlerStats())
@@ -365,10 +365,10 @@ func TestGetBlocks(t *testing.T) {
 
 			responseBytes := test.getResponse(t, test.request)
 			if len(test.expectedErr) == 0 {
-				mockNetClient.mockResponse(1, nil, responseBytes)
+				testNetClient.testResponse(1, nil, responseBytes)
 			} else {
 				attempted := false
-				mockNetClient.mockResponse(2, func() {
+				testNetClient.testResponse(2, func() {
 					if attempted {
 						cancel()
 					}
@@ -412,16 +412,16 @@ func TestGetLeafs(t *testing.T) {
 	const leafsLimit = 1024
 
 	trieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
-	largeTrieRoot, largeTrieKeys, _ := syncutils.GenerateTrie(t, trieDB, 100_000, common.HashLength)
-	smallTrieRoot, _, _ := syncutils.GenerateTrie(t, trieDB, leafsLimit, common.HashLength)
+	largeTrieRoot, largeTrieKeys, _ := statesynctest.GenerateTrie(t, trieDB, 100_000, common.HashLength)
+	smallTrieRoot, _, _ := statesynctest.GenerateTrie(t, trieDB, leafsLimit, common.HashLength)
 
 	handler := handlers.NewLeafsRequestHandler(trieDB, nil, message.Codec, handlerstats.NewNoopHandlerStats())
 	client := NewClient(&ClientConfig{
-		NetworkClient:    &mockNetwork{},
+		NetworkClient:    &testNetwork{},
 		Codec:            message.Codec,
 		Stats:            clientstats.NewNoOpStats(),
 		StateSyncNodeIDs: nil,
-		BlockParser:      mockBlockParser,
+		BlockParser:      newTestBlockParser(),
 	})
 
 	tests := map[string]struct {
@@ -795,18 +795,18 @@ func TestGetLeafsRetries(t *testing.T) {
 	rand.Seed(1)
 
 	trieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
-	root, _, _ := syncutils.GenerateTrie(t, trieDB, 100_000, common.HashLength)
+	root, _, _ := statesynctest.GenerateTrie(t, trieDB, 100_000, common.HashLength)
 
 	handler := handlers.NewLeafsRequestHandler(trieDB, nil, message.Codec, handlerstats.NewNoopHandlerStats())
-	mockNetClient := &mockNetwork{}
+	testNetClient := &testNetwork{}
 
 	const maxAttempts = 8
 	client := NewClient(&ClientConfig{
-		NetworkClient:    mockNetClient,
+		NetworkClient:    testNetClient,
 		Codec:            message.Codec,
 		Stats:            clientstats.NewNoOpStats(),
 		StateSyncNodeIDs: nil,
-		BlockParser:      mockBlockParser,
+		BlockParser:      newTestBlockParser(),
 	})
 
 	request := message.LeafsRequest{
@@ -821,7 +821,7 @@ func TestGetLeafsRetries(t *testing.T) {
 	defer cancel()
 	goodResponse, responseErr := handler.OnLeafsRequest(ctx, ids.GenerateTestNodeID(), 1, request)
 	assert.NoError(t, responseErr)
-	mockNetClient.mockResponse(1, nil, goodResponse)
+	testNetClient.testResponse(1, nil, goodResponse)
 
 	res, err := client.GetLeafs(ctx, request)
 	if err != nil {
@@ -832,7 +832,7 @@ func TestGetLeafsRetries(t *testing.T) {
 
 	// Succeeds within the allotted number of attempts
 	invalidResponse := []byte("invalid response")
-	mockNetClient.mockResponses(nil, invalidResponse, invalidResponse, goodResponse)
+	testNetClient.testResponses(nil, invalidResponse, invalidResponse, goodResponse)
 
 	res, err = client.GetLeafs(ctx, request)
 	if err != nil {
@@ -843,7 +843,7 @@ func TestGetLeafsRetries(t *testing.T) {
 
 	// Test that GetLeafs stops after the context is cancelled
 	numAttempts := 0
-	mockNetClient.mockResponse(maxAttempts, func() {
+	testNetClient.testResponse(maxAttempts, func() {
 		numAttempts++
 		if numAttempts >= maxAttempts {
 			cancel()
@@ -855,7 +855,7 @@ func TestGetLeafsRetries(t *testing.T) {
 }
 
 func TestStateSyncNodes(t *testing.T) {
-	mockNetClient := &mockNetwork{}
+	testNetClient := &testNetwork{}
 
 	stateSyncNodes := []ids.NodeID{
 		ids.GenerateTestNodeID(),
@@ -864,17 +864,17 @@ func TestStateSyncNodes(t *testing.T) {
 		ids.GenerateTestNodeID(),
 	}
 	client := NewClient(&ClientConfig{
-		NetworkClient:    mockNetClient,
+		NetworkClient:    testNetClient,
 		Codec:            message.Codec,
 		Stats:            clientstats.NewNoOpStats(),
 		StateSyncNodeIDs: stateSyncNodes,
-		BlockParser:      mockBlockParser,
+		BlockParser:      newTestBlockParser(),
 	})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	attempt := 0
 	responses := [][]byte{{1}, {2}, {3}, {4}}
-	mockNetClient.mockResponses(func() {
+	testNetClient.testResponses(func() {
 		attempt++
 		if attempt >= 4 {
 			cancel()
@@ -887,8 +887,8 @@ func TestStateSyncNodes(t *testing.T) {
 	assert.Empty(t, response)
 
 	// assert all nodes were called
-	assert.Contains(t, mockNetClient.nodesRequested, stateSyncNodes[0])
-	assert.Contains(t, mockNetClient.nodesRequested, stateSyncNodes[1])
-	assert.Contains(t, mockNetClient.nodesRequested, stateSyncNodes[2])
-	assert.Contains(t, mockNetClient.nodesRequested, stateSyncNodes[3])
+	assert.Contains(t, testNetClient.nodesRequested, stateSyncNodes[0])
+	assert.Contains(t, testNetClient.nodesRequested, stateSyncNodes[1])
+	assert.Contains(t, testNetClient.nodesRequested, stateSyncNodes[2])
+	assert.Contains(t, testNetClient.nodesRequested, stateSyncNodes[3])
 }

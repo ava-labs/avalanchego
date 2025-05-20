@@ -6,10 +6,10 @@ internal/*
 !internal/ethapi/api_extra_test.go
 !core/blockchain_ext.go
 !core/blockchain_log_test.go
-!core/blockchain_test.go
+!core/blockchain_ext_test.go
 !core/bounded_buffer.go
-!core/extstate/statedb.go
-!core/extstate/test_statedb.go
+!core/coretest/*
+!core/extstate/*
 !core/fifo_cache.go
 !core/main_test.go
 !core/predicate_check.go
@@ -18,7 +18,6 @@ internal/*
 !core/state/statedb_multicoin_test.go
 !core/state_manager_test.go
 !core/state_processor_ext.go
-!core/test_blockchain.go
 !eth/chain_with_final_block.go
 !eth/gasprice/fee_info_provider_test.go
 !internal/ethapi/api.coreth.go

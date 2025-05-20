@@ -10,8 +10,8 @@ import (
 )
 
 var (
-	_ ethdb.Iterator = &AccountIterator{}
-	_ ethdb.Iterator = &StorageIterator{}
+	_ ethdb.Iterator = (*AccountIterator)(nil)
+	_ ethdb.Iterator = (*StorageIterator)(nil)
 )
 
 // AccountIterator wraps a [snapshot.AccountIterator] to conform to [ethdb.Iterator]

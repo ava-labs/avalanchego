@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	_ ethdb.KeyValueStore = &ethDbWrapper{}
+	_ ethdb.KeyValueStore = (*ethDbWrapper)(nil)
 
 	ErrSnapshotNotSupported = errors.New("snapshot is not supported")
 )

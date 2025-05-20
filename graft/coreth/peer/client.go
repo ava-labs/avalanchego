@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	_ NetworkClient = &client{}
+	_ NetworkClient = (*client)(nil)
 
 	ErrRequestFailed = errors.New("request failed")
 )

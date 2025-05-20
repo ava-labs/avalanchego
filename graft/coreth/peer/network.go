@@ -33,9 +33,9 @@ const minRequestHandlingDuration = 100 * time.Millisecond
 var (
 	errAcquiringSemaphore                      = errors.New("error acquiring semaphore")
 	errExpiredRequest                          = errors.New("expired request")
-	_                     Network              = &network{}
-	_                     validators.Connector = &network{}
-	_                     common.AppHandler    = &network{}
+	_                     Network              = (*network)(nil)
+	_                     validators.Connector = (*network)(nil)
+	_                     common.AppHandler    = (*network)(nil)
 )
 
 type Network interface {
