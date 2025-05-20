@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.21;
 
 /// @notice Dummy is a contract used only for simulating the load
 /// of contract creation operations in the EVM. It has state variables,

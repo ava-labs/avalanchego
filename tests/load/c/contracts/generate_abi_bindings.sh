@@ -9,15 +9,9 @@ if ! command -v solc &> /dev/null; then
   exit 1
 fi
 
-if ! command -v solhint &> /dev/null; then
-  echo "Error: solhint not found. Run this command within Nix shell."
-  exit 1
-fi
-
 CONTRACTS_DIR="$(dirname "$0")"
 TEMPDIR=$(mktemp -d)
 for FILE in "${CONTRACTS_DIR}"/*.sol; do
-  solhint --config ${CONTRACTS_DIR}/.solhint.json "${FILE}"
   echo "Generating Go bindings from Solidity contract $FILE..."
   CONTRACT_NAME=$(basename "$FILE" .sol)
   solc --abi --bin --overwrite -o "$TEMPDIR" "${CONTRACTS_DIR}/${CONTRACT_NAME}.sol"

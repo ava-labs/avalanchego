@@ -59,9 +59,6 @@
 
             # Solidity compiler from nixpkgs 24.11
             solc
-
-            # Solidity linting from nixpkgs 24.11
-            solhint
           ] ++ lib.optionals stdenv.isDarwin [
             # macOS-specific frameworks
             darwin.apple_sdk.frameworks.Security
