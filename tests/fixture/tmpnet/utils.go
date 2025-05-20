@@ -53,19 +53,12 @@ type NodeURI struct {
 	URI    string
 }
 
-// GetNodeURIs returns the URIs of the given nodes. Prefer GetLocalNodeURIs
-// if targeting nodes that could be running in a Kubernetes cluster.
+// GetNodeURIs returns the URIs of the given nodes provided they are running and not ephemeral. Prefer
+// GetLocalNodeURIs if targeting nodes that could be running in a Kubernetes cluster.
 func GetNodeURIs(nodes []*Node) []NodeURI {
-	uris := make([]NodeURI, 0, len(nodes))
-	for _, node := range nodes {
-		if node.IsEphemeral {
-			// Avoid returning URIs for nodes whose lifespan is indeterminate
-			continue
-		}
-		if !node.IsRunning() {
-			// Only running nodes have URIs
-			continue
-		}
+	availableNodes := filterAvailableNodes(nodes)
+	uris := make([]NodeURI, 0, len(availableNodes))
+	for _, node := range availableNodes {
 		uris = append(uris, NodeURI{
 			NodeID: node.NodeID,
 			URI:    node.URI,
@@ -74,19 +67,12 @@ func GetNodeURIs(nodes []*Node) []NodeURI {
 	return uris
 }
 
-// GetLocalNodeURIs returns locally-accessible URIs for the given nodes.
+// GetLocalNodeURIs returns locally-accessible URIs for the given nodes provided they are running and not
+// ephemeral.
 func GetLocalNodeURIs(ctx context.Context, nodes []*Node, deferCleanupFunc func(func())) ([]NodeURI, error) {
-	uris := make([]NodeURI, 0, len(nodes))
-	for _, node := range nodes {
-		if node.IsEphemeral {
-			// Avoid returning URIs for nodes whose lifespan is indeterminate
-			continue
-		}
-		if !node.IsRunning() {
-			// Only running nodes have URIs
-			continue
-		}
-
+	availableNodes := filterAvailableNodes(nodes)
+	uris := make([]NodeURI, 0, len(availableNodes))
+	for _, node := range availableNodes {
 		uri, cancel, err := node.GetLocalURI(ctx)
 		if err != nil {
 			return nil, err
@@ -99,6 +85,23 @@ func GetLocalNodeURIs(ctx context.Context, nodes []*Node, deferCleanupFunc func(
 	}
 
 	return uris, nil
+}
+
+// filteredAvailableNodes filters the provided nodes by whether they are running and not ephemeral.
+func filterAvailableNodes(nodes []*Node) []*Node {
+	filteredNodes := make([]*Node, 0, len(nodes))
+	for _, node := range nodes {
+		if node.IsEphemeral {
+			// Avoid returning URIs for nodes whose lifespan is indeterminate
+			continue
+		}
+		if !node.IsRunning() {
+			// Only running nodes have URIs
+			continue
+		}
+		filteredNodes = append(filteredNodes, node)
+	}
+	return filteredNodes
 }
 
 // Marshal to json with default prefix and indent.
