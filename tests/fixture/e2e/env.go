@@ -253,6 +253,8 @@ func (te *TestEnvironment) GetRandomNodeURI() tmpnet.NodeURI {
 		availableNodes = append(availableNodes, node)
 	}
 
+	require.NotEmpty(tc, availableNodes, "no available nodes to target")
+
 	// Use a local URI for the node to ensure compatibility with kube
 	randomNode := availableNodes[r.Intn(len(availableNodes))]
 	uri, cancel, err := randomNode.GetLocalURI(tc.DefaultContext())
