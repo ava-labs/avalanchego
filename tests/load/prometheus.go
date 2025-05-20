@@ -86,6 +86,7 @@ func (s *MetricsServer) Stop() (err error) {
 
 // GenerateMonitoringConfig generates and writes the Prometheus collector configuration
 // so tmpnet can dynamically discover new scrape target via file-based service discovery
+// It returns the collector file path and an eventual error
 func (s *MetricsServer) GenerateMonitoringConfig(networkUUID, networkOwner string) (string, error) {
 	const metricsFilePath = ".tmpnet/prometheus/file_sd_configs/load-test.json"
 
