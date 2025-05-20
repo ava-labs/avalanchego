@@ -771,6 +771,10 @@ func (n *Network) GetNodeURIs() []NodeURI {
 	return GetNodeURIs(n.Nodes)
 }
 
+func (n *Network) GetLocalNodeURIs(ctx context.Context, deferCleanupFunc func(func())) ([]NodeURI, error) {
+	return GetLocalNodeURIs(ctx, n.Nodes, deferCleanupFunc)
+}
+
 // Retrieves bootstrap IPs and IDs for all non-ephemeral nodes except the skipped one
 // (this supports collecting the bootstrap details for restarting a node).
 //

@@ -53,6 +53,8 @@ type NodeURI struct {
 	URI    string
 }
 
+// GetNodeURIs returns the URIs of the given nodes. Prefer GetLocalNodeURIs
+// if targeting nodes that could be running in a Kubernetes cluster.
 func GetNodeURIs(nodes []*Node) []NodeURI {
 	uris := make([]NodeURI, 0, len(nodes))
 	for _, node := range nodes {
@@ -60,16 +62,43 @@ func GetNodeURIs(nodes []*Node) []NodeURI {
 			// Avoid returning URIs for nodes whose lifespan is indeterminate
 			continue
 		}
-		// Only append URIs that are not empty. A node may have an
-		// empty URI if it is not currently running.
-		if node.IsRunning() {
-			uris = append(uris, NodeURI{
-				NodeID: node.NodeID,
-				URI:    node.URI,
-			})
+		if !node.IsRunning() {
+			// Only running nodes have URIs
+			continue
 		}
+		uris = append(uris, NodeURI{
+			NodeID: node.NodeID,
+			URI:    node.URI,
+		})
 	}
 	return uris
+}
+
+// GetLocalNodeURIs returns locally-accessible URIs for the given nodes.
+func GetLocalNodeURIs(ctx context.Context, nodes []*Node, deferCleanupFunc func(func())) ([]NodeURI, error) {
+	uris := make([]NodeURI, 0, len(nodes))
+	for _, node := range nodes {
+		if node.IsEphemeral {
+			// Avoid returning URIs for nodes whose lifespan is indeterminate
+			continue
+		}
+		if !node.IsRunning() {
+			// Only running nodes have URIs
+			continue
+		}
+
+		uri, cancel, err := node.GetLocalURI(ctx)
+		if err != nil {
+			return nil, err
+		}
+		deferCleanupFunc(cancel)
+		uris = append(uris, NodeURI{
+			NodeID: node.NodeID,
+			URI:    uri,
+		})
+	}
+
+	return uris, nil
 }
 
 // Marshal to json with default prefix and indent.

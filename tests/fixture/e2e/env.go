@@ -46,8 +46,6 @@ type TestEnvironment struct {
 	RootNetworkDir string
 	// The directory where the test network configuration is stored
 	NetworkDir string
-	// URIs used to access the API endpoints of nodes of the network
-	URIs []tmpnet.NodeURI
 	// Pre-funded key for this ginkgo process
 	PreFundedKey *secp256k1.PrivateKey
 	// The duration to wait before shutting down private networks. A
@@ -66,7 +64,6 @@ func GetEnv(tc tests.TestContext) *TestEnvironment {
 	return &TestEnvironment{
 		RootNetworkDir:              env.RootNetworkDir,
 		NetworkDir:                  env.NetworkDir,
-		URIs:                        env.URIs,
 		PreFundedKey:                env.PreFundedKey,
 		PrivateNetworkShutdownDelay: env.PrivateNetworkShutdownDelay,
 		testContext:                 tc,
@@ -219,21 +216,58 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 	return &TestEnvironment{
 		RootNetworkDir:              flagVars.RootNetworkDir(),
 		NetworkDir:                  network.Dir,
-		URIs:                        uris,
 		PrivateNetworkShutdownDelay: flagVars.NetworkShutdownDelay(),
 		testContext:                 tc,
 	}
 }
 
-// Retrieve a random URI to naively attempt to spread API load across
-// nodes.
+// Retrieve the locally-accessible URIs for validator nodes of the shared network.
+func (te *TestEnvironment) GetLocalNodeURIs() []tmpnet.NodeURI {
+	var (
+		tc      = te.testContext
+		network = te.GetNetwork()
+	)
+	uris, err := network.GetLocalNodeURIs(tc.DefaultContext(), tc.DeferCleanup)
+	require.NoError(tc, err)
+	return uris
+}
+
+// Retrieve a random URI to naively attempt to spread API load across nodes.
 func (te *TestEnvironment) GetRandomNodeURI() tmpnet.NodeURI {
-	r := rand.New(rand.NewSource(time.Now().Unix())) //#nosec G404
-	nodeURI := te.URIs[r.Intn(len(te.URIs))]
-	te.testContext.Log().Info("targeting random node",
+	var (
+		tc             = te.testContext
+		r              = rand.New(rand.NewSource(time.Now().Unix())) //#nosec G404
+		network        = te.GetNetwork()
+		availableNodes = []*tmpnet.Node{}
+	)
+
+	for _, node := range network.Nodes {
+		if node.IsEphemeral {
+			// Avoid returning URIs for nodes whose lifespan is indeterminate
+			continue
+		}
+		if !node.IsRunning() {
+			// Only running nodes have URIs
+			continue
+		}
+		availableNodes = append(availableNodes, node)
+	}
+
+	// Use a local URI for the node to ensure compatibility with kube
+	randomNode := availableNodes[r.Intn(len(availableNodes))]
+	uri, cancel, err := randomNode.GetLocalURI(tc.DefaultContext())
+	require.NoError(tc, err)
+	tc.DeferCleanup(cancel)
+
+	nodeURI := tmpnet.NodeURI{
+		NodeID: randomNode.NodeID,
+		URI:    uri,
+	}
+	tc.Log().Info("targeting random node",
 		zap.Stringer("nodeID", nodeURI.NodeID),
 		zap.String("uri", nodeURI.URI),
 	)
+
 	return nodeURI
 }
 
