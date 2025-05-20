@@ -70,7 +70,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 		config := loadConfig{
 			endpoints: endpoints,
 			issuer:    issuerSimple,
-			maxFeeCap: 3000,
+			maxFeeCap: 4761904, // max fee cap equivalent to 100 ether
 			agents:    1,
 			minTPS:    50,
 			maxTPS:    90,
