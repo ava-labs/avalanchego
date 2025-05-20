@@ -6,12 +6,10 @@ package merkledb
 import (
 	"context"
 	"math/rand"
-	"slices"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -519,13 +517,13 @@ func Test_History_MaxLength(t *testing.T) {
 	require.NoError(batch.Put([]byte("k"), []byte("v")))
 	require.NoError(batch.Write())
 
-	require.Contains(db.history.lastChanges, oldRoot)
+	require.Contains(db.history.lastChangesInsertNumber, oldRoot)
 
 	batch = db.NewBatch()
 	require.NoError(batch.Put([]byte("k1"), []byte("v2"))) // Overwrites oldest element in history
 	require.NoError(batch.Write())
 
-	require.NotContains(db.history.lastChanges, oldRoot)
+	require.NotContains(db.history.lastChangesInsertNumber, oldRoot)
 }
 
 func Test_Change_List(t *testing.T) {
@@ -728,11 +726,12 @@ func TestHistoryRecord(t *testing.T) {
 		changes = append(changes, &changeSummary{rootID: ids.GenerateTestID()})
 
 		th.record(changes[i])
-		require.Equal(uint64(i+1), th.nextInsertNumber)
+		require.Equal(uint64(i+1), th.getNextInsertNumber())
 		require.Equal(i+1, th.history.Len())
-		require.Len(th.lastChanges, i+1)
-		require.Contains(th.lastChanges, changes[i].rootID)
-		changeAndIndex := th.lastChanges[changes[i].rootID]
+		require.Len(th.lastChangesInsertNumber, i+1)
+		require.Contains(th.lastChangesInsertNumber, changes[i].rootID)
+		changeAndIndex, ok := th.getRootChanges(changes[i].rootID)
+		require.True(ok)
 		require.Equal(uint64(i), changeAndIndex.insertNumber)
 		got, ok := th.history.Index(int(changeAndIndex.insertNumber))
 		require.True(ok)
@@ -744,18 +743,19 @@ func TestHistoryRecord(t *testing.T) {
 	change3 := &changeSummary{rootID: ids.GenerateTestID()}
 	th.record(change3)
 	// history is [changes[1], changes[2], change3]
-	require.Equal(uint64(maxHistoryLen+1), th.nextInsertNumber)
+	require.Equal(uint64(maxHistoryLen+1), th.getNextInsertNumber())
 	require.Equal(maxHistoryLen, th.history.Len())
-	require.Len(th.lastChanges, maxHistoryLen)
-	require.Contains(th.lastChanges, change3.rootID)
-	changeAndIndex := th.lastChanges[change3.rootID]
+	require.Len(th.lastChangesInsertNumber, maxHistoryLen)
+	require.Contains(th.lastChangesInsertNumber, change3.rootID)
+	changeAndIndex, ok := th.getRootChanges(change3.rootID)
+	require.True(ok)
 	require.Equal(uint64(maxHistoryLen), changeAndIndex.insertNumber)
 	got, ok := th.history.PeekRight()
 	require.True(ok)
 	require.Equal(change3, got.changeSummary)
 
 	// // Make sure the oldest change was evicted
-	require.NotContains(th.lastChanges, changes[0].rootID)
+	require.NotContains(th.lastChangesInsertNumber, changes[0].rootID)
 	oldestChange, ok := th.history.PeekLeft()
 	require.True(ok)
 	require.Equal(uint64(1), oldestChange.insertNumber)
@@ -771,9 +771,10 @@ func TestHistoryRecord(t *testing.T) {
 
 	// Make sure that even though changes[2] was evicted, we still remember
 	// that the most recent change resulting in that change's root ID.
-	require.Len(th.lastChanges, maxHistoryLen)
-	require.Contains(th.lastChanges, changes[2].rootID)
-	changeAndIndex = th.lastChanges[changes[2].rootID]
+	require.Len(th.lastChangesInsertNumber, maxHistoryLen)
+	require.Contains(th.lastChangesInsertNumber, changes[2].rootID)
+	changeAndIndex, ok = th.getRootChanges(changes[2].rootID)
+	require.True(ok)
 	require.Equal(uint64(maxHistoryLen+1), changeAndIndex.insertNumber)
 
 	// Make sure [t.history] is right.
@@ -850,13 +851,14 @@ func TestHistoryGetChangesToRootKeyRollback(t *testing.T) {
 			rootChange: change[maybe.Maybe[*node]]{
 				before: maybe.Some(&node{}),
 			},
-			nodes:            map[Key]*change[*node]{},
-			values:           map[Key]*keyChange{},
-			sortedKeyChanges: keyChangesSets[i],
+			nodes:      map[Key]*change[*node]{},
+			keyIndexes: map[Key]int{},
+			keyChanges: []*keyChange{},
 		}
 
 		for _, kc := range keyChangesSets[i] {
-			changeSummary.values[kc.key] = kc
+			changeSummary.keyIndexes[kc.key] = len(changeSummary.keyChanges)
+			changeSummary.keyChanges = append(changeSummary.keyChanges, kc)
 		}
 
 		history.record(changeSummary)
@@ -866,8 +868,8 @@ func TestHistoryGetChangesToRootKeyRollback(t *testing.T) {
 	combinedChangeSummary, err := history.getChangesToGetToRoot(changeSummaries[0].rootID, maybe.Nothing[[]byte](), maybe.Nothing[[]byte]())
 	require.NoError(t, err)
 
-	require.Len(t, combinedChangeSummary.values, 1)
-	require.Len(t, combinedChangeSummary.sortedKeyChanges, 1)
+	require.Len(t, combinedChangeSummary.keyIndexes, 1)
+	require.Len(t, combinedChangeSummary.keyChanges, 1)
 
 	// key2 => value2a => value 2b
 	require.Equal(t, []*keyChange{
@@ -878,7 +880,7 @@ func TestHistoryGetChangesToRootKeyRollback(t *testing.T) {
 			},
 			key: ToKey([]byte("key2")),
 		},
-	}, combinedChangeSummary.sortedKeyChanges)
+	}, combinedChangeSummary.keyChanges)
 }
 
 func TestHistoryGetChangesToRootState(t *testing.T) {
@@ -916,13 +918,15 @@ func TestHistoryGetChangesToRootState(t *testing.T) {
 			rootChange: change[maybe.Maybe[*node]]{
 				before: maybe.Some(&node{}),
 			},
-			nodes:            map[Key]*change[*node]{},
-			values:           map[Key]*keyChange{},
-			sortedKeyChanges: keyChanges,
+			nodes:      map[Key]*change[*node]{},
+			keyIndexes: map[Key]int{},
+			keyChanges: keyChanges,
 		}
 
 		for _, kc := range keyChanges {
-			changeSummary.values[kc.key] = kc
+			changeSummary.keyIndexes[kc.key] = len(changeSummary.keyChanges)
+			changeSummary.keyChanges = append(changeSummary.keyChanges, kc)
+
 			changeSummary.nodes[kc.key] = &change[*node]{before: &node{}, after: &node{}}
 		}
 
@@ -933,26 +937,14 @@ func TestHistoryGetChangesToRootState(t *testing.T) {
 	combinedChangeSummary, err := history.getChangesToGetToRoot(changeSummaries[0].rootID, maybe.Nothing[[]byte](), maybe.Nothing[[]byte]())
 	require.NoError(t, err)
 
-	require.Len(t, combinedChangeSummary.values, changesPerHistory*(historyLen-1))
+	require.Len(t, combinedChangeSummary.keyIndexes, changesPerHistory*(historyLen-1))
 	require.Len(t, combinedChangeSummary.nodes, changesPerHistory*(historyLen-1))
-	require.Len(t, combinedChangeSummary.sortedKeyChanges, changesPerHistory*(historyLen-1))
+	require.Len(t, combinedChangeSummary.keyChanges, changesPerHistory*(historyLen-1))
 
-	for _, kc := range combinedChangeSummary.values {
+	for _, kc := range combinedChangeSummary.keyChanges {
 		require.Equal(t, []byte(kc.key.value), kc.after.Value())
 		require.Equal(t, []byte{([]byte(kc.key.value))[0] + 1}, kc.before.Value())
 	}
-
-	expectedSortedKeys := maps.Keys(combinedChangeSummary.values)
-	slices.SortFunc(expectedSortedKeys, func(a, b Key) int {
-		return a.Compare(b)
-	})
-
-	actualSortedKeys := make([]Key, len(combinedChangeSummary.sortedKeyChanges))
-	for i, kc := range combinedChangeSummary.sortedKeyChanges {
-		actualSortedKeys[i] = kc.key
-	}
-
-	require.Equal(t, expectedSortedKeys, actualSortedKeys)
 }
 
 func TestHistoryGetChangesToRoot(t *testing.T) {
@@ -980,8 +972,8 @@ func TestHistoryGetChangesToRoot(t *testing.T) {
 					after:  &node{},
 				},
 			},
-			values:           map[Key]*keyChange{kc.key: kc},
-			sortedKeyChanges: []*keyChange{kc},
+			keyIndexes: map[Key]int{kc.key: 0},
+			keyChanges: []*keyChange{kc},
 		})
 		history.record(changes[i])
 	}
@@ -1015,12 +1007,16 @@ func TestHistoryGetChangesToRoot(t *testing.T) {
 			validateFunc: func(require *require.Assertions, got *changeSummary) {
 				// Ensure this is the reverse of the most recent change
 				require.Len(got.nodes, 1)
-				require.Len(got.values, 1)
+				require.Len(got.keyChanges, 1)
 				reversedChanges := changes[maxHistoryLen-1]
 				removedKey := ToKey([]byte{byte(maxHistoryLen - 1)})
 				require.Equal(reversedChanges.nodes[removedKey].before, got.nodes[removedKey].after)
-				require.Equal(reversedChanges.values[removedKey].before, got.values[removedKey].after)
-				require.Equal(reversedChanges.values[removedKey].after, got.values[removedKey].before)
+
+				require.Equal(reversedChanges.keyChanges[0].key, removedKey)
+				require.Equal(got.keyChanges[0].key, removedKey)
+
+				require.Equal(reversedChanges.keyChanges[0].before, got.keyChanges[0].after)
+				require.Equal(reversedChanges.keyChanges[0].after, got.keyChanges[0].before)
 			},
 		},
 		{
@@ -1028,17 +1024,22 @@ func TestHistoryGetChangesToRoot(t *testing.T) {
 			rootID: changes[maxHistoryLen-3].rootID,
 			validateFunc: func(require *require.Assertions, got *changeSummary) {
 				require.Len(got.nodes, 2)
-				require.Len(got.values, 2)
+				require.Len(got.keyChanges, 2)
 				reversedChanges1 := changes[maxHistoryLen-1]
 				removedKey1 := ToKey([]byte{byte(maxHistoryLen - 1)})
 				require.Equal(reversedChanges1.nodes[removedKey1].before, got.nodes[removedKey1].after)
-				require.Equal(reversedChanges1.values[removedKey1].before, got.values[removedKey1].after)
-				require.Equal(reversedChanges1.values[removedKey1].after, got.values[removedKey1].before)
+				require.Equal(reversedChanges1.keyChanges[0].key, removedKey1)
+				require.Equal(got.keyChanges[1].key, removedKey1)
+				require.Equal(reversedChanges1.keyChanges[0].before, got.keyChanges[1].after)
+				require.Equal(reversedChanges1.keyChanges[0].after, got.keyChanges[1].before)
+
 				reversedChanges2 := changes[maxHistoryLen-2]
 				removedKey2 := ToKey([]byte{byte(maxHistoryLen - 2)})
 				require.Equal(reversedChanges2.nodes[removedKey2].before, got.nodes[removedKey2].after)
-				require.Equal(reversedChanges2.values[removedKey2].before, got.values[removedKey2].after)
-				require.Equal(reversedChanges2.values[removedKey2].after, got.values[removedKey2].before)
+				require.Equal(reversedChanges2.keyChanges[0].key, removedKey2)
+				require.Equal(got.keyChanges[0].key, removedKey2)
+				require.Equal(reversedChanges2.keyChanges[0].before, got.keyChanges[0].after)
+				require.Equal(reversedChanges2.keyChanges[0].after, got.keyChanges[0].before)
 			},
 		},
 		{
@@ -1047,12 +1048,14 @@ func TestHistoryGetChangesToRoot(t *testing.T) {
 			start:  maybe.Some([]byte{byte(maxHistoryLen - 1)}), // Omit values from second most recent change
 			validateFunc: func(require *require.Assertions, got *changeSummary) {
 				require.Len(got.nodes, 2)
-				require.Len(got.values, 1)
+				require.Len(got.keyChanges, 1)
 				reversedChanges1 := changes[maxHistoryLen-1]
 				removedKey1 := ToKey([]byte{byte(maxHistoryLen - 1)})
 				require.Equal(reversedChanges1.nodes[removedKey1].before, got.nodes[removedKey1].after)
-				require.Equal(reversedChanges1.values[removedKey1].before, got.values[removedKey1].after)
-				require.Equal(reversedChanges1.values[removedKey1].after, got.values[removedKey1].before)
+				require.Equal(reversedChanges1.keyChanges[0].key, removedKey1)
+				require.Equal(got.keyChanges[0].key, removedKey1)
+				require.Equal(reversedChanges1.keyChanges[0].before, got.keyChanges[0].after)
+				require.Equal(reversedChanges1.keyChanges[0].after, got.keyChanges[0].before)
 				reversedChanges2 := changes[maxHistoryLen-2]
 				removedKey2 := ToKey([]byte{byte(maxHistoryLen - 2)})
 				require.Equal(reversedChanges2.nodes[removedKey2].before, got.nodes[removedKey2].after)
@@ -1064,15 +1067,17 @@ func TestHistoryGetChangesToRoot(t *testing.T) {
 			end:    maybe.Some([]byte{byte(maxHistoryLen - 2)}), // Omit values from most recent change
 			validateFunc: func(require *require.Assertions, got *changeSummary) {
 				require.Len(got.nodes, 2)
-				require.Len(got.values, 1)
+				require.Len(got.keyChanges, 1)
 				reversedChanges1 := changes[maxHistoryLen-1]
 				removedKey1 := ToKey([]byte{byte(maxHistoryLen - 1)})
 				require.Equal(reversedChanges1.nodes[removedKey1].before, got.nodes[removedKey1].after)
 				reversedChanges2 := changes[maxHistoryLen-2]
 				removedKey2 := ToKey([]byte{byte(maxHistoryLen - 2)})
 				require.Equal(reversedChanges2.nodes[removedKey2].before, got.nodes[removedKey2].after)
-				require.Equal(reversedChanges2.values[removedKey2].before, got.values[removedKey2].after)
-				require.Equal(reversedChanges2.values[removedKey2].after, got.values[removedKey2].before)
+				require.Equal(reversedChanges2.keyChanges[0].key, removedKey2)
+				require.Equal(got.keyChanges[0].key, removedKey2)
+				require.Equal(reversedChanges2.keyChanges[0].before, got.keyChanges[0].after)
+				require.Equal(reversedChanges2.keyChanges[0].after, got.keyChanges[0].before)
 			},
 		},
 	}

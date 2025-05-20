@@ -24,8 +24,8 @@ var (
 
 // stores previous trie states
 type trieHistory struct {
-	// Root ID --> The most recent change resulting in [rootID].
-	lastChanges map[ids.ID]*changeSummaryAndInsertNumber
+	// Root ID --> The most recent insert number resulting in [rootID].
+	lastChangesInsertNumber map[ids.ID]uint64
 
 	// Maximum number of previous roots/changes to store in [history].
 	maxHistoryLen int
@@ -34,9 +34,6 @@ type trieHistory struct {
 	// Sorted by increasing order of insertion.
 	// Contains at most [maxHistoryLen] values.
 	history buffer.Deque[*changeSummaryAndInsertNumber]
-
-	// Each change is tagged with this monotonic increasing number.
-	nextInsertNumber uint64
 }
 
 // Tracks the beginning and ending state of a value.
@@ -65,27 +62,68 @@ type changeSummary struct {
 	rootID ids.ID
 	// The root before/after this change.
 	// Set in [applyValueChanges].
-	rootChange       change[maybe.Maybe[*node]]
-	nodes            map[Key]*change[*node]
-	values           map[Key]*keyChange
-	sortedKeyChanges []*keyChange
+	rootChange change[maybe.Maybe[*node]]
+	nodes      map[Key]*change[*node]
+
+	keyIndexes map[Key]int
+	keyChanges []*keyChange // sorted
+}
+
+func (cs *changeSummary) getChange(key Key) (*change[maybe.Maybe[[]byte]], bool) {
+	if index, ok := cs.keyIndexes[key]; ok {
+		return cs.keyChanges[index].change, true
+	}
+
+	return nil, false
 }
 
 func newChangeSummary(estimatedSize int) *changeSummary {
 	return &changeSummary{
-		nodes:            make(map[Key]*change[*node], estimatedSize),
-		values:           make(map[Key]*keyChange, estimatedSize),
-		sortedKeyChanges: make([]*keyChange, 0, estimatedSize),
-		rootChange:       change[maybe.Maybe[*node]]{},
+		nodes:      make(map[Key]*change[*node], estimatedSize),
+		keyIndexes: make(map[Key]int, estimatedSize),
+		keyChanges: make([]*keyChange, 0, estimatedSize),
+		rootChange: change[maybe.Maybe[*node]]{},
 	}
 }
 
 func newTrieHistory(maxHistoryLookback int) *trieHistory {
 	return &trieHistory{
-		maxHistoryLen: maxHistoryLookback,
-		history:       buffer.NewUnboundedDeque[*changeSummaryAndInsertNumber](maxHistoryLookback),
-		lastChanges:   make(map[ids.ID]*changeSummaryAndInsertNumber),
+		maxHistoryLen:           maxHistoryLookback,
+		history:                 buffer.NewUnboundedDeque[*changeSummaryAndInsertNumber](maxHistoryLookback),
+		lastChangesInsertNumber: make(map[ids.ID]uint64),
 	}
+}
+
+func (th *trieHistory) getNextInsertNumber() uint64 {
+	if oldestEntry, ok := th.history.PeekRight(); ok {
+		return oldestEntry.insertNumber + 1
+	}
+
+	return 0
+}
+
+func (th *trieHistory) getRootChanges(root ids.ID) (*changeSummaryAndInsertNumber, bool) {
+	insertNumber, ok := th.lastChangesInsertNumber[root]
+	if !ok {
+		return nil, false
+	}
+
+	mostRecentChangeInsertNumber := th.getNextInsertNumber() - 1
+
+	// The difference between the last index in [th.history] and the index of [rootChanges].
+	rootToMostRecentOffset := int(mostRecentChangeInsertNumber - insertNumber)
+
+	mostRecentChangeIndex := th.history.Len() - 1
+
+	// The index in [th.history] of the latest change resulting in [root].
+	index := mostRecentChangeIndex - rootToMostRecentOffset
+
+	rootChanges, ok := th.history.Index(index)
+	if !ok {
+		panic("root changes not found in history")
+	}
+
+	return rootChanges, true
 }
 
 // Returns up to [maxLength] sorted changes with keys in
@@ -112,7 +150,7 @@ func (th *trieHistory) getValueChanges(
 	}
 
 	// [endRootChanges] is the last change in the history resulting in [endRoot].
-	endRootChanges, ok := th.lastChanges[endRoot]
+	endRootChanges, ok := th.getRootChanges(endRoot)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrNoEndRoot, endRoot)
 	}
@@ -120,14 +158,14 @@ func (th *trieHistory) getValueChanges(
 	// Confirm there's a change resulting in [startRoot] before
 	// a change resulting in [endRoot] in the history.
 	// [startRootChanges] is the last appearance of [startRoot].
-	startRootChanges, ok := th.lastChanges[startRoot]
+	startRootChanges, ok := th.getRootChanges(startRoot)
 	if !ok {
 		return nil, fmt.Errorf("%w: start root %s not found", ErrInsufficientHistory, startRoot)
 	}
 
 	var (
 		// The insert number of the last element in [th.history].
-		mostRecentChangeInsertNumber = th.nextInsertNumber - 1
+		mostRecentChangeInsertNumber = th.getNextInsertNumber() - 1
 
 		// The index within [th.history] of its last element.
 		mostRecentChangeIndex = th.history.Len() - 1
@@ -172,8 +210,8 @@ func (th *trieHistory) getValueChanges(
 	}
 
 	// historyChangesIndexHeap is used to traverse the changes sorted by ASC [key] and ASC [insertNumber].
-	historyChangesIndexHeap := heap.NewQueue[*historyChangesIndex](func(a, b *historyChangesIndex) bool {
-		keyComparison := a.changes.sortedKeyChanges[a.kvChangeIndex].key.Compare(b.changes.sortedKeyChanges[b.kvChangeIndex].key)
+	historyChangesIndexHeap := heap.NewQueue[historyChangesIndex](func(a, b historyChangesIndex) bool {
+		keyComparison := a.changes.keyChanges[a.kvChangeIndex].key.Compare(b.changes.keyChanges[b.kvChangeIndex].key)
 		if keyComparison != 0 {
 			return keyComparison < 0
 		}
@@ -201,30 +239,30 @@ func (th *trieHistory) getValueChanges(
 	for i := startRootIndex + 1; i <= endRootIndex; i++ {
 		historyChanges, ok := th.history.Index(i)
 		if !ok {
-			return nil, fmt.Errorf("missing history changes at index %d", i)
+			panic(fmt.Sprintf("missing history changes at index %d", i))
 		}
 
 		startKeyIndex := 0
 		if startKey.HasValue() {
-			// Binary search for [startKey] index.
-			startKeyIndex, _ = slices.BinarySearchFunc(historyChanges.sortedKeyChanges, startKey, func(k *keyChange, m maybe.Maybe[Key]) int {
+			// Binary search for [startKey] index, or the index where [startKey] would appear.
+			startKeyIndex, _ = slices.BinarySearchFunc(historyChanges.keyChanges, startKey, func(k *keyChange, m maybe.Maybe[Key]) int {
 				return k.key.Compare(m.Value())
 			})
 
-			if startKeyIndex >= len(historyChanges.sortedKeyChanges) {
+			if startKeyIndex >= len(historyChanges.keyChanges) {
 				// [startKey] is after last key of [sortedKeyChanges].
 				continue
 			}
 		}
 
-		keyChange := historyChanges.sortedKeyChanges[startKeyIndex]
+		keyChange := historyChanges.keyChanges[startKeyIndex]
 		if end.HasValue() && keyChange.key.Greater(endKey.Value()) {
 			// [keyChange] is after [endKey].
 			continue
 		}
 
 		// [startKeyIndex] is the index of the first key in [startKey, endKey] from [sortedKeyChanges].
-		historyChangesIndexHeap.Push(&historyChangesIndex{
+		historyChangesIndexHeap.Push(historyChangesIndex{
 			changes:       historyChanges,
 			kvChangeIndex: startKeyIndex,
 		})
@@ -239,14 +277,14 @@ func (th *trieHistory) getValueChanges(
 
 	for historyChangesIndexHeap.Len() > 0 {
 		historyRootChanges, _ := historyChangesIndexHeap.Pop()
-		kvChange := historyRootChanges.changes.sortedKeyChanges[historyRootChanges.kvChangeIndex]
+		kvChange := historyRootChanges.changes.keyChanges[historyRootChanges.kvChangeIndex]
 
 		if end.HasValue() && kvChange.key.Greater(endKey.Value()) {
 			// Skip processing the current [historyRootChanges] if we are after [endKey].
 			continue
 		}
 
-		if len(historyRootChanges.changes.sortedKeyChanges) > 1+historyRootChanges.kvChangeIndex {
+		if len(historyRootChanges.changes.keyChanges) > 1+historyRootChanges.kvChangeIndex {
 			// If there are remaining changes in the current [historyRootChanges], push to minheap.
 			historyRootChanges.kvChangeIndex++
 			historyChangesIndexHeap.Push(historyRootChanges)
@@ -297,8 +335,8 @@ func (th *trieHistory) getValueChanges(
 // If [start] is Nothing, all keys are considered > [start].
 // If [end] is Nothing, all keys are considered < [end].
 func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte]) (*changeSummary, error) {
-	// [lastRootChange] is the last change in the historyChanges resulting in [rootID].
-	lastRootChange, ok := th.lastChanges[rootID]
+	// [lastRootChange] is the last change in the history resulting in [rootID].
+	lastRootChange, ok := th.getRootChanges(rootID)
 	if !ok {
 		return nil, ErrInsufficientHistory
 	}
@@ -307,10 +345,11 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start maybe.Maybe[[]
 		startKey                     = maybe.Bind(start, ToKey)
 		endKey                       = maybe.Bind(end, ToKey)
 		combinedChanges              = newChangeSummary(defaultPreallocationSize)
-		mostRecentChangeInsertNumber = th.nextInsertNumber - 1
+		mostRecentChangeInsertNumber = th.getNextInsertNumber() - 1
 		mostRecentChangeIndex        = th.history.Len() - 1
 		offset                       = int(mostRecentChangeInsertNumber - lastRootChange.insertNumber)
 		lastRootChangeIndex          = mostRecentChangeIndex - offset
+		keyChanges                   = map[Key]*keyChange{}
 	)
 
 	// Go backward from the most recent change in the history up to but
@@ -335,17 +374,17 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start maybe.Maybe[[]
 		startKeyIndex := 0
 		if startKey.HasValue() {
 			// Binary search for [startKey] index.
-			startKeyIndex, _ = slices.BinarySearchFunc(changes.sortedKeyChanges, startKey, func(k *keyChange, m maybe.Maybe[Key]) int {
+			startKeyIndex, _ = slices.BinarySearchFunc(changes.keyChanges, startKey, func(k *keyChange, m maybe.Maybe[Key]) int {
 				return k.key.Compare(m.Value())
 			})
 		}
 
-		for _, kc := range changes.sortedKeyChanges[startKeyIndex:] {
+		for _, kc := range changes.keyChanges[startKeyIndex:] {
 			if end.HasValue() && kc.key.Greater(endKey.Value()) {
 				break
 			}
 
-			if existing, ok := combinedChanges.values[kc.key]; ok {
+			if existing, ok := keyChanges[kc.key]; ok {
 				// Update existing [after] with current [before]
 				existing.after = kc.before
 
@@ -360,24 +399,25 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start maybe.Maybe[[]
 				key: kc.key,
 			}
 
-			combinedChanges.values[kc.key] = &keyChange
+			keyChanges[kc.key] = &keyChange
 		}
 	}
 
-	sortedKeys := maps.Keys(combinedChanges.values)
+	sortedKeys := maps.Keys(keyChanges)
 	slices.SortFunc(sortedKeys, func(a, b Key) int {
 		return a.Compare(b)
 	})
 
 	for _, key := range sortedKeys {
-		if maybe.Equal(combinedChanges.values[key].before, combinedChanges.values[key].after, bytes.Equal) {
+		if maybe.Equal(keyChanges[key].before, keyChanges[key].after, bytes.Equal) {
 			// Remove changed key, if there is a no-op.
-			delete(combinedChanges.values, key)
+			delete(keyChanges, key)
 
 			continue
 		}
 
-		combinedChanges.sortedKeyChanges = append(combinedChanges.sortedKeyChanges, combinedChanges.values[key])
+		combinedChanges.keyIndexes[key] = len(combinedChanges.keyChanges)
+		combinedChanges.keyChanges = append(combinedChanges.keyChanges, keyChanges[key])
 	}
 
 	return combinedChanges, nil
@@ -395,22 +435,21 @@ func (th *trieHistory) record(changes *changeSummary) {
 		// Remove the oldest set of changes.
 		oldestEntry, _ := th.history.PopLeft()
 
-		latestChange := th.lastChanges[oldestEntry.rootID]
-		if latestChange == oldestEntry {
+		if th.lastChangesInsertNumber[oldestEntry.rootID] == oldestEntry.insertNumber {
 			// The removed change was the most recent resulting in this root ID.
-			delete(th.lastChanges, oldestEntry.rootID)
+			// (Note: this if is for situations when the same root could appear twice in history)
+			delete(th.lastChangesInsertNumber, oldestEntry.rootID)
 		}
 	}
 
 	changesAndIndex := &changeSummaryAndInsertNumber{
 		changeSummary: changes,
-		insertNumber:  th.nextInsertNumber,
+		insertNumber:  th.getNextInsertNumber(),
 	}
-	th.nextInsertNumber++
 
 	// Add [changes] to the sorted change list.
 	_ = th.history.PushRight(changesAndIndex)
 
 	// Mark that this is the most recent change resulting in [changes.rootID].
-	th.lastChanges[changes.rootID] = changesAndIndex
+	th.lastChangesInsertNumber[changes.rootID] = changesAndIndex.insertNumber
 }

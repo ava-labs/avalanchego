@@ -346,9 +346,9 @@ func newDatabase(
 		rootChange: change[maybe.Maybe[*node]]{
 			after: trieDB.root,
 		},
-		values:           map[Key]*keyChange{},
-		nodes:            map[Key]*change[*node]{},
-		sortedKeyChanges: []*keyChange{},
+		keyIndexes: map[Key]int{},
+		nodes:      map[Key]*change[*node]{},
+		keyChanges: []*keyChange{},
 	})
 
 	// mark that the db has not yet been cleanly closed
@@ -979,7 +979,7 @@ func (db *merkleDB) commitView(ctx context.Context, trieToCommit *view) error {
 	changes := trieToCommit.changes
 	_, span := db.infoTracer.Start(ctx, "MerkleDB.commitView", oteltrace.WithAttributes(
 		attribute.Int("nodesChanged", len(changes.nodes)),
-		attribute.Int("valuesChanged", len(changes.values)),
+		attribute.Int("valuesChanged", len(changes.keyChanges)),
 	))
 	defer span.End()
 
@@ -1359,10 +1359,10 @@ func (db *merkleDB) Clear() error {
 	// Clear history
 	db.history = newTrieHistory(db.history.maxHistoryLen)
 	db.history.record(&changeSummary{
-		rootID:           db.rootID,
-		values:           map[Key]*keyChange{},
-		nodes:            map[Key]*change[*node]{},
-		sortedKeyChanges: make([]*keyChange, 0),
+		rootID:     db.rootID,
+		keyIndexes: map[Key]int{},
+		nodes:      map[Key]*change[*node]{},
+		keyChanges: make([]*keyChange, 0),
 	})
 	return nil
 }

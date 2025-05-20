@@ -154,6 +154,8 @@ func newView(
 		tokenSize:  db.tokenSize,
 	}
 
+	keyChanges := map[Key]*keyChange{}
+
 	for _, op := range changes.BatchOps {
 		key := op.Key
 		if !changes.ConsumeBytes {
@@ -167,29 +169,62 @@ func newView(
 				newVal = maybe.Some(slices.Clone(op.Value))
 			}
 		}
-		if err := v.recordValueChange(toKey(key), newVal); err != nil {
-			return nil, err
-		}
-	}
-	for key, val := range changes.MapOps {
-		if !changes.ConsumeBytes {
-			val = maybe.Bind(val, slices.Clone[[]byte])
-		}
-		if err := v.recordValueChange(toKey(stringToByteSlice(key)), val); err != nil {
+
+		if err := recordValueChange(v, keyChanges, toKey(key), newVal); err != nil {
 			return nil, err
 		}
 	}
 
-	sortedKeys := maps.Keys(v.changes.values)
+	for key, val := range changes.MapOps {
+		if !changes.ConsumeBytes {
+			val = maybe.Bind(val, slices.Clone[[]byte])
+		}
+		if err := recordValueChange(v, keyChanges, toKey(stringToByteSlice(key)), val); err != nil {
+			return nil, err
+		}
+	}
+
+	sortedKeys := maps.Keys(keyChanges)
 	slices.SortFunc(sortedKeys, func(a, b Key) int {
 		return a.Compare(b)
 	})
 
 	for _, key := range sortedKeys {
-		v.changes.sortedKeyChanges = append(v.changes.sortedKeyChanges, v.changes.values[key])
+		v.changes.keyIndexes[key] = len(v.changes.keyChanges)
+		v.changes.keyChanges = append(v.changes.keyChanges, keyChanges[key])
 	}
 
 	return v, nil
+}
+
+func recordValueChange(v *view, keyChanges map[Key]*keyChange, key Key, value maybe.Maybe[[]byte]) error {
+	// update the existing change if it exists
+	if existing, ok := keyChanges[key]; ok {
+		existing.after = value
+		return nil
+	}
+
+	// grab the before value
+	var beforeMaybe maybe.Maybe[[]byte]
+	before, err := v.getParentTrie().getValue(key)
+	switch err {
+	case nil:
+		beforeMaybe = maybe.Some(before)
+	case database.ErrNotFound:
+		beforeMaybe = maybe.Nothing[[]byte]()
+	default:
+		return err
+	}
+
+	keyChanges[key] = &keyChange{
+		change: &change[maybe.Maybe[[]byte]]{
+			before: beforeMaybe,
+			after:  value,
+		},
+		key: key,
+	}
+
+	return nil
 }
 
 // Creates a view of the db at a historical root using the provided [changes].
@@ -270,12 +305,12 @@ func (v *view) calculateNodeChanges(ctx context.Context) error {
 	defer span.End()
 
 	// Add all the changed key/values to the nodes of the trie
-	for key, change := range v.changes.values {
-		if change.after.IsNothing() {
-			if err := v.remove(key); err != nil {
+	for _, keyChange := range v.changes.keyChanges {
+		if keyChange.after.IsNothing() {
+			if err := v.remove(keyChange.key); err != nil {
 				return err
 			}
-		} else if _, err := v.insert(key, change.after); err != nil {
+		} else if _, err := v.insert(keyChange.key, keyChange.after); err != nil {
 			return err
 		}
 	}
@@ -505,7 +540,7 @@ func (v *view) commitToDB(ctx context.Context) error {
 	defer v.commitLock.Unlock()
 
 	ctx, span := v.db.infoTracer.Start(ctx, "MerkleDB.view.commitToDB", oteltrace.WithAttributes(
-		attribute.Int("changeCount", len(v.changes.values)),
+		attribute.Int("changeCount", len(v.changes.keyChanges)),
 	))
 	defer span.End()
 
@@ -602,7 +637,7 @@ func (v *view) getValue(key Key) ([]byte, error) {
 		return nil, ErrInvalid
 	}
 
-	if change, ok := v.changes.values[key]; ok {
+	if change, ok := v.changes.getChange(key); ok {
 		v.db.metrics.ViewChangesValueHit()
 		if change.after.IsNothing() {
 			return nil, database.ErrNotFound
@@ -940,44 +975,6 @@ func (v *view) recordKeyChange(key Key, after *node, hadValue bool, newNode bool
 		before: before,
 		after:  after,
 	}
-	return nil
-}
-
-// Records that a key's value has been added or updated.
-// Doesn't actually change the trie data structure.
-// That's deferred until we call [applyValueChanges].
-// Must not be called after [applyValueChanges] has returned.
-func (v *view) recordValueChange(key Key, value maybe.Maybe[[]byte]) error {
-	if v.valueChangesApplied.Get() {
-		return ErrNodesAlreadyCalculated
-	}
-
-	// update the existing change if it exists
-	if existing, ok := v.changes.values[key]; ok {
-		existing.after = value
-		return nil
-	}
-
-	// grab the before value
-	var beforeMaybe maybe.Maybe[[]byte]
-	before, err := v.getParentTrie().getValue(key)
-	switch err {
-	case nil:
-		beforeMaybe = maybe.Some(before)
-	case database.ErrNotFound:
-		beforeMaybe = maybe.Nothing[[]byte]()
-	default:
-		return err
-	}
-
-	v.changes.values[key] = &keyChange{
-		change: &change[maybe.Maybe[[]byte]]{
-			before: beforeMaybe,
-			after:  value,
-		},
-		key: key,
-	}
-
 	return nil
 }
 

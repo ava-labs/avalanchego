@@ -24,7 +24,7 @@ func (v *view) NewIteratorWithPrefix(prefix []byte) database.Iterator {
 
 func (v *view) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
 	var (
-		changes   = make([]KeyChange, 0, len(v.changes.values))
+		changes   = make([]KeyChange, 0, len(v.changes.keyChanges))
 		startKey  = ToKey(start)
 		prefixKey = ToKey(prefix)
 	)
@@ -32,12 +32,12 @@ func (v *view) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iter
 	startKeyIndex := 0
 	if len(start) > 0 {
 		// Binary search for [startKey] index.
-		startKeyIndex, _ = slices.BinarySearchFunc(v.changes.sortedKeyChanges, startKey, func(k *keyChange, key Key) int {
+		startKeyIndex, _ = slices.BinarySearchFunc(v.changes.keyChanges, startKey, func(k *keyChange, key Key) int {
 			return k.key.Compare(key)
 		})
 	}
 
-	for _, kChange := range v.changes.sortedKeyChanges[startKeyIndex:] {
+	for _, kChange := range v.changes.keyChanges[startKeyIndex:] {
 		if !kChange.key.HasPrefix(prefixKey) {
 			if len(changes) > 0 {
 				// Since [sortedKeyChanges] is sorted, if the prefix isnt found anymore after we

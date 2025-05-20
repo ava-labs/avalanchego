@@ -132,10 +132,8 @@ func BenchmarkView_NewIteratorWithStartAndPrefix(b *testing.B) {
 	}
 
 	ctx := context.Background()
-	viewIntf, err := db.NewView(ctx, ViewChanges{BatchOps: ops})
+	view, err := db.NewView(ctx, ViewChanges{BatchOps: ops})
 	require.NoError(b, err)
-
-	view := viewIntf.(*view)
 
 	for range b.N {
 		b.StopTimer()
