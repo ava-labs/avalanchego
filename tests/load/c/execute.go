@@ -5,7 +5,6 @@ package c
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"fmt"
 	"math/big"
 	"os"
@@ -19,8 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/tests/load/c/listener"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
-
-	ethcrypto "github.com/ava-labs/libevm/crypto"
 )
 
 type loadConfig struct {
@@ -40,13 +37,8 @@ const (
 	issuerOpcoder issuerType = "opcoder"
 )
 
-func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config loadConfig) error {
+func execute(ctx context.Context, keys []*secp256k1.PrivateKey, config loadConfig) error {
 	logger := logging.NewLogger("", logging.NewWrappedCore(logging.Info, os.Stdout, logging.Auto.ConsoleEncoder()))
-
-	keys := make([]*ecdsa.PrivateKey, len(preFundedKeys))
-	for i, key := range preFundedKeys {
-		keys[i] = key.ToECDSA()
-	}
 
 	registry := prometheus.NewRegistry()
 	metricsServer := load.NewPrometheusServer("127.0.0.1:8082", registry, logger)
@@ -100,7 +92,7 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 // It creates them in parallel because creating issuers can sometimes take a while,
 // and this adds up for many agents. For example, deploying the Opcoder contract
 // takes a few seconds. Running the creation in parallel can reduce the time significantly.
-func createAgents(ctx context.Context, config loadConfig, keys []*ecdsa.PrivateKey,
+func createAgents(ctx context.Context, config loadConfig, keys []*secp256k1.PrivateKey,
 	tracker *load.Tracker[common.Hash],
 ) ([]load.Agent[common.Hash], error) {
 	ctx, cancel := context.WithCancel(ctx)
@@ -113,7 +105,7 @@ func createAgents(ctx context.Context, config loadConfig, keys []*ecdsa.PrivateK
 	for i := range int(config.agents) {
 		key := keys[i]
 		endpoint := config.endpoints[i%len(config.endpoints)]
-		go func(key *ecdsa.PrivateKey, endpoint string) {
+		go func(key *secp256k1.PrivateKey, endpoint string) {
 			agent, err := createAgent(ctx, endpoint, key, config.issuer, tracker, config.maxFeeCap)
 			ch <- result{agent: agent, err: err}
 		}(key, endpoint)
@@ -142,7 +134,7 @@ func createAgents(ctx context.Context, config loadConfig, keys []*ecdsa.PrivateK
 	return agents, nil
 }
 
-func createAgent(ctx context.Context, endpoint string, key *ecdsa.PrivateKey,
+func createAgent(ctx context.Context, endpoint string, key *secp256k1.PrivateKey,
 	issuerType issuerType, tracker *load.Tracker[common.Hash], maxFeeCap int64,
 ) (load.Agent[common.Hash], error) {
 	client, err := ethclient.DialContext(ctx, endpoint)
@@ -150,7 +142,7 @@ func createAgent(ctx context.Context, endpoint string, key *ecdsa.PrivateKey,
 		return load.Agent[common.Hash]{}, fmt.Errorf("dialing %s: %w", endpoint, err)
 	}
 
-	address := ethcrypto.PubkeyToAddress(key.PublicKey)
+	address := key.EthAddress()
 	blockNumber := (*big.Int)(nil)
 	nonce, err := client.NonceAt(ctx, address, blockNumber)
 	if err != nil {
@@ -168,15 +160,15 @@ func createAgent(ctx context.Context, endpoint string, key *ecdsa.PrivateKey,
 
 func createIssuer(ctx context.Context, typ issuerType,
 	client *ethclient.Client, tracker *load.Tracker[common.Hash],
-	maxFeeCap int64, nonce uint64, key *ecdsa.PrivateKey,
+	maxFeeCap int64, nonce uint64, key *secp256k1.PrivateKey,
 ) (load.Issuer[common.Hash], error) {
 	switch typ {
 	case issuerSimple:
 		return issuers.NewSimple(ctx, client, tracker,
-			nonce, big.NewInt(maxFeeCap), key)
+			nonce, big.NewInt(maxFeeCap), key.ToECDSA())
 	case issuerOpcoder:
 		return issuers.NewOpcoder(ctx, client, tracker,
-			nonce, big.NewInt(maxFeeCap), key)
+			nonce, big.NewInt(maxFeeCap), key.ToECDSA())
 	default:
 		return nil, fmt.Errorf("unknown issuer type %s", typ)
 	}
