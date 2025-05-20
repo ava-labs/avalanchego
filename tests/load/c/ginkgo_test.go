@@ -1,17 +1,24 @@
-// Co// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package c
 
 import (
 	"context"
+	"encoding/json"
+	"os"
 	"testing"
 
+	"github.com/ava-labs/coreth/core"
 	"github.com/onsi/ginkgo/v2"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/tests/load"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 // Run this using the command:
@@ -117,24 +124,6 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 		}
 	})
 
-	ginkgo.It("C-Chain opcoder", func(ctx context.Context) {
-		endpoints, err := tmpnet.GetNodeWebsocketURIs(network.Nodes, blockchainID)
-		require.NoError(ginkgo.GinkgoT(), err, "getting node websocket URIs")
-		config := config{
-			endpoints: endpoints,
-			issuer:    issuerOpcoder,
-			maxFeeCap: 300000000000,
-			agents:    1,
-			minTPS:    30,
-			maxTPS:    60,
-			step:      5,
-		}
-		err = execute(ctx, network.PreFundedKeys, config, metrics, logger)
-		if err != nil {
-			ginkgo.GinkgoT().Error(err)
-		}
-	})
-})
 	// ginkgo.It("C-Chain opcoder", func(ctx context.Context) {
 	// 	const blockchainID = "C"
 	// 	endpoints, err := tmpnet.GetNodeWebsocketURIs(network.Nodes, blockchainID)

@@ -1,4 +1,4 @@
-// Co// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package c
@@ -49,6 +49,7 @@ func execute(ctx context.Context, preFundedKeys []*secp256k1.PrivateKey, config 
 		return fmt.Errorf("ensuring minimum funds: %w", err)
 	}
 
+	tracker := load.NewTracker[common.Hash](metrics)
 	agents, err := createAgents(ctx, config, keys, tracker)
 	if err != nil {
 		return fmt.Errorf("creating agents: %w", err)
