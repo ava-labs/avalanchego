@@ -1482,7 +1482,7 @@ func TestBonusBlocksTxs(t *testing.T) {
 	}
 
 	// Make [blk] a bonus block.
-	tvm.vm.atomicBackend.(*atomicBackend).bonusBlocks = map[uint64]ids.ID{blk.Height(): blk.ID()}
+	tvm.vm.atomicBackend.AddBonusBlock(blk.Height(), blk.ID())
 
 	// Remove the UTXOs from shared memory, so that non-bonus blocks will fail verification
 	if err := tvm.vm.ctx.SharedMemory.Apply(map[ids.ID]*avalancheatomic.Requests{tvm.vm.ctx.XChainID: {RemoveRequests: [][]byte{inputID[:]}}}); err != nil {

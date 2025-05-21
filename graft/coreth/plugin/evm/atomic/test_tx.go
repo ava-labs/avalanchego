@@ -19,9 +19,11 @@ import (
 	"github.com/ava-labs/coreth/params/extras"
 )
 
-var (
-	_ UnsignedAtomicTx = (*TestUnsignedTx)(nil)
+const testCodecVersion = 0
 
+// TODO: Remove this and use actual codec and transactions (export, import)
+var (
+	_           UnsignedAtomicTx = (*TestUnsignedTx)(nil)
 	TestTxCodec codec.Manager
 )
 
@@ -32,7 +34,7 @@ func init() {
 	errs := wrappers.Errs{}
 	errs.Add(
 		c.RegisterType(&TestUnsignedTx{}),
-		TestTxCodec.RegisterCodec(CodecVersion, c),
+		TestTxCodec.RegisterCodec(testCodecVersion, c),
 	)
 
 	if errs.Errored() {
