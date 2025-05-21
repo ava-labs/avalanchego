@@ -575,11 +575,8 @@ func (n *Network) TrackedSubnetsForNode(nodeID ids.NodeID) string {
 			continue
 		}
 		// Only track subnets that this node validates
-		for _, validatorID := range subnet.ValidatorIDs {
-			if validatorID == nodeID {
-				subnetIDs = append(subnetIDs, subnet.SubnetID.String())
-				break
-			}
+		if slices.Contains(subnet.ValidatorIDs, nodeID) {
+			subnetIDs = append(subnetIDs, subnet.SubnetID.String())
 		}
 	}
 	return strings.Join(subnetIDs, ",")
