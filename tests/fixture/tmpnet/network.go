@@ -768,8 +768,8 @@ func (n *Network) GetNode(nodeID ids.NodeID) (*Node, error) {
 }
 
 // GetNodeURIs returns the URIs of nodes in the network that are running and not ephemeral. The URIs
-// returned are guaranteed be reachable by the caller regardless of whether the nodes are running as
-// local processes or in a kube cluster.
+// returned are guaranteed be reachable by the caller until the cleanup function is called regardless
+// of whether the nodes are running as local processes or in a kube cluster.
 func (n *Network) GetNodeURIs(ctx context.Context, deferCleanupFunc func(func())) ([]NodeURI, error) {
 	return GetNodeURIs(ctx, n.Nodes, deferCleanupFunc)
 }

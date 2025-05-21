@@ -54,8 +54,8 @@ type NodeURI struct {
 }
 
 // GetNodeURIs returns the URIs of the provided nodes that are running and not ephemeral. The URIs returned
-// are guaranteed be reachable by the caller regardless of whether the nodes are running as local processes
-// or in a kube cluster.
+// are guaranteed be reachable by the caller until the cleanup function is called regardless of whether the
+// nodes are running as local processes or in a kube cluster.
 func GetNodeURIs(ctx context.Context, nodes []*Node, deferCleanupFunc func(func())) ([]NodeURI, error) {
 	availableNodes := FilterAvailableNodes(nodes)
 	uris := make([]NodeURI, 0, len(availableNodes))
