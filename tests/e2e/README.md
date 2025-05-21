@@ -9,7 +9,6 @@
 ./scripts/build.sh        # Builds avalanchego for use in deploying a test network
 ./scripts/build_xsvm.sh   # Builds xsvm for use in deploying a test network with a subnet
 ./bin/ginkgo -v ./tests/e2e -- --avalanchego-path=$PWD/build/avalanchego # Note that the path given for --avalanchego-path must be an absolute and not a relative path.
-./bin/ginkgo -v ./tests/load/c -- --avalanchego-path=$PWD/build/avalanchego
 ```
 
 See [`tests.e2e.sh`](../../scripts/tests.e2e.sh) for an example.
