@@ -228,7 +228,6 @@ jobs:
         with:
           run: ./scripts/run_task.sh test-load
           artifact_prefix: e2e-load
-          filter_by_owner: avalanchego-e2e
           prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           loki_username: ${{ secrets.LOKI_ID || '' }}
