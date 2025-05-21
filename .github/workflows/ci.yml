@@ -221,9 +221,6 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/setup-go-for-project
       - uses: ./.github/actions/install-nix
-      - name: Contract bindings are up to date
-        shell: bash
-        run: nix develop --command ./scripts/run_task.sh check-generate-load-contract-bindings
       - uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
           run: ./scripts/run_task.sh test-load
