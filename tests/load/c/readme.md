@@ -21,21 +21,50 @@ From the load test perspective, only the TPS (transactions per second) is logged
 
 There are more interesting metrics available from the tmpnet nodes being load tested.
 
-If you have the Grafana credentials, the easiest way to visualize the metrics is to click the Grafana URL logged by the load test, in the form
-
-```log
-INFO metrics and logs available via grafana (collectors must be running)     {"url": "https://grafana-poc.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?&var-filter=network_uuid%7C%3D%7Cdb0cb247-e0a6-46e1-b265-4ac6b3c8f6c4&var-filter=is_ephemeral_node%7C%3D%7Cfalse&from=1747816981769&to=now"}
-```
-
-If you don't, follow the local steps in the [visualize metrics locally](#visualize-metrics-locally) section.
-
-Finally, to run the load test, from the root of the repository:
+Finally, to run the load test, run:
 
 ```bash
 ./bin/ginkgo -v tests/load/c -- --avalanchego-path=$PWD/build/avalanchego
 ```
 
-## Visualize metrics locally
+## Visualize metrics in Grafana
+
+### Private remote instances
+
+If you have the credentials (internal to Ava Labs) for the remote Prometheus and Grafana PoC, you can visualize the metrics following these steps:
+
+1. Start the dev shell to have Prometheus setup to scrape the load test metrics and send it to the remote Prometheus instance:
+
+    ```bash
+    nix develop
+    ```
+
+1. Set your Prometheus credentials using the credentials you can find in your password manager
+
+    ```bash
+    export PROMETHEUS_USERNAME=<username>
+    export PROMETHEUS_PASSWORD=<password>
+    export LOKI_USERNAME=<username>
+    export LOKI_PASSWORD=<password>
+    ```
+
+1. Run the load test:
+
+    ```bash
+    ./bin/ginkgo -v tests/load/c -- --avalanchego-path=$PWD/build/avalanchego --start-collectors
+    ```
+
+1. Wait for the load test to finish, this will log out a URL at the end of the test, in the form
+
+    ```log
+    INFO metrics and logs available via grafana (collectors must be running)     {"uri": "https://grafana-poc.avax-dev.network/d/eabddd1d-0a06-4ba1-8e68-a44504e37535/C-Chain%20Load?from=1747817500582&to=1747817952631&var-filter=network_uuid%7C%3D%7C4f419e3a-dba5-4ccd-b2fd-bda15f9826ff"}
+    ```
+
+1. Open the URL in your browser, and log in with the Grafana credentials which you can find in your password manager.
+
+For reference, see [the tmpnet monitoring section](../../fixture/tmpnet/README.md#monitoring)
+
+### Locally
 
 1. Navigate to this directory with `cd tests/load/c`.
 1. Setup the Prometheus configuration file: `envsubst < prometheus.template.yml > prometheus.yml`
