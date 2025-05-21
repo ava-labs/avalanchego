@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evm
+package state
 
 import (
 	"fmt"
@@ -14,27 +14,10 @@ import (
 	"github.com/ava-labs/libevm/log"
 )
 
-var _ AtomicState = (*atomicState)(nil)
-
-// AtomicState is an abstraction created through AtomicBackend
-// and can be used to apply the VM's state change for atomic txs
-// or reject them to free memory.
-// The root of the atomic trie after applying the state change
-// is accessible through this interface as well.
-type AtomicState interface {
-	// Root of the atomic trie after applying the state change.
-	Root() common.Hash
-	// Accept applies the state change to VM's persistent storage
-	// Changes are persisted atomically along with the provided [commitBatch].
-	Accept(commitBatch database.Batch, requests map[ids.ID]*avalancheatomic.Requests) error
-	// Reject frees memory associated with the state change.
-	Reject() error
-}
-
 // atomicState implements the AtomicState interface using
 // a pointer to the atomicBackend.
 type atomicState struct {
-	backend     *atomicBackend
+	backend     *AtomicBackend
 	blockHash   common.Hash
 	blockHeight uint64
 	txs         []*atomic.Tx
@@ -46,15 +29,14 @@ func (a *atomicState) Root() common.Hash {
 	return a.atomicRoot
 }
 
-// Accept applies the state change to VM's persistent storage.
-func (a *atomicState) Accept(commitBatch database.Batch, requests map[ids.ID]*avalancheatomic.Requests) error {
-	// Add the new requests to the batch to be accepted
-	for chainID, requests := range requests {
-		mergeAtomicOpsToMap(a.atomicOps, chainID, requests)
-	}
+// Accept writes the atomic operations to the database and
+// updates the last accepted block in the atomic backend.
+// It also commits the `commitBatch` to the shared memory.
+func (a *atomicState) Accept(commitBatch database.Batch) error {
+	isBonus := a.backend.IsBonus(a.blockHeight, a.blockHash)
 	// Update the atomic tx repository. Note it is necessary to invoke
 	// the correct method taking bonus blocks into consideration.
-	if a.backend.IsBonus(a.blockHeight, a.blockHash) {
+	if isBonus {
 		if err := a.backend.repo.WriteBonus(a.blockHeight, a.txs); err != nil {
 			return err
 		}
@@ -75,14 +57,14 @@ func (a *atomicState) Accept(commitBatch database.Batch, requests map[ids.ID]*av
 
 	// get changes from the atomic trie and repository in a batch
 	// to be committed atomically with [commitBatch] and shared memory.
-	atomicChangesBatch, err := a.backend.db.CommitBatch()
+	atomicChangesBatch, err := a.backend.repo.db.CommitBatch()
 	if err != nil {
 		return fmt.Errorf("could not create commit batch in atomicState accept: %w", err)
 	}
 
 	// If this is a bonus block, write [commitBatch] without applying atomic ops
 	// to shared memory.
-	if a.backend.IsBonus(a.blockHeight, a.blockHash) {
+	if isBonus {
 		log.Info("skipping atomic tx acceptance on bonus block", "block", a.blockHash)
 		return avalancheatomic.WriteAll(commitBatch, atomicChangesBatch)
 	}

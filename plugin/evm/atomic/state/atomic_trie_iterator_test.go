@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evm
+package state
 
 import (
 	"testing"
@@ -10,24 +10,19 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-)
 
-func testSharedMemory() avalancheatomic.SharedMemory {
-	m := avalancheatomic.NewMemory(memdb.New())
-	return m.NewSharedMemory(snowtest.CChainID)
-}
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
+	"github.com/ava-labs/coreth/plugin/evm/atomic/atomictest"
+)
 
 func TestIteratorCanIterate(t *testing.T) {
 	lastAcceptedHeight := uint64(1000)
 	db := versiondb.New(memdb.New())
-	codec := atomic.TestTxCodec
-	repo, err := NewAtomicTxRepository(db, codec, lastAcceptedHeight)
+	repo, err := NewAtomicTxRepository(db, atomic.TestTxCodec, lastAcceptedHeight)
 	assert.NoError(t, err)
 
 	// create state with multiple transactions
@@ -38,7 +33,7 @@ func TestIteratorCanIterate(t *testing.T) {
 
 	// create an atomic trie
 	// on create it will initialize all the transactions from the above atomic repository
-	atomicBackend, err := NewAtomicBackend(db, testSharedMemory(), nil, repo, lastAcceptedHeight, common.Hash{}, 100)
+	atomicBackend, err := NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, lastAcceptedHeight, common.Hash{}, 100)
 	assert.NoError(t, err)
 	atomicTrie1 := atomicBackend.AtomicTrie()
 
@@ -47,11 +42,11 @@ func TestIteratorCanIterate(t *testing.T) {
 	assert.NotEqual(t, common.Hash{}, lastCommittedHash1)
 	assert.EqualValues(t, 1000, lastCommittedHeight1)
 
-	verifyOperations(t, atomicTrie1, codec, lastCommittedHash1, 1, 1000, operationsMap)
+	verifyOperations(t, atomicTrie1, atomic.TestTxCodec, lastCommittedHash1, 1, 1000, operationsMap)
 
 	// iterate on a new atomic trie to make sure there is no resident state affecting the data and the
 	// iterator
-	atomicBackend2, err := NewAtomicBackend(db, testSharedMemory(), nil, repo, lastAcceptedHeight, common.Hash{}, 100)
+	atomicBackend2, err := NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, lastAcceptedHeight, common.Hash{}, 100)
 	assert.NoError(t, err)
 	atomicTrie2 := atomicBackend2.AtomicTrie()
 	lastCommittedHash2, lastCommittedHeight2 := atomicTrie2.LastCommitted()
@@ -59,15 +54,14 @@ func TestIteratorCanIterate(t *testing.T) {
 	assert.NotEqual(t, common.Hash{}, lastCommittedHash2)
 	assert.EqualValues(t, 1000, lastCommittedHeight2)
 
-	verifyOperations(t, atomicTrie2, codec, lastCommittedHash1, 1, 1000, operationsMap)
+	verifyOperations(t, atomicTrie2, atomic.TestTxCodec, lastCommittedHash1, 1, 1000, operationsMap)
 }
 
 func TestIteratorHandlesInvalidData(t *testing.T) {
 	require := require.New(t)
 	lastAcceptedHeight := uint64(1000)
 	db := versiondb.New(memdb.New())
-	codec := atomic.TestTxCodec
-	repo, err := NewAtomicTxRepository(db, codec, lastAcceptedHeight)
+	repo, err := NewAtomicTxRepository(db, atomic.TestTxCodec, lastAcceptedHeight)
 	require.NoError(err)
 
 	// create state with multiple transactions
@@ -79,7 +73,7 @@ func TestIteratorHandlesInvalidData(t *testing.T) {
 	// create an atomic trie
 	// on create it will initialize all the transactions from the above atomic repository
 	commitInterval := uint64(100)
-	atomicBackend, err := NewAtomicBackend(db, testSharedMemory(), nil, repo, lastAcceptedHeight, common.Hash{}, commitInterval)
+	atomicBackend, err := NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, lastAcceptedHeight, common.Hash{}, commitInterval)
 	require.NoError(err)
 	atomicTrie := atomicBackend.AtomicTrie()
 
@@ -87,7 +81,7 @@ func TestIteratorHandlesInvalidData(t *testing.T) {
 	require.NotEqual(common.Hash{}, lastCommittedHash)
 	require.EqualValues(1000, lastCommittedHeight)
 
-	verifyOperations(t, atomicTrie, codec, lastCommittedHash, 1, 1000, operationsMap)
+	verifyOperations(t, atomicTrie, atomic.TestTxCodec, lastCommittedHash, 1, 1000, operationsMap)
 
 	// Add a random key-value pair to the atomic trie in order to test that the iterator correctly
 	// handles an error when it runs into an unexpected key-value pair in the trie.

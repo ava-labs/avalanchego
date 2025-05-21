@@ -191,7 +191,7 @@ func (b *Block) Accept(context.Context) error {
 
 	// Apply any shared memory changes atomically with other pending changes to
 	// the vm's versionDB.
-	return atomicState.Accept(vdbBatch, nil)
+	return atomicState.Accept(vdbBatch)
 }
 
 // handlePrecompileAccept calls Accept on any logs generated with an active precompile address that implements
