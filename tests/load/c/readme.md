@@ -52,7 +52,7 @@ There are more interesting metrics available from the tmpnet nodes being load te
     1. Name it `prometheus`
     1. In the Connection section, set the URL to `http://localhost:9090`
     1. Click the "Save & Test" button at the bottom to verify the connection.
-1. Create a dashboard at [localhost:3000/dashboard/new?editview=json-model](http://localhost:3000/dashboard/new?editview=json-model) and paste the JSON content of [`dashboard.json`](dashboard.json) into the text area, and click "Save changes".
+1. Create a dashboard at [localhost:3000/dashboard/new?editview=json-model](http://localhost:3000/dashboard/new?editview=json-model) and paste the JSON content of [`dashboard.json`](https://github.com/ava-labs/avalanche-monitoring/blob/main/grafana/dashboards/c_chain_load.json) into the text area, and click "Save changes".
 1. Open the Load testing dashboard at [localhost:3000/d/aejze3k4d0mpsb/load-testing](http://localhost:3000/d/aejze3k4d0mpsb/load-testing)
 
 ## Run the load test
