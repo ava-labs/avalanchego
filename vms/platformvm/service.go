@@ -1506,7 +1506,7 @@ func (s *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, response *
 		return err
 	}
 
-	if _, ok := s.vm.Builder.Get(args.TxID); ok {
+	if _, ok := s.vm.Mempool.Get(args.TxID); ok {
 		// Found the tx in the mempool. Report tx is processing.
 		response.Status = status.Processing
 		return nil
@@ -1514,7 +1514,7 @@ func (s *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, response *
 
 	// Note: we check if tx is dropped only after having looked for it
 	// in the database and the mempool, because dropped txs may be re-issued.
-	reason := s.vm.Builder.GetDropReason(args.TxID)
+	reason := s.vm.Mempool.GetDropReason(args.TxID)
 	if reason == nil {
 		// The tx isn't being tracked by the node.
 		response.Status = status.Unknown

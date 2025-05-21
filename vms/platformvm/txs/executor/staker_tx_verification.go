@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -136,9 +137,10 @@ func verifyAddValidatorTx(
 		return nil, ErrStakeTooLong
 	}
 
-	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
-	copy(outs, tx.Outs)
-	copy(outs[len(tx.Outs):], tx.StakeOuts)
+	ins, outs, _, err := utxo.GetInputOutputs(tx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get utxos: %w", err)
+	}
 
 	if !backend.Bootstrapped.Get() {
 		return outs, nil
@@ -148,7 +150,7 @@ func verifyAddValidatorTx(
 		return nil, err
 	}
 
-	_, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
+	_, err = GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
 	if err == nil {
 		return nil, fmt.Errorf(
 			"%s is %w of the primary network",
@@ -172,7 +174,7 @@ func verifyAddValidatorTx(
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
-		tx.Ins,
+		ins,
 		outs,
 		sTx.Creds,
 		map[ids.ID]uint64{
@@ -257,6 +259,11 @@ func verifyAddSubnetValidatorTx(
 		return err
 	}
 
+	ins, outs, _, err := utxo.GetInputOutputs(tx)
+	if err != nil {
+		return fmt.Errorf("failed to get utxos: %w", err)
+	}
+
 	// Verify the flowcheck
 	fee, err := feeCalculator.CalculateFee(tx)
 	if err != nil {
@@ -265,8 +272,8 @@ func verifyAddSubnetValidatorTx(
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
-		tx.Ins,
-		tx.Outs,
+		ins,
+		outs,
 		baseTxCreds,
 		map[ids.ID]uint64{
 			backend.Ctx.AVAXAssetID: fee,
@@ -337,6 +344,11 @@ func verifyRemoveSubnetValidatorTx(
 		return nil, false, err
 	}
 
+	ins, outs, _, err := utxo.GetInputOutputs(tx)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to get utxos: %w", err)
+	}
+
 	// Verify the flowcheck
 	fee, err := feeCalculator.CalculateFee(tx)
 	if err != nil {
@@ -345,8 +357,8 @@ func verifyRemoveSubnetValidatorTx(
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
-		tx.Ins,
-		tx.Outs,
+		ins,
+		outs,
 		baseTxCreds,
 		map[ids.ID]uint64{
 			backend.Ctx.AVAXAssetID: fee,
@@ -404,9 +416,10 @@ func verifyAddDelegatorTx(
 		return nil, ErrWeightTooSmall
 	}
 
-	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
-	copy(outs, tx.Outs)
-	copy(outs[len(tx.Outs):], tx.StakeOuts)
+	ins, outs, _, err := utxo.GetInputOutputs(tx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get utxos: %w", err)
+	}
 
 	if !backend.Bootstrapped.Get() {
 		return outs, nil
@@ -465,7 +478,7 @@ func verifyAddDelegatorTx(
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
-		tx.Ins,
+		ins,
 		outs,
 		sTx.Creds,
 		map[ids.ID]uint64{
@@ -575,9 +588,10 @@ func verifyAddPermissionlessValidatorTx(
 		}
 	}
 
-	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
-	copy(outs, tx.Outs)
-	copy(outs[len(tx.Outs):], tx.StakeOuts)
+	ins, outs, _, err := utxo.GetInputOutputs(tx)
+	if err != nil {
+		return fmt.Errorf("failed to get utxos: %w", err)
+	}
 
 	// Verify the flowcheck
 	fee, err := feeCalculator.CalculateFee(tx)
@@ -587,7 +601,7 @@ func verifyAddPermissionlessValidatorTx(
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
-		tx.Ins,
+		ins,
 		outs,
 		sTx.Creds,
 		map[ids.ID]uint64{
@@ -710,10 +724,6 @@ func verifyAddPermissionlessDelegatorTx(
 		return ErrOverDelegated
 	}
 
-	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
-	copy(outs, tx.Outs)
-	copy(outs[len(tx.Outs):], tx.StakeOuts)
-
 	if tx.Subnet != constants.PrimaryNetworkID {
 		// Invariant: Delegators must only be able to reference validator
 		//            transactions that implement [txs.ValidatorTx]. All
@@ -726,6 +736,11 @@ func verifyAddPermissionlessDelegatorTx(
 		}
 	}
 
+	ins, outs, _, err := utxo.GetInputOutputs(tx)
+	if err != nil {
+		return fmt.Errorf("failed to get utxos: %w", err)
+	}
+
 	// Verify the flowcheck
 	fee, err := feeCalculator.CalculateFee(tx)
 	if err != nil {
@@ -734,7 +749,7 @@ func verifyAddPermissionlessDelegatorTx(
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
-		tx.Ins,
+		ins,
 		outs,
 		sTx.Creds,
 		map[ids.ID]uint64{
@@ -786,6 +801,11 @@ func verifyTransferSubnetOwnershipTx(
 		return err
 	}
 
+	ins, outs, _, err := utxo.GetInputOutputs(tx)
+	if err != nil {
+		return fmt.Errorf("failed to get utxos: %w", err)
+	}
+
 	// Verify the flowcheck
 	fee, err := feeCalculator.CalculateFee(tx)
 	if err != nil {
@@ -794,8 +814,8 @@ func verifyTransferSubnetOwnershipTx(
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
-		tx.Ins,
-		tx.Outs,
+		ins,
+		outs,
 		baseTxCreds,
 		map[ids.ID]uint64{
 			backend.Ctx.AVAXAssetID: fee,
