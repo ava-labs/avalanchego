@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -118,7 +117,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			handler := NewGetRangeProofHandler(logging.NoLog{}, smallTrieDB)
+			handler := NewGetRangeProofHandler(smallTrieDB)
 			requestBytes, err := proto.Marshal(test.request)
 			require.NoError(err)
 			responseBytes, err := handler.AppRequest(context.Background(), test.nodeID, time.Time{}, requestBytes)
@@ -339,7 +338,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			handler := NewGetChangeProofHandler(logging.NoLog{}, serverDB)
+			handler := NewGetChangeProofHandler(serverDB)
 
 			requestBytes, err := proto.Marshal(test.request)
 			require.NoError(err)

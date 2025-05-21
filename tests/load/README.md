@@ -50,13 +50,6 @@ graph
     A3_L --> T
 ```
 
-### Orchestrator
-
-The orchestrator is responsible for directing issuers and listeners
-to send transactions to the network and detect when a transaction is confirmed.
-The strategy for how the orchestrator directs issuers varies
-between implementations (e.g. short burst vs gradual load).
-
 ### Issuer
 
 The issuer is responsible for generating and issuing transactions.
@@ -74,33 +67,26 @@ The tracker is responsible for maintaining metrics for all sent txs. Since the
 tracker is used by both the issuers, listeners and the orchestrator, all methods of the
 tracker must be thread safe.
 
-## Default Orchestrators
+### Orchestrator
 
-This package comes with the following orchestrators:
+The orchestrator supports the following modes:
 
-### Short Burst
-
-The short burst orchestator is used to send a fixed number of transactions to the network at
-once. This orchestrator is parameterizable via the following:
-
-- `N`: the number of transactions an issuer will send to the network.
-- `timeout`: the maximum amount of time which, after all transactions have been sent,
-  the orchestrator will wait to hear the confirmation of all outstanding
-  transactions.
-
-### Gradual Load
-
-The gradual load orchestrator sends transactions at an initial rate (TPS) and
+- Gradual Load: the orchestrator sends transactions at an initial rate (TPS) and
 increases that rate until hitting the maxiumum desired rate or until the
 orchestrator determines that it can no longer make progress.
+- Burst: for each issuer, the orchestrator sends `MinTPS` transactions at once
+  and waits for all transactions to be marked as accepted.
 
-The current TPS in the gradual load orchestrator is determined by taking the
+Setting `MaxTPS` in the orchestrator configuration to `-1` sets the orchestrator
+in burst mode. Otherwise, the orchestator will run in gradual load mode.
+
+The current TPS in the gradual orchestrator is determined by taking the
 number of transactions confirmed in a given time window (`SustainedTime`) and
 diving it by `SustainedTime` (in terms of seconds) Furthermore, the orchestator
-has `maxAttempt` tries to try and achieve a given TPS before determining that
+has `MaxAttempts` tries to try and achieve a given TPS before determining that
 the given TPS is not achievable.
 
-Below is the pseudocode for how the gradual load orchestrator determines TPS and
+Below is the pseudocode for how the orchestrator in gradual load mode determines TPS and
 for how it increases TPS:
 
 ```

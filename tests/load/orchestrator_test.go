@@ -105,6 +105,7 @@ func TestOrchestratorExecution(t *testing.T) {
 	)
 
 	m, err := NewMetrics(prometheus.NewRegistry())
+	require.NoError(t, err, "creating metrics")
 	tracker := NewTracker[ids.ID](m)
 
 	tests := []struct {

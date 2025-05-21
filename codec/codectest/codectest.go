@@ -650,7 +650,7 @@ func TestSerializeUnexportedField(t testing.TB, codec codecpkg.GeneralCodec) {
 
 	type s struct {
 		ExportedField   string `serialize:"true"`
-		unexportedField string `serialize:"true"` //nolint:revive
+		unexportedField string `serialize:"true"` //nolint:revive,unused
 	}
 
 	myS := s{

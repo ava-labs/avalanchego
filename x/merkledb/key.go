@@ -54,10 +54,8 @@ const (
 
 // Valid checks if BranchFactor [b] is one of the predefined valid options for BranchFactor
 func (b BranchFactor) Valid() error {
-	for _, validBF := range validBranchFactors {
-		if validBF == b {
-			return nil
-		}
+	if slices.Contains(validBranchFactors, b) {
+		return nil
 	}
 	return fmt.Errorf("%w: %d", ErrInvalidBranchFactor, b)
 }

@@ -30,15 +30,19 @@ type FlagVars struct {
 	startNetwork     bool
 	startNetworkVars *flags.StartNetworkVars
 
-	startCollectors bool
-	checkMonitoring bool
+	// The collectors configured by these flags run as local processes
+	startMetricsCollector bool
+	startLogsCollector    bool
+
+	checkMetricsCollected bool
+	checkLogsCollected    bool
 
 	networkDir     string
 	reuseNetwork   bool
 	stopNetwork    bool
 	restartNetwork bool
 
-	activateFortuna bool
+	activateGranite bool
 }
 
 func (v *FlagVars) NetworkCmd() (NetworkCmd, error) {
@@ -83,12 +87,20 @@ func (v *FlagVars) NodeRuntimeConfig() (*tmpnet.NodeRuntimeConfig, error) {
 	return v.startNetworkVars.GetNodeRuntimeConfig()
 }
 
-func (v *FlagVars) StartCollectors() bool {
-	return v.startCollectors
+func (v *FlagVars) StartMetricsCollector() bool {
+	return v.startMetricsCollector
 }
 
-func (v *FlagVars) CheckMonitoring() bool {
-	return v.checkMonitoring
+func (v *FlagVars) StartLogsCollector() bool {
+	return v.startLogsCollector
+}
+
+func (v *FlagVars) CheckMetricsCollected() bool {
+	return v.checkMetricsCollected
+}
+
+func (v *FlagVars) CheckLogsCollected() bool {
+	return v.checkLogsCollected
 }
 
 func (v *FlagVars) NetworkDir() string {
@@ -102,7 +114,7 @@ func (v *FlagVars) NetworkDir() string {
 }
 
 func (v *FlagVars) NetworkShutdownDelay() time.Duration {
-	if v.startCollectors {
+	if v.StartMetricsCollector() {
 		// Only return a non-zero value if we want to ensure the collectors have
 		// a chance to collect the metrics at the end of the test.
 		return tmpnet.NetworkShutdownDelay
@@ -110,8 +122,8 @@ func (v *FlagVars) NetworkShutdownDelay() time.Duration {
 	return 0
 }
 
-func (v *FlagVars) ActivateFortuna() bool {
-	return v.activateFortuna
+func (v *FlagVars) ActivateGranite() bool {
+	return v.activateGranite
 }
 
 func RegisterFlags() *FlagVars {
@@ -131,8 +143,10 @@ func RegisterFlagsWithDefaultOwner(defaultOwner string) *FlagVars {
 	vars.startNetworkVars = flags.NewStartNetworkFlagVars(defaultOwner)
 
 	SetMonitoringFlags(
-		&vars.startCollectors,
-		&vars.checkMonitoring,
+		&vars.startMetricsCollector,
+		&vars.startLogsCollector,
+		&vars.checkMetricsCollected,
+		&vars.checkLogsCollected,
 	)
 
 	flag.StringVar(
@@ -164,27 +178,38 @@ func RegisterFlagsWithDefaultOwner(defaultOwner string) *FlagVars {
 	)
 
 	flag.BoolVar(
-		&vars.activateFortuna,
-		"activate-fortuna",
+		&vars.activateGranite,
+		"activate-granite",
 		false,
-		"[optional] activate the fortuna upgrade",
+		"[optional] activate the granite upgrade",
 	)
 
 	return &vars
 }
 
-// Enable reuse by the upgrade job
-func SetMonitoringFlags(startCollectors *bool, checkMonitoring *bool) {
+func SetMonitoringFlags(startMetricsCollector, startLogsCollector, checkMetricsCollected, checkLogsCollected *bool) {
 	flag.BoolVar(
-		startCollectors,
-		"start-collectors",
-		cast.ToBool(tmpnet.GetEnvWithDefault("TMPNET_START_COLLECTORS", "false")),
-		"[optional] whether to start collectors of logs and metrics from nodes of the temporary network.",
+		startMetricsCollector,
+		"start-metrics-collector",
+		cast.ToBool(tmpnet.GetEnvWithDefault("TMPNET_START_METRICS_COLLECTOR", "false")),
+		"[optional] whether to start a local collector of metrics from nodes of the temporary network.",
 	)
 	flag.BoolVar(
-		checkMonitoring,
-		"check-monitoring",
-		cast.ToBool(tmpnet.GetEnvWithDefault("TMPNET_CHECK_MONITORING", "false")),
-		"[optional] whether to check that logs and metrics have been collected from nodes of the temporary network.",
+		startLogsCollector,
+		"start-logs-collector",
+		cast.ToBool(tmpnet.GetEnvWithDefault("TMPNET_START_LOGS_COLLECTOR", "false")),
+		"[optional] whether to start a local collector of logs from nodes of the temporary network.",
+	)
+	flag.BoolVar(
+		checkMetricsCollected,
+		"check-metrics-collected",
+		cast.ToBool(tmpnet.GetEnvWithDefault("TMPNET_CHECK_METRICS_COLLECTED", "false")),
+		"[optional] whether to check that metrics have been collected from nodes of the temporary network.",
+	)
+	flag.BoolVar(
+		checkLogsCollected,
+		"check-logs-collected",
+		cast.ToBool(tmpnet.GetEnvWithDefault("TMPNET_CHECK_LOGS_COLLECTED", "false")),
+		"[optional] whether to check that logs have been collected from nodes of the temporary network.",
 	)
 }

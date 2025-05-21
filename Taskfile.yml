@@ -2,7 +2,7 @@
 # To run on a system without task installed, `./scripts/run_task.sh` will execute it with `go run`.
 # If in the nix dev shell, `task` is available.
 
-version: "3"
+version: '3'
 
 tasks:
   default: ./scripts/run_task.sh --list
@@ -57,6 +57,12 @@ tasks:
       - task: generate-canoto
       - task: check-clean-branch
 
+  check-generate-load-contract-bindings:
+    desc: Checks that generated load contract bindings are up-to-date (requires a clean git working tree)
+    cmds:
+      - task: generate-load-contract-bindings
+      - task: check-clean-branch
+
   check-generate-mocks:
     desc: Checks that generated mocks are up-to-date (requires a clean git working tree)
     cmds:
@@ -75,12 +81,6 @@ tasks:
       - cmd: go mod tidy
       - task: check-clean-branch
 
-  check-generate-load-contract-bindings:
-    desc: Checks that generated load contract bindings are up-to-date (requires a clean git working tree)
-    cmds:
-      - task: generate-load-contract-bindings
-      - task: check-clean-branch
-
   generate-mocks:
     desc: Generates testing mocks
     cmds:
@@ -91,15 +91,19 @@ tasks:
     desc: Generates canoto
     cmd: go generate -run "github.com/StephenButtolph/canoto/canoto" ./...
 
-  generate-protobuf:
-    desc: Generates protobuf
-    cmd: ./scripts/protobuf_codegen.sh
-
   generate-load-contract-bindings:
     desc: Generates load contract bindings
     cmds:
       - cmd: grep -lr -E '^// Code generated - DO NOT EDIT\.$' tests/load | xargs -r rm
       - cmd: go generate ./tests/load/...
+
+  generate-protobuf:
+    desc: Generates protobuf
+    cmd: ./scripts/protobuf_codegen.sh
+
+  ginkgo-build:
+    desc: Runs ginkgo against the current working directory
+    cmd: ./bin/ginkgo build {{.USER_WORKING_DIR}}
 
   install-nix:
     desc: Installs nix with the determinate systems installer
@@ -185,12 +189,6 @@ tasks:
       - task: build-xsvm
       - cmd: bash -x ./scripts/tests.e2e.existing.sh {{.CLI_ARGS}}
 
-  test-load:
-    desc: Runs load tests
-    cmds:
-      - task: build
-      - cmd: ./bin/ginkgo -v ./tests/load/c -- --avalanchego-path=$PWD/build/avalanchego
-
   # To use a different fuzz time, run `task test-fuzz FUZZTIME=[value in seconds]`.
   # A value of `-1` will run until it encounters a failing output.
 
@@ -211,6 +209,12 @@ tasks:
     vars:
       FUZZTIME: '{{.FUZZTIME| default "900"}}'
     cmd: ./scripts/build_fuzz.sh {{.FUZZTIME}} ./x/merkledb
+
+  test-load:
+    desc: Runs load tests
+    cmds:
+      - task: build
+      - cmd: ./bin/ginkgo -v ./tests/load/c -- --avalanchego-path=$PWD/build/avalanchego
 
   test-unit:
     desc: Runs unit tests

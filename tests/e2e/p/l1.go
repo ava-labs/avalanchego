@@ -29,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
@@ -771,7 +770,6 @@ func wrapWarpSignatureRequest(
 	justification []byte,
 ) (p2pmessage.OutboundMessage, error) {
 	p2pMessageFactory, err := p2pmessage.NewCreator(
-		logging.NoLog{},
 		prometheus.NewRegistry(),
 		constants.DefaultNetworkCompressionType,
 		p2pTimeout,

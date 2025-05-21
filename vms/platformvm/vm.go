@@ -150,7 +150,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	validatorManager := pvalidators.NewManager(chainCtx.Log, vm.Internal, vm.state, vm.metrics, &vm.clock)
+	validatorManager := pvalidators.NewManager(vm.Internal, vm.state, vm.metrics, &vm.clock)
 	vm.State = validatorManager
 	utxoVerifier := utxo.NewVerifier(vm.ctx, &vm.clock, vm.fx)
 	vm.uptimeManager = uptime.NewManager(vm.state, &vm.clock)

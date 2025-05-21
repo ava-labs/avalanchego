@@ -2096,7 +2096,6 @@ type transformSubnetTxVerifyEnv struct {
 	unsignedTx     *txs.TransformSubnetTx
 	tx             *txs.Tx
 	state          *state.MockDiff
-	staker         *state.Staker
 }
 
 // Returns mock implementations that can be used in tests
@@ -2116,10 +2115,6 @@ func newValidTransformSubnetTxVerifyEnv(t *testing.T, ctrl *gomock.Controller) t
 		unsignedTx:     unsignedTx,
 		tx:             tx,
 		state:          mockState,
-		staker: &state.Staker{
-			TxID:   ids.GenerateTestID(),
-			NodeID: ids.GenerateTestNodeID(),
-		},
 	}
 }
 

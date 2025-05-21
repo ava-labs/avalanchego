@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/libevm/core"
 	"github.com/stretchr/testify/require"
 
 	_ "embed"
