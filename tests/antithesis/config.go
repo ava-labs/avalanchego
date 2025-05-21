@@ -102,7 +102,7 @@ func configForNewNetwork(
 	c := &Config{
 		Duration: duration,
 	}
-	localURIs := testEnv.GetLocalNodeURIs()
+	localURIs := testEnv.GetNodeURIs()
 	c.URIs = make(CSV, len(localURIs))
 	for i, nodeURI := range localURIs {
 		c.URIs[i] = nodeURI.URI

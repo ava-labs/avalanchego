@@ -207,27 +207,43 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 		"not enough pre-funded keys for the requested number of parallel test processes",
 	)
 
-	uris := network.GetNodeURIs()
-	require.NotEmpty(uris, "network contains no nodes")
-	tc.Log().Info("network nodes are available",
-		zap.Any("uris", uris),
-	)
-
-	return &TestEnvironment{
+	env := &TestEnvironment{
 		RootNetworkDir:              flagVars.RootNetworkDir(),
 		NetworkDir:                  network.Dir,
 		PrivateNetworkShutdownDelay: flagVars.NetworkShutdownDelay(),
 		testContext:                 tc,
 	}
+
+	if network.DefaultRuntimeConfig.Process != nil {
+		// Display node IDs and URIs for process-based networks since the nodes are guaranteed to be network accessible
+		uris := env.GetNodeURIs()
+		require.NotEmpty(uris, "network contains no nodes")
+		tc.Log().Info("network nodes are available",
+			zap.Any("uris", uris),
+		)
+	} else {
+		// Only display node IDs for kube-based networks since the nodes may not be network accessible and
+		// port-forwarded URIs are ephemeral
+		nodeIDs := network.GetAvailableNodeIDs()
+		require.NotEmpty(nodeIDs, "network contains no nodes")
+		tc.Log().Info("network nodes are available. Not showing node URIs since kube nodes may be running remotely.",
+			zap.Any("nodeIDs", nodeIDs),
+		)
+	}
+
+	return env
 }
 
-// Retrieve the locally-accessible URIs for validator nodes of the shared network.
-func (te *TestEnvironment) GetLocalNodeURIs() []tmpnet.NodeURI {
+// Retrieve URIs for validator nodes of the shared network. The URIs
+// are only guaranteed to be accessible until the environment test
+// context is torn down (usually the duration of execution of a single
+// test).
+func (te *TestEnvironment) GetNodeURIs() []tmpnet.NodeURI {
 	var (
 		tc      = te.testContext
 		network = te.GetNetwork()
 	)
-	uris, err := network.GetLocalNodeURIs(tc.DefaultContext(), tc.DeferCleanup)
+	uris, err := network.GetNodeURIs(tc.DefaultContext(), tc.DeferCleanup)
 	require.NoError(tc, err)
 	return uris
 }

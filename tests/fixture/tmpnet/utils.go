@@ -53,24 +53,11 @@ type NodeURI struct {
 	URI    string
 }
 
-// GetNodeURIs returns the URIs of the given nodes provided they are running and not ephemeral. Prefer
-// GetLocalNodeURIs if targeting nodes that could be running in a Kubernetes cluster.
-func GetNodeURIs(nodes []*Node) []NodeURI {
-	availableNodes := filterAvailableNodes(nodes)
-	uris := make([]NodeURI, 0, len(availableNodes))
-	for _, node := range availableNodes {
-		uris = append(uris, NodeURI{
-			NodeID: node.NodeID,
-			URI:    node.URI,
-		})
-	}
-	return uris
-}
-
-// GetLocalNodeURIs returns locally-accessible URIs for the given nodes provided they are running and not
-// ephemeral.
-func GetLocalNodeURIs(ctx context.Context, nodes []*Node, deferCleanupFunc func(func())) ([]NodeURI, error) {
-	availableNodes := filterAvailableNodes(nodes)
+// GetNodeURIs returns the URIs of the provided nodes that are running and not ephemeral. The URIs returned
+// are guaranteed be reachable by the caller regardless of whether the nodes are running as local processes
+// or in a kube cluster.
+func GetNodeURIs(ctx context.Context, nodes []*Node, deferCleanupFunc func(func())) ([]NodeURI, error) {
+	availableNodes := FilterAvailableNodes(nodes)
 	uris := make([]NodeURI, 0, len(availableNodes))
 	for _, node := range availableNodes {
 		uri, cancel, err := node.GetLocalURI(ctx)
@@ -87,8 +74,8 @@ func GetLocalNodeURIs(ctx context.Context, nodes []*Node, deferCleanupFunc func(
 	return uris, nil
 }
 
-// filteredAvailableNodes filters the provided nodes by whether they are running and not ephemeral.
-func filterAvailableNodes(nodes []*Node) []*Node {
+// FilteredAvailableNodes filters the provided nodes by whether they are running and not ephemeral.
+func FilterAvailableNodes(nodes []*Node) []*Node {
 	filteredNodes := make([]*Node, 0, len(nodes))
 	for _, node := range nodes {
 		if node.IsEphemeral {

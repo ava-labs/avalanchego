@@ -49,7 +49,7 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 		func() {
 			var (
 				env       = e2e.GetEnv(tc)
-				localURIs = env.GetLocalNodeURIs()
+				localURIs = env.GetNodeURIs()
 				rpcEps    = make([]string, len(localURIs))
 			)
 			for i, nodeURI := range localURIs {
