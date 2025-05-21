@@ -227,7 +227,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 		nodeIDs := network.GetAvailableNodeIDs()
 		require.NotEmpty(nodeIDs, "network contains no nodes")
 		tc.Log().Info("network nodes are available. Not showing node URIs since kube nodes may be running remotely.",
-			zap.Any("nodeIDs", nodeIDs),
+			zap.Strings("nodeIDs", nodeIDs),
 		)
 	}
 
