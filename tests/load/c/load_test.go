@@ -5,16 +5,13 @@ package c
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"testing"
 
-	"github.com/ava-labs/coreth/core"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/tests/load"
@@ -51,7 +48,6 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 		Nodes: nodes,
 	}
 	setPrefundedKeys(tc, network, agentsCount)
-	setNetworkGas(tc, network)
 
 	env := e2e.NewTestEnvironment(
 		tc,
@@ -152,38 +148,4 @@ func setPrefundedKeys(t require.TestingT, network *tmpnet.Network, minKeys int) 
 	missingPreFundedKeys, err := tmpnet.NewPrivateKeys(minKeys - len(network.PreFundedKeys))
 	require.NoError(t, err, "creating pre-funded keys")
 	network.PreFundedKeys = append(network.PreFundedKeys, missingPreFundedKeys...)
-}
-
-func setNetworkGas(t require.TestingT, network *tmpnet.Network) {
-	if network.PrimaryChainConfigs == nil {
-		network.PrimaryChainConfigs = make(map[string]tmpnet.ConfigMap, 1)
-	}
-	primaryConfig, ok := network.PrimaryChainConfigs["C"]
-	if !ok {
-		primaryConfig = make(tmpnet.ConfigMap, 1)
-		network.PrimaryChainConfigs["C"] = primaryConfig
-	}
-	primaryConfig["gas-target"] = uint64(1000000000000000000)
-
-	if network.DefaultFlags == nil {
-		network.DefaultFlags = make(tmpnet.FlagsMap)
-	}
-	network.DefaultFlags[config.DynamicFeesMaxGasCapacityKey] = "1000000000000000000"
-	network.DefaultFlags[config.DynamicFeesMaxGasPerSecondKey] = "10000000000000000000"
-	network.DefaultFlags[config.DynamicFeesTargetGasPerSecondKey] = "10000000000000000000"
-
-	// We must set the pre-funded keys to generate a default genesis
-	// with those keys, so ensure at least one key is set.
-	require.NotEmpty(t, network.PreFundedKeys, "no pre-funded keys set")
-
-	var err error
-	network.Genesis, err = network.DefaultGenesis()
-	require.NoError(t, err, "creating genesis")
-	var cChainGenesis core.Genesis
-	err = json.Unmarshal([]byte(network.Genesis.CChainGenesis), &cChainGenesis)
-	require.NoError(t, err, "unmarshalling genesis")
-	cChainGenesis.GasLimit = 10000000000000000000
-	encodedChainGenesis, err := json.Marshal(cChainGenesis)
-	require.NoError(t, err, "marshalling C chain genesis")
-	network.Genesis.CChainGenesis = string(encodedChainGenesis)
 }
