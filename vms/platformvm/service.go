@@ -11,6 +11,7 @@ import (
 	"maps"
 	"math"
 	"net/http"
+	"slices"
 	"time"
 
 	"go.uber.org/zap"
@@ -2071,13 +2072,7 @@ func getStakeHelper(tx *txs.Tx, addrs set.Set[ids.ShortID], totalAmountStaked ma
 		}
 
 		// Check whether this output is owned by one of the given addresses
-		contains := false
-		for _, addr := range secpOut.Addrs {
-			if addrs.Contains(addr) {
-				contains = true
-				break
-			}
-		}
+		contains := slices.ContainsFunc(secpOut.Addrs, addrs.Contains)
 		if !contains {
 			// This output isn't owned by one of the given addresses. Ignore.
 			continue
