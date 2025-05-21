@@ -213,6 +213,7 @@ tasks:
   test-load:
     desc: Runs load tests
     cmds:
+      - task: generate-load-contract-bindings
       - task: build
       - cmd: ./bin/ginkgo -v ./tests/load/c -- --avalanchego-path=$PWD/build/avalanchego
 
