@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"math"
 	"net"
@@ -212,6 +213,7 @@ func Start(
 	messageQueue MessageQueue,
 	isIngress bool,
 ) Peer {
+	fmt.Println("Starting peer, id:", id, "engine:", config.VersionCompatibility.Version().String())
 	onClosingCtx, onClosingCtxCancel := context.WithCancel(context.Background())
 	p := &peer{
 		isIngress:          isIngress,
@@ -371,6 +373,7 @@ func (p *peer) close() {
 // Read and handle messages from this peer.
 // When this method returns, the connection is closed.
 func (p *peer) readMessages() {
+	fmt.Println("Reading messages from peer, id:", p.id)
 	// Track this node with the inbound message throttler.
 	p.InboundMsgThrottler.AddNode(p.id)
 	defer func() {
@@ -385,7 +388,7 @@ func (p *peer) readMessages() {
 	for {
 		// Time out and close connection if we can't read the message length
 		if err := p.conn.SetReadDeadline(p.nextTimeout()); err != nil {
-			p.Log.Verbo(failedToSetDeadlineLog,
+			p.Log.Warn(failedToSetDeadlineLog,
 				zap.Stringer("nodeID", p.id),
 				zap.String("direction", "read"),
 				zap.Error(err),
@@ -395,7 +398,7 @@ func (p *peer) readMessages() {
 
 		// Read the message length
 		if _, err := io.ReadFull(reader, msgLenBytes); err != nil {
-			p.Log.Verbo("error reading message length",
+			p.Log.Warn("error reading message length",
 				zap.Stringer("nodeID", p.id),
 				zap.Error(err),
 			)
@@ -405,7 +408,7 @@ func (p *peer) readMessages() {
 		// Parse the message length
 		msgLen, err := readMsgLen(msgLenBytes, constants.DefaultMaxMessageSize)
 		if err != nil {
-			p.Log.Verbo("error parsing message length",
+			p.Log.Warn("error parsing message length",
 				zap.Stringer("nodeID", p.id),
 				zap.Error(err),
 			)
@@ -439,7 +442,7 @@ func (p *peer) readMessages() {
 
 		// Time out and close connection if we can't read message
 		if err := p.conn.SetReadDeadline(p.nextTimeout()); err != nil {
-			p.Log.Verbo(failedToSetDeadlineLog,
+			p.Log.Warn(failedToSetDeadlineLog,
 				zap.Stringer("nodeID", p.id),
 				zap.String("direction", "read"),
 				zap.Error(err),
@@ -451,7 +454,7 @@ func (p *peer) readMessages() {
 		// Read the message
 		msgBytes := make([]byte, msgLen)
 		if _, err := io.ReadFull(reader, msgBytes); err != nil {
-			p.Log.Verbo("error reading message",
+			p.Log.Warn("error reading message",
 				zap.Stringer("nodeID", p.id),
 				zap.Error(err),
 			)
@@ -467,7 +470,7 @@ func (p *peer) readMessages() {
 		// finished.
 		p.ResourceTracker.StartProcessing(p.id, p.Clock.Time())
 
-		p.Log.Verbo("parsing message",
+		p.Log.Warn("parsing message",
 			zap.Stringer("nodeID", p.id),
 			zap.Binary("messageBytes", msgBytes),
 		)
@@ -475,7 +478,7 @@ func (p *peer) readMessages() {
 		// Parse the message
 		msg, err := p.MessageCreator.Parse(msgBytes, p.id, onFinishedHandling)
 		if err != nil {
-			p.Log.Verbo("failed to parse message",
+			p.Log.Warn("failed to parse message",
 				zap.Stringer("nodeID", p.id),
 				zap.Binary("messageBytes", msgBytes),
 				zap.Error(err),
