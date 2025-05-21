@@ -51,6 +51,7 @@ func (s *MetricsServer) Start() (runError <-chan error, err error) {
 	if err != nil {
 		return nil, err
 	}
+	s.addr = listener.Addr().String()
 
 	s.server = http.Server{
 		Addr:              s.addr,
