@@ -18,8 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-// Run this using the command:
-// ./bin/ginkgo -v ./tests/load/c -- --avalanchego-path=$PWD/build/avalanchego
+// Run this using the command from the root of the repository in a Nix develop shell:
+// task test-load
 func TestLoad(t *testing.T) {
 	ginkgo.RunSpecs(t, "load tests")
 }
