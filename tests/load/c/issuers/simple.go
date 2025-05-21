@@ -8,7 +8,6 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
-	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
@@ -42,8 +41,7 @@ type Simple struct {
 	gasTipCap *big.Int
 
 	// State
-	nonce     uint64
-	lastIssue time.Time
+	nonce uint64
 }
 
 func NewSimple(ctx context.Context, client EthClientSimple, tracker IssueTracker,
@@ -94,6 +92,5 @@ func (s *Simple) GenerateAndIssueTx(ctx context.Context) (common.Hash, error) {
 	s.nonce++
 	txHash := tx.Hash()
 	s.tracker.Issue(txHash)
-	s.lastIssue = time.Now()
 	return txHash, nil
 }
