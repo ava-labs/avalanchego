@@ -34,7 +34,6 @@ type Opcoder struct {
 
 	// Determined by constructor
 	chainID          *big.Int
-	maxTipCap        *big.Int
 	contractInstance *contracts.EVMLoadSimulator
 
 	// State
@@ -75,7 +74,6 @@ func NewOpcoder(
 		senderKey:        key,
 		maxFeeCap:        maxFeeCap,
 		chainID:          chainID,
-		maxTipCap:        maxTipCap,
 		contractInstance: simulatorInstance,
 		nonce:            nonce,
 	}, nil
@@ -169,7 +167,8 @@ func allLoadTypes() []string {
 }
 
 func (o *Opcoder) newTxOpts(ctx context.Context) (*bind.TransactOpts, error) {
-	return newTxOpts(ctx, o.senderKey, o.chainID, o.maxFeeCap, o.maxTipCap, o.nonce)
+	maxTipCap := big.NewInt(1)
+	return newTxOpts(ctx, o.senderKey, o.chainID, o.maxFeeCap, maxTipCap, o.nonce)
 }
 
 func newTxOpts(ctx context.Context, key *ecdsa.PrivateKey,
