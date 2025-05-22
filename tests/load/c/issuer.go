@@ -63,8 +63,7 @@ func createIssuer(
 		return nil, fmt.Errorf("getting chain id: %w", err)
 	}
 
-	maxTipCap := big.NewInt(1)
-	txOpts, err := newTxOpts(ctx, key, chainID, maxFeeCap, maxTipCap, nonce)
+	txOpts, err := newTxOpts(ctx, key, chainID, maxFeeCap, nonce)
 	if err != nil {
 		return nil, fmt.Errorf("creating transaction opts: %w", err)
 	}
@@ -136,7 +135,7 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 			name:   "random write",
 			weight: 1,
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
-				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, big.NewInt(1), nonce)
+				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
 				if err != nil {
 					return nil, fmt.Errorf("creating transaction opts: %w", err)
 				}
@@ -148,7 +147,7 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 			name:   "state modification",
 			weight: 1,
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
-				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, big.NewInt(1), nonce)
+				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
 				if err != nil {
 					return nil, fmt.Errorf("creating transaction opts: %w", err)
 				}
@@ -160,7 +159,7 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 			name:   "random read",
 			weight: 1,
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
-				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, big.NewInt(1), nonce)
+				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
 				if err != nil {
 					return nil, fmt.Errorf("creating transaction opts: %w", err)
 				}
@@ -172,7 +171,7 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 			name:   "hashing",
 			weight: 1,
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
-				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, big.NewInt(1), nonce)
+				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
 				if err != nil {
 					return nil, fmt.Errorf("creating transaction opts: %w", err)
 				}
@@ -184,7 +183,7 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 			name:   "memory",
 			weight: 1,
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
-				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, big.NewInt(1), nonce)
+				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
 				if err != nil {
 					return nil, fmt.Errorf("creating transaction opts: %w", err)
 				}
@@ -196,7 +195,7 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 			name:   "call depth",
 			weight: 1,
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
-				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, big.NewInt(1), nonce)
+				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
 				if err != nil {
 					return nil, fmt.Errorf("creating transaction opts: %w", err)
 				}
@@ -208,7 +207,7 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 			name:   "contract creation",
 			weight: 1,
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
-				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, big.NewInt(1), nonce)
+				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
 				if err != nil {
 					return nil, fmt.Errorf("creating transaction opts: %w", err)
 				}
@@ -219,7 +218,7 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 			name:   "pure compute",
 			weight: 1,
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
-				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, big.NewInt(1), nonce)
+				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
 				if err != nil {
 					return nil, fmt.Errorf("creating transaction opts: %w", err)
 				}
@@ -231,7 +230,7 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 			name:   "large event",
 			weight: 1,
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
-				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, big.NewInt(1), nonce)
+				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
 				if err != nil {
 					return nil, fmt.Errorf("creating transaction opts: %w", err)
 				}
@@ -243,7 +242,7 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 			name:   "external call",
 			weight: 1,
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
-				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, big.NewInt(1), nonce)
+				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
 				if err != nil {
 					return nil, fmt.Errorf("creating transaction opts: %w", err)
 				}
@@ -288,7 +287,7 @@ func intNBigInt(n int64) *big.Int {
 }
 
 func newTxOpts(ctx context.Context, key *ecdsa.PrivateKey,
-	chainID, maxFeeCap, maxTipCap *big.Int, nonce uint64,
+	chainID, maxFeeCap *big.Int, nonce uint64,
 ) (*bind.TransactOpts, error) {
 	txOpts, err := bind.NewKeyedTransactorWithChainID(key, chainID)
 	if err != nil {
@@ -296,7 +295,7 @@ func newTxOpts(ctx context.Context, key *ecdsa.PrivateKey,
 	}
 	txOpts.Nonce = new(big.Int).SetUint64(nonce)
 	txOpts.GasFeeCap = maxFeeCap
-	txOpts.GasTipCap = maxTipCap
+	txOpts.GasTipCap = common.Big1
 	txOpts.Context = ctx
 	return txOpts, nil
 }
