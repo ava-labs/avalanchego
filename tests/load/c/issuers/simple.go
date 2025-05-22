@@ -18,7 +18,6 @@ import (
 
 type EthClientSimple interface {
 	ChainID(ctx context.Context) (*big.Int, error)
-	NonceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (uint64, error)
 	SendTransaction(ctx context.Context, tx *types.Transaction) error
 }
 
