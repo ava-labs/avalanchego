@@ -761,6 +761,8 @@ func (p *peer) handle(msg message.InboundMessage) {
 		p.handlePeerList(m)
 		msg.OnFinishedHandling()
 		return
+	case *p2p.Simplex:
+		fmt.Println("Simplex message received!!!!")
 	}
 	if !p.finishedHandshake.Get() {
 		p.Log.Debug("dropping message",
