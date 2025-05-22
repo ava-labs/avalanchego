@@ -385,7 +385,7 @@ func (p *peer) readMessages() {
 	for {
 		// Time out and close connection if we can't read the message length
 		if err := p.conn.SetReadDeadline(p.nextTimeout()); err != nil {
-			p.Log.Debug(failedToSetDeadlineLog,
+			p.Log.Verbo(failedToSetDeadlineLog,
 				zap.Stringer("nodeID", p.id),
 				zap.String("direction", "read"),
 				zap.Error(err),
@@ -395,7 +395,7 @@ func (p *peer) readMessages() {
 
 		// Read the message length
 		if _, err := io.ReadFull(reader, msgLenBytes); err != nil {
-			p.Log.Debug("error reading message length",
+			p.Log.Verbo("error reading message length",
 				zap.Stringer("nodeID", p.id),
 				zap.Error(err),
 			)
@@ -405,7 +405,7 @@ func (p *peer) readMessages() {
 		// Parse the message length
 		msgLen, err := readMsgLen(msgLenBytes, constants.DefaultMaxMessageSize)
 		if err != nil {
-			p.Log.Debug("error parsing message length",
+			p.Log.Verbo("error parsing message length",
 				zap.Stringer("nodeID", p.id),
 				zap.Error(err),
 			)
@@ -439,7 +439,7 @@ func (p *peer) readMessages() {
 
 		// Time out and close connection if we can't read message
 		if err := p.conn.SetReadDeadline(p.nextTimeout()); err != nil {
-			p.Log.Debug(failedToSetDeadlineLog,
+			p.Log.Verbo(failedToSetDeadlineLog,
 				zap.Stringer("nodeID", p.id),
 				zap.String("direction", "read"),
 				zap.Error(err),
@@ -451,7 +451,7 @@ func (p *peer) readMessages() {
 		// Read the message
 		msgBytes := make([]byte, msgLen)
 		if _, err := io.ReadFull(reader, msgBytes); err != nil {
-			p.Log.Debug("error reading message",
+			p.Log.Verbo("error reading message",
 				zap.Stringer("nodeID", p.id),
 				zap.Error(err),
 			)
@@ -467,7 +467,7 @@ func (p *peer) readMessages() {
 		// finished.
 		p.ResourceTracker.StartProcessing(p.id, p.Clock.Time())
 
-		p.Log.Debug("parsing message",
+		p.Log.Verbo("parsing message",
 			zap.Stringer("nodeID", p.id),
 			zap.Binary("messageBytes", msgBytes),
 		)
@@ -475,7 +475,7 @@ func (p *peer) readMessages() {
 		// Parse the message
 		msg, err := p.MessageCreator.Parse(msgBytes, p.id, onFinishedHandling)
 		if err != nil {
-			p.Log.Debug("failed to parse message",
+			p.Log.Verbo("failed to parse message",
 				zap.Stringer("nodeID", p.id),
 				zap.Binary("messageBytes", msgBytes),
 				zap.Error(err),

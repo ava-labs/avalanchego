@@ -278,7 +278,6 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	}
 
 	chainCtx := chain.Context()
-
 	if message.UnrequestedOps.Contains(op) {
 		if chainCtx.Executing.Get() {
 			cr.log.Debug("dropping message and skipping queue",
