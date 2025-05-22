@@ -2,7 +2,7 @@
 # To run on a system without task installed, `./scripts/run_task.sh` will execute it with `go run`.
 # If in the nix dev shell, `task` is available.
 
-version: '3'
+version: "3"
 
 tasks:
   default: ./scripts/run_task.sh --list
@@ -94,8 +94,8 @@ tasks:
   generate-load-contract-bindings:
     desc: Generates load contract bindings
     cmds:
-      - cmd: grep -lr -E '^// Code generated - DO NOT EDIT\.$' tests/load | xargs -r rm
-      - cmd: go generate ./tests/load/...
+      - cmd: grep -lr -E '^// Code generated - DO NOT EDIT\.$' tests/load/c | xargs -r rm
+      - cmd: go generate ./tests/load/c/...
 
   generate-protobuf:
     desc: Generates protobuf
