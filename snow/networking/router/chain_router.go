@@ -279,7 +279,6 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 
 	chainCtx := chain.Context()
 
-	// are unrequested ops, messages that aren't expected to get a response? or are these messages that we never requested but were sent anyways
 	if message.UnrequestedOps.Contains(op) {
 		if chainCtx.Executing.Get() {
 			cr.log.Debug("dropping message and skipping queue",
