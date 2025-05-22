@@ -37,32 +37,6 @@ const (
 	agentsCount   = nodesCount * agentsPerNode
 )
 
-var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
-	// Run only once in the first ginkgo process
-
-	require.GreaterOrEqual(ginkgo.GinkgoT(), nodesCount, 5, "number of nodes must be at least 5")
-	tc := e2e.NewTestContext()
-	nodes := tmpnet.NewNodesOrPanic(nodesCount)
-	network := &tmpnet.Network{
-		Owner: "avalanchego-load-test",
-		Nodes: nodes,
-	}
-	setPrefundedKeys(tc, network, agentsCount)
-
-	env := e2e.NewTestEnvironment(
-		tc,
-		flagVars,
-		network,
-	)
-
-	return env.Marshal()
-}, func(envBytes []byte) {
-	// Run in every ginkgo process
-
-	// Initialize the local test environment from the global state
-	e2e.InitSharedTestEnvironment(e2e.NewTestContext(), envBytes)
-})
-
 var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 	var (
 		network *tmpnet.Network
@@ -72,9 +46,22 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 	)
 
 	ginkgo.BeforeAll(func() {
+		require.GreaterOrEqual(ginkgo.GinkgoT(), nodesCount, 5, "number of nodes must be at least 5")
 		tc := e2e.NewTestContext()
+		nodes := tmpnet.NewNodesOrPanic(nodesCount)
+		network = &tmpnet.Network{
+			Owner: "avalanchego-load-test",
+			Nodes: nodes,
+		}
+		setPrefundedKeys(tc, network, agentsCount)
+
+		env := e2e.NewTestEnvironment(
+			tc,
+			flagVars,
+			network,
+		)
+
 		logger = tc.Log()
-		env := e2e.GetEnv(tc)
 		registry := prometheus.NewRegistry()
 
 		network = env.GetNetwork()
