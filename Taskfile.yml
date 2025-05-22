@@ -215,7 +215,7 @@ tasks:
     cmds:
       - task: generate-load-contract-bindings
       - task: build
-      - cmd: ./bin/ginkgo -v ./tests/load/c -- --avalanchego-path=$PWD/build/avalanchego --start-collectors
+      - cmd: ./bin/ginkgo -v ./tests/load/c -- --avalanchego-path=$PWD/build/avalanchego --start-metrics-collector --start-logs-collector
 
   test-unit:
     desc: Runs unit tests
