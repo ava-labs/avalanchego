@@ -59,6 +59,8 @@ const (
 	DisconnectedOp
 	NotifyOp
 	GossipRequestOp
+	// Simplex
+	SimplexOp
 )
 
 var (
@@ -262,6 +264,9 @@ func (op Op) String() string {
 		return "notify"
 	case GossipRequestOp:
 		return "gossip_request"
+	// Simplex
+	case SimplexOp:
+		return "simplex"
 	default:
 		return "unknown"
 	}
@@ -322,6 +327,9 @@ func Unwrap(m *p2p.Message) (fmt.Stringer, error) {
 		return msg.AppError, nil
 	case *p2p.Message_AppGossip:
 		return msg.AppGossip, nil
+	// Simplex
+	case *p2p.Message_Simplex:
+		return msg.Simplex, nil
 	default:
 		return nil, fmt.Errorf("%w: %T", errUnknownMessageType, msg)
 	}
@@ -377,6 +385,8 @@ func ToOp(m *p2p.Message) (Op, error) {
 		return AppErrorOp, nil
 	case *p2p.Message_AppGossip:
 		return AppGossipOp, nil
+	case *p2p.Message_Simplex:
+		return SimplexOp, nil
 	default:
 		return 0, fmt.Errorf("%w: %T", errUnknownMessageType, msg)
 	}

@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/simplex"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
@@ -485,7 +486,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 
 	var engineType p2ppb.EngineType
 	switch msg.EngineType {
-	case p2ppb.EngineType_ENGINE_TYPE_AVALANCHE, p2ppb.EngineType_ENGINE_TYPE_SNOWMAN:
+	case p2ppb.EngineType_ENGINE_TYPE_AVALANCHE, p2ppb.EngineType_ENGINE_TYPE_SNOWMAN, p2ppb.EngineType_ENGINE_TYPE_SIMPLEX:
 		// The peer is requesting an engine type that has been initialized, so
 		// we should attempt to honor the request.
 		engineType = msg.EngineType
@@ -709,7 +710,16 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		}
 
 		return engine.Chits(ctx, nodeID, msg.RequestId, preferredID, preferredIDAtHeight, acceptedID, msg.AcceptedHeight)
+	case *p2ppb.Simplex:
+		engine, ok := engine.(*simplex.Engine)
+		if !ok {
+			return fmt.Errorf(
+				"attempt to submit simplex message to non-simplex engine %s",
+				engineType,
+			)
+		}
 
+		return engine.Simplex(nodeID, msg)
 	case *message.QueryFailed:
 		return engine.QueryFailed(ctx, nodeID, msg.RequestID)
 
