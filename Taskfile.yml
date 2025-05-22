@@ -2,7 +2,7 @@
 # To run on a system without task installed, `./scripts/run_task.sh` will execute it with `go run`.
 # If in the nix dev shell, `task` is available.
 
-version: "3"
+version: '3'
 
 tasks:
   default: ./scripts/run_task.sh --list
