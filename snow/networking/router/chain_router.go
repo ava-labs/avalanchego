@@ -718,16 +718,6 @@ func (cr *ChainRouter) handleSimplexMessage(ctx context.Context, msg message.Inb
 	nodeID := msg.NodeID()
 	op := msg.Op()
 
-	if msg.Op() != message.SimplexOp {
-		cr.log.Debug("dropping message with invalid field",
-			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("messageOp", op),
-			zap.String("field", "SimplexOp"),
-		)
-		msg.OnFinishedHandling()
-		return
-	}
-
 	chainID, err := message.GetChainID(m)
 	if err != nil {
 		cr.log.Debug("dropping message with invalid field",
