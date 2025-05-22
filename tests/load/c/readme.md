@@ -70,16 +70,14 @@ For reference, see [the tmpnet monitoring section](../../fixture/tmpnet/README.m
 
 ### Locally
 
-1. Navigate to this directory with `cd tests/load/c`.
-1. Setup the Prometheus configuration file: `envsubst < prometheus.template.yml > prometheus.yml`
+1. Create a directory `/yourpath` to store the Prometheus configuration file and its data.
+1. Setup the Prometheus configuration file: `envsubst < tests/load/c/prometheus.template.yml > /yourpath/prometheus.yml`
 1. Launch Prometheus using the dev shell:
 
     ```bash
     nix develop
-    ```
-
-    ```nix
-    prometheus --config.file prometheus.yml
+    cd /yourpath
+    prometheus --config.file /yourpath/prometheus.yml
     ```
 
     This starts Prometheus listening on port `9090`.
