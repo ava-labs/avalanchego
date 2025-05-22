@@ -68,11 +68,12 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 		network *tmpnet.Network
 		metrics *load.Metrics
 
-		logger = logging.NewLogger("c-chain-load-testing", logging.NewWrappedCore(logging.Info, os.Stdout, logging.Auto.ConsoleEncoder()))
+		logger logging.Logger
 	)
 
 	ginkgo.BeforeAll(func() {
 		tc := e2e.NewTestContext()
+		logger = tc.Log()
 		env := e2e.GetEnv(tc)
 		registry := prometheus.NewRegistry()
 
