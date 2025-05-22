@@ -19,6 +19,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
 type MetricsServer struct {
@@ -108,5 +109,5 @@ func (s *MetricsServer) GenerateMonitoringConfig(networkUUID, networkOwner strin
 		return "", err
 	}
 
-	return collectorFilePath, os.WriteFile(collectorFilePath, config, 0o600)
+	return collectorFilePath, os.WriteFile(collectorFilePath, config, perms.ReadWrite)
 }
