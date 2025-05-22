@@ -1109,7 +1109,6 @@ func BuildMonitoringURLForNetwork(dashboardID, dashboardName, networkUUID string
 		filters = maps.Clone(options.Filters)
 	}
 
-	// Ensure network_uuid is set
 	if _, exists := filters["network_uuid"]; !exists {
 		filters["network_uuid"] = networkUUID
 	}
