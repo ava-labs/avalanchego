@@ -77,7 +77,6 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 		registry := prometheus.NewRegistry()
 
 		network = env.GetNetwork()
-		network.Nodes = network.Nodes[:nodesCount]
 
 		loadMetrics, err := load.NewMetrics(registry)
 		require.NoError(tc, err, "failed to register load metrics")
