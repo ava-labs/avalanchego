@@ -7,10 +7,9 @@ It runs with 5 nodes and 5 "agents".
 Each "agent" runs a transaction issuer and a transaction listener asynchronously,
 and is assigned uniformly to the nodes available, via websocket connections.
 
-There are two load tests:
+The load test picks at weighted random a transaction type to generate and issue, defined in [issuer.go](issuer.go).
 
-1. "Simple" load test, where transactions issued are zero-fund transfers to the sender address.
-2. "Complex" load test, where [this contract](contracts/EVMLoadSimulator.sol) is deployed and transactions call functions of this contract at random with random parameters. This contract has different functions, each testing a particular performance aspect of the EVM, for example memory writes.
+For some transaction types, [this contract](contracts/EVMLoadSimulator.sol) is deployed and transactions call functions of this contract. This contract has different functions, each testing a particular performance aspect of the EVM, for example memory writes.
 
 From the load test perspective, only the TPS (transactions per second) is logged out. Metrics available are:
 

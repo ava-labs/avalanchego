@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/libevm/ethclient"
 
 	"github.com/ava-labs/avalanchego/tests/load"
-	"github.com/ava-labs/avalanchego/tests/load/c/issuers"
 	"github.com/ava-labs/avalanchego/tests/load/c/listener"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -25,15 +24,7 @@ type loadConfig struct {
 	minTPS    int64
 	maxTPS    int64
 	step      int64
-	issuer    issuerType
 }
-
-type issuerType string
-
-const (
-	issuerSimple  issuerType = "simple"
-	issuerOpcoder issuerType = "opcoder"
-)
 
 func execute(ctx context.Context, keys []*secp256k1.PrivateKey, config loadConfig, metrics *load.Metrics, logger logging.Logger) error {
 	tracker := load.NewTracker[common.Hash](metrics)
@@ -72,7 +63,7 @@ func createAgents(ctx context.Context, config loadConfig, keys []*secp256k1.Priv
 		key := keys[i]
 		endpoint := config.endpoints[i%len(config.endpoints)]
 		go func(key *secp256k1.PrivateKey, endpoint string) {
-			agent, err := createAgent(ctx, endpoint, key, config.issuer, tracker, config.maxFeeCap)
+			agent, err := createAgent(ctx, endpoint, key, tracker, config.maxFeeCap)
 			ch <- result{agent: agent, err: err}
 		}(key, endpoint)
 	}
@@ -101,7 +92,7 @@ func createAgents(ctx context.Context, config loadConfig, keys []*secp256k1.Priv
 }
 
 func createAgent(ctx context.Context, endpoint string, key *secp256k1.PrivateKey,
-	issuerType issuerType, tracker *load.Tracker[common.Hash], maxFeeCap int64,
+	tracker *load.Tracker[common.Hash], maxFeeCap int64,
 ) (load.Agent[common.Hash], error) {
 	client, err := ethclient.DialContext(ctx, endpoint)
 	if err != nil {
@@ -115,27 +106,10 @@ func createAgent(ctx context.Context, endpoint string, key *secp256k1.PrivateKey
 		return load.Agent[common.Hash]{}, fmt.Errorf("getting nonce for address %s: %w", address, err)
 	}
 
-	issuer, err := createIssuer(ctx, issuerType,
-		client, tracker, maxFeeCap, nonce, key)
+	issuer, err := createIssuer(ctx, client, tracker, nonce, new(big.Int).SetInt64(maxFeeCap), key.ToECDSA())
 	if err != nil {
 		return load.Agent[common.Hash]{}, fmt.Errorf("creating issuer: %w", err)
 	}
 	listener := listener.New(client, tracker, address, nonce)
 	return load.NewAgent(issuer, listener), nil
-}
-
-func createIssuer(ctx context.Context, typ issuerType,
-	client *ethclient.Client, tracker *load.Tracker[common.Hash],
-	maxFeeCap int64, nonce uint64, key *secp256k1.PrivateKey,
-) (load.Issuer[common.Hash], error) {
-	switch typ {
-	case issuerSimple:
-		return issuers.NewSimple(ctx, client, tracker,
-			nonce, big.NewInt(maxFeeCap), key.ToECDSA())
-	case issuerOpcoder:
-		return issuers.NewOpcoder(ctx, client, tracker,
-			nonce, big.NewInt(maxFeeCap), key.ToECDSA())
-	default:
-		return nil, fmt.Errorf("unknown issuer type %s", typ)
-	}
 }

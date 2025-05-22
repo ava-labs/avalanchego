@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package issuers
+package c
 
 import (
 	"context"
@@ -13,20 +13,32 @@ import (
 	"github.com/ava-labs/libevm/accounts/abi/bind"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/params"
 
 	"github.com/ava-labs/avalanchego/tests/load/c/contracts"
+
+	ethcrypto "github.com/ava-labs/libevm/crypto"
 )
 
-type EthClientOpcoder interface {
-	EthClientSimple
+type EthClient interface {
+	ChainID(ctx context.Context) (*big.Int, error)
+	EthClientSender
 	bind.DeployBackend
 	bind.ContractBackend
 }
 
-// Opcoder generates and issues transactions that randomly call the
+type EthClientSender interface {
+	SendTransaction(ctx context.Context, tx *types.Transaction) error
+}
+
+type IssueTracker interface {
+	Issue(tx common.Hash)
+}
+
+// issuer generates and issues transactions that randomly call the
 // external functions of the [contracts.EVMLoadSimulator] contract
 // instance that it deploys.
-type Opcoder struct {
+type issuer struct {
 	// Injected parameters
 	tracker   IssueTracker
 	maxFeeCap *big.Int
@@ -38,14 +50,14 @@ type Opcoder struct {
 	nonce uint64
 }
 
-func NewOpcoder(
+func createIssuer(
 	ctx context.Context,
-	client EthClientOpcoder,
+	client EthClient,
 	tracker IssueTracker,
 	nonce uint64,
 	maxFeeCap *big.Int,
 	key *ecdsa.PrivateKey,
-) (*Opcoder, error) {
+) (*issuer, error) {
 	chainID, err := client.ChainID(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting chain id: %w", err)
@@ -67,14 +79,14 @@ func NewOpcoder(
 		return nil, fmt.Errorf("waiting for simulator contract to be mined: %w", err)
 	}
 
-	return &Opcoder{
+	return &issuer{
 		tracker: tracker,
-		txTypes: makeTxTypes(simulatorInstance, key, chainID),
+		txTypes: makeTxTypes(simulatorInstance, key, chainID, client),
 		nonce:   nonce,
 	}, nil
 }
 
-func (o *Opcoder) GenerateAndIssueTx(ctx context.Context) (common.Hash, error) {
+func (o *issuer) GenerateAndIssueTx(ctx context.Context) (common.Hash, error) {
 	txType := pickWeightedRandom(o.txTypes)
 
 	tx, err := txType.generateAndIssueTx(ctx, o.maxFeeCap, o.nonce)
@@ -88,8 +100,38 @@ func (o *Opcoder) GenerateAndIssueTx(ctx context.Context) (common.Hash, error) {
 	return txHash, err
 }
 
-func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.PrivateKey, chainID *big.Int) []txType {
+func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.PrivateKey,
+	chainID *big.Int, client EthClientSender,
+) []txType {
+	senderAddress := ethcrypto.PubkeyToAddress(senderKey.PublicKey)
+	signer := types.LatestSignerForChainID(chainID)
 	return []txType{
+		{
+			name:   "zero self transfer",
+			weight: 1,
+			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
+				bigGwei := big.NewInt(params.GWei)
+				gasTipCap := new(big.Int).Mul(bigGwei, big.NewInt(1))
+				gasFeeCap := new(big.Int).Mul(bigGwei, maxFeeCap)
+				tx, err := types.SignNewTx(senderKey, signer, &types.DynamicFeeTx{
+					ChainID:   chainID,
+					Nonce:     nonce,
+					GasTipCap: gasTipCap,
+					GasFeeCap: gasFeeCap,
+					Gas:       params.TxGas,
+					To:        &senderAddress,
+					Data:      nil,
+					Value:     common.Big0,
+				})
+				if err != nil {
+					return nil, fmt.Errorf("signing transaction: %w", err)
+				}
+				if err := client.SendTransaction(txCtx, tx); err != nil {
+					return nil, fmt.Errorf("issuing transaction with nonce %d: %w", nonce, err)
+				}
+				return tx, nil
+			},
+		},
 		{
 			name:   "random write",
 			weight: 1,
