@@ -28,7 +28,6 @@ type EthClientOpcoder interface {
 // instance that it deploys.
 type Opcoder struct {
 	// Injected parameters
-	client    EthClientOpcoder
 	tracker   IssueTracker
 	senderKey *ecdsa.PrivateKey
 	maxFeeCap *big.Int
@@ -36,7 +35,6 @@ type Opcoder struct {
 	// Determined by constructor
 	chainID          *big.Int
 	maxTipCap        *big.Int
-	contractAddress  common.Address
 	contractInstance *contracts.EVMLoadSimulator
 
 	// State
@@ -67,19 +65,17 @@ func NewOpcoder(
 	}
 	nonce++ // deploying contract consumes one nonce
 
-	simulatorAddress, err := bind.WaitDeployed(ctx, client, simulatorDeploymentTx)
+	_, err = bind.WaitDeployed(ctx, client, simulatorDeploymentTx)
 	if err != nil {
 		return nil, fmt.Errorf("waiting for simulator contract to be mined: %w", err)
 	}
 
 	return &Opcoder{
-		client:           client,
 		tracker:          tracker,
 		senderKey:        key,
 		maxFeeCap:        maxFeeCap,
 		chainID:          chainID,
 		maxTipCap:        maxTipCap,
-		contractAddress:  simulatorAddress,
 		contractInstance: simulatorInstance,
 		nonce:            nonce,
 	}, nil
