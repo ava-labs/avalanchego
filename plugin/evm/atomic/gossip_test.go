@@ -14,17 +14,15 @@ import (
 func TestGossipAtomicTxMarshaller(t *testing.T) {
 	require := require.New(t)
 
-	want := &GossipAtomicTx{
-		Tx: &Tx{
-			UnsignedAtomicTx: &UnsignedImportTx{},
-			Creds:            []verify.Verifiable{},
-		},
+	want := &Tx{
+		UnsignedAtomicTx: &UnsignedImportTx{},
+		Creds:            []verify.Verifiable{},
 	}
-	marshaller := GossipAtomicTxMarshaller{}
+	marshaller := TxMarshaller{}
 
 	key0, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
-	require.NoError(want.Tx.Sign(Codec, [][]*secp256k1.PrivateKey{{key0}}))
+	require.NoError(want.Sign(Codec, [][]*secp256k1.PrivateKey{{key0}}))
 
 	bytes, err := marshaller.MarshalGossip(want)
 	require.NoError(err)

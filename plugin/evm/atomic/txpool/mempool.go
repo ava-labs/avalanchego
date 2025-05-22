@@ -25,13 +25,13 @@ const (
 )
 
 var (
+	_ gossip.Set[*atomic.Tx] = (*Mempool)(nil)
+
 	errTxAlreadyKnown          = errors.New("tx already known")
 	errNoGasUsed               = errors.New("no gas used")
 	ErrConflictingAtomicTx     = errors.New("conflicting atomic tx present")
 	ErrInsufficientAtomicTxFee = errors.New("atomic tx fee too low for atomic mempool")
 	ErrTooManyAtomicTx         = errors.New("too many atomic tx")
-
-	_ gossip.Set[*atomic.GossipAtomicTx] = (*Mempool)(nil)
 )
 
 // mempoolMetrics defines the metrics for the atomic mempool
@@ -141,11 +141,11 @@ func (m *Mempool) atomicTxGasPrice(tx *atomic.Tx) (uint64, error) {
 	return burned / gasUsed, nil
 }
 
-func (m *Mempool) Add(tx *atomic.GossipAtomicTx) error {
+func (m *Mempool) Add(tx *atomic.Tx) error {
 	m.ctx.Lock.RLock()
 	defer m.ctx.Lock.RUnlock()
 
-	return m.AddRemoteTx(tx.Tx)
+	return m.AddRemoteTx(tx)
 }
 
 // AddRemoteTx attempts to add [tx] to the mempool and returns an error if
@@ -321,7 +321,7 @@ func (m *Mempool) addTx(tx *atomic.Tx, local bool, force bool) error {
 		m.utxoSpenders[utxoID] = tx
 	}
 
-	m.bloom.Add(&atomic.GossipAtomicTx{Tx: tx})
+	m.bloom.Add(tx)
 	reset, err := gossip.ResetBloomFilterIfNeeded(m.bloom, m.length()*config.TxGossipBloomChurnMultiplier)
 	if err != nil {
 		return err
@@ -331,7 +331,7 @@ func (m *Mempool) addTx(tx *atomic.Tx, local bool, force bool) error {
 		log.Debug("resetting bloom filter", "reason", "reached max filled ratio")
 
 		for _, pendingTx := range m.txHeap.minHeap.items {
-			m.bloom.Add(&atomic.GossipAtomicTx{Tx: pendingTx.tx})
+			m.bloom.Add(pendingTx.tx)
 		}
 	}
 
@@ -345,12 +345,12 @@ func (m *Mempool) addTx(tx *atomic.Tx, local bool, force bool) error {
 	return nil
 }
 
-func (m *Mempool) Iterate(f func(tx *atomic.GossipAtomicTx) bool) {
+func (m *Mempool) Iterate(f func(tx *atomic.Tx) bool) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
 	for _, item := range m.txHeap.maxHeap.items {
-		if !f(&atomic.GossipAtomicTx{Tx: item.tx}) {
+		if !f(item.tx) {
 			return
 		}
 	}

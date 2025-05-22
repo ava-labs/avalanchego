@@ -307,7 +307,7 @@ type VM struct {
 	ethTxPushGossiper     avalancheUtils.Atomic[*gossip.PushGossiper[*GossipEthTx]]
 	ethTxPullGossiper     gossip.Gossiper
 	atomicTxGossipHandler p2p.Handler
-	atomicTxPushGossiper  *gossip.PushGossiper[*atomic.GossipAtomicTx]
+	atomicTxPushGossiper  *gossip.PushGossiper[*atomic.Tx]
 	atomicTxPullGossiper  gossip.Gossiper
 
 	chainAlias string
@@ -1082,7 +1082,7 @@ func (vm *VM) initBlockBuilding() error {
 		vm.shutdownWg.Done()
 	}()
 
-	atomicTxGossipMarshaller := atomic.GossipAtomicTxMarshaller{}
+	atomicTxGossipMarshaller := &atomic.TxMarshaller{}
 	atomicTxGossipClient := vm.Network.NewClient(p2p.AtomicTxGossipHandlerID, p2p.WithValidatorSampling(vm.p2pValidators))
 	atomicTxGossipMetrics, err := gossip.NewMetrics(vm.sdkMetrics, atomicTxGossipNamespace)
 	if err != nil {
@@ -1120,7 +1120,7 @@ func (vm *VM) initBlockBuilding() error {
 	}
 
 	if vm.atomicTxPushGossiper == nil {
-		vm.atomicTxPushGossiper, err = gossip.NewPushGossiper[*atomic.GossipAtomicTx](
+		vm.atomicTxPushGossiper, err = gossip.NewPushGossiper[*atomic.Tx](
 			atomicTxGossipMarshaller,
 			vm.mempool,
 			vm.p2pValidators,
@@ -1159,7 +1159,7 @@ func (vm *VM) initBlockBuilding() error {
 	}
 
 	if vm.atomicTxGossipHandler == nil {
-		vm.atomicTxGossipHandler = newTxGossipHandler[*atomic.GossipAtomicTx](
+		vm.atomicTxGossipHandler = newTxGossipHandler[*atomic.Tx](
 			vm.ctx.Log,
 			atomicTxGossipMarshaller,
 			vm.mempool,
@@ -1204,7 +1204,7 @@ func (vm *VM) initBlockBuilding() error {
 	}()
 
 	if vm.atomicTxPullGossiper == nil {
-		atomicTxPullGossiper := gossip.NewPullGossiper[*atomic.GossipAtomicTx](
+		atomicTxPullGossiper := gossip.NewPullGossiper[*atomic.Tx](
 			vm.ctx.Log,
 			atomicTxGossipMarshaller,
 			vm.mempool,
@@ -1608,7 +1608,7 @@ func (vm *VM) verifyTx(tx *atomic.Tx, parentHash common.Hash, baseFee *big.Int, 
 	if !ok {
 		return fmt.Errorf("parent block %s had unexpected type %T", parentIntf.ID(), parentIntf)
 	}
-	atomicBackend := &atomic.Backend{
+	atomicBackend := &atomic.VerifierBackend{
 		Ctx:          vm.ctx,
 		Fx:           &vm.fx,
 		Rules:        rules,
@@ -1616,7 +1616,12 @@ func (vm *VM) verifyTx(tx *atomic.Tx, parentHash common.Hash, baseFee *big.Int, 
 		BlockFetcher: vm,
 		SecpCache:    vm.secpCache,
 	}
-	if err := tx.UnsignedAtomicTx.SemanticVerify(atomicBackend, tx, parent, baseFee); err != nil {
+	if err := tx.UnsignedAtomicTx.Visit(&atomic.SemanticVerifier{
+		Backend: atomicBackend,
+		Tx:      tx,
+		Parent:  parent,
+		BaseFee: baseFee,
+	}); err != nil {
 		return err
 	}
 	return tx.UnsignedAtomicTx.EVMStateTransfer(vm.ctx, state)
@@ -1647,7 +1652,7 @@ func (vm *VM) verifyTxs(txs []*atomic.Tx, parentHash common.Hash, baseFee *big.I
 	// Ensure each tx in [txs] doesn't conflict with any other atomic tx in
 	// a processing ancestor block.
 	inputs := set.Set[ids.ID]{}
-	atomicBackend := &atomic.Backend{
+	atomicBackend := &atomic.VerifierBackend{
 		Ctx:          vm.ctx,
 		Fx:           &vm.fx,
 		Rules:        rules,
@@ -1657,7 +1662,12 @@ func (vm *VM) verifyTxs(txs []*atomic.Tx, parentHash common.Hash, baseFee *big.I
 	}
 	for _, atomicTx := range txs {
 		utx := atomicTx.UnsignedAtomicTx
-		if err := utx.SemanticVerify(atomicBackend, atomicTx, ancestor, baseFee); err != nil {
+		if err := utx.Visit(&atomic.SemanticVerifier{
+			Backend: atomicBackend,
+			Tx:      atomicTx,
+			Parent:  ancestor,
+			BaseFee: baseFee,
+		}); err != nil {
 			return fmt.Errorf("invalid block due to failed semanatic verify: %w at height %d", err, height)
 		}
 		txInputs := utx.InputUTXOs()

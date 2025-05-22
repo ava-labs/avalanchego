@@ -5,7 +5,6 @@ package atomic
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"math/big"
@@ -19,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -26,9 +26,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
+
+var _ gossip.Gossipable = (*Tx)(nil)
 
 const (
 	X2CRateUint64       uint64 = 1_000_000_000
@@ -117,6 +118,17 @@ func (in *EVMInput) Verify() error {
 	return nil
 }
 
+type AtomicBlockContext interface {
+	AtomicTxs() []*Tx
+	snowman.Block
+}
+
+// Visitor allows executing custom logic against the underlying transaction types.
+type Visitor interface {
+	ImportTx(*UnsignedImportTx) error
+	ExportTx(*UnsignedExportTx) error
+}
+
 // UnsignedTx is an unsigned transaction
 type UnsignedTx interface {
 	Initialize(unsignedBytes, signedBytes []byte)
@@ -125,25 +137,6 @@ type UnsignedTx interface {
 	Burned(assetID ids.ID) (uint64, error)
 	Bytes() []byte
 	SignedBytes() []byte
-}
-
-type Backend struct {
-	Ctx          *snow.Context
-	Fx           fx.Fx
-	Rules        extras.Rules
-	Bootstrapped bool
-	BlockFetcher BlockFetcher
-	SecpCache    *secp256k1.RecoverCache
-}
-
-type BlockFetcher interface {
-	LastAcceptedBlockInternal() snowman.Block
-	GetBlockInternal(context.Context, ids.ID) (snowman.Block, error)
-}
-
-type AtomicBlockContext interface {
-	AtomicTxs() []*Tx
-	snowman.Block
 }
 
 type StateDB interface {
@@ -168,9 +161,10 @@ type UnsignedAtomicTx interface {
 	InputUTXOs() set.Set[ids.ID]
 	// Verify attempts to verify that the transaction is well formed
 	Verify(ctx *snow.Context, rules extras.Rules) error
-	// Attempts to verify this transaction with the provided state.
-	// SemanticVerify this transaction is valid.
-	SemanticVerify(backend *Backend, stx *Tx, parent AtomicBlockContext, baseFee *big.Int) error
+	// Visit calls the corresponding method for the underlying transaction type
+	// implementing [Visitor].
+	// This is used in semantic verification of the tx.
+	Visit(v Visitor) error
 	// AtomicOps returns the blockchainID and set of atomic requests that
 	// must be applied to shared memory for this transaction to be accepted.
 	// The set of atomic requests must be returned in a consistent order.
@@ -264,6 +258,10 @@ func (tx *Tx) BlockFeeContribution(fixedFee bool, avaxAssetID ids.ID, baseFee *b
 	// in C-Chain native 18 decimal places
 	blockFeeContribution := new(big.Int).Mul(new(big.Int).SetUint64(excessBurned), X2CRate.ToBig())
 	return blockFeeContribution, new(big.Int).SetUint64(gasUsed), nil
+}
+
+func (tx *Tx) GossipID() ids.ID {
+	return tx.ID()
 }
 
 // innerSortInputsAndSigners implements sort.Interface for EVMInput
