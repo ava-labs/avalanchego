@@ -27,6 +27,8 @@ Finally, to run the load test, run:
 nix develop
 # Start the load test
 task test-load
+# If you don't have access to the Ava Labs CI monitoring stack, use:
+task test-load-local
 ```
 
 ## Visualize metrics in Grafana

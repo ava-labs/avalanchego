@@ -211,11 +211,18 @@ tasks:
     cmd: ./scripts/build_fuzz.sh {{.FUZZTIME}} ./x/merkledb
 
   test-load:
-    desc: Runs load tests
+    desc: Runs load tests with remote monitoring
     cmds:
       - task: generate-load-contract-bindings
       - task: build
       - cmd: ./bin/ginkgo -v ./tests/load/c -- --avalanchego-path=$PWD/build/avalanchego --start-metrics-collector --start-logs-collector
+
+  test-load-local:
+    desc: Runs load tests with local monitoring
+    cmds:
+      - task: generate-load-contract-bindings
+      - task: build
+      - cmd: ./bin/ginkgo -v ./tests/load/c -- --avalanchego-path=$PWD/build/avalanchego
 
   test-unit:
     desc: Runs unit tests
