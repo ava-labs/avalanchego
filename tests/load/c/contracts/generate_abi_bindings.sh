@@ -15,7 +15,7 @@ for FILE in "${CONTRACTS_DIR}"/*.sol; do
   echo "Generating Go bindings from Solidity contract $FILE..."
   CONTRACT_NAME=$(basename "$FILE" .sol)
   solc --abi --bin --overwrite -o "$TEMPDIR" "${CONTRACTS_DIR}/${CONTRACT_NAME}.sol"
-  go run github.com/ava-labs/libevm/cmd/abigen \
+  go run github.com/ava-labs/libevm/cmd/abigen@v1.13.14-0.2.0.release \
     --bin="${TEMPDIR}/${CONTRACT_NAME}.bin" \
     --abi="${TEMPDIR}/${CONTRACT_NAME}.abi" \
     --type "$CONTRACT_NAME" \
