@@ -24,7 +24,10 @@ There are more interesting metrics available from the tmpnet nodes being load te
 Finally, to run the load test, run:
 
 ```bash
-./bin/ginkgo -v tests/load/c -- --avalanchego-path=$PWD/build/avalanchego
+# Start the dev shell
+nix develop
+# Start the load test
+task test-load
 ```
 
 ## Visualize metrics in Grafana
@@ -51,7 +54,7 @@ If you have the credentials (internal to Ava Labs) for the remote Prometheus and
 1. Run the load test:
 
     ```bash
-    ./bin/ginkgo -v tests/load/c -- --avalanchego-path=$PWD/build/avalanchego --start-collectors
+    task test-load
     ```
 
 1. Wait for the load test to finish, this will log out a URL at the end of the test, in the form
