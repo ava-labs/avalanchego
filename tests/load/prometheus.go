@@ -89,14 +89,12 @@ func (s *MetricsServer) Stop() (err error) {
 // so tmpnet can dynamically discover new scrape target via file-based service discovery
 // It returns the collector file path and an eventual error
 func (s *MetricsServer) GenerateMonitoringConfig(networkUUID, networkOwner string) (string, error) {
-	const metricsFilePath = ".tmpnet/prometheus/file_sd_configs/load-test.json"
-
-	homedir, err := os.UserHomeDir()
+	discoveryDir, err := tmpnet.GetServiceDiscoveryDir("prometheus")
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("getting tmpnet service discovery directory: %w", err)
 	}
 
-	collectorFilePath := filepath.Join(homedir, metricsFilePath)
+	collectorFilePath := filepath.Join(discoveryDir, "load-test.json")
 	config, err := json.MarshalIndent([]tmpnet.ConfigMap{
 		{
 			"targets": []string{s.addr},
