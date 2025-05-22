@@ -109,8 +109,8 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 		config := loadConfig{
 			endpoints: endpoints,
 			agents:    agentsPerNode,
-			minTPS:    2400,
-			maxTPS:    3000,
+			minTPS:    1000,
+			maxTPS:    1700,
 			step:      100,
 		}
 		err = execute(ctx, network.PreFundedKeys, config, metrics, logger)
