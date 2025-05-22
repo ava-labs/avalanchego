@@ -34,7 +34,7 @@ task test-load
 
 ### Private remote instances
 
-If you have the credentials (internal to Ava Labs) for the remote Prometheus and Grafana PoC, you can visualize the metrics following these steps:
+If you have the credentials (internal to Ava Labs) for the CI monitoring stack, you can visualize the metrics following these steps:
 
 1. Start the dev shell to have Prometheus setup to scrape the load test metrics and send it to the remote Prometheus instance:
 
