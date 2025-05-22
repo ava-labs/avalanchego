@@ -114,9 +114,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 			step:      100,
 		}
 		err = execute(ctx, network.PreFundedKeys, config, metrics, logger)
-		if err != nil {
-			ginkgo.GinkgoT().Error(err)
-		}
+		require.NoError(ginkgo.GinkgoT(), err, "executing load test")
 	})
 
 	ginkgo.It("C-Chain opcoder", func(ctx context.Context) {
@@ -132,9 +130,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 			step:      50,
 		}
 		err = execute(ctx, network.PreFundedKeys, config, metrics, logger)
-		if err != nil {
-			ginkgo.GinkgoT().Error(err)
-		}
+		require.NoError(ginkgo.GinkgoT(), err, "executing load test")
 	})
 })
 
