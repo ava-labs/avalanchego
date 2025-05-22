@@ -47,9 +47,12 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 
 	ginkgo.It("can issue a virtuous transfer tx for AVAX asset",
 		func() {
-			env := e2e.GetEnv(tc)
-			rpcEps := make([]string, len(env.URIs))
-			for i, nodeURI := range env.URIs {
+			var (
+				env       = e2e.GetEnv(tc)
+				localURIs = env.GetNodeURIs()
+				rpcEps    = make([]string, len(localURIs))
+			)
+			for i, nodeURI := range localURIs {
 				rpcEps[i] = nodeURI.URI
 			}
 

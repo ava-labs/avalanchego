@@ -54,30 +54,53 @@ type NodeURI struct {
 	URI    string
 }
 
-func GetNodeURIs(nodes []*Node) []NodeURI {
-	uris := make([]NodeURI, 0, len(nodes))
+// GetNodeURIs returns the URIs of the provided nodes that are running and not ephemeral. The URIs returned
+// are guaranteed be reachable by the caller until the cleanup function is called regardless of whether the
+// nodes are running as local processes or in a kube cluster.
+func GetNodeURIs(ctx context.Context, nodes []*Node, deferCleanupFunc func(func())) ([]NodeURI, error) {
+	availableNodes := FilterAvailableNodes(nodes)
+	uris := make([]NodeURI, 0, len(availableNodes))
+	for _, node := range availableNodes {
+		uri, cancel, err := node.GetLocalURI(ctx)
+		if err != nil {
+			return nil, err
+		}
+		deferCleanupFunc(cancel)
+		uris = append(uris, NodeURI{
+			NodeID: node.NodeID,
+			URI:    uri,
+		})
+	}
+
+	return uris, nil
+}
+
+// FilteredAvailableNodes filters the provided nodes by whether they are running and not ephemeral.
+func FilterAvailableNodes(nodes []*Node) []*Node {
+	filteredNodes := make([]*Node, 0, len(nodes))
 	for _, node := range nodes {
 		if node.IsEphemeral {
 			// Avoid returning URIs for nodes whose lifespan is indeterminate
 			continue
 		}
-		// Only append URIs that are not empty. A node may have an
-		// empty URI if it is not currently running.
-		if node.IsRunning() {
-			uris = append(uris, NodeURI{
-				NodeID: node.NodeID,
-				URI:    node.URI,
-			})
+		if !node.IsRunning() {
+			// Only running nodes have URIs
+			continue
 		}
+		filteredNodes = append(filteredNodes, node)
 	}
-	return uris
+	return filteredNodes
 }
 
 // GetNodeWebsocketURIs returns a list of websocket URIs for the given nodes and
 // blockchain ID, in the form "ws://<node-uri>/ext/bc/<blockchain-id>/ws".
 // Ephemeral and stopped nodes are ignored.
-func GetNodeWebsocketURIs(nodes []*Node, blockchainID string) ([]string, error) {
-	nodeURIs := GetNodeURIs(nodes)
+func GetNodeWebsocketURIs(ctx context.Context, nodes []*Node, blockchainID string) ([]string, error) {
+	deferCleanup := func(f func()) {}
+	nodeURIs, err := GetNodeURIs(ctx, nodes, deferCleanup)
+	if err != nil {
+		return nil, fmt.Errorf("getting node URIs: %w", err)
+	}
 	wsURIs := make([]string, len(nodeURIs))
 	for i := range nodeURIs {
 		uri, err := url.Parse(nodeURIs[i].URI)

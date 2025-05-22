@@ -81,8 +81,9 @@ var _ = e2e.DescribePChain("[Validator Sets]", func() {
 		require.NoError(err)
 
 		tc.By("checking that validator sets are equal across all heights for all nodes", func() {
-			pvmClients := make([]platformvm.Client, len(env.URIs))
-			for i, nodeURI := range env.URIs {
+			localURIs := env.GetNodeURIs()
+			pvmClients := make([]platformvm.Client, len(localURIs))
+			for i, nodeURI := range localURIs {
 				pvmClients[i] = platformvm.NewClient(nodeURI.URI)
 				// Ensure that the height of the target node is at least the expected height
 				tc.Eventually(

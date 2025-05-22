@@ -91,7 +91,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 	})
 
 	ginkgo.It("C-Chain", func(ctx context.Context) {
-		endpoints, err := tmpnet.GetNodeWebsocketURIs(network.Nodes, blockchainID)
+		endpoints, err := tmpnet.GetNodeWebsocketURIs(ctx, network.Nodes, blockchainID)
 		require.NoError(ginkgo.GinkgoT(), err, "getting node websocket URIs")
 		config := loadConfig{
 			endpoints: endpoints,

@@ -772,8 +772,21 @@ func (n *Network) GetNode(nodeID ids.NodeID) (*Node, error) {
 	return nil, fmt.Errorf("%s is not known to the network", nodeID)
 }
 
-func (n *Network) GetNodeURIs() []NodeURI {
-	return GetNodeURIs(n.Nodes)
+// GetNodeURIs returns the URIs of nodes in the network that are running and not ephemeral. The URIs
+// returned are guaranteed be reachable by the caller until the cleanup function is called regardless
+// of whether the nodes are running as local processes or in a kube cluster.
+func (n *Network) GetNodeURIs(ctx context.Context, deferCleanupFunc func(func())) ([]NodeURI, error) {
+	return GetNodeURIs(ctx, n.Nodes, deferCleanupFunc)
+}
+
+// GetAvailableNodeIDs returns the node IDs of nodes in the network that are running and not ephemeral.
+func (n *Network) GetAvailableNodeIDs() []string {
+	availableNodes := FilterAvailableNodes(n.Nodes)
+	ids := make([]string, len(availableNodes))
+	for _, node := range availableNodes {
+		ids = append(ids, node.NodeID.String())
+	}
+	return ids
 }
 
 // Retrieves bootstrap IPs and IDs for all non-ephemeral nodes except the skipped one
