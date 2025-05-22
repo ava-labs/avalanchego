@@ -106,7 +106,7 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 	return []txType{
 		{
 			name:      "zero self transfer",
-			weight:    1,
+			weight:    1000,
 			maxFeeCap: big.NewInt(4761904), // equiavelent to 100 ETH which is the maximum value
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
 				bigGwei := big.NewInt(params.GWei)
@@ -133,7 +133,7 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 		},
 		{
 			name:      "random write",
-			weight:    1,
+			weight:    100,
 			maxFeeCap: big.NewInt(300000000000),
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
 				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
@@ -146,7 +146,7 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 		},
 		{
 			name:      "state modification",
-			weight:    1,
+			weight:    100,
 			maxFeeCap: big.NewInt(300000000000),
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
 				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
@@ -159,7 +159,7 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 		},
 		{
 			name:      "random read",
-			weight:    1,
+			weight:    200,
 			maxFeeCap: big.NewInt(300000000000),
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
 				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
@@ -172,7 +172,7 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 		},
 		{
 			name:      "hashing",
-			weight:    1,
+			weight:    50,
 			maxFeeCap: big.NewInt(300000000000),
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
 				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
@@ -185,7 +185,7 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 		},
 		{
 			name:      "memory",
-			weight:    1,
+			weight:    100,
 			maxFeeCap: big.NewInt(300000000000),
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
 				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
@@ -198,7 +198,7 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 		},
 		{
 			name:      "call depth",
-			weight:    1,
+			weight:    50,
 			maxFeeCap: big.NewInt(300000000000),
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
 				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
@@ -223,7 +223,7 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 		},
 		{
 			name:      "pure compute",
-			weight:    1,
+			weight:    100,
 			maxFeeCap: big.NewInt(300000000000),
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
 				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
@@ -236,7 +236,7 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 		},
 		{
 			name:      "large event",
-			weight:    1,
+			weight:    100,
 			maxFeeCap: big.NewInt(300000000000),
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
 				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
@@ -249,7 +249,7 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 		},
 		{
 			name:      "external call",
-			weight:    1,
+			weight:    50,
 			maxFeeCap: big.NewInt(300000000000),
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
 				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
