@@ -107,7 +107,7 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 		{
 			name:      "zero self transfer",
 			weight:    1,
-			maxFeeCap: big.NewInt(300000000000),
+			maxFeeCap: big.NewInt(4761904), // equiavelent to 100 ETH which is the maximum value
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
 				bigGwei := big.NewInt(params.GWei)
 				gasTipCap := new(big.Int).Mul(bigGwei, big.NewInt(1))
