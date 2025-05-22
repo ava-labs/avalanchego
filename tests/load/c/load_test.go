@@ -97,6 +97,8 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 			default:
 				require.NoError(tc, metricsServer.Stop(), "failed to stop metrics server")
 			}
+		})
+		ginkgo.DeferCleanup(func() {
 			require.NoError(tc, os.Remove(monitoringConfigFilePath), "failed to remove monitoring config file")
 		})
 	})
