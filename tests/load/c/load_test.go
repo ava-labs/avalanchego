@@ -108,7 +108,6 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 		require.NoError(ginkgo.GinkgoT(), err, "getting node websocket URIs")
 		config := loadConfig{
 			endpoints: endpoints,
-			maxFeeCap: 300000000000,
 			agents:    agentsPerNode,
 			minTPS:    2400,
 			maxTPS:    3000,

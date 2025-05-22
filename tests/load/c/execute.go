@@ -19,7 +19,6 @@ import (
 
 type loadConfig struct {
 	endpoints []string
-	maxFeeCap int64
 	agents    uint
 	minTPS    int64
 	maxTPS    int64
@@ -63,7 +62,7 @@ func createAgents(ctx context.Context, config loadConfig, keys []*secp256k1.Priv
 		key := keys[i]
 		endpoint := config.endpoints[i%len(config.endpoints)]
 		go func(key *secp256k1.PrivateKey, endpoint string) {
-			agent, err := createAgent(ctx, endpoint, key, tracker, config.maxFeeCap)
+			agent, err := createAgent(ctx, endpoint, key, tracker)
 			ch <- result{agent: agent, err: err}
 		}(key, endpoint)
 	}
@@ -92,7 +91,7 @@ func createAgents(ctx context.Context, config loadConfig, keys []*secp256k1.Priv
 }
 
 func createAgent(ctx context.Context, endpoint string, key *secp256k1.PrivateKey,
-	tracker *load.Tracker[common.Hash], maxFeeCap int64,
+	tracker *load.Tracker[common.Hash],
 ) (load.Agent[common.Hash], error) {
 	client, err := ethclient.DialContext(ctx, endpoint)
 	if err != nil {
@@ -106,7 +105,7 @@ func createAgent(ctx context.Context, endpoint string, key *secp256k1.PrivateKey
 		return load.Agent[common.Hash]{}, fmt.Errorf("getting nonce for address %s: %w", address, err)
 	}
 
-	issuer, err := createIssuer(ctx, client, tracker, nonce, new(big.Int).SetInt64(maxFeeCap), key.ToECDSA())
+	issuer, err := createIssuer(ctx, client, tracker, nonce, key.ToECDSA())
 	if err != nil {
 		return load.Agent[common.Hash]{}, fmt.Errorf("creating issuer: %w", err)
 	}

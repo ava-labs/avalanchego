@@ -40,8 +40,7 @@ type IssueTracker interface {
 // instance that it deploys.
 type issuer struct {
 	// Injected parameters
-	tracker   IssueTracker
-	maxFeeCap *big.Int
+	tracker IssueTracker
 
 	// Determined by constructor
 	txTypes []txType
@@ -55,7 +54,6 @@ func createIssuer(
 	client EthClient,
 	tracker IssueTracker,
 	nonce uint64,
-	maxFeeCap *big.Int,
 	key *ecdsa.PrivateKey,
 ) (*issuer, error) {
 	chainID, err := client.ChainID(ctx)
@@ -63,6 +61,7 @@ func createIssuer(
 		return nil, fmt.Errorf("getting chain id: %w", err)
 	}
 
+	maxFeeCap := big.NewInt(300000000000) // enough for contract deployment in parallel
 	txOpts, err := newTxOpts(ctx, key, chainID, maxFeeCap, nonce)
 	if err != nil {
 		return nil, fmt.Errorf("creating transaction opts: %w", err)
@@ -88,7 +87,7 @@ func createIssuer(
 func (o *issuer) GenerateAndIssueTx(ctx context.Context) (common.Hash, error) {
 	txType := pickWeightedRandom(o.txTypes)
 
-	tx, err := txType.generateAndIssueTx(ctx, o.maxFeeCap, o.nonce)
+	tx, err := txType.generateAndIssueTx(ctx, txType.maxFeeCap, o.nonce)
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("generating and issuing transaction of type %s: %w", txType.name, err)
 	}
@@ -106,8 +105,9 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 	signer := types.LatestSignerForChainID(chainID)
 	return []txType{
 		{
-			name:   "zero self transfer",
-			weight: 1,
+			name:      "zero self transfer",
+			weight:    1,
+			maxFeeCap: big.NewInt(300000000000),
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
 				bigGwei := big.NewInt(params.GWei)
 				gasTipCap := new(big.Int).Mul(bigGwei, big.NewInt(1))
@@ -132,8 +132,9 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 			},
 		},
 		{
-			name:   "random write",
-			weight: 1,
+			name:      "random write",
+			weight:    1,
+			maxFeeCap: big.NewInt(300000000000),
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
 				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
 				if err != nil {
@@ -144,8 +145,9 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 			},
 		},
 		{
-			name:   "state modification",
-			weight: 1,
+			name:      "state modification",
+			weight:    1,
+			maxFeeCap: big.NewInt(300000000000),
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
 				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
 				if err != nil {
@@ -156,8 +158,9 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 			},
 		},
 		{
-			name:   "random read",
-			weight: 1,
+			name:      "random read",
+			weight:    1,
+			maxFeeCap: big.NewInt(300000000000),
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
 				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
 				if err != nil {
@@ -168,8 +171,9 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 			},
 		},
 		{
-			name:   "hashing",
-			weight: 1,
+			name:      "hashing",
+			weight:    1,
+			maxFeeCap: big.NewInt(300000000000),
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
 				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
 				if err != nil {
@@ -180,8 +184,9 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 			},
 		},
 		{
-			name:   "memory",
-			weight: 1,
+			name:      "memory",
+			weight:    1,
+			maxFeeCap: big.NewInt(300000000000),
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
 				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
 				if err != nil {
@@ -192,8 +197,9 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 			},
 		},
 		{
-			name:   "call depth",
-			weight: 1,
+			name:      "call depth",
+			weight:    1,
+			maxFeeCap: big.NewInt(300000000000),
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
 				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
 				if err != nil {
@@ -204,8 +210,9 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 			},
 		},
 		{
-			name:   "contract creation",
-			weight: 1,
+			name:      "contract creation",
+			weight:    1,
+			maxFeeCap: big.NewInt(300000000000),
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
 				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
 				if err != nil {
@@ -215,8 +222,9 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 			},
 		},
 		{
-			name:   "pure compute",
-			weight: 1,
+			name:      "pure compute",
+			weight:    1,
+			maxFeeCap: big.NewInt(300000000000),
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
 				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
 				if err != nil {
@@ -227,8 +235,9 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 			},
 		},
 		{
-			name:   "large event",
-			weight: 1,
+			name:      "large event",
+			weight:    1,
+			maxFeeCap: big.NewInt(300000000000),
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
 				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
 				if err != nil {
@@ -239,8 +248,9 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 			},
 		},
 		{
-			name:   "external call",
-			weight: 1,
+			name:      "external call",
+			weight:    1,
+			maxFeeCap: big.NewInt(300000000000),
 			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
 				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
 				if err != nil {
@@ -255,6 +265,7 @@ func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.
 type txType struct {
 	name               string // for error wrapping only
 	weight             uint
+	maxFeeCap          *big.Int
 	generateAndIssueTx func(txCtx context.Context, gasFeeCap *big.Int, nonce uint64) (*types.Transaction, error)
 }
 
