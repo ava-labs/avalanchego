@@ -82,7 +82,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 		require.NoError(tc, err, "failed to register load metrics")
 		metrics = loadMetrics
 
-		metricsServer := load.NewPrometheusServer("127.0.0.1:0", registry, logger)
+		metricsServer := load.NewPrometheusServer("127.0.0.1:0", registry)
 		metricsErrCh, err := metricsServer.Start()
 		require.NoError(tc, err, "failed to start load metrics server")
 
