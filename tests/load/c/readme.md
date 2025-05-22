@@ -42,7 +42,7 @@ If you have the credentials (internal to Ava Labs) for the CI monitoring stack, 
     nix develop
     ```
 
-1. Set your Prometheus credentials using the credentials you can find in your password manager
+1. Set your monitoring credentials using the credentials you can find in your password manager
 
     ```bash
     export PROMETHEUS_USERNAME=<username>
