@@ -29,12 +29,10 @@ type EthClientOpcoder interface {
 type Opcoder struct {
 	// Injected parameters
 	tracker   IssueTracker
-	senderKey *ecdsa.PrivateKey
 	maxFeeCap *big.Int
 
 	// Determined by constructor
-	chainID          *big.Int
-	contractInstance *contracts.EVMLoadSimulator
+	txTypes []txType
 
 	// State
 	nonce uint64
@@ -70,66 +68,18 @@ func NewOpcoder(
 	}
 
 	return &Opcoder{
-		tracker:          tracker,
-		senderKey:        key,
-		maxFeeCap:        maxFeeCap,
-		chainID:          chainID,
-		contractInstance: simulatorInstance,
-		nonce:            nonce,
+		tracker: tracker,
+		txTypes: makeTxTypes(simulatorInstance, key, chainID),
+		nonce:   nonce,
 	}, nil
 }
 
 func (o *Opcoder) GenerateAndIssueTx(ctx context.Context) (common.Hash, error) {
-	txOpts, err := o.newTxOpts(ctx)
+	txType := pickWeightedRandom(o.txTypes)
+
+	tx, err := txType.generateAndIssueTx(ctx, o.maxFeeCap, o.nonce)
 	if err != nil {
-		return common.Hash{}, fmt.Errorf("creating transaction opts: %w", err)
-	}
-
-	loadTypes := allLoadTypes()
-	loadType := loadTypes[rand.IntN(len(loadTypes))] //nolint:gosec
-
-	var tx *types.Transaction
-	switch loadType {
-	case randomWrite:
-		const maxWriteSizeBytes = 5
-		writeSize := big.NewInt(rand.Int64N(maxWriteSizeBytes)) //nolint:gosec
-		tx, err = o.contractInstance.SimulateRandomWrite(txOpts, writeSize)
-	case stateModification:
-		const maxStateSizeBytes = 5
-		stateSize := big.NewInt(rand.Int64N(maxStateSizeBytes)) //nolint:gosec
-		tx, err = o.contractInstance.SimulateModification(txOpts, stateSize)
-	case randomReads:
-		const maxReadSizeBytes = 5
-		numReads := big.NewInt(rand.Int64N(maxReadSizeBytes)) //nolint:gosec
-		tx, err = o.contractInstance.SimulateReads(txOpts, numReads)
-	case hashing:
-		const maxRounds = 3
-		rounds := big.NewInt(rand.Int64N(maxRounds)) //nolint:gosec
-		tx, err = o.contractInstance.SimulateHashing(txOpts, rounds)
-	case memory:
-		const maxArraySize = 4
-		arraySize := big.NewInt(rand.Int64N(maxArraySize)) //nolint:gosec
-		tx, err = o.contractInstance.SimulateMemory(txOpts, arraySize)
-	case callDepth:
-		const maxDepth = 5
-		depth := big.NewInt(rand.Int64N(maxDepth)) //nolint:gosec
-		tx, err = o.contractInstance.SimulateCallDepth(txOpts, depth)
-	case contractCreation:
-		tx, err = o.contractInstance.SimulateContractCreation(txOpts)
-	case pureCompute:
-		const iterations = 100
-		tx, err = o.contractInstance.SimulatePureCompute(txOpts, big.NewInt(iterations))
-	case largeEvent:
-		const maxEventSize = 100
-		tx, err = o.contractInstance.SimulateLargeEvent(txOpts, big.NewInt(maxEventSize))
-	case externalCall:
-		tx, err = o.contractInstance.SimulateExternalCall(txOpts)
-	default:
-		return common.Hash{}, fmt.Errorf("invalid load type: %s", loadType)
-	}
-
-	if err != nil {
-		return common.Hash{}, fmt.Errorf("calling simulator contract with load type %s: %w", loadType, err)
+		return common.Hash{}, fmt.Errorf("generating and issuing transaction of type %s: %w", txType.name, err)
 	}
 
 	o.nonce++
@@ -138,37 +88,161 @@ func (o *Opcoder) GenerateAndIssueTx(ctx context.Context) (common.Hash, error) {
 	return txHash, err
 }
 
-const (
-	randomWrite       = "random write"
-	stateModification = "state modification"
-	randomReads       = "random reads"
-	hashing           = "hashing"
-	memory            = "memory"
-	callDepth         = "call depth"
-	contractCreation  = "contract creation"
-	pureCompute       = "pure compute"
-	largeEvent        = "large event"
-	externalCall      = "external call"
-)
-
-func allLoadTypes() []string {
-	return []string{
-		randomWrite,
-		stateModification,
-		randomReads,
-		hashing,
-		memory,
-		callDepth,
-		contractCreation,
-		pureCompute,
-		largeEvent,
-		externalCall,
+func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.PrivateKey, chainID *big.Int) []txType {
+	return []txType{
+		{
+			name:   "random write",
+			weight: 1,
+			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
+				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, big.NewInt(1), nonce)
+				if err != nil {
+					return nil, fmt.Errorf("creating transaction opts: %w", err)
+				}
+				const maxWriteSizeBytes = 5
+				return contractInstance.SimulateRandomWrite(txOpts, intNBigInt(maxWriteSizeBytes))
+			},
+		},
+		{
+			name:   "state modification",
+			weight: 1,
+			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
+				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, big.NewInt(1), nonce)
+				if err != nil {
+					return nil, fmt.Errorf("creating transaction opts: %w", err)
+				}
+				const maxStateSizeBytes = 5
+				return contractInstance.SimulateModification(txOpts, intNBigInt(maxStateSizeBytes))
+			},
+		},
+		{
+			name:   "random read",
+			weight: 1,
+			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
+				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, big.NewInt(1), nonce)
+				if err != nil {
+					return nil, fmt.Errorf("creating transaction opts: %w", err)
+				}
+				const maxReadSizeBytes = 5
+				return contractInstance.SimulateReads(txOpts, intNBigInt(maxReadSizeBytes))
+			},
+		},
+		{
+			name:   "hashing",
+			weight: 1,
+			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
+				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, big.NewInt(1), nonce)
+				if err != nil {
+					return nil, fmt.Errorf("creating transaction opts: %w", err)
+				}
+				const maxRounds = 3
+				return contractInstance.SimulateHashing(txOpts, intNBigInt(maxRounds))
+			},
+		},
+		{
+			name:   "memory",
+			weight: 1,
+			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
+				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, big.NewInt(1), nonce)
+				if err != nil {
+					return nil, fmt.Errorf("creating transaction opts: %w", err)
+				}
+				const maxArraySize = 4
+				return contractInstance.SimulateMemory(txOpts, intNBigInt(maxArraySize))
+			},
+		},
+		{
+			name:   "call depth",
+			weight: 1,
+			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
+				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, big.NewInt(1), nonce)
+				if err != nil {
+					return nil, fmt.Errorf("creating transaction opts: %w", err)
+				}
+				const maxDepth = 5
+				return contractInstance.SimulateCallDepth(txOpts, intNBigInt(maxDepth))
+			},
+		},
+		{
+			name:   "contract creation",
+			weight: 1,
+			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
+				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, big.NewInt(1), nonce)
+				if err != nil {
+					return nil, fmt.Errorf("creating transaction opts: %w", err)
+				}
+				return contractInstance.SimulateContractCreation(txOpts)
+			},
+		},
+		{
+			name:   "pure compute",
+			weight: 1,
+			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
+				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, big.NewInt(1), nonce)
+				if err != nil {
+					return nil, fmt.Errorf("creating transaction opts: %w", err)
+				}
+				const iterations = 100
+				return contractInstance.SimulatePureCompute(txOpts, big.NewInt(iterations))
+			},
+		},
+		{
+			name:   "large event",
+			weight: 1,
+			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
+				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, big.NewInt(1), nonce)
+				if err != nil {
+					return nil, fmt.Errorf("creating transaction opts: %w", err)
+				}
+				const maxEventSize = 100
+				return contractInstance.SimulateLargeEvent(txOpts, big.NewInt(maxEventSize))
+			},
+		},
+		{
+			name:   "external call",
+			weight: 1,
+			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
+				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, big.NewInt(1), nonce)
+				if err != nil {
+					return nil, fmt.Errorf("creating transaction opts: %w", err)
+				}
+				return contractInstance.SimulateExternalCall(txOpts)
+			},
+		},
 	}
 }
 
-func (o *Opcoder) newTxOpts(ctx context.Context) (*bind.TransactOpts, error) {
-	maxTipCap := big.NewInt(1)
-	return newTxOpts(ctx, o.senderKey, o.chainID, o.maxFeeCap, maxTipCap, o.nonce)
+type txType struct {
+	name               string // for error wrapping only
+	weight             uint
+	generateAndIssueTx func(txCtx context.Context, gasFeeCap *big.Int, nonce uint64) (*types.Transaction, error)
+}
+
+func pickWeightedRandom(txTypes []txType) txType {
+	var totalWeight uint
+	for _, txType := range txTypes {
+		totalWeight += txType.weight
+	}
+
+	if totalWeight == 0 {
+		panic("Total weight cannot be zero")
+	}
+
+	r := rand.UintN(totalWeight) //nolint:gosec
+
+	for _, txType := range txTypes {
+		if r < txType.weight {
+			return txType
+		}
+		r -= txType.weight
+	}
+	panic("failed to pick a tx type")
+}
+
+func intNBigInt(n int64) *big.Int {
+	if n <= 0 {
+		panic("n must be greater than 0")
+	}
+	return big.NewInt(rand.Int64N(n)) //nolint:gosec
 }
 
 func newTxOpts(ctx context.Context, key *ecdsa.PrivateKey,
