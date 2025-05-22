@@ -3,33 +3,16 @@
 
 package atomic
 
-import (
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p/gossip"
-)
+import "github.com/ava-labs/avalanchego/network/p2p/gossip"
 
-var (
-	_ gossip.Gossipable                  = (*GossipAtomicTx)(nil)
-	_ gossip.Marshaller[*GossipAtomicTx] = (*GossipAtomicTxMarshaller)(nil)
-)
+var _ gossip.Marshaller[*Tx] = (*TxMarshaller)(nil)
 
-type GossipAtomicTxMarshaller struct{}
+type TxMarshaller struct{}
 
-func (g GossipAtomicTxMarshaller) MarshalGossip(tx *GossipAtomicTx) ([]byte, error) {
-	return tx.Tx.SignedBytes(), nil
+func (g *TxMarshaller) MarshalGossip(tx *Tx) ([]byte, error) {
+	return tx.SignedBytes(), nil
 }
 
-func (g GossipAtomicTxMarshaller) UnmarshalGossip(bytes []byte) (*GossipAtomicTx, error) {
-	tx, err := ExtractAtomicTx(bytes, Codec)
-	return &GossipAtomicTx{
-		Tx: tx,
-	}, err
-}
-
-type GossipAtomicTx struct {
-	Tx *Tx
-}
-
-func (tx *GossipAtomicTx) GossipID() ids.ID {
-	return tx.Tx.ID()
+func (_ *TxMarshaller) UnmarshalGossip(bytes []byte) (*Tx, error) {
+	return ExtractAtomicTx(bytes, Codec)
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
+	"github.com/ava-labs/coreth/plugin/evm/atomic/atomictest"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -30,7 +31,7 @@ func addTxs(t testing.TB, codec codec.Manager, acceptedAtomicTxDB database.Datab
 	for height := fromHeight; height < toHeight; height++ {
 		txs := make([]*atomic.Tx, 0, txsPerHeight)
 		for i := 0; i < txsPerHeight; i++ {
-			tx := atomic.NewTestTx()
+			tx := atomictest.NewTestTx()
 			txs = append(txs, tx)
 			txBytes, err := codec.Marshal(atomic.CodecVersion, tx)
 			assert.NoError(t, err)
@@ -72,7 +73,7 @@ func writeTxs(t testing.TB, repo *AtomicRepository, fromHeight uint64, toHeight 
 	txsPerHeight func(height uint64) int, txMap map[uint64][]*atomic.Tx, operationsMap map[uint64]map[ids.ID]*avalancheatomic.Requests,
 ) {
 	for height := fromHeight; height < toHeight; height++ {
-		txs := atomic.NewTestTxs(txsPerHeight(height))
+		txs := atomictest.NewTestTxs(txsPerHeight(height))
 		if err := repo.Write(height, txs); err != nil {
 			t.Fatal(err)
 		}
@@ -114,7 +115,7 @@ func verifyTxs(t testing.TB, repo *AtomicRepository, txMap map[uint64][]*atomic.
 
 func TestAtomicRepositoryReadWriteSingleTx(t *testing.T) {
 	db := versiondb.New(memdb.New())
-	repo, err := NewAtomicTxRepository(db, atomic.TestTxCodec, 0)
+	repo, err := NewAtomicTxRepository(db, atomictest.TestTxCodec, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +127,7 @@ func TestAtomicRepositoryReadWriteSingleTx(t *testing.T) {
 
 func TestAtomicRepositoryReadWriteMultipleTxs(t *testing.T) {
 	db := versiondb.New(memdb.New())
-	repo, err := NewAtomicTxRepository(db, atomic.TestTxCodec, 0)
+	repo, err := NewAtomicTxRepository(db, atomictest.TestTxCodec, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,14 +142,14 @@ func TestAtomicRepositoryPreAP5Migration(t *testing.T) {
 
 	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
 	txMap := make(map[uint64][]*atomic.Tx)
-	addTxs(t, atomic.TestTxCodec, acceptedAtomicTxDB, 1, 100, 1, txMap, nil)
+	addTxs(t, atomictest.TestTxCodec, acceptedAtomicTxDB, 1, 100, 1, txMap, nil)
 	if err := db.Commit(); err != nil {
 		t.Fatal(err)
 	}
 
 	// Ensure the atomic repository can correctly migrate the transactions
 	// from the old accepted atomic tx DB to add the height index.
-	repo, err := NewAtomicTxRepository(db, atomic.TestTxCodec, 100)
+	repo, err := NewAtomicTxRepository(db, atomictest.TestTxCodec, 100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,15 +166,15 @@ func TestAtomicRepositoryPostAP5Migration(t *testing.T) {
 
 	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
 	txMap := make(map[uint64][]*atomic.Tx)
-	addTxs(t, atomic.TestTxCodec, acceptedAtomicTxDB, 1, 100, 1, txMap, nil)
-	addTxs(t, atomic.TestTxCodec, acceptedAtomicTxDB, 100, 200, 10, txMap, nil)
+	addTxs(t, atomictest.TestTxCodec, acceptedAtomicTxDB, 1, 100, 1, txMap, nil)
+	addTxs(t, atomictest.TestTxCodec, acceptedAtomicTxDB, 100, 200, 10, txMap, nil)
 	if err := db.Commit(); err != nil {
 		t.Fatal(err)
 	}
 
 	// Ensure the atomic repository can correctly migrate the transactions
 	// from the old accepted atomic tx DB to add the height index.
-	repo, err := NewAtomicTxRepository(db, atomic.TestTxCodec, 200)
+	repo, err := NewAtomicTxRepository(db, atomictest.TestTxCodec, 200)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,11 +191,11 @@ func benchAtomicRepositoryIndex10_000(b *testing.B, maxHeight uint64, txsPerHeig
 	acceptedAtomicTxDB := prefixdb.New(atomicTxIDDBPrefix, db)
 	txMap := make(map[uint64][]*atomic.Tx)
 
-	addTxs(b, atomic.TestTxCodec, acceptedAtomicTxDB, 0, maxHeight, txsPerHeight, txMap, nil)
+	addTxs(b, atomictest.TestTxCodec, acceptedAtomicTxDB, 0, maxHeight, txsPerHeight, txMap, nil)
 	if err := db.Commit(); err != nil {
 		b.Fatal(err)
 	}
-	repo, err := NewAtomicTxRepository(db, atomic.TestTxCodec, maxHeight)
+	repo, err := NewAtomicTxRepository(db, atomictest.TestTxCodec, maxHeight)
 	if err != nil {
 		b.Fatal(err)
 	}

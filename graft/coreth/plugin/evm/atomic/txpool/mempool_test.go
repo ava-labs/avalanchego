@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
+	"github.com/ava-labs/coreth/plugin/evm/atomic/atomictest"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 )
@@ -19,13 +20,11 @@ func TestMempoolAddTx(t *testing.T) {
 	m, err := NewMempool(ctx, prometheus.NewRegistry(), 5_000, nil)
 	require.NoError(err)
 
-	txs := make([]*atomic.GossipAtomicTx, 0)
+	txs := make([]*atomic.Tx, 0)
 	for i := 0; i < 3_000; i++ {
-		tx := &atomic.GossipAtomicTx{
-			Tx: &atomic.Tx{
-				UnsignedAtomicTx: &atomic.TestUnsignedTx{
-					IDV: ids.GenerateTestID(),
-				},
+		tx := &atomic.Tx{
+			UnsignedAtomicTx: &atomictest.TestUnsignedTx{
+				IDV: ids.GenerateTestID(),
 			},
 		}
 
@@ -45,11 +44,9 @@ func TestMempoolAdd(t *testing.T) {
 	m, err := NewMempool(ctx, prometheus.NewRegistry(), 5_000, nil)
 	require.NoError(err)
 
-	tx := &atomic.GossipAtomicTx{
-		Tx: &atomic.Tx{
-			UnsignedAtomicTx: &atomic.TestUnsignedTx{
-				IDV: ids.GenerateTestID(),
-			},
+	tx := &atomic.Tx{
+		UnsignedAtomicTx: &atomictest.TestUnsignedTx{
+			IDV: ids.GenerateTestID(),
 		},
 	}
 
@@ -59,41 +56,37 @@ func TestMempoolAdd(t *testing.T) {
 }
 
 func TestAtomicMempoolIterate(t *testing.T) {
-	txs := []*atomic.GossipAtomicTx{
+	txs := []*atomic.Tx{
 		{
-			Tx: &atomic.Tx{
-				UnsignedAtomicTx: &atomic.TestUnsignedTx{
-					IDV: ids.GenerateTestID(),
-				},
+			UnsignedAtomicTx: &atomictest.TestUnsignedTx{
+				IDV: ids.GenerateTestID(),
 			},
 		},
 		{
-			Tx: &atomic.Tx{
-				UnsignedAtomicTx: &atomic.TestUnsignedTx{
-					IDV: ids.GenerateTestID(),
-				},
+			UnsignedAtomicTx: &atomictest.TestUnsignedTx{
+				IDV: ids.GenerateTestID(),
 			},
 		},
 	}
 
 	tests := []struct {
 		name        string
-		add         []*atomic.GossipAtomicTx
-		f           func(tx *atomic.GossipAtomicTx) bool
-		expectedTxs []*atomic.GossipAtomicTx
+		add         []*atomic.Tx
+		f           func(tx *atomic.Tx) bool
+		expectedTxs []*atomic.Tx
 	}{
 		{
 			name: "func matches nothing",
 			add:  txs,
-			f: func(*atomic.GossipAtomicTx) bool {
+			f: func(*atomic.Tx) bool {
 				return false
 			},
-			expectedTxs: []*atomic.GossipAtomicTx{},
+			expectedTxs: []*atomic.Tx{},
 		},
 		{
 			name: "func matches all",
 			add:  txs,
-			f: func(*atomic.GossipAtomicTx) bool {
+			f: func(*atomic.Tx) bool {
 				return true
 			},
 			expectedTxs: txs,
@@ -101,10 +94,10 @@ func TestAtomicMempoolIterate(t *testing.T) {
 		{
 			name: "func matches subset",
 			add:  txs,
-			f: func(tx *atomic.GossipAtomicTx) bool {
-				return tx.Tx == txs[0].Tx
+			f: func(tx *atomic.Tx) bool {
+				return tx == txs[0]
 			},
-			expectedTxs: []*atomic.GossipAtomicTx{txs[0]},
+			expectedTxs: []*atomic.Tx{txs[0]},
 		},
 	}
 
@@ -119,8 +112,8 @@ func TestAtomicMempoolIterate(t *testing.T) {
 				require.NoError(m.Add(add))
 			}
 
-			matches := make([]*atomic.GossipAtomicTx, 0)
-			f := func(tx *atomic.GossipAtomicTx) bool {
+			matches := make([]*atomic.Tx, 0)
+			f := func(tx *atomic.Tx) bool {
 				match := tt.f(tx)
 
 				if match {
@@ -146,7 +139,7 @@ func TestMempoolMaxSizeHandling(t *testing.T) {
 	mempool, err := NewMempool(ctx, prometheus.NewRegistry(), 1, nil)
 	require.NoError(err)
 	// create candidate tx (we will drop before validation)
-	tx := atomic.GenerateTestImportTx()
+	tx := atomictest.GenerateTestImportTx()
 
 	require.NoError(mempool.AddRemoteTx(tx))
 	require.True(mempool.Has(tx.ID()))
@@ -156,7 +149,7 @@ func TestMempoolMaxSizeHandling(t *testing.T) {
 	mempool.IssueCurrentTxs()
 
 	// try to add one more tx
-	tx2 := atomic.GenerateTestImportTx()
+	tx2 := atomictest.GenerateTestImportTx()
 	err = mempool.AddRemoteTx(tx2)
 	require.ErrorIs(err, ErrTooManyAtomicTx)
 	require.False(mempool.Has(tx2.ID()))
@@ -170,17 +163,17 @@ func TestMempoolPriorityDrop(t *testing.T) {
 	mempool, err := NewMempool(ctx, prometheus.NewRegistry(), 1, nil)
 	require.NoError(err)
 
-	tx1 := atomic.GenerateTestImportTxWithGas(1, 2) // lower fee
+	tx1 := atomictest.GenerateTestImportTxWithGas(1, 2) // lower fee
 	require.NoError(mempool.AddRemoteTx(tx1))
 	require.True(mempool.Has(tx1.ID()))
 
-	tx2 := atomic.GenerateTestImportTxWithGas(1, 2) // lower fee
+	tx2 := atomictest.GenerateTestImportTxWithGas(1, 2) // lower fee
 	err = mempool.AddRemoteTx(tx2)
 	require.ErrorIs(err, ErrInsufficientAtomicTxFee)
 	require.True(mempool.Has(tx1.ID()))
 	require.False(mempool.Has(tx2.ID()))
 
-	tx3 := atomic.GenerateTestImportTxWithGas(1, 5) // higher fee
+	tx3 := atomictest.GenerateTestImportTxWithGas(1, 5) // higher fee
 	require.NoError(mempool.AddRemoteTx(tx3))
 	require.False(mempool.Has(tx1.ID()))
 	require.False(mempool.Has(tx2.ID()))

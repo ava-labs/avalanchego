@@ -292,7 +292,7 @@ func TestAtomicTxGossip(t *testing.T) {
 	// Ask the VM for new transactions. We should get the newly issued tx.
 	wg.Add(1)
 
-	marshaller := atomic.GossipAtomicTxMarshaller{}
+	marshaller := atomic.TxMarshaller{}
 	onResponse = func(_ context.Context, nodeID ids.NodeID, responseBytes []byte, err error) {
 		require.NoError(err)
 
@@ -493,7 +493,7 @@ func TestAtomicTxPushGossipOutbound(t *testing.T) {
 	tx, err := atomic.NewImportTx(vm.ctx, vm.currentRules(), vm.clock.Unix(), vm.ctx.XChainID, address, initialBaseFee, secp256k1fx.NewKeychain(pk), []*avax.UTXO{utxo})
 	require.NoError(err)
 	require.NoError(vm.mempool.AddLocalTx(tx))
-	vm.atomicTxPushGossiper.Add(&atomic.GossipAtomicTx{Tx: tx})
+	vm.atomicTxPushGossiper.Add(tx)
 
 	gossipedBytes := <-sender.SentAppGossip
 	require.Equal(byte(p2p.AtomicTxGossipHandlerID), gossipedBytes[0])
@@ -502,10 +502,10 @@ func TestAtomicTxPushGossipOutbound(t *testing.T) {
 	require.NoError(proto.Unmarshal(gossipedBytes[1:], outboundGossipMsg))
 	require.Len(outboundGossipMsg.Gossip, 1)
 
-	marshaller := atomic.GossipAtomicTxMarshaller{}
+	marshaller := atomic.TxMarshaller{}
 	gossipedTx, err := marshaller.UnmarshalGossip(outboundGossipMsg.Gossip[0])
 	require.NoError(err)
-	require.Equal(tx.ID(), gossipedTx.Tx.ID())
+	require.Equal(tx.ID(), gossipedTx.GossipID())
 }
 
 // Tests that a tx is gossiped when it is issued
@@ -565,11 +565,8 @@ func TestAtomicTxPushGossipInbound(t *testing.T) {
 	require.NoError(err)
 	require.NoError(vm.mempool.AddLocalTx(tx))
 
-	marshaller := atomic.GossipAtomicTxMarshaller{}
-	gossipedTx := &atomic.GossipAtomicTx{
-		Tx: tx,
-	}
-	gossipBytes, err := marshaller.MarshalGossip(gossipedTx)
+	marshaller := atomic.TxMarshaller{}
+	gossipBytes, err := marshaller.MarshalGossip(tx)
 	require.NoError(err)
 
 	inboundGossip := &sdk.PushGossip{

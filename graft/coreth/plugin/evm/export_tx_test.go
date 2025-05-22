@@ -922,7 +922,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		backend := &atomic.Backend{
+		backend := &atomic.VerifierBackend{
 			Ctx:          vm.ctx,
 			Fx:           &vm.fx,
 			Rules:        test.rules,
@@ -935,7 +935,12 @@ func TestExportTxSemanticVerify(t *testing.T) {
 			tx := test.tx
 			exportTx := tx.UnsignedAtomicTx
 
-			err := exportTx.SemanticVerify(backend, tx, parent, test.baseFee)
+			err := exportTx.Visit(&atomic.SemanticVerifier{
+				Backend: backend,
+				Tx:      tx,
+				Parent:  parent,
+				BaseFee: test.baseFee,
+			})
 			if test.shouldErr && err == nil {
 				t.Fatalf("should have errored but returned valid")
 			}
@@ -1778,7 +1783,7 @@ func TestNewExportTx(t *testing.T) {
 
 			exportTx := tx.UnsignedAtomicTx
 
-			backend := &atomic.Backend{
+			backend := &atomic.VerifierBackend{
 				Ctx:          tvm.vm.ctx,
 				Fx:           &tvm.vm.fx,
 				Rules:        tvm.vm.currentRules(),
@@ -1787,7 +1792,12 @@ func TestNewExportTx(t *testing.T) {
 				SecpCache:    tvm.vm.secpCache,
 			}
 
-			if err := exportTx.SemanticVerify(backend, tx, parent, parent.ethBlock.BaseFee()); err != nil {
+			if err := exportTx.Visit(&atomic.SemanticVerifier{
+				Backend: backend,
+				Tx:      tx,
+				Parent:  parent,
+				BaseFee: parent.ethBlock.BaseFee(),
+			}); err != nil {
 				t.Fatal("newExportTx created an invalid transaction", err)
 			}
 
@@ -1977,7 +1987,7 @@ func TestNewExportTxMulticoin(t *testing.T) {
 			}
 
 			exportTx := tx.UnsignedAtomicTx
-			backend := &atomic.Backend{
+			backend := &atomic.VerifierBackend{
 				Ctx:          tvm.vm.ctx,
 				Fx:           &tvm.vm.fx,
 				Rules:        tvm.vm.currentRules(),
@@ -1986,7 +1996,12 @@ func TestNewExportTxMulticoin(t *testing.T) {
 				SecpCache:    tvm.vm.secpCache,
 			}
 
-			if err := exportTx.SemanticVerify(backend, tx, parent, parent.ethBlock.BaseFee()); err != nil {
+			if err := exportTx.Visit(&atomic.SemanticVerifier{
+				Backend: backend,
+				Tx:      tx,
+				Parent:  parent,
+				BaseFee: parent.ethBlock.BaseFee(),
+			}); err != nil {
 				t.Fatal("newExportTx created an invalid transaction", err)
 			}
 

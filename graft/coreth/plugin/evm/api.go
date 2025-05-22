@@ -185,7 +185,7 @@ func (service *AvaxAPI) IssueTx(r *http.Request, args *api.FormattedTx, response
 	if err := service.vm.mempool.AddLocalTx(tx); err != nil {
 		return err
 	}
-	service.vm.atomicTxPushGossiper.Add(&atomic.GossipAtomicTx{Tx: tx})
+	service.vm.atomicTxPushGossiper.Add(tx)
 	return nil
 }
 
