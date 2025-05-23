@@ -46,7 +46,7 @@ func newGinkgoLogger(cfg zapcore.Encoder) logging.Logger {
 	return logging.NewLogger(
 		"",
 		logging.NewWrappedCore(
-			logging.Verbo,
+			logging.Info,
 			&ginkgoWriteCloser{},
 			cfg,
 		),
