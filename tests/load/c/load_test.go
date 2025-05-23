@@ -53,7 +53,9 @@ func TestLoad(t *testing.T) {
 	setPrefundedKeys(t, network, agentsCount)
 
 	testEnv := e2e.NewTestEnvironment(tc, flagVars, network)
-	defer network.Stop(ctx)
+	defer func() {
+		require.NoError(network.Stop(ctx), "failed to stop network")
+	}()
 
 	registry := prometheus.NewRegistry()
 	metrics, err := load.NewMetrics(registry)
@@ -63,7 +65,7 @@ func TestLoad(t *testing.T) {
 	merticsErrCh, err := metricsServer.Start()
 	require.NoError(err, "failed to start load metrics server")
 
-	monitoringConfigFilePath, err := metricsServer.GenerateMonitoringConfig(network.UUID, network.Owner)
+	monitoringConfigFilePath, err := metricsServer.GenerateMonitoringConfig(network.UUID)
 	require.NoError(err, "failed to generate monitoring config file")
 
 	defer func() {
