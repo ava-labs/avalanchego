@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package peer
+package network
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
-	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -56,11 +56,10 @@ var (
 )
 
 func TestNetworkDoesNotConnectToItself(t *testing.T) {
-	selfNodeID := ids.GenerateTestNodeID()
-	p2pNetwork, err := p2p.NewNetwork(logging.NoLog{}, nil, prometheus.NewRegistry(), "")
+	ctx := snowtest.Context(t, snowtest.CChainID)
+	n, err := NewNetwork(ctx, nil, nil, 1, prometheus.NewRegistry())
 	require.NoError(t, err)
-	n := NewNetwork(p2pNetwork, nil, nil, selfNodeID, 1)
-	assert.NoError(t, n.Connected(context.Background(), selfNodeID, defaultPeerVersion))
+	assert.NoError(t, n.Connected(context.Background(), ctx.NodeID, defaultPeerVersion))
 	assert.EqualValues(t, 0, n.Size())
 }
 
@@ -94,11 +93,10 @@ func TestRequestAnyRequestsRoutingAndResponse(t *testing.T) {
 	}
 
 	codecManager := buildCodec(t, HelloRequest{}, HelloResponse{})
-	p2pNetwork, err := p2p.NewNetwork(logging.NoLog{}, nil, prometheus.NewRegistry(), "")
+	ctx := snowtest.Context(t, snowtest.CChainID)
+	net, err := NewNetwork(ctx, sender, codecManager, 16, prometheus.NewRegistry())
 	require.NoError(t, err)
-	net = NewNetwork(p2pNetwork, sender, codecManager, ids.EmptyNodeID, 16)
 	net.SetRequestHandler(&HelloGreetingRequestHandler{codec: codecManager})
-	client := NewNetworkClient(net)
 	nodeID := ids.GenerateTestNodeID()
 	assert.NoError(t, net.Connected(context.Background(), nodeID, defaultPeerVersion))
 
@@ -118,7 +116,7 @@ func TestRequestAnyRequestsRoutingAndResponse(t *testing.T) {
 			defer wg.Done()
 			requestBytes, err := message.RequestToBytes(codecManager, requestMessage)
 			assert.NoError(t, err)
-			responseBytes, _, err := client.SendAppRequestAny(context.Background(), defaultPeerVersion, requestBytes)
+			responseBytes, _, err := net.SendSyncedAppRequestAny(context.Background(), defaultPeerVersion, requestBytes)
 			assert.NoError(t, err)
 			assert.NotNil(t, responseBytes)
 
@@ -146,10 +144,11 @@ func TestAppRequestOnCtxCancellation(t *testing.T) {
 		},
 	}
 
-	p2pNetwork, err := p2p.NewNetwork(logging.NoLog{}, nil, prometheus.NewRegistry(), "")
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	net, err := NewNetwork(snowCtx, sender, codecManager, 1, prometheus.NewRegistry())
 	require.NoError(t, err)
-	net := NewNetwork(p2pNetwork, sender, codecManager, ids.EmptyNodeID, 1)
-	net.SetRequestHandler(&HelloGreetingRequestHandler{codec: codecManager})
+	handler := &HelloGreetingRequestHandler{codec: codecManager}
+	net.SetRequestHandler(handler)
 
 	requestMessage := HelloRequest{Message: "this is a request"}
 	requestBytes, err := message.RequestToBytes(codecManager, requestMessage)
@@ -159,8 +158,7 @@ func TestAppRequestOnCtxCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	// cancel context prior to sending
 	cancel()
-	client := NewNetworkClient(net)
-	_, err = client.SendAppRequest(ctx, nodeID, requestBytes)
+	err = net.SendAppRequest(ctx, nodeID, requestBytes, nil)
 	assert.ErrorIs(t, err, context.Canceled)
 }
 
@@ -199,11 +197,10 @@ func TestRequestRequestsRoutingAndResponse(t *testing.T) {
 	}
 
 	codecManager := buildCodec(t, HelloRequest{}, HelloResponse{})
-	p2pNetwork, err := p2p.NewNetwork(logging.NoLog{}, nil, prometheus.NewRegistry(), "")
+	ctx := snowtest.Context(t, snowtest.CChainID)
+	net, err := NewNetwork(ctx, sender, codecManager, 16, prometheus.NewRegistry())
 	require.NoError(t, err)
-	net = NewNetwork(p2pNetwork, sender, codecManager, ids.EmptyNodeID, 16)
 	net.SetRequestHandler(&HelloGreetingRequestHandler{codec: codecManager})
-	client := NewNetworkClient(net)
 
 	nodes := []ids.NodeID{
 		ids.GenerateTestNodeID(),
@@ -233,7 +230,7 @@ func TestRequestRequestsRoutingAndResponse(t *testing.T) {
 			defer wg.Done()
 			requestBytes, err := message.RequestToBytes(codecManager, requestMessage)
 			assert.NoError(t, err)
-			responseBytes, err := client.SendAppRequest(context.Background(), nodeID, requestBytes)
+			responseBytes, err := net.SendSyncedAppRequest(context.Background(), nodeID, requestBytes)
 			assert.NoError(t, err)
 			assert.NotNil(t, responseBytes)
 
@@ -255,9 +252,10 @@ func TestRequestRequestsRoutingAndResponse(t *testing.T) {
 	}
 
 	// ensure empty nodeID is not allowed
-	_, err = client.SendAppRequest(context.Background(), ids.EmptyNodeID, []byte("hello there"))
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "cannot send request to empty nodeID")
+	assert.ErrorContains(t,
+		net.SendAppRequest(context.Background(), ids.EmptyNodeID, []byte("hello there"), nil),
+		"cannot send request to empty nodeID",
+	)
 }
 
 func TestAppRequestOnShutdown(t *testing.T) {
@@ -280,10 +278,9 @@ func TestAppRequestOnShutdown(t *testing.T) {
 	}
 
 	codecManager := buildCodec(t, HelloRequest{}, HelloResponse{})
-	p2pNetwork, err := p2p.NewNetwork(logging.NoLog{}, nil, prometheus.NewRegistry(), "")
+	ctx := snowtest.Context(t, snowtest.CChainID)
+	net, err := NewNetwork(ctx, sender, codecManager, 1, prometheus.NewRegistry())
 	require.NoError(t, err)
-	net = NewNetwork(p2pNetwork, sender, codecManager, ids.EmptyNodeID, 1)
-	client := NewNetworkClient(net)
 	nodeID := ids.GenerateTestNodeID()
 	require.NoError(t, net.Connected(context.Background(), nodeID, defaultPeerVersion))
 
@@ -295,15 +292,15 @@ func TestAppRequestOnShutdown(t *testing.T) {
 		defer wg.Done()
 		requestBytes, err := message.RequestToBytes(codecManager, requestMessage)
 		require.NoError(t, err)
-		responseBytes, _, err := client.SendAppRequestAny(context.Background(), defaultPeerVersion, requestBytes)
-		require.Error(t, err, ErrRequestFailed)
+		responseBytes, _, err := net.SendSyncedAppRequestAny(context.Background(), defaultPeerVersion, requestBytes)
+		require.Error(t, err, errRequestFailed)
 		require.Nil(t, responseBytes)
 	}()
 	wg.Wait()
 	require.True(t, called)
 }
 
-func TestAppRequestAnyOnCtxCancellation(t *testing.T) {
+func TestSyncedAppRequestAnyOnCtxCancellation(t *testing.T) {
 	codecManager := buildCodec(t, HelloRequest{}, HelloResponse{})
 	type reqInfo struct {
 		nodeID    ids.NodeID
@@ -329,9 +326,9 @@ func TestAppRequestAnyOnCtxCancellation(t *testing.T) {
 		},
 	}
 
-	p2pNetwork, err := p2p.NewNetwork(logging.NoLog{}, nil, prometheus.NewRegistry(), "")
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	net, err := NewNetwork(snowCtx, sender, codecManager, 1, prometheus.NewRegistry())
 	require.NoError(t, err)
-	net := NewNetwork(p2pNetwork, sender, codecManager, ids.EmptyNodeID, 1)
 	net.SetRequestHandler(&HelloGreetingRequestHandler{codec: codecManager})
 	assert.NoError(t,
 		net.Connected(
@@ -348,8 +345,7 @@ func TestAppRequestAnyOnCtxCancellation(t *testing.T) {
 	// cancel context prior to sending
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	client := NewNetworkClient(net)
-	_, _, err = client.SendAppRequestAny(ctx, defaultPeerVersion, requestBytes)
+	_, _, err = net.SendSyncedAppRequestAny(ctx, defaultPeerVersion, requestBytes)
 	assert.ErrorIs(t, err, context.Canceled)
 	// Assert we didn't send anything
 	select {
@@ -363,7 +359,7 @@ func TestAppRequestAnyOnCtxCancellation(t *testing.T) {
 	ctx, cancel = context.WithCancel(context.Background())
 	doneChan := make(chan struct{})
 	go func() {
-		_, _, err = client.SendAppRequestAny(ctx, defaultPeerVersion, requestBytes)
+		_, _, err = net.SendSyncedAppRequestAny(ctx, defaultPeerVersion, requestBytes)
 		assert.ErrorIs(t, err, context.Canceled)
 		close(doneChan)
 	}()
@@ -409,10 +405,9 @@ func TestRequestMinVersion(t *testing.T) {
 	}
 
 	// passing nil as codec works because the net.AppRequest is never called
-	p2pNetwork, err := p2p.NewNetwork(logging.NoLog{}, nil, prometheus.NewRegistry(), "")
+	ctx := snowtest.Context(t, snowtest.CChainID)
+	net, err := NewNetwork(ctx, sender, codecManager, 1, prometheus.NewRegistry())
 	require.NoError(t, err)
-	net = NewNetwork(p2pNetwork, sender, codecManager, ids.EmptyNodeID, 1)
-	client := NewNetworkClient(net)
 	requestMessage := TestMessage{Message: "this is a request"}
 	requestBytes, err := message.RequestToBytes(codecManager, requestMessage)
 	assert.NoError(t, err)
@@ -430,7 +425,7 @@ func TestRequestMinVersion(t *testing.T) {
 	)
 
 	// ensure version does not match
-	responseBytes, _, err := client.SendAppRequestAny(
+	responseBytes, _, err := net.SendSyncedAppRequestAny(
 		context.Background(),
 		&version.Application{
 			Name:  version.Client,
@@ -444,7 +439,7 @@ func TestRequestMinVersion(t *testing.T) {
 	assert.Nil(t, responseBytes)
 
 	// ensure version matches and the request goes through
-	responseBytes, _, err = client.SendAppRequestAny(context.Background(), defaultPeerVersion, requestBytes)
+	responseBytes, _, err = net.SendSyncedAppRequestAny(context.Background(), defaultPeerVersion, requestBytes)
 	assert.NoError(t, err)
 
 	var response TestMessage
@@ -475,9 +470,9 @@ func TestOnRequestHonoursDeadline(t *testing.T) {
 		processingDuration: 500 * time.Millisecond,
 	}
 
-	p2pNetwork, err := p2p.NewNetwork(logging.NoLog{}, nil, prometheus.NewRegistry(), "")
+	ctx := snowtest.Context(t, snowtest.CChainID)
+	net, err = NewNetwork(ctx, sender, codecManager, 1, prometheus.NewRegistry())
 	require.NoError(t, err)
-	net = NewNetwork(p2pNetwork, sender, codecManager, ids.EmptyNodeID, 1)
 	net.SetRequestHandler(requestHandler)
 	nodeID := ids.GenerateTestNodeID()
 
@@ -502,9 +497,9 @@ func TestHandleInvalidMessages(t *testing.T) {
 			return nil
 		},
 	}
-	p2pNetwork, err := p2p.NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+	ctx := snowtest.Context(t, snowtest.CChainID)
+	clientNetwork, err := NewNetwork(ctx, sender, codecManager, 1, prometheus.NewRegistry())
 	require.NoError(t, err)
-	clientNetwork := NewNetwork(p2pNetwork, sender, codecManager, ids.EmptyNodeID, 1)
 	clientNetwork.SetRequestHandler(&testRequestHandler{})
 
 	assert.NoError(t, clientNetwork.Connected(context.Background(), nodeID, defaultPeerVersion))
@@ -551,9 +546,9 @@ func TestNetworkPropagatesRequestHandlerError(t *testing.T) {
 	requestID := uint32(1)
 	sender := testAppSender{}
 
-	p2pNetwork, err := p2p.NewNetwork(logging.NoLog{}, nil, prometheus.NewRegistry(), "")
+	ctx := snowtest.Context(t, snowtest.CChainID)
+	clientNetwork, err := NewNetwork(ctx, sender, codecManager, 1, prometheus.NewRegistry())
 	require.NoError(t, err)
-	clientNetwork := NewNetwork(p2pNetwork, sender, codecManager, ids.EmptyNodeID, 1)
 	clientNetwork.SetRequestHandler(&testRequestHandler{err: errors.New("fail")}) // Return an error from the request handler
 
 	assert.NoError(t, clientNetwork.Connected(context.Background(), nodeID, defaultPeerVersion))
@@ -571,7 +566,9 @@ func TestNetworkPropagatesRequestHandlerError(t *testing.T) {
 func TestNetworkAppRequestAfterShutdown(t *testing.T) {
 	require := require.New(t)
 
-	net := NewNetwork(nil, nil, nil, ids.EmptyNodeID, 1)
+	ctx := snowtest.Context(t, snowtest.CChainID)
+	net, err := NewNetwork(ctx, nil, nil, 16, prometheus.NewRegistry())
+	require.NoError(err)
 	net.Shutdown()
 
 	require.NoError(net.SendAppRequest(context.Background(), ids.GenerateTestNodeID(), nil, nil))
@@ -590,12 +587,12 @@ func TestNetworkRouting(t *testing.T) {
 	}
 	protocol := 0
 	handler := &testSDKHandler{}
-	p2pNetwork, err := p2p.NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
-	require.NoError(err)
-	require.NoError(p2pNetwork.AddHandler(uint64(protocol), handler))
 
 	networkCodec := codec.NewManager(0)
-	network := NewNetwork(p2pNetwork, nil, networkCodec, ids.EmptyNodeID, 1)
+	ctx := snowtest.Context(t, snowtest.CChainID)
+	network, err := NewNetwork(ctx, sender, networkCodec, 1, prometheus.NewRegistry())
+	require.NoError(err)
+	require.NoError(network.AddHandler(uint64(protocol), handler))
 
 	nodeID := ids.GenerateTestNodeID()
 	foobar := append([]byte{byte(protocol)}, []byte("foobar")...)

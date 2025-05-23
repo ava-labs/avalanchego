@@ -59,7 +59,6 @@ func TestEthTxGossip(t *testing.T) {
 		SentAppResponse: make(chan []byte, 1),
 	}
 	vm := &VM{
-		p2pSender:             responseSender,
 		atomicTxGossipHandler: &p2p.NoOpHandler{},
 		atomicTxPullGossiper:  &gossip.NoOpGossiper{},
 	}
@@ -73,7 +72,7 @@ func TestEthTxGossip(t *testing.T) {
 		nil,
 		make(chan common.Message),
 		nil,
-		&enginetest.Sender{},
+		responseSender,
 	))
 	require.NoError(vm.SetState(ctx, snow.NormalOp))
 
@@ -193,7 +192,6 @@ func TestAtomicTxGossip(t *testing.T) {
 		SentAppResponse: make(chan []byte, 1),
 	}
 	vm := &VM{
-		p2pSender:          responseSender,
 		ethTxGossipHandler: &p2p.NoOpHandler{},
 		ethTxPullGossiper:  &gossip.NoOpGossiper{},
 	}
@@ -207,7 +205,7 @@ func TestAtomicTxGossip(t *testing.T) {
 		nil,
 		make(chan common.Message),
 		nil,
-		&enginetest.Sender{},
+		responseSender,
 	))
 	require.NoError(vm.SetState(ctx, snow.NormalOp))
 
@@ -322,7 +320,6 @@ func TestEthTxPushGossipOutbound(t *testing.T) {
 	}
 
 	vm := &VM{
-		p2pSender:            sender,
 		ethTxPullGossiper:    gossip.NoOpGossiper{},
 		atomicTxPullGossiper: gossip.NoOpGossiper{},
 	}
@@ -382,7 +379,6 @@ func TestEthTxPushGossipInbound(t *testing.T) {
 
 	sender := &enginetest.Sender{}
 	vm := &VM{
-		p2pSender:            sender,
 		ethTxPullGossiper:    gossip.NoOpGossiper{},
 		atomicTxPullGossiper: gossip.NoOpGossiper{},
 	}
@@ -457,7 +453,6 @@ func TestAtomicTxPushGossipOutbound(t *testing.T) {
 		SentAppGossip: make(chan []byte, 1),
 	}
 	vm := &VM{
-		p2pSender:            sender,
 		ethTxPullGossiper:    gossip.NoOpGossiper{},
 		atomicTxPullGossiper: gossip.NoOpGossiper{},
 	}
@@ -471,7 +466,7 @@ func TestAtomicTxPushGossipOutbound(t *testing.T) {
 		nil,
 		make(chan common.Message),
 		nil,
-		&enginetest.SenderStub{},
+		sender,
 	))
 	require.NoError(vm.SetState(ctx, snow.NormalOp))
 
@@ -528,7 +523,6 @@ func TestAtomicTxPushGossipInbound(t *testing.T) {
 
 	sender := &enginetest.Sender{}
 	vm := &VM{
-		p2pSender:            sender,
 		ethTxPullGossiper:    gossip.NoOpGossiper{},
 		atomicTxPullGossiper: gossip.NoOpGossiper{},
 	}
@@ -542,7 +536,7 @@ func TestAtomicTxPushGossipInbound(t *testing.T) {
 		nil,
 		make(chan common.Message),
 		nil,
-		&enginetest.SenderStub{},
+		sender,
 	))
 	require.NoError(vm.SetState(ctx, snow.NormalOp))
 

@@ -8,12 +8,12 @@ import (
 	"errors"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/coreth/peer"
+	"github.com/ava-labs/coreth/network"
 
 	"github.com/ava-labs/avalanchego/version"
 )
 
-var _ peer.NetworkClient = (*testNetwork)(nil)
+var _ network.SyncedNetworkClient = (*testNetwork)(nil)
 
 type testNetwork struct {
 	// captured request data
@@ -28,7 +28,7 @@ type testNetwork struct {
 	nodesRequested []ids.NodeID
 }
 
-func (t *testNetwork) SendAppRequestAny(ctx context.Context, minVersion *version.Application, request []byte) ([]byte, ids.NodeID, error) {
+func (t *testNetwork) SendSyncedAppRequestAny(ctx context.Context, minVersion *version.Application, request []byte) ([]byte, ids.NodeID, error) {
 	if len(t.response) == 0 {
 		return nil, ids.EmptyNodeID, errors.New("no tested response to return in testNetwork")
 	}
@@ -39,7 +39,7 @@ func (t *testNetwork) SendAppRequestAny(ctx context.Context, minVersion *version
 	return response, ids.EmptyNodeID, err
 }
 
-func (t *testNetwork) SendAppRequest(ctx context.Context, nodeID ids.NodeID, request []byte) ([]byte, error) {
+func (t *testNetwork) SendSyncedAppRequest(ctx context.Context, nodeID ids.NodeID, request []byte) ([]byte, error) {
 	if len(t.response) == 0 {
 		return nil, errors.New("no tested response to return in testNetwork")
 	}
