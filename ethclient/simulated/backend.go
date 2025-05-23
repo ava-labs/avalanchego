@@ -68,7 +68,7 @@ type Client interface {
 // simClient wraps ethclient. This exists to prevent extracting ethclient.Client
 // from the Client interface returned by Backend.
 type simClient struct {
-	ethclient.Client
+	*ethclient.Client
 }
 
 // Backend is a simulated blockchain. You can use it to test your contracts or
