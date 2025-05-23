@@ -57,6 +57,12 @@ tasks:
       - task: generate-canoto
       - task: check-clean-branch
 
+  check-generate-load-contract-bindings:
+    desc: Checks that generated load contract bindings are up-to-date (requires a clean git working tree)
+    cmds:
+      - task: generate-load-contract-bindings
+      - task: check-clean-branch
+
   check-generate-mocks:
     desc: Checks that generated mocks are up-to-date (requires a clean git working tree)
     cmds:
@@ -84,6 +90,12 @@ tasks:
   generate-canoto:
     desc: Generates canoto
     cmd: go generate -run "github.com/StephenButtolph/canoto/canoto" ./...
+
+  generate-load-contract-bindings:
+    desc: Generates load contract bindings
+    cmds:
+      - cmd: grep -lr -E '^// Code generated - DO NOT EDIT\.$' tests/load/c | xargs -r rm
+      - cmd: go generate ./tests/load/c/...
 
   generate-protobuf:
     desc: Generates protobuf
@@ -197,6 +209,13 @@ tasks:
     vars:
       FUZZTIME: '{{.FUZZTIME| default "900"}}'
     cmd: ./scripts/build_fuzz.sh {{.FUZZTIME}} ./x/merkledb
+
+  test-load:
+    desc: Runs load tests
+    cmds:
+      - task: generate-load-contract-bindings
+      - task: build
+      - cmd: go test ./tests/load/c -test.v -- --avalanchego-path=$PWD/build/avalanchego 
 
   test-unit:
     desc: Runs unit tests
