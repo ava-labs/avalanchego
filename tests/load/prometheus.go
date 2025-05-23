@@ -94,10 +94,7 @@ func (s *MetricsServer) GenerateMonitoringConfig(networkUUID, networkOwner strin
 	config, err := json.MarshalIndent([]tmpnet.ConfigMap{
 		{
 			"targets": []string{s.addr},
-			"labels": map[string]string{
-				"network_uuid":  networkUUID,
-				"network_owner": networkOwner,
-			},
+			"labels":  map[string]string{"network_uuid": networkUUID},
 		},
 	}, "", "  ")
 	if err != nil {
