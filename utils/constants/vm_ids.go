@@ -18,6 +18,7 @@ var (
 	AVMID        = ids.ID{'a', 'v', 'm'}
 	EVMID        = ids.ID{'e', 'v', 'm'}
 	SubnetEVMID  = ids.ID{'s', 'u', 'b', 'n', 'e', 't', 'e', 'v', 'm'}
+	SimplexVMID  = ids.ID{'s', 'i', 'm', 'p', 'l', 'e', 'x'}
 	XSVMID       = ids.ID{'x', 's', 'v', 'm'}
 )
 
