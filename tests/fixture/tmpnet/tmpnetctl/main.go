@@ -258,7 +258,10 @@ func main() {
 	)
 	rootCmd.AddCommand(checkLogsCmd)
 
-	var kubeconfigVars *flags.KubeconfigVars
+	var (
+		kubeconfigVars *flags.KubeconfigVars
+		collectorVars  *flags.CollectorVars
+	)
 	startKindClusterCmd := &cobra.Command{
 		Use:   "start-kind-cluster",
 		Short: "Starts a local kind cluster with an integrated registry",
@@ -281,10 +284,17 @@ func main() {
 					zap.String("requiredContext", tmpnet.KindKubeconfigContext),
 				)
 			}
-			return tmpnet.StartKindCluster(ctx, log, kubeconfigVars.Path)
+			return tmpnet.StartKindCluster(
+				ctx,
+				log,
+				kubeconfigVars.Path,
+				collectorVars.StartMetricsCollector,
+				collectorVars.StartLogsCollector,
+			)
 		},
 	}
 	kubeconfigVars = flags.NewKubeconfigFlagSetVars(startKindClusterCmd.PersistentFlags())
+	collectorVars = flags.NewCollectorFlagSetVars(startKindClusterCmd.PersistentFlags())
 	rootCmd.AddCommand(startKindClusterCmd)
 
 	if err := rootCmd.Execute(); err != nil {
