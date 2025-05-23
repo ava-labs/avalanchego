@@ -91,3 +91,7 @@ To support these changes, there have been a number of changes to the C-Chain blo
 * `BaseFee`: Added by EIP-1559 to represent the base fee of the block (present in Ethereum as of EIP-1559)
 * `ExtDataGasUsed`: amount of gas consumed by the atomic transactions in the block
 * `BlockGasCost`: surcharge for producing a block faster than the target rate
+
+## Releasing
+
+See [docs/releasing/README.md](docs/releasing/README.md) for the release process.
