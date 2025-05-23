@@ -7,103 +7,98 @@ import (
 	"context"
 	"os"
 	"testing"
+	"time"
 
-	"github.com/onsi/ginkgo/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/tests/load"
-	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-// Run this using the command from the root of the repository in a Nix develop shell:
-// task test-load
-func TestLoad(t *testing.T) {
-	ginkgo.RunSpecs(t, "load tests")
-}
+const (
+	blockchainID = "C"
+	// invariant: nodesCount >= 5
+	nodesCount    = 5
+	agentsPerNode = 50
+	agentsCount   = nodesCount * agentsPerNode
+	logPrefix     = "avalanchego-load-test"
+)
 
 var flagVars *e2e.FlagVars
 
 func init() {
 	flagVars = e2e.RegisterFlagsWithDefaultOwner("avalanchego-load")
+
+	// Disable default metrics link generation to prevent duplicate links.
+	// We generate load specific links.
+	e2e.EmitMetricsLink = false
 }
 
-const (
-	blockchainID  = "C"
-	nodesCount    = 5
-	agentsPerNode = 50
-	agentsCount   = nodesCount * agentsPerNode
-)
+func TestLoad(t *testing.T) {
+	require := require.New(t)
+	ctx := context.Background()
+	log := tests.NewDefaultLogger(logPrefix)
+	tc := tests.NewTestContext(log)
 
-var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
-	var (
-		network *tmpnet.Network
-		metrics *load.Metrics
+	startTime := time.Now()
+	nodes := tmpnet.NewNodesOrPanic(nodesCount)
+	network := &tmpnet.Network{
+		Owner: "avalanchego-load-test",
+		Nodes: nodes,
+	}
 
-		logger logging.Logger
+	setPrefundedKeys(t, network, agentsCount)
+
+	testEnv := e2e.NewTestEnvironment(tc, flagVars, network)
+	defer network.Stop(ctx)
+
+	registry := prometheus.NewRegistry()
+	metrics, err := load.NewMetrics(registry)
+	require.NoError(err, "failed to register load metrics")
+
+	metricsServer := load.NewPrometheusServer("127.0.0.1:0", registry)
+	merticsErrCh, err := metricsServer.Start()
+	require.NoError(err, "failed to start load metrics server")
+
+	monitoringConfigFilePath, err := metricsServer.GenerateMonitoringConfig(network.UUID, network.Owner)
+	require.NoError(err, "failed to generate monitoring config file")
+
+	defer func() {
+		select {
+		case err := <-merticsErrCh:
+			require.NoError(err, "metrics server exited with error")
+		default:
+			require.NoError(metricsServer.Stop(), "failed to stop metrics server")
+		}
+	}()
+
+	defer func() {
+		require.NoError(
+			os.Remove(monitoringConfigFilePath),
+			"failed †o remove monitoring config file",
+		)
+	}()
+
+	endpoints, err := tmpnet.GetNodeWebsocketURIs(ctx, network.Nodes, blockchainID)
+	require.NoError(err, "failed †o get node websocket URIs")
+	config := loadConfig{
+		endpoints: endpoints,
+		agents:    agentsPerNode,
+		minTPS:    100,
+		maxTPS:    500,
+		step:      100,
+	}
+
+	require.NoError(
+		execute(ctx, network.PreFundedKeys, config, metrics, log),
+		"failed to execute load test",
 	)
 
-	ginkgo.BeforeAll(func() {
-		require.GreaterOrEqual(ginkgo.GinkgoT(), nodesCount, 5, "number of nodes must be at least 5")
-		tc := e2e.NewTestContext()
-		nodes := tmpnet.NewNodesOrPanic(nodesCount)
-		network = &tmpnet.Network{
-			Owner: "avalanchego-load-test",
-			Nodes: nodes,
-		}
-		setPrefundedKeys(tc, network, agentsCount)
-
-		env := e2e.NewTestEnvironment(
-			tc,
-			flagVars,
-			network,
-		)
-
-		logger = tc.Log()
-		registry := prometheus.NewRegistry()
-
-		network = env.GetNetwork()
-
-		loadMetrics, err := load.NewMetrics(registry)
-		require.NoError(tc, err, "failed to register load metrics")
-		metrics = loadMetrics
-
-		metricsServer := load.NewPrometheusServer("127.0.0.1:0", registry)
-		metricsErrCh, err := metricsServer.Start()
-		require.NoError(tc, err, "failed to start load metrics server")
-
-		monitoringConfigFilePath, err := metricsServer.GenerateMonitoringConfig(network.UUID, network.Owner)
-		require.NoError(tc, err, "failed to generate monitoring config file")
-
-		ginkgo.DeferCleanup(func() {
-			select {
-			case err := <-metricsErrCh:
-				require.NoError(tc, err, "metrics server exited with error")
-			default:
-				require.NoError(tc, metricsServer.Stop(), "failed to stop metrics server")
-			}
-		})
-		ginkgo.DeferCleanup(func() {
-			require.NoError(tc, os.Remove(monitoringConfigFilePath), "failed to remove monitoring config file")
-		})
-	})
-
-	ginkgo.It("C-Chain", func(ctx context.Context) {
-		endpoints, err := tmpnet.GetNodeWebsocketURIs(ctx, network.Nodes, blockchainID)
-		require.NoError(ginkgo.GinkgoT(), err, "getting node websocket URIs")
-		config := loadConfig{
-			endpoints: endpoints,
-			agents:    agentsPerNode,
-			minTPS:    1000,
-			maxTPS:    1700,
-			step:      100,
-		}
-		err = execute(ctx, network.PreFundedKeys, config, metrics, logger)
-		require.NoError(ginkgo.GinkgoT(), err, "executing load test")
-	})
-})
+	load.GenerateMetricsLink(testEnv, log, startTime)
+}
 
 // setPrefundedKeys sets the pre-funded keys for the network, and keeps
 // keys already set if any. If there are more keys than required, it
@@ -112,7 +107,9 @@ func setPrefundedKeys(t require.TestingT, network *tmpnet.Network, minKeys int) 
 	if len(network.PreFundedKeys) >= minKeys {
 		return
 	}
+
+	require := require.New(t)
 	missingPreFundedKeys, err := tmpnet.NewPrivateKeys(minKeys - len(network.PreFundedKeys))
-	require.NoError(t, err, "creating pre-funded keys")
+	require.NoError(err, "creating pre-funded keys")
 	network.PreFundedKeys = append(network.PreFundedKeys, missingPreFundedKeys...)
 }

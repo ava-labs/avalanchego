@@ -215,14 +215,14 @@ tasks:
     cmds:
       - task: generate-load-contract-bindings
       - task: build
-      - cmd: ./bin/ginkgo -v ./tests/load/c -- --avalanchego-path=$PWD/build/avalanchego --start-metrics-collector --start-logs-collector
+      - cmd: go test ./tests/load/c -test.v -- --avalanchego-path=$PWD/build/avalanchego --start-metrics-collector --start-logs-collector
 
   test-load-local:
     desc: Runs load tests with local monitoring
     cmds:
       - task: generate-load-contract-bindings
       - task: build
-      - cmd: ./bin/ginkgo -v ./tests/load/c -- --avalanchego-path=$PWD/build/avalanchego
+      - cmd: go test ./tests/load/c -test.v -- --avalanchego-path=$PWD/build/avalanchego
 
   test-unit:
     desc: Runs unit tests

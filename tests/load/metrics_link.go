@@ -7,11 +7,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 const (
@@ -19,31 +19,13 @@ const (
 	dashboardName = "C-Chain Load"
 )
 
-var (
-	// Disable default metrics link generation to prevent duplicate links.
-	// We generate load specific links.
-	_ = ginkgo.JustBeforeEach(func() {
-		e2e.EmitMetricsLink = false
+func GenerateMetricsLink(env *e2e.TestEnvironment, log logging.Logger, startTime time.Time) {
+	grafanaLink := tmpnet.BuildMonitoringURLForNetwork(dashboardID, dashboardName, env.GetNetwork().UUID, tmpnet.GrafanaFilterOptions{
+		StartTime: strconv.FormatInt(startTime.UnixMilli(), 10),
+		EndTime:   strconv.FormatInt(time.Now().Add(tmpnet.NetworkShutdownDelay).UnixMilli(), 10),
 	})
 
-	_ = ginkgo.AfterEach(func() {
-		tc := e2e.NewTestContext()
-		env := e2e.GetEnv(tc)
-
-		if env == nil {
-			return
-		}
-
-		specReport := ginkgo.CurrentSpecReport()
-		startTimeMs := specReport.StartTime.UnixMilli()
-
-		grafanaLink := tmpnet.BuildMonitoringURLForNetwork(dashboardID, dashboardName, env.GetNetwork().UUID, tmpnet.GrafanaFilterOptions{
-			StartTime: strconv.FormatInt(startTimeMs, 10),
-			EndTime:   strconv.FormatInt(time.Now().Add(tmpnet.NetworkShutdownDelay).UnixMilli(), 10),
-		})
-
-		tc.Log().Info(tmpnet.MetricsAvailableMessage,
-			zap.String("uri", grafanaLink),
-		)
-	})
-)
+	log.Info(tmpnet.MetricsAvailableMessage,
+		zap.String("uri", grafanaLink),
+	)
+}
