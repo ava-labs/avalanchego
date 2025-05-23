@@ -24,6 +24,16 @@ type Engine struct {
 	log logging.Logger
 }
 
+func NewEngine(
+	checker health.Checker,
+	log logging.Logger,
+) *Engine {
+	return &Engine{
+		Checker: checker,
+		log:     log,
+	}
+}
+
 func (e *Engine) Simplex(nodeID ids.NodeID, _ *p2p.Simplex) error {
 	e.log.Debug("Simplex request from %s", zap.Stringer("nodeID", nodeID))
 	return nil
