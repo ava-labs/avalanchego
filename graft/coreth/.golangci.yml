@@ -34,3 +34,11 @@ linters-settings:
     min-len: 3 # minimum length of string constant
     min-occurrences: 6 # minimum number of occurrences
     ignore-tests: true
+
+issues:
+  exclude-rules:
+    # Exclude unused geth symbols from ethclient/ethclient.go to simplify upgrading Geth to a newer version.
+    - path: "ethclient\\/ethclient\\.go"
+      text: "(type `rpcProgress`|func `\\(\\*rpcProgress\\)\\.toSyncProgress`) is unused"
+      linters:
+        - unused
