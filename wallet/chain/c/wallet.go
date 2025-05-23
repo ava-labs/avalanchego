@@ -68,7 +68,7 @@ func NewWallet(
 	builder Builder,
 	signer Signer,
 	avaxClient client.Client,
-	ethClient ethclient.Client,
+	ethClient *ethclient.Client,
 	backend Backend,
 ) Wallet {
 	return &wallet{
@@ -85,7 +85,7 @@ type wallet struct {
 	builder    Builder
 	signer     Signer
 	avaxClient client.Client
-	ethClient  ethclient.Client
+	ethClient  *ethclient.Client
 }
 
 func (w *wallet) Builder() Builder {
