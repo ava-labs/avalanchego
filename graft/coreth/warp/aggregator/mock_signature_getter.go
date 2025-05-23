@@ -82,17 +82,17 @@ func (m *MockNetworkClient) EXPECT() *MockNetworkClientMockRecorder {
 	return m.recorder
 }
 
-// SendAppRequest mocks base method.
-func (m *MockNetworkClient) SendAppRequest(ctx context.Context, nodeID ids.NodeID, message []byte) ([]byte, error) {
+// SendSyncedAppRequest mocks base method.
+func (m *MockNetworkClient) SendSyncedAppRequest(ctx context.Context, nodeID ids.NodeID, message []byte) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SendAppRequest", ctx, nodeID, message)
+	ret := m.ctrl.Call(m, "SendSyncedAppRequest", ctx, nodeID, message)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// SendAppRequest indicates an expected call of SendAppRequest.
-func (mr *MockNetworkClientMockRecorder) SendAppRequest(ctx, nodeID, message any) *gomock.Call {
+// SendSyncedAppRequest indicates an expected call of SendSyncedAppRequest.
+func (mr *MockNetworkClientMockRecorder) SendSyncedAppRequest(ctx, nodeID, message any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendAppRequest", reflect.TypeOf((*MockNetworkClient)(nil).SendAppRequest), ctx, nodeID, message)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendSyncedAppRequest", reflect.TypeOf((*MockNetworkClient)(nil).SendSyncedAppRequest), ctx, nodeID, message)
 }
