@@ -1576,83 +1576,12 @@ func (m *manager) createSimplexChain(
 	sb subnets.Subnet,
 ) (*chain, error) {
 	ctx.State.Set(snow.EngineState{
-		Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
+		Type:  p2ppb.EngineType_ENGINE_TYPE_SIMPLEX,
 		State: snow.Initializing,
 	})
 
 	primaryAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
-	meterDBReg, err := metrics.MakeAndRegister(
-		m.MeterDBMetrics,
-		primaryAlias,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	meterDB, err := meterdb.New(meterDBReg, m.DB)
-	if err != nil {
-		return nil, err
-	}
-
-	prefixDB := prefixdb.New(ctx.ChainID[:], meterDB)
-	vmDB := prefixdb.New(VMDBPrefix, prefixDB)
-
-	// Passes messages from the consensus engine to the network
-	messageSender, err := m.createChainSender(
-		ctx,
-		p2ppb.EngineType_ENGINE_TYPE_SIMPLEX,
-		sb,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
-	}
-
-	if m.TracingEnabled {
-		vm = tracedvm.NewBlockVM(vm, primaryAlias, m.Tracer)
-	}
-
-	proposerVM, err := m.createProposeVM(ctx, primaryAlias, vm)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't create proposer vm: %w", err)
-	}
-	vm = proposerVM
-
-	if m.MeterVMEnabled {
-		meterchainvmReg, err := metrics.MakeAndRegister(
-			m.meterChainVMGatherer,
-			primaryAlias,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		vm = metervm.NewBlockVM(vm, meterchainvmReg)
-	}
-	if m.TracingEnabled {
-		vm = tracedvm.NewBlockVM(vm, "proposervm", m.Tracer)
-	}
-
-	// The channel through which a VM may send messages to the consensus engine
-	// VM uses this channel to notify engine that a block is ready to be made
-	msgChan := make(chan common.Message, defaultChannelSize)
-	// Initialize the ProposerVM and the vm wrapped inside it
-	chainConfig, err := m.getChainConfig(ctx.ChainID)
-	if err != nil {
-		return nil, fmt.Errorf("error while fetching chain config: %w", err)
-	}
-	if err := vm.Initialize(
-		context.TODO(),
-		ctx.Context,
-		vmDB,
-		genesisData,
-		chainConfig.Upgrade,
-		chainConfig.Config,
-		msgChan,
-		fxs,
-		messageSender,
-	); err != nil {
-		return nil, err
-	}
+	vm, msgChan, err := m.createChainVM(ctx, vm, genesisData, primaryAlias, sb, fxs)
 
 	connectedBeacons := tracker.NewPeers()
 	bootstrapWeight, err := beacons.TotalWeight(ctx.SubnetID)
@@ -1832,4 +1761,79 @@ func (m *manager) createChainHandler(ctx *snow.ConsensusContext, vdrs validators
 	})
 
 	return h, nil
+}
+
+func (m *manager) createChainVM(ctx *snow.ConsensusContext, vm block.ChainVM, genesisData []byte, primaryAlias string, sb subnets.Subnet, fxs []*common.Fx) (block.ChainVM, chan common.Message, error) {
+	meterDBReg, err := metrics.MakeAndRegister(
+		m.MeterDBMetrics,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	meterDB, err := meterdb.New(meterDBReg, m.DB)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	prefixDB := prefixdb.New(ctx.ChainID[:], meterDB)
+	vmDB := prefixdb.New(VMDBPrefix, prefixDB)
+
+	// Passes messages from the consensus engine to the network
+	messageSender, err := m.createChainSender(
+		ctx,
+		p2ppb.EngineType_ENGINE_TYPE_SIMPLEX,
+		sb,
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("couldn't initialize sender: %w", err)
+	}
+
+	if m.TracingEnabled {
+		vm = tracedvm.NewBlockVM(vm, primaryAlias, m.Tracer)
+	}
+
+	proposerVM, err := m.createProposeVM(ctx, primaryAlias, vm)
+	if err != nil {
+		return nil, nil, fmt.Errorf("couldn't create proposer vm: %w", err)
+	}
+	vm = proposerVM
+
+	if m.MeterVMEnabled {
+		meterchainvmReg, err := metrics.MakeAndRegister(
+			m.meterChainVMGatherer,
+			primaryAlias,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		vm = metervm.NewBlockVM(vm, meterchainvmReg)
+	}
+	if m.TracingEnabled {
+		vm = tracedvm.NewBlockVM(vm, "proposervm", m.Tracer)
+	}
+
+	// The channel through which a VM may send messages to the consensus engine
+	// VM uses this channel to notify engine that a block is ready to be made
+	msgChan := make(chan common.Message, defaultChannelSize)
+	// Initialize the ProposerVM and the vm wrapped inside it
+	chainConfig, err := m.getChainConfig(ctx.ChainID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error while fetching chain config: %w", err)
+	}
+	err = vm.Initialize(
+		context.TODO(),
+		ctx.Context,
+		vmDB,
+		genesisData,
+		chainConfig.Upgrade,
+		chainConfig.Config,
+		msgChan,
+		fxs,
+		messageSender,
+	)
+
+	return vm, msgChan, err
 }
