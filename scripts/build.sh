@@ -9,17 +9,20 @@ print_usage() {
 
   Options:
 
-    -r  Build with race detector
+    -r           Build with race detector
+    -p <value>   use custom GOPROXY
 "
 }
 
 race=''
-while getopts 'r' flag; do
+proxy=''
+while getopts 'rp:' flag; do
   case "${flag}" in
     r)
       echo "Building with race detection enabled"
-      race='-race'
-      ;;
+      race='-race' ;;
+    p)
+      proxy="${OPTARG}" ;;
     *) print_usage
       exit 1 ;;
   esac
@@ -27,7 +30,7 @@ done
 
 REPO_ROOT=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 # Configure the build environment
-source "${REPO_ROOT}"/scripts/constants.sh
+source "${REPO_ROOT}"/scripts/constants.sh $proxy
 # Determine the git commit hash to use for the build
 source "${REPO_ROOT}"/scripts/git_commit.sh
 
