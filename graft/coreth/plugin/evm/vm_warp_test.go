@@ -786,7 +786,7 @@ func TestMessageSignatureRequestsToVM(t *testing.T) {
 
 			// Send the app request and make sure we called SendAppResponseFn
 			deadline := time.Now().Add(60 * time.Second)
-			require.NoError(t, tvm.vm.Network.AppRequest(context.Background(), ids.GenerateTestNodeID(), 1, deadline, requestBytes))
+			require.NoError(t, tvm.vm.Network.AppRequest(context.Background(), ids.GenerateTestNodeID(), 0, deadline, requestBytes))
 			require.True(t, calledSendAppResponseFn)
 		})
 	}
@@ -844,7 +844,7 @@ func TestBlockSignatureRequestsToVM(t *testing.T) {
 
 			// Send the app request and make sure we called SendAppResponseFn
 			deadline := time.Now().Add(60 * time.Second)
-			require.NoError(t, tvm.vm.Network.AppRequest(context.Background(), ids.GenerateTestNodeID(), 1, deadline, requestBytes))
+			require.NoError(t, tvm.vm.Network.AppRequest(context.Background(), ids.GenerateTestNodeID(), 0, deadline, requestBytes))
 			require.True(t, calledSendAppResponseFn)
 		})
 	}
