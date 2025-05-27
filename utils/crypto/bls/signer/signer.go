@@ -13,12 +13,13 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/ava-labs/libevm/log"
+
 	"github.com/ava-labs/avalanchego/config/node"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/rpcsigner"
 	"github.com/ava-labs/avalanchego/utils/perms"
-	"github.com/ava-labs/libevm/log"
 )
 
 var errMissingStakingSigningKeyFile = errors.New("missing staking signing key file")
