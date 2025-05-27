@@ -15,6 +15,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/chains/atomic/atomicmock"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
@@ -25,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/metrics/metricsmock"
+	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/state/statemock"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
@@ -161,19 +165,27 @@ func TestBlockVerify(t *testing.T) {
 				parentID := ids.GenerateTestID()
 				mockBlock.EXPECT().Parent().Return(parentID).AnyTimes()
 
-				mockState := statemock.NewState(ctrl)
-				mockState.EXPECT().GetBlock(parentID).Return(nil, errTest)
+				parser, err := block.NewParser(nil)
+				require.NoError(t, err)
+				state, err := state.New(
+					versiondb.New(memdb.New()),
+					parser,
+					prometheus.NewRegistry(),
+					false,
+				)
+				require.NoError(t, err)
+
 				return &Block{
 					Block: mockBlock,
 					manager: &manager{
 						backend:      defaultTestBackend(false, nil),
-						state:        mockState,
+						state:        state,
 						blkIDToState: map[ids.ID]*blockState{},
 						clk:          &mockable.Clock{},
 					},
 				}
 			},
-			expectedErr: errTest,
+			expectedErr: database.ErrNotFound,
 		},
 		{
 			name: "block height isn't parent height + 1",
