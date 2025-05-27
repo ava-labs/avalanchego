@@ -137,6 +137,11 @@ func New(
 
 	n.DoneShuttingDown.Add(1)
 
+	n.StakingSigner, err = blssigner.GetStakingSigner(config.StakingSignerConfig)
+	if err != nil {
+		return nil, fmt.Errorf("problem initializing staking signer: %w", err)
+	}
+
 	pop, err := signer.NewProofOfPossession(n.StakingSigner)
 	if err != nil {
 		return nil, fmt.Errorf("problem creating proof of possession: %w", err)
@@ -151,11 +156,6 @@ func New(
 		zap.Reflect("providedFlags", n.Config.ProvidedFlags),
 		zap.Reflect("config", n.Config),
 	)
-
-	n.StakingSigner, err = blssigner.GetStakingSigner(config.StakingSignerConfig)
-	if err != nil {
-		return nil, fmt.Errorf("problem initializing staking signer: %w", err)
-	}
 
 	n.VMFactoryLog, err = logFactory.Make("vm-factory")
 	if err != nil {
