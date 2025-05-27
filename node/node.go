@@ -676,7 +676,7 @@ func (n *Node) Dispatch() error {
 		}
 		// If the API server isn't running, shut down the node.
 		// If node is already shutting down, this does not tigger shutdown again,
-		// and blocks until the shutdown is complete.
+		// and blocks until Shutdown returns.
 		n.Shutdown(1)
 	})
 
@@ -714,7 +714,7 @@ func (n *Node) Dispatch() error {
 
 	// If the P2P server isn't running, shut down the node.
 	// If node is already shutting down, this does not tigger shutdown again,
-	// and blocks until the shutdown is complete.
+	// and blocks until Shutdown returns.
 	n.Shutdown(1)
 
 	if n.tlsKeyLogWriterCloser != nil {
@@ -1619,6 +1619,7 @@ func (n *Node) initDiskTargeter(
 
 // Shutdown this node
 // May be called multiple times
+// All calls to shutdownOnce.Do block until the first call returns
 func (n *Node) Shutdown(exitCode int) {
 	if !n.shuttingDown.Swap(true) { // only set the exit code once
 		n.shuttingDownExitCode.Set(exitCode)

@@ -165,7 +165,7 @@ func (a *app) Start() {
 }
 
 // Stop attempts to shutdown the currently running node. This function will
-// block until shutdown is complete.
+// block until Shutdown returns.
 func (a *app) Stop() {
 	a.node.Shutdown(0)
 }
