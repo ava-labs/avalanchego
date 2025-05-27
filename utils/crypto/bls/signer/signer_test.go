@@ -1,13 +1,17 @@
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package signer
 
 import (
 	"log"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/config"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/config"
 )
 
 func TestDefaultConfigInitializationUsesExistingDefaultKey(t *testing.T) {

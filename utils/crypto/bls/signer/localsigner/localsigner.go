@@ -77,6 +77,6 @@ func (s *LocalSigner) SignProofOfPossession(msg []byte) (*bls.Signature, error) 
 }
 
 // Sign [msg] to prove the ownership
-func (s *LocalSigner) Shutdown() error {
+func (*LocalSigner) Shutdown() error {
 	return nil
 }

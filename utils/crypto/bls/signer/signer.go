@@ -1,3 +1,6 @@
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package signer
 
 import (
@@ -17,9 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
-var (
-	errMissingStakingSigningKeyFile = errors.New("missing staking signing key file")
-)
+var errMissingStakingSigningKeyFile = errors.New("missing staking signing key file")
 
 // GetStakingSigner returns a BLS signer based on the provided configuration.
 func GetStakingSigner(
@@ -60,15 +61,7 @@ func GetStakingSigner(
 	case node.SignerPathConfig:
 		_, err := os.Stat(cfg.SigningKeyPath)
 		if !errors.Is(err, fs.ErrNotExist) {
-			signingKeyBytes, err := os.ReadFile(cfg.SigningKeyPath)
-			if err != nil {
-				return nil, err
-			}
-			signer, err := localsigner.FromBytes(signingKeyBytes)
-			if err != nil {
-				return nil, fmt.Errorf("couldn't parse signing key: %w", err)
-			}
-			return signer, nil
+			return createSignerFromFile(cfg.SigningKeyPath)
 		}
 
 		if cfg.SignerPathIsSet {

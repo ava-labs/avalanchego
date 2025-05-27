@@ -76,8 +76,6 @@ var (
 	errCannotTrackPrimaryNetwork              = errors.New("cannot track primary network")
 	errStakingKeyContentUnset                 = fmt.Errorf("%s key not set but %s set", StakingTLSKeyContentKey, StakingCertContentKey)
 	errStakingCertContentUnset                = fmt.Errorf("%s key set but %s not set", StakingTLSKeyContentKey, StakingCertContentKey)
-	errMissingStakingSigningKeyFile           = errors.New("missing staking signing key file")
-	errTracingEndpointEmpty                   = fmt.Errorf("%s cannot be empty", TracingEndpointKey)
 	errPluginDirNotADirectory                 = errors.New("plugin dir is not a directory")
 	errCannotReadDirectory                    = errors.New("cannot read directory")
 	errUnmarshalling                          = errors.New("unmarshalling failed")
@@ -742,7 +740,6 @@ func getStakingSignerConfig(v *viper.Viper) (interface{}, error) {
 			SigningKeyPath:  getExpandedArg(v, StakingSignerKeyPathKey),
 			SignerPathIsSet: false,
 		}, nil
-
 	}
 }
 

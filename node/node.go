@@ -58,7 +58,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	blssigner "github.com/ava-labs/avalanchego/utils/crypto/bls/signer"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/filesystem"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -79,6 +78,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
 	databasefactory "github.com/ava-labs/avalanchego/database/factory"
+	blssigner "github.com/ava-labs/avalanchego/utils/crypto/bls/signer"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
 	coreth "github.com/ava-labs/coreth/plugin/evm"
