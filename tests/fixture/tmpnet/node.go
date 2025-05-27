@@ -129,17 +129,18 @@ func NewNodesOrPanic(count int) []*Node {
 // Retrieves the runtime for the node.
 func (n *Node) getRuntime() NodeRuntime {
 	if n.runtime == nil {
-		if n.getRuntimeConfig().Process != nil {
+		switch {
+		case n.getRuntimeConfig().Process != nil:
 			n.runtime = &ProcessRuntime{
 				node: n,
 			}
-		} else if n.getRuntimeConfig().Kube != nil {
+		case n.getRuntimeConfig().Kube != nil:
 			n.runtime = &KubeRuntime{
 				node: n,
 			}
-		} else {
+		default:
 			// Runtime configuration is validated during flag handling and network
-			// bootstrap so for this to be missing would be very unusual.
+			// bootstrap so misconfiguration should be unusual.
 			panic(fmt.Sprintf("no runtime configuration set for %q", n.NodeID))
 		}
 	}
