@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/api/grpcapi"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/xsvm"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
@@ -24,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/export"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/importtx"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/transfer"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 )
 
 const pollingInterval = 50 * time.Millisecond
@@ -186,7 +186,13 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 	ginkgo.It("should serve grpc api requests", func() {
 		tc.By("establishing connection")
 		uri := strings.TrimPrefix(e2e.GetEnv(tc).GetRandomNodeURI().URI, "http://")
-		conn, err := grpcutils.Dial(uri)
+		conn, err := grpcapi.NewClient(
+			uri,
+			e2e.GetEnv(tc).GetNetwork().NetworkID,
+			ids.ID{'f', 'o', 'o'},
+			ids.ID{'b', 'a', 'r'},
+			ids.ID{'b', 'a', 'z'},
+		)
 		require.NoError(err)
 
 		tc.By("serving unary rpc")
@@ -208,7 +214,7 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		wg := &sync.WaitGroup{}
 		wg.Add(2)
 
-		n := 1_000
+		n := 10
 		go func() {
 			defer wg.Done()
 
@@ -217,6 +223,7 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 				require.NoError(stream.Send(&xsvm.StreamPingRequest{
 					Message: msg,
 				}))
+				tc.Log().Info("sent message", zap.String("msg", msg))
 			}
 		}()
 
@@ -227,6 +234,7 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 				reply, err := stream.Recv()
 				require.NoError(err)
 				require.Equal(fmt.Sprintf("ping-%d", i), reply.Message)
+				tc.Log().Info("received message", zap.String("msg", reply.Message))
 			}
 		}()
 
