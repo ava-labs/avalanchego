@@ -175,7 +175,7 @@ func (vm *VM) CreateGRPCService(context.Context) (string, http.Handler, error) {
 	server := grpc.NewServer()
 	server.RegisterService(&sd, &grpcService{Log: vm.chainContext.Log})
 
-	return xsvm.Ping_ServiceDesc.ServiceName, server, nil
+	return sd.ServiceName, server, nil
 }
 
 func (*VM) HealthCheck(context.Context) (interface{}, error) {
