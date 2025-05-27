@@ -123,6 +123,8 @@ var (
 		upgradetest.Fortuna:           params.TestFortunaChainConfig,
 	}
 
+	latestKnownFork = upgradetest.Fortuna
+
 	genesisJSONCancun = genesisJSON(activateCancun(params.TestChainConfig))
 
 	apricotRulesPhase0 = *params.GetRulesExtra(params.TestLaunchConfig.Rules(common.Big0, params.IsMergeTODO, 0))
@@ -183,7 +185,7 @@ type testVM struct {
 
 func newVM(t *testing.T, config testVMConfig) *testVM {
 	ctx := snowtest.Context(t, snowtest.CChainID)
-	fork := upgradetest.Latest
+	fork := latestKnownFork
 	if config.fork != nil {
 		fork = *config.fork
 	}
@@ -3692,7 +3694,7 @@ func TestSkipChainConfigCheckCompatible(t *testing.T) {
 	// use the block's timestamp instead of 0 since rewind to genesis
 	// is hardcoded to be allowed in core/genesis.go.
 	newCTX := snowtest.Context(t, tvm.vm.ctx.ChainID)
-	upgradetest.SetTimesTo(&newCTX.NetworkUpgrades, upgradetest.Latest, upgrade.UnscheduledActivationTime)
+	upgradetest.SetTimesTo(&newCTX.NetworkUpgrades, latestKnownFork, upgrade.UnscheduledActivationTime)
 	upgradetest.SetTimesTo(&newCTX.NetworkUpgrades, fork+1, blk.Timestamp())
 	upgradetest.SetTimesTo(&newCTX.NetworkUpgrades, fork, upgrade.InitiallyActiveTime)
 	genesis := []byte(genesisJSON(forkToChainConfig[fork]))

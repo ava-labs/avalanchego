@@ -851,7 +851,7 @@ func TestBlockSignatureRequestsToVM(t *testing.T) {
 }
 
 func TestClearWarpDB(t *testing.T) {
-	ctx, db, genesisBytes, issuer, _ := setupGenesis(t, upgradetest.Latest)
+	ctx, db, genesisBytes, issuer, _ := setupGenesis(t, latestKnownFork)
 	vm := &VM{}
 	require.NoError(t, vm.Initialize(
 		context.Background(),
@@ -884,7 +884,7 @@ func TestClearWarpDB(t *testing.T) {
 	// Restart VM with the same database default should not prune the warp db
 	vm = &VM{}
 	// we need new context since the previous one has registered metrics.
-	ctx, _, _, _, _ = setupGenesis(t, upgradetest.Latest)
+	ctx, _, _, _, _ = setupGenesis(t, latestKnownFork)
 	require.NoError(t, vm.Initialize(
 		context.Background(),
 		ctx,
@@ -908,7 +908,7 @@ func TestClearWarpDB(t *testing.T) {
 	// restart the VM with pruning enabled
 	vm = &VM{}
 	config := `{"prune-warp-db-enabled": true}`
-	ctx, _, _, _, _ = setupGenesis(t, upgradetest.Latest)
+	ctx, _, _, _, _ = setupGenesis(t, latestKnownFork)
 	require.NoError(t, vm.Initialize(
 		context.Background(),
 		ctx,
