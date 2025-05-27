@@ -121,9 +121,8 @@ var (
 		upgradetest.Durango:           params.TestDurangoChainConfig,
 		upgradetest.Etna:              params.TestEtnaChainConfig,
 		upgradetest.Fortuna:           params.TestFortunaChainConfig,
+		upgradetest.Granite:           params.TestGraniteChainConfig,
 	}
-
-	latestKnownFork = upgradetest.Fortuna
 
 	genesisJSONCancun = genesisJSON(activateCancun(params.TestChainConfig))
 
@@ -185,7 +184,7 @@ type testVM struct {
 
 func newVM(t *testing.T, config testVMConfig) *testVM {
 	ctx := snowtest.Context(t, snowtest.CChainID)
-	fork := latestKnownFork
+	fork := upgradetest.Latest
 	if config.fork != nil {
 		fork = *config.fork
 	}
@@ -3694,7 +3693,7 @@ func TestSkipChainConfigCheckCompatible(t *testing.T) {
 	// use the block's timestamp instead of 0 since rewind to genesis
 	// is hardcoded to be allowed in core/genesis.go.
 	newCTX := snowtest.Context(t, tvm.vm.ctx.ChainID)
-	upgradetest.SetTimesTo(&newCTX.NetworkUpgrades, latestKnownFork, upgrade.UnscheduledActivationTime)
+	upgradetest.SetTimesTo(&newCTX.NetworkUpgrades, upgradetest.Latest, upgrade.UnscheduledActivationTime)
 	upgradetest.SetTimesTo(&newCTX.NetworkUpgrades, fork+1, blk.Timestamp())
 	upgradetest.SetTimesTo(&newCTX.NetworkUpgrades, fork, upgrade.InitiallyActiveTime)
 	genesis := []byte(genesisJSON(forkToChainConfig[fork]))

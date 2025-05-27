@@ -24,6 +24,7 @@ import (
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -143,7 +144,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 	// Reset metrics to allow re-initialization
 	vmSetup.syncerVM.ctx.Metrics = metrics.NewPrefixGatherer()
 	stateSyncDisabledConfigJSON := `{"state-sync-enabled":false}`
-	genesisJSON := []byte(genesisJSON(forkToChainConfig[latestKnownFork]))
+	genesisJSON := []byte(genesisJSON(forkToChainConfig[upgradetest.Latest]))
 	if err := syncDisabledVM.Initialize(
 		context.Background(),
 		vmSetup.syncerVM.ctx,
