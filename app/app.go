@@ -40,7 +40,7 @@ type App interface {
 	// It is safe to call Stop multiple times.
 	Stop()
 
-	// ExitCode should only be called after [Start] returns with no error. It
+	// ExitCode should only be called after [Start] returns. It
 	// should block until the application finishes
 	ExitCode() int
 }
