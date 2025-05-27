@@ -12,39 +12,50 @@ import (
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
+// NetworkUpgrades tracks the timestamps of all the Avalanche upgrades.
+//
+// For each upgrade, a nil value means the fork hasn't happened and is not
+// scheduled. A pointer to 0 means the fork has already activated.
 type NetworkUpgrades struct {
-	ApricotPhase1BlockTimestamp *uint64 `json:"apricotPhase1BlockTimestamp,omitempty"` // Apricot Phase 1 Block Timestamp (nil = no fork, 0 = already activated)
-	// Apricot Phase 2 Block Timestamp (nil = no fork, 0 = already activated)
-	// Apricot Phase 2 includes a modified version of the Berlin Hard Fork from Ethereum
+	ApricotPhase1BlockTimestamp *uint64 `json:"apricotPhase1BlockTimestamp,omitempty"` // Apricot Phase 1 Block Timestamp
+	// Apricot Phase 2 Block Timestamp includes a modified version of the Berlin
+	// Hard Fork.
 	ApricotPhase2BlockTimestamp *uint64 `json:"apricotPhase2BlockTimestamp,omitempty"`
-	// Apricot Phase 3 introduces dynamic fees and a modified version of the London Hard Fork from Ethereum (nil = no fork, 0 = already activated)
+	// Apricot Phase 3 introduces dynamic fees and a modified version of the
+	// London Hard Fork.
 	ApricotPhase3BlockTimestamp *uint64 `json:"apricotPhase3BlockTimestamp,omitempty"`
-	// Apricot Phase 4 introduces the notion of a block fee to the dynamic fee algorithm (nil = no fork, 0 = already activated)
+	// Apricot Phase 4 introduces the notion of a block fee to the dynamic fee
+	// algorithm.
 	ApricotPhase4BlockTimestamp *uint64 `json:"apricotPhase4BlockTimestamp,omitempty"`
-	// Apricot Phase 5 introduces a batch of atomic transactions with a maximum atomic gas limit per block. (nil = no fork, 0 = already activated)
+	// Apricot Phase 5 introduces a batch of atomic transactions with a maximum
+	// atomic gas limit per block.
 	ApricotPhase5BlockTimestamp *uint64 `json:"apricotPhase5BlockTimestamp,omitempty"`
-	// Apricot Phase Pre-6 deprecates the NativeAssetCall precompile (soft). (nil = no fork, 0 = already activated)
+	// Apricot Phase Pre-6 deprecates the NativeAssetCall precompile (soft).
 	ApricotPhasePre6BlockTimestamp *uint64 `json:"apricotPhasePre6BlockTimestamp,omitempty"`
-	// Apricot Phase 6 deprecates the NativeAssetBalance and NativeAssetCall precompiles. (nil = no fork, 0 = already activated)
+	// Apricot Phase 6 deprecates the NativeAssetBalance and NativeAssetCall
+	// precompiles.
 	ApricotPhase6BlockTimestamp *uint64 `json:"apricotPhase6BlockTimestamp,omitempty"`
-	// Apricot Phase Post-6 deprecates the NativeAssetCall precompile (soft). (nil = no fork, 0 = already activated)
+	// Apricot Phase Post-6 deprecates the NativeAssetCall precompile (soft).
 	ApricotPhasePost6BlockTimestamp *uint64 `json:"apricotPhasePost6BlockTimestamp,omitempty"`
-	// Banff restricts import/export transactions to AVAX. (nil = no fork, 0 = already activated)
+	// Banff restricts import/export transactions to AVAX.
 	BanffBlockTimestamp *uint64 `json:"banffBlockTimestamp,omitempty"`
-	// Cortina increases the block gas limit to 15M. (nil = no fork, 0 = already activated)
+	// Cortina increases the block gas limit to 15M.
 	CortinaBlockTimestamp *uint64 `json:"cortinaBlockTimestamp,omitempty"`
-	// Durango activates the Shanghai Execution Spec Upgrade from Ethereum (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/shanghai.md#included-eips)
-	// and Avalanche Warp Messaging. (nil = no fork, 0 = already activated)
-	// Note: EIP-4895 is excluded since withdrawals are not relevant to the Avalanche C-Chain or Subnets running the EVM.
+	// Durango activates Avalanche Warp Messaging and the Shanghai Execution
+	// Spec Upgrade (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/shanghai.md#included-eips).
+	//
+	// Note: EIP-4895 is excluded since withdrawals are not relevant to the
+	// Avalanche C-Chain or Subnets running the EVM.
 	DurangoBlockTimestamp *uint64 `json:"durangoBlockTimestamp,omitempty"`
-	// Etna activates Cancun from Ethereum (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/cancun.md#included-eips)
-	// and reduces the min base fee. (nil = no fork, 0 = already activated)
+	// Etna activates Cancun (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/cancun.md#included-eips)
+	// and reduces the min base fee.
 	// Note: EIP-4844 BlobTxs are not enabled in the mempool and blocks are not
 	// allowed to contain them. For details see https://github.com/avalanche-foundation/ACPs/pull/131
 	EtnaTimestamp *uint64 `json:"etnaTimestamp,omitempty"`
-	// Fortuna is a placeholder for the next upgrade.
-	// (nil = no fork, 0 = already activated)
+	// Fortuna modifies the gas price mechanism based on ACP-176
 	FortunaTimestamp *uint64 `json:"fortunaTimestamp,omitempty"`
+	// Granite is a placeholder for the next upgrade.
+	GraniteTimestamp *uint64 `json:"graniteTimestamp,omitempty"`
 }
 
 func (n *NetworkUpgrades) Equal(other *NetworkUpgrades) bool {
@@ -91,6 +102,9 @@ func (n *NetworkUpgrades) checkNetworkUpgradesCompatible(newcfg *NetworkUpgrades
 	if isForkTimestampIncompatible(n.FortunaTimestamp, newcfg.FortunaTimestamp, time) {
 		return ethparams.NewTimestampCompatError("Fortuna fork block timestamp", n.FortunaTimestamp, newcfg.FortunaTimestamp)
 	}
+	if isForkTimestampIncompatible(n.GraniteTimestamp, newcfg.GraniteTimestamp, time) {
+		return ethparams.NewTimestampCompatError("Granite fork block timestamp", n.GraniteTimestamp, newcfg.GraniteTimestamp)
+	}
 
 	return nil
 }
@@ -110,6 +124,7 @@ func (n *NetworkUpgrades) forkOrder() []fork {
 		{name: "durangoBlockTimestamp", timestamp: n.DurangoBlockTimestamp},
 		{name: "etnaTimestamp", timestamp: n.EtnaTimestamp},
 		{name: "fortunaTimestamp", timestamp: n.FortunaTimestamp},
+		{name: "graniteTimestamp", timestamp: n.GraniteTimestamp},
 	}
 }
 
@@ -191,6 +206,12 @@ func (n *NetworkUpgrades) IsFortuna(time uint64) bool {
 	return isTimestampForked(n.FortunaTimestamp, time)
 }
 
+// IsGranite returns whether [time] represents a block
+// with a timestamp after the Granite upgrade time.
+func (n *NetworkUpgrades) IsGranite(time uint64) bool {
+	return isTimestampForked(n.GraniteTimestamp, time)
+}
+
 func (n NetworkUpgrades) Description() string {
 	var banner string
 	banner += fmt.Sprintf(" - Apricot Phase 1 Timestamp:        @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.3.0)\n", ptrToString(n.ApricotPhase1BlockTimestamp))
@@ -205,7 +226,8 @@ func (n NetworkUpgrades) Description() string {
 	banner += fmt.Sprintf(" - Cortina Timestamp:                @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0)\n", ptrToString(n.CortinaBlockTimestamp))
 	banner += fmt.Sprintf(" - Durango Timestamp:                @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0)\n", ptrToString(n.DurangoBlockTimestamp))
 	banner += fmt.Sprintf(" - Etna Timestamp:                   @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0)\n", ptrToString(n.EtnaTimestamp))
-	banner += fmt.Sprintf(" - Fortuna Timestamp:                @%-10v (Unscheduled)\n", ptrToString(n.FortunaTimestamp))
+	banner += fmt.Sprintf(" - Fortuna Timestamp:                @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.13.0)\n", ptrToString(n.FortunaTimestamp))
+	banner += fmt.Sprintf(" - Granite Timestamp:                @%-10v (Unscheduled)\n", ptrToString(n.GraniteTimestamp))
 	return banner
 }
 
@@ -224,6 +246,7 @@ func GetNetworkUpgrades(agoUpgrade upgrade.Config) NetworkUpgrades {
 		DurangoBlockTimestamp:           utils.TimeToNewUint64(agoUpgrade.DurangoTime),
 		EtnaTimestamp:                   utils.TimeToNewUint64(agoUpgrade.EtnaTime),
 		FortunaTimestamp:                utils.TimeToNewUint64(agoUpgrade.FortunaTime),
+		GraniteTimestamp:                utils.TimeToNewUint64(agoUpgrade.GraniteTime),
 	}
 }
 
@@ -235,6 +258,7 @@ type AvalancheRules struct {
 	IsDurango                                                                           bool
 	IsEtna                                                                              bool
 	IsFortuna                                                                           bool
+	IsGranite                                                                           bool
 }
 
 func (n *NetworkUpgrades) GetAvalancheRules(timestamp uint64) AvalancheRules {
@@ -252,6 +276,7 @@ func (n *NetworkUpgrades) GetAvalancheRules(timestamp uint64) AvalancheRules {
 		IsDurango:           n.IsDurango(timestamp),
 		IsEtna:              n.IsEtna(timestamp),
 		IsFortuna:           n.IsFortuna(timestamp),
+		IsGranite:           n.IsGranite(timestamp),
 	}
 }
 
