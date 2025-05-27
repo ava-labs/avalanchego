@@ -98,10 +98,7 @@ func Run(app App) int {
 	signal.Notify(stackTraceSignal, syscall.SIGABRT)
 
 	// start up a new go routine to handle attempts to kill the application
-	var wg sync.WaitGroup
-	wg.Add(1)
 	go func() {
-		defer wg.Done()
 		for range terminationSignals {
 			app.Stop()
 			return
@@ -127,9 +124,6 @@ func Run(app App) int {
 	signal.Stop(stackTraceSignal)
 	close(stackTraceSignal)
 
-	// if there was an error closing or running the application, report that error
-	wg.Wait()
-
 	// return the exit code that the application reported
 	return exitCode
 }
@@ -143,8 +137,7 @@ type app struct {
 }
 
 // Start the business logic of the node (as opposed to config reading, etc).
-// Does not block until the node is done. Errors returned from this method
-// are not logged.
+// Does not block until the node is done.
 func (a *app) Start() {
 	// [p.ExitCode] will block until [p.exitWG.Done] is called
 	a.exitWG.Add(1)
