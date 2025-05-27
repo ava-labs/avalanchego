@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/rpcsigner"
 	"github.com/ava-labs/avalanchego/utils/perms"
+	"github.com/ava-labs/libevm/log"
 )
 
 var errMissingStakingSigningKeyFile = errors.New("missing staking signing key file")
@@ -28,6 +29,7 @@ func GetStakingSigner(
 ) (bls.Signer, error) {
 	switch cfg := config.(type) {
 	case node.EphemeralSignerConfig:
+		log.Info("creating ephemeral signer")
 		signer, err := localsigner.New()
 		if err != nil {
 			return nil, fmt.Errorf("couldn't generate ephemeral signer: %w", err)
@@ -36,6 +38,7 @@ func GetStakingSigner(
 		return signer, nil
 
 	case node.ContentKeyConfig:
+		log.Info("creating signer from key content")
 		signerKeyContent, err := base64.StdEncoding.DecodeString(cfg.SignerKeyRawContent)
 		if err != nil {
 			return nil, fmt.Errorf("unable to decode base64 content: %w", err)
@@ -49,6 +52,7 @@ func GetStakingSigner(
 		return signer, nil
 
 	case node.RPCSignerConfig:
+		log.Info("creating RPC signer")
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		signer, err := rpcsigner.NewClient(ctx, cfg.StakingSignerRPC)
 		cancel()
@@ -61,12 +65,15 @@ func GetStakingSigner(
 	case node.SignerPathConfig:
 		_, err := os.Stat(cfg.SigningKeyPath)
 		if !errors.Is(err, fs.ErrNotExist) {
+			log.Info("creating signer from file")
 			return createSignerFromFile(cfg.SigningKeyPath)
 		}
 
 		if cfg.SignerPathIsSet {
 			return nil, errMissingStakingSigningKeyFile
 		}
+
+		log.Info("creating signer from new key")
 
 		signer, err := localsigner.New()
 		if err != nil {

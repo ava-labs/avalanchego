@@ -1295,14 +1295,12 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	// Health
 	nodeConfig.HealthCheckFreq = v.GetDuration(HealthCheckFreqKey)
 	if nodeConfig.HealthCheckFreq < 0 {
-		err = fmt.Errorf("%s must be positive", HealthCheckFreqKey)
-		return node.Config{}, err
+		return node.Config{}, fmt.Errorf("%s must be positive", HealthCheckFreqKey)
 	}
 	// Halflife of continuous averager used in health checks
 	healthCheckAveragerHalflife := v.GetDuration(HealthCheckAveragerHalflifeKey)
 	if healthCheckAveragerHalflife <= 0 {
-		err = fmt.Errorf("%s must be positive", HealthCheckAveragerHalflifeKey)
-		return node.Config{}, err
+		return node.Config{}, fmt.Errorf("%s must be positive", HealthCheckAveragerHalflifeKey)
 	}
 
 	// Router
@@ -1340,14 +1338,12 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	// Subnet Configs
 	subnetConfigs, err := getSubnetConfigs(v, nodeConfig.TrackedSubnets.List())
 	if err != nil {
-		err = fmt.Errorf("couldn't read subnet configs: %w", err)
-		return node.Config{}, err
+		return node.Config{}, fmt.Errorf("couldn't read subnet configs: %w", err)
 	}
 
 	primaryNetworkConfig := getDefaultSubnetConfig(v)
 	if err := primaryNetworkConfig.Valid(); err != nil {
-		err = fmt.Errorf("invalid consensus parameters: %w", err)
-		return node.Config{}, err
+		return node.Config{}, fmt.Errorf("invalid consensus parameters: %w", err)
 	}
 	subnetConfigs[constants.PrimaryNetworkID] = primaryNetworkConfig
 
