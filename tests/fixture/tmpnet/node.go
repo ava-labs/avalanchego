@@ -133,10 +133,14 @@ func (n *Node) getRuntime() NodeRuntime {
 			n.runtime = &ProcessRuntime{
 				node: n,
 			}
-		} else {
+		} else if n.getRuntimeConfig().Kube != nil {
 			n.runtime = &KubeRuntime{
 				node: n,
 			}
+		} else {
+			// Runtime configuration is validated during flag handling and network
+			// bootstrap so for this to be missing would be very unusual.
+			panic(fmt.Sprintf("no runtime configuration set for %q", n.NodeID))
 		}
 	}
 	return n.runtime
