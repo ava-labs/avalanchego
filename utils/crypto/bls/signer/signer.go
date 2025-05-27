@@ -25,7 +25,6 @@ var (
 func GetStakingSigner(
 	config interface{},
 ) (bls.Signer, error) {
-
 	switch cfg := config.(type) {
 	case node.EphemeralSignerConfig:
 		signer, err := localsigner.New()

@@ -13,11 +13,13 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/subnets"
+	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/config/node"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
@@ -545,6 +547,79 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				return
 			}
 			test.testF(require, subnetConfigs)
+		})
+	}
+}
+
+func TestGetStakingSigner(t *testing.T) {
+	testKey := "HLimS3vRibTMk9lZD4b+Z+GLuSBShvgbsu0WTLt2Kd4="
+	type cfg map[string]any
+
+	tests := []struct {
+		name                     string
+		viperKeys                string
+		config                   cfg
+		expectedSignerConfigType interface{}
+		expectedErr              error
+	}{
+		{
+			name:                     "default-signer",
+			expectedSignerConfigType: node.SignerPathConfig{},
+		},
+		{
+			name:                     "ephemeral-signer",
+			config:                   cfg{StakingEphemeralSignerEnabledKey: true},
+			expectedSignerConfigType: node.EphemeralSignerConfig{},
+		},
+		{
+			name:                     "content-key",
+			config:                   cfg{StakingSignerKeyContentKey: testKey},
+			expectedSignerConfigType: node.ContentKeyConfig{},
+		},
+		{
+			name: "file-key",
+			config: cfg{
+				StakingSignerKeyPathKey: func() string {
+					filePath := filepath.Join(t.TempDir(), "signer.key")
+					bytes, err := base64.StdEncoding.DecodeString(testKey)
+					require.NoError(t, err)
+					require.NoError(t, os.WriteFile(filePath, bytes, perms.ReadWrite))
+					return filePath
+				}(),
+			},
+			expectedSignerConfigType: node.SignerPathConfig{},
+		},
+		{
+			name:                     "rpc-signer",
+			config:                   cfg{StakingRPCSignerKey: "localhost"},
+			expectedSignerConfigType: node.RPCSignerConfig{},
+		},
+		{
+			name: "multiple-configurations-set",
+			config: cfg{
+				StakingEphemeralSignerEnabledKey: true,
+				StakingSignerKeyContentKey:       testKey,
+			},
+			expectedErr: errInvalidSignerConfig,
+		},
+	}
+
+	// required for proper write permissions for the default signer-key location
+	t.Setenv("HOME", t.TempDir())
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			v := setupViperFlags()
+
+			for key, value := range tt.config {
+				v.Set(key, value)
+			}
+
+			config, err := GetNodeConfig(v)
+
+			require.ErrorIs(err, tt.expectedErr)
+			require.IsType(tt.expectedSignerConfigType, config.StakingSignerConfig)
 		})
 	}
 }
