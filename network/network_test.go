@@ -478,7 +478,7 @@ func TestOnRequestHonoursDeadline(t *testing.T) {
 
 	requestHandler.response, err = marshalStruct(codecManager, TestMessage{Message: "hi there"})
 	assert.NoError(t, err)
-	assert.NoError(t, net.AppRequest(context.Background(), nodeID, 1, time.Now().Add(1*time.Millisecond), requestBytes))
+	assert.NoError(t, net.AppRequest(context.Background(), nodeID, 0, time.Now().Add(1*time.Millisecond), requestBytes))
 	// ensure the handler didn't get called (as peer.Network would've dropped the request)
 	assert.EqualValues(t, requestHandler.calls, 0)
 
@@ -543,7 +543,7 @@ func TestHandleInvalidMessages(t *testing.T) {
 func TestNetworkPropagatesRequestHandlerError(t *testing.T) {
 	codecManager := buildCodec(t, TestMessage{})
 	nodeID := ids.GenerateTestNodeID()
-	requestID := uint32(1)
+	requestID := uint32(0)
 	sender := testAppSender{}
 
 	ctx := snowtest.Context(t, snowtest.CChainID)
@@ -596,13 +596,14 @@ func TestNetworkRouting(t *testing.T) {
 
 	nodeID := ids.GenerateTestNodeID()
 	foobar := append([]byte{byte(protocol)}, []byte("foobar")...)
-	require.NoError(network.AppRequest(context.Background(), nodeID, 0, time.Time{}, foobar))
+	// forward it to the sdk handler
+	require.NoError(network.AppRequest(context.Background(), nodeID, 1, time.Now().Add(5*time.Second), foobar))
 	require.True(handler.appRequested)
 
-	err = network.AppResponse(context.Background(), ids.GenerateTestNodeID(), 0, foobar)
+	err = network.AppResponse(context.Background(), ids.GenerateTestNodeID(), 1, foobar)
 	require.ErrorIs(err, p2p.ErrUnrequestedResponse)
 
-	err = network.AppRequestFailed(context.Background(), nodeID, 0, common.ErrTimeout)
+	err = network.AppRequestFailed(context.Background(), nodeID, 1, common.ErrTimeout)
 	require.ErrorIs(err, p2p.ErrUnrequestedResponse)
 }
 
