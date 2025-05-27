@@ -9,7 +9,6 @@
 ./scripts/build.sh        # Builds avalanchego for use in deploying a test network
 ./scripts/build_xsvm.sh   # Builds xsvm for use in deploying a test network with a subnet
 ./bin/ginkgo -v ./tests/e2e -- --avalanchego-path=$PWD/build/avalanchego # Note that the path given for --avalanchego-path must be an absolute and not a relative path.
-./bin/ginkgo -v ./tests/load/c -- --avalanchego-path=$PWD/build/avalanchego
 ```
 
 See [`tests.e2e.sh`](../../scripts/tests.e2e.sh) for an example.
@@ -30,6 +29,7 @@ declarative labels that have been applied to them. Available labels
 are defined as constants in [`describe.go`](../fixture/e2e/describe.go) with names
 of the form `*Label`. The following example runs only those tests that
 primarily target the X-Chain:
+
 
 ```bash
 ./bin/ginkgo -v --label-filter=x ./tests/e2e -- --avalanchego-path=$PWD/build/avalanchego
@@ -113,26 +113,27 @@ E2E_SKIP_BOOTSTRAP_CHECKS=1 ./bin/ginkgo -v ./tests/e2e ...
 It is possible to enable collection of logs and metrics from the
 temporary networks used for e2e testing by:
 
-- Supplying `--start-collectors` as an argument to the test suite
-- Starting collectors in advance of a test run with `tmpnetctl
-   start-collectors`
+ - Supplying `--start-metrics-collector` and `--start-logs-collector`
+   as arguments to the test suite
+ - Starting collectors in advance of a test run with `tmpnetctl
+   start-metrics-collector` and ` tmpnetctl start-logs-collector`
 
 Both methods require:
 
-- Auth credentials to be supplied as env vars:
-  - `PROMETHEUS_USERNAME`
-  - `PROMETHEUS_PASSWORD`
-  - `LOKI_USERNAME`
-  - `LOKI_PASSWORD`
-- The availability in the path of binaries for promtail and prometheus
-  - Starting a development shell with `nix develop` is one way to
-     ensure this and requires the [installation of
-     nix](https://github.com/DeterminateSystems/nix-installer?tab=readme-ov-file#install-nix).
+ - Auth credentials to be supplied as env vars:
+   - `PROMETHEUS_USERNAME`
+   - `PROMETHEUS_PASSWORD`
+   - `LOKI_USERNAME`
+   - `LOKI_PASSWORD`
+ - The availability in the path of binaries for promtail and prometheus
+   - Starting a development shell with `nix develop` is one way to
+     ensure this and requires the installation of nix
+     (e.g. `./scripts/run_task.sh install-nix`).
 
 Once started, the collectors will continue to run in the background
-until stopped by `tmpnetctl stop-collectors`.
+until stopped by `tmpnetctl stop-metrics-collector` and `tmpnetctl stop-logs-collector`.
 
 The results of collection will be viewable at
-<https://grafana-poc.avax-dev.network>.
+https://grafana-poc.avax-dev.network.
 
 For more detail, see the [tmpnet docs](../fixture/tmpnet/README.md##monitoring).

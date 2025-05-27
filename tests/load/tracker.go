@@ -6,10 +6,6 @@ package load
 import (
 	"sync"
 	"time"
-
-	"github.com/prometheus/client_golang/prometheus"
-
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const namespace = "load"
@@ -25,111 +21,77 @@ type Tracker[T TxID] struct {
 	txsConfirmed uint64
 	txsFailed    uint64
 
-	// metrics
-	txsIssuedCounter    prometheus.Counter
-	txsConfirmedCounter prometheus.Counter
-	txsFailedCounter    prometheus.Counter
-	txLatency           prometheus.Histogram
+	metrics *Metrics
 }
 
 // NewTracker returns a new Tracker instance which records metrics for the number
 // of transactions issued, confirmed, and failed. It also tracks the latency of
 // transactions.
-func NewTracker[T TxID](reg prometheus.Registerer) (*Tracker[T], error) {
-	tracker := &Tracker[T]{
+func NewTracker[T TxID](metrics *Metrics) *Tracker[T] {
+	return &Tracker[T]{
 		outstandingTxs: make(map[T]time.Time),
-		txsIssuedCounter: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "txs_issued",
-			Help:      "Number of transactions issued",
-		}),
-		txsConfirmedCounter: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "txs_confirmed",
-			Help:      "Number of transactions confirmed",
-		}),
-		txsFailedCounter: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "txs_failed",
-			Help:      "Number of transactions failed",
-		}),
-		txLatency: prometheus.NewHistogram(prometheus.HistogramOpts{
-			Namespace: namespace,
-			Name:      "tx_latency",
-			Help:      "Latency of transactions",
-		}),
+		metrics:        metrics,
 	}
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		reg.Register(tracker.txsIssuedCounter),
-		reg.Register(tracker.txsConfirmedCounter),
-		reg.Register(tracker.txsFailedCounter),
-		reg.Register(tracker.txLatency),
-	)
-	return tracker, errs.Err
 }
 
 // GetObservedConfirmed returns the number of transactions that the tracker has
 // confirmed were accepted.
-func (p *Tracker[_]) GetObservedConfirmed() uint64 {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
+func (t *Tracker[_]) GetObservedConfirmed() uint64 {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
 
-	return p.txsConfirmed
+	return t.txsConfirmed
 }
 
 // GetObservedFailed returns the number of transactions that the tracker has
 // confirmed failed.
-func (p *Tracker[_]) GetObservedFailed() uint64 {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
+func (t *Tracker[_]) GetObservedFailed() uint64 {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
 
-	return p.txsFailed
+	return t.txsFailed
 }
 
 // GetObservedIssued returns the number of transactions that the tracker has
 // confirmed were issued.
-func (p *Tracker[_]) GetObservedIssued() uint64 {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
+func (t *Tracker[_]) GetObservedIssued() uint64 {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
 
-	return p.txsIssued
+	return t.txsIssued
 }
 
 // Issue records a transaction that was submitted, but whose final status is
 // not yet known.
-func (p *Tracker[T]) Issue(txID T) {
-	p.lock.Lock()
-	defer p.lock.Unlock()
+func (t *Tracker[T]) Issue(txID T) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
 
-	p.outstandingTxs[txID] = time.Now()
-	p.txsIssued++
-	p.txsIssuedCounter.Inc()
+	t.outstandingTxs[txID] = time.Now()
+	t.txsIssued++
+	t.metrics.IncIssuedTx()
 }
 
 // ObserveConfirmed records a transaction that was confirmed.
-func (p *Tracker[T]) ObserveConfirmed(txID T) {
-	p.lock.Lock()
-	defer p.lock.Unlock()
+func (t *Tracker[T]) ObserveConfirmed(txID T) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
 
-	startTime := p.outstandingTxs[txID]
-	delete(p.outstandingTxs, txID)
+	startTime := t.outstandingTxs[txID]
+	delete(t.outstandingTxs, txID)
 
-	p.txsConfirmed++
-	p.txsConfirmedCounter.Inc()
-	p.txLatency.Observe(float64(time.Since(startTime).Milliseconds()))
+	t.txsConfirmed++
+	t.metrics.RecordConfirmedTx(float64(time.Since(startTime).Milliseconds()))
 }
 
 // ObserveFailed records a transaction that failed (e.g. expired)
-func (p *Tracker[T]) ObserveFailed(txID T) {
-	p.lock.Lock()
-	defer p.lock.Unlock()
+func (t *Tracker[T]) ObserveFailed(txID T) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
 
-	startTime := p.outstandingTxs[txID]
-	delete(p.outstandingTxs, txID)
+	startTime := t.outstandingTxs[txID]
+	delete(t.outstandingTxs, txID)
 
-	p.txsFailed++
-	p.txsFailedCounter.Inc()
-	p.txLatency.Observe(float64(time.Since(startTime).Milliseconds()))
+	t.txsFailed++
+	t.metrics.RecordFailedTx(float64(time.Since(startTime).Milliseconds()))
 }

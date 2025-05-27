@@ -12,6 +12,7 @@ import (
 	"io"
 	"io/fs"
 	"maps"
+	"net"
 	"net/netip"
 	"os"
 	"os/exec"
@@ -235,6 +236,26 @@ func (p *ProcessRuntime) WaitForStopped(ctx context.Context) error {
 	}
 }
 
+// Restarts the node
+func (p *ProcessRuntime) Restart(ctx context.Context) error {
+	if p.getRuntimeConfig().ReuseDynamicPorts {
+		// Attempt to save the API port currently being used so the
+		// restarted node can reuse it. This may result in the node
+		// failing to start if the operating system allocates the port
+		// to a different process between node stop and start.
+		if err := p.saveAPIPort(); err != nil {
+			return err
+		}
+	}
+	if err := p.node.Stop(ctx); err != nil {
+		return fmt.Errorf("failed to stop node %s: %w", p.node.NodeID, err)
+	}
+	if err := p.Start(ctx); err != nil {
+		return fmt.Errorf("failed to start node %s: %w", p.node.NodeID, err)
+	}
+	return nil
+}
+
 func (p *ProcessRuntime) IsHealthy(ctx context.Context) (bool, error) {
 	// Check that the node process is running as a precondition for
 	// checking health. getProcess will also ensure that the node's
@@ -351,7 +372,7 @@ func (p *ProcessRuntime) writeMonitoringConfig() error {
 func (p *ProcessRuntime) getMonitoringConfigPath(name string) (string, error) {
 	// Ensure a unique filename to allow config files to be added and removed
 	// by multiple nodes without conflict.
-	serviceDiscoveryDir, err := getServiceDiscoveryDir(name)
+	serviceDiscoveryDir, err := GetServiceDiscoveryDir(name)
 	if err != nil {
 		return "", err
 	}
@@ -402,6 +423,22 @@ func (p *ProcessRuntime) GetLocalURI(_ context.Context) (string, func(), error) 
 
 func (p *ProcessRuntime) GetLocalStakingAddress(_ context.Context) (netip.AddrPort, func(), error) {
 	return p.node.StakingAddress, func() {}, nil
+}
+
+// Saves the currently allocated API port to the node's configuration
+// for use across restarts.
+func (p *ProcessRuntime) saveAPIPort() error {
+	hostPort := strings.TrimPrefix(p.node.URI, "http://")
+	if len(hostPort) == 0 {
+		// Without an API URI there is nothing to save
+		return nil
+	}
+	_, port, err := net.SplitHostPort(hostPort)
+	if err != nil {
+		return err
+	}
+	p.node.Flags[config.HTTPPortKey] = port
+	return nil
 }
 
 // watchLogFileForFatal waits for the specified file path to exist and then checks each of

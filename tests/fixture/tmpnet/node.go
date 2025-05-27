@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"maps"
-	"net"
 	"net/http"
 	"net/netip"
 	"os"
@@ -58,6 +57,7 @@ type NodeRuntime interface {
 	Start(ctx context.Context) error
 	InitiateStop(ctx context.Context) error
 	WaitForStopped(ctx context.Context) error
+	Restart(ctx context.Context) error
 	IsHealthy(ctx context.Context) (bool, error)
 }
 
@@ -163,6 +163,10 @@ func (n *Node) InitiateStop(ctx context.Context) error {
 
 func (n *Node) WaitForStopped(ctx context.Context) error {
 	return n.getRuntime().WaitForStopped(ctx)
+}
+
+func (n *Node) Restart(ctx context.Context) error {
+	return n.getRuntime().Restart(ctx)
 }
 
 func (n *Node) readState(ctx context.Context) error {
@@ -383,22 +387,6 @@ func (n *Node) composeFlags() (FlagsMap, error) {
 	return flags, nil
 }
 
-// Saves the currently allocated API port to the node's configuration
-// for use across restarts.
-func (n *Node) SaveAPIPort() error {
-	hostPort := strings.TrimPrefix(n.URI, "http://")
-	if len(hostPort) == 0 {
-		// Without an API URI there is nothing to save
-		return nil
-	}
-	_, port, err := net.SplitHostPort(hostPort)
-	if err != nil {
-		return err
-	}
-	n.Flags[config.HTTPPortKey] = port
-	return nil
-}
-
 // WaitForHealthy blocks until node health is true or an error (including context timeout) is observed.
 func (n *Node) WaitForHealthy(ctx context.Context) error {
 	if _, ok := ctx.Deadline(); !ok {
@@ -451,4 +439,8 @@ func (n *Node) getMonitoringLabels() map[string]string {
 		}
 	}
 	return labels
+}
+
+func (n *Node) IsRunning() bool {
+	return len(n.URI) > 0
 }

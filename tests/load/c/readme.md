@@ -1,16 +1,15 @@
 # Load testing
 
-The C-chain load test entrypoint is in [ginkgo_test.go](ginkgo_test.go).
+The C-chain load test entrypoint is in [load_test.go](load_test.go).
 
 It runs with 5 nodes and 5 "agents".
 
 Each "agent" runs a transaction issuer and a transaction listener asynchronously,
 and is assigned uniformly to the nodes available, via websocket connections.
 
-There are two load tests:
+The load test picks at weighted random a transaction type to generate and issue, defined in [issuer.go](issuer.go).
 
-1. "Simple" load test, where transactions issued are zero-fund transfers to the sender address.
-2. "Complex" load test, where [this contract](contracts/EVMLoadSimulator.sol) is deployed and transactions call functions of this contract at random with random parameters. This contract has different functions, each testing a particular performance aspect of the EVM, for example memory writes.
+For some transaction types, [this contract](contracts/EVMLoadSimulator.sol) is deployed and transactions call functions of this contract. This contract has different functions, each testing a particular performance aspect of the EVM, for example memory writes.
 
 From the load test perspective, only the TPS (transactions per second) is logged out. Metrics available are:
 
@@ -19,27 +18,70 @@ From the load test perspective, only the TPS (transactions per second) is logged
 - total transactions failed `txs_failed`
 - transaction latency histogram `tx_latency`
 
-There are more interesting metrics available from the tmpnet nodes being load tested. The following sub-sections explain how to set up the monitoring stack to visualize the metrics during the load tests.
+There are more interesting metrics available from the tmpnet nodes being load tested.
 
-## Prometheus
+Finally, to run the load test, run:
 
-1. Navigate to this directory with `cd tests/load/c`.
-1. Setup the Prometheus configuration file: `envsubst < prometheus.template.yml > prometheus.yml`
-1. Launch Prometheus using the dev shell:
+```bash
+# Start the dev shell
+nix develop
+# Start the load test
+task test-load
+# If you don't have access to the Ava Labs CI monitoring stack, use:
+task test-load-local
+```
+
+## Visualize metrics in Grafana
+
+### Private remote instances
+
+If you have the credentials (internal to Ava Labs) for the CI monitoring stack, you can visualize the metrics following these steps:
+
+1. Start a dev shell to ensure `prometheus` and `promtail` binaries are available to the test runner so it can use them to collect metrics and logs:
 
     ```bash
     nix develop
     ```
 
-    ```nix
-    prometheus --config.file prometheus.yml
+1. Set your monitoring credentials using the credentials you can find in your password manager
+
+    ```bash
+    export PROMETHEUS_USERNAME=<username>
+    export PROMETHEUS_PASSWORD=<password>
+    export LOKI_USERNAME=<username>
+    export LOKI_PASSWORD=<password>
+    ```
+
+1. Run the load test:
+
+    ```bash
+    task test-load
+    ```
+
+1. Wait for the load test to finish, this will log out a URL at the end of the test, in the form
+
+    ```log
+    INFO metrics and logs available via grafana (collectors must be running)     {"uri": "https://grafana-poc.avax-dev.network/d/eabddd1d-0a06-4ba1-8e68-a44504e37535/C-Chain%20Load?from=1747817500582&to=1747817952631&var-filter=network_uuid%7C%3D%7C4f419e3a-dba5-4ccd-b2fd-bda15f9826ff"}
+    ```
+
+1. Open the URL in your browser, and log in with the Grafana credentials which you can find in your password manager.
+
+For reference, see [the tmpnet monitoring section](../../fixture/tmpnet/README.md#monitoring)
+
+### Locally
+
+1. Create a directory `/yourpath` to store the Prometheus configuration file and its data.
+1. Setup the Prometheus configuration file: `envsubst < tests/load/c/prometheus.template.yml > /yourpath/prometheus.yml`
+1. Launch Prometheus using the dev shell:
+
+    ```bash
+    nix develop
+    cd /yourpath
+    prometheus --config.file /yourpath/prometheus.yml
     ```
 
     This starts Prometheus listening on port `9090`.
-
-## Grafana
-
-1. In a separate terminal, install and launch the Grafana service:
+1. In a separate terminal, install and launch the Grafana service. For example on MacOS:
 
     ```bash
     brew install grafana
@@ -52,13 +94,5 @@ There are more interesting metrics available from the tmpnet nodes being load te
     1. Name it `prometheus`
     1. In the Connection section, set the URL to `http://localhost:9090`
     1. Click the "Save & Test" button at the bottom to verify the connection.
-1. Create a dashboard at [localhost:3000/dashboard/new?editview=json-model](http://localhost:3000/dashboard/new?editview=json-model) and paste the JSON content of [`dashboard.json`](dashboard.json) into the text area, and click "Save changes".
+1. Create a dashboard at [localhost:3000/dashboard/new?editview=json-model](http://localhost:3000/dashboard/new?editview=json-model) and paste the JSON content of [`dashboard.json`](https://github.com/ava-labs/avalanche-monitoring/blob/main/grafana/dashboards/c_chain_load.json) into the text area, and click "Save changes".
 1. Open the Load testing dashboard at [localhost:3000/d/aejze3k4d0mpsb/load-testing](http://localhost:3000/d/aejze3k4d0mpsb/load-testing)
-
-## Run the load test
-
-From the root of the repository:
-
-```bash
-./bin/ginkgo -v tests/load/c -- --avalanchego-path=$PWD/build/avalanchego
-```

@@ -44,7 +44,6 @@ type VM struct {
 	chainContext *snow.Context
 	db           database.Database
 	genesis      *genesis.Genesis
-	engineChan   chan<- common.Message
 
 	chain   chain.Chain
 	builder builder.Builder
@@ -107,7 +106,6 @@ func (vm *VM) Initialize(
 	}
 
 	vm.genesis = g
-	vm.engineChan = engineChan
 
 	vm.chain, err = chain.New(chainContext, vm.db)
 	if err != nil {

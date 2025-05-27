@@ -32,7 +32,6 @@ type metrics struct {
 	numProcessingAncestorFetchesDropped   prometheus.Counter
 	numProcessingAncestorFetchesSucceeded prometheus.Counter
 	numProcessingAncestorFetchesUnneeded  prometheus.Counter
-	getAncestorsBlks                      metric.Averager
 	selectedVoteIndex                     metric.Averager
 	issuerStake                           metric.Averager
 	issued                                *prometheus.CounterVec
@@ -97,12 +96,6 @@ func newMetrics(reg prometheus.Registerer) (*metrics, error) {
 			Name: "num_processing_ancestor_fetches_unneeded",
 			Help: "Number of votes that were directly applied to blocks",
 		}),
-		getAncestorsBlks: metric.NewAveragerWithErrs(
-			"get_ancestors_blks",
-			"blocks fetched in a call to GetAncestors",
-			reg,
-			&errs,
-		),
 		selectedVoteIndex: metric.NewAveragerWithErrs(
 			"selected_vote_index",
 			"index of the voteID that was passed into consensus",
