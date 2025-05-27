@@ -188,7 +188,7 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		uri := strings.TrimPrefix(e2e.GetEnv(tc).GetRandomNodeURI().URI, "http://")
 		conn, err := grpcapi.NewClient(
 			uri,
-			e2e.GetEnv(tc).GetNetwork().NetworkID,
+			e2e.GetEnv(tc).GetNetwork().GetNetworkID(),
 			ids.ID{'f', 'o', 'o'},
 			ids.ID{'b', 'a', 'r'},
 			ids.ID{'b', 'a', 'z'},
