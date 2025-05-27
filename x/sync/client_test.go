@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/trace"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -43,7 +42,7 @@ func newFlakyRangeProofHandler(
 	db merkledb.MerkleDB,
 	modifyResponse func(response *merkledb.RangeProof),
 ) p2p.Handler {
-	handler := NewGetRangeProofHandler(logging.NoLog{}, db)
+	handler := NewGetRangeProofHandler(db)
 
 	c := counter{m: 2}
 	return &p2p.TestHandler{
@@ -79,7 +78,7 @@ func newFlakyChangeProofHandler(
 	db merkledb.MerkleDB,
 	modifyResponse func(response *merkledb.ChangeProof),
 ) p2p.Handler {
-	handler := NewGetChangeProofHandler(logging.NoLog{}, db)
+	handler := NewGetChangeProofHandler(db)
 
 	c := counter{m: 2}
 	return &p2p.TestHandler{

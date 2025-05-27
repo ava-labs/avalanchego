@@ -212,7 +212,6 @@ func NewTestNetwork(
 	router router.ExternalHandler,
 ) (Network, error) {
 	msgCreator, err := message.NewCreator(
-		logging.NoLog{},
 		metrics,
 		constants.DefaultNetworkCompressionType,
 		constants.DefaultNetworkMaximumInboundTimeout,

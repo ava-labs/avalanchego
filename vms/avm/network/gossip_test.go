@@ -63,15 +63,11 @@ func TestGossipMempoolAdd(t *testing.T) {
 	baseMempool, err := mempool.New("", metrics, toEngine)
 	require.NoError(err)
 
-	parser, err := txs.NewParser(nil)
-	require.NoError(err)
-
 	mempool, err := newGossipMempool(
 		baseMempool,
 		metrics,
 		logging.NoLog{},
 		testVerifier{},
-		parser,
 		DefaultConfig.ExpectedBloomFilterElements,
 		DefaultConfig.ExpectedBloomFilterFalsePositiveProbability,
 		DefaultConfig.MaxBloomFilterFalsePositiveProbability,
@@ -100,9 +96,6 @@ func TestGossipMempoolAddVerified(t *testing.T) {
 	baseMempool, err := mempool.New("", metrics, toEngine)
 	require.NoError(err)
 
-	parser, err := txs.NewParser(nil)
-	require.NoError(err)
-
 	mempool, err := newGossipMempool(
 		baseMempool,
 		metrics,
@@ -110,7 +103,6 @@ func TestGossipMempoolAddVerified(t *testing.T) {
 		testVerifier{
 			err: errTest, // We shouldn't be attempting to verify the tx in this flow
 		},
-		parser,
 		DefaultConfig.ExpectedBloomFilterElements,
 		DefaultConfig.ExpectedBloomFilterFalsePositiveProbability,
 		DefaultConfig.MaxBloomFilterFalsePositiveProbability,

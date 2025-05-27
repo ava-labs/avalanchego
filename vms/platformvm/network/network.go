@@ -31,7 +31,6 @@ type Network struct {
 	log                       logging.Logger
 	mempool                   *gossipMempool
 	partialSyncPrimaryNetwork bool
-	appSender                 common.AppSender
 
 	txPushGossiper        *gossip.PushGossiper[*txs.Tx]
 	txPushGossipFrequency time.Duration
@@ -178,7 +177,6 @@ func New(
 		log:                       log,
 		mempool:                   gossipMempool,
 		partialSyncPrimaryNetwork: partialSyncPrimaryNetwork,
-		appSender:                 appSender,
 		txPushGossiper:            txPushGossiper,
 		txPushGossipFrequency:     config.PushGossipFrequency,
 		txPullGossiper:            txPullGossiper,

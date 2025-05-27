@@ -215,7 +215,6 @@ func New(
 	}
 
 	n.msgCreator, err = message.NewCreator(
-		n.Log,
 		networkRegisterer,
 		n.Config.NetworkConfig.CompressionType,
 		n.Config.NetworkConfig.MaximumInboundMessageTimeout,
@@ -1011,7 +1010,6 @@ func (n *Node) initAPIServer() error {
 
 	n.APIServer, err = server.New(
 		n.Log,
-		n.LogFactory,
 		listener,
 		n.Config.HTTPAllowedOrigins,
 		n.Config.ShutdownTimeout,

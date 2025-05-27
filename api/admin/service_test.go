@@ -22,7 +22,6 @@ import (
 
 type loadVMsTest struct {
 	admin          *Admin
-	ctrl           *gomock.Controller
 	mockVMManager  *vmsmock.Manager
 	mockVMRegistry *registrymock.VMRegistry
 }
@@ -39,7 +38,6 @@ func initLoadVMsTest(t *testing.T) *loadVMsTest {
 			VMRegistry: mockVMRegistry,
 			VMManager:  mockVMManager,
 		}},
-		ctrl:           ctrl,
 		mockVMManager:  mockVMManager,
 		mockVMRegistry: mockVMRegistry,
 	}

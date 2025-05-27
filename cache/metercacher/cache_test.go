@@ -16,32 +16,31 @@ import (
 )
 
 func TestInterface(t *testing.T) {
-	type scenario struct {
-		description string
-		setup       func(size int) cache.Cacher[ids.ID, int64]
-	}
-
-	scenarios := []scenario{
+	scenarios := []struct {
+		name  string
+		setup func(size int) cache.Cacher[ids.ID, int64]
+	}{
 		{
-			description: "cache LRU",
+			name: "cache LRU",
 			setup: func(size int) cache.Cacher[ids.ID, int64] {
 				return lru.NewCache[ids.ID, int64](size)
 			},
 		},
 		{
-			description: "sized cache LRU",
+			name: "sized cache LRU",
 			setup: func(size int) cache.Cacher[ids.ID, int64] {
 				return lru.NewSizedCache(size*cachetest.IntSize, cachetest.IntSizeFunc)
 			},
 		},
 	}
-
 	for _, scenario := range scenarios {
-		for _, test := range cachetest.Tests {
-			baseCache := scenario.setup(test.Size)
-			c, err := New("", prometheus.NewRegistry(), baseCache)
-			require.NoError(t, err)
-			test.Func(t, c)
-		}
+		t.Run(scenario.name, func(t *testing.T) {
+			for _, test := range cachetest.Tests {
+				baseCache := scenario.setup(test.Size)
+				c, err := New("", prometheus.NewRegistry(), baseCache)
+				require.NoError(t, err)
+				test.Func(t, c)
+			}
+		})
 	}
 }
