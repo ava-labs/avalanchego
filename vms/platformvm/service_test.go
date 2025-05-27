@@ -1524,18 +1524,18 @@ func TestGetCurrentValidatorsForL1(t *testing.T) {
 					require.Equal(avajson.Uint64(staker.Weight), v.Weight)
 					require.Equal(staker.StartTime.Unix(), int64(v.StartTime))
 					return v.NodeID
-				case APIL1Validator:
-					validator, exists := l1ValidatorsByVID[v.ValidationID]
+				case pchainapi.APIL1Validator:
+					validator, exists := l1ValidatorsByVID[*v.ValidationID]
 					require.True(exists, "unexpected validator: %s", vdr)
 					require.Equal(validator.NodeID, v.NodeID)
 					require.Equal(avajson.Uint64(validator.Weight), v.Weight)
 					require.Equal(validator.StartTime, uint64(v.StartTime))
 					accruedFees := service.vm.state.GetAccruedFees()
-					require.Equal(avajson.Uint64(validator.EndAccumulatedFee-accruedFees), v.Balance)
-					require.Equal(avajson.Uint64(validator.MinNonce), v.MinNonce)
+					require.Equal(avajson.Uint64(validator.EndAccumulatedFee-accruedFees), *v.Balance)
+					require.Equal(avajson.Uint64(validator.MinNonce), *v.MinNonce)
 					require.Equal(
 						types.JSONByteSlice(bls.PublicKeyToCompressedBytes(bls.PublicKeyFromValidUncompressedBytes(validator.PublicKey))),
-						v.PublicKey)
+						*v.PublicKey)
 					var expectedRemainingBalanceOwner message.PChainOwner
 					_, err := txs.Codec.Unmarshal(validator.RemainingBalanceOwner, &expectedRemainingBalanceOwner)
 					require.NoError(err)

@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -99,7 +98,6 @@ func TestGetValidatorSet_AfterEtna(t *testing.T) {
 	}
 
 	m := NewManager(
-		logging.NoLog{},
 		config.Internal{
 			Validators: vdrs,
 		},

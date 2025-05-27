@@ -19,7 +19,6 @@ var errTest = errors.New("non-nil error")
 
 type getVMsTest struct {
 	info          *Info
-	ctrl          *gomock.Controller
 	mockVMManager *vmsmock.Manager
 }
 
@@ -33,7 +32,6 @@ func initGetVMsTest(t *testing.T) *getVMsTest {
 			},
 			log: logging.NoLog{},
 		},
-		ctrl:          ctrl,
 		mockVMManager: mockVMManager,
 	}
 }

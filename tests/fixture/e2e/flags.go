@@ -42,7 +42,7 @@ type FlagVars struct {
 	stopNetwork    bool
 	restartNetwork bool
 
-	activateFortuna bool
+	activateGranite bool
 }
 
 func (v *FlagVars) NetworkCmd() (NetworkCmd, error) {
@@ -122,8 +122,8 @@ func (v *FlagVars) NetworkShutdownDelay() time.Duration {
 	return 0
 }
 
-func (v *FlagVars) ActivateFortuna() bool {
-	return v.activateFortuna
+func (v *FlagVars) ActivateGranite() bool {
+	return v.activateGranite
 }
 
 func RegisterFlags() *FlagVars {
@@ -178,10 +178,10 @@ func RegisterFlagsWithDefaultOwner(defaultOwner string) *FlagVars {
 	)
 
 	flag.BoolVar(
-		&vars.activateFortuna,
-		"activate-fortuna",
+		&vars.activateGranite,
+		"activate-granite",
 		false,
-		"[optional] activate the fortuna upgrade",
+		"[optional] activate the granite upgrade",
 	)
 
 	return &vars
