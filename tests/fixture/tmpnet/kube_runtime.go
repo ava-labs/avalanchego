@@ -675,9 +675,8 @@ func (p *KubeRuntime) waitForPodReadiness(ctx context.Context) error {
 // getStatefulSetName determines the name of the node's StatefulSet from the network UUID and node ID.
 func (p *KubeRuntime) getStatefulSetName() string {
 	nodeIDString := p.node.NodeID.String()
-	unwantedNodeIDPrefix := "NodeID-"
-	startIndex := len(unwantedNodeIDPrefix)
-	endIndex := len(unwantedNodeIDPrefix) + 8
+	startIndex := len(ids.NodeIDPrefix)
+	endIndex := startIndex + 8
 	return p.node.network.UUID + "-" + strings.ToLower(nodeIDString[startIndex:endIndex])
 }
 
