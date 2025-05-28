@@ -192,11 +192,7 @@ func (p *KubeRuntime) Start(ctx context.Context) error {
 		zap.String("statefulSet", statefulSetName),
 	)
 	_, err = clientset.AppsV1().StatefulSets(namespace).Get(ctx, statefulSetName, metav1.GetOptions{})
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to retrieve StatefulSet %s/%s: %w", namespace, statefulSetName, err)
-		}
-	} else {
+	if err == nil {
 		// Stateful exists - make sure it is scaled up and running
 
 		log.Debug("attempting to retrieve scale for existing StatefulSet",
@@ -241,6 +237,8 @@ func (p *KubeRuntime) Start(ctx context.Context) error {
 		)
 
 		return nil
+	} else if !apierrors.IsNotFound(err) {
+		return fmt.Errorf("failed to retrieve StatefulSet %s/%s: %w", namespace, statefulSetName, err)
 	}
 
 	// StatefulSet does not exist - create it
