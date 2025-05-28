@@ -30,7 +30,7 @@ const (
 var flagVars *e2e.FlagVars
 
 func init() {
-	flagVars = e2e.RegisterFlagsWithDefaultOwner("avalanchego-load")
+	flagVars = e2e.RegisterFlags()
 
 	// Disable default metrics link generation to prevent duplicate links.
 	// We generate load specific links.
