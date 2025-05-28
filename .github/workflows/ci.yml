@@ -20,10 +20,11 @@ on:
       runner_label:
         description: 'Runner'
         required: false
-        default: 'self-hosted'
+        default: 'k8s-runner'
         type: choice
         options:
-          - 'self-hosted'
+          - 'k8s-runner'
+          - 'avalanche-avalanchego'
           - 'ubuntu-latest'
 
 permissions:
@@ -36,7 +37,7 @@ concurrency:
 jobs:
   k8s_load_tests:
     name: "K8s Load Tests"
-    runs-on: ${{ github.event.inputs.runner_label || 'self-hosted' }}
+    runs-on: ${{ github.event.inputs.runner_label || 'k8s-runner' }}
     steps:
       - uses: actions/checkout@v4
         with:
