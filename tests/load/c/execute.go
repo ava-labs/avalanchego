@@ -17,18 +17,18 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-type loadConfig struct {
-	endpoints []string
-	agents    uint
-	minTPS    int64
-	maxTPS    int64
-	step      int64
+type LoadConfig struct {
+	Endpoints []string
+	Agents    uint
+	MinTPS    int64
+	MaxTPS    int64
+	Step      int64
 }
 
-func execute(
+func Execute(
 	ctx context.Context,
 	keys []*secp256k1.PrivateKey,
-	config loadConfig,
+	config LoadConfig,
 	metrics *load.Metrics,
 	logger logging.Logger,
 ) error {
@@ -41,9 +41,9 @@ func execute(
 	orchestratorCtx, orchestratorCancel := context.WithCancel(ctx)
 	defer orchestratorCancel()
 	orchestratorConfig := load.NewOrchestratorConfig()
-	orchestratorConfig.MinTPS = config.minTPS
-	orchestratorConfig.MaxTPS = config.maxTPS
-	orchestratorConfig.Step = config.step
+	orchestratorConfig.MinTPS = config.MinTPS
+	orchestratorConfig.MaxTPS = config.MaxTPS
+	orchestratorConfig.Step = config.Step
 	orchestratorConfig.TxRateMultiplier = 1.1
 	orchestrator := load.NewOrchestrator(agents, tracker, logger, orchestratorConfig)
 
@@ -56,7 +56,7 @@ func execute(
 // takes a few seconds. Running the creation in parallel can reduce the time significantly.
 func createAgents(
 	ctx context.Context,
-	config loadConfig,
+	config LoadConfig,
 	keys []*secp256k1.PrivateKey,
 	tracker *load.Tracker[common.Hash],
 ) ([]load.Agent[common.Hash], error) {
@@ -67,18 +67,18 @@ func createAgents(
 		agent load.Agent[common.Hash]
 		err   error
 	}
-	ch := make(chan result, config.agents)
-	for i := range int(config.agents) {
+	ch := make(chan result, config.Agents)
+	for i := range int(config.Agents) {
 		key := keys[i]
-		endpoint := config.endpoints[i%len(config.endpoints)]
+		endpoint := config.Endpoints[i%len(config.Endpoints)]
 		go func(key *secp256k1.PrivateKey, endpoint string) {
 			agent, err := createAgent(ctx, endpoint, key, tracker)
 			ch <- result{agent: agent, err: err}
 		}(key, endpoint)
 	}
 
-	agents := make([]load.Agent[common.Hash], 0, int(config.agents))
-	for range int(config.agents) {
+	agents := make([]load.Agent[common.Hash], 0, int(config.Agents))
+	for range int(config.Agents) {
 		select {
 		case result := <-ch:
 			// exit immediately if we hit an error

@@ -1,12 +1,11 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package c
+package main
 
 import (
 	"context"
 	"os"
-	"testing"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -16,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/tests/load"
+	"github.com/ava-labs/avalanchego/tests/load/c"
 )
 
 const (
@@ -37,11 +37,13 @@ func init() {
 	e2e.EmitMetricsLink = false
 }
 
-func TestLoad(t *testing.T) {
-	require := require.New(t)
-	ctx := context.Background()
+func main() {
 	log := tests.NewDefaultLogger(logPrefix)
 	tc := tests.NewTestContext(log)
+	defer tc.Cleanup()
+
+	require := require.New(tc)
+	ctx := context.Background()
 
 	startTime := time.Now()
 	nodes := tmpnet.NewNodesOrPanic(nodesCount)
@@ -50,7 +52,7 @@ func TestLoad(t *testing.T) {
 		Nodes: nodes,
 	}
 
-	setPrefundedKeys(t, network, agentsCount)
+	setPrefundedKeys(tc, network, agentsCount)
 
 	testEnv := e2e.NewTestEnvironment(tc, flagVars, network)
 	defer func() {
@@ -86,16 +88,16 @@ func TestLoad(t *testing.T) {
 
 	endpoints, err := tmpnet.GetNodeWebsocketURIs(ctx, network.Nodes, blockchainID)
 	require.NoError(err, "failed †o get node websocket URIs")
-	config := loadConfig{
-		endpoints: endpoints,
-		agents:    agentsPerNode,
-		minTPS:    100,
-		maxTPS:    500,
-		step:      100,
+	config := c.LoadConfig{
+		Endpoints: endpoints,
+		Agents:    agentsPerNode,
+		MinTPS:    100,
+		MaxTPS:    500,
+		Step:      100,
 	}
 
 	require.NoError(
-		execute(ctx, network.PreFundedKeys, config, metrics, log),
+		c.Execute(ctx, network.PreFundedKeys, config, metrics, log),
 		"failed to execute load test",
 	)
 
