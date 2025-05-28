@@ -6,6 +6,7 @@ package c
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
@@ -73,15 +74,24 @@ func createAgents(
 		agent load.Agent[common.Hash]
 		err   error
 	}
+
 	ch := make(chan result, config.Agents)
+	wg := sync.WaitGroup{}
 	for i := range int(config.Agents) {
 		key := keys[i]
 		endpoint := config.Endpoints[i%len(config.Endpoints)]
+		wg.Add(1)
 		go func(key *secp256k1.PrivateKey, endpoint string) {
+			defer wg.Done()
 			agent, err := createAgent(ctx, endpoint, key, tracker)
 			ch <- result{agent: agent, err: err}
 		}(key, endpoint)
 	}
+
+	defer func() {
+		wg.Wait()
+		close(ch)
+	}()
 
 	agents := make([]load.Agent[common.Hash], 0, int(config.Agents))
 	for range int(config.Agents) {
