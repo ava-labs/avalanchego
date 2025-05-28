@@ -546,7 +546,7 @@ func (p *KubeRuntime) Restart(ctx context.Context) error {
 
 // IsHealthy checks if the node is running and healthy.
 //
-// TODO(marun) Add WaitForHealthy as a runtime method to minimize API calls requires and
+// TODO(marun) Add WaitForHealthy as a runtime method to minimize API calls required and
 // enable reuse of forwarded connection when running external to the kubernetes cluster
 func (p *KubeRuntime) IsHealthy(ctx context.Context) (bool, error) {
 	err := p.readState(ctx)
