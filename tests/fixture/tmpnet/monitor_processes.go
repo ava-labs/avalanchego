@@ -172,7 +172,7 @@ func startPrometheus(ctx context.Context, log logging.Logger) error {
 		return err
 	}
 
-	serviceDiscoveryDir, err := GetServiceDiscoveryDir(cmdName)
+	serviceDiscoveryDir, err := getServiceDiscoveryDir(cmdName)
 	if err != nil {
 		return err
 	}
@@ -216,7 +216,7 @@ func startPromtail(ctx context.Context, log logging.Logger) error {
 		return err
 	}
 
-	serviceDiscoveryDir, err := GetServiceDiscoveryDir(cmdName)
+	serviceDiscoveryDir, err := getServiceDiscoveryDir(cmdName)
 	if err != nil {
 		return err
 	}
@@ -253,8 +253,12 @@ func getWorkingDir(cmdName string) (string, error) {
 	return filepath.Join(tmpnetDir, cmdName), nil
 }
 
-// GetServiceDiscoveryDir returns the service discovery directory path.
-func GetServiceDiscoveryDir(cmdName string) (string, error) {
+// GetServiceDiscoveryDir returns the prometheus directory path.
+func GetPrometheusDicoveryDir() (string, error) {
+	return getServiceDiscoveryDir("prometheus")
+}
+
+func getServiceDiscoveryDir(cmdName string) (string, error) {
 	tmpnetDir, err := getTmpnetPath()
 	if err != nil {
 		return "", err

@@ -372,7 +372,7 @@ func (p *ProcessRuntime) writeMonitoringConfig() error {
 func (p *ProcessRuntime) getMonitoringConfigPath(name string) (string, error) {
 	// Ensure a unique filename to allow config files to be added and removed
 	// by multiple nodes without conflict.
-	serviceDiscoveryDir, err := GetServiceDiscoveryDir(name)
+	serviceDiscoveryDir, err := getServiceDiscoveryDir(name)
 	if err != nil {
 		return "", err
 	}
