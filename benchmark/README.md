@@ -1,6 +1,7 @@
 # Firewood Benchmark
 
-Welcome to the Firewood Benchmark! This repository contains the benchmarking code and resources for the Firewood project.
+Welcome to the Firewood Benchmark! This repository contains the benchmarking
+code and resources for the Firewood project.
 
 ## Table of Contents
 
@@ -138,7 +139,7 @@ If you want to install grafana and prometheus on an AWS host (using Ubuntu as a 
    a. On the right top pulldown, click New->Import
    b. Import the dashboard from the Grafana-dashboard.json file
    c. Set the data source to Prometheus
-9. \[optional] Install a stock dashboard from [here](https://grafana.com/grafana/dashboards/1860-node-exporter-full/)
+9. \[optional] Install a stock dashboard from [grafana](https://grafana.com/grafana/dashboards/1860-node-exporter-full/)
 
 ## Usage
 

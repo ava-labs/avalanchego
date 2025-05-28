@@ -37,7 +37,7 @@ Open a terminal in vscode OR exec into the container directly as follows
 docker exec -it --privileged -u root firewood-app-1 zsh
 ```
 
-Once you're in the terminal you'll want to install the Rust toolset. You can find instructions [here](https://rustup.rs/)
+Once you're in the terminal you'll want to install the Rust toolset. You can [find instructions here](https://rustup.rs/)
 
 **!!! IMPORTANT !!!**
 
@@ -65,7 +65,7 @@ After adding the line, don't forget to `source` the file to make sure your curre
 
 ### Step 6
 
-Navigate to `/com.docker.devenvironments.code ` and run `cargo test`. If it worked, you are most of the way there! If it did not work, there are a couple of common issues. If the code will not compile, it's possible that your target directory isn't set up properly. Check inside `/root/target` to see if there are any build artifacts. If not, you might need to call `source ~/.zshrc` again (sub in whatever your preferred shell is).
+Navigate to `/com.docker.devenvironments.code` and run `cargo test`. If it worked, you are most of the way there! If it did not work, there are a couple of common issues. If the code will not compile, it's possible that your target directory isn't set up properly. Check inside `/root/target` to see if there are any build artifacts. If not, you might need to call `source ~/.zshrc` again (sub in whatever your preferred shell is).
 
 Now for vscode, you need to configure your `rust-analyzer` in the "remote-environment" (the Docker container). There are a couple of places to do this. First, you want to open `/root/.vscode-server/Machine/settings.json` and make sure that you have the following entry:
 

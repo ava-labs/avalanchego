@@ -1,28 +1,33 @@
 # fwdctl
 
-`fwdctl` is a small CLI designed to make it easy to experiment with firewood locally. 
+`fwdctl` is a small CLI designed to make it easy to experiment with firewood locally.
 
 ## Building locally
-*Note: fwdctl is linux-only*
-```
+
+```sh
 cargo build --release --bin fwdctl
 ```
+
 To use
-```
-$ ./target/release/fwdctl -h
+
+```sh
+./target/release/fwdctl -h
 ```
 
 ## Supported commands
+
 * `fwdctl create`: Create a new firewood database.
 * `fwdctl get`: Get the code associated with a key in the database.
 * `fwdctl insert`: Insert a key/value pair into the generic key/value store.
-* `fwdctl delete`: Delete a key/value pair from the database. 
+* `fwdctl delete`: Delete a key/value pair from the database.
 * `fwdctl root`: Get the root hash of the key/value trie.
 * `fwdctl dump`: Dump the contents of the key/value store.
 
 ## Examples
+
 * fwdctl create
-```
+
+```sh
 # Check available options when creating a database, including the defaults.
 $ fwdctl create -h
 # Create a new, blank instance of firewood using the default name "firewood".
@@ -30,19 +35,24 @@ $ fwdctl create firewood
 # Look inside, there are several folders representing different components of firewood, including the WAL.
 $ ls firewood
 ```
+
 * fwdctl get KEY
-```
-Get the value associated with a key in the database, if it exists.
+
+```sh
+# Get the value associated with a key in the database, if it exists.
 fwdctl get KEY
 ```
+
 * fwdctl insert KEY VALUE
-```
-Insert a key/value pair into the database.
+
+```sh
+# Insert a key/value pair into the database.
 fwdctl insert KEY VALUE
 ```
+
 * fwdctl delete KEY
-```
-Delete a key from the database, along with the associated value.
+
+```sh
+# Delete a key from the database, along with the associated value.
 fwdctl delete KEY
 ```
-

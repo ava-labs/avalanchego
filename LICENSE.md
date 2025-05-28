@@ -1,6 +1,5 @@
-Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
+# Ecosystem License
 
-Ecosystem License
 Version: 1.1
 
 Subject to the terms herein, Ava Labs, Inc. (**“Ava Labs”**) hereby grants you
@@ -33,7 +32,7 @@ Authorized Platform will be deemed to be the then-current iteration of such
 platform.
 
 You hereby acknowledge and agree to the terms set forth at
-www.avalabs.org/important-notice.
+<www.avalabs.org/important-notice>.
 
 If you use the Licensed Software in violation of this License, this License
 will automatically terminate and Ava Labs reserves all rights to seek any

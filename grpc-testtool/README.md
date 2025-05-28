@@ -19,7 +19,7 @@ There are 3 RPC specs that must be implemented:
 2. The sync proto, which supports retrieving range and change proofs
 3. The process-server proto, which currently only retrieves metrics
 
-# Running
+## Running
 
 To test the release version of firewood, just run `RUST_MIN_STACK=7000000 cargo bench`. If you make some changes and then
 run it again, it will give you a report showing how much it sped up or slowed down.
