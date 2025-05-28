@@ -170,7 +170,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
-      - shell: bash
+      - uses: ./.github/actions/install-nix
+      - shell: nix develop --command bash -x {0}
         run: ./scripts/run_task.sh check-generate-load-contract-bindings
   go_mod_tidy:
     name: Up-to-date go.mod and go.sum
