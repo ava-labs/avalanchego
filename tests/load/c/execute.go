@@ -6,7 +6,7 @@ package c
 import (
 	"context"
 	"fmt"
-	"math/big"
+	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/ethclient"
@@ -38,16 +38,22 @@ func Execute(
 		return fmt.Errorf("creating agents: %w", err)
 	}
 
-	orchestratorCtx, orchestratorCancel := context.WithCancel(ctx)
-	defer orchestratorCancel()
-	orchestratorConfig := load.NewOrchestratorConfig()
-	orchestratorConfig.MinTPS = config.MinTPS
-	orchestratorConfig.MaxTPS = config.MaxTPS
-	orchestratorConfig.Step = config.Step
-	orchestratorConfig.TxRateMultiplier = 1.1
+	orchestratorConfig := load.OrchestratorConfig{
+		MaxTPS:           config.MaxTPS,
+		MinTPS:           config.MinTPS,
+		Step:             config.Step,
+		TxRateMultiplier: 1.1,
+		SustainedTime:    20 * time.Second,
+		MaxAttempts:      3,
+		Terminate:        true,
+	}
+
 	orchestrator := load.NewOrchestrator(agents, tracker, logger, orchestratorConfig)
 
-	return orchestrator.Execute(orchestratorCtx)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	return orchestrator.Execute(ctx)
 }
 
 // createAgents creates agents for the given configuration and keys.
@@ -106,8 +112,7 @@ func createAgent(
 	}
 
 	address := key.EthAddress()
-	blockNumber := (*big.Int)(nil)
-	nonce, err := client.NonceAt(ctx, address, blockNumber)
+	nonce, err := client.NonceAt(ctx, address, nil)
 	if err != nil {
 		return load.Agent[common.Hash]{}, fmt.Errorf("getting nonce for address %s: %w", address, err)
 	}
