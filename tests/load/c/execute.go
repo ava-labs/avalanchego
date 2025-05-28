@@ -25,7 +25,13 @@ type loadConfig struct {
 	step      int64
 }
 
-func execute(ctx context.Context, keys []*secp256k1.PrivateKey, config loadConfig, metrics *load.Metrics, logger logging.Logger) error {
+func execute(
+	ctx context.Context,
+	keys []*secp256k1.PrivateKey,
+	config loadConfig,
+	metrics *load.Metrics,
+	logger logging.Logger,
+) error {
 	tracker := load.NewTracker[common.Hash](metrics)
 	agents, err := createAgents(ctx, config, keys, tracker)
 	if err != nil {
@@ -48,7 +54,10 @@ func execute(ctx context.Context, keys []*secp256k1.PrivateKey, config loadConfi
 // It creates them in parallel because creating issuers can sometimes take a while,
 // and this adds up for many agents. For example, deploying the Opcoder contract
 // takes a few seconds. Running the creation in parallel can reduce the time significantly.
-func createAgents(ctx context.Context, config loadConfig, keys []*secp256k1.PrivateKey,
+func createAgents(
+	ctx context.Context,
+	config loadConfig,
+	keys []*secp256k1.PrivateKey,
 	tracker *load.Tracker[common.Hash],
 ) ([]load.Agent[common.Hash], error) {
 	ctx, cancel := context.WithCancel(ctx)
@@ -90,7 +99,10 @@ func createAgents(ctx context.Context, config loadConfig, keys []*secp256k1.Priv
 	return agents, nil
 }
 
-func createAgent(ctx context.Context, endpoint string, key *secp256k1.PrivateKey,
+func createAgent(
+	ctx context.Context,
+	endpoint string,
+	key *secp256k1.PrivateKey,
 	tracker *load.Tracker[common.Hash],
 ) (load.Agent[common.Hash], error) {
 	client, err := ethclient.DialContext(ctx, endpoint)
@@ -105,7 +117,7 @@ func createAgent(ctx context.Context, endpoint string, key *secp256k1.PrivateKey
 		return load.Agent[common.Hash]{}, fmt.Errorf("getting nonce for address %s: %w", address, err)
 	}
 
-	issuer, err := createIssuer(ctx, client, tracker, nonce, key.ToECDSA())
+	issuer, err := createIssuer(ctx, client, nonce, key.ToECDSA())
 	if err != nil {
 		return load.Agent[common.Hash]{}, fmt.Errorf("creating issuer: %w", err)
 	}
