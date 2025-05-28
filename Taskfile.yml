@@ -215,7 +215,7 @@ tasks:
     cmds:
       - task: generate-load-contract-bindings
       - task: build
-      - cmd: go test ./tests/load/c -test.v -- --avalanchego-path=$PWD/build/avalanchego 
+      - cmd: go run ./tests/load/c/main -- --avalanchego-path=$PWD/build/avalanchego 
 
   test-unit:
     desc: Runs unit tests
