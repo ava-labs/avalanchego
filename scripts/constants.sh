@@ -30,8 +30,4 @@ export CGO_CFLAGS="-O2 -D__BLST_PORTABLE__"
 export CGO_ENABLED=1 # Required for cross-compilation
 
 # Disable version control fallbacks
-if [ "$#" -gt 0 ]; then
-    export GOPROXY=$1
-else
-    export GOPROXY="https://proxxy.golang.org"
-fi
+export GOPROXY="${GOPROXY:-https://proxy.golang.org}"
