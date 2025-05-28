@@ -38,6 +38,8 @@ jobs:
             target: aarch64-apple-darwin
           - os: macos-13
             target: x86_64-apple-darwin
+    outputs:
+      has_secrets: ${{ steps.check_secrets.outputs.has_secrets }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -56,12 +58,24 @@ jobs:
           path: target/${{ matrix.target }}/maxperf/libfirewood_ffi.a
           if-no-files-found: error
 
+      - name: Check if FIREWOOD_GO_GITHUB_TOKEN is set
+        id: check_secrets
+        run: |
+          if [ -z "${{ secrets.FIREWOOD_GO_GITHUB_TOKEN }}" ]; then
+            echo "FIREWOOD_GO_GITHUB_TOKEN is not set"
+            echo "has_secrets=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "FIREWOOD_GO_GITHUB_TOKEN is set"
+            echo "has_secrets=true" >> "$GITHUB_OUTPUT"
+          fi
+
   # Collect all the static libraries built on the previous matrix of jobs
   # and add them into ffi/libs directory.
   # We commit and push this as a new branch with "--force" to overwrite
   # the previous static libs that will not be on our branch.
   push-firewood-ffi-libs:
     needs: build-firewood-ffi-libs
+    if: needs.build-firewood-ffi-libs.outputs.has_secrets == 'true'
     runs-on: ubuntu-latest
     outputs:
       target_branch: ${{ steps.determine_branch.outputs.target_branch }}
