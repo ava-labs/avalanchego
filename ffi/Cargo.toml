@@ -23,7 +23,7 @@ logger = ["dep:env_logger", "firewood/logger"]
 ethhash = ["firewood/ethhash"]
 
 [build-dependencies]
-cbindgen = "0.28.0"
+cbindgen = "0.29.0"
 
 [lints.clippy]
 unwrap_used = "warn"
