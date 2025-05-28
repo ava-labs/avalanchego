@@ -79,22 +79,23 @@ type StakingConfig struct {
 	StakingTLSKeyPath             string          `json:"stakingTLSKeyPath"`
 	StakingTLSCertPath            string          `json:"stakingTLSCertPath"`
 
-	StakingSignerConfig interface{} `json:"stakingSignerConfig"`
+	// Not user supplied. This is set in order to instatiate the correct signer type.
+	StakingSignerConfig interface{}
 }
 
 type EphemeralSignerConfig struct{}
 
 type ContentKeyConfig struct {
-	SignerKeyRawContent string `json:"signerKeyRawContent"`
+	SignerKeyRawContent string
 }
 
 type SignerPathConfig struct {
-	SignerPathIsSet bool   `json:"signerPathIsSet"`
-	SigningKeyPath  string `json:"signingKeyPath"`
+	SignerPathIsSet bool
+	SigningKeyPath  string
 }
 
 type RPCSignerConfig struct {
-	StakingSignerRPC string `json:"stakingSignerRPC"`
+	StakingSignerRPC string
 }
 
 type StateSyncConfig struct {
