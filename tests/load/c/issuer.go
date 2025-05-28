@@ -31,17 +31,10 @@ type EthClientSender interface {
 	SendTransaction(ctx context.Context, tx *types.Transaction) error
 }
 
-type IssueTracker interface {
-	Issue(tx common.Hash)
-}
-
 // issuer generates and issues transactions that randomly call the
 // external functions of the [contracts.EVMLoadSimulator] contract
 // instance that it deploys.
 type issuer struct {
-	// Injected parameters
-	tracker IssueTracker
-
 	// Determined by constructor
 	txTypes []txType
 
@@ -52,7 +45,6 @@ type issuer struct {
 func createIssuer(
 	ctx context.Context,
 	client EthClient,
-	tracker IssueTracker,
 	nonce uint64,
 	key *ecdsa.PrivateKey,
 ) (*issuer, error) {
@@ -78,7 +70,6 @@ func createIssuer(
 	}
 
 	return &issuer{
-		tracker: tracker,
 		txTypes: makeTxTypes(simulatorInstance, key, chainID, client),
 		nonce:   nonce,
 	}, nil
@@ -94,12 +85,14 @@ func (o *issuer) GenerateAndIssueTx(ctx context.Context) (common.Hash, error) {
 
 	o.nonce++
 	txHash := tx.Hash()
-	o.tracker.Issue(txHash)
-	return txHash, err
+	return txHash, nil
 }
 
-func makeTxTypes(contractInstance *contracts.EVMLoadSimulator, senderKey *ecdsa.PrivateKey,
-	chainID *big.Int, client EthClientSender,
+func makeTxTypes(
+	contractInstance *contracts.EVMLoadSimulator,
+	senderKey *ecdsa.PrivateKey,
+	chainID *big.Int,
+	client EthClientSender,
 ) []txType {
 	senderAddress := ethcrypto.PubkeyToAddress(senderKey.PublicKey)
 	signer := types.LatestSignerForChainID(chainID)
@@ -297,8 +290,12 @@ func intNBigInt(n int64) *big.Int {
 	return big.NewInt(rand.Int64N(n)) //nolint:gosec
 }
 
-func newTxOpts(ctx context.Context, key *ecdsa.PrivateKey,
-	chainID, maxFeeCap *big.Int, nonce uint64,
+func newTxOpts(
+	ctx context.Context,
+	key *ecdsa.PrivateKey,
+	chainID *big.Int,
+	maxFeeCap *big.Int,
+	nonce uint64,
 ) (*bind.TransactOpts, error) {
 	txOpts, err := bind.NewKeyedTransactorWithChainID(key, chainID)
 	if err != nil {

@@ -117,7 +117,7 @@ func createAgent(
 		return load.Agent[common.Hash]{}, fmt.Errorf("getting nonce for address %s: %w", address, err)
 	}
 
-	issuer, err := createIssuer(ctx, client, tracker, nonce, key.ToECDSA())
+	issuer, err := createIssuer(ctx, client, nonce, key.ToECDSA())
 	if err != nil {
 		return load.Agent[common.Hash]{}, fmt.Errorf("creating issuer: %w", err)
 	}
