@@ -564,7 +564,7 @@ func (p *KubeRuntime) IsHealthy(ctx context.Context) (bool, error) {
 	defer cancel()
 
 	healthReply, err := CheckNodeHealth(ctx, uri)
-	if errors.Is(ErrUnrecoverableNodeHealthCheck, err) {
+	if errors.Is(err, ErrUnrecoverableNodeHealthCheck) {
 		return false, err
 	} else if err != nil {
 		p.node.network.log.Verbo("failed to check node health",
