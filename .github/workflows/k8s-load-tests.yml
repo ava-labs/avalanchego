@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       branch:
-        description: 'Branch to test'
+        description: 'Branch to test (leave empty for current branch)'
         required: false
         type: string
       runner_label:
-        description: 'Runner'
+        description: 'Runner label (self-hosted for K8s)'
         required: false
         default: 'self-hosted'
         type: choice
@@ -22,7 +22,7 @@ permissions:
 jobs:
   load:
     name: "K8S Load Test"
-    runs-on: "self-hosted"
+    runs-on: ${{ github.event.inputs.runner_label || 'self-hosted' }}
     steps:
       - uses: actions/checkout@v4
         with:
