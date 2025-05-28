@@ -205,7 +205,7 @@ func WaitForNodeHealthy(
 	}
 	if err := wait.PollImmediateInfinite(healthCheckInterval, func() (bool, error) {
 		healthReply, err := CheckNodeHealth(ctx, localNodeURI)
-		if errors.Is(ErrUnrecoverableNodeHealthCheck, err) {
+		if errors.Is(err, ErrUnrecoverableNodeHealthCheck) {
 			return false, err
 		} else if err != nil {
 			// Error is potentially recoverable - log and continue
