@@ -62,11 +62,12 @@ func createAgents(
 ) ([]load.Agent[common.Hash], error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+
 	type result struct {
 		agent load.Agent[common.Hash]
 		err   error
 	}
-	ch := make(chan result)
+	ch := make(chan result, config.agents)
 	for i := range int(config.agents) {
 		key := keys[i]
 		endpoint := config.endpoints[i%len(config.endpoints)]
@@ -76,26 +77,20 @@ func createAgents(
 		}(key, endpoint)
 	}
 
-	var err error
 	agents := make([]load.Agent[common.Hash], 0, int(config.agents))
 	for range int(config.agents) {
-		result := <-ch
-		switch {
-		case result.err == nil && err == nil: // no previous error or new error
+		select {
+		case result := <-ch:
+			// exit immediately if we hit an error
+			if result.err != nil {
+				return nil, result.err
+			}
 			agents = append(agents, result.agent)
-		case err != nil: // error already occurred
-			continue
-		case result.err != nil: // first error
-			err = result.err
-			cancel()
-		default:
-			panic("unreachable")
+		case <-ctx.Done():
+			return nil, ctx.Err()
 		}
 	}
 
-	if err != nil {
-		return nil, err
-	}
 	return agents, nil
 }
 
