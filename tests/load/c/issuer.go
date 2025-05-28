@@ -13,23 +13,13 @@ import (
 	"github.com/ava-labs/libevm/accounts/abi/bind"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/params"
 
 	"github.com/ava-labs/avalanchego/tests/load/c/contracts"
 
 	ethcrypto "github.com/ava-labs/libevm/crypto"
 )
-
-type EthClient interface {
-	ChainID(ctx context.Context) (*big.Int, error)
-	EthClientSender
-	bind.DeployBackend
-	bind.ContractBackend
-}
-
-type EthClientSender interface {
-	SendTransaction(ctx context.Context, tx *types.Transaction) error
-}
 
 // issuer generates and issues transactions that randomly call the
 // external functions of the [contracts.EVMLoadSimulator] contract
@@ -44,7 +34,7 @@ type issuer struct {
 
 func createIssuer(
 	ctx context.Context,
-	client EthClient,
+	client *ethclient.Client,
 	nonce uint64,
 	key *ecdsa.PrivateKey,
 ) (*issuer, error) {
@@ -92,7 +82,7 @@ func makeTxTypes(
 	contractInstance *contracts.EVMLoadSimulator,
 	senderKey *ecdsa.PrivateKey,
 	chainID *big.Int,
-	client EthClientSender,
+	client *ethclient.Client,
 ) []txType {
 	senderAddress := ethcrypto.PubkeyToAddress(senderKey.PublicKey)
 	signer := types.LatestSignerForChainID(chainID)
