@@ -9,9 +9,10 @@ import (
 	"math/big"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/tests/load"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/ethclient"
+
+	"github.com/ava-labs/avalanchego/tests/load"
 )
 
 // Listener listens for transaction confirmations from a node.
