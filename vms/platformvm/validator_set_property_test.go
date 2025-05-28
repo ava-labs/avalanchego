@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"sort"
+	"slices"
 	"testing"
 	"time"
 
@@ -153,7 +153,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 			// Checks: let's look back at validator sets at previous heights and
 			// make sure they match the snapshots already taken
 			snapshotHeights := maps.Keys(validatorSetByHeightAndSubnet)
-			sort.Slice(snapshotHeights, func(i, j int) bool { return snapshotHeights[i] < snapshotHeights[j] })
+			slices.Sort(snapshotHeights)
 			for idx, snapShotHeight := range snapshotHeights {
 				lastAcceptedHeight, err := vm.GetCurrentHeight(context.Background())
 				if err != nil {
