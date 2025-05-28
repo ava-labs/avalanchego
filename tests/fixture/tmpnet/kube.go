@@ -165,8 +165,8 @@ func envVarsToJSONValue(envVars []corev1.EnvVar) []map[string]string {
 }
 
 func sortEnvVars(envVars []corev1.EnvVar) {
-	sort.Slice(envVars, func(i, j int) bool {
-		return envVars[i].Name < envVars[j].Name
+	slices.SortFunc(envVars, func(a, b corev1.EnvVar) int {
+		return cmp.Compare(a.Name, b.Name)
 	})
 }
 
