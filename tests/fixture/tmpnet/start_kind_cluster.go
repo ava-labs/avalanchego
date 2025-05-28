@@ -5,7 +5,9 @@ package tmpnet
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"strings"
@@ -72,7 +74,7 @@ func isKindClusterRunning(log logging.Logger, configPath string) (bool, error) {
 	configContext := KindKubeconfigContext
 
 	_, err := os.Stat(configPath)
-	if os.IsNotExist(err) {
+	if errors.Is(err, fs.ErrNotExist) {
 		log.Info("specified kubeconfig path does not exist",
 			zap.String("kubeconfig", configPath),
 		)
