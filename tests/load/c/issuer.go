@@ -72,18 +72,18 @@ func createIssuer(
 	}, nil
 }
 
-func (o *issuer) GenerateAndIssueTx(ctx context.Context) (common.Hash, error) {
-	txType, err := pickWeightedRandom(o.txTypes)
+func (i *issuer) GenerateAndIssueTx(ctx context.Context) (common.Hash, error) {
+	txType, err := pickWeightedRandom(i.txTypes)
 	if err != nil {
 		return common.Hash{}, err
 	}
 
-	tx, err := txType.generateAndIssueTx(ctx, txType.maxFeeCap, o.nonce)
+	tx, err := txType.generateAndIssueTx(ctx, txType.maxFeeCap, i.nonce)
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("generating and issuing transaction of type %s: %w", txType.name, err)
 	}
 
-	o.nonce++
+	i.nonce++
 	txHash := tx.Hash()
 	return txHash, nil
 }
