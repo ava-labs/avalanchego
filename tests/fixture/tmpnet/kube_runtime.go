@@ -190,16 +190,14 @@ func (p *KubeRuntime) Start(ctx context.Context) error {
 		zap.String("namespace", namespace),
 		zap.String("statefulSet", statefulSetName),
 	)
-	exists := true
 	_, err = clientset.AppsV1().StatefulSets(namespace).Get(ctx, statefulSetName, metav1.GetOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed to retrieve StatefulSet %s/%s: %w", namespace, statefulSetName, err)
 		}
-		exists = false
-	}
+	} else {
+		// Stateful exists - make sure it is scaled up and running
 
-	if exists {
 		log.Debug("attempting to retrieve scale for existing StatefulSet",
 			zap.String("nodeID", nodeID),
 			zap.String("namespace", namespace),
@@ -242,43 +240,44 @@ func (p *KubeRuntime) Start(ctx context.Context) error {
 		)
 
 		return nil
-	} else {
-		// StatefulSet for node needs to be created
-		flags, err := p.getFlags()
-		if err != nil {
-			return err
-		}
-
-		log.Debug("creating StatefulSet",
-			zap.String("nodeID", nodeID),
-			zap.String("namespace", namespace),
-			zap.String("statefulSet", statefulSetName),
-		)
-		statefulSet := NewNodeStatefulSet(
-			statefulSetName,
-			false, // generateName
-			runtimeConfig.Image,
-			containerName,
-			volumeName,
-			fmt.Sprintf("%dGi", runtimeConfig.VolumeSizeGB),
-			volumeMountPath,
-			flags,
-		)
-
-		_, err = clientset.AppsV1().StatefulSets(runtimeConfig.Namespace).Create(
-			ctx,
-			statefulSet,
-			metav1.CreateOptions{},
-		)
-		if err != nil {
-			return fmt.Errorf("failed to create StatefulSet: %w", err)
-		}
-		log.Debug("created StatefulSet",
-			zap.String("nodeID", nodeID),
-			zap.String("namespace", runtimeConfig.Namespace),
-			zap.String("statefulSet", statefulSetName),
-		)
 	}
+
+	// StatefulSet does not exist - create it
+
+	flags, err := p.getFlags()
+	if err != nil {
+		return err
+	}
+
+	log.Debug("creating StatefulSet",
+		zap.String("nodeID", nodeID),
+		zap.String("namespace", namespace),
+		zap.String("statefulSet", statefulSetName),
+	)
+	statefulSet := NewNodeStatefulSet(
+		statefulSetName,
+		false, // generateName
+		runtimeConfig.Image,
+		containerName,
+		volumeName,
+		fmt.Sprintf("%dGi", runtimeConfig.VolumeSizeGB),
+		volumeMountPath,
+		flags,
+	)
+
+	_, err = clientset.AppsV1().StatefulSets(runtimeConfig.Namespace).Create(
+		ctx,
+		statefulSet,
+		metav1.CreateOptions{},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create StatefulSet: %w", err)
+	}
+	log.Debug("created StatefulSet",
+		zap.String("nodeID", nodeID),
+		zap.String("namespace", runtimeConfig.Namespace),
+		zap.String("statefulSet", statefulSetName),
+	)
 
 	return p.ensureBootstrapIP(ctx)
 }
