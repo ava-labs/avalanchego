@@ -47,12 +47,14 @@ func main() {
 
 	startTime := time.Now()
 	nodes := tmpnet.NewNodesOrPanic(nodesCount)
-	network := &tmpnet.Network{
-		Owner: "avalanchego-load-test",
-		Nodes: nodes,
-	}
 
-	setPrefundedKeys(tc, network, agentsCount)
+	keys, err := tmpnet.NewPrivateKeys(agentsCount)
+	require.NoError(err)
+	network := &tmpnet.Network{
+		Owner:         "avalanchego-load-test",
+		Nodes:         nodes,
+		PreFundedKeys: keys,
+	}
 
 	testEnv := e2e.NewTestEnvironment(tc, flagVars, network)
 	defer func() {
@@ -102,18 +104,4 @@ func main() {
 	)
 
 	load.GenerateMetricsLink(testEnv.GetNetwork().UUID, log, startTime)
-}
-
-// setPrefundedKeys sets the pre-funded keys for the network, and keeps
-// keys already set if any. If there are more keys than required, it
-// keeps the already set keys as they are.
-func setPrefundedKeys(t require.TestingT, network *tmpnet.Network, minKeys int) {
-	if len(network.PreFundedKeys) >= minKeys {
-		return
-	}
-
-	require := require.New(t)
-	missingPreFundedKeys, err := tmpnet.NewPrivateKeys(minKeys - len(network.PreFundedKeys))
-	require.NoError(err, "creating pre-funded keys")
-	network.PreFundedKeys = append(network.PreFundedKeys, missingPreFundedKeys...)
 }
