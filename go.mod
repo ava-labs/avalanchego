@@ -14,7 +14,7 @@ require (
 	github.com/NYTimes/gziphandler v1.1.1
 	github.com/StephenButtolph/canoto v0.15.0
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
-	github.com/ava-labs/coreth v0.15.1-rc.0.0.20250521122838-a195bad0641e
+	github.com/ava-labs/coreth v0.15.1-rc.0.0.20250523163800-aac22d91be3f
 	github.com/ava-labs/ledger-avalanche/go v0.0.0-20241009183145-e6f90a8a1a60
 	github.com/ava-labs/libevm v1.13.14-0.2.0.release
 	github.com/btcsuite/btcd/btcutil v1.1.3
