@@ -99,7 +99,7 @@ func TestLoad(t *testing.T) {
 		"failed to execute load test",
 	)
 
-	load.GenerateMetricsLink(testEnv, log, startTime)
+	load.GenerateMetricsLink(testEnv.GetNetwork().UUID, log, startTime)
 }
 
 // setPrefundedKeys sets the pre-funded keys for the network, and keeps

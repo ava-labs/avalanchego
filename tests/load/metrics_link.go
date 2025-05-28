@@ -9,7 +9,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -19,8 +18,8 @@ const (
 	dashboardName = "C-Chain Load"
 )
 
-func GenerateMetricsLink(env *e2e.TestEnvironment, log logging.Logger, startTime time.Time) {
-	grafanaLink := tmpnet.BuildMonitoringURLForNetwork(dashboardID, dashboardName, env.GetNetwork().UUID, tmpnet.GrafanaFilterOptions{
+func GenerateMetricsLink(networkUUID string, log logging.Logger, startTime time.Time) {
+	grafanaLink := tmpnet.BuildMonitoringURLForNetwork(dashboardID, dashboardName, networkUUID, tmpnet.GrafanaFilterOptions{
 		StartTime: strconv.FormatInt(startTime.UnixMilli(), 10),
 		EndTime:   strconv.FormatInt(time.Now().Add(tmpnet.NetworkShutdownDelay).UnixMilli(), 10),
 	})
