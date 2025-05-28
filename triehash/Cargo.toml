@@ -12,7 +12,7 @@ hash-db = { version = "0.16.0", default-features = false }
 rlp = { version = "0.6", default-features = false }
 
 [dev-dependencies]
-criterion = "0.5.1"
+criterion = "0.6.0"
 keccak-hasher = "0.16.0"
 ethereum-types = { version = "0.15.1" }
 tiny-keccak = { version = "2.0", features = ["keccak"] }
