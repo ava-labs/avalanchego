@@ -61,9 +61,10 @@ type NodeRuntime interface {
 	IsHealthy(ctx context.Context) (bool, error)
 }
 
-// Configuration required to configure a node runtime.
+// Configuration required to configure a node runtime. Only one of the fields should be set.
 type NodeRuntimeConfig struct {
 	Process *ProcessRuntimeConfig `json:"process,omitempty"`
+	Kube    *KubeRuntimeConfig    `json:"kube,omitempty"`
 }
 
 // Node supports configuring and running a node participating in a temporary network.
@@ -128,8 +129,19 @@ func NewNodesOrPanic(count int) []*Node {
 // Retrieves the runtime for the node.
 func (n *Node) getRuntime() NodeRuntime {
 	if n.runtime == nil {
-		n.runtime = &ProcessRuntime{
-			node: n,
+		switch {
+		case n.getRuntimeConfig().Process != nil:
+			n.runtime = &ProcessRuntime{
+				node: n,
+			}
+		case n.getRuntimeConfig().Kube != nil:
+			n.runtime = &KubeRuntime{
+				node: n,
+			}
+		default:
+			// Runtime configuration is validated during flag handling and network
+			// bootstrap so misconfiguration should be unusual.
+			panic(fmt.Sprintf("no runtime configuration set for %q", n.NodeID))
 		}
 	}
 	return n.runtime
