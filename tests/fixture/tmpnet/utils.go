@@ -95,9 +95,13 @@ func FilterAvailableNodes(nodes []*Node) []*Node {
 // GetNodeWebsocketURIs returns a list of websocket URIs for the given nodes and
 // blockchain ID, in the form "ws://<node-uri>/ext/bc/<blockchain-id>/ws".
 // Ephemeral and stopped nodes are ignored.
-func GetNodeWebsocketURIs(ctx context.Context, nodes []*Node, blockchainID string) ([]string, error) {
-	deferCleanup := func(func()) {}
-	nodeURIs, err := GetNodeURIs(ctx, nodes, deferCleanup)
+func GetNodeWebsocketURIs(
+	ctx context.Context,
+	nodes []*Node,
+	blockchainID string,
+	deferCleanupFunc func(func()),
+) ([]string, error) {
+	nodeURIs, err := GetNodeURIs(ctx, nodes, deferCleanupFunc)
 	if err != nil {
 		return nil, fmt.Errorf("getting node URIs: %w", err)
 	}
