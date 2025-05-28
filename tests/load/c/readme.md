@@ -1,6 +1,6 @@
 # Load testing
 
-The C-chain load test entrypoint is in [load_test.go](load_test.go).
+The C-chain load test entrypoint is in [main.go](main/main.go).
 
 It runs with 5 nodes and 5 "agents".
 
