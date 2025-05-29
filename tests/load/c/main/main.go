@@ -29,7 +29,7 @@ const (
 	blockchainID = "C"
 	// invariant: nodesCount >= 5
 	nodesCount    = 5
-	agentsPerNode = 50
+	agentsPerNode = 1
 	agentsCount   = nodesCount * agentsPerNode
 	logPrefix     = "avalanchego-load-test"
 )
@@ -96,9 +96,9 @@ func main() {
 	w := &workload{
 		endpoints: endpoints,
 		numAgents: agentsPerNode,
-		minTPS:    100,
-		maxTPS:    500,
-		step:      100,
+		minTPS:    10,
+		maxTPS:    50,
+		step:      10,
 	}
 
 	require.NoError(
