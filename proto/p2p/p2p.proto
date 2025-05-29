@@ -430,7 +430,7 @@ message Simplex {
   bytes chain_id = 1;
 
   oneof message {
-    Block block = 2;
+    SimplexBlock block = 2;
     Vote vote = 3;
     EmptyVote empty_vote = 4;
     Finalization finalization = 5;
@@ -442,7 +442,7 @@ message Simplex {
   }
 }
 
-message Block {
+message SimplexBlock {
   bytes block = 1;
   Vote vote = 2;
 }
@@ -464,6 +464,7 @@ message ProtocolMetadata {
 
 message BlockHeader {
   ProtocolMetadata metadata = 1;
+  // digest is the digest of the inner block data.
   bytes digest = 2;
 }
 
@@ -513,7 +514,7 @@ message ReplicationResponse {
 }
 
 message QuorumRound {
-  Block block = 1;
+  SimplexBlock block = 1;
   Notarization notarization = 2;
   EmptyNotarization empty_notarization = 3;
   FinalizationCertificate finalization = 4;

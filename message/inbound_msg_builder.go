@@ -314,6 +314,54 @@ func InboundAppResponse(
 	}
 }
 
+func InboundSimplexBlock(
+	chainID ids.ID,
+	nodeID ids.NodeID,
+	block *p2p.Simplex_Block,
+) InboundMessage {
+	return &inboundMessage{
+		nodeID: nodeID,
+		op:     SimplexOp,
+		message: &p2p.Simplex{
+			ChainId: chainID[:],
+			Message: block,
+		},
+		expiration: mockable.MaxTime,
+	}
+}
+
+func InboundSimplexVote(
+	chainID ids.ID,
+	nodeID ids.NodeID,
+	vote *p2p.Simplex_Vote,
+) InboundMessage {
+	return &inboundMessage{
+		nodeID: nodeID,
+		op:     SimplexOp,
+		message: &p2p.Simplex{
+			ChainId: chainID[:],
+			Message: vote,
+		},
+		expiration: mockable.MaxTime,
+	}
+}
+
+func InboundSimplexReplicationRequest(
+	chainID ids.ID,
+	nodeID ids.NodeID,
+	replicationRequest *p2p.Simplex_ReplicationRequest,
+) InboundMessage {
+	return &inboundMessage{
+		nodeID: nodeID,
+		op:     SimplexOp,
+		message: &p2p.Simplex{
+			ChainId: chainID[:],
+			Message: replicationRequest,
+		},
+		expiration: mockable.MaxTime,
+	}
+}
+
 func encodeIDs(ids []ids.ID, result [][]byte) {
 	for i, id := range ids {
 		result[i] = id[:]
