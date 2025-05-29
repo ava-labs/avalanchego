@@ -28,10 +28,10 @@ var (
 	errFailedToSelectTxType = errors.New("failed to select tx type")
 )
 
-// issuer generates and issues transactions that randomly call the
+// Issuer generates and issues transactions that randomly call the
 // external functions of the [contracts.EVMLoadSimulator] contract
 // instance that it deploys.
-type issuer struct {
+type Issuer struct {
 	// Determined by constructor
 	txTypes []txType
 
@@ -39,12 +39,12 @@ type issuer struct {
 	nonce uint64
 }
 
-func createIssuer(
+func NewIssuer(
 	ctx context.Context,
 	client *ethclient.Client,
 	nonce uint64,
 	key *ecdsa.PrivateKey,
-) (*issuer, error) {
+) (*Issuer, error) {
 	chainID, err := client.ChainID(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting chain id: %w", err)
@@ -66,13 +66,13 @@ func createIssuer(
 		return nil, fmt.Errorf("waiting for simulator contract to be mined: %w", err)
 	}
 
-	return &issuer{
+	return &Issuer{
 		txTypes: makeTxTypes(simulatorInstance, key, chainID, client),
 		nonce:   nonce,
 	}, nil
 }
 
-func (i *issuer) GenerateAndIssueTx(ctx context.Context) (common.Hash, error) {
+func (i *Issuer) GenerateAndIssueTx(ctx context.Context) (common.Hash, error) {
 	txType, err := pickWeightedRandom(i.txTypes)
 	if err != nil {
 		return common.Hash{}, err
