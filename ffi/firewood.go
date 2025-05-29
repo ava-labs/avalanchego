@@ -99,6 +99,9 @@ func New(filePath string, conf *Config) (*Database, error) {
 		strategy:     C.uint8_t(conf.ReadCacheStrategy),
 		metrics_port: C.uint16_t(conf.MetricsPort),
 	}
+	// Defer freeing the C string allocated to the heap on the other side
+	// of the FFI boundary.
+	defer C.free(unsafe.Pointer(args.path))
 
 	var db *C.DatabaseHandle
 	if conf.Create {
@@ -107,8 +110,6 @@ func New(filePath string, conf *Config) (*Database, error) {
 		db = C.fwd_open_db(args)
 	}
 
-	// After creating the db, we can safely free the path string.
-	C.free(unsafe.Pointer(args.path))
 	return &Database{handle: db}, nil
 }
 
