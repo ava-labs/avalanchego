@@ -1568,14 +1568,17 @@ func TestHandleSimplexMessage(t *testing.T) {
 	chainRouter.log = log
 	testID := ids.GenerateTestID()
 
-	msg := &p2ppb.Simplex_ReplicationRequest{
-		ReplicationRequest: &p2ppb.ReplicationRequest{
-			Seqs:        []uint64{1, 2, 3},
-			LatestRound: 1,
+	msg := p2ppb.Message_Simplex{
+		Simplex: &p2ppb.Simplex{
+			Message: &p2ppb.Simplex_ReplicationRequest{
+				ReplicationRequest: &p2ppb.ReplicationRequest{
+					Seqs:        []uint64{1, 2, 3},
+					LatestRound: 1,
+				},
+			},
 		},
 	}
-	inboundMsg, err := message.InboundSimplexMessage(testID, ids.NodeID{}, msg)
-	require.NoError(t, err)
+	inboundMsg := message.InboundSimplexMessage(testID, ids.NodeID{}, msg)
 
 	ctrl := gomock.NewController(t)
 	h := handlermock.NewHandler(ctrl)
