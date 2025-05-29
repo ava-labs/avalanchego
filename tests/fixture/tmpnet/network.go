@@ -11,9 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 	"net/netip"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -1081,52 +1079,4 @@ func MetricsLinkForNetwork(networkUUID string, startTime string, endTime string)
 		startTime,
 		endTime,
 	)
-}
-
-// GrafanaFilterOptions contains filters to apply to Grafana link in form of a query
-// Example: https://grafana-poc.avax-dev.network/?start_time=now-1h&endTime=now
-type GrafanaFilterOptions struct {
-	StartTime string
-	EndTime   string
-	Filters   map[string]string
-}
-
-func BuildMonitoringURLForNetwork(dashboardID, dashboardName, networkUUID string, options GrafanaFilterOptions) string {
-	// Set defaults for options if not provided
-	startTime := "now-1h"
-	if options.StartTime != "" {
-		startTime = options.StartTime
-	}
-
-	endTime := "now"
-	if options.EndTime != "" {
-		endTime = options.EndTime
-	}
-
-	baseURL := url.URL{
-		Scheme: "https",
-		Host:   grafanaURI,
-		Path:   fmt.Sprintf("/d/%s/%s", dashboardID, dashboardName),
-	}
-
-	query := baseURL.Query()
-
-	query.Add("from", startTime)
-	query.Add("to", endTime)
-
-	filters := make(map[string]string)
-	if options.Filters != nil {
-		filters = maps.Clone(options.Filters)
-	}
-
-	if _, exists := filters["network_uuid"]; !exists {
-		filters["network_uuid"] = networkUUID
-	}
-
-	for key, value := range filters {
-		query.Add("var-filter", fmt.Sprintf("%s|=|%s", key, value))
-	}
-
-	baseURL.RawQuery = query.Encode()
-	return baseURL.String()
 }
