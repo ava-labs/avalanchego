@@ -9,6 +9,7 @@ use std::sync::Arc;
 #[cfg(feature = "ethhash")]
 use std::sync::OnceLock;
 
+use metrics::gauge;
 use storage::logger::{trace, trace_enabled, warn};
 use typed_builder::TypedBuilder;
 
@@ -182,6 +183,8 @@ impl RevisionManager {
                     break;
                 }
             }
+            gauge!("firewood.active_revisions").set(self.historical.len() as f64);
+            gauge!("firewood.max_revisions").set(self.max_revisions as f64);
         }
 
         // 4. Set last committed revision
