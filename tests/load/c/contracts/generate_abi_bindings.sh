@@ -11,6 +11,13 @@ fi
 
 CONTRACTS_DIR="$(dirname "$0")"
 TEMPDIR=$(mktemp -d)
+
+cleanup() {
+  rm -r "${TEMPDIR}"   
+}
+
+trap cleanup EXIT
+
 for FILE in "${CONTRACTS_DIR}"/*.sol; do
   echo "Generating Go bindings from Solidity contract $FILE..."
   CONTRACT_NAME=$(basename "$FILE" .sol)
@@ -23,4 +30,3 @@ for FILE in "${CONTRACTS_DIR}"/*.sol; do
     --out="${CONTRACTS_DIR}/${CONTRACT_NAME}.bindings.go"
   echo "Generated ${CONTRACT_NAME}.bindings.go"
 done
-rm -r "${TEMPDIR}"
