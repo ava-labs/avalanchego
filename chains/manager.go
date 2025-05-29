@@ -1806,7 +1806,7 @@ func (m *manager) createChainVM(ctx *snow.ConsensusContext, vm block.ChainVM, ge
 			primaryAlias,
 		)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		vm = metervm.NewBlockVM(vm, meterchainvmReg)
