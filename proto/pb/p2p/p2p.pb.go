@@ -2466,7 +2466,6 @@ type Simplex struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// Chain being responded from
 	ChainId []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
 	// Types that are assignable to Message:
 	//

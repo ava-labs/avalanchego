@@ -426,7 +426,6 @@ message AppGossip {
 }
 
 message Simplex {
-  // Chain being responded from
   bytes chain_id = 1;
 
   oneof message {
