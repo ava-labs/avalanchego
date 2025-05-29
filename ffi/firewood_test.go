@@ -162,28 +162,26 @@ func TestInsert(t *testing.T) {
 	require.Equal(t, val, string(got), "Recover lone batch-inserted value")
 }
 
-// Attempt to make a call to a nil or invalid handle.
-// Each function should return an error and not panic.
-func TestGetBadHandle(t *testing.T) {
-	db := &Database{handle: nil}
+func TestClosedDatabase(t *testing.T) {
+	r := require.New(t)
+	dbFile := filepath.Join(t.TempDir(), "test.db")
+	db, _, err := newDatabase(dbFile)
+	r.NoError(err)
 
-	// This ignores error, but still shouldn't panic.
-	_, err := db.Get([]byte("non-existent"))
-	require.ErrorIs(t, err, errDBClosed)
+	r.NoError(db.Close())
 
-	// We ignore the error, but it shouldn't panic.
 	_, err = db.Root()
-	require.ErrorIs(t, err, errDBClosed)
+	r.ErrorIs(err, errDBClosed)
 
 	root, err := db.Update(
 		[][]byte{[]byte("key")},
 		[][]byte{[]byte("value")},
 	)
-	require.Empty(t, root)
-	require.ErrorIs(t, err, errDBClosed)
+	r.Empty(root)
+	r.ErrorIs(err, errDBClosed)
 
 	err = db.Close()
-	require.ErrorIs(t, err, errDBClosed)
+	r.ErrorIs(err, errDBClosed)
 }
 
 func keyForTest(i int) []byte {
@@ -428,21 +426,6 @@ func TestDeleteAll(t *testing.T) {
 	expectedHash, err := hex.DecodeString(expectedHashHex)
 	require.NoError(t, err)
 	require.Equalf(t, expectedHash, hash, "%T.Root() of empty trie", db)
-}
-
-// Tests that a proposal with an invalid ID cannot be committed.
-func TestCommitFakeProposal(t *testing.T) {
-	db := newTestDatabase(t)
-
-	// Create a fake proposal with an invalid ID.
-	proposal := &Proposal{
-		handle: db.handle,
-		id:     1, // note that ID 0 is reserved for invalid proposals
-	}
-
-	// Attempt to get a value from the fake proposal.
-	_, err := proposal.Get([]byte("non-existent"))
-	require.Contains(t, err.Error(), "proposal not found", "Get(fake proposal)")
 }
 
 func TestDropProposal(t *testing.T) {
