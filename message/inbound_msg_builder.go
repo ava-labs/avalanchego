@@ -4,12 +4,15 @@
 package message
 
 import (
+	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
+
+var ErrUnknownSimplexMessageType = errors.New("unknown simplex message type")
 
 var _ InboundMsgBuilder = (*inMsgBuilder)(nil)
 
@@ -314,52 +317,47 @@ func InboundAppResponse(
 	}
 }
 
-func InboundSimplexBlock(
+// NewInboundSimplexMessage creates a new InboundMessage for simplex messages.
+// It takes a chainID, nodeID, and the message itself, which can be of various types
+// such as Block, Vote, EmptyVote, Finalization, Notarization, EmptyNotarization,
+// FinalizationCertificate, ReplicationRequest, or ReplicationResponse.
+// If a message type is not recognized, it errors.
+func InboundSimplexMessage(
 	chainID ids.ID,
 	nodeID ids.NodeID,
-	block *p2p.Simplex_Block,
-) InboundMessage {
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     SimplexOp,
-		message: &p2p.Simplex{
-			ChainId: chainID[:],
-			Message: block,
-		},
-		expiration: mockable.MaxTime,
-	}
-}
+	msg any,
+) (InboundMessage, error) {
+	var simplexMsg *p2p.Simplex
 
-func InboundSimplexVote(
-	chainID ids.ID,
-	nodeID ids.NodeID,
-	vote *p2p.Simplex_Vote,
-) InboundMessage {
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     SimplexOp,
-		message: &p2p.Simplex{
-			ChainId: chainID[:],
-			Message: vote,
-		},
-		expiration: mockable.MaxTime,
+	switch m := msg.(type) {
+	case *p2p.Simplex_Block:
+		simplexMsg = &p2p.Simplex{ChainId: chainID[:], Message: m}
+	case *p2p.Simplex_Vote:
+		simplexMsg = &p2p.Simplex{ChainId: chainID[:], Message: m}
+	case *p2p.Simplex_EmptyVote:
+		simplexMsg = &p2p.Simplex{ChainId: chainID[:], Message: m}
+	case *p2p.Simplex_Finalization:
+		simplexMsg = &p2p.Simplex{ChainId: chainID[:], Message: m}
+	case *p2p.Simplex_Notarization:
+		simplexMsg = &p2p.Simplex{ChainId: chainID[:], Message: m}
+	case *p2p.Simplex_EmptyNotarization:
+		simplexMsg = &p2p.Simplex{ChainId: chainID[:], Message: m}
+	case *p2p.Simplex_FinalizationCertificate:
+		simplexMsg = &p2p.Simplex{ChainId: chainID[:], Message: m}
+	case *p2p.Simplex_ReplicationRequest:
+		simplexMsg = &p2p.Simplex{ChainId: chainID[:], Message: m}
+	case *p2p.Simplex_ReplicationResponse:
+		simplexMsg = &p2p.Simplex{ChainId: chainID[:], Message: m}
+	default:
+		return nil, ErrUnknownSimplexMessageType
 	}
-}
 
-func InboundSimplexReplicationRequest(
-	chainID ids.ID,
-	nodeID ids.NodeID,
-	replicationRequest *p2p.Simplex_ReplicationRequest,
-) InboundMessage {
 	return &inboundMessage{
-		nodeID: nodeID,
-		op:     SimplexOp,
-		message: &p2p.Simplex{
-			ChainId: chainID[:],
-			Message: replicationRequest,
-		},
+		nodeID:     nodeID,
+		op:         SimplexOp,
+		message:    simplexMsg,
 		expiration: mockable.MaxTime,
-	}
+	}, nil
 }
 
 func encodeIDs(ids []ids.ID, result [][]byte) {

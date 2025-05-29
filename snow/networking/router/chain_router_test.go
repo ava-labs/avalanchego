@@ -1574,7 +1574,8 @@ func TestHandleSimplexMessage(t *testing.T) {
 			LatestRound: 1,
 		},
 	}
-	inboundMsg := message.InboundSimplexReplicationRequest(testID, ids.NodeID{}, msg)
+	inboundMsg, err := message.InboundSimplexMessage(testID, ids.NodeID{}, msg)
+	require.NoError(t, err)
 
 	ctrl := gomock.NewController(t)
 	h := handlermock.NewHandler(ctrl)
