@@ -6,7 +6,6 @@ package main
 import (
 	"context"
 	"os"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
@@ -45,7 +44,6 @@ func main() {
 	require := require.New(tc)
 	ctx := context.Background()
 
-	startTime := time.Now()
 	nodes := tmpnet.NewNodesOrPanic(nodesCount)
 
 	keys, err := tmpnet.NewPrivateKeys(agentsCount)
@@ -56,7 +54,7 @@ func main() {
 		PreFundedKeys: keys,
 	}
 
-	testEnv := e2e.NewTestEnvironment(tc, flagVars, network)
+	e2e.NewTestEnvironment(tc, flagVars, network)
 	defer func() {
 		require.NoError(network.Stop(ctx), "failed to stop network")
 	}()
@@ -102,6 +100,4 @@ func main() {
 		c.Execute(ctx, network.PreFundedKeys, config, metrics, log),
 		"failed to execute load test",
 	)
-
-	load.GenerateMetricsLink(testEnv.GetNetwork().UUID, log, startTime)
 }
