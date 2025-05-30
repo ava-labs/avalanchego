@@ -4,12 +4,14 @@
 package tmpnet
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -21,7 +23,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/config"
@@ -50,19 +52,24 @@ func DefaultPodFlags(networkName string, dataDir string) map[string]string {
 // NewNodeStatefulSet returns a statefulset for an avalanchego node.
 func NewNodeStatefulSet(
 	name string,
+	generateName bool,
 	imageName string,
 	containerName string,
 	volumeName string,
 	volumeSize string,
 	volumeMountPath string,
-	flags map[string]string,
+	flags FlagsMap,
 ) *appsv1.StatefulSet {
+	objectMeta := metav1.ObjectMeta{}
+	if generateName {
+		objectMeta.GenerateName = name + "-"
+	} else {
+		objectMeta.Name = name
+	}
 	return &appsv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: name + "-",
-		},
+		ObjectMeta: objectMeta,
 		Spec: appsv1.StatefulSetSpec{
-			Replicas:    pointer.Int32(1),
+			Replicas:    ptr.To[int32](1),
 			ServiceName: name,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
@@ -123,7 +130,7 @@ func NewNodeStatefulSet(
 								PeriodSeconds:    1,
 								SuccessThreshold: 1,
 							},
-							Env: stringMapToEnvVarSlice(flags),
+							Env: flagsToEnvVarSlice(flags),
 						},
 					},
 				},
@@ -133,17 +140,35 @@ func NewNodeStatefulSet(
 }
 
 // stringMapToEnvVarSlice converts a string map to a kube EnvVar slice.
-func stringMapToEnvVarSlice(mapping map[string]string) []corev1.EnvVar {
-	envVars := make([]corev1.EnvVar, len(mapping))
+func flagsToEnvVarSlice(flags FlagsMap) []corev1.EnvVar {
+	envVars := make([]corev1.EnvVar, len(flags))
 	var i int
-	for k, v := range mapping {
+	for k, v := range flags {
 		envVars[i] = corev1.EnvVar{
 			Name:  config.EnvVarName(config.EnvPrefix, k),
 			Value: v,
 		}
 		i++
 	}
+	sortEnvVars(envVars)
 	return envVars
+}
+
+func envVarsToJSONValue(envVars []corev1.EnvVar) []map[string]string {
+	jsonValue := make([]map[string]string, len(envVars))
+	for i, envVar := range envVars {
+		jsonValue[i] = map[string]string{
+			"name":  envVar.Name,
+			"value": envVar.Value,
+		}
+	}
+	return jsonValue
+}
+
+func sortEnvVars(envVars []corev1.EnvVar) {
+	slices.SortFunc(envVars, func(a, b corev1.EnvVar) int {
+		return cmp.Compare(a.Name, b.Name)
+	})
 }
 
 // WaitForNodeHealthy waits for the node running in the specified pod to report healthy.
@@ -180,7 +205,7 @@ func WaitForNodeHealthy(
 	}
 	if err := wait.PollImmediateInfinite(healthCheckInterval, func() (bool, error) {
 		healthReply, err := CheckNodeHealth(ctx, localNodeURI)
-		if errors.Is(ErrUnrecoverableNodeHealthCheck, err) {
+		if errors.Is(err, ErrUnrecoverableNodeHealthCheck) {
 			return false, err
 		} else if err != nil {
 			// Error is potentially recoverable - log and continue
