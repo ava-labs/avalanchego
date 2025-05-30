@@ -222,7 +222,7 @@ func NewTestNetwork(
 
 	return NewNetwork(
 		cfg,
-		upgrade.InitiallyActiveTime,
+		upgrade.GetConfig(cfg.NetworkID).FortunaTime, // Must be updated for each network upgrade
 		msgCreator,
 		metrics,
 		log,
