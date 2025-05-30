@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"sync"
@@ -38,6 +39,7 @@ var flagVars *e2e.FlagVars
 
 func init() {
 	flagVars = e2e.RegisterFlags()
+	flag.Parse()
 }
 
 func main() {
