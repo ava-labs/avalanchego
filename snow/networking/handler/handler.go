@@ -719,10 +719,12 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 			return nil
 		}
 
-		return fmt.Errorf(
-			"simplex message handling not implemented yet %s",
-			engineType,
+		h.ctx.Log.Debug("received simplex message",
+			zap.Stringer("nodeID", nodeID),
+			zap.String("messageOp", op),
+			zap.Stringer("message", body),
 		)
+		return nil
 	case *message.QueryFailed:
 		return engine.QueryFailed(ctx, nodeID, msg.RequestID)
 
