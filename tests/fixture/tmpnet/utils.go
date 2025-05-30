@@ -103,13 +103,13 @@ func GetNodeWebsocketURIs(
 ) ([]string, error) {
 	nodeURIs, err := GetNodeURIs(ctx, nodes, deferCleanupFunc)
 	if err != nil {
-		return nil, fmt.Errorf("getting node URIs: %w", err)
+		return nil, fmt.Errorf("failed to get node URIs: %w", err)
 	}
 	wsURIs := make([]string, len(nodeURIs))
 	for i := range nodeURIs {
 		uri, err := url.Parse(nodeURIs[i].URI)
 		if err != nil {
-			return nil, fmt.Errorf("parsing URI: %w", err)
+			return nil, fmt.Errorf("failed to parse node URI: %w", err)
 		}
 		uri.Scheme = "ws" // use websocket to be able to stream events
 		wsURIs[i] = fmt.Sprintf("%s/ext/bc/%s/ws", uri, blockchainID)
