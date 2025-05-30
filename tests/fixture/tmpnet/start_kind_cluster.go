@@ -33,7 +33,13 @@ const (
 )
 
 // StartKindCluster starts a new kind cluster with integrated registry if one is not already running.
-func StartKindCluster(ctx context.Context, log logging.Logger, configPath string) error {
+func StartKindCluster(
+	ctx context.Context,
+	log logging.Logger,
+	configPath string,
+	startMetricsCollector bool,
+	startLogsCollector bool,
+) error {
 	configContext := KindKubeconfigContext
 
 	clusterRunning, err := isKindClusterRunning(log, configPath)
@@ -65,8 +71,15 @@ func StartKindCluster(ctx context.Context, log logging.Logger, configPath string
 	if err != nil {
 		return err
 	}
+	if err := ensureNamespace(ctx, log, clientset, DefaultTmpnetNamespace); err != nil {
+		return err
+	}
 
-	return ensureNamespace(ctx, log, clientset, DefaultTmpnetNamespace)
+	if err := DeployKubeCollectors(ctx, log, configPath, configContext, startMetricsCollector, startLogsCollector); err != nil {
+		return fmt.Errorf("failed to deploy kube collectors: %w", err)
+	}
+
+	return nil
 }
 
 // isKindClusterRunning determines if a kind cluster is running with context kind-kind

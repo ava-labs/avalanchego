@@ -59,6 +59,7 @@ func NewNodeStatefulSet(
 	volumeSize string,
 	volumeMountPath string,
 	flags FlagsMap,
+	labels map[string]string,
 ) *appsv1.StatefulSet {
 	objectMeta := metav1.ObjectMeta{}
 	if generateName {
@@ -66,6 +67,25 @@ func NewNodeStatefulSet(
 	} else {
 		objectMeta.Name = name
 	}
+
+	podAnnotations := map[string]string{
+		"prometheus.io/scrape": "true",
+		"prometheus.io/path":   "/ext/metrics",
+		"promtail/collect":     "true",
+	}
+
+	podLabels := map[string]string{
+		"app": name,
+	}
+	for label, value := range labels {
+		// These labels may contain values invalid for use in labels. Set them as annotations instead.
+		if label == "gh_repo" || label == "gh_workflow" {
+			podAnnotations[label] = value
+			continue
+		}
+		podLabels[label] = value
+	}
+
 	return &appsv1.StatefulSet{
 		ObjectMeta: objectMeta,
 		Spec: appsv1.StatefulSetSpec{
@@ -95,9 +115,8 @@ func NewNodeStatefulSet(
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"app": name,
-					},
+					Labels:      podLabels,
+					Annotations: podAnnotations,
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
