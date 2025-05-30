@@ -315,10 +315,6 @@ func InboundAppResponse(
 }
 
 // NewInboundSimplexMessage creates a new InboundMessage for simplex messages.
-// It takes a chainID, nodeID, and the message itself, which can be of various types
-// such as Block, Vote, EmptyVote, Finalization, Notarization, EmptyNotarization,
-// FinalizationCertificate, ReplicationRequest, or ReplicationResponse.
-// If a message type is not recognized, it errors.
 func InboundSimplexMessage(
 	chainID ids.ID,
 	nodeID ids.NodeID,
