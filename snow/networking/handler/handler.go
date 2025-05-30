@@ -485,7 +485,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 
 	var engineType p2ppb.EngineType
 	switch msg.EngineType {
-	case p2ppb.EngineType_ENGINE_TYPE_AVALANCHE, p2ppb.EngineType_ENGINE_TYPE_SNOWMAN:
+	case p2ppb.EngineType_ENGINE_TYPE_AVALANCHE, p2ppb.EngineType_ENGINE_TYPE_SNOWMAN, p2ppb.EngineType_ENGINE_TYPE_SIMPLEX:
 		// The peer is requesting an engine type that has been initialized, so
 		// we should attempt to honor the request.
 		engineType = msg.EngineType
@@ -709,7 +709,22 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		}
 
 		return engine.Chits(ctx, nodeID, msg.RequestId, preferredID, preferredIDAtHeight, acceptedID, msg.AcceptedHeight)
+	case *p2ppb.Simplex:
+		if engineType != p2ppb.EngineType_ENGINE_TYPE_SIMPLEX {
+			h.ctx.Log.Debug("dropping simplex message",
+				zap.String("reason", "engine type mismatch"),
+				zap.String("messageOp", op),
+				zap.Stringer("currentEngineType", currentState.Type),
+			)
+			return nil
+		}
 
+		h.ctx.Log.Debug("received simplex message",
+			zap.Stringer("nodeID", nodeID),
+			zap.String("messageOp", op),
+			zap.Stringer("message", body),
+		)
+		return nil
 	case *message.QueryFailed:
 		return engine.QueryFailed(ctx, nodeID, msg.RequestID)
 
