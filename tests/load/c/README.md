@@ -56,12 +56,12 @@ If you have the credentials (internal to Ava Labs) for the CI monitoring stack, 
     task test-load
     ```
 
-4. Wait for the load test to finish, this will log out a URL at the end of the test, in the form
+4. Prior to the test beginning, you will see the following log:
 
     ```log
     INFO metrics and logs available via grafana (collectors must be running)     {"uri": "https://grafana-poc.avax-dev.network/d/eabddd1d-0a06-4ba1-8e68-a44504e37535/C-Chain%20Load?from=1747817500582&to=1747817952631&var-filter=network_uuid%7C%3D%7C4f419e3a-dba5-4ccd-b2fd-bda15f9826ff"}
     ```
 
-1. Open the URL in your browser, and log in with the Grafana credentials which you can find in your password manager.
+5. Open the URL in your browser, and log in with the Grafana credentials which you can find in your password manager.
 
 For reference, see [the tmpnet monitoring section](../../fixture/tmpnet/README.md#monitoring)
