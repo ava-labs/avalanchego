@@ -66,6 +66,16 @@ var (
 
 	errInsufficientNodes    = errors.New("at least one node is required")
 	errMissingRuntimeConfig = errors.New("DefaultRuntimeConfig must not be empty")
+
+	// Labels expected to be available in the environment when running in GitHub Actions
+	githubLabels = []string{
+		"gh_repo",
+		"gh_workflow",
+		"gh_run_id",
+		"gh_run_number",
+		"gh_run_attempt",
+		"gh_job_id",
+	}
 )
 
 func init() {
@@ -897,6 +907,29 @@ func (n *Network) GetChainConfigContent() (string, error) {
 		return "", fmt.Errorf("failed to marshal chain configs: %w", err)
 	}
 	return base64.StdEncoding.EncodeToString(marshaledConfigs), nil
+}
+
+// GetMonitoringLabels retrieves the map of labels and their values to be
+// applied to metrics and logs collected from nodes and other collection
+// targets for the network (including test workloads). Callers may need
+// to set a unique value for the `instance` label to ensure a stable
+// identity for the collection target.
+func (n *Network) GetMonitoringLabels() map[string]string {
+	labels := map[string]string{
+		"network_uuid": n.UUID,
+		// This label must be set for compatibility with the expected
+		// filtering. Nodes should override this value.
+		"is_ephemeral_node": "false",
+		"network_owner":     n.Owner,
+	}
+	// Include the values of github labels if available
+	for _, label := range githubLabels {
+		value := os.Getenv(strings.ToUpper(label))
+		if len(value) > 0 {
+			labels[label] = value
+		}
+	}
+	return labels
 }
 
 // Waits until the provided nodes are healthy.

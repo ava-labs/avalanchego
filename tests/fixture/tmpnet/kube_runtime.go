@@ -262,6 +262,7 @@ func (p *KubeRuntime) Start(ctx context.Context) error {
 		fmt.Sprintf("%dGi", runtimeConfig.VolumeSizeGB),
 		volumeMountPath,
 		flags,
+		p.node.getMonitoringLabels(),
 	)
 
 	_, err = clientset.AppsV1().StatefulSets(runtimeConfig.Namespace).Create(

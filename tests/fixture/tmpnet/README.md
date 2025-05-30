@@ -59,11 +59,13 @@ the following non-test files:
 | Filename                    | Types          | Purpose                                                                |
 |:----------------------------|:---------------|:-----------------------------------------------------------------------|
 | flags/                      |                | Directory defining flags usable with both stdlib flags and spf13/pflag |
+| flags/collector.go          |                | Defines flags configuring collection of logs and metrics               |
 | flags/common.go             |                | Defines type definitions common across other files                     |
 | flags/process_runtime.go    |                | Defines flags configuring the process node runtime                     |
 | flags/runtime.go            |                | Defines flags configuring node runtime                                 |
 | flags/start_network.go      |                | Defines flags configuring network start                                |
 | tmpnetctl/                  |                | Directory containing main entrypoint for tmpnetctl command             |
+| yaml/                       |                | Directory defining kubernetes resources in yaml format                 |
 | check_monitoring.go         |                | Enables checking if logs and metrics were collected                    |
 | defaults.go                 |                | Defines common default configuration                                   |
 | detached_process_default.go |                | Configures detached processes for darwin and linux                     |
@@ -72,6 +74,7 @@ the following non-test files:
 | genesis.go                  |                | Creates test genesis                                                   |
 | kube.go                     |                | Library for Kubernetes interaction                                     |
 | local_network.go            |                | Defines configuration for the default local network                    |
+| monitor_kube.go             |                | Enables collection of logs and metrics from kube pods                  |
 | monitor_processes.go        |                | Enables collection of logs and metrics from local processes            |
 | network.go                  | Network        | Orchestrates and configures temporary networks                         |
 | network_config.go           | Network        | Reads and writes network configuration                                 |
