@@ -911,9 +911,9 @@ func (n *Network) GetChainConfigContent() (string, error) {
 
 // GetMonitoringLabels retrieves the map of labels and their values to be
 // applied to metrics and logs collected from nodes and other collection
-// targets for the network (including test workloads). Callers should
-// take care to set a unique value for the `instance` key to ensure a
-// stable identity for the collection target.
+// targets for the network (including test workloads). Callers may need
+// to set a unique value for the `instance` label to ensure a stable
+// identity for the collection target.
 func (n *Network) GetMonitoringLabels() map[string]string {
 	labels := map[string]string{
 		"network_uuid": n.UUID,
