@@ -320,12 +320,11 @@ func InboundSimplexMessage(
 	nodeID ids.NodeID,
 	msg p2p.Message_Simplex,
 ) InboundMessage {
-	msgWithChain := msg
-	msgWithChain.Simplex.ChainId = chainID[:]
+	msg.Simplex.ChainId = chainID[:]
 	return &inboundMessage{
 		nodeID:     nodeID,
 		op:         SimplexOp,
-		message:    msgWithChain.Simplex,
+		message:    msg.Simplex,
 		expiration: mockable.MaxTime,
 	}
 }
