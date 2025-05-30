@@ -104,7 +104,7 @@ func DeployKubeCollectors(
 	return nil
 }
 
-// deployKubeCollector deploys a the named collector to a Kubernetes cluster via the provided manifest bytes.
+// deployKubeCollector deploys a named collector to a Kubernetes cluster via the provided manifest bytes.
 func deployKubeCollector(
 	ctx context.Context,
 	log logging.Logger,
