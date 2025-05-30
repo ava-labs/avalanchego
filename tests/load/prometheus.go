@@ -88,7 +88,7 @@ func (s *MetricsServer) GenerateMonitoringConfig(
 	networkUUID string,
 	monitoringLabels map[string]string,
 ) (string, error) {
-	discoveryDir, err := tmpnet.GetPrometheusDicoveryDir()
+	discoveryDir, err := tmpnet.GetPrometheusServiceDiscoveryDir()
 	if err != nil {
 		return "", fmt.Errorf("getting tmpnet service discovery directory: %w", err)
 	}

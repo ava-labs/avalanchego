@@ -253,9 +253,10 @@ func getWorkingDir(cmdName string) (string, error) {
 	return filepath.Join(tmpnetDir, cmdName), nil
 }
 
-// GetServiceDiscoveryDir returns the prometheus directory path.
-func GetPrometheusDicoveryDir() (string, error) {
-	return getServiceDiscoveryDir("prometheus")
+// GetPrometheusServiceDiscoveryDir returns the path for prometheus file-based
+// service discovery configuration.
+func GetPrometheusServiceDiscoveryDir() (string, error) {
+	return getServiceDiscoveryDir(prometheusCmd)
 }
 
 func getServiceDiscoveryDir(cmdName string) (string, error) {
