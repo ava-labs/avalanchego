@@ -1,26 +1,20 @@
 # Release Notes
 
-## Pending Release
-
-- Added L1 validators to `platformvm.GetCurrentValidators` client implementation
-
 ## [v1.13.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.1)
 
 This version is backwards compatible to [v1.13.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.0). It is optional, but encouraged. The supported plugin version is `39`.
 
-### AVM
-
-- Removed indexer config flags
-  - `--index-transactions`
-  - `--index-allow-incomplete`
-
 ### APIs
 
 - Removed `avm.getAddressTxs` api
+- Added L1 validators to `platformvm.GetCurrentValidators` client implementation
 
 ### Configs
 
 - Removed `--tracing-enabled` and added `disabled` as an option to `--tracing-exporter-type`
+- Removed AVM indexer configs
+  - `index-transactions`
+  - `index-allow-incomplete`
 
 ## [v1.13.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.0)
 
