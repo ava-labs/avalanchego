@@ -24,7 +24,7 @@ func NewCollectorFlagVars() *CollectorVars {
 	return v
 }
 
-// NewRuntimeConfigFlagSetVars registers collector flag variables for pflag
+// NewCollectorFlagSetVars registers collector flag variables for pflag
 func NewCollectorFlagSetVars(flagSet *pflag.FlagSet) *CollectorVars {
 	v := &CollectorVars{}
 	v.register(flagSet.BoolVar)
