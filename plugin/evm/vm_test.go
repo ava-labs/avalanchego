@@ -22,9 +22,11 @@ import (
 
 	"github.com/ava-labs/coreth/constants"
 	"github.com/ava-labs/coreth/eth/filters"
+	"github.com/ava-labs/coreth/miner"
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/coreth/plugin/evm/config"
 	"github.com/ava-labs/coreth/plugin/evm/header"
+	"github.com/ava-labs/coreth/plugin/evm/upgrade/acp176"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap0"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap1"
 	"github.com/ava-labs/coreth/utils"
@@ -3880,4 +3882,175 @@ func TestNoBlobsAllowed(t *testing.T) {
 	require.ErrorContains(err, "blobs not enabled on avalanche networks")
 	err = vmBlock.Verify(ctx)
 	require.ErrorContains(err, "blobs not enabled on avalanche networks")
+}
+
+func TestBuildBlockWithInsufficientCapacity(t *testing.T) {
+	ctx := context.Background()
+	require := require.New(t)
+
+	importAmount := uint64(2_000_000_000_000_000) // 2M AVAX
+	fork := upgradetest.Fortuna
+	tvm := newVM(t, testVMConfig{
+		fork: &fork,
+		utxos: map[ids.ShortID]uint64{
+			testShortIDAddrs[0]: importAmount,
+		},
+	})
+	defer func() {
+		require.NoError(tvm.vm.Shutdown(ctx))
+	}()
+
+	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
+	tvm.vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
+
+	// Build a block consuming all of the available gas
+	var (
+		txs = make([]*types.Transaction, 2)
+		err error
+	)
+	for i := uint64(0); i < 2; i++ {
+		tx := types.NewContractCreation(
+			i,
+			big.NewInt(0),
+			acp176.MinMaxCapacity,
+			big.NewInt(ap0.MinGasPrice),
+			[]byte{0xfe}, // invalid opcode consumes all gas
+		)
+		txs[i], err = types.SignTx(tx, types.NewEIP155Signer(tvm.vm.chainID), testKeys[0].ToECDSA())
+		require.NoError(err)
+	}
+
+	errs := tvm.vm.txPool.AddRemotesSync([]*types.Transaction{txs[0]})
+	require.Len(errs, 1)
+	require.NoError(errs[0])
+
+	<-tvm.toEngine
+	blk2, err := tvm.vm.BuildBlock(ctx)
+	require.NoError(err)
+
+	require.NoError(blk2.Verify(ctx))
+	require.NoError(blk2.Accept(ctx))
+
+	// Attempt to build a block consuming more than the current gas capacity
+	errs = tvm.vm.txPool.AddRemotesSync([]*types.Transaction{txs[1]})
+	require.Len(errs, 1)
+	require.NoError(errs[0])
+
+	<-tvm.toEngine
+	// Expect block building to fail due to insufficient gas capacity
+	_, err = tvm.vm.BuildBlock(ctx)
+	require.ErrorIs(err, miner.ErrInsufficientGasCapacityToBuild)
+
+	// Wait to fill block capacity and retry block builiding
+	tvm.vm.clock.Set(tvm.vm.clock.Time().Add(acp176.TimeToFillCapacity * time.Second))
+
+	<-tvm.toEngine
+	blk3, err := tvm.vm.BuildBlock(ctx)
+	require.NoError(err)
+
+	require.NoError(blk3.Verify(ctx))
+	require.NoError(blk3.Accept(ctx))
+}
+
+func TestBuildBlockLargeTxStarvation(t *testing.T) {
+	ctx := context.Background()
+	require := require.New(t)
+
+	importAmount := uint64(2_000_000_000_000_000) // 2M AVAX
+	fork := upgradetest.Fortuna
+	tvm := newVM(t, testVMConfig{
+		fork: &fork,
+		utxos: map[ids.ShortID]uint64{
+			testShortIDAddrs[0]: importAmount,
+			testShortIDAddrs[1]: importAmount,
+		},
+	})
+	defer func() {
+		require.NoError(tvm.vm.Shutdown(ctx))
+	}()
+
+	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
+	tvm.vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
+
+	importTx1, err := tvm.vm.newImportTx(tvm.vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
+	require.NoError(err)
+	require.NoError(tvm.vm.mempool.AddLocalTx(importTx1))
+
+	importTx2, err := tvm.vm.newImportTx(tvm.vm.ctx.XChainID, testEthAddrs[1], initialBaseFee, []*secp256k1.PrivateKey{testKeys[1]})
+	require.NoError(err)
+	require.NoError(tvm.vm.mempool.AddLocalTx(importTx2))
+
+	<-tvm.toEngine
+	blk1, err := tvm.vm.BuildBlock(ctx)
+	require.NoError(err)
+
+	require.NoError(blk1.Verify(ctx))
+	require.NoError(tvm.vm.SetPreference(ctx, blk1.ID()))
+	require.NoError(blk1.Accept(ctx))
+
+	newHead := <-newTxPoolHeadChan
+	require.Equal(common.Hash(blk1.ID()), newHead.Head.Hash())
+
+	// Build a block consuming all of the available gas
+	var (
+		highGasPrice = big.NewInt(2 * ap0.MinGasPrice)
+		lowGasPrice  = big.NewInt(ap0.MinGasPrice)
+	)
+
+	// Refill capacity after distributing funds with import transactions
+	tvm.vm.clock.Set(tvm.vm.clock.Time().Add(acp176.TimeToFillCapacity * time.Second))
+	maxSizeTxs := make([]*types.Transaction, 2)
+	for i := uint64(0); i < 2; i++ {
+		tx := types.NewContractCreation(
+			i,
+			big.NewInt(0),
+			acp176.MinMaxCapacity,
+			highGasPrice,
+			[]byte{0xfe}, // invalid opcode consumes all gas
+		)
+		maxSizeTxs[i], err = types.SignTx(tx, types.NewEIP155Signer(tvm.vm.chainID), testKeys[0].ToECDSA())
+		require.NoError(err)
+	}
+
+	errs := tvm.vm.txPool.AddRemotesSync([]*types.Transaction{maxSizeTxs[0]})
+	require.Len(errs, 1)
+	require.NoError(errs[0])
+
+	<-tvm.toEngine
+	blk2, err := tvm.vm.BuildBlock(ctx)
+	require.NoError(err)
+
+	require.NoError(blk2.Verify(ctx))
+	require.NoError(blk2.Accept(ctx))
+
+	// Add a second transaction trying to consume the max guaranteed gas capacity at a higher gas price
+	errs = tvm.vm.txPool.AddRemotesSync([]*types.Transaction{maxSizeTxs[1]})
+	require.Len(errs, 1)
+	require.NoError(errs[0])
+
+	// Build a smaller transaction that consumes less gas at a lower price. Block building should
+	// fail and enforce waiting for more capacity to avoid starving the larger transaction.
+	tx := types.NewContractCreation(0, big.NewInt(0), 2_000_000, lowGasPrice, []byte{0xfe})
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(tvm.vm.chainID), testKeys[1].ToECDSA())
+	require.NoError(err)
+	errs = tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
+	require.Len(errs, 1)
+	require.NoError(errs[0])
+
+	<-tvm.toEngine
+	_, err = tvm.vm.BuildBlock(ctx)
+	require.ErrorIs(err, miner.ErrInsufficientGasCapacityToBuild)
+
+	// Wait to fill block capacity and retry block building
+	tvm.vm.clock.Set(tvm.vm.clock.Time().Add(acp176.TimeToFillCapacity * time.Second))
+	<-tvm.toEngine
+	blk4, err := tvm.vm.BuildBlock(ctx)
+	require.NoError(err)
+	ethBlk4 := blk4.(*chain.BlockWrapper).Block.(*Block).ethBlock
+	actualTxs := ethBlk4.Transactions()
+	require.Len(actualTxs, 1)
+	require.Equal(maxSizeTxs[1].Hash(), actualTxs[0].Hash())
+
+	require.NoError(blk4.Verify(ctx))
+	require.NoError(blk4.Accept(ctx))
 }
