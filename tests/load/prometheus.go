@@ -84,10 +84,7 @@ func (s *MetricsServer) Stop() (err error) {
 // GenerateMonitoringConfig generates and writes the Prometheus collector configuration
 // so tmpnet can dynamically discover new scrape target via file-based service discovery
 // It returns the collector file path.
-func (s *MetricsServer) GenerateMonitoringConfig(
-	networkUUID string,
-	monitoringLabels map[string]string,
-) (string, error) {
+func (s *MetricsServer) GenerateMonitoringConfig(monitoringLabels map[string]string) (string, error) {
 	discoveryDir, err := tmpnet.GetPrometheusServiceDiscoveryDir()
 	if err != nil {
 		return "", fmt.Errorf("getting tmpnet service discovery directory: %w", err)

@@ -73,7 +73,7 @@ func main() {
 	merticsErrCh, err := metricsServer.Start()
 	require.NoError(err, "failed to start load metrics server")
 
-	monitoringConfigFilePath, err := metricsServer.GenerateMonitoringConfig(network.UUID, network.GetMonitoringLabels())
+	monitoringConfigFilePath, err := metricsServer.GenerateMonitoringConfig(network.GetMonitoringLabels())
 	require.NoError(err, "failed to generate monitoring config file")
 
 	tc.DeferCleanup(func() {
