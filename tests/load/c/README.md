@@ -23,6 +23,8 @@ There are more interesting metrics available from the tmpnet nodes being load te
 Finally, to run the load test, run:
 
 ```bash
+# Install nix (skip this step if nix is already installed)
+./scripts/run_task.sh install-nix
 # Start the dev shell
 nix develop
 # Start the load test
