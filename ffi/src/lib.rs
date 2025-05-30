@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::ffi::{CStr, CString, OsStr, c_char};
 use std::fmt::{self, Display, Formatter};
 use std::ops::Deref;
+#[cfg(unix)]
 use std::os::unix::ffi::OsStrExt as _;
 use std::path::Path;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -18,6 +19,7 @@ use metrics::counter;
 #[doc(hidden)]
 mod metrics_setup;
 
+#[cfg(unix)]
 #[global_allocator]
 #[doc(hidden)]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
@@ -790,7 +792,10 @@ unsafe fn common_create(
         .try_init();
 
     let path = unsafe { CStr::from_ptr(path) };
+    #[cfg(unix)]
     let path: &Path = OsStr::from_bytes(path.to_bytes()).as_ref();
+    #[cfg(windows)]
+    let path: &Path = OsStr::new(path.to_str().expect("path should be valid UTF-8")).as_ref();
     if metrics_port > 0 {
         metrics_setup::setup_metrics(metrics_port);
     }

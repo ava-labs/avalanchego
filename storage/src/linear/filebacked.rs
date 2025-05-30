@@ -9,7 +9,10 @@
 use std::fs::{File, OpenOptions};
 use std::io::{Error, Read};
 use std::num::NonZero;
+#[cfg(unix)]
 use std::os::unix::fs::FileExt;
+#[cfg(windows)]
+use std::os::windows::fs::FileExt;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -154,7 +157,14 @@ impl ReadableStorage for FileBacked {
 
 impl WritableStorage for FileBacked {
     fn write(&self, offset: u64, object: &[u8]) -> Result<usize, Error> {
-        self.fd.write_at(object, offset)
+        #[cfg(unix)]
+        {
+            self.fd.write_at(object, offset)
+        }
+        #[cfg(windows)]
+        {
+            self.fd.seek_write(object, offset)
+        }
     }
 
     fn write_cached_nodes<'a>(
@@ -221,9 +231,14 @@ impl Read for PredictiveReader<'_> {
         if self.len == self.pos {
             let bytes_left_in_page = PREDICTIVE_READ_BUFFER_SIZE
                 - (self.offset % PREDICTIVE_READ_BUFFER_SIZE as u64) as usize;
+            #[cfg(unix)]
             let read = self
                 .fd
                 .read_at(&mut self.buffer[..bytes_left_in_page], self.offset)?;
+            #[cfg(windows)]
+            let read = self
+                .fd
+                .seek_read(&mut self.buffer[..bytes_left_in_page], self.offset)?;
             self.offset += read as u64;
             self.len = read;
             self.pos = 0;

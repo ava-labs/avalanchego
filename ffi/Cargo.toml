@@ -16,6 +16,8 @@ chrono = "0.4.39"
 oxhttp = "0.3.0"
 coarsetime = "0.1.35"
 env_logger = {version = "0.11.7", optional = true}
+
+[target.'cfg(unix)'.dependencies]
 tikv-jemallocator = "0.6.0"
 
 [features]
