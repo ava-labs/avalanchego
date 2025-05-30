@@ -61,9 +61,9 @@ func main() {
 	}
 
 	e2e.NewTestEnvironment(tc, flagVars, network)
-	defer func() {
+	tc.DeferCleanup(func() {
 		require.NoError(network.Stop(ctx), "failed to stop network")
-	}()
+	})
 
 	registry := prometheus.NewRegistry()
 	metrics, err := load.NewMetrics(registry)
@@ -76,23 +76,23 @@ func main() {
 	monitoringConfigFilePath, err := metricsServer.GenerateMonitoringConfig(network.UUID, network.GetMonitoringLabels())
 	require.NoError(err, "failed to generate monitoring config file")
 
-	defer func() {
+	tc.DeferCleanup(func() {
 		select {
 		case err := <-merticsErrCh:
 			require.NoError(err, "metrics server exited with error")
 		default:
 			require.NoError(metricsServer.Stop(), "failed to stop metrics server")
 		}
-	}()
+	})
 
-	defer func() {
+	tc.DeferCleanup(func() {
 		require.NoError(
 			os.Remove(monitoringConfigFilePath),
 			"failed †o remove monitoring config file",
 		)
-	}()
+	})
 
-	endpoints, err := tmpnet.GetNodeWebsocketURIs(ctx, network.Nodes, blockchainID, func(func()) {})
+	endpoints, err := tmpnet.GetNodeWebsocketURIs(ctx, network.Nodes, blockchainID, tc.DeferCleanup)
 	require.NoError(err, "failed †o get node websocket URIs")
 
 	w := &workload{
