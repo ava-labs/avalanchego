@@ -263,15 +263,17 @@ func buildImage(tc tests.TestContext, imageName string, forceNewHash bool, scrip
 	require.NoError(err, "Image build failed: %s", output)
 }
 
-func newNodeStatefulSet(name string, flags map[string]string) *appsv1.StatefulSet {
+func newNodeStatefulSet(name string, flags tmpnet.FlagsMap) *appsv1.StatefulSet {
 	statefulSet := tmpnet.NewNodeStatefulSet(
 		name,
+		true, // generateName
 		latestAvalanchegoImage,
 		nodeContainerName,
 		volumeName,
 		volumeSize,
 		nodeDataDir,
 		flags,
+		nil, /* labels */
 	)
 
 	// The version annotations key needs to be present to ensure compatibility with json patch replace

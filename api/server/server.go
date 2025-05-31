@@ -79,8 +79,6 @@ type HTTPConfig struct {
 type server struct {
 	// log this server writes to
 	log logging.Logger
-	// generates new logs for chains to write to
-	factory logging.Factory
 
 	shutdownTimeout time.Duration
 
@@ -101,7 +99,6 @@ type server struct {
 // New returns an instance of a Server.
 func New(
 	log logging.Logger,
-	factory logging.Factory,
 	listener net.Listener,
 	allowedOrigins []string,
 	shutdownTimeout time.Duration,
@@ -152,7 +149,6 @@ func New(
 
 	return &server{
 		log:             log,
-		factory:         factory,
 		shutdownTimeout: shutdownTimeout,
 		tracingEnabled:  tracingEnabled,
 		tracer:          tracer,

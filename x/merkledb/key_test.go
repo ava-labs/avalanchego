@@ -188,7 +188,6 @@ func Test_Key_Token(t *testing.T) {
 	type test struct {
 		name         string
 		inputBytes   []byte
-		ts           int
 		assertTokens func(*require.Assertions, Key)
 	}
 
@@ -196,7 +195,6 @@ func Test_Key_Token(t *testing.T) {
 		{
 			name:       "branch factor 2",
 			inputBytes: []byte{0b0_1_0_1_0_1_0_1, 0b1_0_1_0_1_0_1_0},
-			ts:         1,
 			assertTokens: func(require *require.Assertions, key Key) {
 				require.Equal(byte(0), key.Token(0, 1))
 				require.Equal(byte(1), key.Token(1, 1))
@@ -219,7 +217,6 @@ func Test_Key_Token(t *testing.T) {
 		{
 			name:       "branch factor 4",
 			inputBytes: []byte{0b00_01_10_11, 0b11_10_01_00},
-			ts:         2,
 			assertTokens: func(require *require.Assertions, key Key) {
 				require.Equal(byte(0), key.Token(0, 2))  // 00
 				require.Equal(byte(1), key.Token(2, 2))  // 01
@@ -243,7 +240,6 @@ func Test_Key_Token(t *testing.T) {
 				0b1100_1101,
 				0b1110_1111,
 			},
-			ts: 4,
 			assertTokens: func(require *require.Assertions, key Key) {
 				for i := 0; i < 16; i++ {
 					require.Equal(byte(i), key.Token(i*4, 4))
@@ -256,7 +252,6 @@ func Test_Key_Token(t *testing.T) {
 		tests = append(tests, test{
 			name:       fmt.Sprintf("branch factor 256, byte %d", i),
 			inputBytes: []byte{byte(i)},
-			ts:         8,
 			assertTokens: func(require *require.Assertions, key Key) {
 				require.Equal(byte(i), key.Token(0, 8))
 			},

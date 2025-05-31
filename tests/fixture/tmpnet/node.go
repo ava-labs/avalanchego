@@ -12,7 +12,6 @@ import (
 	"maps"
 	"net/http"
 	"net/netip"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -37,16 +36,6 @@ var (
 	errMissingTLSKeyForNodeID = fmt.Errorf("failed to ensure node ID: missing value for %q", config.StakingTLSKeyContentKey)
 	errMissingCertForNodeID   = fmt.Errorf("failed to ensure node ID: missing value for %q", config.StakingCertContentKey)
 	errInvalidKeypair         = fmt.Errorf("%q and %q must be provided together or not at all", config.StakingTLSKeyContentKey, config.StakingCertContentKey)
-
-	// Labels expected to be available in the environment when running in GitHub Actions
-	githubLabels = []string{
-		"gh_repo",
-		"gh_workflow",
-		"gh_run_id",
-		"gh_run_number",
-		"gh_run_attempt",
-		"gh_job_id",
-	}
 )
 
 // NodeRuntime defines the methods required to support running a node.
@@ -61,9 +50,10 @@ type NodeRuntime interface {
 	IsHealthy(ctx context.Context) (bool, error)
 }
 
-// Configuration required to configure a node runtime.
+// Configuration required to configure a node runtime. Only one of the fields should be set.
 type NodeRuntimeConfig struct {
 	Process *ProcessRuntimeConfig `json:"process,omitempty"`
+	Kube    *KubeRuntimeConfig    `json:"kube,omitempty"`
 }
 
 // Node supports configuring and running a node participating in a temporary network.
@@ -128,8 +118,19 @@ func NewNodesOrPanic(count int) []*Node {
 // Retrieves the runtime for the node.
 func (n *Node) getRuntime() NodeRuntime {
 	if n.runtime == nil {
-		n.runtime = &ProcessRuntime{
-			node: n,
+		switch {
+		case n.getRuntimeConfig().Process != nil:
+			n.runtime = &ProcessRuntime{
+				node: n,
+			}
+		case n.getRuntimeConfig().Kube != nil:
+			n.runtime = &KubeRuntime{
+				node: n,
+			}
+		default:
+			// Runtime configuration is validated during flag handling and network
+			// bootstrap so misconfiguration should be unusual.
+			panic(fmt.Sprintf("no runtime configuration set for %q", n.NodeID))
 		}
 	}
 	return n.runtime
@@ -421,23 +422,16 @@ func (n *Node) WaitForHealthy(ctx context.Context) error {
 // getMonitoringLabels retrieves the map of labels and their values to be
 // applied to metrics and logs collected from the node.
 func (n *Node) getMonitoringLabels() map[string]string {
-	labels := map[string]string{
-		// Explicitly setting an instance label avoids the default
-		// behavior of using the node's URI since the URI isn't
-		// guaranteed stable (e.g. port may change after restart).
-		"instance":          n.GetUniqueID(),
-		"network_uuid":      n.network.UUID,
-		"node_id":           n.NodeID.String(),
-		"is_ephemeral_node": strconv.FormatBool(n.IsEphemeral),
-		"network_owner":     n.network.Owner,
-	}
-	// Include the values of github labels if available
-	for _, label := range githubLabels {
-		value := os.Getenv(strings.ToUpper(label))
-		if len(value) > 0 {
-			labels[label] = value
-		}
-	}
+	labels := n.network.GetMonitoringLabels()
+
+	// Explicitly setting an instance label avoids the default
+	// behavior of using the node's URI since the URI isn't
+	// guaranteed stable (e.g. port may change after restart).
+	labels["instance"] = n.GetUniqueID()
+
+	labels["node_id"] = n.NodeID.String()
+	labels["is_ephemeral_node"] = strconv.FormatBool(n.IsEphemeral)
+
 	return labels
 }
 

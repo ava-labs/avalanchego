@@ -112,6 +112,7 @@ linters-settings:
       - 'require\.EqualValues$(# Equal should be used instead)?'
       - 'require\.NotEqualValues$(# NotEqual should be used instead)?'
       - '^(t|b|tb|f)\.(Fatal|Fatalf|Error|Errorf)$(# the require library should be used instead)?'
+      - '^sort\.(Slice|Strings)$(# the slices package should be used instead)?'
     # Exclude godoc examples from forbidigo checks.
     exclude_godoc_examples: false
   gci:
@@ -212,3 +213,13 @@ linters-settings:
     disable:
       - go-require
       - float-compare
+  unused:
+    # Mark all struct fields that have been written to as used.
+    # Default: true
+    field-writes-are-uses: false
+    # Treat IncDec statement (e.g. `i++` or `i--`) as both read and write operation instead of just write.
+    # Default: false
+    post-statements-are-reads: true
+    # Mark all local variables as used.
+    # default: true
+    local-variables-are-used: false
