@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -euo pipefail
+
 # Run load test against nodes deployed to a kind cluster
 
 if ! [[ "$0" =~ scripts/tests.load.kube.sh ]]; then
