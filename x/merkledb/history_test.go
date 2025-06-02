@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/maybe"
@@ -316,7 +317,7 @@ func Test_History_Values_Lookup_Over_Queue_Break(t *testing.T) {
 	changes, err := db.history.getValueChanges(startRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 10)
 	require.NoError(err)
 
-	require.Equal([]*keyChange{
+	require.Equal([]valueChange{
 		{
 			change: &change[maybe.Maybe[[]byte]]{
 				before: maybe.Nothing[[]byte](),
@@ -551,7 +552,7 @@ func Test_Change_List(t *testing.T) {
 
 	changes, err := db.history.getValueChanges(emptyRoot, startRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 100)
 	require.NoError(err)
-	require.Equal([]*keyChange{
+	require.Equal([]valueChange{
 		{
 			change: &change[maybe.Maybe[[]byte]]{
 				before: maybe.Nothing[[]byte](),
@@ -602,7 +603,7 @@ func Test_Change_List(t *testing.T) {
 
 	changes, err = db.history.getValueChanges(startRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 100)
 	require.NoError(err)
-	require.Equal([]*keyChange{
+	require.Equal([]valueChange{
 		{
 			change: &change[maybe.Maybe[[]byte]]{
 				before: maybe.Nothing[[]byte](),
@@ -655,7 +656,7 @@ func Test_Change_List(t *testing.T) {
 	changes, err = db.history.getValueChanges(startRoot, endRoot, maybe.Some[[]byte]([]byte("key22")), maybe.Some[[]byte]([]byte("key31")), 8)
 	require.NoError(err)
 
-	require.Equal([]*keyChange{
+	require.Equal([]valueChange{
 		{
 			change: &change[maybe.Maybe[[]byte]]{
 				before: maybe.Some([]byte("value22")),
@@ -793,305 +794,66 @@ func TestHistoryRecord(t *testing.T) {
 	require.Equal(change5.rootID, got.rootID)
 }
 
-func TestHistoryGetChangesToRootKeyRollback(t *testing.T) {
-	keyChangesSets := [][]*keyChange{
+func TestHistoryKeyChangeRollback(t *testing.T) {
+	require := require.New(t)
+
+	db, err := getBasicDB()
+	require.NoError(err)
+
+	keyChangesBatches := [][]database.BatchOp{
 		{
 			// First changes
 			{
-				change: &change[maybe.Maybe[[]byte]]{
-					before: maybe.Some([]byte{}),
-					after:  maybe.Some([]byte("value1a")),
-				},
-				key: ToKey([]byte("key1")),
+				Key:   []byte("key1"),
+				Value: []byte("value1a"),
 			},
 			{
-				change: &change[maybe.Maybe[[]byte]]{
-					before: maybe.Some([]byte{}),
-					after:  maybe.Some([]byte("value2a")),
-				},
-				key: ToKey([]byte("key2")),
+				Key:   []byte("key2"),
+				Value: []byte("value2a"),
 			},
 		},
 		{
 			// Second changes
 			{
-				change: &change[maybe.Maybe[[]byte]]{
-					before: maybe.Some([]byte("value1a")),
-					after:  maybe.Some([]byte("value1b")),
-				},
-				key: ToKey([]byte("key1")),
+				Key:   []byte("key1"),
+				Value: []byte("value1b"),
 			},
 			{
-				change: &change[maybe.Maybe[[]byte]]{
-					before: maybe.Some([]byte("value2a")),
-					after:  maybe.Some([]byte("value2b")),
-				},
-				key: ToKey([]byte("key2")),
+				Key:   []byte("key2"),
+				Value: []byte("value2b"),
 			},
 		},
 		{
 			// Third changes
 			{
-				change: &change[maybe.Maybe[[]byte]]{
-					before: maybe.Some([]byte("value1b")),
-					after:  maybe.Some([]byte("value1a")),
-				},
-				key: ToKey([]byte("key1")),
+				Key:   []byte("key1"),
+				Value: []byte("value1a"),
 			},
 		},
 	}
 
-	maxHistoryLen := len(keyChangesSets)
-	history := newTrieHistory(maxHistoryLen)
-
-	changeSummaries := make([]*changeSummary, maxHistoryLen)
-	for i := 0; i < maxHistoryLen; i++ {
-		changeSummary := &changeSummary{
-			rootID: ids.GenerateTestID(),
-			rootChange: change[maybe.Maybe[*node]]{
-				before: maybe.Some(&node{}),
-			},
-			nodes:      map[Key]*change[*node]{},
-			keyIndexes: map[Key]int{},
-			keyChanges: []*keyChange{},
-		}
-
-		for _, kc := range keyChangesSets[i] {
-			changeSummary.keyIndexes[kc.key] = len(changeSummary.keyChanges)
-			changeSummary.keyChanges = append(changeSummary.keyChanges, kc)
-		}
-
-		history.record(changeSummary)
-		changeSummaries[i] = changeSummary
-	}
-
-	combinedChangeSummary, err := history.getChangesToGetToRoot(changeSummaries[0].rootID, maybe.Nothing[[]byte](), maybe.Nothing[[]byte]())
-	require.NoError(t, err)
-
-	require.Len(t, combinedChangeSummary.keyIndexes, 1)
-	require.Len(t, combinedChangeSummary.keyChanges, 1)
-
-	// key2 => value2a => value 2b
-	require.Equal(t, []*keyChange{
-		{
-			change: &change[maybe.Maybe[[]byte]]{
-				before: maybe.Some([]byte("value2b")),
-				after:  maybe.Some([]byte("value2a")),
-			},
-			key: ToKey([]byte("key2")),
-		},
-	}, combinedChangeSummary.keyChanges)
-}
-
-func TestHistoryGetChangesToRootState(t *testing.T) {
-	var (
-		historyLen        = 3
-		changesPerHistory = 5
-
-		// unordered keys, so we can verify the [sortedKeys] field from [changeSummary].
-		// the length should be [historyLen] * [changesPerHistory]
-		keys = []byte{246, 19, 235, 233, 224, 122, 28, 22, 131, 77, 64, 207, 142, 103, 193}
-	)
-
-	history := newTrieHistory(historyLen)
-
-	changeSummaries := make([]*changeSummary, historyLen)
-	for i := 0; i < historyLen; i++ {
-		keyChanges := make([]*keyChange, changesPerHistory)
-
-		for j := 0; j < changesPerHistory; j++ {
-			key := ToKey([]byte{keys[j+i*changesPerHistory]})
-			before := []byte{keys[j+i*changesPerHistory]}
-			after := []byte{keys[j+i*changesPerHistory] + 1}
-
-			keyChanges[j] = &keyChange{
-				change: &change[maybe.Maybe[[]byte]]{
-					before: maybe.Some(before),
-					after:  maybe.Some(after),
-				},
-				key: key,
-			}
-		}
-
-		changeSummary := &changeSummary{
-			rootID: ids.GenerateTestID(),
-			rootChange: change[maybe.Maybe[*node]]{
-				before: maybe.Some(&node{}),
-			},
-			nodes:      map[Key]*change[*node]{},
-			keyIndexes: map[Key]int{},
-			keyChanges: keyChanges,
-		}
-
-		for _, kc := range keyChanges {
-			changeSummary.keyIndexes[kc.key] = len(changeSummary.keyChanges)
-			changeSummary.keyChanges = append(changeSummary.keyChanges, kc)
-
-			changeSummary.nodes[kc.key] = &change[*node]{before: &node{}, after: &node{}}
-		}
-
-		history.record(changeSummary)
-		changeSummaries[i] = changeSummary
-	}
-
-	combinedChangeSummary, err := history.getChangesToGetToRoot(changeSummaries[0].rootID, maybe.Nothing[[]byte](), maybe.Nothing[[]byte]())
-	require.NoError(t, err)
-
-	require.Len(t, combinedChangeSummary.keyIndexes, changesPerHistory*(historyLen-1))
-	require.Len(t, combinedChangeSummary.nodes, changesPerHistory*(historyLen-1))
-	require.Len(t, combinedChangeSummary.keyChanges, changesPerHistory*(historyLen-1))
-
-	for _, kc := range combinedChangeSummary.keyChanges {
-		require.Equal(t, []byte(kc.key.value), kc.after.Value())
-		require.Equal(t, []byte{([]byte(kc.key.value))[0] + 1}, kc.before.Value())
-	}
-}
-
-func TestHistoryGetChangesToRoot(t *testing.T) {
-	maxHistoryLen := 3
-	history := newTrieHistory(maxHistoryLen)
-
-	changes := []*changeSummary{}
-	for i := 0; i < maxHistoryLen; i++ { // Fill the history
-		kc := &keyChange{
-			change: &change[maybe.Maybe[[]byte]]{
-				before: maybe.Some([]byte{byte(i)}),
-				after:  maybe.Some([]byte{byte(i + 1)}),
-			},
-			key: ToKey([]byte{byte(i)}),
-		}
-
-		changes = append(changes, &changeSummary{
-			rootID: ids.GenerateTestID(),
-			rootChange: change[maybe.Maybe[*node]]{
-				before: maybe.Some(&node{}),
-			},
-			nodes: map[Key]*change[*node]{
-				ToKey([]byte{byte(i)}): {
-					before: &node{},
-					after:  &node{},
-				},
-			},
-			keyIndexes: map[Key]int{kc.key: 0},
-			keyChanges: []*keyChange{kc},
+	rootIDs := []ids.ID{}
+	for _, batchOps := range keyChangesBatches {
+		view, err := db.NewView(context.Background(), ViewChanges{
+			BatchOps: batchOps,
 		})
-		history.record(changes[i])
+		require.NoError(err)
+
+		require.NoError(view.CommitToDB(context.Background()))
+
+		rootID, err := db.GetMerkleRoot(context.Background())
+		require.NoError(err)
+
+		rootIDs = append(rootIDs, rootID)
 	}
 
-	type test struct {
-		name         string
-		rootID       ids.ID
-		start        maybe.Maybe[[]byte]
-		end          maybe.Maybe[[]byte]
-		validateFunc func(*require.Assertions, *changeSummary)
-		expectedErr  error
-	}
+	changeProof, err := db.GetChangeProof(context.Background(), rootIDs[0], rootIDs[len(rootIDs)-1], maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 100)
+	require.NoError(err)
 
-	tests := []test{
+	require.Equal([]KeyChange{
 		{
-			name:        "unknown root ID",
-			rootID:      ids.GenerateTestID(),
-			expectedErr: ErrInsufficientHistory,
+			Key:   []byte("key2"),
+			Value: maybe.Some([]byte("value2b")),
 		},
-		{
-			name:   "most recent change",
-			rootID: changes[maxHistoryLen-1].rootID,
-			validateFunc: func(require *require.Assertions, got *changeSummary) {
-				expected := newChangeSummary(defaultPreallocationSize)
-				require.Equal(expected, got)
-			},
-		},
-		{
-			name:   "second most recent change",
-			rootID: changes[maxHistoryLen-2].rootID,
-			validateFunc: func(require *require.Assertions, got *changeSummary) {
-				// Ensure this is the reverse of the most recent change
-				require.Len(got.nodes, 1)
-				require.Len(got.keyChanges, 1)
-				reversedChanges := changes[maxHistoryLen-1]
-				removedKey := ToKey([]byte{byte(maxHistoryLen - 1)})
-				require.Equal(reversedChanges.nodes[removedKey].before, got.nodes[removedKey].after)
-
-				require.Equal(reversedChanges.keyChanges[0].key, removedKey)
-				require.Equal(got.keyChanges[0].key, removedKey)
-
-				require.Equal(reversedChanges.keyChanges[0].before, got.keyChanges[0].after)
-				require.Equal(reversedChanges.keyChanges[0].after, got.keyChanges[0].before)
-			},
-		},
-		{
-			name:   "third most recent change",
-			rootID: changes[maxHistoryLen-3].rootID,
-			validateFunc: func(require *require.Assertions, got *changeSummary) {
-				require.Len(got.nodes, 2)
-				require.Len(got.keyChanges, 2)
-				reversedChanges1 := changes[maxHistoryLen-1]
-				removedKey1 := ToKey([]byte{byte(maxHistoryLen - 1)})
-				require.Equal(reversedChanges1.nodes[removedKey1].before, got.nodes[removedKey1].after)
-				require.Equal(reversedChanges1.keyChanges[0].key, removedKey1)
-				require.Equal(got.keyChanges[1].key, removedKey1)
-				require.Equal(reversedChanges1.keyChanges[0].before, got.keyChanges[1].after)
-				require.Equal(reversedChanges1.keyChanges[0].after, got.keyChanges[1].before)
-
-				reversedChanges2 := changes[maxHistoryLen-2]
-				removedKey2 := ToKey([]byte{byte(maxHistoryLen - 2)})
-				require.Equal(reversedChanges2.nodes[removedKey2].before, got.nodes[removedKey2].after)
-				require.Equal(reversedChanges2.keyChanges[0].key, removedKey2)
-				require.Equal(got.keyChanges[0].key, removedKey2)
-				require.Equal(reversedChanges2.keyChanges[0].before, got.keyChanges[0].after)
-				require.Equal(reversedChanges2.keyChanges[0].after, got.keyChanges[0].before)
-			},
-		},
-		{
-			name:   "third most recent change with start filter",
-			rootID: changes[maxHistoryLen-3].rootID,
-			start:  maybe.Some([]byte{byte(maxHistoryLen - 1)}), // Omit values from second most recent change
-			validateFunc: func(require *require.Assertions, got *changeSummary) {
-				require.Len(got.nodes, 2)
-				require.Len(got.keyChanges, 1)
-				reversedChanges1 := changes[maxHistoryLen-1]
-				removedKey1 := ToKey([]byte{byte(maxHistoryLen - 1)})
-				require.Equal(reversedChanges1.nodes[removedKey1].before, got.nodes[removedKey1].after)
-				require.Equal(reversedChanges1.keyChanges[0].key, removedKey1)
-				require.Equal(got.keyChanges[0].key, removedKey1)
-				require.Equal(reversedChanges1.keyChanges[0].before, got.keyChanges[0].after)
-				require.Equal(reversedChanges1.keyChanges[0].after, got.keyChanges[0].before)
-				reversedChanges2 := changes[maxHistoryLen-2]
-				removedKey2 := ToKey([]byte{byte(maxHistoryLen - 2)})
-				require.Equal(reversedChanges2.nodes[removedKey2].before, got.nodes[removedKey2].after)
-			},
-		},
-		{
-			name:   "third most recent change with end filter",
-			rootID: changes[maxHistoryLen-3].rootID,
-			end:    maybe.Some([]byte{byte(maxHistoryLen - 2)}), // Omit values from most recent change
-			validateFunc: func(require *require.Assertions, got *changeSummary) {
-				require.Len(got.nodes, 2)
-				require.Len(got.keyChanges, 1)
-				reversedChanges1 := changes[maxHistoryLen-1]
-				removedKey1 := ToKey([]byte{byte(maxHistoryLen - 1)})
-				require.Equal(reversedChanges1.nodes[removedKey1].before, got.nodes[removedKey1].after)
-				reversedChanges2 := changes[maxHistoryLen-2]
-				removedKey2 := ToKey([]byte{byte(maxHistoryLen - 2)})
-				require.Equal(reversedChanges2.nodes[removedKey2].before, got.nodes[removedKey2].after)
-				require.Equal(reversedChanges2.keyChanges[0].key, removedKey2)
-				require.Equal(got.keyChanges[0].key, removedKey2)
-				require.Equal(reversedChanges2.keyChanges[0].before, got.keyChanges[0].after)
-				require.Equal(reversedChanges2.keyChanges[0].after, got.keyChanges[0].before)
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-
-			got, err := history.getChangesToGetToRoot(tt.rootID, tt.start, tt.end)
-			require.ErrorIs(err, tt.expectedErr)
-			if tt.expectedErr != nil {
-				return
-			}
-			tt.validateFunc(require, got)
-		})
-	}
+	}, changeProof.KeyChanges)
 }

@@ -346,9 +346,9 @@ func newDatabase(
 		rootChange: change[maybe.Maybe[*node]]{
 			after: trieDB.root,
 		},
-		keyIndexes: map[Key]int{},
+		sortedKeys: []Key{},
 		nodes:      map[Key]*change[*node]{},
-		keyChanges: []*keyChange{},
+		keyChanges: map[Key]*change[maybe.Maybe[[]byte]]{},
 	})
 
 	// mark that the db has not yet been cleanly closed
@@ -747,22 +747,22 @@ func (db *merkleDB) GetChangeProof(
 		return nil, database.ErrClosed
 	}
 
-	// [changes] contains a subset of the keys that were added or had their
+	// [valueChanges] contains a subset of the keys that were added or had their
 	// values modified between [startRootID] to [endRootID].
-	changes, err := db.history.getValueChanges(startRootID, endRootID, start, end, maxLength)
+	valueChanges, err := db.history.getValueChanges(startRootID, endRootID, start, end, maxLength)
 	if err != nil {
 		return nil, err
 	}
 
 	result := &ChangeProof{
-		KeyChanges: make([]KeyChange, len(changes)),
+		KeyChanges: make([]KeyChange, len(valueChanges)),
 	}
 
-	for i, keyChange := range changes {
+	for i, valueChange := range valueChanges {
 		result.KeyChanges[i] = KeyChange{
-			Key: keyChange.key.Bytes(),
+			Key: valueChange.key.Bytes(),
 			// create a copy so edits of the []byte don't affect the db
-			Value: maybe.Bind(keyChange.after, slices.Clone[[]byte]),
+			Value: maybe.Bind(valueChange.change.after, slices.Clone[[]byte]),
 		}
 	}
 
@@ -1360,9 +1360,9 @@ func (db *merkleDB) Clear() error {
 	db.history = newTrieHistory(db.history.maxHistoryLen)
 	db.history.record(&changeSummary{
 		rootID:     db.rootID,
-		keyIndexes: map[Key]int{},
+		sortedKeys: []Key{},
 		nodes:      map[Key]*change[*node]{},
-		keyChanges: make([]*keyChange, 0),
+		keyChanges: map[Key]*change[maybe.Maybe[[]byte]]{},
 	})
 	return nil
 }

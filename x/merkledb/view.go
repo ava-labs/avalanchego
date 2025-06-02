@@ -154,7 +154,7 @@ func newView(
 		tokenSize:  db.tokenSize,
 	}
 
-	keyChanges := map[Key]*keyChange{}
+	keyChanges := map[Key]*change[maybe.Maybe[[]byte]]{}
 
 	for _, op := range changes.BatchOps {
 		key := op.Key
@@ -189,15 +189,13 @@ func newView(
 		return a.Compare(b)
 	})
 
-	for _, key := range sortedKeys {
-		v.changes.keyIndexes[key] = len(v.changes.keyChanges)
-		v.changes.keyChanges = append(v.changes.keyChanges, keyChanges[key])
-	}
+	v.changes.keyChanges = keyChanges
+	v.changes.sortedKeys = sortedKeys
 
 	return v, nil
 }
 
-func recordValueChange(v *view, keyChanges map[Key]*keyChange, key Key, value maybe.Maybe[[]byte]) error {
+func recordValueChange(v *view, keyChanges map[Key]*change[maybe.Maybe[[]byte]], key Key, value maybe.Maybe[[]byte]) error {
 	// update the existing change if it exists
 	if existing, ok := keyChanges[key]; ok {
 		existing.after = value
@@ -216,12 +214,9 @@ func recordValueChange(v *view, keyChanges map[Key]*keyChange, key Key, value ma
 		return err
 	}
 
-	keyChanges[key] = &keyChange{
-		change: &change[maybe.Maybe[[]byte]]{
-			before: beforeMaybe,
-			after:  value,
-		},
-		key: key,
+	keyChanges[key] = &change[maybe.Maybe[[]byte]]{
+		before: beforeMaybe,
+		after:  value,
 	}
 
 	return nil
@@ -305,12 +300,12 @@ func (v *view) calculateNodeChanges(ctx context.Context) error {
 	defer span.End()
 
 	// Add all the changed key/values to the nodes of the trie
-	for _, keyChange := range v.changes.keyChanges {
+	for key, keyChange := range v.changes.keyChanges {
 		if keyChange.after.IsNothing() {
-			if err := v.remove(keyChange.key); err != nil {
+			if err := v.remove(key); err != nil {
 				return err
 			}
-		} else if _, err := v.insert(keyChange.key, keyChange.after); err != nil {
+		} else if _, err := v.insert(key, keyChange.after); err != nil {
 			return err
 		}
 	}
@@ -637,7 +632,7 @@ func (v *view) getValue(key Key) ([]byte, error) {
 		return nil, ErrInvalid
 	}
 
-	if change, ok := v.changes.getChange(key); ok {
+	if change, ok := v.changes.keyChanges[key]; ok {
 		v.db.metrics.ViewChangesValueHit()
 		if change.after.IsNothing() {
 			return nil, database.ErrNotFound
