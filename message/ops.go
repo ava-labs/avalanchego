@@ -16,7 +16,7 @@ type Op byte
 
 // Types of messages that may be sent between nodes
 // Note: If you add a new parseable Op below, you must add it to either
-// UnrequestedOps or FailedToResponseOps.
+// [UnrequestedOps] or [FailedToResponseOps].
 const (
 	// Handshake:
 	PingOp Op = iota
