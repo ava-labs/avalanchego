@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"syscall"
 	"time"
@@ -89,6 +90,31 @@ func FilterAvailableNodes(nodes []*Node) []*Node {
 		filteredNodes = append(filteredNodes, node)
 	}
 	return filteredNodes
+}
+
+// GetNodeWebsocketURIs returns a list of websocket URIs for the given nodes and
+// blockchain ID, in the form "ws://<node-uri>/ext/bc/<blockchain-id>/ws".
+// Ephemeral and stopped nodes are ignored.
+func GetNodeWebsocketURIs(
+	ctx context.Context,
+	nodes []*Node,
+	blockchainID string,
+	deferCleanupFunc func(func()),
+) ([]string, error) {
+	nodeURIs, err := GetNodeURIs(ctx, nodes, deferCleanupFunc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get node URIs: %w", err)
+	}
+	wsURIs := make([]string, len(nodeURIs))
+	for i := range nodeURIs {
+		uri, err := url.Parse(nodeURIs[i].URI)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse node URI: %w", err)
+		}
+		uri.Scheme = "ws" // use websocket to be able to stream events
+		wsURIs[i] = fmt.Sprintf("%s/ext/bc/%s/ws", uri, blockchainID)
+	}
+	return wsURIs, nil
 }
 
 // Marshal to json with default prefix and indent.

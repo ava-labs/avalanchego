@@ -57,6 +57,9 @@ const (
 
 	// eth address: 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
 	HardHatKeyStr = "56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027"
+
+	// grafanaURI is remote Grafana URI
+	grafanaURI = "grafana-poc.avax-dev.network"
 )
 
 var (
@@ -1103,7 +1106,8 @@ func MetricsLinkForNetwork(networkUUID string, startTime string, endTime string)
 		endTime = "now"
 	}
 	return fmt.Sprintf(
-		"https://grafana-poc.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?&var-filter=network_uuid%%7C%%3D%%7C%s&var-filter=is_ephemeral_node%%7C%%3D%%7Cfalse&from=%s&to=%s",
+		"https://%s/d/kBQpRdWnk/avalanche-main-dashboard?&var-filter=network_uuid%%7C%%3D%%7C%s&var-filter=is_ephemeral_node%%7C%%3D%%7Cfalse&from=%s&to=%s",
+		grafanaURI,
 		networkUUID,
 		startTime,
 		endTime,
