@@ -15,6 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet/flags"
 )
 
 func TestUpgrade(t *testing.T) {
@@ -24,8 +25,7 @@ func TestUpgrade(t *testing.T) {
 var (
 	avalancheGoExecPath            string
 	avalancheGoExecPathToUpgradeTo string
-	startMetricsCollector          bool
-	startLogsCollector             bool
+	collectorVars                  *flags.CollectorVars
 	checkMetricsCollected          bool
 	checkLogsCollected             bool
 )
@@ -43,9 +43,8 @@ func init() {
 		"",
 		"avalanchego executable path to upgrade to",
 	)
-	e2e.SetMonitoringFlags(
-		&startMetricsCollector,
-		&startLogsCollector,
+	collectorVars = flags.NewCollectorFlagVars()
+	e2e.SetCheckCollectionFlags(
 		&checkMetricsCollected,
 		&checkLogsCollected,
 	)
@@ -70,11 +69,11 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 		network.Genesis = genesis
 
 		shutdownDelay := 0 * time.Second
-		if startMetricsCollector {
+		if collectorVars.StartMetricsCollector {
 			require.NoError(tmpnet.StartPrometheus(tc.DefaultContext(), tc.Log()))
 			shutdownDelay = tmpnet.NetworkShutdownDelay // Ensure a final metrics scrape
 		}
-		if startLogsCollector {
+		if collectorVars.StartLogsCollector {
 			require.NoError(tmpnet.StartPromtail(tc.DefaultContext(), tc.Log()))
 		}
 

@@ -273,6 +273,7 @@ func newNodeStatefulSet(name string, flags tmpnet.FlagsMap) *appsv1.StatefulSet 
 		volumeSize,
 		nodeDataDir,
 		flags,
+		nil, /* labels */
 	)
 
 	// The version annotations key needs to be present to ensure compatibility with json patch replace
