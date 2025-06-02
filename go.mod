@@ -9,6 +9,8 @@ module github.com/ava-labs/avalanchego
 //   - Consider updating the version of golangci-lint (in scripts/lint.sh).
 go 1.23.9
 
+replace simplex => ../Simplex
+
 require (
 	github.com/DataDog/zstd v1.5.2
 	github.com/NYTimes/gziphandler v1.1.1
@@ -197,4 +199,5 @@ require (
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
+	simplex v0.0.0-00010101000000-000000000000
 )

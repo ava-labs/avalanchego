@@ -152,6 +152,14 @@ type Manager interface {
 	Shutdown()
 }
 
+var (
+	SimplexID = ids.ID{'s', 'i', 'm', 'p', 'l', 'e', 'x'}
+)
+
+type ConsensusConfig struct {
+	ProtocolID ids.ID
+}
+
 // ChainParameters defines the chain being created
 type ChainParameters struct {
 	// The ID of the chain being created.
@@ -166,6 +174,8 @@ type ChainParameters struct {
 	FxIDs []ids.ID
 	// Invariant: Only used when [ID] is the P-chain ID.
 	CustomBeacons validators.Manager
+	// The consensus parameters of this chain.
+	ConsensusConfig ConsensusConfig
 }
 
 type chain struct {
@@ -563,7 +573,18 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		}
 	case block.ChainVM:
 		beacons := m.Validators
-		if chainParams.VMID == constants.SimplexVMID {
+		if chainParams.ID == constants.PlatformChainID {
+			beacons = chainParams.CustomBeacons
+		}
+
+		var err error
+
+		// TODO: replace this hack with an additional field in ChainParameters
+		// something like a ConsensusContext with an id for a consensus type
+		isPrimaryNetwork := chainParams.SubnetID == constants.PrimaryNetworkID
+		isPlugin := chainParams.VMID == constants.SubnetEVMID || chainParams.VMID == constants.XSVMID
+
+		if isPlugin && !isPrimaryNetwork {
 			chain, err = m.createSimplexChain(
 				ctx,
 				chainParams.GenesisData,
@@ -571,13 +592,8 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 				beacons,
 				vm,
 				chainFxs,
-				sb,
-			)
+				sb)
 		} else {
-			if chainParams.ID == constants.PlatformChainID {
-				beacons = chainParams.CustomBeacons
-			}
-	
 			chain, err = m.createSnowmanChain(
 				ctx,
 				chainParams.GenesisData,
@@ -1565,7 +1581,6 @@ func (m *manager) getOrMakeVMGatherer(vmID ids.ID) (metrics.MultiGatherer, error
 	return vmGatherer, nil
 }
 
-
 func (m *manager) createSimplexChain(
 	ctx *snow.ConsensusContext,
 	genesisData []byte,
@@ -1582,6 +1597,9 @@ func (m *manager) createSimplexChain(
 
 	primaryAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
 	vm, msgChan, err := m.createChainVM(ctx, vm, genesisData, primaryAlias, sb, fxs)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize chain vm: %w", err)
+	}
 
 	connectedBeacons := tracker.NewPeers()
 	bootstrapWeight, err := beacons.TotalWeight(ctx.SubnetID)
@@ -1636,7 +1654,7 @@ func (m *manager) createChainSender(
 }
 
 func (m *manager) createSimplexEngine() (common.Engine, error) {
-	simplexEngine := simplex.NewEngine(nil, nil)
+	simplexEngine := simplex.NewEngine(nil, m.Log)
 
 	var engine common.Engine
 	engine = simplexEngine
@@ -1644,7 +1662,9 @@ func (m *manager) createSimplexEngine() (common.Engine, error) {
 	if m.TracingEnabled {
 		engine = common.TraceEngine(engine, m.Tracer)
 	}
-
+	m.Log.Warn("Simplex engine is not fully implemented yet, it will not be able to process any messages",
+		zap.String("engine", "simplex"),
+		zap.String("status", "not fully implemented"))
 	return engine, nil
 }
 
@@ -1728,7 +1748,7 @@ func (m *manager) createChainHandler(ctx *snow.ConsensusContext, vdrs validators
 	if err != nil {
 		return nil, err
 	}
-	
+
 	simplexEngine, err := m.createSimplexEngine()
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create simplex instance: %w", err)
@@ -1754,9 +1774,9 @@ func (m *manager) createChainHandler(ctx *snow.ConsensusContext, vdrs validators
 
 	h.SetEngineManager(&handler.EngineManager{
 		Avalanche: nil,
-		Snowman: nil,
+		Snowman:   nil,
 		Simplex: &handler.Engine{
-			Consensus:    simplexEngine,
+			Consensus: simplexEngine,
 		},
 	})
 

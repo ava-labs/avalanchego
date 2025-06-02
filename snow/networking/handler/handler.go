@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/simplex"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
@@ -710,19 +711,15 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 
 		return engine.Chits(ctx, nodeID, msg.RequestId, preferredID, preferredIDAtHeight, acceptedID, msg.AcceptedHeight)
 	case *p2ppb.Simplex:
-		if engineType != p2ppb.EngineType_ENGINE_TYPE_SIMPLEX {
-			h.ctx.Log.Debug("dropping simplex message",
-				zap.String("reason", "engine type mismatch"),
-				zap.String("messageOp", op),
-				zap.Stringer("currentEngineType", currentState.Type),
+		engine, ok := engine.(*simplex.Engine)
+		if !ok {
+			return fmt.Errorf(
+				"attempt to submit simplex message to non-simplex engine %s",
+				engineType,
 			)
-			return nil
 		}
 
-		return fmt.Errorf(
-			"simplex message handling not implemented yet %s",
-			engineType,
-		)
+		return engine.Simplex(nodeID, msg)
 	case *message.QueryFailed:
 		return engine.QueryFailed(ctx, nodeID, msg.RequestID)
 
