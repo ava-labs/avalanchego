@@ -25,6 +25,51 @@ type Proposal struct {
 	// The proposal ID.
 	// id = 0 is reserved for a dropped proposal.
 	id uint32
+
+	// The proposal root hash.
+	root []byte
+}
+
+// newProposal creates a new Proposal from the given DatabaseHandle and Value.
+// The Value must be returned from a Firewood FFI function.
+// An error can only occur from parsing the Value.
+func newProposal(handle *C.DatabaseHandle, val *C.struct_Value) (*Proposal, error) {
+	bytes, id, err := hashAndIDFromValue(val)
+	if err != nil {
+		return nil, err
+	}
+
+	// If the proposal root is nil, it means the proposal is empty.
+	if bytes == nil {
+		bytes = make([]byte, RootLength)
+	}
+
+	return &Proposal{
+		handle: handle,
+		id:     id,
+		root:   bytes,
+	}, nil
+}
+
+// Root retrieves the root hash of the proposal.
+// If the proposal is empty (i.e. no keys in database),
+// it returns nil, nil.
+func (p *Proposal) Root() ([]byte, error) {
+	if p.handle == nil {
+		return nil, errDBClosed
+	}
+
+	if p.id == 0 {
+		return nil, errDroppedProposal
+	}
+
+	// If the hash is empty, return the empty root hash.
+	if p.root == nil {
+		return make([]byte, RootLength), nil
+	}
+
+	// Get the root hash of the proposal.
+	return p.root, nil
 }
 
 // Get retrieves the value for the given key.
@@ -42,7 +87,7 @@ func (p *Proposal) Get(key []byte) ([]byte, error) {
 
 	// Get the value for the given key.
 	val := C.fwd_get_from_proposal(p.handle, C.uint32_t(p.id), values.from(key))
-	return extractBytesThenFree(&val)
+	return bytesFromValue(&val)
 }
 
 // Propose creates a new proposal with the given keys and values.
@@ -77,15 +122,8 @@ func (p *Proposal) Propose(keys, vals [][]byte) (*Proposal, error) {
 		C.size_t(len(ffiOps)),
 		unsafe.SliceData(ffiOps),
 	)
-	id, err := extractUintThenFree(&val)
-	if err != nil {
-		return nil, err
-	}
 
-	return &Proposal{
-		handle: p.handle,
-		id:     id,
-	}, nil
+	return newProposal(p.handle, &val)
 }
 
 // Commit commits the proposal and returns any errors.
@@ -101,7 +139,7 @@ func (p *Proposal) Commit() error {
 
 	// Commit the proposal and return the hash.
 	errVal := C.fwd_commit(p.handle, C.uint32_t(p.id))
-	err := extractErrorThenFree(&errVal)
+	err := errorFromValue(&errVal)
 	if err != nil {
 		// this is unrecoverable due to Rust's ownership model
 		// The underlying proposal is no longer valid.
@@ -125,5 +163,5 @@ func (p *Proposal) Drop() error {
 	// Drop the proposal.
 	val := C.fwd_drop_proposal(p.handle, C.uint32_t(p.id))
 	p.id = 0
-	return extractErrorThenFree(&val)
+	return errorFromValue(&val)
 }

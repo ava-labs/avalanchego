@@ -44,7 +44,7 @@ func newRevision(handle *C.DatabaseHandle, root []byte) (*Revision, error) {
 	values, cleanup := newValueFactory()
 	defer cleanup()
 	val := C.fwd_get_from_root(handle, values.from(root), values.from([]byte{}))
-	_, err := extractBytesThenFree(&val)
+	_, err := bytesFromValue(&val)
 	if err != nil {
 		// Any error from this function indicates that the root is inaccessible.
 		return nil, errRevisionNotFound
@@ -69,7 +69,7 @@ func (r *Revision) Get(key []byte) ([]byte, error) {
 	defer cleanup()
 
 	val := C.fwd_get_from_root(r.handle, values.from(r.root), values.from(key))
-	value, err := extractBytesThenFree(&val)
+	value, err := bytesFromValue(&val)
 	if err != nil {
 		// Any error from this function indicates that the revision is inaccessible.
 		r.root = nil
