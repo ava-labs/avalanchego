@@ -20,11 +20,10 @@ on:
       runner_label:
         description: 'Runner'
         required: false
-        default: 'k8s-runner'
+        default: 'avalanche-avalanchego-runner'
         type: choice
         options:
-          - 'k8s-runner'
-          - 'avalanche-avalanchego'
+          - 'avalanche-avalanchego-runner'
           - 'ubuntu-latest'
 
 permissions:
@@ -37,7 +36,7 @@ concurrency:
 jobs:
   k8s_load_tests:
     name: "K8s Load Tests"
-    runs-on: ${{ github.event.inputs.runner_label || 'k8s-runner' }}
+    runs-on: ${{ github.event.inputs.runner_label || 'avalanche-avalanchego-runner' }}
     steps:
       - uses: actions/checkout@v4
         with:
