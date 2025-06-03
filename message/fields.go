@@ -83,14 +83,9 @@ type requestIDGetter interface {
 
 func GetRequestID(m any) (uint32, bool) {
 	if msg, ok := m.(requestIDGetter); ok {
-		requestID := msg.GetRequestId()
-		return requestID, true
+		return msg.GetRequestId(), true
 	}
-
-	// AppGossip is the only inbound message not containing a requestID. For
-	// ease of handling, imagine that it does have a requestID.
-	_, ok := m.(*p2p.AppGossip)
-	return 0, ok
+	return 0, false
 }
 
 type engineTypeGetter interface {
