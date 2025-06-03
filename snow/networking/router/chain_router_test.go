@@ -1576,9 +1576,10 @@ func TestHandleSimplexMessage(t *testing.T) {
 					LatestRound: 1,
 				},
 			},
+			ChainId: testID[:],
 		},
 	}
-	inboundMsg := message.InboundSimplexMessage(testID, ids.NodeID{}, msg)
+	inboundMsg := message.InboundSimplexMessage(ids.NodeID{}, msg)
 
 	ctrl := gomock.NewController(t)
 	h := handlermock.NewHandler(ctrl)

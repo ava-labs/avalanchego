@@ -316,11 +316,9 @@ func InboundAppResponse(
 
 // NewInboundSimplexMessage creates a new InboundMessage for simplex messages.
 func InboundSimplexMessage(
-	chainID ids.ID,
 	nodeID ids.NodeID,
 	msg p2p.Message_Simplex,
 ) InboundMessage {
-	msg.Simplex.ChainId = chainID[:]
 	return &inboundMessage{
 		nodeID:     nodeID,
 		op:         SimplexOp,

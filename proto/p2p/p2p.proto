@@ -463,12 +463,14 @@ message ProtocolMetadata {
 
 message BlockHeader {
   ProtocolMetadata metadata = 1;
-  // digest is the digest of the inner block data.
+  // digest is the short representation of the inner block's bytes
   bytes digest = 2;
 }
 
 message Signature {
+  // Signer identifies who the signature came from.
   bytes signer = 1;
+  // Value is the actual cryptographic signature.
   bytes value = 2;
 }
 
@@ -488,7 +490,7 @@ message Finalization {
 }
 
 message FinalizationCertificate {
-  Finalization finalization = 1;
+  BlockHeader finalization = 1;
   bytes quorum_certificate = 2;
 }
 
@@ -498,20 +500,22 @@ message Notarization {
 }
 
 message EmptyNotarization {
-  BlockHeader empty_vote = 1;
+  ProtocolMetadata empty_vote = 1;
   bytes quorum_certificate = 2;
 }
 
 message ReplicationRequest {
-  repeated uint64 seqs = 1; // array of seqs being requested
-  uint64 latest_round = 2; // latest round, our node has
+  repeated uint64 seqs = 1; // sequences we are requesting
+  uint64 latest_round = 2;  // latest round that we are aware of
 }
 
 message ReplicationResponse {
-  repeated QuorumRound data = 1;
-  QuorumRound latest_round = 2;
+  repeated QuorumRound data = 1; // requested seqs. not required to be in particular order
+  QuorumRound latest_round = 2; // latest round the responding node is aware of
 }
 
+// QuorumRound represents a round that has acheived quorum on either
+// (empty notarization), (block & notarization), or (block, finalization certificate)
 message QuorumRound {
   SimplexBlock block = 1;
   Notarization notarization = 2;

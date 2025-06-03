@@ -709,6 +709,8 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		}
 
 		return engine.Chits(ctx, nodeID, msg.RequestId, preferredID, preferredIDAtHeight, acceptedID, msg.AcceptedHeight)
+	case *message.QueryFailed:
+		return engine.QueryFailed(ctx, nodeID, msg.RequestID)
 	case *p2ppb.Simplex:
 		if engineType != p2ppb.EngineType_ENGINE_TYPE_SIMPLEX {
 			h.ctx.Log.Debug("dropping simplex message",
@@ -725,9 +727,6 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 			zap.Stringer("message", body),
 		)
 		return nil
-	case *message.QueryFailed:
-		return engine.QueryFailed(ctx, nodeID, msg.RequestID)
-
 	// Connection messages can be sent to the currently executing engine
 	case *message.Connected:
 		err := h.peerTracker.Connected(ctx, nodeID, msg.NodeVersion)
