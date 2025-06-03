@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/api/grpcapi"
+	"github.com/ava-labs/avalanchego/api/grpcclient"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/xsvm"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
@@ -186,12 +186,12 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 	ginkgo.It("should serve grpc api requests", func() {
 		tc.By("establishing connection")
 		uri := strings.TrimPrefix(e2e.GetEnv(tc).GetRandomNodeURI().URI, "http://")
-		conn, err := grpcapi.NewClient(
+		conn, err := grpcclient.New(
 			uri,
 			e2e.GetEnv(tc).GetNetwork().GetNetworkID(),
-			ids.ID{'f', 'o', 'o'},
-			ids.ID{'b', 'a', 'r'},
-			ids.ID{'b', 'a', 'z'},
+			e2e.GetEnv(tc).GetNetwork().GetSubnet(subnetAName).Chains[0].ChainID,
+			e2e.GetEnv(tc).GetNetwork().GetSubnet(subnetAName).Chains[0].ChainID,
+			e2e.GetEnv(tc).GetNetwork().GetSubnet(subnetAName).Chains[0].ChainID,
 		)
 		require.NoError(err)
 

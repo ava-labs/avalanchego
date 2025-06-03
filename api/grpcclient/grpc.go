@@ -1,4 +1,7 @@
-package grpcapi
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package grpcclient
 
 import (
 	"context"
@@ -11,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-func NewClient(
+func New(
 	uri string,
 	networkID uint32,
 	localPrefix ids.ID,
