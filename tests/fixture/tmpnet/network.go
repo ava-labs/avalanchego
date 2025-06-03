@@ -57,6 +57,9 @@ const (
 
 	// eth address: 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
 	HardHatKeyStr = "56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027"
+
+	// grafanaURI is remote Grafana URI
+	grafanaURI = "grafana-poc.avax-dev.network"
 )
 
 var (
@@ -66,6 +69,16 @@ var (
 
 	errInsufficientNodes    = errors.New("at least one node is required")
 	errMissingRuntimeConfig = errors.New("DefaultRuntimeConfig must not be empty")
+
+	// Labels expected to be available in the environment when running in GitHub Actions
+	githubLabels = []string{
+		"gh_repo",
+		"gh_workflow",
+		"gh_run_id",
+		"gh_run_number",
+		"gh_run_attempt",
+		"gh_job_id",
+	}
 )
 
 func init() {
@@ -899,6 +912,29 @@ func (n *Network) GetChainConfigContent() (string, error) {
 	return base64.StdEncoding.EncodeToString(marshaledConfigs), nil
 }
 
+// GetMonitoringLabels retrieves the map of labels and their values to be
+// applied to metrics and logs collected from nodes and other collection
+// targets for the network (including test workloads). Callers may need
+// to set a unique value for the `instance` label to ensure a stable
+// identity for the collection target.
+func (n *Network) GetMonitoringLabels() map[string]string {
+	labels := map[string]string{
+		"network_uuid": n.UUID,
+		// This label must be set for compatibility with the expected
+		// filtering. Nodes should override this value.
+		"is_ephemeral_node": "false",
+		"network_owner":     n.Owner,
+	}
+	// Include the values of github labels if available
+	for _, label := range githubLabels {
+		value := os.Getenv(strings.ToUpper(label))
+		if len(value) > 0 {
+			labels[label] = value
+		}
+	}
+	return labels
+}
+
 // Waits until the provided nodes are healthy.
 func waitForHealthy(ctx context.Context, log logging.Logger, nodes []*Node) error {
 	ticker := time.NewTicker(networkHealthCheckInterval)
@@ -1070,7 +1106,8 @@ func MetricsLinkForNetwork(networkUUID string, startTime string, endTime string)
 		endTime = "now"
 	}
 	return fmt.Sprintf(
-		"https://grafana-poc.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?&var-filter=network_uuid%%7C%%3D%%7C%s&var-filter=is_ephemeral_node%%7C%%3D%%7Cfalse&from=%s&to=%s",
+		"https://%s/d/kBQpRdWnk/avalanche-main-dashboard?&var-filter=network_uuid%%7C%%3D%%7C%s&var-filter=is_ephemeral_node%%7C%%3D%%7Cfalse&from=%s&to=%s",
+		grafanaURI,
 		networkUUID,
 		startTime,
 		endTime,
