@@ -13,6 +13,7 @@ fi
 ./scripts/start_kind_cluster.sh "$@"
 
 # Build AvalancheGo image
-DOCKER_IMAGE=localhost:5001/avalanchego FORCE_TAG_LATEST=1 ./scripts/build_image.sh 
+AVALANCHEGO_IMAGE="localhost:5001/avalanchego"
+DOCKER_IMAGE="$AVALANCHEGO_IMAGE" FORCE_TAG_LATEST=1 ./scripts/build_image.sh 
 
-go run ./tests/load/c/main --runtime=kube "$@"
+go run ./tests/load/c/main --runtime=kube --kube-image="$AVALANCHEGO_IMAGE" "$@"
