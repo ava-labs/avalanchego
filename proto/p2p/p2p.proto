@@ -430,10 +430,10 @@ message Simplex {
     BlockProposal block_proposal = 2;
     Vote vote = 3;
     EmptyVote empty_vote = 4;
-    Finalization finalization = 5;
-    Notarization notarization = 6;
+    Vote finalize_vote = 5;
+    QuorumCertificate notarization = 6;
     EmptyNotarization empty_notarization = 7;
-    FinalizationCertificate finalization_certificate = 8;
+    QuorumCertificate finalization = 8;
     ReplicationResponse replication_response = 9;
     ReplicationRequest replication_request = 10;
   }
@@ -482,18 +482,8 @@ message EmptyVote {
   Signature signature = 2;
 }
 
-message Finalization {
-  BlockHeader vote = 1;
-  Signature signature = 2;
-}
-
-message FinalizationCertificate {
+message QuorumCertificate {
   BlockHeader finalization = 1;
-  bytes quorum_certificate = 2;
-}
-
-message Notarization {
-  BlockHeader vote = 1;
   bytes quorum_certificate = 2;
 }
 
@@ -516,7 +506,7 @@ message ReplicationResponse {
 // (empty notarization), (block & notarization), or (block, finalization certificate)
 message QuorumRound {
   BlockProposal block = 1;
-  Notarization notarization = 2;
+  QuorumCertificate notarization = 2;
   EmptyNotarization empty_notarization = 3;
-  FinalizationCertificate finalization = 4;
+  QuorumCertificate finalization = 4;
 }
