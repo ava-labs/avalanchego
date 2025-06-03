@@ -25,7 +25,7 @@ type Context struct {
 	// against the P-chain's state, this context is undefined for those blocks.
 	PChainHeight uint64 `canoto:"uint,1" json:"pChainHeight"`
 
-	canotoData canotoData_Context `canoto:"nocopy"`
+	canotoData canotoData_Context `canoto:"nocopy"` //nolint:revive // Tag on unexported field required by canoto
 }
 
 // BuildBlockWithContextChainVM defines the interface a ChainVM can optionally
