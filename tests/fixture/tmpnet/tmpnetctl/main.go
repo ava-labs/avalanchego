@@ -10,7 +10,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -81,19 +80,7 @@ func main() {
 				DefaultRuntimeConfig: *nodeRuntimeConfig,
 			}
 
-			// Default timeout assumes process-based nodes
-			timeout := tmpnet.DefaultNetworkTimeout
-
-			// Kube-based nodes are expected to take longer
-			if nodeRuntimeConfig.Kube != nil {
-				// Ensure sufficient time for scheduling and image pull
-				timeout = time.Duration(nodeCount) * time.Minute
-
-				if nodeRuntimeConfig.Kube.UseExclusiveScheduling {
-					// Ensure sufficient time for the creation of autoscaled nodes
-					timeout *= 2
-				}
-			}
+			timeout := nodeRuntimeConfig.GetNetworkStartTimeout(nodeCount)
 			log.Info("waiting for network to start",
 				zap.Float64("timeoutSeconds", timeout.Seconds()),
 			)
