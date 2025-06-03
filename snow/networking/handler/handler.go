@@ -712,15 +712,6 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 	case *message.QueryFailed:
 		return engine.QueryFailed(ctx, nodeID, msg.RequestID)
 	case *p2ppb.Simplex:
-		if engineType != p2ppb.EngineType_ENGINE_TYPE_SIMPLEX {
-			h.ctx.Log.Debug("dropping simplex message",
-				zap.String("reason", "engine type mismatch"),
-				zap.String("messageOp", op),
-				zap.Stringer("currentEngineType", currentState.Type),
-			)
-			return nil
-		}
-
 		h.ctx.Log.Debug("received simplex message",
 			zap.Stringer("nodeID", nodeID),
 			zap.String("messageOp", op),

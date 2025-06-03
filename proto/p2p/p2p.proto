@@ -217,8 +217,6 @@ enum EngineType {
   // Only the X-Chain uses avalanche consensus
   ENGINE_TYPE_AVALANCHE = 1;
   ENGINE_TYPE_SNOWMAN = 2;
-  // For simplex consensus
-  ENGINE_TYPE_SIMPLEX = 3;
 }
 
 // GetAcceptedFrontier requests the accepted frontier from a peer.
@@ -506,7 +504,7 @@ message EmptyNotarization {
 
 message ReplicationRequest {
   repeated uint64 seqs = 1; // sequences we are requesting
-  uint64 latest_round = 2;  // latest round that we are aware of
+  uint64 latest_round = 2; // latest round that we are aware of
 }
 
 message ReplicationResponse {
