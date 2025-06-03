@@ -11,9 +11,9 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-var ErrInsufficientCapacity = errors.New("insufficient capacity")
-
 //go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
+
+var ErrInsufficientCapacity = errors.New("insufficient capacity")
 
 type State struct {
 	Capacity Gas `serialize:"true" json:"capacity" canoto:"uint,1"`
