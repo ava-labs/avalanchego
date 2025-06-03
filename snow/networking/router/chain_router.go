@@ -209,11 +209,6 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 
 	m := msg.Message()
 
-	if msg.Op() == message.SimplexOp {
-		cr.handleSimplexMessage(ctx, msg)
-		return
-	}
-
 	chainID, err := message.GetChainID(m)
 	if err != nil {
 		cr.log.Debug("dropping message with invalid field",
@@ -711,83 +706,4 @@ func (cr *ChainRouter) clearRequest(
 	cr.timedRequests.Delete(uniqueRequestID)
 	cr.metrics.outstandingRequests.Set(float64(cr.timedRequests.Len()))
 	return uniqueRequestID, &request
-}
-
-func (cr *ChainRouter) handleSimplexMessage(ctx context.Context, msg message.InboundMessage) {
-	m := msg.Message()
-	nodeID := msg.NodeID()
-	op := msg.Op()
-
-	chainID, err := message.GetChainID(m)
-	if err != nil {
-		cr.log.Debug("dropping message with invalid field",
-			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("messageOp", op),
-			zap.String("field", "ChainID"),
-			zap.Error(err),
-		)
-
-		msg.OnFinishedHandling()
-		return
-	}
-
-	cr.lock.Lock()
-	defer cr.lock.Unlock()
-
-	if cr.closing {
-		cr.log.Debug("dropping message",
-			zap.Stringer("messageOp", op),
-			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("chainID", chainID),
-			zap.Error(errClosing),
-		)
-		msg.OnFinishedHandling()
-		return
-	}
-
-	// Get the chain, if it exists
-	chain, exists := cr.chainHandlers[chainID]
-	if !exists {
-		cr.log.Debug("dropping message",
-			zap.Stringer("messageOp", op),
-			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("chainID", chainID),
-			zap.Error(errUnknownChain),
-		)
-		msg.OnFinishedHandling()
-		return
-	}
-
-	if !chain.ShouldHandle(nodeID) {
-		cr.log.Debug("dropping message",
-			zap.Stringer("messageOp", op),
-			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("chainID", chainID),
-			zap.Error(errUnallowedNode),
-		)
-		msg.OnFinishedHandling()
-		return
-	}
-
-	chainCtx := chain.Context()
-	if chainCtx.Executing.Get() {
-		cr.log.Debug("dropping message and skipping queue",
-			zap.String("reason", "the chain is currently executing"),
-			zap.Stringer("messageOp", op),
-		)
-		cr.metrics.droppedRequests.Inc()
-		msg.OnFinishedHandling()
-		return
-	}
-
-	engineType := p2p.EngineType_ENGINE_TYPE_UNSPECIFIED
-
-	// Pass the response to the chain
-	chain.Push(
-		ctx,
-		handler.Message{
-			InboundMessage: msg,
-			EngineType:     engineType,
-		},
-	)
 }
