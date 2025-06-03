@@ -155,7 +155,7 @@ where
     }
 
     async fn root_hash(&self) -> Result<Option<TrieHash>, api::Error> {
-        Ok(self.manager.read().expect("poisoned lock").root_hash()?)
+        self.root_hash_sync()
     }
 
     async fn all_hashes(&self) -> Result<Vec<TrieHash>, api::Error> {
@@ -254,7 +254,11 @@ impl Db {
 
     /// Synchronously get the root hash of the latest revision.
     pub fn root_hash_sync(&self) -> Result<Option<TrieHash>, api::Error> {
-        Ok(self.manager.read().expect("poisoned lock").root_hash()?)
+        let hash = self.manager.read().expect("poisoned lock").root_hash()?;
+        #[cfg(not(feature = "ethhash"))]
+        return Ok(hash);
+        #[cfg(feature = "ethhash")]
+        return Ok(Some(hash.unwrap_or_else(storage::empty_trie_hash)));
     }
 
     /// Synchronously get a revision from a root hash
@@ -342,7 +346,14 @@ pub struct Proposal<'p> {
 impl Proposal<'_> {
     /// Get the root hash of the proposal synchronously
     pub fn root_hash_sync(&self) -> Result<Option<api::HashKey>, api::Error> {
-        Ok(self.nodestore.root_hash()?)
+        #[cfg(not(feature = "ethhash"))]
+        return Ok(self.nodestore.root_hash()?);
+        #[cfg(feature = "ethhash")]
+        return Ok(Some(
+            self.nodestore
+                .root_hash()?
+                .unwrap_or_else(storage::empty_trie_hash),
+        ));
     }
 }
 

@@ -100,10 +100,9 @@ fn get_latest(db: *const DatabaseHandle, key: &Value) -> Result<Value, String> {
 
     // Find root hash.
     // Matches `hash` function but we use the TrieHash type here
-    let root = db
-        .root_hash_sync()
-        .map_err(|e| e.to_string())?
-        .ok_or_else(|| String::from("unexpected None from db.root_hash_sync"))?;
+    let Some(root) = db.root_hash_sync().map_err(|e| e.to_string())? else {
+        return Ok(Value::default());
+    };
 
     // Find revision assoicated with root.
     let rev = db.revision_sync(root).map_err(|e| e.to_string())?;
@@ -586,8 +585,8 @@ fn root_hash(db: *const DatabaseHandle) -> Result<Value, String> {
 fn hash(db: &Db) -> Result<Value, String> {
     db.root_hash_sync()
         .map_err(|e| e.to_string())?
-        .ok_or_else(|| String::from("unexpected None from db.root_hash_sync"))
         .map(|root| Value::from(root.as_slice()))
+        .map_or_else(|| Ok(Value::default()), Ok)
 }
 
 /// A value returned by the FFI.
@@ -623,6 +622,15 @@ impl Display for Value {
     }
 }
 
+impl Default for Value {
+    fn default() -> Self {
+        Self {
+            len: 0,
+            data: std::ptr::null(),
+        }
+    }
+}
+
 impl Value {
     #[must_use]
     pub const fn as_slice(&self) -> &[u8] {
@@ -652,15 +660,13 @@ impl From<Box<[u8]>> for Value {
 impl From<String> for Value {
     fn from(s: String) -> Self {
         if s.is_empty() {
-            return Value {
+            Self::default()
+        } else {
+            let cstr = CString::new(s).unwrap_or_default().into_raw();
+            Value {
                 len: 0,
-                data: std::ptr::null(),
-            };
-        }
-        let cstr = CString::new(s).unwrap_or_default().into_raw();
-        Value {
-            len: 0,
-            data: cstr.cast::<u8>(),
+                data: cstr.cast::<u8>(),
+            }
         }
     }
 }
@@ -680,10 +686,7 @@ impl From<u32> for Value {
 
 impl From<()> for Value {
     fn from((): ()) -> Self {
-        Self {
-            len: 0,
-            data: std::ptr::null(),
-        }
+        Self::default()
     }
 }
 
@@ -867,10 +870,7 @@ mod tests {
 
     #[test]
     fn test_invalid_value_display() {
-        let value = Value {
-            len: 0,
-            data: std::ptr::null(),
-        };
+        let value = Value::default();
         assert_eq!(format!("{value}"), "[not found]");
     }
 

@@ -244,15 +244,7 @@ impl RevisionManager {
     }
 
     pub fn root_hash(&self) -> Result<Option<HashKey>, RevisionManagerError> {
-        self.current_revision()
-            .kind
-            .root_hash()
-            .or_else(|| self.empty_trie_hash())
-            .map(Option::Some)
-            .ok_or(RevisionManagerError::IO(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "Root hash not found",
-            )))
+        Ok(self.current_revision().kind.root_hash())
     }
 
     pub fn current_revision(&self) -> CommittedRevision {

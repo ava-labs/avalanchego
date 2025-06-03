@@ -175,6 +175,11 @@ pub trait Db {
     async fn revision(&self, hash: TrieHash) -> Result<Arc<Self::Historical>, Error>;
 
     /// Get the hash of the most recently committed version
+    ///
+    /// # Note
+    ///
+    /// If the database is empty, this will return None, unless the ethhash feature is enabled.
+    /// In that case, we return the special ethhash compatible empty trie hash.
     async fn root_hash(&self) -> Result<Option<TrieHash>, Error>;
 
     /// Get all the hashes available
@@ -214,6 +219,11 @@ pub trait DbView {
         Self: 'a;
 
     /// Get the root hash for the current DbView
+    ///
+    /// # Note
+    ///
+    /// If the database is empty, this will return None, unless the ethhash feature is enabled.
+    /// In that case, we return the special ethhash compatible empty trie hash.
     async fn root_hash(&self) -> Result<Option<HashKey>, Error>;
 
     /// Get the value of a specific key

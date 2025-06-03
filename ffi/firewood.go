@@ -197,9 +197,8 @@ func (db *Database) Root() ([]byte, error) {
 	bytes, err := bytesFromValue(&hash)
 
 	// If the root hash is not found, return a zeroed slice.
-	if err != nil && strings.Contains(err.Error(), rootHashNotFound) {
+	if err == nil && bytes == nil {
 		bytes = make([]byte, RootLength)
-		err = nil
 	}
 	return bytes, err
 }
