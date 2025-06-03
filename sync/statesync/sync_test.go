@@ -50,15 +50,15 @@ func testSync(t *testing.T, test syncTest) {
 		ctx = test.ctx
 	}
 	clientDB, serverDB, serverTrieDB, root := test.prepareForTest(t)
-	leafsRequestHandler := handlers.NewLeafsRequestHandler(serverTrieDB, nil, message.Codec, handlerstats.NewNoopHandlerStats())
+	leafsRequestHandler := handlers.NewLeafsRequestHandler(serverTrieDB, message.StateTrieKeyLength, nil, message.Codec, handlerstats.NewNoopHandlerStats())
 	codeRequestHandler := handlers.NewCodeRequestHandler(serverDB, message.Codec, handlerstats.NewNoopHandlerStats())
-	testClient := statesyncclient.NewTestClient(message.Codec, leafsRequestHandler, codeRequestHandler, nil)
-	// Set intercept functions for the test client
-	testClient.GetLeafsIntercept = test.GetLeafsIntercept
-	testClient.GetCodeIntercept = test.GetCodeIntercept
+	mockClient := statesyncclient.NewTestClient(message.Codec, leafsRequestHandler, codeRequestHandler, nil)
+	// Set intercept functions for the mock client
+	mockClient.GetLeafsIntercept = test.GetLeafsIntercept
+	mockClient.GetCodeIntercept = test.GetCodeIntercept
 
 	s, err := NewStateSyncer(&StateSyncerConfig{
-		Client:                   testClient,
+		Client:                   mockClient,
 		Root:                     root,
 		DB:                       clientDB,
 		BatchSize:                1000, // Use a lower batch size in order to get test coverage of batches being written early.

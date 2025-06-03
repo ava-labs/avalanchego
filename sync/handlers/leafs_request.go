@@ -6,13 +6,11 @@ package handlers
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/coreth/core/state/snapshot"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	"github.com/ava-labs/coreth/sync/handlers/stats"
@@ -27,6 +25,8 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 )
 
+var _ LeafRequestHandler = (*leafsRequestHandler)(nil)
+
 const (
 	// Maximum number of leaves to return in a message.LeafsResponse
 	// This parameter overrides any other Limit specified
@@ -40,22 +40,28 @@ const (
 	segmentLen = 64 // divide data from snapshot to segments of this size
 )
 
-// LeafsRequestHandler is a peer.RequestHandler for types.LeafsRequest
+type LeafRequestHandler interface {
+	OnLeafsRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, leafsRequest message.LeafsRequest) ([]byte, error)
+}
+
+// leafsRequestHandler is a peer.RequestHandler for types.LeafsRequest
 // serving requested trie data
-type LeafsRequestHandler struct {
+type leafsRequestHandler struct {
 	trieDB           *triedb.Database
 	snapshotProvider SnapshotProvider
 	codec            codec.Manager
 	stats            stats.LeafsRequestHandlerStats
 	pool             sync.Pool
+	trieKeyLength    int
 }
 
-func NewLeafsRequestHandler(trieDB *triedb.Database, snapshotProvider SnapshotProvider, codec codec.Manager, syncerStats stats.LeafsRequestHandlerStats) *LeafsRequestHandler {
-	return &LeafsRequestHandler{
+func NewLeafsRequestHandler(trieDB *triedb.Database, trieKeyLength int, snapshotProvider SnapshotProvider, codec codec.Manager, syncerStats stats.LeafsRequestHandlerStats) *leafsRequestHandler {
+	return &leafsRequestHandler{
 		trieDB:           trieDB,
 		snapshotProvider: snapshotProvider,
 		codec:            codec,
 		stats:            syncerStats,
+		trieKeyLength:    trieKeyLength,
 		pool: sync.Pool{
 			New: func() interface{} { return make([][]byte, 0, maxLeavesLimit) },
 		},
@@ -70,10 +76,9 @@ func NewLeafsRequestHandler(trieDB *triedb.Database, snapshotProvider SnapshotPr
 // Specified Limit in message.LeafsRequest is overridden to maxLeavesLimit if it is greater than maxLeavesLimit
 // Expects returned errors to be treated as FATAL
 // Never returns errors
-// Expects NodeType to be one of message.AtomicTrieNode or message.StateTrieNode
 // Returns nothing if NodeType is invalid or requested trie root is not found
 // Assumes ctx is active
-func (lrh *LeafsRequestHandler) OnLeafsRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, leafsRequest message.LeafsRequest) ([]byte, error) {
+func (lrh *leafsRequestHandler) OnLeafsRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, leafsRequest message.LeafsRequest) ([]byte, error) {
 	startTime := time.Now()
 	lrh.stats.IncLeafsRequest()
 
@@ -85,16 +90,9 @@ func (lrh *LeafsRequestHandler) OnLeafsRequest(ctx context.Context, nodeID ids.N
 		lrh.stats.IncInvalidLeafsRequest()
 		return nil, nil
 	}
-	keyLength, err := getKeyLength(leafsRequest.NodeType)
-	if err != nil {
-		// Note: LeafsRequest.Handle checks NodeType's validity so clients cannot cause the server to spam this error
-		log.Error("Failed to get key length for leafs request", "err", err)
-		lrh.stats.IncInvalidLeafsRequest()
-		return nil, nil
-	}
-	if len(leafsRequest.Start) != 0 && len(leafsRequest.Start) != keyLength ||
-		len(leafsRequest.End) != 0 && len(leafsRequest.End) != keyLength {
-		log.Debug("invalid length for leafs request range, dropping request", "startLen", len(leafsRequest.Start), "endLen", len(leafsRequest.End), "expected", keyLength)
+	if (len(leafsRequest.Start) != 0 && len(leafsRequest.Start) != lrh.trieKeyLength) ||
+		(len(leafsRequest.End) != 0 && len(leafsRequest.End) != lrh.trieKeyLength) {
+		log.Debug("invalid length for leafs request range, dropping request", "startLen", len(leafsRequest.Start), "endLen", len(leafsRequest.End), "expected", lrh.trieKeyLength)
 		lrh.stats.IncInvalidLeafsRequest()
 		return nil, nil
 	}
@@ -134,7 +132,7 @@ func (lrh *LeafsRequestHandler) OnLeafsRequest(ctx context.Context, nodeID ids.N
 		request:   &leafsRequest,
 		response:  &leafsResponse,
 		t:         t,
-		keyLength: keyLength,
+		keyLength: lrh.trieKeyLength,
 		limit:     limit,
 		stats:     lrh.stats,
 	}
@@ -453,18 +451,6 @@ func (rb *responseBuilder) fillFromTrie(ctx context.Context, end []byte) (bool, 
 		rb.response.Vals = append(rb.response.Vals, it.Value)
 	}
 	return more, it.Err
-}
-
-// getKeyLength returns trie key length for given nodeType
-// expects nodeType to be one of message.AtomicTrieNode or message.StateTrieNode
-func getKeyLength(nodeType message.NodeType) (int, error) {
-	switch nodeType {
-	case message.AtomicTrieNode:
-		return wrappers.LongLen + common.HashLength, nil
-	case message.StateTrieNode:
-		return common.HashLength, nil
-	}
-	return 0, fmt.Errorf("cannot get key length for unknown node type: %s", nodeType)
 }
 
 // readLeafsFromSnapshot iterates the storage snapshot of the requested account

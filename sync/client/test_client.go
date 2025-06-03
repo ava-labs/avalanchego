@@ -24,7 +24,7 @@ var (
 
 type TestClient struct {
 	codec          codec.Manager
-	leafsHandler   *handlers.LeafsRequestHandler
+	leafsHandler   handlers.LeafRequestHandler
 	leavesReceived int32
 	codesHandler   *handlers.CodeRequestHandler
 	codeReceived   int32
@@ -43,7 +43,7 @@ type TestClient struct {
 
 func NewTestClient(
 	codec codec.Manager,
-	leafHandler *handlers.LeafsRequestHandler,
+	leafHandler handlers.LeafRequestHandler,
 	codesHandler *handlers.CodeRequestHandler,
 	blocksHandler *handlers.BlockRequestHandler,
 ) *TestClient {

@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evm
+package sync
 
 import (
 	"bytes"
@@ -17,18 +17,31 @@ import (
 	atomicstate "github.com/ava-labs/coreth/plugin/evm/atomic/state"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	syncclient "github.com/ava-labs/coreth/sync/client"
+
 	"github.com/ava-labs/libevm/trie"
 )
 
+// TrieNode represents a leaf node that belongs to the atomic trie.
+const TrieNode message.NodeType = 2
+
 var (
-	_ Syncer                  = (*atomicSyncer)(nil)
-	_ syncclient.LeafSyncTask = (*atomicSyncerLeafTask)(nil)
+	_ Syncer                  = (*syncer)(nil)
+	_ syncclient.LeafSyncTask = (*syncerLeafTask)(nil)
 )
 
-// atomicSyncer is used to sync the atomic trie from the network. The CallbackLeafSyncer
-// is responsible for orchestrating the sync while atomicSyncer is responsible for maintaining
+// Syncer represents a step in state sync,
+// along with Start/Done methods to control
+// and monitor progress.
+// Error returns an error if any was encountered.
+type Syncer interface {
+	Start(ctx context.Context) error
+	Done() <-chan error
+}
+
+// syncer is used to sync the atomic trie from the network. The CallbackLeafSyncer
+// is responsible for orchestrating the sync while syncer is responsible for maintaining
 // the state of progress and writing the actual atomic trie to the trieDB.
-type atomicSyncer struct {
+type syncer struct {
 	db           *versiondb.Database
 	atomicTrie   *atomicstate.AtomicTrie
 	trie         *trie.Trie // used to update the atomic trie
@@ -51,14 +64,14 @@ func addZeroes(height uint64) []byte {
 	return packer.Bytes
 }
 
-func newAtomicSyncer(client syncclient.LeafClient, vdb *versiondb.Database, atomicTrie *atomicstate.AtomicTrie, targetRoot common.Hash, targetHeight uint64, requestSize uint16) (*atomicSyncer, error) {
+func newSyncer(client syncclient.LeafClient, vdb *versiondb.Database, atomicTrie *atomicstate.AtomicTrie, targetRoot common.Hash, targetHeight uint64, requestSize uint16) (*syncer, error) {
 	lastCommittedRoot, lastCommit := atomicTrie.LastCommitted()
 	trie, err := atomicTrie.OpenTrie(lastCommittedRoot)
 	if err != nil {
 		return nil, err
 	}
 
-	atomicSyncer := &atomicSyncer{
+	syncer := &syncer{
 		db:           vdb,
 		atomicTrie:   atomicTrie,
 		trie:         trie,
@@ -67,20 +80,20 @@ func newAtomicSyncer(client syncclient.LeafClient, vdb *versiondb.Database, atom
 		lastHeight:   lastCommit,
 	}
 	tasks := make(chan syncclient.LeafSyncTask, 1)
-	tasks <- &atomicSyncerLeafTask{atomicSyncer: atomicSyncer}
+	tasks <- &syncerLeafTask{syncer: syncer}
 	close(tasks)
-	atomicSyncer.syncer = syncclient.NewCallbackLeafSyncer(client, tasks, requestSize)
-	return atomicSyncer, nil
+	syncer.syncer = syncclient.NewCallbackLeafSyncer(client, tasks, requestSize)
+	return syncer, nil
 }
 
 // Start begins syncing the target atomic root.
-func (s *atomicSyncer) Start(ctx context.Context) error {
+func (s *syncer) Start(ctx context.Context) error {
 	s.syncer.Start(ctx, 1, s.onSyncFailure)
 	return nil
 }
 
 // onLeafs is the callback for the leaf syncer, which will insert the key-value pairs into the trie.
-func (s *atomicSyncer) onLeafs(keys [][]byte, values [][]byte) error {
+func (s *syncer) onLeafs(keys [][]byte, values [][]byte) error {
 	for i, key := range keys {
 		if len(key) != atomicstate.TrieKeyLength {
 			return fmt.Errorf("unexpected key len (%d) in atomic trie sync", len(key))
@@ -128,7 +141,7 @@ func (s *atomicSyncer) onLeafs(keys [][]byte, values [][]byte) error {
 
 // onFinish is called when sync for this trie is complete.
 // commit the trie to disk and perform the final checks that we synced the target root correctly.
-func (s *atomicSyncer) onFinish() error {
+func (s *syncer) onFinish() error {
 	// commit the trie on finish
 	root, nodes, err := s.trie.Commit(false)
 	if err != nil {
@@ -154,24 +167,24 @@ func (s *atomicSyncer) onFinish() error {
 
 // onSyncFailure is a no-op since we flush progress to disk at the regular commit interval when syncing
 // the atomic trie.
-func (s *atomicSyncer) onSyncFailure(error) error {
+func (s *syncer) onSyncFailure(error) error {
 	return nil
 }
 
 // Done returns a channel which produces any error that occurred during syncing or nil on success.
-func (s *atomicSyncer) Done() <-chan error { return s.syncer.Done() }
+func (s *syncer) Done() <-chan error { return s.syncer.Done() }
 
-type atomicSyncerLeafTask struct {
-	atomicSyncer *atomicSyncer
+type syncerLeafTask struct {
+	syncer *syncer
 }
 
-func (a *atomicSyncerLeafTask) Start() []byte                  { return addZeroes(a.atomicSyncer.lastHeight + 1) }
-func (a *atomicSyncerLeafTask) End() []byte                    { return nil }
-func (a *atomicSyncerLeafTask) NodeType() message.NodeType     { return message.AtomicTrieNode }
-func (a *atomicSyncerLeafTask) OnFinish(context.Context) error { return a.atomicSyncer.onFinish() }
-func (a *atomicSyncerLeafTask) OnStart() (bool, error)         { return false, nil }
-func (a *atomicSyncerLeafTask) Root() common.Hash              { return a.atomicSyncer.targetRoot }
-func (a *atomicSyncerLeafTask) Account() common.Hash           { return common.Hash{} }
-func (a *atomicSyncerLeafTask) OnLeafs(keys, vals [][]byte) error {
-	return a.atomicSyncer.onLeafs(keys, vals)
+func (a *syncerLeafTask) Start() []byte                  { return addZeroes(a.syncer.lastHeight + 1) }
+func (a *syncerLeafTask) End() []byte                    { return nil }
+func (a *syncerLeafTask) NodeType() message.NodeType     { return TrieNode }
+func (a *syncerLeafTask) OnFinish(context.Context) error { return a.syncer.onFinish() }
+func (a *syncerLeafTask) OnStart() (bool, error)         { return false, nil }
+func (a *syncerLeafTask) Root() common.Hash              { return a.syncer.targetRoot }
+func (a *syncerLeafTask) Account() common.Hash           { return common.Hash{} }
+func (a *syncerLeafTask) OnLeafs(keys, vals [][]byte) error {
+	return a.syncer.onLeafs(keys, vals)
 }
