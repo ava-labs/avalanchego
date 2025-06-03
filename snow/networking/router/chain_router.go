@@ -780,7 +780,7 @@ func (cr *ChainRouter) handleSimplexMessage(ctx context.Context, msg message.Inb
 		return
 	}
 
-	engineType := p2p.EngineType_ENGINE_TYPE_SIMPLEX
+	engineType := p2p.EngineType_ENGINE_TYPE_UNSPECIFIED
 
 	// Pass the response to the chain
 	chain.Push(

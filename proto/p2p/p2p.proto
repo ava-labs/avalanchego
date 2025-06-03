@@ -427,7 +427,7 @@ message Simplex {
   bytes chain_id = 1;
 
   oneof message {
-    SimplexBlock block = 2;
+    BlockProposal block_proposal = 2;
     Vote vote = 3;
     EmptyVote empty_vote = 4;
     Finalization finalization = 5;
@@ -439,7 +439,7 @@ message Simplex {
   }
 }
 
-message SimplexBlock {
+message BlockProposal {
   bytes block = 1;
   Vote vote = 2;
 }
@@ -515,7 +515,7 @@ message ReplicationResponse {
 // QuorumRound represents a round that has acheived quorum on either
 // (empty notarization), (block & notarization), or (block, finalization certificate)
 message QuorumRound {
-  SimplexBlock block = 1;
+  BlockProposal block = 1;
   Notarization notarization = 2;
   EmptyNotarization empty_notarization = 3;
   FinalizationCertificate finalization = 4;
