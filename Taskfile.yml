@@ -233,6 +233,11 @@ tasks:
       - task: build
       - cmd: go run ./tests/load/c/main --avalanchego-path=./build/avalanchego {{.CLI_ARGS}}
 
+  test-load-exclusive:
+    desc: Runs load tests against kube with exclusive scheduling
+    cmds:
+      - cmd: go run ./tests/load/c/main --runtime=kube --kube-use-exclusive-scheduling {{.CLI_ARGS}}
+
   test-unit:
     desc: Runs unit tests
     # Invoking with bash ensures compatibility with CI execution on Windows
