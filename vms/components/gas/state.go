@@ -16,8 +16,8 @@ import (
 var ErrInsufficientCapacity = errors.New("insufficient capacity")
 
 type State struct {
-	Capacity Gas `serialize:"true" json:"capacity" canoto:"uint,1"`
-	Excess   Gas `serialize:"true" json:"excess" canoto:"uint,2"`
+	Capacity Gas `serialize:"true" canoto:"uint,1" json:"capacity"`
+	Excess   Gas `serialize:"true" canoto:"uint,2" json:"excess"`
 
 	canotoData canotoData_State
 }
