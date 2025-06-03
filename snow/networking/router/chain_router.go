@@ -208,7 +208,6 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	op := msg.Op()
 
 	m := msg.Message()
-
 	chainID, err := message.GetChainID(m)
 	if err != nil {
 		cr.log.Debug("dropping message with invalid field",

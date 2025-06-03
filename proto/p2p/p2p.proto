@@ -434,8 +434,8 @@ message Simplex {
     QuorumCertificate notarization = 6;
     EmptyNotarization empty_notarization = 7;
     QuorumCertificate finalization = 8;
-    ReplicationResponse replication_response = 9;
-    ReplicationRequest replication_request = 10;
+    ReplicationRequest replication_request = 9;
+    ReplicationResponse replication_response = 10;
   }
 }
 
@@ -505,7 +505,7 @@ message ReplicationResponse {
 // QuorumRound represents a round that has acheived quorum on either
 // (empty notarization), (block & notarization), or (block, finalization certificate)
 message QuorumRound {
-  BlockProposal block = 1;
+  bytes block = 1;
   QuorumCertificate notarization = 2;
   EmptyNotarization empty_notarization = 3;
   QuorumCertificate finalization = 4;

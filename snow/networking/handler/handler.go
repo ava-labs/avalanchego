@@ -709,8 +709,10 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		}
 
 		return engine.Chits(ctx, nodeID, msg.RequestId, preferredID, preferredIDAtHeight, acceptedID, msg.AcceptedHeight)
+
 	case *message.QueryFailed:
 		return engine.QueryFailed(ctx, nodeID, msg.RequestID)
+
 	case *p2ppb.Simplex:
 		h.ctx.Log.Debug("received simplex message",
 			zap.Stringer("nodeID", nodeID),

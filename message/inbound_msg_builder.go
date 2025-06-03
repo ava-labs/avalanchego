@@ -317,12 +317,12 @@ func InboundAppResponse(
 // NewInboundSimplexMessage creates a new InboundMessage for simplex messages.
 func InboundSimplexMessage(
 	nodeID ids.NodeID,
-	msg p2p.Message_Simplex,
+	msg *p2p.Simplex,
 ) InboundMessage {
 	return &inboundMessage{
 		nodeID:     nodeID,
 		op:         SimplexOp,
-		message:    msg.Simplex,
+		message:    msg,
 		expiration: mockable.MaxTime,
 	}
 }
