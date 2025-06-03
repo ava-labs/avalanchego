@@ -12,6 +12,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 
 	"github.com/ava-labs/avalanchego/api/grpcclient"
 	"github.com/ava-labs/avalanchego/ids"
@@ -186,12 +187,13 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 	ginkgo.It("should serve grpc api requests", func() {
 		tc.By("establishing connection")
 		uri := strings.TrimPrefix(e2e.GetEnv(tc).GetRandomNodeURI().URI, "http://")
-		conn, err := grpcclient.New(
+		conn, err := grpc.NewClient(
 			uri,
-			e2e.GetEnv(tc).GetNetwork().GetNetworkID(),
-			e2e.GetEnv(tc).GetNetwork().GetSubnet(subnetAName).Chains[0].ChainID,
-			e2e.GetEnv(tc).GetNetwork().GetSubnet(subnetAName).Chains[0].ChainID,
-			e2e.GetEnv(tc).GetNetwork().GetSubnet(subnetAName).Chains[0].ChainID,
+			grpc.WithUnaryInterceptor(
+				grpcclient.PrefixServiceNameInterceptor(
+					e2e.GetEnv(tc).GetNetwork().GetSubnet(subnetAName).Chains[0].ChainID.String(),
+				),
+			),
 		)
 		require.NoError(err)
 

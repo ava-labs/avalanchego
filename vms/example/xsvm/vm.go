@@ -38,10 +38,6 @@ import (
 var (
 	_ smblock.ChainVM                      = (*VM)(nil)
 	_ smblock.BuildBlockWithContextChainVM = (*VM)(nil)
-
-	GRPCPrefixLocal   = ids.ID{'f', 'o', 'o'}
-	GRPCPrefixTestnet = ids.ID{'b', 'a', 'r'}
-	GRPCPrefixMainnet = ids.ID{'b', 'a', 'z'}
 )
 
 type VM struct {
