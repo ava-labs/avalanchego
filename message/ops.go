@@ -181,6 +181,7 @@ var (
 		AppGossipOp,
 		GetStateSummaryFrontierOp,
 		GetAcceptedStateSummaryOp,
+		SimplexOp,
 	)
 
 	errUnknownMessageType = errors.New("unknown message type")
