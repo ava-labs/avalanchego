@@ -227,18 +227,6 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 		return
 	}
 
-	requestID, ok := message.GetRequestID(m)
-	if !ok {
-		cr.log.Debug("dropping message with invalid field",
-			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("messageOp", op),
-			zap.String("field", "RequestID"),
-		)
-
-		msg.OnFinishedHandling()
-		return
-	}
-
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
@@ -299,6 +287,18 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 				EngineType:     engineType,
 			},
 		)
+		return
+	}
+
+	requestID, ok := message.GetRequestID(m)
+	if !ok {
+		cr.log.Debug("dropping message with invalid field",
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("messageOp", op),
+			zap.String("field", "RequestID"),
+		)
+
+		msg.OnFinishedHandling()
 		return
 	}
 
