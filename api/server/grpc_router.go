@@ -36,7 +36,7 @@ func (g *grpcRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get the unique chain-id and grpc service name pair
-	handler, ok := g.handlers[path.Join(parsed[1], parsed[2])]
+	handler, ok := g.handlers[path.Join(parsed[0], parsed[1])]
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
 		return
