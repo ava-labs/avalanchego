@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/coreth/plugin/evm/header"
+	"github.com/ava-labs/coreth/plugin/evm/sync"
 	"github.com/ava-labs/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/coreth/predicate"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -33,6 +34,7 @@ import (
 var (
 	_ snowman.Block           = (*Block)(nil)
 	_ block.WithVerifyContext = (*Block)(nil)
+	_ sync.EthBlockWrapper    = (*Block)(nil)
 )
 
 var errMissingUTXOs = errors.New("missing UTXOs")
@@ -445,3 +447,7 @@ func (b *Block) Bytes() []byte {
 }
 
 func (b *Block) String() string { return fmt.Sprintf("EVM block, ID = %s", b.ID()) }
+
+func (b *Block) GetEthBlock() *types.Block {
+	return b.ethBlock
+}
