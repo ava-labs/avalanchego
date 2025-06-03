@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/ava-labs/avalanchego/api/grpcclient"
 	"github.com/ava-labs/avalanchego/ids"
@@ -189,6 +190,7 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		uri := strings.TrimPrefix(e2e.GetEnv(tc).GetRandomNodeURI().URI, "http://")
 		conn, err := grpc.NewClient(
 			uri,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
 			grpc.WithUnaryInterceptor(
 				grpcclient.PrefixServiceNameInterceptor(
 					e2e.GetEnv(tc).GetNetwork().GetSubnet(subnetAName).Chains[0].ChainID.String(),
