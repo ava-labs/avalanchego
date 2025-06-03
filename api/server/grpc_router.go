@@ -4,7 +4,9 @@
 package server
 
 import (
+	"fmt"
 	"net/http"
+	"path"
 	"strings"
 	"sync"
 )
@@ -26,30 +28,40 @@ func (g *grpcRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 
-	// Requests take the form of "/Service/Method"
-	parsed := strings.Split(r.RequestURI, "/")
-	if len(parsed) < 2 {
+	// Requests take the form of Prefix/Service/Method
+	parsed := strings.Split(r.URL.Path, "/")
+	if len(parsed) != 3 {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	handler, ok := g.handlers[parsed[1]]
+	// Get the unique chain-id and grpc service name pair
+	handler, ok := g.handlers[path.Join(parsed[1], parsed[2])]
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
+	// Route this request to the grpc service using the chain prefix
+	requestCopy := *r
+	requestCopy.URL = &(*r.URL)
+	requestCopy.URL.Path = strings.TrimPrefix(
+		requestCopy.URL.Path,
+		fmt.Sprintf("%s/", parsed[0]),
+	)
+
 	handler.ServeHTTP(w, r)
 }
 
-func (g *grpcRouter) Add(serviceName string, handler http.Handler) bool {
+func (g *grpcRouter) Add(chainID string, service string, handler http.Handler) bool {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
-	if _, ok := g.handlers[serviceName]; ok {
+	prefixedService := path.Join(chainID, service)
+	if _, ok := g.handlers[prefixedService]; ok {
 		return false
 	}
 
-	g.handlers[serviceName] = handler
+	g.handlers[prefixedService] = handler
 	return true
 }

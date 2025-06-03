@@ -13,7 +13,6 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 
-	"github.com/ava-labs/avalanchego/api/grpcapi"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -160,22 +159,10 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 }
 
 func (vm *VM) CreateGRPCService(context.Context) (string, http.Handler, error) {
-	sd, err := grpcapi.NewService(
-		vm.chainContext.NetworkID,
-		ids.ID{'f', 'o', 'o'},
-		ids.ID{'b', 'a', 'r'},
-		ids.ID{'b', 'a', 'z'},
-		xsvm.Ping_ServiceDesc,
-	)
-
-	if err != nil {
-		return "", nil, fmt.Errorf("failed to create grpc service: %w", err)
-	}
-
 	server := grpc.NewServer()
-	server.RegisterService(&sd, &grpcService{Log: vm.chainContext.Log})
+	server.RegisterService(&xsvm.Ping_ServiceDesc, &grpcService{Log: vm.chainContext.Log})
 
-	return sd.ServiceName, server, nil
+	return xsvm.Ping_ServiceDesc.ServiceName, server, nil
 }
 
 func (*VM) HealthCheck(context.Context) (interface{}, error) {

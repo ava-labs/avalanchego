@@ -6,6 +6,7 @@ package server
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -17,31 +18,41 @@ func TestGRPCRouterAdd(t *testing.T) {
 	g := newGRPCRouter()
 	h := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
 
-	require.True(g.Add("foo", h))
-	require.False(g.Add("foo", h))
+	require.True(g.Add("foo", "bar", h))
+	require.False(g.Add("foo", "bar", h))
 }
 
 func TestGRPCRouterServeHTTP(t *testing.T) {
+	type service struct {
+		chainID string
+		service string
+	}
+
 	tests := []struct {
 		name     string
-		handlers []string
-		uri      string
+		services []service
+		path     string
 		wantCode int
 	}{
 		{
 			name:     "invalid request",
-			uri:      "foobar",
+			path:     "foo",
 			wantCode: http.StatusBadRequest,
 		},
 		{
 			name:     "invalid handler",
-			uri:      "/foo/method",
+			path:     "/bar/method",
 			wantCode: http.StatusNotFound,
 		},
 		{
-			name:     "valid handler",
-			handlers: []string{"foo"},
-			uri:      "/foo/method",
+			name: "valid handler",
+			services: []service{
+				{
+					chainID: "foo",
+					service: "bar",
+				},
+			},
+			path:     "foo/bar/method",
 			wantCode: http.StatusOK,
 		},
 	}
@@ -53,12 +64,13 @@ func TestGRPCRouterServeHTTP(t *testing.T) {
 			grpcRouter := newGRPCRouter()
 			handler := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
 			writer := httptest.NewRecorder()
-			request := httptest.NewRequest("", "/", nil)
+			request := httptest.NewRequest("POST", "/", nil)
+			request.URL = &url.URL{
+				Path: tt.path,
+			}
 
-			request.RequestURI = tt.uri
-
-			for _, h := range tt.handlers {
-				require.True(grpcRouter.Add(h, handler))
+			for _, service := range tt.services {
+				require.True(grpcRouter.Add(service.chainID, service.service, handler))
 			}
 
 			grpcRouter.ServeHTTP(writer, request)
