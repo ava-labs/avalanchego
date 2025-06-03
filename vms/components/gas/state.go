@@ -18,6 +18,8 @@ var ErrInsufficientCapacity = errors.New("insufficient capacity")
 type State struct {
 	Capacity Gas `serialize:"true" json:"capacity" canoto:"uint,1"`
 	Excess   Gas `serialize:"true" json:"excess" canoto:"uint,2"`
+
+	canotoData canotoData_State
 }
 
 // AdvanceTime adds maxPerSecond to capacity and subtracts targetPerSecond
