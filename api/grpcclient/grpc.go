@@ -5,7 +5,7 @@ package grpcclient
 
 import (
 	"context"
-	"path"
+	"fmt"
 
 	"google.golang.org/grpc"
 )
@@ -20,7 +20,7 @@ func PrefixServiceNameInterceptor(prefix string) grpc.UnaryClientInterceptor {
 		invoker grpc.UnaryInvoker,
 		opts ...grpc.CallOption,
 	) error {
-		prefixedMethod := path.Join(prefix, method)
+		prefixedMethod := fmt.Sprintf("%s%s", prefix, method)
 
 		return invoker(ctx, prefixedMethod, req, reply, cc, opts...)
 	}
