@@ -215,7 +215,7 @@ func (s *server) RegisterChain(chainName string, ctx *snow.ConsensusContext, vm 
 	}
 
 	grpcHandler = s.wrapMiddleware(chainName, grpcHandler, ctx)
-	if !s.grpcRouter.Add(ctx.ChainID.String(), serviceName, grpcHandler) {
+	if !s.grpcRouter.Add(ctx.ChainID, serviceName, grpcHandler) {
 		s.log.Error("failed to add route to grpc service")
 	}
 }
