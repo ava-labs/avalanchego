@@ -46,7 +46,7 @@ func (g *grpcRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	requestCopy.URL = &(*r.URL)
 	requestCopy.URL.Path = strings.TrimPrefix(requestCopy.URL.Path, parsed[0])
 
-	handler.ServeHTTP(w, r)
+	handler.ServeHTTP(w, &requestCopy)
 }
 
 func (g *grpcRouter) Add(chainID string, service string, handler http.Handler) bool {
