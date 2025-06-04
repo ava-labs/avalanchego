@@ -30,7 +30,7 @@ type Engine struct {
 	blockTracker blockTracker
 
 	// simplex digest to vm digest cache
-	lock         sync.Mutex
+	lock        sync.Mutex
 	digestCache map[simplex.Digest]ids.ID
 }
 

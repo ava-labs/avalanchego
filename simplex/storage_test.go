@@ -13,4 +13,3 @@ func TestStorageInit(t *testing.T) {
 	// i.e. genesis block is stored at height 0 and the height is 1
 	// do this by both checking the storage and using the retrieve method
 }
-
