@@ -429,19 +429,19 @@ message Simplex {
   bytes chain_id = 1;
 
   oneof message {
-    SimplexBlock block = 2;
+    BlockProposal block_proposal = 2;
     Vote vote = 3;
     EmptyVote empty_vote = 4;
-    Finalization finalization = 5;
-    Notarization notarization = 6;
+    Vote finalize_vote = 5;
+    QuorumCertificate notarization = 6;
     EmptyNotarization empty_notarization = 7;
-    FinalizationCertificate finalization_certificate = 8;
-    ReplicationResponse replication_response = 9;
-    ReplicationRequest replication_request = 10;
+    QuorumCertificate finalization = 8;
+    ReplicationRequest replication_request = 9;
+    ReplicationResponse replication_response = 10;
   }
 }
 
-message SimplexBlock {
+message BlockProposal {
   bytes block = 1;
   Vote vote = 2;
 }
@@ -463,12 +463,15 @@ message ProtocolMetadata {
 
 message BlockHeader {
   ProtocolMetadata metadata = 1;
-  // digest is the digest of the inner block data.
+
+  // digest is the short representation of the inner block's bytes
   bytes digest = 2;
 }
 
 message Signature {
+  // Signer identifies who the signature came from.
   bytes signer = 1;
+  // Value is the actual cryptographic signature.
   bytes value = 2;
 }
 
@@ -482,39 +485,31 @@ message EmptyVote {
   Signature signature = 2;
 }
 
-message Finalization {
-  BlockHeader vote = 1;
-  Signature signature = 2;
-}
-
-message FinalizationCertificate {
-  Finalization finalization = 1;
-  bytes quorum_certificate = 2;
-}
-
-message Notarization {
-  BlockHeader vote = 1;
+message QuorumCertificate {
+  BlockHeader finalization = 1;
   bytes quorum_certificate = 2;
 }
 
 message EmptyNotarization {
-  BlockHeader empty_vote = 1;
+  ProtocolMetadata empty_vote = 1;
   bytes quorum_certificate = 2;
 }
 
 message ReplicationRequest {
-  repeated uint64 seqs = 1; // array of seqs being requested
-  uint64 latest_round = 2; // latest round, our node has
+  repeated uint64 seqs = 1; // sequences we are requesting
+  uint64 latest_round = 2; // latest round that we are aware of
 }
 
 message ReplicationResponse {
-  repeated QuorumRound data = 1;
-  QuorumRound latest_round = 2;
+  repeated QuorumRound data = 1; // requested seqs. not required to be in particular order
+  QuorumRound latest_round = 2; // latest round the responding node is aware of
 }
 
+// QuorumRound represents a round that has acheived quorum on either
+// (empty notarization), (block & notarization), or (block, finalization certificate)
 message QuorumRound {
-  SimplexBlock block = 1;
-  Notarization notarization = 2;
+  bytes block = 1;
+  QuorumCertificate notarization = 2;
   EmptyNotarization empty_notarization = 3;
-  FinalizationCertificate finalization = 4;
+  QuorumCertificate finalization = 4;
 }
