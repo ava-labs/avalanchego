@@ -2510,7 +2510,6 @@ func TestFeeManagerChangeFee(t *testing.T) {
 
 	block := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
 
-	// Contract is initialized but no state is given, reader should return genesis fee config
 	feeConfig, lastChangedAt, err = vm.blockChain.GetFeeConfigAt(block.Header())
 	require.NoError(t, err)
 	require.EqualValues(t, testHighFeeConfig, feeConfig)
@@ -3160,4 +3159,164 @@ func TestStandaloneDB(t *testing.T) {
 	// Ensure that the standalone database is not empty
 	assert.False(t, isDBEmpty(vm.db))
 	assert.False(t, isDBEmpty(vm.acceptedBlockDB))
+}
+
+func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
+	// Setup chain params
+	genesis := &core.Genesis{}
+	if err := genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)); err != nil {
+		t.Fatal(err)
+	}
+	precompileActivationTime := utils.NewUint64(genesis.Timestamp + 5) // 5 seconds after genesis
+	configExtra := params.GetExtra(genesis.Config)
+	configExtra.GenesisPrecompiles = extras.Precompiles{
+		feemanager.ConfigKey: feemanager.NewConfig(precompileActivationTime, testEthAddrs[0:1], nil, nil, nil),
+	}
+
+	// set a higher fee config now
+	testHighFeeConfig := commontype.FeeConfig{
+		GasLimit:        big.NewInt(8_000_000),
+		TargetBlockRate: 5, // in seconds
+
+		MinBaseFee:               big.NewInt(50_000_000),
+		TargetGas:                big.NewInt(18_000_000),
+		BaseFeeChangeDenominator: big.NewInt(3396),
+
+		MinBlockGasCost:  big.NewInt(0),
+		MaxBlockGasCost:  big.NewInt(4_000_000),
+		BlockGasCostStep: big.NewInt(500_000),
+	}
+
+	configExtra.FeeConfig = testHighFeeConfig
+	genesisJSON, err := genesis.MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	issuer, vm, sharedDB, appSender := GenesisVM(t, true, string(genesisJSON), "", "")
+
+	// tx pool min base fee should be the high fee config
+	tx := types.NewTx(&types.DynamicFeeTx{
+		ChainID:   genesis.Config.ChainID,
+		Nonce:     uint64(0),
+		To:        &feemanager.ContractAddress,
+		Gas:       21_000,
+		Value:     common.Big0,
+		GasFeeCap: big.NewInt(5_000_000), // give a lower base fee
+		GasTipCap: common.Big0,
+		Data:      nil,
+	})
+	signedTx, err := types.SignTx(tx, types.LatestSigner(genesis.Config), testKeys[0])
+	require.NoError(t, err)
+
+	errs := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
+	require.Len(t, errs, 1)
+	require.ErrorIs(t, errs[0], txpool.ErrUnderpriced) // should fail because mempool expects higher fee
+
+	// restart vm and try again
+	genesisBytes := buildGenesisTest(t, string(genesisJSON))
+	restartedVM, err := restartVM(vm, sharedDB, genesisBytes, issuer, appSender, true)
+	require.NoError(t, err)
+
+	// it still should fail
+	errs = restartedVM.txPool.AddRemotesSync([]*types.Transaction{signedTx})
+	require.Len(t, errs, 1)
+	require.ErrorIs(t, errs[0], txpool.ErrUnderpriced)
+
+	// send a tx to activate the precompile
+	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
+	restartedVM.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
+	restartedVM.clock.Set(utils.Uint64ToTime(precompileActivationTime).Add(time.Second * 10))
+	tx = types.NewTransaction(uint64(0), testEthAddrs[0], common.Big0, 21000, big.NewInt(testHighFeeConfig.MinBaseFee.Int64()), nil)
+	signedTx, err = types.SignTx(tx, types.LatestSigner(genesis.Config), testKeys[0])
+	require.NoError(t, err)
+	errs = restartedVM.txPool.AddRemotesSync([]*types.Transaction{signedTx})
+	require.NoError(t, errs[0])
+	blk := issueAndAccept(t, issuer, restartedVM)
+	newHead := <-newTxPoolHeadChan
+	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
+	// Contract is initialized but no preconfig is given, reader should return genesis fee config
+	feeConfig, lastChangedAt, err := vm.blockChain.GetFeeConfigAt(vm.blockChain.Genesis().Header())
+	require.NoError(t, err)
+	require.EqualValues(t, feeConfig, testHighFeeConfig)
+	require.Zero(t, vm.blockChain.CurrentBlock().Number.Cmp(lastChangedAt))
+
+	// set a lower fee config now through feemanager
+	testLowFeeConfig := testHighFeeConfig
+	testLowFeeConfig.MinBaseFee = big.NewInt(25_000_000)
+	data, err := feemanager.PackSetFeeConfig(testLowFeeConfig)
+	require.NoError(t, err)
+	tx = types.NewTx(&types.DynamicFeeTx{
+		ChainID:   genesis.Config.ChainID,
+		Nonce:     uint64(1),
+		To:        &feemanager.ContractAddress,
+		Gas:       1_000_000,
+		Value:     common.Big0,
+		GasFeeCap: testHighFeeConfig.MinBaseFee, // the blockchain state still expects high fee
+		Data:      data,
+	})
+	// let some time pass for block gas cost
+	restartedVM.clock.Set(restartedVM.clock.Time().Add(time.Second * 10))
+	signedTx, err = types.SignTx(tx, types.LatestSigner(genesis.Config), testKeys[0])
+	require.NoError(t, err)
+	errs = restartedVM.txPool.AddRemotesSync([]*types.Transaction{signedTx})
+	require.NoError(t, errs[0])
+	blk = issueAndAccept(t, issuer, restartedVM)
+	newHead = <-newTxPoolHeadChan
+	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
+
+	// check that the fee config is updated
+	block := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
+	feeConfig, lastChangedAt, err = restartedVM.blockChain.GetFeeConfigAt(block.Header())
+	require.NoError(t, err)
+	require.EqualValues(t, restartedVM.blockChain.CurrentBlock().Number, lastChangedAt)
+	require.EqualValues(t, testLowFeeConfig, feeConfig)
+
+	// send another tx with low fee
+	tx = types.NewTransaction(uint64(2), testEthAddrs[0], common.Big0, 21000, big.NewInt(testLowFeeConfig.MinBaseFee.Int64()), nil)
+	signedTx, err = types.SignTx(tx, types.LatestSigner(genesis.Config), testKeys[0])
+	require.NoError(t, err)
+	errs = restartedVM.txPool.AddRemotesSync([]*types.Transaction{signedTx})
+	require.NoError(t, errs[0])
+	// let some time pass for block gas cost and fees to be updated
+	restartedVM.clock.Set(restartedVM.clock.Time().Add(time.Hour * 10))
+	blk = issueAndAccept(t, issuer, restartedVM)
+	newHead = <-newTxPoolHeadChan
+	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
+
+	// Regression: Mempool should see the new config after restart
+	restartedVM, err = restartVM(restartedVM, sharedDB, genesisBytes, issuer, appSender, true)
+	require.NoError(t, err)
+	newTxPoolHeadChan = make(chan core.NewTxPoolReorgEvent, 1)
+	restartedVM.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
+	// send a tx with low fee
+	tx = types.NewTransaction(uint64(3), testEthAddrs[0], common.Big0, 21000, big.NewInt(testLowFeeConfig.MinBaseFee.Int64()), nil)
+	signedTx, err = types.SignTx(tx, types.LatestSigner(genesis.Config), testKeys[0])
+	require.NoError(t, err)
+	errs = restartedVM.txPool.AddRemotesSync([]*types.Transaction{signedTx})
+	require.NoError(t, errs[0])
+	blk = issueAndAccept(t, issuer, restartedVM)
+	newHead = <-newTxPoolHeadChan
+	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
+}
+
+func restartVM(vm *VM, sharedDB database.Database, genesisBytes []byte, issuer chan commonEng.Message, appSender commonEng.AppSender, finishBootstrapping bool) (*VM, error) {
+	vm.Shutdown(context.Background())
+	restartedVM := &VM{}
+	vm.ctx.Metrics = metrics.NewPrefixGatherer()
+	err := restartedVM.Initialize(context.Background(), vm.ctx, sharedDB, genesisBytes, nil, nil, issuer, []*commonEng.Fx{}, appSender)
+	if err != nil {
+		return nil, err
+	}
+
+	if finishBootstrapping {
+		err = restartedVM.SetState(context.Background(), snow.Bootstrapping)
+		if err != nil {
+			return nil, err
+		}
+		err = restartedVM.SetState(context.Background(), snow.NormalOp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return restartedVM, nil
 }

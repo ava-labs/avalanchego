@@ -594,13 +594,18 @@ func (vm *VM) initializeChain(lastAcceptedHash common.Hash, ethConfig ethconfig.
 	}
 	vm.eth.SetEtherbase(ethConfig.Miner.Etherbase)
 	vm.txPool = vm.eth.TxPool()
-	vm.txPool.SetMinFee(vm.chainConfigExtra().FeeConfig.MinBaseFee)
-	vm.txPool.SetGasTip(big.NewInt(0))
 	vm.blockChain = vm.eth.BlockChain()
 	vm.miner = vm.eth.Miner()
+	lastAccepted := vm.blockChain.LastAcceptedBlock()
+	feeConfig, _, err := vm.blockChain.GetFeeConfigAt(lastAccepted.Header())
+	if err != nil {
+		return err
+	}
+	vm.txPool.SetMinFee(feeConfig.MinBaseFee)
+	vm.txPool.SetGasTip(big.NewInt(0))
 
 	vm.eth.Start()
-	return vm.initChainState(vm.blockChain.LastAcceptedBlock())
+	return vm.initChainState(lastAccepted)
 }
 
 // initializeStateSyncClient initializes the client for performing state sync.
