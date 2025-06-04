@@ -35,7 +35,6 @@ func PrefixChainIDStreamClientInterceptor(chainID ids.ID) grpc.StreamClientInter
 		streamer grpc.Streamer,
 		opts ...grpc.CallOption,
 	) (grpc.ClientStream, error) {
-
 		return streamer(ctx, desc, cc, prefix(chainID, method), opts...)
 	}
 }
