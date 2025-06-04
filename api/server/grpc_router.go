@@ -38,7 +38,8 @@ func (g *grpcRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get the unique chain id and service name pair
-	handler, ok := g.handlers[prefixChainGRPCService(parsed[1], parsed[2])]
+	prefixedService := prefixChainGRPCService(parsed[1], parsed[2])
+	handler, ok := g.handlers[prefixedService]
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
 		return
