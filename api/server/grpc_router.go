@@ -14,15 +14,15 @@ import (
 
 var _ http.Handler = (*grpcRouter)(nil)
 
+type grpcRouter struct {
+	lock     sync.RWMutex
+	handlers map[string]http.Handler
+}
+
 func newGRPCRouter() *grpcRouter {
 	return &grpcRouter{
 		handlers: make(map[string]http.Handler),
 	}
-}
-
-type grpcRouter struct {
-	lock     sync.RWMutex
-	handlers map[string]http.Handler
 }
 
 func (g *grpcRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
