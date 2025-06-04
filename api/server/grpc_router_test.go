@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-// TODO refactor this package so we can test against the actual package api
 func TestGRPCRouterAdd(t *testing.T) {
 	require := require.New(t)
 	g := newGRPCRouter()
