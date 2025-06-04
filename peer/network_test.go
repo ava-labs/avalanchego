@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/subnet-evm/peer/peertest"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 
 	"github.com/ava-labs/avalanchego/codec"
@@ -477,8 +478,7 @@ func TestOnRequestHonoursDeadline(t *testing.T) {
 
 	requestHandler.response, err = marshalStruct(codecManager, TestMessage{Message: "hi there"})
 	assert.NoError(t, err)
-	err = net.AppRequest(context.Background(), nodeID, 1, time.Now().Add(1*time.Millisecond), requestBytes)
-	assert.NoError(t, err)
+	assert.NoError(t, net.AppRequest(context.Background(), nodeID, 0, time.Now().Add(1*time.Millisecond), requestBytes))
 	// ensure the handler didn't get called (as peer.Network would've dropped the request)
 	assert.EqualValues(t, requestHandler.calls, 0)
 
@@ -492,7 +492,7 @@ func TestOnRequestHonoursDeadline(t *testing.T) {
 func TestHandleInvalidMessages(t *testing.T) {
 	codecManager := buildCodec(t, HelloGossip{}, TestMessage{})
 	nodeID := ids.GenerateTestNodeID()
-	requestID := uint32(1)
+	requestID := peertest.TestSDKRequestID
 	sender := &enginetest.Sender{
 		SendAppErrorF: func(context.Context, ids.NodeID, uint32, int32, string) error {
 			return nil
@@ -544,7 +544,7 @@ func TestHandleInvalidMessages(t *testing.T) {
 func TestNetworkPropagatesRequestHandlerError(t *testing.T) {
 	codecManager := buildCodec(t, TestMessage{})
 	nodeID := ids.GenerateTestNodeID()
-	requestID := uint32(1)
+	requestID := peertest.TestPeerRequestID
 	sender := testAppSender{}
 
 	p2pNetwork, err := p2p.NewNetwork(logging.NoLog{}, nil, prometheus.NewRegistry(), "")
@@ -585,6 +585,7 @@ func TestNetworkRouting(t *testing.T) {
 		},
 	}
 	protocol := 0
+	requestID := peertest.TestSDKRequestID
 	handler := &testSDKHandler{}
 	p2pNetwork, err := p2p.NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 	require.NoError(err)
@@ -595,14 +596,14 @@ func TestNetworkRouting(t *testing.T) {
 
 	nodeID := ids.GenerateTestNodeID()
 	foobar := append([]byte{byte(protocol)}, []byte("foobar")...)
-	err = network.AppRequest(context.Background(), nodeID, 0, time.Time{}, foobar)
-	require.NoError(err)
+	// forward it to the sdk handler
+	require.NoError(network.AppRequest(context.Background(), nodeID, requestID, time.Now().Add(5*time.Second), foobar))
 	require.True(handler.appRequested)
 
-	err = network.AppResponse(context.Background(), ids.GenerateTestNodeID(), 0, foobar)
+	err = network.AppResponse(context.Background(), ids.GenerateTestNodeID(), requestID, foobar)
 	require.ErrorIs(err, p2p.ErrUnrequestedResponse)
 
-	err = network.AppRequestFailed(context.Background(), nodeID, 0, common.ErrTimeout)
+	err = network.AppRequestFailed(context.Background(), nodeID, requestID, common.ErrTimeout)
 	require.ErrorIs(err, p2p.ErrUnrequestedResponse)
 }
 

@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/subnet-evm/eth/tracers"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/params/extras"
+	"github.com/ava-labs/subnet-evm/peer/peertest"
 	customheader "github.com/ava-labs/subnet-evm/plugin/evm/header"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
@@ -798,8 +799,7 @@ func TestMessageSignatureRequestsToVM(t *testing.T) {
 
 			// Send the app request and make sure we called SendAppResponseFn
 			deadline := time.Now().Add(60 * time.Second)
-			err = vm.Network.AppRequest(context.Background(), ids.GenerateTestNodeID(), 1, deadline, requestBytes)
-			require.NoError(t, err)
+			require.NoError(t, vm.Network.AppRequest(context.Background(), ids.GenerateTestNodeID(), peertest.TestPeerRequestID, deadline, requestBytes))
 			require.True(t, calledSendAppResponseFn)
 		})
 	}
@@ -856,8 +856,7 @@ func TestBlockSignatureRequestsToVM(t *testing.T) {
 
 			// Send the app request and make sure we called SendAppResponseFn
 			deadline := time.Now().Add(60 * time.Second)
-			err = vm.Network.AppRequest(context.Background(), ids.GenerateTestNodeID(), 1, deadline, requestBytes)
-			require.NoError(t, err)
+			require.NoError(t, vm.Network.AppRequest(context.Background(), ids.GenerateTestNodeID(), peertest.TestPeerRequestID, deadline, requestBytes))
 			require.True(t, calledSendAppResponseFn)
 		})
 	}

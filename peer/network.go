@@ -228,15 +228,20 @@ func (n *network) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID u
 
 	log.Debug("received AppRequest from node", "nodeID", nodeID, "requestID", requestID, "requestLen", len(request))
 
-	var req message.Request
-	if _, err := n.codec.Unmarshal(request, &req); err != nil {
-		log.Debug("forwarding AppRequest to SDK network", "nodeID", nodeID, "requestID", requestID, "requestLen", len(request), "err", err)
+	if !IsNetworkRequest(requestID) {
+		log.Debug("forwarding AppRequest to SDK network", "nodeID", nodeID, "requestID", requestID, "requestLen", len(request))
 		return n.p2pNetwork.AppRequest(ctx, nodeID, requestID, deadline, request)
 	}
 
 	bufferedDeadline, err := calculateTimeUntilDeadline(deadline, n.appStats)
 	if err != nil {
 		log.Debug("deadline to process AppRequest has expired, skipping", "nodeID", nodeID, "requestID", requestID, "err", err)
+		return nil
+	}
+
+	var req message.Request
+	if _, err := n.codec.Unmarshal(request, &req); err != nil {
+		log.Debug("failed to unmarshal AppRequest", "nodeID", nodeID, "requestID", requestID, "err", err)
 		return nil
 	}
 
@@ -434,4 +439,11 @@ func (n *network) nextRequestID() uint32 {
 	n.requestIDGen += 2
 
 	return next
+}
+
+// IsNetworkRequest checks if the given requestID is a request for this network handler (even-numbered requestIDs)
+// SDK requests are odd-numbered requestIDs
+// (see invariant: https://github.com/ava-labs/avalanchego/blob/v1.13.0/network/p2p/router.go#L83)
+func IsNetworkRequest(requestID uint32) bool {
+	return requestID%2 == 0
 }
