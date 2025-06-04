@@ -4,7 +4,6 @@
 package server
 
 import (
-	"fmt"
 	"net/http"
 	"path"
 	"strings"
@@ -50,7 +49,7 @@ func (g *grpcRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Route this request to the grpc service using the chain prefix
 	requestDeepCopy.URL.Path = strings.TrimPrefix(
 		requestDeepCopy.URL.Path,
-		fmt.Sprintf("/%s", parsed[1]),
+		"/"+parsed[1],
 	)
 
 	handler.ServeHTTP(w, requestDeepCopy)
