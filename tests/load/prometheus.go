@@ -34,25 +34,21 @@ func NewPrometheusServer(addr string, registry *prometheus.Registry) *MetricsSer
 	}
 }
 
-func (*MetricsServer) String() string {
-	return "metrics server"
-}
-
-func (s *MetricsServer) Start() (runError <-chan error, err error) {
+func (m *MetricsServer) Start() (runError <-chan error, err error) {
 	const metricsPattern = "/ext/metrics"
 
 	mux := http.NewServeMux()
-	handlerOpts := promhttp.HandlerOpts{Registry: s.registry}
-	mux.Handle(metricsPattern, promhttp.HandlerFor(s.registry, handlerOpts))
+	handlerOpts := promhttp.HandlerOpts{Registry: m.registry}
+	mux.Handle(metricsPattern, promhttp.HandlerFor(m.registry, handlerOpts))
 
-	listener, err := net.Listen("tcp", s.addr)
+	listener, err := net.Listen("tcp", m.addr)
 	if err != nil {
 		return nil, err
 	}
-	s.addr = listener.Addr().String()
+	m.addr = listener.Addr().String()
 
-	s.server = http.Server{
-		Addr:              s.addr,
+	m.server = http.Server{
+		Addr:              m.addr,
 		Handler:           mux,
 		ReadHeaderTimeout: time.Second,
 		ReadTimeout:       time.Second,
@@ -63,7 +59,7 @@ func (s *MetricsServer) Start() (runError <-chan error, err error) {
 	ready := make(chan struct{})
 	go func() {
 		close(ready)
-		err = s.server.Serve(listener)
+		err = m.server.Serve(listener)
 		if errors.Is(err, http.ErrServerClosed) {
 			return
 		}
@@ -74,17 +70,17 @@ func (s *MetricsServer) Start() (runError <-chan error, err error) {
 	return runError, nil
 }
 
-func (s *MetricsServer) Stop() (err error) {
+func (m *MetricsServer) Stop() (err error) {
 	const shutdownTimeout = time.Second
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
-	return s.server.Shutdown(shutdownCtx)
+	return m.server.Shutdown(shutdownCtx)
 }
 
 // GenerateMonitoringConfig generates and writes the Prometheus collector configuration
 // so tmpnet can dynamically discover new scrape target via file-based service discovery
 // It returns the collector file path.
-func (s *MetricsServer) GenerateMonitoringConfig(monitoringLabels map[string]string) (string, error) {
+func (m *MetricsServer) GenerateMonitoringConfig(monitoringLabels map[string]string) (string, error) {
 	discoveryDir, err := tmpnet.GetPrometheusServiceDiscoveryDir()
 	if err != nil {
 		return "", fmt.Errorf("getting tmpnet service discovery directory: %w", err)
@@ -93,7 +89,7 @@ func (s *MetricsServer) GenerateMonitoringConfig(monitoringLabels map[string]str
 	collectorFilePath := filepath.Join(discoveryDir, "load-test.json")
 	config, err := json.MarshalIndent([]tmpnet.ConfigMap{
 		{
-			"targets": []string{s.addr},
+			"targets": []string{m.addr},
 			"labels":  monitoringLabels,
 		},
 	}, "", "  ")
