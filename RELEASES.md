@@ -1,7 +1,9 @@
 # Release Notes
 
-## Pending Release
+## [v0.7.4](https://github.com/ava-labs/subnet-evm/releases/tag/v0.7.4)
 
+- Major refactor to use [`libevm`](https://github.com/ava-labs/libevm) for EVM execution, database access, types & chain configuration. This improves maintainability and enables keeping up with upstream changes more easily.
+- Wrapped database with `corruptabledb` to prevent corruption of the database.
 - Updated dockerhub image name to `avaplatform/subnet-evm_avalanchego` and tags to accommodate the new versioning scheme: {subnet-evm version}_{avalanchego version}
 - Updated golang version to 1.23.9
 - Fixed a bug in mempool where the min fee was not updated after restart
