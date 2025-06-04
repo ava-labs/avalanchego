@@ -20,7 +20,8 @@ func PrefixServiceNameInterceptor(prefix string) grpc.UnaryClientInterceptor {
 		invoker grpc.UnaryInvoker,
 		opts ...grpc.CallOption,
 	) error {
-		prefixedMethod := fmt.Sprintf("%s%s", prefix, method)
+		// http/2 :path takes the form of /ChainID/Service/Method
+		prefixedMethod := fmt.Sprintf("/%s%s", prefix, method)
 
 		return invoker(ctx, prefixedMethod, req, reply, cc, opts...)
 	}
