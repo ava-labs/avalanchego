@@ -1639,7 +1639,7 @@ func (m *manager) createChainSender(
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
-		p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
+		chainType,
 		sb,
 		ctx.Registerer,
 	)
@@ -1749,7 +1749,7 @@ func (m *manager) createChainHandler(ctx *snow.ConsensusContext, vdrs validators
 		return nil, err
 	}
 
-	simplexEngine, err := m.createSimplexEngine()
+	_, err = m.createSimplexEngine()
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create simplex instance: %w", err)
 	}
@@ -1775,9 +1775,6 @@ func (m *manager) createChainHandler(ctx *snow.ConsensusContext, vdrs validators
 	h.SetEngineManager(&handler.EngineManager{
 		Avalanche: nil,
 		Snowman:   nil,
-		Simplex: &handler.Engine{
-			Consensus: simplexEngine,
-		},
 	})
 
 	return h, nil

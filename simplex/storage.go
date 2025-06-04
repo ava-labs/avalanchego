@@ -82,7 +82,7 @@ func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalizat
 
 // Index indexes the finalization in the storage.
 // It stores the finalization bytes at the current height and increments the height.
-// TODO: where do we actually store the block? also isn't it wierd to pass in a VerifiedBlock here
+// TODO: where do we actually store the block? also isn't it weird to pass in a VerifiedBlock here
 // since we haven't verified it yet?
 func (s *Storage) Index(block simplex.VerifiedBlock, finalization simplex.Finalization) {
 	currentHeight := s.height.Load()

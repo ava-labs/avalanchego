@@ -35,7 +35,7 @@ type Config struct {
 	SignBLS     func(msg []byte) (*bls.Signature, error)
 	GenesisData []byte
 
-	// things i havne't been through
+	// things i haven't been through
 	GetServer          common.AllGetsServer
 	Sender             Sender
 	OutboundMsgBuilder message.OutboundMsgBuilder
