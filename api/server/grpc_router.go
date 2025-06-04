@@ -5,7 +5,6 @@ package server
 
 import (
 	"net/http"
-	"path"
 	"strings"
 	"sync"
 
@@ -69,5 +68,5 @@ func (g *grpcRouter) Add(chainID ids.ID, service string, handler http.Handler) b
 }
 
 func prefixChainGRPCService(chainID string, service string) string {
-	return path.Join(chainID, service)
+	return chainID + "/" + service
 }
