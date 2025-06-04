@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 // TODO refactor this package so we can test against the actual package api
@@ -18,13 +20,13 @@ func TestGRPCRouterAdd(t *testing.T) {
 	g := newGRPCRouter()
 	h := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
 
-	require.True(g.Add("foo", "bar", h))
-	require.False(g.Add("foo", "bar", h))
+	require.True(g.Add(ids.Empty, "bar", h))
+	require.False(g.Add(ids.Empty, "bar", h))
 }
 
 func TestGRPCRouterServeHTTP(t *testing.T) {
 	type service struct {
-		chainID string
+		chainID ids.ID
 		service string
 	}
 
@@ -48,7 +50,7 @@ func TestGRPCRouterServeHTTP(t *testing.T) {
 			name: "valid handler",
 			services: []service{
 				{
-					chainID: "foo",
+					chainID: ids.GenerateTestID(),
 					service: "bar",
 				},
 			},

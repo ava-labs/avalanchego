@@ -9,6 +9,8 @@ import (
 	"path"
 	"strings"
 	"sync"
+
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 var _ http.Handler = (*grpcRouter)(nil)
@@ -36,7 +38,7 @@ func (g *grpcRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get the unique chain id and service name pair
-	handler, ok := g.handlers[path.Join(parsed[1], parsed[2])]
+	handler, ok := g.handlers[prefixChainGRPCService(parsed[1], parsed[2])]
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -53,15 +55,19 @@ func (g *grpcRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	handler.ServeHTTP(w, requestDeepCopy)
 }
 
-func (g *grpcRouter) Add(chainID string, service string, handler http.Handler) bool {
+func (g *grpcRouter) Add(chainID ids.ID, service string, handler http.Handler) bool {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
-	prefixedService := path.Join(chainID, service)
+	prefixedService := prefixChainGRPCService(chainID.String(), service)
 	if _, ok := g.handlers[prefixedService]; ok {
 		return false
 	}
 
 	g.handlers[prefixedService] = handler
 	return true
+}
+
+func prefixChainGRPCService(chainID string, service string) string {
+	return path.Join(chainID, service)
 }
