@@ -4,6 +4,7 @@
 package server
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -19,8 +20,8 @@ func TestGRPCRouterAdd(t *testing.T) {
 	g := newGRPCRouter()
 	h := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
 
-	require.True(g.Add(ids.Empty, "bar", h))
-	require.False(g.Add(ids.Empty, "bar", h))
+	require.True(g.Add(ids.Empty, "foo", h))
+	require.False(g.Add(ids.Empty, "foo", h))
 }
 
 func TestGRPCRouterServeHTTP(t *testing.T) {
@@ -42,18 +43,18 @@ func TestGRPCRouterServeHTTP(t *testing.T) {
 		},
 		{
 			name:     "invalid handler",
-			path:     "/bar/method",
+			path:     "/foo/bar/method",
 			wantCode: http.StatusNotFound,
 		},
 		{
 			name: "valid handler",
 			services: []service{
 				{
-					chainID: ids.GenerateTestID(),
+					chainID: ids.ID{'f', 'o', 'o'},
 					service: "bar",
 				},
 			},
-			path:     "foo/bar/method",
+			path:     fmt.Sprintf("/%s/bar/method", ids.ID{'f', 'o', 'o'}.String()),
 			wantCode: http.StatusOK,
 		},
 	}
