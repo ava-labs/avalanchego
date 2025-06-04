@@ -118,10 +118,11 @@ func New(
 	}
 
 	router := newRouter()
-	handler := wrapHandler(router, nodeID, allowedOrigins, allowedHosts)
+	handler := wrapHandler(router, nodeID, allowedOrigins, allowedHosts, true)
 
 	grpcRouter := newGRPCRouter()
-	grpcHandler := wrapHandler(grpcRouter, nodeID, allowedOrigins, allowedHosts)
+	// Do not use gzip middleware because it breaks the grpc spec
+	grpcHandler := wrapHandler(grpcRouter, nodeID, allowedOrigins, allowedHosts, false)
 
 	httpServer := &http.Server{
 		Handler: h2c.NewHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -322,18 +323,26 @@ func (a readPathAdder) AddAliases(endpoint string, aliases ...string) error {
 	return a.pather.AddAliasesWithReadLock(endpoint, aliases...)
 }
 
-func wrapHandler(handler http.Handler, nodeID ids.NodeID, allowedOrigins []string, allowedHosts []string) http.Handler {
-	allowedHostsHandler := filterInvalidHosts(handler, allowedHosts)
-	corsHandler := cors.New(cors.Options{
+func wrapHandler(
+	handler http.Handler,
+	nodeID ids.NodeID,
+	allowedOrigins []string,
+	allowedHosts []string,
+	gzip bool,
+) http.Handler {
+	h := filterInvalidHosts(handler, allowedHosts)
+	h = cors.New(cors.Options{
 		AllowedOrigins:   allowedOrigins,
 		AllowCredentials: true,
-	}).Handler(allowedHostsHandler)
-	gzipHandler := gziphandler.GzipHandler(corsHandler)
+	}).Handler(h)
+	if gzip {
+		h = gziphandler.GzipHandler(h)
+	}
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			// Attach this node's ID as a header
 			w.Header().Set("node-id", nodeID.String())
-			gzipHandler.ServeHTTP(w, r)
+			h.ServeHTTP(w, r)
 		},
 	)
 }

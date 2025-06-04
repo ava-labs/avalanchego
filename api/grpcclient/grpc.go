@@ -8,9 +8,11 @@ import (
 	"fmt"
 
 	"google.golang.org/grpc"
+
+	"github.com/ava-labs/avalanchego/ids"
 )
 
-func PrefixServiceNameInterceptor(prefix string) grpc.UnaryClientInterceptor {
+func PrefixChainIDUnaryClientInterceptor(chainID ids.ID) grpc.UnaryClientInterceptor {
 	return func(
 		ctx context.Context,
 		method string,
@@ -20,9 +22,25 @@ func PrefixServiceNameInterceptor(prefix string) grpc.UnaryClientInterceptor {
 		invoker grpc.UnaryInvoker,
 		opts ...grpc.CallOption,
 	) error {
-		// http/2 :path takes the form of /ChainID/Service/Method
-		prefixedMethod := fmt.Sprintf("/%s%s", prefix, method)
-
-		return invoker(ctx, prefixedMethod, req, reply, cc, opts...)
+		return invoker(ctx, prefix(chainID, method), req, reply, cc, opts...)
 	}
+}
+
+func PrefixChainIDStreamClientInterceptor(chainID ids.ID) grpc.StreamClientInterceptor {
+	return func(
+		ctx context.Context,
+		desc *grpc.StreamDesc,
+		cc *grpc.ClientConn,
+		method string,
+		streamer grpc.Streamer,
+		opts ...grpc.CallOption,
+	) (grpc.ClientStream, error) {
+
+		return streamer(ctx, desc, cc, prefix(chainID, method), opts...)
+	}
+}
+
+// http/2 :path takes the form of /ChainID/Service/Method
+func prefix(chainID ids.ID, method string) string {
+	return fmt.Sprintf("/%s%s", chainID.String(), method)
 }

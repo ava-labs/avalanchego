@@ -42,15 +42,15 @@ func (g *grpcRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Deep copy the request to avoid weird behavior from modifying r
+	requestDeepCopy := r.Clone(r.Context())
 	// Route this request to the grpc service using the chain prefix
-	requestCopy := *r
-	requestCopy.URL = &(*r.URL)
-	requestCopy.URL.Path = strings.TrimPrefix(
-		requestCopy.URL.Path,
+	requestDeepCopy.URL.Path = strings.TrimPrefix(
+		requestDeepCopy.URL.Path,
 		fmt.Sprintf("/%s", parsed[1]),
 	)
 
-	handler.ServeHTTP(w, &requestCopy)
+	handler.ServeHTTP(w, requestDeepCopy)
 }
 
 func (g *grpcRouter) Add(chainID string, service string, handler http.Handler) bool {

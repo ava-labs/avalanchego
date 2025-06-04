@@ -188,13 +188,15 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 	ginkgo.It("should serve grpc api requests", func() {
 		tc.By("establishing connection")
 		uri := strings.TrimPrefix(e2e.GetEnv(tc).GetRandomNodeURI().URI, "http://")
+		chainID := e2e.GetEnv(tc).GetNetwork().GetSubnet(subnetAName).Chains[0].ChainID
 		conn, err := grpc.NewClient(
 			uri,
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
 			grpc.WithUnaryInterceptor(
-				grpcclient.PrefixServiceNameInterceptor(
-					e2e.GetEnv(tc).GetNetwork().GetSubnet(subnetAName).Chains[0].ChainID.String(),
-				),
+				grpcclient.PrefixChainIDUnaryClientInterceptor(chainID),
+			),
+			grpc.WithStreamInterceptor(
+				grpcclient.PrefixChainIDStreamClientInterceptor(chainID),
 			),
 		)
 		require.NoError(err)
@@ -220,7 +222,10 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 
 		n := 10
 		go func() {
-			defer wg.Done()
+			defer func() {
+				ginkgo.GinkgoRecover()
+				wg.Done()
+			}()
 
 			for i := 0; i < n; i++ {
 				msg := fmt.Sprintf("ping-%d", i)
@@ -232,7 +237,10 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		}()
 
 		go func() {
-			defer wg.Done()
+			defer func() {
+				ginkgo.GinkgoRecover()
+				wg.Done()
+			}()
 
 			for i := 0; i < n; i++ {
 				reply, err := stream.Recv()
