@@ -39,7 +39,6 @@ func (e *Engine) Get(state snow.State) (common.Engine, bool) {
 type EngineManager struct {
 	Avalanche *Engine
 	Snowman   *Engine
-	Simplex   *Engine
 }
 
 // Get returns the engine corresponding to the provided type if possible.
@@ -50,8 +49,6 @@ func (e *EngineManager) Get(engineType p2p.EngineType) *Engine {
 		return e.Avalanche
 	case p2p.EngineType_ENGINE_TYPE_SNOWMAN:
 		return e.Snowman
-	case p2p.EngineType_ENGINE_TYPE_SIMPLEX:
-		return e.Simplex
 	default:
 		return nil
 	}
