@@ -125,7 +125,9 @@ func NewNodeStatefulSet(
 							Image: imageName,
 							Ports: []corev1.ContainerPort{
 								{
-									Name:          "http",
+									Name: "http",
+									// Bypass kube-proxy
+									HostPort:      config.DefaultHTTPPort,
 									ContainerPort: config.DefaultHTTPPort,
 								},
 								{
