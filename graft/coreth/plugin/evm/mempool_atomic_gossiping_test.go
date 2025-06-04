@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	atomictxpool "github.com/ava-labs/coreth/plugin/evm/atomic/txpool"
+	"github.com/ava-labs/coreth/plugin/evm/extension"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -69,10 +70,13 @@ func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 			blk, err := tvm.vm.BuildBlock(context.Background())
 			assert.NoError(err, "could not build block out of mempool")
 
-			evmBlk, ok := blk.(*chain.BlockWrapper).Block.(*Block)
+			wrappedBlock, ok := blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock)
 			assert.True(ok, "unknown block type")
 
-			assert.Equal(txID, evmBlk.atomicTxs[0].ID(), "block does not include expected transaction")
+			blockExtension, ok := wrappedBlock.GetBlockExtension().(atomic.AtomicBlockContext)
+			assert.True(ok, "unknown block extension type")
+
+			assert.Equal(txID, blockExtension.AtomicTxs()[0].ID(), "block does not include expected transaction")
 
 			has = mempool.Has(txID)
 			assert.True(has, "tx should stay in mempool until block is accepted")
