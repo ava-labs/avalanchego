@@ -282,13 +282,14 @@ func StartNetwork(
 	require := require.New(tc)
 
 	nodeCount := len(network.Nodes)
-	timeout := network.DefaultRuntimeConfig.GetNetworkStartTimeout(nodeCount)
+	timeout, err := network.DefaultRuntimeConfig.GetNetworkStartTimeout(nodeCount)
+	require.NoError(err)
 	tc.Log().Info("waiting for network to start",
 		zap.Float64("timeoutSeconds", timeout.Seconds()),
 	)
 	ctx := tc.ContextWithTimeout(timeout)
 
-	err := tmpnet.BootstrapNewNetwork(
+	err = tmpnet.BootstrapNewNetwork(
 		ctx,
 		tc.Log(),
 		network,

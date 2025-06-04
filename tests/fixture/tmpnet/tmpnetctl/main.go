@@ -80,7 +80,10 @@ func main() {
 				DefaultRuntimeConfig: *nodeRuntimeConfig,
 			}
 
-			timeout := nodeRuntimeConfig.GetNetworkStartTimeout(nodeCount)
+			timeout, err := nodeRuntimeConfig.GetNetworkStartTimeout(nodeCount)
+			if err != nil {
+				return err
+			}
 			log.Info("waiting for network to start",
 				zap.Float64("timeoutSeconds", timeout.Seconds()),
 			)

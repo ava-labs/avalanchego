@@ -57,11 +57,11 @@ type NodeRuntimeConfig struct {
 }
 
 // GetNetworkStartTimeout returns the timeout to use when starting a network.
-func (c *NodeRuntimeConfig) GetNetworkStartTimeout(nodeCount int) time.Duration {
+func (c *NodeRuntimeConfig) GetNetworkStartTimeout(nodeCount int) (time.Duration, error) {
 	switch {
 	case c.Process != nil:
 		// Processes are expected to start quickly, nodeCount is ignored
-		return DefaultNetworkTimeout
+		return DefaultNetworkTimeout, nil
 	case c.Kube != nil:
 		// Ensure sufficient time for scheduling and image pull
 		timeout := time.Duration(nodeCount) * time.Minute
@@ -71,9 +71,9 @@ func (c *NodeRuntimeConfig) GetNetworkStartTimeout(nodeCount int) time.Duration 
 			timeout *= 2
 		}
 
-		return timeout
+		return timeout, nil
 	default:
-		panic("no runtime configuration set")
+		return 0, errors.New("no runtime configuration set")
 	}
 }
 
