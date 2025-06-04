@@ -787,7 +787,7 @@ func (n *Network) GetNodeURIs(ctx context.Context, deferCleanupFunc func(func())
 // GetAvailableNodeIDs returns the node IDs of nodes in the network that are running and not ephemeral.
 func (n *Network) GetAvailableNodeIDs() []string {
 	availableNodes := FilterAvailableNodes(n.Nodes)
-	ids := make([]string, len(availableNodes))
+	ids := []string{}
 	for _, node := range availableNodes {
 		ids = append(ids, node.NodeID.String())
 	}

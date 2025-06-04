@@ -59,7 +59,7 @@ type NodeURI struct {
 // nodes are running as local processes or in a kube cluster.
 func GetNodeURIs(ctx context.Context, nodes []*Node, deferCleanupFunc func(func())) ([]NodeURI, error) {
 	availableNodes := FilterAvailableNodes(nodes)
-	uris := make([]NodeURI, 0, len(availableNodes))
+	uris := []NodeURI{}
 	for _, node := range availableNodes {
 		uri, cancel, err := node.GetLocalURI(ctx)
 		if err != nil {
@@ -77,7 +77,7 @@ func GetNodeURIs(ctx context.Context, nodes []*Node, deferCleanupFunc func(func(
 
 // FilteredAvailableNodes filters the provided nodes by whether they are running and not ephemeral.
 func FilterAvailableNodes(nodes []*Node) []*Node {
-	filteredNodes := make([]*Node, 0, len(nodes))
+	filteredNodes := []*Node{}
 	for _, node := range nodes {
 		if node.IsEphemeral {
 			// Avoid returning URIs for nodes whose lifespan is indeterminate

@@ -56,6 +56,27 @@ type NodeRuntimeConfig struct {
 	Kube    *KubeRuntimeConfig    `json:"kube,omitempty"`
 }
 
+// GetNetworkStartTimeout returns the timeout to use when starting a network.
+func (c *NodeRuntimeConfig) GetNetworkStartTimeout(nodeCount int) (time.Duration, error) {
+	switch {
+	case c.Process != nil:
+		// Processes are expected to start quickly, nodeCount is ignored
+		return DefaultNetworkTimeout, nil
+	case c.Kube != nil:
+		// Ensure sufficient time for scheduling and image pull
+		timeout := time.Duration(nodeCount) * time.Minute
+
+		if c.Kube.UseExclusiveScheduling {
+			// Ensure sufficient time for the creation of autoscaled nodes
+			timeout *= 2
+		}
+
+		return timeout, nil
+	default:
+		return 0, errors.New("no runtime configuration set")
+	}
+}
+
 // Node supports configuring and running a node participating in a temporary network.
 type Node struct {
 	// Set by EnsureNodeID which is also called when the node is read.
