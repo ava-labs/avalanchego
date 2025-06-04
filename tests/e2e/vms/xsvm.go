@@ -49,7 +49,7 @@ func XSVMSubnetsOrPanic(nodes ...*tmpnet.Node) []*tmpnet.Subnet {
 	}
 }
 
-var _ = ginkgo.Describe("[XSVM]", func() {
+var _ = ginkgo.Describe("[XSVM]", ginkgo.Label("xsvm"), func() {
 	tc := e2e.NewTestContext()
 	require := require.New(tc)
 
