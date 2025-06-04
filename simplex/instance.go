@@ -18,7 +18,7 @@ func createSimplexInstance(config *Config) (*simplex.Epoch, *BlockBuilder, *WALI
 		return nil, nil, nil, err
 	}
 
-	storage, err := createStorage(config, verifier)
+	storage, err := newStorage(config, verifier)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -43,7 +43,7 @@ func createSimplexInstance(config *Config) (*simplex.Epoch, *BlockBuilder, *WALI
 		BlockDeserializer: &blockDeserializer{
 			vm: config.VM,
 		},
-		MaxProposalWait:     config.Ctx.Params.MaxProposalWait,
+		MaxProposalWait:    config.Ctx.Params.MaxProposalWait,
 		MaxRebroadcastWait: config.Ctx.Params.MaxRebroadcastWait,
 	}
 

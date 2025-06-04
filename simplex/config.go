@@ -22,26 +22,24 @@ type ValidatorInfo interface {
 }
 
 type ConsensusParams struct {
-	MaxProposalWait time.Duration 
-	MaxRebroadcastWait  time.Duration
+	MaxProposalWait    time.Duration
+	MaxRebroadcastWait time.Duration
 }
 
 // Config wraps all the parameters needed for a snowman engine
 type Config struct {
 	// Things i've been through
-	Ctx        SimplexChainContext
-	Validators ValidatorInfo
-	VM         block.ChainVM
-	SignBLS            func(msg []byte) (*bls.Signature, error)
-	GenesisData        []byte
-
+	Ctx         SimplexChainContext
+	Validators  ValidatorInfo
+	VM          block.ChainVM
+	SignBLS     func(msg []byte) (*bls.Signature, error)
+	GenesisData []byte
 
 	// things i havne't been through
 	GetServer          common.AllGetsServer
 	Sender             Sender
 	OutboundMsgBuilder message.OutboundMsgBuilder
 	DB                 database.Database
-
 }
 
 type SimplexChainContext struct {

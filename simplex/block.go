@@ -13,10 +13,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
+var maxBlockVerificationTime = time.Second * 30
+
 type Block struct {
 	e             *Engine
 	verifiedBlock VerifiedBlock
-	vm            block.ChainVM
 }
 
 func (b *Block) BlockHeader() simplex.BlockHeader {
@@ -24,10 +25,10 @@ func (b *Block) BlockHeader() simplex.BlockHeader {
 }
 
 func (b *Block) Verify(ctx context.Context) (simplex.VerifiedBlock, error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
+	ctx, cancel := context.WithTimeout(ctx, maxBlockVerificationTime)
 	defer cancel()
 
-	block, err := b.vm.ParseBlock(ctx, b.verifiedBlock.innerBlock)
+	block, err := b.e.vm.ParseBlock(ctx, b.verifiedBlock.innerBlock)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +41,7 @@ func (b *Block) Verify(ctx context.Context) (simplex.VerifiedBlock, error) {
 	b.e.blockTracker.trackBlock(md.Round, md.Digest, rejection)
 	b.verifiedBlock.accept = func(ctx context.Context) error {
 		b.e.removeDigestToIDMapping(md.Digest)
-		b.e.ChainVM.SetPreference(context.Background(), block.ID())
+		b.e.vm.SetPreference(context.Background(), block.ID())
 		b.e.blockTracker.rejectSiblingsAndUncles(md.Round, md.Digest)
 		return block.Accept(ctx)
 	}

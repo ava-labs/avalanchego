@@ -3,171 +3,153 @@ package simplex
 import (
 	"context"
 	"encoding/binary"
-	"errors"
-	"fmt"
 	"simplex"
 	"sync/atomic"
 
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 )
 
 var _ simplex.Storage = (*Storage)(nil)
+var simplexStoragePrefix = []byte("simplex")
+var heightKey = []byte("height")
 
 type Storage struct {
-	height      atomic.Uint64
-	db          *versiondb.Database
-	vm          block.ChainVM
-	d           QCDeserializer
+	// height represents the number of blocks indexed in storage.
+	height atomic.Uint64
+
+	// db is the underlying database used to store blocks and finalizations.
+	db *versiondb.Database
+
+	// genesisData is the genesis block data. It is stored as the first block in the storage.
 	genesisData []byte
+
+	vm block.ChainVM
+
+	// deserializer is used to deserialize quorum certificates from bytes.
+	deserializer QCDeserializer
 }
 
+// newStorage creates a new Storage instance.
+// it writes the genesis block to the database at height 0, seq 0.
+func newStorage(config *Config, verifier BLSVerifier) (*Storage, error) {
+	db := versiondb.New(prefixdb.New(simplexStoragePrefix, config.DB))
 
-func createStorage(config *Config, verifier BLSVerifier) (*Storage, error) {
-	storage, err := NewStorage(config.DB, QCDeserializer(verifier), config.VM, config.GenesisData)
-	if err != nil {
-		return nil, err
+	s := &Storage{
+		height:       atomic.Uint64{},
+		db:           db,
+		genesisData:  config.GenesisData,
+		vm:           config.VM,
+		deserializer: QCDeserializer(verifier),
 	}
 
-	return storage, nil
+	s.Index(s.getGenesisBlock(), simplex.Finalization{})
+	return s, nil
+}
+
+func (s *Storage) getGenesisBlock() simplex.VerifiedBlock {
+	return &VerifiedBlock{innerBlock: s.genesisData, metadata: simplex.ProtocolMetadata{}}
 }
 
 func (s *Storage) Height() uint64 {
 	return s.height.Load()
 }
 
-// Retrieve returns the block and finalization certificate at [seq].
+// Retrieve returns the block and finalization at [seq].
 // If [seq] is not found, returns false.
-func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.FinalizationCertificate, bool) {
-	if seq == 0 {
-		return &VerifiedBlock{innerBlock: s.genesisData, metadata: simplex.ProtocolMetadata{}}, simplex.FinalizationCertificate{}, true
-	}
-
-	id, err := s.vm.GetBlockIDAtHeight(context.Background(), seq+1)
+func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalization, bool) {
+	id, err := s.vm.GetBlockIDAtHeight(context.Background(), seq)
 	if err != nil {
-		return nil, simplex.FinalizationCertificate{}, false
+		return nil, simplex.Finalization{}, false
 	}
 
 	block, err := s.vm.GetBlock(context.Background(), id)
 	if err != nil {
-		return nil, simplex.FinalizationCertificate{}, false
+		return nil, simplex.Finalization{}, false
 	}
 
-	if seq == 0 {
-		return &VerifiedBlock{innerBlock: block.Bytes()}, simplex.FinalizationCertificate{}, true
+	finalization, found := s.retrieveFinalization(seq)
+	if !found {
+		return nil, simplex.Finalization{}, false
 	}
 
-	seqBuff := make([]byte, 8)
-	binary.BigEndian.PutUint64(seqBuff, seq)
-	fCertBytes, err := s.db.Get(seqBuff)
-	if err != nil {
-		return nil, simplex.FinalizationCertificate{}, false
-	}
+	vb := &VerifiedBlock{innerBlock: block.Bytes(), metadata: finalization.Finalization.ProtocolMetadata}
 
-	fCert, err := fCertFromBytes(fCertBytes, s.d)
-	if err != nil {
-		panic(err)
-	}
-
-	vb := &VerifiedBlock{innerBlock: block.Bytes(), metadata: fCert.Finalization.ProtocolMetadata}
-
-	return vb, fCert, true
+	return vb, finalization, true
 }
-func (s *Storage) Index(block simplex.VerifiedBlock, fCert simplex.FinalizationCertificate) {
+
+// Index indexes the finalization in the storage.
+// It stores the finalization bytes at the current height and increments the height.
+// TODO: where do we actually store the block? also isn't it wierd to pass in a VerifiedBlock here 
+// since we haven't verified it yet?
+func (s *Storage) Index(block simplex.VerifiedBlock, finalization simplex.Finalization) {
 	currentHeight := s.height.Load()
-	newHeight := currentHeight + 1
-	s.height.Store(newHeight)
+	s.height.Add(1)
 
-	heightBuff, seqBuff := encodeHeightAndSeq(currentHeight)
+	heightBuff, seqBuff := make([]byte, 8), make([]byte, 8)
+	binary.BigEndian.PutUint64(heightBuff, currentHeight)
+	binary.BigEndian.PutUint64(seqBuff, currentHeight)
 
-	if err := s.db.Put([]byte("height"), heightBuff); err != nil {
-		panic(err)
-	}
+	var finalizationBuf []byte
 
-	var fCertBuff []byte
-
+	// The genesis block does not have a finalization
 	if currentHeight > 0 {
-		fCertBuff = fCertToBytes(fCert)
+		finalizationBuf = finalizationToBytes(finalization)
 	}
 
-	if err := s.db.Put(seqBuff, fCertBuff); err != nil {
+	// Store the current height in the database.
+	if err := s.db.Put(heightKey, heightBuff); err != nil {
 		panic(err)
 	}
 
+	if err := s.db.Put(seqBuff, finalizationBuf); err != nil {
+		panic(err)
+	}
+
+	// TODO: can we call verify on the genesis block?
 	if err := block.(*VerifiedBlock).accept(context.Background()); err != nil {
 		panic(err)
 	}
-
-	if s.onIndex != nil {
-		s.onIndex(fCert.Finalization.Seq, fCert.Finalization.Round)
-	}
 }
 
-func encodeHeightAndSeq(seq uint64) ([]byte, []byte) {
-	heightBuff := make([]byte, 8)
-	binary.BigEndian.PutUint64(heightBuff, seq+1)
+// retrieveFinalization retrieves the finalization at [seq].
+// If the finalization is not found, it returns false.
+func (s *Storage) retrieveFinalization(seq uint64) (simplex.Finalization, bool) {
 	seqBuff := make([]byte, 8)
 	binary.BigEndian.PutUint64(seqBuff, seq)
-	return heightBuff, seqBuff
-}
-
-func NewStorage(db database.Database, d QCDeserializer, vm block.ChainVM, genesisData []byte) (*Storage, error) {
-	var s Storage
-
-	vdb := versiondb.New(prefixdb.New([]byte("simplex"), db))
-
-	height, err := initHeight(vdb)
+	finalizationBytes, err := s.db.Get(seqBuff)
 	if err != nil {
-		return nil, err
+		return simplex.Finalization{}, false
 	}
 
-	s.height.Store(height)
-	s.db = vdb
-	s.d = d
-	s.vm = vm
-	s.genesisData = genesisData
+	fCert, err := finalizationFromBytes(finalizationBytes, s.deserializer)
+	if err != nil {
+		panic(err)
+	}
 
-	return &s, nil
+	return fCert, true
 }
 
-func initHeight(vdb *versiondb.Database) (uint64, error) {
-	var height uint64
-	heightBytes, err := vdb.Get([]byte("height"))
-	if !errors.Is(err, database.ErrNotFound) {
-		return 0, fmt.Errorf("failed retrieving height from DB: %w", err)
-	}
-	if err == nil {
-		height = binary.BigEndian.Uint64(heightBytes)
-	} else {
-		buff := make([]byte, 8)
-		binary.BigEndian.PutUint64(buff, 1)
-		err = vdb.Put([]byte("height"), buff)
-		height = 1
-	}
-	return height, err
-}
-
-func fCertToBytes(fCert simplex.FinalizationCertificate) []byte {
-	blockHeaderBytes := fCert.Finalization.Bytes()
-	qcBytes := fCert.QC.Bytes()
+func finalizationToBytes(finalization simplex.Finalization) []byte {
+	blockHeaderBytes := finalization.Finalization.Bytes()
+	qcBytes := finalization.QC.Bytes()
 	buff := make([]byte, len(blockHeaderBytes)+len(qcBytes))
 	copy(buff, blockHeaderBytes)
 	copy(buff[len(blockHeaderBytes):], qcBytes)
 	return buff
 }
 
-func fCertFromBytes(bytes []byte, d QCDeserializer) (simplex.FinalizationCertificate, error) {
-	var fCert simplex.FinalizationCertificate
-	if err := fCert.Finalization.FromBytes(bytes[:89]); err != nil {
-		return simplex.FinalizationCertificate{}, err
+func finalizationFromBytes(bytes []byte, d QCDeserializer) (simplex.Finalization, error) {
+	var fCert simplex.Finalization
+	if err := fCert.Finalization.FromBytes(bytes[:simplex.MetadataLen]); err != nil {
+		return simplex.Finalization{}, err
 	}
 
-	qc, err := d.DeserializeQuorumCertificate(bytes[89:])
+	qc, err := d.DeserializeQuorumCertificate(bytes[simplex.MetadataLen:])
 	if err != nil {
-		return simplex.FinalizationCertificate{}, err
+		return simplex.Finalization{}, err
 	}
 
 	fCert.QC = qc

@@ -4,7 +4,6 @@ import (
 	"context"
 	"simplex"
 
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"go.uber.org/zap"
 )
@@ -45,17 +44,16 @@ func (b *BlockBuilder) BuildBlock(ctx context.Context, metadata simplex.Protocol
 }
 
 func (b *BlockBuilder) IncomingBlock(ctx context.Context) {
-	b.e.ctx.Log.Info("Waiting for incoming block")
-	for {
-		msg := b.VM.SubscribeToEvents(ctx)
-		if msg == common.PendingTxs {
-			b.e.ctx.Log.Info("Received pending transactions")
-			return
-		}
-		select {
-		case <-ctx.Done():
-			return
-		}
-		b.Logger.Warn("Received message we should not have received", zap.String("msg", msg.String()))
-	}
+	b.e.log.Info("Waiting for incoming block")
+	// for {
+	// 	msg := b.vm.SubscribeToEvents(ctx)
+	// 	if msg == common.PendingTxs {
+	// 		b.e.log.Info("Received pending transactions")
+	// 		return
+	// 	}
+	// 	select {
+	// 	case <-ctx.Done():
+	// 		return
+	// 	}
+	// }
 }

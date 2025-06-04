@@ -5,6 +5,8 @@ package simplex
 
 import (
 	"context"
+	"simplex"
+	"sync"
 
 	"go.uber.org/zap"
 
@@ -12,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -22,6 +25,13 @@ type Engine struct {
 	health.Checker
 
 	log logging.Logger
+	vm  block.ChainVM
+
+	blockTracker blockTracker
+
+	// simplex digest to vm digest cache
+	lock         sync.Mutex
+	digestCache map[simplex.Digest]ids.ID
 }
 
 func NewEngine(
@@ -42,4 +52,20 @@ func (e *Engine) Simplex(nodeID ids.NodeID, _ *p2p.Simplex) error {
 
 func (*Engine) Start(_ context.Context, _ uint32) error {
 	return nil
+}
+
+func (e *Engine) removeDigestToIDMapping(digest simplex.Digest) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	delete(e.digestCache, digest)
+}
+
+func (e *Engine) observeDigestToIDMapping(digest simplex.Digest, blockID ids.ID) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	// the block ID is input to the entire simplex block, therefore
+	// if the leader equivocates the simplex digest will be different.
+	e.digestCache[digest] = blockID
 }

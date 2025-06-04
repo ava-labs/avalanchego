@@ -35,6 +35,7 @@ func newWal(ctx SimplexChainContext) (*WALInterceptor, error) {
 
 	return walInterceptor, nil
 }
+
 type WALInterceptor struct {
 	Intercept func(digest simplex.Digest)
 	simplex.WriteAheadLog
