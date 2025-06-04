@@ -5,7 +5,6 @@ package grpcclient
 
 import (
 	"context"
-	"fmt"
 
 	"google.golang.org/grpc"
 
@@ -41,5 +40,5 @@ func PrefixChainIDStreamClientInterceptor(chainID ids.ID) grpc.StreamClientInter
 
 // http/2 :path takes the form of /ChainID/Service/Method
 func prefix(chainID ids.ID, method string) string {
-	return fmt.Sprintf("/%s%s", chainID.String(), method)
+	return "/" + chainID.String() + method
 }
