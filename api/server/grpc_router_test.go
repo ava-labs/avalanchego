@@ -64,7 +64,7 @@ func TestGRPCRouterServeHTTP(t *testing.T) {
 			grpcRouter := newGRPCRouter()
 			handler := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
 			writer := httptest.NewRecorder()
-			request := httptest.NewRequest("POST", "/", nil)
+			request := httptest.NewRequest(http.MethodPost, "/", nil)
 			request.URL = &url.URL{
 				Path: tt.path,
 			}
