@@ -167,3 +167,22 @@ func (f *valueFactory) from(data []byte) C.struct_Value {
 	f.pin.Pin(ptr)
 	return C.struct_Value{C.size_t(len(data)), ptr}
 }
+
+// createOps creates a slice of cgo `KeyValue` structs from the given keys and
+// values and pins the memory of the underlying byte slices to prevent
+// garbage collection while the cgo function is using them. The returned cleanup
+// function MUST be called when the constructed values are no longer required,
+// after which they can no longer be used as cgo arguments.
+func createOps(keys, vals [][]byte) ([]C.struct_KeyValue, func()) {
+	values, cleanup := newValueFactory()
+
+	ffiOps := make([]C.struct_KeyValue, len(keys))
+	for i := range keys {
+		ffiOps[i] = C.struct_KeyValue{
+			key:   values.from(keys[i]),
+			value: values.from(vals[i]),
+		}
+	}
+
+	return ffiOps, cleanup
+}

@@ -101,21 +101,8 @@ func (p *Proposal) Propose(keys, vals [][]byte) (*Proposal, error) {
 		return nil, errDroppedProposal
 	}
 
-	ops := make([]KeyValue, len(keys))
-	for i := range keys {
-		ops[i] = KeyValue{keys[i], vals[i]}
-	}
-
-	values, cleanup := newValueFactory()
+	ffiOps, cleanup := createOps(keys, vals)
 	defer cleanup()
-
-	ffiOps := make([]C.struct_KeyValue, len(ops))
-	for i, op := range ops {
-		ffiOps[i] = C.struct_KeyValue{
-			key:   values.from(op.Key),
-			value: values.from(op.Value),
-		}
-	}
 
 	// Propose the keys and values.
 	val := C.fwd_propose_on_proposal(p.handle, C.uint32_t(p.id),

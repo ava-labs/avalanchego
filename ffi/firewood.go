@@ -113,28 +113,18 @@ func New(filePath string, conf *Config) (*Database, error) {
 	return &Database{handle: db}, nil
 }
 
-// Batch applies a batch of updates to the database, returning the hash of the
+// Update applies a batch of updates to the database, returning the hash of the
 // root node after the batch is applied.
 //
-// NOTE that if the `Value` is empty, the respective `Key` will be deleted as a
-// prefix deletion; i.e. all children will be deleted.
-//
-// WARNING: a consequence of prefix deletion is that calling Batch with an empty
+// WARNING: a consequence of prefix deletion is that calling Update with an empty
 // key and value will delete the entire database.
-func (db *Database) Batch(ops []KeyValue) ([]byte, error) {
-	// TODO(arr4n) refactor this to require explicit signalling from the caller
-	// that they want prefix deletion, similar to `rm --no-preserve-root`.
-
-	values, cleanup := newValueFactory()
-	defer cleanup()
-
-	ffiOps := make([]C.struct_KeyValue, len(ops))
-	for i, op := range ops {
-		ffiOps[i] = C.struct_KeyValue{
-			key:   values.from(op.Key),
-			value: values.from(op.Value),
-		}
+func (db *Database) Update(keys, vals [][]byte) ([]byte, error) {
+	if db.handle == nil {
+		return nil, errDBClosed
 	}
+
+	ffiOps, cleanup := createOps(keys, vals)
+	defer cleanup()
 
 	hash := C.fwd_batch(
 		db.handle,
@@ -149,16 +139,9 @@ func (db *Database) Propose(keys, vals [][]byte) (*Proposal, error) {
 		return nil, errDBClosed
 	}
 
-	values, cleanup := newValueFactory()
+	ffiOps, cleanup := createOps(keys, vals)
 	defer cleanup()
 
-	ffiOps := make([]C.struct_KeyValue, len(keys))
-	for i := range keys {
-		ffiOps[i] = C.struct_KeyValue{
-			key:   values.from(keys[i]),
-			value: values.from(vals[i]),
-		}
-	}
 	val := C.fwd_propose_on_db(
 		db.handle,
 		C.size_t(len(ffiOps)),

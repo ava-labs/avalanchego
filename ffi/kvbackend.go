@@ -57,17 +57,3 @@ func (db *Database) Commit(_ []byte) error {
 
 	return nil
 }
-
-// Update batches all the keys and values and applies them to the
-// database.
-func (db *Database) Update(keys, vals [][]byte) ([]byte, error) {
-	if db.handle == nil {
-		return nil, errDBClosed
-	}
-
-	ops := make([]KeyValue, len(keys))
-	for i := range keys {
-		ops[i] = KeyValue{keys[i], vals[i]}
-	}
-	return db.Batch(ops)
-}
