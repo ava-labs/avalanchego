@@ -8,23 +8,27 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"time"
 
-	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/log"
-	"github.com/ava-labs/libevm/rlp"
-
+	"github.com/ava-labs/coreth/constants"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/params/extras"
-	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/coreth/plugin/evm/extension"
 	"github.com/ava-labs/coreth/plugin/evm/header"
-	"github.com/ava-labs/coreth/plugin/evm/sync"
+	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap0"
+	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap1"
 	"github.com/ava-labs/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/coreth/predicate"
+
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/log"
+	"github.com/ava-labs/libevm/rlp"
+	"github.com/ava-labs/libevm/trie"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -32,120 +36,47 @@ import (
 )
 
 var (
-	_ snowman.Block           = (*Block)(nil)
-	_ block.WithVerifyContext = (*Block)(nil)
-	_ sync.EthBlockWrapper    = (*Block)(nil)
+	_ snowman.Block           = (*wrappedBlock)(nil)
+	_ block.WithVerifyContext = (*wrappedBlock)(nil)
+	_ extension.ExtendedBlock = (*wrappedBlock)(nil)
 )
 
-var errMissingUTXOs = errors.New("missing UTXOs")
+var (
+	ap0MinGasPrice = big.NewInt(ap0.MinGasPrice)
+	ap1MinGasPrice = big.NewInt(ap1.MinGasPrice)
+)
 
-// readMainnetBonusBlocks returns maps of bonus block numbers to block IDs.
-// Note bonus blocks are indexed in the atomic trie.
-func readMainnetBonusBlocks() (map[uint64]ids.ID, error) {
-	mainnetBonusBlocks := map[uint64]string{
-		102972: "Njm9TcLUXRojZk8YhEM6ksvfiPdC1TME4zJvGaDXgzMCyB6oB",
-		103105: "BYqLB6xpqy7HsAgP2XNfGE8Ubg1uEzse5mBPTSJH9z5s8pvMa",
-		103143: "AfWvJH3rB2fdHuPWQp6qYNCFVT29MooQPRigD88rKKwUDEDhq",
-		103183: "2KPW9G5tiNF14tZNfG4SqHuQrtUYVZyxuof37aZ7AnTKrQdsHn",
-		103197: "pE93VXY3N5QKfwsEFcM9i59UpPFgeZ8nxpJNaGaDQyDgsscNf",
-		103203: "2czmtnBS44VCWNRFUM89h4Fe9m3ZeZVYyh7Pe3FhNqjRNgPXhZ",
-		103208: "esx5J962LtYm2aSrskpLai5e4CMMsaS1dsu9iuLGJ3KWgSu2M",
-		103209: "DK9NqAJGry1wAo767uuYc1dYXAjUhzwka6vi8d9tNheqzGUTd",
-		103259: "i1HoerJ1axognkUKKL58FvF9aLrbZKtv7TdKLkT5kgzoeU1vB",
-		103261: "2DpCuBaH94zKKFNY2XTs4GeJcwsEv6qT2DHc59S8tdg97GZpcJ",
-		103266: "2ez4CA7w4HHr8SSobHQUAwFgj2giRNjNFUZK9JvrZFa1AuRj6X",
-		103287: "2QBNMMFJmhVHaGF45GAPszKyj1gK6ToBERRxYvXtM7yfrdUGPK",
-		103339: "2pSjfo7rkFCfZ2CqAxqfw8vqM2CU2nVLHrFZe3rwxz43gkVuGo",
-		103346: "2SiSziHHqPjb1qkw7CdGYupokiYpd2b7mMqRiyszurctcA5AKr",
-		103350: "2F5tSQbdTfhZxvkxZqdFp7KR3FrJPKEsDLQK7KtPhNXj1EZAh4",
-		103358: "2tCe88ur6MLQcVgwE5XxoaHiTGtSrthwKN3SdbHE4kWiQ7MSTV",
-		103437: "21o2fVTnzzmtgXqkV1yuQeze7YEQhR5JB31jVVD9oVUnaaV8qm",
-		103472: "2nG4exd9eUoAGzELfksmBR8XDCKhohY1uDKRFzEXJG4M8p3qA7",
-		103478: "63YLdYXfXc5tY3mwWLaDsbXzQHYmwWVxMP7HKbRh4Du3C2iM1",
-		103493: "soPweZ8DGaoUMjrnzjH3V2bypa7ZvvfqBan4UCsMUxMP759gw",
-		103514: "2dNkpQF4mooveyUDfBYQTBfsGDV4wkncQPpEw4kHKfSTSTo5x",
-		103536: "PJTkRrHvKZ1m4AQdPND1MBpUXpCrGN4DDmXmJQAiUrsxPoLQX",
-		103545: "22ck2Z7cC38hmBfX2v3jMWxun8eD8psNaicfYeokS67DxwmPTx",
-		103547: "pTf7gfk1ksj7bqMrLyMCij8FBKth1uRqQrtfykMFeXhx5xnrL",
-		103554: "9oZh4qyBCcVwSGyDoUzRAuausvPJN3xH6nopKS6bwYzMfLoQ2",
-		103555: "MjExz2z1qhwugc1tAyiGxRsCq4GvJwKfyyS29nr4tRVB8ooic",
-		103559: "cwJusfmn98TW3DjAbfLRN9utYR24KAQ82qpAXmVSvjHyJZuM2",
-		103561: "2YgxGHns7Z2hMMHJsPCgVXuJaL7x1b3gnHbmSCfCdyAcYGr6mx",
-		103563: "2AXxT3PSEnaYHNtBTnYrVTf24TtKDWjky9sqoFEhydrGXE9iKH",
-		103564: "Ry2sfjFfGEnJxRkUGFSyZNn7GR3m4aKAf1scDW2uXSNQB568Y",
-		103569: "21Jys8UNURmtckKSV89S2hntEWymJszrLQbdLaNcbXcxDAsQSa",
-		103570: "sg6wAwFBsPQiS5Yfyh41cVkCRQbrrXsxXmeNyQ1xkunf2sdyv",
-		103575: "z3BgePPpCXq1mRBRvUi28rYYxnEtJizkUEHnDBrcZeVA7MFVk",
-		103577: "uK5Ff9iBfDtREpVv9NgCQ1STD1nzLJG3yrfibHG4mGvmybw6f",
-		103578: "Qv5v5Ru8ArfnWKB1w6s4G5EYPh7TybHJtF6UsVwAkfvZFoqmj",
-		103582: "7KCZKBpxovtX9opb7rMRie9WmW5YbZ8A4HwBBokJ9eSHpZPqx",
-		103587: "2AfTQ2FXNj9bkSUQnud9pFXULx6EbF7cbbw6i3ayvc2QNhgxfF",
-		103590: "2gTygYckZgFZfN5QQWPaPBD3nabqjidV55mwy1x1Nd4JmJAwaM",
-		103591: "2cUPPHy1hspr2nAKpQrrAEisLKkaWSS9iF2wjNFyFRs8vnSkKK",
-		103594: "5MptSdP6dBMPSwk9GJjeVe39deZJTRh9i82cgNibjeDffrrTf",
-		103597: "2J8z7HNv4nwh82wqRGyEHqQeuw4wJ6mCDCSvUgusBu35asnshK",
-		103598: "2i2FP6nJyvhX9FR15qN2D9AVoK5XKgBD2i2AQ7FoSpfowxvQDX",
-		103603: "2v3smb35s4GLACsK4Zkd2RcLBLdWA4huqrvq8Y3VP4CVe8kfTM",
-		103604: "b7XfDDLgwB12DfL7UTWZoxwBpkLPL5mdHtXngD94Y2RoeWXSh",
-		103607: "PgaRk1UAoUvRybhnXsrLq5t6imWhEa6ksNjbN6hWgs4qPrSzm",
-		103612: "2oueNTj4dUE2FFtGyPpawnmCCsy6EUQeVHVLZy8NHeQmkAciP4",
-		103614: "2YHZ1KymFjiBhpXzgt6HXJhLSt5SV9UQ4tJuUNjfN1nQQdm5zz",
-		103617: "amgH2C1s9H3Av7vSW4y7n7TXb9tKyKHENvrDXutgNN6nsejgc",
-		103618: "fV8k1U8oQDmfVwK66kAwN73aSsWiWhm8quNpVnKmSznBycV2W",
-		103621: "Nzs93kFTvcXanFUp9Y8VQkKYnzmH8xykxVNFJTkdyAEeuxWbP",
-		103623: "2rAsBj3emqQa13CV8r5fTtHogs4sXnjvbbXVzcKPi3WmzhpK9D",
-		103624: "2JbuExUGKW5mYz5KfXATwq1ibRDimgks9wEdYGNSC6Ttey1R4U",
-		103627: "tLLijh7oKfvWT1yk9zRv4FQvuQ5DAiuvb5kHCNN9zh4mqkFMG",
-		103628: "dWBsRYRwFrcyi3DPdLoHsL67QkZ5h86hwtVfP94ZBaY18EkmF",
-		103629: "XMoEsew2DhSgQaydcJFJUQAQYP8BTNTYbEJZvtbrV2QsX7iE3",
-		103630: "2db2wMbVAoCc5EUJrsBYWvNZDekqyY8uNpaaVapdBAQZ5oRaou",
-		103633: "2QiHZwLhQ3xLuyyfcdo5yCUfoSqWDvRZox5ECU19HiswfroCGp",
-	}
-
-	bonusBlockMainnetHeights := make(map[uint64]ids.ID)
-	for height, blkIDStr := range mainnetBonusBlocks {
-		blkID, err := ids.FromString(blkIDStr)
-		if err != nil {
-			return nil, err
-		}
-		bonusBlockMainnetHeights[height] = blkID
-	}
-	return bonusBlockMainnetHeights, nil
-}
-
-// Block implements the snowman.Block interface
-type Block struct {
+// wrappedBlock implements the snowman.wrappedBlock interface
+type wrappedBlock struct {
 	id        ids.ID
 	ethBlock  *types.Block
+	extension extension.BlockExtension
 	vm        *VM
-	atomicTxs []*atomic.Tx
 }
 
-// newBlock returns a new Block wrapping the ethBlock type and implementing the snowman.Block interface
-func (vm *VM) newBlock(ethBlock *types.Block) (*Block, error) {
-	isApricotPhase5 := vm.chainConfigExtra().IsApricotPhase5(ethBlock.Time())
-	atomicTxs, err := atomic.ExtractAtomicTxs(customtypes.BlockExtData(ethBlock), isApricotPhase5, atomic.Codec)
-	if err != nil {
-		return nil, err
+// wrapBlock returns a new Block wrapping the ethBlock type and implementing the snowman.Block interface
+func wrapBlock(ethBlock *types.Block, vm *VM) (*wrappedBlock, error) {
+	b := &wrappedBlock{
+		id:       ids.ID(ethBlock.Hash()),
+		ethBlock: ethBlock,
+		vm:       vm,
 	}
-
-	return &Block{
-		id:        ids.ID(ethBlock.Hash()),
-		ethBlock:  ethBlock,
-		vm:        vm,
-		atomicTxs: atomicTxs,
-	}, nil
+	if vm.extensionConfig.BlockExtender != nil {
+		extension, err := vm.extensionConfig.BlockExtender.NewBlockExtension(b)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create block extension: %w", err)
+		}
+		b.extension = extension
+	}
+	return b, nil
 }
 
 // ID implements the snowman.Block interface
-func (b *Block) ID() ids.ID { return b.id }
-
-func (b *Block) AtomicTxs() []*atomic.Tx { return b.atomicTxs }
+func (b *wrappedBlock) ID() ids.ID { return b.id }
 
 // Accept implements the snowman.Block interface
-func (b *Block) Accept(context.Context) error {
+func (b *wrappedBlock) Accept(context.Context) error {
 	vm := b.vm
-
 	// Although returning an error from Accept is considered fatal, it is good
 	// practice to cleanup the batch we were modifying in the case of an error.
 	defer vm.versiondb.Abort()
@@ -156,7 +87,6 @@ func (b *Block) Accept(context.Context) error {
 		"id", blkID,
 		"height", b.Height(),
 	)
-
 	// Call Accept for relevant precompile logs. Note we do this prior to
 	// calling Accept on the blockChain so any side effects (eg warp signatures)
 	// take place before the accepted log is emitted to subscribers.
@@ -168,37 +98,31 @@ func (b *Block) Accept(context.Context) error {
 		return fmt.Errorf("chain could not accept %s: %w", blkID, err)
 	}
 
-	if err := vm.acceptedBlockDB.Put(lastAcceptedKey, blkID[:]); err != nil {
+	if err := vm.PutLastAcceptedID(blkID); err != nil {
 		return fmt.Errorf("failed to put %s as the last accepted block: %w", blkID, err)
 	}
 
-	for _, tx := range b.atomicTxs {
-		// Remove the accepted transaction from the mempool
-		vm.mempool.RemoveTx(tx)
-	}
-
-	// Update VM state for atomic txs in this block. This includes updating the
-	// atomic tx repo, atomic trie, and shared memory.
-	atomicState, err := b.vm.atomicBackend.GetVerifiedAtomicState(common.Hash(blkID))
-	if err != nil {
-		// should never occur since [b] must be verified before calling Accept
-		return err
-	}
 	// Get pending operations on the vm's versionDB so we can apply them atomically
-	// with the shared memory changes.
-	vdbBatch, err := b.vm.versiondb.CommitBatch()
+	// with the block extension's changes.
+	vdbBatch, err := vm.versiondb.CommitBatch()
 	if err != nil {
 		return fmt.Errorf("could not create commit batch processing block[%s]: %w", blkID, err)
 	}
 
-	// Apply any shared memory changes atomically with other pending changes to
-	// the vm's versionDB.
-	return atomicState.Accept(vdbBatch)
+	if b.extension != nil {
+		// Apply any changes atomically with other pending changes to
+		// the vm's versionDB.
+		// Accept flushes the changes in the batch to the database.
+		return b.extension.Accept(vdbBatch)
+	}
+
+	// If there is no extension, we still need to apply the changes to the versionDB
+	return vdbBatch.Write()
 }
 
 // handlePrecompileAccept calls Accept on any logs generated with an active precompile address that implements
 // contract.Accepter
-func (b *Block) handlePrecompileAccept(rules extras.Rules) error {
+func (b *wrappedBlock) handlePrecompileAccept(rules extras.Rules) error {
 	// Short circuit early if there are no precompile accepters to execute
 	if len(rules.AccepterPrecompiles) == 0 {
 		return nil
@@ -232,7 +156,7 @@ func (b *Block) handlePrecompileAccept(rules extras.Rules) error {
 
 // Reject implements the snowman.Block interface
 // If [b] contains an atomic transaction, attempt to re-issue it
-func (b *Block) Reject(context.Context) error {
+func (b *wrappedBlock) Reject(context.Context) error {
 	blkID := b.ID()
 	log.Debug("rejecting block",
 		"hash", blkID.Hex(),
@@ -240,52 +164,31 @@ func (b *Block) Reject(context.Context) error {
 		"height", b.Height(),
 	)
 
-	for _, tx := range b.atomicTxs {
-		// Re-issue the transaction in the mempool, continue even if it fails
-		b.vm.mempool.RemoveTx(tx)
-		if err := b.vm.mempool.AddRemoteTx(tx); err != nil {
-			log.Debug("Failed to re-issue transaction in rejected block", "txID", tx.ID(), "err", err)
+	if b.extension != nil {
+		if err := b.extension.Reject(); err != nil {
+			return err
 		}
-	}
-	atomicState, err := b.vm.atomicBackend.GetVerifiedAtomicState(common.Hash(blkID))
-	if err != nil {
-		// should never occur since [b] must be verified before calling Reject
-		return err
-	}
-	if err := atomicState.Reject(); err != nil {
-		return err
 	}
 	return b.vm.blockChain.Reject(b.ethBlock)
 }
 
 // Parent implements the snowman.Block interface
-func (b *Block) Parent() ids.ID {
+func (b *wrappedBlock) Parent() ids.ID {
 	return ids.ID(b.ethBlock.ParentHash())
 }
 
 // Height implements the snowman.Block interface
-func (b *Block) Height() uint64 {
+func (b *wrappedBlock) Height() uint64 {
 	return b.ethBlock.NumberU64()
 }
 
 // Timestamp implements the snowman.Block interface
-func (b *Block) Timestamp() time.Time {
+func (b *wrappedBlock) Timestamp() time.Time {
 	return time.Unix(int64(b.ethBlock.Time()), 0)
 }
 
-// syntacticVerify verifies that a *Block is well-formed.
-func (b *Block) syntacticVerify() error {
-	if b == nil || b.ethBlock == nil {
-		return errInvalidBlock
-	}
-
-	header := b.ethBlock.Header()
-	rules := b.vm.chainConfig.Rules(header.Number, params.IsMergeTODO, header.Time)
-	return b.vm.syntacticBlockValidator.SyntacticVerify(b, rules)
-}
-
 // Verify implements the snowman.Block interface
-func (b *Block) Verify(context.Context) error {
+func (b *wrappedBlock) Verify(context.Context) error {
 	return b.verify(&precompileconfig.PredicateContext{
 		SnowCtx:            b.vm.ctx,
 		ProposerVMBlockCtx: nil,
@@ -293,7 +196,7 @@ func (b *Block) Verify(context.Context) error {
 }
 
 // ShouldVerifyWithContext implements the block.WithVerifyContext interface
-func (b *Block) ShouldVerifyWithContext(context.Context) (bool, error) {
+func (b *wrappedBlock) ShouldVerifyWithContext(context.Context) (bool, error) {
 	rules := b.vm.rules(b.ethBlock.Number(), b.ethBlock.Time())
 	predicates := rules.Predicaters
 	// Short circuit early if there are no predicates to verify
@@ -317,7 +220,7 @@ func (b *Block) ShouldVerifyWithContext(context.Context) (bool, error) {
 }
 
 // VerifyWithContext implements the block.WithVerifyContext interface
-func (b *Block) VerifyWithContext(ctx context.Context, proposerVMBlockCtx *block.Context) error {
+func (b *wrappedBlock) VerifyWithContext(ctx context.Context, proposerVMBlockCtx *block.Context) error {
 	return b.verify(&precompileconfig.PredicateContext{
 		SnowCtx:            b.vm.ctx,
 		ProposerVMBlockCtx: proposerVMBlockCtx,
@@ -327,7 +230,7 @@ func (b *Block) VerifyWithContext(ctx context.Context, proposerVMBlockCtx *block
 // Verify the block is valid.
 // Enforces that the predicates are valid within [predicateContext].
 // Writes the block details to disk and the state to the trie manager iff writes=true.
-func (b *Block) verify(predicateContext *precompileconfig.PredicateContext, writes bool) error {
+func (b *wrappedBlock) verify(predicateContext *precompileconfig.PredicateContext, writes bool) error {
 	if predicateContext.ProposerVMBlockCtx != nil {
 		log.Debug("Verifying block with context", "block", b.ID(), "height", b.Height())
 	} else {
@@ -337,22 +240,15 @@ func (b *Block) verify(predicateContext *precompileconfig.PredicateContext, writ
 		return fmt.Errorf("syntactic block verification failed: %w", err)
 	}
 
+	if err := b.semanticVerify(); err != nil {
+		return fmt.Errorf("failed to verify block: %w", err)
+	}
+
 	// If the VM is not marked as bootstrapped the other chains may also be
 	// bootstrapping and not have populated the required indices. Since
 	// bootstrapping only verifies blocks that have been canonically accepted by
 	// the network, these checks would be guaranteed to pass on a synced node.
 	if b.vm.bootstrapped.Get() {
-		// Verify that the UTXOs named in import txs are present in shared
-		// memory.
-		//
-		// This does not fully verify that this block can spend these UTXOs.
-		// However, it guarantees that any block that fails the later checks was
-		// built by an incorrect block proposer. This ensures that we only mark
-		// blocks as BAD BLOCKs if they were incorrectly generated.
-		if err := b.verifyUTXOsPresent(); err != nil {
-			return err
-		}
-
 		// Verify that all the ICM messages are correctly marked as either valid
 		// or invalid.
 		if err := b.verifyPredicates(predicateContext); err != nil {
@@ -370,19 +266,171 @@ func (b *Block) verify(predicateContext *precompileconfig.PredicateContext, writ
 	}
 
 	err := b.vm.blockChain.InsertBlockManual(b.ethBlock, writes)
-	if err != nil || !writes {
-		// if an error occurred inserting the block into the chain
-		// or if we are not pinning to memory, unpin the atomic trie
-		// changes from memory (if they were pinned).
-		if atomicState, err := b.vm.atomicBackend.GetVerifiedAtomicState(b.ethBlock.Hash()); err == nil {
-			_ = atomicState.Reject() // ignore this error so we can return the original error instead.
-		}
+	// If this was not called with intention to writing to the database or
+	// got an error while inserting to blockchain, we may need to cleanup the extension.
+	if b.extension != nil && (err != nil || !writes) {
+		b.extension.CleanupVerified()
 	}
 	return err
 }
 
+// semanticVerify verifies that a *Block is internally consistent.
+func (b *wrappedBlock) semanticVerify() error {
+	// Make sure the block isn't too far in the future
+	blockTimestamp := b.ethBlock.Time()
+	if maxBlockTime := uint64(b.vm.clock.Time().Add(maxFutureBlockTime).Unix()); blockTimestamp > maxBlockTime {
+		return fmt.Errorf("block timestamp is too far in the future: %d > allowed %d", blockTimestamp, maxBlockTime)
+	}
+
+	if b.extension != nil {
+		if err := b.extension.SemanticVerify(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// syntacticVerify verifies that a *Block is well-formed.
+func (b *wrappedBlock) syntacticVerify() error {
+	if b == nil || b.ethBlock == nil {
+		return errInvalidBlock
+	}
+
+	// Skip verification of the genesis block since it should already be marked as accepted.
+	if b.ethBlock.Hash() == b.vm.genesisHash {
+		return nil
+	}
+
+	ethHeader := b.ethBlock.Header()
+	rules := b.vm.chainConfig.Rules(ethHeader.Number, params.IsMergeTODO, ethHeader.Time)
+	rulesExtra := params.GetRulesExtra(rules)
+	// Perform block and header sanity checks
+	if !ethHeader.Number.IsUint64() {
+		return fmt.Errorf("invalid block number: %v", ethHeader.Number)
+	}
+	if !ethHeader.Difficulty.IsUint64() || ethHeader.Difficulty.Cmp(common.Big1) != 0 {
+		return fmt.Errorf("invalid difficulty: %d", ethHeader.Difficulty)
+	}
+	if ethHeader.Nonce.Uint64() != 0 {
+		return fmt.Errorf(
+			"expected nonce to be 0 but got %d: %w",
+			ethHeader.Nonce.Uint64(), errInvalidNonce,
+		)
+	}
+
+	if ethHeader.MixDigest != (common.Hash{}) {
+		return fmt.Errorf("invalid mix digest: %v", ethHeader.MixDigest)
+	}
+
+	// Verify the extra data is well-formed.
+	if err := header.VerifyExtra(rulesExtra.AvalancheRules, ethHeader.Extra); err != nil {
+		return err
+	}
+
+	if version := customtypes.BlockVersion(b.ethBlock); version != 0 {
+		return fmt.Errorf("invalid version: %d", version)
+	}
+
+	// Check that the tx hash in the header matches the body
+	txsHash := types.DeriveSha(b.ethBlock.Transactions(), trie.NewStackTrie(nil))
+	if txsHash != ethHeader.TxHash {
+		return fmt.Errorf("invalid txs hash %v does not match calculated txs hash %v", ethHeader.TxHash, txsHash)
+	}
+	// Check that the uncle hash in the header matches the body
+	uncleHash := types.CalcUncleHash(b.ethBlock.Uncles())
+	if uncleHash != ethHeader.UncleHash {
+		return fmt.Errorf("invalid uncle hash %v does not match calculated uncle hash %v", ethHeader.UncleHash, uncleHash)
+	}
+	// Coinbase must match the BlackholeAddr on C-Chain
+	if ethHeader.Coinbase != constants.BlackholeAddr {
+		return fmt.Errorf("invalid coinbase %v does not match required blackhole address %v", ethHeader.Coinbase, constants.BlackholeAddr)
+	}
+	// Block must not have any uncles
+	if len(b.ethBlock.Uncles()) > 0 {
+		return errUnclesUnsupported
+	}
+
+	// Enforce minimum gas prices here prior to dynamic fees going into effect.
+	switch {
+	case !rulesExtra.IsApricotPhase1:
+		// If we are in ApricotPhase0, enforce each transaction has a minimum gas price of at least the LaunchMinGasPrice
+		for _, tx := range b.ethBlock.Transactions() {
+			if tx.GasPrice().Cmp(ap0MinGasPrice) < 0 {
+				return fmt.Errorf("block contains tx %s with gas price too low (%d < %d)", tx.Hash(), tx.GasPrice(), ap0.MinGasPrice)
+			}
+		}
+	case !rulesExtra.IsApricotPhase3:
+		// If we are prior to ApricotPhase3, enforce each transaction has a minimum gas price of at least the ApricotPhase1MinGasPrice
+		for _, tx := range b.ethBlock.Transactions() {
+			if tx.GasPrice().Cmp(ap1MinGasPrice) < 0 {
+				return fmt.Errorf("block contains tx %s with gas price too low (%d < %d)", tx.Hash(), tx.GasPrice(), ap1.MinGasPrice)
+			}
+		}
+	}
+
+	// Ensure BaseFee is non-nil as of ApricotPhase3.
+	if rulesExtra.IsApricotPhase3 {
+		if ethHeader.BaseFee == nil {
+			return errNilBaseFeeApricotPhase3
+		}
+		if bfLen := ethHeader.BaseFee.BitLen(); bfLen > 256 {
+			return fmt.Errorf("too large base fee: bitlen %d", bfLen)
+		}
+	}
+
+	headerExtra := customtypes.GetHeaderExtra(ethHeader)
+	if rulesExtra.IsApricotPhase4 {
+		switch {
+		// Make sure BlockGasCost is not nil
+		// NOTE: ethHeader.BlockGasCost correctness is checked in header verification
+		case headerExtra.BlockGasCost == nil:
+			return errNilBlockGasCostApricotPhase4
+		case !headerExtra.BlockGasCost.IsUint64():
+			return fmt.Errorf("too large blockGasCost: %d", headerExtra.BlockGasCost)
+		}
+	}
+
+	// Verify the existence / non-existence of excessBlobGas
+	cancun := rules.IsCancun
+	if !cancun && ethHeader.ExcessBlobGas != nil {
+		return fmt.Errorf("invalid excessBlobGas: have %d, expected nil", *ethHeader.ExcessBlobGas)
+	}
+	if !cancun && ethHeader.BlobGasUsed != nil {
+		return fmt.Errorf("invalid blobGasUsed: have %d, expected nil", *ethHeader.BlobGasUsed)
+	}
+	if cancun && ethHeader.ExcessBlobGas == nil {
+		return errors.New("header is missing excessBlobGas")
+	}
+	if cancun && ethHeader.BlobGasUsed == nil {
+		return errors.New("header is missing blobGasUsed")
+	}
+	if !cancun && ethHeader.ParentBeaconRoot != nil {
+		return fmt.Errorf("invalid parentBeaconRoot: have %x, expected nil", *ethHeader.ParentBeaconRoot)
+	}
+	if cancun {
+		switch {
+		case ethHeader.ParentBeaconRoot == nil:
+			return errors.New("header is missing parentBeaconRoot")
+		case *ethHeader.ParentBeaconRoot != (common.Hash{}):
+			return fmt.Errorf("invalid parentBeaconRoot: have %x, expected empty hash", ethHeader.ParentBeaconRoot)
+		}
+		if ethHeader.BlobGasUsed == nil {
+			return fmt.Errorf("blob gas used must not be nil in Cancun")
+		} else if *ethHeader.BlobGasUsed > 0 {
+			return fmt.Errorf("blobs not enabled on avalanche networks: used %d blob gas, expected 0", *ethHeader.BlobGasUsed)
+		}
+	}
+
+	if b.extension != nil {
+		if err := b.extension.SyntacticVerify(*rulesExtra); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // verifyPredicates verifies the predicates in the block are valid according to predicateContext.
-func (b *Block) verifyPredicates(predicateContext *precompileconfig.PredicateContext) error {
+func (b *wrappedBlock) verifyPredicates(predicateContext *precompileconfig.PredicateContext) error {
 	rules := b.vm.chainConfig.Rules(b.ethBlock.Number(), params.IsMergeTODO, b.ethBlock.Time())
 	rulesExtra := params.GetRulesExtra(rules)
 
@@ -415,30 +463,8 @@ func (b *Block) verifyPredicates(predicateContext *precompileconfig.PredicateCon
 	return nil
 }
 
-// verifyUTXOsPresent verifies all atomic UTXOs consumed by the block are
-// present in shared memory.
-func (b *Block) verifyUTXOsPresent() error {
-	blockHash := common.Hash(b.ID())
-	if b.vm.atomicBackend.IsBonus(b.Height(), blockHash) {
-		log.Info("skipping atomic tx verification on bonus block", "block", blockHash)
-		return nil
-	}
-
-	for _, atomicTx := range b.atomicTxs {
-		utx := atomicTx.UnsignedAtomicTx
-		chainID, requests, err := utx.AtomicOps()
-		if err != nil {
-			return err
-		}
-		if _, err := b.vm.ctx.SharedMemory.Get(chainID, requests.RemoveRequests); err != nil {
-			return fmt.Errorf("%w: %s", errMissingUTXOs, err)
-		}
-	}
-	return nil
-}
-
 // Bytes implements the snowman.Block interface
-func (b *Block) Bytes() []byte {
+func (b *wrappedBlock) Bytes() []byte {
 	res, err := rlp.EncodeToBytes(b.ethBlock)
 	if err != nil {
 		panic(err)
@@ -446,8 +472,12 @@ func (b *Block) Bytes() []byte {
 	return res
 }
 
-func (b *Block) String() string { return fmt.Sprintf("EVM block, ID = %s", b.ID()) }
+func (b *wrappedBlock) String() string { return fmt.Sprintf("EVM block, ID = %s", b.ID()) }
 
-func (b *Block) GetEthBlock() *types.Block {
+func (b *wrappedBlock) GetEthBlock() *types.Block {
 	return b.ethBlock
+}
+
+func (b *wrappedBlock) GetBlockExtension() extension.BlockExtension {
+	return b.extension
 }

@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -120,7 +119,6 @@ func (in *EVMInput) Verify() error {
 
 type AtomicBlockContext interface {
 	AtomicTxs() []*Tx
-	snowman.Block
 }
 
 // Visitor allows executing custom logic against the underlying transaction types.

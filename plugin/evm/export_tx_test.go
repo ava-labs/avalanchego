@@ -457,7 +457,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 		}
 	}()
 
-	parent := vm.LastAcceptedBlockInternal().(*Block)
+	parent := vm.LastAcceptedExtendedBlock()
 
 	key := testKeys[0]
 	addr := key.Address()
@@ -1708,7 +1708,7 @@ func TestNewExportTx(t *testing.T) {
 				}
 			}()
 
-			parent := tvm.vm.LastAcceptedBlockInternal().(*Block)
+			parent := tvm.vm.LastAcceptedExtendedBlock()
 			importAmount := uint64(50000000)
 			utxoID := avax.UTXOID{TxID: ids.GenerateTestID()}
 
@@ -1768,7 +1768,7 @@ func TestNewExportTx(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			parent = tvm.vm.LastAcceptedBlockInternal().(*Block)
+			parent = tvm.vm.LastAcceptedExtendedBlock()
 			exportAmount := uint64(5000000)
 
 			state, err := tvm.vm.blockChain.State()
@@ -1796,7 +1796,7 @@ func TestNewExportTx(t *testing.T) {
 				Backend: backend,
 				Tx:      tx,
 				Parent:  parent,
-				BaseFee: parent.ethBlock.BaseFee(),
+				BaseFee: parent.GetEthBlock().BaseFee(),
 			}); err != nil {
 				t.Fatal("newExportTx created an invalid transaction", err)
 			}
@@ -1877,7 +1877,7 @@ func TestNewExportTxMulticoin(t *testing.T) {
 				}
 			}()
 
-			parent := tvm.vm.LastAcceptedBlockInternal().(*Block)
+			parent := tvm.vm.LastAcceptedExtendedBlock()
 			importAmount := uint64(50000000)
 			utxoID := avax.UTXOID{TxID: ids.GenerateTestID()}
 
@@ -1967,7 +1967,7 @@ func TestNewExportTxMulticoin(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			parent = tvm.vm.LastAcceptedBlockInternal().(*Block)
+			parent = tvm.vm.LastAcceptedExtendedBlock()
 			exportAmount := uint64(5000000)
 
 			testKeys0Addr := testKeys[0].EthAddress()
@@ -2000,7 +2000,7 @@ func TestNewExportTxMulticoin(t *testing.T) {
 				Backend: backend,
 				Tx:      tx,
 				Parent:  parent,
-				BaseFee: parent.ethBlock.BaseFee(),
+				BaseFee: parent.GetEthBlock().BaseFee(),
 			}); err != nil {
 				t.Fatal("newExportTx created an invalid transaction", err)
 			}

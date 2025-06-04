@@ -113,7 +113,7 @@ func executeTxTest(t *testing.T, test atomicTxTest) {
 		baseFee = initialBaseFee
 	}
 
-	lastAcceptedBlock := tvm.vm.LastAcceptedBlockInternal().(*Block)
+	lastAcceptedBlock := tvm.vm.LastAcceptedExtendedBlock()
 	backend := &atomic.VerifierBackend{
 		Ctx:          tvm.vm.ctx,
 		Fx:           &tvm.vm.fx,
@@ -141,7 +141,7 @@ func executeTxTest(t *testing.T, test atomicTxTest) {
 	}
 
 	// Retrieve dummy state to test that EVMStateTransfer works correctly
-	sdb, err := tvm.vm.blockChain.StateAt(lastAcceptedBlock.ethBlock.Root())
+	sdb, err := tvm.vm.blockChain.StateAt(lastAcceptedBlock.GetEthBlock().Root())
 	if err != nil {
 		t.Fatal(err)
 	}
