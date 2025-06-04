@@ -215,6 +215,10 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		stream, err := client.StreamPing(tc.DefaultContext())
 		require.NoError(err)
 
+		ginkgo.DeferCleanup(func() {
+			require.NoError(stream.CloseSend())
+		})
+
 		// Stream pings to the server and block until all events are received
 		// back.
 		wg := &sync.WaitGroup{}
@@ -251,8 +255,6 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		}()
 
 		wg.Wait()
-
-		require.NoError(stream.CloseSend())
 	})
 })
 
