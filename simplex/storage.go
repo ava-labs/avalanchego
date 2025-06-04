@@ -26,10 +26,10 @@ type Storage struct {
 	// genesisData is the genesis block data. It is stored as the first block in the storage.
 	genesisData []byte
 
-	vm block.ChainVM
-
 	// deserializer is used to deserialize quorum certificates from bytes.
 	deserializer QCDeserializer
+
+	vm block.ChainVM
 }
 
 // newStorage creates a new Storage instance.

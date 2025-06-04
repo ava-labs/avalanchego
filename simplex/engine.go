@@ -27,8 +27,6 @@ type Engine struct {
 	log logging.Logger
 	vm  block.ChainVM
 
-	blockTracker blockTracker
-
 	// simplex digest to vm digest cache
 	lock        sync.Mutex
 	digestCache map[simplex.Digest]ids.ID

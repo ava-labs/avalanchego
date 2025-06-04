@@ -1,7 +1,6 @@
 package simplex
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
@@ -12,7 +11,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
-
 var maxBlockVerificationTime = time.Second * 30
 
 type Block struct {
@@ -25,34 +23,8 @@ func (b *Block) BlockHeader() simplex.BlockHeader {
 }
 
 func (b *Block) Verify(ctx context.Context) (simplex.VerifiedBlock, error) {
-	ctx, cancel := context.WithTimeout(ctx, maxBlockVerificationTime)
-	defer cancel()
-
-	block, err := b.e.vm.ParseBlock(ctx, b.verifiedBlock.innerBlock)
-	if err != nil {
-		return nil, err
-	}
-
-	md := b.BlockHeader()
-	rejection := func(ctx context.Context) error {
-		b.e.removeDigestToIDMapping(md.Digest)
-		return block.Reject(ctx)
-	}
-	b.e.blockTracker.trackBlock(md.Round, md.Digest, rejection)
-	b.verifiedBlock.accept = func(ctx context.Context) error {
-		b.e.removeDigestToIDMapping(md.Digest)
-		b.e.vm.SetPreference(context.Background(), block.ID())
-		b.e.blockTracker.rejectSiblingsAndUncles(md.Round, md.Digest)
-		return block.Accept(ctx)
-	}
-
-	err = block.Verify(ctx)
-
-	if err == nil {
-		b.e.observeDigestToIDMapping(md.Digest, block.ID())
-	}
-
-	return &b.verifiedBlock, err
+	// TODO: Implement the logic to verify the block.
+	return &b.verifiedBlock, nil
 }
 
 type VerifiedBlock struct {
@@ -64,6 +36,7 @@ type VerifiedBlock struct {
 	accept     func(context.Context) error
 }
 
+// BlockHeader returns the block header for the verified block.
 func (v *VerifiedBlock) BlockHeader() simplex.BlockHeader {
 	v.computeDigestOnce.Do(v.computeDigest)
 	return simplex.BlockHeader{
@@ -107,6 +80,7 @@ func (v *VerifiedBlock) Bytes() []byte {
 	return buff
 }
 
+// computeDigest computes the digest of the block.
 func (v *VerifiedBlock) computeDigest() {
 	mdBytes := v.metadataBytes()
 	h := sha256.New()
@@ -156,58 +130,4 @@ func (b *blockDeserializer) DeserializeBlock(bytes []byte) (simplex.VerifiedBloc
 	}
 
 	return &vb, vb.FromBytes(bytes)
-}
-
-type blockRejection struct {
-	digest simplex.Digest
-	reject func(context.Context) error
-}
-
-// blockTracker maps rounds to blocks verified in that round that may be rejected
-type blockTracker struct {
-	lock            sync.Mutex
-	round2Rejection map[uint64][]blockRejection
-}
-
-func (bt *blockTracker) init() {
-	bt.round2Rejection = make(map[uint64][]blockRejection)
-}
-
-func (bt *blockTracker) rejectSiblingsAndUncles(round uint64, acceptedDigest simplex.Digest) {
-	bt.lock.Lock()
-	defer bt.lock.Unlock()
-
-	bt.disposeOfUncles(round)
-	bt.disposeOfSiblings(round, acceptedDigest)
-	// Completely get rid of the round, to make sure that the accepted block is not rejected in future rounds.
-	delete(bt.round2Rejection, round)
-}
-
-func (bt *blockTracker) disposeOfSiblings(round uint64, acceptedDigest simplex.Digest) {
-	for _, rejection := range bt.round2Rejection[round] {
-		if !bytes.Equal(rejection.digest[:], acceptedDigest[:]) {
-			rejection.reject(context.Background())
-		}
-	}
-}
-
-func (bt *blockTracker) disposeOfUncles(round uint64) {
-	for r, rejections := range bt.round2Rejection {
-		if r < round {
-			for _, rejection := range rejections {
-				rejection.reject(context.Background())
-			}
-			delete(bt.round2Rejection, r)
-		}
-	}
-}
-
-func (bt *blockTracker) trackBlock(round uint64, digest simplex.Digest, reject func(context.Context) error) {
-	bt.lock.Lock()
-	defer bt.lock.Unlock()
-
-	bt.round2Rejection[round] = append(bt.round2Rejection[round], blockRejection{
-		digest: digest,
-		reject: reject,
-	})
 }
