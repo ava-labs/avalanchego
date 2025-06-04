@@ -6,6 +6,7 @@ package xsvm
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 
 	"go.uber.org/zap"
@@ -36,14 +37,14 @@ func (g *grpcService) StreamPing(server xsvm.Ping_StreamPingServer) error {
 			return nil
 		}
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to receive message: %w", err)
 		}
 
 		g.Log.Debug("stream ping", zap.String("message", request.Message))
 		if err := server.Send(&xsvm.StreamPingReply{
 			Message: request.Message,
 		}); err != nil {
-			return err
+			return fmt.Errorf("failed to send message: %w", err)
 		}
 	}
 }
