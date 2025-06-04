@@ -187,7 +187,6 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 
 	ginkgo.It("should serve grpc api requests", func() {
 		tc.By("establishing connection")
-		node := tmpnet.FilterAvailableNodes(e2e.GetEnv(tc).GetNetwork().Nodes)[0]
 		nodeID := e2e.GetEnv(tc).GetNetwork().GetSubnet(subnetAName).ValidatorIDs[0]
 		node, err := e2e.GetEnv(tc).GetNetwork().GetNode(nodeID)
 		require.NoError(err)
