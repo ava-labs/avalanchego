@@ -324,7 +324,8 @@ fn batch(
     // Get the root hash of the database post-commit.
     let propose_plus_commit_time = start.elapsed().as_millis();
     counter!("firewood.ffi.batch_ms").increment(propose_plus_commit_time);
-    counter!("firewood.ffi.commit_ms").increment(propose_plus_commit_time - propose_time);
+    counter!("firewood.ffi.commit_ms")
+        .increment(propose_plus_commit_time.saturating_sub(propose_time));
     counter!("firewood.ffi.batch").increment(1);
     Ok(hash_val)
 }
