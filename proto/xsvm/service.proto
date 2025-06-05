@@ -6,7 +6,7 @@ option go_package = "github.com/ava-labs/avalanchego/proto/pb/xsvm";
 
 service Ping {
   rpc Ping(PingRequest) returns (PingReply);
-  rpc StreamPing(stream PingRequest) returns (stream PingReply);
+  rpc StreamPing(stream StreamPingRequest) returns (stream StreamPingReply);
 }
 
 message PingRequest {
@@ -14,5 +14,13 @@ message PingRequest {
 }
 
 message PingReply {
+  string message = 1;
+}
+
+message StreamPingRequest {
+  string message = 1;
+}
+
+message StreamPingReply {
   string message = 1;
 }
