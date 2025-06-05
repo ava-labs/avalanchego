@@ -186,6 +186,10 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 	})
 
 	ginkgo.It("should serve grpc api requests", func() {
+		if e2e.GetEnv(tc).GetNetwork().DefaultRuntimeConfig.Kube != nil {
+			ginkgo.Skip("h2c is not currently supported in kube")
+		}
+
 		tc.By("establishing connection")
 		nodeID := e2e.GetEnv(tc).GetNetwork().GetSubnet(subnetAName).ValidatorIDs[0]
 		node, err := e2e.GetEnv(tc).GetNetwork().GetNode(nodeID)
