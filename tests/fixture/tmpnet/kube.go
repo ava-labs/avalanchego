@@ -382,6 +382,5 @@ func GetClientset(log logging.Logger, path string, context string) (*kubernetes.
 	if err != nil {
 		return nil, fmt.Errorf("failed to create clientset: %w", err)
 	}
-
 	return clientset, nil
 }
