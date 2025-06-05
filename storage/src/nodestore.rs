@@ -36,24 +36,6 @@ use std::fmt::Debug;
 /// I --> |commit|N("New commit NodeStore&lt;Committed, S&gt;")
 /// style E color:#FFFFFF, fill:#AA00FF, stroke:#AA00FF
 /// ```
-///
-/// Nodestores represent a revision of the trie. There are three types of nodestores:
-/// - Committed: A committed revision of the trie. It has no in-memory changes.
-/// - MutableProposal: A proposal that is still being modified. It has some nodes in memory.
-/// - ImmutableProposal: A proposal that has been hashed and assigned addresses. It has no in-memory changes.
-///
-/// The general lifecycle of nodestores is as follows:
-/// ```mermaid
-/// flowchart TD
-/// subgraph subgraph["Committed Revisions"]
-/// L("Latest Nodestore&lt;Committed, S&gt;") --- |...|O("Oldest NodeStore&lt;Committed, S&gt;")
-/// end
-/// O --> E("Expire")
-/// L --> |start propose|M("NodeStore&lt;ProposedMutable, S&gt;")
-/// M --> |finish propose + hash|I("NodeStore&lt;ProposedImmutable, S&gt;")
-/// I --> |commit|N("New commit NodeStore&lt;Committed, S&gt;")
-/// style E color:#FFFFFF, fill:#AA00FF, stroke:#AA00FF
-/// ```
 use std::io::{Error, ErrorKind, Write};
 use std::mem::{offset_of, take};
 use std::num::NonZeroU64;
