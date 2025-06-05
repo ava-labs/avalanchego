@@ -6,30 +6,92 @@ package simplex
 import (
 	"testing"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message/messagemock"
 	"github.com/ava-labs/avalanchego/snow/networking/sender/sendermock"
+	"github.com/ava-labs/simplex"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
 
-func TestComm(t *testing.T) {	
-	require := require.New(t)
+var testSimplexMessage = simplex.Message{
+	VoteMessage: &simplex.Vote{
+		Vote: simplex.ToBeSignedVote{
+			BlockHeader: simplex.BlockHeader{
+				ProtocolMetadata: simplex.ProtocolMetadata{
+					Version: 1,
+					Epoch:   1,
+					Round:   1,
+					Seq:     1,
+				},
+			},
+		},
+		Signature: simplex.Signature{
+			Signer: []byte("dummy_node_id"),
+			Value:  []byte("dummy_signature"),
+		},
+	},
+}
+
+func TestComm(t *testing.T) {
+	config, _ := newTestEngineConfig(t, 1)
+	destinationNodeID := ids.GenerateTestNodeID()
+
 	ctrl := gomock.NewController(t)
+	msgCreator := messagemock.NewOutboundMsgBuilder(ctrl)
+	sender := sendermock.NewExternalSender(ctrl)
 
-	msgCreator     := messagemock.NewOutboundMsgBuilder(ctrl)
-	sender         := sendermock.NewExternalSender(ctrl)
+	config.OutboundMsgBuilder = msgCreator
+	config.Sender = sender
 
-	comm, err := NewComm(&Config{
-		{
-			
-		})
+	comm, err := NewComm(config)
+	require.NoError(t, err)
 
+	msgCreator.EXPECT().Vote(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil, nil)
+	sender.EXPECT().Send(gomock.Any(), gomock.Any(), comm.subnetID, gomock.Any())
+
+	comm.SendMessage(&testSimplexMessage, destinationNodeID[:])
 }
 
-func TestCommBroadcast(){
+// TestCommBroadcast tests the Broadcast method sends to all nodes in the subnet
+// not including the sending node.
+func TestCommBroadcast(t *testing.T) {
+	config, _ := newTestEngineConfig(t, 3)
 
+	ctrl := gomock.NewController(t)
+	msgCreator := messagemock.NewOutboundMsgBuilder(ctrl)
+	sender := sendermock.NewExternalSender(ctrl)
+
+	config.OutboundMsgBuilder = msgCreator
+	config.Sender = sender
+
+	comm, err := NewComm(config)
+	require.NoError(t, err)
+
+	msgCreator.EXPECT().Vote(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil, nil).Times(3)
+	sender.EXPECT().Send(gomock.Any(), gomock.Any(), comm.subnetID, gomock.Any()).Times(3)
+
+	comm.Broadcast(&testSimplexMessage)
 }
 
-func TestCommFailsWithoutCurrentNode() {
+func TestCommFailsWithoutCurrentNode(t *testing.T) {
+	config, _ := newTestEngineConfig(t, 3)
 
+	ctrl := gomock.NewController(t)
+	msgCreator := messagemock.NewOutboundMsgBuilder(ctrl)
+	sender := sendermock.NewExternalSender(ctrl)
+
+	config.OutboundMsgBuilder = msgCreator
+	config.Sender = sender
+
+	// set the curNode to a different nodeID than the one in the config
+	nodeID := ids.GenerateTestNodeID()
+	vdrs, err := newTestValidatorInfo(nodeID, nil, 3)
+	require.NoError(t, err)
+	config.Validators = vdrs
+
+	_, err = NewComm(config)
+	require.ErrorIs(t, err, errNodeNotFound)
 }

@@ -53,7 +53,6 @@ type SimplexOutboundMessageBuilder interface {
 	) (OutboundMessage, error)
 }
 
-
 func (b *outMsgBuilder) BlockProposal(
 	chainID ids.ID,
 	block []byte,
@@ -63,30 +62,30 @@ func (b *outMsgBuilder) BlockProposal(
 		&p2p.Message{
 			Message: &p2p.Message_Simplex{
 				Simplex: &p2p.Simplex{
-				ChainId: chainID[:],
-				Message: &p2p.Simplex_BlockProposal{
-					BlockProposal: &p2p.BlockProposal{
-						Block: block,
-						Vote: &p2p.Vote{				
-							Vote: &p2p.BlockHeader{
-								Metadata: &p2p.ProtocolMetadata{
-									Version: uint32(vote.Vote.Version),
-									Epoch: vote.Vote.Epoch,
-									Round: vote.Vote.Round,
-									Seq: vote.Vote.Seq,
-									Prev: vote.Vote.Prev[:],
+					ChainId: chainID[:],
+					Message: &p2p.Simplex_BlockProposal{
+						BlockProposal: &p2p.BlockProposal{
+							Block: block,
+							Vote: &p2p.Vote{
+								Vote: &p2p.BlockHeader{
+									Metadata: &p2p.ProtocolMetadata{
+										Version: uint32(vote.Vote.Version),
+										Epoch:   vote.Vote.Epoch,
+										Round:   vote.Vote.Round,
+										Seq:     vote.Vote.Seq,
+										Prev:    vote.Vote.Prev[:],
+									},
+									Digest: vote.Vote.Digest[:],
 								},
-								Digest: vote.Vote.Digest[:],
-							},
-							Signature: &p2p.Signature{
-								Signer: vote.Signature.Signer[:],
-								Value: vote.Signature.Value[:],
+								Signature: &p2p.Signature{
+									Signer: vote.Signature.Signer[:],
+									Value:  vote.Signature.Value[:],
+								},
 							},
 						},
 					},
 				},
 			},
-		},
 		},
 		b.compressionType,
 		false,
@@ -108,16 +107,16 @@ func (b *outMsgBuilder) Vote(
 							Vote: &p2p.BlockHeader{
 								Metadata: &p2p.ProtocolMetadata{
 									Version: uint32(blockHeader.Version),
-									Epoch: blockHeader.Epoch,
-									Round: blockHeader.Round,
-									Seq: blockHeader.Seq,
-									Prev: blockHeader.Prev[:],
+									Epoch:   blockHeader.Epoch,
+									Round:   blockHeader.Round,
+									Seq:     blockHeader.Seq,
+									Prev:    blockHeader.Prev[:],
 								},
 								Digest: blockHeader.Digest[:],
 							},
 							Signature: &p2p.Signature{
 								Signer: signature.Signer[:],
-								Value: signature.Value[:],
+								Value:  signature.Value[:],
 							},
 						},
 					},
@@ -143,14 +142,14 @@ func (b *outMsgBuilder) EmptyVote(
 						EmptyVote: &p2p.EmptyVote{
 							Vote: &p2p.ProtocolMetadata{
 								Version: uint32(protocolMetadata.Version),
-								Epoch: protocolMetadata.Epoch,
-								Round: protocolMetadata.Round,
-								Seq: protocolMetadata.Seq,
-								Prev: protocolMetadata.Prev[:],
+								Epoch:   protocolMetadata.Epoch,
+								Round:   protocolMetadata.Round,
+								Seq:     protocolMetadata.Seq,
+								Prev:    protocolMetadata.Prev[:],
 							},
 							Signature: &p2p.Signature{
 								Signer: signature.Signer[:],
-								Value: signature.Value[:],
+								Value:  signature.Value[:],
 							},
 						},
 					},
@@ -177,16 +176,16 @@ func (b *outMsgBuilder) FinalizeVote(
 							Vote: &p2p.BlockHeader{
 								Metadata: &p2p.ProtocolMetadata{
 									Version: uint32(blockHeader.Version),
-									Epoch: blockHeader.Epoch,
-									Round: blockHeader.Round,
-									Seq: blockHeader.Seq,
-									Prev: blockHeader.Prev[:],
+									Epoch:   blockHeader.Epoch,
+									Round:   blockHeader.Round,
+									Seq:     blockHeader.Seq,
+									Prev:    blockHeader.Prev[:],
 								},
 								Digest: blockHeader.Digest[:],
 							},
 							Signature: &p2p.Signature{
 								Signer: signature.Signer[:],
-								Value: signature.Value[:],
+								Value:  signature.Value[:],
 							},
 						},
 					},
@@ -213,10 +212,10 @@ func (b *outMsgBuilder) Notarization(
 							Finalization: &p2p.BlockHeader{
 								Metadata: &p2p.ProtocolMetadata{
 									Version: uint32(blockHeader.Version),
-									Epoch: blockHeader.Epoch,
-									Round: blockHeader.Round,
-									Seq: blockHeader.Seq,
-									Prev: blockHeader.Prev[:],
+									Epoch:   blockHeader.Epoch,
+									Round:   blockHeader.Round,
+									Seq:     blockHeader.Seq,
+									Prev:    blockHeader.Prev[:],
 								},
 								Digest: blockHeader.Digest[:],
 							},
@@ -245,10 +244,10 @@ func (b *outMsgBuilder) EmptyNotarization(
 						EmptyNotarization: &p2p.EmptyNotarization{
 							EmptyVote: &p2p.ProtocolMetadata{
 								Version: uint32(protocolMetadata.Version),
-								Epoch: protocolMetadata.Epoch,
-								Round: protocolMetadata.Round,
-								Seq: protocolMetadata.Seq,
-								Prev: protocolMetadata.Prev[:],
+								Epoch:   protocolMetadata.Epoch,
+								Round:   protocolMetadata.Round,
+								Seq:     protocolMetadata.Seq,
+								Prev:    protocolMetadata.Prev[:],
 							},
 							QuorumCertificate: qc,
 						},
@@ -276,10 +275,10 @@ func (b *outMsgBuilder) Finalization(
 							Finalization: &p2p.BlockHeader{
 								Metadata: &p2p.ProtocolMetadata{
 									Version: uint32(blockHeader.Version),
-									Epoch: blockHeader.Epoch,
-									Round: blockHeader.Round,
-									Seq: blockHeader.Seq,
-									Prev: blockHeader.Prev[:],
+									Epoch:   blockHeader.Epoch,
+									Round:   blockHeader.Round,
+									Seq:     blockHeader.Seq,
+									Prev:    blockHeader.Prev[:],
 								},
 								Digest: blockHeader.Digest[:],
 							},
