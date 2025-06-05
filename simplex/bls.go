@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/simplex"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -121,6 +122,7 @@ func createVerifier(config *Config) BLSVerifier {
 	for _, node := range nodes {
 		validator, ok := config.Validators.GetValidator(config.Ctx.SubnetID, node)
 		if !ok {
+			config.Log.Error("failed to get validator for node %s in subnet %s", zap.Stringer("node", node), zap.Stringer("subnetID", config.Ctx.SubnetID))
 			continue
 		}
 		verifier.nodeID2PK[node] = *validator.PublicKey
