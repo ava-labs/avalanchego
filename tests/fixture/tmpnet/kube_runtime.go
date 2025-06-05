@@ -145,7 +145,7 @@ func (p *KubeRuntime) GetLocalURI(ctx context.Context) (string, func(), error) {
 	}
 
 	// Use direct pod URI if running inside the cluster
-	if p.isRunningInCluster() {
+	if isRunningInCluster() {
 		return p.node.URI, func() {}, nil
 	}
 
@@ -167,7 +167,7 @@ func (p *KubeRuntime) GetLocalStakingAddress(ctx context.Context) (netip.AddrPor
 	}
 
 	// Use direct pod staking address if running inside the cluster
-	if p.isRunningInCluster() {
+	if isRunningInCluster() {
 		return p.node.StakingAddress, func() {}, nil
 	}
 
@@ -845,7 +845,7 @@ func configureExclusiveScheduling(template *corev1.PodTemplateSpec, labelKey str
 // isRunningInCluster detects if this code is running inside a Kubernetes cluster
 // by checking for the presence of the service account token that's automatically
 // mounted in every pod.
-func (p *KubeRuntime) isRunningInCluster() bool {
+func isRunningInCluster() bool {
 	_, err := os.Stat("/var/run/secrets/kubernetes.io/serviceaccount/token")
 	return err == nil
 }
