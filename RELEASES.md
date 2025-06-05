@@ -66,7 +66,7 @@ The plugin version is updated to `40` all plugins must update to be compatible.
 - [tmpnet] Unify start network flag usage between e2e and tmpnetctl by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3871
 - [tmpnet] Avoid serializing the node data directory by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3881
 - [tmpnet] Rename NodeProcess to ProcessRuntime by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3890
-- wrap db in initDatabase with corruptable db by @ceyonur in https://github.com/ava-labs/avalanchego/pull/3892
+- wrap db in initDatabase with corruptible db by @ceyonur in https://github.com/ava-labs/avalanchego/pull/3892
 - [tmpnet] Switch FlagsMap from map[string]any to map[string]string by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3884
 - [tmpnet] Ensure tmpnet methods always have a logger by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3893
 - [tmpnet] Ensure all node runtime methods accept a context by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3894
@@ -861,7 +861,7 @@ The plugin version is unchanged at `35` and is compatible with versions `v1.11.3
 - Refactor `event.Blocker` into `job.Scheduler` by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3125
 - Remove block lookup from `deliver` by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3130
 - [chains/atomic] Remove a nested if statement by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/3135
-- [vms/platformvm] Minor grammer fixes in `state` struct code comments by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/3136
+- [vms/platformvm] Minor grammar fixes in `state` struct code comments by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/3136
 - bump protobuf (fixes some build issues) by @darioush in https://github.com/ava-labs/avalanchego/pull/3142
 - Emit version in JSON format for --json-version by @marun in https://github.com/ava-labs/avalanchego/pull/3129
 - Repackaged NextBlockTime and GetNextStakerChangeTime by @abi87 in https://github.com/ava-labs/avalanchego/pull/3134
@@ -1045,7 +1045,7 @@ The plugin version is unchanged at `35` and is compatible with versions `v1.11.3
 - chore: fix some function names by @cartnavoy in https://github.com/ava-labs/avalanchego/pull/3015
 - Mark nodes as connected to the P-chain networking stack by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2981
 - [antithesis] Ensure images with a prefix are pushed by @marun in https://github.com/ava-labs/avalanchego/pull/3016
-- boostrapper: compact blocks before iterating them by @a1k0n in https://github.com/ava-labs/avalanchego/pull/2997
+- bootstrapper: compact blocks before iterating them by @a1k0n in https://github.com/ava-labs/avalanchego/pull/2997
 - Remove pre-Durango networking checks by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3018
 - Repackaged upgrades times into upgrade package by @abi87 in https://github.com/ava-labs/avalanchego/pull/3019
 - Standardize peer logs by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3017
