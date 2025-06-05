@@ -125,9 +125,7 @@ func NewNodeStatefulSet(
 							Image: imageName,
 							Ports: []corev1.ContainerPort{
 								{
-									Name: "http",
-									// Bypass kube-proxy
-									HostPort:      config.DefaultHTTPPort,
+									Name:          "http",
 									ContainerPort: config.DefaultHTTPPort,
 								},
 								{
@@ -384,5 +382,6 @@ func GetClientset(log logging.Logger, path string, context string) (*kubernetes.
 	if err != nil {
 		return nil, fmt.Errorf("failed to create clientset: %w", err)
 	}
+
 	return clientset, nil
 }
