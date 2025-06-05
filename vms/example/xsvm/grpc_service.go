@@ -18,8 +18,9 @@ import (
 var _ xsvm.PingServer = (*grpcService)(nil)
 
 type grpcService struct {
+	xsvm.UnsafePingServer
+
 	Log logging.Logger
-	xsvm.UnimplementedPingServer
 }
 
 func (g *grpcService) Ping(_ context.Context, request *xsvm.PingRequest) (*xsvm.PingReply, error) {
