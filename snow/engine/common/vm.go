@@ -78,7 +78,7 @@ type VM interface {
 	// information about their accounts.
 	CreateHandlers(context.Context) (map[string]http.Handler, error)
 
-	// CreateGRPCService returns the gRPC service to register into the
+	// CreateHTTP2Handler returns the http/2 handler to register into the
 	// avalanchego api server.
-	CreateGRPCService(ctx context.Context) (string, http.Handler, error)
+	CreateHTTP2Handler(ctx context.Context) (http.Handler, error)
 }

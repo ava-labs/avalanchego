@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"path"
-	"strings"
 	"time"
 
 	"github.com/NYTimes/gziphandler"
@@ -90,8 +89,8 @@ type server struct {
 	metrics *metrics
 
 	// Maps endpoints to handlers
-	router     *router
-	grpcRouter *grpcRouter
+	router      *router
+	http2Router *http2Router
 
 	srv *http.Server
 
@@ -120,14 +119,14 @@ func New(
 	router := newRouter()
 	handler := wrapHandler(router, nodeID, allowedOrigins, allowedHosts, true)
 
-	grpcRouter := newGRPCRouter()
+	http2Router := newHTTP2Router()
 	// Do not use gzip middleware because it breaks the grpc spec
-	grpcHandler := wrapHandler(grpcRouter, nodeID, allowedOrigins, allowedHosts, false)
+	http2Handler := wrapHandler(http2Router, nodeID, allowedOrigins, allowedHosts, false)
 
 	httpServer := &http.Server{
 		Handler: h2c.NewHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.ProtoMajor == 2 && strings.Contains(r.Header.Get("Content-Type"), "application/grpc") {
-				grpcHandler.ServeHTTP(w, r)
+			if r.ProtoMajor == 2 {
+				http2Handler.ServeHTTP(w, r)
 				return
 			}
 
@@ -152,7 +151,7 @@ func New(
 		tracer:          tracer,
 		metrics:         m,
 		router:          router,
-		grpcRouter:      grpcRouter,
+		http2Router:     http2Router,
 		srv:             httpServer,
 		listener:        listener,
 	}, nil
@@ -200,23 +199,23 @@ func (s *server) RegisterChain(chainName string, ctx *snow.ConsensusContext, vm 
 	}
 
 	ctx.Lock.Lock()
-	serviceName, grpcHandler, err := vm.CreateGRPCService(context.TODO())
+	http2Handler, err := vm.CreateHTTP2Handler(context.TODO())
 	ctx.Lock.Unlock()
 	if err != nil {
-		s.log.Error("failed to create grpc service",
+		s.log.Error("failed to create http2 handler",
 			zap.String("chainName", chainName),
 			zap.Error(err),
 		)
 		return
 	}
 
-	if serviceName == "" && grpcHandler == nil {
+	if http2Handler == nil {
 		return
 	}
 
-	grpcHandler = s.wrapMiddleware(chainName, grpcHandler, ctx)
-	if !s.grpcRouter.Add(ctx.ChainID, serviceName, grpcHandler) {
-		s.log.Error("failed to add route to grpc service")
+	http2Handler = s.wrapMiddleware(chainName, http2Handler, ctx)
+	if !s.http2Router.Add(ctx.ChainID, http2Handler) {
+		s.log.Error("failed to add route to http2 handler")
 	}
 }
 

@@ -133,20 +133,19 @@ func (mr *ChainVMMockRecorder) Connected(ctx, nodeID, nodeVersion any) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Connected", reflect.TypeOf((*ChainVM)(nil).Connected), ctx, nodeID, nodeVersion)
 }
 
-// CreateGRPCService mocks base method.
-func (m *ChainVM) CreateGRPCService(ctx context.Context) (string, http.Handler, error) {
+// CreateHTTP2Handler mocks base method.
+func (m *ChainVM) CreateHTTP2Handler(ctx context.Context) (http.Handler, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateGRPCService", ctx)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(http.Handler)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	ret := m.ctrl.Call(m, "CreateHTTP2Handler", ctx)
+	ret0, _ := ret[0].(http.Handler)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
-// CreateGRPCService indicates an expected call of CreateGRPCService.
-func (mr *ChainVMMockRecorder) CreateGRPCService(ctx any) *gomock.Call {
+// CreateHTTP2Handler indicates an expected call of CreateHTTP2Handler.
+func (mr *ChainVMMockRecorder) CreateHTTP2Handler(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateGRPCService", reflect.TypeOf((*ChainVM)(nil).CreateGRPCService), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateHTTP2Handler", reflect.TypeOf((*ChainVM)(nil).CreateHTTP2Handler), ctx)
 }
 
 // CreateHandlers mocks base method.

@@ -41,6 +41,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/messenger"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	dto "github.com/prometheus/client_model/go"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
+
 	aliasreaderpb "github.com/ava-labs/avalanchego/proto/pb/aliasreader"
 	appsenderpb "github.com/ava-labs/avalanchego/proto/pb/appsender"
 	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
@@ -50,9 +54,6 @@ import (
 	validatorstatepb "github.com/ava-labs/avalanchego/proto/pb/validatorstate"
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 	warppb "github.com/ava-labs/avalanchego/proto/pb/warp"
-	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
-	dto "github.com/prometheus/client_model/go"
-	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
 
 // TODO: Enable these to be configured by the user
@@ -389,23 +390,23 @@ func (vm *VMClient) CreateHandlers(ctx context.Context) (map[string]http.Handler
 	return handlers, nil
 }
 
-func (vm *VMClient) CreateGRPCService(ctx context.Context) (string, http.Handler, error) {
-	resp, err := vm.client.CreateGRPCService(ctx, &emptypb.Empty{})
+func (vm *VMClient) CreateHTTP2Handler(ctx context.Context) (http.Handler, error) {
+	resp, err := vm.client.CreateHTTP2Handler(ctx, &emptypb.Empty{})
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 
-	if resp.ServiceName == "" || resp.ServerAddr == "" {
-		return "", nil, nil
+	if resp.ServerAddr == "" {
+		return nil, nil
 	}
 
 	clientConn, err := grpcutils.Dial(resp.ServerAddr)
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 
 	vm.conns = append(vm.conns, clientConn)
-	return resp.ServiceName, ghttp.NewClient(httppb.NewHTTPClient(clientConn)), nil
+	return ghttp.NewClient(httppb.NewHTTPClient(clientConn)), nil
 }
 
 func (vm *VMClient) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {

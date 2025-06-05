@@ -134,20 +134,19 @@ func (mr *LinearizableVMMockRecorder) Connected(ctx, nodeID, nodeVersion any) *g
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Connected", reflect.TypeOf((*LinearizableVM)(nil).Connected), ctx, nodeID, nodeVersion)
 }
 
-// CreateGRPCService mocks base method.
-func (m *LinearizableVM) CreateGRPCService(ctx context.Context) (string, http.Handler, error) {
+// CreateHTTP2Handler mocks base method.
+func (m *LinearizableVM) CreateHTTP2Handler(ctx context.Context) (http.Handler, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateGRPCService", ctx)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(http.Handler)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	ret := m.ctrl.Call(m, "CreateHTTP2Handler", ctx)
+	ret0, _ := ret[0].(http.Handler)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
-// CreateGRPCService indicates an expected call of CreateGRPCService.
-func (mr *LinearizableVMMockRecorder) CreateGRPCService(ctx any) *gomock.Call {
+// CreateHTTP2Handler indicates an expected call of CreateHTTP2Handler.
+func (mr *LinearizableVMMockRecorder) CreateHTTP2Handler(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateGRPCService", reflect.TypeOf((*LinearizableVM)(nil).CreateGRPCService), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateHTTP2Handler", reflect.TypeOf((*LinearizableVM)(nil).CreateHTTP2Handler), ctx)
 }
 
 // CreateHandlers mocks base method.

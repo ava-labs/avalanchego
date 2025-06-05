@@ -154,11 +154,11 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	}, server.RegisterService(api, constants.XSVMName)
 }
 
-func (vm *VM) CreateGRPCService(context.Context) (string, http.Handler, error) {
+func (vm *VM) CreateHTTP2Handler(context.Context) (http.Handler, error) {
 	server := grpc.NewServer()
 	server.RegisterService(&xsvm.Ping_ServiceDesc, &grpcService{Log: vm.chainContext.Log})
 
-	return xsvm.Ping_ServiceDesc.ServiceName, server, nil
+	return server, nil
 }
 
 func (*VM) HealthCheck(context.Context) (interface{}, error) {

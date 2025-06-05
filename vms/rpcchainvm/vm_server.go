@@ -38,6 +38,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/messenger"
 
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+
 	aliasreaderpb "github.com/ava-labs/avalanchego/proto/pb/aliasreader"
 	appsenderpb "github.com/ava-labs/avalanchego/proto/pb/appsender"
 	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
@@ -47,7 +49,6 @@ import (
 	validatorstatepb "github.com/ava-labs/avalanchego/proto/pb/validatorstate"
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 	warppb "github.com/ava-labs/avalanchego/proto/pb/warp"
-	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 )
 
 var (
@@ -359,15 +360,15 @@ func (vm *VMServer) CreateHandlers(ctx context.Context, _ *emptypb.Empty) (*vmpb
 	return resp, nil
 }
 
-func (vm *VMServer) CreateGRPCService(ctx context.Context, _ *emptypb.Empty) (*vmpb.CreateGRPCServiceResponse, error) {
-	serviceName, handler, err := vm.vm.CreateGRPCService(ctx)
+func (vm *VMServer) CreateHTTP2Handler(ctx context.Context, _ *emptypb.Empty) (*vmpb.CreateHTTP2HandlerResponse, error) {
+	handler, err := vm.vm.CreateHTTP2Handler(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// The vm does not expose a gRPC service
-	if serviceName == "" && handler == nil {
-		return &vmpb.CreateGRPCServiceResponse{}, nil
+	if handler == nil {
+		return &vmpb.CreateHTTP2HandlerResponse{}, nil
 	}
 
 	serverListener, err := grpcutils.NewListener()
@@ -382,9 +383,8 @@ func (vm *VMServer) CreateGRPCService(ctx context.Context, _ *emptypb.Empty) (*v
 	// Start HTTP service
 	go grpcutils.Serve(serverListener, server)
 
-	return &vmpb.CreateGRPCServiceResponse{
-		ServiceName: serviceName,
-		ServerAddr:  serverListener.Addr().String(),
+	return &vmpb.CreateHTTP2HandlerResponse{
+		ServerAddr: serverListener.Addr().String(),
 	}, nil
 }
 

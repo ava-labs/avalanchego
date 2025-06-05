@@ -17,22 +17,17 @@ import (
 
 func TestGRPCRouterAdd(t *testing.T) {
 	require := require.New(t)
-	g := newGRPCRouter()
-	h := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
+	h := newHTTP2Router()
+	handler := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
 
-	require.True(g.Add(ids.Empty, "foo", h))
-	require.False(g.Add(ids.Empty, "foo", h))
+	require.True(h.Add(ids.Empty, handler))
+	require.False(h.Add(ids.Empty, handler))
 }
 
 func TestGRPCRouterServeHTTP(t *testing.T) {
-	type service struct {
-		chainID ids.ID
-		service string
-	}
-
 	tests := []struct {
 		name     string
-		services []service
+		chainIDs []ids.ID
 		path     string
 		wantCode int
 	}{
@@ -47,13 +42,8 @@ func TestGRPCRouterServeHTTP(t *testing.T) {
 			wantCode: http.StatusNotFound,
 		},
 		{
-			name: "valid handler",
-			services: []service{
-				{
-					chainID: ids.ID{'f', 'o', 'o'},
-					service: "bar",
-				},
-			},
+			name:     "valid handler",
+			chainIDs: []ids.ID{{'f', 'o', 'o'}},
 			path:     fmt.Sprintf("/%s/bar/method", ids.ID{'f', 'o', 'o'}.String()),
 			wantCode: http.StatusOK,
 		},
@@ -63,7 +53,7 @@ func TestGRPCRouterServeHTTP(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			grpcRouter := newGRPCRouter()
+			h := newHTTP2Router()
 			handler := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
 			writer := httptest.NewRecorder()
 			request := httptest.NewRequest(http.MethodPost, "/", nil)
@@ -71,11 +61,11 @@ func TestGRPCRouterServeHTTP(t *testing.T) {
 				Path: tt.path,
 			}
 
-			for _, service := range tt.services {
-				require.True(grpcRouter.Add(service.chainID, service.service, handler))
+			for _, chainID := range tt.chainIDs {
+				require.True(h.Add(chainID, handler))
 			}
 
-			grpcRouter.ServeHTTP(writer, request)
+			h.ServeHTTP(writer, request)
 			require.Equal(tt.wantCode, writer.Code)
 		})
 	}
