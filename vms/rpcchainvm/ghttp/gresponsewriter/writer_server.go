@@ -69,6 +69,7 @@ func (s *Server) WriteHeader(
 	for _, header := range req.Headers {
 		headers[header.Key] = header.Values
 	}
+	s.writer.WriteHeader(grpcutils.EnsureValidResponseCode(int(req.StatusCode)))
 	return &emptypb.Empty{}, nil
 }
 
