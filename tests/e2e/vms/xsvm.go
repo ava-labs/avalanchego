@@ -60,6 +60,7 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 	require := require.New(tc)
 
 	network := e2e.GetEnv(tc).GetNetwork()
+	log := tc.Log()
 	ginkgo.It("should support transfers between subnets", func() {
 
 		sourceSubnet := network.GetSubnet(subnetAName)
@@ -74,7 +75,7 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		require.NotEmpty(sourceValidators)
 		sourceAPINode := sourceValidators[0]
 		sourceAPINodeURI := e2e.GetLocalURI(tc, sourceAPINode)
-		tc.Log().Info("issuing transactions for source subnet",
+		log.Info("issuing transactions for source subnet",
 			zap.String("subnetName", subnetAName),
 			zap.Stringer("nodeID", sourceAPINode.NodeID),
 			zap.String("nodeURI", sourceAPINodeURI),
@@ -84,7 +85,7 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		require.NotEmpty(destinationValidators)
 		destinationAPINode := destinationValidators[0]
 		destinationAPINodeURI := e2e.GetLocalURI(tc, destinationAPINode)
-		tc.Log().Info("issuing transactions for destination subnet",
+		log.Info("issuing transactions for destination subnet",
 			zap.String("subnetName", subnetBName),
 			zap.Stringer("nodeID", destinationAPINode.NodeID),
 			zap.String("nodeURI", destinationAPINodeURI),
@@ -115,7 +116,7 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 			},
 		)
 		require.NoError(err)
-		tc.Log().Info("issued export transaction",
+		log.Info("issued export transaction",
 			zap.Stringer("txID", exportTxStatus.TxID),
 		)
 
@@ -146,7 +147,7 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 			},
 		)
 		require.NoError(err)
-		tc.Log().Info("issued transfer transaction",
+		log.Info("issued transfer transaction",
 			zap.Stringer("txID", transferTxStatus.TxID),
 		)
 
@@ -167,7 +168,7 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 			},
 		)
 		require.NoError(err)
-		tc.Log().Info("issued import transaction",
+		log.Info("issued import transaction",
 			zap.Stringer("txID", importTxStatus.TxID),
 		)
 
@@ -244,7 +245,7 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 				require.NoError(stream.Send(&xsvm.StreamPingRequest{
 					Message: msg,
 				}))
-				tc.Log().Info("sent message", zap.String("msg", msg))
+				log.Info("sent message", zap.String("msg", msg))
 			}
 		}()
 
@@ -258,7 +259,7 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 				reply, err := stream.Recv()
 				require.NoError(err)
 				require.Equal(fmt.Sprintf("ping-%d", i), reply.Message)
-				tc.Log().Info("received message", zap.String("msg", reply.Message))
+				log.Info("received message", zap.String("msg", reply.Message))
 			}
 		}()
 
