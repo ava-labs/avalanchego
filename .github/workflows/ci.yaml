@@ -153,6 +153,7 @@ jobs:
           globs: |
             *.md
             **/*.md
+            !CHANGELOG.md
             !target/**
       - name: doc generation
         run: RUSTDOCFLAGS="-D warnings" cargo doc --document-private-items --no-deps

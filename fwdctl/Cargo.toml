@@ -1,11 +1,11 @@
 [package]
 name = "fwdctl"
-version = "0.0.4"
+version = "0.0.5"
 edition = "2024"
 rust-version = "1.85.0"
 
 [dependencies]
-firewood = { version = "0.0.4", path = "../firewood" }
+firewood = { version = "0.0.5", path = "../firewood" }
 clap = { version = "4.5.0", features = ["cargo", "derive"] }
 env_logger = "0.11.2"
 log = "0.4.20"

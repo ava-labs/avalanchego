@@ -25,3 +25,12 @@ more information on the tool.
 To trigger a release, simply push a semver-compatible tag to the main branch,
 for example `v0.0.5`. The CI will automatically publish a draft release which
 consists of release notes and changes.
+
+## Changelog
+
+To build the changelog, see git-cliff.org. Short version:
+
+```sh
+cargo install git-cliff
+git cliff --tag v0.0.5 | sed -e 's/_/\\_/g' > CHANGELOG.md
+```
