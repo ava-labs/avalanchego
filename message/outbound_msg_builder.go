@@ -181,6 +181,8 @@ type OutboundMsgBuilder interface {
 		chainID ids.ID,
 		msg []byte,
 	) (OutboundMessage, error)
+
+	SimplexOutboundMessageBuilder
 }
 
 type outMsgBuilder struct {

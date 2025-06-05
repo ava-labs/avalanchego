@@ -5,6 +5,8 @@ package simplex
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message"
+	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -20,6 +22,9 @@ type Config struct {
 	Log        logging.Logger
 	Validators ValidatorInfo
 	SignBLS    SignFunc
+
+	Sender             sender.ExternalSender
+	OutboundMsgBuilder message.SimplexOutboundMessageBuilder
 }
 
 // Context is information about the current execution.
