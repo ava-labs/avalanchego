@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package simplex
@@ -23,7 +23,7 @@ type Config struct {
 }
 
 // Context is information about the current execution.
-// [SubnitID] is the ID of the subnet this context exists within.
+// [SubnetID] is the ID of the subnet this context exists within.
 // [ChainID] is the ID of the chain this context exists within.
 // [NodeID] is the ID of this node
 type SimplexChainContext struct {

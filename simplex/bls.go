@@ -8,28 +8,29 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/simplex"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/simplex"
 )
 
 var (
 	errSignatureVerificationFailed = errors.New("signature verification failed")
 	errSignerNotFound              = errors.New("signer not found in the membership set")
+	simplexLabel                   = []byte("simplex")
 )
 
 var _ simplex.Signer = (*BLSSigner)(nil)
 
 type SignFunc func(msg []byte) (*bls.Signature, error)
 
-// BLSSigner signs messages encoded with the provided ChainID and NetworkID
+// BLSSigner signs messages encoded with the provided ChainID and SubnetID.
 // using the SignBLS function.
 type BLSSigner struct {
 	chainID  ids.ID
 	subnetID ids.ID
 	// signBLS is passed in because we support both software and hardware BLS signing.
 	signBLS SignFunc
-	nodeID  ids.NodeID
 }
 
 type BLSVerifier struct {
@@ -42,7 +43,6 @@ func NewBLSAuth(config *Config) (BLSSigner, BLSVerifier) {
 	return BLSSigner{
 		chainID:  config.Ctx.ChainID,
 		subnetID: config.Ctx.SubnetID,
-		nodeID:   config.Ctx.NodeID,
 		signBLS:  config.SignBLS,
 	}, createVerifier(config)
 }
@@ -64,18 +64,20 @@ func (s *BLSSigner) Sign(message []byte) ([]byte, error) {
 	return sigBytes, nil
 }
 
-type encodedSimplexMessage struct {
+type encodedSimplexSignedPayload struct {
 	Message  []byte
 	ChainID  []byte
 	SubnetID []byte
+	Label    []byte
 }
 
 // encodesMessageToSign returns a byte slice [simplexLabel][chainID][networkID][message length][message].
 func encodeMessageToSign(message []byte, chainID ids.ID, subnetID ids.ID) ([]byte, error) {
-	encodedSimplexMessage := encodedSimplexMessage{
+	encodedSimplexMessage := encodedSimplexSignedPayload{
 		Message:  message,
 		ChainID:  chainID[:],
 		SubnetID: subnetID[:],
+		Label:    simplexLabel,
 	}
 	return asn1.Marshal(encodedSimplexMessage)
 }
