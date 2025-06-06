@@ -157,3 +157,13 @@ func Test_State_ConsumeGas(t *testing.T) {
 		})
 	}
 }
+
+func TestStateCanoto(t *testing.T) {
+	in := State{
+		Capacity: 42,
+		Excess:   43,
+	}
+	var got State
+	require.NoError(t, got.UnmarshalCanoto(in.MarshalCanoto()))
+	require.Equal(t, in, got)
+}

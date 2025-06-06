@@ -11,11 +11,15 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
+//go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
+
 var ErrInsufficientCapacity = errors.New("insufficient capacity")
 
 type State struct {
-	Capacity Gas `serialize:"true" json:"capacity"`
-	Excess   Gas `serialize:"true" json:"excess"`
+	Capacity Gas `serialize:"true" canoto:"uint,1" json:"capacity"`
+	Excess   Gas `serialize:"true" canoto:"uint,2" json:"excess"`
+
+	canotoData canotoData_State
 }
 
 // AdvanceTime adds maxPerSecond to capacity and subtracts targetPerSecond
