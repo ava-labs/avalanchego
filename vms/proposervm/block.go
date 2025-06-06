@@ -474,7 +474,7 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPostDurango(
 
 	// In case the inner VM only issued one pendingTxs message, we should
 	// attempt to re-handle that once it is our turn to build the block.
-	p.vm.notifyInnerBlockReady()
+	p.vm.notifyInnerBlockReady(parentPChainHeight)
 	return false, fmt.Errorf("%w: slot %d expects %s", errUnexpectedProposer, currentSlot, expectedProposerID)
 }
 
@@ -519,6 +519,6 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPreDurango(
 
 	// In case the inner VM only issued one pendingTxs message, we should
 	// attempt to re-handle that once it is our turn to build the block.
-	p.vm.notifyInnerBlockReady()
+	p.vm.notifyInnerBlockReady(parentPChainHeight)
 	return false, fmt.Errorf("%w: delay %s < minDelay %s", errProposerWindowNotStarted, delay, minDelay)
 }

@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -349,7 +348,6 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	msgChan := make(chan common.Message, 1)
 	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
@@ -357,7 +355,6 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		genesistest.NewBytes(t, genesistest.Config{}),
 		nil,
 		nil,
-		msgChan,
 		nil,
 		nil,
 	))

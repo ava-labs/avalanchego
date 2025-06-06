@@ -69,5 +69,5 @@ func (f *factory) New(log logging.Logger) (interface{}, error) {
 
 	f.processTracker.TrackProcess(status.Pid)
 	f.runtimeTracker.TrackRuntime(stopper)
-	return NewClient(clientConn, stopper, status.Pid, f.processTracker, f.metricsGatherer), nil
+	return NewClient(clientConn, stopper, status.Pid, f.processTracker, f.metricsGatherer, log), nil
 }

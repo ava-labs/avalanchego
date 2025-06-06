@@ -69,6 +69,8 @@ var (
 type Bootstrapper struct {
 	Config
 
+	nf *common.NotificationForwarder
+
 	*metrics
 	TimeoutRegistrar common.TimeoutRegistrar
 	// list of NoOpsHandler for messages dropped by bootstrapper
@@ -149,6 +151,17 @@ func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) e
 		}
 	}
 	bs.TimeoutRegistrar = common.NewTimeoutScheduler(timeout, config.BootstrapTracker.AllBootstrapped())
+	bs.nf = &common.NotificationForwarder{
+		BootstrappingOrSyncing: true,
+		GetPreference: func() ids.ID {
+			// Since we're bootstrapping, even if the preference changes, it doesn't matter as we will never
+			// re-try subscribing because we don't build blocks during bootstrapping.
+			return ids.Empty
+		},
+		Subscribe: bs.VM.SubscribeToEvents,
+		Log:       bs.Config.Ctx.Log,
+		Notifier:  bs,
+	}
 
 	return bs, err
 }
@@ -779,6 +792,7 @@ func (b *Bootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
 
 func (b *Bootstrapper) Shutdown(ctx context.Context) error {
 	b.Ctx.Log.Info("shutting down bootstrapper")
+	b.nf.Close()
 
 	b.Ctx.Lock.Lock()
 	defer b.Ctx.Lock.Unlock()
