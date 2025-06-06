@@ -30,7 +30,7 @@ func (h *http2Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// The :path pseudo-header takes the form of /Prefix/Path
 	parsed := strings.Split(r.URL.Path, "/")
-	if len(parsed) < 3 {
+	if len(parsed) < 2 {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
