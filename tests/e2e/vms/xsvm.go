@@ -198,7 +198,7 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 
 		uri := strings.TrimPrefix(node.URI, "http://")
 		chainID := network.GetSubnet(subnetAName).Chains[0].ChainID
-		client, conn, err := api.NewGRPCClient(
+		client, conn, err := api.NewPingClient(
 			uri,
 			chainID,
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
