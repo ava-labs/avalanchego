@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-func TestGRPCRouterAdd(t *testing.T) {
+func TestHTTP2RouterAdd(t *testing.T) {
 	require := require.New(t)
 	h := newHTTP2Router()
 	handler := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
