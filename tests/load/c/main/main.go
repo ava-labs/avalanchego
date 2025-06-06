@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/ethclient"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
@@ -21,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/tests/load"
 	"github.com/ava-labs/avalanchego/tests/load/c"
-	"github.com/ava-labs/avalanchego/tests/load/c/listener"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -29,10 +27,11 @@ import (
 const (
 	blockchainID = "C"
 	// invariant: nodesCount >= 5
-	nodesCount    = 5
-	agentsPerNode = 1
-	agentsCount   = nodesCount * agentsPerNode
-	logPrefix     = "avalanchego-load-test"
+	nodesCount       = 5
+	sendersPerNode   = 1
+	sendersCount     = nodesCount * sendersPerNode
+	logPrefix        = "avalanchego-load-test"
+	metricsNamespace = "load"
 )
 
 var flagVars *e2e.FlagVars
@@ -52,7 +51,7 @@ func main() {
 
 	nodes := tmpnet.NewNodesOrPanic(nodesCount)
 
-	keys, err := tmpnet.NewPrivateKeys(agentsCount)
+	keys, err := tmpnet.NewPrivateKeys(sendersCount)
 	require.NoError(err)
 	network := &tmpnet.Network{
 		Owner:         "avalanchego-load-test",
@@ -66,7 +65,7 @@ func main() {
 	})
 
 	registry := prometheus.NewRegistry()
-	metrics, err := load.NewMetrics(registry)
+	metrics, err := load.NewMetrics(metricsNamespace, registry)
 	require.NoError(err, "failed to register load metrics")
 
 	metricsServer := load.NewPrometheusServer("127.0.0.1:0", registry)
@@ -96,11 +95,8 @@ func main() {
 	require.NoError(err, "failed †o get node websocket URIs")
 
 	w := &workload{
-		endpoints: endpoints,
-		numAgents: agentsPerNode,
-		minTPS:    10,
-		maxTPS:    50,
-		step:      10,
+		endpoints:  endpoints,
+		numSenders: sendersCount,
 	}
 
 	require.NoError(
@@ -110,11 +106,8 @@ func main() {
 }
 
 type workload struct {
-	endpoints []string
-	numAgents uint
-	minTPS    int64
-	maxTPS    int64
-	step      int64
+	endpoints  []string
+	numSenders uint
 }
 
 func (w *workload) run(
@@ -123,57 +116,47 @@ func (w *workload) run(
 	keys []*secp256k1.PrivateKey,
 	metrics *load.Metrics,
 ) error {
-	tracker := load.NewTracker[common.Hash](metrics)
-	agents, err := w.createAgents(ctx, keys, tracker)
+	tracker := load.NewTracker(metrics)
+	senders, builders, err := w.createSendersAndBuilders(ctx, keys)
 	if err != nil {
 		return fmt.Errorf("creating agents: %w", err)
 	}
 
-	orchestratorConfig := load.OrchestratorConfig{
-		MaxTPS:           w.maxTPS,
-		MinTPS:           w.minTPS,
-		Step:             w.step,
-		TxRateMultiplier: 1.1,
-		SustainedTime:    20 * time.Second,
-		MaxAttempts:      3,
-		Terminate:        true,
-	}
+	orchestrator := load.NewOrchestrator(senders, builders, tracker, log)
 
-	orchestrator := load.NewOrchestrator(agents, tracker, log, orchestratorConfig)
-
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
-	return orchestrator.Execute(ctx)
+	return orchestrator.Run(ctx)
 }
 
-// createAgents creates agents for the given configuration and keys.
-// It creates them in parallel because creating issuers can sometimes take a while,
-// and this adds up for many agents. For example, deploying the Opcoder contract
+// createSendersAndBuilders creates senders and builders for the given configuration and keys.
+// It creates them in parallel because creating builders can sometimes take a while,
+// and this adds up for many builders. For example, deploying the Opcoder contract
 // takes a few seconds. Running the creation in parallel can reduce the time significantly.
-func (w *workload) createAgents(
+func (w *workload) createSendersAndBuilders(
 	ctx context.Context,
 	keys []*secp256k1.PrivateKey,
-	tracker *load.Tracker[common.Hash],
-) ([]load.Agent[common.Hash], error) {
+) ([]*load.Sender, []load.Builder, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	type result struct {
-		agent load.Agent[common.Hash]
-		err   error
+		sender  *load.Sender
+		builder load.Builder
+		err     error
 	}
 
-	ch := make(chan result, w.numAgents)
+	ch := make(chan result, w.numSenders)
 	wg := sync.WaitGroup{}
-	for i := range int(w.numAgents) {
+	for i := range int(w.numSenders) {
 		key := keys[i]
 		endpoint := w.endpoints[i%len(w.endpoints)]
 		wg.Add(1)
 		go func(key *secp256k1.PrivateKey, endpoint string) {
 			defer wg.Done()
-			agent, err := createAgent(ctx, endpoint, key, tracker)
-			ch <- result{agent: agent, err: err}
+			sender, builder, err := createSenderAndBuilder(ctx, endpoint, key)
+			ch <- result{sender: sender, builder: builder, err: err}
 		}(key, endpoint)
 	}
 
@@ -182,44 +165,46 @@ func (w *workload) createAgents(
 		close(ch)
 	}()
 
-	agents := make([]load.Agent[common.Hash], 0, int(w.numAgents))
-	for range int(w.numAgents) {
+	senders := make([]*load.Sender, 0, len(keys))
+	builders := make([]load.Builder, 0, len(keys))
+	for range int(w.numSenders) {
 		select {
 		case result := <-ch:
 			// exit immediately if we hit an error
 			if result.err != nil {
-				return nil, result.err
+				return nil, nil, result.err
 			}
-			agents = append(agents, result.agent)
+			senders = append(senders, result.sender)
+			builders = append(builders, result.builder)
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return nil, nil, ctx.Err()
 		}
 	}
 
-	return agents, nil
+	return senders, builders, nil
 }
 
-func createAgent(
+func createSenderAndBuilder(
 	ctx context.Context,
 	endpoint string,
 	key *secp256k1.PrivateKey,
-	tracker *load.Tracker[common.Hash],
-) (load.Agent[common.Hash], error) {
+) (*load.Sender, load.Builder, error) {
 	client, err := ethclient.DialContext(ctx, endpoint)
 	if err != nil {
-		return load.Agent[common.Hash]{}, fmt.Errorf("dialing %s: %w", endpoint, err)
+		return nil, nil, fmt.Errorf("failed to dial %s: %w", endpoint, err)
 	}
 
 	address := key.EthAddress()
 	nonce, err := client.NonceAt(ctx, address, nil)
 	if err != nil {
-		return load.Agent[common.Hash]{}, fmt.Errorf("getting nonce for address %s: %w", address, err)
+		return nil, nil, fmt.Errorf("getting nonce for address %s: %w", address, err)
 	}
 
 	issuer, err := c.NewIssuer(ctx, client, nonce, key.ToECDSA())
 	if err != nil {
-		return load.Agent[common.Hash]{}, fmt.Errorf("creating issuer: %w", err)
+		return nil, nil, fmt.Errorf("failed to create issuer: %w", err)
 	}
-	listener := listener.New(client, tracker, address, nonce)
-	return load.NewAgent(issuer, listener), nil
+
+	sender := load.NewSender(client)
+	return sender, issuer, nil
 }

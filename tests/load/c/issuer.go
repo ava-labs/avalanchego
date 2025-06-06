@@ -51,10 +51,14 @@ func NewIssuer(
 	}
 
 	maxFeeCap := big.NewInt(300000000000) // enough for contract deployment in parallel
-	txOpts, err := newTxOpts(ctx, key, chainID, maxFeeCap, nonce)
+	txOpts, err := newTxOpts(key, chainID, maxFeeCap, nonce)
 	if err != nil {
 		return nil, fmt.Errorf("creating transaction opts: %w", err)
 	}
+	// add params necessary for tx issuance
+	txOpts.NoSend = false
+	txOpts.Context = ctx
+
 	_, simulatorDeploymentTx, simulatorInstance, err := contracts.DeployEVMLoadSimulator(txOpts, client)
 	if err != nil {
 		return nil, fmt.Errorf("deploying simulator contract: %w", err)
@@ -67,32 +71,31 @@ func NewIssuer(
 	}
 
 	return &Issuer{
-		txTypes: makeTxTypes(simulatorInstance, key, chainID, client),
+		txTypes: makeTxTypes(simulatorInstance, key, chainID),
 		nonce:   nonce,
 	}, nil
 }
 
-func (i *Issuer) GenerateAndIssueTx(ctx context.Context) (common.Hash, error) {
+func (i *Issuer) BuildTx() (*types.Transaction, error) {
 	txType, err := pickWeightedRandom(i.txTypes)
 	if err != nil {
-		return common.Hash{}, err
+		return nil, err
 	}
 
-	tx, err := txType.generateAndIssueTx(ctx, txType.maxFeeCap, i.nonce)
+	tx, err := txType.generate(txType.maxFeeCap, i.nonce)
 	if err != nil {
-		return common.Hash{}, fmt.Errorf("generating and issuing transaction of type %s: %w", txType.name, err)
+		return nil, fmt.Errorf("failed to generate transaction of type %s: %w", txType.name, err)
 	}
 
 	i.nonce++
-	txHash := tx.Hash()
-	return txHash, nil
+
+	return tx, nil
 }
 
 func makeTxTypes(
 	contractInstance *contracts.EVMLoadSimulator,
 	senderKey *ecdsa.PrivateKey,
 	chainID *big.Int,
-	client *ethclient.Client,
 ) []txType {
 	senderAddress := ethcrypto.PubkeyToAddress(senderKey.PublicKey)
 	signer := types.LatestSignerForChainID(chainID)
@@ -101,7 +104,7 @@ func makeTxTypes(
 			name:      "zero self transfer",
 			weight:    1000,
 			maxFeeCap: big.NewInt(4761904), // equiavelent to 100 ETH which is the maximum value
-			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
+			generate: func(maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
 				bigGwei := big.NewInt(params.GWei)
 				gasTipCap := new(big.Int).Mul(bigGwei, big.NewInt(1))
 				gasFeeCap := new(big.Int).Mul(bigGwei, maxFeeCap)
@@ -118,9 +121,6 @@ func makeTxTypes(
 				if err != nil {
 					return nil, fmt.Errorf("signing transaction: %w", err)
 				}
-				if err := client.SendTransaction(txCtx, tx); err != nil {
-					return nil, fmt.Errorf("issuing transaction with nonce %d: %w", nonce, err)
-				}
 				return tx, nil
 			},
 		},
@@ -128,8 +128,8 @@ func makeTxTypes(
 			name:      "random write",
 			weight:    100,
 			maxFeeCap: big.NewInt(300000000000),
-			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
-				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
+			generate: func(maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
+				txOpts, err := newTxOpts(senderKey, chainID, maxFeeCap, nonce)
 				if err != nil {
 					return nil, fmt.Errorf("creating transaction opts: %w", err)
 				}
@@ -145,8 +145,8 @@ func makeTxTypes(
 			name:      "state modification",
 			weight:    100,
 			maxFeeCap: big.NewInt(300000000000),
-			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
-				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
+			generate: func(maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
+				txOpts, err := newTxOpts(senderKey, chainID, maxFeeCap, nonce)
 				if err != nil {
 					return nil, fmt.Errorf("creating transaction opts: %w", err)
 				}
@@ -162,8 +162,8 @@ func makeTxTypes(
 			name:      "random read",
 			weight:    200,
 			maxFeeCap: big.NewInt(300000000000),
-			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
-				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
+			generate: func(maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
+				txOpts, err := newTxOpts(senderKey, chainID, maxFeeCap, nonce)
 				if err != nil {
 					return nil, fmt.Errorf("creating transaction opts: %w", err)
 				}
@@ -179,8 +179,8 @@ func makeTxTypes(
 			name:      "hashing",
 			weight:    50,
 			maxFeeCap: big.NewInt(300000000000),
-			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
-				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
+			generate: func(maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
+				txOpts, err := newTxOpts(senderKey, chainID, maxFeeCap, nonce)
 				if err != nil {
 					return nil, fmt.Errorf("creating transaction opts: %w", err)
 				}
@@ -196,8 +196,8 @@ func makeTxTypes(
 			name:      "memory",
 			weight:    100,
 			maxFeeCap: big.NewInt(300000000000),
-			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
-				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
+			generate: func(maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
+				txOpts, err := newTxOpts(senderKey, chainID, maxFeeCap, nonce)
 				if err != nil {
 					return nil, fmt.Errorf("creating transaction opts: %w", err)
 				}
@@ -213,8 +213,8 @@ func makeTxTypes(
 			name:      "call depth",
 			weight:    50,
 			maxFeeCap: big.NewInt(300000000000),
-			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
-				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
+			generate: func(maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
+				txOpts, err := newTxOpts(senderKey, chainID, maxFeeCap, nonce)
 				if err != nil {
 					return nil, fmt.Errorf("creating transaction opts: %w", err)
 				}
@@ -230,8 +230,8 @@ func makeTxTypes(
 			name:      "contract creation",
 			weight:    1,
 			maxFeeCap: big.NewInt(300000000000),
-			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
-				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
+			generate: func(maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
+				txOpts, err := newTxOpts(senderKey, chainID, maxFeeCap, nonce)
 				if err != nil {
 					return nil, fmt.Errorf("creating transaction opts: %w", err)
 				}
@@ -242,8 +242,8 @@ func makeTxTypes(
 			name:      "pure compute",
 			weight:    100,
 			maxFeeCap: big.NewInt(300000000000),
-			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
-				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
+			generate: func(maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
+				txOpts, err := newTxOpts(senderKey, chainID, maxFeeCap, nonce)
 				if err != nil {
 					return nil, fmt.Errorf("creating transaction opts: %w", err)
 				}
@@ -255,8 +255,8 @@ func makeTxTypes(
 			name:      "large event",
 			weight:    100,
 			maxFeeCap: big.NewInt(300000000000),
-			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
-				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
+			generate: func(maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
+				txOpts, err := newTxOpts(senderKey, chainID, maxFeeCap, nonce)
 				if err != nil {
 					return nil, fmt.Errorf("creating transaction opts: %w", err)
 				}
@@ -268,8 +268,8 @@ func makeTxTypes(
 			name:      "external call",
 			weight:    50,
 			maxFeeCap: big.NewInt(300000000000),
-			generateAndIssueTx: func(txCtx context.Context, maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
-				txOpts, err := newTxOpts(txCtx, senderKey, chainID, maxFeeCap, nonce)
+			generate: func(maxFeeCap *big.Int, nonce uint64) (*types.Transaction, error) {
+				txOpts, err := newTxOpts(senderKey, chainID, maxFeeCap, nonce)
 				if err != nil {
 					return nil, fmt.Errorf("creating transaction opts: %w", err)
 				}
@@ -280,10 +280,10 @@ func makeTxTypes(
 }
 
 type txType struct {
-	name               string // for error wrapping only
-	weight             uint
-	maxFeeCap          *big.Int
-	generateAndIssueTx func(txCtx context.Context, gasFeeCap *big.Int, nonce uint64) (*types.Transaction, error)
+	name      string // for error wrapping only
+	weight    uint
+	maxFeeCap *big.Int
+	generate  func(gasFeeCap *big.Int, nonce uint64) (*types.Transaction, error)
 }
 
 func pickWeightedRandom(txTypes []txType) (txType, error) {
@@ -314,8 +314,9 @@ func randomNum(seed int64) (*big.Int, error) {
 	return big.NewInt(rand.Int64N(seed)), nil //nolint:gosec
 }
 
+// newTxOpts returns transaction options for contract calls, with transaction
+// issuance disabled
 func newTxOpts(
-	ctx context.Context,
 	key *ecdsa.PrivateKey,
 	chainID *big.Int,
 	maxFeeCap *big.Int,
@@ -328,6 +329,6 @@ func newTxOpts(
 	txOpts.Nonce = new(big.Int).SetUint64(nonce)
 	txOpts.GasFeeCap = maxFeeCap
 	txOpts.GasTipCap = common.Big1
-	txOpts.Context = ctx
+	txOpts.NoSend = true
 	return txOpts, nil
 }
