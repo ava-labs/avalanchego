@@ -44,7 +44,7 @@ func (h *http2Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Deep copy the request to avoid weird behavior from modifying r
 	requestDeepCopy := r.Clone(r.Context())
-	// Route this request to the grpc service using the chain prefix
+	// Route this request to the http2 handler using the chain prefix
 	requestDeepCopy.URL.Path = strings.TrimPrefix(
 		requestDeepCopy.URL.Path,
 		"/"+chainID,
