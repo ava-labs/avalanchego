@@ -261,7 +261,7 @@
 
 - Add optional JSON logging
 - Bump minimum go version to v1.18.1
-- Add interface for suppporting stateful precompiles
+- Add interface for supporting stateful precompiles
 - Remove legacy code format from the database
 - Enable expensive metrics by default
 - Fix atomic trie sync bug that could result in storing incorrect metadata
