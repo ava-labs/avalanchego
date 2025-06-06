@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
+	atomicvm "github.com/ava-labs/coreth/plugin/evm/atomic/vm"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap0"
 	"github.com/ava-labs/coreth/utils"
 	"github.com/ava-labs/libevm/common"
@@ -1002,7 +1003,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 				}
 				return tx
 			},
-			semanticVerifyErr: atomic.ErrAssetIDMismatch.Error(),
+			semanticVerifyErr: atomicvm.ErrAssetIDMismatch.Error(),
 		},
 		"insufficient AVAX funds": {
 			setup: func(t *testing.T, vm *VM, sharedMemory *avalancheatomic.Memory) *atomic.Tx {

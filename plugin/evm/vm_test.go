@@ -63,6 +63,7 @@ import (
 	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/coreth/params"
 	atomictxpool "github.com/ava-labs/coreth/plugin/evm/atomic/txpool"
+	atomicvm "github.com/ava-labs/coreth/plugin/evm/atomic/vm"
 	"github.com/ava-labs/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/libevm/core/types"
@@ -474,7 +475,7 @@ func TestImportMissingUTXOs(t *testing.T) {
 	vm2Blk, err := vm2.ParseBlock(context.Background(), blk.Bytes())
 	require.NoError(t, err)
 	err = vm2Blk.Verify(context.Background())
-	require.ErrorIs(t, err, errMissingUTXOs)
+	require.ErrorIs(t, err, atomicvm.ErrMissingUTXOs)
 
 	// This should not result in a bad block since the missing UTXO should
 	// prevent InsertBlockManual from being called.
@@ -880,8 +881,8 @@ func testConflictingImportTxs(t *testing.T, fork upgradetest.Fork) {
 		t.Fatal(err)
 	}
 
-	if err := parsedBlock.Verify(context.Background()); !errors.Is(err, atomic.ErrConflictingAtomicInputs) {
-		t.Fatalf("Expected to fail with err: %s, but found err: %s", atomic.ErrConflictingAtomicInputs, err)
+	if err := parsedBlock.Verify(context.Background()); !errors.Is(err, atomicvm.ErrConflictingAtomicInputs) {
+		t.Fatalf("Expected to fail with err: %s, but found err: %s", atomicvm.ErrConflictingAtomicInputs, err)
 	}
 
 	if !rules.IsApricotPhase5 {
@@ -917,8 +918,8 @@ func testConflictingImportTxs(t *testing.T, fork upgradetest.Fork) {
 		t.Fatal(err)
 	}
 
-	if err := parsedBlock.Verify(context.Background()); !errors.Is(err, atomic.ErrConflictingAtomicInputs) {
-		t.Fatalf("Expected to fail with err: %s, but found err: %s", atomic.ErrConflictingAtomicInputs, err)
+	if err := parsedBlock.Verify(context.Background()); !errors.Is(err, atomicvm.ErrConflictingAtomicInputs) {
+		t.Fatalf("Expected to fail with err: %s, but found err: %s", atomicvm.ErrConflictingAtomicInputs, err)
 	}
 }
 
@@ -2393,10 +2394,10 @@ func TestEmptyBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := tvm.vm.ParseBlock(context.Background(), emptyBlock.Bytes()); !errors.Is(err, errEmptyBlock) {
+	if _, err := tvm.vm.ParseBlock(context.Background(), emptyBlock.Bytes()); !errors.Is(err, atomicvm.ErrEmptyBlock) {
 		t.Fatalf("VM should have failed with errEmptyBlock but got %s", err.Error())
 	}
-	if err := emptyBlock.Verify(context.Background()); !errors.Is(err, errEmptyBlock) {
+	if err := emptyBlock.Verify(context.Background()); !errors.Is(err, atomicvm.ErrEmptyBlock) {
 		t.Fatalf("block should have failed verification with errEmptyBlock but got %s", err.Error())
 	}
 }

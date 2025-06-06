@@ -5,19 +5,30 @@ package extension
 
 import (
 	"context"
+	"errors"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	avalanchecommon "github.com/ava-labs/avalanchego/snow/engine/common"
+
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+
+	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	"github.com/ava-labs/coreth/sync/handlers"
+
 	"github.com/ava-labs/libevm/core/types"
 )
 
+var errNilConfig = errors.New("nil extension config")
+
 type ExtensibleVM interface {
+	// SetExtensionConfig sets the configuration for the VM extension
+	// Should be called before any other method and only once
+	SetExtensionConfig(config *Config) error
+
 	// SetLastAcceptedBlock sets the last accepted block
 	SetLastAcceptedBlock(lastAcceptedBlock snowman.Block) error
 	// GetExtendedBlock returns the VMBlock for the given ID or an error if the block is not found
@@ -26,6 +37,8 @@ type ExtensibleVM interface {
 	LastAcceptedExtendedBlock() ExtendedBlock
 	// IsBootstrapped returns true if the VM is bootstrapped
 	IsBootstrapped() bool
+	// Ethereum returns the Ethereum client
+	Ethereum() *eth.Ethereum
 }
 
 // InnerVM is the interface that must be implemented by the VM
@@ -83,4 +96,11 @@ type Config struct {
 	// BlockExtender allows the VM extension to create an extension to handle block processing events.
 	// It's optional and can be nil
 	BlockExtender BlockExtender
+}
+
+func (c *Config) Validate() error {
+	if c == nil {
+		return errNilConfig
+	}
+	return nil
 }

@@ -43,6 +43,7 @@ import (
 	atomicstate "github.com/ava-labs/coreth/plugin/evm/atomic/state"
 	atomicsync "github.com/ava-labs/coreth/plugin/evm/atomic/sync"
 	atomictxpool "github.com/ava-labs/coreth/plugin/evm/atomic/txpool"
+	atomicvm "github.com/ava-labs/coreth/plugin/evm/atomic/vm"
 	"github.com/ava-labs/coreth/plugin/evm/config"
 	customheader "github.com/ava-labs/coreth/plugin/evm/header"
 	corethlog "github.com/ava-labs/coreth/plugin/evm/log"
@@ -177,7 +178,6 @@ var (
 )
 
 var (
-	errEmptyBlock                    = errors.New("empty block")
 	errInvalidBlock                  = errors.New("invalid block")
 	errInvalidNonce                  = errors.New("invalid nonce")
 	errUnclesUnsupported             = errors.New("uncles unsupported")
@@ -218,7 +218,8 @@ func init() {
 
 // VM implements the snowman.ChainVM interface
 type VM struct {
-	ctx *snow.Context
+	atomicVM *atomicvm.VM
+	ctx      *snow.Context
 	// [cancel] may be nil until [snow.NormalOp] starts
 	cancel context.CancelFunc
 	// *chain.State helps to implement the VM interface by wrapping blocks
@@ -337,7 +338,23 @@ func (vm *VM) Initialize(
 	_ []*commonEng.Fx,
 	appSender commonEng.AppSender,
 ) error {
-	vm.extensionConfig = &extension.Config{}
+	// TODO: this is to prevent migration of VM tests
+	// however this is not the intended change
+	// and should be removed after everything is migrated to atomicvm.VM
+	// atomicVM.Initialize() should be calling this vm's Initialize()
+	// we should prevent infinite recursion
+	// See https://github.com/ava-labs/coreth/pull/998 for the resolution of this TODO.
+	if vm.atomicVM == nil {
+		vm.atomicVM = atomicvm.WrapVM(vm)
+		if err := vm.atomicVM.Initialize(nil, chainCtx, db, genesisBytes, nil, configBytes, toEngine, nil, appSender); err != nil {
+			return fmt.Errorf("failed to initialize atomic VM: %w", err)
+		}
+		return nil
+	}
+
+	if err := vm.extensionConfig.Validate(); err != nil {
+		return fmt.Errorf("failed to validate extension config: %w", err)
+	}
 	vm.config.SetDefaults(defaultTxPoolConfig)
 	if len(configBytes) > 0 {
 		if err := json.Unmarshal(configBytes, &vm.config); err != nil {
@@ -403,21 +420,6 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return err
 	}
-
-	var extDataHashes map[common.Hash]common.Hash
-	// Set the chain config for mainnet/fuji chain IDs
-	switch chainCtx.NetworkID {
-	case avalanchegoConstants.MainnetID:
-		extDataHashes = mainnetExtDataHashes
-	case avalanchegoConstants.FujiID:
-		extDataHashes = fujiExtDataHashes
-	}
-	vm.extensionConfig.BlockExtender = newBlockExtender(extDataHashes, vm)
-
-	// Free the memory of the extDataHash map that is not used (i.e. if mainnet
-	// config, free fuji)
-	fujiExtDataHashes = nil
-	mainnetExtDataHashes = nil
 
 	vm.chainID = g.Config.ChainID
 
@@ -854,7 +856,7 @@ func (vm *VM) preBatchOnFinalizeAndAssemble(header *types.Header, state *state.S
 
 	if len(txs) == 0 {
 		// this could happen due to the async logic of geth tx pool
-		return nil, nil, nil, errEmptyBlock
+		return nil, nil, nil, atomicvm.ErrEmptyBlock
 	}
 
 	return nil, nil, nil, nil
@@ -963,7 +965,7 @@ func (vm *VM) postBatchOnFinalizeAndAssemble(
 	// then the block is empty and should be considered invalid.
 	if len(txs) == 0 {
 		// this could happen due to the async logic of geth tx pool
-		return nil, nil, nil, errEmptyBlock
+		return nil, nil, nil, atomicvm.ErrEmptyBlock
 	}
 
 	// If there are no atomic transactions, but there is a non-zero number of regular transactions, then
@@ -1619,7 +1621,7 @@ func (vm *VM) verifyTx(tx *atomic.Tx, parentHash common.Hash, baseFee *big.Int, 
 	if err != nil {
 		return fmt.Errorf("failed to get parent block: %w", err)
 	}
-	atomicBackend := &atomic.VerifierBackend{
+	atomicBackend := &atomicvm.VerifierBackend{
 		Ctx:          vm.ctx,
 		Fx:           &vm.fx,
 		Rules:        rules,
@@ -1627,7 +1629,7 @@ func (vm *VM) verifyTx(tx *atomic.Tx, parentHash common.Hash, baseFee *big.Int, 
 		BlockFetcher: vm,
 		SecpCache:    vm.secpCache,
 	}
-	if err := tx.UnsignedAtomicTx.Visit(&atomic.SemanticVerifier{
+	if err := tx.UnsignedAtomicTx.Visit(&atomicvm.SemanticVerifier{
 		Backend: atomicBackend,
 		Tx:      tx,
 		Parent:  parent,
@@ -1659,7 +1661,7 @@ func (vm *VM) verifyTxs(txs []*atomic.Tx, parentHash common.Hash, baseFee *big.I
 	// Ensure each tx in [txs] doesn't conflict with any other atomic tx in
 	// a processing ancestor block.
 	inputs := set.Set[ids.ID]{}
-	atomicBackend := &atomic.VerifierBackend{
+	atomicBackend := &atomicvm.VerifierBackend{
 		Ctx:          vm.ctx,
 		Fx:           &vm.fx,
 		Rules:        rules,
@@ -1669,7 +1671,7 @@ func (vm *VM) verifyTxs(txs []*atomic.Tx, parentHash common.Hash, baseFee *big.I
 	}
 	for _, atomicTx := range txs {
 		utx := atomicTx.UnsignedAtomicTx
-		if err := utx.Visit(&atomic.SemanticVerifier{
+		if err := utx.Visit(&atomicvm.SemanticVerifier{
 			Backend: atomicBackend,
 			Tx:      atomicTx,
 			Parent:  ancestor,
@@ -1679,7 +1681,7 @@ func (vm *VM) verifyTxs(txs []*atomic.Tx, parentHash common.Hash, baseFee *big.I
 		}
 		txInputs := utx.InputUTXOs()
 		if inputs.Overlaps(txInputs) {
-			return atomic.ErrConflictingAtomicInputs
+			return atomicvm.ErrConflictingAtomicInputs
 		}
 		inputs.Union(txInputs)
 	}
