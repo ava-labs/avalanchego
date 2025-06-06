@@ -365,7 +365,7 @@ func (vm *VMServer) CreateHTTP2Handler(ctx context.Context, _ *emptypb.Empty) (*
 		return nil, err
 	}
 
-	// The vm does not expose a gRPC service
+	// The vm does not expose an HTTP2 handler
 	if handler == nil {
 		return &vmpb.CreateHTTP2HandlerResponse{}, nil
 	}
