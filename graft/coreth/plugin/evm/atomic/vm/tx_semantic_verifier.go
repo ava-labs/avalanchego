@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package atomic
+package vm
 
 import (
 	"context"
@@ -17,11 +17,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/coreth/params/extras"
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/coreth/plugin/evm/extension"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap0"
 )
 
-var _ Visitor = (*SemanticVerifier)(nil)
+var _ atomic.Visitor = (*SemanticVerifier)(nil)
 
 var (
 	ErrAssetIDMismatch            = errors.New("asset IDs in the input don't match the utxo")
@@ -49,13 +50,13 @@ type VerifierBackend struct {
 // SemanticVerifier is a visitor that checks the semantic validity of atomic transactions.
 type SemanticVerifier struct {
 	Backend *VerifierBackend
-	Tx      *Tx
+	Tx      *atomic.Tx
 	Parent  extension.ExtendedBlock
 	BaseFee *big.Int
 }
 
 // ImportTx verifies this transaction is valid.
-func (s *SemanticVerifier) ImportTx(utx *UnsignedImportTx) error {
+func (s *SemanticVerifier) ImportTx(utx *atomic.UnsignedImportTx) error {
 	backend := s.Backend
 	ctx := backend.Ctx
 	rules := backend.Rules
@@ -73,7 +74,7 @@ func (s *SemanticVerifier) ImportTx(utx *UnsignedImportTx) error {
 		if err != nil {
 			return err
 		}
-		txFee, err := CalculateDynamicFee(gasUsed, s.BaseFee)
+		txFee, err := atomic.CalculateDynamicFee(gasUsed, s.BaseFee)
 		if err != nil {
 			return err
 		}
@@ -118,7 +119,7 @@ func (s *SemanticVerifier) ImportTx(utx *UnsignedImportTx) error {
 		utxoBytes := allUTXOBytes[i]
 
 		utxo := &avax.UTXO{}
-		if _, err := Codec.Unmarshal(utxoBytes, utxo); err != nil {
+		if _, err := atomic.Codec.Unmarshal(utxoBytes, utxo); err != nil {
 			return fmt.Errorf("failed to unmarshal UTXO: %w", err)
 		}
 
@@ -148,7 +149,7 @@ func conflicts(backend *VerifierBackend, inputs set.Set[ids.ID], ancestor extens
 	lastAcceptedHeight := lastAcceptedBlock.Height()
 	for ancestor.Height() > lastAcceptedHeight {
 		ancestorExtIntf := ancestor.GetBlockExtension()
-		ancestorExt, ok := ancestorExtIntf.(AtomicBlockContext)
+		ancestorExt, ok := ancestorExtIntf.(atomic.AtomicBlockContext)
 		if !ok {
 			return fmt.Errorf("expected block extension to be AtomicBlockContext but got %T", ancestorExtIntf)
 		}
@@ -180,7 +181,7 @@ func conflicts(backend *VerifierBackend, inputs set.Set[ids.ID], ancestor extens
 }
 
 // ExportTx verifies this transaction is valid.
-func (s *SemanticVerifier) ExportTx(utx *UnsignedExportTx) error {
+func (s *SemanticVerifier) ExportTx(utx *atomic.UnsignedExportTx) error {
 	backend := s.Backend
 	ctx := backend.Ctx
 	rules := backend.Rules
@@ -198,7 +199,7 @@ func (s *SemanticVerifier) ExportTx(utx *UnsignedExportTx) error {
 		if err != nil {
 			return err
 		}
-		txFee, err := CalculateDynamicFee(gasUsed, s.BaseFee)
+		txFee, err := atomic.CalculateDynamicFee(gasUsed, s.BaseFee)
 		if err != nil {
 			return err
 		}

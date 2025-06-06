@@ -8,6 +8,9 @@ import (
 	"errors"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/coreth/eth"
+	"github.com/ava-labs/coreth/plugin/evm/atomic/state"
+	"github.com/ava-labs/coreth/plugin/evm/atomic/txpool"
 	"github.com/ava-labs/coreth/plugin/evm/extension"
 )
 
@@ -54,4 +57,16 @@ func (vm *VM) LastAcceptedExtendedBlock() extension.ExtendedBlock {
 // IsBootstrapped returns true if the VM has finished bootstrapping
 func (vm *VM) IsBootstrapped() bool {
 	return vm.bootstrapped.Get()
+}
+
+func (vm *VM) Ethereum() *eth.Ethereum {
+	return vm.eth
+}
+
+func (vm *VM) AtomicBackend() *state.AtomicBackend {
+	return vm.atomicBackend
+}
+
+func (vm *VM) AtomicMempool() *txpool.Mempool {
+	return vm.mempool
 }

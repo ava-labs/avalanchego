@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
+	atomicvm "github.com/ava-labs/coreth/plugin/evm/atomic/vm"
 	"github.com/ava-labs/coreth/utils"
 	"github.com/ava-labs/libevm/common"
 	"github.com/holiman/uint256"
@@ -922,7 +923,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		backend := &atomic.VerifierBackend{
+		backend := &atomicvm.VerifierBackend{
 			Ctx:          vm.ctx,
 			Fx:           &vm.fx,
 			Rules:        test.rules,
@@ -935,7 +936,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 			tx := test.tx
 			exportTx := tx.UnsignedAtomicTx
 
-			err := exportTx.Visit(&atomic.SemanticVerifier{
+			err := exportTx.Visit(&atomicvm.SemanticVerifier{
 				Backend: backend,
 				Tx:      tx,
 				Parent:  parent,
@@ -1783,7 +1784,7 @@ func TestNewExportTx(t *testing.T) {
 
 			exportTx := tx.UnsignedAtomicTx
 
-			backend := &atomic.VerifierBackend{
+			backend := &atomicvm.VerifierBackend{
 				Ctx:          tvm.vm.ctx,
 				Fx:           &tvm.vm.fx,
 				Rules:        tvm.vm.currentRules(),
@@ -1792,7 +1793,7 @@ func TestNewExportTx(t *testing.T) {
 				SecpCache:    tvm.vm.secpCache,
 			}
 
-			if err := exportTx.Visit(&atomic.SemanticVerifier{
+			if err := exportTx.Visit(&atomicvm.SemanticVerifier{
 				Backend: backend,
 				Tx:      tx,
 				Parent:  parent,
@@ -1987,7 +1988,7 @@ func TestNewExportTxMulticoin(t *testing.T) {
 			}
 
 			exportTx := tx.UnsignedAtomicTx
-			backend := &atomic.VerifierBackend{
+			backend := &atomicvm.VerifierBackend{
 				Ctx:          tvm.vm.ctx,
 				Fx:           &tvm.vm.fx,
 				Rules:        tvm.vm.currentRules(),
@@ -1996,7 +1997,7 @@ func TestNewExportTxMulticoin(t *testing.T) {
 				SecpCache:    tvm.vm.secpCache,
 			}
 
-			if err := exportTx.Visit(&atomic.SemanticVerifier{
+			if err := exportTx.Visit(&atomicvm.SemanticVerifier{
 				Backend: backend,
 				Tx:      tx,
 				Parent:  parent,
