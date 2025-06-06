@@ -41,10 +41,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/messenger"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
-	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
-	dto "github.com/prometheus/client_model/go"
-	healthpb "google.golang.org/grpc/health/grpc_health_v1"
-
 	aliasreaderpb "github.com/ava-labs/avalanchego/proto/pb/aliasreader"
 	appsenderpb "github.com/ava-labs/avalanchego/proto/pb/appsender"
 	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
@@ -54,6 +50,9 @@ import (
 	validatorstatepb "github.com/ava-labs/avalanchego/proto/pb/validatorstate"
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 	warppb "github.com/ava-labs/avalanchego/proto/pb/warp"
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	dto "github.com/prometheus/client_model/go"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
 
 // TODO: Enable these to be configured by the user
