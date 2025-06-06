@@ -54,6 +54,7 @@ func (p *PingService) StreamPing(server xsvm.Ping_StreamPingServer) error {
 	}
 }
 
+// NewPingClient returns a client for PingService
 func NewPingClient(
 	uri string,
 	chainID ids.ID,

@@ -12,6 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
+// NewClient returns grpc.ClientConn that prefixes method calls with the
+// provided chainID prefix
 func NewClient(uri string, chainID ids.ID, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
 	dialOpts := []grpc.DialOption{
 		grpc.WithUnaryInterceptor(PrefixChainIDUnaryClientInterceptor(chainID)),
@@ -28,6 +30,8 @@ func NewClient(uri string, chainID ids.ID, opts ...grpc.DialOption) (*grpc.Clien
 	return conn, nil
 }
 
+// PrefixChainIDUnaryClientInterceptor prefixes unary grpc calls with the
+// provided chainID prefix
 func PrefixChainIDUnaryClientInterceptor(chainID ids.ID) grpc.UnaryClientInterceptor {
 	return func(
 		ctx context.Context,
@@ -42,6 +46,8 @@ func PrefixChainIDUnaryClientInterceptor(chainID ids.ID) grpc.UnaryClientInterce
 	}
 }
 
+// PrefixChainIDStreamClientInterceptor prefixes streaming grpc calls with the
+// provided chainID prefix
 func PrefixChainIDStreamClientInterceptor(chainID ids.ID) grpc.StreamClientInterceptor {
 	return func(
 		ctx context.Context,
