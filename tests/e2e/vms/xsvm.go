@@ -186,17 +186,19 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 	})
 
 	ginkgo.It("should serve grpc api requests", func() {
-		if e2e.GetEnv(tc).GetNetwork().DefaultRuntimeConfig.Kube != nil {
+		network := e2e.GetEnv(tc).GetNetwork()
+		log := tc.Log()
+		if network.DefaultRuntimeConfig.Kube != nil {
 			ginkgo.Skip("h2c is not currently supported in kube")
 		}
 
 		tc.By("establishing connection")
-		nodeID := e2e.GetEnv(tc).GetNetwork().GetSubnet(subnetAName).ValidatorIDs[0]
-		node, err := e2e.GetEnv(tc).GetNetwork().GetNode(nodeID)
+		nodeID := network.GetSubnet(subnetAName).ValidatorIDs[0]
+		node, err := network.GetNode(nodeID)
 		require.NoError(err)
 
 		uri := strings.TrimPrefix(node.URI, "http://")
-		chainID := e2e.GetEnv(tc).GetNetwork().GetSubnet(subnetAName).Chains[0].ChainID
+		chainID := network.GetSubnet(subnetAName).Chains[0].ChainID
 		conn, err := grpc.NewClient(
 			uri,
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -244,7 +246,7 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 				require.NoError(stream.Send(&xsvm.StreamPingRequest{
 					Message: msg,
 				}))
-				tc.Log().Info("sent message", zap.String("msg", msg))
+				log.Info("sent message", zap.String("msg", msg))
 			}
 		}()
 
@@ -258,7 +260,7 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 				reply, err := stream.Recv()
 				require.NoError(err)
 				require.Equal(fmt.Sprintf("ping-%d", i), reply.Message)
-				tc.Log().Info("received message", zap.String("msg", reply.Message))
+				log.Info("received message", zap.String("msg", reply.Message))
 			}
 		}()
 
