@@ -24,7 +24,7 @@ func NewChainClient(uri string, chainID ids.ID, opts ...grpc.DialOption) (*grpc.
 
 	conn, err := grpc.NewClient(uri, dialOpts...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize grpc client: %w", err)
+		return nil, fmt.Errorf("failed to initialize chain grpc client: %w", err)
 	}
 
 	return conn, nil

@@ -62,7 +62,7 @@ func NewPingClient(
 ) (xsvm.PingClient, *grpc.ClientConn, error) {
 	conn, err := grpcclient.NewChainClient(uri, chainID, opts...)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to initialize grpc client: %w", err)
+		return nil, nil, err
 	}
 
 	return xsvm.NewPingClient(conn), conn, nil
