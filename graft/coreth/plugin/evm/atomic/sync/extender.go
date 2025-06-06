@@ -25,12 +25,14 @@ type extender struct {
 }
 
 // Initialize initializes the sync extender with the backend and trie.
-func NewExtender(backend *state.AtomicBackend, trie *state.AtomicTrie, requestSize uint16) *extender {
-	return &extender{
-		backend:     backend,
-		trie:        trie,
-		requestSize: requestSize,
-	}
+func NewExtender() *extender {
+	return &extender{}
+}
+
+func (a *extender) Initialize(backend *state.AtomicBackend, trie *state.AtomicTrie, requestSize uint16) {
+	a.backend = backend
+	a.trie = trie
+	a.requestSize = requestSize
 }
 
 func (a *extender) Sync(ctx context.Context, client syncclient.LeafClient, verDB *versiondb.Database, summary message.Syncable) error {

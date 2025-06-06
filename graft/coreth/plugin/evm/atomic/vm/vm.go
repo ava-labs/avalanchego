@@ -12,12 +12,15 @@ import (
 	avalanchecommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/plugin/evm/atomic/state"
+	"github.com/ava-labs/coreth/plugin/evm/atomic/sync"
 	"github.com/ava-labs/coreth/plugin/evm/atomic/txpool"
 	"github.com/ava-labs/coreth/plugin/evm/extension"
+	"github.com/ava-labs/coreth/plugin/evm/message"
 
 	"github.com/ava-labs/libevm/common"
 )
@@ -46,6 +49,8 @@ type InnerVM interface {
 type VM struct {
 	InnerVM
 	ctx *snow.Context
+
+	clock mockable.Clock
 }
 
 func WrapVM(vm InnerVM) *VM {
@@ -81,9 +86,24 @@ func (vm *VM) Initialize(
 	// Create the atomic extension structs
 	// some of them need to be initialized after the inner VM is initialized
 	blockExtender := newBlockExtender(extDataHashes, vm)
+	syncExtender := sync.NewExtender()
+	syncProvider := sync.NewSummaryProvider()
+	// Create and pass the leaf handler to the atomic extension
+	// it will be initialized after the inner VM is initialized
+	leafHandler := sync.NewLeafHandler()
+	atomicLeafTypeConfig := &extension.LeafRequestConfig{
+		LeafType:   sync.TrieNode,
+		MetricName: "sync_atomic_trie_leaves",
+		Handler:    leafHandler,
+	}
 
 	extensionConfig := &extension.Config{
-		BlockExtender: blockExtender,
+		BlockExtender:              blockExtender,
+		SyncableParser:             sync.NewSummaryParser(),
+		SyncExtender:               syncExtender,
+		SyncSummaryProvider:        syncProvider,
+		ExtraSyncLeafHandlerConfig: atomicLeafTypeConfig,
+		Clock:                      &vm.clock,
 	}
 	if err := vm.SetExtensionConfig(extensionConfig); err != nil {
 		return fmt.Errorf("failed to set extension config: %w", err)
@@ -103,6 +123,12 @@ func (vm *VM) Initialize(
 	); err != nil {
 		return fmt.Errorf("failed to initialize inner VM: %w", err)
 	}
+
+	// Atomic backend is available now, we can initialize structs that depend on it
+	syncProvider.Initialize(vm.AtomicBackend().AtomicTrie())
+	syncExtender.Initialize(vm.AtomicBackend(), vm.AtomicBackend().AtomicTrie(), vm.Config().StateSyncRequestSize)
+	leafHandler.Initialize(vm.AtomicBackend().AtomicTrie().TrieDB(), state.TrieKeyLength, message.Codec)
+
 	return nil
 }
 
