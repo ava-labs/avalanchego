@@ -7,7 +7,7 @@
 // read/write operations at once
 
 use std::fs::{File, OpenOptions};
-use std::io::{Error, Read};
+use std::io::Read;
 use std::num::NonZero;
 #[cfg(unix)]
 use std::os::unix::fs::FileExt;
@@ -21,11 +21,12 @@ use metrics::counter;
 
 use crate::{CacheReadStrategy, LinearAddress, SharedNode};
 
-use super::{ReadableStorage, WritableStorage};
+use super::{FileIoError, ReadableStorage, WritableStorage};
 
-/// A [ReadableStorage] backed by a file
+/// A [ReadableStorage] and [WritableStorage] backed by a file
 pub struct FileBacked {
     fd: File,
+    filename: PathBuf,
     cache: Mutex<LruCache<LinearAddress, SharedNode>>,
     free_list_cache: Mutex<LruCache<LinearAddress, Option<LinearAddress>>>,
     cache_read_strategy: CacheReadStrategy,
@@ -40,6 +41,7 @@ impl std::fmt::Debug for FileBacked {
             .field("fd", &self.fd)
             .field("cache", &self.cache)
             .field("free_list_cache", &self.free_list_cache)
+            .field("cache_read_strategy", &self.cache_read_strategy)
             .finish()
     }
 }
@@ -73,13 +75,19 @@ impl FileBacked {
         free_list_cache_size: NonZero<usize>,
         truncate: bool,
         cache_read_strategy: CacheReadStrategy,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, FileIoError> {
         let fd = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
             .truncate(truncate)
-            .open(path)?;
+            .open(&path)
+            .map_err(|inner| FileIoError {
+                inner,
+                filename: Some(path.clone()),
+                offset: 0,
+                context: Some("file open".to_string()),
+            })?;
 
         #[cfg(feature = "io-uring")]
         let ring = {
@@ -94,7 +102,13 @@ impl FileBacked {
                 .setup_cqsize(FileBacked::RINGSIZE * 2)
                 // start a kernel thread to do the IO
                 .setup_sqpoll(IDLETIME_MS)
-                .build(FileBacked::RINGSIZE)?
+                .build(FileBacked::RINGSIZE)
+                .map_err(|e| FileIoError {
+                    inner: e,
+                    filename: Some(path.clone()),
+                    offset: 0,
+                    context: Some("IO-uring setup".to_string()),
+                })?
         };
 
         Ok(Self {
@@ -102,6 +116,7 @@ impl FileBacked {
             cache: Mutex::new(LruCache::new(node_cache_size)),
             free_list_cache: Mutex::new(LruCache::new(free_list_cache_size)),
             cache_read_strategy,
+            filename: path,
             #[cfg(feature = "io-uring")]
             ring: ring.into(),
         })
@@ -109,12 +124,16 @@ impl FileBacked {
 }
 
 impl ReadableStorage for FileBacked {
-    fn stream_from(&self, addr: u64) -> Result<Box<dyn Read + '_>, Error> {
+    fn stream_from(&self, addr: u64) -> Result<Box<dyn Read + '_>, FileIoError> {
         Ok(Box::new(PredictiveReader::new(self, addr)))
     }
 
-    fn size(&self) -> Result<u64, Error> {
-        Ok(self.fd.metadata()?.len())
+    fn size(&self) -> Result<u64, FileIoError> {
+        Ok(self
+            .fd
+            .metadata()
+            .map_err(|e| self.file_io_error(e, 0, Some("size".to_string())))?
+            .len())
     }
 
     fn read_cached_node(&self, addr: LinearAddress, mode: &'static str) -> Option<SharedNode> {
@@ -153,24 +172,32 @@ impl ReadableStorage for FileBacked {
             }
         }
     }
+
+    fn filename(&self) -> Option<PathBuf> {
+        Some(self.filename.clone())
+    }
 }
 
 impl WritableStorage for FileBacked {
-    fn write(&self, offset: u64, object: &[u8]) -> Result<usize, Error> {
+    fn write(&self, offset: u64, object: &[u8]) -> Result<usize, FileIoError> {
         #[cfg(unix)]
         {
-            self.fd.write_at(object, offset)
+            self.fd
+                .write_at(object, offset)
+                .map_err(|e| self.file_io_error(e, offset, Some("write".to_string())))
         }
         #[cfg(windows)]
         {
-            self.fd.seek_write(object, offset)
+            self.fd
+                .seek_write(object, offset)
+                .map_err(|e| self.file_io_error(e, offset, Some("write".to_string())))
         }
     }
 
     fn write_cached_nodes<'a>(
         &self,
         nodes: impl Iterator<Item = (&'a std::num::NonZero<u64>, &'a SharedNode)>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), FileIoError> {
         let mut guard = self.cache.lock().expect("poisoned lock");
         for (addr, node) in nodes {
             guard.put(*addr, node.clone());

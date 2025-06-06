@@ -1,7 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use super::{ReadableStorage, WritableStorage};
+use super::{FileIoError, ReadableStorage, WritableStorage};
 use std::io::{Cursor, Read};
 use std::sync::Mutex;
 
@@ -21,7 +21,7 @@ impl MemStore {
 }
 
 impl WritableStorage for MemStore {
-    fn write(&self, offset: u64, object: &[u8]) -> Result<usize, std::io::Error> {
+    fn write(&self, offset: u64, object: &[u8]) -> Result<usize, FileIoError> {
         let offset = offset as usize;
         let mut guard = self.bytes.lock().expect("poisoned lock");
         if offset + object.len() > guard.len() {
@@ -33,7 +33,7 @@ impl WritableStorage for MemStore {
 }
 
 impl ReadableStorage for MemStore {
-    fn stream_from(&self, addr: u64) -> Result<Box<dyn Read>, std::io::Error> {
+    fn stream_from(&self, addr: u64) -> Result<Box<dyn Read>, FileIoError> {
         let bytes = self
             .bytes
             .lock()
@@ -45,7 +45,7 @@ impl ReadableStorage for MemStore {
         Ok(Box::new(Cursor::new(bytes)))
     }
 
-    fn size(&self) -> Result<u64, std::io::Error> {
+    fn size(&self) -> Result<u64, FileIoError> {
         Ok(self.bytes.lock().expect("poisoned lock").len() as u64)
     }
 }

@@ -324,7 +324,7 @@ impl Node {
     }
 
     /// Given a reader, return a [Node] from those bytes
-    pub fn from_reader(mut serialized: impl Read) -> Result<Self, std::io::Error> {
+    pub fn from_reader(mut serialized: impl Read) -> Result<Self, Error> {
         let mut first_byte: [u8; 1] = [0];
         serialized.read_exact(&mut first_byte)?;
         match first_byte[0] {

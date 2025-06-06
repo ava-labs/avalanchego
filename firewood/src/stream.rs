@@ -9,7 +9,9 @@ use futures::{Stream, StreamExt};
 use std::cmp::Ordering;
 use std::iter::once;
 use std::task::Poll;
-use storage::{BranchNode, Child, NibblesIterator, Node, PathIterItem, SharedNode, TrieReader};
+use storage::{
+    BranchNode, Child, FileIoError, NibblesIterator, Node, PathIterItem, SharedNode, TrieReader,
+};
 
 /// Represents an ongoing iteration over a node and its children.
 enum IterationNode {
@@ -90,23 +92,19 @@ impl<'a, T: TrieReader> MerkleNodeStream<'a, T> {
             merkle,
         }
     }
-}
 
-impl<T: TrieReader> Stream for MerkleNodeStream<'_, T> {
-    type Item = Result<(Key, SharedNode), api::Error>;
-
-    fn poll_next(
-        mut self: std::pin::Pin<&mut Self>,
-        _cx: &mut std::task::Context<'_>,
-    ) -> Poll<Option<Self::Item>> {
-        // destructuring is necessary here because we need mutable access to `state`
-        // at the same time as immutable access to `merkle`.
+    /// Internal function that handles the core iteration logic shared between Iterator and Stream implementations.
+    /// Returns None when iteration is complete, or Some(Result) with either a node or an error.
+    fn next_internal(&mut self) -> Option<Result<(Key, SharedNode), FileIoError>> {
         let Self { state, merkle } = &mut *self;
 
         match state {
             NodeStreamState::StartFromKey(key) => {
-                self.state = get_iterator_intial_state(*merkle, key)?;
-                self.poll_next(_cx)
+                match get_iterator_intial_state(*merkle, key) {
+                    Ok(state) => self.state = state,
+                    Err(e) => return Some(Err(e)),
+                }
+                self.next_internal()
             }
             NodeStreamState::Iterating { iter_stack } => {
                 while let Some(mut iter_node) = iter_stack.pop() {
@@ -126,7 +124,7 @@ impl<T: TrieReader> Stream for MerkleNodeStream<'_, T> {
                             }
 
                             let key = key_from_nibble_iter(key.iter().copied());
-                            return Poll::Ready(Some(Ok((key, node))));
+                            return Some(Ok((key, node)));
                         }
                         IterationNode::Visited {
                             ref key,
@@ -139,7 +137,10 @@ impl<T: TrieReader> Stream for MerkleNodeStream<'_, T> {
                             };
 
                             let child = match child {
-                                Child::AddressWithHash(addr, _) => merkle.read_node(addr)?,
+                                Child::AddressWithHash(addr, _) => match merkle.read_node(addr) {
+                                    Ok(node) => node,
+                                    Err(e) => return Some(Err(e)),
+                                },
                                 Child::Node(node) => node.clone().into(),
                             };
 
@@ -162,13 +163,35 @@ impl<T: TrieReader> Stream for MerkleNodeStream<'_, T> {
                                 key: child_key,
                                 node: child,
                             });
-                            return self.poll_next(_cx);
+                            return self.next_internal();
                         }
                     }
                 }
-                Poll::Ready(None)
+                None
             }
         }
+    }
+}
+
+impl<T: TrieReader> Stream for MerkleNodeStream<'_, T> {
+    type Item = Result<(Key, SharedNode), FileIoError>;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        _cx: &mut std::task::Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
+        match self.next_internal() {
+            Some(result) => Poll::Ready(Some(result)),
+            None => Poll::Ready(None),
+        }
+    }
+}
+
+impl<T: TrieReader> Iterator for MerkleNodeStream<'_, T> {
+    type Item = Result<(Key, SharedNode), FileIoError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next_internal()
     }
 }
 
@@ -176,7 +199,7 @@ impl<T: TrieReader> Stream for MerkleNodeStream<'_, T> {
 fn get_iterator_intial_state<T: TrieReader>(
     merkle: &T,
     key: &[u8],
-) -> Result<NodeStreamState, api::Error> {
+) -> Result<NodeStreamState, FileIoError> {
     let Some(root) = merkle.root_node() else {
         // This merkle is empty.
         return Ok(NodeStreamState::Iterating { iter_stack: vec![] });
@@ -352,7 +375,7 @@ impl<T: TrieReader> Stream for MerkleKeyValueStream<'_, T> {
                                 Poll::Ready(Some(Ok((key, value))))
                             }
                         },
-                        Some(Err(e)) => Poll::Ready(Some(Err(e))),
+                        Some(Err(e)) => Poll::Ready(Some(Err(e.into()))),
                         None => Poll::Ready(None),
                     },
                     Poll::Pending => Poll::Pending,
@@ -390,7 +413,7 @@ pub struct PathIterator<'a, 'b, T> {
 }
 
 impl<'a, 'b, T: TrieReader> PathIterator<'a, 'b, T> {
-    pub(super) fn new(merkle: &'a T, key: &'b [u8]) -> Result<Self, std::io::Error> {
+    pub(super) fn new(merkle: &'a T, key: &'b [u8]) -> Result<Self, FileIoError> {
         let Some(root) = merkle.root_node() else {
             return Ok(Self {
                 state: PathIteratorState::Exhausted,
@@ -410,7 +433,7 @@ impl<'a, 'b, T: TrieReader> PathIterator<'a, 'b, T> {
 }
 
 impl<T: TrieReader> Iterator for PathIterator<'_, '_, T> {
-    type Item = Result<PathIterItem, std::io::Error>;
+    type Item = Result<PathIterItem, FileIoError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         // destructuring is necessary here because we need mutable access to `state`
@@ -766,7 +789,10 @@ mod tests {
 
         let mut stream = MerkleNodeStream::new(merkle.nodestore(), Box::new([]));
 
-        let (key, node) = stream.next().await.unwrap().unwrap();
+        let (key, node) = futures::StreamExt::next(&mut stream)
+            .await
+            .unwrap()
+            .unwrap();
 
         assert_eq!(key, vec![0x00].into_boxed_slice());
         assert_eq!(node.as_leaf().unwrap().value.to_vec(), vec![0x00]);
@@ -824,35 +850,53 @@ mod tests {
         let mut stream = MerkleNodeStream::new(merkle.nodestore(), Box::new([]));
 
         // Covers case of branch with no value
-        let (key, node) = stream.next().await.unwrap().unwrap();
+        let (key, node) = futures::StreamExt::next(&mut stream)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(key, vec![0x00].into_boxed_slice());
         let node = node.as_branch().unwrap();
         assert!(node.value.is_none());
 
         // Covers case of branch with value
-        let (key, node) = stream.next().await.unwrap().unwrap();
+        let (key, node) = futures::StreamExt::next(&mut stream)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(key, vec![0x00, 0x00, 0x00].into_boxed_slice());
         let node = node.as_branch().unwrap();
         assert_eq!(node.value.clone().unwrap().to_vec(), vec![0x00, 0x00, 0x00]);
 
         // Covers case of leaf with partial path
-        let (key, node) = stream.next().await.unwrap().unwrap();
+        let (key, node) = futures::StreamExt::next(&mut stream)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(key, vec![0x00, 0x00, 0x00, 0x01].into_boxed_slice());
         let node = node.as_leaf().unwrap();
         assert_eq!(node.clone().value.to_vec(), vec![0x00, 0x00, 0x00, 0x01]);
 
-        let (key, node) = stream.next().await.unwrap().unwrap();
+        let (key, node) = futures::StreamExt::next(&mut stream)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(key, vec![0x00, 0x00, 0x00, 0xFF].into_boxed_slice());
         let node = node.as_leaf().unwrap();
         assert_eq!(node.clone().value.to_vec(), vec![0x00, 0x00, 0x00, 0xFF]);
 
-        let (key, node) = stream.next().await.unwrap().unwrap();
+        let (key, node) = futures::StreamExt::next(&mut stream)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(key, vec![0x00, 0xD0, 0xD0].into_boxed_slice());
         let node = node.as_leaf().unwrap();
         assert_eq!(node.clone().value.to_vec(), vec![0x00, 0xD0, 0xD0]);
 
         // Covers case of leaf with no partial path
-        let (key, node) = stream.next().await.unwrap().unwrap();
+        let (key, node) = futures::StreamExt::next(&mut stream)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(key, vec![0x00, 0xFF].into_boxed_slice());
         let node = node.as_leaf().unwrap();
         assert_eq!(node.clone().value.to_vec(), vec![0x00, 0xFF]);
@@ -869,7 +913,10 @@ mod tests {
             vec![0x00, 0x00, 0x01].into_boxed_slice(),
         );
 
-        let (key, node) = stream.next().await.unwrap().unwrap();
+        let (key, node) = futures::StreamExt::next(&mut stream)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(key, vec![0x00, 0xD0, 0xD0].into_boxed_slice());
         assert_eq!(
             node.as_leaf().unwrap().clone().value.to_vec(),
@@ -877,7 +924,10 @@ mod tests {
         );
 
         // Covers case of leaf with no partial path
-        let (key, node) = stream.next().await.unwrap().unwrap();
+        let (key, node) = futures::StreamExt::next(&mut stream)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(key, vec![0x00, 0xFF].into_boxed_slice());
         assert_eq!(
             node.as_leaf().unwrap().clone().value.to_vec(),
@@ -896,7 +946,10 @@ mod tests {
             vec![0x00, 0xD0, 0xD0].into_boxed_slice(),
         );
 
-        let (key, node) = stream.next().await.unwrap().unwrap();
+        let (key, node) = futures::StreamExt::next(&mut stream)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(key, vec![0x00, 0xD0, 0xD0].into_boxed_slice());
         assert_eq!(
             node.as_leaf().unwrap().clone().value.to_vec(),
@@ -904,7 +957,10 @@ mod tests {
         );
 
         // Covers case of leaf with no partial path
-        let (key, node) = stream.next().await.unwrap().unwrap();
+        let (key, node) = futures::StreamExt::next(&mut stream)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(key, vec![0x00, 0xFF].into_boxed_slice());
         assert_eq!(
             node.as_leaf().unwrap().clone().value.to_vec(),
@@ -944,7 +1000,7 @@ mod tests {
         // we iterate twice because we should get a None then start over
         #[expect(clippy::indexing_slicing)]
         for k in start.map(|r| r[0]).unwrap_or_default()..=u8::MAX {
-            let next = stream.next().await.map(|kv| {
+            let next = futures::StreamExt::next(&mut stream).await.map(|kv| {
                 let (k, v) = kv.unwrap();
                 assert_eq!(&*k, &*v);
                 k
@@ -986,7 +1042,10 @@ mod tests {
                 let expected_value = vec![i, j];
 
                 assert_eq!(
-                    stream.next().await.unwrap().unwrap(),
+                    futures::StreamExt::next(&mut stream)
+                        .await
+                        .unwrap()
+                        .unwrap(),
                     (expected_key.into_boxed_slice(), expected_value),
                     "i: {}, j: {}",
                     i,
@@ -1003,7 +1062,10 @@ mod tests {
                 let expected_key = vec![i, j];
                 let expected_value = vec![i, j];
                 assert_eq!(
-                    stream.next().await.unwrap().unwrap(),
+                    futures::StreamExt::next(&mut stream)
+                        .await
+                        .unwrap()
+                        .unwrap(),
                     (expected_key.into_boxed_slice(), expected_value),
                     "i: {}, j: {}",
                     i,
@@ -1014,7 +1076,10 @@ mod tests {
                 check_stream_is_done(stream).await;
             } else {
                 assert_eq!(
-                    stream.next().await.unwrap().unwrap(),
+                    futures::StreamExt::next(&mut stream)
+                        .await
+                        .unwrap()
+                        .unwrap(),
                     (vec![i + 1, 0].into_boxed_slice(), vec![i + 1, 0]),
                     "i: {}",
                     i,
@@ -1045,7 +1110,10 @@ mod tests {
         let mut stream = merkle.key_value_iter();
 
         for kv in key_values.iter() {
-            let next = stream.next().await.unwrap().unwrap();
+            let next = futures::StreamExt::next(&mut stream)
+                .await
+                .unwrap()
+                .unwrap();
             assert_eq!(&*next.0, &*next.1);
             assert_eq!(&next.1, kv);
         }

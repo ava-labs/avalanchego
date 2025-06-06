@@ -2,7 +2,6 @@
 // See the file LICENSE.md for licensing terms.
 
 use std::collections::{HashMap, VecDeque};
-use std::io::Error;
 use std::num::NonZero;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -17,7 +16,10 @@ use crate::merkle::Merkle;
 use crate::v2::api::HashKey;
 
 pub use storage::CacheReadStrategy;
-use storage::{Committed, FileBacked, ImmutableProposal, NodeStore, Parentable, TrieHash};
+use storage::{
+    Committed, FileBacked, FileIoError, ImmutableProposal, NodeStore, Parentable, TrieHash,
+};
+
 #[derive(Clone, Debug, TypedBuilder)]
 /// Revision manager configuratoin
 pub struct RevisionManagerConfig {
@@ -61,8 +63,10 @@ pub(crate) enum RevisionManagerError {
         "The proposal cannot be committed since it is not a direct child of the most recent commit"
     )]
     NotLatest,
+    #[error("Revision not found")]
+    RevisionNotFound,
     #[error("An IO error occurred during the commit")]
-    IO(#[from] std::io::Error),
+    FileIoError(#[from] FileIoError),
 }
 
 impl RevisionManager {
@@ -70,7 +74,7 @@ impl RevisionManager {
         filename: PathBuf,
         truncate: bool,
         config: RevisionManagerConfig,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, FileIoError> {
         let storage = Arc::new(FileBacked::new(
             filename,
             config.node_cache_size,
@@ -221,7 +225,7 @@ impl RevisionManager {
 
         if trace_enabled() {
             let _merkle = Merkle::from(committed);
-            trace!("{}", _merkle.dump()?);
+            trace!("{}", _merkle.dump().expect("failed to dump merkle"));
         }
 
         Ok(())
@@ -237,10 +241,7 @@ impl RevisionManager {
         self.by_hash
             .get(&root_hash)
             .cloned()
-            .ok_or(RevisionManagerError::IO(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "Revision not found",
-            )))
+            .ok_or(RevisionManagerError::RevisionNotFound)
     }
 
     pub fn root_hash(&self) -> Result<Option<HashKey>, RevisionManagerError> {

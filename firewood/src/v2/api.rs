@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use futures::Stream;
 use std::fmt::Debug;
 use std::sync::Arc;
-use storage::TrieHash;
+use storage::{FileIoError, TrieHash};
 
 /// A `KeyType` is something that can be xcast to a u8 reference,
 /// and can be sent and shared across threads. References with
@@ -107,6 +107,10 @@ pub enum Error {
     /// An IO error occurred
     IO(#[from] std::io::Error),
 
+    #[error("File IO error: {0}")]
+    /// A file I/O error occurred
+    FileIO(#[from] FileIoError),
+
     /// Cannot commit a cloned proposal
     ///
     /// Cloned proposals are problematic because if they are committed, then you could
@@ -142,13 +146,18 @@ pub enum Error {
     /// Proof error
     #[error("proof error")]
     ProofError(#[from] ProofError),
+
+    /// Revision not found
+    #[error("revision not found")]
+    RevisionNotFound,
 }
 
 impl From<RevisionManagerError> for Error {
     fn from(err: RevisionManagerError) -> Self {
         match err {
-            RevisionManagerError::IO(io_err) => Error::IO(io_err),
+            RevisionManagerError::FileIoError(io_err) => Error::FileIO(io_err),
             RevisionManagerError::NotLatest => Error::NotLatest,
+            RevisionManagerError::RevisionNotFound => Error::RevisionNotFound,
         }
     }
 }

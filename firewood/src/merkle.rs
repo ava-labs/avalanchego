@@ -15,9 +15,9 @@ use std::iter::once;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 use storage::{
-    BranchNode, Child, HashType, Hashable, HashedNodeReader, ImmutableProposal, LeafNode,
-    LinearAddress, MutableProposal, NibblesIterator, Node, NodeStore, Path, ReadableStorage,
-    SharedNode, TrieReader, ValueDigest,
+    BranchNode, Child, FileIoError, HashType, Hashable, HashedNodeReader, ImmutableProposal,
+    LeafNode, LinearAddress, MutableProposal, NibblesIterator, Node, NodeStore, Path,
+    ReadableStorage, SharedNode, TrieReader, ValueDigest,
 };
 
 /// Keys are boxed u8 slices
@@ -54,19 +54,24 @@ macro_rules! write_attributes {
                 " pp={}",
                 nibbles_formatter($node.partial_path.0.clone())
             )
-            .map_err(|e| Error::other(e))?;
+            .map_err(|e| FileIoError::from_generic_no_file(e, "write attributes"))?;
         }
         if !$value.is_empty() {
             match std::str::from_utf8($value) {
                 Ok(string) if string.chars().all(char::is_alphanumeric) => {
-                    write!($writer, " val={}", string).map_err(|e| Error::other(e))?
+                    write!($writer, " val={}", string)
+                        .map_err(|e| FileIoError::from_generic_no_file(e, "write attributes"))?;
                 }
                 _ => {
                     let hex = hex::encode($value);
                     if hex.len() > 6 {
-                        write!($writer, " val={:.6}...", hex).map_err(|e| Error::other(e))?;
+                        write!($writer, " val={:.6}...", hex).map_err(|e| {
+                            FileIoError::from_generic_no_file(e, "write attributes")
+                        })?;
                     } else {
-                        write!($writer, " val={}", hex).map_err(|e| Error::other(e))?;
+                        write!($writer, " val={}", hex).map_err(|e| {
+                            FileIoError::from_generic_no_file(e, "write attributes")
+                        })?;
                     }
                 }
             }
@@ -79,7 +84,7 @@ fn get_helper<T: TrieReader>(
     nodestore: &T,
     node: &Node,
     key: &[u8],
-) -> Result<Option<SharedNode>, Error> {
+) -> Result<Option<SharedNode>, FileIoError> {
     // 4 possibilities for the position of the `key` relative to `node`:
     // 1. The node is at `key`
     // 2. The key is above the node (i.e. its ancestor)
@@ -147,7 +152,7 @@ impl<T: TrieReader> Merkle<T> {
         &self.nodestore
     }
 
-    fn read_node(&self, addr: LinearAddress) -> Result<SharedNode, Error> {
+    fn read_node(&self, addr: LinearAddress) -> Result<SharedNode, FileIoError> {
         self.nodestore.read_node(addr)
     }
 
@@ -206,7 +211,10 @@ impl<T: TrieReader> Merkle<T> {
         todo!()
     }
 
-    pub(crate) fn path_iter<'a>(&self, key: &'a [u8]) -> Result<PathIterator<'_, 'a, T>, Error> {
+    pub(crate) fn path_iter<'a>(
+        &self,
+        key: &'a [u8],
+    ) -> Result<PathIterator<'_, 'a, T>, FileIoError> {
         PathIterator::new(&self.nodestore, key)
     }
 
@@ -314,14 +322,14 @@ impl<T: TrieReader> Merkle<T> {
         })
     }
 
-    pub(crate) fn get_value(&self, key: &[u8]) -> Result<Option<Box<[u8]>>, Error> {
+    pub(crate) fn get_value(&self, key: &[u8]) -> Result<Option<Box<[u8]>>, FileIoError> {
         let Some(node) = self.get_node(key)? else {
             return Ok(None);
         };
         Ok(node.value().map(|v| v.to_vec().into_boxed_slice()))
     }
 
-    pub(crate) fn get_node(&self, key: &[u8]) -> Result<Option<SharedNode>, Error> {
+    pub(crate) fn get_node(&self, key: &[u8]) -> Result<Option<SharedNode>, FileIoError> {
         let Some(root) = self.root() else {
             return Ok(None);
         };
@@ -338,16 +346,21 @@ impl<T: HashedNodeReader> Merkle<T> {
         hash: Option<&HashType>,
         seen: &mut HashSet<LinearAddress>,
         writer: &mut dyn Write,
-    ) -> Result<(), Error> {
-        write!(writer, "  {addr}[label=\"addr:{addr:?}").map_err(Error::other)?;
+    ) -> Result<(), FileIoError> {
+        write!(writer, "  {addr}[label=\"addr:{addr:?}")
+            .map_err(Error::other)
+            .map_err(|e| FileIoError::new(e, None, 0, None))?;
         if let Some(hash) = hash {
-            write!(writer, " hash:{hash:.6?}...").map_err(Error::other)?;
+            write!(writer, " hash:{hash:.6?}...")
+                .map_err(Error::other)
+                .map_err(|e| FileIoError::new(e, None, 0, None))?;
         }
 
         match &*self.read_node(addr)? {
             Node::Branch(b) => {
                 write_attributes!(writer, b, &b.value.clone().unwrap_or(Box::from([])));
-                writeln!(writer, "\"]").map_err(Error::other)?;
+                writeln!(writer, "\"]")
+                    .map_err(|e| FileIoError::from_generic_no_file(e, "write branch"))?;
                 for (childidx, child) in b.children.iter().enumerate() {
                     let (child_addr, child_hash) = match child {
                         None => continue,
@@ -363,17 +376,18 @@ impl<T: HashedNodeReader> Merkle<T> {
                             writer,
                             "  {addr} -> {child_addr}[label=\"{childidx} (dup)\" color=red]"
                         )
-                        .map_err(Error::other)?;
+                        .map_err(|e| FileIoError::from_generic_no_file(e, "write branch"))?;
                     } else {
                         writeln!(writer, "  {addr} -> {child_addr}[label=\"{childidx}\"]")
-                            .map_err(Error::other)?;
+                            .map_err(|e| FileIoError::from_generic_no_file(e, "write branch"))?;
                         self.dump_node(child_addr, child_hash, seen, writer)?;
                     }
                 }
             }
             Node::Leaf(l) => {
                 write_attributes!(writer, l, &l.value);
-                writeln!(writer, "\" shape=rect]").map_err(Error::other)?;
+                writeln!(writer, "\" shape=rect]")
+                    .map_err(|e| FileIoError::from_generic_no_file(e, "write leaf"))?;
             }
         };
         Ok(())
@@ -382,15 +396,26 @@ impl<T: HashedNodeReader> Merkle<T> {
     pub(crate) fn dump(&self) -> Result<String, Error> {
         let mut result = String::new();
         writeln!(result, "digraph Merkle {{\n  rankdir=LR;").map_err(Error::other)?;
-        if let Some((root_addr, root_hash)) = self.nodestore.root_address_and_hash()? {
-            writeln!(result, " root -> {root_addr}").map_err(Error::other)?;
+        if let Some((root_addr, root_hash)) = self
+            .nodestore
+            .root_address_and_hash()
+            .expect("failed to get root address and hash")
+        {
+            writeln!(result, " root -> {root_addr}")
+                .map_err(Error::other)
+                .map_err(|e| FileIoError::new(e, None, 0, None))
+                .map_err(Error::other)?;
             let mut seen = HashSet::new();
             // If ethhash is off, root_hash.into() is already the correct type
             // so we disable the warning here
             #[allow(clippy::useless_conversion)]
-            self.dump_node(root_addr, Some(&root_hash.into()), &mut seen, &mut result)?;
+            self.dump_node(root_addr, Some(&root_hash.into()), &mut seen, &mut result)
+                .map_err(Error::other)?;
         }
-        write!(result, "}}").map_err(Error::other)?;
+        write!(result, "}}")
+            .map_err(Error::other)
+            .map_err(|e| FileIoError::new(e, None, 0, None))
+            .map_err(Error::other)?;
 
         Ok(result)
     }
@@ -399,7 +424,7 @@ impl<T: HashedNodeReader> Merkle<T> {
 impl<S: ReadableStorage> TryFrom<Merkle<NodeStore<MutableProposal, S>>>
     for Merkle<NodeStore<Arc<ImmutableProposal>, S>>
 {
-    type Error = std::io::Error;
+    type Error = FileIoError;
     fn try_from(m: Merkle<NodeStore<MutableProposal, S>>) -> Result<Self, Self::Error> {
         Ok(Merkle {
             nodestore: m.nodestore.try_into()?,
@@ -417,7 +442,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
 
     /// Map `key` to `value` in the trie.
     /// Each element of key is 2 nibbles.
-    pub fn insert(&mut self, key: &[u8], value: Box<[u8]>) -> Result<(), Error> {
+    pub fn insert(&mut self, key: &[u8], value: Box<[u8]>) -> Result<(), FileIoError> {
         let key = Path::from_nibbles_iterator(NibblesIterator::new(key));
 
         let root = self.nodestore.mut_root();
@@ -446,7 +471,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
         mut node: Node,
         key: &[u8],
         value: Box<[u8]>,
-    ) -> Result<Node, Error> {
+    ) -> Result<Node, FileIoError> {
         // 4 possibilities for the position of the `key` relative to `node`:
         // 1. The node is at `key`
         // 2. The key is above the node (i.e. its ancestor)
@@ -578,7 +603,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
     /// Returns the value that was removed, if any.
     /// Otherwise returns `None`.
     /// Each element of `key` is 2 nibbles.
-    pub fn remove(&mut self, key: &[u8]) -> Result<Option<Box<[u8]>>, Error> {
+    pub fn remove(&mut self, key: &[u8]) -> Result<Option<Box<[u8]>>, FileIoError> {
         let key = Path::from_nibbles_iterator(NibblesIterator::new(key));
 
         let root = self.nodestore.mut_root();
@@ -608,7 +633,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
         &mut self,
         mut node: Node,
         key: &[u8],
-    ) -> Result<(Option<Node>, Option<Box<[u8]>>), Error> {
+    ) -> Result<(Option<Node>, Option<Box<[u8]>>), FileIoError> {
         // 4 possibilities for the position of the `key` relative to `node`:
         // 1. The node is at `key`
         // 2. The key is above the node (i.e. its ancestor)
@@ -803,7 +828,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
 
     /// Removes any key-value pairs with keys that have the given `prefix`.
     /// Returns the number of key-value pairs removed.
-    pub fn remove_prefix(&mut self, prefix: &[u8]) -> Result<usize, Error> {
+    pub fn remove_prefix(&mut self, prefix: &[u8]) -> Result<usize, FileIoError> {
         let prefix = Path::from_nibbles_iterator(NibblesIterator::new(prefix));
 
         let root = self.nodestore.mut_root();
@@ -826,7 +851,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
         mut node: Node,
         key: &[u8],
         deleted: &mut usize,
-    ) -> Result<Option<Node>, Error> {
+    ) -> Result<Option<Node>, FileIoError> {
         // 4 possibilities for the position of the `key` relative to `node`:
         // 1. The node is at `key`, in which case we need to delete this node and all its children.
         // 2. The key is above the node (i.e. its ancestor), so the parent needs to be restructured (TODO).
@@ -954,7 +979,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
         &mut self,
         branch: &mut BranchNode,
         deleted: &mut usize,
-    ) -> Result<(), Error> {
+    ) -> Result<(), FileIoError> {
         if branch.value.is_some() {
             // a KV pair was in the branch itself
             *deleted += 1;
@@ -1709,7 +1734,7 @@ mod tests {
 
     fn merkle_build_test<K: AsRef<[u8]>, V: AsRef<[u8]>>(
         items: Vec<(K, V)>,
-    ) -> Result<Merkle<NodeStore<MutableProposal, MemStore>>, Error> {
+    ) -> Result<Merkle<NodeStore<MutableProposal, MemStore>>, FileIoError> {
         let nodestore = NodeStore::new_empty_proposal(MemStore::new(vec![]).into());
         let mut merkle = Merkle::from(nodestore);
         for (k, v) in items {
@@ -1878,7 +1903,7 @@ mod tests {
     }
 
     #[test]
-    fn test_root_hash_fuzz_insertions() -> Result<(), Error> {
+    fn test_root_hash_fuzz_insertions() -> Result<(), FileIoError> {
         use rand::rngs::StdRng;
         use rand::{Rng, SeedableRng};
         let rng = std::cell::RefCell::new(StdRng::seed_from_u64(42));
@@ -1948,7 +1973,7 @@ mod tests {
 
     #[test]
     #[allow(clippy::unwrap_used)]
-    fn test_root_hash_reversed_deletions() -> Result<(), Error> {
+    fn test_root_hash_reversed_deletions() -> Result<(), FileIoError> {
         use rand::rngs::StdRng;
         use rand::{Rng, SeedableRng};
         let rng = std::cell::RefCell::new(StdRng::seed_from_u64(42));
@@ -1989,20 +2014,20 @@ mod tests {
                     .nodestore
                     .root_address_and_hash()?
                     .map(|(_, hash)| hash);
-                hashes.push((root_hash, merkle.dump()?));
+                hashes.push((root_hash, merkle.dump().unwrap()));
                 merkle.insert(k, v.clone())?;
             }
 
             let mut new_hashes = Vec::new();
 
             for (k, _) in items.iter().rev() {
-                let before = merkle.dump()?;
+                let before = merkle.dump().unwrap();
                 merkle.remove(k)?;
                 let root_hash = merkle
                     .nodestore
                     .root_address_and_hash()?
                     .map(|(_, hash)| hash);
-                new_hashes.push((root_hash, k, before, merkle.dump()?));
+                new_hashes.push((root_hash, k, before, merkle.dump().unwrap()));
             }
 
             hashes.reverse();

@@ -11,37 +11,22 @@ pub use crate::v2::api::{Batch, BatchOp};
 use crate::manager::{RevisionManager, RevisionManagerConfig};
 use async_trait::async_trait;
 use metrics::{counter, describe_counter};
-use std::error::Error;
-use std::fmt;
 use std::io::Write;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
-use storage::{Committed, FileBacked, HashedNodeReader, ImmutableProposal, NodeStore, TrieHash};
+use storage::{
+    Committed, FileBacked, FileIoError, HashedNodeReader, ImmutableProposal, NodeStore, TrieHash,
+};
+use thiserror::Error;
 use typed_builder::TypedBuilder;
 
-#[derive(Debug)]
-#[non_exhaustive]
+#[derive(Error, Debug)]
 /// Represents the different types of errors that can occur in the database.
 pub enum DbError {
-    /// I/O error occurred.
-    IO(std::io::Error),
+    /// I/O error
+    #[error("I/O error: {0:?}")]
+    FileIo(#[from] FileIoError),
 }
-
-impl fmt::Display for DbError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            DbError::IO(e) => write!(f, "I/O error: {e:?}"),
-        }
-    }
-}
-
-impl From<std::io::Error> for DbError {
-    fn from(e: std::io::Error) -> Self {
-        DbError::IO(e)
-    }
-}
-
-impl Error for DbError {}
 
 type HistoricalRev = NodeStore<Committed, FileBacked>;
 
@@ -79,7 +64,7 @@ impl api::DbView for HistoricalRev {
         Self: 'a;
 
     async fn root_hash(&self) -> Result<Option<api::HashKey>, api::Error> {
-        HashedNodeReader::root_hash(self).map_err(api::Error::IO)
+        HashedNodeReader::root_hash(self).map_err(api::Error::FileIO)
     }
 
     async fn val<K: api::KeyType>(&self, key: K) -> Result<Option<Box<[u8]>>, api::Error> {
