@@ -20,10 +20,12 @@ type summaryProvider struct {
 	trie *state.AtomicTrie
 }
 
-func NewSummaryProvider(atomicTrie *state.AtomicTrie) *summaryProvider {
-	return &summaryProvider{
-		trie: atomicTrie,
-	}
+func NewSummaryProvider() *summaryProvider {
+	return &summaryProvider{}
+}
+
+func (a *summaryProvider) Initialize(trie *state.AtomicTrie) {
+	a.trie = trie
 }
 
 // StateSummaryAtBlock returns the block state summary at [blk] if valid.

@@ -41,7 +41,6 @@ import (
 	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	atomicstate "github.com/ava-labs/coreth/plugin/evm/atomic/state"
-	atomicsync "github.com/ava-labs/coreth/plugin/evm/atomic/sync"
 	atomictxpool "github.com/ava-labs/coreth/plugin/evm/atomic/txpool"
 	atomicvm "github.com/ava-labs/coreth/plugin/evm/atomic/vm"
 	"github.com/ava-labs/coreth/plugin/evm/config"
@@ -274,7 +273,7 @@ type VM struct {
 	builder *blockBuilder
 
 	baseCodec codec.Registry
-	clock     mockable.Clock
+	clock     *mockable.Clock
 	mempool   *atomictxpool.Mempool
 
 	shutdownChan chan struct{}
@@ -321,7 +320,7 @@ type VM struct {
 func (vm *VM) CodecRegistry() codec.Registry { return vm.baseCodec }
 
 // Clock implements the secp256k1fx interface
-func (vm *VM) Clock() *mockable.Clock { return &vm.clock }
+func (vm *VM) Clock() *mockable.Clock { return vm.clock }
 
 // Logger implements the secp256k1fx interface
 func (vm *VM) Logger() logging.Logger { return vm.ctx.Log }
@@ -354,6 +353,9 @@ func (vm *VM) Initialize(
 
 	if err := vm.extensionConfig.Validate(); err != nil {
 		return fmt.Errorf("failed to validate extension config: %w", err)
+	}
+	if vm.extensionConfig.Clock != nil {
+		vm.clock = vm.extensionConfig.Clock
 	}
 	vm.config.SetDefaults(defaultTxPoolConfig)
 	if len(configBytes) > 0 {
@@ -651,10 +653,10 @@ func (vm *VM) initializeChain(lastAcceptedHash common.Hash) error {
 		dummy.NewDummyEngine(
 			callbacks,
 			dummy.Mode{},
-			&vm.clock,
+			vm.clock,
 			desiredTargetExcess,
 		),
-		&vm.clock,
+		vm.clock,
 	)
 	if err != nil {
 		return err
@@ -673,7 +675,7 @@ func (vm *VM) initializeChain(lastAcceptedHash common.Hash) error {
 	return vm.initChainState(vm.blockChain.LastAcceptedBlock())
 }
 
-// initializeStateSyncClient initializes the client for performing state sync.
+// initializeStateSync initializes the vm for performing state sync and responding to peer requests.
 // If state sync is disabled, this function will wipe any ongoing summary from
 // disk to ensure that we do not continue syncing from an invalid snapshot.
 func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
@@ -688,6 +690,8 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 			}.BackendConstructor,
 		},
 	)
+	leafHandlers := make(LeafHandlers)
+	leafMetricsNames := make(map[message.NodeType]string)
 	// register default leaf request handler for state trie
 	syncStats := handlerstats.GetOrRegisterHandlerStats(metrics.Enabled)
 	stateLeafRequestConfig := &extension.LeafRequestConfig{
@@ -699,16 +703,14 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 			syncStats,
 		),
 	}
-
-	atomicLeafHandlerConfig := &extension.LeafRequestConfig{
-		LeafType:   atomicsync.TrieNode,
-		MetricName: "sync_atomic_trie_leaves",
-		Handler:    atomicsync.NewLeafHandler(vm.atomicBackend.AtomicTrie().TrieDB(), atomicstate.TrieKeyLength, vm.networkCodec),
-	}
-
-	leafHandlers := make(LeafHandlers)
 	leafHandlers[stateLeafRequestConfig.LeafType] = stateLeafRequestConfig.Handler
-	leafHandlers[atomicLeafHandlerConfig.LeafType] = atomicLeafHandlerConfig.Handler
+	leafMetricsNames[stateLeafRequestConfig.LeafType] = stateLeafRequestConfig.MetricName
+
+	extraLeafConfig := vm.extensionConfig.ExtraSyncLeafHandlerConfig
+	if extraLeafConfig != nil {
+		leafHandlers[extraLeafConfig.LeafType] = extraLeafConfig.Handler
+		leafMetricsNames[extraLeafConfig.LeafType] = extraLeafConfig.MetricName
+	}
 
 	networkHandler := newNetworkHandler(
 		vm.blockChain,
@@ -720,7 +722,7 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 	)
 	vm.Network.SetRequestHandler(networkHandler)
 
-	vm.Server = vmsync.NewServer(vm.blockChain, atomicsync.NewSummaryProvider(vm.atomicBackend.AtomicTrie()), vm.config.StateSyncCommitInterval)
+	vm.Server = vmsync.NewServer(vm.blockChain, vm.extensionConfig.SyncSummaryProvider, vm.config.StateSyncCommitInterval)
 	stateSyncEnabled := vm.stateSyncEnabled(lastAcceptedHeight)
 	// parse nodeIDs from state sync IDs in vm config
 	var stateSyncIDs []ids.NodeID
@@ -737,9 +739,6 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 	}
 
 	// Initialize the state sync client
-	leafMetricsNames := make(map[message.NodeType]string)
-	leafMetricsNames[stateLeafRequestConfig.LeafType] = stateLeafRequestConfig.MetricName
-	leafMetricsNames[atomicLeafHandlerConfig.LeafType] = atomicLeafHandlerConfig.MetricName
 
 	vm.Client = vmsync.NewClient(&vmsync.ClientConfig{
 		Chain: vm.eth,
@@ -763,8 +762,8 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 		MetadataDB:         vm.metadataDB,
 		ToEngine:           vm.toEngine,
 		Acceptor:           vm,
-		Parser:             atomicsync.NewSummaryParser(),
-		Extender:           atomicsync.NewExtender(vm.atomicBackend, vm.atomicBackend.AtomicTrie(), vm.config.StateSyncRequestSize),
+		Parser:             vm.extensionConfig.SyncableParser,
+		Extender:           vm.extensionConfig.SyncExtender,
 	})
 
 	// If StateSync is disabled, clear any ongoing summary so that we will not attempt to resume

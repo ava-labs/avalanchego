@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/coreth/plugin/evm/atomic/state"
 	"github.com/ava-labs/coreth/plugin/evm/atomic/txpool"
+	"github.com/ava-labs/coreth/plugin/evm/config"
 	"github.com/ava-labs/coreth/plugin/evm/extension"
 )
 
@@ -63,6 +64,11 @@ func (vm *VM) Ethereum() *eth.Ethereum {
 	return vm.eth
 }
 
+func (vm *VM) Config() config.Config {
+	return vm.config
+}
+
+// TODO: remove these
 func (vm *VM) AtomicBackend() *state.AtomicBackend {
 	return vm.atomicBackend
 }
