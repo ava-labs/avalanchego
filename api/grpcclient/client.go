@@ -12,9 +12,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-// NewClient returns grpc.ClientConn that prefixes method calls with the
+// NewChainClient returns grpc.ClientConn that prefixes method calls with the
 // provided chainID prefix
-func NewClient(uri string, chainID ids.ID, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
+func NewChainClient(uri string, chainID ids.ID, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
 	dialOpts := []grpc.DialOption{
 		grpc.WithUnaryInterceptor(PrefixChainIDUnaryClientInterceptor(chainID)),
 		grpc.WithStreamInterceptor(PrefixChainIDStreamClientInterceptor(chainID)),
