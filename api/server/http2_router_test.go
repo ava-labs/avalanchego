@@ -24,7 +24,7 @@ func TestHTTP2RouterAdd(t *testing.T) {
 	require.False(h.Add(ids.Empty, handler))
 }
 
-func TestGRPCRouterServeHTTP(t *testing.T) {
+func TestHTTP2RouterServeHTTP(t *testing.T) {
 	tests := []struct {
 		name     string
 		chainIDs []ids.ID
