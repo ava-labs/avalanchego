@@ -25,9 +25,6 @@ func newHTTP2Router() *http2Router {
 }
 
 func (h *http2Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	h.lock.RLock()
-	defer h.lock.RUnlock()
-
 	// The :path pseudo-header takes the form of /Prefix/Path
 	parsed := strings.Split(r.URL.Path, "/")
 	if len(parsed) < 2 {
@@ -36,7 +33,10 @@ func (h *http2Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	chainID := parsed[1]
+
+	h.lock.RLock()
 	handler, ok := h.handlers[chainID]
+	h.lock.RUnlock()
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
 		return
