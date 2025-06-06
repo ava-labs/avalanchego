@@ -483,7 +483,7 @@ message EmptyVote {
 }
 
 message QuorumCertificate {
-  BlockHeader finalization = 1;
+  BlockHeader finalization = 1; // TODO: update the name to something more generic
   bytes quorum_certificate = 2;
 }
 
