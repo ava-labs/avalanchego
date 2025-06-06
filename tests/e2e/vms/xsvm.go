@@ -59,8 +59,8 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 	tc := e2e.NewTestContext()
 	require := require.New(tc)
 
-	network := e2e.GetEnv(tc).GetNetwork()
 	ginkgo.It("should support transfers between subnets", func() {
+		network := e2e.GetEnv(tc).GetNetwork()
 
 		sourceSubnet := network.GetSubnet(subnetAName)
 		require.NotNil(sourceSubnet)
@@ -186,17 +186,17 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 	})
 
 	ginkgo.It("should serve grpc api requests", func() {
-		if network.DefaultRuntimeConfig.Kube != nil {
+		if e2e.GetEnv(tc).GetNetwork().DefaultRuntimeConfig.Kube != nil {
 			ginkgo.Skip("h2c is not currently supported in kube")
 		}
 
 		tc.By("establishing connection")
-		nodeID := network.GetSubnet(subnetAName).ValidatorIDs[0]
-		node, err := network.GetNode(nodeID)
+		nodeID := e2e.GetEnv(tc).GetNetwork().GetSubnet(subnetAName).ValidatorIDs[0]
+		node, err := e2e.GetEnv(tc).GetNetwork().GetNode(nodeID)
 		require.NoError(err)
 
 		uri := strings.TrimPrefix(node.URI, "http://")
-		chainID := network.GetSubnet(subnetAName).Chains[0].ChainID
+		chainID := e2e.GetEnv(tc).GetNetwork().GetSubnet(subnetAName).Chains[0].ChainID
 		conn, err := grpc.NewClient(
 			uri,
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
