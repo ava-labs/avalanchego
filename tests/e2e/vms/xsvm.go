@@ -210,6 +210,9 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 			),
 		)
 		require.NoError(err)
+		ginkgo.DeferCleanup(func() {
+			require.NoError(conn.Close())
+		})
 
 		tc.By("serving unary rpc")
 		client := xsvm.NewPingClient(conn)
