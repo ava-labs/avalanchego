@@ -42,9 +42,10 @@ func (g *grpcService) StreamPing(server xsvm.Ping_StreamPingServer) error {
 		}
 
 		g.Log.Debug("stream ping", zap.String("message", request.Message))
-		if err := server.Send(&xsvm.StreamPingReply{
+		err = server.Send(&xsvm.StreamPingReply{
 			Message: request.Message,
-		}); err != nil {
+		})
+		if err != nil {
 			return fmt.Errorf("failed to send message: %w", err)
 		}
 	}
