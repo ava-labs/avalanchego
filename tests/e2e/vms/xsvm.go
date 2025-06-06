@@ -15,7 +15,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/ava-labs/avalanchego/api/grpcclient"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/xsvm"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
@@ -199,15 +198,10 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 
 		uri := strings.TrimPrefix(node.URI, "http://")
 		chainID := network.GetSubnet(subnetAName).Chains[0].ChainID
-		conn, err := grpc.NewClient(
+		client, conn, err := api.NewGRPCClient(
 			uri,
+			chainID,
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
-			grpc.WithUnaryInterceptor(
-				grpcclient.PrefixChainIDUnaryClientInterceptor(chainID),
-			),
-			grpc.WithStreamInterceptor(
-				grpcclient.PrefixChainIDStreamClientInterceptor(chainID),
-			),
 		)
 		require.NoError(err)
 		ginkgo.DeferCleanup(func() {
@@ -215,8 +209,6 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		})
 
 		tc.By("serving unary rpc")
-		client := xsvm.NewPingClient(conn)
-
 		msg := "foobar"
 		reply, err := client.Ping(tc.DefaultContext(), &xsvm.PingRequest{
 			Message: msg,

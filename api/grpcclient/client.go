@@ -5,11 +5,28 @@ package grpcclient
 
 import (
 	"context"
+	"fmt"
 
 	"google.golang.org/grpc"
 
 	"github.com/ava-labs/avalanchego/ids"
 )
+
+func NewClient(uri string, chainID ids.ID, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
+	dialOpts := []grpc.DialOption{
+		grpc.WithUnaryInterceptor(PrefixChainIDUnaryClientInterceptor(chainID)),
+		grpc.WithStreamInterceptor(PrefixChainIDStreamClientInterceptor(chainID)),
+	}
+
+	dialOpts = append(dialOpts, opts...)
+
+	conn, err := grpc.NewClient(uri, dialOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize grpc client: %w", err)
+	}
+
+	return conn, nil
+}
 
 func PrefixChainIDUnaryClientInterceptor(chainID ids.ID) grpc.UnaryClientInterceptor {
 	return func(
