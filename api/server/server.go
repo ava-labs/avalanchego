@@ -217,7 +217,11 @@ func (s *server) RegisterChain(chainName string, ctx *snow.ConsensusContext, vm 
 
 	http2Handler = s.wrapMiddleware(chainName, http2Handler, ctx)
 	if !s.http2Router.Add(ctx.ChainID, http2Handler) {
-		s.log.Error("failed to add route to http2 handler")
+		s.log.Error(
+			"failed to add route to http2 handler",
+			zap.String("chainName", chainName),
+			zap.Error(err),
+		)
 	}
 }
 
