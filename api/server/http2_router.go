@@ -57,10 +57,11 @@ func (h *http2Router) Add(chainID ids.ID, handler http.Handler) bool {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
-	if _, ok := h.handlers[chainID.String()]; ok {
+	chainIDStr := chainID.String()
+	if _, ok := h.handlers[chainIDStr]; ok {
 		return false
 	}
 
-	h.handlers[chainID.String()] = handler
+	h.handlers[chainIDStr] = handler
 	return true
 }
