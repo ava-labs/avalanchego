@@ -124,16 +124,18 @@ func New(
 	http2Handler := wrapHandler(http2Router, nodeID, allowedOrigins, allowedHosts, false)
 
 	httpServer := &http.Server{
-		Handler: h2c.NewHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.ProtoMajor == 2 {
-				http2Handler.ServeHTTP(w, r)
-				return
-			}
+		Handler: h2c.NewHandler(
+			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.ProtoMajor == 2 {
+					http2Handler.ServeHTTP(w, r)
+					return
+				}
 
-			handler.ServeHTTP(w, r)
-		}), &http2.Server{
-			MaxConcurrentStreams: maxConcurrentStreams,
-		}),
+				handler.ServeHTTP(w, r)
+			}),
+			&http2.Server{
+				MaxConcurrentStreams: maxConcurrentStreams,
+			}),
 		ReadTimeout:       httpConfig.ReadTimeout,
 		ReadHeaderTimeout: httpConfig.ReadHeaderTimeout,
 		WriteTimeout:      httpConfig.WriteTimeout,
