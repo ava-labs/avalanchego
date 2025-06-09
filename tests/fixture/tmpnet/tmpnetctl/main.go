@@ -23,7 +23,10 @@ import (
 
 const cliVersion = "0.0.1"
 
-var errNetworkDirRequired = fmt.Errorf("--network-dir or %s is required", tmpnet.NetworkDirEnvName)
+var (
+	errNetworkDirRequired = fmt.Errorf("--network-dir or %s is required", tmpnet.NetworkDirEnvName)
+	errKubeconfigRequired = errors.New("--kubeconfig is required")
+)
 
 func main() {
 	var (
@@ -280,7 +283,7 @@ func main() {
 			// A valid kubeconfig is required for local kind usage but this is not validated by KubeconfigVars
 			// since unlike kind, tmpnet usage may involve an implicit in-cluster config.
 			if len(kubeconfigVars.Path) == 0 {
-				kubeconfigVars.Path = os.ExpandEnv("$HOME/.kube/config")
+				return errKubeconfigRequired
 			}
 			// TODO(marun) Consider supporting other contexts. Will require modifying the kind cluster start script.
 			if len(kubeconfigVars.Context) > 0 && kubeconfigVars.Context != tmpnet.KindKubeconfigContext {
