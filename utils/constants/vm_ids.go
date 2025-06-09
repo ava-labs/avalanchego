@@ -19,6 +19,7 @@ var (
 	EVMID        = ids.ID{'e', 'v', 'm'}
 	SubnetEVMID  = ids.ID{'s', 'u', 'b', 'n', 'e', 't', 'e', 'v', 'm'}
 	XSVMID       = ids.ID{'x', 's', 'v', 'm'}
+	StrEVMID     = ids.ID{'s', 't', 'r', 'e', 'v', 'm'}
 )
 
 // VMName returns the name of the VM with the provided ID. If a human readable
