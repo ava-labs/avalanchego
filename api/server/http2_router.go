@@ -5,7 +5,6 @@ package server
 
 import (
 	"net/http"
-	"strings"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -25,14 +24,13 @@ func newHTTP2Router() *http2Router {
 }
 
 func (h *http2Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// The :path pseudo-header takes the form of /Prefix/Path
-	parsed := strings.Split(r.URL.Path, "/")
-	if len(parsed) < 2 {
+	// the chain-id header must be set to route the request to the correct chain
+	// http2 handler
+	chainID := r.Header.Get("chain-id")
+	if len(chainID) == 0 {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-
-	chainID := parsed[1]
 
 	h.lock.RLock()
 	handler, ok := h.handlers[chainID]
@@ -42,15 +40,7 @@ func (h *http2Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Deep copy the request to avoid weird behavior from modifying r
-	requestDeepCopy := r.Clone(r.Context())
-	// Route this request to the http2 handler using the chain prefix
-	requestDeepCopy.URL.Path = strings.TrimPrefix(
-		requestDeepCopy.URL.Path,
-		"/"+chainID,
-	)
-
-	handler.ServeHTTP(w, requestDeepCopy)
+	handler.ServeHTTP(w, r)
 }
 
 func (h *http2Router) Add(chainID ids.ID, handler http.Handler) bool {

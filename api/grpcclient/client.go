@@ -8,16 +8,17 @@ import (
 	"fmt"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-// NewChainClient returns grpc.ClientConn that prefixes method calls with the
-// provided chainID prefix
+// NewChainClient returns a grpc.ClientConn that sets the chain-id header for
+// all requests
 func NewChainClient(uri string, chainID ids.ID, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
 	dialOpts := []grpc.DialOption{
-		grpc.WithUnaryInterceptor(PrefixChainIDUnaryClientInterceptor(chainID)),
-		grpc.WithStreamInterceptor(PrefixChainIDStreamClientInterceptor(chainID)),
+		grpc.WithUnaryInterceptor(SetChainIDHeaderUnaryClientInterceptor(chainID)),
+		grpc.WithStreamInterceptor(SetChainIDHeaderStreamClientInterceptor(chainID)),
 	}
 
 	dialOpts = append(dialOpts, opts...)
@@ -30,9 +31,9 @@ func NewChainClient(uri string, chainID ids.ID, opts ...grpc.DialOption) (*grpc.
 	return conn, nil
 }
 
-// PrefixChainIDUnaryClientInterceptor prefixes unary grpc calls with the
-// provided chainID prefix
-func PrefixChainIDUnaryClientInterceptor(chainID ids.ID) grpc.UnaryClientInterceptor {
+// SetChainIDHeaderUnaryClientInterceptor sets the chain-id header for unary
+// requests
+func SetChainIDHeaderUnaryClientInterceptor(chainID ids.ID) grpc.UnaryClientInterceptor {
 	return func(
 		ctx context.Context,
 		method string,
@@ -42,13 +43,14 @@ func PrefixChainIDUnaryClientInterceptor(chainID ids.ID) grpc.UnaryClientInterce
 		invoker grpc.UnaryInvoker,
 		opts ...grpc.CallOption,
 	) error {
-		return invoker(ctx, prefix(chainID, method), req, reply, cc, opts...)
+		ctx = newContextWithChainIDHeader(ctx, chainID)
+		return invoker(ctx, method, req, reply, cc, opts...)
 	}
 }
 
-// PrefixChainIDStreamClientInterceptor prefixes streaming grpc calls with the
-// provided chainID prefix
-func PrefixChainIDStreamClientInterceptor(chainID ids.ID) grpc.StreamClientInterceptor {
+// SetChainIDHeaderStreamClientInterceptor sets the chain-id header for
+// streaming requests
+func SetChainIDHeaderStreamClientInterceptor(chainID ids.ID) grpc.StreamClientInterceptor {
 	return func(
 		ctx context.Context,
 		desc *grpc.StreamDesc,
@@ -57,11 +59,13 @@ func PrefixChainIDStreamClientInterceptor(chainID ids.ID) grpc.StreamClientInter
 		streamer grpc.Streamer,
 		opts ...grpc.CallOption,
 	) (grpc.ClientStream, error) {
-		return streamer(ctx, desc, cc, prefix(chainID, method), opts...)
+		ctx = newContextWithChainIDHeader(ctx, chainID)
+		return streamer(ctx, desc, cc, method, opts...)
 	}
 }
 
-// http/2 :path takes the form of /ChainID/Service/Method
-func prefix(chainID ids.ID, method string) string {
-	return "/" + chainID.String() + method
+// newContextWithChainHeader sets the chain-id header which the server uses
+// to route the client grpc request
+func newContextWithChainIDHeader(ctx context.Context, chainID ids.ID) context.Context {
+	return metadata.AppendToOutgoingContext(ctx, "chain-id", chainID.String())
 }
