@@ -58,7 +58,6 @@ func TestHTTP2RouterServeHTTP(t *testing.T) {
 			handler := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
 			writer := httptest.NewRecorder()
 			request := httptest.NewRequest(http.MethodPost, "/", nil)
-			request.Proto = "HTTP/2"
 			request.Header = tt.header
 
 			for _, chainID := range tt.chainIDs {
