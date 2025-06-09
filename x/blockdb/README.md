@@ -205,8 +205,11 @@ maxContiguous := store.MaxContiguousHeight()
 minHeight := store.MinHeight()
 ```
 
-## Future Improvements
+## TODO
 
-- **Multiple Data Files**: Split data across multiple files when MaxDataFileSize is reached
-- **Block Cache**: Implement circular buffer cache for recently accessed blocks
-- **Enforced In-Order Writes**: Optional mode to require blocks be written sequentially, preventing gaps
+- [ ] **Multiple Data Files**: Split data across multiple files when MaxDataFileSize is reached
+- [ ] **Block Cache**: Implement circular buffer cache for recently accessed blocks
+- [ ] **Enforced In-Order Writes**: Optional mode to require blocks be written sequentially, preventing gaps
+- [ ] **User buffered pool**: Use a buffered pool for fetch index entries and block headers to avoid allocations
+- [ ] **Unit Tests**: Add comprehensive test coverage for all core functionality
+- [ ] **Benchmarks**: Add performance benchmarks for all major operations
