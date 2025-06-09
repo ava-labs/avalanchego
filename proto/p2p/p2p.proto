@@ -483,7 +483,7 @@ message EmptyVote {
 }
 
 message QuorumCertificate {
-  BlockHeader finalization = 1;
+  BlockHeader block_header = 1;
   bytes quorum_certificate = 2;
 }
 
