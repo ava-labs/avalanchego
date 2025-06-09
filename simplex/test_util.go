@@ -85,6 +85,8 @@ func newTestValidatorInfo(all []*testValidator) *testValidatorInfo {
 type testEngineConfig struct {
 	curNode  *testValidator   // defaults to the first node
 	allNodes []*testValidator // all nodes in the test. defaults to a single node
+	chainID ids.ID
+	subnetID ids.ID
 }
 
 func newEngineConfig(options *testEngineConfig) (*Config, error) {
@@ -100,8 +102,8 @@ func newEngineConfig(options *testEngineConfig) (*Config, error) {
 
 	simplexChainContext := SimplexChainContext{
 		NodeID:   options.curNode.nodeID,
-		ChainID:  ids.GenerateTestID(),
-		SubnetID: ids.GenerateTestID(),
+		ChainID:  options.chainID,
+		SubnetID: options.subnetID,
 	}
 
 	return &Config{
@@ -120,5 +122,7 @@ func withNodes(numNodes uint64) (*testEngineConfig, error) {
 	return &testEngineConfig{
 		curNode:  vds[0],
 		allNodes: vds,
+		chainID:  ids.GenerateTestID(),
+		subnetID: ids.GenerateTestID(),
 	}, nil
 }

@@ -76,8 +76,6 @@ func TestQCAggregateAndSign(t *testing.T) {
 
 	options.curNode = options.allNodes[1]
 	config2, err := newEngineConfig(options)
-	config2.Ctx.ChainID = config.Ctx.ChainID
-	config2.Ctx.SubnetID = config.Ctx.SubnetID
 	require.NoError(t, err)
 
 	signer2, verifier2 := NewBLSAuth(config2)
@@ -235,8 +233,6 @@ func TestSignatureAggregatorExcessSignatures(t *testing.T) {
 	for i, node := range options.allNodes {
 		options.curNode = node
 		nodeConfig, err := newEngineConfig(options)
-		nodeConfig.Ctx.ChainID = config.Ctx.ChainID
-		nodeConfig.Ctx.SubnetID = config.Ctx.SubnetID
 		require.NoError(t, err)
 
 		nodeSigner, _ := NewBLSAuth(nodeConfig)
@@ -272,8 +268,6 @@ func TestQCVerifyWithWrongMessage(t *testing.T) {
 
 	options.curNode = options.allNodes[1]
 	config2, err := newEngineConfig(options)
-	config2.Ctx.ChainID = config.Ctx.ChainID
-	config2.Ctx.SubnetID = config.Ctx.SubnetID
 	require.NoError(t, err)
 
 	signer2, _ := NewBLSAuth(config2)
