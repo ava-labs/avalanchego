@@ -2,16 +2,14 @@
 
 BlockDB is a specialized storage system designed for blockchain blocks. It provides O(1) write performance with support for parallel operations. Unlike general-purpose key-value stores like LevelDB that require periodic compaction, BlockDB's append-only design ensures consistently fast writes without the overhead of background maintenance operations.
 
-## Key Functionalities (Needs Review)
+## Key Functionalities
 
 - **O(1) Performance**: Both reads and writes complete in constant time
 - **Parallel Operations**: Multiple threads can read and write blocks concurrently without blocking
-- **Flexible Write Ordering**: Supports out-of-order block writes for efficient synchronization
-- **Configurable Durability**: Optional `syncToDisk` mode guarantees immediate recoverability at the cost of performance
+- **Flexible Write Ordering**: Supports out-of-order block writes for bootstrapping
+- **Configurable Durability**: Optional `syncToDisk` mode guarantees immediate recoverability
 - **Automatic Recovery**: Detects and recovers unindexed blocks after unclean shutdowns
-- **Data Integrity**: Checksums verify block data on every read
-- **No Maintenance Required**: Append-only design eliminates the need for compaction or reorganization
-- **Progress Tracking**: Maintains maximum contiguous height for sync status
+- **Data Integrity**: Checksums verify block data on reads
 
 ## Architecture
 
@@ -27,6 +25,7 @@ BlockDB uses two file types: index files and data files. The index file maps blo
 │ - Min Height    │  │      │ - Data          │
 │ - MCH           │  │      ├─────────────────┤
 │ - Data Size     │  │      │ Block 2         │
+│ - ...           │  │      │                 │
 ├─────────────────┤  │  ┌──>│ - Header        │
 │ Entry[0]        │  │  │   │ - Data          │
 │ - Offset ───────┼──┘  │   ├─────────────────┤
@@ -101,7 +100,7 @@ BlockDB is strictly append-only with no support for deletions. This aligns with 
 - Straightforward recovery logic
 - No compaction overhead
 
-**Trade-off**: Overwriting a block leaves the old data as unreferenced "dead" space. However, since blockchain blocks are immutable and rarely overwritten (only during reorgs), this trade-off has minimal impact in practice.
+**Trade-off**: Overwriting a block leaves the old data as unreferenced "dead" space. However, since blocks are immutable and rarely overwritten (only during reorgs), this trade-off has minimal impact in practice.
 
 #### Fixed-Size Index Entries
 
@@ -164,26 +163,26 @@ BlockDB uses a reader-writer lock for overall thread safety, with atomic operati
 
 ## Usage
 
-### Creating a Store
+### Creating a Database
 
 ```go
 import "github.com/ava-labs/avalanchego/x/blockdb"
 
-opts := blockdb.DefaultStoreOptions()
-opts.MinimumHeight = 1
+config := blockdb.DefaultDatabaseOptions()
+config.MinimumHeight = 1
 
-store, err := blockdb.NewStore(
+db, err := blockdb.New(
     "/path/to/index",  // Index directory
     "/path/to/data",   // Data directory
     true,              // Sync to disk
     false,             // Don't truncate existing data
-    opts,
+    config,
     logger,
 )
 if err != nil {
     return err
 }
-defer store.Close()
+defer db.Close()
 ```
 
 ### Writing and Reading Blocks
@@ -192,17 +191,17 @@ defer store.Close()
 // Write a block
 height := uint64(100)
 blockData := []byte("block data...")
-err := store.WriteBlock(height, blockData)
+err := db.WriteBlock(height, blockData)
 
 // Read a block
-blockData, err := store.ReadBlock(height)
+blockData, err := db.ReadBlock(height)
 if err == blockdb.ErrBlockNotFound {
     // Block doesn't exist at this height
 }
 
-// Query store state
-maxContiguous := store.MaxContiguousHeight()
-minHeight := store.MinHeight()
+// Query database state
+maxContiguous := db.MaxContiguousHeight()
+minHeight := db.MinHeight()
 ```
 
 ## TODO

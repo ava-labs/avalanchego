@@ -21,7 +21,7 @@ var (
 
 // blockHeader is prepended to each block in the data file.
 type blockHeader struct {
-	Height uint64
+	Height uint64 // todo: can this be omitted? currently only used for verification
 	// Size of the raw block data (excluding this blockHeader).
 	Size     uint64
 	Checksum uint64
@@ -49,12 +49,12 @@ func (bh *blockHeader) UnmarshalBinary(data []byte) error {
 
 // WriteBlock inserts a block into the store at the given height.
 // Returns an error if the store is closed, the block is empty, or the write fails.
-func (s *Store) WriteBlock(height BlockHeight, block Block) error {
+func (s *Database) WriteBlock(height BlockHeight, block Block) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	if s.closed {
-		return ErrStoreClosed
+		return ErrDatabaseClosed
 	}
 
 	if len(block) == 0 {
@@ -95,12 +95,12 @@ func (s *Store) WriteBlock(height BlockHeight, block Block) error {
 
 // ReadBlock retrieves a block by its height.
 // Returns the block data or an error if not found or block data is corrupted.
-func (s *Store) ReadBlock(height BlockHeight) (Block, error) {
+func (s *Database) ReadBlock(height BlockHeight) (Block, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	if s.closed {
-		return nil, ErrStoreClosed
+		return nil, ErrDatabaseClosed
 	}
 
 	indexEntry, err := s.readIndexEntry(height)
@@ -122,7 +122,7 @@ func (s *Store) ReadBlock(height BlockHeight) (Block, error) {
 	return s.readAndVerifyBlockData(indexEntry, bh)
 }
 
-func (s *Store) readAndVerifyBlockHeader(indexEntry IndexEntry, expectedHeight BlockHeight) (blockHeader, error) {
+func (s *Database) readAndVerifyBlockHeader(indexEntry IndexEntry, expectedHeight BlockHeight) (blockHeader, error) {
 	var bh blockHeader
 	dataHeaderBuf := make([]byte, sizeOfBlockHeader)
 	_, err := s.dataFile.ReadAt(dataHeaderBuf, int64(indexEntry.Offset))
@@ -143,7 +143,7 @@ func (s *Store) readAndVerifyBlockHeader(indexEntry IndexEntry, expectedHeight B
 	return bh, nil
 }
 
-func (s *Store) readAndVerifyBlockData(indexEntry IndexEntry, bh blockHeader) (Block, error) {
+func (s *Database) readAndVerifyBlockData(indexEntry IndexEntry, bh blockHeader) (Block, error) {
 	blockData := make(Block, bh.Size)
 	actualDataOffset := indexEntry.Offset + sizeOfBlockHeader
 	if actualDataOffset < indexEntry.Offset {
@@ -167,7 +167,7 @@ func calculateChecksum(data []byte) uint64 {
 	return xxhash.Sum64(data)
 }
 
-func (s *Store) writeBlockAtOffset(offset uint64, bh blockHeader, block Block) error {
+func (s *Database) writeBlockAtOffset(offset uint64, bh blockHeader, block Block) error {
 	headerBytes, err := bh.MarshalBinary()
 	if err != nil {
 		return fmt.Errorf("failed to serialize block header: %w", err)
@@ -192,7 +192,7 @@ func (s *Store) writeBlockAtOffset(offset uint64, bh blockHeader, block Block) e
 	return nil
 }
 
-func (s *Store) updateBlockHeights(writtenBlockHeight uint64) error {
+func (s *Database) updateBlockHeights(writtenBlockHeight uint64) error {
 	// update max contiguous height
 	var prevContiguousCandidate uint64
 	if writtenBlockHeight == s.header.MinBlockHeight {
@@ -244,7 +244,7 @@ func (s *Store) updateBlockHeights(writtenBlockHeight uint64) error {
 	return nil
 }
 
-func (s *Store) allocateBlockSpace(sizeWithDataHeader uint64) (writeDataOffset uint64, err error) {
+func (s *Database) allocateBlockSpace(sizeWithDataHeader uint64) (writeDataOffset uint64, err error) {
 	maxDataFileSize := s.header.MaxDataFileSize
 
 	for {
