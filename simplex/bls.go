@@ -18,6 +18,11 @@ import (
 var (
 	errSignatureVerificationFailed = errors.New("signature verification failed")
 	errSignerNotFound              = errors.New("signer not found in the membership set")
+	errFailedToParseSignature      = errors.New("failed to parse signature")
+	errInvalidByteSliceLength      = errors.New("invalid byte slice length")
+	errNotEnoughSigners            = errors.New("not enough signers")
+	errSignatureAggregation        = errors.New("signature aggregation failed")
+	errEncodingMessageToSign       = errors.New("failed to encode message to sign")
 	simplexLabel                   = []byte("simplex")
 )
 
@@ -53,7 +58,7 @@ func NewBLSAuth(config *Config) (BLSSigner, BLSVerifier) {
 func (s *BLSSigner) Sign(message []byte) ([]byte, error) {
 	message2Sign, err := encodeMessageToSign(message, s.chainID, s.subnetID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to encode message to sign: %w", err)
+		return nil, fmt.Errorf("%w: %w", errEncodingMessageToSign, err)
 	}
 
 	sig, err := s.signBLS(message2Sign)

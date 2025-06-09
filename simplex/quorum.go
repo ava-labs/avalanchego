@@ -6,13 +6,16 @@ package simplex
 import (
 	"fmt"
 
+	"github.com/ava-labs/simplex"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/simplex"
 )
 
-var _ simplex.QuorumCertificate = (*QC)(nil)
-var _ simplex.QCDeserializer = QCDeserializer{}
+var (
+	_ simplex.QuorumCertificate = (*QC)(nil)
+	_ simplex.QCDeserializer    = QCDeserializer{}
+)
 
 type QCDeserializer BLSVerifier
 
@@ -36,24 +39,25 @@ func (qc *QC) Verify(msg []byte) error {
 	for _, signer := range qc.signers {
 		pk, exists := qc.verifier.nodeID2PK[ids.NodeID(signer)]
 		if !exists {
-			return fmt.Errorf("signer %x is not found in the membership set", signer)
+			return fmt.Errorf("%w: %x", errSignerNotFound, signer)
 		}
+
 		pks = append(pks, &pk)
 	}
 
 	// aggregate the public keys
 	aggPK, err := bls.AggregatePublicKeys(pks)
 	if err != nil {
-		return fmt.Errorf("failed to aggregate public keys: %w", err)
+		return fmt.Errorf("%w: %w", errSignatureAggregation, err)
 	}
 
 	message2Verify, err := encodeMessageToSign(msg, qc.verifier.chainID, qc.verifier.subnetID)
 	if err != nil {
-		return fmt.Errorf("failed to encode message to verify: %w", err)
+		return fmt.Errorf("%w: %w", errEncodingMessageToSign, err)
 	}
 
 	if !bls.Verify(aggPK, &qc.sig, message2Verify) {
-		return fmt.Errorf("signature verification failed")
+		return errSignatureVerificationFailed
 	}
 
 	return nil
@@ -81,7 +85,7 @@ func (d QCDeserializer) DeserializeQuorumCertificate(bytes []byte) (simplex.Quor
 	quorumSize := simplex.Quorum(len(d.nodeID2PK))
 	expectedSize := quorumSize*ids.NodeIDLen + bls.SignatureLen
 	if len(bytes) != expectedSize {
-		return nil, fmt.Errorf("expected at least %d bytes but got %d bytes", expectedSize, len(bytes))
+		return nil, fmt.Errorf("%w: %d expected but got %d bytes", errInvalidByteSliceLength, expectedSize, len(bytes))
 	}
 
 	signers := make([]simplex.NodeID, 0, quorumSize)
@@ -94,7 +98,7 @@ func (d QCDeserializer) DeserializeQuorumCertificate(bytes []byte) (simplex.Quor
 
 	sig, err := bls.SignatureFromBytes(bytes[pos:])
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse signature: %w", err)
+		return nil, fmt.Errorf("%w: %w", errFailedToParseSignature, err)
 	}
 
 	return &QC{
@@ -113,7 +117,7 @@ type SignatureAggregator BLSVerifier
 func (a SignatureAggregator) Aggregate(signatures []simplex.Signature) (simplex.QuorumCertificate, error) {
 	quorumSize := simplex.Quorum(len(a.nodeID2PK))
 	if len(signatures) < quorumSize {
-		return nil, fmt.Errorf("expected at least %d signatures but got %d", quorumSize, len(signatures))
+		return nil, fmt.Errorf("%w: wanted %d signatures but got %d", errNotEnoughSigners, quorumSize, len(signatures))
 	}
 
 	signatures = signatures[:quorumSize]
@@ -124,19 +128,19 @@ func (a SignatureAggregator) Aggregate(signatures []simplex.Signature) (simplex.
 		signer := signature.Signer
 		_, exists := a.nodeID2PK[ids.NodeID(signer)]
 		if !exists {
-			return nil, fmt.Errorf("signer %x is not found in the membership set", signer)
+			return nil, fmt.Errorf("%w: %x", errSignerNotFound, signer)
 		}
 		signers = append(signers, signer)
 		sig, err := bls.SignatureFromBytes(signature.Value)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse signature: %w", err)
+			return nil, fmt.Errorf("%w: %w", errFailedToParseSignature, err)
 		}
 		sigs = append(sigs, sig)
 	}
 
 	aggregatedSig, err := bls.AggregateSignatures(sigs)
 	if err != nil {
-		return nil, fmt.Errorf("failed to aggregate signatures: %w", err)
+		return nil, fmt.Errorf("%w: %w", errSignatureAggregation, err)
 	}
 
 	return &QC{
