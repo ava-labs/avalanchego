@@ -23,11 +23,11 @@ type BlockHeight = uint64
 // Block defines the type for block data.
 type Block = []byte
 
-// Store is a collection of blockchain blocks. It provides methods to read, write, and manage blocks on disk.
-type Store struct {
+// Database is a collection of blockchain blocks. It provides methods to read, write, and manage blocks on disk.
+type Database struct {
 	indexFile *os.File
 	dataFile  *os.File
-	options   StoreOptions
+	options   DatabaseConfig
 	header    IndexFileHeader
 	log       logging.Logger
 
@@ -45,7 +45,7 @@ type Store struct {
 	maxContiguousHeight atomic.Uint64
 }
 
-func (s *Store) openOrCreateFiles(indexDir, dataDir string, truncate bool) error {
+func (s *Database) openOrCreateFiles(indexDir, dataDir string, truncate bool) error {
 	indexPath := filepath.Join(indexDir, indexFileName)
 	dataPath := filepath.Join(dataDir, dataFileName)
 
@@ -75,7 +75,7 @@ func (s *Store) openOrCreateFiles(indexDir, dataDir string, truncate bool) error
 	return nil
 }
 
-func (s *Store) loadOrInitializeHeader(truncate bool) error {
+func (s *Database) loadOrInitializeHeader(truncate bool) error {
 	if truncate {
 		initialMCH := uint64(0)
 		if s.options.MinimumHeight > 1 {
@@ -125,25 +125,25 @@ func (s *Store) loadOrInitializeHeader(truncate bool) error {
 	return nil
 }
 
-// NewStore creates or opens a block store.
+// New creates a block database.
 // Parameters:
 //   - indexDir: Directory for the index file
 //   - dataDir: Directory for the data file(s)
 //   - syncToDisk: If true, forces fsync after writes for guaranteed recoverability
 //   - truncate: If true, truncates existing store files
-//   - opts: Optional configuration parameters
+//   - config: Optional configuration parameters
 //   - log: Logger instance for structured logging
-func NewStore(indexDir, dataDir string, syncToDisk bool, truncate bool, opts StoreOptions, log logging.Logger) (*Store, error) {
+func New(indexDir, dataDir string, syncToDisk bool, truncate bool, config DatabaseConfig, log logging.Logger) (*Database, error) {
 	if indexDir == "" || dataDir == "" {
 		return nil, fmt.Errorf("both indexDir and dataDir must be provided")
 	}
 
-	if err := opts.Validate(); err != nil {
+	if err := config.Validate(); err != nil {
 		return nil, err
 	}
 
-	s := &Store{
-		options:    opts,
+	s := &Database{
+		options:    config,
 		syncToDisk: syncToDisk,
 		log:        log,
 	}
@@ -166,7 +166,7 @@ func NewStore(indexDir, dataDir string, syncToDisk bool, truncate bool, opts Sto
 	return s, nil
 }
 
-func (s *Store) closeFiles() {
+func (s *Database) closeFiles() {
 	if s.indexFile != nil {
 		s.indexFile.Close()
 	}
@@ -176,22 +176,22 @@ func (s *Store) closeFiles() {
 }
 
 // MaxContiguousHeight returns the highest block height known to be contiguously stored.
-func (s *Store) MaxContiguousHeight() BlockHeight {
+func (s *Database) MaxContiguousHeight() BlockHeight {
 	return s.maxContiguousHeight.Load()
 }
 
 // MinHeight returns the minimum block height configured for this store.
-func (s *Store) MinHeight() uint64 {
+func (s *Database) MinHeight() uint64 {
 	return s.header.MinBlockHeight
 }
 
-func (s *Store) MaxBlockHeight() BlockHeight {
+func (s *Database) MaxBlockHeight() BlockHeight {
 	return s.maxBlockHeight.Load()
 }
 
 // Close flushes pending writes and closes the store files.
 // It is safe to call Close multiple times.
-func (s *Store) Close() error {
+func (s *Database) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

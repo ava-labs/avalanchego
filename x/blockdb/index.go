@@ -91,7 +91,7 @@ func (h *IndexFileHeader) UnmarshalBinary(data []byte) error {
 	return nil
 }
 
-func (s *Store) indexEntryOffset(height BlockHeight) (uint64, error) {
+func (s *Database) indexEntryOffset(height BlockHeight) (uint64, error) {
 	if height < s.header.MinBlockHeight {
 		return 0, fmt.Errorf("%w: height %d is less than minimum block height %d", ErrInvalidBlockHeight, height, s.header.MinBlockHeight)
 	}
@@ -107,7 +107,7 @@ func (s *Store) indexEntryOffset(height BlockHeight) (uint64, error) {
 	return finalOffset, nil
 }
 
-func (s *Store) readIndexEntry(height BlockHeight) (IndexEntry, error) {
+func (s *Database) readIndexEntry(height BlockHeight) (IndexEntry, error) {
 	offset, err := s.indexEntryOffset(height)
 	if err != nil {
 		return IndexEntry{}, err
@@ -128,7 +128,7 @@ func (s *Store) readIndexEntry(height BlockHeight) (IndexEntry, error) {
 	return entry, nil
 }
 
-func (s *Store) writeIndexEntryAt(indexFileOffset, dataFileBlockOffset, blockDataLen uint64) error {
+func (s *Database) writeIndexEntryAt(indexFileOffset, dataFileBlockOffset, blockDataLen uint64) error {
 	indexEntry := IndexEntry{
 		Offset: dataFileBlockOffset,
 		Size:   blockDataLen,
@@ -145,7 +145,7 @@ func (s *Store) writeIndexEntryAt(indexFileOffset, dataFileBlockOffset, blockDat
 	return nil
 }
 
-func (s *Store) persistIndexHeader(syncToDisk bool) error {
+func (s *Database) persistIndexHeader(syncToDisk bool) error {
 	// Why fsync indexFile before writing its header?
 	// To prevent a critical inconsistency: the header must not describe a state
 	// more advanced than what's durably stored in the index entries.

@@ -4,8 +4,8 @@ import (
 	"fmt"
 )
 
-// StoreOptions contains optional configuration parameters for BlockDB.
-type StoreOptions struct {
+// DatabaseConfig contains configuration parameters for BlockDB.
+type DatabaseConfig struct {
 	// MinimumHeight is the lowest block height the store will track (must be >= 1).
 	MinimumHeight uint64
 
@@ -16,9 +16,9 @@ type StoreOptions struct {
 	CheckpointInterval uint64
 }
 
-// DefaultStoreOptions returns the default options for BlockDB.
-func DefaultStoreOptions() StoreOptions {
-	return StoreOptions{
+// DefaultDatabaseConfig returns the default options for BlockDB.
+func DefaultDatabaseConfig() DatabaseConfig {
+	return DatabaseConfig{
 		MinimumHeight:      1,
 		MaxDataFileSize:    1 << 31, // Default to 2GB
 		CheckpointInterval: 1024,
@@ -26,7 +26,7 @@ func DefaultStoreOptions() StoreOptions {
 }
 
 // Validate checks if the store options are valid.
-func (opts StoreOptions) Validate() error {
+func (opts DatabaseConfig) Validate() error {
 	if opts.MinimumHeight == 0 {
 		return fmt.Errorf("%w: MinimumHeight cannot be 0, must be >= 1", ErrInvalidBlockHeight)
 	}
