@@ -25,7 +25,6 @@ use firewood::manager::{CacheReadStrategy, RevisionManagerConfig};
 use fastrace::collector::Config;
 
 use opentelemetry::InstrumentationScope;
-use opentelemetry::trace::SpanKind;
 use opentelemetry_otlp::{SpanExporter, WithExportConfig};
 use opentelemetry_sdk::Resource;
 
@@ -191,7 +190,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 .with_timeout(opentelemetry_otlp::OTEL_EXPORTER_OTLP_TIMEOUT_DEFAULT)
                 .build()
                 .expect("initialize oltp exporter"),
-            SpanKind::Server,
             Cow::Owned(
                 Resource::builder()
                     .with_service_name("avalabs.firewood.benchmark")
