@@ -473,12 +473,12 @@ message Signature {
 }
 
 message Vote {
-  BlockHeader vote = 1;
+  BlockHeader block_header = 1;
   Signature signature = 2;
 }
 
 message EmptyVote {
-  ProtocolMetadata vote = 1;
+  ProtocolMetadata metadata = 1;
   Signature signature = 2;
 }
 
@@ -488,7 +488,7 @@ message QuorumCertificate {
 }
 
 message EmptyNotarization {
-  ProtocolMetadata empty_vote = 1;
+  ProtocolMetadata metadata = 1;
   bytes quorum_certificate = 2;
 }
 
