@@ -4,10 +4,8 @@
 package server
 
 import (
-	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -28,23 +26,26 @@ func TestHTTP2RouterServeHTTP(t *testing.T) {
 	tests := []struct {
 		name     string
 		chainIDs []ids.ID
-		path     string
+		header   http.Header
 		wantCode int
 	}{
 		{
-			name:     "invalid request",
-			path:     "foo",
-			wantCode: http.StatusBadRequest,
+			name:     "missing chain-id header",
+			wantCode: http.StatusNotFound,
 		},
 		{
-			name:     "invalid handler",
-			path:     "/foo/bar/method",
+			name: "unknown referenced chain-id",
+			header: http.Header{
+				http.CanonicalHeaderKey("chain-id"): []string{ids.Empty.String()},
+			},
 			wantCode: http.StatusNotFound,
 		},
 		{
 			name:     "valid handler",
-			chainIDs: []ids.ID{{'f', 'o', 'o'}},
-			path:     fmt.Sprintf("/%s/bar/method", ids.ID{'f', 'o', 'o'}.String()),
+			chainIDs: []ids.ID{ids.Empty},
+			header: http.Header{
+				http.CanonicalHeaderKey("chain-id"): []string{ids.Empty.String()},
+			},
 			wantCode: http.StatusOK,
 		},
 	}
@@ -57,9 +58,8 @@ func TestHTTP2RouterServeHTTP(t *testing.T) {
 			handler := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
 			writer := httptest.NewRecorder()
 			request := httptest.NewRequest(http.MethodPost, "/", nil)
-			request.URL = &url.URL{
-				Path: tt.path,
-			}
+			request.Proto = "HTTP/2"
+			request.Header = tt.header
 
 			for _, chainID := range tt.chainIDs {
 				require.True(h.Add(chainID, handler))

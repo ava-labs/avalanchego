@@ -25,15 +25,9 @@ func newHTTP2Router() *http2Router {
 }
 
 func (h *http2Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// The :path pseudo-header takes the form of /Prefix/Path
-	parsed := strings.Split(r.URL.Path, "/")
-	if len(parsed) < 2 {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	chainID := parsed[1]
-
+	// the chain-id header must be set to route the request to the correct chain
+	// http2 handler
+	chainID := r.Header.Get("chain-id")
 	h.lock.RLock()
 	handler, ok := h.handlers[chainID]
 	h.lock.RUnlock()
