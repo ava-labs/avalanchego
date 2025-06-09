@@ -13,8 +13,9 @@ import (
 )
 
 var (
-	_ simplex.QuorumCertificate = (*QC)(nil)
-	_ simplex.QCDeserializer    = QCDeserializer{}
+	_ simplex.QuorumCertificate   = (*QC)(nil)
+	_ simplex.QCDeserializer      = QCDeserializer{}
+	_ simplex.SignatureAggregator = (*SignatureAggregator)(nil)
 )
 
 type QCDeserializer BLSVerifier

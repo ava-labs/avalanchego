@@ -8,6 +8,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var _ ValidatorInfo = (*testValidatorInfo)(nil)
@@ -85,7 +86,7 @@ func newTestValidatorInfo(all []*testValidator) *testValidatorInfo {
 type testEngineConfig struct {
 	curNode  *testValidator   // defaults to the first node
 	allNodes []*testValidator // all nodes in the test. defaults to a single node
-	chainID ids.ID
+	chainID  ids.ID
 	subnetID ids.ID
 }
 
@@ -110,6 +111,7 @@ func newEngineConfig(options *testEngineConfig) (*Config, error) {
 		Ctx:        simplexChainContext,
 		Validators: vdrs,
 		SignBLS:    options.curNode.sign,
+		Log:        logging.NoLog{}, // TODO: replace with a proper logger
 	}, nil
 }
 
