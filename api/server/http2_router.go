@@ -5,7 +5,6 @@ package server
 
 import (
 	"net/http"
-	"strings"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -41,15 +40,7 @@ func (h *http2Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Deep copy the request to avoid weird behavior from modifying r
-	requestDeepCopy := r.Clone(r.Context())
-	// Route this request to the http2 handler using the chain prefix
-	requestDeepCopy.URL.Path = strings.TrimPrefix(
-		requestDeepCopy.URL.Path,
-		"/"+chainID,
-	)
-
-	handler.ServeHTTP(w, requestDeepCopy)
+	handler.ServeHTTP(w, r)
 }
 
 func (h *http2Router) Add(chainID ids.ID, handler http.Handler) bool {
