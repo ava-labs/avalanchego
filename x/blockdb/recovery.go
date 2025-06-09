@@ -15,7 +15,7 @@ const (
 // recover attempts to restore the store to a consistent state by scanning the data file
 // for blocks that may not be correctly indexed, usually after an unclean shutdown.
 // It reconciles the data file with the index file header and entries.
-func (s *Store) recover() error {
+func (s *Database) recover() error {
 	dataFileInfo, err := s.dataFile.Stat()
 	if err != nil {
 		return fmt.Errorf("failed to get data file stats for recovery: %w", err)
@@ -94,7 +94,7 @@ func (s *Store) recover() error {
 
 // recoverBlockAtOffset attempts to read, validate, and index a block at the given offset.
 // Returns the blockHeader and an error if the block is invalid or incomplete.
-func (s *Store) recoverBlockAtOffset(offset, dataFileActualSize uint64) (blockHeader, error) {
+func (s *Database) recoverBlockAtOffset(offset, dataFileActualSize uint64) (blockHeader, error) {
 	var bh blockHeader
 	if dataFileActualSize-offset < sizeOfBlockHeader {
 		return bh, fmt.Errorf("not enough data for block header at offset %d", offset)
@@ -143,7 +143,7 @@ func (s *Store) recoverBlockAtOffset(offset, dataFileActualSize uint64) (blockHe
 
 // updateMaxContiguousHeightOnRecovery extends the max contiguous height from the value in the header,
 // incrementing as long as contiguous blocks exist.
-func (s *Store) updateMaxContiguousHeightOnRecovery() {
+func (s *Database) updateMaxContiguousHeightOnRecovery() {
 	currentMCH := s.header.MaxContiguousBlockHeight
 	highestKnown := s.maxBlockHeight.Load()
 
