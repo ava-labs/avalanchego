@@ -132,3 +132,37 @@ func TestSignerInvalidMessageEncoding(t *testing.T) {
 	err = verifier.Verify(dummyMsg, sigBytes, config.Ctx.NodeID[:])
 	require.ErrorIs(t, err, errSignatureVerificationFailed)
 }
+
+// TestQCAggregateAndSign tests the aggregation of multiple signatures
+// and then verifies the generated quorum certificate on that message.
+func TestQCAggregateAndSign(t *testing.T) {
+	ls, err := localsigner.New()
+	require.NoError(t, err)
+
+	config := newEngineConfig(ls)
+	signer, verifier := NewBLSAuth(config)
+
+	msg := "Begin at the beginning, and go on till you come to the end: then stop"
+
+	sig1, err := signer.Sign([]byte(msg))
+	require.NoError(t, err)
+
+	sig2, err := signer.Sign([]byte(msg))
+	require.NoError(t, err)
+
+	// Aggregate signatures
+	aggSig, err := bls.AggregateSignatures([]*bls.Signature{bls.SignatureFromBytes(sig1), bls.SignatureFromBytes(sig2)})
+	require.NoError(t, err)
+
+	err = verifier.Verify([]byte(msg), bls.SignatureToBytes(aggSig), config.Ctx.NodeID[:])
+	require.NoError(t, err)
+}
+
+func TestQCSignerNotInMembershipSet(t *testing.T) {
+	
+}
+
+func TestQCNotInMembershipSet(t *testing.T) {
+	
+}
+
