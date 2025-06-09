@@ -31,8 +31,8 @@ func NewChainClient(uri string, chainID ids.ID, opts ...grpc.DialOption) (*grpc.
 	return conn, nil
 }
 
-// SetChainIDHeaderUnaryClientInterceptor prefixes unary grpc calls with the
-// provided chainID prefix
+// SetChainIDHeaderUnaryClientInterceptor sets the chain-id header for unary
+// requests
 func SetChainIDHeaderUnaryClientInterceptor(chainID ids.ID) grpc.UnaryClientInterceptor {
 	return func(
 		ctx context.Context,
@@ -48,8 +48,8 @@ func SetChainIDHeaderUnaryClientInterceptor(chainID ids.ID) grpc.UnaryClientInte
 	}
 }
 
-// SetChainIDHeaderStreamClientInterceptor prefixes streaming grpc calls with the
-// provided chainID prefix
+// SetChainIDHeaderStreamClientInterceptor sets the chain-id header for
+// streaming requests
 func SetChainIDHeaderStreamClientInterceptor(chainID ids.ID) grpc.StreamClientInterceptor {
 	return func(
 		ctx context.Context,
@@ -64,7 +64,7 @@ func SetChainIDHeaderStreamClientInterceptor(chainID ids.ID) grpc.StreamClientIn
 	}
 }
 
-// newContextWithChainHeader sets the chain-id header which is the server uses
+// newContextWithChainHeader sets the chain-id header which the server uses
 // to route the client grpc request
 func newContextWithChainIDHeader(ctx context.Context, chainID ids.ID) context.Context {
 	return metadata.AppendToOutgoingContext(ctx, "chain-id", chainID.String())
