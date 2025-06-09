@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-// NewChainClient returns grpc.ClientConn that sets the chain-id header for
+// NewChainClient returns a grpc.ClientConn that sets the chain-id header for
 // all requests
 func NewChainClient(uri string, chainID ids.ID, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
 	dialOpts := []grpc.DialOption{
