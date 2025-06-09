@@ -31,7 +31,7 @@ func TestHTTP2RouterServeHTTP(t *testing.T) {
 	}{
 		{
 			name:     "missing chain-id header",
-			wantCode: http.StatusNotFound,
+			wantCode: http.StatusBadRequest,
 		},
 		{
 			name: "unknown referenced chain-id",

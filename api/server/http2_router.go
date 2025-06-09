@@ -28,6 +28,11 @@ func (h *http2Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// the chain-id header must be set to route the request to the correct chain
 	// http2 handler
 	chainID := r.Header.Get("chain-id")
+	if len(chainID) == 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
 	h.lock.RLock()
 	handler, ok := h.handlers[chainID]
 	h.lock.RUnlock()
