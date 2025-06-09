@@ -6,7 +6,6 @@ package flags
 import (
 	"flag"
 	"fmt"
-	"os"
 
 	"github.com/spf13/pflag"
 
@@ -48,7 +47,7 @@ func (v *KubeconfigVars) register(stringVar varFunc[string], docPrefix string) {
 	stringVar(
 		&v.Path,
 		"kubeconfig",
-		tmpnet.GetEnvWithDefault(KubeconfigPathEnvVar, os.ExpandEnv("$HOME/.kube/config")),
+		tmpnet.GetEnvWithDefault(KubeconfigPathEnvVar, ""),
 		docPrefix+fmt.Sprintf(
 			"The path to a kubernetes configuration file for the target cluster. Also possible to configure via the %s env variable.",
 			KubeconfigPathEnvVar,
