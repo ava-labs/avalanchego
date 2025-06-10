@@ -13,7 +13,7 @@ require (
 	github.com/DataDog/zstd v1.5.2
 	github.com/StephenButtolph/canoto v0.15.0
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
-	github.com/ava-labs/coreth v0.15.2-rc.0.0.20250610152518-803c510ae42b
+	github.com/ava-labs/coreth v0.15.2-rc.0.0.20250610160521-41b58f8789cf
 	github.com/ava-labs/ledger-avalanche/go v0.0.0-20241009183145-e6f90a8a1a60
 	github.com/ava-labs/libevm v0.0.0-20250610142802-2672fbd7cdfc
 	github.com/btcsuite/btcd/btcutil v1.1.3
