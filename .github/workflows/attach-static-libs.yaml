@@ -129,14 +129,16 @@ jobs:
           git config --global user.name "FirewoodCI"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -b ${{ steps.determine_branch.outputs.target_branch }}
+          echo "Editing ffi/go.mod in place to use firewood-go/ffi module path"
+          # Note: requires sed -i '' ... on MacOS to edit in place without creating a backup file since BSD sed differs from GNU sed.
+          sed -i 's|module github.com/ava-labs/firewood/ffi|module github.com/ava-labs/firewood-go/ffi|' ffi/go.mod
           git add .
           git commit -m "firewood ci ${{ github.sha }}: attach firewood static libs"
+          git push -u origin ${{ steps.determine_branch.outputs.target_branch }} --force
           
           if [[ "${{ github.ref_type }}" == "tag" ]]; then
             git tag -a "${GITHUB_REF#refs/tags/}" -m "firewood ci ${{ github.sha }}: attach firewood static libs"
             git push origin "refs/tags/${GITHUB_REF#refs/tags/}"
-          else
-            git push -u origin ${{ steps.determine_branch.outputs.target_branch }} --force
           fi
 
   # Check out the branch created in the previous job on a matrix of
