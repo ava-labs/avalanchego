@@ -101,5 +101,9 @@ func (s *MetricsServer) GenerateMonitoringConfig(monitoringLabels map[string]str
 		return "", err
 	}
 
+	if err := os.MkdirAll(filepath.Dir(collectorFilePath), 0755); err != nil {
+		return "", err
+	}
+
 	return collectorFilePath, os.WriteFile(collectorFilePath, config, perms.ReadWrite)
 }

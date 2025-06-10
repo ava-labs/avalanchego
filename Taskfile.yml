@@ -232,10 +232,10 @@ tasks:
       - task: generate-load-contract-bindings
       - task: build
       - cmd: go run ./tests/load/c/main --avalanchego-path=./build/avalanchego {{.CLI_ARGS}}
-    
+  
   test-load-kube:
     desc: Runs load tests against a network deployed to kube
-    cmds: 
+    cmds:
       - task: generate-load-contract-bindings
       - cmd: bash -x ./scripts/tests.load.kube.sh {{.CLI_ARGS}}
 
@@ -243,6 +243,10 @@ tasks:
     desc: Runs load tests against kube with exclusive scheduling
     cmds:
       - cmd: go run ./tests/load/c/main --runtime=kube --kube-use-exclusive-scheduling {{.CLI_ARGS}}
+
+  test-load-kind-cluster:
+    desc: Runs load tests within a kind cluster
+    cmd: bash -x ./scripts/tests.load.kind.sh
 
   test-unit:
     desc: Runs unit tests

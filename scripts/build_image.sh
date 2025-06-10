@@ -10,6 +10,7 @@ set -euo pipefail
 # DOCKER_IMAGE=avaplatform/avalanchego ./scripts/build_image.sh                       # Build and push multi-arch image to docker hub
 # DOCKER_IMAGE=localhost:5001/avalanchego ./scripts/build_image.sh                    # Build and push multi-arch image to private registry
 # DOCKER_IMAGE=localhost:5001/avalanchego FORCE_TAG_LATEST=1 ./scripts/build_image.sh # Build and push image to private registry with tag `latest`
+# DOCKERFILE="./Dockerfile" ./scripts/build_image.sh                                    # Build and push image with a custom Dockerfile
 
 # Multi-arch builds require Docker Buildx and QEMU. buildx should be enabled by
 # default in the version of docker included with Ubuntu 22.04, and qemu can be
@@ -34,6 +35,8 @@ SKIP_BUILD_RACE="${SKIP_BUILD_RACE:-}"
 
 # Force tagging as latest even if not the master branch
 FORCE_TAG_LATEST="${FORCE_TAG_LATEST:-}"
+
+DOCKERFILE="${DOCKERFILE:-$AVALANCHE_PATH/Dockerfile}"
 
 # Load the constants
 source "$AVALANCHE_PATH"/scripts/constants.sh
@@ -108,12 +111,12 @@ fi
 
 echo "Building Docker Image with tags: $DOCKER_IMAGE:$commit_hash , $DOCKER_IMAGE:$image_tag"
 ${DOCKER_CMD} -t "$DOCKER_IMAGE:$commit_hash" -t "$DOCKER_IMAGE:$image_tag" \
-              "$AVALANCHE_PATH" -f "$AVALANCHE_PATH/Dockerfile"
+              "$AVALANCHE_PATH" -f "$DOCKERFILE"
 
 if [[ -z "${SKIP_BUILD_RACE}" ]]; then
    echo "Building Docker Image with tags (race detector): $DOCKER_IMAGE:$commit_hash-r , $DOCKER_IMAGE:$image_tag-r"
    ${DOCKER_CMD} --build-arg="RACE_FLAG=-r" -t "$DOCKER_IMAGE:$commit_hash-r" -t "$DOCKER_IMAGE:$image_tag-r" \
-                 "$AVALANCHE_PATH" -f "$AVALANCHE_PATH/Dockerfile"
+                 "$AVALANCHE_PATH" -f "$DOCKERFILE"
 fi
 
 # Only tag the latest image for the master branch when images are pushed to a registry
