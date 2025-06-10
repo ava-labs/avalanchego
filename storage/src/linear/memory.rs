@@ -2,6 +2,7 @@
 // See the file LICENSE.md for licensing terms.
 
 use super::{FileIoError, ReadableStorage, WritableStorage};
+use metrics::counter;
 use std::io::{Cursor, Read};
 use std::sync::Mutex;
 
@@ -34,6 +35,7 @@ impl WritableStorage for MemStore {
 
 impl ReadableStorage for MemStore {
     fn stream_from(&self, addr: u64) -> Result<Box<dyn Read>, FileIoError> {
+        counter!("firewood.read_node", "from" => "memory").increment(1);
         let bytes = self
             .bytes
             .lock()

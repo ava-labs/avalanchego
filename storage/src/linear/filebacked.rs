@@ -125,6 +125,7 @@ impl FileBacked {
 
 impl ReadableStorage for FileBacked {
     fn stream_from(&self, addr: u64) -> Result<Box<dyn Read + '_>, FileIoError> {
+        counter!("firewood.read_node", "from" => "file").increment(1);
         Ok(Box::new(PredictiveReader::new(self, addr)))
     }
 
