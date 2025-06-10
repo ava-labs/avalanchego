@@ -10,7 +10,7 @@ set -euo pipefail
 # DOCKER_IMAGE=avaplatform/avalanchego ./scripts/build_image.sh                       # Build and push multi-arch image to docker hub
 # DOCKER_IMAGE=localhost:5001/avalanchego ./scripts/build_image.sh                    # Build and push multi-arch image to private registry
 # DOCKER_IMAGE=localhost:5001/avalanchego FORCE_TAG_LATEST=1 ./scripts/build_image.sh # Build and push image to private registry with tag `latest`
-# DOCKERFILE="./Dockerfile" ./scripts/build_image.sh                                    # Build and push image with a custom Dockerfile
+# DOCKERFILE="./Dockerfile" ./scripts/build_image.sh                                    # Build image with a custom Dockerfile
 
 # Multi-arch builds require Docker Buildx and QEMU. buildx should be enabled by
 # default in the version of docker included with Ubuntu 22.04, and qemu can be
