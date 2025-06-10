@@ -4,7 +4,9 @@
 package simplex
 
 import (
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -20,6 +22,10 @@ type Config struct {
 	Log        logging.Logger
 	Validators ValidatorInfo
 	SignBLS    SignFunc
+
+	GenesisData []byte // genesis block data, stored as the first block in the storage
+	VM          block.ChainVM 
+	DB          database.Database
 }
 
 // Context is information about the current execution.

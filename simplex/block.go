@@ -11,25 +11,13 @@ import (
 	"github.com/ava-labs/simplex"
 )
 
-// type Block struct {
-// 	verifiedBlock VerifiedBlock
-// }
-
-// func (b *Block) BlockHeader() simplex.BlockHeader {
-// 	return b.verifiedBlock.BlockHeader()
-// }
-
-// func (b *Block) Verify(ctx context.Context) (simplex.VerifiedBlock, error) {
-// 	// TODO: Implement the logic to verify the block.
-// 	return &b.verifiedBlock, nil
-// }
-
 type VerifiedBlock struct {
 	computeDigestOnce sync.Once
 	digest            simplex.Digest // cached, not serialized
 
 	metadata   simplex.ProtocolMetadata
 	innerBlock []byte
+	onIndex func() error // called when the block is indexed
 }
 
 // BlockHeader returns the block header for the verified block.
@@ -52,10 +40,10 @@ func VerifiedBlockFromBytes(buff []byte) (*VerifiedBlock, error) {
 	}
 
 	v := &VerifiedBlock{
-		metadata: md,
+		metadata:   md,
 		innerBlock: buff[simplex.ProtocolMetadataLen:],
 	}
-	
+
 	return v, nil
 }
 
