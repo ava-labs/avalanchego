@@ -129,9 +129,10 @@ jobs:
           git config --global user.name "FirewoodCI"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -b ${{ steps.determine_branch.outputs.target_branch }}
-          echo "Editing ffi/go.mod in place to use firewood-go/ffi module path"
-          # Note: requires sed -i '' ... on MacOS to edit in place without creating a backup file since BSD sed differs from GNU sed.
-          sed -i 's|module github.com/ava-labs/firewood/ffi|module github.com/ava-labs/firewood-go/ffi|' ffi/go.mod
+          echo "Updating ffi module path before pushing to alternative remote"
+          pushd ffi
+          go mod edit -module github.com/ava-labs/firewood-go/ffi
+          popd
           git add .
           git commit -m "firewood ci ${{ github.sha }}: attach firewood static libs"
           git push -u origin ${{ steps.determine_branch.outputs.target_branch }} --force
