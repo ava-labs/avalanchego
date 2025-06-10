@@ -66,10 +66,12 @@ github.com/antithesishq/antithesis-sdk-go v0.3.8/go.mod h1:IUpT2DPAKh6i/YhSbt6Gl
 github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6/go.mod h1:grANhF5doyWs3UAsr3K4I6qtAmlQcZDesFNEHPZAzj8=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPdPJAN/hZIm0C4OItdklCFmMRWYpio=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
-github.com/ava-labs/coreth v0.15.2-rc.0 h1:RnCH59A/WMEdMyuqugaPIk1xrQQuo9vEgMVOjk9ZjWQ=
-github.com/ava-labs/coreth v0.15.2-rc.0/go.mod h1:Tl6TfpOwSq0bXvN7DTENXB4As3hml8ma9OQEWS9DH9I=
+github.com/ava-labs/coreth v0.15.2-rc.0.0.20250610152518-803c510ae42b h1:2KYUkspEuqXNP3Kk4kbG9yPGKoYUR4JAJ+3LpOEZN6E=
+github.com/ava-labs/coreth v0.15.2-rc.0.0.20250610152518-803c510ae42b/go.mod h1:tmn8A6k+nV7UIgzq2RdpuEiIwsUGkGCrEhijfoRUaKY=
 github.com/ava-labs/ledger-avalanche/go v0.0.0-20241009183145-e6f90a8a1a60 h1:EL66gtXOAwR/4KYBjOV03LTWgkEXvLePribLlJNu4g0=
 github.com/ava-labs/ledger-avalanche/go v0.0.0-20241009183145-e6f90a8a1a60/go.mod h1:/7qKobTfbzBu7eSTVaXMTr56yTYk4j2Px6/8G+idxHo=
+github.com/ava-labs/libevm v0.0.0-20250610142802-2672fbd7cdfc h1:cSXaUY4hdmoJ2FJOgOzn+WiovN/ZB/zkNRgnZhE50OA=
+github.com/ava-labs/libevm v0.0.0-20250610142802-2672fbd7cdfc/go.mod h1:+Iol+sVQ1KyoBsHf3veyrBmHCXr3xXRWq6ZXkgVfNLU=
 github.com/ava-labs/libevm v1.13.14-0.2.0.release h1:uKGCc5/ceeBbfAPRVtBUxbQt50WzB2pEDb8Uy93ePgQ=
 github.com/ava-labs/libevm v1.13.14-0.2.0.release/go.mod h1:+Iol+sVQ1KyoBsHf3veyrBmHCXr3xXRWq6ZXkgVfNLU=
 github.com/aymerick/raymond v2.0.3-0.20180322193309-b565731e1464+incompatible/go.mod h1:osfaiScAUVup+UC9Nfq76eWqDhXlp+4UYaA8uhTBO6g=
