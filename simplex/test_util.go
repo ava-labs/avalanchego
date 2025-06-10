@@ -19,10 +19,6 @@ type testValidatorInfo struct {
 }
 
 func (v *testValidatorInfo) GetValidatorIDs(_ ids.ID) []ids.NodeID {
-	if v.validators == nil {
-		return nil
-	}
-
 	ids := make([]ids.NodeID, 0, len(v.validators))
 	for id := range v.validators {
 		ids = append(ids, id)
@@ -36,10 +32,7 @@ func (v *testValidatorInfo) GetValidator(_ ids.ID, nodeID ids.NodeID) (*validato
 	}
 
 	val, exists := v.validators[nodeID]
-	if !exists {
-		return nil, false
-	}
-	return &val, true
+	return &val, exists
 }
 
 func newTestValidatorInfo(nodeIds []ids.NodeID, pks []*bls.PublicKey) *testValidatorInfo {

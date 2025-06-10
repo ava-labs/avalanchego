@@ -72,7 +72,6 @@ type encodedSimplexSignedPayload struct {
 	Label    []byte
 }
 
-// encodesMessageToSign returns a byte slice [simplexLabel][chainID][networkID][message length][message].
 func encodeMessageToSign(message []byte, chainID ids.ID, subnetID ids.ID) ([]byte, error) {
 	encodedSimplexMessage := encodedSimplexSignedPayload{
 		Message:  message,
