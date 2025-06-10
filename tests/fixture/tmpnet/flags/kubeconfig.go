@@ -44,7 +44,6 @@ func newKubeconfigFlagSetVars(flagSet *pflag.FlagSet, docPrefix string) *Kubecon
 	return v
 }
 
-// internal method registering kubeConfig and kubeconfig context
 func (v *KubeconfigVars) register(stringVar varFunc[string], docPrefix string) {
 	// the default kubeConfig path is set to empty to allow for the use of a projected
 	// token when running in-cluster
