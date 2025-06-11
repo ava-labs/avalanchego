@@ -70,7 +70,6 @@ func TestBlockDeserializer(t *testing.T) {
 		vm: testVM,
 	}
 
-	// Create a verified block
 	vb := &VerifiedBlock{
 		innerBlock: snowmantest.GenesisBytes,
 		metadata: simplex.ProtocolMetadata{
@@ -88,7 +87,6 @@ func TestBlockDeserializer(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, vb.BlockHeader(), vb1.BlockHeader())
 
-	// Create a verified block
 	vbWrongBytes := &VerifiedBlock{
 		innerBlock: []byte("wrong block data"),
 		metadata:   simplex.ProtocolMetadata{},

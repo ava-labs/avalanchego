@@ -45,8 +45,8 @@ func (v *VerifiedBlock) Bytes() []byte {
 func (v *VerifiedBlock) computeDigest() {
 	mdBytes := v.metadata.Bytes()
 	h := sha256.New()
-	h.Write(v.innerBlock)
 	h.Write(mdBytes)
+	h.Write(v.innerBlock)
 	digest := h.Sum(nil)
 	v.digest = simplex.Digest(digest)
 }
