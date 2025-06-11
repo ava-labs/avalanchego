@@ -36,6 +36,7 @@ var (
 		DurangoTime:               time.Date(2024, time.March, 6, 16, 0, 0, 0, time.UTC),
 		EtnaTime:                  time.Date(2024, time.December, 16, 17, 0, 0, 0, time.UTC),
 		FortunaTime:               time.Date(2025, time.April, 8, 15, 0, 0, 0, time.UTC),
+		GraniteTime:               UnscheduledActivationTime,
 	}
 	Fuji = Config{
 		ApricotPhase1Time:            time.Date(2021, time.March, 26, 14, 0, 0, 0, time.UTC),
@@ -57,6 +58,7 @@ var (
 		DurangoTime:               time.Date(2024, time.February, 13, 16, 0, 0, 0, time.UTC),
 		EtnaTime:                  time.Date(2024, time.November, 25, 16, 0, 0, 0, time.UTC),
 		FortunaTime:               time.Date(2025, time.March, 13, 15, 0, 0, 0, time.UTC),
+		GraniteTime:               UnscheduledActivationTime,
 	}
 	Default = Config{
 		ApricotPhase1Time:            InitiallyActiveTime,
@@ -74,8 +76,8 @@ var (
 		DurangoTime:                  InitiallyActiveTime,
 		EtnaTime:                     InitiallyActiveTime,
 		FortunaTime:                  InitiallyActiveTime,
-		GUpgradeTime:                 InitiallyActiveTime,
-		GUpgradeEpochDuration:        30,
+		GraniteTime:                  UnscheduledActivationTime,
+		GraniteEpochDuration:         30,
 	}
 
 	ErrInvalidUpgradeTimes = errors.New("invalid upgrade configuration")
@@ -97,8 +99,8 @@ type Config struct {
 	DurangoTime                  time.Time `json:"durangoTime"`
 	EtnaTime                     time.Time `json:"etnaTime"`
 	FortunaTime                  time.Time `json:"fortunaTime"`
-	GUpgradeTime                 time.Time `json:"gUpgradeTime"`
-	GUpgradeEpochDuration        uint64    `json:"gUpgradeEpochDuration"`
+	GraniteTime                  time.Time `json:"graniteTime"`
+	GraniteEpochDuration         uint64    `json:"graniteEpochDuration"`
 }
 
 func (c *Config) Validate() error {
@@ -116,6 +118,7 @@ func (c *Config) Validate() error {
 		c.DurangoTime,
 		c.EtnaTime,
 		c.FortunaTime,
+		c.GraniteTime,
 	}
 	for i := 0; i < len(upgrades)-1; i++ {
 		if upgrades[i].After(upgrades[i+1]) {
@@ -183,8 +186,8 @@ func (c *Config) IsFortunaActivated(t time.Time) bool {
 	return !t.Before(c.FortunaTime)
 }
 
-func (c *Config) IsGUpgradeActivated(t time.Time) bool {
-	return !t.Before(c.GUpgradeTime)
+func (c *Config) IsGraniteActivated(t time.Time) bool {
+	return !t.Before(c.GraniteTime)
 }
 
 func GetConfig(networkID uint32) Config {

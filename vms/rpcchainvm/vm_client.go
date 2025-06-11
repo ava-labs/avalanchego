@@ -199,6 +199,7 @@ func (vm *VMClient) Initialize(
 		DurangoTime:                   grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.DurangoTime),
 		EtnaTime:                      grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.EtnaTime),
 		FortunaTime:                   grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.FortunaTime),
+		GraniteTime:                   grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.GraniteTime),
 	}
 
 	resp, err := vm.client.Initialize(ctx, &vmpb.InitializeRequest{
@@ -386,6 +387,25 @@ func (vm *VMClient) CreateHandlers(ctx context.Context) (map[string]http.Handler
 		handlers[handler.Prefix] = ghttp.NewClient(httppb.NewHTTPClient(clientConn))
 	}
 	return handlers, nil
+}
+
+func (vm *VMClient) CreateHTTP2Handler(ctx context.Context) (http.Handler, error) {
+	resp, err := vm.client.CreateHTTP2Handler(ctx, &emptypb.Empty{})
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.ServerAddr == "" {
+		return nil, nil
+	}
+
+	clientConn, err := grpcutils.Dial(resp.ServerAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	vm.conns = append(vm.conns, clientConn)
+	return ghttp.NewClient(httppb.NewHTTPClient(clientConn)), nil
 }
 
 func (vm *VMClient) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {

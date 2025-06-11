@@ -16,7 +16,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
-	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -27,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/linked"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
@@ -46,8 +44,6 @@ import (
 	txexecutor "github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 	xmempool "github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 )
-
-const assetToFxCacheSize = 1024
 
 var (
 	errIncompatibleFx            = errors.New("incompatible feature extension")
@@ -85,14 +81,8 @@ type VM struct {
 	// State management
 	state state.State
 
-	// Set to true once this VM is marked as `Bootstrapped` by the engine
-	bootstrapped bool
-
 	// asset id that will be used for fees
 	feeAssetID ids.ID
-
-	// Asset ID --> Bit set with fx IDs the asset supports
-	assetToFxCache *lru.Cache[ids.ID, set.Bits64]
 
 	baseDB database.Database
 	db     *versiondb.Database
@@ -185,7 +175,6 @@ func (vm *VM) Initialize(
 	vm.appSender = appSender
 	vm.baseDB = db
 	vm.db = versiondb.New(db)
-	vm.assetToFxCache = lru.NewCache[ids.ID, set.Bits64](assetToFxCacheSize)
 
 	typedFxs := make([]extensions.Fx, len(fxs))
 	vm.fxs = make([]*extensions.ParsedFx, len(fxs))
@@ -270,8 +259,6 @@ func (vm *VM) onNormalOperationsStarted() error {
 			return err
 		}
 	}
-
-	vm.bootstrapped = true
 	return nil
 }
 
@@ -329,6 +316,10 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 		"":        rpcServer,
 		"/wallet": walletServer,
 	}, err
+}
+
+func (*VM) CreateHTTP2Handler(context.Context) (http.Handler, error) {
+	return nil, nil
 }
 
 /*

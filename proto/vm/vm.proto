@@ -21,6 +21,7 @@ service VM {
   rpc Shutdown(google.protobuf.Empty) returns (google.protobuf.Empty);
   // Creates the HTTP handlers for custom chain network calls.
   rpc CreateHandlers(google.protobuf.Empty) returns (CreateHandlersResponse);
+  rpc CreateHTTP2Handler(google.protobuf.Empty) returns (CreateHTTP2HandlerResponse);
   rpc Connected(ConnectedRequest) returns (google.protobuf.Empty);
   rpc Disconnected(DisconnectedRequest) returns (google.protobuf.Empty);
   // Attempt to create a new block from data contained in the VM.
@@ -131,6 +132,7 @@ message NetworkUpgrades {
   google.protobuf.Timestamp durango_time = 13;
   google.protobuf.Timestamp etna_time = 14;
   google.protobuf.Timestamp fortuna_time = 15;
+  google.protobuf.Timestamp granite_time = 16;
 }
 
 message InitializeResponse {
@@ -155,6 +157,12 @@ message SetStateResponse {
 
 message CreateHandlersResponse {
   repeated Handler handlers = 1;
+}
+
+message CreateHTTP2HandlerResponse {
+  // server_addr is the address of the gRPC server which serves the
+  // HTTP service
+  string server_addr = 1;
 }
 
 message Handler {

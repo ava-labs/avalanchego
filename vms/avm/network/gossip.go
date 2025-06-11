@@ -73,7 +73,6 @@ func newGossipMempool(
 	registerer prometheus.Registerer,
 	log logging.Logger,
 	txVerifier TxVerifier,
-	parser txs.Parser,
 	minTargetElements int,
 	targetFalsePositiveProbability,
 	resetFalsePositiveProbability float64,
@@ -83,7 +82,6 @@ func newGossipMempool(
 		Mempool:    mempool,
 		log:        log,
 		txVerifier: txVerifier,
-		parser:     parser,
 		bloom:      bloom,
 	}, err
 }
@@ -92,7 +90,6 @@ type gossipMempool struct {
 	xmempool.Mempool
 	log        logging.Logger
 	txVerifier TxVerifier
-	parser     txs.Parser
 
 	lock  sync.RWMutex
 	bloom *gossip.BloomFilter

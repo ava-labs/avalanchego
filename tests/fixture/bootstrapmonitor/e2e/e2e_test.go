@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/bootstrapmonitor"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet/flags"
 	"github.com/ava-labs/avalanchego/utils/constants"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -60,6 +61,7 @@ const (
 )
 
 var (
+	kubeconfigVars            *flags.KubeconfigVars
 	skipAvalanchegoImageBuild bool
 	skipMonitorImageBuild     bool
 
@@ -67,6 +69,7 @@ var (
 )
 
 func init() {
+	kubeconfigVars = flags.NewKubeconfigFlagVars()
 	flag.BoolVar(
 		&skipAvalanchegoImageBuild,
 		"skip-avalanchego-image-build",
@@ -103,8 +106,7 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 		}
 
 		ginkgo.By("Configuring a kubernetes client")
-		kubeconfigPath := os.Getenv("KUBECONFIG")
-		kubeconfig, err := tmpnet.GetClientConfig(tc.Log(), kubeconfigPath, "")
+		kubeconfig, err := tmpnet.GetClientConfig(tc.Log(), kubeconfigVars.Path, kubeconfigVars.Context)
 		require.NoError(err)
 		clientset, err := kubernetes.NewForConfig(kubeconfig)
 		require.NoError(err)
@@ -261,15 +263,17 @@ func buildImage(tc tests.TestContext, imageName string, forceNewHash bool, scrip
 	require.NoError(err, "Image build failed: %s", output)
 }
 
-func newNodeStatefulSet(name string, flags map[string]string) *appsv1.StatefulSet {
+func newNodeStatefulSet(name string, flags tmpnet.FlagsMap) *appsv1.StatefulSet {
 	statefulSet := tmpnet.NewNodeStatefulSet(
 		name,
+		true, // generateName
 		latestAvalanchegoImage,
 		nodeContainerName,
 		volumeName,
 		volumeSize,
 		nodeDataDir,
 		flags,
+		nil, /* labels */
 	)
 
 	// The version annotations key needs to be present to ensure compatibility with json patch replace

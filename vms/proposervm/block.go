@@ -107,7 +107,7 @@ func (p *postForkCommonComponents) getPChainEpoch(ctx context.Context, parentID 
 		return height, 0, parentTimestamp, nil
 	}
 
-	if parentTimestamp.After(epochStartTime.Add(time.Duration(p.vm.Upgrades.GUpgradeEpochDuration) * time.Second)) {
+	if parentTimestamp.After(epochStartTime.Add(time.Duration(p.vm.Upgrades.GraniteEpochDuration) * time.Second)) {
 		// If the parent crossed the epoch boundary, then it sealed the previous epoch. The child
 		// is the first block of the new epoch, so should use the parent's P-Chain height, increment
 		// the epoch number, and set the epoch start time to the parent's timestamp.
@@ -212,7 +212,7 @@ func (p *postForkCommonComponents) Verify(
 	}
 
 	var contextPChainHeight uint64
-	if p.vm.Upgrades.IsGUpgradeActivated(childTimestamp) {
+	if p.vm.Upgrades.IsGraniteActivated(childTimestamp) {
 		pChainEpochHeight, _, _, err := p.getPChainEpoch(ctx, child.Parent())
 		if err != nil {
 			p.vm.ctx.Log.Error("unexpected build verification failure",
@@ -291,7 +291,7 @@ func (p *postForkCommonComponents) buildChild(
 		contextPChainHeight, pChainEpochHeight, epochNumber uint64
 		epochStartTime                                      time.Time
 	)
-	if p.vm.Upgrades.IsGUpgradeActivated(newTimestamp) {
+	if p.vm.Upgrades.IsGraniteActivated(newTimestamp) {
 		pChainEpochHeight, epochNumber, epochStartTime, err = p.getPChainEpoch(ctx, parentID)
 		if err != nil {
 			p.vm.ctx.Log.Error("unexpected build block failure",

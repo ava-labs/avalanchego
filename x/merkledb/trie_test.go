@@ -1249,55 +1249,44 @@ func getSingleChildKey(n *node, tokenSize int) Key {
 	return Key{}
 }
 
-func TestTrieCommitToDB(t *testing.T) {
-	r := require.New(t)
-
-	type test struct {
+func TestTrieCommitToDBInvalid(t *testing.T) {
+	tests := []struct {
 		name        string
-		trieFunc    func() View
+		trieFunc    func(*require.Assertions, *merkleDB) View
 		expectedErr error
-	}
-
-	// Make a database
-	db, err := getBasicDB()
-	r.NoError(err)
-
-	tests := []test{
+	}{
 		{
 			name: "invalid",
-			trieFunc: func() View {
+			trieFunc: func(require *require.Assertions, db *merkleDB) View {
 				nView, err := db.NewView(context.Background(), ViewChanges{})
-				r.NoError(err)
+				require.NoError(err)
 
 				// Invalidate the view
 				nView.(*view).invalidate()
-
 				return nView
 			},
 			expectedErr: ErrInvalid,
 		},
 		{
 			name: "committed",
-			trieFunc: func() View {
+			trieFunc: func(require *require.Assertions, db *merkleDB) View {
 				view, err := db.NewView(context.Background(), ViewChanges{})
-				r.NoError(err)
+				require.NoError(err)
 
 				// Commit the view
-				r.NoError(view.CommitToDB(context.Background()))
-
+				require.NoError(view.CommitToDB(context.Background()))
 				return view
 			},
 			expectedErr: ErrCommitted,
 		},
 		{
 			name: "parent not database",
-			trieFunc: func() View {
+			trieFunc: func(require *require.Assertions, db *merkleDB) View {
 				nView, err := db.NewView(context.Background(), ViewChanges{})
-				r.NoError(err)
+				require.NoError(err)
 
 				// Change the parent
 				nView.(*view).parentTrie = &view{}
-
 				return nView
 			},
 			expectedErr: ErrParentNotDatabase,
@@ -1305,18 +1294,32 @@ func TestTrieCommitToDB(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		require := require.New(t)
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
 
-		trie := tt.trieFunc()
-		err := trie.CommitToDB(context.Background())
-		require.ErrorIs(err, tt.expectedErr)
+			// Make a database
+			db, err := getBasicDB()
+			require.NoError(err)
+
+			trie := tt.trieFunc(require, db)
+			err = trie.CommitToDB(context.Background())
+			require.ErrorIs(err, tt.expectedErr)
+		})
 	}
+}
+
+func TestTrieCommitToDBValid(t *testing.T) {
+	require := require.New(t)
+
+	// Make a database
+	db, err := getBasicDB()
+	require.NoError(err)
 
 	// Put 2 key-value pairs
 	key1, value1 := []byte("key1"), []byte("value1")
 	key2, value2 := []byte("key2"), []byte("value2")
-	r.NoError(db.Put(key1, value1))
-	r.NoError(db.Put(key2, value2))
+	require.NoError(db.Put(key1, value1))
+	require.NoError(db.Put(key2, value2))
 
 	// Make a view
 	key3, value3 := []byte("key3"), []byte("value3")
@@ -1332,20 +1335,20 @@ func TestTrieCommitToDB(t *testing.T) {
 			},
 		},
 	)
-	r.NoError(err)
+	require.NoError(err)
 
 	// Commit the view
-	r.NoError(view.CommitToDB(context.Background()))
+	require.NoError(view.CommitToDB(context.Background()))
 
 	// Make sure the database has the right values
 	_, err = db.Get(key1)
-	r.ErrorIs(err, database.ErrNotFound)
+	require.ErrorIs(err, database.ErrNotFound)
 
 	got, err := db.Get(key2)
-	r.NoError(err)
-	r.Equal(value3, got)
+	require.NoError(err)
+	require.Equal(value3, got)
 
 	got, err = db.Get(key3)
-	r.NoError(err)
-	r.Equal(value3, got)
+	require.NoError(err)
+	require.Equal(value3, got)
 }

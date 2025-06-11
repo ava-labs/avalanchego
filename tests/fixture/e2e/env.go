@@ -46,8 +46,6 @@ type TestEnvironment struct {
 	RootNetworkDir string
 	// The directory where the test network configuration is stored
 	NetworkDir string
-	// URIs used to access the API endpoints of nodes of the network
-	URIs []tmpnet.NodeURI
 	// Pre-funded key for this ginkgo process
 	PreFundedKey *secp256k1.PrivateKey
 	// The duration to wait before shutting down private networks. A
@@ -66,7 +64,6 @@ func GetEnv(tc tests.TestContext) *TestEnvironment {
 	return &TestEnvironment{
 		RootNetworkDir:              env.RootNetworkDir,
 		NetworkDir:                  env.NetworkDir,
-		URIs:                        env.URIs,
 		PreFundedKey:                env.PreFundedKey,
 		PrivateNetworkShutdownDelay: env.PrivateNetworkShutdownDelay,
 		testContext:                 tc,
@@ -90,19 +87,36 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 
 	// Consider monitoring flags for any command but stop
 	if networkCmd != StopNetworkCmd {
-		if flagVars.StartCollectors() {
-			require.NoError(tmpnet.StartCollectors(tc.DefaultContext(), tc.Log()))
+		if flagVars.StartMetricsCollector() {
+			require.NoError(tmpnet.StartPrometheus(tc.DefaultContext(), tc.Log()))
 		}
-		if flagVars.CheckMonitoring() {
-			// Register cleanup before network start to ensure it runs after the network is stopped (LIFO)
+		if flagVars.StartLogsCollector() {
+			require.NoError(tmpnet.StartPromtail(tc.DefaultContext(), tc.Log()))
+		}
+
+		// Register cleanups before network start to ensure they run after the network is stopped (LIFO)
+
+		if flagVars.CheckMetricsCollected() {
 			tc.DeferCleanup(func() {
 				if network == nil {
-					tc.Log().Warn("unable to check that logs and metrics were collected from an uninitialized network")
+					tc.Log().Warn("unable to check that metrics were collected from an uninitialized network")
 					return
 				}
 				ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 				defer cancel()
-				require.NoError(tmpnet.CheckMonitoring(ctx, tc.Log(), network.UUID))
+				require.NoError(tmpnet.CheckMetricsExist(ctx, tc.Log(), network.UUID))
+			})
+		}
+
+		if flagVars.CheckLogsCollected() {
+			tc.DeferCleanup(func() {
+				if network == nil {
+					tc.Log().Warn("unable to check that logs were collected from an uninitialized network")
+					return
+				}
+				ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
+				defer cancel()
+				require.NoError(tmpnet.CheckLogsExist(ctx, tc.Log(), network.UUID))
 			})
 		}
 	}
@@ -178,8 +192,16 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 	}
 
 	// Once one or more nodes are running it should be safe to wait for promtail to report readiness
-	if flagVars.StartCollectors() {
-		require.NoError(tmpnet.WaitForPromtailReadiness(tc.DefaultContext(), tc.Log()))
+	if flagVars.StartLogsCollector() {
+		runtimeConfig, err := flagVars.NodeRuntimeConfig()
+		require.NoError(err)
+		if runtimeConfig.Kube != nil {
+			// TODO(marun) Maybe make this configurable to enable the check for a test suite that writes service
+			// discovery configuration for its own metrics endpoint?
+			tc.Log().Warn("skipping check for logs collection readiness since kube nodes won't create have created the required service discovery config")
+		} else {
+			require.NoError(tmpnet.WaitForPromtailReadiness(tc.DefaultContext(), tc.Log()))
+		}
 	}
 
 	if networkCmd == StartNetworkCmd {
@@ -193,30 +215,85 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 		"not enough pre-funded keys for the requested number of parallel test processes",
 	)
 
-	uris := network.GetNodeURIs()
-	require.NotEmpty(uris, "network contains no nodes")
-	tc.Log().Info("network nodes are available",
-		zap.Any("uris", uris),
-	)
-
-	return &TestEnvironment{
+	env := &TestEnvironment{
 		RootNetworkDir:              flagVars.RootNetworkDir(),
 		NetworkDir:                  network.Dir,
-		URIs:                        uris,
 		PrivateNetworkShutdownDelay: flagVars.NetworkShutdownDelay(),
 		testContext:                 tc,
 	}
+
+	if network.DefaultRuntimeConfig.Process != nil {
+		// Display node IDs and URIs for process-based networks since the nodes are guaranteed to be network accessible
+		uris := env.GetNodeURIs()
+		require.NotEmpty(uris, "network contains no nodes")
+		tc.Log().Info("network nodes are available",
+			zap.Any("uris", uris),
+		)
+	} else {
+		// Only display node IDs for kube-based networks since the nodes may not be network accessible and
+		// port-forwarded URIs are ephemeral
+		nodeIDs := network.GetAvailableNodeIDs()
+		require.NotEmpty(nodeIDs, "network contains no nodes")
+		tc.Log().Info("network nodes are available. Not showing node URIs since kube nodes may be running remotely.",
+			zap.Strings("nodeIDs", nodeIDs),
+		)
+	}
+
+	return env
 }
 
-// Retrieve a random URI to naively attempt to spread API load across
-// nodes.
+// Retrieve URIs for validator nodes of the shared network. The URIs
+// are only guaranteed to be accessible until the environment test
+// context is torn down (usually the duration of execution of a single
+// test).
+func (te *TestEnvironment) GetNodeURIs() []tmpnet.NodeURI {
+	var (
+		tc      = te.testContext
+		network = te.GetNetwork()
+	)
+	uris, err := network.GetNodeURIs(tc.DefaultContext(), tc.DeferCleanup)
+	require.NoError(tc, err)
+	return uris
+}
+
+// Retrieve a random URI to naively attempt to spread API load across nodes.
 func (te *TestEnvironment) GetRandomNodeURI() tmpnet.NodeURI {
-	r := rand.New(rand.NewSource(time.Now().Unix())) //#nosec G404
-	nodeURI := te.URIs[r.Intn(len(te.URIs))]
-	te.testContext.Log().Info("targeting random node",
+	var (
+		tc             = te.testContext
+		r              = rand.New(rand.NewSource(time.Now().Unix())) //#nosec G404
+		network        = te.GetNetwork()
+		availableNodes = []*tmpnet.Node{}
+	)
+
+	for _, node := range network.Nodes {
+		if node.IsEphemeral {
+			// Avoid returning URIs for nodes whose lifespan is indeterminate
+			continue
+		}
+		if !node.IsRunning() {
+			// Only running nodes have URIs
+			continue
+		}
+		availableNodes = append(availableNodes, node)
+	}
+
+	require.NotEmpty(tc, availableNodes, "no available nodes to target")
+
+	// Use a local URI for the node to ensure compatibility with kube
+	randomNode := availableNodes[r.Intn(len(availableNodes))]
+	uri, cancel, err := randomNode.GetLocalURI(tc.DefaultContext())
+	require.NoError(tc, err)
+	tc.DeferCleanup(cancel)
+
+	nodeURI := tmpnet.NodeURI{
+		NodeID: randomNode.NodeID,
+		URI:    uri,
+	}
+	tc.Log().Info("targeting random node",
 		zap.Stringer("nodeID", nodeURI.NodeID),
 		zap.String("uri", nodeURI.URI),
 	)
+
 	return nodeURI
 }
 

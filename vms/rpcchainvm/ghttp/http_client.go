@@ -36,7 +36,10 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// to specify a communication protocols it supports and would like to
 	// use. Upgrade (e.g. websockets) is a more expensive transaction and
 	// if not required use the less expensive HTTPSimple.
-	if !isUpgradeRequest(r) {
+	//
+	// Http/2 explicitly does not allow the use of the Upgrade header.
+	// (ref: https://httpwg.org/specs/rfc9113.html#informational-responses)
+	if !isUpgradeRequest(r) && !isHTTP2Request(r) {
 		c.serveHTTPSimple(w, r)
 		return
 	}
@@ -167,7 +170,7 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // serveHTTPSimple converts an http request to a gRPC HTTPRequest and returns the
 // response to the client. Protocol upgrade requests (websockets) are not supported
-// and should use ServeHTTP. Based on https://www.weave.works/blog/turtles-way-http-grpc.
+// and should use ServeHTTP.
 func (c *Client) serveHTTPSimple(w http.ResponseWriter, r *http.Request) {
 	req, err := getHTTPSimpleRequest(r)
 	if err != nil {
@@ -217,4 +220,8 @@ func convertWriteResponse(w http.ResponseWriter, resp *httppb.HandleSimpleHTTPRe
 // isUpgradeRequest returns true if the upgrade key exists in header and value is non empty.
 func isUpgradeRequest(req *http.Request) bool {
 	return req.Header.Get("Upgrade") != ""
+}
+
+func isHTTP2Request(req *http.Request) bool {
+	return req.ProtoMajor == 2
 }

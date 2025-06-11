@@ -96,7 +96,10 @@ func initComposeConfig(
 	targetPath string,
 ) error {
 	// Generate a compose project for the specified network
-	project := newComposeProject(network, nodeImageName, workloadImageName)
+	project, err := newComposeProject(network, nodeImageName, workloadImageName)
+	if err != nil {
+		return err
+	}
 
 	absPath, err := filepath.Abs(targetPath)
 	if err != nil {
@@ -131,7 +134,7 @@ func initComposeConfig(
 
 // Create a new docker compose project for an antithesis test setup
 // for the provided network configuration.
-func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadImageName string) *types.Project {
+func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadImageName string) (*types.Project, error) {
 	networkName := "avalanche-testnet"
 	baseNetworkAddress := "10.0.20"
 
@@ -141,6 +144,20 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 		bootstrapIP  string
 		bootstrapIDs string
 	)
+
+	if network.PrimaryChainConfigs == nil {
+		network.PrimaryChainConfigs = make(map[string]tmpnet.ConfigMap)
+	}
+	if network.PrimaryChainConfigs["C"] == nil {
+		network.PrimaryChainConfigs["C"] = make(tmpnet.ConfigMap)
+	}
+	network.PrimaryChainConfigs["C"]["log-json-format"] = true
+
+	chainConfigContent, err := network.GetChainConfigContent()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get chain config content: %w", err)
+	}
+
 	for i, node := range network.Nodes {
 		address := fmt.Sprintf("%s.%d", baseNetworkAddress, 3+i)
 
@@ -158,6 +175,7 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 			config.StakingTLSKeyContentKey:    tlsKey,
 			config.StakingCertContentKey:      tlsCert,
 			config.StakingSignerKeyContentKey: signerKey,
+			config.ChainConfigContentKey:      chainConfigContent,
 		}
 
 		// Apply configuration appropriate to a test network
@@ -259,7 +277,7 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 			},
 		},
 		Services: services,
-	}
+	}, nil
 }
 
 // Convert a mapping of avalanche config keys to a mapping of env vars

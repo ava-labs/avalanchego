@@ -985,7 +985,7 @@ func (m *manager) createAvalancheChain(
 	}
 
 	// create engine gear
-	avalancheEngine := aveng.New(ctx, avaGetHandler, linearizableVM)
+	avalancheEngine := aveng.New(ctx, avaGetHandler)
 	if m.TracingEnabled {
 		avalancheEngine = common.TraceEngine(avalancheEngine, m.Tracer)
 	}
