@@ -4,13 +4,11 @@
 package simplex
 
 import (
-	"context"
 	"encoding/asn1"
 	"errors"
 	"fmt"
 
 	"github.com/ava-labs/simplex"
-	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -41,14 +39,14 @@ type BLSVerifier struct {
 	chainID   ids.ID
 }
 
-func NewBLSAuth(config *Config) (BLSSigner, BLSVerifier, error) {
-	verifier, err := createVerifier(config)
+func NewBLSAuth(config *Config) (BLSSigner, BLSVerifier) {
+	verifier := createVerifier(config)
 
 	return BLSSigner{
 		chainID:  config.Ctx.ChainID,
 		subnetID: config.Ctx.SubnetID,
 		signBLS:  config.SignBLS,
-	}, verifier, err
+	}, verifier
 }
 
 // Sign returns a signature on the given message using BLS signature scheme.
@@ -113,22 +111,16 @@ func (v BLSVerifier) Verify(message []byte, signature []byte, signer simplex.Nod
 	return nil
 }
 
-func createVerifier(config *Config) (BLSVerifier, error) {
+func createVerifier(config *Config) BLSVerifier {
 	verifier := BLSVerifier{
 		nodeID2PK: make(map[ids.NodeID]bls.PublicKey),
 		subnetID:  config.Ctx.SubnetID,
 		chainID:   config.Ctx.ChainID,
 	}
 
-	nodes, err := config.Validators.GetValidatorSet(context.Background(), 0, config.Ctx.SubnetID)
-	if err != nil {
-		config.Log.Error("failed to get validator set", zap.Error(err), zap.Stringer("subnetID", config.Ctx.SubnetID))
-		return BLSVerifier{}, err
-	}
-
-	for _, node := range nodes {
+	for _, node := range config.Validators {
 		verifier.nodeID2PK[node.NodeID] = *node.PublicKey
 	}
 
-	return verifier, nil
+	return verifier
 }

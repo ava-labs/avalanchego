@@ -4,30 +4,23 @@
 package simplex
 
 import (
-	"context"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-type ValidatorInfo interface {
-	// GetValidatorSet returns the validators of the provided subnet at the
-	// requested P-chain height.
-	// The returned map should not be modified.
-	GetValidatorSet(
-		ctx context.Context,
-		height uint64,
-		subnetID ids.ID,
-	) (map[ids.NodeID]*validators.GetValidatorOutput, error)
-}
-
 // Config wraps all the parameters needed for a simplex engine
 type Config struct {
-	Ctx        SimplexChainContext
-	Log        logging.Logger
-	Validators ValidatorInfo
-	SignBLS    SignFunc
+	Ctx SimplexChainContext
+	Log logging.Logger
+
+	// Validators is a map of node IDs to their validator information.
+	// This tells the node about the current membership set, and should be consistent
+	// across all nodes in the subnet.
+	Validators map[ids.NodeID]*validators.GetValidatorOutput
+
+	// SignBLS is the signing function used for this node to sign messages.
+	SignBLS SignFunc
 }
 
 // Context is information about the current execution.

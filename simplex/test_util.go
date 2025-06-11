@@ -4,31 +4,13 @@
 package simplex
 
 import (
-	"context"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 )
 
-var _ ValidatorInfo = (*testValidatorInfo)(nil)
-
-// testValidatorInfo is a mock implementation of ValidatorInfo for testing purposes.
-// it assumes all validators are in the same subnet and returns all of them for any subnetID.
-type testValidatorInfo struct {
-	validators map[ids.NodeID]*validators.GetValidatorOutput
-}
-
-func (t *testValidatorInfo) GetValidatorSet(
-	context.Context,
-	uint64,
-	ids.ID,
-) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-	return t.validators, nil
-}
-
-func newTestValidatorInfo(nodeIds []ids.NodeID, pks []*bls.PublicKey) *testValidatorInfo {
+func newTestValidatorInfo(nodeIds []ids.NodeID, pks []*bls.PublicKey) map[ids.NodeID]*validators.GetValidatorOutput {
 	if len(nodeIds) != len(pks) {
 		panic("nodeIds and pks must have the same length")
 	}
@@ -42,9 +24,7 @@ func newTestValidatorInfo(nodeIds []ids.NodeID, pks []*bls.PublicKey) *testValid
 		vds[nodeIds[i]] = validator
 	}
 	// all we need is to generate the public keys for the validators
-	return &testValidatorInfo{
-		validators: vds,
-	}
+	return vds
 }
 
 func newEngineConfig() (*Config, error) {
