@@ -9,6 +9,8 @@ on:
   push:
     tags:
       - "*"
+    branches:
+      - "main"
   pull_request:
 
 env:
@@ -90,6 +92,10 @@ jobs:
           elif [[ "${{ github.event_name }}" == "push" && "${{ github.ref_type }}" == "tag" ]]; then
             export target_branch="${GITHUB_REF#refs/tags/}"
             echo "Using tag name as target_branch: $target_branch"
+            echo "target_branch=$target_branch" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.event_name }}" == "push" && "${{ github.ref_name }}" == "main" ]]; then
+            export target_branch="main-ci" # Avoid pushing to main branch of firewood-go repo
+            echo "Using main-ci as target branch for push to main: $target_branch"
             echo "target_branch=$target_branch" >> "$GITHUB_OUTPUT"
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             export target_branch="${{ github.event.pull_request.head.ref }}"
