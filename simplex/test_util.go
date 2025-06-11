@@ -23,7 +23,7 @@ func newTestValidatorInfo(nodeIds []ids.NodeID, pks []*bls.PublicKey) map[ids.No
 		}
 		vds[nodeIds[i]] = validator
 	}
-	// all we need is to generate the public keys for the validators
+
 	return vds
 }
 
