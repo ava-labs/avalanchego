@@ -193,6 +193,7 @@ jobs:
         run: GOEXPERIMENT=cgocheck2 TEST_FIREWOOD_HASH_MODE=firewood go test ./...
       
   ethhash-compatibility-go:
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -209,12 +210,36 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: "ffi/tests/go.mod"
-          cache-dependency-path: "ffi/tests/go.sum"
+          go-version-file: "ffi/tests/eth/go.mod"
+          cache-dependency-path: "ffi/tests/eth/go.sum"
       - name: Test Go FFI bindings
         working-directory: ffi
         # cgocheck2 is expensive but provides complete pointer checks
         run: GOEXPERIMENT=cgocheck2 TEST_FIREWOOD_HASH_MODE=ethhash go test ./...
       - name: Test Ethereum hash compatability
-        working-directory: ffi/tests
+        working-directory: ffi/tests/eth
+        run: go test ./...
+
+  firewood-merkle-differential-fuzz:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: "false"
+          shared-key: "debug-no-features"
+      - name: Build Firewood FFI
+        run: cargo build -p firewood-ffi
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "ffi/tests/firewood/go.mod"
+          cache-dependency-path: "ffi/tests/firewood/go.sum"
+      - name: Test Firewood <> MerkleDB Differential fuzz
+        working-directory: ffi/tests/firewood
         run: go test ./...

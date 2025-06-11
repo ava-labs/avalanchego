@@ -1,4 +1,4 @@
-package tests
+package eth
 
 import (
 	"encoding/binary"
