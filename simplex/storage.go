@@ -148,11 +148,14 @@ func finalizationToBytes(finalization simplex.Finalization) []byte {
 
 func finalizationFromBytes(bytes []byte, d QCDeserializer) (simplex.Finalization, error) {
 	var fCert simplex.Finalization
-	if err := fCert.Finalization.FromBytes(bytes[:simplex.MetadataLen]); err != nil {
+
+	// deserialize the finalization block header
+	if err := fCert.Finalization.FromBytes(bytes[:89]); err != nil {
 		return simplex.Finalization{}, err
 	}
 
-	qc, err := d.DeserializeQuorumCertificate(bytes[simplex.MetadataLen:])
+	// deserialize the quorum certificate
+	qc, err := d.DeserializeQuorumCertificate(bytes[89:])
 	if err != nil {
 		return simplex.Finalization{}, err
 	}

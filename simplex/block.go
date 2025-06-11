@@ -17,7 +17,7 @@ type VerifiedBlock struct {
 
 	metadata   simplex.ProtocolMetadata
 	innerBlock []byte
-	onIndex func() error // called when the block is indexed
+	onIndex    func() error // called when the block is indexed
 }
 
 // BlockHeader returns the block header for the verified block.
@@ -29,24 +29,8 @@ func (v *VerifiedBlock) BlockHeader() simplex.BlockHeader {
 	}
 }
 
-func VerifiedBlockFromBytes(buff []byte) (*VerifiedBlock, error) {
-	if len(buff) < simplex.ProtocolMetadataLen {
-		return nil, fmt.Errorf("buff too small, expected at least 57 bytes, got %d", len(buff))
-	}
-
-	md, err := simplex.ProtocolMetadataFromBytes(buff[:simplex.ProtocolMetadataLen])
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse metadata: %w", err)
-	}
-
-	v := &VerifiedBlock{
-		metadata:   md,
-		innerBlock: buff[simplex.ProtocolMetadataLen:],
-	}
-
-	return v, nil
-}
-
+// Bytes returns the serialized bytes of the verified block.
+// It concatenates the metadata bytes followed by the inner block bytes.
 func (v *VerifiedBlock) Bytes() []byte {
 	mdBytes := v.metadata.Bytes()
 	buff := make([]byte, len(mdBytes)+len(v.innerBlock))
@@ -70,7 +54,7 @@ type blockDeserializer struct {
 }
 
 func (b *blockDeserializer) DeserializeBlock(bytes []byte) (simplex.VerifiedBlock, error) {
-	vb, err := VerifiedBlockFromBytes(bytes)
+	vb, err := verifiedBlockFromBytes(bytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to deserialize verified block: %w", err)
 	}
@@ -81,4 +65,22 @@ func (b *blockDeserializer) DeserializeBlock(bytes []byte) (simplex.VerifiedBloc
 	}
 
 	return vb, nil
+}
+
+func verifiedBlockFromBytes(buff []byte) (*VerifiedBlock, error) {
+	if len(buff) < simplex.ProtocolMetadataLen {
+		return nil, fmt.Errorf("buff too small, expected at least 57 bytes, got %d", len(buff))
+	}
+
+	md, err := simplex.ProtocolMetadataFromBytes(buff[:simplex.ProtocolMetadataLen])
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse metadata: %w", err)
+	}
+
+	v := &VerifiedBlock{
+		metadata:   *md,
+		innerBlock: buff[simplex.ProtocolMetadataLen:],
+	}
+
+	return v, nil
 }

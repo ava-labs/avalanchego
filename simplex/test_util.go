@@ -5,6 +5,7 @@ package simplex
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
@@ -127,4 +128,8 @@ func withNodes(numNodes uint64) (*testEngineConfig, error) {
 		chainID:  ids.GenerateTestID(),
 		subnetID: ids.GenerateTestID(),
 	}, nil
+}
+
+type testChainVM struct {
+	*blocktest.VM
 }

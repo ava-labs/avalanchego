@@ -24,7 +24,7 @@ type Config struct {
 	SignBLS    SignFunc
 
 	GenesisData []byte // genesis block data, stored as the first block in the storage
-	VM          block.ChainVM 
+	VM          block.ChainVM
 	DB          database.Database
 }
 
