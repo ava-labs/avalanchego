@@ -4,6 +4,7 @@
 package simplex
 
 import (
+	"context"
 	"encoding/asn1"
 	"errors"
 	"fmt"
@@ -40,12 +41,14 @@ type BLSVerifier struct {
 	chainID   ids.ID
 }
 
-func NewBLSAuth(config *Config) (BLSSigner, BLSVerifier) {
+func NewBLSAuth(config *Config) (BLSSigner, BLSVerifier, error) {
+	verifier, err := createVerifier(config)
+
 	return BLSSigner{
 		chainID:  config.Ctx.ChainID,
 		subnetID: config.Ctx.SubnetID,
 		signBLS:  config.SignBLS,
-	}, createVerifier(config)
+	}, verifier, err
 }
 
 // Sign returns a signature on the given message using BLS signature scheme.
@@ -110,21 +113,22 @@ func (v BLSVerifier) Verify(message []byte, signature []byte, signer simplex.Nod
 	return nil
 }
 
-func createVerifier(config *Config) BLSVerifier {
+func createVerifier(config *Config) (BLSVerifier, error) {
 	verifier := BLSVerifier{
 		nodeID2PK: make(map[ids.NodeID]bls.PublicKey),
 		subnetID:  config.Ctx.SubnetID,
 		chainID:   config.Ctx.ChainID,
 	}
 
-	nodes := config.Validators.GetValidatorIDs(config.Ctx.SubnetID)
-	for _, node := range nodes {
-		validator, ok := config.Validators.GetValidator(config.Ctx.SubnetID, node)
-		if !ok {
-			config.Log.Error("failed to get validator for node %s in subnet %s", zap.Stringer("node", node), zap.Stringer("subnetID", config.Ctx.SubnetID))
-			continue
-		}
-		verifier.nodeID2PK[node] = *validator.PublicKey
+	nodes, err := config.Validators.GetValidatorSet(context.Background(), 0, config.Ctx.SubnetID)
+	if err != nil {
+		config.Log.Error("failed to get validator set", zap.Error(err), zap.Stringer("subnetID", config.Ctx.SubnetID))
+		return BLSVerifier{}, err
 	}
-	return verifier
+
+	for _, node := range nodes {
+		verifier.nodeID2PK[node.NodeID] = *node.PublicKey
+	}
+
+	return verifier, nil
 }

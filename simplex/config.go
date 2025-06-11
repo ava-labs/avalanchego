@@ -4,14 +4,22 @@
 package simplex
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 type ValidatorInfo interface {
-	GetValidatorIDs(subnetID ids.ID) []ids.NodeID
-	GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*validators.Validator, bool)
+	// GetValidatorSet returns the validators of the provided subnet at the
+	// requested P-chain height.
+	// The returned map should not be modified.
+	GetValidatorSet(
+		ctx context.Context,
+		height uint64,
+		subnetID ids.ID,
+	) (map[ids.NodeID]*validators.GetValidatorOutput, error)
 }
 
 // Config wraps all the parameters needed for a simplex engine

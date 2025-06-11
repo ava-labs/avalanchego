@@ -4,6 +4,8 @@
 package simplex
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -15,24 +17,15 @@ var _ ValidatorInfo = (*testValidatorInfo)(nil)
 // testValidatorInfo is a mock implementation of ValidatorInfo for testing purposes.
 // it assumes all validators are in the same subnet and returns all of them for any subnetID.
 type testValidatorInfo struct {
-	validators map[ids.NodeID]validators.Validator
+	validators map[ids.NodeID]*validators.GetValidatorOutput
 }
 
-func (v *testValidatorInfo) GetValidatorIDs(_ ids.ID) []ids.NodeID {
-	ids := make([]ids.NodeID, 0, len(v.validators))
-	for id := range v.validators {
-		ids = append(ids, id)
-	}
-	return ids
-}
-
-func (v *testValidatorInfo) GetValidator(_ ids.ID, nodeID ids.NodeID) (*validators.Validator, bool) {
-	if v.validators == nil {
-		return nil, false
-	}
-
-	val, exists := v.validators[nodeID]
-	return &val, exists
+func (t *testValidatorInfo) GetValidatorSet(
+	context.Context,
+	uint64,
+	ids.ID,
+) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+	return t.validators, nil
 }
 
 func newTestValidatorInfo(nodeIds []ids.NodeID, pks []*bls.PublicKey) *testValidatorInfo {
@@ -40,9 +33,9 @@ func newTestValidatorInfo(nodeIds []ids.NodeID, pks []*bls.PublicKey) *testValid
 		panic("nodeIds and pks must have the same length")
 	}
 
-	vds := make(map[ids.NodeID]validators.Validator, len(pks))
+	vds := make(map[ids.NodeID]*validators.GetValidatorOutput, len(pks))
 	for i, pk := range pks {
-		validator := validators.Validator{
+		validator := &validators.GetValidatorOutput{
 			PublicKey: pk,
 			NodeID:    nodeIds[i],
 		}

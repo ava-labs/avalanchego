@@ -16,7 +16,8 @@ func TestBLSSignVerify(t *testing.T) {
 	config, err := newEngineConfig()
 	require.NoError(t, err)
 
-	signer, verifier := NewBLSAuth(config)
+	signer, verifier, err := NewBLSAuth(config)
+	require.NoError(t, err)
 
 	msg := "Begin at the beginning, and go on till you come to the end: then stop"
 
@@ -30,7 +31,8 @@ func TestBLSSignVerify(t *testing.T) {
 func TestSignerNotInMemberSet(t *testing.T) {
 	config, err := newEngineConfig()
 	require.NoError(t, err)
-	signer, verifier := NewBLSAuth(config)
+	signer, verifier, err := NewBLSAuth(config)
+	require.NoError(t, err)
 
 	msg := "Begin at the beginning, and go on till you come to the end: then stop"
 
@@ -53,7 +55,8 @@ func TestSignerInvalidMessageEncoding(t *testing.T) {
 
 	sigBytes := bls.SignatureToBytes(sig)
 
-	_, verifier := NewBLSAuth(config)
+	_, verifier, err := NewBLSAuth(config)
+	require.NoError(t, err)
 	err = verifier.Verify(dummyMsg, sigBytes, config.Ctx.NodeID[:])
 	require.ErrorIs(t, err, errSignatureVerificationFailed)
 }
