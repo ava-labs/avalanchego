@@ -8,7 +8,7 @@ if ! [[ "$0" =~ scripts/tests.load.kind.sh ]]; then
 fi
 
 # Start kind cluster
-./scripts/start_kind_cluster.sh
+./scripts/start_kind_cluster.sh "$@"
 
 # Build docker image for load test
 DOCKERFILE="./tests/load/c/Dockerfile.loadtest"
