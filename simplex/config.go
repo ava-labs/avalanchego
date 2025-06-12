@@ -9,17 +9,18 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-type ValidatorInfo interface {
-	GetValidatorIDs(subnetID ids.ID) []ids.NodeID
-	GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*validators.Validator, bool)
-}
-
 // Config wraps all the parameters needed for a simplex engine
 type Config struct {
-	Ctx        SimplexChainContext
-	Log        logging.Logger
-	Validators ValidatorInfo
-	SignBLS    SignFunc
+	Ctx SimplexChainContext
+	Log logging.Logger
+
+	// Validators is a map of node IDs to their validator information.
+	// This tells the node about the current membership set, and should be consistent
+	// across all nodes in the subnet.
+	Validators map[ids.NodeID]*validators.GetValidatorOutput
+
+	// SignBLS is the signing function used for this node to sign messages.
+	SignBLS SignFunc
 }
 
 // Context is information about the current execution.

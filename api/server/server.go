@@ -12,7 +12,6 @@ import (
 	"path"
 	"time"
 
-	"github.com/NYTimes/gziphandler"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/cors"
 	"go.uber.org/zap"
@@ -117,11 +116,10 @@ func New(
 	}
 
 	router := newRouter()
-	handler := wrapHandler(router, nodeID, allowedOrigins, allowedHosts, true)
+	handler := wrapHandler(router, nodeID, allowedOrigins, allowedHosts)
 
 	http2Router := newHTTP2Router()
-	// Do not use gzip middleware because it breaks the grpc spec
-	http2Handler := wrapHandler(http2Router, nodeID, allowedOrigins, allowedHosts, false)
+	http2Handler := wrapHandler(http2Router, nodeID, allowedOrigins, allowedHosts)
 
 	httpServer := &http.Server{
 		Handler: h2c.NewHandler(
@@ -333,16 +331,12 @@ func wrapHandler(
 	nodeID ids.NodeID,
 	allowedOrigins []string,
 	allowedHosts []string,
-	gzip bool,
 ) http.Handler {
 	h := filterInvalidHosts(handler, allowedHosts)
 	h = cors.New(cors.Options{
 		AllowedOrigins:   allowedOrigins,
 		AllowCredentials: true,
 	}).Handler(h)
-	if gzip {
-		h = gziphandler.GzipHandler(h)
-	}
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			// Attach this node's ID as a header

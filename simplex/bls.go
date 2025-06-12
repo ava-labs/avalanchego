@@ -9,7 +9,6 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/simplex"
-	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -47,11 +46,13 @@ type BLSVerifier struct {
 }
 
 func NewBLSAuth(config *Config) (BLSSigner, BLSVerifier) {
+	verifier := createVerifier(config)
+
 	return BLSSigner{
 		chainID:  config.Ctx.ChainID,
 		subnetID: config.Ctx.SubnetID,
 		signBLS:  config.SignBLS,
-	}, createVerifier(config)
+	}, verifier
 }
 
 // Sign returns a signature on the given message using BLS signature scheme.
@@ -78,7 +79,6 @@ type encodedSimplexSignedPayload struct {
 	Label    []byte
 }
 
-// encodesMessageToSign returns a byte slice [simplexLabel][chainID][networkID][message length][message].
 func encodeMessageToSign(message []byte, chainID ids.ID, subnetID ids.ID) ([]byte, error) {
 	encodedSimplexMessage := encodedSimplexSignedPayload{
 		Message:  message,
@@ -124,14 +124,9 @@ func createVerifier(config *Config) BLSVerifier {
 		chainID:   config.Ctx.ChainID,
 	}
 
-	nodes := config.Validators.GetValidatorIDs(config.Ctx.SubnetID)
-	for _, node := range nodes {
-		validator, ok := config.Validators.GetValidator(config.Ctx.SubnetID, node)
-		if !ok {
-			config.Log.Error("failed to get validator for node %s in subnet %s", zap.Stringer("node", node), zap.Stringer("subnetID", config.Ctx.SubnetID))
-			continue
-		}
-		verifier.nodeID2PK[node] = *validator.PublicKey
+	for _, node := range config.Validators {
+		verifier.nodeID2PK[node.NodeID] = *node.PublicKey
 	}
+
 	return verifier
 }
