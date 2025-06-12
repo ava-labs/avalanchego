@@ -1,0 +1,137 @@
+syntax = "proto3";
+package info.v1;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+// Reference: https://developers.google.com/protocol-buffers/docs/proto3
+option go_package = "github.com/ava-labs/avalanchego/proto/pb/info/v1;infov1";
+
+// InfoService is the API service for unprivileged info on a node
+service InfoService {
+  rpc GetNodeVersion(google.protobuf.Empty) returns (GetNodeVersionReply);
+  rpc GetNodeID(google.protobuf.Empty) returns (GetNodeIDReply);
+  rpc GetNodeIP(google.protobuf.Empty) returns (GetNodeIPReply);
+  rpc GetNetworkID(google.protobuf.Empty) returns (GetNetworkIDReply);
+  rpc GetNetworkName(google.protobuf.Empty) returns (GetNetworkNameReply);
+  rpc GetBlockchainID(GetBlockchainIDArgs) returns (GetBlockchainIDReply);
+  rpc Peers(PeersArgs) returns (PeersReply);
+  rpc IsBootstrapped(IsBootstrappedArgs) returns (IsBootstrappedResponse);
+  rpc Upgrades(google.protobuf.Empty) returns (UpgradesReply);
+  rpc Uptime(google.protobuf.Empty) returns (UptimeResponse);
+  rpc GetVMs(google.protobuf.Empty) returns (GetVMsReply);
+}
+
+// GetNodeVersionReply are the results from calling GetNodeVersion
+message GetNodeVersionReply {
+  string version = 1;
+  string database_version = 2;
+  uint32 rpc_protocol_version = 3;
+  string git_commit = 4;
+  map<string, string> vm_versions = 5;
+}
+
+// GetNodeIDReply are the results from calling GetNodeID
+message GetNodeIDReply {
+  string node_id = 1;
+  bytes node_pop = 2;
+}
+
+// GetNodeIPReply are the results from calling GetNodeIP
+message GetNodeIPReply {
+  string ip = 1;
+}
+
+// GetNetworkIDReply are the results from calling GetNetworkID
+message GetNetworkIDReply {
+  uint32 network_id = 1;
+}
+
+// GetNetworkNameReply is the result from calling GetNetworkName
+message GetNetworkNameReply {
+  string network_name = 1;
+}
+
+// GetBlockchainIDArgs are the arguments for calling GetBlockchainID
+message GetBlockchainIDArgs {
+  string alias = 1;
+}
+
+// GetBlockchainIDReply are the results from calling GetBlockchainID
+message GetBlockchainIDReply {
+  string blockchain_id = 1;
+}
+
+// PeersArgs are the arguments for calling Peers
+message PeersArgs {
+  repeated string node_ids = 1;
+}
+
+// PeerInfo provides metadata about a connected peer in the network
+message PeerInfo {
+  string ip = 1;
+  string public_ip = 2;
+  string node_id = 3;
+  string version = 4;
+  string last_sent = 5;
+  string last_received = 6;
+  repeated string benched = 7;
+  uint32 observed_uptime = 8;
+  repeated string tracked_subnets = 9;
+}
+
+// PeersReply are the results from calling Peers
+message PeersReply {
+  uint32 num_peers = 1;
+  repeated PeerInfo peers = 2;
+}
+
+// IsBootstrappedArgs are the arguments for calling IsBootstrapped
+message IsBootstrappedArgs {
+  // Alias of the chain
+  // Can also be the string representation of the chain's ID
+  string chain = 1;
+}
+
+// IsBootstrappedResponse are the results from calling IsBootstrapped
+message IsBootstrappedResponse {
+  // True iff the chain exists and is done bootstrapping
+  bool is_bootstrapped = 1;
+}
+
+// UpgradesReply contains the scheduled activation times for each protocol upgrade
+message UpgradesReply {
+  google.protobuf.Timestamp apricot_phase1_time = 1;
+  google.protobuf.Timestamp apricot_phase2_time = 2;
+  google.protobuf.Timestamp apricot_phase3_time = 3;
+  google.protobuf.Timestamp apricot_phase4_time = 4;
+  uint64 apricot_phase4_min_p_chain_height = 5;
+  google.protobuf.Timestamp apricot_phase5_time = 6;
+  google.protobuf.Timestamp apricot_phase_pre6_time = 7;
+  google.protobuf.Timestamp apricot_phase6_time = 8;
+  google.protobuf.Timestamp apricot_phase_post6_time = 9;
+  google.protobuf.Timestamp banff_time = 10;
+  google.protobuf.Timestamp cortina_time = 11;
+  string cortina_x_chain_stop_vertex_id = 12;
+  google.protobuf.Timestamp durango_time = 13;
+  google.protobuf.Timestamp etna_time = 14;
+  google.protobuf.Timestamp fortuna_time = 15;
+  google.protobuf.Timestamp granite_time = 16;
+}
+
+// UptimeResponse are the results from calling Uptime
+message UptimeResponse {
+  double rewarding_stake_percentage = 1;
+  double weighted_average_percentage = 2;
+}
+
+// GetVMsReply contains the response metadata for VMAliases
+message GetVMsReply {
+  map<string, VMAliases> vms = 1;
+  map<string, string> fxs = 2;
+}
+
+// VMAliases lists all known aliases for a given VM
+message VMAliases {
+  repeated string aliases = 1;
+}

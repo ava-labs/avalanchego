@@ -13,6 +13,7 @@ import (
 	"io"
 	"io/fs"
 	"net"
+	"net/http"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -20,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"connectrpc.com/grpcreflect"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -46,6 +48,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
+	"github.com/ava-labs/avalanchego/proto/pb/info/v1/infov1connect"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -77,6 +80,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
+	connecthandler "github.com/ava-labs/avalanchego/api/info/connect_handler"
 	databasefactory "github.com/ava-labs/avalanchego/database/factory"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -1349,7 +1353,7 @@ func (n *Node) initInfoAPI() error {
 		return fmt.Errorf("problem creating proof of possession: %w", err)
 	}
 
-	service, err := info.NewService(
+	service, info, err := info.NewService(
 		info.Parameters{
 			Version:   version.CurrentApp,
 			NodeID:    n.ID,
@@ -1372,6 +1376,25 @@ func (n *Node) initInfoAPI() error {
 	if err != nil {
 		return err
 	}
+
+	// Register the InfoService handler and gRPC reflection handler
+	infoPattern, infoHandler := infov1connect.NewInfoServiceHandler(connecthandler.NewConnectInfoService(info))
+
+	// Register the gRPC reflection handler for InfoService
+	refPattern, refHandler := grpcreflect.NewHandlerV1(
+		grpcreflect.NewStaticReflector(infov1connect.InfoServiceName),
+	)
+
+	// Create a new ServeMux to handle the InfoService and reflection handlers
+	mux := http.NewServeMux()
+	mux.Handle(infoPattern, infoHandler)
+	mux.Handle(refPattern, refHandler)
+
+	if !n.APIServer.AddHeaderRoute("info", mux) {
+		// TODO do not panic
+		panic("could not add info route")
+	}
+
 	return n.APIServer.AddRoute(
 		service,
 		"info",
