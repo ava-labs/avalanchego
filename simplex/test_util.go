@@ -22,7 +22,7 @@ func newEngineConfig(numNodes uint64) (*Config, error) {
 	if numNodes == 0 {
 		numNodes = 1 // Ensure at least one node for testing
 	}
-  
+
 	ls, err := localsigner.New()
 	if err != nil {
 		return nil, err
@@ -69,4 +69,3 @@ func generateTestValidators(num uint64) ([]validators.GetValidatorOutput, error)
 	}
 	return vds, nil
 }
-
