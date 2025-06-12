@@ -6,12 +6,13 @@ package simplex
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/message/messagemock"
-	"github.com/ava-labs/avalanchego/snow/networking/sender/sendermock"
 	"github.com/ava-labs/simplex"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message/messagemock"
+	"github.com/ava-labs/avalanchego/snow/networking/sender/sendermock"
 )
 
 var testSimplexMessage = simplex.Message{
@@ -34,7 +35,9 @@ var testSimplexMessage = simplex.Message{
 }
 
 func TestComm(t *testing.T) {
-	config, _ := newTestEngineConfig(t, 1)
+	config, err := newEngineConfig(1)
+	require.NoError(t, err)
+
 	destinationNodeID := ids.GenerateTestNodeID()
 
 	ctrl := gomock.NewController(t)
@@ -57,7 +60,8 @@ func TestComm(t *testing.T) {
 // TestCommBroadcast tests the Broadcast method sends to all nodes in the subnet
 // not including the sending node.
 func TestCommBroadcast(t *testing.T) {
-	config, _ := newTestEngineConfig(t, 3)
+	config, err := newEngineConfig(3)
+	require.NoError(t, err)
 
 	ctrl := gomock.NewController(t)
 	msgCreator := messagemock.NewOutboundMsgBuilder(ctrl)
@@ -70,14 +74,15 @@ func TestCommBroadcast(t *testing.T) {
 	require.NoError(t, err)
 
 	msgCreator.EXPECT().Vote(gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(nil, nil).Times(3)
-	sender.EXPECT().Send(gomock.Any(), gomock.Any(), comm.subnetID, gomock.Any()).Times(3)
+		Return(nil, nil).Times(2)
+	sender.EXPECT().Send(gomock.Any(), gomock.Any(), comm.subnetID, gomock.Any()).Times(2)
 
 	comm.Broadcast(&testSimplexMessage)
 }
 
 func TestCommFailsWithoutCurrentNode(t *testing.T) {
-	config, _ := newTestEngineConfig(t, 3)
+	config, err := newEngineConfig(3)
+	require.NoError(t, err)
 
 	ctrl := gomock.NewController(t)
 	msgCreator := messagemock.NewOutboundMsgBuilder(ctrl)
@@ -87,10 +92,9 @@ func TestCommFailsWithoutCurrentNode(t *testing.T) {
 	config.Sender = sender
 
 	// set the curNode to a different nodeID than the one in the config
-	nodeID := ids.GenerateTestNodeID()
-	vdrs, err := newTestValidatorInfo(nodeID, nil, 3)
+	vdrs, err := generateTestValidators(3)
 	require.NoError(t, err)
-	config.Validators = vdrs
+	config.Validators = newTestValidators(vdrs)
 
 	_, err = NewComm(config)
 	require.ErrorIs(t, err, errNodeNotFound)

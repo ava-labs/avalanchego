@@ -6,7 +6,11 @@ package simplex
 import (
 	"errors"
 	"fmt"
-	"sort"
+	"slices"
+	"strings"
+
+	"github.com/ava-labs/simplex"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -14,13 +18,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/simplex"
-	"go.uber.org/zap"
 )
 
-var (
-	errNodeNotFound = errors.New("node not found in the validator list")
-)
+var errNodeNotFound = errors.New("node not found in the validator list")
 
 type Comm struct {
 	logger   simplex.Logger
@@ -36,10 +36,11 @@ type Comm struct {
 }
 
 func NewComm(config *Config) (*Comm, error) {
-	var nodes []simplex.NodeID
+	nodes := make([]simplex.NodeID, 0, len(config.Validators))
+
 	// grab all the nodes that are validators for the subnet
-	for _, id := range config.Validators.GetValidatorIDs(config.Ctx.SubnetID) {
-		nodes = append(nodes, id[:])
+	for _, vd := range config.Validators {
+		nodes = append(nodes, vd.NodeID[:])
 	}
 
 	sortedNodes := sortNodes(nodes)
@@ -70,8 +71,8 @@ func NewComm(config *Config) (*Comm, error) {
 }
 
 func sortNodes(nodes []simplex.NodeID) []simplex.NodeID {
-	sort.Slice(nodes, func(i, j int) bool {
-		return nodes[i].String() < nodes[j].String()
+	slices.SortFunc(nodes, func(i, j simplex.NodeID) int {
+		return strings.Compare(i.String(), j.String())
 	})
 	return nodes
 }
@@ -81,8 +82,6 @@ func (c *Comm) ListNodes() []simplex.NodeID {
 }
 
 func (c *Comm) SendMessage(msg *simplex.Message, destination simplex.NodeID) {
-	// TODO: do we want to check if the destination is in the subnet?
-
 	var outboundMessage message.OutboundMessage
 	var err error
 	switch {
@@ -100,11 +99,14 @@ func (c *Comm) SendMessage(msg *simplex.Message, destination simplex.NodeID) {
 		outboundMessage, err = c.msgBuilder.EmptyNotarization(c.chainID, msg.EmptyNotarization.Vote.ProtocolMetadata, msg.EmptyNotarization.QC.Bytes())
 	case msg.Finalization != nil:
 		outboundMessage, err = c.msgBuilder.Finalization(c.chainID, msg.Finalization.Finalization.BlockHeader, msg.Finalization.QC.Bytes())
-		// TODO: create replication messages
+	case msg.ReplicationRequest != nil:
+		outboundMessage, err = c.msgBuilder.ReplicationRequest(c.chainID, msg.ReplicationRequest.Seqs, msg.ReplicationRequest.LatestRound)
+	case msg.VerifiedReplicationResponse != nil:
+		outboundMessage, err = c.msgBuilder.VerifiedReplicationResponse(c.chainID, msg.VerifiedReplicationResponse.Data, msg.VerifiedReplicationResponse.LatestRound)
 	}
 
 	if err != nil {
-		c.logger.Error("Failed creating message: %w", zap.Error(err))
+		c.logger.Error("Failed creating message", zap.Error(err))
 		return
 	}
 
