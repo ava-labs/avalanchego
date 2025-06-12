@@ -192,7 +192,7 @@ jobs:
         # cgocheck2 is expensive but provides complete pointer checks
         run: GOEXPERIMENT=cgocheck2 TEST_FIREWOOD_HASH_MODE=firewood go test ./...
       
-  ethhash-compatibility-go:
+  firewood-ethhash-differential-fuzz:
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -216,9 +216,9 @@ jobs:
         working-directory: ffi
         # cgocheck2 is expensive but provides complete pointer checks
         run: GOEXPERIMENT=cgocheck2 TEST_FIREWOOD_HASH_MODE=ethhash go test ./...
-      - name: Test Ethereum hash compatability
+      - name: Test Firewood <> Ethereum Differential Fuzz
         working-directory: ffi/tests/eth
-        run: go test ./...
+        run: go test -fuzz=. -fuzztime=1m
 
   firewood-merkle-differential-fuzz:
     needs: build
@@ -242,4 +242,4 @@ jobs:
           cache-dependency-path: "ffi/tests/firewood/go.sum"
       - name: Test Firewood <> MerkleDB Differential fuzz
         working-directory: ffi/tests/firewood
-        run: go test ./...
+        run: go test -fuzz=. -fuzztime=1m
