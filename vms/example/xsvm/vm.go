@@ -12,6 +12,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -157,6 +158,7 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 func (vm *VM) CreateHTTP2Handler(context.Context) (http.Handler, error) {
 	server := grpc.NewServer()
 	server.RegisterService(&xsvm.Ping_ServiceDesc, &api.PingService{Log: vm.chainContext.Log})
+	reflection.Register(server)
 	return server, nil
 }
 
