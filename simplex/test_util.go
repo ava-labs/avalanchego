@@ -6,22 +6,13 @@ package simplex
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 )
 
-func newTestValidatorInfo(nodeIds []ids.NodeID, pks []*bls.PublicKey) map[ids.NodeID]*validators.GetValidatorOutput {
-	if len(nodeIds) != len(pks) {
-		panic("nodeIds and pks must have the same length")
-	}
-
-	vds := make(map[ids.NodeID]*validators.GetValidatorOutput, len(pks))
-	for i, pk := range pks {
-		validator := &validators.GetValidatorOutput{
-			PublicKey: pk,
-			NodeID:    nodeIds[i],
-		}
-		vds[nodeIds[i]] = validator
+func newTestValidatorInfo(allVds []validators.GetValidatorOutput) map[ids.NodeID]*validators.GetValidatorOutput {
+	vds := make(map[ids.NodeID]*validators.GetValidatorOutput, len(allVds))
+	for _, vd := range allVds {
+		vds[vd.NodeID] = &vd
 	}
 
 	return vds
@@ -41,9 +32,14 @@ func newEngineConfig() (*Config, error) {
 		SubnetID: ids.GenerateTestID(),
 	}
 
+	nodeInfo := validators.GetValidatorOutput{
+		NodeID:    nodeID,
+		PublicKey: ls.PublicKey(),
+	}
+
 	return &Config{
 		Ctx:        simplexChainContext,
-		Validators: newTestValidatorInfo([]ids.NodeID{nodeID}, []*bls.PublicKey{ls.PublicKey()}),
+		Validators: newTestValidatorInfo([]validators.GetValidatorOutput{nodeInfo}),
 		SignBLS:    ls.Sign,
 	}, nil
 }
