@@ -30,7 +30,8 @@ func initGetVMsTest(t *testing.T) *getVMsTest {
 			Parameters: Parameters{
 				VMManager: mockVMManager,
 			},
-			log: logging.NoLog{},
+			VMManager: mockVMManager,
+			Log:       logging.NoLog{},
 		},
 		mockVMManager: mockVMManager,
 	}

@@ -39,6 +39,7 @@ var (
 type PathAdder interface {
 	// AddRoute registers a route to a handler.
 	AddRoute(handler http.Handler, endpoint string, metricName string) error
+	AddHeaderRoute(route string, handler http.Handler) bool
 
 	// AddAliases registers aliases to the server
 	AddAliases(endpoint string, aliases ...string) error
@@ -193,6 +194,10 @@ func (s *server) AddRoute(handler http.Handler, endpoint string, metricName stri
 	return s.addRoute(handler, endpoint, metricName)
 }
 
+func (s *server) AddHeaderRoute(route string, handler http.Handler) bool {
+	return s.router.AddHeaderRoute(route, handler)
+}
+
 func (s *server) AddRouteWithReadLock(handler http.Handler, endpoint string, metricName string) error {
 	s.router.lock.RUnlock()
 	defer s.router.lock.RLock()
@@ -259,18 +264,16 @@ type readPathAdder struct {
 	pather PathAdderWithReadLock
 }
 
-func PathWriterFromWithReadLock(pather PathAdderWithReadLock) PathAdder {
-	return readPathAdder{
-		pather: pather,
-	}
+func (r readPathAdder) AddHeaderRoute(string, http.Handler) bool {
+	panic("implement me")
 }
 
-func (a readPathAdder) AddRoute(handler http.Handler, base, endpoint string) error {
-	return a.pather.AddRouteWithReadLock(handler, base, endpoint)
+func (r readPathAdder) AddRoute(handler http.Handler, base, endpoint string) error {
+	return r.pather.AddRouteWithReadLock(handler, base, endpoint)
 }
 
-func (a readPathAdder) AddAliases(endpoint string, aliases ...string) error {
-	return a.pather.AddAliasesWithReadLock(endpoint, aliases...)
+func (r readPathAdder) AddAliases(endpoint string, aliases ...string) error {
+	return r.pather.AddAliasesWithReadLock(endpoint, aliases...)
 }
 
 func wrapHandler(
