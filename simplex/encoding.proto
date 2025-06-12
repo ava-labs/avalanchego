@@ -1,0 +1,12 @@
+
+syntax = "proto3";
+
+package p2p;
+
+// Reference: https://developers.google.com/protocol-buffers/docs/proto3
+option go_package = "github.com/ava-labs/avalanchego/proto/pb/p2p";
+
+message VerifiedBlock {
+    bytes block = 1;
+    bytes metadata = 2;
+}

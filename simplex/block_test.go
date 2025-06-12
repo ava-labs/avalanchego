@@ -67,7 +67,7 @@ func TestBlockDeserializer(t *testing.T) {
 	}
 
 	deserializer := &blockDeserializer{
-		vm: testVM,
+		parser: testVM,
 	}
 
 	vb := &VerifiedBlock{

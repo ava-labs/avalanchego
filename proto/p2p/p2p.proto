@@ -510,3 +510,8 @@ message QuorumRound {
   EmptyNotarization empty_notarization = 3;
   QuorumCertificate finalization = 4;
 }
+
+message VerifiedBlock {
+  bytes block = 1;
+  bytes metadata = 2;
+}

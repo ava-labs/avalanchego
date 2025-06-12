@@ -10,7 +10,9 @@ import (
 	"sync"
 
 	"github.com/ava-labs/simplex"
+	"google.golang.org/protobuf/proto"
 
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
@@ -31,28 +33,32 @@ func (v *VerifiedBlock) BlockHeader() simplex.BlockHeader {
 	}
 }
 
-// Bytes returns the serialized bytes of the verified block.
-// It concatenates the metadata bytes followed by the inner block bytes.
+// Bytes returns the serialized bytes of the verified block 
+// as the asn1 encoding of `encodedVerifiedBlock`.
 func (v *VerifiedBlock) Bytes() []byte {
-	mdBytes := v.metadata.Bytes()
-	buff := make([]byte, len(mdBytes)+len(v.innerBlock))
-	copy(buff, mdBytes)
-	copy(buff[len(mdBytes):], v.innerBlock)
+	cBlock := p2p.VerifiedBlock{
+		Metadata:   v.metadata.Bytes(),
+		Block: v.innerBlock,
+	}
+
+	buff, err := proto.Marshal(&cBlock)
+	if err != nil {
+		panic(fmt.Errorf("failed to marshal verified block: %w", err))
+	}
+
 	return buff
 }
 
 // computeDigest computes the digest of the block.
 func (v *VerifiedBlock) computeDigest() {
-	mdBytes := v.metadata.Bytes()
 	h := sha256.New()
-	h.Write(mdBytes)
-	h.Write(v.innerBlock)
+	h.Write(v.Bytes())
 	digest := h.Sum(nil)
 	v.digest = simplex.Digest(digest)
 }
 
 type blockDeserializer struct {
-	vm block.ChainVM
+	parser block.Parser
 }
 
 func (b *blockDeserializer) DeserializeBlock(bytes []byte) (simplex.VerifiedBlock, error) {
@@ -61,7 +67,7 @@ func (b *blockDeserializer) DeserializeBlock(bytes []byte) (simplex.VerifiedBloc
 		return nil, fmt.Errorf("failed to deserialize verified block: %w", err)
 	}
 
-	_, err = b.vm.ParseBlock(context.Background(), vb.innerBlock)
+	_, err = b.parser.ParseBlock(context.Background(), vb.innerBlock)
 	if err != nil {
 		return nil, err
 	}
@@ -70,18 +76,20 @@ func (b *blockDeserializer) DeserializeBlock(bytes []byte) (simplex.VerifiedBloc
 }
 
 func verifiedBlockFromBytes(buff []byte) (*VerifiedBlock, error) {
-	if len(buff) < simplex.ProtocolMetadataLen {
-		return nil, fmt.Errorf("buff too small, expected at least %d bytes, got %d", simplex.ProtocolMetadataLen, len(buff))
-	}
+	var protoBlock p2p.VerifiedBlock
 
-	md, err := simplex.ProtocolMetadataFromBytes(buff[:simplex.ProtocolMetadataLen])
+	if err := proto.Unmarshal(buff, &protoBlock); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal verified block: %w", err)
+	}
+	
+	md, err := simplex.ProtocolMetadataFromBytes(protoBlock.Metadata)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse metadata: %w", err)
+		return nil, fmt.Errorf("failed to parse protocol metadata: %w", err)
 	}
 
 	v := &VerifiedBlock{
 		metadata:   *md,
-		innerBlock: buff[simplex.ProtocolMetadataLen:],
+		innerBlock: protoBlock.Block,
 	}
 
 	return v, nil
