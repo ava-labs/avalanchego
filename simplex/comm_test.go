@@ -35,8 +35,7 @@ var testSimplexMessage = simplex.Message{
 }
 
 func TestComm(t *testing.T) {
-	config, err := newEngineConfig(1)
-	require.NoError(t, err)
+	config := newEngineConfig(t, 1)
 
 	destinationNodeID := ids.GenerateTestNodeID()
 
@@ -60,8 +59,7 @@ func TestComm(t *testing.T) {
 // TestCommBroadcast tests the Broadcast method sends to all nodes in the subnet
 // not including the sending node.
 func TestCommBroadcast(t *testing.T) {
-	config, err := newEngineConfig(3)
-	require.NoError(t, err)
+	config := newEngineConfig(t, 3)
 
 	ctrl := gomock.NewController(t)
 	msgCreator := messagemock.NewOutboundMsgBuilder(ctrl)
@@ -81,8 +79,7 @@ func TestCommBroadcast(t *testing.T) {
 }
 
 func TestCommFailsWithoutCurrentNode(t *testing.T) {
-	config, err := newEngineConfig(3)
-	require.NoError(t, err)
+	config := newEngineConfig(t, 3)
 
 	ctrl := gomock.NewController(t)
 	msgCreator := messagemock.NewOutboundMsgBuilder(ctrl)
@@ -92,10 +89,9 @@ func TestCommFailsWithoutCurrentNode(t *testing.T) {
 	config.Sender = sender
 
 	// set the curNode to a different nodeID than the one in the config
-	vdrs, err := generateTestValidators(3)
-	require.NoError(t, err)
+	vdrs := generateTestValidators(t, 3)
 	config.Validators = newTestValidators(vdrs)
 
-	_, err = NewComm(config)
+	_, err := NewComm(config)
 	require.ErrorIs(t, err, errNodeNotFound)
 }

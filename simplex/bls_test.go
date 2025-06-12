@@ -13,8 +13,7 @@ import (
 )
 
 func TestBLSSignVerify(t *testing.T) {
-	config, err := newEngineConfig(1)
-	require.NoError(t, err)
+	config := newEngineConfig(t, 1)
 
 	signer, verifier := NewBLSAuth(config)
 
@@ -28,8 +27,7 @@ func TestBLSSignVerify(t *testing.T) {
 }
 
 func TestSignerNotInMemberSet(t *testing.T) {
-	config, err := newEngineConfig(1)
-	require.NoError(t, err)
+	config := newEngineConfig(t, 1)
 	signer, verifier := NewBLSAuth(config)
 
 	msg := "Begin at the beginning, and go on till you come to the end: then stop"
@@ -43,8 +41,7 @@ func TestSignerNotInMemberSet(t *testing.T) {
 }
 
 func TestSignerInvalidMessageEncoding(t *testing.T) {
-	config, err := newEngineConfig(1)
-	require.NoError(t, err)
+	config := newEngineConfig(t, 1)
 
 	// sign a message with invalid encoding
 	dummyMsg := []byte("dummy message")

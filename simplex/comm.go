@@ -82,6 +82,28 @@ func (c *Comm) ListNodes() []simplex.NodeID {
 }
 
 func (c *Comm) SendMessage(msg *simplex.Message, destination simplex.NodeID) {
+	outboundMsg, err := c.simplexMessageToOutboundMessage(msg)
+	if err != nil {
+		c.logger.Error("Failed creating message", zap.Error(err))
+		return
+	}
+
+	dest := ids.NodeID(destination)
+
+	c.sender.Send(outboundMsg, common.SendConfig{NodeIDs: set.Of(dest)}, c.subnetID, subnets.NoOpAllower)
+}
+
+func (c *Comm) Broadcast(msg *simplex.Message) {
+	for _, node := range c.nodes {
+		if node.Equals(c.nodeID) {
+			continue
+		}
+
+		c.SendMessage(msg, node)
+	}
+}
+
+func (c *Comm) simplexMessageToOutboundMessage(msg *simplex.Message) (message.OutboundMessage, error) {
 	var outboundMessage message.OutboundMessage
 	var err error
 	switch {
@@ -105,22 +127,5 @@ func (c *Comm) SendMessage(msg *simplex.Message, destination simplex.NodeID) {
 		outboundMessage, err = c.msgBuilder.VerifiedReplicationResponse(c.chainID, msg.VerifiedReplicationResponse.Data, msg.VerifiedReplicationResponse.LatestRound)
 	}
 
-	if err != nil {
-		c.logger.Error("Failed creating message", zap.Error(err))
-		return
-	}
-
-	dest := ids.NodeID(destination)
-
-	c.sender.Send(outboundMessage, common.SendConfig{NodeIDs: set.Of(dest)}, c.subnetID, subnets.NoOpAllower)
-}
-
-func (c *Comm) Broadcast(msg *simplex.Message) {
-	for _, node := range c.nodes {
-		if node.Equals(c.nodeID) {
-			continue
-		}
-
-		c.SendMessage(msg, node)
-	}
+	return outboundMessage, err
 }
