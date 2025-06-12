@@ -4,12 +4,17 @@
 package node
 
 import (
+	"connectrpc.com/grpcreflect"
 	"context"
 	"crypto"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
+	healthhandler "github.com/ava-labs/avalanchego/api/health/connecthandler"
+	infohandler "github.com/ava-labs/avalanchego/api/info/connecthandler"
+	"github.com/ava-labs/avalanchego/proto/pb/health/v1/healthv1connect"
+	"github.com/ava-labs/avalanchego/proto/pb/info/v1/infov1connect"
 	"io"
 	"io/fs"
 	"net"
@@ -21,7 +26,6 @@ import (
 	"sync"
 	"time"
 
-	"connectrpc.com/grpcreflect"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -48,7 +52,6 @@ import (
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
-	"github.com/ava-labs/avalanchego/proto/pb/info/v1/infov1connect"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -80,7 +83,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
-	connecthandler "github.com/ava-labs/avalanchego/api/info/connect_handler"
 	databasefactory "github.com/ava-labs/avalanchego/database/factory"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -266,6 +268,26 @@ func New(
 		return nil, fmt.Errorf("couldn't initialize indexer: %w", err)
 	}
 
+	// mount InfoService onto the shared gRPC mux
+	infoPattern, infoHandler := infov1connect.NewInfoServiceHandler(
+		infohandler.NewConnectInfoService(n.info),
+	)
+	n.grpcMux.Handle(infoPattern, infoHandler)
+
+	// mount HealthService onto the same mux
+	healthPattern, healthHandler := healthv1connect.NewHealthServiceHandler(
+		healthhandler.NewConnectHealthService(n.health),
+	)
+	n.grpcMux.Handle(healthPattern, healthHandler)
+
+	// register reflection for both services, once
+	reflector := grpcreflect.NewStaticReflector(
+		infov1connect.InfoServiceName,
+		healthv1connect.HealthServiceName,
+	)
+	reflectPattern, reflectHandler := grpcreflect.NewHandlerV1(reflector)
+	n.grpcMux.Handle(reflectPattern, reflectHandler)
+
 	n.health.Start(context.TODO(), n.Config.HealthCheckFreq)
 	n.initProfiler()
 
@@ -310,6 +332,9 @@ type Node struct {
 	// Monitors node health and runs health checks
 	health health.Health
 
+	// Info service instance
+	info *info.Info
+
 	// Build and parse messages, for both network layer and chain manager
 	msgCreator message.Creator
 
@@ -351,6 +376,9 @@ type Node struct {
 
 	// Handles HTTP API calls
 	APIServer server.Server
+
+	// Shared HTTP/2 mux for ConnectRPC services
+	grpcMux *http.ServeMux
 
 	// This node's configuration
 	Config *node.Config
@@ -1010,6 +1038,10 @@ func (n *Node) initAPIServer() error {
 		n.Config.HTTPConfig.HTTPConfig,
 		n.Config.HTTPAllowedHosts,
 	)
+
+	// Set up a shared HTTP/2 mux for all ConnectRPC services
+	n.grpcMux = http.NewServeMux()
+	n.APIServer.AddHTTP2Handler(n.grpcMux)
 	return err
 }
 
@@ -1353,7 +1385,7 @@ func (n *Node) initInfoAPI() error {
 		return fmt.Errorf("problem creating proof of possession: %w", err)
 	}
 
-	service, info, err := info.NewService(
+	service, infoInst, err := info.NewService(
 		info.Parameters{
 			Version:   version.CurrentApp,
 			NodeID:    n.ID,
@@ -1376,29 +1408,12 @@ func (n *Node) initInfoAPI() error {
 	if err != nil {
 		return err
 	}
-
-	// Register the InfoService handler and gRPC reflection handler
-	infoPattern, infoHandler := infov1connect.NewInfoServiceHandler(connecthandler.NewConnectInfoService(info))
-
-	// Register the gRPC reflection handler for InfoService
-	refPattern, refHandler := grpcreflect.NewHandlerV1(
-		grpcreflect.NewStaticReflector(infov1connect.InfoServiceName),
-	)
-
-	// Create a new ServeMux to handle the InfoService and reflection handlers
-	mux := http.NewServeMux()
-	mux.Handle(infoPattern, infoHandler)
-	mux.Handle(refPattern, refHandler)
-
-	if !n.APIServer.AddHeaderRoute("info", mux) {
-		// TODO do not panic
-		panic("could not add info route")
-	}
+	n.info = infoInst
 
 	return n.APIServer.AddRoute(
 		service,
 		"info",
-		"info",
+		"",
 	)
 }
 
@@ -1413,10 +1428,13 @@ func (n *Node) initHealthAPI() error {
 		return err
 	}
 
-	n.health, err = health.New(n.Log, healthReg)
+	// Create the health service
+	healthService, err := health.New(n.Log, healthReg)
 	if err != nil {
 		return err
 	}
+	// Store the health service in the node's health field
+	n.health = healthService
 
 	if !n.Config.HealthAPIEnabled {
 		n.Log.Info("skipping health API initialization because it has been disabled")

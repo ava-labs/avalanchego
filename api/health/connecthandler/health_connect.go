@@ -1,0 +1,129 @@
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package connecthandler
+
+import (
+	"context"
+	"time"
+
+	"connectrpc.com/connect"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"github.com/ava-labs/avalanchego/api/health"
+	healthv1 "github.com/ava-labs/avalanchego/proto/pb/health/v1"
+)
+
+// NewConnectHealthService returns a ConnectRPC-compatible ConnectHealthService
+// that delegates calls to the existing health service implementation.
+func NewConnectHealthService(healthService health.Health) *ConnectHealthService {
+	return &ConnectHealthService{
+		Service: healthService,
+	}
+}
+
+type ConnectHealthService struct {
+	Service health.Health
+}
+
+func (s *ConnectHealthService) Readiness(
+	_ context.Context,
+	req *connect.Request[healthv1.APIArgs],
+) (*connect.Response[healthv1.APIReply], error) {
+	// The health.Health interface has different methods than the service.
+	// We need to use the methods of the Health interface.
+	checks, healthy := s.Service.Readiness(req.Msg.Tags...)
+
+	// Convert the health.Result map to protobuf format
+	checksProto := make(map[string]*healthv1.Result, len(checks))
+	for name, check := range checks {
+		checksProto[name] = convertResult(check)
+	}
+
+	out := &healthv1.APIReply{
+		Checks:  checksProto,
+		Healthy: healthy,
+	}
+
+	return connect.NewResponse(out), nil
+}
+
+func (s *ConnectHealthService) Health(
+	_ context.Context,
+	req *connect.Request[healthv1.APIArgs],
+) (*connect.Response[healthv1.APIReply], error) {
+	// The health.Health interface has different methods than the service.
+	// We need to use the methods of the Health interface.
+	checks, healthy := s.Service.Health(req.Msg.Tags...)
+
+	// Convert the health.Result map to protobuf format
+	checksProto := make(map[string]*healthv1.Result, len(checks))
+	for name, check := range checks {
+		checksProto[name] = convertResult(check)
+	}
+
+	out := &healthv1.APIReply{
+		Checks:  checksProto,
+		Healthy: healthy,
+	}
+
+	return connect.NewResponse(out), nil
+}
+
+func (s *ConnectHealthService) Liveness(
+	_ context.Context,
+	req *connect.Request[healthv1.APIArgs],
+) (*connect.Response[healthv1.APIReply], error) {
+	// The health.Health interface has different methods than the service.
+	// We need to use the methods of the Health interface.
+	checks, healthy := s.Service.Liveness(req.Msg.Tags...)
+
+	// Convert the health.Result map to protobuf format
+	checksProto := make(map[string]*healthv1.Result, len(checks))
+	for name, check := range checks {
+		checksProto[name] = convertResult(check)
+	}
+
+	out := &healthv1.APIReply{
+		Checks:  checksProto,
+		Healthy: healthy,
+	}
+
+	return connect.NewResponse(out), nil
+}
+
+// convertResult transforms a health.Result into a healthv1.Result
+func convertResult(r health.Result) *healthv1.Result {
+	result := &healthv1.Result{
+		Message:            "", // Will be set below if details exist
+		ContiguousFailures: r.ContiguousFailures,
+		DurationNs:         r.Duration.Nanoseconds(),
+	}
+
+	// Handle message field (from the Details field)
+	if r.Details != nil {
+		if msg, ok := r.Details.(string); ok {
+			result.Message = msg
+		}
+	}
+
+	// Set error field if exists
+	if r.Error != nil {
+		result.Error = *r.Error
+	}
+
+	// Set timestamp if not zero
+	if !r.Timestamp.IsZero() {
+		result.Timestamp = timestamppb.New(r.Timestamp)
+	}
+
+	// Set time of first failure if exists and not nil
+	if r.TimeOfFirstFailure != nil {
+		result.TimeOfFirstFailure = timestamppb.New(*r.TimeOfFirstFailure)
+	} else {
+		// Use zero time if TimeOfFirstFailure is nil
+		result.TimeOfFirstFailure = timestamppb.New(time.Time{})
+	}
+
+	return result
+}
