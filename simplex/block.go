@@ -12,8 +12,9 @@ import (
 	"github.com/ava-labs/simplex"
 	"google.golang.org/protobuf/proto"
 
-	pSimplex "github.com/ava-labs/avalanchego/proto/pb/simplex"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+
+	pSimplex "github.com/ava-labs/avalanchego/proto/pb/simplex"
 )
 
 type VerifiedBlock struct {
