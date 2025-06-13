@@ -19,7 +19,6 @@ var (
 	errSignerNotFound              = errors.New("signer not found in the membership set")
 	errFailedToParseSignature      = errors.New("failed to parse signature")
 	errFailedToParseQC             = errors.New("failed to parse quorum certificate")
-	errInvalidByteSliceLength      = errors.New("invalid byte slice length")
 	errNotEnoughSigners            = errors.New("not enough signers")
 	errSignatureAggregation        = errors.New("signature aggregation failed")
 	errEncodingMessageToSign       = errors.New("failed to encode message to sign")
