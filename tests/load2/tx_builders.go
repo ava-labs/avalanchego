@@ -26,7 +26,126 @@ var (
 	maxFeeCap = big.NewInt(300000000000)
 )
 
-func BuildZeroTransferTx(backend Backend) (*types.Transaction, error) {
+func BuildRandomTx(
+	backend Backend,
+	contractInstance *contracts.EVMLoadSimulator,
+) (*types.Transaction, error) {
+	txTypes := []txType{
+		{
+			txFunc: func(b Backend, _ *contracts.EVMLoadSimulator) (*types.Transaction, error) {
+				return buildZeroTransferTx(b)
+			},
+			name:   "ZeroTransfer",
+			weight: 1000,
+		},
+		{
+			txFunc: buildRandomWriteTx,
+			name:   "RandomWrite",
+			weight: 100,
+		},
+		{
+			txFunc: buildStateModificationTx,
+			name:   "StateModification",
+			weight: 100,
+		},
+		{
+			txFunc: buildRandomReadTx,
+			name:   "RandomRead",
+			weight: 200,
+		},
+		{
+			txFunc: buildHashingTx,
+			name:   "Hashing",
+			weight: 50,
+		},
+		{
+			txFunc: buildMemoryTx,
+			name:   "Memory",
+			weight: 100,
+		},
+		{
+			txFunc: buildCallDepthTx,
+			name:   "CallDepth",
+			weight: 50,
+		},
+		{
+			txFunc: BuildContractCreationTx,
+			name:   "ContractCreation",
+			weight: 1,
+		},
+		{
+			txFunc: buildPureComputeTx,
+			name:   "PureCompute",
+			weight: 100,
+		},
+		{
+			txFunc: buildLargeEventTx,
+			name:   "LargeEvent",
+			weight: 100,
+		},
+		{
+			txFunc: buildExternalCallTx,
+			name:   "ExternalCall",
+			weight: 50,
+		},
+	}
+
+	txType, err := pickWeightedRandom(txTypes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to select random tx: %w", err)
+	}
+
+	tx, err := txType.txFunc(backend, contractInstance)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate tx of type %s: %w", txType.name, err)
+	}
+
+	return tx, nil
+}
+
+func BuildContractCreationTx(
+	backend Backend,
+	contractInstance *contracts.EVMLoadSimulator,
+) (*types.Transaction, error) {
+	txOpts, err := NewTxOpts(
+		backend.PrivKey(),
+		backend.ChainID(),
+		maxFeeCap,
+		backend.Nonce(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create tx opts: %w", err)
+	}
+	return contractInstance.SimulateContractCreation(txOpts)
+}
+
+func WithContractInstance(
+	f func(Backend, *contracts.EVMLoadSimulator) (*types.Transaction, error),
+	contractInstance *contracts.EVMLoadSimulator,
+) func(Backend) (*types.Transaction, error) {
+	return func(b Backend) (*types.Transaction, error) {
+		return f(b, contractInstance)
+	}
+}
+
+func NewTxOpts(
+	key *ecdsa.PrivateKey,
+	chainID *big.Int,
+	maxFeeCap *big.Int,
+	nonce uint64,
+) (*bind.TransactOpts, error) {
+	txOpts, err := bind.NewKeyedTransactorWithChainID(key, chainID)
+	if err != nil {
+		return nil, err
+	}
+	txOpts.Nonce = new(big.Int).SetUint64(nonce)
+	txOpts.GasFeeCap = maxFeeCap
+	txOpts.GasTipCap = common.Big1
+	txOpts.NoSend = true
+	return txOpts, nil
+}
+
+func buildZeroTransferTx(backend Backend) (*types.Transaction, error) {
 	maxValue := int64(100 * 1_000_000_000 / params.TxGas)
 	maxFeeCap := big.NewInt(maxValue)
 	bigGwei := big.NewInt(params.GWei)
@@ -49,11 +168,11 @@ func BuildZeroTransferTx(backend Backend) (*types.Transaction, error) {
 	return tx, nil
 }
 
-func BuildRandomWriteTx(
+func buildRandomWriteTx(
 	backend Backend,
 	contractInstance *contracts.EVMLoadSimulator,
 ) (*types.Transaction, error) {
-	txOpts, err := newTxOpts(
+	txOpts, err := NewTxOpts(
 		backend.PrivKey(),
 		backend.ChainID(),
 		maxFeeCap,
@@ -67,11 +186,11 @@ func BuildRandomWriteTx(
 	return contractInstance.SimulateRandomWrite(txOpts, count)
 }
 
-func BuildStateModificationTx(
+func buildStateModificationTx(
 	backend Backend,
 	contractInstance *contracts.EVMLoadSimulator,
 ) (*types.Transaction, error) {
-	txOpts, err := newTxOpts(
+	txOpts, err := NewTxOpts(
 		backend.PrivKey(),
 		backend.ChainID(),
 		maxFeeCap,
@@ -85,11 +204,11 @@ func BuildStateModificationTx(
 	return contractInstance.SimulateModification(txOpts, count)
 }
 
-func BuildRandomReadTx(
+func buildRandomReadTx(
 	backend Backend,
 	contractInstance *contracts.EVMLoadSimulator,
 ) (*types.Transaction, error) {
-	txOpts, err := newTxOpts(
+	txOpts, err := NewTxOpts(
 		backend.PrivKey(),
 		backend.ChainID(),
 		maxFeeCap,
@@ -103,11 +222,11 @@ func BuildRandomReadTx(
 	return contractInstance.SimulateReads(txOpts, count)
 }
 
-func BuildHashingTx(
+func buildHashingTx(
 	backend Backend,
 	contractInstance *contracts.EVMLoadSimulator,
 ) (*types.Transaction, error) {
-	txOpts, err := newTxOpts(
+	txOpts, err := NewTxOpts(
 		backend.PrivKey(),
 		backend.ChainID(),
 		maxFeeCap,
@@ -121,11 +240,11 @@ func BuildHashingTx(
 	return contractInstance.SimulateHashing(txOpts, count)
 }
 
-func BuildMemoryTx(
+func buildMemoryTx(
 	backend Backend,
 	contractInstance *contracts.EVMLoadSimulator,
 ) (*types.Transaction, error) {
-	txOpts, err := newTxOpts(
+	txOpts, err := NewTxOpts(
 		backend.PrivKey(),
 		backend.ChainID(),
 		maxFeeCap,
@@ -139,11 +258,11 @@ func BuildMemoryTx(
 	return contractInstance.SimulateMemory(txOpts, count)
 }
 
-func BuildCallDepthTx(
+func buildCallDepthTx(
 	backend Backend,
 	contractInstance *contracts.EVMLoadSimulator,
 ) (*types.Transaction, error) {
-	txOpts, err := newTxOpts(
+	txOpts, err := NewTxOpts(
 		backend.PrivKey(),
 		backend.ChainID(),
 		maxFeeCap,
@@ -157,27 +276,11 @@ func BuildCallDepthTx(
 	return contractInstance.SimulateCallDepth(txOpts, count)
 }
 
-func BuildContractCreationTx(
+func buildPureComputeTx(
 	backend Backend,
 	contractInstance *contracts.EVMLoadSimulator,
 ) (*types.Transaction, error) {
-	txOpts, err := newTxOpts(
-		backend.PrivKey(),
-		backend.ChainID(),
-		maxFeeCap,
-		backend.Nonce(),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create tx opts: %w", err)
-	}
-	return contractInstance.SimulateContractCreation(txOpts)
-}
-
-func BuildPureComputeTx(
-	backend Backend,
-	contractInstance *contracts.EVMLoadSimulator,
-) (*types.Transaction, error) {
-	txOpts, err := newTxOpts(
+	txOpts, err := NewTxOpts(
 		backend.PrivKey(),
 		backend.ChainID(),
 		maxFeeCap,
@@ -190,11 +293,11 @@ func BuildPureComputeTx(
 	return contractInstance.SimulatePureCompute(txOpts, big.NewInt(iterations))
 }
 
-func BuildLargeEventTx(
+func buildLargeEventTx(
 	backend Backend,
 	contractInstance *contracts.EVMLoadSimulator,
 ) (*types.Transaction, error) {
-	txOpts, err := newTxOpts(
+	txOpts, err := NewTxOpts(
 		backend.PrivKey(),
 		backend.ChainID(),
 		maxFeeCap,
@@ -207,11 +310,11 @@ func BuildLargeEventTx(
 	return contractInstance.SimulateLargeEvent(txOpts, big.NewInt(maxEventSize))
 }
 
-func BuildExternalCallTx(
+func buildExternalCallTx(
 	backend Backend,
 	contractInstance *contracts.EVMLoadSimulator,
 ) (*types.Transaction, error) {
-	txOpts, err := newTxOpts(
+	txOpts, err := NewTxOpts(
 		backend.PrivKey(),
 		backend.ChainID(),
 		maxFeeCap,
@@ -221,83 +324,6 @@ func BuildExternalCallTx(
 		return nil, fmt.Errorf("failed to create tx opts: %w", err)
 	}
 	return contractInstance.SimulateExternalCall(txOpts)
-}
-
-func BuildRandomTx(
-	backend Backend,
-	contractInstance *contracts.EVMLoadSimulator,
-) (*types.Transaction, error) {
-	txTypes := []txType{
-		{
-			txFunc: func(b Backend, _ *contracts.EVMLoadSimulator) (*types.Transaction, error) {
-				return BuildZeroTransferTx(b)
-			},
-			name:   "ZeroTransfer",
-			weight: 1000,
-		},
-		{
-			txFunc: BuildRandomReadTx,
-			name:   "RandomWrite",
-			weight: 100,
-		},
-		{
-			txFunc: BuildStateModificationTx,
-			name:   "StateModification",
-			weight: 100,
-		},
-		{
-			txFunc: BuildRandomReadTx,
-			name:   "RandomRead",
-			weight: 200,
-		},
-		{
-			txFunc: BuildHashingTx,
-			name:   "Hashing",
-			weight: 50,
-		},
-		{
-			txFunc: BuildMemoryTx,
-			name:   "Memory",
-			weight: 100,
-		},
-		{
-			txFunc: BuildCallDepthTx,
-			name:   "CallDepth",
-			weight: 50,
-		},
-		{
-			txFunc: BuildContractCreationTx,
-			name:   "ContractCreation",
-			weight: 1,
-		},
-		{
-			txFunc: BuildPureComputeTx,
-			name:   "PureCompute",
-			weight: 100,
-		},
-		{
-			txFunc: BuildLargeEventTx,
-			name:   "LargeEvent",
-			weight: 100,
-		},
-		{
-			txFunc: BuildExternalCallTx,
-			name:   "ExternalCall",
-			weight: 50,
-		},
-	}
-
-	txType, err := pickWeightedRandom(txTypes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to select random tx: %w", err)
-	}
-
-	tx, err := txType.txFunc(backend, contractInstance)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate tx of type %s: %w", txType.name, err)
-	}
-
-	return tx, nil
 }
 
 type txType struct {
@@ -326,21 +352,4 @@ func pickWeightedRandom(txTypes []txType) (txType, error) {
 		r -= txType.weight
 	}
 	return txType{}, errFailedToSelectTxType
-}
-
-func newTxOpts(
-	key *ecdsa.PrivateKey,
-	chainID *big.Int,
-	maxFeeCap *big.Int,
-	nonce uint64,
-) (*bind.TransactOpts, error) {
-	txOpts, err := bind.NewKeyedTransactorWithChainID(key, chainID)
-	if err != nil {
-		return nil, err
-	}
-	txOpts.Nonce = new(big.Int).SetUint64(nonce)
-	txOpts.GasFeeCap = maxFeeCap
-	txOpts.GasTipCap = common.Big1
-	txOpts.NoSend = true
-	return txOpts, nil
 }

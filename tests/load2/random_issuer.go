@@ -32,9 +32,12 @@ func TestRandomTx(
 
 	tc.By("deploying contract", func() {
 		maxFeeCap := big.NewInt(300000000000)
-		txOpts, err := newTxOpts(backend.PrivKey(), backend.ChainID(), maxFeeCap, backend.Nonce())
-		txOpts.Context = ctx
-		txOpts.NoSend = false
+		txOpts, err := NewTxOpts(
+			backend.PrivKey(),
+			backend.ChainID(),
+			maxFeeCap,
+			backend.Nonce(),
+		)
 		r.NoError(err)
 
 		_, tx, _, err := contracts.DeployEVMLoadSimulator(txOpts, client)
@@ -46,7 +49,10 @@ func TestRandomTx(
 			500*time.Millisecond,
 			func(time.Duration) {},
 			func(receipt *types.Receipt, _ time.Duration) {
-				contractInstance, err = contracts.NewEVMLoadSimulator(receipt.ContractAddress, client)
+				contractInstance, err = contracts.NewEVMLoadSimulator(
+					receipt.ContractAddress,
+					client,
+				)
 				r.NoError(err)
 			},
 		))
