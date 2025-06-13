@@ -36,5 +36,6 @@ func (t *Tracker) LogAccepted(receipt *types.Receipt, _ time.Duration) {
 func (t *Tracker) TotalGasUsed() uint64 {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
+
 	return t.totalGasUsed
 }

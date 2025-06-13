@@ -20,8 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/tests/load/c/contracts"
 	"github.com/ava-labs/avalanchego/tests/load2"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 const (
@@ -67,36 +65,23 @@ func main() {
 		require.NoError(network.Stop(ctx), "failed to stop network")
 	})
 
-	endpoints, err := tmpnet.GetNodeWebsocketURIs(ctx, network.Nodes, blockchainID, tc.DeferCleanup)
+	wsURIs, err := tmpnet.GetNodeWebsocketURIs(ctx, network.Nodes, blockchainID, tc.DeferCleanup)
 	require.NoError(err)
 
-	require.NoError(run(ctx, log, keys, endpoints))
-}
-
-func run(
-	ctx context.Context,
-	log logging.Logger,
-	keys []*secp256k1.PrivateKey,
-	wsURIs []string,
-) error {
 	wallets := make([]*load2.Wallet, len(keys))
 	txBuilders := make([]load2.TxBuilder, len(keys))
 	for i := range len(keys) {
 		wsURI := wsURIs[i%len(wsURIs)]
 		client, err := ethclient.Dial(wsURI)
-		if err != nil {
-			return err
-		}
+		require.NoError(err)
 
 		chainID, err := client.ChainID(ctx)
-		if err != nil {
-			return err
-		}
+		require.NoError(err)
+
 		wallet := load2.NewWallet(client, keys[i].ToECDSA(), 0, chainID)
 		contract, err := createContract(ctx, client, wallet)
-		if err != nil {
-			return err
-		}
+		require.NoError(err)
+
 		txBuilder := load2.WithContractInstance(load2.BuildContractCreationTx, contract)
 
 		wallets[i] = wallet
@@ -104,11 +89,9 @@ func run(
 	}
 
 	generator, err := load2.NewGenerator(log, wallets, txBuilders)
-	if err != nil {
-		return err
-	}
+	require.NoError(err)
 
-	return generator.Run(ctx)
+	require.NoError(generator.Run(ctx))
 }
 
 func createContract(
