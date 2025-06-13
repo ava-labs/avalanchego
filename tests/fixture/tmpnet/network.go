@@ -469,19 +469,15 @@ func (n *Network) Bootstrap(ctx context.Context, log logging.Logger) error {
 	// TODO(marun) This restart might be unnecessary if:
 	// - sybil protection didn't change
 	// - the node is not a subnet validator
-	log.Info("restarting bootstrap node",
+	log.Info("stopping bootstrap node",
 		zap.Stringer("nodeID", bootstrapNode.NodeID),
 	)
-	if err := bootstrapNode.Restart(ctx); err != nil {
+	if err := bootstrapNode.Stop(ctx); err != nil {
 		return err
 	}
 
-	if len(n.Nodes) == 1 {
-		return nil
-	}
-
-	log.Info("starting remaining nodes")
-	return n.StartNodes(ctx, log, n.Nodes[1:]...)
+	log.Info("starting nodes")
+	return n.StartNodes(ctx, log, n.Nodes...)
 }
 
 // Starts the provided node after configuring it for the network.

@@ -6,6 +6,7 @@ package antithesis
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -116,6 +117,9 @@ func initComposeConfig(
 		return fmt.Errorf("failed to marshal compose project: %w", err)
 	}
 	composePath := filepath.Join(targetPath, "docker-compose.yml")
+
+	log.Printf("writing docker compose to: %q\n\n%s", composePath, string(bytes))
+
 	if err := os.WriteFile(composePath, bytes, perms.ReadWrite); err != nil {
 		return fmt.Errorf("failed to write genesis: %w", err)
 	}
