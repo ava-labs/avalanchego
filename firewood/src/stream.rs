@@ -597,7 +597,11 @@ fn key_from_nibble_iter<Iter: Iterator<Item = u8>>(mut nibbles: Iter) -> Key {
     let mut data = Vec::with_capacity(nibbles.size_hint().0 / 2);
 
     while let (Some(hi), Some(lo)) = (nibbles.next(), nibbles.next()) {
-        data.push((hi << 4) + lo);
+        let byte = hi
+            .checked_shl(4)
+            .and_then(|v| v.checked_add(lo))
+            .expect("Nibble overflow while constructing byte");
+        data.push(byte);
     }
 
     data.into_boxed_slice()

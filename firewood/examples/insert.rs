@@ -120,7 +120,7 @@ fn get_keys_to_verify(batch: &Batch<Vec<u8>, Vec<u8>>, pct: u16) -> HashMap<Vec<
     } else {
         batch
             .iter()
-            .filter(|_last_key| rand::rng().random_range(0..=(100 - pct)) == 0)
+            .filter(|_last_key| rand::rng().random_range(0..=100u16.saturating_sub(pct)) == 0)
             .map(|op| {
                 if let BatchOp::Put { key, value } = op {
                     (key.clone(), value.clone().into_boxed_slice())

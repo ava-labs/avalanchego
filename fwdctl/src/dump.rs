@@ -133,7 +133,7 @@ pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
         .or(opts.start_key_hex.clone())
         .unwrap_or_default();
     let stop_key = opts.stop_key.clone().or(opts.stop_key_hex.clone());
-    let mut key_count = 0;
+    let mut key_count: u32 = 0;
 
     let mut stream = MerkleKeyValueStream::from_key(&latest_rev, start_key);
     let mut output_handler = create_output_handler(opts).expect("Error creating output handler");
@@ -143,7 +143,7 @@ pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
             Ok((key, value)) => {
                 output_handler.handle_record(&key, &value)?;
 
-                key_count += 1;
+                key_count = key_count.saturating_add(1);
 
                 if (stop_key.as_ref().is_some_and(|stop_key| key >= *stop_key))
                     || key_count_exceeded(opts.max_key_count, key_count)

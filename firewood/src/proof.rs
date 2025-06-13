@@ -119,7 +119,10 @@ impl From<PathIterItem> for ProofNode {
         }
 
         #[cfg(feature = "ethhash")]
-        let partial_len = item.key_nibbles.len() - item.node.partial_path().0.len();
+        let partial_len = item
+            .key_nibbles
+            .len()
+            .saturating_sub(item.node.partial_path().0.len());
 
         Self {
             key: item.key_nibbles,

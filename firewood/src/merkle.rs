@@ -280,7 +280,7 @@ impl<T: TrieReader> Merkle<T> {
         };
 
         let start_proof = self.prove(&first_key)?;
-        let limit = limit.map(|old_limit| old_limit.get() - 1);
+        let limit = limit.map(|old_limit| old_limit.get().saturating_sub(1));
 
         let mut key_values = vec![(first_key, first_value.into_boxed_slice())];
 
@@ -875,13 +875,13 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                     Node::Branch(branch) => {
                         if branch.value.is_some() {
                             // a KV pair was in the branch itself
-                            *deleted += 1;
+                            *deleted = deleted.saturating_add(1);
                         }
                         self.delete_children(branch, deleted)?;
                     }
                     Node::Leaf(_) => {
                         // the prefix matched only a leaf, so we remove it and indicate only one item was removed
-                        *deleted += 1;
+                        *deleted = deleted.saturating_add(1);
                     }
                 };
                 Ok(None)
@@ -982,7 +982,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
     ) -> Result<(), FileIoError> {
         if branch.value.is_some() {
             // a KV pair was in the branch itself
-            *deleted += 1;
+            *deleted = deleted.saturating_add(1);
         }
         for children in branch.children.iter_mut() {
             // read the child node
@@ -998,7 +998,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                     self.delete_children(child_branch, deleted)?;
                 }
                 Node::Leaf(_) => {
-                    *deleted += 1;
+                    *deleted = deleted.saturating_add(1);
                 }
             }
         }
