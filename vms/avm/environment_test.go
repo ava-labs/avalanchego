@@ -68,7 +68,7 @@ type environment struct {
 	genesisBytes []byte
 	genesisTx    *txs.Tx
 	sharedMemory *atomic.Memory
-	issuer       chan common.Message
+	subscriber   common.Subscriber
 	vm           *VM
 	txBuilder    *txstest.Builder
 }
@@ -129,7 +129,6 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),
 		genesisBytes,
-		nil,
 		configBytes,
 		nil,
 		append(
@@ -149,13 +148,12 @@ func setup(tb testing.TB, c *envConfig) *environment {
 	))
 
 	stopVertexID := ids.GenerateTestID()
-	issuer := make(chan common.Message, 1)
 
 	env := &environment{
+		subscriber:   vm.Subscriber,
 		genesisBytes: genesisBytes,
 		genesisTx:    getCreateTxFromGenesisTest(tb, genesisBytes, assetName),
 		sharedMemory: m,
-		issuer:       issuer,
 		vm:           vm,
 		txBuilder:    txstest.New(vm.parser.Codec(), vm.ctx, &vm.Config, vm.feeAssetID, vm.state),
 	}
@@ -165,7 +163,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		return env
 	}
 
-	require.NoError(vm.Linearize(context.Background(), stopVertexID, issuer))
+	require.NoError(vm.Linearize(context.Background(), stopVertexID))
 	if c.notBootstrapped {
 		return env
 	}
@@ -410,24 +408,25 @@ func makeCustomAssetGenesisData(tb testing.TB) map[string]AssetDefinition {
 func issueAndAccept(
 	require *require.Assertions,
 	vm *VM,
-	issuer <-chan common.Message,
+	subscriber common.Subscriber,
 	tx *txs.Tx,
 ) {
 	txID, err := vm.issueTxFromRPC(tx)
 	require.NoError(err)
 	require.Equal(tx.ID(), txID)
 
-	buildAndAccept(require, vm, issuer, txID)
+	buildAndAccept(require, vm, subscriber, txID)
 }
 
 // buildAndAccept expects the context lock not to be held
 func buildAndAccept(
 	require *require.Assertions,
 	vm *VM,
-	issuer <-chan common.Message,
+	subscriber common.Subscriber,
 	txID ids.ID,
 ) {
-	require.Equal(common.PendingTxs, <-issuer)
+	msg := subscriber.SubscribeToEvents(context.Background())
+	require.Equal(common.PendingTxs, msg)
 
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()

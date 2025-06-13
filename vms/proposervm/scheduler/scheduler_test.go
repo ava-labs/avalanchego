@@ -4,6 +4,7 @@
 package scheduler
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -14,48 +15,57 @@ import (
 )
 
 func TestDelayFromNew(t *testing.T) {
-	toEngine := make(chan common.Message, 10)
 	startTime := time.Now().Add(50 * time.Millisecond)
 
-	s, fromVM := New(logging.NoLog{}, toEngine)
+	msgs := make(chan common.Message, 1)
+	sub := func(ctx context.Context) common.Message {
+		return <-msgs
+	}
+	s, fromVM := New(logging.NoLog{}, sub)
 	defer s.Close()
 	go s.Dispatch(startTime)
 
-	fromVM <- common.PendingTxs
+	msgs <- common.PendingTxs
+	fromVM.SubscribeToEvents(context.Background())
 
-	<-toEngine
 	require.LessOrEqual(t, time.Until(startTime), time.Duration(0))
 }
 
 func TestDelayFromSetTime(t *testing.T) {
-	toEngine := make(chan common.Message, 10)
 	now := time.Now()
 	startTime := now.Add(50 * time.Millisecond)
 
-	s, fromVM := New(logging.NoLog{}, toEngine)
+	msgs := make(chan common.Message, 1)
+	sub := func(ctx context.Context) common.Message {
+		return <-msgs
+	}
+	s, fromVM := New(logging.NoLog{}, sub)
 	defer s.Close()
 	go s.Dispatch(now)
 
 	s.SetBuildBlockTime(startTime)
 
-	fromVM <- common.PendingTxs
+	msgs <- common.PendingTxs
 
-	<-toEngine
+	fromVM.SubscribeToEvents(context.Background())
 	require.LessOrEqual(t, time.Until(startTime), time.Duration(0))
 }
 
 func TestReceipt(*testing.T) {
-	toEngine := make(chan common.Message, 10)
+	msgs := make(chan common.Message, 1)
+	sub := func(ctx context.Context) common.Message {
+		return <-msgs
+	}
 	now := time.Now()
 	startTime := now.Add(50 * time.Millisecond)
 
-	s, fromVM := New(logging.NoLog{}, toEngine)
+	s, fromVM := New(logging.NoLog{}, sub)
 	defer s.Close()
 	go s.Dispatch(now)
 
-	fromVM <- common.PendingTxs
+	msgs <- common.PendingTxs
 
 	s.SetBuildBlockTime(startTime)
 
-	<-toEngine
+	fromVM.SubscribeToEvents(context.Background())
 }

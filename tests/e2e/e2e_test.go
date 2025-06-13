@@ -6,6 +6,7 @@ package e2e_test
 import (
 	"encoding/base64"
 	"encoding/json"
+	"github.com/ava-labs/avalanchego/tests/e2e/vms"
 	"testing"
 
 	"github.com/onsi/ginkgo/v2"
@@ -21,7 +22,6 @@ import (
 	_ "github.com/ava-labs/avalanchego/tests/e2e/x/transfer"
 
 	"github.com/ava-labs/avalanchego/config"
-	"github.com/ava-labs/avalanchego/tests/e2e/vms"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/upgrade"
@@ -46,6 +46,10 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	require.NoError(tc, err)
 	nodes := tmpnet.NewNodesOrPanic(nodeCount)
 	subnets := vms.XSVMSubnetsOrPanic(nodes...)
+
+	for _, node := range nodes {
+		node.Flags[config.LogLevelKey] = "debug"
+	}
 
 	upgrades := upgrade.Default
 	if flagVars.ActivateGranite() {
