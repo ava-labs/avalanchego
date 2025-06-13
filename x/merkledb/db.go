@@ -14,7 +14,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/otel/attribute"
-	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -347,8 +346,9 @@ func newDatabase(
 		rootChange: change[maybe.Maybe[*node]]{
 			after: trieDB.root,
 		},
-		values: map[Key]*change[maybe.Maybe[[]byte]]{},
-		nodes:  map[Key]*change[*node]{},
+		sortedKeys: []Key{},
+		nodes:      map[Key]*change[*node]{},
+		keyChanges: map[Key]*change[maybe.Maybe[[]byte]]{},
 	})
 
 	// mark that the db has not yet been cleanly closed
@@ -747,29 +747,23 @@ func (db *merkleDB) GetChangeProof(
 		return nil, database.ErrClosed
 	}
 
-	changes, err := db.history.getValueChanges(startRootID, endRootID, start, end, maxLength)
+	// [valueChanges] contains a subset of the keys that were added or had their
+	// values modified between [startRootID] to [endRootID].
+	valueChanges, err := db.history.getValueChanges(startRootID, endRootID, start, end, maxLength)
 	if err != nil {
 		return nil, err
 	}
 
-	// [changedKeys] are a subset of the keys that were added or had their
-	// values modified between [startRootID] to [endRootID] sorted in increasing
-	// order.
-	changedKeys := maps.Keys(changes.values)
-	utils.Sort(changedKeys)
-
 	result := &ChangeProof{
-		KeyChanges: make([]KeyChange, 0, len(changedKeys)),
+		KeyChanges: make([]KeyChange, len(valueChanges)),
 	}
 
-	for _, key := range changedKeys {
-		change := changes.values[key]
-
-		result.KeyChanges = append(result.KeyChanges, KeyChange{
-			Key: key.Bytes(),
+	for i, valueChange := range valueChanges {
+		result.KeyChanges[i] = KeyChange{
+			Key: valueChange.key.Bytes(),
 			// create a copy so edits of the []byte don't affect the db
-			Value: maybe.Bind(change.after, slices.Clone[[]byte]),
-		})
+			Value: maybe.Bind(valueChange.change.after, slices.Clone[[]byte]),
+		}
 	}
 
 	largestKey := end
@@ -985,7 +979,7 @@ func (db *merkleDB) commitView(ctx context.Context, trieToCommit *view) error {
 	changes := trieToCommit.changes
 	_, span := db.infoTracer.Start(ctx, "MerkleDB.commitView", oteltrace.WithAttributes(
 		attribute.Int("nodesChanged", len(changes.nodes)),
-		attribute.Int("valuesChanged", len(changes.values)),
+		attribute.Int("valuesChanged", len(changes.keyChanges)),
 	))
 	defer span.End()
 
@@ -1365,9 +1359,10 @@ func (db *merkleDB) Clear() error {
 	// Clear history
 	db.history = newTrieHistory(db.history.maxHistoryLen)
 	db.history.record(&changeSummary{
-		rootID: db.rootID,
-		values: map[Key]*change[maybe.Maybe[[]byte]]{},
-		nodes:  map[Key]*change[*node]{},
+		rootID:     db.rootID,
+		sortedKeys: []Key{},
+		nodes:      map[Key]*change[*node]{},
+		keyChanges: map[Key]*change[maybe.Maybe[[]byte]]{},
 	})
 	return nil
 }
