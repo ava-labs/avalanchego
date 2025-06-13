@@ -5,6 +5,8 @@ package simplex
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message"
+	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -13,6 +15,9 @@ import (
 type Config struct {
 	Ctx SimplexChainContext
 	Log logging.Logger
+
+	Sender             sender.ExternalSender
+	OutboundMsgBuilder message.SimplexOutboundMessageBuilder
 
 	// Validators is a map of node IDs to their validator information.
 	// This tells the node about the current membership set, and should be consistent
