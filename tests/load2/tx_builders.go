@@ -69,7 +69,7 @@ func BuildRandomTx(
 			weight: 50,
 		},
 		{
-			txFunc: BuildContractCreationTx,
+			txFunc: buildContractCreationTx,
 			name:   "ContractCreation",
 			weight: 1,
 		},
@@ -101,22 +101,6 @@ func BuildRandomTx(
 	}
 
 	return tx, nil
-}
-
-func BuildContractCreationTx(
-	backend Backend,
-	contractInstance *contracts.EVMLoadSimulator,
-) (*types.Transaction, error) {
-	txOpts, err := NewTxOpts(
-		backend.PrivKey(),
-		backend.ChainID(),
-		maxFeeCap,
-		backend.Nonce(),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create tx opts: %w", err)
-	}
-	return contractInstance.SimulateContractCreation(txOpts)
 }
 
 func WithContractInstance(
@@ -274,6 +258,22 @@ func buildCallDepthTx(
 	const maxDepth = 5
 	count := big.NewInt(rand.Int64N(maxDepth)) //#nosec G404
 	return contractInstance.SimulateCallDepth(txOpts, count)
+}
+
+func buildContractCreationTx(
+	backend Backend,
+	contractInstance *contracts.EVMLoadSimulator,
+) (*types.Transaction, error) {
+	txOpts, err := NewTxOpts(
+		backend.PrivKey(),
+		backend.ChainID(),
+		maxFeeCap,
+		backend.Nonce(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create tx opts: %w", err)
+	}
+	return contractInstance.SimulateContractCreation(txOpts)
 }
 
 func buildPureComputeTx(
