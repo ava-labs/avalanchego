@@ -6,6 +6,7 @@ package c
 import (
 	"context"
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	"math/big"
 	"math/rand/v2"
@@ -13,6 +14,7 @@ import (
 	"github.com/ava-labs/libevm/accounts/abi/bind"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/params"
 
 	"github.com/ava-labs/avalanchego/tests/load/c/contracts"
@@ -20,21 +22,16 @@ import (
 	ethcrypto "github.com/ava-labs/libevm/crypto"
 )
 
-type EthClient interface {
-	ChainID(ctx context.Context) (*big.Int, error)
-	EthClientSender
-	bind.DeployBackend
-	bind.ContractBackend
-}
+var (
+	errNonpositiveSeed      = errors.New("seed is nonpositive")
+	errZeroTotalWeight      = errors.New("total weight is zero")
+	errFailedToSelectTxType = errors.New("failed to select tx type")
+)
 
-type EthClientSender interface {
-	SendTransaction(ctx context.Context, tx *types.Transaction) error
-}
-
-// issuer generates and issues transactions that randomly call the
+// Issuer generates and issues transactions that randomly call the
 // external functions of the [contracts.EVMLoadSimulator] contract
 // instance that it deploys.
-type issuer struct {
+type Issuer struct {
 	// Determined by constructor
 	txTypes []txType
 
@@ -42,12 +39,12 @@ type issuer struct {
 	nonce uint64
 }
 
-func createIssuer(
+func NewIssuer(
 	ctx context.Context,
-	client EthClient,
+	client *ethclient.Client,
 	nonce uint64,
 	key *ecdsa.PrivateKey,
-) (*issuer, error) {
+) (*Issuer, error) {
 	chainID, err := client.ChainID(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting chain id: %w", err)
@@ -69,21 +66,24 @@ func createIssuer(
 		return nil, fmt.Errorf("waiting for simulator contract to be mined: %w", err)
 	}
 
-	return &issuer{
+	return &Issuer{
 		txTypes: makeTxTypes(simulatorInstance, key, chainID, client),
 		nonce:   nonce,
 	}, nil
 }
 
-func (o *issuer) GenerateAndIssueTx(ctx context.Context) (common.Hash, error) {
-	txType := pickWeightedRandom(o.txTypes)
+func (i *Issuer) GenerateAndIssueTx(ctx context.Context) (common.Hash, error) {
+	txType, err := pickWeightedRandom(i.txTypes)
+	if err != nil {
+		return common.Hash{}, err
+	}
 
-	tx, err := txType.generateAndIssueTx(ctx, txType.maxFeeCap, o.nonce)
+	tx, err := txType.generateAndIssueTx(ctx, txType.maxFeeCap, i.nonce)
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("generating and issuing transaction of type %s: %w", txType.name, err)
 	}
 
-	o.nonce++
+	i.nonce++
 	txHash := tx.Hash()
 	return txHash, nil
 }
@@ -92,7 +92,7 @@ func makeTxTypes(
 	contractInstance *contracts.EVMLoadSimulator,
 	senderKey *ecdsa.PrivateKey,
 	chainID *big.Int,
-	client EthClientSender,
+	client *ethclient.Client,
 ) []txType {
 	senderAddress := ethcrypto.PubkeyToAddress(senderKey.PublicKey)
 	signer := types.LatestSignerForChainID(chainID)
@@ -134,7 +134,11 @@ func makeTxTypes(
 					return nil, fmt.Errorf("creating transaction opts: %w", err)
 				}
 				const maxWriteSizeBytes = 5
-				return contractInstance.SimulateRandomWrite(txOpts, intNBigInt(maxWriteSizeBytes))
+				count, err := randomNum(maxWriteSizeBytes)
+				if err != nil {
+					return nil, err
+				}
+				return contractInstance.SimulateRandomWrite(txOpts, count)
 			},
 		},
 		{
@@ -147,7 +151,11 @@ func makeTxTypes(
 					return nil, fmt.Errorf("creating transaction opts: %w", err)
 				}
 				const maxStateSizeBytes = 5
-				return contractInstance.SimulateModification(txOpts, intNBigInt(maxStateSizeBytes))
+				count, err := randomNum(maxStateSizeBytes)
+				if err != nil {
+					return nil, err
+				}
+				return contractInstance.SimulateModification(txOpts, count)
 			},
 		},
 		{
@@ -160,7 +168,11 @@ func makeTxTypes(
 					return nil, fmt.Errorf("creating transaction opts: %w", err)
 				}
 				const maxReadSizeBytes = 5
-				return contractInstance.SimulateReads(txOpts, intNBigInt(maxReadSizeBytes))
+				count, err := randomNum(maxReadSizeBytes)
+				if err != nil {
+					return nil, err
+				}
+				return contractInstance.SimulateReads(txOpts, count)
 			},
 		},
 		{
@@ -173,7 +185,11 @@ func makeTxTypes(
 					return nil, fmt.Errorf("creating transaction opts: %w", err)
 				}
 				const maxRounds = 3
-				return contractInstance.SimulateHashing(txOpts, intNBigInt(maxRounds))
+				count, err := randomNum(maxRounds)
+				if err != nil {
+					return nil, err
+				}
+				return contractInstance.SimulateHashing(txOpts, count)
 			},
 		},
 		{
@@ -186,7 +202,11 @@ func makeTxTypes(
 					return nil, fmt.Errorf("creating transaction opts: %w", err)
 				}
 				const maxArraySize = 4
-				return contractInstance.SimulateMemory(txOpts, intNBigInt(maxArraySize))
+				count, err := randomNum(maxArraySize)
+				if err != nil {
+					return nil, err
+				}
+				return contractInstance.SimulateMemory(txOpts, count)
 			},
 		},
 		{
@@ -199,7 +219,11 @@ func makeTxTypes(
 					return nil, fmt.Errorf("creating transaction opts: %w", err)
 				}
 				const maxDepth = 5
-				return contractInstance.SimulateCallDepth(txOpts, intNBigInt(maxDepth))
+				count, err := randomNum(maxDepth)
+				if err != nil {
+					return nil, err
+				}
+				return contractInstance.SimulateCallDepth(txOpts, count)
 			},
 		},
 		{
@@ -262,32 +286,32 @@ type txType struct {
 	generateAndIssueTx func(txCtx context.Context, gasFeeCap *big.Int, nonce uint64) (*types.Transaction, error)
 }
 
-func pickWeightedRandom(txTypes []txType) txType {
+func pickWeightedRandom(txTypes []txType) (txType, error) {
 	var totalWeight uint
 	for _, txType := range txTypes {
 		totalWeight += txType.weight
 	}
 
 	if totalWeight == 0 {
-		panic("Total weight cannot be zero")
+		return txType{}, errZeroTotalWeight
 	}
 
 	r := rand.UintN(totalWeight) //nolint:gosec
 
 	for _, txType := range txTypes {
 		if r < txType.weight {
-			return txType
+			return txType, nil
 		}
 		r -= txType.weight
 	}
-	panic("failed to pick a tx type")
+	return txType{}, errFailedToSelectTxType
 }
 
-func intNBigInt(n int64) *big.Int {
-	if n <= 0 {
-		panic("n must be greater than 0")
+func randomNum(seed int64) (*big.Int, error) {
+	if seed <= 0 {
+		return nil, errNonpositiveSeed
 	}
-	return big.NewInt(rand.Int64N(n)) //nolint:gosec
+	return big.NewInt(rand.Int64N(seed)), nil //nolint:gosec
 }
 
 func newTxOpts(

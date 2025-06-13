@@ -80,7 +80,15 @@ func main() {
 				DefaultRuntimeConfig: *nodeRuntimeConfig,
 			}
 
-			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
+			timeout, err := nodeRuntimeConfig.GetNetworkStartTimeout(nodeCount)
+			if err != nil {
+				return err
+			}
+			log.Info("waiting for network to start",
+				zap.Float64("timeoutSeconds", timeout.Seconds()),
+			)
+
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
 			if err := tmpnet.BootstrapNewNetwork(
 				ctx,
@@ -258,7 +266,10 @@ func main() {
 	)
 	rootCmd.AddCommand(checkLogsCmd)
 
-	var kubeconfigVars *flags.KubeconfigVars
+	var (
+		kubeconfigVars *flags.KubeconfigVars
+		collectorVars  *flags.CollectorVars
+	)
 	startKindClusterCmd := &cobra.Command{
 		Use:   "start-kind-cluster",
 		Short: "Starts a local kind cluster with an integrated registry",
@@ -274,10 +285,24 @@ func main() {
 			if len(kubeconfigVars.Path) == 0 {
 				return errKubeconfigRequired
 			}
-			return tmpnet.StartKindCluster(ctx, log, kubeconfigVars.Path, kubeconfigVars.Context)
+			// TODO(marun) Consider supporting other contexts. Will require modifying the kind cluster start script.
+			if len(kubeconfigVars.Context) > 0 && kubeconfigVars.Context != tmpnet.KindKubeconfigContext {
+				log.Warn("ignoring kubeconfig context for kind cluster",
+					zap.String("providedContext", kubeconfigVars.Context),
+					zap.String("requiredContext", tmpnet.KindKubeconfigContext),
+				)
+			}
+			return tmpnet.StartKindCluster(
+				ctx,
+				log,
+				kubeconfigVars.Path,
+				collectorVars.StartMetricsCollector,
+				collectorVars.StartLogsCollector,
+			)
 		},
 	}
 	kubeconfigVars = flags.NewKubeconfigFlagSetVars(startKindClusterCmd.PersistentFlags())
+	collectorVars = flags.NewCollectorFlagSetVars(startKindClusterCmd.PersistentFlags())
 	rootCmd.AddCommand(startKindClusterCmd)
 
 	if err := rootCmd.Execute(); err != nil {

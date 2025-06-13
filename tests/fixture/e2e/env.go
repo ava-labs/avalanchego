@@ -193,7 +193,15 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 
 	// Once one or more nodes are running it should be safe to wait for promtail to report readiness
 	if flagVars.StartLogsCollector() {
-		require.NoError(tmpnet.WaitForPromtailReadiness(tc.DefaultContext(), tc.Log()))
+		runtimeConfig, err := flagVars.NodeRuntimeConfig()
+		require.NoError(err)
+		if runtimeConfig.Kube != nil {
+			// TODO(marun) Maybe make this configurable to enable the check for a test suite that writes service
+			// discovery configuration for its own metrics endpoint?
+			tc.Log().Warn("skipping check for logs collection readiness since kube nodes won't create have created the required service discovery config")
+		} else {
+			require.NoError(tmpnet.WaitForPromtailReadiness(tc.DefaultContext(), tc.Log()))
+		}
 	}
 
 	if networkCmd == StartNetworkCmd {

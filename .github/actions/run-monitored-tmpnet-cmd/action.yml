@@ -8,6 +8,9 @@ inputs:
   run_env:
     description: 'a string containing env vars for the command e.g. "MY_VAR1=foo MY_VAR2=bar"'
     default: ''
+  runtime:
+    description: 'the tmpnet runtime being used'
+    default: 'process'
   filter_by_owner:
     default: ''
   artifact_prefix:
@@ -67,8 +70,10 @@ runs:
       # --impure ensures the env vars are accessible to the command
       run: ${{ inputs.run_env }} ${{ github.action_path }}/nix-develop.sh --impure --command bash -x ${{ inputs.run }}
       env:
+        # Always collect metrics locally even when nodes are running in kube to enable collection from the test workload
         TMPNET_START_METRICS_COLLECTOR: ${{ inputs.prometheus_username != '' }}
-        TMPNET_START_LOGS_COLLECTOR: ${{ inputs.loki_username != '' }}
+        # Skip local log collection when nodes are running in kube since collection will occur in-cluster.
+        TMPNET_START_LOGS_COLLECTOR: ${{ inputs.loki_username != '' && inputs.runtime == 'process' }}
         TMPNET_CHECK_METRICS_COLLECTED: ${{ inputs.prometheus_username != '' }}
         TMPNET_CHECK_LOGS_COLLECTED: ${{ inputs.loki_username != '' }}
         LOKI_USERNAME: ${{ inputs.loki_username }}
@@ -86,7 +91,7 @@ runs:
     # easy way to compose custom actions for use by other repos
     # without running into versioning issues.
     - name: Upload tmpnet data
-      if: always()
+      if: always() && (inputs.runtime == 'process')
       uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.artifact_prefix }}-tmpnet-data
@@ -94,4 +99,15 @@ runs:
           ~/.tmpnet/networks
           ~/.tmpnet/prometheus/prometheus.log
           ~/.tmpnet/promtail/promtail.log
+        if-no-files-found: error
+    - name: Export kind logs
+      if: always() && (inputs.runtime == 'kube')
+      shell: bash
+      run: kind export logs /tmp/kind-logs
+    - name: Upload kind logs
+      if: always() && (inputs.runtime == 'kube')
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact_prefix }}-kind-logs
+        path: /tmp/kind-logs
         if-no-files-found: error

@@ -10,23 +10,16 @@ import (
 	"sync"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/ethclient"
+
+	"github.com/ava-labs/avalanchego/tests/load"
 )
-
-type EthClient interface {
-	NonceAt(ctx context.Context, addr common.Address, blockNumber *big.Int) (uint64, error)
-	NewHeadSubscriber
-}
-
-type Observer interface {
-	ObserveConfirmed(hash common.Hash)
-	ObserveFailed(hash common.Hash)
-}
 
 // Listener listens for transaction confirmations from a node.
 type Listener struct {
 	// Injected parameters
-	client  EthClient
-	tracker Observer
+	client  *ethclient.Client
+	tracker *load.Tracker[common.Hash]
 	address common.Address
 
 	// Internal state
@@ -36,7 +29,12 @@ type Listener struct {
 	inFlightTxs []common.Hash
 }
 
-func New(client EthClient, tracker Observer, address common.Address, nonce uint64) *Listener {
+func New(
+	client *ethclient.Client,
+	tracker *load.Tracker[common.Hash],
+	address common.Address,
+	nonce uint64,
+) *Listener {
 	return &Listener{
 		client:  client,
 		tracker: tracker,

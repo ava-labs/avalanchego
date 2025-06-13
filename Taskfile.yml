@@ -47,6 +47,10 @@ tasks:
     desc: Builds xsvm plugin
     cmd: ./scripts/build_xsvm.sh
 
+  build-xsvm-image:
+    desc: Builds xsvm image
+    cmd: ./scripts/build_xsvm_image.sh
+
   check-clean-branch:
     desc: Checks that the git working tree is clean
     cmd: .github/workflows/check-clean-branch.sh
@@ -189,6 +193,18 @@ tasks:
       - task: build-xsvm
       - cmd: bash -x ./scripts/tests.e2e.existing.sh {{.CLI_ARGS}}
 
+  test-e2e-kube:
+    desc: Runs e2e tests against a network deployed to kube
+    cmds:
+      - cmd: bash -x ./scripts/tests.e2e.kube.sh {{.CLI_ARGS}}
+
+  test-e2e-kube-ci:
+    desc: Runs e2e tests against a network deployed to kube [serially]
+    env:
+      E2E_SERIAL: 1
+    cmds:
+      - task: test-e2e-kube
+
   # To use a different fuzz time, run `task test-fuzz FUZZTIME=[value in seconds]`.
   # A value of `-1` will run until it encounters a failing output.
 
@@ -215,7 +231,18 @@ tasks:
     cmds:
       - task: generate-load-contract-bindings
       - task: build
-      - cmd: go test ./tests/load/c -test.v -- --avalanchego-path=$PWD/build/avalanchego 
+      - cmd: go run ./tests/load/c/main --avalanchego-path=./build/avalanchego {{.CLI_ARGS}}
+    
+  test-load-kube:
+    desc: Runs load tests against a network deployed to kube
+    cmds: 
+      - task: generate-load-contract-bindings
+      - cmd: bash -x ./scripts/tests.load.kube.sh {{.CLI_ARGS}}
+
+  test-load-exclusive:
+    desc: Runs load tests against kube with exclusive scheduling
+    cmds:
+      - cmd: go run ./tests/load/c/main --runtime=kube --kube-use-exclusive-scheduling {{.CLI_ARGS}}
 
   test-unit:
     desc: Runs unit tests

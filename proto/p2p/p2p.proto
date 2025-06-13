@@ -9,7 +9,7 @@ option go_package = "github.com/ava-labs/avalanchego/proto/pb/p2p";
 // Only one type can be non-null.
 message Message {
   reserved 1; // Until E upgrade is activated.
-  reserved 36; // Next unused field number.
+  reserved 37; // Next unused field number.
   // NOTES
   // Use "oneof" for each message type and set rest to null if not used.
   // That is because when the compression is enabled, we don't want to include uncompressed fields.
@@ -55,6 +55,9 @@ message Message {
     AppResponse app_response = 31;
     AppGossip app_gossip = 32;
     AppError app_error = 34;
+
+    // Simplex messages:
+    Simplex simplex = 36;
   }
 }
 
@@ -418,4 +421,92 @@ message AppGossip {
   bytes chain_id = 1;
   // Message body
   bytes app_bytes = 2;
+}
+
+message Simplex {
+  bytes chain_id = 1;
+
+  oneof message {
+    BlockProposal block_proposal = 2;
+    Vote vote = 3;
+    EmptyVote empty_vote = 4;
+    Vote finalize_vote = 5;
+    QuorumCertificate notarization = 6;
+    EmptyNotarization empty_notarization = 7;
+    QuorumCertificate finalization = 8;
+    ReplicationRequest replication_request = 9;
+    ReplicationResponse replication_response = 10;
+  }
+}
+
+message BlockProposal {
+  bytes block = 1;
+  Vote vote = 2;
+}
+
+message ProtocolMetadata {
+  // Version defines the version of the protocol this block was created with.
+  uint32 version = 1;
+  // Epoch returns the epoch in which the block was proposed
+  uint64 epoch = 2;
+  // Round returns the round number in which the block was proposed.
+  // Can also be an empty block.
+  uint64 round = 3;
+  // Seq is the order of the block among all blocks in the blockchain.
+  // Cannot correspond to an empty block.
+  uint64 seq = 4;
+  // Prev returns the digest of the previous data block
+  bytes prev = 5;
+}
+
+message BlockHeader {
+  ProtocolMetadata metadata = 1;
+  // digest is the short representation of the inner block's bytes
+  bytes digest = 2;
+}
+
+message Signature {
+  // Signer identifies who the signature came from.
+  bytes signer = 1;
+  // Value is the actual cryptographic signature.
+  bytes value = 2;
+}
+
+message Vote {
+  BlockHeader block_header = 1;
+  Signature signature = 2;
+}
+
+message EmptyVote {
+  ProtocolMetadata metadata = 1;
+  Signature signature = 2;
+}
+
+message QuorumCertificate {
+  BlockHeader block_header = 1;
+  bytes quorum_certificate = 2;
+}
+
+message EmptyNotarization {
+  ProtocolMetadata metadata = 1;
+  bytes quorum_certificate = 2;
+}
+
+message ReplicationRequest {
+  repeated uint64 seqs = 1; // sequences we are requesting
+  uint64 latest_round = 2; // latest round that we are aware of
+}
+
+message ReplicationResponse {
+  repeated QuorumRound data = 1; // requested seqs. not required to be in particular order
+  QuorumRound latest_round = 2; // latest round the responding node is aware of
+}
+
+// QuorumRound represents a round that has acheived quorum on either
+// (empty notarization), (block & notarization), or (block, finalization certificate)
+message QuorumRound {
+  bytes block = 1;
+  QuorumCertificate notarization = 2;
+  EmptyNotarization empty_notarization = 3;
+  QuorumCertificate finalization = 4;
 }
