@@ -4,7 +4,6 @@
 package simplex
 
 import (
-	"encoding/asn1"
 	"errors"
 	"fmt"
 
@@ -67,10 +66,10 @@ func (s *BLSSigner) Sign(message []byte) ([]byte, error) {
 }
 
 type encodedSimplexSignedPayload struct {
-	Message  []byte
-	ChainID  []byte
-	SubnetID []byte
-	Label    []byte
+	Message  []byte `serialize:"true"`
+	ChainID  []byte `serialize:"true"`
+	SubnetID []byte `serialize:"true"`
+	Label    []byte `serialize:"true"`
 }
 
 func encodeMessageToSign(message []byte, chainID ids.ID, subnetID ids.ID) ([]byte, error) {
@@ -80,7 +79,7 @@ func encodeMessageToSign(message []byte, chainID ids.ID, subnetID ids.ID) ([]byt
 		SubnetID: subnetID[:],
 		Label:    simplexLabel,
 	}
-	return asn1.Marshal(encodedSimplexMessage)
+	return Codec.Marshal(CodecVersion, &encodedSimplexMessage)
 }
 
 func (v BLSVerifier) Verify(message []byte, signature []byte, signer simplex.NodeID) error {
