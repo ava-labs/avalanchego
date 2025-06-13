@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package simplex;
+
+option go_package = "github.com/ava-labs/avalanchego/proto/pb/simplex";
+
+// VerifiedBlock is a message that contains a block bytes and its metadata.
+message VerifiedBlock {
+  bytes block = 1;
+  bytes metadata = 2;
+}

@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/simplex"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	pSimplex "github.com/ava-labs/avalanchego/proto/pb/simplex"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
@@ -33,12 +33,12 @@ func (v *VerifiedBlock) BlockHeader() simplex.BlockHeader {
 	}
 }
 
-// Bytes returns the serialized bytes of the verified block 
+// Bytes returns the serialized bytes of the verified block
 // as the asn1 encoding of `encodedVerifiedBlock`.
 func (v *VerifiedBlock) Bytes() []byte {
-	cBlock := p2p.VerifiedBlock{
-		Metadata:   v.metadata.Bytes(),
-		Block: v.innerBlock,
+	cBlock := pSimplex.VerifiedBlock{
+		Metadata: v.metadata.Bytes(),
+		Block:    v.innerBlock,
 	}
 
 	buff, err := proto.Marshal(&cBlock)
@@ -76,12 +76,12 @@ func (b *blockDeserializer) DeserializeBlock(bytes []byte) (simplex.VerifiedBloc
 }
 
 func verifiedBlockFromBytes(buff []byte) (*VerifiedBlock, error) {
-	var protoBlock p2p.VerifiedBlock
+	var protoBlock pSimplex.VerifiedBlock
 
 	if err := proto.Unmarshal(buff, &protoBlock); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal verified block: %w", err)
 	}
-	
+
 	md, err := simplex.ProtocolMetadataFromBytes(protoBlock.Metadata)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse protocol metadata: %w", err)
