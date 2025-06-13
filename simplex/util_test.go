@@ -90,23 +90,3 @@ func generateTestValidators(t *testing.T, num uint64) []*testSigner {
 	}
 	return vds
 }
-
-// getNewSigner returns a new signer that is not already selected.
-func getNewSigner(signers []*testSigner, selected ...ids.NodeID) *testSigner {
-	for _, signer := range signers {
-		// if vd is already selected, skip it
-		found := false
-		for _, id := range selected {
-			if id == signer.NodeID {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			return signer
-		}
-	}
-
-	return nil
-}

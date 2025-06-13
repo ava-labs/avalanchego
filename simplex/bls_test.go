@@ -60,6 +60,7 @@ func TestSignerInvalidMessageEncoding(t *testing.T) {
 // and then verifies the generated quorum certificate on that message.
 func TestQCAggregateAndSign(t *testing.T) {
 	config := newEngineConfig(t, 2)
+	nodeID1 := config.Ctx.NodeID
 
 	signer, verifier := NewBLSAuth(&config.Config)
 	// nodes 1 and 2 will sign the same message
@@ -68,23 +69,23 @@ func TestQCAggregateAndSign(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, verifier.Verify(msg, sig, config.Ctx.NodeID[:]))
 
-	node2ID := getNewSigner(config.Nodes, config.Ctx.NodeID)
-	config.SignBLS = node2ID.sign
+	node2 := config.Nodes[1]
+	config.SignBLS = node2.sign
 	signer2, verifier2 := NewBLSAuth(&config.Config)
 	sig2, err := signer2.Sign(msg)
 	require.NoError(t, err)
-	require.NoError(t, verifier2.Verify(msg, sig2, node2ID.NodeID[:]))
+	require.NoError(t, verifier2.Verify(msg, sig2, node2.NodeID[:]))
 
 	// aggregate the signatures into a quorum certificate
 	signatureAggregator := SignatureAggregator(verifier)
 	qc, err := signatureAggregator.Aggregate(
 		[]simplex.Signature{
-			{Signer: config.Ctx.NodeID[:], Value: sig},
-			{Signer: node2ID.NodeID[:], Value: sig2},
+			{Signer: nodeID1[:], Value: sig},
+			{Signer: node2.NodeID[:], Value: sig2},
 		},
 	)
 	require.NoError(t, err)
-	require.Equal(t, []simplex.NodeID{config.Ctx.NodeID[:], node2ID.NodeID[:]}, qc.Signers())
+	require.Equal(t, []simplex.NodeID{config.Ctx.NodeID[:], node2.NodeID[:]}, qc.Signers())
 	// verify the quorum certificate
 	require.NoError(t, qc.Verify(msg))
 
