@@ -16,7 +16,7 @@ service InfoService {
   rpc GetNetworkName(google.protobuf.Empty) returns (GetNetworkNameReply);
   rpc GetBlockchainID(GetBlockchainIDArgs) returns (GetBlockchainIDReply);
   rpc Peers(PeersArgs) returns (PeersReply);
-  rpc IsBootstrapped(IsBootstrappedResponse) returns (IsBootstrappedResponse);
+  rpc IsBootstrapped(IsBootstrappedArgs) returns (IsBootstrappedResponse);
   rpc Upgrades(google.protobuf.Empty) returns (UpgradesReply);
   rpc Uptime(google.protobuf.Empty) returns (UptimeResponse);
   rpc GetVMs(google.protobuf.Empty) returns (GetVMsReply);
