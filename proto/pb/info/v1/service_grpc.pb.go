@@ -46,7 +46,7 @@ type InfoServiceClient interface {
 	GetNetworkName(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetNetworkNameReply, error)
 	GetBlockchainID(ctx context.Context, in *GetBlockchainIDArgs, opts ...grpc.CallOption) (*GetBlockchainIDReply, error)
 	Peers(ctx context.Context, in *PeersArgs, opts ...grpc.CallOption) (*PeersReply, error)
-	IsBootstrapped(ctx context.Context, in *IsBootstrappedResponse, opts ...grpc.CallOption) (*IsBootstrappedResponse, error)
+	IsBootstrapped(ctx context.Context, in *IsBootstrappedArgs, opts ...grpc.CallOption) (*IsBootstrappedResponse, error)
 	Upgrades(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*UpgradesReply, error)
 	Uptime(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*UptimeResponse, error)
 	GetVMs(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetVMsReply, error)
@@ -130,7 +130,7 @@ func (c *infoServiceClient) Peers(ctx context.Context, in *PeersArgs, opts ...gr
 	return out, nil
 }
 
-func (c *infoServiceClient) IsBootstrapped(ctx context.Context, in *IsBootstrappedResponse, opts ...grpc.CallOption) (*IsBootstrappedResponse, error) {
+func (c *infoServiceClient) IsBootstrapped(ctx context.Context, in *IsBootstrappedArgs, opts ...grpc.CallOption) (*IsBootstrappedResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(IsBootstrappedResponse)
 	err := c.cc.Invoke(ctx, InfoService_IsBootstrapped_FullMethodName, in, out, cOpts...)
@@ -183,7 +183,7 @@ type InfoServiceServer interface {
 	GetNetworkName(context.Context, *emptypb.Empty) (*GetNetworkNameReply, error)
 	GetBlockchainID(context.Context, *GetBlockchainIDArgs) (*GetBlockchainIDReply, error)
 	Peers(context.Context, *PeersArgs) (*PeersReply, error)
-	IsBootstrapped(context.Context, *IsBootstrappedResponse) (*IsBootstrappedResponse, error)
+	IsBootstrapped(context.Context, *IsBootstrappedArgs) (*IsBootstrappedResponse, error)
 	Upgrades(context.Context, *emptypb.Empty) (*UpgradesReply, error)
 	Uptime(context.Context, *emptypb.Empty) (*UptimeResponse, error)
 	GetVMs(context.Context, *emptypb.Empty) (*GetVMsReply, error)
@@ -218,7 +218,7 @@ func (UnimplementedInfoServiceServer) GetBlockchainID(context.Context, *GetBlock
 func (UnimplementedInfoServiceServer) Peers(context.Context, *PeersArgs) (*PeersReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Peers not implemented")
 }
-func (UnimplementedInfoServiceServer) IsBootstrapped(context.Context, *IsBootstrappedResponse) (*IsBootstrappedResponse, error) {
+func (UnimplementedInfoServiceServer) IsBootstrapped(context.Context, *IsBootstrappedArgs) (*IsBootstrappedResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method IsBootstrapped not implemented")
 }
 func (UnimplementedInfoServiceServer) Upgrades(context.Context, *emptypb.Empty) (*UpgradesReply, error) {
@@ -378,7 +378,7 @@ func _InfoService_Peers_Handler(srv interface{}, ctx context.Context, dec func(i
 }
 
 func _InfoService_IsBootstrapped_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(IsBootstrappedResponse)
+	in := new(IsBootstrappedArgs)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -390,7 +390,7 @@ func _InfoService_IsBootstrapped_Handler(srv interface{}, ctx context.Context, d
 		FullMethod: InfoService_IsBootstrapped_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(InfoServiceServer).IsBootstrapped(ctx, req.(*IsBootstrappedResponse))
+		return srv.(InfoServiceServer).IsBootstrapped(ctx, req.(*IsBootstrappedArgs))
 	}
 	return interceptor(ctx, in, info, handler)
 }

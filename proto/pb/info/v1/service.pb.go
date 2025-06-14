@@ -423,6 +423,7 @@ func (x *PeersArgs) GetNodeIDs() []string {
 	return nil
 }
 
+// PeerInfo provides metadata about a connected peer in the network
 type PeerInfo struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Ip             string                 `protobuf:"bytes,1,opt,name=ip,proto3" json:"ip,omitempty"`
@@ -677,6 +678,7 @@ func (x *IsBootstrappedResponse) GetIsBootstrapped() bool {
 	return false
 }
 
+// UpgradesReply contains the scheduled activation times for each protocol upgrade
 type UpgradesReply struct {
 	state                        protoimpl.MessageState `protogen:"open.v1"`
 	ApricotPhase1Time            *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=apricotPhase1Time,proto3" json:"apricotPhase1Time,omitempty"`
@@ -894,7 +896,7 @@ func (x *UptimeResponse) GetWeightedAveragePercentage() float64 {
 	return 0
 }
 
-// GetVMsReply contains the response metadata for GetVMs
+// GetVMsReply contains the response metadata for VMAliases
 type GetVMsReply struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Vms           map[string]*VMAliases  `protobuf:"bytes,1,rep,name=vms,proto3" json:"vms,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
@@ -947,6 +949,7 @@ func (x *GetVMsReply) GetFxs() map[string]string {
 	return nil
 }
 
+// VMAliases lists all known aliases for a given VM
 type VMAliases struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Aliases       []string               `protobuf:"bytes,1,rep,name=aliases,proto3" json:"aliases,omitempty"`
@@ -1071,7 +1074,7 @@ const file_info_v1_service_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"%\n" +
 	"\tVMAliases\x12\x18\n" +
-	"\aaliases\x18\x01 \x03(\tR\aaliases2\xe2\x05\n" +
+	"\aaliases\x18\x01 \x03(\tR\aaliases2\xde\x05\n" +
 	"\vInfoService\x12F\n" +
 	"\x0eGetNodeVersion\x12\x16.google.protobuf.Empty\x1a\x1c.info.v1.GetNodeVersionReply\x12<\n" +
 	"\tGetNodeID\x12\x16.google.protobuf.Empty\x1a\x17.info.v1.GetNodeIDReply\x12<\n" +
@@ -1079,8 +1082,8 @@ const file_info_v1_service_proto_rawDesc = "" +
 	"\fGetNetworkID\x12\x16.google.protobuf.Empty\x1a\x1a.info.v1.GetNetworkIDReply\x12F\n" +
 	"\x0eGetNetworkName\x12\x16.google.protobuf.Empty\x1a\x1c.info.v1.GetNetworkNameReply\x12N\n" +
 	"\x0fGetBlockchainID\x12\x1c.info.v1.GetBlockchainIDArgs\x1a\x1d.info.v1.GetBlockchainIDReply\x120\n" +
-	"\x05Peers\x12\x12.info.v1.PeersArgs\x1a\x13.info.v1.PeersReply\x12R\n" +
-	"\x0eIsBootstrapped\x12\x1f.info.v1.IsBootstrappedResponse\x1a\x1f.info.v1.IsBootstrappedResponse\x12:\n" +
+	"\x05Peers\x12\x12.info.v1.PeersArgs\x1a\x13.info.v1.PeersReply\x12N\n" +
+	"\x0eIsBootstrapped\x12\x1b.info.v1.IsBootstrappedArgs\x1a\x1f.info.v1.IsBootstrappedResponse\x12:\n" +
 	"\bUpgrades\x12\x16.google.protobuf.Empty\x1a\x16.info.v1.UpgradesReply\x129\n" +
 	"\x06Uptime\x12\x16.google.protobuf.Empty\x1a\x17.info.v1.UptimeResponse\x126\n" +
 	"\x06GetVMs\x12\x16.google.protobuf.Empty\x1a\x14.info.v1.GetVMsReplyB9Z7github.com/ava-labs/avalanchego/proto/pb/info/v1;infov1b\x06proto3"
@@ -1148,7 +1151,7 @@ var file_info_v1_service_proto_depIdxs = []int32{
 	20, // 23: info.v1.InfoService.GetNetworkName:input_type -> google.protobuf.Empty
 	5,  // 24: info.v1.InfoService.GetBlockchainID:input_type -> info.v1.GetBlockchainIDArgs
 	7,  // 25: info.v1.InfoService.Peers:input_type -> info.v1.PeersArgs
-	11, // 26: info.v1.InfoService.IsBootstrapped:input_type -> info.v1.IsBootstrappedResponse
+	10, // 26: info.v1.InfoService.IsBootstrapped:input_type -> info.v1.IsBootstrappedArgs
 	20, // 27: info.v1.InfoService.Upgrades:input_type -> google.protobuf.Empty
 	20, // 28: info.v1.InfoService.Uptime:input_type -> google.protobuf.Empty
 	20, // 29: info.v1.InfoService.GetVMs:input_type -> google.protobuf.Empty
