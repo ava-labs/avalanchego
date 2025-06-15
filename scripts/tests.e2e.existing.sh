@@ -26,6 +26,9 @@ function cleanup {
 }
 trap cleanup EXIT
 
+# TMPNET_NETWORK_DIR needs to be unset to ensure --reuse-network won't target an existing network
+unset TMPNET_NETWORK_DIR
+
 print_separator
 echo "starting initial test run that should create the reusable network"
 ./scripts/tests.e2e.sh --reuse-network --ginkgo.focus-file=xsvm.go "${@}"
@@ -37,7 +40,8 @@ INITIAL_NETWORK_DIR="$(realpath "${SYMLINK_PATH}")"
 
 print_separator
 echo "starting second test run that should reuse the network created by the first run"
-./scripts/tests.e2e.sh --reuse-network --ginkgo.focus-file=xsvm.go "${@}"
+echo "the network is first restarted to verify that the network state was correctly serialized"
+./scripts/tests.e2e.sh --restart-network --ginkgo.focus-file=xsvm.go "${@}"
 
 SUBSEQUENT_NETWORK_DIR="$(realpath "${SYMLINK_PATH}")"
 echo "checking that the symlink path remains the same, indicating that the network was reused"

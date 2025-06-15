@@ -462,11 +462,6 @@ func (p *KubeRuntime) Restart(ctx context.Context) error {
 		return err
 	}
 
-	// Save node to disk to ensure the same state can be used to restart
-	if err := p.node.Write(); err != nil {
-		return err
-	}
-
 	statefulset, err := clientset.AppsV1().StatefulSets(namespace).Get(ctx, statefulSetName, metav1.GetOptions{})
 	if err != nil {
 		return err
