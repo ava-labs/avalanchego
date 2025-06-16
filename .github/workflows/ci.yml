@@ -24,7 +24,7 @@ jobs:
   # New minimal job to test ARC
   arc_test:
     name: "ARC Test"
-    runs-on: [avalanche-avalanchego-runner, self-hosted]
+    runs-on: "avalanche-avalanchego-runner"
     if: github.ref == 'refs/heads/arc-load-test'
     steps:
       - uses: actions/checkout@v4
