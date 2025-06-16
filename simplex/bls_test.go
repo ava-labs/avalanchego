@@ -12,48 +12,77 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
 
-func TestBLSSignVerify(t *testing.T) {
-	config, err := newEngineConfig()
-	require.NoError(t, err)
-
-	signer, verifier := NewBLSAuth(config)
-
-	msg := "Begin at the beginning, and go on till you come to the end: then stop"
-
-	sig, err := signer.Sign([]byte(msg))
-	require.NoError(t, err)
-
-	err = verifier.Verify([]byte(msg), sig, config.Ctx.NodeID[:])
-	require.NoError(t, err)
-}
-
-func TestSignerNotInMemberSet(t *testing.T) {
+func TestBLSVerifier(t *testing.T) {
 	config, err := newEngineConfig()
 	require.NoError(t, err)
 	signer, verifier := NewBLSAuth(config)
+	otherNodeID := ids.GenerateTestNodeID()
 
-	msg := "Begin at the beginning, and go on till you come to the end: then stop"
+	msg := []byte("Begin at the beginning, and go on till you come to the end: then stop")
+	tests := []struct {
+		name      string
+		expectErr error
+		nodeID    []byte
+		sig       []byte
+	}{
+		{
+			name:      "valid signature",
+			expectErr: nil,
+			nodeID:    config.Ctx.NodeID[:],
+			sig: func(msg []byte) []byte {
+				sig, err := signer.Sign(msg)
+				require.NoError(t, err)
+				return sig
+			}([]byte(msg)),
+		},
+		{
+			name:      "not in membership set",
+			expectErr: errSignerNotFound,
+			nodeID:    otherNodeID[:],
+			sig: func() []byte {
+				sig, err := signer.Sign(msg)
+				require.NoError(t, err)
+				return sig
+			}(),
+		},
+		{
+			name:      "invalid encoding",
+			expectErr: errSignatureVerificationFailed,
+			nodeID:    config.Ctx.NodeID[:],
+			sig: func() []byte {
+				sig, err := config.SignBLS(msg)
+				require.NoError(t, err)
+				return bls.SignatureToBytes(sig)
+			}(),
+		},
+		{
+			name:      "nodeID incorrect length",
+			expectErr: errInvalidNodeIDLength,
+			nodeID:    []byte{0x01, 0x02, 0x03, 0x04, 0x05}, // Incorrect length NodeID
+			sig: func() []byte {
+				sig, err := signer.Sign(msg)
+				require.NoError(t, err)
+				return sig
+			}(),
+		},
+		{
+			name:      "nil signature",
+			expectErr: errFailedToParseSignature,
+			nodeID:    config.Ctx.NodeID[:],
+			sig:       nil,
+		},
+		{
+			name:      "malformed signature",
+			expectErr: errFailedToParseSignature,
+			nodeID:    config.Ctx.NodeID[:],
+			sig:       []byte{0x01, 0x02, 0x03}, // Malformed signature
+		},
+	}
 
-	sig, err := signer.Sign([]byte(msg))
-	require.NoError(t, err)
-
-	notInMembershipSet := ids.GenerateTestNodeID()
-	err = verifier.Verify([]byte(msg), sig, notInMembershipSet[:])
-	require.ErrorIs(t, err, errSignerNotFound)
-}
-
-func TestSignerInvalidMessageEncoding(t *testing.T) {
-	config, err := newEngineConfig()
-	require.NoError(t, err)
-
-	// sign a message with invalid encoding
-	dummyMsg := []byte("dummy message")
-	sig, err := config.SignBLS(dummyMsg)
-	require.NoError(t, err)
-
-	sigBytes := bls.SignatureToBytes(sig)
-
-	_, verifier := NewBLSAuth(config)
-	err = verifier.Verify(dummyMsg, sigBytes, config.Ctx.NodeID[:])
-	require.ErrorIs(t, err, errSignatureVerificationFailed)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err = verifier.Verify(msg, tt.sig, tt.nodeID)
+			require.ErrorIs(t, err, tt.expectErr)
+		})
+	}
 }

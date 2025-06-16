@@ -16,6 +16,8 @@ import (
 var (
 	errSignatureVerificationFailed = errors.New("signature verification failed")
 	errSignerNotFound              = errors.New("signer not found in the membership set")
+	errInvalidNodeIDLength         = errors.New("invalid node ID length")
+	errFailedToParseSignature      = errors.New("failed to parse signature")
 )
 
 var _ simplex.Signer = (*BLSSigner)(nil)
@@ -81,8 +83,10 @@ func encodeMessageToSign(message []byte, chainID ids.ID, networkID uint32) ([]by
 
 func (v BLSVerifier) Verify(message []byte, signature []byte, signer simplex.NodeID) error {
 	if len(signer) != ids.NodeIDLen {
-		return fmt.Errorf("expected signer to be %d bytes but got %d bytes", ids.NodeIDLen, len(signer))
+		return fmt.Errorf("%w: expected signer to be %d bytes but got %d bytes", errInvalidNodeIDLength, ids.NodeIDLen, len(signer))
 	}
+
+	fmt.Println("verifying signature for signer", len(signer))
 
 	key, err := ids.ToNodeID(signer)
 	if err != nil {
@@ -96,7 +100,7 @@ func (v BLSVerifier) Verify(message []byte, signature []byte, signer simplex.Nod
 
 	sig, err := bls.SignatureFromBytes(signature)
 	if err != nil {
-		return fmt.Errorf("failed to parse signature: %w", err)
+		return fmt.Errorf("%w: %w", errFailedToParseSignature, err)
 	}
 
 	message2Verify, err := encodeMessageToSign(message, v.chainID, v.networkID)
