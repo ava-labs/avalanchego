@@ -29,11 +29,11 @@ func TestBLSVerifier(t *testing.T) {
 			name:      "valid signature",
 			expectErr: nil,
 			nodeID:    config.Ctx.NodeID[:],
-			sig: func(msg []byte) []byte {
+			sig: func() []byte {
 				sig, err := signer.Sign(msg)
 				require.NoError(t, err)
 				return sig
-			}([]byte(msg)),
+			}(),
 		},
 		{
 			name:      "not in membership set",
