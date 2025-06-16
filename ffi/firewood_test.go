@@ -144,6 +144,15 @@ func newDatabase(dbFile string) (*Database, func() error, error) {
 	return f, f.Close, nil
 }
 
+func TestOpenNonexistentDatabase(t *testing.T) {
+	r := require.New(t)
+	cfg := DefaultConfig()
+	cfg.Create = false
+	db, err := New(filepath.Join(t.TempDir(), "test.db"), cfg)
+	r.ErrorContains(err, "File IO error")
+	r.Nil(db)
+}
+
 func TestUpdateSingleKV(t *testing.T) {
 	r := require.New(t)
 	db := newTestDatabase(t)

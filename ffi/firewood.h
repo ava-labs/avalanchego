@@ -42,6 +42,14 @@ typedef struct KeyValue {
 } KeyValue;
 
 /**
+ * Struct returned by `fwd_create_db` and `fwd_open_db`
+ */
+typedef struct DatabaseCreationResult {
+  const struct DatabaseHandle *db;
+  uint8_t *error_str;
+} DatabaseCreationResult;
+
+/**
  * Common arguments, accepted by both `fwd_create_db()` and `fwd_open_db()`.
  *
  * * `path` - The path to the database file, which will be truncated if passed to `fwd_create_db()`
@@ -149,7 +157,7 @@ struct Value fwd_commit(const struct DatabaseHandle *db, uint32_t proposal_id);
  * The caller must call `close` to free the memory associated with the returned database handle.
  *
  */
-const struct DatabaseHandle *fwd_create_db(struct CreateOrOpenArgs args);
+struct DatabaseCreationResult fwd_create_db(struct CreateOrOpenArgs args);
 
 /**
  * Drops a proposal from the database.
@@ -169,6 +177,25 @@ const struct DatabaseHandle *fwd_create_db(struct CreateOrOpenArgs args);
 struct Value fwd_drop_proposal(const struct DatabaseHandle *db, uint32_t proposal_id);
 
 /**
+ * Frees the memory associated with a `DatabaseCreationResult`.
+ * This only needs to be called if the `error_str` field is non-null.
+ *
+ * # Arguments
+ *
+ * * `result` - The `DatabaseCreationResult` to free, previously returned from `fwd_create_db` or `fwd_open_db`.
+ *
+ * # Safety
+ *
+ * This function is unsafe because it dereferences raw pointers.
+ * The caller must ensure that `result` is a valid pointer.
+ *
+ * # Panics
+ *
+ * This function panics if `result` is `null`.
+ */
+void fwd_free_database_error_result(struct DatabaseCreationResult *result);
+
+/**
  * Frees the memory associated with a `Value`.
  *
  * # Arguments
@@ -184,7 +211,7 @@ struct Value fwd_drop_proposal(const struct DatabaseHandle *db, uint32_t proposa
  *
  * This function panics if `value` is `null`.
  */
-void fwd_free_value(const struct Value *value);
+void fwd_free_value(struct Value *value);
 
 /**
  * Gets the value associated with the given key from the proposal provided.
@@ -281,7 +308,7 @@ struct Value fwd_get_latest(const struct DatabaseHandle *db, struct Value key);
  * The caller must call `close` to free the memory associated with the returned database handle.
  *
  */
-const struct DatabaseHandle *fwd_open_db(struct CreateOrOpenArgs args);
+struct DatabaseCreationResult fwd_open_db(struct CreateOrOpenArgs args);
 
 /**
  * Proposes a batch of operations to the database.

@@ -1,9 +1,10 @@
 use std::collections::HashSet;
+use std::error::Error;
 use std::io::Write;
 use std::net::Ipv6Addr;
 use std::ops::Deref;
+use std::sync::Arc;
 use std::sync::atomic::Ordering;
-use std::sync::{Arc, Once};
 use std::time::SystemTime;
 
 use oxhttp::Server;
@@ -16,39 +17,46 @@ use chrono::{DateTime, Utc};
 use metrics::Key;
 use metrics_util::registry::{AtomicStorage, Registry};
 
-static INIT: Once = Once::new();
+/// Sets up a metrics server over a specified port.
+/// If `metrics_port` is set to 0, it will not initialize the metrics system.
+/// This happens on a per-process basis, meaning that the metrics system
+/// cannot be initialized if it has already been set up in the same process.
+/// Any caller should ensure that the metrics system is not already initialized
+/// by explicitly calling with `metrics_port` == 0..
+pub(crate) fn setup_metrics(metrics_port: u16) -> Result<(), Box<dyn Error>> {
+    if metrics_port == 0 {
+        // If the port is 0, we do not initialize the metrics system.
+        return Ok(());
+    }
 
-pub(crate) fn setup_metrics(metrics_port: u16) {
-    INIT.call_once(|| {
-        let inner: TextRecorderInner = TextRecorderInner {
-            registry: Registry::atomic(),
-        };
-        let recorder = TextRecorder {
-            inner: Arc::new(inner),
-        };
-        metrics::set_global_recorder(recorder.clone()).expect("failed to set recorder");
+    let inner: TextRecorderInner = TextRecorderInner {
+        registry: Registry::atomic(),
+    };
+    let recorder = TextRecorder {
+        inner: Arc::new(inner),
+    };
+    metrics::set_global_recorder(recorder.clone())?;
 
-        Server::new(move |request| {
-            if request.method() == "GET" {
-                Response::builder()
-                    .status(StatusCode::OK)
-                    .header("Content-Type", "text/plain")
-                    .body(Body::from(recorder.stats()))
-                    .expect("failed to build response")
-            } else {
-                Response::builder()
-                    .status(StatusCode::METHOD_NOT_ALLOWED)
-                    .body(Body::from("Method not allowed"))
-                    .expect("failed to build response")
-            }
-        })
-        .bind((Ipv4Addr::LOCALHOST, metrics_port))
-        .bind((Ipv6Addr::LOCALHOST, metrics_port))
-        .with_global_timeout(Duration::from_secs(60 * 60))
-        .with_max_concurrent_connections(2)
-        .spawn()
-        .expect("failed to spawn server");
-    });
+    Server::new(move |request| {
+        if request.method() == "GET" {
+            Response::builder()
+                .status(StatusCode::OK)
+                .header("Content-Type", "text/plain")
+                .body(Body::from(recorder.stats()))
+                .expect("failed to build response")
+        } else {
+            Response::builder()
+                .status(StatusCode::METHOD_NOT_ALLOWED)
+                .body(Body::from("Method not allowed"))
+                .expect("failed to build response")
+        }
+    })
+    .bind((Ipv4Addr::LOCALHOST, metrics_port))
+    .bind((Ipv6Addr::LOCALHOST, metrics_port))
+    .with_global_timeout(Duration::from_secs(60 * 60))
+    .with_max_concurrent_connections(2)
+    .spawn()?;
+    Ok(())
 }
 
 #[derive(Debug)]

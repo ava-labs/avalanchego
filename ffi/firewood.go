@@ -103,11 +103,16 @@ func New(filePath string, conf *Config) (*Database, error) {
 	// of the FFI boundary.
 	defer C.free(unsafe.Pointer(args.path))
 
-	var db *C.DatabaseHandle
+	var dbResult C.struct_DatabaseCreationResult
 	if conf.Create {
-		db = C.fwd_create_db(args)
+		dbResult = C.fwd_create_db(args)
 	} else {
-		db = C.fwd_open_db(args)
+		dbResult = C.fwd_open_db(args)
+	}
+
+	db, err := databaseFromResult(&dbResult)
+	if err != nil {
+		return nil, err
 	}
 
 	return &Database{handle: db}, nil
