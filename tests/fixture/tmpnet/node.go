@@ -188,6 +188,10 @@ func (n *Node) WaitForStopped(ctx context.Context) error {
 }
 
 func (n *Node) Restart(ctx context.Context) error {
+	// Ensure the config used to restart the node is persisted for future use
+	if err := n.Write(); err != nil {
+		return err
+	}
 	return n.getRuntime().Restart(ctx)
 }
 
