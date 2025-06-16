@@ -6,6 +6,7 @@ package simplex
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 )
 
@@ -27,9 +28,9 @@ func newEngineConfig() (*Config, error) {
 	nodeID := ids.GenerateTestNodeID()
 
 	simplexChainContext := SimplexChainContext{
-		NodeID:   nodeID,
-		ChainID:  ids.GenerateTestID(),
-		SubnetID: ids.GenerateTestID(),
+		NodeID:    nodeID,
+		ChainID:   ids.GenerateTestID(),
+		NetworkID: constants.LocalID,
 	}
 
 	nodeInfo := validators.GetValidatorOutput{

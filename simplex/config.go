@@ -28,7 +28,7 @@ type Config struct {
 // [ChainID] is the ID of the chain this context exists within.
 // [NodeID] is the ID of this node
 type SimplexChainContext struct {
-	NodeID   ids.NodeID
-	ChainID  ids.ID
-	SubnetID ids.ID
+	NodeID    ids.NodeID
+	ChainID   ids.ID
+	NetworkID uint32
 }
