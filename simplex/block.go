@@ -5,7 +5,6 @@ package simplex
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
 	"sync"
 
@@ -13,6 +12,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 
 	pSimplex "github.com/ava-labs/avalanchego/proto/pb/simplex"
 )
@@ -52,10 +52,7 @@ func (v *VerifiedBlock) Bytes() []byte {
 
 // computeDigest computes the digest of the block.
 func (v *VerifiedBlock) computeDigest() {
-	h := sha256.New()
-	h.Write(v.Bytes())
-	digest := h.Sum(nil)
-	v.digest = simplex.Digest(digest)
+	v.digest = hashing.ComputeHash256Array(v.Bytes())
 }
 
 type blockDeserializer struct {
