@@ -1,8 +1,17 @@
 [package]
-name = "storage"
+name = "firewood-storage"
 version = "0.0.5"
 edition = "2024"
 rust-version = "1.85.0"
+authors = [
+     "Aaron Buchwald <aaron.buchwald56@gmail.com>",
+     "Ron Kuris <ron.kuris@avalabs.org>",
+     "Suyan Qu <36519575+qusuyan@users.noreply.github.com>",
+]
+description = "Storage layer for Firewood, an embedded key-value store optimized for blockchain state."
+license-file = "../LICENSE.md"
+homepage = "https://avalabs.org"
+repository = "https://github.com/ava-labs/firewood"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

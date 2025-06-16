@@ -63,13 +63,13 @@
 //! Firewood is built by layers of abstractions that totally decouple the layout/representation
 //! of the data on disk from the actual logical data structure it retains:
 //!
-//! - The storage module has a [storage::NodeStore] which has a generic parameter identifying
+//! - The storage module has a [firewood_storage::NodeStore] which has a generic parameter identifying
 //!   the state of the nodestore, and a storage type.
 //!
 //!   There are three states for a nodestore:
-//!    - [storage::Committed] for revisions that are on disk
-//!    - [storage::ImmutableProposal] for revisions that are proposals against committed versions
-//!    - [storage::MutableProposal] for revisions where nodes are still being added.
+//!    - [firewood_storage::Committed] for revisions that are on disk
+//!    - [firewood_storage::ImmutableProposal] for revisions that are proposals against committed versions
+//!    - [firewood_storage::MutableProposal] for revisions where nodes are still being added.
 //!
 //!  For more information on these node states, see their associated documentation.
 //!
@@ -85,17 +85,17 @@
 //!
 //! In short, a Read-Modify-Write (RMW) style normal operation flow is as follows in Firewood:
 //!
-//! - Create a [storage::MutableProposal] [storage::NodeStore] from the most recent [storage::Committed] one.
+//! - Create a [firewood_storage::MutableProposal] [firewood_storage::NodeStore] from the most recent [firewood_storage::Committed] one.
 //! - Traverse the trie, starting at the root. Make a new root node by duplicating the existing
 //!   root from the committed one and save that in memory. As you continue traversing, make copies
 //!   of each node accessed if they are not already in memory.
 //!
 //! - Make changes to the trie, in memory. Each node you've accessed is currently in memory and is
-//!   owned by the [storage::MutableProposal]. Adding a node simply means adding a reference to it.
+//!   owned by the [firewood_storage::MutableProposal]. Adding a node simply means adding a reference to it.
 //!
 //! - If you delete a node, mark it as deleted in the proposal and remove the child reference to it.
 //!
-//! - After making all mutations, convert the [storage::MutableProposal] to an [storage::ImmutableProposal]. This
+//! - After making all mutations, convert the [firewood_storage::MutableProposal] to an [firewood_storage::ImmutableProposal]. This
 //!   involves walking the in-memory trie and looking for nodes without disk addresses, then assigning
 //!   them from the freelist of the parent. This gives the node an address, but it is stil in
 //!   memory.
@@ -134,4 +134,4 @@ pub mod stream;
 pub mod v2;
 
 /// Expose the storage logger
-pub use storage::logger;
+pub use firewood_storage::logger;

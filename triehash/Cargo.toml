@@ -1,5 +1,5 @@
 [package]
-name = "triehash"
+name = "firewood-triehash"
 version = "0.8.5"
 authors = ["Parity Technologies <admin@parity.io>", "Ron Kuris <swcafe@gmail.com>"]
 description = "In-memory patricia trie operations"

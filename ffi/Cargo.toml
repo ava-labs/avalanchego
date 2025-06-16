@@ -3,13 +3,24 @@ name = "firewood-ffi"
 version = "0.0.5"
 edition = "2024"
 rust-version = "1.85.0"
+authors = [
+     "Aaron Buchwald <aaron.buchwald56@gmail.com>",
+     "Arran Schlosberg <519948+ARR4N@users.noreply.github.com>",
+     "Austin Larson <78000745+alarso16@users.noreply.github.com>",
+     "Darioush Jalali <darioush.jalali@avalabs.org>",
+     "Ron Kuris <ron.kuris@avalabs.org>",
+]
+description = "C FFI bindings for Firewood, an embedded key-value store optimized for blockchain state."
+license-file = "../LICENSE.md"
+homepage = "https://avalabs.org"
+repository = "https://github.com/ava-labs/firewood"
 
 [lib]
 crate-type = ["staticlib"]
 
 [dependencies]
 libc = "0.2.2"
-firewood = { path = "../firewood" }
+firewood = { version = "0.0.5", path = "../firewood" }
 metrics = "0.24.1"
 metrics-util = "0.19.0"
 chrono = "0.4.39"

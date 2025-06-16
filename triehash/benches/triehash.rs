@@ -8,10 +8,10 @@
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use ethereum_types::H256;
+use firewood_triehash::trie_root;
 use keccak_hasher::KeccakHasher;
 use tiny_keccak::{Hasher, Keccak};
 use trie_standardmap::{Alphabet, StandardMap, ValueMode};
-use triehash::trie_root;
 
 fn keccak256(input: &[u8]) -> [u8; 32] {
     let mut keccak256 = Keccak::v256();

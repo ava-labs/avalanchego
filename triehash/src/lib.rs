@@ -46,7 +46,7 @@ fn shared_prefix_len<T: Eq>(first: &[T], second: &[T]) -> usize {
 /// ```
 /// use hex_literal::hex;
 /// use ethereum_types::H256;
-/// use triehash::ordered_trie_root;
+/// use firewood_triehash::ordered_trie_root;
 /// use keccak_hasher::KeccakHasher;
 ///
 /// let v = &["doe", "reindeer"];
@@ -72,7 +72,7 @@ where
 ///
 /// ```
 /// use hex_literal::hex;
-/// use triehash::trie_root;
+/// use firewood_triehash::trie_root;
 /// use ethereum_types::H256;
 /// use keccak_hasher::KeccakHasher;
 ///
@@ -124,7 +124,7 @@ where
 /// ```
 /// use hex_literal::hex;
 /// use ethereum_types::H256;
-/// use triehash::sec_trie_root;
+/// use firewood_triehash::sec_trie_root;
 /// use keccak_hasher::KeccakHasher;
 ///
 /// let v = vec![

@@ -9,9 +9,9 @@ use std::os::raw::c_int;
 use bincode::Options;
 use criterion::profiler::Profiler;
 use criterion::{Criterion, criterion_group, criterion_main};
+use firewood_storage::{LeafNode, Node, Path};
 use pprof::ProfilerGuard;
 use smallvec::SmallVec;
-use storage::{LeafNode, Node, Path};
 
 use std::path::Path as FsPath;
 
@@ -79,14 +79,14 @@ fn leaf(c: &mut Criterion) {
 
 fn branch(c: &mut Criterion) {
     let mut group = c.benchmark_group("has_value");
-    let mut input = Node::Branch(Box::new(storage::BranchNode {
+    let mut input = Node::Branch(Box::new(firewood_storage::BranchNode {
         partial_path: Path(SmallVec::from_slice(&[0, 1])),
         value: Some(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9].into_boxed_slice()),
         children: from_fn(|i| {
             if i == 0 {
-                Some(storage::Child::AddressWithHash(
+                Some(firewood_storage::Child::AddressWithHash(
                     NonZeroU64::new(1).unwrap(),
-                    storage::HashType::from([0; 32]),
+                    firewood_storage::HashType::from([0; 32]),
                 ))
             } else {
                 None
@@ -94,13 +94,13 @@ fn branch(c: &mut Criterion) {
         }),
     }));
     let serializer = bincode::DefaultOptions::new().with_varint_encoding();
-    let serde_serializer = |b: &mut criterion::Bencher, input: &storage::Node| {
+    let serde_serializer = |b: &mut criterion::Bencher, input: &firewood_storage::Node| {
         b.iter(|| {
             serializer.serialize(input).unwrap();
         })
     };
 
-    let manual_serializer = |b: &mut criterion::Bencher, input: &storage::Node| {
+    let manual_serializer = |b: &mut criterion::Bencher, input: &firewood_storage::Node| {
         b.iter(|| {
             let mut bytes = Vec::new();
             input.as_bytes(0, &mut bytes);

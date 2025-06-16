@@ -1,7 +1,7 @@
 // Copyright (C) 2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use storage::Hashable;
+use firewood_storage::Hashable;
 
 use crate::proof::Proof;
 

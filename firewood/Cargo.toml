@@ -3,12 +3,17 @@ name = "firewood"
 version = "0.0.5"
 edition = "2024"
 authors = [
-     "Ted Yin (@Determinant) <ted@avalabs.org>",
-     "Dan Sover (@exdx) <dan.sover@avalabs.org>",
-     "Hao Hao (@haohao-os) <hao.hao@avalabs.org>",
-     "Gyuho Lee (@gyuho) <gyuho.lee@avalabs.org>",
-     "Sam Batschelet (@hexfusion) <sam.batschelet@avalabs.org>",
-     "Ron Kuris (@rkuris) <ron.kuris@avalabs.org>",
+     "Angel Leon <gubatron@gmail.com>",
+     "Austin Larson <78000745+alarso16@users.noreply.github.com>",
+     "Cesar <137245636+nytzuga@users.noreply.github.com>",
+     "Dan Laine <daniel.laine@avalabs.org>",
+     "Dan Sover <dan.sover@avalabs.org>",
+     "Hao Hao <hao.hao@avalabs.org>",
+     "Patrick O'Grady <prohb125@gmail.com>",
+     "Richard Pringle <rpring9@gmail.com>",
+     "Ron Kuris <ron.kuris@avalabs.org>",
+     "Sam Batschelet <sam.batschelet@avalabs.org>",
+     "xinifinity <113067541+xinifinity@users.noreply.github.com>",
 ]
 description = "Firewood is an embedded key-value store, optimized to store blockchain state."
 license-file = "../LICENSE.md"
@@ -34,13 +39,13 @@ fastrace = { version = "0.7.4" }
 [features]
 default = []
 nightly = []
-io-uring = ["storage/io-uring"]
-logger = ["storage/logger"]
-branch_factor_256 = [ "storage/branch_factor_256" ]
-ethhash = [ "storage/ethhash" ]
+io-uring = ["firewood-storage/io-uring"]
+logger = ["firewood-storage/logger"]
+branch_factor_256 = [ "firewood-storage/branch_factor_256" ]
+ethhash = [ "firewood-storage/ethhash" ]
 
 [dev-dependencies]
-triehash = { version = "0.8.5", path = "../triehash" }
+firewood-triehash = { version = "0.8.5", path = "../triehash" }
 criterion = { version = "0.6.0", features = ["async_tokio"] }
 rand = "0.9.0"
 rand_distr = "0.5.0"
@@ -67,7 +72,7 @@ missing_const_for_fn = "warn"
 arithmetic_side_effects = "warn"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-storage = { path = "../storage", features = ["io-uring"] }
+firewood-storage = { version = "0.0.5", path = "../storage", features = ["io-uring"] }
 
 [target.'cfg(not(target_os = "linux"))'.dependencies]
-storage = { path = "../storage" }
+firewood-storage = { version = "0.0.5", path = "../storage" }

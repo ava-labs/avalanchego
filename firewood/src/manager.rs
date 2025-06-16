@@ -8,15 +8,15 @@ use std::sync::Arc;
 #[cfg(feature = "ethhash")]
 use std::sync::OnceLock;
 
+use firewood_storage::logger::{trace, trace_enabled, warn};
 use metrics::gauge;
-use storage::logger::{trace, trace_enabled, warn};
 use typed_builder::TypedBuilder;
 
 use crate::merkle::Merkle;
 use crate::v2::api::HashKey;
 
-pub use storage::CacheReadStrategy;
-use storage::{
+pub use firewood_storage::CacheReadStrategy;
+use firewood_storage::{
     Committed, FileBacked, FileIoError, ImmutableProposal, NodeStore, Parentable, TrieHash,
 };
 
@@ -268,7 +268,7 @@ impl RevisionManager {
         #[allow(clippy::redundant_closure)]
         Some(
             self.empty_hash
-                .get_or_init(|| storage::empty_trie_hash())
+                .get_or_init(|| firewood_storage::empty_trie_hash())
                 .clone(),
         )
     }

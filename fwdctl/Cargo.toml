@@ -1,8 +1,26 @@
 [package]
-name = "fwdctl"
+name = "firewood-fwdctl"
 version = "0.0.5"
 edition = "2024"
 rust-version = "1.85.0"
+authors = [
+     "Dan Laine <daniel.laine@avalabs.org>",
+     "Dan Sover <dan.sover@avalabs.org>",
+     "Hao Hao <hao.hao@avalabs.org>",
+     "Richard Pringle <rpring9@gmail.com>",
+     "Ron Kuris <ron.kuris@avalabs.org>",
+     "Sam Batschelet <sam.batschelet@avalabs.org>",
+     "xinifinity <113067541+xinifinity@users.noreply.github.com>",
+     "zdf <orientzh1230@gmail.com>",
+]
+description = "Command-line tool for Firewood, an embedded key-value store optimized for blockchain state."
+license-file = "../LICENSE.md"
+homepage = "https://avalabs.org"
+repository = "https://github.com/ava-labs/firewood"
+
+[[bin]]
+name = "fwdctl"
+path = "src/main.rs"
 
 [dependencies]
 firewood = { version = "0.0.5", path = "../firewood" }

@@ -10,13 +10,13 @@ pub use crate::v2::api::{Batch, BatchOp};
 
 use crate::manager::{RevisionManager, RevisionManagerConfig};
 use async_trait::async_trait;
+use firewood_storage::{
+    Committed, FileBacked, FileIoError, HashedNodeReader, ImmutableProposal, NodeStore, TrieHash,
+};
 use metrics::{counter, describe_counter};
 use std::io::Write;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
-use storage::{
-    Committed, FileBacked, FileIoError, HashedNodeReader, ImmutableProposal, NodeStore, TrieHash,
-};
 use thiserror::Error;
 use typed_builder::TypedBuilder;
 
@@ -243,7 +243,7 @@ impl Db {
         #[cfg(not(feature = "ethhash"))]
         return Ok(hash);
         #[cfg(feature = "ethhash")]
-        return Ok(Some(hash.unwrap_or_else(storage::empty_trie_hash)));
+        return Ok(Some(hash.unwrap_or_else(firewood_storage::empty_trie_hash)));
     }
 
     /// Synchronously get a revision from a root hash
@@ -337,7 +337,7 @@ impl Proposal<'_> {
         return Ok(Some(
             self.nodestore
                 .root_hash()?
-                .unwrap_or_else(storage::empty_trie_hash),
+                .unwrap_or_else(firewood_storage::empty_trie_hash),
         ));
     }
 }

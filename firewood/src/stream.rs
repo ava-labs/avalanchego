@@ -4,14 +4,14 @@
 use crate::merkle::{Key, Value};
 use crate::v2::api;
 
+use firewood_storage::{
+    BranchNode, Child, FileIoError, NibblesIterator, Node, PathIterItem, SharedNode, TrieReader,
+};
 use futures::stream::FusedStream;
 use futures::{Stream, StreamExt};
 use std::cmp::Ordering;
 use std::iter::once;
 use std::task::Poll;
-use storage::{
-    BranchNode, Child, FileIoError, NibblesIterator, Node, PathIterItem, SharedNode, TrieReader,
-};
 
 /// Represents an ongoing iteration over a node and its children.
 enum IterationNode {
@@ -612,7 +612,7 @@ fn key_from_nibble_iter<Iter: Iterator<Item = u8>>(mut nibbles: Iter) -> Key {
 mod tests {
     use std::sync::Arc;
 
-    use storage::{MemStore, MutableProposal, NodeStore};
+    use firewood_storage::{MemStore, MutableProposal, NodeStore};
 
     use crate::merkle::Merkle;
 

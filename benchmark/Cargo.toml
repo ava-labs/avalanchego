@@ -1,11 +1,23 @@
 [package]
-name = "benchmark"
+name = "firewood-benchmark"
 version = "0.0.5"
 edition = "2024"
 rust-version = "1.85.0"
+authors = [
+     "Aaron Buchwald <aaron.buchwald56@gmail.com>",
+     "Ron Kuris <ron.kuris@avalabs.org>",
+]
+description = "Benchmarking tool for Firewood, an embedded key-value store optimized for blockchain state."
+license-file = "../LICENSE.md"
+homepage = "https://avalabs.org"
+repository = "https://github.com/ava-labs/firewood"
+
+[[bin]]
+name = "benchmark"
+path = "src/main.rs"
 
 [dependencies]
-firewood = { path = "../firewood" }
+firewood = { version = "0.0.5", path = "../firewood" }
 hex = "0.4.3"
 clap = { version = "4.5.0", features = ['derive', 'string'] }
 sha2 = "0.10.8"

@@ -5,6 +5,11 @@ use crate::proof::{Proof, ProofError, ProofNode};
 use crate::range_proof::RangeProof;
 use crate::stream::{MerkleKeyValueStream, PathIterator};
 use crate::v2::api;
+use firewood_storage::{
+    BranchNode, Child, FileIoError, HashType, Hashable, HashedNodeReader, ImmutableProposal,
+    LeafNode, LinearAddress, MutableProposal, NibblesIterator, Node, NodeStore, Path,
+    ReadableStorage, SharedNode, TrieReader, ValueDigest,
+};
 use futures::{StreamExt, TryStreamExt};
 use metrics::counter;
 use std::collections::HashSet;
@@ -14,11 +19,6 @@ use std::io::Error;
 use std::iter::once;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
-use storage::{
-    BranchNode, Child, FileIoError, HashType, Hashable, HashedNodeReader, ImmutableProposal,
-    LeafNode, LinearAddress, MutableProposal, NibblesIterator, Node, NodeStore, Path,
-    ReadableStorage, SharedNode, TrieReader, ValueDigest,
-};
 
 /// Keys are boxed u8 slices
 pub type Key = Box<[u8]>;
@@ -1049,9 +1049,9 @@ impl<'a, T: PartialEq> PrefixOverlap<'a, T> {
 #[expect(clippy::indexing_slicing, clippy::unwrap_used)]
 mod tests {
     use super::*;
+    use firewood_storage::{MemStore, MutableProposal, NodeStore, RootReader, TrieHash};
     use rand::rngs::StdRng;
     use rand::{Rng, SeedableRng, rng};
-    use storage::{MemStore, MutableProposal, NodeStore, RootReader, TrieHash};
     use test_case::test_case;
 
     // Returns n random key-value pairs.
@@ -1821,7 +1821,7 @@ mod tests {
     fn test_root_hash_eth_compatible<T: AsRef<[u8]> + Clone + Ord>(kvs: &[(T, T)]) {
         use ethereum_types::H256;
         use ethhasher::KeccakHasher;
-        use triehash::trie_root;
+        use firewood_triehash::trie_root;
 
         let merkle = merkle_build_test(kvs.to_vec()).unwrap().hash();
         let firewood_hash = merkle.nodestore.root_hash().unwrap().unwrap_or_default();

@@ -8,6 +8,7 @@ use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use firewood::db::{BatchOp, DbConfig};
 use firewood::merkle::Merkle;
 use firewood::v2::api::{Db as _, Proposal as _};
+use firewood_storage::{MemStore, NodeStore};
 use pprof::ProfilerGuard;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
@@ -17,7 +18,6 @@ use std::iter::repeat_with;
 use std::os::raw::c_int;
 use std::path::Path;
 use std::sync::Arc;
-use storage::{MemStore, NodeStore};
 
 // To enable flamegraph output
 // cargo bench --bench hashops -- --profile-time=N

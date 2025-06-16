@@ -16,7 +16,6 @@ write_files:
           . "$HOME/.cargo/env"
           git clone https://github.com/ava-labs/firewood.git
           cd firewood
-          git checkout rkuris/prometheus
           cargo build --release
 - path: /etc/prometheus/prometheus.yml.addon
   content: |2

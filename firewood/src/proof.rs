@@ -1,11 +1,11 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use sha2::{Digest, Sha256};
-use storage::{
+use firewood_storage::{
     BranchNode, FileIoError, HashType, Hashable, NibblesIterator, PathIterItem, Preimage, TrieHash,
     ValueDigest,
 };
+use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
