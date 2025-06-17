@@ -4,34 +4,30 @@ set -euo pipefail
 
 SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 
-if [ $# -ne 4 ]; then
+if [ $# -ne 3 ]; then
     echo "Error: incorrect number of arguments provided $#"
-    echo "Usage: $0 <execution-data-directory> <source-db-directory> <execution-db-directory> <execution-chain-data-directory>"
-    echo "Example: $0 /path/to/execution/data /path/to/source/db /path/to/execution-db /path/to/chain-data"
+    echo "Usage: $0 <current-state-dir-dst> <block-source-src> <current-state-dir-src>"
+    echo "Example: $0 /path/to/current-state-dst /path/to/block-source-src /path/to/current-state-src"
+    echo "Expected resulting file structure:"
+    echo "<current-state-dir-dst>/"
+    echo "├── blocks/                   # Copied from <block-source-src>"
+    echo "└── current-state/       # Copied from <current-state-dir-src>"
     exit 1
 fi
 
 function import_cchain_data() {
-    local execution_data_dir_arg=$1
-    local source_db_dir_arg=$2
-    local db_dir_arg=$3
-    local chain_data_dir_arg=$4
+    local current_state_dir_arg=$1
+    local source_block_dir_arg=$2
+    local current_state_dir_src_arg=$3
 
-    local source_db_dir_dst="${execution_data_dir_arg}/blocks"
-    local db_dir_dst="${execution_data_dir_arg}/db"
-    local chain_data_dir_dst="${execution_data_dir_arg}/chain-data-dir"
+    local source_block_dir_dst="${current_state_dir_arg}/blocks"
+    local current_state_dir_dst="${current_state_dir_arg}/current-state"
 
+    echo "Copying block source db from $source_block_dir_arg to $source_block_dir_dst"
+    "$SCRIPT_DIR/copy_dir.sh" "$source_block_dir_arg" "$source_block_dir_dst"
     
-    echo "Copying block source db from $source_db_dir_arg to $source_db_dir_dst"
-    "$SCRIPT_DIR/copy_dir.sh" "$source_db_dir_arg" "$source_db_dir_dst"
-    
-    echo "Copying db directory from $db_dir_arg to $db_dir_dst"
-    "$SCRIPT_DIR/copy_dir.sh" "$db_dir_arg" "$db_dir_dst"
-
-    echo "Copying chain data directory from $chain_data_dir_arg to $chain_data_dir_dst"
-    "$SCRIPT_DIR/copy_dir.sh" "$chain_data_dir_arg" "$chain_data_dir_dst"
+    echo "Copying current state directory from $current_state_dir_src_arg to $current_state_dir_dst"
+    "$SCRIPT_DIR/copy_dir.sh" "$current_state_dir_src_arg" "$current_state_dir_dst"
 }
 
 import_cchain_data $@
-
-# ./scripts/bench.import_cchain_data.sh $(mktemp -d) 's3://statesync-testing/blocks-mainnet-200/*' 's3://statesync-testing/coreth-state-100-firewood/vmdb/*' 's3://statesync-testing/coreth-state-100-firewood/chain-data-dir'

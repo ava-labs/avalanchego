@@ -29,6 +29,13 @@ copy_source() {
         echo "Copying from S3: $source -> $dest"
         # Use s5cmd to copy from S3
         time s5cmd cp "$source" "$dest"
+
+        # If we copied a zip, extract it in place
+        if [[ "$source" == *.zip ]]; then
+            echo "Extracting zip file in place"
+            time unzip "$dest"/*.zip -d "$dest"
+            rm "$dest"/*.zip
+        fi
     else
         echo "Copying from local filesystem: $source -> $dest"
         # Use cp for local filesystem with recursive support

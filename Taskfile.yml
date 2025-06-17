@@ -255,13 +255,19 @@ tasks:
       - task: build
       - cmd: bash -x ./scripts/tests.upgrade.sh {{.CLI_ARGS}}
 
-  bench-import-cchain-reexecute-range-100-200:
-    desc: Imports the C-Chain block and state data to re-execute the range (100, 200]
+  import-cchain-reexecute-range:
+    desc: Imports the C-Chain block and state data to re-execute. Defaults to execute the block range (100, 200].
     vars:
-      EXECUTION_DATA_DIR:
-        sh: echo "${EXECUTION_DATA_DIR:-$(mktemp -d)}"
-      SOURCE_DB_DIR: '{{.SOURCE_DB_DIR | default "s3://statesync-testing/blocks-mainnet-200/*"}}'
-      EXECUTION_DB_DIR: '{{.EXECUTION_DB_DIR | default "s3://statesync-testing/coreth-state-100-firewood/vmdb/*"}}'
-      CHAIN_DATA_DIR: '{{.CHAIN_DATA_DIR | default "s3://statesync-testing/coreth-state-100-firewood/chain-data-dir/*"}}'
+      EXECUTION_DATA_DIR_DST:
+        sh: echo "${EXECUTION_DATA_DIR:-$(mktemp -d)}" # TODO: fix tempdir param
+      SOURCE_BLOCK_DIR: '{{.SOURCE_BLOCK_DIR | default "s3://statesync-testing/blocks-mainnet-200/*"}}'
+      CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR | default "s3://statesync-testing/cchain-current-state-100-firewood.zip"}}'
     cmds:
-      - cmd: bash -x ./scripts/bench.import_cchain_data.sh {{.EXECUTION_DATA_DIR}} {{.SOURCE_DB_DIR}} {{.EXECUTION_DB_DIR}} {{.CHAIN_DATA_DIR}}
+      - cmd: bash -x ./scripts/bench.import_cchain_data.sh {{.EXECUTION_DATA_DIR_DST}} {{.SOURCE_BLOCK_DIR}} {{.CURRENT_STATE_DIR}}
+
+  reexecute-cchain-range:
+    desc: Benchmark re-execute a range of blocks on the C-Chain. Defaults to execute the block range (100, 200].
+    vars:
+      EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR | default "execution-data"}}'
+    cmds:
+      - cmd: go test -run=TestReexecuteRange github.com/ava-labs/avalanchego/tests/bench/c --source-block-dir={{.EXECUTION_DATA_DIR}}/blocks --target-dir={{.EXECUTION_DATA_DIR}}/current-state
