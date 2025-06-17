@@ -7,6 +7,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/pflag"
 
@@ -20,10 +21,11 @@ const (
 )
 
 var (
-	errKubeNamespaceRequired       = errors.New("--kube-namespace is required")
-	errKubeImageRequired           = errors.New("--kube-image is required")
-	errKubeMinVolumeSizeRequired   = fmt.Errorf("--kube-volume-size must be >= %d", tmpnet.MinimumVolumeSizeGB)
-	errKubeSchedulingLabelRequired = errors.New("--kube-scheduling-label-key and --kube-scheduling-label-value are required when --kube-use-exclusive-scheduling is enabled")
+	errKubeNamespaceRequired         = errors.New("--kube-namespace is required")
+	errKubeImageRequired             = errors.New("--kube-image is required")
+	errKubeMinVolumeSizeRequired     = fmt.Errorf("--kube-volume-size must be >= %d", tmpnet.MinimumVolumeSizeGB)
+	errKubeSchedulingLabelRequired   = errors.New("--kube-scheduling-label-key and --kube-scheduling-label-value are required when --kube-use-exclusive-scheduling is enabled")
+	errKubeBaseAccessibleURIRequired = errors.New("--kube-base-accessible-uri is required when running outside of cluster")
 )
 
 type kubeRuntimeVars struct {
@@ -33,6 +35,7 @@ type kubeRuntimeVars struct {
 	useExclusiveScheduling bool
 	schedulingLabelKey     string
 	schedulingLabelValue   string
+	baseAccessibleURI      string
 	config                 *KubeconfigVars
 }
 
@@ -86,6 +89,12 @@ func (v *kubeRuntimeVars) register(stringVar varFunc[string], uintVar varFunc[ui
 		"higher-spec",
 		kubeDocPrefix+"The label value to use for exclusive scheduling for node selection and toleration",
 	)
+	stringVar(
+		&v.baseAccessibleURI,
+		"kube-base-accessible-uri",
+		"http://localhost:30791",
+		kubeDocPrefix+"The base URI for constructing node URIs when running outside of the cluster hosting nodes",
+	)
 }
 
 func (v *kubeRuntimeVars) getKubeRuntimeConfig() (*tmpnet.KubeRuntimeConfig, error) {
@@ -101,6 +110,9 @@ func (v *kubeRuntimeVars) getKubeRuntimeConfig() (*tmpnet.KubeRuntimeConfig, err
 	if v.useExclusiveScheduling && (len(v.schedulingLabelKey) == 0 || len(v.schedulingLabelValue) == 0) {
 		return nil, errKubeSchedulingLabelRequired
 	}
+	if !tmpnet.IsRunningInCluster() && len(v.baseAccessibleURI) == 0 {
+		return nil, errKubeBaseAccessibleURIRequired
+	}
 	return &tmpnet.KubeRuntimeConfig{
 		ConfigPath:             v.config.Path,
 		ConfigContext:          v.config.Context,
@@ -110,5 +122,7 @@ func (v *kubeRuntimeVars) getKubeRuntimeConfig() (*tmpnet.KubeRuntimeConfig, err
 		UseExclusiveScheduling: v.useExclusiveScheduling,
 		SchedulingLabelKey:     v.schedulingLabelKey,
 		SchedulingLabelValue:   v.schedulingLabelValue,
+		// Strip trailing slashes to simplify path composition
+		BaseAccessibleURI: strings.TrimRight(v.baseAccessibleURI, "/"),
 	}, nil
 }
