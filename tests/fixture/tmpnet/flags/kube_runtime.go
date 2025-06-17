@@ -7,6 +7,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/pflag"
 
@@ -121,6 +122,7 @@ func (v *kubeRuntimeVars) getKubeRuntimeConfig() (*tmpnet.KubeRuntimeConfig, err
 		UseExclusiveScheduling: v.useExclusiveScheduling,
 		SchedulingLabelKey:     v.schedulingLabelKey,
 		SchedulingLabelValue:   v.schedulingLabelValue,
-		BaseAccessibleURI:      v.baseAccessibleURI,
+		// Strip trailing slashes to simplify path composition
+		BaseAccessibleURI: strings.TrimRight(v.baseAccessibleURI, "/"),
 	}, nil
 }
