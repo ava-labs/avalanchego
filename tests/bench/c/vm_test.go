@@ -66,8 +66,8 @@ func TestMain(m *testing.M) {
 
 // TODO:
 // - pull metrics into tmpnet ingestion and integrate w/ existing dashboards
+// - add scoped access tokens to AvalancheGo CI for required S3 bucket ONLY
 // - separate general purpose VM setup from C-Chain specific setup
-// - migrate s3 data to separate bucket/account explicitly for CI
 func TestReexecuteRange(t *testing.T) {
 	r := require.New(t)
 
@@ -121,8 +121,7 @@ func newMainnetCChainVM(
 
 	genesisConfig := genesis.GetConfig(constants.MainnetID)
 
-	sharedMemoryDBRegistry := prometheus.NewRegistry()
-	sharedMemoryDB, err := leveldb.New(atomicMemoryDBDir, nil, log, sharedMemoryDBRegistry)
+	sharedMemoryDB, err := leveldb.New(atomicMemoryDBDir, nil, log, prometheus.NewRegistry() /* ignore metrics from shared memory db */)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create shared memory db: %w", err)
 	}

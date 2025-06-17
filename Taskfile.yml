@@ -260,8 +260,8 @@ tasks:
     vars:
       EXECUTION_DATA_DIR_DST:
         sh: echo "${EXECUTION_DATA_DIR:-$(mktemp -d)}" # TODO: fix tempdir param
-      SOURCE_BLOCK_DIR: '{{.SOURCE_BLOCK_DIR | default "s3://statesync-testing/blocks-mainnet-200/*"}}'
-      CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR | default "s3://statesync-testing/cchain-current-state-100-firewood.zip"}}'
+      SOURCE_BLOCK_DIR: '{{.SOURCE_BLOCK_DIR | default "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-200.zip"}}'
+      CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR | default "s3://avalanchego-bootstrap-testing/cchain-current-state-100-firewood.zip"}}'
     cmds:
       - cmd: bash -x ./scripts/bench.import_cchain_data.sh {{.EXECUTION_DATA_DIR_DST}} {{.SOURCE_BLOCK_DIR}} {{.CURRENT_STATE_DIR}}
 
