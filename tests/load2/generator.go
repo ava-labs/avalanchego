@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-type Tracker struct {
+type tracker struct {
 	lock sync.RWMutex
 
 	totalGasUsed uint64
@@ -24,14 +24,14 @@ type Tracker struct {
 	txsAccepted  uint64
 }
 
-func (t *Tracker) Issue(time.Duration) {
+func (t *tracker) Issue(time.Duration) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
 	t.txsIssued++
 }
 
-func (t *Tracker) Accept(receipt *types.Receipt, _ time.Duration) {
+func (t *tracker) Accept(receipt *types.Receipt, _ time.Duration) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -39,7 +39,7 @@ func (t *Tracker) Accept(receipt *types.Receipt, _ time.Duration) {
 	t.totalGasUsed += receipt.GasUsed
 }
 
-func (t *Tracker) TotalGasUsed() uint64 {
+func (t *tracker) TotalGasUsed() uint64 {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
@@ -78,7 +78,7 @@ func NewGenerator(
 }
 
 func (g Generator) Run(ctx context.Context) error {
-	tracker := &Tracker{}
+	tracker := &tracker{}
 	issuerGroup, childCtx := errgroup.WithContext(ctx)
 
 	for i := range len(g.wallets) {
