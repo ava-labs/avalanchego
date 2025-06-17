@@ -23,13 +23,13 @@ import (
 var maxFeeCap = big.NewInt(300000000000)
 
 func BuildRandomTx(
-	backend Backend,
+	wallet *Wallet,
 	contractInstance *contracts.EVMLoadSimulator,
 ) (*types.Transaction, error) {
 	txTypes := []txType{
 		{
-			txFunc: func(b Backend, _ *contracts.EVMLoadSimulator) (*types.Transaction, error) {
-				return buildZeroTransferTx(b)
+			txFunc: func(w *Wallet, _ *contracts.EVMLoadSimulator) (*types.Transaction, error) {
+				return buildZeroTransferTx(w)
 			},
 			name:   "ZeroTransfer",
 			weight: 1000,
@@ -104,7 +104,7 @@ func BuildRandomTx(
 	}
 
 	txType := txTypes[index]
-	tx, err := txType.txFunc(backend, contractInstance)
+	tx, err := txType.txFunc(wallet, contractInstance)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate tx of type %s: %w", txType.name, err)
 	}
@@ -113,11 +113,11 @@ func BuildRandomTx(
 }
 
 func WithContractInstance(
-	f func(Backend, *contracts.EVMLoadSimulator) (*types.Transaction, error),
+	f func(*Wallet, *contracts.EVMLoadSimulator) (*types.Transaction, error),
 	contractInstance *contracts.EVMLoadSimulator,
-) func(Backend) (*types.Transaction, error) {
-	return func(b Backend) (*types.Transaction, error) {
-		return f(b, contractInstance)
+) func(*Wallet) (*types.Transaction, error) {
+	return func(w *Wallet) (*types.Transaction, error) {
+		return f(w, contractInstance)
 	}
 }
 
@@ -138,16 +138,16 @@ func NewTxOpts(
 	return txOpts, nil
 }
 
-func buildZeroTransferTx(backend Backend) (*types.Transaction, error) {
+func buildZeroTransferTx(wallet *Wallet) (*types.Transaction, error) {
 	maxValue := int64(100 * 1_000_000_000 / params.TxGas)
 	maxFeeCap := big.NewInt(maxValue)
 	bigGwei := big.NewInt(params.GWei)
 	gasTipCap := new(big.Int).Mul(bigGwei, big.NewInt(1))
 	gasFeeCap := new(big.Int).Mul(bigGwei, maxFeeCap)
-	senderAddress := crypto.PubkeyToAddress(backend.PrivKey().PublicKey)
-	tx, err := types.SignNewTx(backend.PrivKey(), backend.Signer(), &types.DynamicFeeTx{
-		ChainID:   backend.ChainID(),
-		Nonce:     backend.Nonce(),
+	senderAddress := crypto.PubkeyToAddress(wallet.PrivKey().PublicKey)
+	tx, err := types.SignNewTx(wallet.PrivKey(), wallet.Signer(), &types.DynamicFeeTx{
+		ChainID:   wallet.ChainID(),
+		Nonce:     wallet.Nonce(),
 		GasTipCap: gasTipCap,
 		GasFeeCap: gasFeeCap,
 		Gas:       params.TxGas,
@@ -162,14 +162,14 @@ func buildZeroTransferTx(backend Backend) (*types.Transaction, error) {
 }
 
 func buildRandomWriteTx(
-	backend Backend,
+	wallet *Wallet,
 	contractInstance *contracts.EVMLoadSimulator,
 ) (*types.Transaction, error) {
 	txOpts, err := NewTxOpts(
-		backend.PrivKey(),
-		backend.ChainID(),
+		wallet.PrivKey(),
+		wallet.ChainID(),
 		maxFeeCap,
-		backend.Nonce(),
+		wallet.Nonce(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tx opts: %w", err)
@@ -180,14 +180,14 @@ func buildRandomWriteTx(
 }
 
 func buildStateModificationTx(
-	backend Backend,
+	wallet *Wallet,
 	contractInstance *contracts.EVMLoadSimulator,
 ) (*types.Transaction, error) {
 	txOpts, err := NewTxOpts(
-		backend.PrivKey(),
-		backend.ChainID(),
+		wallet.PrivKey(),
+		wallet.ChainID(),
 		maxFeeCap,
-		backend.Nonce(),
+		wallet.Nonce(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tx opts: %w", err)
@@ -198,14 +198,14 @@ func buildStateModificationTx(
 }
 
 func buildRandomReadTx(
-	backend Backend,
+	wallet *Wallet,
 	contractInstance *contracts.EVMLoadSimulator,
 ) (*types.Transaction, error) {
 	txOpts, err := NewTxOpts(
-		backend.PrivKey(),
-		backend.ChainID(),
+		wallet.PrivKey(),
+		wallet.ChainID(),
 		maxFeeCap,
-		backend.Nonce(),
+		wallet.Nonce(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tx opts: %w", err)
@@ -216,14 +216,14 @@ func buildRandomReadTx(
 }
 
 func buildHashingTx(
-	backend Backend,
+	wallet *Wallet,
 	contractInstance *contracts.EVMLoadSimulator,
 ) (*types.Transaction, error) {
 	txOpts, err := NewTxOpts(
-		backend.PrivKey(),
-		backend.ChainID(),
+		wallet.PrivKey(),
+		wallet.ChainID(),
 		maxFeeCap,
-		backend.Nonce(),
+		wallet.Nonce(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tx opts: %w", err)
@@ -234,14 +234,14 @@ func buildHashingTx(
 }
 
 func buildMemoryTx(
-	backend Backend,
+	wallet *Wallet,
 	contractInstance *contracts.EVMLoadSimulator,
 ) (*types.Transaction, error) {
 	txOpts, err := NewTxOpts(
-		backend.PrivKey(),
-		backend.ChainID(),
+		wallet.PrivKey(),
+		wallet.ChainID(),
 		maxFeeCap,
-		backend.Nonce(),
+		wallet.Nonce(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tx opts: %w", err)
@@ -252,14 +252,14 @@ func buildMemoryTx(
 }
 
 func buildCallDepthTx(
-	backend Backend,
+	wallet *Wallet,
 	contractInstance *contracts.EVMLoadSimulator,
 ) (*types.Transaction, error) {
 	txOpts, err := NewTxOpts(
-		backend.PrivKey(),
-		backend.ChainID(),
+		wallet.PrivKey(),
+		wallet.ChainID(),
 		maxFeeCap,
-		backend.Nonce(),
+		wallet.Nonce(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tx opts: %w", err)
@@ -270,14 +270,14 @@ func buildCallDepthTx(
 }
 
 func buildContractCreationTx(
-	backend Backend,
+	wallet *Wallet,
 	contractInstance *contracts.EVMLoadSimulator,
 ) (*types.Transaction, error) {
 	txOpts, err := NewTxOpts(
-		backend.PrivKey(),
-		backend.ChainID(),
+		wallet.PrivKey(),
+		wallet.ChainID(),
 		maxFeeCap,
-		backend.Nonce(),
+		wallet.Nonce(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tx opts: %w", err)
@@ -286,14 +286,14 @@ func buildContractCreationTx(
 }
 
 func buildPureComputeTx(
-	backend Backend,
+	wallet *Wallet,
 	contractInstance *contracts.EVMLoadSimulator,
 ) (*types.Transaction, error) {
 	txOpts, err := NewTxOpts(
-		backend.PrivKey(),
-		backend.ChainID(),
+		wallet.PrivKey(),
+		wallet.ChainID(),
 		maxFeeCap,
-		backend.Nonce(),
+		wallet.Nonce(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tx opts: %w", err)
@@ -303,14 +303,14 @@ func buildPureComputeTx(
 }
 
 func buildLargeEventTx(
-	backend Backend,
+	wallet *Wallet,
 	contractInstance *contracts.EVMLoadSimulator,
 ) (*types.Transaction, error) {
 	txOpts, err := NewTxOpts(
-		backend.PrivKey(),
-		backend.ChainID(),
+		wallet.PrivKey(),
+		wallet.ChainID(),
 		maxFeeCap,
-		backend.Nonce(),
+		wallet.Nonce(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tx opts: %w", err)
@@ -320,14 +320,14 @@ func buildLargeEventTx(
 }
 
 func buildExternalCallTx(
-	backend Backend,
+	wallet *Wallet,
 	contractInstance *contracts.EVMLoadSimulator,
 ) (*types.Transaction, error) {
 	txOpts, err := NewTxOpts(
-		backend.PrivKey(),
-		backend.ChainID(),
+		wallet.PrivKey(),
+		wallet.ChainID(),
 		maxFeeCap,
-		backend.Nonce(),
+		wallet.Nonce(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tx opts: %w", err)
@@ -336,7 +336,7 @@ func buildExternalCallTx(
 }
 
 type txType struct {
-	txFunc func(Backend, *contracts.EVMLoadSimulator) (*types.Transaction, error)
+	txFunc func(*Wallet, *contracts.EVMLoadSimulator) (*types.Transaction, error)
 	name   string
 	weight uint64
 }

@@ -18,48 +18,12 @@ import (
 	ethereum "github.com/ava-labs/libevm"
 )
 
-type Backend interface {
-	PrivKey() *ecdsa.PrivateKey
-	Nonce() uint64
-	ChainID() *big.Int
-	Signer() types.Signer
-}
-
-type backend struct {
+type Wallet struct {
+	client  *ethclient.Client
 	privKey *ecdsa.PrivateKey
 	nonce   uint64
 	chainID *big.Int
 	signer  types.Signer
-}
-
-func newBackend(privKey *ecdsa.PrivateKey, nonce uint64, chainID *big.Int) *backend {
-	return &backend{
-		privKey: privKey,
-		nonce:   nonce,
-		chainID: chainID,
-		signer:  types.LatestSignerForChainID(chainID),
-	}
-}
-
-func (b *backend) PrivKey() *ecdsa.PrivateKey {
-	return b.privKey
-}
-
-func (b *backend) Nonce() uint64 {
-	return b.nonce
-}
-
-func (b *backend) ChainID() *big.Int {
-	return b.chainID
-}
-
-func (b *backend) Signer() types.Signer {
-	return b.signer
-}
-
-type Wallet struct {
-	client  *ethclient.Client
-	backend *backend
 }
 
 func NewWallet(
@@ -67,14 +31,17 @@ func NewWallet(
 	privKey *ecdsa.PrivateKey,
 	nonce uint64,
 	chainID *big.Int,
-) Wallet {
-	return Wallet{
+) *Wallet {
+	return &Wallet{
 		client:  client,
-		backend: newBackend(privKey, nonce, chainID),
+		privKey: privKey,
+		nonce:   nonce,
+		chainID: chainID,
+		signer:  types.LatestSignerForChainID(chainID),
 	}
 }
 
-func (w Wallet) SendTx(
+func (w *Wallet) SendTx(
 	ctx context.Context,
 	tx *types.Transaction,
 	pingFrequency time.Duration,
@@ -98,13 +65,25 @@ func (w Wallet) SendTx(
 	confirmationDuration := totalDuration - issuanceDuration
 	confirmationHandler(receipt, confirmationDuration)
 
-	w.backend.nonce++
+	w.nonce++
 
 	return nil
 }
 
-func (w Wallet) Backend() Backend {
-	return w.backend
+func (w *Wallet) PrivKey() *ecdsa.PrivateKey {
+	return w.privKey
+}
+
+func (w *Wallet) Nonce() uint64 {
+	return w.nonce
+}
+
+func (w *Wallet) ChainID() *big.Int {
+	return w.chainID
+}
+
+func (w *Wallet) Signer() types.Signer {
+	return w.signer
 }
 
 func awaitTx(

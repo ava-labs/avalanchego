@@ -48,17 +48,17 @@ func (t *Tracker) TotalGasUsed() uint64 {
 	return t.totalGasUsed
 }
 
-type TxBuilder func(Backend) (*types.Transaction, error)
+type TxBuilder func(*Wallet) (*types.Transaction, error)
 
 type Generator struct {
 	log        logging.Logger
-	wallets    []Wallet
+	wallets    []*Wallet
 	txBuilders []TxBuilder
 }
 
 func NewGenerator(
 	log logging.Logger,
-	wallets []Wallet,
+	wallets []*Wallet,
 	txBuilders []TxBuilder,
 ) (Generator, error) {
 	if len(wallets) != len(txBuilders) {
@@ -90,7 +90,7 @@ func (g Generator) Run(ctx context.Context) error {
 				}
 
 				// Build tx
-				tx, err := g.txBuilders[i](g.wallets[i].Backend())
+				tx, err := g.txBuilders[i](g.wallets[i])
 				if err != nil {
 					return err
 				}
