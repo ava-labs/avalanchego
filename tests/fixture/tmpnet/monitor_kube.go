@@ -37,7 +37,7 @@ type kubeCollectorConfig struct {
 }
 
 // DeployKubeCollectors deploys collectors of logs and metrics to a Kubernetes cluster.
-func DeployKubeCollectors(
+func deployKubeCollectors(
 	ctx context.Context,
 	log logging.Logger,
 	configPath string,

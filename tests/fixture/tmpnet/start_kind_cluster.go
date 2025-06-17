@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"go.uber.org/zap"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -37,6 +38,13 @@ const (
 
 	// TODO(marun) Check for the presence of the context rather than string matching on this error
 	missingContextMsg = `context "` + KindKubeconfigContext + `" does not exist`
+
+	// Ingress controller constants
+	ingressNamespace      = "ingress-nginx"
+	ingressReleaseName    = "ingress-nginx"
+	ingressChartRepo      = "https://kubernetes.github.io/ingress-nginx"
+	ingressChartName      = "ingress-nginx/ingress-nginx"
+	ingressControllerName = "ingress-nginx-controller"
 )
 
 //go:embed yaml/tmpnet-rbac.yaml
@@ -96,8 +104,12 @@ func StartKindCluster(
 		return fmt.Errorf("failed to create service account kubeconfig context: %w", err)
 	}
 
-	if err := DeployKubeCollectors(ctx, log, configPath, configContext, startMetricsCollector, startLogsCollector); err != nil {
+	if err := deployKubeCollectors(ctx, log, configPath, configContext, startMetricsCollector, startLogsCollector); err != nil {
 		return fmt.Errorf("failed to deploy kube collectors: %w", err)
+	}
+
+	if err := deployIngressController(ctx, log, configPath, configContext); err != nil {
+		return fmt.Errorf("failed to deploy ingress controller: %w", err)
 	}
 
 	return nil
@@ -284,4 +296,111 @@ func createServiceAccountKubeconfig(
 	)
 
 	return nil
+}
+
+// deployIngressController deploys the nginx ingress controller using Helm.
+func deployIngressController(ctx context.Context, log logging.Logger, configPath string, configContext string) error {
+	log.Info("checking if nginx ingress controller is already running")
+
+	isRunning, err := isIngressControllerRunning(ctx, log, configPath, configContext)
+	if err != nil {
+		return fmt.Errorf("failed to check nginx ingress controller status: %w", err)
+	}
+	if isRunning {
+		log.Info("nginx ingress controller already running")
+		return nil
+	}
+
+	log.Info("deploying nginx ingress controller using Helm")
+
+	// Add the helm repo for ingress-nginx
+	if err := runHelmCommand(ctx, "repo", "add", "ingress-nginx", ingressChartRepo); err != nil {
+		return fmt.Errorf("failed to add helm repo: %w", err)
+	}
+	if err := runHelmCommand(ctx, "repo", "update"); err != nil {
+		return fmt.Errorf("failed to update helm repos: %w", err)
+	}
+
+	// Install nginx-ingress with values set directly via flags
+	// Using fixed nodePort 30791 for cross-platform compatibility
+	args := []string{
+		"install",
+		ingressReleaseName,
+		ingressChartName,
+		"--namespace", ingressNamespace,
+		"--create-namespace",
+		"--wait",
+		"--set", "controller.service.type=NodePort",
+		// This port value must match the port configured in scripts/kind-with-registry.sh
+		"--set", "controller.service.nodePorts.http=30791",
+		"--set", "controller.admissionWebhooks.enabled=false",
+		"--set", "controller.config.proxy-read-timeout=600",
+		"--set", "controller.config.proxy-send-timeout=600",
+		"--set", "controller.config.proxy-body-size=0",
+		"--set", "controller.config.proxy-http-version=1.1",
+		"--set", "controller.metrics.enabled=true",
+	}
+
+	if err := runHelmCommand(ctx, args...); err != nil {
+		return fmt.Errorf("failed to install nginx-ingress: %w", err)
+	}
+
+	return waitForIngressController(ctx, log, configPath, configContext)
+}
+
+// isIngressControllerRunning checks if the nginx ingress controller is already running.
+func isIngressControllerRunning(ctx context.Context, log logging.Logger, configPath string, configContext string) (bool, error) {
+	clientset, err := GetClientset(log, configPath, configContext)
+	if err != nil {
+		return false, err
+	}
+
+	// TODO(marun) Handle the case of the deployment being in a failed state
+	_, err = clientset.AppsV1().Deployments(ingressNamespace).Get(ctx, ingressControllerName, metav1.GetOptions{})
+	isRunning := !apierrors.IsNotFound(err) || err == nil
+	return isRunning, nil
+}
+
+// waitForIngressController waits for the nginx ingress controller to be ready.
+func waitForIngressController(ctx context.Context, log logging.Logger, configPath string, configContext string) error {
+	clientset, err := GetClientset(log, configPath, configContext)
+	if err != nil {
+		return fmt.Errorf("failed to get clientset: %w", err)
+	}
+
+	return wait.PollUntilContextCancel(ctx, statusCheckInterval, true /* immediate */, func(ctx context.Context) (bool, error) {
+		deployment, err := clientset.AppsV1().Deployments(ingressNamespace).Get(ctx, ingressControllerName, metav1.GetOptions{})
+		if err != nil {
+			log.Debug("failed to get nginx ingress controller deployment",
+				zap.String("namespace", ingressNamespace),
+				zap.String("deployment", ingressControllerName),
+				zap.Error(err),
+			)
+			return false, nil
+		}
+		if deployment.Status.ReadyReplicas == 0 {
+			log.Debug("waiting for nginx ingress controller to become ready",
+				zap.String("namespace", ingressNamespace),
+				zap.String("deployment", ingressControllerName),
+				zap.Int32("readyReplicas", deployment.Status.ReadyReplicas),
+				zap.Int32("replicas", deployment.Status.Replicas),
+			)
+			return false, nil
+		}
+
+		log.Info("nginx ingress controller is ready",
+			zap.String("namespace", ingressNamespace),
+			zap.String("deployment", ingressControllerName),
+			zap.Int32("readyReplicas", deployment.Status.ReadyReplicas),
+		)
+		return true, nil
+	})
+}
+
+// runHelmCommand runs a Helm command with the given arguments.
+func runHelmCommand(ctx context.Context, args ...string) error {
+	cmd := exec.CommandContext(ctx, "helm", args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
