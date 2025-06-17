@@ -84,8 +84,8 @@ func (g Generator) Run(ctx context.Context) error {
 		issuerGroup.Go(func() error {
 			for {
 				select {
-				case <-ctx.Done():
-					return ctx.Err()
+				case <-childCtx.Done():
+					return childCtx.Err()
 				default:
 				}
 
