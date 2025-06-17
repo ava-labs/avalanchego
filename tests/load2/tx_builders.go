@@ -17,14 +17,10 @@ import (
 	"github.com/ava-labs/libevm/params"
 
 	"github.com/ava-labs/avalanchego/tests/load/c/contracts"
+	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 
-var (
-	errZeroTotalWeight      = errors.New("total weight is zero")
-	errFailedToSelectTxType = errors.New("failed to select tx type")
-
-	maxFeeCap = big.NewInt(300000000000)
-)
+var maxFeeCap = big.NewInt(300000000000)
 
 func BuildRandomTx(
 	backend Backend,
@@ -90,11 +86,24 @@ func BuildRandomTx(
 		},
 	}
 
-	txType, err := pickWeightedRandom(txTypes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to select random tx: %w", err)
+	weights := make([]uint64, len(txTypes))
+	totalWeight := uint64(0)
+	for i, txType := range txTypes {
+		weights[i] = txType.weight
+		totalWeight += txType.weight
 	}
 
+	sampler := sampler.NewWeighted()
+	if err := sampler.Initialize(weights); err != nil {
+		return nil, fmt.Errorf("failed to initialize sampler: %w", err)
+	}
+
+	index, ok := sampler.Sample(rand.Uint64N(totalWeight)) //#nosec G404
+	if !ok {
+		return nil, errors.New("failed to select random tx")
+	}
+
+	txType := txTypes[index]
 	tx, err := txType.txFunc(backend, contractInstance)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate tx of type %s: %w", txType.name, err)
@@ -329,27 +338,5 @@ func buildExternalCallTx(
 type txType struct {
 	txFunc func(Backend, *contracts.EVMLoadSimulator) (*types.Transaction, error)
 	name   string
-	weight uint
-}
-
-func pickWeightedRandom(txTypes []txType) (txType, error) {
-	var totalWeight uint
-	for _, txType := range txTypes {
-		totalWeight += txType.weight
-	}
-
-	// this ensures that UintN does not panic
-	if totalWeight == 0 {
-		return txType{}, errZeroTotalWeight
-	}
-
-	r := rand.UintN(totalWeight) //nolint:gosec
-
-	for _, txType := range txTypes {
-		if r < txType.weight {
-			return txType, nil
-		}
-		r -= txType.weight
-	}
-	return txType{}, errFailedToSelectTxType
+	weight uint64
 }
