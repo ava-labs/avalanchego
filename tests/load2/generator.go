@@ -6,6 +6,7 @@ package load2
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/ava-labs/libevm/core/types"
@@ -16,6 +17,36 @@ import (
 )
 
 const pingFrequency = time.Millisecond
+
+type Tracker struct {
+	lock sync.RWMutex
+
+	totalGasUsed uint64
+	txsIssued    uint64
+	txsAccepted  uint64
+}
+
+func (t *Tracker) LogIssued(time.Duration) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	t.txsIssued++
+}
+
+func (t *Tracker) LogAccepted(receipt *types.Receipt, _ time.Duration) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	t.txsAccepted++
+	t.totalGasUsed += receipt.GasUsed
+}
+
+func (t *Tracker) TotalGasUsed() uint64 {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	return t.totalGasUsed
+}
 
 type TxBuilder func(Backend) (*types.Transaction, error)
 
