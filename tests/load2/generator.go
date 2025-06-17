@@ -26,14 +26,14 @@ type Tracker struct {
 	txsAccepted  uint64
 }
 
-func (t *Tracker) LogIssued(time.Duration) {
+func (t *Tracker) Issue(time.Duration) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
 	t.txsIssued++
 }
 
-func (t *Tracker) LogAccepted(receipt *types.Receipt, _ time.Duration) {
+func (t *Tracker) Accept(receipt *types.Receipt, _ time.Duration) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -101,10 +101,10 @@ func (g Generator) Run(ctx context.Context) error {
 					tx,
 					pingFrequency,
 					func(d time.Duration) {
-						tracker.LogIssued(d)
+						tracker.Issue(d)
 					},
 					func(r *types.Receipt, d time.Duration) {
-						tracker.LogAccepted(r, d)
+						tracker.Accept(r, d)
 					},
 				); err != nil {
 					return err
