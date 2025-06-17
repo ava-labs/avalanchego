@@ -11,6 +11,7 @@ import (
 	"github.com/gorilla/rpc/v2"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -41,11 +42,6 @@ var (
 	hasRunKey = []byte{0x07}
 )
 
-// Define a local interface for HTTP server functionality
-type HTTPServer interface {
-	AddAliases(endpoint string, alias ...string) error
-}
-
 // Config for an indexer
 type Config struct {
 	DB                   database.Database
@@ -55,7 +51,7 @@ type Config struct {
 	BlockAcceptorGroup   snow.AcceptorGroup
 	TxAcceptorGroup      snow.AcceptorGroup
 	VertexAcceptorGroup  snow.AcceptorGroup
-	APIServer            HTTPServer // changed from APIServer
+	APIServer            server.PathAdder
 	ShutdownF            func()
 }
 
@@ -108,7 +104,7 @@ type indexer struct {
 	hasRunBefore bool
 
 	// Used to add API endpoint for new indices
-	pathAdder HTTPServer // changed from PathAdder
+	pathAdder server.PathAdder
 
 	// If true, allow running in such a way that could allow the creation
 	// of an index which could be missing accepted containers.
@@ -341,8 +337,7 @@ func (i *indexer) registerChainHelper(
 		_ = index.Close()
 		return nil, err
 	}
-	alias := fmt.Sprintf("index/%s", name)
-	if err := i.pathAdder.AddAliases(endpoint, alias); err != nil { // updated type
+	if err := i.pathAdder.AddRoute(apiServer, "index/"+name, "/"+endpoint); err != nil {
 		_ = index.Close()
 		return nil, err
 	}

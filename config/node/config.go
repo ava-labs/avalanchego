@@ -8,6 +8,7 @@ import (
 	"net/netip"
 	"time"
 
+	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -31,6 +32,7 @@ type APIIndexerConfig struct {
 }
 
 type HTTPConfig struct {
+	server.HTTPConfig
 	APIConfig `json:"apiConfig"`
 	HTTPHost  string `json:"httpHost"`
 	HTTPPort  uint16 `json:"httpPort"`
@@ -39,10 +41,11 @@ type HTTPConfig struct {
 	HTTPSKey     []byte `json:"-"`
 	HTTPSCert    []byte `json:"-"`
 
-	HTTPAllowedOrigins []string      `json:"httpAllowedOrigins"`
-	HTTPAllowedHosts   []string      `json:"httpAllowedHosts"`
-	ShutdownTimeout    time.Duration `json:"shutdownTimeout"`
-	ShutdownWait       time.Duration `json:"shutdownWait"`
+	HTTPAllowedOrigins []string `json:"httpAllowedOrigins"`
+	HTTPAllowedHosts   []string `json:"httpAllowedHosts"`
+
+	ShutdownTimeout time.Duration `json:"shutdownTimeout"`
+	ShutdownWait    time.Duration `json:"shutdownWait"`
 }
 
 type APIConfig struct {
@@ -116,11 +119,6 @@ type DatabaseConfig struct {
 
 	// Path to config file
 	Config []byte `json:"-"`
-}
-
-// Define a local interface for HTTP server functionality
-type HTTPServer interface {
-	AddAliases(endpoint string, aliases ...string) error
 }
 
 // Config contains all of the configurations of an Avalanche node.
@@ -220,8 +218,4 @@ type Config struct {
 	// Path to write process context to (including PID, API URI, and
 	// staking address).
 	ProcessContextFilePath string `json:"processContextFilePath"`
-
-	// Add these missing fields:
-	ShutdownTimeout time.Duration `json:"shutdownTimeout"`
-	ShutdownWait    time.Duration `json:"shutdownWait"`
 }
