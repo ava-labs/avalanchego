@@ -20,29 +20,33 @@ const (
 )
 
 var (
-	errKubeNamespaceRequired     = errors.New("--kube-namespace is required")
-	errKubeImageRequired         = errors.New("--kube-image is required")
-	errKubeMinVolumeSizeRequired = fmt.Errorf("--kube-volume-size must be >= %d", tmpnet.MinimumVolumeSizeGB)
+	errKubeNamespaceRequired       = errors.New("--kube-namespace is required")
+	errKubeImageRequired           = errors.New("--kube-image is required")
+	errKubeMinVolumeSizeRequired   = fmt.Errorf("--kube-volume-size must be >= %d", tmpnet.MinimumVolumeSizeGB)
+	errKubeSchedulingLabelRequired = errors.New("--kube-scheduling-label-key and --kube-scheduling-label-value are required when --kube-use-exclusive-scheduling is enabled")
 )
 
 type kubeRuntimeVars struct {
-	namespace    string
-	image        string
-	volumeSizeGB uint
-	config       *KubeconfigVars
+	namespace              string
+	image                  string
+	volumeSizeGB           uint
+	useExclusiveScheduling bool
+	schedulingLabelKey     string
+	schedulingLabelValue   string
+	config                 *KubeconfigVars
 }
 
 func (v *kubeRuntimeVars) registerWithFlag() {
 	v.config = newKubeconfigFlagVars(kubeDocPrefix)
-	v.register(flag.StringVar, flag.UintVar)
+	v.register(flag.StringVar, flag.UintVar, flag.BoolVar)
 }
 
 func (v *kubeRuntimeVars) registerWithFlagSet(flagSet *pflag.FlagSet) {
 	v.config = newKubeconfigFlagSetVars(flagSet, kubeDocPrefix)
-	v.register(flagSet.StringVar, flagSet.UintVar)
+	v.register(flagSet.StringVar, flagSet.UintVar, flagSet.BoolVar)
 }
 
-func (v *kubeRuntimeVars) register(stringVar varFunc[string], uintVar varFunc[uint]) {
+func (v *kubeRuntimeVars) register(stringVar varFunc[string], uintVar varFunc[uint], boolVar varFunc[bool]) {
 	stringVar(
 		&v.namespace,
 		"kube-namespace",
@@ -64,6 +68,24 @@ func (v *kubeRuntimeVars) register(stringVar varFunc[string], uintVar varFunc[ui
 			tmpnet.MinimumVolumeSizeGB,
 		),
 	)
+	boolVar(
+		&v.useExclusiveScheduling,
+		"kube-use-exclusive-scheduling",
+		false,
+		kubeDocPrefix+"Whether to schedule each AvalancheGo node to a dedicated Kubernetes node",
+	)
+	stringVar(
+		&v.schedulingLabelKey,
+		"kube-scheduling-label-key",
+		"purpose",
+		kubeDocPrefix+"The label key to use for exclusive scheduling for node selection and toleration",
+	)
+	stringVar(
+		&v.schedulingLabelValue,
+		"kube-scheduling-label-value",
+		"higher-spec",
+		kubeDocPrefix+"The label value to use for exclusive scheduling for node selection and toleration",
+	)
 }
 
 func (v *kubeRuntimeVars) getKubeRuntimeConfig() (*tmpnet.KubeRuntimeConfig, error) {
@@ -76,11 +98,17 @@ func (v *kubeRuntimeVars) getKubeRuntimeConfig() (*tmpnet.KubeRuntimeConfig, err
 	if v.volumeSizeGB < tmpnet.MinimumVolumeSizeGB {
 		return nil, errKubeMinVolumeSizeRequired
 	}
+	if v.useExclusiveScheduling && (len(v.schedulingLabelKey) == 0 || len(v.schedulingLabelValue) == 0) {
+		return nil, errKubeSchedulingLabelRequired
+	}
 	return &tmpnet.KubeRuntimeConfig{
-		ConfigPath:    v.config.Path,
-		ConfigContext: v.config.Context,
-		Namespace:     v.namespace,
-		Image:         v.image,
-		VolumeSizeGB:  v.volumeSizeGB,
+		ConfigPath:             v.config.Path,
+		ConfigContext:          v.config.Context,
+		Namespace:              v.namespace,
+		Image:                  v.image,
+		VolumeSizeGB:           v.volumeSizeGB,
+		UseExclusiveScheduling: v.useExclusiveScheduling,
+		SchedulingLabelKey:     v.schedulingLabelKey,
+		SchedulingLabelValue:   v.schedulingLabelValue,
 	}, nil
 }

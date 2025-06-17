@@ -57,7 +57,7 @@ func StartPrometheus(ctx context.Context, log logging.Logger) error {
 	if err := waitForReadiness(ctx, log, prometheusCmd, prometheusReadinessURL); err != nil {
 		return err
 	}
-	log.Info("To stop: tmpnetctl stop-collectors")
+	log.Info("To stop: tmpnetctl stop-metrics-collector")
 	return nil
 }
 
@@ -70,7 +70,7 @@ func StartPromtail(ctx context.Context, log logging.Logger) error {
 		return err
 	}
 	log.Info("skipping promtail readiness check until one or more nodes have written their service discovery configuration")
-	log.Info("To stop: tmpnetctl stop-collectors")
+	log.Info("To stop: tmpnetctl stop-logs-collector")
 	return nil
 }
 

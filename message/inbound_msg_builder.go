@@ -314,6 +314,19 @@ func InboundAppResponse(
 	}
 }
 
+// NewInboundSimplexMessage creates a new InboundMessage for simplex messages.
+func InboundSimplexMessage(
+	nodeID ids.NodeID,
+	msg *p2p.Simplex,
+) InboundMessage {
+	return &inboundMessage{
+		nodeID:     nodeID,
+		op:         SimplexOp,
+		message:    msg,
+		expiration: mockable.MaxTime,
+	}
+}
+
 func encodeIDs(ids []ids.ID, result [][]byte) {
 	for i, id := range ids {
 		result[i] = id[:]
