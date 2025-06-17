@@ -26,13 +26,13 @@ var (
 )
 
 type RandomTxBuilder struct {
-	builders    []txType
+	txTypes     []txType
 	sampler     sampler.Weighted
 	totalWeight uint64
 }
 
 func NewRandomTxBuilder(contract *contracts.EVMLoadSimulator) (RandomTxBuilder, error) {
-	builders := []txType{
+	txTypes := []txType{
 		{
 			builder: zeroTransferTxBuilder{},
 			weight:  1000,
@@ -80,9 +80,9 @@ func NewRandomTxBuilder(contract *contracts.EVMLoadSimulator) (RandomTxBuilder, 
 	}
 
 	// define weights and sampler
-	weights := make([]uint64, len(builders))
+	weights := make([]uint64, len(txTypes))
 	totalWeight := uint64(0)
-	for i, builder := range builders {
+	for i, builder := range txTypes {
 		weights[i] = builder.weight
 		totalWeight += builder.weight
 	}
@@ -93,7 +93,7 @@ func NewRandomTxBuilder(contract *contracts.EVMLoadSimulator) (RandomTxBuilder, 
 	}
 
 	return RandomTxBuilder{
-		builders:    builders,
+		txTypes:     txTypes,
 		sampler:     weightedSampler,
 		totalWeight: totalWeight,
 	}, nil
@@ -105,10 +105,10 @@ func (r RandomTxBuilder) Build(wallet *Wallet) (*types.Transaction, error) {
 		return nil, errFailedToSelectTx
 	}
 
-	selectedBuilder := r.builders[index]
-	tx, err := selectedBuilder.builder.Build(wallet)
+	builder := r.txTypes[index].builder
+	tx, err := builder.Build(wallet)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build tx with builder %T: %w", selectedBuilder, err)
+		return nil, fmt.Errorf("failed to build tx with builder %T: %w", builder, err)
 	}
 
 	return tx, nil
