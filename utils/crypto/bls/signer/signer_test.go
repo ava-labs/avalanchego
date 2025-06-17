@@ -22,9 +22,9 @@ func TestDefaultConfigInitializationUsesExistingDefaultKey(t *testing.T) {
 
 	config1, err := config.GetNodeConfig(v)
 	require.NoError(err)
-	signer1, err := GetStakingSigner(config1.StakingSignerConfig)
+	signer1, err := NewStakingSigner(config1.StakingSignerConfig)
 	require.NoError(err)
-	signer2, err := GetStakingSigner(config1.StakingSignerConfig)
+	signer2, err := NewStakingSigner(config1.StakingSignerConfig)
 	require.NoError(err)
 
 	require.Equal(signer1.PublicKey(), signer2.PublicKey())

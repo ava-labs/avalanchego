@@ -21,8 +21,9 @@ import (
 var _ bls.Signer = (*Client)(nil)
 
 type Client struct {
-	client     pb.SignerClient
-	pk         *bls.PublicKey
+	client pb.SignerClient
+	pk     *bls.PublicKey
+	// grpc.ClientConn handles transient connection errors.
 	connection *grpc.ClientConn
 }
 
@@ -51,7 +52,10 @@ func NewClient(ctx context.Context, url string) (*Client, error) {
 	pkBytes := pubkeyResponse.GetPublicKey()
 	pk, err := bls.PublicKeyFromCompressedBytes(pkBytes)
 	if err != nil {
-		return nil, errors.Join(fmt.Errorf("failed to uncompress public key bytes: %w", err), conn.Close())
+		return nil, errors.Join(
+			fmt.Errorf("failed to uncompress public key bytes: %w", err),
+			conn.Close(),
+		)
 	}
 
 	return &Client{
@@ -65,7 +69,6 @@ func (c *Client) PublicKey() *bls.PublicKey {
 	return c.pk
 }
 
-// Sign a message. The [Client] already handles transient connection errors.
 func (c *Client) Sign(message []byte) (*bls.Signature, error) {
 	resp, err := c.client.Sign(context.TODO(), &pb.SignRequest{Message: message})
 	if err != nil {
@@ -73,10 +76,14 @@ func (c *Client) Sign(message []byte) (*bls.Signature, error) {
 	}
 
 	sigBytes := resp.GetSignature()
-	return bls.SignatureFromBytes(sigBytes)
+	sig, err := bls.SignatureFromBytes(sigBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse signature: %w", err)
+	}
+	return sig, nil
 }
 
-// [SignProofOfPossession] has the same behavior as [Sign] but will product a different signature.
+// SignProofOfPossession produces a ProofOfPossession signature.
 // See BLS spec for more details.
 func (c *Client) SignProofOfPossession(message []byte) (*bls.Signature, error) {
 	resp, err := c.client.SignProofOfPossession(context.TODO(), &pb.SignProofOfPossessionRequest{Message: message})
@@ -85,7 +92,11 @@ func (c *Client) SignProofOfPossession(message []byte) (*bls.Signature, error) {
 	}
 
 	sigBytes := resp.GetSignature()
-	return bls.SignatureFromBytes(sigBytes)
+	sig, err := bls.SignatureFromBytes(sigBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse signature: %w", err)
+	}
+	return sig, nil
 }
 
 func (c *Client) Shutdown() error {

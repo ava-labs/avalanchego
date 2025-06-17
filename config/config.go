@@ -80,7 +80,7 @@ var (
 	errCannotReadDirectory                    = errors.New("cannot read directory")
 	errUnmarshalling                          = errors.New("unmarshalling failed")
 	errFileDoesNotExist                       = errors.New("file does not exist")
-	errInvalidSignerConfig                    = fmt.Errorf("only one of the following flags can be set: %s, %s, %s, %s", StakingEphemeralSignerEnabledKey, StakingSignerKeyContentKey, StakingSignerKeyPathKey, StakingRPCSignerKey)
+	errInvalidSignerConfig                    = fmt.Errorf("only one of the following flags can be set: %s, %s, %s, %s", StakingEphemeralSignerEnabledKey, StakingSignerKeyContentKey, StakingSignerKeyPathKey, StakingRPCSignerEndpointKey)
 )
 
 func getConsensusConfig(v *viper.Viper) snowball.Parameters {
@@ -703,13 +703,13 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 	return config, nil
 }
 
-func getStakingSignerConfig(v *viper.Viper) (interface{}, error) {
+func getStakingSignerConfig(v *viper.Viper) (any, error) {
 	// A maximum of one signer option can be set
 	bools := bag.Of(
 		v.GetBool(StakingEphemeralSignerEnabledKey),
 		v.IsSet(StakingSignerKeyContentKey),
 		v.IsSet(StakingSignerKeyPathKey),
-		v.IsSet(StakingRPCSignerKey),
+		v.IsSet(StakingRPCSignerEndpointKey),
 	)
 	if bools.Count(true) > 1 {
 		return node.StakingConfig{}, errInvalidSignerConfig
@@ -724,21 +724,19 @@ func getStakingSignerConfig(v *viper.Viper) (interface{}, error) {
 			SignerKeyRawContent: getExpandedArg(v, StakingSignerKeyContentKey),
 		}, nil
 
-	case v.IsSet(StakingRPCSignerKey):
+	case v.IsSet(StakingRPCSignerEndpointKey):
 		return node.RPCSignerConfig{
-			StakingSignerRPC: getExpandedArg(v, StakingRPCSignerKey),
+			StakingSignerRPC: getExpandedArg(v, StakingRPCSignerEndpointKey),
 		}, nil
 
 	case v.IsSet(StakingSignerKeyPathKey):
 		return node.SignerPathConfig{
-			SigningKeyPath:  getExpandedArg(v, StakingSignerKeyPathKey),
-			SignerPathIsSet: true,
+			SignerKeyPath: getExpandedArg(v, StakingSignerKeyPathKey),
 		}, nil
 
 	default:
-		return node.SignerPathConfig{
-			SigningKeyPath:  getExpandedArg(v, StakingSignerKeyPathKey),
-			SignerPathIsSet: false,
+		return node.DefaultSignerConfig{
+			SignerKeyPath: getExpandedArg(v, StakingSignerKeyPathKey),
 		}, nil
 	}
 }

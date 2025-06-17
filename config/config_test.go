@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/spf13/pflag"
@@ -553,50 +554,63 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 
 func TestGetStakingSigner(t *testing.T) {
 	testKey := "HLimS3vRibTMk9lZD4b+Z+GLuSBShvgbsu0WTLt2Kd4="
-	type cfg map[string]any
+	testKeyPath1 := filepath.Join(t.TempDir(), ".avalanchego/staking/signer.key")
+	testKeyPath2 := strings.Replace(testKeyPath1, "001", "002", 1) // Anticipate the new temp dir that will be created
 
 	tests := []struct {
-		name                     string
-		viperKeys                string
-		config                   cfg
-		expectedSignerConfigType interface{}
-		expectedErr              error
+		name                 string
+		viperKeys            string
+		config               map[string]any
+		expectedSignerConfig any
+		expectedErr          error
 	}{
 		{
-			name:                     "default-signer",
-			expectedSignerConfigType: node.SignerPathConfig{},
+			name: "default signer",
+			expectedSignerConfig: node.DefaultSignerConfig{
+				SignerKeyPath: testKeyPath2,
+			},
 		},
 		{
-			name:                     "ephemeral-signer",
-			config:                   cfg{StakingEphemeralSignerEnabledKey: true},
-			expectedSignerConfigType: node.EphemeralSignerConfig{},
+			name:                 "ephemeral signer",
+			config:               map[string]any{StakingEphemeralSignerEnabledKey: true},
+			expectedSignerConfig: node.EphemeralSignerConfig{},
 		},
 		{
-			name:                     "content-key",
-			config:                   cfg{StakingSignerKeyContentKey: testKey},
-			expectedSignerConfigType: node.ContentKeyConfig{},
+			name:   "content key",
+			config: map[string]any{StakingSignerKeyContentKey: testKey},
+			expectedSignerConfig: node.ContentKeyConfig{
+				SignerKeyRawContent: testKey,
+			},
 		},
 		{
-			name: "file-key",
-			config: cfg{
+			name: "file key",
+			config: map[string]any{
 				StakingSignerKeyPathKey: func() string {
-					filePath := filepath.Join(t.TempDir(), "signer.key")
+					require.NoError(t, os.MkdirAll(
+						filepath.Dir(testKeyPath1),
+						os.ModePerm,
+					))
+
 					bytes, err := base64.StdEncoding.DecodeString(testKey)
 					require.NoError(t, err)
-					require.NoError(t, os.WriteFile(filePath, bytes, perms.ReadWrite))
-					return filePath
+					require.NoError(t, os.WriteFile(testKeyPath1, bytes, perms.ReadWrite))
+					return testKeyPath1
 				}(),
 			},
-			expectedSignerConfigType: node.SignerPathConfig{},
+			expectedSignerConfig: node.SignerPathConfig{
+				SignerKeyPath: testKeyPath1,
+			},
 		},
 		{
-			name:                     "rpc-signer",
-			config:                   cfg{StakingRPCSignerKey: "localhost"},
-			expectedSignerConfigType: node.RPCSignerConfig{},
+			name:   "rpc signer",
+			config: map[string]any{StakingRPCSignerEndpointKey: "localhost"},
+			expectedSignerConfig: node.RPCSignerConfig{
+				StakingSignerRPC: "localhost",
+			},
 		},
 		{
-			name: "multiple-configurations-set",
-			config: cfg{
+			name: "multiple configurations set",
+			config: map[string]any{
 				StakingEphemeralSignerEnabledKey: true,
 				StakingSignerKeyContentKey:       testKey,
 			},
@@ -619,7 +633,7 @@ func TestGetStakingSigner(t *testing.T) {
 			config, err := GetNodeConfig(v)
 
 			require.ErrorIs(err, tt.expectedErr)
-			require.IsType(tt.expectedSignerConfigType, config.StakingSignerConfig)
+			require.Equal(tt.expectedSignerConfig, config.StakingSignerConfig)
 		})
 	}
 }
