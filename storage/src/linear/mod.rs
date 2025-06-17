@@ -24,7 +24,7 @@ use crate::{CacheReadStrategy, LinearAddress, SharedNode};
 pub(super) mod filebacked;
 pub mod memory;
 
-/// An error that occurs when reading or writing to a [ReadableStorage] or [WritableStorage]   
+/// An error that occurs when reading or writing to a [ReadableStorage] or [WritableStorage]
 ///
 /// This error is used to wrap errors that occur when reading or writing to a file.
 /// It contains the filename, offset, and context of the error.

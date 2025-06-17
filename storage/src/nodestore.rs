@@ -2,7 +2,7 @@
 // See the file LICENSE.md for licensing terms.
 
 use crate::linear::FileIoError;
-use crate::logger::trace;
+use crate::logger::{debug, trace};
 use arc_swap::ArcSwap;
 use arc_swap::access::DynAccess;
 use bincode::{DefaultOptions, Options as _};
@@ -37,7 +37,7 @@ use std::fmt::Debug;
 /// I --> |commit|N("New commit NodeStore&lt;Committed, S&gt;")
 /// style E color:#FFFFFF, fill:#AA00FF, stroke:#AA00FF
 /// ```
-use std::io::{Error, ErrorKind, Write};
+use std::io::{Error, ErrorKind};
 use std::mem::{offset_of, take};
 use std::num::NonZeroU64;
 use std::ops::Deref;
@@ -303,58 +303,9 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
 
         drop(stream);
 
-        if header.version != Version::new() {
-            return Err(storage.file_io_error(
-                Error::new(ErrorKind::InvalidData, "Incompatible firewood version"),
-                0,
-                Some("header read".to_string()),
-            ));
-        }
-        if header.endian_test != 1 {
-            return Err(storage.file_io_error(
-                Error::new(
-                    ErrorKind::InvalidData,
-                    "Database cannot be opened due to difference in endianness",
-                ),
-                0,
-                Some("header read".to_string()),
-            ));
-        }
-
-        if header.area_size_hash != area_size_hash().as_slice() {
-            return Err(storage.file_io_error(
-                Error::new(
-                    ErrorKind::InvalidData,
-                    "Database cannot be opened due to difference in area size hash",
-                ),
-                0,
-                Some("header read".to_string()),
-            ));
-        }
-
-        #[cfg(not(feature = "ethhash"))]
-        if header.ethhash != 0 {
-            return Err(storage.file_io_error(
-                Error::new(
-                    ErrorKind::InvalidData,
-                    "Database cannot be opened as it was created with ethhash enabled",
-                ),
-                0,
-                Some("header read".to_string()),
-            ));
-        }
-
-        #[cfg(feature = "ethhash")]
-        if header.ethhash != 1 {
-            return Err(storage.file_io_error(
-                Error::new(
-                    ErrorKind::InvalidData,
-                    "Database cannot be opened as it was created without ethhash enabled",
-                ),
-                0,
-                Some("header read".to_string()),
-            ));
-        }
+        header
+            .validate()
+            .map_err(|e| storage.file_io_error(e, 0, Some("header read".to_string())))?;
 
         let mut nodestore = Self {
             header,
@@ -691,18 +642,107 @@ struct Version {
 }
 
 impl Version {
-    const SIZE: u64 = std::mem::size_of::<Self>() as u64;
+    const SIZE: usize = size_of::<Self>();
 
-    /// construct a [Version] header from the firewood version
-    fn new() -> Self {
-        let mut version_bytes: [u8; Self::SIZE as usize] = Default::default();
-        let version = env!("CARGO_PKG_VERSION");
-        let _ = version_bytes
-            .as_mut_slice()
-            .write_all(format!("firewood {}", version).as_bytes());
-        Self {
-            bytes: version_bytes,
+    /// Version >= 0.0.4
+    ///
+    /// Increase as needed to set the minimum required version of `firewood-storage` for
+    /// compatibility checks.
+    ///
+    /// We may want to add migrations if we need to add a breaking change.
+    const BASE_VERSION: semver::Comparator = semver::Comparator {
+        op: semver::Op::GreaterEq,
+        major: 0,
+        minor: Some(0),
+        patch: Some(4),
+        pre: semver::Prerelease::EMPTY,
+    };
+
+    /// Validates that the version identifier is valid and compatible with the current
+    /// build of firewood.
+    ///
+    /// # Errors
+    ///
+    /// - If the token contains invalid utf-8 bytes (nul is allowed).
+    /// - If the token does not start with "firewood ".
+    /// - If the version is not parsable by [`semver::Version`].
+    /// - If the version is not compatible with the current build of firewood.
+    ///   - Currently, the minimum required version is 0.0.4.
+    fn validate(&self) -> Result<(), Error> {
+        let version = std::str::from_utf8(&self.bytes).map_err(|e| {
+            Error::new(
+                ErrorKind::InvalidData,
+                format!(
+                    "Invalid database version: invalid utf-8: {e} (original: [{:032x}])",
+                    u128::from_be_bytes(self.bytes)
+                ),
+            )
+        })?;
+
+        // strip trailling nuls as they're only for padding
+        let version = version.trim_end_matches('\0');
+
+        // strip magic prefix or error
+        let version = version.strip_prefix("firewood ").ok_or_else(|| {
+            Error::new(
+                ErrorKind::InvalidData,
+                format!(
+                    "Invalid database version: does not start with magic 'firewood ': {version}",
+                ),
+            )
+        })?;
+
+        // Version strings from CARGO_PKG_VERSION are guaranteed to be parsable by
+        // semver (cargo uses the same library).
+        let version = semver::Version::parse(version).map_err(|e| {
+            Error::new(
+                ErrorKind::InvalidData,
+                format!(
+                    "Invalid version string: unable to parse `{version}` as a semver string: {e}"
+                ),
+            )
+        })?;
+
+        // verify base compatibility version
+        if !Self::BASE_VERSION.matches(&version) {
+            return Err(Error::new(
+                ErrorKind::InvalidData,
+                format!(
+                    "Database was created with firewood version {version}; however, this build of firewood requires version {}",
+                    Self::BASE_VERSION,
+                ),
+            ));
         }
+
+        debug!(
+            "Database version is valid: {version} {}",
+            Self::BASE_VERSION
+        );
+        Ok(())
+    }
+
+    /// Construct a [`Version`] instance for the current build of firewood.
+    fn new() -> Self {
+        // Note that with this magic token of 9 bytes, we can store a version string of
+        // up to 7 bytes. If we always include the major, minor, and patch versions,
+        // then no more than two of three can be 2 digits long.
+        const VERSION_STR: &str = concat!("firewood ", env!("CARGO_PKG_VERSION"));
+        const {
+            assert!(
+                VERSION_STR.len() <= Version::SIZE,
+                concat!(
+                    "Database version string `firewood ",
+                    env!("CARGO_PKG_VERSION"),
+                    "` is too long for the Version struct! Update Cargo.toml or modify this code.",
+                ),
+            );
+        }
+
+        // pad with nul bytes
+        let mut bytes = [0u8; Version::SIZE];
+        bytes[..VERSION_STR.len()].copy_from_slice(VERSION_STR.as_bytes());
+
+        Self { bytes }
     }
 }
 
@@ -752,6 +792,68 @@ impl NodeStoreHeader {
             ethhash: 1,
             #[cfg(not(feature = "ethhash"))]
             ethhash: 0,
+        }
+    }
+
+    fn validate(&self) -> Result<(), Error> {
+        trace!("Checking version...");
+        self.version.validate()?;
+
+        trace!("Checking endianness...");
+        self.validate_endian_test()?;
+
+        trace!("Checking area size hash...");
+        self.validate_area_size_hash()?;
+
+        trace!("Checking if db ethhash flag matches build feature...");
+        self.validate_ethhash()?;
+
+        Ok(())
+    }
+
+    fn validate_endian_test(&self) -> Result<(), Error> {
+        if self.endian_test == 1 {
+            Ok(())
+        } else {
+            Err(Error::new(
+                ErrorKind::InvalidData,
+                "Database cannot be opened due to difference in endianness",
+            ))
+        }
+    }
+
+    fn validate_area_size_hash(&self) -> Result<(), Error> {
+        if self.area_size_hash == area_size_hash().as_slice() {
+            Ok(())
+        } else {
+            Err(Error::new(
+                ErrorKind::InvalidData,
+                "Database cannot be opened due to difference in area size hash",
+            ))
+        }
+    }
+
+    #[cfg(not(feature = "ethhash"))]
+    fn validate_ethhash(&self) -> Result<(), Error> {
+        if self.ethhash == 0 {
+            Ok(())
+        } else {
+            Err(Error::new(
+                ErrorKind::InvalidData,
+                "Database cannot be opened as it was created with ethhash enabled",
+            ))
+        }
+    }
+
+    #[cfg(feature = "ethhash")]
+    fn validate_ethhash(&self) -> Result<(), Error> {
+        if self.ethhash == 1 {
+            Ok(())
+        } else {
+            Err(Error::new(
+                ErrorKind::InvalidData,
+                "Database cannot be opened as it was created without ethhash enabled",
+            ))
         }
     }
 
@@ -1514,6 +1616,20 @@ mod tests {
         assert_eq!(header.version, Version::new());
         let empty_free_list: FreeLists = Default::default();
         assert_eq!(header.free_lists, empty_free_list);
+    }
+
+    #[test]
+    fn test_version_new_is_valid() {
+        Version::new()
+            .validate()
+            .expect("Version::new() should always be valid");
+    }
+
+    #[test_case(*b"invalid\0\0\0\0\0\0\0\0\0")]
+    #[test_case(*b"avalanche 0.1.0\0")]
+    #[test_case(*b"firewood 0.0.1\0\0")]
+    fn test_invalid_version_strings(bytes: [u8; 16]) {
+        assert!(Version { bytes }.validate().is_err());
     }
 
     #[test_case(BranchNode {
