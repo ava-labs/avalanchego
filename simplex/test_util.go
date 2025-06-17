@@ -30,7 +30,7 @@ func newEngineConfig() (*Config, error) {
 	simplexChainContext := SimplexChainContext{
 		NodeID:    nodeID,
 		ChainID:   ids.GenerateTestID(),
-		NetworkID: constants.LocalID,
+		NetworkID: constants.UnitTestID,
 	}
 
 	nodeInfo := validators.GetValidatorOutput{

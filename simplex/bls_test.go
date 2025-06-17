@@ -26,7 +26,7 @@ func TestBLSVerifier(t *testing.T) {
 		sig       []byte
 	}{
 		{
-			name:      "valid signature",
+			name:      "valid_signature",
 			expectErr: nil,
 			nodeID:    config.Ctx.NodeID[:],
 			sig: func() []byte {
@@ -36,7 +36,7 @@ func TestBLSVerifier(t *testing.T) {
 			}(),
 		},
 		{
-			name:      "not in membership set",
+			name:      "not_in_membership_set",
 			expectErr: errSignerNotFound,
 			nodeID:    otherNodeID[:],
 			sig: func() []byte {
@@ -46,7 +46,7 @@ func TestBLSVerifier(t *testing.T) {
 			}(),
 		},
 		{
-			name:      "invalid encoding",
+			name:      "invalid_message_encoding",
 			expectErr: errSignatureVerificationFailed,
 			nodeID:    config.Ctx.NodeID[:],
 			sig: func() []byte {
@@ -56,8 +56,8 @@ func TestBLSVerifier(t *testing.T) {
 			}(),
 		},
 		{
-			name:      "nodeID incorrect length",
-			expectErr: errInvalidNodeIDLength,
+			name:      "invalid_nodeID",
+			expectErr: errInvalidNodeID,
 			nodeID:    []byte{0x01, 0x02, 0x03, 0x04, 0x05}, // Incorrect length NodeID
 			sig: func() []byte {
 				sig, err := signer.Sign(msg)
@@ -66,13 +66,13 @@ func TestBLSVerifier(t *testing.T) {
 			}(),
 		},
 		{
-			name:      "nil signature",
+			name:      "nil_signature",
 			expectErr: errFailedToParseSignature,
 			nodeID:    config.Ctx.NodeID[:],
 			sig:       nil,
 		},
 		{
-			name:      "malformed signature",
+			name:      "malformed_signature",
 			expectErr: errFailedToParseSignature,
 			nodeID:    config.Ctx.NodeID[:],
 			sig:       []byte{0x01, 0x02, 0x03}, // Malformed signature
