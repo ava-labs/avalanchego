@@ -10,25 +10,9 @@
 //!
 //! This module should be used to generate trie root hash.
 
-#![cfg_attr(not(feature = "std"), no_std)]
-
-#[cfg(not(feature = "std"))]
-extern crate alloc;
-
-#[cfg(feature = "std")]
-mod rstd {
-    pub use std::collections::BTreeMap;
-}
-
-#[cfg(not(feature = "std"))]
-mod rstd {
-    pub use alloc::collections::BTreeMap;
-    pub use alloc::vec::Vec;
-}
-
-use core::cmp;
-use core::iter::once;
-use rstd::*;
+use std::cmp;
+use std::collections::BTreeMap;
+use std::iter::once;
 
 use hash_db::Hasher;
 use rlp::RlpStream;
