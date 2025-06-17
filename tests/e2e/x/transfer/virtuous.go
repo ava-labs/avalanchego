@@ -48,11 +48,12 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 	ginkgo.It("can issue a virtuous transfer tx for AVAX asset",
 		func() {
 			var (
-				env       = e2e.GetEnv(tc)
-				localURIs = env.GetNodeURIs()
-				rpcEps    = make([]string, len(localURIs))
+				env     = e2e.GetEnv(tc)
+				network = env.GetNetwork()
+				uris    = network.GetNodeURIs()
+				rpcEps  = make([]string, len(uris))
 			)
-			for i, nodeURI := range localURIs {
+			for i, nodeURI := range uris {
 				rpcEps[i] = nodeURI.URI
 			}
 
@@ -304,6 +305,6 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 				runFunc(i)
 			}
 
-			_ = e2e.CheckBootstrapIsPossible(tc, env.GetNetwork())
+			_ = e2e.CheckBootstrapIsPossible(tc, network)
 		})
 })

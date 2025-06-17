@@ -92,7 +92,7 @@ func main() {
 		)
 	})
 
-	endpoints, err := tmpnet.GetNodeWebsocketURIs(ctx, network.Nodes, blockchainID, tc.DeferCleanup)
+	endpoints, err := tmpnet.GetNodeWebsocketURIs(network.Nodes, blockchainID)
 	require.NoError(err, "failed †o get node websocket URIs")
 
 	w := &workload{
