@@ -241,6 +241,10 @@ jobs:
     name: load tests
     runs-on: avalanche-avalanchego-runner
     steps:
+      - name: Install xz-utils
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xz-util
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
