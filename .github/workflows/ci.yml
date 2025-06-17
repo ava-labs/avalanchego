@@ -21,44 +21,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # New minimal job to test ARC
-  arc_test:
-    name: "ARC Test"
-    runs-on: "avalanche-avalanchego-runner"
-    if: github.ref == 'refs/heads/arc-load-test'
-    steps:
-      - uses: actions/checkout@v4
-      - name: Test ARC runner
-        run: |
-          echo "Running on ARC self-hosted runner!"
-          echo "Runner name: $RUNNER_NAME"
-          echo "Runner OS: $RUNNER_OS"
-          echo "Runner arch: $RUNNER_ARCH"
-          uname -a
-          echo "ARC test successful!"
-
-#name: Tests
-#
-#on:
-#  push:
-#    tags:
-#      - "*"
-#    branches:
-#      - master
-#      - dev
-#  pull_request:
-#  merge_group:
-#    types: [checks_requested]
-#
-#permissions:
-#  contents: read
-#
-## Cancel ongoing workflow runs if a new one is started
-#concurrency:
-#  group: ${{ github.workflow }}-${{ github.ref }}
-#  cancel-in-progress: true
-#
-#jobs:
 #  Unit:
 #    runs-on: ${{ matrix.os }}
 #    strategy:
@@ -116,7 +78,7 @@ jobs:
 #          loki_username: ${{ secrets.LOKI_ID || '' }}
 #          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 #  e2e_kube:
-#    runs-on: ubuntu-latest
+#    runs-on: avalanche-avalanchego-runner
 #    steps:
 #      - uses: actions/checkout@v4
 #      - uses: ./.github/actions/setup-go-for-project
@@ -227,26 +189,26 @@ jobs:
 #      - uses: ./.github/actions/install-nix
 #      - shell: nix develop --command bash -x {0}
 #        run: task check-generate-load-contract-bindings
-#  go_mod_tidy:
-#    name: Up-to-date go.mod and go.sum
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: actions/checkout@v4
-#      - uses: ./.github/actions/setup-go-for-project
-#      - shell: bash
-#        run: ./scripts/run_task.sh check-go-mod-tidy
-#  test_build_image:
-#    name: Image build
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: actions/checkout@v4
-#      - name: Install qemu (required for cross-platform builds)
-#        run: |
-#          sudo apt update
-#          sudo apt -y install qemu-system qemu-user-static
-#      - name: Check image build
-#        shell: bash
-#        run: ./scripts/run_task.sh test-build-image
+  go_mod_tidy:
+    name: Up-to-date go.mod and go.sum
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - shell: bash
+        run: ./scripts/run_task.sh check-go-mod-tidy
+  test_build_image:
+    name: Image build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install qemu (required for cross-platform builds)
+        run: |
+          sudo apt update
+          sudo apt -y install qemu-system qemu-user-static
+      - name: Check image build
+        shell: bash
+        run: ./scripts/run_task.sh test-build-image
 #  test_build_antithesis_avalanchego_images:
 #    name: Build Antithesis avalanchego images
 #    runs-on: ubuntu-latest
@@ -275,20 +237,20 @@ jobs:
 #      - name: Run e2e tests
 #        shell: bash
 #        run: nix develop --command ./scripts/run_task.sh test-bootstrap-monitor-e2e
-#  load_tests:
-#    name: load tests
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: actions/checkout@v4
-#        with:
-#          fetch-depth: 0
-#      - uses: ./.github/actions/setup-go-for-project
-#      - uses: ./.github/actions/install-nix
-#      - uses: ./.github/actions/run-monitored-tmpnet-cmd
-#        with:
-#          run: ./scripts/run_task.sh test-load
-#          artifact_prefix: load
-#          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
-#          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-#          loki_username: ${{ secrets.LOKI_ID || '' }}
-#          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+  load_tests:
+    name: load tests
+    runs-on: avalanche-avalanchego-runner
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-go-for-project
+      - uses: ./.github/actions/install-nix
+      - uses: ./.github/actions/run-monitored-tmpnet-cmd
+        with:
+          run: ./scripts/run_task.sh test-load
+          artifact_prefix: load
+          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_username: ${{ secrets.LOKI_ID || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
