@@ -222,38 +222,13 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 		testContext:                 tc,
 	}
 
-	if network.DefaultRuntimeConfig.Process != nil {
-		// Display node IDs and URIs for process-based networks since the nodes are guaranteed to be network accessible
-		uris := env.GetNodeURIs()
-		require.NotEmpty(uris, "network contains no nodes")
-		tc.Log().Info("network nodes are available",
-			zap.Any("uris", uris),
-		)
-	} else {
-		// Only display node IDs for kube-based networks since the nodes may not be network accessible and
-		// port-forwarded URIs are ephemeral
-		nodeIDs := network.GetAvailableNodeIDs()
-		require.NotEmpty(nodeIDs, "network contains no nodes")
-		tc.Log().Info("network nodes are available. Not showing node URIs since kube nodes may be running remotely.",
-			zap.Strings("nodeIDs", nodeIDs),
-		)
-	}
+	uris := network.GetNodeURIs()
+	require.NotEmpty(uris, "network contains no nodes")
+	tc.Log().Info("network nodes are available",
+		zap.Any("uris", uris),
+	)
 
 	return env
-}
-
-// Retrieve URIs for validator nodes of the shared network. The URIs
-// are only guaranteed to be accessible until the environment test
-// context is torn down (usually the duration of execution of a single
-// test).
-func (te *TestEnvironment) GetNodeURIs() []tmpnet.NodeURI {
-	var (
-		tc      = te.testContext
-		network = te.GetNetwork()
-	)
-	uris, err := network.GetNodeURIs(tc.DefaultContext(), tc.DeferCleanup)
-	require.NoError(tc, err)
-	return uris
 }
 
 // Retrieve a random URI to naively attempt to spread API load across nodes.
@@ -279,15 +254,10 @@ func (te *TestEnvironment) GetRandomNodeURI() tmpnet.NodeURI {
 
 	require.NotEmpty(tc, availableNodes, "no available nodes to target")
 
-	// Use a local URI for the node to ensure compatibility with kube
 	randomNode := availableNodes[r.Intn(len(availableNodes))]
-	uri, cancel, err := randomNode.GetLocalURI(tc.DefaultContext())
-	require.NoError(tc, err)
-	tc.DeferCleanup(cancel)
-
 	nodeURI := tmpnet.NodeURI{
 		NodeID: randomNode.NodeID,
-		URI:    uri,
+		URI:    randomNode.GetAccessibleURI(),
 	}
 	tc.Log().Info("targeting random node",
 		zap.Stringer("nodeID", nodeURI.NodeID),

@@ -16,6 +16,7 @@ import (
 
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	restclient "k8s.io/client-go/rest"
@@ -76,6 +78,8 @@ type KubeRuntimeConfig struct {
 	SchedulingLabelKey string `json:"schedulingLabelKey,omitempty"`
 	// Label value to use for exclusive scheduling for node selection and toleration
 	SchedulingLabelValue string `json:"schedulingLabelValue,omitempty"`
+	// Base URI for constructing node URIs when running outside of the cluster hosting nodes (e.g., "http://localhost:30791")
+	BaseAccessibleURI string `json:"baseAccessibleURI,omitempty"`
 }
 
 // ensureDefaults sets cluster-specific defaults for fields not already set by flags.
@@ -145,6 +149,11 @@ func (p *KubeRuntime) readState(ctx context.Context) error {
 		zap.String("statefulSet", statefulSetName),
 	)
 
+	// Validate that it will be possible to construct accessible URIs when running external to the kube cluster
+	if !IsRunningInCluster() && len(runtimeConfig.BaseAccessibleURI) == 0 {
+		return errors.New("BaseAccessibleURI must be set when running outside of the kubernetes cluster")
+	}
+
 	clientset, err := p.getClientset()
 	if err != nil {
 		return err
@@ -187,31 +196,27 @@ func (p *KubeRuntime) readState(ctx context.Context) error {
 	return nil
 }
 
-// GetLocalURI retrieves a URI for the node intended to be accessible from this
-// process until the provided cancel function is called.
-func (p *KubeRuntime) GetLocalURI(ctx context.Context) (string, func(), error) {
-	if len(p.node.URI) == 0 {
-		// Assume that an empty URI indicates a need to read pod state
-		if err := p.readState(ctx); err != nil {
-			return "", func() {}, fmt.Errorf("failed to read Pod state: %w", err)
-		}
-	}
-
-	// Use direct pod URI if running inside the cluster
+// GetAccessibleURI retrieves a URI for the node accessible from where
+// this process is running. If the process is running inside a kube
+// cluster, the node and the process will be assumed to be running in the
+// same kube cluster and the node's URI be used. If the process is
+// running outside of a kube cluster, a URI accessible from outside of
+// the cluster will be used.
+func (p *KubeRuntime) GetAccessibleURI() string {
 	if IsRunningInCluster() {
-		return p.node.URI, func() {}, nil
+		return p.node.URI
 	}
 
-	port, stopChan, err := p.forwardPort(ctx, config.DefaultHTTPPort)
-	if err != nil {
-		return "", nil, err
-	}
-	return fmt.Sprintf("http://127.0.0.1:%d", port), func() { close(stopChan) }, nil
+	baseURI := p.runtimeConfig().BaseAccessibleURI
+	nodeID := p.node.NodeID.String()
+	networkUUID := p.node.network.UUID
+
+	return fmt.Sprintf("%s/networks/%s/%s", baseURI, networkUUID, nodeID)
 }
 
-// GetLocalStakingAddress retrieves a StakingAddress for the node intended to be
+// GetAccessibleStakingAddress retrieves a StakingAddress for the node intended to be
 // accessible from this process until the provided cancel function is called.
-func (p *KubeRuntime) GetLocalStakingAddress(ctx context.Context) (netip.AddrPort, func(), error) {
+func (p *KubeRuntime) GetAccessibleStakingAddress(ctx context.Context) (netip.AddrPort, func(), error) {
 	if p.node.StakingAddress == (netip.AddrPort{}) {
 		// Assume that an empty staking address indicates a need to retrieve pod state
 		if err := p.readState(ctx); err != nil {
@@ -363,6 +368,24 @@ func (p *KubeRuntime) Start(ctx context.Context) error {
 		zap.String("namespace", runtimeConfig.Namespace),
 		zap.String("statefulSet", statefulSetName),
 	)
+
+	// Create Service for the node (prefix with 's-' for DNS compatibility)
+	serviceName := "s-" + statefulSetName
+	if err := p.createNodeService(ctx, serviceName); err != nil {
+		return fmt.Errorf("failed to create Service for node: %w", err)
+	}
+
+	// Create Ingress for the node
+	if err := p.createNodeIngress(ctx, serviceName); err != nil {
+		return fmt.Errorf("failed to create Ingress for node: %w", err)
+	}
+
+	// Wait for ingress to be ready if running outside cluster
+	if !IsRunningInCluster() {
+		if err := p.waitForIngressReadiness(ctx, serviceName); err != nil {
+			return fmt.Errorf("failed to wait for Ingress readiness: %w", err)
+		}
+	}
 
 	return p.ensureBootstrapIP(ctx)
 }
@@ -624,9 +647,6 @@ func (p *KubeRuntime) Restart(ctx context.Context) error {
 }
 
 // IsHealthy checks if the node is running and healthy.
-//
-// TODO(marun) Add WaitForHealthy as a runtime method to minimize API calls required and
-// enable reuse of forwarded connection when running external to the kubernetes cluster
 func (p *KubeRuntime) IsHealthy(ctx context.Context) (bool, error) {
 	err := p.readState(ctx)
 	if err != nil {
@@ -636,13 +656,7 @@ func (p *KubeRuntime) IsHealthy(ctx context.Context) (bool, error) {
 		return false, errNotRunning
 	}
 
-	uri, cancel, err := p.GetLocalURI(ctx)
-	if err != nil {
-		return false, err
-	}
-	defer cancel()
-
-	healthReply, err := CheckNodeHealth(ctx, uri)
+	healthReply, err := CheckNodeHealth(ctx, p.GetAccessibleURI())
 	if errors.Is(err, ErrUnrecoverableNodeHealthCheck) {
 		return false, err
 	} else if err != nil {
@@ -888,6 +902,261 @@ func configureExclusiveScheduling(template *corev1.PodTemplateSpec, labelKey str
 			},
 		},
 	}
+}
+
+// createNodeService creates a Kubernetes Service for the node to enable ingress routing
+func (p *KubeRuntime) createNodeService(ctx context.Context, serviceName string) error {
+	var (
+		log           = p.node.network.log
+		nodeID        = p.node.NodeID.String()
+		runtimeConfig = p.runtimeConfig()
+		namespace     = runtimeConfig.Namespace
+	)
+
+	log.Debug("creating Service for node",
+		zap.String("nodeID", nodeID),
+		zap.String("namespace", namespace),
+		zap.String("service", serviceName),
+	)
+
+	clientset, err := p.getClientset()
+	if err != nil {
+		return err
+	}
+
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      serviceName,
+			Namespace: namespace,
+			Labels: map[string]string{
+				"app":          serviceName,
+				"network-uuid": p.node.network.UUID,
+				"node-id":      nodeID,
+			},
+		},
+		Spec: corev1.ServiceSpec{
+			Selector: map[string]string{
+				"network_uuid": p.node.network.UUID,
+				"node_id":      nodeID,
+			},
+			Ports: []corev1.ServicePort{
+				{
+					Name:       "http",
+					Port:       config.DefaultHTTPPort,
+					TargetPort: intstr.FromInt(config.DefaultHTTPPort),
+					Protocol:   corev1.ProtocolTCP,
+				},
+			},
+			Type: corev1.ServiceTypeClusterIP,
+		},
+	}
+
+	_, err = clientset.CoreV1().Services(namespace).Create(ctx, service, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to create Service: %w", err)
+	}
+
+	log.Debug("created Service",
+		zap.String("nodeID", nodeID),
+		zap.String("namespace", namespace),
+		zap.String("service", serviceName),
+	)
+
+	return nil
+}
+
+// createNodeIngress creates a Kubernetes Ingress for the node to enable external access
+func (p *KubeRuntime) createNodeIngress(ctx context.Context, serviceName string) error {
+	var (
+		log           = p.node.network.log
+		nodeID        = p.node.NodeID.String()
+		runtimeConfig = p.runtimeConfig()
+		namespace     = runtimeConfig.Namespace
+		networkUUID   = p.node.network.UUID
+	)
+
+	log.Debug("creating Ingress for node",
+		zap.String("nodeID", nodeID),
+		zap.String("namespace", namespace),
+		zap.String("service", serviceName),
+	)
+
+	clientset, err := p.getClientset()
+	if err != nil {
+		return err
+	}
+
+	var (
+		ingressClassName = "nginx" // Assume nginx ingress controller
+		// Path pattern: /networks/<network-uuid>/<node-id>(/|$)(.*)
+		// Using (/|$)(.*) to properly handle trailing slashes
+		pathPattern = fmt.Sprintf("/networks/%s/%s", networkUUID, nodeID) + "(/|$)(.*)"
+		pathType    = networkingv1.PathTypeImplementationSpecific
+	)
+
+	ingress := &networkingv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      serviceName,
+			Namespace: namespace,
+			Labels: map[string]string{
+				"app":          serviceName,
+				"network-uuid": networkUUID,
+				"node-id":      nodeID,
+			},
+			Annotations: map[string]string{
+				"nginx.ingress.kubernetes.io/use-regex":          "true",
+				"nginx.ingress.kubernetes.io/rewrite-target":     "/$2",
+				"nginx.ingress.kubernetes.io/proxy-body-size":    "0",
+				"nginx.ingress.kubernetes.io/proxy-read-timeout": "600",
+				"nginx.ingress.kubernetes.io/proxy-send-timeout": "600",
+			},
+		},
+		Spec: networkingv1.IngressSpec{
+			IngressClassName: &ingressClassName,
+			Rules: []networkingv1.IngressRule{
+				{
+					IngressRuleValue: networkingv1.IngressRuleValue{
+						HTTP: &networkingv1.HTTPIngressRuleValue{
+							Paths: []networkingv1.HTTPIngressPath{
+								{
+									Path:     pathPattern,
+									PathType: &pathType,
+									Backend: networkingv1.IngressBackend{
+										Service: &networkingv1.IngressServiceBackend{
+											Name: serviceName,
+											Port: networkingv1.ServiceBackendPort{
+												Number: config.DefaultHTTPPort,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	_, err = clientset.NetworkingV1().Ingresses(namespace).Create(ctx, ingress, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to create Ingress: %w", err)
+	}
+
+	log.Debug("created Ingress",
+		zap.String("nodeID", nodeID),
+		zap.String("namespace", namespace),
+		zap.String("ingress", serviceName),
+		zap.String("path", pathPattern),
+	)
+
+	return nil
+}
+
+// waitForIngressReadiness waits for the ingress to be ready and able to route traffic
+// This prevents 503 errors when health checks are performed immediately after node start
+func (p *KubeRuntime) waitForIngressReadiness(ctx context.Context, serviceName string) error {
+	var (
+		log           = p.node.network.log
+		nodeID        = p.node.NodeID.String()
+		runtimeConfig = p.runtimeConfig()
+		namespace     = runtimeConfig.Namespace
+	)
+
+	log.Debug("waiting for Ingress readiness",
+		zap.String("nodeID", nodeID),
+		zap.String("namespace", namespace),
+		zap.String("ingress", serviceName),
+	)
+
+	clientset, err := p.getClientset()
+	if err != nil {
+		return err
+	}
+
+	// Wait for the ingress to exist and service endpoints to be available
+	err = wait.PollUntilContextCancel(
+		ctx,
+		statusCheckInterval,
+		true, // immediate
+		func(ctx context.Context) (bool, error) {
+			// Check if ingress exists
+			_, err := clientset.NetworkingV1().Ingresses(namespace).Get(ctx, serviceName, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				log.Debug("waiting for Ingress to be created",
+					zap.String("nodeID", nodeID),
+					zap.String("namespace", namespace),
+					zap.String("ingress", serviceName),
+				)
+				return false, nil
+			}
+			if err != nil {
+				log.Warn("failed to retrieve Ingress",
+					zap.String("nodeID", nodeID),
+					zap.String("namespace", namespace),
+					zap.String("ingress", serviceName),
+					zap.Error(err),
+				)
+				return false, nil
+			}
+
+			// Check if service endpoints are available
+			endpoints, err := clientset.CoreV1().Endpoints(namespace).Get(ctx, serviceName, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				log.Debug("waiting for Service endpoints to be created",
+					zap.String("nodeID", nodeID),
+					zap.String("namespace", namespace),
+					zap.String("service", serviceName),
+				)
+				return false, nil
+			}
+			if err != nil {
+				log.Warn("failed to retrieve Service endpoints",
+					zap.String("nodeID", nodeID),
+					zap.String("namespace", namespace),
+					zap.String("service", serviceName),
+					zap.Error(err),
+				)
+				return false, nil
+			}
+
+			// Check if endpoints have at least one ready address
+			hasReadyEndpoints := false
+			for _, subset := range endpoints.Subsets {
+				if len(subset.Addresses) > 0 {
+					hasReadyEndpoints = true
+					break
+				}
+			}
+
+			if !hasReadyEndpoints {
+				log.Debug("waiting for Service endpoints to have ready addresses",
+					zap.String("nodeID", nodeID),
+					zap.String("namespace", namespace),
+					zap.String("service", serviceName),
+				)
+				return false, nil
+			}
+
+			log.Debug("Ingress and Service endpoints are ready",
+				zap.String("nodeID", nodeID),
+				zap.String("namespace", namespace),
+				zap.String("ingress", serviceName),
+			)
+			return true, nil
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to wait for Ingress %s/%s readiness: %w", namespace, serviceName, err)
+	}
+
+	log.Debug("Ingress is ready",
+		zap.String("nodeID", nodeID),
+		zap.String("namespace", namespace),
+		zap.String("ingress", serviceName),
+	)
+
+	return nil
 }
 
 // IsRunningInCluster detects if this code is running inside a Kubernetes cluster
