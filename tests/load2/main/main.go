@@ -68,7 +68,7 @@ func main() {
 	wsURIs, err := tmpnet.GetNodeWebsocketURIs(ctx, network.Nodes, blockchainID, tc.DeferCleanup)
 	require.NoError(err)
 
-	wallets := make([]*load2.Wallet, len(keys))
+	wallets := make([]load2.Wallet, len(keys))
 	txBuilders := make([]load2.TxBuilder, len(keys))
 	for i := range len(keys) {
 		wsURI := wsURIs[i%len(wsURIs)]
@@ -97,7 +97,7 @@ func main() {
 func createContract(
 	ctx context.Context,
 	client *ethclient.Client,
-	wallet *load2.Wallet,
+	wallet load2.Wallet,
 ) (*contracts.EVMLoadSimulator, error) {
 	backend := wallet.Backend()
 	maxFeeCap := big.NewInt(300000000000)

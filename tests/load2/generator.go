@@ -21,31 +21,31 @@ type TxBuilder func(Backend) (*types.Transaction, error)
 
 type Generator struct {
 	log        logging.Logger
-	wallets    []*Wallet
+	wallets    []Wallet
 	txBuilders []TxBuilder
 }
 
 func NewGenerator(
 	log logging.Logger,
-	wallets []*Wallet,
+	wallets []Wallet,
 	txBuilders []TxBuilder,
-) (*Generator, error) {
+) (Generator, error) {
 	if len(wallets) != len(txBuilders) {
-		return nil, fmt.Errorf(
+		return Generator{}, fmt.Errorf(
 			"wallet and tx builder count mismatch: got %d wallets and %d txBuilders",
 			len(wallets),
 			len(txBuilders),
 		)
 	}
 
-	return &Generator{
+	return Generator{
 		log:        log,
 		wallets:    wallets,
 		txBuilders: txBuilders,
 	}, nil
 }
 
-func (g *Generator) Run(ctx context.Context) error {
+func (g Generator) Run(ctx context.Context) error {
 	tracker := &Tracker{}
 	issuerGroup, childCtx := errgroup.WithContext(ctx)
 

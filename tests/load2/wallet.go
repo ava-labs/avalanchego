@@ -67,14 +67,14 @@ func NewWallet(
 	privKey *ecdsa.PrivateKey,
 	nonce uint64,
 	chainID *big.Int,
-) *Wallet {
-	return &Wallet{
+) Wallet {
+	return Wallet{
 		client:  client,
 		backend: newBackend(privKey, nonce, chainID),
 	}
 }
 
-func (w *Wallet) SendTx(
+func (w Wallet) SendTx(
 	ctx context.Context,
 	tx *types.Transaction,
 	pingFrequency time.Duration,
@@ -103,7 +103,7 @@ func (w *Wallet) SendTx(
 	return nil
 }
 
-func (w *Wallet) Backend() Backend {
+func (w Wallet) Backend() Backend {
 	return w.backend
 }
 
