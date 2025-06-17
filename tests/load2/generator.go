@@ -46,7 +46,9 @@ func (t *tracker) TotalGasUsed() uint64 {
 	return t.totalGasUsed
 }
 
-type TxBuilder func(*Wallet) (*types.Transaction, error)
+type TxBuilder interface {
+	Build(*Wallet) (*types.Transaction, error)
+}
 
 type Generator struct {
 	log           logging.Logger
@@ -91,7 +93,7 @@ func (g Generator) Run(ctx context.Context) error {
 				}
 
 				// Build tx
-				tx, err := g.txBuilders[i](g.wallets[i])
+				tx, err := g.txBuilders[i].Build(g.wallets[i])
 				if err != nil {
 					return err
 				}

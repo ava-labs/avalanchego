@@ -20,105 +20,98 @@ import (
 	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 
-var maxFeeCap = big.NewInt(300000000000)
+var (
+	maxFeeCap           = big.NewInt(300000000000)
+	errFailedToSelectTx = errors.New("failed to select random tx")
+)
 
-func BuildRandomTx(
-	wallet *Wallet,
-	contractInstance *contracts.EVMLoadSimulator,
-) (*types.Transaction, error) {
-	txTypes := []txType{
+type RandomTxBuilder struct {
+	builders    []txType
+	sampler     sampler.Weighted
+	totalWeight uint64
+}
+
+func NewRandomTxBuilder(contract *contracts.EVMLoadSimulator) (RandomTxBuilder, error) {
+	builders := []txType{
 		{
-			txFunc: func(w *Wallet, _ *contracts.EVMLoadSimulator) (*types.Transaction, error) {
-				return buildZeroTransferTx(w)
-			},
-			name:   "ZeroTransfer",
-			weight: 1000,
+			builder: zeroTransferTxBuilder{},
+			weight:  1000,
 		},
 		{
-			txFunc: buildRandomWriteTx,
-			name:   "RandomWrite",
-			weight: 100,
+			builder: randomWriteTxBuilder{contract: contract},
+			weight:  100,
 		},
 		{
-			txFunc: buildStateModificationTx,
-			name:   "StateModification",
-			weight: 100,
+			builder: stateModificationTxBuilder{contract: contract},
+			weight:  100,
 		},
 		{
-			txFunc: buildRandomReadTx,
-			name:   "RandomRead",
-			weight: 200,
+			builder: randomReadTxBuilder{contract: contract},
+			weight:  200,
 		},
 		{
-			txFunc: buildHashingTx,
-			name:   "Hashing",
-			weight: 50,
+			builder: hashingTxBuilder{contract: contract},
+			weight:  50,
 		},
 		{
-			txFunc: buildMemoryTx,
-			name:   "Memory",
-			weight: 100,
+			builder: memoryTxBuilder{contract: contract},
+			weight:  100,
 		},
 		{
-			txFunc: buildCallDepthTx,
-			name:   "CallDepth",
-			weight: 50,
+			builder: callDepthTxBuilder{contract: contract},
+			weight:  50,
 		},
 		{
-			txFunc: buildContractCreationTx,
-			name:   "ContractCreation",
-			weight: 1,
+			builder: contractCreationTxBuilder{contract: contract},
+			weight:  1,
 		},
 		{
-			txFunc: buildPureComputeTx,
-			name:   "PureCompute",
-			weight: 100,
+			builder: pureComputeTxBuilder{contract: contract},
+			weight:  100,
 		},
 		{
-			txFunc: buildLargeEventTx,
-			name:   "LargeEvent",
-			weight: 100,
+			builder: largeEventTxBuilder{contract: contract},
+			weight:  100,
 		},
 		{
-			txFunc: buildExternalCallTx,
-			name:   "ExternalCall",
-			weight: 50,
+			builder: externalCallTxBuilder{contract: contract},
+			weight:  50,
 		},
 	}
 
-	weights := make([]uint64, len(txTypes))
+	// define weights and sampler
+	weights := make([]uint64, len(builders))
 	totalWeight := uint64(0)
-	for i, txType := range txTypes {
-		weights[i] = txType.weight
-		totalWeight += txType.weight
+	for i, builder := range builders {
+		weights[i] = builder.weight
+		totalWeight += builder.weight
 	}
 
-	sampler := sampler.NewWeighted()
-	if err := sampler.Initialize(weights); err != nil {
-		return nil, fmt.Errorf("failed to initialize sampler: %w", err)
+	weightedSampler := sampler.NewWeighted()
+	if err := weightedSampler.Initialize(weights); err != nil {
+		return RandomTxBuilder{}, fmt.Errorf("failed to initialize sampler: %w", err)
 	}
 
-	index, ok := sampler.Sample(rand.Uint64N(totalWeight)) //#nosec G404
+	return RandomTxBuilder{
+		builders:    builders,
+		sampler:     weightedSampler,
+		totalWeight: totalWeight,
+	}, nil
+}
+
+func (r RandomTxBuilder) Build(wallet *Wallet) (*types.Transaction, error) {
+	index, ok := r.sampler.Sample(rand.Uint64N(r.totalWeight)) //#nosec G404
 	if !ok {
-		return nil, errors.New("failed to select random tx")
+		return nil, errFailedToSelectTx
 	}
 
-	txType := txTypes[index]
-	tx, err := txType.txFunc(wallet, contractInstance)
+	selectedBuilder := r.builders[index]
+	tx, err := selectedBuilder.builder.Build(wallet)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate tx of type %s: %w", txType.name, err)
+		return nil, fmt.Errorf("failed to build tx with builder %T: %w", selectedBuilder, err)
 	}
 
 	return tx, nil
-}
-
-func WithContractInstance(
-	f func(*Wallet, *contracts.EVMLoadSimulator) (*types.Transaction, error),
-	contractInstance *contracts.EVMLoadSimulator,
-) func(*Wallet) (*types.Transaction, error) {
-	return func(w *Wallet) (*types.Transaction, error) {
-		return f(w, contractInstance)
-	}
 }
 
 func NewTxOpts(
@@ -138,7 +131,14 @@ func NewTxOpts(
 	return txOpts, nil
 }
 
-func buildZeroTransferTx(wallet *Wallet) (*types.Transaction, error) {
+type txType struct {
+	builder TxBuilder
+	weight  uint64
+}
+
+type zeroTransferTxBuilder struct{}
+
+func (zeroTransferTxBuilder) Build(wallet *Wallet) (*types.Transaction, error) {
 	maxValue := int64(100 * 1_000_000_000 / params.TxGas)
 	maxFeeCap := big.NewInt(maxValue)
 	bigGwei := big.NewInt(params.GWei)
@@ -161,10 +161,11 @@ func buildZeroTransferTx(wallet *Wallet) (*types.Transaction, error) {
 	return tx, nil
 }
 
-func buildRandomWriteTx(
-	wallet *Wallet,
-	contractInstance *contracts.EVMLoadSimulator,
-) (*types.Transaction, error) {
+type randomWriteTxBuilder struct {
+	contract *contracts.EVMLoadSimulator
+}
+
+func (r randomWriteTxBuilder) Build(wallet *Wallet) (*types.Transaction, error) {
 	txOpts, err := NewTxOpts(
 		wallet.PrivKey(),
 		wallet.ChainID(),
@@ -176,13 +177,14 @@ func buildRandomWriteTx(
 	}
 	const maxWriteSizeBytes = 5
 	count := big.NewInt(rand.Int64N(maxWriteSizeBytes)) //#nosec G404
-	return contractInstance.SimulateRandomWrite(txOpts, count)
+	return r.contract.SimulateRandomWrite(txOpts, count)
 }
 
-func buildStateModificationTx(
-	wallet *Wallet,
-	contractInstance *contracts.EVMLoadSimulator,
-) (*types.Transaction, error) {
+type stateModificationTxBuilder struct {
+	contract *contracts.EVMLoadSimulator
+}
+
+func (s stateModificationTxBuilder) Build(wallet *Wallet) (*types.Transaction, error) {
 	txOpts, err := NewTxOpts(
 		wallet.PrivKey(),
 		wallet.ChainID(),
@@ -194,13 +196,14 @@ func buildStateModificationTx(
 	}
 	const maxStateSizeBytes = 5
 	count := big.NewInt(rand.Int64N(maxStateSizeBytes)) //#nosec G404
-	return contractInstance.SimulateModification(txOpts, count)
+	return s.contract.SimulateModification(txOpts, count)
 }
 
-func buildRandomReadTx(
-	wallet *Wallet,
-	contractInstance *contracts.EVMLoadSimulator,
-) (*types.Transaction, error) {
+type randomReadTxBuilder struct {
+	contract *contracts.EVMLoadSimulator
+}
+
+func (r randomReadTxBuilder) Build(wallet *Wallet) (*types.Transaction, error) {
 	txOpts, err := NewTxOpts(
 		wallet.PrivKey(),
 		wallet.ChainID(),
@@ -212,13 +215,14 @@ func buildRandomReadTx(
 	}
 	const maxReadSizeBytes = 5
 	count := big.NewInt(rand.Int64N(maxReadSizeBytes)) //#nosec G404
-	return contractInstance.SimulateReads(txOpts, count)
+	return r.contract.SimulateReads(txOpts, count)
 }
 
-func buildHashingTx(
-	wallet *Wallet,
-	contractInstance *contracts.EVMLoadSimulator,
-) (*types.Transaction, error) {
+type hashingTxBuilder struct {
+	contract *contracts.EVMLoadSimulator
+}
+
+func (h hashingTxBuilder) Build(wallet *Wallet) (*types.Transaction, error) {
 	txOpts, err := NewTxOpts(
 		wallet.PrivKey(),
 		wallet.ChainID(),
@@ -230,13 +234,14 @@ func buildHashingTx(
 	}
 	const maxRounds = 3
 	count := big.NewInt(rand.Int64N(maxRounds)) //#nosec G404
-	return contractInstance.SimulateHashing(txOpts, count)
+	return h.contract.SimulateHashing(txOpts, count)
 }
 
-func buildMemoryTx(
-	wallet *Wallet,
-	contractInstance *contracts.EVMLoadSimulator,
-) (*types.Transaction, error) {
+type memoryTxBuilder struct {
+	contract *contracts.EVMLoadSimulator
+}
+
+func (m memoryTxBuilder) Build(wallet *Wallet) (*types.Transaction, error) {
 	txOpts, err := NewTxOpts(
 		wallet.PrivKey(),
 		wallet.ChainID(),
@@ -248,13 +253,14 @@ func buildMemoryTx(
 	}
 	const maxRounds = 3
 	count := big.NewInt(rand.Int64N(maxRounds)) //#nosec G404
-	return contractInstance.SimulateMemory(txOpts, count)
+	return m.contract.SimulateMemory(txOpts, count)
 }
 
-func buildCallDepthTx(
-	wallet *Wallet,
-	contractInstance *contracts.EVMLoadSimulator,
-) (*types.Transaction, error) {
+type callDepthTxBuilder struct {
+	contract *contracts.EVMLoadSimulator
+}
+
+func (c callDepthTxBuilder) Build(wallet *Wallet) (*types.Transaction, error) {
 	txOpts, err := NewTxOpts(
 		wallet.PrivKey(),
 		wallet.ChainID(),
@@ -266,13 +272,14 @@ func buildCallDepthTx(
 	}
 	const maxDepth = 5
 	count := big.NewInt(rand.Int64N(maxDepth)) //#nosec G404
-	return contractInstance.SimulateCallDepth(txOpts, count)
+	return c.contract.SimulateCallDepth(txOpts, count)
 }
 
-func buildContractCreationTx(
-	wallet *Wallet,
-	contractInstance *contracts.EVMLoadSimulator,
-) (*types.Transaction, error) {
+type contractCreationTxBuilder struct {
+	contract *contracts.EVMLoadSimulator
+}
+
+func (c contractCreationTxBuilder) Build(wallet *Wallet) (*types.Transaction, error) {
 	txOpts, err := NewTxOpts(
 		wallet.PrivKey(),
 		wallet.ChainID(),
@@ -282,13 +289,14 @@ func buildContractCreationTx(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tx opts: %w", err)
 	}
-	return contractInstance.SimulateContractCreation(txOpts)
+	return c.contract.SimulateContractCreation(txOpts)
 }
 
-func buildPureComputeTx(
-	wallet *Wallet,
-	contractInstance *contracts.EVMLoadSimulator,
-) (*types.Transaction, error) {
+type pureComputeTxBuilder struct {
+	contract *contracts.EVMLoadSimulator
+}
+
+func (p pureComputeTxBuilder) Build(wallet *Wallet) (*types.Transaction, error) {
 	txOpts, err := NewTxOpts(
 		wallet.PrivKey(),
 		wallet.ChainID(),
@@ -299,13 +307,14 @@ func buildPureComputeTx(
 		return nil, fmt.Errorf("failed to create tx opts: %w", err)
 	}
 	const iterations = 100
-	return contractInstance.SimulatePureCompute(txOpts, big.NewInt(iterations))
+	return p.contract.SimulatePureCompute(txOpts, big.NewInt(iterations))
 }
 
-func buildLargeEventTx(
-	wallet *Wallet,
-	contractInstance *contracts.EVMLoadSimulator,
-) (*types.Transaction, error) {
+type largeEventTxBuilder struct {
+	contract *contracts.EVMLoadSimulator
+}
+
+func (l largeEventTxBuilder) Build(wallet *Wallet) (*types.Transaction, error) {
 	txOpts, err := NewTxOpts(
 		wallet.PrivKey(),
 		wallet.ChainID(),
@@ -316,13 +325,14 @@ func buildLargeEventTx(
 		return nil, fmt.Errorf("failed to create tx opts: %w", err)
 	}
 	const maxEventSize = 100
-	return contractInstance.SimulateLargeEvent(txOpts, big.NewInt(maxEventSize))
+	return l.contract.SimulateLargeEvent(txOpts, big.NewInt(maxEventSize))
 }
 
-func buildExternalCallTx(
-	wallet *Wallet,
-	contractInstance *contracts.EVMLoadSimulator,
-) (*types.Transaction, error) {
+type externalCallTxBuilder struct {
+	contract *contracts.EVMLoadSimulator
+}
+
+func (e externalCallTxBuilder) Build(wallet *Wallet) (*types.Transaction, error) {
 	txOpts, err := NewTxOpts(
 		wallet.PrivKey(),
 		wallet.ChainID(),
@@ -332,11 +342,5 @@ func buildExternalCallTx(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tx opts: %w", err)
 	}
-	return contractInstance.SimulateExternalCall(txOpts)
-}
-
-type txType struct {
-	txFunc func(*Wallet, *contracts.EVMLoadSimulator) (*types.Transaction, error)
-	name   string
-	weight uint64
+	return e.contract.SimulateExternalCall(txOpts)
 }

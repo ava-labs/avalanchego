@@ -83,7 +83,8 @@ func main() {
 		contract, err := createContract(ctx, client, wallet)
 		require.NoError(err)
 
-		txBuilder := load2.WithContractInstance(load2.BuildRandomTx, contract)
+		txBuilder, err := load2.NewRandomTxBuilder(contract)
+		require.NoError(err)
 
 		wallets[i] = wallet
 		txBuilders[i] = txBuilder
