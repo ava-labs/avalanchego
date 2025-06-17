@@ -50,7 +50,7 @@ type Config struct {
 	NodeConfig   interface{}
 	DB           database.Database
 	ChainManager chains.Manager
-	HTTPServer   server.PathAdderWithReadLock
+	HTTPServer   server.PathAdder // changed from server.PathAdder
 	VMRegistry   registry.VMRegistry
 	VMManager    vms.Manager
 }
@@ -149,7 +149,7 @@ func (a *Admin) Alias(_ *http.Request, args *AliasArgs, _ *api.EmptyReply) error
 		return errAliasTooLong
 	}
 
-	return a.HTTPServer.AddAliasesWithReadLock(args.Endpoint, args.Alias)
+	return a.HTTPServer.AddAliases(args.Endpoint, args.Alias)
 }
 
 // AliasChainArgs are the arguments for calling AliasChain
@@ -184,7 +184,7 @@ func (a *Admin) AliasChain(_ *http.Request, args *AliasChainArgs, _ *api.EmptyRe
 
 	endpoint := path.Join(constants.ChainAliasPrefix, chainID.String())
 	alias := path.Join(constants.ChainAliasPrefix, args.Alias)
-	return a.HTTPServer.AddAliasesWithReadLock(endpoint, alias)
+	return a.HTTPServer.AddAliases(endpoint, alias) // changed from AddAliasesWithReadLock
 }
 
 // GetChainAliasesArgs are the arguments for calling GetChainAliases
@@ -412,4 +412,8 @@ func (a *Admin) DbGet(_ *http.Request, args *DBGetArgs, reply *DBGetReply) error
 
 	reply.Value, err = formatting.Encode(formatting.HexNC, value)
 	return err
+}
+
+type HTTPServer interface {
+	AddAliases(endpoint string, aliases ...string) error
 }

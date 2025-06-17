@@ -72,7 +72,7 @@ type InfoServiceClient interface {
 	GetNetworkName(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.GetNetworkNameReply], error)
 	GetBlockchainID(context.Context, *connect_go.Request[v1.GetBlockchainIDArgs]) (*connect_go.Response[v1.GetBlockchainIDReply], error)
 	Peers(context.Context, *connect_go.Request[v1.PeersArgs]) (*connect_go.Response[v1.PeersReply], error)
-	IsBootstrapped(context.Context, *connect_go.Request[v1.IsBootstrappedResponse]) (*connect_go.Response[v1.IsBootstrappedResponse], error)
+	IsBootstrapped(context.Context, *connect_go.Request[v1.IsBootstrappedArgs]) (*connect_go.Response[v1.IsBootstrappedResponse], error)
 	Upgrades(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.UpgradesReply], error)
 	Uptime(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.UptimeResponse], error)
 	GetVMs(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.GetVMsReply], error)
@@ -123,7 +123,7 @@ func NewInfoServiceClient(httpClient connect_go.HTTPClient, baseURL string, opts
 			baseURL+InfoServicePeersProcedure,
 			opts...,
 		),
-		isBootstrapped: connect_go.NewClient[v1.IsBootstrappedResponse, v1.IsBootstrappedResponse](
+		isBootstrapped: connect_go.NewClient[v1.IsBootstrappedArgs, v1.IsBootstrappedResponse](
 			httpClient,
 			baseURL+InfoServiceIsBootstrappedProcedure,
 			opts...,
@@ -155,7 +155,7 @@ type infoServiceClient struct {
 	getNetworkName  *connect_go.Client[emptypb.Empty, v1.GetNetworkNameReply]
 	getBlockchainID *connect_go.Client[v1.GetBlockchainIDArgs, v1.GetBlockchainIDReply]
 	peers           *connect_go.Client[v1.PeersArgs, v1.PeersReply]
-	isBootstrapped  *connect_go.Client[v1.IsBootstrappedResponse, v1.IsBootstrappedResponse]
+	isBootstrapped  *connect_go.Client[v1.IsBootstrappedArgs, v1.IsBootstrappedResponse]
 	upgrades        *connect_go.Client[emptypb.Empty, v1.UpgradesReply]
 	uptime          *connect_go.Client[emptypb.Empty, v1.UptimeResponse]
 	getVMs          *connect_go.Client[emptypb.Empty, v1.GetVMsReply]
@@ -197,7 +197,7 @@ func (c *infoServiceClient) Peers(ctx context.Context, req *connect_go.Request[v
 }
 
 // IsBootstrapped calls info.v1.InfoService.IsBootstrapped.
-func (c *infoServiceClient) IsBootstrapped(ctx context.Context, req *connect_go.Request[v1.IsBootstrappedResponse]) (*connect_go.Response[v1.IsBootstrappedResponse], error) {
+func (c *infoServiceClient) IsBootstrapped(ctx context.Context, req *connect_go.Request[v1.IsBootstrappedArgs]) (*connect_go.Response[v1.IsBootstrappedResponse], error) {
 	return c.isBootstrapped.CallUnary(ctx, req)
 }
 
@@ -225,7 +225,7 @@ type InfoServiceHandler interface {
 	GetNetworkName(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.GetNetworkNameReply], error)
 	GetBlockchainID(context.Context, *connect_go.Request[v1.GetBlockchainIDArgs]) (*connect_go.Response[v1.GetBlockchainIDReply], error)
 	Peers(context.Context, *connect_go.Request[v1.PeersArgs]) (*connect_go.Response[v1.PeersReply], error)
-	IsBootstrapped(context.Context, *connect_go.Request[v1.IsBootstrappedResponse]) (*connect_go.Response[v1.IsBootstrappedResponse], error)
+	IsBootstrapped(context.Context, *connect_go.Request[v1.IsBootstrappedArgs]) (*connect_go.Response[v1.IsBootstrappedResponse], error)
 	Upgrades(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.UpgradesReply], error)
 	Uptime(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.UptimeResponse], error)
 	GetVMs(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.GetVMsReply], error)
@@ -353,7 +353,7 @@ func (UnimplementedInfoServiceHandler) Peers(context.Context, *connect_go.Reques
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("info.v1.InfoService.Peers is not implemented"))
 }
 
-func (UnimplementedInfoServiceHandler) IsBootstrapped(context.Context, *connect_go.Request[v1.IsBootstrappedResponse]) (*connect_go.Response[v1.IsBootstrappedResponse], error) {
+func (UnimplementedInfoServiceHandler) IsBootstrapped(context.Context, *connect_go.Request[v1.IsBootstrappedArgs]) (*connect_go.Response[v1.IsBootstrappedResponse], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("info.v1.InfoService.IsBootstrapped is not implemented"))
 }
 

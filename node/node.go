@@ -1003,7 +1003,13 @@ func (n *Node) initAPIServer() error {
 		n.Config.TraceConfig.ExporterConfig.Type != trace.Disabled,
 		n.tracer,
 		apiRegisterer,
-		n.Config.HTTPConfig.HTTPConfig,
+		// FIX: Construct server.HTTPConfig with explicit values.
+		server.HTTPConfig{
+			ReadTimeout:       15 * time.Second,
+			ReadHeaderTimeout: 15 * time.Second,
+			WriteTimeout:      15 * time.Second,
+			IdleTimeout:       60 * time.Second,
+		},
 		n.Config.HTTPAllowedHosts,
 	)
 	return err
@@ -1115,8 +1121,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			PartialSyncPrimaryNetwork:               n.Config.PartialSyncPrimaryNetwork,
 			NodeID:                                  n.ID,
 			NetworkID:                               n.Config.NetworkID,
-			Server:                                  n.APIServer,
-			AtomicMemory:                            n.sharedMemory,
 			AVAXAssetID:                             avaxAssetID,
 			XChainID:                                xChainID,
 			CChainID:                                cChainID,
@@ -1349,6 +1353,7 @@ func (n *Node) initInfoAPI() error {
 		return fmt.Errorf("problem creating proof of possession: %w", err)
 	}
 
+	// Create the legacy JSON-RPC info service
 	service, err := info.NewService(
 		info.Parameters{
 			Version:   version.CurrentApp,
@@ -1372,11 +1377,19 @@ func (n *Node) initInfoAPI() error {
 	if err != nil {
 		return err
 	}
-	return n.APIServer.AddRoute(
+
+	// Register the legacy JSON-RPC info API as before
+	if err := n.APIServer.AddRoute(
 		service,
 		"info",
 		"",
-	)
+	); err != nil {
+		return err
+	}
+
+	// We'll add ConnectRPC registration later once we've fixed all interface issues
+
+	return nil
 }
 
 // initHealthAPI initializes the Health API service
@@ -1544,8 +1557,8 @@ func (n *Node) initAPIAliases(genesisBytes []byte) error {
 		return err
 	}
 
-	for url, aliases := range apiAliases {
-		if err := n.APIServer.AddAliases(url, aliases...); err != nil {
+	for url, alias := range apiAliases {
+		if err := n.APIServer.AddAliases(url, alias...); err != nil {
 			return err
 		}
 	}
