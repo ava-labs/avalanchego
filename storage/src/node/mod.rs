@@ -275,7 +275,7 @@ impl Node {
                     for (_, child) in child_iter {
                         if let Child::AddressWithHash(address, hash) = child {
                             encoded.extend_from_slice(&address.get().to_ne_bytes());
-                            encoded.extend_from_slice(&hash.serialized_bytes());
+                            hash.write_to(encoded);
                         } else {
                             panic!(
                                 "attempt to serialize to persist a branch with a child that is not an AddressWithHash"
@@ -289,7 +289,7 @@ impl Node {
                             .expect("writing to vec should succeed");
                         if let Child::AddressWithHash(address, hash) = child {
                             encoded.extend_from_slice(&address.get().to_ne_bytes());
-                            encoded.extend_from_slice(&hash.serialized_bytes());
+                            hash.write_to(encoded);
                         } else {
                             panic!(
                                 "attempt to serialize to persist a branch with a child that is not an AddressWithHash"

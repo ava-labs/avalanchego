@@ -5,6 +5,7 @@ use serde::ser::SerializeStruct as _;
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 
+use crate::node::ExtendableBytes;
 use crate::{LeafNode, LinearAddress, Node, Path};
 use std::fmt::{Debug, Formatter};
 
@@ -19,7 +20,8 @@ pub type HashType = ethhash::HashOrRlp;
 pub type HashType = crate::TrieHash;
 
 pub(crate) trait Serializable {
-    fn serialized_bytes(&self) -> Vec<u8>;
+    fn write_to<W: ExtendableBytes>(&self, vec: &mut W);
+
     fn from_reader<R: std::io::Read>(reader: R) -> Result<Self, std::io::Error>
     where
         Self: Sized;
@@ -49,6 +51,7 @@ mod ethhash {
     };
 
     use crate::TrieHash;
+    use crate::node::ExtendableBytes;
 
     use super::Serializable;
 
@@ -71,17 +74,17 @@ mod ethhash {
     }
 
     impl Serializable for HashOrRlp {
-        fn serialized_bytes(&self) -> Vec<u8> {
+        fn write_to<W: ExtendableBytes>(&self, vec: &mut W) {
             match self {
-                HashOrRlp::Hash(h) => std::iter::once(0)
-                    .chain(h.as_ref().iter().copied())
-                    .collect(),
+                HashOrRlp::Hash(h) => {
+                    vec.push(0);
+                    vec.extend_from_slice(h.as_ref());
+                }
                 HashOrRlp::Rlp(r) => {
                     debug_assert!(!r.is_empty());
                     debug_assert!(r.len() < 32);
-                    std::iter::once(r.len() as u8)
-                        .chain(r.iter().copied())
-                        .collect()
+                    vec.push(r.len() as u8);
+                    vec.extend_from_slice(r.as_ref());
                 }
             }
         }
