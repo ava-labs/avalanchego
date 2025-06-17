@@ -78,7 +78,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
 	databasefactory "github.com/ava-labs/avalanchego/database/factory"
-	blssigner "github.com/ava-labs/avalanchego/utils/crypto/bls/signer"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
 	coreth "github.com/ava-labs/coreth/plugin/evm"
@@ -135,7 +134,7 @@ func New(
 		Config:           config,
 	}
 
-	n.StakingSigner, err = blssigner.NewStakingSigner(config.StakingSignerConfig)
+	n.StakingSigner, err = NewStakingSigner(config.StakingSignerConfig)
 	if err != nil {
 		return nil, fmt.Errorf("problem initializing staking signer: %w", err)
 	}

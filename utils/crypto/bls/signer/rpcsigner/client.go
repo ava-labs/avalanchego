@@ -47,8 +47,8 @@ func NewClient(ctx context.Context, url string) (*Client, error) {
 	pubkeyResponse, err := client.PublicKey(ctx, &pb.PublicKeyRequest{})
 	if err != nil {
 		return nil, errors.Join(
-		    fmt.Errorf("failed to get pubkey response: %w", err),
-		    conn.Close(),
+			fmt.Errorf("failed to get pubkey response: %w", err),
+			conn.Close(),
 		)
 	}
 
