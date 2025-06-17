@@ -16,8 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-const pingFrequency = time.Millisecond
-
 type Tracker struct {
 	lock sync.RWMutex
 
@@ -51,15 +49,17 @@ func (t *Tracker) TotalGasUsed() uint64 {
 type TxBuilder func(*Wallet) (*types.Transaction, error)
 
 type Generator struct {
-	log        logging.Logger
-	wallets    []*Wallet
-	txBuilders []TxBuilder
+	log           logging.Logger
+	wallets       []*Wallet
+	txBuilders    []TxBuilder
+	pingFrequency time.Duration
 }
 
 func NewGenerator(
 	log logging.Logger,
 	wallets []*Wallet,
 	txBuilders []TxBuilder,
+	pingFrequency time.Duration,
 ) (Generator, error) {
 	if len(wallets) != len(txBuilders) {
 		return Generator{}, fmt.Errorf(
@@ -70,9 +70,10 @@ func NewGenerator(
 	}
 
 	return Generator{
-		log:        log,
-		wallets:    wallets,
-		txBuilders: txBuilders,
+		log:           log,
+		wallets:       wallets,
+		txBuilders:    txBuilders,
+		pingFrequency: pingFrequency,
 	}, nil
 }
 
@@ -99,7 +100,7 @@ func (g Generator) Run(ctx context.Context) error {
 				if err := g.wallets[i].SendTx(
 					childCtx,
 					tx,
-					pingFrequency,
+					g.pingFrequency,
 					func(d time.Duration) {
 						tracker.Issue(d)
 					},
