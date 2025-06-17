@@ -1,6 +1,37 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+#![expect(
+    clippy::unnecessary_wraps,
+    reason = "Found 2 occurrences after enabling the lint."
+)]
+#![cfg_attr(
+    feature = "ethhash",
+    expect(
+        clippy::used_underscore_binding,
+        reason = "Found 1 occurrences after enabling the lint."
+    )
+)]
+#![cfg_attr(
+    not(feature = "ethhash"),
+    expect(
+        clippy::unused_self,
+        reason = "Found 1 occurrences after enabling the lint."
+    )
+)]
+#![expect(
+    clippy::cast_precision_loss,
+    reason = "Found 2 occurrences after enabling the lint."
+)]
+#![expect(
+    clippy::default_trait_access,
+    reason = "Found 3 occurrences after enabling the lint."
+)]
+#![expect(
+    clippy::needless_pass_by_value,
+    reason = "Found 1 occurrences after enabling the lint."
+)]
+
 use std::collections::{HashMap, VecDeque};
 use std::num::NonZero;
 use std::path::PathBuf;
@@ -82,9 +113,10 @@ impl RevisionManager {
             truncate,
             config.cache_read_strategy,
         )?);
-        let nodestore = match truncate {
-            true => Arc::new(NodeStore::new_empty_committed(storage.clone())?),
-            false => Arc::new(NodeStore::open(storage.clone())?),
+        let nodestore = if truncate {
+            Arc::new(NodeStore::new_empty_committed(storage.clone())?)
+        } else {
+            Arc::new(NodeStore::open(storage.clone())?)
         };
         let mut manager = Self {
             max_revisions: config.max_revisions,
@@ -219,7 +251,7 @@ impl RevisionManager {
             .retain(|p| !Arc::ptr_eq(&proposal, p) && Arc::strong_count(p) > 1);
 
         // then reparent any proposals that have this proposal as a parent
-        for p in self.proposals.iter() {
+        for p in &self.proposals {
             proposal.commit_reparent(p);
         }
 

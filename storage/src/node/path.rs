@@ -1,6 +1,19 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+#![expect(
+    clippy::arithmetic_side_effects,
+    reason = "Found 8 occurrences after enabling the lint."
+)]
+#![expect(
+    clippy::from_iter_instead_of_collect,
+    reason = "Found 1 occurrences after enabling the lint."
+)]
+#![expect(
+    clippy::inline_always,
+    reason = "Found 1 occurrences after enabling the lint."
+)]
+
 // TODO: remove bitflags, we only use one bit
 use bitflags::bitflags;
 use serde::{Deserialize, Serialize};
@@ -17,7 +30,7 @@ pub struct Path(pub SmallVec<[u8; 64]>);
 
 impl Debug for Path {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        for nib in self.0.iter() {
+        for nib in &self.0 {
             if *nib > 0xf {
                 write!(f, "[invalid {:02x}] ", *nib)?;
             } else {
@@ -75,13 +88,14 @@ impl Path {
     }
 
     /// Creates an empty Path
+    #[must_use]
     pub fn new() -> Self {
         Path(SmallVec::new())
     }
 
     /// Read from an iterator that returns nibbles with a prefix
     /// The prefix is one optional byte -- if not present, the Path is empty
-    /// If there is one byte, and the byte contains a [Flags::ODD_LEN] (0x1)
+    /// If there is one byte, and the byte contains a [`Flags::ODD_LEN`] (0x1)
     /// then there is another discarded byte after that.
     #[cfg(test)]
     pub fn from_encoded_iter<Iter: Iterator<Item = u8>>(mut iter: Iter) -> Self {
@@ -96,11 +110,12 @@ impl Path {
 
     /// Add nibbles to the end of a path
     pub fn extend<T: IntoIterator<Item = u8>>(&mut self, iter: T) {
-        self.0.extend(iter)
+        self.0.extend(iter);
     }
 
     /// Create an iterator that returns the bytes from the underlying nibbles
     /// If there is an odd nibble at the end, it is dropped
+    #[must_use]
     pub fn bytes_iter(&self) -> BytesIterator<'_> {
         BytesIterator {
             nibbles_iter: self.iter(),
@@ -108,6 +123,7 @@ impl Path {
     }
 
     /// Create a boxed set of bytes from the Path
+    #[must_use]
     pub fn bytes(&self) -> Box<[u8]> {
         self.bytes_iter().collect()
     }
@@ -204,6 +220,7 @@ impl<'a> NibblesIterator<'a> {
 
     /// Returns a new `NibblesIterator` over the given `data`.
     /// Each byte in `data` is converted to two nibbles.
+    #[must_use]
     pub const fn new(data: &'a [u8]) -> Self {
         NibblesIterator {
             data,
@@ -239,6 +256,8 @@ impl DoubleEndedIterator for NibblesIterator<'_> {
 
 #[cfg(test)]
 mod test {
+    #![expect(clippy::needless_pass_by_value)]
+
     use super::*;
     use std::fmt::Debug;
     use test_case::test_case;

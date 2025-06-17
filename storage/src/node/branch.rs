@@ -1,6 +1,23 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+#![expect(
+    clippy::cast_possible_truncation,
+    reason = "Found 2 occurrences after enabling the lint."
+)]
+#![expect(
+    clippy::indexing_slicing,
+    reason = "Found 2 occurrences after enabling the lint."
+)]
+#![expect(
+    clippy::match_same_arms,
+    reason = "Found 1 occurrences after enabling the lint."
+)]
+#![expect(
+    clippy::missing_panics_doc,
+    reason = "Found 2 occurrences after enabling the lint."
+)]
+
 use serde::ser::SerializeStruct as _;
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
@@ -11,12 +28,12 @@ use std::fmt::{Debug, Formatter};
 
 /// The type of a hash. For ethereum compatible hashes, this might be a RLP encoded
 /// value if it's small enough to fit in less than 32 bytes. For merkledb compatible
-/// hashes, it's always a TrieHash.
+/// hashes, it's always a `TrieHash`.
 #[cfg(feature = "ethhash")]
 pub type HashType = ethhash::HashOrRlp;
 
 #[cfg(not(feature = "ethhash"))]
-/// The type of a hash. For non-ethereum compatible hashes, this is always a TrieHash.
+/// The type of a hash. For non-ethereum compatible hashes, this is always a `TrieHash`.
 pub type HashType = crate::TrieHash;
 
 pub(crate) trait Serializable {
@@ -47,7 +64,6 @@ mod ethhash {
     use std::{
         fmt::{Display, Formatter},
         io::Read,
-        ops::Deref as _,
     };
 
     use crate::TrieHash;
@@ -65,7 +81,7 @@ mod ethhash {
 
     impl HashOrRlp {
         pub fn as_slice(&self) -> &[u8] {
-            self.deref()
+            self
         }
 
         pub(crate) fn into_triehash(self) -> TrieHash {
@@ -147,7 +163,7 @@ mod ethhash {
         fn deref(&self) -> &Self::Target {
             match self {
                 HashOrRlp::Hash(h) => h,
-                HashOrRlp::Rlp(r) => r.deref(),
+                HashOrRlp::Rlp(r) => r,
             }
         }
     }
@@ -155,7 +171,7 @@ mod ethhash {
     impl Display for HashOrRlp {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
             match self {
-                HashOrRlp::Hash(h) => write!(f, "{}", h),
+                HashOrRlp::Hash(h) => write!(f, "{h}"),
                 HashOrRlp::Rlp(r) => {
                     let width = f.precision().unwrap_or(32);
                     write!(f, "{:.*}", width, hex::encode(r))
@@ -182,8 +198,8 @@ pub struct BranchNode {
 
     /// The children of this branch.
     /// Element i is the child at index i, or None if there is no child at that index.
-    /// Each element is (child_hash, child_address).
-    /// child_address is None if we don't know the child's hash.
+    /// Each element is (`child_hash`, `child_address`).
+    /// `child_address` is None if we don't know the child's hash.
     pub children: [Option<Child>; Self::MAX_CHILDREN],
 }
 
@@ -230,7 +246,7 @@ impl<'de> Deserialize<'de> for BranchNode {
 
         let mut children: [Option<Child>; BranchNode::MAX_CHILDREN] =
             [const { None }; BranchNode::MAX_CHILDREN];
-        for (offset, addr, hash) in s.children.iter() {
+        for (offset, addr, hash) in &s.children {
             children[*offset as usize] = Some(Child::AddressWithHash(*addr, hash.clone()));
         }
 
@@ -252,7 +268,7 @@ impl Debug for BranchNode {
                 None => {}
                 Some(Child::Node(_)) => {} //TODO
                 Some(Child::AddressWithHash(addr, hash)) => {
-                    write!(f, "({i:?}: address={addr:?} hash={})", hash)?
+                    write!(f, "({i:?}: address={addr:?} hash={hash})")?;
                 }
             }
         }
@@ -269,16 +285,17 @@ impl Debug for BranchNode {
 }
 
 impl BranchNode {
-    /// The maximum number of children in a [BranchNode]
+    /// The maximum number of children in a [`BranchNode`]
     #[cfg(feature = "branch_factor_256")]
     pub const MAX_CHILDREN: usize = 256;
 
-    /// The maximum number of children in a [BranchNode]
+    /// The maximum number of children in a [`BranchNode`]
     #[cfg(not(feature = "branch_factor_256"))]
     pub const MAX_CHILDREN: usize = 16;
 
     /// Returns the address of the child at the given index.
-    /// Panics if `child_index` >= [BranchNode::MAX_CHILDREN].
+    /// Panics if `child_index` >= [`BranchNode::MAX_CHILDREN`].
+    #[must_use]
     pub fn child(&self, child_index: u8) -> &Option<Child> {
         self.children
             .get(child_index as usize)

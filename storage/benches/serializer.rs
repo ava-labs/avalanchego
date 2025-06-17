@@ -1,6 +1,15 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+#![expect(
+    clippy::assigning_clones,
+    reason = "Found 1 occurrences after enabling the lint."
+)]
+#![expect(
+    clippy::unwrap_used,
+    reason = "Found 7 occurrences after enabling the lint."
+)]
+
 use std::array::from_fn;
 use std::fs::File;
 use std::num::NonZeroU64;
@@ -65,14 +74,14 @@ fn leaf(c: &mut Criterion) {
     group.bench_with_input("serde", &input, |b, input| {
         b.iter(|| {
             serializer.serialize(input).unwrap();
-        })
+        });
     });
 
     group.bench_with_input("manual", &input, |b, input| {
         b.iter(|| {
             let mut bytes = Vec::<u8>::new();
             input.as_bytes(0, &mut bytes);
-        })
+        });
     });
     group.finish();
 }
@@ -97,14 +106,14 @@ fn branch(c: &mut Criterion) {
     let serde_serializer = |b: &mut criterion::Bencher, input: &firewood_storage::Node| {
         b.iter(|| {
             serializer.serialize(input).unwrap();
-        })
+        });
     };
 
     let manual_serializer = |b: &mut criterion::Bencher, input: &firewood_storage::Node| {
         b.iter(|| {
             let mut bytes = Vec::new();
             input.as_bytes(0, &mut bytes);
-        })
+        });
     };
 
     group.bench_with_input("serde", &input, serde_serializer);

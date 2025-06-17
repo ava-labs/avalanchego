@@ -37,20 +37,12 @@ criterion = {version = "0.6.0", features = ["async_tokio"]}
 rand = "0.9.1"
 rand_distr = "0.5.0"
 
-[lints.rust]
-unsafe_code = "deny"
-
 [[bench]]
 name = "insert"
 harness = false
 
-[lints.clippy]
-unwrap_used = "warn"
-indexing_slicing = "warn"
-explicit_deref_methods = "warn"
-missing_const_for_fn = "warn"
-arithmetic_side_effects = "warn"
-
 [package.metadata.cargo-machete]
 ignored = ["prost", "tonic_build"]
 
+[lints]
+workspace = true

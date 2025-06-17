@@ -6,6 +6,15 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+#![expect(
+    clippy::arithmetic_side_effects,
+    reason = "Found 5 occurrences after enabling the lint."
+)]
+#![expect(
+    clippy::indexing_slicing,
+    reason = "Found 1 occurrences after enabling the lint."
+)]
+
 use criterion::{Criterion, criterion_group, criterion_main};
 use ethereum_types::H256;
 use firewood_triehash::trie_root;
@@ -78,7 +87,7 @@ fn bench_insertions(c: &mut Criterion) {
         for _ in 0..1000 {
             let k = random_bytes(6, 0, &mut seed);
             let v = random_value(&mut seed);
-            d.push((k, v))
+            d.push((k, v));
         }
         b.iter(|| trie_root::<KeccakHasher, _, _, _>(d.clone()));
     });
@@ -90,7 +99,7 @@ fn bench_insertions(c: &mut Criterion) {
         for _ in 0..1000 {
             let k = random_word(alphabet, 6, 0, &mut seed);
             let v = random_value(&mut seed);
-            d.push((k, v))
+            d.push((k, v));
         }
         b.iter(|| trie_root::<KeccakHasher, _, _, _>(d.clone()));
     });
@@ -102,7 +111,7 @@ fn bench_insertions(c: &mut Criterion) {
         for _ in 0..1000 {
             let k = random_word(alphabet, 1, 5, &mut seed);
             let v = random_value(&mut seed);
-            d.push((k, v))
+            d.push((k, v));
         }
         b.iter(|| trie_root::<KeccakHasher, _, _, _>(d.clone()));
     });
@@ -114,7 +123,7 @@ fn bench_insertions(c: &mut Criterion) {
         for _ in 0..1000 {
             let k = random_word(alphabet, 6, 0, &mut seed);
             let v = random_value(&mut seed);
-            d.push((k, v))
+            d.push((k, v));
         }
         b.iter(|| trie_root::<KeccakHasher, _, _, _>(d.clone()));
     });

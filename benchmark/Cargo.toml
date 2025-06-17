@@ -42,3 +42,6 @@ tikv-jemallocator = "0.6.0"
 
 [features]
 logger = ["firewood/logger"]
+
+[lints]
+workspace = true

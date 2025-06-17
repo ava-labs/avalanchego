@@ -10,14 +10,14 @@ use async_trait::async_trait;
 use futures::Stream;
 use std::sync::Arc;
 
-/// An EmptyDb is a simple implementation of api::Db
+/// An `EmptyDb` is a simple implementation of `api::Db`
 /// that doesn't store any data. It contains a single
-/// HistoricalImpl that has no keys or values
+/// `HistoricalImpl` that has no keys or values
 #[derive(Debug)]
 pub struct EmptyDb;
 
-/// HistoricalImpl is always empty, and there is only one,
-/// since nothing can be committed to an EmptyDb.
+/// `HistoricalImpl` is always empty, and there is only one,
+/// since nothing can be committed to an `EmptyDb`.
 #[derive(Debug)]
 pub struct HistoricalImpl;
 

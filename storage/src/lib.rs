@@ -1,15 +1,16 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
+
 #![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 #![deny(unsafe_code)]
 
-//! # storage implements the storage of a [Node] on top of a LinearStore
+//! # storage implements the storage of a [Node] on top of a `LinearStore`
 //!
-//! Nodes are stored at a [LinearAddress] within a [ReadableStorage].
+//! Nodes are stored at a [`LinearAddress`] within a [`ReadableStorage`].
 //!
-//! The [NodeStore] maintains a free list and the [LinearAddress] of a root node.
+//! The [`NodeStore`] maintains a free list and the [`LinearAddress`] of a root node.
 //!
-//! A [NodeStore] is backed by a [ReadableStorage] which is persisted storage.
+//! A [`NodeStore`] is backed by a [`ReadableStorage`] which is persisted storage.
 
 mod hashednode;
 mod hashers;
@@ -65,6 +66,11 @@ impl std::fmt::Display for CacheReadStrategy {
 ///
 /// This function is slow, so callers should cache the result
 #[cfg(feature = "ethhash")]
+#[must_use]
+#[expect(
+    clippy::missing_panics_doc,
+    reason = "Found 1 occurrences after enabling the lint."
+)]
 pub fn empty_trie_hash() -> TrieHash {
     use sha3::Digest as _;
 

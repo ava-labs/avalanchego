@@ -10,6 +10,23 @@
 //!
 //! This module should be used to generate trie root hash.
 
+#![expect(
+    clippy::arithmetic_side_effects,
+    reason = "Found 7 occurrences after enabling the lint."
+)]
+#![expect(
+    clippy::bool_to_int_with_if,
+    reason = "Found 1 occurrences after enabling the lint."
+)]
+#![expect(
+    clippy::cast_possible_truncation,
+    reason = "Found 1 occurrences after enabling the lint."
+)]
+#![expect(
+    clippy::indexing_slicing,
+    reason = "Found 13 occurrences after enabling the lint."
+)]
+
 use std::cmp;
 use std::collections::BTreeMap;
 use std::iter::once;
@@ -155,7 +172,7 @@ fn hex_prefix_encode(nibbles: &[u8], leaf: bool) -> impl Iterator<Item = u8> + '
     let oddness_factor = inlen % 2;
 
     let first_byte = {
-        let mut bits = ((inlen as u8 & 1) + (2 * leaf as u8)) << 4;
+        let mut bits = ((inlen as u8 & 1) + (2 * u8::from(leaf))) << 4;
         if oddness_factor == 1 {
             bits += nibbles[0];
         }

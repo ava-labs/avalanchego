@@ -25,6 +25,6 @@ jobs:
           save-if: "false"
           shared-key: "debug-no-features"
       - name: Check
-        run: cargo check --workspace --tests --examples --benches
+        run: cargo check --workspace --all-targets
       - name: Build
-        run: cargo build --workspace --tests --examples --benches
+        run: cargo build --workspace --all-targets

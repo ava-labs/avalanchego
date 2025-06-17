@@ -38,12 +38,5 @@ assert_cmd = "2.0.13"
 predicates = "3.1.0"
 serial_test = "3.0.0"
 
-[lints.rust]
-unsafe_code = "deny"
-
-[lints.clippy]
-unwrap_used = "warn"
-indexing_slicing = "warn"
-explicit_deref_methods = "warn"
-missing_const_for_fn = "warn"
-arithmetic_side_effects = "warn"
+[lints]
+workspace = true

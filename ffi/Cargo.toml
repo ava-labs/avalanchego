@@ -38,10 +38,5 @@ ethhash = ["firewood/ethhash"]
 [build-dependencies]
 cbindgen = "0.29.0"
 
-[lints.clippy]
-unwrap_used = "warn"
-indexing_slicing = "warn"
-explicit_deref_methods = "warn"
-missing_const_for_fn = "warn"
-pedantic = "warn"
-arithmetic_side_effects = "warn"
+[lints]
+workspace = true

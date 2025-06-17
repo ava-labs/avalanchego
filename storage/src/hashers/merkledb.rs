@@ -1,6 +1,21 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+#![cfg_attr(
+    not(feature = "ethhash"),
+    expect(
+        clippy::arithmetic_side_effects,
+        reason = "Found 1 occurrences after enabling the lint."
+    )
+)]
+#![cfg_attr(
+    not(feature = "ethhash"),
+    expect(
+        clippy::cast_possible_truncation,
+        reason = "Found 1 occurrences after enabling the lint."
+    )
+)]
+
 use crate::hashednode::{HasUpdate, Hashable, Preimage};
 use crate::{TrieHash, ValueDigest};
 /// Merkledb compatible hashing algorithm.
@@ -12,7 +27,7 @@ const BITS_PER_NIBBLE: u64 = 4;
 
 impl HasUpdate for Sha256 {
     fn update<T: AsRef<[u8]>>(&mut self, data: T) {
-        sha2::Digest::update(self, data)
+        sha2::Digest::update(self, data);
     }
 }
 

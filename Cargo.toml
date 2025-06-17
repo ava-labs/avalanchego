@@ -18,3 +18,15 @@ codegen-units = 1
 lto = "fat"
 debug = false
 inherits = "release"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+unwrap_used = "warn"
+indexing_slicing = "warn"
+explicit_deref_methods = "warn"
+missing_const_for_fn = "warn"
+arithmetic_side_effects = "warn"
+# lower the priority of pedantic to allow overriding the lints it includes
+pedantic = { level = "warn", priority = -1 }

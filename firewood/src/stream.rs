@@ -1,6 +1,19 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+#![expect(
+    clippy::cast_possible_truncation,
+    reason = "Found 1 occurrences after enabling the lint."
+)]
+#![expect(
+    clippy::unnecessary_wraps,
+    reason = "Found 1 occurrences after enabling the lint."
+)]
+#![expect(
+    clippy::used_underscore_binding,
+    reason = "Found 3 occurrences after enabling the lint."
+)]
+
 use crate::merkle::{Key, Value};
 use crate::v2::api;
 
@@ -49,13 +62,13 @@ impl std::fmt::Debug for IterationNode {
 
 #[derive(Debug)]
 enum NodeStreamState {
-    /// The iterator state is lazily initialized when poll_next is called
+    /// The iterator state is lazily initialized when `poll_next` is called
     /// for the first time. The iteration start key is stored here.
     StartFromKey(Key),
     Iterating {
         /// Each element is a node that will be visited (i.e. returned)
         /// or has been visited but has unvisited children.
-        /// On each call to poll_next we pop the next element.
+        /// On each call to `poll_next` we pop the next element.
         /// If it's unvisited, we visit it.
         /// If it's visited, we push its next child onto this stack.
         iter_stack: Vec<IterationNode>,
@@ -285,7 +298,7 @@ fn get_iterator_intial_state<T: TrieReader>(
 
 #[derive(Debug)]
 enum MerkleKeyValueStreamState<'a, T> {
-    /// The iterator state is lazily initialized when poll_next is called
+    /// The iterator state is lazily initialized when `poll_next` is called
     /// for the first time. The iteration start key is stored here.
     _Uninitialized(Key),
     /// The iterator works by iterating over the nodes in the merkle trie
@@ -329,7 +342,7 @@ impl<T: TrieReader> FusedStream for MerkleKeyValueStream<'_, T> {
 }
 
 impl<'a, T: TrieReader> MerkleKeyValueStream<'a, T> {
-    /// Construct a [MerkleKeyValueStream] that will iterate over all the key-value pairs in `merkle`
+    /// Construct a [`MerkleKeyValueStream`] that will iterate over all the key-value pairs in `merkle`
     /// starting from a particular key
     pub fn from_key<K: AsRef<[u8]>>(merkle: &'a T, key: K) -> Self {
         Self {
@@ -547,9 +560,9 @@ impl<T: TrieReader> Iterator for PathIterator<'_, '_, T> {
 /// Takes in an iterator over a node's partial path and an iterator over the
 /// unmatched portion of a key.
 /// The first returned element is:
-/// * [Ordering::Less] if the node is before the key.
-/// * [Ordering::Equal] if the node is a prefix of the key.
-/// * [Ordering::Greater] if the node is after the key.
+/// * [`Ordering::Less`] if the node is before the key.
+/// * [`Ordering::Equal`] if the node is a prefix of the key.
+/// * [`Ordering::Greater`] if the node is after the key.
 ///
 /// The second returned element is the unmatched portion of the key after the
 /// partial path has been matched.
@@ -649,7 +662,7 @@ mod tests {
         let mut stream = merkle.path_iter(key).unwrap();
         let node = match stream.next() {
             Some(Ok(item)) => item,
-            Some(Err(e)) => panic!("{:?}", e),
+            Some(Err(e)) => panic!("{e:?}"),
             None => {
                 assert!(!should_yield_elt);
                 return;
@@ -680,7 +693,7 @@ mod tests {
 
         let node = match stream.next() {
             Some(Ok(node)) => node,
-            Some(Err(e)) => panic!("{:?}", e),
+            Some(Err(e)) => panic!("{e:?}"),
             None => panic!("unexpected end of iterator"),
         };
         #[cfg(not(feature = "branch_factor_256"))]
@@ -692,7 +705,7 @@ mod tests {
 
         let node = match stream.next() {
             Some(Ok(node)) => node,
-            Some(Err(e)) => panic!("{:?}", e),
+            Some(Err(e)) => panic!("{e:?}"),
             None => panic!("unexpected end of iterator"),
         };
         #[cfg(not(feature = "branch_factor_256"))]
@@ -715,7 +728,7 @@ mod tests {
 
         let node = match stream.next() {
             Some(Ok(node)) => node,
-            Some(Err(e)) => panic!("{:?}", e),
+            Some(Err(e)) => panic!("{e:?}"),
             None => panic!("unexpected end of iterator"),
         };
         #[cfg(not(feature = "branch_factor_256"))]
@@ -742,7 +755,7 @@ mod tests {
 
         let node = match stream.next() {
             Some(Ok(node)) => node,
-            Some(Err(e)) => panic!("{:?}", e),
+            Some(Err(e)) => panic!("{e:?}"),
             None => panic!("unexpected end of iterator"),
         };
         // TODO: make this branch factor 16 compatible
@@ -754,7 +767,7 @@ mod tests {
 
         let node = match stream.next() {
             Some(Ok(node)) => node,
-            Some(Err(e)) => panic!("{:?}", e),
+            Some(Err(e)) => panic!("{e:?}"),
             None => panic!("unexpected end of iterator"),
         };
         #[cfg(not(feature = "branch_factor_256"))]
@@ -1051,9 +1064,7 @@ mod tests {
                         .unwrap()
                         .unwrap(),
                     (expected_key.into_boxed_slice(), expected_value),
-                    "i: {}, j: {}",
-                    i,
-                    j,
+                    "i: {i}, j: {j}",
                 );
             }
         }
@@ -1071,9 +1082,7 @@ mod tests {
                         .unwrap()
                         .unwrap(),
                     (expected_key.into_boxed_slice(), expected_value),
-                    "i: {}, j: {}",
-                    i,
-                    j,
+                    "i: {i}, j: {j}",
                 );
             }
             if i == max {
@@ -1085,8 +1094,7 @@ mod tests {
                         .unwrap()
                         .unwrap(),
                     (vec![i + 1, 0].into_boxed_slice(), vec![i + 1, 0]),
-                    "i: {}",
-                    i,
+                    "i: {i}",
                 );
             }
         }
@@ -1107,13 +1115,13 @@ mod tests {
             key_values.push(last);
         }
 
-        for kv in key_values.iter() {
+        for kv in &key_values {
             merkle.insert(kv, kv.clone().into_boxed_slice()).unwrap();
         }
 
         let mut stream = merkle.key_value_iter();
 
-        for kv in key_values.iter() {
+        for kv in &key_values {
             let next = futures::StreamExt::next(&mut stream)
                 .await
                 .unwrap()
@@ -1192,7 +1200,7 @@ mod tests {
         assert!(key_values[0] < key_values[1]);
         assert!(key_values[1] < key_values[2]);
 
-        for key in key_values.iter() {
+        for key in &key_values {
             merkle.insert(key, key.clone().into_boxed_slice()).unwrap();
         }
 

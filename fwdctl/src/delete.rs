@@ -23,7 +23,7 @@ pub struct Options {
 }
 
 pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
-    log::debug!("deleting key {:?}", opts);
+    log::debug!("deleting key {opts:?}");
     let cfg = DbConfig::builder().truncate(false);
 
     let db = Db::new(opts.db.clone(), cfg.build()).await?;

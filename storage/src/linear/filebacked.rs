@@ -6,6 +6,27 @@
 // object. Instead, we probably should use an IO system that can perform multiple
 // read/write operations at once
 
+#![expect(
+    clippy::arithmetic_side_effects,
+    reason = "Found 5 occurrences after enabling the lint."
+)]
+#![expect(
+    clippy::cast_possible_truncation,
+    reason = "Found 1 occurrences after enabling the lint."
+)]
+#![expect(
+    clippy::indexing_slicing,
+    reason = "Found 3 occurrences after enabling the lint."
+)]
+#![expect(
+    clippy::missing_errors_doc,
+    reason = "Found 1 occurrences after enabling the lint."
+)]
+#![expect(
+    clippy::missing_fields_in_debug,
+    reason = "Found 1 occurrences after enabling the lint."
+)]
+
 use std::fs::{File, OpenOptions};
 use std::io::Read;
 use std::num::NonZero;
@@ -23,7 +44,7 @@ use crate::{CacheReadStrategy, LinearAddress, SharedNode};
 
 use super::{FileIoError, ReadableStorage, WritableStorage};
 
-/// A [ReadableStorage] and [WritableStorage] backed by a file
+/// A [`ReadableStorage`] and [`WritableStorage`] backed by a file
 pub struct FileBacked {
     fd: File,
     filename: PathBuf,
@@ -280,6 +301,8 @@ impl Read for PredictiveReader<'_> {
 
 #[cfg(test)]
 mod test {
+    #![expect(clippy::unwrap_used)]
+
     use super::*;
     use std::io::Write;
     use tempfile::NamedTempFile;

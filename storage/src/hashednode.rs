@@ -1,6 +1,11 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+#![expect(
+    clippy::arithmetic_side_effects,
+    reason = "Found 1 occurrences after enabling the lint."
+)]
+
 use std::{
     iter::{self},
     ops::Deref,
@@ -11,6 +16,7 @@ use smallvec::SmallVec;
 use crate::{BranchNode, HashType, LeafNode, Node, Path};
 
 /// Returns the hash of `node`, which is at the given `path_prefix`.
+#[must_use]
 pub fn hash_node(node: &Node, path_prefix: &Path) -> HashType {
     match node {
         Node::Branch(node) => {
@@ -40,6 +46,7 @@ pub fn hash_node(node: &Node, path_prefix: &Path) -> HashType {
 
 /// Returns the serialized representation of `node` used as the pre-image
 /// when hashing the node. The node is at the given `path_prefix`.
+#[must_use]
 pub fn hash_preimage(node: &Node, path_prefix: &Path) -> Box<[u8]> {
     // Key, 3 options, value digest
     let est_len = node.partial_path().len() + path_prefix.len() + 3 + HashType::default().len();
@@ -85,7 +92,7 @@ impl HasUpdate for SmallVec<[u8; 32]> {
 }
 
 #[derive(Clone, Debug)]
-/// A ValueDigest is either a node's value or the hash of its value.
+/// A `ValueDigest` is either a node's value or the hash of its value.
 pub enum ValueDigest<T> {
     /// The node's value.
     Value(T),

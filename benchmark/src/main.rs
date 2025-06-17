@@ -2,6 +2,18 @@
 // See the file LICENSE.md for licensing terms.
 //
 
+#![expect(
+    clippy::arithmetic_side_effects,
+    reason = "Found 2 occurrences after enabling the lint."
+)]
+#![expect(
+    clippy::cast_possible_truncation,
+    reason = "Found 1 occurrences after enabling the lint."
+)]
+#![expect(
+    clippy::match_same_arms,
+    reason = "Found 1 occurrences after enabling the lint."
+)]
 #![doc = include_str!("../README.md")]
 
 use clap::{Parser, Subcommand, ValueEnum};
@@ -202,9 +214,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         fastrace::set_reporter(reporter, Config::default());
     }
 
-    if args.test_name == TestName::Single && args.global_opts.batch_size > 1000 {
-        panic!("Single test is not designed to handle batch sizes > 1000");
-    }
+    assert!(
+        !(args.test_name == TestName::Single && args.global_opts.batch_size > 1000),
+        "Single test is not designed to handle batch sizes > 1000"
+    );
 
     env_logger::Builder::new()
         .filter_level(match args.global_opts.log_level.as_str() {

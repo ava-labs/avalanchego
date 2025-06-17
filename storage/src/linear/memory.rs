@@ -1,19 +1,33 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+#![expect(
+    clippy::arithmetic_side_effects,
+    reason = "Found 3 occurrences after enabling the lint."
+)]
+#![expect(
+    clippy::cast_possible_truncation,
+    reason = "Found 2 occurrences after enabling the lint."
+)]
+#![expect(
+    clippy::indexing_slicing,
+    reason = "Found 1 occurrences after enabling the lint."
+)]
+
 use super::{FileIoError, ReadableStorage, WritableStorage};
 use metrics::counter;
 use std::io::{Cursor, Read};
 use std::sync::Mutex;
 
 #[derive(Debug, Default)]
-/// An in-memory impelementation of [WritableStorage] and [ReadableStorage]
+/// An in-memory impelementation of [`WritableStorage`] and [`ReadableStorage`]
 pub struct MemStore {
     bytes: Mutex<Vec<u8>>,
 }
 
 impl MemStore {
-    /// Create a new, empty [MemStore]
+    /// Create a new, empty [`MemStore`]
+    #[must_use]
     pub const fn new(bytes: Vec<u8>) -> Self {
         Self {
             bytes: Mutex::new(bytes),

@@ -40,10 +40,9 @@ jobs:
         with:
           shared-key: ${{ matrix.profile-key }}
       - name: Check
-        run: cargo check ${{ matrix.profile-args }} --workspace --tests --examples --benches
+        run: cargo check ${{ matrix.profile-args }} --workspace --all-targets
       - name: Build
-        run: cargo build ${{ matrix.profile-args }} --workspace --tests --examples --benches
-
+        run: cargo build ${{ matrix.profile-args }} --workspace --all-targets
 
   no-rust-cache-lint:
     runs-on: ubuntu-latest
@@ -58,6 +57,35 @@ jobs:
           strict: true
       - name: Format
         run: cargo fmt -- --check
+
+  rust-lint-pr-comments:
+    # caveat emptor: actions-rs/clippy-check can only write comments on pull requests
+    # not originating from a fork.
+    if: github.event_name == 'pull_request' && github.repository == github.event.pull_request.head.repo.full_name
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - profile-key: debug-no-features
+            profile-args: ""
+          - profile-key: debug-ethhash-logger
+            profile-args: "--features ethhash,logger"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: "false"
+          shared-key: ${{ matrix.profile-key }}
+      - uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          name: ${{ matrix.profile-key }}
+          args: ${{ matrix.profile-args }} --workspace --all-targets
 
   rust-lint:
     needs: build
@@ -80,7 +108,7 @@ jobs:
           save-if: "false"
           shared-key: ${{ matrix.profile-key }}
       - name: Clippy
-        run: cargo clippy ${{ matrix.profile-args }} --tests --examples --benches -- -D warnings
+        run: cargo clippy ${{ matrix.profile-args }} --workspace --all-targets -- -D warnings
 
   test:
     needs: build
@@ -191,7 +219,7 @@ jobs:
         working-directory: ffi
         # cgocheck2 is expensive but provides complete pointer checks
         run: GOEXPERIMENT=cgocheck2 TEST_FIREWOOD_HASH_MODE=firewood go test ./...
-      
+
   firewood-ethhash-differential-fuzz:
     needs: build
     runs-on: ubuntu-latest

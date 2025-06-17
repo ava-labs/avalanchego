@@ -10,6 +10,7 @@ pub use log::{debug, error, info, trace, warn};
 
 /// Returns true if the trace log level is enabled
 #[cfg(feature = "logger")]
+#[must_use]
 pub fn trace_enabled() -> bool {
     log::log_enabled!(log::Level::Trace)
 }
@@ -31,9 +32,10 @@ mod noop_logger {
     pub use noop as trace;
     pub use noop as warn;
 
-    /// trace_enabled for a noop logger is always false
+    /// `trace_enabled` for a noop logger is always false
     #[inline]
-    pub fn trace_enabled() -> bool {
+    #[must_use]
+    pub const fn trace_enabled() -> bool {
         false
     }
 }

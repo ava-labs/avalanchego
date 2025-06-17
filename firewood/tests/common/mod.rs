@@ -1,6 +1,15 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+#![expect(
+    clippy::used_underscore_binding,
+    reason = "Found 3 occurrences after enabling the lint."
+)]
+#![expect(
+    clippy::used_underscore_items,
+    reason = "Found 1 occurrences after enabling the lint."
+)]
+
 use std::env::temp_dir;
 use std::fs::remove_file;
 use std::ops::Deref;
@@ -27,6 +36,10 @@ pub struct TestDb {
 
 impl TestDbCreator {
     #[expect(clippy::unwrap_used)]
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "Found 1 occurrences after enabling the lint."
+    )]
     pub async fn _create(self) -> TestDb {
         let path = self.path.clone().unwrap_or_else(|| {
             let mut path: PathBuf = std::env::var_os("CARGO_TARGET_DIR")
@@ -57,7 +70,7 @@ impl Deref for TestDb {
 }
 
 impl TestDb {
-    /// reopen the database, consuming the old TestDb and giving you a new one
+    /// reopen the database, consuming the old `TestDb` and giving you a new one
     pub async fn _reopen(mut self) -> Self {
         let mut creator = self.creator.clone();
         self.preserve_on_drop = true;

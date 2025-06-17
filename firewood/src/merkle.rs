@@ -1,6 +1,27 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+#![expect(
+    clippy::cast_possible_truncation,
+    reason = "Found 5 occurrences after enabling the lint."
+)]
+#![expect(
+    clippy::match_same_arms,
+    reason = "Found 1 occurrences after enabling the lint."
+)]
+#![expect(
+    clippy::missing_errors_doc,
+    reason = "Found 6 occurrences after enabling the lint."
+)]
+#![expect(
+    clippy::missing_panics_doc,
+    reason = "Found 1 occurrences after enabling the lint."
+)]
+#![expect(
+    clippy::too_many_lines,
+    reason = "Found 1 occurrences after enabling the lint."
+)]
+
 use crate::proof::{Proof, ProofError, ProofNode};
 use crate::range_proof::RangeProof;
 use crate::stream::{MerkleKeyValueStream, PathIterator};
@@ -193,7 +214,7 @@ impl<T: TrieReader> Merkle<T> {
                     .value()
                     .map(|value| ValueDigest::Value(value.to_vec().into_boxed_slice())),
                 child_hashes,
-            })
+            });
         }
 
         Ok(Proof(proof.into_boxed_slice()))
@@ -369,7 +390,11 @@ impl<T: HashedNodeReader> Merkle<T> {
                     };
 
                     let inserted = seen.insert(child_addr);
-                    if !inserted {
+                    if inserted {
+                        writeln!(writer, "  {addr} -> {child_addr}[label=\"{childidx}\"]")
+                            .map_err(|e| FileIoError::from_generic_no_file(e, "write branch"))?;
+                        self.dump_node(child_addr, child_hash, seen, writer)?;
+                    } else {
                         // We have already seen this child, which shouldn't happen.
                         // Indicate this with a red edge.
                         writeln!(
@@ -377,10 +402,6 @@ impl<T: HashedNodeReader> Merkle<T> {
                             "  {addr} -> {child_addr}[label=\"{childidx} (dup)\" color=red]"
                         )
                         .map_err(|e| FileIoError::from_generic_no_file(e, "write branch"))?;
-                    } else {
-                        writeln!(writer, "  {addr} -> {child_addr}[label=\"{childidx}\"]")
-                            .map_err(|e| FileIoError::from_generic_no_file(e, "write branch"))?;
-                        self.dump_node(child_addr, child_hash, seen, writer)?;
                     }
                 }
             }
@@ -389,7 +410,7 @@ impl<T: HashedNodeReader> Merkle<T> {
                 writeln!(writer, "\" shape=rect]")
                     .map_err(|e| FileIoError::from_generic_no_file(e, "write leaf"))?;
             }
-        };
+        }
         Ok(())
     }
 
@@ -433,8 +454,9 @@ impl<S: ReadableStorage> TryFrom<Merkle<NodeStore<MutableProposal, S>>>
 }
 
 impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
-    /// Convert a merkle backed by an MutableProposal into an ImmutableProposal
+    /// Convert a merkle backed by an `MutableProposal` into an `ImmutableProposal`
     /// TODO: We probably don't need this function
+    #[must_use]
     pub fn hash(self) -> Merkle<NodeStore<Arc<ImmutableProposal>, S>> {
         // I think this is only used in testing
         self.try_into().expect("failed to convert")
@@ -883,7 +905,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                         // the prefix matched only a leaf, so we remove it and indicate only one item was removed
                         *deleted = deleted.saturating_add(1);
                     }
-                };
+                }
                 Ok(None)
             }
             (_, Some(_)) => {
@@ -984,7 +1006,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
             // a KV pair was in the branch itself
             *deleted = deleted.saturating_add(1);
         }
-        for children in branch.children.iter_mut() {
+        for children in &mut branch.children {
             // read the child node
             let child = match children {
                 Some(Child::Node(node)) => node,
@@ -1046,8 +1068,17 @@ impl<'a, T: PartialEq> PrefixOverlap<'a, T> {
 }
 
 #[cfg(test)]
-#[expect(clippy::indexing_slicing, clippy::unwrap_used)]
 mod tests {
+    #![expect(clippy::indexing_slicing, clippy::unwrap_used)]
+    #![expect(
+        clippy::items_after_statements,
+        reason = "Found 1 occurrences after enabling the lint."
+    )]
+    #![expect(
+        clippy::unnecessary_wraps,
+        reason = "Found 1 occurrences after enabling the lint."
+    )]
+
     use super::*;
     use firewood_storage::{MemStore, MutableProposal, NodeStore, RootReader, TrieHash};
     use rand::rngs::StdRng;
@@ -1101,7 +1132,7 @@ mod tests {
     #[test]
     fn insert_one() {
         let mut merkle = create_in_memory_merkle();
-        merkle.insert(b"abc", Box::new([])).unwrap()
+        merkle.insert(b"abc", Box::new([])).unwrap();
     }
 
     fn create_in_memory_merkle() -> Merkle<NodeStore<MutableProposal, MemStore>> {
@@ -1913,8 +1944,8 @@ mod tests {
             let (len0, len1): (usize, usize) = {
                 let mut rng = rng.borrow_mut();
                 (
-                    rng.random_range(1..max_len0 + 1),
-                    rng.random_range(1..max_len1 + 1),
+                    rng.random_range(1..=max_len0),
+                    rng.random_range(1..=max_len1),
                 )
             };
             let key: Vec<u8> = (0..len0)
@@ -1954,8 +1985,8 @@ mod tests {
     fn test_delete_some() {
         let items = (0..100)
             .map(|n| {
-                let key = format!("key{}", n);
-                let val = format!("value{}", n);
+                let key = format!("key{n}");
+                let val = format!("value{n}");
                 (key.as_bytes().to_vec(), val.as_bytes().to_vec())
             })
             .collect::<Vec<(Vec<u8>, Vec<u8>)>>();
@@ -1983,8 +2014,8 @@ mod tests {
             let (len0, len1): (usize, usize) = {
                 let mut rng = rng.borrow_mut();
                 (
-                    rng.random_range(1..max_len0 + 1),
-                    rng.random_range(1..max_len1 + 1),
+                    rng.random_range(1..=max_len0),
+                    rng.random_range(1..=max_len1),
                 )
             };
             let key: Vec<u8> = (0..len0)
@@ -2009,7 +2040,7 @@ mod tests {
 
             let mut hashes = Vec::new();
 
-            for (k, v) in items.iter() {
+            for (k, v) in &items {
                 let root_hash = merkle
                     .nodestore
                     .root_address_and_hash()?
@@ -2038,7 +2069,7 @@ mod tests {
                 #[allow(clippy::indexing_slicing)]
                 let expected_hash = &hashes[i];
                 let key = key.iter().fold(String::new(), |mut s, b| {
-                    let _ = write!(s, "{:02x}", b);
+                    let _ = write!(s, "{b:02x}");
                     s
                 });
                 assert_eq!(

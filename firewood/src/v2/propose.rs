@@ -36,10 +36,10 @@ impl<T: api::DbView> Clone for ProposalBase<T> {
     }
 }
 
-/// A proposal is created either from the [[crate::v2::api::Db]] object
+/// A proposal is created either from the [[`crate::v2::api::Db`]] object
 /// or from another proposal. Proposals are owned by the
 /// caller. A proposal can only be committed if it has a
-/// base of the current revision of the [[crate::v2::api::Db]].
+/// base of the current revision of the [[`crate::v2::api::Db`]].
 #[cfg_attr(doc, aquamarine::aquamarine)]
 /// ```mermaid
 /// graph LR

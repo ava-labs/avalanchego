@@ -131,7 +131,7 @@ fn bench_db<const N: usize>(criterion: &mut Criterion) {
                             .await
                             .unwrap();
 
-                        db.propose(batch_ops).await.unwrap().commit().await.unwrap()
+                        db.propose(batch_ops).await.unwrap().commit().await.unwrap();
                     },
                     BatchSize::SmallInput,
                 );

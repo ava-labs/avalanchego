@@ -130,7 +130,7 @@ If you want to install grafana and prometheus on an AWS host (using Ubuntu as a 
 4. Run the scripts as described above, including the grafana installation.
 5. Log in to grafana on <http://YOUR-AWS-IP>
    a. username: admin, password: admin
-6. When prompted, change the password (firewood_is_fast)
+6. When prompted, change the password (`firewood_is_fast`)
 7. On the left panel, click "Data Sources"
    a. Select "Prometheus"
    b. For the URL, use <http://localhost:9090>

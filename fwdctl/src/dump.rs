@@ -1,6 +1,19 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+#![expect(
+    clippy::doc_link_with_quotes,
+    reason = "Found 1 occurrences after enabling the lint."
+)]
+#![expect(
+    clippy::unnecessary_wraps,
+    reason = "Found 1 occurrences after enabling the lint."
+)]
+#![expect(
+    clippy::unused_async,
+    reason = "Found 1 occurrences after enabling the lint."
+)]
+
 use clap::Args;
 use firewood::db::{Db, DbConfig};
 use firewood::merkle::Key;
@@ -116,7 +129,7 @@ pub struct Options {
 }
 
 pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
-    log::debug!("dump database {:?}", opts);
+    log::debug!("dump database {opts:?}");
 
     let cfg = DbConfig::builder().truncate(false);
     let db = Db::new(opts.db.clone(), cfg.build()).await?;
@@ -161,7 +174,7 @@ pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
 }
 
 fn key_count_exceeded(max: Option<u32>, key_count: u32) -> bool {
-    max.map(|max| key_count >= max).unwrap_or(false)
+    max.is_some_and(|max| key_count >= max)
 }
 
 fn u8_to_string(data: &[u8]) -> Cow<'_, str> {
@@ -203,7 +216,7 @@ async fn handle_next_key(next_key: KeyFromStream) {
             );
         }
         Some(Err(e)) => {
-            eprintln!("Error occurred while fetching the next key: {}.", e);
+            eprintln!("Error occurred while fetching the next key: {e}.");
         }
         None => {
             println!("There is no next key. Data dump completed.");
@@ -268,7 +281,7 @@ struct StdoutOutputHandler {
 impl OutputHandler for StdoutOutputHandler {
     fn handle_record(&mut self, key: &[u8], value: &[u8]) -> Result<(), std::io::Error> {
         let (key_str, value_str) = key_value_to_string(key, value, self.hex);
-        println!("'{}': '{}'", key_str, value_str);
+        println!("'{key_str}': '{value_str}'");
         Ok(())
     }
     fn flush(&mut self) -> Result<(), std::io::Error> {

@@ -1,6 +1,15 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+#![expect(
+    clippy::iter_not_returning_iterator,
+    reason = "Found 1 occurrences after enabling the lint."
+)]
+#![expect(
+    clippy::missing_errors_doc,
+    reason = "Found 3 occurrences after enabling the lint."
+)]
+
 use crate::manager::RevisionManagerError;
 use crate::proof::{Proof, ProofError, ProofNode};
 pub use crate::range_proof::RangeProof;
@@ -127,11 +136,11 @@ pub enum Error {
     #[error("Range too small")]
     RangeTooSmall,
 
-    /// Request RangeProof for empty trie
+    /// Request `RangeProof` for empty trie
     #[error("request RangeProof for empty trie")]
     RangeProofOnEmptyTrie,
 
-    /// Request RangeProof for empty range
+    /// Request `RangeProof` for empty range
     #[error("the latest revision is empty and has no root hash")]
     LatestIsEmpty,
 

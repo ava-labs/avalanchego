@@ -23,3 +23,6 @@ hex-literal = "1.0.0"
 name = "triehash"
 path = "benches/triehash.rs"
 harness = false
+
+[lints]
+workspace = true
