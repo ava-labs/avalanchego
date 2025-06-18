@@ -125,6 +125,10 @@ jobs:
       - name: Copy FFI Source Code
         run: cp -r firewood/ffi firewood-go
 
+      - name: Switch to Static Libs CGO Mode
+        working-directory: firewood-go/ffi
+        run: FIREWOOD_LD_MODE=STATIC_LIBS go generate
+
       - name: Download binaries into libs directory
         uses: actions/download-artifact@v4
         with:
