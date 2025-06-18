@@ -59,7 +59,7 @@ type SimplexOutboundMessageBuilder interface {
 		latestRound uint64,
 	) (OutboundMessage, error)
 
-	VerifiedReplicationResponse(
+	ReplicationResponse(
 		chainID ids.ID,
 		data []simplex.VerifiedQuorumRound,
 		latestRound *simplex.VerifiedQuorumRound,
@@ -273,7 +273,7 @@ func (b *outMsgBuilder) ReplicationRequest(
 	)
 }
 
-func (b *outMsgBuilder) VerifiedReplicationResponse(
+func (b *outMsgBuilder) ReplicationResponse(
 	chainID ids.ID,
 	data []simplex.VerifiedQuorumRound,
 	latestRound *simplex.VerifiedQuorumRound,

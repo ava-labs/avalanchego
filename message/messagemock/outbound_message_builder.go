@@ -496,6 +496,21 @@ func (mr *OutboundMsgBuilderMockRecorder) ReplicationRequest(chainID, seqs, late
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReplicationRequest", reflect.TypeOf((*OutboundMsgBuilder)(nil).ReplicationRequest), chainID, seqs, latestRound)
 }
 
+// ReplicationResponse mocks base method.
+func (m *OutboundMsgBuilder) ReplicationResponse(chainID ids.ID, data []simplex.VerifiedQuorumRound, latestRound *simplex.VerifiedQuorumRound) (message.OutboundMessage, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReplicationResponse", chainID, data, latestRound)
+	ret0, _ := ret[0].(message.OutboundMessage)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReplicationResponse indicates an expected call of ReplicationResponse.
+func (mr *OutboundMsgBuilderMockRecorder) ReplicationResponse(chainID, data, latestRound any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReplicationResponse", reflect.TypeOf((*OutboundMsgBuilder)(nil).ReplicationResponse), chainID, data, latestRound)
+}
+
 // StateSummaryFrontier mocks base method.
 func (m *OutboundMsgBuilder) StateSummaryFrontier(chainID ids.ID, requestID uint32, summary []byte) (message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
@@ -509,21 +524,6 @@ func (m *OutboundMsgBuilder) StateSummaryFrontier(chainID ids.ID, requestID uint
 func (mr *OutboundMsgBuilderMockRecorder) StateSummaryFrontier(chainID, requestID, summary any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StateSummaryFrontier", reflect.TypeOf((*OutboundMsgBuilder)(nil).StateSummaryFrontier), chainID, requestID, summary)
-}
-
-// VerifiedReplicationResponse mocks base method.
-func (m *OutboundMsgBuilder) VerifiedReplicationResponse(chainID ids.ID, data []simplex.VerifiedQuorumRound, latestRound *simplex.VerifiedQuorumRound) (message.OutboundMessage, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "VerifiedReplicationResponse", chainID, data, latestRound)
-	ret0, _ := ret[0].(message.OutboundMessage)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// VerifiedReplicationResponse indicates an expected call of VerifiedReplicationResponse.
-func (mr *OutboundMsgBuilderMockRecorder) VerifiedReplicationResponse(chainID, data, latestRound any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifiedReplicationResponse", reflect.TypeOf((*OutboundMsgBuilder)(nil).VerifiedReplicationResponse), chainID, data, latestRound)
 }
 
 // Vote mocks base method.

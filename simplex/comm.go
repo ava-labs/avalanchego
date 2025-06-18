@@ -44,7 +44,12 @@ func NewComm(config *Config) (*Comm, error) {
 	}
 
 	if _, ok := config.Validators[config.Ctx.NodeID]; !ok {
-		return nil, fmt.Errorf("%w: %s", errNodeNotFound, config.Ctx.NodeID)
+		config.Log.Warn("Node is not a validator for the subnet",
+			zap.String("nodeID", config.Ctx.NodeID.String()),
+			zap.String("chainID", config.Ctx.ChainID.String()),
+			zap.String("subnetID", config.Ctx.SubnetID.String()),
+		)
+		return nil, fmt.Errorf("%w could not find our node: %s", errNodeNotFound, config.Ctx.NodeID)
 	}
 
 	sortedNodes := sortNodes(nodes)
@@ -116,7 +121,7 @@ func (c *Comm) simplexMessageToOutboundMessage(msg *simplex.Message) (message.Ou
 	case msg.ReplicationRequest != nil:
 		outboundMessage, err = c.msgBuilder.ReplicationRequest(c.chainID, msg.ReplicationRequest.Seqs, msg.ReplicationRequest.LatestRound)
 	case msg.VerifiedReplicationResponse != nil:
-		outboundMessage, err = c.msgBuilder.VerifiedReplicationResponse(c.chainID, msg.VerifiedReplicationResponse.Data, msg.VerifiedReplicationResponse.LatestRound)
+		outboundMessage, err = c.msgBuilder.ReplicationResponse(c.chainID, msg.VerifiedReplicationResponse.Data, msg.VerifiedReplicationResponse.LatestRound)
 	}
 
 	return outboundMessage, err
