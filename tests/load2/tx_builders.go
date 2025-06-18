@@ -6,7 +6,6 @@ package load2
 import (
 	"context"
 	"crypto/ecdsa"
-	"errors"
 	"math/big"
 	"math/rand/v2"
 	"time"
@@ -23,10 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 
-var (
-	maxFeeCap           = big.NewInt(300000000000)
-	errFailedToSelectTx = errors.New("failed to select random tx")
-)
+var maxFeeCap = big.NewInt(300000000000)
 
 func TestRandomTx(
 	tc tests.TestContext,

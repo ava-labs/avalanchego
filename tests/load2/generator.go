@@ -50,17 +50,15 @@ func (t *tracker) TotalGasUsed() uint64 {
 type TxTest func(tests.TestContext, context.Context, *Wallet)
 
 type Generator struct {
-	log           logging.Logger
-	wallets       []*Wallet
-	txTests       []TxTest
-	pingFrequency time.Duration
+	log     logging.Logger
+	wallets []*Wallet
+	txTests []TxTest
 }
 
 func NewGenerator(
 	log logging.Logger,
 	wallets []*Wallet,
 	txTests []TxTest,
-	pingFrequency time.Duration,
 ) (Generator, error) {
 	if len(wallets) != len(txTests) {
 		return Generator{}, fmt.Errorf(
@@ -71,10 +69,9 @@ func NewGenerator(
 	}
 
 	return Generator{
-		log:           log,
-		wallets:       wallets,
-		txTests:       txTests,
-		pingFrequency: pingFrequency,
+		log:     log,
+		wallets: wallets,
+		txTests: txTests,
 	}, nil
 }
 

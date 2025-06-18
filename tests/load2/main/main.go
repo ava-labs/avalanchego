@@ -29,7 +29,6 @@ const (
 	agentsPerNode = 5
 	agentsCount   = nodesCount * agentsPerNode
 	logPrefix     = "avalanchego-load-test"
-	pingFrequency = time.Millisecond
 )
 
 var (
@@ -89,7 +88,7 @@ func main() {
 		txTests[i] = txTest
 	}
 
-	generator, err := load2.NewGenerator(log, wallets, txTests, pingFrequency)
+	generator, err := load2.NewGenerator(log, wallets, txTests)
 	require.NoError(err)
 
 	require.NoError(generator.Run(tc, ctx))
