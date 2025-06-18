@@ -1,7 +1,7 @@
-// Package firewood provides a Go wrapper around the [Firewood] database.
+// Package ffi provides a Go wrapper around the [Firewood] database.
 //
 // [Firewood]: https://github.com/ava-labs/firewood
-package firewood
+package ffi
 
 // // Note that -lm is required on Linux but not on Mac.
 // #cgo LDFLAGS: -L${SRCDIR}/../target/release -L/usr/local/lib -lfirewood_ffi -lm

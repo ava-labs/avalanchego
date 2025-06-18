@@ -1,4 +1,4 @@
-package firewood
+package ffi
 
 import (
 	"bytes"

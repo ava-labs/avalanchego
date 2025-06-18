@@ -1,4 +1,4 @@
-package firewood
+package ffi
 
 // implement a specific interface for firewood
 // this is used for some of the firewood performance tests
