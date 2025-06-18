@@ -38,8 +38,10 @@ jobs:
             target: aarch64-unknown-linux-gnu
           - os: macos-latest
             target: aarch64-apple-darwin
+            pre-build-cmd: echo "MACOSX_DEPLOYMENT_TARGET=13.0" >> "$GITHUB_ENV"
           - os: macos-13
             target: x86_64-apple-darwin
+            pre-build-cmd: echo "MACOSX_DEPLOYMENT_TARGET=13.0" >> "$GITHUB_ENV"
     outputs:
       has_secrets: ${{ steps.check_secrets.outputs.has_secrets }}
     steps:
@@ -49,6 +51,10 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: Swatinem/rust-cache@v2
+
+      - name: Run pre-build command
+        if: matrix.pre-build-cmd != ''
+        run: ${{ matrix.pre-build-cmd }}
 
       - name: Build for ${{ matrix.target }}
         run: cargo build --profile maxperf --features ethhash,logger --target ${{ matrix.target }} -p firewood-ffi
