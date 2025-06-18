@@ -13,6 +13,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -46,40 +47,38 @@ func (t *tracker) TotalGasUsed() uint64 {
 	return t.totalGasUsed
 }
 
-type TxBuilder interface {
-	Build(*Wallet) (*types.Transaction, error)
-}
+type TxTest func(tests.TestContext, context.Context, *Wallet)
 
 type Generator struct {
 	log           logging.Logger
 	wallets       []*Wallet
-	txBuilders    []TxBuilder
+	txTests       []TxTest
 	pingFrequency time.Duration
 }
 
 func NewGenerator(
 	log logging.Logger,
 	wallets []*Wallet,
-	txBuilders []TxBuilder,
+	txTests []TxTest,
 	pingFrequency time.Duration,
 ) (Generator, error) {
-	if len(wallets) != len(txBuilders) {
+	if len(wallets) != len(txTests) {
 		return Generator{}, fmt.Errorf(
 			"wallet and tx builder count mismatch: got %d wallets and %d txBuilders",
 			len(wallets),
-			len(txBuilders),
+			len(txTests),
 		)
 	}
 
 	return Generator{
 		log:           log,
 		wallets:       wallets,
-		txBuilders:    txBuilders,
+		txTests:       txTests,
 		pingFrequency: pingFrequency,
 	}, nil
 }
 
-func (g Generator) Run(ctx context.Context) error {
+func (g Generator) Run(tc tests.TestContext, ctx context.Context) error {
 	tracker := &tracker{}
 	issuerGroup, childCtx := errgroup.WithContext(ctx)
 
@@ -92,26 +91,7 @@ func (g Generator) Run(ctx context.Context) error {
 				default:
 				}
 
-				// Build tx
-				tx, err := g.txBuilders[i].Build(g.wallets[i])
-				if err != nil {
-					return err
-				}
-
-				// Issue and await tx
-				if err := g.wallets[i].SendTx(
-					childCtx,
-					tx,
-					g.pingFrequency,
-					func(d time.Duration) {
-						tracker.Issue(d)
-					},
-					func(r *types.Receipt, d time.Duration) {
-						tracker.Accept(r, d)
-					},
-				); err != nil {
-					return err
-				}
+				g.txTests[i](tc, ctx, g.wallets[i])
 			}
 		})
 	}

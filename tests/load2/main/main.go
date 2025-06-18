@@ -70,7 +70,7 @@ func main() {
 	require.NoError(err)
 
 	wallets := make([]*load2.Wallet, len(keys))
-	txBuilders := make([]load2.TxBuilder, len(keys))
+	txTests := make([]load2.TxTest, len(keys))
 	for i := range len(keys) {
 		wsURI := wsURIs[i%len(wsURIs)]
 		client, err := ethclient.Dial(wsURI)
@@ -83,17 +83,16 @@ func main() {
 		contract, err := createContract(ctx, client, wallet)
 		require.NoError(err)
 
-		txBuilder, err := load2.NewRandomTxBuilder(contract)
-		require.NoError(err)
+		txTest := testWithContract(load2.TestRandomTx, contract)
 
 		wallets[i] = wallet
-		txBuilders[i] = txBuilder
+		txTests[i] = txTest
 	}
 
-	generator, err := load2.NewGenerator(log, wallets, txBuilders, pingFrequency)
+	generator, err := load2.NewGenerator(log, wallets, txTests, pingFrequency)
 	require.NoError(err)
 
-	require.NoError(generator.Run(ctx))
+	require.NoError(generator.Run(tc, ctx))
 }
 
 func createContract(
@@ -130,4 +129,13 @@ func createContract(
 	}
 
 	return contracts.NewEVMLoadSimulator(contractAddress, client)
+}
+
+func testWithContract(
+	f func(tests.TestContext, context.Context, *load2.Wallet, *contracts.EVMLoadSimulator),
+	contract *contracts.EVMLoadSimulator,
+) load2.TxTest {
+	return func(tc tests.TestContext, ctx context.Context, w *load2.Wallet) {
+		f(tc, ctx, w, contract)
+	}
 }
