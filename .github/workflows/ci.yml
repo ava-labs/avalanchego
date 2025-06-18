@@ -240,6 +240,9 @@ jobs:
   load_tests:
     name: load tests
     runs-on: avalanche-avalanchego-runner
+    container:
+      image: ubuntu:22.04
+      options: --user root
     steps:
       - name: Install xz-utils
         run: |
