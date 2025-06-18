@@ -5,8 +5,7 @@ package simplex
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/snow/networking/sender"
+
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -29,11 +28,13 @@ type Config struct {
 }
 
 // Context is information about the current execution.
-// [SubnetID] is the ID of the subnet this context exists within.
-// [ChainID] is the ID of the chain this context exists within.
-// [NodeID] is the ID of this node
 type SimplexChainContext struct {
-	NodeID   ids.NodeID
-	ChainID  ids.ID
-	SubnetID ids.ID
+	// Network is the ID of the network this context exists within.
+	NodeID ids.NodeID
+
+	// ChainID is the ID of the chain this context exists within.
+	ChainID ids.ID
+
+	// NodeID is the ID of this node
+	NetworkID uint32
 }
