@@ -34,7 +34,7 @@ var testSimplexMessage = simplex.Message{
 	},
 }
 
-func TestComm(t *testing.T) {
+func TestCommSendMessage(t *testing.T) {
 	config := newEngineConfig(t, 1)
 
 	destinationNodeID := ids.GenerateTestNodeID()
@@ -71,6 +71,7 @@ func TestCommBroadcast(t *testing.T) {
 	comm, err := NewComm(config)
 	require.NoError(t, err)
 
+	// should only send twice since the current node does not send to itself
 	msgCreator.EXPECT().Vote(gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(nil, nil).Times(2)
 	sender.EXPECT().Send(gomock.Any(), gomock.Any(), comm.subnetID, gomock.Any()).Times(2)

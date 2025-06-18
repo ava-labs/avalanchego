@@ -6,11 +6,11 @@ package simplex
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
+	"github.com/stretchr/testify/require"
 )
 
 func newTestValidators(allVds []validators.GetValidatorOutput) map[ids.NodeID]*validators.GetValidatorOutput {
@@ -24,7 +24,7 @@ func newTestValidators(allVds []validators.GetValidatorOutput) map[ids.NodeID]*v
 
 func newEngineConfig(t *testing.T, numNodes uint64) *Config {
 	if numNodes == 0 {
-		panic("numNodes must be greater than 0")
+		require.FailNow(t, "numNodes must be greater than 0")
 	}
 
 	ls, err := localsigner.New()
@@ -33,9 +33,9 @@ func newEngineConfig(t *testing.T, numNodes uint64) *Config {
 	nodeID := ids.GenerateTestNodeID()
 
 	simplexChainContext := SimplexChainContext{
-		NodeID:   nodeID,
-		ChainID:  ids.GenerateTestID(),
-		SubnetID: ids.GenerateTestID(),
+		NodeID:    nodeID,
+		ChainID:   ids.GenerateTestID(),
+		NetworkID: constants.UnitTestID,
 	}
 
 	nodeInfo := validators.GetValidatorOutput{
@@ -44,10 +44,10 @@ func newEngineConfig(t *testing.T, numNodes uint64) *Config {
 	}
 
 	validators := generateTestValidators(t, numNodes-1)
-
+	validators = append(validators, nodeInfo)
 	return &Config{
 		Ctx:        simplexChainContext,
-		Validators: newTestValidators(append(validators, nodeInfo)),
+		Validators: newTestValidators(validators),
 		SignBLS:    ls.Sign,
 	}
 }

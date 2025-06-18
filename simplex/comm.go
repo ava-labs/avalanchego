@@ -43,19 +43,11 @@ func NewComm(config *Config) (*Comm, error) {
 		nodes = append(nodes, vd.NodeID[:])
 	}
 
-	sortedNodes := sortNodes(nodes)
-
-	var found bool
-	for _, node := range sortedNodes {
-		if node.Equals(config.Ctx.NodeID[:]) {
-			found = true
-			break
-		}
-	}
-
-	if !found {
+	if _, ok := config.Validators[config.Ctx.NodeID]; !ok {
 		return nil, fmt.Errorf("%w: %s", errNodeNotFound, config.Ctx.NodeID)
 	}
+
+	sortedNodes := sortNodes(nodes)
 
 	c := &Comm{
 		subnetID:   config.Ctx.SubnetID,
