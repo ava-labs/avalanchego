@@ -23,15 +23,15 @@ jobs:
         run: docker buildx create --use
       - name: Build and publish images to DockerHub
         env:
-          DOCKER_USERNAME: ${{ secrets.docker_username }}
-          DOCKER_PASS: ${{ secrets.docker_pass }}
-          DOCKER_IMAGE: ${{ secrets.docker_repo }}
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
+          DOCKER_IMAGE: ${{ secrets.DOCKER_REPO }}
           BUILD_MULTI_ARCH: 1
         run: scripts/run_task.sh build-image
       - name: Build and publish bootstrap-monitor image to DockerHub
         env:
-          DOCKER_USERNAME: ${{ secrets.docker_username }}
-          DOCKER_PASS: ${{ secrets.docker_pass }}
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
           DOCKER_IMAGE: avaplatform/bootstrap-monitor
           BUILD_MULTI_ARCH: 1
         run: scripts/run_task.sh build-bootstrap-monitor-image
