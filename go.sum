@@ -48,8 +48,6 @@ github.com/DataDog/zstd v1.5.2/go.mod h1:g4AWEaM3yOg3HYfnJ3YIawPnVdXJh9QME85blwS
 github.com/Joker/hpp v1.0.0/go.mod h1:8x5n+M1Hp5hC0g8okX3sR3vFQwynaX/UgSOM9MeBKzY=
 github.com/Microsoft/go-winio v0.6.1 h1:9/kr64B9VUZrLm5YYwbGtUJnMgqWVOdUAXu6Migciow=
 github.com/Microsoft/go-winio v0.6.1/go.mod h1:LRdKpFKfdobln8UmuiYcKPot9D2v6svN5+sAH+4kjUM=
-github.com/NYTimes/gziphandler v1.1.1 h1:ZUDjpQae29j0ryrS0u/B8HZfJBtBQHjqw2rQ2cqUQ3I=
-github.com/NYTimes/gziphandler v1.1.1/go.mod h1:n/CVRwUEOgIxrgPvAQhUUr9oeUtvrhMomdKFjzJNB0c=
 github.com/Shopify/goreferrer v0.0.0-20181106222321-ec9c9a553398/go.mod h1:a1uqRtAwp2Xwc6WNPJEufxJ7fx3npB4UV/JOLmbu5I0=
 github.com/StephenButtolph/canoto v0.15.0 h1:3iGdyTSQZ7/y09WaJCe0O/HIi53ZyTrnmVzfCqt64mM=
 github.com/StephenButtolph/canoto v0.15.0/go.mod h1:IcnAHC6nJUfQFVR9y60ko2ecUqqHHSB6UwI9NnBFZnE=
@@ -64,10 +62,10 @@ github.com/antithesishq/antithesis-sdk-go v0.3.8/go.mod h1:IUpT2DPAKh6i/YhSbt6Gl
 github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6/go.mod h1:grANhF5doyWs3UAsr3K4I6qtAmlQcZDesFNEHPZAzj8=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPdPJAN/hZIm0C4OItdklCFmMRWYpio=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
-github.com/ava-labs/avalanchego v1.13.1 h1:sviA3MJbY00xYl77ru4vs9yiz7uTnAYfHpqYFucoXEE=
-github.com/ava-labs/avalanchego v1.13.1/go.mod h1:h8VRoqOhLRzqSlBpgFSOtCIu2Hey2FxgjD3pBkOXOY8=
-github.com/ava-labs/coreth v0.15.1-rc.0.0.20250530184801-28421010abae h1:PPcOEtY3SoXruzMPYJMxoeoExRVhf5UOiH7SvdPHQwY=
-github.com/ava-labs/coreth v0.15.1-rc.0.0.20250530184801-28421010abae/go.mod h1:Tl6TfpOwSq0bXvN7DTENXB4As3hml8ma9OQEWS9DH9I=
+github.com/ava-labs/avalanchego v1.13.2-rc.0 h1:BWV5z/u6oJwRPx/zuACBbge4puhoDV38RZEGqj3fa6I=
+github.com/ava-labs/avalanchego v1.13.2-rc.0/go.mod h1:BCxJWx2E1zeCDoQuH12I+B7BsrAbBpF19af4O0V7b/8=
+github.com/ava-labs/coreth v0.15.2-rc.0.0.20250610170140-2fcf45f828a2 h1:/E1w2S6xvEhkO2+C9sGCV8W80qaeSN5WBFqdKLl12HM=
+github.com/ava-labs/coreth v0.15.2-rc.0.0.20250610170140-2fcf45f828a2/go.mod h1:cqwBag+zzqifDutdPVzZKovfC2d0L8Zxq4YgTGaMCwg=
 github.com/ava-labs/libevm v1.13.14-0.2.0.release h1:uKGCc5/ceeBbfAPRVtBUxbQt50WzB2pEDb8Uy93ePgQ=
 github.com/ava-labs/libevm v1.13.14-0.2.0.release/go.mod h1:+Iol+sVQ1KyoBsHf3veyrBmHCXr3xXRWq6ZXkgVfNLU=
 github.com/aymerick/raymond v2.0.3-0.20180322193309-b565731e1464+incompatible/go.mod h1:osfaiScAUVup+UC9Nfq76eWqDhXlp+4UYaA8uhTBO6g=

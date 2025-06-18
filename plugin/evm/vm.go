@@ -1127,6 +1127,10 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	return apis, nil
 }
 
+func (*VM) CreateHTTP2Handler(context.Context) (http.Handler, error) {
+	return nil, nil
+}
+
 // CreateStaticHandlers makes new http handlers that can handle API calls
 func (vm *VM) CreateStaticHandlers(context.Context) (map[string]http.Handler, error) {
 	handler := rpc.NewServer(0)
