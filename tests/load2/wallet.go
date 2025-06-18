@@ -11,14 +11,30 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethclient"
 
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+
 	ethereum "github.com/ava-labs/libevm"
+	ethcommon "github.com/ava-labs/libevm/common"
 )
 
-type Wallet struct {
+var (
+	_ Wallet = (*wallet)(nil)
+	_ Wallet = (*walletWithOptions)(nil)
+)
+
+type Wallet interface {
+	SendTx(context.Context, *types.Transaction, ...common.Option) error
+	PrivKey() *ecdsa.PrivateKey
+	ChainID() *big.Int
+	Nonce() uint64
+	Signer() types.Signer
+}
+
+type wallet struct {
 	client  *ethclient.Client
 	privKey *ecdsa.PrivateKey
 	nonce   uint64
@@ -31,8 +47,8 @@ func NewWallet(
 	privKey *ecdsa.PrivateKey,
 	nonce uint64,
 	chainID *big.Int,
-) *Wallet {
-	return &Wallet{
+) Wallet {
+	return &wallet{
 		client:  client,
 		privKey: privKey,
 		nonce:   nonce,
@@ -41,64 +57,100 @@ func NewWallet(
 	}
 }
 
-func (w *Wallet) SendTx(
+func (w *wallet) SendTx(
 	ctx context.Context,
 	tx *types.Transaction,
-	pingFrequency time.Duration,
-	issuanceHandler func(time.Duration),
-	confirmationHandler func(*types.Receipt, time.Duration),
+	ops ...common.Option,
 ) error {
+	options := common.NewOptions(ops)
+
 	startTime := time.Now()
 	if err := w.client.SendTransaction(ctx, tx); err != nil {
 		return err
 	}
 
 	issuanceDuration := time.Since(startTime)
-	issuanceHandler(issuanceDuration)
+	if f := options.IssuanceHandler(); f != nil {
+		f(common.IssuanceReceipt{
+			Duration: issuanceDuration,
+		})
+	}
 
-	receipt, err := awaitTx(ctx, w.client, tx.Hash(), pingFrequency)
-	if err != nil {
+	if err := awaitTx(ctx, w.client, tx.Hash(), options.PollFrequency()); err != nil {
 		return err
 	}
 
 	totalDuration := time.Since(startTime)
 	confirmationDuration := totalDuration - issuanceDuration
-	confirmationHandler(receipt, confirmationDuration)
+	if f := options.ConfirmationHandler(); f != nil {
+		f(common.ConfirmationReceipt{
+			ConfirmationDuration: confirmationDuration,
+			TotalDuration:        totalDuration,
+			TxID:                 ids.ID(tx.Hash()),
+		})
+	}
 
 	w.nonce++
 
 	return nil
 }
 
-func (w *Wallet) PrivKey() *ecdsa.PrivateKey {
+func (w *wallet) PrivKey() *ecdsa.PrivateKey {
 	return w.privKey
 }
 
-func (w *Wallet) Nonce() uint64 {
+func (w *wallet) Nonce() uint64 {
 	return w.nonce
 }
 
-func (w *Wallet) ChainID() *big.Int {
+func (w *wallet) ChainID() *big.Int {
 	return w.chainID
 }
 
-func (w *Wallet) Signer() types.Signer {
+func (w *wallet) Signer() types.Signer {
 	return w.signer
+}
+
+type walletWithOptions struct {
+	Wallet
+	options []common.Option
+}
+
+func NewWalletWithOptions(
+	wallet Wallet,
+	options ...common.Option,
+) Wallet {
+	return &walletWithOptions{
+		Wallet:  wallet,
+		options: options,
+	}
+}
+
+func (w *walletWithOptions) SendTransaction(
+	ctx context.Context,
+	tx *types.Transaction,
+	ops ...common.Option,
+) error {
+	return w.Wallet.SendTx(
+		ctx,
+		tx,
+		common.UnionOptions(w.options, ops)...,
+	)
 }
 
 func awaitTx(
 	ctx context.Context,
 	client *ethclient.Client,
-	txHash common.Hash,
+	txHash ethcommon.Hash,
 	pingFrequency time.Duration,
-) (*types.Receipt, error) {
+) error {
 	ticker := time.NewTicker(pingFrequency)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return ctx.Err()
 		case <-ticker.C:
 		}
 
@@ -108,13 +160,13 @@ func awaitTx(
 				continue
 			}
 
-			return nil, err
+			return err
 		}
 
 		if receipt.Status != 1 {
-			return nil, fmt.Errorf("failed tx: %d", receipt.Status)
+			return fmt.Errorf("failed tx: %d", receipt.Status)
 		}
 
-		return receipt, nil
+		return nil
 	}
 }

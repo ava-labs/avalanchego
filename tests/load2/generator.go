@@ -5,59 +5,98 @@ package load2
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
 
-	"github.com/ava-labs/libevm/core/types"
-	"go.uber.org/zap"
-	"golang.org/x/sync/errgroup"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/tests"
-	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-type tracker struct {
+type Tracker struct {
 	lock sync.RWMutex
 
-	totalGasUsed uint64
-	txsIssued    uint64
-	txsAccepted  uint64
+	txsIssued   uint64
+	txsAccepted uint64
+
+	txsIssuedCounter      prometheus.Counter
+	txsAcceptedCounter    prometheus.Counter
+	txIssuanceLatency     prometheus.Histogram
+	txConfirmationLatency prometheus.Histogram
+	txTotalLatency        prometheus.Histogram
 }
 
-func (t *tracker) Issue(time.Duration) {
+func NewTracker(namespace string, registry *prometheus.Registry) (*Tracker, error) {
+	t := &Tracker{
+		txsIssuedCounter: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "txs_issued",
+			Help:      "Number of transactions issued",
+		}),
+		txsAcceptedCounter: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "txs_confirmed",
+			Help:      "Number of transactions confirmed",
+		}),
+		txIssuanceLatency: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespace,
+			Name:      "tx_issuance_latency",
+			Help:      "issuance latency of transactions",
+		}),
+		txConfirmationLatency: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespace,
+			Name:      "tx_confirmation_latency",
+			Help:      "confirmation latency of transactions",
+		}),
+		txTotalLatency: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespace,
+			Name:      "tx_total_latency",
+			Help:      "total latency of transactions",
+		}),
+	}
+
+	if err := errors.Join(
+		registry.Register(t.txsIssuedCounter),
+		registry.Register(t.txsAcceptedCounter),
+		registry.Register(t.txIssuanceLatency),
+		registry.Register(t.txConfirmationLatency),
+		registry.Register(t.txTotalLatency),
+	); err != nil {
+		return nil, err
+	}
+
+	return t, nil
+}
+
+func (t *Tracker) Issue(d time.Duration) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
 	t.txsIssued++
+	t.txIssuanceLatency.Observe(float64(d.Milliseconds()))
 }
 
-func (t *tracker) Accept(receipt *types.Receipt, _ time.Duration) {
+func (t *Tracker) Accept(confirmationDuration time.Duration, totalDuration time.Duration) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
 	t.txsAccepted++
-	t.totalGasUsed += receipt.GasUsed
+
+	t.txTotalLatency.Observe(float64(totalDuration.Milliseconds()))
+	t.txConfirmationLatency.Observe(float64(confirmationDuration.Milliseconds()))
 }
 
-func (t *tracker) TotalGasUsed() uint64 {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
-
-	return t.totalGasUsed
-}
-
-type TxTest func(tests.TestContext, context.Context, *Wallet)
+type TxTest func(tests.TestContext, context.Context, Wallet)
 
 type Generator struct {
-	log     logging.Logger
-	wallets []*Wallet
+	wallets []Wallet
 	txTests []TxTest
 }
 
 func NewGenerator(
-	log logging.Logger,
-	wallets []*Wallet,
+	wallets []Wallet,
 	txTests []TxTest,
 ) (Generator, error) {
 	if len(wallets) != len(txTests) {
@@ -69,61 +108,31 @@ func NewGenerator(
 	}
 
 	return Generator{
-		log:     log,
 		wallets: wallets,
 		txTests: txTests,
 	}, nil
 }
 
-func (g Generator) Run(tc tests.TestContext, ctx context.Context) error {
-	tracker := &tracker{}
-	issuerGroup, childCtx := errgroup.WithContext(ctx)
+func (g Generator) Run(tc tests.TestContext, ctx context.Context) {
+	wg := sync.WaitGroup{}
 
-	for i := range len(g.wallets) {
-		issuerGroup.Go(func() error {
+	for i := range g.wallets {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
 			for {
 				select {
-				case <-childCtx.Done():
-					return childCtx.Err()
+				case <-ctx.Done():
+					return
 				default:
 				}
 
 				g.txTests[i](tc, ctx, g.wallets[i])
 			}
-		})
+		}()
 	}
 
-	ticker := time.NewTicker(15 * time.Second)
-	defer ticker.Stop()
-
-	prevTotalGasUsed := uint64(0)
-	prevTime := time.Now()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-ticker.C:
-		}
-
-		currTotalGasUsed := tracker.TotalGasUsed()
-		currTime := time.Now()
-
-		gps := computeDiff(prevTotalGasUsed, currTotalGasUsed, currTime.Sub(prevTime))
-		g.log.Info("stats", zap.Uint64("gps", gps))
-
-		prevTotalGasUsed = currTotalGasUsed
-		prevTime = currTime
-	}
-}
-
-func computeDiff(initial uint64, final uint64, duration time.Duration) uint64 {
-	if duration <= 0 {
-		return 0
-	}
-
-	numTxs := final - initial
-	tps := float64(numTxs) / duration.Seconds()
-
-	return uint64(tps)
+	<-ctx.Done()
+	wg.Wait()
 }

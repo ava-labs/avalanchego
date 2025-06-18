@@ -8,7 +8,6 @@ import (
 	"crypto/ecdsa"
 	"math/big"
 	"math/rand/v2"
-	"time"
 
 	"github.com/ava-labs/libevm/accounts/abi/bind"
 	"github.com/ava-labs/libevm/common"
@@ -27,20 +26,20 @@ var maxFeeCap = big.NewInt(300000000000)
 func TestRandomTx(
 	tc tests.TestContext,
 	ctx context.Context,
-	wallet *Wallet,
+	wallet Wallet,
 	contract *contracts.EVMLoadSimulator,
 ) {
 	require := require.New(tc)
 
 	txTypes := []txType{
 		{
-			txFunc: func(tc tests.TestContext, ctx context.Context, w *Wallet, _ *contracts.EVMLoadSimulator) {
+			txFunc: func(tc tests.TestContext, ctx context.Context, w Wallet, _ *contracts.EVMLoadSimulator) {
 				testZeroTransfer(tc, ctx, w)
 			},
 			weight: 1000,
 		},
 		{
-			txFunc: testRandomWriteTx,
+			txFunc: testRandomWrite,
 			weight: 100,
 		},
 		{
@@ -117,14 +116,14 @@ func NewTxOpts(
 }
 
 type txType struct {
-	txFunc func(tests.TestContext, context.Context, *Wallet, *contracts.EVMLoadSimulator)
+	txFunc func(tests.TestContext, context.Context, Wallet, *contracts.EVMLoadSimulator)
 	weight uint64
 }
 
 func testZeroTransfer(
 	tc tests.TestContext,
 	ctx context.Context,
-	wallet *Wallet,
+	wallet Wallet,
 ) {
 	require := require.New(tc)
 
@@ -146,19 +145,13 @@ func testZeroTransfer(
 	})
 	require.NoError(err)
 
-	require.NoError(wallet.SendTx(
-		ctx,
-		tx,
-		500*time.Millisecond,
-		func(time.Duration) {},
-		func(*types.Receipt, time.Duration) {},
-	))
+	require.NoError(wallet.SendTx(ctx, tx))
 }
 
-func testRandomWriteTx(
+func testRandomWrite(
 	tc tests.TestContext,
 	ctx context.Context,
-	wallet *Wallet,
+	wallet Wallet,
 	contract *contracts.EVMLoadSimulator,
 ) {
 	require := require.New(tc)
@@ -176,19 +169,13 @@ func testRandomWriteTx(
 	tx, err := contract.SimulateRandomWrite(txOpts, count)
 	require.NoError(err)
 
-	require.NoError(wallet.SendTx(
-		ctx,
-		tx,
-		500*time.Millisecond,
-		func(time.Duration) {},
-		func(*types.Receipt, time.Duration) {},
-	))
+	require.NoError(wallet.SendTx(ctx, tx))
 }
 
 func testStateModification(
 	tc tests.TestContext,
 	ctx context.Context,
-	wallet *Wallet,
+	wallet Wallet,
 	contract *contracts.EVMLoadSimulator,
 ) {
 	require := require.New(tc)
@@ -206,19 +193,13 @@ func testStateModification(
 	tx, err := contract.SimulateModification(txOpts, count)
 	require.NoError(err)
 
-	require.NoError(wallet.SendTx(
-		ctx,
-		tx,
-		500*time.Millisecond,
-		func(time.Duration) {},
-		func(*types.Receipt, time.Duration) {},
-	))
+	require.NoError(wallet.SendTx(ctx, tx))
 }
 
 func testRandomRead(
 	tc tests.TestContext,
 	ctx context.Context,
-	wallet *Wallet,
+	wallet Wallet,
 	contract *contracts.EVMLoadSimulator,
 ) {
 	require := require.New(tc)
@@ -236,19 +217,13 @@ func testRandomRead(
 	tx, err := contract.SimulateReads(txOpts, count)
 	require.NoError(err)
 
-	require.NoError(wallet.SendTx(
-		ctx,
-		tx,
-		500*time.Millisecond,
-		func(time.Duration) {},
-		func(*types.Receipt, time.Duration) {},
-	))
+	require.NoError(wallet.SendTx(ctx, tx))
 }
 
 func testHashing(
 	tc tests.TestContext,
 	ctx context.Context,
-	wallet *Wallet,
+	wallet Wallet,
 	contract *contracts.EVMLoadSimulator,
 ) {
 	require := require.New(tc)
@@ -266,19 +241,13 @@ func testHashing(
 	tx, err := contract.SimulateHashing(txOpts, count)
 	require.NoError(err)
 
-	require.NoError(wallet.SendTx(
-		ctx,
-		tx,
-		500*time.Millisecond,
-		func(time.Duration) {},
-		func(*types.Receipt, time.Duration) {},
-	))
+	require.NoError(wallet.SendTx(ctx, tx))
 }
 
 func testMemory(
 	tc tests.TestContext,
 	ctx context.Context,
-	wallet *Wallet,
+	wallet Wallet,
 	contract *contracts.EVMLoadSimulator,
 ) {
 	require := require.New(tc)
@@ -296,19 +265,13 @@ func testMemory(
 	tx, err := contract.SimulateMemory(txOpts, count)
 	require.NoError(err)
 
-	require.NoError(wallet.SendTx(
-		ctx,
-		tx,
-		500*time.Millisecond,
-		func(time.Duration) {},
-		func(*types.Receipt, time.Duration) {},
-	))
+	require.NoError(wallet.SendTx(ctx, tx))
 }
 
 func testCallDepth(
 	tc tests.TestContext,
 	ctx context.Context,
-	wallet *Wallet,
+	wallet Wallet,
 	contract *contracts.EVMLoadSimulator,
 ) {
 	require := require.New(tc)
@@ -326,19 +289,13 @@ func testCallDepth(
 	tx, err := contract.SimulateCallDepth(txOpts, count)
 	require.NoError(err)
 
-	require.NoError(wallet.SendTx(
-		ctx,
-		tx,
-		500*time.Millisecond,
-		func(time.Duration) {},
-		func(*types.Receipt, time.Duration) {},
-	))
+	require.NoError(wallet.SendTx(ctx, tx))
 }
 
 func testContractCreation(
 	tc tests.TestContext,
 	ctx context.Context,
-	wallet *Wallet,
+	wallet Wallet,
 	contract *contracts.EVMLoadSimulator,
 ) {
 	require := require.New(tc)
@@ -354,19 +311,13 @@ func testContractCreation(
 	tx, err := contract.SimulateContractCreation(txOpts)
 	require.NoError(err)
 
-	require.NoError(wallet.SendTx(
-		ctx,
-		tx,
-		500*time.Millisecond,
-		func(time.Duration) {},
-		func(*types.Receipt, time.Duration) {},
-	))
+	require.NoError(wallet.SendTx(ctx, tx))
 }
 
 func testPureCompute(
 	tc tests.TestContext,
 	ctx context.Context,
-	wallet *Wallet,
+	wallet Wallet,
 	contract *contracts.EVMLoadSimulator,
 ) {
 	require := require.New(tc)
@@ -383,19 +334,13 @@ func testPureCompute(
 	tx, err := contract.SimulatePureCompute(txOpts, big.NewInt(iterations))
 	require.NoError(err)
 
-	require.NoError(wallet.SendTx(
-		ctx,
-		tx,
-		500*time.Millisecond,
-		func(time.Duration) {},
-		func(*types.Receipt, time.Duration) {},
-	))
+	require.NoError(wallet.SendTx(ctx, tx))
 }
 
 func testLargeEvent(
 	tc tests.TestContext,
 	ctx context.Context,
-	wallet *Wallet,
+	wallet Wallet,
 	contract *contracts.EVMLoadSimulator,
 ) {
 	require := require.New(tc)
@@ -412,19 +357,13 @@ func testLargeEvent(
 	tx, err := contract.SimulateLargeEvent(txOpts, big.NewInt(maxEventSize))
 	require.NoError(err)
 
-	require.NoError(wallet.SendTx(
-		ctx,
-		tx,
-		500*time.Millisecond,
-		func(time.Duration) {},
-		func(*types.Receipt, time.Duration) {},
-	))
+	require.NoError(wallet.SendTx(ctx, tx))
 }
 
 func testExternallCall(
 	tc tests.TestContext,
 	ctx context.Context,
-	wallet *Wallet,
+	wallet Wallet,
 	contract *contracts.EVMLoadSimulator,
 ) {
 	require := require.New(tc)
@@ -440,11 +379,5 @@ func testExternallCall(
 	tx, err := contract.SimulateExternalCall(txOpts)
 	require.NoError(err)
 
-	require.NoError(wallet.SendTx(
-		ctx,
-		tx,
-		500*time.Millisecond,
-		func(time.Duration) {},
-		func(*types.Receipt, time.Duration) {},
-	))
+	require.NoError(wallet.SendTx(ctx, tx))
 }

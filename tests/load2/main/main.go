@@ -10,9 +10,8 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethclient"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/tests"
@@ -20,6 +19,9 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/tests/load/c/contracts"
 	"github.com/ava-labs/avalanchego/tests/load2"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+
+	ethcommon "github.com/ava-labs/libevm/common"
 )
 
 const (
@@ -29,6 +31,8 @@ const (
 	agentsPerNode = 5
 	agentsCount   = nodesCount * agentsPerNode
 	logPrefix     = "avalanchego-load-test"
+	namespace     = "load"
+	pollFrequency = time.Millisecond
 )
 
 var (
@@ -68,7 +72,18 @@ func main() {
 	wsURIs, err := tmpnet.GetNodeWebsocketURIs(ctx, network.Nodes, blockchainID, tc.DeferCleanup)
 	require.NoError(err)
 
-	wallets := make([]*load2.Wallet, len(keys))
+	registry := prometheus.NewRegistry()
+	tracker, err := load2.NewTracker(namespace, registry)
+	require.NoError(err)
+
+	issuanceF := func(i common.IssuanceReceipt) {
+		tracker.Issue(i.Duration)
+	}
+	confirmationF := func(c common.ConfirmationReceipt) {
+		tracker.Accept(c.ConfirmationDuration, c.TotalDuration)
+	}
+
+	wallets := make([]load2.Wallet, len(keys))
 	txTests := make([]load2.TxTest, len(keys))
 	for i := range len(keys) {
 		wsURI := wsURIs[i%len(wsURIs)]
@@ -79,25 +94,33 @@ func main() {
 		require.NoError(err)
 
 		wallet := load2.NewWallet(client, keys[i].ToECDSA(), 0, chainID)
+
 		contract, err := createContract(ctx, client, wallet)
 		require.NoError(err)
 
-		txTest := testWithContract(load2.TestRandomTx, contract)
+		txTest := func(tc tests.TestContext, ctx context.Context, w load2.Wallet) {
+			load2.TestRandomTx(tc, ctx, w, contract)
+		}
 
-		wallets[i] = wallet
+		wallets[i] = load2.NewWalletWithOptions(
+			wallet,
+			common.WithIssuanceHandler(issuanceF),
+			common.WithConfirmationHandler(confirmationF),
+			common.WithPollFrequency(pollFrequency),
+		)
 		txTests[i] = txTest
 	}
 
-	generator, err := load2.NewGenerator(log, wallets, txTests)
+	generator, err := load2.NewGenerator(wallets, txTests)
 	require.NoError(err)
 
-	require.NoError(generator.Run(tc, ctx))
+	generator.Run(tc, ctx)
 }
 
 func createContract(
 	ctx context.Context,
 	client *ethclient.Client,
-	wallet *load2.Wallet,
+	wallet load2.Wallet,
 ) (*contracts.EVMLoadSimulator, error) {
 	maxFeeCap := big.NewInt(300000000000)
 	txOpts, err := load2.NewTxOpts(wallet.PrivKey(), wallet.ChainID(), maxFeeCap, wallet.Nonce())
@@ -110,31 +133,25 @@ func createContract(
 		return nil, err
 	}
 
-	var contractAddress common.Address
+	var contractAddress ethcommon.Address
+	addressF := func(c common.ConfirmationReceipt) {
+		receipt, err := client.TransactionReceipt(ctx, ethcommon.Hash(c.TxID))
+		if err == nil {
+			contractAddress = receipt.ContractAddress
+		}
+	}
+
 	if err := wallet.SendTx(
 		ctx,
 		tx,
-		500*time.Millisecond,
-		func(time.Duration) {},
-		func(receipt *types.Receipt, _ time.Duration) {
-			contractAddress = receipt.ContractAddress
-		},
+		common.WithConfirmationHandler(addressF),
 	); err != nil {
 		return nil, err
 	}
 
-	if contractAddress == (common.Address{}) {
+	if contractAddress == (ethcommon.Address{}) {
 		return nil, errFailedToCreateContract
 	}
 
 	return contracts.NewEVMLoadSimulator(contractAddress, client)
-}
-
-func testWithContract(
-	f func(tests.TestContext, context.Context, *load2.Wallet, *contracts.EVMLoadSimulator),
-	contract *contracts.EVMLoadSimulator,
-) load2.TxTest {
-	return func(tc tests.TestContext, ctx context.Context, w *load2.Wallet) {
-		f(tc, ctx, w, contract)
-	}
 }
