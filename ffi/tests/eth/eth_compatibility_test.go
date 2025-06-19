@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	firewood "github.com/ava-labs/firewood-go/ffi"
+	firewood "github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"

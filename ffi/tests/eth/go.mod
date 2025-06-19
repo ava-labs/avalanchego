@@ -5,7 +5,7 @@ go 1.23.9
 toolchain go1.24.2
 
 require (
-	github.com/ava-labs/firewood-go/ffi v0.0.0 // this is replaced to use the parent folder
+	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.0 // this is replaced to use the parent folder
 	github.com/ava-labs/libevm v1.13.14-0.2.0.release
 	github.com/holiman/uint256 v1.3.2
 	github.com/stretchr/testify v1.10.0
@@ -70,4 +70,4 @@ require (
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
-replace github.com/ava-labs/firewood-go/ffi => ../../
+replace github.com/ava-labs/firewood-go-ethhash/ffi => ../../

@@ -100,7 +100,7 @@ jobs:
             echo "Using tag name as target_branch: $target_branch"
             echo "target_branch=$target_branch" >> "$GITHUB_OUTPUT"
           elif [[ "${{ github.event_name }}" == "push" && "${{ github.ref_name }}" == "main" ]]; then
-            export target_branch="main-ci" # Avoid pushing to main branch of firewood-go repo
+            export target_branch="main-ci" # Avoid pushing to main branch of firewood-go-ethhash repo
             echo "Using main-ci as target branch for push to main: $target_branch"
             echo "target_branch=$target_branch" >> "$GITHUB_OUTPUT"
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
@@ -118,36 +118,36 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
-          repository: ava-labs/firewood-go
+          repository: ava-labs/firewood-go-ethhash
           token: ${{ secrets.FIREWOOD_GO_GITHUB_TOKEN }}
-          path: firewood-go
+          path: firewood-go-ethhash
 
       - name: Copy FFI Source Code
-        run: cp -r firewood/ffi firewood-go
+        run: cp -r firewood/ffi firewood-go-ethhash
 
       - name: Switch to Static Libs CGO Mode
-        working-directory: firewood-go/ffi
+        working-directory: firewood-go-ethhash/ffi
         run: FIREWOOD_LD_MODE=STATIC_LIBS go generate
 
       - name: Download binaries into libs directory
         uses: actions/download-artifact@v4
         with:
-          path: firewood-go/ffi/libs
+          path: firewood-go-ethhash/ffi/libs
 
       - name: List downloaded target directory
-        run: find firewood-go -type f | sort
+        run: find firewood-go-ethhash -type f | sort
 
       - name: Push static libs to branch
-        working-directory: firewood-go
+        working-directory: firewood-go-ethhash
         # GITHUB_TOKEN is configured in the last actions/checkout step
-        # to have read/write permissions to the firewood-go repo.
+        # to have read/write permissions to the firewood-go-ethhash repo.
         run: |
           git config --global user.name "FirewoodCI"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -b ${{ steps.determine_branch.outputs.target_branch }}
           echo "Updating ffi module path before pushing to alternative remote"
           pushd ffi
-          go mod edit -module github.com/ava-labs/firewood-go/ffi
+          go mod edit -module github.com/ava-labs/firewood-go-ethhash/ffi
           popd
           git add .
           git commit -m "firewood ci ${{ github.sha }}: attach firewood static libs"
@@ -173,7 +173,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          repository: ava-labs/firewood-go
+          repository: ava-labs/firewood-go-ethhash
           token: ${{ secrets.FIREWOOD_GO_GITHUB_TOKEN }}
           ref: ${{ needs.push-firewood-ffi-libs.outputs.target_branch }}
       - name: Set up Go
@@ -197,7 +197,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          repository: ava-labs/firewood-go
+          repository: ava-labs/firewood-go-ethhash
           token: ${{ secrets.FIREWOOD_GO_GITHUB_TOKEN }}
           ref: ${{ needs.push-firewood-ffi-libs.outputs.target_branch }}
       - name: Delete branch

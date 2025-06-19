@@ -6,14 +6,14 @@ The FFI package provides a golang FFI layer for Firewood.
 
 The Golang FFI layer uses a CGO directive to locate a C-API compatible binary built from Firewood. Firewood supports both seamless local development and a single-step compilation process for Go projects that depend or transitively depend on Firewood.
 
-To do this, [firewood.go](./firewood.go) includes CGO directives to include multiple search paths for the Firewood binary in the local `target/` build directory and `ffi/libs`. For the latter, [attach-static-libs](../.github/workflows/attach-static-libs.yaml) GitHub Action pushes an FFI package with static libraries attached for the following supported architectures:
+To do this, [firewood.go](./firewood.go) includes CGO directives to include multiple search paths for the Firewood binary in the local `target/` build directory and `ffi/libs`. For the latter, [attach-static-libs](../.github/workflows/attach-static-libs.yaml) GitHub Action pushes an FFI package for `ethhash` with static libraries attached for the following supported architectures:
 
 - x86_64-unknown-linux-gnu
 - aarch64-unknown-linux-gnu
 - aarch64-apple-darwin
 - x86_64-apple-darwin
 
-to a separate repo [firewood-go](https://github.com/ava-labs/firewood-go) (to avoid including binaries in the Firewood repo).
+to a separate repo [firewood-go-ethhash](https://github.com/ava-labs/firewood-go-ethhash) (to avoid including binaries in the Firewood repo).
 
 ### Local Development
 
@@ -36,17 +36,17 @@ go test
 To use a local build of Firewood for a project that depends on Firewood, you must redirect the `go.mod` to use the local version of Firewood FFI, for example:
 
 ```bash
-go mod edit -replace github.com/ava-labs/firewood-go/ffi=/path/to/firewood/ffi
+go mod edit -replace github.com/ava-labs/firewood-go-ethhash/ffi=/path/to/firewood/ffi
 go mod tidy
 ```
 
 ### Production Development Flow
 
-Firewood pushes the FFI source code and attached static libraries to [firewood-go](https://github.com/ava-labs/firewood-go) via [attach-static-libs](../.github/workflows/attach-static-libs.yaml).
+Firewood pushes the FFI source code and attached static libraries to [firewood-go-ethhash](https://github.com/ava-labs/firewood-go-ethhash) via [attach-static-libs](../.github/workflows/attach-static-libs.yaml).
 
-This enables consumers to utilize it directly without forcing them to compile Firewood locally. Go programs running on supported architectures can utilize `firewood-go/ffi` just like any other dependency.
+This enables consumers to utilize it directly without forcing them to compile Firewood locally. Go programs running on supported architectures can utilize `firewood-go-ethhash/ffi` just like any other dependency.
 
-To trigger this build, [attach-static-libs](../.github/workflows/attach-static-libs.yaml) supports triggers for both manual GitHub Actions and tags, so you can create a mirror branch/tag on [firewood-go](https://github.com/ava-labs/firewood-go) by either trigger a manual GitHub Action and selecting your branch or pushing a tag to Firewood.
+To trigger this build, [attach-static-libs](../.github/workflows/attach-static-libs.yaml) supports triggers for both manual GitHub Actions and tags, so you can create a mirror branch/tag on [firewood-go-ethhash](https://github.com/ava-labs/firewood-go-ethhash) by either trigger a manual GitHub Action and selecting your branch or pushing a tag to Firewood.
 
 ### Hash Mode
 
@@ -58,7 +58,7 @@ This is an optional feature (disabled by default). To enable it for a local buil
 cargo build -p firewood-ffi --features ethhash
 ```
 
-To support development in [Coreth](https://github.com/ava-labs/coreth), Firewood pushes static libraries to [firewood-go](https://github.com/ava-labs/firewood-go) with `ethhash` enabled by default.
+To support development in [Coreth](https://github.com/ava-labs/coreth), Firewood pushes static libraries for Ethereum-compatible hashing to [firewood-go-ethhash](https://github.com/ava-labs/firewood-go-ethhash) with `ethhash` enabled by default. To use Firewood's native hashing structure, you must still build the static library separately.
 
 ## Development
 
