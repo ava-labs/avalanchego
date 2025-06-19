@@ -6,12 +6,6 @@ import (
 	"go.uber.org/zap"
 )
 
-const (
-	// maxRecoverBlockSize is a sanity limit for block sizes encountered during the recovery scan.
-	// It prevents attempts to read/allocate excessively large blocks due to data corruption in a block header.
-	maxRecoverBlockSize uint64 = 50 * 1024 * 1024 // 50MB
-)
-
 // recover attempts to restore the store to a consistent state by scanning the data file
 // for blocks that may not be correctly indexed, usually after an unclean shutdown.
 // It reconciles the data file with the index file header and entries.
@@ -25,10 +19,6 @@ func (s *Database) recover() error {
 
 	// If the data file size matches the size recorded in the index header, then no recovery is needed.
 	if dataFileActualSize == nextDataWriteOffset {
-		// TODO: Do we need to validate that the max contiguous height is correct?
-		// it might not be correct if the previous shutdown was not clean and
-		// only the new datafile size was persisted somehow. In this case, we need
-		// to fix the max contiguous height otherwise it will never be updated.
 		return nil
 	}
 
@@ -43,7 +33,6 @@ func (s *Database) recover() error {
 	s.log.Info("Data file larger than indexed size; recovering blocks",
 		zap.Uint64("dataFileSize", dataFileActualSize),
 		zap.Uint64("indexedSize", nextDataWriteOffset),
-		zap.Uint64("scanStartOffset", nextDataWriteOffset),
 	)
 
 	// Start scan from where the index left off.
@@ -65,7 +54,7 @@ func (s *Database) recover() error {
 			zap.Uint64("offset", currentScanOffset),
 		)
 		recoveredBlocksCount++
-		if bh.Height > maxRecoveredHeightSeen {
+		if bh.Height > maxRecoveredHeightSeen || maxRecoveredHeightSeen == unsetHeight {
 			maxRecoveredHeightSeen = bh.Height
 		}
 		currentScanOffset += sizeOfBlockHeader + bh.Size
@@ -78,7 +67,7 @@ func (s *Database) recover() error {
 		s.updateMaxContiguousHeightOnRecovery()
 	}
 
-	if err := s.persistIndexHeader(true); err != nil {
+	if err := s.persistIndexHeader(); err != nil {
 		return fmt.Errorf("recovery: failed to save index header after recovery scan: %w", err)
 	}
 
@@ -92,38 +81,37 @@ func (s *Database) recover() error {
 	return nil
 }
 
-// recoverBlockAtOffset attempts to read, validate, and index a block at the given offset.
-// Returns the blockHeader and an error if the block is invalid or incomplete.
 func (s *Database) recoverBlockAtOffset(offset, dataFileActualSize uint64) (blockHeader, error) {
 	var bh blockHeader
 	if dataFileActualSize-offset < sizeOfBlockHeader {
 		return bh, fmt.Errorf("not enough data for block header at offset %d", offset)
 	}
 	bhBuf := make([]byte, sizeOfBlockHeader)
-	_, readErr := s.dataFile.ReadAt(bhBuf, int64(offset))
-	if readErr != nil {
-		return bh, fmt.Errorf("error reading block header at offset %d: %w", offset, readErr)
+	if _, err := s.dataFile.ReadAt(bhBuf, int64(offset)); err != nil {
+		return bh, fmt.Errorf("error reading block header at offset %d: %w", offset, err)
 	}
 	if err := bh.UnmarshalBinary(bhBuf); err != nil {
 		return bh, fmt.Errorf("error deserializing block header at offset %d: %w", offset, err)
 	}
-	if bh.Size == 0 || bh.Size > maxRecoverBlockSize {
+	if bh.Size == 0 || bh.Size > MaxBlockDataSize {
 		return bh, fmt.Errorf("invalid block size in header at offset %d: %d", offset, bh.Size)
 	}
-	if bh.Height < s.header.MinBlockHeight {
+	if bh.Height < s.header.MinHeight || bh.Height == unsetHeight {
 		return bh, fmt.Errorf(
 			"invalid block height in header at offset %d: found %d, expected >= %d",
-			offset, bh.Height, s.header.MinBlockHeight,
+			offset, bh.Height, s.header.MinHeight,
 		)
+	}
+	if uint64(bh.HeaderSize) > bh.Size {
+		return bh, fmt.Errorf("invalid block header size in header at offset %d: %d > %d", offset, bh.HeaderSize, bh.Size)
 	}
 	expectedBlockEndOffset := offset + sizeOfBlockHeader + bh.Size
 	if expectedBlockEndOffset < offset || expectedBlockEndOffset > dataFileActualSize {
 		return bh, fmt.Errorf("block data out of bounds at offset %d", offset)
 	}
 	blockData := make([]byte, bh.Size)
-	_, readErr = s.dataFile.ReadAt(blockData, int64(offset+sizeOfBlockHeader))
-	if readErr != nil {
-		return bh, fmt.Errorf("failed to read block data at offset %d: %w", offset, readErr)
+	if _, err := s.dataFile.ReadAt(blockData, int64(offset+sizeOfBlockHeader)); err != nil {
+		return bh, fmt.Errorf("failed to read block data at offset %d: %w", offset, err)
 	}
 	calculatedChecksum := calculateChecksum(blockData)
 	if calculatedChecksum != bh.Checksum {
@@ -135,21 +123,27 @@ func (s *Database) recoverBlockAtOffset(offset, dataFileActualSize uint64) (bloc
 	if idxErr != nil {
 		return bh, fmt.Errorf("cannot get index offset for recovered block %d: %w", bh.Height, idxErr)
 	}
-	if err := s.writeIndexEntryAt(indexFileOffset, offset, bh.Size); err != nil {
+	if err := s.writeIndexEntryAt(indexFileOffset, offset, bh.Size, bh.HeaderSize); err != nil {
 		return bh, fmt.Errorf("failed to update index for recovered block %d: %w", bh.Height, err)
 	}
 	return bh, nil
 }
 
-// updateMaxContiguousHeightOnRecovery extends the max contiguous height from the value in the header,
-// incrementing as long as contiguous blocks exist.
 func (s *Database) updateMaxContiguousHeightOnRecovery() {
-	currentMCH := s.header.MaxContiguousBlockHeight
+	currentMCH := s.header.MaxContiguousHeight
 	highestKnown := s.maxBlockHeight.Load()
 
 	for nextHeight := currentMCH + 1; nextHeight <= highestKnown; nextHeight++ {
 		entry, err := s.readIndexEntry(nextHeight)
-		if err != nil || entry.IsEmpty() {
+		if err != nil {
+			s.log.Error(
+				"error reading index entry when updating max contiguous height on recovery",
+				zap.Uint64("height", nextHeight),
+				zap.Error(err),
+			)
+			break
+		}
+		if entry.IsEmpty() {
 			break
 		}
 		currentMCH = nextHeight
