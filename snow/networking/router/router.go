@@ -56,4 +56,5 @@ type InternalHandler interface {
 		failedMsg message.InboundMessage,
 		engineType p2p.EngineType,
 	)
+	HandleInternal(context.Context, message.InboundMessage)
 }
