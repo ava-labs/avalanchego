@@ -6,6 +6,7 @@ package sender_test
 import (
 	"context"
 	"fmt"
+	"math/rand/v2"
 	"sync"
 	"testing"
 	"time"
@@ -307,6 +308,162 @@ func TestTimeout(t *testing.T) {
 }
 
 func TestReliableMessages(t *testing.T) {
+	require := require.New(t)
+
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
+	vdrs := validators.NewManager()
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.BuildTestNodeID([]byte{1}), nil, ids.Empty, 1))
+	benchlist := benchlist.NewNoBenchlist()
+	tm, err := timeout.NewManager(
+		&timer.AdaptiveTimeoutConfig{
+			InitialTimeout:     time.Millisecond,
+			MinimumTimeout:     time.Millisecond,
+			MaximumTimeout:     time.Millisecond,
+			TimeoutHalflife:    5 * time.Minute,
+			TimeoutCoefficient: 1.25,
+		},
+		benchlist,
+		prometheus.NewRegistry(),
+		prometheus.NewRegistry(),
+	)
+	require.NoError(err)
+
+	go tm.Dispatch()
+
+	chainRouter := router.ChainRouter{}
+
+	metrics := prometheus.NewRegistry()
+	mc, err := message.NewCreator(
+		metrics,
+		constants.DefaultNetworkCompressionType,
+		10*time.Second,
+	)
+	require.NoError(err)
+
+	require.NoError(chainRouter.Initialize(
+		ids.EmptyNodeID,
+		logging.NoLog{},
+		tm,
+		time.Second,
+		set.Set[ids.ID]{},
+		true,
+		set.Set[ids.ID]{},
+		nil,
+		router.HealthConfig{},
+		prometheus.NewRegistry(),
+	))
+
+	externalSender := &sendertest.External{TB: t}
+	externalSender.Default(false)
+
+	sender, err := New(
+		ctx,
+		mc,
+		externalSender,
+		&chainRouter,
+		tm,
+		p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
+		subnets.New(ctx.NodeID, subnets.Config{}),
+		prometheus.NewRegistry(),
+	)
+	require.NoError(err)
+
+	ctx2 := snowtest.ConsensusContext(snowCtx)
+	resourceTracker, err := tracker.NewResourceTracker(
+		prometheus.NewRegistry(),
+		resource.NoUsage,
+		meter.ContinuousFactory{},
+		time.Second,
+	)
+	require.NoError(err)
+
+	p2pTracker, err := p2p.NewPeerTracker(
+		logging.NoLog{},
+		"",
+		prometheus.NewRegistry(),
+		nil,
+		version.CurrentApp,
+	)
+	require.NoError(err)
+
+	h, err := handler.New(
+		ctx2,
+		vdrs,
+		nil,
+		1,
+		testThreadPoolSize,
+		resourceTracker,
+		subnets.New(ctx.NodeID, subnets.Config{}),
+		commontracker.NewPeers(),
+		p2pTracker,
+		prometheus.NewRegistry(),
+		func() {},
+	)
+	require.NoError(err)
+
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine: enginetest.Engine{
+			T: t,
+		},
+	}
+	bootstrapper.Default(true)
+	bootstrapper.CantGossip = false
+	bootstrapper.ContextF = func() *snow.ConsensusContext {
+		return ctx2
+	}
+	bootstrapper.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error {
+		return nil
+	}
+	queriesToSend := 1000
+	awaiting := make([]chan struct{}, queriesToSend)
+	for i := 0; i < queriesToSend; i++ {
+		awaiting[i] = make(chan struct{}, 1)
+	}
+	bootstrapper.QueryFailedF = func(_ context.Context, _ ids.NodeID, reqID uint32) error {
+		close(awaiting[int(reqID)])
+		return nil
+	}
+	bootstrapper.CantGossip = false
+	h.SetEngineManager(&handler.EngineManager{
+		Avalanche: &handler.Engine{
+			StateSyncer:  nil,
+			Bootstrapper: bootstrapper,
+			Consensus:    nil,
+		},
+		Snowman: &handler.Engine{
+			StateSyncer:  nil,
+			Bootstrapper: bootstrapper,
+			Consensus:    nil,
+		},
+	})
+	ctx2.State.Set(snow.EngineState{
+		Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
+		State: snow.Bootstrapping, // assumed bootstrap is ongoing
+	})
+
+	chainRouter.AddChain(context.Background(), h)
+
+	bootstrapper.StartF = func(context.Context, uint32) error {
+		return nil
+	}
+	h.Start(context.Background(), false)
+
+	go func() {
+		for i := 0; i < queriesToSend; i++ {
+			vdrIDs := set.Of(ids.BuildTestNodeID([]byte{1}))
+
+			sender.SendPullQuery(context.Background(), vdrIDs, uint32(i), ids.Empty, 0)
+			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond))) // #nosec G404
+		}
+	}()
+
+	for _, await := range awaiting {
+		<-await
+	}
+}
+
+func TestReliableMessagesToMyself(t *testing.T) {
 	for _, validatorOnly := range []bool{false, true} {
 		t.Run(fmt.Sprintf("validatorOnly_%v", validatorOnly), func(t *testing.T) {
 			require := require.New(t)
