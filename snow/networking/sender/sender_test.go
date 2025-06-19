@@ -6,7 +6,7 @@ package sender_test
 import (
 	"context"
 	"fmt"
-	"math/rand/v2"
+	"math/rand"
 	"sync"
 	"testing"
 	"time"
