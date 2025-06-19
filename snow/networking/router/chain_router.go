@@ -211,9 +211,10 @@ func (cr *ChainRouter) HandleInternal(ctx context.Context, msg message.InboundMe
 	cr.handleMessage(ctx, msg, true)
 }
 
-// HandleMessage handles a message from a peer. The internal flag indicates
-// whether the message is being sent from an internal component, such as due to
-// a timeout, or if the message originated from a remote peer.
+// handleMessage routes a message to the specified chain. Messages may be
+// unrequested, responses, or timeouts. The internal flag indicates whether the
+// message is being sent from an internal component, such as due to a timeout,
+// or if the message originated from a remote peer.
 func (cr *ChainRouter) handleMessage(ctx context.Context, msg message.InboundMessage, internal bool) {
 	nodeID := msg.NodeID()
 	op := msg.Op()
