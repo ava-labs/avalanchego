@@ -120,4 +120,15 @@ function gen_antithesis_compose_config {
   # Generate compose config for copying into the config image
   # shellcheck disable=SC2086
   env ${compose_env} go run "${exe_path}"
+
+  # Dump the generated docker compose file to build directory for inspection
+  local compose_file="${target_path}/docker-compose.yml"
+  if [[ -f "${compose_file}" ]]; then
+    echo "Generated docker compose configuration:"
+    cat "${compose_file}"
+    echo ""
+    echo "Compose file saved to: ${compose_file}"
+  else
+    echo "Warning: Expected compose file not found at ${compose_file}"
+  fi
 }
