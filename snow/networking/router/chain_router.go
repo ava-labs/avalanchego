@@ -198,7 +198,7 @@ func (cr *ChainRouter) RegisterRequest(
 		shouldMeasureLatency,
 		uniqueRequestID,
 		func() {
-			cr.HandleInternal(ctx, timeoutMsg)
+			cr.handleMessage(ctx, timeoutMsg, true)
 		},
 	)
 }
@@ -208,7 +208,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 }
 
 func (cr *ChainRouter) HandleInternal(ctx context.Context, msg message.InboundMessage) {
-	cr.handleMessage(ctx, msg, true)
+	go cr.handleMessage(ctx, msg, true)
 }
 
 // handleMessage routes a message to the specified chain. Messages may be

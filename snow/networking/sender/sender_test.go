@@ -864,15 +864,10 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 
 			// Make sure we send a message to ourselves since [myNodeID]
 			// is in [nodeIDs].
-			// Note that HandleInternal is called in a separate goroutine
-			// so we need to use a channel to synchronize the test.
-			calledHandleInternal := make(chan struct{})
 			router.EXPECT().HandleInternal(gomock.Any(), gomock.Any()).Do(
 				func(_ context.Context, msg message.InboundMessage) {
-					// Make sure we're sending ourselves
-					// the expected message.
+					// Make sure we're sending ourselves the expected message.
 					tt.assertMsgToMyself(require, msg)
-					close(calledHandleInternal)
 				},
 			)
 
@@ -883,8 +878,6 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			tt.setExternalSenderExpect(externalSender)
 
 			tt.sendF(require, sender, nodeIDsCopy)
-
-			<-calledHandleInternal
 		})
 	}
 }
@@ -1064,17 +1057,13 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 
 			// Case: sending to ourselves
 			{
-				calledHandleInternal := make(chan struct{})
 				router.EXPECT().HandleInternal(gomock.Any(), gomock.Any()).Do(
 					func(_ context.Context, msg message.InboundMessage) {
-						// Make sure we're sending ourselves
-						// the expected message.
+						// Make sure we're sending ourselves the expected message.
 						tt.assertMsgToMyself(require, msg)
-						close(calledHandleInternal)
 					},
 				)
 				tt.sendF(require, sender, ctx.NodeID)
-				<-calledHandleInternal
 			}
 
 			// Case: not sending to ourselves
@@ -1243,25 +1232,16 @@ func TestSender_Single_Request(t *testing.T) {
 					tt.expectedEngineType, // Engine Type
 				)
 
-				// Note that HandleInternal is called in a separate goroutine
-				// so we need to use a channel to synchronize the test.
-				calledHandleInternal := make(chan struct{})
 				if tt.shouldFailMessageToSelf {
 					router.EXPECT().HandleInternal(gomock.Any(), gomock.Any()).Do(
 						func(_ context.Context, msg message.InboundMessage) {
-							// Make sure we're sending ourselves
-							// the expected message.
+							// Make sure we're sending ourselves the expected message.
 							tt.assertMsg(require, msg)
-							close(calledHandleInternal)
 						},
 					)
-				} else {
-					close(calledHandleInternal)
 				}
 
 				tt.sendF(require, sender, ctx.NodeID)
-
-				<-calledHandleInternal
 			}
 
 			// Case: Node is benched
@@ -1282,21 +1262,14 @@ func TestSender_Single_Request(t *testing.T) {
 					tt.expectedEngineType, // Engine Type
 				)
 
-				// Note that HandleInternal is called in a separate goroutine
-				// so we need to use a channel to synchronize the test.
-				calledHandleInternal := make(chan struct{})
 				router.EXPECT().HandleInternal(gomock.Any(), gomock.Any()).Do(
 					func(_ context.Context, msg message.InboundMessage) {
-						// Make sure we're sending ourselves
-						// the expected message.
+						// Make sure we're sending ourselves the expected message.
 						tt.assertMsg(require, msg)
-						close(calledHandleInternal)
 					},
 				)
 
 				tt.sendF(require, sender, destinationNodeID)
-
-				<-calledHandleInternal
 			}
 
 			// Case: Node is not myself, not benched and send fails
@@ -1317,15 +1290,10 @@ func TestSender_Single_Request(t *testing.T) {
 					tt.expectedEngineType, // Engine Type
 				)
 
-				// Note that HandleInternal is called in a separate goroutine
-				// so we need to use a channel to synchronize the test.
-				calledHandleInternal := make(chan struct{})
 				router.EXPECT().HandleInternal(gomock.Any(), gomock.Any()).Do(
 					func(_ context.Context, msg message.InboundMessage) {
-						// Make sure we're sending ourselves
-						// the expected message.
+						// Make sure we're sending ourselves the expected message.
 						tt.assertMsg(require, msg)
-						close(calledHandleInternal)
 					},
 				)
 
@@ -1336,8 +1304,6 @@ func TestSender_Single_Request(t *testing.T) {
 				tt.setExternalSenderExpect(externalSender, set.Set[ids.NodeID]{})
 
 				tt.sendF(require, sender, destinationNodeID)
-
-				<-calledHandleInternal
 			}
 		})
 	}
