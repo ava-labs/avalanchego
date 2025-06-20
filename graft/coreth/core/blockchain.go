@@ -59,6 +59,7 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
+	"github.com/ava-labs/libevm/libevm/stateconf"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/metrics"
 	"github.com/ava-labs/libevm/trie"
@@ -1722,8 +1723,8 @@ func (bc *BlockChain) commitWithSnap(
 ) (common.Hash, error) {
 	// blockHashes must be passed through [state.StateDB]'s Commit since snapshots
 	// are based on the block hash.
-	blockHashes := snapshot.WithBlockHashes(current.Hash(), current.ParentHash())
-	root, err := statedb.Commit(current.NumberU64(), bc.chainConfig.IsEIP158(current.Number()), blockHashes)
+	snapshotOpt := snapshot.WithBlockHashes(current.Hash(), current.ParentHash())
+	root, err := statedb.Commit(current.NumberU64(), bc.chainConfig.IsEIP158(current.Number()), stateconf.WithSnapshotUpdateOpts(snapshotOpt))
 	if err != nil {
 		return common.Hash{}, err
 	}
@@ -1731,7 +1732,7 @@ func (bc *BlockChain) commitWithSnap(
 	// parent root, however here the snapshots are based on the block hash, so
 	// this update is necessary. Note blockHashes are passed here as well.
 	if bc.snaps != nil && root == parentRoot {
-		if err := bc.snaps.Update(root, parentRoot, nil, nil, nil, blockHashes); err != nil {
+		if err := bc.snaps.Update(root, parentRoot, nil, nil, nil, snapshotOpt); err != nil {
 			return common.Hash{}, err
 		}
 	}

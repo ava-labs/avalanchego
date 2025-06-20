@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/crypto"
+	"github.com/ava-labs/libevm/libevm/stateconf"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 )
@@ -71,7 +72,8 @@ func TestMultiCoinSnapshot(t *testing.T) {
 	assertBalances(10, 0, 0)
 
 	// Commit and get the new root
-	root, err = stateDB.Commit(0, false, snapshot.WithBlockHashes(common.Hash{}, common.Hash{}))
+	snapshotOpt := snapshot.WithBlockHashes(common.Hash{}, common.Hash{})
+	root, err = stateDB.Commit(0, false, stateconf.WithSnapshotUpdateOpts(snapshotOpt))
 	require.NoError(t, err, "committing statedb")
 	assertBalances(10, 0, 0)
 
@@ -80,7 +82,8 @@ func TestMultiCoinSnapshot(t *testing.T) {
 	stateDB, err = New(root, sdb, snapTree)
 	require.NoError(t, err, "creating statedb")
 	stateDB.AddBalanceMultiCoin(addr, assetID1, big.NewInt(10))
-	root, err = stateDB.Commit(0, false, snapshot.WithBlockHashes(common.Hash{}, common.Hash{}))
+	snapshotOpt = snapshot.WithBlockHashes(common.Hash{}, common.Hash{})
+	root, err = stateDB.Commit(0, false, stateconf.WithSnapshotUpdateOpts(snapshotOpt))
 	require.NoError(t, err, "committing statedb")
 	assertBalances(10, 10, 0)
 
@@ -90,7 +93,8 @@ func TestMultiCoinSnapshot(t *testing.T) {
 		require.NoErrorf(t, err, "creating statedb %d", i)
 		stateDB.AddBalanceMultiCoin(addr, assetID1, big.NewInt(1))
 		stateDB.AddBalanceMultiCoin(addr, assetID2, big.NewInt(2))
-		root, err = stateDB.Commit(0, false, snapshot.WithBlockHashes(common.Hash{}, common.Hash{}))
+		snapshotOpt = snapshot.WithBlockHashes(common.Hash{}, common.Hash{})
+		root, err = stateDB.Commit(0, false, stateconf.WithSnapshotUpdateOpts(snapshotOpt))
 		require.NoErrorf(t, err, "committing statedb %d", i)
 	}
 	assertBalances(10, 266, 512)
@@ -101,7 +105,8 @@ func TestMultiCoinSnapshot(t *testing.T) {
 	require.NoError(t, err, "creating statedb")
 	stateDB.AddBalance(addr, uint256.NewInt(1))
 	stateDB.AddBalanceMultiCoin(addr, assetID1, big.NewInt(1))
-	root, err = stateDB.Commit(0, false, snapshot.WithBlockHashes(common.Hash{}, common.Hash{}))
+	snapshotOpt = snapshot.WithBlockHashes(common.Hash{}, common.Hash{})
+	root, err = stateDB.Commit(0, false, stateconf.WithSnapshotUpdateOpts(snapshotOpt))
 	require.NoError(t, err, "committing statedb")
 
 	stateDB, err = New(root, sdb, snapTree)
