@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/libevm/legacy"
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 type RulesExtra extras.Rules
@@ -35,6 +36,11 @@ func (r RulesExtra) CanCreateContract(ac *libevm.AddressContext, gas uint64, sta
 
 func (r RulesExtra) CanExecuteTransaction(_ common.Address, _ *common.Address, _ libevm.StateReader) error {
 	return nil
+}
+
+// MinimumGasConsumption is a no-op.
+func (r RulesExtra) MinimumGasConsumption(x uint64) uint64 {
+	return (ethparams.NOOPHooks{}).MinimumGasConsumption(x)
 }
 
 var PrecompiledContractsApricotPhase2 = map[common.Address]contract.StatefulPrecompiledContract{
