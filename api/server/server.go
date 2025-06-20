@@ -242,7 +242,7 @@ func (s *server) wrapMiddleware(chainName string, handler http.Handler, ctx *sno
 	return s.metrics.wrapHandler(chainName, handler)
 }
 
-func (s *server) AddHandler(handler http.Handler) error {
+func (s *server) AddHTTP2Handler(handler http.Handler) error {
 	//return s.addRoute(handler, base, endpoint)
 	panic("TODO")
 	return nil
