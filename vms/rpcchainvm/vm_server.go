@@ -37,12 +37,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/gwarp"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/messenger"
 
 	aliasreaderpb "github.com/ava-labs/avalanchego/proto/pb/aliasreader"
 	appsenderpb "github.com/ava-labs/avalanchego/proto/pb/appsender"
 	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
-	messengerpb "github.com/ava-labs/avalanchego/proto/pb/messenger"
 	rpcdbpb "github.com/ava-labs/avalanchego/proto/pb/rpcdb"
 	sharedmemorypb "github.com/ava-labs/avalanchego/proto/pb/sharedmemory"
 	validatorstatepb "github.com/ava-labs/avalanchego/proto/pb/validatorstate"
@@ -211,14 +209,6 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 
 	vm.connCloser.Add(clientConn)
 
-	subscribe := func(ctx context.Context) messengerpb.Message {
-		msg := vm.vm.SubscribeToEvents(ctx)
-		return messengerpb.Message(msg)
-	}
-	msgClient := messenger.NewClient(messengerpb.NewMessengerClient(clientConn), vm.log, subscribe)
-	defer func() {
-		go msgClient.Run()
-	}()
 	sharedMemoryClient := gsharedmemory.NewClient(sharedmemorypb.NewSharedMemoryClient(clientConn))
 	bcLookupClient := galiasreader.NewClient(aliasreaderpb.NewAliasReaderClient(clientConn))
 	appSenderClient := appsender.NewClient(appsenderpb.NewAppSenderClient(clientConn))
@@ -381,6 +371,13 @@ func (vm *VMServer) CreateHTTP2Handler(ctx context.Context, _ *emptypb.Empty) (*
 
 	return &vmpb.CreateHTTP2HandlerResponse{
 		ServerAddr: serverListener.Addr().String(),
+	}, nil
+}
+
+func (vm *VMServer) SubscribeToEvents(ctx context.Context, _ *emptypb.Empty) (*vmpb.SubscribeToEventsResponse, error) {
+	message := vm.vm.SubscribeToEvents(ctx)
+	return &vmpb.SubscribeToEventsResponse{
+		Message: vmpb.Message(message),
 	}, nil
 }
 

@@ -39,13 +39,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/gwarp"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/messenger"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
 	aliasreaderpb "github.com/ava-labs/avalanchego/proto/pb/aliasreader"
 	appsenderpb "github.com/ava-labs/avalanchego/proto/pb/appsender"
 	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
-	messengerpb "github.com/ava-labs/avalanchego/proto/pb/messenger"
 	rpcdbpb "github.com/ava-labs/avalanchego/proto/pb/rpcdb"
 	sharedmemorypb "github.com/ava-labs/avalanchego/proto/pb/sharedmemory"
 	validatorstatepb "github.com/ava-labs/avalanchego/proto/pb/validatorstate"
@@ -90,7 +88,6 @@ type VMClient struct {
 	processTracker  resource.ProcessTracker
 	metricsGatherer metrics.MultiGatherer
 
-	messenger            *messenger.Server
 	sharedMemory         *gsharedmemory.Server
 	bcLookup             *galiasreader.Server
 	appSender            *appsender.Server
@@ -168,7 +165,6 @@ func (vm *VMClient) Initialize(
 		zap.String("address", dbServerAddr),
 	)
 
-	vm.messenger = messenger.NewServer(chainCtx.Log)
 	vm.sharedMemory = gsharedmemory.NewServer(chainCtx.SharedMemory, db)
 	vm.bcLookup = galiasreader.NewServer(chainCtx.BCLookup)
 	vm.appSender = appsender.NewServer(appSender)
@@ -295,15 +291,6 @@ func (vm *VMClient) newDBServer(db database.Database) *grpc.Server {
 	return server
 }
 
-func (vm *VMClient) SubscribeToEvents(ctx context.Context) common.Message {
-	msg, err := vm.messenger.SubscribeToEvents(ctx)
-	if err != nil {
-		vm.logger.Error("failed to subscribe to events", zap.Error(err))
-		return 0
-	}
-	return msg
-}
-
 func (vm *VMClient) newInitServer() *grpc.Server {
 	server := grpcutils.NewServer(
 		grpcutils.WithUnaryInterceptor(vm.grpcServerMetrics.UnaryServerInterceptor()),
@@ -317,7 +304,6 @@ func (vm *VMClient) newInitServer() *grpc.Server {
 	vm.serverCloser.Add(server)
 
 	// Register services
-	messengerpb.RegisterMessengerServer(server, vm.messenger)
 	sharedmemorypb.RegisterSharedMemoryServer(server, vm.sharedMemory)
 	aliasreaderpb.RegisterAliasReaderServer(server, vm.bcLookup)
 	appsenderpb.RegisterAppSenderServer(server, vm.appSender)
@@ -418,6 +404,16 @@ func (vm *VMClient) CreateHTTP2Handler(ctx context.Context) (http.Handler, error
 
 	vm.conns = append(vm.conns, clientConn)
 	return ghttp.NewClient(httppb.NewHTTPClient(clientConn)), nil
+}
+
+func (vm *VMClient) SubscribeToEvents(ctx context.Context) common.Message {
+	resp, err := vm.client.SubscribeToEvents(ctx, &emptypb.Empty{})
+	if err != nil {
+		// TODO: Correctly return this error to the caller.
+		vm.logger.Error("failed to subscribe to events", zap.Error(err))
+		return 0
+	}
+	return common.Message(resp.Message)
 }
 
 func (vm *VMClient) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
