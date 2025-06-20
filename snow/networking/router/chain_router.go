@@ -208,6 +208,10 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 }
 
 func (cr *ChainRouter) HandleInternal(ctx context.Context, msg message.InboundMessage) {
+	// handleMessage is called in a separate goroutine because internal messages
+	// may be sent while holding the chain's context lock. To enforce the
+	// expected lock ordering, we must not grab the chain router lock while
+	// holding the chain's context lock.
 	go cr.handleMessage(ctx, msg, true)
 }
 
