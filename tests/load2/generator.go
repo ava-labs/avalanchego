@@ -1,0 +1,138 @@
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package load2
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"sync"
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/ava-labs/avalanchego/tests"
+)
+
+type Tracker struct {
+	lock sync.RWMutex
+
+	txsIssued   uint64
+	txsAccepted uint64
+
+	txsIssuedCounter      prometheus.Counter
+	txsAcceptedCounter    prometheus.Counter
+	txIssuanceLatency     prometheus.Histogram
+	txConfirmationLatency prometheus.Histogram
+	txTotalLatency        prometheus.Histogram
+}
+
+func NewTracker(namespace string, registry *prometheus.Registry) (*Tracker, error) {
+	t := &Tracker{
+		txsIssuedCounter: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "txs_issued",
+			Help:      "Number of transactions issued",
+		}),
+		txsAcceptedCounter: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "txs_confirmed",
+			Help:      "Number of transactions confirmed",
+		}),
+		txIssuanceLatency: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespace,
+			Name:      "tx_issuance_latency",
+			Help:      "issuance latency of transactions",
+		}),
+		txConfirmationLatency: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespace,
+			Name:      "tx_confirmation_latency",
+			Help:      "confirmation latency of transactions",
+		}),
+		txTotalLatency: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespace,
+			Name:      "tx_total_latency",
+			Help:      "total latency of transactions",
+		}),
+	}
+
+	if err := errors.Join(
+		registry.Register(t.txsIssuedCounter),
+		registry.Register(t.txsAcceptedCounter),
+		registry.Register(t.txIssuanceLatency),
+		registry.Register(t.txConfirmationLatency),
+		registry.Register(t.txTotalLatency),
+	); err != nil {
+		return nil, err
+	}
+
+	return t, nil
+}
+
+func (t *Tracker) Issue(d time.Duration) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	t.txsIssued++
+	t.txIssuanceLatency.Observe(float64(d.Milliseconds()))
+}
+
+func (t *Tracker) Accept(confirmationDuration time.Duration, totalDuration time.Duration) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	t.txsAccepted++
+
+	t.txTotalLatency.Observe(float64(totalDuration.Milliseconds()))
+	t.txConfirmationLatency.Observe(float64(confirmationDuration.Milliseconds()))
+}
+
+type TxTest func(tests.TestContext, context.Context, Wallet)
+
+type Generator struct {
+	wallets []Wallet
+	txTests []TxTest
+}
+
+func NewGenerator(
+	wallets []Wallet,
+	txTests []TxTest,
+) (Generator, error) {
+	if len(wallets) != len(txTests) {
+		return Generator{}, fmt.Errorf(
+			"wallet and tx builder count mismatch: got %d wallets and %d txBuilders",
+			len(wallets),
+			len(txTests),
+		)
+	}
+
+	return Generator{
+		wallets: wallets,
+		txTests: txTests,
+	}, nil
+}
+
+func (g Generator) Run(tc tests.TestContext, ctx context.Context) {
+	wg := sync.WaitGroup{}
+
+	for i := range g.wallets {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+
+				g.txTests[i](tc, ctx, g.wallets[i])
+			}
+		}()
+	}
+
+	<-ctx.Done()
+	wg.Wait()
+}
