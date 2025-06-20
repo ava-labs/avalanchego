@@ -2,7 +2,7 @@
 // This file implements the ConnectRPC handler for the InfoService
 // It should satisfy the infov1.InfoServiceHandler interface generated from service.proto
 
-package connect_handler
+package connecthandler
 
 import (
 	"context"
