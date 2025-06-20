@@ -10,6 +10,7 @@ module github.com/ava-labs/avalanchego
 go 1.23.9
 
 require (
+	connectrpc.com/connect v1.18.1
 	github.com/DataDog/zstd v1.5.2
 	github.com/StephenButtolph/canoto v0.15.0
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
@@ -88,7 +89,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.10.0 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
-	github.com/bufbuild/connect-go v1.10.0 // indirect
+	github.com/bufbuild/connect-go v1.10.0
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cockroachdb/errors v1.9.1 // indirect

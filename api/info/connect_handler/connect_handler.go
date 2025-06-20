@@ -7,12 +7,13 @@ package connecthandler
 import (
 	"context"
 	"fmt"
-	"github.com/ava-labs/avalanchego/api/info"
 	"time"
 
+	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/ids"
 	v1 "github.com/ava-labs/avalanchego/proto/pb/info/v1"
 	"github.com/ava-labs/avalanchego/upgrade"
+
 	"github.com/bufbuild/connect-go"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"

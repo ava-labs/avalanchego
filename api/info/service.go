@@ -98,7 +98,7 @@ func NewService(
 	myIP *utils.Atomic[netip.AddrPort],
 	network network.Network,
 	benchlist benchlist.Manager,
-) (http.Handler, info.Info, error) {
+) (http.Handler, *Info, error) {
 	server := rpc.NewServer()
 	codec := json.NewCodec()
 	server.RegisterCodec(codec, "application/json")

@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	connecthandler "github.com/ava-labs/avalanchego/api/info/connect_handler"
 	"io"
 	"io/fs"
 	"net"
@@ -20,6 +19,9 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	connecthandler "github.com/ava-labs/avalanchego/api/info/connect_handler"
+	"github.com/ava-labs/avalanchego/proto/pb/info/v1/infov1connect"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -1375,8 +1377,10 @@ func (n *Node) initInfoAPI() error {
 	}
 
 	// TODO add the connect handler
-	connectHandler := connecthandler.NewConnectInfoService(info)
-	n.APIServer.AddHandler(connectHandler)
+	connectInfoService := connecthandler.NewConnectInfoService(info)
+	_, connectHandler := infov1connect.NewInfoServiceHandler(connectInfoService)
+
+	n.APIServer.AddHTTP2Handler(connectHandler)
 
 	return n.APIServer.AddRoute(
 		service,

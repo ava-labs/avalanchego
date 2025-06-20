@@ -38,6 +38,7 @@ var (
 )
 
 type PathAdder interface {
+	AddHTTP2Handler(handler http.Handler) bool
 	// AddRoute registers a route to a handler.
 	AddRoute(handler http.Handler, base, endpoint string) error
 
@@ -320,6 +321,10 @@ func PathWriterFromWithReadLock(pather PathAdderWithReadLock) PathAdder {
 	return readPathAdder{
 		pather: pather,
 	}
+}
+
+func (r readPathAdder) AddHTTP2Handler(handler http.Handler) bool {
+	panic("TODO")
 }
 
 func (a readPathAdder) AddRoute(handler http.Handler, base, endpoint string) error {
