@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	connecthandler "github.com/ava-labs/avalanchego/api/info/connect_handler"
 	"io"
 	"io/fs"
 	"net"
@@ -1349,7 +1350,7 @@ func (n *Node) initInfoAPI() error {
 		return fmt.Errorf("problem creating proof of possession: %w", err)
 	}
 
-	service, err := info.NewService(
+	service, info, err := info.NewService(
 		info.Parameters{
 			Version:   version.CurrentApp,
 			NodeID:    n.ID,
@@ -1374,6 +1375,8 @@ func (n *Node) initInfoAPI() error {
 	}
 
 	// TODO add the connect handler
+	connectHandler := connecthandler.NewConnectInfoService(info)
+	n.APIServer.AddHandler(connectHandler)
 
 	return n.APIServer.AddRoute(
 		service,

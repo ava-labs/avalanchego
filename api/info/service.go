@@ -98,24 +98,22 @@ func NewService(
 	myIP *utils.Atomic[netip.AddrPort],
 	network network.Network,
 	benchlist benchlist.Manager,
-) (http.Handler, error) {
+) (http.Handler, info.Info, error) {
 	server := rpc.NewServer()
 	codec := json.NewCodec()
 	server.RegisterCodec(codec, "application/json")
 	server.RegisterCodec(codec, "application/json;charset=UTF-8")
-	return server, server.RegisterService(
-		&Info{
-			Parameters:   parameters,
-			Log:          log,
-			Validators:   validators,
-			ChainManager: chainManager,
-			VmManager:    vmManager,
-			MyIP:         myIP,
-			Networking:   network,
-			Benchlist:    benchlist,
-		},
-		"info",
-	)
+	info := &Info{
+		Parameters:   parameters,
+		Log:          log,
+		Validators:   validators,
+		ChainManager: chainManager,
+		VmManager:    vmManager,
+		MyIP:         myIP,
+		Networking:   network,
+		Benchlist:    benchlist,
+	}
+	return server, info, server.RegisterService(info, "info")
 }
 
 // GetNodeVersionReply are the results from calling GetNodeVersion
