@@ -1372,6 +1372,9 @@ func (n *Node) initInfoAPI() error {
 	if err != nil {
 		return err
 	}
+
+	// TODO add the connect handler
+
 	return n.APIServer.AddRoute(
 		service,
 		"info",
