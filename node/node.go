@@ -23,6 +23,7 @@ import (
 	connecthandler "github.com/ava-labs/avalanchego/api/info/connect_handler"
 	"github.com/ava-labs/avalanchego/proto/pb/info/v1/infov1connect"
 
+	"connectrpc.com/grpcreflect"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -1377,10 +1378,13 @@ func (n *Node) initInfoAPI() error {
 	}
 
 	// TODO add the connect handler
-	connectInfoService := connecthandler.NewConnectInfoService(info)
-	_, connectHandler := infov1connect.NewInfoServiceHandler(connectInfoService)
 
-	n.APIServer.AddHTTP2Handler(connectHandler)
+	connectInfoService := connecthandler.NewConnectInfoService(info)
+	//_, connectHandler := infov1connect.NewInfoServiceHandler(connectInfoService)
+
+	reflector := grpcreflect.NewReflector(infov1connect.NewInfoServiceHandler(connectInfoService))
+
+	n.APIServer.AddHTTP2Handler(reflector)
 
 	return n.APIServer.AddRoute(
 		service,
