@@ -38,6 +38,7 @@ var (
 )
 
 type PathAdder interface {
+	AddHTTP2Handler(handler http.Handler) bool
 	// AddRoute registers a route to a handler.
 	AddRoute(handler http.Handler, base, endpoint string) error
 
@@ -242,6 +243,10 @@ func (s *server) wrapMiddleware(chainName string, handler http.Handler, ctx *sno
 	return s.metrics.wrapHandler(chainName, handler)
 }
 
+func (s *server) AddHTTP2Handler(handler http.Handler) bool {
+	return s.http2Router.Add(ids.Empty, handler)
+}
+
 func (s *server) AddRoute(handler http.Handler, base, endpoint string) error {
 	return s.addRoute(handler, base, endpoint)
 }
@@ -316,6 +321,10 @@ func PathWriterFromWithReadLock(pather PathAdderWithReadLock) PathAdder {
 	return readPathAdder{
 		pather: pather,
 	}
+}
+
+func (r readPathAdder) AddHTTP2Handler(handler http.Handler) bool {
+	panic("TODO")
 }
 
 func (a readPathAdder) AddRoute(handler http.Handler, base, endpoint string) error {

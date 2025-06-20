@@ -1,0 +1,137 @@
+syntax = "proto3";
+package info.v1;
+
+// Reference: https://developers.google.com/protocol-buffers/docs/proto3
+option go_package = "github.com/ava-labs/avalanchego/proto/pb/info/v1;infov1";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+// InfoService is the API service for unprivileged info on a node
+service InfoService {
+  rpc GetNodeVersion(google.protobuf.Empty) returns (GetNodeVersionReply);
+  rpc GetNodeID(google.protobuf.Empty) returns (GetNodeIDReply);
+  rpc GetNodeIP(google.protobuf.Empty) returns (GetNodeIPReply);
+  rpc GetNetworkID(google.protobuf.Empty) returns (GetNetworkIDReply);
+  rpc GetNetworkName(google.protobuf.Empty) returns (GetNetworkNameReply);
+  rpc GetBlockchainID(GetBlockchainIDArgs) returns (GetBlockchainIDReply);
+  rpc Peers(PeersArgs) returns (PeersReply);
+  rpc IsBootstrapped(IsBootstrappedArgs) returns (IsBootstrappedResponse);
+  rpc Upgrades(google.protobuf.Empty) returns (UpgradesReply);
+  rpc Uptime(google.protobuf.Empty) returns (UptimeResponse);
+  rpc GetVMs(google.protobuf.Empty) returns (GetVMsReply);
+}
+
+// GetNodeVersionReply are the results from calling GetNodeVersion
+message GetNodeVersionReply {
+  string version            = 1;
+  string databaseVersion    = 2;
+  uint32 rpcProtocolVersion = 3;
+  string gitCommit          = 4;
+  map<string,string> vmVersions = 5;
+}
+
+// GetNodeIDReply are the results from calling GetNodeID
+message GetNodeIDReply {
+  string nodeID  = 1;
+  bytes  nodePOP = 2;
+}
+
+// GetNodeIPReply are the results from calling GetNodeIP
+message GetNodeIPReply {
+  string ip = 1;
+}
+
+// GetNetworkIDReply are the results from calling GetNetworkID
+message GetNetworkIDReply {
+  uint32 networkID = 1;
+}
+
+// GetNetworkNameReply is the result from calling GetNetworkName
+message GetNetworkNameReply {
+  string networkName = 1;
+}
+
+// GetBlockchainIDArgs are the arguments for calling GetBlockchainID
+message GetBlockchainIDArgs {
+  string alias = 1;
+}
+
+// GetBlockchainIDReply are the results from calling GetBlockchainID
+message GetBlockchainIDReply {
+  string blockchainID = 1;
+}
+
+// PeersArgs are the arguments for calling Peers
+message PeersArgs {
+  repeated string nodeIDs = 1;
+}
+
+// PeerInfo provides metadata about a connected peer in the network
+message PeerInfo {
+  string ip              = 1;
+  string publicIP        = 2;
+  string nodeID          = 3;
+  string version         = 4;
+  string lastSent        = 5;
+  string lastReceived    = 6;
+  repeated string benched = 7;
+  uint32 observedUptime  = 8;
+  repeated string trackedSubnets = 9;
+}
+
+// PeersReply are the results from calling Peers
+message PeersReply {
+  uint32 numPeers     = 1;
+  repeated PeerInfo peers = 2;
+}
+
+// IsBootstrappedArgs are the arguments for calling IsBootstrapped
+message IsBootstrappedArgs {
+  // Alias of the chain
+  // Can also be the string representation of the chain's ID
+  string chain = 1;
+}
+
+// IsBootstrappedResponse are the results from calling IsBootstrapped
+message IsBootstrappedResponse {
+  // True iff the chain exists and is done bootstrapping
+  bool isBootstrapped = 1;
+}
+
+// UpgradesReply contains the scheduled activation times for each protocol upgrade
+message UpgradesReply {
+  google.protobuf.Timestamp apricotPhase1Time           = 1;
+  google.protobuf.Timestamp apricotPhase2Time           = 2;
+  google.protobuf.Timestamp apricotPhase3Time           = 3;
+  google.protobuf.Timestamp apricotPhase4Time           = 4;
+  uint64 apricotPhase4MinPChainHeight                   = 5;
+  google.protobuf.Timestamp apricotPhase5Time           = 6;
+  google.protobuf.Timestamp apricotPhasePre6Time        = 7;
+  google.protobuf.Timestamp apricotPhase6Time           = 8;
+  google.protobuf.Timestamp apricotPhasePost6Time       = 9;
+  google.protobuf.Timestamp banffTime                   = 10;
+  google.protobuf.Timestamp cortinaTime                 = 11;
+  string cortinaXChainStopVertexID                     = 12;
+  google.protobuf.Timestamp durangoTime                 = 13;
+  google.protobuf.Timestamp etnaTime                    = 14;
+  google.protobuf.Timestamp fortunaTime                 = 15;
+  google.protobuf.Timestamp graniteTime                 = 16;
+}
+
+// UptimeResponse are the results from calling Uptime
+message UptimeResponse {
+  double rewardingStakePercentage    = 1;
+  double weightedAveragePercentage    = 2;
+}
+
+// GetVMsReply contains the response metadata for VMAliases
+message GetVMsReply {
+  map<string, VMAliases> vms = 1;
+  map<string, string> fxs  = 2;
+}
+
+// VMAliases lists all known aliases for a given VM
+message VMAliases {
+  repeated string aliases = 1;
+}

@@ -5,6 +5,7 @@ package info
 
 import (
 	"errors"
+	"github.com/ava-labs/avalanchego/version"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -30,7 +31,7 @@ func initGetVMsTest(t *testing.T) *getVMsTest {
 			Parameters: Parameters{
 				VMManager: mockVMManager,
 			},
-			log: logging.NoLog{},
+			Log: logging.NoLog{},
 		},
 		mockVMManager: mockVMManager,
 	}
