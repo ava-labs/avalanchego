@@ -104,10 +104,12 @@ func TestShutdown(t *testing.T) {
 	)
 	require.NoError(err)
 
+	subscriber := common.NewSimpleSubscriber()
+
 	h, err := handler.New(
 		chainCtx,
+		subscriber,
 		vdrs,
-		nil,
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
@@ -230,9 +232,11 @@ func TestConnectedAfterShutdownErrorLogRegression(t *testing.T) {
 	)
 	require.NoError(err)
 
+	subscriber := common.NewSimpleSubscriber()
+
 	h, err := handler.New(
 		chainCtx,
-		nil,
+		subscriber,
 		nil,
 		time.Second,
 		testThreadPoolSize,
@@ -363,10 +367,12 @@ func TestShutdownTimesOut(t *testing.T) {
 	)
 	require.NoError(err)
 
+	subscriber := common.NewSimpleSubscriber()
+
 	h, err := handler.New(
 		ctx,
+		subscriber,
 		vdrs,
-		nil,
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
@@ -532,10 +538,12 @@ func TestRouterTimeout(t *testing.T) {
 	)
 	require.NoError(err)
 
+	subscriber := common.NewSimpleSubscriber()
+
 	h, err := handler.New(
 		ctx,
+		subscriber,
 		vdrs,
-		nil,
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
@@ -1064,10 +1072,12 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	)
 	require.NoError(err)
 
+	subscriber := common.NewSimpleSubscriber()
+
 	h, err := handler.New(
 		ctx,
+		subscriber,
 		vdrs,
-		nil,
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
@@ -1230,10 +1240,12 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 	)
 	require.NoError(err)
 
+	subscriber := common.NewSimpleSubscriber()
+
 	h, err := handler.New(
 		ctx,
+		subscriber,
 		vdrs,
-		nil,
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
@@ -1482,10 +1494,12 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *enginetest.Engine) {
 	)
 	require.NoError(t, err)
 
+	subscriber := common.NewSimpleSubscriber()
+
 	h, err := handler.New(
 		ctx,
+		subscriber,
 		vdrs,
-		nil,
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,

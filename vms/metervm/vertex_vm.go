@@ -45,7 +45,6 @@ func (vm *vertexVM) Initialize(
 	genesisBytes,
 	upgradeBytes,
 	configBytes []byte,
-	toEngine chan<- common.Message,
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
@@ -60,7 +59,6 @@ func (vm *vertexVM) Initialize(
 		genesisBytes,
 		upgradeBytes,
 		configBytes,
-		toEngine,
 		fxs,
 		appSender,
 	)

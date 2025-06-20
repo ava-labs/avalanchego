@@ -224,17 +224,17 @@ func (mr *LinearizableVMMockRecorder) HealthCheck(arg0 any) *gomock.Call {
 }
 
 // Initialize mocks base method.
-func (m *LinearizableVM) Initialize(ctx context.Context, chainCtx *snow.Context, db database.Database, genesisBytes, upgradeBytes, configBytes []byte, toEngine chan<- common.Message, fxs []*common.Fx, appSender common.AppSender) error {
+func (m *LinearizableVM) Initialize(ctx context.Context, chainCtx *snow.Context, db database.Database, genesisBytes, upgradeBytes, configBytes []byte, fxs []*common.Fx, appSender common.AppSender) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Initialize", ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs, appSender)
+	ret := m.ctrl.Call(m, "Initialize", ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, fxs, appSender)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Initialize indicates an expected call of Initialize.
-func (mr *LinearizableVMMockRecorder) Initialize(ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs, appSender any) *gomock.Call {
+func (mr *LinearizableVMMockRecorder) Initialize(ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, fxs, appSender any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Initialize", reflect.TypeOf((*LinearizableVM)(nil).Initialize), ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs, appSender)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Initialize", reflect.TypeOf((*LinearizableVM)(nil).Initialize), ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, fxs, appSender)
 }
 
 // LastAccepted mocks base method.
@@ -336,6 +336,20 @@ func (m *LinearizableVM) Shutdown(arg0 context.Context) error {
 func (mr *LinearizableVMMockRecorder) Shutdown(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Shutdown", reflect.TypeOf((*LinearizableVM)(nil).Shutdown), arg0)
+}
+
+// SubscribeToEvents mocks base method.
+func (m *LinearizableVM) SubscribeToEvents(ctx context.Context) common.Message {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SubscribeToEvents", ctx)
+	ret0, _ := ret[0].(common.Message)
+	return ret0
+}
+
+// SubscribeToEvents indicates an expected call of SubscribeToEvents.
+func (mr *LinearizableVMMockRecorder) SubscribeToEvents(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubscribeToEvents", reflect.TypeOf((*LinearizableVM)(nil).SubscribeToEvents), ctx)
 }
 
 // Version mocks base method.
