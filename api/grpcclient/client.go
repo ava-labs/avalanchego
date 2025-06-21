@@ -64,7 +64,7 @@ func SetChainIDHeaderStreamClientInterceptor(chainID ids.ID) grpc.StreamClientIn
 	}
 }
 
-// newContextWithChainHeader sets the chain-id header which the server uses
+// newContextWithChainIDHeader sets the chain-id header which the server uses
 // to route the client grpc request
 func newContextWithChainIDHeader(ctx context.Context, chainID ids.ID) context.Context {
 	return metadata.AppendToOutgoingContext(ctx, "chain-id", chainID.String())
