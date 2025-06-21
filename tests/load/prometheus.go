@@ -38,7 +38,7 @@ func (*MetricsServer) String() string {
 	return "metrics server"
 }
 
-func (s *MetricsServer) Start() (runError <-chan error, err error) {
+func (s *MetricsServer) Start() (<-chan error, error) {
 	const metricsPattern = "/ext/metrics"
 
 	mux := http.NewServeMux()
@@ -58,23 +58,21 @@ func (s *MetricsServer) Start() (runError <-chan error, err error) {
 		ReadTimeout:       time.Second,
 	}
 
-	runErrorBiDirectional := make(chan error)
-	runError = runErrorBiDirectional
-	ready := make(chan struct{})
+	errChan := make(chan error)
 	go func() {
-		close(ready)
-		err = s.server.Serve(listener)
+		defer close(errChan)
+
+		err := s.server.Serve(listener)
 		if errors.Is(err, http.ErrServerClosed) {
 			return
 		}
-		runErrorBiDirectional <- err
+		errChan <- err
 	}()
-	<-ready
 
-	return runError, nil
+	return errChan, nil
 }
 
-func (s *MetricsServer) Stop() (err error) {
+func (s *MetricsServer) Stop() error {
 	const shutdownTimeout = time.Second
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
