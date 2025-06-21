@@ -2,6 +2,53 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.6] - 2025-06-21
+
+### 🚀 Features
+
+- Improve error handling and add sync iterator (#941)
+- *(metrics)* Add read\_node counters (#947)
+- Return database creation errors through FFI (#945)
+- *(ffi)* Add go generate switch between enabled cgo blocks (#978)
+
+### 🐛 Bug Fixes
+
+- Use saturating subtraction for metrics counter (#937)
+- *(attach-static-libs)* Push commit/branch to remote on tag events (#944)
+- Add add\_arithmetic\_side\_effects clippy (#949)
+- Improve ethhash warning message (#961)
+- *(storage)* Parse and validate database versions (#964)
+
+### 💼 Other
+
+- *(deps)* Update fastrace-opentelemetry requirement from 0.11.0 to 0.12.0 (#943)
+- Move lints to the workspace (#957)
+
+### ⚡ Performance
+
+- Remove some unecessary allocs during serialization (#965)
+
+### 🎨 Styling
+
+- *(attach-static-libs)* Use go mod edit instead of sed to update mod path (#946)
+
+### 🧪 Testing
+
+- *(ethhash)* Convert ethhash test to fuzz test for ethhash compatibility (#956)
+
+### ⚙️ Miscellaneous Tasks
+
+- Upgrade actions/checkout (#939)
+- Add push to main to attach static libs triggers (#952)
+- Check the PR title for conventional commits (#953)
+- Add Brandon to CODEOWNERS (#954)
+- Set up for publishing to crates.io (#962)
+- Remove remnants of no-std (#968)
+- *(ffi)* Rename ffi package to match dir (#971)
+- *(attach-static-libs)* Add pre build command to set MACOSX\_DEPLOYMENT\_TARGET for static libs build (#973)
+- Use new firewood-go-* FFI repo naming (#975)
+- Upgrade metrics packages (#982)
+
 ## [0.0.5] - 2025-06-05
 
 ### 🚀 Features
@@ -95,6 +142,8 @@ All notable changes to this project will be documented in this file.
 - *(ffi/tests)* Update go-ethereum v1.15.7 (#838)
 - *(ffi)* Fix typo fwd\_close\_db comment (#843)
 - *(ffi)* Add linter (#893)
+- Require conventional commit format (#933)
+- Bump to v0.5.0 (#934)
 
 ## [0.0.4] - 2023-09-27
 

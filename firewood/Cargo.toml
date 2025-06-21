@@ -1,6 +1,6 @@
 [package]
 name = "firewood"
-version = "0.0.5"
+version = "0.0.6"
 edition = "2024"
 authors = [
      "Angel Leon <gubatron@gmail.com>",
@@ -45,7 +45,7 @@ branch_factor_256 = [ "firewood-storage/branch_factor_256" ]
 ethhash = [ "firewood-storage/ethhash" ]
 
 [dev-dependencies]
-firewood-triehash = { version = "0.8.5", path = "../triehash" }
+firewood-triehash = { version = "0.0.6", path = "../triehash" }
 criterion = { version = "0.6.0", features = ["async_tokio"] }
 rand = "0.9.0"
 rand_distr = "0.5.0"
@@ -65,10 +65,10 @@ name = "hashops"
 harness = false
 
 [target.'cfg(target_os = "linux")'.dependencies]
-firewood-storage = { version = "0.0.5", path = "../storage", features = ["io-uring"] }
+firewood-storage = { version = "0.0.6", path = "../storage", features = ["io-uring"] }
 
 [target.'cfg(not(target_os = "linux"))'.dependencies]
-firewood-storage = { version = "0.0.5", path = "../storage" }
+firewood-storage = { version = "0.0.6", path = "../storage" }
 
 [lints]
 workspace = true
