@@ -7,4 +7,5 @@ type Signer interface {
 	PublicKey() *PublicKey
 	Sign(msg []byte) (*Signature, error)
 	SignProofOfPossession(msg []byte) (*Signature, error)
+	Shutdown() error
 }
