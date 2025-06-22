@@ -1,9 +1,8 @@
 package blockdb
 
 import (
-	"bytes"
-	"encoding/binary"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"sync"
@@ -15,30 +14,26 @@ import (
 const (
 	indexFileName = "blockdb.idx"
 	dataFileName  = "blockdb.dat"
+
+	// Since 0 is a valid height, math.MaxUint64 is used to indicate unset height.
+	// It is not be possible for block height to be max uint64 as it would overflow the index entry offset
+	unsetHeight = math.MaxUint64
 )
 
-// BlockHeight defines the type for block heights.
-type BlockHeight = uint64
-
-// Block defines the type for block data.
-type Block = []byte
-
-// Database is a collection of blockchain blocks. It provides methods to read, write, and manage blocks on disk.
+// Database stores blockchain blocks on disk and provides methods to read, and write blocks.
 type Database struct {
 	indexFile *os.File
 	dataFile  *os.File
 	options   DatabaseConfig
-	header    IndexFileHeader
+	header    indexFileHeader
 	log       logging.Logger
+	mu        sync.RWMutex
+	closed    bool
 
 	// syncToDisk determines if fsync is called after each write for durability.
 	syncToDisk bool
-	// maxBlockHeight tracks the highest block height that has been written to the store, even if there are gaps in the sequence.
+	// maxBlockHeight tracks the highest block height that has been written to the db, even if there are gaps in the sequence.
 	maxBlockHeight atomic.Uint64
-	// closed indicates if the store has been closed.
-	closed bool
-	// mu synchronizes access to the store.
-	mu sync.RWMutex
 	// nextDataWriteOffset tracks the next position to write new data in the data file.
 	nextDataWriteOffset atomic.Uint64
 	// maxContiguousHeight tracks the highest block height known to be contiguously stored.
@@ -77,29 +72,25 @@ func (s *Database) openOrCreateFiles(indexDir, dataDir string, truncate bool) er
 
 func (s *Database) loadOrInitializeHeader(truncate bool) error {
 	if truncate {
-		initialMCH := uint64(0)
-		if s.options.MinimumHeight > 1 {
-			initialMCH = s.options.MinimumHeight - 1
-			s.maxContiguousHeight.Store(initialMCH)
+		s.header = indexFileHeader{
+			Version:             IndexFileVersion,
+			MinHeight:           s.options.MinimumHeight,
+			MaxDataFileSize:     s.options.MaxDataFileSize,
+			MaxHeight:           unsetHeight,
+			MaxContiguousHeight: unsetHeight,
+			DataFileSize:        0,
 		}
+		s.maxContiguousHeight.Store(unsetHeight)
+		s.maxBlockHeight.Store(unsetHeight)
 
-		s.header = IndexFileHeader{
-			Version:                  IndexFileVersion,
-			MinBlockHeight:           s.options.MinimumHeight,
-			MaxDataFileSize:          s.options.MaxDataFileSize,
-			MaxBlockHeight:           0,
-			MaxContiguousBlockHeight: initialMCH,
-			DataFileSize:             0,
-		}
-
-		buf := new(bytes.Buffer)
-		if err := binary.Write(buf, binary.LittleEndian, &s.header); err != nil {
+		headerBytes, err := s.header.MarshalBinary()
+		if err != nil {
 			return fmt.Errorf("failed to serialize new header: %w", err)
 		}
-		if uint64(buf.Len()) != sizeOfIndexFileHeader {
-			return fmt.Errorf("internal error: serialized new header size %d, expected %d", buf.Len(), sizeOfIndexFileHeader)
+		if uint64(len(headerBytes)) != sizeOfIndexFileHeader {
+			return fmt.Errorf("internal error: serialized new header size %d, expected %d", len(headerBytes), sizeOfIndexFileHeader)
 		}
-		if _, err := s.indexFile.WriteAt(buf.Bytes(), 0); err != nil {
+		if _, err := s.indexFile.WriteAt(headerBytes, 0); err != nil {
 			return fmt.Errorf("failed to write initial index header: %w", err)
 		}
 
@@ -119,8 +110,8 @@ func (s *Database) loadOrInitializeHeader(truncate bool) error {
 		return fmt.Errorf("mismatched index file version: found %d, expected %d", s.header.Version, IndexFileVersion)
 	}
 	s.nextDataWriteOffset.Store(s.header.DataFileSize)
-	s.maxContiguousHeight.Store(s.header.MaxContiguousBlockHeight)
-	s.maxBlockHeight.Store(s.header.MaxBlockHeight)
+	s.maxContiguousHeight.Store(s.header.MaxContiguousHeight)
+	s.maxBlockHeight.Store(s.header.MaxHeight)
 
 	return nil
 }
@@ -129,8 +120,8 @@ func (s *Database) loadOrInitializeHeader(truncate bool) error {
 // Parameters:
 //   - indexDir: Directory for the index file
 //   - dataDir: Directory for the data file(s)
-//   - syncToDisk: If true, forces fsync after writes for guaranteed recoverability
-//   - truncate: If true, truncates existing store files
+//   - syncToDisk: If true, forces fsync after writes
+//   - truncate: If true, truncates the index file
 //   - config: Optional configuration parameters
 //   - log: Logger instance for structured logging
 func New(indexDir, dataDir string, syncToDisk bool, truncate bool, config DatabaseConfig, log logging.Logger) (*Database, error) {
@@ -176,21 +167,14 @@ func (s *Database) closeFiles() {
 }
 
 // MaxContiguousHeight returns the highest block height known to be contiguously stored.
-func (s *Database) MaxContiguousHeight() BlockHeight {
-	return s.maxContiguousHeight.Load()
-}
-
-// MinHeight returns the minimum block height configured for this store.
-func (s *Database) MinHeight() uint64 {
-	return s.header.MinBlockHeight
-}
-
-func (s *Database) MaxBlockHeight() BlockHeight {
-	return s.maxBlockHeight.Load()
+func (s *Database) MaxContiguousHeight() (height BlockHeight, found bool) {
+	if s.maxContiguousHeight.Load() == unsetHeight {
+		return 0, false
+	}
+	return s.maxContiguousHeight.Load(), true
 }
 
 // Close flushes pending writes and closes the store files.
-// It is safe to call Close multiple times.
 func (s *Database) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -200,7 +184,7 @@ func (s *Database) Close() error {
 	}
 	s.closed = true
 
-	err := s.persistIndexHeader(false)
+	err := s.persistIndexHeader()
 	s.closeFiles()
 	return err
 }

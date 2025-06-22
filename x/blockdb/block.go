@@ -3,14 +3,12 @@ package blockdb
 import (
 	"encoding"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"math"
 
 	"github.com/cespare/xxhash/v2"
+	"go.uber.org/zap"
 )
-
-const MaxBlockDataSize = 1 << 30 // 1 GB
 
 var (
 	_ encoding.BinaryMarshaler   = blockHeader{}
@@ -19,12 +17,24 @@ var (
 	sizeOfBlockHeader = uint64(binary.Size(blockHeader{}))
 )
 
+// BlockHeight defines the type for block heights.
+type BlockHeight = uint64
+
+// BlockData defines the type for block data.
+type BlockData = []byte
+
+// BlockHeaderSize is the size of the header in the block data.
+type BlockHeaderSize = uint16
+
+// MaxBlockDataSize is the maximum size of a block in bytes (16 MB).
+const MaxBlockDataSize = 1 << 24
+
 // blockHeader is prepended to each block in the data file.
 type blockHeader struct {
-	Height uint64 // todo: can this be omitted? currently only used for verification
-	// Size of the raw block data (excluding this blockHeader).
-	Size     uint64
-	Checksum uint64
+	Height     BlockHeight
+	Size       uint64
+	HeaderSize BlockHeaderSize
+	Checksum   uint64
 }
 
 // MarshalBinary implements the encoding.BinaryMarshaler interface.
@@ -32,7 +42,8 @@ func (bh blockHeader) MarshalBinary() ([]byte, error) {
 	buf := make([]byte, sizeOfBlockHeader)
 	binary.LittleEndian.PutUint64(buf[0:], bh.Height)
 	binary.LittleEndian.PutUint64(buf[8:], bh.Size)
-	binary.LittleEndian.PutUint64(buf[16:], bh.Checksum)
+	binary.LittleEndian.PutUint16(buf[16:], bh.HeaderSize)
+	binary.LittleEndian.PutUint64(buf[18:], bh.Checksum)
 	return buf, nil
 }
 
@@ -43,13 +54,13 @@ func (bh *blockHeader) UnmarshalBinary(data []byte) error {
 	}
 	bh.Height = binary.LittleEndian.Uint64(data[0:])
 	bh.Size = binary.LittleEndian.Uint64(data[8:])
-	bh.Checksum = binary.LittleEndian.Uint64(data[16:])
+	bh.HeaderSize = binary.LittleEndian.Uint16(data[16:])
+	bh.Checksum = binary.LittleEndian.Uint64(data[18:])
 	return nil
 }
 
-// WriteBlock inserts a block into the store at the given height.
-// Returns an error if the store is closed, the block is empty, or the write fails.
-func (s *Database) WriteBlock(height BlockHeight, block Block) error {
+// WriteBlock inserts a block into the store at the given height with the specified header size.
+func (s *Database) WriteBlock(height BlockHeight, block BlockData, headerSize BlockHeaderSize) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -65,6 +76,10 @@ func (s *Database) WriteBlock(height BlockHeight, block Block) error {
 		return ErrBlockTooLarge
 	}
 
+	if uint64(headerSize) >= uint64(len(block)) {
+		return ErrHeaderSizeTooLarge
+	}
+
 	indexFileOffset, err := s.indexEntryOffset(height)
 	if err != nil {
 		return err
@@ -78,15 +93,16 @@ func (s *Database) WriteBlock(height BlockHeight, block Block) error {
 	}
 
 	bh := blockHeader{
-		Height:   height,
-		Size:     uint64(len(block)),
-		Checksum: calculateChecksum(block),
+		Height:     height,
+		Size:       blockDataLen,
+		HeaderSize: headerSize,
+		Checksum:   calculateChecksum(block),
 	}
-	if err := s.writeBlockAtOffset(writeDataOffset, bh, block); err != nil {
+	if err := s.writeBlockAt(writeDataOffset, bh, block); err != nil {
 		return err
 	}
 
-	if err := s.writeIndexEntryAt(indexFileOffset, writeDataOffset, blockDataLen); err != nil {
+	if err := s.writeIndexEntryAt(indexFileOffset, writeDataOffset, blockDataLen, headerSize); err != nil {
 		return err
 	}
 
@@ -94,8 +110,8 @@ func (s *Database) WriteBlock(height BlockHeight, block Block) error {
 }
 
 // ReadBlock retrieves a block by its height.
-// Returns the block data or an error if not found or block data is corrupted.
-func (s *Database) ReadBlock(height BlockHeight) (Block, error) {
+// Returns nil if the block is not found.
+func (s *Database) ReadBlock(height BlockHeight) (BlockData, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -105,78 +121,107 @@ func (s *Database) ReadBlock(height BlockHeight) (Block, error) {
 
 	indexEntry, err := s.readIndexEntry(height)
 	if err != nil {
-		if errors.Is(err, ErrInvalidBlockHeight) {
-			return nil, ErrBlockNotFound
-		}
-		return nil, fmt.Errorf("failed to prepare for reading index entry for height %d: %w", height, err)
-	}
-	if indexEntry.IsEmpty() {
-		return nil, ErrBlockNotFound
-	}
-
-	bh, err := s.readAndVerifyBlockHeader(indexEntry, height)
-	if err != nil {
 		return nil, err
 	}
-
-	return s.readAndVerifyBlockData(indexEntry, bh)
-}
-
-func (s *Database) readAndVerifyBlockHeader(indexEntry IndexEntry, expectedHeight BlockHeight) (blockHeader, error) {
-	var bh blockHeader
-	dataHeaderBuf := make([]byte, sizeOfBlockHeader)
-	_, err := s.dataFile.ReadAt(dataHeaderBuf, int64(indexEntry.Offset))
-	if err != nil {
-		return bh, fmt.Errorf("failed to read block header from data file for height %d: %w", expectedHeight, err)
+	if indexEntry.IsEmpty() {
+		return nil, nil
 	}
 
-	if err := bh.UnmarshalBinary(dataHeaderBuf); err != nil {
-		return bh, fmt.Errorf("failed to deserialize block header for height %d: %w", expectedHeight, err)
-	}
-
-	if bh.Size != indexEntry.Size {
-		return bh, fmt.Errorf("%w: for height %d, index size %d, data header size %d", ErrBlockSizeMismatch, expectedHeight, indexEntry.Size, bh.Size)
-	}
-	if bh.Height != expectedHeight {
-		return bh, fmt.Errorf("internal error: requested %d, data header contains %d", expectedHeight, bh.Height)
-	}
-	return bh, nil
-}
-
-func (s *Database) readAndVerifyBlockData(indexEntry IndexEntry, bh blockHeader) (Block, error) {
-	blockData := make(Block, bh.Size)
+	// Read the complete block data
+	blockData := make(BlockData, indexEntry.Size)
 	actualDataOffset := indexEntry.Offset + sizeOfBlockHeader
 	if actualDataOffset < indexEntry.Offset {
-		return nil, fmt.Errorf("internal error: block data offset calculation overflowed for height %d", bh.Height)
+		return nil, fmt.Errorf("internal error: block data offset calculation overflowed")
 	}
-
-	_, err := s.dataFile.ReadAt(blockData, int64(actualDataOffset))
+	_, err = s.dataFile.ReadAt(blockData, int64(actualDataOffset))
 	if err != nil {
-		return nil, fmt.Errorf("failed to read block data from data file for height %d: %w", bh.Height, err)
-	}
-
-	calculatedChecksum := calculateChecksum(blockData)
-	if calculatedChecksum != bh.Checksum {
-		return nil, fmt.Errorf("%w: for block height %d", ErrChecksumMismatch, bh.Height)
+		return nil, fmt.Errorf("failed to read block data from data file: %w", err)
 	}
 
 	return blockData, nil
+}
+
+// ReadHeader retrieves only the header portion of a block by its height.
+// Returns nil if the block is not found or no header.
+func (s *Database) ReadHeader(height BlockHeight) (BlockData, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if s.closed {
+		return nil, ErrDatabaseClosed
+	}
+
+	indexEntry, err := s.readIndexEntry(height)
+	if err != nil {
+		return nil, err
+	}
+	if indexEntry.IsEmpty() {
+		return nil, nil
+	}
+
+	// Return nil if there's no header data
+	if indexEntry.HeaderSize == 0 {
+		return nil, nil
+	}
+
+	// Validate header size doesn't exceed total block size
+	if uint64(indexEntry.HeaderSize) > indexEntry.Size {
+		return nil, fmt.Errorf("invalid header size %d exceeds block size %d", indexEntry.HeaderSize, indexEntry.Size)
+	}
+
+	// Read only the header portion
+	headerData := make([]byte, indexEntry.HeaderSize)
+	actualDataOffset := indexEntry.Offset + sizeOfBlockHeader
+	if actualDataOffset < indexEntry.Offset {
+		return nil, fmt.Errorf("internal error: block data offset calculation overflowed")
+	}
+	_, err = s.dataFile.ReadAt(headerData, int64(actualDataOffset))
+	if err != nil {
+		return nil, fmt.Errorf("failed to read block header data from data file: %w", err)
+	}
+
+	return headerData, nil
+}
+
+// ReadBody retrieves only the body portion (excluding header) of a block by its height.
+// Returns nil if the block is not found.
+func (s *Database) ReadBody(height BlockHeight) (BlockData, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if s.closed {
+		return nil, ErrDatabaseClosed
+	}
+
+	indexEntry, err := s.readIndexEntry(height)
+	if err != nil {
+		return nil, err
+	}
+	if indexEntry.IsEmpty() {
+		return nil, nil
+	}
+
+	bodySize := indexEntry.Size - uint64(indexEntry.HeaderSize)
+	bodyData := make([]byte, bodySize)
+	bodyOffset := indexEntry.Offset + sizeOfBlockHeader + uint64(indexEntry.HeaderSize)
+	_, err = s.dataFile.ReadAt(bodyData, int64(bodyOffset))
+	if err != nil {
+		return nil, fmt.Errorf("failed to read block body data from data file: %w", err)
+	}
+	return bodyData, nil
 }
 
 func calculateChecksum(data []byte) uint64 {
 	return xxhash.Sum64(data)
 }
 
-func (s *Database) writeBlockAtOffset(offset uint64, bh blockHeader, block Block) error {
+func (s *Database) writeBlockAt(offset uint64, bh blockHeader, block BlockData) error {
 	headerBytes, err := bh.MarshalBinary()
 	if err != nil {
 		return fmt.Errorf("failed to serialize block header: %w", err)
 	}
 
-	// Allocate combined buffer for header and block data
-	// Using a single WriteAt instead of two separate calls for header and block
-	// data reduces syscall overhead in high-concurrency environments.
-	// The memory copy cost is lower than the syscall cost for typical block sizes.
+	// Allocate combined buffer for header and block data and write it to the data file
 	combinedBuf := make([]byte, sizeOfBlockHeader+uint64(len(block)))
 	copy(combinedBuf, headerBytes)
 	copy(combinedBuf[sizeOfBlockHeader:], block)
@@ -192,26 +237,26 @@ func (s *Database) writeBlockAtOffset(offset uint64, bh blockHeader, block Block
 	return nil
 }
 
-func (s *Database) updateBlockHeights(writtenBlockHeight uint64) error {
-	// update max contiguous height
-	var prevContiguousCandidate uint64
-	if writtenBlockHeight == s.header.MinBlockHeight {
-		if s.header.MinBlockHeight > 0 {
-			prevContiguousCandidate = s.header.MinBlockHeight - 1
-		} else {
-			prevContiguousCandidate = 0
-		}
-	} else if writtenBlockHeight > s.header.MinBlockHeight {
+func (s *Database) updateBlockHeights(writtenBlockHeight BlockHeight) error {
+	prevContiguousCandidate := uint64(unsetHeight)
+	if writtenBlockHeight > s.header.MinHeight {
 		prevContiguousCandidate = writtenBlockHeight - 1
-	} else {
-		return fmt.Errorf("internal error in MCH update: height %d < minimum %d", writtenBlockHeight, s.header.MinBlockHeight)
 	}
+
 	if s.maxContiguousHeight.CompareAndSwap(prevContiguousCandidate, writtenBlockHeight) {
 		currentMax := writtenBlockHeight
 		for {
 			nextHeightToVerify := currentMax + 1
-			idxEntry, readErr := s.readIndexEntry(nextHeightToVerify)
-			if readErr != nil || idxEntry.IsEmpty() {
+			entry, err := s.readIndexEntry(nextHeightToVerify)
+			if err != nil {
+				s.log.Error(
+					"error reading index entry when updating max contiguous height",
+					zap.Uint64("height", nextHeightToVerify),
+					zap.Error(err),
+				)
+				break
+			}
+			if entry.IsEmpty() {
 				break
 			}
 			if !s.maxContiguousHeight.CompareAndSwap(currentMax, nextHeightToVerify) {
@@ -222,19 +267,15 @@ func (s *Database) updateBlockHeights(writtenBlockHeight uint64) error {
 	}
 
 	// update max block height and persist header on checkpoint interval
-	var oldMaxHeight uint64
+	var oldMaxHeight BlockHeight
 	for {
 		oldMaxHeight = s.maxBlockHeight.Load()
-		if writtenBlockHeight <= oldMaxHeight {
+		if writtenBlockHeight <= oldMaxHeight && oldMaxHeight != unsetHeight {
 			break
 		}
 		if s.maxBlockHeight.CompareAndSwap(oldMaxHeight, writtenBlockHeight) {
-			// todo: consider separating checkpoint logic out of this function
-			// a situation may arise where multiple blocks are written that trigger a checkpoint
-			// in this case, we are persisting the header multiple times. But this can only happen during bootstrapping.
-			// One solution is only checkpoint after x blocks are written, instead of at specific heights.
 			if writtenBlockHeight%s.options.CheckpointInterval == 0 {
-				if err := s.persistIndexHeader(s.syncToDisk); err != nil {
+				if err := s.persistIndexHeader(); err != nil {
 					return fmt.Errorf("block %d written, but checkpoint failed: %w", writtenBlockHeight, err)
 				}
 			}

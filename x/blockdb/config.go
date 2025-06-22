@@ -4,9 +4,12 @@ import (
 	"fmt"
 )
 
+// DefaultMaxDataFileSize is the default maximum size of the data block file in bytes (500GB).
+const DefaultMaxDataFileSize = 500 * 1024 * 1024 * 1024
+
 // DatabaseConfig contains configuration parameters for BlockDB.
 type DatabaseConfig struct {
-	// MinimumHeight is the lowest block height the store will track (must be >= 1).
+	// MinimumHeight is the lowest block height tracked by the database.
 	MinimumHeight uint64
 
 	// MaxDataFileSize sets the maximum size of the data block file in bytes. If 0, there is no limit.
@@ -19,20 +22,16 @@ type DatabaseConfig struct {
 // DefaultDatabaseConfig returns the default options for BlockDB.
 func DefaultDatabaseConfig() DatabaseConfig {
 	return DatabaseConfig{
-		MinimumHeight:      1,
-		MaxDataFileSize:    1 << 31, // Default to 2GB
+		MinimumHeight:      0,
+		MaxDataFileSize:    DefaultMaxDataFileSize,
 		CheckpointInterval: 1024,
 	}
 }
 
 // Validate checks if the store options are valid.
 func (opts DatabaseConfig) Validate() error {
-	if opts.MinimumHeight == 0 {
-		return fmt.Errorf("%w: MinimumHeight cannot be 0, must be >= 1", ErrInvalidBlockHeight)
-	}
-
 	if opts.CheckpointInterval == 0 {
-		return fmt.Errorf("%w: CheckpointInterval cannot be 0", ErrInvalidCheckpointInterval)
+		return fmt.Errorf("CheckpointInterval cannot be 0")
 	}
 	return nil
 }
