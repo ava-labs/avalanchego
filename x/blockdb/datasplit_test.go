@@ -79,6 +79,7 @@ func TestDataSplitting_DeletedFile(t *testing.T) {
 		blocks[i][0] = byte(i)
 		require.NoError(t, store.WriteBlock(uint64(i), blocks[i], 0))
 	}
+	store.Close()
 
 	// Delete the first data file (blockdb_0.dat)
 	firstDataFilePath := filepath.Join(store.dataDir, fmt.Sprintf(dataFileNameFormat, 0))
