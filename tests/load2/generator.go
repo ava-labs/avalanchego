@@ -16,11 +16,6 @@ import (
 )
 
 type Tracker struct {
-	lock sync.RWMutex
-
-	txsIssued   uint64
-	txsAccepted uint64
-
 	txsIssuedCounter      prometheus.Counter
 	txsAcceptedCounter    prometheus.Counter
 	txIssuanceLatency     prometheus.Histogram
@@ -71,19 +66,12 @@ func NewTracker(namespace string, registry *prometheus.Registry) (*Tracker, erro
 }
 
 func (t *Tracker) Issue(d time.Duration) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
-	t.txsIssued++
+	t.txsIssuedCounter.Inc()
 	t.txIssuanceLatency.Observe(float64(d.Milliseconds()))
 }
 
 func (t *Tracker) Accept(confirmationDuration time.Duration, totalDuration time.Duration) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
-	t.txsAccepted++
-
+	t.txsAcceptedCounter.Inc()
 	t.txTotalLatency.Observe(float64(totalDuration.Milliseconds()))
 	t.txConfirmationLatency.Observe(float64(confirmationDuration.Milliseconds()))
 }
