@@ -49,8 +49,5 @@ func (z ZeroTransferTest) Run(
 	})
 	require.NoError(err)
 
-	ctx, cancel := context.WithTimeout(ctx, z.Timeout)
-	defer cancel()
-
 	require.NoError(wallet.SendTx(ctx, tx, z.PollFrequency))
 }

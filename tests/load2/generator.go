@@ -106,13 +106,14 @@ func NewGenerator(
 func (g Generator) Run(
 	tc tests.TestContext,
 	ctx context.Context,
-	timeout time.Duration,
+	loadTimeout time.Duration,
+	testTimeout time.Duration,
 ) {
 	wg := sync.WaitGroup{}
 
 	childCtx := ctx
-	if timeout != 0 {
-		ctx, cancel := context.WithTimeout(ctx, timeout)
+	if loadTimeout != 0 {
+		ctx, cancel := context.WithTimeout(ctx, loadTimeout)
 		childCtx = ctx
 		defer cancel()
 	}
@@ -128,6 +129,9 @@ func (g Generator) Run(
 					return
 				default:
 				}
+
+				ctx, cancel := context.WithTimeout(ctx, testTimeout)
+				defer cancel()
 
 				g.txTests[i].Run(tc, ctx, g.wallets[i])
 			}

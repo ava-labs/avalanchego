@@ -36,7 +36,7 @@ func init() {
 
 	flag.IntVar(
 		&loadTimeout,
-		"loadTimeout",
+		"load-timeout",
 		0,
 		"the duration that the load test should run for (in seconds)",
 	)
@@ -98,5 +98,5 @@ func main() {
 	require.NoError(err)
 
 	loadTimeout := time.Duration(loadTimeout) * time.Second
-	generator.Run(tc, ctx, loadTimeout)
+	generator.Run(tc, ctx, loadTimeout, testTimeout)
 }
