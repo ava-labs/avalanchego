@@ -19,10 +19,9 @@ import (
 )
 
 const (
-	blockchainID  = "C"
-	logPrefix     = "avalanchego-load-test"
-	namespace     = "load"
-	pollFrequency = time.Millisecond
+	blockchainID     = "C"
+	metricsNamespace = "load"
+	pollFrequency    = time.Millisecond
 )
 
 var flagVars *e2e.FlagVars
@@ -33,7 +32,7 @@ func init() {
 }
 
 func main() {
-	log := tests.NewDefaultLogger(logPrefix)
+	log := tests.NewDefaultLogger("")
 	tc := tests.NewTestContext(log)
 	defer tc.Cleanup()
 
@@ -61,7 +60,7 @@ func main() {
 	require.NoError(err)
 
 	registry := prometheus.NewRegistry()
-	metrics, err := load2.NewMetrics(namespace, registry)
+	metrics, err := load2.NewMetrics(metricsNamespace, registry)
 	require.NoError(err)
 
 	wallets := make([]*load2.Wallet, len(keys))
