@@ -34,7 +34,7 @@ type leafHandler struct {
 	handlers.LeafRequestHandler
 }
 
-// NewAtomicLeafHandler returns a new uninitialzied atomicLeafHandler that can be later initialized
+// NewAtomicLeafHandler returns a new uninitialized leafHandler that can be later initialized
 func NewLeafHandler() *leafHandler {
 	return &leafHandler{
 		LeafRequestHandler: &uninitializedHandler{},

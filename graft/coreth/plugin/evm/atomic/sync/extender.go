@@ -16,26 +16,24 @@ import (
 	"github.com/ava-labs/libevm/log"
 )
 
-var _ sync.Extender = (*extender)(nil)
+var _ sync.Extender = (*Extender)(nil)
 
-type extender struct {
+// Extender is the sync extender for the atomic VM.
+type Extender struct {
 	backend     *state.AtomicBackend
 	trie        *state.AtomicTrie
 	requestSize uint16 // maximum number of leaves to sync in a single request
 }
 
-// Initialize initializes the sync extender with the backend and trie.
-func NewExtender() *extender {
-	return &extender{}
-}
-
-func (a *extender) Initialize(backend *state.AtomicBackend, trie *state.AtomicTrie, requestSize uint16) {
+// Initialize initializes the sync extender with the backend and trie and request size.
+func (a *Extender) Initialize(backend *state.AtomicBackend, trie *state.AtomicTrie, requestSize uint16) {
 	a.backend = backend
 	a.trie = trie
 	a.requestSize = requestSize
 }
 
-func (a *extender) Sync(ctx context.Context, client syncclient.LeafClient, verDB *versiondb.Database, summary message.Syncable) error {
+// Sync syncs the atomic summary with the given client and verDB.
+func (a *Extender) Sync(ctx context.Context, client syncclient.LeafClient, verDB *versiondb.Database, summary message.Syncable) error {
 	atomicSummary, ok := summary.(*Summary)
 	if !ok {
 		return fmt.Errorf("expected *Summary, got %T", summary)
@@ -60,7 +58,8 @@ func (a *extender) Sync(ctx context.Context, client syncclient.LeafClient, verDB
 	return err
 }
 
-func (a *extender) OnFinishBeforeCommit(lastAcceptedHeight uint64, Summary message.Syncable) error {
+// OnFinishBeforeCommit implements the sync.Extender interface by marking the previously last accepted block for the shared memory cursor.
+func (a *Extender) OnFinishBeforeCommit(lastAcceptedHeight uint64, Summary message.Syncable) error {
 	// Mark the previously last accepted block for the shared memory cursor, so that we will execute shared
 	// memory operations from the previously last accepted block when ApplyToSharedMemory
 	// is called.
@@ -71,7 +70,8 @@ func (a *extender) OnFinishBeforeCommit(lastAcceptedHeight uint64, Summary messa
 	return nil
 }
 
-func (a *extender) OnFinishAfterCommit(summaryHeight uint64) error {
+// OnFinishAfterCommit implements the sync.Extender interface by applying the atomic trie to the shared memory.
+func (a *Extender) OnFinishAfterCommit(summaryHeight uint64) error {
 	// the chain state is already restored, and, from this point on,
 	// the block synced to is the accepted block. The last operation
 	// is updating shared memory with the atomic trie.
