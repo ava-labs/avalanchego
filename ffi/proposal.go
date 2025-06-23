@@ -3,8 +3,6 @@
 // [Firewood]: https://github.com/ava-labs/firewood
 package ffi
 
-// // Note that -lm is required on Linux but not on Mac.
-// #cgo LDFLAGS: -L${SRCDIR}/../target/release -L/usr/local/lib -lfirewood_ffi -lm
 // #include <stdlib.h>
 // #include "firewood.h"
 import "C"

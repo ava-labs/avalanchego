@@ -1,12 +1,40 @@
 //go:build ignore
 
+// go generate script
+//
+// This script fixes up a go file to enable/disable the correct cgo directives,
+// tailored for use in firewood.go to eliminate linker warnings for production builds.
+//
+// It scans for blocks of cgo directives, using marker lines like this:
+// FIREWOOD_CGO_BEGIN_<FIREWOOD_LD_MODE>
+// cgo line 1
+// ...
+// cgo line n
+// FIREWOOD_CGO_END_<FIREWOOD_LD_MODE>
+//
+// FIREWOOD_LD_MODE is an environment variable that decides which blocks are activated.
+// The default value for FIREWOOD_LD_MODE is "LOCAL_LIBS" for local development.
+// When building production static libraries, FIREWOOD_LD_MODE is set to "STATIC_LIBS"
+// in the github actions workflow.
+//
+// The script enables CGO directives for the target mode and comments out CGO directives
+// that do not match.
+//
+// CGO directives are already comments and CGO does not allow interleaving regular
+// comments with CGO directives. To disable, we must double escape the CGO directives
+// with:
+//
+// // #cgo ...
+//
+// The go file may contain multiple such blocks, but nesting is not allowed.
+
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
-	"regexp"
 	"strings"
 )
 
@@ -14,182 +42,100 @@ const (
 	defaultMode = "LOCAL_LIBS"
 )
 
-// run via go generate to parse $GOFILE and scan for blocks of CGO directives (including cgo comments, which require a "// //" prefix)
-// Uses delimiters set by:
-// FIREWOOD_CGO_BEGIN_<FIREWOOD_LD_MODE>
-// cgo line 1
-// .
-// .
-// .
-// cgo line n
-// FIREWOOD_CGO_END_<FIREWOOD_LD_MODE>
-//
-// $GOFILE may contain multiple such blocks, where only one should be active at once.
-// Discovers the set FIREWOOD_LD_MODE via env var or defaults to "LOCAL_LIBS", which is
-// specific to the firewood.go file.
-// Activates the block set by FIREWOOD_LD_MODE by uncommenting any commented out cgo directives
-// and deactivates all other blocks' cgo directives.
+var errGoFileNotSet = errors.New("GOFILE is not set")
+
 func main() {
-	mode := os.Getenv("FIREWOOD_LD_MODE")
-	if mode == "" {
-		mode = defaultMode
+	mode := getFirewoodLdMode()
+
+	targetFile, err := getTargetFile()
+	if err != nil {
+		log.Fatalf("Error switching CGO mode to %s:\n%v", mode, err)
 	}
 
-	if err := switchCGOMode(mode); err != nil {
-		log.Fatalf("Error switching CGO mode to %s: %v", mode, err)
+	if err := changeCgoDirectivesForFile(mode, targetFile); err != nil {
+		log.Fatalf("Error switching CGO mode to %s:\n%v", mode, err)
 	}
+
 	fmt.Printf("Successfully switched CGO directives to %s mode\n", mode)
+}
+
+// getFirewoodLdMode returns the FIREWOOD_LD_MODE environment variable.
+// Defaults to "LOCAL_LIBS".
+func getFirewoodLdMode() string {
+	mode, ok := os.LookupEnv("FIREWOOD_LD_MODE")
+	if !ok {
+		mode = "LOCAL_LIBS"
+	}
+	return mode
 }
 
 func getTargetFile() (string, error) {
 	targetFile, ok := os.LookupEnv("GOFILE")
 	if !ok {
-		return "", fmt.Errorf("GOFILE is not set")
+		return "", errGoFileNotSet
 	}
 	return targetFile, nil
 }
 
-type CGOBlock struct {
-	Name      string   // e.g., "STATIC_LIBS", "LOCAL_LIBS"
-	StartLine int      // Line number where block starts
-	EndLine   int      // Line number where block ends
-	Lines     []string // All lines in the block (including begin/end markers)
-}
-
-func switchCGOMode(targetMode string) error {
-	targetFile, err := getTargetFile()
-	if err != nil {
-		return err
-	}
-
-	content, err := os.ReadFile(targetFile)
+func changeCgoDirectivesForFile(targetMode string, targetFile string) error {
+	originalFileContent, err := os.ReadFile(targetFile)
 	if err != nil {
 		return fmt.Errorf("failed to read %s: %w", targetFile, err)
 	}
 
-	lines := strings.Split(string(content), "\n")
+	fileLines := strings.Split(string(originalFileContent), "\n")
 
-	blocks, err := findCGOBlocks(lines)
-	if err != nil {
-		return fmt.Errorf("failed to find CGO blocks: %w", err)
-	}
-
-	if err := validateCGOBlocks(blocks, lines); err != nil {
-		return fmt.Errorf("validation failed: %w", err)
-	}
-
-	cgoBlockMap, err := createCGOBlockMap(blocks)
-	if err != nil {
-		return err
-	}
-
-	targetCGOBlock, ok := cgoBlockMap[targetMode]
-	if !ok {
-		return fmt.Errorf("no CGO block found for FIREWOOD_LD_MODE=%s", targetMode)
-	}
-
-	// Process lines: activate target block, deactivate others
-	result := make([]string, len(lines))
-	copy(result, lines)
-
-	for _, block := range blocks {
-		isTarget := block.Name == targetCGOBlock.Name
-
-		for i := block.StartLine + 1; i < block.EndLine; i++ {
-			line := lines[i]
-
-			if isTarget {
-				// Activate: "// // #cgo" -> "// #cgo"
-				result[i] = activateCGOLine(line)
-			} else {
-				// Deactivate: "// #cgo" -> "// // #cgo"
-				result[i] = deactivateCGOLine(line)
+	// Initial state is "None" which does not process any lines
+	currentBlockName := "None"
+	for i, line := range fileLines {
+		// process state transitions
+		// if the line starts with "// FIREWOOD_CGO_BEGIN_", set the state to the text after the prefix
+		if newBlockName, ok := strings.CutPrefix(line, "// // FIREWOOD_CGO_BEGIN_"); ok {
+			if currentBlockName != "None" {
+				return fmt.Errorf("[ERROR] %s:%d: nested CGO blocks not allowed (found %s after %s)", targetFile, i+1, newBlockName, currentBlockName)
 			}
-		}
-	}
-
-	newContent := strings.Join(result, "\n")
-	return os.WriteFile(targetFile, []byte(newContent), 0644)
-}
-
-func findCGOBlocks(lines []string) ([]CGOBlock, error) {
-	var blocks []CGOBlock
-	beginRegex := regexp.MustCompile(`^// // FIREWOOD_CGO_BEGIN_(\w+)`)
-	endRegex := regexp.MustCompile(`^// // FIREWOOD_CGO_END_(\w+)`)
-
-	for i, line := range lines {
-		matches := beginRegex.FindStringSubmatch(line)
-		if matches == nil {
+			currentBlockName = newBlockName
+			continue
+		} else if line == fmt.Sprintf("// // FIREWOOD_CGO_END_%s", currentBlockName) {
+			currentBlockName = "None"
 			continue
 		}
-		blockName := matches[1]
 
-		// Find corresponding end marker
-		endLine := -1
-		for j := i + 1; j < len(lines); j++ {
-			if endMatches := endRegex.FindStringSubmatch(lines[j]); endMatches != nil {
-				if endMatches[1] == blockName {
-					endLine = j
-					break
-				}
+		// If we are in a block, process the line
+		if currentBlockName != "None" {
+			if !isCGODirective(line) {
+				return fmt.Errorf("[ERROR] %s:%d: invalid CGO directive in %s section:\n===\n%s\n===\n", targetFile, i+1, currentBlockName, line)
 			}
-		}
-
-		if endLine == -1 {
-			return nil, fmt.Errorf("no matching end marker found for FIREWOOD_CGO_BEGIN_%s at line %d", blockName, i+1)
-		}
-
-		blocks = append(blocks, CGOBlock{
-			Name:      blockName,
-			StartLine: i,
-			EndLine:   endLine,
-			Lines:     lines[i : endLine+1],
-		})
-	}
-
-	return blocks, nil
-}
-
-func validateCGOBlocks(blocks []CGOBlock, lines []string) error {
-	// Check every CGO block contains ONLY valid CGO directives or valid comments within a CGO directive block
-	for _, block := range blocks {
-		for i := block.StartLine + 1; i < block.EndLine; i++ {
-			if !isCGODirective(lines[i]) {
-				return fmt.Errorf("invalid CGO directive at line %d in block %s: %s", i+1, block.Name, lines[i])
+			if currentBlockName == targetMode {
+				fileLines[i] = activateCGOLine(fileLines[i])
+			} else {
+				fileLines[i] = deactivateCGOLine(fileLines[i])
 			}
 		}
 	}
 
-	return nil
-}
-
-func createCGOBlockMap(blocks []CGOBlock) (map[string]CGOBlock, error) {
-	cgoBlockMap := make(map[string]CGOBlock)
-	for _, block := range blocks {
-		if existingBlock, exists := cgoBlockMap[block.Name]; exists {
-			return nil, fmt.Errorf("duplicate CGO block name %q found at lines %d-%d, previously defined at lines %d-%d",
-				block.Name, block.StartLine+1, block.EndLine+1,
-				existingBlock.StartLine+1, existingBlock.EndLine+1)
-		}
-		cgoBlockMap[block.Name] = block
+	if currentBlockName != "None" {
+		return fmt.Errorf("[ERROR] %s: unterminated CGO block ended in %s", targetFile, currentBlockName)
 	}
-	return cgoBlockMap, nil
+
+	// If the contents changed, write it back to the file
+	newContents := strings.Join(fileLines, "\n")
+	if newContents == string(originalFileContent) {
+		fmt.Printf("[INFO] No changes needed to %s\n", targetFile)
+		return nil
+	}
+	return os.WriteFile(targetFile, []byte(newContents), 0644)
 }
 
 func isCGODirective(line string) bool {
 	trimmed := strings.TrimSpace(line)
-	return strings.HasPrefix(trimmed, "// #cgo") || strings.HasPrefix(trimmed, "// // ")
+	return strings.HasPrefix(trimmed, "// #cgo") || strings.HasPrefix(trimmed, "// // #cgo")
 }
 
 func activateCGOLine(line string) string {
 	// Convert "// // #cgo" to "// #cgo"
-	if strings.Contains(line, "// // #cgo") {
-		return strings.Replace(line, "// // #cgo", "// #cgo", 1)
-	}
-	// Already active
-	return line
+	return strings.Replace(line, "// // #cgo", "// #cgo", 1)
 }
-
 func deactivateCGOLine(line string) string {
 	// Convert "// #cgo" to "// // #cgo" (but not "// // #cgo" to "// // // #cgo")
 	if strings.Contains(line, "// #cgo") && !strings.Contains(line, "// // #cgo") {
