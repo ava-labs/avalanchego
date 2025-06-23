@@ -21,6 +21,7 @@ var _ Test = (*ZeroTransferTest)(nil)
 
 type ZeroTransferTest struct {
 	PollFrequency time.Duration
+	Timeout       time.Duration
 }
 
 func (z ZeroTransferTest) Run(
@@ -47,6 +48,9 @@ func (z ZeroTransferTest) Run(
 		Value:     common.Big0,
 	})
 	require.NoError(err)
+
+	ctx, cancel := context.WithTimeout(ctx, z.Timeout)
+	defer cancel()
 
 	require.NoError(wallet.SendTx(ctx, tx, z.PollFrequency))
 }

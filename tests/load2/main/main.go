@@ -22,6 +22,7 @@ const (
 	blockchainID     = "C"
 	metricsNamespace = "load"
 	pollFrequency    = time.Millisecond
+	testTimeout      = time.Minute
 )
 
 var flagVars *e2e.FlagVars
@@ -75,7 +76,10 @@ func main() {
 
 		wallets[i] = load2.NewWallet(metrics, client, keys[i].ToECDSA(), 0, chainID)
 
-		txTests[i] = load2.ZeroTransferTest{PollFrequency: pollFrequency}
+		txTests[i] = load2.ZeroTransferTest{
+			PollFrequency: pollFrequency,
+			Timeout:       testTimeout,
+		}
 	}
 
 	generator, err := load2.NewGenerator(wallets, txTests)
