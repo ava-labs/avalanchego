@@ -41,10 +41,8 @@ func main() {
 	require := require.New(tc)
 	ctx := context.Background()
 
-	numNodes, _ := flagVars.NodeCount()
-	if numNodes == 0 {
-		numNodes = 5
-	}
+	numNodes, err := flagVars.NodeCount()
+	require.NoError(err, "failed to get node count")
 
 	nodes := tmpnet.NewNodesOrPanic(numNodes)
 
