@@ -166,7 +166,7 @@ curl -X POST --data '{
 ```
 
 For more information on dynamic fees see the [C-Chain section of the transaction fee
-documentation](/docs/api-reference/standards/guides/txn-fees#c-chain-fees).
+documentation](/docs/api-reference/guides/txn-fees#c-chain-fees).
 
 ## Admin APIs
 
