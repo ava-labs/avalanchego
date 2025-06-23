@@ -43,17 +43,17 @@ func NewTracker(namespace string, registry *prometheus.Registry) (*Tracker, erro
 		txIssuanceLatency: prometheus.NewHistogram(prometheus.HistogramOpts{
 			Namespace: namespace,
 			Name:      "tx_issuance_latency",
-			Help:      "issuance latency of transactions",
+			Help:      "Issuance latency of transactions",
 		}),
 		txConfirmationLatency: prometheus.NewHistogram(prometheus.HistogramOpts{
 			Namespace: namespace,
 			Name:      "tx_confirmation_latency",
-			Help:      "confirmation latency of transactions",
+			Help:      "Confirmation latency of transactions",
 		}),
 		txTotalLatency: prometheus.NewHistogram(prometheus.HistogramOpts{
 			Namespace: namespace,
 			Name:      "tx_total_latency",
-			Help:      "total latency of transactions",
+			Help:      "Total latency of transactions",
 		}),
 	}
 
