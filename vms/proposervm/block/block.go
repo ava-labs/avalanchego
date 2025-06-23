@@ -43,16 +43,16 @@ type SignedBlock interface {
 }
 
 type statelessUnsignedBlock struct {
-	ParentID     ids.ID `serialize:"true"`
-	Timestamp    int64  `serialize:"true"`
-	PChainHeight uint64 `serialize:"true"`
-	Certificate  []byte `serialize:"true"`
-	Block        []byte `serialize:"true"`
+	ParentID     ids.ID `serialize:"true" json:"parentID"`
+	Timestamp    int64  `serialize:"true" json:"timestamp"`
+	PChainHeight uint64 `serialize:"true" json:"pChainHeight"`
+	Certificate  []byte `serialize:"true" json:"certificate"`
+	Block        []byte `serialize:"true" json:"block"`
 }
 
 type statelessBlock struct {
-	StatelessBlock statelessUnsignedBlock `serialize:"true"`
-	Signature      []byte                 `serialize:"true"`
+	StatelessBlock statelessUnsignedBlock `serialize:"true" json:"block"`
+	Signature      []byte                 `serialize:"true" json:"signature"`
 
 	id        ids.ID
 	timestamp time.Time
