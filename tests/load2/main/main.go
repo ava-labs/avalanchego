@@ -5,7 +5,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"time"
 
@@ -22,19 +21,12 @@ import (
 
 const (
 	blockchainID  = "C"
-	nodesCount    = 5
-	agentsPerNode = 5
-	agentsCount   = nodesCount * agentsPerNode
 	logPrefix     = "avalanchego-load-test"
 	namespace     = "load"
 	pollFrequency = time.Millisecond
 )
 
-var (
-	flagVars *e2e.FlagVars
-
-	errFailedToCreateContract = errors.New("failed to create contract")
-)
+var flagVars *e2e.FlagVars
 
 func init() {
 	flagVars = e2e.RegisterFlags()
@@ -49,9 +41,14 @@ func main() {
 	require := require.New(tc)
 	ctx := context.Background()
 
-	nodes := tmpnet.NewNodesOrPanic(nodesCount)
+	numNodes, _ := flagVars.NodeCount()
+	if numNodes == 0 {
+		numNodes = 5
+	}
 
-	keys, err := tmpnet.NewPrivateKeys(agentsCount)
+	nodes := tmpnet.NewNodesOrPanic(numNodes)
+
+	keys, err := tmpnet.NewPrivateKeys(numNodes)
 	require.NoError(err)
 	network := &tmpnet.Network{
 		Nodes:         nodes,
