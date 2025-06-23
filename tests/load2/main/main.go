@@ -75,7 +75,7 @@ func main() {
 	}
 
 	wallets := make([]load2.Wallet, len(keys))
-	txTests := make([]load2.TxTest, len(keys))
+	txTests := make([]load2.Test, len(keys))
 	for i := range len(keys) {
 		wsURI := wsURIs[i%len(wsURIs)]
 		client, err := ethclient.Dial(wsURI)
@@ -92,7 +92,7 @@ func main() {
 			common.WithConfirmationHandler(confirmationF),
 			common.WithPollFrequency(pollFrequency),
 		)
-		txTests[i] = load2.TestZeroTransfer
+		txTests[i] = load2.ZeroTransferTest{}
 	}
 
 	generator, err := load2.NewGenerator(wallets, txTests)

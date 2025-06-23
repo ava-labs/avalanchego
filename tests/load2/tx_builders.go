@@ -16,7 +16,11 @@ import (
 	"github.com/ava-labs/avalanchego/tests"
 )
 
-func TestZeroTransfer(
+var _ Test = (*ZeroTransferTest)(nil)
+
+type ZeroTransferTest struct{}
+
+func (ZeroTransferTest) Run(
 	tc tests.TestContext,
 	ctx context.Context,
 	wallet Wallet,

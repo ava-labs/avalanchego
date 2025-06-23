@@ -88,16 +88,18 @@ func (t *Tracker) Accept(confirmationDuration time.Duration, totalDuration time.
 	t.txConfirmationLatency.Observe(float64(confirmationDuration.Milliseconds()))
 }
 
-type TxTest func(tests.TestContext, context.Context, Wallet)
+type Test interface {
+	Run(tests.TestContext, context.Context, Wallet)
+}
 
 type Generator struct {
 	wallets []Wallet
-	txTests []TxTest
+	txTests []Test
 }
 
 func NewGenerator(
 	wallets []Wallet,
-	txTests []TxTest,
+	txTests []Test,
 ) (Generator, error) {
 	if len(wallets) != len(txTests) {
 		return Generator{}, fmt.Errorf(
@@ -128,7 +130,7 @@ func (g Generator) Run(tc tests.TestContext, ctx context.Context) {
 				default:
 				}
 
-				g.txTests[i](tc, ctx, g.wallets[i])
+				g.txTests[i].Run(tc, ctx, g.wallets[i])
 			}
 		}()
 	}
