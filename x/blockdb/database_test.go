@@ -1,3 +1,6 @@
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package blockdb
 
 import (
@@ -6,9 +9,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 func TestNew_Truncate(t *testing.T) {
@@ -24,10 +27,8 @@ func TestNew_Truncate(t *testing.T) {
 
 	// Write some test data and close the database
 	testBlock := []byte("test block data")
-	err = db.WriteBlock(0, testBlock, 0)
-	require.NoError(t, err)
-	err = db.Close()
-	require.NoError(t, err)
+	require.NoError(t, db.WriteBlock(0, testBlock, 0))
+	require.NoError(t, db.Close())
 
 	// Reopen with truncate=true and verify data is gone
 	db2, err := New(indexDir, dataDir, false, true, DefaultDatabaseConfig(), logging.NoLog{})
@@ -53,13 +54,11 @@ func TestNew_NoTruncate(t *testing.T) {
 
 	// Write some test data and close the database
 	testBlock := []byte("test block data")
-	err = db.WriteBlock(1, testBlock, 5)
-	require.NoError(t, err)
+	require.NoError(t, db.WriteBlock(1, testBlock, 5))
 	readBlock, err := db.ReadBlock(1)
 	require.NoError(t, err)
 	require.Equal(t, testBlock, readBlock)
-	err = db.Close()
-	require.NoError(t, err)
+	require.NoError(t, db.Close())
 
 	// Reopen with truncate=false and verify data is still there
 	db2, err := New(indexDir, dataDir, false, false, DefaultDatabaseConfig(), logging.NoLog{})
@@ -72,8 +71,7 @@ func TestNew_NoTruncate(t *testing.T) {
 
 	// Verify we can write additional data
 	testBlock2 := []byte("test block data 3")
-	err = db2.WriteBlock(2, testBlock2, 0)
-	require.NoError(t, err)
+	require.NoError(t, db2.WriteBlock(2, testBlock2, 0))
 	readBlock2, err := db2.ReadBlock(2)
 	require.NoError(t, err)
 	require.Equal(t, testBlock2, readBlock2)
@@ -149,8 +147,7 @@ func TestNew_Params(t *testing.T) {
 			db, err := New(tt.indexDir, tt.dataDir, tt.syncToDisk, true, tt.config, tt.log)
 
 			if tt.wantErr != nil {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.wantErr.Error())
+				require.Equal(t, tt.wantErr.Error(), err.Error())
 				return
 			}
 
@@ -158,20 +155,16 @@ func TestNew_Params(t *testing.T) {
 			require.NotNil(t, db)
 
 			// Verify the database was created with correct configuration
-			assert.Equal(t, tt.config.MinimumHeight, db.options.MinimumHeight)
-			assert.Equal(t, tt.config.MaxDataFileSize, db.options.MaxDataFileSize)
-			assert.Equal(t, tt.config.CheckpointInterval, db.options.CheckpointInterval)
-			assert.Equal(t, tt.syncToDisk, db.syncToDisk)
+			require.Equal(t, tt.config.MinimumHeight, db.options.MinimumHeight)
+			require.Equal(t, tt.config.MaxDataFileSize, db.options.MaxDataFileSize)
+			require.Equal(t, tt.config.CheckpointInterval, db.options.CheckpointInterval)
+			require.Equal(t, tt.syncToDisk, db.syncToDisk)
 
-			// Verify files were created
 			indexPath := filepath.Join(tt.indexDir, indexFileName)
-			dataPath := filepath.Join(tt.dataDir, dataFileName)
-			assert.FileExists(t, indexPath)
-			assert.FileExists(t, dataPath)
+			require.FileExists(t, indexPath)
 
 			// Test that we can close the database
-			err = db.Close()
-			require.NoError(t, err)
+			require.NoError(t, db.Close())
 		})
 	}
 }
@@ -188,16 +181,13 @@ func TestNew_IndexFileErrors(t *testing.T) {
 				tempDir, _ := os.MkdirTemp("", "blockdb_test_*")
 				indexDir := filepath.Join(tempDir, "index")
 				dataDir := filepath.Join(tempDir, "data")
-				os.MkdirAll(indexDir, 0755)
-				os.MkdirAll(dataDir, 0755)
+				require.NoError(t, os.MkdirAll(indexDir, 0o755))
+				require.NoError(t, os.MkdirAll(dataDir, 0o755))
 
 				// Create a corrupted index file
 				indexPath := filepath.Join(indexDir, indexFileName)
 				corruptedData := []byte("corrupted index file data")
-				err := os.WriteFile(indexPath, corruptedData, 0666)
-				if err != nil {
-					return "", ""
-				}
+				require.NoError(t, os.WriteFile(indexPath, corruptedData, defaultFilePermissions))
 
 				return indexDir, dataDir
 			},
@@ -211,8 +201,8 @@ func TestNew_IndexFileErrors(t *testing.T) {
 				dataDir := filepath.Join(tempDir, "data")
 
 				// Create directories
-				os.MkdirAll(indexDir, 0755)
-				os.MkdirAll(dataDir, 0755)
+				require.NoError(t, os.MkdirAll(indexDir, 0o755))
+				require.NoError(t, os.MkdirAll(dataDir, 0o755))
 
 				// Create a valid index file with wrong version
 				indexPath := filepath.Join(indexDir, indexFileName)
@@ -222,17 +212,12 @@ func TestNew_IndexFileErrors(t *testing.T) {
 					MaxDataFileSize:     DefaultMaxDataFileSize,
 					MaxHeight:           unsetHeight,
 					MaxContiguousHeight: unsetHeight,
-					DataFileSize:        0,
+					NextWriteOffset:     0,
 				}
 
 				headerBytes, err := header.MarshalBinary()
-				if err != nil {
-					return "", ""
-				}
-				err = os.WriteFile(indexPath, headerBytes, 0666)
-				if err != nil {
-					return "", ""
-				}
+				require.NoError(t, err)
+				require.NoError(t, os.WriteFile(indexPath, headerBytes, defaultFilePermissions))
 
 				return indexDir, dataDir
 			},
@@ -250,17 +235,15 @@ func TestNew_IndexFileErrors(t *testing.T) {
 			defer os.RemoveAll(filepath.Dir(dataDir))
 
 			_, err := New(indexDir, dataDir, false, false, DefaultDatabaseConfig(), logging.NoLog{})
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), tt.wantErrMsg)
+			require.Contains(t, err.Error(), tt.wantErrMsg)
 		})
 	}
 }
 
 func TestIndexFileHeaderAlignment(t *testing.T) {
-	if sizeOfIndexFileHeader%sizeOfIndexEntry != 0 {
-		t.Errorf("sizeOfIndexFileHeader (%d) is not a multiple of sizeOfIndexEntry (%d)",
-			sizeOfIndexFileHeader, sizeOfIndexEntry)
-	}
+	require.Equal(t, uint64(0), sizeOfIndexFileHeader%sizeOfIndexEntry,
+		"sizeOfIndexFileHeader (%d) is not a multiple of sizeOfIndexEntry (%d)",
+		sizeOfIndexFileHeader, sizeOfIndexEntry)
 }
 
 func TestNew_IndexFileConfigPrecedence(t *testing.T) {
@@ -279,13 +262,11 @@ func TestNew_IndexFileConfigPrecedence(t *testing.T) {
 
 	// Write a block at height 100 and close db
 	testBlock := []byte("test block data")
-	err = db.WriteBlock(100, testBlock, 0)
-	require.NoError(t, err)
+	require.NoError(t, db.WriteBlock(100, testBlock, 0))
 	readBlock, err := db.ReadBlock(100)
 	require.NoError(t, err)
 	require.Equal(t, testBlock, readBlock)
-	err = db.Close()
-	require.NoError(t, err)
+	require.NoError(t, db.Close())
 
 	// Reopen with different config that has higher minimum height and smaller max data file size
 	differentConfig := DatabaseConfig{
@@ -300,22 +281,19 @@ func TestNew_IndexFileConfigPrecedence(t *testing.T) {
 
 	// The database should still accept blocks between 100 and 200
 	testBlock2 := []byte("test block data 2")
-	err = db2.WriteBlock(150, testBlock2, 0)
-	require.NoError(t, err)
+	require.NoError(t, db2.WriteBlock(150, testBlock2, 0))
 	readBlock2, err := db2.ReadBlock(150)
 	require.NoError(t, err)
 	require.Equal(t, testBlock2, readBlock2)
 
 	// Verify that writing below initial minimum height fails
 	err = db2.WriteBlock(50, []byte("invalid block"), 0)
-	require.Error(t, err)
-	require.True(t, errors.Is(err, ErrInvalidBlockHeight))
+	require.ErrorIs(t, err, ErrInvalidBlockHeight)
 
 	// Write a large block that would exceed the new config's 512KB limit
 	// but should succeed because we use the original 1MB limit from index file
 	largeBlock := make([]byte, 768*1024) // 768KB block
-	err = db2.WriteBlock(200, largeBlock, 0)
-	require.NoError(t, err)
+	require.NoError(t, db2.WriteBlock(200, largeBlock, 0))
 	readLargeBlock, err := db2.ReadBlock(200)
 	require.NoError(t, err)
 	require.Equal(t, largeBlock, readLargeBlock)
