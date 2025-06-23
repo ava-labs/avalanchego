@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/tests/load2"
-	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
 const (
@@ -65,14 +64,7 @@ func main() {
 	metrics, err := load2.NewMetrics(namespace, registry)
 	require.NoError(err)
 
-	issuanceF := func(i common.IssuanceReceipt) {
-		metrics.Issue(i.Duration)
-	}
-	confirmationF := func(c common.ConfirmationReceipt) {
-		metrics.Accept(c.ConfirmationDuration, c.TotalDuration)
-	}
-
-	wallets := make([]load2.Wallet, len(keys))
+	wallets := make([]*load2.Wallet, len(keys))
 	txTests := make([]load2.Test, len(keys))
 	for i := range len(keys) {
 		wsURI := wsURIs[i%len(wsURIs)]
@@ -82,15 +74,9 @@ func main() {
 		chainID, err := client.ChainID(ctx)
 		require.NoError(err)
 
-		wallet := load2.NewWallet(client, keys[i].ToECDSA(), 0, chainID)
+		wallets[i] = load2.NewWallet(metrics, client, keys[i].ToECDSA(), 0, chainID)
 
-		wallets[i] = load2.NewWalletWithOptions(
-			wallet,
-			common.WithIssuanceHandler(issuanceF),
-			common.WithConfirmationHandler(confirmationF),
-			common.WithPollFrequency(pollFrequency),
-		)
-		txTests[i] = load2.ZeroTransferTest{}
+		txTests[i] = load2.ZeroTransferTest{PollFrequency: pollFrequency}
 	}
 
 	generator, err := load2.NewGenerator(wallets, txTests)

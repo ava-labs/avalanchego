@@ -6,6 +6,7 @@ package load2
 import (
 	"context"
 	"math/big"
+	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
@@ -18,12 +19,14 @@ import (
 
 var _ Test = (*ZeroTransferTest)(nil)
 
-type ZeroTransferTest struct{}
+type ZeroTransferTest struct {
+	PollFrequency time.Duration
+}
 
-func (ZeroTransferTest) Run(
+func (z ZeroTransferTest) Run(
 	tc tests.TestContext,
 	ctx context.Context,
-	wallet Wallet,
+	wallet *Wallet,
 ) {
 	require := require.New(tc)
 
@@ -45,5 +48,5 @@ func (ZeroTransferTest) Run(
 	})
 	require.NoError(err)
 
-	require.NoError(wallet.SendTx(ctx, tx))
+	require.NoError(wallet.SendTx(ctx, tx, z.PollFrequency))
 }

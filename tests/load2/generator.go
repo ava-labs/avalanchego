@@ -77,16 +77,16 @@ func (m *Metrics) Accept(confirmationDuration time.Duration, totalDuration time.
 }
 
 type Test interface {
-	Run(tests.TestContext, context.Context, Wallet)
+	Run(tests.TestContext, context.Context, *Wallet)
 }
 
 type Generator struct {
-	wallets []Wallet
+	wallets []*Wallet
 	txTests []Test
 }
 
 func NewGenerator(
-	wallets []Wallet,
+	wallets []*Wallet,
 	txTests []Test,
 ) (Generator, error) {
 	if len(wallets) != len(txTests) {
