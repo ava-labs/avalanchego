@@ -6,7 +6,6 @@ package load2
 import (
 	"context"
 	"crypto/ecdsa"
-	"errors"
 	"fmt"
 	"math/big"
 	"time"
@@ -148,25 +147,22 @@ func awaitTx(
 	defer ticker.Stop()
 
 	for {
+		receipt, err := client.TransactionReceipt(ctx, txHash)
+		if err == nil {
+			if receipt.Status != 1 {
+				return fmt.Errorf("failed tx: %d", receipt.Status)
+			}
+			return nil
+		}
+
+		if err != ethereum.NotFound {
+			return err
+		}
+
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
 		}
-
-		receipt, err := client.TransactionReceipt(ctx, txHash)
-		if err != nil {
-			if errors.Is(err, ethereum.NotFound) {
-				continue
-			}
-
-			return err
-		}
-
-		if receipt.Status != 1 {
-			return fmt.Errorf("failed tx: %d", receipt.Status)
-		}
-
-		return nil
 	}
 }
