@@ -8,6 +8,7 @@ import (
 	"errors"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	avalanchecommon "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -15,13 +16,16 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 
+	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/eth"
+	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/plugin/evm/config"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	"github.com/ava-labs/coreth/plugin/evm/sync"
 	"github.com/ava-labs/coreth/sync/handlers"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 )
 
@@ -44,10 +48,16 @@ type ExtensibleVM interface {
 	LastAcceptedExtendedBlock() ExtendedBlock
 	// IsBootstrapped returns true if the VM is bootstrapped
 	IsBootstrapped() bool
+	// ChainConfig returns the chain config for the VM
+	ChainConfig() *params.ChainConfig
 	// Ethereum returns the Ethereum client
 	Ethereum() *eth.Ethereum
 	// Config returns the configuration for the VM
 	Config() config.Config
+	// ReadLastAccepted returns the last accepted block hash and height
+	ReadLastAccepted() (common.Hash, uint64, error)
+	// VersionDB returns the versioned database for the VM
+	VersionDB() *versiondb.Database
 }
 
 // InnerVM is the interface that must be implemented by the VM
@@ -102,6 +112,10 @@ type LeafRequestConfig struct {
 
 // Config is the configuration for the VM extension
 type Config struct {
+	// ConsensusCallbacks is the consensus callbacks to use
+	// for the VM to be used in consensus engine.
+	// Callback functions can be nil.
+	ConsensusCallbacks dummy.ConsensusCallbacks
 	// SyncSummaryProvider is the sync summary provider to use
 	// for the VM to be used in syncer.
 	// It's required and should be non-nil
