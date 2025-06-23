@@ -86,8 +86,8 @@ func (vm *VM) Initialize(
 	// Create the atomic extension structs
 	// some of them need to be initialized after the inner VM is initialized
 	blockExtender := newBlockExtender(extDataHashes, vm)
-	syncExtender := sync.NewExtender()
-	syncProvider := sync.NewSummaryProvider()
+	syncExtender := &sync.Extender{}
+	syncProvider := &sync.SummaryProvider{}
 	// Create and pass the leaf handler to the atomic extension
 	// it will be initialized after the inner VM is initialized
 	leafHandler := sync.NewLeafHandler()
@@ -105,7 +105,7 @@ func (vm *VM) Initialize(
 		ExtraSyncLeafHandlerConfig: atomicLeafTypeConfig,
 		Clock:                      &vm.clock,
 	}
-	if err := vm.SetExtensionConfig(extensionConfig); err != nil {
+	if err := vm.InnerVM.SetExtensionConfig(extensionConfig); err != nil {
 		return fmt.Errorf("failed to set extension config: %w", err)
 	}
 
@@ -125,13 +125,15 @@ func (vm *VM) Initialize(
 	}
 
 	// Atomic backend is available now, we can initialize structs that depend on it
-	syncProvider.Initialize(vm.AtomicBackend().AtomicTrie())
-	syncExtender.Initialize(vm.AtomicBackend(), vm.AtomicBackend().AtomicTrie(), vm.Config().StateSyncRequestSize)
-	leafHandler.Initialize(vm.AtomicBackend().AtomicTrie().TrieDB(), state.TrieKeyLength, message.Codec)
+	atomicBackend := vm.InnerVM.AtomicBackend()
+	atomicTrie := atomicBackend.AtomicTrie()
+	syncProvider.Initialize(atomicTrie)
+	syncExtender.Initialize(atomicBackend, atomicTrie, vm.Config().StateSyncRequestSize)
+	leafHandler.Initialize(atomicTrie.TrieDB(), state.TrieKeyLength, message.Codec)
 
 	return nil
 }
 
 func (vm *VM) chainConfigExtra() *extras.ChainConfig {
-	return params.GetExtra(vm.Ethereum().BlockChain().Config())
+	return params.GetExtra(vm.InnerVM.Ethereum().BlockChain().Config())
 }
