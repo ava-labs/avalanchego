@@ -199,7 +199,7 @@ func (be *blockExtension) Accept(acceptedBatch database.Batch) error {
 
 	// Update VM state for atomic txs in this block. This includes updating the
 	// atomic tx repo, atomic trie, and shared memory.
-	atomicState, err := vm.AtomicBackend().GetVerifiedAtomicState(common.Hash(be.block.ID()))
+	atomicState, err := vm.AtomicBackend.GetVerifiedAtomicState(common.Hash(be.block.ID()))
 	if err != nil {
 		// should never occur since [b] must be verified before calling Accept
 		return err
@@ -219,7 +219,7 @@ func (be *blockExtension) Reject() error {
 			log.Debug("Failed to re-issue transaction in rejected block", "txID", tx.ID(), "err", err)
 		}
 	}
-	atomicState, err := vm.AtomicBackend().GetVerifiedAtomicState(common.Hash(be.block.ID()))
+	atomicState, err := vm.AtomicBackend.GetVerifiedAtomicState(common.Hash(be.block.ID()))
 	if err != nil {
 		// should never occur since [b] must be verified before calling Reject
 		return err
@@ -230,7 +230,7 @@ func (be *blockExtension) Reject() error {
 // CleanupVerified is called when the block is cleaned up after a failed insertion.
 func (be *blockExtension) CleanupVerified() {
 	vm := be.blockExtender.vm
-	if atomicState, err := vm.AtomicBackend().GetVerifiedAtomicState(be.block.GetEthBlock().Hash()); err == nil {
+	if atomicState, err := vm.AtomicBackend.GetVerifiedAtomicState(be.block.GetEthBlock().Hash()); err == nil {
 		atomicState.Reject()
 	}
 }
@@ -246,7 +246,7 @@ func (be *blockExtension) verifyUTXOsPresent(atomicTxs []*atomic.Tx) error {
 	b := be.block
 	blockHash := common.Hash(b.ID())
 	vm := be.blockExtender.vm
-	if vm.AtomicBackend().IsBonus(b.Height(), blockHash) {
+	if vm.AtomicBackend.IsBonus(b.Height(), blockHash) {
 		log.Info("skipping atomic tx verification on bonus block", "block", blockHash)
 		return nil
 	}

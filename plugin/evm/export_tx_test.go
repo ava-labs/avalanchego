@@ -925,11 +925,11 @@ func TestExportTxSemanticVerify(t *testing.T) {
 
 		backend := &atomicvm.VerifierBackend{
 			Ctx:          vm.ctx,
-			Fx:           &vm.fx,
+			Fx:           &vm.atomicVM.Fx,
 			Rules:        test.rules,
 			Bootstrapped: vm.bootstrapped.Get(),
 			BlockFetcher: vm,
-			SecpCache:    vm.secpCache,
+			SecpCache:    vm.atomicVM.SecpCache,
 		}
 
 		t.Run(test.name, func(t *testing.T) {
@@ -1786,11 +1786,11 @@ func TestNewExportTx(t *testing.T) {
 
 			backend := &atomicvm.VerifierBackend{
 				Ctx:          tvm.vm.ctx,
-				Fx:           &tvm.vm.fx,
+				Fx:           &tvm.vm.atomicVM.Fx,
 				Rules:        tvm.vm.currentRules(),
 				Bootstrapped: tvm.vm.bootstrapped.Get(),
 				BlockFetcher: tvm.vm,
-				SecpCache:    tvm.vm.secpCache,
+				SecpCache:    tvm.vm.atomicVM.SecpCache,
 			}
 
 			if err := exportTx.Visit(&atomicvm.SemanticVerifier{
@@ -1990,11 +1990,11 @@ func TestNewExportTxMulticoin(t *testing.T) {
 			exportTx := tx.UnsignedAtomicTx
 			backend := &atomicvm.VerifierBackend{
 				Ctx:          tvm.vm.ctx,
-				Fx:           &tvm.vm.fx,
+				Fx:           &tvm.vm.atomicVM.Fx,
 				Rules:        tvm.vm.currentRules(),
 				Bootstrapped: tvm.vm.bootstrapped.Get(),
 				BlockFetcher: tvm.vm,
-				SecpCache:    tvm.vm.secpCache,
+				SecpCache:    tvm.vm.atomicVM.SecpCache,
 			}
 
 			if err := exportTx.Visit(&atomicvm.SemanticVerifier{

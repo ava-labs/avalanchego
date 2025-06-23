@@ -7,9 +7,10 @@ import (
 	"context"
 	"errors"
 
+	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/coreth/eth"
-	"github.com/ava-labs/coreth/plugin/evm/atomic/state"
+	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/atomic/txpool"
 	"github.com/ava-labs/coreth/plugin/evm/config"
 	"github.com/ava-labs/coreth/plugin/evm/extension"
@@ -60,6 +61,10 @@ func (vm *VM) IsBootstrapped() bool {
 	return vm.bootstrapped.Get()
 }
 
+func (vm *VM) ChainConfig() *params.ChainConfig {
+	return vm.chainConfig
+}
+
 func (vm *VM) Ethereum() *eth.Ethereum {
 	return vm.eth
 }
@@ -68,9 +73,8 @@ func (vm *VM) Config() config.Config {
 	return vm.config
 }
 
-// TODO: remove these
-func (vm *VM) AtomicBackend() *state.AtomicBackend {
-	return vm.atomicBackend
+func (vm *VM) VersionDB() *versiondb.Database {
+	return vm.versiondb
 }
 
 func (vm *VM) AtomicMempool() *txpool.Mempool {

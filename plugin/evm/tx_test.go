@@ -117,11 +117,11 @@ func executeTxTest(t *testing.T, test atomicTxTest) {
 	lastAcceptedBlock := tvm.vm.LastAcceptedExtendedBlock()
 	backend := &atomicvm.VerifierBackend{
 		Ctx:          tvm.vm.ctx,
-		Fx:           &tvm.vm.fx,
+		Fx:           &tvm.vm.atomicVM.Fx,
 		Rules:        rules,
 		Bootstrapped: tvm.vm.bootstrapped.Get(),
 		BlockFetcher: tvm.vm,
-		SecpCache:    tvm.vm.secpCache,
+		SecpCache:    tvm.vm.atomicVM.SecpCache,
 	}
 	if err := tx.UnsignedAtomicTx.Visit(&atomicvm.SemanticVerifier{
 		Backend: backend,
