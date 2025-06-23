@@ -25,8 +25,7 @@ import (
 )
 
 const (
-	blockchainID = "C"
-	// invariant: nodesCount >= 5
+	blockchainID  = "C"
 	nodesCount    = 5
 	agentsPerNode = 5
 	agentsCount   = nodesCount * agentsPerNode
@@ -59,7 +58,6 @@ func main() {
 	keys, err := tmpnet.NewPrivateKeys(agentsCount)
 	require.NoError(err)
 	network := &tmpnet.Network{
-		Owner:         "avalanchego-load-test",
 		Nodes:         nodes,
 		PreFundedKeys: keys,
 	}
