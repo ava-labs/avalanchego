@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/ava-labs/simplex"
 	"google.golang.org/protobuf/proto"
@@ -17,12 +18,58 @@ import (
 	pSimplex "github.com/ava-labs/avalanchego/proto/pb/simplex"
 )
 
+var _ simplex.Block = (*Block)(nil)
+var _ simplex.VerifiedBlock = (*VerifiedBlock)(nil)
+var _ simplex.BlockDeserializer = (*blockDeserializer)(nil)
+var maxBlockVerifyTimeout = 30 * time.Second // Maximum time to wait for block verification
+
+type Block struct {
+	block *VerifiedBlock 
+	parser    block.Parser
+}
+
+func (b *Block) BlockHeader() simplex.BlockHeader {
+	return b.block.BlockHeader()
+}
+
+func (b *Block) Verify(ctx context.Context) (simplex.VerifiedBlock, error) {
+	ctx, cancel := context.WithTimeout(ctx, maxBlockVerifyTimeout) // todo: should this be passed in via config?
+	defer cancel()
+
+	block, err := b.parser.ParseBlock(ctx, b.block.innerBlock)
+	if err != nil {
+		return nil, err
+	}
+
+	md := b.BlockHeader()
+	rejection := func(ctx context.Context) error {
+		b.e.removeDigestToIDMapping(md.Digest)
+		return block.Reject(ctx)
+	}
+
+	b.e.blockTracker.trackBlock(md.Round, md.Digest, rejection)
+	b.verifiedBlock.accept = func(ctx context.Context) error {
+		b.e.removeDigestToIDMapping(md.Digest)
+		b.e.ChainVM.SetPreference(context.Background(), block.ID())
+		b.e.blockTracker.rejectSiblingsAndUncles(md.Round, md.Digest)
+		return block.Accept(ctx)
+	}
+
+	err = block.Verify(ctx)
+
+	if err == nil {
+		b.e.observeDigestToIDMapping(md.Digest, block.ID())
+	}
+
+	return b.block, err
+}
+
 type VerifiedBlock struct {
 	computeDigestOnce sync.Once
 	digest            simplex.Digest // cached, not serialized
 
 	metadata   simplex.ProtocolMetadata
-	innerBlock []byte
+	innerBlock []byte // inner block bytes
 }
 
 // BlockHeader returns the block header for the verified block.
@@ -59,7 +106,7 @@ type blockDeserializer struct {
 	parser block.Parser
 }
 
-func (b *blockDeserializer) DeserializeBlock(bytes []byte) (simplex.VerifiedBlock, error) {
+func (b *blockDeserializer) DeserializeBlock(bytes []byte) (simplex.Block, error) {
 	vb, err := verifiedBlockFromBytes(bytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to deserialize verified block: %w", err)
@@ -70,7 +117,13 @@ func (b *blockDeserializer) DeserializeBlock(bytes []byte) (simplex.VerifiedBloc
 		return nil, err
 	}
 
-	return vb, nil
+	return &Block{
+		block:  &VerifiedBlock{
+			metadata:  vb.metadata,
+			innerBlock: vb.innerBlock,
+		},
+		parser: b.parser,
+	}, nil
 }
 
 func verifiedBlockFromBytes(buff []byte) (*VerifiedBlock, error) {

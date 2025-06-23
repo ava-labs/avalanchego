@@ -5,6 +5,7 @@ package simplex
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -21,6 +22,8 @@ type Config struct {
 
 	// SignBLS is the signing function used for this node to sign messages.
 	SignBLS SignFunc
+
+	Parser block.Parser
 }
 
 // Context is information about the current execution.
