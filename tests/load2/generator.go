@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests"
 )
 
-type Tracker struct {
+type Metrics struct {
 	txsIssuedCounter      prometheus.Counter
 	txsAcceptedCounter    prometheus.Counter
 	txIssuanceLatency     prometheus.Histogram
@@ -23,8 +23,8 @@ type Tracker struct {
 	txTotalLatency        prometheus.Histogram
 }
 
-func NewTracker(namespace string, registry *prometheus.Registry) (*Tracker, error) {
-	t := &Tracker{
+func NewMetrics(namespace string, registry *prometheus.Registry) (*Metrics, error) {
+	m := &Metrics{
 		txsIssuedCounter: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "txs_issued",
@@ -53,27 +53,27 @@ func NewTracker(namespace string, registry *prometheus.Registry) (*Tracker, erro
 	}
 
 	if err := errors.Join(
-		registry.Register(t.txsIssuedCounter),
-		registry.Register(t.txsAcceptedCounter),
-		registry.Register(t.txIssuanceLatency),
-		registry.Register(t.txConfirmationLatency),
-		registry.Register(t.txTotalLatency),
+		registry.Register(m.txsIssuedCounter),
+		registry.Register(m.txsAcceptedCounter),
+		registry.Register(m.txIssuanceLatency),
+		registry.Register(m.txConfirmationLatency),
+		registry.Register(m.txTotalLatency),
 	); err != nil {
 		return nil, err
 	}
 
-	return t, nil
+	return m, nil
 }
 
-func (t *Tracker) Issue(d time.Duration) {
-	t.txsIssuedCounter.Inc()
-	t.txIssuanceLatency.Observe(float64(d.Milliseconds()))
+func (m *Metrics) Issue(d time.Duration) {
+	m.txsIssuedCounter.Inc()
+	m.txIssuanceLatency.Observe(float64(d.Milliseconds()))
 }
 
-func (t *Tracker) Accept(confirmationDuration time.Duration, totalDuration time.Duration) {
-	t.txsAcceptedCounter.Inc()
-	t.txTotalLatency.Observe(float64(totalDuration.Milliseconds()))
-	t.txConfirmationLatency.Observe(float64(confirmationDuration.Milliseconds()))
+func (m *Metrics) Accept(confirmationDuration time.Duration, totalDuration time.Duration) {
+	m.txsAcceptedCounter.Inc()
+	m.txTotalLatency.Observe(float64(totalDuration.Milliseconds()))
+	m.txConfirmationLatency.Observe(float64(confirmationDuration.Milliseconds()))
 }
 
 type Test interface {

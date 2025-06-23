@@ -64,14 +64,14 @@ func main() {
 	require.NoError(err)
 
 	registry := prometheus.NewRegistry()
-	tracker, err := load2.NewTracker(namespace, registry)
+	metrics, err := load2.NewMetrics(namespace, registry)
 	require.NoError(err)
 
 	issuanceF := func(i common.IssuanceReceipt) {
-		tracker.Issue(i.Duration)
+		metrics.Issue(i.Duration)
 	}
 	confirmationF := func(c common.ConfirmationReceipt) {
-		tracker.Accept(c.ConfirmationDuration, c.TotalDuration)
+		metrics.Accept(c.ConfirmationDuration, c.TotalDuration)
 	}
 
 	wallets := make([]load2.Wallet, len(keys))
