@@ -1,3 +1,6 @@
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package blockdb
 
 import (
@@ -7,7 +10,6 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -166,7 +168,7 @@ func TestWriteBlock_HeightsVerification(t *testing.T) {
 			for h, expectedBlock := range blocksWritten {
 				readBlock, err := store.ReadBlock(h)
 				require.NoError(t, err, "ReadBlock failed at height %d", h)
-				assert.Equal(t, expectedBlock, readBlock, "data integrity check failed at height %d", h)
+				require.Equal(t, expectedBlock, readBlock)
 
 				// Test header/body separation if header size was specified
 				if tt.headerSizes != nil {
@@ -178,13 +180,13 @@ func TestWriteBlock_HeightsVerification(t *testing.T) {
 						require.NoError(t, err, "ReadBody failed at height %d", h)
 
 						if headerSize == 0 {
-							assert.Nil(t, header, "header should be nil for headerSize=0")
-							assert.Equal(t, expectedBlock, body, "body should equal full block when headerSize=0")
+							require.Nil(t, header)
+							require.Equal(t, expectedBlock, body)
 						} else {
 							expectedHeader := expectedBlock[:headerSize]
 							expectedBody := expectedBlock[headerSize:]
-							assert.Equal(t, expectedHeader, header, "header mismatch at height %d", h)
-							assert.Equal(t, expectedBody, body, "body mismatch at height %d", h)
+							require.Equal(t, expectedHeader, header, "header mismatch at height %d", h)
+							require.Equal(t, expectedBody, body, "body mismatch at height %d", h)
 						}
 					}
 				}
@@ -221,7 +223,7 @@ func TestWriteBlock_Concurrency(t *testing.T) {
 
 			err := store.WriteBlock(height, block, 1)
 			if err != nil {
-				t.Errorf("WriteBlock failed for iteration %d (height %d): %v", i, height, err)
+				require.NoError(t, err, "WriteBlock failed for iteration %d (height %d)", i, height)
 				errors.Add(1)
 			}
 		}(i)
@@ -329,7 +331,7 @@ func TestWriteBlock_Errors(t *testing.T) {
 				CheckpointInterval: 1024,
 			},
 			headerSize: 0,
-			wantErr:    errors.New("exceed configured max data file size"),
+			wantErr:    ErrBlockTooLarge,
 		},
 		{
 			name:   "data file offset overflow",
@@ -359,12 +361,7 @@ func TestWriteBlock_Errors(t *testing.T) {
 			}
 
 			err := store.WriteBlock(tt.height, tt.block, tt.headerSize)
-			require.Error(t, err)
-			require.NotNil(t, tt.wantErr, "test case must specify expected error")
-
-			if !errors.Is(err, tt.wantErr) {
-				require.Contains(t, err.Error(), tt.wantErr.Error())
-			}
+			require.Contains(t, err.Error(), tt.wantErr.Error())
 			checkDatabaseState(t, store, unsetHeight, unsetHeight)
 		})
 	}

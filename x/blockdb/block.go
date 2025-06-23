@@ -1,18 +1,24 @@
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package blockdb
 
 import (
 	"encoding"
 	"encoding/binary"
+	"errors"
 	"fmt"
+	"io"
 	"math"
+	"os"
 
 	"github.com/cespare/xxhash/v2"
 	"go.uber.org/zap"
 )
 
 var (
-	_ encoding.BinaryMarshaler   = blockHeader{}
-	_ encoding.BinaryUnmarshaler = &blockHeader{}
+	_ encoding.BinaryMarshaler   = (*blockHeader)(nil)
+	_ encoding.BinaryUnmarshaler = (*blockHeader)(nil)
 
 	sizeOfBlockHeader = uint64(binary.Size(blockHeader{}))
 )
@@ -68,11 +74,12 @@ func (s *Database) WriteBlock(height BlockHeight, block BlockData, headerSize Bl
 		return ErrDatabaseClosed
 	}
 
-	if len(block) == 0 {
+	blockDataLen := uint64(len(block))
+	if blockDataLen == 0 {
 		return ErrBlockEmpty
 	}
 
-	if len(block) > MaxBlockDataSize {
+	if blockDataLen > MaxBlockDataSize {
 		return ErrBlockTooLarge
 	}
 
@@ -85,7 +92,6 @@ func (s *Database) WriteBlock(height BlockHeight, block BlockData, headerSize Bl
 		return err
 	}
 
-	blockDataLen := uint64(len(block))
 	sizeWithDataHeader := sizeOfBlockHeader + blockDataLen
 	writeDataOffset, err := s.allocateBlockSpace(sizeWithDataHeader)
 	if err != nil {
@@ -129,12 +135,15 @@ func (s *Database) ReadBlock(height BlockHeight) (BlockData, error) {
 
 	// Read the complete block data
 	blockData := make(BlockData, indexEntry.Size)
-	actualDataOffset := indexEntry.Offset + sizeOfBlockHeader
-	if actualDataOffset < indexEntry.Offset {
-		return nil, fmt.Errorf("internal error: block data offset calculation overflowed")
-	}
-	_, err = s.dataFile.ReadAt(blockData, int64(actualDataOffset))
+	dataFile, localOffset, err := s.getDataFileAndOffset(indexEntry.Offset)
 	if err != nil {
+		return nil, fmt.Errorf("failed to get data file for block at height %d: %w", height, err)
+	}
+	_, err = dataFile.ReadAt(blockData, int64(localOffset+sizeOfBlockHeader))
+	if err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("failed to read block data from data file: %w", err)
 	}
 
@@ -171,12 +180,15 @@ func (s *Database) ReadHeader(height BlockHeight) (BlockData, error) {
 
 	// Read only the header portion
 	headerData := make([]byte, indexEntry.HeaderSize)
-	actualDataOffset := indexEntry.Offset + sizeOfBlockHeader
-	if actualDataOffset < indexEntry.Offset {
-		return nil, fmt.Errorf("internal error: block data offset calculation overflowed")
-	}
-	_, err = s.dataFile.ReadAt(headerData, int64(actualDataOffset))
+	dataFile, localOffset, err := s.getDataFileAndOffset(indexEntry.Offset)
 	if err != nil {
+		return nil, fmt.Errorf("failed to get data file for block header at height %d: %w", height, err)
+	}
+	_, err = dataFile.ReadAt(headerData, int64(localOffset+sizeOfBlockHeader))
+	if err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("failed to read block header data from data file: %w", err)
 	}
 
@@ -203,9 +215,16 @@ func (s *Database) ReadBody(height BlockHeight) (BlockData, error) {
 
 	bodySize := indexEntry.Size - uint64(indexEntry.HeaderSize)
 	bodyData := make([]byte, bodySize)
-	bodyOffset := indexEntry.Offset + sizeOfBlockHeader + uint64(indexEntry.HeaderSize)
-	_, err = s.dataFile.ReadAt(bodyData, int64(bodyOffset))
+	dataFile, localOffset, err := s.getDataFileAndOffset(indexEntry.Offset)
 	if err != nil {
+		return nil, fmt.Errorf("failed to get data file for block body at height %d: %w", height, err)
+	}
+	bodyOffset := localOffset + sizeOfBlockHeader + uint64(indexEntry.HeaderSize)
+	_, err = dataFile.ReadAt(bodyData, int64(bodyOffset))
+	if err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("failed to read block body data from data file: %w", err)
 	}
 	return bodyData, nil
@@ -221,16 +240,21 @@ func (s *Database) writeBlockAt(offset uint64, bh blockHeader, block BlockData) 
 		return fmt.Errorf("failed to serialize block header: %w", err)
 	}
 
+	dataFile, localOffset, err := s.getDataFileAndOffset(offset)
+	if err != nil {
+		return fmt.Errorf("failed to get data file for writing block %d: %w", bh.Height, err)
+	}
+
 	// Allocate combined buffer for header and block data and write it to the data file
 	combinedBuf := make([]byte, sizeOfBlockHeader+uint64(len(block)))
 	copy(combinedBuf, headerBytes)
 	copy(combinedBuf[sizeOfBlockHeader:], block)
-	if _, err := s.dataFile.WriteAt(combinedBuf, int64(offset)); err != nil {
+	if _, err := dataFile.WriteAt(combinedBuf, int64(localOffset)); err != nil {
 		return fmt.Errorf("failed to write block to data file at offset %d: %w", offset, err)
 	}
 
 	if s.syncToDisk {
-		if err := s.dataFile.Sync(); err != nil {
+		if err := dataFile.Sync(); err != nil {
 			return fmt.Errorf("failed to sync data file after writing block %d: %w", bh.Height, err)
 		}
 	}
@@ -285,29 +309,51 @@ func (s *Database) updateBlockHeights(writtenBlockHeight BlockHeight) error {
 	return nil
 }
 
-func (s *Database) allocateBlockSpace(sizeWithDataHeader uint64) (writeDataOffset uint64, err error) {
+func (s *Database) allocateBlockSpace(totalSize uint64) (writeDataOffset uint64, err error) {
 	maxDataFileSize := s.header.MaxDataFileSize
 
+	// Check if a single block would exceed the max data file size
+	if maxDataFileSize > 0 && totalSize > maxDataFileSize {
+		return 0, ErrBlockTooLarge
+	}
+
 	for {
-		// Check if the new offset would overflow uint64.
 		currentOffset := s.nextDataWriteOffset.Load()
-		if currentOffset > math.MaxUint64-sizeWithDataHeader {
+		if currentOffset > math.MaxUint64-totalSize {
 			return 0, fmt.Errorf(
 				"adding block of size %d to offset %d would overflow uint64 data file pointer",
-				sizeWithDataHeader, currentOffset,
+				totalSize, currentOffset,
 			)
 		}
 
-		newOffset := currentOffset + sizeWithDataHeader
-		if maxDataFileSize > 0 && newOffset > maxDataFileSize {
-			return 0, fmt.Errorf(
-				"adding block of size %d to offset %d (new offset %d) would exceed configured max data file size of %d bytes",
-				sizeWithDataHeader, currentOffset, newOffset, maxDataFileSize,
-			)
+		writeOffset := currentOffset
+		newOffset := currentOffset + totalSize
+
+		if maxDataFileSize > 0 {
+			fileIndex := int(currentOffset / maxDataFileSize)
+			localOffset := currentOffset % maxDataFileSize
+
+			if localOffset+totalSize > maxDataFileSize {
+				writeOffset = (uint64(fileIndex) + 1) * maxDataFileSize
+				newOffset = writeOffset + totalSize
+			}
 		}
 
 		if s.nextDataWriteOffset.CompareAndSwap(currentOffset, newOffset) {
-			return currentOffset, nil
+			return writeOffset, nil
 		}
 	}
+}
+
+func (s *Database) getDataFileAndOffset(globalOffset uint64) (*os.File, uint64, error) {
+	maxFileSize := s.header.MaxDataFileSize
+	if maxFileSize == 0 {
+		handle, err := s.getOrOpenDataFile(0)
+		return handle, globalOffset, err
+	}
+
+	fileIndex := int(globalOffset / maxFileSize)
+	localOffset := globalOffset % maxFileSize
+	handle, err := s.getOrOpenDataFile(fileIndex)
+	return handle, localOffset, err
 }

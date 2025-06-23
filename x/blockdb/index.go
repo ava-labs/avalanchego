@@ -1,3 +1,6 @@
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package blockdb
 
 import (
@@ -14,8 +17,8 @@ const (
 )
 
 var (
-	_ encoding.BinaryMarshaler   = indexEntry{}
-	_ encoding.BinaryUnmarshaler = &indexEntry{}
+	_ encoding.BinaryMarshaler   = (*indexEntry)(nil)
+	_ encoding.BinaryUnmarshaler = (*indexEntry)(nil)
 
 	sizeOfIndexEntry      = uint64(binary.Size(indexEntry{}))
 	sizeOfIndexFileHeader = uint64(binary.Size(indexFileHeader{}))
@@ -63,7 +66,7 @@ type indexFileHeader struct {
 	MaxHeight           BlockHeight
 	MinHeight           BlockHeight
 	MaxContiguousHeight BlockHeight
-	DataFileSize        uint64
+	NextWriteOffset     uint64
 	// reserve 24 bytes for future use
 	Reserved [24]byte
 }
@@ -76,7 +79,7 @@ func (h indexFileHeader) MarshalBinary() ([]byte, error) {
 	binary.LittleEndian.PutUint64(buf[16:], h.MaxHeight)
 	binary.LittleEndian.PutUint64(buf[24:], h.MinHeight)
 	binary.LittleEndian.PutUint64(buf[32:], h.MaxContiguousHeight)
-	binary.LittleEndian.PutUint64(buf[40:], h.DataFileSize)
+	binary.LittleEndian.PutUint64(buf[40:], h.NextWriteOffset)
 	return buf, nil
 }
 
@@ -93,7 +96,7 @@ func (h *indexFileHeader) UnmarshalBinary(data []byte) error {
 	h.MaxHeight = binary.LittleEndian.Uint64(data[16:])
 	h.MinHeight = binary.LittleEndian.Uint64(data[24:])
 	h.MaxContiguousHeight = binary.LittleEndian.Uint64(data[32:])
-	h.DataFileSize = binary.LittleEndian.Uint64(data[40:])
+	h.NextWriteOffset = binary.LittleEndian.Uint64(data[40:])
 	return nil
 }
 
@@ -115,6 +118,10 @@ func (s *Database) indexEntryOffset(height BlockHeight) (uint64, error) {
 
 func (s *Database) readIndexEntry(height BlockHeight) (indexEntry, error) {
 	var entry indexEntry
+	if height > s.maxBlockHeight.Load() {
+		return entry, nil
+	}
+
 	offset, err := s.indexEntryOffset(height)
 	if err != nil {
 		return entry, err
@@ -164,7 +171,7 @@ func (s *Database) persistIndexHeader() error {
 	}
 
 	header := s.header
-	header.DataFileSize = s.nextDataWriteOffset.Load()
+	header.NextWriteOffset = s.nextDataWriteOffset.Load()
 	header.MaxContiguousHeight = s.maxContiguousHeight.Load()
 	header.MaxHeight = s.maxBlockHeight.Load()
 	headerBytes, err := header.MarshalBinary()

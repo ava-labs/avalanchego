@@ -1,8 +1,9 @@
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package blockdb
 
-import (
-	"fmt"
-)
+import "errors"
 
 // DefaultMaxDataFileSize is the default maximum size of the data block file in bytes (500GB).
 const DefaultMaxDataFileSize = 500 * 1024 * 1024 * 1024
@@ -31,7 +32,7 @@ func DefaultDatabaseConfig() DatabaseConfig {
 // Validate checks if the store options are valid.
 func (opts DatabaseConfig) Validate() error {
 	if opts.CheckpointInterval == 0 {
-		return fmt.Errorf("CheckpointInterval cannot be 0")
+		return errors.New("CheckpointInterval cannot be 0")
 	}
 	return nil
 }

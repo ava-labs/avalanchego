@@ -1,13 +1,14 @@
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package blockdb
 
 import (
-	"errors"
 	"math"
 	"sync"
 	"sync/atomic"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -96,8 +97,7 @@ func TestReadOperations(t *testing.T) {
 					}
 
 					block := randomBlock(t)
-					err := store.WriteBlock(i, block, uint16(i-minHeight))
-					require.NoError(t, err)
+					require.NoError(t, store.WriteBlock(i, block, uint16(i-minHeight)))
 					seededBlocks[i] = block
 				}
 			}
@@ -105,18 +105,21 @@ func TestReadOperations(t *testing.T) {
 			if tt.setup != nil {
 				tt.setup(store)
 			}
-			readBlock, err := store.ReadBlock(tt.readHeight)
-			readHeader, err := store.ReadHeader(tt.readHeight)
-			readBody, err := store.ReadBody(tt.readHeight)
 
 			if tt.wantErr != nil {
-				require.Error(t, err)
-				require.True(t, errors.Is(err, tt.wantErr))
+				_, err := store.ReadBlock(tt.readHeight)
+				require.ErrorIs(t, err, tt.wantErr)
 				return
 			}
 
-			// Handle success cases
+			readBlock, err := store.ReadBlock(tt.readHeight)
 			require.NoError(t, err)
+			readHeader, err := store.ReadHeader(tt.readHeight)
+			require.NoError(t, err)
+			readBody, err := store.ReadBody(tt.readHeight)
+			require.NoError(t, err)
+
+			// Handle success cases
 			if tt.noBlock {
 				require.Nil(t, readBlock)
 				require.Nil(t, readHeader)
@@ -129,9 +132,9 @@ func TestReadOperations(t *testing.T) {
 				if headerSize > 0 {
 					expectHeader = expectedBlock[:headerSize]
 				}
-				assert.Equal(t, expectedBlock, readBlock)
-				assert.Equal(t, expectHeader, readHeader)
-				assert.Equal(t, expectedBlock[headerSize:], readBody)
+				require.Equal(t, expectedBlock, readBlock)
+				require.Equal(t, expectHeader, readHeader)
+				require.Equal(t, expectedBlock[headerSize:], readBody)
 			}
 		})
 	}
@@ -161,8 +164,7 @@ func TestReadOperations_Concurrency(t *testing.T) {
 			headerSizes[i] = uint16(len(blocks[i])) / 2
 		}
 
-		err := store.WriteBlock(uint64(i), blocks[i], headerSizes[i])
-		require.NoError(t, err)
+		require.NoError(t, store.WriteBlock(uint64(i), blocks[i], headerSizes[i]))
 	}
 
 	var wg sync.WaitGroup
@@ -174,20 +176,15 @@ func TestReadOperations_Concurrency(t *testing.T) {
 			defer wg.Done()
 			block, err := store.ReadBlock(uint64(height))
 			if err != nil {
-				t.Errorf("ReadBlock failed for height %d: %v", height, err)
 				errors.Add(1)
 				return
 			}
 			if gapHeights[uint64(height)] || height >= numBlocks {
 				if block != nil {
-					t.Errorf("Expected nil block for height %d", height)
 					errors.Add(1)
 				}
 			} else {
-				if !assert.Equal(t, blocks[height], block) {
-					t.Errorf("ReadBlock data mismatch at height %d", height)
-					errors.Add(1)
-				}
+				require.Equal(t, blocks[height], block)
 			}
 		}(i)
 
@@ -195,13 +192,11 @@ func TestReadOperations_Concurrency(t *testing.T) {
 			defer wg.Done()
 			header, err := store.ReadHeader(uint64(height))
 			if err != nil {
-				t.Errorf("ReadHeader failed for height %d: %v", height, err)
 				errors.Add(1)
 				return
 			}
 			if gapHeights[uint64(height)] || height >= numBlocks {
 				if header != nil {
-					t.Errorf("Expected nil header for height %d", height)
 					errors.Add(1)
 				}
 			} else {
@@ -209,10 +204,7 @@ func TestReadOperations_Concurrency(t *testing.T) {
 				if headerSizes[height] == 0 {
 					expectedHeader = nil
 				}
-				if !assert.Equal(t, expectedHeader, header) {
-					t.Errorf("ReadHeader data mismatch at height %d", height)
-					errors.Add(1)
-				}
+				require.Equal(t, expectedHeader, header)
 			}
 		}(i)
 
@@ -220,21 +212,16 @@ func TestReadOperations_Concurrency(t *testing.T) {
 			defer wg.Done()
 			body, err := store.ReadBody(uint64(height))
 			if err != nil {
-				t.Errorf("ReadBody failed for height %d: %v", height, err)
 				errors.Add(1)
 				return
 			}
 			if gapHeights[uint64(height)] || height >= numBlocks {
 				if body != nil {
-					t.Errorf("Expected nil body for height %d", height)
 					errors.Add(1)
 				}
 			} else {
 				expectedBody := blocks[height][headerSizes[height]:]
-				if !assert.Equal(t, expectedBody, body) {
-					t.Errorf("ReadBody data mismatch at height %d", height)
-					errors.Add(1)
-				}
+				require.Equal(t, expectedBody, body)
 			}
 		}(i)
 	}

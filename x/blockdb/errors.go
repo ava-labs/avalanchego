@@ -1,12 +1,18 @@
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package blockdb
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 var (
-	ErrInvalidBlockHeight = fmt.Errorf("blockdb: invalid block height")
-	ErrBlockEmpty         = fmt.Errorf("blockdb: block is empty")
-	ErrDatabaseClosed     = fmt.Errorf("blockdb: database is closed")
-	ErrCorrupted          = fmt.Errorf("blockdb: unrecoverable corruption detected")
+	ErrInvalidBlockHeight = errors.New("blockdb: invalid block height")
+	ErrBlockEmpty         = errors.New("blockdb: block is empty")
+	ErrDatabaseClosed     = errors.New("blockdb: database is closed")
+	ErrCorrupted          = errors.New("blockdb: unrecoverable corruption detected")
+	ErrHeaderSizeTooLarge = errors.New("blockdb: header size cannot be >= block size")
 	ErrBlockTooLarge      = fmt.Errorf("blockdb: block size exceeds maximum allowed size of %d bytes", MaxBlockDataSize)
-	ErrHeaderSizeTooLarge = fmt.Errorf("blockdb: header size cannot be >= block size")
 )
