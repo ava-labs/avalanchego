@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"flag"
-	"math/big"
 	"time"
 
 	"github.com/ava-labs/libevm/ethclient"
@@ -17,11 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
-	"github.com/ava-labs/avalanchego/tests/load/c/contracts"
 	"github.com/ava-labs/avalanchego/tests/load2"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
-
-	ethcommon "github.com/ava-labs/libevm/common"
 )
 
 const (
@@ -93,63 +89,17 @@ func main() {
 
 		wallet := load2.NewWallet(client, keys[i].ToECDSA(), 0, chainID)
 
-		contract, err := createContract(ctx, client, wallet)
-		require.NoError(err)
-
-		txTest := func(tc tests.TestContext, ctx context.Context, w load2.Wallet) {
-			load2.TestRandomTx(tc, ctx, w, contract)
-		}
-
 		wallets[i] = load2.NewWalletWithOptions(
 			wallet,
 			common.WithIssuanceHandler(issuanceF),
 			common.WithConfirmationHandler(confirmationF),
 			common.WithPollFrequency(pollFrequency),
 		)
-		txTests[i] = txTest
+		txTests[i] = load2.TestZeroTransfer
 	}
 
 	generator, err := load2.NewGenerator(wallets, txTests)
 	require.NoError(err)
 
 	generator.Run(tc, ctx)
-}
-
-func createContract(
-	ctx context.Context,
-	client *ethclient.Client,
-	wallet load2.Wallet,
-) (*contracts.EVMLoadSimulator, error) {
-	maxFeeCap := big.NewInt(300000000000)
-	txOpts, err := load2.NewTxOpts(wallet.PrivKey(), wallet.ChainID(), maxFeeCap, wallet.Nonce())
-	if err != nil {
-		return nil, err
-	}
-
-	_, tx, _, err := contracts.DeployEVMLoadSimulator(txOpts, client)
-	if err != nil {
-		return nil, err
-	}
-
-	var contractAddress ethcommon.Address
-	addressF := func(c common.ConfirmationReceipt) {
-		receipt, err := client.TransactionReceipt(ctx, ethcommon.Hash(c.TxID))
-		if err == nil {
-			contractAddress = receipt.ContractAddress
-		}
-	}
-
-	if err := wallet.SendTx(
-		ctx,
-		tx,
-		common.WithConfirmationHandler(addressF),
-	); err != nil {
-		return nil, err
-	}
-
-	if contractAddress == (ethcommon.Address{}) {
-		return nil, errFailedToCreateContract
-	}
-
-	return contracts.NewEVMLoadSimulator(contractAddress, client)
 }
