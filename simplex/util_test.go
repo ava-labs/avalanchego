@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 func newTestValidators(allVds []validators.GetValidatorOutput) map[ids.NodeID]*validators.GetValidatorOutput {
@@ -36,6 +37,7 @@ func newEngineConfig(t *testing.T, numNodes uint64) *Config {
 	simplexChainContext := SimplexChainContext{
 		NodeID:    nodeID,
 		ChainID:   ids.GenerateTestID(),
+		SubnetID:  ids.GenerateTestID(),
 		NetworkID: constants.UnitTestID,
 	}
 
@@ -48,6 +50,7 @@ func newEngineConfig(t *testing.T, numNodes uint64) *Config {
 	validators = append(validators, nodeInfo)
 	return &Config{
 		Ctx:        simplexChainContext,
+		Log:        logging.NoLog{},
 		Validators: newTestValidators(validators),
 		SignBLS:    ls.Sign,
 	}
