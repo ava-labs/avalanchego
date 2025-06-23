@@ -797,11 +797,11 @@ func TestMerkleDBClear(t *testing.T) {
 	require.Zero(db.intermediateNodeDB.writeBuffer.currentSize)
 
 	// Assert history has only the clearing change.
-	require.Len(db.history.lastChanges, 1)
-	change, ok := db.history.lastChanges[emptyRootID]
+	require.Len(db.history.lastChangesInsertNumber, 1)
+	change, ok := db.history.getRootChanges(emptyRootID)
 	require.True(ok)
 	require.Empty(change.nodes)
-	require.Empty(change.values)
+	require.Empty(change.keyChanges)
 }
 
 func FuzzMerkleDBEmptyRandomizedActions(f *testing.F) {
