@@ -1,5 +1,23 @@
 # Release Notes
 
+## [v1.13.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.2)
+
+This version is backwards compatible to [v1.13.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.0). It is optional, but encouraged.
+
+The plugin version is updated to `41` all plugins must update to be compatible.
+
+### APIs
+
+- Added initial support for HTTP2 connections into VMs
+- Removed native support for gzip compression of HTTP requests
+
+### Fixes
+
+- Fixed message timeout handling on L1s configured with `validatorOnly=true`
+- Fixed segfault on ARM64 when profiling is enabled
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.13.1...v1.13.2
+
 ## [v1.13.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.1)
 
 This version is backwards compatible to [v1.13.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.0). It is optional, but encouraged.
