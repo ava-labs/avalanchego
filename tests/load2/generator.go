@@ -103,8 +103,19 @@ func NewGenerator(
 	}, nil
 }
 
-func (g Generator) Run(tc tests.TestContext, ctx context.Context) {
+func (g Generator) Run(
+	tc tests.TestContext,
+	ctx context.Context,
+	timeout time.Duration,
+) {
 	wg := sync.WaitGroup{}
+
+	childCtx := ctx
+	if timeout != 0 {
+		ctx, cancel := context.WithTimeout(ctx, timeout)
+		childCtx = ctx
+		defer cancel()
+	}
 
 	for i := range g.wallets {
 		wg.Add(1)
@@ -113,7 +124,7 @@ func (g Generator) Run(tc tests.TestContext, ctx context.Context) {
 
 			for {
 				select {
-				case <-ctx.Done():
+				case <-childCtx.Done():
 					return
 				default:
 				}
@@ -123,6 +134,5 @@ func (g Generator) Run(tc tests.TestContext, ctx context.Context) {
 		}()
 	}
 
-	<-ctx.Done()
 	wg.Wait()
 }

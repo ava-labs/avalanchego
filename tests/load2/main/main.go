@@ -25,10 +25,22 @@ const (
 	testTimeout      = time.Minute
 )
 
-var flagVars *e2e.FlagVars
+var (
+	flagVars *e2e.FlagVars
+
+	loadTimeout int
+)
 
 func init() {
 	flagVars = e2e.RegisterFlags()
+
+	flag.IntVar(
+		&loadTimeout,
+		"loadTimeout",
+		0,
+		"the duration that the load test should run for (in seconds)",
+	)
+
 	flag.Parse()
 }
 
@@ -85,5 +97,6 @@ func main() {
 	generator, err := load2.NewGenerator(wallets, txTests)
 	require.NoError(err)
 
-	generator.Run(tc, ctx)
+	loadTimeout := time.Duration(loadTimeout) * time.Second
+	generator.Run(tc, ctx, loadTimeout)
 }
