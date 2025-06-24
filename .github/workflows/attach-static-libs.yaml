@@ -154,8 +154,8 @@ jobs:
           git push -u origin ${{ steps.determine_branch.outputs.target_branch }} --force
           
           if [[ "${{ github.ref_type }}" == "tag" ]]; then
-            git tag -a "${GITHUB_REF#refs/tags/}" -m "firewood ci ${{ github.sha }}: attach firewood static libs"
-            git push origin "refs/tags/${GITHUB_REF#refs/tags/}"
+            git tag -a "ffi/${GITHUB_REF#refs/tags/}" -m "firewood ci ${{ github.sha }}: attach firewood static libs"
+            git push origin "refs/tags/ffi/${GITHUB_REF#refs/tags/}"
           fi
 
   # Check out the branch created in the previous job on a matrix of
