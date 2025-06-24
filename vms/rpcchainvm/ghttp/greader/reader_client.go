@@ -31,7 +31,9 @@ func (c *Client) Read(p []byte) (int, error) {
 
 	copy(p, resp.Read)
 
-	if resp.Error != nil {
+	if resp.Error != nil && *resp.Error == "EOF" {
+		err = io.EOF
+	} else if resp.Error != nil {
 		err = errors.New(*resp.Error)
 	}
 	return len(resp.Read), err
