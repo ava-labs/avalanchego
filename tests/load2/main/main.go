@@ -5,6 +5,7 @@ package main
 
 import (
 	"flag"
+	"os"
 	"time"
 
 	"github.com/ava-labs/libevm/ethclient"
@@ -14,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/tests/load"
 	"github.com/ava-labs/avalanchego/tests/load2"
 )
 
@@ -71,6 +73,29 @@ func main() {
 	registry := prometheus.NewRegistry()
 	metrics, err := load2.NewMetrics(metricsNamespace, registry)
 	require.NoError(err)
+
+	metricsServer := load.NewPrometheusServer("127.0.0.1:0", registry)
+	metricsErrChan, err := metricsServer.Start()
+	require.NoError(err)
+
+	tc.DeferCleanup(func() {
+		select {
+		case err := <-metricsErrChan:
+			require.NoError(err)
+		default:
+		}
+
+		require.NoError(metricsServer.Stop(), "failed to stop metrics server")
+	})
+
+	monitoringConfigFilePath, err := metricsServer.GenerateMonitoringConfig(
+		network.GetMonitoringLabels(),
+	)
+	require.NoError(err)
+
+	tc.DeferCleanup(func() {
+		require.NoError(os.Remove(monitoringConfigFilePath))
+	})
 
 	wallets := make([]*load2.Wallet, len(keys))
 	for i := range len(keys) {
