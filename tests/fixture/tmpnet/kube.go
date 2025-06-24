@@ -17,8 +17,12 @@ import (
 
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer/yaml"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/portforward"
@@ -32,6 +36,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	restclient "k8s.io/client-go/rest"
 )
@@ -383,4 +388,73 @@ func GetClientset(log logging.Logger, path string, context string) (*kubernetes.
 		return nil, fmt.Errorf("failed to create clientset: %w", err)
 	}
 	return clientset, nil
+}
+
+// applyManifest creates the resources defined by the provided manifest in a manner similar to `kubectl apply -f`.
+// If namespace is empty, the namespace from the manifest will be used for namespaced resources.
+func applyManifest(
+	ctx context.Context,
+	log logging.Logger,
+	dynamicClient dynamic.Interface,
+	manifest []byte,
+	namespace string,
+) error {
+	// Split the manifest into individual resources
+	decoder := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
+	documents := strings.Split(string(manifest), "\n---\n")
+
+	for _, doc := range documents {
+		doc := strings.TrimSpace(doc)
+		if strings.TrimSpace(doc) == "" || strings.HasPrefix(doc, "#") {
+			continue
+		}
+
+		obj := &unstructured.Unstructured{}
+		_, gvk, err := decoder.Decode([]byte(doc), nil, obj)
+		if err != nil {
+			return fmt.Errorf("failed to decode manifest: %w", err)
+		}
+
+		gvr := schema.GroupVersionResource{
+			Group:    gvk.Group,
+			Version:  gvk.Version,
+			Resource: strings.ToLower(gvk.Kind) + "s",
+		}
+
+		// Determine namespace for the resource
+		resourceNamespace := namespace
+		if resourceNamespace == "" {
+			// Use namespace from the manifest if not provided
+			resourceNamespace = obj.GetNamespace()
+		}
+
+		var resourceInterface dynamic.ResourceInterface
+		if strings.HasPrefix(gvk.Kind, "Cluster") || gvk.Kind == "Namespace" {
+			resourceInterface = dynamicClient.Resource(gvr)
+		} else {
+			resourceInterface = dynamicClient.Resource(gvr).Namespace(resourceNamespace)
+		}
+
+		_, err = resourceInterface.Create(ctx, obj, metav1.CreateOptions{})
+		if err != nil {
+			if apierrors.IsAlreadyExists(err) {
+				log.Info("resource already exists",
+					zap.String("kind", gvk.Kind),
+					zap.String("namespace", resourceNamespace),
+					zap.String("name", obj.GetName()),
+				)
+				continue
+			}
+			return fmt.Errorf("failed to create %s %s/%s: %w", gvk.Kind, resourceNamespace, obj.GetName(), err)
+		}
+		log.Info("created resource",
+			zap.String("kind", gvk.Kind),
+			zap.String("namespace", resourceNamespace),
+			zap.String("name", obj.GetName()),
+		)
+	}
+
+	// TODO(marun) Check that the resources are running and healthy
+
+	return nil
 }
