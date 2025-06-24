@@ -21,7 +21,6 @@ var _ Test = (*ZeroTransferTest)(nil)
 
 type ZeroTransferTest struct {
 	PollFrequency time.Duration
-	Timeout       time.Duration
 }
 
 func (z ZeroTransferTest) Run(

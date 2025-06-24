@@ -84,10 +84,7 @@ func main() {
 
 		wallets[i] = load2.NewWallet(metrics, client, keys[i].ToECDSA(), 0, chainID)
 
-		txTests[i] = load2.ZeroTransferTest{
-			PollFrequency: pollFrequency,
-			Timeout:       testTimeout,
-		}
+		txTests[i] = load2.ZeroTransferTest{PollFrequency: pollFrequency}
 	}
 
 	generator, err := load2.NewGenerator(wallets, txTests)
