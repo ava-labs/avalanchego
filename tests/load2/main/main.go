@@ -4,7 +4,6 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"time"
 
@@ -50,7 +49,6 @@ func main() {
 	defer tc.Cleanup()
 
 	require := require.New(tc)
-	ctx := context.Background()
 
 	numNodes, err := flagVars.NodeCount()
 	require.NoError(err, "failed to get node count")
@@ -65,10 +63,8 @@ func main() {
 	}
 
 	e2e.NewTestEnvironment(tc, flagVars, network)
-	tc.DeferCleanup(func() {
-		require.NoError(network.Stop(ctx), "failed to stop network")
-	})
 
+	ctx := tests.DefaultNotifyContext(0, tc.DeferCleanup)
 	wsURIs, err := tmpnet.GetNodeWebsocketURIs(ctx, network.Nodes, blockchainID, tc.DeferCleanup)
 	require.NoError(err)
 
