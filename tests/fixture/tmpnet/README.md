@@ -69,7 +69,6 @@ the following non-test files:
 | check_monitoring.go         |                | Enables checking if logs and metrics were collected                    |
 | defaults.go                 |                | Defines common default configuration                                   |
 | detached_process_default.go |                | Configures detached processes for darwin and linux                     |
-| detached_process_windows.go |                | No-op detached process configuration for windows                       |
 | flagsmap.go                 | FlagsMap       | Simplifies configuration of avalanchego flags                          |
 | genesis.go                  |                | Creates test genesis                                                   |
 | kube.go                     |                | Library for Kubernetes interaction                                     |

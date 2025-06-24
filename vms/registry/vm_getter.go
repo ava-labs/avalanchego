@@ -68,10 +68,7 @@ func (getter *vmGetter) Get() (map[ids.ID]vms.Factory, map[ids.ID]vms.Factory, e
 			continue
 		}
 
-		nameWithExtension := file.Name()
-		// Strip any extension from the file. This is to support windows .exe
-		// files.
-		name := nameWithExtension[:len(nameWithExtension)-len(filepath.Ext(nameWithExtension))]
+		name := file.Name()
 
 		// Skip hidden files.
 		if len(name) == 0 {
