@@ -255,6 +255,7 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   load2_tests:
     name: load2 tests
+    runs-on: ubuntu-latest
     steps:
         - uses: actions/checkout@v4
         - uses: ./github/actions/setup-go-for-project
