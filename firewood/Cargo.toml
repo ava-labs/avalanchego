@@ -18,6 +18,7 @@ authors = [
 description = "Firewood is an embedded key-value store, optimized to store blockchain state."
 license-file = "../LICENSE.md"
 homepage = "https://avalabs.org"
+repository = "https://github.com/ava-labs/firewood"
 readme = "../README.md"
 
 [dependencies]
