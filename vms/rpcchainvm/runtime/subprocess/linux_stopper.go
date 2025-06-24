@@ -4,7 +4,6 @@
 //go:build linux
 // +build linux
 
-// ^ SIGTERM signal is not available on Windows
 // ^ syscall.SysProcAttr only has field Pdeathsig on Linux
 
 package subprocess
