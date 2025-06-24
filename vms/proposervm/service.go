@@ -26,6 +26,8 @@ func (p *ProposerAPI) GetProposedHeight(_ *http.Request, _ *struct{}, reply *api
 		zap.String("service", "proposervm"),
 		zap.String("method", "getProposedHeight"),
 	)
+	p.vm.ctx.Lock.Lock()
+	defer p.vm.ctx.Lock.Unlock()
 
 	reply.Height = avajson.Uint64(p.vm.lastAcceptedHeight)
 	return nil
@@ -44,6 +46,8 @@ func (p *ProposerAPI) GetProposerBlockWrapper(r *http.Request, args *GetProposer
 		zap.String("proposerID", args.ProposerID.String()),
 		zap.String("encoding", args.Encoding.String()),
 	)
+	p.vm.ctx.Lock.Lock()
+	defer p.vm.ctx.Lock.Unlock()
 
 	block, err := p.vm.GetBlock(r.Context(), args.ProposerID)
 	if err != nil {
