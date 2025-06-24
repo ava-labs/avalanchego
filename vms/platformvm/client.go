@@ -70,7 +70,7 @@ type Client interface {
 	// GetCurrentValidators returns the list of current validators for subnet with ID [subnetID]
 	GetCurrentValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.NodeID, options ...rpc.Option) ([]ClientPermissionlessValidator, error)
 	// GetCurrentL1Validators returns the L1 validators for the L1 with ID [subnetID]. Non-L1 validators are omitted.
-	GetCurrentL1Validators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.NodeID, options ...rpc.Option) ([]APIL1Validator, error)
+	GetCurrentL1Validators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.NodeID, options ...rpc.Option) ([]platformapi.APIL1Validator, error)
 	// GetL1Validator returns the requested L1 validator with [validationID] and
 	// the height at which it was calculated.
 	GetL1Validator(ctx context.Context, validationID ids.ID, options ...rpc.Option) (L1Validator, uint64, error)
@@ -338,7 +338,7 @@ func (c *client) GetCurrentL1Validators(
 	subnetID ids.ID,
 	nodeIDs []ids.NodeID,
 	options ...rpc.Option,
-) ([]APIL1Validator, error) {
+) ([]platformapi.APIL1Validator, error) {
 	res := &GetCurrentValidatorsReply{}
 	err := c.requester.SendRequest(ctx, "platform.getCurrentValidators", &GetCurrentValidatorsArgs{
 		SubnetID: subnetID,
@@ -348,16 +348,16 @@ func (c *client) GetCurrentL1Validators(
 		return nil, err
 	}
 
-	var l1Validators []APIL1Validator
+	var l1Validators []platformapi.APIL1Validator
 	for _, validator := range res.Validators {
 		validatorMapJSON, err := goJson.Marshal(validator)
 		if err != nil {
 			return nil, err
 		}
 
-		var apiValidator APIL1Validator
+		var apiValidator platformapi.APIL1Validator
 		err = goJson.Unmarshal(validatorMapJSON, &apiValidator)
-		if err != nil || apiValidator.ValidationID == ids.Empty {
+		if err != nil || apiValidator.ValidationID == nil {
 			continue
 		}
 		l1Validators = append(l1Validators, apiValidator)
