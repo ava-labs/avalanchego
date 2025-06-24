@@ -849,3 +849,55 @@ func TestGetNilCases(t *testing.T) {
 		r.Empty(got, "Proposal.Get(%q)", k)
 	}
 }
+
+func TestEmptyProposals(t *testing.T) {
+	r := require.New(t)
+	db := newTestDatabase(t)
+	numProposals := 10
+	emptyProposals := make([]*Proposal, numProposals)
+
+	// Create several empty proposals
+	for i := range numProposals {
+		// Create a proposal with no keys.
+		var err error
+		if i == 0 {
+			emptyProposals[i], err = db.Propose(nil, nil)
+		} else {
+			emptyProposals[i], err = emptyProposals[i-1].Propose(nil, nil)
+		}
+		r.NoError(err, "Propose(%d)", i)
+
+		// Check that the proposal has no keys.
+		got, err := emptyProposals[i].Get([]byte("non-existent"))
+		r.NoError(err, "Get(%d)", i)
+		r.Empty(got, "Get(%d)", i)
+	}
+
+	// Create one non-empty proposal.
+	keys, vals := kvForTest(10)
+	nonEmptyProposal, err := db.Propose(keys, vals)
+	r.NoError(err, "Propose non-empty proposal")
+
+	// Check that the proposal has the keys we just inserted.
+	for i := range keys {
+		got, err := nonEmptyProposal.Get(keys[i])
+		r.NoError(err, "Get(%d)", i)
+		r.Equal(vals[i], got, "Get(%d)", i)
+	}
+
+	// Commit all empty proposals.
+	for _, p := range emptyProposals {
+		r.NoError(p.Commit(), "Commit empty proposal")
+	}
+
+	// Commit the empty proposal.
+	err = nonEmptyProposal.Commit()
+	r.NoError(err)
+
+	// Check that the database has the keys from the non-empty proposal.
+	for i := range keys {
+		got, err := db.Get(keys[i])
+		r.NoError(err, "Get(%d)", i)
+		r.Equal(vals[i], got, "Get(%d)", i)
+	}
+}
