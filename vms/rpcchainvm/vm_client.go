@@ -389,6 +389,25 @@ func (vm *VMClient) CreateHandlers(ctx context.Context) (map[string]http.Handler
 	return handlers, nil
 }
 
+func (vm *VMClient) CreateHTTP2Handler(ctx context.Context) (http.Handler, error) {
+	resp, err := vm.client.CreateHTTP2Handler(ctx, &emptypb.Empty{})
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.ServerAddr == "" {
+		return nil, nil
+	}
+
+	clientConn, err := grpcutils.Dial(resp.ServerAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	vm.conns = append(vm.conns, clientConn)
+	return ghttp.NewClient(httppb.NewHTTPClient(clientConn)), nil
+}
+
 func (vm *VMClient) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
 	_, err := vm.client.Connected(ctx, &vmpb.ConnectedRequest{
 		NodeId: nodeID.Bytes(),
