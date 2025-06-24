@@ -247,6 +247,13 @@ jobs:
       - name: Test Firewood <> Ethereum Differential Fuzz
         working-directory: ffi/tests/eth
         run: go test -fuzz=. -fuzztime=1m
+      - name: Upload Fuzz testdata
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ethhash-differential-fuzz-testdata
+          path: ffi/tests/eth/testdata
+          retention-days: 30
 
   firewood-merkle-differential-fuzz:
     needs: build
@@ -271,3 +278,10 @@ jobs:
       - name: Test Firewood <> MerkleDB Differential fuzz
         working-directory: ffi/tests/firewood
         run: go test -fuzz=. -fuzztime=1m
+      - name: Upload Fuzz testdata
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firewood-merkle-differential-fuzz-testdata
+          path: ffi/tests/firewood/testdata
+          retention-days: 30
