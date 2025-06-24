@@ -208,5 +208,5 @@ type headerMarshaling struct {
 // This function MUST be exported and is used in [HeaderSerializable.EncodeJSON] which is
 // generated to the file gen_header_json.go.
 func (h *HeaderSerializable) Hash() common.Hash {
-	return rlpHash(h)
+	return ethtypes.RLPHash(h)
 }
