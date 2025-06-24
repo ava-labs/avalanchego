@@ -154,8 +154,18 @@ jobs:
           git push -u origin ${{ steps.determine_branch.outputs.target_branch }} --force
           
           if [[ "${{ github.ref_type }}" == "tag" ]]; then
-            git tag -a "ffi/${GITHUB_REF#refs/tags/}" -m "firewood ci ${{ github.sha }}: attach firewood static libs"
-            git push origin "refs/tags/ffi/${GITHUB_REF#refs/tags/}"
+            # If the tag is a semantic version, prefix it with "ffi/" to ensure go get correctly
+            # fetches the submodule. Otherwise, use the tag name as is.
+            # Note: we explicitly ignore semantic versions with suffixes ie. v1.1.1-beta because
+            # go get treats them as non-semantic version tags.
+            # Ref: https://github.com/ava-labs/firewood/pull/991
+            if [[ "${{ github.ref_name }}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              tag_name="ffi/${GITHUB_REF#refs/tags/}"
+            else
+              tag_name="${GITHUB_REF#refs/tags/}"
+            fi
+            git tag -a "$tag_name" -m "firewood ci ${{ github.sha }}: attach firewood static libs"
+            git push origin "refs/tags/$tag_name"
           fi
 
   # Check out the branch created in the previous job on a matrix of
