@@ -65,6 +65,8 @@ type VM interface {
 	// Version returns the version of the VM.
 	Version(context.Context) (string, error)
 
+	// TODO update doc
+	// TODO deprecate route return value for header based routing
 	// Creates the HTTP handlers for custom chain network calls.
 	//
 	// This exposes handlers that the outside world can use to communicate with
@@ -76,9 +78,5 @@ type VM interface {
 	// For example, if this VM implements an account-based payments system,
 	// it have an extension called `accounts`, where clients could get
 	// information about their accounts.
-	CreateHandlers(context.Context) (map[string]http.Handler, error)
-
-	// CreateHTTP2Handler returns the http/2 handler to register into the
-	// avalanchego api server.
-	CreateHTTP2Handler(ctx context.Context) (http.Handler, error)
+	NewHTTPHandler(context.Context) (http.Handler, error)
 }

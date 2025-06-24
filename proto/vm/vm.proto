@@ -20,8 +20,7 @@ service VM {
   // Shutdown is called when the node is shutting down.
   rpc Shutdown(google.protobuf.Empty) returns (google.protobuf.Empty);
   // Creates the HTTP handlers for custom chain network calls.
-  rpc CreateHandlers(google.protobuf.Empty) returns (CreateHandlersResponse);
-  rpc CreateHTTP2Handler(google.protobuf.Empty) returns (CreateHTTP2HandlerResponse);
+  rpc NewHTTPHandler(google.protobuf.Empty) returns (NewHTTPHandlerResponse);
   rpc Connected(ConnectedRequest) returns (google.protobuf.Empty);
   rpc Disconnected(DisconnectedRequest) returns (google.protobuf.Empty);
   // Attempt to create a new block from data contained in the VM.
@@ -155,21 +154,10 @@ message SetStateResponse {
   google.protobuf.Timestamp timestamp = 5;
 }
 
-message CreateHandlersResponse {
-  repeated Handler handlers = 1;
-}
-
-message CreateHTTP2HandlerResponse {
+message NewHTTPHandlerResponse {
   // server_addr is the address of the gRPC server which serves the
   // HTTP service
   string server_addr = 1;
-}
-
-message Handler {
-  string prefix = 1;
-  // server_addr is the address of the gRPC server which serves the
-  // HTTP service
-  string server_addr = 2;
 }
 
 message BuildBlockRequest {

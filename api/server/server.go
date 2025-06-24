@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"net/url"
 	"path"
 	"time"
 
@@ -39,7 +38,7 @@ var (
 
 type PathAdder interface {
 	// AddRoute registers a route to a handler.
-	AddRoute(handler http.Handler, base, endpoint string) error
+	AddRoute(handler http.Handler, endpoint string, metricName string) error
 
 	// AddAliases registers aliases to the server
 	AddAliases(endpoint string, aliases ...string) error
@@ -88,8 +87,7 @@ type server struct {
 	metrics *metrics
 
 	// Maps endpoints to handlers
-	router      *router
-	http2Router *http2Router
+	router *router
 
 	srv *http.Server
 
@@ -118,19 +116,9 @@ func New(
 	router := newRouter()
 	handler := wrapHandler(router, nodeID, allowedOrigins, allowedHosts)
 
-	http2Router := newHTTP2Router()
-	http2Handler := wrapHandler(http2Router, nodeID, allowedOrigins, allowedHosts)
-
 	httpServer := &http.Server{
 		Handler: h2c.NewHandler(
-			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.ProtoMajor == 2 {
-					http2Handler.ServeHTTP(w, r)
-					return
-				}
-
-				handler.ServeHTTP(w, r)
-			}),
+			handler,
 			&http2.Server{
 				MaxConcurrentStreams: maxConcurrentStreams,
 			}),
@@ -151,7 +139,6 @@ func New(
 		tracer:          tracer,
 		metrics:         m,
 		router:          router,
-		http2Router:     http2Router,
 		srv:             httpServer,
 		listener:        listener,
 	}, nil
@@ -163,7 +150,7 @@ func (s *server) Dispatch() error {
 
 func (s *server) RegisterChain(chainName string, ctx *snow.ConsensusContext, vm common.VM) {
 	ctx.Lock.Lock()
-	handlers, err := vm.CreateHandlers(context.TODO())
+	handler, err := vm.NewHTTPHandler(context.TODO())
 	ctx.Lock.Unlock()
 	if err != nil {
 		s.log.Error("failed to create handlers",
@@ -178,59 +165,19 @@ func (s *server) RegisterChain(chainName string, ctx *snow.ConsensusContext, vm 
 	)
 	// all subroutes to a chain begin with "bc/<the chain's ID>"
 	defaultEndpoint := path.Join(constants.ChainAliasPrefix, ctx.ChainID.String())
-
-	// Register each endpoint
-	for extension, handler := range handlers {
-		// Validate that the route being added is valid
-		// e.g. "/foo" and "" are ok but "\n" is not
-		_, err := url.ParseRequestURI(extension)
-		if extension != "" && err != nil {
-			s.log.Error("could not add route to chain's API handler",
-				zap.String("reason", "route is malformed"),
-				zap.Error(err),
-			)
-			continue
-		}
-		if err := s.addChainRoute(chainName, handler, ctx, defaultEndpoint, extension); err != nil {
-			s.log.Error("error adding route",
-				zap.Error(err),
-			)
-		}
-	}
-
-	ctx.Lock.Lock()
-	http2Handler, err := vm.CreateHTTP2Handler(context.TODO())
-	ctx.Lock.Unlock()
-	if err != nil {
-		s.log.Error("failed to create http2 handler",
-			zap.String("chainName", chainName),
-			zap.Error(err),
-		)
-		return
-	}
-
-	if http2Handler == nil {
-		return
-	}
-
-	http2Handler = s.wrapMiddleware(chainName, http2Handler, ctx)
-	if !s.http2Router.Add(ctx.ChainID, http2Handler) {
-		s.log.Error(
-			"failed to add route to http2 handler",
-			zap.String("chainName", chainName),
+	if err := s.addChainRoute(chainName, handler, ctx, defaultEndpoint); err != nil {
+		s.log.Error("error adding route",
 			zap.Error(err),
 		)
 	}
 }
 
-func (s *server) addChainRoute(chainName string, handler http.Handler, ctx *snow.ConsensusContext, base, endpoint string) error {
+func (s *server) addChainRoute(chainName string, handler http.Handler, ctx *snow.ConsensusContext, base string) error {
 	url := fmt.Sprintf("%s/%s", baseURL, base)
-	s.log.Info("adding route",
-		zap.String("url", url),
-		zap.String("endpoint", endpoint),
-	)
+	s.log.Info("adding route", zap.String("url", url))
 	handler = s.wrapMiddleware(chainName, handler, ctx)
-	return s.router.AddRouter(url, endpoint, handler)
+	s.router.AddHeaderRoute(ctx.ChainID.String(), handler)
+	return s.router.AddRouter(url, handler)
 }
 
 func (s *server) wrapMiddleware(chainName string, handler http.Handler, ctx *snow.ConsensusContext) http.Handler {
@@ -242,18 +189,18 @@ func (s *server) wrapMiddleware(chainName string, handler http.Handler, ctx *sno
 	return s.metrics.wrapHandler(chainName, handler)
 }
 
-func (s *server) AddRoute(handler http.Handler, base, endpoint string) error {
-	return s.addRoute(handler, base, endpoint)
+func (s *server) AddRoute(handler http.Handler, endpoint string, metricName string) error {
+	return s.addRoute(handler, endpoint, metricName)
 }
 
-func (s *server) AddRouteWithReadLock(handler http.Handler, base, endpoint string) error {
+func (s *server) AddRouteWithReadLock(handler http.Handler, endpoint string, metricName string) error {
 	s.router.lock.RUnlock()
 	defer s.router.lock.RLock()
-	return s.addRoute(handler, base, endpoint)
+	return s.addRoute(handler, endpoint, metricName)
 }
 
-func (s *server) addRoute(handler http.Handler, base, endpoint string) error {
-	url := fmt.Sprintf("%s/%s", baseURL, base)
+func (s *server) addRoute(handler http.Handler, endpoint string, metricName string) error {
+	url := fmt.Sprintf("%s/%s", baseURL, endpoint)
 	s.log.Info("adding route",
 		zap.String("url", url),
 		zap.String("endpoint", endpoint),
@@ -263,8 +210,8 @@ func (s *server) addRoute(handler http.Handler, base, endpoint string) error {
 		handler = api.TraceHandler(handler, url, s.tracer)
 	}
 
-	handler = s.metrics.wrapHandler(base, handler)
-	return s.router.AddRouter(url, endpoint, handler)
+	handler = s.metrics.wrapHandler(metricName, handler)
+	return s.router.AddRouter(url, handler)
 }
 
 // Reject middleware wraps a handler. If the chain that the context describes is

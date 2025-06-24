@@ -10,6 +10,8 @@ module github.com/ava-labs/avalanchego
 go 1.23.9
 
 require (
+	connectrpc.com/connect v1.18.1
+	connectrpc.com/grpcreflect v1.3.0
 	github.com/DataDog/zstd v1.5.2
 	github.com/StephenButtolph/canoto v0.15.0
 	github.com/antithesishq/antithesis-sdk-go v0.3.8

@@ -446,10 +446,10 @@ func (*VM) Version(context.Context) (string, error) {
 	return version.Current.String(), nil
 }
 
-// CreateHandlers returns a map where:
+// NewHTTPHandler returns a map where:
 // * keys are API endpoint extensions
 // * values are API handlers
-func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
+func (vm *VM) NewHTTPHandler(context.Context) (http.Handler, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
@@ -461,13 +461,8 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 		stakerAttributesCache: lru.NewCache[ids.ID, *stakerAttributes](stakerAttributesCacheSize),
 	}
 	err := server.RegisterService(service, "platform")
-	return map[string]http.Handler{
-		"": server,
-	}, err
-}
 
-func (*VM) CreateHTTP2Handler(context.Context) (http.Handler, error) {
-	return nil, nil
+	return server, err
 }
 
 func (vm *VM) Connected(ctx context.Context, nodeID ids.NodeID, version *version.Application) error {

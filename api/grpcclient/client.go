@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
+	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -17,7 +18,7 @@ import (
 // all requests
 func NewChainClient(uri string, chainID ids.ID, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
 	dialOpts := []grpc.DialOption{
-		grpc.WithUnaryInterceptor(SetChainIDHeaderUnaryClientInterceptor(chainID)),
+		grpc.WithUnaryInterceptor(SetAPIRouteHeaderUnaryClientInterceptor(chainID)),
 		grpc.WithStreamInterceptor(SetChainIDHeaderStreamClientInterceptor(chainID)),
 	}
 
@@ -31,9 +32,9 @@ func NewChainClient(uri string, chainID ids.ID, opts ...grpc.DialOption) (*grpc.
 	return conn, nil
 }
 
-// SetChainIDHeaderUnaryClientInterceptor sets the chain-id header for unary
+// SetAPIRouteHeaderUnaryClientInterceptor sets the chain-id header for unary
 // requests
-func SetChainIDHeaderUnaryClientInterceptor(chainID ids.ID) grpc.UnaryClientInterceptor {
+func SetAPIRouteHeaderUnaryClientInterceptor(chainID ids.ID) grpc.UnaryClientInterceptor {
 	return func(
 		ctx context.Context,
 		method string,
@@ -67,5 +68,5 @@ func SetChainIDHeaderStreamClientInterceptor(chainID ids.ID) grpc.StreamClientIn
 // newContextWithChainHeader sets the chain-id header which the server uses
 // to route the client grpc request
 func newContextWithChainIDHeader(ctx context.Context, chainID ids.ID) context.Context {
-	return metadata.AppendToOutgoingContext(ctx, "chain-id", chainID.String())
+	return metadata.AppendToOutgoingContext(ctx, server.HTTPHeaderRoute, chainID.String())
 }

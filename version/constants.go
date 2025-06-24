@@ -4,10 +4,9 @@
 package version
 
 import (
+	_ "embed"
 	"encoding/json"
 	"time"
-
-	_ "embed"
 )
 
 const (

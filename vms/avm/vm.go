@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strings"
 	"sync"
 
 	"github.com/gorilla/rpc/v2"
@@ -291,7 +292,7 @@ func (*VM) Version(context.Context) (string, error) {
 	return version.Current.String(), nil
 }
 
-func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
+func (vm *VM) NewHTTPHandler(context.Context) (http.Handler, error) {
 	codec := json.NewCodec()
 
 	rpcServer := rpc.NewServer()
@@ -311,11 +312,23 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	walletServer.RegisterAfterFunc(vm.metrics.AfterRequest)
 	// name this service "wallet"
 	err := walletServer.RegisterService(&vm.walletService, "wallet")
+	if err != nil {
+		return nil, err
+	}
 
-	return map[string]http.Handler{
-		"":        rpcServer,
-		"/wallet": walletServer,
-	}, err
+	mux := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+
+		if strings.HasSuffix(path, "/wallet") {
+			walletServer.ServeHTTP(w, r)
+			return
+		}
+
+		rpcServer.ServeHTTP(w, r)
+		return
+	})
+
+	return mux, nil
 }
 
 func (*VM) CreateHTTP2Handler(context.Context) (http.Handler, error) {
