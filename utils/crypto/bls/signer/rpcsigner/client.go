@@ -103,5 +103,5 @@ func (c *Client) SignProofOfPossession(message []byte) (*bls.Signature, error) {
 }
 
 func (c *Client) Shutdown() error {
-	return c.connection.Close()
+	return fmt.Errorf("failed to close connection: %w",c.connection.Close())
 }
