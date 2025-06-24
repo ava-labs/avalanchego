@@ -6,7 +6,6 @@ package load2
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 
@@ -82,24 +81,16 @@ type Test interface {
 
 type Generator struct {
 	wallets []*Wallet
-	txTests []Test
+	test    Test
 }
 
 func NewGenerator(
 	wallets []*Wallet,
-	txTests []Test,
+	test Test,
 ) (Generator, error) {
-	if len(wallets) != len(txTests) {
-		return Generator{}, fmt.Errorf(
-			"wallet and tx builder count mismatch: got %d wallets and %d txBuilders",
-			len(wallets),
-			len(txTests),
-		)
-	}
-
 	return Generator{
 		wallets: wallets,
-		txTests: txTests,
+		test:    test,
 	}, nil
 }
 
@@ -133,7 +124,7 @@ func (g Generator) Run(
 				ctx, cancel := context.WithTimeout(ctx, testTimeout)
 				defer cancel()
 
-				g.txTests[i].Run(tc, ctx, g.wallets[i])
+				g.test.Run(tc, ctx, g.wallets[i])
 			}
 		}()
 	}

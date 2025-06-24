@@ -73,7 +73,6 @@ func main() {
 	require.NoError(err)
 
 	wallets := make([]*load2.Wallet, len(keys))
-	txTests := make([]load2.Test, len(keys))
 	for i := range len(keys) {
 		wsURI := wsURIs[i%len(wsURIs)]
 		client, err := ethclient.Dial(wsURI)
@@ -83,11 +82,12 @@ func main() {
 		require.NoError(err)
 
 		wallets[i] = load2.NewWallet(metrics, client, keys[i].ToECDSA(), 0, chainID)
-
-		txTests[i] = load2.ZeroTransferTest{PollFrequency: pollFrequency}
 	}
 
-	generator, err := load2.NewGenerator(wallets, txTests)
+	generator, err := load2.NewGenerator(
+		wallets,
+		load2.ZeroTransferTest{PollFrequency: pollFrequency},
+	)
 	require.NoError(err)
 
 	loadTimeout := time.Duration(loadTimeout) * time.Second
