@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime/subprocess"

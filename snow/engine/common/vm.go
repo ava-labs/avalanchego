@@ -63,6 +63,8 @@ type VM interface {
 	// Version returns the version of the VM.
 	Version(context.Context) (string, error)
 
+	// Deprecated: implementations should expose apis through NewHTTPHandler.
+	//
 	// Creates the HTTP handlers for custom chain network calls.
 	//
 	// This exposes handlers that the outside world can use to communicate with
