@@ -12,8 +12,8 @@ import (
 // TODO(marun) What else does a test need? e.g. node URIs?
 type APITestFunction func(tc tests.TestContext, wallet primary.Wallet, ownerAddress ids.ShortID)
 
-// ExecuteAPITest executes a test primary dependency is being able to access the API of one or
-// more avalanchego nodes.
+// ExecuteAPITest executes a test whose primary dependency is being
+// able to access the API of one or more avalanchego nodes.
 func ExecuteAPITest(apiTest APITestFunction) {
 	tc := NewTestContext()
 	env := GetEnv(tc)
