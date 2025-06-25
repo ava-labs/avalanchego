@@ -446,6 +446,7 @@ impl Proposal<'_> {
         Ok(self.create_proposal(batch)?.into())
     }
 
+    #[crate::metrics("firewood.proposal.create", "database proposal creation")]
     fn create_proposal<K: KeyType, V: ValueType>(
         &self,
         batch: api::Batch<K, V>,

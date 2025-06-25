@@ -21,6 +21,7 @@
       "triehash/**",
       "CHANGELOG.md",
       "cliff.toml",
+      "**/tests/compile_*/**",
     ],
     "license": "./.github/license-header.txt"
   },
@@ -43,6 +44,7 @@
       "triehash/**",
       "CHANGELOG.md",
       "cliff.toml",
+      "**/tests/compile_*/**",
     ],
   }
 ]

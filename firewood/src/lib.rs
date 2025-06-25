@@ -8,7 +8,7 @@
 //! store trie nodes on-disk. Unlike most of state management approaches in the field,
 //! it is not built on top of a generic KV store such as LevelDB/RocksDB. Firewood, like a
 //! B+-tree based database, directly uses the trie structure as the index on-disk. Thus,
-//! there is no additional “emulation” of the logical trie to flatten out the data structure
+//! there is no additional "emulation" of the logical trie to flatten out the data structure
 //! to feed into the underlying database that is unaware of the data being stored. The convenient
 //! byproduct of this approach is that iteration is still fast (for serving state sync queries)
 //! but compaction is not required to maintain the index. Firewood was first conceived to provide
@@ -123,6 +123,9 @@ pub mod merkle;
 
 /// Proof module
 pub mod proof;
+
+// Re-export the proc macro from firewood-macros
+pub use firewood_macros::metrics;
 
 /// Range proof module
 pub mod range_proof;

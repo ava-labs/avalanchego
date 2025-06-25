@@ -179,6 +179,7 @@ impl RevisionManager {
     /// 8. Proposal Cleanup.
     ///    Any other proposals that have this proposal as a parent should be reparented to the committed version.
     #[fastrace::trace(short_name = true)]
+    #[crate::metrics("firewood.proposal.commit", "proposal commit to storage")]
     pub fn commit(&mut self, proposal: ProposedRevision) -> Result<(), RevisionManagerError> {
         // 1. Commit check
         let current_revision = self.current_revision();
