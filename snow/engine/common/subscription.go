@@ -18,7 +18,7 @@ type Subscription func(ctx context.Context) Message
 
 // SimpleSubscriber is a basic implementation of the Subscriber interface.
 // It allows publishing messages to be received by the subscriber.
-// Once a message is published, it can be received by via a call to SubscribeToEvents.
+// Once a message is published, it can be received via a call to SubscribeToEvents.
 // Once Close is called, SubscribeToEvents always returns 0.
 // It assumes there is only one subscriber at a time, and does not support concurrent subscribers,
 // as a message passed by Publish is only retained until the next call to SubscribeToEvents.
@@ -65,9 +65,7 @@ func (ss *SimpleSubscriber) SubscribeToEvents(ctx context.Context) Message {
 	}()
 
 	for {
-		closed := ss.closed
-
-		if closed {
+		if ss.closed {
 			return 0
 		}
 

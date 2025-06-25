@@ -59,7 +59,7 @@ type VM struct {
 	AppGossipF          func(ctx context.Context, nodeID ids.NodeID, msg []byte) error
 	AppRequestFailedF   func(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *common.AppError) error
 	VersionF            func(context.Context) (string, error)
-	SubscribeToEventsF  func(context.Context) common.Message
+	SubscribeToEventsF  common.Subscription
 }
 
 func (vm *VM) SubscribeToEvents(_ context.Context) common.Message {

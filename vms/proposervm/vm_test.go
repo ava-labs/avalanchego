@@ -818,7 +818,6 @@ func TestExpiredBuildBlock(t *testing.T) {
 		case <-testEnd:
 			return 0
 		case event := <-events:
-			fmt.Println(">>>>>", event)
 			return event
 		}
 	}

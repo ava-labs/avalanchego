@@ -406,14 +406,13 @@ func makeCustomAssetGenesisData(tb testing.TB) map[string]AssetDefinition {
 func issueAndAccept(
 	require *require.Assertions,
 	vm *VM,
-	subscriber common.Subscriber,
 	tx *txs.Tx,
 ) {
 	txID, err := vm.issueTxFromRPC(tx)
 	require.NoError(err)
 	require.Equal(tx.ID(), txID)
 
-	buildAndAccept(require, vm, subscriber, txID)
+	buildAndAccept(require, vm, vm.Subscriber, txID)
 }
 
 // buildAndAccept expects the context lock not to be held
