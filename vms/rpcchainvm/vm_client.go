@@ -406,14 +406,14 @@ func (vm *VMClient) CreateHTTP2Handler(ctx context.Context) (http.Handler, error
 	return ghttp.NewClient(httppb.NewHTTPClient(clientConn)), nil
 }
 
-func (vm *VMClient) SubscribeToEvents(ctx context.Context) common.Message {
-	resp, err := vm.client.SubscribeToEvents(ctx, &emptypb.Empty{})
+func (vm *VMClient) WaitForEvent(ctx context.Context) (common.Message, error) {
+	resp, err := vm.client.WaitForEvent(ctx, &emptypb.Empty{})
 	if err != nil {
 		// TODO: Correctly return this error to the caller.
 		vm.logger.Error("failed to subscribe to events", zap.Error(err))
-		return 0
+		return 0, nil
 	}
-	return common.Message(resp.Message)
+	return common.Message(resp.Message), nil
 }
 
 func (vm *VMClient) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {

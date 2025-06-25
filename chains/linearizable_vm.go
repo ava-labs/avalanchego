@@ -37,8 +37,8 @@ type initializeOnLinearizeVM struct {
 	appSender    common.AppSender
 }
 
-func (vm *initializeOnLinearizeVM) SubscribeToEvents(ctx context.Context) common.Message {
-	return vm.vmToInitialize.SubscribeToEvents(ctx)
+func (vm *initializeOnLinearizeVM) WaitForEvent(ctx context.Context) (common.Message, error) {
+	return vm.vmToInitialize.WaitForEvent(ctx)
 }
 
 func (vm *initializeOnLinearizeVM) Linearize(ctx context.Context, stopVertexID ids.ID) error {

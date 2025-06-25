@@ -389,7 +389,7 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 	require.NoError(err)
 
 	chainVM := blockmock.NewChainVM(ctrl)
-	chainVM.EXPECT().SubscribeToEvents(gomock.Any()).Return(common.PendingTxs).AnyTimes()
+	chainVM.EXPECT().WaitForEvent(gomock.Any()).Return(common.PendingTxs, nil).AnyTimes()
 
 	vm := &VM{
 		Config: Config{
@@ -409,7 +409,7 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 		proposerBuildSlotGauge: prometheus.NewGauge(prometheus.GaugeOpts{}),
 	}
 
-	vm.subscriber = common.NewSubscriptionProxy(vm.ChainVM.SubscribeToEvents)
+	vm.subscriber = common.NewSubscriptionProxy(vm.ChainVM.WaitForEvent, &logging.NoLog{})
 	defer vm.subscriber.Close()
 
 	vm.Clock.Set(now)

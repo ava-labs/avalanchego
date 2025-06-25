@@ -6,22 +6,26 @@ package common
 import (
 	"context"
 	"sync"
+
+	"go.uber.org/zap"
+
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 type Subscriber interface {
-	// SubscribeToEvents blocks until either the given context is cancelled, or a message is returned.
-	SubscribeToEvents(ctx context.Context) Message
+	// WaitForEvent blocks until either the given context is cancelled, or a message is returned.
+	WaitForEvent(ctx context.Context) (Message, error)
 }
 
 // Subscription is a function that blocks until either the given context is cancelled, or a message is returned.
-type Subscription func(ctx context.Context) Message
+type Subscription func(ctx context.Context) (Message, error)
 
 // SimpleSubscriber is a basic implementation of the Subscriber interface.
 // It allows publishing messages to be received by the subscriber.
-// Once a message is published, it can be received via a call to SubscribeToEvents.
-// Once Close is called, SubscribeToEvents always returns 0.
+// Once a message is published, it can be received via a call to WaitForEvent.
+// Once Close is called, WaitForEvent always returns 0.
 // It assumes there is only one subscriber at a time, and does not support concurrent subscribers,
-// as a message passed by Publish is only retained until the next call to SubscribeToEvents.
+// as a message passed by Publish is only retained until the next call to WaitForEvent.
 type SimpleSubscriber struct {
 	lock   sync.Mutex
 	signal sync.Cond
@@ -52,7 +56,7 @@ func (ss *SimpleSubscriber) Close() {
 	ss.signal.Broadcast()
 }
 
-func (ss *SimpleSubscriber) SubscribeToEvents(ctx context.Context) Message {
+func (ss *SimpleSubscriber) WaitForEvent(ctx context.Context) (Message, error) {
 	ss.lock.Lock()
 	defer ss.lock.Unlock()
 
@@ -66,18 +70,18 @@ func (ss *SimpleSubscriber) SubscribeToEvents(ctx context.Context) Message {
 
 	for {
 		if ss.closed {
-			return 0
+			return 0, nil
 		}
 
 		if ss.msg != nil {
 			msg := *ss.msg
 			ss.msg = nil
-			return msg
+			return msg, nil
 		}
 
 		select {
 		case <-ctx.Done():
-			return 0
+			return 0, nil
 		default:
 			ss.signal.Wait()
 		}
@@ -91,9 +95,10 @@ func (ss *SimpleSubscriber) SubscribeToEvents(ctx context.Context) Message {
 // from the underlying subscription.
 // Then, the message is only forwarded to the subscriber when the channel Forward returns is read from.
 // It assumes that there is only one subscriber at a time, as messages passed by Publish or received by the underlying subscription
-// are only retained until the next call to SubscribeToEvents.
-// A call to Close will make SubscribeToEvents to always return 0.
+// are only retained until the next call to WaitForEvent.
+// A call to Close will make WaitForEvent to always return 0.
 type SubscriptionProxy struct {
+	logger  logging.Logger
 	lock    sync.Mutex
 	signal  sync.Cond
 	running sync.WaitGroup
@@ -106,9 +111,10 @@ type SubscriptionProxy struct {
 	onClose   context.CancelFunc
 }
 
-func NewSubscriptionProxy(s Subscription) *SubscriptionProxy {
+func NewSubscriptionProxy(s Subscription, logger logging.Logger) *SubscriptionProxy {
 	sp := &SubscriptionProxy{
 		subscribe: s,
+		logger:    logger,
 	}
 
 	sp.signal = *sync.NewCond(&sp.lock)
@@ -151,7 +157,11 @@ func (sp *SubscriptionProxy) proxyNotifications() {
 			return
 		}
 		ctx := sp.createContext()
-		msg := sp.subscribe(ctx)
+		msg, err := sp.subscribe(ctx)
+		if err != nil {
+			sp.logger.Error("failed to subscribe to events", zap.Error(err))
+			return
+		}
 		sp.Publish(msg)
 		if sp.isClosed() {
 			return
@@ -161,7 +171,7 @@ func (sp *SubscriptionProxy) proxyNotifications() {
 }
 
 // Forward returns a channel that when read from, will forward a message received by Publish or the underlying subscription,
-// to a caller of SubscribeToEvents. The returned channel can only be read from once.
+// to a caller of WaitForEvent. The returned channel can only be read from once.
 // If the context is cancelled, or if Close is called, the channel will be closed.
 func (sp *SubscriptionProxy) Forward(ctx context.Context) <-chan struct{} {
 	out := make(chan struct{})
@@ -230,10 +240,10 @@ func (sp *SubscriptionProxy) createContext() context.Context {
 	return ctx
 }
 
-// SubscribeToEvents blocks until either the given context is cancelled, or a message is received.
+// WaitForEvent blocks until either the given context is cancelled, or a message is received.
 // In order for a message to be received, it must be either set using SetAbsorbedMsg, or to be received
 // by the underlying subscription, and then the consumer must call Forward.
-func (sp *SubscriptionProxy) SubscribeToEvents(ctx context.Context) Message {
+func (sp *SubscriptionProxy) WaitForEvent(ctx context.Context) (Message, error) {
 	sp.lock.Lock()
 	defer sp.lock.Unlock()
 
@@ -249,18 +259,18 @@ func (sp *SubscriptionProxy) SubscribeToEvents(ctx context.Context) Message {
 
 	for {
 		if sp.closed {
-			return 0
+			return 0, nil
 		}
 
 		if sp.releasedMsg != nil {
 			releasedMsg := *sp.releasedMsg
 			sp.releasedMsg = nil
-			return releasedMsg
+			return releasedMsg, nil
 		}
 
 		select {
 		case <-ctx.Done():
-			return 0
+			return 0, nil
 		default:
 			sp.signal.Wait()
 		}
