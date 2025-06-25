@@ -18,8 +18,8 @@ type Metrics struct {
 	txTotalLatency        prometheus.Histogram
 }
 
-func NewMetrics(namespace string, registry *prometheus.Registry) (*Metrics, error) {
-	m := &Metrics{
+func NewMetrics(namespace string, registry *prometheus.Registry) (Metrics, error) {
+	m := Metrics{
 		txsIssuedCounter: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "txs_issued",
@@ -54,18 +54,18 @@ func NewMetrics(namespace string, registry *prometheus.Registry) (*Metrics, erro
 		registry.Register(m.txConfirmationLatency),
 		registry.Register(m.txTotalLatency),
 	); err != nil {
-		return nil, err
+		return Metrics{}, err
 	}
 
 	return m, nil
 }
 
-func (m *Metrics) Issue(d time.Duration) {
+func (m Metrics) Issue(d time.Duration) {
 	m.txsIssuedCounter.Inc()
 	m.txIssuanceLatency.Observe(float64(d.Milliseconds()))
 }
 
-func (m *Metrics) Accept(confirmationDuration time.Duration, totalDuration time.Duration) {
+func (m Metrics) Accept(confirmationDuration time.Duration, totalDuration time.Duration) {
 	m.txsAcceptedCounter.Inc()
 	m.txTotalLatency.Observe(float64(totalDuration.Milliseconds()))
 	m.txConfirmationLatency.Observe(float64(confirmationDuration.Milliseconds()))

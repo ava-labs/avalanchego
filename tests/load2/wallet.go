@@ -18,7 +18,7 @@ import (
 )
 
 type Wallet struct {
-	metrics *Metrics
+	metrics Metrics
 	client  *ethclient.Client
 	privKey *ecdsa.PrivateKey
 	nonce   uint64
@@ -27,7 +27,7 @@ type Wallet struct {
 }
 
 func NewWallet(
-	metrics *Metrics,
+	metrics Metrics,
 	client *ethclient.Client,
 	privKey *ecdsa.PrivateKey,
 	nonce uint64,
