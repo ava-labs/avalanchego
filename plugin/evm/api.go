@@ -182,10 +182,10 @@ func (service *AvaxAPI) IssueTx(r *http.Request, args *api.FormattedTx, response
 	service.vm.ctx.Lock.Lock()
 	defer service.vm.ctx.Lock.Unlock()
 
-	if err := service.vm.mempool.AddLocalTx(tx); err != nil {
+	if err := service.vm.atomicVM.AtomicMempool.AddLocalTx(tx); err != nil {
 		return err
 	}
-	service.vm.atomicTxPushGossiper.Add(tx)
+	service.vm.atomicVM.AtomicTxPushGossiper.Add(tx)
 	return nil
 }
 

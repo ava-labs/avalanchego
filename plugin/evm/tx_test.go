@@ -168,7 +168,7 @@ func executeTxTest(t *testing.T, test atomicTxTest) {
 		}
 	}
 
-	if err := tvm.vm.mempool.AddLocalTx(tx); err != nil {
+	if err := tvm.vm.atomicVM.AtomicMempool.AddLocalTx(tx); err != nil {
 		t.Fatal(err)
 	}
 	<-tvm.toEngine

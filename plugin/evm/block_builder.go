@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/txpool"
-	atomictxpool "github.com/ava-labs/coreth/plugin/evm/atomic/txpool"
+	"github.com/ava-labs/coreth/plugin/evm/extension"
 	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/snow"
@@ -27,8 +27,8 @@ const (
 type blockBuilder struct {
 	ctx *snow.Context
 
-	txPool  *txpool.TxPool
-	mempool *atomictxpool.Mempool
+	txPool       *txpool.TxPool
+	extraMempool extension.BuilderMempool
 
 	shutdownChan <-chan struct{}
 	shutdownWg   *sync.WaitGroup
@@ -51,11 +51,13 @@ type blockBuilder struct {
 	buildBlockTimer *timer.Timer
 }
 
-func (vm *VM) NewBlockBuilder(notifyBuildBlockChan chan<- commonEng.Message) *blockBuilder {
+// NewBlockBuilder creates a new block builder. extraMempool is an optional mempool (can be nil) that
+// can be used to add transactions to the block builder, in addition to the txPool.
+func (vm *VM) NewBlockBuilder(notifyBuildBlockChan chan<- commonEng.Message, extraMempool extension.BuilderMempool) *blockBuilder {
 	b := &blockBuilder{
 		ctx:                  vm.ctx,
 		txPool:               vm.txPool,
-		mempool:              vm.mempool,
+		extraMempool:         extraMempool,
 		shutdownChan:         vm.shutdownChan,
 		shutdownWg:           &vm.shutdownWg,
 		notifyBuildBlockChan: notifyBuildBlockChan,
@@ -102,7 +104,7 @@ func (b *blockBuilder) needToBuild() bool {
 	size := b.txPool.PendingSize(txpool.PendingFilter{
 		MinTip: uint256.MustFromBig(b.txPool.GasTip()),
 	})
-	return size > 0 || b.mempool.Len() > 0
+	return size > 0 || (b.extraMempool != nil && b.extraMempool.PendingLen() > 0)
 }
 
 // markBuilding adds a PendingTxs message to the toEngine channel.
@@ -147,6 +149,11 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 	txSubmitChan := make(chan core.NewTxsEvent)
 	b.txPool.SubscribeTransactions(txSubmitChan, true)
 
+	var extraChan <-chan struct{}
+	if b.extraMempool != nil {
+		extraChan = b.extraMempool.SubscribePendingTxs()
+	}
+
 	b.shutdownWg.Add(1)
 	go b.ctx.Log.RecoverAndPanic(func() {
 		defer b.shutdownWg.Done()
@@ -156,8 +163,8 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 			case <-txSubmitChan:
 				log.Trace("New tx detected, trying to generate a block")
 				b.signalTxsReady()
-			case <-b.mempool.SubscribePendingTxs():
-				log.Trace("New atomic Tx detected, trying to generate a block")
+			case <-extraChan:
+				log.Trace("New extra Tx detected, trying to generate a block")
 				b.signalTxsReady()
 			case <-b.shutdownChan:
 				b.buildBlockTimer.Stop()
