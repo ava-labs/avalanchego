@@ -131,7 +131,7 @@ func (tc *SimpleTestContext) Recover(rethrow bool) {
 // cleanup ensures that the registered cleanup functions have been
 // called. Cleanup functions will be called at most once. Returns a
 // boolean indication of whether a panic results from executing one or
-// more cleanup functions e.g. allow a non-zero exit.
+// more cleanup functions i.e. to trigger a non-zero exit.
 func (tc *SimpleTestContext) cleanup() bool {
 	if tc.cleanupCalled {
 		return false

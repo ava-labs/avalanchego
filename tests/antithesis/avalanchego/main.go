@@ -45,7 +45,6 @@ import (
 
 const NumKeys = 5
 
-// TODO(marun) Switch to using zap for logging
 // TODO(marun) Extract the common elements of test execution for reuse across test setups
 
 func main() {
@@ -223,7 +222,6 @@ func (w *workload) executeTest(ctx context.Context) {
 	val, err := rand.Int(rand.Reader, big.NewInt(6))
 	require.NoError(err, "failed to read randomness")
 
-	// TODO(marun)
 	flowID := val.Int64()
 	switch flowID {
 	case 0:
