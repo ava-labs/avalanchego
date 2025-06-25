@@ -6,6 +6,7 @@ package tmpnet
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -20,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/yaml"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
@@ -36,7 +38,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	restclient "k8s.io/client-go/rest"
 )
@@ -390,7 +391,7 @@ func GetClientset(log logging.Logger, path string, context string) (*kubernetes.
 	return clientset, nil
 }
 
-// applyManifest creates the resources defined by the provided manifest in a manner similar to `kubectl apply -f`.
+// applyManifest creates or updates the resources defined by the provided manifest using server-side apply.
 // If namespace is empty, the namespace from the manifest will be used for namespaced resources.
 func applyManifest(
 	ctx context.Context,
@@ -435,19 +436,21 @@ func applyManifest(
 			resourceInterface = dynamicClient.Resource(gvr).Namespace(resourceNamespace)
 		}
 
-		_, err = resourceInterface.Create(ctx, obj, metav1.CreateOptions{})
+		// Convert object to JSON for server-side apply
+		data, err := json.Marshal(obj)
 		if err != nil {
-			if apierrors.IsAlreadyExists(err) {
-				log.Info("resource already exists",
-					zap.String("kind", gvk.Kind),
-					zap.String("namespace", resourceNamespace),
-					zap.String("name", obj.GetName()),
-				)
-				continue
-			}
-			return fmt.Errorf("failed to create %s %s/%s: %w", gvk.Kind, resourceNamespace, obj.GetName(), err)
+			return fmt.Errorf("failed to marshal object to JSON: %w", err)
 		}
-		log.Info("created resource",
+
+		// Use server-side apply to create or update the resource
+		_, err = resourceInterface.Patch(ctx, obj.GetName(), types.ApplyPatchType, data, metav1.PatchOptions{
+			FieldManager: "tmpnet-apply",
+			Force:        ptr.To(true),
+		})
+		if err != nil {
+			return fmt.Errorf("failed to apply %s %s/%s: %w", gvk.Kind, resourceNamespace, obj.GetName(), err)
+		}
+		log.Info("applied resource",
 			zap.String("kind", gvk.Kind),
 			zap.String("namespace", resourceNamespace),
 			zap.String("name", obj.GetName()),
