@@ -88,7 +88,7 @@ func TestServiceGetTxStatus(t *testing.T) {
 	require.NoError(service.GetTxStatus(nil, statusArgs, statusReply))
 	require.Equal(choices.Unknown, statusReply.Status)
 
-	issueAndAccept(require, env.vm, env.vm.Subscriber, newTx)
+	issueAndAccept(require, env.vm, newTx)
 
 	statusReply = &GetTxStatusReply{}
 	require.NoError(service.GetTxStatus(nil, statusArgs, statusReply))
@@ -498,7 +498,7 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 	env.vm.ctx.Lock.Unlock()
 
 	newTx := newAvaxBaseTxWithOutputs(t, env)
-	issueAndAccept(require, env.vm, env.vm.Subscriber, newTx)
+	issueAndAccept(require, env.vm, newTx)
 
 	reply := api.GetTxReply{}
 	require.NoError(service.GetTx(nil, &api.GetTxArgs{
@@ -586,7 +586,7 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 	env.vm.ctx.Lock.Unlock()
 
 	newTx := buildTestExportTx(t, env, env.vm.ctx.CChainID)
-	issueAndAccept(require, env.vm, env.vm.Subscriber, newTx)
+	issueAndAccept(require, env.vm, newTx)
 
 	reply := api.GetTxReply{}
 	require.NoError(service.GetTx(nil, &api.GetTxArgs{
@@ -725,7 +725,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 		},
 	}
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env, initialStates)
-	issueAndAccept(require, env.vm, env.vm.Subscriber, createAssetTx)
+	issueAndAccept(require, env.vm, createAssetTx)
 
 	reply := api.GetTxReply{}
 	require.NoError(service.GetTx(nil, &api.GetTxArgs{
@@ -892,11 +892,11 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 		},
 	}
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env, initialStates)
-	issueAndAccept(require, env.vm, env.vm.Subscriber, createAssetTx)
+	issueAndAccept(require, env.vm, createAssetTx)
 
 	op := buildNFTxMintOp(createAssetTx, key, 1, 1)
 	mintNFTTx := buildOperationTxWithOps(t, env, op)
-	issueAndAccept(require, env.vm, env.vm.Subscriber, mintNFTTx)
+	issueAndAccept(require, env.vm, mintNFTTx)
 
 	reply := api.GetTxReply{}
 	require.NoError(service.GetTx(nil, &api.GetTxArgs{
@@ -1036,12 +1036,12 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 		},
 	}
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env, initialStates)
-	issueAndAccept(require, env.vm, env.vm.Subscriber, createAssetTx)
+	issueAndAccept(require, env.vm, createAssetTx)
 
 	mintOp1 := buildNFTxMintOp(createAssetTx, key, 1, 0)
 	mintOp2 := buildNFTxMintOp(createAssetTx, key, 2, 1)
 	mintNFTTx := buildOperationTxWithOps(t, env, mintOp1, mintOp2)
-	issueAndAccept(require, env.vm, env.vm.Subscriber, mintNFTTx)
+	issueAndAccept(require, env.vm, mintNFTTx)
 
 	reply := api.GetTxReply{}
 	require.NoError(service.GetTx(nil, &api.GetTxArgs{
@@ -1212,11 +1212,11 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 		},
 	}
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env, initialStates)
-	issueAndAccept(require, env.vm, env.vm.Subscriber, createAssetTx)
+	issueAndAccept(require, env.vm, createAssetTx)
 
 	op := buildSecpMintOp(createAssetTx, key, 1)
 	mintSecpOpTx := buildOperationTxWithOps(t, env, op)
-	issueAndAccept(require, env.vm, env.vm.Subscriber, mintSecpOpTx)
+	issueAndAccept(require, env.vm, mintSecpOpTx)
 
 	reply := api.GetTxReply{}
 	require.NoError(service.GetTx(nil, &api.GetTxArgs{
@@ -1358,12 +1358,12 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 		},
 	}
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env, initialStates)
-	issueAndAccept(require, env.vm, env.vm.Subscriber, createAssetTx)
+	issueAndAccept(require, env.vm, createAssetTx)
 
 	op1 := buildSecpMintOp(createAssetTx, key, 1)
 	op2 := buildSecpMintOp(createAssetTx, key, 2)
 	mintSecpOpTx := buildOperationTxWithOps(t, env, op1, op2)
-	issueAndAccept(require, env.vm, env.vm.Subscriber, mintSecpOpTx)
+	issueAndAccept(require, env.vm, mintSecpOpTx)
 
 	reply := api.GetTxReply{}
 	require.NoError(service.GetTx(nil, &api.GetTxArgs{
@@ -1537,11 +1537,11 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 		},
 	}
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env, initialStates)
-	issueAndAccept(require, env.vm, env.vm.Subscriber, createAssetTx)
+	issueAndAccept(require, env.vm, createAssetTx)
 
 	op := buildPropertyFxMintOp(createAssetTx, key, 1)
 	mintPropertyFxOpTx := buildOperationTxWithOps(t, env, op)
-	issueAndAccept(require, env.vm, env.vm.Subscriber, mintPropertyFxOpTx)
+	issueAndAccept(require, env.vm, mintPropertyFxOpTx)
 
 	reply := api.GetTxReply{}
 	require.NoError(service.GetTx(nil, &api.GetTxArgs{
@@ -1678,12 +1678,12 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 		},
 	}
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, env, initialStates)
-	issueAndAccept(require, env.vm, env.vm.Subscriber, createAssetTx)
+	issueAndAccept(require, env.vm, createAssetTx)
 
 	op1 := buildPropertyFxMintOp(createAssetTx, key, 1)
 	op2 := buildPropertyFxMintOp(createAssetTx, key, 2)
 	mintPropertyFxOpTx := buildOperationTxWithOps(t, env, op1, op2)
-	issueAndAccept(require, env.vm, env.vm.Subscriber, mintPropertyFxOpTx)
+	issueAndAccept(require, env.vm, mintPropertyFxOpTx)
 
 	reply := api.GetTxReply{}
 	require.NoError(service.GetTx(nil, &api.GetTxArgs{

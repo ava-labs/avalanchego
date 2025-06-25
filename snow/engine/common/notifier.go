@@ -44,7 +44,7 @@ func (nf *NotificationForwarder) run() {
 		default:
 		}
 
-		ctx := nf.getContext()
+		ctx := nf.setAndGetContext()
 
 		nf.Log.Debug("Subscribing to notifications")
 		msg := nf.Subscribe(ctx)
@@ -64,7 +64,7 @@ func (nf *NotificationForwarder) run() {
 	}
 }
 
-func (nf *NotificationForwarder) getContext() context.Context {
+func (nf *NotificationForwarder) setAndGetContext() context.Context {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	nf.lock.Lock()
