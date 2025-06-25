@@ -39,6 +39,13 @@ const (
 	PingStreamPingProcedure = "/xsvm.Ping/StreamPing"
 )
 
+// These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
+var (
+	pingServiceDescriptor          = xsvm.File_xsvm_service_proto.Services().ByName("Ping")
+	pingPingMethodDescriptor       = pingServiceDescriptor.Methods().ByName("Ping")
+	pingStreamPingMethodDescriptor = pingServiceDescriptor.Methods().ByName("StreamPing")
+)
+
 // PingClient is a client for the xsvm.Ping service.
 type PingClient interface {
 	Ping(context.Context, *connect.Request[xsvm.PingRequest]) (*connect.Response[xsvm.PingReply], error)
@@ -54,18 +61,17 @@ type PingClient interface {
 // http://api.acme.com or https://acme.com/grpc).
 func NewPingClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) PingClient {
 	baseURL = strings.TrimRight(baseURL, "/")
-	pingMethods := xsvm.File_xsvm_service_proto.Services().ByName("Ping").Methods()
 	return &pingClient{
 		ping: connect.NewClient[xsvm.PingRequest, xsvm.PingReply](
 			httpClient,
 			baseURL+PingPingProcedure,
-			connect.WithSchema(pingMethods.ByName("Ping")),
+			connect.WithSchema(pingPingMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		streamPing: connect.NewClient[xsvm.StreamPingRequest, xsvm.StreamPingReply](
 			httpClient,
 			baseURL+PingStreamPingProcedure,
-			connect.WithSchema(pingMethods.ByName("StreamPing")),
+			connect.WithSchema(pingStreamPingMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -99,17 +105,16 @@ type PingHandler interface {
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
 func NewPingHandler(svc PingHandler, opts ...connect.HandlerOption) (string, http.Handler) {
-	pingMethods := xsvm.File_xsvm_service_proto.Services().ByName("Ping").Methods()
 	pingPingHandler := connect.NewUnaryHandler(
 		PingPingProcedure,
 		svc.Ping,
-		connect.WithSchema(pingMethods.ByName("Ping")),
+		connect.WithSchema(pingPingMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	pingStreamPingHandler := connect.NewBidiStreamHandler(
 		PingStreamPingProcedure,
 		svc.StreamPing,
-		connect.WithSchema(pingMethods.ByName("StreamPing")),
+		connect.WithSchema(pingStreamPingMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/xsvm.Ping/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
