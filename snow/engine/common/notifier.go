@@ -47,7 +47,11 @@ func (nf *NotificationForwarder) run() {
 		ctx := nf.setAndGetContext()
 
 		nf.Log.Debug("Subscribing to notifications")
-		msg := nf.Subscribe(ctx)
+		msg, err := nf.Subscribe(ctx)
+		if err != nil {
+			nf.Log.Error("Failed subscribing to notifications", zap.Error(err))
+			return
+		}
 		nf.Log.Debug("Received notification", zap.Stringer("msg", msg))
 
 		select {

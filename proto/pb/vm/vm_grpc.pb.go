@@ -25,7 +25,7 @@ const (
 	VM_Shutdown_FullMethodName                   = "/vm.VM/Shutdown"
 	VM_CreateHandlers_FullMethodName             = "/vm.VM/CreateHandlers"
 	VM_CreateHTTP2Handler_FullMethodName         = "/vm.VM/CreateHTTP2Handler"
-	VM_SubscribeToEvents_FullMethodName          = "/vm.VM/SubscribeToEvents"
+	VM_SubscribeToEvents_FullMethodName          = "/vm.VM/WaitForEvent"
 	VM_Connected_FullMethodName                  = "/vm.VM/Connected"
 	VM_Disconnected_FullMethodName               = "/vm.VM/Disconnected"
 	VM_BuildBlock_FullMethodName                 = "/vm.VM/BuildBlock"
@@ -499,7 +499,7 @@ func (UnimplementedVMServer) CreateHTTP2Handler(context.Context, *emptypb.Empty)
 	return nil, status.Errorf(codes.Unimplemented, "method CreateHTTP2Handler not implemented")
 }
 func (UnimplementedVMServer) SubscribeToEvents(context.Context, *emptypb.Empty) (*SubscribeToEventsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SubscribeToEvents not implemented")
+	return nil, status.Errorf(codes.Unimplemented, "method WaitForEvent not implemented")
 }
 func (UnimplementedVMServer) Connected(context.Context, *ConnectedRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Connected not implemented")
@@ -1175,7 +1175,7 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _VM_CreateHTTP2Handler_Handler,
 		},
 		{
-			MethodName: "SubscribeToEvents",
+			MethodName: "WaitForEvent",
 			Handler:    _VM_SubscribeToEvents_Handler,
 		},
 		{

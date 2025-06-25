@@ -3530,7 +3530,7 @@ var file_vm_vm_proto_depIdxs = []int32{
 	50, // 38: vm.VM.Shutdown:input_type -> google.protobuf.Empty
 	50, // 39: vm.VM.CreateHandlers:input_type -> google.protobuf.Empty
 	50, // 40: vm.VM.CreateHTTP2Handler:input_type -> google.protobuf.Empty
-	50, // 41: vm.VM.SubscribeToEvents:input_type -> google.protobuf.Empty
+	50, // 41: vm.VM.WaitForEvent:input_type -> google.protobuf.Empty
 	30, // 42: vm.VM.Connected:input_type -> vm.ConnectedRequest
 	31, // 43: vm.VM.Disconnected:input_type -> vm.DisconnectedRequest
 	13, // 44: vm.VM.BuildBlock:input_type -> vm.BuildBlockRequest
@@ -3561,7 +3561,7 @@ var file_vm_vm_proto_depIdxs = []int32{
 	50, // 69: vm.VM.Shutdown:output_type -> google.protobuf.Empty
 	9,  // 70: vm.VM.CreateHandlers:output_type -> vm.CreateHandlersResponse
 	10, // 71: vm.VM.CreateHTTP2Handler:output_type -> vm.CreateHTTP2HandlerResponse
-	12, // 72: vm.VM.SubscribeToEvents:output_type -> vm.SubscribeToEventsResponse
+	12, // 72: vm.VM.WaitForEvent:output_type -> vm.SubscribeToEventsResponse
 	50, // 73: vm.VM.Connected:output_type -> google.protobuf.Empty
 	50, // 74: vm.VM.Disconnected:output_type -> google.protobuf.Empty
 	14, // 75: vm.VM.BuildBlock:output_type -> vm.BuildBlockResponse

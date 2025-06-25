@@ -78,7 +78,7 @@ type Handler interface {
 type handler struct {
 	haltBootstrapping func()
 
-	// the NotificationForwarder is used to forward messages received from the VM's SubscribeToEvents
+	// the NotificationForwarder is used to forward messages received from the VM's WaitForEvent
 	// into the Notify() call of the engine.
 	nf *common.NotificationForwarder
 
@@ -159,7 +159,7 @@ func New(
 	h.asyncMessagePool.SetLimit(threadPoolSize)
 
 	h.nf = &common.NotificationForwarder{
-		Subscribe: subscriber.SubscribeToEvents,
+		Subscribe: subscriber.WaitForEvent,
 		Log:       h.ctx.Log,
 		Notifier:  h,
 	}

@@ -375,7 +375,7 @@ func (vm *VMServer) CreateHTTP2Handler(ctx context.Context, _ *emptypb.Empty) (*
 }
 
 func (vm *VMServer) SubscribeToEvents(ctx context.Context, _ *emptypb.Empty) (*vmpb.SubscribeToEventsResponse, error) {
-	message := vm.vm.SubscribeToEvents(ctx)
+	message, _ := vm.vm.WaitForEvent(ctx)
 	return &vmpb.SubscribeToEventsResponse{
 		Message: vmpb.Message(message),
 	}, nil
