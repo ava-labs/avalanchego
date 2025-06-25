@@ -244,10 +244,10 @@ jobs:
       image: ubuntu:22.04
       options: --user root
     steps:
-      - name: Install xz-utils
+      - name: Install prerequisites
         run: |
           apt-get update
-          apt-get install -y xz-utils
+          apt-get install -y curl git xz-utils build-essential
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
