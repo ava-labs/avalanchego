@@ -9,13 +9,10 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/gorilla/mux"
-
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
-	// TODO normalize lowercase?
 	HTTPHeaderRoute = "Avalanche-API-Route"
 
 	errUnknownEndpoint = errors.New("unknown endpoint")
@@ -23,8 +20,8 @@ var (
 )
 
 type router struct {
-	lock   sync.RWMutex
-	router *mux.Router
+	lock sync.RWMutex
+	mux  *http.ServeMux
 
 	routeLock      sync.Mutex
 	reservedRoutes set.Set[string]     // Reserves routes so that there can't be alias that conflict
@@ -38,7 +35,7 @@ type router struct {
 
 func newRouter() *router {
 	return &router{
-		router:         mux.NewRouter(),
+		mux:            http.NewServeMux(),
 		reservedRoutes: set.Set[string]{},
 		aliases:        make(map[string][]string),
 		headerRoutes:   make(map[string]http.Handler),
@@ -54,7 +51,7 @@ func (r *router) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	if !ok {
 		// If there is no routing header, fall-back to the legacy path-based
 		// routing
-		r.router.ServeHTTP(writer, request)
+		r.mux.ServeHTTP(writer, request)
 		return
 	}
 
@@ -87,7 +84,6 @@ func (r *router) GetHandler(endpoint string) (http.Handler, error) {
 }
 
 func (r *router) AddHeaderRoute(route string, handler http.Handler) bool {
-	// TODO which lock do i use
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
@@ -125,13 +121,9 @@ func (r *router) forceAddRouter(endpoint string, handler http.Handler) error {
 
 	r.routes[endpoint] = handler
 
-	// Name routes based on their URL for easy retrieval in the future
-	route := r.router.Handle(endpoint, handler)
-	if route == nil {
-		return fmt.Errorf("failed to create new route for %s", endpoint)
-	}
-	route.Name(endpoint)
-
+	// Handle exact matches and any sub-matches under the endpoint
+	r.mux.Handle(endpoint, handler)
+	r.mux.Handle(endpoint+"/", handler)
 	var err error
 	if aliases, exists := r.aliases[endpoint]; exists {
 		for _, alias := range aliases {
