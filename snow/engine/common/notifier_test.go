@@ -31,7 +31,7 @@ func TestNotifier(t *testing.T) {
 
 	subscriber := NewSimpleSubscriber()
 	nf := &NotificationForwarder{
-		Subscribe: subscriber.SubscribeToEvents,
+		Subscribe: subscriber.WaitForEvent,
 		Notifier:  Notifier(notifier),
 		Log:       &logging.NoLog{},
 	}
@@ -61,10 +61,10 @@ func TestNotifierStopWhileSubscribing(_ *testing.T) {
 	var subscribed sync.WaitGroup
 	subscribed.Add(1)
 
-	nf.Subscribe = func(ctx context.Context) Message {
+	nf.Subscribe = func(ctx context.Context) (Message, error) {
 		subscribed.Done()
 		<-ctx.Done()
-		return 0
+		return 0, nil
 	}
 
 	nf.Start()
@@ -86,8 +86,8 @@ func TestNotifierStopWhileNotifying(_ *testing.T) {
 		return nil
 	}))
 
-	nf.Subscribe = func(context.Context) Message {
-		return 0
+	nf.Subscribe = func(context.Context) (Message, error) {
+		return 0, nil
 	}
 
 	nf.Start()

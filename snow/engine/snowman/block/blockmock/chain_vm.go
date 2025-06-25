@@ -308,20 +308,6 @@ func (mr *ChainVMMockRecorder) Shutdown(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Shutdown", reflect.TypeOf((*ChainVM)(nil).Shutdown), arg0)
 }
 
-// SubscribeToEvents mocks base method.
-func (m *ChainVM) SubscribeToEvents(ctx context.Context) common.Message {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SubscribeToEvents", ctx)
-	ret0, _ := ret[0].(common.Message)
-	return ret0
-}
-
-// SubscribeToEvents indicates an expected call of SubscribeToEvents.
-func (mr *ChainVMMockRecorder) SubscribeToEvents(ctx any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubscribeToEvents", reflect.TypeOf((*ChainVM)(nil).SubscribeToEvents), ctx)
-}
-
 // Version mocks base method.
 func (m *ChainVM) Version(arg0 context.Context) (string, error) {
 	m.ctrl.T.Helper()
@@ -335,4 +321,19 @@ func (m *ChainVM) Version(arg0 context.Context) (string, error) {
 func (mr *ChainVMMockRecorder) Version(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Version", reflect.TypeOf((*ChainVM)(nil).Version), arg0)
+}
+
+// WaitForEvent mocks base method.
+func (m *ChainVM) WaitForEvent(ctx context.Context) (common.Message, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WaitForEvent", ctx)
+	ret0, _ := ret[0].(common.Message)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// WaitForEvent indicates an expected call of WaitForEvent.
+func (mr *ChainVMMockRecorder) WaitForEvent(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForEvent", reflect.TypeOf((*ChainVM)(nil).WaitForEvent), ctx)
 }

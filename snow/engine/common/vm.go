@@ -81,6 +81,6 @@ type VM interface {
 	// avalanchego api server.
 	CreateHTTP2Handler(ctx context.Context) (http.Handler, error)
 
-	// SubscribeToEvents blocks until either the given context is cancelled, or a message is returned.
-	SubscribeToEvents(ctx context.Context) Message
+	// WaitForEvent blocks until either the given context is cancelled, or a message is returned.
+	WaitForEvent(ctx context.Context) (Message, error)
 }
