@@ -161,7 +161,7 @@ func (vm *VM) NewHTTPHandler(context.Context) (http.Handler, error) {
 		grpcreflect.NewStaticReflector(xsvmconnect.PingName),
 	)
 
-	pingService := api.PingService{Log: vm.chainContext.Log}
+	pingService := &api.PingService{Log: vm.chainContext.Log}
 	pingPath, pingHandler := xsvmconnect.NewPingHandler(pingService)
 
 	mux := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
