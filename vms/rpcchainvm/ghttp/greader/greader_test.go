@@ -33,8 +33,7 @@ func TestEOF(t *testing.T) {
 		require.NoError(server.Serve(listener))
 	}()
 
-	ctx := context.Background()
-	conn, err := grpc.DialContext(ctx, "bufnet",
+	conn, err := grpc.DialContext(context.Background(), "bufnet",
 		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
 			return listener.Dial()
 		}),
@@ -47,5 +46,6 @@ func TestEOF(t *testing.T) {
 	buf := make([]byte, 1)
 	n, err := client.Read(buf)
 	require.Zero(n)
-	require.ErrorIs(err, io.EOF)
+	// Do not use require.ErrorIs because callers use equality checks on io.EOF
+	require.Equal(err, io.EOF)
 }

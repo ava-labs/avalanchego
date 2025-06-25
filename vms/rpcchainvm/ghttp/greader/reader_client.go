@@ -31,10 +31,11 @@ func (c *Client) Read(p []byte) (int, error) {
 
 	copy(p, resp.Read)
 
-	if resp.Error != nil && *resp.Error == "EOF" {
+	// Sentinel errors must be special-cased through an error code
+	if resp.Error != nil && resp.Error.ErrorCode == readerpb.ErrorCode_ERROR_CODE_EOF {
 		err = io.EOF
 	} else if resp.Error != nil {
-		err = errors.New(*resp.Error)
+		err = errors.New(resp.Error.Message)
 	}
 	return len(resp.Read), err
 }
