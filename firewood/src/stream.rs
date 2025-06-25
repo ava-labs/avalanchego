@@ -625,7 +625,7 @@ fn key_from_nibble_iter<Iter: Iterator<Item = u8>>(mut nibbles: Iter) -> Key {
 mod tests {
     use std::sync::Arc;
 
-    use firewood_storage::{MemStore, MutableProposal, NodeStore};
+    use firewood_storage::{ImmutableProposal, MemStore, MutableProposal, NodeStore};
 
     use crate::merkle::Merkle;
 
@@ -1160,9 +1160,12 @@ mod tests {
 
         merkle.insert(&branch, branch.into()).unwrap();
 
-        let mut stream = merkle.key_value_iter();
+        let immutable_merkle: Merkle<NodeStore<Arc<ImmutableProposal>, _>> =
+            merkle.try_into().unwrap();
+        println!("{}", immutable_merkle.dump().unwrap());
+        merkle = Merkle::from(NodeStore::new(Arc::new(immutable_merkle.into_inner())).unwrap());
 
-        println!("{}", merkle.dump().unwrap());
+        let mut stream = merkle.key_value_iter();
 
         assert_eq!(
             stream.next().await.unwrap().unwrap(),

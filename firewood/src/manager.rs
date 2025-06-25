@@ -48,7 +48,7 @@ use crate::v2::api::HashKey;
 
 pub use firewood_storage::CacheReadStrategy;
 use firewood_storage::{
-    Committed, FileBacked, FileIoError, ImmutableProposal, NodeStore, Parentable, TrieHash,
+    Committed, FileBacked, FileIoError, HashedNodeReader, ImmutableProposal, NodeStore, TrieHash,
 };
 
 #[derive(Clone, Debug, TypedBuilder)]
@@ -128,11 +128,7 @@ impl RevisionManager {
             empty_hash: OnceLock::new(),
         };
 
-        if let Some(hash) = nodestore
-            .kind
-            .root_hash()
-            .or_else(|| manager.empty_trie_hash())
-        {
+        if let Some(hash) = nodestore.root_hash().or_else(|| manager.empty_trie_hash()) {
             manager.by_hash.insert(hash, nodestore.clone());
         }
 
@@ -146,11 +142,11 @@ impl RevisionManager {
     pub fn all_hashes(&self) -> Vec<TrieHash> {
         self.historical
             .iter()
-            .filter_map(|r| r.kind.root_hash().or_else(|| self.empty_trie_hash()))
+            .filter_map(|r| r.root_hash().or_else(|| self.empty_trie_hash()))
             .chain(
                 self.proposals
                     .iter()
-                    .filter_map(|p| p.kind.root_hash().or_else(|| self.empty_trie_hash())),
+                    .filter_map(|p| p.root_hash().or_else(|| self.empty_trie_hash())),
             )
             .collect()
     }
@@ -186,10 +182,7 @@ impl RevisionManager {
     pub fn commit(&mut self, proposal: ProposedRevision) -> Result<(), RevisionManagerError> {
         // 1. Commit check
         let current_revision = self.current_revision();
-        if !proposal
-            .kind
-            .parent_hash_is(current_revision.kind.root_hash())
-        {
+        if !proposal.parent_hash_is(current_revision.root_hash()) {
             return Err(RevisionManagerError::NotLatest);
         }
 
@@ -202,7 +195,7 @@ impl RevisionManager {
         // TODO: Handle the case where we get something off the free list that is not free
         while self.historical.len() >= self.max_revisions {
             let oldest = self.historical.pop_front().expect("must be present");
-            if let Some(oldest_hash) = oldest.kind.root_hash().or_else(|| self.empty_trie_hash()) {
+            if let Some(oldest_hash) = oldest.root_hash().or_else(|| self.empty_trie_hash()) {
                 self.by_hash.remove(&oldest_hash);
             }
 
@@ -226,11 +219,7 @@ impl RevisionManager {
         // 4. Set last committed revision
         let committed: CommittedRevision = committed.into();
         self.historical.push_back(committed.clone());
-        if let Some(hash) = committed
-            .kind
-            .root_hash()
-            .or_else(|| self.empty_trie_hash())
-        {
+        if let Some(hash) = committed.root_hash().or_else(|| self.empty_trie_hash()) {
             self.by_hash.insert(hash, committed.clone());
         }
         // TODO: We could allow other commits to start here using the pending list
@@ -277,7 +266,7 @@ impl RevisionManager {
     }
 
     pub fn root_hash(&self) -> Result<Option<HashKey>, RevisionManagerError> {
-        Ok(self.current_revision().kind.root_hash())
+        Ok(self.current_revision().root_hash())
     }
 
     pub fn current_revision(&self) -> CommittedRevision {

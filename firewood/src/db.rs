@@ -81,7 +81,7 @@ impl api::DbView for HistoricalRev {
         Self: 'a;
 
     async fn root_hash(&self) -> Result<Option<api::HashKey>, api::Error> {
-        HashedNodeReader::root_hash(self).map_err(api::Error::FileIO)
+        Ok(HashedNodeReader::root_hash(self))
     }
 
     async fn val<K: api::KeyType>(&self, key: K) -> Result<Option<Box<[u8]>>, api::Error> {
@@ -349,11 +349,11 @@ impl Proposal<'_> {
     /// Get the root hash of the proposal synchronously
     pub fn root_hash_sync(&self) -> Result<Option<api::HashKey>, api::Error> {
         #[cfg(not(feature = "ethhash"))]
-        return Ok(self.nodestore.root_hash()?);
+        return Ok(self.nodestore.root_hash());
         #[cfg(feature = "ethhash")]
         return Ok(Some(
             self.nodestore
-                .root_hash()?
+                .root_hash()
                 .unwrap_or_else(firewood_storage::empty_trie_hash),
         ));
     }
@@ -367,7 +367,7 @@ impl api::DbView for Proposal<'_> {
         Self: 'b;
 
     async fn root_hash(&self) -> Result<Option<api::HashKey>, api::Error> {
-        self.nodestore.root_hash().map_err(api::Error::from)
+        Ok(self.nodestore.root_hash())
     }
 
     async fn val<K: KeyType>(&self, key: K) -> Result<Option<Box<[u8]>>, api::Error> {

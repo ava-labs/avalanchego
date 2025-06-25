@@ -417,10 +417,8 @@ impl<T: HashedNodeReader> Merkle<T> {
     pub(crate) fn dump(&self) -> Result<String, Error> {
         let mut result = String::new();
         writeln!(result, "digraph Merkle {{\n  rankdir=LR;").map_err(Error::other)?;
-        if let Some((root_addr, root_hash)) = self
-            .nodestore
-            .root_address_and_hash()
-            .expect("failed to get root address and hash")
+        if let (Some(root_addr), Some(root_hash)) =
+            (self.nodestore.root_address(), self.nodestore.root_hash())
         {
             writeln!(result, " root -> {root_addr}")
                 .map_err(Error::other)
@@ -1365,7 +1363,7 @@ mod tests {
 
         let merkle = merkle.hash();
 
-        let root_hash = merkle.nodestore.root_hash().unwrap().unwrap();
+        let root_hash = merkle.nodestore.root_hash().unwrap();
 
         for (key, value) in kvs {
             let proof = merkle.prove(&key).unwrap();
@@ -1805,7 +1803,7 @@ mod tests {
         #[cfg(not(feature = "branch_factor_256"))]
         {
             let merkle = merkle_build_test(kvs).unwrap().hash();
-            let Some(got_hash) = merkle.nodestore.root_hash().unwrap() else {
+            let Some(got_hash) = merkle.nodestore.root_hash() else {
                 assert!(expected_hash.is_none());
                 return;
             };
@@ -1855,7 +1853,7 @@ mod tests {
         use firewood_triehash::trie_root;
 
         let merkle = merkle_build_test(kvs.to_vec()).unwrap().hash();
-        let firewood_hash = merkle.nodestore.root_hash().unwrap().unwrap_or_default();
+        let firewood_hash = merkle.nodestore.root_hash().unwrap_or_default();
         let eth_hash = trie_root::<KeccakHasher, _, _, _>(kvs.to_vec());
         let firewood_hash = H256::from_slice(firewood_hash.as_ref());
 
@@ -1919,7 +1917,7 @@ mod tests {
         .collect::<Vec<(Box<_>, Box<_>)>>();
 
         let merkle = merkle_build_test(items).unwrap().hash();
-        let firewood_hash = merkle.nodestore.root_hash().unwrap();
+        let firewood_hash = merkle.nodestore.root_hash();
 
         assert_eq!(
             firewood_hash,
@@ -2007,7 +2005,18 @@ mod tests {
     fn test_root_hash_reversed_deletions() -> Result<(), FileIoError> {
         use rand::rngs::StdRng;
         use rand::{Rng, SeedableRng};
-        let rng = std::cell::RefCell::new(StdRng::seed_from_u64(42));
+
+        let seed = std::env::var("FIREWOOD_TEST_SEED")
+            .ok()
+            .map_or_else(
+                || None,
+                |s| Some(str::parse(&s).expect("couldn't parse FIREWOOD_TEST_SEED; must be a u64")),
+            )
+            .unwrap_or_else(|| rng().random());
+
+        eprintln!("Seed {seed}: to rerun with this data, export FIREWOOD_TEST_SEED={seed}");
+        let rng = std::cell::RefCell::new(StdRng::seed_from_u64(seed));
+
         let max_len0 = 8;
         let max_len1 = 4;
         let keygen = || {
@@ -2036,47 +2045,55 @@ mod tests {
 
             items.sort();
 
-            let mut merkle = merkle_build_test(items.clone())?;
+            let init_merkle: Merkle<NodeStore<MutableProposal, MemStore>> =
+                merkle_build_test::<Vec<u8>, Box<[u8]>>(vec![])?;
+            let init_immutable_merkle: Merkle<NodeStore<Arc<ImmutableProposal>, _>> =
+                init_merkle.try_into().unwrap();
 
-            let mut hashes = Vec::new();
+            let (hashes, complete_immutable_merkle) = items.iter().fold(
+                (vec![], init_immutable_merkle),
+                |(mut hashes, immutable_merkle), (k, v)| {
+                    let root_hash = immutable_merkle.nodestore.root_hash();
+                    hashes.push(root_hash);
+                    let mut merkle =
+                        Merkle::from(NodeStore::new(Arc::new(immutable_merkle.nodestore)).unwrap());
+                    merkle.insert(k, v.clone()).unwrap();
+                    (hashes, merkle.try_into().unwrap())
+                },
+            );
 
-            for (k, v) in &items {
-                let root_hash = merkle
-                    .nodestore
-                    .root_address_and_hash()?
-                    .map(|(_, hash)| hash);
-                hashes.push((root_hash, merkle.dump().unwrap()));
-                merkle.insert(k, v.clone())?;
-            }
+            let (new_hashes, _) = items.iter().rev().fold(
+                (vec![], complete_immutable_merkle),
+                |(mut new_hashes, immutable_merkle_before_removal), (k, _)| {
+                    let before = immutable_merkle_before_removal.dump().unwrap();
+                    let mut merkle = Merkle::from(
+                        NodeStore::new(Arc::new(immutable_merkle_before_removal.nodestore))
+                            .unwrap(),
+                    );
+                    merkle.remove(k).unwrap();
+                    let immutable_merkle_after_removal: Merkle<
+                        NodeStore<Arc<ImmutableProposal>, _>,
+                    > = merkle.try_into().unwrap();
+                    new_hashes.push((
+                        immutable_merkle_after_removal.nodestore.root_hash(),
+                        k,
+                        before,
+                        immutable_merkle_after_removal.dump().unwrap(),
+                    ));
+                    (new_hashes, immutable_merkle_after_removal)
+                },
+            );
 
-            let mut new_hashes = Vec::new();
-
-            for (k, _) in items.iter().rev() {
-                let before = merkle.dump().unwrap();
-                merkle.remove(k)?;
-                let root_hash = merkle
-                    .nodestore
-                    .root_address_and_hash()?
-                    .map(|(_, hash)| hash);
-                new_hashes.push((root_hash, k, before, merkle.dump().unwrap()));
-            }
-
-            hashes.reverse();
-
-            for i in 0..hashes.len() {
-                #[allow(clippy::indexing_slicing)]
-                let (new_hash, key, before_removal, after_removal) = &new_hashes[i];
-                #[allow(clippy::indexing_slicing)]
-                let expected_hash = &hashes[i];
+            for (expected_hash, (actual_hash, key, before_removal, after_removal)) in
+                hashes.into_iter().rev().zip(new_hashes)
+            {
                 let key = key.iter().fold(String::new(), |mut s, b| {
                     let _ = write!(s, "{b:02x}");
                     s
                 });
                 assert_eq!(
-                    new_hash.clone(),
-                    expected_hash.0,
-                    "\n\nkey: {key}\nbefore:\n{before_removal}\nafter:\n{after_removal}\n\nexpected:\n{:?}\n",
-                    expected_hash.0
+                    actual_hash, expected_hash,
+                    "\n\nkey: {key}\nbefore:\n{before_removal}\nafter:\n{after_removal}\n\nexpected:\n{expected_hash:?}\nactual:\n{actual_hash:?}\n",
                 );
             }
         }
