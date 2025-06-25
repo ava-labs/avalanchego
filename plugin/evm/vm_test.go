@@ -34,7 +34,6 @@ import (
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/upgrade"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
@@ -69,8 +68,7 @@ var (
 	testKeys        []*ecdsa.PrivateKey
 	testEthAddrs    []common.Address // testEthAddrs[i] corresponds to testKeys[i]
 
-	firstTxAmount  = new(big.Int).Mul(big.NewInt(testMinGasPrice), big.NewInt(21000*100))
-	genesisBalance = new(big.Int).Mul(big.NewInt(testMinGasPrice), big.NewInt(21000*1000))
+	firstTxAmount = new(big.Int).Mul(big.NewInt(testMinGasPrice), big.NewInt(21000*100))
 
 	genesisJSON = func(cfg *params.ChainConfig) string {
 		g := new(core.Genesis)
@@ -112,27 +110,6 @@ func init() {
 	testEthAddrs = append(testEthAddrs, addr1, addr2)
 }
 
-// BuildGenesisTest returns the genesis bytes for Subnet EVM VM to be used in testing
-func buildGenesisTest(t *testing.T, genesisJSON string) []byte {
-	ss := CreateStaticService()
-
-	genesis := &core.Genesis{}
-	if err := json.Unmarshal([]byte(genesisJSON), genesis); err != nil {
-		t.Fatalf("Problem unmarshaling genesis JSON: %s", err)
-	}
-	args := &BuildGenesisArgs{GenesisData: genesis}
-	reply := &BuildGenesisReply{}
-	err := ss.BuildGenesis(nil, args, reply)
-	if err != nil {
-		t.Fatalf("Failed to create test genesis")
-	}
-	genesisBytes, err := formatting.Decode(reply.Encoding, reply.GenesisBytes)
-	if err != nil {
-		t.Fatalf("Failed to decode genesis bytes: %s", err)
-	}
-	return genesisBytes
-}
-
 // setupGenesis sets up the genesis
 // If [genesisJSON] is empty, defaults to using [genesisJSONLatest]
 func setupGenesis(
@@ -147,7 +124,6 @@ func setupGenesis(
 	if len(genesisJSON) == 0 {
 		genesisJSON = genesisJSONLatest
 	}
-	genesisBytes := buildGenesisTest(t, genesisJSON)
 	ctx := utils.TestSnowContext()
 
 	baseDB := memdb.New()
@@ -158,7 +134,7 @@ func setupGenesis(
 
 	issuer := make(chan commonEng.Message, 1)
 	prefixedDB := prefixdb.New([]byte{1}, baseDB)
-	return ctx, prefixedDB, genesisBytes, issuer, atomicMemory
+	return ctx, prefixedDB, []byte(genesisJSON), issuer, atomicMemory
 }
 
 // GenesisVM creates a VM instance with the genesis test bytes and returns
@@ -437,13 +413,12 @@ func TestBuildEthTxBlock(t *testing.T) {
 	}
 
 	restartedVM := &VM{}
-	genesisBytes := buildGenesisTest(t, genesisJSONSubnetEVM)
 
 	if err := restartedVM.Initialize(
 		context.Background(),
 		utils.TestSnowContext(),
 		dbManager,
-		genesisBytes,
+		[]byte(genesisJSONSubnetEVM),
 		[]byte(""),
 		[]byte(`{"pruning-enabled":true}`),
 		issuer,
@@ -3109,7 +3084,6 @@ func TestStandaloneDB(t *testing.T) {
 	ctx.SharedMemory = atomicMemory.NewSharedMemory(ctx.ChainID)
 	issuer := make(chan commonEng.Message, 1)
 	sharedDB := prefixdb.New([]byte{1}, baseDB)
-	genesisBytes := buildGenesisTest(t, genesisJSONLatest)
 	// alter network ID to use standalone database
 	ctx.NetworkID = 123456
 	appSender := &enginetest.Sender{T: t}
@@ -3129,7 +3103,7 @@ func TestStandaloneDB(t *testing.T) {
 		context.Background(),
 		ctx,
 		sharedDB,
-		genesisBytes,
+		[]byte(genesisJSONLatest),
 		nil,
 		[]byte(configJSON),
 		issuer,
@@ -3214,8 +3188,7 @@ func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
 	require.ErrorIs(t, errs[0], txpool.ErrUnderpriced) // should fail because mempool expects higher fee
 
 	// restart vm and try again
-	genesisBytes := buildGenesisTest(t, string(genesisJSON))
-	restartedVM, err := restartVM(vm, sharedDB, genesisBytes, issuer, appSender, true)
+	restartedVM, err := restartVM(vm, sharedDB, genesisJSON, issuer, appSender, true)
 	require.NoError(t, err)
 
 	// it still should fail
@@ -3285,7 +3258,7 @@ func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
 
 	// Regression: Mempool should see the new config after restart
-	restartedVM, err = restartVM(restartedVM, sharedDB, genesisBytes, issuer, appSender, true)
+	restartedVM, err = restartVM(restartedVM, sharedDB, genesisJSON, issuer, appSender, true)
 	require.NoError(t, err)
 	newTxPoolHeadChan = make(chan core.NewTxPoolReorgEvent, 1)
 	restartedVM.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)

@@ -1,5 +1,9 @@
 # Release Notes
 
+## Pending Release
+
+- Removed static API handler: `subnetevm.decodeGenesis`, `subnetevm.buildGenesis`
+
 ## [v0.7.4](https://github.com/ava-labs/subnet-evm/releases/tag/v0.7.4)
 
 - Major refactor to use [`libevm`](https://github.com/ava-labs/libevm) for EVM execution, database access, types & chain configuration. This improves maintainability and enables keeping up with upstream changes more easily.
