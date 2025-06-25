@@ -246,8 +246,8 @@ jobs:
     steps:
       - name: Install xz-utils
         run: |
-          sudo apt-get update
-          sudo apt-get install -y xz-utils
+          apt-get update
+          apt-get install -y xz-utils
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
