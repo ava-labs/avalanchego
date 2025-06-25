@@ -247,7 +247,7 @@ jobs:
       - name: Install prerequisites
         run: |
           apt-get update
-          apt-get install -y curl git xz-utils build-essential
+          apt-get install -y sudo curl git xz-utils build-essential
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
