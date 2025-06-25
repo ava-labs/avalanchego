@@ -25,7 +25,7 @@ type Mempool interface {
 type mempool struct {
 	txmempool.Mempool[*txs.Tx]
 
-	notify func()
+	notifyBuildBlock func()
 }
 
 func New(
@@ -41,8 +41,8 @@ func New(
 		metrics,
 	)
 	return &mempool{
-		Mempool: pool,
-		notify:  notify,
+		Mempool:          pool,
+		notifyBuildBlock: notify,
 	}, nil
 }
 
@@ -51,5 +51,5 @@ func (m *mempool) RequestBuildBlock() {
 		return
 	}
 
-	m.notify()
+	m.notifyBuildBlock()
 }

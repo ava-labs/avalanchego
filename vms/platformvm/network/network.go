@@ -52,7 +52,7 @@ func New(
 	signer warp.Signer,
 	registerer prometheus.Registerer,
 	config config.Network,
-	notify func(),
+	notifyBuildBlock func(),
 ) (*Network, error) {
 	p2pNetwork, err := p2p.NewNetwork(log, appSender, registerer, "p2p")
 	if err != nil {
@@ -84,7 +84,7 @@ func New(
 		config.ExpectedBloomFilterElements,
 		config.ExpectedBloomFilterFalsePositiveProbability,
 		config.MaxBloomFilterFalsePositiveProbability,
-		notify,
+		notifyBuildBlock,
 	)
 	if err != nil {
 		return nil, err

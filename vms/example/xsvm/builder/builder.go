@@ -33,18 +33,18 @@ type builder struct {
 	chainContext *snow.Context
 	chain        chain.Chain
 
-	pendingTxs *linked.Hashmap[ids.ID, *tx.Tx]
-	notify     func()
-	preference ids.ID
+	pendingTxs       *linked.Hashmap[ids.ID, *tx.Tx]
+	notifyBuildBlock func()
+	preference       ids.ID
 }
 
-func New(chainContext *snow.Context, notify func(), chain chain.Chain) Builder {
+func New(chainContext *snow.Context, notifyBuildBlock func(), chain chain.Chain) Builder {
 	return &builder{
-		chainContext: chainContext,
-		chain:        chain,
-		notify:       notify,
-		pendingTxs:   linked.NewHashmap[ids.ID, *tx.Tx](),
-		preference:   chain.LastAccepted(),
+		chainContext:     chainContext,
+		chain:            chain,
+		notifyBuildBlock: notifyBuildBlock,
+		pendingTxs:       linked.NewHashmap[ids.ID, *tx.Tx](),
+		preference:       chain.LastAccepted(),
 	}
 }
 
@@ -59,7 +59,7 @@ func (b *builder) AddTx(_ context.Context, newTx *tx.Tx) error {
 		return err
 	}
 	b.pendingTxs.Put(txID, newTx)
-	b.notify()
+	b.notifyBuildBlock()
 	return nil
 }
 
@@ -78,7 +78,7 @@ func (b *builder) BuildBlock(ctx context.Context, blockContext *smblock.Context)
 		if b.pendingTxs.Len() == 0 {
 			return
 		}
-		b.notify()
+		b.notifyBuildBlock()
 	}()
 
 	parentTimestamp := preferredBlk.Timestamp()
