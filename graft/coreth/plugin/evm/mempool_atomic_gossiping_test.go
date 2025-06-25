@@ -32,7 +32,7 @@ func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 				err := tvm.vm.Shutdown(context.Background())
 				assert.NoError(err)
 			}()
-			mempool := tvm.vm.mempool
+			mempool := tvm.vm.atomicVM.AtomicMempool
 
 			// generate a valid and conflicting tx
 			var (
@@ -49,13 +49,13 @@ func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 			conflictingTxID := conflictingTx.ID()
 
 			// add a tx to the mempool
-			err := tvm.vm.mempool.AddLocalTx(tx)
+			err := tvm.vm.atomicVM.AtomicMempool.AddLocalTx(tx)
 			assert.NoError(err)
 			has := mempool.Has(txID)
 			assert.True(has, "valid tx not recorded into mempool")
 
 			// try to add a conflicting tx
-			err = tvm.vm.mempool.AddLocalTx(conflictingTx)
+			err = tvm.vm.atomicVM.AtomicMempool.AddLocalTx(conflictingTx)
 			assert.ErrorIs(err, atomictxpool.ErrConflictingAtomicTx)
 			has = mempool.Has(conflictingTxID)
 			assert.False(has, "conflicting tx in mempool")

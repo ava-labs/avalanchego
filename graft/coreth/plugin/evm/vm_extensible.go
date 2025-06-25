@@ -9,11 +9,13 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/coreth/eth"
+	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/coreth/plugin/evm/atomic/txpool"
 	"github.com/ava-labs/coreth/plugin/evm/config"
 	"github.com/ava-labs/coreth/plugin/evm/extension"
+	vmsync "github.com/ava-labs/coreth/plugin/evm/sync"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var _ extension.InnerVM = (*VM)(nil)
@@ -56,27 +58,30 @@ func (vm *VM) LastAcceptedExtendedBlock() extension.ExtendedBlock {
 	return lastAcceptedBlock.(*wrappedBlock)
 }
 
-// IsBootstrapped returns true if the VM has finished bootstrapping
-func (vm *VM) IsBootstrapped() bool {
-	return vm.bootstrapped.Get()
-}
-
 func (vm *VM) ChainConfig() *params.ChainConfig {
 	return vm.chainConfig
 }
 
-func (vm *VM) Ethereum() *eth.Ethereum {
-	return vm.eth
+func (vm *VM) Blockchain() *core.BlockChain {
+	return vm.blockChain
 }
 
 func (vm *VM) Config() config.Config {
 	return vm.config
 }
 
+func (vm *VM) MetricRegistry() *prometheus.Registry {
+	return vm.sdkMetrics
+}
+
+func (vm *VM) Validators() *p2p.Validators {
+	return vm.P2PValidators()
+}
+
 func (vm *VM) VersionDB() *versiondb.Database {
 	return vm.versiondb
 }
 
-func (vm *VM) AtomicMempool() *txpool.Mempool {
-	return vm.mempool
+func (vm *VM) SyncerClient() vmsync.Client {
+	return vm.Client
 }

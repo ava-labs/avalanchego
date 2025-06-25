@@ -10,17 +10,13 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	ethcommon "github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/log"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/logging"
 
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/txpool"
@@ -32,64 +28,12 @@ import (
 const pendingTxsBuffer = 10
 
 var (
-	_ p2p.Handler = (*txGossipHandler)(nil)
-
 	_ gossip.Gossipable               = (*GossipEthTx)(nil)
 	_ gossip.Marshaller[*GossipEthTx] = (*GossipEthTxMarshaller)(nil)
 	_ gossip.Set[*GossipEthTx]        = (*GossipEthTxPool)(nil)
 
 	_ eth.PushGossiper = (*EthPushGossiper)(nil)
 )
-
-func newTxGossipHandler[T gossip.Gossipable](
-	log logging.Logger,
-	marshaller gossip.Marshaller[T],
-	mempool gossip.Set[T],
-	metrics gossip.Metrics,
-	maxMessageSize int,
-	throttlingPeriod time.Duration,
-	throttlingLimit int,
-	validators p2p.ValidatorSet,
-) txGossipHandler {
-	// push gossip messages can be handled from any peer
-	handler := gossip.NewHandler(
-		log,
-		marshaller,
-		mempool,
-		metrics,
-		maxMessageSize,
-	)
-
-	// pull gossip requests are filtered by validators and are throttled
-	// to prevent spamming
-	validatorHandler := p2p.NewValidatorHandler(
-		p2p.NewThrottlerHandler(
-			handler,
-			p2p.NewSlidingWindowThrottler(throttlingPeriod, throttlingLimit),
-			log,
-		),
-		validators,
-		log,
-	)
-
-	return txGossipHandler{
-		appGossipHandler:  handler,
-		appRequestHandler: validatorHandler,
-	}
-}
-
-type txGossipHandler struct {
-	appGossipHandler  p2p.Handler
-	appRequestHandler p2p.Handler
-}
-
-func (t txGossipHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) {
-	t.appGossipHandler.AppGossip(ctx, nodeID, gossipBytes)
-}
-
-func (t txGossipHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
-	return t.appRequestHandler.AppRequest(ctx, nodeID, deadline, requestBytes)
-}
 
 func NewGossipEthTxPool(mempool *txpool.TxPool, registerer prometheus.Registerer) (*GossipEthTxPool, error) {
 	bloom, err := gossip.NewBloomFilter(
