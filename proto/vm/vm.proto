@@ -22,8 +22,8 @@ service VM {
   // Creates the HTTP handlers for custom chain network calls.
   rpc CreateHandlers(google.protobuf.Empty) returns (CreateHandlersResponse);
   rpc CreateHTTP2Handler(google.protobuf.Empty) returns (CreateHTTP2HandlerResponse);
-  // SubscribeToEvents blocks until receiving the next event from the VM.
-  rpc SubscribeToEvents(google.protobuf.Empty) returns (SubscribeToEventsResponse);
+  // WaitForEvent blocks until receiving the next event from the VM.
+  rpc WaitForEvent(google.protobuf.Empty) returns (WaitForEventResponse);
   rpc Connected(ConnectedRequest) returns (google.protobuf.Empty);
   rpc Disconnected(DisconnectedRequest) returns (google.protobuf.Empty);
   // Attempt to create a new block from data contained in the VM.
@@ -174,7 +174,7 @@ message Handler {
   string server_addr = 2;
 }
 
-message SubscribeToEventsResponse {
+message WaitForEventResponse {
   Message message = 1;
 }
 

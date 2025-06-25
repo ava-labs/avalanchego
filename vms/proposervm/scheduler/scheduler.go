@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 type Scheduler interface {
@@ -33,8 +34,8 @@ type scheduler struct {
 	onClose           context.CancelFunc
 }
 
-func New(subscription common.Subscription) (Scheduler, *common.SubscriptionProxy) {
-	sp := common.NewSubscriptionProxy(subscription)
+func New(subscription common.Subscription, logger logging.Logger) (Scheduler, *common.SubscriptionProxy) {
+	sp := common.NewSubscriptionProxy(subscription, logger)
 	return &scheduler{
 		onClose:             sp.Close,
 		subscriptionDelayer: sp,

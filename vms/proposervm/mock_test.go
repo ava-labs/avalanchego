@@ -65,16 +65,17 @@ func (mr *MockSelfSubscriberMockRecorder) Publish(msg any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Publish", reflect.TypeOf((*MockSelfSubscriber)(nil).Publish), msg)
 }
 
-// SubscribeToEvents mocks base method.
-func (m *MockSelfSubscriber) SubscribeToEvents(ctx context.Context) common.Message {
+// WaitForEvent mocks base method.
+func (m *MockSelfSubscriber) WaitForEvent(ctx context.Context) (common.Message, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SubscribeToEvents", ctx)
+	ret := m.ctrl.Call(m, "WaitForEvent", ctx)
 	ret0, _ := ret[0].(common.Message)
-	return ret0
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
-// SubscribeToEvents indicates an expected call of SubscribeToEvents.
-func (mr *MockSelfSubscriberMockRecorder) SubscribeToEvents(ctx any) *gomock.Call {
+// WaitForEvent indicates an expected call of WaitForEvent.
+func (mr *MockSelfSubscriberMockRecorder) WaitForEvent(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubscribeToEvents", reflect.TypeOf((*MockSelfSubscriber)(nil).SubscribeToEvents), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForEvent", reflect.TypeOf((*MockSelfSubscriber)(nil).WaitForEvent), ctx)
 }
