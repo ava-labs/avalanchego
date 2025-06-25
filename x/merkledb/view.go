@@ -789,6 +789,45 @@ func (v *view) compressNodePath(parent, n *node) error {
 	return v.recordNodeChange(parent)
 }
 
+// Get a copy of the node matching the passed key from the view.
+// Used by views to get nodes from their ancestors.
+func (v *view) getEditableNode(key Key, hadValue bool) (*node, error) {
+	if v.isInvalid() {
+		return nil, ErrInvalid
+	}
+
+	var n *node
+
+	// check for the key within the changed nodes
+	if nodeChange, isChanged := v.changes.nodes[key]; isChanged {
+		v.db.metrics.ViewChangesNodeHit()
+
+		if nodeChange.after == nil {
+			return nil, database.ErrNotFound
+		}
+
+		n = nodeChange.after.clone()
+	} else {
+		v.db.metrics.ViewChangesNodeMiss()
+
+		var err error
+
+		// already returning a clone, no need to clone it again
+		n, err = v.getParentTrie().getEditableNode(key, hadValue)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// get the node from the parent trie and store a local copy
+	// ensure no ancestor changes occurred during execution
+	if v.isInvalid() {
+		return nil, ErrInvalid
+	}
+
+	return n, nil
+}
+
 // insert a key/value pair into the correct node of the trie.
 // Must not be called after [applyValueChanges] has returned.
 func (v *view) insert(key Key, value maybe.Maybe[[]byte]) (*node, error) {
@@ -982,45 +1021,6 @@ func (v *view) getNode(key Key, hasValue bool) (*node, error) {
 
 	// get the cloned node from the parent trie
 	return v.getParentTrie().getEditableNode(key, hasValue)
-}
-
-// Get a copy of the node matching the passed key from the view.
-// Used by views to get nodes from their ancestors.
-func (v *view) getEditableNode(key Key, hadValue bool) (*node, error) {
-	if v.isInvalid() {
-		return nil, ErrInvalid
-	}
-
-	var n *node
-
-	// check for the key within the changed nodes
-	if nodeChange, isChanged := v.changes.nodes[key]; isChanged {
-		v.db.metrics.ViewChangesNodeHit()
-
-		if nodeChange.after == nil {
-			return nil, database.ErrNotFound
-		}
-
-		n = nodeChange.after.clone()
-	} else {
-		v.db.metrics.ViewChangesNodeMiss()
-
-		var err error
-
-		// already returning a clone, no need to clone it again
-		n, err = v.getParentTrie().getEditableNode(key, hadValue)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// get the node from the parent trie and store a local copy
-	// ensure no ancestor changes occurred during execution
-	if v.isInvalid() {
-		return nil, ErrInvalid
-	}
-
-	return n, nil
 }
 
 // Get the parent trie of the view
