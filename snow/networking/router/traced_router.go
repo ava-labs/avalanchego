@@ -101,6 +101,24 @@ func (r *tracedRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	r.router.HandleInbound(ctx, msg)
 }
 
+func (r *tracedRouter) HandleInternal(ctx context.Context, msg message.InboundMessage) {
+	m := msg.Message()
+	chainID, err := message.GetChainID(m)
+	if err != nil {
+		r.router.HandleInternal(ctx, msg)
+		return
+	}
+
+	ctx, span := r.tracer.Start(ctx, "tracedRouter.HandleInternal", oteltrace.WithAttributes(
+		attribute.Stringer("nodeID", msg.NodeID()),
+		attribute.Stringer("messageOp", msg.Op()),
+		attribute.Stringer("chainID", chainID),
+	))
+	defer span.End()
+
+	r.router.HandleInternal(ctx, msg)
+}
+
 func (r *tracedRouter) Shutdown(ctx context.Context) {
 	ctx, span := r.tracer.Start(ctx, "tracedRouter.Shutdown")
 	defer span.End()
