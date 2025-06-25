@@ -320,7 +320,7 @@ type blockHashes struct {
 }
 
 func WithBlockHashes(blockHash, parentBlockHash common.Hash) stateconf.SnapshotUpdateOption {
-	return stateconf.WithUpdatePayload(blockHashes{blockHash, parentBlockHash})
+	return stateconf.WithSnapshotUpdatePayload(blockHashes{blockHash, parentBlockHash})
 }
 
 // Update adds a new snapshot into the tree, if that can be linked to an existing
@@ -337,7 +337,7 @@ func (t *Tree) Update(
 		return fmt.Errorf("missing block hashes")
 	}
 
-	payload := stateconf.ExtractUpdatePayload(opts[0])
+	payload := stateconf.ExtractSnapshotUpdatePayload(opts[0])
 	p, ok := payload.(blockHashes)
 	if !ok {
 		return fmt.Errorf("invalid block hashes payload type: %T", payload)

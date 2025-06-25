@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/libevm/stateconf"
 	"github.com/ava-labs/libevm/metrics"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/ava-labs/subnet-evm/core/state/snapshot"
@@ -183,8 +184,8 @@ func addKVs(
 			statedb.SetState(address, common.BytesToHash(key), common.BytesToHash(value))
 		}
 	}
-	blockHashes := snapshot.WithBlockHashes(fakeHash(block+1), fakeHash(block))
-	root, err = statedb.Commit(block+1, true, blockHashes)
+	snapshotOpt := snapshot.WithBlockHashes(fakeHash(block+1), fakeHash(block))
+	root, err = statedb.Commit(block+1, true, stateconf.WithSnapshotUpdateOpts(snapshotOpt))
 	if err != nil {
 		return nil, common.Hash{}, fmt.Errorf("committing with snap: %w", err)
 	}
