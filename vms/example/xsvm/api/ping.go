@@ -20,8 +20,6 @@ import (
 var _ xsvmconnect.PingHandler = (*PingService)(nil)
 
 type PingService struct {
-	xsvmconnect.UnsafePingServer
-
 	Log logging.Logger
 }
 
