@@ -59,7 +59,12 @@ func (b *Block) Accept(context.Context) error {
 	// practice to cleanup the batch we were modifying in the case of an error.
 	defer vm.versiondb.Abort()
 
-	log.Debug(fmt.Sprintf("Accepting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
+	blkID := b.ID()
+	log.Debug("accepting block",
+		"hash", blkID.Hex(),
+		"id", blkID,
+		"height", b.Height(),
+	)
 
 	// Call Accept for relevant precompile logs. Note we do this prior to
 	// calling Accept on the blockChain so any side effects (eg warp signatures)
@@ -69,11 +74,11 @@ func (b *Block) Accept(context.Context) error {
 		return err
 	}
 	if err := vm.blockChain.Accept(b.ethBlock); err != nil {
-		return fmt.Errorf("chain could not accept %s: %w", b.ID(), err)
+		return fmt.Errorf("chain could not accept %s: %w", blkID, err)
 	}
 
-	if err := vm.acceptedBlockDB.Put(lastAcceptedKey, b.id[:]); err != nil {
-		return fmt.Errorf("failed to put %s as the last accepted block: %w", b.ID(), err)
+	if err := vm.acceptedBlockDB.Put(lastAcceptedKey, blkID[:]); err != nil {
+		return fmt.Errorf("failed to put %s as the last accepted block: %w", blkID, err)
 	}
 
 	return b.vm.versiondb.Commit()
@@ -115,7 +120,12 @@ func (b *Block) handlePrecompileAccept(rules extras.Rules) error {
 
 // Reject implements the snowman.Block interface
 func (b *Block) Reject(context.Context) error {
-	log.Debug(fmt.Sprintf("Rejecting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
+	blkID := b.ID()
+	log.Debug("rejecting block",
+		"hash", blkID.Hex(),
+		"id", blkID,
+		"height", b.Height(),
+	)
 	return b.vm.blockChain.Reject(b.ethBlock)
 }
 
