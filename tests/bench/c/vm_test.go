@@ -5,10 +5,13 @@ package vm
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -21,9 +24,12 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/tests"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/tests/load"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
+	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/coreth/plugin/evm"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -64,20 +70,136 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
+func TestPrometheusIntegration(t *testing.T) {
+	r := require.New(t)
+
+	// Start prometheus server on port 9000
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	r.NoError(tmpnet.StartPrometheus(ctx, tests.NewDefaultLogger("prometheus")))
+
+	registry := prometheus.NewRegistry()
+	server := load.NewPrometheusServer("127.0.0.1:9000", registry)
+	errChan, err := server.Start()
+	r.NoError(err)
+	t.Cleanup(func() {
+		r.NoError(server.Stop())
+		r.NoError(<-errChan)
+	})
+
+	r.NoError(WriteNodeServiceDiscovery("test"))
+
+	counter := prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "thingy_majig",
+		Help: "help",
+	})
+	registry.MustRegister(counter)
+	counter.Inc()
+
+	for i := 0; i < 3; i++ {
+		time.Sleep(time.Second * 5)
+		counter.Inc()
+	}
+}
+
+func WriteNodeServiceDiscovery(instanceID string) error {
+	serviceDiscoveryDir, err := tmpnet.GetPrometheusServiceDiscoveryDir()
+	if err != nil {
+		return fmt.Errorf("failed to get service discovery dir: %w", err)
+	}
+
+	if err := os.MkdirAll(serviceDiscoveryDir, 0755); err != nil {
+		return fmt.Errorf("failed to create service discovery dir: %w", err)
+	}
+
+	labels := tmpnet.GetGitHubLabels()
+	labels["job"] = "test-prometheus"
+	labels["service"] = "test"
+	labels["instance"] = instanceID
+
+	targets := []map[string]interface{}{
+		{
+			"targets": []string{"127.0.0.1:9000"},
+			"labels":  labels,
+		},
+	}
+
+	configPath := filepath.Join(serviceDiscoveryDir, fmt.Sprintf("%s.json", "test"))
+	configData, err := json.MarshalIndent(targets, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	return os.WriteFile(configPath, configData, 0644)
+}
+
 // TODO:
 // - pull metrics into tmpnet ingestion and integrate w/ existing dashboards
 // - add scoped access tokens to AvalancheGo CI for required S3 bucket ONLY
 // - separate general purpose VM setup from C-Chain specific setup
 func TestReexecuteRange(t *testing.T) {
+	t.Skip()
 	r := require.New(t)
 
 	var (
 		targetDBDir = filepath.Join(targetDir, "vmdb")
 		firewoodDB  = filepath.Join(targetDBDir, "chain-data-dir")
 	)
+	r.NoError(tmpnet.StartPrometheus(context.Background(), tests.NewDefaultLogger("prometheus")))
 
 	blockChan, err := createBlockChanFromRawDB(sourceBlockDir, 1, 100, 100)
 	r.NoError(err)
+
+	// WIP:
+	// start a prometheus metrics server to collect metrics from the VM + Firewood throughout the test
+	// Set up ingestion, so that I can view them in the existing CI grafana instance
+	// Update the prefix/labels to match C-Chain / EVM as they will appear on a mainnet node ie. avalanchego.avalanche_C_metric_name as opposed to
+	// metric_name because the prefix is not present when started in the test
+
+	prefixGatherer := metrics.NewPrefixGatherer()
+	addr := "127.0.0.1:9000"
+	metricsServer := load.NewPrometheusServer(addr, prefixGatherer)
+	errChan, err := metricsServer.Start()
+	r.NoError(err)
+	t.Cleanup(func() {
+		r.NoError(metricsServer.Stop())
+		<-errChan
+	})
+
+	discoveryDir, err := tmpnet.GetPrometheusServiceDiscoveryDir()
+	r.NoError(err)
+
+	r.NoError(os.MkdirAll(discoveryDir, 0755))
+
+	vmTargetPath := filepath.Join(discoveryDir, "vm.json")
+	t.Cleanup(func() {
+		r.NoError(os.RemoveAll(discoveryDir))
+	})
+	config, err := json.MarshalIndent([]tmpnet.ConfigMap{
+		{
+			"targets": []string{addr},
+			"labels": map[string]string{
+				"network_uuid": "test",
+			},
+		},
+		{
+			"targets": []string{"firewood-port"},
+			"labels": map[string]string{
+				"network_uuid": "test",
+			},
+		},
+	}, "", "  ")
+	r.NoError(err)
+
+	os.WriteFile(vmTargetPath, config, perms.ReadWrite)
+
+	monitoringConfigFilePath, err := metricsServer.GenerateMonitoringConfig(map[string]string{
+		"network_uuid": "test",
+	})
+	r.NoError(err)
+	t.Cleanup(func() {
+		r.NoError(os.Remove(monitoringConfigFilePath))
+	})
 
 	sourceVM, err := newMainnetCChainVM(
 		context.Background(),
@@ -85,6 +207,7 @@ func TestReexecuteRange(t *testing.T) {
 		t.TempDir(),
 		firewoodDB,
 		[]byte(`{"pruning-enabled": false}`),
+		prefixGatherer,
 	)
 	r.NoError(err)
 	defer sourceVM.Shutdown(context.Background())
@@ -100,6 +223,7 @@ func newMainnetCChainVM(
 	atomicMemoryDBDir string,
 	chainDataDir string,
 	configBytes []byte,
+	metricsGatherer metrics.MultiGatherer,
 ) (*evm.VM, error) {
 	vm := evm.VM{}
 
@@ -109,6 +233,9 @@ func newMainnetCChainVM(
 	db, err := leveldb.New(dbDir, nil, log, baseDBRegistry)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create base level db: %w", err)
+	}
+	if err := metricsGatherer.Register("vm", baseDBRegistry); err != nil {
+		return nil, fmt.Errorf("failed to register vm metrics: %w", err)
 	}
 
 	blsKey, err := localsigner.New()
@@ -121,9 +248,13 @@ func newMainnetCChainVM(
 
 	genesisConfig := genesis.GetConfig(constants.MainnetID)
 
-	sharedMemoryDB, err := leveldb.New(atomicMemoryDBDir, nil, log, prometheus.NewRegistry() /* ignore metrics from shared memory db */)
+	sharedMemoryRegistry := prometheus.NewRegistry()
+	sharedMemoryDB, err := leveldb.New(atomicMemoryDBDir, nil, log, sharedMemoryRegistry)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create shared memory db: %w", err)
+	}
+	if err := metricsGatherer.Register("sharedmemorydb", sharedMemoryRegistry); err != nil {
+		return nil, fmt.Errorf("failed to register shared memory metrics: %w", err)
 	}
 	atomicMemory := atomic.NewMemory(sharedMemoryDB)
 
@@ -144,7 +275,7 @@ func newMainnetCChainVM(
 			Log:          log,
 			SharedMemory: atomicMemory.NewSharedMemory(mainnetCChainID),
 			BCLookup:     ids.NewAliaser(),
-			Metrics:      metrics.NewPrefixGatherer(),
+			Metrics:      metricsGatherer,
 
 			WarpSigner: warpSigner,
 

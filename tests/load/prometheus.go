@@ -23,14 +23,14 @@ import (
 
 type MetricsServer struct {
 	addr     string
-	registry *prometheus.Registry
+	gatherer prometheus.Gatherer
 	server   http.Server
 }
 
-func NewPrometheusServer(addr string, registry *prometheus.Registry) *MetricsServer {
+func NewPrometheusServer(addr string, gatherer prometheus.Gatherer) *MetricsServer {
 	return &MetricsServer{
 		addr:     addr,
-		registry: registry,
+		gatherer: gatherer,
 	}
 }
 
@@ -38,12 +38,9 @@ func (*MetricsServer) String() string {
 	return "metrics server"
 }
 
-func (s *MetricsServer) Start() (runError <-chan error, err error) {
-	const metricsPattern = "/ext/metrics"
-
+func (s *MetricsServer) Start() (<-chan error, error) {
 	mux := http.NewServeMux()
-	handlerOpts := promhttp.HandlerOpts{Registry: s.registry}
-	mux.Handle(metricsPattern, promhttp.HandlerFor(s.registry, handlerOpts))
+	mux.Handle("/ext/metrics", promhttp.HandlerFor(s.gatherer, promhttp.HandlerOpts{}))
 
 	listener, err := net.Listen("tcp", s.addr)
 	if err != nil {
@@ -58,23 +55,20 @@ func (s *MetricsServer) Start() (runError <-chan error, err error) {
 		ReadTimeout:       time.Second,
 	}
 
-	runErrorBiDirectional := make(chan error)
-	runError = runErrorBiDirectional
-	ready := make(chan struct{})
+	errChan := make(chan error)
 	go func() {
-		close(ready)
-		err = s.server.Serve(listener)
+		defer close(errChan)
+		err := s.server.Serve(listener)
 		if errors.Is(err, http.ErrServerClosed) {
 			return
 		}
-		runErrorBiDirectional <- err
+		errChan <- err
 	}()
-	<-ready
 
-	return runError, nil
+	return errChan, nil
 }
 
-func (s *MetricsServer) Stop() (err error) {
+func (s *MetricsServer) Stop() error {
 	const shutdownTimeout = time.Second
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
