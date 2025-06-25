@@ -10,12 +10,13 @@ import (
 	"sync"
 
 	"go.opentelemetry.io/otel/attribute"
-	oteltrace "go.opentelemetry.io/otel/trace"
 	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/maybe"
+
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -169,33 +170,33 @@ func newView(
 	keyChanges := map[Key]*change[maybe.Maybe[[]byte]]{}
 
 	for _, op := range changes.BatchOps {
-			key := op.Key
-			if !changes.ConsumeBytes {
-				key = slices.Clone(op.Key)
-			}
+		key := op.Key
+		if !changes.ConsumeBytes {
+			key = slices.Clone(op.Key)
+		}
 
-			newVal := maybe.Nothing[[]byte]()
-			if !op.Delete {
-				newVal = maybe.Some(op.Value)
-				if !changes.ConsumeBytes {
-					newVal = maybe.Some(slices.Clone(op.Value))
-				}
+		newVal := maybe.Nothing[[]byte]()
+		if !op.Delete {
+			newVal = maybe.Some(op.Value)
+			if !changes.ConsumeBytes {
+				newVal = maybe.Some(slices.Clone(op.Value))
 			}
+		}
 
 		if err := recordValueChange(v, keyChanges, toKey(key), newVal); err != nil {
 			return nil, err
-			}
+		}
+	}
+
+	for key, val := range changes.MapOps {
+		if !changes.ConsumeBytes {
+			val = maybe.Bind(val, slices.Clone[[]byte])
 		}
 
-		for key, val := range changes.MapOps {
-			if !changes.ConsumeBytes {
-				val = maybe.Bind(val, slices.Clone[[]byte])
-			}
-
-			if err := recordValueChange(v, keyChanges, toKey(stringToByteSlice(key)), val); err != nil {
-				return nil, err
-			}
+		if err := recordValueChange(v, keyChanges, toKey(stringToByteSlice(key)), val); err != nil {
+			return nil, err
 		}
+	}
 
 	sortedKeys := maps.Keys(keyChanges)
 	slices.SortFunc(sortedKeys, func(a, b Key) int {
