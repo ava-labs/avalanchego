@@ -259,6 +259,26 @@ impl RevisionManager {
         self.proposals.push(proposal);
     }
 
+    pub fn view(
+        &self,
+        root_hash: HashKey,
+    ) -> Result<Box<dyn crate::db::DbViewSyncBytes>, RevisionManagerError> {
+        // First try to find it in committed revisions
+        if let Ok(committed) = self.revision(root_hash.clone()) {
+            return Ok(Box::new(committed));
+        }
+
+        // If not found in committed revisions, try proposals
+        let proposal = self
+            .proposals
+            .iter()
+            .find(|p| p.root_hash().as_ref() == Some(&root_hash))
+            .cloned()
+            .ok_or(RevisionManagerError::RevisionNotFound)?;
+
+        Ok(Box::new(proposal))
+    }
+
     pub fn revision(&self, root_hash: HashKey) -> Result<CommittedRevision, RevisionManagerError> {
         self.by_hash
             .get(&root_hash)

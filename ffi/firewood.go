@@ -23,6 +23,7 @@ package ffi
 import "C"
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"strings"
@@ -37,7 +38,10 @@ const (
 	keyNotFound      = "key not found"
 )
 
-var errDBClosed = errors.New("firewood database already closed")
+var (
+	errDBClosed = errors.New("firewood database already closed")
+	EmptyRoot   = make([]byte, RootLength)
+)
 
 // A Database is a handle to a Firewood database.
 // It is not safe to call these methods with a nil handle.
@@ -179,6 +183,26 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 	return bytes, err
 }
 
+// GetFromRoot retrieves the value for the given key from a specific root hash.
+// If the root is not found, it returnas an error.
+// If key is not found, it returns (nil, nil).
+func (db *Database) GetFromRoot(root, key []byte) ([]byte, error) {
+	if db.handle == nil {
+		return nil, errDBClosed
+	}
+
+	// If the root is empty, the database is empty.
+	if len(root) == 0 || bytes.Equal(root, EmptyRoot) {
+		return nil, nil
+	}
+
+	values, cleanup := newValueFactory()
+	defer cleanup()
+	val := C.fwd_get_from_root(db.handle, values.from(root), values.from(key))
+
+	return bytesFromValue(&val)
+}
+
 // Root returns the current root hash of the trie.
 // Empty trie must return common.Hash{}.
 func (db *Database) Root() ([]byte, error) {
@@ -190,7 +214,7 @@ func (db *Database) Root() ([]byte, error) {
 
 	// If the root hash is not found, return a zeroed slice.
 	if err == nil && bytes == nil {
-		bytes = make([]byte, RootLength)
+		bytes = EmptyRoot
 	}
 	return bytes, err
 }

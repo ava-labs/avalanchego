@@ -901,3 +901,61 @@ func TestEmptyProposals(t *testing.T) {
 		r.Equal(vals[i], got, "Get(%d)", i)
 	}
 }
+
+// Tests the GetFromRoot function for retrieving values from specific root hashes.
+func TestGetFromRoot(t *testing.T) {
+	r := require.New(t)
+	db := newTestDatabase(t)
+
+	// Check empty database
+	emptyRoot, err := db.Root()
+	r.NoError(err, "Root of empty database")
+	got, err := db.GetFromRoot(emptyRoot, []byte("non-existent"))
+	r.NoError(err, "GetFromRoot empty root")
+	r.Empty(got, "GetFromRoot empty root should return empty value")
+
+	// Insert some initial data
+	keys, vals := kvForTest(10)
+	committedRoot, err := db.Update(keys[:5], vals[:5])
+	r.NoError(err)
+
+	// Test getting values from first state
+	for i := range 5 {
+		got, err := db.GetFromRoot(committedRoot, keys[i])
+		r.NoError(err, "GetFromRoot committed key %d", i)
+		r.Equal(vals[i], got, "GetFromRoot committed key %d", i)
+	}
+
+	// Replace the first 5 keys with new values
+	p, err := db.Propose(keys[:5], vals[5:])
+	r.NoError(err, "Propose to update first 5 keys")
+	r.NotNil(p)
+
+	proposedRoot, err := p.Root()
+	t.Logf("%x", proposedRoot)
+	r.NoError(err, "Root of proposal")
+
+	// Test that we can still get old values from the first root
+	for i := range 5 {
+		got, err := db.GetFromRoot(committedRoot, keys[i])
+		r.NoError(err, "GetFromRoot root1 after update, key %d", i)
+		r.Equal(vals[i], got, "GetFromRoot root1 after update, key %d", i)
+
+		got, err = db.GetFromRoot(proposedRoot, keys[i])
+		r.NoError(err, "GetFromRoot root1 newer key %d", i)
+		r.Equal(vals[i+5], got, "GetFromRoot root1 newer key %d", i)
+	}
+
+	// Test with invalid root hash
+	invalidRoot := []byte("this is not a valid 32-byte hash")
+	_, err = db.GetFromRoot(invalidRoot, []byte("key"))
+	r.Error(err, "GetFromRoot with invalid root should return error")
+
+	// Test with valid-length but non-existent root
+	nonExistentRoot := make([]byte, RootLength)
+	for i := range nonExistentRoot {
+		nonExistentRoot[i] = 0xFF // All 1's, very unlikely to exist
+	}
+	_, err = db.GetFromRoot(nonExistentRoot, []byte("key"))
+	r.Error(err, "GetFromRoot with non-existent root should return error")
+}

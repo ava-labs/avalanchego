@@ -65,10 +65,39 @@ pub trait DbViewSync {
     fn val_sync<K: KeyType>(&self, key: K) -> Result<Option<Box<[u8]>>, DbError>;
 }
 
-impl DbViewSync for HistoricalRev {
+/// A synchronous view of the database with raw byte keys (object-safe version).
+pub trait DbViewSyncBytes {
+    /// find a value synchronously using raw bytes
+    fn val_sync_bytes(&self, key: &[u8]) -> Result<Option<Box<[u8]>>, DbError>;
+}
+
+// Provide blanket implementation for DbViewSync using DbViewSyncBytes
+impl<T: DbViewSyncBytes> DbViewSync for T {
     fn val_sync<K: KeyType>(&self, key: K) -> Result<Option<Box<[u8]>>, DbError> {
+        self.val_sync_bytes(key.as_ref())
+    }
+}
+
+impl DbViewSyncBytes for Arc<HistoricalRev> {
+    fn val_sync_bytes(&self, key: &[u8]) -> Result<Option<Box<[u8]>>, DbError> {
         let merkle = Merkle::from(self);
-        let value = merkle.get_value(key.as_ref())?;
+        let value = merkle.get_value(key)?;
+        Ok(value)
+    }
+}
+
+impl DbViewSyncBytes for Proposal<'_> {
+    fn val_sync_bytes(&self, key: &[u8]) -> Result<Option<Box<[u8]>>, DbError> {
+        let merkle = Merkle::from(self.nodestore.clone());
+        let value = merkle.get_value(key)?;
+        Ok(value)
+    }
+}
+
+impl DbViewSyncBytes for Arc<NodeStore<Arc<ImmutableProposal>, FileBacked>> {
+    fn val_sync_bytes(&self, key: &[u8]) -> Result<Option<Box<[u8]>>, DbError> {
+        let merkle = Merkle::from(self.clone());
+        let value = merkle.get_value(key)?;
         Ok(value)
     }
 }
@@ -273,6 +302,16 @@ impl Db {
         Ok(nodestore)
     }
 
+    /// Synchronously get a view, either committed or proposed
+    pub fn view_sync(&self, root_hash: TrieHash) -> Result<Box<dyn DbViewSyncBytes>, api::Error> {
+        let nodestore = self
+            .manager
+            .read()
+            .expect("poisoned lock")
+            .view(root_hash)?;
+        Ok(nodestore)
+    }
+
     /// propose a new batch synchronously
     pub fn propose_sync<K: KeyType, V: ValueType>(
         &'_ self,
@@ -430,12 +469,6 @@ impl Proposal<'_> {
             }
             None => Err(api::Error::CannotCommitClonedProposal),
         }
-    }
-
-    /// Get a value from the proposal synchronously
-    pub fn val_sync<K: KeyType>(&self, key: K) -> Result<Option<Box<[u8]>>, api::Error> {
-        let merkle = Merkle::from(self.nodestore.clone());
-        merkle.get_value(key.as_ref()).map_err(api::Error::from)
     }
 
     /// Create a new proposal from the current one synchronously
@@ -675,6 +708,44 @@ mod test {
         // through proposal3
         assert_eq!(&*proposal3.val(b"k2").await.unwrap().unwrap(), b"v2");
         assert_eq!(&*proposal3.val(b"k3").await.unwrap().unwrap(), b"v3");
+    }
+
+    #[tokio::test]
+    async fn test_view_sync() {
+        let db = testdb().await;
+
+        // Create and commit some data to get a historical revision
+        let batch = vec![BatchOp::Put {
+            key: b"historical_key",
+            value: b"historical_value",
+        }];
+        let proposal = db.propose(batch).await.unwrap();
+        let historical_hash = proposal.root_hash().await.unwrap().unwrap();
+        proposal.commit().await.unwrap();
+
+        // Create a new proposal (uncommitted)
+        let batch = vec![BatchOp::Put {
+            key: b"proposal_key",
+            value: b"proposal_value",
+        }];
+        let proposal = db.propose(batch).await.unwrap();
+        let proposal_hash = proposal.root_hash().await.unwrap().unwrap();
+
+        // Test that view_sync can find the historical revision
+        let historical_view = db.view_sync(historical_hash).unwrap();
+        let value = historical_view
+            .val_sync_bytes(b"historical_key")
+            .unwrap()
+            .unwrap();
+        assert_eq!(&*value, b"historical_value");
+
+        // Test that view_sync can find the proposal
+        let proposal_view = db.view_sync(proposal_hash).unwrap();
+        let value = proposal_view
+            .val_sync_bytes(b"proposal_key")
+            .unwrap()
+            .unwrap();
+        assert_eq!(&*value, b"proposal_value");
     }
 
     // Testdb is a helper struct for testing the Db. Once it's dropped, the directory and file disappear

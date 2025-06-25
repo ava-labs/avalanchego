@@ -239,7 +239,9 @@ struct Value fwd_get_from_proposal(const struct DatabaseHandle *db,
                                    struct Value key);
 
 /**
- * Gets a value assoicated with the given historical root hash and key.
+ * Gets a value assoicated with the given root hash and key.
+ *
+ * The hash may refer to a historical revision or an existing proposal.
  *
  * # Arguments
  *
