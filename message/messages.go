@@ -332,3 +332,37 @@ func (mb *msgBuilder) parseInbound(
 		bytesSavedCompression: bytesSavedCompression,
 	}, nil
 }
+
+type MsgBuilder struct {
+	builder *msgBuilder
+}
+
+func NewMsgBuilder(
+	metrics prometheus.Registerer,
+	compressionType compression.Type,
+	maxMessageTimeout time.Duration,
+) (*MsgBuilder, error) {
+	builder, err := newMsgBuilder(
+		metrics,
+		maxMessageTimeout,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MsgBuilder{
+		builder: builder,
+	}, nil
+}
+
+func (mb *MsgBuilder) CreateOutbound(
+	m *p2p.Message,
+	compressionType compression.Type,
+	bypassThrottling bool,
+) (OutboundMessage, error) {
+	outboundMsg, err := mb.builder.createOutbound(m, compressionType, bypassThrottling)
+	if err != nil {
+		return nil, err
+	}
+	return outboundMsg, nil
+}

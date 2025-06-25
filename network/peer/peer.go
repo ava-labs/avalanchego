@@ -745,7 +745,7 @@ func (p *peer) handle(msg message.InboundMessage) {
 	case *p2p.Pong:
 		p.handlePong(m)
 		msg.OnFinishedHandling()
-		return
+		// return
 	case *p2p.Handshake:
 		p.handleHandshake(m)
 		msg.OnFinishedHandling()
@@ -757,7 +757,7 @@ func (p *peer) handle(msg message.InboundMessage) {
 	case *p2p.PeerList:
 		p.handlePeerList(m)
 		msg.OnFinishedHandling()
-		return
+		// return
 	}
 	if !p.finishedHandshake.Get() {
 		p.Log.Debug("dropping message",
