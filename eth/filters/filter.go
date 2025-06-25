@@ -35,7 +35,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/subnet-evm/core/bloombits"
-	"github.com/ava-labs/subnet-evm/plugin/evm/customtypes"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customlogs"
 	"github.com/ava-labs/subnet-evm/rpc"
 )
 
@@ -342,7 +342,7 @@ func (f *Filter) checkMatches(ctx context.Context, header *types.Header) ([]*typ
 		return nil, err
 	}
 
-	unfiltered := customtypes.FlattenLogs(logsList)
+	unfiltered := customlogs.FlattenLogs(logsList)
 	logs := filterLogs(unfiltered, nil, nil, f.addresses, f.topics)
 	if len(logs) == 0 {
 		return nil, nil
@@ -377,7 +377,7 @@ func includes[T comparable](things []T, element T) bool {
 
 // filterLogs creates a slice of logs matching the given criteria.
 func filterLogs(logs []*types.Log, fromBlock, toBlock *big.Int, addresses []common.Address, topics [][]common.Hash) []*types.Log {
-	var check = func(log *types.Log) bool {
+	check := func(log *types.Log) bool {
 		if fromBlock != nil && fromBlock.Int64() >= 0 && fromBlock.Uint64() > log.BlockNumber {
 			return false
 		}

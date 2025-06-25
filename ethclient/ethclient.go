@@ -151,6 +151,7 @@ func (ec *client) Client() *rpc.Client {
 // Blockchain Access
 
 // ChainConfig retrieves the current chain config.
+// TODO: this requires a dependency on params, we should remove this dependency.
 func (ec *client) ChainConfig(ctx context.Context) (*params.ChainConfigWithUpgradesJSON, error) {
 	var result *params.ChainConfigWithUpgradesJSON
 	err := ec.c.CallContext(ctx, &result, "eth_getChainConfig")
@@ -205,11 +206,9 @@ func (ec *client) BlockReceipts(ctx context.Context, blockNrOrHash rpc.BlockNumb
 }
 
 type rpcBlock struct {
-	Hash           common.Hash      `json:"hash"`
-	Transactions   []rpcTransaction `json:"transactions"`
-	UncleHashes    []common.Hash    `json:"uncles"`
-	Version        uint32           `json:"version"`
-	BlockExtraData *hexutil.Bytes   `json:"blockExtraData"`
+	Hash         common.Hash      `json:"hash"`
+	Transactions []rpcTransaction `json:"transactions"`
+	UncleHashes  []common.Hash    `json:"uncles"`
 }
 
 func (ec *client) getBlock(ctx context.Context, method string, args ...interface{}) (*types.Block, error) {
@@ -278,11 +277,10 @@ func (ec *client) getBlock(ctx context.Context, method string, args ...interface
 		}
 		txs[i] = tx.tx
 	}
-	return types.NewBlockWithHeader(head).WithBody(
-		types.Body{
-			Transactions: txs,
-			Uncles:       uncles,
-		}), nil
+	return types.NewBlockWithHeader(head).WithBody(types.Body{
+		Transactions: txs,
+		Uncles:       uncles,
+	}), nil
 }
 
 // HeaderByHash returns the block header with the given hash.
