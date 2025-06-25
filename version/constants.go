@@ -4,10 +4,9 @@
 package version
 
 import (
+	_ "embed"
 	"encoding/json"
 	"time"
-
-	_ "embed"
 )
 
 const (
@@ -23,7 +22,7 @@ var (
 	Current = &Semantic{
 		Major: 1,
 		Minor: 13,
-		Patch: 2,
+		Patch: 3,
 	}
 	CurrentApp = &Application{
 		Name:  Client,
