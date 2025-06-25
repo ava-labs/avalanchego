@@ -99,7 +99,6 @@ runs:
           ~/.tmpnet/networks
           ~/.tmpnet/prometheus/prometheus.log
           ~/.tmpnet/promtail/promtail.log
-        if-no-files-found: error
     - name: Export kind logs
       if: always() && (inputs.runtime == 'kube')
       shell: bash
@@ -110,4 +109,3 @@ runs:
       with:
         name: ${{ inputs.artifact_prefix }}-kind-logs
         path: /tmp/kind-logs
-        if-no-files-found: error
