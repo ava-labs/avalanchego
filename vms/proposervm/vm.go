@@ -47,7 +47,7 @@ const (
 )
 
 type SelfSubscriber interface {
-	SubscribeToEvents(ctx context.Context) common.Message
+	WaitForEvent(ctx context.Context) (common.Message, error)
 	Publish(msg common.Message)
 	Close()
 }
@@ -179,7 +179,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	scheduler, subscriber := scheduler.New(vm.ChainVM.SubscribeToEvents)
+	scheduler, subscriber := scheduler.New(vm.ChainVM.WaitForEvent, vm.ctx.Log)
 	vm.Scheduler = scheduler
 	vm.subscriber = subscriber
 
@@ -246,8 +246,8 @@ func (vm *VM) Initialize(
 	)
 }
 
-func (vm *VM) SubscribeToEvents(ctx context.Context) common.Message {
-	return vm.subscriber.SubscribeToEvents(ctx)
+func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
+	return vm.subscriber.WaitForEvent(ctx)
 }
 
 // shutdown ops then propagate shutdown to innerVM

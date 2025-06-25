@@ -813,12 +813,12 @@ func TestExpiredBuildBlock(t *testing.T) {
 	testEnd := make(chan struct{})
 
 	events := make(chan common.Message, 1)
-	coreVM.SubscribeToEventsF = func(context.Context) common.Message {
+	coreVM.WaitForEventF = func(context.Context) (common.Message, error) {
 		select {
 		case <-testEnd:
-			return 0
+			return 0, nil
 		case event := <-events:
-			return event
+			return event, nil
 		}
 	}
 
@@ -896,7 +896,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 	// Notify the proposer VM of a new block on the inner block side
 	events <- common.PendingTxs
 	// The first notification will be read from the consensus engine
-	msg := proVM.SubscribeToEvents(context.Background())
+	msg, _ := proVM.WaitForEvent(context.Background())
 	require.Equal(common.PendingTxs, msg)
 
 	// Before calling BuildBlock, verify a remote block and set it as the
@@ -956,7 +956,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 	// the window has started again. This is to guarantee that the inner VM has
 	// build block called after it sent a pendingTxs message on its internal
 	// engine channel.
-	msg = proVM.SubscribeToEvents(context.Background())
+	msg, _ = proVM.WaitForEvent(context.Background())
 	require.Equal(common.PendingTxs, msg)
 }
 
@@ -1909,7 +1909,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 		},
 	)
 
-	innerVM.EXPECT().SubscribeToEvents(gomock.Any()).Return(common.PendingTxs).AnyTimes()
+	innerVM.EXPECT().WaitForEvent(gomock.Any()).Return(common.PendingTxs, nil).AnyTimes()
 
 	innerVM.EXPECT().Initialize(
 		gomock.Any(),
@@ -2005,7 +2005,7 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 
 	// Create a VM
 	innerVM := blockmock.NewChainVM(ctrl)
-	innerVM.EXPECT().SubscribeToEvents(gomock.Any()).Return(common.Message(0)).AnyTimes()
+	innerVM.EXPECT().WaitForEvent(gomock.Any()).Return(common.Message(0), nil).AnyTimes()
 
 	vm := New(
 		innerVM,
@@ -2455,8 +2455,8 @@ func TestLocalParse(t *testing.T) {
 		},
 	}
 
-	innerVM.VM.SubscribeToEventsF = func(_ context.Context) common.Message {
-		return common.PendingTxs
+	innerVM.VM.WaitForEventF = func(_ context.Context) (common.Message, error) {
+		return common.PendingTxs, nil
 	}
 
 	chainID := ids.GenerateTestID()
@@ -2841,7 +2841,7 @@ func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
 	// message to the consensus engine. This is really the source of the issue,
 	// as the proposervm is not currently in a state where it can correctly
 	// build any blocks.
-	msg := proVM.SubscribeToEvents(context.Background())
+	msg, _ := proVM.WaitForEvent(context.Background())
 	require.Equal(common.PendingTxs, msg)
 
 	innerBlock3 := snowmantest.BuildChild(innerBlock2)

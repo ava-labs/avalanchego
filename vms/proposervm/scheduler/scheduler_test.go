@@ -11,26 +11,28 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 func TestDelayFromNew(t *testing.T) {
 	startTime := time.Now().Add(50 * time.Millisecond)
 
 	msgs := make(chan common.Message, 1)
-	sub := func(ctx context.Context) common.Message {
+	sub := func(ctx context.Context) (common.Message, error) {
 		select {
 		case msg := <-msgs:
-			return msg
+			return msg, nil
 		case <-ctx.Done():
-			return 0
+			return 0, nil
 		}
 	}
-	s, fromVM := New(sub)
+	s, fromVM := New(sub, &logging.NoLog{})
 	defer s.Close()
 	go s.Dispatch(startTime)
 
 	msgs <- common.PendingTxs
-	fromVM.SubscribeToEvents(context.Background())
+	_, err := fromVM.WaitForEvent(context.Background())
+	require.NoError(t, err)
 
 	require.LessOrEqual(t, time.Until(startTime), time.Duration(0))
 }
@@ -40,15 +42,15 @@ func TestDelayFromSetTime(t *testing.T) {
 	startTime := now.Add(50 * time.Millisecond)
 
 	msgs := make(chan common.Message, 1)
-	sub := func(ctx context.Context) common.Message {
+	sub := func(ctx context.Context) (common.Message, error) {
 		select {
 		case msg := <-msgs:
-			return msg
+			return msg, nil
 		case <-ctx.Done():
-			return 0
+			return 0, nil
 		}
 	}
-	s, fromVM := New(sub)
+	s, fromVM := New(sub, &logging.NoLog{})
 	defer s.Close()
 	go s.Dispatch(now)
 
@@ -56,25 +58,25 @@ func TestDelayFromSetTime(t *testing.T) {
 
 	msgs <- common.PendingTxs
 
-	msg := fromVM.SubscribeToEvents(context.Background())
+	msg, _ := fromVM.WaitForEvent(context.Background())
 	require.Equal(t, common.PendingTxs, msg)
 	require.LessOrEqual(t, time.Until(startTime), time.Duration(0))
 }
 
-func TestReceipt(*testing.T) {
+func TestReceipt(t *testing.T) {
 	msgs := make(chan common.Message, 1)
-	sub := func(ctx context.Context) common.Message {
+	sub := func(ctx context.Context) (common.Message, error) {
 		select {
 		case msg := <-msgs:
-			return msg
+			return msg, nil
 		case <-ctx.Done():
-			return 0
+			return 0, nil
 		}
 	}
 	now := time.Now()
 	startTime := now.Add(50 * time.Millisecond)
 
-	s, fromVM := New(sub)
+	s, fromVM := New(sub, &logging.NoLog{})
 	defer s.Close()
 	go s.Dispatch(now)
 
@@ -82,5 +84,6 @@ func TestReceipt(*testing.T) {
 
 	s.SetBuildBlockTime(startTime)
 
-	fromVM.SubscribeToEvents(context.Background())
+	_, err := fromVM.WaitForEvent(context.Background())
+	require.NoError(t, err)
 }

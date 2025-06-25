@@ -422,7 +422,7 @@ func buildAndAccept(
 	subscriber common.Subscriber,
 	txID ids.ID,
 ) {
-	msg := subscriber.SubscribeToEvents(context.Background())
+	msg, _ := subscriber.WaitForEvent(context.Background())
 	require.Equal(common.PendingTxs, msg)
 
 	vm.ctx.Lock.Lock()

@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 func TestSimpleSubscriber(t *testing.T) {
@@ -18,7 +20,7 @@ func TestSimpleSubscriber(t *testing.T) {
 
 	t.Run("TestSubscribe after publish", func(t *testing.T) {
 		subscriber.Publish(PendingTxs)
-		msg := subscriber.SubscribeToEvents(ctx)
+		msg, _ := subscriber.WaitForEvent(ctx)
 		require.Equal(t, PendingTxs, msg)
 	})
 
@@ -28,7 +30,7 @@ func TestSimpleSubscriber(t *testing.T) {
 			subscriber.Publish(StateSyncDone)
 		}()
 
-		msg := subscriber.SubscribeToEvents(ctx)
+		msg, _ := subscriber.WaitForEvent(ctx)
 		require.Equal(t, StateSyncDone, msg)
 	})
 
@@ -37,7 +39,7 @@ func TestSimpleSubscriber(t *testing.T) {
 			time.Sleep(time.Millisecond * 10)
 			cancel()
 		}()
-		msg := subscriber.SubscribeToEvents(ctx)
+		msg, _ := subscriber.WaitForEvent(ctx)
 		require.Equal(t, Message(0), msg)
 	})
 }
@@ -53,7 +55,7 @@ func TestSimpleSubscriberClose(t *testing.T) {
 
 	go func() {
 		defer wg.Done()
-		msg := subscriber.SubscribeToEvents(ctx)
+		msg, _ := subscriber.WaitForEvent(ctx)
 		require.Equal(t, Message(0), msg)
 	}()
 
@@ -98,16 +100,16 @@ func TestSubscriptionProxy(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			subscription := func(ctx context.Context) Message {
+			subscription := func(ctx context.Context) (Message, error) {
 				select {
 				case msg := <-msgs:
-					return msg
+					return msg, nil
 				case <-ctx.Done():
-					return Message(0)
+					return Message(0), nil
 				}
 			}
 
-			sp := NewSubscriptionProxy(subscription)
+			sp := NewSubscriptionProxy(subscription, &logging.NoLog{})
 
 			start := time.Now()
 
@@ -126,7 +128,7 @@ func TestSubscriptionProxy(t *testing.T) {
 				require.Greater(t, time.Since(start), time.Millisecond*10)
 			}()
 
-			msg := sp.SubscribeToEvents(ctx)
+			msg, _ := sp.WaitForEvent(ctx)
 			require.Greater(t, time.Since(start), time.Millisecond*10)
 			require.Equal(t, testCase.expectedEvent, msg)
 			wg.Wait()
