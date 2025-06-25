@@ -14,6 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
+const HTTPHeaderRoute = "Avalanche-Api-Route"
+
 var (
 	errUnknownBaseURL  = errors.New("unknown base url")
 	errUnknownEndpoint = errors.New("unknown endpoint")
@@ -25,9 +27,13 @@ type router struct {
 	router *mux.Router
 
 	routeLock      sync.Mutex
-	reservedRoutes set.Set[string]                    // Reserves routes so that there can't be alias that conflict
-	aliases        map[string][]string                // Maps a route to a set of reserved routes
-	routes         map[string]map[string]http.Handler // Maps routes to a handler
+	reservedRoutes set.Set[string]     // Reserves routes so that there can't be alias that conflict
+	aliases        map[string][]string // Maps a route to a set of reserved routes
+	// headerRoutes contains routes based on http headers
+	// aliasing is not currently supported
+	headerRoutes map[string]http.Handler
+	// legacy url-based routing
+	routes map[string]map[string]http.Handler // Maps routes to a handler
 }
 
 func newRouter() *router {
@@ -35,6 +41,7 @@ func newRouter() *router {
 		router:         mux.NewRouter(),
 		reservedRoutes: set.Set[string]{},
 		aliases:        make(map[string][]string),
+		headerRoutes:   make(map[string]http.Handler),
 		routes:         make(map[string]map[string]http.Handler),
 	}
 }
@@ -43,7 +50,28 @@ func (r *router) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 
-	r.router.ServeHTTP(writer, request)
+	route, ok := request.Header[HTTPHeaderRoute]
+	if !ok {
+		// If there is no routing header, fall-back to the legacy path-based
+		// routing
+		r.router.ServeHTTP(writer, request)
+		return
+	}
+
+	// Request specified the routing header key but did not provide a
+	// corresponding value
+	if len(route) != 1 {
+		writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	handler, ok := r.headerRoutes[route[0]]
+	if !ok {
+		writer.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	handler.ServeHTTP(writer, request)
 }
 
 func (r *router) GetHandler(base, endpoint string) (http.Handler, error) {
@@ -59,6 +87,16 @@ func (r *router) GetHandler(base, endpoint string) (http.Handler, error) {
 		return nil, errUnknownEndpoint
 	}
 	return handler, nil
+}
+
+func (r *router) AddHeaderRoute(route string, handler http.Handler) bool {
+	_, ok := r.headerRoutes[route]
+	if ok {
+		return false
+	}
+
+	r.headerRoutes[route] = handler
+	return true
 }
 
 func (r *router) AddRouter(base, endpoint string, handler http.Handler) error {

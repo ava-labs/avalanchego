@@ -60,3 +60,8 @@ func TestRejectMiddleware(t *testing.T) {
 		})
 	}
 }
+
+func TestHTTPHeaderRouteIsCanonical(t *testing.T) {
+	wantHeaderKey := http.CanonicalHeaderKey(HTTPHeaderRoute)
+	require.Equal(t, wantHeaderKey, HTTPHeaderRoute)
+}

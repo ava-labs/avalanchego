@@ -1,0 +1,27 @@
+version: v1
+name: buf.build/ava-labs/avalanche
+build:
+  excludes:
+    # for golang we handle prometheus as a buf dep so we exclude it from generate, this proto
+    # file is required by languages such as rust.
+    - io/prometheus
+breaking:
+  use:
+    - FILE
+deps:
+  - buf.build/prometheus/client-model
+lint:
+  use:
+    - STANDARD
+  except:
+    - SERVICE_SUFFIX # service requirement of <name>+Service
+    - RPC_REQUEST_STANDARD_NAME # explicit <rpc>+Request naming
+    - RPC_RESPONSE_STANDARD_NAME # explicit <rpc>+Response naming
+    - PACKAGE_VERSION_SUFFIX # versioned naming <service>.v1beta
+  # allows RPC requests or responses to be google.protobuf.Empty messages. This can be set if you
+  # want to allow messages to be void forever, that is they will never take any parameters.
+  rpc_allow_google_protobuf_empty_requests: true
+  rpc_allow_google_protobuf_empty_responses: true
+  # allows the same message type to be used for a single RPC's request and response type.
+  # TODO: this should not be tolerated and if it is only perscriptivly.
+  rpc_allow_same_request_response: true

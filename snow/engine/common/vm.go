@@ -64,6 +64,8 @@ type VM interface {
 	// Version returns the version of the VM.
 	Version(context.Context) (string, error)
 
+	// Deprecated: implementations should expose apis through NewHTTPHandler.
+	//
 	// Creates the HTTP handlers for custom chain network calls.
 	//
 	// This exposes handlers that the outside world can use to communicate with
@@ -77,9 +79,10 @@ type VM interface {
 	// information about their accounts.
 	CreateHandlers(context.Context) (map[string]http.Handler, error)
 
-	// CreateHTTP2Handler returns the http/2 handler to register into the
-	// avalanchego api server.
-	CreateHTTP2Handler(ctx context.Context) (http.Handler, error)
+	// NewHTTPHandler returns the handler to register into the avalanchego http
+	// server. The server.HTTPHeaderRoute header must be specified with this VM's
+	// corresponding chain id by clients to route requests to this handler.
+	NewHTTPHandler(ctx context.Context) (http.Handler, error)
 
 	// WaitForEvent blocks until either the given context is cancelled, or a message is returned.
 	WaitForEvent(ctx context.Context) (Message, error)

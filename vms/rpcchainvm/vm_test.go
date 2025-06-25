@@ -6,6 +6,9 @@ package rpcchainvm
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"reflect"
@@ -15,10 +18,17 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/test/bufconn"
 
+	"github.com/ava-labs/avalanchego/api/metrics"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blockmock"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime/subprocess"
@@ -199,4 +209,52 @@ func TestRuntimeSubprocessBootstrap(t *testing.T) {
 			test.assertErr(require, err)
 		})
 	}
+}
+
+func TestNewHTTPHandler(t *testing.T) {
+	require := require.New(t)
+
+	grpcServer := grpc.NewServer()
+	listener := bufconn.Listen(1024)
+
+	serverVM := &blocktest.VM{
+		VM: enginetest.VM{
+			NewHTTPHandlerF: func(context.Context) (http.Handler, error) {
+				return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					w.WriteHeader(http.StatusOK)
+				}), nil
+			},
+		},
+	}
+
+	server := NewServer(serverVM, utils.NewAtomic[bool](false))
+	vmpb.RegisterVMServer(grpcServer, server)
+
+	go func() {
+		_ = grpcServer.Serve(listener)
+	}()
+
+	cc, err := grpc.DialContext(context.Background(), "bufnet",
+		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
+			return listener.Dial()
+		}),
+		grpc.WithInsecure(),
+	)
+	require.NoError(err)
+
+	client := NewClient(
+		cc,
+		runtime.NewManager(),
+		123,
+		resource.NoManager{},
+		metrics.NewLabelGatherer(""),
+		logging.NoLog{},
+	)
+
+	handler, err := client.NewHTTPHandler(context.Background())
+	require.NoError(err)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
+	require.Equal(http.StatusOK, w.Code)
 }
