@@ -290,7 +290,7 @@ func WritePrometheusServiceDiscoveryConfigFile(name string, sdConfigs []SDConfig
 		return fmt.Errorf("failed to get service discovery dir: %w", err)
 	}
 
-	if err := os.MkdirAll(serviceDiscoveryDir, 0755); err != nil {
+	if err := os.MkdirAll(serviceDiscoveryDir, perms.ReadWriteExecute); err != nil {
 		return fmt.Errorf("failed to create service discovery dir: %w", err)
 	}
 
@@ -298,13 +298,13 @@ func WritePrometheusServiceDiscoveryConfigFile(name string, sdConfigs []SDConfig
 		sdConfigs = applyGitHubLabels(sdConfigs)
 	}
 
-	configPath := filepath.Join(serviceDiscoveryDir, fmt.Sprintf("%s.json", name))
+	configPath := filepath.Join(serviceDiscoveryDir, name+".json")
 	configData, err := json.MarshalIndent(sdConfigs, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	return os.WriteFile(configPath, configData, 0644)
+	return os.WriteFile(configPath, configData, perms.ReadWrite)
 }
 
 func getLogFilename(cmdName string) string {
