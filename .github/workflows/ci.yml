@@ -249,5 +249,6 @@ jobs:
       - uses: ./.github/actions/setup-go-for-project
       - uses: ./.github/actions/install-nix
       - name: Hello
+        shell: nix develop --command bash -x {0}
         run: |
           go run ./tests/load/c/main --runtime=kube --kube-image="avalanchego:arc-load-test"
