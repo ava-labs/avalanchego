@@ -337,7 +337,7 @@ func (i *indexer) registerChainHelper(
 		_ = index.Close()
 		return nil, err
 	}
-	if err := i.pathAdder.AddRoute(apiServer, "index/"+name, "/"+endpoint); err != nil {
+	if err := i.pathAdder.AddRoute(apiServer, "index/"+name+"/"+endpoint, name); err != nil {
 		_ = index.Close()
 		return nil, err
 	}

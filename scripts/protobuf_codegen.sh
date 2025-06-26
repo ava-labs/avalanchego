@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+#
+# Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+# See the file LICENSE for licensing terms.
+#
+
 set -euo pipefail
 
 if ! [[ "$0" =~ scripts/protobuf_codegen.sh ]]; then
@@ -39,7 +44,7 @@ for BUF_MODULE in "${BUF_MODULES[@]}"; do
     TARGET="$1"
   fi
 
-  # move to api directory
+  # move to buf module directory
   cd "$TARGET"
 
   echo "Generating for buf module $BUF_MODULE"

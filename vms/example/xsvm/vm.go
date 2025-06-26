@@ -35,7 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/state"
 
 	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	jsonutil "github.com/ava-labs/avalanchego/utils/json"
+	avajson "github.com/ava-labs/avalanchego/utils/json"
 	xsblock "github.com/ava-labs/avalanchego/vms/example/xsvm/block"
 )
 

@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+#
+# Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+# See the file LICENSE for licensing terms.
+#
+
 set -euo pipefail
 
 print_usage() {
@@ -34,5 +39,4 @@ source "${REPO_ROOT}"/scripts/git_commit.sh
 echo "Building AvalancheGo with [$(go version)]..."
 go build ${race} -o "${avalanchego_path}" \
    -ldflags "-X github.com/ava-labs/avalanchego/version.GitCommit=$git_commit $static_ld_flags" \
-   -gcflags="all=-N -l" \
    "${REPO_ROOT}"/main
