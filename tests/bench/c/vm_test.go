@@ -73,38 +73,8 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-func CollectRegistry(t *testing.T, name string, addr string, timeout time.Duration, gatherer prometheus.Gatherer, labels map[string]string) {
-	r := require.New(t)
-
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	t.Cleanup(cancel)
-
-	r.NoError(tmpnet.StartPrometheus(ctx, tests.NewDefaultLogger("prometheus")))
-
-	server := tests.NewPrometheusServer(addr, "/", gatherer)
-	errChan, err := server.Start()
-	r.NoError(err)
-
-	t.Cleanup(func() {
-		r.NoError(server.Stop())
-		r.NoError(<-errChan)
-	})
-
-	sdConfigFilePath, err := tmpnet.WritePrometheusServiceDiscoveryConfigFile(name, []tmpnet.SDConfig{
-		{
-			Targets: []string{addr},
-			Labels:  labels,
-		},
-	}, true)
-	r.NoError(err)
-	t.Cleanup(func() {
-		os.Remove(sdConfigFilePath)
-	})
-}
-
 // TODO:
 // - provide task to snapshot current state and block ranges to s3
-// - separate general purpose VM setup from C-Chain specific setup
 // - update C-Chain dashboard to make it useful for the benchmark
 func TestReexecuteRange(t *testing.T) {
 	r := require.New(t)
@@ -130,12 +100,6 @@ func TestReexecuteRange(t *testing.T) {
 
 	blockChan, err := createBlockChanFromRawDB(sourceBlockDir, startBlock, endBlock, chanSize)
 	r.NoError(err)
-
-	// WIP:
-	// start a prometheus metrics server to collect metrics from the VM + Firewood throughout the test
-	// Set up ingestion, so that I can view them in the existing CI grafana instance
-	// Update the prefix/labels to match C-Chain / EVM as they will appear on a mainnet node ie. avalanchego.avalanche_C_metric_name as opposed to
-	// metric_name because the prefix is not present when started in the test
 
 	sourceVM, err := newMainnetCChainVM(
 		context.Background(),
@@ -325,4 +289,33 @@ func createBlockChanFromRawDB(sourceDir string, startBlock, endBlock uint64, cha
 	}()
 
 	return ch, nil
+}
+
+func CollectRegistry(t *testing.T, name string, addr string, timeout time.Duration, gatherer prometheus.Gatherer, labels map[string]string) {
+	r := require.New(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	t.Cleanup(cancel)
+
+	r.NoError(tmpnet.StartPrometheus(ctx, tests.NewDefaultLogger("prometheus")))
+
+	server := tests.NewPrometheusServer(addr, "/", gatherer)
+	errChan, err := server.Start()
+	r.NoError(err)
+
+	t.Cleanup(func() {
+		r.NoError(server.Stop())
+		r.NoError(<-errChan)
+	})
+
+	sdConfigFilePath, err := tmpnet.WritePrometheusServiceDiscoveryConfigFile(name, []tmpnet.SDConfig{
+		{
+			Targets: []string{addr},
+			Labels:  labels,
+		},
+	}, true)
+	r.NoError(err)
+	t.Cleanup(func() {
+		os.Remove(sdConfigFilePath)
+	})
 }
