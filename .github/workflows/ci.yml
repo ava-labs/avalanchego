@@ -75,6 +75,7 @@ jobs:
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           loki_username: ${{ secrets.LOKI_ID || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+          runtime: "" # Set runtime input to empty string to disable log collection
   e2e_post_granite:
     runs-on: ubuntu-latest
     steps:
