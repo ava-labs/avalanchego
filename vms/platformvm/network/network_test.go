@@ -238,7 +238,6 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				nil,
 				prometheus.NewRegistry(),
 				testConfig,
-				noopNotify,
 			)
 			require.NoError(err)
 

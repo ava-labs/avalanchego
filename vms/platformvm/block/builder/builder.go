@@ -92,17 +92,14 @@ type builder struct {
 	resetTimer chan struct{}
 	closed     chan struct{}
 	closeOnce  sync.Once
-	notify     func() // Notifies when a block is built
 }
 
 func New(
 	mempool mempool.Mempool[*txs.Tx],
 	txExecutorBackend *txexecutor.Backend,
 	blkManager blockexecutor.Manager,
-	notify func(),
 ) Builder {
 	return &builder{
-		notify:            notify,
 		Mempool:           mempool,
 		txExecutorBackend: txExecutorBackend,
 		blkManager:        blkManager,
@@ -226,16 +223,6 @@ func (b *builder) BuildBlockWithContext(
 	ctx context.Context,
 	blockContext *smblock.Context,
 ) (snowman.Block, error) {
-	// If there are still transactions in the mempool, then we need to
-	// re-trigger block building.
-	defer func() {
-		if b.Mempool.Len() == 0 {
-			return
-		}
-
-		b.notify()
-	}()
-
 	b.txExecutorBackend.Ctx.Log.Debug("starting to attempt to build a block")
 
 	// Get the block to build on top of and retrieve the new block's context.

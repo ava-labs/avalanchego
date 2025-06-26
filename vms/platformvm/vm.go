@@ -64,10 +64,6 @@ type VM struct {
 	*network.Network
 	validators.State
 
-	common.Subscriber
-
-	closeSubscriber func()
-
 	metrics platformvmmetrics.Metrics
 
 	// Used to get time. Useful for faking time during tests.
@@ -170,14 +166,7 @@ func (vm *VM) Initialize(
 		Bootstrapped: &vm.bootstrapped,
 	}
 
-	ss := common.NewSimpleSubscriber()
-	vm.closeSubscriber = ss.Close
-	vm.Subscriber = ss
-	notifyEngine := func() {
-		ss.Publish(common.PendingTxs)
-	}
-
-	mempool, err := pmempool.New("mempool", registerer, notifyEngine)
+	mempool, err := pmempool.New("mempool", registerer)
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}
@@ -208,7 +197,6 @@ func (vm *VM) Initialize(
 		chainCtx.WarpSigner,
 		registerer,
 		execConfig.Network,
-		notifyEngine,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initialize network: %w", err)
@@ -224,7 +212,6 @@ func (vm *VM) Initialize(
 		mempool,
 		txExecutorBackend,
 		vm.manager,
-		notifyEngine,
 	)
 
 	// Create all of the chains that the database says exist
@@ -417,8 +404,6 @@ func (vm *VM) Shutdown(context.Context) error {
 			return err
 		}
 	}
-
-	vm.closeSubscriber()
 
 	return errors.Join(
 		vm.state.Close(),

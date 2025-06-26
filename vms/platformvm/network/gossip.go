@@ -73,20 +73,17 @@ func newGossipMempool(
 	minTargetElements int,
 	targetFalsePositiveProbability,
 	resetFalsePositiveProbability float64,
-	notifyBuildBlock func(),
 ) (*gossipMempool, error) {
 	bloom, err := gossip.NewBloomFilter(registerer, "mempool_bloom_filter", minTargetElements, targetFalsePositiveProbability, resetFalsePositiveProbability)
 	return &gossipMempool{
-		notifyBuildBlock: notifyBuildBlock,
-		Mempool:          mempool,
-		log:              log,
-		txVerifier:       txVerifier,
-		bloom:            bloom,
+		Mempool:    mempool,
+		log:        log,
+		txVerifier: txVerifier,
+		bloom:      bloom,
 	}, err
 }
 
 type gossipMempool struct {
-	notifyBuildBlock func() // Notifies when a transaction is added to the mempool
 	mempool.Mempool[*txs.Tx]
 	log        logging.Logger
 	txVerifier TxVerifier
@@ -140,13 +137,6 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 			return true
 		})
 	}
-
-	if g.Mempool.Len() == 0 {
-		return nil
-	}
-
-	g.notifyBuildBlock()
-
 	return nil
 }
 

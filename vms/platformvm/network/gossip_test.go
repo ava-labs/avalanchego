@@ -43,7 +43,6 @@ func TestGossipMempoolAddVerificationError(t *testing.T) {
 		testConfig.ExpectedBloomFilterElements,
 		testConfig.ExpectedBloomFilterFalsePositiveProbability,
 		testConfig.MaxBloomFilterFalsePositiveProbability,
-		noopNotify,
 	)
 	require.NoError(err)
 
@@ -75,7 +74,6 @@ func TestMempoolDuplicate(t *testing.T) {
 		testConfig.ExpectedBloomFilterElements,
 		testConfig.ExpectedBloomFilterFalsePositiveProbability,
 		testConfig.MaxBloomFilterFalsePositiveProbability,
-		noopNotify,
 	)
 	require.NoError(err)
 
@@ -106,7 +104,6 @@ func TestGossipAddBloomFilter(t *testing.T) {
 		testConfig.ExpectedBloomFilterElements,
 		testConfig.ExpectedBloomFilterFalsePositiveProbability,
 		testConfig.MaxBloomFilterFalsePositiveProbability,
-		noopNotify,
 	)
 	require.NoError(err)
 
