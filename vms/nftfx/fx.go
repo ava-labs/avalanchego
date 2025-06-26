@@ -80,7 +80,7 @@ func (fx *Fx) VerifyMintOperation(tx secp256k1fx.UnsignedTx, op *MintOperation, 
 	case out.GroupID != op.GroupID:
 		return errWrongUniqueID
 	default:
-		return fx.Fx.VerifyCredentials(tx, &op.MintInput, &cred.Credential, &out.OutputOwners)
+		return fx.VerifyCredentials(tx, &op.MintInput, &cred.Credential, &out.OutputOwners)
 	}
 }
 

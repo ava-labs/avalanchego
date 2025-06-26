@@ -13,7 +13,7 @@ var _ tx.Visitor = (*TxExpectsContext)(nil)
 func ExpectsContext(blk *block.Stateless) (bool, error) {
 	t := TxExpectsContext{}
 	for _, tx := range blk.Txs {
-		if err := tx.Unsigned.Visit(&t); err != nil {
+		if err := tx.Visit(&t); err != nil {
 			return false, err
 		}
 	}

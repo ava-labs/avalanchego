@@ -139,8 +139,8 @@ func (vm *VM) Initialize(
 		vm.db,
 		genesisBytes,
 		registerer,
-		vm.Internal.Validators,
-		vm.Internal.UpgradeConfig,
+		vm.Validators,
+		vm.UpgradeConfig,
 		execConfig,
 		vm.ctx,
 		vm.metrics,
@@ -208,8 +208,8 @@ func (vm *VM) Initialize(
 	vm.onShutdownCtx, vm.onShutdownCtxCancel = context.WithCancel(context.Background())
 	// TODO: Wait for this goroutine to exit during Shutdown once the platformvm
 	// has better control of the context lock.
-	go vm.Network.PushGossip(vm.onShutdownCtx)
-	go vm.Network.PullGossip(vm.onShutdownCtx)
+	go vm.PushGossip(vm.onShutdownCtx)
+	go vm.PullGossip(vm.onShutdownCtx)
 
 	vm.Builder = blockbuilder.New(
 		mempool,
@@ -275,13 +275,13 @@ func (vm *VM) pruneMempool() error {
 	// Packing all of the transactions in order performs additional checks that
 	// the MempoolTxVerifier doesn't include. So, evicting transactions from
 	// here is expected to happen occasionally.
-	blockTxs, err := vm.Builder.PackAllBlockTxs()
+	blockTxs, err := vm.PackAllBlockTxs()
 	if err != nil {
 		return err
 	}
 
 	for _, tx := range blockTxs {
-		if err := vm.Builder.Add(tx); err != nil {
+		if err := vm.Add(tx); err != nil {
 			vm.ctx.Log.Debug(
 				"failed to reissue tx",
 				zap.Stringer("txID", tx.ID()),
@@ -295,7 +295,7 @@ func (vm *VM) pruneMempool() error {
 
 // Create all chains that exist that this node validates.
 func (vm *VM) initBlockchains() error {
-	if vm.Internal.PartialSyncPrimaryNetwork {
+	if vm.PartialSyncPrimaryNetwork {
 		vm.ctx.Log.Info("skipping primary network chain creation")
 	} else if err := vm.createSubnet(constants.PrimaryNetworkID); err != nil {
 		return err
@@ -332,7 +332,7 @@ func (vm *VM) createSubnet(subnetID ids.ID) error {
 		if !ok {
 			return fmt.Errorf("expected tx type *txs.CreateChainTx but got %T", chain.Unsigned)
 		}
-		vm.Internal.CreateChain(chain.ID(), tx)
+		vm.CreateChain(chain.ID(), tx)
 	}
 	return nil
 }
@@ -374,7 +374,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 	}
 
 	// Start the block builder
-	vm.Builder.StartBlockTimer()
+	vm.StartBlockTimer()
 	return nil
 }
 
@@ -396,7 +396,7 @@ func (vm *VM) Shutdown(context.Context) error {
 	}
 
 	vm.onShutdownCtxCancel()
-	vm.Builder.ShutdownBlockTimer()
+	vm.ShutdownBlockTimer()
 
 	if vm.uptimeManager.StartedTracking() {
 		primaryVdrIDs := vm.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
@@ -437,7 +437,7 @@ func (vm *VM) LastAccepted(context.Context) (ids.ID, error) {
 // SetPreference sets the preferred block to be the one with ID [blkID]
 func (vm *VM) SetPreference(_ context.Context, blkID ids.ID) error {
 	if vm.manager.SetPreference(blkID) {
-		vm.Builder.ResetBlockTimer()
+		vm.ResetBlockTimer()
 	}
 	return nil
 }
@@ -504,7 +504,7 @@ func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, erro
 }
 
 func (vm *VM) issueTxFromRPC(tx *txs.Tx) error {
-	err := vm.Network.IssueTxFromRPC(tx)
+	err := vm.IssueTxFromRPC(tx)
 	if err != nil && !errors.Is(err, mempool.ErrDuplicateTx) {
 		vm.ctx.Log.Debug("failed to add tx to mempool",
 			zap.Stringer("txID", tx.ID()),

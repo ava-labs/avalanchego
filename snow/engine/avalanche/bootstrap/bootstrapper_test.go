@@ -577,12 +577,12 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	require.NoError(err)
 
 	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
-		switch {
-		case vtxID == vtxID0:
+		switch vtxID {
+		case vtxID0:
 			return nil, errUnknownVertex
-		case vtxID == vtxID1:
+		case vtxID1:
 			return nil, errUnknownVertex
-		case vtxID == vtxID2:
+		case vtxID2:
 			return vtx2, nil
 		default:
 			require.FailNow(errUnknownVertex.Error())

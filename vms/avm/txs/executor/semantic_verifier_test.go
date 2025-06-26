@@ -152,7 +152,7 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 				state := statemock.NewChain(ctrl)
 
 				utxo := utxo
-				utxo.Asset.ID = ids.GenerateTestID()
+				utxo.ID = ids.GenerateTestID()
 
 				state.EXPECT().GetUTXO(utxoID.InputID()).Return(&utxo, nil)
 
@@ -513,7 +513,7 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 				state := statemock.NewChain(ctrl)
 
 				utxo := utxo
-				utxo.Asset.ID = ids.GenerateTestID()
+				utxo.ID = ids.GenerateTestID()
 
 				state.EXPECT().GetUTXO(utxoID.InputID()).Return(&utxo, nil)
 

@@ -19,8 +19,8 @@ type MintOperation struct {
 }
 
 func (op *MintOperation) InitCtx(ctx *snow.Context) {
-	op.MintOutput.OutputOwners.InitCtx(ctx)
-	op.TransferOutput.OutputOwners.InitCtx(ctx)
+	op.MintOutput.InitCtx(ctx)
+	op.TransferOutput.InitCtx(ctx)
 }
 
 func (op *MintOperation) Cost() (uint64, error) {
@@ -32,8 +32,8 @@ func (op *MintOperation) Outs() []verify.State {
 }
 
 func (op *MintOperation) Verify() error {
-	switch {
-	case op == nil:
+	switch op {
+	case nil:
 		return errNilMintOperation
 	default:
 		return verify.All(&op.MintInput, &op.MintOutput, &op.TransferOutput)

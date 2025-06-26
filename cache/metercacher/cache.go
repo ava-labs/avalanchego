@@ -38,8 +38,8 @@ func (c *Cache[K, V]) Put(key K, value V) {
 
 	c.metrics.putCount.Inc()
 	c.metrics.putTime.Add(float64(putDuration))
-	c.metrics.len.Set(float64(c.Cacher.Len()))
-	c.metrics.portionFilled.Set(c.Cacher.PortionFilled())
+	c.metrics.len.Set(float64(c.Len()))
+	c.metrics.portionFilled.Set(c.PortionFilled())
 }
 
 func (c *Cache[K, V]) Get(key K) (V, bool) {
@@ -61,13 +61,13 @@ func (c *Cache[K, V]) Get(key K) (V, bool) {
 func (c *Cache[K, _]) Evict(key K) {
 	c.Cacher.Evict(key)
 
-	c.metrics.len.Set(float64(c.Cacher.Len()))
-	c.metrics.portionFilled.Set(c.Cacher.PortionFilled())
+	c.metrics.len.Set(float64(c.Len()))
+	c.metrics.portionFilled.Set(c.PortionFilled())
 }
 
 func (c *Cache[_, _]) Flush() {
 	c.Cacher.Flush()
 
-	c.metrics.len.Set(float64(c.Cacher.Len()))
-	c.metrics.portionFilled.Set(c.Cacher.PortionFilled())
+	c.metrics.len.Set(float64(c.Len()))
+	c.metrics.portionFilled.Set(c.PortionFilled())
 }

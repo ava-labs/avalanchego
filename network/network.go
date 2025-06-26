@@ -366,7 +366,7 @@ func (n *network) HealthCheck(context.Context) (interface{}, error) {
 	sendFailRate := n.sendFailRateCalculator.Read()
 
 	// Make sure we're connected to at least the minimum number of peers
-	isConnected := connectedTo >= int(n.config.HealthConfig.MinConnectedPeers)
+	isConnected := connectedTo >= int(n.config.MinConnectedPeers)
 	healthy := isConnected
 	details := map[string]interface{}{
 		ConnectedPeersKey: connectedTo,
@@ -380,7 +380,7 @@ func (n *network) HealthCheck(context.Context) (interface{}, error) {
 	timeSinceLastMsgReceived := time.Duration(0)
 	if msgReceived {
 		timeSinceLastMsgReceived = now.Sub(lastMsgReceivedAt)
-		wasMsgReceivedRecently = timeSinceLastMsgReceived <= n.config.HealthConfig.MaxTimeSinceMsgReceived
+		wasMsgReceivedRecently = timeSinceLastMsgReceived <= n.config.MaxTimeSinceMsgReceived
 		details[TimeSinceLastMsgReceivedKey] = timeSinceLastMsgReceived.String()
 		n.metrics.timeSinceLastMsgReceived.Set(float64(timeSinceLastMsgReceived))
 	}
@@ -392,14 +392,14 @@ func (n *network) HealthCheck(context.Context) (interface{}, error) {
 	timeSinceLastMsgSent := time.Duration(0)
 	if msgSent {
 		timeSinceLastMsgSent = now.Sub(lastMsgSentAt)
-		wasMsgSentRecently = timeSinceLastMsgSent <= n.config.HealthConfig.MaxTimeSinceMsgSent
+		wasMsgSentRecently = timeSinceLastMsgSent <= n.config.MaxTimeSinceMsgSent
 		details[TimeSinceLastMsgSentKey] = timeSinceLastMsgSent.String()
 		n.metrics.timeSinceLastMsgSent.Set(float64(timeSinceLastMsgSent))
 	}
 	healthy = healthy && wasMsgSentRecently
 
 	// Make sure the message send failed rate isn't too high
-	isMsgFailRate := sendFailRate <= n.config.HealthConfig.MaxSendFailRate
+	isMsgFailRate := sendFailRate <= n.config.MaxSendFailRate
 	healthy = healthy && isMsgFailRate
 	details[SendFailRateKey] = sendFailRate
 	n.metrics.sendFailRate.Set(sendFailRate)
@@ -417,27 +417,27 @@ func (n *network) HealthCheck(context.Context) (interface{}, error) {
 	n.metrics.updatePeerConnectionLifetimeMetrics()
 
 	// Network layer is healthy
-	if healthy || !n.config.HealthConfig.Enabled {
+	if healthy || !n.config.Enabled {
 		return details, nil
 	}
 
 	var errorReasons []string
 	if !isConnected {
-		errorReasons = append(errorReasons, fmt.Sprintf("not connected to a minimum of %d peer(s) only %d", n.config.HealthConfig.MinConnectedPeers, connectedTo))
+		errorReasons = append(errorReasons, fmt.Sprintf("not connected to a minimum of %d peer(s) only %d", n.config.MinConnectedPeers, connectedTo))
 	}
 	if !msgReceived {
 		errorReasons = append(errorReasons, "no messages received from network")
 	} else if !wasMsgReceivedRecently {
-		errorReasons = append(errorReasons, fmt.Sprintf("no messages from network received in %s > %s", timeSinceLastMsgReceived, n.config.HealthConfig.MaxTimeSinceMsgReceived))
+		errorReasons = append(errorReasons, fmt.Sprintf("no messages from network received in %s > %s", timeSinceLastMsgReceived, n.config.MaxTimeSinceMsgReceived))
 	}
 	if !msgSent {
 		errorReasons = append(errorReasons, "no messages sent to network")
 	} else if !wasMsgSentRecently {
-		errorReasons = append(errorReasons, fmt.Sprintf("no messages from network sent in %s > %s", timeSinceLastMsgSent, n.config.HealthConfig.MaxTimeSinceMsgSent))
+		errorReasons = append(errorReasons, fmt.Sprintf("no messages from network sent in %s > %s", timeSinceLastMsgSent, n.config.MaxTimeSinceMsgSent))
 	}
 
 	if !isMsgFailRate {
-		errorReasons = append(errorReasons, fmt.Sprintf("messages failure send rate %g > %g", sendFailRate, n.config.HealthConfig.MaxSendFailRate))
+		errorReasons = append(errorReasons, fmt.Sprintf("messages failure send rate %g > %g", sendFailRate, n.config.MaxSendFailRate))
 	}
 
 	if !reachablePrimaryNetworkValidator {
@@ -602,11 +602,7 @@ func (n *network) Peers(
 func (n *network) Dispatch() error {
 	go n.runTimers() // Periodically perform operations
 	go n.inboundConnUpgradeThrottler.Dispatch()
-	for { // Continuously accept new connections
-		if n.onCloseCtx.Err() != nil {
-			break
-		}
-
+	for n.onCloseCtx.Err() == nil { // Continuously accept new connections
 		conn, err := n.listener.Accept() // Returns error when n.Close() is called
 		if err != nil {
 			n.peerConfig.Log.Debug("error during server accept", zap.Error(err))

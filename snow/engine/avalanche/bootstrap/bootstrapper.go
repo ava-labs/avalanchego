@@ -68,7 +68,7 @@ func New(
 		processedCache: lru.NewCache[ids.ID, struct{}](cacheSize),
 		onFinished:     onFinished,
 	}
-	return b, b.metrics.Initialize(reg)
+	return b, b.Initialize(reg)
 }
 
 // Note: To align with the Snowman invariant, it should be guaranteed the VM is
@@ -156,13 +156,13 @@ func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 		return b.fetch(ctx, requestedVtxID)
 	}
 
-	if lenVtxs > b.Config.AncestorsMaxContainersReceived {
-		vtxs = vtxs[:b.Config.AncestorsMaxContainersReceived]
+	if lenVtxs > b.AncestorsMaxContainersReceived {
+		vtxs = vtxs[:b.AncestorsMaxContainersReceived]
 
 		b.Ctx.Log.Debug("ignoring containers in Ancestors",
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
-			zap.Int("numIgnored", lenVtxs-b.Config.AncestorsMaxContainersReceived),
+			zap.Int("numIgnored", lenVtxs-b.AncestorsMaxContainersReceived),
 		)
 	}
 
@@ -357,12 +357,12 @@ func (b *Bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	}
 
 	// If a stop vertex is well known, accept that.
-	if b.Config.StopVertexID != ids.Empty {
+	if b.StopVertexID != ids.Empty {
 		b.Ctx.Log.Info("using well known stop vertex",
-			zap.Stringer("vtxID", b.Config.StopVertexID),
+			zap.Stringer("vtxID", b.StopVertexID),
 		)
 
-		return b.startSyncing(ctx, []ids.ID{b.Config.StopVertexID})
+		return b.startSyncing(ctx, []ids.ID{b.StopVertexID})
 	}
 
 	// If a stop vertex isn't well known, treat the current state as the final
@@ -435,7 +435,7 @@ func (b *Bootstrapper) fetch(ctx context.Context, vtxIDs ...ids.ID) error {
 		}
 		b.outstandingRequests.Put(request, vtxID)
 		b.outstandingRequestTimes[request] = time.Now()
-		b.Config.Sender.SendGetAncestors(ctx, nodeID, b.requestID, vtxID) // request vertex and ancestors
+		b.Sender.SendGetAncestors(ctx, nodeID, b.requestID, vtxID) // request vertex and ancestors
 	}
 	return b.checkFinish(ctx)
 }
@@ -516,7 +516,7 @@ func (b *Bootstrapper) process(ctx context.Context, vtxs ...avalanche.Vertex) er
 
 			b.numFetchedVts.Inc()
 
-			verticesFetchedSoFar := b.VtxBlocked.Jobs.PendingJobs()
+			verticesFetchedSoFar := b.VtxBlocked.PendingJobs()
 			if verticesFetchedSoFar%statusUpdateFrequency == 0 { // Periodically print progress
 				b.Ctx.Log.Info("fetched vertices",
 					zap.Uint64("numVerticesFetched", verticesFetchedSoFar),
@@ -600,7 +600,7 @@ func (b *Bootstrapper) checkFinish(ctx context.Context) error {
 	b.Ctx.Log.Info("executing transactions")
 	_, err := b.TxBlocked.ExecuteAll(
 		ctx,
-		b.Config.Ctx,
+		b.Ctx,
 		b,
 		false,
 		b.Ctx.TxAcceptor,
@@ -612,7 +612,7 @@ func (b *Bootstrapper) checkFinish(ctx context.Context) error {
 	b.Ctx.Log.Info("executing vertices")
 	_, err = b.VtxBlocked.ExecuteAll(
 		ctx,
-		b.Config.Ctx,
+		b.Ctx,
 		b,
 		false,
 		b.Ctx.VertexAcceptor,
