@@ -151,7 +151,7 @@ impl HashableNode for BranchNode {
     }
 
     fn children_iter(&self) -> impl Iterator<Item = (usize, &HashType)> + Clone {
-        self.children_iter()
+        self.children_hashes()
     }
 }
 

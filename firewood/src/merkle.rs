@@ -201,7 +201,7 @@ impl<T: TrieReader> Merkle<T> {
             if let Some(branch) = root.as_branch() {
                 // TODO danlaine: can we avoid indexing?
                 #[expect(clippy::indexing_slicing)]
-                for (i, hash) in branch.children_iter() {
+                for (i, hash) in branch.children_hashes() {
                     child_hashes[i] = Some(hash.clone());
                 }
             }

@@ -304,6 +304,7 @@ mod test {
     #![expect(clippy::unwrap_used)]
 
     use super::*;
+    use nonzero_ext::nonzero;
     use std::io::Write;
     use tempfile::NamedTempFile;
 
@@ -318,12 +319,13 @@ mod test {
         // read the whole thing in
         let fb = FileBacked::new(
             path,
-            NonZero::new(10).unwrap(),
-            NonZero::new(10).unwrap(),
+            nonzero!(10usize),
+            nonzero!(10usize),
             false,
             CacheReadStrategy::WritesOnly,
         )
         .unwrap();
+
         let mut reader = fb.stream_from(0).unwrap();
         let mut buf: String = String::new();
         assert_eq!(reader.read_to_string(&mut buf).unwrap(), 11);
@@ -358,8 +360,8 @@ mod test {
 
         let fb = FileBacked::new(
             path,
-            NonZero::new(10).unwrap(),
-            NonZero::new(10).unwrap(),
+            nonzero!(10usize),
+            nonzero!(10usize),
             false,
             CacheReadStrategy::WritesOnly,
         )

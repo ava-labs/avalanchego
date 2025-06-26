@@ -317,7 +317,8 @@ impl<T: ReadInMemoryNode, S: ReadableStorage> NodeStore<T, S> {
     }
 
     /// Get the size of an area index (used by the checker)
-    pub const fn size_from_area_index(&self, index: AreaIndex) -> u64 {
+    #[must_use]
+    pub const fn size_from_area_index(index: AreaIndex) -> u64 {
         AREA_SIZES[index as usize]
     }
 }
@@ -801,7 +802,7 @@ impl NodeStoreHeader {
     /// The first SIZE bytes of the `ReadableStorage` are reserved for the
     /// [`NodeStoreHeader`].
     /// We also want it aligned to a disk block
-    const SIZE: u64 = 2048;
+    pub(crate) const SIZE: u64 = 2048;
 
     /// Number of extra bytes to write on the first creation of the `NodeStoreHeader`
     /// (zero-padded)
@@ -1554,6 +1555,52 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
     }
 }
 
+// Helper functions for the checker
+impl<S: ReadableStorage> NodeStore<Committed, S> {
+    pub(crate) const fn size(&self) -> u64 {
+        self.header.size
+    }
+
+    pub(crate) fn get_physical_size(&self) -> Result<u64, FileIoError> {
+        self.storage.size()
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod nodestore_test_utils {
+    use super::*;
+
+    // Helper function to wrap the node in a StoredArea and write it to the given offset. Returns the size of the area on success.
+    #[allow(clippy::cast_possible_truncation)]
+    pub(crate) fn write_new_node<S: WritableStorage>(
+        nodestore: &NodeStore<Committed, S>,
+        node: &Node,
+        offset: u64,
+    ) -> u64 {
+        let node_length = NodeStore::<Arc<ImmutableProposal>, FileBacked>::stored_len(node);
+        let area_size_index = area_size_to_index(node_length).unwrap();
+        let mut stored_area_bytes = Vec::new();
+        node.as_bytes(area_size_index, &mut stored_area_bytes);
+        nodestore
+            .storage
+            .write(offset, stored_area_bytes.as_slice())
+            .unwrap();
+        AREA_SIZES[area_size_index as usize]
+    }
+
+    pub(crate) fn write_header<S: WritableStorage>(
+        nodestore: &NodeStore<Committed, S>,
+        root_addr: LinearAddress,
+        size: u64,
+    ) {
+        let mut header = NodeStoreHeader::new();
+        header.size = size;
+        header.root_address = Some(root_addr);
+        let header_bytes = bytemuck::bytes_of(&header);
+        nodestore.storage.write(0, header_bytes).unwrap();
+    }
+}
+
 #[cfg(test)]
 #[expect(clippy::unwrap_used)]
 mod tests {
@@ -1562,6 +1609,7 @@ mod tests {
     use crate::linear::memory::MemStore;
     use crate::{BranchNode, LeafNode};
     use arc_swap::access::DynGuard;
+    use nonzero_ext::nonzero;
     use test_case::test_case;
 
     use super::*;
@@ -1661,7 +1709,7 @@ mod tests {
         value: Some(vec![9, 10, 11].into_boxed_slice()),
         children: from_fn(|i| {
             if i == 15 {
-                Some(Child::AddressWithHash(LinearAddress::new(1).unwrap(), std::array::from_fn::<u8, 32, _>(|i| i as u8).into()))
+                Some(Child::AddressWithHash(nonzero!(1u64), std::array::from_fn::<u8, 32, _>(|i| i as u8).into()))
             } else {
                 None
             }
@@ -1671,7 +1719,7 @@ mod tests {
         partial_path: Path::from([6, 7, 8]),
         value: Some(vec![9, 10, 11].into_boxed_slice()),
         children: from_fn(|_|
-            Some(Child::AddressWithHash(LinearAddress::new(1).unwrap(), std::array::from_fn::<u8, 32, _>(|i| i as u8).into()))
+            Some(Child::AddressWithHash(nonzero!(1u64), std::array::from_fn::<u8, 32, _>(|i| i as u8).into()))
         ),
     }; "branch node with all child")]
     #[test_case(

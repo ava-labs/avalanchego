@@ -12,11 +12,16 @@
 //!
 //! A [`NodeStore`] is backed by a [`ReadableStorage`] which is persisted storage.
 
+use std::ops::Range;
+use thiserror::Error;
+
+mod checker;
 mod hashednode;
 mod hashers;
 mod linear;
 mod node;
 mod nodestore;
+mod range_set;
 mod trie_hash;
 
 /// Logger module for handling logging functionality
@@ -78,4 +83,46 @@ pub fn empty_trie_hash() -> TrieHash {
         .as_slice()
         .try_into()
         .expect("empty trie hash is 32 bytes")
+}
+
+/// Errors returned by the checker
+#[derive(Error, Debug)]
+#[non_exhaustive]
+pub enum CheckerError {
+    /// The file size is not valid
+    #[error("Invalid DB size ({db_size}): {description}")]
+    InvalidDBSize {
+        /// The size of the db
+        db_size: u64,
+        /// The description of the error
+        description: String,
+    },
+
+    /// The address is out of bounds
+    #[error("stored area at {start} with size {size} is out of bounds ({bounds:?})")]
+    AreaOutOfBounds {
+        /// Start of the `StoredArea`
+        start: LinearAddress,
+        /// Size of the `StoredArea`
+        size: u64,
+        /// Valid range of addresses
+        bounds: Range<LinearAddress>,
+    },
+
+    /// Stored areas intersect
+    #[error(
+        "stored area at {start} with size {size} intersects with other stored areas: {intersection:?}"
+    )]
+    AreaIntersects {
+        /// Start of the `StoredArea`
+        start: LinearAddress,
+        /// Size of the `StoredArea`
+        size: u64,
+        /// The intersection
+        intersection: Vec<Range<LinearAddress>>,
+    },
+
+    /// IO error
+    #[error("IO error")]
+    IO(#[from] FileIoError),
 }

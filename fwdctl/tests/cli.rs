@@ -45,9 +45,7 @@ fn fwdctl_creates_database() -> Result<()> {
         .assert()
         .success();
 
-    fwdctl_delete_db().map_err(|e| anyhow!(e))?;
-
-    Ok(())
+    fwdctl_delete_db()
 }
 
 #[test]
@@ -71,9 +69,7 @@ fn fwdctl_insert_successful() -> Result<()> {
         .success()
         .stdout(predicate::str::contains("year"));
 
-    fwdctl_delete_db().map_err(|e| anyhow!(e))?;
-
-    Ok(())
+    fwdctl_delete_db()
 }
 
 #[test]
@@ -106,9 +102,7 @@ fn fwdctl_get_successful() -> Result<()> {
         .success()
         .stdout(predicate::str::contains("2023"));
 
-    fwdctl_delete_db().map_err(|e| anyhow!(e))?;
-
-    Ok(())
+    fwdctl_delete_db()
 }
 
 #[test]
@@ -140,9 +134,7 @@ fn fwdctl_delete_successful() -> Result<()> {
         .success()
         .stdout(predicate::str::contains("key year deleted successfully"));
 
-    fwdctl_delete_db().map_err(|e| anyhow!(e))?;
-
-    Ok(())
+    fwdctl_delete_db()
 }
 
 #[test]
@@ -173,9 +165,7 @@ fn fwdctl_root_hash() -> Result<()> {
         .success()
         .stdout(predicate::str::is_empty().not());
 
-    fwdctl_delete_db().map_err(|e| anyhow!(e))?;
-
-    Ok(())
+    fwdctl_delete_db()
 }
 
 #[test]
@@ -205,9 +195,7 @@ fn fwdctl_dump() -> Result<()> {
         .success()
         .stdout(predicate::str::contains("2023"));
 
-    fwdctl_delete_db().map_err(|e| anyhow!(e))?;
-
-    Ok(())
+    fwdctl_delete_db()
 }
 
 #[test]
@@ -313,9 +301,7 @@ fn fwdctl_dump_with_start_stop_and_max() -> Result<()> {
             "Next key is c, resume with \"--start-key=c\"",
         ));
 
-    fwdctl_delete_db().map_err(|e| anyhow!(e))?;
-
-    Ok(())
+    fwdctl_delete_db()
 }
 
 #[test]
@@ -388,9 +374,7 @@ fn fwdctl_dump_with_csv_and_json() -> Result<()> {
     );
     fs::remove_file("dump.json").expect("Should remove dump.json file");
 
-    fwdctl_delete_db().map_err(|e| anyhow!(e))?;
-
-    Ok(())
+    fwdctl_delete_db()
 }
 
 #[test]
@@ -454,9 +438,7 @@ fn fwdctl_dump_with_file_name() -> Result<()> {
     assert_eq!(contents, "{\n  \"a\": \"1\"\n}\n");
     fs::remove_file("test.json").expect("Should remove test.json file");
 
-    fwdctl_delete_db().map_err(|e| anyhow!(e))?;
-
-    Ok(())
+    fwdctl_delete_db()
 }
 
 #[test]
@@ -534,9 +516,73 @@ fn fwdctl_dump_with_hex() -> Result<()> {
         .stdout(predicate::str::contains("--start-key=c"))
         .stdout(predicate::str::contains("--start-key-hex=63"));
 
-    fwdctl_delete_db().map_err(|e| anyhow!(e))?;
+    fwdctl_delete_db()
+}
 
-    Ok(())
+#[test]
+#[serial]
+fn fwdctl_check_empty_db() -> Result<()> {
+    Command::cargo_bin(PRG)?
+        .arg("create")
+        .arg(tmpdb::path())
+        .assert()
+        .success();
+
+    Command::cargo_bin(PRG)?
+        .arg("check")
+        .arg("--db")
+        .arg(tmpdb::path())
+        .assert()
+        .success();
+
+    fwdctl_delete_db()
+}
+
+#[test]
+#[serial]
+fn fwdctl_check_db_with_data() -> Result<()> {
+    use rand::rngs::StdRng;
+    use rand::{Rng, SeedableRng, rng};
+
+    let seed = std::env::var("FIREWOOD_TEST_SEED")
+        .ok()
+        .map_or_else(
+            || None,
+            |s| Some(str::parse(&s).expect("couldn't parse FIREWOOD_TEST_SEED; must be a u64")),
+        )
+        .unwrap_or_else(|| rng().random());
+
+    eprintln!("Seed {seed}: to rerun with this data, export FIREWOOD_TEST_SEED={seed}");
+    let mut rng = StdRng::seed_from_u64(seed);
+
+    Command::cargo_bin(PRG)?
+        .arg("create")
+        .arg(tmpdb::path())
+        .assert()
+        .success();
+
+    // TODO: bulk loading data instead of inserting one by one
+    for _ in 0..4 {
+        let key = format!("key_{}", rng.random::<u64>());
+        let value = format!("value_{}", rng.random::<u64>());
+        Command::cargo_bin(PRG)?
+            .arg("insert")
+            .args([key])
+            .args([value])
+            .args(["--db"])
+            .args([tmpdb::path()])
+            .assert()
+            .success();
+    }
+
+    Command::cargo_bin(PRG)?
+        .arg("check")
+        .arg("--db")
+        .arg(tmpdb::path())
+        .assert()
+        .success();
+
+    fwdctl_delete_db()
 }
 
 // A module to create a temporary database name for use in
