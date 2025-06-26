@@ -11,6 +11,7 @@ metadata:
   name: tmpnet
   namespace: tmpnet
 rules:
+# Regular usage
 - apiGroups: ["apps"]
   resources: ["statefulsets"]
   verbs: ["get", "create", "update", "patch"]
@@ -22,6 +23,16 @@ rules:
   verbs: ["get", "watch"]
 - apiGroups: [""]
   resources: ["pods/portforward"]
+  verbs: ["create"]
+# Enable external node access via ingress
+- apiGroups: ["networking.k8s.io"]
+  resources: ["ingresses"]
+  verbs: ["get", "create"]
+- apiGroups: [""]
+  resources: ["endpoints"]
+  verbs: ["get"]
+- apiGroups: [""]
+  resources: ["services"]
   verbs: ["create"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
