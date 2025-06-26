@@ -30,7 +30,7 @@ typedef struct DatabaseHandle DatabaseHandle;
  */
 typedef struct Value {
   size_t len;
-  const uint8_t *data;
+  uint8_t *data;
 } Value;
 
 /**
@@ -45,7 +45,7 @@ typedef struct KeyValue {
  * Struct returned by `fwd_create_db` and `fwd_open_db`
  */
 typedef struct DatabaseCreationResult {
-  const struct DatabaseHandle *db;
+  struct DatabaseHandle *db;
   uint8_t *error_str;
 } DatabaseCreationResult;
 
@@ -192,6 +192,7 @@ struct Value fwd_drop_proposal(const struct DatabaseHandle *db, uint32_t proposa
  * # Panics
  *
  * This function panics if `result` is `null`.
+ *
  */
 void fwd_free_database_error_result(struct DatabaseCreationResult *result);
 
@@ -210,6 +211,7 @@ void fwd_free_database_error_result(struct DatabaseCreationResult *result);
  * # Panics
  *
  * This function panics if `value` is `null`.
+ *
  */
 void fwd_free_value(struct Value *value);
 
@@ -233,6 +235,7 @@ void fwd_free_value(struct Value *value);
  *  * ensure that `db` is a valid pointer returned by `open_db`
  *  * ensure that `key` is a valid pointer to a `Value` struct
  *  * call `free_value` to free the memory associated with the returned `Value`
+ *
  */
 struct Value fwd_get_from_proposal(const struct DatabaseHandle *db,
                                    ProposalId id,
@@ -261,6 +264,7 @@ struct Value fwd_get_from_proposal(const struct DatabaseHandle *db,
  * * ensure that `key` is a valid pointer to a `Value` struct
  * * ensure that `root` is a valid pointer to a `Value` struct
  * * call `free_value` to free the memory associated with the returned `Value`
+ *
  */
 struct Value fwd_get_from_root(const struct DatabaseHandle *db,
                                struct Value root,
@@ -288,6 +292,7 @@ struct Value fwd_get_from_root(const struct DatabaseHandle *db,
  *  * ensure that `db` is a valid pointer returned by `open_db`
  *  * ensure that `key` is a valid pointer to a `Value` struct
  *  * call `free_value` to free the memory associated with the returned `Value`
+ *
  */
 struct Value fwd_get_latest(const struct DatabaseHandle *db, struct Value key);
 
