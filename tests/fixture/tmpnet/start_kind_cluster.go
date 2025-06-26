@@ -13,10 +13,17 @@ import (
 	"strings"
 
 	"go.uber.org/zap"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/utils/ptr"
+
+	_ "embed"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 
+	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +39,9 @@ const (
 	missingContextMsg = `context "` + KindKubeconfigContext + `" does not exist`
 )
 
+//go:embed yaml/tmpnet-rbac.yaml
+var tmpnetRBACManifest []byte
+
 // StartKindCluster starts a new kind cluster with integrated registry if one is not already running.
 func StartKindCluster(
 	ctx context.Context,
@@ -42,7 +52,7 @@ func StartKindCluster(
 ) error {
 	configContext := KindKubeconfigContext
 
-	clusterRunning, err := isKindClusterRunning(log, configPath)
+	clusterRunning, err := isKindClusterRunning(log, configPath, configContext)
 	if err != nil {
 		return err
 	}
@@ -59,7 +69,7 @@ func StartKindCluster(
 
 		startCtx, cancel := context.WithTimeout(ctx, DefaultNetworkTimeout)
 		defer cancel()
-		cmd := exec.CommandContext(startCtx, "kind-with-registry.sh")
+		cmd := exec.CommandContext(startCtx, "bash", "-x", "kind-with-registry.sh")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
@@ -75,6 +85,17 @@ func StartKindCluster(
 		return err
 	}
 
+	// Deploy RBAC resources for tmpnet
+	if err := deployRBAC(ctx, log, configPath, configContext, DefaultTmpnetNamespace); err != nil {
+		return fmt.Errorf("failed to deploy tmpnet RBAC: %w", err)
+	}
+
+	// Create service account kubeconfig context to enable checking that RBAC permissions are sufficient
+	rbacContextName := KindKubeconfigContext + "-tmpnet"
+	if err := createServiceAccountKubeconfig(ctx, log, configPath, configContext, DefaultTmpnetNamespace, rbacContextName); err != nil {
+		return fmt.Errorf("failed to create service account kubeconfig context: %w", err)
+	}
+
 	if err := DeployKubeCollectors(ctx, log, configPath, configContext, startMetricsCollector, startLogsCollector); err != nil {
 		return fmt.Errorf("failed to deploy kube collectors: %w", err)
 	}
@@ -82,10 +103,8 @@ func StartKindCluster(
 	return nil
 }
 
-// isKindClusterRunning determines if a kind cluster is running with context kind-kind
-func isKindClusterRunning(log logging.Logger, configPath string) (bool, error) {
-	configContext := KindKubeconfigContext
-
+// isKindClusterRunning determines if a kind cluster is running
+func isKindClusterRunning(log logging.Logger, configPath string, configContext string) (bool, error) {
 	_, err := os.Stat(configPath)
 	if errors.Is(err, fs.ErrNotExist) {
 		log.Info("specified kubeconfig path does not exist",
@@ -152,6 +171,115 @@ func ensureNamespace(ctx context.Context, log logging.Logger, clientset *kuberne
 		return fmt.Errorf("failed to create namespace %s: %w", namespace, err)
 	}
 	log.Info("created namespace",
+		zap.String("namespace", namespace),
+	)
+
+	return nil
+}
+
+// deployRBAC deploys the RBAC resources for tmpnet to a Kubernetes cluster.
+func deployRBAC(
+	ctx context.Context,
+	log logging.Logger,
+	configPath string,
+	configContext string,
+	namespace string,
+) error {
+	log.Info("deploying tmpnet RBAC resources",
+		zap.String("namespace", namespace),
+	)
+
+	clientConfig, err := GetClientConfig(log, configPath, configContext)
+	if err != nil {
+		return fmt.Errorf("failed to get client config: %w", err)
+	}
+	dynamicClient, err := dynamic.NewForConfig(clientConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create dynamic client: %w", err)
+	}
+
+	// Apply the RBAC manifest
+	if err := applyManifest(ctx, log, dynamicClient, tmpnetRBACManifest, ""); err != nil {
+		return fmt.Errorf("failed to apply RBAC manifest: %w", err)
+	}
+
+	log.Info("successfully deployed tmpnet RBAC resources",
+		zap.String("namespace", namespace),
+	)
+
+	return nil
+}
+
+// createServiceAccountKubeconfig creates a kubeconfig that uses the tmpnet service account token.
+// It only creates the context if it doesn't already exist.
+// This function is called from StartKindCluster after the kubeconfig and context have been verified.
+func createServiceAccountKubeconfig(
+	ctx context.Context,
+	log logging.Logger,
+	configPath string,
+	configContext string,
+	namespace string,
+	newContextName string,
+) error {
+	// Get the existing kubeconfig
+	config, err := clientcmd.LoadFromFile(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to load kubeconfig: %w", err)
+	}
+
+	// Check if the context already exists
+	if _, exists := config.Contexts[newContextName]; exists {
+		log.Info("service account kubeconfig context already exists",
+			zap.String("context", newContextName),
+			zap.String("namespace", namespace),
+		)
+		return nil
+	}
+
+	// Get the current context (already verified to exist by StartKindCluster)
+	currentContext := config.Contexts[configContext]
+
+	// Get clientset to retrieve service account token
+	clientConfig, err := GetClientConfig(log, configPath, configContext)
+	if err != nil {
+		return fmt.Errorf("failed to get client config: %w", err)
+	}
+	clientset, err := kubernetes.NewForConfig(clientConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create clientset: %w", err)
+	}
+
+	// Create a token for the service account (Kubernetes 1.24+)
+	tokenRequest := &authenticationv1.TokenRequest{
+		Spec: authenticationv1.TokenRequestSpec{
+			// Token will be valid for 1 year
+			ExpirationSeconds: ptr.To[int64](365 * 24 * 60 * 60),
+		},
+	}
+	token, err := clientset.CoreV1().ServiceAccounts(namespace).CreateToken(ctx, "tmpnet", tokenRequest, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to create service account token: %w", err)
+	}
+
+	// Create new context with the token
+	config.AuthInfos[newContextName] = &api.AuthInfo{
+		Token: token.Status.Token,
+	}
+
+	// Create new context
+	config.Contexts[newContextName] = &api.Context{
+		Cluster:   currentContext.Cluster,
+		AuthInfo:  newContextName,
+		Namespace: namespace,
+	}
+
+	// Save the updated kubeconfig
+	if err := clientcmd.WriteToFile(*config, configPath); err != nil {
+		return fmt.Errorf("failed to write kubeconfig: %w", err)
+	}
+
+	log.Info("created service account kubeconfig context",
+		zap.String("context", newContextName),
 		zap.String("namespace", namespace),
 	)
 

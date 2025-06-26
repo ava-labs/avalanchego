@@ -176,6 +176,9 @@ func startPrometheus(ctx context.Context, log logging.Logger) error {
 	if err != nil {
 		return err
 	}
+	if err := os.MkdirAll(serviceDiscoveryDir, perms.ReadWriteExecute); err != nil {
+		return fmt.Errorf("failed to create service discovery dir: %w", err)
+	}
 
 	config := fmt.Sprintf(`
 global:
@@ -219,6 +222,9 @@ func startPromtail(ctx context.Context, log logging.Logger) error {
 	serviceDiscoveryDir, err := getServiceDiscoveryDir(cmdName)
 	if err != nil {
 		return err
+	}
+	if err := os.MkdirAll(serviceDiscoveryDir, perms.ReadWriteExecute); err != nil {
+		return fmt.Errorf("failed to create service discovery dir: %w", err)
 	}
 
 	config := fmt.Sprintf(`
