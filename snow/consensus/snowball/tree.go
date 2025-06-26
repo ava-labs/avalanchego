@@ -175,22 +175,24 @@ func (u *unaryNode) DecidedPrefix() int {
 	return u.decidedPrefix
 }
 
-//nolint:gofmt,gofumpt,gci // this comment is formatted as intended
+//nolint:gci,gofmt,gofumpt // this comment is formatted as intended
+//
 // This is by far the most complicated function in this algorithm.
 // The intuition is that this instance represents a series of consecutive unary
 // snowball instances, and this function's purpose is convert one of these unary
 // snowball instances into a binary snowball instance.
 // There are 5 possible cases.
 //
-//  1. None of these instances should be split, we should attempt to split a child.
+//  1. None of these instances should be split, we should attempt to split a
+//     child
 //
 //     For example, attempting to insert the value "00001" in this node:
 //
-//                       +-------------------+  <-- This node will not be split
+//                       +-------------------+ <-- This node will not be split
 //                       |                   |
 //                       |       0 0 0       |
 //                       |                   |
-//                       +-------------------+  <-- Pass the add to the child
+//                       +-------------------+ <-- Pass the add to the child
 //                                 ^
 //                                 |
 //
@@ -200,7 +202,7 @@ func (u *unaryNode) DecidedPrefix() int {
 //                       |                   |
 //                       |       0 0 0       |
 //                       |                   |
-//                       +-------------------+  <-- With the modified child
+//                       +-------------------+ <-- With the modified child
 //                                 ^
 //                                 |
 //
@@ -250,11 +252,11 @@ func (u *unaryNode) DecidedPrefix() int {
 //                       +-------------------+
 //                             ^         ^
 //                            /           \
-//             +-------------------+   +-------------------+
-//             |                   |   |                   |
-//             |         0         |   |         0         |
-//             |                   |   |                   |
-//             +-------------------+   +-------------------+
+//             +-------------------+ +-------------------+
+//             |                   | |                   |
+//             |         0         | |         0         |
+//             |                   | |                   |
+//             +-------------------+ +-------------------+
 //
 //  4. This instance must be split on the last bit
 //
@@ -318,11 +320,11 @@ func (u *unaryNode) DecidedPrefix() int {
 //                       +-------------------+
 //                             ^         ^
 //                            /           \
-//             +-------------------+   +-------------------+
-//             |                   |   |                   |
-//             |         0         |   |         0         |
-//             |                   |   |                   |
-//             +-------------------+   +-------------------+
+//             +-------------------+ +-------------------+
+//             |                   | |                   |
+//             |         0         | |         0         |
+//             |                   | |                   |
+//             +-------------------+ +-------------------+
 func (u *unaryNode) Add(newChoice ids.ID) node {
 	if u.Finalized() {
 		return u // Only happens if the tree is finalized, or it's a leaf node
