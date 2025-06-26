@@ -7,6 +7,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -136,17 +137,19 @@ func CollectRegistry(t *testing.T, name string, addr string, timeout time.Durati
 		}
 	})
 
-	r.NoError(tmpnet.WritePrometheusServiceDiscoveryConfigFile(name, []tmpnet.SDConfig{
+	sdConfigFilePath, err := tmpnet.WritePrometheusServiceDiscoveryConfigFile(name, []tmpnet.SDConfig{
 		{
 			Targets: []string{addr},
 			Labels:  labels,
 		},
-	}, true))
+	}, true)
+	r.NoError(err)
+	t.Cleanup(func() {
+		os.Remove(sdConfigFilePath)
+	})
 }
 
 // TODO:
-// - cleanup
-// - document and make required updates to tmpnet / CI
 // - add scoped access tokens to AvalancheGo CI for required S3 bucket ONLY
 // - separate general purpose VM setup from C-Chain specific setup
 // - update C-Chain dashboard to make it useful for the benchmark
