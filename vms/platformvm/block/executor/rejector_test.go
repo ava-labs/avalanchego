@@ -120,7 +120,7 @@ func TestRejectBlock(t *testing.T) {
 			blk, err := tt.newBlockFunc()
 			require.NoError(err)
 
-			mempool, err := mempool.New("", prometheus.NewRegistry(), func() {})
+			mempool, err := mempool.New("", prometheus.NewRegistry())
 			require.NoError(err)
 			state := state.NewMockState(ctrl)
 			blkIDToState := map[ids.ID]*blockState{

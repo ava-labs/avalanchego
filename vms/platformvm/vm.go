@@ -365,13 +365,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 		vm.Validators.RegisterSetCallbackListener(subnetID, vl)
 	}
 
-	if err := vm.state.Commit(); err != nil {
-		return err
-	}
-
-	// Start the block builder
-	vm.Builder.StartBlockTimer()
-	return nil
+	return vm.state.Commit()
 }
 
 func (vm *VM) SetState(_ context.Context, state snow.State) error {
@@ -392,7 +386,6 @@ func (vm *VM) Shutdown(context.Context) error {
 	}
 
 	vm.onShutdownCtxCancel()
-	vm.Builder.ShutdownBlockTimer()
 
 	if vm.uptimeManager.StartedTracking() {
 		primaryVdrIDs := vm.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
@@ -432,9 +425,8 @@ func (vm *VM) LastAccepted(context.Context) (ids.ID, error) {
 
 // SetPreference sets the preferred block to be the one with ID [blkID]
 func (vm *VM) SetPreference(_ context.Context, blkID ids.ID) error {
-	if vm.manager.SetPreference(blkID) {
-		vm.Builder.ResetBlockTimer()
-	}
+	// TODO: Remove return value from SetPreference
+	vm.manager.SetPreference(blkID)
 	return nil
 }
 
