@@ -5,7 +5,6 @@ package simplex
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/ava-labs/simplex"
 	"google.golang.org/protobuf/proto"
@@ -18,7 +17,6 @@ import (
 var _ simplex.VerifiedBlock = (*VerifiedBlock)(nil)
 
 type VerifiedBlock struct {
-	computeDigestOnce sync.Once
 	digest            simplex.Digest // cached, not serialized
 
 	metadata   simplex.ProtocolMetadata
@@ -27,7 +25,6 @@ type VerifiedBlock struct {
 
 // BlockHeader returns the block header for the verified block.
 func (v *VerifiedBlock) BlockHeader() simplex.BlockHeader {
-	v.computeDigestOnce.Do(v.computeDigest)
 	return simplex.BlockHeader{
 		ProtocolMetadata: v.metadata,
 		Digest:           v.digest,
@@ -36,8 +33,8 @@ func (v *VerifiedBlock) BlockHeader() simplex.BlockHeader {
 
 // Bytes returns the serialized bytes of the verified block
 // as the proto encoding of `encodedVerifiedBlock`.
-// TODO: we should use canoto or a canonical encoding since proto is not guaranteed to be canonical.
-func (v *VerifiedBlock) Bytes() []byte {
+// TODO: we should use a canonical encoding since proto is not guaranteed to be canonical.
+func (v *VerifiedBlock) Bytes() ([]byte, error) {
 	cBlock := pSimplex.VerifiedBlock{
 		Metadata: v.metadata.Bytes(),
 		Block:    v.innerBlock,
@@ -45,15 +42,20 @@ func (v *VerifiedBlock) Bytes() []byte {
 
 	buff, err := proto.Marshal(&cBlock)
 	if err != nil {
-		panic(fmt.Errorf("failed to marshal verified block: %w", err))
+		return nil, err
 	}
 
-	return buff
+	return buff, nil
 }
 
 // computeDigest computes the digest of the block.
-func (v *VerifiedBlock) computeDigest() {
-	v.digest = hashing.ComputeHash256Array(v.Bytes())
+func (v *VerifiedBlock) computeDigest() (simplex.Digest, error) {
+	bytes, err := v.Bytes()
+	if err != nil {
+		return simplex.Digest{}, fmt.Errorf("failed to serialize verified block: %w", err)
+	}
+
+	return hashing.ComputeHash256Array(bytes), nil
 }
 
 func verifiedBlockFromBytes(buff []byte) (*VerifiedBlock, error) {
@@ -67,11 +69,19 @@ func verifiedBlockFromBytes(buff []byte) (*VerifiedBlock, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse protocol metadata: %w", err)
 	}
+	
 
 	v := &VerifiedBlock{
 		metadata:   *md,
 		innerBlock: protoBlock.Block,
 	}
+
+	digest, err := v.computeDigest()
+	if err != nil {
+		return nil, fmt.Errorf("failed to compute digest: %w", err)
+	}
+
+	v.digest = digest
 
 	return v, nil
 }

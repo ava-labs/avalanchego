@@ -25,7 +25,8 @@ func TestVerifiedBlockSerialization(t *testing.T) {
 	}
 
 	// Serialize the block
-	blockBytes := vb.Bytes()
+	blockBytes, err := vb.Bytes()
+	require.NoError(t, err)
 
 	// Deserialize the block
 	vb1, err := verifiedBlockFromBytes(blockBytes)
