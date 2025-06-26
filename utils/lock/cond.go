@@ -39,8 +39,8 @@ func NewCond(l sync.Locker) *Cond {
 //	defer c.L.Unlock()
 //
 //	for !condition() {
-//	    if err := c.Wait(ctx); err != nil {
-//	    	return err
+//		if err := c.Wait(ctx); err != nil {
+//			return err
 //		}
 //	}
 //	... make use of condition ...
@@ -52,22 +52,18 @@ func (c *Cond) Wait(ctx context.Context) error {
 	c.m.Unlock()
 
 	c.L.Unlock()
-	defer func() {
-		// Remove this thread as a waiter, we should do this in both cases, if
-		// we are awoken or if we have cancelled the wait.
-		c.m.Lock()
-		defer c.m.Unlock()
-
-		delete(c.w, newL)
-
-		// We must hold the lock when we return to ensure that the caller can
-		// release the lock after wait returns. This is also true regardless of
-		// if the wait was cancelled or not.
-		c.L.Lock()
-	}()
+	// We must hold the lock when we return to ensure that the caller can
+	// release the lock after wait returns. This is true regardless of if the
+	// wait was cancelled or not.
+	defer c.L.Lock()
 
 	select {
 	case <-ctx.Done():
+		// Since the wait was cancelled, we should remove our waiting channel.
+		c.m.Lock()
+		delete(c.w, newL)
+		c.m.Unlock()
+
 		return ctx.Err()
 	case <-newL:
 		return nil
@@ -87,6 +83,7 @@ func (c *Cond) Signal() {
 
 	for w := range c.w {
 		close(w)
+		delete(c.w, w)
 		break
 	}
 }
@@ -101,5 +98,6 @@ func (c *Cond) Broadcast() {
 
 	for w := range c.w {
 		close(w)
+		delete(c.w, w)
 	}
 }
