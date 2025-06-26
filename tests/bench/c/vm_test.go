@@ -98,7 +98,7 @@ func TestReexecuteRange(t *testing.T) {
 		})
 	}
 
-	blockChan, err := createBlockChanFromRawDB(sourceBlockDir, startBlock, endBlock, chanSize)
+	blockChan, err := createBlockChanFromRawDB(t, sourceBlockDir, startBlock, endBlock, chanSize)
 	r.NoError(err)
 
 	sourceVM, err := newMainnetCChainVM(
@@ -256,19 +256,21 @@ func (e *VMExecutor) executeSequence(ctx context.Context, blkChan <-chan BlockRe
 	return nil
 }
 
-func createBlockChanFromRawDB(sourceDir string, startBlock, endBlock uint64, chanSize int) (<-chan BlockResult, error) {
+func createBlockChanFromRawDB(t *testing.T, sourceDir string, startBlock, endBlock uint64, chanSize int) (<-chan BlockResult, error) {
 	ch := make(chan BlockResult, chanSize)
 
 	db, err := rawdb.NewLevelDBDatabase(sourceDir, sourceDBCacheSize, sourceDBHandles, "", true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create leveldb database from %q: %w", sourceDir, err)
 	}
+	t.Cleanup(func() {
+		if err := db.Close(); err != nil {
+			t.Fatal(err)
+		}
+	})
 
 	go func() {
-		defer func() {
-			_ = db.Close() // TODO: handle error
-			close(ch)
-		}()
+		defer close(ch)
 
 		for i := startBlock; i <= endBlock; i++ {
 			block := rawdb.ReadBlock(db, rawdb.ReadCanonicalHash(db, i), i)
