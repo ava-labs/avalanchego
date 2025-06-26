@@ -239,13 +239,18 @@ func createServiceAccountKubeconfig(
 		return fmt.Errorf("failed to load kubeconfig: %w", err)
 	}
 
-	// Check if the context already exists
 	if _, exists := config.Contexts[newContextName]; exists {
-		log.Info("service account kubeconfig context already exists",
+		log.Info("service account kubeconfig context exists, recreating to ensure consistency with cluster state",
+			zap.String("kubeconfig", configPath),
 			zap.String("context", newContextName),
 			zap.String("namespace", namespace),
 		)
-		return nil
+	} else {
+		log.Info("creating new service account kubeconfig context",
+			zap.String("kubeconfig", configPath),
+			zap.String("context", newContextName),
+			zap.String("namespace", namespace),
+		)
 	}
 
 	// Get the current context (already verified to exist by StartKindCluster)
@@ -291,6 +296,7 @@ func createServiceAccountKubeconfig(
 	}
 
 	log.Info("created service account kubeconfig context",
+		zap.String("kubeconfig", configPath),
 		zap.String("context", newContextName),
 		zap.String("namespace", namespace),
 	)
