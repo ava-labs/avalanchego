@@ -59,7 +59,8 @@ func (c *Cond) Wait(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
-		// Since the wait was cancelled, we should remove our waiting channel.
+		// Since the wait was cancelled, we remove our waiting channel on a
+		// best-effort basis.
 		c.m.Lock()
 		delete(c.w, newL)
 		c.m.Unlock()
