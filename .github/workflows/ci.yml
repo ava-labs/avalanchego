@@ -243,6 +243,9 @@ jobs:
     container:
       image: ghcr.io/actions/actions-runner:latest
     steps:
+      - name: Install x
+        run: |
+          apt-get update && apt-get install xz-utils
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
