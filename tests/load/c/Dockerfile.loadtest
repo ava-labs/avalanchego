@@ -1,0 +1,13 @@
+# The version is supplied as a build argument rather than hard-coded
+# to minimize the cost of version changes.
+ARG GO_VERSION=INVALID # This value is not intended to be used but silences a warning
+
+FROM --platform=$BUILDPLATFORM golang:$GO_VERSION-bookworm
+
+WORKDIR /build
+
+# Copy entire source into container
+COPY . .
+
+# Set default command
+CMD go run ./tests/load/c/main --runtime=kube
