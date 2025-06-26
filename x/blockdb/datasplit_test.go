@@ -14,11 +14,8 @@ import (
 
 func TestDataSplitting(t *testing.T) {
 	// Each data file should have enough space for 2 blocks
-	config := &DatabaseConfig{
-		MaxDataFileSize:    1024 * 2.5,
-		CheckpointInterval: 1024,
-	}
-	store, cleanup := newTestDatabase(t, false, config)
+	config := DefaultDatabaseConfig().WithMaxDataFileSize(1024 * 2.5)
+	store, cleanup := newTestDatabase(t, config)
 	defer cleanup()
 
 	// create 11 blocks, 1kb each
@@ -53,7 +50,7 @@ func TestDataSplitting(t *testing.T) {
 
 	// reopen and verify all blocks are readable
 	require.NoError(t, store.Close())
-	store, err = New(filepath.Dir(store.indexFile.Name()), store.dataDir, false, false, *config, store.log)
+	store, err = New(filepath.Dir(store.indexFile.Name()), store.dataDir, config, store.log)
 	require.NoError(t, err)
 	defer store.Close()
 	for i := range numBlocks {
@@ -64,11 +61,8 @@ func TestDataSplitting(t *testing.T) {
 }
 
 func TestDataSplitting_DeletedFile(t *testing.T) {
-	config := &DatabaseConfig{
-		MaxDataFileSize:    1024 * 2.5,
-		CheckpointInterval: 1024,
-	}
-	store, cleanup := newTestDatabase(t, false, config)
+	config := DefaultDatabaseConfig().WithMaxDataFileSize(1024 * 2.5)
+	store, cleanup := newTestDatabase(t, config)
 	defer cleanup()
 
 	// create 5 blocks, 1kb each
@@ -87,7 +81,7 @@ func TestDataSplitting_DeletedFile(t *testing.T) {
 
 	// reopen and verify the blocks
 	require.NoError(t, store.Close())
-	store, err := New(filepath.Dir(store.indexFile.Name()), store.dataDir, false, false, *config, store.log)
+	store, err := New(filepath.Dir(store.indexFile.Name()), store.dataDir, config, store.log)
 	require.NoError(t, err)
 	defer store.Close()
 	for i := range numBlocks {

@@ -32,12 +32,12 @@ type Database struct {
 	options   DatabaseConfig
 	header    indexFileHeader
 	log       logging.Logger
-	mu        sync.RWMutex
 	closed    bool
 	fileCache sync.Map
 
-	// syncToDisk determines if fsync is called after each write for durability.
-	syncToDisk bool
+	// closeMu prevents the database from being closed while in use and prevents
+	// use of a closed database.
+	closeMu sync.RWMutex
 
 	// maxBlockHeight tracks the highest block height that has been written to the db, even if there are gaps in the sequence.
 	maxBlockHeight atomic.Uint64
@@ -118,7 +118,13 @@ func (s *Database) initializeDataFiles(dataDir string, truncate bool) error {
 }
 
 func (s *Database) loadOrInitializeHeader(truncate bool) error {
-	if truncate {
+	fileInfo, err := s.indexFile.Stat()
+	if err != nil {
+		return fmt.Errorf("failed to get index file stats: %w", err)
+	}
+
+	// reset index file if its empty or we are truncating
+	if truncate || fileInfo.Size() == 0 {
 		s.header = indexFileHeader{
 			Version:             IndexFileVersion,
 			MinHeight:           s.options.MinimumHeight,
@@ -144,14 +150,13 @@ func (s *Database) loadOrInitializeHeader(truncate bool) error {
 		return nil
 	}
 
-	// Not truncating, load existing header
 	headerBuf := make([]byte, sizeOfIndexFileHeader)
 	_, readErr := s.indexFile.ReadAt(headerBuf, 0)
 	if readErr != nil {
-		return fmt.Errorf("failed to read index header: %w", readErr)
+		return fmt.Errorf("failed to read index header (delete index file to reindex): %w", readErr)
 	}
 	if err := s.header.UnmarshalBinary(headerBuf); err != nil {
-		return fmt.Errorf("failed to deserialize index header: %w", err)
+		return fmt.Errorf("failed to deserialize index header (delete index file to reindex): %w", err)
 	}
 	if s.header.Version != IndexFileVersion {
 		return fmt.Errorf("mismatched index file version: found %d, expected %d", s.header.Version, IndexFileVersion)
@@ -167,11 +172,9 @@ func (s *Database) loadOrInitializeHeader(truncate bool) error {
 // Parameters:
 //   - indexDir: Directory for the index file
 //   - dataDir: Directory for the data file(s)
-//   - syncToDisk: If true, forces fsync after writes
-//   - truncate: If true, truncates the index file
-//   - config: Optional configuration parameters
+//   - config: Configuration parameters
 //   - log: Logger instance for structured logging
-func New(indexDir, dataDir string, syncToDisk bool, truncate bool, config DatabaseConfig, log logging.Logger) (*Database, error) {
+func New(indexDir, dataDir string, config DatabaseConfig, log logging.Logger) (*Database, error) {
 	if indexDir == "" || dataDir == "" {
 		return nil, errors.New("both indexDir and dataDir must be provided")
 	}
@@ -181,22 +184,21 @@ func New(indexDir, dataDir string, syncToDisk bool, truncate bool, config Databa
 	}
 
 	s := &Database{
-		options:    config,
-		syncToDisk: syncToDisk,
-		log:        log,
-		fileCache:  sync.Map{},
+		options:   config,
+		log:       log,
+		fileCache: sync.Map{},
 	}
 
-	if err := s.openAndInitializeIndex(indexDir, truncate); err != nil {
+	if err := s.openAndInitializeIndex(indexDir, config.Truncate); err != nil {
 		return nil, err
 	}
 
-	if err := s.initializeDataFiles(dataDir, truncate); err != nil {
+	if err := s.initializeDataFiles(dataDir, config.Truncate); err != nil {
 		s.closeFiles()
 		return nil, err
 	}
 
-	if !truncate {
+	if !config.Truncate {
 		if err := s.recover(); err != nil {
 			s.closeFiles()
 			return nil, fmt.Errorf("recovery failed: %w", err)
@@ -225,6 +227,10 @@ func (s *Database) getOrOpenDataFile(fileIndex int) (*os.File, error) {
 		return handle.(*os.File), nil
 	}
 
+	if fileIndex >= MaxDataFiles {
+		return nil, fmt.Errorf("%w: file index %d would exceed limit of %d", ErrMaxDataFilesExceeded, fileIndex, MaxDataFiles)
+	}
+
 	filePath := s.dataFilePath(fileIndex)
 	handle, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, defaultFilePermissions)
 	if err != nil {
@@ -250,8 +256,8 @@ func (s *Database) MaxContiguousHeight() (height BlockHeight, found bool) {
 
 // Close flushes pending writes and closes the store files.
 func (s *Database) Close() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.closeMu.Lock()
+	defer s.closeMu.Unlock()
 
 	if s.closed {
 		return nil

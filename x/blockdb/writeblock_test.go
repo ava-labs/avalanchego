@@ -4,28 +4,26 @@
 package blockdb
 
 import (
-	"errors"
 	"math"
 	"sync"
 	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-// todo: create TestWriteBlock test that includes error tests and also tests for things like write when sync is true, etc
-
-func TestWriteBlock_HeightsVerification(t *testing.T) {
-	customConfig := DefaultDatabaseConfig()
-	customConfig.MinimumHeight = 10
+func TestWriteBlock_Basic(t *testing.T) {
+	customConfig := DefaultDatabaseConfig().WithMinimumHeight(10)
 
 	tests := []struct {
 		name               string
 		blockHeights       []uint64 // block heights to write, in order
-		config             *DatabaseConfig
+		config             DatabaseConfig
 		expectedMCH        uint64 // expected max contiguous height
 		expectedMaxHeight  uint64
-		headerSizes        []uint16
+		headerSizes        []BlockHeaderSize
 		syncToDisk         bool
 		checkpointInterval uint64
 	}{
@@ -73,42 +71,42 @@ func TestWriteBlock_HeightsVerification(t *testing.T) {
 		{
 			name:              "custom min height single block",
 			blockHeights:      []uint64{10},
-			config:            &customConfig,
+			config:            customConfig,
 			expectedMCH:       10,
 			expectedMaxHeight: 10,
 		},
 		{
 			name:              "custom min height out of order",
 			blockHeights:      []uint64{13, 11, 10, 12},
-			config:            &customConfig,
+			config:            customConfig,
 			expectedMCH:       13,
 			expectedMaxHeight: 13,
 		},
 		{
 			name:              "custom min height with gaps",
 			blockHeights:      []uint64{10, 11, 13, 15},
-			config:            &customConfig,
+			config:            customConfig,
 			expectedMCH:       11,
 			expectedMaxHeight: 15,
 		},
 		{
 			name:              "custom min height start with gap",
 			blockHeights:      []uint64{11, 12},
-			config:            &customConfig,
+			config:            customConfig,
 			expectedMCH:       unsetHeight,
 			expectedMaxHeight: 12,
 		},
 		{
 			name:              "blocks with various header sizes",
 			blockHeights:      []uint64{0, 1, 2},
-			headerSizes:       []uint16{0, 50, 100},
+			headerSizes:       []BlockHeaderSize{0, 50, 100},
 			expectedMCH:       2,
 			expectedMaxHeight: 2,
 		},
 		{
 			name:              "overwrite with different header size",
 			blockHeights:      []uint64{12, 13, 12}, // Write twice to same height
-			headerSizes:       []uint16{10, 0, 50},
+			headerSizes:       []BlockHeaderSize{10, 0, 50},
 			expectedMCH:       unsetHeight,
 			expectedMaxHeight: 13,
 		},
@@ -131,24 +129,18 @@ func TestWriteBlock_HeightsVerification(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config := tt.config
-			if config == nil {
-				defaultConfig := DefaultDatabaseConfig()
-				config = &defaultConfig
-			}
-			if tt.checkpointInterval > 0 {
-				configCopy := *config
-				configCopy.CheckpointInterval = tt.checkpointInterval
-				config = &configCopy
+			if config.CheckpointInterval == 0 {
+				config = DefaultDatabaseConfig()
 			}
 
-			store, cleanup := newTestDatabase(t, tt.syncToDisk, config)
+			store, cleanup := newTestDatabase(t, config)
 			defer cleanup()
 
 			blocksWritten := make(map[uint64][]byte)
-			headerSizesWritten := make(map[uint64]uint16)
+			headerSizesWritten := make(map[uint64]BlockHeaderSize)
 			for i, h := range tt.blockHeights {
 				block := randomBlock(t)
-				var headerSize uint16
+				var headerSize BlockHeaderSize
 
 				// Use specific header size if provided
 				if tt.headerSizes != nil && i < len(tt.headerSizes) {
@@ -198,7 +190,7 @@ func TestWriteBlock_HeightsVerification(t *testing.T) {
 }
 
 func TestWriteBlock_Concurrency(t *testing.T) {
-	store, cleanup := newTestDatabase(t, false, nil)
+	store, cleanup := newTestDatabase(t, DefaultDatabaseConfig())
 	defer cleanup()
 
 	var wg sync.WaitGroup
@@ -252,9 +244,9 @@ func TestWriteBlock_Errors(t *testing.T) {
 		name       string
 		height     uint64
 		block      []byte
-		headerSize uint16
+		headerSize BlockHeaderSize
 		setup      func(db *Database)
-		config     *DatabaseConfig
+		config     DatabaseConfig
 		wantErr    error
 	}{
 		{
@@ -293,14 +285,10 @@ func TestWriteBlock_Errors(t *testing.T) {
 			wantErr:    ErrHeaderSizeTooLarge,
 		},
 		{
-			name:   "height below custom minimum",
-			height: 5,
-			block:  randomBlock(t),
-			config: &DatabaseConfig{
-				MinimumHeight:      10,
-				MaxDataFileSize:    DefaultMaxDataFileSize,
-				CheckpointInterval: 1024,
-			},
+			name:       "height below custom minimum",
+			height:     5,
+			block:      randomBlock(t),
+			config:     DefaultDatabaseConfig().WithMinimumHeight(10),
 			headerSize: 0,
 			wantErr:    ErrInvalidBlockHeight,
 		},
@@ -322,14 +310,10 @@ func TestWriteBlock_Errors(t *testing.T) {
 			wantErr: ErrDatabaseClosed,
 		},
 		{
-			name:   "exceed max data file size",
-			height: 0,
-			block:  make([]byte, 1000), // Block + header will exceed 1024 limit
-			config: &DatabaseConfig{
-				MinimumHeight:      0,
-				MaxDataFileSize:    1024, // 1KB limit
-				CheckpointInterval: 1024,
-			},
+			name:       "exceed max data file size",
+			height:     0,
+			block:      make([]byte, 1001), // Block + header will exceed 1024 limit (1001 + 24 = 1025 > 1024)
+			config:     DefaultDatabaseConfig().WithMaxDataFileSize(1024),
 			headerSize: 0,
 			wantErr:    ErrBlockTooLarge,
 		},
@@ -337,23 +321,36 @@ func TestWriteBlock_Errors(t *testing.T) {
 			name:   "data file offset overflow",
 			height: 0,
 			block:  make([]byte, 100),
-			config: &DatabaseConfig{
-				MinimumHeight:      0,
-				MaxDataFileSize:    0, // No limit
-				CheckpointInterval: 1024,
-			},
+			config: DefaultDatabaseConfig(),
 			setup: func(db *Database) {
 				// Set the next write offset to near max to trigger overflow
 				db.nextDataWriteOffset.Store(math.MaxUint64 - 50)
 			},
 			headerSize: 0,
-			wantErr:    errors.New("would overflow uint64 data file pointer"),
+			wantErr:    safemath.ErrOverflow,
+		},
+		{
+			name:   "max data files exceeded",
+			height: 0,
+			block:  make([]byte, 1),
+			config: DefaultDatabaseConfig().WithMaxDataFileSize(100),
+			setup: func(db *Database) {
+				// set next data write offset to the max to trigger max data files exceeded error
+				db.nextDataWriteOffset.Store(uint64(MaxDataFiles) * 100)
+			},
+			headerSize: 0,
+			wantErr:    ErrMaxDataFilesExceeded,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			store, cleanup := newTestDatabase(t, false, tt.config)
+			config := tt.config
+			if config.CheckpointInterval == 0 {
+				config = DefaultDatabaseConfig()
+			}
+
+			store, cleanup := newTestDatabase(t, config)
 			defer cleanup()
 
 			if tt.setup != nil {
@@ -361,7 +358,7 @@ func TestWriteBlock_Errors(t *testing.T) {
 			}
 
 			err := store.WriteBlock(tt.height, tt.block, tt.headerSize)
-			require.Contains(t, err.Error(), tt.wantErr.Error())
+			require.ErrorIs(t, err, tt.wantErr)
 			checkDatabaseState(t, store, unsetHeight, unsetHeight)
 		})
 	}
