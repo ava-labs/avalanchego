@@ -154,7 +154,6 @@ func CollectRegistry(t *testing.T, name string, addr string, timeout time.Durati
 }
 
 // TODO:
-// - add task to combine s3 pull + reexecution
 // - separate general purpose VM setup from C-Chain specific setup
 // - update C-Chain dashboard to make it useful for the benchmark
 // - add s5cmd to flake
