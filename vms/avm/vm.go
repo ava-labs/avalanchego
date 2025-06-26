@@ -325,7 +325,6 @@ func (vm *VM) NewHTTPHandler(context.Context) (http.Handler, error) {
 		}
 
 		rpcServer.ServeHTTP(w, r)
-		return
 	})
 
 	return mux, nil

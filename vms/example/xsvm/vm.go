@@ -35,7 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/state"
 
 	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	jsonutil "github.com/ava-labs/avalanchego/utils/json"
+	avajson "github.com/ava-labs/avalanchego/utils/json"
 	xsblock "github.com/ava-labs/avalanchego/vms/example/xsvm/block"
 )
 
@@ -144,8 +144,8 @@ func (*VM) Version(context.Context) (string, error) {
 
 func (vm *VM) NewHTTPHandler(context.Context) (http.Handler, error) {
 	server := rpc.NewServer()
-	server.RegisterCodec(jsonutil.NewCodec(), "application/json")
-	server.RegisterCodec(jsonutil.NewCodec(), "application/json;charset=UTF-8")
+	server.RegisterCodec(avajson.NewCodec(), "application/json")
+	server.RegisterCodec(avajson.NewCodec(), "application/json;charset=UTF-8")
 	jsonRPCAPI := api.NewServer(
 		vm.chainContext,
 		vm.genesis,
