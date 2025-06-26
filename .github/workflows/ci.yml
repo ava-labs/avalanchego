@@ -248,5 +248,6 @@ jobs:
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup-go-for-project
-      - run: |
-          echo "Hello, world!"
+      - name: Run
+        run: |
+          go run ./tests/load/c/main --runtime=kube --kube-image="avalanchego:arc-load-test"
