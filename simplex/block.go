@@ -7,11 +7,8 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/simplex"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/utils/hashing"
-
-	pSimplex "github.com/ava-labs/avalanchego/proto/pb/simplex"
 )
 
 var _ simplex.VerifiedBlock = (*VerifiedBlock)(nil)
@@ -35,15 +32,12 @@ func (v *VerifiedBlock) BlockHeader() simplex.BlockHeader {
 // as the proto encoding of `encodedVerifiedBlock`.
 // TODO: we should use a canonical encoding since proto is not guaranteed to be canonical.
 func (v *VerifiedBlock) Bytes() ([]byte, error) {
-	cBlock := pSimplex.VerifiedBlock{
-		Metadata: v.metadata.Bytes(),
-		Block:    v.innerBlock,
+	cBlock := &CanotoVerifiedBlock{
+		Metadata:   v.metadata.Bytes(),
+		InnerBlock: v.innerBlock,
 	}
 
-	buff, err := proto.Marshal(&cBlock)
-	if err != nil {
-		return nil, err
-	}
+	buff := cBlock.MarshalCanoto()
 
 	return buff, nil
 }
@@ -59,20 +53,20 @@ func (v *VerifiedBlock) computeDigest() (simplex.Digest, error) {
 }
 
 func verifiedBlockFromBytes(buff []byte) (*VerifiedBlock, error) {
-	var protoBlock pSimplex.VerifiedBlock
+	var canotoBlock CanotoVerifiedBlock
 
-	if err := proto.Unmarshal(buff, &protoBlock); err != nil {
+	if err := canotoBlock.UnmarshalCanoto(buff); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal verified block: %w", err)
 	}
 
-	md, err := simplex.ProtocolMetadataFromBytes(protoBlock.Metadata)
+	md, err := simplex.ProtocolMetadataFromBytes(canotoBlock.Metadata)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse protocol metadata: %w", err)
 	}
 
 	v := &VerifiedBlock{
 		metadata:   *md,
-		innerBlock: protoBlock.Block,
+		innerBlock: canotoBlock.InnerBlock,
 	}
 
 	digest, err := v.computeDigest()

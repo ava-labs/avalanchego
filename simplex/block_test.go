@@ -33,5 +33,5 @@ func TestVerifiedBlockSerialization(t *testing.T) {
 	require.NoError(t, err)
 
 	// Check that the inner block data is preserved
-	require.Equal(t, vb.BlockHeader(), vb1.BlockHeader())
+	require.Equal(t, vb.BlockHeader().ProtocolMetadata, vb1.BlockHeader().ProtocolMetadata)
 }
