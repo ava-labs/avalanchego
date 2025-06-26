@@ -35,7 +35,8 @@ func (v *VerifiedBlock) BlockHeader() simplex.BlockHeader {
 }
 
 // Bytes returns the serialized bytes of the verified block
-// as the asn1 encoding of `encodedVerifiedBlock`.
+// as the proto encoding of `encodedVerifiedBlock`.
+// TODO: we should use canoto or a canonical encoding since proto is not guaranteed to be canonical.
 func (v *VerifiedBlock) Bytes() []byte {
 	cBlock := pSimplex.VerifiedBlock{
 		Metadata: v.metadata.Bytes(),
