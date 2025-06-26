@@ -9,7 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (
@@ -28,9 +29,9 @@ type indexEntry struct {
 	// Offset is the byte offset in the data file where the block's header starts.
 	Offset uint64
 	// Size is the length in bytes of the block's data (excluding the blockHeader).
-	Size uint64
+	Size uint32
 	// HeaderSize is the size in bytes of the block's header portion within the data.
-	HeaderSize uint16
+	HeaderSize BlockHeaderSize
 }
 
 // IsEmpty returns true if this entry is uninitialized.
@@ -43,8 +44,8 @@ func (e indexEntry) IsEmpty() bool {
 func (e indexEntry) MarshalBinary() ([]byte, error) {
 	buf := make([]byte, sizeOfIndexEntry)
 	binary.LittleEndian.PutUint64(buf[0:], e.Offset)
-	binary.LittleEndian.PutUint64(buf[8:], e.Size)
-	binary.LittleEndian.PutUint16(buf[16:], e.HeaderSize)
+	binary.LittleEndian.PutUint32(buf[8:], e.Size)
+	binary.LittleEndian.PutUint32(buf[12:], e.HeaderSize)
 	return buf, nil
 }
 
@@ -54,8 +55,8 @@ func (e *indexEntry) UnmarshalBinary(data []byte) error {
 		return fmt.Errorf("incorrect data length to unmarshal indexEntry: got %d bytes, need exactly %d", len(data), sizeOfIndexEntry)
 	}
 	e.Offset = binary.LittleEndian.Uint64(data[0:])
-	e.Size = binary.LittleEndian.Uint64(data[8:])
-	e.HeaderSize = binary.LittleEndian.Uint16(data[16:])
+	e.Size = binary.LittleEndian.Uint32(data[8:])
+	e.HeaderSize = binary.LittleEndian.Uint32(data[12:])
 	return nil
 }
 
@@ -63,12 +64,12 @@ func (e *indexEntry) UnmarshalBinary(data []byte) error {
 type indexFileHeader struct {
 	Version             uint64
 	MaxDataFileSize     uint64
-	MaxHeight           BlockHeight
 	MinHeight           BlockHeight
 	MaxContiguousHeight BlockHeight
+	MaxHeight           BlockHeight
 	NextWriteOffset     uint64
-	// reserve 24 bytes for future use
-	Reserved [24]byte
+	// reserve 32 bytes for future use
+	Reserved [32]byte
 }
 
 // Add MarshalBinary for indexFileHeader
@@ -76,9 +77,9 @@ func (h indexFileHeader) MarshalBinary() ([]byte, error) {
 	buf := make([]byte, sizeOfIndexFileHeader)
 	binary.LittleEndian.PutUint64(buf[0:], h.Version)
 	binary.LittleEndian.PutUint64(buf[8:], h.MaxDataFileSize)
-	binary.LittleEndian.PutUint64(buf[16:], h.MaxHeight)
-	binary.LittleEndian.PutUint64(buf[24:], h.MinHeight)
-	binary.LittleEndian.PutUint64(buf[32:], h.MaxContiguousHeight)
+	binary.LittleEndian.PutUint64(buf[16:], h.MinHeight)
+	binary.LittleEndian.PutUint64(buf[24:], h.MaxContiguousHeight)
+	binary.LittleEndian.PutUint64(buf[32:], h.MaxHeight)
 	binary.LittleEndian.PutUint64(buf[40:], h.NextWriteOffset)
 	return buf, nil
 }
@@ -93,9 +94,9 @@ func (h *indexFileHeader) UnmarshalBinary(data []byte) error {
 	}
 	h.Version = binary.LittleEndian.Uint64(data[0:])
 	h.MaxDataFileSize = binary.LittleEndian.Uint64(data[8:])
-	h.MaxHeight = binary.LittleEndian.Uint64(data[16:])
-	h.MinHeight = binary.LittleEndian.Uint64(data[24:])
-	h.MaxContiguousHeight = binary.LittleEndian.Uint64(data[32:])
+	h.MinHeight = binary.LittleEndian.Uint64(data[16:])
+	h.MaxContiguousHeight = binary.LittleEndian.Uint64(data[24:])
+	h.MaxHeight = binary.LittleEndian.Uint64(data[32:])
 	h.NextWriteOffset = binary.LittleEndian.Uint64(data[40:])
 	return nil
 }
@@ -105,14 +106,15 @@ func (s *Database) indexEntryOffset(height BlockHeight) (uint64, error) {
 		return 0, fmt.Errorf("%w: height %d is less than minimum block height %d", ErrInvalidBlockHeight, height, s.header.MinHeight)
 	}
 	relativeHeight := height - s.header.MinHeight
-
-	// Check for overflow before calculating the final offset.
-	if relativeHeight > (math.MaxUint64-sizeOfIndexFileHeader)/sizeOfIndexEntry {
+	offsetFromHeaderStart, err := safemath.Mul(relativeHeight, sizeOfIndexEntry)
+	if err != nil {
+		return 0, fmt.Errorf("%w: block height %d is too large", ErrInvalidBlockHeight, height)
+	}
+	finalOffset, err := safemath.Add(sizeOfIndexFileHeader, offsetFromHeaderStart)
+	if err != nil {
 		return 0, fmt.Errorf("%w: block height %d is too large", ErrInvalidBlockHeight, height)
 	}
 
-	offsetFromHeaderStart := relativeHeight * sizeOfIndexEntry
-	finalOffset := sizeOfIndexFileHeader + offsetFromHeaderStart
 	return finalOffset, nil
 }
 
@@ -142,7 +144,7 @@ func (s *Database) readIndexEntry(height BlockHeight) (indexEntry, error) {
 	return entry, nil
 }
 
-func (s *Database) writeIndexEntryAt(indexFileOffset, dataFileBlockOffset, blockDataLen uint64, headerSize uint16) error {
+func (s *Database) writeIndexEntryAt(indexFileOffset, dataFileBlockOffset uint64, blockDataLen uint32, headerSize BlockHeaderSize) error {
 	indexEntry := indexEntry{
 		Offset:     dataFileBlockOffset,
 		Size:       blockDataLen,
@@ -164,7 +166,7 @@ func (s *Database) persistIndexHeader() error {
 	// The index file must be fsync'd before the header is written to prevent
 	// a state where the header is persisted but the index entries it refers to
 	// are not. This could lead to data inconsistency on recovery.
-	if s.syncToDisk {
+	if s.options.SyncToDisk {
 		if err := s.indexFile.Sync(); err != nil {
 			return fmt.Errorf("failed to sync index file before writing header state: %w", err)
 		}

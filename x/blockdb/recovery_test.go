@@ -1,0 +1,348 @@
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package blockdb
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
+
+func TestRecovery_Success(t *testing.T) {
+	// Create database with 10KB file size and 4KB blocks
+	// This means each file will have 2 blocks (4KB + 24 bytes header = ~4KB per block)
+	config := DefaultDatabaseConfig().WithMaxDataFileSize(10 * 1024) // 10KB per file
+
+	tests := []struct {
+		name         string
+		corruptIndex func(indexPath string) error
+	}{
+		{
+			name:         "recovery from missing index file; blocks will be recovered",
+			corruptIndex: os.Remove,
+		},
+		{
+			name: "recovery from truncated index file",
+			corruptIndex: func(indexPath string) error {
+				// Remove the existing index file
+				if err := os.Remove(indexPath); err != nil {
+					return err
+				}
+
+				// Create a new index file with only the first block indexed
+				// This simulates an unclean shutdown where the index file is behind
+				indexFile, err := os.OpenFile(indexPath, os.O_RDWR|os.O_CREATE, defaultFilePermissions)
+				if err != nil {
+					return err
+				}
+				defer indexFile.Close()
+
+				// Create a header that only knows about the first block
+				// Block 0: 4KB data + header
+				firstBlockOffset := uint64(sizeOfBlockHeader) + 4*1024
+
+				header := indexFileHeader{
+					Version:             IndexFileVersion,
+					MaxDataFileSize:     10 * 1024, // 10KB per file
+					MinHeight:           0,
+					MaxContiguousHeight: 0,
+					MaxHeight:           0,
+					NextWriteOffset:     firstBlockOffset,
+				}
+
+				// Write the header
+				headerBytes, err := header.MarshalBinary()
+				if err != nil {
+					return err
+				}
+				if _, err := indexFile.WriteAt(headerBytes, 0); err != nil {
+					return err
+				}
+
+				// Write index entry for only the first block
+				indexEntry := indexEntry{
+					Offset:     0,
+					Size:       4 * 1024, // 4KB
+					HeaderSize: 0,
+				}
+				entryBytes, err := indexEntry.MarshalBinary()
+				if err != nil {
+					return err
+				}
+				indexEntryOffset := sizeOfIndexFileHeader
+				if _, err := indexFile.WriteAt(entryBytes, int64(indexEntryOffset)); err != nil {
+					return err
+				}
+
+				return nil
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store, cleanup := newTestDatabase(t, config)
+			defer cleanup()
+			blockHeights := []uint64{0, 1, 3, 5, 2, 8}
+			blocks := make(map[uint64][]byte)
+
+			for _, height := range blockHeights {
+				// Create 4KB blocks
+				block := make([]byte, 4*1024)
+				copy(block, fmt.Appendf(nil, "block-data-for-height-%d", height))
+
+				require.NoError(t, store.WriteBlock(height, block, 0))
+				blocks[height] = block
+			}
+			checkDatabaseState(t, store, 8, 3)
+			require.NoError(t, store.Close())
+
+			// Corrupt the index file according to the test case
+			indexPath := store.indexFile.Name()
+			require.NoError(t, tt.corruptIndex(indexPath))
+
+			// Reopen the database and test recovery
+			indexDir := filepath.Join(indexPath, "..")
+			recoveredStore, err := New(indexDir, store.dataDir, config, store.log)
+			require.NoError(t, err)
+			defer recoveredStore.Close()
+
+			// Verify all blocks are still readable
+			for _, height := range blockHeights {
+				readBlock, err := recoveredStore.ReadBlock(height)
+				require.NoError(t, err)
+				require.Equal(t, blocks[height], readBlock, "block %d should be the same", height)
+			}
+
+			checkDatabaseState(t, recoveredStore, 8, 3)
+		})
+	}
+}
+
+func TestRecovery_CorruptionDetection(t *testing.T) {
+	tests := []struct {
+		name            string
+		blockHeights    []uint64
+		minHeight       uint64
+		setupCorruption func(store *Database, blocks [][]byte) error
+		wantErr         error
+		wantErrText     string
+	}{
+		{
+			name:         "index header claims larger offset than actual data",
+			blockHeights: []uint64{0, 1, 2, 3, 4},
+			setupCorruption: func(store *Database, _ [][]byte) error {
+				indexPath := store.indexFile.Name()
+				indexFile, err := os.OpenFile(indexPath, os.O_RDWR, 0)
+				if err != nil {
+					return err
+				}
+				defer indexFile.Close()
+
+				// Read the current header
+				headerBuf := make([]byte, sizeOfIndexFileHeader)
+				_, err = indexFile.ReadAt(headerBuf, 0)
+				if err != nil {
+					return err
+				}
+
+				// Parse and corrupt the header by setting NextWriteOffset to be much larger than actual data
+				var header indexFileHeader
+				err = header.UnmarshalBinary(headerBuf)
+				if err != nil {
+					return err
+				}
+				header.NextWriteOffset = 1000000
+
+				// Write the corrupted header back
+				corruptedHeaderBytes, err := header.MarshalBinary()
+				if err != nil {
+					return err
+				}
+				_, err = indexFile.WriteAt(corruptedHeaderBytes, 0)
+				return err
+			},
+			wantErr:     ErrCorrupted,
+			wantErrText: "index header claims to have more data than is actually on disk",
+		},
+		{
+			name:         "corrupted block header in data file",
+			blockHeights: []uint64{0, 1},
+			setupCorruption: func(store *Database, blocks [][]byte) error {
+				if err := resetIndexToBlock(store, uint64(len(blocks[0])), 0); err != nil {
+					return err
+				}
+				// Corrupt second block header with invalid data
+				secondBlockOffset := int64(sizeOfBlockHeader) + int64(len(blocks[0]))
+				corruptedHeader := make([]byte, sizeOfBlockHeader)
+				for i := range corruptedHeader {
+					corruptedHeader[i] = 0xFF // Invalid data
+				}
+				dataFilePath := store.dataFilePath(0)
+				dataFile, err := os.OpenFile(dataFilePath, os.O_RDWR, 0)
+				if err != nil {
+					return err
+				}
+				defer dataFile.Close()
+				_, err = dataFile.WriteAt(corruptedHeader, secondBlockOffset)
+				return err
+			},
+			wantErr:     ErrCorrupted,
+			wantErrText: "invalid block size in header",
+		},
+		{
+			name:         "block with invalid block size in header",
+			blockHeights: []uint64{0, 1},
+			setupCorruption: func(store *Database, blocks [][]byte) error {
+				if err := resetIndexToBlock(store, uint64(len(blocks[0])), 0); err != nil {
+					return err
+				}
+				secondBlockOffset := int64(sizeOfBlockHeader) + int64(len(blocks[0]))
+				bh := blockHeader{
+					Height:     1,
+					Checksum:   calculateChecksum(blocks[1]),
+					Size:       uint32(len(blocks[1])) + 1, // too large
+					HeaderSize: 0,
+				}
+				return writeBlockHeader(store, secondBlockOffset, bh)
+			},
+			wantErr:     ErrCorrupted,
+			wantErrText: "block data out of bounds",
+		},
+		{
+			name:         "block with checksum mismatch",
+			blockHeights: []uint64{0, 1},
+			setupCorruption: func(store *Database, blocks [][]byte) error {
+				if err := resetIndexToBlock(store, uint64(len(blocks[0])), 0); err != nil {
+					return err
+				}
+				secondBlockOffset := int64(sizeOfBlockHeader) + int64(len(blocks[0]))
+				bh := blockHeader{
+					Height:     1,
+					Checksum:   0xDEADBEEF, // Wrong checksum
+					Size:       uint32(len(blocks[1])),
+					HeaderSize: 0,
+				}
+				return writeBlockHeader(store, secondBlockOffset, bh)
+			},
+			wantErr:     ErrCorrupted,
+			wantErrText: "checksum mismatch for block",
+		},
+		{
+			name:         "partial block at end of file",
+			blockHeights: []uint64{0},
+			setupCorruption: func(store *Database, blocks [][]byte) error {
+				dataFilePath := store.dataFilePath(0)
+				dataFile, err := os.OpenFile(dataFilePath, os.O_RDWR, 0)
+				if err != nil {
+					return err
+				}
+				defer dataFile.Close()
+
+				// Truncate to have only partial block data
+				truncateSize := int64(sizeOfBlockHeader) + int64(len(blocks[0]))/2
+				return dataFile.Truncate(truncateSize)
+			},
+			wantErr:     ErrCorrupted,
+			wantErrText: "index header claims to have more data than is actually on disk",
+		},
+		{
+			name:         "block with invalid height",
+			blockHeights: []uint64{10, 11},
+			minHeight:    10,
+			setupCorruption: func(store *Database, blocks [][]byte) error {
+				if err := resetIndexToBlock(store, uint64(len(blocks[0])), 10); err != nil {
+					return err
+				}
+				secondBlockOffset := int64(sizeOfBlockHeader) + int64(len(blocks[0]))
+				bh := blockHeader{
+					Height:     5, // Below minimum height of 10
+					Checksum:   calculateChecksum(blocks[1]),
+					Size:       uint32(len(blocks[1])),
+					HeaderSize: 0,
+				}
+				return writeBlockHeader(store, secondBlockOffset, bh)
+			},
+			wantErr:     ErrCorrupted,
+			wantErrText: "invalid block height in header",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := DefaultDatabaseConfig()
+			if tt.minHeight > 0 {
+				config = config.WithMinimumHeight(tt.minHeight)
+			}
+
+			store, cleanup := newTestDatabase(t, config)
+			defer cleanup()
+
+			// Setup blocks
+			blocks := make([][]byte, len(tt.blockHeights))
+			for i, height := range tt.blockHeights {
+				blocks[i] = randomBlock(t)
+				require.NoError(t, store.WriteBlock(height, blocks[i], 0))
+			}
+			require.NoError(t, store.Close())
+
+			// Apply corruption
+			require.NoError(t, tt.setupCorruption(store, blocks))
+
+			// Try to reopen the database - it should detect corruption
+			indexDir := filepath.Dir(store.indexFile.Name())
+			_, err := New(indexDir, store.dataDir, config, store.log)
+			require.ErrorIs(t, err, tt.wantErr)
+			require.Contains(t, err.Error(), tt.wantErrText, "error message should contain expected text")
+		})
+	}
+}
+
+// Helper function to reset index to only a single block
+func resetIndexToBlock(store *Database, blockSize uint64, minHeight uint64) error {
+	indexPath := store.indexFile.Name()
+	indexFile, err := os.OpenFile(indexPath, os.O_RDWR, 0)
+	if err != nil {
+		return err
+	}
+	defer indexFile.Close()
+
+	header := indexFileHeader{
+		Version:             IndexFileVersion,
+		MaxDataFileSize:     DefaultMaxDataFileSize,
+		MinHeight:           minHeight,
+		MaxContiguousHeight: minHeight,
+		MaxHeight:           minHeight,
+		NextWriteOffset:     uint64(sizeOfBlockHeader) + blockSize,
+	}
+
+	headerBytes, err := header.MarshalBinary()
+	if err != nil {
+		return err
+	}
+	_, err = indexFile.WriteAt(headerBytes, 0)
+	return err
+}
+
+// Helper function to write a block header at a specific offset
+func writeBlockHeader(store *Database, offset int64, bh blockHeader) error {
+	fileIndex := int(offset / int64(store.header.MaxDataFileSize))
+	localOffset := offset % int64(store.header.MaxDataFileSize)
+	dataFilePath := store.dataFilePath(fileIndex)
+	dataFile, err := os.OpenFile(dataFilePath, os.O_RDWR, 0)
+	if err != nil {
+		return err
+	}
+	defer dataFile.Close()
+
+	headerBytes, err := bh.MarshalBinary()
+	if err != nil {
+		return err
+	}
+	_, err = dataFile.WriteAt(headerBytes, localOffset)
+	return err
+}

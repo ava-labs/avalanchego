@@ -81,7 +81,7 @@ func TestReadOperations(t *testing.T) {
 				config = &defaultConfig
 			}
 
-			store, cleanup := newTestDatabase(t, false, tt.config)
+			store, cleanup := newTestDatabase(t, *config)
 			defer cleanup()
 
 			// Seed database with blocks based on config
@@ -97,7 +97,7 @@ func TestReadOperations(t *testing.T) {
 					}
 
 					block := randomBlock(t)
-					require.NoError(t, store.WriteBlock(i, block, uint16(i-minHeight)))
+					require.NoError(t, store.WriteBlock(i, block, BlockHeaderSize(i-minHeight)))
 					seededBlocks[i] = block
 				}
 			}
@@ -127,7 +127,7 @@ func TestReadOperations(t *testing.T) {
 			} else {
 				require.NotNil(t, readBlock)
 				expectedBlock := seededBlocks[tt.readHeight]
-				headerSize := uint16(tt.readHeight - config.MinimumHeight)
+				headerSize := BlockHeaderSize(tt.readHeight - config.MinimumHeight)
 				var expectHeader []byte
 				if headerSize > 0 {
 					expectHeader = expectedBlock[:headerSize]
@@ -141,13 +141,13 @@ func TestReadOperations(t *testing.T) {
 }
 
 func TestReadOperations_Concurrency(t *testing.T) {
-	store, cleanup := newTestDatabase(t, false, nil)
+	store, cleanup := newTestDatabase(t, DefaultDatabaseConfig())
 	defer cleanup()
 
 	// Pre-generate blocks and write them
 	numBlocks := 50
 	blocks := make([][]byte, numBlocks)
-	headerSizes := make([]uint16, numBlocks)
+	headerSizes := make([]BlockHeaderSize, numBlocks)
 	gapHeights := map[uint64]bool{
 		10: true,
 		20: true,
@@ -159,9 +159,9 @@ func TestReadOperations_Concurrency(t *testing.T) {
 		}
 
 		blocks[i] = randomBlock(t)
-		headerSizes[i] = uint16(i * 10) // Varying header sizes
-		if headerSizes[i] > uint16(len(blocks[i])) {
-			headerSizes[i] = uint16(len(blocks[i])) / 2
+		headerSizes[i] = BlockHeaderSize(i * 10) // Varying header sizes
+		if headerSizes[i] > BlockHeaderSize(len(blocks[i])) {
+			headerSizes[i] = BlockHeaderSize(len(blocks[i])) / 2
 		}
 
 		require.NoError(t, store.WriteBlock(uint64(i), blocks[i], headerSizes[i]))

@@ -21,7 +21,8 @@ func TestNew_Truncate(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 	indexDir := filepath.Join(tempDir, "index")
 	dataDir := filepath.Join(tempDir, "data")
-	db, err := New(indexDir, dataDir, false, true, DefaultDatabaseConfig(), logging.NoLog{})
+	config := DefaultDatabaseConfig().WithTruncate(true)
+	db, err := New(indexDir, dataDir, config, logging.NoLog{})
 	require.NoError(t, err)
 	require.NotNil(t, db)
 
@@ -31,7 +32,7 @@ func TestNew_Truncate(t *testing.T) {
 	require.NoError(t, db.Close())
 
 	// Reopen with truncate=true and verify data is gone
-	db2, err := New(indexDir, dataDir, false, true, DefaultDatabaseConfig(), logging.NoLog{})
+	db2, err := New(indexDir, dataDir, config, logging.NoLog{})
 	require.NoError(t, err)
 	require.NotNil(t, db2)
 	defer db2.Close()
@@ -48,7 +49,8 @@ func TestNew_NoTruncate(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 	indexDir := filepath.Join(tempDir, "index")
 	dataDir := filepath.Join(tempDir, "data")
-	db, err := New(indexDir, dataDir, false, true, DefaultDatabaseConfig(), logging.NoLog{})
+	config := DefaultDatabaseConfig().WithTruncate(true)
+	db, err := New(indexDir, dataDir, config, logging.NoLog{})
 	require.NoError(t, err)
 	require.NotNil(t, db)
 
@@ -61,7 +63,8 @@ func TestNew_NoTruncate(t *testing.T) {
 	require.NoError(t, db.Close())
 
 	// Reopen with truncate=false and verify data is still there
-	db2, err := New(indexDir, dataDir, false, false, DefaultDatabaseConfig(), logging.NoLog{})
+	config = DefaultDatabaseConfig().WithTruncate(false)
+	db2, err := New(indexDir, dataDir, config, logging.NoLog{})
 	require.NoError(t, err)
 	require.NotNil(t, db2)
 	defer db2.Close()
@@ -85,7 +88,6 @@ func TestNew_Params(t *testing.T) {
 		name        string
 		indexDir    string
 		dataDir     string
-		syncToDisk  bool
 		config      DatabaseConfig
 		log         logging.Logger
 		wantErr     error
@@ -98,15 +100,13 @@ func TestNew_Params(t *testing.T) {
 			config:   DefaultDatabaseConfig(),
 		},
 		{
-			name:       "custom config",
-			indexDir:   tempDir,
-			dataDir:    tempDir,
-			syncToDisk: true,
-			config: DatabaseConfig{
-				MinimumHeight:      100,
-				MaxDataFileSize:    1024 * 1024 * 1024, // 1GB
-				CheckpointInterval: 512,
-			},
+			name:     "custom config",
+			indexDir: tempDir,
+			dataDir:  tempDir,
+			config: DefaultDatabaseConfig().
+				WithMinimumHeight(100).
+				WithMaxDataFileSize(1024 * 1024). // 1MB
+				WithCheckpointInterval(512),
 		},
 		{
 			name:     "empty index directory",
@@ -133,18 +133,14 @@ func TestNew_Params(t *testing.T) {
 			name:     "invalid config - zero checkpoint interval",
 			indexDir: tempDir,
 			dataDir:  tempDir,
-			config: DatabaseConfig{
-				MinimumHeight:      0,
-				MaxDataFileSize:    DefaultMaxDataFileSize,
-				CheckpointInterval: 0,
-			},
-			wantErr: errors.New("CheckpointInterval cannot be 0"),
+			config:   DefaultDatabaseConfig().WithCheckpointInterval(0),
+			wantErr:  errors.New("CheckpointInterval cannot be 0"),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			db, err := New(tt.indexDir, tt.dataDir, tt.syncToDisk, true, tt.config, tt.log)
+			db, err := New(tt.indexDir, tt.dataDir, tt.config, tt.log)
 
 			if tt.wantErr != nil {
 				require.Equal(t, tt.wantErr.Error(), err.Error())
@@ -158,7 +154,7 @@ func TestNew_Params(t *testing.T) {
 			require.Equal(t, tt.config.MinimumHeight, db.options.MinimumHeight)
 			require.Equal(t, tt.config.MaxDataFileSize, db.options.MaxDataFileSize)
 			require.Equal(t, tt.config.CheckpointInterval, db.options.CheckpointInterval)
-			require.Equal(t, tt.syncToDisk, db.syncToDisk)
+			require.Equal(t, tt.config.SyncToDisk, db.options.SyncToDisk)
 
 			indexPath := filepath.Join(tt.indexDir, indexFileName)
 			require.FileExists(t, indexPath)
@@ -234,7 +230,7 @@ func TestNew_IndexFileErrors(t *testing.T) {
 			defer os.RemoveAll(filepath.Dir(indexDir))
 			defer os.RemoveAll(filepath.Dir(dataDir))
 
-			_, err := New(indexDir, dataDir, false, false, DefaultDatabaseConfig(), logging.NoLog{})
+			_, err := New(indexDir, dataDir, DefaultDatabaseConfig(), logging.NoLog{})
 			require.Contains(t, err.Error(), tt.wantErrMsg)
 		})
 	}
@@ -248,15 +244,11 @@ func TestIndexFileHeaderAlignment(t *testing.T) {
 
 func TestNew_IndexFileConfigPrecedence(t *testing.T) {
 	// set up db
-	initialConfig := DatabaseConfig{
-		MinimumHeight:      100,
-		MaxDataFileSize:    1024 * 1024, // 1MB limit
-		CheckpointInterval: 1024,
-	}
+	initialConfig := DefaultDatabaseConfig().WithMinimumHeight(100).WithMaxDataFileSize(1024 * 1024)
 	tempDir, err := os.MkdirTemp("", "blockdb_config_precedence_test_*")
 	require.NoError(t, err)
 	defer os.RemoveAll(tempDir)
-	db, err := New(tempDir, tempDir, false, true, initialConfig, logging.NoLog{})
+	db, err := New(tempDir, tempDir, initialConfig, logging.NoLog{})
 	require.NoError(t, err)
 	require.NotNil(t, db)
 
@@ -269,12 +261,8 @@ func TestNew_IndexFileConfigPrecedence(t *testing.T) {
 	require.NoError(t, db.Close())
 
 	// Reopen with different config that has higher minimum height and smaller max data file size
-	differentConfig := DatabaseConfig{
-		MinimumHeight:      200,        // Higher minimum height
-		MaxDataFileSize:    512 * 1024, // 512KB limit (smaller than original 1MB)
-		CheckpointInterval: 512,
-	}
-	db2, err := New(tempDir, tempDir, false, false, differentConfig, logging.NoLog{})
+	differentConfig := DefaultDatabaseConfig().WithMinimumHeight(200).WithMaxDataFileSize(512 * 1024)
+	db2, err := New(tempDir, tempDir, differentConfig, logging.NoLog{})
 	require.NoError(t, err)
 	require.NotNil(t, db2)
 	defer db2.Close()

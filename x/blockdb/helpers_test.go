@@ -15,19 +15,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-func newTestDatabase(t *testing.T, syncToDisk bool, opts *DatabaseConfig) (*Database, func()) {
+func newTestDatabase(t *testing.T, opts DatabaseConfig) (*Database, func()) {
 	t.Helper()
 	dir, err := os.MkdirTemp("", "blockdb_test_*")
 	require.NoError(t, err, "failed to create temp dir")
 	idxDir := filepath.Join(dir, "idx")
 	dataDir := filepath.Join(dir, "dat")
-	var config DatabaseConfig
-	if opts != nil {
-		config = *opts
-	} else {
-		config = DefaultDatabaseConfig()
-	}
-	db, err := New(idxDir, dataDir, syncToDisk, true, config, logging.NoLog{})
+
+	db, err := New(idxDir, dataDir, opts, logging.NoLog{})
 	if err != nil {
 		os.RemoveAll(dir)
 		require.NoError(t, err, "failed to create database")
