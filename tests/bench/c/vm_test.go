@@ -24,16 +24,17 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
-	"github.com/ava-labs/avalanchego/tests/load"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/coreth/plugin/evm"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 const (
@@ -52,6 +53,7 @@ var (
 	targetDir      string
 	startBlock     uint64
 	endBlock       uint64
+	chanSize       int
 	metricsEnabled bool
 )
 
@@ -62,8 +64,9 @@ func TestMain(m *testing.M) {
 	// - vmdb/
 	// - chain-data-dir/
 	flag.StringVar(&targetDir, "target-dir", targetDir, "Target directory for the current state including VM DB and Chain Data Directory.")
-	flag.Uint64Var(&startBlock, "start-block", 100, "Start block to begin execution (exclusive).")
+	flag.Uint64Var(&startBlock, "start-block", 101, "Start block to begin execution (exclusive).")
 	flag.Uint64Var(&endBlock, "end-block", 200, "End block to end execution (inclusive).")
+	flag.IntVar(&chanSize, "chan-size", 100, "Size of the channel to use for block processing.")
 	flag.BoolVar(&metricsEnabled, "metrics-enabled", true, "Enable metrics collection.")
 
 	flag.Parse()
@@ -119,7 +122,7 @@ func CollectRegistry(t *testing.T, name string, addr string, timeout time.Durati
 
 	r.NoError(tmpnet.StartPrometheus(ctx, tests.NewDefaultLogger("prometheus")))
 
-	server := load.NewPrometheusServer(addr, gatherer)
+	server := tests.NewPrometheusServer(addr, "/", gatherer)
 	errChan, err := server.Start()
 	r.NoError(err)
 
@@ -152,9 +155,9 @@ func CollectRegistry(t *testing.T, name string, addr string, timeout time.Durati
 
 // TODO:
 // - add task to combine s3 pull + reexecution
-// - fix task env var handling
 // - separate general purpose VM setup from C-Chain specific setup
 // - update C-Chain dashboard to make it useful for the benchmark
+// - add s5cmd to flake
 func TestReexecuteRange(t *testing.T) {
 	r := require.New(t)
 
@@ -177,7 +180,7 @@ func TestReexecuteRange(t *testing.T) {
 		})
 	}
 
-	blockChan, err := createBlockChanFromRawDB(sourceBlockDir, 1, 100, 100)
+	blockChan, err := createBlockChanFromRawDB(sourceBlockDir, startBlock, endBlock, chanSize)
 	r.NoError(err)
 
 	// WIP:
@@ -200,10 +203,6 @@ func TestReexecuteRange(t *testing.T) {
 	executor := newVMExecutor(sourceVM)
 	err = executor.executeSequence(context.Background(), blockChan)
 	r.NoError(err)
-
-	time.Sleep(20 * time.Second)
-
-	t.Fail()
 }
 
 func newMainnetCChainVM(
@@ -291,33 +290,52 @@ type BlockResult struct {
 }
 
 type VMExecutor struct {
-	vm block.ChainVM
+	log logging.Logger
+	vm  block.ChainVM
 }
 
 func newVMExecutor(vm block.ChainVM) *VMExecutor {
 	return &VMExecutor{
-		vm: vm,
+		vm:  vm,
+		log: tests.NewDefaultLogger("vm-executor"),
 	}
 }
 
 func (e *VMExecutor) execute(ctx context.Context, blockBytes []byte) error {
 	blk, err := e.vm.ParseBlock(ctx, blockBytes)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to parse block: %w", err)
 	}
 
 	if err := blk.Verify(ctx); err != nil {
-		return err
+		return fmt.Errorf("failed to verify block %s at height %d: %w", blk.ID(), blk.Height(), err)
 	}
 
-	return blk.Accept(ctx)
+	if err := blk.Accept(ctx); err != nil {
+		return fmt.Errorf("failed to accept block %s at height %d: %w", blk.ID(), blk.Height(), err)
+	}
+
+	return nil
 }
 
 func (e *VMExecutor) executeSequence(ctx context.Context, blkChan <-chan BlockResult) error {
+	blkID, err := e.vm.LastAccepted(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get last accepted block: %w", err)
+	}
+	blk, err := e.vm.GetBlock(ctx, blkID)
+	if err != nil {
+		return fmt.Errorf("failed to get last accepted block: %w", err)
+	}
+
+	e.log.Info("last accepted block", zap.String("blkID", blkID.String()), zap.Uint64("height", blk.Height()))
+
 	for blkResult := range blkChan {
 		if blkResult.Err != nil {
 			return blkResult.Err
 		}
+
+		e.log.Info("executing block", zap.String("blkID", blkID.String()), zap.Uint64("height", blk.Height()))
 		if err := e.execute(ctx, blkResult.BlockBytes); err != nil {
 			return err
 		}
@@ -331,7 +349,7 @@ func createBlockChanFromRawDB(sourceDir string, startBlock, endBlock uint64, cha
 
 	db, err := rawdb.NewLevelDBDatabase(sourceDir, sourceDBCacheSize, sourceDBHandles, "", true)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create leveldb database from %q: %w", sourceDir, err)
 	}
 
 	go func() {
