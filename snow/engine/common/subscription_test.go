@@ -84,13 +84,15 @@ func TestSubscriptionProxy(t *testing.T) {
 		},
 		{
 			name: "Cancel wait",
-			f: func(_ *SubscriptionProxy, cancel context.CancelFunc, _ chan Message) {
+			f: func(sp *SubscriptionProxy, cancel context.CancelFunc, _ chan Message) {
 				cancel()
+				sp.Publish(StateSyncDone)
 			},
 		},
 		{
 			name: "Close",
 			f: func(sp *SubscriptionProxy, _ context.CancelFunc, _ chan Message) {
+				sp.Publish(StateSyncDone)
 				sp.Close()
 			},
 		},
