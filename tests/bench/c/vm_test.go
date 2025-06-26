@@ -5,10 +5,8 @@ package vm
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -29,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
-	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/coreth/plugin/evm"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -54,6 +51,7 @@ var (
 	targetDir      string
 	startBlock     uint64
 	endBlock       uint64
+	metricsEnabled bool
 )
 
 func TestMain(m *testing.M) {
@@ -65,6 +63,7 @@ func TestMain(m *testing.M) {
 	flag.StringVar(&targetDir, "target-dir", targetDir, "Target directory for the current state including VM DB and Chain Data Directory.")
 	flag.Uint64Var(&startBlock, "start-block", 100, "Start block to begin execution (exclusive).")
 	flag.Uint64Var(&endBlock, "end-block", 200, "End block to end execution (inclusive).")
+	flag.BoolVar(&metricsEnabled, "metrics-enabled", true, "Enable metrics collection.")
 
 	flag.Parse()
 	m.Run()
@@ -73,21 +72,15 @@ func TestMain(m *testing.M) {
 func TestPrometheusIntegration(t *testing.T) {
 	r := require.New(t)
 
-	// Start prometheus server on port 9000
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-	r.NoError(tmpnet.StartPrometheus(ctx, tests.NewDefaultLogger("prometheus")))
-
+	prefixGatherer := metrics.NewPrefixGatherer()
 	registry := prometheus.NewRegistry()
-	server := load.NewPrometheusServer("127.0.0.1:9000", registry)
-	errChan, err := server.Start()
-	r.NoError(err)
-	t.Cleanup(func() {
-		r.NoError(server.Stop())
-		r.NoError(<-errChan)
-	})
+	prefixGatherer.Register("dummy", registry)
 
-	r.NoError(WriteNodeServiceDiscovery("test"))
+	CollectRegistry(t, "test", "127.0.0.1:9000", time.Minute, prefixGatherer, map[string]string{
+		"job":      "test-prometheus2",
+		"service":  "test",
+		"instance": "testPrometheusIntegration2",
+	})
 
 	counter := prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "thingy_majig",
@@ -100,52 +93,84 @@ func TestPrometheusIntegration(t *testing.T) {
 		time.Sleep(time.Second * 5)
 		counter.Inc()
 	}
+
+	prefixedMetrics, err := prefixGatherer.Gather()
+	r.NoError(err)
+	for _, metricFamily := range prefixedMetrics {
+		fmt.Println(metricFamily.GetName())
+	}
+
+	registryMetrics, err := registry.Gather()
+	r.NoError(err)
+	for _, metricFamily := range registryMetrics {
+		fmt.Println(metricFamily.GetName())
+	}
+
+	t.Fail()
 }
 
-func WriteNodeServiceDiscovery(instanceID string) error {
-	serviceDiscoveryDir, err := tmpnet.GetPrometheusServiceDiscoveryDir()
-	if err != nil {
-		return fmt.Errorf("failed to get service discovery dir: %w", err)
-	}
+func CollectRegistry(t *testing.T, name string, addr string, timeout time.Duration, gatherer prometheus.Gatherer, labels map[string]string) {
+	r := require.New(t)
 
-	if err := os.MkdirAll(serviceDiscoveryDir, 0755); err != nil {
-		return fmt.Errorf("failed to create service discovery dir: %w", err)
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	t.Cleanup(cancel)
 
-	labels := tmpnet.GetGitHubLabels()
-	labels["job"] = "test-prometheus"
-	labels["service"] = "test"
-	labels["instance"] = instanceID
+	r.NoError(tmpnet.StartPrometheus(ctx, tests.NewDefaultLogger("prometheus")))
 
-	targets := []map[string]interface{}{
+	server := load.NewPrometheusServer(addr, gatherer)
+	errChan, err := server.Start()
+	r.NoError(err)
+
+	t.Cleanup(func() {
+		r.NoError(server.Stop())
+		r.NoError(<-errChan)
+	})
+
+	// TODO: remove this after debugging metrics showing up correctly
+	t.Cleanup(func() {
+		metrics, err := gatherer.Gather()
+		r.NoError(err)
+		t.Log("metrics:")
+		for _, metricFamily := range metrics {
+			t.Log(metricFamily.GetName())
+		}
+	})
+
+	r.NoError(tmpnet.WritePrometheusServiceDiscoveryConfigFile(name, []tmpnet.SDConfig{
 		{
-			"targets": []string{"127.0.0.1:9000"},
-			"labels":  labels,
+			Targets: []string{addr},
+			Labels:  labels,
 		},
-	}
-
-	configPath := filepath.Join(serviceDiscoveryDir, fmt.Sprintf("%s.json", "test"))
-	configData, err := json.MarshalIndent(targets, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
-	}
-
-	return os.WriteFile(configPath, configData, 0644)
+	}, true))
 }
 
 // TODO:
-// - pull metrics into tmpnet ingestion and integrate w/ existing dashboards
+// - cleanup
+// - document and make required updates to tmpnet / CI
 // - add scoped access tokens to AvalancheGo CI for required S3 bucket ONLY
 // - separate general purpose VM setup from C-Chain specific setup
+// - update C-Chain dashboard to make it useful for the benchmark
 func TestReexecuteRange(t *testing.T) {
-	t.Skip()
 	r := require.New(t)
 
 	var (
-		targetDBDir = filepath.Join(targetDir, "vmdb")
-		firewoodDB  = filepath.Join(targetDBDir, "chain-data-dir")
+		targetDBDir  = filepath.Join(targetDir, "vmdb")
+		chainDataDir = filepath.Join(targetDBDir, "chain-data-dir")
 	)
-	r.NoError(tmpnet.StartPrometheus(context.Background(), tests.NewDefaultLogger("prometheus")))
+
+	// AvalancheGo passes in a prefix of avalanche_<vm_id> via a prefix gatherer to each VM. Create and register
+	// an avalancheGoSimulatedPrefixGatherer to apply the expected prefix to the VM, so that dashboards created
+	// for the C-Chain run via AvalancheGo work directly with the benchmark.
+	avalancheGoSimulatedPrefixGatherer := metrics.NewPrefixGatherer()
+	vmPrefixGatherer := metrics.NewPrefixGatherer()
+	r.NoError(avalancheGoSimulatedPrefixGatherer.Register("avalanche_evm", vmPrefixGatherer))
+
+	if metricsEnabled {
+		CollectRegistry(t, "benchmark-c-chain-reexecution", "127.0.0.1:9000", 2*time.Minute, avalancheGoSimulatedPrefixGatherer, map[string]string{
+			"job":     "benchmark-c-chain-reexecution",
+			"service": "benchmark-c-chain-reexecution",
+		})
+	}
 
 	blockChan, err := createBlockChanFromRawDB(sourceBlockDir, 1, 100, 100)
 	r.NoError(err)
@@ -156,58 +181,13 @@ func TestReexecuteRange(t *testing.T) {
 	// Update the prefix/labels to match C-Chain / EVM as they will appear on a mainnet node ie. avalanchego.avalanche_C_metric_name as opposed to
 	// metric_name because the prefix is not present when started in the test
 
-	prefixGatherer := metrics.NewPrefixGatherer()
-	addr := "127.0.0.1:9000"
-	metricsServer := load.NewPrometheusServer(addr, prefixGatherer)
-	errChan, err := metricsServer.Start()
-	r.NoError(err)
-	t.Cleanup(func() {
-		r.NoError(metricsServer.Stop())
-		<-errChan
-	})
-
-	discoveryDir, err := tmpnet.GetPrometheusServiceDiscoveryDir()
-	r.NoError(err)
-
-	r.NoError(os.MkdirAll(discoveryDir, 0755))
-
-	vmTargetPath := filepath.Join(discoveryDir, "vm.json")
-	t.Cleanup(func() {
-		r.NoError(os.RemoveAll(discoveryDir))
-	})
-	config, err := json.MarshalIndent([]tmpnet.ConfigMap{
-		{
-			"targets": []string{addr},
-			"labels": map[string]string{
-				"network_uuid": "test",
-			},
-		},
-		{
-			"targets": []string{"firewood-port"},
-			"labels": map[string]string{
-				"network_uuid": "test",
-			},
-		},
-	}, "", "  ")
-	r.NoError(err)
-
-	os.WriteFile(vmTargetPath, config, perms.ReadWrite)
-
-	monitoringConfigFilePath, err := metricsServer.GenerateMonitoringConfig(map[string]string{
-		"network_uuid": "test",
-	})
-	r.NoError(err)
-	t.Cleanup(func() {
-		r.NoError(os.Remove(monitoringConfigFilePath))
-	})
-
 	sourceVM, err := newMainnetCChainVM(
 		context.Background(),
 		targetDBDir,
 		t.TempDir(),
-		firewoodDB,
+		chainDataDir,
 		[]byte(`{"pruning-enabled": false}`),
-		prefixGatherer,
+		vmPrefixGatherer,
 	)
 	r.NoError(err)
 	defer sourceVM.Shutdown(context.Background())
@@ -215,6 +195,10 @@ func TestReexecuteRange(t *testing.T) {
 	executor := newVMExecutor(sourceVM)
 	err = executor.executeSequence(context.Background(), blockChan)
 	r.NoError(err)
+
+	time.Sleep(20 * time.Second)
+
+	t.Fail()
 }
 
 func newMainnetCChainVM(
