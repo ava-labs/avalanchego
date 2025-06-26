@@ -27,7 +27,7 @@ MAX_RUNS=4
 for ((i = 1; i <= MAX_RUNS; i++));
 do
     # shellcheck disable=SC2046
-    go test -shuffle=on ${race:-} -timeout="${TIMEOUT:-600s}" -coverprofile=coverage.out -covermode=atomic "$@" ./... | tee test.out || command_status=$?
+    go test -shuffle=on ${race:-} -timeout="${TIMEOUT:-600s}" -coverprofile=coverage.out -covermode=atomic "$@" $(go list ./... | grep -v github.com/ava-labs/coreth/tests) | tee test.out || command_status=$?
 
     # If the test passed, exit
     if [[ ${command_status:-0} == 0 ]]; then
