@@ -260,8 +260,8 @@ jobs:
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           loki_username: ${{ secrets.LOKI_ID || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-  load2_tests:
-    name: load2 tests
+  load2:
+    name: Run load2 test
     runs-on: ubuntu-latest
     steps:
         - uses: actions/checkout@v4

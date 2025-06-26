@@ -89,6 +89,7 @@ func main() {
 	})
 
 	monitoringConfigFilePath, err := metricsServer.GenerateMonitoringConfig(
+		log,
 		network.GetMonitoringLabels(),
 	)
 	require.NoError(err)
