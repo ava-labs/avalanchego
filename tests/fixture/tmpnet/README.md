@@ -68,7 +68,7 @@ the following non-test files:
 | yaml/                       |                | Directory defining kubernetes resources in yaml format                 |
 | check_monitoring.go         |                | Enables checking if logs and metrics were collected                    |
 | defaults.go                 |                | Defines common default configuration                                   |
-| detached_process_default.go |                | Configures detached processes for darwin and linux                     |
+| detached_process.go         |                | Configures detached processes                                          |
 | flagsmap.go                 | FlagsMap       | Simplifies configuration of avalanchego flags                          |
 | genesis.go                  |                | Creates test genesis                                                   |
 | kube.go                     |                | Library for Kubernetes interaction                                     |
