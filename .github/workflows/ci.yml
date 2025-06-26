@@ -54,7 +54,7 @@ jobs:
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: ./scripts/run_task.sh test-e2e-ci
+          run: bash -x ./scripts/run_task.sh test-e2e-ci
           artifact_prefix: e2e
           filter_by_owner: avalanchego-e2e
           prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
@@ -83,7 +83,7 @@ jobs:
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: ./scripts/run_task.sh test-e2e-ci -- --activate-granite
+          run: bash -x ./scripts/run_task.sh test-e2e-ci -- --activate-granite
           artifact_prefix: e2e-post-granite
           filter_by_owner: avalanchego-e2e
           prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
@@ -97,7 +97,7 @@ jobs:
       - uses: ./.github/actions/setup-go-for-project
       - uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: ./scripts/run_task.sh test-e2e-kube-ci
+          run: bash -x ./scripts/run_task.sh test-e2e-kube-ci
           runtime: kube
           artifact_prefix: e2e-kube
           filter_by_owner: avalanchego-e2e
@@ -113,7 +113,7 @@ jobs:
       - name: Run e2e tests with existing network
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: ./scripts/run_task.sh test-e2e-existing-ci
+          run: bash -x ./scripts/run_task.sh test-e2e-existing-ci
           artifact_prefix: e2e-existing-network
           prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
@@ -127,7 +127,7 @@ jobs:
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: ./scripts/run_task.sh test-upgrade
+          run: bash -x ./scripts/run_task.sh test-upgrade
           artifact_prefix: upgrade
           prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
@@ -261,7 +261,7 @@ jobs:
       - uses: ./.github/actions/install-nix
       - uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: ./scripts/run_task.sh test-load
+          run: bash -x ./scripts/run_task.sh test-load
           artifact_prefix: load
           prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
