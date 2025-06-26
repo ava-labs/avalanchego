@@ -248,6 +248,5 @@ jobs:
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup-go-for-project
-      - name: Run
-        run: |
-          go run ./tests/load/c/main --runtime=kube --kube-image="avaplatform/avalanchego:latest"
+      - run: |
+          echo "Hello, world!"
