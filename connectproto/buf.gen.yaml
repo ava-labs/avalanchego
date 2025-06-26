@@ -1,0 +1,8 @@
+version: v1
+plugins:
+  - name: go
+    out: pb
+    opt: paths=source_relative
+  - plugin: connect-go
+    out: pb
+    opt: paths=source_relative

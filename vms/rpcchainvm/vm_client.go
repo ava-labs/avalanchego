@@ -370,33 +370,10 @@ func (vm *VMClient) Shutdown(ctx context.Context) error {
 	return errs.Err
 }
 
-func (vm *VMClient) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
-	resp, err := vm.client.CreateHandlers(ctx, &emptypb.Empty{})
+func (vm *VMClient) NewHTTPHandler(ctx context.Context) (http.Handler, error) {
+	resp, err := vm.client.NewHTTPHandler(ctx, &emptypb.Empty{})
 	if err != nil {
 		return nil, err
-	}
-
-	handlers := make(map[string]http.Handler, len(resp.Handlers))
-	for _, handler := range resp.Handlers {
-		clientConn, err := grpcutils.Dial(handler.ServerAddr)
-		if err != nil {
-			return nil, err
-		}
-
-		vm.conns = append(vm.conns, clientConn)
-		handlers[handler.Prefix] = ghttp.NewClient(httppb.NewHTTPClient(clientConn))
-	}
-	return handlers, nil
-}
-
-func (vm *VMClient) CreateHTTP2Handler(ctx context.Context) (http.Handler, error) {
-	resp, err := vm.client.CreateHTTP2Handler(ctx, &emptypb.Empty{})
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.ServerAddr == "" {
-		return nil, nil
 	}
 
 	clientConn, err := grpcutils.Dial(resp.ServerAddr)
@@ -405,7 +382,9 @@ func (vm *VMClient) CreateHTTP2Handler(ctx context.Context) (http.Handler, error
 	}
 
 	vm.conns = append(vm.conns, clientConn)
-	return ghttp.NewClient(httppb.NewHTTPClient(clientConn)), nil
+	handler := ghttp.NewClient(httppb.NewHTTPClient(clientConn))
+
+	return handler, nil
 }
 
 func (vm *VMClient) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
