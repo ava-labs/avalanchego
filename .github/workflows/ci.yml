@@ -240,8 +240,8 @@ jobs:
   load_tests:
     name: load tests
     runs-on: avalanche-avalanchego-runner
-#    container:
-#      image: ghcr.io/actions/actions-runner:latest
+    container:
+      image: ghcr.io/actions/actions-runner:latest
     steps:
       - uses: actions/checkout@v4
         with:
