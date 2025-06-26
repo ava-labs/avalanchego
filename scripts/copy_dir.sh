@@ -13,13 +13,6 @@ if [ $# -ne 2 ]; then
     exit 1
 fi
 
-# Check if s5cmd is installed, install if not
-if ! command -v s5cmd &> /dev/null; then
-    echo "s5cmd not found, installing..."
-    go install github.com/peak/s5cmd/v2@master
-fi
-
-
 SRC="$1"
 DST="$2"
 

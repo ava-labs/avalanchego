@@ -73,47 +73,6 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-func TestPrometheusIntegration(t *testing.T) {
-	t.Skip("TODO: remove after debugging metrics setup")
-	r := require.New(t)
-
-	prefixGatherer := metrics.NewPrefixGatherer()
-	registry := prometheus.NewRegistry()
-	r.NoError(prefixGatherer.Register("dummy", registry))
-
-	CollectRegistry(t, "test", "127.0.0.1:9000", time.Minute, prefixGatherer, map[string]string{
-		"job":      "test-prometheus2",
-		"service":  "test",
-		"instance": "testPrometheusIntegration2",
-	})
-
-	counter := prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "thingy_majig",
-		Help: "help",
-	})
-	registry.MustRegister(counter)
-	counter.Inc()
-
-	for i := 0; i < 3; i++ {
-		time.Sleep(time.Second * 5)
-		counter.Inc()
-	}
-
-	prefixedMetrics, err := prefixGatherer.Gather()
-	r.NoError(err)
-	for _, metricFamily := range prefixedMetrics {
-		fmt.Println(metricFamily.GetName())
-	}
-
-	registryMetrics, err := registry.Gather()
-	r.NoError(err)
-	for _, metricFamily := range registryMetrics {
-		fmt.Println(metricFamily.GetName())
-	}
-
-	t.Fail()
-}
-
 func CollectRegistry(t *testing.T, name string, addr string, timeout time.Duration, gatherer prometheus.Gatherer, labels map[string]string) {
 	r := require.New(t)
 
@@ -131,16 +90,6 @@ func CollectRegistry(t *testing.T, name string, addr string, timeout time.Durati
 		r.NoError(<-errChan)
 	})
 
-	// TODO: remove this after debugging metrics showing up correctly
-	t.Cleanup(func() {
-		metrics, err := gatherer.Gather()
-		r.NoError(err)
-		t.Log("metrics:")
-		for _, metricFamily := range metrics {
-			t.Log(metricFamily.GetName())
-		}
-	})
-
 	sdConfigFilePath, err := tmpnet.WritePrometheusServiceDiscoveryConfigFile(name, []tmpnet.SDConfig{
 		{
 			Targets: []string{addr},
@@ -154,9 +103,9 @@ func CollectRegistry(t *testing.T, name string, addr string, timeout time.Durati
 }
 
 // TODO:
+// - provide task to snapshot current state and block ranges to s3
 // - separate general purpose VM setup from C-Chain specific setup
 // - update C-Chain dashboard to make it useful for the benchmark
-// - add s5cmd to flake
 func TestReexecuteRange(t *testing.T) {
 	r := require.New(t)
 
