@@ -25,6 +25,7 @@ The Subnet EVM runs in a separate process from the main AvalancheGo process and 
 [v0.7.2] AvalancheGo@v1.12.2/1.13.0-fuji (Protocol Version: 39)
 [v0.7.3] AvalancheGo@v1.12.2/1.13.0 (Protocol Version: 39)
 [v0.7.4] AvalancheGo@v1.13.1 (Protocol Version: 40)
+[v0.7.5] AvalancheGo@v1.13.2 (Protocol Version: 41)
 ```
 
 ## API
