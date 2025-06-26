@@ -369,19 +369,18 @@ func (p *KubeRuntime) Start(ctx context.Context) error {
 		zap.String("statefulSet", statefulSetName),
 	)
 
-	// Create Service for the node (prefix with 's-' for DNS compatibility)
-	serviceName := "s-" + statefulSetName
-	if err := p.createNodeService(ctx, serviceName); err != nil {
-		return fmt.Errorf("failed to create Service for node: %w", err)
-	}
-
-	// Create Ingress for the node
-	if err := p.createNodeIngress(ctx, serviceName); err != nil {
-		return fmt.Errorf("failed to create Ingress for node: %w", err)
-	}
-
-	// Wait for ingress to be ready if running outside cluster
 	if !IsRunningInCluster() {
+		// If running outside the cluster, ensure the node's API port is accessible via ingress
+
+		serviceName := "s-" + statefulSetName // The 's-' prefix ensures DNS compatibility
+		if err := p.createNodeService(ctx, serviceName); err != nil {
+			return fmt.Errorf("failed to create Service for node: %w", err)
+		}
+
+		if err := p.createNodeIngress(ctx, serviceName); err != nil {
+			return fmt.Errorf("failed to create Ingress for node: %w", err)
+		}
+
 		if err := p.waitForIngressReadiness(ctx, serviceName); err != nil {
 			return fmt.Errorf("failed to wait for Ingress readiness: %w", err)
 		}
