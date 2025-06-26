@@ -17,7 +17,7 @@ import (
 var _ simplex.VerifiedBlock = (*VerifiedBlock)(nil)
 
 type VerifiedBlock struct {
-	digest            simplex.Digest // cached, not serialized
+	digest simplex.Digest // cached, not serialized
 
 	metadata   simplex.ProtocolMetadata
 	innerBlock []byte // inner block bytes
@@ -69,7 +69,6 @@ func verifiedBlockFromBytes(buff []byte) (*VerifiedBlock, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse protocol metadata: %w", err)
 	}
-	
 
 	v := &VerifiedBlock{
 		metadata:   *md,
