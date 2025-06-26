@@ -8,13 +8,7 @@ import (
 
 	"github.com/ava-labs/simplex"
 	"github.com/stretchr/testify/require"
-
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 )
-
-type testChainVM struct {
-	*blocktest.VM
-}
 
 // TestVerifiedBlock tests that a block can be serialized and deserialized correctly,
 // and that the digest is computed correctly after deserialization.

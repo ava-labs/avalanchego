@@ -15,7 +15,7 @@ import (
 	pSimplex "github.com/ava-labs/avalanchego/proto/pb/simplex"
 )
 
-var _ simplex.VerifiedBlock     = (*VerifiedBlock)(nil)
+var _ simplex.VerifiedBlock = (*VerifiedBlock)(nil)
 
 type VerifiedBlock struct {
 	computeDigestOnce sync.Once
