@@ -1083,7 +1083,7 @@ func (p *KubeRuntime) waitForIngressReadiness(ctx context.Context, serviceName s
 			// Check if ingress exists
 			_, err := clientset.NetworkingV1().Ingresses(namespace).Get(ctx, serviceName, metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
-				log.Debug("waiting for Ingress to be created",
+				log.Verbo("waiting for Ingress to be created",
 					zap.String("nodeID", nodeID),
 					zap.String("namespace", namespace),
 					zap.String("ingress", serviceName),
@@ -1103,7 +1103,7 @@ func (p *KubeRuntime) waitForIngressReadiness(ctx context.Context, serviceName s
 			// Check if service endpoints are available
 			endpoints, err := clientset.CoreV1().Endpoints(namespace).Get(ctx, serviceName, metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
-				log.Debug("waiting for Service endpoints to be created",
+				log.Verbo("waiting for Service endpoints to be created",
 					zap.String("nodeID", nodeID),
 					zap.String("namespace", namespace),
 					zap.String("service", serviceName),
@@ -1130,7 +1130,7 @@ func (p *KubeRuntime) waitForIngressReadiness(ctx context.Context, serviceName s
 			}
 
 			if !hasReadyEndpoints {
-				log.Debug("waiting for Service endpoints to have ready addresses",
+				log.Verbo("waiting for Service endpoints to have ready addresses",
 					zap.String("nodeID", nodeID),
 					zap.String("namespace", namespace),
 					zap.String("service", serviceName),
