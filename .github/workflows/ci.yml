@@ -244,6 +244,13 @@ jobs:
       image: ubuntu:22.04
 #      options: --user root
     steps:
+      - name: Install prerequisites
+        run: |
+          apt-get update
+          apt-get install -y ca-certificates
+          update-ca-certificates
+          apt-get clean
+          rm -rf /var/lib/apt/lists/*
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
