@@ -190,6 +190,10 @@ func (s *server) wrapMiddleware(chainName string, handler http.Handler, ctx *sno
 	return s.metrics.wrapHandler(chainName, handler)
 }
 
+func (*server) NewHTTPHandler() error {
+	return nil
+}
+
 func (s *server) AddRoute(handler http.Handler, endpoint string, metricName string) error {
 	return s.addRoute(handler, endpoint, metricName)
 }

@@ -4,17 +4,12 @@
 package node
 
 import (
-	"connectrpc.com/grpcreflect"
 	"context"
 	"crypto"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
-	healthhandler "github.com/ava-labs/avalanchego/api/health/connecthandler"
-	infohandler "github.com/ava-labs/avalanchego/api/info/connecthandler"
-	"github.com/ava-labs/avalanchego/proto/pb/health/v1/healthv1connect"
-	"github.com/ava-labs/avalanchego/proto/pb/info/v1/infov1connect"
 	"io"
 	"io/fs"
 	"net"
@@ -83,7 +78,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
+	healthhandler "github.com/ava-labs/avalanchego/api/health/connecthandler"
+	infohandler "github.com/ava-labs/avalanchego/api/info/connecthandler"
 	databasefactory "github.com/ava-labs/avalanchego/database/factory"
+	healthv1connect "github.com/ava-labs/avalanchego/proto/pb/health/v1/healthv1connect"
+	infov1connect "github.com/ava-labs/avalanchego/proto/pb/info/v1/infov1connect"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
 	coreth "github.com/ava-labs/coreth/plugin/evm"
@@ -268,25 +267,25 @@ func New(
 		return nil, fmt.Errorf("couldn't initialize indexer: %w", err)
 	}
 
-	// mount InfoService onto the shared gRPC mux
-	infoPattern, infoHandler := infov1connect.NewInfoServiceHandler(
-		infohandler.NewConnectInfoService(n.info),
-	)
-	n.grpcMux.Handle(infoPattern, infoHandler)
-
-	// mount HealthService onto the same mux
-	healthPattern, healthHandler := healthv1connect.NewHealthServiceHandler(
-		healthhandler.NewConnectHealthService(n.health),
-	)
-	n.grpcMux.Handle(healthPattern, healthHandler)
-
-	// register reflection for both services, once
-	reflector := grpcreflect.NewStaticReflector(
-		infov1connect.InfoServiceName,
-		healthv1connect.HealthServiceName,
-	)
-	reflectPattern, reflectHandler := grpcreflect.NewHandlerV1(reflector)
-	n.grpcMux.Handle(reflectPattern, reflectHandler)
+	//// mount InfoService onto the shared gRPC mux
+	//infoPattern, infoHandler := infov1connect.NewInfoServiceHandler(
+	//	infohandler.NewConnectInfoService(n.info),
+	//)
+	//n.grpcMux.Handle(infoPattern, infoHandler)
+	//
+	//// mount HealthService onto the same mux
+	//healthPattern, healthHandler := healthv1connect.NewHealthServiceHandler(
+	//	healthhandler.NewConnectHealthService(n.health),
+	//)
+	//n.grpcMux.Handle(healthPattern, healthHandler)
+	//
+	//// register reflection for both services, once
+	//reflector := grpcreflect.NewStaticReflector(
+	//	infov1connect.InfoServiceName,
+	//	healthv1connect.HealthServiceName,
+	//)
+	//reflectPattern, reflectHandler := grpcreflect.NewHandlerV1(reflector)
+	//n.grpcMux.Handle(reflectPattern, reflectHandler)
 
 	n.health.Start(context.TODO(), n.Config.HealthCheckFreq)
 	n.initProfiler()
@@ -377,8 +376,9 @@ type Node struct {
 	// Handles HTTP API calls
 	APIServer server.Server
 
-	// Shared HTTP/2 mux for ConnectRPC services
-	grpcMux *http.ServeMux
+	// Set up separate HTTP/2 muxes for ConnectRPC Info and Health services
+	grpcMuxInfo   *http.ServeMux
+	grpcMuxHealth *http.ServeMux
 
 	// This node's configuration
 	Config *node.Config
@@ -1039,9 +1039,32 @@ func (n *Node) initAPIServer() error {
 		n.Config.HTTPAllowedHosts,
 	)
 
-	// Set up a shared HTTP/2 mux for all ConnectRPC services
-	n.grpcMux = http.NewServeMux()
-	n.APIServer.AddHTTP2Handler(n.grpcMux)
+	//// Set up separate HTTP/2 muxes for Info and Health ConnectRPC services
+	//n.grpcMuxInfo = http.NewServeMux()
+	//n.grpcMuxHealth = http.NewServeMux()
+	//// Header-based router: dispatch on Avalanche-API-Route header
+	//headerMux := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	//	switch r.Header.Get("Avalanche-API-Route") {
+	//	case "info":
+	//		n.grpcMuxInfo.ServeHTTP(w, r)
+	//	case "health":
+	//		n.grpcMuxHealth.ServeHTTP(w, r)
+	//	default:
+	//		http.Error(w, "missing or unknown Avalanche-API-Route header", http.StatusBadRequest)
+	//	}
+	//})
+
+	// Mount ConnectRPC InfoService handler into the info mux:
+	infoPattern, infoConnHandler := infov1connect.NewInfoServiceHandler(
+		infohandler.NewConnectInfoService(n.info),
+	)
+	n.grpcMuxInfo.Handle(infoPattern, infoConnHandler)
+
+	// Mount ConnectRPC HealthService handler into the health mux:
+	healthPattern, healthConnHandler := healthv1connect.NewHealthServiceHandler(
+		healthhandler.NewConnectHealthService(n.health),
+	)
+	n.grpcMuxHealth.Handle(healthPattern, healthConnHandler)
 	return err
 }
 
@@ -1410,6 +1433,17 @@ func (n *Node) initInfoAPI() error {
 	}
 	n.info = infoInst
 
+	// Create a standalone HTTP/2 mux for Info/ConnectRPC:
+	muxInfo := http.NewServeMux()
+	infoPattern, infoConnHandler := infov1connect.NewInfoServiceHandler(
+		infohandler.NewConnectInfoService(n.info),
+	)
+	muxInfo.Handle(infoPattern, infoConnHandler)
+
+	// Tell the server to send any HTTP/2 traffic to that mux:
+	n.APIServer.AddHeaderRoute("info", muxInfo)
+
+	// Finally add the HTTP JSON-RPC route as before
 	return n.APIServer.AddRoute(
 		service,
 		"info",
@@ -1543,11 +1577,25 @@ func (n *Node) initHealthAPI() error {
 		return err
 	}
 
-	return n.APIServer.AddRoute(
+	err = n.APIServer.AddRoute(
 		health.NewGetHandler(n.health.Liveness),
 		"health/liveness",
 		"health",
 	)
+	if err != nil {
+		return err
+	}
+
+	// Mount HealthService ConnectRPC handler into its mux
+	muxHealth := http.NewServeMux()
+	healthPattern, healthConnHandler := healthv1connect.NewHealthServiceHandler(
+		healthhandler.NewConnectHealthService(n.health),
+	)
+	muxHealth.Handle(healthPattern, healthConnHandler)
+
+	n.APIServer.AddHeaderRoute("health", muxHealth)
+
+	return nil
 }
 
 // Give chains aliases as specified by the genesis information
