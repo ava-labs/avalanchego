@@ -17,7 +17,7 @@ test = false
 bench = false
 
 [dependencies]
-firewood = { version = "0.0.6", path = "../firewood" }
+firewood = { version = "0.0.7", path = "../firewood" }
 prost = "0.13.1"
 tokio = { version = "1.36.0", features = ["sync", "rt-multi-thread"] }
 tonic = { version = "0.13.0", features = ["tls-ring"] }

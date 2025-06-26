@@ -1,6 +1,6 @@
 [package]
 name = "firewood-benchmark"
-version = "0.0.6"
+version = "0.0.7"
 edition = "2024"
 rust-version = "1.85.0"
 authors = [
@@ -17,7 +17,7 @@ name = "benchmark"
 path = "src/main.rs"
 
 [dependencies]
-firewood = { version = "0.0.6", path = "../firewood" }
+firewood = { version = "0.0.7", path = "../firewood" }
 hex = "0.4.3"
 clap = { version = "4.5.0", features = ['derive', 'string'] }
 sha2 = "0.10.8"

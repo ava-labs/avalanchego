@@ -1,6 +1,6 @@
 [package]
 name = "firewood-ffi"
-version = "0.0.6"
+version = "0.0.7"
 edition = "2024"
 rust-version = "1.85.0"
 authors = [
@@ -20,7 +20,7 @@ crate-type = ["staticlib"]
 
 [dependencies]
 libc = "0.2.2"
-firewood = { version = "0.0.6", path = "../firewood" }
+firewood = { version = "0.0.7", path = "../firewood" }
 metrics = "0.24.2"
 metrics-util = "0.20.0"
 chrono = "0.4.39"

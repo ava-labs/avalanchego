@@ -1,6 +1,6 @@
 [package]
 name = "firewood-fwdctl"
-version = "0.0.6"
+version = "0.0.7"
 edition = "2024"
 rust-version = "1.85.0"
 authors = [
@@ -23,7 +23,7 @@ name = "fwdctl"
 path = "src/main.rs"
 
 [dependencies]
-firewood = { version = "0.0.6", path = "../firewood" }
+firewood = { version = "0.0.7", path = "../firewood" }
 clap = { version = "4.5.0", features = ["cargo", "derive"] }
 env_logger = "0.11.2"
 log = "0.4.20"

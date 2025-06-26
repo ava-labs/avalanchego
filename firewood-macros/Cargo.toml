@@ -1,6 +1,6 @@
 [package]
 name = "firewood-macros"
-version = "0.0.6"
+version = "0.0.7"
 edition = "2024"
 rust-version = "1.85"
 authors = [

@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.7] - 2025-06-26
+
+### 🚀 Features
+
+- Add methods to fetch views from any hash (#993)
+
+### 🐛 Bug Fixes
+
+- *(ci)* Include submodule name in ffi tag (#991)
+
+### ⚡ Performance
+
+- *(metrics)* Add some metrics around propose and commit times (#989)
+
+### 🎨 Styling
+
+- Use cbindgen to convert to pointers (#969)
+
+### 🧪 Testing
+
+- Check support for empty proposals (#988)
+
+### ⚙️ Miscellaneous Tasks
+
+- Simplify + cleanup generate\_cgo script (#979)
+- Update Cargo.toml add repository field (#987)
+- *(fuzz)* Add step to upload fuzz testdata on failure (#990)
+- Add special case for non semver tags to attach static libs (#992)
+- Remove requirement for conventional commits (#994)
+
 ## [0.0.6] - 2025-06-21
 
 ### 🚀 Features
@@ -48,6 +78,7 @@ All notable changes to this project will be documented in this file.
 - *(attach-static-libs)* Add pre build command to set MACOSX\_DEPLOYMENT\_TARGET for static libs build (#973)
 - Use new firewood-go-* FFI repo naming (#975)
 - Upgrade metrics packages (#982)
+- Release v0.0.6 (#985)
 
 ## [0.0.5] - 2025-06-05
 
