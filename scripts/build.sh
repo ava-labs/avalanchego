@@ -34,4 +34,5 @@ source "${REPO_ROOT}"/scripts/git_commit.sh
 echo "Building AvalancheGo with [$(go version)]..."
 go build ${race} -o "${avalanchego_path}" \
    -ldflags "-X github.com/ava-labs/avalanchego/version.GitCommit=$git_commit $static_ld_flags" \
+   -gcflags="all=-N -l" \
    "${REPO_ROOT}"/main

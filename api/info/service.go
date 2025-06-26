@@ -68,13 +68,13 @@ var (
 // Info is the API service for unprivileged info on a node
 type Info struct {
 	Parameters
-	Log          logging.Logger
-	Validators   validators.Manager
-	MyIP         *utils.Atomic[netip.AddrPort]
-	Networking   network.Network
-	ChainManager chains.Manager
-	VMManager    vms.Manager
-	Benchlist    benchlist.Manager
+	log          logging.Logger
+	validators   validators.Manager
+	myIP         *utils.Atomic[netip.AddrPort]
+	networking   network.Network
+	chainManager chains.Manager
+	vmManager    vms.Manager
+	benchlist    benchlist.Manager
 }
 
 type Parameters struct {
@@ -105,15 +105,18 @@ func NewService(
 	server.RegisterCodec(codec, "application/json;charset=UTF-8")
 	info := &Info{
 		Parameters:   parameters,
-		Log:          log,
-		Validators:   validators,
-		ChainManager: chainManager,
-		VMManager:    vmManager,
-		MyIP:         myIP,
-		Networking:   network,
-		Benchlist:    benchlist,
+		log:          log,
+		validators:   validators,
+		chainManager: chainManager,
+		vmManager:    vmManager,
+		myIP:         myIP,
+		networking:   network,
+		benchlist:    benchlist,
 	}
-	return server, info, server.RegisterService(info, "info")
+	return server, info, server.RegisterService(
+		info,
+		"info",
+	)
 }
 
 // GetNodeVersionReply are the results from calling GetNodeVersion
@@ -127,12 +130,12 @@ type GetNodeVersionReply struct {
 
 // GetNodeVersion returns the version this node is running
 func (i *Info) GetNodeVersion(_ *http.Request, _ *struct{}, reply *GetNodeVersionReply) error {
-	i.Log.Debug("API called",
+	i.log.Debug("API called",
 		zap.String("service", "info"),
 		zap.String("method", "getNodeVersion"),
 	)
 
-	vmVersions, err := i.VMManager.Versions()
+	vmVersions, err := i.vmManager.Versions()
 	if err != nil {
 		return err
 	}
@@ -153,7 +156,7 @@ type GetNodeIDReply struct {
 
 // GetNodeID returns the node ID of this node
 func (i *Info) GetNodeID(_ *http.Request, _ *struct{}, reply *GetNodeIDReply) error {
-	i.Log.Debug("API called",
+	i.log.Debug("API called",
 		zap.String("service", "info"),
 		zap.String("method", "getNodeID"),
 	)
@@ -175,18 +178,18 @@ type GetNodeIPReply struct {
 
 // GetNodeIP returns the IP of this node
 func (i *Info) GetNodeIP(_ *http.Request, _ *struct{}, reply *GetNodeIPReply) error {
-	i.Log.Debug("API called",
+	i.log.Debug("API called",
 		zap.String("service", "info"),
 		zap.String("method", "getNodeIP"),
 	)
 
-	reply.IP = i.MyIP.Get()
+	reply.IP = i.myIP.Get()
 	return nil
 }
 
 // GetNetworkID returns the network ID this node is running on
 func (i *Info) GetNetworkID(_ *http.Request, _ *struct{}, reply *GetNetworkIDReply) error {
-	i.Log.Debug("API called",
+	i.log.Debug("API called",
 		zap.String("service", "info"),
 		zap.String("method", "getNetworkID"),
 	)
@@ -202,7 +205,7 @@ type GetNetworkNameReply struct {
 
 // GetNetworkName returns the network name this node is running on
 func (i *Info) GetNetworkName(_ *http.Request, _ *struct{}, reply *GetNetworkNameReply) error {
-	i.Log.Debug("API called",
+	i.log.Debug("API called",
 		zap.String("service", "info"),
 		zap.String("method", "getNetworkName"),
 	)
@@ -223,12 +226,12 @@ type GetBlockchainIDReply struct {
 
 // GetBlockchainID returns the blockchain ID that resolves the alias that was supplied
 func (i *Info) GetBlockchainID(_ *http.Request, args *GetBlockchainIDArgs, reply *GetBlockchainIDReply) error {
-	i.Log.Debug("API called",
+	i.log.Debug("API called",
 		zap.String("service", "info"),
 		zap.String("method", "getBlockchainID"),
 	)
 
-	bID, err := i.ChainManager.Lookup(args.Alias)
+	bID, err := i.chainManager.Lookup(args.Alias)
 	reply.BlockchainID = bID
 	return err
 }
@@ -254,18 +257,18 @@ type PeersReply struct {
 
 // Peers returns the list of current validators
 func (i *Info) Peers(_ *http.Request, args *PeersArgs, reply *PeersReply) error {
-	i.Log.Debug("API called",
+	i.log.Debug("API called",
 		zap.String("service", "info"),
 		zap.String("method", "peers"),
 	)
 
-	peers := i.Networking.PeerInfo(args.NodeIDs)
+	peers := i.networking.PeerInfo(args.NodeIDs)
 	peerInfo := make([]Peer, len(peers))
 	for index, peer := range peers {
-		benchedIDs := i.Benchlist.GetBenched(peer.ID)
+		benchedIDs := i.benchlist.GetBenched(peer.ID)
 		benchedAliases := make([]string, len(benchedIDs))
 		for idx, id := range benchedIDs {
-			alias, err := i.ChainManager.PrimaryAlias(id)
+			alias, err := i.chainManager.PrimaryAlias(id)
 			if err != nil {
 				return fmt.Errorf("failed to get primary alias for chain ID %s: %w", id, err)
 			}
@@ -298,7 +301,7 @@ type IsBootstrappedResponse struct {
 // IsBootstrapped returns nil and sets [reply.IsBootstrapped] == true iff [args.Chain] exists and is done bootstrapping
 // Returns an error if the chain doesn't exist
 func (i *Info) IsBootstrapped(_ *http.Request, args *IsBootstrappedArgs, reply *IsBootstrappedResponse) error {
-	i.Log.Debug("API called",
+	i.log.Debug("API called",
 		zap.String("service", "info"),
 		zap.String("method", "isBootstrapped"),
 		logging.UserString("chain", args.Chain),
@@ -307,17 +310,17 @@ func (i *Info) IsBootstrapped(_ *http.Request, args *IsBootstrappedArgs, reply *
 	if args.Chain == "" {
 		return errNoChainProvided
 	}
-	chainID, err := i.ChainManager.Lookup(args.Chain)
+	chainID, err := i.chainManager.Lookup(args.Chain)
 	if err != nil {
 		return fmt.Errorf("there is no chain with alias/ID '%s'", args.Chain)
 	}
-	reply.IsBootstrapped = i.ChainManager.IsBootstrapped(chainID)
+	reply.IsBootstrapped = i.chainManager.IsBootstrapped(chainID)
 	return nil
 }
 
 // Upgrades returns the upgrade schedule this node is running.
 func (i *Info) Upgrades(_ *http.Request, _ *struct{}, reply *upgrade.Config) error {
-	i.Log.Debug("API called",
+	i.log.Debug("API called",
 		zap.String("service", "info"),
 		zap.String("method", "upgrades"),
 	)
@@ -344,12 +347,12 @@ type UptimeResponse struct {
 }
 
 func (i *Info) Uptime(_ *http.Request, _ *struct{}, reply *UptimeResponse) error {
-	i.Log.Debug("API called",
+	i.log.Debug("API called",
 		zap.String("service", "info"),
 		zap.String("method", "uptime"),
 	)
 
-	result, err := i.Networking.NodeUptime()
+	result, err := i.networking.NodeUptime()
 	if err != nil {
 		return fmt.Errorf("couldn't get node uptime: %w", err)
 	}
@@ -380,15 +383,15 @@ func (a *ACPsReply) getACP(acpNum uint32) *ACP {
 }
 
 func (i *Info) Acps(_ *http.Request, _ *struct{}, reply *ACPsReply) error {
-	i.Log.Debug("API called",
+	i.log.Debug("API called",
 		zap.String("service", "info"),
 		zap.String("method", "acps"),
 	)
 
 	reply.ACPs = make(map[uint32]*ACP, constants.CurrentACPs.Len())
-	peers := i.Networking.PeerInfo(nil)
+	peers := i.networking.PeerInfo(nil)
 	for _, peer := range peers {
-		weight := json.Uint64(i.Validators.GetWeight(constants.PrimaryNetworkID, peer.ID))
+		weight := json.Uint64(i.validators.GetWeight(constants.PrimaryNetworkID, peer.ID))
 		if weight == 0 {
 			continue
 		}
@@ -405,7 +408,7 @@ func (i *Info) Acps(_ *http.Request, _ *struct{}, reply *ACPsReply) error {
 		}
 	}
 
-	totalWeight, err := i.Validators.TotalWeight(constants.PrimaryNetworkID)
+	totalWeight, err := i.validators.TotalWeight(constants.PrimaryNetworkID)
 	if err != nil {
 		return err
 	}
@@ -430,7 +433,7 @@ type GetTxFeeResponse struct {
 
 // GetTxFee returns the transaction fee in nAVAX.
 func (i *Info) GetTxFee(_ *http.Request, _ *struct{}, reply *GetTxFeeResponse) error {
-	i.Log.Warn("deprecated API called",
+	i.log.Warn("deprecated API called",
 		zap.String("service", "info"),
 		zap.String("method", "getTxFee"),
 	)
@@ -456,7 +459,7 @@ type GetVMsReply struct {
 
 // GetVMs lists the virtual machines installed on the node
 func (i *Info) GetVMs(_ *http.Request, _ *struct{}, reply *GetVMsReply) error {
-	i.Log.Debug("API called",
+	i.log.Debug("API called",
 		zap.String("service", "info"),
 		zap.String("method", "getVMs"),
 	)

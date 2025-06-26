@@ -33,15 +33,13 @@ var (
 
 type apiServerMock struct {
 	timesCalled int
+	bases       []string
 	endpoints   []string
-}
-
-func (*apiServerMock) AddHTTP2Handler(http.Handler) bool {
-	panic("unimplemented")
 }
 
 func (a *apiServerMock) AddRoute(_ http.Handler, base, endpoint string) error {
 	a.timesCalled++
+	a.bases = append(a.bases, base)
 	a.endpoints = append(a.endpoints, endpoint)
 	return nil
 }
@@ -173,7 +171,8 @@ func TestIndexer(t *testing.T) {
 	require.NoError(err)
 	require.True(previouslyIndexed)
 	require.Equal(1, server.timesCalled)
-	require.Equal("index/chain1/block", server.endpoints[0])
+	require.Equal("index/chain1", server.bases[0])
+	require.Equal("/block", server.endpoints[0])
 	require.Len(idxr.blockIndices, 1)
 	require.Empty(idxr.txIndices)
 	require.Empty(idxr.vtxIndices)
@@ -255,7 +254,7 @@ func TestIndexer(t *testing.T) {
 	require.NoError(err)
 	require.Equal(blkID, container.ID)
 	require.Equal(1, server.timesCalled) // block index for chain
-	require.Contains(server.endpoints, "index/chain1/block")
+	require.Contains(server.endpoints, "/block")
 
 	// Register a DAG chain
 	snow2Ctx := snowtest.Context(t, snowtest.XChainID)
@@ -270,9 +269,10 @@ func TestIndexer(t *testing.T) {
 	idxr.RegisterChain("chain2", chain2Ctx, dagVM)
 	require.NoError(err)
 	require.Equal(4, server.timesCalled) // block index for chain, block index for dag, vtx index, tx index
-	require.Contains(server.endpoints, "index/chain2/block")
-	require.Contains(server.endpoints, "index/chain2/vtx")
-	require.Contains(server.endpoints, "index/chain2/tx")
+	require.Contains(server.bases, "index/chain2")
+	require.Contains(server.endpoints, "/block")
+	require.Contains(server.endpoints, "/vtx")
+	require.Contains(server.endpoints, "/tx")
 	require.Len(idxr.blockIndices, 2)
 	require.Len(idxr.txIndices, 1)
 	require.Len(idxr.vtxIndices, 1)

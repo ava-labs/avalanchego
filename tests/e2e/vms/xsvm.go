@@ -4,24 +4,19 @@
 package vms
 
 import (
-	"context"
-	"crypto/tls"
 	"fmt"
-	"net"
-	"net/http"
+	"strings"
 	"sync"
 	"time"
 
-	"connectrpc.com/connect"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-	"golang.org/x/net/http2"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/ava-labs/avalanchego/api/server"
-	"github.com/ava-labs/avalanchego/connectproto/pb/xsvm"
-	"github.com/ava-labs/avalanchego/connectproto/pb/xsvm/xsvmconnect"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/xsvm"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/subnet"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
@@ -201,40 +196,32 @@ var _ = ginkgo.Describe("[XSVM]", ginkgo.Label("xsvm"), func() {
 		node, err := network.GetNode(nodeID)
 		require.NoError(err)
 
-		httpClient := &http.Client{
-			Transport: &http2.Transport{
-				AllowHTTP: true,
-				DialTLSContext: func(_ context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
-					// Skip TLS to use h2c
-					return net.Dial(network, addr)
-				},
-			},
-		}
-
-		client := xsvmconnect.NewPingClient(httpClient, node.URI)
+		uri := strings.TrimPrefix(node.URI, "http://")
+		chainID := network.GetSubnet(subnetAName).Chains[0].ChainID
+		client, conn, err := api.NewPingClient(
+			uri,
+			chainID,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		)
+		require.NoError(err)
+		ginkgo.DeferCleanup(func() {
+			require.NoError(conn.Close())
+		})
 
 		tc.By("serving unary rpc")
 		msg := "foobar"
-
-		request := &connect.Request[xsvm.PingRequest]{
-			Msg: &xsvm.PingRequest{
-				Message: msg,
-			},
-		}
-
-		chainID := network.GetSubnet(subnetAName).Chains[0].ChainID
-		request.Header().Set(server.HTTPHeaderRoute, chainID.String())
-
-		reply, err := client.Ping(tc.DefaultContext(), request)
+		reply, err := client.Ping(tc.DefaultContext(), &xsvm.PingRequest{
+			Message: msg,
+		})
 		require.NoError(err)
-		require.Equal(msg, reply.Msg.Message)
+		require.Equal(msg, reply.Message)
 
 		tc.By("serving bidirectional streaming rpc")
+		stream, err := client.StreamPing(tc.DefaultContext())
+		require.NoError(err)
 
-		stream := client.StreamPing(tc.DefaultContext())
-		stream.RequestHeader().Set(server.HTTPHeaderRoute, chainID.String())
 		ginkgo.DeferCleanup(func() {
-			require.NoError(stream.CloseRequest())
+			require.NoError(stream.CloseSend())
 		})
 
 		// Stream pings to the server and block until all events are received
@@ -265,7 +252,7 @@ var _ = ginkgo.Describe("[XSVM]", ginkgo.Label("xsvm"), func() {
 			}()
 
 			for i := 0; i < n; i++ {
-				reply, err := stream.Receive()
+				reply, err := stream.Recv()
 				require.NoError(err)
 				require.Equal(fmt.Sprintf("ping-%d", i), reply.Message)
 				log.Info("received message", zap.String("msg", reply.Message))

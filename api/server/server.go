@@ -39,7 +39,6 @@ var (
 type PathAdder interface {
 	// AddRoute registers a route to a handler.
 	AddRoute(handler http.Handler, endpoint string, metricName string) error
-	AddHeaderRoute(route string, handler http.Handler) bool
 
 	// AddAliases registers aliases to the server
 	AddAliases(endpoint string, aliases ...string) error
@@ -67,6 +66,7 @@ type Server interface {
 	RegisterChain(chainName string, ctx *snow.ConsensusContext, vm common.VM)
 	// Shutdown this server
 	Shutdown() error
+	AddHeaderRoute(s string, info *http.ServeMux)
 }
 
 type HTTPConfig struct {
@@ -94,6 +94,11 @@ type server struct {
 
 	// Listener used to serve traffic
 	listener net.Listener
+}
+
+func (s *server) AddHeaderRoute(st string, info *http.ServeMux) {
+	//TODO implement me
+	panic("implement me")
 }
 
 // New returns an instance of a Server.
@@ -190,16 +195,8 @@ func (s *server) wrapMiddleware(chainName string, handler http.Handler, ctx *sno
 	return s.metrics.wrapHandler(chainName, handler)
 }
 
-func (*server) NewHTTPHandler() error {
-	return nil
-}
-
 func (s *server) AddRoute(handler http.Handler, endpoint string, metricName string) error {
 	return s.addRoute(handler, endpoint, metricName)
-}
-
-func (s *server) AddHeaderRoute(route string, handler http.Handler) bool {
-	return s.router.AddHeaderRoute(route, handler)
 }
 
 func (s *server) AddRouteWithReadLock(handler http.Handler, endpoint string, metricName string) error {
@@ -268,16 +265,18 @@ type readPathAdder struct {
 	pather PathAdderWithReadLock
 }
 
-func (r readPathAdder) AddHeaderRoute(string, http.Handler) bool {
-	panic("implement me")
+func PathWriterFromWithReadLock(pather PathAdderWithReadLock) PathAdder {
+	return readPathAdder{
+		pather: pather,
+	}
 }
 
-func (r readPathAdder) AddRoute(handler http.Handler, base, endpoint string) error {
-	return r.pather.AddRouteWithReadLock(handler, base, endpoint)
+func (a readPathAdder) AddRoute(handler http.Handler, base, endpoint string) error {
+	return a.pather.AddRouteWithReadLock(handler, base, endpoint)
 }
 
-func (r readPathAdder) AddAliases(endpoint string, aliases ...string) error {
-	return r.pather.AddAliasesWithReadLock(endpoint, aliases...)
+func (a readPathAdder) AddAliases(endpoint string, aliases ...string) error {
+	return a.pather.AddAliasesWithReadLock(endpoint, aliases...)
 }
 
 func wrapHandler(

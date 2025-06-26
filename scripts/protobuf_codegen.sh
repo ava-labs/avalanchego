@@ -39,7 +39,7 @@ for BUF_MODULE in "${BUF_MODULES[@]}"; do
     TARGET="$1"
   fi
 
-  # move to buf module directory
+  # move to api directory
   cd "$TARGET"
 
   echo "Generating for buf module $BUF_MODULE"

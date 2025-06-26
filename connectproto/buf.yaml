@@ -18,6 +18,11 @@ lint:
     - RPC_REQUEST_STANDARD_NAME # explicit <rpc>+Request naming
     - RPC_RESPONSE_STANDARD_NAME # explicit <rpc>+Response naming
     - PACKAGE_VERSION_SUFFIX # versioned naming <service>.v1beta
+  ignore:
+    # TODO: how will fixing this affect functionality. Multiple fields are used as the request
+    # or response type for multiple RPCs
+    - aliasreader/aliasreader.proto
+    - net/conn/conn.proto
   # allows RPC requests or responses to be google.protobuf.Empty messages. This can be set if you
   # want to allow messages to be void forever, that is they will never take any parameters.
   rpc_allow_google_protobuf_empty_requests: true

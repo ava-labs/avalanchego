@@ -38,6 +38,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/messenger"
 
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+
 	aliasreaderpb "github.com/ava-labs/avalanchego/proto/pb/aliasreader"
 	appsenderpb "github.com/ava-labs/avalanchego/proto/pb/appsender"
 	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
@@ -47,7 +49,6 @@ import (
 	validatorstatepb "github.com/ava-labs/avalanchego/proto/pb/validatorstate"
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 	warppb "github.com/ava-labs/avalanchego/proto/pb/warp"
-	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 )
 
 var (
