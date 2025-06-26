@@ -240,21 +240,14 @@ jobs:
   load_tests:
     name: load tests
     runs-on: avalanche-avalanchego-runner
-    container:
-      image: ubuntu:22.04
-#      options: --user root
+#    container:
+#      image: ghcr.io/actions/actions-runner:latest
     steps:
-      - name: Install prerequisites
-        run: |
-          apt-get update
-          apt-get install -y ca-certificates
-          update-ca-certificates
-          apt-get clean
-          rm -rf /var/lib/apt/lists/*
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup-go-for-project
-      - name: Run
+      - uses: ./.github/actions/install-nix
+      - name: Hello
         run: |
           go run ./tests/load/c/main --runtime=kube --kube-image="avalanchego:arc-load-test"
