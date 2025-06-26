@@ -16,8 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
-
-	txmempool "github.com/ava-labs/avalanchego/vms/txs/mempool"
+	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
 var (
@@ -44,7 +43,7 @@ func New(
 	vdrs validators.State,
 	parser txs.Parser,
 	txVerifier TxVerifier,
-	mempool txmempool.Mempool[*txs.Tx],
+	mempool mempool.Mempool[*txs.Tx],
 	appSender common.AppSender,
 	registerer prometheus.Registerer,
 	config Config,
