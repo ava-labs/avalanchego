@@ -59,7 +59,7 @@ func (sf *binarySnowflake) RecordPoll(count, choice int) {
 	if choice != sf.Preference() {
 		clear(sf.confidence)
 	}
-	sf.binarySlush.RecordSuccessfulPoll(choice)
+	sf.RecordSuccessfulPoll(choice)
 
 	for i, terminationCondition := range sf.terminationConditions {
 		// If I did not reach this alpha threshold, I did not

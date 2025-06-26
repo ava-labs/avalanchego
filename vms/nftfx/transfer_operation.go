@@ -19,7 +19,7 @@ type TransferOperation struct {
 }
 
 func (op *TransferOperation) InitCtx(ctx *snow.Context) {
-	op.Output.OutputOwners.InitCtx(ctx)
+	op.Output.InitCtx(ctx)
 }
 
 func (op *TransferOperation) Cost() (uint64, error) {
@@ -31,8 +31,8 @@ func (op *TransferOperation) Outs() []verify.State {
 }
 
 func (op *TransferOperation) Verify() error {
-	switch {
-	case op == nil:
+	switch op {
+	case nil:
 		return errNilTransferOperation
 	default:
 		return verify.All(&op.Input, &op.Output)

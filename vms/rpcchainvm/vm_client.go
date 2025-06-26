@@ -344,7 +344,7 @@ func (vm *VMClient) SetState(ctx context.Context, state snow.State) error {
 
 	// We don't need to check whether this is a block.WithVerifyContext because
 	// we'll never Verify this block.
-	return vm.State.SetLastAcceptedBlock(&blockClient{
+	return vm.SetLastAcceptedBlock(&blockClient{
 		vm:       vm,
 		id:       id,
 		parentID: parentID,

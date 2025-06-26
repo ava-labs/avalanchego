@@ -91,9 +91,9 @@ func (b *Block) Options(context.Context) ([2]snowman.Block, error) {
 		log:                     b.manager.ctx.Log,
 		primaryUptimePercentage: b.manager.txExecutorBackend.Config.UptimePercentage,
 		uptimes:                 b.manager.txExecutorBackend.Uptimes,
-		state:                   b.manager.backend.state,
+		state:                   b.manager.state,
 	}
-	if err := b.Block.Visit(&options); err != nil {
+	if err := b.Visit(&options); err != nil {
 		return [2]snowman.Block{}, err
 	}
 

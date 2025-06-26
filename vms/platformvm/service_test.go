@@ -106,7 +106,7 @@ func TestGetProposedHeight(t *testing.T) {
 	// Get the last accepted block which should be genesis
 	genesisBlockID := service.vm.manager.LastAccepted()
 
-	require.NoError(service.vm.Network.IssueTxFromRPC(tx))
+	require.NoError(service.vm.IssueTxFromRPC(tx))
 	service.vm.ctx.Lock.Lock()
 
 	block, err := service.vm.BuildBlock(context.Background())
@@ -210,7 +210,7 @@ func TestGetTxStatus(t *testing.T) {
 	require.Zero(resp.Reason)
 
 	// put the chain in existing chain list
-	require.NoError(service.vm.Network.IssueTxFromRPC(tx))
+	require.NoError(service.vm.IssueTxFromRPC(tx))
 	service.vm.ctx.Lock.Lock()
 
 	block, err := service.vm.BuildBlock(context.Background())
@@ -340,7 +340,7 @@ func TestGetTx(t *testing.T) {
 				err := service.GetTx(nil, arg, &response)
 				require.ErrorIs(err, database.ErrNotFound) // We haven't issued the tx yet
 
-				require.NoError(service.vm.Network.IssueTxFromRPC(tx))
+				require.NoError(service.vm.IssueTxFromRPC(tx))
 				service.vm.ctx.Lock.Lock()
 
 				blk, err := service.vm.BuildBlock(context.Background())
@@ -826,7 +826,7 @@ func TestGetValidatorsAt(t *testing.T) {
 	require.NoError(err)
 
 	service.vm.ctx.Lock.Unlock()
-	require.NoError(service.vm.Network.IssueTxFromRPC(tx))
+	require.NoError(service.vm.IssueTxFromRPC(tx))
 	service.vm.ctx.Lock.Lock()
 
 	block, err := service.vm.BuildBlock(context.Background())
@@ -990,8 +990,8 @@ func TestGetBlock(t *testing.T) {
 			response := api.GetBlockResponse{}
 			require.NoError(service.GetBlock(nil, &args, &response))
 
-			switch {
-			case test.encoding == formatting.JSON:
+			switch test.encoding {
+			case formatting.JSON:
 				statelessBlock.InitCtx(service.vm.ctx)
 				expectedBlockJSON, err := json.Marshal(statelessBlock)
 				require.NoError(err)

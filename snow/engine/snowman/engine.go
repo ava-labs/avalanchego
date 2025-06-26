@@ -256,11 +256,11 @@ func (e *Engine) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, b
 		//
 		// Note: It is still possible this block will be issued here, because
 		// the block may have previously failed verification.
-		issuedMetric = e.metrics.issued.WithLabelValues(unknownSource)
+		issuedMetric = e.issued.WithLabelValues(unknownSource)
 	}
 
 	if !e.shouldIssueBlock(blk) {
-		e.metrics.numUselessPutBytes.Add(float64(len(blkBytes)))
+		e.numUselessPutBytes.Add(float64(len(blkBytes)))
 	}
 
 	// issue the block into consensus. If the block has already been issued,
@@ -303,7 +303,7 @@ func (e *Engine) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID uin
 func (e *Engine) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID, requestedHeight uint64) error {
 	e.sendChits(ctx, nodeID, requestID, requestedHeight)
 
-	issuedMetric := e.metrics.issued.WithLabelValues(pushGossipSource)
+	issuedMetric := e.issued.WithLabelValues(pushGossipSource)
 
 	// Try to issue [blkID] to consensus.
 	// If we're missing an ancestor, request it from [vdr]
@@ -338,10 +338,10 @@ func (e *Engine) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uin
 	}
 
 	if !e.shouldIssueBlock(blk) {
-		e.metrics.numUselessPushQueryBytes.Add(float64(len(blkBytes)))
+		e.numUselessPushQueryBytes.Add(float64(len(blkBytes)))
 	}
 
-	issuedMetric := e.metrics.issued.WithLabelValues(pushGossipSource)
+	issuedMetric := e.issued.WithLabelValues(pushGossipSource)
 
 	// issue the block into consensus. If the block has already been issued,
 	// this will be a noop. If this block has missing dependencies, nodeID will
@@ -367,7 +367,7 @@ func (e *Engine) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32,
 		zap.Uint64("acceptedHeight", acceptedHeight),
 	)
 
-	issuedMetric := e.metrics.issued.WithLabelValues(pullGossipSource)
+	issuedMetric := e.issued.WithLabelValues(pullGossipSource)
 	if err := e.issueFromByID(ctx, nodeID, preferredID, issuedMetric); err != nil {
 		return err
 	}
@@ -495,7 +495,7 @@ func (e *Engine) Start(ctx context.Context, startReqID uint32) error {
 		case err != nil:
 			return err
 		default:
-			issuedMetric := e.metrics.issued.WithLabelValues(builtSource)
+			issuedMetric := e.issued.WithLabelValues(builtSource)
 			for _, blk := range options {
 				// note that deliver will set the VM's preference
 				if err := e.deliver(ctx, e.Ctx.NodeID, blk, false, issuedMetric); err != nil {
@@ -511,7 +511,7 @@ func (e *Engine) Start(ctx context.Context, startReqID uint32) error {
 		zap.Stringer("lastAcceptedID", lastAcceptedID),
 		zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
 	)
-	e.metrics.bootstrapFinished.Set(1)
+	e.bootstrapFinished.Set(1)
 
 	e.Ctx.State.Set(snow.EngineState{
 		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
@@ -556,10 +556,10 @@ func (e *Engine) executeDeferredWork(ctx context.Context) error {
 		return err
 	}
 
-	e.metrics.numRequests.Set(float64(e.blkReqs.Len()))
-	e.metrics.numBlocked.Set(float64(len(e.pending)))
-	e.metrics.numBlockers.Set(float64(e.blocked.NumDependencies()))
-	e.metrics.numNonVerifieds.Set(float64(e.unverifiedIDToAncestor.Len()))
+	e.numRequests.Set(float64(e.blkReqs.Len()))
+	e.numBlocked.Set(float64(len(e.pending)))
+	e.numBlockers.Set(float64(e.blocked.NumDependencies()))
+	e.numNonVerifieds.Set(float64(e.unverifiedIDToAncestor.Len()))
 	return nil
 }
 
@@ -578,7 +578,7 @@ func (e *Engine) sendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 	lastAcceptedID, lastAcceptedHeight := e.Consensus.LastAccepted()
 	// If we aren't fully verifying blocks, only vote for blocks that are widely
 	// preferred by the validator set.
-	if e.Ctx.StateSyncing.Get() || e.Config.PartialSync {
+	if e.Ctx.StateSyncing.Get() || e.PartialSync {
 		acceptedAtHeight, err := e.VM.GetBlockIDAtHeight(ctx, requestedHeight)
 		if err != nil {
 			// Because we only return accepted state here, it's fairly likely
@@ -667,7 +667,7 @@ func (e *Engine) buildBlocks(ctx context.Context) error {
 			)
 		}
 
-		issuedMetric := e.metrics.issued.WithLabelValues(builtSource)
+		issuedMetric := e.issued.WithLabelValues(builtSource)
 		if err := e.issueWithAncestors(ctx, blk, issuedMetric); err != nil {
 			return err
 		}
@@ -918,7 +918,7 @@ func (e *Engine) sendQuery(
 }
 
 func (e *Engine) abortDueToInsufficientConnectedStake(blkID ids.ID) bool {
-	stakeConnectedRatio := e.Config.ConnectedValidators.ConnectedPercent()
+	stakeConnectedRatio := e.ConnectedValidators.ConnectedPercent()
 	minConnectedStakeToQuery := float64(e.Params.AlphaConfidence) / float64(e.Params.K)
 
 	if stakeConnectedRatio < minConnectedStakeToQuery {
@@ -1090,7 +1090,7 @@ func (e *Engine) addUnverifiedBlockToConsensus(
 	issuedMetric.Inc()
 	e.unverifiedIDToAncestor.Remove(blkID)
 	e.unverifiedBlockCache.Evict(blkID)
-	e.metrics.issuerStake.Observe(float64(e.Validators.GetWeight(e.Ctx.SubnetID, nodeID)))
+	e.issuerStake.Observe(float64(e.Validators.GetWeight(e.Ctx.SubnetID, nodeID)))
 	e.Ctx.Log.Verbo("adding block to consensus",
 		zap.Stringer("nodeID", nodeID),
 		zap.Stringer("blkID", blkID),

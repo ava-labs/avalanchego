@@ -380,7 +380,7 @@ func (p *peer) readMessages() {
 	}()
 
 	// Continuously read and handle messages from this peer.
-	reader := bufio.NewReaderSize(p.conn, p.Config.ReadBufferSize)
+	reader := bufio.NewReaderSize(p.conn, p.ReadBufferSize)
 	msgLenBytes := make([]byte, wrappers.IntLen)
 	for {
 		// Time out and close connection if we can't read the message length
@@ -506,7 +506,7 @@ func (p *peer) writeMessages() {
 		p.close()
 	}()
 
-	writer := bufio.NewWriterSize(p.conn, p.Config.WriteBufferSize)
+	writer := bufio.NewWriterSize(p.conn, p.WriteBufferSize)
 
 	// Make sure that the Handshake is the first message sent
 	mySignedIP, err := p.IPSigner.GetSignedIP()
@@ -639,9 +639,9 @@ func (p *peer) sendNetworkMessages() {
 	for {
 		select {
 		case <-p.getPeerListChan:
-			knownPeersFilter, knownPeersSalt := p.Config.Network.KnownPeers()
+			knownPeersFilter, knownPeersSalt := p.Network.KnownPeers()
 			_, areWeAPrimaryNetworkValidator := p.Validators.GetValidator(constants.PrimaryNetworkID, p.MyNodeID)
-			msg, err := p.Config.MessageCreator.GetPeerList(
+			msg, err := p.MessageCreator.GetPeerList(
 				knownPeersFilter,
 				knownPeersSalt,
 				areWeAPrimaryNetworkValidator,
@@ -720,7 +720,7 @@ func (p *peer) shouldDisconnect() bool {
 	validSignature := bls.VerifyProofOfPossession(
 		vdr.PublicKey,
 		p.ip.BLSSignature,
-		p.ip.UnsignedIP.bytes(),
+		p.ip.bytes(),
 	)
 	if !validSignature {
 		p.Log.Debug(disconnectingLog,
@@ -1047,7 +1047,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 
 	// We bypass throttling here to ensure that the handshake message is
 	// acknowledged correctly.
-	peerListMsg, err := p.Config.MessageCreator.PeerList(peerIPs, true /*=bypassThrottling*/)
+	peerListMsg, err := p.MessageCreator.PeerList(peerIPs, true /*=bypassThrottling*/)
 	if err != nil {
 		p.Log.Error(failedToCreateMessageLog,
 			zap.Stringer("nodeID", p.id),
@@ -1115,7 +1115,7 @@ func (p *peer) handleGetPeerList(msg *p2p.GetPeerList) {
 
 	// Bypass throttling is disabled here to follow the non-handshake message
 	// sending pattern.
-	peerListMsg, err := p.Config.MessageCreator.PeerList(peerIPs, false /*=bypassThrottling*/)
+	peerListMsg, err := p.MessageCreator.PeerList(peerIPs, false /*=bypassThrottling*/)
 	if err != nil {
 		p.Log.Error(failedToCreateMessageLog,
 			zap.Stringer("nodeID", p.id),

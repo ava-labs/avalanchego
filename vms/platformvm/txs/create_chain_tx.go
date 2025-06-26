@@ -69,7 +69,7 @@ func (tx *CreateChainTx) SyntacticVerify(ctx *snow.Context) error {
 	}
 
 	for _, r := range tx.ChainName {
-		if r > unicode.MaxASCII || !(unicode.IsLetter(r) || unicode.IsNumber(r) || r == ' ') {
+		if r > unicode.MaxASCII || (!unicode.IsLetter(r) && !unicode.IsNumber(r) && r != ' ') {
 			return errIllegalNameCharacter
 		}
 	}

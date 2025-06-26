@@ -81,10 +81,10 @@ func (vm *blockVM) BuildBlock(ctx context.Context) (snowman.Block, error) {
 	end := vm.clock.Time()
 	duration := float64(end.Sub(start))
 	if err != nil {
-		vm.blockMetrics.buildBlockErr.Observe(duration)
+		vm.buildBlockErr.Observe(duration)
 		return nil, err
 	}
-	vm.blockMetrics.buildBlock.Observe(duration)
+	vm.buildBlock.Observe(duration)
 	return &meterBlock{
 		Block: blk,
 		vm:    vm,
@@ -97,10 +97,10 @@ func (vm *blockVM) ParseBlock(ctx context.Context, b []byte) (snowman.Block, err
 	end := vm.clock.Time()
 	duration := float64(end.Sub(start))
 	if err != nil {
-		vm.blockMetrics.parseBlockErr.Observe(duration)
+		vm.parseBlockErr.Observe(duration)
 		return nil, err
 	}
-	vm.blockMetrics.parseBlock.Observe(duration)
+	vm.parseBlock.Observe(duration)
 	return &meterBlock{
 		Block: blk,
 		vm:    vm,
@@ -113,10 +113,10 @@ func (vm *blockVM) GetBlock(ctx context.Context, id ids.ID) (snowman.Block, erro
 	end := vm.clock.Time()
 	duration := float64(end.Sub(start))
 	if err != nil {
-		vm.blockMetrics.getBlockErr.Observe(duration)
+		vm.getBlockErr.Observe(duration)
 		return nil, err
 	}
-	vm.blockMetrics.getBlock.Observe(duration)
+	vm.getBlock.Observe(duration)
 	return &meterBlock{
 		Block: blk,
 		vm:    vm,
@@ -127,7 +127,7 @@ func (vm *blockVM) SetPreference(ctx context.Context, id ids.ID) error {
 	start := vm.clock.Time()
 	err := vm.ChainVM.SetPreference(ctx, id)
 	end := vm.clock.Time()
-	vm.blockMetrics.setPreference.Observe(float64(end.Sub(start)))
+	vm.setPreference.Observe(float64(end.Sub(start)))
 	return err
 }
 
@@ -135,7 +135,7 @@ func (vm *blockVM) LastAccepted(ctx context.Context) (ids.ID, error) {
 	start := vm.clock.Time()
 	lastAcceptedID, err := vm.ChainVM.LastAccepted(ctx)
 	end := vm.clock.Time()
-	vm.blockMetrics.lastAccepted.Observe(float64(end.Sub(start)))
+	vm.lastAccepted.Observe(float64(end.Sub(start)))
 	return lastAcceptedID, err
 }
 
@@ -143,6 +143,6 @@ func (vm *blockVM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.I
 	start := vm.clock.Time()
 	blockID, err := vm.ChainVM.GetBlockIDAtHeight(ctx, height)
 	end := vm.clock.Time()
-	vm.blockMetrics.getBlockIDAtHeight.Observe(float64(end.Sub(start)))
+	vm.getBlockIDAtHeight.Observe(float64(end.Sub(start)))
 	return blockID, err
 }

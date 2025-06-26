@@ -513,8 +513,8 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	require.NoError(blk.Verify(context.Background()))
 
 	// Assert expected state.
-	require.Contains(manager.backend.blkIDToState, apricotBlk.ID())
-	gotBlkState := manager.backend.blkIDToState[apricotBlk.ID()]
+	require.Contains(manager.blkIDToState, apricotBlk.ID())
+	gotBlkState := manager.blkIDToState[apricotBlk.ID()]
 	require.Equal(parentOnAbortState, gotBlkState.onAcceptState)
 	require.Equal(timestamp, gotBlkState.timestamp)
 
@@ -587,8 +587,8 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	require.NoError(blk.Verify(context.Background()))
 
 	// Assert expected state.
-	require.Contains(manager.backend.blkIDToState, apricotBlk.ID())
-	gotBlkState := manager.backend.blkIDToState[apricotBlk.ID()]
+	require.Contains(manager.blkIDToState, apricotBlk.ID())
+	gotBlkState := manager.blkIDToState[apricotBlk.ID()]
 	require.Equal(parentOnAbortState, gotBlkState.onAcceptState)
 	require.Equal(timestamp, gotBlkState.timestamp)
 

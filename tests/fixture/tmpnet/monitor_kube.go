@@ -49,7 +49,7 @@ func DeployKubeCollectors(
 	startMetricsCollector bool,
 	startLogsCollector bool,
 ) error {
-	if !(startMetricsCollector || startLogsCollector) {
+	if !startMetricsCollector && !startLogsCollector {
 		// Nothing to do
 		return nil
 	}

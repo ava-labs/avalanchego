@@ -539,7 +539,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 
 	// Create chain router
 	n.chainRouter = &router.ChainRouter{}
-	if n.Config.TraceConfig.ExporterConfig.Type != trace.Disabled {
+	if n.Config.TraceConfig.Type != trace.Disabled {
 		n.chainRouter = router.Trace(n.chainRouter, n.tracer)
 	}
 
@@ -747,7 +747,7 @@ func (n *Node) Dispatch() error {
 
 func (n *Node) initDatabase() error {
 	var dbFolderName string
-	switch n.Config.DatabaseConfig.Name {
+	switch n.Config.Name {
 	case leveldb.Name:
 		// Prior to v1.10.15, the only on-disk database was leveldb, and its
 		// files went to [dbPath]/[networkID]/v1.4.5.
@@ -758,14 +758,14 @@ func (n *Node) initDatabase() error {
 		dbFolderName = "db"
 	}
 	// dbFolderName is appended to the database path given in the config
-	dbFullPath := filepath.Join(n.Config.DatabaseConfig.Path, dbFolderName)
+	dbFullPath := filepath.Join(n.Config.Path, dbFolderName)
 
 	var err error
 	n.DB, err = databasefactory.New(
-		n.Config.DatabaseConfig.Name,
+		n.Config.Name,
 		dbFullPath,
-		n.Config.DatabaseConfig.ReadOnly,
-		n.Config.DatabaseConfig.Config,
+		n.Config.ReadOnly,
+		n.Config.Config,
 		n.MetricsGatherer,
 		n.Log,
 		dbNamespace,
@@ -1000,7 +1000,7 @@ func (n *Node) initAPIServer() error {
 		n.Config.HTTPAllowedOrigins,
 		n.Config.ShutdownTimeout,
 		n.ID,
-		n.Config.TraceConfig.ExporterConfig.Type != trace.Disabled,
+		n.Config.TraceConfig.Type != trace.Disabled,
 		n.tracer,
 		apiRegisterer,
 		n.Config.HTTPConfig.HTTPConfig,
@@ -1137,7 +1137,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			Upgrades:                                n.Config.UpgradeConfig,
 			ResourceTracker:                         n.resourceTracker,
 			StateSyncBeacons:                        n.Config.StateSyncIDs,
-			TracingEnabled:                          n.Config.TraceConfig.ExporterConfig.Type != trace.Disabled,
+			TracingEnabled:                          n.Config.TraceConfig.Type != trace.Disabled,
 			Tracer:                                  n.tracer,
 			ChainDataDir:                            n.Config.ChainDataDir,
 			Subnets:                                 subnets,
@@ -1563,7 +1563,7 @@ func (n *Node) initResourceManager() error {
 	}
 	resourceManager, err := resource.NewManager(
 		n.Log,
-		n.Config.DatabaseConfig.Path,
+		n.Config.Path,
 		n.Config.SystemTrackerFrequency,
 		n.Config.SystemTrackerCPUHalflife,
 		n.Config.SystemTrackerDiskHalflife,
@@ -1695,7 +1695,7 @@ func (n *Node) shutdown() {
 		}
 	}
 
-	if n.Config.TraceConfig.ExporterConfig.Type != trace.Disabled {
+	if n.Config.TraceConfig.Type != trace.Disabled {
 		n.Log.Info("shutting down tracing")
 	}
 

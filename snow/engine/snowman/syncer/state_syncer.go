@@ -471,7 +471,7 @@ func (ss *stateSyncer) GetAcceptedStateSummaryFailed(ctx context.Context, nodeID
 // to bootstrapping. Unlike Start, startup does not check
 // whether sufficient stake amount is connected.
 func (ss *stateSyncer) startup(ctx context.Context) error {
-	ss.Config.Ctx.Log.Info("starting state sync")
+	ss.Ctx.Log.Info("starting state sync")
 
 	// clear up messages trackers
 	ss.weightedSummaries = make(map[ids.ID]*weightedSummary)
@@ -486,7 +486,7 @@ func (ss *stateSyncer) startup(ctx context.Context) error {
 	ss.failedVoters.Clear()
 
 	// sample K beacons to retrieve frontier from
-	beaconIDs, err := ss.StateSyncBeacons.Sample(ss.Ctx.SubnetID, ss.Config.SampleK)
+	beaconIDs, err := ss.StateSyncBeacons.Sample(ss.Ctx.SubnetID, ss.SampleK)
 	if err != nil {
 		return err
 	}
@@ -592,7 +592,7 @@ func (*stateSyncer) Gossip(context.Context) error {
 }
 
 func (ss *stateSyncer) Shutdown(ctx context.Context) error {
-	ss.Config.Ctx.Log.Info("shutting down state syncer")
+	ss.Ctx.Log.Info("shutting down state syncer")
 
 	ss.Ctx.Lock.Lock()
 	defer ss.Ctx.Lock.Unlock()

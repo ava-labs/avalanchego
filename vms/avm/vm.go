@@ -360,7 +360,7 @@ func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, erro
  */
 
 func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<- common.Message) error {
-	time := vm.Config.Upgrades.CortinaTime
+	time := vm.Upgrades.CortinaTime
 	if err := vm.state.InitializeChainState(stopVertexID, time); err != nil {
 		return fmt.Errorf("failed to initialize chain state: %w", err)
 	}
@@ -417,7 +417,7 @@ func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<
 	// Note: It's important only to switch the networking stack after the full
 	// chainVM has been initialized. Traffic will immediately start being
 	// handled asynchronously.
-	vm.Atomic.Set(vm.network)
+	vm.Set(vm.network)
 
 	vm.awaitShutdown.Add(2)
 	go func() {

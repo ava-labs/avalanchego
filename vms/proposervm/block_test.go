@@ -403,7 +403,7 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 		Scheduler:              scheduler,
 		proposerBuildSlotGauge: prometheus.NewGauge(prometheus.GaugeOpts{}),
 	}
-	vm.Clock.Set(now)
+	vm.Set(now)
 
 	blk := &postForkCommonComponents{
 		innerBlk: innerBlk,

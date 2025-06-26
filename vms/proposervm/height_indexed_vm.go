@@ -17,7 +17,7 @@ const pruneCommitPeriod = 1024
 
 // vm.ctx.Lock should be held
 func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
-	switch forkHeight, err := vm.State.GetForkHeight(); err {
+	switch forkHeight, err := vm.GetForkHeight(); err {
 	case nil:
 		if height < forkHeight {
 			return vm.ChainVM.GetBlockIDAtHeight(ctx, height)
@@ -34,14 +34,14 @@ func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, er
 }
 
 func (vm *VM) updateHeightIndex(height uint64, blkID ids.ID) error {
-	forkHeight, err := vm.State.GetForkHeight()
+	forkHeight, err := vm.GetForkHeight()
 	switch err {
 	case nil:
 		// The fork was already reached. Just update the index.
 
 	case database.ErrNotFound:
 		// This is the first post fork block, store the fork height.
-		if err := vm.State.SetForkHeight(height); err != nil {
+		if err := vm.SetForkHeight(height); err != nil {
 			return fmt.Errorf("failed storing fork height: %w", err)
 		}
 		forkHeight = height
@@ -50,7 +50,7 @@ func (vm *VM) updateHeightIndex(height uint64, blkID ids.ID) error {
 		return fmt.Errorf("failed to load fork height: %w", err)
 	}
 
-	if err := vm.State.SetBlockIDAtHeight(height, blkID); err != nil {
+	if err := vm.SetBlockIDAtHeight(height, blkID); err != nil {
 		return err
 	}
 
@@ -87,10 +87,10 @@ func (vm *VM) updateHeightIndex(height uint64, blkID ids.ID) error {
 		return err
 	}
 
-	if err := vm.State.DeleteBlockIDAtHeight(heightToDelete); err != nil {
+	if err := vm.DeleteBlockIDAtHeight(heightToDelete); err != nil {
 		return err
 	}
-	if err := vm.State.DeleteBlock(blockToDelete); err != nil {
+	if err := vm.DeleteBlock(blockToDelete); err != nil {
 		return err
 	}
 
@@ -107,7 +107,7 @@ func (vm *VM) pruneOldBlocks() error {
 		return nil
 	}
 
-	height, err := vm.State.GetMinimumHeight()
+	height, err := vm.GetMinimumHeight()
 	if err == database.ErrNotFound {
 		// Chain hasn't forked yet
 		return nil
@@ -123,10 +123,10 @@ func (vm *VM) pruneOldBlocks() error {
 			return err
 		}
 
-		if err := vm.State.DeleteBlockIDAtHeight(height); err != nil {
+		if err := vm.DeleteBlockIDAtHeight(height); err != nil {
 			return err
 		}
-		if err := vm.State.DeleteBlock(blockToDelete); err != nil {
+		if err := vm.DeleteBlock(blockToDelete); err != nil {
 			return err
 		}
 

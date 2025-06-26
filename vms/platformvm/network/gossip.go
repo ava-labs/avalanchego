@@ -97,11 +97,11 @@ type gossipMempool struct {
 
 func (g *gossipMempool) Add(tx *txs.Tx) error {
 	txID := tx.ID()
-	if _, ok := g.Mempool.Get(txID); ok {
+	if _, ok := g.Get(txID); ok {
 		return fmt.Errorf("tx %s dropped: %w", txID, mempool.ErrDuplicateTx)
 	}
 
-	if reason := g.Mempool.GetDropReason(txID); reason != nil {
+	if reason := g.GetDropReason(txID); reason != nil {
 		// If the tx is being dropped - just ignore it
 		//
 		// TODO: Should we allow re-verification of the transaction even if it
@@ -115,12 +115,12 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 			zap.Error(err),
 		)
 
-		g.Mempool.MarkDropped(txID, err)
+		g.MarkDropped(txID, err)
 		return fmt.Errorf("failed verification: %w", err)
 	}
 
 	if err := g.Mempool.Add(tx); err != nil {
-		g.Mempool.MarkDropped(txID, err)
+		g.MarkDropped(txID, err)
 		return err
 	}
 
@@ -128,20 +128,20 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 	defer g.lock.Unlock()
 
 	g.bloom.Add(tx)
-	reset, err := gossip.ResetBloomFilterIfNeeded(g.bloom, g.Mempool.Len()*bloomChurnMultiplier)
+	reset, err := gossip.ResetBloomFilterIfNeeded(g.bloom, g.Len()*bloomChurnMultiplier)
 	if err != nil {
 		return err
 	}
 
 	if reset {
 		g.log.Debug("resetting bloom filter")
-		g.Mempool.Iterate(func(tx *txs.Tx) bool {
+		g.Iterate(func(tx *txs.Tx) bool {
 			g.bloom.Add(tx)
 			return true
 		})
 	}
 
-	if g.Mempool.Len() == 0 {
+	if g.Len() == 0 {
 		return nil
 	}
 
@@ -154,7 +154,7 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 }
 
 func (g *gossipMempool) Has(txID ids.ID) bool {
-	_, ok := g.Mempool.Get(txID)
+	_, ok := g.Get(txID)
 	return ok
 }
 

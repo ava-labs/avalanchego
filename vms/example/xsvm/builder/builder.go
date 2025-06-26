@@ -125,7 +125,7 @@ func (b *builder) BuildBlock(ctx context.Context, blockContext *smblock.Context)
 			Sender:       sender,
 			// TODO: populate fees
 		}
-		if err := currentTx.Unsigned.Visit(&txExecutor); err != nil {
+		if err := currentTx.Visit(&txExecutor); err != nil {
 			// This tx was invalid, drop it and continue block building
 			continue
 		}

@@ -150,7 +150,7 @@ func (p *postForkCommonComponents) Verify(
 			return err
 		}
 
-		hasProposer := child.SignedBlock.Proposer() != ids.EmptyNodeID
+		hasProposer := child.Proposer() != ids.EmptyNodeID
 		if shouldHaveProposer != hasProposer {
 			return fmt.Errorf("%w: shouldHaveProposer (%v) != hasProposer (%v)", errProposerMismatch, shouldHaveProposer, hasProposer)
 		}
@@ -343,7 +343,7 @@ func (p *postForkCommonComponents) verifyPreDurangoBlockDelay(
 		childHeight  = blk.Height()
 		proposerID   = blk.Proposer()
 	)
-	minDelay, err := p.vm.Windower.Delay(
+	minDelay, err := p.vm.Delay(
 		ctx,
 		childHeight,
 		parentPChainHeight,
@@ -383,7 +383,7 @@ func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
 	blk.slot = &currentSlot
 
 	// find the expected proposer
-	expectedProposerID, err := p.vm.Windower.ExpectedProposer(
+	expectedProposerID, err := p.vm.ExpectedProposer(
 		ctx,
 		blkHeight,
 		parentPChainHeight,
@@ -415,7 +415,7 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPostDurango(
 ) (bool, error) {
 	parentHeight := p.innerBlk.Height()
 	currentSlot := proposer.TimeToSlot(parentTimestamp, newTimestamp)
-	expectedProposerID, err := p.vm.Windower.ExpectedProposer(
+	expectedProposerID, err := p.vm.ExpectedProposer(
 		ctx,
 		parentHeight+1,
 		parentPChainHeight,
@@ -470,7 +470,7 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPostDurango(
 	p.vm.proposerBuildSlotGauge.Set(float64(proposer.TimeToSlot(parentTimestamp, nextStartTime)))
 
 	// set the scheduler to let us know when the next block need to be built.
-	p.vm.Scheduler.SetBuildBlockTime(nextStartTime)
+	p.vm.SetBuildBlockTime(nextStartTime)
 
 	// In case the inner VM only issued one pendingTxs message, we should
 	// attempt to re-handle that once it is our turn to build the block.
@@ -492,7 +492,7 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPreDurango(
 
 	parentHeight := p.innerBlk.Height()
 	proposerID := p.vm.ctx.NodeID
-	minDelay, err := p.vm.Windower.Delay(ctx, parentHeight+1, parentPChainHeight, proposerID, proposer.MaxBuildWindows)
+	minDelay, err := p.vm.Delay(ctx, parentHeight+1, parentPChainHeight, proposerID, proposer.MaxBuildWindows)
 	if err != nil {
 		p.vm.ctx.Log.Error("unexpected build block failure",
 			zap.String("reason", "failed to calculate required timestamp delay"),
