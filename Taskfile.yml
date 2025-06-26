@@ -258,16 +258,17 @@ tasks:
   import-cchain-reexecute-range:
     desc: Imports the C-Chain block and state data to re-execute. Defaults to execute the block range (100, 200].
     vars:
-      EXECUTION_DATA_DIR_DST:
-        sh: echo "${EXECUTION_DATA_DIR:-$(mktemp -d)}" # TODO: fix tempdir param
+      EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR | default "reexecution-data-dir"}}'
       SOURCE_BLOCK_DIR: '{{.SOURCE_BLOCK_DIR | default "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-200.zip"}}'
       CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR | default "s3://avalanchego-bootstrap-testing/cchain-current-state-100-firewood.zip"}}'
     cmds:
-      - cmd: bash -x ./scripts/bench.import_cchain_data.sh {{.EXECUTION_DATA_DIR_DST}} {{.SOURCE_BLOCK_DIR}} {{.CURRENT_STATE_DIR}}
+      - cmd: bash -x ./scripts/bench.import_cchain_data.sh {{.EXECUTION_DATA_DIR}} {{.SOURCE_BLOCK_DIR}} {{.CURRENT_STATE_DIR}}
 
   reexecute-cchain-range:
     desc: Benchmark re-execute a range of blocks on the C-Chain. Defaults to execute the block range (100, 200].
     vars:
-      EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR | default "execution-data"}}'
+      EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR | default "reexecution-data-dir"}}'
     cmds:
       - cmd: go test -run=TestReexecuteRange github.com/ava-labs/avalanchego/tests/bench/c --source-block-dir={{.EXECUTION_DATA_DIR}}/blocks --target-dir={{.EXECUTION_DATA_DIR}}/current-state
+  
+  

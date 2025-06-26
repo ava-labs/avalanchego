@@ -151,10 +151,10 @@ func CollectRegistry(t *testing.T, name string, addr string, timeout time.Durati
 }
 
 // TODO:
-// - separate general purpose VM setup from C-Chain specific setup
-// - update C-Chain dashboard to make it useful for the benchmark
 // - add task to combine s3 pull + reexecution
 // - fix task env var handling
+// - separate general purpose VM setup from C-Chain specific setup
+// - update C-Chain dashboard to make it useful for the benchmark
 func TestReexecuteRange(t *testing.T) {
 	r := require.New(t)
 
