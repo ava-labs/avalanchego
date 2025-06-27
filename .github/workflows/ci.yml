@@ -240,19 +240,19 @@ jobs:
   load_tests:
     name: load tests
     runs-on: avalanche-avalanchego-runner
+    container:
+      image: cimg/go:1.23.9
     steps:
-      - name: Install dependencies
+      - name: Install x
         run: |
-          # Update package lists
-          apt-get update
-          # Install required packages (no sudo needed in container)
-          apt-get install -y xz-utils curl wget git
+          sudo apt-get update
+          sudo apt-get install -y xz-utils
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup-go-for-project
       - uses: ./.github/actions/install-nix
-      - name: Run load tests
+      - name: Hello
         shell: nix develop --command bash -x {0}
         run: |
           go run ./tests/load/c/main --runtime=kube --kube-image="avalanchego:arc-load-test"
