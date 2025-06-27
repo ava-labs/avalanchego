@@ -81,7 +81,7 @@ func TestNotifierStopWhileNotifying(_ *testing.T) {
 	notifiying.Add(1)
 
 	nf.Notifier = Notifier(notifier(func(ctx context.Context, _ Message) error {
-		notifiying.Done()
+		notifiying.Wait()
 		<-ctx.Done()
 		return nil
 	}))
@@ -91,6 +91,6 @@ func TestNotifierStopWhileNotifying(_ *testing.T) {
 	}
 
 	nf.Start()
-	notifiying.Wait()
+	notifiying.Done()
 	nf.Close()
 }

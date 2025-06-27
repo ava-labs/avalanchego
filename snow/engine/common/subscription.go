@@ -65,6 +65,9 @@ func (ss *SimpleSubscriber) WaitForEvent(ctx context.Context) (Message, error) {
 
 	go func() {
 		<-ctx.Done()
+
+		ss.lock.Lock()
+		defer ss.lock.Unlock()
 		ss.signal.Broadcast()
 	}()
 
