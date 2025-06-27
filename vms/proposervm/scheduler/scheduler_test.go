@@ -4,6 +4,7 @@
 package scheduler
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -14,48 +15,75 @@ import (
 )
 
 func TestDelayFromNew(t *testing.T) {
-	toEngine := make(chan common.Message, 10)
 	startTime := time.Now().Add(50 * time.Millisecond)
 
-	s, fromVM := New(logging.NoLog{}, toEngine)
+	msgs := make(chan common.Message, 1)
+	sub := func(ctx context.Context) (common.Message, error) {
+		select {
+		case msg := <-msgs:
+			return msg, nil
+		case <-ctx.Done():
+			return 0, nil
+		}
+	}
+	s, fromVM := New(sub, &logging.NoLog{})
 	defer s.Close()
 	go s.Dispatch(startTime)
 
-	fromVM <- common.PendingTxs
+	msgs <- common.PendingTxs
+	_, err := fromVM.WaitForEvent(context.Background())
+	require.NoError(t, err)
 
-	<-toEngine
 	require.LessOrEqual(t, time.Until(startTime), time.Duration(0))
 }
 
 func TestDelayFromSetTime(t *testing.T) {
-	toEngine := make(chan common.Message, 10)
 	now := time.Now()
 	startTime := now.Add(50 * time.Millisecond)
 
-	s, fromVM := New(logging.NoLog{}, toEngine)
+	msgs := make(chan common.Message, 1)
+	sub := func(ctx context.Context) (common.Message, error) {
+		select {
+		case msg := <-msgs:
+			return msg, nil
+		case <-ctx.Done():
+			return 0, nil
+		}
+	}
+	s, fromVM := New(sub, &logging.NoLog{})
 	defer s.Close()
 	go s.Dispatch(now)
 
 	s.SetBuildBlockTime(startTime)
 
-	fromVM <- common.PendingTxs
+	msgs <- common.PendingTxs
 
-	<-toEngine
+	msg, _ := fromVM.WaitForEvent(context.Background())
+	require.Equal(t, common.PendingTxs, msg)
 	require.LessOrEqual(t, time.Until(startTime), time.Duration(0))
 }
 
-func TestReceipt(*testing.T) {
-	toEngine := make(chan common.Message, 10)
+func TestReceipt(t *testing.T) {
+	msgs := make(chan common.Message, 1)
+	sub := func(ctx context.Context) (common.Message, error) {
+		select {
+		case msg := <-msgs:
+			return msg, nil
+		case <-ctx.Done():
+			return 0, nil
+		}
+	}
 	now := time.Now()
 	startTime := now.Add(50 * time.Millisecond)
 
-	s, fromVM := New(logging.NoLog{}, toEngine)
+	s, fromVM := New(sub, &logging.NoLog{})
 	defer s.Close()
 	go s.Dispatch(now)
 
-	fromVM <- common.PendingTxs
+	msgs <- common.PendingTxs
 
 	s.SetBuildBlockTime(startTime)
 
-	<-toEngine
+	_, err := fromVM.WaitForEvent(context.Background())
+	require.NoError(t, err)
 }

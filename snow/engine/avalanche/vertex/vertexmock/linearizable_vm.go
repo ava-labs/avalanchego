@@ -224,17 +224,17 @@ func (mr *LinearizableVMMockRecorder) HealthCheck(arg0 any) *gomock.Call {
 }
 
 // Initialize mocks base method.
-func (m *LinearizableVM) Initialize(ctx context.Context, chainCtx *snow.Context, db database.Database, genesisBytes, upgradeBytes, configBytes []byte, toEngine chan<- common.Message, fxs []*common.Fx, appSender common.AppSender) error {
+func (m *LinearizableVM) Initialize(ctx context.Context, chainCtx *snow.Context, db database.Database, genesisBytes, upgradeBytes, configBytes []byte, fxs []*common.Fx, appSender common.AppSender) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Initialize", ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs, appSender)
+	ret := m.ctrl.Call(m, "Initialize", ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, fxs, appSender)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Initialize indicates an expected call of Initialize.
-func (mr *LinearizableVMMockRecorder) Initialize(ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs, appSender any) *gomock.Call {
+func (mr *LinearizableVMMockRecorder) Initialize(ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, fxs, appSender any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Initialize", reflect.TypeOf((*LinearizableVM)(nil).Initialize), ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs, appSender)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Initialize", reflect.TypeOf((*LinearizableVM)(nil).Initialize), ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, fxs, appSender)
 }
 
 // LastAccepted mocks base method.
@@ -351,4 +351,19 @@ func (m *LinearizableVM) Version(arg0 context.Context) (string, error) {
 func (mr *LinearizableVMMockRecorder) Version(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Version", reflect.TypeOf((*LinearizableVM)(nil).Version), arg0)
+}
+
+// WaitForEvent mocks base method.
+func (m *LinearizableVM) WaitForEvent(ctx context.Context) (common.Message, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WaitForEvent", ctx)
+	ret0, _ := ret[0].(common.Message)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// WaitForEvent indicates an expected call of WaitForEvent.
+func (mr *LinearizableVMMockRecorder) WaitForEvent(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForEvent", reflect.TypeOf((*LinearizableVM)(nil).WaitForEvent), ctx)
 }

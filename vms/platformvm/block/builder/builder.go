@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -85,7 +84,6 @@ type Builder interface {
 type builder struct {
 	mempool.Mempool[*txs.Tx]
 
-	toEngine          chan<- common.Message
 	txExecutorBackend *txexecutor.Backend
 	blkManager        blockexecutor.Manager
 
@@ -94,17 +92,18 @@ type builder struct {
 	resetTimer chan struct{}
 	closed     chan struct{}
 	closeOnce  sync.Once
+	notify     func() // Notifies when a block is built
 }
 
 func New(
 	mempool mempool.Mempool[*txs.Tx],
-	toEngine chan<- common.Message,
 	txExecutorBackend *txexecutor.Backend,
 	blkManager blockexecutor.Manager,
+	notify func(),
 ) Builder {
 	return &builder{
+		notify:            notify,
 		Mempool:           mempool,
-		toEngine:          toEngine,
 		txExecutorBackend: txExecutorBackend,
 		blkManager:        blkManager,
 		resetTimer:        make(chan struct{}, 1),
@@ -147,10 +146,7 @@ func (b *builder) StartBlockTimer() {
 				}
 
 				// Block needs to be issued to advance time.
-				select {
-				case b.toEngine <- common.PendingTxs:
-				default:
-				}
+				b.notify()
 
 				// Invariant: ResetBlockTimer is guaranteed to be called after
 				// [durationToSleep] returns a value <= 0. This is because we
@@ -237,10 +233,7 @@ func (b *builder) BuildBlockWithContext(
 			return
 		}
 
-		select {
-		case b.toEngine <- common.PendingTxs:
-		default:
-		}
+		b.notify()
 	}()
 
 	b.txExecutorBackend.Ctx.Log.Debug("starting to attempt to build a block")
