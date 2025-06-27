@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/common/commontest"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
@@ -36,7 +37,6 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 
 	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
-	"github.com/ava-labs/avalanchego/snow/engine/common/commontest"
 	commontracker "github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 )
 
