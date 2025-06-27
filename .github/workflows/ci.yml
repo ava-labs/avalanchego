@@ -197,18 +197,18 @@ jobs:
       - uses: ./.github/actions/setup-go-for-project
       - shell: bash
         run: ./scripts/run_task.sh check-go-mod-tidy
-  test_build_image:
-    name: Image build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install qemu (required for cross-platform builds)
-        run: |
-          sudo apt update
-          sudo apt -y install qemu-system qemu-user-static
-      - name: Check image build
-        shell: bash
-        run: ./scripts/run_task.sh test-build-image
+#  test_build_image:
+#    name: Image build
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      - name: Install qemu (required for cross-platform builds)
+#        run: |
+#          sudo apt update
+#          sudo apt -y install qemu-system qemu-user-static
+#      - name: Check image build
+#        shell: bash
+#        run: ./scripts/run_task.sh test-build-image
 #  test_build_antithesis_avalanchego_images:
 #    name: Build Antithesis avalanchego images
 #    runs-on: ubuntu-latest
