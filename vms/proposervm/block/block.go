@@ -51,7 +51,7 @@ type statelessUnsignedBlock struct {
 }
 
 type statelessBlock struct {
-	StatelessBlock statelessUnsignedBlock `serialize:"true" json:"block"`
+	StatelessBlock statelessUnsignedBlock `serialize:"true" json:"statelessBlock"`
 	Signature      []byte                 `serialize:"true" json:"signature"`
 
 	id        ids.ID
