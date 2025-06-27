@@ -64,7 +64,7 @@ func (s *visitor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 	if err != nil {
 		return err
 	}
-	subnetAuthSigners, err := s.getAuthSigners(tx.SubnetValidator.Subnet, tx.SubnetAuth)
+	subnetAuthSigners, err := s.getAuthSigners(tx.Subnet, tx.SubnetAuth)
 	if err != nil {
 		return err
 	}

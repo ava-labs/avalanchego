@@ -63,7 +63,7 @@ func TestBuildBlockBasic(t *testing.T) {
 	require.True(ok)
 
 	// [BuildBlock] should build a block with the transaction
-	blkIntf, err := env.Builder.BuildBlock(context.Background())
+	blkIntf, err := env.BuildBlock(context.Background())
 	require.NoError(err)
 
 	require.IsType(&blockexecutor.Block{}, blkIntf)
@@ -89,7 +89,7 @@ func TestBuildBlockDoesNotBuildWithEmptyMempool(t *testing.T) {
 	require.Nil(tx)
 
 	// [BuildBlock] should not build an empty block
-	blk, err := env.Builder.BuildBlock(context.Background())
+	blk, err := env.BuildBlock(context.Background())
 	require.ErrorIs(err, ErrNoPendingBlocks)
 	require.Nil(blk)
 }
@@ -151,10 +151,10 @@ func TestBuildBlockShouldReward(t *testing.T) {
 	require.True(ok)
 
 	// Build and accept a block with the tx
-	blk, err := env.Builder.BuildBlock(context.Background())
+	blk, err := env.BuildBlock(context.Background())
 	require.NoError(err)
 	require.IsType(&block.BanffStandardBlock{}, blk.(*blockexecutor.Block).Block)
-	require.Equal([]*txs.Tx{tx}, blk.(*blockexecutor.Block).Block.Txs())
+	require.Equal([]*txs.Tx{tx}, blk.(*blockexecutor.Block).Txs())
 	require.NoError(blk.Verify(context.Background()))
 	require.NoError(blk.Accept(context.Background()))
 	require.True(env.blkManager.SetPreference(blk.ID()))
@@ -175,14 +175,14 @@ func TestBuildBlockShouldReward(t *testing.T) {
 		iter.Release()
 
 		// Check that the right block was built
-		blk, err := env.Builder.BuildBlock(context.Background())
+		blk, err := env.BuildBlock(context.Background())
 		require.NoError(err)
 		require.NoError(blk.Verify(context.Background()))
 		require.IsType(&block.BanffProposalBlock{}, blk.(*blockexecutor.Block).Block)
 
 		expectedTx, err := NewRewardValidatorTx(env.ctx, staker.TxID)
 		require.NoError(err)
-		require.Equal([]*txs.Tx{expectedTx}, blk.(*blockexecutor.Block).Block.Txs())
+		require.Equal([]*txs.Tx{expectedTx}, blk.(*blockexecutor.Block).Txs())
 
 		// Commit the [ProposalBlock] with a [CommitBlock]
 		proposalBlk, ok := blk.(snowman.OracleBlock)
@@ -232,7 +232,7 @@ func TestBuildBlockAdvanceTime(t *testing.T) {
 	env.backend.Clk.Set(nextTime)
 
 	// [BuildBlock] should build a block advancing the time to [NextTime]
-	blkIntf, err := env.Builder.BuildBlock(context.Background())
+	blkIntf, err := env.BuildBlock(context.Background())
 	require.NoError(err)
 
 	require.IsType(&blockexecutor.Block{}, blkIntf)
@@ -290,7 +290,7 @@ func TestBuildBlockForceAdvanceTime(t *testing.T) {
 
 	// [BuildBlock] should build a block advancing the time to [nextTime],
 	// not the current wall clock.
-	blkIntf, err := env.Builder.BuildBlock(context.Background())
+	blkIntf, err := env.BuildBlock(context.Background())
 	require.NoError(err)
 
 	require.IsType(&blockexecutor.Block{}, blkIntf)
@@ -386,7 +386,7 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	require.True(ok)
 
 	// Only tx1 should be in a built block since [MaxStakeDuration] is satisfied.
-	blkIntf, err := env.Builder.BuildBlock(context.Background())
+	blkIntf, err := env.BuildBlock(context.Background())
 	require.NoError(err)
 
 	require.IsType(&blockexecutor.Block{}, blkIntf)

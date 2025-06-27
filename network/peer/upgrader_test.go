@@ -144,7 +144,7 @@ func nonStandardRSAKey(t *testing.T) *rsa.PrivateKey {
 
 		// We want a non-standard E, so let's use E = 257 and derive D again.
 		e := 257
-		sk.PublicKey.E = e
+		sk.E = e
 		sk.E = e
 
 		p := sk.Primes[0]

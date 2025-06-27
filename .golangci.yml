@@ -31,7 +31,7 @@ linters:
     - predeclared
     - revive
     - spancheck
-#    - staticcheck
+    - staticcheck
     - tagalign
 #    - testifylint
     - unconvert

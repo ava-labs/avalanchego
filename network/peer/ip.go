@@ -89,7 +89,7 @@ func (ip *SignedIP) Verify(
 
 	if err := staking.CheckSignature(
 		cert,
-		ip.UnsignedIP.bytes(),
+		ip.bytes(),
 		ip.TLSSignature,
 	); err != nil {
 		return fmt.Errorf("%w: %w", errInvalidTLSSignature, err)

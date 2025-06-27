@@ -378,13 +378,13 @@ func getNetworkConfig(
 	}
 
 	switch {
-	case config.HealthConfig.MaxTimeSinceMsgSent < 0:
+	case config.MaxTimeSinceMsgSent < 0:
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkHealthMaxTimeSinceMsgSentKey)
-	case config.HealthConfig.MaxTimeSinceMsgReceived < 0:
+	case config.MaxTimeSinceMsgReceived < 0:
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkHealthMaxTimeSinceMsgReceivedKey)
-	case config.HealthConfig.MaxSendFailRate < 0 || config.HealthConfig.MaxSendFailRate > 1:
+	case config.MaxSendFailRate < 0 || config.MaxSendFailRate > 1:
 		return network.Config{}, fmt.Errorf("%s must be in [0,1]", NetworkHealthMaxSendFailRateKey)
-	case config.HealthConfig.MaxPortionSendQueueBytesFull < 0 || config.HealthConfig.MaxPortionSendQueueBytesFull > 1:
+	case config.MaxPortionSendQueueBytesFull < 0 || config.MaxPortionSendQueueBytesFull > 1:
 		return network.Config{}, fmt.Errorf("%s must be in [0,1]", NetworkHealthMaxPortionSendQueueFillKey)
 	case config.DialerConfig.ConnectionTimeout < 0:
 		return network.Config{}, fmt.Errorf("%q must be >= 0", NetworkOutboundConnectionTimeoutKey)

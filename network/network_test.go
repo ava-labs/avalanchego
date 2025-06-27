@@ -326,7 +326,7 @@ func TestIngressConnCount(t *testing.T) {
 
 	for _, net := range networks {
 		net.config.NoIngressValidatorConnectionGracePeriod = 0
-		net.config.HealthConfig.Enabled = true
+		net.config.Enabled = true
 	}
 
 	require.Eventually(func() bool {

@@ -195,7 +195,7 @@ func (db *Database) updateMetrics() error {
 	currentStats := metrics.currentStats
 
 	// Retrieve the database stats
-	if err := db.DB.Stats(currentStats); err != nil {
+	if err := db.Stats(currentStats); err != nil {
 		return err
 	}
 

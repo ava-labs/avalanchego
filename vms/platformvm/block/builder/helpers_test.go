@@ -180,7 +180,7 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 		&res.backend,
 		res.blkManager,
 	)
-	res.Builder.StartBlockTimer()
+	res.StartBlockTimer()
 
 	res.blkManager.SetPreference(genesisID)
 	addSubnet(t, res)
@@ -189,7 +189,7 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 		res.ctx.Lock.Lock()
 		defer res.ctx.Lock.Unlock()
 
-		res.Builder.ShutdownBlockTimer()
+		res.ShutdownBlockTimer()
 
 		if res.uptimes.StartedTracking() {
 			validatorIDs := res.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)

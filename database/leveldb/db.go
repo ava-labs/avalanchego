@@ -349,7 +349,7 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 // And a nil limit is treated as a key after all keys in the DB.
 // Therefore if both are nil then it will compact entire DB.
 func (db *Database) Compact(start []byte, limit []byte) error {
-	return updateError(db.DB.CompactRange(util.Range{Start: start, Limit: limit}))
+	return updateError(db.CompactRange(util.Range{Start: start, Limit: limit}))
 }
 
 func (db *Database) Close() error {
@@ -396,7 +396,7 @@ func (b *batch) Size() int {
 
 // Write flushes any accumulated data to disk.
 func (b *batch) Write() error {
-	return updateError(b.db.DB.Write(&b.Batch, nil))
+	return updateError(b.db.Write(&b.Batch, nil))
 }
 
 // Reset resets the batch for reuse.

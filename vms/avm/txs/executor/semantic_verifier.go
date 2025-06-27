@@ -96,7 +96,7 @@ func (v *SemanticVerifier) ImportTx(tx *txs.ImportTx) error {
 
 	utxoIDs := make([][]byte, len(tx.ImportedIns))
 	for i, in := range tx.ImportedIns {
-		inputID := in.UTXOID.InputID()
+		inputID := in.InputID()
 		utxoIDs[i] = inputID[:]
 	}
 
@@ -152,9 +152,9 @@ func (v *SemanticVerifier) verifyTransfer(
 	in *avax.TransferableInput,
 	cred verify.Verifiable,
 ) error {
-	utxo, err := v.State.GetUTXO(in.UTXOID.InputID())
+	utxo, err := v.State.GetUTXO(in.InputID())
 	if err != nil {
-		return fmt.Errorf("failed to get utxo %s: %w", in.UTXOID.InputID(), err)
+		return fmt.Errorf("failed to get utxo %s: %w", in.InputID(), err)
 	}
 	return v.verifyTransferOfUTXO(tx, in, cred, utxo)
 }

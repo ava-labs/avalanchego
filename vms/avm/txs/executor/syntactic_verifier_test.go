@@ -259,7 +259,7 @@ func TestSyntacticVerifierBaseTx(t *testing.T) {
 				}
 
 				input1 := input
-				input1.UTXOID.OutputIndex++
+				input1.OutputIndex++
 				input1.In = &secp256k1fx.TransferInput{
 					Amt:   math.MaxUint64,
 					Input: inputSigners,
@@ -754,7 +754,7 @@ func TestSyntacticVerifierCreateAssetTx(t *testing.T) {
 				}
 
 				input1 := input
-				input1.UTXOID.OutputIndex++
+				input1.OutputIndex++
 				input1.In = &secp256k1fx.TransferInput{
 					Amt:   math.MaxUint64,
 					Input: inputSigners,
@@ -1275,7 +1275,7 @@ func TestSyntacticVerifierOperationTx(t *testing.T) {
 				}
 
 				input1 := input
-				input1.UTXOID.OutputIndex++
+				input1.OutputIndex++
 				input1.In = &secp256k1fx.TransferInput{
 					Amt:   math.MaxUint64,
 					Input: inputSigners,
@@ -1395,7 +1395,7 @@ func TestSyntacticVerifierOperationTx(t *testing.T) {
 			name: "invalid duplicated UTXOs across ops",
 			txFunc: func() *txs.Tx {
 				newOp := op
-				op.Asset.ID = ids.GenerateTestID()
+				op.ID = ids.GenerateTestID()
 
 				tx := tx
 				tx.Ops = []*txs.Operation{
@@ -1764,7 +1764,7 @@ func TestSyntacticVerifierImportTx(t *testing.T) {
 				}
 
 				input1 := input
-				input1.UTXOID.OutputIndex++
+				input1.OutputIndex++
 				input1.In = &secp256k1fx.TransferInput{
 					Amt:   math.MaxUint64,
 					Input: inputSigners,
@@ -2176,7 +2176,7 @@ func TestSyntacticVerifierExportTx(t *testing.T) {
 				}
 
 				input1 := input
-				input1.UTXOID.OutputIndex++
+				input1.OutputIndex++
 				input1.In = &secp256k1fx.TransferInput{
 					Amt:   math.MaxUint64,
 					Input: inputSigners,
