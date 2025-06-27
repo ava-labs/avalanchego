@@ -240,19 +240,19 @@ jobs:
   load_tests:
     name: load tests
     runs-on: avalanche-avalanchego-runner
-    container:
-      image: ubuntu:22.04
     steps:
-      - name: Install x
+      - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y xz-utils
+          # Update package lists
+          apt-get update
+          # Install required packages (no sudo needed in container)
+          apt-get install -y xz-utils curl wget git
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup-go-for-project
       - uses: ./.github/actions/install-nix
-      - name: Hello
+      - name: Run load tests
         shell: nix develop --command bash -x {0}
         run: |
           go run ./tests/load/c/main --runtime=kube --kube-image="avalanchego:arc-load-test"
