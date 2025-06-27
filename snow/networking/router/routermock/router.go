@@ -11,6 +11,7 @@ package routermock
 
 import (
 	context "context"
+	netip "net/netip"
 	reflect "reflect"
 	time "time"
 
@@ -76,15 +77,15 @@ func (mr *RouterMockRecorder) Benched(chainID, validatorID any) *gomock.Call {
 }
 
 // Connected mocks base method.
-func (m *Router) Connected(nodeID ids.NodeID, nodeVersion *version.Application, subnetID ids.ID) {
+func (m *Router) Connected(nodeID ids.NodeID, ip netip.AddrPort, nodeVersion *version.Application, subnetID ids.ID) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Connected", nodeID, nodeVersion, subnetID)
+	m.ctrl.Call(m, "Connected", nodeID, ip, nodeVersion, subnetID)
 }
 
 // Connected indicates an expected call of Connected.
-func (mr *RouterMockRecorder) Connected(nodeID, nodeVersion, subnetID any) *gomock.Call {
+func (mr *RouterMockRecorder) Connected(nodeID, ip, nodeVersion, subnetID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Connected", reflect.TypeOf((*Router)(nil).Connected), nodeID, nodeVersion, subnetID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Connected", reflect.TypeOf((*Router)(nil).Connected), nodeID, ip, nodeVersion, subnetID)
 }
 
 // Disconnected mocks base method.

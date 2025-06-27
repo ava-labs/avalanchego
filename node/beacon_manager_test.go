@@ -4,6 +4,7 @@
 package node
 
 import (
+	"net/netip"
 	"sync"
 	"testing"
 
@@ -48,7 +49,7 @@ func TestBeaconManager_DataRace(t *testing.T) {
 	// connect numValidators validators, each with a weight of 1
 	wg.Add(2 * numValidators)
 	mockRouter.EXPECT().
-		Connected(gomock.Any(), gomock.Any(), gomock.Any()).
+		Connected(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Times(2 * numValidators).
 		Do(func(ids.NodeID, *version.Application, ids.ID) {
 			wg.Done()
@@ -56,8 +57,8 @@ func TestBeaconManager_DataRace(t *testing.T) {
 
 	for _, nodeID := range validatorIDs {
 		go func() {
-			b.Connected(nodeID, version.CurrentApp, constants.PrimaryNetworkID)
-			b.Connected(nodeID, version.CurrentApp, ids.GenerateTestID())
+			b.Connected(nodeID, netip.AddrPort{}, version.CurrentApp, constants.PrimaryNetworkID)
+			b.Connected(nodeID, netip.AddrPort{}, version.CurrentApp, ids.GenerateTestID())
 		}()
 	}
 	wg.Wait()

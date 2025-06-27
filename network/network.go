@@ -486,10 +486,10 @@ func (n *network) Connected(nodeID ids.NodeID) {
 	n.metrics.markConnected(peer)
 
 	peerVersion := peer.Version()
-	n.router.Connected(nodeID, peerVersion, constants.PrimaryNetworkID)
+	n.router.Connected(nodeID, peerIP.AddrPort, peerVersion, constants.PrimaryNetworkID)
 	for subnetID := range n.peerConfig.MySubnets {
 		if trackedSubnets.Contains(subnetID) {
-			n.router.Connected(nodeID, peerVersion, subnetID)
+			n.router.Connected(nodeID, peerIP.AddrPort, peerVersion, subnetID)
 		}
 	}
 }

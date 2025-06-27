@@ -4,6 +4,8 @@
 package node
 
 import (
+	"net/netip"
+
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -21,7 +23,7 @@ type insecureValidatorManager struct {
 	weight uint64
 }
 
-func (i *insecureValidatorManager) Connected(vdrID ids.NodeID, nodeVersion *version.Application, subnetID ids.ID) {
+func (i *insecureValidatorManager) Connected(vdrID ids.NodeID, ip netip.AddrPort, nodeVersion *version.Application, subnetID ids.ID) {
 	if constants.PrimaryNetworkID == subnetID {
 		// Sybil protection is disabled so we don't have a txID that added the
 		// peer as a validator. Because each validator needs a txID associated
@@ -38,7 +40,7 @@ func (i *insecureValidatorManager) Connected(vdrID ids.NodeID, nodeVersion *vers
 			)
 		}
 	}
-	i.Router.Connected(vdrID, nodeVersion, subnetID)
+	i.Router.Connected(vdrID, ip, nodeVersion, subnetID)
 }
 
 func (i *insecureValidatorManager) Disconnected(vdrID ids.NodeID) {

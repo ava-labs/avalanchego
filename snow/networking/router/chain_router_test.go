@@ -5,6 +5,7 @@ package router
 
 import (
 	"context"
+	"net/netip"
 	"sync"
 	"testing"
 	"time"
@@ -299,6 +300,7 @@ func TestConnectedAfterShutdownErrorLogRegression(t *testing.T) {
 	// Calling connected after shutdown should result in an error log.
 	chainRouter.Connected(
 		ids.GenerateTestNodeID(),
+		netip.AddrPort{},
 		version.CurrentApp,
 		ids.GenerateTestID(),
 	)

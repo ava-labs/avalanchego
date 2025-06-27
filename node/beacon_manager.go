@@ -4,6 +4,7 @@
 package node
 
 import (
+	"net/netip"
 	"sync"
 	"sync/atomic"
 
@@ -25,7 +26,7 @@ type beaconManager struct {
 	onceOnSufficientlyConnected sync.Once
 }
 
-func (b *beaconManager) Connected(nodeID ids.NodeID, nodeVersion *version.Application, subnetID ids.ID) {
+func (b *beaconManager) Connected(nodeID ids.NodeID, ip netip.AddrPort, nodeVersion *version.Application, subnetID ids.ID) {
 	_, isBeacon := b.beacons.GetValidator(constants.PrimaryNetworkID, nodeID)
 	if isBeacon &&
 		constants.PrimaryNetworkID == subnetID &&
@@ -34,7 +35,7 @@ func (b *beaconManager) Connected(nodeID ids.NodeID, nodeVersion *version.Applic
 			close(b.onSufficientlyConnected)
 		})
 	}
-	b.Router.Connected(nodeID, nodeVersion, subnetID)
+	b.Router.Connected(nodeID, ip, nodeVersion, subnetID)
 }
 
 func (b *beaconManager) Disconnected(nodeID ids.NodeID) {

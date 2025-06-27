@@ -4,6 +4,8 @@
 package network
 
 import (
+	"net/netip"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/version"
@@ -17,7 +19,7 @@ type testHandler struct {
 	DisconnectedF func(nodeID ids.NodeID)
 }
 
-func (h *testHandler) Connected(id ids.NodeID, nodeVersion *version.Application, subnetID ids.ID) {
+func (h *testHandler) Connected(id ids.NodeID, ip netip.AddrPort, nodeVersion *version.Application, subnetID ids.ID) {
 	if h.ConnectedF != nil {
 		h.ConnectedF(id, nodeVersion, subnetID)
 	}
