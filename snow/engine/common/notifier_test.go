@@ -1,96 +1,85 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package common
+package common_test
 
 import (
-	"context"
-	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/snow/engine/common/commontest"
 	"github.com/ava-labs/avalanchego/utils/logging"
+
+	. "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
-type notifier func(_ context.Context, msg Message) error
-
-func (n notifier) Notify(ctx context.Context, msg Message) error {
-	return n(ctx, msg)
-}
-
 func TestNotifier(t *testing.T) {
-	var wg sync.WaitGroup
-	wg.Add(2)
+	s := commontest.NewSubscriber()
+	n := make(chan Message)
+	nf := NewNotificationForwarder(&logging.NoLog{}, s, n)
+	nf.CheckForEvent()
 
-	notifier := notifier(func(_ context.Context, msg Message) error {
-		defer wg.Done()
-		require.Equal(t, PendingTxs, msg)
-		return nil
-	})
+	select {
+	case <-n:
+		require.FailNow(t, "unexpected message")
 
-	subscriber := NewSimpleSubscriber()
-	nf := &NotificationForwarder{
-		Subscribe: subscriber.WaitForEvent,
-		Notifier:  Notifier(notifier),
-		Log:       &logging.NoLog{},
+	// TODO: Replace this racy check with the synctest package once the minimum
+	// go version is >= 1.25
+	case <-time.After(time.Millisecond):
 	}
 
-	nf.Start()
-	defer nf.Close()
+	s.SetEvent(PendingTxs)
+	select {
+	case msg := <-n:
+		require.Equal(t, PendingTxs, msg)
 
-	go func() {
-		defer wg.Done()
-		subscriber.Publish(PendingTxs)
-	}()
+	// TODO: Replace this racy check with the synctest package once the minimum
+	// go version is >= 1.25
+	case <-time.After(time.Millisecond):
+		require.FailNow(t, "expected message")
+	}
 
-	wg.Wait()
+	s.SetEvent(0)
+	nf.CheckForEvent()
+
+	select {
+	case <-n:
+		require.FailNow(t, "unexpected message")
+
+	// TODO: Replace this racy check with the synctest package once the minimum
+	// go version is >= 1.25
+	case <-time.After(time.Millisecond):
+	}
+
+	nf.Close() // Must not block on n being read
 }
 
 func TestNotifierStopWhileSubscribing(_ *testing.T) {
-	notifier := notifier(func(ctx context.Context, _ Message) error {
-		<-ctx.Done()
-		return nil
-	})
+	s := commontest.NewSubscriber()
+	n := make(chan Message)
+	nf := NewNotificationForwarder(&logging.NoLog{}, s, n)
+	nf.CheckForEvent()
 
-	nf := &NotificationForwarder{
-		Notifier: Notifier(notifier),
-		Log:      &logging.NoLog{},
-	}
+	// TODO: Replace this racy check with the synctest package once the minimum
+	// go version is >= 1.25
+	time.Sleep(time.Millisecond)
 
-	var subscribed sync.WaitGroup
-	subscribed.Add(1)
-
-	nf.Subscribe = func(ctx context.Context) (Message, error) {
-		subscribed.Done()
-		<-ctx.Done()
-		return 0, nil
-	}
-
-	nf.Start()
-	subscribed.Wait()
-	nf.Close()
+	nf.Close() // Must not block on n being read
 }
 
-func TestNotifierStopWhileNotifying(_ *testing.T) {
-	nf := &NotificationForwarder{
-		Log: &logging.NoLog{},
-	}
+func TestNotifierStopWhileNotifying(*testing.T) {
+	s := commontest.NewSubscriber()
+	s.SetEvent(PendingTxs)
 
-	var notifiying sync.WaitGroup
-	notifiying.Add(1)
+	n := make(chan Message)
+	nf := NewNotificationForwarder(&logging.NoLog{}, s, n)
+	nf.CheckForEvent()
 
-	nf.Notifier = Notifier(notifier(func(ctx context.Context, _ Message) error {
-		notifiying.Done()
-		<-ctx.Done()
-		return nil
-	}))
+	// TODO: Replace this racy check with the synctest package once the minimum
+	// go version is >= 1.25
+	time.Sleep(time.Millisecond)
 
-	nf.Subscribe = func(context.Context) (Message, error) {
-		return 0, nil
-	}
-
-	nf.Start()
-	notifiying.Wait()
-	nf.Close()
+	nf.Close() // Must not block on n being read
 }

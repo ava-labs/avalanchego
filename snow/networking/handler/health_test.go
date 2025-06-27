@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/common/commontest"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -83,7 +83,7 @@ func TestHealthCheckSubnet(t *testing.T) {
 			)
 			require.NoError(err)
 
-			subscriber := common.NewSimpleSubscriber()
+			subscriber := commontest.NewSubscriber()
 
 			handlerIntf, err := New(
 				ctx,

@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/common/commontest"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -66,7 +67,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := common.NewSimpleSubscriber()
+	subscriber := commontest.NewSubscriber()
 
 	handlerIntf, err := New(
 		ctx,
@@ -175,7 +176,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := common.NewSimpleSubscriber()
+	subscriber := commontest.NewSubscriber()
 
 	handlerIntf, err := New(
 		ctx,
@@ -280,7 +281,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := common.NewSimpleSubscriber()
+	subscriber := commontest.NewSubscriber()
 
 	handlerIntf, err := New(
 		ctx,
@@ -372,7 +373,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := common.NewSimpleSubscriber()
+	subscriber := commontest.NewSubscriber()
 
 	handler, err := New(
 		ctx,
@@ -426,7 +427,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 
 	wg.Add(1)
 	handler.Start(context.Background(), false)
-	subscriber.Publish(common.PendingTxs)
+	subscriber.SetEvent(common.PendingTxs)
 	wg.Wait()
 }
 
@@ -550,7 +551,7 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 			)
 			require.NoError(err)
 
-			subscriber := common.NewSimpleSubscriber()
+			subscriber := commontest.NewSubscriber()
 
 			handler, err := New(
 				ctx,
@@ -635,7 +636,7 @@ func TestHandlerStartError(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := common.NewSimpleSubscriber()
+	subscriber := commontest.NewSubscriber()
 
 	handler, err := New(
 		ctx,

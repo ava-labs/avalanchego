@@ -12,82 +12,103 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-type Notifier interface {
-	Notify(context.Context, Message) error
+type Subscriber interface {
+	// WaitForEvent blocks until either the given context is cancelled, or a
+	// message is returned.
+	WaitForEvent(context.Context) (Message, error)
 }
 
 // NotificationForwarder is a component that listens for notifications from a Subscription,
 // and forwards them to a Notifier.
 type NotificationForwarder struct {
-	Notifier  Notifier
-	Subscribe Subscription
-	Log       logging.Logger
+	log        logging.Logger
+	subscriber Subscriber
+	notifier   chan<- Message
 
-	running   sync.WaitGroup
-	closeChan chan struct{}
-	lock      sync.Mutex
-	cancel    context.CancelFunc
+	ctx     context.Context
+	closer  context.CancelFunc
+	running sync.WaitGroup
+
+	lock          sync.Mutex
+	currentCtx    context.Context
+	cancelCurrent context.CancelFunc
 }
 
-func (nf *NotificationForwarder) Start() {
+func NewNotificationForwarder(
+	log logging.Logger,
+	subscriber Subscriber,
+	notifier chan<- Message,
+) *NotificationForwarder {
+	ctx, closer := context.WithCancel(context.Background())
+	currentCtx, cancelCurrent := context.WithCancel(ctx)
+	nf := &NotificationForwarder{
+		log:        log,
+		subscriber: subscriber,
+		notifier:   notifier,
+
+		ctx:    ctx,
+		closer: closer,
+
+		currentCtx:    currentCtx,
+		cancelCurrent: cancelCurrent,
+	}
+
 	nf.running.Add(1)
-	nf.closeChan = make(chan struct{})
-	go nf.run()
+	go nf.run(currentCtx)
+	return nf
 }
 
-func (nf *NotificationForwarder) run() {
+func (nf *NotificationForwarder) run(ctx context.Context) {
 	defer nf.running.Done()
-	for {
-		select {
-		case <-nf.closeChan:
-			return
-		default:
-		}
 
-		ctx := nf.setAndGetContext()
+	// Wait for CheckForEvent or Close to be called at least once.
+	<-ctx.Done()
 
-		nf.Log.Debug("Subscribing to notifications")
-		msg, err := nf.Subscribe(ctx)
-		if err != nil {
-			nf.Log.Error("Failed subscribing to notifications", zap.Error(err))
-			return
-		}
-		nf.Log.Debug("Received notification", zap.Stringer("msg", msg))
-
-		select {
-		case <-nf.closeChan:
-			return
-		default:
-		}
-
-		if err := nf.Notifier.Notify(ctx, msg); err != nil {
-			nf.Log.Error("Failed notifying engine", zap.Error(err))
-		}
-
-		nf.cancel()
-	}
-}
-
-func (nf *NotificationForwarder) setAndGetContext() context.Context {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	nf.lock.Lock()
-	nf.cancel = cancel
-	nf.lock.Unlock()
-	return ctx
-}
-
-func (nf *NotificationForwarder) Close() {
-	defer nf.running.Wait()
-
-	select {
-	case <-nf.closeChan:
-	default:
-		close(nf.closeChan)
+	for nf.ctx.Err() == nil {
 		nf.lock.Lock()
-		if nf.cancel != nil {
-			nf.cancel()
-		}
+		ctx := nf.currentCtx
 		nf.lock.Unlock()
+
+		msg, err := nf.subscriber.WaitForEvent(ctx)
+		if ctx.Err() != nil {
+			// If the long-lived or short-lived context was cancelled, we should
+			// continue.
+			continue
+		}
+		if err != nil {
+			nf.log.Warn("error returned by wait for event",
+				zap.Error(err),
+			)
+			// TODO: Rather than spinning on an unexpected error, we should
+			// probably have a backoff here.
+			continue
+		}
+
+		select {
+		case <-nf.ctx.Done():
+		case nf.notifier <- msg:
+		}
+
+		// We should wait until a new context is provided before waiting for
+		// another event.
+		<-ctx.Done()
 	}
+}
+
+// CheckForEvent schedules a new call to WaitForEvent. If there is a current
+// call to WaitForEvent, the current call is cancelled before the new call is
+// initiated.
+func (nf *NotificationForwarder) CheckForEvent() {
+	nf.lock.Lock()
+	defer nf.lock.Unlock()
+
+	nf.cancelCurrent()
+	nf.currentCtx, nf.cancelCurrent = context.WithCancel(nf.ctx)
+}
+
+// Close cancels any current calls to WaitForEvent and returns once no more
+// calls to WaitForEvent will be made.
+func (nf *NotificationForwarder) Close() {
+	nf.closer()
+	nf.running.Wait()
 }

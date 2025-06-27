@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 
 	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/snow/engine/common/commontest"
 	commontracker "github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 )
 
@@ -104,7 +105,7 @@ func TestShutdown(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := common.NewSimpleSubscriber()
+	subscriber := commontest.NewSubscriber()
 
 	h, err := handler.New(
 		chainCtx,
@@ -232,7 +233,7 @@ func TestConnectedAfterShutdownErrorLogRegression(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := common.NewSimpleSubscriber()
+	subscriber := commontest.NewSubscriber()
 
 	h, err := handler.New(
 		chainCtx,
@@ -367,7 +368,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := common.NewSimpleSubscriber()
+	subscriber := commontest.NewSubscriber()
 
 	h, err := handler.New(
 		ctx,
@@ -538,7 +539,7 @@ func TestRouterTimeout(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := common.NewSimpleSubscriber()
+	subscriber := commontest.NewSubscriber()
 
 	h, err := handler.New(
 		ctx,
@@ -1072,7 +1073,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := common.NewSimpleSubscriber()
+	subscriber := commontest.NewSubscriber()
 
 	h, err := handler.New(
 		ctx,
@@ -1240,7 +1241,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := common.NewSimpleSubscriber()
+	subscriber := commontest.NewSubscriber()
 
 	h, err := handler.New(
 		ctx,
@@ -1494,7 +1495,7 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *enginetest.Engine) {
 	)
 	require.NoError(t, err)
 
-	subscriber := common.NewSimpleSubscriber()
+	subscriber := commontest.NewSubscriber()
 
 	h, err := handler.New(
 		ctx,

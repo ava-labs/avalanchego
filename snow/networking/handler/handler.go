@@ -158,14 +158,9 @@ func New(
 	}
 	h.asyncMessagePool.SetLimit(threadPoolSize)
 
-	h.nf = &common.NotificationForwarder{
-		Subscribe: subscriber.WaitForEvent,
-		Log:       h.ctx.Log,
-		Notifier:  h,
-	}
+	h.nf = common.NewNotificationForwarder(h.ctx.Log, subscriber, h.msgFromVMChan)
 
 	var err error
-
 	h.metrics, err = newMetrics(reg)
 	if err != nil {
 		return nil, fmt.Errorf("initializing handler metrics errored with: %w", err)
@@ -286,8 +281,6 @@ func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 		go h.ctx.Log.RecoverAndPanic(dispatchAsync)
 		go h.ctx.Log.RecoverAndPanic(dispatchChans)
 	}
-
-	h.nf.Start()
 }
 
 func (h *handler) Notify(_ context.Context, msg common.Message) error {
@@ -322,7 +315,6 @@ func (h *handler) Stop(_ context.Context) {
 		h.asyncMessageQueue.Shutdown()
 		close(h.closingChan)
 		h.haltBootstrapping()
-		h.nf.Close()
 	})
 }
 
@@ -993,6 +985,9 @@ func (h *handler) shutdown(ctx context.Context, startClosingTime time.Time) {
 		h.totalClosingTime = h.clock.Time().Sub(startClosingTime)
 		close(h.closed)
 	}()
+
+	// Ensure that WaitForEvent is not called concurrently with Shutdown.
+	h.nf.Close()
 
 	state := h.ctx.State.Get()
 	engine, ok := h.engineManager.Get(state.Type).Get(state.State)

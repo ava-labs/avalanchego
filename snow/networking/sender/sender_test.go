@@ -43,6 +43,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 
 	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/snow/engine/common/commontest"
 	commontracker "github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 
 	. "github.com/ava-labs/avalanchego/snow/networking/sender"
@@ -129,7 +130,7 @@ func TestTimeout(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := common.NewSimpleSubscriber()
+	subscriber := commontest.NewSubscriber()
 
 	h, err := handler.New(
 		ctx2,
@@ -389,7 +390,7 @@ func TestReliableMessages(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := common.NewSimpleSubscriber()
+	subscriber := commontest.NewSubscriber()
 
 	h, err := handler.New(
 		ctx2,
@@ -552,7 +553,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 			)
 			require.NoError(err)
 
-			subscriber := common.NewSimpleSubscriber()
+			subscriber := commontest.NewSubscriber()
 
 			h, err := handler.New(
 				ctx2,
