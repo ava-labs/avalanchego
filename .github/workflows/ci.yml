@@ -142,6 +142,9 @@ jobs:
           # This version should match the version installed in the nix dev shell
           version: 1.47.2
   links-lint:
+    # This job broke master on 2025.06.26. Disabling until further notice.
+    # Tracking issue: https://github.com/ava-labs/avalanchego/issues/4041
+    if: false
     name: Markdown Links Lint
     runs-on: ubuntu-latest
     steps:
