@@ -46,6 +46,12 @@ func (nf *NotificationForwarder) run() {
 
 		ctx := nf.setAndGetContext()
 
+		select {
+		case <-nf.closeChan:
+			return
+		default:
+		}
+
 		nf.Log.Debug("Subscribing to notifications")
 		msg, err := nf.Subscribe(ctx)
 		if err != nil {
@@ -53,6 +59,8 @@ func (nf *NotificationForwarder) run() {
 			return
 		}
 		nf.Log.Debug("Received notification", zap.Stringer("msg", msg))
+
+		nf.cancelContext()
 
 		select {
 		case <-nf.closeChan:
@@ -64,7 +72,17 @@ func (nf *NotificationForwarder) run() {
 			nf.Log.Error("Failed notifying engine", zap.Error(err))
 		}
 
+		nf.cancelContext()
+	}
+}
+
+func (nf *NotificationForwarder) cancelContext() {
+	nf.lock.Lock()
+	defer nf.lock.Unlock()
+
+	if nf.cancel != nil {
 		nf.cancel()
+		nf.cancel = nil
 	}
 }
 
@@ -72,8 +90,8 @@ func (nf *NotificationForwarder) setAndGetContext() context.Context {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	nf.lock.Lock()
+	defer nf.lock.Unlock()
 	nf.cancel = cancel
-	nf.lock.Unlock()
 	return ctx
 }
 
@@ -84,10 +102,6 @@ func (nf *NotificationForwarder) Close() {
 	case <-nf.closeChan:
 	default:
 		close(nf.closeChan)
-		nf.lock.Lock()
-		if nf.cancel != nil {
-			nf.cancel()
-		}
-		nf.lock.Unlock()
+		nf.cancelContext()
 	}
 }
