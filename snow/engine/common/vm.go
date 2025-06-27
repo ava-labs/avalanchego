@@ -65,20 +65,8 @@ type VM interface {
 	// Version returns the version of the VM.
 	Version(context.Context) (string, error)
 
-	// Creates the HTTP handlers for custom chain network calls.
-	//
-	// This exposes handlers that the outside world can use to communicate with
-	// the chain. Each handler has the path:
-	// [Address of node]/ext/bc/[chain ID]/[extension]
-	//
-	// Returns a mapping from [extension]s to HTTP handlers.
-	//
-	// For example, if this VM implements an account-based payments system,
-	// it have an extension called `accounts`, where clients could get
-	// information about their accounts.
-	CreateHandlers(context.Context) (map[string]http.Handler, error)
-
-	// CreateHTTP2Handler returns the http/2 handler to register into the
-	// avalanchego api server.
-	CreateHTTP2Handler(ctx context.Context) (http.Handler, error)
+	// NewHTTPHandler returns the handler to register into the avalanchego http
+	// server. The "Avalanche-API-Route" header must be specified with this VM's
+	// corresponding chain id by clients to route requests to this handler.
+	NewHTTPHandler(context.Context) (http.Handler, error)
 }

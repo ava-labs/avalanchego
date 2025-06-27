@@ -10,9 +10,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/ava-labs/avalanchego/proto/pb/admin/v1/adminv1connect"
 	"io"
 	"io/fs"
 	"net"
+	"net/http"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -20,14 +22,18 @@ import (
 	"sync"
 	"time"
 
+	"connectrpc.com/grpcreflect"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/admin"
+	adminconnect "github.com/ava-labs/avalanchego/api/admin/connecthandler"
 	"github.com/ava-labs/avalanchego/api/health"
+	healthconnect "github.com/ava-labs/avalanchego/api/health/connecthandler"
 	"github.com/ava-labs/avalanchego/api/info"
+	infoconnect "github.com/ava-labs/avalanchego/api/info/connecthandler"
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
@@ -46,6 +52,8 @@ import (
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
+	"github.com/ava-labs/avalanchego/proto/pb/health/v1/healthv1connect"
+	"github.com/ava-labs/avalanchego/proto/pb/info/v1/infov1connect"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -77,10 +85,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
+	coreth "github.com/ava-labs/coreth/plugin/evm"
+
 	databasefactory "github.com/ava-labs/avalanchego/database/factory"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
-	coreth "github.com/ava-labs/coreth/plugin/evm"
 )
 
 const (
@@ -391,6 +400,12 @@ type Node struct {
 
 	// Closed when a sufficient amount of bootstrap nodes are connected to
 	onSufficientlyConnected chan struct{}
+
+	// Info API
+	info *info.Info
+
+	// Admin API
+	admin *admin.Admin
 }
 
 /*
@@ -1277,7 +1292,7 @@ func (n *Node) initMetricsAPI() error {
 			promhttp.HandlerOpts{},
 		),
 		"metrics",
-		"",
+		"metrics",
 	)
 }
 
@@ -1289,7 +1304,7 @@ func (n *Node) initAdminAPI() error {
 		return nil
 	}
 	n.Log.Info("initializing admin API")
-	service, err := admin.NewService(
+	service, adminReceiver, err := admin.NewService(
 		admin.Config{
 			Log:          n.Log,
 			DB:           n.DB,
@@ -1305,10 +1320,27 @@ func (n *Node) initAdminAPI() error {
 	if err != nil {
 		return err
 	}
+
+	n.admin = adminReceiver
+
+	adminServicePattern, adminServiceHandler := adminv1connect.NewAdminServiceHandler(
+		adminconnect.NewConnectAdminService(n.admin),
+	)
+
+	reflectionPattern, reflectionHandler := grpcreflect.NewHandlerV1(
+		grpcreflect.NewStaticReflector(adminv1connect.AdminServiceName),
+	)
+
+	mux := http.NewServeMux()
+	mux.Handle(reflectionPattern, reflectionHandler)
+	mux.Handle(adminServicePattern, adminServiceHandler)
+
+	n.APIServer.AddHeaderRoute("admin", mux)
+
 	return n.APIServer.AddRoute(
 		service,
 		"admin",
-		"",
+		"admin",
 	)
 }
 
@@ -1349,7 +1381,7 @@ func (n *Node) initInfoAPI() error {
 		return fmt.Errorf("problem creating proof of possession: %w", err)
 	}
 
-	service, err := info.NewService(
+	service, infoReceiver, err := info.NewService(
 		info.Parameters{
 			Version:   version.CurrentApp,
 			NodeID:    n.ID,
@@ -1372,10 +1404,27 @@ func (n *Node) initInfoAPI() error {
 	if err != nil {
 		return err
 	}
+
+	n.info = infoReceiver
+
+	infoPattern, infoConnHandler := infov1connect.NewInfoServiceHandler(
+		infoconnect.NewConnectInfoService(n.info),
+	)
+
+	reflectionPattern, reflectionHandler := grpcreflect.NewHandlerV1(
+		grpcreflect.NewStaticReflector(infov1connect.InfoServiceName),
+	)
+
+	mux := http.NewServeMux()
+	mux.Handle(reflectionPattern, reflectionHandler)
+	mux.Handle(infoPattern, infoConnHandler)
+
+	n.APIServer.AddHeaderRoute("info", mux)
+
 	return n.APIServer.AddRoute(
 		service,
 		"info",
-		"",
+		"info",
 	)
 }
 
@@ -1399,6 +1448,20 @@ func (n *Node) initHealthAPI() error {
 		n.Log.Info("skipping health API initialization because it has been disabled")
 		return nil
 	}
+
+	healthServicePattern, healthServiceHandler := healthv1connect.NewHealthServiceHandler(
+		healthconnect.NewConnectHealthService(n.health),
+	)
+
+	reflectionPattern, reflectionHandler := grpcreflect.NewHandlerV1(
+		grpcreflect.NewStaticReflector(healthv1connect.HealthServiceName),
+	)
+
+	mux := http.NewServeMux()
+	mux.Handle(reflectionPattern, reflectionHandler)
+	mux.Handle(healthServicePattern, healthServiceHandler)
+
+	n.APIServer.AddHeaderRoute("health", mux)
 
 	n.Log.Info("initializing Health API")
 	err = n.health.RegisterHealthCheck("network", n.Net, health.ApplicationTag)
@@ -1478,7 +1541,7 @@ func (n *Node) initHealthAPI() error {
 	err = n.APIServer.AddRoute(
 		handler,
 		"health",
-		"",
+		"health",
 	)
 	if err != nil {
 		return err
@@ -1486,8 +1549,8 @@ func (n *Node) initHealthAPI() error {
 
 	err = n.APIServer.AddRoute(
 		health.NewGetHandler(n.health.Readiness),
+		"health/readiness",
 		"health",
-		"/readiness",
 	)
 	if err != nil {
 		return err
@@ -1495,8 +1558,8 @@ func (n *Node) initHealthAPI() error {
 
 	err = n.APIServer.AddRoute(
 		health.NewGetHandler(n.health.Health),
+		"health/health",
 		"health",
-		"/health",
 	)
 	if err != nil {
 		return err
@@ -1504,9 +1567,23 @@ func (n *Node) initHealthAPI() error {
 
 	return n.APIServer.AddRoute(
 		health.NewGetHandler(n.health.Liveness),
+		"health/liveness",
 		"health",
-		"/liveness",
 	)
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//// Mount HealthService ConnectRPC handler into its mux
+	//muxHealth := http.NewServeMux()
+	//healthPattern, healthConnHandler := healthv1connect.NewHealthServiceHandler(
+	//	healthhandler.NewConnectHealthService(n.health),
+	//)
+	//muxHealth.Handle(healthPattern, healthConnHandler)
+
+	//n.APIServer.AddHeaderRoute("health", muxHealth)
+
+	//return nil
 }
 
 // Give chains aliases as specified by the genesis information
