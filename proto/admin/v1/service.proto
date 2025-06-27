@@ -1,0 +1,90 @@
+syntax = "proto3";
+package admin.v1;
+
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/ava-labs/avalanchego/proto/pb/admin/v1;adminv1";
+
+// AdminService is the API service for node admin management
+service AdminService {
+  rpc StartCPUProfiler(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc StopCPUProfiler(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc MemoryProfile(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc LockProfile(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc Alias(AliasArgs) returns (google.protobuf.Empty);
+  rpc AliasChain(AliasChainArgs) returns (google.protobuf.Empty);
+  rpc GetChainAliases(GetChainAliasesArgs) returns (GetChainAliasesReply);
+  rpc Stacktrace(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc SetLoggerLevel(SetLoggerLevelArgs) returns (LoggerLevelReply);
+  rpc GetLoggerLevel(GetLoggerLevelArgs) returns (LoggerLevelReply);
+  rpc GetConfig(google.protobuf.Empty) returns (GetConfigReply);
+  rpc LoadVMs(google.protobuf.Empty) returns (LoadVMsReply);
+  rpc DbGet(DBGetArgs) returns (DBGetReply);
+}
+
+
+message AliasArgs {
+  string endpoint = 1;
+  string alias = 2;
+}
+
+message AliasChainArgs {
+  string chain = 1;
+  string alias = 2;
+}
+
+message GetChainAliasesArgs {
+  string chain = 1;
+}
+
+message GetChainAliasesReply {
+  repeated string aliases = 1;
+}
+
+message SetLoggerLevelArgs {
+  string logger_name = 1;
+  string log_level = 2;        // nullable in Go, use empty string for unset
+  string display_level = 3;    // nullable in Go, use empty string for unset
+}
+
+message GetLoggerLevelArgs {
+  string logger_name = 1;
+}
+
+message LogAndDisplayLevels {
+  string log_level = 1;
+  string display_level = 2;
+}
+
+message LoggerLevelReply {
+  map<string, LogAndDisplayLevels> logger_levels = 1;
+}
+
+message GetConfigReply {
+  string config_json = 1; // NodeConfig is interface{} in Go, so use JSON string
+}
+
+message LoadVMsReply {
+  map<string, VMAliases> new_vms = 1; // ids.ID as string
+  map<string, string> failed_vms = 2; // ids.ID as string, error message
+}
+
+message VMAliases {
+  repeated string aliases = 1;
+}
+
+message DBGetArgs {
+  string key = 1;
+}
+
+enum ErrorCode {
+  ERROR_CODE_UNSPECIFIED = 0;
+  ERROR_CODE_NOT_FOUND = 1;
+  ERROR_CODE_DATABASE_ERROR = 2;
+  // Add more as needed
+}
+
+message DBGetReply {
+  string value = 1;
+  ErrorCode error_code = 2;
+}

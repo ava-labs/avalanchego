@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/ava-labs/avalanchego/proto/pb/admin/v1/adminv1connect"
 	"io"
 	"io/fs"
 	"net"
@@ -28,6 +29,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/admin"
+	adminconnect "github.com/ava-labs/avalanchego/api/admin/connecthandler"
 	"github.com/ava-labs/avalanchego/api/health"
 	healthconnect "github.com/ava-labs/avalanchego/api/health/connecthandler"
 	"github.com/ava-labs/avalanchego/api/info"
@@ -399,7 +401,11 @@ type Node struct {
 	// Closed when a sufficient amount of bootstrap nodes are connected to
 	onSufficientlyConnected chan struct{}
 
+	// Info API
 	info *info.Info
+
+	// Admin API
+	admin *admin.Admin
 }
 
 /*
@@ -1298,7 +1304,7 @@ func (n *Node) initAdminAPI() error {
 		return nil
 	}
 	n.Log.Info("initializing admin API")
-	service, err := admin.NewService(
+	service, adminReceiver, err := admin.NewService(
 		admin.Config{
 			Log:          n.Log,
 			DB:           n.DB,
@@ -1314,6 +1320,23 @@ func (n *Node) initAdminAPI() error {
 	if err != nil {
 		return err
 	}
+
+	n.admin = adminReceiver
+
+	adminServicePattern, adminServiceHandler := adminv1connect.NewAdminServiceHandler(
+		adminconnect.NewConnectAdminService(n.admin),
+	)
+
+	reflectionPattern, reflectionHandler := grpcreflect.NewHandlerV1(
+		grpcreflect.NewStaticReflector(adminv1connect.AdminServiceName),
+	)
+
+	mux := http.NewServeMux()
+	mux.Handle(reflectionPattern, reflectionHandler)
+	mux.Handle(adminServicePattern, adminServiceHandler)
+
+	n.APIServer.AddHeaderRoute("admin", mux)
+
 	return n.APIServer.AddRoute(
 		service,
 		"admin",
@@ -1358,7 +1381,7 @@ func (n *Node) initInfoAPI() error {
 		return fmt.Errorf("problem creating proof of possession: %w", err)
 	}
 
-	service, info, err := info.NewService(
+	service, infoReceiver, err := info.NewService(
 		info.Parameters{
 			Version:   version.CurrentApp,
 			NodeID:    n.ID,
@@ -1382,10 +1405,10 @@ func (n *Node) initInfoAPI() error {
 		return err
 	}
 
-	n.info = info
+	n.info = infoReceiver
 
 	infoPattern, infoConnHandler := infov1connect.NewInfoServiceHandler(
-		infoconnect.NewConnectInfoService(info),
+		infoconnect.NewConnectInfoService(n.info),
 	)
 
 	reflectionPattern, reflectionHandler := grpcreflect.NewHandlerV1(
@@ -1426,7 +1449,7 @@ func (n *Node) initHealthAPI() error {
 		return nil
 	}
 
-	healthServiceHandlerPattern, healthServiceHandler := healthv1connect.NewHealthServiceHandler(
+	healthServicePattern, healthServiceHandler := healthv1connect.NewHealthServiceHandler(
 		healthconnect.NewConnectHealthService(n.health),
 	)
 
@@ -1436,7 +1459,7 @@ func (n *Node) initHealthAPI() error {
 
 	mux := http.NewServeMux()
 	mux.Handle(reflectionPattern, reflectionHandler)
-	mux.Handle(healthServiceHandlerPattern, healthServiceHandler)
+	mux.Handle(healthServicePattern, healthServiceHandler)
 
 	n.APIServer.AddHeaderRoute("health", mux)
 

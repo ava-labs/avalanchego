@@ -4,7 +4,6 @@ package info.v1;
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 
-// Reference: https://developers.google.com/protocol-buffers/docs/proto3
 option go_package = "github.com/ava-labs/avalanchego/proto/pb/info/v1;infov1";
 
 // InfoService is the API service for unprivileged info on a node
