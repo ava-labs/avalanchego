@@ -91,7 +91,7 @@ func (v *kubeRuntimeVars) register(stringVar varFunc[string], uintVar varFunc[ui
 	stringVar(
 		&v.baseAccessibleURI,
 		"kube-base-accessible-uri",
-		"http://localhost:30791",
+		"",
 		kubeDocPrefix+"The base URI for constructing node URIs when running outside of the cluster hosting nodes",
 	)
 }
@@ -106,7 +106,15 @@ func (v *kubeRuntimeVars) getKubeRuntimeConfig() (*tmpnet.KubeRuntimeConfig, err
 	if v.volumeSizeGB < tmpnet.MinimumVolumeSizeGB {
 		return nil, errKubeMinVolumeSizeRequired
 	}
-	if !tmpnet.IsRunningInCluster() && len(v.baseAccessibleURI) == 0 {
+	baseAccessibleURI := v.baseAccessibleURI
+	if strings.HasPrefix(v.config.Context, "kind-kind") && len(baseAccessibleURI) == 0 {
+		// Use the base uri expected for the kind cluster deployed by tmpnet. Not supplying this as a default
+		// ensures that an explicit value is required for non-kind clusters.
+		//
+		// TODO(marun) Log why this value is being used. This will require passing a log through the call chain.
+		baseAccessibleURI = "http://localhost:30791"
+	}
+	if !tmpnet.IsRunningInCluster() && len(baseAccessibleURI) == 0 {
 		return nil, errKubeBaseAccessibleURIRequired
 	}
 	return &tmpnet.KubeRuntimeConfig{
@@ -119,6 +127,6 @@ func (v *kubeRuntimeVars) getKubeRuntimeConfig() (*tmpnet.KubeRuntimeConfig, err
 		SchedulingLabelKey:     v.schedulingLabelKey,
 		SchedulingLabelValue:   v.schedulingLabelValue,
 		// Strip trailing slashes to simplify path composition
-		BaseAccessibleURI: strings.TrimRight(v.baseAccessibleURI, "/"),
+		BaseAccessibleURI: strings.TrimRight(baseAccessibleURI, "/"),
 	}, nil
 }

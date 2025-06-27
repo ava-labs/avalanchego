@@ -1073,14 +1073,14 @@ func (p *KubeRuntime) waitForIngressReadiness(ctx context.Context, serviceName s
 		return err
 	}
 
-	// Wait for the ingress to exist and service endpoints to be available
+	// Wait for the ingress to exist, be processed by the controller, and service endpoints to be available
 	err = wait.PollUntilContextCancel(
 		ctx,
 		statusCheckInterval,
 		true, // immediate
 		func(ctx context.Context) (bool, error) {
-			// Check if ingress exists
-			_, err := clientset.NetworkingV1().Ingresses(namespace).Get(ctx, serviceName, metav1.GetOptions{})
+			// Check if ingress exists and is processed by the controller
+			ingress, err := clientset.NetworkingV1().Ingresses(namespace).Get(ctx, serviceName, metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
 				log.Verbo("waiting for Ingress to be created",
 					zap.String("nodeID", nodeID),
@@ -1095,6 +1095,37 @@ func (p *KubeRuntime) waitForIngressReadiness(ctx context.Context, serviceName s
 					zap.String("namespace", namespace),
 					zap.String("ingress", serviceName),
 					zap.Error(err),
+				)
+				return false, nil
+			}
+
+			// Check if ingress controller has processed the ingress
+			// The ingress controller should populate the Status.LoadBalancer.Ingress field
+			// when it has successfully processed and exposed the ingress
+			hasIngressIP := len(ingress.Status.LoadBalancer.Ingress) > 0
+			if !hasIngressIP {
+				log.Verbo("waiting for Ingress controller to process and expose the Ingress",
+					zap.String("nodeID", nodeID),
+					zap.String("namespace", namespace),
+					zap.String("ingress", serviceName),
+				)
+				return false, nil
+			}
+
+			// Validate that at least one ingress has an IP or hostname
+			hasValidIngress := false
+			for _, ing := range ingress.Status.LoadBalancer.Ingress {
+				if ing.IP != "" || ing.Hostname != "" {
+					hasValidIngress = true
+					break
+				}
+			}
+
+			if !hasValidIngress {
+				log.Verbo("waiting for Ingress controller to assign IP or hostname",
+					zap.String("nodeID", nodeID),
+					zap.String("namespace", namespace),
+					zap.String("ingress", serviceName),
 				)
 				return false, nil
 			}
@@ -1137,7 +1168,7 @@ func (p *KubeRuntime) waitForIngressReadiness(ctx context.Context, serviceName s
 				return false, nil
 			}
 
-			log.Debug("Ingress and Service endpoints are ready",
+			log.Debug("Ingress is exposed by controller and Service endpoints are ready",
 				zap.String("nodeID", nodeID),
 				zap.String("namespace", namespace),
 				zap.String("ingress", serviceName),
