@@ -388,8 +388,6 @@ func (vm *VM) timeToBuild(ctx context.Context) (time.Time, bool, error) {
 		// bootstrapping caused the last accepted block to move past the latest
 		// P-chain height. This will cause building blocks to return an error
 		// until the P-chain's height has advanced.
-		//
-		// TODO: What should we do here now?
 		return time.Time{}, false, nil
 	}
 
