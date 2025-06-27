@@ -156,7 +156,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		txBuilder:    txstest.New(vm.parser.Codec(), vm.ctx, &vm.Config, vm.feeAssetID, vm.state),
 	}
 
-	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping, false))
 	if c.notLinearized {
 		return env
 	}
@@ -166,7 +166,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		return env
 	}
 
-	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
+	require.NoError(vm.SetState(context.Background(), snow.NormalOp, false))
 
 	tb.Cleanup(func() {
 		env.vm.ctx.Lock.Lock()

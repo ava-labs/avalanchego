@@ -317,9 +317,10 @@ func (vm *VMClient) newInitServer() *grpc.Server {
 	return server
 }
 
-func (vm *VMClient) SetState(ctx context.Context, state snow.State) error {
+func (vm *VMClient) SetState(ctx context.Context, state snow.State, stateSyncing bool) error {
 	resp, err := vm.client.SetState(ctx, &vmpb.SetStateRequest{
-		State: vmpb.State(state),
+		State:        vmpb.State(state),
+		StateSyncing: stateSyncing,
 	})
 	if err != nil {
 		return err

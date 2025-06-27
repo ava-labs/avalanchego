@@ -254,7 +254,7 @@ func lastAcceptedBlockPostStateSummaryAcceptTestPlugin(t *testing.T, loadExpecta
 				},
 			).Times(2),
 
-			ssVM.ChainVM.EXPECT().SetState(gomock.Any(), gomock.Any()).Return(nil).Times(1),
+			ssVM.ChainVM.EXPECT().SetState(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1),
 			ssVM.ChainVM.EXPECT().LastAccepted(gomock.Any()).Return(summaryBlk.ID(), nil).Times(1),
 			ssVM.ChainVM.EXPECT().GetBlock(gomock.Any(), gomock.Any()).Return(summaryBlk, nil).Times(1),
 		)
@@ -501,7 +501,7 @@ func TestLastAcceptedBlockPostStateSummaryAccept(t *testing.T) {
 	require.Equal(preSummaryBlk.Height(), lastBlk.Height())
 
 	// Setting state to bootstrapping duly update last accepted block
-	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping, false))
 
 	blkID, err = vm.LastAccepted(context.Background())
 	require.NoError(err)

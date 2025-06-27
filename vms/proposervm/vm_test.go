@@ -203,7 +203,7 @@ func initTestProposerVM(
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
 
-	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
+	require.NoError(proVM.SetState(context.Background(), snow.NormalOp, false))
 	require.NoError(proVM.SetPreference(context.Background(), snowmantest.GenesisID))
 
 	proVM.Set(snowmantest.GenesisTimestamp)
@@ -889,7 +889,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
 
-	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
+	require.NoError(proVM.SetState(context.Background(), snow.NormalOp, false))
 	require.NoError(proVM.SetPreference(context.Background(), snowmantest.GenesisID))
 
 	// Notify the proposer VM of a new block on the inner block side
@@ -1147,7 +1147,7 @@ func TestInnerVMRollback(t *testing.T) {
 		nil,
 	))
 
-	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
+	require.NoError(proVM.SetState(context.Background(), snow.NormalOp, false))
 	require.NoError(proVM.SetPreference(context.Background(), snowmantest.GenesisID))
 
 	coreBlk := snowmantest.BuildChild(snowmantest.Genesis)
@@ -1655,7 +1655,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
 
-	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
+	require.NoError(proVM.SetState(context.Background(), snow.NormalOp, false))
 
 	require.NoError(proVM.SetPreference(context.Background(), snowmantest.GenesisID))
 
@@ -1823,7 +1823,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
 
-	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
+	require.NoError(proVM.SetState(context.Background(), snow.NormalOp, false))
 
 	require.NoError(proVM.SetPreference(context.Background(), snowmantest.GenesisID))
 
@@ -2220,7 +2220,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	lastAcceptedID, err := proVM.LastAccepted(context.Background())
 	require.NoError(err)
 
-	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
+	require.NoError(proVM.SetState(context.Background(), snow.NormalOp, false))
 	require.NoError(proVM.SetPreference(context.Background(), lastAcceptedID))
 
 	issueBlock := func() {
@@ -2309,7 +2309,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	lastAcceptedID, err = proVM.LastAccepted(context.Background())
 	require.NoError(err)
 
-	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
+	require.NoError(proVM.SetState(context.Background(), snow.NormalOp, false))
 	require.NoError(proVM.SetPreference(context.Background(), lastAcceptedID))
 
 	// Verify that old blocks were pruned during startup
@@ -2354,7 +2354,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	lastAcceptedID, err = proVM.LastAccepted(context.Background())
 	require.NoError(err)
 
-	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
+	require.NoError(proVM.SetState(context.Background(), snow.NormalOp, false))
 	require.NoError(proVM.SetPreference(context.Background(), lastAcceptedID))
 
 	// The height index shouldn't be modified at this point
@@ -2768,7 +2768,7 @@ func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
-	require.NoError(proVM.SetState(context.Background(), snow.Bootstrapping))
+	require.NoError(proVM.SetState(context.Background(), snow.Bootstrapping, false))
 
 	// During bootstrapping, the first post-fork block is verified against the
 	// P-chain height, so we provide a valid height.
@@ -2814,7 +2814,7 @@ func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
 
 	// At this point, the VM has a last accepted block with a P-chain height
 	// greater than our locally accepted P-chain.
-	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
+	require.NoError(proVM.SetState(context.Background(), snow.NormalOp, false))
 
 	// If the inner VM requests building a block, the proposervm passes that
 	// message to the consensus engine. This is really the source of the issue,

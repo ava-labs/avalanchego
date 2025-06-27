@@ -281,17 +281,17 @@ func (mr *ChainVMMockRecorder) SetPreference(ctx, blkID any) *gomock.Call {
 }
 
 // SetState mocks base method.
-func (m *ChainVM) SetState(ctx context.Context, state snow.State) error {
+func (m *ChainVM) SetState(ctx context.Context, state snow.State, stateSyncing bool) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetState", ctx, state)
+	ret := m.ctrl.Call(m, "SetState", ctx, state, stateSyncing)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SetState indicates an expected call of SetState.
-func (mr *ChainVMMockRecorder) SetState(ctx, state any) *gomock.Call {
+func (mr *ChainVMMockRecorder) SetState(ctx, state, stateSyncing any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetState", reflect.TypeOf((*ChainVM)(nil).SetState), ctx, state)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetState", reflect.TypeOf((*ChainVM)(nil).SetState), ctx, state, stateSyncing)
 }
 
 // Shutdown mocks base method.

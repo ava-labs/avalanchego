@@ -147,6 +147,7 @@ message InitializeResponse {
 
 message SetStateRequest {
   State state = 1;
+  bool state_syncing = 2;
 }
 
 message SetStateResponse {

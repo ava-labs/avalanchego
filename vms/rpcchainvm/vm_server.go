@@ -282,7 +282,7 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 }
 
 func (vm *VMServer) SetState(ctx context.Context, stateReq *vmpb.SetStateRequest) (*vmpb.SetStateResponse, error) {
-	err := vm.vm.SetState(ctx, snow.State(stateReq.State))
+	err := vm.vm.SetState(ctx, snow.State(stateReq.State), stateReq.StateSyncing)
 	if err != nil {
 		return nil, err
 	}

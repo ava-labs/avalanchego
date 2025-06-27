@@ -84,6 +84,7 @@ type VM struct {
 	innerBlkCache  cache.Cacher[ids.ID, snowman.Block]
 	preferred      ids.ID
 	consensusState snow.State
+	isStateSyncing bool
 
 	// lastAcceptedTime is set to the last accepted PostForkBlock's timestamp
 	// if the last accepted block has been a PostForkOption block since having
@@ -236,13 +237,14 @@ func (vm *VM) Shutdown(ctx context.Context) error {
 	return vm.ChainVM.Shutdown(ctx)
 }
 
-func (vm *VM) SetState(ctx context.Context, newState snow.State) error {
-	if err := vm.ChainVM.SetState(ctx, newState); err != nil {
+func (vm *VM) SetState(ctx context.Context, newState snow.State, stateSyncing bool) error {
+	if err := vm.ChainVM.SetState(ctx, newState, stateSyncing); err != nil {
 		return err
 	}
 
 	oldState := vm.consensusState
 	vm.consensusState = newState
+	vm.isStateSyncing = stateSyncing
 	if oldState != snow.StateSyncing {
 		return nil
 	}
@@ -346,7 +348,9 @@ func (vm *VM) timeToBuild(ctx context.Context) (time.Time, bool, error) {
 	defer vm.ctx.Lock.Unlock()
 
 	blk, err := vm.getPostForkBlock(ctx, vm.preferred)
-	if err != nil || vm.consensusState != snow.NormalOp {
+	// Block building is only supported if the consensus state is normal
+	// operations and the vm is not state syncing.
+	if err != nil || vm.consensusState != snow.NormalOp || vm.isStateSyncing {
 		return time.Time{}, false, nil
 	}
 

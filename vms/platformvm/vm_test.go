@@ -187,7 +187,7 @@ func defaultVM(t *testing.T, f upgradetest.Fork) (*VM, database.Database, *mutab
 		Capacity: defaultDynamicFeeConfig.MaxCapacity,
 	})
 
-	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
+	require.NoError(vm.SetState(context.Background(), snow.NormalOp, false))
 
 	wallet := newWallet(t, vm, walletConfig{
 		keys: []*secp256k1.PrivateKey{genesistest.DefaultFundedKeys[0]},
@@ -1006,13 +1006,13 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	err = blk.Verify(context.Background())
 	require.ErrorIs(err, database.ErrNotFound) // erred due to missing shared memory UTXOs
 
-	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping, false))
 
 	require.NoError(blk.Verify(context.Background())) // skips shared memory UTXO verification during bootstrapping
 
 	require.NoError(blk.Accept(context.Background()))
 
-	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
+	require.NoError(vm.SetState(context.Background(), snow.NormalOp, false))
 
 	_, txStatus, err := vm.state.GetTx(tx.ID())
 	require.NoError(err)
@@ -1684,8 +1684,8 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	firstVM.clock.Set(initialClkTime)
 
 	// Set VM state to NormalOp, to start tracking validators' uptime
-	require.NoError(firstVM.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(firstVM.SetState(context.Background(), snow.NormalOp))
+	require.NoError(firstVM.SetState(context.Background(), snow.Bootstrapping, false))
+	require.NoError(firstVM.SetState(context.Background(), snow.NormalOp, false))
 
 	// Fast forward clock so that validators meet 20% uptime required for reward
 	durationForReward := genesistest.DefaultValidatorEndTime.Sub(genesistest.DefaultValidatorStartTime) * firstUptimePercentage / 100
@@ -1733,8 +1733,8 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	secondVM.clock.Set(vmStopTime)
 
 	// Set VM state to NormalOp, to start tracking validators' uptime
-	require.NoError(secondVM.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(secondVM.SetState(context.Background(), snow.NormalOp))
+	require.NoError(secondVM.SetState(context.Background(), snow.Bootstrapping, false))
+	require.NoError(secondVM.SetState(context.Background(), snow.NormalOp, false))
 
 	// after restart and change of uptime required for reward, push validators to their end of life
 	secondVM.clock.Set(genesistest.DefaultValidatorEndTime)
@@ -1831,8 +1831,8 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	vm.clock.Set(initialClkTime)
 
 	// Set VM state to NormalOp, to start tracking validators' uptime
-	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
+	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping, false))
+	require.NoError(vm.SetState(context.Background(), snow.NormalOp, false))
 
 	// Fast forward clock to time for genesis validators to leave
 	vm.clock.Set(genesistest.DefaultValidatorEndTime)

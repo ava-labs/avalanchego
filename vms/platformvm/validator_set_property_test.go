@@ -658,7 +658,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		return nil, ids.Empty, err
 	}
 
-	err = vm.SetState(context.Background(), snow.NormalOp)
+	err = vm.SetState(context.Background(), snow.NormalOp, false)
 	if err != nil {
 		return nil, ids.Empty, err
 	}

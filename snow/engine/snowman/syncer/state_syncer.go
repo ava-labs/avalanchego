@@ -116,7 +116,7 @@ func (ss *stateSyncer) Start(ctx context.Context, startReqID uint32) error {
 		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		State: snow.StateSyncing,
 	})
-	if err := ss.VM.SetState(ctx, snow.StateSyncing); err != nil {
+	if err := ss.VM.SetState(ctx, snow.StateSyncing, ss.Ctx.StateSyncing.Get()); err != nil {
 		return fmt.Errorf("failed to notify VM that state syncing has started: %w", err)
 	}
 

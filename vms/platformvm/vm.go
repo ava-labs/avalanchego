@@ -368,7 +368,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 	return vm.state.Commit()
 }
 
-func (vm *VM) SetState(_ context.Context, state snow.State) error {
+func (vm *VM) SetState(_ context.Context, state snow.State, _ bool) error {
 	switch state {
 	case snow.Bootstrapping:
 		return vm.onBootstrapStarted()

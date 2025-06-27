@@ -1033,7 +1033,7 @@ func initTestRemoteProposerVM(
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
 
-	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
+	require.NoError(proVM.SetState(context.Background(), snow.NormalOp, false))
 	require.NoError(proVM.SetPreference(context.Background(), snowmantest.GenesisID))
 	return coreVM, proVM
 }

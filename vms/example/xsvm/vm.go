@@ -122,7 +122,7 @@ func (vm *VM) Initialize(
 	return nil
 }
 
-func (vm *VM) SetState(_ context.Context, state snow.State) error {
+func (vm *VM) SetState(_ context.Context, state snow.State, _ bool) error {
 	vm.chain.SetChainState(state)
 	return nil
 }

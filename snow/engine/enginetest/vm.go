@@ -47,7 +47,7 @@ type VM struct {
 	CantAppRequest, CantAppResponse, CantAppGossip, CantAppRequestFailed bool
 
 	InitializeF         func(ctx context.Context, chainCtx *snow.Context, db database.Database, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, fxs []*common.Fx, appSender common.AppSender) error
-	SetStateF           func(ctx context.Context, state snow.State) error
+	SetStateF           func(ctx context.Context, state snow.State, stateSyncing bool) error
 	ShutdownF           func(context.Context) error
 	CreateHandlersF     func(context.Context) (map[string]http.Handler, error)
 	CreateHTTP2HandlerF func(context.Context) (http.Handler, error)
@@ -112,9 +112,9 @@ func (vm *VM) Initialize(
 	return errInitialize
 }
 
-func (vm *VM) SetState(ctx context.Context, state snow.State) error {
+func (vm *VM) SetState(ctx context.Context, state snow.State, stateSyncing bool) error {
 	if vm.SetStateF != nil {
-		return vm.SetStateF(ctx, state)
+		return vm.SetStateF(ctx, state, stateSyncing)
 	}
 	if vm.CantSetState {
 		if vm.T != nil {

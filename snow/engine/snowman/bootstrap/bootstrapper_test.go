@@ -779,7 +779,7 @@ func TestBootstrapperRollbackOnSetState(t *testing.T) {
 	bs.TimeoutRegistrar = &enginetest.Timer{}
 	require.NoError(err)
 
-	vm.SetStateF = func(context.Context, snow.State) error {
+	vm.SetStateF = func(context.Context, snow.State, bool) error {
 		blks[1].Status = snowtest.Undecided
 		return nil
 	}

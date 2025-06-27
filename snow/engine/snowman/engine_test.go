@@ -2424,7 +2424,7 @@ func TestEngineVoteStallRegression(t *testing.T) {
 			) error {
 				return nil
 			},
-			SetStateF: func(context.Context, snow.State) error {
+			SetStateF: func(context.Context, snow.State, bool) error {
 				return nil
 			},
 		},
@@ -2648,7 +2648,7 @@ func TestEngineEarlyTerminateVoterRegression(t *testing.T) {
 			) error {
 				return nil
 			},
-			SetStateF: func(context.Context, snow.State) error {
+			SetStateF: func(context.Context, snow.State, bool) error {
 				return nil
 			},
 		},
@@ -2798,7 +2798,7 @@ func TestEngineRegistersInvalidVoterDependencyRegression(t *testing.T) {
 			) error {
 				return nil
 			},
-			SetStateF: func(context.Context, snow.State) error {
+			SetStateF: func(context.Context, snow.State, bool) error {
 				return nil
 			},
 		},

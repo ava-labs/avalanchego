@@ -311,17 +311,17 @@ func (mr *LinearizableVMMockRecorder) SetPreference(ctx, blkID any) *gomock.Call
 }
 
 // SetState mocks base method.
-func (m *LinearizableVM) SetState(ctx context.Context, state snow.State) error {
+func (m *LinearizableVM) SetState(ctx context.Context, state snow.State, stateSyncing bool) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetState", ctx, state)
+	ret := m.ctrl.Call(m, "SetState", ctx, state, stateSyncing)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SetState indicates an expected call of SetState.
-func (mr *LinearizableVMMockRecorder) SetState(ctx, state any) *gomock.Call {
+func (mr *LinearizableVMMockRecorder) SetState(ctx, state, stateSyncing any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetState", reflect.TypeOf((*LinearizableVM)(nil).SetState), ctx, state)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetState", reflect.TypeOf((*LinearizableVM)(nil).SetState), ctx, state, stateSyncing)
 }
 
 // Shutdown mocks base method.

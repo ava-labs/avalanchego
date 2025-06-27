@@ -56,7 +56,7 @@ type VM interface {
 	) error
 
 	// SetState communicates to VM its next state it starts
-	SetState(ctx context.Context, state snow.State) error
+	SetState(ctx context.Context, state snow.State, stateSyncing bool) error
 
 	// Shutdown is called when the node is shutting down.
 	Shutdown(context.Context) error
