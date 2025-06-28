@@ -97,7 +97,7 @@ func awaitTx(
 	for {
 		receipt, err := client.TransactionReceipt(ctx, txHash)
 		if err == nil {
-			if receipt.Status != 1 {
+			if receipt.Status != types.ReceiptStatusSuccessful {
 				return fmt.Errorf("failed tx: %d", receipt.Status)
 			}
 			return nil
