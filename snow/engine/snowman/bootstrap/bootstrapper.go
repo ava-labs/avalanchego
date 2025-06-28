@@ -753,7 +753,7 @@ func (b *Bootstrapper) restartBootstrapping(ctx context.Context) error {
 	return b.startBootstrapping(ctx)
 }
 
-func (b *Bootstrapper) Notify(_ context.Context, msg common.Message) error {
+func (b *Bootstrapper) Notify(ctx context.Context, msg common.Message) error {
 	if msg != common.StateSyncDone {
 		b.Ctx.Log.Warn("received an unexpected message from the VM",
 			zap.Stringer("msg", msg),
@@ -762,6 +762,9 @@ func (b *Bootstrapper) Notify(_ context.Context, msg common.Message) error {
 	}
 
 	b.Ctx.StateSyncing.Set(false)
+	if err := b.VM.SetState(ctx, snow.Bootstrapping, false); err != nil {
+		return fmt.Errorf("failed to notify VM that state sync has finished: %w", err)
+	}
 	return nil
 }
 

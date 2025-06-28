@@ -341,10 +341,9 @@ func (vm *VM) onBootstrapStarted() error {
 
 // onNormalOperationsStarted marks this VM as bootstrapped
 func (vm *VM) onNormalOperationsStarted() error {
-	if vm.bootstrapped.Get() {
+	if vm.bootstrapped.Swap(true) {
 		return nil
 	}
-	vm.bootstrapped.Set(true)
 
 	if err := vm.fx.Bootstrapped(); err != nil {
 		return err

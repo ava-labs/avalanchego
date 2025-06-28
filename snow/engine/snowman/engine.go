@@ -447,6 +447,9 @@ func (e *Engine) Notify(ctx context.Context, msg common.Message) error {
 		return e.executeDeferredWork(ctx)
 	case common.StateSyncDone:
 		e.Ctx.StateSyncing.Set(false)
+		if err := e.VM.SetState(ctx, snow.NormalOp, false); err != nil {
+			return fmt.Errorf("failed to notify VM that state sync has finished: %w", err)
+		}
 		return nil
 	default:
 		e.Ctx.Log.Warn("received an unexpected message from the VM",
