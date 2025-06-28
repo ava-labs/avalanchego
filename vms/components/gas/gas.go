@@ -74,6 +74,8 @@ func (g Gas) SubPerSecond(gasPerSecond Gas, seconds uint64) Gas {
 //			i += 1
 //		return output // denominator
 //
+// https://eips.ethereum.org/EIPS/eip-4844#helpers
+//
 // This implementation is optimized with the knowledge that any value greater
 // than MaxUint64 gets returned as MaxUint64. This means that every intermediate
 // value is guaranteed to be at most MaxUint193. So, we can safely use
