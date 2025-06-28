@@ -29,17 +29,17 @@ const (
 var (
 	flagVars *e2e.FlagVars
 
-	loadTimeout int
+	loadTimeout time.Duration
 )
 
 func init() {
 	flagVars = e2e.RegisterFlags()
 
-	flag.IntVar(
+	flag.DurationVar(
 		&loadTimeout,
 		"load-timeout",
 		0,
-		"the duration that the load test should run for (in seconds)",
+		"the duration that the load test should run for",
 	)
 
 	flag.Parse()
@@ -116,6 +116,5 @@ func main() {
 	)
 	require.NoError(err)
 
-	loadTimeout := time.Duration(loadTimeout) * time.Second
 	generator.Run(tc, ctx, loadTimeout, testTimeout)
 }
