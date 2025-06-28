@@ -245,7 +245,7 @@ func (vm *VM) SetState(ctx context.Context, newState snow.State, stateSyncing bo
 	oldState := vm.consensusState
 	vm.consensusState = newState
 	vm.isStateSyncing = stateSyncing
-	if oldState != snow.StateSyncing {
+	if oldState == newState || oldState != snow.StateSyncing {
 		return nil
 	}
 
