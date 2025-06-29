@@ -12,7 +12,6 @@ import (
 
 type Metrics struct {
 	txsIssuedCounter      prometheus.Counter
-	txsAcceptedCounter    prometheus.Counter
 	txIssuanceLatency     prometheus.Histogram
 	txConfirmationLatency prometheus.Histogram
 	txTotalLatency        prometheus.Histogram
@@ -24,11 +23,6 @@ func NewMetrics(namespace string, registry *prometheus.Registry) (Metrics, error
 			Namespace: namespace,
 			Name:      "txs_issued",
 			Help:      "Number of transactions issued",
-		}),
-		txsAcceptedCounter: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "txs_confirmed",
-			Help:      "Number of transactions confirmed",
 		}),
 		txIssuanceLatency: prometheus.NewHistogram(prometheus.HistogramOpts{
 			Namespace: namespace,
@@ -49,7 +43,6 @@ func NewMetrics(namespace string, registry *prometheus.Registry) (Metrics, error
 
 	if err := errors.Join(
 		registry.Register(m.txsIssuedCounter),
-		registry.Register(m.txsAcceptedCounter),
 		registry.Register(m.txIssuanceLatency),
 		registry.Register(m.txConfirmationLatency),
 		registry.Register(m.txTotalLatency),
@@ -66,7 +59,6 @@ func (m Metrics) Issue(d time.Duration) {
 }
 
 func (m Metrics) Accept(confirmationDuration time.Duration, totalDuration time.Duration) {
-	m.txsAcceptedCounter.Inc()
-	m.txTotalLatency.Observe(float64(totalDuration.Milliseconds()))
 	m.txConfirmationLatency.Observe(float64(confirmationDuration.Milliseconds()))
+	m.txTotalLatency.Observe(float64(totalDuration.Milliseconds()))
 }
