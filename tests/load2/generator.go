@@ -15,22 +15,22 @@ type Test interface {
 	Run(tests.TestContext, context.Context, *Wallet)
 }
 
-type Generator struct {
+type LoadGenerator struct {
 	wallets []*Wallet
 	test    Test
 }
 
-func NewGenerator(
+func NewLoadGenerator(
 	wallets []*Wallet,
 	test Test,
-) (Generator, error) {
-	return Generator{
+) (LoadGenerator, error) {
+	return LoadGenerator{
 		wallets: wallets,
 		test:    test,
 	}, nil
 }
 
-func (g Generator) Run(
+func (g LoadGenerator) Run(
 	tc tests.TestContext,
 	ctx context.Context,
 	loadTimeout time.Duration,
