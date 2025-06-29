@@ -18,28 +18,29 @@ import (
 )
 
 type Wallet struct {
-	metrics Metrics
+	PrivKey *ecdsa.PrivateKey
+	Nonce   uint64
+	ChainID *big.Int
+	Signer  types.Signer
+
 	client  *ethclient.Client
-	privKey *ecdsa.PrivateKey
-	nonce   uint64
-	chainID *big.Int
-	signer  types.Signer
+	metrics Metrics
 }
 
 func NewWallet(
-	metrics Metrics,
-	client *ethclient.Client,
 	privKey *ecdsa.PrivateKey,
 	nonce uint64,
 	chainID *big.Int,
+	client *ethclient.Client,
+	metrics Metrics,
 ) *Wallet {
 	return &Wallet{
-		metrics: metrics,
+		PrivKey: privKey,
+		Nonce:   nonce,
+		ChainID: chainID,
+		Signer:  types.LatestSignerForChainID(chainID),
 		client:  client,
-		privKey: privKey,
-		nonce:   nonce,
-		chainID: chainID,
-		signer:  types.LatestSignerForChainID(chainID),
+		metrics: metrics,
 	}
 }
 
@@ -64,25 +65,9 @@ func (w *Wallet) SendTx(
 	confirmationDuration := totalDuration - issuanceDuration
 	w.metrics.Accept(confirmationDuration, totalDuration)
 
-	w.nonce++
+	w.Nonce++
 
 	return nil
-}
-
-func (w *Wallet) PrivKey() *ecdsa.PrivateKey {
-	return w.privKey
-}
-
-func (w *Wallet) Nonce() uint64 {
-	return w.nonce
-}
-
-func (w *Wallet) ChainID() *big.Int {
-	return w.chainID
-}
-
-func (w *Wallet) Signer() types.Signer {
-	return w.signer
 }
 
 func awaitTx(

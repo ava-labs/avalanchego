@@ -107,7 +107,7 @@ func main() {
 		chainID, err := client.ChainID(ctx)
 		require.NoError(err)
 
-		wallets[i] = load2.NewWallet(metrics, client, keys[i].ToECDSA(), 0, chainID)
+		wallets[i] = load2.NewWallet(keys[i].ToECDSA(), 0, chainID, client, metrics)
 	}
 
 	generator, err := load2.NewLoadGenerator(
