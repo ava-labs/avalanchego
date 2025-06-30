@@ -153,7 +153,7 @@ func TestServiceDBGet(t *testing.T) {
 			require := require.New(t)
 
 			reply := &DBGetReply{}
-			require.NoError(a.DbGet(
+			require.NoError(a.DBGet(
 				nil,
 				&DBGetArgs{
 					Key: test.key,

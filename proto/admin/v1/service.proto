@@ -22,7 +22,6 @@ service AdminService {
   rpc DBGet(DBGetArgs) returns (DBGetReply);
 }
 
-
 message AliasArgs {
   string endpoint = 1;
   string alias = 2;
@@ -43,8 +42,8 @@ message GetChainAliasesReply {
 
 message SetLoggerLevelArgs {
   string logger_name = 1;
-  string log_level = 2;        // use empty string for unset
-  string display_level = 3;    // use empty string for unset
+  string log_level = 2;
+  string display_level = 3;
 }
 
 message GetLoggerLevelArgs {
@@ -65,12 +64,12 @@ message GetLoggerLevelReply {
 }
 
 message GetConfigReply {
-  string config_json = 1; // NodeConfig is interface{}, so use JSON string
+  string config_json = 1;
 }
 
 message LoadVMsReply {
-  map<string, VMAliases> new_vms = 1; // ids.ID as string
-  map<string, string> failed_vms = 2; // ids.ID as string, error message
+  map<string, VMAliases> new_vms = 1;
+  map<string, string> failed_vms = 2;
 }
 
 message VMAliases {
