@@ -130,11 +130,11 @@ func TestTimeout(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := commontest.NewSubscriber()
-
+	msgFromVM := make(chan common.Message)
 	h, err := handler.New(
 		ctx2,
-		subscriber,
+		common.NewNotificationForwarder(&logging.NoLog{}, commontest.NewSubscriber(), msgFromVM),
+		msgFromVM,
 		vdrs,
 		time.Hour,
 		testThreadPoolSize,
@@ -390,11 +390,11 @@ func TestReliableMessages(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := commontest.NewSubscriber()
-
+	msgFromVM := make(chan common.Message)
 	h, err := handler.New(
 		ctx2,
-		subscriber,
+		common.NewNotificationForwarder(&logging.NoLog{}, commontest.NewSubscriber(), msgFromVM),
+		msgFromVM,
 		vdrs,
 		1,
 		testThreadPoolSize,
@@ -553,11 +553,11 @@ func TestReliableMessagesToMyself(t *testing.T) {
 			)
 			require.NoError(err)
 
-			subscriber := commontest.NewSubscriber()
-
+			msgFromVM := make(chan common.Message)
 			h, err := handler.New(
 				ctx2,
-				subscriber,
+				common.NewNotificationForwarder(&logging.NoLog{}, commontest.NewSubscriber(), msgFromVM),
+				msgFromVM,
 				vdrs,
 				time.Second,
 				testThreadPoolSize,

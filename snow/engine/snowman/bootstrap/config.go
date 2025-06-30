@@ -17,6 +17,7 @@ type Config struct {
 	common.AllGetsServer
 
 	Ctx     *snow.ConsensusContext
+	Events  *common.NotificationForwarder
 	Beacons validators.Manager
 
 	SampleK          int

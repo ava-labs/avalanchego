@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/commontest"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
@@ -83,11 +84,11 @@ func TestHealthCheckSubnet(t *testing.T) {
 			)
 			require.NoError(err)
 
-			subscriber := commontest.NewSubscriber()
-
+			msgFromVM := make(chan common.Message)
 			handlerIntf, err := New(
 				ctx,
-				subscriber,
+				common.NewNotificationForwarder(&logging.NoLog{}, commontest.NewSubscriber(), msgFromVM),
+				msgFromVM,
 				vdrs,
 				time.Second,
 				testThreadPoolSize,

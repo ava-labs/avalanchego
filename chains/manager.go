@@ -874,12 +874,15 @@ func (m *manager) createAvalancheChain(
 		return nil, err
 	}
 
+	msgFromVM := make(chan common.Message)
+	forwarder := common.NewNotificationForwarder(ctx.Log, linearizableVM, msgFromVM)
 	var halter common.Halter
 
 	// Asynchronously passes messages from the network to the consensus engine
 	h, err := handler.New(
 		ctx,
-		linearizableVM,
+		forwarder,
+		msgFromVM,
 		vdrs,
 		m.FrontierPollFrequency,
 		m.ConsensusAppConcurrency,
@@ -918,8 +921,9 @@ func (m *manager) createAvalancheChain(
 	// Create engine, bootstrapper and state-syncer in this order,
 	// to make sure start callbacks are duly initialized
 	snowmanEngineConfig := smeng.Config{
-		Ctx:                 ctx,
 		AllGetsServer:       snowGetHandler,
+		Ctx:                 ctx,
+		Events:              forwarder,
 		VM:                  vmWrappingProposerVM,
 		Sender:              snowmanMessageSender,
 		Validators:          vdrs,
@@ -943,6 +947,7 @@ func (m *manager) createAvalancheChain(
 		NonVerifyingParse:              block.ParseFunc(proposerVM.ParseLocalBlock),
 		AllGetsServer:                  snowGetHandler,
 		Ctx:                            ctx,
+		Events:                         forwarder,
 		Beacons:                        vdrs,
 		SampleK:                        sampleK,
 		StartupTracker:                 startupTracker,
@@ -1261,12 +1266,15 @@ func (m *manager) createSnowmanChain(
 		return nil, err
 	}
 
+	msgFromVM := make(chan common.Message)
+	forwarder := common.NewNotificationForwarder(ctx.Log, vm, msgFromVM)
 	var halter common.Halter
 
 	// Asynchronously passes messages from the network to the consensus engine
 	h, err := handler.New(
 		ctx,
-		vm,
+		forwarder,
+		msgFromVM,
 		vdrs,
 		m.FrontierPollFrequency,
 		m.ConsensusAppConcurrency,
@@ -1305,8 +1313,9 @@ func (m *manager) createSnowmanChain(
 	// Create engine, bootstrapper and state-syncer in this order,
 	// to make sure start callbacks are duly initialized
 	engineConfig := smeng.Config{
-		Ctx:                 ctx,
 		AllGetsServer:       snowGetHandler,
+		Ctx:                 ctx,
+		Events:              forwarder,
 		VM:                  vm,
 		Sender:              messageSender,
 		Validators:          vdrs,
@@ -1331,6 +1340,7 @@ func (m *manager) createSnowmanChain(
 		NonVerifyingParse:              block.ParseFunc(proposerVM.ParseLocalBlock),
 		AllGetsServer:                  snowGetHandler,
 		Ctx:                            ctx,
+		Events:                         forwarder,
 		Beacons:                        beacons,
 		SampleK:                        sampleK,
 		StartupTracker:                 startupTracker,

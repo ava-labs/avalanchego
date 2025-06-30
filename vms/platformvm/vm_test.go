@@ -1302,9 +1302,12 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	)
 	require.NoError(err)
 
+	msgFromVM := make(chan common.Message)
+	nf := common.NewNotificationForwarder(ctx.Log, bootstrapConfig.VM, msgFromVM)
 	h, err := handler.New(
 		bootstrapConfig.Ctx,
-		bootstrapConfig.VM,
+		nf,
+		msgFromVM,
 		beacons,
 		time.Hour,
 		2,
@@ -1318,8 +1321,9 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(err)
 
 	engineConfig := smeng.Config{
-		Ctx:                 bootstrapConfig.Ctx,
 		AllGetsServer:       snowGetHandler,
+		Ctx:                 bootstrapConfig.Ctx,
+		Events:              nf,
 		VM:                  bootstrapConfig.VM,
 		Sender:              bootstrapConfig.Sender,
 		Validators:          beacons,

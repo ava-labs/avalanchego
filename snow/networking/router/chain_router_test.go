@@ -105,11 +105,11 @@ func TestShutdown(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := commontest.NewSubscriber()
-
+	msgFromVM := make(chan common.Message)
 	h, err := handler.New(
 		chainCtx,
-		subscriber,
+		common.NewNotificationForwarder(&logging.NoLog{}, commontest.NewSubscriber(), msgFromVM),
+		msgFromVM,
 		vdrs,
 		time.Second,
 		testThreadPoolSize,
@@ -233,11 +233,11 @@ func TestConnectedAfterShutdownErrorLogRegression(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := commontest.NewSubscriber()
-
+	msgFromVM := make(chan common.Message)
 	h, err := handler.New(
 		chainCtx,
-		subscriber,
+		common.NewNotificationForwarder(&logging.NoLog{}, commontest.NewSubscriber(), msgFromVM),
+		msgFromVM,
 		nil,
 		time.Second,
 		testThreadPoolSize,
@@ -368,11 +368,11 @@ func TestShutdownTimesOut(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := commontest.NewSubscriber()
-
+	msgFromVM := make(chan common.Message)
 	h, err := handler.New(
 		ctx,
-		subscriber,
+		common.NewNotificationForwarder(&logging.NoLog{}, commontest.NewSubscriber(), msgFromVM),
+		msgFromVM,
 		vdrs,
 		time.Second,
 		testThreadPoolSize,
@@ -539,11 +539,11 @@ func TestRouterTimeout(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := commontest.NewSubscriber()
-
+	msgFromVM := make(chan common.Message)
 	h, err := handler.New(
 		ctx,
-		subscriber,
+		common.NewNotificationForwarder(&logging.NoLog{}, commontest.NewSubscriber(), msgFromVM),
+		msgFromVM,
 		vdrs,
 		time.Second,
 		testThreadPoolSize,
@@ -1073,11 +1073,11 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := commontest.NewSubscriber()
-
+	msgFromVM := make(chan common.Message)
 	h, err := handler.New(
 		ctx,
-		subscriber,
+		common.NewNotificationForwarder(&logging.NoLog{}, commontest.NewSubscriber(), msgFromVM),
+		msgFromVM,
 		vdrs,
 		time.Second,
 		testThreadPoolSize,
@@ -1241,11 +1241,11 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := commontest.NewSubscriber()
-
+	msgFromVM := make(chan common.Message)
 	h, err := handler.New(
 		ctx,
-		subscriber,
+		common.NewNotificationForwarder(&logging.NoLog{}, commontest.NewSubscriber(), msgFromVM),
+		msgFromVM,
 		vdrs,
 		time.Second,
 		testThreadPoolSize,
@@ -1495,11 +1495,11 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *enginetest.Engine) {
 	)
 	require.NoError(t, err)
 
-	subscriber := commontest.NewSubscriber()
-
+	msgFromVM := make(chan common.Message)
 	h, err := handler.New(
 		ctx,
-		subscriber,
+		common.NewNotificationForwarder(&logging.NoLog{}, commontest.NewSubscriber(), msgFromVM),
+		msgFromVM,
 		vdrs,
 		time.Second,
 		testThreadPoolSize,

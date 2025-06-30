@@ -8,6 +8,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/common/commontest"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
@@ -19,7 +21,12 @@ func DefaultConfig(t testing.TB) Config {
 	ctx := snowtest.Context(t, snowtest.PChainID)
 
 	return Config{
-		Ctx:                 snowtest.ConsensusContext(ctx),
+		Ctx: snowtest.ConsensusContext(ctx),
+		Events: common.NewNotificationForwarder(
+			ctx.Log,
+			commontest.NewSubscriber(),
+			make(chan common.Message),
+		),
 		VM:                  &blocktest.VM{},
 		Sender:              &enginetest.Sender{},
 		Validators:          validators.NewManager(),

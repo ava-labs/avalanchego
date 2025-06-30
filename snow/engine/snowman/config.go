@@ -18,6 +18,7 @@ type Config struct {
 	common.AllGetsServer
 
 	Ctx                 *snow.ConsensusContext
+	Events              *common.NotificationForwarder
 	VM                  block.ChainVM
 	Sender              common.Sender
 	Validators          validators.Manager

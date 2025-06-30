@@ -67,11 +67,11 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := commontest.NewSubscriber()
-
+	msgFromVM := make(chan common.Message)
 	handlerIntf, err := New(
 		ctx,
-		subscriber,
+		common.NewNotificationForwarder(&logging.NoLog{}, commontest.NewSubscriber(), msgFromVM),
+		msgFromVM,
 		vdrs,
 		time.Second,
 		testThreadPoolSize,
@@ -176,11 +176,11 @@ func TestHandlerClosesOnError(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := commontest.NewSubscriber()
-
+	msgFromVM := make(chan common.Message)
 	handlerIntf, err := New(
 		ctx,
-		subscriber,
+		common.NewNotificationForwarder(&logging.NoLog{}, commontest.NewSubscriber(), msgFromVM),
+		msgFromVM,
 		vdrs,
 		time.Second,
 		testThreadPoolSize,
@@ -281,11 +281,11 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := commontest.NewSubscriber()
-
+	msgFromVM := make(chan common.Message)
 	handlerIntf, err := New(
 		ctx,
-		subscriber,
+		common.NewNotificationForwarder(&logging.NoLog{}, commontest.NewSubscriber(), msgFromVM),
+		msgFromVM,
 		vdrs,
 		1,
 		testThreadPoolSize,
@@ -374,10 +374,12 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	require.NoError(err)
 
 	subscriber := commontest.NewSubscriber()
-
+	msgFromVM := make(chan common.Message)
+	nf := common.NewNotificationForwarder(&logging.NoLog{}, subscriber, msgFromVM)
 	handler, err := New(
 		ctx,
-		subscriber,
+		nf,
+		msgFromVM,
 		vdrs,
 		time.Second,
 		testThreadPoolSize,
@@ -427,6 +429,8 @@ func TestHandlerDispatchInternal(t *testing.T) {
 
 	wg.Add(1)
 	handler.Start(context.Background(), false)
+
+	nf.CheckForEvent()
 	subscriber.SetEvent(common.PendingTxs)
 	wg.Wait()
 }
@@ -551,11 +555,11 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 			)
 			require.NoError(err)
 
-			subscriber := commontest.NewSubscriber()
-
+			msgFromVM := make(chan common.Message)
 			handler, err := New(
 				ctx,
-				subscriber,
+				common.NewNotificationForwarder(&logging.NoLog{}, commontest.NewSubscriber(), msgFromVM),
+				msgFromVM,
 				vdrs,
 				time.Second,
 				testThreadPoolSize,
@@ -636,11 +640,11 @@ func TestHandlerStartError(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := commontest.NewSubscriber()
-
+	msgFromVM := make(chan common.Message)
 	handler, err := New(
 		ctx,
-		subscriber,
+		common.NewNotificationForwarder(&logging.NoLog{}, commontest.NewSubscriber(), msgFromVM),
+		msgFromVM,
 		validators.NewManager(),
 		time.Second,
 		testThreadPoolSize,

@@ -92,7 +92,7 @@ type handler struct {
 	// since peerTracker is already tracking validators
 	validators validators.Manager
 	// Receives messages from the VM
-	msgFromVMChan   chan common.Message
+	msgFromVM       <-chan common.Message
 	gossipFrequency time.Duration
 
 	engineManager *EngineManager
@@ -132,7 +132,8 @@ type handler struct {
 // [engine] must be initialized before initializing this handler
 func New(
 	ctx *snow.ConsensusContext,
-	subscriber common.Subscriber,
+	nf *common.NotificationForwarder,
+	msgFromVM <-chan common.Message,
 	validators validators.Manager,
 	gossipFrequency time.Duration,
 	threadPoolSize int,
@@ -144,7 +145,8 @@ func New(
 	haltBootstrapping func(),
 ) (Handler, error) {
 	h := &handler{
-		msgFromVMChan:     make(chan common.Message),
+		msgFromVM:         msgFromVM,
+		nf:                nf,
 		haltBootstrapping: haltBootstrapping,
 		ctx:               ctx,
 		validators:        validators,
@@ -157,8 +159,6 @@ func New(
 		p2pTracker:        p2pTracker,
 	}
 	h.asyncMessagePool.SetLimit(threadPoolSize)
-
-	h.nf = common.NewNotificationForwarder(h.ctx.Log, subscriber, h.msgFromVMChan)
 
 	var err error
 	h.metrics, err = newMetrics(reg)
@@ -283,11 +283,6 @@ func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 	}
 }
 
-func (h *handler) Notify(_ context.Context, msg common.Message) error {
-	h.msgFromVMChan <- msg
-	return nil
-}
-
 // Push the message onto the handler's queue
 func (h *handler) Push(ctx context.Context, msg Message) {
 	switch msg.Op() {
@@ -401,7 +396,7 @@ func (h *handler) dispatchChans(ctx context.Context) {
 		case <-h.closingChan:
 			return
 
-		case vmMSG := <-h.msgFromVMChan:
+		case vmMSG := <-h.msgFromVM:
 			msg = message.InternalVMMessage(h.ctx.NodeID, uint32(vmMSG))
 
 		case <-gossiper.C:
