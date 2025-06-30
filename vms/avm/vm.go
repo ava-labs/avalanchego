@@ -364,7 +364,7 @@ func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID) error {
 		return fmt.Errorf("failed to initialize chain state: %w", err)
 	}
 
-	mempool, err := xmempool.New("mempool", vm.registerer, notify)
+	mempool, err := xmempool.New("mempool", vm.registerer)
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}
