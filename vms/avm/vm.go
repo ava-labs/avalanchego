@@ -42,7 +42,6 @@ import (
 	extensions "github.com/ava-labs/avalanchego/vms/avm/fxs"
 	avmmetrics "github.com/ava-labs/avalanchego/vms/avm/metrics"
 	txexecutor "github.com/ava-labs/avalanchego/vms/avm/txs/executor"
-	xmempool "github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 )
 
 var (
@@ -59,8 +58,6 @@ type VM struct {
 	config.Config
 
 	metrics avmmetrics.Metrics
-
-	common.Subscriber
 
 	avax.AddressManager
 	ids.Aliaser
@@ -366,18 +363,11 @@ func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID) error {
 		return fmt.Errorf("failed to initialize chain state: %w", err)
 	}
 
-	ss := common.NewSimpleSubscriber()
-	vm.Subscriber = ss
-
-	notify := func() {
-		ss.Publish(common.PendingTxs)
-	}
-
-	mempool, err := xmempool.New("mempool", vm.registerer, notify)
+	metrics, err := mempool.NewMetrics("mempool", vm.registerer)
 	if err != nil {
-		return fmt.Errorf("failed to create mempool: %w", err)
+		return fmt.Errorf("failed to create mempool metrics: %w", err)
 	}
-
+	mempool := mempool.New[*txs.Tx](metrics)
 	vm.chainManager = blockexecutor.NewManager(
 		mempool,
 		vm.metrics,
