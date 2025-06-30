@@ -20,17 +20,14 @@ type LoadGenerator struct {
 	test    Test
 }
 
-func NewLoadGenerator(
-	wallets []*Wallet,
-	test Test,
-) (LoadGenerator, error) {
+func NewLoadGenerator(wallets []*Wallet, test Test) (LoadGenerator, error) {
 	return LoadGenerator{
 		wallets: wallets,
 		test:    test,
 	}, nil
 }
 
-func (g LoadGenerator) Run(
+func (l LoadGenerator) Run(
 	tc tests.TestContext,
 	ctx context.Context,
 	loadTimeout time.Duration,
@@ -45,7 +42,7 @@ func (g LoadGenerator) Run(
 		defer cancel()
 	}
 
-	for i := range g.wallets {
+	for i := range l.wallets {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -60,7 +57,7 @@ func (g LoadGenerator) Run(
 				ctx, cancel := context.WithTimeout(ctx, testTimeout)
 				defer cancel()
 
-				g.test.Run(tc, ctx, g.wallets[i])
+				l.test.Run(tc, ctx, l.wallets[i])
 			}
 		}()
 	}
