@@ -412,17 +412,17 @@ func issueAndAccept(
 	require.NoError(err)
 	require.Equal(tx.ID(), txID)
 
-	buildAndAccept(require, vm, vm.Subscriber, txID)
+	buildAndAccept(require, vm, txID)
 }
 
 // buildAndAccept expects the context lock not to be held
 func buildAndAccept(
 	require *require.Assertions,
 	vm *VM,
-	subscriber common.Subscriber,
 	txID ids.ID,
 ) {
-	msg, _ := subscriber.WaitForEvent(context.Background())
+	msg, err := vm.WaitForEvent(context.Background())
+	require.NoError(err)
 	require.Equal(common.PendingTxs, msg)
 
 	vm.ctx.Lock.Lock()
