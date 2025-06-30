@@ -1,17 +1,3 @@
-
-
-var (
-	errSignatureVerificationFailed = errors.New("signature verification failed")
-	errSignerNotFound              = errors.New("signer not found in the membership set")
-	errFailedToParseSignature      = errors.New("failed to parse signature")
-	errFailedToParseQC             = errors.New("failed to parse quorum certificate")
-	errNotEnoughSigners            = errors.New("not enough signers")
-	errSignatureAggregation        = errors.New("signature aggregation failed")
-	errEncodingMessageToSign       = errors.New("failed to encode message to sign")
-	simplexLabel                   = []byte("simplex")
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
-// See the file LICENSE for licensing terms.
-
 package simplex
 
 import (
@@ -29,6 +15,13 @@ var (
 	errSignerNotFound              = errors.New("signer not found in the membership set")
 	errInvalidNodeID               = errors.New("unable to parse node ID")
 	errFailedToParseSignature      = errors.New("failed to parse signature")
+
+	// QC errors
+	errFailedToParseQC             = errors.New("failed to parse quorum certificate")
+	errNotEnoughSigners            = errors.New("not enough signers")
+	errSignatureAggregation        = errors.New("signature aggregation failed")
+	errEncodingMessageToSign       = errors.New("failed to encode message to sign")
+	simplexLabel                   = []byte("simplex")
 )
 
 var _ simplex.Signer = (*BLSSigner)(nil)

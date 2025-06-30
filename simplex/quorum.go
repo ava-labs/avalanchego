@@ -46,7 +46,7 @@ func (qc *QC) Verify(msg []byte) error {
 			return fmt.Errorf("%w: %x", errSignerNotFound, signer)
 		}
 
-		pks = append(pks, &pk)
+		pks = append(pks, pk)
 	}
 
 	// aggregate the public keys
@@ -55,7 +55,7 @@ func (qc *QC) Verify(msg []byte) error {
 		return fmt.Errorf("%w: %w", errSignatureAggregation, err)
 	}
 
-	message2Verify, err := encodeMessageToSign(msg, qc.verifier.chainID, qc.verifier.subnetID)
+	message2Verify, err := encodeMessageToSign(msg, qc.verifier.chainID, qc.verifier.networkID)
 	if err != nil {
 		return fmt.Errorf("%w: %w", errEncodingMessageToSign, err)
 	}
