@@ -92,8 +92,8 @@ func TestSubscriptionProxy(t *testing.T) {
 		{
 			name: "Close",
 			f: func(sp *SubscriptionProxy, _ context.CancelFunc, _ chan Message) {
-				sp.Publish(StateSyncDone)
 				sp.Close()
+				sp.Publish(StateSyncDone)
 			},
 		},
 	} {
