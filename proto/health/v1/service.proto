@@ -54,4 +54,3 @@ message HealthReply {
 message HealthArgs {
   repeated string tags = 1;
 }
-
