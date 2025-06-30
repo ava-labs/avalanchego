@@ -350,13 +350,19 @@ func (vm *VM) timeToBuild(ctx context.Context) (time.Time, bool, error) {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
-	blk, err := vm.getPostForkBlock(ctx, vm.preferred)
 	// Block building is only supported if the consensus state is normal
 	// operations and the vm is not state syncing.
 	//
 	// TODO: Correctly handle dynamic state sync here. When the innerVM is
 	// dynamically state syncing, we should return here as well.
-	if err != nil || vm.consensusState != snow.NormalOp {
+	if vm.consensusState != snow.NormalOp {
+		return time.Time{}, false, nil
+	}
+
+	blk, err := vm.getPostForkBlock(ctx, vm.preferred)
+	// If the preferred block is pre-fork, we should wait for events on the
+	// innerVM.
+	if err != nil {
 		return time.Time{}, false, nil
 	}
 
