@@ -6,6 +6,7 @@ package load2
 import (
 	"context"
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	"math/big"
 	"time"
@@ -88,7 +89,7 @@ func awaitTx(
 			return nil
 		}
 
-		if err != ethereum.NotFound {
+		if !errors.Is(err, ethereum.NotFound) {
 			return err
 		}
 
