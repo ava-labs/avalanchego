@@ -243,7 +243,7 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 		return err
 	}
 
-	v.Remove(b.Tx)
+	v.Mempool.Remove(b.Tx)
 
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
@@ -432,7 +432,7 @@ func (v *verifier) proposalBlock(
 	onCommitState.AddTx(tx, status.Committed)
 	onAbortState.AddTx(tx, status.Aborted)
 
-	v.Remove(tx)
+	v.Mempool.Remove(tx)
 
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
@@ -490,7 +490,7 @@ func (v *verifier) standardBlock(
 		return ErrStandardBlockWithoutChanges
 	}
 
-	v.Remove(txs...)
+	v.Mempool.Remove(txs...)
 
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{

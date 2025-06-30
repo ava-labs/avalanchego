@@ -929,7 +929,7 @@ func initTestRemoteProposerVM(
 		BatchedVM: &blocktest.BatchedVM{},
 	}
 	coreVM.VM.T = t
-	coreVM.T = t
+	coreVM.BatchedVM.T = t
 
 	coreVM.InitializeF = func(
 		context.Context,

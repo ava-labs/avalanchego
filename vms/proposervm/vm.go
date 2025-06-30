@@ -140,7 +140,7 @@ func (vm *VM) Initialize(
 ) error {
 	vm.ctx = chainCtx
 	vm.db = versiondb.New(prefixdb.New(dbPrefix, db))
-	baseState, err := state.NewMetered(vm.db, "state", vm.Registerer)
+	baseState, err := state.NewMetered(vm.db, "state", vm.Config.Registerer)
 	if err != nil {
 		return err
 	}
@@ -149,7 +149,7 @@ func (vm *VM) Initialize(
 	vm.Tree = tree.New()
 	innerBlkCache, err := metercacher.New(
 		"inner_block_cache",
-		vm.Registerer,
+		vm.Config.Registerer,
 		lru.NewSizedCache(innerBlkCacheSize, cachedBlockSize),
 	)
 	if err != nil {
@@ -235,15 +235,15 @@ func (vm *VM) Initialize(
 	)
 
 	return errors.Join(
-		vm.Registerer.Register(vm.proposerBuildSlotGauge),
-		vm.Registerer.Register(vm.acceptedBlocksSlotHistogram),
-		vm.Registerer.Register(vm.lastAcceptedTimestampGaugeVec),
+		vm.Config.Registerer.Register(vm.proposerBuildSlotGauge),
+		vm.Config.Registerer.Register(vm.acceptedBlocksSlotHistogram),
+		vm.Config.Registerer.Register(vm.lastAcceptedTimestampGaugeVec),
 	)
 }
 
 // shutdown ops then propagate shutdown to innerVM
 func (vm *VM) Shutdown(ctx context.Context) error {
-	vm.Close()
+	vm.Scheduler.Close()
 
 	if err := vm.db.Commit(); err != nil {
 		return err
@@ -359,7 +359,7 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 		// until the P-chain's height has advanced.
 		return nil
 	}
-	vm.SetBuildBlockTime(nextStartTime)
+	vm.Scheduler.SetBuildBlockTime(nextStartTime)
 
 	vm.ctx.Log.Debug("set preference",
 		zap.Stringer("blkID", blk.ID()),
@@ -375,7 +375,7 @@ func (vm *VM) getPreDurangoSlotTime(
 	pChainHeight uint64,
 	parentTimestamp time.Time,
 ) (time.Time, error) {
-	delay, err := vm.Delay(ctx, blkHeight, pChainHeight, vm.ctx.NodeID, proposer.MaxBuildWindows)
+	delay, err := vm.Windower.Delay(ctx, blkHeight, pChainHeight, vm.ctx.NodeID, proposer.MaxBuildWindows)
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -397,7 +397,7 @@ func (vm *VM) getPostDurangoSlotTime(
 	slot uint64,
 	parentTimestamp time.Time,
 ) (time.Time, error) {
-	delay, err := vm.MinDelayForProposer(
+	delay, err := vm.Windower.MinDelayForProposer(
 		ctx,
 		blkHeight,
 		pChainHeight,
@@ -422,7 +422,7 @@ func (vm *VM) getPostDurangoSlotTime(
 }
 
 func (vm *VM) LastAccepted(ctx context.Context) (ids.ID, error) {
-	lastAccepted, err := vm.GetLastAccepted()
+	lastAccepted, err := vm.State.GetLastAccepted()
 	if err == database.ErrNotFound {
 		return vm.ChainVM.LastAccepted(ctx)
 	}
@@ -438,7 +438,7 @@ func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get inner last accepted block: %w", err)
 	}
-	proLastAcceptedID, err := vm.GetLastAccepted()
+	proLastAcceptedID, err := vm.State.GetLastAccepted()
 	if err == database.ErrNotFound {
 		// If the last accepted block isn't indexed yet, then the underlying
 		// chain is the only chain and there is nothing to repair.
@@ -469,7 +469,7 @@ func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 
 	// The inner vm must be behind the proposer vm, so we must roll the
 	// proposervm back.
-	forkHeight, err := vm.GetForkHeight()
+	forkHeight, err := vm.State.GetForkHeight()
 	if err != nil {
 		return fmt.Errorf("failed to get fork height: %w", err)
 	}
@@ -477,7 +477,7 @@ func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 	if forkHeight > innerLastAcceptedHeight {
 		// We are rolling back past the fork, so we should just forget about all
 		// of our proposervm indices.
-		if err := vm.DeleteLastAccepted(); err != nil {
+		if err := vm.State.DeleteLastAccepted(); err != nil {
 			return fmt.Errorf("failed to delete last accepted: %w", err)
 		}
 		return vm.db.Commit()
@@ -491,7 +491,7 @@ func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 		return fmt.Errorf("proposervm failed to rollback last accepted block to height (%d): %w", innerLastAcceptedHeight, err)
 	}
 
-	if err := vm.SetLastAccepted(newProLastAcceptedID); err != nil {
+	if err := vm.State.SetLastAccepted(newProLastAcceptedID); err != nil {
 		return fmt.Errorf("failed to set last accepted: %w", err)
 	}
 
@@ -644,10 +644,10 @@ func (vm *VM) acceptPostForkBlock(blk PostForkBlock) error {
 	delete(vm.verifiedBlocks, blkID)
 
 	// Persist this block, its height index, and its status
-	if err := vm.SetLastAccepted(blkID); err != nil {
+	if err := vm.State.SetLastAccepted(blkID); err != nil {
 		return err
 	}
-	if err := vm.PutBlock(blk.getStatelessBlk()); err != nil {
+	if err := vm.State.PutBlock(blk.getStatelessBlk()); err != nil {
 		return err
 	}
 	if err := vm.updateHeightIndex(height, blkID); err != nil {
@@ -659,7 +659,7 @@ func (vm *VM) acceptPostForkBlock(blk PostForkBlock) error {
 func (vm *VM) verifyAndRecordInnerBlk(ctx context.Context, blockCtx *block.Context, postFork PostForkBlock) error {
 	innerBlk := postFork.getInnerBlk()
 	postForkID := postFork.ID()
-	originalInnerBlock, previouslyVerified := vm.Get(innerBlk)
+	originalInnerBlock, previouslyVerified := vm.Tree.Get(innerBlk)
 	if previouslyVerified {
 		innerBlk = originalInnerBlock
 		// We must update all of the mappings from postFork -> innerBlock to
@@ -703,7 +703,7 @@ func (vm *VM) verifyAndRecordInnerBlk(ctx context.Context, blockCtx *block.Conte
 	// Since verification passed, we should ensure the inner block tree is
 	// populated.
 	if !previouslyVerified {
-		vm.Add(innerBlk)
+		vm.Tree.Add(innerBlk)
 	}
 	vm.verifiedBlocks[postForkID] = postFork
 	return nil
@@ -729,7 +729,7 @@ var fujiOverridePChainHeightUntilTimestamp = time.Date(2025, time.March, 7, 17, 
 
 func (vm *VM) selectChildPChainHeight(ctx context.Context, minPChainHeight uint64) (uint64, error) {
 	var (
-		now            = vm.Time()
+		now            = vm.Clock.Time()
 		shouldOverride = vm.ctx.NetworkID == constants.FujiID &&
 			vm.ctx.SubnetID != constants.PrimaryNetworkID &&
 			now.Before(fujiOverridePChainHeightUntilTimestamp) &&

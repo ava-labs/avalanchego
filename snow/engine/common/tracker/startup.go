@@ -41,7 +41,7 @@ func (s *startup) OnValidatorAdded(nodeID ids.NodeID, pk *bls.PublicKey, txID id
 	defer s.lock.Unlock()
 
 	s.Peers.OnValidatorAdded(nodeID, pk, txID, weight)
-	s.shouldStart = s.shouldStart || s.ConnectedWeight() >= s.startupWeight
+	s.shouldStart = s.shouldStart || s.Peers.ConnectedWeight() >= s.startupWeight
 }
 
 func (s *startup) OnValidatorWeightChanged(nodeID ids.NodeID, oldWeight, newWeight uint64) {
@@ -49,7 +49,7 @@ func (s *startup) OnValidatorWeightChanged(nodeID ids.NodeID, oldWeight, newWeig
 	defer s.lock.Unlock()
 
 	s.Peers.OnValidatorWeightChanged(nodeID, oldWeight, newWeight)
-	s.shouldStart = s.shouldStart || s.ConnectedWeight() >= s.startupWeight
+	s.shouldStart = s.shouldStart || s.Peers.ConnectedWeight() >= s.startupWeight
 }
 
 func (s *startup) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
@@ -60,7 +60,7 @@ func (s *startup) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion 
 		return err
 	}
 
-	s.shouldStart = s.shouldStart || s.ConnectedWeight() >= s.startupWeight
+	s.shouldStart = s.shouldStart || s.Peers.ConnectedWeight() >= s.startupWeight
 	return nil
 }
 

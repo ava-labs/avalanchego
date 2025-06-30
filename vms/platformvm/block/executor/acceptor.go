@@ -202,7 +202,7 @@ func (a *acceptor) proposalBlock(b block.Block, blockType string) {
 	//   The snowman.Engine requires that the last committed block is a decision block
 
 	blkID := b.ID()
-	a.lastAccepted = blkID
+	a.backend.lastAccepted = blkID
 
 	a.ctx.Log.Trace(
 		"accepted block",
@@ -271,7 +271,7 @@ func (a *acceptor) commonAccept(b *blockState) error {
 		return fmt.Errorf("failed to accept block %s: %w", blkID, err)
 	}
 
-	a.lastAccepted = blkID
+	a.backend.lastAccepted = blkID
 	a.state.SetLastAccepted(blkID)
 	a.state.SetHeight(blk.Height())
 	a.state.AddStatelessBlock(blk)

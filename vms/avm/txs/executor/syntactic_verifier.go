@@ -51,7 +51,7 @@ type SyntacticVerifier struct {
 }
 
 func (v *SyntacticVerifier) BaseTx(tx *txs.BaseTx) error {
-	if err := tx.Verify(v.Ctx); err != nil {
+	if err := tx.BaseTx.Verify(v.Ctx); err != nil {
 		return err
 	}
 
@@ -114,7 +114,7 @@ func (v *SyntacticVerifier) CreateAssetTx(tx *txs.CreateAssetTx) error {
 		}
 	}
 
-	if err := tx.Verify(v.Ctx); err != nil {
+	if err := tx.BaseTx.BaseTx.Verify(v.Ctx); err != nil {
 		return err
 	}
 
@@ -162,7 +162,7 @@ func (v *SyntacticVerifier) OperationTx(tx *txs.OperationTx) error {
 		return errNoOperations
 	}
 
-	if err := tx.Verify(v.Ctx); err != nil {
+	if err := tx.BaseTx.BaseTx.Verify(v.Ctx); err != nil {
 		return err
 	}
 
@@ -222,7 +222,7 @@ func (v *SyntacticVerifier) ImportTx(tx *txs.ImportTx) error {
 		return errNoImportInputs
 	}
 
-	if err := tx.Verify(v.Ctx); err != nil {
+	if err := tx.BaseTx.BaseTx.Verify(v.Ctx); err != nil {
 		return err
 	}
 
@@ -264,7 +264,7 @@ func (v *SyntacticVerifier) ExportTx(tx *txs.ExportTx) error {
 		return errNoExportOutputs
 	}
 
-	if err := tx.Verify(v.Ctx); err != nil {
+	if err := tx.BaseTx.BaseTx.Verify(v.Ctx); err != nil {
 		return err
 	}
 

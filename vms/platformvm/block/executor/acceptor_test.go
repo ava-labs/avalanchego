@@ -66,7 +66,7 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 
 	require.NoError(acceptor.ApricotProposalBlock(blk))
 
-	require.Equal(blkID, acceptor.lastAccepted)
+	require.Equal(blkID, acceptor.backend.lastAccepted)
 
 	_, exists := acceptor.GetState(blkID)
 	require.False(exists)
@@ -119,7 +119,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	onAcceptState := state.NewMockDiff(ctrl)
 	childID := ids.GenerateTestID()
 	atomicRequests := make(map[ids.ID]*atomic.Requests)
-	acceptor.blkIDToState[blk.ID()] = &blockState{
+	acceptor.backend.blkIDToState[blk.ID()] = &blockState{
 		statelessBlock: blk,
 		onAcceptState:  onAcceptState,
 		atomicRequests: atomicRequests,
@@ -138,7 +138,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 			onCommitState: childOnCommitState,
 		},
 	}
-	acceptor.blkIDToState[childID] = childState
+	acceptor.backend.blkIDToState[childID] = childState
 
 	// Set expected calls on dependencies.
 	s.EXPECT().SetLastAccepted(blk.ID()).Times(1)
@@ -201,7 +201,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	childID := ids.GenerateTestID()
 	atomicRequests := make(map[ids.ID]*atomic.Requests)
 	calledOnAcceptFunc := false
-	acceptor.blkIDToState[blk.ID()] = &blockState{
+	acceptor.backend.blkIDToState[blk.ID()] = &blockState{
 		statelessBlock: blk,
 		onAcceptState:  onAcceptState,
 		onAcceptFunc: func() {
@@ -224,7 +224,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 			onCommitState: childOnCommitState,
 		},
 	}
-	acceptor.blkIDToState[childID] = childState
+	acceptor.backend.blkIDToState[childID] = childState
 
 	// Set expected calls on dependencies.
 	s.EXPECT().SetLastAccepted(blk.ID()).Times(1)
@@ -239,7 +239,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 
 	require.NoError(acceptor.BanffStandardBlock(blk))
 	require.True(calledOnAcceptFunc)
-	require.Equal(blk.ID(), acceptor.lastAccepted)
+	require.Equal(blk.ID(), acceptor.backend.lastAccepted)
 }
 
 func TestAcceptorVisitCommitBlock(t *testing.T) {
@@ -291,7 +291,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 
 		atomicRequests: atomicRequests,
 	}
-	acceptor.blkIDToState[parentID] = parentState
+	acceptor.backend.blkIDToState[parentID] = parentState
 
 	blkID := blk.ID()
 	// Set expected calls on dependencies.
@@ -310,8 +310,8 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	parentOnCommitState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
 
 	// Set [blk]'s state in the map as though it had been verified.
-	acceptor.blkIDToState[parentID] = parentState
-	acceptor.blkIDToState[blkID] = &blockState{
+	acceptor.backend.blkIDToState[parentID] = parentState
+	acceptor.backend.blkIDToState[blkID] = &blockState{
 		statelessBlock: blk,
 		onAcceptState:  parentState.onCommitState,
 		onAcceptFunc:   parentState.onAcceptFunc,
@@ -348,7 +348,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 
 	require.NoError(acceptor.ApricotCommitBlock(blk))
 	require.True(calledOnAcceptFunc)
-	require.Equal(blk.ID(), acceptor.lastAccepted)
+	require.Equal(blk.ID(), acceptor.backend.lastAccepted)
 }
 
 func TestAcceptorVisitAbortBlock(t *testing.T) {
@@ -400,7 +400,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 
 		atomicRequests: atomicRequests,
 	}
-	acceptor.blkIDToState[parentID] = parentState
+	acceptor.backend.blkIDToState[parentID] = parentState
 
 	blkID := blk.ID()
 	// Set expected calls on dependencies.
@@ -419,8 +419,8 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	parentOnAbortState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
 
 	// Set [blk]'s state in the map as though it had been verified.
-	acceptor.blkIDToState[parentID] = parentState
-	acceptor.blkIDToState[blkID] = &blockState{
+	acceptor.backend.blkIDToState[parentID] = parentState
+	acceptor.backend.blkIDToState[blkID] = &blockState{
 		statelessBlock: blk,
 		onAcceptState:  parentState.onAbortState,
 		onAcceptFunc:   parentState.onAcceptFunc,
@@ -457,5 +457,5 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 
 	require.NoError(acceptor.ApricotAbortBlock(blk))
 	require.True(calledOnAcceptFunc)
-	require.Equal(blk.ID(), acceptor.lastAccepted)
+	require.Equal(blk.ID(), acceptor.backend.lastAccepted)
 }

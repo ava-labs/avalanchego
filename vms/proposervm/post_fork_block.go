@@ -63,7 +63,7 @@ func (b *postForkBlock) acceptOuterBlk() error {
 func (b *postForkBlock) acceptInnerBlk(ctx context.Context) error {
 	// mark the inner block as accepted and all conflicting inner blocks as
 	// rejected
-	return b.vm.Accept(ctx, b.innerBlk)
+	return b.vm.Tree.Accept(ctx, b.innerBlk)
 }
 
 func (b *postForkBlock) Reject(context.Context) error {

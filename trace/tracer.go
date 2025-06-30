@@ -53,7 +53,7 @@ func (t *tracer) Close() error {
 }
 
 func New(config Config) (Tracer, error) {
-	if config.Type == Disabled {
+	if config.ExporterConfig.Type == Disabled {
 		return Noop, nil
 	}
 

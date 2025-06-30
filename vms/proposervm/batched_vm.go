@@ -30,7 +30,7 @@ func (vm *VM) GetAncestors(
 
 	res := make([][]byte, 0, maxBlocksNum)
 	currentByteLength := 0
-	startTime := vm.Time()
+	startTime := vm.Clock.Time()
 
 	// hereinafter loop over proposerVM cache and DB, possibly till snowman++
 	// fork is hit

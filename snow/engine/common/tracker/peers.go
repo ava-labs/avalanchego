@@ -168,32 +168,32 @@ func (p *meteredPeers) OnValidatorAdded(nodeID ids.NodeID, pk *bls.PublicKey, tx
 	p.Peers.OnValidatorAdded(nodeID, pk, txID, weight)
 	p.numValidators.Inc()
 	p.totalWeight.Add(float64(weight))
-	p.percentConnected.Set(p.ConnectedPercent())
+	p.percentConnected.Set(p.Peers.ConnectedPercent())
 }
 
 func (p *meteredPeers) OnValidatorRemoved(nodeID ids.NodeID, weight uint64) {
 	p.Peers.OnValidatorRemoved(nodeID, weight)
 	p.numValidators.Dec()
 	p.totalWeight.Sub(float64(weight))
-	p.percentConnected.Set(p.ConnectedPercent())
+	p.percentConnected.Set(p.Peers.ConnectedPercent())
 }
 
 func (p *meteredPeers) OnValidatorWeightChanged(nodeID ids.NodeID, oldWeight, newWeight uint64) {
 	p.Peers.OnValidatorWeightChanged(nodeID, oldWeight, newWeight)
 	p.totalWeight.Sub(float64(oldWeight))
 	p.totalWeight.Add(float64(newWeight))
-	p.percentConnected.Set(p.ConnectedPercent())
+	p.percentConnected.Set(p.Peers.ConnectedPercent())
 }
 
 func (p *meteredPeers) Connected(ctx context.Context, nodeID ids.NodeID, version *version.Application) error {
 	err := p.Peers.Connected(ctx, nodeID, version)
-	p.percentConnected.Set(p.ConnectedPercent())
+	p.percentConnected.Set(p.Peers.ConnectedPercent())
 	return err
 }
 
 func (p *meteredPeers) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 	err := p.Peers.Disconnected(ctx, nodeID)
-	p.percentConnected.Set(p.ConnectedPercent())
+	p.percentConnected.Set(p.Peers.ConnectedPercent())
 	return err
 }
 

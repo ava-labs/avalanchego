@@ -201,11 +201,11 @@ func TestGenesis(t *testing.T) {
 	// Validate allocations
 	require.Len(genesis.UTXOs, 1)
 	utxo := genesis.UTXOs[0]
-	require.Equal(avaxAssetID, utxo.ID)
+	require.Equal(avaxAssetID, utxo.Asset.ID)
 	output, ok := utxo.Out.(*secp256k1fx.TransferOutput)
 	require.True(ok)
 	require.Equal(uint64(123456789), output.Amt)
-	require.Len(output.Addrs, 1)
+	require.Len(output.OutputOwners.Addrs, 1)
 
 	// Validate validator
 	require.Len(genesis.Validators, 1)
@@ -213,7 +213,7 @@ func TestGenesis(t *testing.T) {
 	txValidator, ok := validator.Unsigned.(*txs.AddValidatorTx)
 	require.True(ok)
 	require.Equal(nodeID, txValidator.Validator.NodeID)
-	require.Equal(uint64(20), txValidator.End)
+	require.Equal(uint64(20), txValidator.Validator.End)
 	require.Len(txValidator.StakeOuts, 1)
 	stakeOut := txValidator.StakeOuts[0]
 	stakeOutput, ok := stakeOut.Out.(*secp256k1fx.TransferOutput)

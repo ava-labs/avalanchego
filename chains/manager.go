@@ -452,7 +452,7 @@ func (m *manager) createChain(chainParams ChainParameters) {
 	// Allows messages to be routed to the new chain. If the handler hasn't been
 	// started and a message is forwarded, then the message will block until the
 	// handler is started.
-	m.Router.AddChain(context.TODO(), chain.Handler)
+	m.ManagerConfig.Router.AddChain(context.TODO(), chain.Handler)
 
 	// Register bootstrapped health checks after P chain has been added to
 	// chains.
@@ -662,7 +662,7 @@ func (m *manager) createAvalancheChain(
 		ctx,
 		m.MsgCreator,
 		m.Net,
-		m.Router,
+		m.ManagerConfig.Router,
 		m.TimeoutManager,
 		p2ppb.EngineType_ENGINE_TYPE_AVALANCHE,
 		sb,
@@ -681,7 +681,7 @@ func (m *manager) createAvalancheChain(
 		ctx,
 		m.MsgCreator,
 		m.Net,
-		m.Router,
+		m.ManagerConfig.Router,
 		m.TimeoutManager,
 		p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		sb,
@@ -1089,7 +1089,7 @@ func (m *manager) createSnowmanChain(
 		ctx,
 		m.MsgCreator,
 		m.Net,
-		m.Router,
+		m.ManagerConfig.Router,
 		m.TimeoutManager,
 		p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		sb,
@@ -1128,7 +1128,7 @@ func (m *manager) createSnowmanChain(
 			m.validatorState = validators.Trace(m.validatorState, "lockedState", m.Tracer)
 		}
 
-		if !m.SybilProtectionEnabled {
+		if !m.ManagerConfig.SybilProtectionEnabled {
 			m.validatorState = validators.NewNoValidatorsState(m.validatorState)
 			ctx.ValidatorState = validators.NewNoValidatorsState(ctx.ValidatorState)
 		}
@@ -1512,7 +1512,7 @@ func (m *manager) Shutdown() {
 	m.chainsQueue.Close()
 	close(m.chainCreatorShutdownCh)
 	m.chainCreatorExited.Wait()
-	m.Router.Shutdown(context.TODO())
+	m.ManagerConfig.Router.Shutdown(context.TODO())
 }
 
 // LookupVM returns the ID of the VM associated with an alias
@@ -1531,7 +1531,7 @@ func (m *manager) notifyRegistrants(name string, ctx *snow.ConsensusContext, vm 
 // getChainConfig returns value of a entry by looking at ID key and alias key
 // it first searches ID key, then falls back to it's corresponding primary alias
 func (m *manager) getChainConfig(id ids.ID) (ChainConfig, error) {
-	if val, ok := m.ChainConfigs[id.String()]; ok {
+	if val, ok := m.ManagerConfig.ChainConfigs[id.String()]; ok {
 		return val, nil
 	}
 	aliases, err := m.Aliases(id)
@@ -1539,7 +1539,7 @@ func (m *manager) getChainConfig(id ids.ID) (ChainConfig, error) {
 		return ChainConfig{}, err
 	}
 	for _, alias := range aliases {
-		if val, ok := m.ChainConfigs[alias]; ok {
+		if val, ok := m.ManagerConfig.ChainConfigs[alias]; ok {
 			return val, nil
 		}
 	}

@@ -232,7 +232,7 @@ func waitForProposerWindow(vm *VM, chainTip snowman.Block, pchainHeight uint64) 
 			return err
 		}
 
-		vm.Set(parentTimestamp.Add(delay))
+		vm.Clock.Set(parentTimestamp.Add(delay))
 		if delay < proposer.MaxLookAheadWindow {
 			return nil
 		}
@@ -288,7 +288,7 @@ func TestBuildBlockIsIdempotent(t *testing.T) {
 	}
 
 	// Mock the clock time to make sure that block timestamps will be equal
-	proVM.Set(time.Now())
+	proVM.Clock.Set(time.Now())
 
 	builtBlk1, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
@@ -922,7 +922,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 		}
 	}
 
-	proVM.Set(statelessBlock.Timestamp())
+	proVM.Clock.Set(statelessBlock.Timestamp())
 
 	parsedBlock, err := proVM.ParseBlock(context.Background(), statelessBlock.Bytes())
 	require.NoError(err)
@@ -941,7 +941,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 	require.ErrorIs(err, errProposerWindowNotStarted)
 
 	proVM.Set(statelessBlock.Timestamp().Add(proposer.MaxBuildDelay))
-	proVM.SetBuildBlockTime(time.Now())
+	proVM.Scheduler.SetBuildBlockTime(time.Now())
 
 	// The engine should have been notified to attempt to build a block now that
 	// the window has started again. This is to guarantee that the inner VM has
@@ -1183,7 +1183,7 @@ func TestInnerVMRollback(t *testing.T) {
 		}
 	}
 
-	proVM.Set(statelessBlock.Timestamp())
+	proVM.Clock.Set(statelessBlock.Timestamp())
 
 	lastAcceptedID, err := proVM.LastAccepted(context.Background())
 	require.NoError(err)
@@ -1292,7 +1292,7 @@ func TestBuildBlockDuringWindow(t *testing.T) {
 		}
 	}
 
-	proVM.Set(statelessBlock0.Timestamp())
+	proVM.Clock.Set(statelessBlock0.Timestamp())
 
 	statefulBlock0, err := proVM.ParseBlock(context.Background(), statelessBlock0.Bytes())
 	require.NoError(err)
@@ -2545,7 +2545,7 @@ func TestTimestampMetrics(t *testing.T) {
 
 	outerTime := time.Unix(314159, 0)
 	innerTime := time.Unix(142857, 0)
-	proVM.Set(outerTime)
+	proVM.Clock.Set(outerTime)
 	innerBlock.TimestampV = innerTime
 
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
@@ -2643,7 +2643,7 @@ func TestSelectChildPChainHeight(t *testing.T) {
 				require.NoError(proVM.Shutdown(context.Background()))
 			}()
 
-			proVM.Set(test.time)
+			proVM.Clock.Set(test.time)
 			proVM.ctx.NetworkID = test.networkID
 			proVM.ctx.SubnetID = test.subnetID
 

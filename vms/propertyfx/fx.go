@@ -75,10 +75,10 @@ func (fx *Fx) VerifyMintOperation(tx secp256k1fx.UnsignedTx, op *MintOperation, 
 	}
 
 	switch {
-	case !out.Equals(&op.MintOutput.OutputOwners):
+	case !out.OutputOwners.Equals(&op.MintOutput.OutputOwners):
 		return errWrongMintOutput
 	default:
-		return fx.VerifyCredentials(tx, &op.MintInput, &cred.Credential, &out.OutputOwners)
+		return fx.Fx.VerifyCredentials(tx, &op.MintInput, &cred.Credential, &out.OutputOwners)
 	}
 }
 

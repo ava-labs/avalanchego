@@ -115,11 +115,11 @@ func verifyAddValidatorTx(
 	startTime := tx.StartTime()
 	duration := tx.EndTime().Sub(startTime)
 	switch {
-	case tx.Wght < backend.Config.MinValidatorStake:
+	case tx.Validator.Wght < backend.Config.MinValidatorStake:
 		// Ensure validator is staking at least the minimum amount
 		return nil, ErrWeightTooSmall
 
-	case tx.Wght > backend.Config.MaxValidatorStake:
+	case tx.Validator.Wght > backend.Config.MaxValidatorStake:
 		// Ensure validator isn't staking too much
 		return nil, ErrWeightTooLarge
 
@@ -231,13 +231,13 @@ func verifyAddSubnetValidatorTx(
 		return err
 	}
 
-	_, err := GetValidator(chainState, tx.Subnet, tx.Validator.NodeID)
+	_, err := GetValidator(chainState, tx.SubnetValidator.Subnet, tx.Validator.NodeID)
 	if err == nil {
 		return fmt.Errorf(
 			"attempted to issue %w for %s on subnet %s",
 			ErrDuplicateValidator,
 			tx.Validator.NodeID,
-			tx.Subnet,
+			tx.SubnetValidator.Subnet,
 		)
 	}
 	if err != database.ErrNotFound {
@@ -252,7 +252,7 @@ func verifyAddSubnetValidatorTx(
 		return err
 	}
 
-	baseTxCreds, err := verifyPoASubnetAuthorization(backend.Fx, chainState, sTx, tx.Subnet, tx.SubnetAuth)
+	baseTxCreds, err := verifyPoASubnetAuthorization(backend.Fx, chainState, sTx, tx.SubnetValidator.Subnet, tx.SubnetAuth)
 	if err != nil {
 		return err
 	}
@@ -399,7 +399,7 @@ func verifyAddDelegatorTx(
 		// Ensure staking length is not too long
 		return nil, ErrStakeTooLong
 
-	case tx.Wght < backend.Config.MinDelegatorStake:
+	case tx.Validator.Wght < backend.Config.MinDelegatorStake:
 		// Ensure validator is staking at least the minimum amount
 		return nil, ErrWeightTooSmall
 	}
@@ -446,7 +446,7 @@ func verifyAddDelegatorTx(
 		chainState,
 		primaryNetworkValidator,
 		maximumWeight,
-		tx.Wght,
+		tx.Validator.Wght,
 		startTime,
 		endTime,
 	)
@@ -521,11 +521,11 @@ func verifyAddPermissionlessValidatorTx(
 
 	stakedAssetID := tx.StakeOuts[0].AssetID()
 	switch {
-	case tx.Wght < validatorRules.minValidatorStake:
+	case tx.Validator.Wght < validatorRules.minValidatorStake:
 		// Ensure validator is staking at least the minimum amount
 		return ErrWeightTooSmall
 
-	case tx.Wght > validatorRules.maxValidatorStake:
+	case tx.Validator.Wght > validatorRules.maxValidatorStake:
 		// Ensure validator isn't staking too much
 		return ErrWeightTooLarge
 
@@ -646,7 +646,7 @@ func verifyAddPermissionlessDelegatorTx(
 
 	stakedAssetID := tx.StakeOuts[0].AssetID()
 	switch {
-	case tx.Wght < delegatorRules.minDelegatorStake:
+	case tx.Validator.Wght < delegatorRules.minDelegatorStake:
 		// Ensure delegator is staking at least the minimum amount
 		return ErrWeightTooSmall
 
@@ -699,7 +699,7 @@ func verifyAddPermissionlessDelegatorTx(
 		chainState,
 		validator,
 		maximumWeight,
-		tx.Wght,
+		tx.Validator.Wght,
 		startTime,
 		endTime,
 	)

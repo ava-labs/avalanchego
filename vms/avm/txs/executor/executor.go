@@ -91,7 +91,7 @@ func (e *Executor) ImportTx(tx *txs.ImportTx) error {
 
 	utxoIDs := make([][]byte, len(tx.ImportedIns))
 	for i, in := range tx.ImportedIns {
-		utxoID := in.InputID()
+		utxoID := in.UTXOID.InputID()
 
 		e.Inputs.Add(utxoID)
 		utxoIDs[i] = utxoID[:]

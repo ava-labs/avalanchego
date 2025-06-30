@@ -632,13 +632,13 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	}
 
 	// Force a reload of the state from the database.
-	vm.Validators = validators.NewManager()
+	vm.Internal.Validators = validators.NewManager()
 	newState := statetest.New(t, statetest.Config{
 		DB:         vm.db,
-		Validators: vm.Validators,
-		Upgrades:   vm.UpgradeConfig,
+		Validators: vm.Internal.Validators,
+		Upgrades:   vm.Internal.UpgradeConfig,
 		Context:    vm.ctx,
-		Rewards:    reward.NewCalculator(vm.RewardConfig),
+		Rewards:    reward.NewCalculator(vm.Internal.RewardConfig),
 	})
 
 	// Verify that new validator is now in the current validator set.
@@ -924,13 +924,13 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	}
 
 	// Force a reload of the state from the database.
-	vm.Validators = validators.NewManager()
+	vm.Internal.Validators = validators.NewManager()
 	newState := statetest.New(t, statetest.Config{
 		DB:         vm.db,
-		Validators: vm.Validators,
-		Upgrades:   vm.UpgradeConfig,
+		Validators: vm.Internal.Validators,
+		Upgrades:   vm.Internal.UpgradeConfig,
 		Context:    vm.ctx,
-		Rewards:    reward.NewCalculator(vm.RewardConfig),
+		Rewards:    reward.NewCalculator(vm.Internal.RewardConfig),
 	})
 
 	// Verify that validators are in the current validator set with the correct
@@ -1562,7 +1562,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 
 	// move time ahead, terminating primary network validator
 	vm.clock.Set(primaryEndTime)
-	blk, err := vm.BuildBlock(context.Background()) // must be a proposal block rewarding the primary validator
+	blk, err := vm.Builder.BuildBlock(context.Background()) // must be a proposal block rewarding the primary validator
 	require.NoError(t, err)
 	require.NoError(t, blk.Verify(context.Background()))
 
@@ -1731,7 +1731,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 
 	// move time ahead, terminating primary network validator
 	vm.clock.Set(primaryEndTime1)
-	blk, err := vm.BuildBlock(context.Background()) // must be a proposal block rewarding the primary validator
+	blk, err := vm.Builder.BuildBlock(context.Background()) // must be a proposal block rewarding the primary validator
 	require.NoError(err)
 	require.NoError(blk.Verify(context.Background()))
 
@@ -1902,7 +1902,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 
 	// move time ahead, terminating primary network validator
 	vm.clock.Set(primaryEndTime1)
-	blk, err := vm.BuildBlock(context.Background()) // must be a proposal block rewarding the primary validator
+	blk, err := vm.Builder.BuildBlock(context.Background()) // must be a proposal block rewarding the primary validator
 	require.NoError(err)
 	require.NoError(blk.Verify(context.Background()))
 
@@ -2089,7 +2089,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 
 	// move time ahead, terminating primary network validator
 	vm.clock.Set(primaryEndTime1)
-	blk, err := vm.BuildBlock(context.Background()) // must be a proposal block rewarding the primary validator
+	blk, err := vm.Builder.BuildBlock(context.Background()) // must be a proposal block rewarding the primary validator
 	require.NoError(err)
 	require.NoError(blk.Verify(context.Background()))
 
@@ -2110,7 +2110,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 
 	// Generating the validator set should not error when re-introducing a
 	// subnet validator whose primary network validator was also removed.
-	_, err = vm.GetValidatorSet(context.Background(), subnetStartHeight, subnetID)
+	_, err = vm.State.GetValidatorSet(context.Background(), subnetStartHeight, subnetID)
 	require.NoError(err)
 }
 
@@ -2210,7 +2210,7 @@ func TestBanffStandardBlockWithNoChangesRemainsInvalid(t *testing.T) {
 }
 
 func buildAndAcceptStandardBlock(vm *VM) error {
-	blk, err := vm.BuildBlock(context.Background())
+	blk, err := vm.Builder.BuildBlock(context.Background())
 	if err != nil {
 		return err
 	}

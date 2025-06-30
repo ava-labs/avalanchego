@@ -32,7 +32,7 @@ func (mb *meterBlock) Verify(ctx context.Context) error {
 	end := mb.vm.clock.Time()
 	duration := float64(end.Sub(start))
 	if err != nil {
-		mb.vm.verifyErr.Observe(duration)
+		mb.vm.blockMetrics.verifyErr.Observe(duration)
 	} else {
 		mb.vm.verify.Observe(duration)
 	}
@@ -44,7 +44,7 @@ func (mb *meterBlock) Accept(ctx context.Context) error {
 	err := mb.Block.Accept(ctx)
 	end := mb.vm.clock.Time()
 	duration := float64(end.Sub(start))
-	mb.vm.accept.Observe(duration)
+	mb.vm.blockMetrics.accept.Observe(duration)
 	return err
 }
 
@@ -53,7 +53,7 @@ func (mb *meterBlock) Reject(ctx context.Context) error {
 	err := mb.Block.Reject(ctx)
 	end := mb.vm.clock.Time()
 	duration := float64(end.Sub(start))
-	mb.vm.reject.Observe(duration)
+	mb.vm.blockMetrics.reject.Observe(duration)
 	return err
 }
 
@@ -89,7 +89,7 @@ func (mb *meterBlock) ShouldVerifyWithContext(ctx context.Context) (bool, error)
 	shouldVerify, err := blkWithCtx.ShouldVerifyWithContext(ctx)
 	end := mb.vm.clock.Time()
 	duration := float64(end.Sub(start))
-	mb.vm.shouldVerifyWithContext.Observe(duration)
+	mb.vm.blockMetrics.shouldVerifyWithContext.Observe(duration)
 	return shouldVerify, err
 }
 
@@ -104,7 +104,7 @@ func (mb *meterBlock) VerifyWithContext(ctx context.Context, blockCtx *block.Con
 	end := mb.vm.clock.Time()
 	duration := float64(end.Sub(start))
 	if err != nil {
-		mb.vm.verifyWithContextErr.Observe(duration)
+		mb.vm.blockMetrics.verifyWithContextErr.Observe(duration)
 	} else {
 		mb.vm.verifyWithContext.Observe(duration)
 	}

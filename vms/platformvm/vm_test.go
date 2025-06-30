@@ -273,7 +273,7 @@ func TestGenesis(t *testing.T) {
 		genesisOut := utxo.Out.(*secp256k1fx.TransferOutput)
 		utxos, err := avax.GetAllUTXOs(
 			vm.state,
-			genesisOut.AddressesSet(),
+			genesisOut.OutputOwners.AddressesSet(),
 		)
 		require.NoError(err)
 		require.Len(utxos, 1)
@@ -282,7 +282,7 @@ func TestGenesis(t *testing.T) {
 		if out.Amt != genesisOut.Amt {
 			require.Equal(
 				[]ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
-				out.Addrs,
+				out.OutputOwners.Addrs,
 			)
 			require.Equal(genesisOut.Amt-createSubnetFee, out.Amt)
 		}
@@ -408,7 +408,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	require.ErrorIs(err, txexecutor.ErrTimestampNotBeforeStartTime)
 
 	txID := statelessBlk.Txs()[0].ID()
-	reason := vm.GetDropReason(txID)
+	reason := vm.Builder.GetDropReason(txID)
 	require.ErrorIs(reason, txexecutor.ErrTimestampNotBeforeStartTime)
 }
 
@@ -449,7 +449,7 @@ func TestAddValidatorReject(t *testing.T) {
 	require.NoError(vm.issueTxFromRPC(tx))
 	vm.ctx.Lock.Lock()
 
-	blk, err := vm.BuildBlock(context.Background())
+	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 
 	require.NoError(blk.Verify(context.Background()))
@@ -601,7 +601,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	require.NoError(vm.issueTxFromRPC(tx))
 	vm.ctx.Lock.Lock()
 
-	blk, err := vm.BuildBlock(context.Background())
+	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 
 	require.NoError(blk.Verify(context.Background()))
@@ -626,7 +626,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 	vm.clock.Set(genesistest.DefaultValidatorEndTime)
 
 	// Advance time and create proposal to reward a genesis validator
-	blk, err := vm.BuildBlock(context.Background())
+	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 	require.NoError(blk.Verify(context.Background()))
 
@@ -694,7 +694,7 @@ func TestRewardValidatorReject(t *testing.T) {
 	vm.clock.Set(genesistest.DefaultValidatorEndTime)
 
 	// Advance time and create proposal to reward a genesis validator
-	blk, err := vm.BuildBlock(context.Background())
+	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 	require.NoError(blk.Verify(context.Background()))
 
@@ -760,7 +760,7 @@ func TestUnneededBuildBlock(t *testing.T) {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
-	_, err := vm.BuildBlock(context.Background())
+	_, err := vm.Builder.BuildBlock(context.Background())
 	require.ErrorIs(err, blockbuilder.ErrNoPendingBlocks)
 }
 
@@ -1754,7 +1754,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	secondVM.clock.Set(genesistest.DefaultValidatorEndTime)
 
 	// evaluate a genesis validator for reward
-	blk, err := secondVM.BuildBlock(context.Background())
+	blk, err := secondVM.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 	require.NoError(blk.Verify(context.Background()))
 
@@ -1854,7 +1854,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	vm.clock.Set(genesistest.DefaultValidatorEndTime)
 
 	// evaluate a genesis validator for reward
-	blk, err := vm.BuildBlock(context.Background())
+	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 	require.NoError(blk.Verify(context.Background()))
 
@@ -2125,7 +2125,7 @@ func TestPruneMempool(t *testing.T) {
 
 	// [baseTx] should be in the mempool.
 	baseTxID := baseTx.ID()
-	_, ok := vm.Get(baseTxID)
+	_, ok := vm.Builder.Get(baseTxID)
 	require.True(ok)
 
 	// Create a tx that will be invalid after time advancement.
@@ -2170,9 +2170,9 @@ func TestPruneMempool(t *testing.T) {
 
 	// [addValidatorTx] and [baseTx] should be in the mempool.
 	addValidatorTxID := addValidatorTx.ID()
-	_, ok = vm.Get(addValidatorTxID)
+	_, ok = vm.Builder.Get(addValidatorTxID)
 	require.True(ok)
-	_, ok = vm.Get(baseTxID)
+	_, ok = vm.Builder.Get(baseTxID)
 	require.True(ok)
 
 	// Advance clock to [endTime], making [addValidatorTx] invalid.
@@ -2184,8 +2184,8 @@ func TestPruneMempool(t *testing.T) {
 
 	// [addValidatorTx] should be ejected from the mempool.
 	// [baseTx] should still be in the mempool.
-	_, ok = vm.Get(addValidatorTxID)
+	_, ok = vm.Builder.Get(addValidatorTxID)
 	require.False(ok)
-	_, ok = vm.Get(baseTxID)
+	_, ok = vm.Builder.Get(baseTxID)
 	require.True(ok)
 }

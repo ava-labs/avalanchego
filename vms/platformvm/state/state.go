@@ -1783,7 +1783,7 @@ func (s *state) loadCurrentValidators() error {
 
 		s.currentStakers.stakers.ReplaceOrInsert(staker)
 
-		s.LoadValidatorMetadata(staker.NodeID, staker.SubnetID, metadata)
+		s.validatorState.LoadValidatorMetadata(staker.NodeID, staker.SubnetID, metadata)
 	}
 
 	subnetValidatorIt := s.currentSubnetValidatorList.NewIterator()
@@ -1833,7 +1833,7 @@ func (s *state) loadCurrentValidators() error {
 
 		s.currentStakers.stakers.ReplaceOrInsert(staker)
 
-		s.LoadValidatorMetadata(staker.NodeID, staker.SubnetID, metadata)
+		s.validatorState.LoadValidatorMetadata(staker.NodeID, staker.SubnetID, metadata)
 	}
 
 	delegatorIt := s.currentDelegatorList.NewIterator()
@@ -2662,13 +2662,13 @@ func (s *state) writeCurrentStakers(codecVersion uint16) error {
 					return fmt.Errorf("failed to write current validator to list: %w", err)
 				}
 
-				s.LoadValidatorMetadata(nodeID, subnetID, metadata)
+				s.validatorState.LoadValidatorMetadata(nodeID, subnetID, metadata)
 			case deleted:
 				if err := validatorDB.Delete(validatorDiff.validator.TxID[:]); err != nil {
 					return fmt.Errorf("failed to delete current staker: %w", err)
 				}
 
-				s.DeleteValidatorMetadata(nodeID, subnetID)
+				s.validatorState.DeleteValidatorMetadata(nodeID, subnetID)
 			}
 
 			err := writeCurrentDelegatorDiff(

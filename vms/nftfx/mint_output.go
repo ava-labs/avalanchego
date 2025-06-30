@@ -23,7 +23,7 @@ type MintOutput struct {
 // into a JSON readable format
 // If OutputOwners cannot be serialized then this will return error
 func (out *MintOutput) MarshalJSON() ([]byte, error) {
-	result, err := out.Fields()
+	result, err := out.OutputOwners.Fields()
 	if err != nil {
 		return nil, err
 	}

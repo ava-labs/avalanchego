@@ -557,7 +557,7 @@ func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
 
 	// let just one node respond and all others timeout
 	maxResponses := 1
-	reachedSeedersCount := syncer.SampleK
+	reachedSeedersCount := syncer.Config.SampleK
 	for reachedSeedersCount >= 0 {
 		beaconID, found := syncer.pendingSeeders.Peek()
 		require.True(found)

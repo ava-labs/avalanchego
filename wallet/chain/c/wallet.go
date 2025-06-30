@@ -166,7 +166,7 @@ func (w *wallet) IssueAtomicTx(
 	}
 
 	if ops.AssumeDecided() {
-		return w.AcceptAtomicTx(ctx, tx)
+		return w.Backend.AcceptAtomicTx(ctx, tx)
 	}
 
 	if err := awaitTxAccepted(w.avaxClient, ctx, txID, ops.PollFrequency()); err != nil {
@@ -185,7 +185,7 @@ func (w *wallet) IssueAtomicTx(
 		})
 	}
 
-	return w.AcceptAtomicTx(ctx, tx)
+	return w.Backend.AcceptAtomicTx(ctx, tx)
 }
 
 func (w *wallet) baseFee(options []common.Option) (*big.Int, error) {

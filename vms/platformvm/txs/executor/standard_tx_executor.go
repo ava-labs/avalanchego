@@ -302,7 +302,7 @@ func (e *standardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 	e.inputs = set.NewSet[ids.ID](len(tx.ImportedInputs))
 	utxoIDs := make([][]byte, len(tx.ImportedInputs))
 	for i, in := range tx.ImportedInputs {
-		utxoID := in.InputID()
+		utxoID := in.UTXOID.InputID()
 
 		e.inputs.Add(utxoID)
 		utxoIDs[i] = utxoID[:]

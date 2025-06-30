@@ -72,10 +72,10 @@ func (vm *vertexVM) ParseTx(ctx context.Context, b []byte) (snowstorm.Tx, error)
 	end := vm.clock.Time()
 	duration := float64(end.Sub(start))
 	if err != nil {
-		vm.parseErr.Observe(duration)
+		vm.vertexMetrics.parseErr.Observe(duration)
 		return nil, err
 	}
-	vm.parse.Observe(duration)
+	vm.vertexMetrics.parse.Observe(duration)
 	return &meterTx{
 		Tx: tx,
 		vm: vm,
@@ -94,9 +94,9 @@ func (mtx *meterTx) Verify(ctx context.Context) error {
 	end := mtx.vm.clock.Time()
 	duration := float64(end.Sub(start))
 	if err != nil {
-		mtx.vm.verifyErr.Observe(duration)
+		mtx.vm.vertexMetrics.verifyErr.Observe(duration)
 	} else {
-		mtx.vm.verify.Observe(duration)
+		mtx.vm.vertexMetrics.verify.Observe(duration)
 	}
 	return err
 }
@@ -105,7 +105,7 @@ func (mtx *meterTx) Accept(ctx context.Context) error {
 	start := mtx.vm.clock.Time()
 	err := mtx.Tx.Accept(ctx)
 	end := mtx.vm.clock.Time()
-	mtx.vm.accept.Observe(float64(end.Sub(start)))
+	mtx.vm.vertexMetrics.accept.Observe(float64(end.Sub(start)))
 	return err
 }
 
@@ -113,6 +113,6 @@ func (mtx *meterTx) Reject(ctx context.Context) error {
 	start := mtx.vm.clock.Time()
 	err := mtx.Tx.Reject(ctx)
 	end := mtx.vm.clock.Time()
-	mtx.vm.reject.Observe(float64(end.Sub(start)))
+	mtx.vm.vertexMetrics.reject.Observe(float64(end.Sub(start)))
 	return err
 }

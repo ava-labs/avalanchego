@@ -48,7 +48,7 @@ func TestGetBlock(t *testing.T) {
 	}
 	{
 		// Case: block is in memory
-		manager.blkIDToState[statelessBlk.ID()] = &blockState{
+		manager.backend.blkIDToState[statelessBlk.ID()] = &blockState{
 			statelessBlock: statelessBlk,
 		}
 		gotBlk, err := manager.GetBlock(statelessBlk.ID())

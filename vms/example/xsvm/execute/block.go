@@ -48,7 +48,7 @@ func Block(
 			Sender:       sender,
 			// TODO: populate fees
 		}
-		if err := currentTx.Visit(&txExecutor); err != nil {
+		if err := currentTx.Unsigned.Visit(&txExecutor); err != nil {
 			return err
 		}
 	}

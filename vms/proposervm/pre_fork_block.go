@@ -43,7 +43,7 @@ func (b *preForkBlock) acceptInnerBlk(ctx context.Context) error {
 }
 
 func (b *preForkBlock) Verify(ctx context.Context) error {
-	parent, err := b.vm.getPreForkBlock(ctx, b.Parent())
+	parent, err := b.vm.getPreForkBlock(ctx, b.Block.Parent())
 	if err != nil {
 		return err
 	}
@@ -149,7 +149,7 @@ func (b *preForkBlock) verifyPostForkChild(ctx context.Context, child *postForkB
 	}
 
 	// Verify the lack of signature on the node
-	if child.Proposer() != ids.EmptyNodeID {
+	if child.SignedBlock.Proposer() != ids.EmptyNodeID {
 		return errChildOfPreForkBlockHasProposer
 	}
 

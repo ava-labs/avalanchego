@@ -145,7 +145,7 @@ func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) e
 		defer config.Ctx.Lock.Unlock()
 
 		if err := bs.Timeout(); err != nil {
-			bs.Ctx.Log.Warn("Encountered error during bootstrapping: %w", zap.Error(err))
+			bs.Config.Ctx.Log.Warn("Encountered error during bootstrapping: %w", zap.Error(err))
 		}
 	}
 	bs.TimeoutRegistrar = common.NewTimeoutScheduler(timeout, config.BootstrapTracker.AllBootstrapped())
@@ -442,7 +442,7 @@ func (b *Bootstrapper) fetch(ctx context.Context, blkID ids.ID) error {
 	}
 	b.outstandingRequests.Put(request, blkID)
 	b.outstandingRequestTimes[request] = time.Now()
-	b.Sender.SendGetAncestors(ctx, nodeID, b.requestID, blkID) // request block and ancestors
+	b.Config.Sender.SendGetAncestors(ctx, nodeID, b.requestID, blkID) // request block and ancestors
 	return nil
 }
 
@@ -478,10 +478,10 @@ func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 		return b.fetch(ctx, wantedBlkID)
 	}
 
-	if lenBlks > b.AncestorsMaxContainersReceived {
-		blks = blks[:b.AncestorsMaxContainersReceived]
+	if lenBlks > b.Config.AncestorsMaxContainersReceived {
+		blks = blks[:b.Config.AncestorsMaxContainersReceived]
 		b.Ctx.Log.Debug("ignoring containers in Ancestors",
-			zap.Int("numContainers", lenBlks-b.AncestorsMaxContainersReceived),
+			zap.Int("numContainers", lenBlks-b.Config.AncestorsMaxContainersReceived),
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 		)
@@ -706,11 +706,11 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 	}
 
 	// Notify the subnet that this chain is synced
-	b.BootstrapTracker.Bootstrapped(b.Ctx.ChainID)
+	b.Config.BootstrapTracker.Bootstrapped(b.Ctx.ChainID)
 
 	// If the subnet hasn't finished bootstrapping, this chain should remain
 	// syncing.
-	if !b.BootstrapTracker.IsBootstrapped() {
+	if !b.Config.BootstrapTracker.IsBootstrapped() {
 		log("waiting for the remaining chains in this subnet to finish syncing")
 		// Restart bootstrapping after [bootstrappingDelay] to keep up to date
 		// on the latest tip.
@@ -739,7 +739,7 @@ func (b *Bootstrapper) Timeout() error {
 	}
 	b.awaitingTimeout = false
 
-	if !b.BootstrapTracker.IsBootstrapped() {
+	if !b.Config.BootstrapTracker.IsBootstrapped() {
 		return b.restartBootstrapping(context.TODO())
 	}
 	return b.onFinished(context.TODO(), b.requestID)

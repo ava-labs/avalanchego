@@ -403,7 +403,7 @@ func getSpendableAmount(
 	minIssuanceTime uint64,
 	avaxAssetID ids.ID,
 ) (uint64, []uint32, bool) {
-	if utxo.ID != avaxAssetID {
+	if utxo.Asset.ID != avaxAssetID {
 		// Only AVAX can be imported
 		return 0, nil, false
 	}

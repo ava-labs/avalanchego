@@ -258,7 +258,7 @@ func addSubnetValidator(t testing.TB, vm *VM, data *validatorInputData, subnetID
 				NodeID: data.nodeID,
 				Start:  uint64(data.startTime.Unix()),
 				End:    uint64(data.endTime.Unix()),
-				Wght:   vm.MinValidatorStake,
+				Wght:   vm.Internal.MinValidatorStake,
 			},
 			Subnet: subnetID,
 		},
@@ -291,7 +291,7 @@ func addPrimaryValidatorWithBLSKey(t testing.TB, vm *VM, data *validatorInputDat
 				NodeID: data.nodeID,
 				Start:  uint64(data.startTime.Unix()),
 				End:    uint64(data.endTime.Unix()),
-				Wght:   vm.MinValidatorStake,
+				Wght:   vm.Internal.MinValidatorStake,
 			},
 			Subnet: constants.PrimaryNetworkID,
 		},
@@ -317,7 +317,7 @@ func internalAddValidator(vm *VM, signedTx *txs.Tx) (*state.Staker, error) {
 		return nil, fmt.Errorf("could not add tx to mempool: %w", err)
 	}
 
-	blk, err := vm.BuildBlock(context.Background())
+	blk, err := vm.Builder.BuildBlock(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed building block: %w", err)
 	}
@@ -340,7 +340,7 @@ func terminateSubnetValidator(vm *VM, validator *state.Staker) error {
 	vm.clock.Set(currentTime)
 	vm.state.SetTimestamp(currentTime)
 
-	blk, err := vm.BuildBlock(context.Background())
+	blk, err := vm.Builder.BuildBlock(context.Background())
 	if err != nil {
 		return fmt.Errorf("failed building block: %w", err)
 	}
@@ -362,7 +362,7 @@ func terminatePrimaryValidator(vm *VM, validator *state.Staker) error {
 	vm.clock.Set(currentTime)
 	vm.state.SetTimestamp(currentTime)
 
-	blk, err := vm.BuildBlock(context.Background())
+	blk, err := vm.Builder.BuildBlock(context.Background())
 	if err != nil {
 		return fmt.Errorf("failed building block: %w", err)
 	}
@@ -688,7 +688,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		return nil, ids.Empty, err
 	}
 
-	blk, err := vm.BuildBlock(context.Background())
+	blk, err := vm.Builder.BuildBlock(context.Background())
 	if err != nil {
 		return nil, ids.Empty, err
 	}

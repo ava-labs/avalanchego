@@ -19,7 +19,7 @@ type TransferOperation struct {
 }
 
 func (op *TransferOperation) InitCtx(ctx *snow.Context) {
-	op.Output.InitCtx(ctx)
+	op.Output.OutputOwners.InitCtx(ctx)
 }
 
 func (op *TransferOperation) Cost() (uint64, error) {

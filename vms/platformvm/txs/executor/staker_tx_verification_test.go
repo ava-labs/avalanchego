@@ -204,7 +204,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			},
 			txF: func() *txs.AddPermissionlessValidatorTx {
 				tx := verifiedTx // Note that this copies [verifiedTx]
-				tx.Wght = unsignedTransformTx.MinValidatorStake - 1
+				tx.Validator.Wght = unsignedTransformTx.MinValidatorStake - 1
 				return &tx
 			},
 			expectedErr: ErrWeightTooSmall,
@@ -233,7 +233,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			},
 			txF: func() *txs.AddPermissionlessValidatorTx {
 				tx := verifiedTx // Note that this copies [verifiedTx]
-				tx.Wght = unsignedTransformTx.MaxValidatorStake + 1
+				tx.Validator.Wght = unsignedTransformTx.MaxValidatorStake + 1
 				return &tx
 			},
 			expectedErr: ErrWeightTooLarge,
@@ -262,7 +262,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			},
 			txF: func() *txs.AddPermissionlessValidatorTx {
 				tx := verifiedTx // Note that this copies [verifiedTx]
-				tx.Wght = unsignedTransformTx.MaxValidatorStake
+				tx.Validator.Wght = unsignedTransformTx.MaxValidatorStake
 				tx.DelegationShares = unsignedTransformTx.MinDelegationFee - 1
 				return &tx
 			},
@@ -292,11 +292,11 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			},
 			txF: func() *txs.AddPermissionlessValidatorTx {
 				tx := verifiedTx // Note that this copies [verifiedTx]
-				tx.Wght = unsignedTransformTx.MaxValidatorStake
+				tx.Validator.Wght = unsignedTransformTx.MaxValidatorStake
 				tx.DelegationShares = unsignedTransformTx.MinDelegationFee
 
 				// Note the duration is 1 less than the minimum
-				tx.End = tx.Start + uint64(unsignedTransformTx.MinStakeDuration) - 1
+				tx.Validator.End = tx.Validator.Start + uint64(unsignedTransformTx.MinStakeDuration) - 1
 				return &tx
 			},
 			expectedErr: ErrStakeTooShort,
@@ -325,11 +325,11 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			},
 			txF: func() *txs.AddPermissionlessValidatorTx {
 				tx := verifiedTx // Note that this copies [verifiedTx]
-				tx.Wght = unsignedTransformTx.MaxValidatorStake
+				tx.Validator.Wght = unsignedTransformTx.MaxValidatorStake
 				tx.DelegationShares = unsignedTransformTx.MinDelegationFee
 
 				// Note the duration is more than the maximum
-				tx.End = uint64(unsignedTransformTx.MaxStakeDuration) + 2
+				tx.Validator.End = uint64(unsignedTransformTx.MaxStakeDuration) + 2
 				return &tx
 			},
 			expectedErr: ErrStakeTooLong,

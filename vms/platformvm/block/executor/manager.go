@@ -203,5 +203,5 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 }
 
 func (m *manager) VerifyUniqueInputs(blkID ids.ID, inputs set.Set[ids.ID]) error {
-	return m.verifyUniqueInputs(blkID, inputs)
+	return m.backend.verifyUniqueInputs(blkID, inputs)
 }

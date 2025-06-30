@@ -17,7 +17,7 @@ func (vm *blockVM) StateSyncEnabled(ctx context.Context) (bool, error) {
 	start := vm.clock.Time()
 	enabled, err := vm.ssVM.StateSyncEnabled(ctx)
 	end := vm.clock.Time()
-	vm.stateSyncEnabled.Observe(float64(end.Sub(start)))
+	vm.blockMetrics.stateSyncEnabled.Observe(float64(end.Sub(start)))
 	return enabled, err
 }
 
@@ -29,7 +29,7 @@ func (vm *blockVM) GetOngoingSyncStateSummary(ctx context.Context) (block.StateS
 	start := vm.clock.Time()
 	summary, err := vm.ssVM.GetOngoingSyncStateSummary(ctx)
 	end := vm.clock.Time()
-	vm.getOngoingSyncStateSummary.Observe(float64(end.Sub(start)))
+	vm.blockMetrics.getOngoingSyncStateSummary.Observe(float64(end.Sub(start)))
 	return summary, err
 }
 
@@ -41,7 +41,7 @@ func (vm *blockVM) GetLastStateSummary(ctx context.Context) (block.StateSummary,
 	start := vm.clock.Time()
 	summary, err := vm.ssVM.GetLastStateSummary(ctx)
 	end := vm.clock.Time()
-	vm.getLastStateSummary.Observe(float64(end.Sub(start)))
+	vm.blockMetrics.getLastStateSummary.Observe(float64(end.Sub(start)))
 	return summary, err
 }
 
@@ -55,10 +55,10 @@ func (vm *blockVM) ParseStateSummary(ctx context.Context, summaryBytes []byte) (
 	end := vm.clock.Time()
 	duration := float64(end.Sub(start))
 	if err != nil {
-		vm.parseStateSummaryErr.Observe(duration)
+		vm.blockMetrics.parseStateSummaryErr.Observe(duration)
 		return nil, err
 	}
-	vm.parseStateSummary.Observe(duration)
+	vm.blockMetrics.parseStateSummary.Observe(duration)
 	return summary, nil
 }
 
@@ -72,9 +72,9 @@ func (vm *blockVM) GetStateSummary(ctx context.Context, height uint64) (block.St
 	end := vm.clock.Time()
 	duration := float64(end.Sub(start))
 	if err != nil {
-		vm.getStateSummaryErr.Observe(duration)
+		vm.blockMetrics.getStateSummaryErr.Observe(duration)
 		return nil, err
 	}
-	vm.getStateSummary.Observe(duration)
+	vm.blockMetrics.getStateSummary.Observe(duration)
 	return summary, nil
 }

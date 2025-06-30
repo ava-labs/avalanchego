@@ -233,7 +233,7 @@ func (b *builder) BuildBlockWithContext(
 	// If there are still transactions in the mempool, then we need to
 	// re-trigger block building.
 	defer func() {
-		if b.Len() == 0 {
+		if b.Mempool.Len() == 0 {
 			return
 		}
 

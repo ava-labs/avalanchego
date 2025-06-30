@@ -101,11 +101,11 @@ type gossipMempool struct {
 // transaction to push gossip as well.
 func (g *gossipMempool) Add(tx *txs.Tx) error {
 	txID := tx.ID()
-	if _, ok := g.Get(txID); ok {
+	if _, ok := g.Mempool.Get(txID); ok {
 		return fmt.Errorf("attempted to issue %w: %s ", mempool.ErrDuplicateTx, txID)
 	}
 
-	if reason := g.GetDropReason(txID); reason != nil {
+	if reason := g.Mempool.GetDropReason(txID); reason != nil {
 		// If the tx is being dropped - just ignore it
 		//
 		// TODO: Should we allow re-verification of the transaction even if it
@@ -115,7 +115,7 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 
 	// Verify the tx at the currently preferred state
 	if err := g.txVerifier.VerifyTx(tx); err != nil {
-		g.MarkDropped(txID, err)
+		g.Mempool.MarkDropped(txID, err)
 		return err
 	}
 
@@ -123,13 +123,13 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 }
 
 func (g *gossipMempool) Has(txID ids.ID) bool {
-	_, ok := g.Get(txID)
+	_, ok := g.Mempool.Get(txID)
 	return ok
 }
 
 func (g *gossipMempool) AddWithoutVerification(tx *txs.Tx) error {
 	if err := g.Mempool.Add(tx); err != nil {
-		g.MarkDropped(tx.ID(), err)
+		g.Mempool.MarkDropped(tx.ID(), err)
 		return err
 	}
 
@@ -137,7 +137,7 @@ func (g *gossipMempool) AddWithoutVerification(tx *txs.Tx) error {
 	defer g.lock.Unlock()
 
 	g.bloom.Add(tx)
-	reset, err := gossip.ResetBloomFilterIfNeeded(g.bloom, g.Len()*bloomChurnMultiplier)
+	reset, err := gossip.ResetBloomFilterIfNeeded(g.bloom, g.Mempool.Len()*bloomChurnMultiplier)
 	if err != nil {
 		return err
 	}
@@ -150,7 +150,7 @@ func (g *gossipMempool) AddWithoutVerification(tx *txs.Tx) error {
 		})
 	}
 
-	g.RequestBuildBlock()
+	g.Mempool.RequestBuildBlock()
 	return nil
 }
 

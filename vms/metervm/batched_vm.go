@@ -32,7 +32,7 @@ func (vm *blockVM) GetAncestors(
 		maxBlocksRetrivalTime,
 	)
 	end := vm.clock.Time()
-	vm.getAncestors.Observe(float64(end.Sub(start)))
+	vm.blockMetrics.getAncestors.Observe(float64(end.Sub(start)))
 	return ancestors, err
 }
 
@@ -44,7 +44,7 @@ func (vm *blockVM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snow
 	start := vm.clock.Time()
 	blocks, err := vm.batchedVM.BatchedParseBlock(ctx, blks)
 	end := vm.clock.Time()
-	vm.batchedParseBlock.Observe(float64(end.Sub(start)))
+	vm.blockMetrics.batchedParseBlock.Observe(float64(end.Sub(start)))
 
 	wrappedBlocks := make([]snowman.Block, len(blocks))
 	for i, block := range blocks {

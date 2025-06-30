@@ -59,10 +59,10 @@ func (tx *BaseTx) Outputs() []*avax.TransferableOutput {
 // sets the [ctx] to the given [vm.ctx] so that the addresses can be json
 // marshalled into human readable format
 func (tx *BaseTx) InitCtx(ctx *snow.Context) {
-	for _, in := range tx.Ins {
+	for _, in := range tx.BaseTx.Ins {
 		in.FxID = secp256k1fx.ID
 	}
-	for _, out := range tx.Outs {
+	for _, out := range tx.BaseTx.Outs {
 		out.FxID = secp256k1fx.ID
 		out.InitCtx(ctx)
 	}
@@ -76,7 +76,7 @@ func (tx *BaseTx) SyntacticVerify(ctx *snow.Context) error {
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
 	}
-	if err := tx.Verify(ctx); err != nil {
+	if err := tx.BaseTx.Verify(ctx); err != nil {
 		return fmt.Errorf("metadata failed verification: %w", err)
 	}
 	for _, out := range tx.Outs {

@@ -20,8 +20,8 @@ type MintOperation struct {
 }
 
 func (op *MintOperation) InitCtx(ctx *snow.Context) {
-	op.MintOutput.InitCtx(ctx)
-	op.OwnedOutput.InitCtx(ctx)
+	op.MintOutput.OutputOwners.InitCtx(ctx)
+	op.OwnedOutput.OutputOwners.InitCtx(ctx)
 }
 
 func (op *MintOperation) Cost() (uint64, error) {

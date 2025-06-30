@@ -57,7 +57,7 @@ type Tree struct {
 }
 
 func (t *Tree) Add(choice ids.ID) {
-	prefix := t.DecidedPrefix()
+	prefix := t.node.DecidedPrefix()
 	// Make sure that we haven't already decided against this new id
 	if ids.EqualSubset(0, prefix, t.Preference(), choice) {
 		t.node = t.node.Add(choice)
@@ -66,7 +66,7 @@ func (t *Tree) Add(choice ids.ID) {
 
 func (t *Tree) RecordPoll(votes bag.Bag[ids.ID]) bool {
 	// Get the assumed decided prefix of the root node.
-	decidedPrefix := t.DecidedPrefix()
+	decidedPrefix := t.node.DecidedPrefix()
 
 	// If any of the bits differ from the preference in this prefix, the vote is
 	// for a rejected operation. So, we filter out these invalid votes.

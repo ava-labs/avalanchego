@@ -20,10 +20,10 @@ func (vm *blockVM) BuildBlockWithContext(ctx context.Context, blockCtx *block.Co
 	end := vm.clock.Time()
 	duration := float64(end.Sub(start))
 	if err != nil {
-		vm.buildBlockWithContextErr.Observe(duration)
+		vm.blockMetrics.buildBlockWithContextErr.Observe(duration)
 		return nil, err
 	}
-	vm.buildBlockWithContext.Observe(duration)
+	vm.blockMetrics.buildBlockWithContext.Observe(duration)
 	return &meterBlock{
 		Block: blk,
 		vm:    vm,

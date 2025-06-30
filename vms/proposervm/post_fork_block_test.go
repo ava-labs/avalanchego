@@ -357,7 +357,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	{
 		// child block timestamp cannot be lower than parent timestamp
 		newTime := parentTimestamp.Add(-1 * time.Second)
-		proVM.Set(newTime)
+		proVM.Clock.Set(newTime)
 
 		childSlb, err := block.Build(
 			parentBlk.ID(),
@@ -381,7 +381,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	{
 		// block cannot arrive before its creator window starts
 		beforeWinStart := parentTimestamp.Add(blkWinDelay).Add(-1 * time.Second)
-		proVM.Set(beforeWinStart)
+		proVM.Clock.Set(beforeWinStart)
 
 		childSlb, err := block.Build(
 			parentBlk.ID(),
@@ -402,7 +402,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	{
 		// block can arrive at its creator window starts
 		atWindowStart := parentTimestamp.Add(blkWinDelay)
-		proVM.Set(atWindowStart)
+		proVM.Clock.Set(atWindowStart)
 
 		childSlb, err := block.Build(
 			parentBlk.ID(),
@@ -422,7 +422,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	{
 		// block can arrive after its creator window starts
 		afterWindowStart := parentTimestamp.Add(blkWinDelay).Add(5 * time.Second)
-		proVM.Set(afterWindowStart)
+		proVM.Clock.Set(afterWindowStart)
 
 		childSlb, err := block.Build(
 			parentBlk.ID(),
@@ -442,7 +442,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	{
 		// block can arrive within submission window
 		atSubWindowEnd := proVM.Time().Add(proposer.MaxVerifyDelay)
-		proVM.Set(atSubWindowEnd)
+		proVM.Clock.Set(atSubWindowEnd)
 
 		childSlb, err := block.BuildUnsigned(
 			parentBlk.ID(),

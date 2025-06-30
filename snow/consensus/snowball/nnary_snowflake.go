@@ -66,7 +66,7 @@ func (sf *nnarySnowflake) RecordPoll(count int, choice ids.ID) {
 	if choice != sf.Preference() {
 		clear(sf.confidence)
 	}
-	sf.RecordSuccessfulPoll(choice)
+	sf.nnarySlush.RecordSuccessfulPoll(choice)
 
 	for i, terminationCondition := range sf.terminationConditions {
 		// If I did not reach this alpha threshold, I did not

@@ -47,7 +47,7 @@ func (b *Block) Verify(context.Context) error {
 	}
 
 	// Currently we don't populate the blocks merkle root.
-	merkleRoot := b.MerkleRoot()
+	merkleRoot := b.Block.MerkleRoot()
 	if merkleRoot != ids.Empty {
 		return fmt.Errorf("%w: %s", ErrUnexpectedMerkleRoot, merkleRoot)
 	}

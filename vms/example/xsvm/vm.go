@@ -89,7 +89,7 @@ func (vm *VM) Initialize(
 		acp118Verifier{},
 		chainContext.WarpSigner,
 	)
-	if err := vm.AddHandler(p2p.SignatureRequestHandlerID, acp118Handler); err != nil {
+	if err := vm.Network.AddHandler(p2p.SignatureRequestHandlerID, acp118Handler); err != nil {
 		return err
 	}
 
