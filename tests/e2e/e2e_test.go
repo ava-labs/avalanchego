@@ -34,10 +34,7 @@ func TestE2E(t *testing.T) {
 var flagVars *e2e.FlagVars
 
 func init() {
-	flagVars = e2e.RegisterFlagsWithOptions(
-		e2e.WithDefaultOwner("avalanchego-e2e"),
-		e2e.WithDefaultNodeCount(tmpnet.DefaultNodeCount),
-	)
+	flagVars = e2e.RegisterFlagsWithOptions(e2e.WithDefaultOwner("avalanchego-e2e"))
 }
 
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {

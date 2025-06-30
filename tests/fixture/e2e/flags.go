@@ -131,12 +131,28 @@ type DefaultOptions struct {
 
 type DefaultOption func(*DefaultOptions)
 
-func NewDefaultOptions(options []DefaultOption) *DefaultOptions {
-	d := &DefaultOptions{}
-	for _, do := range options {
-		do(d)
+func NewDefaultOptions(ops []DefaultOption) *DefaultOptions {
+	o := &DefaultOptions{}
+	o.applyOptions(ops)
+	return o
+}
+
+func (d *DefaultOptions) applyOptions(ops []DefaultOption) {
+	for _, op := range ops {
+		op(d)
 	}
-	return d
+}
+
+func (d *DefaultOptions) Owner() string {
+	return d.owner
+}
+
+func (d *DefaultOptions) NodeCount() int {
+	if d.nodeCount == 0 {
+		return tmpnet.DefaultNodeCount
+	}
+
+	return d.nodeCount
 }
 
 func WithDefaultOwner(owner string) DefaultOption {
@@ -166,7 +182,10 @@ func RegisterFlagsWithOptions(ops ...DefaultOption) *FlagVars {
 	)
 
 	options := NewDefaultOptions(ops)
-	vars.startNetworkVars = flags.NewStartNetworkFlagVars(options.owner, options.nodeCount)
+	vars.startNetworkVars = flags.NewStartNetworkFlagVars(
+		options.Owner(),
+		options.NodeCount(),
+	)
 
 	vars.collectorVars = flags.NewCollectorFlagVars()
 
