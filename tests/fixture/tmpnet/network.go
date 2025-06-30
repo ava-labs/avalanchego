@@ -545,7 +545,7 @@ func (n *Network) Restart(ctx context.Context) error {
 	if err := restartNodes(ctx, nodes); err != nil {
 		return err
 	}
-	return WaitForHealthyNodes(ctx, n.log, n.Nodes)
+	return WaitForHealthyNodes(ctx, n.log, nodes)
 }
 
 // Waits for the provided nodes to become healthy.

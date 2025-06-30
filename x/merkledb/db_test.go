@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"maps"
 	"math/rand"
 	"slices"
 	"strconv"
@@ -797,11 +798,11 @@ func TestMerkleDBClear(t *testing.T) {
 	require.Zero(db.intermediateNodeDB.writeBuffer.currentSize)
 
 	// Assert history has only the clearing change.
-	require.Len(db.history.lastChanges, 1)
-	change, ok := db.history.lastChanges[emptyRootID]
+	require.Len(db.history.lastChangesInsertNumber, 1)
+	change, ok := db.history.getRootChanges(emptyRootID)
 	require.True(ok)
 	require.Empty(change.nodes)
-	require.Empty(change.values)
+	require.Empty(change.keyChanges)
 }
 
 func FuzzMerkleDBEmptyRandomizedActions(f *testing.F) {
@@ -999,9 +1000,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 				continue
 			}
 
-			for key, value := range uncommittedKeyValues {
-				values[key] = value
-			}
+			maps.Copy(values, uncommittedKeyValues)
 			clear(uncommittedKeyValues)
 
 			for key := range uncommittedDeletes {

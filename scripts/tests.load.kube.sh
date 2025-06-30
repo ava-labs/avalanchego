@@ -14,6 +14,23 @@ fi
 
 # Build AvalancheGo image
 AVALANCHEGO_IMAGE="localhost:5001/avalanchego"
-DOCKER_IMAGE="$AVALANCHEGO_IMAGE" FORCE_TAG_LATEST=1 ./scripts/build_image.sh 
+if [[ -n "${SKIP_BUILD_IMAGE:-}" ]]; then
+  echo "Skipping build of avalanchego image due to SKIP_BUILD_IMAGE=${SKIP_BUILD_IMAGE}"
+else
+  DOCKER_IMAGE="$AVALANCHEGO_IMAGE" FORCE_TAG_LATEST=1 ./scripts/build_image.sh
+fi
 
-go run ./tests/load/c/main --runtime=kube --kube-image="$AVALANCHEGO_IMAGE" "$@"
+# Determine kubeconfig context to use
+KUBECONFIG_CONTEXT=""
+
+# Check if --kubeconfig-context is already provided in arguments
+if [[ "$*" =~ --kubeconfig-context ]]; then
+    # User provided a context, use it as-is
+    echo "Using provided kubeconfig context from arguments"
+else
+    # Default to the RBAC context
+    KUBECONFIG_CONTEXT="--kubeconfig-context=kind-kind-tmpnet"
+    echo "Defaulting to limited-permission context 'kind-kind-tmpnet' to test RBAC Role permissions"
+fi
+
+go run ./tests/load/c/main --runtime=kube --kube-image="$AVALANCHEGO_IMAGE" "$KUBECONFIG_CONTEXT" "$@"
