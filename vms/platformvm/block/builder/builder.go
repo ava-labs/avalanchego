@@ -94,6 +94,9 @@ func (b *builder) WaitForEvent(ctx context.Context) (common.Message, error) {
 
 		duration, err := b.durationToSleep()
 		if err != nil {
+			b.txExecutorBackend.Ctx.Log.Error("block builder failed to calculate next staker change time",
+				zap.Error(err),
+			)
 			return 0, err
 		}
 		if duration <= 0 {
@@ -113,7 +116,9 @@ func (b *builder) WaitForEvent(ctx context.Context) (common.Message, error) {
 		case errors.Is(err, context.DeadlineExceeded):
 			continue // Recheck the staker change time before returning
 		default:
-			return 0, err // Unexpected error
+			// Error could have been due to the parent context being cancelled
+			// or another unexpected error.
+			return 0, err
 		}
 	}
 }
