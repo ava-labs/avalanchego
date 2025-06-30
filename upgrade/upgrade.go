@@ -76,7 +76,7 @@ var (
 		DurangoTime:                  InitiallyActiveTime,
 		EtnaTime:                     InitiallyActiveTime,
 		FortunaTime:                  InitiallyActiveTime,
-		GraniteTime:                  UnscheduledActivationTime,
+		GraniteTime:                  InitiallyActiveTime,
 		GraniteEpochDuration:         30,
 	}
 
