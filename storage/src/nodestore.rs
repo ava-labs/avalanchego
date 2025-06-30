@@ -1318,35 +1318,85 @@ impl NodeStore<Arc<ImmutableProposal>, FileBacked> {
     #[fastrace::trace(short_name = true)]
     #[cfg(feature = "io-uring")]
     pub fn flush_nodes(&self) -> Result<(), FileIoError> {
+        use std::pin::Pin;
+
+        #[derive(Clone, Debug)]
+        struct PinnedBufferEntry {
+            pinned_buffer: Pin<Box<[u8]>>,
+            offset: Option<u64>,
+        }
+
+        /// Helper function to handle completion queue entries and check for errors
+        fn handle_completion_queue(
+            storage: &FileBacked,
+            completion_queue: io_uring::cqueue::CompletionQueue<'_>,
+            saved_pinned_buffers: &mut [PinnedBufferEntry],
+        ) -> Result<(), FileIoError> {
+            for entry in completion_queue {
+                let item = entry.user_data() as usize;
+                let pbe = saved_pinned_buffers
+                    .get_mut(item)
+                    .expect("should be an index into the array");
+
+                if entry.result()
+                    != pbe
+                        .pinned_buffer
+                        .len()
+                        .try_into()
+                        .expect("buffer should be small enough")
+                {
+                    let error = if entry.result() >= 0 {
+                        std::io::Error::other("Partial write")
+                    } else {
+                        std::io::Error::from_raw_os_error(0 - entry.result())
+                    };
+                    return Err(storage.file_io_error(
+                        error,
+                        pbe.offset.expect("offset should be Some"),
+                        Some("write failure".to_string()),
+                    ));
+                }
+                pbe.offset = None;
+            }
+            Ok(())
+        }
+
         const RINGSIZE: usize = FileBacked::RINGSIZE as usize;
 
         let flush_start = Instant::now();
 
         let mut ring = self.storage.ring.lock().expect("poisoned lock");
-        let mut saved_pinned_buffers = vec![(false, std::pin::Pin::new(Box::default())); RINGSIZE];
+        let mut saved_pinned_buffers = vec![
+            PinnedBufferEntry {
+                pinned_buffer: Pin::new(Box::new([0; 0])),
+                offset: None,
+            };
+            RINGSIZE
+        ];
         for (&addr, &(area_size_index, ref node)) in &self.kind.new {
             let mut serialized = Vec::with_capacity(100); // TODO: better size? we can guess branches are larger
             node.as_bytes(area_size_index, &mut serialized);
             let mut serialized = serialized.into_boxed_slice();
             loop {
                 // Find the first available write buffer, enumerate to get the position for marking it completed
-                if let Some((pos, (busy, found))) = saved_pinned_buffers
+                if let Some((pos, pbe)) = saved_pinned_buffers
                     .iter_mut()
                     .enumerate()
-                    .find(|(_, (busy, _))| !*busy)
+                    .find(|(_, pbe)| pbe.offset.is_none())
                 {
-                    *found = std::pin::Pin::new(std::mem::take(&mut serialized));
+                    pbe.pinned_buffer = std::pin::Pin::new(std::mem::take(&mut serialized));
+                    pbe.offset = Some(addr.get());
+
                     let submission_queue_entry = self
                         .storage
-                        .make_op(found)
+                        .make_op(&pbe.pinned_buffer)
                         .offset(addr.get())
                         .build()
                         .user_data(pos as u64);
 
-                    *busy = true;
                     // SAFETY: the submission_queue_entry's found buffer must not move or go out of scope
-                    // until the operation has been completed. This is ensured by marking the slot busy,
-                    // and not marking it !busy until the kernel has said it's done below.
+                    // until the operation has been completed. This is ensured by having a Some(offset)
+                    // and not marking it None until the kernel has said it's done below.
                     #[expect(unsafe_code)]
                     while unsafe { ring.submission().push(&submission_queue_entry) }.is_err() {
                         ring.submitter().squeue_wait().map_err(|e| {
@@ -1370,33 +1420,29 @@ impl NodeStore<Arc<ImmutableProposal>, FileBacked> {
                 })?;
                 let completion_queue = ring.completion();
                 trace!("competion queue length: {}", completion_queue.len());
-                for entry in completion_queue {
-                    let item = entry.user_data() as usize;
-                    saved_pinned_buffers
-                        .get_mut(item)
-                        .expect("should be an index into the array")
-                        .0 = false;
-                }
+                handle_completion_queue(
+                    &self.storage,
+                    completion_queue,
+                    &mut saved_pinned_buffers,
+                )?;
             }
         }
         let pending = saved_pinned_buffers
             .iter()
-            .filter(|(busy, _)| *busy)
+            .filter(|pbe| pbe.offset.is_some())
             .count();
         ring.submit_and_wait(pending).map_err(|e| {
             self.storage
                 .file_io_error(e, 0, Some("io-uring final submit_and_wait".to_string()))
         })?;
 
-        for entry in ring.completion() {
-            let item = entry.user_data() as usize;
-            saved_pinned_buffers
-                .get_mut(item)
-                .expect("should be an index into the array")
-                .0 = false;
-        }
+        handle_completion_queue(&self.storage, ring.completion(), &mut saved_pinned_buffers)?;
 
-        debug_assert_eq!(saved_pinned_buffers.iter().find(|(busy, _)| *busy), None);
+        debug_assert!(
+            !saved_pinned_buffers.iter().any(|pbe| pbe.offset.is_some()),
+            "Found entry with offset still set: {:?}",
+            saved_pinned_buffers.iter().find(|pbe| pbe.offset.is_some())
+        );
 
         self.storage
             .write_cached_nodes(self.kind.new.iter().map(|(addr, (_, node))| (addr, node)))?;
