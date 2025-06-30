@@ -25,10 +25,10 @@ path = "src/main.rs"
 [dependencies]
 firewood = { version = "0.0.7", path = "../firewood" }
 firewood-storage = { version = "0.0.7", path = "../storage" }
-clap = { version = "4.5.0", features = ["cargo", "derive"] }
-env_logger = "0.11.2"
+clap = { workspace = true, features = ["cargo"] }
+env_logger = { workspace = true }
 log = "0.4.20"
-tokio = { version = "1.36.0", features = ["full"] }
+tokio = { workspace = true, features = ["full"] }
 futures-util = "0.3.30"
 hex = "0.4.3"
 csv = "1.3.1"
@@ -39,7 +39,7 @@ anyhow = "1.0.79"
 assert_cmd = "2.0.13"
 predicates = "3.1.0"
 serial_test = "3.0.0"
-rand = "0.9.1"
+rand = { workspace = true }
 
 [lints]
 workspace = true

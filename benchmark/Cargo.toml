@@ -19,18 +19,18 @@ path = "src/main.rs"
 [dependencies]
 firewood = { version = "0.0.7", path = "../firewood" }
 hex = "0.4.3"
-clap = { version = "4.5.0", features = ['derive', 'string'] }
-sha2 = "0.10.8"
-metrics = "0.24.2"
-metrics-util = "0.20.0"
+clap = { workspace = true, features = ['string'] }
+sha2 = { workspace = true }
+metrics = { workspace = true }
+metrics-util = { workspace = true }
 metrics-exporter-prometheus = "0.17.2"
-tokio = { version = "1.36.0", features = ["rt", "sync", "macros", "rt-multi-thread"] }
+tokio = { workspace = true, features = ["rt", "sync", "macros", "rt-multi-thread"] }
 rand = "0.9.0"
 rand_distr = "0.5.0"
 pretty-duration = "0.1.1"
-env_logger = "0.11.5"
+env_logger = { workspace = true }
 log = "0.4.20"
-fastrace = { version = "0.7.4", features = ["enable"] }
+fastrace = { workspace = true, features = ["enable"] }
 fastrace-opentelemetry = { version = "0.12.0" }
 opentelemetry-otlp = { version = "0.30.0", features = ["grpc-tonic"] }
 opentelemetry = "0.30.0"
