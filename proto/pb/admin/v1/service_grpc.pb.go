@@ -49,8 +49,8 @@ type AdminServiceClient interface {
 	AliasChain(ctx context.Context, in *AliasChainArgs, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetChainAliases(ctx context.Context, in *GetChainAliasesArgs, opts ...grpc.CallOption) (*GetChainAliasesReply, error)
 	Stacktrace(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	SetLoggerLevel(ctx context.Context, in *SetLoggerLevelArgs, opts ...grpc.CallOption) (*LoggerLevelReply, error)
-	GetLoggerLevel(ctx context.Context, in *GetLoggerLevelArgs, opts ...grpc.CallOption) (*LoggerLevelReply, error)
+	SetLoggerLevel(ctx context.Context, in *SetLoggerLevelArgs, opts ...grpc.CallOption) (*SetLoggerLevelReply, error)
+	GetLoggerLevel(ctx context.Context, in *GetLoggerLevelArgs, opts ...grpc.CallOption) (*GetLoggerLevelReply, error)
 	GetConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetConfigReply, error)
 	LoadVMs(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*LoadVMsReply, error)
 	DbGet(ctx context.Context, in *DBGetArgs, opts ...grpc.CallOption) (*DBGetReply, error)
@@ -144,9 +144,9 @@ func (c *adminServiceClient) Stacktrace(ctx context.Context, in *emptypb.Empty, 
 	return out, nil
 }
 
-func (c *adminServiceClient) SetLoggerLevel(ctx context.Context, in *SetLoggerLevelArgs, opts ...grpc.CallOption) (*LoggerLevelReply, error) {
+func (c *adminServiceClient) SetLoggerLevel(ctx context.Context, in *SetLoggerLevelArgs, opts ...grpc.CallOption) (*SetLoggerLevelReply, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(LoggerLevelReply)
+	out := new(SetLoggerLevelReply)
 	err := c.cc.Invoke(ctx, AdminService_SetLoggerLevel_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -154,9 +154,9 @@ func (c *adminServiceClient) SetLoggerLevel(ctx context.Context, in *SetLoggerLe
 	return out, nil
 }
 
-func (c *adminServiceClient) GetLoggerLevel(ctx context.Context, in *GetLoggerLevelArgs, opts ...grpc.CallOption) (*LoggerLevelReply, error) {
+func (c *adminServiceClient) GetLoggerLevel(ctx context.Context, in *GetLoggerLevelArgs, opts ...grpc.CallOption) (*GetLoggerLevelReply, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(LoggerLevelReply)
+	out := new(GetLoggerLevelReply)
 	err := c.cc.Invoke(ctx, AdminService_GetLoggerLevel_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -208,8 +208,8 @@ type AdminServiceServer interface {
 	AliasChain(context.Context, *AliasChainArgs) (*emptypb.Empty, error)
 	GetChainAliases(context.Context, *GetChainAliasesArgs) (*GetChainAliasesReply, error)
 	Stacktrace(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
-	SetLoggerLevel(context.Context, *SetLoggerLevelArgs) (*LoggerLevelReply, error)
-	GetLoggerLevel(context.Context, *GetLoggerLevelArgs) (*LoggerLevelReply, error)
+	SetLoggerLevel(context.Context, *SetLoggerLevelArgs) (*SetLoggerLevelReply, error)
+	GetLoggerLevel(context.Context, *GetLoggerLevelArgs) (*GetLoggerLevelReply, error)
 	GetConfig(context.Context, *emptypb.Empty) (*GetConfigReply, error)
 	LoadVMs(context.Context, *emptypb.Empty) (*LoadVMsReply, error)
 	DbGet(context.Context, *DBGetArgs) (*DBGetReply, error)
@@ -247,10 +247,10 @@ func (UnimplementedAdminServiceServer) GetChainAliases(context.Context, *GetChai
 func (UnimplementedAdminServiceServer) Stacktrace(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Stacktrace not implemented")
 }
-func (UnimplementedAdminServiceServer) SetLoggerLevel(context.Context, *SetLoggerLevelArgs) (*LoggerLevelReply, error) {
+func (UnimplementedAdminServiceServer) SetLoggerLevel(context.Context, *SetLoggerLevelArgs) (*SetLoggerLevelReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetLoggerLevel not implemented")
 }
-func (UnimplementedAdminServiceServer) GetLoggerLevel(context.Context, *GetLoggerLevelArgs) (*LoggerLevelReply, error) {
+func (UnimplementedAdminServiceServer) GetLoggerLevel(context.Context, *GetLoggerLevelArgs) (*GetLoggerLevelReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetLoggerLevel not implemented")
 }
 func (UnimplementedAdminServiceServer) GetConfig(context.Context, *emptypb.Empty) (*GetConfigReply, error) {

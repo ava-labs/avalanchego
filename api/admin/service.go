@@ -392,8 +392,8 @@ type DBGetReply struct {
 	ErrorCode rpcdbpb.Error `json:"errorCode"`
 }
 
-//nolint:stylecheck // renaming this method to DBGet would change the API method from "dbGet" to "dBGet"
-func (a *Admin) DbGet(_ *http.Request, args *DBGetArgs, reply *DBGetReply) error {
+// DBGet returns the value of a database entry
+func (a *Admin) DBGet(_ *http.Request, args *DBGetArgs, reply *DBGetReply) error {
 	a.Log.Debug("API called",
 		zap.String("service", "admin"),
 		zap.String("method", "dbGet"),

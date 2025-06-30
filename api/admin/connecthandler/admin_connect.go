@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	adminv1 "github.com/ava-labs/avalanchego/proto/pb/admin/v1"
+	adminv1connect "github.com/ava-labs/avalanchego/proto/pb/admin/v1/adminv1connect"
 )
 
 // NewConnectAdminService returns a ConnectRPC-compatible AdminServiceHandler
@@ -30,6 +31,9 @@ func NewConnectAdminService(admin *admin.Admin) *ConnectAdminService {
 type ConnectAdminService struct {
 	*admin.Admin
 }
+
+// Compile-time check: ensure ConnectAdminService implements AdminServiceHandler
+var _ adminv1connect.AdminServiceHandler = (*ConnectAdminService)(nil)
 
 // StartCPUProfiler starts a CPU profile writing to the specified file
 func (s *ConnectAdminService) StartCPUProfiler(
@@ -145,7 +149,7 @@ func (s *ConnectAdminService) Stacktrace(
 func (s *ConnectAdminService) SetLoggerLevel(
 	_ context.Context,
 	req *connect.Request[adminv1.SetLoggerLevelArgs],
-) (*connect.Response[adminv1.LoggerLevelReply], error) {
+) (*connect.Response[adminv1.SetLoggerLevelReply], error) {
 	// Convert the request to the format used by the JSON-RPC API
 	jsonArgs := &admin.SetLoggerLevelArgs{
 		LoggerName: req.Msg.LoggerName,
@@ -173,14 +177,14 @@ func (s *ConnectAdminService) SetLoggerLevel(
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
-	return connect.NewResponse(convertLoggerLevelReply(jsonReply)), nil
+	return connect.NewResponse(convertSetLoggerLevelReply(jsonReply)), nil
 }
 
 // GetLoggerLevel returns the log level and display level of all loggers
 func (s *ConnectAdminService) GetLoggerLevel(
 	_ context.Context,
 	req *connect.Request[adminv1.GetLoggerLevelArgs],
-) (*connect.Response[adminv1.LoggerLevelReply], error) {
+) (*connect.Response[adminv1.GetLoggerLevelReply], error) {
 	jsonArgs := &admin.GetLoggerLevelArgs{
 		LoggerName: req.Msg.LoggerName,
 	}
@@ -190,7 +194,7 @@ func (s *ConnectAdminService) GetLoggerLevel(
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
-	return connect.NewResponse(convertLoggerLevelReply(jsonReply)), nil
+	return connect.NewResponse(convertGetLoggerLevelReply(jsonReply)), nil
 }
 
 // GetConfig returns the config that the node was started with
@@ -247,8 +251,8 @@ func (s *ConnectAdminService) LoadVMs(
 	return connect.NewResponse(reply), nil
 }
 
-// DbGet returns the value of a database entry
-func (s *ConnectAdminService) DbGet(
+// DBGet returns the value of a database entry
+func (s *ConnectAdminService) DBGet(
 	_ context.Context,
 	req *connect.Request[adminv1.DBGetArgs],
 ) (*connect.Response[adminv1.DBGetReply], error) {
@@ -257,8 +261,7 @@ func (s *ConnectAdminService) DbGet(
 	}
 
 	var jsonReply admin.DBGetReply
-	if err := s.Admin.DbGet(nil, jsonArgs, &jsonReply); err != nil {
-		// Check if it's a known error type that should be converted to ErrorCode
+	if err := s.Admin.DBGet(nil, jsonArgs, &jsonReply); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
@@ -271,7 +274,7 @@ func (s *ConnectAdminService) DbGet(
 }
 
 // Helper function to convert LoggerLevelReply to protobuf format
-func convertLoggerLevelReply(jsonReply admin.LoggerLevelReply) *adminv1.LoggerLevelReply {
+func convertSetLoggerLevelReply(jsonReply admin.LoggerLevelReply) *adminv1.SetLoggerLevelReply {
 	protoLoggerLevels := make(map[string]*adminv1.LogAndDisplayLevels)
 
 	for name, levels := range jsonReply.LoggerLevels {
@@ -281,7 +284,22 @@ func convertLoggerLevelReply(jsonReply admin.LoggerLevelReply) *adminv1.LoggerLe
 		}
 	}
 
-	return &adminv1.LoggerLevelReply{
+	return &adminv1.SetLoggerLevelReply{
+		LoggerLevels: protoLoggerLevels,
+	}
+}
+
+func convertGetLoggerLevelReply(jsonReply admin.LoggerLevelReply) *adminv1.GetLoggerLevelReply {
+	protoLoggerLevels := make(map[string]*adminv1.LogAndDisplayLevels)
+
+	for name, levels := range jsonReply.LoggerLevels {
+		protoLoggerLevels[name] = &adminv1.LogAndDisplayLevels{
+			LogLevel:     levels.LogLevel.String(),
+			DisplayLevel: levels.DisplayLevel.String(),
+		}
+	}
+
+	return &adminv1.GetLoggerLevelReply{
 		LoggerLevels: protoLoggerLevels,
 	}
 }

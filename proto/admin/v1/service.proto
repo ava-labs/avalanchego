@@ -15,11 +15,11 @@ service AdminService {
   rpc AliasChain(AliasChainArgs) returns (google.protobuf.Empty);
   rpc GetChainAliases(GetChainAliasesArgs) returns (GetChainAliasesReply);
   rpc Stacktrace(google.protobuf.Empty) returns (google.protobuf.Empty);
-  rpc SetLoggerLevel(SetLoggerLevelArgs) returns (LoggerLevelReply);
-  rpc GetLoggerLevel(GetLoggerLevelArgs) returns (LoggerLevelReply);
+  rpc SetLoggerLevel(SetLoggerLevelArgs) returns (SetLoggerLevelReply);
+  rpc GetLoggerLevel(GetLoggerLevelArgs) returns (GetLoggerLevelReply);
   rpc GetConfig(google.protobuf.Empty) returns (GetConfigReply);
   rpc LoadVMs(google.protobuf.Empty) returns (LoadVMsReply);
-  rpc DbGet(DBGetArgs) returns (DBGetReply);
+  rpc DBGet(DBGetArgs) returns (DBGetReply);
 }
 
 
@@ -43,8 +43,8 @@ message GetChainAliasesReply {
 
 message SetLoggerLevelArgs {
   string logger_name = 1;
-  string log_level = 2;        // nullable in Go, use empty string for unset
-  string display_level = 3;    // nullable in Go, use empty string for unset
+  string log_level = 2;        // use empty string for unset
+  string display_level = 3;    // use empty string for unset
 }
 
 message GetLoggerLevelArgs {
@@ -56,12 +56,16 @@ message LogAndDisplayLevels {
   string display_level = 2;
 }
 
-message LoggerLevelReply {
+message SetLoggerLevelReply {
+  map<string, LogAndDisplayLevels> logger_levels = 1;
+}
+
+message GetLoggerLevelReply {
   map<string, LogAndDisplayLevels> logger_levels = 1;
 }
 
 message GetConfigReply {
-  string config_json = 1; // NodeConfig is interface{} in Go, so use JSON string
+  string config_json = 1; // NodeConfig is interface{}, so use JSON string
 }
 
 message LoadVMsReply {
@@ -81,7 +85,7 @@ enum ErrorCode {
   ERROR_CODE_UNSPECIFIED = 0;
   ERROR_CODE_NOT_FOUND = 1;
   ERROR_CODE_DATABASE_ERROR = 2;
-  // Add more as needed
+  // Add more if needed
 }
 
 message DBGetReply {

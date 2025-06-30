@@ -11,6 +11,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/ava-labs/avalanchego/api/health"
+
 	healthv1 "github.com/ava-labs/avalanchego/proto/pb/health/v1"
 )
 
@@ -28,8 +29,8 @@ type ConnectHealthService struct {
 
 func (s *ConnectHealthService) Readiness(
 	_ context.Context,
-	req *connect.Request[healthv1.APIArgs],
-) (*connect.Response[healthv1.APIReply], error) {
+	req *connect.Request[healthv1.ReadinessArgs],
+) (*connect.Response[healthv1.ReadinessReply], error) {
 	// The health.Health interface has different methods than the service.
 	// We need to use the methods of the Health interface.
 	checks, healthy := s.Service.Readiness(req.Msg.Tags...)
@@ -40,7 +41,7 @@ func (s *ConnectHealthService) Readiness(
 		checksProto[name] = convertResult(check)
 	}
 
-	out := &healthv1.APIReply{
+	out := &healthv1.ReadinessReply{
 		Checks:  checksProto,
 		Healthy: healthy,
 	}
@@ -50,8 +51,8 @@ func (s *ConnectHealthService) Readiness(
 
 func (s *ConnectHealthService) Health(
 	_ context.Context,
-	req *connect.Request[healthv1.APIArgs],
-) (*connect.Response[healthv1.APIReply], error) {
+	req *connect.Request[healthv1.HealthArgs],
+) (*connect.Response[healthv1.HealthReply], error) {
 	// The health.Health interface has different methods than the service.
 	// We need to use the methods of the Health interface.
 	checks, healthy := s.Service.Health(req.Msg.Tags...)
@@ -62,7 +63,7 @@ func (s *ConnectHealthService) Health(
 		checksProto[name] = convertResult(check)
 	}
 
-	out := &healthv1.APIReply{
+	out := &healthv1.HealthReply{
 		Checks:  checksProto,
 		Healthy: healthy,
 	}
@@ -72,8 +73,8 @@ func (s *ConnectHealthService) Health(
 
 func (s *ConnectHealthService) Liveness(
 	_ context.Context,
-	req *connect.Request[healthv1.APIArgs],
-) (*connect.Response[healthv1.APIReply], error) {
+	req *connect.Request[healthv1.LivenessArgs],
+) (*connect.Response[healthv1.LivenessReply], error) {
 	// The health.Health interface has different methods than the service.
 	// We need to use the methods of the Health interface.
 	checks, healthy := s.Service.Liveness(req.Msg.Tags...)
@@ -84,7 +85,7 @@ func (s *ConnectHealthService) Liveness(
 		checksProto[name] = convertResult(check)
 	}
 
-	out := &healthv1.APIReply{
+	out := &healthv1.LivenessReply{
 		Checks:  checksProto,
 		Healthy: healthy,
 	}

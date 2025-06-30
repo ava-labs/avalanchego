@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/ava-labs/avalanchego/proto/pb/admin/v1/adminv1connect"
 	"io"
 	"io/fs"
 	"net"
@@ -29,11 +28,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/admin"
-	adminconnect "github.com/ava-labs/avalanchego/api/admin/connecthandler"
 	"github.com/ava-labs/avalanchego/api/health"
-	healthconnect "github.com/ava-labs/avalanchego/api/health/connecthandler"
 	"github.com/ava-labs/avalanchego/api/info"
-	infoconnect "github.com/ava-labs/avalanchego/api/info/connecthandler"
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
@@ -52,6 +48,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
+	"github.com/ava-labs/avalanchego/proto/pb/admin/v1/adminv1connect"
 	"github.com/ava-labs/avalanchego/proto/pb/health/v1/healthv1connect"
 	"github.com/ava-labs/avalanchego/proto/pb/info/v1/infov1connect"
 	"github.com/ava-labs/avalanchego/snow"
@@ -85,11 +82,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
-	coreth "github.com/ava-labs/coreth/plugin/evm"
-
+	adminconnect "github.com/ava-labs/avalanchego/api/admin/connecthandler"
+	healthconnect "github.com/ava-labs/avalanchego/api/health/connecthandler"
+	infoconnect "github.com/ava-labs/avalanchego/api/info/connecthandler"
 	databasefactory "github.com/ava-labs/avalanchego/database/factory"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
+	coreth "github.com/ava-labs/coreth/plugin/evm"
 )
 
 const (
@@ -1570,20 +1569,6 @@ func (n *Node) initHealthAPI() error {
 		"health/liveness",
 		"health",
 	)
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//// Mount HealthService ConnectRPC handler into its mux
-	//muxHealth := http.NewServeMux()
-	//healthPattern, healthConnHandler := healthv1connect.NewHealthServiceHandler(
-	//	healthhandler.NewConnectHealthService(n.health),
-	//)
-	//muxHealth.Handle(healthPattern, healthConnHandler)
-
-	//n.APIServer.AddHeaderRoute("health", muxHealth)
-
-	//return nil
 }
 
 // Give chains aliases as specified by the genesis information

@@ -27,7 +27,7 @@ type ErrorCode int32
 const (
 	ErrorCode_ERROR_CODE_UNSPECIFIED    ErrorCode = 0
 	ErrorCode_ERROR_CODE_NOT_FOUND      ErrorCode = 1
-	ErrorCode_ERROR_CODE_DATABASE_ERROR ErrorCode = 2 // Add more as needed
+	ErrorCode_ERROR_CODE_DATABASE_ERROR ErrorCode = 2 // Add more if needed
 )
 
 // Enum value maps for ErrorCode.
@@ -266,8 +266,8 @@ func (x *GetChainAliasesReply) GetAliases() []string {
 type SetLoggerLevelArgs struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	LoggerName    string                 `protobuf:"bytes,1,opt,name=logger_name,json=loggerName,proto3" json:"logger_name,omitempty"`
-	LogLevel      string                 `protobuf:"bytes,2,opt,name=log_level,json=logLevel,proto3" json:"log_level,omitempty"`             // nullable in Go, use empty string for unset
-	DisplayLevel  string                 `protobuf:"bytes,3,opt,name=display_level,json=displayLevel,proto3" json:"display_level,omitempty"` // nullable in Go, use empty string for unset
+	LogLevel      string                 `protobuf:"bytes,2,opt,name=log_level,json=logLevel,proto3" json:"log_level,omitempty"`             // use empty string for unset
+	DisplayLevel  string                 `protobuf:"bytes,3,opt,name=display_level,json=displayLevel,proto3" json:"display_level,omitempty"` // use empty string for unset
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -419,27 +419,27 @@ func (x *LogAndDisplayLevels) GetDisplayLevel() string {
 	return ""
 }
 
-type LoggerLevelReply struct {
+type SetLoggerLevelReply struct {
 	state         protoimpl.MessageState          `protogen:"open.v1"`
 	LoggerLevels  map[string]*LogAndDisplayLevels `protobuf:"bytes,1,rep,name=logger_levels,json=loggerLevels,proto3" json:"logger_levels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *LoggerLevelReply) Reset() {
-	*x = LoggerLevelReply{}
+func (x *SetLoggerLevelReply) Reset() {
+	*x = SetLoggerLevelReply{}
 	mi := &file_admin_v1_service_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *LoggerLevelReply) String() string {
+func (x *SetLoggerLevelReply) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*LoggerLevelReply) ProtoMessage() {}
+func (*SetLoggerLevelReply) ProtoMessage() {}
 
-func (x *LoggerLevelReply) ProtoReflect() protoreflect.Message {
+func (x *SetLoggerLevelReply) ProtoReflect() protoreflect.Message {
 	mi := &file_admin_v1_service_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -451,12 +451,56 @@ func (x *LoggerLevelReply) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use LoggerLevelReply.ProtoReflect.Descriptor instead.
-func (*LoggerLevelReply) Descriptor() ([]byte, []int) {
+// Deprecated: Use SetLoggerLevelReply.ProtoReflect.Descriptor instead.
+func (*SetLoggerLevelReply) Descriptor() ([]byte, []int) {
 	return file_admin_v1_service_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *LoggerLevelReply) GetLoggerLevels() map[string]*LogAndDisplayLevels {
+func (x *SetLoggerLevelReply) GetLoggerLevels() map[string]*LogAndDisplayLevels {
+	if x != nil {
+		return x.LoggerLevels
+	}
+	return nil
+}
+
+type GetLoggerLevelReply struct {
+	state         protoimpl.MessageState          `protogen:"open.v1"`
+	LoggerLevels  map[string]*LogAndDisplayLevels `protobuf:"bytes,1,rep,name=logger_levels,json=loggerLevels,proto3" json:"logger_levels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetLoggerLevelReply) Reset() {
+	*x = GetLoggerLevelReply{}
+	mi := &file_admin_v1_service_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetLoggerLevelReply) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetLoggerLevelReply) ProtoMessage() {}
+
+func (x *GetLoggerLevelReply) ProtoReflect() protoreflect.Message {
+	mi := &file_admin_v1_service_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetLoggerLevelReply.ProtoReflect.Descriptor instead.
+func (*GetLoggerLevelReply) Descriptor() ([]byte, []int) {
+	return file_admin_v1_service_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *GetLoggerLevelReply) GetLoggerLevels() map[string]*LogAndDisplayLevels {
 	if x != nil {
 		return x.LoggerLevels
 	}
@@ -465,14 +509,14 @@ func (x *LoggerLevelReply) GetLoggerLevels() map[string]*LogAndDisplayLevels {
 
 type GetConfigReply struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	ConfigJson    string                 `protobuf:"bytes,1,opt,name=config_json,json=configJson,proto3" json:"config_json,omitempty"` // NodeConfig is interface{} in Go, so use JSON string
+	ConfigJson    string                 `protobuf:"bytes,1,opt,name=config_json,json=configJson,proto3" json:"config_json,omitempty"` // NodeConfig is interface{}, so use JSON string
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetConfigReply) Reset() {
 	*x = GetConfigReply{}
-	mi := &file_admin_v1_service_proto_msgTypes[8]
+	mi := &file_admin_v1_service_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -484,7 +528,7 @@ func (x *GetConfigReply) String() string {
 func (*GetConfigReply) ProtoMessage() {}
 
 func (x *GetConfigReply) ProtoReflect() protoreflect.Message {
-	mi := &file_admin_v1_service_proto_msgTypes[8]
+	mi := &file_admin_v1_service_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -497,7 +541,7 @@ func (x *GetConfigReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetConfigReply.ProtoReflect.Descriptor instead.
 func (*GetConfigReply) Descriptor() ([]byte, []int) {
-	return file_admin_v1_service_proto_rawDescGZIP(), []int{8}
+	return file_admin_v1_service_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *GetConfigReply) GetConfigJson() string {
@@ -517,7 +561,7 @@ type LoadVMsReply struct {
 
 func (x *LoadVMsReply) Reset() {
 	*x = LoadVMsReply{}
-	mi := &file_admin_v1_service_proto_msgTypes[9]
+	mi := &file_admin_v1_service_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -529,7 +573,7 @@ func (x *LoadVMsReply) String() string {
 func (*LoadVMsReply) ProtoMessage() {}
 
 func (x *LoadVMsReply) ProtoReflect() protoreflect.Message {
-	mi := &file_admin_v1_service_proto_msgTypes[9]
+	mi := &file_admin_v1_service_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -542,7 +586,7 @@ func (x *LoadVMsReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoadVMsReply.ProtoReflect.Descriptor instead.
 func (*LoadVMsReply) Descriptor() ([]byte, []int) {
-	return file_admin_v1_service_proto_rawDescGZIP(), []int{9}
+	return file_admin_v1_service_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *LoadVMsReply) GetNewVms() map[string]*VMAliases {
@@ -568,7 +612,7 @@ type VMAliases struct {
 
 func (x *VMAliases) Reset() {
 	*x = VMAliases{}
-	mi := &file_admin_v1_service_proto_msgTypes[10]
+	mi := &file_admin_v1_service_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -580,7 +624,7 @@ func (x *VMAliases) String() string {
 func (*VMAliases) ProtoMessage() {}
 
 func (x *VMAliases) ProtoReflect() protoreflect.Message {
-	mi := &file_admin_v1_service_proto_msgTypes[10]
+	mi := &file_admin_v1_service_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -593,7 +637,7 @@ func (x *VMAliases) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VMAliases.ProtoReflect.Descriptor instead.
 func (*VMAliases) Descriptor() ([]byte, []int) {
-	return file_admin_v1_service_proto_rawDescGZIP(), []int{10}
+	return file_admin_v1_service_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *VMAliases) GetAliases() []string {
@@ -612,7 +656,7 @@ type DBGetArgs struct {
 
 func (x *DBGetArgs) Reset() {
 	*x = DBGetArgs{}
-	mi := &file_admin_v1_service_proto_msgTypes[11]
+	mi := &file_admin_v1_service_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -624,7 +668,7 @@ func (x *DBGetArgs) String() string {
 func (*DBGetArgs) ProtoMessage() {}
 
 func (x *DBGetArgs) ProtoReflect() protoreflect.Message {
-	mi := &file_admin_v1_service_proto_msgTypes[11]
+	mi := &file_admin_v1_service_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -637,7 +681,7 @@ func (x *DBGetArgs) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DBGetArgs.ProtoReflect.Descriptor instead.
 func (*DBGetArgs) Descriptor() ([]byte, []int) {
-	return file_admin_v1_service_proto_rawDescGZIP(), []int{11}
+	return file_admin_v1_service_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *DBGetArgs) GetKey() string {
@@ -657,7 +701,7 @@ type DBGetReply struct {
 
 func (x *DBGetReply) Reset() {
 	*x = DBGetReply{}
-	mi := &file_admin_v1_service_proto_msgTypes[12]
+	mi := &file_admin_v1_service_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -669,7 +713,7 @@ func (x *DBGetReply) String() string {
 func (*DBGetReply) ProtoMessage() {}
 
 func (x *DBGetReply) ProtoReflect() protoreflect.Message {
-	mi := &file_admin_v1_service_proto_msgTypes[12]
+	mi := &file_admin_v1_service_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -682,7 +726,7 @@ func (x *DBGetReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DBGetReply.ProtoReflect.Descriptor instead.
 func (*DBGetReply) Descriptor() ([]byte, []int) {
-	return file_admin_v1_service_proto_rawDescGZIP(), []int{12}
+	return file_admin_v1_service_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *DBGetReply) GetValue() string {
@@ -724,9 +768,14 @@ const file_admin_v1_service_proto_rawDesc = "" +
 	"loggerName\"W\n" +
 	"\x13LogAndDisplayLevels\x12\x1b\n" +
 	"\tlog_level\x18\x01 \x01(\tR\blogLevel\x12#\n" +
-	"\rdisplay_level\x18\x02 \x01(\tR\fdisplayLevel\"\xc5\x01\n" +
-	"\x10LoggerLevelReply\x12Q\n" +
-	"\rlogger_levels\x18\x01 \x03(\v2,.admin.v1.LoggerLevelReply.LoggerLevelsEntryR\floggerLevels\x1a^\n" +
+	"\rdisplay_level\x18\x02 \x01(\tR\fdisplayLevel\"\xcb\x01\n" +
+	"\x13SetLoggerLevelReply\x12T\n" +
+	"\rlogger_levels\x18\x01 \x03(\v2/.admin.v1.SetLoggerLevelReply.LoggerLevelsEntryR\floggerLevels\x1a^\n" +
+	"\x11LoggerLevelsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x123\n" +
+	"\x05value\x18\x02 \x01(\v2\x1d.admin.v1.LogAndDisplayLevelsR\x05value:\x028\x01\"\xcb\x01\n" +
+	"\x13GetLoggerLevelReply\x12T\n" +
+	"\rlogger_levels\x18\x01 \x03(\v2/.admin.v1.GetLoggerLevelReply.LoggerLevelsEntryR\floggerLevels\x1a^\n" +
 	"\x11LoggerLevelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x123\n" +
 	"\x05value\x18\x02 \x01(\v2\x1d.admin.v1.LogAndDisplayLevelsR\x05value:\x028\x01\"1\n" +
@@ -755,7 +804,7 @@ const file_admin_v1_service_proto_rawDesc = "" +
 	"\tErrorCode\x12\x1a\n" +
 	"\x16ERROR_CODE_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14ERROR_CODE_NOT_FOUND\x10\x01\x12\x1d\n" +
-	"\x19ERROR_CODE_DATABASE_ERROR\x10\x022\xe1\x06\n" +
+	"\x19ERROR_CODE_DATABASE_ERROR\x10\x022\xe7\x06\n" +
 	"\fAdminService\x12B\n" +
 	"\x10StartCPUProfiler\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.Empty\x12A\n" +
 	"\x0fStopCPUProfiler\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.Empty\x12?\n" +
@@ -766,9 +815,9 @@ const file_admin_v1_service_proto_rawDesc = "" +
 	"AliasChain\x12\x18.admin.v1.AliasChainArgs\x1a\x16.google.protobuf.Empty\x12P\n" +
 	"\x0fGetChainAliases\x12\x1d.admin.v1.GetChainAliasesArgs\x1a\x1e.admin.v1.GetChainAliasesReply\x12<\n" +
 	"\n" +
-	"Stacktrace\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.Empty\x12J\n" +
-	"\x0eSetLoggerLevel\x12\x1c.admin.v1.SetLoggerLevelArgs\x1a\x1a.admin.v1.LoggerLevelReply\x12J\n" +
-	"\x0eGetLoggerLevel\x12\x1c.admin.v1.GetLoggerLevelArgs\x1a\x1a.admin.v1.LoggerLevelReply\x12=\n" +
+	"Stacktrace\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.Empty\x12M\n" +
+	"\x0eSetLoggerLevel\x12\x1c.admin.v1.SetLoggerLevelArgs\x1a\x1d.admin.v1.SetLoggerLevelReply\x12M\n" +
+	"\x0eGetLoggerLevel\x12\x1c.admin.v1.GetLoggerLevelArgs\x1a\x1d.admin.v1.GetLoggerLevelReply\x12=\n" +
 	"\tGetConfig\x12\x16.google.protobuf.Empty\x1a\x18.admin.v1.GetConfigReply\x129\n" +
 	"\aLoadVMs\x12\x16.google.protobuf.Empty\x1a\x16.admin.v1.LoadVMsReply\x122\n" +
 	"\x05DbGet\x12\x13.admin.v1.DBGetArgs\x1a\x14.admin.v1.DBGetReplyB;Z9github.com/ava-labs/avalanchego/proto/pb/admin/v1;adminv1b\x06proto3"
@@ -786,7 +835,7 @@ func file_admin_v1_service_proto_rawDescGZIP() []byte {
 }
 
 var file_admin_v1_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_admin_v1_service_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_admin_v1_service_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_admin_v1_service_proto_goTypes = []any{
 	(ErrorCode)(0),               // 0: admin.v1.ErrorCode
 	(*AliasArgs)(nil),            // 1: admin.v1.AliasArgs
@@ -796,55 +845,59 @@ var file_admin_v1_service_proto_goTypes = []any{
 	(*SetLoggerLevelArgs)(nil),   // 5: admin.v1.SetLoggerLevelArgs
 	(*GetLoggerLevelArgs)(nil),   // 6: admin.v1.GetLoggerLevelArgs
 	(*LogAndDisplayLevels)(nil),  // 7: admin.v1.LogAndDisplayLevels
-	(*LoggerLevelReply)(nil),     // 8: admin.v1.LoggerLevelReply
-	(*GetConfigReply)(nil),       // 9: admin.v1.GetConfigReply
-	(*LoadVMsReply)(nil),         // 10: admin.v1.LoadVMsReply
-	(*VMAliases)(nil),            // 11: admin.v1.VMAliases
-	(*DBGetArgs)(nil),            // 12: admin.v1.DBGetArgs
-	(*DBGetReply)(nil),           // 13: admin.v1.DBGetReply
-	nil,                          // 14: admin.v1.LoggerLevelReply.LoggerLevelsEntry
-	nil,                          // 15: admin.v1.LoadVMsReply.NewVmsEntry
-	nil,                          // 16: admin.v1.LoadVMsReply.FailedVmsEntry
-	(*emptypb.Empty)(nil),        // 17: google.protobuf.Empty
+	(*SetLoggerLevelReply)(nil),  // 8: admin.v1.SetLoggerLevelReply
+	(*GetLoggerLevelReply)(nil),  // 9: admin.v1.GetLoggerLevelReply
+	(*GetConfigReply)(nil),       // 10: admin.v1.GetConfigReply
+	(*LoadVMsReply)(nil),         // 11: admin.v1.LoadVMsReply
+	(*VMAliases)(nil),            // 12: admin.v1.VMAliases
+	(*DBGetArgs)(nil),            // 13: admin.v1.DBGetArgs
+	(*DBGetReply)(nil),           // 14: admin.v1.DBGetReply
+	nil,                          // 15: admin.v1.SetLoggerLevelReply.LoggerLevelsEntry
+	nil,                          // 16: admin.v1.GetLoggerLevelReply.LoggerLevelsEntry
+	nil,                          // 17: admin.v1.LoadVMsReply.NewVmsEntry
+	nil,                          // 18: admin.v1.LoadVMsReply.FailedVmsEntry
+	(*emptypb.Empty)(nil),        // 19: google.protobuf.Empty
 }
 var file_admin_v1_service_proto_depIdxs = []int32{
-	14, // 0: admin.v1.LoggerLevelReply.logger_levels:type_name -> admin.v1.LoggerLevelReply.LoggerLevelsEntry
-	15, // 1: admin.v1.LoadVMsReply.new_vms:type_name -> admin.v1.LoadVMsReply.NewVmsEntry
-	16, // 2: admin.v1.LoadVMsReply.failed_vms:type_name -> admin.v1.LoadVMsReply.FailedVmsEntry
-	0,  // 3: admin.v1.DBGetReply.error_code:type_name -> admin.v1.ErrorCode
-	7,  // 4: admin.v1.LoggerLevelReply.LoggerLevelsEntry.value:type_name -> admin.v1.LogAndDisplayLevels
-	11, // 5: admin.v1.LoadVMsReply.NewVmsEntry.value:type_name -> admin.v1.VMAliases
-	17, // 6: admin.v1.AdminService.StartCPUProfiler:input_type -> google.protobuf.Empty
-	17, // 7: admin.v1.AdminService.StopCPUProfiler:input_type -> google.protobuf.Empty
-	17, // 8: admin.v1.AdminService.MemoryProfile:input_type -> google.protobuf.Empty
-	17, // 9: admin.v1.AdminService.LockProfile:input_type -> google.protobuf.Empty
-	1,  // 10: admin.v1.AdminService.Alias:input_type -> admin.v1.AliasArgs
-	2,  // 11: admin.v1.AdminService.AliasChain:input_type -> admin.v1.AliasChainArgs
-	3,  // 12: admin.v1.AdminService.GetChainAliases:input_type -> admin.v1.GetChainAliasesArgs
-	17, // 13: admin.v1.AdminService.Stacktrace:input_type -> google.protobuf.Empty
-	5,  // 14: admin.v1.AdminService.SetLoggerLevel:input_type -> admin.v1.SetLoggerLevelArgs
-	6,  // 15: admin.v1.AdminService.GetLoggerLevel:input_type -> admin.v1.GetLoggerLevelArgs
-	17, // 16: admin.v1.AdminService.GetConfig:input_type -> google.protobuf.Empty
-	17, // 17: admin.v1.AdminService.LoadVMs:input_type -> google.protobuf.Empty
-	12, // 18: admin.v1.AdminService.DbGet:input_type -> admin.v1.DBGetArgs
-	17, // 19: admin.v1.AdminService.StartCPUProfiler:output_type -> google.protobuf.Empty
-	17, // 20: admin.v1.AdminService.StopCPUProfiler:output_type -> google.protobuf.Empty
-	17, // 21: admin.v1.AdminService.MemoryProfile:output_type -> google.protobuf.Empty
-	17, // 22: admin.v1.AdminService.LockProfile:output_type -> google.protobuf.Empty
-	17, // 23: admin.v1.AdminService.Alias:output_type -> google.protobuf.Empty
-	17, // 24: admin.v1.AdminService.AliasChain:output_type -> google.protobuf.Empty
-	4,  // 25: admin.v1.AdminService.GetChainAliases:output_type -> admin.v1.GetChainAliasesReply
-	17, // 26: admin.v1.AdminService.Stacktrace:output_type -> google.protobuf.Empty
-	8,  // 27: admin.v1.AdminService.SetLoggerLevel:output_type -> admin.v1.LoggerLevelReply
-	8,  // 28: admin.v1.AdminService.GetLoggerLevel:output_type -> admin.v1.LoggerLevelReply
-	9,  // 29: admin.v1.AdminService.GetConfig:output_type -> admin.v1.GetConfigReply
-	10, // 30: admin.v1.AdminService.LoadVMs:output_type -> admin.v1.LoadVMsReply
-	13, // 31: admin.v1.AdminService.DbGet:output_type -> admin.v1.DBGetReply
-	19, // [19:32] is the sub-list for method output_type
-	6,  // [6:19] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	15, // 0: admin.v1.SetLoggerLevelReply.logger_levels:type_name -> admin.v1.SetLoggerLevelReply.LoggerLevelsEntry
+	16, // 1: admin.v1.GetLoggerLevelReply.logger_levels:type_name -> admin.v1.GetLoggerLevelReply.LoggerLevelsEntry
+	17, // 2: admin.v1.LoadVMsReply.new_vms:type_name -> admin.v1.LoadVMsReply.NewVmsEntry
+	18, // 3: admin.v1.LoadVMsReply.failed_vms:type_name -> admin.v1.LoadVMsReply.FailedVmsEntry
+	0,  // 4: admin.v1.DBGetReply.error_code:type_name -> admin.v1.ErrorCode
+	7,  // 5: admin.v1.SetLoggerLevelReply.LoggerLevelsEntry.value:type_name -> admin.v1.LogAndDisplayLevels
+	7,  // 6: admin.v1.GetLoggerLevelReply.LoggerLevelsEntry.value:type_name -> admin.v1.LogAndDisplayLevels
+	12, // 7: admin.v1.LoadVMsReply.NewVmsEntry.value:type_name -> admin.v1.VMAliases
+	19, // 8: admin.v1.AdminService.StartCPUProfiler:input_type -> google.protobuf.Empty
+	19, // 9: admin.v1.AdminService.StopCPUProfiler:input_type -> google.protobuf.Empty
+	19, // 10: admin.v1.AdminService.MemoryProfile:input_type -> google.protobuf.Empty
+	19, // 11: admin.v1.AdminService.LockProfile:input_type -> google.protobuf.Empty
+	1,  // 12: admin.v1.AdminService.Alias:input_type -> admin.v1.AliasArgs
+	2,  // 13: admin.v1.AdminService.AliasChain:input_type -> admin.v1.AliasChainArgs
+	3,  // 14: admin.v1.AdminService.GetChainAliases:input_type -> admin.v1.GetChainAliasesArgs
+	19, // 15: admin.v1.AdminService.Stacktrace:input_type -> google.protobuf.Empty
+	5,  // 16: admin.v1.AdminService.SetLoggerLevel:input_type -> admin.v1.SetLoggerLevelArgs
+	6,  // 17: admin.v1.AdminService.GetLoggerLevel:input_type -> admin.v1.GetLoggerLevelArgs
+	19, // 18: admin.v1.AdminService.GetConfig:input_type -> google.protobuf.Empty
+	19, // 19: admin.v1.AdminService.LoadVMs:input_type -> google.protobuf.Empty
+	13, // 20: admin.v1.AdminService.DbGet:input_type -> admin.v1.DBGetArgs
+	19, // 21: admin.v1.AdminService.StartCPUProfiler:output_type -> google.protobuf.Empty
+	19, // 22: admin.v1.AdminService.StopCPUProfiler:output_type -> google.protobuf.Empty
+	19, // 23: admin.v1.AdminService.MemoryProfile:output_type -> google.protobuf.Empty
+	19, // 24: admin.v1.AdminService.LockProfile:output_type -> google.protobuf.Empty
+	19, // 25: admin.v1.AdminService.Alias:output_type -> google.protobuf.Empty
+	19, // 26: admin.v1.AdminService.AliasChain:output_type -> google.protobuf.Empty
+	4,  // 27: admin.v1.AdminService.GetChainAliases:output_type -> admin.v1.GetChainAliasesReply
+	19, // 28: admin.v1.AdminService.Stacktrace:output_type -> google.protobuf.Empty
+	8,  // 29: admin.v1.AdminService.SetLoggerLevel:output_type -> admin.v1.SetLoggerLevelReply
+	9,  // 30: admin.v1.AdminService.GetLoggerLevel:output_type -> admin.v1.GetLoggerLevelReply
+	10, // 31: admin.v1.AdminService.GetConfig:output_type -> admin.v1.GetConfigReply
+	11, // 32: admin.v1.AdminService.LoadVMs:output_type -> admin.v1.LoadVMsReply
+	14, // 33: admin.v1.AdminService.DbGet:output_type -> admin.v1.DBGetReply
+	21, // [21:34] is the sub-list for method output_type
+	8,  // [8:21] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_admin_v1_service_proto_init() }
@@ -858,7 +911,7 @@ func file_admin_v1_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_admin_v1_service_proto_rawDesc), len(file_admin_v1_service_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   16,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
