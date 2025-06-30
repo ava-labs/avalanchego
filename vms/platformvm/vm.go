@@ -259,6 +259,10 @@ func (vm *VM) Initialize(
 	return nil
 }
 
+func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
+	return vm.Subscriber.WaitForEvent(ctx)
+}
+
 func (vm *VM) periodicallyPruneMempool(frequency time.Duration) {
 	ticker := time.NewTicker(frequency)
 	defer ticker.Stop()
