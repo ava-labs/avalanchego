@@ -273,6 +273,14 @@ tasks:
     cmds:
       - cmd: go test -run=TestReexecuteRange github.com/ava-labs/avalanchego/tests/bench/c --source-block-dir={{.EXECUTION_DATA_DIR}}/blocks --target-dir={{.EXECUTION_DATA_DIR}}/current-state --start-block={{.START_BLOCK}} --end-block={{.END_BLOCK}}
 
+  export-cchain-data:
+    desc: Exports the C-Chain block and state data to a zip file and pushes it to s3
+    vars:
+      EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
+      S3_PATH: '{{.S3_PATH}}'
+    cmds:
+      - cmd: zip -r - {{.EXECUTION_DATA_DIR}} | s5cmd pipe {{.S3_PATH}}
+
   reexecute-cchain-range-with-copied-data:
     desc: Combines import-cchain-reexecute-range and reexecute-cchain-range
     vars:
