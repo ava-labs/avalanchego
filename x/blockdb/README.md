@@ -187,3 +187,4 @@ if err != nil {
 - [ ] Use a buffered pool to avoid allocations on reads and writes
 - [ ] Add tests for core functionality
 - [ ] Add performance benchmarks
+- [ ] Consider supporting missing data files (currently we error if any data files are missing)

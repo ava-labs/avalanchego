@@ -5,6 +5,7 @@ package blockdb
 
 import (
 	"crypto/rand"
+	"fmt"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -45,6 +46,19 @@ func randomBlock(t *testing.T) []byte {
 	return b
 }
 
+// fixedSizeBlock generates a block of the specified fixed size with height information.
+func fixedSizeBlock(t *testing.T, size int, height uint64) []byte {
+	require.Positive(t, size, "block size must be positive")
+	b := make([]byte, size)
+
+	// Fill the beginning with height information for better testability
+	heightStr := fmt.Sprintf("block-height-%d-", height)
+	if len(heightStr) <= size {
+		copy(b, heightStr)
+	}
+	return b
+}
+
 func checkDatabaseState(t *testing.T, db *Database, maxHeight uint64, maxContiguousHeight uint64) {
 	require.Equal(t, maxHeight, db.maxBlockHeight.Load(), "maxBlockHeight mismatch")
 	gotMCH, ok := db.MaxContiguousHeight()
@@ -52,4 +66,9 @@ func checkDatabaseState(t *testing.T, db *Database, maxHeight uint64, maxContigu
 		require.True(t, ok, "MaxContiguousHeight is not set, want %d", maxContiguousHeight)
 		require.Equal(t, maxContiguousHeight, gotMCH, "maxContiguousHeight mismatch")
 	}
+}
+
+// Helper function to create a pointer to uint64
+func uint64Ptr(v uint64) *uint64 {
+	return &v
 }

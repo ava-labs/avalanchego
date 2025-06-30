@@ -7,10 +7,13 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -260,7 +263,7 @@ func TestNew_IndexFileConfigPrecedence(t *testing.T) {
 	require.Equal(t, testBlock, readBlock)
 	require.NoError(t, db.Close())
 
-	// Reopen with different config that has higher minimum height and smaller max data file size
+	// Reopen with different config that has minimum height of 200 and smaller max data file size
 	differentConfig := DefaultDatabaseConfig().WithMinimumHeight(200).WithMaxDataFileSize(512 * 1024)
 	db2, err := New(tempDir, tempDir, differentConfig, logging.NoLog{})
 	require.NoError(t, err)
@@ -285,4 +288,67 @@ func TestNew_IndexFileConfigPrecedence(t *testing.T) {
 	readLargeBlock, err := db2.ReadBlock(200)
 	require.NoError(t, err)
 	require.Equal(t, largeBlock, readLargeBlock)
+}
+
+func TestFileCache_Eviction(t *testing.T) {
+	// Create a database with a small max data file size to force multiple files
+	// each file should have enough for 2 blocks (0.5kb * 2)
+	config := DefaultDatabaseConfig().WithMaxDataFileSize(1024 * 1.5)
+	store, cleanup := newTestDatabase(t, config)
+	defer cleanup()
+
+	// Override the file cache with a smaller size to force evictions
+	evictionCount := atomic.Int32{}
+	evictionMu := sync.Mutex{}
+	smallCache := lru.NewCache[int, *os.File](3) // Only 3 files in cache
+	smallCache.SetOnEvict(func(_ int, file *os.File) {
+		evictionMu.Lock()
+		defer evictionMu.Unlock()
+		evictionCount.Add(1)
+		if file != nil {
+			file.Close()
+		}
+	})
+	store.fileCache = smallCache
+
+	const numBlocks = 20 // 20 blocks will create 10 files
+	const numGoroutines = 4
+	var wg sync.WaitGroup
+	var writeErrors atomic.Int32
+
+	// Create blocks of 0.5kb each
+	blocks := make([][]byte, numBlocks)
+	for i := range blocks {
+		blocks[i] = fixedSizeBlock(t, 512, uint64(i))
+	}
+
+	// Each goroutine writes all block heights 0-(numBlocks-1)
+	for g := range numGoroutines {
+		wg.Add(1)
+		go func(goroutineID int) {
+			defer wg.Done()
+			for i := range numBlocks {
+				height := uint64((i + goroutineID) % numBlocks)
+				err := store.WriteBlock(height, blocks[height], 0)
+				if err != nil {
+					writeErrors.Add(1)
+				}
+			}
+		}(g)
+	}
+
+	wg.Wait()
+
+	// Verify no write errors
+	require.Zero(t, writeErrors.Load(), "concurrent writes had errors")
+
+	// Verify we had some evictions
+	require.Positive(t, evictionCount.Load(), "should have had some cache evictions")
+
+	// Verify all blocks are readable
+	for i := range numBlocks {
+		block, err := store.ReadBlock(uint64(i))
+		require.NoError(t, err, "failed to read block at height %d", i)
+		require.Equal(t, blocks[i], block, "block data mismatch at height %d", i)
+	}
 }

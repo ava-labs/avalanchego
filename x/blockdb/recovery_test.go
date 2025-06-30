@@ -4,7 +4,6 @@
 package blockdb
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -92,8 +91,7 @@ func TestRecovery_Success(t *testing.T) {
 
 			for _, height := range blockHeights {
 				// Create 4KB blocks
-				block := make([]byte, 4*1024)
-				copy(block, fmt.Appendf(nil, "block-data-for-height-%d", height))
+				block := fixedSizeBlock(t, 4*1024, height)
 
 				require.NoError(t, store.WriteBlock(height, block, 0))
 				blocks[height] = block
@@ -111,13 +109,12 @@ func TestRecovery_Success(t *testing.T) {
 			require.NoError(t, err)
 			defer recoveredStore.Close()
 
-			// Verify all blocks are still readable
+			// Verify blocks are readable
 			for _, height := range blockHeights {
 				readBlock, err := recoveredStore.ReadBlock(height)
 				require.NoError(t, err)
 				require.Equal(t, blocks[height], readBlock, "block %d should be the same", height)
 			}
-
 			checkDatabaseState(t, recoveredStore, 8, 3)
 		})
 	}
@@ -128,6 +125,8 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 		name            string
 		blockHeights    []uint64
 		minHeight       uint64
+		maxDataFileSize *uint64
+		blockSize       int // Optional: if set, creates fixed-size blocks instead of random
 		setupCorruption func(store *Database, blocks [][]byte) error
 		wantErr         error
 		wantErrText     string
@@ -180,7 +179,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				secondBlockOffset := int64(sizeOfBlockHeader) + int64(len(blocks[0]))
 				corruptedHeader := make([]byte, sizeOfBlockHeader)
 				for i := range corruptedHeader {
-					corruptedHeader[i] = 0xFF // Invalid data
+					corruptedHeader[i] = 0xFF // Invalid header data
 				}
 				dataFilePath := store.dataFilePath(0)
 				dataFile, err := os.OpenFile(dataFilePath, os.O_RDWR, 0)
@@ -205,7 +204,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				bh := blockHeader{
 					Height:     1,
 					Checksum:   calculateChecksum(blocks[1]),
-					Size:       uint32(len(blocks[1])) + 1, // too large
+					Size:       uint32(len(blocks[1])) + 1, // make block larger than actual
 					HeaderSize: 0,
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
@@ -243,7 +242,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				}
 				defer dataFile.Close()
 
-				// Truncate to have only partial block data
+				// Truncate data file to have only partial block data
 				truncateSize := int64(sizeOfBlockHeader) + int64(len(blocks[0]))/2
 				return dataFile.Truncate(truncateSize)
 			},
@@ -260,7 +259,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				}
 				secondBlockOffset := int64(sizeOfBlockHeader) + int64(len(blocks[0]))
 				bh := blockHeader{
-					Height:     5, // Below minimum height of 10
+					Height:     5, // Invalid height because its below the minimum height of 10
 					Checksum:   calculateChecksum(blocks[1]),
 					Size:       uint32(len(blocks[1])),
 					HeaderSize: 0,
@@ -270,6 +269,41 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 			wantErr:     ErrCorrupted,
 			wantErrText: "invalid block height in header",
 		},
+		{
+			name:            "missing data file at index 1",
+			blockHeights:    []uint64{0, 1, 2, 3, 4, 5},
+			maxDataFileSize: uint64Ptr(1024), // 1KB per file to force multiple files
+			blockSize:       512,             // 512 bytes per block
+			setupCorruption: func(store *Database, _ [][]byte) error {
+				// Delete the second data file (index 1)
+				dataFilePath := store.dataFilePath(1)
+				return os.Remove(dataFilePath)
+			},
+			wantErr:     ErrCorrupted,
+			wantErrText: "data file at index 1 is missing",
+		},
+		{
+			name:            "unexpected multiple data files when MaxDataFileSize is 0",
+			blockHeights:    []uint64{0, 1, 2},
+			maxDataFileSize: uint64Ptr(0), // Single file mode
+			blockSize:       512,          // 512 bytes per block
+			setupCorruption: func(store *Database, _ [][]byte) error {
+				// Manually create a second data file to simulate corruption
+				secondDataFilePath := store.dataFilePath(1)
+				secondDataFile, err := os.Create(secondDataFilePath)
+				if err != nil {
+					return err
+				}
+				defer secondDataFile.Close()
+
+				// Write some dummy data to the second file
+				dummyData := []byte("dummy data file")
+				_, err = secondDataFile.Write(dummyData)
+				return err
+			},
+			wantErr:     ErrCorrupted,
+			wantErrText: "expect only 1 data file at index 0, got 2 files with max index 1",
+		},
 	}
 
 	for _, tt := range tests {
@@ -278,6 +312,9 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 			if tt.minHeight > 0 {
 				config = config.WithMinimumHeight(tt.minHeight)
 			}
+			if tt.maxDataFileSize != nil {
+				config = config.WithMaxDataFileSize(*tt.maxDataFileSize)
+			}
 
 			store, cleanup := newTestDatabase(t, config)
 			defer cleanup()
@@ -285,12 +322,16 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 			// Setup blocks
 			blocks := make([][]byte, len(tt.blockHeights))
 			for i, height := range tt.blockHeights {
-				blocks[i] = randomBlock(t)
+				if tt.blockSize > 0 {
+					blocks[i] = fixedSizeBlock(t, tt.blockSize, height)
+				} else {
+					blocks[i] = randomBlock(t)
+				}
 				require.NoError(t, store.WriteBlock(height, blocks[i], 0))
 			}
 			require.NoError(t, store.Close())
 
-			// Apply corruption
+			// Apply corruption logic
 			require.NoError(t, tt.setupCorruption(store, blocks))
 
 			// Try to reopen the database - it should detect corruption

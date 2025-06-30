@@ -29,6 +29,21 @@ func (s *Database) recover() error {
 		return nil
 	}
 
+	// ensure no data files are missing
+	// If any data files are missing, we would need to recalculate the max height
+	// and max contiguous height. This can be supported in the future but for now
+	// to keep things simple, we will just error if the data files are not as expected.
+	if s.header.MaxDataFileSize > 0 {
+		// Ensure data files are sequential starting from 0
+		for i := 0; i <= maxIndex; i++ {
+			if _, exists := dataFiles[i]; !exists {
+				return fmt.Errorf("%w: data file at index %d is missing", ErrCorrupted, i)
+			}
+		}
+	} else if len(dataFiles) > 1 || maxIndex > 1 {
+		return fmt.Errorf("%w: expect only 1 data file at index 0, got %d files with max index %d", ErrCorrupted, len(dataFiles), maxIndex)
+	}
+
 	// Calculate the expected next write offset based on the data on disk.
 	var calculatedNextDataWriteOffset uint64
 	if s.header.MaxDataFileSize > 0 {
@@ -57,7 +72,6 @@ func (s *Database) recover() error {
 	}
 
 	nextDataWriteOffset := s.nextDataWriteOffset.Load()
-
 	switch {
 	case calculatedNextDataWriteOffset == nextDataWriteOffset:
 		s.log.Debug("Recovery: data files match index header, no recovery needed.")

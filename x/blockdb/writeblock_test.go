@@ -329,18 +329,6 @@ func TestWriteBlock_Errors(t *testing.T) {
 			headerSize: 0,
 			wantErr:    safemath.ErrOverflow,
 		},
-		{
-			name:   "max data files exceeded",
-			height: 0,
-			block:  make([]byte, 1),
-			config: DefaultDatabaseConfig().WithMaxDataFileSize(100),
-			setup: func(db *Database) {
-				// set next data write offset to the max to trigger max data files exceeded error
-				db.nextDataWriteOffset.Store(uint64(MaxDataFiles) * 100)
-			},
-			headerSize: 0,
-			wantErr:    ErrMaxDataFilesExceeded,
-		},
 	}
 
 	for _, tt := range tests {

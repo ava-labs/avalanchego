@@ -22,8 +22,7 @@ func TestDataSplitting(t *testing.T) {
 	numBlocks := 11
 	blocks := make([][]byte, numBlocks)
 	for i := range numBlocks {
-		blocks[i] = make([]byte, 1024)
-		blocks[i][0] = byte(i)
+		blocks[i] = fixedSizeBlock(t, 1024, uint64(i))
 		require.NoError(t, store.WriteBlock(uint64(i), blocks[i], 0))
 	}
 
@@ -69,8 +68,7 @@ func TestDataSplitting_DeletedFile(t *testing.T) {
 	numBlocks := 5
 	blocks := make([][]byte, numBlocks)
 	for i := range numBlocks {
-		blocks[i] = make([]byte, 1024)
-		blocks[i][0] = byte(i)
+		blocks[i] = fixedSizeBlock(t, 1024, uint64(i))
 		require.NoError(t, store.WriteBlock(uint64(i), blocks[i], 0))
 	}
 	store.Close()
@@ -81,16 +79,6 @@ func TestDataSplitting_DeletedFile(t *testing.T) {
 
 	// reopen and verify the blocks
 	require.NoError(t, store.Close())
-	store, err := New(filepath.Dir(store.indexFile.Name()), store.dataDir, config, store.log)
-	require.NoError(t, err)
-	defer store.Close()
-	for i := range numBlocks {
-		readBlock, err := store.ReadBlock(uint64(i))
-		require.NoError(t, err)
-		if i < 2 {
-			require.Nil(t, readBlock)
-		} else {
-			require.Equal(t, blocks[i], readBlock)
-		}
-	}
+	_, err := New(filepath.Dir(store.indexFile.Name()), store.dataDir, config, store.log)
+	require.ErrorIs(t, err, ErrCorrupted)
 }
