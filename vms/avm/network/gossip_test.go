@@ -58,7 +58,7 @@ func TestGossipMempoolAdd(t *testing.T) {
 
 	metrics := prometheus.NewRegistry()
 
-	baseMempool, err := mempool.New("", metrics, func() {})
+	baseMempool, err := mempool.New("", metrics)
 	require.NoError(err)
 
 	mempool, err := newGossipMempool(
@@ -90,7 +90,7 @@ func TestGossipMempoolAddVerified(t *testing.T) {
 
 	metrics := prometheus.NewRegistry()
 
-	baseMempool, err := mempool.New("", metrics, func() {})
+	baseMempool, err := mempool.New("", metrics)
 	require.NoError(err)
 
 	mempool, err := newGossipMempool(
