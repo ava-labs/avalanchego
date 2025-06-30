@@ -47,5 +47,5 @@ func TestEOF(t *testing.T) {
 	n, err := client.Read(buf)
 	require.Zero(n)
 	// Do not use require.ErrorIs because callers use equality checks on io.EOF
-	require.Equal(err, io.EOF)
+	require.Equal(io.EOF, err)
 }
