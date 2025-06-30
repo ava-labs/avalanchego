@@ -12,7 +12,7 @@ import (
 )
 
 type Test interface {
-	Run(tests.TestContext, context.Context, *Wallet)
+	Run(tc tests.TestContext, ctx context.Context, wallet *Wallet)
 }
 
 type LoadGenerator struct {
