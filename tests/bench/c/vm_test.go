@@ -62,8 +62,8 @@ var (
 func TestMain(m *testing.M) {
 	// Source directory must be a leveldb dir with the required blocks accessible via rawdb.ReadBlock.
 	flag.StringVar(&sourceBlockDir, "source-block-dir", sourceBlockDir, "DB directory storing executable block range.")
-	// Target directory assumes the same structure as bench.import_cchain_data.sh:
-	// - vmdb/
+	// Target directory assumes the current-state directory contains a db directory and a chain-data-dir directory.
+	// - db/
 	// - chain-data-dir/
 	flag.StringVar(&targetDir, "target-dir", targetDir, "Target directory for the current state including VM DB and Chain Data Directory.")
 	flag.Uint64Var(&startBlock, "start-block", 101, "Start block to begin execution (exclusive).")

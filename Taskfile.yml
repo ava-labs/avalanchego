@@ -260,9 +260,10 @@ tasks:
     vars:
       EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
       SOURCE_BLOCK_DIR: '{{.SOURCE_BLOCK_DIR | default "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-200.zip"}}'
-      CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR | default "s3://avalanchego-bootstrap-testing/cchain-current-state-100-firewood.zip"}}'
+      CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR | default "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-100.zip"}}'
     cmds:
-      - cmd: bash -x ./scripts/bench.import_cchain_data.sh {{.EXECUTION_DATA_DIR}} {{.SOURCE_BLOCK_DIR}} {{.CURRENT_STATE_DIR}}
+      - cmd: bash -x ./scripts/copy_dir.sh {{.SOURCE_BLOCK_DIR}} {{.EXECUTION_DATA_DIR}}/blocks
+      - cmd: bash -x ./scripts/copy_dir.sh {{.CURRENT_STATE_DIR}} {{.EXECUTION_DATA_DIR}}/current-state
 
   reexecute-cchain-range:
     desc: Benchmark re-execute a range of blocks on the C-Chain. Defaults to execute the block range (100, 200].
@@ -273,22 +274,38 @@ tasks:
     cmds:
       - cmd: go test -run=TestReexecuteRange github.com/ava-labs/avalanchego/tests/bench/c --source-block-dir={{.EXECUTION_DATA_DIR}}/blocks --target-dir={{.EXECUTION_DATA_DIR}}/current-state --start-block={{.START_BLOCK}} --end-block={{.END_BLOCK}}
 
-  export-cchain-data:
-    desc: Exports the C-Chain block and state data to a zip file and pushes it to s3
+  export-cchain-blocks:
+    desc: Exports the C-Chain blocks
     vars:
-      EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
+      SOURCE_BLOCK_DIR: '{{.SOURCE_BLOCK_DIR}}'
       S3_PATH: '{{.S3_PATH}}'
     cmds:
-      - cmd: zip -r - {{.EXECUTION_DATA_DIR}} | s5cmd pipe {{.S3_PATH}}
+      - cmd: s5cmd cp {{.SOURCE_BLOCK_DIR}} {{.S3_PATH}}
+
+  export-cchain-current-state:
+    desc: Exports the C-Chain current state
+    vars:
+      CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR}}'
+      S3_PATH: '{{.S3_PATH}}'
+    cmds:
+      - cmd: s5cmd cp {{.CURRENT_STATE_DIR}} {{.S3_PATH}}
 
   reexecute-cchain-range-with-copied-data:
     desc: Combines import-cchain-reexecute-range and reexecute-cchain-range
     vars:
       EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
       SOURCE_BLOCK_DIR: '{{.SOURCE_BLOCK_DIR | default "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-200.zip"}}'
-      CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR | default "s3://avalanchego-bootstrap-testing/cchain-current-state-100-firewood.zip"}}'
-      START_BLOCK: '{{.START_BLOCK | default "100"}}'
+      CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR | default "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-100.zip"}}'
+      START_BLOCK: '{{.START_BLOCK | default "101"}}'
       END_BLOCK: '{{.END_BLOCK | default "200"}}'
     cmds:
       - task: import-cchain-reexecute-range
+        vars:
+          SOURCE_BLOCK_DIR: '{{.SOURCE_BLOCK_DIR}}'
+          CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR}}'
+          EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
       - task: reexecute-cchain-range
+        vars:
+          EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
+          START_BLOCK: '{{.START_BLOCK}}'
+          END_BLOCK: '{{.END_BLOCK}}'
