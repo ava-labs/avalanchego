@@ -1,3 +1,4 @@
+# https://golangci-lint.run/usage/configuration/
 version: "2"
 run:
   build-tags:
