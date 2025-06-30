@@ -243,7 +243,7 @@ jobs:
     container:
       image: ghcr.io/actions/actions-runner:latest
     steps:
-      - name: Install x
+      - name: Install xz-utils
         run: |
           sudo apt-get update
           sudo apt-get install -y xz-utils
