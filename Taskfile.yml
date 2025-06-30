@@ -258,7 +258,7 @@ tasks:
   import-cchain-reexecute-range:
     desc: Imports the C-Chain block and state data to re-execute. Defaults to execute the block range (100, 200].
     vars:
-      EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR | default "./reexecution-data-dir"}}'
+      EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
       SOURCE_BLOCK_DIR: '{{.SOURCE_BLOCK_DIR | default "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-200.zip"}}'
       CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR | default "s3://avalanchego-bootstrap-testing/cchain-current-state-100-firewood.zip"}}'
     cmds:
@@ -267,9 +267,11 @@ tasks:
   reexecute-cchain-range:
     desc: Benchmark re-execute a range of blocks on the C-Chain. Defaults to execute the block range (100, 200].
     vars:
-      EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR | default "./reexecution-data-dir"}}'
+      EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
+      START_BLOCK: '{{.START_BLOCK}}'
+      END_BLOCK: '{{.END_BLOCK}}'
     cmds:
-      - cmd: go test -run=TestReexecuteRange github.com/ava-labs/avalanchego/tests/bench/c --source-block-dir={{.EXECUTION_DATA_DIR}}/blocks --target-dir={{.EXECUTION_DATA_DIR}}/current-state
+      - cmd: go test -run=TestReexecuteRange github.com/ava-labs/avalanchego/tests/bench/c --source-block-dir={{.EXECUTION_DATA_DIR}}/blocks --target-dir={{.EXECUTION_DATA_DIR}}/current-state --start-block={{.START_BLOCK}} --end-block={{.END_BLOCK}}
 
   reexecute-cchain-range-with-copied-data:
     desc: Combines import-cchain-reexecute-range and reexecute-cchain-range
@@ -277,8 +279,8 @@ tasks:
       EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
       SOURCE_BLOCK_DIR: '{{.SOURCE_BLOCK_DIR | default "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-200.zip"}}'
       CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR | default "s3://avalanchego-bootstrap-testing/cchain-current-state-100-firewood.zip"}}'
+      START_BLOCK: '{{.START_BLOCK | default "100"}}'
+      END_BLOCK: '{{.END_BLOCK | default "200"}}'
     cmds:
       - task: import-cchain-reexecute-range
       - task: reexecute-cchain-range
-  
-  

@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -80,7 +81,7 @@ func TestReexecuteRange(t *testing.T) {
 	r := require.New(t)
 
 	var (
-		targetDBDir  = filepath.Join(targetDir, "vmdb")
+		targetDBDir  = filepath.Join(targetDir, "db")
 		chainDataDir = filepath.Join(targetDBDir, "chain-data-dir")
 	)
 
@@ -107,11 +108,13 @@ func TestReexecuteRange(t *testing.T) {
 	db, err := leveldb.New(targetDBDir, nil, dbLogger, baseDBRegistry)
 	r.NoError(err)
 	r.NoError(vmPrefixGatherer.Register("vm", baseDBRegistry))
+	t.Cleanup(func() {
+		r.NoError(db.Close())
+	})
 
 	sourceVM, err := newMainnetCChainVM(
 		context.Background(),
 		db,
-		t.TempDir(),
 		chainDataDir,
 		[]byte(`{"pruning-enabled": false}`),
 		vmPrefixGatherer,
@@ -126,8 +129,7 @@ func TestReexecuteRange(t *testing.T) {
 
 func newMainnetCChainVM(
 	ctx context.Context,
-	db database.Database,
-	atomicMemoryDBDir string,
+	vmAndSharedMemoryDB database.Database,
 	chainDataDir string,
 	configBytes []byte,
 	metricsGatherer metrics.MultiGatherer,
@@ -146,14 +148,7 @@ func newMainnetCChainVM(
 
 	genesisConfig := genesis.GetConfig(constants.MainnetID)
 
-	sharedMemoryRegistry := prometheus.NewRegistry()
-	sharedMemoryDB, err := leveldb.New(atomicMemoryDBDir, nil, log, sharedMemoryRegistry)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create shared memory db: %w", err)
-	}
-	if err := metricsGatherer.Register("sharedmemorydb", sharedMemoryRegistry); err != nil {
-		return nil, fmt.Errorf("failed to register shared memory metrics: %w", err)
-	}
+	sharedMemoryDB := prefixdb.New([]byte("sharedmemory"), vmAndSharedMemoryDB)
 	atomicMemory := atomic.NewMemory(sharedMemoryDB)
 
 	if err := vm.Initialize(
@@ -180,7 +175,7 @@ func newMainnetCChainVM(
 			ValidatorState: &validatorstest.State{},
 			ChainDataDir:   chainDataDir,
 		},
-		db,
+		prefixdb.New([]byte("vm"), vmAndSharedMemoryDB),
 		[]byte(genesisConfig.CChainGenesis),
 		nil,
 		configBytes,
@@ -245,11 +240,11 @@ func (e *VMExecutor) executeSequence(ctx context.Context, blkChan <-chan BlockRe
 			return blkResult.Err
 		}
 
-		e.log.Info("executing block", zap.String("blkID", blkID.String()), zap.Uint64("height", blk.Height()))
 		if err := e.execute(ctx, blkResult.BlockBytes); err != nil {
 			return err
 		}
 	}
+	e.log.Info("finished executing sequence")
 
 	return nil
 }
