@@ -41,7 +41,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
-	"github.com/ava-labs/avalanchego/vms/proposervm/scheduler/schedulermock"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
@@ -896,7 +895,8 @@ func TestExpiredBuildBlock(t *testing.T) {
 	// Notify the proposer VM of a new block on the inner block side
 	events <- common.PendingTxs
 	// The first notification will be read from the consensus engine
-	msg, _ := proVM.WaitForEvent(context.Background())
+	msg, err := proVM.WaitForEvent(context.Background())
+	require.NoError(err)
 	require.Equal(common.PendingTxs, msg)
 
 	// Before calling BuildBlock, verify a remote block and set it as the
@@ -948,16 +948,6 @@ func TestExpiredBuildBlock(t *testing.T) {
 	// shouldn't have started.
 	_, err = proVM.BuildBlock(context.Background())
 	require.ErrorIs(err, errProposerWindowNotStarted)
-
-	proVM.Set(statelessBlock.Timestamp().Add(proposer.MaxBuildDelay))
-	proVM.Scheduler.SetBuildBlockTime(time.Now())
-
-	// The engine should have been notified to attempt to build a block now that
-	// the window has started again. This is to guarantee that the inner VM has
-	// build block called after it sent a pendingTxs message on its internal
-	// engine channel.
-	msg, _ = proVM.WaitForEvent(context.Background())
-	require.Equal(common.PendingTxs, msg)
 }
 
 type wrappedBlock struct {
@@ -2494,16 +2484,6 @@ func TestLocalParse(t *testing.T) {
 	}
 
 	vm := New(innerVM, conf)
-	ctrl := gomock.NewController(t)
-	scheduler := schedulermock.NewScheduler(ctrl)
-	scheduler.EXPECT().Close().AnyTimes()
-
-	subscriber := NewMockSelfSubscriber(ctrl)
-	subscriber.EXPECT().Close().AnyTimes()
-
-	vm.Scheduler = scheduler
-	vm.subscriber = subscriber
-
 	defer func() {
 		require.NoError(t, vm.Shutdown(context.Background()))
 	}()
@@ -2841,7 +2821,8 @@ func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
 	// message to the consensus engine. This is really the source of the issue,
 	// as the proposervm is not currently in a state where it can correctly
 	// build any blocks.
-	msg, _ := proVM.WaitForEvent(context.Background())
+	msg, err := proVM.WaitForEvent(context.Background())
+	require.NoError(err)
 	require.Equal(common.PendingTxs, msg)
 
 	innerBlock3 := snowmantest.BuildChild(innerBlock2)
