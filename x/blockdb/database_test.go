@@ -19,9 +19,7 @@ import (
 
 func TestNew_Truncate(t *testing.T) {
 	// Create initial database
-	tempDir, err := os.MkdirTemp("", "blockdb_truncate_test_*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
 	indexDir := filepath.Join(tempDir, "index")
 	dataDir := filepath.Join(tempDir, "data")
 	config := DefaultDatabaseConfig().WithTruncate(true)
@@ -47,9 +45,7 @@ func TestNew_Truncate(t *testing.T) {
 }
 
 func TestNew_NoTruncate(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "blockdb_no_truncate_test_*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
 	indexDir := filepath.Join(tempDir, "index")
 	dataDir := filepath.Join(tempDir, "data")
 	config := DefaultDatabaseConfig().WithTruncate(true)
@@ -84,9 +80,7 @@ func TestNew_NoTruncate(t *testing.T) {
 }
 
 func TestNew_Params(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "blockdb_test_*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
 	tests := []struct {
 		name        string
 		indexDir    string
@@ -177,7 +171,7 @@ func TestNew_IndexFileErrors(t *testing.T) {
 		{
 			name: "corrupted index file",
 			setup: func() (string, string) {
-				tempDir, _ := os.MkdirTemp("", "blockdb_test_*")
+				tempDir := t.TempDir()
 				indexDir := filepath.Join(tempDir, "index")
 				dataDir := filepath.Join(tempDir, "data")
 				require.NoError(t, os.MkdirAll(indexDir, 0o755))
@@ -195,7 +189,7 @@ func TestNew_IndexFileErrors(t *testing.T) {
 		{
 			name: "version mismatch in existing index file",
 			setup: func() (string, string) {
-				tempDir, _ := os.MkdirTemp("", "blockdb_test_*")
+				tempDir := t.TempDir()
 				indexDir := filepath.Join(tempDir, "index")
 				dataDir := filepath.Join(tempDir, "data")
 
@@ -230,8 +224,6 @@ func TestNew_IndexFileErrors(t *testing.T) {
 			if indexDir == "" || dataDir == "" {
 				t.Skip("Setup failed, skipping test")
 			}
-			defer os.RemoveAll(filepath.Dir(indexDir))
-			defer os.RemoveAll(filepath.Dir(dataDir))
 
 			_, err := New(indexDir, dataDir, DefaultDatabaseConfig(), logging.NoLog{})
 			require.Contains(t, err.Error(), tt.wantErrMsg)
@@ -248,9 +240,7 @@ func TestIndexFileHeaderAlignment(t *testing.T) {
 func TestNew_IndexFileConfigPrecedence(t *testing.T) {
 	// set up db
 	initialConfig := DefaultDatabaseConfig().WithMinimumHeight(100).WithMaxDataFileSize(1024 * 1024)
-	tempDir, err := os.MkdirTemp("", "blockdb_config_precedence_test_*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
 	db, err := New(tempDir, tempDir, initialConfig, logging.NoLog{})
 	require.NoError(t, err)
 	require.NotNil(t, db)
