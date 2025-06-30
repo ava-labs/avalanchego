@@ -1,9 +1,33 @@
 # https://golangci-lint.run/usage/configuration/
 version: "2"
 run:
+  # If set we pass it to "go list -mod={option}". From "go help modules":
+  # If invoked with -mod=readonly, the go command is disallowed from the implicit
+  # automatic updating of go.mod described above. Instead, it fails when any changes
+  # to go.mod are needed. This setting is most useful to check that go.mod does
+  # not need updates, such as in a continuous integration and testing system.
+  # If invoked with -mod=vendor, the go command assumes that the vendor
+  # directory holds the correct copies of dependencies and ignores
+  # the dependency descriptions in go.mod.
+  #
+  # Allowed values: readonly|vendor|mod
+  # By default, it isn't set.
+  modules-download-mode: readonly
+
+  # Include non-test files tagged as test-only.
+  # Context: https://github.com/ava-labs/avalanchego/pull/3173
   build-tags:
     - test
-  modules-download-mode: readonly
+
+issues:
+  # Maximum issues count per one linter.
+  max-issues-per-linter: 0
+  # Maximum count of issues with the same text.
+  max-same-issues: 0
+
+  # Make issues output unique by line.
+  uniq-by-line: false
+
 linters:
   default: none
   enable:
@@ -54,9 +78,12 @@ linters:
             - pkg: io/ioutil
               desc: io/ioutil is deprecated. Use package io or os instead.
     errorlint:
+      # Check for plain type assertions and type switches.
       asserts: false
+      # Check for plain error comparisons.
       comparison: false
     forbidigo:
+      # Forbid the following identifiers (list of regexp).
       forbid:
         - pattern: require\.Error$(# ErrorIs should be used instead)?
         - pattern: require\.ErrorContains$(# ErrorIs should be used instead)?
@@ -64,28 +91,37 @@ linters:
         - pattern: require\.NotEqualValues$(# NotEqual should be used instead)?
         - pattern: ^(t|b|tb|f)\.(Fatal|Fatalf|Error|Errorf)$(# the require library should be used instead)?
         - pattern: ^sort\.(Slice|Strings)$(# the slices package should be used instead)?
+      # Exclude godoc examples from forbidigo checks.
       exclude-godoc-examples: false
     gosec:
       excludes:
-        - G107
-        - G115
+        - G107 # Url provided to HTTP request as taint input https://securego.io/docs/rules/g107
+        - G115 # TODO(marun) Enable this ruleset in a follow-up PR
     importas:
+      # Do not allow unaliased imports of aliased packages.
+      no-unaliased: false
+      # Do not allow non-required aliases.
+      no-extra-aliases: false
+      # List of aliases
       alias:
         - pkg: github.com/ava-labs/avalanchego/utils/math
           alias: safemath
         - pkg: github.com/ava-labs/avalanchego/utils/json
           alias: avajson
-      no-unaliased: false
-      no-extra-aliases: false
     revive:
       rules:
+        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#bool-literal-in-expr
         - name: bool-literal-in-expr
           disabled: false
+        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#early-return
         - name: early-return
           disabled: false
+        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#empty-lines
         - name: empty-lines
           disabled: false
+        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#string-format
         - name: string-format
+          disabled: false
           arguments:
             - - b.Logf[0]
               - /.*%.*/
@@ -111,27 +147,37 @@ linters:
             - - t.Logf[0]
               - /.*%.*/
               - no format directive, use t.Log instead
-          disabled: false
+        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#struct-tag
         - name: struct-tag
           disabled: false
+        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unexported-naming
         - name: unexported-naming
           disabled: false
+        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unhandled-error
         - name: unhandled-error
+          # prefer the errcheck linter since it can be disabled directly with nolint directive
+          # but revive's disable directive (e.g. //revive:disable:unhandled-error) is not
+          # supported when run under golangci_lint
           disabled: true
+        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unused-parameter
         - name: unused-parameter
           disabled: false
+        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unused-receiver
         - name: unused-receiver
           disabled: false
+        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#useless-break
         - name: useless-break
           disabled: false
     spancheck:
+      # https://github.com/jjti/go-spancheck#checks
       checks:
         - end
     staticcheck:
+      # https://staticcheck.io/docs/options#checks
       checks:
         - all
-        - -SA1019
-        - -SA6002
+        - -SA6002A # Storing non-pointer values in sync.Pool allocates memory
+        - -SA1019 # Using a deprecated function, variable, constant or field
     tagalign:
       align: true
       sort: true
@@ -139,13 +185,25 @@ linters:
         - serialize
       strict: true
     testifylint:
-      enable-all: true
-      disable:
-        - go-require
-        - float-compare
+    # Enable all checkers (https://github.com/Antonboom/testifylint#checkers).
+    # Default: false
+    enable-all: true
+    # Disable checkers by name
+    # (in addition to default
+    #   suite-thelper
+    # ).
+    disable:
+      - go-require
+      - float-compare
     unused:
+      # Mark all struct fields that have been written to as used.
+      # Default: true
       field-writes-are-uses: false
+      # Treat IncDec statement (e.g. `i++` or `i--`) as both read and write operation instead of just write.
+      # Default: false
       post-statements-are-reads: true
+      # Mark all local variables as used.
+      # default: true
       local-variables-are-used: false
   exclusions:
     generated: lax
@@ -154,10 +212,6 @@ linters:
       - common-false-positives
       - legacy
       - std-error-handling
-issues:
-  max-issues-per-linter: 0
-  max-same-issues: 0
-  uniq-by-line: false
 formatters:
   enable:
     - gci
