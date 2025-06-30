@@ -4,27 +4,29 @@
 package xsvm
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 
+	"connectrpc.com/grpcreflect"
 	"github.com/gorilla/rpc/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
 
+	"github.com/ava-labs/avalanchego/connectproto/pb/xsvm/xsvmconnect"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
-	"github.com/ava-labs/avalanchego/proto/pb/xsvm"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/api"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/builder"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/chain"
@@ -33,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/state"
 
 	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	jsonutil "github.com/ava-labs/avalanchego/utils/json"
 	xsblock "github.com/ava-labs/avalanchego/vms/example/xsvm/block"
 )
 
@@ -139,27 +142,76 @@ func (*VM) Version(context.Context) (string, error) {
 	return Version.String(), nil
 }
 
-func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
+func (vm *VM) NewHTTPHandler(context.Context) (http.Handler, error) {
 	server := rpc.NewServer()
-	server.RegisterCodec(json.NewCodec(), "application/json")
-	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
-	api := api.NewServer(
+	server.RegisterCodec(jsonutil.NewCodec(), "application/json")
+	server.RegisterCodec(jsonutil.NewCodec(), "application/json;charset=UTF-8")
+	jsonRPCAPI := api.NewServer(
 		vm.chainContext,
 		vm.genesis,
 		vm.db,
 		vm.chain,
 		vm.builder,
 	)
-	return map[string]http.Handler{
-		"": server,
-	}, server.RegisterService(api, constants.XSVMName)
+	if err := server.RegisterService(jsonRPCAPI, constants.XSVMName); err != nil {
+		return nil, err
+	}
+
+	reflectionPattern, reflectionHandler := grpcreflect.NewHandlerV1(
+		grpcreflect.NewStaticReflector(xsvmconnect.PingName),
+	)
+
+	pingService := api.PingService{Log: vm.chainContext.Log}
+	pingPath, pingHandler := xsvmconnect.NewPingHandler(pingService)
+
+	mux := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if isJSONRPCRequest(r) {
+			server.ServeHTTP(w, r)
+			return
+		}
+
+		// Match requests to any exact matches or anything under the path
+		if strings.HasPrefix(r.URL.Path, pingPath) {
+			pingHandler.ServeHTTP(w, r)
+			return
+		}
+
+		if strings.HasPrefix(r.URL.Path, reflectionPattern) {
+			reflectionHandler.ServeHTTP(w, r)
+			return
+		}
+
+		w.WriteHeader(http.StatusNotFound)
+	})
+
+	return mux, nil
 }
 
-func (vm *VM) CreateHTTP2Handler(context.Context) (http.Handler, error) {
-	server := grpc.NewServer()
-	server.RegisterService(&xsvm.Ping_ServiceDesc, &api.PingService{Log: vm.chainContext.Log})
-	reflection.Register(server)
-	return server, nil
+func isJSONRPCRequest(r *http.Request) bool {
+	// Must be a POST with Content-Type application/json
+	if r.Method != http.MethodPost || !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+		return false
+	}
+
+	// Read the request body (and preserve it for later use)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		return false
+	}
+	r.Body = io.NopCloser(bytes.NewReader(body)) // Reset body for the actual handler
+
+	// Minimal struct to detect JSON-RPC 2.0
+	var msg struct {
+		JSONRPC string `json:"jsonrpc"`
+		Method  string `json:"method"`
+	}
+
+	// Must parse as JSON and have the JSON-RPC marker
+	if err := json.Unmarshal(body, &msg); err != nil {
+		return false
+	}
+
+	return msg.JSONRPC == "2.0" && msg.Method != ""
 }
 
 func (*VM) HealthCheck(context.Context) (interface{}, error) {

@@ -9,16 +9,18 @@ import (
 	"fmt"
 	"io"
 
+	"connectrpc.com/connect"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 
 	"github.com/ava-labs/avalanchego/api/grpcclient"
+	"github.com/ava-labs/avalanchego/connectproto/pb/xsvm/xsvmconnect"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/xsvm"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-var _ xsvm.PingServer = (*PingService)(nil)
+var _ xsvmconnect.PingHandler = (*PingService)(nil)
 
 type PingService struct {
 	xsvm.UnsafePingServer
@@ -26,16 +28,18 @@ type PingService struct {
 	Log logging.Logger
 }
 
-func (p *PingService) Ping(_ context.Context, request *xsvm.PingRequest) (*xsvm.PingReply, error) {
-	p.Log.Debug("ping", zap.String("message", request.Message))
-	return &xsvm.PingReply{
-		Message: request.Message,
-	}, nil
+func (p PingService) Ping(_ context.Context, request *connect.Request[xsvm.PingRequest]) (*connect.Response[xsvm.PingReply], error) {
+	p.Log.Debug("ping", zap.String("message", request.Msg.Message))
+	return connect.NewResponse[xsvm.PingReply](
+		&xsvm.PingReply{
+			Message: request.Msg.Message,
+		},
+	), nil
 }
 
-func (p *PingService) StreamPing(server xsvm.Ping_StreamPingServer) error {
+func (p PingService) StreamPing(_ context.Context, server *connect.BidiStream[xsvm.StreamPingRequest, xsvm.StreamPingReply]) error {
 	for {
-		request, err := server.Recv()
+		request, err := server.Receive()
 		if errors.Is(err, io.EOF) {
 			// Client closed the send stream
 			return nil

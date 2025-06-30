@@ -37,6 +37,10 @@ type apiServerMock struct {
 	endpoints   []string
 }
 
+func (*apiServerMock) AddHTTP2Handler(http.Handler) bool {
+	panic("unimplemented")
+}
+
 func (a *apiServerMock) AddRoute(_ http.Handler, base, endpoint string) error {
 	a.timesCalled++
 	a.bases = append(a.bases, base)
