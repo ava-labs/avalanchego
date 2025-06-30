@@ -6,7 +6,9 @@ package merkledb
 import (
 	"context"
 	"encoding/binary"
+	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -101,5 +103,47 @@ func Benchmark_HashChangedNodes(b *testing.B) {
 				view.hashChangedNodes(ctx)
 			}
 		})
+	}
+}
+
+func BenchmarkView_NewIteratorWithStartAndPrefix(b *testing.B) {
+	var (
+		keyMaxLen = 20
+		numKeys   = uint64(1_000_000)
+	)
+
+	rand := rand.New(rand.NewSource(time.Now().Unix())) // #nosec G404
+
+	db, err := getBasicDB()
+	require.NoError(b, err)
+
+	ops := make([]database.BatchOp, 0, numKeys)
+	for range numKeys {
+		key := make([]byte, rand.Intn(keyMaxLen))
+		rand.Read(key)
+
+		value := make([]byte, rand.Intn(keyMaxLen))
+		rand.Read(value)
+
+		ops = append(ops, database.BatchOp{
+			Key:   key,
+			Value: value,
+		})
+	}
+
+	ctx := context.Background()
+	view, err := db.NewView(ctx, ViewChanges{BatchOps: ops})
+	require.NoError(b, err)
+
+	for range b.N {
+		b.StopTimer()
+		start := make([]byte, rand.Intn(keyMaxLen))
+		rand.Read(start)
+
+		prefix := make([]byte, rand.Intn(keyMaxLen/2))
+		rand.Read(prefix)
+
+		b.StartTimer()
+		view.NewIteratorWithStartAndPrefix(start, prefix)
 	}
 }

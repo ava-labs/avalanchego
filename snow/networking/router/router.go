@@ -56,4 +56,9 @@ type InternalHandler interface {
 		failedMsg message.InboundMessage,
 		engineType p2p.EngineType,
 	)
+
+	// HandleInternal enqueues a message to be handled by the consensus engine
+	// in the future. This function should only be called with messages
+	// generated internally, and not from messages received from a peer.
+	HandleInternal(context.Context, message.InboundMessage)
 }
