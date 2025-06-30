@@ -4,7 +4,7 @@
 // - protoc             v5.29.3
 // source: health/v1/service.proto
 
-package v1
+package healthv1
 
 import (
 	context "context"

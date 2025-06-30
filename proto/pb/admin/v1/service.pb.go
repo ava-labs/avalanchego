@@ -693,8 +693,8 @@ func (x *DBGetArgs) GetKey() string {
 
 type DBGetReply struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Value         string    `protobuf:"bytes,1,opt,name=value,proto3" json:"value,omitempty"`
-	ErrorCode     ErrorCode `protobuf:"varint,2,opt,name=error_code,json=errorCode,proto3,enum=admin.v1.ErrorCode" json:"error_code,omitempty"`
+	Value         string                 `protobuf:"bytes,1,opt,name=value,proto3" json:"value,omitempty"`
+	ErrorCode     ErrorCode              `protobuf:"varint,2,opt,name=error_code,json=errorCode,proto3,enum=admin.v1.ErrorCode" json:"error_code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
