@@ -7,7 +7,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -18,19 +17,15 @@ import (
 
 func newTestDatabase(t *testing.T, opts DatabaseConfig) (*Database, func()) {
 	t.Helper()
-	dir, err := os.MkdirTemp("", "blockdb_test_*")
-	require.NoError(t, err, "failed to create temp dir")
+	dir := t.TempDir()
 	idxDir := filepath.Join(dir, "idx")
 	dataDir := filepath.Join(dir, "dat")
 
 	db, err := New(idxDir, dataDir, opts, logging.NoLog{})
-	if err != nil {
-		os.RemoveAll(dir)
-		require.NoError(t, err, "failed to create database")
-	}
+	require.NoError(t, err, "failed to create database")
+
 	cleanup := func() {
 		db.Close()
-		os.RemoveAll(dir)
 	}
 	return db, cleanup
 }
