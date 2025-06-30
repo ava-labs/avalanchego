@@ -42,6 +42,7 @@ import (
 	extensions "github.com/ava-labs/avalanchego/vms/avm/fxs"
 	avmmetrics "github.com/ava-labs/avalanchego/vms/avm/metrics"
 	txexecutor "github.com/ava-labs/avalanchego/vms/avm/txs/executor"
+	xmempool "github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 )
 
 var (
@@ -363,11 +364,11 @@ func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID) error {
 		return fmt.Errorf("failed to initialize chain state: %w", err)
 	}
 
-	metrics, err := mempool.NewMetrics("mempool", vm.registerer)
+	mempool, err := xmempool.New("mempool", vm.registerer, notify)
 	if err != nil {
-		return fmt.Errorf("failed to create mempool metrics: %w", err)
+		return fmt.Errorf("failed to create mempool: %w", err)
 	}
-	mempool := mempool.New[*txs.Tx](metrics)
+
 	vm.chainManager = blockexecutor.NewManager(
 		mempool,
 		vm.metrics,
