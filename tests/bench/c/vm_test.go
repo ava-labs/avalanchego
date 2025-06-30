@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -68,14 +69,13 @@ func TestMain(m *testing.M) {
 	flag.Uint64Var(&endBlock, "end-block", 200, "End block to end execution (inclusive).")
 	flag.IntVar(&chanSize, "chan-size", 100, "Size of the channel to use for block processing.")
 	flag.BoolVar(&metricsEnabled, "metrics-enabled", true, "Enable metrics collection.")
-
 	flag.Parse()
 	m.Run()
 }
 
 // TODO:
-// - provide task to snapshot current state and block ranges to s3
 // - update C-Chain dashboard to make it useful for the benchmark
+// - provide task to snapshot block ranges from existing database or direct p2p to s3
 func TestReexecuteRange(t *testing.T) {
 	r := require.New(t)
 
@@ -101,9 +101,16 @@ func TestReexecuteRange(t *testing.T) {
 	blockChan, err := createBlockChanFromRawDB(t, sourceBlockDir, startBlock, endBlock, chanSize)
 	r.NoError(err)
 
+	dbLogger := tests.NewDefaultLogger("db")
+
+	baseDBRegistry := prometheus.NewRegistry()
+	db, err := leveldb.New(targetDBDir, nil, dbLogger, baseDBRegistry)
+	r.NoError(err)
+	r.NoError(vmPrefixGatherer.Register("vm", baseDBRegistry))
+
 	sourceVM, err := newMainnetCChainVM(
 		context.Background(),
-		targetDBDir,
+		db,
 		t.TempDir(),
 		chainDataDir,
 		[]byte(`{"pruning-enabled": false}`),
@@ -119,7 +126,7 @@ func TestReexecuteRange(t *testing.T) {
 
 func newMainnetCChainVM(
 	ctx context.Context,
-	dbDir string,
+	db database.Database,
 	atomicMemoryDBDir string,
 	chainDataDir string,
 	configBytes []byte,
@@ -128,15 +135,6 @@ func newMainnetCChainVM(
 	vm := evm.VM{}
 
 	log := tests.NewDefaultLogger("mainnet-vm-reexecution")
-
-	baseDBRegistry := prometheus.NewRegistry()
-	db, err := leveldb.New(dbDir, nil, log, baseDBRegistry)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create base level db: %w", err)
-	}
-	if err := metricsGatherer.Register("vm", baseDBRegistry); err != nil {
-		return nil, fmt.Errorf("failed to register vm metrics: %w", err)
-	}
 
 	blsKey, err := localsigner.New()
 	if err != nil {
