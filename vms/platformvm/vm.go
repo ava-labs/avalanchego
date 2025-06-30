@@ -64,10 +64,6 @@ type VM struct {
 	*network.Network
 	validators.State
 
-	common.Subscriber
-
-	closeSubscriber func()
-
 	metrics platformvmmetrics.Metrics
 
 	// Used to get time. Useful for faking time during tests.
@@ -170,14 +166,7 @@ func (vm *VM) Initialize(
 		Bootstrapped: &vm.bootstrapped,
 	}
 
-	ss := common.NewSimpleSubscriber()
-	vm.closeSubscriber = ss.Close
-	vm.Subscriber = ss
-	notifyEngine := func() {
-		ss.Publish(common.PendingTxs)
-	}
-
-	mempool, err := pmempool.New("mempool", registerer, notifyEngine)
+	mempool, err := pmempool.New("mempool", registerer)
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}
@@ -208,7 +197,6 @@ func (vm *VM) Initialize(
 		chainCtx.WarpSigner,
 		registerer,
 		execConfig.Network,
-		notifyEngine,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initialize network: %w", err)
@@ -224,7 +212,6 @@ func (vm *VM) Initialize(
 		mempool,
 		txExecutorBackend,
 		vm.manager,
-		notifyEngine,
 	)
 
 	// Create all of the chains that the database says exist
@@ -257,10 +244,6 @@ func (vm *VM) Initialize(
 	}()
 
 	return nil
-}
-
-func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
-	return vm.Subscriber.WaitForEvent(ctx)
 }
 
 func (vm *VM) periodicallyPruneMempool(frequency time.Duration) {
@@ -382,13 +365,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 		vm.Validators.RegisterSetCallbackListener(subnetID, vl)
 	}
 
-	if err := vm.state.Commit(); err != nil {
-		return err
-	}
-
-	// Start the block builder
-	vm.Builder.StartBlockTimer()
-	return nil
+	return vm.state.Commit()
 }
 
 func (vm *VM) SetState(_ context.Context, state snow.State) error {
@@ -409,7 +386,6 @@ func (vm *VM) Shutdown(context.Context) error {
 	}
 
 	vm.onShutdownCtxCancel()
-	vm.Builder.ShutdownBlockTimer()
 
 	if vm.uptimeManager.StartedTracking() {
 		primaryVdrIDs := vm.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
@@ -421,8 +397,6 @@ func (vm *VM) Shutdown(context.Context) error {
 			return err
 		}
 	}
-
-	vm.closeSubscriber()
 
 	return errors.Join(
 		vm.state.Close(),
@@ -451,9 +425,7 @@ func (vm *VM) LastAccepted(context.Context) (ids.ID, error) {
 
 // SetPreference sets the preferred block to be the one with ID [blkID]
 func (vm *VM) SetPreference(_ context.Context, blkID ids.ID) error {
-	if vm.manager.SetPreference(blkID) {
-		vm.Builder.ResetBlockTimer()
-	}
+	vm.manager.SetPreference(blkID)
 	return nil
 }
 

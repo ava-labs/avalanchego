@@ -20,10 +20,9 @@ var (
 
 type Mempool struct {
 	txmempool.Mempool[*txs.Tx]
-	notify func() // Notifies when a transaction is added to the mempool
 }
 
-func New(namespace string, registerer prometheus.Registerer, notify func()) (*Mempool, error) {
+func New(namespace string, registerer prometheus.Registerer) (*Mempool, error) {
 	metrics, err := txmempool.NewMetrics(namespace, registerer)
 	if err != nil {
 		return nil, err
@@ -31,7 +30,7 @@ func New(namespace string, registerer prometheus.Registerer, notify func()) (*Me
 	pool := txmempool.New[*txs.Tx](
 		metrics,
 	)
-	return &Mempool{Mempool: pool, notify: notify}, nil
+	return &Mempool{Mempool: pool}, nil
 }
 
 func (m *Mempool) Add(tx *txs.Tx) error {
@@ -41,11 +40,6 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 	case *txs.RewardValidatorTx:
 		return ErrCantIssueRewardValidatorTx
 	default:
+		return m.Mempool.Add(tx)
 	}
-
-	err := m.Mempool.Add(tx)
-	if err == nil {
-		m.notify()
-	}
-	return err
 }

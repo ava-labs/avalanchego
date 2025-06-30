@@ -72,7 +72,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 		{
 			name: "mempool has transaction",
 			mempool: func() *pmempool.Mempool {
-				mempool, err := pmempool.New("", prometheus.NewRegistry(), noopNotify)
+				mempool, err := pmempool.New("", prometheus.NewRegistry())
 				require.NoError(t, err)
 				require.NoError(t, mempool.Add(&txs.Tx{Unsigned: &txs.BaseTx{}}))
 				return mempool
@@ -86,7 +86,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 		{
 			name: "transaction marked as dropped in mempool",
 			mempool: func() *pmempool.Mempool {
-				mempool, err := pmempool.New("", prometheus.NewRegistry(), noopNotify)
+				mempool, err := pmempool.New("", prometheus.NewRegistry())
 				require.NoError(t, err)
 				mempool.MarkDropped(ids.Empty, errTest)
 				return mempool
@@ -101,7 +101,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 		{
 			name: "tx dropped",
 			mempool: func() *pmempool.Mempool {
-				mempool, err := pmempool.New("", prometheus.NewRegistry(), noopNotify)
+				mempool, err := pmempool.New("", prometheus.NewRegistry())
 				require.NoError(t, err)
 				return mempool
 			}(),
@@ -116,7 +116,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 		{
 			name: "tx too big",
 			mempool: func() *pmempool.Mempool {
-				mempool, err := pmempool.New("", prometheus.NewRegistry(), noopNotify)
+				mempool, err := pmempool.New("", prometheus.NewRegistry())
 				require.NoError(t, err)
 				return mempool
 			}(),
@@ -135,7 +135,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 		{
 			name: "tx conflicts",
 			mempool: func() *pmempool.Mempool {
-				mempool, err := pmempool.New("", prometheus.NewRegistry(), noopNotify)
+				mempool, err := pmempool.New("", prometheus.NewRegistry())
 				require.NoError(t, err)
 
 				tx := &txs.Tx{
@@ -177,7 +177,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 		{
 			name: "mempool full",
 			mempool: func() *pmempool.Mempool {
-				m, err := pmempool.New("", prometheus.NewRegistry(), noopNotify)
+				m, err := pmempool.New("", prometheus.NewRegistry())
 				require.NoError(t, err)
 
 				for i := 0; i < 1024; i++ {
@@ -204,7 +204,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 		{
 			name: "happy path",
 			mempool: func() *pmempool.Mempool {
-				mempool, err := pmempool.New("", prometheus.NewRegistry(), noopNotify)
+				mempool, err := pmempool.New("", prometheus.NewRegistry())
 				require.NoError(t, err)
 				return mempool
 			}(),
@@ -238,7 +238,6 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				nil,
 				prometheus.NewRegistry(),
 				testConfig,
-				noopNotify,
 			)
 			require.NoError(err)
 

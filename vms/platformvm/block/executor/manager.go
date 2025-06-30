@@ -34,7 +34,7 @@ type Manager interface {
 	// Returns the ID of the most recently accepted block.
 	LastAccepted() ids.ID
 
-	SetPreference(blkID ids.ID) (updated bool)
+	SetPreference(blkID ids.ID)
 	Preferred() ids.ID
 
 	GetBlock(blkID ids.ID) (snowman.Block, error)
@@ -110,10 +110,8 @@ func (m *manager) NewBlock(blk block.Block) snowman.Block {
 	}
 }
 
-func (m *manager) SetPreference(blkID ids.ID) bool {
-	updated := m.preferred != blkID
+func (m *manager) SetPreference(blkID ids.ID) {
 	m.preferred = blkID
-	return updated
 }
 
 func (m *manager) Preferred() ids.ID {
