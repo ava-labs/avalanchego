@@ -124,11 +124,38 @@ func (v *FlagVars) ActivateGranite() bool {
 	return v.activateGranite
 }
 
-func RegisterFlags() *FlagVars {
-	return RegisterFlagsWithDefaultOwner("")
+type DefaultOptions struct {
+	owner     string
+	nodeCount int
 }
 
-func RegisterFlagsWithDefaultOwner(defaultOwner string) *FlagVars {
+type DefaultOption func(*DefaultOptions)
+
+func NewDefaultOptions(options []DefaultOption) *DefaultOptions {
+	d := &DefaultOptions{}
+	for _, do := range options {
+		do(d)
+	}
+	return d
+}
+
+func WithDefaultOwner(owner string) DefaultOption {
+	return func(d *DefaultOptions) {
+		d.owner = owner
+	}
+}
+
+func WithDefaultNodeCount(nodeCount int) DefaultOption {
+	return func(d *DefaultOptions) {
+		d.nodeCount = nodeCount
+	}
+}
+
+func RegisterFlags() *FlagVars {
+	return RegisterFlagsWithOptions(WithDefaultNodeCount(tmpnet.DefaultNodeCount))
+}
+
+func RegisterFlagsWithOptions(ops ...DefaultOption) *FlagVars {
 	vars := FlagVars{}
 
 	flag.BoolVar(
@@ -138,7 +165,8 @@ func RegisterFlagsWithDefaultOwner(defaultOwner string) *FlagVars {
 		"[optional] start a new network and exit without executing any tests. The new network cannot be reused with --reuse-network.",
 	)
 
-	vars.startNetworkVars = flags.NewStartNetworkFlagVars(defaultOwner)
+	options := NewDefaultOptions(ops)
+	vars.startNetworkVars = flags.NewStartNetworkFlagVars(options.owner, options.nodeCount)
 
 	vars.collectorVars = flags.NewCollectorFlagVars()
 
