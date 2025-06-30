@@ -143,7 +143,7 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 	metrics, err := metrics.New(registerer)
 	require.NoError(err)
 
-	res.mempool, err = mempool.New("mempool", registerer, func() {})
+	res.mempool, err = mempool.New("mempool", registerer)
 	require.NoError(err)
 
 	res.blkManager = blockexecutor.NewManager(
@@ -169,7 +169,6 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 		res.ctx.WarpSigner,
 		registerer,
 		config.DefaultNetwork,
-		func() {},
 	)
 	require.NoError(err)
 
@@ -177,9 +176,7 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 		res.mempool,
 		&res.backend,
 		res.blkManager,
-		func() {},
 	)
-	res.Builder.StartBlockTimer()
 
 	res.blkManager.SetPreference(genesisID)
 	addSubnet(t, res)
@@ -187,8 +184,6 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 	t.Cleanup(func() {
 		res.ctx.Lock.Lock()
 		defer res.ctx.Lock.Unlock()
-
-		res.Builder.ShutdownBlockTimer()
 
 		if res.uptimes.StartedTracking() {
 			validatorIDs := res.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)

@@ -20,8 +20,6 @@ import (
 
 var errFoo = errors.New("foo")
 
-func noopNotify() {}
-
 // Add should error if verification errors
 func TestGossipMempoolAddVerificationError(t *testing.T) {
 	require := require.New(t)
@@ -31,7 +29,7 @@ func TestGossipMempoolAddVerificationError(t *testing.T) {
 		TxID: txID,
 	}
 
-	mempool, err := pmempool.New("", prometheus.NewRegistry(), noopNotify)
+	mempool, err := pmempool.New("", prometheus.NewRegistry())
 	require.NoError(err)
 	txVerifier := testTxVerifier{err: errFoo}
 
@@ -43,7 +41,6 @@ func TestGossipMempoolAddVerificationError(t *testing.T) {
 		testConfig.ExpectedBloomFilterElements,
 		testConfig.ExpectedBloomFilterFalsePositiveProbability,
 		testConfig.MaxBloomFilterFalsePositiveProbability,
-		noopNotify,
 	)
 	require.NoError(err)
 
@@ -56,7 +53,7 @@ func TestGossipMempoolAddVerificationError(t *testing.T) {
 func TestMempoolDuplicate(t *testing.T) {
 	require := require.New(t)
 
-	testMempool, err := pmempool.New("", prometheus.NewRegistry(), noopNotify)
+	testMempool, err := pmempool.New("", prometheus.NewRegistry())
 	require.NoError(err)
 	txVerifier := testTxVerifier{}
 
@@ -75,7 +72,6 @@ func TestMempoolDuplicate(t *testing.T) {
 		testConfig.ExpectedBloomFilterElements,
 		testConfig.ExpectedBloomFilterFalsePositiveProbability,
 		testConfig.MaxBloomFilterFalsePositiveProbability,
-		noopNotify,
 	)
 	require.NoError(err)
 
@@ -95,7 +91,7 @@ func TestGossipAddBloomFilter(t *testing.T) {
 	}
 
 	txVerifier := testTxVerifier{}
-	mempool, err := pmempool.New("", prometheus.NewRegistry(), noopNotify)
+	mempool, err := pmempool.New("", prometheus.NewRegistry())
 	require.NoError(err)
 
 	gossipMempool, err := newGossipMempool(
@@ -106,7 +102,6 @@ func TestGossipAddBloomFilter(t *testing.T) {
 		testConfig.ExpectedBloomFilterElements,
 		testConfig.ExpectedBloomFilterFalsePositiveProbability,
 		testConfig.MaxBloomFilterFalsePositiveProbability,
-		noopNotify,
 	)
 	require.NoError(err)
 
