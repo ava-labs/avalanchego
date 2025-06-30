@@ -241,7 +241,7 @@ jobs:
     name: load tests
     runs-on: avalanche-avalanchego-runner
     container:
-      image: cimg/go:1.23.9
+      image: ubuntu:22.04
     steps:
       - name: Install x
         run: |
@@ -255,4 +255,4 @@ jobs:
       - name: Hello
         shell: nix develop --command bash -x {0}
         run: |
-          go run ./tests/load/c/main --runtime=kube --kube-image="avalanchego:arc-load-test"
+          go run ./tests/load/c/main --runtime=kube
