@@ -17,10 +17,9 @@ import (
 	"github.com/ava-labs/avalanchego/proto/pb/io/reader"
 )
 
-// TestEOF tests that if an io.EOF is returned by an io.Reader, it propagates
-// the same error type. This is important because the io.EOF type is used as a
-// sentinel error value for a lot of things.
-func TestEOF(t *testing.T) {
+// TestErrIOEOF tests that if an io.EOF is returned by an io.Reader, it
+// propagates that same error type.
+func TestErrIOEOF(t *testing.T) {
 	require := require.New(t)
 
 	server := grpc.NewServer()
