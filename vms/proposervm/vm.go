@@ -359,6 +359,8 @@ func (vm *VM) timeToBuild(ctx context.Context) (time.Time, bool, error) {
 		return time.Time{}, false, nil
 	}
 
+	// Because the VM in marked as being in the [snow.NormalOp] state, we know
+	// that [VM.SetPreference] must have already been called.
 	blk, err := vm.getPostForkBlock(ctx, vm.preferred)
 	// If the preferred block is pre-fork, we should wait for events on the
 	// innerVM.
