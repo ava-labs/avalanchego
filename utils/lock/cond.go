@@ -9,8 +9,7 @@ import (
 )
 
 // Cond implements a condition variable. Typically [sync.Cond] should be
-// preferred. However, this condition variable implementation supports
-// cancellable waits.
+// preferred. However, this implementation supports cancellable waits.
 type Cond struct {
 	L sync.Locker
 
@@ -28,8 +27,8 @@ func NewCond(l sync.Locker) *Cond {
 
 // Wait atomically unlocks c.L and suspends execution of the calling goroutine.
 // After later resuming execution, Wait locks c.L before returning. Unlike in
-// other systems, Wait cannot return unless awoken by [cond.Broadcast],
-// [cond.Signal], or due to the context being cancelled.
+// other systems, Wait cannot return unless awoken by [Cond.Broadcast],
+// [Cond.Signal], or due to the context being cancelled.
 //
 // Because c.L is not locked while Wait is waiting, the caller typically cannot
 // assume that the condition is true when Wait returns, even if the returned
@@ -73,8 +72,7 @@ func (c *Cond) Wait(ctx context.Context) error {
 
 // Signal wakes one goroutine waiting on c, if there is any.
 //
-// It is allowed but not required for the caller to hold c.L
-// during the call.
+// It is allowed but not required for the caller to hold c.L during the call.
 //
 // Signal() does not affect goroutine scheduling priority; if other goroutines
 // are attempting to lock c.L, they may be awoken before a "waiting" goroutine.
@@ -91,8 +89,7 @@ func (c *Cond) Signal() {
 
 // Broadcast wakes all goroutines waiting on c.
 //
-// It is allowed but not required for the caller to hold c.L
-// during the call.
+// It is allowed but not required for the caller to hold c.L during the call.
 func (c *Cond) Broadcast() {
 	c.m.Lock()
 	defer c.m.Unlock()
