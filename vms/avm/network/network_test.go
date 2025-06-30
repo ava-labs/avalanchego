@@ -57,7 +57,7 @@ var (
 func TestNetworkIssueTxFromRPC(t *testing.T) {
 	type test struct {
 		name           string
-		mempool        xmempool.Mempool
+		mempool        mempool.Mempool[*txs.Tx]
 		txVerifierFunc func(*gomock.Controller) TxVerifier
 		appSenderFunc  func(*gomock.Controller) common.AppSender
 		tx             *txs.Tx
@@ -67,8 +67,8 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 	tests := []test{
 		{
 			name: "mempool has transaction",
-			mempool: func() xmempool.Mempool {
-				mempool, err := xmempool.New("", prometheus.NewRegistry(), func() {})
+			mempool: func() mempool.Mempool[*txs.Tx] {
+				mempool, err := xmempool.New("", prometheus.NewRegistry())
 				require.NoError(t, err)
 				require.NoError(t, mempool.Add(&txs.Tx{Unsigned: &txs.BaseTx{}}))
 				return mempool
@@ -78,8 +78,8 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 		},
 		{
 			name: "transaction marked as dropped in mempool",
-			mempool: func() xmempool.Mempool {
-				mempool, err := xmempool.New("", prometheus.NewRegistry(), func() {})
+			mempool: func() mempool.Mempool[*txs.Tx] {
+				mempool, err := xmempool.New("", prometheus.NewRegistry())
 				require.NoError(t, err)
 				mempool.MarkDropped(ids.Empty, errTest)
 				return mempool
@@ -89,8 +89,8 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 		},
 		{
 			name: "tx too big",
-			mempool: func() xmempool.Mempool {
-				mempool, err := xmempool.New("", prometheus.NewRegistry(), func() {})
+			mempool: func() mempool.Mempool[*txs.Tx] {
+				mempool, err := xmempool.New("", prometheus.NewRegistry())
 				require.NoError(t, err)
 				return mempool
 			}(),
@@ -109,8 +109,8 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 		},
 		{
 			name: "tx conflicts",
-			mempool: func() xmempool.Mempool {
-				mempool, err := xmempool.New("", prometheus.NewRegistry(), func() {})
+			mempool: func() mempool.Mempool[*txs.Tx] {
+				mempool, err := xmempool.New("", prometheus.NewRegistry())
 				require.NoError(t, err)
 
 				tx := &txs.Tx{
@@ -152,8 +152,8 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 		},
 		{
 			name: "mempool full",
-			mempool: func() xmempool.Mempool {
-				m, err := xmempool.New("", prometheus.NewRegistry(), func() {})
+			mempool: func() mempool.Mempool[*txs.Tx] {
+				m, err := xmempool.New("", prometheus.NewRegistry())
 				require.NoError(t, err)
 
 				for i := 0; i < 1024; i++ {
@@ -180,8 +180,8 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 		},
 		{
 			name: "happy path",
-			mempool: func() xmempool.Mempool {
-				mempool, err := xmempool.New("", prometheus.NewRegistry(), func() {})
+			mempool: func() mempool.Mempool[*txs.Tx] {
+				mempool, err := xmempool.New("", prometheus.NewRegistry())
 				require.NoError(t, err)
 				return mempool
 			}(),
@@ -259,7 +259,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 func TestNetworkIssueTxFromRPCWithoutVerification(t *testing.T) {
 	type test struct {
 		name          string
-		mempool       xmempool.Mempool
+		mempool       mempool.Mempool[*txs.Tx]
 		appSenderFunc func(*gomock.Controller) common.AppSender
 		expectedErr   error
 	}
@@ -267,8 +267,8 @@ func TestNetworkIssueTxFromRPCWithoutVerification(t *testing.T) {
 	tests := []test{
 		{
 			name: "happy path",
-			mempool: func() xmempool.Mempool {
-				mempool, err := xmempool.New("", prometheus.NewRegistry(), func() {})
+			mempool: func() mempool.Mempool[*txs.Tx] {
+				mempool, err := xmempool.New("", prometheus.NewRegistry())
 				require.NoError(t, err)
 				return mempool
 			}(),
