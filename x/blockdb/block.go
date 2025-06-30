@@ -412,7 +412,6 @@ func (s *Database) getDataFileAndOffset(globalOffset uint64) (*os.File, uint64, 
 		handle, err := s.getOrOpenDataFile(0)
 		return handle, globalOffset, err
 	}
-
 	fileIndex := int(globalOffset / maxFileSize)
 	localOffset := globalOffset % maxFileSize
 	handle, err := s.getOrOpenDataFile(fileIndex)

@@ -12,6 +12,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -33,11 +34,14 @@ type Database struct {
 	header    indexFileHeader
 	log       logging.Logger
 	closed    bool
-	fileCache sync.Map
+	fileCache *lru.Cache[int, *os.File]
 
 	// closeMu prevents the database from being closed while in use and prevents
 	// use of a closed database.
 	closeMu sync.RWMutex
+
+	// fileOpenMu prevents race conditions when multiple threads try to open the same data file
+	fileOpenMu sync.Mutex
 
 	// maxBlockHeight tracks the highest block height that has been written to the db, even if there are gaps in the sequence.
 	maxBlockHeight atomic.Uint64
@@ -186,8 +190,13 @@ func New(indexDir, dataDir string, config DatabaseConfig, log logging.Logger) (*
 	s := &Database{
 		options:   config,
 		log:       log,
-		fileCache: sync.Map{},
+		fileCache: lru.NewCache[int, *os.File](MaxDataFiles),
 	}
+	s.fileCache.SetOnEvict(func(_ int, f *os.File) {
+		if f != nil {
+			f.Close()
+		}
+	})
 
 	if err := s.openAndInitializeIndex(indexDir, config.Truncate); err != nil {
 		return nil, err
@@ -211,11 +220,9 @@ func (s *Database) closeFiles() {
 	if s.indexFile != nil {
 		s.indexFile.Close()
 	}
-	s.fileCache.Range(func(_, value any) bool {
-		file := value.(*os.File)
-		file.Close()
-		return true
-	})
+	if s.fileCache != nil {
+		s.fileCache.Flush()
+	}
 }
 
 func (s *Database) dataFilePath(index int) string {
@@ -223,12 +230,17 @@ func (s *Database) dataFilePath(index int) string {
 }
 
 func (s *Database) getOrOpenDataFile(fileIndex int) (*os.File, error) {
-	if handle, ok := s.fileCache.Load(fileIndex); ok {
-		return handle.(*os.File), nil
+	if handle, ok := s.fileCache.Get(fileIndex); ok {
+		return handle, nil
 	}
 
-	if fileIndex >= MaxDataFiles {
-		return nil, fmt.Errorf("%w: file index %d would exceed limit of %d", ErrMaxDataFilesExceeded, fileIndex, MaxDataFiles)
+	// Prevent race conditions when multiple threads try to open the same file
+	s.fileOpenMu.Lock()
+	defer s.fileOpenMu.Unlock()
+
+	// Double-check the cache after acquiring the lock
+	if handle, ok := s.fileCache.Get(fileIndex); ok {
+		return handle, nil
 	}
 
 	filePath := s.dataFilePath(fileIndex)
@@ -236,13 +248,7 @@ func (s *Database) getOrOpenDataFile(fileIndex int) (*os.File, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open data file %s: %w", filePath, err)
 	}
-	actual, loaded := s.fileCache.LoadOrStore(fileIndex, handle)
-	if loaded {
-		// Another goroutine created the file first, close ours
-		handle.Close()
-		return actual.(*os.File), nil
-	}
-
+	s.fileCache.Put(fileIndex, handle)
 	return handle, nil
 }
 
