@@ -55,9 +55,13 @@ const (
 
 	// Name of config map containing tmpnet defaults
 	defaultsConfigMapName = "tmpnet-defaults"
+	ingressHostKey        = "ingressHost"
 )
 
-var errMissingSchedulingLabels = errors.New("--kube-scheduling-label-key and --kube-scheduling-label-value are required when exclusive scheduling is enabled")
+var (
+	errMissingSchedulingLabels = errors.New("--kube-scheduling-label-key and --kube-scheduling-label-value are required when exclusive scheduling is enabled")
+	errMissingIngressHost      = errors.New("IngressHost is a required value. Ensure the " + defaultsConfigMapName + " ConfigMap contains an entry for " + ingressHostKey)
+)
 
 type KubeRuntimeConfig struct {
 	// Path to the kubeconfig file identifying the target cluster
@@ -78,14 +82,18 @@ type KubeRuntimeConfig struct {
 	SchedulingLabelKey string `json:"schedulingLabelKey,omitempty"`
 	// Label value to use for exclusive scheduling for node selection and toleration
 	SchedulingLabelValue string `json:"schedulingLabelValue,omitempty"`
-	// Base URI for constructing node URIs when running outside of the cluster hosting nodes (e.g., "http://localhost:30791")
-	BaseAccessibleURI string `json:"baseAccessibleURI,omitempty"`
+	// Host for ingress rules (e.g., "localhost:30791" for kind, "tmpnet.example.com" for EKS)
+	IngressHost string `json:"ingressHost,omitempty"`
+	// TLS secret name for ingress (empty for HTTP, populated for HTTPS)
+	IngressSecret string `json:"ingressSecret,omitempty"`
 }
 
 // ensureDefaults sets cluster-specific defaults for fields not already set by flags.
 func (c *KubeRuntimeConfig) ensureDefaults(ctx context.Context, log logging.Logger) error {
+	// Only read defaults if necessary
 	requireSchedulingDefaults := c.UseExclusiveScheduling && (len(c.SchedulingLabelKey) == 0 || len(c.SchedulingLabelValue) == 0)
-	if !requireSchedulingDefaults {
+	requireIngressDefaults := !IsRunningInCluster() && len(c.IngressHost) == 0
+	if !requireSchedulingDefaults && !requireIngressDefaults {
 		return nil
 	}
 
@@ -104,26 +112,47 @@ func (c *KubeRuntimeConfig) ensureDefaults(ctx context.Context, log logging.Logg
 		return fmt.Errorf("failed to get ConfigMap: %w", err)
 	}
 
-	var (
-		schedulingLabelKey   = configMap.Data["schedulingLabelKey"]
-		schedulingLabelValue = configMap.Data["schedulingLabelValue"]
-	)
-	if len(c.SchedulingLabelKey) == 0 && len(schedulingLabelKey) > 0 {
-		log.Info("setting default value for SchedulingLabelKey",
-			zap.String("schedulingLabelKey", schedulingLabelKey),
+	if requireSchedulingDefaults {
+		var (
+			schedulingLabelKey   = configMap.Data["schedulingLabelKey"]
+			schedulingLabelValue = configMap.Data["schedulingLabelValue"]
 		)
-		c.SchedulingLabelKey = schedulingLabelKey
+		if len(c.SchedulingLabelKey) == 0 && len(schedulingLabelKey) > 0 {
+			log.Info("setting default value for SchedulingLabelKey",
+				zap.String("schedulingLabelKey", schedulingLabelKey),
+			)
+			c.SchedulingLabelKey = schedulingLabelKey
+		}
+		if len(c.SchedulingLabelValue) == 0 && len(schedulingLabelValue) > 0 {
+			log.Info("setting default value for SchedulingLabelValue",
+				zap.String("schedulingLabelValue", schedulingLabelValue),
+			)
+			c.SchedulingLabelValue = schedulingLabelValue
+		}
+		if len(c.SchedulingLabelKey) == 0 || len(c.SchedulingLabelValue) == 0 {
+			return errMissingSchedulingLabels
+		}
 	}
-	if len(c.SchedulingLabelValue) == 0 && len(schedulingLabelValue) > 0 {
-		log.Info("setting default value for SchedulingLabelValue",
-			zap.String("schedulingLabelValue", schedulingLabelValue),
+	if requireIngressDefaults {
+		var (
+			ingressHost   = configMap.Data[ingressHostKey]
+			ingressSecret = configMap.Data["ingressSecret"]
 		)
-		c.SchedulingLabelValue = schedulingLabelValue
-	}
-
-	// Validate that the scheduling labels are now set
-	if len(c.SchedulingLabelKey) == 0 || len(c.SchedulingLabelValue) == 0 {
-		return errMissingSchedulingLabels
+		if len(c.IngressHost) == 0 && len(ingressHost) > 0 {
+			log.Info("setting default value for IngressHost",
+				zap.String("ingressHost", ingressHost),
+			)
+			c.IngressHost = ingressHost
+		}
+		if len(c.IngressSecret) == 0 && len(ingressSecret) > 0 {
+			log.Info("setting default value for IngressSecret",
+				zap.String("ingressSecret", ingressSecret),
+			)
+			c.IngressSecret = ingressSecret
+		}
+		if len(c.IngressHost) == 0 {
+			return errMissingIngressHost
+		}
 	}
 
 	return nil
@@ -150,8 +179,8 @@ func (p *KubeRuntime) readState(ctx context.Context) error {
 	)
 
 	// Validate that it will be possible to construct accessible URIs when running external to the kube cluster
-	if !IsRunningInCluster() && len(runtimeConfig.BaseAccessibleURI) == 0 {
-		return errors.New("BaseAccessibleURI must be set when running outside of the kubernetes cluster")
+	if !IsRunningInCluster() && len(runtimeConfig.IngressHost) == 0 {
+		return errors.New("IngressHost must be set when running outside of the kubernetes cluster")
 	}
 
 	clientset, err := p.getClientset()
@@ -207,11 +236,18 @@ func (p *KubeRuntime) GetAccessibleURI() string {
 		return p.node.URI
 	}
 
-	baseURI := p.runtimeConfig().BaseAccessibleURI
-	nodeID := p.node.NodeID.String()
-	networkUUID := p.node.network.UUID
+	var (
+		protocol      = "http"
+		nodeID        = p.node.NodeID.String()
+		networkUUID   = p.node.network.UUID
+		runtimeConfig = p.runtimeConfig()
+	)
+	// Assume tls is configured for an ingress secret
+	if len(runtimeConfig.IngressSecret) > 0 {
+		protocol = "https"
+	}
 
-	return fmt.Sprintf("%s/networks/%s/%s", baseURI, networkUUID, nodeID)
+	return fmt.Sprintf("%s://%s/networks/%s/%s", protocol, runtimeConfig.IngressHost, networkUUID, nodeID)
 }
 
 // GetAccessibleStakingAddress retrieves a StakingAddress for the node intended to be
@@ -993,6 +1029,35 @@ func (p *KubeRuntime) createNodeIngress(ctx context.Context, serviceName string)
 		pathType    = networkingv1.PathTypeImplementationSpecific
 	)
 
+	// Build the ingress rules
+	ingressRules := []networkingv1.IngressRule{
+		{
+			IngressRuleValue: networkingv1.IngressRuleValue{
+				HTTP: &networkingv1.HTTPIngressRuleValue{
+					Paths: []networkingv1.HTTPIngressPath{
+						{
+							Path:     pathPattern,
+							PathType: &pathType,
+							Backend: networkingv1.IngressBackend{
+								Service: &networkingv1.IngressServiceBackend{
+									Name: serviceName,
+									Port: networkingv1.ServiceBackendPort{
+										Number: config.DefaultHTTPPort,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Add host if not localhost
+	if !strings.HasPrefix(runtimeConfig.IngressHost, "localhost") {
+		ingressRules[0].Host = runtimeConfig.IngressHost
+	}
+
 	ingress := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
@@ -1012,29 +1077,18 @@ func (p *KubeRuntime) createNodeIngress(ctx context.Context, serviceName string)
 		},
 		Spec: networkingv1.IngressSpec{
 			IngressClassName: &ingressClassName,
-			Rules: []networkingv1.IngressRule{
-				{
-					IngressRuleValue: networkingv1.IngressRuleValue{
-						HTTP: &networkingv1.HTTPIngressRuleValue{
-							Paths: []networkingv1.HTTPIngressPath{
-								{
-									Path:     pathPattern,
-									PathType: &pathType,
-									Backend: networkingv1.IngressBackend{
-										Service: &networkingv1.IngressServiceBackend{
-											Name: serviceName,
-											Port: networkingv1.ServiceBackendPort{
-												Number: config.DefaultHTTPPort,
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
+			Rules:            ingressRules,
 		},
+	}
+
+	// Add TLS configuration if IngressSecret is set
+	if len(runtimeConfig.IngressSecret) > 0 && !strings.HasPrefix(runtimeConfig.IngressHost, "localhost") {
+		ingress.Spec.TLS = []networkingv1.IngressTLS{
+			{
+				Hosts:      []string{runtimeConfig.IngressHost},
+				SecretName: runtimeConfig.IngressSecret,
+			},
+		}
 	}
 
 	_, err = clientset.NetworkingV1().Ingresses(namespace).Create(ctx, ingress, metav1.CreateOptions{})
