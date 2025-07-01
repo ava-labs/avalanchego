@@ -74,9 +74,6 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-// TODO:
-// - update C-Chain dashboard to make it useful for the benchmark
-// - provide task to snapshot block ranges from existing database or direct p2p to s3
 func TestReexecuteRange(t *testing.T) {
 	r := require.New(t)
 
@@ -286,6 +283,8 @@ func createBlockChanFromRawDB(t *testing.T, sourceDir string, startBlock, endBlo
 	return ch, nil
 }
 
+// CollectRegistry starts prometheus and collects metrics from the provided gatherer.
+// Attaches the provided labels + GitHub labels if available to the collected metrics.
 func CollectRegistry(t *testing.T, name string, addr string, timeout time.Duration, gatherer prometheus.Gatherer, labels map[string]string) {
 	r := require.New(t)
 
