@@ -14,7 +14,7 @@ To set up your dev environment to run C-Chain benchmarks, run:
 nix develop
 ```
 
-In addition, if using AWS to push/pull S3 buckets, configure your AWS profile with the required access. The S3 buckets referenced in this README are in the Ava Labs Experimental AWS Account.
+In addition, if using AWS to push/pull S3 buckets, configure your AWS profile with the required access. The S3 buckets referenced in this README are in the Ava Labs Experimental AWS Account in AWS Region us-east-2.
 
 To enable metrics collection, provide the Prometheus credentials referenced in the e2e [README](../../e2e/README.md#monitoring).
 
