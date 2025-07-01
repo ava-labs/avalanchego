@@ -68,6 +68,7 @@ var (
 		TriePrefetcherParallelism: 4,
 		Pruning:                   true, // Enable pruning
 		CommitInterval:            4096,
+		StateHistory:              32,
 		SnapshotLimit:             256,
 		AcceptorQueueLimit:        64,
 	}
@@ -153,6 +154,7 @@ func TestPruningBlockChainSnapsDisabled(t *testing.T) {
 				TriePrefetcherParallelism: 4,
 				Pruning:                   true, // Enable pruning
 				CommitInterval:            4096,
+				StateHistory:              32,
 				SnapshotLimit:             0, // Disable snapshots
 				AcceptorQueueLimit:        64,
 			},
@@ -203,6 +205,7 @@ func TestPruningBlockChainUngracefulShutdownSnapsDisabled(t *testing.T) {
 				TriePrefetcherParallelism: 4,
 				Pruning:                   true, // Enable pruning
 				CommitInterval:            4096,
+				StateHistory:              32,
 				SnapshotLimit:             0, // Disable snapshots
 				AcceptorQueueLimit:        64,
 			},
@@ -239,6 +242,7 @@ func TestEnableSnapshots(t *testing.T) {
 				TriePrefetcherParallelism: 4,
 				Pruning:                   true, // Enable pruning
 				CommitInterval:            4096,
+				StateHistory:              32,
 				SnapshotLimit:             snapLimit,
 				AcceptorQueueLimit:        64,
 			},
@@ -428,6 +432,7 @@ func TestUngracefulAsyncShutdown(t *testing.T) {
 				TriePrefetcherParallelism: 4,
 				Pruning:                   true,
 				CommitInterval:            4096,
+				StateHistory:              32,
 				SnapshotLimit:             256,
 				SnapshotNoBuild:           true, // Ensure the test errors if snapshot initialization fails
 				AcceptorQueueLimit:        1000, // ensure channel doesn't block
@@ -686,6 +691,7 @@ func TestTxLookupBlockChain(t *testing.T) {
 		Pruning:                   true,
 		CommitInterval:            4096,
 		SnapshotLimit:             256,
+		StateHistory:              32,
 		SnapshotNoBuild:           true, // Ensure the test errors if snapshot initialization fails
 		AcceptorQueueLimit:        64,   // ensure channel doesn't block
 		TransactionHistory:        5,
@@ -708,6 +714,7 @@ func TestTxLookupSkipIndexingBlockChain(t *testing.T) {
 		TriePrefetcherParallelism: 4,
 		Pruning:                   true,
 		CommitInterval:            4096,
+		StateHistory:              32,
 		SnapshotLimit:             256,
 		SnapshotNoBuild:           true, // Ensure the test errors if snapshot initialization fails
 		AcceptorQueueLimit:        64,   // ensure channel doesn't block

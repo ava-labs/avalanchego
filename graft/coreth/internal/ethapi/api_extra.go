@@ -101,12 +101,9 @@ func (s *BlockChainAPI) GetBadBlocks(ctx context.Context) ([]*BadBlockArgs, erro
 //
 // Otherwise, it returns a non-nil error containing block number information.
 func (s *BlockChainAPI) stateQueryBlockNumberAllowed(blockNumOrHash rpc.BlockNumberOrHash) (err error) {
-	queryWindow := uint64(core.TipBufferSize)
-	if s.b.IsArchive() {
-		queryWindow = s.b.HistoricalProofQueryWindow()
-		if queryWindow == 0 {
-			return nil
-		}
+	queryWindow := s.b.HistoricalProofQueryWindow()
+	if s.b.IsArchive() && queryWindow == 0 {
+		return nil
 	}
 
 	lastAcceptedNumber := s.b.LastAcceptedBlock().NumberU64()

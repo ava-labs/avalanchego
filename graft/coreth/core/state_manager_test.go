@@ -13,6 +13,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Default state history size
+const tipBufferSize = 32
+
 type MockTrieDB struct {
 	LastDereference common.Hash
 	LastCommit      common.Hash
@@ -35,7 +38,7 @@ func (t *MockTrieDB) Cap(limit common.StorageSize) error {
 
 func TestCappedMemoryTrieWriter(t *testing.T) {
 	m := &MockTrieDB{}
-	cacheConfig := &CacheConfig{Pruning: true, CommitInterval: 4096}
+	cacheConfig := &CacheConfig{Pruning: true, CommitInterval: 4096, StateHistory: uint64(tipBufferSize)}
 	w := NewTrieWriter(m, cacheConfig)
 	assert := assert.New(t)
 	for i := 0; i < int(cacheConfig.CommitInterval)+1; i++ {
@@ -53,10 +56,10 @@ func TestCappedMemoryTrieWriter(t *testing.T) {
 		assert.Equal(common.Hash{}, m.LastCommit, "should not have committed block on insert")
 
 		w.AcceptTrie(block)
-		if i <= TipBufferSize {
+		if i <= tipBufferSize {
 			assert.Equal(common.Hash{}, m.LastDereference, "should not have dereferenced block on accept")
 		} else {
-			assert.Equal(common.BigToHash(big.NewInt(int64(i-TipBufferSize))), m.LastDereference, "should have dereferenced old block on last accept")
+			assert.Equal(common.BigToHash(big.NewInt(int64(i-tipBufferSize))), m.LastDereference, "should have dereferenced old block on last accept")
 			m.LastDereference = common.Hash{}
 		}
 		if i < int(cacheConfig.CommitInterval) {
@@ -77,7 +80,7 @@ func TestNoPruningTrieWriter(t *testing.T) {
 	m := &MockTrieDB{}
 	w := NewTrieWriter(m, &CacheConfig{})
 	assert := assert.New(t)
-	for i := 0; i < TipBufferSize+1; i++ {
+	for i := 0; i < tipBufferSize+1; i++ {
 		bigI := big.NewInt(int64(i))
 		block := types.NewBlock(
 			&types.Header{
