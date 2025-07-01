@@ -65,7 +65,7 @@ After generating the `$HOME/exec-data/current-state` directory from executing th
 To export, run:
 
 ```bash
-task export-dir-to-s3 LOCAL_SRC=$HOME/exec-data/current-state S3_DST=s3://avalanchego-bootstrap-testing/cchain-current-state-test
+task export-dir-to-s3 LOCAL_SRC=$HOME/exec-data/current-state/ S3_DST=s3://avalanchego-bootstrap-testing/cchain-current-state-test/
 ```
 
 ## Run C-Chain Benchmark
@@ -78,6 +78,8 @@ First, to run the block range using our locally available data, run:
 task reexecute-cchain-range EXECUTION_DATA_DIR=$HOME/exec-data START_BLOCK=101 END_BLOCK=200
 ```
 
+Note: if you attempt to re-execute a second time on the same data set, then it will of course fail because the current state starting at state 100 has been overwritten and the new current state is at height 200.
+
 To re-execute with an entirely fresh copy, either use the defaults provided in [Taskfile.yaml](../../../Taskfile.yml) or provide the parameters we've already used here.
 
 Use the defaults to execute the range [101, 200]:
@@ -89,7 +91,7 @@ task reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=$HOME/reexec-dat
 Provide the parameters explicitly that we have just used locally:
 
 ```bash
-task reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=$HOME/reexec-data-params SOURCE_BLOCK_DIR=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-200.zip CURRENT_STATE_DIR=s3://avalanchego-bootstrap-testing/cchain-current-state-test START_BLOCK=101 END_BLOCK=200
+task reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=$HOME/reexec-data-params SOURCE_BLOCK_DIR=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-200.zip CURRENT_STATE_DIR=s3://avalanchego-bootstrap-testing/cchain-current-state-test/** START_BLOCK=101 END_BLOCK=200
 ```
 
 ## Future Additions
