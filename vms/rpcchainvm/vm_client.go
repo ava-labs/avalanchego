@@ -50,7 +50,7 @@ import (
 	validatorstatepb "github.com/ava-labs/avalanchego/proto/pb/validatorstate"
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 	warppb "github.com/ava-labs/avalanchego/proto/pb/warp"
-	grpcprometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	dto "github.com/prometheus/client_model/go"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
@@ -98,7 +98,7 @@ type VMClient struct {
 	serverCloser grpcutils.ServerCloser
 	conns        []*grpc.ClientConn
 
-	grpcServerMetrics *grpcprometheus.ServerMetrics
+	grpcServerMetrics *grpc_prometheus.ServerMetrics
 }
 
 // NewClient returns a VM connected to a remote VM
@@ -148,7 +148,7 @@ func (vm *VMClient) Initialize(
 	if err != nil {
 		return err
 	}
-	vm.grpcServerMetrics = grpcprometheus.NewServerMetrics()
+	vm.grpcServerMetrics = grpc_prometheus.NewServerMetrics()
 	if err := serverReg.Register(vm.grpcServerMetrics); err != nil {
 		return err
 	}
@@ -287,7 +287,7 @@ func (vm *VMClient) newDBServer(db database.Database) *grpc.Server {
 	healthpb.RegisterHealthServer(server, grpcHealth)
 
 	// Ensure metric counters are zeroed on restart
-	grpcprometheus.Register(server)
+	grpc_prometheus.Register(server)
 
 	return server
 }
@@ -314,7 +314,7 @@ func (vm *VMClient) newInitServer() *grpc.Server {
 	warppb.RegisterSignerServer(server, vm.warpSignerServer)
 
 	// Ensure metric counters are zeroed on restart
-	grpcprometheus.Register(server)
+	grpc_prometheus.Register(server)
 
 	return server
 }

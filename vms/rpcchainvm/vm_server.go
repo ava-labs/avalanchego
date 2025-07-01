@@ -47,7 +47,7 @@ import (
 	validatorstatepb "github.com/ava-labs/avalanchego/proto/pb/validatorstate"
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 	warppb "github.com/ava-labs/avalanchego/proto/pb/warp"
-	grpcprometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 )
 
 var (
@@ -161,7 +161,7 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 	}
 
 	// gRPC client metrics
-	grpcClientMetrics := grpcprometheus.NewClientMetrics()
+	grpcClientMetrics := grpc_prometheus.NewClientMetrics()
 	if err := grpcMetrics.Register(grpcClientMetrics); err != nil {
 		return nil, err
 	}
