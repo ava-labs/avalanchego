@@ -51,6 +51,7 @@ import (
 	"github.com/ava-labs/avalanchego/proto/pb/admin/v1/adminv1connect"
 	"github.com/ava-labs/avalanchego/proto/pb/health/v1/healthv1connect"
 	"github.com/ava-labs/avalanchego/proto/pb/info/v1/infov1connect"
+	"github.com/ava-labs/avalanchego/proto/pb/metrics/v1/metricsv1connect"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -85,6 +86,7 @@ import (
 	adminconnect "github.com/ava-labs/avalanchego/api/admin/connecthandler"
 	healthconnect "github.com/ava-labs/avalanchego/api/health/connecthandler"
 	infoconnect "github.com/ava-labs/avalanchego/api/info/connecthandler"
+	metricsconnect "github.com/ava-labs/avalanchego/api/metrics/connecthandler"
 	databasefactory "github.com/ava-labs/avalanchego/database/factory"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -792,7 +794,7 @@ func (n *Node) initDatabase() error {
 	rawExpectedGenesisHash := hashing.ComputeHash256(n.Config.GenesisBytes)
 
 	rawGenesisHash, err := n.DB.Get(genesisHashKey)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		rawGenesisHash = rawExpectedGenesisHash
 		err = n.DB.Put(genesisHashKey, rawGenesisHash)
 	}
@@ -1284,6 +1286,20 @@ func (n *Node) initMetricsAPI() error {
 	}
 
 	n.Log.Info("initializing metrics API")
+
+	metricsServicePattern, metricsServiceHandler := metricsv1connect.NewMetricsServiceHandler(
+		metricsconnect.NewConnectMetricsService(n.MetricsGatherer),
+	)
+
+	reflectionPattern, reflectionHandler := grpcreflect.NewHandlerV1(
+		grpcreflect.NewStaticReflector(metricsv1connect.MetricsServiceName),
+	)
+
+	mux := http.NewServeMux()
+	mux.Handle(reflectionPattern, reflectionHandler)
+	mux.Handle(metricsServicePattern, metricsServiceHandler)
+
+	n.APIServer.AddHeaderRoute("metrics", mux)
 
 	return n.APIServer.AddRoute(
 		promhttp.HandlerFor(
