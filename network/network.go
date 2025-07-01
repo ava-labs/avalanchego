@@ -160,7 +160,7 @@ type network struct {
 	// as well as all non-handshake peer messages.
 	//
 	// It is ensured that [Connected] and [Disconnected] are called in
-	// consistent ways. Specifically, the a peer starts in the disconnected
+	// consistent ways. Specifically, a peer starts in the disconnected
 	// state and the network can change the peer's state from disconnected to
 	// connected and back.
 	//
