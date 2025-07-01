@@ -279,6 +279,16 @@ tasks:
           S3_SRC: '{{.CURRENT_STATE_DIR}}'
           LOCAL_DST: '{{.EXECUTION_DATA_DIR}}/current-state'
 
+  export-cchain-block-range:
+    desc: Export range of C-Chain blocks from source to target directory.
+    vars:
+      SOURCE_BLOCK_DIR: '{{.SOURCE_BLOCK_DIR}}'
+      TARGET_BLOCK_DIR: '{{.TARGET_BLOCK_DIR}}'
+      START_BLOCK: '{{.START_BLOCK}}'
+      END_BLOCK: '{{.END_BLOCK}}'
+    cmds:
+      - cmd: go test -run=TestExportBlockRange github.com/ava-labs/avalanchego/tests/bench/c --source-block-dir={{.SOURCE_BLOCK_DIR}} --target-block-dir={{.TARGET_BLOCK_DIR}} --start-block={{.START_BLOCK}} --end-block={{.END_BLOCK}}
+
   reexecute-cchain-range:
     desc: Benchmark re-execute a range of blocks on the C-Chain. Defaults to execute the block range (100, 200].
     vars:

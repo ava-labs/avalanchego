@@ -5,6 +5,7 @@ package vm
 
 import (
 	"context"
+	"encoding/binary"
 	"flag"
 	"fmt"
 	"os"
@@ -30,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/coreth/plugin/evm"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -52,6 +54,7 @@ var (
 
 var (
 	sourceBlockDir string
+	targetBlockDir string
 	targetDir      string
 	startBlock     uint64
 	endBlock       uint64
@@ -62,6 +65,9 @@ var (
 func TestMain(m *testing.M) {
 	// Source directory must be a leveldb dir with the required blocks accessible via rawdb.ReadBlock.
 	flag.StringVar(&sourceBlockDir, "source-block-dir", sourceBlockDir, "DB directory storing executable block range.")
+	// Target block directory to write blocks into when executing TestExportBlockRange.
+	flag.StringVar(&targetBlockDir, "target-block-dir", targetBlockDir, "DB directory to write blocks into when executing TestExportBlockRange.")
+
 	// Target directory assumes the current-state directory contains a db directory and a chain-data-dir directory.
 	// - db/
 	// - chain-data-dir/
@@ -122,6 +128,10 @@ func TestReexecuteRange(t *testing.T) {
 	executor := newVMExecutor(sourceVM)
 	err = executor.executeSequence(context.Background(), blockChan)
 	r.NoError(err)
+}
+
+func TestExportBlockRange(t *testing.T) {
+	exportBlockRange(t, sourceBlockDir, targetBlockDir, startBlock, endBlock, chanSize)
 }
 
 func newMainnetCChainVM(
@@ -188,6 +198,7 @@ func newMainnetCChainVM(
 
 type BlockResult struct {
 	BlockBytes []byte
+	Height     uint64
 	Err        error
 }
 
@@ -246,43 +257,6 @@ func (e *VMExecutor) executeSequence(ctx context.Context, blkChan <-chan BlockRe
 	return nil
 }
 
-func createBlockChanFromRawDB(t *testing.T, sourceDir string, startBlock, endBlock uint64, chanSize int) (<-chan BlockResult, error) {
-	ch := make(chan BlockResult, chanSize)
-
-	db, err := rawdb.NewLevelDBDatabase(sourceDir, sourceDBCacheSize, sourceDBHandles, "", true)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create leveldb database from %q: %w", sourceDir, err)
-	}
-	t.Cleanup(func() {
-		if err := db.Close(); err != nil {
-			t.Fatal(err)
-		}
-	})
-
-	go func() {
-		defer close(ch)
-
-		for i := startBlock; i <= endBlock; i++ {
-			block := rawdb.ReadBlock(db, rawdb.ReadCanonicalHash(db, i), i)
-			blockBytes, err := rlp.EncodeToBytes(block)
-			if err != nil {
-				ch <- BlockResult{
-					BlockBytes: nil,
-					Err:        err,
-				}
-				return
-			}
-
-			ch <- BlockResult{
-				BlockBytes: blockBytes,
-				Err:        nil,
-			}
-		}
-	}()
-
-	return ch, nil
-}
-
 // CollectRegistry starts prometheus and collects metrics from the provided gatherer.
 // Attaches the provided labels + GitHub labels if available to the collected metrics.
 func CollectRegistry(t *testing.T, name string, addr string, timeout time.Duration, gatherer prometheus.Gatherer, labels map[string]string) {
@@ -316,4 +290,103 @@ func CollectRegistry(t *testing.T, name string, addr string, timeout time.Durati
 	t.Cleanup(func() {
 		os.Remove(sdConfigFilePath)
 	})
+}
+
+func createBlockChanFromRawDB(t *testing.T, sourceDir string, startBlock, endBlock uint64, chanSize int) (<-chan BlockResult, error) {
+	ch := make(chan BlockResult, chanSize)
+
+	db, err := rawdb.NewLevelDBDatabase(sourceDir, sourceDBCacheSize, sourceDBHandles, "", true)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create leveldb database from %q: %w", sourceDir, err)
+	}
+	t.Cleanup(func() {
+		if err := db.Close(); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	go func() {
+		defer close(ch)
+
+		for i := startBlock; i <= endBlock; i++ {
+			block := rawdb.ReadBlock(db, rawdb.ReadCanonicalHash(db, i), i)
+			blockBytes, err := rlp.EncodeToBytes(block)
+			if err != nil {
+				ch <- BlockResult{
+					BlockBytes: nil,
+					Err:        err,
+				}
+				return
+			}
+
+			ch <- BlockResult{
+				BlockBytes: blockBytes,
+				Height:     i,
+				Err:        nil,
+			}
+		}
+	}()
+
+	return ch, nil
+}
+
+func createBlockChanFromLevelDB(t *testing.T, sourceDir string, startBlock, endBlock uint64, chanSize int) (<-chan BlockResult, error) {
+	ch := make(chan BlockResult, chanSize)
+
+	db, err := leveldb.New(targetDir, nil, logging.NoLog{}, prometheus.NewRegistry())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create leveldb database from %q: %w", sourceDir, err)
+	}
+	t.Cleanup(func() {
+		if err := db.Close(); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	go func() {
+		defer close(ch)
+
+		for i := startBlock; i <= endBlock; i++ {
+			blockBytes, err := db.Get(binary.BigEndian.AppendUint64(nil, i))
+			if err != nil {
+				ch <- BlockResult{
+					BlockBytes: nil,
+					Err:        err,
+				}
+				return
+			}
+
+			ch <- BlockResult{
+				BlockBytes: blockBytes,
+				Height:     i,
+				Err:        nil,
+			}
+		}
+	}()
+
+	return ch, nil
+}
+
+func exportBlockRange(t *testing.T, sourceDir string, targetDir string, startBlock, endBlock uint64, chanSize int) {
+	r := require.New(t)
+	blockChan, err := createBlockChanFromRawDB(t, sourceDir, startBlock, endBlock, chanSize)
+	r.NoError(err)
+
+	db, err := leveldb.New(targetDir, nil, logging.NoLog{}, prometheus.NewRegistry())
+	r.NoError(err)
+	t.Cleanup(func() {
+		r.NoError(db.Close())
+	})
+
+	batch := db.NewBatch()
+	for blkResult := range blockChan {
+		r.NoError(batch.Put(binary.BigEndian.AppendUint64(nil, blkResult.Height), blkResult.BlockBytes))
+
+		if batch.Size() > 10*units.MiB {
+			r.NoError(batch.Write())
+			batch = db.NewBatch()
+		}
+	}
+
+	r.NoError(batch.Write())
 }
