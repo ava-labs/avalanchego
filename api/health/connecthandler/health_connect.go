@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/ava-labs/avalanchego/api/health"
@@ -96,16 +97,27 @@ func (s *ConnectHealthService) Liveness(
 // convertResult transforms a health.Result into a healthv1.Result
 func convertResult(r health.Result) *healthv1.Result {
 	result := &healthv1.Result{
-		Message:            "", // Will be set below if details exist
 		ContiguousFailures: r.ContiguousFailures,
 		DurationNs:         r.Duration.Nanoseconds(),
 	}
 
 	// Handle message field (from the Details field)
 	if r.Details != nil {
-		if msg, ok := r.Details.(string); ok {
-			result.Message = msg
+		if m, ok := r.Details.(map[string]interface{}); ok {
+			if structMsg, err := structpb.NewStruct(m); err == nil {
+				result.Message = structMsg
+			}
+		} else if msg, ok := r.Details.(string); ok {
+			// Convert string to a Struct with a single field "message"
+			result.Message = &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"message": structpb.NewStringValue(msg),
+				},
+			}
 		}
+	} else {
+		// If no details, set empty struct
+		result.Message = &structpb.Struct{}
 	}
 
 	// Set error field if exists

@@ -9,6 +9,7 @@ package healthv1
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	structpb "google.golang.org/protobuf/types/known/structpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
@@ -25,7 +26,7 @@ const (
 // Result is the result of a health check.
 type Result struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
-	Message string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	Message *structpb.Struct       `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
 	// Error is the string representation of the error returned by the failing
 	// HealthCheck. The value is nil if the check passed.
 	Error string `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
@@ -71,11 +72,11 @@ func (*Result) Descriptor() ([]byte, []int) {
 	return file_health_v1_service_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *Result) GetMessage() string {
+func (x *Result) GetMessage() *structpb.Struct {
 	if x != nil {
 		return x.Message
 	}
-	return ""
+	return nil
 }
 
 func (x *Result) GetError() string {
@@ -405,9 +406,9 @@ var File_health_v1_service_proto protoreflect.FileDescriptor
 
 const file_health_v1_service_proto_rawDesc = "" +
 	"\n" +
-	"\x17health/v1/service.proto\x12\thealth.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x93\x02\n" +
-	"\x06Result\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessage\x12\x14\n" +
+	"\x17health/v1/service.proto\x12\thealth.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\"\xac\x02\n" +
+	"\x06Result\x121\n" +
+	"\amessage\x18\x01 \x01(\v2\x17.google.protobuf.StructR\amessage\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\x128\n" +
 	"\ttimestamp\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12\x1f\n" +
 	"\vduration_ns\x18\x04 \x01(\x03R\n" +
@@ -468,28 +469,30 @@ var file_health_v1_service_proto_goTypes = []any{
 	nil,                           // 7: health.v1.ReadinessReply.ChecksEntry
 	nil,                           // 8: health.v1.LivenessReply.ChecksEntry
 	nil,                           // 9: health.v1.HealthReply.ChecksEntry
-	(*timestamppb.Timestamp)(nil), // 10: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),       // 10: google.protobuf.Struct
+	(*timestamppb.Timestamp)(nil), // 11: google.protobuf.Timestamp
 }
 var file_health_v1_service_proto_depIdxs = []int32{
-	10, // 0: health.v1.Result.timestamp:type_name -> google.protobuf.Timestamp
-	10, // 1: health.v1.Result.time_of_first_failure:type_name -> google.protobuf.Timestamp
-	7,  // 2: health.v1.ReadinessReply.checks:type_name -> health.v1.ReadinessReply.ChecksEntry
-	8,  // 3: health.v1.LivenessReply.checks:type_name -> health.v1.LivenessReply.ChecksEntry
-	9,  // 4: health.v1.HealthReply.checks:type_name -> health.v1.HealthReply.ChecksEntry
-	0,  // 5: health.v1.ReadinessReply.ChecksEntry.value:type_name -> health.v1.Result
-	0,  // 6: health.v1.LivenessReply.ChecksEntry.value:type_name -> health.v1.Result
-	0,  // 7: health.v1.HealthReply.ChecksEntry.value:type_name -> health.v1.Result
-	2,  // 8: health.v1.HealthService.Readiness:input_type -> health.v1.ReadinessArgs
-	4,  // 9: health.v1.HealthService.Liveness:input_type -> health.v1.LivenessArgs
-	6,  // 10: health.v1.HealthService.Health:input_type -> health.v1.HealthArgs
-	1,  // 11: health.v1.HealthService.Readiness:output_type -> health.v1.ReadinessReply
-	3,  // 12: health.v1.HealthService.Liveness:output_type -> health.v1.LivenessReply
-	5,  // 13: health.v1.HealthService.Health:output_type -> health.v1.HealthReply
-	11, // [11:14] is the sub-list for method output_type
-	8,  // [8:11] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	10, // 0: health.v1.Result.message:type_name -> google.protobuf.Struct
+	11, // 1: health.v1.Result.timestamp:type_name -> google.protobuf.Timestamp
+	11, // 2: health.v1.Result.time_of_first_failure:type_name -> google.protobuf.Timestamp
+	7,  // 3: health.v1.ReadinessReply.checks:type_name -> health.v1.ReadinessReply.ChecksEntry
+	8,  // 4: health.v1.LivenessReply.checks:type_name -> health.v1.LivenessReply.ChecksEntry
+	9,  // 5: health.v1.HealthReply.checks:type_name -> health.v1.HealthReply.ChecksEntry
+	0,  // 6: health.v1.ReadinessReply.ChecksEntry.value:type_name -> health.v1.Result
+	0,  // 7: health.v1.LivenessReply.ChecksEntry.value:type_name -> health.v1.Result
+	0,  // 8: health.v1.HealthReply.ChecksEntry.value:type_name -> health.v1.Result
+	2,  // 9: health.v1.HealthService.Readiness:input_type -> health.v1.ReadinessArgs
+	4,  // 10: health.v1.HealthService.Liveness:input_type -> health.v1.LivenessArgs
+	6,  // 11: health.v1.HealthService.Health:input_type -> health.v1.HealthArgs
+	1,  // 12: health.v1.HealthService.Readiness:output_type -> health.v1.ReadinessReply
+	3,  // 13: health.v1.HealthService.Liveness:output_type -> health.v1.LivenessReply
+	5,  // 14: health.v1.HealthService.Health:output_type -> health.v1.HealthReply
+	12, // [12:15] is the sub-list for method output_type
+	9,  // [9:12] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_health_v1_service_proto_init() }

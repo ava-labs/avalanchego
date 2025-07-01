@@ -2,6 +2,7 @@ syntax = "proto3";
 package health.v1;
 
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
 
 option go_package = "github.com/ava-labs/avalanchego/proto/pb/health/v1;healthv1";
 
@@ -14,7 +15,7 @@ service HealthService {
 
 // Result is the result of a health check.
 message Result {
-  string message = 1;
+  google.protobuf.Struct message = 1;
   // Error is the string representation of the error returned by the failing
   // HealthCheck. The value is nil if the check passed.
   string error = 2;
