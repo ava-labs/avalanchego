@@ -18,7 +18,7 @@ message ReadResponse {
   // read is the payload in bytes
   bytes read = 1;
   // error is an error message
-  optional Error error = 2;
+  Error error = 2;
 }
 
 message Error {

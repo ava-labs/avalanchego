@@ -16,8 +16,10 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
@@ -84,10 +86,21 @@ func (s *MetricsServer) Stop() (err error) {
 // GenerateMonitoringConfig generates and writes the Prometheus collector configuration
 // so tmpnet can dynamically discover new scrape target via file-based service discovery
 // It returns the collector file path.
-func (s *MetricsServer) GenerateMonitoringConfig(monitoringLabels map[string]string) (string, error) {
+func (s *MetricsServer) GenerateMonitoringConfig(log logging.Logger, monitoringLabels map[string]string) (string, error) {
 	discoveryDir, err := tmpnet.GetPrometheusServiceDiscoveryDir()
 	if err != nil {
 		return "", fmt.Errorf("getting tmpnet service discovery directory: %w", err)
+	}
+	_, err = os.Stat(discoveryDir)
+	if errors.Is(err, os.ErrNotExist) {
+		log.Warn("The prometheus service discovery directory does not exist. Prometheus may not be running.",
+			zap.String("dir", discoveryDir),
+		)
+		if err := os.MkdirAll(discoveryDir, perms.ReadWriteExecute); err != nil {
+			return "", fmt.Errorf("failed to create service discovery dir: %w", err)
+		}
+	} else if err != nil {
+		return "", fmt.Errorf("failed to stat service discovery dir: %w", err)
 	}
 
 	collectorFilePath := filepath.Join(discoveryDir, "load-test.json")

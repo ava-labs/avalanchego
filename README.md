@@ -225,7 +225,7 @@ AvalancheGo support tiers:
 |    amd64     |      Linux       |       1       |
 |    arm64     |      Linux       |       2       |
 |    amd64     |      Darwin      |       2       |
-|    amd64     |     Windows      |       3       |
+|    amd64     |     Windows      | Not supported |
 |     arm      |      Linux       | Not supported |
 |     i386     |      Linux       | Not supported |
 |    arm64     |      Darwin      | Not supported |
