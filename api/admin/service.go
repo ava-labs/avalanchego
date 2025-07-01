@@ -64,16 +64,17 @@ type Admin struct {
 
 // NewService returns a new admin API service.
 // All of the fields in [config] must be set.
-func NewService(config Config) (http.Handler, error) {
+func NewService(config Config) (http.Handler, *Admin, error) {
 	server := rpc.NewServer()
 	codec := json.NewCodec()
 	server.RegisterCodec(codec, "application/json")
 	server.RegisterCodec(codec, "application/json;charset=UTF-8")
-	return server, server.RegisterService(
-		&Admin{
-			Config:   config,
-			profiler: profiler.New(config.ProfileDir),
-		},
+	admin := &Admin{
+		Config:   config,
+		profiler: profiler.New(config.ProfileDir),
+	}
+	return server, admin, server.RegisterService(
+		admin,
 		"admin",
 	)
 }
@@ -391,8 +392,8 @@ type DBGetReply struct {
 	ErrorCode rpcdbpb.Error `json:"errorCode"`
 }
 
-//nolint:stylecheck // renaming this method to DBGet would change the API method from "dbGet" to "dBGet"
-func (a *Admin) DbGet(_ *http.Request, args *DBGetArgs, reply *DBGetReply) error {
+// DBGet returns the value of a database entry
+func (a *Admin) DBGet(_ *http.Request, args *DBGetArgs, reply *DBGetReply) error {
 	a.Log.Debug("API called",
 		zap.String("service", "admin"),
 		zap.String("method", "dbGet"),

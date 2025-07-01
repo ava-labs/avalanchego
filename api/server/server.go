@@ -66,6 +66,7 @@ type Server interface {
 	RegisterChain(chainName string, ctx *snow.ConsensusContext, vm common.VM)
 	// Shutdown this server
 	Shutdown() error
+	AddHeaderRoute(s string, info http.Handler) bool
 }
 
 type HTTPConfig struct {
@@ -93,6 +94,10 @@ type server struct {
 
 	// Listener used to serve traffic
 	listener net.Listener
+}
+
+func (s *server) AddHeaderRoute(route string, handler http.Handler) bool {
+	return s.router.AddHeaderRoute(route, handler)
 }
 
 // New returns an instance of a Server.

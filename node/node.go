@@ -13,6 +13,7 @@ import (
 	"io"
 	"io/fs"
 	"net"
+	"net/http"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -20,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"connectrpc.com/grpcreflect"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -46,6 +48,10 @@ import (
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
+	"github.com/ava-labs/avalanchego/proto/pb/admin/v1/adminv1connect"
+	"github.com/ava-labs/avalanchego/proto/pb/health/v1/healthv1connect"
+	"github.com/ava-labs/avalanchego/proto/pb/info/v1/infov1connect"
+	"github.com/ava-labs/avalanchego/proto/pb/metrics/v1/metricsv1connect"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -77,6 +83,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
+	adminconnect "github.com/ava-labs/avalanchego/api/admin/connecthandler"
+	healthconnect "github.com/ava-labs/avalanchego/api/health/connecthandler"
+	infoconnect "github.com/ava-labs/avalanchego/api/info/connecthandler"
+	metricsconnect "github.com/ava-labs/avalanchego/api/metrics/connecthandler"
 	databasefactory "github.com/ava-labs/avalanchego/database/factory"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -391,6 +401,12 @@ type Node struct {
 
 	// Closed when a sufficient amount of bootstrap nodes are connected to
 	onSufficientlyConnected chan struct{}
+
+	// Info API
+	info *info.Info
+
+	// Admin API
+	admin *admin.Admin
 }
 
 /*
@@ -778,7 +794,7 @@ func (n *Node) initDatabase() error {
 	rawExpectedGenesisHash := hashing.ComputeHash256(n.Config.GenesisBytes)
 
 	rawGenesisHash, err := n.DB.Get(genesisHashKey)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		rawGenesisHash = rawExpectedGenesisHash
 		err = n.DB.Put(genesisHashKey, rawGenesisHash)
 	}
@@ -1271,6 +1287,20 @@ func (n *Node) initMetricsAPI() error {
 
 	n.Log.Info("initializing metrics API")
 
+	metricsServicePattern, metricsServiceHandler := metricsv1connect.NewMetricsServiceHandler(
+		metricsconnect.NewConnectMetricsService(n.MetricsGatherer),
+	)
+
+	reflectionPattern, reflectionHandler := grpcreflect.NewHandlerV1(
+		grpcreflect.NewStaticReflector(metricsv1connect.MetricsServiceName),
+	)
+
+	mux := http.NewServeMux()
+	mux.Handle(reflectionPattern, reflectionHandler)
+	mux.Handle(metricsServicePattern, metricsServiceHandler)
+
+	n.APIServer.AddHeaderRoute("metrics", mux)
+
 	return n.APIServer.AddRoute(
 		promhttp.HandlerFor(
 			n.MetricsGatherer,
@@ -1289,7 +1319,7 @@ func (n *Node) initAdminAPI() error {
 		return nil
 	}
 	n.Log.Info("initializing admin API")
-	service, err := admin.NewService(
+	service, adminReceiver, err := admin.NewService(
 		admin.Config{
 			Log:          n.Log,
 			DB:           n.DB,
@@ -1305,6 +1335,23 @@ func (n *Node) initAdminAPI() error {
 	if err != nil {
 		return err
 	}
+
+	n.admin = adminReceiver
+
+	adminServicePattern, adminServiceHandler := adminv1connect.NewAdminServiceHandler(
+		adminconnect.NewConnectAdminService(n.admin),
+	)
+
+	reflectionPattern, reflectionHandler := grpcreflect.NewHandlerV1(
+		grpcreflect.NewStaticReflector(adminv1connect.AdminServiceName),
+	)
+
+	mux := http.NewServeMux()
+	mux.Handle(reflectionPattern, reflectionHandler)
+	mux.Handle(adminServicePattern, adminServiceHandler)
+
+	n.APIServer.AddHeaderRoute("admin", mux)
+
 	return n.APIServer.AddRoute(
 		service,
 		"admin",
@@ -1349,7 +1396,7 @@ func (n *Node) initInfoAPI() error {
 		return fmt.Errorf("problem creating proof of possession: %w", err)
 	}
 
-	service, err := info.NewService(
+	service, infoReceiver, err := info.NewService(
 		info.Parameters{
 			Version:   version.CurrentApp,
 			NodeID:    n.ID,
@@ -1372,6 +1419,23 @@ func (n *Node) initInfoAPI() error {
 	if err != nil {
 		return err
 	}
+
+	n.info = infoReceiver
+
+	infoPattern, infoConnHandler := infov1connect.NewInfoServiceHandler(
+		infoconnect.NewConnectInfoService(n.info),
+	)
+
+	reflectionPattern, reflectionHandler := grpcreflect.NewHandlerV1(
+		grpcreflect.NewStaticReflector(infov1connect.InfoServiceName),
+	)
+
+	mux := http.NewServeMux()
+	mux.Handle(reflectionPattern, reflectionHandler)
+	mux.Handle(infoPattern, infoConnHandler)
+
+	n.APIServer.AddHeaderRoute("info", mux)
+
 	return n.APIServer.AddRoute(
 		service,
 		"info",
@@ -1399,6 +1463,20 @@ func (n *Node) initHealthAPI() error {
 		n.Log.Info("skipping health API initialization because it has been disabled")
 		return nil
 	}
+
+	healthServicePattern, healthServiceHandler := healthv1connect.NewHealthServiceHandler(
+		healthconnect.NewConnectHealthService(n.health),
+	)
+
+	reflectionPattern, reflectionHandler := grpcreflect.NewHandlerV1(
+		grpcreflect.NewStaticReflector(healthv1connect.HealthServiceName),
+	)
+
+	mux := http.NewServeMux()
+	mux.Handle(reflectionPattern, reflectionHandler)
+	mux.Handle(healthServicePattern, healthServiceHandler)
+
+	n.APIServer.AddHeaderRoute("health", mux)
 
 	n.Log.Info("initializing Health API")
 	err = n.health.RegisterHealthCheck("network", n.Net, health.ApplicationTag)

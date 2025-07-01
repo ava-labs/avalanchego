@@ -98,22 +98,23 @@ func NewService(
 	myIP *utils.Atomic[netip.AddrPort],
 	network network.Network,
 	benchlist benchlist.Manager,
-) (http.Handler, error) {
+) (http.Handler, *Info, error) {
 	server := rpc.NewServer()
 	codec := json.NewCodec()
 	server.RegisterCodec(codec, "application/json")
 	server.RegisterCodec(codec, "application/json;charset=UTF-8")
-	return server, server.RegisterService(
-		&Info{
-			Parameters:   parameters,
-			log:          log,
-			validators:   validators,
-			chainManager: chainManager,
-			vmManager:    vmManager,
-			myIP:         myIP,
-			networking:   network,
-			benchlist:    benchlist,
-		},
+	info := &Info{
+		Parameters:   parameters,
+		log:          log,
+		validators:   validators,
+		chainManager: chainManager,
+		vmManager:    vmManager,
+		myIP:         myIP,
+		networking:   network,
+		benchlist:    benchlist,
+	}
+	return server, info, server.RegisterService(
+		info,
 		"info",
 	)
 }
