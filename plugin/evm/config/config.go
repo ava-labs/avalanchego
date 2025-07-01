@@ -64,6 +64,7 @@ const (
 
 	estimatedBlockAcceptPeriod        = 2 * time.Second
 	defaultHistoricalProofQueryWindow = uint64(24 * time.Hour / estimatedBlockAcceptPeriod)
+	defaultStateHistory               = uint64(32)
 	// Price Option Defaults
 	defaultPriceOptionSlowFeePercentage = uint64(95)
 	defaultPriceOptionFastFeePercentage = uint64(105)
@@ -226,6 +227,8 @@ type Config struct {
 	//  * 0:   means no limit
 	//  * N:   means N block limit [HEAD-N+1, HEAD] and delete extra indexes
 	TransactionHistory uint64 `json:"transaction-history"`
+	// The maximum number of blocks from head whose state histories are reserved for pruning blockchains.
+	StateHistory uint64 `json:"state-history"`
 	// Deprecated, use 'TransactionHistory' instead.
 	TxLookupLimit uint64 `json:"tx-lookup-limit"`
 
@@ -311,6 +314,7 @@ func (c *Config) SetDefaults(txPoolConfig TxPoolConfig) {
 	c.AllowUnprotectedTxHashes = defaultAllowUnprotectedTxHashes
 	c.AcceptedCacheSize = defaultAcceptedCacheSize
 	c.HistoricalProofQueryWindow = defaultHistoricalProofQueryWindow
+	c.StateHistory = defaultStateHistory
 
 	// Price Option Settings
 	c.PriceOptionSlowFeePercentage = defaultPriceOptionSlowFeePercentage
@@ -362,6 +366,9 @@ func (c *Config) Validate(networkID uint32) error {
 	// If pruning is enabled, the commit interval must be non-zero so the node commits state tries every CommitInterval blocks.
 	if c.Pruning && c.CommitInterval == 0 {
 		return fmt.Errorf("cannot use commit interval of 0 with pruning enabled")
+	}
+	if c.Pruning && c.StateHistory == 0 {
+		return fmt.Errorf("cannot use state history of 0 with pruning enabled")
 	}
 
 	if c.PushGossipPercentStake < 0 || c.PushGossipPercentStake > 1 {

@@ -81,6 +81,7 @@ func TestTransactionIndices(t *testing.T) {
 		TriePrefetcherParallelism: 4,
 		Pruning:                   true,
 		CommitInterval:            4096,
+		StateHistory:              32,
 		SnapshotLimit:             256,
 		SnapshotNoBuild:           true, // Ensure the test errors if snapshot initialization fails
 		AcceptorQueueLimit:        64,
@@ -200,6 +201,7 @@ func TestTransactionSkipIndexing(t *testing.T) {
 		TriePrefetcherParallelism: 4,
 		Pruning:                   true,
 		CommitInterval:            4096,
+		StateHistory:              32,
 		SnapshotLimit:             256,
 		SnapshotNoBuild:           true, // Ensure the test errors if snapshot initialization fails
 		AcceptorQueueLimit:        64,
