@@ -4,11 +4,11 @@
 package simplex
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"testing"
 
+	"github.com/StephenButtolph/canoto"
 	"github.com/ava-labs/simplex"
 	"github.com/stretchr/testify/require"
 
@@ -18,15 +18,22 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 )
 
-type testChainVM struct {
-	*blocktest.VM
-}
+func TestBlockSerialization(t *testing.T) {
+	unexpectedBlockBytes := errors.New("unexpected block bytes")
 
-// TestVerifiedBlock tests that a block can be serialized and deserialized correctly,
-// and that the digest is computed correctly after deserialization.
-func TestVerifiedBlockSerialization(t *testing.T) {
-	vb := &VerifiedBlock{
-		innerBlock: []byte("test block data"),
+	testVM := &blocktest.VM{
+		VM: enginetest.VM{
+			T: t,
+		},
+	}
+
+	testBlock := snowmantest.Block{
+		HeightV: 1,
+		BytesV:  []byte("test block"),
+	}
+
+	b := &Block{
+		vmBlock: &testBlock,
 		metadata: simplex.ProtocolMetadata{
 			Version: 1,
 			Epoch:   1,
@@ -37,42 +44,73 @@ func TestVerifiedBlockSerialization(t *testing.T) {
 	}
 
 	// Serialize the block
-	blockBytes := vb.Bytes()
-
-	// Deserialize the block
-	vb1, err := verifiedBlockFromBytes(blockBytes)
+	blockBytes, err := b.Bytes()
 	require.NoError(t, err)
 
-	// Check that the inner block data is preserved
-	require.Equal(t, vb.BlockHeader(), vb1.BlockHeader())
-}
-
-func TestBlockDeserializer(t *testing.T) {
-	unexpectedBlockBytes := errors.New("unexpected block bytes")
-	testVM := &testChainVM{
-		VM: &blocktest.VM{
-			VM: enginetest.VM{
-				T: t,
+	tests := []struct {
+		name          string
+		expected      []byte
+		parseFunc     func(context.Context, []byte) (snowman.Block, error)
+		expectedError error
+		blockBytes    []byte
+	}{
+		{
+			name:       "block serialization",
+			blockBytes: blockBytes,
+			expected:   blockBytes,
+			parseFunc: func(_ context.Context, _ []byte) (snowman.Block, error) {
+				require.Equal(t, b, testBlock.BytesV, "block bytes should match")
+				return &testBlock, nil
+			},
+			expectedError: nil,
+		},
+		{
+			name:          "block deserialization error",
+			blockBytes:    blockBytes,
+			expected:      nil,
+			expectedError: unexpectedBlockBytes,
+			parseFunc: func(_ context.Context, _ []byte) (snowman.Block, error) {
+				return nil, unexpectedBlockBytes
+			},
+		},
+		{
+			name:          "corrupted block data",
+			blockBytes:    []byte("corrupted data"),
+			expected:      nil,
+			expectedError: canoto.ErrInvalidWireType,
+			parseFunc: func(_ context.Context, _ []byte) (snowman.Block, error) {
+				return nil, nil
 			},
 		},
 	}
 
-	testVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-		switch {
-		case bytes.Equal(b, snowmantest.GenesisBytes):
-			return snowmantest.Genesis, nil
-		default:
-			return nil, unexpectedBlockBytes
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testVM.ParseBlockF = tt.parseFunc
+			deserializer := &blockDeserializer{
+				parser: testVM,
+			}
+
+			// Deserialize the block
+			deserializedBlock, err := deserializer.DeserializeBlock(tt.blockBytes)
+			require.ErrorIs(t, err, tt.expectedError)
+
+			if tt.expectedError == nil {
+				require.Equal(t, deserializedBlock.BlockHeader().ProtocolMetadata, b.BlockHeader().ProtocolMetadata)
+			}
+		})
+	}
+}
+
+// TestBlockVerify tests a block cannot be verified more than once.
+func TestBlockVerify(t *testing.T) {
+	testBlock := snowmantest.Block{
+		HeightV: 1,
+		BytesV:  []byte("test block"),
 	}
 
-	deserializer := &blockDeserializer{
-		vm: testVM,
-	}
-
-	// Create a verified block
-	vb := &VerifiedBlock{
-		innerBlock: snowmantest.GenesisBytes,
+	b := &Block{
+		vmBlock: &testBlock,
 		metadata: simplex.ProtocolMetadata{
 			Version: 1,
 			Epoch:   1,
@@ -82,19 +120,30 @@ func TestBlockDeserializer(t *testing.T) {
 		},
 	}
 
-	// Serialize & Deserialize the block
-	blockBytes := vb.Bytes()
-	vb1, err := deserializer.DeserializeBlock(blockBytes)
-	require.NoError(t, err)
-	require.Equal(t, vb.BlockHeader(), vb1.BlockHeader())
+	block, err := b.Verify(context.Background())
+	require.NoError(t, err, "block should be verified successfully")
 
-	// Create a verified block
-	vbWrongBytes := &VerifiedBlock{
-		innerBlock: []byte("wrong block data"),
-		metadata:   simplex.ProtocolMetadata{},
+	// The block we get should be serializable into a block
+	serializedBlock, err := block.Bytes()
+	require.NoError(t, err, "block should be serializable")
+
+	// Deserialize the block
+	deserializer := &blockDeserializer{
+		parser: &blocktest.VM{
+			VM: enginetest.VM{
+				T: t,
+			},
+			ParseBlockF: func(_ context.Context, b []byte) (snowman.Block, error) {
+				require.Equal(t, b, testBlock.BytesV, "block bytes should match")
+				return &testBlock, nil
+			},
+		},
 	}
+	deserializedBlock, err := deserializer.DeserializeBlock(serializedBlock)
+	require.NoError(t, err, "block should be deserialized successfully")
+	require.Equal(t, b.BlockHeader().ProtocolMetadata, deserializedBlock.BlockHeader().ProtocolMetadata)
 
-	wrongBytes := vbWrongBytes.Bytes()
-	_, err = deserializer.DeserializeBlock(wrongBytes)
-	require.ErrorIs(t, err, unexpectedBlockBytes)
+	// Ensure no double verification
+	_, err = b.Verify(context.Background())
+	require.ErrorIs(t, err, errBlockAlreadyVerified)
 }

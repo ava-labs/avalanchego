@@ -5,84 +5,98 @@ package simplex
 
 import (
 	"context"
-	"crypto/sha256"
+	"errors"
 	"fmt"
-	"sync"
 
 	"github.com/ava-labs/simplex"
 
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-type VerifiedBlock struct {
-	computeDigestOnce sync.Once
-	digest            simplex.Digest // cached, not serialized
+var _ simplex.BlockDeserializer = (*blockDeserializer)(nil)
 
-	metadata   simplex.ProtocolMetadata
-	innerBlock []byte
+var _ simplex.Block = (*Block)(nil)
+
+var _ simplex.VerifiedBlock = (*Block)(nil)
+
+var errBlockAlreadyVerified = errors.New("block has already been verified")
+
+type Block struct {
+	digest simplex.Digest
+
+	// metadata contains protocol metadata for the block
+	metadata simplex.ProtocolMetadata
+
+	verified bool // whether vmBlock.verify() function has been called
+
+	// the parsed block
+	vmBlock snowman.Block
 }
 
 // BlockHeader returns the block header for the verified block.
-func (v *VerifiedBlock) BlockHeader() simplex.BlockHeader {
-	v.computeDigestOnce.Do(v.computeDigest)
+func (b *Block) BlockHeader() simplex.BlockHeader {
 	return simplex.BlockHeader{
-		ProtocolMetadata: v.metadata,
-		Digest:           v.digest,
+		ProtocolMetadata: b.metadata,
+		Digest:           b.digest,
 	}
 }
 
 // Bytes returns the serialized bytes of the verified block.
-// It concatenates the metadata bytes followed by the inner block bytes.
-func (v *VerifiedBlock) Bytes() []byte {
-	mdBytes := v.metadata.Bytes()
-	buff := make([]byte, len(mdBytes)+len(v.innerBlock))
-	copy(buff, mdBytes)
-	copy(buff[len(mdBytes):], v.innerBlock)
-	return buff
+func (b *Block) Bytes() ([]byte, error) {
+	cBlock := &CanotoSimplexBlock{
+		Metadata:   b.metadata.Bytes(),
+		InnerBlock: b.vmBlock.Bytes(),
+	}
+
+	buff := cBlock.MarshalCanoto()
+
+	return buff, nil
 }
 
-// computeDigest computes the digest of the block.
-func (v *VerifiedBlock) computeDigest() {
-	mdBytes := v.metadata.Bytes()
-	h := sha256.New()
-	h.Write(v.innerBlock)
-	h.Write(mdBytes)
-	digest := h.Sum(nil)
-	v.digest = simplex.Digest(digest)
+func (b *Block) Verify(ctx context.Context) (simplex.VerifiedBlock, error) {
+	if b.verified {
+		return b, errBlockAlreadyVerified
+	}
+
+	// TODO: track blocks that have been verified to ensure they are either rejected or accepted
+	b.verified = true
+	err := b.vmBlock.Verify(ctx)
+
+	return b, err
 }
 
 type blockDeserializer struct {
-	vm block.ChainVM
+	parser block.Parser
 }
 
-func (b *blockDeserializer) DeserializeBlock(bytes []byte) (simplex.VerifiedBlock, error) {
-	vb, err := verifiedBlockFromBytes(bytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to deserialize verified block: %w", err)
+func (d *blockDeserializer) DeserializeBlock(bytes []byte) (simplex.Block, error) {
+	return d.deserializeBlockBytes(bytes)
+}
+
+func (d *blockDeserializer) deserializeBlockBytes(buff []byte) (simplex.Block, error) {
+	var canotoBlock CanotoSimplexBlock
+
+	if err := canotoBlock.UnmarshalCanoto(buff); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal verified block: %w", err)
 	}
 
-	_, err = b.vm.ParseBlock(context.Background(), vb.innerBlock)
+	md, err := simplex.ProtocolMetadataFromBytes(canotoBlock.Metadata)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse protocol metadata: %w", err)
+	}
+
+	vmblock, err := d.parser.ParseBlock(context.Background(), canotoBlock.InnerBlock)
 	if err != nil {
 		return nil, err
 	}
 
-	return vb, nil
-}
+	digest := hashing.ComputeHash256Array(buff)
 
-func verifiedBlockFromBytes(buff []byte) (*VerifiedBlock, error) {
-	if len(buff) < simplex.ProtocolMetadataLen {
-		return nil, fmt.Errorf("buff too small, expected at least %d bytes, got %d", simplex.ProtocolMetadataLen, len(buff))
-	}
-
-	md, err := simplex.ProtocolMetadataFromBytes(buff[:simplex.ProtocolMetadataLen])
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse metadata: %w", err)
-	}
-
-	v := &VerifiedBlock{
-		metadata:   *md,
-		innerBlock: buff[simplex.ProtocolMetadataLen:],
-	}
-
-	return v, nil
+	return &Block{
+		metadata: *md,
+		vmBlock:  vmblock,
+		digest:   digest,
+	}, nil
 }
