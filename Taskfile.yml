@@ -232,10 +232,10 @@ tasks:
       - task: generate-load-contract-bindings
       - task: build
       - cmd: go run ./tests/load/c/main --avalanchego-path=./build/avalanchego {{.CLI_ARGS}}
-    
+
   test-load-kube:
     desc: Runs load tests against a network deployed to kube
-    cmds: 
+    cmds:
       - task: generate-load-contract-bindings
       - cmd: bash -x ./scripts/tests.load.kube.sh {{.CLI_ARGS}}
 
