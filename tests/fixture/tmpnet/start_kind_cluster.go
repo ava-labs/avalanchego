@@ -112,6 +112,11 @@ func StartKindCluster(
 		return fmt.Errorf("failed to deploy ingress controller: %w", err)
 	}
 
+	// Create configmap for ingress configuration
+	if err := createIngressConfigMap(ctx, log, configPath, configContext, DefaultTmpnetNamespace); err != nil {
+		return fmt.Errorf("failed to create ingress configmap: %w", err)
+	}
+
 	return nil
 }
 
@@ -409,4 +414,55 @@ func runHelmCommand(ctx context.Context, args ...string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
+}
+
+// createIngressConfigMap creates a ConfigMap containing ingress configuration for the tmpnet namespace.
+func createIngressConfigMap(ctx context.Context, log logging.Logger, configPath string, configContext string, namespace string) error {
+	clientset, err := GetClientset(log, configPath, configContext)
+	if err != nil {
+		return fmt.Errorf("failed to get clientset: %w", err)
+	}
+
+	configMapName := ingressConfigMapName
+
+	// Check if configmap already exists
+	_, err = clientset.CoreV1().ConfigMaps(namespace).Get(ctx, configMapName, metav1.GetOptions{})
+	if err == nil {
+		log.Info("ingress configmap already exists",
+			zap.String("namespace", namespace),
+			zap.String("configmap", configMapName),
+		)
+		return nil
+	}
+	if !apierrors.IsNotFound(err) {
+		return fmt.Errorf("failed to check for configmap %s/%s: %w", namespace, configMapName, err)
+	}
+
+	log.Info("creating ingress configmap",
+		zap.String("namespace", namespace),
+		zap.String("configmap", configMapName),
+	)
+
+	configMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      configMapName,
+			Namespace: namespace,
+		},
+		Data: map[string]string{
+			"host":   "localhost:30791",
+			"secret": "", // No TLS for kind cluster
+		},
+	}
+
+	_, err = clientset.CoreV1().ConfigMaps(namespace).Create(ctx, configMap, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to create configmap %s/%s: %w", namespace, configMapName, err)
+	}
+
+	log.Info("created ingress configmap",
+		zap.String("namespace", namespace),
+		zap.String("configmap", configMapName),
+	)
+
+	return nil
 }

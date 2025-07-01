@@ -177,7 +177,7 @@ func BootstrapNewNetwork(
 	if err := checkVMBinaries(log, network.Subnets, network.DefaultRuntimeConfig.Process); err != nil {
 		return err
 	}
-	if err := network.EnsureDefaultConfig(log); err != nil {
+	if err := network.EnsureDefaultConfig(ctx, log); err != nil {
 		return err
 	}
 	if err := network.Create(rootNetworkDir); err != nil {
@@ -234,7 +234,7 @@ func ReadNetwork(ctx context.Context, log logging.Logger, dir string) (*Network,
 }
 
 // Initializes a new network with default configuration.
-func (n *Network) EnsureDefaultConfig(log logging.Logger) error {
+func (n *Network) EnsureDefaultConfig(ctx context.Context, log logging.Logger) error {
 	log.Info("preparing configuration for new network",
 		zap.Any("runtimeConfig", n.DefaultRuntimeConfig),
 	)
@@ -279,6 +279,13 @@ func (n *Network) EnsureDefaultConfig(log logging.Logger) error {
 	emptyRuntime := NodeRuntimeConfig{}
 	if n.DefaultRuntimeConfig == emptyRuntime {
 		return errMissingRuntimeConfig
+	}
+
+	// If using kube runtime and running outside cluster, read ingress configuration
+	if n.DefaultRuntimeConfig.Kube != nil && !IsRunningInCluster() && len(n.DefaultRuntimeConfig.Kube.IngressHost) == 0 {
+		if err := readIngressConfig(ctx, log, n.DefaultRuntimeConfig.Kube); err != nil {
+			return fmt.Errorf("failed to read ingress configuration: %w", err)
+		}
 	}
 
 	return nil
