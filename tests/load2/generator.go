@@ -23,7 +23,6 @@ type Test interface {
 type Worker struct {
 	PrivKey *ecdsa.PrivateKey
 	Nonce   uint64
-	ChainID *big.Int
 	Client  *ethclient.Client
 }
 
@@ -34,6 +33,7 @@ type LoadGenerator struct {
 
 func NewLoadGenerator(
 	workers []Worker,
+	chainID *big.Int,
 	metricsNamespace string,
 	registry *prometheus.Registry,
 	test Test,
@@ -48,7 +48,7 @@ func NewLoadGenerator(
 		wallets[i] = newWallet(
 			workers[i].PrivKey,
 			workers[i].Nonce,
-			workers[i].ChainID,
+			chainID,
 			workers[i].Client,
 			metrics,
 		)

@@ -101,18 +101,18 @@ func main() {
 		client, err := ethclient.Dial(wsURI)
 		require.NoError(err)
 
-		chainID, err := client.ChainID(ctx)
-		require.NoError(err)
-
 		workers[i] = load2.Worker{
 			PrivKey: keys[i].ToECDSA(),
-			ChainID: chainID,
 			Client:  client,
 		}
 	}
 
+	chainID, err := workers[0].Client.ChainID(ctx)
+	require.NoError(err)
+
 	generator, err := load2.NewLoadGenerator(
 		workers,
+		chainID,
 		metricsNamespace,
 		registry,
 		load2.ZeroTransferTest{PollFrequency: pollFrequency},
