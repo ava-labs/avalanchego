@@ -91,8 +91,8 @@ func TestReexecuteRange(t *testing.T) {
 
 	if metricsEnabled {
 		CollectRegistry(t, "benchmark-c-chain-reexecution", "127.0.0.1:9000", 2*time.Minute, avalancheGoSimulatedPrefixGatherer, map[string]string{
-			"job":     "benchmark-c-chain-reexecution",
-			"service": "benchmark-c-chain-reexecution",
+			"job":     "c-chain-reexecution",
+			"service": "c-chain-reexecution",
 		})
 	}
 
@@ -298,6 +298,10 @@ func CollectRegistry(t *testing.T, name string, addr string, timeout time.Durati
 	r.NoError(err)
 
 	t.Cleanup(func() {
+		// Ensure a final metrics scrape.
+		// This default delay is set above the default scrape interval used by StartPrometheus.
+		time.Sleep(tmpnet.NetworkShutdownDelay)
+
 		r.NoError(server.Stop())
 		r.NoError(<-errChan)
 	})
