@@ -112,6 +112,10 @@ func StartKindCluster(
 		return fmt.Errorf("failed to deploy ingress controller: %w", err)
 	}
 
+	if err := createDefaultsConfigMap(ctx, log, configPath, configContext, DefaultTmpnetNamespace); err != nil {
+		return fmt.Errorf("failed to create defaults ConfigMap: %w", err)
+	}
+
 	return nil
 }
 
@@ -409,4 +413,49 @@ func runHelmCommand(ctx context.Context, args ...string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
+}
+
+// createDefaultsConfigMap creates a ConfigMap containing defaults for the tmpnet namespace.
+func createDefaultsConfigMap(ctx context.Context, log logging.Logger, configPath string, configContext string, namespace string) error {
+	clientset, err := GetClientset(log, configPath, configContext)
+	if err != nil {
+		return fmt.Errorf("failed to get clientset: %w", err)
+	}
+
+	configMapName := defaultsConfigMapName
+
+	// Check if configmap already exists
+	_, err = clientset.CoreV1().ConfigMaps(namespace).Get(ctx, configMapName, metav1.GetOptions{})
+	if err == nil {
+		log.Info("defaults ConfigMap already exists",
+			zap.String("namespace", namespace),
+			zap.String("configMap", configMapName),
+		)
+		return nil
+	}
+	if !apierrors.IsNotFound(err) {
+		return fmt.Errorf("failed to check for configmap %s/%s: %w", namespace, configMapName, err)
+	}
+
+	log.Info("creating defaults ConfigMap",
+		zap.String("namespace", namespace),
+		zap.String("configMap", configMapName),
+	)
+
+	configMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      configMapName,
+			Namespace: namespace,
+		},
+		Data: map[string]string{
+			ingressHostKey: "localhost:30791",
+		},
+	}
+
+	_, err = clientset.CoreV1().ConfigMaps(namespace).Create(ctx, configMap, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to create configmap %s/%s: %w", namespace, configMapName, err)
+	}
+
+	return nil
 }
