@@ -19,33 +19,32 @@ import (
 )
 
 type Wallet struct {
-	PrivKey *ecdsa.PrivateKey
-	Nonce   uint64
-	ChainID *big.Int
-	Signer  types.Signer
-
+	privKey *ecdsa.PrivateKey
+	nonce   uint64
+	chainID *big.Int
+	signer  types.Signer
 	client  *ethclient.Client
-	metrics Metrics
+	metrics metrics
 }
 
-func NewWallet(
+func newWallet(
 	privKey *ecdsa.PrivateKey,
 	nonce uint64,
 	chainID *big.Int,
 	client *ethclient.Client,
-	metrics Metrics,
+	metrics metrics,
 ) *Wallet {
 	return &Wallet{
-		PrivKey: privKey,
-		Nonce:   nonce,
-		ChainID: chainID,
-		Signer:  types.LatestSignerForChainID(chainID),
+		privKey: privKey,
+		nonce:   nonce,
+		chainID: chainID,
+		signer:  types.LatestSignerForChainID(chainID),
 		client:  client,
 		metrics: metrics,
 	}
 }
 
-func (w *Wallet) SendTx(
+func (w *Wallet) sendTx(
 	ctx context.Context,
 	tx *types.Transaction,
 	pingFrequency time.Duration,
@@ -56,7 +55,7 @@ func (w *Wallet) SendTx(
 	}
 
 	issuanceDuration := time.Since(startTime)
-	w.metrics.Issue(issuanceDuration)
+	w.metrics.issue(issuanceDuration)
 
 	if err := awaitTx(ctx, w.client, tx.Hash(), pingFrequency); err != nil {
 		return err
@@ -64,9 +63,9 @@ func (w *Wallet) SendTx(
 
 	totalDuration := time.Since(startTime)
 	confirmationDuration := totalDuration - issuanceDuration
-	w.metrics.Accept(confirmationDuration, totalDuration)
+	w.metrics.accept(confirmationDuration, totalDuration)
 
-	w.Nonce++
+	w.nonce++
 
 	return nil
 }

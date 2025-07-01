@@ -10,15 +10,15 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-type Metrics struct {
+type metrics struct {
 	txsIssuedCounter      prometheus.Counter
 	txIssuanceLatency     prometheus.Histogram
 	txConfirmationLatency prometheus.Histogram
 	txTotalLatency        prometheus.Histogram
 }
 
-func NewMetrics(namespace string, registry *prometheus.Registry) (Metrics, error) {
-	m := Metrics{
+func newMetrics(namespace string, registry *prometheus.Registry) (metrics, error) {
+	m := metrics{
 		txsIssuedCounter: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "txs_issued",
@@ -47,18 +47,18 @@ func NewMetrics(namespace string, registry *prometheus.Registry) (Metrics, error
 		registry.Register(m.txConfirmationLatency),
 		registry.Register(m.txTotalLatency),
 	); err != nil {
-		return Metrics{}, err
+		return metrics{}, err
 	}
 
 	return m, nil
 }
 
-func (m Metrics) Issue(d time.Duration) {
+func (m metrics) issue(d time.Duration) {
 	m.txsIssuedCounter.Inc()
 	m.txIssuanceLatency.Observe(float64(d.Milliseconds()))
 }
 
-func (m Metrics) Accept(confirmationDuration time.Duration, totalDuration time.Duration) {
+func (m metrics) accept(confirmationDuration time.Duration, totalDuration time.Duration) {
 	m.txConfirmationLatency.Observe(float64(confirmationDuration.Milliseconds()))
 	m.txTotalLatency.Observe(float64(totalDuration.Milliseconds()))
 }

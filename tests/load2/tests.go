@@ -35,10 +35,10 @@ func (z ZeroTransferTest) Run(
 	bigGwei := big.NewInt(params.GWei)
 	gasTipCap := new(big.Int).Mul(bigGwei, big.NewInt(1))
 	gasFeeCap := new(big.Int).Mul(bigGwei, maxFeeCap)
-	senderAddress := crypto.PubkeyToAddress(wallet.PrivKey.PublicKey)
-	tx, err := types.SignNewTx(wallet.PrivKey, wallet.Signer, &types.DynamicFeeTx{
-		ChainID:   wallet.ChainID,
-		Nonce:     wallet.Nonce,
+	senderAddress := crypto.PubkeyToAddress(wallet.privKey.PublicKey)
+	tx, err := types.SignNewTx(wallet.privKey, wallet.signer, &types.DynamicFeeTx{
+		ChainID:   wallet.chainID,
+		Nonce:     wallet.nonce,
 		GasTipCap: gasTipCap,
 		GasFeeCap: gasFeeCap,
 		Gas:       params.TxGas,
@@ -48,5 +48,5 @@ func (z ZeroTransferTest) Run(
 	})
 	require.NoError(err)
 
-	require.NoError(wallet.SendTx(ctx, tx, z.PollFrequency))
+	require.NoError(wallet.sendTx(ctx, tx, z.PollFrequency))
 }

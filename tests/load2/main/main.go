@@ -71,9 +71,6 @@ func main() {
 	require.NoError(err)
 
 	registry := prometheus.NewRegistry()
-	metrics, err := load2.NewMetrics(metricsNamespace, registry)
-	require.NoError(err)
-
 	metricsServer := load.NewPrometheusServer("127.0.0.1:0", registry)
 	metricsErrChan, err := metricsServer.Start()
 	require.NoError(err)
@@ -98,7 +95,7 @@ func main() {
 		require.NoError(os.Remove(monitoringConfigFilePath))
 	})
 
-	wallets := make([]*load2.Wallet, len(keys))
+	workers := make([]load2.Worker, len(keys))
 	for i := range len(keys) {
 		wsURI := wsURIs[i%len(wsURIs)]
 		client, err := ethclient.Dial(wsURI)
@@ -107,11 +104,17 @@ func main() {
 		chainID, err := client.ChainID(ctx)
 		require.NoError(err)
 
-		wallets[i] = load2.NewWallet(keys[i].ToECDSA(), 0, chainID, client, metrics)
+		workers[i] = load2.Worker{
+			PrivKey: keys[i].ToECDSA(),
+			ChainID: chainID,
+			Client:  client,
+		}
 	}
 
 	generator, err := load2.NewLoadGenerator(
-		wallets,
+		workers,
+		metricsNamespace,
+		registry,
 		load2.ZeroTransferTest{PollFrequency: pollFrequency},
 	)
 	require.NoError(err)
