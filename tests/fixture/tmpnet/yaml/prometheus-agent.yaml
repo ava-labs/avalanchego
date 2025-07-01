@@ -162,7 +162,7 @@ spec:
           mountPath: /tmp/config
       containers:
       - name: prometheus
-        # For consistency use the same minor verson as the scripts/run_prometheus.sh
+        # For consistency use the same minor version as the scripts/run_prometheus.sh
         image: prom/prometheus:v2.45.6
         args:
         - --config.file=/etc/prometheus/config/prometheus.yaml

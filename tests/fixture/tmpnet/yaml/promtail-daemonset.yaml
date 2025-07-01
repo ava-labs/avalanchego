@@ -148,7 +148,7 @@ spec:
         image: grafana/promtail:3.3.2 # Pin latest version
         args:
         - -config.file=/etc/promtail/promtail.yaml
-        - -config.expand-env=true # Enable subsitution of env variables in the configuration i.e. for credentials
+        - -config.expand-env=true # Enable substitution of env variables in the configuration i.e. for credentials
         env:
         - name: 'HOSTNAME' # needed when using kubernetes_sd_configs
           valueFrom:
