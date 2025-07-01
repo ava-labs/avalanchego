@@ -12,7 +12,6 @@ import (
 	syncHandlers "github.com/ava-labs/coreth/sync/handlers"
 	"github.com/ava-labs/coreth/sync/handlers/stats"
 	"github.com/ava-labs/coreth/warp"
-	warpHandlers "github.com/ava-labs/coreth/warp/handlers"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/triedb"
@@ -23,10 +22,9 @@ var _ message.RequestHandler = (*networkHandler)(nil)
 type LeafHandlers map[message.NodeType]syncHandlers.LeafRequestHandler
 
 type networkHandler struct {
-	leafRequestHandlers     LeafHandlers
-	blockRequestHandler     *syncHandlers.BlockRequestHandler
-	codeRequestHandler      *syncHandlers.CodeRequestHandler
-	signatureRequestHandler *warpHandlers.SignatureRequestHandler
+	leafRequestHandlers LeafHandlers
+	blockRequestHandler *syncHandlers.BlockRequestHandler
+	codeRequestHandler  *syncHandlers.CodeRequestHandler
 }
 
 type LeafRequestTypeConfig struct {
@@ -47,10 +45,9 @@ func newNetworkHandler(
 	syncStats stats.HandlerStats,
 ) *networkHandler {
 	return &networkHandler{
-		leafRequestHandlers:     leafRequestHandlers,
-		blockRequestHandler:     syncHandlers.NewBlockRequestHandler(provider, networkCodec, syncStats),
-		codeRequestHandler:      syncHandlers.NewCodeRequestHandler(diskDB, networkCodec, syncStats),
-		signatureRequestHandler: warpHandlers.NewSignatureRequestHandler(warpBackend, networkCodec),
+		leafRequestHandlers: leafRequestHandlers,
+		blockRequestHandler: syncHandlers.NewBlockRequestHandler(provider, networkCodec, syncStats),
+		codeRequestHandler:  syncHandlers.NewCodeRequestHandler(diskDB, networkCodec, syncStats),
 	}
 }
 
@@ -69,12 +66,4 @@ func (n networkHandler) HandleBlockRequest(ctx context.Context, nodeID ids.NodeI
 
 func (n networkHandler) HandleCodeRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, codeRequest message.CodeRequest) ([]byte, error) {
 	return n.codeRequestHandler.OnCodeRequest(ctx, nodeID, requestID, codeRequest)
-}
-
-func (n networkHandler) HandleMessageSignatureRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, messageSignatureRequest message.MessageSignatureRequest) ([]byte, error) {
-	return n.signatureRequestHandler.OnMessageSignatureRequest(ctx, nodeID, requestID, messageSignatureRequest)
-}
-
-func (n networkHandler) HandleBlockSignatureRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, blockSignatureRequest message.BlockSignatureRequest) ([]byte, error) {
-	return n.signatureRequestHandler.OnBlockSignatureRequest(ctx, nodeID, requestID, blockSignatureRequest)
 }

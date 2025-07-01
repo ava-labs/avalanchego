@@ -6,6 +6,7 @@
 - Add metrics for ACP-176
 - Removed the `"price-options-max-base-fee"` config flag
 - Moved extra types returned in `ethclient` package to a new package `plugin/evm/customethclient` which supports the same functionality as `ethclient` but with the new types registered in header and block.
+- Removed legacy warp message handlers in favor of ACP-118 SDK handlers.
 
 ## [v0.15.0](https://github.com/ava-labs/coreth/releases/tag/v0.15.0)
 
