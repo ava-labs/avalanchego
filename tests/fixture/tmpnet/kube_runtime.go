@@ -22,6 +22,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -51,6 +52,8 @@ const (
 	// are never scheduled to the same nodes.
 	antiAffinityLabelKey   = "tmpnet-scheduling"
 	antiAffinityLabelValue = "exclusive"
+
+	ingressConfigMapName = "tmpnet-ingress-config"
 )
 
 type KubeRuntimeConfig struct {
@@ -72,8 +75,10 @@ type KubeRuntimeConfig struct {
 	SchedulingLabelKey string `json:"schedulingLabelKey,omitempty"`
 	// Label value to use for exclusive scheduling for node selection and toleration
 	SchedulingLabelValue string `json:"schedulingLabelValue,omitempty"`
-	// Base URI for constructing node URIs when running outside of the cluster hosting nodes (e.g., "http://localhost:30791")
-	BaseAccessibleURI string `json:"baseAccessibleURI,omitempty"`
+	// Host for ingress rules (e.g., "localhost:30791" for kind, "tmpnet.example.com" for EKS)
+	IngressHost string `json:"ingressHost,omitempty"`
+	// TLS secret name for ingress (empty for HTTP, populated for HTTPS)
+	IngressSecret string `json:"ingressSecret,omitempty"`
 }
 
 type KubeRuntime struct {
@@ -97,8 +102,8 @@ func (p *KubeRuntime) readState(ctx context.Context) error {
 	)
 
 	// Validate that it will be possible to construct accessible URIs when running external to the kube cluster
-	if !IsRunningInCluster() && len(runtimeConfig.BaseAccessibleURI) == 0 {
-		return errors.New("BaseAccessibleURI must be set when running outside of the kubernetes cluster")
+	if !IsRunningInCluster() && len(runtimeConfig.IngressHost) == 0 {
+		return errors.New("IngressHost must be set when running outside of the kubernetes cluster")
 	}
 
 	clientset, err := p.getClientset()
@@ -154,11 +159,18 @@ func (p *KubeRuntime) GetAccessibleURI() string {
 		return p.node.URI
 	}
 
-	baseURI := p.runtimeConfig().BaseAccessibleURI
-	nodeID := p.node.NodeID.String()
-	networkUUID := p.node.network.UUID
+	var (
+		protocol      = "http"
+		nodeID        = p.node.NodeID.String()
+		networkUUID   = p.node.network.UUID
+		runtimeConfig = p.runtimeConfig()
+	)
+	// Assume tls is configured for an ingress secret
+	if len(runtimeConfig.IngressSecret) > 0 {
+		protocol = "https"
+	}
 
-	return fmt.Sprintf("%s/networks/%s/%s", baseURI, networkUUID, nodeID)
+	return fmt.Sprintf("%s://%s/networks/%s/%s", protocol, runtimeConfig.IngressHost, networkUUID, nodeID)
 }
 
 // GetAccessibleStakingAddress retrieves a StakingAddress for the node intended to be
@@ -940,6 +952,35 @@ func (p *KubeRuntime) createNodeIngress(ctx context.Context, serviceName string)
 		pathType    = networkingv1.PathTypeImplementationSpecific
 	)
 
+	// Build the ingress rules
+	ingressRules := []networkingv1.IngressRule{
+		{
+			IngressRuleValue: networkingv1.IngressRuleValue{
+				HTTP: &networkingv1.HTTPIngressRuleValue{
+					Paths: []networkingv1.HTTPIngressPath{
+						{
+							Path:     pathPattern,
+							PathType: &pathType,
+							Backend: networkingv1.IngressBackend{
+								Service: &networkingv1.IngressServiceBackend{
+									Name: serviceName,
+									Port: networkingv1.ServiceBackendPort{
+										Number: config.DefaultHTTPPort,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Add host if not localhost
+	if !strings.HasPrefix(runtimeConfig.IngressHost, "localhost") {
+		ingressRules[0].Host = runtimeConfig.IngressHost
+	}
+
 	ingress := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
@@ -959,29 +1000,18 @@ func (p *KubeRuntime) createNodeIngress(ctx context.Context, serviceName string)
 		},
 		Spec: networkingv1.IngressSpec{
 			IngressClassName: &ingressClassName,
-			Rules: []networkingv1.IngressRule{
-				{
-					IngressRuleValue: networkingv1.IngressRuleValue{
-						HTTP: &networkingv1.HTTPIngressRuleValue{
-							Paths: []networkingv1.HTTPIngressPath{
-								{
-									Path:     pathPattern,
-									PathType: &pathType,
-									Backend: networkingv1.IngressBackend{
-										Service: &networkingv1.IngressServiceBackend{
-											Name: serviceName,
-											Port: networkingv1.ServiceBackendPort{
-												Number: config.DefaultHTTPPort,
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
+			Rules:            ingressRules,
 		},
+	}
+
+	// Add TLS configuration if IngressSecret is set
+	if len(runtimeConfig.IngressSecret) > 0 && !strings.HasPrefix(runtimeConfig.IngressHost, "localhost") {
+		ingress.Spec.TLS = []networkingv1.IngressTLS{
+			{
+				Hosts:      []string{runtimeConfig.IngressHost},
+				SecretName: runtimeConfig.IngressSecret,
+			},
+		}
 	}
 
 	_, err = clientset.NetworkingV1().Ingresses(namespace).Create(ctx, ingress, metav1.CreateOptions{})
@@ -1142,4 +1172,46 @@ func (p *KubeRuntime) waitForIngressReadiness(ctx context.Context, serviceName s
 func IsRunningInCluster() bool {
 	_, err := os.Stat("/var/run/secrets/kubernetes.io/serviceaccount/token")
 	return err == nil
+}
+
+// readIngressConfig attempts to read ingress configuration from the cluster
+func readIngressConfig(ctx context.Context, log logging.Logger, kubeConfig *KubeRuntimeConfig) error {
+	configMapName := ingressConfigMapName
+
+	log.Debug("reading ingress configuration from ConfigMap",
+		zap.String("namespace", kubeConfig.Namespace),
+		zap.String("configmap", configMapName),
+	)
+
+	clientConfig, err := GetClientConfig(log, kubeConfig.ConfigPath, kubeConfig.ConfigContext)
+	if err != nil {
+		return err
+	}
+
+	clientset, err := kubernetes.NewForConfig(clientConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create clientset: %w", err)
+	}
+
+	configMap, err := clientset.CoreV1().ConfigMaps(kubeConfig.Namespace).Get(ctx, configMapName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get configmap %s/%s: %w", kubeConfig.Namespace, configMapName, err)
+	}
+
+	// Read host value (required)
+	host, ok := configMap.Data["host"]
+	if !ok || len(host) == 0 {
+		return fmt.Errorf("missing or empty 'host' value in configmap %s/%s", kubeConfig.Namespace, configMapName)
+	}
+	kubeConfig.IngressHost = host
+	kubeConfig.IngressSecret = configMap.Data["secret"] // A missing or empty value means tls won't be used
+
+	log.Info("loaded ingress configuration from ConfigMap",
+		zap.String("namespace", kubeConfig.Namespace),
+		zap.String("configmap", configMapName),
+		zap.String("host", kubeConfig.IngressHost),
+		zap.String("secret", kubeConfig.IngressSecret),
+	)
+
+	return nil
 }
