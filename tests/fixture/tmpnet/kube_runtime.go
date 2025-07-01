@@ -160,6 +160,8 @@ func (c *KubeRuntimeConfig) ensureDefaults(ctx context.Context, log logging.Logg
 
 type KubeRuntime struct {
 	node *Node
+
+	kubeConfig *restclient.Config
 }
 
 // readState reads the URI and staking address for the node if the node is running.
@@ -818,13 +820,23 @@ func (p *KubeRuntime) runtimeConfig() *KubeRuntimeConfig {
 	return p.node.getRuntimeConfig().Kube
 }
 
+// getKubeconfig retrieves the kubeconfig for the target cluster. It
+// will be cached after the first call to avoid unnecessary logging
+// when running in-cluster.
 func (p *KubeRuntime) getKubeconfig() (*restclient.Config, error) {
-	runtimeConfig := p.runtimeConfig()
-	return GetClientConfig(
-		p.node.network.log,
-		runtimeConfig.ConfigPath,
-		runtimeConfig.ConfigContext,
-	)
+	if p.kubeConfig == nil {
+		runtimeConfig := p.runtimeConfig()
+		config, err := GetClientConfig(
+			p.node.network.log,
+			runtimeConfig.ConfigPath,
+			runtimeConfig.ConfigContext,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get kubeconfig: %w", err)
+		}
+		p.kubeConfig = config
+	}
+	return p.kubeConfig, nil
 }
 
 func (p *KubeRuntime) getClientset() (*kubernetes.Clientset, error) {
