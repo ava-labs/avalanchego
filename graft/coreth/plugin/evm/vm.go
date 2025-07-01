@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
-	avalanchegoConstants "github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/coreth/network"
 	"github.com/ava-labs/coreth/plugin/evm/extension"
 	"github.com/ava-labs/coreth/plugin/evm/gossip"
@@ -38,7 +37,6 @@ import (
 	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/params/extras"
-	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	atomicvm "github.com/ava-labs/coreth/plugin/evm/atomic/vm"
 	"github.com/ava-labs/coreth/plugin/evm/config"
 	corethlog "github.com/ava-labs/coreth/plugin/evm/log"
@@ -54,31 +52,19 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 
 	warpcontract "github.com/ava-labs/coreth/precompile/contracts/warp"
+	"github.com/ava-labs/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/coreth/rpc"
 	statesyncclient "github.com/ava-labs/coreth/sync/client"
 	"github.com/ava-labs/coreth/sync/client/stats"
 	"github.com/ava-labs/coreth/sync/handlers"
 	handlerstats "github.com/ava-labs/coreth/sync/handlers/stats"
+	utilsrpc "github.com/ava-labs/coreth/utils/rpc"
 	"github.com/ava-labs/coreth/warp"
-
-	// Force-load tracer engine to trigger registration
-	//
-	// We must import this package (not referenced elsewhere) so that the native "callTracer"
-	// is added to a map of client-accessible tracers. In geth, this is done
-	// inside of cmd/geth.
-	_ "github.com/ava-labs/libevm/eth/tracers/js"
-	_ "github.com/ava-labs/libevm/eth/tracers/native"
-
-	"github.com/ava-labs/coreth/precompile/precompileconfig"
-	// Force-load precompiles to trigger registration
-	_ "github.com/ava-labs/coreth/precompile/registry"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/rlp"
-
-	avalancheRPC "github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/codec"
@@ -88,23 +74,26 @@ import (
 	avalanchegossip "github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/formatting/address"
+	avalancheUtils "github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/profiler"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
+	// Force-load tracer engine to trigger registration
+	//
+	// We must import this package (not referenced elsewhere) so that the native "callTracer"
+	// is added to a map of client-accessible tracers. In geth, this is done
+	// inside of cmd/geth.
+	_ "github.com/ava-labs/libevm/eth/tracers/js"
+	_ "github.com/ava-labs/libevm/eth/tracers/native"
 
-	avalancheUtils "github.com/ava-labs/avalanchego/utils"
-	avalancheJSON "github.com/ava-labs/avalanchego/utils/json"
+	// Force-load precompiles to trigger registration
+	_ "github.com/ava-labs/coreth/precompile/registry"
 )
 
 var (
@@ -119,7 +108,6 @@ const (
 	// Max time from current time allowed for blocks, before they're considered future blocks
 	// and fail verification
 	maxFutureBlockTime = 10 * time.Second
-	maxUTXOsToFetch    = 1024
 
 	secpCacheSize          = 1024
 	decidedCacheSize       = 10 * units.MiB
@@ -136,12 +124,10 @@ const (
 
 // Define the API endpoints for the VM
 const (
-	avaxEndpoint            = "/avax"
-	adminEndpoint           = "/admin"
-	ethRPCEndpoint          = "/rpc"
-	ethWSEndpoint           = "/ws"
-	ethTxGossipNamespace    = "eth_tx_gossip"
-	atomicTxGossipNamespace = "atomic_tx_gossip"
+	adminEndpoint        = "/admin"
+	ethRPCEndpoint       = "/rpc"
+	ethWSEndpoint        = "/ws"
+	ethTxGossipNamespace = "eth_tx_gossip"
 )
 
 var (
@@ -1042,17 +1028,6 @@ func (vm *VM) Version(context.Context) (string, error) {
 	return Version, nil
 }
 
-// NewHandler returns a new Handler for a service where:
-//   - The handler's functionality is defined by [service]
-//     [service] should be a gorilla RPC service (see https://www.gorillatoolkit.org/pkg/rpc/v2)
-//   - The name of the service is [name]
-func newHandler(name string, service interface{}) (http.Handler, error) {
-	server := avalancheRPC.NewServer()
-	server.RegisterCodec(avalancheJSON.NewCodec(), "application/json")
-	server.RegisterCodec(avalancheJSON.NewCodec(), "application/json;charset=UTF-8")
-	return server, server.RegisterService(service, name)
-}
-
 // CreateHandlers makes new http handlers that can handle API calls
 func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	handler := rpc.NewServer(vm.config.APIMaxDuration.Duration)
@@ -1065,16 +1040,13 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 		return nil, err
 	}
 
-	apis := make(map[string]http.Handler)
-	avaxAPI, err := newHandler("avax", &AvaxAPI{vm})
+	apis, err := vm.atomicVM.CreateHandlers(nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to register service for AVAX API due to %w", err)
+		return nil, fmt.Errorf("failed to create atomic VM handlers: %w", err)
 	}
-	enabledAPIs = append(enabledAPIs, "avax")
-	apis[avaxEndpoint] = avaxAPI
 
 	if vm.config.AdminAPIEnabled {
-		adminAPI, err := newHandler("admin", NewAdminService(vm, os.ExpandEnv(fmt.Sprintf("%s_coreth_performance_%s", vm.config.AdminAPIDir, vm.chainAlias))))
+		adminAPI, err := utilsrpc.NewHandler("admin", NewAdminService(vm, os.ExpandEnv(fmt.Sprintf("%s_coreth_performance_%s", vm.config.AdminAPIDir, vm.chainAlias))))
 		if err != nil {
 			return nil, fmt.Errorf("failed to register service for admin API due to %w", err)
 		}
@@ -1117,81 +1089,6 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 
 func (vm *VM) CreateHTTP2Handler(context.Context) (http.Handler, error) {
 	return nil, nil
-}
-
-/*
- ******************************************************************************
- *********************************** Helpers **********************************
- ******************************************************************************
- */
-
-// getAtomicTx returns the requested transaction, status, and height.
-// If the status is Unknown, then the returned transaction will be nil.
-func (vm *VM) getAtomicTx(txID ids.ID) (*atomic.Tx, atomic.Status, uint64, error) {
-	if tx, height, err := vm.atomicVM.AtomicTxRepository.GetByTxID(txID); err == nil {
-		return tx, atomic.Accepted, height, nil
-	} else if err != database.ErrNotFound {
-		return nil, atomic.Unknown, 0, err
-	}
-	tx, dropped, found := vm.atomicVM.AtomicMempool.GetTx(txID)
-	switch {
-	case found && dropped:
-		return tx, atomic.Dropped, 0, nil
-	case found:
-		return tx, atomic.Processing, 0, nil
-	default:
-		return nil, atomic.Unknown, 0, nil
-	}
-}
-
-// ParseAddress takes in an address and produces the ID of the chain it's for
-// the ID of the address
-func (vm *VM) ParseAddress(addrStr string) (ids.ID, ids.ShortID, error) {
-	chainIDAlias, hrp, addrBytes, err := address.Parse(addrStr)
-	if err != nil {
-		return ids.ID{}, ids.ShortID{}, err
-	}
-
-	chainID, err := vm.ctx.BCLookup.Lookup(chainIDAlias)
-	if err != nil {
-		return ids.ID{}, ids.ShortID{}, err
-	}
-
-	expectedHRP := avalanchegoConstants.GetHRP(vm.ctx.NetworkID)
-	if hrp != expectedHRP {
-		return ids.ID{}, ids.ShortID{}, fmt.Errorf("expected hrp %q but got %q",
-			expectedHRP, hrp)
-	}
-
-	addr, err := ids.ToShortID(addrBytes)
-	if err != nil {
-		return ids.ID{}, ids.ShortID{}, err
-	}
-	return chainID, addr, nil
-}
-
-// GetAtomicUTXOs returns the utxos that at least one of the provided addresses is
-// referenced in.
-func (vm *VM) GetAtomicUTXOs(
-	chainID ids.ID,
-	addrs set.Set[ids.ShortID],
-	startAddr ids.ShortID,
-	startUTXOID ids.ID,
-	limit int,
-) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
-	if limit <= 0 || limit > maxUTXOsToFetch {
-		limit = maxUTXOsToFetch
-	}
-
-	return avax.GetAtomicUTXOs(
-		vm.ctx.SharedMemory,
-		atomic.Codec,
-		chainID,
-		addrs,
-		startAddr,
-		startUTXOID,
-		limit,
-	)
 }
 
 func (vm *VM) chainConfigExtra() *extras.ChainConfig {
@@ -1318,58 +1215,6 @@ func (vm *VM) stateSyncEnabled(lastAcceptedHeight uint64) bool {
 
 	// enable state sync by default if the chain is empty.
 	return lastAcceptedHeight == 0
-}
-
-func (vm *VM) newImportTx(
-	chainID ids.ID, // chain to import from
-	to common.Address, // Address of recipient
-	baseFee *big.Int, // fee to use post-AP3
-	keys []*secp256k1.PrivateKey, // Keys to import the funds
-) (*atomic.Tx, error) {
-	kc := secp256k1fx.NewKeychain()
-	for _, key := range keys {
-		kc.Add(key)
-	}
-
-	atomicUTXOs, _, _, err := vm.GetAtomicUTXOs(chainID, kc.Addresses(), ids.ShortEmpty, ids.Empty, -1)
-	if err != nil {
-		return nil, fmt.Errorf("problem retrieving atomic UTXOs: %w", err)
-	}
-
-	return atomic.NewImportTx(vm.ctx, vm.currentRules(), vm.clock.Unix(), chainID, to, baseFee, kc, atomicUTXOs)
-}
-
-// newExportTx returns a new ExportTx
-func (vm *VM) newExportTx(
-	assetID ids.ID, // AssetID of the tokens to export
-	amount uint64, // Amount of tokens to export
-	chainID ids.ID, // Chain to send the UTXOs to
-	to ids.ShortID, // Address of chain recipient
-	baseFee *big.Int, // fee to use post-AP3
-	keys []*secp256k1.PrivateKey, // Pay the fee and provide the tokens
-) (*atomic.Tx, error) {
-	state, err := vm.blockChain.State()
-	if err != nil {
-		return nil, err
-	}
-
-	// Create the transaction
-	tx, err := atomic.NewExportTx(
-		vm.ctx,            // Context
-		vm.currentRules(), // VM rules
-		state,
-		assetID, // AssetID
-		amount,  // Amount
-		chainID, // ID of the chain to send the funds to
-		to,      // Address
-		baseFee,
-		keys, // Private keys
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return tx, nil
 }
 
 func (vm *VM) PutLastAcceptedID(ID ids.ID) error {

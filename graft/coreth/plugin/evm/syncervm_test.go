@@ -308,12 +308,12 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 		switch i {
 		case 0:
 			// spend the UTXOs from shared memory
-			importTx, err = server.vm.newImportTx(server.vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
+			importTx, err = server.vm.atomicVM.NewImportTx(server.vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 			require.NoError(err)
 			require.NoError(server.vm.atomicVM.AtomicMempool.AddLocalTx(importTx))
 		case 1:
 			// export some of the imported UTXOs to test exportTx is properly synced
-			exportTx, err = server.vm.newExportTx(
+			exportTx, err = server.vm.atomicVM.NewExportTx(
 				server.vm.ctx.AVAXAssetID,
 				importAmount/2,
 				server.vm.ctx.XChainID,

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"net/http"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/codec"
@@ -27,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	"github.com/ava-labs/coreth/consensus/dummy"
@@ -46,6 +48,7 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap5"
 	"github.com/ava-labs/coreth/plugin/evm/vmerrors"
 	"github.com/ava-labs/coreth/utils"
+	"github.com/ava-labs/coreth/utils/rpc"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
@@ -69,21 +72,11 @@ const (
 	// into the mempool.
 	maxAtomicTxMempoolGas   = ap5.AtomicGasLimit
 	atomicTxGossipNamespace = "atomic_tx_gossip"
+	avaxEndpoint            = "/avax"
 )
 
-// TODO: remove this
-// InnerVM is the interface that must be implemented by the VM
-// that's being wrapped by the extension
-type InnerVM interface {
-	extension.ExtensibleVM
-	avalanchecommon.VM
-	block.ChainVM
-	block.BuildBlockWithContextChainVM
-	block.StateSyncableVM
-}
-
 type VM struct {
-	InnerVM
+	extension.InnerVM
 	ctx *snow.Context
 
 	// TODO: unexport these fields
@@ -112,7 +105,7 @@ type VM struct {
 	bootstrapped avalancheutils.Atomic[bool]
 }
 
-func WrapVM(vm InnerVM) *VM {
+func WrapVM(vm extension.InnerVM) *VM {
 	return &VM{InnerVM: vm}
 }
 
@@ -362,6 +355,22 @@ func (vm *VM) Shutdown(context.Context) error {
 	}
 	vm.shutdownWg.Wait()
 	return nil
+}
+
+func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
+	// TODO: uncomment this once atomic VM fully wraps inner VM
+	// apis, err := vm.InnerVM.CreateHandlers(ctx)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	apis := make(map[string]http.Handler)
+	avaxAPI, err := rpc.NewHandler("avax", &AvaxAPI{vm})
+	if err != nil {
+		return nil, fmt.Errorf("failed to register service for AVAX API due to %w", err)
+	}
+	log.Info("AVAX API enabled")
+	apis[avaxEndpoint] = avaxAPI
+	return apis, nil
 }
 
 // verifyTxAtTip verifies that [tx] is valid to be issued on top of the currently preferred block
@@ -769,4 +778,83 @@ func (vm *VM) chainConfigExtra() *extras.ChainConfig {
 func (vm *VM) rules(number *big.Int, time uint64) extras.Rules {
 	ethrules := vm.InnerVM.ChainConfig().Rules(number, params.IsMergeTODO, time)
 	return *params.GetRulesExtra(ethrules)
+}
+
+// currentRules returns the chain rules for the current block.
+func (vm *VM) currentRules() extras.Rules {
+	header := vm.InnerVM.Blockchain().CurrentHeader()
+	return vm.rules(header.Number, header.Time)
+}
+
+// TODO: these should be unexported after test refactor is done
+
+// getAtomicTx returns the requested transaction, status, and height.
+// If the status is Unknown, then the returned transaction will be nil.
+func (vm *VM) GetAtomicTx(txID ids.ID) (*atomic.Tx, atomic.Status, uint64, error) {
+	if tx, height, err := vm.AtomicTxRepository.GetByTxID(txID); err == nil {
+		return tx, atomic.Accepted, height, nil
+	} else if err != avalanchedatabase.ErrNotFound {
+		return nil, atomic.Unknown, 0, err
+	}
+	tx, dropped, found := vm.AtomicMempool.GetTx(txID)
+	switch {
+	case found && dropped:
+		return tx, atomic.Dropped, 0, nil
+	case found:
+		return tx, atomic.Processing, 0, nil
+	default:
+		return nil, atomic.Unknown, 0, nil
+	}
+}
+
+func (vm *VM) NewImportTx(
+	chainID ids.ID, // chain to import from
+	to common.Address, // Address of recipient
+	baseFee *big.Int, // fee to use post-AP3
+	keys []*secp256k1.PrivateKey, // Keys to import the funds
+) (*atomic.Tx, error) {
+	kc := secp256k1fx.NewKeychain()
+	for _, key := range keys {
+		kc.Add(key)
+	}
+
+	atomicUTXOs, _, _, err := avax.GetAtomicUTXOs(vm.ctx.SharedMemory, atomic.Codec, chainID, kc.Addresses(), ids.ShortEmpty, ids.Empty, maxUTXOsToFetch)
+	if err != nil {
+		return nil, fmt.Errorf("problem retrieving atomic UTXOs: %w", err)
+	}
+
+	return atomic.NewImportTx(vm.ctx, vm.currentRules(), vm.clock.Unix(), chainID, to, baseFee, kc, atomicUTXOs)
+}
+
+// newExportTx returns a new ExportTx
+func (vm *VM) NewExportTx(
+	assetID ids.ID, // AssetID of the tokens to export
+	amount uint64, // Amount of tokens to export
+	chainID ids.ID, // Chain to send the UTXOs to
+	to ids.ShortID, // Address of chain recipient
+	baseFee *big.Int, // fee to use post-AP3
+	keys []*secp256k1.PrivateKey, // Pay the fee and provide the tokens
+) (*atomic.Tx, error) {
+	state, err := vm.InnerVM.Blockchain().State()
+	if err != nil {
+		return nil, err
+	}
+
+	// Create the transaction
+	tx, err := atomic.NewExportTx(
+		vm.ctx,            // Context
+		vm.currentRules(), // VM rules
+		state,
+		assetID, // AssetID
+		amount,  // Amount
+		chainID, // ID of the chain to send the funds to
+		to,      // Address
+		baseFee,
+		keys, // Private keys
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return tx, nil
 }
