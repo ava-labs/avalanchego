@@ -31,16 +31,11 @@ func TestDialerCancelDial(t *testing.T) {
 	go func() {
 		for {
 			// Continuously accept connections from myself
-			_, err := l.Accept()
-			if err != nil {
-				// Distinguish between an error that occurred because
-				// the test is over from actual errors
-				select {
-				case <-done:
-					return
-				default:
-					require.FailNow(err.Error())
-				}
+			_, _ = l.Accept()
+			select {
+			case <-done:
+				return
+			default:
 			}
 		}
 	}()

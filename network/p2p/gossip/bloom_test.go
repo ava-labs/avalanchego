@@ -99,7 +99,7 @@ func TestBloomFilterRefresh(t *testing.T) {
 			}
 
 			require.Equal(tt.resetCount, resetCount)
-			require.Equal(float64(tt.resetCount+1), testutil.ToFloat64(bloom.metrics.ResetCount))
+			require.InDelta(float64(tt.resetCount+1), testutil.ToFloat64(bloom.metrics.ResetCount), 0)
 			for _, expected := range tt.expected {
 				require.True(bloom.Has(expected))
 			}

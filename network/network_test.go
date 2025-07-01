@@ -13,6 +13,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -205,7 +206,7 @@ func newMessageCreator(t *testing.T) message.Creator {
 	return mc
 }
 
-func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler) ([]ids.NodeID, []*network, *sync.WaitGroup) {
+func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler) ([]ids.NodeID, []*network, *errgroup.Group) {
 	require := require.New(t)
 
 	dialer, listeners, nodeIDs, configs := newTestNetwork(t, len(handlers))
@@ -275,8 +276,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 		networks[i] = net.(*network)
 	}
 
-	wg := sync.WaitGroup{}
-	wg.Add(len(networks))
+	eg := &errgroup.Group{}
 	for i, net := range networks {
 		if i != 0 {
 			config := configs[0]
@@ -288,26 +288,23 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 			}, 10*time.Second, time.Millisecond)
 		}
 
-		go func(net Network) {
-			defer wg.Done()
-
-			require.NoError(net.Dispatch())
-		}(net)
+		eg.Go(net.Dispatch)
 	}
 
 	if len(networks) > 1 {
 		<-onAllConnected
 	}
 
-	return nodeIDs, networks, &wg
+	return nodeIDs, networks, eg
 }
 
 func TestNewNetwork(t *testing.T) {
-	_, networks, wg := newFullyConnectedTestNetwork(t, []router.InboundHandler{nil, nil, nil})
+	require := require.New(t)
+	_, networks, eg := newFullyConnectedTestNetwork(t, []router.InboundHandler{nil, nil, nil})
 	for _, net := range networks {
 		net.StartClose()
 	}
-	wg.Wait()
+	require.NoError(eg.Wait())
 }
 
 func TestIngressConnCount(t *testing.T) {
@@ -315,14 +312,12 @@ func TestIngressConnCount(t *testing.T) {
 
 	emptyHandler := func(context.Context, message.InboundMessage) {}
 
-	_, networks, wg := newFullyConnectedTestNetwork(
+	_, networks, _ := newFullyConnectedTestNetwork(
 		t, []router.InboundHandler{
 			router.InboundHandlerFunc(emptyHandler),
 			router.InboundHandlerFunc(emptyHandler),
 			router.InboundHandlerFunc(emptyHandler),
 		})
-
-	wg.Done()
 
 	for _, net := range networks {
 		net.config.NoIngressValidatorConnectionGracePeriod = 0
@@ -361,7 +356,7 @@ func TestSend(t *testing.T) {
 	require := require.New(t)
 
 	received := make(chan message.InboundMessage)
-	nodeIDs, networks, wg := newFullyConnectedTestNetwork(
+	nodeIDs, networks, eg := newFullyConnectedTestNetwork(
 		t,
 		[]router.InboundHandler{
 			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
@@ -399,14 +394,14 @@ func TestSend(t *testing.T) {
 	for _, net := range networks {
 		net.StartClose()
 	}
-	wg.Wait()
+	require.NoError(eg.Wait())
 }
 
 func TestSendWithFilter(t *testing.T) {
 	require := require.New(t)
 
 	received := make(chan message.InboundMessage)
-	nodeIDs, networks, wg := newFullyConnectedTestNetwork(
+	nodeIDs, networks, eg := newFullyConnectedTestNetwork(
 		t,
 		[]router.InboundHandler{
 			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
@@ -446,13 +441,13 @@ func TestSendWithFilter(t *testing.T) {
 	for _, net := range networks {
 		net.StartClose()
 	}
-	wg.Wait()
+	require.NoError(eg.Wait())
 }
 
 func TestTrackVerifiesSignatures(t *testing.T) {
 	require := require.New(t)
 
-	_, networks, wg := newFullyConnectedTestNetwork(t, []router.InboundHandler{nil})
+	_, networks, eg := newFullyConnectedTestNetwork(t, []router.InboundHandler{nil})
 
 	network := networks[0]
 
@@ -489,7 +484,7 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 	for _, net := range networks {
 		net.StartClose()
 	}
-	wg.Wait()
+	require.NoError(eg.Wait())
 }
 
 func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
@@ -534,19 +529,14 @@ func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 		networks[i] = net
 	}
 
-	wg := sync.WaitGroup{}
-	wg.Add(len(networks))
+	eg := &errgroup.Group{}
 	for i, net := range networks {
 		if i != 0 {
 			config := configs[0]
 			net.ManuallyTrack(config.MyNodeID, config.MyIPPort.Get())
 		}
 
-		go func(net Network) {
-			defer wg.Done()
-
-			require.NoError(net.Dispatch())
-		}(net)
+		eg.Go(net.Dispatch)
 	}
 
 	network := networks[1].(*network)
@@ -567,7 +557,7 @@ func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 	for _, net := range networks {
 		net.StartClose()
 	}
-	wg.Wait()
+	require.NoError(eg.Wait())
 }
 
 func TestDialDeletesNonValidators(t *testing.T) {
@@ -617,8 +607,7 @@ func TestDialDeletesNonValidators(t *testing.T) {
 	ip, err := signer.GetSignedIP()
 	require.NoError(err)
 
-	wg := sync.WaitGroup{}
-	wg.Add(len(networks))
+	eg := &errgroup.Group{}
 	for i, net := range networks {
 		if i != 0 {
 			stakingCert, err := staking.ParseCertificate(config.TLSConfig.Certificates[0].Leaf.Raw)
@@ -634,11 +623,7 @@ func TestDialDeletesNonValidators(t *testing.T) {
 			}))
 		}
 
-		go func(net Network) {
-			defer wg.Done()
-
-			require.NoError(net.Dispatch())
-		}(net)
+		eg.Go(net.Dispatch)
 	}
 
 	// Give the dialer time to run one iteration. This is racy, but should ony
@@ -663,13 +648,15 @@ func TestDialDeletesNonValidators(t *testing.T) {
 	for _, net := range networks {
 		net.StartClose()
 	}
-	wg.Wait()
+	require.NoError(eg.Wait())
 }
 
 // Test that cancelling the context passed into dial
 // causes dial to return immediately.
 func TestDialContext(t *testing.T) {
-	_, networks, wg := newFullyConnectedTestNetwork(t, []router.InboundHandler{nil})
+	require := require.New(t)
+
+	_, networks, eg := newFullyConnectedTestNetwork(t, []router.InboundHandler{nil})
 
 	dialer := newTestDialer()
 	network := networks[0]
@@ -717,12 +704,12 @@ func TestDialContext(t *testing.T) {
 
 	select {
 	case <-gotNeverDialedIPConn:
-		require.FailNow(t, "unexpectedly connected to peer")
+		require.FailNow("unexpectedly connected to peer")
 	default:
 	}
 
 	network.StartClose()
-	wg.Wait()
+	require.NoError(eg.Wait())
 }
 
 func TestAllowConnectionAsAValidator(t *testing.T) {
@@ -763,19 +750,14 @@ func TestAllowConnectionAsAValidator(t *testing.T) {
 		networks[i] = net
 	}
 
-	wg := sync.WaitGroup{}
-	wg.Add(len(networks))
+	eg := &errgroup.Group{}
 	for i, net := range networks {
 		if i != 0 {
 			config := configs[0]
 			net.ManuallyTrack(config.MyNodeID, config.MyIPPort.Get())
 		}
 
-		go func(net Network) {
-			defer wg.Done()
-
-			require.NoError(net.Dispatch())
-		}(net)
+		eg.Go(net.Dispatch)
 	}
 
 	network := networks[1].(*network)
@@ -795,7 +777,7 @@ func TestAllowConnectionAsAValidator(t *testing.T) {
 	for _, net := range networks {
 		net.StartClose()
 	}
-	wg.Wait()
+	require.NoError(eg.Wait())
 }
 
 func TestGetAllPeers(t *testing.T) {
@@ -823,7 +805,7 @@ func TestGetAllPeers(t *testing.T) {
 	require.NoError(err)
 
 	// Create a network of validators
-	nodeIDs, networks, wg := newFullyConnectedTestNetwork(
+	nodeIDs, networks, eg := newFullyConnectedTestNetwork(
 		t,
 		[]router.InboundHandler{
 			nil, nil, nil,
@@ -831,13 +813,8 @@ func TestGetAllPeers(t *testing.T) {
 	)
 
 	// Connect the non-validator peer to the validator network
-	wg.Add(1)
 	nonValidatorNetwork.ManuallyTrack(networks[0].config.MyNodeID, networks[0].config.MyIPPort.Get())
-	go func() {
-		defer wg.Done()
-
-		require.NoError(nonValidatorNetwork.Dispatch())
-	}()
+	eg.Go(nonValidatorNetwork.Dispatch)
 
 	{
 		// The non-validator peer should be able to get all the peers in the network
@@ -869,5 +846,5 @@ func TestGetAllPeers(t *testing.T) {
 	for _, net := range networks {
 		net.StartClose()
 	}
-	wg.Wait()
+	require.NoError(eg.Wait())
 }

@@ -9,14 +9,15 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"math/big"
 	"net"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 
 	_ "embed"
 
@@ -108,25 +109,25 @@ func TestBlockClientsWithIncorrectRSAKeys(t *testing.T) {
 			require.NoError(t, err)
 			defer listener.Close()
 
-			var wg sync.WaitGroup
-			wg.Add(1)
-
-			go func() {
-				defer wg.Done()
+			eg := &errgroup.Group{}
+			eg.Go(func() error {
 				conn, err := listener.Accept()
-				require.NoError(t, err)
+				if err != nil {
+					return err
+				}
 
 				_, _, _, err = upgrader.Upgrade(conn)
+				if !errors.Is(err, testCase.expectedErr) {
+					return err
+				}
 
-				require.ErrorIs(t, err, testCase.expectedErr)
-			}()
+				return nil
+			})
 
 			conn, err := tls.Dial("tcp", listener.Addr().String(), &clientConfig)
 			require.NoError(t, err)
-
 			require.NoError(t, conn.Handshake())
-
-			wg.Wait()
+			require.NoError(t, eg.Wait())
 		})
 	}
 }

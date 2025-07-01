@@ -69,18 +69,18 @@ func TestSizedLRUSizeAlteringRegression(t *testing.T) {
 	valueA := "ab"
 	cache.Put("a", &valueA)
 
-	require.Equal(expectedPortionFilled, cache.PortionFilled())
+	require.InDelta(expectedPortionFilled, cache.PortionFilled(), 0)
 
 	// mutate first value
 	valueA = "abcd"
-	require.Equal(expectedPortionFilled, cache.PortionFilled(), "after value A mutation, portion filled should be the same")
+	require.InDelta(expectedPortionFilled, cache.PortionFilled(), 0, "after value A mutation, portion filled should be the same")
 
 	// put second value
 	expectedPortionFilled = 0.8
 	valueB := "bcd"
 	cache.Put("b", &valueB)
 
-	require.Equal(expectedPortionFilled, cache.PortionFilled())
+	require.InDelta(expectedPortionFilled, cache.PortionFilled(), 0)
 
 	_, ok := cache.Get("a")
 	require.False(ok, "key a shouldn't exist after b is put")

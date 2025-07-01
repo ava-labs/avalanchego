@@ -48,15 +48,15 @@ func requireEqual(t *testing.T, expected, actual *ipTracker) {
 
 func requireMetricsConsistent(t *testing.T, tracker *ipTracker) {
 	require := require.New(t)
-	require.Equal(float64(len(tracker.tracked)), testutil.ToFloat64(tracker.numTrackedPeers))
+	require.InDelta(float64(len(tracker.tracked)), testutil.ToFloat64(tracker.numTrackedPeers), 0)
 	var numGossipableIPs int
 	for _, subnet := range tracker.subnet {
 		numGossipableIPs += len(subnet.gossipableIndices)
 	}
-	require.Equal(float64(numGossipableIPs), testutil.ToFloat64(tracker.numGossipableIPs))
-	require.Equal(float64(len(tracker.subnet)), testutil.ToFloat64(tracker.numTrackedSubnets))
-	require.Equal(float64(tracker.bloom.Count()), testutil.ToFloat64(tracker.bloomMetrics.Count))
-	require.Equal(float64(tracker.maxBloomCount), testutil.ToFloat64(tracker.bloomMetrics.MaxCount))
+	require.InDelta(float64(numGossipableIPs), testutil.ToFloat64(tracker.numGossipableIPs), 0)
+	require.InDelta(float64(len(tracker.subnet)), testutil.ToFloat64(tracker.numTrackedSubnets), 0)
+	require.InDelta(float64(tracker.bloom.Count()), testutil.ToFloat64(tracker.bloomMetrics.Count), 0)
+	require.InDelta(float64(tracker.maxBloomCount), testutil.ToFloat64(tracker.bloomMetrics.MaxCount), 0)
 }
 
 func TestIPTracker_ManuallyTrack(t *testing.T) {
