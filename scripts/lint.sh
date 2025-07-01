@@ -41,7 +41,16 @@ function test_golangci_lint {
 _addlicense_flags=${ADDLICENSE_FLAGS:-"--verify --debug"}
 function test_license_header {
   local files=()
-  while IFS= read -r line; do files+=("$line"); done < <(find . -type f -name '*.go' ! -name '*.pb.go' ! -name 'mock_*.go' ! -name 'mocks_*.go' ! -path './**/*mock/*.go' ! -name '*.canoto.go' ! -name '*.bindings.go')
+  while IFS= read -r line; do files+=("$line"); done < <(
+    find . -type f -name '*.go' \
+      ! -name '*.pb.go' \
+      ! -name '*.connect.go' \
+      ! -name 'mock_*.go' \
+      ! -name 'mocks_*.go' \
+      ! -path './**/*mock/*.go' \
+      ! -name '*.canoto.go' \
+      ! -name '*.bindings.go'
+    )
 
   # shellcheck disable=SC2086
   go run github.com/palantir/go-license@v1.25.0 \

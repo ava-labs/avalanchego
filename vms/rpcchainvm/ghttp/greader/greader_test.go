@@ -45,6 +45,5 @@ func TestErrIOEOF(t *testing.T) {
 	buf := make([]byte, 1)
 	n, err := client.Read(buf)
 	require.Zero(n)
-	// Do not use require.ErrorIs because callers use equality checks on io.EOF
 	require.Equal(io.EOF, err)
 }
