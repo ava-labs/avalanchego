@@ -36,10 +36,9 @@ func (op *MintOperation) Outs() []verify.State {
 }
 
 func (op *MintOperation) Verify() error {
-	switch op {
-	case nil:
+	if op == nil {
 		return errNilMintOperation
-	default:
-		return verify.All(&op.MintInput, &op.MintOutput, &op.OwnedOutput)
 	}
+
+	return verify.All(&op.MintInput, &op.MintOutput, &op.OwnedOutput)
 }

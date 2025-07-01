@@ -36,10 +36,9 @@ func (cr *Credential) MarshalJSON() ([]byte, error) {
 }
 
 func (cr *Credential) Verify() error {
-	switch cr {
-	case nil:
+	if cr == nil {
 		return ErrNilCredential
-	default:
-		return nil
 	}
+
+	return nil
 }

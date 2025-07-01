@@ -603,7 +603,6 @@ func (n *network) Dispatch() error {
 	go n.runTimers() // Periodically perform operations
 	go n.inboundConnUpgradeThrottler.Dispatch()
 	for n.onCloseCtx.Err() == nil { // Continuously accept new connections
-
 		conn, err := n.listener.Accept() // Returns error when n.Close() is called
 		if err != nil {
 			n.peerConfig.Log.Debug("error during server accept", zap.Error(err))
