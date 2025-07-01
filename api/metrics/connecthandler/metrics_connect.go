@@ -23,8 +23,10 @@ func NewConnectMetricsService(service prometheus.Gatherer) *ConnectMetricsServic
 	}
 }
 
-func (s *ConnectMetricsService) GetMetrics(_ context.Context, _ *connect.Request[metricsv1.MetricsRequest]) (
-	*connect.Response[metricsv1.MetricsReply], error) {
+func (s *ConnectMetricsService) GetMetrics(
+	_ context.Context,
+	_ *connect.Request[metricsv1.MetricsRequest],
+) (*connect.Response[metricsv1.MetricsReply], error) {
 	mfs, err := s.Service.Gather()
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
