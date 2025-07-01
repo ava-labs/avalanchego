@@ -108,16 +108,11 @@ func convertResult(r health.Result) *healthv1.Result {
 				result.Message = structMsg
 			}
 		} else if msg, ok := r.Details.(string); ok {
-			// Convert string to a Struct with a single field "message"
-			result.Message = &structpb.Struct{
-				Fields: map[string]*structpb.Value{
-					"message": structpb.NewStringValue(msg),
-				},
-			}
+			// Convert string to a Struct with a single field "value"
+			result.Message, _ = structpb.NewStruct(map[string]interface{}{
+				"value": msg,
+			})
 		}
-	} else {
-		// If no details, set empty struct
-		result.Message = &structpb.Struct{}
 	}
 
 	// Set error field if exists
