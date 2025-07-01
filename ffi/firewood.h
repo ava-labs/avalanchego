@@ -113,6 +113,12 @@ struct Value fwd_batch(const struct DatabaseHandle *db,
  * # Arguments
  *
  * * `db` - The database handle to close, previously returned from a call to `open_db()`
+ *
+ * # Panics
+ *
+ * This function panics if:
+ * * `db` is `None` (null pointer)
+ * * A lock is poisoned
  */
 void fwd_close_db(struct DatabaseHandle *db);
 

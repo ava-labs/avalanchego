@@ -66,7 +66,7 @@ pub trait DbViewSync {
 }
 
 /// A synchronous view of the database with raw byte keys (object-safe version).
-pub trait DbViewSyncBytes {
+pub trait DbViewSyncBytes: std::fmt::Debug {
     /// find a value synchronously using raw bytes
     fn val_sync_bytes(&self, key: &[u8]) -> Result<Option<Box<[u8]>>, DbError>;
 }

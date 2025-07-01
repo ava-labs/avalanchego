@@ -14,13 +14,14 @@ use std::ops::Deref;
 use std::os::unix::ffi::OsStrExt as _;
 use std::path::Path;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 
 use firewood::db::{
-    BatchOp as DbBatchOp, Db, DbConfig, DbViewSync as _, DbViewSyncBytes as _, Proposal,
+    BatchOp as DbBatchOp, Db, DbConfig, DbViewSync as _, DbViewSyncBytes, Proposal,
 };
 use firewood::manager::{CacheReadStrategy, RevisionManagerConfig};
 
+use firewood::v2::api::HashKey;
 use metrics::counter;
 
 #[doc(hidden)]
@@ -52,6 +53,10 @@ pub struct DatabaseHandle<'p> {
     // Keep proposals first, as they must be dropped before the database handle is dropped due to lifetime
     // issues.
     proposals: RwLock<HashMap<ProposalId, Arc<Proposal<'p>>>>,
+
+    /// A single cached view to improve performance of reads while committing
+    cached_view: Mutex<Option<(HashKey, Box<dyn DbViewSyncBytes>)>>,
+
     /// The database
     db: Db,
 }
@@ -61,7 +66,17 @@ impl From<Db> for DatabaseHandle<'_> {
         Self {
             db,
             proposals: RwLock::new(HashMap::new()),
+            cached_view: Mutex::new(None),
         }
+    }
+}
+
+impl DatabaseHandle<'_> {
+    fn clear_cached_view(&self) {
+        self.cached_view
+            .lock()
+            .expect("cached_view lock is poisoned")
+            .take();
     }
 }
 
@@ -215,17 +230,37 @@ fn get_from_root(
     key: &Value,
 ) -> Result<Value, String> {
     let db = db.ok_or("db should be non-null")?;
-    // Get the revision associated with the root hash.
+    let requested_root = root.as_slice().try_into()?;
+    let mut cached_view = db.cached_view.lock().expect("cached_view lock is poisoned");
+    let value = match cached_view.as_ref() {
+        // found the cached view, use it
+        Some((root_hash, view)) if root_hash == &requested_root => {
+            counter!("firewood.ffi.cached_view.hit").increment(1);
+            view.val_sync_bytes(key.as_slice())
+        }
+        // If what was there didn't match the requested root, we need a new view, so we
+        // update the cache
+        _ => {
+            counter!("firewood.ffi.cached_view.miss").increment(1);
+            let rev = view_sync_from_root(db, root)?;
+            let result = rev.val_sync_bytes(key.as_slice());
+            *cached_view = Some((requested_root.clone(), rev));
+            result
+        }
+    }
+    .map_err(|e| e.to_string())?
+    .ok_or("")?;
+
+    Ok(value.into())
+}
+fn view_sync_from_root(
+    db: &DatabaseHandle<'_>,
+    root: &Value,
+) -> Result<Box<dyn DbViewSyncBytes>, String> {
     let rev = db
         .view_sync(root.as_slice().try_into()?)
         .map_err(|e| e.to_string())?;
-
-    // Get value associated with key.
-    let value = rev
-        .val_sync_bytes(key.as_slice())
-        .map_err(|e| e.to_string())?
-        .ok_or("")?;
-    Ok(value.into())
+    Ok(rev)
 }
 
 /// A `KeyValue` represents a key-value pair, passed to the FFI.
@@ -509,7 +544,26 @@ fn commit(db: Option<&DatabaseHandle<'_>>, proposal_id: u32) -> Result<(), Strin
         .map_err(|_| "proposal lock is poisoned")?
         .remove(&proposal_id)
         .ok_or("proposal not found")?;
-    proposal.commit_sync().map_err(|e| e.to_string())
+
+    // Get the proposal hash and cache the view. We never cache an empty proposal.
+    let proposal_hash = proposal.root_hash_sync();
+
+    if let Ok(Some(proposal_hash)) = proposal_hash {
+        let mut guard = db.cached_view.lock().expect("cached_view lock is poisoned");
+        match db.view_sync(proposal_hash.clone()) {
+            Ok(view) => *guard = Some((proposal_hash, view)),
+            Err(_) => *guard = None, // Clear cache on error
+        }
+        drop(guard);
+    }
+
+    // Commit the proposal
+    let result = proposal.commit_sync().map_err(|e| e.to_string());
+
+    // Clear the cache, which will force readers after this point to find the committed root hash
+    db.clear_cached_view();
+
+    result
 }
 
 /// Drops a proposal from the database.
@@ -883,9 +937,26 @@ fn manager_config(
 /// # Arguments
 ///
 /// * `db` - The database handle to close, previously returned from a call to `open_db()`
+///
+/// # Panics
+///
+/// This function panics if:
+/// * `db` is `None` (null pointer)
+/// * A lock is poisoned
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fwd_close_db(db: *mut DatabaseHandle) {
-    let _ = unsafe { Box::from_raw(db) };
+pub unsafe extern "C" fn fwd_close_db(db: Option<&mut DatabaseHandle>) {
+    let db_handle = db.expect("db should be non-null");
+
+    // Explicitly clear the downstream items. Drop will do these in order, so this
+    // code is defensive in case someone reorders the struct memebers of DatabaseHandle.
+    db_handle
+        .proposals
+        .write()
+        .expect("proposals lock is poisoned")
+        .clear();
+    db_handle.clear_cached_view();
+
+    // The database handle will be dropped automatically when db_handle goes out of scope
 }
 
 #[cfg(test)]
