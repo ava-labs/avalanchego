@@ -10,9 +10,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/libevm/ethclient"
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/ava-labs/avalanchego/tests"
 )
 
 type Test interface {
