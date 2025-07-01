@@ -32,7 +32,7 @@ func TestNotifier(t *testing.T) {
 	subscriber := NewSimpleSubscriber()
 	nf := &NotificationForwarder{
 		Subscribe: subscriber.WaitForEvent,
-		Notifier:  Notifier(notifier),
+		Engine:    Notifier(notifier),
 		Log:       &logging.NoLog{},
 	}
 
@@ -54,8 +54,8 @@ func TestNotifierStopWhileSubscribing(_ *testing.T) {
 	})
 
 	nf := &NotificationForwarder{
-		Notifier: Notifier(notifier),
-		Log:      &logging.NoLog{},
+		Engine: Notifier(notifier),
+		Log:    &logging.NoLog{},
 	}
 
 	var subscribed sync.WaitGroup
@@ -80,7 +80,7 @@ func TestNotifierStopWhileNotifying(_ *testing.T) {
 	var notifiying sync.WaitGroup
 	notifiying.Add(1)
 
-	nf.Notifier = Notifier(notifier(func(ctx context.Context, _ Message) error {
+	nf.Engine = Notifier(notifier(func(ctx context.Context, _ Message) error {
 		notifiying.Wait()
 		<-ctx.Done()
 		return nil

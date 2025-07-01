@@ -5,7 +5,9 @@ package common
 
 import (
 	"context"
+	"errors"
 	"sync"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -19,14 +21,16 @@ type Notifier interface {
 // NotificationForwarder is a component that listens for notifications from a Subscription,
 // and forwards them to a Notifier.
 type NotificationForwarder struct {
-	Notifier  Notifier
+	Engine    Notifier
 	Subscribe Subscription
 	Log       logging.Logger
 
 	running   sync.WaitGroup
 	closeChan chan struct{}
 	lock      sync.Mutex
-	cancel    context.CancelFunc
+	closeFunc context.CancelFunc
+
+	releaseNotifyWait context.CancelFunc
 }
 
 func (nf *NotificationForwarder) Start() {
@@ -38,12 +42,6 @@ func (nf *NotificationForwarder) Start() {
 func (nf *NotificationForwarder) run() {
 	defer nf.running.Done()
 	for {
-		select {
-		case <-nf.closeChan:
-			return
-		default:
-		}
-
 		ctx := nf.setAndGetContext()
 
 		select {
@@ -54,13 +52,20 @@ func (nf *NotificationForwarder) run() {
 
 		nf.Log.Debug("Subscribing to notifications")
 		msg, err := nf.Subscribe(ctx)
+		if errors.Is(err, context.Canceled) {
+			nf.cancelContext()
+			nf.Log.Warn("Context cancelled")
+			continue
+		}
+		nf.cancelContext()
+
+		nf.Log.Info("Got notification", zap.Stringer("msg", msg))
+
 		if err != nil {
 			nf.Log.Error("Failed subscribing to notifications", zap.Error(err))
 			return
 		}
 		nf.Log.Debug("Received notification", zap.Stringer("msg", msg))
-
-		nf.cancelContext()
 
 		select {
 		case <-nf.closeChan:
@@ -68,11 +73,40 @@ func (nf *NotificationForwarder) run() {
 		default:
 		}
 
-		if err := nf.Notifier.Notify(ctx, msg); err != nil {
-			nf.Log.Error("Failed notifying engine", zap.Error(err))
+		t1 := time.Now()
+
+		engineNotified := nf.notifyEngine(msg)
+
+		select {
+		case <-nf.closeChan:
+			return
+		case <-engineNotified.Done():
 		}
 
-		nf.cancelContext()
+		nf.Log.Info("Notifying engine took", zap.Duration("elapsed", time.Since(t1)))
+	}
+}
+
+func (nf *NotificationForwarder) notifyEngine(msg Message) context.Context {
+	nf.lock.Lock()
+	notifyContext, cancel := context.WithCancel(context.Background())
+	nf.releaseNotifyWait = cancel
+	nf.lock.Unlock()
+
+	if err := nf.Engine.Notify(notifyContext, msg); err != nil {
+		nf.Log.Error("Failed notifying engine", zap.Error(err))
+	}
+
+	return notifyContext
+}
+
+func (nf *NotificationForwarder) PreferenceOrStateChanged() {
+	nf.lock.Lock()
+	defer nf.lock.Unlock()
+
+	if nf.releaseNotifyWait != nil {
+		nf.releaseNotifyWait()
+		nf.releaseNotifyWait = nil
 	}
 }
 
@@ -80,9 +114,9 @@ func (nf *NotificationForwarder) cancelContext() {
 	nf.lock.Lock()
 	defer nf.lock.Unlock()
 
-	if nf.cancel != nil {
-		nf.cancel()
-		nf.cancel = nil
+	if nf.closeFunc != nil {
+		nf.closeFunc()
+		nf.closeFunc = nil
 	}
 }
 
@@ -91,7 +125,7 @@ func (nf *NotificationForwarder) setAndGetContext() context.Context {
 
 	nf.lock.Lock()
 	defer nf.lock.Unlock()
-	nf.cancel = cancel
+	nf.closeFunc = cancel
 	return ctx
 }
 

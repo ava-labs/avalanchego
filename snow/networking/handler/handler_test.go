@@ -66,11 +66,8 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := common.NewSimpleSubscriber()
-
 	handlerIntf, err := New(
 		ctx,
-		subscriber,
 		vdrs,
 		time.Second,
 		testThreadPoolSize,
@@ -175,11 +172,8 @@ func TestHandlerClosesOnError(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := common.NewSimpleSubscriber()
-
 	handlerIntf, err := New(
 		ctx,
-		subscriber,
 		vdrs,
 		time.Second,
 		testThreadPoolSize,
@@ -280,11 +274,8 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := common.NewSimpleSubscriber()
-
 	handlerIntf, err := New(
 		ctx,
-		subscriber,
 		vdrs,
 		1,
 		testThreadPoolSize,
@@ -372,11 +363,8 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := common.NewSimpleSubscriber()
-
 	handler, err := New(
 		ctx,
-		subscriber,
 		vdrs,
 		time.Second,
 		testThreadPoolSize,
@@ -426,7 +414,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 
 	wg.Add(1)
 	handler.Start(context.Background(), false)
-	subscriber.Publish(common.PendingTxs)
+	require.NoError(handler.Notify(context.Background(), common.PendingTxs))
 	wg.Wait()
 }
 
@@ -550,11 +538,8 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 			)
 			require.NoError(err)
 
-			subscriber := common.NewSimpleSubscriber()
-
 			handler, err := New(
 				ctx,
-				subscriber,
 				vdrs,
 				time.Second,
 				testThreadPoolSize,
@@ -635,11 +620,8 @@ func TestHandlerStartError(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := common.NewSimpleSubscriber()
-
 	handler, err := New(
 		ctx,
-		subscriber,
 		validators.NewManager(),
 		time.Second,
 		testThreadPoolSize,
