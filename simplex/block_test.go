@@ -58,7 +58,7 @@ func TestBlockSerialization(t *testing.T) {
 			name:       "block serialization",
 			blockBytes: blockBytes,
 			expected:   blockBytes,
-			parseFunc: func(_ context.Context, _ []byte) (snowman.Block, error) {
+			parseFunc: func(_ context.Context, b []byte) (snowman.Block, error) {
 				require.Equal(t, b, testBlock.BytesV, "block bytes should match")
 				return &testBlock, nil
 			},
