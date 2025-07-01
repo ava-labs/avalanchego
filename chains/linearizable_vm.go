@@ -28,21 +28,34 @@ type initializeOnLinearizeVM struct {
 	vmToInitialize common.VM
 	vmToLinearize  *linearizeOnInitializeVM
 
-	ctx          *snow.Context
-	db           database.Database
-	genesisBytes []byte
-	upgradeBytes []byte
-	configBytes  []byte
-	fxs          []*common.Fx
-	appSender    common.AppSender
+	ctx              *snow.Context
+	db               database.Database
+	genesisBytes     []byte
+	upgradeBytes     []byte
+	configBytes      []byte
+	fxs              []*common.Fx
+	appSender        common.AppSender
+	waitForLinearize chan struct{}
 }
 
 func (vm *initializeOnLinearizeVM) WaitForEvent(ctx context.Context) (common.Message, error) {
-	return vm.vmToInitialize.WaitForEvent(ctx)
+	select {
+	case <-vm.waitForLinearize:
+		return vm.vmToInitialize.WaitForEvent(ctx)
+	case <-ctx.Done():
+		return 0, ctx.Err()
+	}
 }
 
 func (vm *initializeOnLinearizeVM) Linearize(ctx context.Context, stopVertexID ids.ID) error {
 	vm.vmToLinearize.stopVertexID = stopVertexID
+	select {
+	case <-vm.waitForLinearize:
+	default:
+		defer func() {
+			close(vm.waitForLinearize)
+		}()
+	}
 	return vm.vmToInitialize.Initialize(
 		ctx,
 		vm.ctx,
