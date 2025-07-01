@@ -6,6 +6,7 @@ package mempool
 import (
 	"context"
 	"errors"
+	"github.com/stretchr/testify/assert"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -316,7 +317,7 @@ func TestWaitForEventWithTx(t *testing.T) {
 	m := newMempool()
 	go func() {
 		tx := newTx(0, 32)
-		require.NoError(m.Add(tx))
+		assert.NoError(t, m.Add(tx))
 	}()
 
 	msg, err := m.WaitForEvent(context.Background())

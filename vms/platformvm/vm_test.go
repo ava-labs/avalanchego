@@ -1304,7 +1304,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	h, err := handler.New(
 		bootstrapConfig.Ctx,
-		bootstrapConfig.VM,
 		beacons,
 		time.Hour,
 		2,

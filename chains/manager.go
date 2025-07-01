@@ -806,12 +806,19 @@ func (m *manager) createAvalancheChain(
 		vmWrappingProposerVM = tracedvm.NewBlockVM(vmWrappingProposerVM, "proposervm", m.Tracer)
 	}
 
+	cn := &ChangeNotifier{
+		ChainVM: vmWrappingProposerVM,
+	}
+
+	vmWrappingProposerVM = cn
+
 	// Note: linearizableVM is the VM that the Avalanche engines should be
 	// using.
 	linearizableVM := &initializeOnLinearizeVM{
-		DAGVM:          dagVM,
-		vmToInitialize: vmWrappingProposerVM,
-		vmToLinearize:  untracedVMWrappedInsideProposerVM,
+		waitForLinearize: make(chan struct{}),
+		DAGVM:            dagVM,
+		vmToInitialize:   vmWrappingProposerVM,
+		vmToLinearize:    untracedVMWrappedInsideProposerVM,
 
 		ctx:          ctx.Context,
 		db:           vmDB,
@@ -879,7 +886,6 @@ func (m *manager) createAvalancheChain(
 	// Asynchronously passes messages from the network to the consensus engine
 	h, err := handler.New(
 		ctx,
-		linearizableVM,
 		vdrs,
 		m.FrontierPollFrequency,
 		m.ConsensusAppConcurrency,
@@ -893,6 +899,16 @@ func (m *manager) createAvalancheChain(
 	if err != nil {
 		return nil, fmt.Errorf("error initializing network handler: %w", err)
 	}
+
+	nf := &common.NotificationForwarder{
+		Subscribe: linearizableVM.WaitForEvent,
+		Log:       ctx.Log,
+		Engine:    h,
+	}
+
+	cn.OnChange = nf.PreferenceOrStateChanged
+
+	defer nf.Start()
 
 	connectedBeacons := tracker.NewPeers()
 	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)
@@ -1196,6 +1212,11 @@ func (m *manager) createSnowmanChain(
 		vm = tracedvm.NewBlockVM(vm, "proposervm", m.Tracer)
 	}
 
+	cn := &ChangeNotifier{
+		ChainVM: vm,
+	}
+	vm = cn
+
 	if err := vm.Initialize(
 		context.TODO(),
 		ctx.Context,
@@ -1266,7 +1287,6 @@ func (m *manager) createSnowmanChain(
 	// Asynchronously passes messages from the network to the consensus engine
 	h, err := handler.New(
 		ctx,
-		vm,
 		vdrs,
 		m.FrontierPollFrequency,
 		m.ConsensusAppConcurrency,
@@ -1280,6 +1300,16 @@ func (m *manager) createSnowmanChain(
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize message handler: %w", err)
 	}
+
+	nf := &common.NotificationForwarder{
+		Subscribe: vm.WaitForEvent,
+		Log:       ctx.Log,
+		Engine:    h,
+	}
+
+	cn.OnChange = nf.PreferenceOrStateChanged
+
+	defer nf.Start()
 
 	connectedBeacons := tracker.NewPeers()
 	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)

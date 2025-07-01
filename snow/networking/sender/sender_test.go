@@ -129,11 +129,8 @@ func TestTimeout(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := common.NewSimpleSubscriber()
-
 	h, err := handler.New(
 		ctx2,
-		subscriber,
 		vdrs,
 		time.Hour,
 		testThreadPoolSize,
@@ -389,11 +386,8 @@ func TestReliableMessages(t *testing.T) {
 	)
 	require.NoError(err)
 
-	subscriber := common.NewSimpleSubscriber()
-
 	h, err := handler.New(
 		ctx2,
-		subscriber,
 		vdrs,
 		1,
 		testThreadPoolSize,
@@ -552,11 +546,8 @@ func TestReliableMessagesToMyself(t *testing.T) {
 			)
 			require.NoError(err)
 
-			subscriber := common.NewSimpleSubscriber()
-
 			h, err := handler.New(
 				ctx2,
-				subscriber,
 				vdrs,
 				time.Second,
 				testThreadPoolSize,

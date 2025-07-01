@@ -51,6 +51,8 @@ var (
 type Handler interface {
 	health.Checker
 
+	Notify(_ context.Context, msg common.Message) error
+
 	Context() *snow.ConsensusContext
 	// ShouldHandle returns true if the node with the given ID is allowed to send
 	// messages to this chain. If the node is not allowed to send messages to
@@ -77,10 +79,6 @@ type Handler interface {
 // (Actually, it receives the incoming messages from a ChainRouter, but same difference.)
 type handler struct {
 	haltBootstrapping func()
-
-	// the NotificationForwarder is used to forward messages received from the VM's WaitForEvent
-	// into the Notify() call of the engine.
-	nf *common.NotificationForwarder
 
 	metrics *metrics
 
@@ -132,7 +130,6 @@ type handler struct {
 // [engine] must be initialized before initializing this handler
 func New(
 	ctx *snow.ConsensusContext,
-	subscriber common.Subscriber,
 	validators validators.Manager,
 	gossipFrequency time.Duration,
 	threadPoolSize int,
@@ -157,12 +154,6 @@ func New(
 		p2pTracker:        p2pTracker,
 	}
 	h.asyncMessagePool.SetLimit(threadPoolSize)
-
-	h.nf = &common.NotificationForwarder{
-		Subscribe: subscriber.WaitForEvent,
-		Log:       h.ctx.Log,
-		Notifier:  h,
-	}
 
 	var err error
 
@@ -286,8 +277,6 @@ func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 		go h.ctx.Log.RecoverAndPanic(dispatchAsync)
 		go h.ctx.Log.RecoverAndPanic(dispatchChans)
 	}
-
-	h.nf.Start()
 }
 
 func (h *handler) Notify(_ context.Context, msg common.Message) error {
@@ -322,7 +311,6 @@ func (h *handler) Stop(_ context.Context) {
 		h.asyncMessageQueue.Shutdown()
 		close(h.closingChan)
 		h.haltBootstrapping()
-		h.nf.Close()
 	})
 }
 

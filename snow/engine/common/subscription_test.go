@@ -5,6 +5,7 @@ package common
 
 import (
 	"context"
+	"github.com/stretchr/testify/assert"
 	"sync"
 	"testing"
 	"time"
@@ -56,7 +57,7 @@ func TestSimpleSubscriberClose(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		msg, _ := subscriber.WaitForEvent(ctx)
-		require.Equal(t, Message(0), msg)
+		assert.Equal(t, Message(0), msg)
 	}()
 
 	subscriber.Close()
@@ -127,7 +128,7 @@ func TestSubscriptionProxy(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				<-sp.Forward(ctx)
-				require.Greater(t, time.Since(start), time.Millisecond*10)
+				assert.Greater(t, time.Since(start), time.Millisecond*10)
 			}()
 
 			msg, _ := sp.WaitForEvent(ctx)

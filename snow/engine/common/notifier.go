@@ -19,14 +19,14 @@ type Notifier interface {
 // NotificationForwarder is a component that listens for notifications from a Subscription,
 // and forwards them to a Notifier.
 type NotificationForwarder struct {
-	Notifier  Notifier
+	Engine    Notifier
 	Subscribe Subscription
 	Log       logging.Logger
 
 	running   sync.WaitGroup
 	closeChan chan struct{}
 	lock      sync.Mutex
-	cancel    context.CancelFunc
+	closeFunc context.CancelFunc
 }
 
 func (nf *NotificationForwarder) Start() {
@@ -38,51 +38,61 @@ func (nf *NotificationForwarder) Start() {
 func (nf *NotificationForwarder) run() {
 	defer nf.running.Done()
 	for {
+		nf.forwardNotification()
 		select {
 		case <-nf.closeChan:
 			return
 		default:
 		}
-
-		ctx := nf.setAndGetContext()
-
-		select {
-		case <-nf.closeChan:
-			return
-		default:
-		}
-
-		nf.Log.Debug("Subscribing to notifications")
-		msg, err := nf.Subscribe(ctx)
-		if err != nil {
-			nf.Log.Error("Failed subscribing to notifications", zap.Error(err))
-			return
-		}
-		nf.Log.Debug("Received notification", zap.Stringer("msg", msg))
-
-		nf.cancelContext()
-
-		select {
-		case <-nf.closeChan:
-			return
-		default:
-		}
-
-		if err := nf.Notifier.Notify(ctx, msg); err != nil {
-			nf.Log.Error("Failed notifying engine", zap.Error(err))
-		}
-
-		nf.cancelContext()
 	}
+}
+
+func (nf *NotificationForwarder) forwardNotification() {
+	ctx := nf.setAndGetContext()
+	defer nf.cancelContext()
+
+	select {
+	case <-nf.closeChan:
+		return
+	default:
+	}
+
+	nf.Log.Debug("Subscribing to notifications")
+	msg, err := nf.Subscribe(ctx)
+	if err != nil {
+		nf.Log.Debug("Failed subscribing to notifications", zap.Error(err))
+		return
+	}
+
+	select {
+	case <-nf.closeChan:
+		return
+	default:
+	}
+
+	if err := nf.Engine.Notify(context.Background(), msg); err != nil {
+		nf.Log.Debug("Failed notifying engine", zap.Error(err))
+		return
+	}
+
+	select {
+	case <-nf.closeChan:
+		return
+	case <-ctx.Done():
+	}
+}
+
+func (nf *NotificationForwarder) PreferenceOrStateChanged() {
+	nf.cancelContext()
 }
 
 func (nf *NotificationForwarder) cancelContext() {
 	nf.lock.Lock()
 	defer nf.lock.Unlock()
 
-	if nf.cancel != nil {
-		nf.cancel()
-		nf.cancel = nil
+	if nf.closeFunc != nil {
+		nf.closeFunc()
+		nf.closeFunc = nil
 	}
 }
 
@@ -91,7 +101,7 @@ func (nf *NotificationForwarder) setAndGetContext() context.Context {
 
 	nf.lock.Lock()
 	defer nf.lock.Unlock()
-	nf.cancel = cancel
+	nf.closeFunc = cancel
 	return ctx
 }
 
