@@ -17,8 +17,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/coreth/accounts/abi/bind"
-	"github.com/ava-labs/coreth/warp/aggregator"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/crypto"
 
@@ -33,6 +31,7 @@ import (
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
+	"github.com/ava-labs/coreth/accounts/abi/bind"
 	"github.com/ava-labs/coreth/cmd/simulator/key"
 	"github.com/ava-labs/coreth/cmd/simulator/load"
 	"github.com/ava-labs/coreth/cmd/simulator/metrics"
@@ -42,6 +41,7 @@ import (
 	"github.com/ava-labs/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/coreth/predicate"
 	"github.com/ava-labs/coreth/tests/utils"
+	"github.com/ava-labs/coreth/tests/warp/aggregator"
 	warpBackend "github.com/ava-labs/coreth/warp"
 	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/core/types"
@@ -370,7 +370,7 @@ func (w *warpTest) aggregateSignaturesViaAPI() {
 	}
 
 	ginkgo.GinkgoLogr.Info("Aggregating signatures from validator set", "numValidators", len(warpValidators), "totalWeight", totalWeight)
-	apiSignatureGetter := warpBackend.NewAPIFetcher(warpAPIs)
+	apiSignatureGetter := NewAPIFetcher(warpAPIs)
 	signatureResult, err := aggregator.New(apiSignatureGetter, warpValidators, totalWeight).AggregateSignatures(ctx, w.addressedCallUnsignedMessage, 100)
 	require.NoError(err)
 	require.Equal(signatureResult.SignatureWeight, signatureResult.TotalWeight)
