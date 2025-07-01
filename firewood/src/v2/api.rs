@@ -120,13 +120,9 @@ pub enum Error {
     /// A file I/O error occurred
     FileIO(#[from] FileIoError),
 
-    /// Cannot commit a cloned proposal
-    ///
-    /// Cloned proposals are problematic because if they are committed, then you could
-    /// create another proposal from this committed proposal, so we error at commit time
-    /// if there are outstanding clones
-    #[error("Cannot commit a cloned proposal")]
-    CannotCommitClonedProposal,
+    /// Cannot commit a committed proposal
+    #[error("Cannot commit a committed proposal")]
+    AlreadyCommitted,
 
     /// Internal error
     #[error("Internal error")]

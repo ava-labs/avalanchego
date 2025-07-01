@@ -33,6 +33,7 @@ use firewood_storage::{
 use metrics::{counter, describe_counter};
 use std::io::Write;
 use std::path::Path;
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, RwLock};
 use thiserror::Error;
 use typed_builder::TypedBuilder;
@@ -241,6 +242,7 @@ where
         Ok(Self::Proposal {
             nodestore: immutable,
             db: self,
+            committed: AtomicBool::new(false),
         }
         .into())
     }
@@ -350,6 +352,7 @@ impl Db {
         Ok(Arc::new(Proposal {
             nodestore: immutable,
             db: self,
+            committed: AtomicBool::new(false),
         }))
     }
 
@@ -382,9 +385,21 @@ impl Db {
 pub struct Proposal<'p> {
     nodestore: Arc<NodeStore<Arc<ImmutableProposal>, FileBacked>>,
     db: &'p Db,
+    committed: AtomicBool,
 }
 
 impl Proposal<'_> {
+    /// Get the root hash of the proposal synchronously
+    pub fn start_commit(&self) -> Result<(), api::Error> {
+        if self
+            .committed
+            .swap(true, std::sync::atomic::Ordering::Relaxed)
+        {
+            return Err(api::Error::AlreadyCommitted);
+        }
+        Ok(())
+    }
+
     /// Get the root hash of the proposal synchronously
     pub fn root_hash_sync(&self) -> Result<Option<api::HashKey>, api::Error> {
         #[cfg(not(feature = "ethhash"))]
@@ -449,26 +464,26 @@ impl<'a> api::Proposal for Proposal<'a> {
     }
 
     async fn commit(self: Arc<Self>) -> Result<(), api::Error> {
-        match Arc::into_inner(self) {
-            Some(proposal) => {
-                let mut manager = proposal.db.manager.write().expect("poisoned lock");
-                Ok(manager.commit(proposal.nodestore)?)
-            }
-            None => Err(api::Error::CannotCommitClonedProposal),
-        }
+        self.start_commit()?;
+        Ok(self
+            .db
+            .manager
+            .write()
+            .expect("poisoned lock")
+            .commit(self.nodestore.clone())?)
     }
 }
 
 impl Proposal<'_> {
     /// Commit a proposal synchronously
     pub fn commit_sync(self: Arc<Self>) -> Result<(), api::Error> {
-        match Arc::into_inner(self) {
-            Some(proposal) => {
-                let mut manager = proposal.db.manager.write().expect("poisoned lock");
-                Ok(manager.commit(proposal.nodestore)?)
-            }
-            None => Err(api::Error::CannotCommitClonedProposal),
-        }
+        self.start_commit()?;
+        Ok(self
+            .db
+            .manager
+            .write()
+            .expect("poisoned lock")
+            .commit(self.nodestore.clone())?)
     }
 
     /// Create a new proposal from the current one synchronously
@@ -512,6 +527,7 @@ impl Proposal<'_> {
         Ok(Self {
             nodestore: immutable,
             db: self.db,
+            committed: AtomicBool::new(false),
         })
     }
 }
@@ -543,15 +559,10 @@ mod test {
 
         // attempt to commit the clone; this should fail
         let result = cloned.commit().await;
-        assert!(
-            matches!(result, Err(Error::CannotCommitClonedProposal)),
-            "{result:?}"
-        );
+        assert!(result.is_ok());
 
-        // the prior attempt consumed the Arc though, so cloned is no longer valid
-        // that means the actual proposal can be committed
         let result = proposal.commit().await;
-        assert!(matches!(result, Ok(())), "{result:?}");
+        assert!(matches!(result, Err(Error::AlreadyCommitted)), "{result:?}");
     }
 
     #[tokio::test]
