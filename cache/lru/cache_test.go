@@ -32,6 +32,6 @@ func TestCacheFlushWithOnEvict(t *testing.T) {
 	})
 
 	cachetest.Eviction(t, c)
-	require.Empty(t, c, 0)
+	require.Zero(t, c.Len())
 	require.Len(t, evicted, 3)
 }
