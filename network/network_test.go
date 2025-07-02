@@ -312,7 +312,7 @@ func TestIngressConnCount(t *testing.T) {
 
 	emptyHandler := func(context.Context, message.InboundMessage) {}
 
-	_, networks, _ := newFullyConnectedTestNetwork(
+	_, networks, eg := newFullyConnectedTestNetwork(
 		t, []router.InboundHandler{
 			router.InboundHandlerFunc(emptyHandler),
 			router.InboundHandlerFunc(emptyHandler),
@@ -350,6 +350,12 @@ func TestIngressConnCount(t *testing.T) {
 	// The remaining last node has no node connected to it, as it connects to the first and second node.
 	// Since it has no one connecting to it, its health check fails.
 	require.Equal(set.Of(0, 1, 2), ingressConnCount)
+
+	for _, net := range networks {
+		net.StartClose()
+	}
+
+	require.NoError(eg.Wait())
 }
 
 func TestSend(t *testing.T) {

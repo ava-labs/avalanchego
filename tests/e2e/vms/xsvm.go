@@ -230,8 +230,6 @@ var _ = ginkgo.Describe("[XSVM]", ginkgo.Label("xsvm"), func() {
 
 		n := 10
 		eg.Go(func() error {
-			defer ginkgo.GinkgoRecover()
-
 			for i := 0; i < n; i++ {
 				msg := fmt.Sprintf("ping-%d", i)
 				if err := stream.Send(&xsvm.StreamPingRequest{
@@ -247,8 +245,6 @@ var _ = ginkgo.Describe("[XSVM]", ginkgo.Label("xsvm"), func() {
 		})
 
 		eg.Go(func() error {
-			defer ginkgo.GinkgoRecover()
-
 			for i := 0; i < n; i++ {
 				reply, err := stream.Recv()
 				if err != nil {
