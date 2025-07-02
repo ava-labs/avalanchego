@@ -6,6 +6,7 @@ package tmpnet
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -285,6 +286,24 @@ func (n *Network) EnsureDefaultConfig(ctx context.Context, log logging.Logger) e
 	if n.DefaultRuntimeConfig.Kube != nil && !IsRunningInCluster() && len(n.DefaultRuntimeConfig.Kube.IngressHost) == 0 {
 		if err := readIngressConfig(ctx, log, n.DefaultRuntimeConfig.Kube); err != nil {
 			return fmt.Errorf("failed to read ingress configuration: %w", err)
+		}
+	}
+
+	// Generate random credentials for ingress basic auth when running outside cluster
+	if n.DefaultRuntimeConfig.Kube != nil && !IsRunningInCluster() {
+		if len(n.DefaultRuntimeConfig.Kube.IngressUser) == 0 {
+			user, err := generateRandomString(8)
+			if err != nil {
+				return fmt.Errorf("failed to generate random ingress user: %w", err)
+			}
+			n.DefaultRuntimeConfig.Kube.IngressUser = user
+		}
+		if len(n.DefaultRuntimeConfig.Kube.IngressPassword) == 0 {
+			password, err := generateRandomString(8)
+			if err != nil {
+				return fmt.Errorf("failed to generate random ingress password: %w", err)
+			}
+			n.DefaultRuntimeConfig.Kube.IngressPassword = password
 		}
 	}
 
@@ -1113,4 +1132,17 @@ func MetricsLinkForNetwork(networkUUID string, startTime string, endTime string)
 		startTime,
 		endTime,
 	)
+}
+
+// generateRandomString generates a random alphanumeric string of the specified length
+func generateRandomString(length int) (string, error) {
+	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
+	b := make([]byte, length)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	for i := range b {
+		b[i] = charset[int(b[i])%len(charset)]
+	}
+	return string(b), nil
 }

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	"golang.org/x/crypto/bcrypt"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -79,6 +80,10 @@ type KubeRuntimeConfig struct {
 	IngressHost string `json:"ingressHost,omitempty"`
 	// TLS secret name for ingress (empty for HTTP, populated for HTTPS)
 	IngressSecret string `json:"ingressSecret,omitempty"`
+	// Username for basic auth when accessing nodes via ingress
+	IngressUser string `json:"ingressUser,omitempty"`
+	// Password for basic auth when accessing nodes via ingress
+	IngressPassword string `json:"ingressPassword,omitempty"`
 }
 
 type KubeRuntime struct {
@@ -172,7 +177,14 @@ func (p *KubeRuntime) GetAccessibleURI() string {
 		protocol = "https"
 	}
 
-	return fmt.Sprintf("%s://%s/networks/%s/%s", protocol, runtimeConfig.IngressHost, networkUUID, nodeID)
+	// Include basic auth credentials in the URI
+	return fmt.Sprintf("%s://%s:%s@%s/networks/%s/%s",
+		protocol,
+		runtimeConfig.IngressUser,
+		runtimeConfig.IngressPassword,
+		runtimeConfig.IngressHost,
+		networkUUID,
+		nodeID)
 }
 
 // GetAccessibleStakingAddress retrieves a StakingAddress for the node intended to be
@@ -874,6 +886,67 @@ func configureExclusiveScheduling(template *corev1.PodTemplateSpec, labelKey str
 	}
 }
 
+// ensureIngressSecret creates or checks the existence of a Kubernetes secret for basic auth
+func (p *KubeRuntime) ensureIngressSecret(ctx context.Context) error {
+	var (
+		log           = p.node.network.log
+		runtimeConfig = p.runtimeConfig()
+		namespace     = runtimeConfig.Namespace
+		networkUUID   = p.node.network.UUID
+		secretName    = networkUUID + "-ingress"
+	)
+
+	// Generate htpasswd entry with bcrypt
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(runtimeConfig.IngressPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("failed to generate bcrypt hash: %w", err)
+	}
+	htpasswdEntry := fmt.Sprintf("%s:%s", runtimeConfig.IngressUser, string(hashedPassword))
+
+	clientset, err := p.getClientset()
+	if err != nil {
+		return err
+	}
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: namespace,
+			Labels: map[string]string{
+				"network-uuid": networkUUID,
+			},
+		},
+		Type: corev1.SecretTypeOpaque,
+		Data: map[string][]byte{
+			"auth": []byte(htpasswdEntry),
+		},
+	}
+
+	log.Debug("ensuring ingress auth secret exists",
+		zap.String("namespace", namespace),
+		zap.String("secret", secretName),
+	)
+
+	_, err = clientset.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{})
+	if err != nil {
+		if apierrors.IsAlreadyExists(err) {
+			log.Debug("ingress auth secret already exists",
+				zap.String("namespace", namespace),
+				zap.String("secret", secretName),
+			)
+			return nil
+		}
+		return fmt.Errorf("failed to create ingress auth secret: %w", err)
+	}
+
+	log.Debug("created ingress auth secret",
+		zap.String("namespace", namespace),
+		zap.String("secret", secretName),
+	)
+
+	return nil
+}
+
 // createNodeService creates a Kubernetes Service for the node to enable ingress routing
 func (p *KubeRuntime) createNodeService(ctx context.Context, serviceName string) error {
 	var (
@@ -951,6 +1024,11 @@ func (p *KubeRuntime) createNodeIngress(ctx context.Context, serviceName string)
 		zap.String("service", serviceName),
 	)
 
+	// Ensure the ingress auth secret exists before creating the ingress
+	if err := p.ensureIngressSecret(ctx); err != nil {
+		return fmt.Errorf("failed to ensure ingress auth secret: %w", err)
+	}
+
 	clientset, err := p.getClientset()
 	if err != nil {
 		return err
@@ -1008,6 +1086,9 @@ func (p *KubeRuntime) createNodeIngress(ctx context.Context, serviceName string)
 				"nginx.ingress.kubernetes.io/proxy-body-size":    "0",
 				"nginx.ingress.kubernetes.io/proxy-read-timeout": "600",
 				"nginx.ingress.kubernetes.io/proxy-send-timeout": "600",
+				"nginx.ingress.kubernetes.io/auth-type":          "basic",
+				"nginx.ingress.kubernetes.io/auth-secret":        networkUUID + "-ingress",
+				"nginx.ingress.kubernetes.io/auth-realm":         "Authentication Required",
 			},
 		},
 		Spec: networkingv1.IngressSpec{
