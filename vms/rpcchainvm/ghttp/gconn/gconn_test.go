@@ -37,7 +37,7 @@ func TestErrIOEOF(t *testing.T) {
 	connpb.RegisterConnServer(server, connServer)
 
 	go func() {
-		require.NoError(server.Serve(listener))
+		_ = server.Serve(listener)
 	}()
 
 	grpcConn, err := grpc.DialContext(context.Background(), "bufnet",
@@ -79,7 +79,7 @@ func TestOSErrDeadlineExceeded(t *testing.T) {
 	connpb.RegisterConnServer(server, connServer)
 
 	go func() {
-		require.NoError(server.Serve(listener))
+		_ = server.Serve(listener)
 	}()
 
 	grpcConn, err := grpc.DialContext(context.Background(), "bufnet",

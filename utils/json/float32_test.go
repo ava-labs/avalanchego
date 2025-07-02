@@ -54,6 +54,6 @@ func TestFloat32(t *testing.T) {
 
 		var f Float32
 		require.NoError(f.UnmarshalJSON(jsonBytes))
-		require.Equal(tt.expectedUnmarshalled, float32(f))
+		require.InDelta(tt.expectedUnmarshalled, float32(f), 0)
 	}
 }
