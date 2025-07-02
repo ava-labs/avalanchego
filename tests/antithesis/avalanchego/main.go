@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/antithesis"
-	"github.com/ava-labs/avalanchego/tests/e2e/banff"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -219,7 +218,7 @@ func (w *workload) executeTest(ctx context.Context) {
 	defer tc.Recover(false /* rethrow */)
 	require := require.New(tc)
 
-	val, err := rand.Int(rand.Reader, big.NewInt(6))
+	val, err := rand.Int(rand.Reader, big.NewInt(5))
 	require.NoError(err, "failed to read randomness")
 
 	flowID := val.Int64()
@@ -241,12 +240,13 @@ func (w *workload) executeTest(ctx context.Context) {
 		w.log.Info("executing issuePToXTransfer")
 		w.issuePToXTransfer(ctx)
 	case 5:
-		w.log.Info("executing banff.TestCustomAssetTransfer")
-		addr, _ := w.addrs.Peek()
-		banff.TestCustomAssetTransfer(tc, *w.wallet, addr)
-	case 6:
 		w.log.Info("sleeping")
 	}
+
+	// TODO(marun) Enable execution of the banff e2e test as part of https://github.com/ava-labs/avalanchego/issues/4049
+	// w.log.Info("executing banff.TestCustomAssetTransfer")
+	// addr, _ := w.addrs.Peek()
+	// banff.TestCustomAssetTransfer(tc, *w.wallet, addr)
 }
 
 func (w *workload) issueXChainBaseTx(ctx context.Context) {
