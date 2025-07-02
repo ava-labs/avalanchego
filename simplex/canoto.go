@@ -5,7 +5,7 @@ package simplex
 
 //go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
 
-// CanotoSimplexBlock is the Canoto representation of a verified block
+// CanotoSimplexBlock is the Canoto representation of a block
 type CanotoSimplexBlock struct {
 	Metadata   []byte `canoto:"bytes,1"`
 	InnerBlock []byte `canoto:"bytes,2"`

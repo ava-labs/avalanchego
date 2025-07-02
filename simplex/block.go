@@ -15,13 +15,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-var _ simplex.BlockDeserializer = (*blockDeserializer)(nil)
-
-var _ simplex.Block = (*Block)(nil)
-
-var _ simplex.VerifiedBlock = (*Block)(nil)
-
-var errBlockAlreadyVerified = errors.New("block has already been verified")
+var (
+	_                       simplex.BlockDeserializer = (*blockDeserializer)(nil)
+	_                       simplex.Block             = (*Block)(nil)
+	_                       simplex.VerifiedBlock     = (*Block)(nil)
+	errBlockAlreadyVerified                           = errors.New("block has already been verified")
+)
 
 type Block struct {
 	digest simplex.Digest
@@ -35,7 +34,7 @@ type Block struct {
 	vmBlock snowman.Block
 }
 
-// BlockHeader returns the block header for the verified block.
+// BlockHeader returns the block header for the block.
 func (b *Block) BlockHeader() simplex.BlockHeader {
 	return simplex.BlockHeader{
 		ProtocolMetadata: b.metadata,
@@ -43,16 +42,14 @@ func (b *Block) BlockHeader() simplex.BlockHeader {
 	}
 }
 
-// Bytes returns the serialized bytes of the verified block.
+// Bytes returns the serialized bytes of the block.
 func (b *Block) Bytes() ([]byte, error) {
 	cBlock := &CanotoSimplexBlock{
 		Metadata:   b.metadata.Bytes(),
 		InnerBlock: b.vmBlock.Bytes(),
 	}
 
-	buff := cBlock.MarshalCanoto()
-
-	return buff, nil
+	return cBlock.MarshalCanoto(), nil
 }
 
 func (b *Block) Verify(ctx context.Context) (simplex.VerifiedBlock, error) {
@@ -72,14 +69,10 @@ type blockDeserializer struct {
 }
 
 func (d *blockDeserializer) DeserializeBlock(bytes []byte) (simplex.Block, error) {
-	return d.deserializeBlockBytes(bytes)
-}
-
-func (d *blockDeserializer) deserializeBlockBytes(buff []byte) (simplex.Block, error) {
 	var canotoBlock CanotoSimplexBlock
 
-	if err := canotoBlock.UnmarshalCanoto(buff); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal verified block: %w", err)
+	if err := canotoBlock.UnmarshalCanoto(bytes); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal block: %w", err)
 	}
 
 	md, err := simplex.ProtocolMetadataFromBytes(canotoBlock.Metadata)
@@ -92,7 +85,7 @@ func (d *blockDeserializer) deserializeBlockBytes(buff []byte) (simplex.Block, e
 		return nil, err
 	}
 
-	digest := hashing.ComputeHash256Array(buff)
+	digest := hashing.ComputeHash256Array(bytes)
 
 	return &Block{
 		metadata: *md,
