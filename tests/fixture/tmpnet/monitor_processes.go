@@ -162,7 +162,7 @@ func startPrometheus(ctx context.Context, log logging.Logger) error {
 	cmdName := prometheusCmd
 
 	args := fmt.Sprintf(
-		"--config.file=%s.yaml --web.listen-address=%s --enable-feature=agent --storage.agent.path=./data",
+		"--config.file=%s.yaml --web.listen-address=%s --agent --storage.agent.path=./data",
 		cmdName,
 		prometheusListenAddress,
 	)
