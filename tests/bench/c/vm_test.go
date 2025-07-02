@@ -34,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/coreth/plugin/evm"
+	_ "github.com/ava-labs/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/prometheus/client_golang/prometheus"
@@ -53,29 +54,29 @@ var (
 )
 
 var (
-	sourceBlockDir string
-	targetBlockDir string
-	targetDir      string
-	startBlock     uint64
-	endBlock       uint64
-	chanSize       int
-	metricsEnabled bool
+	sourceBlockDirArg string
+	targetBlockDirArg string
+	targetDirArg      string
+	startBlockArg     uint64
+	endBlockArg       uint64
+	chanSizeArg       int
+	metricsEnabledArg bool
 )
 
 func TestMain(m *testing.M) {
 	// Source directory must be a leveldb dir with the required blocks accessible via rawdb.ReadBlock.
-	flag.StringVar(&sourceBlockDir, "source-block-dir", sourceBlockDir, "DB directory storing executable block range.")
+	flag.StringVar(&sourceBlockDirArg, "source-block-dir", sourceBlockDirArg, "DB directory storing executable block range.")
 	// Target block directory to write blocks into when executing TestExportBlockRange.
-	flag.StringVar(&targetBlockDir, "target-block-dir", targetBlockDir, "DB directory to write blocks into when executing TestExportBlockRange.")
+	flag.StringVar(&targetBlockDirArg, "target-block-dir", targetBlockDirArg, "DB directory to write blocks into when executing TestExportBlockRange.")
 
 	// Target directory assumes the current-state directory contains a db directory and a chain-data-dir directory.
 	// - db/
 	// - chain-data-dir/
-	flag.StringVar(&targetDir, "target-dir", targetDir, "Target directory for the current state including VM DB and Chain Data Directory.")
-	flag.Uint64Var(&startBlock, "start-block", 101, "Start block to begin execution (exclusive).")
-	flag.Uint64Var(&endBlock, "end-block", 200, "End block to end execution (inclusive).")
-	flag.IntVar(&chanSize, "chan-size", 100, "Size of the channel to use for block processing.")
-	flag.BoolVar(&metricsEnabled, "metrics-enabled", true, "Enable metrics collection.")
+	flag.StringVar(&targetDirArg, "target-dir", targetDirArg, "Target directory for the current state including VM DB and Chain Data Directory.")
+	flag.Uint64Var(&startBlockArg, "start-block", 101, "Start block to begin execution (exclusive).")
+	flag.Uint64Var(&endBlockArg, "end-block", 200, "End block to end execution (inclusive).")
+	flag.IntVar(&chanSizeArg, "chan-size", 100, "Size of the channel to use for block processing.")
+	flag.BoolVar(&metricsEnabledArg, "metrics-enabled", true, "Enable metrics collection.")
 	flag.Parse()
 	m.Run()
 }
@@ -84,7 +85,7 @@ func TestReexecuteRange(t *testing.T) {
 	r := require.New(t)
 
 	var (
-		targetDBDir  = filepath.Join(targetDir, "db")
+		targetDBDir  = filepath.Join(targetDirArg, "db")
 		chainDataDir = filepath.Join(targetDBDir, "chain-data-dir")
 	)
 
@@ -95,19 +96,20 @@ func TestReexecuteRange(t *testing.T) {
 	vmPrefixGatherer := metrics.NewPrefixGatherer()
 	r.NoError(avalancheGoSimulatedPrefixGatherer.Register("avalanche_evm", vmPrefixGatherer))
 
-	if metricsEnabled {
+	if metricsEnabledArg {
 		CollectRegistry(t, "benchmark-c-chain-reexecution", "127.0.0.1:9000", 2*time.Minute, avalancheGoSimulatedPrefixGatherer, map[string]string{
 			"job":     "c-chain-reexecution",
 			"service": "c-chain-reexecution",
 		})
 	}
 
-	blockChan, err := createBlockChanFromRawDB(t, sourceBlockDir, startBlock, endBlock, chanSize)
+	blockChan, err := createBlockChanFromRawDB(t, sourceBlockDirArg, startBlockArg, endBlockArg, chanSizeArg)
 	r.NoError(err)
 
 	dbLogger := tests.NewDefaultLogger("db")
 
 	baseDBRegistry := prometheus.NewRegistry()
+
 	db, err := leveldb.New(targetDBDir, nil, dbLogger, baseDBRegistry)
 	r.NoError(err)
 	r.NoError(vmPrefixGatherer.Register("vm", baseDBRegistry))
@@ -126,12 +128,11 @@ func TestReexecuteRange(t *testing.T) {
 	defer sourceVM.Shutdown(context.Background())
 
 	executor := newVMExecutor(sourceVM)
-	err = executor.executeSequence(context.Background(), blockChan)
-	r.NoError(err)
+	r.NoError(executor.executeSequence(context.Background(), blockChan))
 }
 
 func TestExportBlockRange(t *testing.T) {
-	exportBlockRange(t, sourceBlockDir, targetBlockDir, startBlock, endBlock, chanSize)
+	exportBlockRange(t, sourceBlockDirArg, targetBlockDirArg, startBlockArg, endBlockArg, chanSizeArg)
 }
 
 func newMainnetCChainVM(
@@ -248,6 +249,7 @@ func (e *VMExecutor) executeSequence(ctx context.Context, blkChan <-chan BlockRe
 			return blkResult.Err
 		}
 
+		e.log.Info("executing block", zap.Uint64("height", blkResult.Height))
 		if err := e.execute(ctx, blkResult.BlockBytes); err != nil {
 			return err
 		}
@@ -274,7 +276,7 @@ func CollectRegistry(t *testing.T, name string, addr string, timeout time.Durati
 	t.Cleanup(func() {
 		// Ensure a final metrics scrape.
 		// This default delay is set above the default scrape interval used by StartPrometheus.
-		time.Sleep(tmpnet.NetworkShutdownDelay)
+		time.Sleep(tmpnet.NetworkShutdownDelay * 2)
 
 		r.NoError(server.Stop())
 		r.NoError(<-errChan)
@@ -333,7 +335,7 @@ func createBlockChanFromRawDB(t *testing.T, sourceDir string, startBlock, endBlo
 func createBlockChanFromLevelDB(t *testing.T, sourceDir string, startBlock, endBlock uint64, chanSize int) (<-chan BlockResult, error) {
 	ch := make(chan BlockResult, chanSize)
 
-	db, err := leveldb.New(targetDir, nil, logging.NoLog{}, prometheus.NewRegistry())
+	db, err := leveldb.New(sourceDir, nil, logging.NoLog{}, prometheus.NewRegistry())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create leveldb database from %q: %w", sourceDir, err)
 	}
