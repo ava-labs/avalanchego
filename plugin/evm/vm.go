@@ -345,65 +345,12 @@ func (vm *VM) Initialize(
 		}
 	}
 
-	g := new(core.Genesis)
-	if err := json.Unmarshal(genesisBytes, g); err != nil {
+	g, err := parseGenesis(chainCtx, genesisBytes, upgradeBytes, vm.config.AirdropFile)
+	if err != nil {
 		return err
 	}
 
-	if g.Config == nil {
-		g.Config = params.SubnetEVMDefaultChainConfig
-	}
-
-	// Set the Avalanche Context on the ChainConfig
-	configExtra := params.GetExtra(g.Config)
-	configExtra.AvalancheContext = extras.AvalancheContext{
-		SnowCtx: chainCtx,
-	}
-
-	params.SetNetworkUpgradeDefaults(g.Config)
-
-	// Load airdrop file if provided
-	if vm.config.AirdropFile != "" {
-		g.AirdropData, err = os.ReadFile(vm.config.AirdropFile)
-		if err != nil {
-			return fmt.Errorf("could not read airdrop file '%s': %w", vm.config.AirdropFile, err)
-		}
-	}
-
 	vm.syntacticBlockValidator = NewBlockValidator()
-
-	if configExtra.FeeConfig == commontype.EmptyFeeConfig {
-		log.Info("No fee config given in genesis, setting default fee config", "DefaultFeeConfig", params.DefaultFeeConfig)
-		configExtra.FeeConfig = params.DefaultFeeConfig
-	}
-
-	// Apply upgradeBytes (if any) by unmarshalling them into [chainConfig.UpgradeConfig].
-	// Initializing the chain will verify upgradeBytes are compatible with existing values.
-	// This should be called before g.Verify().
-	if len(upgradeBytes) > 0 {
-		var upgradeConfig extras.UpgradeConfig
-		if err := json.Unmarshal(upgradeBytes, &upgradeConfig); err != nil {
-			return fmt.Errorf("failed to parse upgrade bytes: %w", err)
-		}
-		configExtra.UpgradeConfig = upgradeConfig
-	}
-
-	if configExtra.UpgradeConfig.NetworkUpgradeOverrides != nil {
-		overrides := configExtra.UpgradeConfig.NetworkUpgradeOverrides
-		marshaled, err := json.Marshal(overrides)
-		if err != nil {
-			log.Warn("Failed to marshal network upgrade overrides", "error", err, "overrides", overrides)
-		} else {
-			log.Info("Applying network upgrade overrides", "overrides", string(marshaled))
-		}
-		configExtra.Override(overrides)
-	}
-
-	params.SetEthUpgrades(g.Config, configExtra.NetworkUpgrades)
-
-	if err := configExtra.Verify(); err != nil {
-		return fmt.Errorf("failed to verify genesis: %w", err)
-	}
 
 	vm.ethConfig = ethconfig.NewDefaultConfig()
 	vm.ethConfig.Genesis = g
@@ -558,6 +505,73 @@ func (vm *VM) Initialize(
 		SyncableInterval: vm.config.StateSyncCommitInterval,
 	})
 	return vm.initializeStateSyncClient(lastAcceptedHeight)
+}
+
+func parseGenesis(ctx *snow.Context, genesisBytes []byte, upgradeBytes []byte, airdropFile string) (*core.Genesis, error) {
+	g := new(core.Genesis)
+	if err := json.Unmarshal(genesisBytes, g); err != nil {
+		return nil, fmt.Errorf("parsing genesis: %w", err)
+	}
+
+	// Set the default chain config if not provided
+	if g.Config == nil {
+		g.Config = params.SubnetEVMDefaultChainConfig
+	}
+
+	// Populate the Avalanche config extras.
+	configExtra := params.GetExtra(g.Config)
+	configExtra.AvalancheContext = extras.AvalancheContext{
+		SnowCtx: ctx,
+	}
+
+	if configExtra.FeeConfig == commontype.EmptyFeeConfig {
+		log.Info("No fee config given in genesis, setting default fee config", "DefaultFeeConfig", params.DefaultFeeConfig)
+		configExtra.FeeConfig = params.DefaultFeeConfig
+	}
+
+	// Load airdrop file if provided
+	if airdropFile != "" {
+		var err error
+		g.AirdropData, err = os.ReadFile(airdropFile)
+		if err != nil {
+			return nil, fmt.Errorf("could not read airdrop file '%s': %w", airdropFile, err)
+		}
+	}
+
+	// Set network upgrade defaults
+	configExtra.SetDefaults(ctx.NetworkUpgrades)
+
+	// Apply upgradeBytes (if any) by unmarshalling them into [chainConfig.UpgradeConfig].
+	// Initializing the chain will verify upgradeBytes are compatible with existing values.
+	// This should be called before g.Verify().
+	if len(upgradeBytes) > 0 {
+		var upgradeConfig extras.UpgradeConfig
+		if err := json.Unmarshal(upgradeBytes, &upgradeConfig); err != nil {
+			return nil, fmt.Errorf("failed to parse upgrade bytes: %w", err)
+		}
+		configExtra.UpgradeConfig = upgradeConfig
+	}
+
+	if configExtra.UpgradeConfig.NetworkUpgradeOverrides != nil {
+		overrides := configExtra.UpgradeConfig.NetworkUpgradeOverrides
+		marshaled, err := json.Marshal(overrides)
+		if err != nil {
+			log.Warn("Failed to marshal network upgrade overrides", "error", err, "overrides", overrides)
+		} else {
+			log.Info("Applying network upgrade overrides", "overrides", string(marshaled))
+		}
+		configExtra.Override(overrides)
+	}
+
+	if err := configExtra.Verify(); err != nil {
+		return nil, fmt.Errorf("invalid chain config: %w", err)
+	}
+
+	// Align all the Ethereum upgrades to the Avalanche upgrades
+	if err := params.SetEthUpgrades(g.Config); err != nil {
+		return nil, fmt.Errorf("setting eth upgrades: %w", err)
+	}
+	return g, nil
 }
 
 func (vm *VM) initializeMetrics() error {

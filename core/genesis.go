@@ -191,7 +191,9 @@ func SetupGenesisBlock(
 	//   have the Berlin or London forks initialized by block number on disk.
 	//   See https://github.com/ava-labs/coreth/pull/667/files
 	// - this is not needed in subnet-evm but it does not impact it either
-	params.SetEthUpgrades(storedcfg, params.GetExtra(storedcfg).NetworkUpgrades)
+	if err := params.SetEthUpgrades(storedcfg); err != nil {
+		return genesis.Config, common.Hash{}, err
+	}
 	// Check config compatibility and write the config. Compatibility errors
 	// are returned to the caller unless we're already at block zero.
 	// we use last accepted block for cfg compatibility check. Note this allows

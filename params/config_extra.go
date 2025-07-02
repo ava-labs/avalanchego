@@ -8,6 +8,7 @@ import (
 	"errors"
 	"math/big"
 
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/utils"
 )
@@ -23,6 +24,9 @@ const (
 var (
 	DefaultChainID   = big.NewInt(43214)
 	DefaultFeeConfig = extras.DefaultFeeConfig
+
+	initiallyActive       = uint64(upgrade.InitiallyActiveTime.Unix())
+	unscheduledActivation = uint64(upgrade.UnscheduledActivationTime.Unix())
 )
 
 // SetEthUpgrades enables Etheruem network upgrades using the same time as
@@ -31,19 +35,51 @@ var (
 // TODO: Prior to Cancun, Avalanche upgrades are referenced inline in the
 // code in place of their Ethereum counterparts. The original Ethereum names
 // should be restored for maintainability.
-func SetEthUpgrades(c *ChainConfig, avalancheUpgrades extras.NetworkUpgrades) {
+func SetEthUpgrades(c *ChainConfig) error {
+	if c.HomesteadBlock == nil {
+		c.HomesteadBlock = big.NewInt(0)
+	}
+	if c.EIP150Block == nil {
+		c.EIP150Block = big.NewInt(0)
+	}
+	if c.EIP155Block == nil {
+		c.EIP155Block = big.NewInt(0)
+	}
+	if c.EIP158Block == nil {
+		c.EIP158Block = big.NewInt(0)
+	}
+	if c.ByzantiumBlock == nil {
+		c.ByzantiumBlock = big.NewInt(0)
+	}
+	if c.ConstantinopleBlock == nil {
+		c.ConstantinopleBlock = big.NewInt(0)
+	}
+	if c.PetersburgBlock == nil {
+		c.PetersburgBlock = big.NewInt(0)
+	}
+	if c.IstanbulBlock == nil {
+		c.IstanbulBlock = big.NewInt(0)
+	}
+	if c.MuirGlacierBlock == nil {
+		c.MuirGlacierBlock = big.NewInt(0)
+	}
 	if c.BerlinBlock == nil {
 		c.BerlinBlock = big.NewInt(0)
 	}
 	if c.LondonBlock == nil {
 		c.LondonBlock = big.NewInt(0)
 	}
-	if avalancheUpgrades.DurangoTimestamp != nil {
-		c.ShanghaiTime = utils.NewUint64(*avalancheUpgrades.DurangoTimestamp)
+
+	extra := GetExtra(c)
+	// We only mark Eth upgrades as enabled if we have marked them as scheduled.
+	if durango := extra.DurangoTimestamp; durango != nil && *durango < unscheduledActivation {
+		c.ShanghaiTime = utils.NewUint64(*durango)
 	}
-	if avalancheUpgrades.EtnaTimestamp != nil {
-		c.CancunTime = utils.NewUint64(*avalancheUpgrades.EtnaTimestamp)
+
+	if etna := extra.EtnaTimestamp; etna != nil && *etna < unscheduledActivation {
+		c.CancunTime = utils.NewUint64(*etna)
 	}
+	return nil
 }
 
 func GetExtra(c *ChainConfig) *extras.ChainConfig {
@@ -137,33 +173,5 @@ func ToWithUpgradesJSON(c *ChainConfig) *ChainConfigWithUpgradesJSON {
 }
 
 func SetNetworkUpgradeDefaults(c *ChainConfig) {
-	if c.HomesteadBlock == nil {
-		c.HomesteadBlock = big.NewInt(0)
-	}
-	if c.EIP150Block == nil {
-		c.EIP150Block = big.NewInt(0)
-	}
-	if c.EIP155Block == nil {
-		c.EIP155Block = big.NewInt(0)
-	}
-	if c.EIP158Block == nil {
-		c.EIP158Block = big.NewInt(0)
-	}
-	if c.ByzantiumBlock == nil {
-		c.ByzantiumBlock = big.NewInt(0)
-	}
-	if c.ConstantinopleBlock == nil {
-		c.ConstantinopleBlock = big.NewInt(0)
-	}
-	if c.PetersburgBlock == nil {
-		c.PetersburgBlock = big.NewInt(0)
-	}
-	if c.IstanbulBlock == nil {
-		c.IstanbulBlock = big.NewInt(0)
-	}
-	if c.MuirGlacierBlock == nil {
-		c.MuirGlacierBlock = big.NewInt(0)
-	}
-
 	GetExtra(c).NetworkUpgrades.SetDefaults(GetExtra(c).SnowCtx.NetworkUpgrades)
 }

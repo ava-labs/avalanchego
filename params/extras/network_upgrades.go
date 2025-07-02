@@ -69,7 +69,7 @@ func (n *NetworkUpgrades) forkOrder() []fork {
 // SetDefaults sets the default values for the network upgrades.
 // This overrides deactivating the network upgrade by providing a timestamp of nil value.
 func (n *NetworkUpgrades) SetDefaults(agoUpgrades upgrade.Config) {
-	defaults := getDefaultNetworkUpgrades(agoUpgrades)
+	defaults := GetNetworkUpgrades(agoUpgrades)
 	// If the network upgrade is not set, set it to the default value.
 	// If the network upgrade is set to 0, we also treat it as nil and set it default.
 	// This is because in prior versions, upgrades were not modifiable and were directly set to their default values.
@@ -91,7 +91,7 @@ func (n *NetworkUpgrades) SetDefaults(agoUpgrades upgrade.Config) {
 
 // verifyNetworkUpgrades checks that the network upgrades are well formed.
 func (n *NetworkUpgrades) verifyNetworkUpgrades(agoUpgrades upgrade.Config) error {
-	defaults := getDefaultNetworkUpgrades(agoUpgrades)
+	defaults := GetNetworkUpgrades(agoUpgrades)
 	if err := verifyWithDefault(n.SubnetEVMTimestamp, defaults.SubnetEVMTimestamp); err != nil {
 		return fmt.Errorf("SubnetEVM fork block timestamp is invalid: %w", err)
 	}
@@ -186,9 +186,9 @@ func (n *NetworkUpgrades) GetAvalancheRules(time uint64) AvalancheRules {
 	}
 }
 
-// getDefaultNetworkUpgrades returns the network upgrades for the specified avalanchego upgrades.
+// GetNetworkUpgrades returns the network upgrades for the specified avalanchego upgrades.
 // Nil values are used to indicate optional upgrades.
-func getDefaultNetworkUpgrades(agoUpgrade upgrade.Config) NetworkUpgrades {
+func GetNetworkUpgrades(agoUpgrade upgrade.Config) NetworkUpgrades {
 	return NetworkUpgrades{
 		SubnetEVMTimestamp: utils.NewUint64(0),
 		DurangoTimestamp:   utils.TimeToNewUint64(agoUpgrade.DurangoTime),

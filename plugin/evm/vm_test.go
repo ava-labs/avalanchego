@@ -2890,8 +2890,8 @@ func TestSkipChainConfigCheckCompatible(t *testing.T) {
 	// use the block's timestamp instead of 0 since rewind to genesis
 	// is hardcoded to be allowed in core/genesis.go.
 	genesisWithUpgrade := &core.Genesis{}
-	require.NoError(t, json.Unmarshal([]byte(genesisJSONPreSubnetEVM), genesisWithUpgrade))
-	params.GetExtra(genesisWithUpgrade.Config).SubnetEVMTimestamp = utils.TimeToNewUint64(blk.Timestamp())
+	require.NoError(t, json.Unmarshal([]byte(genesisJSONDurango), genesisWithUpgrade))
+	params.GetExtra(genesisWithUpgrade.Config).EtnaTimestamp = utils.TimeToNewUint64(blk.Timestamp())
 	genesisWithUpgradeBytes, err := json.Marshal(genesisWithUpgrade)
 	require.NoError(t, err)
 
@@ -2900,7 +2900,7 @@ func TestSkipChainConfigCheckCompatible(t *testing.T) {
 
 	// this will not be allowed
 	err = reinitVM.Initialize(context.Background(), vm.ctx, dbManager, genesisWithUpgradeBytes, []byte{}, []byte{}, issuer, []*commonEng.Fx{}, appSender)
-	require.ErrorContains(t, err, "mismatching SubnetEVM fork block timestamp in database")
+	require.ErrorContains(t, err, "mismatching Cancun fork timestamp in database")
 
 	// Reset metrics to allow re-initialization
 	vm.ctx.Metrics = metrics.NewPrefixGatherer()
