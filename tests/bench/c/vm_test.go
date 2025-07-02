@@ -34,17 +34,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/coreth/plugin/evm"
-	_ "github.com/ava-labs/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/libevm/core/rawdb"
-	"github.com/ava-labs/libevm/rlp"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-)
-
-const (
-	sourceDBCacheSize = 128
-	sourceDBHandles   = 1024
 )
 
 var (
@@ -97,13 +89,12 @@ func TestReexecuteRange(t *testing.T) {
 	r.NoError(avalancheGoSimulatedPrefixGatherer.Register("avalanche_evm", vmPrefixGatherer))
 
 	if metricsEnabledArg {
-		CollectRegistry(t, "benchmark-c-chain-reexecution", "127.0.0.1:9000", 2*time.Minute, avalancheGoSimulatedPrefixGatherer, map[string]string{
-			"job":     "c-chain-reexecution",
-			"service": "c-chain-reexecution",
+		collectRegistry(t, "benchmark-c-chain-reexecution", "127.0.0.1:9000", 2*time.Minute, avalancheGoSimulatedPrefixGatherer, map[string]string{
+			"job": "c-chain-reexecution",
 		})
 	}
 
-	blockChan, err := createBlockChanFromRawDB(t, sourceBlockDirArg, startBlockArg, endBlockArg, chanSizeArg)
+	blockChan, err := createBlockChanFromLevelDB(t, sourceBlockDirArg, startBlockArg, endBlockArg, chanSizeArg)
 	r.NoError(err)
 
 	dbLogger := tests.NewDefaultLogger("db")
@@ -259,9 +250,9 @@ func (e *VMExecutor) executeSequence(ctx context.Context, blkChan <-chan BlockRe
 	return nil
 }
 
-// CollectRegistry starts prometheus and collects metrics from the provided gatherer.
+// collectRegistry starts prometheus and collects metrics from the provided gatherer.
 // Attaches the provided labels + GitHub labels if available to the collected metrics.
-func CollectRegistry(t *testing.T, name string, addr string, timeout time.Duration, gatherer prometheus.Gatherer, labels map[string]string) {
+func collectRegistry(t *testing.T, name string, addr string, timeout time.Duration, gatherer prometheus.Gatherer, labels map[string]string) {
 	r := require.New(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -276,7 +267,7 @@ func CollectRegistry(t *testing.T, name string, addr string, timeout time.Durati
 	t.Cleanup(func() {
 		// Ensure a final metrics scrape.
 		// This default delay is set above the default scrape interval used by StartPrometheus.
-		time.Sleep(tmpnet.NetworkShutdownDelay * 2)
+		time.Sleep(tmpnet.NetworkShutdownDelay)
 
 		r.NoError(server.Stop())
 		r.NoError(<-errChan)
@@ -292,44 +283,6 @@ func CollectRegistry(t *testing.T, name string, addr string, timeout time.Durati
 	t.Cleanup(func() {
 		os.Remove(sdConfigFilePath)
 	})
-}
-
-func createBlockChanFromRawDB(t *testing.T, sourceDir string, startBlock, endBlock uint64, chanSize int) (<-chan BlockResult, error) {
-	ch := make(chan BlockResult, chanSize)
-
-	db, err := rawdb.NewLevelDBDatabase(sourceDir, sourceDBCacheSize, sourceDBHandles, "", true)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create leveldb database from %q: %w", sourceDir, err)
-	}
-	t.Cleanup(func() {
-		if err := db.Close(); err != nil {
-			t.Fatal(err)
-		}
-	})
-
-	go func() {
-		defer close(ch)
-
-		for i := startBlock; i <= endBlock; i++ {
-			block := rawdb.ReadBlock(db, rawdb.ReadCanonicalHash(db, i), i)
-			blockBytes, err := rlp.EncodeToBytes(block)
-			if err != nil {
-				ch <- BlockResult{
-					BlockBytes: nil,
-					Err:        err,
-				}
-				return
-			}
-
-			ch <- BlockResult{
-				BlockBytes: blockBytes,
-				Height:     i,
-				Err:        nil,
-			}
-		}
-	}()
-
-	return ch, nil
 }
 
 func createBlockChanFromLevelDB(t *testing.T, sourceDir string, startBlock, endBlock uint64, chanSize int) (<-chan BlockResult, error) {
@@ -371,7 +324,7 @@ func createBlockChanFromLevelDB(t *testing.T, sourceDir string, startBlock, endB
 
 func exportBlockRange(t *testing.T, sourceDir string, targetDir string, startBlock, endBlock uint64, chanSize int) {
 	r := require.New(t)
-	blockChan, err := createBlockChanFromRawDB(t, sourceDir, startBlock, endBlock, chanSize)
+	blockChan, err := createBlockChanFromLevelDB(t, sourceDir, startBlock, endBlock, chanSize)
 	r.NoError(err)
 
 	db, err := leveldb.New(targetDir, nil, logging.NoLog{}, prometheus.NewRegistry())

@@ -96,4 +96,3 @@ task reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=$HOME/reexec-dat
 
 TODO:
 - update C-Chain dashboards
-- provide task to copy block range from 50m blocks to smaller db
