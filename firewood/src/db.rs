@@ -9,14 +9,6 @@
     clippy::missing_panics_doc,
     reason = "Found 5 occurrences after enabling the lint."
 )]
-#![expect(
-    clippy::needless_pass_by_value,
-    reason = "Found 1 occurrences after enabling the lint."
-)]
-#![expect(
-    clippy::unused_async,
-    reason = "Found 2 occurrences after enabling the lint."
-)]
 
 use crate::merkle::Merkle;
 use crate::proof::{Proof, ProofNode};

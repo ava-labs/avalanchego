@@ -1068,10 +1068,6 @@ mod tests {
         clippy::items_after_statements,
         reason = "Found 1 occurrences after enabling the lint."
     )]
-    #![expect(
-        clippy::unnecessary_wraps,
-        reason = "Found 1 occurrences after enabling the lint."
-    )]
 
     use super::*;
     use firewood_storage::{MemStore, MutableProposal, NodeStore, RootReader, TrieHash};

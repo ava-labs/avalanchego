@@ -23,7 +23,6 @@ pub struct Options {
     pub db: String,
 }
 
-#[allow(clippy::unused_async)]
 pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
     let db_path = PathBuf::from(&opts.db);
     let node_cache_size = nonzero!(1usize);

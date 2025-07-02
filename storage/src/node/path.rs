@@ -256,8 +256,6 @@ impl DoubleEndedIterator for NibblesIterator<'_> {
 
 #[cfg(test)]
 mod test {
-    #![expect(clippy::needless_pass_by_value)]
-
     use super::*;
     use std::fmt::Debug;
     use test_case::test_case;

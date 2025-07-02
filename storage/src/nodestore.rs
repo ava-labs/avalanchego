@@ -1018,7 +1018,6 @@ pub struct ImmutableProposal {
 impl ImmutableProposal {
     /// Returns true if the parent of this proposal is committed and has the given hash.
     #[must_use]
-    #[allow(clippy::needless_pass_by_value)]
     fn parent_hash_is(&self, hash: Option<TrieHash>) -> bool {
         match <Arc<ArcSwap<NodeStoreParent>> as arc_swap::access::DynAccess<Arc<_>>>::load(
             &self.parent,

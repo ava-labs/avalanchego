@@ -5,14 +5,6 @@
     clippy::doc_link_with_quotes,
     reason = "Found 1 occurrences after enabling the lint."
 )]
-#![expect(
-    clippy::unnecessary_wraps,
-    reason = "Found 1 occurrences after enabling the lint."
-)]
-#![expect(
-    clippy::unused_async,
-    reason = "Found 1 occurrences after enabling the lint."
-)]
 
 use clap::Args;
 use firewood::db::{Db, DbConfig};

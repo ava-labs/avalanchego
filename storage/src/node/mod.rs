@@ -474,7 +474,7 @@ pub struct PathIterItem {
 
 #[cfg(test)]
 mod test {
-    #![expect(clippy::needless_pass_by_value, clippy::unwrap_used)]
+    #![expect(clippy::unwrap_used)]
 
     use crate::node::{BranchNode, LeafNode, Node};
     use crate::{Child, LinearAddress, Path};
