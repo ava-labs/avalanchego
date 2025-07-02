@@ -91,8 +91,3 @@ Provide the parameters explicitly that we have just used locally:
 ```bash
 task reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=$HOME/reexec-data-params SOURCE_BLOCK_DIR=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-200.zip CURRENT_STATE_DIR=s3://avalanchego-bootstrap-testing/cchain-current-state-test/** START_BLOCK=101 END_BLOCK=200
 ```
-
-## Future Additions
-
-TODO:
-- update C-Chain dashboards
