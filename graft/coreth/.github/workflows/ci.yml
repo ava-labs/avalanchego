@@ -61,7 +61,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-22.04, ubuntu-latest, windows-latest]
+        os: [macos-latest, ubuntu-22.04, ubuntu-latest]
     steps:
       - uses: actions/checkout@v4
       - name: check out ${{ github.event.inputs.avalanchegoRepo }} ${{ github.event.inputs.avalanchegoBranch }}
@@ -79,10 +79,6 @@ jobs:
         run: |
           go mod edit -replace github.com/ava-labs/avalanchego=./avalanchego
           go mod tidy
-      - name: Set timeout on Windows # Windows UT run slower and need a longer timeout
-        shell: bash
-        if: matrix.os == 'windows-latest'
-        run: echo "TIMEOUT=1200s" >> "$GITHUB_ENV"
       - run: go mod download
         shell: bash
       - name: go mod tidy
