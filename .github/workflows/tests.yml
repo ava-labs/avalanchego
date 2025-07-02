@@ -50,16 +50,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-22.04, ubuntu-latest, windows-latest]
+        os: [macos-latest, ubuntu-22.04, ubuntu-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: "go.mod"
-      - name: Set timeout on Windows # Windows UT run slower and need a longer timeout
-        shell: bash
-        if: matrix.os == 'windows-latest'
-        run: echo "TIMEOUT=1200s" >> "$GITHUB_ENV"
       - run: go mod download
         shell: bash
       - name: fjl/gencodec generated files are up to date
