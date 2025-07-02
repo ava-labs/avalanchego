@@ -33,14 +33,16 @@ func TestDialerCancelDial(t *testing.T) {
 	eg.Go(func() error {
 		for {
 			// Continuously accept connections from myself
-			if _, err = l.Accept(); err != nil {
-				return err
-			}
-
-			select {
-			case <-done:
-				return nil
-			default:
+			_, err = l.Accept()
+			if err != nil {
+				// Distinguish between an error that occurred because
+				// the test is over from actual errors
+				select {
+				case <-done:
+					return nil
+				default:
+					return err
+				}
 			}
 		}
 	})
@@ -70,6 +72,6 @@ func TestDialerCancelDial(t *testing.T) {
 	_ = conn.Close()
 
 	close(done) // stop listener goroutine
-	require.NoError(eg.Wait())
 	_ = l.Close()
+	require.NoError(eg.Wait())
 }
