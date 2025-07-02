@@ -52,10 +52,7 @@ func (b *Block) Bytes() ([]byte, error) {
 
 func (b *Block) Verify(ctx context.Context) (simplex.VerifiedBlock, error) {
 	// TODO: track blocks that have been verified to ensure they are either rejected or accepted
-	b.verified = true
-	err := b.vmBlock.Verify(ctx)
-
-	return b, err
+	return b, b.vmBlock.Verify(ctx)
 }
 
 type blockDeserializer struct {
