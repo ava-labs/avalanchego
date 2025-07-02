@@ -72,7 +72,7 @@ tracker must be thread safe.
 The orchestrator supports the following modes:
 
 - Gradual Load: the orchestrator sends transactions at an initial rate (TPS) and
-increases that rate until hitting the maxiumum desired rate or until the
+increases that rate until hitting the maximum desired rate or until the
 orchestrator determines that it can no longer make progress.
 - Burst: for each issuer, the orchestrator sends `MinTPS` transactions at once
   and waits for all transactions to be marked as accepted.

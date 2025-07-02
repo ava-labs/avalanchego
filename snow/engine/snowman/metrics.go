@@ -35,6 +35,7 @@ type metrics struct {
 	selectedVoteIndex                     metric.Averager
 	issuerStake                           metric.Averager
 	issued                                *prometheus.CounterVec
+	blockTimeSkew                         prometheus.Gauge
 }
 
 func newMetrics(reg prometheus.Registerer) (*metrics, error) {
@@ -112,6 +113,10 @@ func newMetrics(reg prometheus.Registerer) (*metrics, error) {
 			Name: "blks_issued",
 			Help: "number of blocks that have been issued into consensus by discovery mechanism",
 		}, []string{"source"}),
+		blockTimeSkew: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "blks_built_time_skew",
+			Help: "The differences between the time the block was built at and the block's timestamp",
+		}),
 	}
 
 	// Register the labels
@@ -136,6 +141,7 @@ func newMetrics(reg prometheus.Registerer) (*metrics, error) {
 		reg.Register(m.numProcessingAncestorFetchesSucceeded),
 		reg.Register(m.numProcessingAncestorFetchesUnneeded),
 		reg.Register(m.issued),
+		reg.Register(m.blockTimeSkew),
 	)
 	return m, errs.Err
 }
