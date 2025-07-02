@@ -16,6 +16,10 @@ func TestCond(t *testing.T) {
 	cancelled, cancel := context.WithCancel(context.Background())
 	cancel()
 
+	log := func(args ...any) {
+		t.Log(args...)
+	}
+
 	var (
 		noop      = func(*Cond) {}
 		signal    = (*Cond).Signal
@@ -120,33 +124,33 @@ func TestCond(t *testing.T) {
 				// once the lock is no longer held.
 				c.L.Lock()
 				go func() {
-					t.Log("waiting", i)
+					log("waiting", i)
 					errs <- c.Wait(test.ctx)
-					t.Log("waited", i)
+					log("waited", i)
 					c.L.Unlock()
 				}()
 			}
 
 			c.L.Lock()
-			t.Log("synchronized waiters")
+			log("synchronized waiters")
 			c.L.Unlock()
 
 			// All goroutines are waiting on the condition variable.
 
 			for i, next := range test.next {
-				t.Log("calling next", i)
+				log("calling next", i)
 				next(c)
-				t.Log("called next", i)
+				log("called next", i)
 
 				select {
 				case err := <-errs:
 					require.ErrorIs(err, test.expectedErrors[i])
-					t.Log("checked error", i)
+					log("checked error", i)
 
 				// Timing out rather than depending on the test timeout allows
 				// the logs to be printed rather than a stack trace.
 				case <-timeout:
-					t.Log("error checking timeout", i)
+					log("error checking timeout", i)
 					t.Fail()
 				}
 			}
