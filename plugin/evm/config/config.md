@@ -6,6 +6,14 @@ The C-Chain config is printed out in the log when a node starts. Default values 
 
 Default values are overridden only if specified in the given config file. It is recommended to only provide values which are different from the default, as that makes the config more resilient to future default changes. Otherwise, if defaults change, your node will remain with the old values, which might adversely affect your node operation.
 
+## Gas Configuration
+
+### `gas-target`
+
+_Integer_
+
+The target gas per second that this node will attempt to use when creating blocks. If this config is not specified, the node will default to use the parent block's target gas per second. Defaults to using the parent block's target.
+
 ## State Sync
 
 ### `state-sync-enabled`
@@ -42,6 +50,18 @@ _Integer_
 
 Size of trie cache used for providing state sync data to peers in MBs. Should be a multiple of `64`. Defaults to `64`.
 
+### `state-sync-commit-interval`
+
+_Integer_
+
+Specifies the commit interval at which to persist EVM and atomic tries during state sync. Defaults to `16384`.
+
+### `state-sync-request-size`
+
+_Integer_
+
+The number of key/values to ask peers for per state sync request. Defaults to `1024`.
+
 ## Continuous Profiling
 
 ### `continuous-profiler-dir`
@@ -70,21 +90,23 @@ _Boolean_
 
 Enables the Snowman API. Defaults to `false`.
 
-### `coreth-admin-api-enabled`
+### `admin-api-enabled`
 
 _Boolean_
 
-Deprecated as of `v0.12.5`. Use `admin-api-enabled` instead.
-
 Enables the Admin API. Defaults to `false`.
 
-### `coreth-admin-api-dir`
+### `admin-api-dir`
 
 _String_
 
-Deprecated as of `v0.12.5`. Use `admin-api-dir` instead.
-
 Specifies the directory for the Admin API to use to store CPU/Mem/Lock Profiles. Defaults to `""`.
+
+### `warp-api-enabled`
+
+_Boolean_
+
+Enables the Warp API. Defaults to `false`.
 
 ### Enabling EVM APIs
 
@@ -379,7 +401,13 @@ Allows queries for unfinalized (not yet accepted) blocks/transactions. Defaults 
 
 _Integer_
 
-Specifies the depth to keep accepted headers and accepted logs in the cache. This is particularly useful to improve the performance of `eth_getLogs` for recent logs.
+Specifies the depth to keep accepted headers and accepted logs in the cache. This is particularly useful to improve the performance of `eth_getLogs` for recent logs. Defaults to `32`.
+
+### `http-body-limit`
+
+_Integer_
+
+Maximum size in bytes for HTTP request bodies. Defaults to `0` (no limit).
 
 ## Transaction Pool
 
@@ -395,11 +423,29 @@ _Boolean_
 
 If `true`, the APIs will allow transactions that are not replay protected (EIP-155) to be issued through this node. Defaults to `false`.
 
-### `allow-unprotected-tx-hashes`[
+### `allow-unprotected-tx-hashes`
 
 _\[\]TxHash_
 
 Specifies an array of transaction hashes that should be allowed to bypass replay protection. This flag is intended for node operators that want to explicitly allow specific transactions to be issued through their API. Defaults to an empty list.
+
+### `price-options-slow-fee-percentage`
+
+_Integer_
+
+Percentage to apply for slow fee estimation. Defaults to `95`.
+
+### `price-options-fast-fee-percentage`
+
+_Integer_
+
+Percentage to apply for fast fee estimation. Defaults to `105`.
+
+### `price-options-max-tip`
+
+_Integer_
+
+Maximum tip in wei for fee estimation. Defaults to `20000000000` (20 Gwei).
 
 #### `push-gossip-percent-stake`
 
@@ -443,11 +489,9 @@ _Duration_
 
 Frequency to request transactions from peers. Defaults to `1000000000` nano seconds which is 1 second.
 
-### `tx-regossip-frequency`
+### `regossip-frequency`
 
 _Duration_
-
-Deprecated as of `v0.12.5`. Use `regossip-frequency` instead.
 
 Amount of time that should elapse before we attempt to re-gossip a transaction that was already gossiped once. Defaults to `30000000000` nano seconds which is 30 seconds.
 
@@ -495,25 +539,19 @@ Maximum duration a non-executable transaction will be allowed in the poll. Defau
 
 ## Metrics
 
-### `metrics-enabled`
-
-_Boolean_
-
-Enables metrics. Defaults to `false`.
-
 ### `metrics-expensive-enabled`
 
 _Boolean_
 
-Enables expensive metrics. Defaults to `false`.
+Enables expensive metrics. Defaults to `true`.
 
 ## Snapshots
 
-### `snapshot-async`
+### `snapshot-wait`
 
 _Boolean_
 
-If `true`, allows snapshot generation to be executed asynchronously. Defaults to `true`.
+If `true`, waits for snapshot generation to complete before starting. Defaults to `false`.
 
 ### `snapshot-verification-enabled`
 
@@ -567,7 +605,7 @@ Size of cache used for clean trie nodes (in MBs). Should be a multiple of `64`. 
 
 _Integer_
 
-Size of cache used for dirty trie nodes (in MBs). When the dirty nodes exceed this limit, they are written to disk. Defaults to `256`.
+Size of cache used for dirty trie nodes (in MBs). When the dirty nodes exceed this limit, they are written to disk. Defaults to `512`.
 
 ### `trie-dirty-commit-target`
 
@@ -587,17 +625,7 @@ _Integer_
 
 Size of the snapshot disk layer clean cache (in MBs). Should be a multiple of `64`. Defaults to `256`.
 
-### `trie-clean-journal`
 
-_String_
-
-Directory to use to save the trie clean cache (must be populated to enable journaling the trie clean cache). Empty and disabled by default.
-
-### `trie-clean-rejournal`
-
-_Duration_
-
-Frequency to re-journal the trie clean cache to disk (minimum 1 minute, must be populated to enable journaling the trie clean cache).
 
 ### `acceptor-queue-limit`
 
@@ -649,6 +677,12 @@ _Boolean_
 
 If `true`, enables preimages. Defaults to `false`.
 
+### `prune-warp-db-enabled`
+
+_Boolean_
+
+If `true`, clears the warp database on startup. Defaults to `false`.
+
 ### `offline-pruning-enabled`
 
 _Boolean_
@@ -673,15 +707,35 @@ _String_
 
 This flag must be set when offline pruning is enabled and sets the directory that offline pruning will use to write its bloom filter to disk. This directory should not be changed in between runs until offline pruning has completed.
 
-### `tx-lookup-limit` (uint64)
+### `transaction-history`
+
+_Integer_
 
 Number of recent blocks for which to maintain transaction lookup indices in the database. If set to 0, transaction lookup indices will be maintained for all blocks. Defaults to `0`.
+
+### `state-history`
+
+_Integer_
+
+The maximum number of blocks from head whose state histories are reserved for pruning blockchains. Defaults to `32`.
+
+### `historical-proof-query-window`
+
+_Integer_
+
+When running in archive mode only, the number of blocks before the last accepted block to be accepted for proof state queries. Defaults to `43200`.
 
 ### `skip-tx-indexing`
 
 _Boolean_
 
 If set to `true`, the node will not index transactions. TxLookupLimit can be still used to control deleting old transaction indices. Defaults to `false`.
+
+### `inspect-database`
+
+_Boolean_
+
+If set to `true`, inspects the database on startup. Defaults to `false`.
 
 ## VM Networking
 
@@ -691,19 +745,15 @@ _Integer_
 
 Specifies the maximum number of outbound VM2VM requests in flight at once. Defaults to `16`.
 
-### `max-outbound-active-cross-chain-requests`
+## Warp Configuration
 
-_Integer_
+### `warp-off-chain-messages`
 
-Specifies the maximum number of outbound cross-chain requests in flight at once. Defaults to `64`.
+_Array of Hex Strings_
+
+Encodes off-chain messages (unrelated to any on-chain event ie. block or AddressedCall) that the node should be willing to sign. Note: only supports AddressedCall payloads. Defaults to empty array.
 
 ## Miscellaneous
-
-### `airdrop`
-
-_String_
-
-Path to a json file that contains a list of addresses for a genesis airdrop. Each address will be airdropped `AirdropAmount` at genesis, and the hash of the airdrop file must match `AirdropHash`. `AirdropAmount` and `AirdropHash` are part of the genesis config. This option applies to `subnet-evm` only (not applicable to `coreth`).
 
 ### `skip-upgrade-check`
 
