@@ -18,5 +18,16 @@ message ReadResponse {
   // read is the payload in bytes
   bytes read = 1;
   // error is an error message
-  optional string error = 2;
+  Error error = 2;
+}
+
+message Error {
+  ErrorCode error_code = 1;
+  string message = 2;
+}
+
+// ErrorCode provides information for special sentinel error types
+enum ErrorCode {
+  ERROR_CODE_UNSPECIFIED = 0;
+  ERROR_CODE_EOF = 1;
 }
