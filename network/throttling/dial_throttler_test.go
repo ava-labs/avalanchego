@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"golang.org/x/sync/errgroup"
 )
 
 // Test that the DialThrottler returned by NewDialThrottler works
@@ -21,30 +20,26 @@ func TestDialThrottler(t *testing.T) {
 	throttler := NewDialThrottler(5)
 	// Use all 5
 	for i := 0; i < 5; i++ {
-		eg := errgroup.Group{}
-		acquiredChan := make(chan struct{})
+		acquiredChan := make(chan error)
 		// Should return immediately because < 5 taken this second
-		eg.Go(func() error {
-			defer close(acquiredChan)
-			return throttler.Acquire(context.Background())
-		})
+		go func() {
+			acquiredChan <- throttler.Acquire(context.Background())
+		}()
 
 		select {
 		case <-time.After(10 * time.Millisecond):
 			require.FailNow("should have acquired immediately")
-		case <-acquiredChan:
-			require.NoError(eg.Wait())
+		case err := <-acquiredChan:
+			require.NoError(err)
 		}
 		close(acquiredChan)
 	}
 
-	eg := errgroup.Group{}
-	acquiredChan := make(chan struct{}, 1)
-	eg.Go(func() error {
-		defer close(acquiredChan)
+	acquiredChan := make(chan error)
+	go func() {
 		// Should block because 5 already taken within last second
-		return throttler.Acquire(context.Background())
-	})
+		acquiredChan <- throttler.Acquire(context.Background())
+	}()
 
 	select {
 	case <-time.After(25 * time.Millisecond):
@@ -55,8 +50,7 @@ func TestDialThrottler(t *testing.T) {
 	// Wait until the 6th Acquire() has returned. The time at which
 	// that returns should be no more than 1s after the time at which
 	// the first Acquire() returned.
-	<-acquiredChan
-	require.NoError(eg.Wait())
+	require.NoError(<-acquiredChan)
 	// Use 1.05 seconds instead of 1 second to give some "wiggle room"
 	// so test doesn't flake
 	require.LessOrEqual(time.Since(startTime), 1050*time.Millisecond)
@@ -70,36 +64,31 @@ func TestDialThrottlerCancel(t *testing.T) {
 	throttler := NewDialThrottler(5)
 	// Use all 5
 	for i := 0; i < 5; i++ {
-		eg := errgroup.Group{}
-		acquiredChan := make(chan struct{})
+		acquiredChan := make(chan error)
 		// Should return immediately because < 5 taken this second
-		eg.Go(func() error {
-			defer close(acquiredChan)
-			return throttler.Acquire(context.Background())
-		})
+		go func() {
+			acquiredChan <- throttler.Acquire(context.Background())
+		}()
 
 		select {
 		case <-time.After(10 * time.Millisecond):
 			require.FailNow("should have acquired immediately")
-		case <-acquiredChan:
+		case err := <-acquiredChan:
+			require.NoError(err)
 		}
 	}
 
-	eg := errgroup.Group{}
-	acquiredChan := make(chan struct{})
+	acquiredChan := make(chan error)
 	ctx, cancel := context.WithCancel(context.Background())
 	// Cancel the 6th acquire
 	cancel()
 
-	eg.Go(func() error {
-		defer close(acquiredChan)
-		// Should block because 5 already taken within last second
-		return throttler.Acquire(ctx)
-	})
+	go func() {
+		acquiredChan <- throttler.Acquire(ctx)
+	}()
 
 	select {
-	case <-acquiredChan:
-		err := eg.Wait()
+	case err := <-acquiredChan:
 		require.ErrorIs(err, context.Canceled)
 	case <-time.After(10 * time.Millisecond):
 		require.FailNow("Acquire should have returned immediately upon context cancellation")
