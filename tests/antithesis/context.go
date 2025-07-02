@@ -33,7 +33,7 @@ func NewInstrumentedTestContextWithArgs(
 		},
 		func(r any) {
 			detailsClone := maps.Clone(details)
-			details["panic"] = r
+			detailsClone["panic"] = r
 			assert.Unreachable("unexpected panic", detailsClone)
 		},
 	)
