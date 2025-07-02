@@ -84,12 +84,11 @@ func UTXOIDFromString(s string) (*UTXOID, error) {
 }
 
 func (utxo *UTXOID) Verify() error {
-	switch {
-	case utxo == nil:
+	if utxo == nil {
 		return errNilUTXOID
-	default:
-		return nil
 	}
+
+	return nil
 }
 
 func (utxo *UTXOID) Compare(other *UTXOID) int {

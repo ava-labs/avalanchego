@@ -57,7 +57,7 @@ linters:
     - predeclared
     - revive
     - spancheck
-#    - staticcheck
+    - staticcheck
     - tagalign
 #    - testifylint
     - unconvert
@@ -179,6 +179,7 @@ linters:
         - all
         - -SA6002A # Storing non-pointer values in sync.Pool allocates memory
         - -SA1019 # Using a deprecated function, variable, constant or field
+        - -QF1008 # Unnecessary embedded expressions
     tagalign:
       align: true
       sort: true

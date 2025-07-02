@@ -47,12 +47,12 @@ func (v *Validator) Weight() uint64 {
 
 // Verify validates the ID for this validator
 func (v *Validator) Verify() error {
-	switch {
-	case v.Wght == 0: // Ensure the validator has some weight
+	// Ensure the validator has some weight
+	if v.Wght == 0 {
 		return ErrWeightTooSmall
-	default:
-		return nil
 	}
+
+	return nil
 }
 
 // BoundedBy returns true iff staker start and end are a

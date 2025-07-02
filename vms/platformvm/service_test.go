@@ -990,8 +990,8 @@ func TestGetBlock(t *testing.T) {
 			response := api.GetBlockResponse{}
 			require.NoError(service.GetBlock(nil, &args, &response))
 
-			switch {
-			case test.encoding == formatting.JSON:
+			switch test.encoding {
+			case formatting.JSON:
 				statelessBlock.InitCtx(service.vm.ctx)
 				expectedBlockJSON, err := json.Marshal(statelessBlock)
 				require.NoError(err)
