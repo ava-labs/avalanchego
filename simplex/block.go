@@ -28,8 +28,6 @@ type Block struct {
 	// metadata contains protocol metadata for the block
 	metadata simplex.ProtocolMetadata
 
-	verified bool // whether vmBlock.verify() function has been called
-
 	// the parsed block
 	vmBlock snowman.Block
 }
@@ -53,10 +51,6 @@ func (b *Block) Bytes() ([]byte, error) {
 }
 
 func (b *Block) Verify(ctx context.Context) (simplex.VerifiedBlock, error) {
-	if b.verified {
-		return b, errBlockAlreadyVerified
-	}
-
 	// TODO: track blocks that have been verified to ensure they are either rejected or accepted
 	b.verified = true
 	err := b.vmBlock.Verify(ctx)
