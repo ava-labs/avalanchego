@@ -117,17 +117,13 @@ func TestBlockClientsWithIncorrectRSAKeys(t *testing.T) {
 				}
 
 				_, _, _, err = upgrader.Upgrade(conn)
-				if !errors.Is(err, testCase.expectedErr) {
-					return err
-				}
-
-				return nil
+				return err
 			})
 
 			conn, err := tls.Dial("tcp", listener.Addr().String(), &clientConfig)
 			require.NoError(t, err)
 			require.NoError(t, conn.Handshake())
-			require.NoError(t, eg.Wait())
+			require.ErrorIs(t, eg.Wait(), testCase.expectedErr)
 		})
 	}
 }
