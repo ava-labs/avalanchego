@@ -1,39 +1,6 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-#![expect(
-    clippy::arithmetic_side_effects,
-    reason = "Found 5 occurrences after enabling the lint."
-)]
-#![expect(
-    clippy::default_trait_access,
-    reason = "Found 6 occurrences after enabling the lint."
-)]
-#![expect(
-    clippy::indexing_slicing,
-    reason = "Found 10 occurrences after enabling the lint."
-)]
-#![expect(
-    clippy::match_wildcard_for_single_variants,
-    reason = "Found 1 occurrences after enabling the lint."
-)]
-#![expect(
-    clippy::missing_errors_doc,
-    reason = "Found 15 occurrences after enabling the lint."
-)]
-#![expect(
-    clippy::missing_panics_doc,
-    reason = "Found 1 occurrences after enabling the lint."
-)]
-#![expect(
-    clippy::needless_pass_by_value,
-    reason = "Found 3 occurrences after enabling the lint."
-)]
-#![expect(
-    clippy::unwrap_used,
-    reason = "Found 2 occurrences after enabling the lint."
-)]
-
 use crate::linear::FileIoError;
 use crate::logger::{debug, trace};
 use arc_swap::ArcSwap;
@@ -45,6 +12,7 @@ use fastrace::local::LocalSpan;
 use metrics::counter;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use smallvec::SmallVec;
 use std::collections::HashMap;
 use std::fmt::Debug;
 
@@ -125,7 +93,7 @@ fn area_size_hash() -> TrieHash {
 }
 
 // TODO: automate this, must stay in sync with above
-const fn index_name(index: AreaIndex) -> &'static str {
+const fn index_name(index: usize) -> &'static str {
     match index {
         0 => "16",
         1 => "32",
@@ -164,6 +132,11 @@ const NUM_AREA_SIZES: usize = AREA_SIZES.len();
 const MIN_AREA_SIZE: u64 = AREA_SIZES[0];
 const MAX_AREA_SIZE: u64 = AREA_SIZES[NUM_AREA_SIZES - 1];
 
+#[inline]
+fn new_area_index(n: usize) -> AreaIndex {
+    n.try_into().expect("Area index out of bounds")
+}
+
 /// Returns the index in `BLOCK_SIZES` of the smallest block size >= `n`.
 fn area_size_to_index(n: u64) -> Result<AreaIndex, Error> {
     if n > MAX_AREA_SIZE {
@@ -180,7 +153,7 @@ fn area_size_to_index(n: u64) -> Result<AreaIndex, Error> {
     AREA_SIZES
         .iter()
         .position(|&size| size >= n)
-        .map(|index| index as AreaIndex)
+        .map(new_area_index)
         .ok_or_else(|| {
             Error::new(
                 ErrorKind::InvalidData,
@@ -219,6 +192,10 @@ struct StoredArea<T> {
 impl<T: ReadInMemoryNode, S: ReadableStorage> NodeStore<T, S> {
     /// Returns (index, `area_size`) for the stored area at `addr`.
     /// `index` is the index of `area_size` in the array of valid block sizes.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`FileIoError`] if the area cannot be read.
     pub fn area_index_and_size(
         &self,
         addr: LinearAddress,
@@ -248,6 +225,10 @@ impl<T: ReadInMemoryNode, S: ReadableStorage> NodeStore<T, S> {
 
     /// Read a [Node] from the provided [`LinearAddress`].
     /// `addr` is the address of a `StoredArea` in the `ReadableStorage`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`FileIoError`] if the node cannot be read.
     pub fn read_node_from_disk(
         &self,
         addr: LinearAddress,
@@ -259,7 +240,9 @@ impl<T: ReadInMemoryNode, S: ReadableStorage> NodeStore<T, S> {
 
         debug_assert!(addr.get() % 8 == 0);
 
-        let actual_addr = addr.get() + 1; // skip the length byte
+        // saturating because there is no way we can be reading at u64::MAX
+        // and this will fail very soon afterwards
+        let actual_addr = addr.get().saturating_add(1); // skip the length byte
 
         let _span = LocalSpan::enter_with_local_parent("read_and_deserialize");
 
@@ -286,6 +269,10 @@ impl<T: ReadInMemoryNode, S: ReadableStorage> NodeStore<T, S> {
 
     /// Read a [Node] from the provided [`LinearAddress`] and size.
     /// This is an uncached read, primarily used by check utilities
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`FileIoError`] if the node cannot be read.
     pub fn uncached_read_node_and_size(
         &self,
         addr: LinearAddress,
@@ -299,7 +286,7 @@ impl<T: ReadInMemoryNode, S: ReadableStorage> NodeStore<T, S> {
                 Some("uncached_read_node_and_size".to_string()),
             )
         })?;
-        self.storage.stream_from(addr.get() + 1)?;
+        self.storage.stream_from(addr.get().saturating_add(1))?;
         let node: SharedNode = Node::from_reader(area_stream)
             .map_err(|e| {
                 self.storage.file_io_error(
@@ -313,8 +300,13 @@ impl<T: ReadInMemoryNode, S: ReadableStorage> NodeStore<T, S> {
     }
 
     /// Get the size of an area index (used by the checker)
+    ///
+    /// # Panics
+    ///
+    /// Panics if `index` is out of bounds for the `AREA_SIZES` array.
     #[must_use]
     pub const fn size_from_area_index(index: AreaIndex) -> u64 {
+        #[expect(clippy::indexing_slicing)]
         AREA_SIZES[index as usize]
     }
 }
@@ -322,6 +314,10 @@ impl<T: ReadInMemoryNode, S: ReadableStorage> NodeStore<T, S> {
 impl<S: ReadableStorage> NodeStore<Committed, S> {
     /// Open an existing [`NodeStore`]
     /// Assumes the header is written in the [`ReadableStorage`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`FileIoError`] if the header cannot be read or validated.
     pub fn open(storage: Arc<S>) -> Result<Self, FileIoError> {
         let mut stream = storage.stream_from(0)?;
         let mut header = NodeStoreHeader::new();
@@ -339,7 +335,7 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
         let mut nodestore = Self {
             header,
             kind: Committed {
-                deleted: Default::default(),
+                deleted: Box::default(),
                 root_hash: None,
             },
             storage,
@@ -347,7 +343,7 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
 
         if let Some(root_address) = nodestore.header.root_address {
             let node = nodestore.read_node_from_disk(root_address, "open");
-            let root_hash = node.map(|n| hash_node(&n, &Path(Default::default())))?;
+            let root_hash = node.map(|n| hash_node(&n, &Path(SmallVec::default())))?;
             nodestore.kind.root_hash = Some(root_hash.into_triehash());
         }
 
@@ -356,6 +352,10 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
 
     /// Create a new, empty, Committed [`NodeStore`] and clobber
     /// the underlying store with an empty freelist and no root node
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`FileIoError`] if the storage cannot be accessed.
     pub fn new_empty_committed(storage: Arc<S>) -> Result<Self, FileIoError> {
         let header = NodeStoreHeader::new();
 
@@ -363,7 +363,7 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
             header,
             storage,
             kind: Committed {
-                deleted: Default::default(),
+                deleted: Box::default(),
                 root_hash: None,
             },
         })
@@ -421,10 +421,14 @@ impl Parentable for Committed {
 
 impl<S: ReadableStorage> NodeStore<MutableProposal, S> {
     /// Create a new `MutableProposal` [`NodeStore`] from a parent [`NodeStore`]
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`FileIoError`] if the parent root cannot be read.
     pub fn new<F: Parentable + ReadInMemoryNode>(
-        parent: Arc<NodeStore<F, S>>,
+        parent: &Arc<NodeStore<F, S>>,
     ) -> Result<Self, FileIoError> {
-        let mut deleted: Vec<_> = Default::default();
+        let mut deleted = Vec::default();
         let root = if let Some(root_addr) = parent.header.root_address {
             deleted.push(root_addr);
             let root = parent.read_node(root_addr)?;
@@ -453,6 +457,10 @@ impl<S: ReadableStorage> NodeStore<MutableProposal, S> {
     /// Reads a node for update, marking it as deleted in this proposal.
     /// We get an arc from cache (reading it from disk if necessary) then
     /// copy/clone the node and return it.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`FileIoError`] if the node cannot be read.
     pub fn read_for_update(&mut self, addr: LinearAddress) -> Result<Node, FileIoError> {
         self.delete_node(addr);
         let arc_wrapped_node = self.read_node(addr)?;
@@ -468,6 +476,10 @@ impl<S: ReadableStorage> NodeStore<MutableProposal, S> {
 impl<S: WritableStorage> NodeStore<MutableProposal, S> {
     /// Creates a new, empty, [`NodeStore`] and clobbers the underlying `storage` with an empty header.
     /// This is used during testing and during the creation of an in-memory merkle for proofs
+    ///
+    /// # Panics
+    ///
+    /// Panics if the header cannot be written.
     pub fn new_empty_proposal(storage: Arc<S>) -> Self {
         let header = NodeStoreHeader::new();
         let header_bytes = bytemuck::bytes_of(&header);
@@ -478,7 +490,7 @@ impl<S: WritableStorage> NodeStore<MutableProposal, S> {
             header,
             kind: MutableProposal {
                 root: None,
-                deleted: Default::default(),
+                deleted: Vec::default(),
                 parent: NodeStoreParent::Committed(None),
             },
             storage,
@@ -492,6 +504,7 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
     /// and the index of the free list that was used.
     /// If there are no free areas big enough for `n` bytes, returns None.
     /// TODO danlaine: If we return a larger area than requested, we should split it.
+    #[expect(clippy::indexing_slicing)]
     fn allocate_from_freed(
         &mut self,
         n: u64,
@@ -546,10 +559,10 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
                 *free_stored_area_addr = free_head.next_free_block;
             }
 
-            counter!("firewood.space.reused", "index" => index_name(index as u8))
+            counter!("firewood.space.reused", "index" => index_name(index))
                 .increment(AREA_SIZES[index]);
-            counter!("firewood.space.wasted", "index" => index_name(index as u8))
-                .increment(AREA_SIZES[index] - n);
+            counter!("firewood.space.wasted", "index" => index_name(index))
+                .increment(AREA_SIZES[index].saturating_sub(n));
 
             // Return the address of the newly allocated block.
             trace!("Allocating from free list: addr: {address:?}, size: {index}");
@@ -557,11 +570,12 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
         }
 
         trace!("No free blocks of sufficient size {index_wanted} found");
-        counter!("firewood.space.from_end", "index" => index_name(index_wanted as u8))
+        counter!("firewood.space.from_end", "index" => index_name(index_wanted as usize))
             .increment(AREA_SIZES[index_wanted as usize]);
         Ok(None)
     }
 
+    #[expect(clippy::indexing_slicing)]
     fn allocate_from_end(&mut self, n: u64) -> Result<(LinearAddress, AreaIndex), FileIoError> {
         let index = area_size_to_index(n).map_err(|e| {
             self.storage
@@ -569,7 +583,7 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
         })?;
         let area_size = AREA_SIZES[index as usize];
         let addr = LinearAddress::new(self.header.size).expect("node store size can't be 0");
-        self.header.size += area_size;
+        self.header.size = self.header.size.saturating_add(area_size);
         debug_assert!(addr.get() % 8 == 0);
         trace!("Allocating from end: addr: {addr:?}, size: {index}");
         Ok((addr, index))
@@ -585,6 +599,10 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
     /// Returns an address that can be used to store the given `node` and updates
     /// `self.header` to reflect the allocation. Doesn't actually write the node to storage.
     /// Also returns the index of the free list the node was allocated from.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`FileIoError`] if the node cannot be allocated.
     pub fn allocate_node(
         &mut self,
         node: &Node,
@@ -607,13 +625,19 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
     /// Deletes the [Node] at the given address, updating the next pointer at
     /// the given addr, and changing the header of this committed nodestore to
     /// have the address on the freelist
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`FileIoError`] if the node cannot be deleted.
+    #[expect(clippy::indexing_slicing)]
     pub fn delete_node(&mut self, addr: LinearAddress) -> Result<(), FileIoError> {
         debug_assert!(addr.get() % 8 == 0);
 
         let (area_size_index, _) = self.area_index_and_size(addr)?;
         trace!("Deleting node at {addr:?} of size {area_size_index}");
-        counter!("firewood.delete_node", "index" => index_name(area_size_index)).increment(1);
-        counter!("firewood.space.freed", "index" => index_name(area_size_index))
+        counter!("firewood.delete_node", "index" => index_name(area_size_index as usize))
+            .increment(1);
+        counter!("firewood.space.freed", "index" => index_name(area_size_index as usize))
             .increment(AREA_SIZES[area_size_index as usize]);
 
         // The area that contained the node is now free.
@@ -766,7 +790,10 @@ impl Version {
 
         // pad with nul bytes
         let mut bytes = [0u8; Version::SIZE];
-        bytes[..VERSION_STR.len()].copy_from_slice(VERSION_STR.as_bytes());
+        bytes
+            .get_mut(..VERSION_STR.len())
+            .expect("must fit")
+            .copy_from_slice(VERSION_STR.as_bytes());
 
         Self { bytes }
     }
@@ -813,7 +840,10 @@ impl NodeStoreHeader {
             root_address: None,
             version: Version::new(),
             free_lists: Default::default(),
-            area_size_hash: area_size_hash().as_slice().try_into().unwrap(),
+            area_size_hash: area_size_hash()
+                .as_slice()
+                .try_into()
+                .expect("sizes should match"),
             #[cfg(feature = "ethhash")]
             ethhash: 1,
             #[cfg(not(feature = "ethhash"))]
@@ -907,6 +937,10 @@ impl<T> TrieReader for T where T: NodeReader + RootReader {}
 /// Reads nodes from a merkle trie.
 pub trait NodeReader {
     /// Returns the node at `addr`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`FileIoError`] if the node cannot be read.
     fn read_node(&self, addr: LinearAddress) -> Result<SharedNode, FileIoError>;
 }
 
@@ -984,6 +1018,7 @@ pub struct ImmutableProposal {
 impl ImmutableProposal {
     /// Returns true if the parent of this proposal is committed and has the given hash.
     #[must_use]
+    #[allow(clippy::needless_pass_by_value)]
     fn parent_hash_is(&self, hash: Option<TrieHash>) -> bool {
         match <Arc<ArcSwap<NodeStoreParent>> as arc_swap::access::DynAccess<Arc<_>>>::load(
             &self.parent,
@@ -991,7 +1026,7 @@ impl ImmutableProposal {
         .as_ref()
         {
             NodeStoreParent::Committed(root_hash) => *root_hash == hash,
-            _ => false,
+            NodeStoreParent::Proposed(_) => false,
         }
     }
 }
@@ -1093,7 +1128,7 @@ impl<T: ReadInMemoryNode + Into<NodeStoreParent>, S: ReadableStorage> From<NodeS
             header: val.header,
             kind: MutableProposal {
                 root: None,
-                deleted: Default::default(),
+                deleted: Vec::default(),
                 parent: val.kind.into(),
             },
             storage: val.storage,
@@ -1130,7 +1165,8 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
         if let Node::Branch(ref mut b) = node {
             // special case code for ethereum hashes at the account level
             #[cfg(feature = "ethhash")]
-            let make_fake_root = if path_prefix.0.len() + b.partial_path.0.len() == 64 {
+            let make_fake_root = if path_prefix.0.len().saturating_add(b.partial_path.0.len()) == 64
+            {
                 // looks like we're at an account branch
                 // tally up how many hashes we need to deal with
                 let (unhashed, mut hashed) = b.children.iter_mut().enumerate().fold(
@@ -1256,6 +1292,10 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
 
 impl<T, S: WritableStorage> NodeStore<T, S> {
     /// Persist the header from this proposal to storage.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`FileIoError`] if the header cannot be written.
     pub fn flush_header(&self) -> Result<(), FileIoError> {
         let header_bytes = bytemuck::bytes_of(&self.header);
         self.storage.write(0, header_bytes)?;
@@ -1264,6 +1304,10 @@ impl<T, S: WritableStorage> NodeStore<T, S> {
 
     /// Persist the header, including all the padding
     /// This is only done the first time we write the header
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`FileIoError`] if the header cannot be written.
     pub fn flush_header_with_padding(&self) -> Result<(), FileIoError> {
         let header_bytes = bytemuck::bytes_of(&self.header)
             .iter()
@@ -1583,6 +1627,10 @@ where
 
 impl<S: WritableStorage> NodeStore<Committed, S> {
     /// adjust the freelist of this proposal to reflect the freed nodes in the oldest proposal
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`FileIoError`] if a node cannot be deleted.
     pub fn reap_deleted(
         mut self,
         proposal: &mut NodeStore<Committed, S>,
@@ -1609,6 +1657,7 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
 }
 
 #[cfg(test)]
+#[expect(clippy::unwrap_used, clippy::indexing_slicing)]
 pub(crate) mod nodestore_test_utils {
     use super::*;
 
@@ -1644,6 +1693,7 @@ pub(crate) mod nodestore_test_utils {
 
 #[cfg(test)]
 #[expect(clippy::unwrap_used)]
+#[expect(clippy::cast_possible_truncation)]
 mod tests {
     use std::array::from_fn;
 
@@ -1692,13 +1742,13 @@ mod tests {
             .into();
 
         // create an empty r1, check that it's parent is the empty committed version
-        let r1 = NodeStore::new(base).unwrap();
+        let r1 = NodeStore::new(&base).unwrap();
         let r1: Arc<NodeStore<Arc<ImmutableProposal>, _>> = Arc::new(r1.try_into().unwrap());
         let parent: DynGuard<Arc<NodeStoreParent>> = r1.kind.parent.load();
         assert!(matches!(**parent, NodeStoreParent::Committed(None)));
 
         // create an empty r2, check that it's parent is the proposed version r1
-        let r2: NodeStore<MutableProposal, _> = NodeStore::new(r1.clone()).unwrap();
+        let r2: NodeStore<MutableProposal, _> = NodeStore::new(&r1.clone()).unwrap();
         let r2: Arc<NodeStore<Arc<ImmutableProposal>, _>> = Arc::new(r2.try_into().unwrap());
         let parent: DynGuard<Arc<NodeStoreParent>> = r2.kind.parent.load();
         assert!(matches!(**parent, NodeStoreParent::Proposed(_)));

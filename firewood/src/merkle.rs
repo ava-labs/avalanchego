@@ -2051,8 +2051,9 @@ mod tests {
                 |(mut hashes, immutable_merkle), (k, v)| {
                     let root_hash = immutable_merkle.nodestore.root_hash();
                     hashes.push(root_hash);
-                    let mut merkle =
-                        Merkle::from(NodeStore::new(Arc::new(immutable_merkle.nodestore)).unwrap());
+                    let mut merkle = Merkle::from(
+                        NodeStore::new(&Arc::new(immutable_merkle.nodestore)).unwrap(),
+                    );
                     merkle.insert(k, v.clone()).unwrap();
                     (hashes, merkle.try_into().unwrap())
                 },
@@ -2063,7 +2064,7 @@ mod tests {
                 |(mut new_hashes, immutable_merkle_before_removal), (k, _)| {
                     let before = immutable_merkle_before_removal.dump().unwrap();
                     let mut merkle = Merkle::from(
-                        NodeStore::new(Arc::new(immutable_merkle_before_removal.nodestore))
+                        NodeStore::new(&Arc::new(immutable_merkle_before_removal.nodestore))
                             .unwrap(),
                     );
                     merkle.remove(k).unwrap();
