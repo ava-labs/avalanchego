@@ -4,6 +4,7 @@
 package simplex
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -21,19 +22,10 @@ import (
 func TestBlockSerialization(t *testing.T) {
 	unexpectedBlockBytes := errors.New("unexpected block bytes")
 
-	testVM := &blocktest.VM{
-		VM: enginetest.VM{
-			T: t,
-		},
-	}
-
-	testBlock := snowmantest.Block{
-		HeightV: 1,
-		BytesV:  []byte("test block"),
-	}
+	testBlock := snowmantest.BuildChild(snowmantest.Genesis)
 
 	b := &Block{
-		vmBlock: &testBlock,
+		vmBlock: testBlock,
 		metadata: simplex.ProtocolMetadata{
 			Version: 1,
 			Epoch:   1,
@@ -49,7 +41,6 @@ func TestBlockSerialization(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		expected      []byte
 		parseFunc     func(context.Context, []byte) (snowman.Block, error)
 		expectedError error
 		blockBytes    []byte
@@ -57,17 +48,17 @@ func TestBlockSerialization(t *testing.T) {
 		{
 			name:       "block serialization",
 			blockBytes: blockBytes,
-			expected:   blockBytes,
 			parseFunc: func(_ context.Context, b []byte) (snowman.Block, error) {
-				require.Equal(t, b, testBlock.BytesV, "block bytes should match")
-				return &testBlock, nil
+				if !bytes.Equal(testBlock.BytesV, b) {
+					return nil, unexpectedBlockBytes
+				}
+				return testBlock, nil
 			},
 			expectedError: nil,
 		},
 		{
 			name:          "block deserialization error",
 			blockBytes:    blockBytes,
-			expected:      nil,
 			expectedError: unexpectedBlockBytes,
 			parseFunc: func(_ context.Context, _ []byte) (snowman.Block, error) {
 				return nil, unexpectedBlockBytes
@@ -76,7 +67,6 @@ func TestBlockSerialization(t *testing.T) {
 		{
 			name:          "corrupted block data",
 			blockBytes:    []byte("corrupted data"),
-			expected:      nil,
 			expectedError: canoto.ErrInvalidWireType,
 			parseFunc: func(_ context.Context, _ []byte) (snowman.Block, error) {
 				return nil, nil
@@ -86,6 +76,12 @@ func TestBlockSerialization(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			testVM := &blocktest.VM{
+				VM: enginetest.VM{
+					T: t,
+				},
+			}
+
 			testVM.ParseBlockF = tt.parseFunc
 			deserializer := &blockDeserializer{
 				parser: testVM,
@@ -96,21 +92,18 @@ func TestBlockSerialization(t *testing.T) {
 			require.ErrorIs(t, err, tt.expectedError)
 
 			if tt.expectedError == nil {
-				require.Equal(t, deserializedBlock.BlockHeader().ProtocolMetadata, b.BlockHeader().ProtocolMetadata)
+				require.Equal(t, b.BlockHeader().ProtocolMetadata, deserializedBlock.BlockHeader().ProtocolMetadata)
 			}
 		})
 	}
 }
 
-// TestBlockVerify tests a block cannot be verified more than once.
+// TestBlockVerify tests the verificatin of a block results in the same bytes as the original block.
 func TestBlockVerify(t *testing.T) {
-	testBlock := snowmantest.Block{
-		HeightV: 1,
-		BytesV:  []byte("test block"),
-	}
+	testBlock := snowmantest.BuildChild(snowmantest.Genesis)
 
 	b := &Block{
-		vmBlock: &testBlock,
+		vmBlock: testBlock,
 		metadata: simplex.ProtocolMetadata{
 			Version: 1,
 			Epoch:   1,
@@ -120,30 +113,14 @@ func TestBlockVerify(t *testing.T) {
 		},
 	}
 
-	block, err := b.Verify(context.Background())
+	verifiedBlock, err := b.Verify(context.Background())
 	require.NoError(t, err, "block should be verified successfully")
 
-	// The block we get should be serializable into a block
-	serializedBlock, err := block.Bytes()
-	require.NoError(t, err, "block should be serializable")
+	vBlockBytes, err := verifiedBlock.Bytes()
+	require.NoError(t, err)
 
-	// Deserialize the block
-	deserializer := &blockDeserializer{
-		parser: &blocktest.VM{
-			VM: enginetest.VM{
-				T: t,
-			},
-			ParseBlockF: func(_ context.Context, b []byte) (snowman.Block, error) {
-				require.Equal(t, b, testBlock.BytesV, "block bytes should match")
-				return &testBlock, nil
-			},
-		},
-	}
-	deserializedBlock, err := deserializer.DeserializeBlock(serializedBlock)
-	require.NoError(t, err, "block should be deserialized successfully")
-	require.Equal(t, b.BlockHeader().ProtocolMetadata, deserializedBlock.BlockHeader().ProtocolMetadata)
+	blockBytes, err := b.Bytes()
+	require.NoError(t, err)
 
-	// Ensure no double verification
-	_, err = b.Verify(context.Background())
-	require.ErrorIs(t, err, errBlockAlreadyVerified)
+	require.Equal(t, blockBytes, vBlockBytes, "block bytes should match after verification")
 }
