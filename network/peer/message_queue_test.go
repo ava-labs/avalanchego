@@ -63,7 +63,6 @@ func TestMessageQueue(t *testing.T) {
 	require.False(<-gotOk)
 
 	// Assert that Push returns false when the queue is closed
-	gotOk = make(chan bool)
 	go func() {
 		gotOk <- q.Push(context.Background(), msgs[0])
 	}()
