@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -27,18 +28,22 @@ func TestDialerCancelDial(t *testing.T) {
 	l, err := net.Listen("tcp", listenAddrPort.String())
 	require.NoError(err)
 
+	eg := errgroup.Group{}
 	done := make(chan struct{})
-	go func() {
+	eg.Go(func() error {
 		for {
 			// Continuously accept connections from myself
-			_, _ = l.Accept()
+			if _, err = l.Accept(); err != nil {
+				return err
+			}
+
 			select {
 			case <-done:
-				return
+				return nil
 			default:
 			}
 		}
-	}()
+	})
 
 	listenedAddrPort, err := netip.ParseAddrPort(l.Addr().String())
 	require.NoError(err)
@@ -65,5 +70,6 @@ func TestDialerCancelDial(t *testing.T) {
 	_ = conn.Close()
 
 	close(done) // stop listener goroutine
+	require.NoError(eg.Wait())
 	_ = l.Close()
 }
