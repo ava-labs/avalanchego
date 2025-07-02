@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -90,7 +91,8 @@ func TestReexecuteRange(t *testing.T) {
 
 	if metricsEnabledArg {
 		collectRegistry(t, "benchmark-c-chain-reexecution", "127.0.0.1:9000", 2*time.Minute, avalancheGoSimulatedPrefixGatherer, map[string]string{
-			"job": "c-chain-reexecution",
+			"job":        "c-chain-reexecution",
+			"start-time": strconv.FormatInt(time.Now().UnixMilli(), 10),
 		})
 	}
 

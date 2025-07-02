@@ -287,7 +287,7 @@ tasks:
       START_BLOCK: '{{.START_BLOCK}}'
       END_BLOCK: '{{.END_BLOCK}}'
     cmds:
-      - cmd: go test -run=TestExportBlockRange github.com/ava-labs/avalanchego/tests/bench/c --source-block-dir={{.SOURCE_BLOCK_DIR}} --target-block-dir={{.TARGET_BLOCK_DIR}} --start-block={{.START_BLOCK}} --end-block={{.END_BLOCK}}
+      - cmd: go test -timeout=0 -run=TestExportBlockRange github.com/ava-labs/avalanchego/tests/bench/c --source-block-dir={{.SOURCE_BLOCK_DIR}} --target-block-dir={{.TARGET_BLOCK_DIR}} --start-block={{.START_BLOCK}} --end-block={{.END_BLOCK}}
 
   reexecute-cchain-range:
     desc: Benchmark re-execute a range of blocks on the C-Chain. Defaults to execute the block range (100, 200].
@@ -296,7 +296,7 @@ tasks:
       START_BLOCK: '{{.START_BLOCK}}'
       END_BLOCK: '{{.END_BLOCK}}'
     cmds:
-      - cmd: go test -v -run=TestReexecuteRange github.com/ava-labs/avalanchego/tests/bench/c --source-block-dir={{.EXECUTION_DATA_DIR}}/blocks --target-dir={{.EXECUTION_DATA_DIR}}/current-state --start-block={{.START_BLOCK}} --end-block={{.END_BLOCK}}
+      - cmd: go test -timeout=0 -v -run=TestReexecuteRange github.com/ava-labs/avalanchego/tests/bench/c --source-block-dir={{.EXECUTION_DATA_DIR}}/blocks --target-dir={{.EXECUTION_DATA_DIR}}/current-state --start-block={{.START_BLOCK}} --end-block={{.END_BLOCK}}
 
   export-dir-to-s3:
     desc: Copies a directory to s3
@@ -310,10 +310,10 @@ tasks:
     desc: Combines import-cchain-reexecute-range and reexecute-cchain-range
     vars:
       EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
-      SOURCE_BLOCK_DIR: '{{.SOURCE_BLOCK_DIR | default "s3://avalanchego-bootstrap-testing/blocks-mainnet-10k-ldb.zip"}}'
+      SOURCE_BLOCK_DIR: '{{.SOURCE_BLOCK_DIR | default "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb.zip"}}'
       CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR | default "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-100.zip"}}'
       START_BLOCK: '{{.START_BLOCK | default "101"}}'
-      END_BLOCK: '{{.END_BLOCK | default "10000"}}'
+      END_BLOCK: '{{.END_BLOCK | default "1000000"}}'
     cmds:
       - task: import-cchain-reexecute-range
         vars:
