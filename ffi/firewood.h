@@ -54,12 +54,18 @@ typedef struct DatabaseCreationResult {
  *
  * * `path` - The path to the database file, which will be truncated if passed to `fwd_create_db()`
  *   otherwise should exist if passed to `fwd_open_db()`.
- * * `cache_size` - The size of the node cache, panics if <= 0
- * * `revisions` - The maximum number of revisions to keep; firewood currently requires this to be at least 2
+ * * `cache_size` - The size of the node cache, returns an error if <= 0
+ * * `free_list_cache_size` - The size of the free list cache, returns an error if <= 0
+ * * `revisions` - The maximum number of revisions to keep; firewood currently requires this to be at least 2.
+ * * `strategy` - The cache read strategy to use, 0 for writes only,
+ *   1 for branch reads, and 2 for all reads.
+ *   Returns an error if the value is not 0, 1, or 2.
+ * * `metrics_port` - The port to use for metrics, 0 to disable metrics.
  */
 typedef struct CreateOrOpenArgs {
   const char *path;
   size_t cache_size;
+  size_t free_list_cache_size;
   size_t revisions;
   uint8_t strategy;
   uint16_t metrics_port;

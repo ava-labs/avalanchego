@@ -827,12 +827,18 @@ pub unsafe extern "C" fn fwd_free_database_error_result(
 ///
 /// * `path` - The path to the database file, which will be truncated if passed to `fwd_create_db()`
 ///   otherwise should exist if passed to `fwd_open_db()`.
-/// * `cache_size` - The size of the node cache, panics if <= 0
-/// * `revisions` - The maximum number of revisions to keep; firewood currently requires this to be at least 2
+/// * `cache_size` - The size of the node cache, returns an error if <= 0
+/// * `free_list_cache_size` - The size of the free list cache, returns an error if <= 0
+/// * `revisions` - The maximum number of revisions to keep; firewood currently requires this to be at least 2.
+/// * `strategy` - The cache read strategy to use, 0 for writes only,
+///   1 for branch reads, and 2 for all reads.
+///   Returns an error if the value is not 0, 1, or 2.
+/// * `metrics_port` - The port to use for metrics, 0 to disable metrics.
 #[repr(C)]
 pub struct CreateOrOpenArgs {
     path: *const std::ffi::c_char,
     cache_size: usize,
+    free_list_cache_size: usize,
     revisions: usize,
     strategy: u8,
     metrics_port: u16,
@@ -890,6 +896,7 @@ unsafe fn common_create(args: &CreateOrOpenArgs, create_file: bool) -> Result<Db
         .truncate(create_file)
         .manager(manager_config(
             args.cache_size,
+            args.free_list_cache_size,
             args.revisions,
             args.strategy,
         )?)
@@ -912,6 +919,7 @@ unsafe fn common_create(args: &CreateOrOpenArgs, create_file: bool) -> Result<Db
 #[doc(hidden)]
 fn manager_config(
     cache_size: usize,
+    free_list_cache_size: usize,
     revisions: usize,
     strategy: u8,
 ) -> Result<RevisionManagerConfig, String> {
@@ -929,6 +937,11 @@ fn manager_config(
         )
         .max_revisions(revisions)
         .cache_read_strategy(cache_read_strategy)
+        .free_list_cache_size(
+            free_list_cache_size
+                .try_into()
+                .map_err(|_| "free list cache size should be non-zero")?,
+        )
         .build();
     Ok(config)
 }
