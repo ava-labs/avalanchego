@@ -657,7 +657,6 @@ func TestDialContext(t *testing.T) {
 	require := require.New(t)
 
 	_, networks, eg := newFullyConnectedTestNetwork(t, []router.InboundHandler{nil})
-
 	dialer := newTestDialer()
 	network := networks[0]
 	network.dialer = dialer
