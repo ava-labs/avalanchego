@@ -5,6 +5,13 @@
     unsafe_code,
     reason = "This is an FFI library, so unsafe code is expected."
 )]
+#![cfg_attr(
+    not(target_pointer_width = "64"),
+    forbid(
+        clippy::cast_possible_truncation,
+        reason = "non-64 bit target likely to cause issues during u64 to usize conversions"
+    )
+)]
 
 use std::collections::HashMap;
 use std::ffi::{CStr, CString, OsStr, c_char};

@@ -106,6 +106,18 @@
 //! abandoned, nothing has actually been written to disk.
 //!
 #![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
+// Instead of using a `compile_error!`, cause clippy to hard fail if the target is not 64-bit. This
+// is a workaround for the fact that the `clippy::cast_possible_truncation` lint does not delineate
+// between 64-bit and non-64-bit targets with respect to `usize -> u64` casts and vice versa which
+// leads to a lot of unecessary `TryInto` casts. This also allows 32-bit builds to compile as long
+// as `clippy` is not part of the build process albeit with the risk of truncation errors.
+#![cfg_attr(
+    not(target_pointer_width = "64"),
+    forbid(
+        clippy::cast_possible_truncation,
+        reason = "non-64 bit target likely to cause issues during u64 to usize conversions"
+    )
+)]
 
 #[cfg(all(feature = "ethhash", feature = "branch_factor_256"))]
 compile_error!(

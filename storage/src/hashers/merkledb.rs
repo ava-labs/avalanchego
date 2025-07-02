@@ -8,13 +8,6 @@
         reason = "Found 1 occurrences after enabling the lint."
     )
 )]
-#![cfg_attr(
-    not(feature = "ethhash"),
-    expect(
-        clippy::cast_possible_truncation,
-        reason = "Found 1 occurrences after enabling the lint."
-    )
-)]
 
 use crate::hashednode::{HasUpdate, Hashable, Preimage};
 use crate::{TrieHash, ValueDigest};

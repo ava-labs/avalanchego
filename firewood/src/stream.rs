@@ -2,10 +2,6 @@
 // See the file LICENSE.md for licensing terms.
 
 #![expect(
-    clippy::cast_possible_truncation,
-    reason = "Found 1 occurrences after enabling the lint."
-)]
-#![expect(
     clippy::unnecessary_wraps,
     reason = "Found 1 occurrences after enabling the lint."
 )]

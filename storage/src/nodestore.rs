@@ -6,10 +6,6 @@
     reason = "Found 5 occurrences after enabling the lint."
 )]
 #![expect(
-    clippy::cast_possible_truncation,
-    reason = "Found 16 occurrences after enabling the lint."
-)]
-#![expect(
     clippy::default_trait_access,
     reason = "Found 6 occurrences after enabling the lint."
 )]
@@ -1617,7 +1613,6 @@ pub(crate) mod nodestore_test_utils {
     use super::*;
 
     // Helper function to wrap the node in a StoredArea and write it to the given offset. Returns the size of the area on success.
-    #[allow(clippy::cast_possible_truncation)]
     pub(crate) fn write_new_node<S: WritableStorage>(
         nodestore: &NodeStore<Committed, S>,
         node: &Node,

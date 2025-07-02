@@ -6,10 +6,6 @@
     reason = "Found 2 occurrences after enabling the lint."
 )]
 #![expect(
-    clippy::cast_possible_truncation,
-    reason = "Found 1 occurrences after enabling the lint."
-)]
-#![expect(
     clippy::cast_sign_loss,
     reason = "Found 1 occurrences after enabling the lint."
 )]

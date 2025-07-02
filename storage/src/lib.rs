@@ -3,6 +3,13 @@
 
 #![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 #![deny(unsafe_code)]
+#![cfg_attr(
+    not(target_pointer_width = "64"),
+    forbid(
+        clippy::cast_possible_truncation,
+        reason = "non-64 bit target likely to cause issues during u64 to usize conversions"
+    )
+)]
 
 //! # storage implements the storage of a [Node] on top of a `LinearStore`
 //!

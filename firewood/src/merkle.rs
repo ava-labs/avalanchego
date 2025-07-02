@@ -2,10 +2,6 @@
 // See the file LICENSE.md for licensing terms.
 
 #![expect(
-    clippy::cast_possible_truncation,
-    reason = "Found 5 occurrences after enabling the lint."
-)]
-#![expect(
     clippy::match_same_arms,
     reason = "Found 1 occurrences after enabling the lint."
 )]

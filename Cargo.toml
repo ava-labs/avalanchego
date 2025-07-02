@@ -30,6 +30,10 @@ missing_const_for_fn = "warn"
 arithmetic_side_effects = "warn"
 # lower the priority of pedantic to allow overriding the lints it includes
 pedantic = { level = "warn", priority = -1 }
+# Ignore interger casts. This is to avoid unnecessary `try_into` calls for usize
+# to u64 and vice versa and should be re-enabled if/when clippy has a separate
+# lint for usize vs non-usize truncation.
+cast_possible_truncation = { level = "allow" }
 
 [workspace.dependencies]
 metrics = "0.24.2"
