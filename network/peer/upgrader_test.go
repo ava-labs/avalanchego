@@ -9,7 +9,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
-	"errors"
 	"math/big"
 	"net"
 	"testing"
@@ -123,7 +122,9 @@ func TestBlockClientsWithIncorrectRSAKeys(t *testing.T) {
 			conn, err := tls.Dial("tcp", listener.Addr().String(), &clientConfig)
 			require.NoError(t, err)
 			require.NoError(t, conn.Handshake())
-			require.ErrorIs(t, eg.Wait(), testCase.expectedErr)
+
+			err = eg.Wait()
+			require.ErrorIs(t, err, testCase.expectedErr)
 		})
 	}
 }

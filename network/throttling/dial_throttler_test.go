@@ -99,7 +99,8 @@ func TestDialThrottlerCancel(t *testing.T) {
 
 	select {
 	case <-acquiredChan:
-		require.ErrorIs(eg.Wait(), context.Canceled)
+		err := eg.Wait()
+		require.ErrorIs(err, context.Canceled)
 	case <-time.After(10 * time.Millisecond):
 		require.FailNow("Acquire should have returned immediately upon context cancellation")
 	}
