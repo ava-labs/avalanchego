@@ -3,9 +3,10 @@
 
 package simplex
 
+//go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
+
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/ava-labs/simplex"
@@ -16,10 +17,9 @@ import (
 )
 
 var (
-	_                       simplex.BlockDeserializer = (*blockDeserializer)(nil)
-	_                       simplex.Block             = (*Block)(nil)
-	_                       simplex.VerifiedBlock     = (*Block)(nil)
-	errBlockAlreadyVerified                           = errors.New("block has already been verified")
+	_ simplex.BlockDeserializer = (*blockDeserializer)(nil)
+	_ simplex.Block             = (*Block)(nil)
+	_ simplex.VerifiedBlock     = (*Block)(nil)
 )
 
 type Block struct {
@@ -32,6 +32,14 @@ type Block struct {
 	vmBlock snowman.Block
 }
 
+// CanotoSimplexBlock is the Canoto representation of a block
+type canotoSimplexBlock struct {
+	Metadata   []byte `canoto:"bytes,1"`
+	InnerBlock []byte `canoto:"bytes,2"`
+
+	canotoData canotoData_canotoSimplexBlock
+}
+
 // BlockHeader returns the block header for the block.
 func (b *Block) BlockHeader() simplex.BlockHeader {
 	return simplex.BlockHeader{
@@ -42,7 +50,7 @@ func (b *Block) BlockHeader() simplex.BlockHeader {
 
 // Bytes returns the serialized bytes of the block.
 func (b *Block) Bytes() ([]byte, error) {
-	cBlock := &CanotoSimplexBlock{
+	cBlock := &canotoSimplexBlock{
 		Metadata:   b.metadata.Bytes(),
 		InnerBlock: b.vmBlock.Bytes(),
 	}
@@ -60,7 +68,7 @@ type blockDeserializer struct {
 }
 
 func (d *blockDeserializer) DeserializeBlock(bytes []byte) (simplex.Block, error) {
-	var canotoBlock CanotoSimplexBlock
+	var canotoBlock canotoSimplexBlock
 
 	if err := canotoBlock.UnmarshalCanoto(bytes); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal block: %w", err)
