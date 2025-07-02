@@ -5,7 +5,10 @@ package gconn
 
 import (
 	"context"
+	"errors"
+	"io"
 	"net"
+	"os"
 	"time"
 
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -39,8 +42,17 @@ func (s *Server) Read(_ context.Context, req *connpb.ReadRequest) (*connpb.ReadR
 		Read: buf[:n],
 	}
 	if err != nil {
-		errStr := err.Error()
-		resp.Error = &errStr
+		resp.Error = &connpb.Error{
+			Message: err.Error(),
+		}
+
+		// Sentinel errors must be special-cased through an error code
+		switch {
+		case err == io.EOF:
+			resp.Error.ErrorCode = connpb.ErrorCode_ERROR_CODE_EOF
+		case errors.Is(err, os.ErrDeadlineExceeded):
+			resp.Error.ErrorCode = connpb.ErrorCode_ERROR_CODE_OS_ERR_DEADLINE_EXCEEDED
+		}
 	}
 	return resp, nil
 }
