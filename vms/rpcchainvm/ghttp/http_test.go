@@ -69,7 +69,7 @@ func TestRequestClientArbitrarilyLongBody(t *testing.T) {
 	httppb.RegisterHTTPServer(server, &httppb.UnimplementedHTTPServer{})
 
 	go func() {
-		require.NoError(server.Serve(listener))
+		_ = server.Serve(listener)
 	}()
 
 	conn, err := grpc.NewClient(listener.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -118,8 +118,7 @@ func TestHttpResponse(t *testing.T) {
 
 			handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				w.Header()["Bar"] = []string{"bar"}
-				_, err := w.Write([]byte("baz"))
-				require.NoError(err)
+				_, _ = w.Write([]byte("baz"))
 			})
 
 			listener, err := grpcutils.NewListener()
@@ -128,7 +127,7 @@ func TestHttpResponse(t *testing.T) {
 			httppb.RegisterHTTPServer(server, NewServer(handler))
 
 			go func() {
-				require.NoError(server.Serve(listener))
+				_ = server.Serve(listener)
 			}()
 
 			conn, err := grpc.NewClient(

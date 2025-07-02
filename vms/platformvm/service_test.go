@@ -207,7 +207,7 @@ func TestGetTxStatus(t *testing.T) {
 	)
 	require.NoError(service.GetTxStatus(nil, arg, &resp))
 	require.Equal(status.Unknown, resp.Status)
-	require.Zero(resp.Reason)
+	require.Empty(resp.Reason)
 
 	// put the chain in existing chain list
 	require.NoError(service.vm.Network.IssueTxFromRPC(tx))
@@ -226,7 +226,7 @@ func TestGetTxStatus(t *testing.T) {
 	resp = GetTxStatusResponse{} // reset
 	require.NoError(service.GetTxStatus(nil, arg, &resp))
 	require.Equal(status.Committed, resp.Status)
-	require.Zero(resp.Reason)
+	require.Empty(resp.Reason)
 }
 
 // Test issuing and then retrieving a transaction
@@ -660,7 +660,7 @@ func TestGetCurrentValidators(t *testing.T) {
 			require.Equal(validator.EndTime().Unix(), int64(gotVdr.EndTime))
 			require.Equal(validator.StartTime().Unix(), int64(gotVdr.StartTime))
 			require.Equal(connectedIDs.Contains(validator.NodeID()), *gotVdr.Connected)
-			require.Equal(avajson.Float32(100), *gotVdr.Uptime)
+			require.InDelta(float32(avajson.Float32(100)), float32(*gotVdr.Uptime), 0)
 			found = true
 			break
 		}
@@ -1552,7 +1552,7 @@ func TestGetCurrentValidatorsForL1(t *testing.T) {
 					require.Equal(avajson.Uint32(expectedDeactivationOwner.Threshold), v.DeactivationOwner.Threshold)
 					return v.NodeID
 				default:
-					require.Fail("unexpected validator type: %T", vdr)
+					require.Failf("unexpected validator type", "got: %T", vdr)
 					return ids.NodeID{}
 				}
 			}
