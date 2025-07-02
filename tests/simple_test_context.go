@@ -109,7 +109,7 @@ func (tc *SimpleTestContext) RecoverAndExit() {
 func (tc *SimpleTestContext) Recover(rethrow bool) {
 	// Recover from test failure
 	var panicData any
-	if panicData := recover(); panicData != nil {
+	if panicData = recover(); panicData != nil {
 		errorString, ok := panicData.(string)
 		if !ok || errorString != failNowMessage {
 			tc.log.Error("unexpected panic",
