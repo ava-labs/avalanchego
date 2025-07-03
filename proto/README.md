@@ -1,6 +1,6 @@
 # Avalanche gRPC
 
-Now Serving: **Protocol Version 41**
+Now Serving: **Protocol Version 42**
 
 Protobuf files are hosted at
 [https://buf.build/ava-labs/avalanche](https://buf.build/ava-labs/avalanche) and

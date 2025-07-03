@@ -160,7 +160,7 @@ type network struct {
 	// as well as all non-handshake peer messages.
 	//
 	// It is ensured that [Connected] and [Disconnected] are called in
-	// consistent ways. Specifically, the a peer starts in the disconnected
+	// consistent ways. Specifically, a peer starts in the disconnected
 	// state and the network can change the peer's state from disconnected to
 	// connected and back.
 	//
@@ -602,11 +602,7 @@ func (n *network) Peers(
 func (n *network) Dispatch() error {
 	go n.runTimers() // Periodically perform operations
 	go n.inboundConnUpgradeThrottler.Dispatch()
-	for { // Continuously accept new connections
-		if n.onCloseCtx.Err() != nil {
-			break
-		}
-
+	for n.onCloseCtx.Err() == nil { // Continuously accept new connections
 		conn, err := n.listener.Accept() // Returns error when n.Close() is called
 		if err != nil {
 			n.peerConfig.Log.Debug("error during server accept", zap.Error(err))
