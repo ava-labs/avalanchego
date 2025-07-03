@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet/testenv"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -47,6 +48,14 @@ const (
 	// Directory used to store private networks (specific to a single test)
 	// under the shared network dir.
 	PrivateNetworksDirName = "private_networks"
+)
+
+var (
+	// testenv helpers for creating and managing test environments
+	GetEnv                    = testenv.GetEnv
+	NewTestEnvironment        = testenv.NewTestEnvironment
+	InitSharedTestEnvironment = testenv.InitSharedTestEnvironment
+	StartNetwork              = testenv.StartNetwork
 )
 
 // NewPrivateKey returns a new private key.
@@ -268,85 +277,6 @@ func CheckBootstrapIsPossible(tc tests.TestContext, network *tmpnet.Network) *tm
 	}
 
 	return node
-}
-
-// Start a temporary network with the provided avalanchego binary.
-func StartNetwork(
-	tc tests.TestContext,
-	network *tmpnet.Network,
-	rootNetworkDir string,
-	shutdownDelay time.Duration,
-	networkCmd NetworkCmd,
-) {
-	require := require.New(tc)
-
-	nodeCount := len(network.Nodes)
-	timeout, err := network.DefaultRuntimeConfig.GetNetworkStartTimeout(nodeCount)
-	require.NoError(err)
-	tc.Log().Info("waiting for network to start",
-		zap.Float64("timeoutSeconds", timeout.Seconds()),
-	)
-	ctx := tc.ContextWithTimeout(timeout)
-
-	err = tmpnet.BootstrapNewNetwork(
-		ctx,
-		tc.Log(),
-		network,
-		rootNetworkDir,
-	)
-	if err != nil {
-		tc.DeferCleanup(func() {
-			tc.Log().Info("shutting down network")
-			ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
-			defer cancel()
-			require.NoError(network.Stop(ctx))
-		})
-		require.NoError(err, "failed to bootstrap network")
-	}
-
-	tc.Log().Info("network started successfully")
-
-	symlinkPath, err := tmpnet.GetReusableNetworkPathForOwner(network.Owner)
-	require.NoError(err)
-
-	if networkCmd == ReuseNetworkCmd || networkCmd == RestartNetworkCmd {
-		// Symlink the path of the created network to the default owner path (e.g. latest_avalanchego-e2e)
-		// to enable easy discovery for reuse.
-		require.NoError(os.Symlink(network.Dir, symlinkPath))
-		tc.Log().Info("symlinked network dir for reuse",
-			zap.String("networkDir", network.Dir),
-			zap.String("symlinkPath", symlinkPath),
-		)
-	}
-
-	tc.DeferCleanup(func() {
-		if networkCmd == ReuseNetworkCmd || networkCmd == RestartNetworkCmd {
-			tc.Log().Info("skipping shutdown for network intended for reuse",
-				zap.String("networkDir", network.Dir),
-				zap.String("symlinkPath", symlinkPath),
-			)
-			return
-		}
-
-		if networkCmd == StartNetworkCmd {
-			tc.Log().Info("skipping shutdown for --start-network",
-				zap.String("networkDir", network.Dir),
-			)
-			return
-		}
-
-		if shutdownDelay > 0 {
-			tc.Log().Info("delaying network shutdown to ensure final metrics scrape",
-				zap.Duration("delay", shutdownDelay),
-			)
-			time.Sleep(shutdownDelay)
-		}
-
-		tc.Log().Info("shutting down network")
-		ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
-		defer cancel()
-		require.NoError(network.Stop(ctx))
-	})
 }
 
 // NewPChainFeeCalculatorFromContext returns either a static or dynamic fee

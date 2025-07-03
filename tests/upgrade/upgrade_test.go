@@ -44,7 +44,7 @@ func init() {
 		"avalanchego executable path to upgrade to",
 	)
 	collectorVars = flags.NewCollectorFlagVars()
-	e2e.SetCheckCollectionFlags(
+	flags.SetCheckCollectionFlags(
 		&checkMetricsCollected,
 		&checkLogsCollected,
 	)
@@ -99,7 +99,7 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 			network,
 			"", /* rootNetworkDir */
 			shutdownDelay,
-			e2e.EmptyNetworkCmd,
+			flags.EmptyNetworkCmd,
 		)
 
 		tc.By(fmt.Sprintf("restarting all nodes with %q binary", avalancheGoExecPathToUpgradeTo))

@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet/flags"
 	"github.com/ava-labs/avalanchego/tests/load"
 	"github.com/ava-labs/avalanchego/tests/load/c"
 	"github.com/ava-labs/avalanchego/tests/load/c/listener"
@@ -35,10 +36,10 @@ const (
 	logPrefix     = "avalanchego-load-test"
 )
 
-var flagVars *e2e.FlagVars
+var flagVars *flags.FlagVars
 
 func init() {
-	flagVars = e2e.RegisterFlags()
+	flagVars = flags.RegisterFlags()
 	flag.Parse()
 }
 
