@@ -5,6 +5,7 @@ package chains
 
 import (
 	"context"
+	"sync"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -36,6 +37,7 @@ type initializeOnLinearizeVM struct {
 	fxs              []*common.Fx
 	appSender        common.AppSender
 	waitForLinearize chan struct{}
+	linearizeOnce    sync.Once
 }
 
 func (vm *initializeOnLinearizeVM) WaitForEvent(ctx context.Context) (common.Message, error) {
@@ -49,13 +51,11 @@ func (vm *initializeOnLinearizeVM) WaitForEvent(ctx context.Context) (common.Mes
 
 func (vm *initializeOnLinearizeVM) Linearize(ctx context.Context, stopVertexID ids.ID) error {
 	vm.vmToLinearize.stopVertexID = stopVertexID
-	select {
-	case <-vm.waitForLinearize:
-	default:
-		defer func() {
+	defer func() {
+		vm.linearizeOnce.Do(func() {
 			close(vm.waitForLinearize)
-		}()
-	}
+		})
+	}()
 	return vm.vmToInitialize.Initialize(
 		ctx,
 		vm.ctx,
