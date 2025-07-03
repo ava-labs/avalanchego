@@ -5,8 +5,8 @@ package common
 
 import (
 	"context"
-	"github.com/stretchr/testify/assert"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -54,13 +54,17 @@ func TestSimpleSubscriberClose(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 
+	var msgVal atomic.Value
+
 	go func() {
 		defer wg.Done()
 		msg, _ := subscriber.WaitForEvent(ctx)
-		assert.Equal(t, Message(0), msg)
+		msgVal.Store(msg)
 	}()
 
 	subscriber.Close()
+	wg.Wait()
+	require.Equal(t, Message(0), msgVal.Load().(Message))
 }
 
 func TestSubscriptionProxy(t *testing.T) {
@@ -119,6 +123,8 @@ func TestSubscriptionProxy(t *testing.T) {
 			var wg sync.WaitGroup
 			wg.Add(2)
 
+			var elapsed atomic.Value
+
 			go func() {
 				defer wg.Done()
 				time.Sleep(time.Millisecond * 10)
@@ -128,13 +134,14 @@ func TestSubscriptionProxy(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				<-sp.Forward(ctx)
-				assert.Greater(t, time.Since(start), time.Millisecond*10)
+				elapsed.Store(time.Since(start))
 			}()
 
 			msg, _ := sp.WaitForEvent(ctx)
 			require.Greater(t, time.Since(start), time.Millisecond*10)
 			require.Equal(t, testCase.expectedEvent, msg)
 			wg.Wait()
+			require.Greater(t, elapsed.Load().(time.Duration), time.Millisecond*10)
 		})
 	}
 }
