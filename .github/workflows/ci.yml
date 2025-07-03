@@ -238,21 +238,29 @@ jobs:
 #        shell: bash
 #        run: nix develop --command ./scripts/run_task.sh test-bootstrap-monitor-e2e
   load_tests:
-    name: load tests
+    name: Load Tests
     runs-on: avalanche-avalanchego-runner
     container:
-      image: ghcr.io/actions/actions-runner:latest
+      image: ubuntu:22.04
+
     steps:
-      - name: Install xz-utils
+      - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y xz-utils
-      - uses: actions/checkout@v4
+          apt-get update
+          apt-get install -y sudo xz-utils
+
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: ./.github/actions/setup-go-for-project
-      - uses: ./.github/actions/install-nix
-      - name: Hello
+
+      - name: Setup Go for project
+        uses: ./.github/actions/setup-go-for-project
+
+      - name: Install Nix
+        uses: ./.github/actions/install-nix
+
+      - name: Run load tests
         shell: nix develop --command bash -x {0}
         run: |
           go run ./tests/load/c/main --runtime=kube
