@@ -64,18 +64,25 @@ func TestUnboundedBlockingDequePop(t *testing.T) {
 	require.Equal(1, ch)
 	require.Empty(deque.List())
 
+	var (
+		gotOk bool
+		gotCh int
+	)
+
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
-		ch, ok := deque.PopLeft()
-		require.True(ok)
-		require.Equal(2, ch)
+		gotCh, gotOk = deque.PopLeft()
 		wg.Done()
 	}()
 
 	ok = deque.PushRight(2)
 	require.True(ok)
 	wg.Wait()
+
+	require.True(gotOk)
+	require.Equal(2, gotCh)
+
 	require.Empty(deque.List())
 	_, ok = deque.Index(0)
 	require.False(ok)
