@@ -233,8 +233,16 @@ tasks:
       - task: build
       - cmd: go run ./tests/load/c/main --avalanchego-path=./build/avalanchego {{.CLI_ARGS}}
 
-  test-load-kube:
-    desc: Runs load tests against a network deployed to kube
+  test-load-kube-kind:
+    desc: Runs load tests against a kubernetes cluster (kind by default, remote with SKIP_KIND_CLUSTER=1)
+    cmds:
+      - task: generate-load-contract-bindings
+      - cmd: bash -x ./scripts/tests.load.kube.sh {{.CLI_ARGS}}
+
+  test-load-kube-remote:
+    desc: Runs load tests against a remote kubernetes cluster
+    env:
+      SKIP_KIND_CLUSTER: 1
     cmds:
       - task: generate-load-contract-bindings
       - cmd: bash -x ./scripts/tests.load.kube.sh {{.CLI_ARGS}}
