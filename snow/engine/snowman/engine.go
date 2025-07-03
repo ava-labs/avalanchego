@@ -132,7 +132,7 @@ func New(config Config) (*Engine, error) {
 		return nil, err
 	}
 
-	e := &Engine{
+	return &Engine{
 		Config:                      config,
 		metrics:                     metrics,
 		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Ctx.Log),
@@ -150,9 +150,7 @@ func New(config Config) (*Engine, error) {
 		polls:                       polls,
 		blkReqs:                     bimap.New[common.Request, ids.ID](),
 		blkReqSourceMetric:          make(map[common.Request]prometheus.Counter),
-	}
-
-	return e, nil
+	}, nil
 }
 
 func (e *Engine) Gossip(ctx context.Context) error {

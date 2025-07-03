@@ -62,11 +62,11 @@ type VM struct {
 	WaitForEventF       common.Subscription
 }
 
-func (vm *VM) WaitForEvent(context.Context) (common.Message, error) {
+func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
 	if vm.WaitForEventF != nil {
 		return vm.WaitForEventF(context.Background())
 	}
-	return common.Message(0), nil
+	return 0, ctx.Err()
 }
 
 func (vm *VM) Default(cant bool) {
