@@ -42,13 +42,11 @@ func TestNotifier(t *testing.T) {
 		}
 	}
 
-	nf := &NotificationForwarder{
-		Subscribe: subscriber,
-		Engine:    Notifier(notifier),
-		Log:       &logging.NoLog{},
-	}
+	nf := NewNotificationForwarder(
+		Notifier(notifier),
+		subscriber,
+		&logging.NoLog{})
 
-	nf.Start()
 	defer nf.Close()
 
 	go func() {
@@ -65,42 +63,37 @@ func TestNotifierStopWhileSubscribing(_ *testing.T) {
 		return nil
 	})
 
-	nf := &NotificationForwarder{
-		Engine: Notifier(notifier),
-		Log:    &logging.NoLog{},
-	}
-
 	var subscribed sync.WaitGroup
 	subscribed.Add(1)
 
-	nf.Subscribe = func(ctx context.Context) (Message, error) {
+	subscribe := func(ctx context.Context) (Message, error) {
 		subscribed.Done()
 		<-ctx.Done()
 		return 0, nil
 	}
 
-	nf.Start()
+	nf := NewNotificationForwarder(
+		Notifier(notifier),
+		subscribe,
+		&logging.NoLog{})
+
 	subscribed.Wait()
 	nf.Close()
 }
 
 func TestNotifierWaitForPrefChangeAfterNotify(t *testing.T) {
-	nf := &NotificationForwarder{
-		Log: &logging.NoLog{},
-	}
-
 	var notifiedCount uint32
 
-	nf.Engine = Notifier(notifier(func(_ context.Context, _ Message) error {
+	engine := Notifier(notifier(func(_ context.Context, _ Message) error {
 		atomic.AddUint32(&notifiedCount, 1)
 		return nil
 	}))
 
-	nf.Subscribe = func(context.Context) (Message, error) {
+	subscribe := func(context.Context) (Message, error) {
 		return 0, nil
 	}
 
-	nf.Start()
+	nf := NewNotificationForwarder(engine, subscribe, &logging.NoLog{})
 	defer nf.Close()
 
 	require.Eventually(t, func() bool {
@@ -156,7 +149,7 @@ func TestNotifierReSubscribeAtPrefChange(t *testing.T) {
 		return nil
 	}))
 
-	nf.Start()
+	nf.start()
 	defer nf.Close()
 
 	wg.Wait()
