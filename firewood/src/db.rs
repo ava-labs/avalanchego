@@ -5,10 +5,6 @@
     clippy::missing_errors_doc,
     reason = "Found 12 occurrences after enabling the lint."
 )]
-#![expect(
-    clippy::missing_panics_doc,
-    reason = "Found 5 occurrences after enabling the lint."
-)]
 
 use crate::merkle::Merkle;
 use crate::proof::{Proof, ProofNode};
@@ -25,8 +21,8 @@ use firewood_storage::{
 use metrics::{counter, describe_counter};
 use std::io::Write;
 use std::path::Path;
+use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, RwLock};
 use thiserror::Error;
 use typed_builder::TypedBuilder;
 
@@ -152,9 +148,7 @@ pub struct DbConfig {
 /// A database instance.
 pub struct Db {
     metrics: Arc<DbMetrics>,
-    // TODO: consider using https://docs.rs/lock_api/latest/lock_api/struct.RwLock.html#method.upgradable_read
-    // TODO: This should probably use an async RwLock
-    manager: RwLock<RevisionManager>,
+    manager: RevisionManager,
 }
 
 #[async_trait]
@@ -170,11 +164,7 @@ where
         Self: 'p;
 
     async fn revision(&self, root_hash: TrieHash) -> Result<Arc<Self::Historical>, api::Error> {
-        let nodestore = self
-            .manager
-            .read()
-            .expect("poisoned lock")
-            .revision(root_hash)?;
+        let nodestore = self.manager.revision(root_hash)?;
         Ok(nodestore)
     }
 
@@ -183,7 +173,7 @@ where
     }
 
     async fn all_hashes(&self) -> Result<Vec<TrieHash>, api::Error> {
-        Ok(self.manager.read().expect("poisoned lock").all_hashes())
+        Ok(self.manager.all_hashes())
     }
 
     #[fastrace::trace(short_name = true)]
@@ -194,11 +184,7 @@ where
     where
         Self: 'p,
     {
-        let parent = self
-            .manager
-            .read()
-            .expect("poisoned lock")
-            .current_revision();
+        let parent = self.manager.current_revision();
         let proposal = NodeStore::new(&parent)?;
         let mut merkle = Merkle::from(proposal);
         let span = fastrace::Span::enter_with_local_parent("merkleops");
@@ -224,10 +210,7 @@ where
             Arc::new(nodestore.try_into()?);
 
         drop(span);
-        self.manager
-            .write()
-            .expect("poisoned lock")
-            .add_proposal(immutable.clone());
+        self.manager.add_proposal(immutable.clone());
 
         self.metrics.proposals.increment(1);
 
@@ -252,10 +235,7 @@ impl Db {
             cfg.truncate,
             cfg.manager.clone(),
         )?;
-        let db = Self {
-            metrics,
-            manager: manager.into(),
-        };
+        let db = Self { metrics, manager };
         Ok(db)
     }
 
@@ -270,16 +250,13 @@ impl Db {
             cfg.truncate,
             cfg.manager.clone(),
         )?;
-        let db = Self {
-            metrics,
-            manager: manager.into(),
-        };
+        let db = Self { metrics, manager };
         Ok(db)
     }
 
     /// Synchronously get the root hash of the latest revision.
     pub fn root_hash_sync(&self) -> Result<Option<TrieHash>, api::Error> {
-        let hash = self.manager.read().expect("poisoned lock").root_hash()?;
+        let hash = self.manager.root_hash()?;
         #[cfg(not(feature = "ethhash"))]
         return Ok(hash);
         #[cfg(feature = "ethhash")]
@@ -288,21 +265,13 @@ impl Db {
 
     /// Synchronously get a revision from a root hash
     pub fn revision_sync(&self, root_hash: TrieHash) -> Result<Arc<HistoricalRev>, api::Error> {
-        let nodestore = self
-            .manager
-            .read()
-            .expect("poisoned lock")
-            .revision(root_hash)?;
+        let nodestore = self.manager.revision(root_hash)?;
         Ok(nodestore)
     }
 
     /// Synchronously get a view, either committed or proposed
     pub fn view_sync(&self, root_hash: TrieHash) -> Result<Box<dyn DbViewSyncBytes>, api::Error> {
-        let nodestore = self
-            .manager
-            .read()
-            .expect("poisoned lock")
-            .view(root_hash)?;
+        let nodestore = self.manager.view(root_hash)?;
         Ok(nodestore)
     }
 
@@ -311,11 +280,7 @@ impl Db {
         &'_ self,
         batch: Batch<K, V>,
     ) -> Result<Arc<Proposal<'_>>, api::Error> {
-        let parent = self
-            .manager
-            .read()
-            .expect("poisoned lock")
-            .current_revision();
+        let parent = self.manager.current_revision();
         let proposal = NodeStore::new(&parent)?;
         let mut merkle = Merkle::from(proposal);
         for op in batch {
@@ -334,10 +299,7 @@ impl Db {
         let nodestore = merkle.into_inner();
         let immutable: Arc<NodeStore<Arc<ImmutableProposal>, FileBacked>> =
             Arc::new(nodestore.try_into()?);
-        self.manager
-            .write()
-            .expect("poisoned lock")
-            .add_proposal(immutable.clone());
+        self.manager.add_proposal(immutable.clone());
 
         self.metrics.proposals.increment(1);
 
@@ -355,11 +317,7 @@ impl Db {
 
     /// Dump the Trie of the latest revision, synchronously.
     pub fn dump_sync(&self, w: &mut dyn Write) -> Result<(), std::io::Error> {
-        let latest_rev_nodestore = self
-            .manager
-            .read()
-            .expect("poisoned lock")
-            .current_revision();
+        let latest_rev_nodestore = self.manager.current_revision();
         let merkle = Merkle::from(latest_rev_nodestore);
         // TODO: This should be a stream
         let output = merkle.dump()?;
@@ -457,12 +415,7 @@ impl<'a> api::Proposal for Proposal<'a> {
 
     async fn commit(self: Arc<Self>) -> Result<(), api::Error> {
         self.start_commit()?;
-        Ok(self
-            .db
-            .manager
-            .write()
-            .expect("poisoned lock")
-            .commit(self.nodestore.clone())?)
+        Ok(self.db.manager.commit(self.nodestore.clone())?)
     }
 }
 
@@ -470,12 +423,7 @@ impl Proposal<'_> {
     /// Commit a proposal synchronously
     pub fn commit_sync(self: Arc<Self>) -> Result<(), api::Error> {
         self.start_commit()?;
-        Ok(self
-            .db
-            .manager
-            .write()
-            .expect("poisoned lock")
-            .commit(self.nodestore.clone())?)
+        Ok(self.db.manager.commit(self.nodestore.clone())?)
     }
 
     /// Create a new proposal from the current one synchronously
@@ -510,11 +458,7 @@ impl Proposal<'_> {
         let nodestore = merkle.into_inner();
         let immutable: Arc<NodeStore<Arc<ImmutableProposal>, FileBacked>> =
             Arc::new(nodestore.try_into()?);
-        self.db
-            .manager
-            .write()
-            .expect("poisoned lock")
-            .add_proposal(immutable.clone());
+        self.db.manager.add_proposal(immutable.clone());
 
         Ok(Self {
             nodestore: immutable,
@@ -654,7 +598,7 @@ mod test {
         // the third proposal should still be contained within the all_hashes list
         // would be deleted if another proposal was committed and proposal3 was dropped here
         let hash3 = proposal3.root_hash().await.unwrap().unwrap();
-        assert!(db.manager.read().unwrap().all_hashes().contains(&hash3));
+        assert!(db.manager.all_hashes().contains(&hash3));
     }
 
     #[tokio::test]
@@ -705,7 +649,7 @@ mod test {
 
         // the third proposal should still be contained within the all_hashes list
         let hash3 = proposal3.root_hash().await.unwrap().unwrap();
-        assert!(db.manager.read().unwrap().all_hashes().contains(&hash3));
+        assert!(db.manager.all_hashes().contains(&hash3));
 
         // moreover, the data from the second and third proposals should still be available
         // through proposal3
