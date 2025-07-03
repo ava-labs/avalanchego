@@ -36,5 +36,4 @@ jobs:
 
       - name: Run load tests
         shell: nix develop --command bash -x {0}
-        run: ./scripts/run_task.sh test-load-kube-remote -- \
-            --kube-image=${{ inputs.image }}
+        run: ./scripts/run_task.sh test-load-kube-remote KUBE_IMAGE=${{ inputs.image }}
