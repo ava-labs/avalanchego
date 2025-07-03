@@ -172,6 +172,7 @@ type chain struct {
 	Context *snow.ConsensusContext
 	VM      common.VM
 	Handler handler.Handler
+	nf      *common.NotificationForwarder
 }
 
 // ChainConfig is configuration settings for the current execution.
@@ -266,7 +267,7 @@ type manager struct {
 	chainsLock sync.Mutex
 	// Key: Chain's ID
 	// Value: The chain
-	chains map[ids.ID]handler.Handler
+	chains map[ids.ID]*chain
 
 	// snowman++ related interface to allow validators retrieval
 	validatorState validators.State
@@ -327,7 +328,7 @@ func New(config *ManagerConfig) (Manager, error) {
 	return &manager{
 		Aliaser:                ids.NewAliaser(),
 		ManagerConfig:          *config,
-		chains:                 make(map[ids.ID]handler.Handler),
+		chains:                 make(map[ids.ID]*chain),
 		chainsQueue:            buffer.NewUnboundedBlockingDeque[ChainParameters](initialQueueSize),
 		unblockChainCreatorCh:  make(chan struct{}),
 		chainCreatorShutdownCh: make(chan struct{}),
@@ -433,7 +434,7 @@ func (m *manager) createChain(chainParams ChainParameters) {
 	}
 
 	m.chainsLock.Lock()
-	m.chains[chainParams.ID] = chain.Handler
+	m.chains[chainParams.ID] = chain
 	m.chainsLock.Unlock()
 
 	// Associate the newly created chain with its default alias
@@ -727,10 +728,6 @@ func (m *manager) createAvalancheChain(
 		},
 	)
 
-	// The channel through which a VM may send messages to the consensus engine
-	// VM uses this channel to notify engine that a block is ready to be made
-	msgChan := make(chan common.Message, defaultChannelSize)
-
 	// The only difference between using avalancheMessageSender and
 	// snowmanMessageSender here is where the metrics will be placed. Because we
 	// end up using this sender after the linearization, we pass in
@@ -742,7 +739,6 @@ func (m *manager) createAvalancheChain(
 		genesisData,
 		chainConfig.Upgrade,
 		chainConfig.Config,
-		msgChan,
 		fxs,
 		snowmanMessageSender,
 	)
@@ -811,19 +807,25 @@ func (m *manager) createAvalancheChain(
 		vmWrappingProposerVM = tracedvm.NewBlockVM(vmWrappingProposerVM, "proposervm", m.Tracer)
 	}
 
+	cn := &ChangeNotifier{
+		ChainVM: vmWrappingProposerVM,
+	}
+
+	vmWrappingProposerVM = cn
+
 	// Note: linearizableVM is the VM that the Avalanche engines should be
 	// using.
 	linearizableVM := &initializeOnLinearizeVM{
-		DAGVM:          dagVM,
-		vmToInitialize: vmWrappingProposerVM,
-		vmToLinearize:  untracedVMWrappedInsideProposerVM,
+		waitForLinearize: make(chan struct{}),
+		DAGVM:            dagVM,
+		vmToInitialize:   vmWrappingProposerVM,
+		vmToLinearize:    untracedVMWrappedInsideProposerVM,
 
 		ctx:          ctx.Context,
 		db:           vmDB,
 		genesisBytes: genesisData,
 		upgradeBytes: chainConfig.Upgrade,
 		configBytes:  chainConfig.Config,
-		toEngine:     msgChan,
 		fxs:          fxs,
 		appSender:    snowmanMessageSender,
 	}
@@ -886,7 +888,6 @@ func (m *manager) createAvalancheChain(
 	h, err := handler.New(
 		ctx,
 		vdrs,
-		msgChan,
 		m.FrontierPollFrequency,
 		m.ConsensusAppConcurrency,
 		m.ResourceTracker,
@@ -1040,7 +1041,11 @@ func (m *manager) createAvalancheChain(
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", primaryAlias, err)
 	}
 
+	nf := common.NewNotificationForwarder(h, linearizableVM.WaitForEvent, ctx.Log)
+	cn.OnChange = nf.PreferenceOrStateChanged
+
 	return &chain{
+		nf:      nf,
 		Name:    primaryAlias,
 		Context: ctx,
 		VM:      dagVM,
@@ -1202,9 +1207,10 @@ func (m *manager) createSnowmanChain(
 		vm = tracedvm.NewBlockVM(vm, "proposervm", m.Tracer)
 	}
 
-	// The channel through which a VM may send messages to the consensus engine
-	// VM uses this channel to notify engine that a block is ready to be made
-	msgChan := make(chan common.Message, defaultChannelSize)
+	cn := &ChangeNotifier{
+		ChainVM: vm,
+	}
+	vm = cn
 
 	if err := vm.Initialize(
 		context.TODO(),
@@ -1213,7 +1219,6 @@ func (m *manager) createSnowmanChain(
 		genesisData,
 		chainConfig.Upgrade,
 		chainConfig.Config,
-		msgChan,
 		fxs,
 		messageSender,
 	); err != nil {
@@ -1278,7 +1283,6 @@ func (m *manager) createSnowmanChain(
 	h, err := handler.New(
 		ctx,
 		vdrs,
-		msgChan,
 		m.FrontierPollFrequency,
 		m.ConsensusAppConcurrency,
 		m.ResourceTracker,
@@ -1404,7 +1408,11 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", primaryAlias, err)
 	}
 
+	nf := common.NewNotificationForwarder(h, vm.WaitForEvent, ctx.Log)
+	cn.OnChange = nf.PreferenceOrStateChanged
+
 	return &chain{
+		nf:      nf,
 		Name:    primaryAlias,
 		Context: ctx,
 		VM:      vm,
@@ -1420,7 +1428,7 @@ func (m *manager) IsBootstrapped(id ids.ID) bool {
 		return false
 	}
 
-	return chain.Context().State.Get().State == snow.NormalOp
+	return chain.Handler.Context().State.Get().State == snow.NormalOp
 }
 
 func (m *manager) registerBootstrappedHealthChecks() error {
@@ -1513,6 +1521,9 @@ func (m *manager) Shutdown() {
 	close(m.chainCreatorShutdownCh)
 	m.chainCreatorExited.Wait()
 	m.ManagerConfig.Router.Shutdown(context.TODO())
+	for _, chain := range m.chains {
+		chain.nf.Close()
+	}
 }
 
 // LookupVM returns the ID of the VM associated with an alias

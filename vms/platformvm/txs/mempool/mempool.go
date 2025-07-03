@@ -40,7 +40,6 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 	case *txs.RewardValidatorTx:
 		return ErrCantIssueRewardValidatorTx
 	default:
+		return m.Mempool.Add(tx)
 	}
-
-	return m.Mempool.Add(tx)
 }

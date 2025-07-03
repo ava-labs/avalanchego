@@ -132,7 +132,6 @@ func TestTimeout(t *testing.T) {
 	h, err := handler.New(
 		ctx2,
 		vdrs,
-		nil,
 		time.Hour,
 		testThreadPoolSize,
 		resourceTracker,
@@ -390,7 +389,6 @@ func TestReliableMessages(t *testing.T) {
 	h, err := handler.New(
 		ctx2,
 		vdrs,
-		nil,
 		1,
 		testThreadPoolSize,
 		resourceTracker,
@@ -551,7 +549,6 @@ func TestReliableMessagesToMyself(t *testing.T) {
 			h, err := handler.New(
 				ctx2,
 				vdrs,
-				nil,
 				time.Second,
 				testThreadPoolSize,
 				resourceTracker,

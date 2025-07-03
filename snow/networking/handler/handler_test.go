@@ -69,7 +69,6 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	handlerIntf, err := New(
 		ctx,
 		vdrs,
-		nil,
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
@@ -176,7 +175,6 @@ func TestHandlerClosesOnError(t *testing.T) {
 	handlerIntf, err := New(
 		ctx,
 		vdrs,
-		nil,
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
@@ -279,7 +277,6 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	handlerIntf, err := New(
 		ctx,
 		vdrs,
-		nil,
 		1,
 		testThreadPoolSize,
 		resourceTracker,
@@ -346,7 +343,6 @@ func TestHandlerDispatchInternal(t *testing.T) {
 
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 	ctx := snowtest.ConsensusContext(snowCtx)
-	msgFromVMChan := make(chan common.Message)
 	vdrs := validators.NewManager()
 	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
@@ -370,7 +366,6 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	handler, err := New(
 		ctx,
 		vdrs,
-		msgFromVMChan,
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
@@ -419,7 +414,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 
 	wg.Add(1)
 	handler.Start(context.Background(), false)
-	msgFromVMChan <- 0
+	require.NoError(handler.Notify(context.Background(), common.PendingTxs))
 	wg.Wait()
 }
 
@@ -546,7 +541,6 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 			handler, err := New(
 				ctx,
 				vdrs,
-				nil,
 				time.Second,
 				testThreadPoolSize,
 				resourceTracker,
@@ -629,7 +623,6 @@ func TestHandlerStartError(t *testing.T) {
 	handler, err := New(
 		ctx,
 		validators.NewManager(),
-		nil,
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,

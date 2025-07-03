@@ -28,7 +28,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
-	"github.com/ava-labs/avalanchego/vms/proposervm/scheduler"
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
 	"github.com/ava-labs/avalanchego/vms/proposervm/tree"
 
@@ -69,12 +68,10 @@ type VM struct {
 
 	proposer.Windower
 	tree.Tree
-	scheduler.Scheduler
 	mockable.Clock
 
-	ctx         *snow.Context
-	db          *versiondb.Database
-	toScheduler chan<- common.Message
+	ctx *snow.Context
+	db  *versiondb.Database
 
 	// Block ID --> Block
 	// Each element is a block that passed verification but
@@ -134,7 +131,6 @@ func (vm *VM) Initialize(
 	genesisBytes []byte,
 	upgradeBytes []byte,
 	configBytes []byte,
-	toEngine chan<- common.Message,
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
@@ -157,14 +153,6 @@ func (vm *VM) Initialize(
 	}
 	vm.innerBlkCache = innerBlkCache
 
-	scheduler, vmToEngine := scheduler.New(vm.ctx.Log, toEngine)
-	vm.Scheduler = scheduler
-	vm.toScheduler = vmToEngine
-
-	go chainCtx.Log.RecoverAndPanic(func() {
-		scheduler.Dispatch(time.Now())
-	})
-
 	vm.verifiedBlocks = make(map[ids.ID]PostForkBlock)
 
 	err = vm.ChainVM.Initialize(
@@ -174,7 +162,6 @@ func (vm *VM) Initialize(
 		genesisBytes,
 		upgradeBytes,
 		configBytes,
-		vmToEngine,
 		fxs,
 		appSender,
 	)
@@ -243,8 +230,6 @@ func (vm *VM) Initialize(
 
 // shutdown ops then propagate shutdown to innerVM
 func (vm *VM) Shutdown(ctx context.Context) error {
-	vm.Scheduler.Close()
-
 	if err := vm.db.Commit(); err != nil {
 		return err
 	}
@@ -315,13 +300,83 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 		return vm.ChainVM.SetPreference(ctx, preferred)
 	}
 
-	if err := vm.ChainVM.SetPreference(ctx, blk.getInnerBlk().ID()); err != nil {
+	innerBlkID := blk.getInnerBlk().ID()
+	if err := vm.ChainVM.SetPreference(ctx, innerBlkID); err != nil {
 		return err
+	}
+
+	vm.ctx.Log.Debug("set preference",
+		zap.Stringer("blkID", preferred),
+		zap.Stringer("innerBlkID", innerBlkID),
+	)
+	return nil
+}
+
+func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
+	for {
+		if err := ctx.Err(); err != nil {
+			vm.ctx.Log.Debug("Aborting WaitForEvent, context is done", zap.Error(err))
+			return 0, err
+		}
+
+		timeToBuild, shouldWait, err := vm.timeToBuild(ctx)
+		if err != nil {
+			vm.ctx.Log.Debug("Aborting WaitForEvent", zap.Error(err))
+			return 0, err
+		}
+
+		// If we are pre-fork or haven't finished bootstrapping yet, we should
+		// directly forward the inner VM's events.
+		if !shouldWait {
+			vm.ctx.Log.Debug("Waiting for inner VM event (pre-fork or before normal operation)")
+			return vm.ChainVM.WaitForEvent(ctx)
+		}
+
+		duration := time.Until(timeToBuild)
+		if duration <= 0 {
+			vm.ctx.Log.Debug("Can build a block without waiting")
+			return vm.ChainVM.WaitForEvent(ctx)
+		}
+
+		vm.ctx.Log.Debug("Waiting until we should build a block", zap.Duration("duration", duration))
+
+		// Wait until it is our turn to build a block.
+		select {
+		case <-ctx.Done():
+		case <-time.After(duration):
+			// We should not call ChainVM.WaitForEvent here as it is possible
+			// that timeToBuild was capped less than the actual time for us to
+			// build a block. If it is actually our turn to build, timeToBuild
+			// will be <= 0 in the next iteration.
+		}
+	}
+}
+
+func (vm *VM) timeToBuild(ctx context.Context) (time.Time, bool, error) {
+	vm.ctx.Lock.Lock()
+	defer vm.ctx.Lock.Unlock()
+
+	// Block building is only supported if the consensus state is normal
+	// operations and the vm is not state syncing.
+	//
+	// TODO: Correctly handle dynamic state sync here. When the innerVM is
+	// dynamically state syncing, we should return here as well.
+	if vm.consensusState != snow.NormalOp {
+		return time.Time{}, false, nil
+	}
+
+	// Because the VM in marked as being in the [snow.NormalOp] state, we know
+	// that [VM.SetPreference] must have already been called.
+	blk, err := vm.getPostForkBlock(ctx, vm.preferred)
+	// If the preferred block is pre-fork, we should wait for events on the
+	// innerVM.
+	if err != nil {
+		return time.Time{}, false, nil
 	}
 
 	pChainHeight, err := blk.pChainHeight(ctx)
 	if err != nil {
-		return err
+		return time.Time{}, false, err
 	}
 
 	var (
@@ -357,16 +412,10 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 		// bootstrapping caused the last accepted block to move past the latest
 		// P-chain height. This will cause building blocks to return an error
 		// until the P-chain's height has advanced.
-		return nil
+		return time.Time{}, false, nil
 	}
-	vm.Scheduler.SetBuildBlockTime(nextStartTime)
 
-	vm.ctx.Log.Debug("set preference",
-		zap.Stringer("blkID", blk.ID()),
-		zap.Time("blockTimestamp", parentTimestamp),
-		zap.Time("nextStartTime", nextStartTime),
-	)
-	return nil
+	return nextStartTime, true, nil
 }
 
 func (vm *VM) getPreDurangoSlotTime(
@@ -707,16 +756,6 @@ func (vm *VM) verifyAndRecordInnerBlk(ctx context.Context, blockCtx *block.Conte
 	}
 	vm.verifiedBlocks[postForkID] = postFork
 	return nil
-}
-
-// notifyInnerBlockReady tells the scheduler that the inner VM is ready to build
-// a new block
-func (vm *VM) notifyInnerBlockReady() {
-	select {
-	case vm.toScheduler <- common.PendingTxs:
-	default:
-		vm.ctx.Log.Debug("dropping message to consensus engine")
-	}
 }
 
 // fujiOverridePChainHeightUntilHeight is the P-chain height at which the

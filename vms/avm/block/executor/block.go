@@ -286,9 +286,5 @@ func (b *Block) Reject(context.Context) error {
 			)
 		}
 	}
-
-	// If we added transactions to the mempool, we should be willing to build a
-	// block.
-	b.manager.mempool.RequestBuildBlock()
 	return nil
 }

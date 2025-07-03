@@ -8,7 +8,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
@@ -30,7 +29,6 @@ type LinearizableVMWithEngine interface {
 	Linearize(
 		ctx context.Context,
 		stopVertexID ids.ID,
-		toEngine chan<- common.Message,
 	) error
 }
 

@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators/gvalidators"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -38,13 +39,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/gwarp"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/messenger"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
 	aliasreaderpb "github.com/ava-labs/avalanchego/proto/pb/aliasreader"
 	appsenderpb "github.com/ava-labs/avalanchego/proto/pb/appsender"
 	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
-	messengerpb "github.com/ava-labs/avalanchego/proto/pb/messenger"
 	rpcdbpb "github.com/ava-labs/avalanchego/proto/pb/rpcdb"
 	sharedmemorypb "github.com/ava-labs/avalanchego/proto/pb/sharedmemory"
 	validatorstatepb "github.com/ava-labs/avalanchego/proto/pb/validatorstate"
@@ -82,13 +81,13 @@ var (
 // VMClient is an implementation of a VM that talks over RPC.
 type VMClient struct {
 	*chain.State
+	logger          logging.Logger
 	client          vmpb.VMClient
 	runtime         runtime.Stopper
 	pid             int
 	processTracker  resource.ProcessTracker
 	metricsGatherer metrics.MultiGatherer
 
-	messenger            *messenger.Server
 	sharedMemory         *gsharedmemory.Server
 	bcLookup             *galiasreader.Server
 	appSender            *appsender.Server
@@ -108,6 +107,7 @@ func NewClient(
 	pid int,
 	processTracker resource.ProcessTracker,
 	metricsGatherer metrics.MultiGatherer,
+	logger logging.Logger,
 ) *VMClient {
 	return &VMClient{
 		client:          vmpb.NewVMClient(clientConn),
@@ -116,6 +116,7 @@ func NewClient(
 		processTracker:  processTracker,
 		metricsGatherer: metricsGatherer,
 		conns:           []*grpc.ClientConn{clientConn},
+		logger:          logger,
 	}
 }
 
@@ -126,7 +127,6 @@ func (vm *VMClient) Initialize(
 	genesisBytes []byte,
 	upgradeBytes []byte,
 	configBytes []byte,
-	toEngine chan<- common.Message,
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
@@ -165,7 +165,6 @@ func (vm *VMClient) Initialize(
 		zap.String("address", dbServerAddr),
 	)
 
-	vm.messenger = messenger.NewServer(toEngine)
 	vm.sharedMemory = gsharedmemory.NewServer(chainCtx.SharedMemory, db)
 	vm.bcLookup = galiasreader.NewServer(chainCtx.BCLookup)
 	vm.appSender = appsender.NewServer(appSender)
@@ -305,7 +304,6 @@ func (vm *VMClient) newInitServer() *grpc.Server {
 	vm.serverCloser.Add(server)
 
 	// Register services
-	messengerpb.RegisterMessengerServer(server, vm.messenger)
 	sharedmemorypb.RegisterSharedMemoryServer(server, vm.sharedMemory)
 	aliasreaderpb.RegisterAliasReaderServer(server, vm.bcLookup)
 	appsenderpb.RegisterAppSenderServer(server, vm.appSender)
@@ -406,6 +404,15 @@ func (vm *VMClient) CreateHTTP2Handler(ctx context.Context) (http.Handler, error
 
 	vm.conns = append(vm.conns, clientConn)
 	return ghttp.NewClient(httppb.NewHTTPClient(clientConn)), nil
+}
+
+func (vm *VMClient) WaitForEvent(ctx context.Context) (common.Message, error) {
+	resp, err := vm.client.WaitForEvent(ctx, &emptypb.Empty{})
+	if err != nil {
+		vm.logger.Debug("failed to subscribe to events", zap.Error(err))
+		return 0, err
+	}
+	return common.Message(resp.Message), nil
 }
 
 func (vm *VMClient) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {

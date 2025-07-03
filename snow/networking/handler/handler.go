@@ -51,6 +51,8 @@ var (
 type Handler interface {
 	health.Checker
 
+	Notify(_ context.Context, msg common.Message) error
+
 	Context() *snow.ConsensusContext
 	// ShouldHandle returns true if the node with the given ID is allowed to send
 	// messages to this chain. If the node is not allowed to send messages to
@@ -88,7 +90,7 @@ type handler struct {
 	// since peerTracker is already tracking validators
 	validators validators.Manager
 	// Receives messages from the VM
-	msgFromVMChan   <-chan common.Message
+	msgFromVMChan   chan common.Message
 	gossipFrequency time.Duration
 
 	engineManager *EngineManager
@@ -129,7 +131,6 @@ type handler struct {
 func New(
 	ctx *snow.ConsensusContext,
 	validators validators.Manager,
-	msgFromVMChan <-chan common.Message,
 	gossipFrequency time.Duration,
 	threadPoolSize int,
 	resourceTracker tracker.ResourceTracker,
@@ -140,10 +141,10 @@ func New(
 	haltBootstrapping func(),
 ) (Handler, error) {
 	h := &handler{
+		msgFromVMChan:     make(chan common.Message),
 		haltBootstrapping: haltBootstrapping,
 		ctx:               ctx,
 		validators:        validators,
-		msgFromVMChan:     msgFromVMChan,
 		gossipFrequency:   gossipFrequency,
 		closingChan:       make(chan struct{}),
 		closed:            make(chan struct{}),
@@ -275,6 +276,17 @@ func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 		go h.ctx.Log.RecoverAndPanic(dispatchSync)
 		go h.ctx.Log.RecoverAndPanic(dispatchAsync)
 		go h.ctx.Log.RecoverAndPanic(dispatchChans)
+	}
+}
+
+func (h *handler) Notify(ctx context.Context, msg common.Message) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-h.closed:
+		return context.Canceled
+	case h.msgFromVMChan <- msg:
+		return nil
 	}
 }
 
