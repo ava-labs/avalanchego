@@ -3,26 +3,38 @@
 ![Github Actions](https://github.com/ava-labs/firewood/actions/workflows/ci.yaml/badge.svg?branch=main)
 [![Ecosystem license](https://img.shields.io/badge/License-Ecosystem-blue.svg)](./LICENSE.md)
 
-> :warning: Firewood is alpha-level software and is not ready for production
-> use. The Firewood API and on-disk state representation may change with
-> little to no warning.
+> :warning: Firewood is beta-level software.
+> The Firewood API may change with little to no warning.
 
 Firewood is an embedded key-value store, optimized to store recent Merkleized blockchain
-state with minimal overhead. Firewood is implemented from the ground up to directly
-store trie nodes on-disk. Unlike most state management approaches in the field,
-it is not built on top of a generic KV store such as LevelDB/RocksDB. Firewood, like a
-B+-tree based database, directly uses the trie structure as the index on-disk. Thus,
-there is no additional “emulation” of the logical trie to flatten out the data structure
-to feed into the underlying database that is unaware of the data being stored. The convenient
-byproduct of this approach is that iteration is still fast (for serving state sync queries)
-but compaction is not required to maintain the index. Firewood was first conceived to provide
-a very fast storage layer for the EVM but could be used on any blockchain that
-requires an authenticated state.
+state with minimal overhead. Most blockchains, including Avalanche's C-Chain and Ethereum, store their state in Merkle tries to support efficient generation and verification of state proofs.
+Firewood is implemented from the ground up to directly store trie nodes on-disk.
+Unlike most state management approaches in the field,
+it is not built on top of a generic KV store such as LevelDB/RocksDB.
+Firewood, like a B+-tree based database, directly uses the trie structure as the index on-disk.
+There is no additional “emulation” of the logical trie to flatten out the data structure
+to feed into the underlying database that is unaware of the data being stored.
+The convenient byproduct of this approach is that iteration is still fast (for serving state sync queries)
+but compaction is not required to maintain the index.
+Firewood was first conceived to provide a very fast storage layer for the EVM,
+but could be used on any blockchain that requires an authenticated state.
 
-Firewood only attempts to store recent revisions on-disk and will actively clean up
-unused data when revisions expire. Firewood keeps some configurable number of previous states in memory and on disk to power state sync (which may occur at a few roots behind the current state). To do this, a new root is always created for each revision that can reference either new nodes from this revision or nodes from a prior revision. When creating a revision, a list of nodes that are no longer needed are computed and saved to disk in a future-delete log (FDL) as well as kept in memory. When a revision expires, the nodes that were deleted when it was created are returned to the free space.
+Firewood only attempts to store recent revisions on-disk and will actively clean up unused data when revisions expire.
+Firewood keeps some configurable number of previous states in memory and on disk to power state sync and APIs
+which may occur at a few roots behind the current state.
+To do this, a new root is always created for each revision that can reference either new nodes from this revision or nodes from a prior revision.
+When creating a revision,
+a list of nodes that are no longer needed are computed and saved to disk in a future-delete log (FDL) as well as kept in memory.
+When a revision expires, the nodes that were deleted when it was created are returned to the free space.
 
-Firewood guarantees recoverability by not referencing the new nodes in a new revision before they are flushed to disk, as well as carefully managing the free list during the creation and expiration of revisions.
+Hashes are not used to determine where a node is stored on disk in the database file.
+Instead space for nodes may be allocated from the end of the file,
+or from space freed from expired revision. Free space management algorithmically resembles that of traditional heap memory management, with free lists used to track different-size spaces that can be reused.
+The root address of a node is simply the disk offset within the database file,
+and each branch node points to the disk offset of that other node.
+
+Firewood guarantees recoverability by not referencing the new nodes in a new revision before they are flushed to disk,
+as well as carefully managing the free list during the creation and expiration of revisions.
 
 ## Architecture Diagram
 
@@ -62,14 +74,6 @@ Firewood guarantees recoverability by not referencing the new nodes in a new rev
 - `Commit` - The operation of applying one or more `Proposal`s to the most recent
   `Revision`.
 
-## Roadmap
-
-- [X] Complete the revision manager
-- [X] Complete the API implementation
-- [X] Implement a node cache
-- [ ] Complete the proof code
-- [ ] Hook up the RPC
-
 ## Build
 
 In order to build firewood, the following dependencies must be installed:
@@ -78,14 +82,43 @@ In order to build firewood, the following dependencies must be installed:
 - `cargo` See [installation instructions](https://doc.rust-lang.org/cargo/getting-started/installation.html).
 - `make` See [download instructions](https://www.gnu.org/software/make/#download) or run `sudo apt install build-essential` on Linux.
 
+More detailed build instructions, including some scripts,
+can be found in the [benchmark setup scripts](benchmark/setup-scripts).
+
+If you want to build and test the ffi layer for another platform,
+you can find those instructions in the [ffi README](ffi/README.md).
+
+## Ethereum compatibility
+
+By default, Firewood builds with hashes compatible with [merkledb](https://github.com/ava-labs/avalanchego/tree/master/x/merkledb),
+and does not support accounts.
+To enable this feature (at the cost of some performance) enable the ethhash [feature flag](https://doc.rust-lang.org/cargo/reference/features.html#command-line-feature-options).
+
+Enabling this feature
+changes the hashing algorithm from [sha256](https://docs.rs/sha2/latest/sha2/type.Sha256.html)
+to [keccak256](https://docs.rs/sha3/latest/sha3/type.Keccak256.html),
+understands that an "account" is actually just a node in the storage tree at a specific depth with a specific RLP-encoded value,
+and computes the hash of the account trie as if it were an actual root.
+
+It is worth nothing that the hash stored as a value inside the account root RLP is not used.
+During hash calculations, we know the hash of the children,
+and use that directly to modify the value in-place
+when hashing the node.
+See [replace\_hash](firewood/storage/src/hashers/ethhash.rs) for more details.
+
 ## Run
 
-There are several examples, in the examples directory, that simulate real world
-use-cases. Try running them via the command-line, via `cargo run --release
+Example(s) are in the [examples](firewood/examples) directory, that simulate real world
+use-cases. Try running the insert example via the command-line, via `cargo run --release
 --example insert`.
 
-For maximum performance, use `cargo run --maxperf` instead, which enables maximum
-link time compiler optimizations, but takes a lot longer to compile.
+There is a [fwdctl cli](fwdctl) for command-line operations on a database.
+
+There is also a [benchmark](benchmark) that shows some other example uses.
+
+For maximum runtime performance at the cost of compile time,
+use `cargo run --maxperf` instead,
+which enables maximum link time compiler optimizations.
 
 ## Logging
 
