@@ -44,7 +44,7 @@ func newWallet(
 	}
 }
 
-func (w *Wallet) sendTx(
+func (w *Wallet) SendTx(
 	ctx context.Context,
 	tx *types.Transaction,
 	pingFrequency time.Duration,

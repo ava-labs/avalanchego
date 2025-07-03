@@ -48,5 +48,5 @@ func (z ZeroTransferTest) Run(
 	})
 	require.NoError(err)
 
-	require.NoError(wallet.sendTx(ctx, tx, z.PollFrequency))
+	require.NoError(wallet.SendTx(ctx, tx, z.PollFrequency))
 }
