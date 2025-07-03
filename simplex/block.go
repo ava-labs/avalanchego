@@ -79,7 +79,7 @@ func (d *blockDeserializer) DeserializeBlock(bytes []byte) (simplex.Block, error
 		return nil, fmt.Errorf("failed to parse protocol metadata: %w", err)
 	}
 
-	vmblock, err := d.parser.ParseBlock(context.Background(), canotoBlock.InnerBlock)
+	vmblock, err := d.parser.ParseBlock(context.TODO(), canotoBlock.InnerBlock)
 	if err != nil {
 		return nil, err
 	}
