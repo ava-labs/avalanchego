@@ -151,7 +151,7 @@ func (w *workload) run(ctx context.Context) {
 	)
 	// Any assertion failure from this test context will result in process exit due to the
 	// panic being rethrown. This ensures that failures in test setup are fatal.
-	defer tc.Recover(true /* rethrow */)
+	defer tc.RecoverAndRethrow()
 	require := require.New(tc)
 
 	uri := w.uris[w.id%len(w.uris)]

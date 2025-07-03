@@ -170,7 +170,7 @@ func (w *workload) run(ctx context.Context) {
 	tc := w.newTestContext(ctx)
 	// Any assertion failure from this test context will result in process exit due to the
 	// panic being rethrown. This ensures that failures in test setup are fatal.
-	defer tc.Recover(true /* rethrow */)
+	defer tc.RecoverAndRethrow()
 
 	xAVAX, pAVAX := e2e.GetWalletBalances(tc, w.wallet)
 	assert.Reachable("wallet starting", map[string]any{
@@ -215,7 +215,7 @@ func (w *workload) run(ctx context.Context) {
 func (w *workload) executeTest(ctx context.Context) {
 	tc := w.newTestContext(ctx)
 	// Panics will be recovered without being rethrown, ensuring that test failures are not fatal.
-	defer tc.Recover(false /* rethrow */)
+	defer tc.Recover()
 	require := require.New(tc)
 
 	val, err := rand.Int(rand.Reader, big.NewInt(5))

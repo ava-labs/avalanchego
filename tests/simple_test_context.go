@@ -102,11 +102,25 @@ func (tc *SimpleTestContext) RecoverAndExit() {
 	}
 }
 
+// Recover is intended to be deferred in a function executing a test whose
+// assertions may result in panics. Such a panic is intended to be recovered to
+// allow cleanup functions to be called before execution continues.
+func (tc *SimpleTestContext) Recover() {
+	tc.recover(false /* rethrow */)
+}
+
+// RecoverAndRethrow is intended to be deferred in a function executing a test
+// whose assertions may result in panics.  Such a panic is intended to be recovered
+// to allow cleanup functions to be called before the panic is rethrown.
+func (tc *SimpleTestContext) RecoverAndRethrow() {
+	tc.recover(true /* rethrow */)
+}
+
 // Recover is intended to be deferred in a function executing a test
 // whose assertions may result in panics. Such a panic is intended to
 // be recovered to allow cleanup functions to be called. A panic can
 // be optionally rethrown by setting `rethrow` to true.
-func (tc *SimpleTestContext) Recover(rethrow bool) {
+func (tc *SimpleTestContext) recover(rethrow bool) {
 	// Recover from test failure
 	var panicData any
 	if panicData = recover(); panicData != nil {
