@@ -31,6 +31,8 @@ mod nodestore;
 mod range_set;
 mod trie_hash;
 
+use crate::nodestore::AreaIndex;
+
 /// Logger module for handling logging functionality
 pub mod logger;
 
@@ -127,6 +129,21 @@ pub enum CheckerError {
         size: u64,
         /// The intersection
         intersection: Vec<Range<LinearAddress>>,
+    },
+
+    /// Freelist area size does not match
+    #[error(
+        "Free area {address} of size {size} is found in free list {actual_free_list} but it should be in freelist {expected_free_list}"
+    )]
+    FreelistAreaSizeMismatch {
+        /// Address of the free area
+        address: LinearAddress,
+        /// Actual size of the free area
+        size: u64,
+        /// Free list on which the area is stored
+        actual_free_list: AreaIndex,
+        /// Expected size of the area
+        expected_free_list: AreaIndex,
     },
 
     /// IO error

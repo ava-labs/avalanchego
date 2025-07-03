@@ -55,7 +55,7 @@ use super::linear::WritableStorage;
 
 /// [`NodeStore`] divides the linear store into blocks of different sizes.
 /// [`AREA_SIZES`] is every valid block size.
-const AREA_SIZES: [u64; 23] = [
+pub(crate) const AREA_SIZES: [u64; 23] = [
     16, // Min block size
     32,
     64,
@@ -903,7 +903,7 @@ struct FreeArea {
 }
 
 impl FreeArea {
-    pub(crate) fn from_storage<S: ReadableStorage>(
+    fn from_storage<S: ReadableStorage>(
         storage: &S,
         address: LinearAddress,
     ) -> Result<(Self, AreaIndex), FileIoError> {
@@ -1663,7 +1663,7 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
         self.header.size
     }
 
-    pub(crate) fn get_physical_size(&self) -> Result<u64, FileIoError> {
+    pub(crate) fn physical_size(&self) -> Result<u64, FileIoError> {
         self.storage.size()
     }
 }
@@ -1716,11 +1716,11 @@ impl<T, S: ReadableStorage> NodeStore<T, S> {
     }
 
     // pub(crate) since checker will use this to verify that the free areas are in the correct free list
-    // Return free_list_id as usize instead of AreaIndex to avoid type conversion
+    // Since this is a low-level iterator, we avoid safe conversion to AreaIndex for performance
     pub(crate) fn free_list_iter_inner(
         &self,
         start_area_index: AreaIndex,
-    ) -> impl Iterator<Item = Result<(LinearAddress, AreaIndex, usize), FileIoError>> {
+    ) -> impl Iterator<Item = Result<(LinearAddress, AreaIndex, AreaIndex), FileIoError>> {
         self.header
             .free_lists
             .iter()
@@ -1728,7 +1728,7 @@ impl<T, S: ReadableStorage> NodeStore<T, S> {
             .skip(start_area_index as usize)
             .flat_map(move |(free_list_id, next_addr)| {
                 FreeListIterator::new(self.storage.as_ref(), *next_addr).map(move |item| {
-                    item.map(|(addr, area_index)| (addr, area_index, free_list_id))
+                    item.map(|(addr, area_index)| (addr, area_index, free_list_id as AreaIndex))
                 })
             })
     }
@@ -1756,6 +1756,7 @@ pub(crate) mod nodestore_test_utils {
         AREA_SIZES[area_size_index as usize]
     }
 
+    // Helper function to write a free area to the given offset.
     pub(crate) fn test_write_free_area<S: WritableStorage>(
         nodestore: &NodeStore<Committed, S>,
         next_free_block: Option<LinearAddress>,
@@ -1771,15 +1772,19 @@ pub(crate) mod nodestore_test_utils {
         nodestore.storage.write(offset, &stored_area_bytes).unwrap();
     }
 
+    // Helper function to write the NodeStoreHeader
     pub(crate) fn test_write_header<S: WritableStorage>(
-        nodestore: &NodeStore<Committed, S>,
-        root_addr: LinearAddress,
+        nodestore: &mut NodeStore<Committed, S>,
         size: u64,
+        root_addr: Option<LinearAddress>,
+        free_lists: FreeLists,
     ) {
         let mut header = NodeStoreHeader::new();
         header.size = size;
-        header.root_address = Some(root_addr);
+        header.root_address = root_addr;
+        header.free_lists = free_lists;
         let header_bytes = bytemuck::bytes_of(&header);
+        nodestore.header = header;
         nodestore.storage.write(0, header_bytes).unwrap();
     }
 }
