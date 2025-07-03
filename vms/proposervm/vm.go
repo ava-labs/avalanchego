@@ -315,24 +315,30 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
 	for {
 		if err := ctx.Err(); err != nil {
+			vm.ctx.Log.Debug("Aborting WaitForEvent, context is done", zap.Error(err))
 			return 0, err
 		}
 
 		timeToBuild, shouldWait, err := vm.timeToBuild(ctx)
 		if err != nil {
+			vm.ctx.Log.Debug("Aborting WaitForEvent", zap.Error(err))
 			return 0, err
 		}
 
 		// If we are pre-fork or haven't finished bootstrapping yet, we should
 		// directly forward the inner VM's events.
 		if !shouldWait {
+			vm.ctx.Log.Debug("Waiting for inner VM event (pre-fork)")
 			return vm.ChainVM.WaitForEvent(ctx)
 		}
 
 		duration := time.Until(timeToBuild)
 		if duration <= 0 {
+			vm.ctx.Log.Debug("Building a block immediately")
 			return vm.ChainVM.WaitForEvent(ctx)
 		}
+
+		vm.ctx.Log.Debug("Waiting until we should build a block", zap.Duration("duration", duration))
 
 		// Wait until it is our turn to build a block.
 		select {
