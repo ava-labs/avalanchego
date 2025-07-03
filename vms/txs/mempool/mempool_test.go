@@ -6,8 +6,6 @@ package mempool
 import (
 	"context"
 	"errors"
-	"sync"
-	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -315,23 +313,15 @@ func TestWaitForEventCancelled(t *testing.T) {
 func TestWaitForEventWithTx(t *testing.T) {
 	require := require.New(t)
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-
-	var addErr atomic.Value
-
 	m := newMempool()
+	errs := make(chan error)
 	go func() {
-		defer wg.Done()
 		tx := newTx(0, 32)
-		if err := m.Add(tx); err != nil {
-			addErr.Store(err)
-		}
+		errs <- m.Add(tx)
 	}()
 
 	msg, err := m.WaitForEvent(context.Background())
 	require.NoError(err)
 	require.Equal(common.PendingTxs, msg)
-	wg.Wait()
-	require.Nil(addErr.Load())
+	require.NoError(<-errs)
 }
