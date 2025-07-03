@@ -172,6 +172,7 @@ type chain struct {
 	Context *snow.ConsensusContext
 	VM      common.VM
 	Handler handler.Handler
+	nf      *common.NotificationForwarder
 }
 
 // ChainConfig is configuration settings for the current execution.
@@ -266,7 +267,7 @@ type manager struct {
 	chainsLock sync.Mutex
 	// Key: Chain's ID
 	// Value: The chain
-	chains map[ids.ID]handler.Handler
+	chains map[ids.ID]*chain
 
 	// snowman++ related interface to allow validators retrieval
 	validatorState validators.State
@@ -327,7 +328,7 @@ func New(config *ManagerConfig) (Manager, error) {
 	return &manager{
 		Aliaser:                ids.NewAliaser(),
 		ManagerConfig:          *config,
-		chains:                 make(map[ids.ID]handler.Handler),
+		chains:                 make(map[ids.ID]*chain),
 		chainsQueue:            buffer.NewUnboundedBlockingDeque[ChainParameters](initialQueueSize),
 		unblockChainCreatorCh:  make(chan struct{}),
 		chainCreatorShutdownCh: make(chan struct{}),
@@ -433,7 +434,7 @@ func (m *manager) createChain(chainParams ChainParameters) {
 	}
 
 	m.chainsLock.Lock()
-	m.chains[chainParams.ID] = chain.Handler
+	m.chains[chainParams.ID] = chain
 	m.chainsLock.Unlock()
 
 	// Associate the newly created chain with its default alias
@@ -1051,6 +1052,7 @@ func (m *manager) createAvalancheChain(
 	}
 
 	return &chain{
+		nf:      nf,
 		Name:    primaryAlias,
 		Context: ctx,
 		VM:      dagVM,
@@ -1424,6 +1426,7 @@ func (m *manager) createSnowmanChain(
 	}
 
 	return &chain{
+		nf:      nf,
 		Name:    primaryAlias,
 		Context: ctx,
 		VM:      vm,
@@ -1439,7 +1442,7 @@ func (m *manager) IsBootstrapped(id ids.ID) bool {
 		return false
 	}
 
-	return chain.Context().State.Get().State == snow.NormalOp
+	return chain.Handler.Context().State.Get().State == snow.NormalOp
 }
 
 func (m *manager) registerBootstrappedHealthChecks() error {
@@ -1532,6 +1535,9 @@ func (m *manager) Shutdown() {
 	close(m.chainCreatorShutdownCh)
 	m.chainCreatorExited.Wait()
 	m.ManagerConfig.Router.Shutdown(context.TODO())
+	for _, chain := range m.chains {
+		chain.nf.Close()
+	}
 }
 
 // LookupVM returns the ID of the VM associated with an alias
