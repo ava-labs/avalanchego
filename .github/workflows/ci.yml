@@ -247,7 +247,7 @@ jobs:
       - name: Install dependencies
         run: |
           apt-get update
-          apt-get install -y sudo xz-utils
+          apt-get install -y sudo curl git xz-utils
 
       - name: Checkout code
         uses: actions/checkout@v4
