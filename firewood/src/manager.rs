@@ -1,13 +1,6 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-#![cfg_attr(
-    feature = "ethhash",
-    expect(
-        clippy::used_underscore_binding,
-        reason = "Found 1 occurrences after enabling the lint."
-    )
-)]
 #![expect(
     clippy::cast_precision_loss,
     reason = "Found 2 occurrences after enabling the lint."
@@ -24,7 +17,7 @@ use std::path::PathBuf;
 use std::sync::OnceLock;
 use std::sync::{Arc, Mutex, RwLock};
 
-use firewood_storage::logger::{trace, trace_enabled, warn};
+use firewood_storage::logger::{trace, warn};
 use metrics::gauge;
 use typed_builder::TypedBuilder;
 
@@ -258,9 +251,9 @@ impl RevisionManager {
             proposal.commit_reparent(p);
         }
 
-        if trace_enabled() {
-            let _merkle = Merkle::from(committed);
-            trace!("{}", _merkle.dump().expect("failed to dump merkle"));
+        if crate::logger::trace_enabled() {
+            let merkle = Merkle::from(committed);
+            trace!("{}", merkle.dump().expect("failed to dump merkle"));
         }
 
         Ok(())

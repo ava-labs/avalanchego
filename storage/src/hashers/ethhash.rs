@@ -22,9 +22,7 @@ use std::iter::once;
 
 use crate::logger::warn;
 use crate::{
-    HashType, Hashable, Preimage, TrieHash, ValueDigest,
-    hashednode::HasUpdate,
-    logger::{trace, trace_enabled},
+    HashType, Hashable, Preimage, TrieHash, ValueDigest, hashednode::HasUpdate, logger::trace,
 };
 use bitfield::bitfield;
 use bytes::BytesMut;
@@ -97,7 +95,7 @@ impl<T: Hashable> Preimage for T {
         let mut collector = SmallVec::with_capacity(32);
         self.write(&mut collector);
 
-        if trace_enabled() {
+        if crate::logger::trace_enabled() {
             if self.key().size_hint().0 == 64 {
                 trace!("SIZE WAS 64 {}", hex::encode(&collector));
             } else {
@@ -163,13 +161,11 @@ impl<T: Hashable> Preimage for T {
             }
 
             let bytes = rlp.out();
-            if crate::logger::trace_enabled() {
-                trace!(
-                    "partial path {:?}",
-                    hex::encode(self.partial_path().collect::<Box<_>>())
-                );
-                trace!("serialized leaf-rlp: {:?}", hex::encode(&bytes));
-            }
+            trace!(
+                "partial path {:?}",
+                hex::encode(self.partial_path().collect::<Box<_>>())
+            );
+            trace!("serialized leaf-rlp: {:?}", hex::encode(&bytes));
             buf.update(&bytes);
         } else {
             // for a branch, there are always 16 children and a value
@@ -203,9 +199,7 @@ impl<T: Hashable> Preimage for T {
                 rlp.append_empty_data();
             }
             let bytes = rlp.out();
-            if crate::logger::trace_enabled() {
-                trace!("pass 1 bytes {:02X?}", hex::encode(&bytes));
-            }
+            trace!("pass 1 bytes {:02X?}", hex::encode(&bytes));
 
             // we've collected all the children in bytes
 
@@ -260,9 +254,7 @@ impl<T: Hashable> Preimage for T {
 
             let partial_path = self.partial_path().collect::<Box<_>>();
             if partial_path.is_empty() {
-                if crate::logger::trace_enabled() {
-                    trace!("pass 2=bytes {:02X?}", hex::encode(&updated_bytes));
-                }
+                trace!("pass 2=bytes {:02X?}", hex::encode(&updated_bytes));
                 buf.update(updated_bytes);
             } else {
                 let mut final_bytes = RlpStream::new_list(2);
@@ -276,9 +268,7 @@ impl<T: Hashable> Preimage for T {
                     final_bytes.append(&updated_bytes);
                 }
                 let final_bytes = final_bytes.out();
-                if crate::logger::trace_enabled() {
-                    trace!("pass 2 bytes {:02X?}", hex::encode(&final_bytes));
-                }
+                trace!("pass 2 bytes {:02X?}", hex::encode(&final_bytes));
                 buf.update(final_bytes);
             }
         }
@@ -293,20 +283,16 @@ fn replace_hash<T: AsRef<[u8]>, U: AsRef<[u8]>>(bytes: T, new_hash: U) -> Option
     let replace = list.get_mut(2)?;
     *replace = Vec::from(new_hash.as_ref());
 
-    if trace_enabled() {
-        trace!("inbound bytes: {}", hex::encode(bytes.as_ref()));
-        trace!("list length was {}", list.len());
-        trace!("replacement hash {:?}", hex::encode(&new_hash));
-    }
+    trace!("inbound bytes: {}", hex::encode(bytes.as_ref()));
+    trace!("list length was {}", list.len());
+    trace!("replacement hash {:?}", hex::encode(&new_hash));
 
     let mut rlp = RlpStream::new_list(list.len());
     for item in list {
         rlp.append(&item);
     }
     let bytes = rlp.out();
-    if trace_enabled() {
-        trace!("updated encoded value {:02X?}", hex::encode(&bytes));
-    }
+    trace!("updated encoded value {:02X?}", hex::encode(&bytes));
     Some(bytes)
 }
 
