@@ -37,7 +37,21 @@ type NotificationForwarder struct {
 	abortContext  context.CancelFunc
 }
 
-func (nf *NotificationForwarder) Start() {
+func NewNotificationForwarder(
+	engine Notifier,
+	subscribe Subscription,
+	log logging.Logger,
+) *NotificationForwarder {
+	nf := &NotificationForwarder{
+		Engine:    engine,
+		Subscribe: subscribe,
+		Log:       log,
+	}
+	nf.start()
+	return nf
+}
+
+func (nf *NotificationForwarder) start() {
 	nf.executing.Add(1)
 	nf.execCtx, nf.haltExecution = context.WithCancel(context.Background())
 	go nf.run()

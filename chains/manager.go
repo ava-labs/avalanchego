@@ -901,16 +901,6 @@ func (m *manager) createAvalancheChain(
 		return nil, fmt.Errorf("error initializing network handler: %w", err)
 	}
 
-	nf := &common.NotificationForwarder{
-		Subscribe: linearizableVM.WaitForEvent,
-		Log:       ctx.Log,
-		Engine:    h,
-	}
-
-	cn.OnChange = nf.PreferenceOrStateChanged
-
-	defer nf.Start()
-
 	connectedBeacons := tracker.NewPeers()
 	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)
 	vdrs.RegisterSetCallbackListener(ctx.SubnetID, startupTracker)
@@ -1050,6 +1040,9 @@ func (m *manager) createAvalancheChain(
 	if err := m.Health.RegisterHealthCheck(primaryAlias, h, ctx.SubnetID.String()); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", primaryAlias, err)
 	}
+
+	nf := common.NewNotificationForwarder(h, linearizableVM.WaitForEvent, ctx.Log)
+	cn.OnChange = nf.PreferenceOrStateChanged
 
 	return &chain{
 		nf:      nf,
@@ -1303,16 +1296,6 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("couldn't initialize message handler: %w", err)
 	}
 
-	nf := &common.NotificationForwarder{
-		Subscribe: vm.WaitForEvent,
-		Log:       ctx.Log,
-		Engine:    h,
-	}
-
-	cn.OnChange = nf.PreferenceOrStateChanged
-
-	defer nf.Start()
-
 	connectedBeacons := tracker.NewPeers()
 	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)
 	beacons.RegisterSetCallbackListener(ctx.SubnetID, startupTracker)
@@ -1424,6 +1407,9 @@ func (m *manager) createSnowmanChain(
 	if err := m.Health.RegisterHealthCheck(primaryAlias, h, ctx.SubnetID.String()); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", primaryAlias, err)
 	}
+
+	nf := common.NewNotificationForwarder(h, vm.WaitForEvent, ctx.Log)
+	cn.OnChange = nf.PreferenceOrStateChanged
 
 	return &chain{
 		nf:      nf,
