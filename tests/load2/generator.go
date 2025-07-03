@@ -7,11 +7,11 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"math/big"
-	"sync"
 	"time"
 
 	"github.com/ava-labs/libevm/ethclient"
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/tests"
 )
@@ -66,7 +66,7 @@ func (l LoadGenerator) Run(
 	loadTimeout time.Duration,
 	testTimeout time.Duration,
 ) {
-	wg := sync.WaitGroup{}
+	eg := &errgroup.Group{}
 
 	childCtx := ctx
 	if loadTimeout != 0 {
@@ -76,14 +76,11 @@ func (l LoadGenerator) Run(
 	}
 
 	for i := range l.wallets {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-
+		eg.Go(func() error {
 			for {
 				select {
 				case <-childCtx.Done():
-					return
+					return nil
 				default:
 				}
 
@@ -92,8 +89,8 @@ func (l LoadGenerator) Run(
 
 				l.test.Run(tc, ctx, l.wallets[i])
 			}
-		}()
+		})
 	}
 
-	wg.Wait()
+	_ = eg.Wait()
 }
