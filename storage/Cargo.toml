@@ -25,7 +25,7 @@ smallvec = { workspace = true, features = ["serde", "write", "union"] }
 sha2 = { workspace = true }
 integer-encoding = { workspace = true }
 arc-swap = "1.7.1"
-lru = "0.15.0"
+lru = "0.16.0"
 metrics = { workspace = true }
 log = { version = "0.4.20", optional = true }
 bytemuck = "1.7.0"
