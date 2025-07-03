@@ -279,9 +279,13 @@ func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 	}
 }
 
-func (h *handler) Notify(_ context.Context, msg common.Message) error {
-	h.msgFromVMChan <- msg
-	return nil
+func (h *handler) Notify(ctx context.Context, msg common.Message) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case h.msgFromVMChan <- msg:
+		return nil
+	}
 }
 
 // Push the message onto the handler's queue

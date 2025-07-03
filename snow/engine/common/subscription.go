@@ -12,11 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-type Subscriber interface {
-	// WaitForEvent blocks until either the given context is cancelled, or a message is returned.
-	WaitForEvent(ctx context.Context) (Message, error)
-}
-
 // Subscription is a function that blocks until either the given context is cancelled, or a message is returned.
 type Subscription func(ctx context.Context) (Message, error)
 

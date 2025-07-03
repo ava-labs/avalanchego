@@ -900,15 +900,12 @@ func (m *manager) createAvalancheChain(
 		return nil, fmt.Errorf("error initializing network handler: %w", err)
 	}
 
-	nf := &common.NotificationForwarder{
-		Subscribe: linearizableVM.WaitForEvent,
-		Log:       ctx.Log,
-		Engine:    h,
-	}
-
-	cn.OnChange = nf.PreferenceOrStateChanged
-
-	defer nf.Start()
+	nf := common.NewNotificationForwarder(
+		ctx.Log,
+		linearizableVM,
+		h,
+	)
+	cn.OnChange = nf.CheckForEvent
 
 	connectedBeacons := tracker.NewPeers()
 	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)
@@ -1301,15 +1298,12 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("couldn't initialize message handler: %w", err)
 	}
 
-	nf := &common.NotificationForwarder{
-		Subscribe: vm.WaitForEvent,
-		Log:       ctx.Log,
-		Engine:    h,
-	}
-
-	cn.OnChange = nf.PreferenceOrStateChanged
-
-	defer nf.Start()
+	nf := common.NewNotificationForwarder(
+		ctx.Log,
+		vm,
+		h,
+	)
+	cn.OnChange = nf.CheckForEvent
 
 	connectedBeacons := tracker.NewPeers()
 	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)

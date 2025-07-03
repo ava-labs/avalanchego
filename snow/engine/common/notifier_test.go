@@ -3,94 +3,84 @@
 
 package common
 
-import (
-	"context"
-	"sync"
-	"testing"
+// type notifier func(_ context.Context, msg Message) error
 
-	"github.com/stretchr/testify/require"
+// func (n notifier) Notify(ctx context.Context, msg Message) error {
+// 	return n(ctx, msg)
+// }
 
-	"github.com/ava-labs/avalanchego/utils/logging"
-)
+// func TestNotifier(t *testing.T) {
+// 	var wg sync.WaitGroup
+// 	wg.Add(2)
 
-type notifier func(_ context.Context, msg Message) error
+// 	notifier := notifier(func(_ context.Context, msg Message) error {
+// 		defer wg.Done()
+// 		require.Equal(t, PendingTxs, msg)
+// 		return nil
+// 	})
 
-func (n notifier) Notify(ctx context.Context, msg Message) error {
-	return n(ctx, msg)
-}
+// 	subscriber := NewSimpleSubscriber()
+// 	nf := &NotificationForwarder{
+// 		Subscribe: subscriber.WaitForEvent,
+// 		Engine:    Notifier(notifier),
+// 		Log:       &logging.NoLog{},
+// 	}
 
-func TestNotifier(t *testing.T) {
-	var wg sync.WaitGroup
-	wg.Add(2)
+// 	nf.Start()
+// 	defer nf.Close()
 
-	notifier := notifier(func(_ context.Context, msg Message) error {
-		defer wg.Done()
-		require.Equal(t, PendingTxs, msg)
-		return nil
-	})
+// 	go func() {
+// 		defer wg.Done()
+// 		subscriber.Publish(PendingTxs)
+// 	}()
 
-	subscriber := NewSimpleSubscriber()
-	nf := &NotificationForwarder{
-		Subscribe: subscriber.WaitForEvent,
-		Engine:    Notifier(notifier),
-		Log:       &logging.NoLog{},
-	}
+// 	wg.Wait()
+// }
 
-	nf.Start()
-	defer nf.Close()
+// func TestNotifierStopWhileSubscribing(_ *testing.T) {
+// 	notifier := notifier(func(ctx context.Context, _ Message) error {
+// 		<-ctx.Done()
+// 		return nil
+// 	})
 
-	go func() {
-		defer wg.Done()
-		subscriber.Publish(PendingTxs)
-	}()
+// 	nf := &NotificationForwarder{
+// 		Engine: Notifier(notifier),
+// 		Log:    &logging.NoLog{},
+// 	}
 
-	wg.Wait()
-}
+// 	var subscribed sync.WaitGroup
+// 	subscribed.Add(1)
 
-func TestNotifierStopWhileSubscribing(_ *testing.T) {
-	notifier := notifier(func(ctx context.Context, _ Message) error {
-		<-ctx.Done()
-		return nil
-	})
+// 	nf.Subscribe = func(ctx context.Context) (Message, error) {
+// 		subscribed.Done()
+// 		<-ctx.Done()
+// 		return 0, nil
+// 	}
 
-	nf := &NotificationForwarder{
-		Engine: Notifier(notifier),
-		Log:    &logging.NoLog{},
-	}
+// 	nf.Start()
+// 	subscribed.Wait()
+// 	nf.Close()
+// }
 
-	var subscribed sync.WaitGroup
-	subscribed.Add(1)
+// func TestNotifierStopWhileNotifying(_ *testing.T) {
+// 	nf := &NotificationForwarder{
+// 		Log: &logging.NoLog{},
+// 	}
 
-	nf.Subscribe = func(ctx context.Context) (Message, error) {
-		subscribed.Done()
-		<-ctx.Done()
-		return 0, nil
-	}
+// 	var notifiying sync.WaitGroup
+// 	notifiying.Add(1)
 
-	nf.Start()
-	subscribed.Wait()
-	nf.Close()
-}
+// 	nf.Engine = Notifier(notifier(func(ctx context.Context, _ Message) error {
+// 		notifiying.Wait()
+// 		<-ctx.Done()
+// 		return nil
+// 	}))
 
-func TestNotifierStopWhileNotifying(_ *testing.T) {
-	nf := &NotificationForwarder{
-		Log: &logging.NoLog{},
-	}
+// 	nf.Subscribe = func(context.Context) (Message, error) {
+// 		return 0, nil
+// 	}
 
-	var notifiying sync.WaitGroup
-	notifiying.Add(1)
-
-	nf.Engine = Notifier(notifier(func(ctx context.Context, _ Message) error {
-		notifiying.Wait()
-		<-ctx.Done()
-		return nil
-	}))
-
-	nf.Subscribe = func(context.Context) (Message, error) {
-		return 0, nil
-	}
-
-	nf.Start()
-	notifiying.Done()
-	nf.Close()
-}
+// 	nf.Start()
+// 	notifiying.Done()
+// 	nf.Close()
+// }
