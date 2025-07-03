@@ -1,18 +1,19 @@
 [package]
 name = "firewood-triehash"
-version = "0.0.7"
+version.workspace = true
 authors = ["Parity Technologies <admin@parity.io>", "Ron Kuris <swcafe@gmail.com>"]
 description = "In-memory patricia trie operations"
-repository = "https://github.com/paritytech/parity-common"
+repository.workspace = true
 license = "MIT OR Apache-2.0"
-edition = "2024"
+edition.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 hash-db = "0.16.0"
 rlp = "0.6"
 
 [dev-dependencies]
-criterion = { workspace = true } 
+criterion = { workspace = true }
 keccak-hasher = "0.16.0"
 ethereum-types = { workspace = true }
 tiny-keccak = { version = "2.0", features = ["keccak"] }

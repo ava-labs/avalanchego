@@ -1,13 +1,23 @@
 [workspace]
 members = [
+  "benchmark",
+  "ffi",
+  "firewood-macros",
   "firewood",
   "fwdctl",
   "storage",
-  "benchmark",
-  "ffi",
   "triehash",
 ]
 resolver = "2"
+
+[workspace.package]
+version = "0.0.7"
+edition = "2024"
+license-file = "LICENSE.md"
+homepage = "https://avalabs.org"
+repository = "https://github.com/ava-labs/firewood"
+readme = "README.md"
+rust-version = "1.85.0"
 
 [profile.release]
 debug = true
@@ -42,6 +52,14 @@ unused_self = "allow"
 cast_possible_truncation = "allow"
 
 [workspace.dependencies]
+# workspace local packages
+firewood = { path = "firewood", version = "0.0.7" }
+firewood-macros = { path = "firewood-macros", version = "0.0.7" }
+firewood-storage = { path = "storage", version = "0.0.7" }
+firewood-ffi = { path = "ffi", version = "0.0.7" }
+firewood-triehash = { path = "triehash", version = "0.0.7" }
+
+# common dependencies
 metrics = "0.24.2"
 metrics-util = "0.20.0"
 sha2 = "0.10.9"
@@ -56,7 +74,7 @@ integer-encoding = "4.0.2"
 env_logger = "0.11.8"
 smallvec = "1.15.1"
 
-# dev dependencies
+# common dev dependencies
 rand = "0.9.1"
 criterion = "0.6.0"
 pprof = "0.15.0"

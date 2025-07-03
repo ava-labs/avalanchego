@@ -1,8 +1,7 @@
 [package]
 name = "firewood-fwdctl"
-version = "0.0.7"
-edition = "2024"
-rust-version = "1.85.0"
+version.workspace = true
+edition.workspace = true
 authors = [
      "Dan Laine <daniel.laine@avalabs.org>",
      "Dan Sover <dan.sover@avalabs.org>",
@@ -14,17 +13,18 @@ authors = [
      "zdf <orientzh1230@gmail.com>",
 ]
 description = "Command-line tool for Firewood, an embedded key-value store optimized for blockchain state."
-license-file = "../LICENSE.md"
-homepage = "https://avalabs.org"
-repository = "https://github.com/ava-labs/firewood"
+license-file.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
 
 [[bin]]
 name = "fwdctl"
 path = "src/main.rs"
 
 [dependencies]
-firewood = { version = "0.0.7", path = "../firewood" }
-firewood-storage = { version = "0.0.7", path = "../storage" }
+firewood.workspace = true
+firewood-storage.workspace = true
 clap = { workspace = true, features = ["cargo"] }
 env_logger = { workspace = true }
 log = "0.4.27"

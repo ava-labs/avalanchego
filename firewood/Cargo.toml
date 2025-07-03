@@ -1,7 +1,7 @@
 [package]
 name = "firewood"
-version = "0.0.7"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
 authors = [
      "Angel Leon <gubatron@gmail.com>",
      "Austin Larson <78000745+alarso16@users.noreply.github.com>",
@@ -16,10 +16,11 @@ authors = [
      "xinifinity <113067541+xinifinity@users.noreply.github.com>",
 ]
 description = "Firewood is an embedded key-value store, optimized to store blockchain state."
-license-file = "../LICENSE.md"
-homepage = "https://avalabs.org"
-repository = "https://github.com/ava-labs/firewood"
-readme = "../README.md"
+license-file.workspace = true
+homepage.workspace = true
+repository.workspace = true
+readme.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 aquamarine = "0.6.0"
@@ -37,7 +38,7 @@ integer-encoding = { workspace = true }
 smallvec = { workspace = true }
 fastrace = { workspace = true }
 coarsetime = { workspace = true }
-firewood-macros = { version = "0.0.7", path = "../firewood-macros" }
+firewood-macros.workspace = true
 
 [features]
 default = []
@@ -48,7 +49,7 @@ branch_factor_256 = [ "firewood-storage/branch_factor_256" ]
 ethhash = [ "firewood-storage/ethhash" ]
 
 [dev-dependencies]
-firewood-triehash = { version = "0.0.7", path = "../triehash" }
+firewood-triehash.workspace = true
 criterion = { workspace = true, features = ["async_tokio"] }
 rand = { workspace = true }
 rand_distr = "0.5.1"
@@ -68,10 +69,10 @@ name = "hashops"
 harness = false
 
 [target.'cfg(target_os = "linux")'.dependencies]
-firewood-storage = { version = "0.0.7", path = "../storage", features = ["io-uring"] }
+firewood-storage = { workspace = true, features = ["io-uring"] }
 
 [target.'cfg(not(target_os = "linux"))'.dependencies]
-firewood-storage = { version = "0.0.7", path = "../storage" }
+firewood-storage.workspace = true
 
 [lints]
 workspace = true

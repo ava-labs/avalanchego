@@ -20,7 +20,7 @@ Add the dependency to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-firewood-macros = { path = "../firewood-macros" }
+firewood-macros.workspace = true
 metrics = "0.24"
 coarsetime = "0.1"
 ```
@@ -64,7 +64,7 @@ Both metrics include a `success` label:
 For `#[metrics("firewood.query", "data retrieval")]`:
 
 - `firewood.example{success="true"}` - Count of successful queries
-- `firewood.example{success="false"}` - Count of failed queries  
+- `firewood.example{success="false"}` - Count of failed queries
 - `firewood.example_ms{success="true"}` - Timing of successful queries
 - `firewood.example_ms{success="false"}` - Timing of failed queries
 

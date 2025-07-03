@@ -1,30 +1,76 @@
 # Releasing firewood
 
-Releasing firewood is straightforward and can be done entirely in CI.
+Releasing firewood is straightforward and can mostly be done in CI. Updating the
+Cargo.toml file is currently manual.
 
 Firewood is made up of several sub-projects in a workspace. Each project is in
 its own crate and has an independent version.
 
-The first step in drafting a release is ensuring all crates within the firewood
-project are using the version of the new release.  There is a utility to ensure
-all versions are updated simultaneously in `cargo-workspace-version`. To use it
-to update to 0.0.5, for example:
+## Git Branch
 
-```sh
-   cargo install cargo-workspace-version
-   cargo workspace-version update v0.0.5
+Start off by crating a new branch:
+
+```console
+$ git fetch
+$ git switch -c release/v0.0.8 origin/main
+branch 'release/v0.0.8' set up to track 'origin/main'.
+Switched to a new branch 'release/v0.0.8'
 ```
 
-See the [source code](https://github.com/ava-labs/cargo-workspace-version) for
-more information on the tool.
+## Package Version
 
-> ❗ Be sure to update the versions of all sub-projects before creating a new
-> release. Open a PR with the updated versions and merge it before continuing to
-> the next step.
+Next, update the workspace version and ensure all crates within the firewood
+project are using the version of the new release. The root [Cargo.toml](Cargo.toml)
+file uses the [`[workspace.package]`](https://doc.rust-lang.org/cargo/reference/workspaces.html#the-package-table)
+table to define the version for all subpackages.
 
-To trigger a release, simply push a semver-compatible tag to the main branch,
-for example `v0.0.5`. The CI will automatically publish a draft release which
-consists of release notes and changes.
+```toml
+[workspace.package]
+version = "0.0.7"
+```
+
+Each package inherits this version by setting `package.version.workspace = true`.
+
+```toml
+[package]
+name = "firewood"
+version.workspace = true
+```
+
+Therefore, updating only the version defined in the root config is needed.
+
+## Dependency Version
+
+The next step is to bump the dependency declarations to the new version. Packages
+within the workspace that are used as libraries are also defined within the
+[`[workspace.dependencies]`](https://doc.rust-lang.org/cargo/reference/workspaces.html#the-dependencies-table)
+table. E.g.,:
+
+```toml
+[workspace.dependencies]
+# workspace local packages
+firewood = { path = "firewood", version = "0.0.7" }
+```
+
+This allows packages within the workspace to inherit the dependency,
+including path, version, and workspace-level features by adding `workspace = true`
+to the dependency table (note: using `cargo add -p firewood-fwdctl firewood-metrics`
+would automatically add the dependency with `workspace = true`).
+
+```toml
+[dependencies]
+firewood-macros.workspace = true
+
+# more complex example
+[target.'cfg(target_os = "linux")'.dependencies]
+firewood-storage = { workspace = true, features = ["io-uring"] }
+
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+firewood-storage.workspace = true
+```
+
+Thefefore, after updating the `workspace.package.version` value, we must update
+the dependency versions to match.
 
 ## Changelog
 
@@ -32,5 +78,24 @@ To build the changelog, see git-cliff.org. Short version:
 
 ```sh
 cargo install git-cliff
-git cliff --tag v0.0.5 | sed -e 's/_/\\_/g' > CHANGELOG.md
+git cliff --tag v0.0.8 | sed -e 's/_/\\_/g' > CHANGELOG.md
 ```
+
+## Review
+
+> ❗ Be sure to update the versions of all sub-projects before creating a new
+> release. Open a PR with the updated versions and merge it before continuing to
+> the next step.
+
+## Publish
+
+To trigger a release, push a tag to the main branch matching the new version,
+
+```sh
+git tag -S v0.0.8
+git push origin v0.0.8
+```
+
+for `v0.0.8` for the merged version change. The CI will automatically publish a
+draft release which consists of release notes and changes (see
+[.github/workflows/release.yaml](.github/workflows/release.yaml)).

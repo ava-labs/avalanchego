@@ -1,14 +1,15 @@
 [package]
 name = "firewood-macros"
-version = "0.0.7"
-edition = "2024"
-rust-version = "1.85"
+version.workspace = true
+edition.workspace = true
 authors = [
      "Ron Kuris <ron.kuris@avalabs.org>",
 ]
 description = "Proc macros for Firewood metrics"
-license-file = "../LICENSE.md"
-homepage = "https://avalabs.org"
+license-file.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
 
 [lib]
 proc-macro = true
@@ -24,4 +25,4 @@ metrics = "0.24"
 coarsetime = "0.1"
 
 [lints]
-workspace = true 
+workspace = true
