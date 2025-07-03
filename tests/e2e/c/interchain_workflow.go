@@ -10,12 +10,14 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/proposervm"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
@@ -44,9 +46,11 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 		nodeURI := env.GetRandomNodeURI()
 		ethClient := e2e.NewEthClient(tc, nodeURI)
 
+		proposerClient := proposervm.NewClient(nodeURI.URI, "C")
+
 		tc.By("issuing C-Chain transactions to advance the epoch", func() {
 			// Create transaction
-			for {
+			for range 20 {
 				acceptedNonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), senderEthAddress)
 				require.NoError(err)
 				gasPrice := e2e.SuggestGasPrice(tc, ethClient)
@@ -68,6 +72,14 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 
 				receipt := e2e.SendEthTransaction(tc, ethClient, signedTx)
 				require.Equal(types.ReceiptStatusSuccessful, receipt.Status)
+
+				epochNumber, epochStartTime, pChainHeight, err := proposerClient.GetEpoch(tc.DefaultContext())
+				tc.Log().Info(
+					"epoch",
+					zap.Uint64("Epoch Number:", epochNumber),
+					zap.Int64("Epoch Start Time:", epochStartTime),
+					zap.Uint64("P-Chain Height:", pChainHeight),
+				)
 
 				time.Sleep(5 * time.Second)
 			}
