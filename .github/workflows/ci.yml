@@ -146,7 +146,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: umbrelladocs/action-linkspector@a0567ce1c7c13de4a2358587492ed43cab5d0102 #v1.3.4
+      - uses: umbrelladocs/action-linkspector@de84085e0f51452a470558693d7d308fbb2fa261 #v1.2.5
         with:
           fail_level: any
   check_generated_protobuf:
