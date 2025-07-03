@@ -30,7 +30,7 @@ type client struct {
 // The provided blockchainName should be the blockchainID or an alias (e.g. "P" for the P-Chain).
 func NewClient(uri string, blockchainName string) Client {
 	return &client{
-		requester: rpc.NewEndpointRequester(uri + fmt.Sprintf("/%s/proposervm", blockchainName)),
+		requester: rpc.NewEndpointRequester(uri + fmt.Sprintf("/ext/bc/%s/proposervm", blockchainName)),
 	}
 }
 
@@ -42,7 +42,7 @@ func (c *client) GetProposedHeight(ctx context.Context, options ...rpc.Option) (
 
 func (c *client) GetProposerBlockWrapper(ctx context.Context, proposerID ids.ID, options ...rpc.Option) ([]byte, error) {
 	res := &api.FormattedBlock{}
-	if err := c.requester.SendRequest(ctx, "proposervm.getBlock", &GetProposerBlockArgs{
+	if err := c.requester.SendRequest(ctx, "proposervm.getProposerBlockWrapper", &GetProposerBlockArgs{
 		ProposerID: proposerID,
 		Encoding:   formatting.Hex,
 	}, res, options...); err != nil {
