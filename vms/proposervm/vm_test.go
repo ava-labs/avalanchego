@@ -809,12 +809,10 @@ func TestExpiredBuildBlock(t *testing.T) {
 		}
 	}
 
-	testEnd := make(chan struct{})
-
 	events := make(chan common.Message, 1)
-	coreVM.WaitForEventF = func(context.Context) (common.Message, error) {
+	coreVM.WaitForEventF = func(ctx context.Context) (common.Message, error) {
 		select {
-		case <-testEnd:
+		case <-ctx.Done():
 			return 0, nil
 		case event := <-events:
 			return event, nil
@@ -883,8 +881,6 @@ func TestExpiredBuildBlock(t *testing.T) {
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
-
-	defer close(testEnd)
 
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
@@ -1995,7 +1991,7 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 
 	// Create a VM
 	innerVM := blockmock.NewChainVM(ctrl)
-	innerVM.EXPECT().WaitForEvent(gomock.Any()).Return(common.Message(0), nil).AnyTimes()
+	innerVM.EXPECT().WaitForEvent(gomock.Any()).Return(common.PendingTxs, nil).AnyTimes()
 
 	vm := New(
 		innerVM,

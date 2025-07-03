@@ -328,13 +328,13 @@ func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
 		// If we are pre-fork or haven't finished bootstrapping yet, we should
 		// directly forward the inner VM's events.
 		if !shouldWait {
-			vm.ctx.Log.Debug("Waiting for inner VM event (pre-fork)")
+			vm.ctx.Log.Debug("Waiting for inner VM event (pre-fork or before normal operation)")
 			return vm.ChainVM.WaitForEvent(ctx)
 		}
 
 		duration := time.Until(timeToBuild)
 		if duration <= 0 {
-			vm.ctx.Log.Debug("Building a block immediately")
+			vm.ctx.Log.Debug("Can build a block without waiting")
 			return vm.ChainVM.WaitForEvent(ctx)
 		}
 
