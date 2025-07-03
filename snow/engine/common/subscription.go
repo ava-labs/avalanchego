@@ -3,9 +3,7 @@
 
 package common
 
-import (
-	"context"
-)
+import "context"
 
 // Subscriber is an interface that defines a method to wait for events.
 // It is used to receive messages from a VM such as Pending transactions, state sync completion, etc.

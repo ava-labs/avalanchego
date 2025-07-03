@@ -409,7 +409,7 @@ func (vm *VMClient) CreateHTTP2Handler(ctx context.Context) (http.Handler, error
 func (vm *VMClient) WaitForEvent(ctx context.Context) (common.Message, error) {
 	resp, err := vm.client.WaitForEvent(ctx, &emptypb.Empty{})
 	if err != nil {
-		vm.logger.Error("failed to subscribe to events", zap.Error(err))
+		vm.logger.Debug("failed to subscribe to events", zap.Error(err))
 		return 0, err
 	}
 	return common.Message(resp.Message), nil

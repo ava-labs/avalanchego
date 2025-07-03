@@ -257,7 +257,7 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		_ = vm.vm.Shutdown(ctx)
 		_ = vm.connCloser.Close()
 		close(vm.closed)
-		vm.log.Error("failed to get last accepted block", zap.Error(err))
+		vm.log.Error("failed to get last accepted block ID", zap.Error(err))
 		return nil, err
 	}
 
@@ -271,7 +271,6 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		return nil, err
 	}
 	parentID := blk.Parent()
-	vm.log.Info("initialized vm")
 	return &vmpb.InitializeResponse{
 		LastAcceptedId:       lastAccepted[:],
 		LastAcceptedParentId: parentID[:],
@@ -375,10 +374,13 @@ func (vm *VMServer) CreateHTTP2Handler(ctx context.Context, _ *emptypb.Empty) (*
 }
 
 func (vm *VMServer) WaitForEvent(ctx context.Context, _ *emptypb.Empty) (*vmpb.WaitForEventResponse, error) {
-	message, _ := vm.vm.WaitForEvent(ctx)
+	message, err := vm.vm.WaitForEvent(ctx)
+	if err != nil {
+		vm.log.Debug("Received error while waiting for event", zap.Error(err))
+	}
 	return &vmpb.WaitForEventResponse{
 		Message: vmpb.Message(message),
-	}, nil
+	}, err
 }
 
 func (vm *VMServer) Connected(ctx context.Context, req *vmpb.ConnectedRequest) (*emptypb.Empty, error) {
