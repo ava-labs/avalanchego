@@ -77,6 +77,7 @@ var (
 		EtnaTime:                     InitiallyActiveTime,
 		FortunaTime:                  InitiallyActiveTime,
 		GraniteTime:                  UnscheduledActivationTime,
+		GraniteEpochDuration:         30,
 	}
 
 	ErrInvalidUpgradeTimes = errors.New("invalid upgrade configuration")
@@ -99,6 +100,7 @@ type Config struct {
 	EtnaTime                     time.Time `json:"etnaTime"`
 	FortunaTime                  time.Time `json:"fortunaTime"`
 	GraniteTime                  time.Time `json:"graniteTime"`
+	GraniteEpochDuration         uint64    `json:"graniteEpochDuration"`
 }
 
 func (c *Config) Validate() error {
