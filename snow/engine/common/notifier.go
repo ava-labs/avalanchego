@@ -30,24 +30,25 @@ type NotificationForwarder struct {
 	Subscribe Subscription
 	Log       logging.Logger
 
-	running   sync.WaitGroup
-	closeChan chan struct{}
-	lock      sync.Mutex
-	closeFunc context.CancelFunc
+	lock          sync.Mutex
+	executing     sync.WaitGroup
+	execCtx       context.Context
+	haltExecution context.CancelFunc
+	abortContext  context.CancelFunc
 }
 
 func (nf *NotificationForwarder) Start() {
-	nf.running.Add(1)
-	nf.closeChan = make(chan struct{})
+	nf.executing.Add(1)
+	nf.execCtx, nf.haltExecution = context.WithCancel(context.Background())
 	go nf.run()
 }
 
 func (nf *NotificationForwarder) run() {
-	defer nf.running.Done()
+	defer nf.executing.Done()
 	for {
 		nf.forwardNotification()
 		select {
-		case <-nf.closeChan:
+		case <-nf.execCtx.Done():
 			return
 		default:
 		}
@@ -58,24 +59,15 @@ func (nf *NotificationForwarder) forwardNotification() {
 	ctx := nf.setAndGetContext()
 	defer nf.cancelContext()
 
-	select {
-	case <-nf.closeChan:
-		return
-	default:
-	}
-
 	nf.Log.Debug("Subscribing to notifications")
+
 	msg, err := nf.Subscribe(ctx)
 	if err != nil {
 		nf.Log.Debug("Failed subscribing to notifications", zap.Error(err))
 		return
 	}
 
-	select {
-	case <-nf.closeChan:
-		return
-	default:
-	}
+	nf.Log.Debug("Received notification", zap.Stringer("msg", msg))
 
 	if err := nf.Engine.Notify(ctx, msg); err != nil {
 		nf.Log.Debug("Failed notifying engine", zap.Error(err))
@@ -83,7 +75,7 @@ func (nf *NotificationForwarder) forwardNotification() {
 	}
 
 	select {
-	case <-nf.closeChan:
+	case <-nf.execCtx.Done():
 		return
 	case <-ctx.Done():
 	}
@@ -101,32 +93,27 @@ func (nf *NotificationForwarder) cancelContext() {
 	nf.lock.Lock()
 	defer nf.lock.Unlock()
 
-	if nf.closeFunc != nil {
-		nf.closeFunc()
-		nf.closeFunc = nil
+	if nf.abortContext != nil {
+		nf.abortContext()
+		nf.abortContext = nil
 	}
 }
 
 func (nf *NotificationForwarder) setAndGetContext() context.Context {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(nf.execCtx)
 
 	nf.lock.Lock()
 	defer nf.lock.Unlock()
-	nf.closeFunc = cancel
+	nf.abortContext = cancel
 	return ctx
 }
 
 func (nf *NotificationForwarder) Close() {
-	defer nf.running.Wait()
+	defer nf.executing.Wait()
 
 	nf.lock.Lock()
+	defer nf.lock.Unlock()
 
-	select {
-	case <-nf.closeChan:
-		nf.lock.Unlock()
-	default:
-		close(nf.closeChan)
-		nf.lock.Unlock()
-		nf.cancelContext()
-	}
+	nf.haltExecution()
+	nf.haltExecution = func() {}
 }
