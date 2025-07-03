@@ -100,9 +100,12 @@ func (b *builder) WaitForEvent(ctx context.Context) (common.Message, error) {
 			return 0, err
 		}
 		if duration <= 0 {
+			b.txExecutorBackend.Ctx.Log.Debug("Skipping block build wait, next staker change is ready")
 			// The next staker change is ready to be performed.
 			return common.PendingTxs, nil
 		}
+
+		b.txExecutorBackend.Ctx.Log.Debug("Will wait until a transaction comes", zap.Duration("maxWait", duration))
 
 		// Wait for a transaction in the mempool until there is a next staker
 		// change ready to be performed.
@@ -112,6 +115,7 @@ func (b *builder) WaitForEvent(ctx context.Context) (common.Message, error) {
 
 		switch {
 		case err == nil:
+			b.txExecutorBackend.Ctx.Log.Debug("New transaction received", zap.Stringer("msg", msg))
 			return msg, nil
 		case errors.Is(err, context.DeadlineExceeded):
 			continue // Recheck the staker change time before returning
