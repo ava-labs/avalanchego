@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests/e2e/vms"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet/flags"
 	"github.com/ava-labs/avalanchego/upgrade"
 )
 
@@ -31,7 +32,7 @@ func TestE2E(t *testing.T) {
 	ginkgo.RunSpecs(t, "e2e test suites")
 }
 
-var flagVars *e2e.FlagVars
+var flagVars *flags.FlagVars
 
 func init() {
 	flagVars = e2e.RegisterFlags(e2e.WithDefaultOwner("avalanchego-e2e"))

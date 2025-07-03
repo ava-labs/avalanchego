@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package e2e
+package flags
 
 import (
 	"errors"
@@ -13,7 +13,6 @@ import (
 	"github.com/spf13/cast"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
-	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet/flags"
 )
 
 type NetworkCmd int
@@ -28,9 +27,9 @@ const (
 
 type FlagVars struct {
 	startNetwork     bool
-	startNetworkVars *flags.StartNetworkVars
+	startNetworkVars *StartNetworkVars
 
-	collectorVars *flags.CollectorVars
+	collectorVars *CollectorVars
 
 	checkMetricsCollected bool
 	checkLogsCollected    bool
@@ -174,12 +173,12 @@ func RegisterFlags(ops ...DefaultOption) *FlagVars {
 	)
 
 	options := newDefaultOptions(ops)
-	vars.startNetworkVars = flags.NewStartNetworkFlagVars(
+	vars.startNetworkVars = NewStartNetworkFlagVars(
 		options.Owner(),
 		options.NodeCount(),
 	)
 
-	vars.collectorVars = flags.NewCollectorFlagVars()
+	vars.collectorVars = NewCollectorFlagVars()
 
 	SetCheckCollectionFlags(
 		&vars.checkMetricsCollected,

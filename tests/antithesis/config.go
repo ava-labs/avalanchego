@@ -13,8 +13,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/tests"
-	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet/flags"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet/testenv"
 )
 
 const (
@@ -39,7 +40,7 @@ func NewConfig(tc tests.TestContext, defaultNetwork *tmpnet.Network) *Config {
 
 func NewConfigWithSubnets(tc tests.TestContext, defaultNetwork *tmpnet.Network, getSubnets SubnetsForNodesFunc) *Config {
 	// tmpnet configuration
-	flagVars := e2e.RegisterFlags()
+	flagVars := flags.RegisterFlags()
 
 	var (
 		duration time.Duration
@@ -85,7 +86,7 @@ func configForNewNetwork(
 	tc tests.TestContext,
 	defaultNetwork *tmpnet.Network,
 	getSubnets SubnetsForNodesFunc,
-	flagVars *e2e.FlagVars,
+	flagVars *flags.FlagVars,
 	duration time.Duration,
 ) *Config {
 	if defaultNetwork.Nodes == nil {
@@ -97,7 +98,7 @@ func configForNewNetwork(
 		defaultNetwork.Subnets = getSubnets(defaultNetwork.Nodes...)
 	}
 
-	testEnv := e2e.NewTestEnvironment(tc, flagVars, defaultNetwork)
+	testEnv := testenv.NewTestEnvironment(tc, flagVars, defaultNetwork)
 
 	c := &Config{
 		Duration: duration,
