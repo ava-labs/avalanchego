@@ -18,6 +18,8 @@ type Notifier interface {
 
 // NotificationForwarder is a component that listens for notifications from a Subscription,
 // and forwards them to a Notifier.
+// When PreferenceOrStateChanged is called mid-subscription, it retries the subscription.
+// After Notify is called, it waits for PreferenceOrStateChanged to be called before subscribing again.
 type NotificationForwarder struct {
 	Engine    Notifier
 	Subscribe Subscription
@@ -82,6 +84,10 @@ func (nf *NotificationForwarder) forwardNotification() {
 	}
 }
 
+// PreferenceOrStateChanged is called whenever the block preference changes or when the engine changes state,
+// and its role is to signal the NotificationForwarder to stop its current subscription and re-subscribe.
+// This is needed in case a block has been accepted that changes when a VM considers the need to build a block.
+// In order for the subscription to be correlated to the latest data, it needs to be retried.
 func (nf *NotificationForwarder) PreferenceOrStateChanged() {
 	nf.cancelContext()
 }
@@ -108,10 +114,14 @@ func (nf *NotificationForwarder) setAndGetContext() context.Context {
 func (nf *NotificationForwarder) Close() {
 	defer nf.running.Wait()
 
+	nf.lock.Lock()
+
 	select {
 	case <-nf.closeChan:
+		nf.lock.Unlock()
 	default:
 		close(nf.closeChan)
+		nf.lock.Unlock()
 		nf.cancelContext()
 	}
 }
