@@ -1,0 +1,34 @@
+name: Load Tests
+
+# This workflow runs comprehensive load tests against our Kubernetes cluster
+on:
+  workflow_dispatch:
+
+jobs:
+  load_tests:
+    name: Load Tests
+    runs-on: avalanche-avalanchego-runner
+    container:
+      image: ghcr.io/actions/actions-runner:2.325.0
+
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xz-utils
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go for project
+        uses: ./.github/actions/setup-go-for-project
+
+      - name: Install Nix
+        uses: ./.github/actions/install-nix
+
+      - name: Run load tests
+        shell: nix develop --command bash -x {0}
+        run: |
+          go run ./tests/load/c/main --runtime=kube
