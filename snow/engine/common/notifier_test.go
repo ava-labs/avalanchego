@@ -31,9 +31,19 @@ func TestNotifier(t *testing.T) {
 		return nil
 	})
 
-	subscriber := NewSimpleSubscriber()
+	c := make(chan Message)
+
+	subscriber := func(ctx context.Context) (Message, error) {
+		select {
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		case msg := <-c:
+			return msg, nil
+		}
+	}
+
 	nf := &NotificationForwarder{
-		Subscribe: subscriber.WaitForEvent,
+		Subscribe: subscriber,
 		Engine:    Notifier(notifier),
 		Log:       &logging.NoLog{},
 	}
@@ -43,7 +53,7 @@ func TestNotifier(t *testing.T) {
 
 	go func() {
 		defer wg.Done()
-		subscriber.Publish(PendingTxs)
+		c <- PendingTxs
 	}()
 
 	wg.Wait()
