@@ -39,6 +39,7 @@ use std::fmt::Debug;
 /// style E color:#FFFFFF, fill:#AA00FF, stroke:#AA00FF
 /// ```
 use std::io::{Error, ErrorKind};
+use std::iter::FusedIterator;
 use std::mem::{offset_of, take};
 use std::num::NonZeroU64;
 use std::ops::Deref;
@@ -531,28 +532,8 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
                 trace!("free_head@{address}(cached): {free_head:?} size:{index}");
                 *free_stored_area_addr = free_head;
             } else {
-                let free_area_addr = address.get();
-                let free_head_stream = self.storage.stream_from(free_area_addr)?;
-                let free_head: StoredArea<Area<Node, FreeArea>> = serializer()
-                    .deserialize_from(free_head_stream)
-                    .map_err(|e| {
-                        self.storage.file_io_error(
-                            Error::new(ErrorKind::InvalidData, e),
-                            free_area_addr,
-                            Some("allocate_from_freed".to_string()),
-                        )
-                    })?;
-                let StoredArea {
-                    area: Area::Free(free_head),
-                    area_size_index: read_index,
-                } = free_head
-                else {
-                    return Err(self.storage.file_io_error(
-                        Error::new(ErrorKind::InvalidData, "Attempted to read a non-free area"),
-                        free_area_addr,
-                        Some("allocate_from_freed".to_string()),
-                    ));
-                };
+                let (free_head, read_index) =
+                    FreeArea::from_storage(self.storage.as_ref(), address)?;
                 debug_assert_eq!(read_index as usize, index);
 
                 // Update the free list to point to the next free block.
@@ -919,6 +900,38 @@ impl NodeStoreHeader {
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
 struct FreeArea {
     next_free_block: Option<LinearAddress>,
+}
+
+impl FreeArea {
+    pub(crate) fn from_storage<S: ReadableStorage>(
+        storage: &S,
+        address: LinearAddress,
+    ) -> Result<(Self, AreaIndex), FileIoError> {
+        let free_area_addr = address.get();
+        let stored_area_stream = storage.stream_from(free_area_addr)?;
+        let stored_area: StoredArea<Area<Node, FreeArea>> = serializer()
+            .deserialize_from(stored_area_stream)
+            .map_err(|e| {
+                storage.file_io_error(
+                    Error::new(ErrorKind::InvalidData, e),
+                    free_area_addr,
+                    Some("FreeArea::from_storage".to_string()),
+                )
+            })?;
+        let StoredArea {
+            area: Area::Free(free_area),
+            area_size_index: stored_area_index,
+        } = stored_area
+        else {
+            return Err(storage.file_io_error(
+                Error::new(ErrorKind::InvalidData, "Attempted to read a non-free area"),
+                free_area_addr,
+                Some("FreeArea::from_storage".to_string()),
+            ));
+        };
+
+        Ok((free_area, stored_area_index as AreaIndex))
+    }
 }
 
 /// Reads from an immutable (i.e. already hashed) merkle trie.
@@ -1655,13 +1668,79 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
     }
 }
 
+pub(crate) struct FreeListIterator<'a, S: ReadableStorage> {
+    storage: &'a S,
+    next_addr: Option<LinearAddress>,
+}
+
+impl<'a, S: ReadableStorage> FreeListIterator<'a, S> {
+    pub(crate) const fn new(storage: &'a S, next_addr: Option<LinearAddress>) -> Self {
+        Self { storage, next_addr }
+    }
+}
+
+impl<S: ReadableStorage> Iterator for FreeListIterator<'_, S> {
+    type Item = Result<(LinearAddress, AreaIndex), FileIoError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let next_addr = self.next_addr?;
+
+        // read the free area, propagate any IO error if it occurs
+        let (free_area, stored_area_index) = match FreeArea::from_storage(self.storage, next_addr) {
+            Ok(free_area) => free_area,
+            Err(e) => {
+                // if the read fails, we cannot proceed with the current freelist
+                self.next_addr = None;
+                return Some(Err(e));
+            }
+        };
+
+        // update the next address to the next free block
+        self.next_addr = free_area.next_free_block;
+        Some(Ok((next_addr, stored_area_index)))
+    }
+}
+
+impl<S: ReadableStorage> FusedIterator for FreeListIterator<'_, S> {}
+
+#[allow(dead_code)] // TODO: free list iterators will be used in the checker
+impl<T, S: ReadableStorage> NodeStore<T, S> {
+    // Returns an iterator over the free lists of size no smaller than the size corresponding to `start_area_index`.
+    // The iterator returns a tuple of the address and the area index of the free area.
+    pub(crate) fn free_list_iter(
+        &self,
+        start_area_index: AreaIndex,
+    ) -> impl Iterator<Item = Result<(LinearAddress, AreaIndex), FileIoError>> {
+        self.free_list_iter_inner(start_area_index)
+            .map(|item| item.map(|(addr, area_index, _)| (addr, area_index)))
+    }
+
+    // pub(crate) since checker will use this to verify that the free areas are in the correct free list
+    // Return free_list_id as usize instead of AreaIndex to avoid type conversion
+    pub(crate) fn free_list_iter_inner(
+        &self,
+        start_area_index: AreaIndex,
+    ) -> impl Iterator<Item = Result<(LinearAddress, AreaIndex, usize), FileIoError>> {
+        self.header
+            .free_lists
+            .iter()
+            .enumerate()
+            .skip(start_area_index as usize)
+            .flat_map(move |(free_list_id, next_addr)| {
+                FreeListIterator::new(self.storage.as_ref(), *next_addr).map(move |item| {
+                    item.map(|(addr, area_index)| (addr, area_index, free_list_id))
+                })
+            })
+    }
+}
+
 #[cfg(test)]
 #[expect(clippy::unwrap_used, clippy::indexing_slicing)]
 pub(crate) mod nodestore_test_utils {
     use super::*;
 
     // Helper function to wrap the node in a StoredArea and write it to the given offset. Returns the size of the area on success.
-    pub(crate) fn write_new_node<S: WritableStorage>(
+    pub(crate) fn test_write_new_node<S: WritableStorage>(
         nodestore: &NodeStore<Committed, S>,
         node: &Node,
         offset: u64,
@@ -1677,7 +1756,22 @@ pub(crate) mod nodestore_test_utils {
         AREA_SIZES[area_size_index as usize]
     }
 
-    pub(crate) fn write_header<S: WritableStorage>(
+    pub(crate) fn test_write_free_area<S: WritableStorage>(
+        nodestore: &NodeStore<Committed, S>,
+        next_free_block: Option<LinearAddress>,
+        area_size_index: AreaIndex,
+        offset: u64,
+    ) {
+        let area: Area<Node, FreeArea> = Area::Free(FreeArea { next_free_block });
+        let stored_area = StoredArea {
+            area_size_index,
+            area,
+        };
+        let stored_area_bytes = serializer().serialize(&stored_area).unwrap();
+        nodestore.storage.write(offset, &stored_area_bytes).unwrap();
+    }
+
+    pub(crate) fn test_write_header<S: WritableStorage>(
         nodestore: &NodeStore<Committed, S>,
         root_addr: LinearAddress,
         size: u64,
@@ -1845,5 +1939,59 @@ mod tests {
 
         let immutable = NodeStore::<Arc<ImmutableProposal>, _>::try_from(node_store).unwrap();
         println!("{immutable:?}"); // should not be reached, but need to consume immutable to avoid optimization removal
+    }
+}
+
+#[cfg(test)]
+#[expect(clippy::unwrap_used, clippy::indexing_slicing)]
+mod test_free_list_iterator {
+    use super::nodestore_test_utils::*;
+    use super::*;
+    use crate::linear::memory::MemStore;
+    use crate::test_utils::seeded_rng;
+
+    use rand::Rng;
+    use rand::seq::IteratorRandom;
+
+    #[test]
+    fn free_list_iterator() {
+        let mut rng = seeded_rng();
+        let memstore = MemStore::new(vec![]);
+        let nodestore = NodeStore::new_empty_committed(memstore.into()).unwrap();
+
+        let area_index = rng.random_range(0..NUM_AREA_SIZES as u8);
+        let area_size = AREA_SIZES[area_index as usize];
+
+        // create a random free list scattered across the storage
+        let offsets = (1..100u64)
+            .map(|i| i * area_size)
+            .choose_multiple(&mut rng, 10);
+        for (cur, next) in offsets.iter().zip(offsets.iter().skip(1)) {
+            test_write_free_area(
+                &nodestore,
+                Some(LinearAddress::new(*next).unwrap()),
+                area_index,
+                *cur,
+            );
+        }
+        test_write_free_area(&nodestore, None, area_index, *offsets.last().unwrap());
+
+        // test iterator from a random starting point
+        let skip = rng.random_range(0..offsets.len());
+        let mut iterator = offsets.into_iter().skip(skip);
+        let start = iterator.next().unwrap();
+        let mut free_list_iter =
+            FreeListIterator::new(nodestore.storage.as_ref(), LinearAddress::new(start));
+        assert_eq!(
+            free_list_iter.next().unwrap().unwrap(),
+            (LinearAddress::new(start).unwrap(), area_index)
+        );
+
+        for offset in iterator {
+            let next_item = free_list_iter.next().unwrap().unwrap();
+            assert_eq!(next_item, (LinearAddress::new(offset).unwrap(), area_index));
+        }
+
+        assert!(free_list_iter.next().is_none());
     }
 }

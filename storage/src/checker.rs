@@ -75,7 +75,7 @@ mod test {
     use super::*;
     use crate::linear::memory::MemStore;
     use crate::nodestore::NodeStoreHeader;
-    use crate::nodestore::nodestore_test_utils::{write_header, write_new_node};
+    use crate::nodestore::nodestore_test_utils::{test_write_header, test_write_new_node};
     use crate::{BranchNode, Child, HashType, LeafNode, NodeStore, Path};
 
     #[test]
@@ -106,7 +106,7 @@ mod test {
             value: Box::new([3, 4, 5]),
         });
         let leaf_addr = LinearAddress::new(high_watermark).unwrap();
-        let leaf_area = write_new_node(&nodestore, &leaf, high_watermark);
+        let leaf_area = test_write_new_node(&nodestore, &leaf, high_watermark);
         high_watermark += leaf_area;
 
         let mut branch_children: [Option<Child>; BranchNode::MAX_CHILDREN] = Default::default();
@@ -117,7 +117,7 @@ mod test {
             children: branch_children,
         }));
         let branch_addr = LinearAddress::new(high_watermark).unwrap();
-        let branch_area = write_new_node(&nodestore, &branch, high_watermark);
+        let branch_area = test_write_new_node(&nodestore, &branch, high_watermark);
         high_watermark += branch_area;
 
         let mut root_children: [Option<Child>; BranchNode::MAX_CHILDREN] = Default::default();
@@ -128,11 +128,11 @@ mod test {
             children: root_children,
         }));
         let root_addr = LinearAddress::new(high_watermark).unwrap();
-        let root_area = write_new_node(&nodestore, &root, high_watermark);
+        let root_area = test_write_new_node(&nodestore, &root, high_watermark);
         high_watermark += root_area;
 
         // write the header
-        write_header(&nodestore, root_addr, high_watermark);
+        test_write_header(&nodestore, root_addr, high_watermark);
 
         // verify that all of the space is accounted for - since there is no free area
         let mut visited = LinearAddressRangeSet::new(high_watermark).unwrap();

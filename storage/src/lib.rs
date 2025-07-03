@@ -133,3 +133,24 @@ pub enum CheckerError {
     #[error("IO error")]
     IO(#[from] FileIoError),
 }
+
+#[cfg(test)]
+mod test_utils {
+    use rand::rngs::StdRng;
+    use rand::{Rng, SeedableRng, rng};
+
+    pub fn seeded_rng() -> StdRng {
+        let seed = std::env::var("FIREWOOD_STORAGE_TEST_SEED")
+            .ok()
+            .map_or_else(
+                || rng().random(),
+                |s| {
+                    str::parse(&s)
+                        .expect("couldn't parse FIREWOOD_STORAGE_TEST_SEED; must be a u64")
+                },
+            );
+
+        eprintln!("Seed {seed}: to rerun with this data, export FIREWOOD_STORAGE_TEST_SEED={seed}");
+        StdRng::seed_from_u64(seed)
+    }
+}
