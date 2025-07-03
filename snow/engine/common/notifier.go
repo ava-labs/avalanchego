@@ -77,7 +77,7 @@ func (nf *NotificationForwarder) forwardNotification() {
 	default:
 	}
 
-	if err := nf.Engine.Notify(context.Background(), msg); err != nil {
+	if err := nf.Engine.Notify(ctx, msg); err != nil {
 		nf.Log.Debug("Failed notifying engine", zap.Error(err))
 		return
 	}
