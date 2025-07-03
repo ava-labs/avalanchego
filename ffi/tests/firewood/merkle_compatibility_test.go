@@ -60,7 +60,6 @@ func newTestFirewoodDatabase(t *testing.T) *firewood.Database {
 
 func newFirewoodDatabase(dbFile string) (*firewood.Database, func() error, error) {
 	conf := firewood.DefaultConfig()
-	conf.MetricsPort = 0
 	conf.Create = true
 
 	f, err := firewood.New(dbFile, conf)

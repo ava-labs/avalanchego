@@ -18,17 +18,9 @@ use metrics::Key;
 use metrics_util::registry::{AtomicStorage, Registry};
 
 /// Sets up a metrics server over a specified port.
-/// If `metrics_port` is set to 0, it will not initialize the metrics system.
 /// This happens on a per-process basis, meaning that the metrics system
 /// cannot be initialized if it has already been set up in the same process.
-/// Any caller should ensure that the metrics system is not already initialized
-/// by explicitly calling with `metrics_port` == 0..
 pub(crate) fn setup_metrics(metrics_port: u16) -> Result<(), Box<dyn Error>> {
-    if metrics_port == 0 {
-        // If the port is 0, we do not initialize the metrics system.
-        return Ok(());
-    }
-
     let inner: TextRecorderInner = TextRecorderInner {
         registry: Registry::atomic(),
     };

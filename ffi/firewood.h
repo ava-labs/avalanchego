@@ -60,7 +60,6 @@ typedef struct DatabaseCreationResult {
  * * `strategy` - The cache read strategy to use, 0 for writes only,
  *   1 for branch reads, and 2 for all reads.
  *   Returns an error if the value is not 0, 1, or 2.
- * * `metrics_port` - The port to use for metrics, 0 to disable metrics.
  */
 typedef struct CreateOrOpenArgs {
   const char *path;
@@ -68,7 +67,6 @@ typedef struct CreateOrOpenArgs {
   size_t free_list_cache_size;
   size_t revisions;
   uint8_t strategy;
-  uint16_t metrics_port;
 } CreateOrOpenArgs;
 
 typedef uint32_t ProposalId;
@@ -408,3 +406,17 @@ struct Value fwd_propose_on_proposal(const struct DatabaseHandle *db,
  *
  */
 struct Value fwd_root_hash(const struct DatabaseHandle *db);
+
+/**
+ * Start metrics exporter for this process
+ *
+ * # Arguments
+ *
+ * * `metrics_port` - the port where metrics will be exposed at
+ *
+ * # Returns
+ *
+ * A `Value` containing {0, null} if the metrics exporter successfully started.
+ * A `Value` containing {0, "error message"} if the metrics exporter failed to start.
+ */
+struct Value fwd_start_metrics(uint16_t metrics_port);

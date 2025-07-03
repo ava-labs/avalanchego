@@ -823,6 +823,23 @@ pub unsafe extern "C" fn fwd_free_database_error_result(
     // Note: we don't free the db pointer as it's managed by the caller
 }
 
+/// Start metrics exporter for this process
+///
+/// # Arguments
+///
+/// * `metrics_port` - the port where metrics will be exposed at
+///
+/// # Returns
+///
+/// A `Value` containing {0, null} if the metrics exporter successfully started.
+/// A `Value` containing {0, "error message"} if the metrics exporter failed to start.
+#[unsafe(no_mangle)]
+pub extern "C" fn fwd_start_metrics(metrics_port: u16) -> Value {
+    metrics_setup::setup_metrics(metrics_port)
+        .map_err(|e| e.to_string())
+        .map_or_else(Into::into, Into::into)
+}
+
 /// Common arguments, accepted by both `fwd_create_db()` and `fwd_open_db()`.
 ///
 /// * `path` - The path to the database file, which will be truncated if passed to `fwd_create_db()`
@@ -833,7 +850,6 @@ pub unsafe extern "C" fn fwd_free_database_error_result(
 /// * `strategy` - The cache read strategy to use, 0 for writes only,
 ///   1 for branch reads, and 2 for all reads.
 ///   Returns an error if the value is not 0, 1, or 2.
-/// * `metrics_port` - The port to use for metrics, 0 to disable metrics.
 #[repr(C)]
 pub struct CreateOrOpenArgs {
     path: *const std::ffi::c_char,
@@ -841,7 +857,6 @@ pub struct CreateOrOpenArgs {
     free_list_cache_size: usize,
     revisions: usize,
     strategy: u8,
-    metrics_port: u16,
 }
 
 /// Create a database with the given cache size and maximum number of revisions, as well
@@ -910,9 +925,6 @@ unsafe fn common_create(args: &CreateOrOpenArgs, create_file: bool) -> Result<Db
     let path: &Path = OsStr::from_bytes(path.to_bytes()).as_ref();
     #[cfg(windows)]
     let path: &Path = OsStr::new(path.to_str().expect("path should be valid UTF-8")).as_ref();
-    if args.metrics_port > 0 {
-        metrics_setup::setup_metrics(args.metrics_port).map_err(|e| e.to_string())?;
-    }
     Db::new_sync(path, cfg).map_err(|e| e.to_string())
 }
 
