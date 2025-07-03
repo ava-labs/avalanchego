@@ -12,6 +12,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
+// Subscription is a function that blocks until either the given context is cancelled, or a message is returned.
+// It is used to receive messages from a VM such as Pending transactions, state sync completion, etc.
+// The function returns the message received, or an error if the context is cancelled.
+type Subscription func(ctx context.Context) (Message, error)
+
 type Notifier interface {
 	Notify(context.Context, Message) error
 }
