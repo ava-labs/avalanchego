@@ -17,8 +17,8 @@ repository = "https://github.com/ava-labs/firewood"
 
 [dependencies]
 bincode = { workspace = true }
-bitflags = "2.5.0"
-enum-as-inner = "0.6.0"
+bitflags = "2.9.1"
+enum-as-inner = "0.6.1"
 hex = "0.4.3"
 serde = { workspace = true, features = ["derive"] }
 smallvec = { workspace = true, features = ["serde", "write", "union"] }
@@ -27,12 +27,12 @@ integer-encoding = { workspace = true }
 arc-swap = "1.7.1"
 lru = "0.16.0"
 metrics = { workspace = true }
-log = { version = "0.4.20", optional = true }
-bytemuck = "1.7.0"
-bytemuck_derive = "1.7.0"
-bitfield = "0.19.0"
+log = { version = "0.4.27", optional = true }
+bytemuck = "1.23.1"
+bytemuck_derive = "1.9.3"
+bitfield = "0.19.1"
 fastrace = { workspace = true }
-io-uring = { version = "0.7.4", optional = true }
+io-uring = { version = "0.7.8", optional = true }
 triomphe = "0.1.14"
 coarsetime = { workspace = true }
 rlp = { version = "0.6.1", optional = true }

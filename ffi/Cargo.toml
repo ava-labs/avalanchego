@@ -19,12 +19,12 @@ repository = "https://github.com/ava-labs/firewood"
 crate-type = ["staticlib"]
 
 [dependencies]
-libc = "0.2.2"
+libc = "0.2.174"
 firewood = { version = "0.0.7", path = "../firewood" }
 metrics = { workspace = true }
 metrics-util = { workspace = true }
-chrono = "0.4.39"
-oxhttp = "0.3.0"
+chrono = "0.4.41"
+oxhttp = "0.3.1"
 coarsetime = { workspace = true }
 env_logger = { workspace = true, optional = true}
 
