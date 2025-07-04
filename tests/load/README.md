@@ -125,7 +125,7 @@ Builds image from local code and deploys to local Kind cluster
 
 ### With additional CLI flags (duration, connections, nodes, etc.)
 ```shell
-./scripts/run_task.sh test-load-kube-kind -- --duration=10m --connections=200 --nodes=3
+./scripts/run_task.sh test-load-kube-kind -- --duration=10m --nodes=3
 ```
 
 ### With custom image (skips building from local code)
