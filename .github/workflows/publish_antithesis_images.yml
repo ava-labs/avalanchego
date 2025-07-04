@@ -26,7 +26,7 @@ jobs:
         password: ${{ secrets.ANTITHESIS_GAR_JSON_KEY }}
 
     - name: Build and publish images
-      run: bash -x ./scripts/build_antithesis_images.sh
+      run: ./scripts/run_task.sh build-antithesis-images
       env:
         IMAGE_PREFIX: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}
         IMAGE_TAG: latest

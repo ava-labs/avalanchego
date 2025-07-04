@@ -16,5 +16,5 @@ jobs:
           go-version-file: "go.mod"
       - run: go mod download
         shell: bash
-      - run: ./scripts/build_bench_precompiles.sh
+      - run: ./scripts/run_task.sh build-bench-precompiles
         shell: bash
