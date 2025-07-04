@@ -250,6 +250,10 @@ tasks:
     cmds:
       - cmd: go run ./tests/load/c/main --runtime=kube --kube-use-exclusive-scheduling {{.CLI_ARGS}}
 
+  test-load-within-cluster:
+    desc: Runs load tests within a kind cluster
+    cmd: bash -x ./scripts/tests.load.kind.sh
+
   test-unit:
     desc: Runs unit tests
     # Invoking with bash ensures compatibility with CI execution on Windows
