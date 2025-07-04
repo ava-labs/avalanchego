@@ -237,7 +237,7 @@ tasks:
     desc: Runs load tests against a kind cluster
     cmds:
       - task: generate-load-contract-bindings
-      - cmd: bash -x ./scripts/tests.load.kube.sh {{.CLI_ARGS}}
+      - cmd: bash -x ./scripts/tests.load.kube.kind.sh {{.CLI_ARGS}}
 
   test-load-kube-remote:
     desc: Runs load tests against a remote kubernetes cluster
