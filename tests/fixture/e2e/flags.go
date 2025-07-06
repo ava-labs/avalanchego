@@ -131,16 +131,12 @@ type DefaultOptions struct {
 	nodeCount int
 }
 
-func NewDefaultOptions(ops []DefaultOption) *DefaultOptions {
+func newDefaultOptions(ops []DefaultOption) *DefaultOptions {
 	o := &DefaultOptions{}
-	o.applyOptions(ops)
-	return o
-}
-
-func (d *DefaultOptions) applyOptions(ops []DefaultOption) {
 	for _, op := range ops {
-		op(d)
+		op(o)
 	}
+	return o
 }
 
 func (d *DefaultOptions) Owner() string {
@@ -177,7 +173,7 @@ func RegisterFlagsWithOptions(ops ...DefaultOption) *FlagVars {
 		"[optional] start a new network and exit without executing any tests. The new network cannot be reused with --reuse-network.",
 	)
 
-	options := NewDefaultOptions(ops)
+	options := newDefaultOptions(ops)
 	vars.startNetworkVars = flags.NewStartNetworkFlagVars(
 		options.Owner(),
 		options.NodeCount(),
