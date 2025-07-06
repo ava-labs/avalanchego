@@ -39,7 +39,7 @@ func NewConfig(tc tests.TestContext, defaultNetwork *tmpnet.Network) *Config {
 
 func NewConfigWithSubnets(tc tests.TestContext, defaultNetwork *tmpnet.Network, getSubnets SubnetsForNodesFunc) *Config {
 	// tmpnet configuration
-	flagVars := e2e.RegisterFlags()
+	flagVars := e2e.RegisterFlagsWithOptions()
 
 	var (
 		duration time.Duration

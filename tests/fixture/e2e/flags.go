@@ -167,10 +167,6 @@ func WithDefaultNodeCount(nodeCount int) DefaultOption {
 	}
 }
 
-func RegisterFlags() *FlagVars {
-	return RegisterFlagsWithOptions(WithDefaultNodeCount(tmpnet.DefaultNodeCount))
-}
-
 func RegisterFlagsWithOptions(ops ...DefaultOption) *FlagVars {
 	vars := FlagVars{}
 
