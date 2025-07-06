@@ -227,21 +227,39 @@ func New(indexDir, dataDir string, config DatabaseConfig, log logging.Logger) (*
 		}
 	})
 
+	s.log.Info("Initializing BlockDB",
+		zap.String("indexDir", indexDir),
+		zap.String("dataDir", dataDir),
+		zap.Uint64("maxDataFileSize", config.MaxDataFileSize),
+		zap.Int("maxDataFiles", config.MaxDataFiles),
+		zap.Bool("truncate", config.Truncate),
+	)
+
 	if err := s.openAndInitializeIndex(indexDir, config.Truncate); err != nil {
+		s.log.Error("Failed to initialize database: failed to initialize index", zap.Error(err))
 		return nil, err
 	}
 
 	if err := s.initializeDataFiles(dataDir, config.Truncate); err != nil {
+		s.log.Error("Failed to initialize database: failed to initialize data files", zap.Error(err))
 		s.closeFiles()
 		return nil, err
 	}
 
 	if !config.Truncate {
 		if err := s.recover(); err != nil {
+			s.log.Error("Failed to initialize database: recovery failed", zap.Error(err))
 			s.closeFiles()
 			return nil, fmt.Errorf("recovery failed: %w", err)
 		}
 	}
+
+	s.log.Info("BlockDB initialized successfully",
+		zap.Uint64("maxContiguousHeight", s.maxContiguousHeight.Load()),
+		zap.Uint64("maxBlockHeight", s.maxBlockHeight.Load()),
+		zap.Uint64("nextWriteOffset", s.nextDataWriteOffset.Load()),
+	)
+
 	return s, nil
 }
 
@@ -264,7 +282,13 @@ func (s *Database) Close() error {
 	s.closed = true
 
 	err := s.persistIndexHeader()
+	if err != nil {
+		s.log.Error("Failed to close database: failed to persist index header", zap.Error(err))
+	}
+
 	s.closeFiles()
+
+	s.log.Info("Block database closed successfully")
 	return err
 }
 
@@ -274,34 +298,61 @@ func (s *Database) WriteBlock(height BlockHeight, block BlockData, headerSize Bl
 	defer s.closeMu.RUnlock()
 
 	if s.closed {
+		s.log.Error("Failed to write block: database is closed",
+			zap.Uint64("height", height),
+		)
 		return ErrDatabaseClosed
 	}
 
 	blockSize := len(block)
 	if blockSize > math.MaxUint32 {
+		s.log.Error("Failed to write block: block size exceeds max size for uint32",
+			zap.Uint64("height", height),
+			zap.Int("blockSize", blockSize),
+		)
 		return fmt.Errorf("%w: block size cannot exceed %d bytes", ErrBlockTooLarge, math.MaxUint32)
 	}
 
 	blockDataLen := uint32(blockSize)
 	if blockDataLen == 0 {
+		s.log.Error("Failed to write block: empty block", zap.Uint64("height", height))
 		return ErrBlockEmpty
 	}
 
 	if headerSize >= blockDataLen {
+		s.log.Error("Failed to write block: header size exceeds block size",
+			zap.Uint64("height", height),
+			zap.Uint32("headerSize", headerSize),
+			zap.Uint32("blockSize", blockDataLen),
+		)
 		return ErrHeaderSizeTooLarge
 	}
 
 	indexFileOffset, err := s.indexEntryOffset(height)
 	if err != nil {
+		s.log.Error("Failed to write block: failed to calculate index entry offset",
+			zap.Uint64("height", height),
+			zap.Error(err),
+		)
 		return fmt.Errorf("failed to get index entry offset for block at height %d: %w", height, err)
 	}
 
 	sizeWithDataHeader, err := safemath.Add(sizeOfBlockEntryHeader, blockDataLen)
 	if err != nil {
+		s.log.Error("Failed to write block: block size calculation overflow",
+			zap.Uint64("height", height),
+			zap.Uint32("blockSize", blockDataLen),
+			zap.Error(err),
+		)
 		return fmt.Errorf("calculating total block size would overflow for block at height %d: %w", height, err)
 	}
 	writeDataOffset, err := s.allocateBlockSpace(sizeWithDataHeader)
 	if err != nil {
+		s.log.Error("Failed to write block: failed to allocate block space",
+			zap.Uint64("height", height),
+			zap.Uint32("totalSize", sizeWithDataHeader),
+			zap.Error(err),
+		)
 		return err
 	}
 
@@ -313,14 +364,40 @@ func (s *Database) WriteBlock(height BlockHeight, block BlockData, headerSize Bl
 		Version:    BlockEntryVersion,
 	}
 	if err := s.writeBlockAt(writeDataOffset, bh, block); err != nil {
+		s.log.Error("Failed to write block: error writing block data",
+			zap.Uint64("height", height),
+			zap.Uint64("dataOffset", writeDataOffset),
+			zap.Error(err),
+		)
 		return err
 	}
 
 	if err := s.writeIndexEntryAt(indexFileOffset, writeDataOffset, blockDataLen, headerSize); err != nil {
+		s.log.Error("Failed to write block: error writing index entry",
+			zap.Uint64("height", height),
+			zap.Uint64("indexOffset", indexFileOffset),
+			zap.Uint64("dataOffset", writeDataOffset),
+			zap.Error(err),
+		)
 		return err
 	}
 
-	return s.updateBlockHeights(height)
+	if err := s.updateBlockHeights(height); err != nil {
+		s.log.Error("Failed to write block: error updating block heights",
+			zap.Uint64("height", height),
+			zap.Error(err),
+		)
+		return err
+	}
+
+	s.log.Debug("Block written successfully",
+		zap.Uint64("height", height),
+		zap.Uint32("blockSize", blockDataLen),
+		zap.Uint32("headerSize", headerSize),
+		zap.Uint64("dataOffset", writeDataOffset),
+	)
+
+	return nil
 }
 
 // readBlockIndex reads the index entry for the given height.
@@ -328,22 +405,42 @@ func (s *Database) WriteBlock(height BlockHeight, block BlockData, headerSize Bl
 func (s *Database) readBlockIndex(height BlockHeight) (indexEntry, error) {
 	var entry indexEntry
 	if s.closed {
+		s.log.Error("Failed to read block index: database is closed",
+			zap.Uint64("height", height),
+		)
 		return entry, ErrDatabaseClosed
 	}
 
 	// Skip the index entry read if we know the block is past the max height.
 	maxHeight := s.maxBlockHeight.Load()
 	if maxHeight == unsetHeight || height > maxHeight {
+		reason := "height beyond max"
+		if maxHeight == unsetHeight {
+			reason = "no blocks written yet"
+		}
+		s.log.Debug("Block not found",
+			zap.Uint64("height", height),
+			zap.Uint64("maxHeight", maxHeight),
+			zap.String("reason", reason),
+		)
 		return entry, ErrBlockNotFound
 	}
 
 	entry, err := s.readIndexEntry(height)
 	if err != nil {
+		if errors.Is(err, ErrBlockNotFound) {
+			s.log.Debug("Block not found",
+				zap.Uint64("height", height),
+				zap.String("reason", "no index entry found"),
+				zap.Error(err),
+			)
+		} else {
+			s.log.Error("Failed to read block index: failed to read index entry",
+				zap.Uint64("height", height),
+				zap.Error(err),
+			)
+		}
 		return entry, err
-	}
-
-	if entry.IsEmpty() {
-		return entry, ErrBlockNotFound
 	}
 
 	return entry, nil
@@ -364,10 +461,21 @@ func (s *Database) ReadBlock(height BlockHeight) (BlockData, error) {
 	blockData := make(BlockData, indexEntry.Size)
 	dataFile, localOffset, err := s.getDataFileAndOffset(indexEntry.Offset)
 	if err != nil {
+		s.log.Error("Failed to read block: failed to get data file",
+			zap.Uint64("height", height),
+			zap.Uint64("dataOffset", indexEntry.Offset),
+			zap.Error(err),
+		)
 		return nil, fmt.Errorf("failed to get data file for block at height %d: %w", height, err)
 	}
 	_, err = dataFile.ReadAt(blockData, int64(localOffset+uint64(sizeOfBlockEntryHeader)))
 	if err != nil {
+		s.log.Error("Failed to read block: failed to read block data from file",
+			zap.Uint64("height", height),
+			zap.Uint64("localOffset", localOffset),
+			zap.Uint32("blockSize", indexEntry.Size),
+			zap.Error(err),
+		)
 		return nil, fmt.Errorf("failed to read block data from data file: %w", err)
 	}
 
@@ -392,6 +500,11 @@ func (s *Database) ReadHeader(height BlockHeight) (BlockData, error) {
 
 	// Validate header size doesn't exceed total block size
 	if indexEntry.HeaderSize > indexEntry.Size {
+		s.log.Error("Failed to read header: header size exceeds block size",
+			zap.Uint64("height", height),
+			zap.Uint32("headerSize", indexEntry.HeaderSize),
+			zap.Uint32("blockSize", indexEntry.Size),
+		)
 		return nil, fmt.Errorf("invalid header size %d exceeds block size %d", indexEntry.HeaderSize, indexEntry.Size)
 	}
 
@@ -399,10 +512,21 @@ func (s *Database) ReadHeader(height BlockHeight) (BlockData, error) {
 	headerData := make([]byte, indexEntry.HeaderSize)
 	dataFile, localOffset, err := s.getDataFileAndOffset(indexEntry.Offset)
 	if err != nil {
+		s.log.Error("Failed to read header: failed to get data file",
+			zap.Uint64("height", height),
+			zap.Uint64("dataOffset", indexEntry.Offset),
+			zap.Error(err),
+		)
 		return nil, fmt.Errorf("failed to get data file for block header at height %d: %w", height, err)
 	}
 	_, err = dataFile.ReadAt(headerData, int64(localOffset+uint64(sizeOfBlockEntryHeader)))
 	if err != nil {
+		s.log.Error("Failed to read header: failed to read header data from file",
+			zap.Uint64("height", height),
+			zap.Uint64("localOffset", localOffset),
+			zap.Uint32("headerSize", indexEntry.HeaderSize),
+			zap.Error(err),
+		)
 		return nil, fmt.Errorf("failed to read block header data from data file: %w", err)
 	}
 
@@ -424,19 +548,41 @@ func (s *Database) ReadBody(height BlockHeight) (BlockData, error) {
 	bodyData := make([]byte, bodySize)
 	dataFile, localOffset, err := s.getDataFileAndOffset(indexEntry.Offset)
 	if err != nil {
+		s.log.Error("Failed to read body: failed to get data file",
+			zap.Uint64("height", height),
+			zap.Uint64("dataOffset", indexEntry.Offset),
+			zap.Error(err),
+		)
 		return nil, fmt.Errorf("failed to get data file for block body at height %d: %w", height, err)
 	}
 	headerOffset, err := safemath.Add(localOffset, uint64(sizeOfBlockEntryHeader))
 	if err != nil {
+		s.log.Error("Failed to read body: header offset calculation overflow",
+			zap.Uint64("height", height),
+			zap.Uint64("localOffset", localOffset),
+			zap.Error(err),
+		)
 		return nil, fmt.Errorf("calculating header offset would overflow for block at height %d: %w", height, err)
 	}
 	bodyOffset, err := safemath.Add(headerOffset, uint64(indexEntry.HeaderSize))
 	if err != nil {
+		s.log.Error("Failed to read body: body offset calculation overflow",
+			zap.Uint64("height", height),
+			zap.Uint64("headerOffset", headerOffset),
+			zap.Uint32("headerSize", indexEntry.HeaderSize),
+			zap.Error(err),
+		)
 		return nil, fmt.Errorf("calculating body offset would overflow for block at height %d: %w", height, err)
 	}
 
 	_, err = dataFile.ReadAt(bodyData, int64(bodyOffset))
 	if err != nil {
+		s.log.Error("Failed to read body: failed to read body data from file",
+			zap.Uint64("height", height),
+			zap.Uint64("bodyOffset", bodyOffset),
+			zap.Uint32("bodySize", bodySize),
+			zap.Error(err),
+		)
 		return nil, fmt.Errorf("failed to read block body data from data file: %w", err)
 	}
 	return bodyData, nil
@@ -491,7 +637,7 @@ func (s *Database) readIndexEntry(height BlockHeight) (indexEntry, error) {
 		// Return ErrBlockNotFound if trying to read past the end of the index file
 		// for a block that has not been indexed yet.
 		if errors.Is(err, io.EOF) {
-			return entry, ErrBlockNotFound
+			return entry, fmt.Errorf("%w: EOF reading index entry at offset %d for height %d", ErrBlockNotFound, offset, height)
 		}
 		return entry, fmt.Errorf("failed to read index entry at offset %d for height %d: %w", offset, height, err)
 	}
@@ -500,7 +646,7 @@ func (s *Database) readIndexEntry(height BlockHeight) (indexEntry, error) {
 	}
 
 	if entry.IsEmpty() {
-		return entry, ErrBlockNotFound
+		return entry, fmt.Errorf("%w: empty index entry for height %d", ErrBlockNotFound, height)
 	}
 
 	return entry, nil
@@ -622,12 +768,11 @@ func (s *Database) recover() error {
 		// The data on disk is ahead of the index. We need to recover un-indexed blocks.
 		s.log.Info("Recovery: data files are ahead of index; recovering un-indexed blocks.",
 			zap.Uint64("headerNextWriteOffset", nextDataWriteOffset),
-			zap.Uint64("calculatedNextWriteOffset", calculatedNextDataWriteOffset),
+			zap.Uint64("actualDataNextWriteOffset", calculatedNextDataWriteOffset),
 		)
 
 		// Start scan from where the index left off.
 		currentScanOffset := nextDataWriteOffset
-		recoveredBlocksCount := 0
 		recoveredHeights := make([]BlockHeight, 0)
 		for currentScanOffset < calculatedNextDataWriteOffset {
 			bh, err := s.recoverBlockAtOffset(currentScanOffset, calculatedNextDataWriteOffset)
@@ -648,10 +793,9 @@ func (s *Database) recover() error {
 			}
 			s.log.Debug("Recovery: Successfully validated and indexed block",
 				zap.Uint64("height", bh.Height),
-				zap.Uint32("size", bh.Size),
-				zap.Uint64("offset", currentScanOffset),
+				zap.Uint32("blockSize", bh.Size),
+				zap.Uint64("dataOffset", currentScanOffset),
 			)
-			recoveredBlocksCount++
 			recoveredHeights = append(recoveredHeights, bh.Height)
 			blockTotalSize, err := safemath.Add(uint64(sizeOfBlockEntryHeader), uint64(bh.Size))
 			if err != nil {
@@ -676,7 +820,7 @@ func (s *Database) recover() error {
 		}
 
 		s.log.Info("Recovery: Scan finished",
-			zap.Int("recoveredBlocks", recoveredBlocksCount),
+			zap.Int("recoveredBlocks", len(recoveredHeights)),
 			zap.Uint64("finalNextWriteOffset", s.nextDataWriteOffset.Load()),
 			zap.Uint64("maxContiguousBlockHeight", s.maxContiguousHeight.Load()),
 			zap.Uint64("maxBlockHeight", s.maxBlockHeight.Load()),
@@ -767,7 +911,7 @@ func (s *Database) listDataFiles() (map[int]string, int, error) {
 		var index int
 		n, err := fmt.Sscanf(file.Name(), dataFileNameFormat, &index)
 		if err != nil || n != 1 {
-			s.log.Debug("non-data file scanned in data directory", zap.String("file", file.Name()), zap.Error(err))
+			s.log.Debug("non-data file found in data directory", zap.String("fileName", file.Name()), zap.Error(err))
 			continue
 		}
 		dataFiles[index] = filepath.Join(s.dataDir, file.Name())
@@ -906,9 +1050,20 @@ func (s *Database) getOrOpenDataFile(fileIndex int) (*os.File, error) {
 	filePath := s.dataFilePath(fileIndex)
 	handle, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, defaultFilePermissions)
 	if err != nil {
+		s.log.Error("Failed to open data file",
+			zap.Int("fileIndex", fileIndex),
+			zap.String("filePath", filePath),
+			zap.Error(err),
+		)
 		return nil, fmt.Errorf("failed to open data file %s: %w", filePath, err)
 	}
 	s.fileCache.Put(fileIndex, handle)
+
+	s.log.Debug("Opened data file",
+		zap.Int("fileIndex", fileIndex),
+		zap.String("filePath", filePath),
+	)
+
 	return handle, nil
 }
 
@@ -960,7 +1115,10 @@ func (s *Database) updateBlockHeights(writtenBlockHeight BlockHeight) error {
 		for {
 			nextHeightToVerify, err := safemath.Add(currentMax, 1)
 			if err != nil {
-				s.log.Error("overflow in height calculation when updating max contiguous height")
+				s.log.Error("Failed to update block heights: overflow in height calculation",
+					zap.Uint64("currentMax", currentMax),
+					zap.Error(err),
+				)
 				break
 			}
 			// Check if we have indexed a block at the next height, which would extend our contiguous sequence
@@ -972,8 +1130,7 @@ func (s *Database) updateBlockHeights(writtenBlockHeight BlockHeight) error {
 				}
 
 				// log unexpected error
-				s.log.Error(
-					"error reading index entry when updating max contiguous height",
+				s.log.Error("Failed to update block heights: error reading index entry",
 					zap.Uint64("height", nextHeightToVerify),
 					zap.Error(err),
 				)
@@ -1031,7 +1188,7 @@ func (s *Database) updateRecoveredBlockHeights(recoveredHeights []BlockHeight) e
 		nextHeightToVerify = currentMaxContiguous + 1
 	}
 	for {
-		entry, err := s.readIndexEntry(nextHeightToVerify)
+		_, err := s.readIndexEntry(nextHeightToVerify)
 		if err != nil {
 			// If no block exists at this height, we've reached the end of our contiguous sequence
 			if errors.Is(err, ErrBlockNotFound) {
@@ -1039,15 +1196,11 @@ func (s *Database) updateRecoveredBlockHeights(recoveredHeights []BlockHeight) e
 			}
 
 			// Log unexpected error but continue
-			s.log.Error(
-				"error reading index entry when updating max contiguous height during recovery",
-				zap.Uint64("height", currentMaxContiguous),
+			s.log.Error("Failed to update recovered block heights: error reading index entry",
+				zap.Uint64("height", nextHeightToVerify),
 				zap.Error(err),
 			)
 			return err
-		}
-		if entry.IsEmpty() {
-			break
 		}
 		nextHeightToVerify++
 	}

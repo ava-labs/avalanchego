@@ -133,7 +133,7 @@ db, err := blockdb.New(
     "/path/to/index",  // Index directory
     "/path/to/data",   // Data directory
     config,
-    logger,
+    logging.NoLog{},
 )
 if err != nil {
     fmt.Println("Error creating database:", err)
@@ -181,10 +181,11 @@ if err != nil {
 
 ## TODO
 
-- [ ] Compress data files to reduce storage size
-- [ ] Split data across multiple files when `MaxDataFileSize` is reached
-- [ ] Implement a block cache for recently accessed blocks
-- [ ] Use a buffered pool to avoid allocations on reads and writes
-- [ ] Add tests for core functionality
-- [ ] Add performance benchmarks
-- [ ] Consider supporting missing data files (currently we error if any data files are missing)
+- Compress data files to reduce storage size
+- ~~Split data across multiple files when `MaxDataFileSize` is reached~~
+- Implement a block cache for recently accessed blocks
+- Use a buffered pool to avoid allocations on reads and writes
+- ~~Add tests for core functionality~~
+- Add metrics collection
+- Add performance benchmarks
+- Consider supporting missing data files (currently we error if any data files are missing)
