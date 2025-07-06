@@ -807,7 +807,7 @@ func (m *manager) createAvalancheChain(
 		vmWrappingProposerVM = tracedvm.NewBlockVM(vmWrappingProposerVM, "proposervm", m.Tracer)
 	}
 
-	cn := &ChangeNotifier{
+	cn := &block.ChangeNotifier{
 		ChainVM: vmWrappingProposerVM,
 	}
 
@@ -1207,7 +1207,7 @@ func (m *manager) createSnowmanChain(
 		vm = tracedvm.NewBlockVM(vm, "proposervm", m.Tracer)
 	}
 
-	cn := &ChangeNotifier{
+	cn := &block.ChangeNotifier{
 		ChainVM: vm,
 	}
 	vm = cn

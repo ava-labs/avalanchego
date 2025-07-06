@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package chains
+package block
 
 import (
 	"context"
@@ -10,67 +10,66 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 type FullVM interface {
-	block.StateSyncableVM
-	block.BatchedChainVM
-	block.ChainVM
+	StateSyncableVM
+	BatchedChainVM
+	ChainVM
 }
 
 type ChangeNotifier struct {
-	block.ChainVM
+	ChainVM
 	OnChange func()
 }
 
 func (cn *ChangeNotifier) GetAncestors(ctx context.Context, blkID ids.ID, maxBlocksNum int, maxBlocksSize int, maxBlocksRetrivalTime time.Duration) ([][]byte, error) {
-	if batchedVM, ok := cn.ChainVM.(block.BatchedChainVM); ok {
+	if batchedVM, ok := cn.ChainVM.(BatchedChainVM); ok {
 		return batchedVM.GetAncestors(ctx, blkID, maxBlocksNum, maxBlocksSize, maxBlocksRetrivalTime)
 	}
-	return nil, block.ErrRemoteVMNotImplemented
+	return nil, ErrRemoteVMNotImplemented
 }
 
 func (cn *ChangeNotifier) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snowman.Block, error) {
-	if batchedVM, ok := cn.ChainVM.(block.BatchedChainVM); ok {
+	if batchedVM, ok := cn.ChainVM.(BatchedChainVM); ok {
 		return batchedVM.BatchedParseBlock(ctx, blks)
 	}
-	return nil, block.ErrRemoteVMNotImplemented
+	return nil, ErrRemoteVMNotImplemented
 }
 
 func (cn *ChangeNotifier) StateSyncEnabled(ctx context.Context) (bool, error) {
-	if ssVM, isSSVM := cn.ChainVM.(block.StateSyncableVM); isSSVM {
+	if ssVM, isSSVM := cn.ChainVM.(StateSyncableVM); isSSVM {
 		return ssVM.StateSyncEnabled(ctx)
 	}
 	return false, nil
 }
 
-func (cn *ChangeNotifier) GetOngoingSyncStateSummary(ctx context.Context) (block.StateSummary, error) {
-	if ssVM, isSSVM := cn.ChainVM.(block.StateSyncableVM); isSSVM {
+func (cn *ChangeNotifier) GetOngoingSyncStateSummary(ctx context.Context) (StateSummary, error) {
+	if ssVM, isSSVM := cn.ChainVM.(StateSyncableVM); isSSVM {
 		return ssVM.GetOngoingSyncStateSummary(ctx)
 	}
-	return nil, block.ErrStateSyncableVMNotImplemented
+	return nil, ErrStateSyncableVMNotImplemented
 }
 
-func (cn *ChangeNotifier) GetLastStateSummary(ctx context.Context) (block.StateSummary, error) {
-	if ssVM, isSSVM := cn.ChainVM.(block.StateSyncableVM); isSSVM {
+func (cn *ChangeNotifier) GetLastStateSummary(ctx context.Context) (StateSummary, error) {
+	if ssVM, isSSVM := cn.ChainVM.(StateSyncableVM); isSSVM {
 		return ssVM.GetLastStateSummary(ctx)
 	}
-	return nil, block.ErrStateSyncableVMNotImplemented
+	return nil, ErrStateSyncableVMNotImplemented
 }
 
-func (cn *ChangeNotifier) ParseStateSummary(ctx context.Context, summaryBytes []byte) (block.StateSummary, error) {
-	if ssVM, isSSVM := cn.ChainVM.(block.StateSyncableVM); isSSVM {
+func (cn *ChangeNotifier) ParseStateSummary(ctx context.Context, summaryBytes []byte) (StateSummary, error) {
+	if ssVM, isSSVM := cn.ChainVM.(StateSyncableVM); isSSVM {
 		return ssVM.ParseStateSummary(ctx, summaryBytes)
 	}
-	return nil, block.ErrStateSyncableVMNotImplemented
+	return nil, ErrStateSyncableVMNotImplemented
 }
 
-func (cn *ChangeNotifier) GetStateSummary(ctx context.Context, summaryHeight uint64) (block.StateSummary, error) {
-	if ssVM, isSSVM := cn.ChainVM.(block.StateSyncableVM); isSSVM {
+func (cn *ChangeNotifier) GetStateSummary(ctx context.Context, summaryHeight uint64) (StateSummary, error) {
+	if ssVM, isSSVM := cn.ChainVM.(StateSyncableVM); isSSVM {
 		return ssVM.GetStateSummary(ctx, summaryHeight)
 	}
-	return nil, block.ErrStateSyncableVMNotImplemented
+	return nil, ErrStateSyncableVMNotImplemented
 }
 
 func (cn *ChangeNotifier) SetPreference(ctx context.Context, blkID ids.ID) error {

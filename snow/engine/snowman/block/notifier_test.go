@@ -1,10 +1,11 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package chains
+package block_test
 
 import (
 	"context"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -14,18 +15,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blockmock"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
-
-	chainsmock "github.com/ava-labs/avalanchego/chains/mocks"
 )
 
 func TestChangeNotifierStateSyncableVM(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	fullVM := chainsmock.NewFullVM(ctrl)
-
-	// StateSyncEnabled,GetOngoingSyncStateSummary,GetLastStateSummary,ParseStateSummary,GetStateSummary
+	fullVM := blockmock.NewFullVM(ctrl)
 
 	fullVM.EXPECT().StateSyncEnabled(gomock.Any()).Return(true, nil)
 	fullVM.EXPECT().GetOngoingSyncStateSummary(gomock.Any()).Return(&blocktest.StateSummary{}, nil)
@@ -37,12 +33,12 @@ func TestChangeNotifierStateSyncableVM(t *testing.T) {
 
 	for _, testCase := range []struct {
 		name string
-		f    func(*testing.T, *ChangeNotifier)
+		f    func(*testing.T, *block.ChangeNotifier)
 		vm   block.ChainVM
 	}{
 		{
 			name: "StateSyncEnabled",
-			f: func(t *testing.T, n *ChangeNotifier) {
+			f: func(t *testing.T, n *block.ChangeNotifier) {
 				_, err := n.StateSyncEnabled(context.Background())
 				require.NoError(t, err)
 			},
@@ -50,7 +46,7 @@ func TestChangeNotifierStateSyncableVM(t *testing.T) {
 		},
 		{
 			name: "GetOngoingSyncStateSummary",
-			f: func(t *testing.T, n *ChangeNotifier) {
+			f: func(t *testing.T, n *block.ChangeNotifier) {
 				_, err := n.GetOngoingSyncStateSummary(context.Background())
 				require.NoError(t, err)
 			},
@@ -58,7 +54,7 @@ func TestChangeNotifierStateSyncableVM(t *testing.T) {
 		},
 		{
 			name: "GetLastStateSummary",
-			f: func(t *testing.T, n *ChangeNotifier) {
+			f: func(t *testing.T, n *block.ChangeNotifier) {
 				_, err := n.GetLastStateSummary(context.Background())
 				require.NoError(t, err)
 			},
@@ -66,7 +62,7 @@ func TestChangeNotifierStateSyncableVM(t *testing.T) {
 		},
 		{
 			name: "ParseStateSummary",
-			f: func(t *testing.T, n *ChangeNotifier) {
+			f: func(t *testing.T, n *block.ChangeNotifier) {
 				_, err := n.ParseStateSummary(context.Background(), []byte{})
 				require.NoError(t, err)
 			},
@@ -74,7 +70,7 @@ func TestChangeNotifierStateSyncableVM(t *testing.T) {
 		},
 		{
 			name: "GetStateSummary",
-			f: func(t *testing.T, n *ChangeNotifier) {
+			f: func(t *testing.T, n *block.ChangeNotifier) {
 				_, err := n.GetStateSummary(context.Background(), 0)
 				require.NoError(t, err)
 			},
@@ -82,7 +78,7 @@ func TestChangeNotifierStateSyncableVM(t *testing.T) {
 		},
 		{
 			name: "StateSyncEnabled-not-implemented",
-			f: func(t *testing.T, n *ChangeNotifier) {
+			f: func(t *testing.T, n *block.ChangeNotifier) {
 				ok, err := n.StateSyncEnabled(context.Background())
 				require.NoError(t, err)
 				require.False(t, ok, "expected StateSyncEnabled to return false")
@@ -91,7 +87,7 @@ func TestChangeNotifierStateSyncableVM(t *testing.T) {
 		},
 		{
 			name: "GetOngoingSyncStateSummary-not-implemented",
-			f: func(t *testing.T, n *ChangeNotifier) {
+			f: func(t *testing.T, n *block.ChangeNotifier) {
 				_, err := n.GetOngoingSyncStateSummary(context.Background())
 				require.ErrorIs(t, err, block.ErrStateSyncableVMNotImplemented)
 			},
@@ -99,28 +95,28 @@ func TestChangeNotifierStateSyncableVM(t *testing.T) {
 		},
 		{
 			name: "GetLastStateSummary-not-implemented",
-			f: func(t *testing.T, n *ChangeNotifier) {
+			f: func(t *testing.T, n *block.ChangeNotifier) {
 				_, err := n.GetLastStateSummary(context.Background())
 				require.ErrorIs(t, err, block.ErrStateSyncableVMNotImplemented)
 			},
 		},
 		{
 			name: "ParseStateSummary-not-implemented",
-			f: func(t *testing.T, n *ChangeNotifier) {
+			f: func(t *testing.T, n *block.ChangeNotifier) {
 				_, err := n.ParseStateSummary(context.Background(), []byte{})
 				require.ErrorIs(t, err, block.ErrStateSyncableVMNotImplemented)
 			},
 		},
 		{
 			name: "GetStateSummary-not-implemented",
-			f: func(t *testing.T, n *ChangeNotifier) {
+			f: func(t *testing.T, n *block.ChangeNotifier) {
 				_, err := n.GetStateSummary(context.Background(), 0)
 				require.ErrorIs(t, err, block.ErrStateSyncableVMNotImplemented)
 			},
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			nf := ChangeNotifier{
+			nf := block.ChangeNotifier{
 				ChainVM: testCase.vm,
 			}
 			testCase.f(t, &nf)
@@ -130,7 +126,7 @@ func TestChangeNotifierStateSyncableVM(t *testing.T) {
 
 func TestChangeNotifierBatchedChainVM(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	fullVM := chainsmock.NewFullVM(ctrl)
+	fullVM := blockmock.NewFullVM(ctrl)
 	fullVM.EXPECT().GetAncestors(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return([][]byte{}, nil)
 	fullVM.EXPECT().BatchedParseBlock(gomock.Any(), gomock.Any()).Return([]snowman.Block{}, nil)
 
@@ -138,12 +134,12 @@ func TestChangeNotifierBatchedChainVM(t *testing.T) {
 
 	for _, testCase := range []struct {
 		name string
-		f    func(*testing.T, *ChangeNotifier)
+		f    func(*testing.T, *block.ChangeNotifier)
 		vm   block.ChainVM
 	}{
 		{
 			name: "BatchedParseBlock",
-			f: func(t *testing.T, n *ChangeNotifier) {
+			f: func(t *testing.T, n *block.ChangeNotifier) {
 				_, err := n.BatchedParseBlock(context.Background(), [][]byte{})
 				require.NoError(t, err)
 			},
@@ -151,7 +147,7 @@ func TestChangeNotifierBatchedChainVM(t *testing.T) {
 		},
 		{
 			name: "GetAncestors",
-			f: func(t *testing.T, n *ChangeNotifier) {
+			f: func(t *testing.T, n *block.ChangeNotifier) {
 				_, err := n.GetAncestors(context.Background(), ids.Empty, 0, 0, 0)
 				require.NoError(t, err)
 			},
@@ -159,7 +155,7 @@ func TestChangeNotifierBatchedChainVM(t *testing.T) {
 		},
 		{
 			name: "BatchedParseBlock-not-implemented",
-			f: func(t *testing.T, n *ChangeNotifier) {
+			f: func(t *testing.T, n *block.ChangeNotifier) {
 				_, err := n.BatchedParseBlock(context.Background(), [][]byte{})
 				require.ErrorIs(t, err, block.ErrRemoteVMNotImplemented)
 			},
@@ -167,7 +163,7 @@ func TestChangeNotifierBatchedChainVM(t *testing.T) {
 		},
 		{
 			name: "GetAncestors-not-implemented",
-			f: func(t *testing.T, n *ChangeNotifier) {
+			f: func(t *testing.T, n *block.ChangeNotifier) {
 				_, err := n.GetAncestors(context.Background(), ids.Empty, 0, 0, 0)
 				require.ErrorIs(t, err, block.ErrRemoteVMNotImplemented)
 			},
@@ -175,7 +171,7 @@ func TestChangeNotifierBatchedChainVM(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			nf := ChangeNotifier{
+			nf := block.ChangeNotifier{
 				ChainVM: testCase.vm,
 			}
 			testCase.f(t, &nf)
@@ -186,30 +182,30 @@ func TestChangeNotifierBatchedChainVM(t *testing.T) {
 func TestChangeNotifierNormal(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	tvm := chainsmock.NewFullVM(ctrl)
+	tvm := blockmock.NewFullVM(ctrl)
 	tvm.EXPECT().BuildBlock(gomock.Any()).Return(&snowmantest.Block{}, nil)
 	tvm.EXPECT().SetState(gomock.Any(), gomock.Any()).Return(nil)
 	tvm.EXPECT().SetPreference(gomock.Any(), gomock.Any()).Return(nil)
 
 	for _, testCase := range []struct {
 		name string
-		f    func(*testing.T, *ChangeNotifier)
+		f    func(*testing.T, *block.ChangeNotifier)
 	}{
 		{
 			name: "SetPreference",
-			f: func(t *testing.T, n *ChangeNotifier) {
+			f: func(t *testing.T, n *block.ChangeNotifier) {
 				require.NoError(t, n.SetPreference(context.Background(), ids.Empty))
 			},
 		},
 		{
 			name: "SetState",
-			f: func(t *testing.T, n *ChangeNotifier) {
+			f: func(t *testing.T, n *block.ChangeNotifier) {
 				require.NoError(t, n.SetState(context.Background(), snow.NormalOp))
 			},
 		},
 		{
 			name: "BuildBlock",
-			f: func(t *testing.T, n *ChangeNotifier) {
+			f: func(t *testing.T, n *block.ChangeNotifier) {
 				_, err := n.BuildBlock(context.Background())
 				require.NoError(t, err)
 			},
@@ -217,7 +213,7 @@ func TestChangeNotifierNormal(t *testing.T) {
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			var invoked bool
-			nf := ChangeNotifier{
+			nf := block.ChangeNotifier{
 				OnChange: func() {
 					invoked = true
 				},
