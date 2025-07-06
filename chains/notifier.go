@@ -13,6 +13,12 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
+type FullVM interface {
+	block.StateSyncableVM
+	block.BatchedChainVM
+	block.ChainVM
+}
+
 type ChangeNotifier struct {
 	block.ChainVM
 	OnChange func()
