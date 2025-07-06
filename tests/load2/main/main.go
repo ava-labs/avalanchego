@@ -24,6 +24,7 @@ const (
 	metricsNamespace = "load"
 	pollFrequency    = time.Millisecond
 	testTimeout      = time.Minute
+	defaultNodeCount = 5
 )
 
 var (
@@ -33,7 +34,9 @@ var (
 )
 
 func init() {
-	flagVars = e2e.RegisterFlags()
+	flagVars = e2e.RegisterFlagsWithOptions(
+		e2e.WithDefaultNodeCount(defaultNodeCount),
+	)
 
 	flag.DurationVar(
 		&loadTimeout,
