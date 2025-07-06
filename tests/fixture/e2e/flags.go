@@ -124,12 +124,12 @@ func (v *FlagVars) ActivateGranite() bool {
 	return v.activateGranite
 }
 
+type DefaultOption func(*DefaultOptions)
+
 type DefaultOptions struct {
 	owner     string
 	nodeCount int
 }
-
-type DefaultOption func(*DefaultOptions)
 
 func NewDefaultOptions(ops []DefaultOption) *DefaultOptions {
 	o := &DefaultOptions{}
