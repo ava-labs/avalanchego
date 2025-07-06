@@ -8,9 +8,8 @@ import "errors"
 // DefaultMaxDataFileSize is the default maximum size of the data block file in bytes (500GB).
 const DefaultMaxDataFileSize = 500 * 1024 * 1024 * 1024
 
-// MaxDataFiles is the maximum number of data files that can be created.
-// This prevents running out of file descriptors when MaxDataFileSize is small.
-const MaxDataFiles = 10_000
+// DefaultMaxDataFiles is the default maximum number of data files descriptors cached.
+const DefaultMaxDataFiles = 10
 
 // DatabaseConfig contains configuration parameters for BlockDB.
 type DatabaseConfig struct {
@@ -19,6 +18,9 @@ type DatabaseConfig struct {
 
 	// MaxDataFileSize sets the maximum size of the data block file in bytes.
 	MaxDataFileSize uint64
+
+	// MaxDataFiles is the maximum number of data files descriptors cached.
+	MaxDataFiles int
 
 	// CheckpointInterval defines how frequently (in blocks) the index file header is updated (default: 1024).
 	CheckpointInterval uint64
@@ -35,6 +37,7 @@ func DefaultDatabaseConfig() DatabaseConfig {
 	return DatabaseConfig{
 		MinimumHeight:      0,
 		MaxDataFileSize:    DefaultMaxDataFileSize,
+		MaxDataFiles:       DefaultMaxDataFiles,
 		CheckpointInterval: 1024,
 		SyncToDisk:         true,
 		Truncate:           false,
@@ -65,6 +68,12 @@ func (c DatabaseConfig) WithMaxDataFileSize(maxSize uint64) DatabaseConfig {
 	return c
 }
 
+// WithMaxDataFiles returns a copy of the config with MaxDataFiles set to the given value.
+func (c DatabaseConfig) WithMaxDataFiles(maxFiles int) DatabaseConfig {
+	c.MaxDataFiles = maxFiles
+	return c
+}
+
 // WithCheckpointInterval returns a copy of the config with CheckpointInterval set to the given value.
 func (c DatabaseConfig) WithCheckpointInterval(interval uint64) DatabaseConfig {
 	c.CheckpointInterval = interval
@@ -75,6 +84,9 @@ func (c DatabaseConfig) WithCheckpointInterval(interval uint64) DatabaseConfig {
 func (c DatabaseConfig) Validate() error {
 	if c.CheckpointInterval == 0 {
 		return errors.New("CheckpointInterval cannot be 0")
+	}
+	if c.MaxDataFiles <= 0 {
+		return errors.New("MaxDataFiles must be positive")
 	}
 	return nil
 }

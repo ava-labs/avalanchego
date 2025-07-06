@@ -219,7 +219,7 @@ func New(indexDir, dataDir string, config DatabaseConfig, log logging.Logger) (*
 	s := &Database{
 		options:   config,
 		log:       databaseLog,
-		fileCache: lru.NewCache[int, *os.File](MaxDataFiles),
+		fileCache: lru.NewCache[int, *os.File](config.MaxDataFiles),
 	}
 	s.fileCache.SetOnEvict(func(_ int, f *os.File) {
 		if f != nil {

@@ -101,6 +101,7 @@ func TestNew_Params(t *testing.T) {
 			config: DefaultDatabaseConfig().
 				WithMinimumHeight(100).
 				WithMaxDataFileSize(1024 * 1024). // 1MB
+				WithMaxDataFiles(50).
 				WithCheckpointInterval(512),
 		},
 		{
@@ -131,6 +132,20 @@ func TestNew_Params(t *testing.T) {
 			config:   DefaultDatabaseConfig().WithCheckpointInterval(0),
 			wantErr:  errors.New("CheckpointInterval cannot be 0"),
 		},
+		{
+			name:     "invalid config - zero max data files",
+			indexDir: tempDir,
+			dataDir:  tempDir,
+			config:   DefaultDatabaseConfig().WithMaxDataFiles(0),
+			wantErr:  errors.New("MaxDataFiles must be positive"),
+		},
+		{
+			name:     "invalid config - negative max data files",
+			indexDir: tempDir,
+			dataDir:  tempDir,
+			config:   DefaultDatabaseConfig().WithMaxDataFiles(-1),
+			wantErr:  errors.New("MaxDataFiles must be positive"),
+		},
 	}
 
 	for _, tt := range tests {
@@ -148,6 +163,7 @@ func TestNew_Params(t *testing.T) {
 			// Verify the database was created with correct configuration
 			require.Equal(t, tt.config.MinimumHeight, db.options.MinimumHeight)
 			require.Equal(t, tt.config.MaxDataFileSize, db.options.MaxDataFileSize)
+			require.Equal(t, tt.config.MaxDataFiles, db.options.MaxDataFiles)
 			require.Equal(t, tt.config.CheckpointInterval, db.options.CheckpointInterval)
 			require.Equal(t, tt.config.SyncToDisk, db.options.SyncToDisk)
 
@@ -345,5 +361,44 @@ func TestFileCache_Eviction(t *testing.T) {
 		block, err := store.ReadBlock(uint64(i))
 		require.NoError(t, err, "failed to read block at height %d", i)
 		require.Equal(t, blocks[i], block, "block data mismatch at height %d", i)
+	}
+}
+
+func TestMaxDataFiles_CacheLimit(t *testing.T) {
+	// Test that the file cache respects the MaxDataFiles limit
+	// Create a small cache size to test eviction behavior
+	config := DefaultDatabaseConfig().
+		WithMaxDataFiles(2).      // Only allow 2 files in cache
+		WithMaxDataFileSize(1024) // Small file size to force multiple files
+
+	store, cleanup := newTestDatabase(t, config)
+	defer cleanup()
+
+	// Create blocks that will span multiple data files
+	// Each block is ~512 bytes, so 2 blocks per file
+	numBlocks := 6 // This will create 3 files, more than our cache limit of 2
+
+	evictionCount := 0
+	store.fileCache.SetOnEvict(func(_ int, f *os.File) {
+		evictionCount++
+		if f != nil {
+			f.Close()
+		}
+	})
+
+	// Write blocks to force multiple data files
+	for i := range numBlocks {
+		block := fixedSizeBlock(t, 512, uint64(i))
+		require.NoError(t, store.WriteBlock(uint64(i), block, 0))
+	}
+
+	// Verify that evictions occurred due to cache limit
+	require.Positive(t, evictionCount, "should have had cache evictions due to MaxDataFiles limit")
+
+	// Verify all blocks are still readable despite evictions
+	for i := range numBlocks {
+		block, err := store.ReadBlock(uint64(i))
+		require.NoError(t, err, "failed to read block at height %d after eviction", i)
+		require.Equal(t, 512, len(block), "block size mismatch at height %d", i)
 	}
 }
