@@ -209,6 +209,7 @@ func TestWriteBlock_Concurrency(t *testing.T) {
 			// create gaps at heights 5 and 10 and rewrite last block
 			if i == 5 || i == 10 {
 				height = uint64(i - 1)
+				block = blocks[i-1]
 			} else {
 				height = uint64(i)
 			}
@@ -228,12 +229,11 @@ func TestWriteBlock_Concurrency(t *testing.T) {
 	for i := range 20 {
 		height := uint64(i)
 		block, err := store.ReadBlock(height)
-		require.NoError(t, err)
-
 		if i == 5 || i == 10 {
-			require.Nil(t, block, "expected nil block at gap height %d", height)
+			require.ErrorIs(t, err, ErrBlockNotFound, "expected ErrBlockNotFound at gap height %d", height)
 		} else {
-			require.NotNil(t, block)
+			require.NoError(t, err)
+			require.Equal(t, blocks[i], block, "block mismatch at height %d", height)
 		}
 	}
 	checkDatabaseState(t, store, 19, 4)

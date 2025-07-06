@@ -4,6 +4,7 @@
 package blockdb
 
 import (
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -283,10 +284,10 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 			wantErrText: "data file at index 1 is missing",
 		},
 		{
-			name:            "unexpected multiple data files when MaxDataFileSize is 0",
+			name:            "unexpected multiple data files when MaxDataFileSize is max uint64",
 			blockHeights:    []uint64{0, 1, 2},
-			maxDataFileSize: uint64Ptr(0), // Single file mode
-			blockSize:       512,          // 512 bytes per block
+			maxDataFileSize: uint64Ptr(math.MaxUint64), // Single file mode
+			blockSize:       512,                       // 512 bytes per block
 			setupCorruption: func(store *Database, _ [][]byte) error {
 				// Manually create a second data file to simulate corruption
 				secondDataFilePath := store.dataFilePath(1)
@@ -302,7 +303,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				return err
 			},
 			wantErr:     ErrCorrupted,
-			wantErrText: "expect only 1 data file at index 0, got 2 files with max index 1",
+			wantErrText: "only one data file expected when MaxDataFileSize is max uint64, got 2 files with max index 1",
 		},
 	}
 

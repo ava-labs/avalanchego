@@ -37,9 +37,8 @@ func TestNew_Truncate(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, db2)
 	defer db2.Close()
-	readBlock2, err := db2.ReadBlock(1)
-	require.NoError(t, err)
-	require.Nil(t, readBlock2)
+	_, err = db2.ReadBlock(1)
+	require.ErrorIs(t, err, ErrBlockNotFound)
 	_, found := db2.MaxContiguousHeight()
 	require.False(t, found)
 }

@@ -4,6 +4,7 @@
 package blockdb
 
 import (
+	"errors"
 	"math"
 	"sync"
 	"sync/atomic"
@@ -67,9 +68,14 @@ func TestReadOperations(t *testing.T) {
 			wantErr: ErrInvalidBlockHeight,
 		},
 		{
-			name:       "height causes overflow",
+			name:       "block is past max height",
+			readHeight: 51,
+			wantErr:    ErrBlockNotFound,
+		},
+		{
+			name:       "block height is max height",
 			readHeight: math.MaxUint64,
-			wantErr:    ErrInvalidBlockHeight,
+			wantErr:    ErrBlockNotFound,
 		},
 	}
 
@@ -86,20 +92,18 @@ func TestReadOperations(t *testing.T) {
 
 			// Seed database with blocks based on config
 			seededBlocks := make(map[uint64][]byte)
-			if tt.wantErr == nil {
-				minHeight := config.MinimumHeight
-				maxHeight := minHeight + 50 // Always write 51 blocks
-				gapHeight := minHeight + 40 // Gap at relative position 40
+			minHeight := config.MinimumHeight
+			maxHeight := minHeight + 50 // Always write 51 blocks
+			gapHeight := minHeight + 40 // Gap at relative position 40
 
-				for i := minHeight; i <= maxHeight; i++ {
-					if i == gapHeight {
-						continue // Create gap
-					}
-
-					block := randomBlock(t)
-					require.NoError(t, store.WriteBlock(i, block, BlockHeaderSize(i-minHeight)))
-					seededBlocks[i] = block
+			for i := minHeight; i <= maxHeight; i++ {
+				if i == gapHeight {
+					continue // Create gap
 				}
+
+				block := randomBlock(t)
+				require.NoError(t, store.WriteBlock(i, block, BlockHeaderSize(i-minHeight)))
+				seededBlocks[i] = block
 			}
 
 			if tt.setup != nil {
@@ -112,19 +116,22 @@ func TestReadOperations(t *testing.T) {
 				return
 			}
 
-			readBlock, err := store.ReadBlock(tt.readHeight)
-			require.NoError(t, err)
-			readHeader, err := store.ReadHeader(tt.readHeight)
-			require.NoError(t, err)
-			readBody, err := store.ReadBody(tt.readHeight)
-			require.NoError(t, err)
-
 			// Handle success cases
 			if tt.noBlock {
-				require.Nil(t, readBlock)
-				require.Nil(t, readHeader)
-				require.Nil(t, readBody)
+				_, err := store.ReadBlock(tt.readHeight)
+				require.ErrorIs(t, err, ErrBlockNotFound)
+				_, err = store.ReadHeader(tt.readHeight)
+				require.ErrorIs(t, err, ErrBlockNotFound)
+				_, err = store.ReadBody(tt.readHeight)
+				require.ErrorIs(t, err, ErrBlockNotFound)
 			} else {
+				readBlock, err := store.ReadBlock(tt.readHeight)
+				require.NoError(t, err)
+				readHeader, err := store.ReadHeader(tt.readHeight)
+				require.NoError(t, err)
+				readBody, err := store.ReadBody(tt.readHeight)
+				require.NoError(t, err)
+
 				require.NotNil(t, readBlock)
 				expectedBlock := seededBlocks[tt.readHeight]
 				headerSize := BlockHeaderSize(tt.readHeight - config.MinimumHeight)
@@ -168,22 +175,22 @@ func TestReadOperations_Concurrency(t *testing.T) {
 	}
 
 	var wg sync.WaitGroup
-	var errors atomic.Int32
+	var errorCount atomic.Int32
 	for i := range numBlocks + 10 {
 		wg.Add(3) // One for each read operation
 
 		go func(height int) {
 			defer wg.Done()
 			block, err := store.ReadBlock(uint64(height))
-			if err != nil {
-				errors.Add(1)
-				return
-			}
 			if gapHeights[uint64(height)] || height >= numBlocks {
-				if block != nil {
-					errors.Add(1)
+				if err == nil || !errors.Is(err, ErrBlockNotFound) {
+					errorCount.Add(1)
 				}
 			} else {
+				if err != nil {
+					errorCount.Add(1)
+					return
+				}
 				require.Equal(t, blocks[height], block)
 			}
 		}(i)
@@ -191,15 +198,15 @@ func TestReadOperations_Concurrency(t *testing.T) {
 		go func(height int) {
 			defer wg.Done()
 			header, err := store.ReadHeader(uint64(height))
-			if err != nil {
-				errors.Add(1)
-				return
-			}
 			if gapHeights[uint64(height)] || height >= numBlocks {
-				if header != nil {
-					errors.Add(1)
+				if err == nil || !errors.Is(err, ErrBlockNotFound) {
+					errorCount.Add(1)
 				}
 			} else {
+				if err != nil {
+					errorCount.Add(1)
+					return
+				}
 				expectedHeader := blocks[height][:headerSizes[height]]
 				if headerSizes[height] == 0 {
 					expectedHeader = nil
@@ -211,20 +218,20 @@ func TestReadOperations_Concurrency(t *testing.T) {
 		go func(height int) {
 			defer wg.Done()
 			body, err := store.ReadBody(uint64(height))
-			if err != nil {
-				errors.Add(1)
-				return
-			}
 			if gapHeights[uint64(height)] || height >= numBlocks {
-				if body != nil {
-					errors.Add(1)
+				if err == nil || !errors.Is(err, ErrBlockNotFound) {
+					errorCount.Add(1)
 				}
 			} else {
+				if err != nil {
+					errorCount.Add(1)
+					return
+				}
 				expectedBody := blocks[height][headerSizes[height]:]
 				require.Equal(t, expectedBody, body)
 			}
 		}(i)
 	}
 	wg.Wait()
-	require.Zero(t, errors.Load(), "concurrent read operations had errors")
+	require.Zero(t, errorCount.Load(), "concurrent read operations had errors")
 }

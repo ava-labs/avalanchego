@@ -118,8 +118,8 @@ On startup, BlockDB checks for signs of an unclean shutdown by comparing the dat
 2. For each unindexed block found:
    - Validates the block header and checksum
    - Writes the corresponding index entry
-3. Updates the max contiguous height and max block height
-4. Persists the updated index header
+3. Calculates the max contiguous height and max block height
+4. Updates the index header with the updated max contiguous height, max block height, and next write offset
 
 ## Usage
 

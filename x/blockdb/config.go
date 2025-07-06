@@ -17,7 +17,7 @@ type DatabaseConfig struct {
 	// MinimumHeight is the lowest block height tracked by the database.
 	MinimumHeight uint64
 
-	// MaxDataFileSize sets the maximum size of the data block file in bytes. If 0, there is no limit.
+	// MaxDataFileSize sets the maximum size of the data block file in bytes.
 	MaxDataFileSize uint64
 
 	// CheckpointInterval defines how frequently (in blocks) the index file header is updated (default: 1024).
