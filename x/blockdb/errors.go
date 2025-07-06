@@ -15,4 +15,5 @@ var (
 	ErrCorrupted          = errors.New("blockdb: unrecoverable corruption detected")
 	ErrHeaderSizeTooLarge = errors.New("blockdb: header size cannot be >= block size")
 	ErrBlockTooLarge      = fmt.Errorf("blockdb: block size exceeds maximum allowed size of %d bytes", MaxBlockDataSize)
+	ErrBlockNotFound      = errors.New("blockdb: block not found")
 )
