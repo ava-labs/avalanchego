@@ -43,7 +43,7 @@ func TestRecovery_Success(t *testing.T) {
 
 				// Create a header that only knows about the first block
 				// Block 0: 4KB data + header
-				firstBlockOffset := uint64(sizeOfBlockHeader) + 4*1024
+				firstBlockOffset := uint64(sizeOfBlockEntryHeader) + 4*1024
 
 				header := indexFileHeader{
 					Version:             IndexFileVersion,
@@ -171,14 +171,14 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 		},
 		{
 			name:         "corrupted block header in data file",
-			blockHeights: []uint64{0, 1},
+			blockHeights: []uint64{0, 1, 3},
 			setupCorruption: func(store *Database, blocks [][]byte) error {
 				if err := resetIndexToBlock(store, uint64(len(blocks[0])), 0); err != nil {
 					return err
 				}
 				// Corrupt second block header with invalid data
-				secondBlockOffset := int64(sizeOfBlockHeader) + int64(len(blocks[0]))
-				corruptedHeader := make([]byte, sizeOfBlockHeader)
+				secondBlockOffset := int64(sizeOfBlockEntryHeader) + int64(len(blocks[0]))
+				corruptedHeader := make([]byte, sizeOfBlockEntryHeader)
 				for i := range corruptedHeader {
 					corruptedHeader[i] = 0xFF // Invalid header data
 				}
@@ -192,26 +192,27 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				return err
 			},
 			wantErr:     ErrCorrupted,
-			wantErrText: "invalid block size in header",
+			wantErrText: "invalid block entry version at offset",
 		},
 		{
-			name:         "block with invalid block size in header",
+			name:         "block with invalid block size in header that reads more than total data file size",
 			blockHeights: []uint64{0, 1},
 			setupCorruption: func(store *Database, blocks [][]byte) error {
 				if err := resetIndexToBlock(store, uint64(len(blocks[0])), 0); err != nil {
 					return err
 				}
-				secondBlockOffset := int64(sizeOfBlockHeader) + int64(len(blocks[0]))
-				bh := blockHeader{
+				secondBlockOffset := int64(sizeOfBlockEntryHeader) + int64(len(blocks[0]))
+				bh := blockEntryHeader{
 					Height:     1,
 					Checksum:   calculateChecksum(blocks[1]),
 					Size:       uint32(len(blocks[1])) + 1, // make block larger than actual
 					HeaderSize: 0,
+					Version:    BlockEntryVersion,
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},
 			wantErr:     ErrCorrupted,
-			wantErrText: "block data out of bounds",
+			wantErrText: "block data out of bounds at offset ",
 		},
 		{
 			name:         "block with checksum mismatch",
@@ -220,12 +221,13 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				if err := resetIndexToBlock(store, uint64(len(blocks[0])), 0); err != nil {
 					return err
 				}
-				secondBlockOffset := int64(sizeOfBlockHeader) + int64(len(blocks[0]))
-				bh := blockHeader{
+				secondBlockOffset := int64(sizeOfBlockEntryHeader) + int64(len(blocks[0]))
+				bh := blockEntryHeader{
 					Height:     1,
 					Checksum:   0xDEADBEEF, // Wrong checksum
 					Size:       uint32(len(blocks[1])),
 					HeaderSize: 0,
+					Version:    BlockEntryVersion,
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},
@@ -244,7 +246,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				defer dataFile.Close()
 
 				// Truncate data file to have only partial block data
-				truncateSize := int64(sizeOfBlockHeader) + int64(len(blocks[0]))/2
+				truncateSize := int64(sizeOfBlockEntryHeader) + int64(len(blocks[0]))/2
 				return dataFile.Truncate(truncateSize)
 			},
 			wantErr:     ErrCorrupted,
@@ -258,12 +260,13 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				if err := resetIndexToBlock(store, uint64(len(blocks[0])), 10); err != nil {
 					return err
 				}
-				secondBlockOffset := int64(sizeOfBlockHeader) + int64(len(blocks[0]))
-				bh := blockHeader{
+				secondBlockOffset := int64(sizeOfBlockEntryHeader) + int64(len(blocks[0]))
+				bh := blockEntryHeader{
 					Height:     5, // Invalid height because its below the minimum height of 10
 					Checksum:   calculateChecksum(blocks[1]),
 					Size:       uint32(len(blocks[1])),
 					HeaderSize: 0,
+					Version:    BlockEntryVersion,
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},
@@ -304,6 +307,48 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 			},
 			wantErr:     ErrCorrupted,
 			wantErrText: "only one data file expected when MaxDataFileSize is max uint64, got 2 files with max index 1",
+		},
+		{
+			name:         "block with invalid block entry version",
+			blockHeights: []uint64{0, 1},
+			setupCorruption: func(store *Database, blocks [][]byte) error {
+				if err := resetIndexToBlock(store, uint64(len(blocks[0])), 0); err != nil {
+					return err
+				}
+				// Corrupt second block header version
+				secondBlockOffset := int64(sizeOfBlockEntryHeader) + int64(len(blocks[0]))
+				bh := blockEntryHeader{
+					Height:     1,
+					Checksum:   calculateChecksum(blocks[1]),
+					Size:       uint32(len(blocks[1])),
+					HeaderSize: 0,
+					Version:    BlockEntryVersion + 1, // Invalid version
+				}
+				return writeBlockHeader(store, secondBlockOffset, bh)
+			},
+			wantErr:     ErrCorrupted,
+			wantErrText: "invalid block entry version at offset",
+		},
+		{
+			name:         "second block with invalid version among 4 blocks",
+			blockHeights: []uint64{0, 3, 2, 4},
+			setupCorruption: func(store *Database, blocks [][]byte) error {
+				if err := resetIndexToBlock(store, uint64(len(blocks[0])), 0); err != nil {
+					return err
+				}
+				// Corrupt second block header with invalid version
+				secondBlockOffset := int64(sizeOfBlockEntryHeader) + int64(len(blocks[0]))
+				bh := blockEntryHeader{
+					Height:     1,
+					Checksum:   calculateChecksum(blocks[1]),
+					Size:       uint32(len(blocks[1])),
+					HeaderSize: 0,
+					Version:    BlockEntryVersion + 10, // version cannot be greater than current
+				}
+				return writeBlockHeader(store, secondBlockOffset, bh)
+			},
+			wantErr:     ErrCorrupted,
+			wantErrText: "invalid block entry version at offset",
 		},
 	}
 
@@ -359,7 +404,7 @@ func resetIndexToBlock(store *Database, blockSize uint64, minHeight uint64) erro
 		MinHeight:           minHeight,
 		MaxContiguousHeight: minHeight,
 		MaxHeight:           minHeight,
-		NextWriteOffset:     uint64(sizeOfBlockHeader) + blockSize,
+		NextWriteOffset:     uint64(sizeOfBlockEntryHeader) + blockSize,
 	}
 
 	headerBytes, err := header.MarshalBinary()
@@ -371,7 +416,7 @@ func resetIndexToBlock(store *Database, blockSize uint64, minHeight uint64) erro
 }
 
 // Helper function to write a block header at a specific offset
-func writeBlockHeader(store *Database, offset int64, bh blockHeader) error {
+func writeBlockHeader(store *Database, offset int64, bh blockEntryHeader) error {
 	fileIndex := int(offset / int64(store.header.MaxDataFileSize))
 	localOffset := offset % int64(store.header.MaxDataFileSize)
 	dataFilePath := store.dataFilePath(fileIndex)

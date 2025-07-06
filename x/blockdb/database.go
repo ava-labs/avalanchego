@@ -32,10 +32,10 @@ const (
 	unsetHeight = math.MaxUint64
 
 	// IndexFileVersion is the version of the index file format.
-	IndexFileVersion uint64 = 1
+	IndexFileVersion uint16 = 1
 
-	// MaxBlockDataSize is the maximum size of a block in bytes (16 MB).
-	MaxBlockDataSize = 1 << 24
+	// BlockEntryVersion is the version of the block entry.
+	BlockEntryVersion uint16 = 1
 )
 
 // BlockHeight defines the type for block heights.
@@ -48,45 +48,49 @@ type BlockData = []byte
 type BlockHeaderSize = uint32
 
 var (
-	_ encoding.BinaryMarshaler   = (*blockHeader)(nil)
-	_ encoding.BinaryUnmarshaler = (*blockHeader)(nil)
+	_ encoding.BinaryMarshaler   = (*blockEntryHeader)(nil)
+	_ encoding.BinaryUnmarshaler = (*blockEntryHeader)(nil)
 	_ encoding.BinaryMarshaler   = (*indexEntry)(nil)
 	_ encoding.BinaryUnmarshaler = (*indexEntry)(nil)
 	_ encoding.BinaryMarshaler   = (*indexFileHeader)(nil)
 	_ encoding.BinaryUnmarshaler = (*indexFileHeader)(nil)
 
-	sizeOfBlockHeader     = uint32(binary.Size(blockHeader{}))
-	sizeOfIndexEntry      = uint64(binary.Size(indexEntry{}))
-	sizeOfIndexFileHeader = uint64(binary.Size(indexFileHeader{}))
+	sizeOfBlockEntryHeader = uint32(binary.Size(blockEntryHeader{}))
+	sizeOfIndexEntry       = uint64(binary.Size(indexEntry{}))
+	sizeOfIndexFileHeader  = uint64(binary.Size(indexFileHeader{}))
 )
 
-// blockHeader is prepended to each block in the data file.
-type blockHeader struct {
+// blockEntryHeader is the header of a block entry in the data file.
+// This is not the header portion of the block data itself.
+type blockEntryHeader struct {
 	Height     BlockHeight
 	Checksum   uint64
 	Size       uint32
 	HeaderSize BlockHeaderSize
+	Version    uint16
 }
 
 // MarshalBinary implements the encoding.BinaryMarshaler interface.
-func (bh blockHeader) MarshalBinary() ([]byte, error) {
-	buf := make([]byte, sizeOfBlockHeader)
-	binary.LittleEndian.PutUint64(buf[0:], bh.Height)
-	binary.LittleEndian.PutUint64(buf[8:], bh.Checksum)
-	binary.LittleEndian.PutUint32(buf[16:], bh.Size)
-	binary.LittleEndian.PutUint32(buf[20:], bh.HeaderSize)
+func (beh blockEntryHeader) MarshalBinary() ([]byte, error) {
+	buf := make([]byte, sizeOfBlockEntryHeader)
+	binary.LittleEndian.PutUint64(buf[0:], beh.Height)
+	binary.LittleEndian.PutUint64(buf[8:], beh.Checksum)
+	binary.LittleEndian.PutUint32(buf[16:], beh.Size)
+	binary.LittleEndian.PutUint32(buf[20:], beh.HeaderSize)
+	binary.LittleEndian.PutUint16(buf[24:], beh.Version)
 	return buf, nil
 }
 
 // UnmarshalBinary implements the encoding.BinaryUnmarshaler interface.
-func (bh *blockHeader) UnmarshalBinary(data []byte) error {
-	if len(data) != int(sizeOfBlockHeader) {
-		return fmt.Errorf("%w: incorrect data length to unmarshal blockHeader: got %d bytes, need exactly %d", ErrCorrupted, len(data), sizeOfBlockHeader)
+func (beh *blockEntryHeader) UnmarshalBinary(data []byte) error {
+	if len(data) != int(sizeOfBlockEntryHeader) {
+		return fmt.Errorf("%w: incorrect data length to unmarshal blockEntryHeader: got %d bytes, need exactly %d", ErrCorrupted, len(data), sizeOfBlockEntryHeader)
 	}
-	bh.Height = binary.LittleEndian.Uint64(data[0:])
-	bh.Checksum = binary.LittleEndian.Uint64(data[8:])
-	bh.Size = binary.LittleEndian.Uint32(data[16:])
-	bh.HeaderSize = binary.LittleEndian.Uint32(data[20:])
+	beh.Height = binary.LittleEndian.Uint64(data[0:])
+	beh.Checksum = binary.LittleEndian.Uint64(data[8:])
+	beh.Size = binary.LittleEndian.Uint32(data[16:])
+	beh.HeaderSize = binary.LittleEndian.Uint32(data[20:])
+	beh.Version = binary.LittleEndian.Uint16(data[24:])
 	return nil
 }
 
@@ -128,20 +132,20 @@ func (e *indexEntry) UnmarshalBinary(data []byte) error {
 
 // indexFileHeader is the header of the index file.
 type indexFileHeader struct {
-	Version             uint64
+	Version             uint16
 	MaxDataFileSize     uint64
 	MinHeight           BlockHeight
 	MaxContiguousHeight BlockHeight
 	MaxHeight           BlockHeight
 	NextWriteOffset     uint64
-	// reserve 32 bytes for future use
-	Reserved [32]byte
+	// reserve 38 bytes for future use
+	Reserved [38]byte
 }
 
 // MarshalBinary implements encoding.BinaryMarshaler for indexFileHeader.
 func (h indexFileHeader) MarshalBinary() ([]byte, error) {
 	buf := make([]byte, sizeOfIndexFileHeader)
-	binary.LittleEndian.PutUint64(buf[0:], h.Version)
+	binary.LittleEndian.PutUint16(buf[0:], h.Version)
 	binary.LittleEndian.PutUint64(buf[8:], h.MaxDataFileSize)
 	binary.LittleEndian.PutUint64(buf[16:], h.MinHeight)
 	binary.LittleEndian.PutUint64(buf[24:], h.MaxContiguousHeight)
@@ -158,7 +162,7 @@ func (h *indexFileHeader) UnmarshalBinary(data []byte) error {
 			ErrCorrupted, len(data), sizeOfIndexFileHeader,
 		)
 	}
-	h.Version = binary.LittleEndian.Uint64(data[0:])
+	h.Version = binary.LittleEndian.Uint16(data[0:])
 	h.MaxDataFileSize = binary.LittleEndian.Uint64(data[8:])
 	h.MinHeight = binary.LittleEndian.Uint64(data[16:])
 	h.MaxContiguousHeight = binary.LittleEndian.Uint64(data[24:])
@@ -207,9 +211,14 @@ func New(indexDir, dataDir string, config DatabaseConfig, log logging.Logger) (*
 		return nil, err
 	}
 
+	databaseLog := log
+	if databaseLog == nil {
+		databaseLog = logging.NoLog{}
+	}
+
 	s := &Database{
 		options:   config,
-		log:       log,
+		log:       databaseLog,
 		fileCache: lru.NewCache[int, *os.File](MaxDataFiles),
 	}
 	s.fileCache.SetOnEvict(func(_ int, f *os.File) {
@@ -268,29 +277,26 @@ func (s *Database) WriteBlock(height BlockHeight, block BlockData, headerSize Bl
 		return ErrDatabaseClosed
 	}
 
-	blockDataLen := uint32(len(block))
-	if blockDataLen == 0 {
-		return ErrBlockEmpty
+	blockSize := len(block)
+	if blockSize > math.MaxUint32 {
+		return fmt.Errorf("%w: block size cannot exceed %d bytes", ErrBlockTooLarge, math.MaxUint32)
 	}
 
-	if blockDataLen > MaxBlockDataSize {
-		return ErrBlockTooLarge
+	blockDataLen := uint32(blockSize)
+	if blockDataLen == 0 {
+		return ErrBlockEmpty
 	}
 
 	if headerSize >= blockDataLen {
 		return ErrHeaderSizeTooLarge
 	}
 
-	if height < s.header.MinHeight {
-		return fmt.Errorf("%w: cannot write block at height %d, minimum height is %d", ErrInvalidBlockHeight, height, s.header.MinHeight)
-	}
-
 	indexFileOffset, err := s.indexEntryOffset(height)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get index entry offset for block at height %d: %w", height, err)
 	}
 
-	sizeWithDataHeader, err := safemath.Add(sizeOfBlockHeader, blockDataLen)
+	sizeWithDataHeader, err := safemath.Add(sizeOfBlockEntryHeader, blockDataLen)
 	if err != nil {
 		return fmt.Errorf("calculating total block size would overflow for block at height %d: %w", height, err)
 	}
@@ -299,11 +305,12 @@ func (s *Database) WriteBlock(height BlockHeight, block BlockData, headerSize Bl
 		return err
 	}
 
-	bh := blockHeader{
+	bh := blockEntryHeader{
 		Height:     height,
 		Size:       blockDataLen,
 		HeaderSize: headerSize,
 		Checksum:   calculateChecksum(block),
+		Version:    BlockEntryVersion,
 	}
 	if err := s.writeBlockAt(writeDataOffset, bh, block); err != nil {
 		return err
@@ -359,7 +366,7 @@ func (s *Database) ReadBlock(height BlockHeight) (BlockData, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get data file for block at height %d: %w", height, err)
 	}
-	_, err = dataFile.ReadAt(blockData, int64(localOffset+uint64(sizeOfBlockHeader)))
+	_, err = dataFile.ReadAt(blockData, int64(localOffset+uint64(sizeOfBlockEntryHeader)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read block data from data file: %w", err)
 	}
@@ -394,7 +401,7 @@ func (s *Database) ReadHeader(height BlockHeight) (BlockData, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get data file for block header at height %d: %w", height, err)
 	}
-	_, err = dataFile.ReadAt(headerData, int64(localOffset+uint64(sizeOfBlockHeader)))
+	_, err = dataFile.ReadAt(headerData, int64(localOffset+uint64(sizeOfBlockEntryHeader)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read block header data from data file: %w", err)
 	}
@@ -419,7 +426,7 @@ func (s *Database) ReadBody(height BlockHeight) (BlockData, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get data file for block body at height %d: %w", height, err)
 	}
-	headerOffset, err := safemath.Add(localOffset, uint64(sizeOfBlockHeader))
+	headerOffset, err := safemath.Add(localOffset, uint64(sizeOfBlockEntryHeader))
 	if err != nil {
 		return nil, fmt.Errorf("calculating header offset would overflow for block at height %d: %w", height, err)
 	}
@@ -451,6 +458,10 @@ func (s *Database) HasBlock(height BlockHeight) (bool, error) {
 }
 
 func (s *Database) indexEntryOffset(height BlockHeight) (uint64, error) {
+	if height < s.header.MinHeight {
+		return 0, fmt.Errorf("%w: failed to get index entry offset for block at height %d, minimum height is %d", ErrInvalidBlockHeight, height, s.header.MinHeight)
+	}
+
 	relativeHeight := height - s.header.MinHeight
 	offsetFromHeaderStart, err := safemath.Mul(relativeHeight, sizeOfIndexEntry)
 	if err != nil {
@@ -468,10 +479,6 @@ func (s *Database) indexEntryOffset(height BlockHeight) (uint64, error) {
 // Returns ErrBlockNotFound if the block does not exist.
 func (s *Database) readIndexEntry(height BlockHeight) (indexEntry, error) {
 	var entry indexEntry
-
-	if height < s.header.MinHeight {
-		return entry, fmt.Errorf("%w: cannot read block at height %d, minimum height is %d", ErrInvalidBlockHeight, height, s.header.MinHeight)
-	}
 
 	offset, err := s.indexEntryOffset(height)
 	if err != nil {
@@ -646,7 +653,7 @@ func (s *Database) recover() error {
 			)
 			recoveredBlocksCount++
 			recoveredHeights = append(recoveredHeights, bh.Height)
-			blockTotalSize, err := safemath.Add(uint64(sizeOfBlockHeader), uint64(bh.Size))
+			blockTotalSize, err := safemath.Add(uint64(sizeOfBlockEntryHeader), uint64(bh.Size))
 			if err != nil {
 				return fmt.Errorf("recovery: overflow in block size calculation: %w", err)
 			}
@@ -678,9 +685,9 @@ func (s *Database) recover() error {
 	return nil
 }
 
-func (s *Database) recoverBlockAtOffset(offset, totalDataSize uint64) (blockHeader, error) {
-	var bh blockHeader
-	if totalDataSize-offset < uint64(sizeOfBlockHeader) {
+func (s *Database) recoverBlockAtOffset(offset, totalDataSize uint64) (blockEntryHeader, error) {
+	var bh blockEntryHeader
+	if totalDataSize-offset < uint64(sizeOfBlockEntryHeader) {
 		return bh, fmt.Errorf("%w: not enough data for block header at offset %d", ErrCorrupted, offset)
 	}
 
@@ -688,15 +695,18 @@ func (s *Database) recoverBlockAtOffset(offset, totalDataSize uint64) (blockHead
 	if err != nil {
 		return bh, fmt.Errorf("recovery: failed to get data file for offset %d: %w", offset, err)
 	}
-	bhBuf := make([]byte, sizeOfBlockHeader)
+	bhBuf := make([]byte, sizeOfBlockEntryHeader)
 	if _, err := dataFile.ReadAt(bhBuf, int64(localOffset)); err != nil {
 		return bh, fmt.Errorf("%w: error reading block header at offset %d: %w", ErrCorrupted, offset, err)
 	}
 	if err := bh.UnmarshalBinary(bhBuf); err != nil {
 		return bh, fmt.Errorf("%w: error deserializing block header at offset %d: %w", ErrCorrupted, offset, err)
 	}
-	if bh.Size == 0 || bh.Size > MaxBlockDataSize {
+	if bh.Size == 0 {
 		return bh, fmt.Errorf("%w: invalid block size in header at offset %d: %d", ErrCorrupted, offset, bh.Size)
+	}
+	if bh.Version > BlockEntryVersion {
+		return bh, fmt.Errorf("%w: invalid block entry version at offset %d, version %d is greater than the current version %d", ErrCorrupted, offset, bh.Version, BlockEntryVersion)
 	}
 	if bh.Height < s.header.MinHeight || bh.Height == unsetHeight {
 		return bh, fmt.Errorf(
@@ -707,7 +717,7 @@ func (s *Database) recoverBlockAtOffset(offset, totalDataSize uint64) (blockHead
 	if bh.HeaderSize > bh.Size {
 		return bh, fmt.Errorf("%w: invalid block header size in header at offset %d: %d > %d", ErrCorrupted, offset, bh.HeaderSize, bh.Size)
 	}
-	expectedBlockEndOffset, err := safemath.Add(offset, uint64(sizeOfBlockHeader))
+	expectedBlockEndOffset, err := safemath.Add(offset, uint64(sizeOfBlockEntryHeader))
 	if err != nil {
 		return bh, fmt.Errorf("calculating block end offset would overflow at offset %d: %w", offset, err)
 	}
@@ -719,7 +729,7 @@ func (s *Database) recoverBlockAtOffset(offset, totalDataSize uint64) (blockHead
 		return bh, fmt.Errorf("%w: block data out of bounds at offset %d", ErrCorrupted, offset)
 	}
 	blockData := make([]byte, bh.Size)
-	blockDataOffset, err := safemath.Add(localOffset, uint64(sizeOfBlockHeader))
+	blockDataOffset, err := safemath.Add(localOffset, uint64(sizeOfBlockEntryHeader))
 	if err != nil {
 		return bh, fmt.Errorf("calculating block data offset would overflow at offset %d: %w", offset, err)
 	}
@@ -755,11 +765,14 @@ func (s *Database) listDataFiles() (map[int]string, int, error) {
 			continue
 		}
 		var index int
-		if n, err := fmt.Sscanf(file.Name(), dataFileNameFormat, &index); n == 1 && err == nil {
-			dataFiles[index] = filepath.Join(s.dataDir, file.Name())
-			if index > maxIndex {
-				maxIndex = index
-			}
+		n, err := fmt.Sscanf(file.Name(), dataFileNameFormat, &index)
+		if err != nil || n != 1 {
+			s.log.Debug("non-data file scanned in data directory", zap.String("file", file.Name()), zap.Error(err))
+			continue
+		}
+		dataFiles[index] = filepath.Join(s.dataDir, file.Name())
+		if index > maxIndex {
+			maxIndex = index
 		}
 	}
 
@@ -903,7 +916,7 @@ func calculateChecksum(data []byte) uint64 {
 	return xxhash.Sum64(data)
 }
 
-func (s *Database) writeBlockAt(offset uint64, bh blockHeader, block BlockData) error {
+func (s *Database) writeBlockAt(offset uint64, bh blockEntryHeader, block BlockData) error {
 	headerBytes, err := bh.MarshalBinary()
 	if err != nil {
 		return fmt.Errorf("failed to serialize block header: %w", err)
@@ -915,13 +928,13 @@ func (s *Database) writeBlockAt(offset uint64, bh blockHeader, block BlockData) 
 	}
 
 	// Allocate combined buffer for header and block data and write it to the data file
-	combinedBufSize, err := safemath.Add(uint64(sizeOfBlockHeader), uint64(len(block)))
+	combinedBufSize, err := safemath.Add(uint64(sizeOfBlockEntryHeader), uint64(len(block)))
 	if err != nil {
 		return fmt.Errorf("calculating combined buffer size would overflow for block %d: %w", bh.Height, err)
 	}
 	combinedBuf := make([]byte, combinedBufSize)
 	copy(combinedBuf, headerBytes)
-	copy(combinedBuf[sizeOfBlockHeader:], block)
+	copy(combinedBuf[sizeOfBlockEntryHeader:], block)
 	if _, err := dataFile.WriteAt(combinedBuf, int64(localOffset)); err != nil {
 		return fmt.Errorf("failed to write block to data file at offset %d: %w", offset, err)
 	}
@@ -1059,7 +1072,7 @@ func (s *Database) allocateBlockSpace(totalSize uint32) (writeDataOffset uint64,
 
 	// Check if a single block would exceed the max data file size
 	if uint64(totalSize) > maxDataFileSize {
-		return 0, ErrBlockTooLarge
+		return 0, fmt.Errorf("%w: block of size %d exceeds max data file size of %d", ErrBlockTooLarge, totalSize, maxDataFileSize)
 	}
 
 	for {
