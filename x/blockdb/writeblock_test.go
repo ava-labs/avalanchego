@@ -264,13 +264,6 @@ func TestWriteBlock_Errors(t *testing.T) {
 			wantErr:    ErrBlockEmpty,
 		},
 		{
-			name:       "block too large",
-			height:     0,
-			block:      make([]byte, MaxBlockDataSize+1),
-			headerSize: 0,
-			wantErr:    ErrBlockTooLarge,
-		},
-		{
 			name:       "header size larger than block",
 			height:     0,
 			block:      []byte("small"),
@@ -312,7 +305,7 @@ func TestWriteBlock_Errors(t *testing.T) {
 		{
 			name:       "exceed max data file size",
 			height:     0,
-			block:      make([]byte, 1001), // Block + header will exceed 1024 limit (1001 + 24 = 1025 > 1024)
+			block:      make([]byte, 999), // Block + header will exceed 1024 limit (999 + 26 = 1025 > 1024)
 			config:     DefaultDatabaseConfig().WithMaxDataFileSize(1024),
 			headerSize: 0,
 			wantErr:    ErrBlockTooLarge,

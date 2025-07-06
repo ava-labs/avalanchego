@@ -85,7 +85,6 @@ func TestNew_Params(t *testing.T) {
 		indexDir    string
 		dataDir     string
 		config      DatabaseConfig
-		log         logging.Logger
 		wantErr     error
 		expectClose bool
 	}{
@@ -136,7 +135,7 @@ func TestNew_Params(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			db, err := New(tt.indexDir, tt.dataDir, tt.config, tt.log)
+			db, err := New(tt.indexDir, tt.dataDir, tt.config, nil)
 
 			if tt.wantErr != nil {
 				require.Equal(t, tt.wantErr.Error(), err.Error())
@@ -234,6 +233,13 @@ func TestIndexFileHeaderAlignment(t *testing.T) {
 	require.Equal(t, uint64(0), sizeOfIndexFileHeader%sizeOfIndexEntry,
 		"sizeOfIndexFileHeader (%d) is not a multiple of sizeOfIndexEntry (%d)",
 		sizeOfIndexFileHeader, sizeOfIndexEntry)
+}
+
+func TestIndexEntrySizePowerOfTwo(t *testing.T) {
+	// Check that sizeOfIndexEntry is a power of 2
+	// This is important for memory alignment and performance
+	require.Equal(t, uint64(0), sizeOfIndexEntry&(sizeOfIndexEntry-1),
+		"sizeOfIndexEntry (%d) is not a power of 2", sizeOfIndexEntry)
 }
 
 func TestNew_IndexFileConfigPrecedence(t *testing.T) {
