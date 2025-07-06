@@ -126,15 +126,14 @@ On startup, BlockDB checks for signs of an unclean shutdown by comparing the dat
 ### Creating a Database
 
 ```go
-import "github.com/ava-labs/avalanchego/x/blockdb"
-
-config := blockdb.DefaultDatabaseConfig()
-db, err := blockdb.New(
-    "/path/to/index",  // Index directory
-    "/path/to/data",   // Data directory
-    config,
-    logging.NoLog{},
+import (
+    "errors"
+    "github.com/ava-labs/avalanchego/x/blockdb"
 )
+
+config := blockdb.DefaultConfig().
+    WithDir("/path/to/blockdb")
+db, err := blockdb.New(config, logging.NoLog{})
 if err != nil {
     fmt.Println("Error creating database:", err)
     return
@@ -158,22 +157,30 @@ if err != nil {
 // Read a block
 blockData, err := db.ReadBlock(height)
 if err != nil {
+    if errors.Is(err, blockdb.ErrBlockNotFound) {
+        fmt.Println("Block doesn't exist at this height")
+        return
+    }
     fmt.Println("Error reading block:", err)
-    return
-}
-if blockData == nil {
-    // Block doesn't exist at this height
     return
 }
 
 // Read block components separately
 headerData, err := db.ReadHeader(height)
 if err != nil {
+    if errors.Is(err, blockdb.ErrBlockNotFound) {
+        fmt.Println("Block doesn't exist at this height")
+        return
+    }
     fmt.Println("Error reading header:", err)
     return
 }
 bodyData, err := db.ReadBody(height)
 if err != nil {
+    if errors.Is(err, blockdb.ErrBlockNotFound) {
+        fmt.Println("Block doesn't exist at this height")
+        return
+    }
     fmt.Println("Error reading body:", err)
     return
 }

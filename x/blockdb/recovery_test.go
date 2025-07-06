@@ -6,7 +6,6 @@ package blockdb
 import (
 	"math"
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -15,7 +14,7 @@ import (
 func TestRecovery_Success(t *testing.T) {
 	// Create database with 10KB file size and 4KB blocks
 	// This means each file will have 2 blocks (4KB + 24 bytes header = ~4KB per block)
-	config := DefaultDatabaseConfig().WithMaxDataFileSize(10 * 1024) // 10KB per file
+	config := DefaultConfig().WithMaxDataFileSize(10 * 1024) // 10KB per file
 
 	tests := []struct {
 		name         string
@@ -105,8 +104,7 @@ func TestRecovery_Success(t *testing.T) {
 			require.NoError(t, tt.corruptIndex(indexPath))
 
 			// Reopen the database and test recovery
-			indexDir := filepath.Join(indexPath, "..")
-			recoveredStore, err := New(indexDir, store.dataDir, config, store.log)
+			recoveredStore, err := New(config.WithIndexDir(store.config.IndexDir).WithDataDir(store.config.DataDir), store.log)
 			require.NoError(t, err)
 			defer recoveredStore.Close()
 
@@ -354,7 +352,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			config := DefaultDatabaseConfig()
+			config := DefaultConfig()
 			if tt.minHeight > 0 {
 				config = config.WithMinimumHeight(tt.minHeight)
 			}
@@ -381,8 +379,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 			require.NoError(t, tt.setupCorruption(store, blocks))
 
 			// Try to reopen the database - it should detect corruption
-			indexDir := filepath.Dir(store.indexFile.Name())
-			_, err := New(indexDir, store.dataDir, config, store.log)
+			_, err := New(config.WithIndexDir(store.config.IndexDir).WithDataDir(store.config.DataDir), store.log)
 			require.ErrorIs(t, err, tt.wantErr)
 			require.Contains(t, err.Error(), tt.wantErrText, "error message should contain expected text")
 		})

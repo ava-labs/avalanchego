@@ -14,7 +14,7 @@ import (
 
 func TestDataSplitting(t *testing.T) {
 	// Each data file should have enough space for 2 blocks
-	config := DefaultDatabaseConfig().WithMaxDataFileSize(1024 * 2.5)
+	config := DefaultConfig().WithMaxDataFileSize(1024 * 2.5)
 	store, cleanup := newTestDatabase(t, config)
 	defer cleanup()
 
@@ -27,7 +27,7 @@ func TestDataSplitting(t *testing.T) {
 	}
 
 	// Verify that multiple data files were created.
-	files, err := os.ReadDir(store.dataDir)
+	files, err := os.ReadDir(store.config.DataDir)
 	require.NoError(t, err)
 	var dataFileCount int
 	for _, file := range files {
@@ -49,7 +49,8 @@ func TestDataSplitting(t *testing.T) {
 
 	// reopen and verify all blocks are readable
 	require.NoError(t, store.Close())
-	store, err = New(filepath.Dir(store.indexFile.Name()), store.dataDir, config, store.log)
+	config = config.WithDataDir(store.config.DataDir).WithIndexDir(store.config.IndexDir)
+	store, err = New(config, store.log)
 	require.NoError(t, err)
 	defer store.Close()
 	for i := range numBlocks {
@@ -60,7 +61,7 @@ func TestDataSplitting(t *testing.T) {
 }
 
 func TestDataSplitting_DeletedFile(t *testing.T) {
-	config := DefaultDatabaseConfig().WithMaxDataFileSize(1024 * 2.5)
+	config := DefaultConfig().WithMaxDataFileSize(1024 * 2.5)
 	store, cleanup := newTestDatabase(t, config)
 	defer cleanup()
 
@@ -74,11 +75,12 @@ func TestDataSplitting_DeletedFile(t *testing.T) {
 	store.Close()
 
 	// Delete the first data file (blockdb_0.dat)
-	firstDataFilePath := filepath.Join(store.dataDir, fmt.Sprintf(dataFileNameFormat, 0))
+	firstDataFilePath := filepath.Join(store.config.DataDir, fmt.Sprintf(dataFileNameFormat, 0))
 	require.NoError(t, os.Remove(firstDataFilePath))
 
 	// reopen and verify the blocks
 	require.NoError(t, store.Close())
-	_, err := New(filepath.Dir(store.indexFile.Name()), store.dataDir, config, store.log)
+	config = config.WithIndexDir(store.config.IndexDir).WithDataDir(store.config.DataDir)
+	_, err := New(config, store.log)
 	require.ErrorIs(t, err, ErrCorrupted)
 }

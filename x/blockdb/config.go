@@ -13,6 +13,12 @@ const DefaultMaxDataFiles = 10
 
 // DatabaseConfig contains configuration parameters for BlockDB.
 type DatabaseConfig struct {
+	// IndexDir is the directory where the index file is stored.
+	IndexDir string
+
+	// DataDir is the directory where the data files are stored.
+	DataDir string
+
 	// MinimumHeight is the lowest block height tracked by the database.
 	MinimumHeight uint64
 
@@ -32,9 +38,11 @@ type DatabaseConfig struct {
 	Truncate bool
 }
 
-// DefaultDatabaseConfig returns the default options for BlockDB.
-func DefaultDatabaseConfig() DatabaseConfig {
+// DefaultConfig returns the default options for BlockDB.
+func DefaultConfig() DatabaseConfig {
 	return DatabaseConfig{
+		IndexDir:           "",
+		DataDir:            "",
 		MinimumHeight:      0,
 		MaxDataFileSize:    DefaultMaxDataFileSize,
 		MaxDataFiles:       DefaultMaxDataFiles,
@@ -42,6 +50,25 @@ func DefaultDatabaseConfig() DatabaseConfig {
 		SyncToDisk:         true,
 		Truncate:           false,
 	}
+}
+
+// WithDir sets both IndexDir and DataDir to the given value.
+func (c DatabaseConfig) WithDir(directory string) DatabaseConfig {
+	c.IndexDir = directory
+	c.DataDir = directory
+	return c
+}
+
+// WithIndexDir returns a copy of the config with IndexDir set to the given value.
+func (c DatabaseConfig) WithIndexDir(indexDir string) DatabaseConfig {
+	c.IndexDir = indexDir
+	return c
+}
+
+// WithDataDir returns a copy of the config with DataDir set to the given value.
+func (c DatabaseConfig) WithDataDir(dataDir string) DatabaseConfig {
+	c.DataDir = dataDir
+	return c
 }
 
 // WithSyncToDisk returns a copy of the config with SyncToDisk set to the given value.
@@ -82,6 +109,9 @@ func (c DatabaseConfig) WithCheckpointInterval(interval uint64) DatabaseConfig {
 
 // Validate checks if the store options are valid.
 func (c DatabaseConfig) Validate() error {
+	if c.IndexDir == "" || c.DataDir == "" {
+		return errors.New("both IndexDir and DataDir must be provided")
+	}
 	if c.CheckpointInterval == 0 {
 		return errors.New("CheckpointInterval cannot be 0")
 	}

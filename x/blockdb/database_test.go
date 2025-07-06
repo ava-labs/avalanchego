@@ -20,10 +20,8 @@ import (
 func TestNew_Truncate(t *testing.T) {
 	// Create initial database
 	tempDir := t.TempDir()
-	indexDir := filepath.Join(tempDir, "index")
-	dataDir := filepath.Join(tempDir, "data")
-	config := DefaultDatabaseConfig().WithTruncate(true)
-	db, err := New(indexDir, dataDir, config, logging.NoLog{})
+	config := DefaultConfig().WithDir(tempDir).WithTruncate(true)
+	db, err := New(config, logging.NoLog{})
 	require.NoError(t, err)
 	require.NotNil(t, db)
 
@@ -33,7 +31,7 @@ func TestNew_Truncate(t *testing.T) {
 	require.NoError(t, db.Close())
 
 	// Reopen with truncate=true and verify data is gone
-	db2, err := New(indexDir, dataDir, config, logging.NoLog{})
+	db2, err := New(config, logging.NoLog{})
 	require.NoError(t, err)
 	require.NotNil(t, db2)
 	defer db2.Close()
@@ -45,10 +43,8 @@ func TestNew_Truncate(t *testing.T) {
 
 func TestNew_NoTruncate(t *testing.T) {
 	tempDir := t.TempDir()
-	indexDir := filepath.Join(tempDir, "index")
-	dataDir := filepath.Join(tempDir, "data")
-	config := DefaultDatabaseConfig().WithTruncate(true)
-	db, err := New(indexDir, dataDir, config, logging.NoLog{})
+	config := DefaultConfig().WithDir(tempDir).WithTruncate(true)
+	db, err := New(config, logging.NoLog{})
 	require.NoError(t, err)
 	require.NotNil(t, db)
 
@@ -61,8 +57,8 @@ func TestNew_NoTruncate(t *testing.T) {
 	require.NoError(t, db.Close())
 
 	// Reopen with truncate=false and verify data is still there
-	config = DefaultDatabaseConfig().WithTruncate(false)
-	db2, err := New(indexDir, dataDir, config, logging.NoLog{})
+	config = DefaultConfig().WithDir(tempDir).WithTruncate(false)
+	db2, err := New(config, logging.NoLog{})
 	require.NoError(t, err)
 	require.NotNil(t, db2)
 	defer db2.Close()
@@ -82,75 +78,61 @@ func TestNew_Params(t *testing.T) {
 	tempDir := t.TempDir()
 	tests := []struct {
 		name        string
-		indexDir    string
-		dataDir     string
 		config      DatabaseConfig
 		wantErr     error
 		expectClose bool
 	}{
 		{
-			name:     "default config",
-			indexDir: tempDir,
-			dataDir:  tempDir,
-			config:   DefaultDatabaseConfig(),
+			name:   "default config",
+			config: DefaultConfig().WithDir(tempDir),
 		},
 		{
-			name:     "custom config",
-			indexDir: tempDir,
-			dataDir:  tempDir,
-			config: DefaultDatabaseConfig().
+			name: "custom config",
+			config: DefaultConfig().WithDir(tempDir).
 				WithMinimumHeight(100).
 				WithMaxDataFileSize(1024 * 1024). // 1MB
 				WithMaxDataFiles(50).
 				WithCheckpointInterval(512),
 		},
 		{
-			name:     "empty index directory",
-			indexDir: "",
-			dataDir:  tempDir,
-			config:   DefaultDatabaseConfig(),
-			wantErr:  errors.New("both indexDir and dataDir must be provided"),
+			name:    "empty index directory",
+			config:  DefaultConfig().WithDataDir(tempDir),
+			wantErr: errors.New("both IndexDir and DataDir must be provided"),
 		},
 		{
-			name:     "empty data directory",
-			indexDir: tempDir,
-			dataDir:  "",
-			config:   DefaultDatabaseConfig(),
-			wantErr:  errors.New("both indexDir and dataDir must be provided"),
+			name:    "empty data directory",
+			config:  DefaultConfig().WithDataDir(tempDir),
+			wantErr: errors.New("both IndexDir and DataDir must be provided"),
 		},
 		{
-			name:     "both directories empty",
-			indexDir: "",
-			config:   DefaultDatabaseConfig(),
-			dataDir:  "",
-			wantErr:  errors.New("both indexDir and dataDir must be provided"),
+			name:    "both directories empty",
+			config:  DefaultConfig(),
+			wantErr: errors.New("both IndexDir and DataDir must be provided"),
 		},
 		{
-			name:     "invalid config - zero checkpoint interval",
-			indexDir: tempDir,
-			dataDir:  tempDir,
-			config:   DefaultDatabaseConfig().WithCheckpointInterval(0),
-			wantErr:  errors.New("CheckpointInterval cannot be 0"),
+			name:   "different index and data directories",
+			config: DefaultConfig().WithIndexDir(filepath.Join(tempDir, "index")).WithDataDir(filepath.Join(tempDir, "data")),
 		},
 		{
-			name:     "invalid config - zero max data files",
-			indexDir: tempDir,
-			dataDir:  tempDir,
-			config:   DefaultDatabaseConfig().WithMaxDataFiles(0),
-			wantErr:  errors.New("MaxDataFiles must be positive"),
+			name:    "invalid config - zero checkpoint interval",
+			config:  DefaultConfig().WithDir(tempDir).WithCheckpointInterval(0),
+			wantErr: errors.New("CheckpointInterval cannot be 0"),
 		},
 		{
-			name:     "invalid config - negative max data files",
-			indexDir: tempDir,
-			dataDir:  tempDir,
-			config:   DefaultDatabaseConfig().WithMaxDataFiles(-1),
-			wantErr:  errors.New("MaxDataFiles must be positive"),
+			name:    "invalid config - zero max data files",
+			config:  DefaultConfig().WithDir(tempDir).WithMaxDataFiles(0),
+			wantErr: errors.New("MaxDataFiles must be positive"),
+		},
+		{
+			name:    "invalid config - negative max data files",
+			config:  DefaultConfig().WithDir(tempDir).WithMaxDataFiles(-1),
+			wantErr: errors.New("MaxDataFiles must be positive"),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			db, err := New(tt.indexDir, tt.dataDir, tt.config, nil)
+			db, err := New(tt.config, nil)
 
 			if tt.wantErr != nil {
 				require.Equal(t, tt.wantErr.Error(), err.Error())
@@ -161,13 +143,12 @@ func TestNew_Params(t *testing.T) {
 			require.NotNil(t, db)
 
 			// Verify the database was created with correct configuration
-			require.Equal(t, tt.config.MinimumHeight, db.options.MinimumHeight)
-			require.Equal(t, tt.config.MaxDataFileSize, db.options.MaxDataFileSize)
-			require.Equal(t, tt.config.MaxDataFiles, db.options.MaxDataFiles)
-			require.Equal(t, tt.config.CheckpointInterval, db.options.CheckpointInterval)
-			require.Equal(t, tt.config.SyncToDisk, db.options.SyncToDisk)
-
-			indexPath := filepath.Join(tt.indexDir, indexFileName)
+			require.Equal(t, tt.config.MinimumHeight, db.config.MinimumHeight)
+			require.Equal(t, tt.config.MaxDataFileSize, db.config.MaxDataFileSize)
+			require.Equal(t, tt.config.MaxDataFiles, db.config.MaxDataFiles)
+			require.Equal(t, tt.config.CheckpointInterval, db.config.CheckpointInterval)
+			require.Equal(t, tt.config.SyncToDisk, db.config.SyncToDisk)
+			indexPath := filepath.Join(tt.config.IndexDir, indexFileName)
 			require.FileExists(t, indexPath)
 
 			// Test that we can close the database
@@ -239,7 +220,8 @@ func TestNew_IndexFileErrors(t *testing.T) {
 				t.Skip("Setup failed, skipping test")
 			}
 
-			_, err := New(indexDir, dataDir, DefaultDatabaseConfig(), logging.NoLog{})
+			config := DefaultConfig().WithIndexDir(indexDir).WithDataDir(dataDir)
+			_, err := New(config, logging.NoLog{})
 			require.Contains(t, err.Error(), tt.wantErrMsg)
 		})
 	}
@@ -260,9 +242,9 @@ func TestIndexEntrySizePowerOfTwo(t *testing.T) {
 
 func TestNew_IndexFileConfigPrecedence(t *testing.T) {
 	// set up db
-	initialConfig := DefaultDatabaseConfig().WithMinimumHeight(100).WithMaxDataFileSize(1024 * 1024)
 	tempDir := t.TempDir()
-	db, err := New(tempDir, tempDir, initialConfig, logging.NoLog{})
+	initialConfig := DefaultConfig().WithDir(tempDir).WithMinimumHeight(100).WithMaxDataFileSize(1024 * 1024)
+	db, err := New(initialConfig, logging.NoLog{})
 	require.NoError(t, err)
 	require.NotNil(t, db)
 
@@ -275,8 +257,8 @@ func TestNew_IndexFileConfigPrecedence(t *testing.T) {
 	require.NoError(t, db.Close())
 
 	// Reopen with different config that has minimum height of 200 and smaller max data file size
-	differentConfig := DefaultDatabaseConfig().WithMinimumHeight(200).WithMaxDataFileSize(512 * 1024)
-	db2, err := New(tempDir, tempDir, differentConfig, logging.NoLog{})
+	differentConfig := DefaultConfig().WithDir(tempDir).WithMinimumHeight(200).WithMaxDataFileSize(512 * 1024)
+	db2, err := New(differentConfig, logging.NoLog{})
 	require.NoError(t, err)
 	require.NotNil(t, db2)
 	defer db2.Close()
@@ -304,7 +286,7 @@ func TestNew_IndexFileConfigPrecedence(t *testing.T) {
 func TestFileCache_Eviction(t *testing.T) {
 	// Create a database with a small max data file size to force multiple files
 	// each file should have enough for 2 blocks (0.5kb * 2)
-	config := DefaultDatabaseConfig().WithMaxDataFileSize(1024 * 1.5)
+	config := DefaultConfig().WithMaxDataFileSize(1024 * 1.5)
 	store, cleanup := newTestDatabase(t, config)
 	defer cleanup()
 
@@ -367,7 +349,7 @@ func TestFileCache_Eviction(t *testing.T) {
 func TestMaxDataFiles_CacheLimit(t *testing.T) {
 	// Test that the file cache respects the MaxDataFiles limit
 	// Create a small cache size to test eviction behavior
-	config := DefaultDatabaseConfig().
+	config := DefaultConfig().
 		WithMaxDataFiles(2).      // Only allow 2 files in cache
 		WithMaxDataFileSize(1024) // Small file size to force multiple files
 

@@ -174,8 +174,7 @@ func (h *indexFileHeader) UnmarshalBinary(data []byte) error {
 // Database stores blockchain blocks on disk and provides methods to read, and write blocks.
 type Database struct {
 	indexFile *os.File
-	dataDir   string
-	options   DatabaseConfig
+	config    DatabaseConfig
 	header    indexFileHeader
 	log       logging.Logger
 	closed    bool
@@ -198,15 +197,9 @@ type Database struct {
 
 // New creates a block database.
 // Parameters:
-//   - indexDir: Directory for the index file
-//   - dataDir: Directory for the data file(s)
 //   - config: Configuration parameters
 //   - log: Logger instance for structured logging
-func New(indexDir, dataDir string, config DatabaseConfig, log logging.Logger) (*Database, error) {
-	if indexDir == "" || dataDir == "" {
-		return nil, errors.New("both indexDir and dataDir must be provided")
-	}
-
+func New(config DatabaseConfig, log logging.Logger) (*Database, error) {
 	if err := config.Validate(); err != nil {
 		return nil, err
 	}
@@ -217,7 +210,7 @@ func New(indexDir, dataDir string, config DatabaseConfig, log logging.Logger) (*
 	}
 
 	s := &Database{
-		options:   config,
+		config:    config,
 		log:       databaseLog,
 		fileCache: lru.NewCache[int, *os.File](config.MaxDataFiles),
 	}
@@ -228,19 +221,19 @@ func New(indexDir, dataDir string, config DatabaseConfig, log logging.Logger) (*
 	})
 
 	s.log.Info("Initializing BlockDB",
-		zap.String("indexDir", indexDir),
-		zap.String("dataDir", dataDir),
+		zap.String("indexDir", config.IndexDir),
+		zap.String("dataDir", config.DataDir),
 		zap.Uint64("maxDataFileSize", config.MaxDataFileSize),
 		zap.Int("maxDataFiles", config.MaxDataFiles),
 		zap.Bool("truncate", config.Truncate),
 	)
 
-	if err := s.openAndInitializeIndex(indexDir, config.Truncate); err != nil {
+	if err := s.openAndInitializeIndex(); err != nil {
 		s.log.Error("Failed to initialize database: failed to initialize index", zap.Error(err))
 		return nil, err
 	}
 
-	if err := s.initializeDataFiles(dataDir, config.Truncate); err != nil {
+	if err := s.initializeDataFiles(); err != nil {
 		s.log.Error("Failed to initialize database: failed to initialize data files", zap.Error(err))
 		s.closeFiles()
 		return nil, err
@@ -674,7 +667,7 @@ func (s *Database) persistIndexHeader() error {
 	// The index file must be fsync'd before the header is written to prevent
 	// a state where the header is persisted but the index entries it refers to
 	// are not. This could lead to data inconsistency on recovery.
-	if s.options.SyncToDisk {
+	if s.config.SyncToDisk {
 		if err := s.indexFile.Sync(); err != nil {
 			return fmt.Errorf("failed to sync index file before writing header state: %w", err)
 		}
@@ -897,9 +890,9 @@ func (s *Database) recoverBlockAtOffset(offset, totalDataSize uint64) (blockEntr
 }
 
 func (s *Database) listDataFiles() (map[int]string, int, error) {
-	files, err := os.ReadDir(s.dataDir)
+	files, err := os.ReadDir(s.config.DataDir)
 	if err != nil {
-		return nil, -1, fmt.Errorf("failed to read data directory %s: %w", s.dataDir, err)
+		return nil, -1, fmt.Errorf("failed to read data directory %s: %w", s.config.DataDir, err)
 	}
 
 	dataFiles := make(map[int]string)
@@ -914,7 +907,7 @@ func (s *Database) listDataFiles() (map[int]string, int, error) {
 			s.log.Debug("non-data file found in data directory", zap.String("fileName", file.Name()), zap.Error(err))
 			continue
 		}
-		dataFiles[index] = filepath.Join(s.dataDir, file.Name())
+		dataFiles[index] = filepath.Join(s.config.DataDir, file.Name())
 		if index > maxIndex {
 			maxIndex = index
 		}
@@ -923,13 +916,13 @@ func (s *Database) listDataFiles() (map[int]string, int, error) {
 	return dataFiles, maxIndex, nil
 }
 
-func (s *Database) openAndInitializeIndex(indexDir string, truncate bool) error {
-	indexPath := filepath.Join(indexDir, indexFileName)
-	if err := os.MkdirAll(indexDir, 0o755); err != nil {
-		return fmt.Errorf("failed to create index directory %s: %w", indexDir, err)
+func (s *Database) openAndInitializeIndex() error {
+	indexPath := filepath.Join(s.config.IndexDir, indexFileName)
+	if err := os.MkdirAll(s.config.IndexDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create index directory %s: %w", s.config.IndexDir, err)
 	}
 	openFlags := os.O_RDWR | os.O_CREATE
-	if truncate {
+	if s.config.Truncate {
 		openFlags |= os.O_TRUNC
 	}
 	var err error
@@ -937,16 +930,15 @@ func (s *Database) openAndInitializeIndex(indexDir string, truncate bool) error 
 	if err != nil {
 		return fmt.Errorf("failed to open index file %s: %w", indexPath, err)
 	}
-	return s.loadOrInitializeHeader(truncate)
+	return s.loadOrInitializeHeader()
 }
 
-func (s *Database) initializeDataFiles(dataDir string, truncate bool) error {
-	s.dataDir = dataDir
-	if err := os.MkdirAll(dataDir, 0o755); err != nil {
-		return fmt.Errorf("failed to create data directory %s: %w", dataDir, err)
+func (s *Database) initializeDataFiles() error {
+	if err := os.MkdirAll(s.config.DataDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create data directory %s: %w", s.config.DataDir, err)
 	}
 
-	if truncate {
+	if s.config.Truncate {
 		dataFiles, _, err := s.listDataFiles()
 		if err != nil {
 			return fmt.Errorf("failed to list data files for truncation: %w", err)
@@ -969,18 +961,18 @@ func (s *Database) initializeDataFiles(dataDir string, truncate bool) error {
 	return nil
 }
 
-func (s *Database) loadOrInitializeHeader(truncate bool) error {
+func (s *Database) loadOrInitializeHeader() error {
 	fileInfo, err := s.indexFile.Stat()
 	if err != nil {
 		return fmt.Errorf("failed to get index file stats: %w", err)
 	}
 
 	// reset index file if its empty or we are truncating
-	if truncate || fileInfo.Size() == 0 {
+	if s.config.Truncate || fileInfo.Size() == 0 {
 		s.header = indexFileHeader{
 			Version:             IndexFileVersion,
-			MinHeight:           s.options.MinimumHeight,
-			MaxDataFileSize:     s.options.MaxDataFileSize,
+			MinHeight:           s.config.MinimumHeight,
+			MaxDataFileSize:     s.config.MaxDataFileSize,
 			MaxHeight:           unsetHeight,
 			MaxContiguousHeight: unsetHeight,
 			NextWriteOffset:     0,
@@ -1030,7 +1022,7 @@ func (s *Database) closeFiles() {
 }
 
 func (s *Database) dataFilePath(index int) string {
-	return filepath.Join(s.dataDir, fmt.Sprintf(dataFileNameFormat, index))
+	return filepath.Join(s.config.DataDir, fmt.Sprintf(dataFileNameFormat, index))
 }
 
 func (s *Database) getOrOpenDataFile(fileIndex int) (*os.File, error) {
@@ -1094,7 +1086,7 @@ func (s *Database) writeBlockAt(offset uint64, bh blockEntryHeader, block BlockD
 		return fmt.Errorf("failed to write block to data file at offset %d: %w", offset, err)
 	}
 
-	if s.options.SyncToDisk {
+	if s.config.SyncToDisk {
 		if err := dataFile.Sync(); err != nil {
 			return fmt.Errorf("failed to sync data file after writing block %d: %w", bh.Height, err)
 		}
@@ -1151,7 +1143,7 @@ func (s *Database) updateBlockHeights(writtenBlockHeight BlockHeight) error {
 			break
 		}
 		if s.maxBlockHeight.CompareAndSwap(oldMaxHeight, writtenBlockHeight) {
-			if writtenBlockHeight%s.options.CheckpointInterval == 0 {
+			if writtenBlockHeight%s.config.CheckpointInterval == 0 {
 				if err := s.persistIndexHeader(); err != nil {
 					return fmt.Errorf("block %d written, but checkpoint failed: %w", writtenBlockHeight, err)
 				}
