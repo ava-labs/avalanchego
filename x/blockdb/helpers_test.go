@@ -7,7 +7,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -18,10 +17,8 @@ import (
 func newTestDatabase(t *testing.T, opts DatabaseConfig) (*Database, func()) {
 	t.Helper()
 	dir := t.TempDir()
-	idxDir := filepath.Join(dir, "idx")
-	dataDir := filepath.Join(dir, "dat")
-
-	db, err := New(idxDir, dataDir, opts, logging.NoLog{})
+	config := opts.WithDir(dir)
+	db, err := New(config, logging.NoLog{})
 	require.NoError(t, err, "failed to create database")
 
 	cleanup := func() {

@@ -15,12 +15,16 @@ import (
 
 func TestReadOperations(t *testing.T) {
 	tests := []struct {
-		name       string
-		readHeight uint64
-		noBlock    bool
-		config     *DatabaseConfig
-		setup      func(db *Database)
-		wantErr    error
+		name           string
+		readHeight     uint64
+		noBlock        bool
+		config         *DatabaseConfig
+		setup          func(db *Database)
+		wantErr        error
+		expectedBlock  []byte
+		expectedHeader []byte
+		expectedBody   []byte
+		skipSeed       bool
 	}{
 		{
 			name:       "read first block",
@@ -79,33 +83,61 @@ func TestReadOperations(t *testing.T) {
 			readHeight: math.MaxUint64,
 			wantErr:    ErrBlockNotFound,
 		},
+		{
+			name:       "read block with no header (headerSize=0)",
+			readHeight: 100,
+			setup: func(db *Database) {
+				// Write a block with no header
+				blockData := []byte("this is all body data")
+				require.NoError(t, db.WriteBlock(100, blockData, 0))
+			},
+			expectedBlock:  []byte("this is all body data"),
+			expectedHeader: nil,
+			expectedBody:   []byte("this is all body data"),
+			skipSeed:       true,
+		},
+		{
+			name:       "read block with minimal body (headerSize=total size-1)",
+			readHeight: 101,
+			setup: func(db *Database) {
+				// Write a block where header is almost the entire block
+				blockData := []byte("this is all header data!")
+				require.NoError(t, db.WriteBlock(101, blockData, BlockHeaderSize(len(blockData)-1)))
+			},
+			expectedBlock:  []byte("this is all header data!"),
+			expectedHeader: []byte("this is all header data"),
+			expectedBody:   []byte("!"),
+			skipSeed:       true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config := tt.config
 			if config == nil {
-				defaultConfig := DefaultDatabaseConfig()
+				defaultConfig := DefaultConfig()
 				config = &defaultConfig
 			}
 
 			store, cleanup := newTestDatabase(t, *config)
 			defer cleanup()
 
-			// Seed database with blocks based on config
+			// Seed database with blocks based on config (unless skipSeed is true)
 			seededBlocks := make(map[uint64][]byte)
-			minHeight := config.MinimumHeight
-			maxHeight := minHeight + 50 // Always write 51 blocks
-			gapHeight := minHeight + 40 // Gap at relative position 40
+			if !tt.skipSeed {
+				minHeight := config.MinimumHeight
+				maxHeight := minHeight + 50 // Always write 51 blocks
+				gapHeight := minHeight + 40 // Gap at relative position 40
 
-			for i := minHeight; i <= maxHeight; i++ {
-				if i == gapHeight {
-					continue // Create gap
+				for i := minHeight; i <= maxHeight; i++ {
+					if i == gapHeight {
+						continue // Create gap
+					}
+
+					block := randomBlock(t)
+					require.NoError(t, store.WriteBlock(i, block, BlockHeaderSize(i-minHeight)))
+					seededBlocks[i] = block
 				}
-
-				block := randomBlock(t)
-				require.NoError(t, store.WriteBlock(i, block, BlockHeaderSize(i-minHeight)))
-				seededBlocks[i] = block
 			}
 
 			if tt.setup != nil {
@@ -135,22 +167,31 @@ func TestReadOperations(t *testing.T) {
 				require.NoError(t, err)
 
 				require.NotNil(t, readBlock)
-				expectedBlock := seededBlocks[tt.readHeight]
-				headerSize := BlockHeaderSize(tt.readHeight - config.MinimumHeight)
-				var expectHeader []byte
-				if headerSize > 0 {
-					expectHeader = expectedBlock[:headerSize]
+
+				// Use custom expected values if provided, otherwise use seeded blocks
+				if tt.expectedBlock != nil {
+					require.Equal(t, tt.expectedBlock, readBlock)
+					require.Equal(t, tt.expectedHeader, readHeader)
+					require.Equal(t, tt.expectedBody, readBody)
+				} else {
+					// Standard test case logic using seeded blocks
+					expectedBlock := seededBlocks[tt.readHeight]
+					headerSize := BlockHeaderSize(tt.readHeight - config.MinimumHeight)
+					var expectHeader []byte
+					if headerSize > 0 {
+						expectHeader = expectedBlock[:headerSize]
+					}
+					require.Equal(t, expectedBlock, readBlock)
+					require.Equal(t, expectHeader, readHeader)
+					require.Equal(t, expectedBlock[headerSize:], readBody)
 				}
-				require.Equal(t, expectedBlock, readBlock)
-				require.Equal(t, expectHeader, readHeader)
-				require.Equal(t, expectedBlock[headerSize:], readBody)
 			}
 		})
 	}
 }
 
 func TestReadOperations_Concurrency(t *testing.T) {
-	store, cleanup := newTestDatabase(t, DefaultDatabaseConfig())
+	store, cleanup := newTestDatabase(t, DefaultConfig())
 	defer cleanup()
 
 	// Pre-generate blocks and write them

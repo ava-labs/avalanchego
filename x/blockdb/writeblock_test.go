@@ -15,7 +15,7 @@ import (
 )
 
 func TestWriteBlock_Basic(t *testing.T) {
-	customConfig := DefaultDatabaseConfig().WithMinimumHeight(10)
+	customConfig := DefaultConfig().WithMinimumHeight(10)
 
 	tests := []struct {
 		name               string
@@ -130,7 +130,7 @@ func TestWriteBlock_Basic(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			config := tt.config
 			if config.CheckpointInterval == 0 {
-				config = DefaultDatabaseConfig()
+				config = DefaultConfig()
 			}
 
 			store, cleanup := newTestDatabase(t, config)
@@ -190,7 +190,7 @@ func TestWriteBlock_Basic(t *testing.T) {
 }
 
 func TestWriteBlock_Concurrency(t *testing.T) {
-	store, cleanup := newTestDatabase(t, DefaultDatabaseConfig())
+	store, cleanup := newTestDatabase(t, DefaultConfig())
 	defer cleanup()
 
 	var wg sync.WaitGroup
@@ -281,7 +281,7 @@ func TestWriteBlock_Errors(t *testing.T) {
 			name:       "height below custom minimum",
 			height:     5,
 			block:      randomBlock(t),
-			config:     DefaultDatabaseConfig().WithMinimumHeight(10),
+			config:     DefaultConfig().WithMinimumHeight(10),
 			headerSize: 0,
 			wantErr:    ErrInvalidBlockHeight,
 		},
@@ -306,7 +306,7 @@ func TestWriteBlock_Errors(t *testing.T) {
 			name:       "exceed max data file size",
 			height:     0,
 			block:      make([]byte, 999), // Block + header will exceed 1024 limit (999 + 26 = 1025 > 1024)
-			config:     DefaultDatabaseConfig().WithMaxDataFileSize(1024),
+			config:     DefaultConfig().WithMaxDataFileSize(1024),
 			headerSize: 0,
 			wantErr:    ErrBlockTooLarge,
 		},
@@ -314,7 +314,7 @@ func TestWriteBlock_Errors(t *testing.T) {
 			name:   "data file offset overflow",
 			height: 0,
 			block:  make([]byte, 100),
-			config: DefaultDatabaseConfig(),
+			config: DefaultConfig(),
 			setup: func(db *Database) {
 				// Set the next write offset to near max to trigger overflow
 				db.nextDataWriteOffset.Store(math.MaxUint64 - 50)
@@ -328,7 +328,7 @@ func TestWriteBlock_Errors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			config := tt.config
 			if config.CheckpointInterval == 0 {
-				config = DefaultDatabaseConfig()
+				config = DefaultConfig()
 			}
 
 			store, cleanup := newTestDatabase(t, config)
