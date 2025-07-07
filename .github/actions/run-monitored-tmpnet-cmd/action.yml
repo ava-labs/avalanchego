@@ -13,7 +13,7 @@ inputs:
     default: 'process'
   action_path:
     description: 'override github action path'
-    default: ${{ github.action_path }}
+    default: ${{ github.workspace }}/.github/actions/run-monitored-tmpnet-cmd
   filter_by_owner:
     default: ''
   artifact_prefix:
