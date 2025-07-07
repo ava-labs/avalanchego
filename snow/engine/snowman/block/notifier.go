@@ -12,6 +12,12 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 )
 
+var (
+	_ ChainVM         = (*ChangeNotifier)(nil)
+	_ BatchedChainVM  = (*ChangeNotifier)(nil)
+	_ StateSyncableVM = (*ChangeNotifier)(nil)
+)
+
 type FullVM interface {
 	StateSyncableVM
 	BatchedChainVM

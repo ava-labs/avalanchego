@@ -64,8 +64,9 @@ type VM struct {
 
 func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
 	if vm.WaitForEventF != nil {
-		return vm.WaitForEventF(context.Background())
+		return vm.WaitForEventF(ctx)
 	}
+	<-ctx.Done()
 	return 0, ctx.Err()
 }
 

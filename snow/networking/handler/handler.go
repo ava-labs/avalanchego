@@ -47,6 +47,7 @@ var (
 
 	errMissingEngine  = errors.New("missing engine")
 	errNoStartingGear = errors.New("failed to select starting gear")
+	errorShuttingDown = errors.New("shutting down")
 )
 
 type Handler interface {
@@ -296,7 +297,7 @@ func (h *handler) Notify(ctx context.Context, msg common.Message) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-h.closed:
-		return context.Canceled
+		return errorShuttingDown
 	case h.msgFromVMChan <- msg:
 		return nil
 	}
