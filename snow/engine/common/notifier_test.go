@@ -23,7 +23,7 @@ func (n notifier) Notify(ctx context.Context, msg Message) error {
 
 func TestNotifier(t *testing.T) {
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(1)
 
 	notifier := notifier(func(_ context.Context, msg Message) error {
 		defer wg.Done()
@@ -49,11 +49,7 @@ func TestNotifier(t *testing.T) {
 
 	defer nf.Close()
 
-	go func() {
-		defer wg.Done()
-		c <- PendingTxs
-	}()
-
+	c <- PendingTxs
 	wg.Wait()
 }
 
@@ -97,68 +93,76 @@ func TestNotifierWaitForPrefChangeAfterNotify(t *testing.T) {
 	defer nf.Close()
 
 	require.Eventually(t, func() bool {
-		return atomic.LoadUint32(&notifiedCount) == uint32(1)
+		return atomic.LoadUint32(&notifiedCount) == 1
 	}, time.Minute, 10*time.Millisecond)
 
 	require.Never(t, func() bool {
-		return atomic.LoadUint32(&notifiedCount) == uint32(2)
+		return atomic.LoadUint32(&notifiedCount) != 1
 	}, time.Millisecond*100, 10*time.Millisecond)
 
 	nf.CheckForEvent()
 
 	require.Eventually(t, func() bool {
-		return atomic.LoadUint32(&notifiedCount) == uint32(2)
+		return atomic.LoadUint32(&notifiedCount) == 2
 	}, time.Minute, 10*time.Millisecond)
 
 	require.Never(t, func() bool {
-		return atomic.LoadUint32(&notifiedCount) == uint32(3)
+		return atomic.LoadUint32(&notifiedCount) != 2
 	}, time.Millisecond*100, 10*time.Millisecond)
 }
 
 func TestNotifierReSubscribeAtPrefChange(t *testing.T) {
-	c := make(chan struct{})
+	notifications := make(chan Message)
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-
-	nf := &NotificationForwarder{
-		Log: &logging.NoLog{},
-	}
-
-	var subscribedCount uint32
-
-	nf.Subscribe = func(ctx context.Context) (Message, error) {
-		if atomic.AddUint32(&subscribedCount, 1) == 1 {
-			nf.CheckForEvent()
-		}
-
+	engine := Notifier(notifier(func(ctx context.Context, msg Message) error {
 		select {
 		case <-ctx.Done():
-			close(c)
-			return 0, ctx.Err()
-		case <-c:
-			wg.Done()
+			return ctx.Err()
+		case notifications <- msg:
 		}
-		return PendingTxs, nil
-	}
 
-	var notifiedCount uint32
-
-	nf.Engine = Notifier(notifier(func(_ context.Context, _ Message) error {
-		atomic.AddUint32(&notifiedCount, 1)
-		return nil
+		<-ctx.Done()
+		return ctx.Err()
 	}))
 
-	nf.start()
+	messages := make(chan Message)
+
+	signal := make(chan struct{})
+
+	subscriber := func(ctx context.Context) (Message, error) {
+		select {
+		case <-signal:
+		default:
+			close(signal)
+		}
+		select {
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		case msg := <-messages:
+			return msg, nil
+		}
+	}
+
+	nf := NewNotificationForwarder(engine, subscriber, &logging.NoLog{})
 	defer nf.Close()
 
-	wg.Wait()
+	select {
+	case <-signal:
+		nf.CheckForEvent()
+	case <-time.After(time.Minute):
+		require.FailNow(t, "Timed out waiting for the notification forwarder to subscribe")
+	}
 
-	require.Eventually(t, func() bool {
-		return atomic.LoadUint32(&notifiedCount) == uint32(1)
-	}, time.Minute, 10*time.Millisecond)
+	select {
+	case messages <- PendingTxs:
+	case <-time.After(time.Minute):
+		require.FailNow(t, "Timed out waiting to send message to notification forwarder")
+	}
 
-	require.Never(t, func() bool {
-		return atomic.LoadUint32(&notifiedCount) == uint32(2)
-	}, time.Millisecond*100, 10*time.Millisecond)
+	select {
+	case msg := <-notifications:
+		require.Equal(t, PendingTxs, msg)
+	case <-time.After(time.Minute):
+		require.FailNow(t, "Timed out waiting for notification forwarder to forward message")
+	}
 }

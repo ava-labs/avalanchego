@@ -51,11 +51,9 @@ func (vm *initializeOnLinearizeVM) WaitForEvent(ctx context.Context) (common.Mes
 
 func (vm *initializeOnLinearizeVM) Linearize(ctx context.Context, stopVertexID ids.ID) error {
 	vm.vmToLinearize.stopVertexID = stopVertexID
-	defer func() {
-		vm.linearizeOnce.Do(func() {
-			close(vm.waitForLinearize)
-		})
-	}()
+	defer vm.linearizeOnce.Do(func() {
+		close(vm.waitForLinearize)
+	})
 	return vm.vmToInitialize.Initialize(
 		ctx,
 		vm.ctx,

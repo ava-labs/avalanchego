@@ -59,13 +59,8 @@ func (nf *NotificationForwarder) start() {
 
 func (nf *NotificationForwarder) run() {
 	defer nf.executing.Done()
-	for {
+	for nf.execCtx.Err() == nil {
 		nf.forwardNotification()
-		select {
-		case <-nf.execCtx.Done():
-			return
-		default:
-		}
 	}
 }
 
@@ -88,11 +83,9 @@ func (nf *NotificationForwarder) forwardNotification() {
 		return
 	}
 
-	select {
-	case <-nf.execCtx.Done():
-		return
-	case <-ctx.Done():
-	}
+	// Wait for the context to be cancelled before proceeding to the next subscription,
+	// in order to subscribe after a block was accepted or a state sync was completed.
+	<-ctx.Done()
 }
 
 // CheckForEvent cancels any outstanding WaitForEvent calls and schedules a new WaitForEvent call.
@@ -106,7 +99,6 @@ func (nf *NotificationForwarder) cancelContext() {
 
 	if nf.abortContext != nil {
 		nf.abortContext()
-		nf.abortContext = nil
 	}
 }
 
@@ -128,5 +120,4 @@ func (nf *NotificationForwarder) Close() {
 	defer nf.lock.Unlock()
 
 	nf.haltExecution()
-	nf.haltExecution = func() {}
 }
