@@ -544,7 +544,6 @@ func TestOptionTimestampValidity(t *testing.T) {
 		[]byte,
 		[]byte,
 		[]byte,
-		chan<- common.Message,
 		[]*common.Fx,
 		common.AppSender,
 	) error {
@@ -587,7 +586,6 @@ func TestOptionTimestampValidity(t *testing.T) {
 		context.Background(),
 		ctx,
 		db,
-		nil,
 		nil,
 		nil,
 		nil,
