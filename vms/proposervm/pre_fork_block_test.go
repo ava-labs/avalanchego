@@ -283,7 +283,10 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	postForkStatelessChild, err := statelessblock.Build(
 		snowmantest.GenesisID,
 		coreBlk.Timestamp(),
-		0, // pChainHeight
+		0,           // pChainHeight
+		0,           // pChainEpochHeight,
+		0,           // epochNumber,
+		time.Time{}, // epochStartTime,
 		proVM.StakingCertLeaf,
 		coreBlk.Bytes(),
 		proVM.ctx.ChainID,
@@ -609,7 +612,10 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 	slb, err := statelessblock.Build(
 		firstBlock.ID(), // refer unknown parent
 		firstBlock.Timestamp(),
-		0, // pChainHeight,
+		0,           // pChainHeight,
+		0,           // pChainEpochHeight,
+		0,           // epochNumber,
+		time.Time{}, // epochStartTime,
 		proVM.StakingCertLeaf,
 		coreBlk.opts[0].Bytes(),
 		proVM.ctx.ChainID,

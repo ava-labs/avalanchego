@@ -246,10 +246,10 @@ func (*preForkBlock) pChainEpochHeight(context.Context) (uint64, error) {
 	return 0, nil
 }
 
-func (b *preForkBlock) epochNumber(context.Context) (uint64, error) {
+func (*preForkBlock) epochNumber(context.Context) (uint64, error) {
 	return 0, nil
 }
 
-func (b *preForkBlock) epochStartTime(context.Context) (time.Time, error) {
+func (*preForkBlock) epochStartTime(context.Context) (time.Time, error) {
 	return time.Time{}, nil
 }
