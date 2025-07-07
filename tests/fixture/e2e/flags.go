@@ -163,7 +163,7 @@ func WithDefaultNodeCount(nodeCount int) DefaultOption {
 	}
 }
 
-func RegisterFlagsWithOptions(ops ...DefaultOption) *FlagVars {
+func RegisterFlags(ops ...DefaultOption) *FlagVars {
 	vars := FlagVars{}
 
 	flag.BoolVar(

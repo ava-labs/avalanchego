@@ -38,7 +38,7 @@ const (
 var flagVars *e2e.FlagVars
 
 func init() {
-	flagVars = e2e.RegisterFlagsWithOptions()
+	flagVars = e2e.RegisterFlags()
 	flag.Parse()
 }
 

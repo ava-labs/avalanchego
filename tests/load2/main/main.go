@@ -34,7 +34,7 @@ var (
 )
 
 func init() {
-	flagVars = e2e.RegisterFlagsWithOptions(
+	flagVars = e2e.RegisterFlags(
 		e2e.WithDefaultNodeCount(defaultNodeCount),
 	)
 
