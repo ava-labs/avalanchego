@@ -91,9 +91,12 @@ func (b *Block) Verify(ctx context.Context) (simplex.VerifiedBlock, error) {
 // matches the parent of the current block's vmBlock.
 func (b *Block) verifyParentMatchesPrevBlock(ctx context.Context) error {
 	prevBlock := b.blockTracker.getBlock(b.metadata.Prev)
+	if prevBlock != nil {
+		if b.vmBlock.Parent() != prevBlock.vmBlock.ID() {
+			return fmt.Errorf("%w: parentID %s, prevID %s", errMismatchedPrevDigest, b.vmBlock.Parent(), prevBlock.vmBlock.ID())
+		}
 
-	if prevBlock != nil && b.vmBlock.Parent() != prevBlock.vmBlock.ID() {
-		return fmt.Errorf("%w: parentID %s, prevID %s", errMismatchedPrevDigest, b.vmBlock.Parent(), prevBlock.vmBlock.ID())
+		return nil
 	}
 
 	// if we do not have it in the map, it's possible for it to be the last accepted block

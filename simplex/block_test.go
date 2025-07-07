@@ -109,6 +109,9 @@ func TestVerifyPrevNotFound(t *testing.T) {
 			T: t,
 		},
 	}
+	testVM.LastAcceptedF = func(_ context.Context) (ids.ID, error) {
+		return ids.GenerateTestID(), nil
+	}
 
 	tracker := newBlockTracker(testVM)
 	b := newBlockWithDigest(t, testBlock, tracker, 1, 1, [32]byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07})
