@@ -96,6 +96,7 @@ var (
 	triedbCommitTimer = getOrOverrideAsRegisteredCounter("chain/triedb/commits", nil)
 
 	blockInsertTimer            = metrics.GetOrRegisterCounter("chain/block/inserts", nil)
+	blockSignatureRecoveryTimer = metrics.GetOrRegisterCounter("chain/block/signature/recovery", nil)
 	blockInsertCount            = metrics.GetOrRegisterCounter("chain/block/inserts/count", nil)
 	blockContentValidationTimer = metrics.GetOrRegisterCounter("chain/block/validations/content", nil)
 	blockStateInitTimer         = metrics.GetOrRegisterCounter("chain/block/inits/state", nil)
@@ -1287,6 +1288,7 @@ func (bc *BlockChain) InsertBlockManual(block *types.Block, writes bool) error {
 func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 	start := time.Now()
 	bc.senderCacher.Recover(types.MakeSigner(bc.chainConfig, block.Number(), block.Time()), block.Transactions())
+	blockSignatureRecoveryTimer.Inc(time.Since(start).Milliseconds())
 
 	substart := time.Now()
 	err := bc.engine.VerifyHeader(bc, block.Header())
