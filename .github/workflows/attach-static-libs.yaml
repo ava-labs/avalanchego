@@ -16,6 +16,10 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 # Build, upload, and collect static libraries for each target architecture,
 # so that golang projects can import the FFI package without needing to
 # recompile Firewood locally.
