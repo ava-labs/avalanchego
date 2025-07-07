@@ -2,6 +2,53 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.8] - 2025-07-07
+
+### 🚀 Features
+
+- *(checker)* Firewood checker framework (#936)
+- Enable a configurable free list cache in the FFI (#1017)
+- *(nodestore)* Add functionalities to iterate the free list (#1015)
+- *(checker)* Traverse free lists (#1026)
+
+### 🐛 Bug Fixes
+
+- Unnecessary quotes in publish action (#996)
+- Report IO errors (#1005)
+- Publish firewood-macros (#1019)
+- Logger macros causing linting warnings (#1021)
+
+### 💼 Other
+
+- *(deps)* Update lru requirement from 0.14.0 to 0.15.0 (#1001)
+- *(deps)* Update lru requirement from 0.15.0 to 0.16.0 (#1023)
+- *(deps)* Upgrade sha2, tokio, clap, fastrace, serde... (#1025)
+
+### 🚜 Refactor
+
+- *(deps)* Move duplicates to workspace (#1002)
+- *(ffi)* [**breaking**] Split starting metrics exporter from db startup (#1016)
+
+### 📚 Documentation
+
+- README cleanup (#1024)
+
+### ⚡ Performance
+
+- Cache the latest view (#1004)
+- Allow cloned proposals (#1010)
+- Break up the RevisionManager lock (#1027)
+
+### ⚙️ Miscellaneous Tasks
+
+- Suppress clippy::cast\_possible\_truncation across the workspace (#1012)
+- Clippy pushdown (#1011)
+- Allow some extra pedantic warnings (#1014)
+- Check for metrics changes (#1013)
+- Share workspace metadata and packages (#1020)
+- Add concurrency group to attach static libs workflow (#1038)
+- Bump version to v0.0.8 (#1018)
+
 ## [0.0.7] - 2025-06-26
 
 ### 🚀 Features
@@ -31,6 +78,7 @@ All notable changes to this project will be documented in this file.
 - *(fuzz)* Add step to upload fuzz testdata on failure (#990)
 - Add special case for non semver tags to attach static libs (#992)
 - Remove requirement for conventional commits (#994)
+- Release v0.0.7 (#997)
 
 ## [0.0.6] - 2025-06-21
 
