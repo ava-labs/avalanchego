@@ -16,8 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 )
 
-// NewBlockWithDigest is a helper function that creates a new block and sets its digest.
-// This is helpful since otherwise we would need the blockDeserializer to create full block.
+// newBlockWithDigest is a helper function that creates a new block and sets its digest.
+// This is helpful since otherwise we would need the blockDeserializer to create the block.
 func newBlockWithDigest(t *testing.T, vmBlock snowman.Block, tracker *blockTracker, round, seq uint64, prev simplex.Digest) *Block {
 	block := &Block{
 		vmBlock:      vmBlock,
