@@ -76,6 +76,7 @@ func TestMain(m *testing.M) {
 
 func TestReexecuteRange(t *testing.T) {
 	r := require.New(t)
+	ctx := context.Background()
 
 	var (
 		targetDBDir  = filepath.Join(targetDirArg, "db")
@@ -111,17 +112,19 @@ func TestReexecuteRange(t *testing.T) {
 	})
 
 	sourceVM, err := newMainnetCChainVM(
-		context.Background(),
+		ctx,
 		db,
 		chainDataDir,
 		[]byte(`{"pruning-enabled": false}`),
 		vmPrefixGatherer,
 	)
 	r.NoError(err)
-	defer sourceVM.Shutdown(context.Background())
+	defer func() {
+		r.NoError(sourceVM.Shutdown(ctx))
+	}()
 
 	executor := newVMExecutor(sourceVM)
-	r.NoError(executor.executeSequence(context.Background(), blockChan))
+	r.NoError(executor.executeSequence(ctx, blockChan))
 }
 
 func TestExportBlockRange(t *testing.T) {
@@ -292,6 +295,7 @@ func collectRegistry(t *testing.T, name string, addr string, timeout time.Durati
 }
 
 func createBlockChanFromLevelDB(t *testing.T, sourceDir string, startBlock, endBlock uint64, chanSize int) (<-chan BlockResult, error) {
+	r := require.New(t)
 	ch := make(chan BlockResult, chanSize)
 
 	db, err := leveldb.New(sourceDir, nil, logging.NoLog{}, prometheus.NewRegistry())
@@ -299,9 +303,7 @@ func createBlockChanFromLevelDB(t *testing.T, sourceDir string, startBlock, endB
 		return nil, fmt.Errorf("failed to create leveldb database from %q: %w", sourceDir, err)
 	}
 	t.Cleanup(func() {
-		if err := db.Close(); err != nil {
-			t.Fatal(err)
-		}
+		r.NoError(db.Close())
 	})
 
 	go func() {
