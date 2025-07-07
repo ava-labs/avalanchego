@@ -212,7 +212,8 @@ func (p *postForkCommonComponents) Verify(
 	}
 
 	var contextPChainHeight uint64
-	if p.vm.Upgrades.IsGraniteActivated(childTimestamp) {
+	switch {
+	case p.vm.Upgrades.IsGraniteActivated(childTimestamp):
 		pChainEpochHeight, _, _, err := p.getPChainEpoch(ctx, child.Parent())
 		if err != nil {
 			p.vm.ctx.Log.Error("unexpected build verification failure",
@@ -225,9 +226,9 @@ func (p *postForkCommonComponents) Verify(
 			return fmt.Errorf("epoch height mismatch: expectedEpochHeight %d != epochHeight %d", pChainEpochHeight, childHeight)
 		}
 		contextPChainHeight = pChainEpochHeight
-	} else if p.vm.Upgrades.IsEtnaActivated(childTimestamp) {
+	case p.vm.Upgrades.IsEtnaActivated(childTimestamp):
 		contextPChainHeight = childPChainHeight
-	} else {
+	default:
 		contextPChainHeight = parentPChainHeight
 	}
 
@@ -291,7 +292,8 @@ func (p *postForkCommonComponents) buildChild(
 		contextPChainHeight, pChainEpochHeight, epochNumber uint64
 		epochStartTime                                      time.Time
 	)
-	if p.vm.Upgrades.IsGraniteActivated(newTimestamp) {
+	switch {
+	case p.vm.Upgrades.IsGraniteActivated(newTimestamp):
 		pChainEpochHeight, epochNumber, epochStartTime, err = p.getPChainEpoch(ctx, parentID)
 		if err != nil {
 			p.vm.ctx.Log.Error("unexpected build block failure",
@@ -308,9 +310,9 @@ func (p *postForkCommonComponents) buildChild(
 			zap.Time("epochStartTime", epochStartTime),
 		)
 		contextPChainHeight = pChainEpochHeight
-	} else if p.vm.Upgrades.IsEtnaActivated(newTimestamp) {
+	case p.vm.Upgrades.IsEtnaActivated(newTimestamp):
 		contextPChainHeight = pChainHeight
-	} else {
+	default:
 		contextPChainHeight = parentPChainHeight
 	}
 

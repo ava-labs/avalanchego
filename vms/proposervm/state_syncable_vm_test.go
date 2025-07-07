@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
@@ -179,7 +180,10 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 	slb, err := statelessblock.Build(
 		vm.preferred,
 		innerBlk.Timestamp(),
-		100, // pChainHeight,
+		100,         // pChainHeight,
+		0,           // pChainEpochHeight,
+		0,           // epochNumber,
+		time.Time{}, // epochStartTime,
 		vm.StakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
@@ -262,7 +266,10 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 	slb, err := statelessblock.Build(
 		vm.preferred,
 		innerBlk.Timestamp(),
-		100, // pChainHeight,
+		100,         // pChainHeight,
+		0,           // pChainEpochHeight,
+		0,           // epochNumber,
+		time.Time{}, // epochStartTime,
 		vm.StakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
@@ -348,7 +355,10 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 	slb, err := statelessblock.Build(
 		vm.preferred,
 		innerBlk.Timestamp(),
-		100, // pChainHeight,
+		100,         // pChainHeight,
+		0,           // pChainEpochHeight,
+		0,           // epochNumber,
+		time.Time{}, // epochStartTime,
 		vm.StakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
@@ -419,7 +429,10 @@ func TestParseStateSummary(t *testing.T) {
 	slb, err := statelessblock.Build(
 		vm.preferred,
 		innerBlk.Timestamp(),
-		100, // pChainHeight,
+		100,         // pChainHeight,
+		0,           // pChainEpochHeight,
+		0,           // epochNumber,
+		time.Time{}, // epochStartTime,
 		vm.StakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
@@ -472,7 +485,10 @@ func TestStateSummaryAccept(t *testing.T) {
 	slb, err := statelessblock.Build(
 		vm.preferred,
 		innerBlk.Timestamp(),
-		100, // pChainHeight,
+		100,         // pChainHeight,
+		0,           // pChainEpochHeight,
+		0,           // epochNumber,
+		time.Time{}, // epochStartTime,
 		vm.StakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
@@ -551,7 +567,10 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 	slb, err := statelessblock.Build(
 		vm.preferred,
 		innerBlk.Timestamp(),
-		100, // pChainHeight,
+		100,         // pChainHeight,
+		0,           // pChainEpochHeight,
+		0,           // epochNumber,
+		time.Time{}, // epochStartTime,
 		vm.StakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
@@ -672,7 +691,10 @@ func TestStateSummaryAcceptOlderBlockSkipStateSync(t *testing.T) {
 	slb1, err := statelessblock.Build(
 		vm.preferred,
 		innerBlk1.Timestamp(),
-		100, // pChainHeight,
+		100,         // pChainHeight,
+		0,           // pChainEpochHeight,
+		0,           // epochNumber,
+		time.Time{}, // epochStartTime,
 		vm.StakingCertLeaf,
 		innerBlk1.Bytes(),
 		vm.ctx.ChainID,
@@ -691,7 +713,10 @@ func TestStateSummaryAcceptOlderBlockSkipStateSync(t *testing.T) {
 	slb2, err := statelessblock.Build(
 		vm.preferred,
 		innerBlk2.Timestamp(),
-		100, // pChainHeight,
+		100,         // pChainHeight,
+		0,           // pChainEpochHeight,
+		0,           // epochNumber,
+		time.Time{}, // epochStartTime,
 		vm.StakingCertLeaf,
 		innerBlk2.Bytes(),
 		vm.ctx.ChainID,

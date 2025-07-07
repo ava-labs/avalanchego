@@ -20,6 +20,9 @@ func TestBuild(t *testing.T) {
 	parentID := ids.ID{1}
 	timestamp := time.Unix(123, 0)
 	pChainHeight := uint64(2)
+	pChainEpochHeight := uint64(2)
+	epochNumber := uint64(0)
+	epochStartTime := time.Unix(123, 0)
 	innerBlockBytes := []byte{3}
 	chainID := ids.ID{4}
 
@@ -35,6 +38,9 @@ func TestBuild(t *testing.T) {
 		parentID,
 		timestamp,
 		pChainHeight,
+		pChainEpochHeight,
+		epochNumber,
+		epochStartTime,
 		cert,
 		innerBlockBytes,
 		chainID,
@@ -53,11 +59,14 @@ func TestBuildUnsigned(t *testing.T) {
 	parentID := ids.ID{1}
 	timestamp := time.Unix(123, 0)
 	pChainHeight := uint64(2)
+	pChainEpochHeight := uint64(2)
+	epochNumber := uint64(0)
+	epochStartTime := time.Unix(123, 0)
 	innerBlockBytes := []byte{3}
 
 	require := require.New(t)
 
-	builtBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes)
+	builtBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, pChainEpochHeight, epochNumber, epochStartTime, innerBlockBytes)
 	require.NoError(err)
 
 	require.Equal(parentID, builtBlock.ParentID())
