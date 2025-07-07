@@ -34,7 +34,7 @@ const (
 	unsetHeight = math.MaxUint64
 
 	// IndexFileVersion is the version of the index file format.
-	IndexFileVersion uint16 = 1
+	IndexFileVersion uint64 = 1
 
 	// BlockEntryVersion is the version of the block entry.
 	BlockEntryVersion uint16 = 1
@@ -66,8 +66,8 @@ var (
 // This is not the header portion of the block data itself.
 type blockEntryHeader struct {
 	Height     BlockHeight
-	Checksum   uint64
 	Size       uint32
+	Checksum   uint64
 	HeaderSize BlockHeaderSize
 	Version    uint16
 }
@@ -76,8 +76,8 @@ type blockEntryHeader struct {
 func (beh blockEntryHeader) MarshalBinary() ([]byte, error) {
 	buf := make([]byte, sizeOfBlockEntryHeader)
 	binary.LittleEndian.PutUint64(buf[0:], beh.Height)
-	binary.LittleEndian.PutUint64(buf[8:], beh.Checksum)
-	binary.LittleEndian.PutUint32(buf[16:], beh.Size)
+	binary.LittleEndian.PutUint32(buf[8:], beh.Size)
+	binary.LittleEndian.PutUint64(buf[12:], beh.Checksum)
 	binary.LittleEndian.PutUint32(buf[20:], beh.HeaderSize)
 	binary.LittleEndian.PutUint16(buf[24:], beh.Version)
 	return buf, nil
@@ -89,8 +89,8 @@ func (beh *blockEntryHeader) UnmarshalBinary(data []byte) error {
 		return fmt.Errorf("%w: incorrect data length to unmarshal blockEntryHeader: got %d bytes, need exactly %d", ErrCorrupted, len(data), sizeOfBlockEntryHeader)
 	}
 	beh.Height = binary.LittleEndian.Uint64(data[0:])
-	beh.Checksum = binary.LittleEndian.Uint64(data[8:])
-	beh.Size = binary.LittleEndian.Uint32(data[16:])
+	beh.Size = binary.LittleEndian.Uint32(data[8:])
+	beh.Checksum = binary.LittleEndian.Uint64(data[12:])
 	beh.HeaderSize = binary.LittleEndian.Uint32(data[20:])
 	beh.Version = binary.LittleEndian.Uint16(data[24:])
 	return nil
@@ -134,20 +134,20 @@ func (e *indexEntry) UnmarshalBinary(data []byte) error {
 
 // indexFileHeader is the header of the index file.
 type indexFileHeader struct {
-	Version             uint16
+	Version             uint64
 	MaxDataFileSize     uint64
 	MinHeight           BlockHeight
 	MaxContiguousHeight BlockHeight
 	MaxHeight           BlockHeight
 	NextWriteOffset     uint64
-	// reserve 38 bytes for future use
-	Reserved [38]byte
+	// reserve 16 bytes for future use
+	Reserved [16]byte
 }
 
 // MarshalBinary implements encoding.BinaryMarshaler for indexFileHeader.
 func (h indexFileHeader) MarshalBinary() ([]byte, error) {
 	buf := make([]byte, sizeOfIndexFileHeader)
-	binary.LittleEndian.PutUint16(buf[0:], h.Version)
+	binary.LittleEndian.PutUint64(buf[0:], h.Version)
 	binary.LittleEndian.PutUint64(buf[8:], h.MaxDataFileSize)
 	binary.LittleEndian.PutUint64(buf[16:], h.MinHeight)
 	binary.LittleEndian.PutUint64(buf[24:], h.MaxContiguousHeight)
@@ -164,7 +164,7 @@ func (h *indexFileHeader) UnmarshalBinary(data []byte) error {
 			ErrCorrupted, len(data), sizeOfIndexFileHeader,
 		)
 	}
-	h.Version = binary.LittleEndian.Uint16(data[0:])
+	h.Version = binary.LittleEndian.Uint64(data[0:])
 	h.MaxDataFileSize = binary.LittleEndian.Uint64(data[8:])
 	h.MinHeight = binary.LittleEndian.Uint64(data[16:])
 	h.MaxContiguousHeight = binary.LittleEndian.Uint64(data[24:])

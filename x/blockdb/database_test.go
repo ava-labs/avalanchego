@@ -4,12 +4,15 @@
 package blockdb
 
 import (
+	"encoding"
+	"encoding/binary"
 	"errors"
 	"os"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"unsafe"
 
 	"github.com/stretchr/testify/require"
 
@@ -382,5 +385,81 @@ func TestMaxDataFiles_CacheLimit(t *testing.T) {
 		block, err := store.ReadBlock(uint64(i))
 		require.NoError(t, err, "failed to read block at height %d after eviction", i)
 		require.Len(t, block, 512, "block size mismatch at height %d", i)
+	}
+}
+
+// TestStructSizes verifies that our critical data structures have the expected sizes
+func TestStructSizes(t *testing.T) {
+	tests := []struct {
+		name                string
+		memorySize          uintptr
+		binarySize          int
+		expectedMemorySize  uintptr
+		expectedBinarySize  int
+		expectedMarshalSize int
+		expectedPadding     uintptr
+		createInstance      func() interface{}
+	}{
+		{
+			name:                "indexFileHeader",
+			memorySize:          unsafe.Sizeof(indexFileHeader{}),
+			binarySize:          binary.Size(indexFileHeader{}),
+			expectedMemorySize:  64,
+			expectedBinarySize:  64,
+			expectedMarshalSize: 64,
+			expectedPadding:     0,
+			createInstance:      func() interface{} { return indexFileHeader{} },
+		},
+		{
+			name:                "blockEntryHeader",
+			memorySize:          unsafe.Sizeof(blockEntryHeader{}),
+			binarySize:          binary.Size(blockEntryHeader{}),
+			expectedMemorySize:  32, // 6 bytes padding due to version field being 2 bytes
+			expectedBinarySize:  26,
+			expectedMarshalSize: 26,
+			expectedPadding:     6,
+			createInstance:      func() interface{} { return blockEntryHeader{} },
+		},
+		{
+			name:                "indexEntry",
+			memorySize:          unsafe.Sizeof(indexEntry{}),
+			binarySize:          binary.Size(indexEntry{}),
+			expectedMemorySize:  16,
+			expectedBinarySize:  16,
+			expectedMarshalSize: 16,
+			expectedPadding:     0,
+			createInstance: func() interface{} {
+				return indexEntry{}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actualMemorySize := tt.memorySize
+			require.Equal(t, tt.expectedMemorySize, actualMemorySize,
+				"%s has unexpected memory size: got %d bytes, expected %d bytes",
+				tt.name, actualMemorySize, tt.expectedMemorySize)
+
+			binarySize := tt.binarySize
+			require.Equal(t, tt.expectedBinarySize, binarySize,
+				"%s binary size should be compact: got %d bytes, expected %d bytes",
+				tt.name, binarySize, tt.expectedBinarySize)
+
+			instance := tt.createInstance()
+			var data []byte
+			var err error
+
+			data, err = instance.(encoding.BinaryMarshaler).MarshalBinary()
+			require.NoError(t, err, "%s MarshalBinary should not fail", tt.name)
+			require.Equal(t, tt.expectedMarshalSize, len(data),
+				"%s MarshalBinary should produce exactly %d bytes, got %d bytes",
+				tt.name, tt.expectedMarshalSize, len(data))
+
+			padding := actualMemorySize - uintptr(binarySize)
+			require.Equal(t, tt.expectedPadding, padding,
+				"%s should have %d bytes of padding: memory=%d, binary=%d",
+				tt.name, tt.expectedPadding, actualMemorySize, binarySize)
+		})
 	}
 }

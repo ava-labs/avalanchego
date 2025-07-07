@@ -47,7 +47,7 @@ BlockDB uses a single index file and multiple data files. The index file maps bl
 The index file consists of a fixed-size header followed by fixed-size entries:
 
 ```
-Index File Header (80 bytes):
+Index File Header (64 bytes):
 ┌────────────────────────────────┬─────────┐
 │ Field                          │ Size    │
 ├────────────────────────────────┼─────────┤
@@ -57,7 +57,7 @@ Index File Header (80 bytes):
 │ Max Contiguous Height          │ 8 bytes │
 │ Max Block Height               │ 8 bytes │
 │ Next Write Offset              │ 8 bytes │
-│ Reserved                       │ 32 bytes│
+│ Reserved                       │ 16 bytes│
 └────────────────────────────────┴─────────┘
 
 Index Entry (16 bytes):
@@ -72,17 +72,18 @@ Index Entry (16 bytes):
 
 #### Data File Structure
 
-Each block in the data file is stored with a header followed by the raw block data:
+Each block in the data file is stored with a block entry header followed by the raw block data:
 
 ```
-Block Header (24 bytes):
+Block Entry Header (26 bytes):
 ┌────────────────────────────────┬─────────┐
 │ Field                          │ Size    │
 ├────────────────────────────────┼─────────┤
 │ Height                         │ 8 bytes │
-│ Checksum                       │ 8 bytes │
 │ Size                           │ 4 bytes │
+│ Checksum                       │ 8 bytes │
 │ Header Size                    │ 4 bytes │
+│ Version                        │ 2 bytes │
 └────────────────────────────────┴─────────┘
 ```
 
@@ -116,7 +117,7 @@ On startup, BlockDB checks for signs of an unclean shutdown by comparing the dat
 
 1. Starts scanning from where the index left off (`NextWriteOffset`)
 2. For each unindexed block found:
-   - Validates the block header and checksum
+   - Validates the block entry header and checksum
    - Writes the corresponding index entry
 3. Calculates the max contiguous height and max block height
 4. Updates the index header with the updated max contiguous height, max block height, and next write offset
@@ -193,6 +194,6 @@ if err != nil {
 - Implement a block cache for recently accessed blocks
 - Use a buffered pool to avoid allocations on reads and writes
 - ~~Add tests for core functionality~~
-- Add metrics collection
+- Add metrics
 - Add performance benchmarks
 - Consider supporting missing data files (currently we error if any data files are missing)
