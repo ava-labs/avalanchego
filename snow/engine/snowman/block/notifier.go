@@ -20,6 +20,10 @@ type FullVM interface {
 
 type ChangeNotifier struct {
 	ChainVM
+
+	// OnChange is used to signal the NotificationForwarder to stop its current subscription and re-subscribe.
+	// This is needed in case a block has been accepted that changes when a VM considers the need to build a block.
+	// In order for the subscription to be correlated to the latest data, it needs to be retried.
 	OnChange func()
 }
 

@@ -262,7 +262,7 @@ func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 	}
 
 	h.nf = common.NewNotificationForwarder(h, h.subscription, h.ctx.Log)
-	h.cn.OnChange = h.nf.PreferenceOrStateChanged
+	h.cn.OnChange = h.nf.CheckForEvent
 
 	detachedCtx := context.WithoutCancel(ctx)
 	dispatchSync := func() {
