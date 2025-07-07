@@ -224,3 +224,38 @@ func TestChangeNotifierNormal(t *testing.T) {
 		})
 	}
 }
+
+func TestChangeNotifierSetPreference(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	tvm := blockmock.NewFullVM(ctrl)
+	tvm.EXPECT().SetPreference(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+
+	var invoked bool
+	nf := block.ChangeNotifier{
+		OnChange: func() {
+			invoked = true
+		},
+		ChainVM: tvm,
+	}
+
+	// First time SetPreference is called, it should invoke OnChange
+	require.NoError(t, nf.SetPreference(context.Background(), ids.Empty), "expected SetPreference to succeed")
+	require.True(t, invoked, "expected to have been invoked on first SetPreference call")
+
+	invoked = false
+	// Second time SetPreference is called with the same block ID, it should not invoke OnChange
+	require.NoError(t, nf.SetPreference(context.Background(), ids.Empty), "expected SetPreference to succeed on second call with same block ID")
+	require.False(t, invoked, "expected not to have been invoked on second SetPreference call with same block ID")
+
+	invoked = false
+	// Third time SetPreference is called with a different block ID, it should invoke OnChange again
+	testID := ids.GenerateTestID()
+	require.NoError(t, nf.SetPreference(context.Background(), testID), "expected SetPreference to succeed on third call with different block ID")
+	require.True(t, invoked, "expected to have been invoked on third SetPreference call with different block ID")
+
+	invoked = false
+	// Fourth time SetPreference is called with the same block ID, it should not invoke OnChange
+	require.NoError(t, nf.SetPreference(context.Background(), testID), "expected SetPreference to succeed on fourth call with same block ID")
+	require.False(t, invoked, "expected not to have been invoked on fourth SetPreference call with same block ID")
+}
