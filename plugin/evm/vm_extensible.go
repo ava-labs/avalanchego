@@ -58,6 +58,9 @@ func (vm *VM) LastAcceptedExtendedBlock() extension.ExtendedBlock {
 	return lastAcceptedBlock.(*wrappedBlock)
 }
 
+// ChainConfig returns the chain config for the VM
+// Even though this is available through Blockchain().Config(),
+// ChainConfig() here will be available before the blockchain is initialized.
 func (vm *VM) ChainConfig() *params.ChainConfig {
 	return vm.chainConfig
 }

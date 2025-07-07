@@ -37,7 +37,6 @@ import (
 	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/params/extras"
-	atomicvm "github.com/ava-labs/coreth/plugin/evm/atomic/vm"
 	"github.com/ava-labs/coreth/plugin/evm/config"
 	corethlog "github.com/ava-labs/coreth/plugin/evm/log"
 	"github.com/ava-labs/coreth/plugin/evm/message"
@@ -179,8 +178,7 @@ func init() {
 
 // VM implements the snowman.ChainVM interface
 type VM struct {
-	atomicVM *atomicvm.VM
-	ctx      *snow.Context
+	ctx *snow.Context
 	// [cancel] may be nil until [snow.NormalOp] starts
 	cancel context.CancelFunc
 	// *chain.State helps to implement the VM interface by wrapping blocks
@@ -275,28 +273,12 @@ func (vm *VM) Initialize(
 	_ []*commonEng.Fx,
 	appSender commonEng.AppSender,
 ) error {
-	// TODO: this is to prevent migration of VM tests
-	// however this is not the intended change
-	// and should be removed after everything is migrated to atomicvm.VM
-	// atomicVM.Initialize() should be calling this vm's Initialize()
-	// we should prevent infinite recursion
-	// See https://github.com/ava-labs/coreth/pull/998 for the resolution of this TODO.
-	if vm.atomicVM == nil {
-		vm.atomicVM = atomicvm.WrapVM(vm)
-		if err := vm.atomicVM.Initialize(nil, chainCtx, db, genesisBytes, nil, configBytes, toEngine, nil, appSender); err != nil {
-			return fmt.Errorf("failed to initialize atomic VM: %w", err)
-		}
-		return nil
-	}
-
 	if err := vm.extensionConfig.Validate(); err != nil {
 		return fmt.Errorf("failed to validate extension config: %w", err)
 	}
 
-	vm.clock = &mockable.Clock{}
-	if vm.extensionConfig.Clock != nil {
-		vm.clock = vm.extensionConfig.Clock
-	}
+	vm.clock = vm.extensionConfig.Clock
+
 	vm.config.SetDefaults(defaultTxPoolConfig)
 	if len(configBytes) > 0 {
 		if err := json.Unmarshal(configBytes, &vm.config); err != nil {
@@ -641,7 +623,6 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 	}
 
 	// Initialize the state sync client
-
 	vm.Client = vmsync.NewClient(&vmsync.ClientConfig{
 		Chain: vm.eth,
 		State: vm.State,
@@ -711,10 +692,6 @@ func (vm *VM) initChainState(lastAcceptedBlock *types.Block) error {
 }
 
 func (vm *VM) SetState(_ context.Context, state snow.State) error {
-	if err := vm.atomicVM.SetState(nil, state); err != nil {
-		return fmt.Errorf("failed to set atomic VM state: %w", err)
-	}
-
 	switch state {
 	case snow.StateSyncing:
 		vm.bootstrapped.Set(false)
@@ -1041,10 +1018,7 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 		return nil, err
 	}
 
-	apis, err := vm.atomicVM.CreateHandlers(nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create atomic VM handlers: %w", err)
-	}
+	apis := make(map[string]http.Handler)
 
 	if vm.config.AdminAPIEnabled {
 		adminAPI, err := utilsrpc.NewHandler("admin", NewAdminService(vm, os.ExpandEnv(fmt.Sprintf("%s_coreth_performance_%s", vm.config.AdminAPIDir, vm.chainAlias))))

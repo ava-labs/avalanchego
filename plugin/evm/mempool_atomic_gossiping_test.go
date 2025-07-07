@@ -32,30 +32,30 @@ func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 				err := tvm.vm.Shutdown(context.Background())
 				assert.NoError(err)
 			}()
-			mempool := tvm.vm.atomicVM.AtomicMempool
+			mempool := tvm.atomicVM.AtomicMempool
 
 			// generate a valid and conflicting tx
 			var (
 				tx, conflictingTx *atomic.Tx
 			)
 			if name == "import" {
-				importTxs := createImportTxOptions(t, tvm.vm, tvm.atomicMemory)
+				importTxs := createImportTxOptions(t, tvm.atomicVM, tvm.atomicMemory)
 				tx, conflictingTx = importTxs[0], importTxs[1]
 			} else {
-				exportTxs := createExportTxOptions(t, tvm.vm, tvm.toEngine, tvm.atomicMemory)
+				exportTxs := createExportTxOptions(t, tvm.atomicVM, tvm.toEngine, tvm.atomicMemory)
 				tx, conflictingTx = exportTxs[0], exportTxs[1]
 			}
 			txID := tx.ID()
 			conflictingTxID := conflictingTx.ID()
 
 			// add a tx to the mempool
-			err := tvm.vm.atomicVM.AtomicMempool.AddLocalTx(tx)
+			err := tvm.atomicVM.AtomicMempool.AddLocalTx(tx)
 			assert.NoError(err)
 			has := mempool.Has(txID)
 			assert.True(has, "valid tx not recorded into mempool")
 
 			// try to add a conflicting tx
-			err = tvm.vm.atomicVM.AtomicMempool.AddLocalTx(conflictingTx)
+			err = tvm.atomicVM.AtomicMempool.AddLocalTx(conflictingTx)
 			assert.ErrorIs(err, atomictxpool.ErrConflictingAtomicTx)
 			has = mempool.Has(conflictingTxID)
 			assert.False(has, "conflicting tx in mempool")

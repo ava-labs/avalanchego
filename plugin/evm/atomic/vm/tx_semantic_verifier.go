@@ -22,7 +22,7 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap0"
 )
 
-var _ atomic.Visitor = (*SemanticVerifier)(nil)
+var _ atomic.Visitor = (*semanticVerifier)(nil)
 
 var (
 	ErrAssetIDMismatch            = errors.New("asset IDs in the input don't match the utxo")
@@ -47,20 +47,41 @@ type VerifierBackend struct {
 	SecpCache    *secp256k1.RecoverCache
 }
 
-// SemanticVerifier is a visitor that checks the semantic validity of atomic transactions.
-type SemanticVerifier struct {
-	Backend *VerifierBackend
-	Tx      *atomic.Tx
-	Parent  extension.ExtendedBlock
-	BaseFee *big.Int
+func NewVerifierBackend(vm *VM, rules extras.Rules) *VerifierBackend {
+	return &VerifierBackend{
+		Ctx:          vm.Ctx,
+		Fx:           &vm.Fx,
+		Rules:        rules,
+		Bootstrapped: vm.bootstrapped.Get(),
+		BlockFetcher: vm,
+		SecpCache:    vm.SecpCache,
+	}
+}
+
+// SemanticVerify checks the semantic validity of atomic transactions.
+func (b *VerifierBackend) SemanticVerify(tx *atomic.Tx, parent extension.ExtendedBlock, baseFee *big.Int) error {
+	return tx.UnsignedAtomicTx.Visit(&semanticVerifier{
+		backend: b,
+		tx:      tx,
+		parent:  parent,
+		baseFee: baseFee,
+	})
+}
+
+// semanticVerifier is a visitor that checks the semantic validity of atomic transactions.
+type semanticVerifier struct {
+	backend *VerifierBackend
+	tx      *atomic.Tx
+	parent  extension.ExtendedBlock
+	baseFee *big.Int
 }
 
 // ImportTx verifies this transaction is valid.
-func (s *SemanticVerifier) ImportTx(utx *atomic.UnsignedImportTx) error {
-	backend := s.Backend
+func (s *semanticVerifier) ImportTx(utx *atomic.UnsignedImportTx) error {
+	backend := s.backend
 	ctx := backend.Ctx
 	rules := backend.Rules
-	stx := s.Tx
+	stx := s.tx
 	if err := utx.Verify(ctx, rules); err != nil {
 		return err
 	}
@@ -74,7 +95,7 @@ func (s *SemanticVerifier) ImportTx(utx *atomic.UnsignedImportTx) error {
 		if err != nil {
 			return err
 		}
-		txFee, err := atomic.CalculateDynamicFee(gasUsed, s.BaseFee)
+		txFee, err := atomic.CalculateDynamicFee(gasUsed, s.baseFee)
 		if err != nil {
 			return err
 		}
@@ -136,7 +157,7 @@ func (s *SemanticVerifier) ImportTx(utx *atomic.UnsignedImportTx) error {
 		}
 	}
 
-	return conflicts(backend, utx.InputUTXOs(), s.Parent)
+	return conflicts(backend, utx.InputUTXOs(), s.parent)
 }
 
 // conflicts returns an error if [inputs] conflicts with any of the atomic inputs contained in [ancestor]
@@ -181,11 +202,11 @@ func conflicts(backend *VerifierBackend, inputs set.Set[ids.ID], ancestor extens
 }
 
 // ExportTx verifies this transaction is valid.
-func (s *SemanticVerifier) ExportTx(utx *atomic.UnsignedExportTx) error {
-	backend := s.Backend
+func (s *semanticVerifier) ExportTx(utx *atomic.UnsignedExportTx) error {
+	backend := s.backend
 	ctx := backend.Ctx
 	rules := backend.Rules
-	stx := s.Tx
+	stx := s.tx
 	if err := utx.Verify(ctx, rules); err != nil {
 		return err
 	}
@@ -199,7 +220,7 @@ func (s *SemanticVerifier) ExportTx(utx *atomic.UnsignedExportTx) error {
 		if err != nil {
 			return err
 		}
-		txFee, err := atomic.CalculateDynamicFee(gasUsed, s.BaseFee)
+		txFee, err := atomic.CalculateDynamicFee(gasUsed, s.baseFee)
 		if err != nil {
 			return err
 		}
@@ -235,7 +256,7 @@ func (s *SemanticVerifier) ExportTx(utx *atomic.UnsignedExportTx) error {
 		if len(cred.Sigs) != 1 {
 			return fmt.Errorf("expected one signature for EVM Input Credential, but found: %d", len(cred.Sigs))
 		}
-		pubKey, err := s.Backend.SecpCache.RecoverPublicKey(utx.Bytes(), cred.Sigs[0][:])
+		pubKey, err := s.backend.SecpCache.RecoverPublicKey(utx.Bytes(), cred.Sigs[0][:])
 		if err != nil {
 			return err
 		}

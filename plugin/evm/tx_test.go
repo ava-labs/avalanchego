@@ -82,14 +82,14 @@ func executeTxVerifyTest(t *testing.T, test atomicTxVerifyTest) {
 
 type atomicTxTest struct {
 	// setup returns the atomic transaction for the test
-	setup func(t *testing.T, vm *VM, sharedMemory *avalancheatomic.Memory) *atomic.Tx
+	setup func(t *testing.T, vm *atomicvm.VM, sharedMemory *avalancheatomic.Memory) *atomic.Tx
 	// define a string that should be contained in the error message if the tx fails verification
 	// at some point. If the strings are empty, then the tx should pass verification at the
 	// respective step.
 	semanticVerifyErr, evmStateTransferErr, acceptErr string
 	// checkState is called iff building and verifying a block containing the transaction is successful. Verifies
 	// the state of the VM following the block's acceptance.
-	checkState func(t *testing.T, vm *VM)
+	checkState func(t *testing.T, vm *atomicvm.VM)
 
 	// Whether or not the VM should be considered to still be bootstrapping
 	bootstrapping bool
@@ -105,7 +105,7 @@ func executeTxTest(t *testing.T, test atomicTxTest) {
 	})
 	rules := tvm.vm.currentRules()
 
-	tx := test.setup(t, tvm.vm, tvm.atomicMemory)
+	tx := test.setup(t, tvm.atomicVM, tvm.atomicMemory)
 
 	var baseFee *big.Int
 	// If ApricotPhase3 is active, use the initial base fee for the atomic transaction
@@ -115,20 +115,8 @@ func executeTxTest(t *testing.T, test atomicTxTest) {
 	}
 
 	lastAcceptedBlock := tvm.vm.LastAcceptedExtendedBlock()
-	backend := &atomicvm.VerifierBackend{
-		Ctx:          tvm.vm.ctx,
-		Fx:           &tvm.vm.atomicVM.Fx,
-		Rules:        rules,
-		Bootstrapped: tvm.vm.bootstrapped.Get(),
-		BlockFetcher: tvm.vm,
-		SecpCache:    tvm.vm.atomicVM.SecpCache,
-	}
-	if err := tx.UnsignedAtomicTx.Visit(&atomicvm.SemanticVerifier{
-		Backend: backend,
-		Tx:      tx,
-		Parent:  lastAcceptedBlock,
-		BaseFee: baseFee,
-	}); len(test.semanticVerifyErr) == 0 && err != nil {
+	backend := atomicvm.NewVerifierBackend(tvm.atomicVM, rules)
+	if err := backend.SemanticVerify(tx, lastAcceptedBlock, baseFee); len(test.semanticVerifyErr) == 0 && err != nil {
 		t.Fatalf("SemanticVerify failed unexpectedly due to: %s", err)
 	} else if len(test.semanticVerifyErr) != 0 {
 		if err == nil {
@@ -168,7 +156,7 @@ func executeTxTest(t *testing.T, test atomicTxTest) {
 		}
 	}
 
-	if err := tvm.vm.atomicVM.AtomicMempool.AddLocalTx(tx); err != nil {
+	if err := tvm.atomicVM.AtomicMempool.AddLocalTx(tx); err != nil {
 		t.Fatal(err)
 	}
 	<-tvm.toEngine
@@ -197,7 +185,7 @@ func executeTxTest(t *testing.T, test atomicTxTest) {
 	}
 
 	if test.checkState != nil {
-		test.checkState(t, tvm.vm)
+		test.checkState(t, tvm.atomicVM)
 	}
 }
 
