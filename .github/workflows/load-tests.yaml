@@ -1,4 +1,4 @@
-name: Load Tests on k8s
+name: Load test on self-hosted runners
 
 # This workflow runs comprehensive load tests against our Kubernetes cluster
 on:
