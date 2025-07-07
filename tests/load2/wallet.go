@@ -6,16 +6,13 @@ package load2
 import (
 	"context"
 	"crypto/ecdsa"
-	"errors"
-	"fmt"
 	"math/big"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethclient"
-
-	ethereum "github.com/ava-labs/libevm"
 )
 
 type Wallet struct {
@@ -47,8 +44,22 @@ func newWallet(
 func (w *Wallet) SendTx(
 	ctx context.Context,
 	tx *types.Transaction,
-	pingFrequency time.Duration,
 ) error {
+	// start listening for blocks
+	headers := make(chan *types.Header)
+	sub, err := w.client.SubscribeNewHead(ctx, headers)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		sub.Unsubscribe()
+
+		// wait for err chan to close before safely closing headers
+		<-sub.Err()
+		close(headers)
+	}()
+
 	startTime := time.Now()
 	if err := w.client.SendTransaction(ctx, tx); err != nil {
 		return err
@@ -57,7 +68,14 @@ func (w *Wallet) SendTx(
 	issuanceDuration := time.Since(startTime)
 	w.metrics.issue(issuanceDuration)
 
-	if err := awaitTx(ctx, w.client, tx.Hash(), pingFrequency); err != nil {
+	if err := await(
+		ctx,
+		w.client,
+		headers,
+		sub.Err(),
+		crypto.PubkeyToAddress(w.privKey.PublicKey),
+		tx.Nonce(),
+	); err != nil {
 		return err
 	}
 
@@ -70,32 +88,29 @@ func (w *Wallet) SendTx(
 	return nil
 }
 
-func awaitTx(
+func await(
 	ctx context.Context,
 	client *ethclient.Client,
-	txHash common.Hash,
-	pingFrequency time.Duration,
+	headers chan *types.Header,
+	errs <-chan error,
+	address common.Address,
+	nonce uint64,
 ) error {
-	ticker := time.NewTicker(pingFrequency)
-	defer ticker.Stop()
-
 	for {
-		receipt, err := client.TransactionReceipt(ctx, txHash)
-		if err == nil {
-			if receipt.Status != types.ReceiptStatusSuccessful {
-				return fmt.Errorf("failed tx: %d", receipt.Status)
-			}
-			return nil
-		}
-
-		if !errors.Is(err, ethereum.NotFound) {
-			return err
-		}
-
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-ticker.C:
+		case err := <-errs:
+			return err
+		case h := <-headers:
+			latestNonce, err := client.NonceAt(ctx, address, h.Number)
+			if err != nil {
+				return err
+			}
+
+			if latestNonce >= nonce {
+				return nil
+			}
 		}
 	}
 }
