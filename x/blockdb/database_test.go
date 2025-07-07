@@ -381,6 +381,6 @@ func TestMaxDataFiles_CacheLimit(t *testing.T) {
 	for i := range numBlocks {
 		block, err := store.ReadBlock(uint64(i))
 		require.NoError(t, err, "failed to read block at height %d after eviction", i)
-		require.Equal(t, 512, len(block), "block size mismatch at height %d", i)
+		require.Len(t, block, 512, "block size mismatch at height %d", i)
 	}
 }

@@ -3,10 +3,7 @@
 
 package blockdb
 
-import (
-	"errors"
-	"fmt"
-)
+import "errors"
 
 var (
 	ErrInvalidBlockHeight = errors.New("blockdb: invalid block height")
@@ -14,6 +11,6 @@ var (
 	ErrDatabaseClosed     = errors.New("blockdb: database is closed")
 	ErrCorrupted          = errors.New("blockdb: unrecoverable corruption detected")
 	ErrHeaderSizeTooLarge = errors.New("blockdb: header size cannot be >= block size")
-	ErrBlockTooLarge      = fmt.Errorf("blockdb: block size too large")
+	ErrBlockTooLarge      = errors.New("blockdb: block size too large")
 	ErrBlockNotFound      = errors.New("blockdb: block not found")
 )
