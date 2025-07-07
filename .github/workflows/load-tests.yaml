@@ -15,7 +15,7 @@ jobs:
     name: Run load test on self-hosted runners
     runs-on: avalanche-avalanchego-runner
     container:
-      image: ghcr.io/actions/actions-runner:@sha256-deb54a88ead0a86beedec6ac949e8b28f77478835b9c6434ccc237390a6e3e4f # v2.325.0
+      image: ghcr.io/actions/actions-runner:2.325.0
 
     steps:
       - name: Install dependencies
@@ -34,7 +34,8 @@ jobs:
       - uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
           run: ./scripts/run_task.sh test-load-kube -- --kube-image ${{ inputs.image }}
-          artifact_prefix: load-kube
+          action_path: .github/actions/run-monitored-tmpnet-cmd
+          artifact_prefix: load-self-hosted-runner
           prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           loki_username: ${{ secrets.LOKI_ID || '' }}

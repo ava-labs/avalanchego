@@ -12,7 +12,7 @@ inputs:
     description: 'the tmpnet runtime being used'
     default: 'process'
   action_path:
-    description: 'override path to directory containing nix-develop.sh'
+    description: 'override github action path'
     default: ${{ github.action_path }}
   filter_by_owner:
     default: ''
