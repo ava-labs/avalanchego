@@ -264,7 +264,7 @@ tasks:
       - cmd: bash -x ./scripts/copy_dir.sh {{.S3_SRC}} {{.LOCAL_DST}}
 
   import-cchain-reexecute-range:
-    desc: Imports the C-Chain block and state data to re-execute. Defaults to execute the block range (100, 200].
+    desc: Imports the C-Chain block and state data to re-execute. Defaults to import the first 200 and the current state created with the default config of the C-Chain (hashdb).
     vars:
       EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
       SOURCE_BLOCK_DIR: '{{.SOURCE_BLOCK_DIR | default "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-200.zip"}}'
@@ -290,7 +290,7 @@ tasks:
       - cmd: go test -timeout=0 -run=TestExportBlockRange github.com/ava-labs/avalanchego/tests/bench/c --source-block-dir={{.SOURCE_BLOCK_DIR}} --target-block-dir={{.TARGET_BLOCK_DIR}} --start-block={{.START_BLOCK}} --end-block={{.END_BLOCK}}
 
   reexecute-cchain-range:
-    desc: Benchmark re-execute a range of blocks on the C-Chain. Defaults to execute the block range (100, 200].
+    desc: Re-execute a range of C-Chain blocks.
     vars:
       EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
       START_BLOCK: '{{.START_BLOCK}}'
