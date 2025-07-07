@@ -42,6 +42,7 @@ import (
 	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/peer"
 	"github.com/ava-labs/subnet-evm/plugin/evm/config"
+	subnetevmlog "github.com/ava-labs/subnet-evm/plugin/evm/log"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/subnet-evm/plugin/evm/validators"
 	"github.com/ava-labs/subnet-evm/plugin/evm/validators/interfaces"
@@ -250,7 +251,7 @@ type VM struct {
 
 	bootstrapped avalancheUtils.Atomic[bool]
 
-	logger SubnetEVMLogger
+	logger subnetevmlog.Logger
 	// State sync server and client
 	StateSyncServer
 	StateSyncClient
@@ -308,7 +309,7 @@ func (vm *VM) Initialize(
 	}
 	vm.chainAlias = alias
 
-	subnetEVMLogger, err := InitLogger(vm.chainAlias, vm.config.LogLevel, vm.config.LogJSONFormat, vm.ctx.Log)
+	subnetEVMLogger, err := subnetevmlog.InitLogger(vm.chainAlias, vm.config.LogLevel, vm.config.LogJSONFormat, vm.ctx.Log)
 	if err != nil {
 		return fmt.Errorf("%w: %w ", errInitializingLogger, err)
 	}

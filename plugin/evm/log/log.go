@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evm
+package log
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	"golang.org/x/exp/slog"
 )
 
-type SubnetEVMLogger struct {
+type Logger struct {
 	ethlog.Logger
 
 	logLevel *slog.LevelVar
@@ -23,7 +23,7 @@ type SubnetEVMLogger struct {
 
 // InitLogger initializes logger with alias and sets the log level and format with the original [os.StdErr] interface
 // along with the context logger.
-func InitLogger(alias string, level string, jsonFormat bool, writer io.Writer) (SubnetEVMLogger, error) {
+func InitLogger(alias string, level string, jsonFormat bool, writer io.Writer) (Logger, error) {
 	logLevel := &slog.LevelVar{}
 
 	var handler slog.Handler
@@ -46,26 +46,26 @@ func InitLogger(alias string, level string, jsonFormat bool, writer io.Writer) (
 	}
 
 	// Create handler
-	c := SubnetEVMLogger{
+	c := Logger{
 		Logger:   ethlog.NewLogger(handler),
 		logLevel: logLevel,
 	}
 
 	if err := c.SetLogLevel(level); err != nil {
-		return SubnetEVMLogger{}, err
+		return Logger{}, err
 	}
 	ethlog.SetDefault(c.Logger)
 	return c, nil
 }
 
 // SetLogLevel sets the log level of initialized log handler.
-func (s *SubnetEVMLogger) SetLogLevel(level string) error {
+func (l *Logger) SetLogLevel(level string) error {
 	// Set log level
 	logLevel, err := log.LvlFromString(level)
 	if err != nil {
 		return err
 	}
-	s.logLevel.Set(logLevel)
+	l.logLevel.Set(logLevel)
 	return nil
 }
 

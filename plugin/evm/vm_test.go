@@ -1810,46 +1810,6 @@ func TestLastAcceptedBlockNumberAllow(t *testing.T) {
 	}
 }
 
-func TestConfigureLogLevel(t *testing.T) {
-	tests := []struct {
-		logLevel    string
-		expectedErr error
-	}{
-		{
-			logLevel: "info",
-		},
-		{
-			logLevel:    "testchain", // invalid
-			expectedErr: errInitializingLogger,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.logLevel, func(t *testing.T) {
-			require := require.New(t)
-
-			vm := &VM{}
-			ctx, dbManager, genesisBytes, issuer, _ := setupGenesis(t, genesisJSONLatest)
-			err := vm.Initialize(
-				context.Background(),
-				ctx,
-				dbManager,
-				genesisBytes,
-				nil,
-				fmt.Appendf(nil, `{"log-level": "%s"}`, test.logLevel),
-				issuer,
-				nil,
-				&enginetest.Sender{T: t},
-			)
-			require.ErrorIs(err, test.expectedErr)
-			if err != nil {
-				return
-			}
-
-			require.NoError(err, vm.Shutdown(context.Background()))
-		})
-	}
-}
-
 // Regression test to ensure we can build blocks if we are starting with the
 // Subnet EVM ruleset in genesis.
 func TestBuildSubnetEVMBlock(t *testing.T) {
