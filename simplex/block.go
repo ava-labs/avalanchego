@@ -175,14 +175,12 @@ func (bt *blockTracker) trackBlock(b *Block) {
 	bt.lock.Lock()
 	defer bt.lock.Unlock()
 
-	// add the block to the block tracker
 	bt.simplexDigestsToBlock[b.digest] = b
 	bt.tree.Add(b.vmBlock)
 }
 
-// indexBlock indexes the block in the block tracker and sets up the onIndex callback.
+// indexBlock calls accept on the block with the given digest, and reject on competing blocks.
 func (bt *blockTracker) indexBlock(ctx context.Context, digest simplex.Digest) error {
-	// check if we have already verified this block
 	bt.lock.Lock()
 	defer bt.lock.Unlock()
 
@@ -191,11 +189,9 @@ func (bt *blockTracker) indexBlock(ctx context.Context, digest simplex.Digest) e
 		return fmt.Errorf("%w: %s", errDigestNotFound, digest)
 	}
 
-	// delete all digests from the map with a lower seq as this block's seq
-	// we keep the seq in the map so we can reference it in verify
+	// removes all digests with a lower seq
 	for d, block := range bt.simplexDigestsToBlock {
 		if block.metadata.Seq < bd.metadata.Seq {
-			// remove the block from the map
 			delete(bt.simplexDigestsToBlock, d)
 		}
 	}
