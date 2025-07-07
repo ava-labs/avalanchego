@@ -16,7 +16,6 @@ import (
 
 	ids "github.com/ava-labs/avalanchego/ids"
 	snow "github.com/ava-labs/avalanchego/snow"
-	common "github.com/ava-labs/avalanchego/snow/engine/common"
 	handler "github.com/ava-labs/avalanchego/snow/networking/handler"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -115,20 +114,6 @@ func (m *Handler) Len() int {
 func (mr *HandlerMockRecorder) Len() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Len", reflect.TypeOf((*Handler)(nil).Len))
-}
-
-// Notify mocks base method.
-func (m *Handler) Notify(arg0 context.Context, msg common.Message) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Notify", arg0, msg)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Notify indicates an expected call of Notify.
-func (mr *HandlerMockRecorder) Notify(arg0, msg any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Notify", reflect.TypeOf((*Handler)(nil).Notify), arg0, msg)
 }
 
 // Push mocks base method.

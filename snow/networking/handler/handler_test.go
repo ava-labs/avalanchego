@@ -66,11 +66,11 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	)
 	require.NoError(err)
 
-	cn, subscription, _ := createSubscriberAndChangeNotifier()
+	subscription, _ := createSubscriber()
 
 	handlerIntf, err := New(
 		ctx,
-		cn,
+		&block.ChangeNotifier{},
 		subscription,
 		vdrs,
 		time.Second,
@@ -285,11 +285,11 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	)
 	require.NoError(err)
 
-	cn, subscription, _ := createSubscriberAndChangeNotifier()
+	subscription, _ := createSubscriber()
 
 	handlerIntf, err := New(
 		ctx,
-		cn,
+		&block.ChangeNotifier{},
 		subscription,
 		vdrs,
 		1,
@@ -378,12 +378,12 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	)
 	require.NoError(err)
 
-	cn, subscription, messages := createSubscriberAndChangeNotifier()
+	subscription, messages := createSubscriber()
 	notified := make(chan common.Message)
 
 	handler, err := New(
 		ctx,
-		cn,
+		&block.ChangeNotifier{},
 		subscription,
 		vdrs,
 		time.Second,
@@ -566,11 +566,11 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 			)
 			require.NoError(err)
 
-			cn, subscription, _ := createSubscriberAndChangeNotifier()
+			subscription, _ := createSubscriber()
 
 			handler, err := New(
 				ctx,
-				cn,
+				&block.ChangeNotifier{},
 				subscription,
 				vdrs,
 				time.Second,
@@ -652,11 +652,11 @@ func TestHandlerStartError(t *testing.T) {
 	)
 	require.NoError(err)
 
-	cn, subscription, _ := createSubscriberAndChangeNotifier()
+	subscription, _ := createSubscriber()
 
 	handler, err := New(
 		ctx,
-		cn,
+		&block.ChangeNotifier{},
 		subscription,
 		validators.NewManager(),
 		time.Second,
@@ -683,9 +683,7 @@ func TestHandlerStartError(t *testing.T) {
 	require.NoError(err)
 }
 
-func createSubscriberAndChangeNotifier() (*block.ChangeNotifier, common.Subscription, chan<- common.Message) {
-	var cn block.ChangeNotifier
-
+func createSubscriber() (common.Subscription, chan<- common.Message) {
 	messages := make(chan common.Message, 1)
 
 	subscription := func(ctx context.Context) (common.Message, error) {
@@ -697,5 +695,5 @@ func createSubscriberAndChangeNotifier() (*block.ChangeNotifier, common.Subscrip
 		}
 	}
 
-	return &cn, subscription, messages
+	return subscription, messages
 }
