@@ -181,6 +181,7 @@ type testVMConfig struct {
 }
 
 type testVM struct {
+	atomicVM     *atomicvm.VM
 	vm           *VM
 	toEngine     chan commonEng.Message
 	db           *prefixdb.Database
@@ -213,13 +214,14 @@ func newVM(t *testing.T, config testVMConfig) *testVM {
 	issuer := make(chan commonEng.Message, 1)
 	prefixedDB := prefixdb.New([]byte{1}, baseDB)
 
-	vm := &VM{}
+	innerVM := &VM{}
+	atomicVM := atomicvm.WrapVM(innerVM)
 	appSender := &enginetest.Sender{
 		T:                 t,
 		CantSendAppGossip: true,
 		SendAppGossipF:    func(context.Context, commonEng.SendConfig, []byte) error { return nil },
 	}
-	require.NoError(t, vm.Initialize(
+	require.NoError(t, atomicVM.Initialize(
 		context.Background(),
 		ctx,
 		prefixedDB,
@@ -232,8 +234,8 @@ func newVM(t *testing.T, config testVMConfig) *testVM {
 	), "error initializing vm")
 
 	if !config.isSyncing {
-		require.NoError(t, vm.SetState(context.Background(), snow.Bootstrapping))
-		require.NoError(t, vm.SetState(context.Background(), snow.NormalOp))
+		require.NoError(t, atomicVM.SetState(context.Background(), snow.Bootstrapping))
+		require.NoError(t, atomicVM.SetState(context.Background(), snow.NormalOp))
 	}
 
 	for addr, avaxAmount := range config.utxos {
@@ -241,13 +243,14 @@ func newVM(t *testing.T, config testVMConfig) *testVM {
 		if err != nil {
 			t.Fatalf("Failed to generate txID from addr: %s", err)
 		}
-		if _, err := addUTXO(atomicMemory, vm.ctx, txID, 0, vm.ctx.AVAXAssetID, avaxAmount, addr); err != nil {
+		if _, err := addUTXO(atomicMemory, innerVM.ctx, txID, 0, innerVM.ctx.AVAXAssetID, avaxAmount, addr); err != nil {
 			t.Fatalf("Failed to add UTXO to shared memory: %s", err)
 		}
 	}
 
 	return &testVM{
-		vm:           vm,
+		atomicVM:     atomicVM,
+		vm:           innerVM,
 		toEngine:     issuer,
 		db:           prefixedDB,
 		atomicMemory: atomicMemory,
@@ -459,9 +462,9 @@ func TestImportMissingUTXOs(t *testing.T) {
 		require.NoError(t, tvm1.vm.Shutdown(context.Background()))
 	}()
 
-	importTx, err := tvm1.vm.atomicVM.NewImportTx(tvm1.vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
+	importTx, err := tvm1.atomicVM.NewImportTx(tvm1.vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 	require.NoError(t, err)
-	require.NoError(t, tvm1.vm.atomicVM.AtomicMempool.AddLocalTx(importTx))
+	require.NoError(t, tvm1.atomicVM.AtomicMempool.AddLocalTx(importTx))
 	<-tvm1.toEngine
 	blk, err := tvm1.vm.BuildBlock(context.Background())
 	require.NoError(t, err)
@@ -502,12 +505,12 @@ func TestIssueAtomicTxs(t *testing.T) {
 		}
 	}()
 
-	importTx, err := tvm.vm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
+	importTx, err := tvm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := tvm.vm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
+	if err := tvm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -553,12 +556,12 @@ func TestIssueAtomicTxs(t *testing.T) {
 		t.Fatal("Expected logs to be non-nil")
 	}
 
-	exportTx, err := tvm.vm.atomicVM.NewExportTx(tvm.vm.ctx.AVAXAssetID, importAmount-(2*ap0.AtomicTxFee), tvm.vm.ctx.XChainID, testShortIDAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
+	exportTx, err := tvm.atomicVM.NewExportTx(tvm.vm.ctx.AVAXAssetID, importAmount-(2*ap0.AtomicTxFee), tvm.vm.ctx.XChainID, testShortIDAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := tvm.vm.atomicVM.AtomicMempool.AddLocalTx(exportTx); err != nil {
+	if err := tvm.atomicVM.AtomicMempool.AddLocalTx(exportTx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -584,13 +587,13 @@ func TestIssueAtomicTxs(t *testing.T) {
 	}
 
 	// Check that both atomic transactions were indexed as expected.
-	indexedImportTx, status, height, err := tvm.vm.atomicVM.GetAtomicTx(importTx.ID())
+	indexedImportTx, status, height, err := tvm.atomicVM.GetAtomicTx(importTx.ID())
 	assert.NoError(t, err)
 	assert.Equal(t, atomic.Accepted, status)
 	assert.Equal(t, uint64(1), height, "expected height of indexed import tx to be 1")
 	assert.Equal(t, indexedImportTx.ID(), importTx.ID(), "expected ID of indexed import tx to match original txID")
 
-	indexedExportTx, status, height, err := tvm.vm.atomicVM.GetAtomicTx(exportTx.ID())
+	indexedExportTx, status, height, err := tvm.atomicVM.GetAtomicTx(exportTx.ID())
 	assert.NoError(t, err)
 	assert.Equal(t, atomic.Accepted, status)
 	assert.Equal(t, uint64(2), height, "expected height of indexed export tx to be 2")
@@ -616,12 +619,12 @@ func TestBuildEthTxBlock(t *testing.T) {
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
 	tvm.vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
 
-	importTx, err := tvm.vm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
+	importTx, err := tvm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := tvm.vm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
+	if err := tvm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -715,7 +718,7 @@ func TestBuildEthTxBlock(t *testing.T) {
 		t.Fatalf("Found unexpected blkID for parent of blk2")
 	}
 
-	restartedVM := &VM{}
+	restartedVM := atomicvm.WrapVM(&VM{})
 	newCTX := snowtest.Context(t, snowtest.CChainID)
 	newCTX.NetworkUpgrades = upgradetest.GetConfig(fork)
 	if err := restartedVM.Initialize(
@@ -733,13 +736,13 @@ func TestBuildEthTxBlock(t *testing.T) {
 	}
 
 	// State root should not have been committed and discarded on restart
-	if ethBlk1Root := ethBlk1.Root(); restartedVM.blockChain.HasState(ethBlk1Root) {
+	if ethBlk1Root := ethBlk1.Root(); restartedVM.Blockchain().HasState(ethBlk1Root) {
 		t.Fatalf("Expected blk1 state root to be pruned after blk2 was accepted on top of it in pruning mode")
 	}
 
 	// State root should be committed when accepted tip on shutdown
 	ethBlk2 := blk2.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
-	if ethBlk2Root := ethBlk2.Root(); !restartedVM.blockChain.HasState(ethBlk2Root) {
+	if ethBlk2Root := ethBlk2.Root(); !restartedVM.Blockchain().HasState(ethBlk2Root) {
 		t.Fatalf("Expected blk2 state root to not be pruned after shutdown (last accepted tip should be committed)")
 	}
 }
@@ -763,14 +766,14 @@ func testConflictingImportTxs(t *testing.T, fork upgradetest.Fork) {
 	importTxs := make([]*atomic.Tx, 0, 3)
 	conflictTxs := make([]*atomic.Tx, 0, 3)
 	for i, key := range testKeys {
-		importTx, err := tvm.vm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, testEthAddrs[i], initialBaseFee, []*secp256k1.PrivateKey{key})
+		importTx, err := tvm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, testEthAddrs[i], initialBaseFee, []*secp256k1.PrivateKey{key})
 		if err != nil {
 			t.Fatal(err)
 		}
 		importTxs = append(importTxs, importTx)
 
 		conflictAddr := testEthAddrs[(i+1)%len(testEthAddrs)]
-		conflictTx, err := tvm.vm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, conflictAddr, initialBaseFee, []*secp256k1.PrivateKey{key})
+		conflictTx, err := tvm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, conflictAddr, initialBaseFee, []*secp256k1.PrivateKey{key})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -782,7 +785,7 @@ func testConflictingImportTxs(t *testing.T, fork upgradetest.Fork) {
 		t.Fatal(err)
 	}
 	for _, tx := range importTxs[:2] {
-		if err := tvm.vm.atomicVM.AtomicMempool.AddLocalTx(tx); err != nil {
+		if err := tvm.atomicVM.AtomicMempool.AddLocalTx(tx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -812,11 +815,11 @@ func testConflictingImportTxs(t *testing.T, fork upgradetest.Fork) {
 	// the VM returns an error when it attempts to issue the conflict into the mempool
 	// and when it attempts to build a block with the conflict force added to the mempool.
 	for i, tx := range conflictTxs[:2] {
-		if err := tvm.vm.atomicVM.AtomicMempool.AddLocalTx(tx); err == nil {
+		if err := tvm.atomicVM.AtomicMempool.AddLocalTx(tx); err == nil {
 			t.Fatal("Expected issueTx to fail due to conflicting transaction")
 		}
 		// Force issue transaction directly to the mempool
-		if err := tvm.vm.atomicVM.AtomicMempool.ForceAddTx(tx); err != nil {
+		if err := tvm.atomicVM.AtomicMempool.ForceAddTx(tx); err != nil {
 			t.Fatal(err)
 		}
 		<-tvm.toEngine
@@ -834,7 +837,7 @@ func testConflictingImportTxs(t *testing.T, fork upgradetest.Fork) {
 	// Generate one more valid block so that we can copy the header to create an invalid block
 	// with modified extra data. This new block will be invalid for more than one reason (invalid merkle root)
 	// so we check to make sure that the expected error is returned from block verification.
-	if err := tvm.vm.atomicVM.AtomicMempool.AddLocalTx(importTxs[2]); err != nil {
+	if err := tvm.atomicVM.AtomicMempool.AddLocalTx(importTxs[2]); err != nil {
 		t.Fatal(err)
 	}
 	<-tvm.toEngine
@@ -928,102 +931,102 @@ func testConflictingImportTxs(t *testing.T, fork upgradetest.Fork) {
 func TestReissueAtomicTxHigherGasPrice(t *testing.T) {
 	kc := secp256k1fx.NewKeychain(testKeys...)
 
-	for name, issueTxs := range map[string]func(t *testing.T, vm *VM, sharedMemory *avalancheatomic.Memory) (issued []*atomic.Tx, discarded []*atomic.Tx){
-		"single UTXO override": func(t *testing.T, vm *VM, sharedMemory *avalancheatomic.Memory) (issued []*atomic.Tx, evicted []*atomic.Tx) {
-			utxo, err := addUTXO(sharedMemory, vm.ctx, ids.GenerateTestID(), 0, vm.ctx.AVAXAssetID, units.Avax, testShortIDAddrs[0])
+	for name, issueTxs := range map[string]func(t *testing.T, vm *atomicvm.VM, sharedMemory *avalancheatomic.Memory) (issued []*atomic.Tx, discarded []*atomic.Tx){
+		"single UTXO override": func(t *testing.T, vm *atomicvm.VM, sharedMemory *avalancheatomic.Memory) (issued []*atomic.Tx, evicted []*atomic.Tx) {
+			utxo, err := addUTXO(sharedMemory, vm.Ctx, ids.GenerateTestID(), 0, vm.Ctx.AVAXAssetID, units.Avax, testShortIDAddrs[0])
 			if err != nil {
 				t.Fatal(err)
 			}
-			tx1, err := atomic.NewImportTx(vm.ctx, vm.currentRules(), vm.clock.Unix(), vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, kc, []*avax.UTXO{utxo})
+			tx1, err := atomic.NewImportTx(vm.Ctx, vm.CurrentRules(), vm.Clock().Unix(), vm.Ctx.XChainID, testEthAddrs[0], initialBaseFee, kc, []*avax.UTXO{utxo})
 			if err != nil {
 				t.Fatal(err)
 			}
-			tx2, err := atomic.NewImportTx(vm.ctx, vm.currentRules(), vm.clock.Unix(), vm.ctx.XChainID, testEthAddrs[0], new(big.Int).Mul(common.Big2, initialBaseFee), kc, []*avax.UTXO{utxo})
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			if err := vm.atomicVM.AtomicMempool.AddLocalTx(tx1); err != nil {
-				t.Fatal(err)
-			}
-			if err := vm.atomicVM.AtomicMempool.AddLocalTx(tx2); err != nil {
-				t.Fatal(err)
-			}
-
-			return []*atomic.Tx{tx2}, []*atomic.Tx{tx1}
-		},
-		"one of two UTXOs overrides": func(t *testing.T, vm *VM, sharedMemory *avalancheatomic.Memory) (issued []*atomic.Tx, evicted []*atomic.Tx) {
-			utxo1, err := addUTXO(sharedMemory, vm.ctx, ids.GenerateTestID(), 0, vm.ctx.AVAXAssetID, units.Avax, testShortIDAddrs[0])
-			if err != nil {
-				t.Fatal(err)
-			}
-			utxo2, err := addUTXO(sharedMemory, vm.ctx, ids.GenerateTestID(), 0, vm.ctx.AVAXAssetID, units.Avax, testShortIDAddrs[0])
-			if err != nil {
-				t.Fatal(err)
-			}
-			tx1, err := atomic.NewImportTx(vm.ctx, vm.currentRules(), vm.clock.Unix(), vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, kc, []*avax.UTXO{utxo1, utxo2})
-			if err != nil {
-				t.Fatal(err)
-			}
-			tx2, err := atomic.NewImportTx(vm.ctx, vm.currentRules(), vm.clock.Unix(), vm.ctx.XChainID, testEthAddrs[0], new(big.Int).Mul(common.Big2, initialBaseFee), kc, []*avax.UTXO{utxo1})
+			tx2, err := atomic.NewImportTx(vm.Ctx, vm.CurrentRules(), vm.Clock().Unix(), vm.Ctx.XChainID, testEthAddrs[0], new(big.Int).Mul(common.Big2, initialBaseFee), kc, []*avax.UTXO{utxo})
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			if err := vm.atomicVM.AtomicMempool.AddLocalTx(tx1); err != nil {
+			if err := vm.AtomicMempool.AddLocalTx(tx1); err != nil {
 				t.Fatal(err)
 			}
-			if err := vm.atomicVM.AtomicMempool.AddLocalTx(tx2); err != nil {
+			if err := vm.AtomicMempool.AddLocalTx(tx2); err != nil {
 				t.Fatal(err)
 			}
 
 			return []*atomic.Tx{tx2}, []*atomic.Tx{tx1}
 		},
-		"hola": func(t *testing.T, vm *VM, sharedMemory *avalancheatomic.Memory) (issued []*atomic.Tx, evicted []*atomic.Tx) {
-			utxo1, err := addUTXO(sharedMemory, vm.ctx, ids.GenerateTestID(), 0, vm.ctx.AVAXAssetID, units.Avax, testShortIDAddrs[0])
+		"one of two UTXOs overrides": func(t *testing.T, vm *atomicvm.VM, sharedMemory *avalancheatomic.Memory) (issued []*atomic.Tx, evicted []*atomic.Tx) {
+			utxo1, err := addUTXO(sharedMemory, vm.Ctx, ids.GenerateTestID(), 0, vm.Ctx.AVAXAssetID, units.Avax, testShortIDAddrs[0])
 			if err != nil {
 				t.Fatal(err)
 			}
-			utxo2, err := addUTXO(sharedMemory, vm.ctx, ids.GenerateTestID(), 0, vm.ctx.AVAXAssetID, units.Avax, testShortIDAddrs[0])
+			utxo2, err := addUTXO(sharedMemory, vm.Ctx, ids.GenerateTestID(), 0, vm.Ctx.AVAXAssetID, units.Avax, testShortIDAddrs[0])
+			if err != nil {
+				t.Fatal(err)
+			}
+			tx1, err := atomic.NewImportTx(vm.Ctx, vm.CurrentRules(), vm.Clock().Unix(), vm.Ctx.XChainID, testEthAddrs[0], initialBaseFee, kc, []*avax.UTXO{utxo1, utxo2})
+			if err != nil {
+				t.Fatal(err)
+			}
+			tx2, err := atomic.NewImportTx(vm.Ctx, vm.CurrentRules(), vm.Clock().Unix(), vm.Ctx.XChainID, testEthAddrs[0], new(big.Int).Mul(common.Big2, initialBaseFee), kc, []*avax.UTXO{utxo1})
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			importTx1, err := atomic.NewImportTx(vm.ctx, vm.currentRules(), vm.clock.Unix(), vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, kc, []*avax.UTXO{utxo1})
+			if err := vm.AtomicMempool.AddLocalTx(tx1); err != nil {
+				t.Fatal(err)
+			}
+			if err := vm.AtomicMempool.AddLocalTx(tx2); err != nil {
+				t.Fatal(err)
+			}
+
+			return []*atomic.Tx{tx2}, []*atomic.Tx{tx1}
+		},
+		"hola": func(t *testing.T, vm *atomicvm.VM, sharedMemory *avalancheatomic.Memory) (issued []*atomic.Tx, evicted []*atomic.Tx) {
+			utxo1, err := addUTXO(sharedMemory, vm.Ctx, ids.GenerateTestID(), 0, vm.Ctx.AVAXAssetID, units.Avax, testShortIDAddrs[0])
+			if err != nil {
+				t.Fatal(err)
+			}
+			utxo2, err := addUTXO(sharedMemory, vm.Ctx, ids.GenerateTestID(), 0, vm.Ctx.AVAXAssetID, units.Avax, testShortIDAddrs[0])
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			importTx2, err := atomic.NewImportTx(vm.ctx, vm.currentRules(), vm.clock.Unix(), vm.ctx.XChainID, testEthAddrs[0], new(big.Int).Mul(big.NewInt(3), initialBaseFee), kc, []*avax.UTXO{utxo2})
+			importTx1, err := atomic.NewImportTx(vm.Ctx, vm.CurrentRules(), vm.Clock().Unix(), vm.Ctx.XChainID, testEthAddrs[0], initialBaseFee, kc, []*avax.UTXO{utxo1})
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			reissuanceTx1, err := atomic.NewImportTx(vm.ctx, vm.currentRules(), vm.clock.Unix(), vm.ctx.XChainID, testEthAddrs[0], new(big.Int).Mul(big.NewInt(2), initialBaseFee), kc, []*avax.UTXO{utxo1, utxo2})
+			importTx2, err := atomic.NewImportTx(vm.Ctx, vm.CurrentRules(), vm.Clock().Unix(), vm.Ctx.XChainID, testEthAddrs[0], new(big.Int).Mul(big.NewInt(3), initialBaseFee), kc, []*avax.UTXO{utxo2})
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := vm.atomicVM.AtomicMempool.AddLocalTx(importTx1); err != nil {
+
+			reissuanceTx1, err := atomic.NewImportTx(vm.Ctx, vm.CurrentRules(), vm.Clock().Unix(), vm.Ctx.XChainID, testEthAddrs[0], new(big.Int).Mul(big.NewInt(2), initialBaseFee), kc, []*avax.UTXO{utxo1, utxo2})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := vm.AtomicMempool.AddLocalTx(importTx1); err != nil {
 				t.Fatal(err)
 			}
 
-			if err := vm.atomicVM.AtomicMempool.AddLocalTx(importTx2); err != nil {
+			if err := vm.AtomicMempool.AddLocalTx(importTx2); err != nil {
 				t.Fatal(err)
 			}
 
-			if err := vm.atomicVM.AtomicMempool.AddLocalTx(reissuanceTx1); !errors.Is(err, atomictxpool.ErrConflictingAtomicTx) {
+			if err := vm.AtomicMempool.AddLocalTx(reissuanceTx1); !errors.Is(err, atomictxpool.ErrConflictingAtomicTx) {
 				t.Fatalf("Expected to fail with err: %s, but found err: %s", atomictxpool.ErrConflictingAtomicTx, err)
 			}
 
-			assert.True(t, vm.atomicVM.AtomicMempool.Has(importTx1.ID()))
-			assert.True(t, vm.atomicVM.AtomicMempool.Has(importTx2.ID()))
-			assert.False(t, vm.atomicVM.AtomicMempool.Has(reissuanceTx1.ID()))
+			assert.True(t, vm.AtomicMempool.Has(importTx1.ID()))
+			assert.True(t, vm.AtomicMempool.Has(importTx2.ID()))
+			assert.False(t, vm.AtomicMempool.Has(reissuanceTx1.ID()))
 
-			reissuanceTx2, err := atomic.NewImportTx(vm.ctx, vm.currentRules(), vm.clock.Unix(), vm.ctx.XChainID, testEthAddrs[0], new(big.Int).Mul(big.NewInt(4), initialBaseFee), kc, []*avax.UTXO{utxo1, utxo2})
+			reissuanceTx2, err := atomic.NewImportTx(vm.Ctx, vm.CurrentRules(), vm.Clock().Unix(), vm.Ctx.XChainID, testEthAddrs[0], new(big.Int).Mul(big.NewInt(4), initialBaseFee), kc, []*avax.UTXO{utxo1, utxo2})
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := vm.atomicVM.AtomicMempool.AddLocalTx(reissuanceTx2); err != nil {
+			if err := vm.AtomicMempool.AddLocalTx(reissuanceTx2); err != nil {
 				t.Fatal(err)
 			}
 
@@ -1035,15 +1038,15 @@ func TestReissueAtomicTxHigherGasPrice(t *testing.T) {
 			tvm := newVM(t, testVMConfig{
 				fork: &fork,
 			})
-			issuedTxs, evictedTxs := issueTxs(t, tvm.vm, tvm.atomicMemory)
+			issuedTxs, evictedTxs := issueTxs(t, tvm.atomicVM, tvm.atomicMemory)
 
 			for i, tx := range issuedTxs {
-				_, issued := tvm.vm.atomicVM.AtomicMempool.GetPendingTx(tx.ID())
+				_, issued := tvm.atomicVM.AtomicMempool.GetPendingTx(tx.ID())
 				assert.True(t, issued, "expected issued tx at index %d to be issued", i)
 			}
 
 			for i, tx := range evictedTxs {
-				_, discarded, _ := tvm.vm.atomicVM.AtomicMempool.GetTx(tx.ID())
+				_, discarded, _ := tvm.atomicVM.AtomicMempool.GetTx(tx.ID())
 				assert.True(t, discarded, "expected discarded tx at index %d to be discarded", i)
 			}
 		})
@@ -1104,12 +1107,12 @@ func TestSetPreferenceRace(t *testing.T) {
 	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
 	tvm2.vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan2)
 
-	importTx, err := tvm1.vm.atomicVM.NewImportTx(tvm1.vm.ctx.XChainID, testEthAddrs[1], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
+	importTx, err := tvm1.atomicVM.NewImportTx(tvm1.vm.ctx.XChainID, testEthAddrs[1], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := tvm1.vm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
+	if err := tvm1.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1328,17 +1331,17 @@ func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
 	tvm.vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
 
-	importTx0A, err := tvm.vm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, key.Address, initialBaseFee, []*secp256k1.PrivateKey{key0})
+	importTx0A, err := tvm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, key.Address, initialBaseFee, []*secp256k1.PrivateKey{key0})
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Create a conflicting transaction
-	importTx0B, err := tvm.vm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, testEthAddrs[2], initialBaseFee, []*secp256k1.PrivateKey{key0})
+	importTx0B, err := tvm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, testEthAddrs[2], initialBaseFee, []*secp256k1.PrivateKey{key0})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := tvm.vm.atomicVM.AtomicMempool.AddLocalTx(importTx0A); err != nil {
+	if err := tvm.atomicVM.AtomicMempool.AddLocalTx(importTx0A); err != nil {
 		t.Fatalf("Failed to issue importTx0A: %s", err)
 	}
 
@@ -1391,12 +1394,12 @@ func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	importTx1, err := tvm.vm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, key.Address, initialBaseFee, []*secp256k1.PrivateKey{key1})
+	importTx1, err := tvm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, key.Address, initialBaseFee, []*secp256k1.PrivateKey{key1})
 	if err != nil {
 		t.Fatalf("Failed to issue importTx1 due to: %s", err)
 	}
 
-	if err := tvm.vm.atomicVM.AtomicMempool.AddLocalTx(importTx1); err != nil {
+	if err := tvm.atomicVM.AtomicMempool.AddLocalTx(importTx1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1415,11 +1418,11 @@ func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := tvm.vm.atomicVM.AtomicMempool.AddLocalTx(importTx0B); err == nil {
+	if err := tvm.atomicVM.AtomicMempool.AddLocalTx(importTx0B); err == nil {
 		t.Fatalf("Should not have been able to issue import tx with conflict")
 	}
 	// Force issue transaction directly into the mempool
-	if err := tvm.vm.atomicVM.AtomicMempool.ForceAddTx(importTx0B); err != nil {
+	if err := tvm.atomicVM.AtomicMempool.ForceAddTx(importTx0B); err != nil {
 		t.Fatal(err)
 	}
 	<-tvm.toEngine
@@ -1472,12 +1475,12 @@ func TestBonusBlocksTxs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	importTx, err := tvm.vm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
+	importTx, err := tvm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := tvm.vm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
+	if err := tvm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1489,7 +1492,7 @@ func TestBonusBlocksTxs(t *testing.T) {
 	}
 
 	// Make [blk] a bonus block.
-	tvm.vm.atomicVM.AtomicBackend.AddBonusBlock(blk.Height(), blk.ID())
+	tvm.atomicVM.AtomicBackend.AddBonusBlock(blk.Height(), blk.ID())
 
 	// Remove the UTXOs from shared memory, so that non-bonus blocks will fail verification
 	if err := tvm.vm.ctx.SharedMemory.Apply(map[ids.ID]*avalancheatomic.Requests{tvm.vm.ctx.XChainID: {RemoveRequests: [][]byte{inputID[:]}}}); err != nil {
@@ -1560,12 +1563,12 @@ func TestReorgProtection(t *testing.T) {
 	key := testKeys[0].ToECDSA()
 	address := testEthAddrs[0]
 
-	importTx, err := tvm1.vm.atomicVM.NewImportTx(tvm1.vm.ctx.XChainID, address, initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
+	importTx, err := tvm1.atomicVM.NewImportTx(tvm1.vm.ctx.XChainID, address, initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := tvm1.vm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
+	if err := tvm1.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1730,12 +1733,12 @@ func TestNonCanonicalAccept(t *testing.T) {
 	key := testKeys[0].ToECDSA()
 	address := testEthAddrs[0]
 
-	importTx, err := tvm1.vm.atomicVM.NewImportTx(tvm1.vm.ctx.XChainID, address, initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
+	importTx, err := tvm1.atomicVM.NewImportTx(tvm1.vm.ctx.XChainID, address, initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := tvm1.vm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
+	if err := tvm1.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1927,12 +1930,12 @@ func TestStickyPreference(t *testing.T) {
 	key := testKeys[0].ToECDSA()
 	address := testEthAddrs[0]
 
-	importTx, err := tvm1.vm.atomicVM.NewImportTx(tvm1.vm.ctx.XChainID, address, initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
+	importTx, err := tvm1.atomicVM.NewImportTx(tvm1.vm.ctx.XChainID, address, initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := tvm1.vm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
+	if err := tvm1.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2187,12 +2190,12 @@ func TestUncleBlock(t *testing.T) {
 	key := testKeys[0].ToECDSA()
 	address := testEthAddrs[0]
 
-	importTx, err := tvm1.vm.atomicVM.NewImportTx(tvm1.vm.ctx.XChainID, address, initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
+	importTx, err := tvm1.atomicVM.NewImportTx(tvm1.vm.ctx.XChainID, address, initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := tvm1.vm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
+	if err := tvm1.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2358,12 +2361,12 @@ func TestEmptyBlock(t *testing.T) {
 		}
 	}()
 
-	importTx, err := tvm.vm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
+	importTx, err := tvm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := tvm.vm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
+	if err := tvm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2441,12 +2444,12 @@ func TestAcceptReorg(t *testing.T) {
 	key := testKeys[0].ToECDSA()
 	address := testEthAddrs[0]
 
-	importTx, err := tvm1.vm.atomicVM.NewImportTx(tvm1.vm.ctx.XChainID, address, initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
+	importTx, err := tvm1.atomicVM.NewImportTx(tvm1.vm.ctx.XChainID, address, initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := tvm1.vm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
+	if err := tvm1.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2628,12 +2631,12 @@ func TestFutureBlock(t *testing.T) {
 		}
 	}()
 
-	importTx, err := tvm.vm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
+	importTx, err := tvm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := tvm.vm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
+	if err := tvm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2697,12 +2700,12 @@ func TestBuildApricotPhase1Block(t *testing.T) {
 	key := testKeys[0].ToECDSA()
 	address := testEthAddrs[0]
 
-	importTx, err := tvm.vm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, address, initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
+	importTx, err := tvm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, address, initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := tvm.vm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
+	if err := tvm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2804,12 +2807,12 @@ func TestLastAcceptedBlockNumberAllow(t *testing.T) {
 		}
 	}()
 
-	importTx, err := tvm.vm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
+	importTx, err := tvm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := tvm.vm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
+	if err := tvm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2881,12 +2884,12 @@ func TestReissueAtomicTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	importTx, err := tvm.vm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
+	importTx, err := tvm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := tvm.vm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
+	if err := tvm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2950,7 +2953,7 @@ func TestReissueAtomicTx(t *testing.T) {
 	}
 
 	// Check that [importTx] has been indexed correctly after [blkB] is accepted.
-	_, height, err := tvm.vm.atomicVM.AtomicTxRepository.GetByTxID(importTx.ID())
+	_, height, err := tvm.atomicVM.AtomicTxRepository.GetByTxID(importTx.ID())
 	if err != nil {
 		t.Fatal(err)
 	} else if height != blkB.Height() {
@@ -2969,10 +2972,10 @@ func TestAtomicTxFailsEVMStateTransferBuildBlock(t *testing.T) {
 		}
 	}()
 
-	exportTxs := createExportTxOptions(t, tvm.vm, tvm.toEngine, tvm.atomicMemory)
+	exportTxs := createExportTxOptions(t, tvm.atomicVM, tvm.toEngine, tvm.atomicMemory)
 	exportTx1, exportTx2 := exportTxs[0], exportTxs[1]
 
-	if err := tvm.vm.atomicVM.AtomicMempool.AddLocalTx(exportTx1); err != nil {
+	if err := tvm.atomicVM.AtomicMempool.AddLocalTx(exportTx1); err != nil {
 		t.Fatal(err)
 	}
 	<-tvm.toEngine
@@ -2988,16 +2991,16 @@ func TestAtomicTxFailsEVMStateTransferBuildBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := tvm.vm.atomicVM.AtomicMempool.AddLocalTx(exportTx2); err == nil {
+	if err := tvm.atomicVM.AtomicMempool.AddLocalTx(exportTx2); err == nil {
 		t.Fatal("Should have failed to issue due to an invalid export tx")
 	}
 
-	if err := tvm.vm.atomicVM.AtomicMempool.AddRemoteTx(exportTx2); err == nil {
+	if err := tvm.atomicVM.AtomicMempool.AddRemoteTx(exportTx2); err == nil {
 		t.Fatal("Should have failed to add because conflicting")
 	}
 
 	// Manually add transaction to mempool to bypass validation
-	if err := tvm.vm.atomicVM.AtomicMempool.ForceAddTx(exportTx2); err != nil {
+	if err := tvm.atomicVM.AtomicMempool.ForceAddTx(exportTx2); err != nil {
 		t.Fatal(err)
 	}
 	<-tvm.toEngine
@@ -3053,11 +3056,11 @@ func TestBuildInvalidBlockHead(t *testing.T) {
 
 	// Verify that the transaction fails verification when attempting to issue
 	// it into the atomic mempool.
-	if err := tvm.vm.atomicVM.AtomicMempool.AddLocalTx(tx); err == nil {
+	if err := tvm.atomicVM.AtomicMempool.AddLocalTx(tx); err == nil {
 		t.Fatal("Should have failed to issue invalid transaction")
 	}
 	// Force issue the transaction directly to the mempool
-	if err := tvm.vm.atomicVM.AtomicMempool.ForceAddTx(tx); err != nil {
+	if err := tvm.atomicVM.AtomicMempool.ForceAddTx(tx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3124,12 +3127,12 @@ func TestBuildApricotPhase4Block(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	importTx, err := tvm.vm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, address, initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
+	importTx, err := tvm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, address, initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := tvm.vm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
+	if err := tvm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3296,12 +3299,12 @@ func TestBuildApricotPhase5Block(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	importTx, err := tvm.vm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, address, initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
+	importTx, err := tvm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, address, initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := tvm.vm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
+	if err := tvm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3428,10 +3431,10 @@ func TestConsecutiveAtomicTransactionsRevertSnapshot(t *testing.T) {
 	tvm.vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
 
 	// Create three conflicting import transactions
-	importTxs := createImportTxOptions(t, tvm.vm, tvm.atomicMemory)
+	importTxs := createImportTxOptions(t, tvm.atomicVM, tvm.atomicMemory)
 
 	// Issue the first import transaction, build, and accept the block.
-	if err := tvm.vm.atomicVM.AtomicMempool.AddLocalTx(importTxs[0]); err != nil {
+	if err := tvm.atomicVM.AtomicMempool.AddLocalTx(importTxs[0]); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3461,8 +3464,8 @@ func TestConsecutiveAtomicTransactionsRevertSnapshot(t *testing.T) {
 
 	// Add the two conflicting transactions directly to the mempool, so that two consecutive transactions
 	// will fail verification when build block is called.
-	tvm.vm.atomicVM.AtomicMempool.AddRemoteTx(importTxs[1])
-	tvm.vm.atomicVM.AtomicMempool.AddRemoteTx(importTxs[2])
+	tvm.atomicVM.AtomicMempool.AddRemoteTx(importTxs[1])
+	tvm.atomicVM.AtomicMempool.AddRemoteTx(importTxs[2])
 
 	if _, err := tvm.vm.BuildBlock(context.Background()); err == nil {
 		t.Fatal("Expected build block to fail due to empty block")
@@ -3490,23 +3493,23 @@ func TestAtomicTxBuildBlockDropsConflicts(t *testing.T) {
 	// Create a conflict set for each pair of transactions
 	conflictSets := make([]set.Set[ids.ID], len(testKeys))
 	for index, key := range testKeys {
-		importTx, err := tvm.vm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, testEthAddrs[index], initialBaseFee, []*secp256k1.PrivateKey{key})
+		importTx, err := tvm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, testEthAddrs[index], initialBaseFee, []*secp256k1.PrivateKey{key})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := tvm.vm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
+		if err := tvm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
 			t.Fatal(err)
 		}
 		conflictSets[index].Add(importTx.ID())
-		conflictTx, err := tvm.vm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, conflictKey.Address, initialBaseFee, []*secp256k1.PrivateKey{key})
+		conflictTx, err := tvm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, conflictKey.Address, initialBaseFee, []*secp256k1.PrivateKey{key})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := tvm.vm.atomicVM.AtomicMempool.AddLocalTx(conflictTx); err == nil {
+		if err := tvm.atomicVM.AtomicMempool.AddLocalTx(conflictTx); err == nil {
 			t.Fatal("should conflict with the utxoSet in the mempool")
 		}
 		// force add the tx
-		tvm.vm.atomicVM.AtomicMempool.ForceAddTx(conflictTx)
+		tvm.atomicVM.AtomicMempool.ForceAddTx(conflictTx)
 		conflictSets[index].Add(conflictTx.ID())
 	}
 	<-tvm.toEngine
@@ -3565,7 +3568,7 @@ func TestBuildBlockDoesNotExceedAtomicGasLimit(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := tvm.vm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
+		if err := tvm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -3625,11 +3628,11 @@ func TestExtraStateChangeAtomicGasLimitExceeded(t *testing.T) {
 
 	// Double the initial base fee used when estimating the cost of this transaction to ensure that when it is
 	// used in ApricotPhase5 it still pays a sufficient fee with the fixed fee per atomic transaction.
-	importTx, err := tvm1.vm.atomicVM.NewImportTx(tvm1.vm.ctx.XChainID, testEthAddrs[0], new(big.Int).Mul(common.Big2, initialBaseFee), []*secp256k1.PrivateKey{testKeys[0]})
+	importTx, err := tvm1.atomicVM.NewImportTx(tvm1.vm.ctx.XChainID, testEthAddrs[0], new(big.Int).Mul(common.Big2, initialBaseFee), []*secp256k1.PrivateKey{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := tvm1.vm.atomicVM.AtomicMempool.ForceAddTx(importTx); err != nil {
+	if err := tvm1.atomicVM.AtomicMempool.ForceAddTx(importTx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3685,9 +3688,9 @@ func TestSkipChainConfigCheckCompatible(t *testing.T) {
 
 	// Since rewinding is permitted for last accepted height of 0, we must
 	// accept one block to test the SkipUpgradeCheck functionality.
-	importTx, err := tvm.vm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
+	importTx, err := tvm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 	require.NoError(t, err)
-	require.NoError(t, tvm.vm.atomicVM.AtomicMempool.AddLocalTx(importTx))
+	require.NoError(t, tvm.atomicVM.AtomicMempool.AddLocalTx(importTx))
 	<-tvm.toEngine
 
 	blk, err := tvm.vm.BuildBlock(context.Background())
@@ -3696,7 +3699,7 @@ func TestSkipChainConfigCheckCompatible(t *testing.T) {
 	require.NoError(t, tvm.vm.SetPreference(context.Background(), blk.ID()))
 	require.NoError(t, blk.Accept(context.Background()))
 
-	reinitVM := &VM{}
+	reinitVM := atomicvm.WrapVM(&VM{})
 	// use the block's timestamp instead of 0 since rewind to genesis
 	// is hardcoded to be allowed in core/genesis.go.
 	newCTX := snowtest.Context(t, tvm.vm.ctx.ChainID)
@@ -3707,7 +3710,7 @@ func TestSkipChainConfigCheckCompatible(t *testing.T) {
 	err = reinitVM.Initialize(context.Background(), newCTX, tvm.db, genesis, []byte{}, []byte{}, tvm.toEngine, []*commonEng.Fx{}, tvm.appSender)
 	require.ErrorContains(t, err, "mismatching Cancun fork timestamp in database")
 
-	reinitVM = &VM{}
+	reinitVM = atomicvm.WrapVM(&VM{})
 	newCTX.Metrics = metrics.NewPrefixGatherer()
 
 	// try again with skip-upgrade-check
@@ -3789,12 +3792,12 @@ func TestParentBeaconRootBlock(t *testing.T) {
 				}
 			}()
 
-			importTx, err := tvm.vm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
+			importTx, err := tvm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			if err := tvm.vm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
+			if err := tvm.atomicVM.AtomicMempool.AddLocalTx(importTx); err != nil {
 				t.Fatal(err)
 			}
 
@@ -3977,13 +3980,13 @@ func TestBuildBlockLargeTxStarvation(t *testing.T) {
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
 	tvm.vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
 
-	importTx1, err := tvm.vm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
+	importTx1, err := tvm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 	require.NoError(err)
-	require.NoError(tvm.vm.atomicVM.AtomicMempool.AddLocalTx(importTx1))
+	require.NoError(tvm.atomicVM.AtomicMempool.AddLocalTx(importTx1))
 
-	importTx2, err := tvm.vm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, testEthAddrs[1], initialBaseFee, []*secp256k1.PrivateKey{testKeys[1]})
+	importTx2, err := tvm.atomicVM.NewImportTx(tvm.vm.ctx.XChainID, testEthAddrs[1], initialBaseFee, []*secp256k1.PrivateKey{testKeys[1]})
 	require.NoError(err)
-	require.NoError(tvm.vm.atomicVM.AtomicMempool.AddLocalTx(importTx2))
+	require.NoError(tvm.atomicVM.AtomicMempool.AddLocalTx(importTx2))
 
 	<-tvm.toEngine
 	blk1, err := tvm.vm.BuildBlock(ctx)

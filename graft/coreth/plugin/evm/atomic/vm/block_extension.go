@@ -258,7 +258,7 @@ func (be *blockExtension) verifyUTXOsPresent(atomicTxs []*atomic.Tx) error {
 		if err != nil {
 			return err
 		}
-		if _, err := vm.ctx.SharedMemory.Get(chainID, requests.RemoveRequests); err != nil {
+		if _, err := vm.Ctx.SharedMemory.Get(chainID, requests.RemoveRequests); err != nil {
 			return fmt.Errorf("%w: %s", ErrMissingUTXOs, err)
 		}
 	}

@@ -77,7 +77,7 @@ const (
 
 type VM struct {
 	extension.InnerVM
-	ctx *snow.Context
+	Ctx *snow.Context
 
 	// TODO: unexport these fields
 	SecpCache     *secp256k1.RecoverCache
@@ -121,7 +121,7 @@ func (vm *VM) Initialize(
 	fxs []*avalanchecommon.Fx,
 	appSender avalanchecommon.AppSender,
 ) error {
-	vm.ctx = chainCtx
+	vm.Ctx = chainCtx
 
 	var extDataHashes map[common.Hash]common.Hash
 	// Set the chain config for mainnet/fuji chain IDs
@@ -189,7 +189,7 @@ func (vm *VM) Initialize(
 	var (
 		bonusBlockHeights map[uint64]ids.ID
 	)
-	if vm.ctx.NetworkID == constants.MainnetID {
+	if vm.Ctx.NetworkID == constants.MainnetID {
 		var err error
 		bonusBlockHeights, err = readMainnetBonusBlocks()
 		if err != nil {
@@ -207,7 +207,7 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("failed to create atomic repository: %w", err)
 	}
 	vm.AtomicBackend, err = atomicstate.NewAtomicBackend(
-		vm.ctx.SharedMemory, bonusBlockHeights,
+		vm.Ctx.SharedMemory, bonusBlockHeights,
 		vm.AtomicTxRepository, lastAcceptedHeight, lastAcceptedHash,
 		vm.InnerVM.Config().CommitInterval,
 	)
@@ -244,9 +244,7 @@ func (vm *VM) SetState(ctx context.Context, state snow.State) error {
 		}
 	}
 
-	// TODO: uncomment this once atomic VM fully wraps inner VM
-	// return vm.InnerVM.SetState(ctx, state)
-	return nil
+	return vm.InnerVM.SetState(ctx, state)
 }
 
 func (vm *VM) onBootstrapStarted() error {
@@ -299,7 +297,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 	}
 
 	vm.atomicTxGossipHandler = gossip.NewTxGossipHandler[*atomic.Tx](
-		vm.ctx.Log,
+		vm.Ctx.Log,
 		&atomicTxGossipMarshaller,
 		vm.AtomicMempool,
 		atomicTxGossipMetrics,
@@ -314,7 +312,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 	}
 
 	atomicTxPullGossiper := avalanchegossip.NewPullGossiper[*atomic.Tx](
-		vm.ctx.Log,
+		vm.Ctx.Log,
 		&atomicTxGossipMarshaller,
 		vm.AtomicMempool,
 		atomicTxGossipClient,
@@ -324,19 +322,19 @@ func (vm *VM) onNormalOperationsStarted() error {
 
 	vm.AtomicTxPullGossiper = &avalanchegossip.ValidatorGossiper{
 		Gossiper:   atomicTxPullGossiper,
-		NodeID:     vm.ctx.NodeID,
+		NodeID:     vm.Ctx.NodeID,
 		Validators: vm.InnerVM.P2PValidators(),
 	}
 
 	vm.shutdownWg.Add(1)
 	go func() {
-		avalanchegossip.Every(ctx, vm.ctx.Log, vm.AtomicTxPushGossiper, vm.InnerVM.Config().PushGossipFrequency.Duration)
+		avalanchegossip.Every(ctx, vm.Ctx.Log, vm.AtomicTxPushGossiper, vm.InnerVM.Config().PushGossipFrequency.Duration)
 		vm.shutdownWg.Done()
 	}()
 
 	vm.shutdownWg.Add(1)
 	go func() {
-		avalanchegossip.Every(ctx, vm.ctx.Log, vm.AtomicTxPullGossiper, vm.InnerVM.Config().PullGossipFrequency.Duration)
+		avalanchegossip.Every(ctx, vm.Ctx.Log, vm.AtomicTxPullGossiper, vm.InnerVM.Config().PullGossipFrequency.Duration)
 		vm.shutdownWg.Done()
 	}()
 
@@ -344,7 +342,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 }
 
 func (vm *VM) Shutdown(context.Context) error {
-	if vm.ctx == nil {
+	if vm.Ctx == nil {
 		return nil
 	}
 	if vm.cancel != nil {
@@ -358,12 +356,10 @@ func (vm *VM) Shutdown(context.Context) error {
 }
 
 func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
-	// TODO: uncomment this once atomic VM fully wraps inner VM
-	// apis, err := vm.InnerVM.CreateHandlers(ctx)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	apis := make(map[string]http.Handler)
+	apis, err := vm.InnerVM.CreateHandlers(ctx)
+	if err != nil {
+		return nil, err
+	}
 	avaxAPI, err := rpc.NewHandler("avax", &AvaxAPI{vm})
 	if err != nil {
 		return nil, fmt.Errorf("failed to register service for AVAX API due to %w", err)
@@ -422,23 +418,11 @@ func (vm *VM) verifyTx(tx *atomic.Tx, parentHash common.Hash, baseFee *big.Int, 
 	if err != nil {
 		return fmt.Errorf("failed to get parent block: %w", err)
 	}
-	atomicBackend := &VerifierBackend{
-		Ctx:          vm.ctx,
-		Fx:           &vm.Fx,
-		Rules:        rules,
-		Bootstrapped: vm.bootstrapped.Get(),
-		BlockFetcher: vm,
-		SecpCache:    vm.SecpCache,
-	}
-	if err := tx.UnsignedAtomicTx.Visit(&SemanticVerifier{
-		Backend: atomicBackend,
-		Tx:      tx,
-		Parent:  parent,
-		BaseFee: baseFee,
-	}); err != nil {
+	verifierBackend := NewVerifierBackend(vm, rules)
+	if err := verifierBackend.SemanticVerify(tx, parent, baseFee); err != nil {
 		return err
 	}
-	return tx.UnsignedAtomicTx.EVMStateTransfer(vm.ctx, state)
+	return tx.UnsignedAtomicTx.EVMStateTransfer(vm.Ctx, state)
 }
 
 // verifyTxs verifies that [txs] are valid to be issued into a block with parent block [parentHash]
@@ -462,23 +446,11 @@ func (vm *VM) verifyTxs(txs []*atomic.Tx, parentHash common.Hash, baseFee *big.I
 	// Ensure each tx in [txs] doesn't conflict with any other atomic tx in
 	// a processing ancestor block.
 	inputs := set.Set[ids.ID]{}
-	atomicBackend := &VerifierBackend{
-		Ctx:          vm.ctx,
-		Fx:           &vm.Fx,
-		Rules:        rules,
-		Bootstrapped: vm.bootstrapped.Get(),
-		BlockFetcher: vm,
-		SecpCache:    vm.SecpCache,
-	}
+	verifierBackend := NewVerifierBackend(vm, rules)
 
 	for _, atomicTx := range txs {
 		utx := atomicTx.UnsignedAtomicTx
-		if err := utx.Visit(&SemanticVerifier{
-			Backend: atomicBackend,
-			Tx:      atomicTx,
-			Parent:  ancestor,
-			BaseFee: baseFee,
-		}); err != nil {
+		if err := verifierBackend.SemanticVerify(atomicTx, ancestor, baseFee); err != nil {
 			return fmt.Errorf("invalid block due to failed semantic verify: %w at height %d", err, height)
 		}
 		txInputs := utx.InputUTXOs()
@@ -497,7 +469,7 @@ func (vm *VM) CodecRegistry() codec.Registry { return vm.baseCodec }
 func (vm *VM) Clock() *mockable.Clock { return &vm.clock }
 
 // Logger implements the secp256k1fx interface
-func (vm *VM) Logger() logging.Logger { return vm.ctx.Log }
+func (vm *VM) Logger() logging.Logger { return vm.Ctx.Log }
 
 func (vm *VM) createConsensusCallbacks() dummy.ConsensusCallbacks {
 	return dummy.ConsensusCallbacks{
@@ -536,7 +508,7 @@ func (vm *VM) preBatchOnFinalizeAndAssemble(header *types.Header, state *state.S
 		}
 		var contribution, gasUsed *big.Int
 		if rules.IsApricotPhase4 {
-			contribution, gasUsed, err = tx.BlockFeeContribution(rules.IsApricotPhase5, vm.ctx.AVAXAssetID, header.BaseFee)
+			contribution, gasUsed, err = tx.BlockFeeContribution(rules.IsApricotPhase5, vm.Ctx.AVAXAssetID, header.BaseFee)
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -594,7 +566,7 @@ func (vm *VM) postBatchOnFinalizeAndAssemble(
 		// Note: we do not need to check if we are in at least ApricotPhase4 here because
 		// we assume that this function will only be called when the block is in at least
 		// ApricotPhase5.
-		txContribution, txGasUsed, err = tx.BlockFeeContribution(true, vm.ctx.AVAXAssetID, header.BaseFee)
+		txContribution, txGasUsed, err = tx.BlockFeeContribution(true, vm.Ctx.AVAXAssetID, header.BaseFee)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -717,12 +689,12 @@ func (vm *VM) onExtraStateChange(block *types.Block, parent *types.Header, state
 	}
 
 	for _, tx := range txs {
-		if err := tx.UnsignedAtomicTx.EVMStateTransfer(vm.ctx, state); err != nil {
+		if err := tx.UnsignedAtomicTx.EVMStateTransfer(vm.Ctx, state); err != nil {
 			return nil, nil, err
 		}
 		// If ApricotPhase4 is enabled, calculate the block fee contribution
 		if rulesExtra.IsApricotPhase4 {
-			contribution, gasUsed, err := tx.BlockFeeContribution(rulesExtra.IsApricotPhase5, vm.ctx.AVAXAssetID, block.BaseFee())
+			contribution, gasUsed, err := tx.BlockFeeContribution(rulesExtra.IsApricotPhase5, vm.Ctx.AVAXAssetID, block.BaseFee())
 			if err != nil {
 				return nil, nil, err
 			}
@@ -780,8 +752,8 @@ func (vm *VM) rules(number *big.Int, time uint64) extras.Rules {
 	return *params.GetRulesExtra(ethrules)
 }
 
-// currentRules returns the chain rules for the current block.
-func (vm *VM) currentRules() extras.Rules {
+// CurrentRules returns the chain rules for the current block.
+func (vm *VM) CurrentRules() extras.Rules {
 	header := vm.InnerVM.Blockchain().CurrentHeader()
 	return vm.rules(header.Number, header.Time)
 }
@@ -818,12 +790,12 @@ func (vm *VM) NewImportTx(
 		kc.Add(key)
 	}
 
-	atomicUTXOs, _, _, err := avax.GetAtomicUTXOs(vm.ctx.SharedMemory, atomic.Codec, chainID, kc.Addresses(), ids.ShortEmpty, ids.Empty, maxUTXOsToFetch)
+	atomicUTXOs, _, _, err := avax.GetAtomicUTXOs(vm.Ctx.SharedMemory, atomic.Codec, chainID, kc.Addresses(), ids.ShortEmpty, ids.Empty, maxUTXOsToFetch)
 	if err != nil {
 		return nil, fmt.Errorf("problem retrieving atomic UTXOs: %w", err)
 	}
 
-	return atomic.NewImportTx(vm.ctx, vm.currentRules(), vm.clock.Unix(), chainID, to, baseFee, kc, atomicUTXOs)
+	return atomic.NewImportTx(vm.Ctx, vm.CurrentRules(), vm.clock.Unix(), chainID, to, baseFee, kc, atomicUTXOs)
 }
 
 // newExportTx returns a new ExportTx
@@ -842,8 +814,8 @@ func (vm *VM) NewExportTx(
 
 	// Create the transaction
 	tx, err := atomic.NewExportTx(
-		vm.ctx,            // Context
-		vm.currentRules(), // VM rules
+		vm.Ctx,            // Context
+		vm.CurrentRules(), // VM rules
 		state,
 		assetID, // AssetID
 		amount,  // Amount

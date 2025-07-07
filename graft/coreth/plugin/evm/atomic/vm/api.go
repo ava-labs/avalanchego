@@ -41,7 +41,7 @@ type VersionReply struct {
 
 // ClientVersion returns the version of the VM running
 func (service *AvaxAPI) Version(r *http.Request, _ *struct{}, reply *VersionReply) error {
-	version, err := service.vm.Version(context.Background())
+	version, err := service.vm.InnerVM.Version(context.Background())
 	if err != nil {
 		return err
 	}
@@ -64,14 +64,14 @@ func (service *AvaxAPI) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply 
 		return errNoSourceChain
 	}
 
-	sourceChainID, err := service.vm.ctx.BCLookup.Lookup(args.SourceChain)
+	sourceChainID, err := service.vm.Ctx.BCLookup.Lookup(args.SourceChain)
 	if err != nil {
 		return fmt.Errorf("problem parsing source chainID %q: %w", args.SourceChain, err)
 	}
 
 	addrSet := set.Set[ids.ShortID]{}
 	for _, addrStr := range args.Addresses {
-		addr, err := ParseServiceAddress(service.vm.ctx, addrStr)
+		addr, err := ParseServiceAddress(service.vm.Ctx, addrStr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse address %q: %w", addrStr, err)
 		}
@@ -81,7 +81,7 @@ func (service *AvaxAPI) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply 
 	startAddr := ids.ShortEmpty
 	startUTXO := ids.Empty
 	if args.StartIndex.Address != "" || args.StartIndex.UTXO != "" {
-		startAddr, err = ParseServiceAddress(service.vm.ctx, args.StartIndex.Address)
+		startAddr, err = ParseServiceAddress(service.vm.Ctx, args.StartIndex.Address)
 		if err != nil {
 			return fmt.Errorf("couldn't parse start index address %q: %w", args.StartIndex.Address, err)
 		}
@@ -91,8 +91,8 @@ func (service *AvaxAPI) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply 
 		}
 	}
 
-	service.vm.ctx.Lock.Lock()
-	defer service.vm.ctx.Lock.Unlock()
+	service.vm.Ctx.Lock.Lock()
+	defer service.vm.Ctx.Lock.Unlock()
 
 	limit := int(args.Limit)
 
@@ -101,7 +101,7 @@ func (service *AvaxAPI) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply 
 	}
 
 	utxos, endAddr, endUTXOID, err := avax.GetAtomicUTXOs(
-		service.vm.ctx.SharedMemory,
+		service.vm.Ctx.SharedMemory,
 		atomic.Codec,
 		sourceChainID,
 		addrSet,
@@ -126,7 +126,7 @@ func (service *AvaxAPI) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply 
 		reply.UTXOs[i] = str
 	}
 
-	endAddress, err := FormatLocalAddress(service.vm.ctx, endAddr)
+	endAddress, err := FormatLocalAddress(service.vm.Ctx, endAddr)
 	if err != nil {
 		return fmt.Errorf("problem formatting address: %w", err)
 	}
@@ -156,8 +156,8 @@ func (service *AvaxAPI) IssueTx(r *http.Request, args *api.FormattedTx, response
 
 	response.TxID = tx.ID()
 
-	service.vm.ctx.Lock.Lock()
-	defer service.vm.ctx.Lock.Unlock()
+	service.vm.Ctx.Lock.Lock()
+	defer service.vm.Ctx.Lock.Unlock()
 
 	if err := service.vm.AtomicMempool.AddLocalTx(tx); err != nil {
 		return err
@@ -174,8 +174,8 @@ func (service *AvaxAPI) GetAtomicTxStatus(r *http.Request, args *api.JSONTxID, r
 		return errNilTxID
 	}
 
-	service.vm.ctx.Lock.Lock()
-	defer service.vm.ctx.Lock.Unlock()
+	service.vm.Ctx.Lock.Lock()
+	defer service.vm.Ctx.Lock.Unlock()
 
 	_, status, height, _ := service.vm.GetAtomicTx(args.TxID)
 
@@ -209,8 +209,8 @@ func (service *AvaxAPI) GetAtomicTx(r *http.Request, args *api.GetTxArgs, reply 
 		return errNilTxID
 	}
 
-	service.vm.ctx.Lock.Lock()
-	defer service.vm.ctx.Lock.Unlock()
+	service.vm.Ctx.Lock.Lock()
+	defer service.vm.Ctx.Lock.Unlock()
 
 	tx, status, height, err := service.vm.GetAtomicTx(args.TxID)
 	if err != nil {

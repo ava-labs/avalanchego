@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/coreth/eth/tracers"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/params/extras"
+	atomicvm "github.com/ava-labs/coreth/plugin/evm/atomic/vm"
 	"github.com/ava-labs/coreth/plugin/evm/extension"
 	customheader "github.com/ava-labs/coreth/plugin/evm/header"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap0"
@@ -851,7 +852,8 @@ func TestSignatureRequestsToVM(t *testing.T) {
 
 func TestClearWarpDB(t *testing.T) {
 	ctx, db, genesisBytes, issuer, _ := setupGenesis(t, upgradetest.Latest)
-	vm := &VM{}
+	innerVM := &VM{}
+	vm := atomicvm.WrapVM(innerVM)
 	require.NoError(t, vm.Initialize(
 		context.Background(),
 		ctx,
@@ -869,11 +871,11 @@ func TestClearWarpDB(t *testing.T) {
 
 	// add all messages
 	for _, payload := range payloads {
-		unsignedMsg, err := avalancheWarp.NewUnsignedMessage(vm.ctx.NetworkID, vm.ctx.ChainID, payload)
+		unsignedMsg, err := avalancheWarp.NewUnsignedMessage(vm.Ctx.NetworkID, vm.Ctx.ChainID, payload)
 		require.NoError(t, err)
-		require.NoError(t, vm.warpBackend.AddMessage(unsignedMsg))
+		require.NoError(t, innerVM.warpBackend.AddMessage(unsignedMsg))
 		// ensure that the message was added
-		_, err = vm.warpBackend.GetMessageSignature(context.TODO(), unsignedMsg)
+		_, err = innerVM.warpBackend.GetMessageSignature(context.TODO(), unsignedMsg)
 		require.NoError(t, err)
 		messages = append(messages, unsignedMsg)
 	}
@@ -881,7 +883,8 @@ func TestClearWarpDB(t *testing.T) {
 	require.NoError(t, vm.Shutdown(context.Background()))
 
 	// Restart VM with the same database default should not prune the warp db
-	vm = &VM{}
+	innerVM = &VM{}
+	vm = atomicvm.WrapVM(innerVM)
 	// we need new context since the previous one has registered metrics.
 	ctx, _, _, _, _ = setupGenesis(t, upgradetest.Latest)
 	require.NoError(t, vm.Initialize(
@@ -897,7 +900,7 @@ func TestClearWarpDB(t *testing.T) {
 
 	// check messages are still present
 	for _, message := range messages {
-		bytes, err := vm.warpBackend.GetMessageSignature(context.TODO(), message)
+		bytes, err := innerVM.warpBackend.GetMessageSignature(context.TODO(), message)
 		require.NoError(t, err)
 		require.NotEmpty(t, bytes)
 	}
@@ -905,7 +908,8 @@ func TestClearWarpDB(t *testing.T) {
 	require.NoError(t, vm.Shutdown(context.Background()))
 
 	// restart the VM with pruning enabled
-	vm = &VM{}
+	innerVM = &VM{}
+	vm = atomicvm.WrapVM(innerVM)
 	config := `{"prune-warp-db-enabled": true}`
 	ctx, _, _, _, _ = setupGenesis(t, upgradetest.Latest)
 	require.NoError(t, vm.Initialize(
@@ -919,13 +923,13 @@ func TestClearWarpDB(t *testing.T) {
 		[]*commonEng.Fx{},
 		&enginetest.Sender{}))
 
-	it := vm.warpDB.NewIterator()
+	it := innerVM.warpDB.NewIterator()
 	require.False(t, it.Next())
 	it.Release()
 
 	// ensure all messages have been deleted
 	for _, message := range messages {
-		_, err := vm.warpBackend.GetMessageSignature(context.TODO(), message)
+		_, err := innerVM.warpBackend.GetMessageSignature(context.TODO(), message)
 		require.ErrorIs(t, err, &commonEng.AppError{Code: warp.ParseErrCode})
 	}
 }

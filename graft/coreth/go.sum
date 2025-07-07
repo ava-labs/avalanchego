@@ -48,6 +48,8 @@ github.com/DataDog/zstd v1.5.2/go.mod h1:g4AWEaM3yOg3HYfnJ3YIawPnVdXJh9QME85blwS
 github.com/Joker/hpp v1.0.0/go.mod h1:8x5n+M1Hp5hC0g8okX3sR3vFQwynaX/UgSOM9MeBKzY=
 github.com/Microsoft/go-winio v0.6.1 h1:9/kr64B9VUZrLm5YYwbGtUJnMgqWVOdUAXu6Migciow=
 github.com/Microsoft/go-winio v0.6.1/go.mod h1:LRdKpFKfdobln8UmuiYcKPot9D2v6svN5+sAH+4kjUM=
+github.com/NYTimes/gziphandler v1.1.1 h1:ZUDjpQae29j0ryrS0u/B8HZfJBtBQHjqw2rQ2cqUQ3I=
+github.com/NYTimes/gziphandler v1.1.1/go.mod h1:n/CVRwUEOgIxrgPvAQhUUr9oeUtvrhMomdKFjzJNB0c=
 github.com/Shopify/goreferrer v0.0.0-20181106222321-ec9c9a553398/go.mod h1:a1uqRtAwp2Xwc6WNPJEufxJ7fx3npB4UV/JOLmbu5I0=
 github.com/StephenButtolph/canoto v0.15.0 h1:3iGdyTSQZ7/y09WaJCe0O/HIi53ZyTrnmVzfCqt64mM=
 github.com/StephenButtolph/canoto v0.15.0/go.mod h1:IcnAHC6nJUfQFVR9y60ko2ecUqqHHSB6UwI9NnBFZnE=
@@ -60,8 +62,8 @@ github.com/allegro/bigcache v1.2.1-0.20190218064605-e24eb225f156/go.mod h1:Cb/ax
 github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6/go.mod h1:grANhF5doyWs3UAsr3K4I6qtAmlQcZDesFNEHPZAzj8=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPdPJAN/hZIm0C4OItdklCFmMRWYpio=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
-github.com/ava-labs/avalanchego v1.13.2-0.20250611151756-1a40195dc447 h1:ZMuCKMeb47pQujFVgCJNgbYxqvml7nLC0CHJ4mQPXvY=
-github.com/ava-labs/avalanchego v1.13.2-0.20250611151756-1a40195dc447/go.mod h1:mTa01sHk2kpDh73GP7v06vhJ9+udQ6vw4ffdlX9khUM=
+github.com/ava-labs/avalanchego v1.13.1-rc.4.0.20250531182522-ce450499b7d7 h1:lVAwojBM/msstF2cYiP7X/dO6qdo8nurJInuqByVH/4=
+github.com/ava-labs/avalanchego v1.13.1-rc.4.0.20250531182522-ce450499b7d7/go.mod h1:hrw1E2ZvgcOMU08qxFg7YAC+k/o1G7AjioiDq8DCTCY=
 github.com/ava-labs/libevm v1.13.14-0.3.0.rc.1 h1:vBMYo+Iazw0rGTr+cwjkBdh5eadLPlv4ywI4lKye3CA=
 github.com/ava-labs/libevm v1.13.14-0.3.0.rc.1/go.mod h1:+Iol+sVQ1KyoBsHf3veyrBmHCXr3xXRWq6ZXkgVfNLU=
 github.com/aymerick/raymond v2.0.3-0.20180322193309-b565731e1464+incompatible/go.mod h1:osfaiScAUVup+UC9Nfq76eWqDhXlp+4UYaA8uhTBO6g=

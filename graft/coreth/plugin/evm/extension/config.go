@@ -35,6 +35,7 @@ var (
 	errNilConfig              = errors.New("nil extension config")
 	errNilSyncSummaryProvider = errors.New("nil sync summary provider")
 	errNilSyncableParser      = errors.New("nil syncable parser")
+	errNilClock               = errors.New("nil clock")
 )
 
 type ExtensibleVM interface {
@@ -166,6 +167,9 @@ func (c *Config) Validate() error {
 	}
 	if c.SyncableParser == nil {
 		return errNilSyncableParser
+	}
+	if c.Clock == nil {
+		return errNilClock
 	}
 	return nil
 }

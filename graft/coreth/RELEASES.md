@@ -4,6 +4,7 @@
 
 - Removed legacy warp message handlers in favor of ACP-118 SDK handlers.
 - Use `state-history` eth config flag to designate the number of recent states queryable.
+- Moves atomic operations from plugin/evm to plugin/evm/atomic and wraps the plugin/evm/VM in `atomicvm` to separate the atomic operations from the EVM execution.
 
 ## [v0.15.1](https://github.com/ava-labs/coreth/releases/tag/v0.15.1)
 

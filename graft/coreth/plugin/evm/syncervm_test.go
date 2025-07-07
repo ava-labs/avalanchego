@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/coreth/plugin/evm/atomic/atomictest"
+	atomicvm "github.com/ava-labs/coreth/plugin/evm/atomic/vm"
 	"github.com/ava-labs/coreth/plugin/evm/customrawdb"
 	"github.com/ava-labs/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/coreth/plugin/evm/database"
@@ -128,7 +129,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 	test.responseIntercept = nil
 	test.expectedErr = nil
 
-	syncDisabledVM := &VM{}
+	syncDisabledVM := atomicvm.WrapVM(&VM{})
 	appSender := &enginetest.Sender{T: t}
 	appSender.SendAppGossipF = func(context.Context, commonEng.SendConfig, []byte) error { return nil }
 	appSender.SendAppRequestF = func(ctx context.Context, nodeSet set.Set[ids.NodeID], requestID uint32, request []byte) error {
@@ -163,11 +164,11 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 		}
 	}()
 
-	if height := syncDisabledVM.LastAcceptedBlockInternal().Height(); height != 0 {
+	if height := syncDisabledVM.LastAcceptedExtendedBlock().Height(); height != 0 {
 		t.Fatalf("Unexpected last accepted height: %d", height)
 	}
 
-	enabled, err := syncDisabledVM.Client.StateSyncEnabled(context.Background())
+	enabled, err := syncDisabledVM.StateSyncEnabled(context.Background())
 	assert.NoError(t, err)
 	assert.False(t, enabled, "sync should be disabled")
 
@@ -193,14 +194,15 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 		}
 	}
 	// Verify the snapshot disk layer matches the last block root
-	lastRoot := syncDisabledVM.blockChain.CurrentBlock().Root
-	if err := syncDisabledVM.blockChain.Snapshots().Verify(lastRoot); err != nil {
+	lastRoot := syncDisabledVM.Blockchain().CurrentBlock().Root
+	if err := syncDisabledVM.Blockchain().Snapshots().Verify(lastRoot); err != nil {
 		t.Fatal(err)
 	}
-	syncDisabledVM.blockChain.DrainAcceptorQueue()
+	syncDisabledVM.Blockchain().DrainAcceptorQueue()
 
 	// Create a new VM from the same database with state sync enabled.
-	syncReEnabledVM := &VM{}
+	syncReEnabledInnerVM := &VM{}
+	syncReEnabledVM := atomicvm.WrapVM(syncReEnabledInnerVM)
 	// Enable state sync in configJSON
 	configJSON := fmt.Sprintf(
 		`{"state-sync-enabled":true, "state-sync-min-blocks":%d}`,
@@ -227,7 +229,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 		if test.responseIntercept == nil {
 			go syncReEnabledVM.AppResponse(ctx, nodeID, requestID, response)
 		} else {
-			go test.responseIntercept(syncReEnabledVM, nodeID, requestID, response)
+			go test.responseIntercept(syncReEnabledInnerVM, nodeID, requestID, response)
 		}
 
 		return nil
@@ -244,7 +246,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, enabled, "sync should be enabled")
 
-	vmSetup.syncerVM = syncReEnabledVM
+	vmSetup.syncerVM = syncReEnabledInnerVM
 	testSyncerVM(t, vmSetup, test)
 }
 
@@ -308,12 +310,12 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 		switch i {
 		case 0:
 			// spend the UTXOs from shared memory
-			importTx, err = server.vm.atomicVM.NewImportTx(server.vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
+			importTx, err = server.atomicVM.NewImportTx(server.vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 			require.NoError(err)
-			require.NoError(server.vm.atomicVM.AtomicMempool.AddLocalTx(importTx))
+			require.NoError(server.atomicVM.AtomicMempool.AddLocalTx(importTx))
 		case 1:
 			// export some of the imported UTXOs to test exportTx is properly synced
-			exportTx, err = server.vm.atomicVM.NewExportTx(
+			exportTx, err = server.atomicVM.NewExportTx(
 				server.vm.ctx.AVAXAssetID,
 				importAmount/2,
 				server.vm.ctx.XChainID,
@@ -322,7 +324,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 				[]*secp256k1.PrivateKey{testKeys[0]},
 			)
 			require.NoError(err)
-			require.NoError(server.vm.atomicVM.AtomicMempool.AddLocalTx(exportTx))
+			require.NoError(server.atomicVM.AtomicMempool.AddLocalTx(exportTx))
 		default: // Generate simple transfer transactions.
 			pk := testKeys[0].ToECDSA()
 			tx := types.NewTransaction(gen.TxNonce(testEthAddrs[0]), testEthAddrs[1], common.Big1, params.TxGas, initialBaseFee, nil)
@@ -335,7 +337,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 	// override serverAtomicTrie's commitInterval so the call to [serverAtomicTrie.Index]
 	// creates a commit at the height [syncableInterval]. This is necessary to support
 	// fetching a state summary.
-	serverAtomicTrie := server.vm.atomicVM.AtomicBackend.AtomicTrie()
+	serverAtomicTrie := server.atomicVM.AtomicBackend.AtomicTrie()
 	require.NoError(serverAtomicTrie.Commit(test.syncableInterval, serverAtomicTrie.LastAcceptedRoot()))
 	require.NoError(server.vm.versiondb.Commit())
 
