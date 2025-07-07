@@ -24,7 +24,7 @@ var (
 	_ simplex.Block             = (*Block)(nil)
 	_ simplex.VerifiedBlock     = (*Block)(nil)
 
-	errDigestNotFound = errors.New("digest not found in block tracker")
+	errDigestNotFound       = errors.New("digest not found in block tracker")
 	errMismatchedPrevDigest = errors.New("prev digest does not match block parent")
 )
 
@@ -92,7 +92,7 @@ func (b *Block) Verify(ctx context.Context) (simplex.VerifiedBlock, error) {
 func (b *Block) verifyParentMatchesPrevBlock(ctx context.Context) error {
 	prevBlock := b.blockTracker.getBlock(b.metadata.Prev)
 
-	if prevBlock!= nil && b.vmBlock.Parent() != prevBlock.vmBlock.ID() {
+	if prevBlock != nil && b.vmBlock.Parent() != prevBlock.vmBlock.ID() {
 		return fmt.Errorf("%w: parentID %s, prevID %s", errMismatchedPrevDigest, b.vmBlock.Parent(), prevBlock.vmBlock.ID())
 	}
 
@@ -156,8 +156,8 @@ type blockTracker struct {
 
 func newBlockTracker(vm block.ChainVM) *blockTracker {
 	return &blockTracker{
-		tree: 				tree.New(),
-		vm: 				vm,
+		tree:                  tree.New(),
+		vm:                    vm,
 		simplexDigestsToBlock: make(map[simplex.Digest]*Block),
 	}
 }
@@ -199,7 +199,5 @@ func (bt *blockTracker) indexBlock(ctx context.Context, digest simplex.Digest) e
 	}
 
 	// notify the VM that we are accepting this block, and reject all competing blocks
-	// one thing the tree doesnt do is reject uncles
 	return bt.tree.Accept(ctx, bd.vmBlock)
 }
-
