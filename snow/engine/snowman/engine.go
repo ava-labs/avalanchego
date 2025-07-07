@@ -450,7 +450,7 @@ func (e *Engine) Notify(ctx context.Context, msg common.Message) error {
 		e.Ctx.StateSyncing.Set(false)
 		return nil
 	default:
-		e.Ctx.Log.Warn("received an unexpected message from the VM",
+		e.Ctx.Log.Info("received an unexpected message from the VM",
 			zap.Stringer("messageString", msg),
 		)
 		return nil
