@@ -118,5 +118,8 @@ func (c DatabaseConfig) Validate() error {
 	if c.MaxDataFiles <= 0 {
 		return errors.New("MaxDataFiles must be positive")
 	}
+	if c.MaxDataFileSize == 0 {
+		return errors.New("MaxDataFileSize must be positive")
+	}
 	return nil
 }
