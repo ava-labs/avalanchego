@@ -6,7 +6,7 @@ package handler
 import (
 	"context"
 	"errors"
-	"sync"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"testing"
 	"time"
 
@@ -66,8 +66,12 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	)
 	require.NoError(err)
 
+	cn, subscription, _ := createSubscriberAndChangeNotifier()
+
 	handlerIntf, err := New(
 		ctx,
+		cn,
+		subscription,
 		vdrs,
 		time.Second,
 		testThreadPoolSize,
@@ -172,8 +176,15 @@ func TestHandlerClosesOnError(t *testing.T) {
 	)
 	require.NoError(err)
 
+	var cn block.ChangeNotifier
+	subscription := func(ctx context.Context) (common.Message, error) {
+		return common.PendingTxs, nil
+	}
+
 	handlerIntf, err := New(
 		ctx,
+		&cn,
+		subscription,
 		vdrs,
 		time.Second,
 		testThreadPoolSize,
@@ -274,8 +285,12 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	)
 	require.NoError(err)
 
+	cn, subscription, _ := createSubscriberAndChangeNotifier()
+
 	handlerIntf, err := New(
 		ctx,
+		cn,
+		subscription,
 		vdrs,
 		1,
 		testThreadPoolSize,
@@ -363,8 +378,13 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	)
 	require.NoError(err)
 
+	cn, subscription, messages := createSubscriberAndChangeNotifier()
+	notified := make(chan common.Message)
+
 	handler, err := New(
 		ctx,
+		cn,
+		subscription,
 		vdrs,
 		time.Second,
 		testThreadPoolSize,
@@ -390,10 +410,14 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		return ctx
 	}
 
-	wg := &sync.WaitGroup{}
-	engine.NotifyF = func(context.Context, common.Message) error {
-		wg.Done()
-		return nil
+	engine.NotifyF = func(ctx context.Context, msg common.Message) error {
+		select {
+		case notified <- msg:
+			notified <- msg
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 
 	handler.SetEngineManager(&EngineManager{
@@ -412,10 +436,14 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		return nil
 	}
 
-	wg.Add(1)
 	handler.Start(context.Background(), false)
-	require.NoError(handler.Notify(context.Background(), common.PendingTxs))
-	wg.Wait()
+	messages <- common.PendingTxs
+	select {
+	case msg := <-notified:
+		require.Equal(msg, common.PendingTxs)
+	case <-time.After(time.Minute):
+		require.FailNow("Handler did not dispatch expected message")
+	}
 }
 
 // Tests that messages are routed to the correct engine type
@@ -538,8 +566,12 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 			)
 			require.NoError(err)
 
+			cn, subscription, _ := createSubscriberAndChangeNotifier()
+
 			handler, err := New(
 				ctx,
+				cn,
+				subscription,
 				vdrs,
 				time.Second,
 				testThreadPoolSize,
@@ -620,8 +652,12 @@ func TestHandlerStartError(t *testing.T) {
 	)
 	require.NoError(err)
 
+	cn, subscription, _ := createSubscriberAndChangeNotifier()
+
 	handler, err := New(
 		ctx,
+		cn,
+		subscription,
 		validators.NewManager(),
 		time.Second,
 		testThreadPoolSize,
@@ -645,4 +681,21 @@ func TestHandlerStartError(t *testing.T) {
 
 	_, err = handler.AwaitStopped(context.Background())
 	require.NoError(err)
+}
+
+func createSubscriberAndChangeNotifier() (*block.ChangeNotifier, common.Subscription, chan<- common.Message) {
+	var cn block.ChangeNotifier
+
+	messages := make(chan common.Message, 1)
+
+	subscription := func(ctx context.Context) (common.Message, error) {
+		select {
+		case msg := <-messages:
+			return msg, nil
+		case <-ctx.Done():
+			return common.Message(0), ctx.Err()
+		}
+	}
+
+	return &cn, subscription, messages
 }
