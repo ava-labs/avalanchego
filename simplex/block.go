@@ -66,8 +66,7 @@ func (b *Block) Bytes() ([]byte, error) {
 	return cBlock.MarshalCanoto(), nil
 }
 
-// Verify calls the Verify method on the underlying vmBlock or returns an error if the block is not able to be verified.
-// We ensure `b.vmBlock.parent` references the same block as `b.metadata.prev.vmBlock` to keep the two hash chains in sync.
+// Verify verifies the block.
 func (b *Block) Verify(ctx context.Context) (simplex.VerifiedBlock, error) {
 	if b.metadata.Seq != 0 {
 		err := b.verifyParentMatchesPrevBlock(ctx)

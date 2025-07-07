@@ -233,54 +233,21 @@ func TestVerifyInnerBlockBreaksHashChain(t *testing.T) {
 			T: t,
 		},
 	}
+	testVM.LastAcceptedF = func(_ context.Context) (ids.ID, error) {
+		return snowmantest.Genesis.ID(), nil
+	}
 
 	tracker := newBlockTracker(testVM)
 	ctx := context.Background()
 	// We have a block whose metadata.prev does not point to their parent
 	seq1 := snowmantest.BuildChild(snowmantest.Genesis)
-
-	testVM.LastAcceptedF = func(_ context.Context) (ids.ID, error) {
-		return snowmantest.Genesis.ID(), nil
-	}
-
-	seq1Block := &Block{
-		vmBlock: seq1,
-		metadata: simplex.ProtocolMetadata{
-			Version: 1,
-			Epoch:   1,
-			Round:   1,
-			Seq:     1,
-		},
-		blockTracker: tracker,
-	}
-
-	seq1Bytes, err := seq1Block.Bytes()
-	require.NoError(t, err)
-	seq1Digest := computeDigest(seq1Bytes)
-	seq1Block.digest = seq1Digest
-
-	_, err = seq1Block.Verify(ctx)
+	seq1Block := newBlockWithDigest(t, seq1, tracker, 1, 1, [32]byte{})
+	_, err := seq1Block.Verify(ctx)
 	require.NoError(t, err)
 
-	// This block does not extend seq1
+	// This block does not extend seq1, however it has a valid previous digest
 	seq2 := snowmantest.BuildChild(snowmantest.Genesis)
-	seq2Block := &Block{
-		vmBlock: seq2,
-		metadata: simplex.ProtocolMetadata{
-			Version: 1,
-			Epoch:   1,
-			Round:   2,
-			Seq:     2,
-			Prev:    seq1Digest, // however it has a valid prev digest
-		},
-		blockTracker: tracker,
-	}
-
-	seq2Bytes, err := seq2Block.Bytes()
-	require.NoError(t, err)
-	seq2Digest := computeDigest(seq2Bytes)
-	seq2Block.digest = seq2Digest
-
+	seq2Block := newBlockWithDigest(t, seq2, tracker, 2, 2, seq1Block.digest)
 	_, err = seq2Block.Verify(ctx)
 	require.ErrorIs(t, err, errMismatchedPrevDigest)
 }
