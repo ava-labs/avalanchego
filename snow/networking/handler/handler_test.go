@@ -6,7 +6,6 @@ package handler
 import (
 	"context"
 	"errors"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"testing"
 	"time"
 
@@ -19,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -177,7 +177,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	require.NoError(err)
 
 	var cn block.ChangeNotifier
-	subscription := func(ctx context.Context) (common.Message, error) {
+	subscription := func(context.Context) (common.Message, error) {
 		return common.PendingTxs, nil
 	}
 
@@ -440,7 +440,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	messages <- common.PendingTxs
 	select {
 	case msg := <-notified:
-		require.Equal(msg, common.PendingTxs)
+		require.Equal(common.PendingTxs, msg)
 	case <-time.After(time.Minute):
 		require.FailNow("Handler did not dispatch expected message")
 	}

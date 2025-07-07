@@ -6,7 +6,6 @@ package sender_test
 import (
 	"context"
 	"fmt"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"math/rand"
 	"sync"
 	"testing"
@@ -23,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -1323,10 +1323,8 @@ func createSubscriberAndChangeNotifier() (*block.ChangeNotifier, common.Subscrip
 	var cn block.ChangeNotifier
 
 	subscription := func(ctx context.Context) (common.Message, error) {
-		select {
-		case <-ctx.Done():
-			return common.Message(0), ctx.Err()
-		}
+		<-ctx.Done()
+		return common.Message(0), ctx.Err()
 	}
 
 	return &cn, subscription
