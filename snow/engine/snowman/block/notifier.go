@@ -31,6 +31,9 @@ type ChangeNotifier struct {
 	// This is needed in case a block has been accepted that changes when a VM considers the need to build a block.
 	// In order for the subscription to be correlated to the latest data, it needs to be retried.
 	OnChange func()
+	// lastPref is the last block ID that was set as preferred via SetPreference.
+	lastPref ids.ID
+	invoked  bool
 }
 
 func (cn *ChangeNotifier) GetAncestors(ctx context.Context, blkID ids.ID, maxBlocksNum int, maxBlocksSize int, maxBlocksRetrivalTime time.Duration) ([][]byte, error) {
@@ -83,7 +86,13 @@ func (cn *ChangeNotifier) GetStateSummary(ctx context.Context, summaryHeight uin
 }
 
 func (cn *ChangeNotifier) SetPreference(ctx context.Context, blkID ids.ID) error {
-	defer cn.OnChange()
+	// Only call OnChange if the preference has changed.
+	if !cn.invoked || cn.lastPref != blkID {
+		cn.lastPref = blkID
+		cn.invoked = true
+		defer cn.OnChange()
+	}
+
 	return cn.ChainVM.SetPreference(ctx, blkID)
 }
 
