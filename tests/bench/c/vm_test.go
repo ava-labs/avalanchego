@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
@@ -183,7 +182,6 @@ func newMainnetCChainVM(
 		[]byte(genesisConfig.CChainGenesis),
 		nil,
 		configBytes,
-		make(chan common.Message, 1),
 		nil,
 		&enginetest.Sender{},
 	); err != nil {
