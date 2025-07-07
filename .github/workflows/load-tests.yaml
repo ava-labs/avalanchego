@@ -12,7 +12,7 @@ on:
 
 jobs:
   load_tests:
-    name: Run load test on platform-chaos-k8s
+    name: Run load test on self-hosted runners
     runs-on: avalanche-avalanchego-runner
     container:
       image: ghcr.io/actions/actions-runner:@sha256-deb54a88ead0a86beedec6ac949e8b28f77478835b9c6434ccc237390a6e3e4f # v2.325.0
