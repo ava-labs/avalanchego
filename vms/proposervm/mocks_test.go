@@ -199,6 +199,36 @@ func (mr *MockPostForkBlockMockRecorder) buildChild(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "buildChild", reflect.TypeOf((*MockPostForkBlock)(nil).buildChild), arg0)
 }
 
+// epochNumber mocks base method.
+func (m *MockPostForkBlock) epochNumber(arg0 context.Context) (uint64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "epochNumber", arg0)
+	ret0, _ := ret[0].(uint64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// epochNumber indicates an expected call of epochNumber.
+func (mr *MockPostForkBlockMockRecorder) epochNumber(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "epochNumber", reflect.TypeOf((*MockPostForkBlock)(nil).epochNumber), arg0)
+}
+
+// epochStartTime mocks base method.
+func (m *MockPostForkBlock) epochStartTime(arg0 context.Context) (time.Time, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "epochStartTime", arg0)
+	ret0, _ := ret[0].(time.Time)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// epochStartTime indicates an expected call of epochStartTime.
+func (mr *MockPostForkBlockMockRecorder) epochStartTime(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "epochStartTime", reflect.TypeOf((*MockPostForkBlock)(nil).epochStartTime), arg0)
+}
+
 // getInnerBlk mocks base method.
 func (m *MockPostForkBlock) getInnerBlk() snowman.Block {
 	m.ctrl.T.Helper()
