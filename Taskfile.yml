@@ -241,11 +241,9 @@ tasks:
 
   test-load-kube:
     desc: Runs load tests against a kubernetes cluster
-    vars:
-      KUBE_IMAGE: '{{.KUBE_IMAGE | default "avaplatform/avalanchego:latest"}}'
     cmds:
       - task: generate-load-contract-bindings
-      - cmd: go run ./tests/load/c/main --runtime=kube --kube-image={{.KUBE_IMAGE}} {{.CLI_ARGS}}
+      - cmd: go run ./tests/load/c/main --runtime=kube {{.CLI_ARGS}}
 
   test-load2:
     desc: Runs second iteration of load tests
