@@ -251,6 +251,9 @@ func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 		return
 	}
 
+	h.nf = common.NewNotificationForwarder(h, h.subscription, h.ctx.Log)
+	h.cn.OnChange = h.nf.CheckForEvent
+
 	h.ctx.Lock.Lock()
 	err = gear.Start(ctx, 0)
 	h.ctx.Lock.Unlock()
@@ -261,9 +264,6 @@ func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 		h.shutdown(ctx, h.clock.Time())
 		return
 	}
-
-	h.nf = common.NewNotificationForwarder(h, h.subscription, h.ctx.Log)
-	h.cn.OnChange = h.nf.CheckForEvent
 
 	detachedCtx := context.WithoutCancel(ctx)
 	dispatchSync := func() {
