@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
+	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
@@ -1542,4 +1543,63 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *enginetest.Engine) {
 	})
 
 	return chainRouter, engine
+}
+
+// Tests that HandleInbound correctly handles Simplex Messages
+func TestHandleSimplexMessage(t *testing.T) {
+	chainRouter := ChainRouter{}
+	log := tests.NewDefaultLogger("test")
+	log.SetLevel(logging.Debug)
+	require.NoError(t,
+		chainRouter.Initialize(
+			ids.EmptyNodeID,
+			log,
+			nil,
+			time.Second,
+			set.Set[ids.ID]{},
+			true,
+			set.Set[ids.ID]{},
+			nil,
+			HealthConfig{},
+			prometheus.NewRegistry(),
+		))
+	defer chainRouter.Shutdown(context.Background())
+
+	chainRouter.log = log
+	testID := ids.GenerateTestID()
+
+	msg := &p2ppb.Simplex{
+		Message: &p2ppb.Simplex_ReplicationRequest{
+			ReplicationRequest: &p2ppb.ReplicationRequest{
+				Seqs:        []uint64{1, 2, 3},
+				LatestRound: 1,
+			},
+		},
+		ChainId: testID[:],
+	}
+
+	inboundMsg := message.InboundSimplexMessage(ids.NodeID{}, msg)
+
+	ctrl := gomock.NewController(t)
+	h := handlermock.NewHandler(ctrl)
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
+	ctx.ChainID = testID
+	h.EXPECT().Context().Return(ctx).AnyTimes()
+	h.EXPECT().SetOnStopped(gomock.Any()).AnyTimes()
+	h.EXPECT().Stop(gomock.Any()).AnyTimes()
+	h.EXPECT().AwaitStopped(gomock.Any()).AnyTimes()
+
+	var receivedMsg bool
+	h.EXPECT().Push(gomock.Any(), gomock.Any()).
+		Do(func(_ context.Context, msg message.InboundMessage) {
+			if msg.Op() == message.SimplexOp {
+				receivedMsg = true
+			}
+		}).AnyTimes()
+
+	chainRouter.AddChain(context.Background(), h)
+	h.EXPECT().ShouldHandle(gomock.Any()).Return(true).Times(1)
+	chainRouter.HandleInbound(context.Background(), inboundMsg)
+	require.True(t, receivedMsg)
 }

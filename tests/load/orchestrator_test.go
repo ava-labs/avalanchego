@@ -61,8 +61,10 @@ func TestOrchestratorTPS(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			tracker, err := NewTracker[ids.ID](prometheus.NewRegistry())
+			m, err := NewMetrics(prometheus.NewRegistry())
 			r.NoError(err)
+
+			tracker := NewTracker[ids.ID](m)
 
 			agents := []Agent[ids.ID]{
 				NewAgent(
@@ -102,8 +104,9 @@ func TestOrchestratorExecution(t *testing.T) {
 		errMockIssuer      = errors.New("mock issuer error")
 	)
 
-	tracker, err := NewTracker[ids.ID](prometheus.NewRegistry())
-	require.NoError(t, err, "creating tracker")
+	m, err := NewMetrics(prometheus.NewRegistry())
+	require.NoError(t, err, "creating metrics")
+	tracker := NewTracker[ids.ID](m)
 
 	tests := []struct {
 		name        string

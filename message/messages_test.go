@@ -629,6 +629,26 @@ func TestMessage(t *testing.T) {
 			bypassThrottling: true,
 			bytesSaved:       true,
 		},
+		{
+			desc: "simplex message with no compression",
+			op:   SimplexOp,
+			msg: &p2p.Message{
+				Message: &p2p.Message_Simplex{
+					Simplex: &p2p.Simplex{
+						ChainId: testID[:],
+						Message: &p2p.Simplex_ReplicationRequest{
+							ReplicationRequest: &p2p.ReplicationRequest{
+								Seqs:        []uint64{1, 2, 3},
+								LatestRound: 1,
+							},
+						},
+					},
+				},
+			},
+			compressionType:  compression.TypeNone,
+			bypassThrottling: true,
+			bytesSaved:       false,
+		},
 	}
 
 	for _, tv := range tests {

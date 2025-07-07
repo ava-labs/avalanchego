@@ -57,6 +57,9 @@ const (
 
 	// eth address: 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
 	HardHatKeyStr = "56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027"
+
+	// grafanaURI is remote Grafana URI
+	grafanaURI = "grafana-poc.avax-dev.network"
 )
 
 var (
@@ -542,7 +545,7 @@ func (n *Network) Restart(ctx context.Context) error {
 	if err := restartNodes(ctx, nodes); err != nil {
 		return err
 	}
-	return WaitForHealthyNodes(ctx, n.log, n.Nodes)
+	return WaitForHealthyNodes(ctx, n.log, nodes)
 }
 
 // Waits for the provided nodes to become healthy.
@@ -784,7 +787,7 @@ func (n *Network) GetNodeURIs(ctx context.Context, deferCleanupFunc func(func())
 // GetAvailableNodeIDs returns the node IDs of nodes in the network that are running and not ephemeral.
 func (n *Network) GetAvailableNodeIDs() []string {
 	availableNodes := FilterAvailableNodes(n.Nodes)
-	ids := make([]string, len(availableNodes))
+	ids := []string{}
 	for _, node := range availableNodes {
 		ids = append(ids, node.NodeID.String())
 	}
@@ -1103,7 +1106,8 @@ func MetricsLinkForNetwork(networkUUID string, startTime string, endTime string)
 		endTime = "now"
 	}
 	return fmt.Sprintf(
-		"https://grafana-poc.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?&var-filter=network_uuid%%7C%%3D%%7C%s&var-filter=is_ephemeral_node%%7C%%3D%%7Cfalse&from=%s&to=%s",
+		"https://%s/d/kBQpRdWnk/avalanche-main-dashboard?&var-filter=network_uuid%%7C%%3D%%7C%s&var-filter=is_ephemeral_node%%7C%%3D%%7Cfalse&from=%s&to=%s",
+		grafanaURI,
 		networkUUID,
 		startTime,
 		endTime,

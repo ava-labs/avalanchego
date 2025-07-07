@@ -56,23 +56,18 @@ func TestMessageQueue(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	expectFail = true
-	done := make(chan struct{})
+	gotOk := make(chan bool)
 	go func() {
-		ok := q.Push(ctx, msgs[0])
-		require.False(ok)
-		close(done)
+		gotOk <- q.Push(ctx, msgs[0])
 	}()
-	<-done
+	require.False(<-gotOk)
 
 	// Assert that Push returns false when the queue is closed
-	done = make(chan struct{})
 	go func() {
-		ok := q.Push(context.Background(), msgs[0])
-		require.False(ok)
-		close(done)
+		gotOk <- q.Push(context.Background(), msgs[0])
 	}()
 	q.Close()
-	<-done
+	require.False(<-gotOk)
 
 	// Assert Pop returns false when the queue is closed
 	_, ok = q.Pop()

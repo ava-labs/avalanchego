@@ -198,12 +198,28 @@ func (cr *ChainRouter) RegisterRequest(
 		shouldMeasureLatency,
 		uniqueRequestID,
 		func() {
-			cr.HandleInbound(ctx, timeoutMsg)
+			cr.handleMessage(ctx, timeoutMsg, true)
 		},
 	)
 }
 
 func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMessage) {
+	cr.handleMessage(ctx, msg, false)
+}
+
+func (cr *ChainRouter) HandleInternal(ctx context.Context, msg message.InboundMessage) {
+	// handleMessage is called in a separate goroutine because internal messages
+	// may be sent while holding the chain's context lock. To enforce the
+	// expected lock ordering, we must not grab the chain router lock while
+	// holding the chain's context lock.
+	go cr.handleMessage(ctx, msg, true)
+}
+
+// handleMessage routes a message to the specified chain. Messages may be
+// unrequested, responses, or timeouts. The internal flag indicates whether the
+// message is being sent from an internal component, such as due to a timeout,
+// or if the message originated from a remote peer.
+func (cr *ChainRouter) handleMessage(ctx context.Context, msg message.InboundMessage, internal bool) {
 	nodeID := msg.NodeID()
 	op := msg.Op()
 
@@ -215,18 +231,6 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 			zap.Stringer("messageOp", op),
 			zap.String("field", "ChainID"),
 			zap.Error(err),
-		)
-
-		msg.OnFinishedHandling()
-		return
-	}
-
-	requestID, ok := message.GetRequestID(m)
-	if !ok {
-		cr.log.Debug("dropping message with invalid field",
-			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("messageOp", op),
-			zap.String("field", "RequestID"),
 		)
 
 		msg.OnFinishedHandling()
@@ -260,7 +264,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 		return
 	}
 
-	if !chain.ShouldHandle(nodeID) {
+	if !internal && !chain.ShouldHandle(nodeID) {
 		cr.log.Debug("dropping message",
 			zap.Stringer("messageOp", op),
 			zap.Stringer("nodeID", nodeID),
@@ -293,6 +297,18 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 				EngineType:     engineType,
 			},
 		)
+		return
+	}
+
+	requestID, ok := message.GetRequestID(m)
+	if !ok {
+		cr.log.Debug("dropping message with invalid field",
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("messageOp", op),
+			zap.String("field", "RequestID"),
+		)
+
+		msg.OnFinishedHandling()
 		return
 	}
 

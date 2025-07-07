@@ -25,14 +25,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-14, ubuntu-22.04, ubuntu-24.04, windows-2022, custom-arm64-jammy, custom-arm64-noble]
+        os: [macos-14, ubuntu-22.04, ubuntu-24.04, custom-arm64-jammy, custom-arm64-noble]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
-      - name: Set timeout on Windows # Windows UT run slower and need a longer timeout
-        shell: bash
-        if: matrix.os == 'windows-2022'
-        run: echo "TIMEOUT=240s" >> "$GITHUB_ENV"
       - name: test-unit
         shell: bash
         run: ./scripts/run_task.sh test-unit
@@ -150,7 +146,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: umbrelladocs/action-linkspector@a0567ce1c7c13de4a2358587492ed43cab5d0102 #v1.3.4
+      - uses: umbrelladocs/action-linkspector@de84085e0f51452a470558693d7d308fbb2fa261 #v1.2.5
         with:
           fail_level: any
   check_generated_protobuf:
@@ -179,6 +175,15 @@ jobs:
       - uses: ./.github/actions/setup-go-for-project
       - shell: bash
         run: ./scripts/run_task.sh check-generate-canoto
+  check_contract_bindings:
+    name: Up-to-date contract bindings
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - uses: ./.github/actions/install-nix
+      - shell: nix develop --command bash -x {0}
+        run: task check-generate-load-contract-bindings
   go_mod_tidy:
     name: Up-to-date go.mod and go.sum
     runs-on: ubuntu-latest
@@ -227,3 +232,46 @@ jobs:
       - name: Run e2e tests
         shell: bash
         run: nix develop --command ./scripts/run_task.sh test-bootstrap-monitor-e2e
+  load:
+    name: Run load test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - uses: ./.github/actions/run-monitored-tmpnet-cmd
+        with:
+          run: ./scripts/run_task.sh test-load
+          artifact_prefix: load
+          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_username: ${{ secrets.LOKI_ID || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+  load_kube:
+    name: Run load test on kube
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - uses: ./.github/actions/run-monitored-tmpnet-cmd
+        with:
+          run: ./scripts/run_task.sh test-load-kube
+          artifact_prefix: load-kube
+          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_username: ${{ secrets.LOKI_ID || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+  load2:
+    name: Run load2 test
+    runs-on: ubuntu-latest
+    steps:
+        - uses: actions/checkout@v4
+        - uses: ./.github/actions/setup-go-for-project
+        - uses: ./.github/actions/run-monitored-tmpnet-cmd
+          with:
+            run: ./scripts/run_task.sh test-load2 -- --load-timeout=30s
+            artifact_prefix: load2
+            prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+            prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+            loki_username: ${{ secrets.LOKI_ID || '' }}
+            loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+

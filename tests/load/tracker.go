@@ -6,10 +6,6 @@ package load
 import (
 	"sync"
 	"time"
-
-	"github.com/prometheus/client_golang/prometheus"
-
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const namespace = "load"
@@ -25,49 +21,17 @@ type Tracker[T TxID] struct {
 	txsConfirmed uint64
 	txsFailed    uint64
 
-	// metrics
-	txsIssuedCounter    prometheus.Counter
-	txsConfirmedCounter prometheus.Counter
-	txsFailedCounter    prometheus.Counter
-	txLatency           prometheus.Histogram
+	metrics *Metrics
 }
 
 // NewTracker returns a new Tracker instance which records metrics for the number
 // of transactions issued, confirmed, and failed. It also tracks the latency of
 // transactions.
-func NewTracker[T TxID](reg *prometheus.Registry) (*Tracker[T], error) {
-	tracker := &Tracker[T]{
+func NewTracker[T TxID](metrics *Metrics) *Tracker[T] {
+	return &Tracker[T]{
 		outstandingTxs: make(map[T]time.Time),
-		txsIssuedCounter: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "txs_issued",
-			Help:      "Number of transactions issued",
-		}),
-		txsConfirmedCounter: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "txs_confirmed",
-			Help:      "Number of transactions confirmed",
-		}),
-		txsFailedCounter: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "txs_failed",
-			Help:      "Number of transactions failed",
-		}),
-		txLatency: prometheus.NewHistogram(prometheus.HistogramOpts{
-			Namespace: namespace,
-			Name:      "tx_latency",
-			Help:      "Latency of transactions",
-		}),
+		metrics:        metrics,
 	}
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		reg.Register(tracker.txsIssuedCounter),
-		reg.Register(tracker.txsConfirmedCounter),
-		reg.Register(tracker.txsFailedCounter),
-		reg.Register(tracker.txLatency),
-	)
-	return tracker, errs.Err
 }
 
 // GetObservedConfirmed returns the number of transactions that the tracker has
@@ -105,7 +69,7 @@ func (t *Tracker[T]) Issue(txID T) {
 
 	t.outstandingTxs[txID] = time.Now()
 	t.txsIssued++
-	t.txsIssuedCounter.Inc()
+	t.metrics.IncIssuedTx()
 }
 
 // ObserveConfirmed records a transaction that was confirmed.
@@ -117,8 +81,7 @@ func (t *Tracker[T]) ObserveConfirmed(txID T) {
 	delete(t.outstandingTxs, txID)
 
 	t.txsConfirmed++
-	t.txsConfirmedCounter.Inc()
-	t.txLatency.Observe(float64(time.Since(startTime).Milliseconds()))
+	t.metrics.RecordConfirmedTx(float64(time.Since(startTime).Milliseconds()))
 }
 
 // ObserveFailed records a transaction that failed (e.g. expired)
@@ -130,6 +93,5 @@ func (t *Tracker[T]) ObserveFailed(txID T) {
 	delete(t.outstandingTxs, txID)
 
 	t.txsFailed++
-	t.txsFailedCounter.Inc()
-	t.txLatency.Observe(float64(time.Since(startTime).Milliseconds()))
+	t.metrics.RecordFailedTx(float64(time.Since(startTime).Milliseconds()))
 }

@@ -80,7 +80,15 @@ func main() {
 				DefaultRuntimeConfig: *nodeRuntimeConfig,
 			}
 
-			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
+			timeout, err := nodeRuntimeConfig.GetNetworkStartTimeout(nodeCount)
+			if err != nil {
+				return err
+			}
+			log.Info("waiting for network to start",
+				zap.Float64("timeoutSeconds", timeout.Seconds()),
+			)
+
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
 			if err := tmpnet.BootstrapNewNetwork(
 				ctx,

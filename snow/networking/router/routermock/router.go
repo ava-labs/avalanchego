@@ -111,6 +111,18 @@ func (mr *RouterMockRecorder) HandleInbound(arg0, arg1 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleInbound", reflect.TypeOf((*Router)(nil).HandleInbound), arg0, arg1)
 }
 
+// HandleInternal mocks base method.
+func (m *Router) HandleInternal(arg0 context.Context, arg1 message.InboundMessage) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "HandleInternal", arg0, arg1)
+}
+
+// HandleInternal indicates an expected call of HandleInternal.
+func (mr *RouterMockRecorder) HandleInternal(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleInternal", reflect.TypeOf((*Router)(nil).HandleInternal), arg0, arg1)
+}
+
 // HealthCheck mocks base method.
 func (m *Router) HealthCheck(arg0 context.Context) (any, error) {
 	m.ctrl.T.Helper()

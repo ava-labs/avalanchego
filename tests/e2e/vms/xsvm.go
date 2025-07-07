@@ -5,13 +5,18 @@ package vms
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/xsvm"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/subnet"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
@@ -49,7 +54,7 @@ func XSVMSubnetsOrPanic(nodes ...*tmpnet.Node) []*tmpnet.Subnet {
 	}
 }
 
-var _ = ginkgo.Describe("[XSVM]", func() {
+var _ = ginkgo.Describe("[XSVM]", ginkgo.Label("xsvm"), func() {
 	tc := e2e.NewTestContext()
 	require := require.New(tc)
 
@@ -177,6 +182,86 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		require.Equal(units.Schmeckle, destinationBalance)
 
 		_ = e2e.CheckBootstrapIsPossible(tc, network)
+	})
+
+	ginkgo.It("should serve grpc api requests", func() {
+		network := e2e.GetEnv(tc).GetNetwork()
+		log := tc.Log()
+		if network.DefaultRuntimeConfig.Kube != nil {
+			ginkgo.Skip("h2c is not currently supported in kube")
+		}
+
+		tc.By("establishing connection")
+		nodeID := network.GetSubnet(subnetAName).ValidatorIDs[0]
+		node, err := network.GetNode(nodeID)
+		require.NoError(err)
+
+		uri := strings.TrimPrefix(node.URI, "http://")
+		chainID := network.GetSubnet(subnetAName).Chains[0].ChainID
+		client, conn, err := api.NewPingClient(
+			uri,
+			chainID,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		)
+		require.NoError(err)
+		ginkgo.DeferCleanup(func() {
+			require.NoError(conn.Close())
+		})
+
+		tc.By("serving unary rpc")
+		msg := "foobar"
+		reply, err := client.Ping(tc.DefaultContext(), &xsvm.PingRequest{
+			Message: msg,
+		})
+		require.NoError(err)
+		require.Equal(msg, reply.Message)
+
+		tc.By("serving bidirectional streaming rpc")
+		stream, err := client.StreamPing(tc.DefaultContext())
+		require.NoError(err)
+
+		ginkgo.DeferCleanup(func() {
+			require.NoError(stream.CloseSend())
+		})
+
+		// Stream pings to the server and block until all events are received
+		// back.
+		eg := &errgroup.Group{}
+
+		n := 10
+		eg.Go(func() error {
+			for i := 0; i < n; i++ {
+				msg := fmt.Sprintf("ping-%d", i)
+				if err := stream.Send(&xsvm.StreamPingRequest{
+					Message: msg,
+				}); err != nil {
+					return err
+				}
+
+				log.Info("sent message", zap.String("msg", msg))
+			}
+
+			return nil
+		})
+
+		eg.Go(func() error {
+			for i := 0; i < n; i++ {
+				reply, err := stream.Recv()
+				if err != nil {
+					return err
+				}
+
+				if fmt.Sprintf("ping-%d", i) != reply.Message {
+					return fmt.Errorf("unexpected ping reply: %s", reply.Message)
+				}
+
+				log.Info("received message", zap.String("msg", reply.Message))
+			}
+
+			return nil
+		})
+
+		require.NoError(eg.Wait())
 	})
 })
 

@@ -11,12 +11,11 @@ go 1.23.9
 
 require (
 	github.com/DataDog/zstd v1.5.2
-	github.com/NYTimes/gziphandler v1.1.1
-	github.com/StephenButtolph/canoto v0.15.0
+	github.com/StephenButtolph/canoto v0.17.1
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
-	github.com/ava-labs/coreth v0.15.1-rc.0.0.20250531142007-d43523a402dd
+	github.com/ava-labs/coreth v0.15.3-0.20250707183503-ecbf4f324f17
 	github.com/ava-labs/ledger-avalanche/go v0.0.0-20241009183145-e6f90a8a1a60
-	github.com/ava-labs/libevm v1.13.14-0.2.0.release
+	github.com/ava-labs/libevm v1.13.14-0.3.0.rc.1
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593
 	github.com/compose-spec/compose-go v1.20.2
@@ -85,6 +84,7 @@ require (
 	github.com/FactomProject/btcutilecc v0.0.0-20130527213604-d3a63a5752ec // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
+	github.com/ava-labs/simplex v0.0.0-20250626192006-220e6aeacdc1
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.10.0 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect

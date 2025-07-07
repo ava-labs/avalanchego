@@ -43,6 +43,12 @@ const (
 	// - EBS volume sizes are in GB
 	//   - The minimum number greater than 1GB is 2GB
 	MinimumVolumeSizeGB = 2
+
+	// All statefulsets configured for exclusive scheduling will use
+	// anti-affinity with the following labeling to ensure their pods
+	// are never scheduled to the same nodes.
+	antiAffinityLabelKey   = "tmpnet-scheduling"
+	antiAffinityLabelValue = "exclusive"
 )
 
 type KubeRuntimeConfig struct {
@@ -58,6 +64,12 @@ type KubeRuntimeConfig struct {
 	Image string `json:"image,omitempty"`
 	// Size in gigabytes of the PersistentVolumeClaim  to allocate for the node
 	VolumeSizeGB uint `json:"volumeSizeGB,omitempty"`
+	// Whether to schedule each AvalancheGo node to a dedicated Kubernetes node
+	UseExclusiveScheduling bool `json:"useExclusiveScheduling,omitempty"`
+	// Label key to use for exclusive scheduling for node selection and toleration
+	SchedulingLabelKey string `json:"schedulingLabelKey,omitempty"`
+	// Label value to use for exclusive scheduling for node selection and toleration
+	SchedulingLabelValue string `json:"schedulingLabelValue,omitempty"`
 }
 
 type KubeRuntime struct {
@@ -132,8 +144,10 @@ func (p *KubeRuntime) GetLocalURI(ctx context.Context) (string, func(), error) {
 		}
 	}
 
-	// TODO(marun) Detect whether this test code is running inside the cluster
-	//             and use the URI directly
+	// Use direct pod URI if running inside the cluster
+	if IsRunningInCluster() {
+		return p.node.URI, func() {}, nil
+	}
 
 	port, stopChan, err := p.forwardPort(ctx, config.DefaultHTTPPort)
 	if err != nil {
@@ -152,8 +166,10 @@ func (p *KubeRuntime) GetLocalStakingAddress(ctx context.Context) (netip.AddrPor
 		}
 	}
 
-	// TODO(marun) Detect whether this test code is running inside the cluster
-	//             and use the URI directly
+	// Use direct pod staking address if running inside the cluster
+	if IsRunningInCluster() {
+		return p.node.StakingAddress, func() {}, nil
+	}
 
 	port, stopChan, err := p.forwardPort(ctx, config.DefaultStakingPort)
 	if err != nil {
@@ -264,6 +280,22 @@ func (p *KubeRuntime) Start(ctx context.Context) error {
 		flags,
 		p.node.getMonitoringLabels(),
 	)
+
+	if runtimeConfig.UseExclusiveScheduling {
+		labelKey := runtimeConfig.SchedulingLabelKey
+		labelValue := runtimeConfig.SchedulingLabelValue
+		log.Debug("configuring exclusive scheduling",
+			zap.String("nodeID", nodeID),
+			zap.String("namespace", namespace),
+			zap.String("statefulSet", statefulSetName),
+			zap.String("schedulingLabelKey", labelKey),
+			zap.String("schedulingLabelValue", labelValue),
+		)
+		if labelKey == "" || labelValue == "" {
+			return errors.New("scheduling label key and value must be non-empty when exclusive scheduling is enabled")
+		}
+		configureExclusiveScheduling(&statefulSet.Spec.Template, labelKey, labelValue)
+	}
 
 	_, err = clientset.AppsV1().StatefulSets(runtimeConfig.Namespace).Create(
 		ctx,
@@ -427,11 +459,6 @@ func (p *KubeRuntime) Restart(ctx context.Context) error {
 
 	clientset, err := p.getClientset()
 	if err != nil {
-		return err
-	}
-
-	// Save node to disk to ensure the same state can be used to restart
-	if err := p.node.Write(); err != nil {
 		return err
 	}
 
@@ -763,4 +790,57 @@ func (p *KubeRuntime) getFlags() (FlagsMap, error) {
 	// The node must bind to the Pod IP to enable the kubelet to access the http port for the readiness check
 	flags[config.HTTPHostKey] = "0.0.0.0"
 	return flags, nil
+}
+
+// configureExclusiveScheduling ensures that the provided template schedules only to nodes with the provided
+// labeling, tolerates a taint that matches the labeling, and uses anti-affinity to ensure only a single
+// avalanchego pod is scheduled to a given target node.
+func configureExclusiveScheduling(template *corev1.PodTemplateSpec, labelKey string, labelValue string) {
+	podSpec := &template.Spec
+
+	// Configure node selection
+	if podSpec.NodeSelector == nil {
+		podSpec.NodeSelector = make(map[string]string)
+	}
+	podSpec.NodeSelector[labelKey] = labelValue
+
+	// Configure toleration. Nodes are assumed to have a taint with the same
+	// key+value as the label used to select it.
+	podSpec.Tolerations = []corev1.Toleration{
+		{
+			Key:      labelKey,
+			Operator: corev1.TolerationOpEqual,
+			Value:    labelValue,
+			Effect:   corev1.TaintEffectNoExecute,
+		},
+	}
+
+	// Configure anti-affinity to ensure only one pod per node
+	templateMeta := &template.ObjectMeta
+	if templateMeta.Labels == nil {
+		templateMeta.Labels = make(map[string]string)
+	}
+	templateMeta.Labels[antiAffinityLabelKey] = antiAffinityLabelValue
+	podSpec.Affinity = &corev1.Affinity{
+		PodAntiAffinity: &corev1.PodAntiAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+				{
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							antiAffinityLabelKey: antiAffinityLabelValue,
+						},
+					},
+					TopologyKey: "kubernetes.io/hostname",
+				},
+			},
+		},
+	}
+}
+
+// IsRunningInCluster detects if this code is running inside a Kubernetes cluster
+// by checking for the presence of the service account token that's automatically
+// mounted in every pod.
+func IsRunningInCluster() bool {
+	_, err := os.Stat("/var/run/secrets/kubernetes.io/serviceaccount/token")
+	return err == nil
 }

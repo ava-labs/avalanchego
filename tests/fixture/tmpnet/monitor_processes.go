@@ -57,7 +57,7 @@ func StartPrometheus(ctx context.Context, log logging.Logger) error {
 	if err := waitForReadiness(ctx, log, prometheusCmd, prometheusReadinessURL); err != nil {
 		return err
 	}
-	log.Info("To stop: tmpnetctl stop-collectors")
+	log.Info("To stop: tmpnetctl stop-metrics-collector")
 	return nil
 }
 
@@ -70,7 +70,7 @@ func StartPromtail(ctx context.Context, log logging.Logger) error {
 		return err
 	}
 	log.Info("skipping promtail readiness check until one or more nodes have written their service discovery configuration")
-	log.Info("To stop: tmpnetctl stop-collectors")
+	log.Info("To stop: tmpnetctl stop-logs-collector")
 	return nil
 }
 
@@ -176,6 +176,9 @@ func startPrometheus(ctx context.Context, log logging.Logger) error {
 	if err != nil {
 		return err
 	}
+	if err := os.MkdirAll(serviceDiscoveryDir, perms.ReadWriteExecute); err != nil {
+		return fmt.Errorf("failed to create service discovery dir: %w", err)
+	}
 
 	config := fmt.Sprintf(`
 global:
@@ -220,6 +223,9 @@ func startPromtail(ctx context.Context, log logging.Logger) error {
 	if err != nil {
 		return err
 	}
+	if err := os.MkdirAll(serviceDiscoveryDir, perms.ReadWriteExecute); err != nil {
+		return fmt.Errorf("failed to create service discovery dir: %w", err)
+	}
 
 	config := fmt.Sprintf(`
 server:
@@ -251,6 +257,12 @@ func getWorkingDir(cmdName string) (string, error) {
 		return "", err
 	}
 	return filepath.Join(tmpnetDir, cmdName), nil
+}
+
+// GetPrometheusServiceDiscoveryDir returns the path for prometheus file-based
+// service discovery configuration.
+func GetPrometheusServiceDiscoveryDir() (string, error) {
+	return getServiceDiscoveryDir(prometheusCmd)
 }
 
 func getServiceDiscoveryDir(cmdName string) (string, error) {

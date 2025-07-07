@@ -359,6 +359,34 @@ func (vm *VMServer) CreateHandlers(ctx context.Context, _ *emptypb.Empty) (*vmpb
 	return resp, nil
 }
 
+func (vm *VMServer) CreateHTTP2Handler(ctx context.Context, _ *emptypb.Empty) (*vmpb.CreateHTTP2HandlerResponse, error) {
+	handler, err := vm.vm.CreateHTTP2Handler(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// The vm does not expose an HTTP2 handler
+	if handler == nil {
+		return &vmpb.CreateHTTP2HandlerResponse{}, nil
+	}
+
+	serverListener, err := grpcutils.NewListener()
+	if err != nil {
+		return nil, err
+	}
+
+	server := grpcutils.NewServer()
+	vm.serverCloser.Add(server)
+	httppb.RegisterHTTPServer(server, ghttp.NewServer(handler))
+
+	// Start HTTP service
+	go grpcutils.Serve(serverListener, server)
+
+	return &vmpb.CreateHTTP2HandlerResponse{
+		ServerAddr: serverListener.Addr().String(),
+	}, nil
+}
+
 func (vm *VMServer) Connected(ctx context.Context, req *vmpb.ConnectedRequest) (*emptypb.Empty, error) {
 	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
