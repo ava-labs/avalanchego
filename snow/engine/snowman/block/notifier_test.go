@@ -5,7 +5,6 @@ package block_test
 
 import (
 	"context"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -15,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blockmock"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 )
