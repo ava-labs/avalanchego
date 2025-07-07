@@ -133,7 +133,7 @@ Builds image from local code and deploys to local Kind cluster
 ./scripts/run_task.sh test-load-kube-kind -- --kube-image=my-registry/avalanchego:v1.2.3
 ```
 
-## Against remote platform-chaos-k8s
+## Trigger CI job on self-hosted runner
 Use GitHub Actions workflow "Load Tests on k8s"
 - Go to Actions tab in GitHub
 - Select "Load Tests on k8s" workflow
