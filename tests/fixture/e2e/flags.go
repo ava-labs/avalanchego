@@ -144,7 +144,7 @@ func (d *DefaultOptions) Owner() string {
 }
 
 func (d *DefaultOptions) NodeCount() int {
-	if d.nodeCount == 0 {
+	if d.nodeCount <= 0 {
 		return tmpnet.DefaultNodeCount
 	}
 
