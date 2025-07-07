@@ -107,7 +107,7 @@ func (p *postForkCommonComponents) getPChainEpoch(ctx context.Context, parentID 
 		return height, 0, parentTimestamp, nil
 	}
 
-	if parentTimestamp.After(epochStartTime.Add(time.Duration(p.vm.Upgrades.GraniteEpochDuration) * time.Second)) {
+	if parentTimestamp.After(epochStartTime.Add(p.vm.Upgrades.GraniteEpochDuration)) {
 		// If the parent crossed the epoch boundary, then it sealed the previous epoch. The child
 		// is the first block of the new epoch, so should use the parent's P-Chain height, increment
 		// the epoch number, and set the epoch start time to the parent's timestamp.
