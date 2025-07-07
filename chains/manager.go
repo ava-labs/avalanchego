@@ -266,7 +266,7 @@ type manager struct {
 	chainsLock sync.Mutex
 	// Key: Chain's ID
 	// Value: The chain
-	chains map[ids.ID]*chain
+	chains map[ids.ID]handler.Handler
 
 	// snowman++ related interface to allow validators retrieval
 	validatorState validators.State
@@ -327,7 +327,7 @@ func New(config *ManagerConfig) (Manager, error) {
 	return &manager{
 		Aliaser:                ids.NewAliaser(),
 		ManagerConfig:          *config,
-		chains:                 make(map[ids.ID]*chain),
+		chains:                 make(map[ids.ID]handler.Handler),
 		chainsQueue:            buffer.NewUnboundedBlockingDeque[ChainParameters](initialQueueSize),
 		unblockChainCreatorCh:  make(chan struct{}),
 		chainCreatorShutdownCh: make(chan struct{}),
@@ -433,7 +433,7 @@ func (m *manager) createChain(chainParams ChainParameters) {
 	}
 
 	m.chainsLock.Lock()
-	m.chains[chainParams.ID] = chain
+	m.chains[chainParams.ID] = chain.Handler
 	m.chainsLock.Unlock()
 
 	// Associate the newly created chain with its default alias
@@ -1423,7 +1423,7 @@ func (m *manager) IsBootstrapped(id ids.ID) bool {
 		return false
 	}
 
-	return chain.Handler.Context().State.Get().State == snow.NormalOp
+	return chain.Context().State.Get().State == snow.NormalOp
 }
 
 func (m *manager) registerBootstrappedHealthChecks() error {

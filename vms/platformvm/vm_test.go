@@ -64,7 +64,7 @@ import (
 	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
-	snowman_block "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
@@ -1303,12 +1303,15 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	)
 	require.NoError(err)
 
-	cn, subscription := createSubscriberAndChangeNotifier()
+	noopSubscription := func(ctx context.Context) (common.Message, error) {
+		<-ctx.Done()
+		return common.Message(0), ctx.Err()
+	}
 
 	h, err := handler.New(
 		bootstrapConfig.Ctx,
-		cn,
-		subscription,
+		&smblock.ChangeNotifier{},
+		noopSubscription,
 		beacons,
 		time.Hour,
 		2,
@@ -2176,15 +2179,4 @@ func TestPruneMempool(t *testing.T) {
 	require.False(ok)
 	_, ok = vm.Builder.Get(baseTxID)
 	require.True(ok)
-}
-
-func createSubscriberAndChangeNotifier() (*snowman_block.ChangeNotifier, common.Subscription) {
-	var cn snowman_block.ChangeNotifier
-
-	subscription := func(ctx context.Context) (common.Message, error) {
-		<-ctx.Done()
-		return common.Message(0), ctx.Err()
-	}
-
-	return &cn, subscription
 }

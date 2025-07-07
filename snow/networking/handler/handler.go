@@ -53,8 +53,6 @@ var (
 type Handler interface {
 	health.Checker
 
-	Notify(_ context.Context, msg common.Message) error
-
 	Context() *snow.ConsensusContext
 	// ShouldHandle returns true if the node with the given ID is allowed to send
 	// messages to this chain. If the node is not allowed to send messages to

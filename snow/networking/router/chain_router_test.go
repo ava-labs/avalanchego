@@ -105,12 +105,10 @@ func TestShutdown(t *testing.T) {
 	)
 	require.NoError(err)
 
-	cn, subscription := createSubscriberAndChangeNotifier()
-
 	h, err := handler.New(
 		chainCtx,
-		cn,
-		subscription,
+		&block.ChangeNotifier{},
+		noopSubscription,
 		vdrs,
 		time.Second,
 		testThreadPoolSize,
@@ -234,12 +232,10 @@ func TestConnectedAfterShutdownErrorLogRegression(t *testing.T) {
 	)
 	require.NoError(err)
 
-	cn, subscription := createSubscriberAndChangeNotifier()
-
 	h, err := handler.New(
 		chainCtx,
-		cn,
-		subscription,
+		&block.ChangeNotifier{},
+		noopSubscription,
 		nil,
 		time.Second,
 		testThreadPoolSize,
@@ -370,12 +366,10 @@ func TestShutdownTimesOut(t *testing.T) {
 	)
 	require.NoError(err)
 
-	cn, subscription := createSubscriberAndChangeNotifier()
-
 	h, err := handler.New(
 		ctx,
-		cn,
-		subscription,
+		&block.ChangeNotifier{},
+		noopSubscription,
 		vdrs,
 		time.Second,
 		testThreadPoolSize,
@@ -542,12 +536,10 @@ func TestRouterTimeout(t *testing.T) {
 	)
 	require.NoError(err)
 
-	cn, subscription := createSubscriberAndChangeNotifier()
-
 	h, err := handler.New(
 		ctx,
-		cn,
-		subscription,
+		&block.ChangeNotifier{},
+		noopSubscription,
 		vdrs,
 		time.Second,
 		testThreadPoolSize,
@@ -1077,12 +1069,10 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	)
 	require.NoError(err)
 
-	cn, subscription := createSubscriberAndChangeNotifier()
-
 	h, err := handler.New(
 		ctx,
-		cn,
-		subscription,
+		&block.ChangeNotifier{},
+		noopSubscription,
 		vdrs,
 		time.Second,
 		testThreadPoolSize,
@@ -1246,12 +1236,10 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 	)
 	require.NoError(err)
 
-	cn, subscription := createSubscriberAndChangeNotifier()
-
 	h, err := handler.New(
 		ctx,
-		cn,
-		subscription,
+		&block.ChangeNotifier{},
+		noopSubscription,
 		vdrs,
 		time.Second,
 		testThreadPoolSize,
@@ -1501,12 +1489,10 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *enginetest.Engine) {
 	)
 	require.NoError(t, err)
 
-	cn, subscription := createSubscriberAndChangeNotifier()
-
 	h, err := handler.New(
 		ctx,
-		cn,
-		subscription,
+		&block.ChangeNotifier{},
+		noopSubscription,
 		vdrs,
 		time.Second,
 		testThreadPoolSize,
@@ -1626,13 +1612,7 @@ func TestHandleSimplexMessage(t *testing.T) {
 	require.True(t, receivedMsg)
 }
 
-func createSubscriberAndChangeNotifier() (*block.ChangeNotifier, common.Subscription) {
-	var cn block.ChangeNotifier
-
-	subscription := func(ctx context.Context) (common.Message, error) {
-		<-ctx.Done()
-		return common.Message(0), ctx.Err()
-	}
-
-	return &cn, subscription
+func noopSubscription(ctx context.Context) (common.Message, error) {
+	<-ctx.Done()
+	return common.Message(0), ctx.Err()
 }

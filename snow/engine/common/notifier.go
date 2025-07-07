@@ -116,8 +116,5 @@ func (nf *NotificationForwarder) setAndGetContext() context.Context {
 func (nf *NotificationForwarder) Close() {
 	defer nf.executing.Wait()
 
-	nf.lock.Lock()
-	defer nf.lock.Unlock()
-
 	nf.haltExecution()
 }
