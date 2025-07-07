@@ -134,7 +134,7 @@ func New(
 		Config:           config,
 	}
 
-	n.StakingSigner, err = NewStakingSigner(config.StakingSignerConfig)
+	n.StakingSigner, err = newStakingSigner(config.StakingSignerConfig)
 	if err != nil {
 		return nil, fmt.Errorf("problem initializing staking signer: %w", err)
 	}

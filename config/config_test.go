@@ -10,7 +10,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/spf13/pflag"
@@ -554,8 +553,12 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 
 func TestGetStakingSigner(t *testing.T) {
 	testKey := "HLimS3vRibTMk9lZD4b+Z+GLuSBShvgbsu0WTLt2Kd4="
-	testKeyPath1 := filepath.Join(t.TempDir(), ".avalanchego/staking/signer.key")
-	testKeyPath2 := strings.Replace(testKeyPath1, "001", "002", 1) // Anticipate the new temp dir that will be created
+	defaultSignerKeyTestDir := t.TempDir()
+	// required for proper write permissions for the default signer-key location
+	t.Setenv("HOME", defaultSignerKeyTestDir)
+
+	fileKeyPath := filepath.Join(t.TempDir(), ".avalanchego/staking/signer.key")
+	defaultSignerKeyPath := filepath.Join(defaultSignerKeyTestDir, ".avalanchego/staking/signer.key")
 
 	tests := []struct {
 		name                 string
@@ -567,7 +570,7 @@ func TestGetStakingSigner(t *testing.T) {
 		{
 			name: "default signer",
 			expectedSignerConfig: node.DefaultSignerConfig{
-				SignerKeyPath: testKeyPath2,
+				SignerKeyPath: defaultSignerKeyPath,
 			},
 		},
 		{
@@ -587,18 +590,18 @@ func TestGetStakingSigner(t *testing.T) {
 			config: map[string]any{
 				StakingSignerKeyPathKey: func() string {
 					require.NoError(t, os.MkdirAll(
-						filepath.Dir(testKeyPath1),
+						filepath.Dir(fileKeyPath),
 						os.ModePerm,
 					))
 
 					bytes, err := base64.StdEncoding.DecodeString(testKey)
 					require.NoError(t, err)
-					require.NoError(t, os.WriteFile(testKeyPath1, bytes, perms.ReadWrite))
-					return testKeyPath1
+					require.NoError(t, os.WriteFile(fileKeyPath, bytes, perms.ReadWrite))
+					return fileKeyPath
 				}(),
 			},
 			expectedSignerConfig: node.SignerPathConfig{
-				SignerKeyPath: testKeyPath1,
+				SignerKeyPath: fileKeyPath,
 			},
 		},
 		{
@@ -617,9 +620,6 @@ func TestGetStakingSigner(t *testing.T) {
 			expectedErr: errInvalidSignerConfig,
 		},
 	}
-
-	// required for proper write permissions for the default signer-key location
-	t.Setenv("HOME", t.TempDir())
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

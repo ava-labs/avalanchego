@@ -4,38 +4,28 @@
 package node
 
 import (
-	"log"
+	"path/filepath"
 	"testing"
 
-	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/config"
+	"github.com/ava-labs/avalanchego/config/node"
 )
 
 func TestDefaultConfigInitializationUsesExistingDefaultKey(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	tempDir := t.TempDir()
+	t.Setenv("HOME", tempDir)
 
 	require := require.New(t)
-	v := setupViperFlags()
 
-	config1, err := config.GetNodeConfig(v)
+	config := node.DefaultSignerConfig{
+		SignerKeyPath: filepath.Join(tempDir, ".avalanchego/staking/signer.key"),
+	}
+
+	signer1, err := newStakingSigner(config)
 	require.NoError(err)
-	signer1, err := NewStakingSigner(config1.StakingSignerConfig)
-	require.NoError(err)
-	signer2, err := NewStakingSigner(config1.StakingSignerConfig)
+	signer2, err := newStakingSigner(config)
 	require.NoError(err)
 
 	require.Equal(signer1.PublicKey(), signer2.PublicKey())
-}
-
-func setupViperFlags() *viper.Viper {
-	v := viper.New()
-	fs := config.BuildFlagSet()
-	pflag.Parse()
-	if err := v.BindPFlags(fs); err != nil {
-		log.Fatal(err)
-	}
-	return v
 }

@@ -1431,7 +1431,6 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	nodeConfig.ProcessContextFilePath = getExpandedArg(v, ProcessContextFileKey)
 
 	nodeConfig.ProvidedFlags = providedFlags(v)
-
 	return nodeConfig, nil
 }
 

@@ -20,15 +20,15 @@ import (
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
-// NewStakingSigner returns a BLS signer based on the provided configuration.
-func NewStakingSigner(
+// newStakingSigner returns a BLS signer based on the provided configuration.
+func newStakingSigner(
 	config any,
 ) (bls.Signer, error) {
 	switch cfg := config.(type) {
 	case node.EphemeralSignerConfig:
 		signer, err := localsigner.New()
 		if err != nil {
-			return nil, fmt.Errorf("couldn't generate ephemeral signer: %w", err)
+			return nil, fmt.Errorf("could not generate ephemeral signer: %w", err)
 		}
 
 		return signer, nil
@@ -41,7 +41,7 @@ func NewStakingSigner(
 
 		signer, err := localsigner.FromBytes(signerKeyContent)
 		if err != nil {
-			return nil, fmt.Errorf("couldn't parse signing key: %w", err)
+			return nil, fmt.Errorf("could not parse signing key: %w", err)
 		}
 
 		return signer, nil
@@ -51,7 +51,7 @@ func NewStakingSigner(
 		signer, err := rpcsigner.NewClient(ctx, cfg.StakingSignerRPC)
 		cancel()
 		if err != nil {
-			return nil, fmt.Errorf("couldn't create rpc signer client: %w", err)
+			return nil, fmt.Errorf("could not create rpc signer client: %w", err)
 		}
 
 		return signer, nil
@@ -74,12 +74,12 @@ func NewStakingSigner(
 func createSignerFromFile(signerKeyPath string) (bls.Signer, error) {
 	signingKeyBytes, err := os.ReadFile(signerKeyPath)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't read signing key from %s: %w", signerKeyPath, err)
+		return nil, fmt.Errorf("could not read signing key from %s: %w", signerKeyPath, err)
 	}
 
 	signer, err := localsigner.FromBytes(signingKeyBytes)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't parse signing key: %w", err)
+		return nil, fmt.Errorf("could not parse signing key: %w", err)
 	}
 
 	return signer, nil
@@ -88,19 +88,19 @@ func createSignerFromFile(signerKeyPath string) (bls.Signer, error) {
 func createSignerFromNewKey(signerKeyPath string) (bls.Signer, error) {
 	signer, err := localsigner.New()
 	if err != nil {
-		return nil, fmt.Errorf("couldn't generate new signing key: %w", err)
+		return nil, fmt.Errorf("could not generate new signing key: %w", err)
 	}
 
 	if err := os.MkdirAll(filepath.Dir(signerKeyPath), perms.ReadWriteExecute); err != nil {
-		return nil, fmt.Errorf("couldn't create path for signing key at %s: %w", signerKeyPath, err)
+		return nil, fmt.Errorf("could not create path for signing key at %s: %w", signerKeyPath, err)
 	}
 
 	keyBytes := signer.ToBytes()
 	if err := os.WriteFile(signerKeyPath, keyBytes, perms.ReadWrite); err != nil {
-		return nil, fmt.Errorf("couldn't write new signing key to %s: %w", signerKeyPath, err)
+		return nil, fmt.Errorf("could not write new signing key to %s: %w", signerKeyPath, err)
 	}
 	if err := os.Chmod(signerKeyPath, perms.ReadOnly); err != nil {
-		return nil, fmt.Errorf("couldn't restrict permissions on new signing key at %s: %w", signerKeyPath, err)
+		return nil, fmt.Errorf("could not restrict permissions on new signing key at %s: %w", signerKeyPath, err)
 	}
 	return signer, nil
 }
