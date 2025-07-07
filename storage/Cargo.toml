@@ -24,7 +24,7 @@ hex = "0.4.3"
 serde = { workspace = true, features = ["derive"] }
 smallvec = { workspace = true, features = ["serde", "write", "union"] }
 sha2 = { workspace = true }
-integer-encoding = { workspace = true }
+integer-encoding = "4.0.2"
 arc-swap = "1.7.1"
 lru = "0.16.0"
 metrics = { workspace = true }

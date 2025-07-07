@@ -285,3 +285,22 @@ jobs:
           name: firewood-merkle-differential-fuzz-testdata
           path: ffi/tests/firewood/testdata
           retention-days: 30
+
+  stale-deps:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: "false"
+          shared-key: "debug-no-features"
+      - name: Install cargo-machete
+        run: cargo install cargo-machete
+      - name: Check for stale dependencies
+        run: cargo machete --with-metadata
+

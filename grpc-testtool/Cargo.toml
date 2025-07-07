@@ -42,7 +42,4 @@ name = "insert"
 harness = false
 
 [package.metadata.cargo-machete]
-ignored = ["prost", "tonic_build"]
-
-[lints]
-workspace = true
+ignored = ["prost", "tonic-build"]
