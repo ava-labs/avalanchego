@@ -15,11 +15,13 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/ava-labs/avalanchego/cache/lru"
-	"github.com/ava-labs/avalanchego/utils/logging"
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/cespare/xxhash/v2"
 	"go.uber.org/zap"
+
+	"github.com/ava-labs/avalanchego/cache/lru"
+	"github.com/ava-labs/avalanchego/utils/logging"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (
