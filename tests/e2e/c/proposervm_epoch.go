@@ -82,7 +82,7 @@ var _ = e2e.DescribeCChain("[ProposerVM Epoch]", func() {
 				tc.Log().Debug(
 					"epoch",
 					zap.Uint64("Epoch Number:", epochNumber),
-					zap.Int64("Epoch Start Time:", epochStartTime),
+					zap.Uint64("Epoch Start Time:", epochStartTime),
 					zap.Uint64("P-Chain Height:", pChainHeight),
 				)
 

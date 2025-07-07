@@ -78,9 +78,9 @@ func (p *ProposerAPI) GetProposerBlockWrapper(_ *http.Request, args *GetProposer
 }
 
 type GetEpochResponse struct {
-	Number       uint64 `json:"Number"`
-	StartTime    int64  `json:"StartTime"`
-	PChainHeight uint64 `json:"pChainHeight"`
+	Number       avajson.Uint64 `json:"Number"`
+	StartTime    avajson.Uint64 `json:"StartTime"`
+	PChainHeight avajson.Uint64 `json:"pChainHeight"`
 }
 
 func (p *ProposerAPI) GetEpoch(r *http.Request, _ *struct{}, reply *GetEpochResponse) error {
@@ -111,17 +111,9 @@ func (p *ProposerAPI) GetEpoch(r *http.Request, _ *struct{}, reply *GetEpochResp
 		return fmt.Errorf("couldn't get epoch P-Chain height: %w", err)
 	}
 
-	reply.Number = epochNumber
-	reply.StartTime = epochStartTime.Unix()
-	reply.PChainHeight = epochPChainHeight
-
-	p.vm.ctx.Log.Info("ProposerAPI called",
-		zap.String("service", "proposervm"),
-		zap.String("method", "getEpoch"),
-		zap.Uint64("epochNumber", epochNumber),
-		zap.Int64("epochStartTime", epochStartTime.Unix()),
-		zap.Uint64("pChainHeight", epochPChainHeight),
-	)
+	reply.Number = avajson.Uint64(epochNumber)
+	reply.StartTime = avajson.Uint64(epochStartTime.Unix())
+	reply.PChainHeight = avajson.Uint64(epochPChainHeight)
 
 	return nil
 }

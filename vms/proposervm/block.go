@@ -128,7 +128,7 @@ func (p *postForkCommonComponents) getPChainEpoch(ctx context.Context, parentID 
 	if err != nil {
 		return 0, 0, time.Time{}, fmt.Errorf("failed to get P-Chain height: %w", err)
 	}
-	p.vm.ctx.Log.Info("parent did not seal epoch. using parent's epoch",
+	p.vm.ctx.Log.Debug("parent did not seal epoch. using parent's epoch",
 		zap.Uint64("height", height),
 		zap.Uint64("epoch", epoch),
 	)
