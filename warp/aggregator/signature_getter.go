@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -36,12 +37,14 @@ type NetworkClient interface {
 // NetworkSignatureGetter fetches warp signatures on behalf of the
 // aggregator using VM App-Specific Messaging
 type NetworkSignatureGetter struct {
-	Client NetworkClient
+	client       NetworkClient
+	networkCodec codec.Manager
 }
 
-func NewSignatureGetter(client NetworkClient) *NetworkSignatureGetter {
+func NewSignatureGetter(client NetworkClient, networkCodec codec.Manager) *NetworkSignatureGetter {
 	return &NetworkSignatureGetter{
-		Client: client,
+		client:       client,
+		networkCodec: networkCodec,
 	}
 }
 
@@ -60,7 +63,7 @@ func (s *NetworkSignatureGetter) GetSignature(ctx context.Context, nodeID ids.No
 		signatureReq := message.MessageSignatureRequest{
 			MessageID: unsignedWarpMessage.ID(),
 		}
-		signatureReqBytes, err = message.RequestToBytes(message.Codec, signatureReq)
+		signatureReqBytes, err = message.RequestToBytes(s.networkCodec, signatureReq)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal signature request: %w", err)
 		}
@@ -68,7 +71,7 @@ func (s *NetworkSignatureGetter) GetSignature(ctx context.Context, nodeID ids.No
 		signatureReq := message.BlockSignatureRequest{
 			BlockID: p.Hash,
 		}
-		signatureReqBytes, err = message.RequestToBytes(message.Codec, signatureReq)
+		signatureReqBytes, err = message.RequestToBytes(s.networkCodec, signatureReq)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal signature request: %w", err)
 		}
@@ -78,7 +81,7 @@ func (s *NetworkSignatureGetter) GetSignature(ctx context.Context, nodeID ids.No
 	timer := time.NewTimer(delay)
 	defer timer.Stop()
 	for {
-		signatureRes, err := s.Client.SendAppRequest(ctx, nodeID, signatureReqBytes)
+		signatureRes, err := s.client.SendAppRequest(ctx, nodeID, signatureReqBytes)
 		// If the client fails to retrieve a response perform an exponential backoff.
 		// Note: it is up to the caller to ensure that [ctx] is eventually cancelled
 		if err != nil {
@@ -102,7 +105,7 @@ func (s *NetworkSignatureGetter) GetSignature(ctx context.Context, nodeID ids.No
 			continue
 		}
 		var response message.SignatureResponse
-		if _, err := message.Codec.Unmarshal(signatureRes, &response); err != nil {
+		if _, err := s.networkCodec.Unmarshal(signatureRes, &response); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal signature res: %w", err)
 		}
 		if response.Signature == [bls.SignatureLen]byte{} {

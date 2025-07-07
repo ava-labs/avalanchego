@@ -1114,7 +1114,8 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	}
 
 	if vm.config.WarpAPIEnabled {
-		if err := handler.RegisterName("warp", warp.NewAPI(vm.ctx.NetworkID, vm.ctx.SubnetID, vm.ctx.ChainID, vm.ctx.ValidatorState, vm.warpBackend, vm.client, vm.requirePrimaryNetworkSigners)); err != nil {
+		warpAPI := warp.NewAPI(vm.ctx, vm.networkCodec, vm.warpBackend, vm.client, vm.requirePrimaryNetworkSigners)
+		if err := handler.RegisterName("warp", warpAPI); err != nil {
 			return nil, err
 		}
 		enabledAPIs = append(enabledAPIs, "warp")
