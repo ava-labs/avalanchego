@@ -1,10 +1,11 @@
-use std::collections::HashSet;
+use std::borrow::Cow;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use std::io::Write;
+use std::fmt::Write;
 use std::net::Ipv6Addr;
 use std::ops::Deref;
-use std::sync::Arc;
 use std::sync::atomic::Ordering;
+use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
 use oxhttp::Server;
@@ -23,6 +24,7 @@ use metrics_util::registry::{AtomicStorage, Registry};
 pub(crate) fn setup_metrics(metrics_port: u16) -> Result<(), Box<dyn Error>> {
     let inner: TextRecorderInner = TextRecorderInner {
         registry: Registry::atomic(),
+        help: Mutex::new(HashMap::new()),
     };
     let recorder = TextRecorder {
         inner: Arc::new(inner),
@@ -54,6 +56,7 @@ pub(crate) fn setup_metrics(metrics_port: u16) -> Result<(), Box<dyn Error>> {
 #[derive(Debug)]
 struct TextRecorderInner {
     registry: Registry<Key, AtomicStorage>,
+    help: Mutex<HashMap<String, String>>,
 }
 
 #[derive(Debug, Clone)]
@@ -63,7 +66,7 @@ struct TextRecorder {
 
 impl TextRecorder {
     fn stats(&self) -> String {
-        let mut output = Vec::new();
+        let mut output = String::new();
         let systemtime_now = SystemTime::now();
         let utc_now: DateTime<Utc> = systemtime_now.into();
         let epoch_duration = systemtime_now
@@ -75,40 +78,91 @@ impl TextRecorder {
             .saturating_add(u64::from(epoch_duration.subsec_millis()));
         writeln!(output, "# {utc_now}").unwrap();
 
+        let help_guard = self.inner.help.lock().expect("poisoned lock");
+
         let counters = self.registry.get_counter_handles();
-        let mut seen = HashSet::new();
+        let mut seen_counters = HashSet::new();
         for (key, counter) in counters {
-            let sanitized_key_name = key.name().to_string().replace('.', "_");
-            if !seen.contains(&sanitized_key_name) {
-                writeln!(
-                    output,
-                    "# TYPE {} counter",
-                    key.name().to_string().replace('.', "_")
-                )
-                .expect("write error");
-                seen.insert(sanitized_key_name.clone());
+            let sanitized_key_name = self.sanitize_key_name(key.name());
+            if !seen_counters.contains(sanitized_key_name.as_ref()) {
+                if let Some(help) = help_guard.get(sanitized_key_name.as_ref()) {
+                    writeln!(output, "# HELP {sanitized_key_name} {help}").expect("write error");
+                }
+                writeln!(output, "# TYPE {} counter", &sanitized_key_name).expect("write error");
+                seen_counters.insert(sanitized_key_name.to_string());
             }
             write!(output, "{sanitized_key_name}").expect("write error");
-            if key.labels().len() > 0 {
-                write!(
-                    output,
-                    "{{{}}}",
-                    key.labels()
-                        .map(|label| format!("{}=\"{}\"", label.key(), label.value()))
-                        .collect::<Vec<_>>()
-                        .join(",")
-                )
-                .expect("write error");
-            }
+            self.write_labels(&mut output, key.labels());
+
             writeln!(output, " {} {}", counter.load(Ordering::Relaxed), epoch_ms)
                 .expect("write error");
         }
-        writeln!(output).expect("write error");
-        output.flush().expect("flush error");
 
-        std::str::from_utf8(output.as_slice())
-            .expect("failed to convert to string")
-            .into()
+        // Get gauge handles: Uses self.registry.get_gauge_handles() to retrieve all registered gauges
+        let gauges = self.registry.get_gauge_handles();
+        // Track seen gauges. We don't reuse the hashset above to allow us to check for duplicates.
+        let mut seen_gauges = HashSet::new();
+        for (key, gauge) in gauges {
+            let sanitized_key_name = self.sanitize_key_name(key.name());
+            if !seen_gauges.contains(sanitized_key_name.as_ref()) {
+                // Output type declaration: Writes # TYPE {name} gauge for each unique gauge name
+                if let Some(help) = help_guard.get(sanitized_key_name.as_ref()) {
+                    writeln!(output, "# HELP {sanitized_key_name} {help}").expect("write error");
+                }
+                writeln!(output, "# TYPE {sanitized_key_name} gauge").expect("write error");
+                seen_gauges.insert(sanitized_key_name.to_string());
+            }
+            // Format metric line: Outputs the gauge name, labels (if any), current value, and timestamp
+            write!(output, "{sanitized_key_name}").expect("write error");
+            self.write_labels(&mut output, key.labels());
+            // Load gauge value: Uses gauge.load(Ordering::Relaxed) to get the current gauge value
+            writeln!(output, " {} {}", gauge.load(Ordering::Relaxed), epoch_ms)
+                .expect("write error");
+        }
+
+        // Prometheus does not support multiple TYPE declarations for the same metric,
+        // but we will emit them anyway, and panic if we're in debug mode.
+        debug_assert_eq!(
+            seen_gauges.intersection(&seen_counters).count(),
+            0,
+            "duplicate name(s) for gauge and counter: {:?}",
+            seen_gauges.intersection(&seen_counters).collect::<Vec<_>>()
+        );
+        drop(help_guard);
+        writeln!(output).expect("write error");
+
+        output
+    }
+
+    // helper to write labels to the output, minimizing allocations
+    fn write_labels<'a, I: Iterator<Item = &'a metrics::Label>>(
+        &self,
+        output: &mut impl Write,
+        labels: I,
+    ) {
+        let mut label_iter = labels.into_iter();
+        if let Some(first_label) = label_iter.next() {
+            write!(
+                output,
+                "{{{}=\"{}\"",
+                first_label.key(),
+                first_label.value()
+            )
+            .expect("write error");
+            label_iter.for_each(|label| {
+                write!(output, ",{}=\"{}\"", label.key(), label.value()).expect("write error");
+            });
+            write!(output, "}}").expect("write error");
+        }
+    }
+
+    // remove dots from key names, if they are present
+    fn sanitize_key_name<'a>(&self, key_name: &'a str) -> Cow<'a, str> {
+        if key_name.contains('.') {
+            Cow::Owned(key_name.replace('.', "_"))
+        } else {
+            Cow::Borrowed(key_name)
+        }
     }
 }
 
@@ -123,18 +177,28 @@ impl Deref for TextRecorder {
 impl metrics::Recorder for TextRecorder {
     fn describe_counter(
         &self,
-        _key: metrics::KeyName,
+        key: metrics::KeyName,
         _unit: Option<metrics::Unit>,
-        _description: metrics::SharedString,
+        description: metrics::SharedString,
     ) {
+        self.inner
+            .help
+            .lock()
+            .expect("poisoned lock")
+            .insert(key.as_str().to_string(), description.to_string());
     }
 
     fn describe_gauge(
         &self,
-        _key: metrics::KeyName,
+        key: metrics::KeyName,
         _unit: Option<metrics::Unit>,
-        _description: metrics::SharedString,
+        description: metrics::SharedString,
     ) {
+        self.inner
+            .help
+            .lock()
+            .expect("poisoned lock")
+            .insert(key.as_str().to_string(), description.to_string());
     }
 
     fn describe_histogram(
