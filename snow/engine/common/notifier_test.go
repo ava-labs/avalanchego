@@ -104,7 +104,7 @@ func TestNotifierWaitForPrefChangeAfterNotify(t *testing.T) {
 		return atomic.LoadUint32(&notifiedCount) == uint32(2)
 	}, time.Millisecond*100, 10*time.Millisecond)
 
-	nf.PreferenceOrStateChanged()
+	nf.CheckForEvent()
 
 	require.Eventually(t, func() bool {
 		return atomic.LoadUint32(&notifiedCount) == uint32(2)
@@ -129,7 +129,7 @@ func TestNotifierReSubscribeAtPrefChange(t *testing.T) {
 
 	nf.Subscribe = func(ctx context.Context) (Message, error) {
 		if atomic.AddUint32(&subscribedCount, 1) == 1 {
-			nf.PreferenceOrStateChanged()
+			nf.CheckForEvent()
 		}
 
 		select {
