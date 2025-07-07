@@ -6,6 +6,7 @@ package sender_test
 import (
 	"context"
 	"fmt"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"math/rand"
 	"sync"
 	"testing"
@@ -129,8 +130,12 @@ func TestTimeout(t *testing.T) {
 	)
 	require.NoError(err)
 
+	cn, subscription := createSubscriberAndChangeNotifier()
+
 	h, err := handler.New(
 		ctx2,
+		cn,
+		subscription,
 		vdrs,
 		time.Hour,
 		testThreadPoolSize,
@@ -386,8 +391,12 @@ func TestReliableMessages(t *testing.T) {
 	)
 	require.NoError(err)
 
+	cn, subscription := createSubscriberAndChangeNotifier()
+
 	h, err := handler.New(
 		ctx2,
+		cn,
+		subscription,
 		vdrs,
 		1,
 		testThreadPoolSize,
@@ -546,8 +555,12 @@ func TestReliableMessagesToMyself(t *testing.T) {
 			)
 			require.NoError(err)
 
+			cn, subscription := createSubscriberAndChangeNotifier()
+
 			h, err := handler.New(
 				ctx2,
+				cn,
+				subscription,
 				vdrs,
 				time.Second,
 				testThreadPoolSize,
@@ -1304,4 +1317,17 @@ func TestSender_Single_Request(t *testing.T) {
 			}
 		})
 	}
+}
+
+func createSubscriberAndChangeNotifier() (*block.ChangeNotifier, common.Subscription) {
+	var cn block.ChangeNotifier
+
+	subscription := func(ctx context.Context) (common.Message, error) {
+		select {
+		case <-ctx.Done():
+			return common.Message(0), ctx.Err()
+		}
+	}
+
+	return &cn, subscription
 }

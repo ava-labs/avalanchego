@@ -172,7 +172,6 @@ type chain struct {
 	Context *snow.ConsensusContext
 	VM      common.VM
 	Handler handler.Handler
-	nf      *common.NotificationForwarder
 }
 
 // ChainConfig is configuration settings for the current execution.
@@ -887,6 +886,8 @@ func (m *manager) createAvalancheChain(
 	// Asynchronously passes messages from the network to the consensus engine
 	h, err := handler.New(
 		ctx,
+		cn,
+		linearizableVM.WaitForEvent,
 		vdrs,
 		m.FrontierPollFrequency,
 		m.ConsensusAppConcurrency,
@@ -1041,11 +1042,7 @@ func (m *manager) createAvalancheChain(
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", primaryAlias, err)
 	}
 
-	nf := common.NewNotificationForwarder(h, linearizableVM.WaitForEvent, ctx.Log)
-	cn.OnChange = nf.PreferenceOrStateChanged
-
 	return &chain{
-		nf:      nf,
 		Name:    primaryAlias,
 		Context: ctx,
 		VM:      dagVM,
@@ -1282,6 +1279,8 @@ func (m *manager) createSnowmanChain(
 	// Asynchronously passes messages from the network to the consensus engine
 	h, err := handler.New(
 		ctx,
+		cn,
+		vm.WaitForEvent,
 		vdrs,
 		m.FrontierPollFrequency,
 		m.ConsensusAppConcurrency,
@@ -1408,11 +1407,7 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", primaryAlias, err)
 	}
 
-	nf := common.NewNotificationForwarder(h, vm.WaitForEvent, ctx.Log)
-	cn.OnChange = nf.PreferenceOrStateChanged
-
 	return &chain{
-		nf:      nf,
 		Name:    primaryAlias,
 		Context: ctx,
 		VM:      vm,
@@ -1521,9 +1516,6 @@ func (m *manager) Shutdown() {
 	close(m.chainCreatorShutdownCh)
 	m.chainCreatorExited.Wait()
 	m.ManagerConfig.Router.Shutdown(context.TODO())
-	for _, chain := range m.chains {
-		chain.nf.Close()
-	}
 }
 
 // LookupVM returns the ID of the VM associated with an alias

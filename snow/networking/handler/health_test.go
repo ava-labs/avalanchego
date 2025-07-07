@@ -82,8 +82,12 @@ func TestHealthCheckSubnet(t *testing.T) {
 			)
 			require.NoError(err)
 
+			cn, subscription, _ := createSubscriberAndChangeNotifier()
+
 			handlerIntf, err := New(
 				ctx,
+				cn,
+				subscription,
 				vdrs,
 				time.Second,
 				testThreadPoolSize,

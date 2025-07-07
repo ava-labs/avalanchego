@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -82,6 +83,10 @@ type handler struct {
 
 	metrics *metrics
 
+	nf           *common.NotificationForwarder
+	subscription common.Subscription
+	cn           *block.ChangeNotifier
+
 	// Useful for faking time in tests
 	clock mockable.Clock
 
@@ -130,6 +135,8 @@ type handler struct {
 // [engine] must be initialized before initializing this handler
 func New(
 	ctx *snow.ConsensusContext,
+	cn *block.ChangeNotifier,
+	subscription common.Subscription,
 	validators validators.Manager,
 	gossipFrequency time.Duration,
 	threadPoolSize int,
@@ -141,6 +148,8 @@ func New(
 	haltBootstrapping func(),
 ) (Handler, error) {
 	h := &handler{
+		subscription:      subscription,
+		cn:                cn,
 		msgFromVMChan:     make(chan common.Message),
 		haltBootstrapping: haltBootstrapping,
 		ctx:               ctx,
@@ -251,6 +260,9 @@ func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 		h.shutdown(ctx, h.clock.Time())
 		return
 	}
+
+	h.nf = common.NewNotificationForwarder(h, h.subscription, h.ctx.Log)
+	h.cn.OnChange = h.nf.PreferenceOrStateChanged
 
 	detachedCtx := context.WithoutCancel(ctx)
 	dispatchSync := func() {
@@ -979,6 +991,12 @@ func (h *handler) closeDispatcher(ctx context.Context) {
 // Note: shutdown is only called after all message dispatchers have exited or if
 // no message dispatchers ever started.
 func (h *handler) shutdown(ctx context.Context, startClosingTime time.Time) {
+	// If we are shutting down but haven't properly started, we don't need to
+	// close the notification forwarder.
+	if h.nf != nil {
+		h.nf.Close()
+	}
+
 	defer func() {
 		if h.onStopped != nil {
 			go h.onStopped()
