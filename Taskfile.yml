@@ -239,8 +239,8 @@ tasks:
       - task: generate-load-contract-bindings
       - cmd: bash -x ./scripts/tests.load.kube.kind.sh {{.CLI_ARGS}}
 
-  test-load-kube-remote:
-    desc: Runs load tests against a remote kubernetes cluster
+  test-load-kube:
+    desc: Runs load tests against a kubernetes cluster
     vars:
       KUBE_IMAGE: '{{.KUBE_IMAGE | default "avaplatform/avalanchego:latest"}}'
     cmds:
@@ -249,7 +249,7 @@ tasks:
 
   test-load2:
     desc: Runs second iteration of load tests
-    cmds: 
+    cmds:
       - task: build
       - cmd: go run ./tests/load2/main --avalanchego-path=./build/avalanchego {{.CLI_ARGS}}
 
