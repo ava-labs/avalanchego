@@ -51,7 +51,7 @@ runs:
     - uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f #v31
       with:
         github_access_token: ${{ inputs.github_token }}
-    - run: ${{ github.action_path }}/nix-develop.sh --command echo "dependencies installed"
+    - run: ${{ github.workspace }}/nix-develop.sh --command echo "dependencies installed"
       shell: bash
     - name: Notify of metrics availability
       if: (inputs.prometheus_username != '')
