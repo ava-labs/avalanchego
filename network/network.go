@@ -697,6 +697,10 @@ func (n *network) ManuallyTrack(nodeID ids.NodeID, ip netip.AddrPort) {
 	}
 }
 
+func (n *network) Subnets() set.Set[ids.ID] {
+	return n.peerConfig.MySubnets
+}
+
 func (n *network) track(ip *ips.ClaimedIPPort, trackAllSubnets bool) error {
 	// To avoid signature verification when the IP isn't needed, we
 	// optimistically filter out IPs. This can result in us not tracking an IP

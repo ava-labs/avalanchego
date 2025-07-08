@@ -37,12 +37,14 @@ type OutboundMsgBuilder interface {
 		knownPeersSalt []byte,
 		requestAllSubnetIPs bool,
 		appRequestOnlyClient bool,
+		requestedSubnets []ids.ID,
 	) (OutboundMessage, error)
 
 	GetPeerList(
 		knownPeersFilter []byte,
 		knownPeersSalt []byte,
 		requestAllSubnetIPs bool,
+		requestedSubnets []ids.ID,
 	) (OutboundMessage, error)
 
 	PeerList(
@@ -245,9 +247,12 @@ func (b *outMsgBuilder) Handshake(
 	knownPeersSalt []byte,
 	requestAllSubnetIPs bool,
 	appRequestOnlyClient bool,
+	requestedSubnets []ids.ID,
 ) (OutboundMessage, error) {
 	subnetIDBytes := make([][]byte, len(trackedSubnets))
 	encodeIDs(trackedSubnets, subnetIDBytes)
+	requestedSubnetBytes := make([][]byte, len(requestedSubnets))
+	encodeIDs(requestedSubnets, requestedSubnetBytes)
 	return b.builder.createOutbound(
 		&p2p.Message{
 			Message: &p2p.Message_Handshake{
@@ -274,6 +279,7 @@ func (b *outMsgBuilder) Handshake(
 					IpBlsSig:         ipBLSSig,
 					AllSubnets:       requestAllSubnetIPs,
 					AppRequestClient: appRequestOnlyClient,
+					RequestedSubnets: requestedSubnetBytes,
 				},
 			},
 		},
@@ -286,7 +292,10 @@ func (b *outMsgBuilder) GetPeerList(
 	knownPeersFilter []byte,
 	knownPeersSalt []byte,
 	requestAllSubnetIPs bool,
+	requestedSubnets []ids.ID,
 ) (OutboundMessage, error) {
+	requestedSubnetBytes := make([][]byte, len(requestedSubnets))
+	encodeIDs(requestedSubnets, requestedSubnetBytes)
 	return b.builder.createOutbound(
 		&p2p.Message{
 			Message: &p2p.Message_GetPeerList{
@@ -295,7 +304,8 @@ func (b *outMsgBuilder) GetPeerList(
 						Filter: knownPeersFilter,
 						Salt:   knownPeersSalt,
 					},
-					AllSubnets: requestAllSubnetIPs,
+					AllSubnets:       requestAllSubnetIPs,
+					RequestedSubnets: requestedSubnetBytes,
 				},
 			},
 		},

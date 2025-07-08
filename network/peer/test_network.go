@@ -30,6 +30,10 @@ func (testNetwork) KnownPeers() ([]byte, []byte) {
 	return bloom.EmptyFilter.Marshal(), nil
 }
 
+func (testNetwork) Subnets() set.Set[ids.ID] {
+	return set.NewSet[ids.ID](0)
+}
+
 func (testNetwork) Peers(
 	ids.NodeID,
 	set.Set[ids.ID],

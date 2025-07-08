@@ -65,5 +65,5 @@ type Config struct {
 
 	// Specifies whether this node is an AppRequestClient.
 	// This should NOT be set for any normal nodes or validators.
-	AppRequestOnlyClient bool `json:"appRequestClient"`
+	AppRequestOnlyClient bool
 }

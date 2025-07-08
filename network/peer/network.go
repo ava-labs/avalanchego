@@ -41,4 +41,7 @@ type Network interface {
 		knownPeers *bloom.ReadFilter,
 		peerSalt []byte,
 	) []*ips.ClaimedIPPort
+
+	// Subnets returns the override list of subnets that the peer is interested in.
+	Subnets() set.Set[ids.ID]
 }
