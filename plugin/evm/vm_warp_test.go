@@ -111,7 +111,8 @@ func TestSendWarpMessage(t *testing.T) {
 	errs := tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx0})
 	require.NoError(errs[0])
 
-	<-tvm.toEngine
+	require.Equal(commonEng.PendingTxs, tvm.WaitForEvent(context.Background()))
+
 	blk, err := tvm.vm.BuildBlock(context.Background())
 	require.NoError(err)
 
@@ -379,7 +380,7 @@ func testWarpVMTransaction(t *testing.T, unsignedMessage *avalancheWarp.Unsigned
 		blockCtx.PChainHeight = minimumValidPChainHeight
 	}
 	tvm.vm.clock.Set(tvm.vm.clock.Time().Add(2 * time.Second))
-	<-tvm.toEngine
+	require.Equal(commonEng.PendingTxs, tvm.WaitForEvent(context.Background()))
 
 	warpBlock, err := tvm.vm.BuildBlockWithContext(context.Background(), blockCtx)
 	require.NoError(err)
@@ -512,14 +513,14 @@ func TestReceiveWarpMessage(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			testReceiveWarpMessage(
-				t, tvm.toEngine, tvm.vm, test.sourceChainID, test.msgFrom, test.useSigners, test.blockTime,
+				t, tvm.vm, test.sourceChainID, test.msgFrom, test.useSigners, test.blockTime,
 			)
 		})
 	}
 }
 
 func testReceiveWarpMessage(
-	t *testing.T, issuer chan commonEng.Message, vm *VM,
+	t *testing.T, vm *VM,
 	sourceChainID ids.ID,
 	msgFrom warpMsgFrom, useSigners useWarpMsgSigners,
 	blockTime time.Time,
@@ -660,7 +661,9 @@ func testReceiveWarpMessage(
 		PChainHeight: minimumValidPChainHeight,
 	}
 	vm.clock.Set(blockTime)
-	<-issuer
+	msg, err := vm.WaitForEvent(context.Background())
+	require.NoError(err)
+	require.Equal(commonEng.PendingTxs, msg)
 
 	block2, err := vm.BuildBlockWithContext(context.Background(), validProposerCtx)
 	require.NoError(err)
@@ -851,7 +854,7 @@ func TestSignatureRequestsToVM(t *testing.T) {
 }
 
 func TestClearWarpDB(t *testing.T) {
-	ctx, db, genesisBytes, issuer, _ := setupGenesis(t, upgradetest.Latest)
+	ctx, db, genesisBytes, _ := setupGenesis(t, upgradetest.Latest)
 	innerVM := &VM{}
 	vm := atomicvm.WrapVM(innerVM)
 	require.NoError(t, vm.Initialize(
@@ -861,7 +864,6 @@ func TestClearWarpDB(t *testing.T) {
 		genesisBytes,
 		[]byte{},
 		[]byte{},
-		issuer,
 		[]*commonEng.Fx{},
 		&enginetest.Sender{}))
 
@@ -886,7 +888,7 @@ func TestClearWarpDB(t *testing.T) {
 	innerVM = &VM{}
 	vm = atomicvm.WrapVM(innerVM)
 	// we need new context since the previous one has registered metrics.
-	ctx, _, _, _, _ = setupGenesis(t, upgradetest.Latest)
+	ctx, _, _, _ = setupGenesis(t, upgradetest.Latest)
 	require.NoError(t, vm.Initialize(
 		context.Background(),
 		ctx,
@@ -894,7 +896,6 @@ func TestClearWarpDB(t *testing.T) {
 		genesisBytes,
 		[]byte{},
 		[]byte{},
-		issuer,
 		[]*commonEng.Fx{},
 		&enginetest.Sender{}))
 
@@ -911,7 +912,7 @@ func TestClearWarpDB(t *testing.T) {
 	innerVM = &VM{}
 	vm = atomicvm.WrapVM(innerVM)
 	config := `{"prune-warp-db-enabled": true}`
-	ctx, _, _, _, _ = setupGenesis(t, upgradetest.Latest)
+	ctx, _, _, _ = setupGenesis(t, upgradetest.Latest)
 	require.NoError(t, vm.Initialize(
 		context.Background(),
 		ctx,
@@ -919,7 +920,6 @@ func TestClearWarpDB(t *testing.T) {
 		genesisBytes,
 		[]byte{},
 		[]byte(config),
-		issuer,
 		[]*commonEng.Fx{},
 		&enginetest.Sender{}))
 

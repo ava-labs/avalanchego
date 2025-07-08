@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
-	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/coreth/core/state/snapshot"
@@ -81,7 +80,7 @@ type ClientConfig struct {
 
 	Client syncclient.Client
 
-	ToEngine chan<- commonEng.Message
+	StateSyncDone chan struct{}
 }
 
 type client struct {
@@ -246,7 +245,7 @@ func (client *client) acceptSyncSummary(proposedSummary message.Syncable) (block
 		// this error will be propagated to the engine when it calls
 		// vm.SetState(snow.Bootstrapping)
 		log.Info("stateSync completed, notifying engine", "err", client.err)
-		client.ToEngine <- commonEng.StateSyncDone
+		close(client.StateSyncDone)
 	}()
 	return block.StateSyncStatic, nil
 }

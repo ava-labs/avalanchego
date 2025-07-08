@@ -146,6 +146,7 @@ var (
 	errNilBlockGasCostApricotPhase4  = errors.New("nil blockGasCost is invalid after apricotPhase4")
 	errInvalidHeaderPredicateResults = errors.New("invalid header predicate results")
 	errInitializingLogger            = errors.New("failed to initialize logger")
+	errShuttingDownVM                = errors.New("shutting down VM")
 )
 
 var originalStderr *os.File
@@ -221,9 +222,10 @@ type VM struct {
 	// set to a prefixDB with the prefix [warpPrefix]
 	warpDB database.Database
 
-	toEngine chan<- commonEng.Message
-
-	builder *blockBuilder
+	// builderLock is used to synchronize access to the block builder,
+	// as it is uninitialized at first and is only initialized when onNormalOperationsStarted is called.
+	builderLock sync.Mutex
+	builder     *blockBuilder
 
 	clock *mockable.Clock
 
@@ -241,6 +243,8 @@ type VM struct {
 
 	bootstrapped avalancheUtils.Atomic[bool]
 	IsPlugin     bool
+
+	stateSyncDone chan struct{}
 
 	logger corethlog.Logger
 	// State sync server and client
@@ -269,7 +273,6 @@ func (vm *VM) Initialize(
 	genesisBytes []byte,
 	_ []byte,
 	configBytes []byte,
-	toEngine chan<- commonEng.Message,
 	_ []*commonEng.Fx,
 	appSender commonEng.AppSender,
 ) error {
@@ -323,7 +326,6 @@ func (vm *VM) Initialize(
 	// Enable debug-level metrics that might impact runtime performance
 	metrics.EnabledExpensive = vm.config.MetricsExpensiveEnabled
 
-	vm.toEngine = toEngine
 	vm.shutdownChan = make(chan struct{}, 1)
 
 	if err := vm.initializeMetrics(); err != nil {
@@ -463,6 +465,8 @@ func (vm *VM) Initialize(
 	// Add p2p warp message warpHandler
 	warpHandler := acp118.NewCachedHandler(meteredCache, vm.warpBackend, vm.ctx.WarpSigner)
 	vm.Network.AddHandler(p2p.SignatureRequestHandlerID, warpHandler)
+
+	vm.stateSyncDone = make(chan struct{})
 
 	return vm.initializeStateSync(lastAcceptedHeight)
 }
@@ -624,8 +628,9 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 
 	// Initialize the state sync client
 	vm.Client = vmsync.NewClient(&vmsync.ClientConfig{
-		Chain: vm.eth,
-		State: vm.State,
+		StateSyncDone: vm.stateSyncDone,
+		Chain:         vm.eth,
+		State:         vm.State,
 		Client: statesyncclient.NewClient(
 			&statesyncclient.ClientConfig{
 				NetworkClient:    vm.Network,
@@ -643,7 +648,6 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 		ChaindDB:           vm.chaindb,
 		VerDB:              vm.versiondb,
 		MetadataDB:         vm.metadataDB,
-		ToEngine:           vm.toEngine,
 		Acceptor:           vm,
 		Parser:             vm.extensionConfig.SyncableParser,
 		Extender:           vm.extensionConfig.SyncExtender,
@@ -780,8 +784,10 @@ func (vm *VM) initBlockBuilding() error {
 	vm.ethTxPushGossiper.Set(ethTxPushGossiper)
 
 	// NOTE: gossip network must be initialized first otherwise ETH tx gossip will not work.
-	vm.builder = vm.NewBlockBuilder(vm.toEngine, vm.extensionConfig.ExtraMempool)
+	vm.builderLock.Lock()
+	vm.builder = vm.NewBlockBuilder(vm.extensionConfig.ExtraMempool)
 	vm.builder.awaitSubmittedTxs()
+	vm.builderLock.Unlock()
 
 	vm.ethTxGossipHandler = gossip.NewTxGossipHandler[*GossipEthTx](
 		vm.ctx.Log,
@@ -836,6 +842,26 @@ func (vm *VM) initBlockBuilding() error {
 	}()
 
 	return nil
+}
+
+func (vm *VM) WaitForEvent(ctx context.Context) (commonEng.Message, error) {
+	vm.builderLock.Lock()
+	builder := vm.builder
+	vm.builderLock.Unlock()
+
+	// Block building is not initialized yet, so we haven't finished syncing or bootstrapping.
+	if builder == nil {
+		select {
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		case <-vm.stateSyncDone:
+			return commonEng.StateSyncDone, nil
+		case <-vm.shutdownChan:
+			return commonEng.Message(0), errShuttingDownVM
+		}
+	}
+
+	return builder.waitForEvent(ctx)
 }
 
 // Shutdown implements the snowman.ChainVM interface

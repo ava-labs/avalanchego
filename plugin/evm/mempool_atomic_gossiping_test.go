@@ -7,13 +7,14 @@ import (
 	"context"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	atomictxpool "github.com/ava-labs/coreth/plugin/evm/atomic/txpool"
 	"github.com/ava-labs/coreth/plugin/evm/extension"
-
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // shows that a locally generated AtomicTx can be added to mempool and then
@@ -42,7 +43,7 @@ func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 				importTxs := createImportTxOptions(t, tvm.atomicVM, tvm.atomicMemory)
 				tx, conflictingTx = importTxs[0], importTxs[1]
 			} else {
-				exportTxs := createExportTxOptions(t, tvm.atomicVM, tvm.toEngine, tvm.atomicMemory)
+				exportTxs := createExportTxOptions(t, tvm.atomicVM, tvm.atomicMemory)
 				tx, conflictingTx = exportTxs[0], exportTxs[1]
 			}
 			txID := tx.ID()
@@ -60,7 +61,7 @@ func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 			has = mempool.Has(conflictingTxID)
 			assert.False(has, "conflicting tx in mempool")
 
-			<-tvm.toEngine
+			require.Equal(t, common.PendingTxs, tvm.WaitForEvent(context.Background()))
 
 			has = mempool.Has(txID)
 			assert.True(has, "valid tx not recorded into mempool")
