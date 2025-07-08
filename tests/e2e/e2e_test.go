@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
@@ -50,6 +51,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	upgrades := upgrade.Default
 	if flagVars.ActivateGranite() {
 		upgrades.GraniteTime = upgrade.InitiallyActiveTime
+		upgrades.GraniteEpochDuration = 4 * time.Second
 	} else {
 		upgrades.GraniteTime = upgrade.UnscheduledActivationTime
 	}
