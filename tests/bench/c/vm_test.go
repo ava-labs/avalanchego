@@ -251,8 +251,6 @@ func (e *VMExecutor) executeSequence(ctx context.Context, blkChan <-chan BlockRe
 
 		if blkResult.Height%1000 == 0 {
 			e.log.Info("executing block", zap.Uint64("height", blkResult.Height))
-		} else {
-			e.log.Debug("executing block", zap.Uint64("height", blkResult.Height))
 		}
 		if err := e.execute(ctx, blkResult.BlockBytes); err != nil {
 			return err
