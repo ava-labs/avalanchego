@@ -181,4 +181,8 @@ type Config struct {
 	// Specifies how much disk usage each peer can cause before
 	// we rate-limit them.
 	DiskTargeter tracker.Targeter `json:"-"`
+
+	// Specifies whether this node is an AppRequestClient.
+	// This should NOT be set for any normal nodes or validators.
+	AppRequestOnlyClient bool `json:"appRequestClient"`
 }

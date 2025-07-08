@@ -109,6 +109,8 @@ message Handshake {
   // To avoid sending IPs that the client isn't interested in tracking, the
   // server expects the client to confirm that it is tracking all subnets.
   bool all_subnets = 14;
+  // Whether the peer is an AppRequestClient
+  bool app_request_client = 15;
 }
 
 // Metadata about a peer's P2P client used to determine compatibility
