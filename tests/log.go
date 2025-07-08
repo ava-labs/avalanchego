@@ -25,5 +25,6 @@ func LoggerForFormat(prefix string, rawLogFormat string) (logging.Logger, error)
 	if err != nil {
 		return nil, err
 	}
-	return logging.NewLogger(prefix, logging.NewWrappedCore(logging.Verbo, writeCloser, logFormat.ConsoleEncoder())), nil
+	// TODO(marun) Make the log level configurable
+	return logging.NewLogger(prefix, logging.NewWrappedCore(logging.Debug, writeCloser, logFormat.ConsoleEncoder())), nil
 }

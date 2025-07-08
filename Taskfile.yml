@@ -203,7 +203,7 @@ tasks:
     env:
       E2E_SERIAL: 1
     cmds:
-      - task: test-e2e-kube
+      - cmd: bash -x ./scripts/tests.e2e.kube.sh {{.CLI_ARGS}}
 
   # To use a different fuzz time, run `task test-fuzz FUZZTIME=[value in seconds]`.
   # A value of `-1` will run until it encounters a failing output.
@@ -241,7 +241,7 @@ tasks:
 
   test-load2:
     desc: Runs second iteration of load tests
-    cmds: 
+    cmds:
       - task: build
       - cmd: go run ./tests/load2/main --avalanchego-path=./build/avalanchego {{.CLI_ARGS}}
 

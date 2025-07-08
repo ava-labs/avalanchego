@@ -449,11 +449,7 @@ func (n *Network) Bootstrap(ctx context.Context, log logging.Logger) error {
 	}
 
 	// Don't restart the node during subnet creation since it will always be restarted afterwards.
-	uri, cancel, err := bootstrapNode.GetLocalURI(ctx)
-	if err != nil {
-		return err
-	}
-	defer cancel()
+	uri := bootstrapNode.GetAccessibleURI()
 	if err := n.CreateSubnets(ctx, log, uri, false /* restartRequired */); err != nil {
 		return err
 	}
@@ -784,11 +780,9 @@ func (n *Network) GetNode(nodeID ids.NodeID) (*Node, error) {
 	return nil, fmt.Errorf("%s is not known to the network", nodeID)
 }
 
-// GetNodeURIs returns the URIs of nodes in the network that are running and not ephemeral. The URIs
-// returned are guaranteed be reachable by the caller until the cleanup function is called regardless
-// of whether the nodes are running as local processes or in a kube cluster.
-func (n *Network) GetNodeURIs(ctx context.Context, deferCleanupFunc func(func())) ([]NodeURI, error) {
-	return GetNodeURIs(ctx, n.Nodes, deferCleanupFunc)
+// GetNodeURIs returns the accessible URIs of nodes in the network that are running and not ephemeral.
+func (n *Network) GetNodeURIs() []NodeURI {
+	return GetNodeURIs(n.Nodes)
 }
 
 // GetAvailableNodeIDs returns the node IDs of nodes in the network that are running and not ephemeral.
@@ -961,7 +955,7 @@ func waitForHealthy(ctx context.Context, log logging.Logger, nodes []*Node) erro
 			unhealthyNodes.Remove(node)
 			log.Info("node is healthy",
 				zap.Stringer("nodeID", node.NodeID),
-				zap.String("uri", node.URI),
+				zap.String("uri", node.GetAccessibleURI()),
 			)
 		}
 
