@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/maps"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
@@ -92,21 +93,31 @@ func TestRequestClientArbitrarilyLongBody(t *testing.T) {
 // client
 func TestHttpResponse(t *testing.T) {
 	tests := []struct {
-		name   string
-		header http.Header
+		name           string
+		requestHeader  http.Header
+		responseHeader http.Header
 	}{
 		{
 			// Requests with an upgrade header do not use the "Simple*" http response
 			// apis and must be separately tested
-			name: "upgrade header specified",
-			header: http.Header{
+			name: "upgrade request header specified",
+			requestHeader: http.Header{
 				"Upgrade": {"upgrade"},
 				"foo":     {"foo"},
 			},
+			responseHeader: http.Header{},
 		},
 		{
-			name: "arbitrary headers",
-			header: http.Header{
+			name: "arbitrary request headers",
+			requestHeader: http.Header{
+				"foo": {"foo"},
+			},
+			responseHeader: http.Header{},
+		},
+		{
+			name:          "response header set",
+			requestHeader: http.Header{},
+			responseHeader: http.Header{
 				"foo": {"foo"},
 			},
 		},
@@ -116,8 +127,14 @@ func TestHttpResponse(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
+			wantHandlerHeaders := http.Header{}
+			wantHandlerHeaders.Add("Bar", "bar")
+			wantHandlerHeaders.Add("Content-Type", "application/json")
 			handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				w.Header()["Bar"] = []string{"bar"}
+				for k, v := range wantHandlerHeaders {
+					w.Header().Set(k, v[0])
+				}
+
 				_, _ = w.Write([]byte("baz"))
 			})
 
@@ -137,22 +154,29 @@ func TestHttpResponse(t *testing.T) {
 			require.NoError(err)
 
 			recorder := &httptest.ResponseRecorder{
-				Body: bytes.NewBuffer(nil),
+				HeaderMap: maps.Clone(tt.responseHeader),
+				Body:      bytes.NewBuffer(nil),
 			}
 
 			client := NewClient(httppb.NewHTTPClient(conn))
-			client.ServeHTTP(recorder, &http.Request{
+			request := &http.Request{
 				Body:   io.NopCloser(strings.NewReader("foo")),
-				Header: tt.header,
-			})
+				Header: tt.requestHeader,
+			}
+			client.ServeHTTP(recorder, request)
 
 			require.Equal(http.StatusOK, recorder.Code)
-			require.Equal(
-				http.Header{
-					"Bar": []string{"bar"},
-				},
-				recorder.Header(),
-			)
+
+			// Sanity check that the request headers were not modified
+			require.Equal(tt.requestHeader, request.Header)
+
+			// Sanity check that any headers added by middleware not modified
+			wantResponseHeader := maps.Clone(tt.responseHeader)
+			for k, v := range wantHandlerHeaders {
+				wantResponseHeader.Add(k, v[0])
+			}
+
+			require.Equal(wantResponseHeader, recorder.Header())
 			require.Equal("baz", recorder.Body.String())
 		})
 	}

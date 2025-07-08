@@ -155,11 +155,13 @@ message HandleSimpleHTTPRequest {
   string method = 1;
   // url specifies either the URI being requested
   string url = 2;
-  // headers contains the request header fields either received
+  // request_headers contains the request header fields either received
   // by the server or to be sent by the client
-  repeated Element headers = 3;
+  repeated Element request_headers = 3;
   // body is the request payload in bytes
   bytes body = 4;
+  // response_headers contains headers that are to be sent by the server to the client
+  repeated Element response_headers = 5;
 }
 
 message HandleSimpleHTTPResponse {
