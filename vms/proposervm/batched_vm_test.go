@@ -938,7 +938,6 @@ func initTestRemoteProposerVM(
 		[]byte,
 		[]byte,
 		[]byte,
-		chan<- common.Message,
 		[]*common.Fx,
 		common.AppSender,
 	) error {
@@ -1025,7 +1024,6 @@ func initTestRemoteProposerVM(
 		ctx,
 		prefixdb.New([]byte{}, memdb.New()), // make sure that DBs are compressed correctly
 		initialState,
-		nil,
 		nil,
 		nil,
 		nil,

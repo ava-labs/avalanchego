@@ -577,7 +577,7 @@ func (ss *stateSyncer) sendGetAcceptedStateSummaries(ctx context.Context) {
 
 func (ss *stateSyncer) Notify(ctx context.Context, msg common.Message) error {
 	if msg != common.StateSyncDone {
-		ss.Ctx.Log.Warn("received an unexpected message from the VM",
+		ss.Ctx.Log.Info("received an unexpected message from the VM",
 			zap.Stringer("msg", msg),
 		)
 		return nil
