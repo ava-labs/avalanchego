@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/libevm/common"
@@ -159,7 +161,8 @@ func executeTxTest(t *testing.T, test atomicTxTest) {
 	if err := tvm.atomicVM.AtomicMempool.AddLocalTx(tx); err != nil {
 		t.Fatal(err)
 	}
-	<-tvm.toEngine
+
+	require.Equal(t, commonEng.PendingTxs, tvm.WaitForEvent(context.Background()))
 
 	// If we've reached this point, we expect to be able to build and verify the block without any errors
 	blk, err := tvm.vm.BuildBlock(context.Background())
