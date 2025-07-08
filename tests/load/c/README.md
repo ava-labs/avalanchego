@@ -26,10 +26,11 @@ Initiate nix shell: `nix develop`
 
 ## Local tmpnet
 
-To run the load test locally against tmpnet nodes:
+### Process-based
+Compiles the current `avalanchego` source code, runs load-test against locally provisioned tmpnet nodes.
 
 ```bash
-./scripts/run_task.sh install-nix
+./scripts/run_task.sh test-load
 ```
 
 ### Against local kind cluster
