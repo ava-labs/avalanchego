@@ -903,6 +903,10 @@ func (p *KubeRuntime) getFlags() (FlagsMap, error) {
 	flags[config.DataDirKey] = volumeMountPath
 	// The node must bind to the Pod IP to enable the kubelet to access the http port for the readiness check
 	flags[config.HTTPHostKey] = "0.0.0.0"
+	// Ensure compatibility with a non-localhost ingress host
+	if !IsRunningInCluster() && !strings.HasPrefix(p.runtimeConfig().IngressHost, "localhost") {
+		flags[config.HTTPAllowedHostsKey] = p.runtimeConfig().IngressHost
+	}
 	return flags, nil
 }
 
