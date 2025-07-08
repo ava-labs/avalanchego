@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/simplex"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -69,7 +70,7 @@ func (b *Block) Bytes() ([]byte, error) {
 // Verify verifies the block.
 func (b *Block) Verify(ctx context.Context) (simplex.VerifiedBlock, error) {
 	if b.metadata.Seq != 0 {
-		err := b.verifyParentMatchesPrevBlock(ctx)
+		err := b.verifyParentMatchesPrevBlock()
 		if err != nil {
 			return nil, err
 		}
@@ -88,10 +89,10 @@ func (b *Block) Verify(ctx context.Context) (simplex.VerifiedBlock, error) {
 
 // verifyPrevBlock verifies that the previous block referenced in the current block's metadata
 // matches the parent of the current block's vmBlock.
-func (b *Block) verifyParentMatchesPrevBlock(ctx context.Context) error {
+func (b *Block) verifyParentMatchesPrevBlock() error {
 	prevBlock := b.blockTracker.getBlock(b.metadata.Prev)
 	if prevBlock != nil {
-		if b.vmBlock.Parent() != prevBlock.vmBlock.ID() && b.metadata.Prev != prevBlock.digest {
+		if b.vmBlock.Parent() != prevBlock.vmBlock.ID() || b.metadata.Prev != prevBlock.digest {
 			return fmt.Errorf("%w: parentID %s, prevID %s", errMismatchedPrevDigest, b.vmBlock.Parent(), prevBlock.vmBlock.ID())
 		}
 
@@ -99,15 +100,13 @@ func (b *Block) verifyParentMatchesPrevBlock(ctx context.Context) error {
 	}
 
 	// if we do not have it in the map, it's possible for it to be the last accepted block
-	lastID, err := b.blockTracker.vm.LastAccepted(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get last accepted block: %w", err)
+	if b.blockTracker.lastAcceptedID != b.vmBlock.Parent() {
+		return fmt.Errorf("%w: last accepted block %s, parentID %s", errDigestNotFound, b.blockTracker.lastAcceptedID, b.vmBlock.Parent())
 	}
 
-	if lastID != b.vmBlock.Parent() {
-		return fmt.Errorf("%w: last accepted block %s, parentID %s", errDigestNotFound, lastID, b.vmBlock.Parent())
+	if b.blockTracker.lastAcceptedDigest != b.metadata.Prev {
+		return fmt.Errorf("%w: last accepted digest %s, prevID %s", errMismatchedPrevDigest, b.blockTracker.lastAcceptedDigest, b.metadata.Prev)
 	}
-
 	return nil
 }
 
@@ -150,16 +149,20 @@ type blockTracker struct {
 	// tracks the simplex digests to the blocks that have been verified
 	simplexDigestsToBlock map[simplex.Digest]*Block
 
-	vm block.ChainVM
+	// lastAcceptedID is the ID of the last accepted block at the time of the block tracker creation.
+	lastAcceptedID ids.ID
+	// lastAcceptedDigest is the digest of the last accepted simplex block at the time of the block tracker creation.
+	lastAcceptedDigest simplex.Digest
 
 	// handles block acceptance and rejection of inner blocks
 	tree tree.Tree
 }
 
-func newBlockTracker(vm block.ChainVM) *blockTracker {
+func newBlockTracker(lastAcceptedID ids.ID, lastAcceptedDigest simplex.Digest) *blockTracker {
 	return &blockTracker{
 		tree:                  tree.New(),
-		vm:                    vm,
+		lastAcceptedID:        lastAcceptedID,
+		lastAcceptedDigest:    lastAcceptedDigest,
 		simplexDigestsToBlock: make(map[simplex.Digest]*Block),
 	}
 }

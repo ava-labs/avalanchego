@@ -104,16 +104,8 @@ func TestBlockSerialization(t *testing.T) {
 func TestVerifyPrevNotFound(t *testing.T) {
 	ctx := context.Background()
 	testBlock := snowmantest.BuildChild(snowmantest.Genesis)
-	testVM := &blocktest.VM{
-		VM: enginetest.VM{
-			T: t,
-		},
-	}
-	testVM.LastAcceptedF = func(_ context.Context) (ids.ID, error) {
-		return ids.GenerateTestID(), nil
-	}
 
-	tracker := newBlockTracker(testVM)
+	tracker := newBlockTracker(ids.GenerateTestID(), simplex.Digest{0x01})
 	b := newBlockWithDigest(t, testBlock, tracker, 1, 1, [32]byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07})
 
 	_, err := b.Verify(ctx)
@@ -124,21 +116,12 @@ func TestVerifyPrevNotFound(t *testing.T) {
 // successfully verifies the block if it is the latest accepted block.
 func TestVerifyPrevIsLatest(t *testing.T) {
 	ctx := context.Background()
-	testVM := &blocktest.VM{
-		VM: enginetest.VM{
-			T: t,
-		},
-	}
-
 	latestAccepted := snowmantest.Genesis
-	testVM.LastAcceptedF = func(_ context.Context) (ids.ID, error) {
-		return latestAccepted.ID(), nil
-	}
-
-	tracker := newBlockTracker(testVM)
+	tracker := newBlockTracker(latestAccepted.ID(), simplex.Digest{})
 
 	// Create latest accepted block, and its child
 	latestBlock := newBlockWithDigest(t, latestAccepted, tracker, 0, 0, [32]byte{})
+	tracker.lastAcceptedDigest = latestBlock.digest
 	testBlock := snowmantest.BuildChild(latestAccepted)
 	b := newBlockWithDigest(t, testBlock, tracker, 1, 1, latestBlock.digest)
 
@@ -154,19 +137,30 @@ func TestVerifyPrevIsLatest(t *testing.T) {
 	require.Equal(t, blockBytes, vBlockBytes, "block bytes should match after verification")
 }
 
+// TestVerifyLatestDigestMismatch tests verification fails if the latest accepted block's digest
+// does not match the expected previous digest in the block metadata.
+func TestVerifyLatestDigestMismatch(t *testing.T) {
+	ctx := context.Background()
+	latestAccepted := snowmantest.Genesis
+	tracker := newBlockTracker(latestAccepted.ID(), simplex.Digest{0x01})
+
+	// Create latest accepted block, and its child
+	latestBlock := newBlockWithDigest(t, latestAccepted, tracker, 0, 0, [32]byte{})
+	testBlock := snowmantest.BuildChild(latestAccepted)
+	b := newBlockWithDigest(t, testBlock, tracker, 1, 1, latestBlock.digest)
+
+	_, err := b.Verify(ctx)
+	require.ErrorIs(t, err, errMismatchedPrevDigest)
+}
+
 // TestVerifyParentAccepted tests that a block, whose parent has been verified and indexed, can
 // also be verified and indexed successfully.
 func TestVerifyParentAccepted(t *testing.T) {
 	ctx := context.Background()
 	vmBlock0 := snowmantest.Genesis
 	vmBlock1 := snowmantest.BuildChild(vmBlock0)
-	testVM := &blocktest.VM{
-		VM: enginetest.VM{
-			T: t,
-		},
-	}
 
-	tracker := newBlockTracker(testVM)
+	tracker := newBlockTracker(ids.Empty, simplex.Digest{0x01})
 	seq0Block := newBlockWithDigest(t, vmBlock0, tracker, 0, 0, [32]byte{})
 	seq1Block := newBlockWithDigest(t, vmBlock1, tracker, 1, 1, seq0Block.digest)
 
@@ -191,13 +185,8 @@ func TestVerifyBlockRejectsSiblings(t *testing.T) {
 	vmBlock0 := snowmantest.Genesis
 	block0Child0 := snowmantest.BuildChild(vmBlock0)
 	block0Child1 := snowmantest.BuildChild(vmBlock0)
-	testVM := &blocktest.VM{
-		VM: enginetest.VM{
-			T: t,
-		},
-	}
 
-	tracker := newBlockTracker(testVM)
+	tracker := newBlockTracker(ids.Empty, simplex.Digest{0x01})
 	seq0Block := newBlockWithDigest(t, vmBlock0, tracker, 0, 0, [32]byte{})
 
 	// round1Block and round2Block are siblings, both children of seq0
@@ -228,24 +217,18 @@ func TestVerifyBlockRejectsSiblings(t *testing.T) {
 }
 
 func TestVerifyInnerBlockBreaksHashChain(t *testing.T) {
-	testVM := &blocktest.VM{
-		VM: enginetest.VM{
-			T: t,
-		},
-	}
-	testVM.LastAcceptedF = func(_ context.Context) (ids.ID, error) {
-		return snowmantest.Genesis.ID(), nil
-	}
+	genesisDigest := simplex.Digest{0x00, 0x01}
 
-	tracker := newBlockTracker(testVM)
+	tracker := newBlockTracker(snowmantest.Genesis.ID(), genesisDigest)
 	ctx := context.Background()
-	// We have a block whose metadata.prev does not point to their parent
+
+	// We verify this valid block
 	seq1 := snowmantest.BuildChild(snowmantest.Genesis)
-	seq1Block := newBlockWithDigest(t, seq1, tracker, 1, 1, [32]byte{})
+	seq1Block := newBlockWithDigest(t, seq1, tracker, 1, 1, genesisDigest)
 	_, err := seq1Block.Verify(ctx)
 	require.NoError(t, err)
 
-	// This block does not extend seq1, however it has a valid previous digest
+	// This block does not extend seq1, however it has a valid previous digest(since seq1Block was verified)
 	seq2 := snowmantest.BuildChild(snowmantest.Genesis)
 	seq2Block := newBlockWithDigest(t, seq2, tracker, 2, 2, seq1Block.digest)
 	_, err = seq2Block.Verify(ctx)
@@ -253,15 +236,9 @@ func TestVerifyInnerBlockBreaksHashChain(t *testing.T) {
 }
 
 func TestIndexBlockDigestNotFound(t *testing.T) {
-	testVM := &blocktest.VM{
-		VM: enginetest.VM{
-			T: t,
-		},
-	}
-	tracker := newBlockTracker(testVM)
+	tracker := newBlockTracker(ids.Empty, simplex.Digest{})
 	ctx := context.Background()
 
-	// We have a block whose metadata.prev does not point to their parent
 	seq1 := snowmantest.BuildChild(snowmantest.Genesis)
 	seq1Block := newBlockWithDigest(t, seq1, tracker, 1, 1, [32]byte{})
 	err := tracker.indexBlock(ctx, seq1Block.digest)
