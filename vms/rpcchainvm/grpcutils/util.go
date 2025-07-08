@@ -68,8 +68,8 @@ func GetHTTPHeader(hs http.Header) []*httppb.Element {
 func SetHeaders(headers http.Header, next []*httppb.Element) {
 	clear(headers)
 
-	for _, header := range next {
-		headers[header.Key] = header.Values
+	for _, h := range next {
+		headers[h.Key] = h.Values
 	}
 }
 
