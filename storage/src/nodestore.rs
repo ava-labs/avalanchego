@@ -1703,10 +1703,10 @@ impl<S: ReadableStorage> Iterator for FreeListIterator<'_, S> {
 
 impl<S: ReadableStorage> FusedIterator for FreeListIterator<'_, S> {}
 
-#[allow(dead_code)] // TODO: free list iterators will be used in the checker
 impl<T, S: ReadableStorage> NodeStore<T, S> {
     // Returns an iterator over the free lists of size no smaller than the size corresponding to `start_area_index`.
     // The iterator returns a tuple of the address and the area index of the free area.
+    #[expect(dead_code)] // TODO: free list iterators will be used in the checker
     pub(crate) fn free_list_iter(
         &self,
         start_area_index: AreaIndex,

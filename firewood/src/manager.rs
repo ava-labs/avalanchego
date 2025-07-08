@@ -317,12 +317,9 @@ impl RevisionManager {
     #[cfg(feature = "ethhash")]
     #[inline]
     pub fn empty_trie_hash(&self) -> Option<TrieHash> {
-        // clippy is wrong here. we need to keep the closure since empty_trie_hash
-        // is an instance method that needs self.
-        #[allow(clippy::redundant_closure)]
         Some(
             self.empty_hash
-                .get_or_init(|| firewood_storage::empty_trie_hash())
+                .get_or_init(firewood_storage::empty_trie_hash)
                 .clone(),
         )
     }

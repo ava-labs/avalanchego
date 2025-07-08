@@ -32,6 +32,33 @@ pub type HashType = ethhash::HashOrRlp;
 /// The type of a hash. For non-ethereum compatible hashes, this is always a `TrieHash`.
 pub type HashType = crate::TrieHash;
 
+/// A trait to convert a value into a [`HashType`].
+///
+/// This is used to allow different hash types to be conditionally used, e.g., when the
+/// `ethhash` feature is enabled. When not enabled, this suppresses the clippy warnings
+/// about useless `.into()` calls.
+pub trait IntoHashType {
+    /// Converts the value into a `HashType`.
+    #[must_use]
+    fn into_hash_type(self) -> HashType;
+}
+
+#[cfg(feature = "ethhash")]
+impl IntoHashType for crate::TrieHash {
+    #[inline]
+    fn into_hash_type(self) -> HashType {
+        self.into()
+    }
+}
+
+#[cfg(not(feature = "ethhash"))]
+impl IntoHashType for crate::TrieHash {
+    #[inline]
+    fn into_hash_type(self) -> HashType {
+        self
+    }
+}
+
 pub(crate) trait Serializable {
     fn write_to<W: ExtendableBytes>(&self, vec: &mut W);
 

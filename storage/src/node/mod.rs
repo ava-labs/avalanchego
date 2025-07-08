@@ -504,8 +504,14 @@ mod test {
         )})), 652; "full branch node with long partial path and value"
     )]
     // When ethhash is enabled, we don't actually check the `expected_length`
-    #[allow(unused_variables)]
-    fn test_serialize_deserialize(node: Node, expected_length: usize) {
+    fn test_serialize_deserialize(
+        node: Node,
+        #[cfg_attr(
+            any(feature = "branch_factor_256", feature = "ethhash"),
+            expect(unused_variables)
+        )]
+        expected_length: usize,
+    ) {
         use crate::node::Node;
         use std::io::Cursor;
 

@@ -21,7 +21,6 @@ struct CoalescingRanges<'a, T> {
     next_adjacent_range: Option<Range<&'a T>>,
 }
 
-#[allow(dead_code)]
 impl<T: Clone + Ord + Debug> RangeSet<T> {
     pub const fn new() -> Self {
         Self(BTreeMap::new())
@@ -157,6 +156,7 @@ impl<T: Clone + Ord + Debug> RangeSet<T> {
     }
 
     /// Insert the range into the range set.
+    #[cfg(test)]
     pub fn insert_range(&mut self, range: Range<T>) {
         self.insert_range_helper(range, true)
             .expect("insert range should always success if we allow intersecting area insert");
@@ -305,12 +305,13 @@ mod test_range_set {
     }
 
     #[test]
-    #[allow(clippy::reversed_empty_ranges)]
     fn test_insert_empty_range() {
         let mut range_set = RangeSet::new();
         range_set.insert_range(0..0);
         range_set.insert_range(10..10);
+        #[expect(clippy::reversed_empty_ranges)]
         range_set.insert_range(20..10);
+        #[expect(clippy::reversed_empty_ranges)]
         range_set.insert_range(30..0);
         assert_eq!(range_set.into_iter().collect::<Vec<_>>(), vec![]);
     }

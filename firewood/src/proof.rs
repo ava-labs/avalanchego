@@ -11,8 +11,8 @@
 )]
 
 use firewood_storage::{
-    BranchNode, FileIoError, HashType, Hashable, NibblesIterator, PathIterItem, Preimage, TrieHash,
-    ValueDigest,
+    BranchNode, FileIoError, HashType, Hashable, IntoHashType, NibblesIterator, PathIterItem,
+    Preimage, TrieHash, ValueDigest,
 };
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -209,8 +209,7 @@ impl<T: Hashable> Proof<T> {
             return Err(ProofError::Empty);
         };
 
-        #[allow(clippy::useless_conversion)]
-        let mut expected_hash: HashType = root_hash.clone().into();
+        let mut expected_hash = root_hash.clone().into_hash_type();
 
         let mut iter = self.0.iter().peekable();
         while let Some(node) = iter.next() {

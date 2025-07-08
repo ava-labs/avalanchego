@@ -1,7 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-#![allow(
+#![expect(
     unsafe_code,
     reason = "This is an FFI library, so unsafe code is expected."
 )]
@@ -272,8 +272,6 @@ fn view_sync_from_root(
 
 /// A `KeyValue` represents a key-value pair, passed to the FFI.
 #[repr(C)]
-#[allow(unused)]
-#[unsafe(no_mangle)]
 pub struct KeyValue {
     key: Value,
     value: Value,
@@ -992,8 +990,9 @@ pub unsafe extern "C" fn fwd_close_db(db: Option<&mut DatabaseHandle>) {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
 mod tests {
+    #![expect(clippy::unwrap_used)]
+
     use super::*;
 
     #[test]

@@ -19,21 +19,28 @@
 )]
 
 use crate::proof::{Proof, ProofError, ProofNode};
+#[cfg(test)]
 use crate::range_proof::RangeProof;
-use crate::stream::{MerkleKeyValueStream, PathIterator};
+#[cfg(test)]
+use crate::stream::MerkleKeyValueStream;
+use crate::stream::PathIterator;
+#[cfg(test)]
 use crate::v2::api;
 use firewood_storage::{
     BranchNode, Child, FileIoError, HashType, Hashable, HashedNodeReader, ImmutableProposal,
-    LeafNode, LinearAddress, MutableProposal, NibblesIterator, Node, NodeStore, Path,
+    IntoHashType, LeafNode, LinearAddress, MutableProposal, NibblesIterator, Node, NodeStore, Path,
     ReadableStorage, SharedNode, TrieReader, ValueDigest,
 };
+#[cfg(test)]
 use futures::{StreamExt, TryStreamExt};
 use metrics::counter;
 use std::collections::HashSet;
 use std::fmt::{Debug, Write};
+#[cfg(test)]
 use std::future::ready;
 use std::io::Error;
 use std::iter::once;
+#[cfg(test)]
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 
@@ -235,12 +242,12 @@ impl<T: TrieReader> Merkle<T> {
         PathIterator::new(&self.nodestore, key)
     }
 
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub(super) fn key_value_iter(&self) -> MerkleKeyValueStream<'_, T> {
         MerkleKeyValueStream::from(&self.nodestore)
     }
 
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub(super) fn key_value_iter_from_key<K: AsRef<[u8]>>(
         &self,
         key: K,
@@ -249,7 +256,7 @@ impl<T: TrieReader> Merkle<T> {
         MerkleKeyValueStream::from_key(&self.nodestore, key.as_ref())
     }
 
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub(super) async fn range_proof(
         &self,
         start_key: Option<&[u8]>,
@@ -421,11 +428,13 @@ impl<T: HashedNodeReader> Merkle<T> {
                 .map_err(|e| FileIoError::new(e, None, 0, None))
                 .map_err(Error::other)?;
             let mut seen = HashSet::new();
-            // If ethhash is off, root_hash.into() is already the correct type
-            // so we disable the warning here
-            #[allow(clippy::useless_conversion)]
-            self.dump_node(root_addr, Some(&root_hash.into()), &mut seen, &mut result)
-                .map_err(Error::other)?;
+            self.dump_node(
+                root_addr,
+                Some(&root_hash.into_hash_type()),
+                &mut seen,
+                &mut result,
+            )
+            .map_err(Error::other)?;
         }
         write!(result, "}}")
             .map_err(Error::other)
@@ -1993,7 +2002,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::unwrap_used)]
     fn test_root_hash_reversed_deletions() -> Result<(), FileIoError> {
         use rand::rngs::StdRng;
         use rand::{Rng, SeedableRng};
@@ -2095,7 +2103,6 @@ mod tests {
     }
 
     // #[test]
-    // #[allow(clippy::unwrap_used)]
     // fn test_root_hash_random_deletions() -> Result<(), Error> {
     //     use rand::rngs::StdRng;
     //     use rand::seq::SliceRandom;
@@ -2171,7 +2178,6 @@ mod tests {
     // }
 
     // #[test]
-    // #[allow(clippy::unwrap_used, clippy::indexing_slicing)]
     // fn test_proof() -> Result<(), Error> {
     //     let set = fixed_and_pseudorandom_data(500);
     //     let mut items = Vec::from_iter(set.iter());
@@ -2288,7 +2294,6 @@ mod tests {
     // #[test]
     // // Tests normal range proof with both edge proofs as the existent proof.
     // // The test cases are generated randomly.
-    // #[allow(clippy::indexing_slicing)]
     // fn test_range_proof() -> Result<(), ProofError> {
     //     let set = fixed_and_pseudorandom_data(4096);
     //     let mut items = Vec::from_iter(set.iter());
@@ -2324,7 +2329,6 @@ mod tests {
     // #[test]
     // // Tests a few cases which the proof is wrong.
     // // The prover is expected to detect the error.
-    // #[allow(clippy::indexing_slicing)]
     // fn test_bad_range_proof() -> Result<(), ProofError> {
     //     let set = fixed_and_pseudorandom_data(4096);
     //     let mut items = Vec::from_iter(set.iter());
@@ -2404,7 +2408,6 @@ mod tests {
     // #[test]
     // // Tests normal range proof with two non-existent proofs.
     // // The test cases are generated randomly.
-    // #[allow(clippy::indexing_slicing)]
     // fn test_range_proof_with_non_existent_proof() -> Result<(), ProofError> {
     //     let set = fixed_and_pseudorandom_data(4096);
     //     let mut items = Vec::from_iter(set.iter());
@@ -2474,7 +2477,6 @@ mod tests {
     // // Tests such scenarios:
     // // - There exists a gap between the first element and the left edge proof
     // // - There exists a gap between the last element and the right edge proof
-    // #[allow(clippy::indexing_slicing)]
     // fn test_range_proof_with_invalid_non_existent_proof() -> Result<(), ProofError> {
     //     let set = fixed_and_pseudorandom_data(4096);
     //     let mut items = Vec::from_iter(set.iter());
@@ -2533,7 +2535,6 @@ mod tests {
     // #[test]
     // // Tests the proof with only one element. The first edge proof can be existent one or
     // // non-existent one.
-    // #[allow(clippy::indexing_slicing)]
     // fn test_one_element_range_proof() -> Result<(), ProofError> {
     //     let set = fixed_and_pseudorandom_data(4096);
     //     let mut items = Vec::from_iter(set.iter());
@@ -2621,7 +2622,6 @@ mod tests {
     // #[test]
     // // Tests the range proof with all elements.
     // // The edge proofs can be nil.
-    // #[allow(clippy::indexing_slicing)]
     // fn test_all_elements_proof() -> Result<(), ProofError> {
     //     let set = fixed_and_pseudorandom_data(4096);
     //     let mut items = Vec::from_iter(set.iter());
@@ -2677,7 +2677,6 @@ mod tests {
     // #[test]
     // // Tests the range proof with "no" element. The first edge proof must
     // // be a non-existent proof.
-    // #[allow(clippy::indexing_slicing)]
     // fn test_empty_range_proof() -> Result<(), ProofError> {
     //     let set = fixed_and_pseudorandom_data(4096);
     //     let mut items = Vec::from_iter(set.iter());
@@ -2709,7 +2708,6 @@ mod tests {
     // #[test]
     // // Focuses on the small trie with embedded nodes. If the gapped
     // // node is embedded in the trie, it should be detected too.
-    // #[allow(clippy::indexing_slicing)]
     // fn test_gapped_range_proof() -> Result<(), ProofError> {
     //     let mut items = Vec::new();
     //     // Sorted entries
@@ -2748,7 +2746,6 @@ mod tests {
 
     // #[test]
     // // Tests the element is not in the range covered by proofs.
-    // #[allow(clippy::indexing_slicing)]
     // fn test_same_side_proof() -> Result<(), Error> {
     //     let set = fixed_and_pseudorandom_data(4096);
     //     let mut items = Vec::from_iter(set.iter());
@@ -2800,7 +2797,6 @@ mod tests {
     // }
 
     // #[test]
-    // #[allow(clippy::indexing_slicing)]
     // // Tests the range starts from zero.
     // fn test_single_side_range_proof() -> Result<(), ProofError> {
     //     for _ in 0..10 {
@@ -2834,7 +2830,6 @@ mod tests {
     // }
 
     // #[test]
-    // #[allow(clippy::indexing_slicing)]
     // // Tests the range ends with 0xffff...fff.
     // fn test_reverse_single_side_range_proof() -> Result<(), ProofError> {
     //     for _ in 0..10 {
@@ -2898,7 +2893,6 @@ mod tests {
     // }
 
     // #[test]
-    // #[allow(clippy::indexing_slicing)]
     // // Tests normal range proof with both edge proofs
     // // as the existent proof, but with an extra empty value included, which is a
     // // noop technically, but practically should be rejected.
@@ -2934,7 +2928,6 @@ mod tests {
     // }
 
     // #[test]
-    // #[allow(clippy::indexing_slicing)]
     // // Tests the range proof with all elements,
     // // but with an extra empty value included, which is a noop technically, but
     // // practically should be rejected.
@@ -3005,7 +2998,6 @@ mod tests {
     // }
 
     // #[test]
-    // #[allow(clippy::indexing_slicing)]
     // // Tests a malicious proof, where the proof is more or less the
     // // whole trie. This is to match corresponding test in geth.
     // fn test_bloadted_range_proof() -> Result<(), ProofError> {
@@ -3044,7 +3036,6 @@ mod tests {
 
     // generate pseudorandom data, but prefix it with some known data
     // The number of fixed data points is 100; you specify how much random data you want
-    // #[allow(clippy::indexing_slicing)]
     // fn fixed_and_pseudorandom_data(random_count: u32) -> HashMap<[u8; 32], [u8; 20]> {
     //     let mut items: HashMap<[u8; 32], [u8; 20]> = HashMap::new();
     //     for i in 0..100_u32 {

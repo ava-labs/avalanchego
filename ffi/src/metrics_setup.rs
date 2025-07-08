@@ -76,7 +76,7 @@ impl TextRecorder {
             .as_secs()
             .saturating_mul(1000)
             .saturating_add(u64::from(epoch_duration.subsec_millis()));
-        writeln!(output, "# {utc_now}").unwrap();
+        writeln!(output, "# {utc_now}").expect("write to string cannot fail");
 
         let help_guard = self.inner.help.lock().expect("poisoned lock");
 

@@ -87,8 +87,9 @@ fn bench_merkle<const NKEYS: usize, const KEYSIZE: usize>(criterion: &mut Criter
                 },
                 #[expect(clippy::unwrap_used)]
                 |(mut merkle, keys)| {
-                    keys.into_iter()
-                        .for_each(|key| merkle.insert(&key, Box::new(*b"v")).unwrap());
+                    for key in keys {
+                        merkle.insert(&key, Box::new(*b"v")).unwrap();
+                    }
                     let _frozen = merkle.hash();
                 },
                 BatchSize::SmallInput,

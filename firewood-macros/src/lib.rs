@@ -214,6 +214,8 @@ fn generate_metrics_wrapper(input_fn: &ItemFn, args: &MetricsArgs) -> proc_macro
 
 #[cfg(test)]
 mod tests {
+    #![expect(clippy::unwrap_used)]
+
     use super::*;
 
     #[test]
@@ -225,7 +227,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::unwrap_used)]
     fn test_metrics_args_parsing() {
         // Test single argument parsing
         let input = quote::quote! { "test.metric" };

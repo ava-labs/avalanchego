@@ -203,7 +203,6 @@ impl<T: Hashable> Preimage for T {
 
             // we've collected all the children in bytes
 
-            #[allow(clippy::let_and_return)]
             let updated_bytes = if is_account {
                 // need to get the value again
                 if let Some(ValueDigest::Value(rlp_encoded_bytes)) = self.value_digest() {
