@@ -63,7 +63,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
         if let Node::Branch(branch) = self.read_node(subtree_root_address)?.as_ref() {
             // this is an internal node, traverse the children
             for (_, address) in branch.children_addresses() {
-                self.visit_trie(*address, visited)?;
+                self.visit_trie(address, visited)?;
             }
         }
 

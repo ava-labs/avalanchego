@@ -310,14 +310,14 @@ impl BranchNode {
     }
 
     // Helper to iterate over only valid children
-    fn children_iter(&self) -> impl Iterator<Item = (usize, (&LinearAddress, &HashType))> + Clone {
+    fn children_iter(&self) -> impl Iterator<Item = (usize, (LinearAddress, &HashType))> + Clone {
         self.children
             .iter()
             .enumerate()
             .filter_map(|(i, child)| match child {
                 None => None,
                 Some(Child::Node(_)) => unreachable!("TODO make unreachable"),
-                Some(Child::AddressWithHash(address, hash)) => Some((i, (address, hash))),
+                Some(Child::AddressWithHash(address, hash)) => Some((i, (*address, hash))),
             })
     }
 
@@ -327,7 +327,7 @@ impl BranchNode {
     }
 
     /// Returns (index, address) for each child that has a hash set.
-    pub fn children_addresses(&self) -> impl Iterator<Item = (usize, &LinearAddress)> + Clone {
+    pub fn children_addresses(&self) -> impl Iterator<Item = (usize, LinearAddress)> + Clone {
         self.children_iter()
             .map(|(idx, (address, _))| (idx, address))
     }
