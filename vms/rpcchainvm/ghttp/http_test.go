@@ -93,31 +93,31 @@ func TestRequestClientArbitrarilyLongBody(t *testing.T) {
 // client
 func TestHttpResponse(t *testing.T) {
 	tests := []struct {
-		name           string
-		requestHeader  http.Header
-		responseHeader http.Header
+		name            string
+		requestHeaders  http.Header
+		responseHeaders http.Header
 	}{
 		{
 			// Requests with an upgrade header do not use the "Simple*" http response
 			// apis and must be separately tested
 			name: "upgrade request header specified",
-			requestHeader: http.Header{
+			requestHeaders: http.Header{
 				"Upgrade": {"upgrade"},
 				"foo":     {"foo"},
 			},
-			responseHeader: http.Header{},
+			responseHeaders: http.Header{},
 		},
 		{
 			name: "arbitrary request headers",
-			requestHeader: http.Header{
+			requestHeaders: http.Header{
 				"foo": {"foo"},
 			},
-			responseHeader: http.Header{},
+			responseHeaders: http.Header{},
 		},
 		{
-			name:          "response header set",
-			requestHeader: http.Header{},
-			responseHeader: http.Header{
+			name:           "response header set",
+			requestHeaders: http.Header{},
+			responseHeaders: http.Header{
 				"foo": {"foo"},
 			},
 		},
@@ -154,29 +154,29 @@ func TestHttpResponse(t *testing.T) {
 			require.NoError(err)
 
 			recorder := &httptest.ResponseRecorder{
-				HeaderMap: maps.Clone(tt.responseHeader),
+				HeaderMap: maps.Clone(tt.responseHeaders),
 				Body:      bytes.NewBuffer(nil),
 			}
 
 			client := NewClient(httppb.NewHTTPClient(conn))
 			request := &http.Request{
 				Body:   io.NopCloser(strings.NewReader("foo")),
-				Header: tt.requestHeader,
+				Header: tt.requestHeaders,
 			}
 			client.ServeHTTP(recorder, request)
 
 			require.Equal(http.StatusOK, recorder.Code)
 
 			// Sanity check that the request headers were not modified
-			require.Equal(tt.requestHeader, request.Header)
+			require.Equal(tt.requestHeaders, request.Header)
 
 			// Sanity check that any headers added by middleware not modified
-			wantResponseHeader := maps.Clone(tt.responseHeader)
+			wantResponseHeaders := maps.Clone(tt.responseHeaders)
 			for k, v := range wantHandlerHeaders {
-				wantResponseHeader.Add(k, v[0])
+				wantResponseHeaders.Add(k, v[0])
 			}
 
-			require.Equal(wantResponseHeader, recorder.Header())
+			require.Equal(wantResponseHeaders, recorder.Header())
 			require.Equal("baz", recorder.Body.String())
 		})
 	}
