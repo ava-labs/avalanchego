@@ -80,8 +80,8 @@ type KubeRuntimeConfig struct {
 
 // ensureDefaults sets cluster-specific defaults for fields not already set by flags.
 func (c *KubeRuntimeConfig) ensureDefaults(ctx context.Context, log logging.Logger) error {
-	// Only source defaults from the cluster if exclusive scheduling is enabled
-	if !c.UseExclusiveScheduling {
+	requireSchedulingDefaults := c.UseExclusiveScheduling && (len(c.SchedulingLabelKey) == 0 || len(c.SchedulingLabelValue) == 0)
+	if !requireSchedulingDefaults {
 		return nil
 	}
 
@@ -101,8 +101,8 @@ func (c *KubeRuntimeConfig) ensureDefaults(ctx context.Context, log logging.Logg
 	}
 
 	var (
-		schedulingLabelKey   = configMap.Data["defaultSchedulingLabelKey"]
-		schedulingLabelValue = configMap.Data["defaultSchedulingLabelValue"]
+		schedulingLabelKey   = configMap.Data["schedulingLabelKey"]
+		schedulingLabelValue = configMap.Data["schedulingLabelValue"]
 	)
 	if len(c.SchedulingLabelKey) == 0 && len(schedulingLabelKey) > 0 {
 		log.Info("setting default value for SchedulingLabelKey",
