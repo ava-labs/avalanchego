@@ -7,6 +7,8 @@ import (
 	"context"
 	"fmt"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/resource"
@@ -64,10 +66,11 @@ func (f *factory) New(log logging.Logger) (interface{}, error) {
 
 	clientConn, err := grpcutils.Dial(status.Addr)
 	if err != nil {
+		log.Error("failed to dial VM gRPC service", zap.Error(err))
 		return nil, err
 	}
 
 	f.processTracker.TrackProcess(status.Pid)
 	f.runtimeTracker.TrackRuntime(stopper)
-	return NewClient(clientConn, stopper, status.Pid, f.processTracker, f.metricsGatherer), nil
+	return NewClient(clientConn, stopper, status.Pid, f.processTracker, f.metricsGatherer, log), nil
 }
