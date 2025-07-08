@@ -278,12 +278,11 @@ func collectRegistry(t *testing.T, name string, addr string, timeout time.Durati
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	t.Cleanup(cancel)
 
-	r.NoError(tmpnet.StartPrometheus(ctx, tests.NewDefaultLogger("prometheus")))
-
-	server := tests.NewPrometheusServer(addr, "/", gatherer)
+	server := tests.NewPrometheusServer(addr, "/ext/metrics", gatherer)
 	errChan, err := server.Start()
 	r.NoError(err)
 
+	var sdConfigFilePath string
 	t.Cleanup(func() {
 		// Ensure a final metrics scrape.
 		// This default delay is set above the default scrape interval used by StartPrometheus.
@@ -291,18 +290,21 @@ func collectRegistry(t *testing.T, name string, addr string, timeout time.Durati
 
 		r.NoError(server.Stop())
 		r.NoError(<-errChan)
+
+		if sdConfigFilePath != "" {
+			r.NoError(os.Remove(sdConfigFilePath))
+		}
 	})
 
-	sdConfigFilePath, err := tmpnet.WritePrometheusServiceDiscoveryConfigFile(name, []tmpnet.SDConfig{
+	sdConfigFilePath, err = tmpnet.WritePrometheusServiceDiscoveryConfigFile(name, []tmpnet.SDConfig{
 		{
-			Targets: []string{addr},
+			Targets: []string{server.Address()},
 			Labels:  labels,
 		},
 	}, true)
 	r.NoError(err)
-	t.Cleanup(func() {
-		os.Remove(sdConfigFilePath)
-	})
+
+	r.NoError(tmpnet.StartPrometheus(ctx, tests.NewDefaultLogger("prometheus")))
 }
 
 func createBlockChanFromLevelDB(t *testing.T, sourceDir string, startBlock, endBlock uint64, chanSize int) (<-chan BlockResult, error) {
