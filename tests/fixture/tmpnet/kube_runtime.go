@@ -21,6 +21,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -49,7 +50,12 @@ const (
 	// are never scheduled to the same nodes.
 	antiAffinityLabelKey   = "tmpnet-scheduling"
 	antiAffinityLabelValue = "exclusive"
+
+	// Name of config map containing tmpnet defaults
+	kubeRuntimeConfigMapName = "tmpnet"
 )
+
+var errMissingSchedulingLabels = errors.New("--kube-scheduling-label-key and --kube-scheduling-label-value are required when exclusive scheduling is enabled")
 
 type KubeRuntimeConfig struct {
 	// Path to the kubeconfig file identifying the target cluster
@@ -70,6 +76,53 @@ type KubeRuntimeConfig struct {
 	SchedulingLabelKey string `json:"schedulingLabelKey,omitempty"`
 	// Label value to use for exclusive scheduling for node selection and toleration
 	SchedulingLabelValue string `json:"schedulingLabelValue,omitempty"`
+}
+
+// ensureDefaults sets cluster-specific defaults for fields not already set by flags.
+func (c *KubeRuntimeConfig) ensureDefaults(ctx context.Context, log logging.Logger) error {
+	// Only source defaults from the cluster if exclusive scheduling is enabled
+	if !c.UseExclusiveScheduling {
+		return nil
+	}
+
+	clientset, err := GetClientset(log, c.ConfigPath, c.ConfigContext)
+	if err != nil {
+		return err
+	}
+
+	log.Info("attempting to retrieve configmap containing tmpnet defaults",
+		zap.String("namespace", c.Namespace),
+		zap.String("configMap", kubeRuntimeConfigMapName),
+	)
+
+	configMap, err := clientset.CoreV1().ConfigMaps(c.Namespace).Get(ctx, kubeRuntimeConfigMapName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get ConfigMap: %w", err)
+	}
+
+	var (
+		schedulingLabelKey   = configMap.Data["defaultSchedulingLabelKey"]
+		schedulingLabelValue = configMap.Data["defaultSchedulingLabelValue"]
+	)
+	if len(c.SchedulingLabelKey) == 0 && len(schedulingLabelKey) > 0 {
+		log.Info("setting default value for SchedulingLabelKey",
+			zap.String("schedulingLabelKey", schedulingLabelKey),
+		)
+		c.SchedulingLabelKey = schedulingLabelKey
+	}
+	if len(c.SchedulingLabelValue) == 0 && len(schedulingLabelValue) > 0 {
+		log.Info("setting default value for SchedulingLabelValue",
+			zap.String("schedulingLabelValue", schedulingLabelValue),
+		)
+		c.SchedulingLabelValue = schedulingLabelValue
+	}
+
+	// Validate that the scheduling labels are now set
+	if len(c.SchedulingLabelKey) == 0 || len(c.SchedulingLabelValue) == 0 {
+		return errMissingSchedulingLabels
+	}
+
+	return nil
 }
 
 type KubeRuntime struct {
