@@ -35,6 +35,7 @@ use std::vec;
 pub mod branch;
 mod leaf;
 pub mod path;
+pub mod persist;
 
 pub use branch::{BranchNode, Child};
 pub use leaf::LeafNode;

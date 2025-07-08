@@ -46,6 +46,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use crate::hashednode::hash_node;
+use crate::node::persist::MaybePersistedNode;
 use crate::node::{ByteCounter, Node};
 use crate::{
     CacheReadStrategy, Child, FileBacked, HashType, Path, ReadableStorage, SharedNode, TrieHash,
@@ -338,6 +339,7 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
             kind: Committed {
                 deleted: Box::default(),
                 root_hash: None,
+                root: header.root_address.map(Into::into),
             },
             storage,
         };
@@ -366,6 +368,7 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
             kind: Committed {
                 deleted: Box::default(),
                 root_hash: None,
+                root: None,
             },
         })
     }
@@ -988,6 +991,7 @@ pub trait RootReader {
 pub struct Committed {
     deleted: Box<[LinearAddress]>,
     root_hash: Option<TrieHash>,
+    root: Option<MaybePersistedNode>,
 }
 
 impl ReadInMemoryNode for Committed {
@@ -1026,6 +1030,8 @@ pub struct ImmutableProposal {
     parent: Arc<ArcSwap<NodeStoreParent>>,
     /// The hash of the root node for this proposal
     root_hash: Option<TrieHash>,
+    /// The root node, either in memory or on disk
+    root: Option<MaybePersistedNode>,
 }
 
 impl ImmutableProposal {
@@ -1156,6 +1162,7 @@ impl<S: WritableStorage> From<NodeStore<ImmutableProposal, S>> for NodeStore<Com
             kind: Committed {
                 deleted: val.kind.deleted,
                 root_hash: val.kind.root_hash,
+                root: val.kind.root,
             },
             storage: val.storage,
         }
@@ -1517,6 +1524,7 @@ impl NodeStore<Arc<ImmutableProposal>, FileBacked> {
             kind: Committed {
                 deleted: self.kind.deleted.clone(),
                 root_hash: self.kind.root_hash.clone(),
+                root: self.kind.root.clone(),
             },
             storage: self.storage.clone(),
         }
@@ -1542,6 +1550,7 @@ impl<S: ReadableStorage> TryFrom<NodeStore<MutableProposal, S>>
                 deleted: kind.deleted.into(),
                 parent: Arc::new(ArcSwap::new(Arc::new(kind.parent))),
                 root_hash: None,
+                root: None,
             }),
             storage,
         };
@@ -1569,6 +1578,7 @@ impl<S: ReadableStorage> TryFrom<NodeStore<MutableProposal, S>>
             deleted: immutable_proposal.deleted,
             parent: immutable_proposal.parent,
             root_hash: Some(root_hash.into_triehash()),
+            root: Some(root_addr.into()),
         });
 
         Ok(nodestore)
@@ -1600,12 +1610,17 @@ impl<S: ReadableStorage> RootReader for NodeStore<MutableProposal, S> {
     }
 }
 
-impl<T: ReadInMemoryNode + Parentable, S: ReadableStorage> RootReader for NodeStore<T, S> {
+impl<S: ReadableStorage> RootReader for NodeStore<Committed, S> {
     fn root_node(&self) -> Option<SharedNode> {
         // TODO: If the read_node fails, we just say there is no root; this is incorrect
-        self.header
-            .root_address
-            .and_then(|addr| self.read_node(addr).ok())
+        self.kind.root.as_ref()?.as_shared_node(self).ok()
+    }
+}
+
+impl<S: ReadableStorage> RootReader for NodeStore<Arc<ImmutableProposal>, S> {
+    fn root_node(&self) -> Option<SharedNode> {
+        // Use the MaybePersistedNode's as_shared_node method to get the root
+        self.kind.root.as_ref()?.as_shared_node(self).ok()
     }
 }
 
