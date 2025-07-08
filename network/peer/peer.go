@@ -198,6 +198,9 @@ type peer struct {
 	// isIngress is true only if the remote peer is connected to this node,
 	// in contrast of this node being connected to the remote peer.
 	isIngress bool
+
+	// isAppRequestClient is true only if the remote peer is an AppRequest only client.
+	isAppRequestClient bool
 }
 
 // Start a new peer instance.
@@ -546,6 +549,7 @@ func (p *peer) writeMessages() {
 		knownPeersFilter,
 		knownPeersSalt,
 		areWeAPrimaryNetworkValidator,
+		p.Config.AppRequestOnlyClient,
 	)
 	if err != nil {
 		p.Log.Error(failedToCreateMessageLog,
@@ -1032,6 +1036,8 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 
 	p.ip.BLSSignature = signature
 	p.ip.BLSSignatureBytes = msg.IpBlsSig
+
+	p.isAppRequestClient = msg.AppRequestClient
 
 	// If the peer is running an incompatible version or has an invalid BLS
 	// signature, disconnect from them prior to marking the handshake as

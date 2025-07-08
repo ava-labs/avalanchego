@@ -62,4 +62,8 @@ type Config struct {
 
 	// IngressConnectionCount counts the ingress (to us) connections.
 	IngressConnectionCount atomic.Int64
+
+	// Specifies whether this node is an AppRequestClient.
+	// This should NOT be set for any normal nodes or validators.
+	AppRequestOnlyClient bool `json:"appRequestClient"`
 }
