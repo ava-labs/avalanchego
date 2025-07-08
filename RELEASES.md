@@ -3,6 +3,7 @@
 ## Pending Release
 
 - Removed static API handler: `subnetevm.decodeGenesis`, `subnetevm.buildGenesis`
+- Demoted unnecessary error log in `core/txpool/legacypool.go` to warning, displaying unexpected but valid behavior.
 
 ## [v0.7.4](https://github.com/ava-labs/subnet-evm/releases/tag/v0.7.4)
 
