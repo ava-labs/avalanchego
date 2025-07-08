@@ -111,6 +111,8 @@ message Handshake {
   bool all_subnets = 14;
   // Whether the peer is an AppRequestClient
   bool app_request_client = 15;
+  // Override list of the subnets the peer wants to connect to but not track.
+  repeated bytes requested_subnets = 16;
 }
 
 // Metadata about a peer's P2P client used to determine compatibility
@@ -154,6 +156,8 @@ message ClaimedIpPort {
 message GetPeerList {
   BloomFilter known_peers = 1;
   bool all_subnets = 2;
+  // Override list of the subnets the peer is interested in
+  repeated bytes requested_subnets = 3;
 }
 
 // PeerList contains network-level metadata for a set of validators.

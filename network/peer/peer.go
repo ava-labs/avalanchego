@@ -887,6 +887,8 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		)
 	}
 
+	p.isAppRequestClient = msg.AppRequestClient
+
 	// handle subnet IDs
 	if numTrackedSubnets := len(msg.TrackedSubnets); numTrackedSubnets > maxNumTrackedSubnets {
 		p.Log.Debug(malformedMessageLog,
@@ -899,21 +901,20 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		return
 	}
 
-	p.trackedSubnets.Add(constants.PrimaryNetworkID)
-	for _, subnetIDBytes := range msg.TrackedSubnets {
-		subnetID, err := ids.ToID(subnetIDBytes)
-		if err != nil {
-			p.Log.Debug(malformedMessageLog,
-				zap.Stringer("nodeID", p.id),
-				zap.Stringer("messageOp", message.HandshakeOp),
-				zap.String("field", "trackedSubnets"),
-				zap.Error(err),
-			)
-			p.StartClose()
-			return
-		}
-		p.trackedSubnets.Add(subnetID)
+	trackedSubnets, err := parseSubnetIDs(msg.TrackedSubnets)
+	if err != nil {
+		p.Log.Debug(malformedMessageLog,
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.HandshakeOp),
+			zap.String("field", "trackedSubnets"),
+			zap.Error(err),
+		)
+		p.StartClose()
+		return
 	}
+
+	p.trackedSubnets = trackedSubnets
+	p.trackedSubnets.Add(constants.PrimaryNetworkID)
 
 	for _, acp := range msg.SupportedAcps {
 		if constants.CurrentACPs.Contains(acp) {
@@ -1049,7 +1050,24 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 
 	p.gotHandshake.Set(true)
 
-	peerIPs := p.Network.Peers(p.id, p.trackedSubnets, msg.AllSubnets, knownPeers, salt)
+	var requestedSubnets set.Set[ids.ID]
+	if p.isAppRequestClient {
+		requestedSubnets, err = parseSubnetIDs(msg.RequestedSubnets)
+		if err != nil {
+			p.Log.Debug(malformedMessageLog,
+				zap.Stringer("nodeID", p.id),
+				zap.Stringer("messageOp", message.HandshakeOp),
+				zap.String("field", "requestableSubnets"),
+				zap.Error(err),
+			)
+			p.StartClose()
+			return
+		}
+	} else {
+		requestedSubnets = p.trackedSubnets
+	}
+
+	peerIPs := p.Network.Peers(p.id, requestedSubnets, msg.AllSubnets, knownPeers, salt)
 
 	// We bypass throttling here to ensure that the handshake message is
 	// acknowledged correctly.
@@ -1111,7 +1129,25 @@ func (p *peer) handleGetPeerList(msg *p2p.GetPeerList) {
 		return
 	}
 
-	peerIPs := p.Network.Peers(p.id, p.trackedSubnets, msg.AllSubnets, filter, salt)
+	var requestedSubnets set.Set[ids.ID]
+	if p.isAppRequestClient {
+		requestedSubnets, err = parseSubnetIDs(msg.RequestedSubnets)
+		if err != nil {
+			p.Log.Debug(malformedMessageLog,
+				zap.Stringer("nodeID", p.id),
+				zap.Stringer("messageOp", message.GetPeerListOp),
+				zap.String("field", "requestableSubnets"),
+				zap.Error(err),
+			)
+			p.StartClose()
+			return
+		}
+	} else {
+		requestedSubnets = p.trackedSubnets
+	}
+
+	peerIPs := p.Network.Peers(p.id, requestedSubnets, msg.AllSubnets, filter, salt)
+
 	if len(peerIPs) == 0 {
 		p.Log.Debug("skipping sending of empty peer list",
 			zap.Stringer("nodeID", p.id),
@@ -1219,4 +1255,16 @@ func (p *peer) storeLastReceived(time time.Time) {
 	unixTime := time.Unix()
 	atomic.StoreInt64(&p.Config.LastReceived, unixTime)
 	atomic.StoreInt64(&p.lastReceived, unixTime)
+}
+
+func parseSubnetIDs(subnetIDBytes [][]byte) (set.Set[ids.ID], error) {
+	subnetIDs := set.NewSet[ids.ID](len(subnetIDBytes))
+	for _, subnetIDBytes := range subnetIDBytes {
+		subnetID, err := ids.ToID(subnetIDBytes)
+		if err != nil {
+			return nil, err
+		}
+		subnetIDs.Add(subnetID)
+	}
+	return subnetIDs, nil
 }
