@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/coreth/plugin/evm"
+	"github.com/ava-labs/coreth/plugin/factory"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -137,8 +137,13 @@ func newMainnetCChainVM(
 	chainDataDir string,
 	configBytes []byte,
 	metricsGatherer metrics.MultiGatherer,
-) (*evm.VM, error) {
-	vm := evm.VM{}
+) (block.ChainVM, error) {
+	factory := factory.Factory{}
+	vmIntf, err := factory.New(logging.NoLog{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create VM from factory: %w", err)
+	}
+	vm := vmIntf.(block.ChainVM)
 
 	log := tests.NewDefaultLogger("mainnet-vm-reexecution")
 
@@ -189,7 +194,7 @@ func newMainnetCChainVM(
 		return nil, fmt.Errorf("failed to initialize VM: %w", err)
 	}
 
-	return &vm, nil
+	return vm, nil
 }
 
 type BlockResult struct {

@@ -50,4 +50,4 @@ copy_source() {
     fi
 }
 
-copy_source "$SRC $DST"
+copy_source "$SRC" "$DST"
