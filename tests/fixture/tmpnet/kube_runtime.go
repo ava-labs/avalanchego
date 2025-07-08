@@ -52,7 +52,7 @@ const (
 	antiAffinityLabelValue = "exclusive"
 
 	// Name of config map containing tmpnet defaults
-	kubeRuntimeConfigMapName = "tmpnet"
+	defaultsConfigMapName = "tmpnet-defaults"
 )
 
 var errMissingSchedulingLabels = errors.New("--kube-scheduling-label-key and --kube-scheduling-label-value are required when exclusive scheduling is enabled")
@@ -92,10 +92,10 @@ func (c *KubeRuntimeConfig) ensureDefaults(ctx context.Context, log logging.Logg
 
 	log.Info("attempting to retrieve configmap containing tmpnet defaults",
 		zap.String("namespace", c.Namespace),
-		zap.String("configMap", kubeRuntimeConfigMapName),
+		zap.String("configMap", defaultsConfigMapName),
 	)
 
-	configMap, err := clientset.CoreV1().ConfigMaps(c.Namespace).Get(ctx, kubeRuntimeConfigMapName, metav1.GetOptions{})
+	configMap, err := clientset.CoreV1().ConfigMaps(c.Namespace).Get(ctx, defaultsConfigMapName, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get ConfigMap: %w", err)
 	}
