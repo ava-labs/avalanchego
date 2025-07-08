@@ -1,3 +1,4 @@
 # CODEOWNERS
-*       @rkuris @aaronbuchwald @demosdemon
+*       @rkuris @demosdemon
 /ffi    @alarso16
+/.github @aaronbuchwald
