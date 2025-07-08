@@ -14,9 +14,11 @@ source "$CORETH_PATH"/scripts/versions.sh
 source "$CORETH_PATH"/scripts/constants.sh
 
 if [[ $# -eq 1 ]]; then
-    binary_path=$1
-elif [[ $# -ne 0 ]]; then
-    echo "Invalid arguments to build coreth. Requires either no arguments (default) or one arguments to specify binary location."
+    BINARY_PATH=$1
+elif [[ $# -eq 0 ]]; then
+    BINARY_PATH="$DEFAULT_PLUGIN_DIR/$DEFAULT_VM_ID"
+else
+    echo "Invalid arguments to build coreth. Requires zero (default binary path) or one argument to specify the binary path."
     exit 1
 fi
 
@@ -26,5 +28,5 @@ fi
 CORETH_COMMIT=${CORETH_COMMIT:-$(git rev-list -1 HEAD)}
 
 # Build Coreth, which runs as a subprocess
-echo "Building Coreth @ GitCommit: $CORETH_COMMIT"
-go build -ldflags "-X github.com/ava-labs/coreth/plugin/evm.GitCommit=$CORETH_COMMIT" -o "$binary_path" "plugin/"*.go
+echo "Building Coreth @ GitCommit: $CORETH_COMMIT at $BINARY_PATH"
+go build -ldflags "-X github.com/ava-labs/coreth/plugin/evm.GitCommit=$CORETH_COMMIT" -o "$BINARY_PATH" "plugin/"*.go
