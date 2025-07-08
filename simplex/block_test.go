@@ -251,3 +251,19 @@ func TestVerifyInnerBlockBreaksHashChain(t *testing.T) {
 	_, err = seq2Block.Verify(ctx)
 	require.ErrorIs(t, err, errMismatchedPrevDigest)
 }
+
+func TestIndexBlockDigestNotFound(t *testing.T) {
+	testVM := &blocktest.VM{
+		VM: enginetest.VM{
+			T: t,
+		},
+	}
+	tracker := newBlockTracker(testVM)
+	ctx := context.Background()
+
+	// We have a block whose metadata.prev does not point to their parent
+	seq1 := snowmantest.BuildChild(snowmantest.Genesis)
+	seq1Block := newBlockWithDigest(t, seq1, tracker, 1, 1, [32]byte{})
+	err := tracker.indexBlock(ctx, seq1Block.digest)
+	require.ErrorIs(t, err, errDigestNotFound)
+}
