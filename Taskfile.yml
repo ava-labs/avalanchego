@@ -271,3 +271,8 @@ tasks:
       EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR | default "execution-data"}}'
     cmds:
       - cmd: go test -run=TestReexecuteRange github.com/ava-labs/avalanchego/tests/bench/c --source-block-dir={{.EXECUTION_DATA_DIR}}/blocks --target-dir={{.EXECUTION_DATA_DIR}}/current-state
+
+  test-prometheus-integration:
+    desc: Tests prometheus integration
+    cmds:
+      - cmd: go test -run=TestPrometheusIntegration github.com/ava-labs/avalanchego/tests/bench/c

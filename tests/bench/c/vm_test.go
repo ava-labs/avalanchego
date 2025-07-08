@@ -24,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
-	"github.com/ava-labs/avalanchego/tests/load"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
@@ -118,13 +117,20 @@ func CollectRegistry(t *testing.T, name string, addr string, timeout time.Durati
 
 	r.NoError(tmpnet.StartPrometheus(ctx, tests.NewDefaultLogger("prometheus")))
 
-	server := load.NewPrometheusServer(addr, gatherer)
+	server := tests.NewPrometheusServer(addr, "/ext/metrics", gatherer)
 	errChan, err := server.Start()
 	r.NoError(err)
 
+	var sdConfigFilePath string
 	t.Cleanup(func() {
+		time.Sleep(tmpnet.NetworkShutdownDelay)
+
 		r.NoError(server.Stop())
 		r.NoError(<-errChan)
+
+		if sdConfigFilePath != "" {
+			r.NoError(os.Remove(sdConfigFilePath))
+		}
 	})
 
 	// TODO: remove this after debugging metrics showing up correctly
@@ -137,16 +143,13 @@ func CollectRegistry(t *testing.T, name string, addr string, timeout time.Durati
 		}
 	})
 
-	sdConfigFilePath, err := tmpnet.WritePrometheusServiceDiscoveryConfigFile(name, []tmpnet.SDConfig{
+	sdConfigFilePath, err = tmpnet.WritePrometheusServiceDiscoveryConfigFile(name, []tmpnet.SDConfig{
 		{
-			Targets: []string{addr},
+			Targets: []string{server.Address()},
 			Labels:  labels,
 		},
 	}, true)
 	r.NoError(err)
-	t.Cleanup(func() {
-		os.Remove(sdConfigFilePath)
-	})
 }
 
 // TODO:
