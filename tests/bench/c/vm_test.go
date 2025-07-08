@@ -102,6 +102,15 @@ func TestReexecuteRange(t *testing.T) {
 
 	dbLogger := tests.NewDefaultLogger("db")
 
+	testRegistry := prometheus.NewRegistry()
+	r.NoError(avalancheGoSimulatedPrefixGatherer.Register("test", testRegistry))
+	counter := prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "test_counter",
+		Help: "A test counter",
+	})
+	r.NoError(testRegistry.Register(counter))
+	counter.Inc()
+
 	baseDBRegistry := prometheus.NewRegistry()
 
 	db, err := leveldb.New(targetDBDir, nil, dbLogger, baseDBRegistry)
