@@ -235,6 +235,13 @@ func ReadNetwork(ctx context.Context, log logging.Logger, dir string) (*Network,
 
 // Initializes a new network with default configuration.
 func (n *Network) EnsureDefaultConfig(ctx context.Context, log logging.Logger) error {
+	// Populate runtime defaults before logging it
+	if n.DefaultRuntimeConfig.Kube != nil {
+		if err := n.DefaultRuntimeConfig.Kube.ensureDefaults(ctx, log); err != nil {
+			return err
+		}
+	}
+
 	log.Info("preparing configuration for new network",
 		zap.Any("runtimeConfig", n.DefaultRuntimeConfig),
 	)
@@ -279,10 +286,6 @@ func (n *Network) EnsureDefaultConfig(ctx context.Context, log logging.Logger) e
 	emptyRuntime := NodeRuntimeConfig{}
 	if n.DefaultRuntimeConfig == emptyRuntime {
 		return errMissingRuntimeConfig
-	}
-
-	if n.DefaultRuntimeConfig.Kube != nil {
-		return n.DefaultRuntimeConfig.Kube.ensureDefaults(ctx, log)
 	}
 
 	return nil
