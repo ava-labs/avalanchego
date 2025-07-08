@@ -677,7 +677,6 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 		config.RewardConfig.MintingPeriod = v.GetDuration(StakeMintingPeriodKey)
 		config.RewardConfig.SupplyCap = v.GetUint64(StakeSupplyCapKey)
 		config.MinDelegationFee = v.GetUint32(MinDelegatorFeeKey)
-
 		switch {
 		case config.UptimeRequirement < 0 || config.UptimeRequirement > 1:
 			return node.StakingConfig{}, errInvalidUptimeRequirement
@@ -699,7 +698,6 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 	} else {
 		config.StakingConfig = genesis.GetStakingConfig(networkID)
 	}
-
 	return config, nil
 }
 
