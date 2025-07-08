@@ -6,6 +6,7 @@ package load2
 import (
 	"context"
 	"crypto/ecdsa"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -68,13 +69,11 @@ func (w *Wallet) SendTx(
 	issuanceDuration := time.Since(startTime)
 	w.metrics.issue(issuanceDuration)
 
-	if err := await(
+	if err := w.awaitTx(
 		ctx,
-		w.client,
 		headers,
 		sub.Err(),
-		crypto.PubkeyToAddress(w.privKey.PublicKey),
-		tx.Nonce(),
+		tx.Hash(),
 	); err != nil {
 		return err
 	}
@@ -88,13 +87,11 @@ func (w *Wallet) SendTx(
 	return nil
 }
 
-func await(
+func (w Wallet) awaitTx(
 	ctx context.Context,
-	client *ethclient.Client,
 	headers chan *types.Header,
 	errs <-chan error,
-	address common.Address,
-	nonce uint64,
+	txHash common.Hash,
 ) error {
 	for {
 		select {
@@ -103,12 +100,25 @@ func await(
 		case err := <-errs:
 			return err
 		case h := <-headers:
-			latestNonce, err := client.NonceAt(ctx, address, h.Number)
+			latestNonce, err := w.client.NonceAt(
+				ctx,
+				crypto.PubkeyToAddress(w.privKey.PublicKey),
+				h.Number,
+			)
 			if err != nil {
 				return err
 			}
 
-			if latestNonce >= nonce {
+			if latestNonce == w.nonce+1 {
+				receipt, err := w.client.TransactionReceipt(ctx, txHash)
+				if err != nil {
+					return err
+				}
+
+				if receipt.Status != types.ReceiptStatusSuccessful {
+					return fmt.Errorf("failed tx: %d", receipt.Status)
+				}
+
 				return nil
 			}
 		}
