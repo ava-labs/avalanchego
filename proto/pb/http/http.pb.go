@@ -785,8 +785,7 @@ type HandleSimpleHTTPRequest struct {
 	Method string `protobuf:"bytes,1,opt,name=method,proto3" json:"method,omitempty"`
 	// url specifies either the URI being requested
 	Url string `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
-	// request_headers contains the request header fields either received
-	// by the server or to be sent by the client
+	// request_headers contains the request header fields received by the server
 	RequestHeaders []*Element `protobuf:"bytes,3,rep,name=request_headers,json=requestHeaders,proto3" json:"request_headers,omitempty"`
 	// body is the request payload in bytes
 	Body []byte `protobuf:"bytes,4,opt,name=body,proto3" json:"body,omitempty"`
