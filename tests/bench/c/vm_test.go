@@ -14,6 +14,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/coreth/plugin/evm"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
@@ -33,10 +38,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
-	"github.com/ava-labs/coreth/plugin/evm"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 )
 
 var (
