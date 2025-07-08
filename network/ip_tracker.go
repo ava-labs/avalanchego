@@ -44,6 +44,7 @@ func newIPTracker(
 	trackedSubnets set.Set[ids.ID],
 	log logging.Logger,
 	registerer prometheus.Registerer,
+	appRequestOnlyClient bool,
 ) (*ipTracker, error) {
 	bloomMetrics, err := bloom.NewMetrics("ip_bloom", registerer)
 	if err != nil {
@@ -64,11 +65,12 @@ func newIPTracker(
 			Name: "tracked_subnets",
 			Help: "number of subnets this node is monitoring",
 		}),
-		bloomMetrics:   bloomMetrics,
-		tracked:        make(map[ids.NodeID]*trackedNode),
-		bloomAdditions: make(map[ids.NodeID]int),
-		connected:      make(map[ids.NodeID]*connectedNode),
-		subnet:         make(map[ids.ID]*gossipableSubnet),
+		bloomMetrics:         bloomMetrics,
+		tracked:              make(map[ids.NodeID]*trackedNode),
+		bloomAdditions:       make(map[ids.NodeID]int),
+		connected:            make(map[ids.NodeID]*connectedNode),
+		subnet:               make(map[ids.ID]*gossipableSubnet),
+		appRequestOnlyClient: appRequestOnlyClient,
 	}
 	err = errors.Join(
 		registerer.Register(tracker.numTrackedPeers),
@@ -230,6 +232,10 @@ type ipTracker struct {
 	connected map[ids.NodeID]*connectedNode
 	// subnet tracks all the subnets that have at least one gossipable ID.
 	subnet map[ids.ID]*gossipableSubnet
+
+	// appRequestOnlyClient is a flag that indicates that this node is only
+	// an app request client and should be more lenie
+	appRequestOnlyClient bool
 }
 
 // ManuallyTrack marks the provided nodeID as being desirable to connect to.
@@ -255,7 +261,7 @@ func (i *ipTracker) ManuallyGossip(subnetID ids.ID, nodeID ids.NodeID) {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
-	if subnetID == constants.PrimaryNetworkID || i.trackedSubnets.Contains(subnetID) {
+	if subnetID == constants.PrimaryNetworkID || i.trackedSubnets.Contains(subnetID) || i.appRequestOnlyClient {
 		i.addTrackableID(nodeID, nil)
 	}
 
@@ -428,7 +434,7 @@ func (i *ipTracker) addTrackableID(nodeID ids.NodeID, subnetID *ids.ID) {
 		nodeTracker.manuallyTracked = true
 	} else {
 		nodeTracker.validatedSubnets.Add(*subnetID)
-		if *subnetID == constants.PrimaryNetworkID || i.trackedSubnets.Contains(*subnetID) {
+		if *subnetID == constants.PrimaryNetworkID || i.trackedSubnets.Contains(*subnetID) || i.appRequestOnlyClient {
 			nodeTracker.trackedSubnets.Add(*subnetID)
 		}
 	}

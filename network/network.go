@@ -183,139 +183,7 @@ func NewNetwork(
 	dialer dialer.Dialer,
 	router router.ExternalHandler,
 ) (Network, error) {
-	if config.ProxyEnabled {
-		// Wrap the listener to process the proxy header.
-		listener = &proxyproto.Listener{
-			Listener: listener,
-			Policy: func(net.Addr) (proxyproto.Policy, error) {
-				// Do not perform any fuzzy matching, the header must be
-				// provided.
-				return proxyproto.REQUIRE, nil
-			},
-			ValidateHeader: func(h *proxyproto.Header) error {
-				if !h.Command.IsProxy() {
-					return errExpectedProxy
-				}
-				if h.TransportProtocol != proxyproto.TCPv4 && h.TransportProtocol != proxyproto.TCPv6 {
-					return errExpectedTCPProtocol
-				}
-				return nil
-			},
-			ReadHeaderTimeout: config.ProxyReadHeaderTimeout,
-		}
-	}
-
-	if config.TrackedSubnets.Contains(constants.PrimaryNetworkID) {
-		return nil, errTrackingPrimaryNetwork
-	}
-
-	inboundMsgThrottler, err := throttling.NewInboundMsgThrottler(
-		log,
-		metricsRegisterer,
-		config.Validators,
-		config.ThrottlerConfig.InboundMsgThrottlerConfig,
-		config.ResourceTracker,
-		config.CPUTargeter,
-		config.DiskTargeter,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("initializing inbound message throttler failed with: %w", err)
-	}
-
-	outboundMsgThrottler, err := throttling.NewSybilOutboundMsgThrottler(
-		log,
-		metricsRegisterer,
-		config.Validators,
-		config.ThrottlerConfig.OutboundMsgThrottlerConfig,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("initializing outbound message throttler failed with: %w", err)
-	}
-
-	peerMetrics, err := peer.NewMetrics(metricsRegisterer)
-	if err != nil {
-		return nil, fmt.Errorf("initializing peer metrics failed with: %w", err)
-	}
-
-	metrics, err := newMetrics(metricsRegisterer, config.TrackedSubnets)
-	if err != nil {
-		return nil, fmt.Errorf("initializing network metrics failed with: %w", err)
-	}
-
-	ipTracker, err := newIPTracker(config.TrackedSubnets, log, metricsRegisterer)
-	if err != nil {
-		return nil, fmt.Errorf("initializing ip tracker failed with: %w", err)
-	}
-	config.Validators.RegisterCallbackListener(ipTracker)
-
-	// Track all default bootstrappers to ensure their current IPs are gossiped
-	// like validator IPs.
-	for _, bootstrapper := range genesis.GetBootstrappers(config.NetworkID) {
-		ipTracker.ManuallyGossip(constants.PrimaryNetworkID, bootstrapper.ID)
-	}
-	// Track all recent validators to optimistically connect to them before the
-	// P-chain has finished syncing.
-	for nodeID := range genesis.GetValidators(config.NetworkID) {
-		ipTracker.ManuallyTrack(nodeID)
-	}
-
-	peerConfig := &peer.Config{
-		ReadBufferSize:       config.PeerReadBufferSize,
-		WriteBufferSize:      config.PeerWriteBufferSize,
-		Metrics:              peerMetrics,
-		MessageCreator:       msgCreator,
-		Log:                  log,
-		InboundMsgThrottler:  inboundMsgThrottler,
-		Network:              nil, // This is set below.
-		Router:               router,
-		VersionCompatibility: version.GetCompatibility(minCompatibleTime),
-		MyNodeID:             config.MyNodeID,
-		MySubnets:            config.TrackedSubnets,
-		Beacons:              config.Beacons,
-		Validators:           config.Validators,
-		NetworkID:            config.NetworkID,
-		PingFrequency:        config.PingFrequency,
-		PongTimeout:          config.PingPongTimeout,
-		MaxClockDifference:   config.MaxClockDifference,
-		SupportedACPs:        config.SupportedACPs.List(),
-		ObjectedACPs:         config.ObjectedACPs.List(),
-		ResourceTracker:      config.ResourceTracker,
-		UptimeCalculator:     config.UptimeCalculator,
-		IPSigner:             peer.NewIPSigner(config.MyIPPort, config.TLSKey, config.BLSKey),
-		AppRequestOnlyClient: config.AppRequestOnlyClient,
-	}
-
-	onCloseCtx, cancel := context.WithCancel(context.Background())
-	n := &network{
-		startupTime:          time.Now(),
-		config:               config,
-		peerConfig:           peerConfig,
-		metrics:              metrics,
-		outboundMsgThrottler: outboundMsgThrottler,
-
-		inboundConnUpgradeThrottler: throttling.NewInboundConnUpgradeThrottler(config.ThrottlerConfig.InboundConnUpgradeThrottlerConfig),
-		listener:                    listener,
-		dialer:                      dialer,
-		serverUpgrader:              peer.NewTLSServerUpgrader(config.TLSConfig, metrics.tlsConnRejected),
-		clientUpgrader:              peer.NewTLSClientUpgrader(config.TLSConfig, metrics.tlsConnRejected),
-
-		onCloseCtx:       onCloseCtx,
-		onCloseCtxCancel: cancel,
-
-		sendFailRateCalculator: safemath.NewSyncAverager(safemath.NewAverager(
-			0,
-			config.SendFailRateHalflife,
-			time.Now(),
-		)),
-
-		trackedIPs:      make(map[ids.NodeID]*trackedIP),
-		ipTracker:       ipTracker,
-		connectingPeers: peer.NewSet(),
-		connectedPeers:  peer.NewSet(),
-		router:          router,
-	}
-	n.peerConfig.Network = n
-	return n, nil
+	return newNetwork(config, minCompatibleTime, msgCreator, metricsRegisterer, log, listener, dialer, router)
 }
 
 func (n *network) Send(
@@ -504,7 +372,7 @@ func (n *network) AllowConnection(nodeID ids.NodeID) bool {
 		return true
 	}
 	_, areWeAPrimaryNetworkAValidator := n.config.Validators.GetValidator(constants.PrimaryNetworkID, n.config.MyNodeID)
-	return areWeAPrimaryNetworkAValidator || n.ipTracker.WantsConnection(nodeID)
+	return areWeAPrimaryNetworkAValidator || n.config.AppRequestOnlyClient || n.ipTracker.WantsConnection(nodeID)
 }
 
 func (n *network) Track(claimedIPPorts []*ips.ClaimedIPPort) error {
@@ -699,6 +567,153 @@ func (n *network) ManuallyTrack(nodeID ids.NodeID, ip netip.AddrPort) {
 
 func (n *network) Subnets() set.Set[ids.ID] {
 	return n.peerConfig.MySubnets
+}
+
+func newNetwork(
+	config *Config,
+	minCompatibleTime time.Time,
+	msgCreator message.Creator,
+	metricsRegisterer prometheus.Registerer,
+	log logging.Logger,
+	listener net.Listener,
+	dialer dialer.Dialer,
+	router router.ExternalHandler,
+) (*network, error) {
+
+	if config.ProxyEnabled {
+		// Wrap the listener to process the proxy header.
+		listener = &proxyproto.Listener{
+			Listener: listener,
+			Policy: func(net.Addr) (proxyproto.Policy, error) {
+				// Do not perform any fuzzy matching, the header must be
+				// provided.
+				return proxyproto.REQUIRE, nil
+			},
+			ValidateHeader: func(h *proxyproto.Header) error {
+				if !h.Command.IsProxy() {
+					return errExpectedProxy
+				}
+				if h.TransportProtocol != proxyproto.TCPv4 && h.TransportProtocol != proxyproto.TCPv6 {
+					return errExpectedTCPProtocol
+				}
+				return nil
+			},
+			ReadHeaderTimeout: config.ProxyReadHeaderTimeout,
+		}
+	}
+
+	if config.TrackedSubnets.Contains(constants.PrimaryNetworkID) {
+		return nil, errTrackingPrimaryNetwork
+	}
+
+	inboundMsgThrottler, err := throttling.NewInboundMsgThrottler(
+		log,
+		metricsRegisterer,
+		config.Validators,
+		config.ThrottlerConfig.InboundMsgThrottlerConfig,
+		config.ResourceTracker,
+		config.CPUTargeter,
+		config.DiskTargeter,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("initializing inbound message throttler failed with: %w", err)
+	}
+
+	outboundMsgThrottler, err := throttling.NewSybilOutboundMsgThrottler(
+		log,
+		metricsRegisterer,
+		config.Validators,
+		config.ThrottlerConfig.OutboundMsgThrottlerConfig,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("initializing outbound message throttler failed with: %w", err)
+	}
+
+	peerMetrics, err := peer.NewMetrics(metricsRegisterer)
+	if err != nil {
+		return nil, fmt.Errorf("initializing peer metrics failed with: %w", err)
+	}
+
+	metrics, err := newMetrics(metricsRegisterer, config.TrackedSubnets)
+	if err != nil {
+		return nil, fmt.Errorf("initializing network metrics failed with: %w", err)
+	}
+
+	ipTracker, err := newIPTracker(config.TrackedSubnets, log, metricsRegisterer, config.AppRequestOnlyClient)
+	if err != nil {
+		return nil, fmt.Errorf("initializing ip tracker failed with: %w", err)
+	}
+	config.Validators.RegisterCallbackListener(ipTracker)
+
+	// Track all default bootstrappers to ensure their current IPs are gossiped
+	// like validator IPs.
+	for _, bootstrapper := range genesis.GetBootstrappers(config.NetworkID) {
+		ipTracker.ManuallyGossip(constants.PrimaryNetworkID, bootstrapper.ID)
+	}
+	// Track all recent validators to optimistically connect to them before the
+	// P-chain has finished syncing.
+	for nodeID := range genesis.GetValidators(config.NetworkID) {
+		ipTracker.ManuallyTrack(nodeID)
+	}
+
+	peerConfig := &peer.Config{
+		ReadBufferSize:       config.PeerReadBufferSize,
+		WriteBufferSize:      config.PeerWriteBufferSize,
+		Metrics:              peerMetrics,
+		MessageCreator:       msgCreator,
+		Log:                  log,
+		InboundMsgThrottler:  inboundMsgThrottler,
+		Network:              nil, // This is set below.
+		Router:               router,
+		VersionCompatibility: version.GetCompatibility(minCompatibleTime),
+		MyNodeID:             config.MyNodeID,
+		MySubnets:            config.TrackedSubnets,
+		Beacons:              config.Beacons,
+		Validators:           config.Validators,
+		NetworkID:            config.NetworkID,
+		PingFrequency:        config.PingFrequency,
+		PongTimeout:          config.PingPongTimeout,
+		MaxClockDifference:   config.MaxClockDifference,
+		SupportedACPs:        config.SupportedACPs.List(),
+		ObjectedACPs:         config.ObjectedACPs.List(),
+		ResourceTracker:      config.ResourceTracker,
+		UptimeCalculator:     config.UptimeCalculator,
+		IPSigner:             peer.NewIPSigner(config.MyIPPort, config.TLSKey, config.BLSKey),
+		AppRequestOnlyClient: config.AppRequestOnlyClient,
+	}
+
+	onCloseCtx, cancel := context.WithCancel(context.Background())
+	n := &network{
+		startupTime:          time.Now(),
+		config:               config,
+		peerConfig:           peerConfig,
+		metrics:              metrics,
+		outboundMsgThrottler: outboundMsgThrottler,
+
+		inboundConnUpgradeThrottler: throttling.NewInboundConnUpgradeThrottler(config.ThrottlerConfig.InboundConnUpgradeThrottlerConfig),
+		listener:                    listener,
+		dialer:                      dialer,
+		serverUpgrader:              peer.NewTLSServerUpgrader(config.TLSConfig, metrics.tlsConnRejected),
+		clientUpgrader:              peer.NewTLSClientUpgrader(config.TLSConfig, metrics.tlsConnRejected),
+
+		onCloseCtx:       onCloseCtx,
+		onCloseCtxCancel: cancel,
+
+		sendFailRateCalculator: safemath.NewSyncAverager(safemath.NewAverager(
+			0,
+			config.SendFailRateHalflife,
+			time.Now(),
+		)),
+
+		trackedIPs:      make(map[ids.NodeID]*trackedIP),
+		ipTracker:       ipTracker,
+		connectingPeers: peer.NewSet(),
+		connectedPeers:  peer.NewSet(),
+		router:          router,
+	}
+	n.peerConfig.Network = n
+	return n, nil
+
 }
 
 func (n *network) track(ip *ips.ClaimedIPPort, trackAllSubnets bool) error {
