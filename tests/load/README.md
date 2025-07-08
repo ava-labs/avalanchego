@@ -113,30 +113,3 @@ for {
         iters += 1
 }
 ```
-
-# How to run
-Initiate nix shell: `nix develop`
-
-## Against local kind cluster
-Builds image from local code and deploys to local Kind cluster
-```shell
-./scripts/run_task.sh test-load-kube-kind
-```
-
-### With additional CLI flags (duration, connections, nodes, etc.)
-```shell
-./scripts/run_task.sh test-load-kube-kind -- --duration=10m --nodes=3
-```
-
-### With custom image (skips building from local code)
-```shell
-./scripts/run_task.sh test-load-kube-kind -- --kube-image=my-registry/avalanchego:v1.2.3
-```
-
-## Trigger CI job on self-hosted runner
-Use GitHub Actions workflow "Load Tests on k8s"
-- Go to Actions tab in GitHub
-- Select "Load Tests on k8s" workflow
-- Click "Run workflow"
-- Specify image (defaults to avaplatform/avalanchego:latest)
-- Additional parameters can be passed via workflow inputs (duration, connections, node count)
