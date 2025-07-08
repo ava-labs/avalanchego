@@ -11,9 +11,6 @@ inputs:
   runtime:
     description: 'the tmpnet runtime being used'
     default: 'process'
-  action_path:
-    description: 'override github action path'
-    default: ${{ github.workspace }}/.github/actions/run-monitored-tmpnet-cmd
   filter_by_owner:
     default: ''
   artifact_prefix:
@@ -54,12 +51,12 @@ runs:
     - uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f #v31
       with:
         github_access_token: ${{ inputs.github_token }}
-    - run: ${{ inputs.action_path }}/nix-develop.sh --command echo "dependencies installed"
+    - run: $GITHUB_ACTION_PATH/nix-develop.sh --command echo "dependencies installed"
       shell: bash
     - name: Notify of metrics availability
       if: (inputs.prometheus_username != '')
       shell: bash
-      run: ${{ inputs.action_path }}/notify-metrics-availability.sh
+      run: $GITHUB_ACTION_PATH/notify-metrics-availability.sh
       env:
         GRAFANA_URL: https://grafana-poc.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?orgId=1&refresh=10s&var-filter=is_ephemeral_node%7C%3D%7Cfalse&var-filter=gh_repo%7C%3D%7C${{ inputs.repository_owner }}%2F${{ inputs.repository_name }}&var-filter=gh_run_id%7C%3D%7C${{ inputs.run_id }}&var-filter=gh_run_attempt%7C%3D%7C${{ inputs.run_attempt }}
         GH_JOB_ID: ${{ inputs.job }}
@@ -71,7 +68,7 @@ runs:
     - name: Run command
       shell: bash
       # --impure ensures the env vars are accessible to the command
-      run: ${{ inputs.run_env }} ${{ inputs.action_path }}/nix-develop.sh --impure --command bash -x ${{ inputs.run }}
+      run: ${{ inputs.run_env }} $GITHUB_ACTION_PATH/nix-develop.sh --impure --command bash -x ${{ inputs.run }}
       env:
         # Always collect metrics locally even when nodes are running in kube to enable collection from the test workload
         TMPNET_START_METRICS_COLLECTOR: ${{ inputs.prometheus_username != '' }}
