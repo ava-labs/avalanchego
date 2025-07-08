@@ -163,21 +163,19 @@ func TestHttpResponse(t *testing.T) {
 				Body:   io.NopCloser(strings.NewReader("foo")),
 				Header: tt.requestHeaders,
 			}
+
 			client.ServeHTTP(recorder, request)
 
-			require.Equal(http.StatusOK, recorder.Code)
-
-			// Sanity check that the request headers were not modified
-			require.Equal(tt.requestHeaders, request.Header)
-
-			// Sanity check that any headers added by middleware not modified
 			wantResponseHeaders := maps.Clone(tt.responseHeaders)
 			for k, v := range wantHandlerHeaders {
 				wantResponseHeaders.Add(k, v[0])
 			}
 
 			require.Equal(wantResponseHeaders, recorder.Header())
+			require.Equal(http.StatusOK, recorder.Code)
 			require.Equal("baz", recorder.Body.String())
+
+			require.Equal(tt.requestHeaders, request.Header)
 		})
 	}
 }
