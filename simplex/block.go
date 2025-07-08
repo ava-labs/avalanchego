@@ -91,7 +91,7 @@ func (b *Block) Verify(ctx context.Context) (simplex.VerifiedBlock, error) {
 func (b *Block) verifyParentMatchesPrevBlock(ctx context.Context) error {
 	prevBlock := b.blockTracker.getBlock(b.metadata.Prev)
 	if prevBlock != nil {
-		if b.vmBlock.Parent() != prevBlock.vmBlock.ID() {
+		if b.vmBlock.Parent() != prevBlock.vmBlock.ID() && b.metadata.Prev != prevBlock.digest {
 			return fmt.Errorf("%w: parentID %s, prevID %s", errMismatchedPrevDigest, b.vmBlock.Parent(), prevBlock.vmBlock.ID())
 		}
 
