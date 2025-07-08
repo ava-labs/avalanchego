@@ -115,6 +115,15 @@ func TestHttpResponse(t *testing.T) {
 			responseHeaders: http.Header{},
 		},
 		{
+			name: "response header set with upgrade request header",
+			requestHeaders: http.Header{
+				"Upgrade": {"upgrade"},
+			},
+			responseHeaders: http.Header{
+				"foo": {"foo"},
+			},
+		},
+		{
 			name:           "response header set",
 			requestHeaders: http.Header{},
 			responseHeaders: http.Header{
