@@ -7,6 +7,7 @@
 - Added maximum number of addresses (1000) to be queried in a single filter.
 - Moves atomic operations from plugin/evm to plugin/evm/atomic and wraps the plugin/evm/VM in `atomicvm` to separate the atomic operations from the EVM execution.
 - Demoted unnecessary error log in `core/txpool/legacypool.go` to warning, displaying unexpected but valid behavior.
+- Removed the `snowman-api-enabled` flag and the corresponding API implementation.
 
 ## [v0.15.1](https://github.com/ava-labs/coreth/releases/tag/v0.15.1)
 

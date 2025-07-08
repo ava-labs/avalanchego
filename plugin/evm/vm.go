@@ -1029,14 +1029,6 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 		enabledAPIs = append(enabledAPIs, "coreth-admin")
 	}
 
-	// RPC APIs
-	if vm.config.SnowmanAPIEnabled {
-		if err := handler.RegisterName("snowman", &SnowmanAPI{vm}); err != nil {
-			return nil, err
-		}
-		enabledAPIs = append(enabledAPIs, "snowman")
-	}
-
 	if vm.config.WarpAPIEnabled {
 		warpSDKClient := vm.Network.NewClient(p2p.SignatureRequestHandlerID)
 		signatureAggregator := acp118.NewSignatureAggregator(vm.ctx.Log, warpSDKClient)

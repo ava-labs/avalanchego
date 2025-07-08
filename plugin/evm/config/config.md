@@ -84,12 +84,6 @@ Specifies the maximum number of profiles to keep before removing the oldest. Def
 
 ## Enabling Avalanche Specific APIs
 
-### `snowman-api-enabled`
-
-_Boolean_
-
-Enables the Snowman API. Defaults to `false`.
-
 ### `admin-api-enabled`
 
 _Boolean_

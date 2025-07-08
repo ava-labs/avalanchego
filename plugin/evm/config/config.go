@@ -98,7 +98,6 @@ type Config struct {
 	GasTarget *gas.Gas `json:"gas-target,omitempty"`
 
 	// Coreth APIs
-	SnowmanAPIEnabled     bool   `json:"snowman-api-enabled"`
 	AdminAPIEnabled       bool   `json:"admin-api-enabled"`
 	AdminAPIDir           string `json:"admin-api-dir"`
 	CorethAdminAPIEnabled bool   `json:"coreth-admin-api-enabled"` // Deprecated: use AdminAPIEnabled instead
