@@ -109,8 +109,11 @@ func (c DatabaseConfig) WithCheckpointInterval(interval uint64) DatabaseConfig {
 
 // Validate checks if the store options are valid.
 func (c DatabaseConfig) Validate() error {
-	if c.IndexDir == "" || c.DataDir == "" {
-		return errors.New("both IndexDir and DataDir must be provided")
+	if c.IndexDir == "" {
+		return errors.New("IndexDir must be provided")
+	}
+	if c.DataDir == "" {
+		return errors.New("DataDir must be provided")
 	}
 	if c.CheckpointInterval == 0 {
 		return errors.New("CheckpointInterval cannot be 0")
