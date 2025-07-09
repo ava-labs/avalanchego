@@ -51,3 +51,5 @@ var (
 	// and is equal to [syncPerformedPrefix] + block number as uint64.
 	syncPerformedKeyLength = len(syncPerformedPrefix) + wrappers.LongLen
 )
+
+var FirewoodScheme = "firewood"

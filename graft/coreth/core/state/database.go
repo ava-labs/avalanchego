@@ -28,6 +28,7 @@
 package state
 
 import (
+	"github.com/ava-labs/coreth/triedb/firewood"
 	ethstate "github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/triedb"
@@ -38,14 +39,26 @@ type (
 	Trie     = ethstate.Trie
 )
 
-func NewDatabase(db ethdb.Database) ethstate.Database {
+func NewDatabase(db ethdb.Database) Database {
 	return ethstate.NewDatabase(db)
 }
 
-func NewDatabaseWithConfig(db ethdb.Database, config *triedb.Config) ethstate.Database {
-	return ethstate.NewDatabaseWithConfig(db, config)
+func NewDatabaseWithConfig(db ethdb.Database, config *triedb.Config) Database {
+	coredb := ethstate.NewDatabaseWithConfig(db, config)
+	return wrapIfFirewood(coredb)
 }
 
-func NewDatabaseWithNodeDB(db ethdb.Database, triedb *triedb.Database) ethstate.Database {
-	return ethstate.NewDatabaseWithNodeDB(db, triedb)
+func NewDatabaseWithNodeDB(db ethdb.Database, triedb *triedb.Database) Database {
+	coredb := ethstate.NewDatabaseWithNodeDB(db, triedb)
+	return wrapIfFirewood(coredb)
+}
+func wrapIfFirewood(db Database) Database {
+	fw, ok := db.TrieDB().Backend().(*firewood.Database)
+	if !ok {
+		return db
+	}
+	return &firewoodAccessorDb{
+		Database: db,
+		fw:       fw,
+	}
 }
