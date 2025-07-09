@@ -147,6 +147,13 @@ impl<'a, T: TrieReader> MerkleNodeStream<'a, T> {
                                     Err(e) => return Some(Err(e)),
                                 },
                                 Child::Node(node) => node.clone().into(),
+                                Child::MaybePersisted(maybe_persisted, _) => {
+                                    // For MaybePersisted, we need to get the node
+                                    match maybe_persisted.as_shared_node(merkle) {
+                                        Ok(node) => node,
+                                        Err(e) => return Some(Err(e)),
+                                    }
+                                }
                             };
 
                             let child_partial_path = child.partial_path().iter().copied();
@@ -279,6 +286,10 @@ fn get_iterator_intial_state<T: TrieReader>(
                         None => return Ok(NodeStreamState::Iterating { iter_stack }),
                         Some(Child::AddressWithHash(addr, _)) => merkle.read_node(*addr)?,
                         Some(Child::Node(node)) => (*node).clone().into(), // TODO can we avoid cloning this?
+                        Some(Child::MaybePersisted(maybe_persisted, _)) => {
+                            // For MaybePersisted, we need to get the node
+                            maybe_persisted.as_shared_node(merkle)?
+                        }
                     };
 
                     matched_key_nibbles.push(next_unmatched_key_nibble);
@@ -536,6 +547,21 @@ impl<T: TrieReader> Iterator for PathIterator<'_, '_, T> {
                                         Some(Ok(PathIterItem {
                                             key_nibbles: node_key,
                                             node: ret,
+                                            next_nibble: Some(next_unmatched_key_nibble),
+                                        }))
+                                    }
+                                    Some(Child::MaybePersisted(maybe_persisted, _)) => {
+                                        let child = match maybe_persisted.as_shared_node(merkle) {
+                                            Ok(child) => child,
+                                            Err(e) => return Some(Err(e)),
+                                        };
+
+                                        let node_key = matched_key.clone().into_boxed_slice();
+                                        matched_key.push(next_unmatched_key_nibble);
+
+                                        Some(Ok(PathIterItem {
+                                            key_nibbles: node_key,
+                                            node: child,
                                             next_nibble: Some(next_unmatched_key_nibble),
                                         }))
                                     }

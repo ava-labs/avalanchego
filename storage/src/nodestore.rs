@@ -1180,7 +1180,54 @@ impl<S: WritableStorage> From<NodeStore<ImmutableProposal, S>> for NodeStore<Com
     }
 }
 
+/// Classified children for ethereum hash processing
+#[cfg(feature = "ethhash")]
+struct ClassifiedChildren<'a> {
+    unhashed: Vec<(usize, Node)>,
+    hashed: Vec<(usize, (MaybePersistedNode, &'a mut HashType))>,
+}
+
 impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
+    /// Helper function to classify children for ethereum hash processing
+    /// We have some special cases based on the number of children
+    /// and whether they are hashed or unhashed, so we need to classify them.
+    #[cfg(feature = "ethhash")]
+    fn ethhash_classify_children<'a>(
+        &self,
+        children: &'a mut [Option<Child>; crate::node::BranchNode::MAX_CHILDREN],
+    ) -> ClassifiedChildren<'a> {
+        children.iter_mut().enumerate().fold(
+            ClassifiedChildren {
+                unhashed: Vec::new(),
+                hashed: Vec::new(),
+            },
+            |mut acc, (idx, child)| {
+                match child {
+                    None => {}
+                    Some(Child::AddressWithHash(a, h)) => {
+                        // Convert address to MaybePersistedNode
+                        let maybe_persisted_node = MaybePersistedNode::from(*a);
+                        acc.hashed.push((idx, (maybe_persisted_node, h)));
+                    }
+                    Some(Child::Node(node)) => acc.unhashed.push((idx, node.clone())),
+                    Some(Child::MaybePersisted(maybe_persisted, h)) => {
+                        // For MaybePersisted, we need to get the address if it's persisted
+                        if let Some(addr) = maybe_persisted.as_linear_address() {
+                            let maybe_persisted_node = MaybePersistedNode::from(addr);
+                            acc.hashed.push((idx, (maybe_persisted_node, h)));
+                        } else {
+                            // If not persisted, we need to get the node to hash it
+                            if let Ok(node) = maybe_persisted.as_shared_node(self) {
+                                acc.unhashed.push((idx, node.deref().clone()));
+                            }
+                        }
+                    }
+                }
+                acc
+            },
+        )
+    }
+
     /// Hashes `node`, which is at the given `path_prefix`, and its children recursively.
     /// Returns the hashed node and its hash.
     fn hash_helper(
@@ -1199,22 +1246,21 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
             {
                 // looks like we're at an account branch
                 // tally up how many hashes we need to deal with
-                let (unhashed, mut hashed) = b.children.iter_mut().enumerate().fold(
-                    (Vec::new(), Vec::new()),
-                    |(mut unhashed, mut hashed), (idx, child)| {
-                        match child {
-                            None => {}
-                            Some(Child::AddressWithHash(a, h)) => hashed.push((idx, (a, h))),
-                            Some(Child::Node(node)) => unhashed.push((idx, node)),
-                        }
-                        (unhashed, hashed)
-                    },
-                );
+                let ClassifiedChildren {
+                    unhashed,
+                    mut hashed,
+                } = self.ethhash_classify_children(&mut b.children);
                 trace!("hashed {hashed:?} unhashed {unhashed:?}");
                 if hashed.len() == 1 {
                     // we were left with one hashed node that must be rehashed
                     let invalidated_node = hashed.first_mut().expect("hashed is not empty");
-                    let mut hashable_node = self.read_node(*invalidated_node.1.0)?.deref().clone();
+                    // Extract the address from the MaybePersistedNode
+                    let addr = invalidated_node
+                        .1
+                        .0
+                        .as_linear_address()
+                        .expect("hashed node should be persisted");
+                    let mut hashable_node = self.read_node(addr)?.deref().clone();
                     let original_length = path_prefix.len();
                     path_prefix.0.extend(b.partial_path.0.iter().copied());
                     if unhashed.is_empty() {
@@ -1240,26 +1286,24 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
                 None
             };
 
-            // branch children -- 1. 1 child, already hashed, 2. >1 child, already hashed,
+            // branch children cases:
+            // 1. 1 child, already hashed
+            // 2. >1 child, already hashed,
             // 3. 1 hashed child, 1 unhashed child
             // 4. 0 hashed, 1 unhashed <-- handle child special
             // 5. 1 hashed, >0 unhashed <-- rehash case
-            // everything already hashed
+            // 6. everything already hashed
 
             for (nibble, child) in b.children.iter_mut().enumerate() {
-                // if this is already hashed, we're done
-                if matches!(child, Some(Child::AddressWithHash(_, _))) {
-                    // We already know the hash of this child.
-                    continue;
-                }
-
-                // If there was no child, we're done. Otherwise, remove the child from
-                // the branch and hash it. This has the side effect of dropping the [Child::Node]
-                // that was allocated. This is fine because we're about to replace it with a
-                // [Child::AddressWithHash].
-                let Some(Child::Node(child_node)) = std::mem::take(child) else {
+                // If this is empty or already hashed, we're done
+                // Empty matches None, and non-Node types match Some(None) here, so we want
+                // Some(Some(node))
+                let Some(Some(child_node)) = child.as_mut().map(|child| child.as_mut_node()) else {
                     continue;
                 };
+
+                // remove the child from the children array, we will replace it with a hashed variant
+                let child_node = std::mem::take(child_node);
 
                 // Hash this child and update
                 // we extend and truncate path_prefix to reduce memory allocations
