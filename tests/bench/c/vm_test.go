@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
@@ -89,6 +90,11 @@ func TestReexecuteRange(t *testing.T) {
 	vmMultiGatherer := metrics.NewPrefixGatherer()
 	r.NoError(prefixGatherer.Register("avalanche_evm", vmMultiGatherer))
 
+	// consensusRegistry includes the chain="C" label and the prefix "avalanche_snowman".
+	// The consensus registry is passed to the executor to mimic a subset of consensus metrics.
+	consensusRegistry := prometheus.NewRegistry()
+	r.NoError(prefixGatherer.Register("avalanche_snowman", consensusRegistry))
+
 	if metricsEnabledArg {
 		collectRegistry(t, "c-chain-reexecution", "127.0.0.1:9000", time.Minute, cChainLabeledGatherer, map[string]string{
 			"job": "c-chain-reexecution",
@@ -123,7 +129,8 @@ func TestReexecuteRange(t *testing.T) {
 		r.NoError(sourceVM.Shutdown(ctx))
 	}()
 
-	executor := newVMExecutor(sourceVM)
+	executor, err := newVMExecutor(sourceVM, consensusRegistry)
+	r.NoError(err)
 	r.NoError(executor.executeSequence(ctx, blockChan))
 }
 
@@ -204,15 +211,39 @@ type BlockResult struct {
 }
 
 type VMExecutor struct {
-	log logging.Logger
-	vm  block.ChainVM
+	log     logging.Logger
+	vm      block.ChainVM
+	metrics *consensusMetrics
 }
 
-func newVMExecutor(vm block.ChainVM) *VMExecutor {
-	return &VMExecutor{
-		vm:  vm,
-		log: tests.NewDefaultLogger("vm-executor"),
+type consensusMetrics struct {
+	lastAcceptedHeight prometheus.Gauge
+}
+
+func newConsensusMetrics(registry prometheus.Registerer) (*consensusMetrics, error) {
+	// Mimic the metrics from snowman consensus [engine](../../snow/engine/snowman/metrics.go).
+	errs := wrappers.Errs{}
+	m := &consensusMetrics{
+		lastAcceptedHeight: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "last_accepted_height",
+			Help: "last height accepted",
+		}),
 	}
+	errs.Add(registry.Register(m.lastAcceptedHeight))
+	return m, errs.Err
+}
+
+func newVMExecutor(vm block.ChainVM, registry prometheus.Registerer) (*VMExecutor, error) {
+	metrics, err := newConsensusMetrics(registry)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create consensus metrics: %w", err)
+	}
+
+	return &VMExecutor{
+		vm:      vm,
+		metrics: metrics,
+		log:     tests.NewDefaultLogger("vm-executor"),
+	}, nil
 }
 
 func (e *VMExecutor) execute(ctx context.Context, blockBytes []byte) error {
@@ -220,7 +251,6 @@ func (e *VMExecutor) execute(ctx context.Context, blockBytes []byte) error {
 	if err != nil {
 		return fmt.Errorf("failed to parse block: %w", err)
 	}
-
 	if err := blk.Verify(ctx); err != nil {
 		return fmt.Errorf("failed to verify block %s at height %d: %w", blk.ID(), blk.Height(), err)
 	}
@@ -228,6 +258,7 @@ func (e *VMExecutor) execute(ctx context.Context, blockBytes []byte) error {
 	if err := blk.Accept(ctx); err != nil {
 		return fmt.Errorf("failed to accept block %s at height %d: %w", blk.ID(), blk.Height(), err)
 	}
+	e.metrics.lastAcceptedHeight.Set(float64(blk.Height()))
 
 	return nil
 }
