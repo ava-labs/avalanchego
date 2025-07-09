@@ -52,11 +52,18 @@ func fixedSizeBlock(t *testing.T, size int, height uint64) []byte {
 }
 
 func checkDatabaseState(t *testing.T, db *Database, maxHeight uint64, maxContiguousHeight uint64) {
-	require.Equal(t, maxHeight, db.maxBlockHeight.Load(), "maxBlockHeight mismatch")
+	heights := db.blockHeights.Load()
+	if heights != nil {
+		require.Equal(t, maxHeight, heights.maxBlockHeight, "maxBlockHeight mismatch")
+	} else {
+		require.Equal(t, uint64(unsetHeight), maxHeight, "maxBlockHeight mismatch")
+	}
 	gotMCH, ok := db.MaxContiguousHeight()
 	if maxContiguousHeight != unsetHeight {
 		require.True(t, ok, "MaxContiguousHeight is not set, want %d", maxContiguousHeight)
 		require.Equal(t, maxContiguousHeight, gotMCH, "maxContiguousHeight mismatch")
+	} else {
+		require.False(t, ok)
 	}
 }
 

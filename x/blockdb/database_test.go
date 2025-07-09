@@ -100,17 +100,12 @@ func TestNew_Params(t *testing.T) {
 		{
 			name:    "empty index directory",
 			config:  DefaultConfig().WithDataDir(tempDir),
-			wantErr: errors.New("both IndexDir and DataDir must be provided"),
+			wantErr: errors.New("IndexDir must be provided"),
 		},
 		{
 			name:    "empty data directory",
-			config:  DefaultConfig().WithDataDir(tempDir),
-			wantErr: errors.New("both IndexDir and DataDir must be provided"),
-		},
-		{
-			name:    "both directories empty",
-			config:  DefaultConfig(),
-			wantErr: errors.New("both IndexDir and DataDir must be provided"),
+			config:  DefaultConfig().WithIndexDir(tempDir),
+			wantErr: errors.New("DataDir must be provided"),
 		},
 		{
 			name:   "different index and data directories",
