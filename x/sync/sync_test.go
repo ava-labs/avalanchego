@@ -422,6 +422,55 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 	require.True(isPrefix(midPointVal, nextKey.Value()))
 }
 
+func Test_Sync_FindNextKey_IdenticalKeys(t *testing.T) {
+	require := require.New(t)
+
+	db, err := merkledb.New(
+		context.Background(),
+		memdb.New(),
+		newDefaultDBConfig(),
+	)
+	require.NoError(err)
+
+	testKeys := [][]byte{
+		{0x10},
+		{0x11, 0x11},
+		{0x12, 0x34},
+		{0x15},
+	}
+
+	for i, key := range testKeys {
+		value := []byte{byte(i + 1)}
+		require.NoError(db.Put(key, value))
+	}
+
+	targetRoot, err := db.GetMerkleRoot(context.Background())
+	require.NoError(err)
+
+	// Get the proof for the test key
+	testKey := []byte{0x11, 0x11}
+	proof, err := db.GetRangeProof(context.Background(), maybe.Some(testKey), maybe.Some(testKey), 1)
+	require.NoError(err)
+
+	ctx := context.Background()
+	syncer, err := NewManager(ManagerConfig{
+		DB:                    db,
+		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(db)),
+		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(db)),
+		TargetRoot:            targetRoot,
+		SimultaneousWorkLimit: 5,
+		Log:                   logging.NoLog{},
+		BranchFactor:          merkledb.BranchFactor16,
+	}, prometheus.NewRegistry())
+	require.NoError(err)
+
+	// Since both keys are identical, the next key should be nothing, since the range is complete
+	nextKey, err := syncer.findNextKey(context.Background(), testKey, maybe.Some([]byte{0x11, 0x11}), proof.EndProof)
+	require.NoError(err)
+
+	require.Equal(maybe.Nothing[[]byte](), nextKey)
+}
+
 func TestFindNextKeyEmptyEndProof(t *testing.T) {
 	require := require.New(t)
 	now := time.Now().UnixNano()
