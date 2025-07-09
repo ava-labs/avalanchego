@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"testing"
 	"time"
 
@@ -78,54 +77,46 @@ func TestReexecuteRange(t *testing.T) {
 	r := require.New(t)
 	ctx := context.Background()
 
+	// Create a multi gatherer to pass in to the VM with the expected "avalanche_evm" prefix
+	// and chain="C" label.
+	// Apply the chain="C" label at the top-level.
+	cChainLabeledGatherer := metrics.NewLabelGatherer("chain")
+	prefixGatherer := metrics.NewPrefixGatherer()
+	r.NoError(cChainLabeledGatherer.Register("C", prefixGatherer))
+
+	// Create the prefix gatherer passed to the VM and register it with the top-level,
+	// labeled gatherer.
+	vmMultiGatherer := metrics.NewPrefixGatherer()
+	r.NoError(prefixGatherer.Register("avalanche_evm", vmMultiGatherer))
+
+	if metricsEnabledArg {
+		collectRegistry(t, "c-chain-reexecution", "127.0.0.1:9000", time.Minute, cChainLabeledGatherer, map[string]string{
+			"job": "c-chain-reexecution",
+		})
+	}
+
 	var (
 		targetDBDir  = filepath.Join(targetDirArg, "db")
 		chainDataDir = filepath.Join(targetDBDir, "chain-data-dir")
 	)
-
-	// AvalancheGo passes in a prefix of avalanche_<vm_id> via a prefix gatherer to each VM. Create and register
-	// an avalancheGoSimulatedPrefixGatherer to apply the expected prefix to the VM, so that dashboards created
-	// for the C-Chain run via AvalancheGo work directly with the benchmark.
-	avalancheGoSimulatedPrefixGatherer := metrics.NewPrefixGatherer()
-	vmPrefixGatherer := metrics.NewPrefixGatherer()
-	r.NoError(avalancheGoSimulatedPrefixGatherer.Register("avalanche_evm", vmPrefixGatherer))
-
-	if metricsEnabledArg {
-		collectRegistry(t, "benchmark-c-chain-reexecution", "127.0.0.1:9000", 2*time.Minute, avalancheGoSimulatedPrefixGatherer, map[string]string{
-			"job":        "c-chain-reexecution",
-			"start-time": strconv.FormatInt(time.Now().UnixMilli(), 10),
-		})
-	}
 
 	blockChan, err := createBlockChanFromLevelDB(t, sourceBlockDirArg, startBlockArg, endBlockArg, chanSizeArg)
 	r.NoError(err)
 
 	dbLogger := tests.NewDefaultLogger("db")
 
-	testRegistry := prometheus.NewRegistry()
-	r.NoError(avalancheGoSimulatedPrefixGatherer.Register("test", testRegistry))
-	counter := prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "test_counter",
-		Help: "A test counter",
-	})
-	r.NoError(testRegistry.Register(counter))
-	counter.Inc()
-
-	baseDBRegistry := prometheus.NewRegistry()
-
-	db, err := leveldb.New(targetDBDir, nil, dbLogger, baseDBRegistry)
+	db, err := leveldb.New(targetDBDir, nil, dbLogger, prometheus.NewRegistry())
 	r.NoError(err)
-	r.NoError(vmPrefixGatherer.Register("vm", baseDBRegistry))
-	t.Cleanup(func() {
+	defer func() {
 		r.NoError(db.Close())
-	})
+	}()
 
 	sourceVM, err := newMainnetCChainVM(
 		ctx,
 		db,
 		chainDataDir,
 		[]byte(`{"pruning-enabled": false}`),
-		vmPrefixGatherer,
+		vmMultiGatherer,
 	)
 	r.NoError(err)
 	defer func() {
@@ -278,6 +269,8 @@ func collectRegistry(t *testing.T, name string, addr string, timeout time.Durati
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	t.Cleanup(cancel)
 
+	r.NoError(tmpnet.StartPrometheus(ctx, tests.NewDefaultLogger("prometheus")))
+
 	server := tests.NewPrometheusServer(addr, "/ext/metrics", gatherer)
 	errChan, err := server.Start()
 	r.NoError(err)
@@ -303,8 +296,6 @@ func collectRegistry(t *testing.T, name string, addr string, timeout time.Durati
 		},
 	}, true)
 	r.NoError(err)
-
-	r.NoError(tmpnet.StartPrometheus(ctx, tests.NewDefaultLogger("prometheus")))
 }
 
 func createBlockChanFromLevelDB(t *testing.T, sourceDir string, startBlock, endBlock uint64, chanSize int) (<-chan BlockResult, error) {
