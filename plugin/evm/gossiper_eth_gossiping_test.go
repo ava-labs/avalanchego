@@ -83,7 +83,7 @@ func TestMempoolEthTxsAppGossipHandling(t *testing.T) {
 	genesisJSON, err := fundAddressByGenesis([]common.Address{addr})
 	assert.NoError(err)
 
-	_, vm, _, sender := GenesisVM(t, true, genesisJSON, "", "")
+	vm, _, sender := GenesisVM(t, true, genesisJSON, "", "")
 	defer func() {
 		err := vm.Shutdown(context.Background())
 		assert.NoError(err)

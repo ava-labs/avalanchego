@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
-	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/libevm/common"
@@ -53,9 +52,8 @@ type stateSyncClientConfig struct {
 	acceptedBlockDB database.Database
 	db              *versiondb.Database
 
-	client syncclient.Client
-
-	toEngine chan<- commonEng.Message
+	client        syncclient.Client
+	stateSyncDone chan struct{}
 }
 
 type stateSyncerClient struct {
@@ -67,12 +65,14 @@ type stateSyncerClient struct {
 	wg     sync.WaitGroup
 
 	// State Sync results
-	syncSummary  message.SyncSummary
-	stateSyncErr error
+	syncSummary   message.SyncSummary
+	stateSyncErr  error
+	stateSyncDone chan struct{}
 }
 
 func NewStateSyncClient(config *stateSyncClientConfig) StateSyncClient {
 	return &stateSyncerClient{
+		stateSyncDone:         config.stateSyncDone,
 		stateSyncClientConfig: config,
 	}
 }
@@ -212,7 +212,7 @@ func (client *stateSyncerClient) acceptSyncSummary(proposedSummary message.SyncS
 		// this error will be propagated to the engine when it calls
 		// vm.SetState(snow.Bootstrapping)
 		log.Info("stateSync completed, notifying engine", "err", client.stateSyncErr)
-		client.toEngine <- commonEng.StateSyncDone
+		close(client.stateSyncDone)
 	}()
 	return block.StateSyncStatic, nil
 }

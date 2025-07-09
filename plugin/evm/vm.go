@@ -157,6 +157,7 @@ var (
 	errNilBlockGasCostSubnetEVM      = errors.New("nil blockGasCost is invalid after subnetEVM")
 	errInvalidHeaderPredicateResults = errors.New("invalid header predicate results")
 	errInitializingLogger            = errors.New("failed to initialize logger")
+	errShuttingDownVM                = errors.New("shutting down VM")
 )
 
 // legacyApiNames maps pre geth v1.10.20 api names to their updated counterparts.
@@ -226,11 +227,12 @@ type VM struct {
 
 	validatorsDB database.Database
 
-	toEngine chan<- commonEng.Message
-
 	syntacticBlockValidator BlockValidator
 
-	builder *blockBuilder
+	// builderLock is used to synchronize access to the block builder,
+	// as it is uninitialized at first and is only initialized when onNormalOperationsStarted is called.
+	builderLock sync.Mutex
+	builder     *blockBuilder
 
 	clock mockable.Clock
 
@@ -250,6 +252,8 @@ type VM struct {
 	sdkMetrics *prometheus.Registry
 
 	bootstrapped avalancheUtils.Atomic[bool]
+
+	stateSyncDone chan struct{}
 
 	logger subnetevmlog.Logger
 	// State sync server and client
@@ -281,10 +285,10 @@ func (vm *VM) Initialize(
 	genesisBytes []byte,
 	upgradeBytes []byte,
 	configBytes []byte,
-	toEngine chan<- commonEng.Message,
 	fxs []*commonEng.Fx,
 	appSender commonEng.AppSender,
 ) error {
+	vm.stateSyncDone = make(chan struct{})
 	vm.config.SetDefaults(defaultTxPoolConfig)
 	if len(configBytes) > 0 {
 		if err := json.Unmarshal(configBytes, &vm.config); err != nil {
@@ -328,7 +332,6 @@ func (vm *VM) Initialize(
 	// Enable debug-level metrics that might impact runtime performance
 	metrics.EnabledExpensive = vm.config.MetricsExpensiveEnabled
 
-	vm.toEngine = toEngine
 	vm.shutdownChan = make(chan struct{}, 1)
 
 	if err := vm.initializeMetrics(); err != nil {
@@ -646,8 +649,9 @@ func (vm *VM) initializeStateSyncClient(lastAcceptedHeight uint64) error {
 	}
 
 	vm.StateSyncClient = NewStateSyncClient(&stateSyncClientConfig{
-		chain: vm.eth,
-		state: vm.State,
+		chain:         vm.eth,
+		state:         vm.State,
+		stateSyncDone: vm.stateSyncDone,
 		client: statesyncclient.NewClient(
 			&statesyncclient.ClientConfig{
 				NetworkClient:    vm.client,
@@ -666,7 +670,6 @@ func (vm *VM) initializeStateSyncClient(lastAcceptedHeight uint64) error {
 		metadataDB:           vm.metadataDB,
 		acceptedBlockDB:      vm.acceptedBlockDB,
 		db:                   vm.versiondb,
-		toEngine:             vm.toEngine,
 	})
 
 	// If StateSync is disabled, clear any ongoing summary so that we will not attempt to resume
@@ -812,8 +815,10 @@ func (vm *VM) onNormalOperationsStarted() error {
 	}
 
 	// NOTE: gossip network must be initialized first otherwise ETH tx gossip will not work.
-	vm.builder = vm.NewBlockBuilder(vm.toEngine)
+	vm.builderLock.Lock()
+	vm.builder = vm.NewBlockBuilder()
 	vm.builder.awaitSubmittedTxs()
+	vm.builderLock.Unlock()
 
 	if vm.ethTxGossipHandler == nil {
 		vm.ethTxGossipHandler = newTxGossipHandler[*GossipEthTx](
@@ -880,6 +885,26 @@ func (vm *VM) setAppRequestHandlers() {
 
 	networkHandler := newNetworkHandler(vm.blockChain, vm.chaindb, evmTrieDB, vm.warpBackend, vm.networkCodec)
 	vm.Network.SetRequestHandler(networkHandler)
+}
+
+func (vm *VM) WaitForEvent(ctx context.Context) (commonEng.Message, error) {
+	vm.builderLock.Lock()
+	builder := vm.builder
+	vm.builderLock.Unlock()
+
+	// Block building is not initialized yet, so we haven't finished syncing or bootstrapping.
+	if builder == nil {
+		select {
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		case <-vm.stateSyncDone:
+			return commonEng.StateSyncDone, nil
+		case <-vm.shutdownChan:
+			return commonEng.Message(0), errShuttingDownVM
+		}
+	}
+
+	return builder.waitForEvent(ctx)
 }
 
 // Shutdown implements the snowman.ChainVM interface
@@ -1103,14 +1128,6 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 		}
 		apis[validatorsEndpoint] = validatorsAPI
 		enabledAPIs = append(enabledAPIs, "validators")
-	}
-
-	// RPC APIs
-	if vm.config.SnowmanAPIEnabled {
-		if err := handler.RegisterName("snowman", &SnowmanAPI{vm}); err != nil {
-			return nil, err
-		}
-		enabledAPIs = append(enabledAPIs, "snowman")
 	}
 
 	if vm.config.WarpAPIEnabled {

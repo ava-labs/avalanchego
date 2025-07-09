@@ -51,7 +51,7 @@ func TestVMUpgradeBytesPrecompile(t *testing.T) {
 	}
 
 	// initialize the VM with these upgrade bytes
-	issuer, vm, dbManager, appSender := GenesisVM(t, true, genesisJSONSubnetEVM, "", string(upgradeBytesJSON))
+	vm, dbManager, appSender := GenesisVM(t, true, genesisJSONSubnetEVM, "", string(upgradeBytesJSON))
 	vm.clock.Set(enableAllowListTimestamp)
 
 	// Submit a successful transaction
@@ -99,7 +99,7 @@ func TestVMUpgradeBytesPrecompile(t *testing.T) {
 	vm.ctx.Metrics = metrics.NewPrefixGatherer()
 
 	if err := vm.Initialize(
-		context.Background(), vm.ctx, dbManager, []byte(genesisJSONSubnetEVM), upgradeBytesJSON, []byte{}, issuer, []*commonEng.Fx{}, appSender,
+		context.Background(), vm.ctx, dbManager, []byte(genesisJSONSubnetEVM), upgradeBytesJSON, []byte{}, []*commonEng.Fx{}, appSender,
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +132,7 @@ func TestVMUpgradeBytesPrecompile(t *testing.T) {
 		t.Fatalf("expected ErrSenderAddressNotAllowListed, got: %s", err)
 	}
 
-	blk := issueAndAccept(t, issuer, vm)
+	blk := issueAndAccept(t, vm)
 
 	// Verify that the constructed block only has the whitelisted tx
 	block := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
@@ -154,7 +154,7 @@ func TestVMUpgradeBytesPrecompile(t *testing.T) {
 	}
 
 	vm.clock.Set(vm.clock.Time().Add(2 * time.Second)) // add 2 seconds for gas fee to adjust
-	blk = issueAndAccept(t, issuer, vm)
+	blk = issueAndAccept(t, vm)
 
 	// Verify that the constructed block only has the previously rejected tx
 	block = blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
@@ -183,7 +183,7 @@ func TestNetworkUpgradesOverriden(t *testing.T) {
 		}`
 
 	vm := &VM{}
-	ctx, dbManager, genesisBytes, issuer, _ := setupGenesis(t, string(genesisBytes))
+	ctx, dbManager, genesisBytes, _ := setupGenesis(t, string(genesisBytes))
 	appSender := &enginetest.Sender{T: t}
 	appSender.CantSendAppGossip = true
 	appSender.SendAppGossipF = func(context.Context, commonEng.SendConfig, []byte) error { return nil }
@@ -194,7 +194,6 @@ func TestNetworkUpgradesOverriden(t *testing.T) {
 		genesisBytes,
 		[]byte(upgradeBytesJSON),
 		nil,
-		issuer,
 		[]*commonEng.Fx{},
 		appSender,
 	)
@@ -279,7 +278,7 @@ func TestVMStateUpgrade(t *testing.T) {
 	require.Contains(t, upgradeBytesJSON, upgradedCodeStr)
 
 	// initialize the VM with these upgrade bytes
-	issuer, vm, _, _ := GenesisVM(t, true, genesisStr, "", upgradeBytesJSON)
+	vm, _, _ := GenesisVM(t, true, genesisStr, "", upgradeBytesJSON)
 	defer func() { require.NoError(t, vm.Shutdown(context.Background())) }()
 
 	// Verify the new account doesn't exist yet
@@ -299,7 +298,7 @@ func TestVMStateUpgrade(t *testing.T) {
 	errs := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx0})
 	require.NoError(t, errs[0], "Failed to add tx")
 
-	blk := issueAndAccept(t, issuer, vm)
+	blk := issueAndAccept(t, vm)
 	require.NotNil(t, blk)
 	require.EqualValues(t, 1, blk.Height())
 
@@ -382,7 +381,7 @@ func TestVMEupgradeActivatesCancun(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, vm, _, _ := GenesisVM(t, true, test.genesisJSON, "", test.upgradeJSON)
+			vm, _, _ := GenesisVM(t, true, test.genesisJSON, "", test.upgradeJSON)
 			defer func() { require.NoError(t, vm.Shutdown(context.Background())) }()
 			test.check(t, vm)
 		})
