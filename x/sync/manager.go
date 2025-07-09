@@ -327,7 +327,7 @@ func (m *Manager) requestChangeProof(ctx context.Context, work *workItem) {
 
 	if work.localRootID == targetRootID {
 		// Start root is the same as the end root, so we're done.
-		m.completeWorkItem(ctx, work, work.end, targetRootID, nil)
+		m.completeWorkItem(work, work.end, targetRootID)
 		m.finishWorkItem()
 		return
 	}
@@ -342,7 +342,7 @@ func (m *Manager) requestChangeProof(ctx context.Context, work *workItem) {
 			return
 		}
 		work.start = maybe.Nothing[[]byte]()
-		m.completeWorkItem(ctx, work, maybe.Nothing[[]byte](), targetRootID, nil)
+		m.completeWorkItem(work, maybe.Nothing[[]byte](), targetRootID)
 		return
 	}
 
@@ -401,7 +401,7 @@ func (m *Manager) requestRangeProof(ctx context.Context, work *workItem) {
 			return
 		}
 		work.start = maybe.Nothing[[]byte]()
-		m.completeWorkItem(ctx, work, maybe.Nothing[[]byte](), targetRootID, nil)
+		m.completeWorkItem(work, maybe.Nothing[[]byte](), targetRootID)
 		return
 	}
 
@@ -545,7 +545,17 @@ func (m *Manager) handleRangeProofResponse(
 		largestHandledKey = maybe.Some(rangeProof.KeyChanges[len(rangeProof.KeyChanges)-1].Key)
 	}
 
-	m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, rangeProof.EndProof)
+	// Find the next key to fetch.
+	// If this is empty, then we have no more keys to fetch.
+	if !largestHandledKey.IsNothing() {
+		nextKey, err := m.findNextKey(ctx, largestHandledKey.Value(), work.end, rangeProof.EndProof)
+		if err != nil {
+			m.setError(err)
+			return nil
+		}
+		largestHandledKey = nextKey
+	}
+	m.completeWorkItem(work, largestHandledKey, targetRootID)
 	return nil
 }
 
@@ -569,6 +579,10 @@ func (m *Manager) handleChangeProofResponse(
 	startKey := maybeBytesToMaybe(request.StartKey)
 	endKey := maybeBytesToMaybe(request.EndKey)
 
+	var (
+		largestHandledKey maybe.Maybe[[]byte]
+		endProof          []merkledb.ProofNode
+	)
 	switch changeProofResp := changeProofResp.Response.(type) {
 	case *pb.SyncGetChangeProofResponse_ChangeProof:
 		// The server had enough history to send us a change proof
@@ -601,7 +615,7 @@ func (m *Manager) handleChangeProofResponse(
 			return fmt.Errorf("%w due to %w", errInvalidChangeProof, err)
 		}
 
-		largestHandledKey := work.end
+		largestHandledKey = work.end
 		// if the proof wasn't empty, apply changes to the sync DB
 		if len(changeProof.KeyChanges) > 0 {
 			if err := m.config.DB.CommitChangeProof(ctx, &changeProof); err != nil {
@@ -610,8 +624,8 @@ func (m *Manager) handleChangeProofResponse(
 			}
 			largestHandledKey = maybe.Some(changeProof.KeyChanges[len(changeProof.KeyChanges)-1].Key)
 		}
+		endProof = changeProof.EndProof
 
-		m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, changeProof.EndProof)
 	case *pb.SyncGetChangeProofResponse_RangeProof:
 		var rangeProof merkledb.RangeProof
 		if err := rangeProof.UnmarshalProto(changeProofResp.RangeProof); err != nil {
@@ -633,7 +647,7 @@ func (m *Manager) handleChangeProofResponse(
 			return err
 		}
 
-		largestHandledKey := work.end
+		largestHandledKey = work.end
 		if len(rangeProof.KeyChanges) > 0 {
 			// Add all the key-value pairs we got to the database.
 			if err := m.config.DB.CommitRangeProof(ctx, work.start, work.end, &rangeProof); err != nil {
@@ -642,14 +656,25 @@ func (m *Manager) handleChangeProofResponse(
 			}
 			largestHandledKey = maybe.Some(rangeProof.KeyChanges[len(rangeProof.KeyChanges)-1].Key)
 		}
+		endProof = rangeProof.EndProof
 
-		m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, rangeProof.EndProof)
 	default:
 		return fmt.Errorf(
 			"%w: %T",
 			errUnexpectedChangeProofResponse, changeProofResp,
 		)
 	}
+	// Find the next key to fetch.
+	// If this is empty, then we have no more keys to fetch.
+	if !largestHandledKey.IsNothing() {
+		nextKey, err := m.findNextKey(ctx, largestHandledKey.Value(), work.end, endProof)
+		if err != nil {
+			m.setError(err)
+			return nil
+		}
+		largestHandledKey = nextKey
+	}
+	m.completeWorkItem(work, largestHandledKey, targetRootID)
 
 	return nil
 }
@@ -933,28 +958,14 @@ func (m *Manager) setError(err error) {
 // that gave us the range up to and including [largestHandledKey].
 //
 // Assumes [m.workLock] is not held.
-func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestHandledKey maybe.Maybe[[]byte], rootID ids.ID, proofOfLargestKey []merkledb.ProofNode) {
+func (m *Manager) completeWorkItem(work *workItem, largestHandledKey maybe.Maybe[[]byte], rootID ids.ID) {
 	if !maybe.Equal(largestHandledKey, work.end, bytes.Equal) {
-		// The largest handled key isn't equal to the end of the work item.
-		// Find the start of the next key range to fetch.
-		// Note that [largestHandledKey] can't be Nothing.
-		// Proof: Suppose it is. That means that we got a range/change proof that proved up to the
-		// greatest key-value pair in the database. That means we requested a proof with no upper
-		// bound. That is, [workItem.end] is Nothing. Since we're here, [bothNothing] is false,
-		// which means [workItem.end] isn't Nothing. Contradiction.
-		nextStartKey, err := m.findNextKey(ctx, largestHandledKey.Value(), work.end, proofOfLargestKey)
-		if err != nil {
-			m.setError(err)
-			return
-		}
-
-		// nextStartKey being Nothing indicates that the entire range has been completed
-		if nextStartKey.IsNothing() {
+		// largestHandledKey being Nothing indicates that the entire range has been completed
+		if largestHandledKey.IsNothing() {
 			largestHandledKey = work.end
 		} else {
 			// the full range wasn't completed, so enqueue a new work item for the range [nextStartKey, workItem.end]
-			m.enqueueWork(newWorkItem(work.localRootID, nextStartKey, work.end, work.priority, time.Now()))
-			largestHandledKey = nextStartKey
+			m.enqueueWork(newWorkItem(work.localRootID, largestHandledKey, work.end, work.priority, time.Now()))
 		}
 	}
 
