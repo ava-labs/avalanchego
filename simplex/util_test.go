@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
@@ -38,6 +39,14 @@ func newBlockWithDigest(t *testing.T, vmBlock snowman.Block, tracker *blockTrack
 	block.digest = digest
 
 	return block
+}
+
+// newTestBlock generate a test block with a given round and sequence number.
+func newTestBlock(t *testing.T, round, seq uint64) *Block {
+	testBlock := snowmantest.BuildChild(snowmantest.Genesis)
+
+	prevDigest := simplex.Digest(ids.GenerateTestID())
+	return newBlockWithDigest(t, testBlock, nil, round, seq, prevDigest)
 }
 
 func newTestValidatorInfo(allVds []validators.GetValidatorOutput) map[ids.NodeID]*validators.GetValidatorOutput {

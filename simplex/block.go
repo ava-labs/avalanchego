@@ -13,7 +13,6 @@ import (
 
 	"github.com/ava-labs/simplex"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -27,6 +26,8 @@ var (
 
 	errDigestNotFound       = errors.New("digest not found in block tracker")
 	errMismatchedPrevDigest = errors.New("prev digest does not match block parent")
+	errGenesisVerification  = errors.New("genesis block should not be verified")
+	errBlockAlreadyVerified = errors.New("block has already been verified")
 )
 
 type Block struct {
@@ -69,44 +70,42 @@ func (b *Block) Bytes() ([]byte, error) {
 
 // Verify verifies the block.
 func (b *Block) Verify(ctx context.Context) (simplex.VerifiedBlock, error) {
-	if b.metadata.Seq != 0 {
-		err := b.verifyParentMatchesPrevBlock()
-		if err != nil {
-			return nil, err
-		}
+	// we should not verify the genesis block
+	if b.metadata.Seq == 0 {
+		return nil, errGenesisVerification
 	}
 
-	err := b.vmBlock.Verify(ctx)
+	err := b.verifyParentMatchesPrevBlock()
+	if err != nil {
+		return nil, err
+	}
+
+	if b.blockTracker.isBlockAlreadyVerified(b.vmBlock) {
+		return nil, errBlockAlreadyVerified
+	}
+
+	err = b.vmBlock.Verify(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to verify block: %w", err)
 	}
 
 	// once verified, the block tracker will eventually either accept or reject the block
 	b.blockTracker.trackBlock(b)
-
 	return b, nil
 }
 
-// verifyPrevBlock verifies that the previous block referenced in the current block's metadata
+// verifyParentMatchesPrevBlock verifies that the previous block referenced in the current block's metadata
 // matches the parent of the current block's vmBlock.
 func (b *Block) verifyParentMatchesPrevBlock() error {
-	prevBlock := b.blockTracker.getBlock(b.metadata.Prev)
-	if prevBlock != nil {
-		if b.vmBlock.Parent() != prevBlock.vmBlock.ID() || b.metadata.Prev != prevBlock.digest {
-			return fmt.Errorf("%w: parentID %s, prevID %s", errMismatchedPrevDigest, b.vmBlock.Parent(), prevBlock.vmBlock.ID())
-		}
-
-		return nil
+	prevBlock := b.blockTracker.getBlockByDigest(b.metadata.Prev)
+	if prevBlock == nil {
+		return fmt.Errorf("%w: %s", errDigestNotFound, b.metadata.Prev)
 	}
 
-	// if we do not have it in the map, it's possible for it to be the last accepted block
-	if b.blockTracker.lastAcceptedID != b.vmBlock.Parent() {
-		return fmt.Errorf("%w: last accepted block %s, parentID %s", errDigestNotFound, b.blockTracker.lastAcceptedID, b.vmBlock.Parent())
+	if b.vmBlock.Parent() != prevBlock.vmBlock.ID() || b.metadata.Prev != prevBlock.digest {
+		return fmt.Errorf("%w: parentID %s, prevID %s", errMismatchedPrevDigest, b.vmBlock.Parent(), prevBlock.vmBlock.ID())
 	}
 
-	if b.blockTracker.lastAcceptedDigest != b.metadata.Prev {
-		return fmt.Errorf("%w: last accepted digest %s, prevID %s", errMismatchedPrevDigest, b.blockTracker.lastAcceptedDigest, b.metadata.Prev)
-	}
 	return nil
 }
 
@@ -149,29 +148,33 @@ type blockTracker struct {
 	// tracks the simplex digests to the blocks that have been verified
 	simplexDigestsToBlock map[simplex.Digest]*Block
 
-	// lastAcceptedID is the ID of the last accepted block at the time of the block tracker creation.
-	lastAcceptedID ids.ID
-	// lastAcceptedDigest is the digest of the last accepted simplex block at the time of the block tracker creation.
-	lastAcceptedDigest simplex.Digest
-
 	// handles block acceptance and rejection of inner blocks
 	tree tree.Tree
 }
 
-func newBlockTracker(lastAcceptedID ids.ID, lastAcceptedDigest simplex.Digest) *blockTracker {
+func newBlockTracker(latestBlock *Block) *blockTracker {
+	simplexDigestsToBlock := make(map[simplex.Digest]*Block)
+	simplexDigestsToBlock[latestBlock.digest] = latestBlock
+
 	return &blockTracker{
 		tree:                  tree.New(),
-		lastAcceptedID:        lastAcceptedID,
-		lastAcceptedDigest:    lastAcceptedDigest,
-		simplexDigestsToBlock: make(map[simplex.Digest]*Block),
+		simplexDigestsToBlock: simplexDigestsToBlock,
 	}
 }
 
-func (bt *blockTracker) getBlock(digest simplex.Digest) *Block {
+func (bt *blockTracker) getBlockByDigest(digest simplex.Digest) *Block {
 	bt.lock.Lock()
 	defer bt.lock.Unlock()
 
 	return bt.simplexDigestsToBlock[digest]
+}
+
+func (bt *blockTracker) isBlockAlreadyVerified(block snowman.Block) bool {
+	bt.lock.Lock()
+	defer bt.lock.Unlock()
+
+	_, exists := bt.tree.Get(block)
+	return exists
 }
 
 func (bt *blockTracker) trackBlock(b *Block) {
