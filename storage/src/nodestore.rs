@@ -385,6 +385,8 @@ pub trait Parentable {
     fn as_nodestore_parent(&self) -> NodeStoreParent;
     /// Returns the root hash of this nodestore. This works because all parentable nodestores have a hash
     fn root_hash(&self) -> Option<TrieHash>;
+    /// Returns the root node
+    fn root(&self) -> Option<MaybePersistedNode>;
 }
 
 impl Parentable for Arc<ImmutableProposal> {
@@ -393,6 +395,9 @@ impl Parentable for Arc<ImmutableProposal> {
     }
     fn root_hash(&self) -> Option<TrieHash> {
         self.root_hash.clone()
+    }
+    fn root(&self) -> Option<MaybePersistedNode> {
+        self.root.clone()
     }
 }
 
@@ -421,6 +426,9 @@ impl Parentable for Committed {
     fn root_hash(&self) -> Option<TrieHash> {
         self.root_hash.clone()
     }
+    fn root(&self) -> Option<MaybePersistedNode> {
+        self.root.clone()
+    }
 }
 
 impl<S: ReadableStorage> NodeStore<MutableProposal, S> {
@@ -433,10 +441,10 @@ impl<S: ReadableStorage> NodeStore<MutableProposal, S> {
         parent: &Arc<NodeStore<F, S>>,
     ) -> Result<Self, FileIoError> {
         let mut deleted = Vec::default();
-        let root = if let Some(root_addr) = parent.header.root_address {
-            deleted.push(root_addr);
-            let root = parent.read_node(root_addr)?;
-            Some((*root).clone())
+        let root = if let Some(ref root) = parent.kind.root() {
+            deleted.push(root.clone());
+            let root = root.as_shared_node(parent)?.deref().clone();
+            Some(root)
         } else {
             None
         };
@@ -453,9 +461,9 @@ impl<S: ReadableStorage> NodeStore<MutableProposal, S> {
     }
 
     /// Marks the node at `addr` as deleted in this proposal.
-    pub fn delete_node(&mut self, addr: LinearAddress) {
-        trace!("Pending delete at {addr:?}");
-        self.kind.deleted.push(addr);
+    pub fn delete_node(&mut self, node: MaybePersistedNode) {
+        trace!("Pending delete at {node:?}");
+        self.kind.deleted.push(node);
     }
 
     /// Reads a node for update, marking it as deleted in this proposal.
@@ -465,9 +473,9 @@ impl<S: ReadableStorage> NodeStore<MutableProposal, S> {
     /// # Errors
     ///
     /// Returns a [`FileIoError`] if the node cannot be read.
-    pub fn read_for_update(&mut self, addr: LinearAddress) -> Result<Node, FileIoError> {
-        self.delete_node(addr);
-        let arc_wrapped_node = self.read_node(addr)?;
+    pub fn read_for_update(&mut self, node: MaybePersistedNode) -> Result<Node, FileIoError> {
+        let arc_wrapped_node = node.as_shared_node(self)?;
+        self.delete_node(node);
         Ok((*arc_wrapped_node).clone())
     }
 
@@ -614,7 +622,10 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
     ///
     /// Returns a [`FileIoError`] if the node cannot be deleted.
     #[expect(clippy::indexing_slicing)]
-    pub fn delete_node(&mut self, addr: LinearAddress) -> Result<(), FileIoError> {
+    pub fn delete_node(&mut self, node: MaybePersistedNode) -> Result<(), FileIoError> {
+        let Some(addr) = node.as_linear_address() else {
+            return Ok(());
+        };
         debug_assert!(addr.get() % 8 == 0);
 
         let (area_size_index, _) = self.area_index_and_size(addr)?;
@@ -989,7 +1000,7 @@ pub trait RootReader {
 /// A committed revision of a merkle trie.
 #[derive(Clone, Debug)]
 pub struct Committed {
-    deleted: Box<[LinearAddress]>,
+    deleted: Box<[MaybePersistedNode]>,
     root_hash: Option<TrieHash>,
     root: Option<MaybePersistedNode>,
 }
@@ -1025,7 +1036,7 @@ pub struct ImmutableProposal {
     /// Address --> Node for nodes created in this proposal.
     new: HashMap<LinearAddress, (u8, SharedNode)>,
     /// Nodes that have been deleted in this proposal.
-    deleted: Box<[LinearAddress]>,
+    deleted: Box<[MaybePersistedNode]>,
     /// The parent of this proposal.
     parent: Arc<ArcSwap<NodeStoreParent>>,
     /// The hash of the root node for this proposal
@@ -1115,7 +1126,7 @@ pub struct MutableProposal {
     /// The root of the trie in this proposal.
     root: Option<Node>,
     /// Nodes that have been deleted in this proposal.
-    deleted: Vec<LinearAddress>,
+    deleted: Vec<MaybePersistedNode>,
     parent: NodeStoreParent,
 }
 
@@ -1665,8 +1676,8 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
         self.storage
             .invalidate_cached_nodes(self.kind.deleted.iter());
         trace!("There are {} nodes to reap", self.kind.deleted.len());
-        for addr in take(&mut self.kind.deleted) {
-            proposal.delete_node(addr)?;
+        for node in take(&mut self.kind.deleted) {
+            proposal.delete_node(node)?;
         }
         Ok(())
     }

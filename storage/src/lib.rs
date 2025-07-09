@@ -51,6 +51,7 @@ pub use nodestore::{
 
 pub use linear::filebacked::FileBacked;
 pub use linear::memory::MemStore;
+pub use node::persist::MaybePersistedNode;
 
 pub use trie_hash::TrieHash;
 

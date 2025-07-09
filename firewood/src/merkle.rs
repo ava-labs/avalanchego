@@ -567,7 +567,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                             }
                             Some(Child::Node(child)) => child,
                             Some(Child::AddressWithHash(addr, _)) => {
-                                self.nodestore.read_for_update(addr)?
+                                self.nodestore.read_for_update(addr.into())?
                             }
                         };
 
@@ -712,7 +712,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                             let mut child = match child {
                                 Child::Node(child_node) => std::mem::take(child_node),
                                 Child::AddressWithHash(addr, _) => {
-                                    self.nodestore.read_for_update(*addr)?
+                                    self.nodestore.read_for_update((*addr).into())?
                                 }
                             };
 
@@ -780,7 +780,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                             }
                             Some(Child::Node(node)) => node,
                             Some(Child::AddressWithHash(addr, _)) => {
-                                self.nodestore.read_for_update(addr)?
+                                self.nodestore.read_for_update(addr.into())?
                             }
                         };
 
@@ -828,7 +828,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                                 }),
                             ),
                             Child::AddressWithHash(addr, _) => {
-                                self.nodestore.read_for_update(*addr)?
+                                self.nodestore.read_for_update((*addr).into())?
                             }
                         };
 
@@ -928,7 +928,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                             }
                             Some(Child::Node(node)) => node,
                             Some(Child::AddressWithHash(addr, _)) => {
-                                self.nodestore.read_for_update(addr)?
+                                self.nodestore.read_for_update(addr.into())?
                             }
                         };
 
@@ -976,7 +976,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                                 }),
                             ),
                             Child::AddressWithHash(addr, _) => {
-                                self.nodestore.read_for_update(*addr)?
+                                self.nodestore.read_for_update((*addr).into())?
                             }
                         };
 
@@ -1014,7 +1014,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
             let child = match children {
                 Some(Child::Node(node)) => node,
                 Some(Child::AddressWithHash(addr, _)) => {
-                    &mut self.nodestore.read_for_update(*addr)?
+                    &mut self.nodestore.read_for_update((*addr).into())?
                 }
                 None => continue,
             };

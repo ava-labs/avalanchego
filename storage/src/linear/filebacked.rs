@@ -36,7 +36,7 @@ use std::sync::Mutex;
 use lru::LruCache;
 use metrics::counter;
 
-use crate::{CacheReadStrategy, LinearAddress, SharedNode};
+use crate::{CacheReadStrategy, LinearAddress, MaybePersistedNode, SharedNode};
 
 use super::{FileIoError, ReadableStorage, WritableStorage};
 
@@ -223,10 +223,10 @@ impl WritableStorage for FileBacked {
         Ok(())
     }
 
-    fn invalidate_cached_nodes<'a>(&self, addresses: impl Iterator<Item = &'a LinearAddress>) {
+    fn invalidate_cached_nodes<'a>(&self, nodes: impl Iterator<Item = &'a MaybePersistedNode>) {
         let mut guard = self.cache.lock().expect("poisoned lock");
-        for addr in addresses {
-            guard.pop(addr);
+        for addr in nodes.filter_map(MaybePersistedNode::as_linear_address) {
+            guard.pop(&addr);
         }
     }
 

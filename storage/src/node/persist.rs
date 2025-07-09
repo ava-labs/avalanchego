@@ -87,6 +87,19 @@ impl MaybePersistedNode {
         }
     }
 
+    /// Returns the linear address of the node if it is persisted on disk.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Some(LinearAddress)` if the node is persisted on disk, otherwise `None`.
+    #[must_use]
+    pub fn as_linear_address(&self) -> Option<LinearAddress> {
+        match self.0.load().as_ref() {
+            MaybePersisted::Unpersisted(_) => None,
+            MaybePersisted::Persisted(address) => Some(*address),
+        }
+    }
+
     /// Updates the internal state to indicate this node is persisted at the specified disk address.
     ///
     /// This method changes the internal state of the `MaybePersistedNode` from `Mem` to `Disk`,

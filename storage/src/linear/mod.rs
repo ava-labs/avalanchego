@@ -25,7 +25,7 @@ use std::num::NonZero;
 use std::ops::Deref;
 use std::path::PathBuf;
 
-use crate::{CacheReadStrategy, LinearAddress, SharedNode};
+use crate::{CacheReadStrategy, LinearAddress, MaybePersistedNode, SharedNode};
 pub(super) mod filebacked;
 pub mod memory;
 
@@ -190,7 +190,11 @@ pub trait WritableStorage: ReadableStorage {
     }
 
     /// Invalidate all nodes that are part of a specific revision, as these will never be referenced again
-    fn invalidate_cached_nodes<'a>(&self, _addresses: impl Iterator<Item = &'a LinearAddress>) {}
+    fn invalidate_cached_nodes<'a>(
+        &self,
+        _addresses: impl Iterator<Item = &'a MaybePersistedNode>,
+    ) {
+    }
 
     /// Add a new entry to the freelist cache
     fn add_to_free_list_cache(&self, _addr: LinearAddress, _next: Option<LinearAddress>) {}
