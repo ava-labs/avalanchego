@@ -40,7 +40,7 @@ queries](https://onsi.github.io/ginkgo/#spec-labels).
 
 ## Adding tests
 
-Define any flags/configurations in [`flags.go`](../fixture/e2e/flags.go).
+Configure test behavior using the flags defined in the [tmpnet flags package](../fixture/tmpnet/flags/). For detailed flag documentation, see the [tmpnet configuration flags documentation](../fixture/tmpnet/README.md#configuration-flags).
 
 Create a new package to implement feature-specific tests, or add tests to an existing package. For example:
 
@@ -110,30 +110,10 @@ E2E_SKIP_BOOTSTRAP_CHECKS=1 ./bin/ginkgo -v ./tests/e2e ...
 
 ## Monitoring
 
-It is possible to enable collection of logs and metrics from the
-temporary networks used for e2e testing by:
+tmpnet supports comprehensive monitoring of temporary networks through log and metric collection.
+This can be enabled for e2e tests in two ways:
 
- - Supplying `--start-metrics-collector` and `--start-logs-collector`
-   as arguments to the test suite
- - Starting collectors in advance of a test run with `tmpnetctl
-   start-metrics-collector` and ` tmpnetctl start-logs-collector`
+- Supply `--start-metrics-collector` and `--start-logs-collector` as arguments to the test suite
+- Start collectors manually before test runs using `tmpnetctl`
 
-Both methods require:
-
- - Auth credentials to be supplied as env vars:
-   - `PROMETHEUS_USERNAME`
-   - `PROMETHEUS_PASSWORD`
-   - `LOKI_USERNAME`
-   - `LOKI_PASSWORD`
- - The availability in the path of binaries for promtail and prometheus
-   - Starting a development shell with `nix develop` is one way to
-     ensure this and requires the installation of nix
-     (e.g. `./scripts/run_task.sh install-nix`).
-
-Once started, the collectors will continue to run in the background
-until stopped by `tmpnetctl stop-metrics-collector` and `tmpnetctl stop-logs-collector`.
-
-The results of collection will be viewable at
-https://grafana-poc.avax-dev.network.
-
-For more detail, see the [tmpnet docs](../fixture/tmpnet/README.md##monitoring).
+For detailed configuration and usage, see the [tmpnet monitoring documentation](../fixture/tmpnet/README.md#monitoring).
