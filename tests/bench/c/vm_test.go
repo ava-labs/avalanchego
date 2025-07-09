@@ -54,6 +54,7 @@ var (
 	endBlockArg       uint64
 	chanSizeArg       int
 	metricsEnabledArg bool
+	executionTimeout  time.Duration
 )
 
 func TestMain(m *testing.M) {
@@ -70,6 +71,7 @@ func TestMain(m *testing.M) {
 	flag.Uint64Var(&endBlockArg, "end-block", 200, "End block to end execution (inclusive).")
 	flag.IntVar(&chanSizeArg, "chan-size", 100, "Size of the channel to use for block processing.")
 	flag.BoolVar(&metricsEnabledArg, "metrics-enabled", true, "Enable metrics collection.")
+	flag.DurationVar(&executionTimeout, "execution-timeout", 0, "Benchmark execution timeout. After this timeout has elapsed, terminate the benchmark without error.")
 	flag.Parse()
 	m.Run()
 }
@@ -131,7 +133,7 @@ func TestReexecuteRange(t *testing.T) {
 
 	executor, err := newVMExecutor(sourceVM, consensusRegistry)
 	r.NoError(err)
-	r.NoError(executor.executeSequence(ctx, blockChan))
+	r.NoError(executor.executeSequence(ctx, blockChan, executionTimeout))
 }
 
 func TestExportBlockRange(t *testing.T) {
@@ -263,7 +265,7 @@ func (e *VMExecutor) execute(ctx context.Context, blockBytes []byte) error {
 	return nil
 }
 
-func (e *VMExecutor) executeSequence(ctx context.Context, blkChan <-chan BlockResult) error {
+func (e *VMExecutor) executeSequence(ctx context.Context, blkChan <-chan BlockResult, executionTimeout time.Duration) error {
 	blkID, err := e.vm.LastAccepted(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get last accepted block: %w", err)
@@ -273,6 +275,7 @@ func (e *VMExecutor) executeSequence(ctx context.Context, blkChan <-chan BlockRe
 		return fmt.Errorf("failed to get last accepted block: %w", err)
 	}
 
+	start := time.Now()
 	e.log.Info("last accepted block", zap.String("blkID", blkID.String()), zap.Uint64("height", blk.Height()))
 
 	for blkResult := range blkChan {
@@ -285,6 +288,10 @@ func (e *VMExecutor) executeSequence(ctx context.Context, blkChan <-chan BlockRe
 		}
 		if err := e.execute(ctx, blkResult.BlockBytes); err != nil {
 			return err
+		}
+		if executionTimeout > 0 && time.Since(start) > executionTimeout {
+			e.log.Info("exiting early due to execution timeout", zap.Duration("elapsed", time.Since(start)), zap.Duration("execution-timeout", executionTimeout))
+			return nil
 		}
 	}
 	e.log.Info("finished executing sequence")
