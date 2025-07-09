@@ -124,6 +124,14 @@ func TestWriteBlock_Basic(t *testing.T) {
 			expectedMCH:        4,
 			expectedMaxHeight:  4,
 		},
+		{
+			name: "complicated gaps",
+			blockHeights: []uint64{
+				10, 3, 2, 9, 35, 34, 30, 1, 9, 88, 83, 4, 43, 5, 0,
+			},
+			expectedMCH:       5,
+			expectedMaxHeight: 88,
+		},
 	}
 
 	for _, tt := range tests {

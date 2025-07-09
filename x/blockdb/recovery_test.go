@@ -25,7 +25,7 @@ func TestRecovery_Success(t *testing.T) {
 			corruptIndex: os.Remove,
 		},
 		{
-			name: "recovery from truncated index file",
+			name: "recovery from truncated index file that only indexed the first block",
 			corruptIndex: func(indexPath string) error {
 				// Remove the existing index file
 				if err := os.Remove(indexPath); err != nil {
@@ -46,7 +46,7 @@ func TestRecovery_Success(t *testing.T) {
 
 				header := indexFileHeader{
 					Version:             IndexFileVersion,
-					MaxDataFileSize:     10 * 1024, // 10KB per file
+					MaxDataFileSize:     4 * 10 * 1024, // 10KB per file
 					MinHeight:           0,
 					MaxContiguousHeight: 0,
 					MaxHeight:           0,
@@ -80,13 +80,90 @@ func TestRecovery_Success(t *testing.T) {
 				return nil
 			},
 		},
+		{
+			name: "recovery from index file that is behind by one block",
+			corruptIndex: func(indexPath string) error {
+				// Read the current index file to get the header
+				indexFile, err := os.OpenFile(indexPath, os.O_RDWR, 0)
+				if err != nil {
+					return err
+				}
+				defer indexFile.Close()
+
+				// Read the current header
+				headerBuf := make([]byte, sizeOfIndexFileHeader)
+				_, err = indexFile.ReadAt(headerBuf, 0)
+				if err != nil {
+					return err
+				}
+
+				// Parse the header
+				var header indexFileHeader
+				err = header.UnmarshalBinary(headerBuf)
+				if err != nil {
+					return err
+				}
+
+				// Corrupt the header by setting the NextWriteOffset to be one block behind
+				blockSize := uint64(sizeOfBlockEntryHeader) + 4*1024
+				header.NextWriteOffset = header.NextWriteOffset - blockSize
+				header.MaxContiguousHeight = 3
+				header.MaxHeight = 8
+
+				// Write the corrupted header back
+				corruptedHeaderBytes, err := header.MarshalBinary()
+				if err != nil {
+					return err
+				}
+				_, err = indexFile.WriteAt(corruptedHeaderBytes, 0)
+				return err
+			},
+		},
+		{
+			name: "recovery from inconsistent index header (offset lagging behind heights)",
+			corruptIndex: func(indexPath string) error {
+				// Read the current index file to get the header
+				indexFile, err := os.OpenFile(indexPath, os.O_RDWR, 0)
+				if err != nil {
+					return err
+				}
+				defer indexFile.Close()
+
+				// Read the current header
+				headerBuf := make([]byte, sizeOfIndexFileHeader)
+				_, err = indexFile.ReadAt(headerBuf, 0)
+				if err != nil {
+					return err
+				}
+
+				// Parse the header
+				var header indexFileHeader
+				err = header.UnmarshalBinary(headerBuf)
+				if err != nil {
+					return err
+				}
+
+				// Calculate the offset after the 5th block (assuming 4KB blocks)
+				// 2 files, 10KB each, 4KB block size
+				blockSize := uint64(sizeOfBlockEntryHeader) + 4*1024
+				header.NextWriteOffset = 10*1024*2 + blockSize
+
+				// Write the corrupted header back
+				corruptedHeaderBytes, err := header.MarshalBinary()
+				if err != nil {
+					return err
+				}
+				_, err = indexFile.WriteAt(corruptedHeaderBytes, 0)
+				return err
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			store, cleanup := newTestDatabase(t, config)
-			defer cleanup()
-			blockHeights := []uint64{0, 1, 3, 5, 2, 8}
+			store, _ := newTestDatabase(t, config)
+
+			blockHeights := []uint64{0, 1, 3, 6, 2, 8, 4}
 			blocks := make(map[uint64][]byte)
 
 			for _, height := range blockHeights {
@@ -96,7 +173,7 @@ func TestRecovery_Success(t *testing.T) {
 				require.NoError(t, store.WriteBlock(height, block, 0))
 				blocks[height] = block
 			}
-			checkDatabaseState(t, store, 8, 3)
+			checkDatabaseState(t, store, 8, 4)
 			require.NoError(t, store.Close())
 
 			// Corrupt the index file according to the test case
@@ -114,7 +191,7 @@ func TestRecovery_Success(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, blocks[height], readBlock, "block %d should be the same", height)
 			}
-			checkDatabaseState(t, recoveredStore, 8, 3)
+			checkDatabaseState(t, recoveredStore, 8, 4)
 		})
 	}
 }
