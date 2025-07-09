@@ -271,8 +271,9 @@ func main() {
 	rootCmd.AddCommand(checkLogsCmd)
 
 	var (
-		kubeconfigVars *flags.KubeconfigVars
-		collectorVars  *flags.CollectorVars
+		kubeconfigVars   *flags.KubeconfigVars
+		collectorVars    *flags.CollectorVars
+		installChaosMesh bool
 	)
 	startKindClusterCmd := &cobra.Command{
 		Use:   "start-kind-cluster",
@@ -302,11 +303,13 @@ func main() {
 				kubeconfigVars.Path,
 				collectorVars.StartMetricsCollector,
 				collectorVars.StartLogsCollector,
+				installChaosMesh,
 			)
 		},
 	}
 	kubeconfigVars = flags.NewKubeconfigFlagSetVars(startKindClusterCmd.PersistentFlags())
 	collectorVars = flags.NewCollectorFlagSetVars(startKindClusterCmd.PersistentFlags())
+	startKindClusterCmd.PersistentFlags().BoolVar(&installChaosMesh, "install-chaos-mesh", false, "Install Chaos Mesh in the kind cluster")
 	rootCmd.AddCommand(startKindClusterCmd)
 
 	if err := rootCmd.Execute(); err != nil {
