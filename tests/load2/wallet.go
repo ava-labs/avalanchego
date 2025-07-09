@@ -69,12 +69,13 @@ func (w *Wallet) SendTx(
 	issuanceDuration := time.Since(startTime)
 	w.metrics.issue(issuanceDuration)
 
-	if err := w.awaitTx(
+	err = w.awaitTx(
 		ctx,
 		headers,
 		sub.Err(),
 		tx.Hash(),
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
 
