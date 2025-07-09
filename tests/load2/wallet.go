@@ -94,6 +94,7 @@ func (w Wallet) awaitTx(
 	errs <-chan error,
 	txHash common.Hash,
 ) error {
+	account := crypto.PubkeyToAddress(w.privKey.PublicKey)
 	for {
 		select {
 		case <-ctx.Done():
@@ -103,7 +104,7 @@ func (w Wallet) awaitTx(
 		case h := <-headers:
 			latestNonce, err := w.client.NonceAt(
 				ctx,
-				crypto.PubkeyToAddress(w.privKey.PublicKey),
+				account,
 				h.Number,
 			)
 			if err != nil {
