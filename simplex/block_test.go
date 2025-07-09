@@ -135,6 +135,17 @@ func TestVerifyPrevIsLatest(t *testing.T) {
 	blockBytes, err := b.Bytes()
 	require.NoError(t, err)
 	require.Equal(t, blockBytes, vBlockBytes, "block bytes should match after verification")
+
+	require.NoError(t, tracker.indexBlock(ctx, b.digest))
+	require.Equal(t, snowtest.Accepted, testBlock.Decidable.Status)
+
+	// Ensure future blocks are verified on the new last accepted id and digest
+	nextVMBlock := snowmantest.BuildChild(testBlock)
+	nextBlock := newBlockWithDigest(t, nextVMBlock, tracker, 2, 2, b.digest)
+	_, err = nextBlock.Verify(ctx)
+	require.NoError(t, err)
+	require.NoError(t, tracker.indexBlock(ctx, nextBlock.digest))
+	require.Equal(t, snowtest.Accepted, nextVMBlock.Decidable.Status)
 }
 
 // TestVerifyLatestDigestMismatch tests verification fails if the latest accepted block's digest
