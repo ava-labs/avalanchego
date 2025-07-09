@@ -14,6 +14,7 @@ internal/*
 !core/main_test.go
 !core/predicate_check.go
 !core/predicate_check_test.go
+!core/state/firewood_database.go
 !core/state/snapshot/snapshot_ext.go
 !core/state/statedb_multicoin_test.go
 !core/state_manager_test.go
