@@ -13,8 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/tests"
-	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet/flags"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet/testenv"
 	"github.com/ava-labs/avalanchego/tests/load"
 	"github.com/ava-labs/avalanchego/tests/load2"
 )
@@ -27,13 +28,13 @@ const (
 )
 
 var (
-	flagVars *e2e.FlagVars
+	flagVars *flags.FlagVars
 
 	loadTimeout time.Duration
 )
 
 func init() {
-	flagVars = e2e.RegisterFlags()
+	flagVars = flags.RegisterFlags()
 
 	flag.DurationVar(
 		&loadTimeout,
@@ -64,7 +65,7 @@ func main() {
 		PreFundedKeys: keys,
 	}
 
-	e2e.NewTestEnvironment(tc, flagVars, network)
+	testenv.NewTestEnvironment(tc, flagVars, network)
 
 	ctx := tests.DefaultNotifyContext(0, tc.DeferCleanup)
 	wsURIs, err := tmpnet.GetNodeWebsocketURIs(network.Nodes, blockchainID)

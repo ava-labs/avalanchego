@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package e2e
+package testenv
 
 import (
 	"context"
@@ -17,6 +17,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet/flags"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -77,7 +78,7 @@ func (te *TestEnvironment) Marshal() []byte {
 }
 
 // Initialize a new test environment with a shared network (either pre-existing or newly created).
-func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork *tmpnet.Network) *TestEnvironment {
+func NewTestEnvironment(tc tests.TestContext, flagVars *flags.FlagVars, desiredNetwork *tmpnet.Network) *TestEnvironment {
 	require := require.New(tc)
 
 	var network *tmpnet.Network
@@ -86,7 +87,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 	require.NoError(err)
 
 	// Consider monitoring flags for any command but stop
-	if networkCmd != StopNetworkCmd {
+	if networkCmd != flags.StopNetworkCmd {
 		if flagVars.StartMetricsCollector() {
 			require.NoError(tmpnet.StartPrometheus(tc.DefaultContext(), tc.Log()))
 		}
@@ -102,7 +103,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 					tc.Log().Warn("unable to check that metrics were collected from an uninitialized network")
 					return
 				}
-				ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
+				ctx, cancel := context.WithTimeout(context.Background(), tests.DefaultTimeout)
 				defer cancel()
 				require.NoError(tmpnet.CheckMetricsExist(ctx, tc.Log(), network.UUID))
 			})
@@ -114,7 +115,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 					tc.Log().Warn("unable to check that logs were collected from an uninitialized network")
 					return
 				}
-				ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
+				ctx, cancel := context.WithTimeout(context.Background(), tests.DefaultTimeout)
 				defer cancel()
 				require.NoError(tmpnet.CheckLogsExist(ctx, tc.Log(), network.UUID))
 			})
@@ -122,7 +123,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 	}
 
 	// Attempt to load the network if it may already be running
-	if networkCmd == StopNetworkCmd || networkCmd == ReuseNetworkCmd || networkCmd == RestartNetworkCmd {
+	if networkCmd == flags.StopNetworkCmd || networkCmd == flags.ReuseNetworkCmd || networkCmd == flags.RestartNetworkCmd {
 		networkDir := flagVars.NetworkDir()
 		var networkSymlink string // If populated, prompts removal of the referenced symlink if --stop-network is specified
 		if len(networkDir) == 0 {
@@ -148,7 +149,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 			)
 		}
 
-		if networkCmd == StopNetworkCmd {
+		if networkCmd == flags.StopNetworkCmd {
 			if len(networkSymlink) > 0 {
 				// Remove the symlink to avoid attempts to reuse the stopped network
 				tc.Log().Info("removing symlink",
@@ -167,7 +168,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 			os.Exit(0)
 		}
 
-		if network != nil && networkCmd == RestartNetworkCmd {
+		if network != nil && networkCmd == flags.RestartNetworkCmd {
 			require.NoError(network.Restart(tc.DefaultContext()))
 		}
 	}
@@ -204,7 +205,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 		}
 	}
 
-	if networkCmd == StartNetworkCmd {
+	if networkCmd == flags.StartNetworkCmd {
 		os.Exit(0)
 	}
 
@@ -294,6 +295,85 @@ func (te *TestEnvironment) StartPrivateNetwork(network *tmpnet.Network) {
 		network,
 		te.RootNetworkDir,
 		te.PrivateNetworkShutdownDelay,
-		EmptyNetworkCmd,
+		flags.EmptyNetworkCmd,
 	)
+}
+
+// Start a temporary network with the provided avalanchego binary.
+func StartNetwork(
+	tc tests.TestContext,
+	network *tmpnet.Network,
+	rootNetworkDir string,
+	shutdownDelay time.Duration,
+	networkCmd flags.NetworkCmd,
+) {
+	require := require.New(tc)
+
+	nodeCount := len(network.Nodes)
+	timeout, err := network.DefaultRuntimeConfig.GetNetworkStartTimeout(nodeCount)
+	require.NoError(err)
+	tc.Log().Info("waiting for network to start",
+		zap.Float64("timeoutSeconds", timeout.Seconds()),
+	)
+	ctx := tc.ContextWithTimeout(timeout)
+
+	err = tmpnet.BootstrapNewNetwork(
+		ctx,
+		tc.Log(),
+		network,
+		rootNetworkDir,
+	)
+	if err != nil {
+		tc.DeferCleanup(func() {
+			tc.Log().Info("shutting down network")
+			ctx, cancel := context.WithTimeout(context.Background(), tests.DefaultTimeout)
+			defer cancel()
+			require.NoError(network.Stop(ctx))
+		})
+		require.NoError(err, "failed to bootstrap network")
+	}
+
+	tc.Log().Info("network started successfully")
+
+	symlinkPath, err := tmpnet.GetReusableNetworkPathForOwner(network.Owner)
+	require.NoError(err)
+
+	if networkCmd == flags.ReuseNetworkCmd || networkCmd == flags.RestartNetworkCmd {
+		// Symlink the path of the created network to the default owner path (e.g. latest_avalanchego-e2e)
+		// to enable easy discovery for reuse.
+		require.NoError(os.Symlink(network.Dir, symlinkPath))
+		tc.Log().Info("symlinked network dir for reuse",
+			zap.String("networkDir", network.Dir),
+			zap.String("symlinkPath", symlinkPath),
+		)
+	}
+
+	tc.DeferCleanup(func() {
+		if networkCmd == flags.ReuseNetworkCmd || networkCmd == flags.RestartNetworkCmd {
+			tc.Log().Info("skipping shutdown for network intended for reuse",
+				zap.String("networkDir", network.Dir),
+				zap.String("symlinkPath", symlinkPath),
+			)
+			return
+		}
+
+		if networkCmd == flags.StartNetworkCmd {
+			tc.Log().Info("skipping shutdown for --start-network",
+				zap.String("networkDir", network.Dir),
+			)
+			return
+		}
+
+		if shutdownDelay > 0 {
+			tc.Log().Info("delaying network shutdown to ensure final metrics scrape",
+				zap.Duration("delay", shutdownDelay),
+			)
+			time.Sleep(shutdownDelay)
+		}
+
+		tc.Log().Info("shutting down network")
+		ctx, cancel := context.WithTimeout(context.Background(), tests.DefaultTimeout)
+		defer cancel()
+		require.NoError(network.Stop(ctx))
+	})
 }

@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package e2e
+package flags
 
 import (
 	"errors"
@@ -13,7 +13,6 @@ import (
 	"github.com/spf13/cast"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
-	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet/flags"
 )
 
 type NetworkCmd int
@@ -28,9 +27,9 @@ const (
 
 type FlagVars struct {
 	startNetwork     bool
-	startNetworkVars *flags.StartNetworkVars
+	startNetworkVars *StartNetworkVars
 
-	collectorVars *flags.CollectorVars
+	collectorVars *CollectorVars
 
 	checkMetricsCollected bool
 	checkLogsCollected    bool
@@ -138,9 +137,9 @@ func RegisterFlagsWithDefaultOwner(defaultOwner string) *FlagVars {
 		"[optional] start a new network and exit without executing any tests. The new network cannot be reused with --reuse-network.",
 	)
 
-	vars.startNetworkVars = flags.NewStartNetworkFlagVars(defaultOwner)
+	vars.startNetworkVars = NewStartNetworkFlagVars(defaultOwner)
 
-	vars.collectorVars = flags.NewCollectorFlagVars()
+	vars.collectorVars = NewCollectorFlagVars()
 
 	SetCheckCollectionFlags(
 		&vars.checkMetricsCollected,

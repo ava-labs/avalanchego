@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet/testenv"
 )
 
 // The ginkgo event handlers defined in this file will be automatically
@@ -32,7 +33,7 @@ var _ = ginkgo.BeforeEach(func() {
 // of the current spec.
 var _ = ginkgo.AfterEach(func() {
 	tc := NewTestContext()
-	env := GetEnv(tc)
+	env := testenv.GetEnv(tc)
 	// The global env isn't guaranteed to be initialized by importers
 	// of this package since initializing a package-local env is also
 	// supported.

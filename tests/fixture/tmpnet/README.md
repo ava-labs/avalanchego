@@ -16,7 +16,29 @@ orchestrate the same temporary networks without the use of an rpc daemon.
   - [Simplifying usage with direnv](#simplifying-usage-with-direnv)
     - [Deprecated usage with e2e suite](#deprecated-usage-with-e2e-suite)
   - [Via code](#via-code)
-- [Networking configuration](#networking-configuration)
+- [Runtime Backends](#runtime-backends)
+  - [Process Runtime](#process-runtime)
+    - [Overview](#process-runtime-overview)
+    - [Requirements](#process-runtime-requirements)
+    - [Configuration](#process-runtime-configuration)
+    - [Networking](#process-runtime-networking)
+    - [Storage](#process-runtime-storage)
+    - [Monitoring](#process-runtime-monitoring)
+    - [Examples](#process-runtime-examples)
+  - [Kubernetes Runtime](#kubernetes-runtime)
+    - [Overview](#kubernetes-runtime-overview)
+    - [Requirements](#kubernetes-runtime-requirements)
+    - [Configuration](#kubernetes-runtime-configuration)
+    - [Networking](#kubernetes-runtime-networking)
+    - [Storage](#kubernetes-runtime-storage)
+    - [Monitoring](#kubernetes-runtime-monitoring)
+    - [Examples](#kubernetes-runtime-examples)
+- [Configuration Flags](#configuration-flags)
+  - [Common Flags](#common-flags)
+  - [Process Runtime Flags](#process-runtime-flags)
+  - [Kubernetes Runtime Flags](#kubernetes-runtime-flags)
+  - [Monitoring Flags](#monitoring-flags)
+  - [Network Control Flags](#network-control-flags)
 - [Configuration on disk](#configuration-on-disk)
   - [Common networking configuration](#common-networking-configuration)
   - [Genesis](#genesis)
@@ -56,35 +78,39 @@ repositories.
 The functionality in this package is grouped by logical purpose into
 the following non-test files:
 
-| Filename                    | Types          | Purpose                                                                |
-|:----------------------------|:---------------|:-----------------------------------------------------------------------|
-| flags/                      |                | Directory defining flags usable with both stdlib flags and spf13/pflag |
-| flags/collector.go          |                | Defines flags configuring collection of logs and metrics               |
-| flags/common.go             |                | Defines type definitions common across other files                     |
-| flags/process_runtime.go    |                | Defines flags configuring the process node runtime                     |
-| flags/runtime.go            |                | Defines flags configuring node runtime                                 |
-| flags/start_network.go      |                | Defines flags configuring network start                                |
-| tmpnetctl/                  |                | Directory containing main entrypoint for tmpnetctl command             |
-| yaml/                       |                | Directory defining kubernetes resources in yaml format                 |
-| check_monitoring.go         |                | Enables checking if logs and metrics were collected                    |
-| defaults.go                 |                | Defines common default configuration                                   |
-| detached_process_default.go |                | Configures detached processes for darwin and linux                     |
-| detached_process_windows.go |                | No-op detached process configuration for windows                       |
-| flagsmap.go                 | FlagsMap       | Simplifies configuration of avalanchego flags                          |
-| genesis.go                  |                | Creates test genesis                                                   |
-| kube.go                     |                | Library for Kubernetes interaction                                     |
-| local_network.go            |                | Defines configuration for the default local network                    |
-| monitor_kube.go             |                | Enables collection of logs and metrics from kube pods                  |
-| monitor_processes.go        |                | Enables collection of logs and metrics from local processes            |
-| network.go                  | Network        | Orchestrates and configures temporary networks                         |
-| network_config.go           | Network        | Reads and writes network configuration                                 |
-| network_test.go             |                | Simple test round-tripping Network serialization                       |
-| node.go                     | Node           | Orchestrates and configures nodes                                      |
-| node_config.go              | Node           | Reads and writes node configuration                                    |
-| process_runtime.go          | ProcessRuntime | Orchestrates node processes                                            |
-| start_kind_cluster.go       |                | Starts a local kind cluster                                            |
-| subnet.go                   | Subnet         | Orchestrates subnets                                                   |
-| utils.go                    |                | Defines shared utility functions                                       |
+| Filename                    | Types               | Purpose                                                                |
+|:----------------------------|:--------------------|:-----------------------------------------------------------------------|
+| flags/                      |                     | Directory defining flags usable with both stdlib flags and spf13/pflag |
+| flags/collector.go          |                     | Defines flags configuring collection of logs and metrics               |
+| flags/common.go             |                     | Defines type definitions common across flag files                      |
+| flags/flag_vars.go          | FlagVars            | Central flag management struct with validation and getters             |
+| flags/kube_runtime.go       |                     | Defines flags configuring the Kubernetes node runtime                  |
+| flags/kubeconfig.go         |                     | Defines flags for Kubernetes cluster authentication                    |
+| flags/process_runtime.go    |                     | Defines flags configuring the process node runtime                     |
+| flags/runtime.go            |                     | Defines flags for runtime selection (process vs Kubernetes)            |
+| flags/start_network.go      |                     | Defines flags configuring network start                                |
+| tmpnetctl/                  |                     | Directory containing main entrypoint for tmpnetctl command             |
+| yaml/                       |                     | Directory defining kubernetes resources in yaml format                 |
+| check_monitoring.go         |                     | Enables checking if logs and metrics were collected                    |
+| defaults.go                 |                     | Defines common default configuration                                   |
+| detached_process_default.go |                     | Configures detached processes for darwin and linux                     |
+| detached_process_windows.go |                     | No-op detached process configuration for windows                       |
+| flagsmap.go                 | FlagsMap            | Simplifies configuration of avalanchego flags                          |
+| genesis.go                  |                     | Creates test genesis                                                   |
+| kube.go                     |                     | Library for Kubernetes interaction                                     |
+| kube_runtime.go             | KubeRuntime         | Orchestrates nodes running in Kubernetes                               |
+| local_network.go            |                     | Defines configuration for the default local network                    |
+| monitor_kube.go             |                     | Enables collection of logs and metrics from kube pods                  |
+| monitor_processes.go        |                     | Enables collection of logs and metrics from local processes            |
+| network.go                  | Network             | Orchestrates and configures temporary networks                         |
+| network_config.go           | Network             | Reads and writes network configuration                                 |
+| network_test.go             |                     | Simple test round-tripping Network serialization                       |
+| node.go                     | Node                | Orchestrates and configures nodes                                      |
+| node_config.go              | Node                | Reads and writes node configuration                                    |
+| process_runtime.go          | ProcessRuntime      | Orchestrates nodes as local processes                                  |
+| start_kind_cluster.go       |                     | Starts a local kind cluster for Kubernetes testing                     |
+| subnet.go                   | Subnet              | Orchestrates subnets                                                   |
+| utils.go                    |                     | Defines shared utility functions                                       |
 
 ## Usage
 
@@ -188,16 +214,366 @@ uris := network.GetNodeURIs()
 network.Stop(context.Background())
 ```
 
-## Networking configuration
+## Runtime Backends
 [Top](#table-of-contents)
 
-By default, nodes in a temporary network will be started with staking and
-API ports set to `0` to ensure that ports will be dynamically
-chosen. The tmpnet fixture discovers the ports used by a given node
-by reading the `[base-data-dir]/process.json` file written by
-avalanchego on node start. The use of dynamic ports supports testing
-with many temporary networks without having to manually select compatible
-port ranges.
+tmpnet supports two runtime backends for running avalanchego nodes:
+
+- **Process Runtime**: Runs nodes as local processes on the host machine. This is the default runtime and is ideal for local development and testing.
+- **Kubernetes Runtime**: Runs nodes as pods in a Kubernetes cluster. This runtime enables testing at scale and closer simulation of production environments.
+
+The runtime can be selected via the `--runtime` flag when using `tmpnetctl` or by configuring the appropriate runtime in code. Both runtimes support the same core functionality but differ in their deployment characteristics, resource management, and networking approaches.
+
+### Process Runtime
+[Top](#table-of-contents)
+
+#### Overview {#process-runtime-overview}
+
+The process runtime executes avalanchego nodes as separate processes on the local machine. Each node runs in its own process with its own data directory, ports, and configuration. This runtime is the simplest to use and requires no additional infrastructure beyond the local machine.
+
+#### Requirements {#process-runtime-requirements}
+
+- **avalanchego binary**: A compiled avalanchego binary must be available locally
+- **Plugin directory**: VM plugins must be available in a local directory (typically `~/.avalanchego/plugins`)
+- **File system permissions**: Write access to the tmpnet root directory (default: `~/.tmpnet`)
+- **Available ports**: Sufficient free ports for nodes (uses dynamic allocation by default)
+- **Operating System**: Linux, macOS, or Windows (with limitations)
+
+#### Configuration {#process-runtime-configuration}
+
+Process runtime nodes can be configured through:
+
+1. **Command-line flags**:
+   ```bash
+   tmpnetctl start-network --avalanchego-path=/path/to/avalanchego --plugin-dir=/path/to/plugins
+   ```
+
+2. **Environment variables**:
+   ```bash
+   export AVALANCHEGO_PATH=/path/to/avalanchego
+   export AVALANCHEGO_PLUGIN_DIR=/path/to/plugins
+   tmpnetctl start-network
+   ```
+
+3. **In code**:
+   ```go
+   network := &tmpnet.Network{
+       DefaultRuntimeConfig: tmpnet.NodeRuntimeConfig{
+           Process: &tmpnet.ProcessRuntimeConfig{
+               AvalanchegoPath: "/path/to/avalanchego",
+               PluginDir: "/path/to/plugins",
+               ReuseDynamicPorts: true,
+           },
+       },
+   }
+   ```
+
+Key configuration options:
+- `AvalanchegoPath`: Path to the avalanchego binary
+- `PluginDir`: Directory containing VM plugins
+- `ReuseDynamicPorts`: Whether to reuse ports when restarting nodes
+- `RedirectStdout`: Redirect node stdout to a file
+- `RedirectStderr`: Redirect node stderr to a file
+
+#### Networking {#process-runtime-networking}
+
+Process runtime nodes use local networking:
+
+- **Dynamic port allocation**: By default, nodes use port 0 for both staking and API ports, allowing the OS to assign available ports
+- **Port discovery**: Actual ports are discovered by reading the `process.json` file written by avalanchego on startup
+- **Direct connectivity**: All nodes can communicate directly via localhost
+- **No ingress required**: External access is direct to node ports
+
+#### Storage {#process-runtime-storage}
+
+Each node's data is stored in a dedicated directory:
+
+```
+~/.tmpnet/networks/[network-id]/[node-id]/
+├── chainData/          # Blockchain data
+├── db/                 # Database files
+├── logs/               # Node logs
+├── plugins/            # VM binaries (if configured)
+├── config.json         # Node runtime configuration
+├── flags.json          # Node flags
+└── process.json        # Process details (PID, ports)
+```
+
+#### Monitoring {#process-runtime-monitoring}
+
+Process runtime supports log and metric collection:
+
+- **Logs**: Written to `[node-dir]/logs/` and can be collected by promtail
+- **Metrics**: Exposed on the node's API port at `/ext/metrics`
+- **File-based discovery**: Prometheus/Promtail configuration is written to `~/.tmpnet/[prometheus|promtail]/file_sd_configs/`
+
+#### Examples {#process-runtime-examples}
+
+**Basic network start**:
+```bash
+# Start a 5-node network
+tmpnetctl start-network --node-count=5 --avalanchego-path=/path/to/avalanchego
+```
+
+**Network with custom VM**:
+```bash
+# Ensure plugin is available
+cp myvm ~/.avalanchego/plugins/
+
+# Start network (in code)
+network := &tmpnet.Network{
+    Subnets: []*tmpnet.Subnet{{
+        Name: "my-subnet",
+        Chains: []*tmpnet.Chain{{
+            VMName: "myvm",
+            Genesis: genesisBytes,
+        }},
+    }},
+}
+```
+
+### Kubernetes Runtime
+[Top](#table-of-contents)
+
+#### Overview {#kubernetes-runtime-overview}
+
+The Kubernetes runtime deploys avalanchego nodes as StatefulSets in a Kubernetes cluster. Each node runs in its own pod with persistent storage, service discovery, and optional ingress for external access. This runtime enables testing at scale and provides better resource isolation.
+
+#### Requirements {#kubernetes-runtime-requirements}
+
+- **Kubernetes cluster**: A running Kubernetes cluster (1.19+)
+- **kubectl access**: Configured kubeconfig with appropriate permissions
+- **Storage provisioner**: Dynamic PersistentVolume provisioner (or pre-provisioned PVs)
+- **Ingress controller** (optional): For external access (e.g., nginx-ingress)
+- **Container image**: avalanchego container image accessible to the cluster
+
+For local development, you can use:
+- **kind** (Kubernetes in Docker): `tmpnetctl start-kind-cluster`
+- **minikube**: Standard minikube setup
+- **Docker Desktop**: Built-in Kubernetes
+
+For production testing:
+- **EKS, GKE, AKS**: Cloud-managed Kubernetes
+- **Self-managed**: Any conformant Kubernetes cluster
+
+#### Configuration {#kubernetes-runtime-configuration}
+
+Kubernetes runtime configuration:
+
+1. **Command-line flags**:
+   ```bash
+   tmpnetctl start-network \
+     --runtime=kubernetes \
+     --kube-config-path=$HOME/.kube/config \
+     --kube-namespace=avalanche-testing \
+     --kube-image=avaplatform/avalanchego:latest
+   ```
+
+2. **Environment variables**:
+   ```bash
+   export TMPNET_RUNTIME=kubernetes
+   export KUBE_CONFIG_PATH=$HOME/.kube/config
+   export KUBE_NAMESPACE=avalanche-testing
+   tmpnetctl start-network
+   ```
+
+3. **In code**:
+   ```go
+   network := &tmpnet.Network{
+       DefaultRuntimeConfig: tmpnet.NodeRuntimeConfig{
+           Kube: &tmpnet.KubeRuntimeConfig{
+               ConfigPath: os.ExpandEnv("$HOME/.kube/config"),
+               Namespace: "avalanche-testing",
+               Image: "avaplatform/avalanchego:latest",
+               VolumeSizeGB: 10,
+               UseExclusiveScheduling: true,
+               SchedulingLabelKey: "avalanche-node",
+               SchedulingLabelValue: "dedicated",
+           },
+       },
+   }
+   ```
+
+Key configuration options:
+- `ConfigPath`: Path to kubeconfig file
+- `ConfigContext`: Kubeconfig context to use
+- `Namespace`: Kubernetes namespace for resources
+- `Image`: Container image for avalanchego
+- `VolumeSizeGB`: Size of PersistentVolumeClaim (minimum 2GB)
+- `UseExclusiveScheduling`: Enable dedicated node scheduling
+- `IngressHost`: Hostname for ingress rules
+- `IngressSecret`: TLS secret for HTTPS ingress
+
+#### Networking {#kubernetes-runtime-networking}
+
+Kubernetes runtime networking differs based on where tmpnet is running:
+
+**When running inside the cluster**:
+- Direct pod-to-pod communication via cluster networking
+- No ingress required
+- Uses internal service discovery
+
+**When running outside the cluster**:
+- Requires ingress configuration for API access
+- Uses port forwarding for staking port access
+- Ingress paths: `/networks/[network-uuid]/[node-id]`
+
+**Ingress configuration**:
+```yaml
+# Create ConfigMap for ingress settings
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tmpnet-ingress-config
+  namespace: avalanche-testing
+data:
+  host: "tmpnet.example.com"
+  secret: "tmpnet-tls"  # Optional, for HTTPS
+```
+
+#### Storage {#kubernetes-runtime-storage}
+
+Each node uses a PersistentVolumeClaim:
+
+- **Minimum size**: 2GB (nodes report unhealthy below 1GB free)
+- **Storage class**: Uses cluster default or can be specified
+- **Mount path**: `/data` within the container
+- **Persistence**: Data survives pod restarts
+
+Example PVC:
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: [network-uuid]-[node-id-prefix]-0
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 10Gi
+```
+
+#### Monitoring {#kubernetes-runtime-monitoring}
+
+Kubernetes runtime monitoring integration:
+
+- **Metrics**: Scraped via Prometheus ServiceMonitor or pod annotations
+- **Logs**: Collected via promtail DaemonSet
+- **Labels**: Includes standard Kubernetes labels plus tmpnet-specific labels
+- **Service discovery**: Automatic via Kubernetes APIs
+
+#### Examples {#kubernetes-runtime-examples}
+
+**Local testing with kind**:
+```bash
+# Start a kind cluster
+tmpnetctl start-kind-cluster
+
+# Start network in kind
+tmpnetctl start-network \
+  --runtime=kubernetes \
+  --kube-namespace=avalanche-testing \
+  --kube-image=avaplatform/avalanchego:latest
+```
+
+**Production-like testing with exclusive scheduling**:
+```bash
+# Label dedicated nodes
+kubectl label nodes worker-1 worker-2 worker-3 avalanche-node=dedicated
+kubectl taint nodes worker-1 worker-2 worker-3 avalanche-node=dedicated:NoExecute
+
+# Start network with exclusive scheduling
+tmpnetctl start-network \
+  --runtime=kubernetes \
+  --kube-use-exclusive-scheduling \
+  --kube-scheduling-label-key=avalanche-node \
+  --kube-scheduling-label-value=dedicated
+```
+
+**External access configuration**:
+```bash
+# Create ingress config
+kubectl create configmap tmpnet-ingress-config \
+  --from-literal=host=tmpnet.example.com \
+  --from-literal=secret=tmpnet-tls
+
+# Start network (will auto-detect ingress config)
+tmpnetctl start-network --runtime=kubernetes
+```
+
+## Configuration Flags
+[Top](#table-of-contents)
+
+tmpnet provides a comprehensive set of flags for configuring networks and nodes. Flags can be set via command line, environment variables, or in code.
+
+### Common Flags
+[Top](#table-of-contents)
+
+These flags apply regardless of runtime:
+
+| Flag | Environment Variable | Default | Description |
+|:-----|:--------------------|:--------|:------------|
+| `--network-dir` | `TMPNET_NETWORK_DIR` | | Path to the network directory |
+| `--root-network-dir` | `TMPNET_ROOT_NETWORK_DIR` | `~/.tmpnet/networks` | Root directory for storing networks |
+| `--network-owner` | `TMPNET_NETWORK_OWNER` | | Identifier for the network owner (for monitoring) |
+| `--node-count` | | 2 | Number of nodes to create in the network |
+| `--log-level` | | INFO | Default log level for nodes |
+
+### Process Runtime Flags
+[Top](#table-of-contents)
+
+Flags specific to process runtime:
+
+| Flag | Environment Variable | Default | Description |
+|:-----|:--------------------|:--------|:------------|
+| `--avalanchego-path` | `AVALANCHEGO_PATH` | | Path to avalanchego binary |
+| `--plugin-dir` | `AVALANCHEGO_PLUGIN_DIR` | `~/.avalanchego/plugins` | Directory containing VM plugins |
+| `--reuse-dynamic-ports` | | false | Reuse ports when restarting nodes |
+| `--redirect-stdout` | | false | Redirect node stdout to file |
+| `--redirect-stderr` | | false | Redirect node stderr to file |
+
+### Kubernetes Runtime Flags
+[Top](#table-of-contents)
+
+Flags specific to Kubernetes runtime:
+
+| Flag | Environment Variable | Default | Description |
+|:-----|:--------------------|:--------|:------------|
+| `--kube-config-path` | `KUBE_CONFIG_PATH` | `~/.kube/config` | Path to kubeconfig file |
+| `--kube-config-context` | `KUBE_CONFIG_CONTEXT` | | Kubeconfig context to use |
+| `--kube-namespace` | `KUBE_NAMESPACE` | `tmpnet` | Kubernetes namespace |
+| `--kube-image` | `KUBE_IMAGE` | | Container image for nodes |
+| `--kube-volume-size` | | 2 | Volume size in GB (minimum 2) |
+| `--kube-use-exclusive-scheduling` | | false | Enable exclusive node scheduling |
+| `--kube-scheduling-label-key` | | | Label key for node selection |
+| `--kube-scheduling-label-value` | | | Label value for node selection |
+| `--kube-ingress-host` | | | Hostname for ingress rules |
+| `--kube-ingress-secret` | | | TLS secret for HTTPS ingress |
+
+### Monitoring Flags
+[Top](#table-of-contents)
+
+Flags for configuring monitoring:
+
+| Flag | Environment Variable | Default | Description |
+|:-----|:--------------------|:--------|:------------|
+| `--start-metrics-collector` | | false | Start prometheus collector |
+| `--start-logs-collector` | | false | Start promtail collector |
+| `--stop-metrics-collector` | | false | Stop prometheus collector |
+| `--stop-logs-collector` | | false | Stop promtail collector |
+
+### Network Control Flags
+[Top](#table-of-contents)
+
+Flags for controlling network lifecycle:
+
+| Flag | Environment Variable | Default | Description |
+|:-----|:--------------------|:--------|:------------|
+| `--start-network` | | false | Start a new network |
+| `--stop-network` | | false | Stop the network |
+| `--restart-network` | | false | Restart network nodes |
+| `--reuse-network` | | false | Reuse existing network |
+
 
 ## Configuration on disk
 [Top](#table-of-contents)
