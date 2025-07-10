@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-func newTestValidators(allVds []validators.GetValidatorOutput) map[ids.NodeID]*validators.GetValidatorOutput {
+func newTestValidatorInfo(allVds []validators.GetValidatorOutput) map[ids.NodeID]*validators.GetValidatorOutput {
 	vds := make(map[ids.NodeID]*validators.GetValidatorOutput, len(allVds))
 	for _, vd := range allVds {
 		vds[vd.NodeID] = &vd
@@ -24,13 +24,11 @@ func newTestValidators(allVds []validators.GetValidatorOutput) map[ids.NodeID]*v
 	return vds
 }
 
-func newEngineConfig(t *testing.T, numNodes uint64) *Config {
-	if numNodes == 0 {
-		require.FailNow(t, "numNodes must be greater than 0")
-	}
-
+func newEngineConfig() (*Config, error) {
 	ls, err := localsigner.New()
-	require.NoError(t, err)
+	if err != nil {
+		return nil, err
+	}
 
 	nodeID := ids.GenerateTestNodeID()
 
@@ -69,4 +67,9 @@ func generateTestValidators(t *testing.T, num uint64) []validators.GetValidatorO
 		}
 	}
 	return vds
+	return &Config{
+		Ctx:        simplexChainContext,
+		Validators: newTestValidatorInfo([]validators.GetValidatorOutput{nodeInfo}),
+		SignBLS:    ls.Sign,
+	}, nil
 }
