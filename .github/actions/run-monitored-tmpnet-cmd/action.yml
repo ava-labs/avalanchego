@@ -40,6 +40,8 @@ inputs:
     default: ${{ github.run_attempt }}
   job:
     default: ${{ github.job }}
+  grafana_preview_dashboard_name:
+    default: 'avalanche-main-dashboard'
 
 runs:
   using: composite
@@ -58,7 +60,7 @@ runs:
       shell: bash
       run: ${{ github.action_path }}/notify-metrics-availability.sh
       env:
-        GRAFANA_URL: https://grafana-poc.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?orgId=1&refresh=10s&var-filter=is_ephemeral_node%7C%3D%7Cfalse&var-filter=gh_repo%7C%3D%7C${{ inputs.repository_owner }}%2F${{ inputs.repository_name }}&var-filter=gh_run_id%7C%3D%7C${{ inputs.run_id }}&var-filter=gh_run_attempt%7C%3D%7C${{ inputs.run_attempt }}
+        GRAFANA_URL: https://grafana-poc.avax-dev.network/d/kBQpRdWnk/${{ inputs.grafana_preview_dashboard_name }}?orgId=1&refresh=10s&var-filter=is_ephemeral_node%7C%3D%7Cfalse&var-filter=gh_repo%7C%3D%7C${{ inputs.repository_owner }}%2F${{ inputs.repository_name }}&var-filter=gh_run_id%7C%3D%7C${{ inputs.run_id }}&var-filter=gh_run_attempt%7C%3D%7C${{ inputs.run_attempt }}
         GH_JOB_ID: ${{ inputs.job }}
         FILTER_BY_OWNER: ${{ inputs.filter_by_owner }}
     - name: Warn that collection of metrics and logs will not be performed
