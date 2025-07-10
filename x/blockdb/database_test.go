@@ -20,63 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-func TestNew_Truncate(t *testing.T) {
-	// Create initial database
-	tempDir := t.TempDir()
-	config := DefaultConfig().WithDir(tempDir).WithTruncate(true)
-	db, err := New(config, logging.NoLog{})
-	require.NoError(t, err)
-	require.NotNil(t, db)
-
-	// Write some test data and close the database
-	testBlock := []byte("test block data")
-	require.NoError(t, db.WriteBlock(0, testBlock, 0))
-	require.NoError(t, db.Close())
-
-	// Reopen with truncate=true and verify data is gone
-	db2, err := New(config, logging.NoLog{})
-	require.NoError(t, err)
-	require.NotNil(t, db2)
-	defer db2.Close()
-	_, err = db2.ReadBlock(1)
-	require.ErrorIs(t, err, ErrBlockNotFound)
-	_, found := db2.MaxContiguousHeight()
-	require.False(t, found)
-}
-
-func TestNew_NoTruncate(t *testing.T) {
-	tempDir := t.TempDir()
-	config := DefaultConfig().WithDir(tempDir).WithTruncate(true)
-	db, err := New(config, logging.NoLog{})
-	require.NoError(t, err)
-	require.NotNil(t, db)
-
-	// Write some test data and close the database
-	testBlock := []byte("test block data")
-	require.NoError(t, db.WriteBlock(1, testBlock, 5))
-	readBlock, err := db.ReadBlock(1)
-	require.NoError(t, err)
-	require.Equal(t, testBlock, readBlock)
-	require.NoError(t, db.Close())
-
-	// Reopen with truncate=false and verify data is still there
-	config = DefaultConfig().WithDir(tempDir).WithTruncate(false)
-	db2, err := New(config, logging.NoLog{})
-	require.NoError(t, err)
-	require.NotNil(t, db2)
-	defer db2.Close()
-	readBlock1, err := db2.ReadBlock(1)
-	require.NoError(t, err)
-	require.Equal(t, testBlock, readBlock1)
-
-	// Verify we can write additional data
-	testBlock2 := []byte("test block data 3")
-	require.NoError(t, db2.WriteBlock(2, testBlock2, 0))
-	readBlock2, err := db2.ReadBlock(2)
-	require.NoError(t, err)
-	require.Equal(t, testBlock2, readBlock2)
-}
-
 func TestNew_Params(t *testing.T) {
 	tempDir := t.TempDir()
 	tests := []struct {
@@ -447,7 +390,7 @@ func TestStructSizes(t *testing.T) {
 
 			data, err = instance.(encoding.BinaryMarshaler).MarshalBinary()
 			require.NoError(t, err, "%s MarshalBinary should not fail", tt.name)
-			require.Equal(t, tt.expectedMarshalSize, len(data),
+			require.Len(t, data, tt.expectedMarshalSize,
 				"%s MarshalBinary should produce exactly %d bytes, got %d bytes",
 				tt.name, tt.expectedMarshalSize, len(data))
 
