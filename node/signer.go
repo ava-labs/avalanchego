@@ -48,8 +48,9 @@ func newStakingSigner(
 
 	case node.RPCSignerConfig:
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
 		signer, err := rpcsigner.NewClient(ctx, cfg.StakingSignerRPC)
-		cancel()
 		if err != nil {
 			return nil, fmt.Errorf("could not create rpc signer client: %w", err)
 		}
