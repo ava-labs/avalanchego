@@ -36,7 +36,7 @@ Peers communicate by enqueuing messages between one another. Each peer on either
 sequenceDiagram
     actor Morty
     actor Rick
-    loop
+    loop 
         Morty->>Rick: Write outbound messages
         Rick->>Morty: Read incoming messages
     end
