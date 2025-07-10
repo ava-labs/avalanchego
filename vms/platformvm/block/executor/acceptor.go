@@ -9,7 +9,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -27,9 +26,8 @@ var (
 // being shutdown.
 type acceptor struct {
 	*backend
-	metrics      metrics.Metrics
-	validators   validators.Manager
-	bootstrapped *utils.Atomic[bool]
+	metrics    metrics.Metrics
+	validators validators.Manager
 }
 
 func (a *acceptor) BanffAbortBlock(b *block.BanffAbortBlock) error {

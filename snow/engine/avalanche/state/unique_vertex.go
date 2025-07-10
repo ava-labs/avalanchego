@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
@@ -20,8 +20,8 @@ import (
 )
 
 var (
-	_ cache.Evictable[ids.ID] = (*uniqueVertex)(nil)
-	_ avalanche.Vertex        = (*uniqueVertex)(nil)
+	_ lru.Evictable[ids.ID] = (*uniqueVertex)(nil)
+	_ avalanche.Vertex      = (*uniqueVertex)(nil)
 
 	errGetParents = errors.New("failed to get parents for vertex")
 	errGetHeight  = errors.New("failed to get height for vertex")

@@ -4,8 +4,11 @@
 package p
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/wallet"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
@@ -33,13 +36,19 @@ func (c *Client) IssueTx(
 ) error {
 	ops := common.NewOptions(options)
 	ctx := ops.Context()
+	startTime := time.Now()
 	txID, err := c.client.IssueTx(ctx, tx.Bytes())
 	if err != nil {
 		return err
 	}
 
-	if f := ops.PostIssuanceFunc(); f != nil {
-		f(txID)
+	issuanceDuration := time.Since(startTime)
+	if f := ops.IssuanceHandler(); f != nil {
+		f(common.IssuanceReceipt{
+			ChainAlias: builder.Alias,
+			TxID:       txID,
+			Duration:   issuanceDuration,
+		})
 	}
 
 	if ops.AssumeDecided() {
@@ -48,6 +57,18 @@ func (c *Client) IssueTx(
 
 	if err := platformvm.AwaitTxAccepted(c.client, ctx, txID, ops.PollFrequency()); err != nil {
 		return err
+	}
+
+	if f := ops.ConfirmationHandler(); f != nil {
+		totalDuration := time.Since(startTime)
+		confirmationDuration := totalDuration - issuanceDuration
+
+		f(common.ConfirmationReceipt{
+			ChainAlias:           builder.Alias,
+			TxID:                 txID,
+			TotalDuration:        totalDuration,
+			ConfirmationDuration: confirmationDuration,
+		})
 	}
 
 	return c.backend.AcceptTx(ctx, tx)

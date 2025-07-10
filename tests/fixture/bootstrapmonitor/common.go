@@ -19,6 +19,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet/flags"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 
@@ -221,6 +222,6 @@ func getLatestImageDetails(
 
 func getClientset(log logging.Logger) (*kubernetes.Clientset, error) {
 	log.Info("Initializing clientset")
-	kubeConfigPath := os.Getenv("KUBECONFIG")
-	return tmpnet.GetClientset(log, kubeConfigPath, "")
+	kubeconfigPath := os.Getenv(flags.KubeconfigPathEnvVar)
+	return tmpnet.GetClientset(log, kubeconfigPath, "")
 }

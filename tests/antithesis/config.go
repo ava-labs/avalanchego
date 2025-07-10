@@ -89,7 +89,9 @@ func configForNewNetwork(
 	duration time.Duration,
 ) *Config {
 	if defaultNetwork.Nodes == nil {
-		defaultNetwork.Nodes = tmpnet.NewNodesOrPanic(flagVars.NodeCount())
+		nodeCount, err := flagVars.NodeCount()
+		require.NoError(tc, err)
+		defaultNetwork.Nodes = tmpnet.NewNodesOrPanic(nodeCount)
 	}
 	if defaultNetwork.Subnets == nil && getSubnets != nil {
 		defaultNetwork.Subnets = getSubnets(defaultNetwork.Nodes...)
@@ -100,8 +102,9 @@ func configForNewNetwork(
 	c := &Config{
 		Duration: duration,
 	}
-	c.URIs = make(CSV, len(testEnv.URIs))
-	for i, nodeURI := range testEnv.URIs {
+	localURIs := testEnv.GetNodeURIs()
+	c.URIs = make(CSV, len(localURIs))
+	for i, nodeURI := range localURIs {
 		c.URIs[i] = nodeURI.URI
 	}
 	network := testEnv.GetNetwork()

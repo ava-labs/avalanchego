@@ -1,0 +1,194 @@
+# A secret named prometheus-credentials must exist with keys `username` and `password`
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ci-monitoring
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+    name: prometheus-agent
+    namespace: ci-monitoring
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus-agent
+rules:
+- apiGroups: [""]
+  resources:
+    - pods
+  verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus-agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus-agent
+subjects:
+- kind: ServiceAccount
+  name: prometheus-agent
+  namespace: ci-monitoring
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: ci-monitoring
+data:
+  # This template needs to have PROMETHEUS_USERNAME and PROMETHEUS_PASSWORD substituted before use
+  prometheus.yaml.template: |
+    global:
+      # Make sure this value takes into account the network-shutdown-delay in tests/fixture/e2e/env.go
+      scrape_interval: 10s     # Default is every 1 minute.
+      evaluation_interval: 10s # The default is every 1 minute.
+      scrape_timeout: 5s       # The default is 10s
+
+    scrape_configs:
+      - job_name: avalanchego
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            regex: "true"
+            replacement: $1
+            action: keep
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__meta_kubernetes_pod_ip]
+            action: replace
+            regex: (.*)
+            # TODO(marun) Configure the port via an annotation
+            replacement: $1:9650
+            target_label: __address__
+            # Set the instance label to the pod name to ensure a stable identity across restarts.
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: instance
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_node_name]
+            target_label: node
+          - source_labels: [__meta_kubernetes_pod_container_name]
+            target_label: container
+          - source_labels: [__meta_kubernetes_pod_ip]
+            target_label: pod_ip
+          - source_labels: [__meta_kubernetes_pod_label_is_ephemeral_node]
+            target_label: is_ephemeral_node
+          - source_labels: [__meta_kubernetes_pod_label_network_owner]
+            target_label: network_owner
+          - source_labels: [__meta_kubernetes_pod_label_network_uuid]
+            target_label: network_uuid
+          - source_labels: [__meta_kubernetes_pod_label_node_id]
+            target_label: node_id
+          # gh_repo is an annotation because labels can't contain `/` and a repo is typically `[org]/[repo]`
+          - source_labels: [__meta_kubernetes_pod_annotation_gh_repo]
+            target_label: gh_repo
+          # gh_workflow is an annotation because workflows can contain spaces
+          - source_labels: [__meta_kubernetes_pod_annotation_gh_workflow]
+            target_label: gh_workflow
+          - source_labels: [__meta_kubernetes_pod_label_gh_run_id]
+            target_label: gh_run_id
+          - source_labels: [__meta_kubernetes_pod_label_gh_run_number]
+            target_label: gh_run_number
+          - source_labels: [__meta_kubernetes_pod_label_gh_run_attempt]
+            target_label: gh_run_attempt
+          - source_labels: [__meta_kubernetes_pod_label_gh_job_id]
+            target_label: gh_job_id
+          # TODO(marun) Add kube cluster identifier as a label
+
+    remote_write:
+    - url: "https://prometheus-poc.avax-dev.network/api/v1/write"
+      basic_auth:
+        username: "${PROMETHEUS_USERNAME}"
+        password: "${PROMETHEUS_PASSWORD}"
+
+---
+apiVersion: apps/v1
+# A statefulset ensures that only a single pod at a time will have
+# access to the PVC backing local storage for prometheus.
+kind: StatefulSet
+metadata:
+  name: prometheus-agent
+  namespace: ci-monitoring
+spec:
+  serviceName: prometheus-agent
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus-agent
+  template:
+    metadata:
+      labels:
+        app: prometheus-agent
+    spec:
+      serviceAccountName: prometheus-agent
+      # Since prometheus doesn't support env substitution, an init
+      # container is required to parameterize the config file with
+      # auth credentials.
+      initContainers:
+      - name: init-prometheus-config
+        # This is one of the few published images that includes
+        # envsubst. Simpler than having to maintain our own image.
+        image: bitnami/nginx:1.27.3
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          envsubst < /tmp/config-template/prometheus.yaml.template > /tmp/config/prometheus.yaml
+        env:
+        - name: PROMETHEUS_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: prometheus-credentials
+              key: username
+        - name: PROMETHEUS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: prometheus-credentials
+              key: password
+        volumeMounts:
+        - name: config-template
+          mountPath: /tmp/config-template
+        - name: config
+          mountPath: /tmp/config
+      containers:
+      - name: prometheus
+        # For consistency use the same minor version as the scripts/run_prometheus.sh
+        image: prom/prometheus:v2.45.6
+        args:
+        - --config.file=/etc/prometheus/config/prometheus.yaml
+        - --storage.agent.path=/prometheus
+        - --enable-feature=agent
+        volumeMounts:
+        - name: config
+          mountPath: /etc/prometheus/config/prometheus.yaml
+          subPath: prometheus.yaml
+          readOnly: true
+        - name: prometheus-data
+          mountPath: /prometheus
+      volumes:
+      - name: config-template
+        configMap:
+          name: prometheus-config
+      - name: config
+        # The config path doesn't need to be persistent since the config
+        # file will be written to the volume by the init container every
+        # time the pod starts.
+        emptyDir: {}
+  volumeClaimTemplates:
+  - metadata:
+      name: prometheus-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 1Gi

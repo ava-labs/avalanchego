@@ -26,9 +26,9 @@ type byEndTime struct {
 func NewByEndTime() TimedHeap {
 	return &byEndTime{
 		txHeap: txHeap{
-			heap: heap.NewMap[ids.ID, heapTx](func(a, b heapTx) bool {
-				aTime := a.tx.Unsigned.(txs.Staker).EndTime()
-				bTime := b.tx.Unsigned.(txs.Staker).EndTime()
+			heap: heap.NewMap[ids.ID, *txs.Tx](func(a, b *txs.Tx) bool {
+				aTime := a.Unsigned.(txs.Staker).EndTime()
+				bTime := b.Unsigned.(txs.Staker).EndTime()
 				return aTime.Before(bTime)
 			}),
 		},

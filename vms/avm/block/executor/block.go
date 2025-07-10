@@ -80,7 +80,7 @@ func (b *Block) Verify(context.Context) error {
 		if err != nil {
 			txID := tx.ID()
 			b.manager.mempool.MarkDropped(txID, err)
-			return err
+			return fmt.Errorf("failed to syntactically verify tx %s: %w", txID, err)
 		}
 	}
 
@@ -88,7 +88,7 @@ func (b *Block) Verify(context.Context) error {
 	parentID := b.Parent()
 	parent, err := b.manager.GetStatelessBlock(parentID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get parent %s: %w", parentID, err)
 	}
 
 	// Verify that currentBlkHeight = parentBlkHeight + 1.
@@ -105,7 +105,11 @@ func (b *Block) Verify(context.Context) error {
 
 	stateDiff, err := state.NewDiff(parentID, b.manager)
 	if err != nil {
-		return err
+		return fmt.Errorf(
+			"failed to initialize state diff on state at %s: %w",
+			parentID,
+			err,
+		)
 	}
 
 	parentChainTime := stateDiff.GetTimestamp()
@@ -138,7 +142,7 @@ func (b *Block) Verify(context.Context) error {
 		if err != nil {
 			txID := tx.ID()
 			b.manager.mempool.MarkDropped(txID, err)
-			return err
+			return fmt.Errorf("failed to semantically verify tx %s: %w", txID, err)
 		}
 
 		// Apply the txs state changes to the state.
@@ -155,7 +159,7 @@ func (b *Block) Verify(context.Context) error {
 		if err != nil {
 			txID := tx.ID()
 			b.manager.mempool.MarkDropped(txID, err)
-			return err
+			return fmt.Errorf("failed to execute tx %s: %w", txID, err)
 		}
 
 		// Verify that the transaction we just executed didn't consume inputs
@@ -188,7 +192,11 @@ func (b *Block) Verify(context.Context) error {
 	// already imported in a currently processing block.
 	err = b.manager.VerifyUniqueInputs(parentID, blockState.importedInputs)
 	if err != nil {
-		return err
+		return fmt.Errorf(
+			"failed to verify unique inputs on state at %s: %w",
+			parent,
+			err,
+		)
 	}
 
 	// Now that the block has been executed, we can add the block data to the
@@ -207,13 +215,7 @@ func (b *Block) Accept(context.Context) error {
 
 	txs := b.Txs()
 	for _, tx := range txs {
-		if err := b.manager.onAccept(tx); err != nil {
-			return fmt.Errorf(
-				"failed to mark tx %q as accepted: %w",
-				blkID,
-				err,
-			)
-		}
+		b.manager.onAccept(tx)
 	}
 
 	b.manager.lastAccepted = blkID
@@ -284,9 +286,5 @@ func (b *Block) Reject(context.Context) error {
 			)
 		}
 	}
-
-	// If we added transactions to the mempool, we should be willing to build a
-	// block.
-	b.manager.mempool.RequestBuildBlock()
 	return nil
 }

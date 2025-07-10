@@ -6,6 +6,7 @@ package executor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -36,19 +37,19 @@ func (v *SemanticVerifier) BaseTx(tx *txs.BaseTx) error {
 		// syntactic verification, which happens before semantic verification.
 		cred := v.Tx.Creds[i].Credential
 		if err := v.verifyTransfer(tx, in, cred); err != nil {
-			return err
+			return fmt.Errorf("failed to verify transfer: %w", err)
 		}
 	}
 
 	for _, out := range tx.Outs {
 		fxIndex, err := v.getFx(out.Out)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get fx: %w", err)
 		}
 
 		assetID := out.AssetID()
 		if err := v.verifyFxUsage(fxIndex, assetID); err != nil {
-			return err
+			return fmt.Errorf("failed to verify fx usage: %w", err)
 		}
 	}
 
@@ -153,7 +154,7 @@ func (v *SemanticVerifier) verifyTransfer(
 ) error {
 	utxo, err := v.State.GetUTXO(in.UTXOID.InputID())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get utxo %s: %w", in.UTXOID.InputID(), err)
 	}
 	return v.verifyTransferOfUTXO(tx, in, cred, utxo)
 }

@@ -4,6 +4,7 @@
 package tmpnet
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,11 +22,11 @@ import (
 var errMissingNetworkDir = errors.New("failed to write network: missing network directory")
 
 // Read network and node configuration from disk.
-func (n *Network) Read() error {
+func (n *Network) Read(ctx context.Context) error {
 	if err := n.readNetwork(); err != nil {
 		return err
 	}
-	if err := n.readNodes(); err != nil {
+	if err := n.readNodes(ctx); err != nil {
 		return err
 	}
 	return n.readSubnets()
@@ -37,9 +38,6 @@ func (n *Network) Write() error {
 		return errMissingNetworkDir
 	}
 	if err := n.writeGenesis(); err != nil {
-		return err
-	}
-	if err := n.writeChainConfigs(); err != nil {
 		return err
 	}
 	if err := n.writeNetworkConfig(); err != nil {
@@ -56,19 +54,38 @@ func (n *Network) readNetwork() error {
 	if err := n.readGenesis(); err != nil {
 		return err
 	}
-	if err := n.readChainConfigs(); err != nil {
-		return err
-	}
 	return n.readConfig()
 }
 
-// Read the non-ephemeral nodes associated with the network from disk.
-func (n *Network) readNodes() error {
-	nodes, err := ReadNodes(n.Dir, false /* includeEphemeral */)
+// Read the nodes associated with the network from disk.
+func (n *Network) readNodes(ctx context.Context) error {
+	nodes := []*Node{}
+
+	// Node configuration is stored in child directories
+	entries, err := os.ReadDir(n.Dir)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read dir: %w", err)
 	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		node := NewNode()
+		dataDir := filepath.Join(n.Dir, entry.Name())
+		err := node.Read(ctx, n, dataDir)
+		if errors.Is(err, os.ErrNotExist) {
+			// If no config file exists, assume this is not the path of a node
+			continue
+		} else if err != nil {
+			return err
+		}
+
+		nodes = append(nodes, node)
+	}
+
 	n.Nodes = nodes
+
 	return nil
 }
 
@@ -81,13 +98,18 @@ func (n *Network) writeNodes() error {
 	return nil
 }
 
-func (n *Network) getGenesisPath() string {
+// For consumption outside of avalanchego. Needs to be kept exported.
+func (n *Network) GetGenesisPath() string {
 	return filepath.Join(n.Dir, "genesis.json")
 }
 
 func (n *Network) readGenesis() error {
-	bytes, err := os.ReadFile(n.getGenesisPath())
+	bytes, err := os.ReadFile(n.GetGenesisPath())
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			n.Genesis = nil
+			return nil
+		}
 		return fmt.Errorf("failed to read genesis: %w", err)
 	}
 	genesis := genesis.UnparsedConfig{}
@@ -99,72 +121,16 @@ func (n *Network) readGenesis() error {
 }
 
 func (n *Network) writeGenesis() error {
+	if n.Genesis == nil {
+		return nil
+	}
 	bytes, err := DefaultJSONMarshal(n.Genesis)
 	if err != nil {
 		return fmt.Errorf("failed to marshal genesis: %w", err)
 	}
-	if err := os.WriteFile(n.getGenesisPath(), bytes, perms.ReadWrite); err != nil {
+	if err := os.WriteFile(n.GetGenesisPath(), bytes, perms.ReadWrite); err != nil {
 		return fmt.Errorf("failed to write genesis: %w", err)
 	}
-	return nil
-}
-
-func (n *Network) GetChainConfigDir() string {
-	return filepath.Join(n.Dir, "chains")
-}
-
-func (n *Network) readChainConfigs() error {
-	baseChainConfigDir := n.GetChainConfigDir()
-	entries, err := os.ReadDir(baseChainConfigDir)
-	if err != nil {
-		return fmt.Errorf("failed to read chain config dir: %w", err)
-	}
-
-	// Clear the map of data that may end up stale (e.g. if a given
-	// chain is in the map but no longer exists on disk)
-	n.ChainConfigs = map[string]FlagsMap{}
-
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			// Chain config files are expected to be nested under a
-			// directory with the name of the chain alias.
-			continue
-		}
-		chainAlias := entry.Name()
-		configPath := filepath.Join(baseChainConfigDir, chainAlias, defaultConfigFilename)
-		if _, err := os.Stat(configPath); os.IsNotExist(err) {
-			// No config file present
-			continue
-		}
-		chainConfig, err := ReadFlagsMap(configPath, chainAlias+" chain config")
-		if err != nil {
-			return err
-		}
-		n.ChainConfigs[chainAlias] = chainConfig
-	}
-
-	return nil
-}
-
-func (n *Network) writeChainConfigs() error {
-	baseChainConfigDir := n.GetChainConfigDir()
-
-	for chainAlias, chainConfig := range n.ChainConfigs {
-		// Create the directory
-		chainConfigDir := filepath.Join(baseChainConfigDir, chainAlias)
-		if err := os.MkdirAll(chainConfigDir, perms.ReadWriteExecute); err != nil {
-			return fmt.Errorf("failed to create %s chain config dir: %w", chainAlias, err)
-		}
-
-		// Write the file
-		path := filepath.Join(chainConfigDir, defaultConfigFilename)
-		if err := chainConfig.Write(path, chainAlias+" chain config"); err != nil {
-			return err
-		}
-	}
-
-	// TODO(marun) Ensure the removal of chain aliases that aren't present in the map
-
 	return nil
 }
 
@@ -185,17 +151,21 @@ func (n *Network) readConfig() error {
 
 // The subset of network fields to store in the network config file.
 type serializedNetworkConfig struct {
-	UUID                 string
-	Owner                string
-	DefaultFlags         FlagsMap
-	DefaultRuntimeConfig NodeRuntimeConfig
-	PreFundedKeys        []*secp256k1.PrivateKey
+	UUID                 string                  `json:"uuid,omitempty"`
+	Owner                string                  `json:"owner,omitempty"`
+	PrimarySubnetConfig  ConfigMap               `json:"primarySubnetConfig,omitempty"`
+	PrimaryChainConfigs  map[string]ConfigMap    `json:"primaryChainConfigs,omitempty"`
+	DefaultFlags         FlagsMap                `json:"defaultFlags,omitempty"`
+	DefaultRuntimeConfig NodeRuntimeConfig       `json:"defaultRuntimeConfig,omitempty"`
+	PreFundedKeys        []*secp256k1.PrivateKey `json:"preFundedKeys,omitempty"`
 }
 
 func (n *Network) writeNetworkConfig() error {
 	config := &serializedNetworkConfig{
 		UUID:                 n.UUID,
 		Owner:                n.Owner,
+		PrimarySubnetConfig:  n.PrimarySubnetConfig,
+		PrimaryChainConfigs:  n.PrimaryChainConfigs,
 		DefaultFlags:         n.DefaultFlags,
 		DefaultRuntimeConfig: n.DefaultRuntimeConfig,
 		PreFundedKeys:        n.PreFundedKeys,

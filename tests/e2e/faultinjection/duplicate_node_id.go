@@ -5,7 +5,6 @@ package faultinjection
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
@@ -26,27 +25,31 @@ var _ = ginkgo.Describe("Duplicate node handling", func() {
 	ginkgo.It("should ensure that a given Node ID (i.e. staking keypair) can be used at most once on a network", func() {
 		network := e2e.GetEnv(tc).GetNetwork()
 
+		if network.DefaultRuntimeConfig.Kube != nil {
+			// Enabling this test for kube requires supporting a flexible name mapping
+			ginkgo.Skip("This test is not supported on kube to avoid having to deviate from composing the statefulset name with the network uuid + nodeid")
+		}
+
 		tc.By("creating new node")
-		node1 := e2e.AddEphemeralNode(tc, network, tmpnet.FlagsMap{})
+		node1 := e2e.AddEphemeralNode(tc, network, tmpnet.NewEphemeralNode(tmpnet.FlagsMap{}))
 		e2e.WaitForHealthy(tc, node1)
 
 		tc.By("checking that the new node is connected to its peers")
 		checkConnectedPeers(tc, network.Nodes, node1)
 
 		tc.By("creating a second new node with the same staking keypair as the first new node")
-		node1Flags := node1.Flags
-		node2Flags := tmpnet.FlagsMap{
-			config.StakingTLSKeyContentKey: node1Flags[config.StakingTLSKeyContentKey],
-			config.StakingCertContentKey:   node1Flags[config.StakingCertContentKey],
-			// Construct a unique data dir to ensure the two nodes' data will be stored
-			// separately. Usually the dir name is the node ID but in this one case the nodes have
-			// the same node ID.
-			config.DataDirKey: fmt.Sprintf("%s-second", node1Flags[config.DataDirKey]),
-		}
-		node2 := e2e.AddEphemeralNode(tc, network, node2Flags)
+		node2 := tmpnet.NewEphemeralNode(tmpnet.FlagsMap{
+			config.StakingTLSKeyContentKey: node1.Flags[config.StakingTLSKeyContentKey],
+			config.StakingCertContentKey:   node1.Flags[config.StakingCertContentKey],
+		})
+		// Construct a unique data dir to ensure the two nodes' data will be stored
+		// separately. Usually the dir name is the node ID but in this one case the nodes have
+		// the same node ID.
+		node2.DataDir = node1.DataDir + "-second"
+		_ = e2e.AddEphemeralNode(tc, network, node2)
 
 		tc.By("checking that the second new node fails to become healthy before timeout")
-		err := tmpnet.WaitForHealthy(tc.DefaultContext(), node2)
+		err := node2.WaitForHealthy(tc.DefaultContext())
 		require.ErrorIs(err, context.DeadlineExceeded)
 
 		tc.By("stopping the first new node")
@@ -77,6 +80,11 @@ func checkConnectedPeers(tc tests.TestContext, existingNodes []*tmpnet.Node, new
 	}
 
 	for _, existingNode := range existingNodes {
+		if existingNode.IsEphemeral {
+			// Ephemeral nodes may not be running
+			continue
+		}
+
 		// Check that the existing node is a peer of the new node
 		require.True(peerIDs.Contains(existingNode.NodeID))
 

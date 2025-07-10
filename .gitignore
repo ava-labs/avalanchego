@@ -51,8 +51,6 @@ keys/staker.*
 !*.go
 !*.proto
 
-plugins/
-
 scripts/ansible/*inventory.yml
 scripts/.build_image_gopath/
 
@@ -64,3 +62,5 @@ vendor
 **/testdata
 
 .direnv
+# Personal extension to .envrc
+.envrc.local

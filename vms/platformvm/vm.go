@@ -14,7 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
-	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
@@ -100,7 +100,6 @@ func (vm *VM) Initialize(
 	genesisBytes []byte,
 	_ []byte,
 	configBytes []byte,
-	toEngine chan<- common.Message,
 	_ []*common.Fx,
 	appSender common.AppSender,
 ) error {
@@ -150,7 +149,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	validatorManager := pvalidators.NewManager(chainCtx.Log, vm.Internal, vm.state, vm.metrics, &vm.clock)
+	validatorManager := pvalidators.NewManager(vm.Internal, vm.state, vm.metrics, &vm.clock)
 	vm.State = validatorManager
 	utxoVerifier := utxo.NewVerifier(vm.ctx, &vm.clock, vm.fx)
 	vm.uptimeManager = uptime.NewManager(vm.state, &vm.clock)
@@ -167,7 +166,7 @@ func (vm *VM) Initialize(
 		Bootstrapped: &vm.bootstrapped,
 	}
 
-	mempool, err := pmempool.New("mempool", registerer, toEngine)
+	mempool, err := pmempool.New("mempool", registerer)
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}
@@ -366,13 +365,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 		vm.Validators.RegisterSetCallbackListener(subnetID, vl)
 	}
 
-	if err := vm.state.Commit(); err != nil {
-		return err
-	}
-
-	// Start the block builder
-	vm.Builder.StartBlockTimer()
-	return nil
+	return vm.state.Commit()
 }
 
 func (vm *VM) SetState(_ context.Context, state snow.State) error {
@@ -393,7 +386,6 @@ func (vm *VM) Shutdown(context.Context) error {
 	}
 
 	vm.onShutdownCtxCancel()
-	vm.Builder.ShutdownBlockTimer()
 
 	if vm.uptimeManager.StartedTracking() {
 		primaryVdrIDs := vm.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
@@ -433,9 +425,7 @@ func (vm *VM) LastAccepted(context.Context) (ids.ID, error) {
 
 // SetPreference sets the preferred block to be the one with ID [blkID]
 func (vm *VM) SetPreference(_ context.Context, blkID ids.ID) error {
-	if vm.manager.SetPreference(blkID) {
-		vm.Builder.ResetBlockTimer()
-	}
+	vm.manager.SetPreference(blkID)
 	return nil
 }
 
@@ -453,16 +443,18 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	server.RegisterInterceptFunc(vm.metrics.InterceptRequest)
 	server.RegisterAfterFunc(vm.metrics.AfterRequest)
 	service := &Service{
-		vm:          vm,
-		addrManager: avax.NewAddressManager(vm.ctx),
-		stakerAttributesCache: &cache.LRU[ids.ID, *stakerAttributes]{
-			Size: stakerAttributesCacheSize,
-		},
+		vm:                    vm,
+		addrManager:           avax.NewAddressManager(vm.ctx),
+		stakerAttributesCache: lru.NewCache[ids.ID, *stakerAttributes](stakerAttributesCacheSize),
 	}
 	err := server.RegisterService(service, "platform")
 	return map[string]http.Handler{
 		"": server,
 	}, err
+}
+
+func (*VM) CreateHTTP2Handler(context.Context) (http.Handler, error) {
+	return nil, nil
 }
 
 func (vm *VM) Connected(ctx context.Context, nodeID ids.NodeID, version *version.Application) error {

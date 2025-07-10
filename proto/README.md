@@ -1,6 +1,6 @@
 # Avalanche gRPC
 
-Now Serving: **Protocol Version 39**
+Now Serving: **Protocol Version 42**
 
 Protobuf files are hosted at
 [https://buf.build/ava-labs/avalanche](https://buf.build/ava-labs/avalanche) and
@@ -15,8 +15,8 @@ Please find installation instructions on
 Any changes made to proto definition can be updated by running
 `protobuf_codegen.sh` located in the `scripts/` directory of AvalancheGo.
 
-Introduction to `buf`
-[https://docs.buf.build/tour/introduction](https://docs.buf.build/tour/introduction)
+`buf` Quickstart
+[https://buf.build/docs/cli/quickstart](https://buf.build/docs/cli/quickstart)
 
 ## Protocol Version Compatibility
 

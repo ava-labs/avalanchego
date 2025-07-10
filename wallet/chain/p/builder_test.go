@@ -154,7 +154,7 @@ func TestBaseTx(t *testing.T) {
 				chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 					constants.PlatformChainID: utxos,
 				})
-				backend = wallet.NewBackend(e.context, chainUTXOs, nil)
+				backend = wallet.NewBackend(chainUTXOs, nil)
 				builder = builder.New(set.Of(utxoAddr), e.context, backend)
 			)
 
@@ -194,7 +194,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 				chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 					constants.PlatformChainID: utxos,
 				})
-				backend = wallet.NewBackend(e.context, chainUTXOs, subnetOwners)
+				backend = wallet.NewBackend(chainUTXOs, subnetOwners)
 				builder = builder.New(set.Of(utxoAddr, subnetAuthAddr), e.context, backend)
 			)
 
@@ -226,7 +226,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 				chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 					constants.PlatformChainID: utxos,
 				})
-				backend = wallet.NewBackend(e.context, chainUTXOs, subnetOwners)
+				backend = wallet.NewBackend(chainUTXOs, subnetOwners)
 				builder = builder.New(set.Of(utxoAddr, subnetAuthAddr), e.context, backend)
 			)
 
@@ -267,7 +267,7 @@ func TestCreateChainTx(t *testing.T) {
 				chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 					constants.PlatformChainID: utxos,
 				})
-				backend = wallet.NewBackend(e.context, chainUTXOs, subnetOwners)
+				backend = wallet.NewBackend(chainUTXOs, subnetOwners)
 				builder = builder.New(set.Of(utxoAddr, subnetAuthAddr), e.context, backend)
 			)
 
@@ -307,7 +307,7 @@ func TestCreateSubnetTx(t *testing.T) {
 				chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 					constants.PlatformChainID: utxos,
 				})
-				backend = wallet.NewBackend(e.context, chainUTXOs, subnetOwners)
+				backend = wallet.NewBackend(chainUTXOs, subnetOwners)
 				builder = builder.New(set.Of(utxoAddr, subnetAuthAddr), e.context, backend)
 			)
 
@@ -339,7 +339,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 				chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 					constants.PlatformChainID: utxos,
 				})
-				backend = wallet.NewBackend(e.context, chainUTXOs, subnetOwners)
+				backend = wallet.NewBackend(chainUTXOs, subnetOwners)
 				builder = builder.New(set.Of(utxoAddr, subnetAuthAddr), e.context, backend)
 			)
 
@@ -379,7 +379,7 @@ func TestImportTx(t *testing.T) {
 					constants.PlatformChainID: utxos,
 					sourceChainID:             importedUTXOs,
 				})
-				backend = wallet.NewBackend(e.context, chainUTXOs, nil)
+				backend = wallet.NewBackend(chainUTXOs, nil)
 				builder = builder.New(set.Of(utxoAddr), e.context, backend)
 			)
 
@@ -416,7 +416,7 @@ func TestExportTx(t *testing.T) {
 				chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 					constants.PlatformChainID: utxos,
 				})
-				backend = wallet.NewBackend(e.context, chainUTXOs, nil)
+				backend = wallet.NewBackend(chainUTXOs, nil)
 				builder = builder.New(set.Of(utxoAddr), e.context, backend)
 			)
 
@@ -483,7 +483,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 				chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 					constants.PlatformChainID: utxos,
 				})
-				backend = wallet.NewBackend(e.context, chainUTXOs, nil)
+				backend = wallet.NewBackend(chainUTXOs, nil)
 				builder = builder.New(set.Of(utxoAddr, rewardAddr), e.context, backend)
 			)
 
@@ -536,7 +536,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 				chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 					constants.PlatformChainID: utxos,
 				})
-				backend = wallet.NewBackend(e.context, chainUTXOs, nil)
+				backend = wallet.NewBackend(chainUTXOs, nil)
 				builder = builder.New(set.Of(utxoAddr, rewardAddr), e.context, backend)
 			)
 
@@ -620,7 +620,7 @@ func TestConvertSubnetToL1Tx(t *testing.T) {
 				chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 					constants.PlatformChainID: utxos,
 				})
-				backend = wallet.NewBackend(e.context, chainUTXOs, subnetOwners)
+				backend = wallet.NewBackend(chainUTXOs, subnetOwners)
 				builder = builder.New(set.Of(utxoAddr, subnetAuthAddr), e.context, backend)
 			)
 
@@ -726,7 +726,7 @@ func TestRegisterL1ValidatorTx(t *testing.T) {
 				chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 					constants.PlatformChainID: utxos,
 				})
-				backend = wallet.NewBackend(e.context, chainUTXOs, nil)
+				backend = wallet.NewBackend(chainUTXOs, nil)
 				builder = builder.New(set.Of(utxoAddr), e.context, backend)
 			)
 
@@ -811,7 +811,7 @@ func TestSetL1ValidatorWeightTx(t *testing.T) {
 				chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 					constants.PlatformChainID: utxos,
 				})
-				backend = wallet.NewBackend(e.context, chainUTXOs, nil)
+				backend = wallet.NewBackend(chainUTXOs, nil)
 				builder = builder.New(set.Of(utxoAddr), e.context, backend)
 			)
 
@@ -845,7 +845,7 @@ func TestIncreaseL1ValidatorBalanceTx(t *testing.T) {
 				chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 					constants.PlatformChainID: utxos,
 				})
-				backend = wallet.NewBackend(e.context, chainUTXOs, nil)
+				backend = wallet.NewBackend(chainUTXOs, nil)
 				builder = builder.New(set.Of(utxoAddr), e.context, backend)
 			)
 
@@ -881,7 +881,7 @@ func TestDisableL1ValidatorTx(t *testing.T) {
 				chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 					constants.PlatformChainID: utxos,
 				})
-				backend = wallet.NewBackend(e.context, chainUTXOs, validationOwners)
+				backend = wallet.NewBackend(chainUTXOs, validationOwners)
 				builder = builder.New(set.Of(utxoAddr, validationAuthAddr), e.context, backend)
 			)
 

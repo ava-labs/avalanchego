@@ -21,6 +21,9 @@ service VM {
   rpc Shutdown(google.protobuf.Empty) returns (google.protobuf.Empty);
   // Creates the HTTP handlers for custom chain network calls.
   rpc CreateHandlers(google.protobuf.Empty) returns (CreateHandlersResponse);
+  rpc CreateHTTP2Handler(google.protobuf.Empty) returns (CreateHTTP2HandlerResponse);
+  // WaitForEvent blocks until receiving the next event from the VM.
+  rpc WaitForEvent(google.protobuf.Empty) returns (WaitForEventResponse);
   rpc Connected(ConnectedRequest) returns (google.protobuf.Empty);
   rpc Disconnected(DisconnectedRequest) returns (google.protobuf.Empty);
   // Attempt to create a new block from data contained in the VM.
@@ -108,8 +111,8 @@ message InitializeRequest {
   bytes upgrade_bytes = 11;
   bytes config_bytes = 12;
   string db_server_addr = 13;
-  // server_addr is the address of the gRPC server which serves the messenger,
-  // shared memory, blockchain alias, subnet alias, and appSender services
+  // server_addr is the address of the gRPC server which serves the shared
+  // memory, blockchain alias, subnet alias, and appSender services
   string server_addr = 14;
   // network_upgrades_bytes is the json encoded network upgrades
   NetworkUpgrades network_upgrades = 15;
@@ -131,6 +134,7 @@ message NetworkUpgrades {
   google.protobuf.Timestamp durango_time = 13;
   google.protobuf.Timestamp etna_time = 14;
   google.protobuf.Timestamp fortuna_time = 15;
+  google.protobuf.Timestamp granite_time = 16;
 }
 
 message InitializeResponse {
@@ -157,11 +161,27 @@ message CreateHandlersResponse {
   repeated Handler handlers = 1;
 }
 
+message CreateHTTP2HandlerResponse {
+  // server_addr is the address of the gRPC server which serves the
+  // HTTP service
+  string server_addr = 1;
+}
+
 message Handler {
   string prefix = 1;
   // server_addr is the address of the gRPC server which serves the
   // HTTP service
   string server_addr = 2;
+}
+
+message WaitForEventResponse {
+  Message message = 1;
+}
+
+enum Message {
+  MESSAGE_UNSPECIFIED = 0;
+  MESSAGE_BUILD_BLOCK = 1;
+  MESSAGE_STATE_SYNC_FINISHED = 2;
 }
 
 message BuildBlockRequest {

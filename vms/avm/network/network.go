@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
-	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
+	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
 var (
@@ -27,10 +27,8 @@ var (
 type Network struct {
 	*p2p.Network
 
-	log       logging.Logger
-	parser    txs.Parser
-	mempool   *gossipMempool
-	appSender common.AppSender
+	log     logging.Logger
+	mempool *gossipMempool
 
 	txPushGossiper        *gossip.PushGossiper[*txs.Tx]
 	txPushGossipFrequency time.Duration
@@ -45,7 +43,7 @@ func New(
 	vdrs validators.State,
 	parser txs.Parser,
 	txVerifier TxVerifier,
-	mempool mempool.Mempool,
+	mempool mempool.Mempool[*txs.Tx],
 	appSender common.AppSender,
 	registerer prometheus.Registerer,
 	config Config,
@@ -79,7 +77,6 @@ func New(
 		registerer,
 		log,
 		txVerifier,
-		parser,
 		config.ExpectedBloomFilterElements,
 		config.ExpectedBloomFilterFalsePositiveProbability,
 		config.MaxBloomFilterFalsePositiveProbability,
@@ -162,9 +159,7 @@ func New(
 	return &Network{
 		Network:               p2pNetwork,
 		log:                   log,
-		parser:                parser,
 		mempool:               gossipMempool,
-		appSender:             appSender,
 		txPushGossiper:        txPushGossiper,
 		txPushGossipFrequency: config.PushGossipFrequency,
 		txPullGossiper:        txPullGossiper,

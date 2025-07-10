@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 
 	"github.com/compose-spec/compose-go/types"
 	"gopkg.in/yaml.v3"
@@ -61,12 +60,19 @@ func GenerateComposeConfig(network *tmpnet.Network, baseImageName string) error 
 			return errPluginDirEnvVarNotSet
 		}
 
+		network.DefaultRuntimeConfig = tmpnet.NodeRuntimeConfig{
+			Process: &tmpnet.ProcessRuntimeConfig{
+				AvalancheGoPath: avalancheGoPath,
+				PluginDir:       pluginDir,
+			},
+		}
+
 		bootstrapVolumePath, err := getBootstrapVolumePath(targetPath)
 		if err != nil {
 			return fmt.Errorf("failed to get bootstrap volume path: %w", err)
 		}
 
-		if err := initBootstrapDB(network, avalancheGoPath, pluginDir, bootstrapVolumePath); err != nil {
+		if err := initBootstrapDB(network, bootstrapVolumePath); err != nil {
 			return fmt.Errorf("failed to initialize db volumes: %w", err)
 		}
 	}
@@ -92,7 +98,7 @@ func initComposeConfig(
 	// Generate a compose project for the specified network
 	project, err := newComposeProject(network, nodeImageName, workloadImageName)
 	if err != nil {
-		return fmt.Errorf("failed to create compose project: %w", err)
+		return err
 	}
 
 	absPath, err := filepath.Abs(targetPath)
@@ -138,21 +144,26 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 		bootstrapIP  string
 		bootstrapIDs string
 	)
+
+	if network.PrimaryChainConfigs == nil {
+		network.PrimaryChainConfigs = make(map[string]tmpnet.ConfigMap)
+	}
+	if network.PrimaryChainConfigs["C"] == nil {
+		network.PrimaryChainConfigs["C"] = make(tmpnet.ConfigMap)
+	}
+	network.PrimaryChainConfigs["C"]["log-json-format"] = true
+
+	chainConfigContent, err := network.GetChainConfigContent()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get chain config content: %w", err)
+	}
+
 	for i, node := range network.Nodes {
 		address := fmt.Sprintf("%s.%d", baseNetworkAddress, 3+i)
 
-		tlsKey, err := node.Flags.GetStringVal(config.StakingTLSKeyContentKey)
-		if err != nil {
-			return nil, err
-		}
-		tlsCert, err := node.Flags.GetStringVal(config.StakingCertContentKey)
-		if err != nil {
-			return nil, err
-		}
-		signerKey, err := node.Flags.GetStringVal(config.StakingSignerKeyContentKey)
-		if err != nil {
-			return nil, err
-		}
+		tlsKey := node.Flags[config.StakingTLSKeyContentKey]
+		tlsCert := node.Flags[config.StakingCertContentKey]
+		signerKey := node.Flags[config.StakingSignerKeyContentKey]
 
 		env := types.Mapping{
 			config.NetworkNameKey:             constants.LocalName,
@@ -164,18 +175,12 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 			config.StakingTLSKeyContentKey:    tlsKey,
 			config.StakingCertContentKey:      tlsCert,
 			config.StakingSignerKeyContentKey: signerKey,
+			config.ChainConfigContentKey:      chainConfigContent,
 		}
 
 		// Apply configuration appropriate to a test network
-		for k, v := range tmpnet.DefaultTestFlags() {
-			switch value := v.(type) {
-			case string:
-				env[k] = value
-			case bool:
-				env[k] = strconv.FormatBool(value)
-			default:
-				return nil, fmt.Errorf("unable to convert unsupported type %T to string", v)
-			}
+		for k, v := range tmpnet.DefaultTmpnetFlags() {
+			env[k] = v
 		}
 
 		serviceName := getServiceName(i)
@@ -188,10 +193,7 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 			},
 		}
 
-		trackSubnets, err := node.Flags.GetStringVal(config.TrackSubnetsKey)
-		if err != nil {
-			return nil, err
-		}
+		trackSubnets := node.Flags[config.TrackSubnetsKey]
 		if len(trackSubnets) > 0 {
 			env[config.TrackSubnetsKey] = trackSubnets
 			if i == bootstrapIndex {

@@ -3,7 +3,7 @@
 ARG GO_VERSION=INVALID # This value is not intended to be used but silences a warning
 
 # AVALANCHEGO_NODE_IMAGE needs to identify an existing node image and should include the tag
-ARG AVALANCHEGO_NODE_IMAGE=INVALID # This value is not intended to be used but silences a warning
+ARG AVALANCHEGO_NODE_IMAGE="invalid-image" # This value is not intended to be used but silences a warning
 
 # ============= Compilation Stage ================
 FROM golang:$GO_VERSION-bookworm AS builder

@@ -6,11 +6,13 @@ package snowman
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
@@ -98,10 +100,7 @@ func New(config Config) (*Engine, error) {
 	nonVerifiedCache, err := metercacher.New[ids.ID, snowman.Block](
 		"non_verified_cache",
 		config.Ctx.Registerer,
-		cache.NewSizedLRU[ids.ID, snowman.Block](
-			nonVerifiedCacheSize,
-			cachedBlockSize,
-		),
+		lru.NewSizedCache(nonVerifiedCacheSize, cachedBlockSize),
 	)
 	if err != nil {
 		return nil, err
@@ -658,6 +657,9 @@ func (e *Engine) buildBlocks(ctx context.Context) error {
 			return nil
 		}
 		e.numBuilt.Inc()
+
+		blockTimeSkew := time.Since(blk.Timestamp())
+		e.blockTimeSkew.Add(float64(blockTimeSkew))
 
 		// The newly created block should be built on top of the preferred block.
 		// Otherwise, the new block doesn't have the best chance of being confirmed.

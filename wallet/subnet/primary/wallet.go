@@ -103,7 +103,7 @@ func MakeWallet(
 	}
 
 	pUTXOs := common.NewChainUTXOs(constants.PlatformChainID, avaxState.UTXOs)
-	pBackend := pwallet.NewBackend(avaxState.PCTX, pUTXOs, owners)
+	pBackend := pwallet.NewBackend(pUTXOs, owners)
 	pClient := p.NewClient(avaxState.PClient, pBackend)
 	pBuilder := pbuilder.New(avaxAddrs, avaxState.PCTX, pBackend)
 	pSigner := psigner.New(avaxKeychain, pBackend)
@@ -154,7 +154,7 @@ func MakePWallet(
 	}
 
 	pUTXOs := common.NewChainUTXOs(constants.PlatformChainID, utxos)
-	pBackend := pwallet.NewBackend(context, pUTXOs, owners)
+	pBackend := pwallet.NewBackend(pUTXOs, owners)
 	pClient := p.NewClient(client, pBackend)
 	pBuilder := pbuilder.New(addrs, context, pBackend)
 	pSigner := psigner.New(keychain, pBackend)

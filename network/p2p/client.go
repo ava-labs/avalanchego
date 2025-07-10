@@ -32,7 +32,6 @@ type AppResponseCallback func(
 )
 
 type Client struct {
-	handlerID     uint64
 	handlerIDStr  string
 	handlerPrefix []byte
 	router        *router

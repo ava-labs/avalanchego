@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"sort"
+	"slices"
 	"testing"
 	"time"
 
@@ -32,7 +32,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
@@ -154,7 +153,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 			// Checks: let's look back at validator sets at previous heights and
 			// make sure they match the snapshots already taken
 			snapshotHeights := maps.Keys(validatorSetByHeightAndSubnet)
-			sort.Slice(snapshotHeights, func(i, j int) bool { return snapshotHeights[i] < snapshotHeights[j] })
+			slices.Sort(snapshotHeights)
 			for idx, snapShotHeight := range snapshotHeights {
 				lastAcceptedHeight, err := vm.GetCurrentHeight(context.Background())
 				if err != nil {
@@ -405,7 +404,6 @@ type validatorInputData struct {
 	startTime time.Time
 	endTime   time.Time
 	nodeID    ids.NodeID
-	publicKey *bls.PublicKey
 }
 
 // buildTimestampsList creates validators start and end time, given the event list.
@@ -416,17 +414,11 @@ func buildTimestampsList(events []uint8, currentTime time.Time, nodeID ids.NodeI
 	currentTime = currentTime.Add(txexecutor.SyncBound)
 	switch endTime := currentTime.Add(defaultMinStakingDuration); events[0] {
 	case startPrimaryWithBLS:
-		sk, err := localsigner.New()
-		if err != nil {
-			return nil, fmt.Errorf("could not make private key: %w", err)
-		}
-
 		res = append(res, &validatorInputData{
 			eventType: startPrimaryWithBLS,
 			startTime: currentTime,
 			endTime:   endTime,
 			nodeID:    nodeID,
-			publicKey: sk.PublicKey(),
 		})
 	default:
 		return nil, fmt.Errorf("unexpected initial event %d", events[0])
@@ -446,7 +438,6 @@ func buildTimestampsList(events []uint8, currentTime time.Time, nodeID ids.NodeI
 				startTime: currentTime,
 				endTime:   endTime,
 				nodeID:    nodeID,
-				publicKey: nil,
 			})
 
 			currentPrimaryVal.endTime = endTime.Add(time.Second)
@@ -454,18 +445,12 @@ func buildTimestampsList(events []uint8, currentTime time.Time, nodeID ids.NodeI
 
 		case startPrimaryWithBLS:
 			currentTime = currentPrimaryVal.endTime.Add(txexecutor.SyncBound)
-			sk, err := localsigner.New()
-			if err != nil {
-				return nil, fmt.Errorf("could not make private key: %w", err)
-			}
-
 			endTime := currentTime.Add(defaultMinStakingDuration)
 			val := &validatorInputData{
 				eventType: startPrimaryWithBLS,
 				startTime: currentTime,
 				endTime:   endTime,
 				nodeID:    nodeID,
-				publicKey: sk.PublicKey(),
 			}
 			res = append(res, val)
 			currentPrimaryVal = val
@@ -641,7 +626,6 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	chainDB := prefixdb.New([]byte{0}, baseDB)
 	atomicDB := prefixdb.New([]byte{1}, baseDB)
 
-	msgChan := make(chan common.Message, 1)
 	ctx := snowtest.Context(t, snowtest.PChainID)
 
 	m := atomic.NewMemory(atomicDB)
@@ -667,7 +651,6 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		}),
 		nil,
 		nil,
-		msgChan,
 		nil,
 		appSender,
 	)

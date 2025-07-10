@@ -24,6 +24,12 @@ var _ p2p.Handler = (*Handler)(nil)
 
 // Verifier verifies that a warp message should be signed
 type Verifier interface {
+	// Verify verifies that the provided message is valid for this node to sign
+	// based on the provided justification.
+	//
+	// Implementations of Verify are not expected to verify the NetworkID or
+	// SourceChainID fields of the message. Verification of these fields should
+	// be performed externally to Verify.
 	Verify(
 		ctx context.Context,
 		message *warp.UnsignedMessage,
@@ -90,10 +96,13 @@ func (h *Handler) AppRequest(
 		return signatureToResponse(signatureBytes)
 	}
 
+	// Verify that the payload is valid to sign.
 	if err := h.verifier.Verify(ctx, msg, request.Justification); err != nil {
 		return nil, err
 	}
 
+	// The signer internally verifies that the NetworkID and SourceChainID are
+	// populated with the expected values.
 	signature, err := h.signer.Sign(msg)
 	if err != nil {
 		return nil, &common.AppError{

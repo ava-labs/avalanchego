@@ -51,6 +51,7 @@ import (
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	txmempool "github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
 const (
@@ -67,7 +68,7 @@ type mutableSharedMemory struct {
 type environment struct {
 	Builder
 	blkManager blockexecutor.Manager
-	mempool    mempool.Mempool
+	mempool    txmempool.Mempool[*txs.Tx]
 	network    *network.Network
 	sender     *enginetest.Sender
 
@@ -142,7 +143,7 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 	metrics, err := metrics.New(registerer)
 	require.NoError(err)
 
-	res.mempool, err = mempool.New("mempool", registerer, nil)
+	res.mempool, err = mempool.New("mempool", registerer)
 	require.NoError(err)
 
 	res.blkManager = blockexecutor.NewManager(
@@ -176,7 +177,6 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 		&res.backend,
 		res.blkManager,
 	)
-	res.Builder.StartBlockTimer()
 
 	res.blkManager.SetPreference(genesisID)
 	addSubnet(t, res)
@@ -184,8 +184,6 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 	t.Cleanup(func() {
 		res.ctx.Lock.Lock()
 		defer res.ctx.Lock.Unlock()
-
-		res.Builder.ShutdownBlockTimer()
 
 		if res.uptimes.StartedTracking() {
 			validatorIDs := res.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)

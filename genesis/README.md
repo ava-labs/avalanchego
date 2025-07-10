@@ -1,6 +1,6 @@
 # Genesis
 
-The Genesis package converts formatted JSON files into the genesis of the Primary Network. For the simplest example, see the [Local Genesis](https://github.com/ava-labs/avalanchego/blob/master/genesis/genesis_local.json) JSON file.
+The Genesis package converts formatted JSON files into the genesis of the Primary Network. For the simplest example, see the [Local Genesis](./genesis_local.json) JSON file.
 
 The genesis JSON file contains the following properties:
 

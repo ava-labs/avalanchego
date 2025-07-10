@@ -17,7 +17,6 @@ var _ bls.Signer = (*Client)(nil)
 
 type Client struct {
 	client pb.SignerClient
-	conn   *grpc.ClientConn
 	pk     *bls.PublicKey
 }
 
@@ -37,7 +36,6 @@ func NewClient(ctx context.Context, conn *grpc.ClientConn) (*Client, error) {
 
 	return &Client{
 		client: client,
-		conn:   conn,
 		pk:     pk,
 	}, nil
 }

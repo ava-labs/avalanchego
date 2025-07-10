@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 
@@ -56,13 +55,12 @@ type InboundConnUpgradeThrottlerConfig struct {
 
 // Returns an InboundConnUpgradeThrottler that upgrades an inbound
 // connection from a given IP at most every [UpgradeCooldown].
-func NewInboundConnUpgradeThrottler(log logging.Logger, config InboundConnUpgradeThrottlerConfig) InboundConnUpgradeThrottler {
+func NewInboundConnUpgradeThrottler(config InboundConnUpgradeThrottlerConfig) InboundConnUpgradeThrottler {
 	if config.UpgradeCooldown <= 0 || config.MaxRecentConnsUpgraded <= 0 {
 		return &noInboundConnUpgradeThrottler{}
 	}
 	return &inboundConnUpgradeThrottler{
 		InboundConnUpgradeThrottlerConfig: config,
-		log:                               log,
 		done:                              make(chan struct{}),
 		recentIPsAndTimes:                 make(chan ipAndTime, config.MaxRecentConnsUpgraded),
 	}
@@ -86,7 +84,6 @@ type ipAndTime struct {
 
 type inboundConnUpgradeThrottler struct {
 	InboundConnUpgradeThrottlerConfig
-	log  logging.Logger
 	lock sync.Mutex
 	// Useful for faking time in tests
 	clock mockable.Clock

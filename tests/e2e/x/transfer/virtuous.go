@@ -47,9 +47,12 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 
 	ginkgo.It("can issue a virtuous transfer tx for AVAX asset",
 		func() {
-			env := e2e.GetEnv(tc)
-			rpcEps := make([]string, len(env.URIs))
-			for i, nodeURI := range env.URIs {
+			var (
+				env       = e2e.GetEnv(tc)
+				localURIs = env.GetNodeURIs()
+				rpcEps    = make([]string, len(localURIs))
+			)
+			for i, nodeURI := range localURIs {
 				rpcEps[i] = nodeURI.URI
 			}
 
@@ -286,12 +289,12 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 					// by now
 					currentXBlksProcessing, _ := tests.GetMetricValue(mm, blksProcessingMetric, xChainMetricLabels)
 					previousXBlksProcessing, _ := tests.GetMetricValue(prev, blksProcessingMetric, xChainMetricLabels)
-					require.Equal(currentXBlksProcessing, previousXBlksProcessing)
+					require.InDelta(currentXBlksProcessing, previousXBlksProcessing, 0)
 
 					// +1 since X-chain tx must have been accepted by now
 					currentXBlksAccepted, _ := tests.GetMetricValue(mm, blksAcceptedMetric, xChainMetricLabels)
 					previousXBlksAccepted, _ := tests.GetMetricValue(prev, blksAcceptedMetric, xChainMetricLabels)
-					require.Equal(currentXBlksAccepted, previousXBlksAccepted+1)
+					require.InDelta(currentXBlksAccepted, previousXBlksAccepted+1, 0)
 
 					metricsBeforeTx[u] = mm
 				}

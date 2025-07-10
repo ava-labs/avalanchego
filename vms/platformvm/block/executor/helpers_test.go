@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -48,6 +47,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/wallet"
+
+	txmempool "github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
 const (
@@ -81,8 +82,7 @@ type test struct {
 
 type environment struct {
 	blkManager Manager
-	mempool    mempool.Mempool
-	sender     *enginetest.Sender
+	mempool    txmempool.Mempool[*txs.Tx]
 
 	isBootstrapped *utils.Atomic[bool]
 	config         *config.Internal
@@ -148,12 +148,11 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 	}
 
 	registerer := prometheus.NewRegistry()
-	res.sender = &enginetest.Sender{T: t}
 
 	metrics := metrics.Noop
 
 	var err error
-	res.mempool, err = mempool.New("mempool", registerer, nil)
+	res.mempool, err = mempool.New("mempool", registerer)
 	if err != nil {
 		panic(fmt.Errorf("failed to create mempool: %w", err))
 	}

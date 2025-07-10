@@ -261,7 +261,7 @@ func TestPackerUnpackString(t *testing.T) {
 	require.NoError(p.Err)
 	require.Equal(6, p.Offset)
 
-	require.Equal("", p.UnpackStr())
+	require.Empty(p.UnpackStr())
 	require.True(p.Errored())
 	require.ErrorIs(p.Err, ErrInsufficientLength)
 }
@@ -275,13 +275,13 @@ func TestPackerUnpackLimitedString(t *testing.T) {
 	require.NoError(p.Err)
 	require.Equal(6, p.Offset)
 
-	require.Equal("", p.UnpackLimitedStr(10))
+	require.Empty(p.UnpackLimitedStr(10))
 	require.True(p.Errored())
 	require.ErrorIs(p.Err, ErrInsufficientLength)
 
 	// Reset and don't allow enough bytes
 	p = Packer{Bytes: p.Bytes}
-	require.Equal("", p.UnpackLimitedStr(2))
+	require.Empty(p.UnpackLimitedStr(2))
 	require.True(p.Errored())
 	require.ErrorIs(p.Err, errOversized)
 }

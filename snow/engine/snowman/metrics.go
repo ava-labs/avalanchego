@@ -32,10 +32,10 @@ type metrics struct {
 	numProcessingAncestorFetchesDropped   prometheus.Counter
 	numProcessingAncestorFetchesSucceeded prometheus.Counter
 	numProcessingAncestorFetchesUnneeded  prometheus.Counter
-	getAncestorsBlks                      metric.Averager
 	selectedVoteIndex                     metric.Averager
 	issuerStake                           metric.Averager
 	issued                                *prometheus.CounterVec
+	blockTimeSkew                         prometheus.Gauge
 }
 
 func newMetrics(reg prometheus.Registerer) (*metrics, error) {
@@ -97,12 +97,6 @@ func newMetrics(reg prometheus.Registerer) (*metrics, error) {
 			Name: "num_processing_ancestor_fetches_unneeded",
 			Help: "Number of votes that were directly applied to blocks",
 		}),
-		getAncestorsBlks: metric.NewAveragerWithErrs(
-			"get_ancestors_blks",
-			"blocks fetched in a call to GetAncestors",
-			reg,
-			&errs,
-		),
 		selectedVoteIndex: metric.NewAveragerWithErrs(
 			"selected_vote_index",
 			"index of the voteID that was passed into consensus",
@@ -119,6 +113,10 @@ func newMetrics(reg prometheus.Registerer) (*metrics, error) {
 			Name: "blks_issued",
 			Help: "number of blocks that have been issued into consensus by discovery mechanism",
 		}, []string{"source"}),
+		blockTimeSkew: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "blks_built_time_skew",
+			Help: "The differences between the time the block was built at and the block's timestamp",
+		}),
 	}
 
 	// Register the labels
@@ -143,6 +141,7 @@ func newMetrics(reg prometheus.Registerer) (*metrics, error) {
 		reg.Register(m.numProcessingAncestorFetchesSucceeded),
 		reg.Register(m.numProcessingAncestorFetchesUnneeded),
 		reg.Register(m.issued),
+		reg.Register(m.blockTimeSkew),
 	)
 	return m, errs.Err
 }

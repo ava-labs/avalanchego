@@ -38,7 +38,7 @@ func main() {
 	log.Printf("fetched state of %s in %s\n", addrStr, time.Since(fetchStartTime))
 
 	pUTXOs := common.NewChainUTXOs(constants.PlatformChainID, state.UTXOs)
-	pBackend := wallet.NewBackend(state.PCTX, pUTXOs, nil)
+	pBackend := wallet.NewBackend(pUTXOs, nil)
 	pBuilder := builder.New(addresses, state.PCTX, pBackend)
 
 	currentBalances, err := pBuilder.GetBalance()

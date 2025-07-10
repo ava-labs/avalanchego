@@ -1,4 +1,4 @@
-The P-Chain API allows clients to interact with the [P-Chain](/learn/avalanche/avalanche-platform.md#p-chain), which maintains Avalanche’s validator set and handles blockchain creation.
+The P-Chain API allows clients to interact with the [P-Chain](https://build.avax.network/docs/quick-start/primary-network#p-chain), which maintains Avalanche’s validator set and handles blockchain creation.
 
 ## Endpoint
 
@@ -1331,9 +1331,6 @@ platform.getSubnets({
 - `threshold` signatures from addresses in `controlKeys` are needed to add a validator to the
   Subnet. If the Subnet is not a PoA Subnet, then `threshold` will be `0` and `controlKeys` will be
   empty.
-
-See [here](/nodes/validate/add-a-validator.md) for information on adding a validator to a
-Subnet.
 
 **Example Call:**
 

@@ -1,0 +1,40 @@
+{
+  "networkID": 9999,
+  "allocations": [
+    {
+      "ethAddr": "0x46a9c04f4bf783aa69daabd519dcf36978168b66",
+      "avaxAddr": "X-custom1g65uqn6t77p656w64023nh8nd9updzmxwd59gh",
+      "initialAmount": 22,
+      "unlockSchedule": [
+        {
+          "amount": 2,
+          "unlockTime": 1660987200
+        }
+      ]
+    }
+  ],
+  "startTime": 1660987200,
+  "initialStakeDuration": 31536000,
+  "initialStakedFunds": [
+    "X-custom1g65uqn6t77p656w64023nh8nd9updzmxwd59gh"
+  ],
+  "initialStakers": [
+    {
+      "nodeID": "NodeID-7gX65ndj8b6UA7uMp4vjQq3FcaC6aqY3Z",
+      "rewardAddress": "X-custom18jma8ppw3nhx5r4ap8clazz0dps7rv5u9xde7p",
+      "delegationFee": 5000
+    },
+    {
+      "nodeID": "NodeID-BW6UnRcxVBvFB4LTfdt8BpBaaw4Vt7ZeR",
+      "rewardAddress": "X-custom18jma8ppw3nhx5r4ap8clazz0dps7rv5u9xde7p",
+      "delegationFee": 5001
+    },
+    {
+      "nodeID": "NodeID-NAyhSLKgrm4Bxd49e5dUwooDDdrStRaj5",
+      "rewardAddress": "X-custom18jma8ppw3nhx5r4ap8clazz0dps7rv5u9xde7p",
+      "delegationFee": 5002
+    }
+  ],
+  "cChainGenesis": "{\"config\":{\"chainId\":43112}}",
+  "message": ""
+}

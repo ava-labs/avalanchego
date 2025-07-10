@@ -7,6 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
@@ -92,11 +93,11 @@ func NewUTXOState(
 	s := &utxoState{
 		codec: codec,
 
-		utxoCache: &cache.LRU[ids.ID, *UTXO]{Size: utxoCacheSize},
+		utxoCache: lru.NewCache[ids.ID, *UTXO](utxoCacheSize),
 		utxoDB:    prefixdb.New(utxoPrefix, db),
 
 		indexDB:    prefixdb.New(indexPrefix, db),
-		indexCache: &cache.LRU[string, linkeddb.LinkedDB]{Size: indexCacheSize},
+		indexCache: lru.NewCache[string, linkeddb.LinkedDB](indexCacheSize),
 
 		trackChecksum: trackChecksum,
 	}
@@ -112,7 +113,7 @@ func NewMeteredUTXOState(
 	utxoCache, err := metercacher.New[ids.ID, *UTXO](
 		"utxo_cache",
 		metrics,
-		&cache.LRU[ids.ID, *UTXO]{Size: utxoCacheSize},
+		lru.NewCache[ids.ID, *UTXO](utxoCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -121,9 +122,7 @@ func NewMeteredUTXOState(
 	indexCache, err := metercacher.New[string, linkeddb.LinkedDB](
 		"index_cache",
 		metrics,
-		&cache.LRU[string, linkeddb.LinkedDB]{
-			Size: indexCacheSize,
-		},
+		lru.NewCache[string, linkeddb.LinkedDB](indexCacheSize),
 	)
 	if err != nil {
 		return nil, err

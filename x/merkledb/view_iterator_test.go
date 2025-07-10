@@ -7,7 +7,7 @@ import (
 	"bytes"
 	"context"
 	"math/rand"
-	"sort"
+	"slices"
 	"testing"
 	"time"
 
@@ -258,7 +258,7 @@ func Test_View_Iterator_Random(t *testing.T) {
 
 	iter := view3.NewIterator()
 	uniqueKeys := maps.Keys(uniqueKeyChanges)
-	sort.Strings(uniqueKeys)
+	slices.Sort(uniqueKeys)
 	i := 0
 	for iter.Next() {
 		expectedKey := uniqueKeys[i]

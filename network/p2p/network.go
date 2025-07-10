@@ -138,7 +138,6 @@ func (n *Network) Disconnected(_ context.Context, nodeID ids.NodeID) error {
 // corresponding protocol.
 func (n *Network) NewClient(handlerID uint64, options ...ClientOption) *Client {
 	client := &Client{
-		handlerID:     handlerID,
 		handlerIDStr:  strconv.FormatUint(handlerID, 10),
 		handlerPrefix: ProtocolPrefix(handlerID),
 		sender:        n.sender,

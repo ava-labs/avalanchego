@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
@@ -31,8 +30,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	avajson "github.com/ava-labs/avalanchego/utils/json"
 )
 
 const (
@@ -71,7 +68,6 @@ type environment struct {
 	genesisBytes []byte
 	genesisTx    *txs.Tx
 	sharedMemory *atomic.Memory
-	issuer       chan common.Message
 	vm           *VM
 	txBuilder    *txstest.Builder
 }
@@ -81,17 +77,21 @@ func setup(tb testing.TB, c *envConfig) *environment {
 	require := require.New(tb)
 
 	var (
-		genesisArgs *BuildGenesisArgs
+		networkID   = uint32(0)
+		genesisData map[string]AssetDefinition
 		assetName   = "AVAX"
 	)
 	if c.isCustomFeeAsset {
-		genesisArgs = makeCustomAssetGenesis(tb)
+		genesisData = makeCustomAssetGenesisData(tb)
 		assetName = feeAssetName
 	} else {
-		genesisArgs = makeDefaultGenesis(tb)
+		genesisData = makeDefaultGenesisData(tb)
 	}
 
-	genesisBytes := buildGenesisTestWithArgs(tb, genesisArgs)
+	genesis, err := NewGenesis(networkID, genesisData)
+	require.NoError(err)
+	genesisBytes, err := genesis.Bytes()
+	require.NoError(err)
 
 	ctx := snowtest.Context(tb, snowtest.XChainID)
 
@@ -117,7 +117,6 @@ func setup(tb testing.TB, c *envConfig) *environment {
 	}
 
 	vmDynamicConfig := DefaultConfig
-	vmDynamicConfig.IndexTransactions = true
 	if c.vmDynamicConfig != nil {
 		vmDynamicConfig = *c.vmDynamicConfig
 	}
@@ -129,7 +128,6 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),
 		genesisBytes,
-		nil,
 		configBytes,
 		nil,
 		append(
@@ -149,13 +147,11 @@ func setup(tb testing.TB, c *envConfig) *environment {
 	))
 
 	stopVertexID := ids.GenerateTestID()
-	issuer := make(chan common.Message, 1)
 
 	env := &environment{
 		genesisBytes: genesisBytes,
 		genesisTx:    getCreateTxFromGenesisTest(tb, genesisBytes, assetName),
 		sharedMemory: m,
-		issuer:       issuer,
 		vm:           vm,
 		txBuilder:    txstest.New(vm.parser.Codec(), vm.ctx, &vm.Config, vm.feeAssetID, vm.state),
 	}
@@ -165,7 +161,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		return env
 	}
 
-	require.NoError(vm.Linearize(context.Background(), stopVertexID, issuer))
+	require.NoError(vm.Linearize(context.Background(), stopVertexID))
 	if c.notBootstrapped {
 		return env
 	}
@@ -218,23 +214,17 @@ func getCreateTxFromGenesisTest(tb testing.TB, genesisBytes []byte, assetName st
 	return tx
 }
 
-// buildGenesisTest is the common Genesis builder for most tests
-func buildGenesisTest(tb testing.TB) []byte {
-	defaultArgs := makeDefaultGenesis(tb)
-	return buildGenesisTestWithArgs(tb, defaultArgs)
-}
-
-// buildGenesisTestWithArgs allows building the genesis while injecting different starting points (args)
-func buildGenesisTestWithArgs(tb testing.TB, args *BuildGenesisArgs) []byte {
+func newGenesisBytesTest(tb testing.TB) []byte {
 	require := require.New(tb)
-
-	ss := CreateStaticService()
-
-	reply := BuildGenesisReply{}
-	require.NoError(ss.BuildGenesis(nil, args, &reply))
-
-	b, err := formatting.Decode(reply.Encoding, reply.Bytes)
+	genesisData := makeDefaultGenesisData(tb)
+	genesis, err := NewGenesis(
+		constants.UnitTestID,
+		genesisData,
+	)
 	require.NoError(err)
+	b, err := genesis.Bytes()
+	require.NoError(err)
+	require.NotEmpty(b)
 	return b
 }
 
@@ -263,11 +253,13 @@ func newTx(tb testing.TB, genesisBytes []byte, chainID ids.ID, parser txs.Parser
 			}},
 		},
 	}}
-	require.NoError(tx.SignSECP256K1Fx(parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}))
+	require.NoError(
+		tx.SignSECP256K1Fx(parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}),
+	)
 	return tx
 }
 
-func makeDefaultGenesis(tb testing.TB) *BuildGenesisArgs {
+func makeDefaultGenesisData(tb testing.TB) map[string]AssetDefinition {
 	require := require.New(tb)
 
 	addr0Str, err := address.FormatBech32(constants.UnitTestHRP, addrs[0].Bytes())
@@ -279,77 +271,74 @@ func makeDefaultGenesis(tb testing.TB) *BuildGenesisArgs {
 	addr2Str, err := address.FormatBech32(constants.UnitTestHRP, addrs[2].Bytes())
 	require.NoError(err)
 
-	return &BuildGenesisArgs{
-		Encoding: formatting.Hex,
-		GenesisData: map[string]AssetDefinition{
-			"asset1": {
-				Name:   "AVAX",
-				Symbol: "SYMB",
-				InitialState: map[string][]interface{}{
-					"fixedCap": {
-						Holder{
-							Amount:  avajson.Uint64(startBalance),
-							Address: addr0Str,
+	return map[string]AssetDefinition{
+		"asset1": {
+			Name:   "AVAX",
+			Symbol: "SYMB",
+			InitialState: AssetInitialState{
+				FixedCap: []Holder{
+					{
+						Amount:  startBalance,
+						Address: addr0Str,
+					},
+					{
+						Amount:  startBalance,
+						Address: addr1Str,
+					},
+					{
+						Amount:  startBalance,
+						Address: addr2Str,
+					},
+				},
+			},
+		},
+		"asset2": {
+			Name:   "myVarCapAsset",
+			Symbol: "MVCA",
+			InitialState: AssetInitialState{
+				VariableCap: []Owners{
+					{
+						Threshold: 1,
+						Minters: []string{
+							addr0Str,
+							addr1Str,
 						},
-						Holder{
-							Amount:  avajson.Uint64(startBalance),
-							Address: addr1Str,
-						},
-						Holder{
-							Amount:  avajson.Uint64(startBalance),
-							Address: addr2Str,
+					},
+					{
+						Threshold: 2,
+						Minters: []string{
+							addr0Str,
+							addr1Str,
+							addr2Str,
 						},
 					},
 				},
 			},
-			"asset2": {
-				Name:   "myVarCapAsset",
-				Symbol: "MVCA",
-				InitialState: map[string][]interface{}{
-					"variableCap": {
-						Owners{
-							Threshold: 1,
-							Minters: []string{
-								addr0Str,
-								addr1Str,
-							},
-						},
-						Owners{
-							Threshold: 2,
-							Minters: []string{
-								addr0Str,
-								addr1Str,
-								addr2Str,
-							},
+		},
+		"asset3": {
+			Name: "myOtherVarCapAsset",
+			InitialState: AssetInitialState{
+				VariableCap: []Owners{
+					{
+						Threshold: 1,
+						Minters: []string{
+							addr0Str,
 						},
 					},
 				},
 			},
-			"asset3": {
-				Name: "myOtherVarCapAsset",
-				InitialState: map[string][]interface{}{
-					"variableCap": {
-						Owners{
-							Threshold: 1,
-							Minters: []string{
-								addr0Str,
-							},
-						},
+		},
+		"asset4": {
+			Name: "myFixedCapAsset",
+			InitialState: AssetInitialState{
+				FixedCap: []Holder{
+					{
+						Amount:  startBalance,
+						Address: addr0Str,
 					},
-				},
-			},
-			"asset4": {
-				Name: "myFixedCapAsset",
-				InitialState: map[string][]interface{}{
-					"fixedCap": {
-						Holder{
-							Amount:  avajson.Uint64(startBalance),
-							Address: addr0Str,
-						},
-						Holder{
-							Amount:  avajson.Uint64(startBalance),
-							Address: addr1Str,
-						},
+					{
+						Amount:  startBalance,
+						Address: addr1Str,
 					},
 				},
 			},
@@ -357,7 +346,7 @@ func makeDefaultGenesis(tb testing.TB) *BuildGenesisArgs {
 	}
 }
 
-func makeCustomAssetGenesis(tb testing.TB) *BuildGenesisArgs {
+func makeCustomAssetGenesisData(tb testing.TB) map[string]AssetDefinition {
 	require := require.New(tb)
 
 	addr0Str, err := address.FormatBech32(constants.UnitTestHRP, addrs[0].Bytes())
@@ -369,46 +358,43 @@ func makeCustomAssetGenesis(tb testing.TB) *BuildGenesisArgs {
 	addr2Str, err := address.FormatBech32(constants.UnitTestHRP, addrs[2].Bytes())
 	require.NoError(err)
 
-	return &BuildGenesisArgs{
-		Encoding: formatting.Hex,
-		GenesisData: map[string]AssetDefinition{
-			"asset1": {
-				Name:   feeAssetName,
-				Symbol: "TST",
-				InitialState: map[string][]interface{}{
-					"fixedCap": {
-						Holder{
-							Amount:  avajson.Uint64(startBalance),
-							Address: addr0Str,
-						},
-						Holder{
-							Amount:  avajson.Uint64(startBalance),
-							Address: addr1Str,
-						},
-						Holder{
-							Amount:  avajson.Uint64(startBalance),
-							Address: addr2Str,
-						},
+	return map[string]AssetDefinition{
+		"asset1": {
+			Name:   feeAssetName,
+			Symbol: "TST",
+			InitialState: AssetInitialState{
+				FixedCap: []Holder{
+					{
+						Amount:  startBalance,
+						Address: addr0Str,
+					},
+					{
+						Amount:  startBalance,
+						Address: addr1Str,
+					},
+					{
+						Amount:  startBalance,
+						Address: addr2Str,
 					},
 				},
 			},
-			"asset2": {
-				Name:   otherAssetName,
-				Symbol: "OTH",
-				InitialState: map[string][]interface{}{
-					"fixedCap": {
-						Holder{
-							Amount:  avajson.Uint64(startBalance),
-							Address: addr0Str,
-						},
-						Holder{
-							Amount:  avajson.Uint64(startBalance),
-							Address: addr1Str,
-						},
-						Holder{
-							Amount:  avajson.Uint64(startBalance),
-							Address: addr2Str,
-						},
+		},
+		"asset2": {
+			Name:   otherAssetName,
+			Symbol: "OTH",
+			InitialState: AssetInitialState{
+				FixedCap: []Holder{
+					{
+						Amount:  startBalance,
+						Address: addr0Str,
+					},
+					{
+						Amount:  startBalance,
+						Address: addr1Str,
+					},
+					{
+						Amount:  startBalance,
+						Address: addr2Str,
 					},
 				},
 			},
@@ -420,24 +406,24 @@ func makeCustomAssetGenesis(tb testing.TB) *BuildGenesisArgs {
 func issueAndAccept(
 	require *require.Assertions,
 	vm *VM,
-	issuer <-chan common.Message,
 	tx *txs.Tx,
 ) {
 	txID, err := vm.issueTxFromRPC(tx)
 	require.NoError(err)
 	require.Equal(tx.ID(), txID)
 
-	buildAndAccept(require, vm, issuer, txID)
+	buildAndAccept(require, vm, txID)
 }
 
 // buildAndAccept expects the context lock not to be held
 func buildAndAccept(
 	require *require.Assertions,
 	vm *VM,
-	issuer <-chan common.Message,
 	txID ids.ID,
 ) {
-	require.Equal(common.PendingTxs, <-issuer)
+	msg, err := vm.WaitForEvent(context.Background())
+	require.NoError(err)
+	require.Equal(common.PendingTxs, msg)
 
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()

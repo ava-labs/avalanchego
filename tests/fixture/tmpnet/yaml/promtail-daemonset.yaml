@@ -1,0 +1,186 @@
+# A secret called loki-credentials must be created separately with keys `username` and `password`
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ci-monitoring
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: promtail-serviceaccount
+  namespace: ci-monitoring
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: promtail-clusterrole
+rules:
+  - apiGroups: [""]
+    resources:
+    - nodes
+    - services
+    - pods
+    verbs:
+    - get
+    - watch
+    - list
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: promtail-clusterrolebinding
+subjects:
+    - kind: ServiceAccount
+      name: promtail-serviceaccount
+      namespace: ci-monitoring
+roleRef:
+    kind: ClusterRole
+    name: promtail-clusterrole
+    apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: promtail-config
+  namespace: ci-monitoring
+data:
+  promtail.yaml: |
+    server:
+      http_listen_port: 9080
+      grpc_listen_port: 0
+
+    clients:
+    - url: https://loki-poc.avax-dev.network/api/prom/push
+      basic_auth:
+        username: ${LOKI_USERNAME}
+        password: ${LOKI_PASSWORD}
+
+    positions:
+      filename: /tmp/positions.yaml
+    target_config:
+      sync_period: 10s
+    scrape_configs:
+    - job_name: pod-logs
+      kubernetes_sd_configs:
+        - role: pod
+      pipeline_stages:
+        - docker: {}
+      relabel_configs:
+        # TODO(marun) Ensure consistency with prometheus labeling
+        - source_labels: [__meta_kubernetes_pod_annotation_promtail_collect]
+          action: keep
+          regex: true
+        - source_labels:
+            - __meta_kubernetes_pod_node_name
+          target_label: __host__
+        - action: replace
+          replacement: $1
+          separator: /
+          source_labels:
+            - __meta_kubernetes_namespace
+            - __meta_kubernetes_pod_name
+          target_label: job
+        - action: replace
+          source_labels:
+            - __meta_kubernetes_namespace
+          target_label: namespace
+        - action: replace
+          source_labels:
+            - __meta_kubernetes_pod_name
+          target_label: pod
+        - action: replace
+          source_labels:
+            - __meta_kubernetes_pod_container_name
+          target_label: container
+        - replacement: /var/log/pods/*$1/*.log
+          separator: /
+          source_labels:
+            - __meta_kubernetes_pod_uid
+            - __meta_kubernetes_pod_container_name
+          target_label: __path__
+        - source_labels: [__meta_kubernetes_pod_label_is_ephemeral_node]
+          target_label: is_ephemeral_node
+        - source_labels: [__meta_kubernetes_pod_label_network_owner]
+          target_label: network_owner
+        - source_labels: [__meta_kubernetes_pod_label_network_uuid]
+          target_label: network_uuid
+        - source_labels: [__meta_kubernetes_pod_label_node_id]
+          target_label: node_id
+        # gh_repo is an annotation because labels can't contain `/` and a repo is typically `[org]/[repo]`
+        - source_labels: [__meta_kubernetes_pod_annotation_gh_repo]
+          target_label: gh_repo
+        # gh_workflow is an annotation because workflows can contain spaces
+        - source_labels: [__meta_kubernetes_pod_annotation_gh_workflow]
+          target_label: gh_workflow
+        - source_labels: [__meta_kubernetes_pod_label_gh_run_id]
+          target_label: gh_run_id
+        - source_labels: [__meta_kubernetes_pod_label_gh_run_number]
+          target_label: gh_run_number
+        - source_labels: [__meta_kubernetes_pod_label_gh_run_attempt]
+          target_label: gh_run_attempt
+        - source_labels: [__meta_kubernetes_pod_label_gh_job_id]
+          target_label: gh_job_id
+          # TODO(marun) Add kube cluster identifier as a label
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: promtail-daemonset
+  namespace: ci-monitoring
+spec:
+  selector:
+    matchLabels:
+      name: promtail
+  template:
+    metadata:
+      labels:
+        name: promtail
+    spec:
+      serviceAccount: promtail-serviceaccount
+      containers:
+      - name: promtail-container
+        image: grafana/promtail:3.3.2 # Pin latest version
+        args:
+        - -config.file=/etc/promtail/promtail.yaml
+        - -config.expand-env=true # Enable substitution of env variables in the configuration i.e. for credentials
+        env:
+        - name: 'HOSTNAME' # needed when using kubernetes_sd_configs
+          valueFrom:
+            fieldRef:
+              fieldPath: 'spec.nodeName'
+        - name: LOKI_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: loki-credentials
+              key: username
+        - name: LOKI_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: loki-credentials
+              key: password
+        volumeMounts:
+        - name: logs
+          mountPath: /var/log
+          readOnly: true
+        - name: promtail-config
+          mountPath: /etc/promtail
+          readOnly: true
+        - mountPath: /var/lib/docker/containers
+          name: varlibdockercontainers
+          readOnly: true
+      volumes:
+      - name: logs
+        hostPath:
+          path: /var/log
+      - name: varlibdockercontainers
+        hostPath:
+          path: /var/lib/docker/containers
+      - name: promtail-config
+        configMap:
+          name: promtail-config

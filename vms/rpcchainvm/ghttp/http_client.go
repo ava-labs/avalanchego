@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/ava-labs/avalanchego/proto/pb/io/reader"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greader"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gresponsewriter"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
@@ -34,7 +36,10 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// to specify a communication protocols it supports and would like to
 	// use. Upgrade (e.g. websockets) is a more expensive transaction and
 	// if not required use the less expensive HTTPSimple.
-	if !isUpgradeRequest(r) {
+	//
+	// Http/2 explicitly does not allow the use of the Upgrade header.
+	// (ref: https://httpwg.org/specs/rfc9113.html#informational-responses)
+	if !isUpgradeRequest(r) && !isHTTP2Request(r) {
 		c.serveHTTPSimple(w, r)
 		return
 	}
@@ -54,15 +59,10 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	server := grpcutils.NewServer()
 	closer.Add(server)
 	responsewriterpb.RegisterWriterServer(server, gresponsewriter.NewServer(w))
+	reader.RegisterReaderServer(server, greader.NewServer(r.Body))
 
 	// Start responsewriter gRPC service.
 	go grpcutils.Serve(serverListener, server)
-
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 
 	req := &httppb.HTTPRequest{
 		ResponseWriter: &httppb.ResponseWriter{
@@ -75,7 +75,6 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			ProtoMajor:       int32(r.ProtoMajor),
 			ProtoMinor:       int32(r.ProtoMinor),
 			Header:           make([]*httppb.Element, 0, len(r.Header)),
-			Body:             body,
 			ContentLength:    r.ContentLength,
 			TransferEncoding: r.TransferEncoding,
 			Host:             r.Host,
@@ -160,17 +159,20 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	_, err = c.client.Handle(r.Context(), req)
+	reply, err := c.client.Handle(r.Context(), req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
+
+	grpcutils.SetHeaders(w.Header(), reply.Header)
 }
 
 // serveHTTPSimple converts an http request to a gRPC HTTPRequest and returns the
 // response to the client. Protocol upgrade requests (websockets) are not supported
-// and should use ServeHTTP. Based on https://www.weave.works/blog/turtles-way-http-grpc.
+// and should use ServeHTTP.
 func (c *Client) serveHTTPSimple(w http.ResponseWriter, r *http.Request) {
-	req, err := getHTTPSimpleRequest(r)
+	req, err := getHTTPSimpleRequest(w, r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -194,22 +196,23 @@ func (c *Client) serveHTTPSimple(w http.ResponseWriter, r *http.Request) {
 }
 
 // getHTTPSimpleRequest takes an http request as input and returns a gRPC HandleSimpleHTTPRequest.
-func getHTTPSimpleRequest(r *http.Request) (*httppb.HandleSimpleHTTPRequest, error) {
+func getHTTPSimpleRequest(w http.ResponseWriter, r *http.Request) (*httppb.HandleSimpleHTTPRequest, error) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		return nil, err
 	}
 	return &httppb.HandleSimpleHTTPRequest{
-		Method:  r.Method,
-		Url:     r.RequestURI,
-		Body:    body,
-		Headers: grpcutils.GetHTTPHeader(r.Header),
+		Method:          r.Method,
+		Url:             r.RequestURI,
+		Body:            body,
+		RequestHeaders:  grpcutils.GetHTTPHeader(r.Header),
+		ResponseHeaders: grpcutils.GetHTTPHeader(w.Header()),
 	}, nil
 }
 
 // convertWriteResponse converts a gRPC HandleSimpleHTTPResponse to an HTTP response.
 func convertWriteResponse(w http.ResponseWriter, resp *httppb.HandleSimpleHTTPResponse) error {
-	grpcutils.MergeHTTPHeader(resp.Headers, w.Header())
+	grpcutils.SetHeaders(w.Header(), resp.Headers)
 	w.WriteHeader(grpcutils.EnsureValidResponseCode(int(resp.Code)))
 	_, err := w.Write(resp.Body)
 	return err
@@ -218,4 +221,8 @@ func convertWriteResponse(w http.ResponseWriter, resp *httppb.HandleSimpleHTTPRe
 // isUpgradeRequest returns true if the upgrade key exists in header and value is non empty.
 func isUpgradeRequest(req *http.Request) bool {
 	return req.Header.Get("Upgrade") != ""
+}
+
+func isHTTP2Request(req *http.Request) bool {
+	return req.ProtoMajor == 2
 }

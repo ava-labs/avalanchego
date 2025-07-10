@@ -212,7 +212,6 @@ func NewTestNetwork(
 	router router.ExternalHandler,
 ) (Network, error) {
 	msgCreator, err := message.NewCreator(
-		logging.NoLog{},
 		metrics,
 		constants.DefaultNetworkCompressionType,
 		constants.DefaultNetworkMaximumInboundTimeout,
@@ -223,7 +222,7 @@ func NewTestNetwork(
 
 	return NewNetwork(
 		cfg,
-		upgrade.InitiallyActiveTime,
+		upgrade.GetConfig(cfg.NetworkID).FortunaTime, // Must be updated for each network upgrade
 		msgCreator,
 		metrics,
 		log,

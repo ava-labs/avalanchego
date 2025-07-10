@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database"
 )
 
@@ -62,7 +63,7 @@ type node struct {
 
 func New(db database.Database, cacheSize int) LinkedDB {
 	return &linkedDB{
-		nodeCache:    &cache.LRU[string, *node]{Size: cacheSize},
+		nodeCache:    lru.NewCache[string, *node](cacheSize),
 		updatedNodes: make(map[string]*node),
 		db:           db,
 		batch:        db.NewBatch(),

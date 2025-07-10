@@ -370,9 +370,8 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Float64(DiskMaxNonVdrNodeUsageKey, 1000*units.GiB, "Maximum number of disk reads/writes per second that a non-validator can utilize. Must be >= 0")
 
 	// Opentelemetry tracing
-	fs.Bool(TracingEnabledKey, false, "If true, enable opentelemetry tracing")
-	fs.String(TracingExporterTypeKey, trace.GRPC.String(), fmt.Sprintf("Type of exporter to use for tracing. Options are [%s, %s]", trace.GRPC, trace.HTTP))
-	fs.String(TracingEndpointKey, "localhost:4317", "The endpoint to send trace data to")
+	fs.String(TracingExporterTypeKey, trace.Disabled.String(), fmt.Sprintf("Type of exporter to use for tracing. Options are [%s, %s, %s]", trace.Disabled, trace.GRPC, trace.HTTP))
+	fs.String(TracingEndpointKey, "", "The endpoint to send trace data to. If unspecified, the default endpoint will be used; depending on the exporter type")
 	fs.Bool(TracingInsecureKey, true, "If true, don't use TLS when sending trace data")
 	fs.Float64(TracingSampleRateKey, 0.1, "The fraction of traces to sample. If >= 1, always sample. If <= 0, never sample")
 	fs.StringToString(TracingHeadersKey, map[string]string{}, "The headers to provide the trace indexer")

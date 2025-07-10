@@ -2,7 +2,7 @@ The Info API can be used to access basic information about an Avalanche node.
 
 ## Format
 
-This API uses the `json 2.0` RPC format. For more information on making JSON RPC calls, see [here](/api-reference/standards/guides/issuing-api-calls).
+This API uses the `json 2.0` RPC format. For more information on making JSON RPC calls, see [here](https://build.avax.network/docs/api-reference/guides/issuing-api-calls).
 
 ## Endpoint
 
@@ -142,7 +142,7 @@ curl -X POST --data '{
 
 ### `info.getBlockchainID`
 
-Given a blockchain's alias, get its ID. (See [`admin.aliasChain`](/api-reference/admin-api#adminaliaschain).)
+Given a blockchain's alias, get its ID. (See [`admin.aliasChain`](https://build.avax.network/docs/api-reference/admin-api#adminaliaschain).)
 
 **Signature**:
 
@@ -246,7 +246,7 @@ curl -X POST --data '{
 Get the ID, the BLS key, and the proof of possession(BLS signature) of this node.
 
 <Callout title="Note">
-This endpoint set is for a specific node, it is unavailable on the [public server](/tooling/rpc-providers).
+This endpoint set is for a specific node, it is unavailable on the [public server](https://build.avax.network/docs/tooling/rpc-providers).
 </Callout>
 
 **Signature**:
@@ -297,7 +297,7 @@ curl -X POST --data '{
 Get the IP of this node.
 
 <Callout title="Note">
-This endpoint set is for a specific node, it is unavailable on the [public server](/tooling/rpc-providers).
+This endpoint set is for a specific node, it is unavailable on the [public server](https://build.avax.network/docs/tooling/rpc-providers).
 </Callout>
 
 **Signature**:
@@ -454,7 +454,7 @@ curl -X POST --data '{
 Get the virtual machines installed on this node.
 
 <Callout title="Note">
-This endpoint set is for a specific node, it is unavailable on the [public server](/tooling/rpc-providers).
+This endpoint set is for a specific node, it is unavailable on the [public server](https://build.avax.network/docs/tooling/rpc-providers).
 </Callout>
 
 **Signature**:
@@ -695,7 +695,8 @@ curl -X POST --data '{
     "cortinaXChainStopVertexID": "11111111111111111111111111111111LpoYY",
     "durangoTime": "2020-12-05T05:00:00Z",
     "etnaTime": "2024-10-09T20:00:00Z",
-    "fortunaTime": "9999-12-01T05:00:00Z"
+    "fortunaTime": "9999-12-01T05:00:00Z",
+    "graniteTime": "9999-12-01T05:00:00Z"
   },
   "id": 1
 }

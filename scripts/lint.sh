@@ -32,8 +32,7 @@ fi
 TESTS=${TESTS:-"golangci_lint license_header require_error_is_no_funcs_as_params single_import interface_compliance_nil require_no_error_inline_func import_testing_only_in_tests"}
 
 function test_golangci_lint {
-  go install -v github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.5
-  golangci-lint run --config .golangci.yml
+  go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.1.6 run --config .golangci.yml
 }
 
 # automatically checks license headers
@@ -41,12 +40,11 @@ function test_golangci_lint {
 # TESTS='license_header' ADDLICENSE_FLAGS="--debug" ./scripts/lint.sh
 _addlicense_flags=${ADDLICENSE_FLAGS:-"--verify --debug"}
 function test_license_header {
-  go install -v github.com/palantir/go-license@v1.25.0
   local files=()
-  while IFS= read -r line; do files+=("$line"); done < <(find . -type f -name '*.go' ! -name '*.pb.go' ! -name 'mock_*.go' ! -name 'mocks_*.go' ! -path './**/*mock/*.go' ! -name '*.canoto.go')
+  while IFS= read -r line; do files+=("$line"); done < <(find . -type f -name '*.go' ! -name '*.pb.go' ! -name 'mock_*.go' ! -name 'mocks_*.go' ! -path './**/*mock/*.go' ! -name '*.canoto.go' ! -name '*.bindings.go')
 
   # shellcheck disable=SC2086
-  go-license \
+  go run github.com/palantir/go-license@v1.25.0 \
   --config=./header.yml \
   ${_addlicense_flags} \
   "${files[@]}"

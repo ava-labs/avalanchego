@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
@@ -46,6 +47,7 @@ var (
 
 	errMissingEngine  = errors.New("missing engine")
 	errNoStartingGear = errors.New("failed to select starting gear")
+	errorShuttingDown = errors.New("shutting down")
 )
 
 type Handler interface {
@@ -80,6 +82,10 @@ type handler struct {
 
 	metrics *metrics
 
+	nf           *common.NotificationForwarder
+	subscription common.Subscription
+	cn           *block.ChangeNotifier
+
 	// Useful for faking time in tests
 	clock mockable.Clock
 
@@ -88,7 +94,7 @@ type handler struct {
 	// since peerTracker is already tracking validators
 	validators validators.Manager
 	// Receives messages from the VM
-	msgFromVMChan   <-chan common.Message
+	msgFromVMChan   chan common.Message
 	gossipFrequency time.Duration
 
 	engineManager *EngineManager
@@ -128,8 +134,9 @@ type handler struct {
 // [engine] must be initialized before initializing this handler
 func New(
 	ctx *snow.ConsensusContext,
+	cn *block.ChangeNotifier,
+	subscription common.Subscription,
 	validators validators.Manager,
-	msgFromVMChan <-chan common.Message,
 	gossipFrequency time.Duration,
 	threadPoolSize int,
 	resourceTracker tracker.ResourceTracker,
@@ -140,10 +147,12 @@ func New(
 	haltBootstrapping func(),
 ) (Handler, error) {
 	h := &handler{
+		subscription:      subscription,
+		cn:                cn,
+		msgFromVMChan:     make(chan common.Message),
 		haltBootstrapping: haltBootstrapping,
 		ctx:               ctx,
 		validators:        validators,
-		msgFromVMChan:     msgFromVMChan,
 		gossipFrequency:   gossipFrequency,
 		closingChan:       make(chan struct{}),
 		closed:            make(chan struct{}),
@@ -240,6 +249,9 @@ func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 		return
 	}
 
+	h.nf = common.NewNotificationForwarder(h, h.subscription, h.ctx.Log)
+	h.cn.OnChange = h.nf.CheckForEvent
+
 	h.ctx.Lock.Lock()
 	err = gear.Start(ctx, 0)
 	h.ctx.Lock.Unlock()
@@ -275,6 +287,17 @@ func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 		go h.ctx.Log.RecoverAndPanic(dispatchSync)
 		go h.ctx.Log.RecoverAndPanic(dispatchAsync)
 		go h.ctx.Log.RecoverAndPanic(dispatchChans)
+	}
+}
+
+func (h *handler) Notify(ctx context.Context, msg common.Message) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-h.closed:
+		return errorShuttingDown
+	case h.msgFromVMChan <- msg:
+		return nil
 	}
 }
 
@@ -713,6 +736,13 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 	case *message.QueryFailed:
 		return engine.QueryFailed(ctx, nodeID, msg.RequestID)
 
+	case *p2ppb.Simplex:
+		h.ctx.Log.Debug("received simplex message",
+			zap.Stringer("nodeID", nodeID),
+			zap.String("messageOp", op),
+			zap.Stringer("message", body),
+		)
+		return nil
 	// Connection messages can be sent to the currently executing engine
 	case *message.Connected:
 		err := h.peerTracker.Connected(ctx, nodeID, msg.NodeVersion)
@@ -960,6 +990,12 @@ func (h *handler) closeDispatcher(ctx context.Context) {
 // Note: shutdown is only called after all message dispatchers have exited or if
 // no message dispatchers ever started.
 func (h *handler) shutdown(ctx context.Context, startClosingTime time.Time) {
+	// If we are shutting down but haven't properly started, we don't need to
+	// close the notification forwarder.
+	if h.nf != nil {
+		h.nf.Close()
+	}
+
 	defer func() {
 		if h.onStopped != nil {
 			go h.onStopped()

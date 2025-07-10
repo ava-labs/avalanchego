@@ -32,6 +32,7 @@ var (
 	_ chainIDGetter = (*p2p.AppRequest)(nil)
 	_ chainIDGetter = (*p2p.AppResponse)(nil)
 	_ chainIDGetter = (*p2p.AppGossip)(nil)
+	_ chainIDGetter = (*p2p.Simplex)(nil)
 
 	_ requestIDGetter = (*p2p.GetStateSummaryFrontier)(nil)
 	_ requestIDGetter = (*p2p.StateSummaryFrontier)(nil)
@@ -83,14 +84,9 @@ type requestIDGetter interface {
 
 func GetRequestID(m any) (uint32, bool) {
 	if msg, ok := m.(requestIDGetter); ok {
-		requestID := msg.GetRequestId()
-		return requestID, true
+		return msg.GetRequestId(), true
 	}
-
-	// AppGossip is the only inbound message not containing a requestID. For
-	// ease of handling, imagine that it does have a requestID.
-	_, ok := m.(*p2p.AppGossip)
-	return 0, ok
+	return 0, false
 }
 
 type engineTypeGetter interface {

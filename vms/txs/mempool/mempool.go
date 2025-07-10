@@ -4,13 +4,16 @@
 package mempool
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/linked"
+	"github.com/ava-labs/avalanchego/utils/lock"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/setmap"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -65,14 +68,18 @@ type Mempool[T Tx] interface {
 
 	// Len returns the number of txs in the mempool.
 	Len() int
+
+	// WaitForEvent waits until there is at least one tx in the mempool.
+	WaitForEvent(ctx context.Context) (common.Message, error)
 }
 
 type mempool[T Tx] struct {
 	lock           sync.RWMutex
+	cond           *lock.Cond
 	unissuedTxs    *linked.Hashmap[ids.ID, T]
 	consumedUTXOs  *setmap.SetMap[ids.ID, ids.ID] // TxID -> Consumed UTXOs
 	bytesAvailable int
-	droppedTxIDs   *cache.LRU[ids.ID, error] // TxID -> Verification error
+	droppedTxIDs   *lru.Cache[ids.ID, error] // TxID -> Verification error
 
 	metrics Metrics
 }
@@ -84,11 +91,11 @@ func New[T Tx](
 		unissuedTxs:    linked.NewHashmap[ids.ID, T](),
 		consumedUTXOs:  setmap.New[ids.ID, ids.ID](),
 		bytesAvailable: maxMempoolSize,
-		droppedTxIDs:   &cache.LRU[ids.ID, error]{Size: droppedTxIDsCacheSize},
+		droppedTxIDs:   lru.NewCache[ids.ID, error](droppedTxIDsCacheSize),
 		metrics:        metrics,
 	}
+	m.cond = lock.NewCond(&m.lock)
 	m.updateMetrics()
-
 	return m
 }
 
@@ -138,6 +145,7 @@ func (m *mempool[T]) Add(tx T) error {
 
 	// An added tx must not be marked as dropped.
 	m.droppedTxIDs.Evict(txID)
+	m.cond.Broadcast()
 	return nil
 }
 
@@ -217,4 +225,16 @@ func (m *mempool[_]) Len() int {
 	defer m.lock.RUnlock()
 
 	return m.unissuedTxs.Len()
+}
+
+func (m *mempool[_]) WaitForEvent(ctx context.Context) (common.Message, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	for m.unissuedTxs.Len() == 0 {
+		if err := m.cond.Wait(ctx); err != nil {
+			return 0, err
+		}
+	}
+	return common.PendingTxs, nil
 }

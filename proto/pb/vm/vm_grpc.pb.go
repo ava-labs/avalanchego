@@ -24,6 +24,8 @@ const (
 	VM_SetState_FullMethodName                   = "/vm.VM/SetState"
 	VM_Shutdown_FullMethodName                   = "/vm.VM/Shutdown"
 	VM_CreateHandlers_FullMethodName             = "/vm.VM/CreateHandlers"
+	VM_CreateHTTP2Handler_FullMethodName         = "/vm.VM/CreateHTTP2Handler"
+	VM_WaitForEvent_FullMethodName               = "/vm.VM/WaitForEvent"
 	VM_Connected_FullMethodName                  = "/vm.VM/Connected"
 	VM_Disconnected_FullMethodName               = "/vm.VM/Disconnected"
 	VM_BuildBlock_FullMethodName                 = "/vm.VM/BuildBlock"
@@ -65,6 +67,9 @@ type VMClient interface {
 	Shutdown(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Creates the HTTP handlers for custom chain network calls.
 	CreateHandlers(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CreateHandlersResponse, error)
+	CreateHTTP2Handler(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CreateHTTP2HandlerResponse, error)
+	// WaitForEvent blocks until receiving the next event from the VM.
+	WaitForEvent(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*WaitForEventResponse, error)
 	Connected(ctx context.Context, in *ConnectedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	Disconnected(ctx context.Context, in *DisconnectedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Attempt to create a new block from data contained in the VM.
@@ -155,6 +160,24 @@ func (c *vMClient) Shutdown(ctx context.Context, in *emptypb.Empty, opts ...grpc
 func (c *vMClient) CreateHandlers(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CreateHandlersResponse, error) {
 	out := new(CreateHandlersResponse)
 	err := c.cc.Invoke(ctx, VM_CreateHandlers_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *vMClient) CreateHTTP2Handler(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CreateHTTP2HandlerResponse, error) {
+	out := new(CreateHTTP2HandlerResponse)
+	err := c.cc.Invoke(ctx, VM_CreateHTTP2Handler_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *vMClient) WaitForEvent(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*WaitForEventResponse, error) {
+	out := new(WaitForEventResponse)
+	err := c.cc.Invoke(ctx, VM_WaitForEvent_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -400,6 +423,9 @@ type VMServer interface {
 	Shutdown(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
 	// Creates the HTTP handlers for custom chain network calls.
 	CreateHandlers(context.Context, *emptypb.Empty) (*CreateHandlersResponse, error)
+	CreateHTTP2Handler(context.Context, *emptypb.Empty) (*CreateHTTP2HandlerResponse, error)
+	// WaitForEvent blocks until receiving the next event from the VM.
+	WaitForEvent(context.Context, *emptypb.Empty) (*WaitForEventResponse, error)
 	Connected(context.Context, *ConnectedRequest) (*emptypb.Empty, error)
 	Disconnected(context.Context, *DisconnectedRequest) (*emptypb.Empty, error)
 	// Attempt to create a new block from data contained in the VM.
@@ -468,6 +494,12 @@ func (UnimplementedVMServer) Shutdown(context.Context, *emptypb.Empty) (*emptypb
 }
 func (UnimplementedVMServer) CreateHandlers(context.Context, *emptypb.Empty) (*CreateHandlersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateHandlers not implemented")
+}
+func (UnimplementedVMServer) CreateHTTP2Handler(context.Context, *emptypb.Empty) (*CreateHTTP2HandlerResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateHTTP2Handler not implemented")
+}
+func (UnimplementedVMServer) WaitForEvent(context.Context, *emptypb.Empty) (*WaitForEventResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method WaitForEvent not implemented")
 }
 func (UnimplementedVMServer) Connected(context.Context, *ConnectedRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Connected not implemented")
@@ -625,6 +657,42 @@ func _VM_CreateHandlers_Handler(srv interface{}, ctx context.Context, dec func(i
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(VMServer).CreateHandlers(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _VM_CreateHTTP2Handler_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).CreateHTTP2Handler(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: VM_CreateHTTP2Handler_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).CreateHTTP2Handler(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _VM_WaitForEvent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).WaitForEvent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: VM_WaitForEvent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).WaitForEvent(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1101,6 +1169,14 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateHandlers",
 			Handler:    _VM_CreateHandlers_Handler,
+		},
+		{
+			MethodName: "CreateHTTP2Handler",
+			Handler:    _VM_CreateHTTP2Handler_Handler,
+		},
+		{
+			MethodName: "WaitForEvent",
+			Handler:    _VM_WaitForEvent_Handler,
 		},
 		{
 			MethodName: "Connected",

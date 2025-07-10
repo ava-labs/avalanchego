@@ -360,10 +360,12 @@ func (c *client) GetL1Validator(
 	if err != nil {
 		return L1Validator{}, 0, err
 	}
-
-	pk, err := bls.PublicKeyFromCompressedBytes(res.PublicKey)
-	if err != nil {
-		return L1Validator{}, 0, err
+	var pk *bls.PublicKey
+	if res.PublicKey != nil {
+		pk, err = bls.PublicKeyFromCompressedBytes(*res.PublicKey)
+		if err != nil {
+			return L1Validator{}, 0, err
+		}
 	}
 	remainingBalanceOwnerAddrs, err := address.ParseToIDs(res.RemainingBalanceOwner.Addresses)
 	if err != nil {
@@ -372,6 +374,15 @@ func (c *client) GetL1Validator(
 	deactivationOwnerAddrs, err := address.ParseToIDs(res.DeactivationOwner.Addresses)
 	if err != nil {
 		return L1Validator{}, 0, err
+	}
+
+	var minNonce uint64
+	if res.MinNonce != nil {
+		minNonce = uint64(*res.MinNonce)
+	}
+	var balance uint64
+	if res.Balance != nil {
+		balance = uint64(*res.Balance)
 	}
 
 	return L1Validator{
@@ -390,8 +401,8 @@ func (c *client) GetL1Validator(
 		},
 		StartTime: uint64(res.StartTime),
 		Weight:    uint64(res.Weight),
-		MinNonce:  uint64(res.MinNonce),
-		Balance:   uint64(res.Balance),
+		MinNonce:  minNonce,
+		Balance:   balance,
 	}, uint64(res.Height), err
 }
 

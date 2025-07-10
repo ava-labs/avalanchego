@@ -33,10 +33,19 @@ type ClientOwner struct {
 	Addresses []ids.ShortID
 }
 
+type ClientL1Validator struct {
+	ValidationID          *ids.ID
+	RemainingBalanceOwner *ClientOwner
+	DeactivationOwner     *ClientOwner
+	MinNonce              *uint64
+	Balance               *uint64
+}
+
 // ClientPermissionlessValidator is the repr. of a permissionless validator sent
 // over client
 type ClientPermissionlessValidator struct {
 	ClientStaker
+	ClientL1Validator
 	ValidationRewardOwner  *ClientOwner
 	DelegationRewardOwner  *ClientOwner
 	PotentialReward        *uint64
@@ -99,47 +108,85 @@ func getClientPermissionlessValidators(validatorsSliceIntf []interface{}) ([]Cli
 			return nil, err
 		}
 
-		validationRewardOwner, err := apiOwnerToClientOwner(apiValidator.ValidationRewardOwner)
+		clientValidator, err := getClientPrimaryOrSubnetValidator(apiValidator)
 		if err != nil {
 			return nil, err
 		}
 
-		delegationRewardOwner, err := apiOwnerToClientOwner(apiValidator.DelegationRewardOwner)
-		if err != nil {
-			return nil, err
-		}
-
-		var clientDelegators []ClientDelegator
-		if apiValidator.Delegators != nil {
-			clientDelegators = make([]ClientDelegator, len(*apiValidator.Delegators))
-			for j, apiDelegator := range *apiValidator.Delegators {
-				rewardOwner, err := apiOwnerToClientOwner(apiDelegator.RewardOwner)
-				if err != nil {
-					return nil, err
-				}
-
-				clientDelegators[j] = ClientDelegator{
-					ClientStaker:    apiStakerToClientStaker(apiDelegator.Staker),
-					RewardOwner:     rewardOwner,
-					PotentialReward: (*uint64)(apiDelegator.PotentialReward),
-				}
+		// If the validator is a L1 validator, we need to set the L1 fields as well
+		if apiValidator.ValidationID != nil {
+			l1Validator, err := getClientL1Validator(apiValidator)
+			if err != nil {
+				return nil, err
 			}
+			clientValidator.ClientL1Validator = l1Validator
 		}
 
-		clientValidators[i] = ClientPermissionlessValidator{
-			ClientStaker:           apiStakerToClientStaker(apiValidator.Staker),
-			ValidationRewardOwner:  validationRewardOwner,
-			DelegationRewardOwner:  delegationRewardOwner,
-			PotentialReward:        (*uint64)(apiValidator.PotentialReward),
-			AccruedDelegateeReward: (*uint64)(apiValidator.AccruedDelegateeReward),
-			DelegationFee:          float32(apiValidator.DelegationFee),
-			Uptime:                 (*float32)(apiValidator.Uptime),
-			Connected:              apiValidator.Connected,
-			Signer:                 apiValidator.Signer,
-			DelegatorCount:         (*uint64)(apiValidator.DelegatorCount),
-			DelegatorWeight:        (*uint64)(apiValidator.DelegatorWeight),
-			Delegators:             clientDelegators,
-		}
+		clientValidators[i] = clientValidator
 	}
 	return clientValidators, nil
+}
+
+func getClientL1Validator(apiValidator api.PermissionlessValidator) (ClientL1Validator, error) {
+	remainingBalanceOwner, err := apiOwnerToClientOwner(apiValidator.RemainingBalanceOwner)
+	if err != nil {
+		return ClientL1Validator{}, err
+	}
+
+	deactivationOwner, err := apiOwnerToClientOwner(apiValidator.DeactivationOwner)
+	if err != nil {
+		return ClientL1Validator{}, err
+	}
+
+	return ClientL1Validator{
+		ValidationID:          apiValidator.ValidationID,
+		RemainingBalanceOwner: remainingBalanceOwner,
+		DeactivationOwner:     deactivationOwner,
+		MinNonce:              (*uint64)(apiValidator.MinNonce),
+		Balance:               (*uint64)(apiValidator.Balance),
+	}, nil
+}
+
+func getClientPrimaryOrSubnetValidator(apiValidator api.PermissionlessValidator) (ClientPermissionlessValidator, error) {
+	validationRewardOwner, err := apiOwnerToClientOwner(apiValidator.ValidationRewardOwner)
+	if err != nil {
+		return ClientPermissionlessValidator{}, err
+	}
+
+	delegationRewardOwner, err := apiOwnerToClientOwner(apiValidator.DelegationRewardOwner)
+	if err != nil {
+		return ClientPermissionlessValidator{}, err
+	}
+
+	var clientDelegators []ClientDelegator
+	if apiValidator.Delegators != nil {
+		clientDelegators = make([]ClientDelegator, len(*apiValidator.Delegators))
+		for j, apiDelegator := range *apiValidator.Delegators {
+			rewardOwner, err := apiOwnerToClientOwner(apiDelegator.RewardOwner)
+			if err != nil {
+				return ClientPermissionlessValidator{}, err
+			}
+
+			clientDelegators[j] = ClientDelegator{
+				ClientStaker:    apiStakerToClientStaker(apiDelegator.Staker),
+				RewardOwner:     rewardOwner,
+				PotentialReward: (*uint64)(apiDelegator.PotentialReward),
+			}
+		}
+	}
+
+	return ClientPermissionlessValidator{
+		ClientStaker:           apiStakerToClientStaker(apiValidator.Staker),
+		ValidationRewardOwner:  validationRewardOwner,
+		DelegationRewardOwner:  delegationRewardOwner,
+		PotentialReward:        (*uint64)(apiValidator.PotentialReward),
+		AccruedDelegateeReward: (*uint64)(apiValidator.AccruedDelegateeReward),
+		DelegationFee:          float32(apiValidator.DelegationFee),
+		Uptime:                 (*float32)(apiValidator.Uptime),
+		Connected:              apiValidator.Connected,
+		Signer:                 apiValidator.Signer,
+		DelegatorCount:         (*uint64)(apiValidator.DelegatorCount),
+		DelegatorWeight:        (*uint64)(apiValidator.DelegatorWeight),
+		Delegators:             clientDelegators,
+	}, nil
 }

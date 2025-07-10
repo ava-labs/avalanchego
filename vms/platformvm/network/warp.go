@@ -331,6 +331,9 @@ func (s signatureRequestVerifier) verifyL1ValidatorWeight(
 	l1Validator, err := s.state.GetL1Validator(msg.ValidationID)
 	switch {
 	case err == database.ErrNotFound:
+		// If the peer is attempting to verify that the weight of the validator
+		// is 0, they should be requesting a [message.L1ValidatorRegistration]
+		// with Registered set to false.
 		return &common.AppError{
 			Code:    ErrValidationDoesNotExist,
 			Message: fmt.Sprintf("validation %q does not exist", msg.ValidationID),

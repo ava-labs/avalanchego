@@ -40,9 +40,7 @@ func (tx *Tx) Accept(context.Context) error {
 		return fmt.Errorf("%w: %s", errTxNotProcessing, s)
 	}
 
-	if err := tx.vm.onAccept(tx.tx); err != nil {
-		return err
-	}
+	tx.vm.onAccept(tx.tx)
 
 	executor := &executor.Executor{
 		Codec: tx.vm.txBackend.Codec,

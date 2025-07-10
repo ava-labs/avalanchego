@@ -20,14 +20,14 @@ fi
 # the instructions to build non-portable BLST.
 source ./scripts/constants.sh
 
-# Enable subnet testing by building xsvm
-./scripts/build_xsvm.sh
-echo ""
+E2E_ARGS=("${@}")
 
-# Ensure an absolute path to avoid dependency on the working directory
-# of script execution.
-AVALANCHEGO_PATH="$(realpath "${AVALANCHEGO_PATH:-./build/avalanchego}")"
-E2E_ARGS="--avalanchego-path=${AVALANCHEGO_PATH}"
+# If not running in kubernetes, default to using a local avalanchego binary
+if ! [[ "${E2E_ARGS[*]}" =~ "--runtime=kube" && ! "${E2E_ARGS[*]}" =~ "--avalanchego-path" ]]; then
+  # Ensure an absolute path to avoid dependency on the working directory of script execution.
+  AVALANCHEGO_PATH="$(realpath "${AVALANCHEGO_PATH:-./build/avalanchego}")"
+  E2E_ARGS+=("--avalanchego-path=${AVALANCHEGO_PATH}")
+fi
 
 #################################
 # Determine ginkgo args
@@ -59,4 +59,4 @@ fi
 
 #################################
 # shellcheck disable=SC2086
-./bin/ginkgo ${GINKGO_ARGS} -v ./tests/e2e -- "${E2E_ARGS[@]}" "${@}"
+./bin/ginkgo ${GINKGO_ARGS} -v ./tests/e2e -- "${E2E_ARGS[@]}"

@@ -11,12 +11,15 @@ import (
 	"github.com/gorilla/rpc/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
+	"github.com/ava-labs/avalanchego/proto/pb/xsvm"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -44,7 +47,6 @@ type VM struct {
 	chainContext *snow.Context
 	db           database.Database
 	genesis      *genesis.Genesis
-	engineChan   chan<- common.Message
 
 	chain   chain.Chain
 	builder builder.Builder
@@ -57,7 +59,6 @@ func (vm *VM) Initialize(
 	genesisBytes []byte,
 	_ []byte,
 	_ []byte,
-	engineChan chan<- common.Message,
 	_ []*common.Fx,
 	appSender common.AppSender,
 ) error {
@@ -107,14 +108,13 @@ func (vm *VM) Initialize(
 	}
 
 	vm.genesis = g
-	vm.engineChan = engineChan
 
 	vm.chain, err = chain.New(chainContext, vm.db)
 	if err != nil {
 		return fmt.Errorf("failed to initialize chain manager: %w", err)
 	}
 
-	vm.builder = builder.New(chainContext, engineChan, vm.chain)
+	vm.builder = builder.New(chainContext, vm.chain)
 
 	chainContext.Log.Info("initialized xsvm",
 		zap.Stringer("lastAcceptedID", vm.chain.LastAccepted()),
@@ -154,6 +154,13 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	}, server.RegisterService(api, constants.XSVMName)
 }
 
+func (vm *VM) CreateHTTP2Handler(context.Context) (http.Handler, error) {
+	server := grpc.NewServer()
+	server.RegisterService(&xsvm.Ping_ServiceDesc, &api.PingService{Log: vm.chainContext.Log})
+	reflection.Register(server)
+	return server, nil
+}
+
 func (*VM) HealthCheck(context.Context) (interface{}, error) {
 	return http.StatusOK, nil
 }
@@ -168,6 +175,10 @@ func (vm *VM) ParseBlock(_ context.Context, blkBytes []byte) (snowman.Block, err
 		return nil, err
 	}
 	return vm.chain.NewBlock(blk)
+}
+
+func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
+	return vm.builder.WaitForEvent(ctx)
 }
 
 func (vm *VM) BuildBlock(ctx context.Context) (snowman.Block, error) {

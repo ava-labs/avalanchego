@@ -59,7 +59,6 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 	})
 
 	m := NewManager(
-		logging.NoLog{},
 		config.Internal{
 			Validators: vdrs,
 		},

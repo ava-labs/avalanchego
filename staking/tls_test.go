@@ -21,7 +21,7 @@ func TestMakeKeys(t *testing.T) {
 	cert, err := NewTLSCert()
 	require.NoError(err)
 
-	msg := []byte(fmt.Sprintf("msg %d", time.Now().Unix()))
+	msg := fmt.Appendf(nil, "msg %d", time.Now().Unix())
 	msgHash := hashing.ComputeHash256(msg)
 
 	sig, err := cert.PrivateKey.(crypto.Signer).Sign(rand.Reader, msgHash, crypto.SHA256)

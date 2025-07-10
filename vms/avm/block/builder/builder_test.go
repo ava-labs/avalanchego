@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -65,7 +64,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				manager.EXPECT().Preferred().Return(preferredID)
 				manager.EXPECT().GetStatelessBlock(preferredID).Return(nil, errTest)
 
-				mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+				mempool, err := mempool.New("", prometheus.NewRegistry())
 				require.NoError(t, err)
 
 				return New(
@@ -96,7 +95,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				manager.EXPECT().GetStatelessBlock(preferredID).Return(preferredBlock, nil)
 				manager.EXPECT().GetState(preferredID).Return(nil, false)
 
-				mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+				mempool, err := mempool.New("", prometheus.NewRegistry())
 				require.NoError(t, err)
 
 				return New(
@@ -136,7 +135,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				unsignedTx.EXPECT().InputIDs().Return(nil)
 				tx := &txs.Tx{Unsigned: unsignedTx}
 
-				mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+				mempool, err := mempool.New("", prometheus.NewRegistry())
 				require.NoError(t, err)
 				require.NoError(t, mempool.Add(tx))
 
@@ -178,7 +177,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				unsignedTx.EXPECT().InputIDs().Return(nil)
 				tx := &txs.Tx{Unsigned: unsignedTx}
 
-				mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+				mempool, err := mempool.New("", prometheus.NewRegistry())
 				require.NoError(t, err)
 				require.NoError(t, mempool.Add(tx))
 
@@ -221,7 +220,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				unsignedTx.EXPECT().InputIDs().Return(nil)
 				tx := &txs.Tx{Unsigned: unsignedTx}
 
-				mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+				mempool, err := mempool.New("", prometheus.NewRegistry())
 				require.NoError(t, err)
 				require.NoError(t, mempool.Add(tx))
 
@@ -303,7 +302,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 					},
 				)
 
-				mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+				mempool, err := mempool.New("", prometheus.NewRegistry())
 				require.NoError(t, err)
 				require.NoError(t, mempool.Add(tx1))
 				require.NoError(t, mempool.Add(tx2))
@@ -374,7 +373,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				unsignedTx.EXPECT().InputIDs().Return(nil)
 				tx := &txs.Tx{Unsigned: unsignedTx}
 
-				mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+				mempool, err := mempool.New("", prometheus.NewRegistry())
 				require.NoError(t, err)
 				require.NoError(t, mempool.Add(tx))
 
@@ -446,7 +445,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				unsignedTx.EXPECT().InputIDs().Return(nil)
 				tx := &txs.Tx{Unsigned: unsignedTx}
 
-				mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+				mempool, err := mempool.New("", prometheus.NewRegistry())
 				require.NoError(t, err)
 				require.NoError(t, mempool.Add(tx))
 
@@ -488,8 +487,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	require := require.New(t)
 
 	registerer := prometheus.NewRegistry()
-	toEngine := make(chan common.Message, 100)
-	mempool, err := mempool.New("mempool", registerer, toEngine)
+	mempool, err := mempool.New("mempool", registerer)
 	require.NoError(err)
 	// add a tx to the mempool
 	tx := transactions[0]
@@ -519,7 +517,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	require.NoError(err)
 
 	clk := &mockable.Clock{}
-	onAccept := func(*txs.Tx) error { return nil }
+	onAccept := func(*txs.Tx) {}
 	now := time.Now()
 	parentTimestamp := now.Add(-2 * time.Second)
 	parentID := ids.GenerateTestID()

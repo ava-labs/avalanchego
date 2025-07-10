@@ -39,7 +39,7 @@ type sender struct {
 	msgCreator message.OutboundMsgBuilder
 
 	sender   ExternalSender // Actually does the sending over the network
-	router   router.Router
+	router   router.InternalHandler
 	timeouts timeout.Manager
 
 	// Counts how many request have failed because the node was benched
@@ -53,7 +53,7 @@ func New(
 	ctx *snow.ConsensusContext,
 	msgCreator message.OutboundMsgBuilder,
 	externalSender ExternalSender,
-	router router.Router,
+	router router.InternalHandler,
 	timeouts timeout.Manager,
 	engineType p2p.EngineType,
 	subnet subnets.Subnet,
@@ -117,7 +117,7 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Se
 			deadline,
 			s.ctx.NodeID,
 		)
-		go s.router.HandleInbound(ctx, inMsg)
+		s.router.HandleInternal(ctx, inMsg)
 	}
 
 	// Create the outbound message.
@@ -171,7 +171,7 @@ func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID
 			summary,
 			nodeID,
 		)
-		go s.router.HandleInbound(ctx, inMsg)
+		s.router.HandleInternal(ctx, inMsg)
 		return
 	}
 
@@ -262,7 +262,7 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Se
 			deadline,
 			s.ctx.NodeID,
 		)
-		go s.router.HandleInbound(ctx, inMsg)
+		s.router.HandleInternal(ctx, inMsg)
 	}
 
 	// Create the outbound message.
@@ -317,7 +317,7 @@ func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 			summaryIDs,
 			nodeID,
 		)
-		go s.router.HandleInbound(ctx, inMsg)
+		s.router.HandleInternal(ctx, inMsg)
 		return
 	}
 
@@ -398,7 +398,7 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[id
 			deadline,
 			s.ctx.NodeID,
 		)
-		go s.router.HandleInbound(ctx, inMsg)
+		s.router.HandleInternal(ctx, inMsg)
 	}
 
 	// Create the outbound message.
@@ -452,7 +452,7 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 			containerID,
 			nodeID,
 		)
-		go s.router.HandleInbound(ctx, inMsg)
+		s.router.HandleInternal(ctx, inMsg)
 		return
 	}
 
@@ -534,7 +534,7 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID
 			containerIDs,
 			s.ctx.NodeID,
 		)
-		go s.router.HandleInbound(ctx, inMsg)
+		s.router.HandleInternal(ctx, inMsg)
 	}
 
 	// Create the outbound message.
@@ -589,7 +589,7 @@ func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 			containerIDs,
 			nodeID,
 		)
-		go s.router.HandleInbound(ctx, inMsg)
+		s.router.HandleInternal(ctx, inMsg)
 		return
 	}
 
@@ -662,7 +662,7 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 			opLabel: message.GetAncestorsOp.String(),
 		}).Inc()
 		s.timeouts.RegisterRequestToUnreachableValidator()
-		go s.router.HandleInbound(ctx, inMsg)
+		s.router.HandleInternal(ctx, inMsg)
 		return
 	}
 
@@ -686,7 +686,7 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 			zap.Error(err),
 		)
 
-		go s.router.HandleInbound(ctx, inMsg)
+		s.router.HandleInternal(ctx, inMsg)
 		return
 	}
 
@@ -710,7 +710,7 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 		)
 
 		s.timeouts.RegisterRequestToUnreachableValidator()
-		go s.router.HandleInbound(ctx, inMsg)
+		s.router.HandleInternal(ctx, inMsg)
 	}
 }
 
@@ -771,7 +771,7 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 
 	// Sending a Get to myself always fails.
 	if nodeID == s.ctx.NodeID {
-		go s.router.HandleInbound(ctx, inMsg)
+		s.router.HandleInternal(ctx, inMsg)
 		return
 	}
 
@@ -782,7 +782,7 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 			opLabel: message.GetOp.String(),
 		}).Inc()
 		s.timeouts.RegisterRequestToUnreachableValidator()
-		go s.router.HandleInbound(ctx, inMsg)
+		s.router.HandleInternal(ctx, inMsg)
 		return
 	}
 
@@ -830,7 +830,7 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 		)
 
 		s.timeouts.RegisterRequestToUnreachableValidator()
-		go s.router.HandleInbound(ctx, inMsg)
+		s.router.HandleInternal(ctx, inMsg)
 	}
 }
 
@@ -925,7 +925,7 @@ func (s *sender) SendPushQuery(
 			requestedHeight,
 			s.ctx.NodeID,
 		)
-		go s.router.HandleInbound(ctx, inMsg)
+		s.router.HandleInternal(ctx, inMsg)
 	}
 
 	// Some of [nodeIDs] may be benched. That is, they've been unresponsive so
@@ -946,7 +946,7 @@ func (s *sender) SendPushQuery(
 				s.ctx.ChainID,
 				requestID,
 			)
-			go s.router.HandleInbound(ctx, inMsg)
+			s.router.HandleInternal(ctx, inMsg)
 		}
 	}
 
@@ -1010,7 +1010,7 @@ func (s *sender) SendPushQuery(
 				s.ctx.ChainID,
 				requestID,
 			)
-			go s.router.HandleInbound(ctx, inMsg)
+			s.router.HandleInternal(ctx, inMsg)
 		}
 	}
 }
@@ -1062,7 +1062,7 @@ func (s *sender) SendPullQuery(
 			requestedHeight,
 			s.ctx.NodeID,
 		)
-		go s.router.HandleInbound(ctx, inMsg)
+		s.router.HandleInternal(ctx, inMsg)
 	}
 
 	// Some of the nodes in [nodeIDs] may be benched. That is, they've been
@@ -1082,7 +1082,7 @@ func (s *sender) SendPullQuery(
 				s.ctx.ChainID,
 				requestID,
 			)
-			go s.router.HandleInbound(ctx, inMsg)
+			s.router.HandleInternal(ctx, inMsg)
 		}
 	}
 
@@ -1136,7 +1136,7 @@ func (s *sender) SendPullQuery(
 				s.ctx.ChainID,
 				requestID,
 			)
-			go s.router.HandleInbound(ctx, inMsg)
+			s.router.HandleInternal(ctx, inMsg)
 		}
 	}
 }
@@ -1163,7 +1163,7 @@ func (s *sender) SendChits(
 			acceptedID,
 			nodeID,
 		)
-		go s.router.HandleInbound(ctx, inMsg)
+		s.router.HandleInternal(ctx, inMsg)
 		return
 	}
 
@@ -1247,7 +1247,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 			appRequestBytes,
 			s.ctx.NodeID,
 		)
-		go s.router.HandleInbound(ctx, inMsg)
+		s.router.HandleInternal(ctx, inMsg)
 	}
 
 	// Some of the nodes in [nodeIDs] may be benched. That is, they've been
@@ -1270,7 +1270,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 				common.ErrTimeout.Code,
 				common.ErrTimeout.Message,
 			)
-			go s.router.HandleInbound(ctx, inMsg)
+			s.router.HandleInternal(ctx, inMsg)
 		}
 	}
 
@@ -1332,7 +1332,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 				common.ErrTimeout.Code,
 				common.ErrTimeout.Message,
 			)
-			go s.router.HandleInbound(ctx, inMsg)
+			s.router.HandleInternal(ctx, inMsg)
 		}
 	}
 	return nil
@@ -1348,7 +1348,7 @@ func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, request
 			appResponseBytes,
 			nodeID,
 		)
-		go s.router.HandleInbound(ctx, inMsg)
+		s.router.HandleInternal(ctx, inMsg)
 		return nil
 	}
 
@@ -1411,7 +1411,7 @@ func (s *sender) SendAppError(ctx context.Context, nodeID ids.NodeID, requestID 
 			errorCode,
 			errorMessage,
 		)
-		go s.router.HandleInbound(ctx, inMsg)
+		s.router.HandleInternal(ctx, inMsg)
 		return nil
 	}
 

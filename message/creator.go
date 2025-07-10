@@ -9,7 +9,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/utils/compression"
-	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var _ Creator = (*creator)(nil)
@@ -25,13 +24,11 @@ type creator struct {
 }
 
 func NewCreator(
-	log logging.Logger,
 	metrics prometheus.Registerer,
 	compressionType compression.Type,
 	maxMessageTimeout time.Duration,
 ) (Creator, error) {
 	builder, err := newMsgBuilder(
-		log,
 		metrics,
 		maxMessageTimeout,
 	)

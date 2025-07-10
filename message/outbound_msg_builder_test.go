@@ -12,14 +12,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/compression"
-	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 func Test_newOutboundBuilder(t *testing.T) {
 	t.Parallel()
 
 	mb, err := newMsgBuilder(
-		logging.NoLog{},
 		prometheus.NewRegistry(),
 		10*time.Second,
 	)

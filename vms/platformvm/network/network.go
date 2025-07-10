@@ -21,8 +21,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
 type Network struct {
@@ -31,7 +31,6 @@ type Network struct {
 	log                       logging.Logger
 	mempool                   *gossipMempool
 	partialSyncPrimaryNetwork bool
-	appSender                 common.AppSender
 
 	txPushGossiper        *gossip.PushGossiper[*txs.Tx]
 	txPushGossipFrequency time.Duration
@@ -45,7 +44,7 @@ func New(
 	subnetID ids.ID,
 	vdrs validators.State,
 	txVerifier TxVerifier,
-	mempool mempool.Mempool,
+	mempool mempool.Mempool[*txs.Tx],
 	partialSyncPrimaryNetwork bool,
 	appSender common.AppSender,
 	stateLock sync.Locker,
@@ -176,7 +175,6 @@ func New(
 		log:                       log,
 		mempool:                   gossipMempool,
 		partialSyncPrimaryNetwork: partialSyncPrimaryNetwork,
-		appSender:                 appSender,
 		txPushGossiper:            txPushGossiper,
 		txPushGossipFrequency:     config.PushGossipFrequency,
 		txPullGossiper:            txPullGossiper,

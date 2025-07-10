@@ -29,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
@@ -172,9 +171,9 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		})
 
 		tc.By("creating the genesis validator")
-		subnetGenesisNode := e2e.AddEphemeralNode(tc, env.GetNetwork(), tmpnet.FlagsMap{
+		subnetGenesisNode := e2e.AddEphemeralNode(tc, env.GetNetwork(), tmpnet.NewEphemeralNode(tmpnet.FlagsMap{
 			config.TrackSubnetsKey: subnetID.String(),
-		})
+		}))
 
 		genesisNodePoP, err := subnetGenesisNode.GetProofOfPossession()
 		require.NoError(err)
@@ -348,9 +347,9 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		tc.By("advancing the proposervm P-chain height", advanceProposerVMPChainHeight)
 
 		tc.By("creating the validator to register")
-		subnetRegisterNode := e2e.AddEphemeralNode(tc, env.GetNetwork(), tmpnet.FlagsMap{
+		subnetRegisterNode := e2e.AddEphemeralNode(tc, env.GetNetwork(), tmpnet.NewEphemeralNode(tmpnet.FlagsMap{
 			config.TrackSubnetsKey: subnetID.String(),
-		})
+		}))
 
 		registerNodePoP, err := subnetRegisterNode.GetProofOfPossession()
 		require.NoError(err)
@@ -771,7 +770,6 @@ func wrapWarpSignatureRequest(
 	justification []byte,
 ) (p2pmessage.OutboundMessage, error) {
 	p2pMessageFactory, err := p2pmessage.NewCreator(
-		logging.NoLog{},
 		prometheus.NewRegistry(),
 		constants.DefaultNetworkCompressionType,
 		p2pTimeout,

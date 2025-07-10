@@ -18,5 +18,4 @@ jobs:
       - name: Set up Go
         uses: ./.github/actions/setup-go-for-project
       - name: Run merkledb fuzz tests
-        shell: bash
-        run: ./scripts/build_fuzz.sh 900 ./x/merkledb # Run each merkledb fuzz tests 15 minutes
+        run: ./scripts/run_task.sh test-fuzz-merkledb

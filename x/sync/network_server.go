@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/x/merkledb"
@@ -60,16 +59,14 @@ func maybeBytesToMaybe(mb *pb.MaybeBytes) maybe.Maybe[[]byte] {
 	return maybe.Nothing[[]byte]()
 }
 
-func NewGetChangeProofHandler(log logging.Logger, db DB) *GetChangeProofHandler {
+func NewGetChangeProofHandler(db DB) *GetChangeProofHandler {
 	return &GetChangeProofHandler{
-		log: log,
-		db:  db,
+		db: db,
 	}
 }
 
 type GetChangeProofHandler struct {
-	log logging.Logger
-	db  DB
+	db DB
 }
 
 func (*GetChangeProofHandler) AppGossip(context.Context, ids.NodeID, []byte) {}
@@ -192,16 +189,14 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 	}
 }
 
-func NewGetRangeProofHandler(log logging.Logger, db DB) *GetRangeProofHandler {
+func NewGetRangeProofHandler(db DB) *GetRangeProofHandler {
 	return &GetRangeProofHandler{
-		log: log,
-		db:  db,
+		db: db,
 	}
 }
 
 type GetRangeProofHandler struct {
-	log logging.Logger
-	db  DB
+	db DB
 }
 
 func (*GetRangeProofHandler) AppGossip(context.Context, ids.NodeID, []byte) {}
@@ -290,7 +285,7 @@ func getRangeProof(
 		}
 
 		// The proof was too large. Try to shrink it.
-		keyLimit = len(rangeProof.KeyValues) / 2
+		keyLimit = len(rangeProof.KeyChanges) / 2
 	}
 	return nil, ErrMinProofSizeIsTooLarge
 }

@@ -25,17 +25,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-14, ubuntu-22.04, ubuntu-24.04, windows-2022, custom-arm64-jammy, custom-arm64-noble]
+        os: [macos-14, ubuntu-22.04, ubuntu-24.04, custom-arm64-jammy, custom-arm64-noble]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
-      - name: Set timeout on Windows # Windows UT run slower and need a longer timeout
+      - name: test-unit
         shell: bash
-        if: matrix.os == 'windows-2022'
-        run: echo "TIMEOUT=240s" >> "$GITHUB_ENV"
-      - name: build_test
-        shell: bash
-        run: ./scripts/build_test.sh
+        run: ./scripts/run_task.sh test-unit
         env:
           TIMEOUT: ${{ env.TIMEOUT }}
   Fuzz:
@@ -43,42 +39,49 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
-      - name: fuzz_test
+      - name: test-fuzz
         shell: bash
-        run: ./scripts/build_fuzz.sh 10 # Run each fuzz test 10 seconds
+        run: ./scripts/run_task.sh test-fuzz
   e2e:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
-      - name: Build AvalancheGo Binary
-        shell: bash
-        run: ./scripts/build.sh -r
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: ./scripts/tests.e2e.sh
-          run_env: E2E_SERIAL=1
+          run: ./scripts/run_task.sh test-e2e-ci
           artifact_prefix: e2e
           filter_by_owner: avalanchego-e2e
           prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           loki_username: ${{ secrets.LOKI_ID || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-  e2e_post_fortuna:
+  e2e_post_granite:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
-      - name: Build AvalancheGo Binary
-        shell: bash
-        run: ./scripts/build.sh -r
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: ./scripts/tests.e2e.sh --activate-fortuna
-          run_env: E2E_SERIAL=1
-          artifact_prefix: e2e-post-fortuna
+          run: ./scripts/run_task.sh test-e2e-ci -- --activate-granite
+          artifact_prefix: e2e-post-granite
+          filter_by_owner: avalanchego-e2e
+          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_username: ${{ secrets.LOKI_ID || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+  e2e_kube:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - uses: ./.github/actions/run-monitored-tmpnet-cmd
+        with:
+          run: ./scripts/run_task.sh test-e2e-kube-ci
+          runtime: kube
+          artifact_prefix: e2e-kube
           filter_by_owner: avalanchego-e2e
           prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
@@ -89,14 +92,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
-      - name: Build AvalancheGo Binary
-        shell: bash
-        run: ./scripts/build.sh -r
       - name: Run e2e tests with existing network
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: ./scripts/tests.e2e.existing.sh
-          run_env: E2E_SERIAL=1
+          run: ./scripts/run_task.sh test-e2e-existing-ci
           artifact_prefix: e2e-existing-network
           prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
@@ -107,39 +106,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
-      - name: Build AvalancheGo Binary
-        shell: bash
-        run: ./scripts/build.sh
-      # TODO: Reactivate test once v1.13.0 is published
-      # - name: Run e2e tests
-      #   uses: ./.github/actions/run-monitored-tmpnet-cmd
-      #   with:
-      #     run: ./scripts/tests.upgrade.sh
-      #     artifact_prefix: upgrade
-      #     prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
-      #     prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-      #     loki_username: ${{ secrets.LOKI_ID || '' }}
-      #     loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+      - name: Run e2e tests
+        uses: ./.github/actions/run-monitored-tmpnet-cmd
+        with:
+          run: ./scripts/run_task.sh test-upgrade
+          artifact_prefix: upgrade
+          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_username: ${{ secrets.LOKI_ID || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   Lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
-      - name: Run static analysis tests
-        shell: bash
-        run: scripts/lint.sh
-      - name: Run shellcheck
-        shell: bash
-        run: scripts/shellcheck.sh
-      - name: Run actionlint
-        shell: bash
-        run: scripts/actionlint.sh
+      - uses: ./.github/actions/install-nix
+      - name: Runs all lint checks
+        shell: nix develop --command bash -x {0}
+        run: ./scripts/run_task.sh lint-all-ci
   buf-lint:
     name: Protobuf Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: bufbuild/buf-action@v1
+      - uses: bufbuild/buf-action@dfda68eacb65895184c76b9ae522b977636a2c47 #v1.1.4
         with:
           input: "proto"
           pr_comment: false
@@ -149,21 +139,26 @@ jobs:
           # which is never desirable for this job. The buf-push job is
           # responsible for pushes.
           push: false
-          version: 1.35.0
+          # This version should match the version installed in the nix dev shell
+          version: 1.47.2
+  links-lint:
+    name: Markdown Links Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: umbrelladocs/action-linkspector@de84085e0f51452a470558693d7d308fbb2fa261 #v1.2.5
+        with:
+          fail_level: any
   check_generated_protobuf:
     name: Up-to-date protobuf
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
-      - uses: bufbuild/buf-action@v1
-        with:
-          setup_only: true
-          version: 1.35.0
-      - shell: bash
-        run: scripts/protobuf_codegen.sh
-      - shell: bash
-        run: .github/workflows/check-clean-branch.sh
+      # Use the dev shell instead of bufbuild/buf-action to ensure the dev shell provides the expected versions
+      - uses: ./.github/actions/install-nix
+      - shell: nix develop --command bash -x {0}
+        run: ./scripts/run_task.sh check-generate-protobuf
   check_mockgen:
     name: Up-to-date mocks
     runs-on: ubuntu-latest
@@ -171,10 +166,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
       - shell: bash
-        run: |
-          grep -lr -E '^// Code generated by MockGen\. DO NOT EDIT\.$' . | xargs -r rm
-          go generate -run "go.uber.org/mock/mockgen" ./...
-          .github/workflows/check-clean-branch.sh
+        run: ./scripts/run_task.sh check-generate-mocks
   check_canotogen:
     name: Up-to-date canoto
     runs-on: ubuntu-latest
@@ -182,9 +174,16 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
       - shell: bash
-        run: go generate -run "github.com/StephenButtolph/canoto/canoto" ./...
-      - shell: bash
-        run: .github/workflows/check-clean-branch.sh
+        run: ./scripts/run_task.sh check-generate-canoto
+  check_contract_bindings:
+    name: Up-to-date contract bindings
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - uses: ./.github/actions/install-nix
+      - shell: nix develop --command bash -x {0}
+        run: task check-generate-load-contract-bindings
   go_mod_tidy:
     name: Up-to-date go.mod and go.sum
     runs-on: ubuntu-latest
@@ -192,9 +191,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
       - shell: bash
-        run: go mod tidy
-      - shell: bash
-        run: .github/workflows/check-clean-branch.sh
+        run: ./scripts/run_task.sh check-go-mod-tidy
   test_build_image:
     name: Image build
     runs-on: ubuntu-latest
@@ -206,44 +203,25 @@ jobs:
           sudo apt -y install qemu-system qemu-user-static
       - name: Check image build
         shell: bash
-        run: bash -x scripts/tests.build_image.sh
+        run: ./scripts/run_task.sh test-build-image
   test_build_antithesis_avalanchego_images:
     name: Build Antithesis avalanchego images
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
-      - name: Build AvalancheGo Binary
-        shell: bash
-        run: ./scripts/build.sh -r
-      - name: Check that the avalanchego workload is sane
-        shell: bash
-        run: go run ./tests/antithesis/avalanchego --avalanchego-path=./build/avalanchego --duration=120s
       - name: Check image build for avalanchego test setup
         shell: bash
-        run: bash -x scripts/tests.build_antithesis_images.sh
-        env:
-          TEST_SETUP: avalanchego
+        run: ./scripts/run_task.sh test-build-antithesis-images-avalanchego
   test_build_antithesis_xsvm_images:
     name: Build Antithesis xsvm images
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
-      - name: Build AvalancheGo Binary
-        shell: bash
-        run: ./scripts/build.sh -r
-      - name: Build xsvm binary
-        shell: bash
-        run: ./scripts/build_xsvm.sh
-      - name: Check that the xsvm workload is sane
-        shell: bash
-        run: go run ./tests/antithesis/xsvm --avalanchego-path=./build/avalanchego --duration=120s
       - name: Check image build for xsvm test setup
         shell: bash
-        run: bash -x scripts/tests.build_antithesis_images.sh
-        env:
-          TEST_SETUP: xsvm
+        run: ./scripts/run_task.sh test-build-antithesis-images-xsvm
   e2e_bootstrap_monitor:
     name: Run bootstrap monitor e2e tests
     runs-on: ubuntu-latest
@@ -251,7 +229,49 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
       - uses: ./.github/actions/install-nix
-      - run: nix develop --command echo "dependencies installed"
       - name: Run e2e tests
         shell: bash
-        run: nix develop --command bash -x ./scripts/tests.e2e.bootstrap_monitor.sh
+        run: nix develop --command ./scripts/run_task.sh test-bootstrap-monitor-e2e
+  load:
+    name: Run load test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - uses: ./.github/actions/run-monitored-tmpnet-cmd
+        with:
+          run: ./scripts/run_task.sh test-load
+          artifact_prefix: load
+          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_username: ${{ secrets.LOKI_ID || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+  load_kube:
+    name: Run load test on kube
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - uses: ./.github/actions/run-monitored-tmpnet-cmd
+        with:
+          run: ./scripts/run_task.sh test-load-kube
+          artifact_prefix: load-kube
+          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_username: ${{ secrets.LOKI_ID || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+  load2:
+    name: Run load2 test
+    runs-on: ubuntu-latest
+    steps:
+        - uses: actions/checkout@v4
+        - uses: ./.github/actions/setup-go-for-project
+        - uses: ./.github/actions/run-monitored-tmpnet-cmd
+          with:
+            run: ./scripts/run_task.sh test-load2 -- --load-timeout=30s
+            artifact_prefix: load2
+            prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+            prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+            loki_username: ${{ secrets.LOKI_ID || '' }}
+            loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+

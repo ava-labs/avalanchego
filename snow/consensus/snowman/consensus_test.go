@@ -521,6 +521,10 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 
 	firstBlock := snowmantest.BuildChild(snowmantest.Genesis)
 	secondBlock := snowmantest.BuildChild(snowmantest.Genesis)
+	// Ensure that the blocks have at least one bit as a common prefix
+	for firstBlock.IDV.Bit(0) != secondBlock.IDV.Bit(0) {
+		secondBlock = snowmantest.BuildChild(snowmantest.Genesis)
+	}
 
 	require.NoError(sm.Add(firstBlock))
 	require.NoError(sm.Add(secondBlock))
@@ -534,7 +538,7 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 
 	metrics := gatherCounterGauge(t, registerer)
 	require.Zero(metrics["polls_failed"])
-	require.Equal(float64(1), metrics["polls_successful"])
+	require.InDelta(float64(1), metrics["polls_successful"], 0)
 
 	// The second poll will do nothing
 	require.NoError(sm.RecordPoll(context.Background(), votes))
@@ -542,8 +546,8 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 	require.Equal(2, sm.NumProcessing())
 
 	metrics = gatherCounterGauge(t, registerer)
-	require.Equal(float64(1), metrics["polls_failed"])
-	require.Equal(float64(1), metrics["polls_successful"])
+	require.InDelta(float64(1), metrics["polls_failed"], 0)
+	require.InDelta(float64(1), metrics["polls_successful"], 0)
 }
 
 func RecordPollWhenFinalizedTest(t *testing.T, factory Factory) {

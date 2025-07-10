@@ -9,10 +9,10 @@ breaking:
   use:
     - FILE
 deps:
-  - buf.build/prometheus/client-model 
+  - buf.build/prometheus/client-model
 lint:
   use:
-    - DEFAULT
+    - STANDARD
   except:
     - SERVICE_SUFFIX # service requirement of <name>+Service
     - RPC_REQUEST_STANDARD_NAME # explicit <rpc>+Request naming
@@ -24,7 +24,7 @@ lint:
     - aliasreader/aliasreader.proto
     - net/conn/conn.proto
   # allows RPC requests or responses to be google.protobuf.Empty messages. This can be set if you
-  # want to allow messages to be void forever, that is they will never take any parameters. 
+  # want to allow messages to be void forever, that is they will never take any parameters.
   rpc_allow_google_protobuf_empty_requests: true
   rpc_allow_google_protobuf_empty_responses: true
   # allows the same message type to be used for a single RPC's request and response type.

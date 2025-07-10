@@ -4,6 +4,7 @@
 package proposervm
 
 import (
+	"bytes"
 	"context"
 	"testing"
 
@@ -44,7 +45,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 
 	// load innerVM expectations
 	innerVM.InitializeF = func(context.Context, *snow.Context, database.Database,
-		[]byte, []byte, []byte, chan<- common.Message,
+		[]byte, []byte, []byte,
 		[]*common.Fx, common.AppSender,
 	) error {
 		return nil
@@ -52,7 +53,10 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 	innerVM.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
 		[]*snowmantest.Block{snowmantest.Genesis},
 	)
-	innerVM.GetBlockF = func(context.Context, ids.ID) (snowman.Block, error) {
+	innerVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		if blkID != snowmantest.Genesis.ID() {
+			return nil, database.ErrNotFound
+		}
 		return snowmantest.Genesis, nil
 	}
 
@@ -81,8 +85,8 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 		nil,
 		nil,
 		nil,
-		nil,
 	))
+	require.NoError(vm.SetState(context.Background(), snow.StateSyncing))
 
 	return innerVM, vm
 }
@@ -524,7 +528,7 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 
 	require.NoError(vm.SetForkHeight(innerSummary.Height() - 1))
 
-	// Set the last accepted block height to be higher that the state summary
+	// Set the last accepted block height to be higher than the state summary
 	// we are going to attempt to accept
 	vm.lastAcceptedHeight = innerSummary.Height() + 1
 
@@ -564,12 +568,161 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 
 	summary, err := vm.GetStateSummary(context.Background(), reqHeight)
 	require.NoError(err)
+	require.Equal(summary.Height(), reqHeight)
 
-	// test Accept skipped
+	// test Accept summary invokes innerVM
+	calledInnerAccept := false
 	innerSummary.AcceptF = func(context.Context) (block.StateSyncMode, error) {
+		innerVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
+			return innerSummary.ID(), nil
+		}
+		innerVM.GetBlockF = func(context.Context, ids.ID) (snowman.Block, error) {
+			return innerBlk, nil
+		}
+		calledInnerAccept = true
 		return block.StateSyncStatic, nil
 	}
 	status, err := summary.Accept(context.Background())
 	require.NoError(err)
+	require.Equal(block.StateSyncStatic, status)
+	require.True(calledInnerAccept)
+
+	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+	require.Equal(summary.Height(), vm.lastAcceptedHeight)
+	lastAcceptedID, err := vm.LastAccepted(context.Background())
+	require.NoError(err)
+	require.Equal(proBlk.ID(), lastAcceptedID)
+}
+
+// TestStateSummaryAcceptOlderBlockSkipStateSync tests the case where we accept
+// a state summary older than the last accepted block. In this case, we should not
+// roll the ProposerVM back to match the state summary, but we should invoke the
+// innerVM to accept the state summary and re-align the ProposerVM with the innerVM
+// during the transition out of state sync.
+func TestStateSummaryAcceptOlderBlockSkipStateSync(t *testing.T) {
+	require := require.New(t)
+
+	innerVM, vm := helperBuildStateSyncTestObjects(t)
+	defer func() {
+		require.NoError(vm.Shutdown(context.Background()))
+	}()
+
+	// store post fork block associated with summary
+	innerBlk1 := &snowmantest.Block{
+		Decidable: snowtest.Decidable{
+			IDV: ids.GenerateTestID(),
+		},
+		BytesV:  []byte{1},
+		ParentV: ids.GenerateTestID(),
+		HeightV: 1969,
+	}
+	innerBlk2 := snowmantest.BuildChild(innerBlk1)
+
+	innerSummary1 := &blocktest.StateSummary{
+		IDV:     innerBlk1.ID(),
+		HeightV: innerBlk1.Height(),
+		BytesV:  innerBlk1.BytesV,
+	}
+
+	require.NoError(vm.SetForkHeight(innerSummary1.Height() - 1))
+
+	// Set the last accepted block height to be higher than the state summary
+	// we are going to attempt to accept
+	vm.lastAcceptedHeight = innerBlk2.Height()
+
+	innerVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return innerBlk2.IDV, nil
+	}
+
+	innerVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case snowmantest.GenesisID:
+			return snowmantest.Genesis, nil
+		case innerBlk1.ID():
+			return innerBlk1, nil
+		case innerBlk2.ID():
+			return innerBlk2, nil
+		default:
+			return nil, database.ErrNotFound
+		}
+	}
+	innerVM.GetStateSummaryF = func(context.Context, uint64) (block.StateSummary, error) {
+		return innerSummary1, nil
+	}
+	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, innerBlk1.BytesV):
+			return innerBlk1, nil
+		case bytes.Equal(b, innerBlk2.BytesV):
+			return innerBlk2, nil
+		default:
+			require.FailNow("unexpected parse block")
+			// Unreachable, but required to satisfy the compiler
+			// since we use FailNow instead of panic
+			return nil, nil
+		}
+	}
+	calledInnerAccept := false
+	innerSummary1.AcceptF = func(context.Context) (block.StateSyncMode, error) {
+		calledInnerAccept = true
+		return block.StateSyncSkipped, nil
+	}
+
+	slb1, err := statelessblock.Build(
+		vm.preferred,
+		innerBlk1.Timestamp(),
+		100, // pChainHeight,
+		vm.StakingCertLeaf,
+		innerBlk1.Bytes(),
+		vm.ctx.ChainID,
+		vm.StakingLeafSigner,
+	)
+	require.NoError(err)
+	proBlk1 := &postForkBlock{
+		SignedBlock: slb1,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       vm,
+			innerBlk: innerBlk1,
+		},
+	}
+	require.NoError(vm.acceptPostForkBlock(proBlk1))
+
+	slb2, err := statelessblock.Build(
+		vm.preferred,
+		innerBlk2.Timestamp(),
+		100, // pChainHeight,
+		vm.StakingCertLeaf,
+		innerBlk2.Bytes(),
+		vm.ctx.ChainID,
+		vm.StakingLeafSigner,
+	)
+	require.NoError(err)
+	proBlk2 := &postForkBlock{
+		SignedBlock: slb2,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       vm,
+			innerBlk: innerBlk2,
+		},
+	}
+	require.NoError(vm.acceptPostForkBlock(proBlk2))
+
+	summary, err := vm.GetStateSummary(context.Background(), innerBlk1.Height())
+	require.NoError(err)
+	require.Equal(innerBlk1.Height(), summary.Height())
+
+	// Process a state summary that would rewind the chain
+	// ProposerVM should ignore the rollback and accept the inner state summary to
+	// notify the innerVM.
+	// This can result in the ProposerVM and innerVM diverging their last accepted block.
+	// These are re-aligned in SetState before transitioning to consensus.
+	status, err := summary.Accept(context.Background())
+	require.NoError(err)
 	require.Equal(block.StateSyncSkipped, status)
+	require.True(calledInnerAccept)
+	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+
+	require.Equal(innerBlk2.Height(), vm.lastAcceptedHeight)
+	lastAcceptedID, err := vm.LastAccepted(context.Background())
+	require.NoError(err)
+	require.Equal(proBlk2.ID(), lastAcceptedID)
 }

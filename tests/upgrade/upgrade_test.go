@@ -15,6 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet/flags"
 )
 
 func TestUpgrade(t *testing.T) {
@@ -24,8 +25,9 @@ func TestUpgrade(t *testing.T) {
 var (
 	avalancheGoExecPath            string
 	avalancheGoExecPathToUpgradeTo string
-	startCollectors                bool
-	checkMonitoring                bool
+	collectorVars                  *flags.CollectorVars
+	checkMetricsCollected          bool
+	checkLogsCollected             bool
 )
 
 func init() {
@@ -41,9 +43,10 @@ func init() {
 		"",
 		"avalanchego executable path to upgrade to",
 	)
-	e2e.SetMonitoringFlags(
-		&startCollectors,
-		&checkMonitoring,
+	collectorVars = flags.NewCollectorFlagVars()
+	e2e.SetCheckCollectionFlags(
+		&checkMetricsCollected,
+		&checkLogsCollected,
 	)
 }
 
@@ -54,34 +57,49 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 	ginkgo.It("can upgrade versions", func() {
 		network := tmpnet.NewDefaultNetwork("avalanchego-upgrade")
 
+		network.DefaultRuntimeConfig = tmpnet.NodeRuntimeConfig{
+			Process: &tmpnet.ProcessRuntimeConfig{
+				AvalancheGoPath: avalancheGoExecPath,
+			},
+		}
+
 		// Get the default genesis so we can modify it
 		genesis, err := network.DefaultGenesis()
 		require.NoError(err)
 		network.Genesis = genesis
 
 		shutdownDelay := 0 * time.Second
-		if startCollectors {
-			require.NoError(tmpnet.StartCollectors(tc.DefaultContext(), tc.Log()))
+		if collectorVars.StartMetricsCollector {
+			require.NoError(tmpnet.StartPrometheus(tc.DefaultContext(), tc.Log()))
 			shutdownDelay = tmpnet.NetworkShutdownDelay // Ensure a final metrics scrape
 		}
-		if checkMonitoring {
-			// Since cleanups are run in LIFO order, adding this cleanup before
-			// StartNetwork is called ensures network shutdown will be called first.
+		if collectorVars.StartLogsCollector {
+			require.NoError(tmpnet.StartPromtail(tc.DefaultContext(), tc.Log()))
+		}
+
+		// Since cleanups are run in LIFO order, adding these cleanups before StartNetwork
+		// is called ensures network shutdown will be called first.
+		if checkMetricsCollected {
 			tc.DeferCleanup(func() {
 				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultTimeout)
 				defer cancel()
-				require.NoError(tmpnet.CheckMonitoring(ctx, tc.Log(), network.UUID))
+				require.NoError(tmpnet.CheckMetricsExist(ctx, tc.Log(), network.UUID))
+			})
+		}
+		if checkLogsCollected {
+			tc.DeferCleanup(func() {
+				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultTimeout)
+				defer cancel()
+				require.NoError(tmpnet.CheckLogsExist(ctx, tc.Log(), network.UUID))
 			})
 		}
 
 		e2e.StartNetwork(
 			tc,
 			network,
-			avalancheGoExecPath,
-			"", /* pluginDir */
+			"", /* rootNetworkDir */
 			shutdownDelay,
-			false, /* skipShutdown */
-			false, /* reuseNetwork */
+			e2e.EmptyNetworkCmd,
 		)
 
 		tc.By(fmt.Sprintf("restarting all nodes with %q binary", avalancheGoExecPathToUpgradeTo))
@@ -89,9 +107,13 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 			tc.By(fmt.Sprintf("restarting node %q with %q binary", node.NodeID, avalancheGoExecPathToUpgradeTo))
 			require.NoError(node.Stop(tc.DefaultContext()))
 
-			node.RuntimeConfig.AvalancheGoPath = avalancheGoExecPathToUpgradeTo
+			node.RuntimeConfig = &tmpnet.NodeRuntimeConfig{
+				Process: &tmpnet.ProcessRuntimeConfig{
+					AvalancheGoPath: avalancheGoExecPathToUpgradeTo,
+				},
+			}
 
-			require.NoError(network.StartNode(tc.DefaultContext(), tc.Log(), node))
+			require.NoError(network.StartNode(tc.DefaultContext(), node))
 
 			tc.By(fmt.Sprintf("waiting for node %q to report healthy after restart", node.NodeID))
 			e2e.WaitForHealthy(tc, node)

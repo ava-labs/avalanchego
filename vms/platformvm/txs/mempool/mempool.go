@@ -8,41 +8,21 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
 	txmempool "github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
 var (
-	_ Mempool = (*mempool)(nil)
-
 	ErrCantIssueAdvanceTimeTx     = errors.New("can not issue an advance time tx")
 	ErrCantIssueRewardValidatorTx = errors.New("can not issue a reward validator tx")
 )
 
-type Mempool interface {
+type Mempool struct {
 	txmempool.Mempool[*txs.Tx]
-
-	// RequestBuildBlock notifies the consensus engine that a block should be
-	// built. If [emptyBlockPermitted] is true, the notification will be sent
-	// regardless of whether there are no transactions in the mempool. If not,
-	// a notification will only be sent if there is at least one transaction in
-	// the mempool.
-	RequestBuildBlock(emptyBlockPermitted bool)
 }
 
-type mempool struct {
-	txmempool.Mempool[*txs.Tx]
-
-	toEngine chan<- common.Message
-}
-
-func New(
-	namespace string,
-	registerer prometheus.Registerer,
-	toEngine chan<- common.Message,
-) (Mempool, error) {
+func New(namespace string, registerer prometheus.Registerer) (*Mempool, error) {
 	metrics, err := txmempool.NewMetrics(namespace, registerer)
 	if err != nil {
 		return nil, err
@@ -50,31 +30,16 @@ func New(
 	pool := txmempool.New[*txs.Tx](
 		metrics,
 	)
-	return &mempool{
-		Mempool:  pool,
-		toEngine: toEngine,
-	}, nil
+	return &Mempool{Mempool: pool}, nil
 }
 
-func (m *mempool) Add(tx *txs.Tx) error {
+func (m *Mempool) Add(tx *txs.Tx) error {
 	switch tx.Unsigned.(type) {
 	case *txs.AdvanceTimeTx:
 		return ErrCantIssueAdvanceTimeTx
 	case *txs.RewardValidatorTx:
 		return ErrCantIssueRewardValidatorTx
 	default:
-	}
-
-	return m.Mempool.Add(tx)
-}
-
-func (m *mempool) RequestBuildBlock(emptyBlockPermitted bool) {
-	if !emptyBlockPermitted && m.Len() == 0 {
-		return
-	}
-
-	select {
-	case m.toEngine <- common.PendingTxs:
-	default:
+		return m.Mempool.Add(tx)
 	}
 }

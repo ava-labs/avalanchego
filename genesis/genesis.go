@@ -11,14 +11,11 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
-	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
-	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -28,7 +25,6 @@ import (
 )
 
 const (
-	defaultEncoding    = formatting.Hex
 	configChainIDAlias = "X"
 )
 
@@ -46,6 +42,7 @@ var (
 	errFutureStartTime                 = errors.New("startTime cannot be in the future")
 	errInitialStakeDurationTooLow      = errors.New("initial stake duration is too low")
 	errOverridesStandardNetworkConfig  = errors.New("overrides standard network genesis config")
+	errAllocationsLockedAmountTooLow   = errors.New("total allocations locked amount is too low")
 )
 
 // validateInitialStakedFunds ensures all staked
@@ -113,6 +110,27 @@ func validateInitialStakedFunds(config *Config) error {
 	return nil
 }
 
+// validateAllocationsLockedAmount ensures that the sum of all locked
+// allocation amounts is at least the number of initial stakers.
+func validateAllocationsLockedAmount(config *Config) error {
+	totalLocked := uint64(0)
+	for _, allocation := range config.Allocations {
+		for _, unlock := range allocation.UnlockSchedule {
+			totalLocked += unlock.Amount
+		}
+	}
+	stakersCount := len(config.InitialStakers)
+	if totalLocked < uint64(stakersCount) {
+		return fmt.Errorf(
+			"%w: %d locked < %d stakers",
+			errAllocationsLockedAmountTooLow,
+			totalLocked,
+			stakersCount,
+		)
+	}
+	return nil
+}
+
 // validateConfig returns an error if the provided
 // *Config is not considered valid.
 func validateConfig(networkID uint32, config *Config, stakingCfg *StakingConfig) error {
@@ -171,6 +189,10 @@ func validateConfig(networkID uint32, config *Config, stakingCfg *StakingConfig)
 
 	if err := validateInitialStakedFunds(config); err != nil {
 		return fmt.Errorf("initial staked funds validation failed: %w", err)
+	}
+
+	if err := validateAllocationsLockedAmount(config); err != nil {
+		return err
 	}
 
 	if len(config.CChainGenesis) == 0 {
@@ -272,65 +294,51 @@ func FromFlag(networkID uint32, genesisContent string, stakingCfg *StakingConfig
 func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	hrp := constants.GetHRP(config.NetworkID)
 
-	amount := uint64(0)
-
 	// Specify the genesis state of the AVM
-	avmArgs := avm.BuildGenesisArgs{
-		NetworkID: json.Uint32(config.NetworkID),
-		Encoding:  defaultEncoding,
+	avax := avm.AssetDefinition{
+		Name:         "Avalanche",
+		Symbol:       "AVAX",
+		Denomination: 9,
+		InitialState: avm.AssetInitialState{},
 	}
-	{
-		avax := avm.AssetDefinition{
-			Name:         "Avalanche",
-			Symbol:       "AVAX",
-			Denomination: 9,
-			InitialState: map[string][]interface{}{},
+	memoBytes := []byte{}
+	xAllocations := []Allocation(nil)
+	for _, allocation := range config.Allocations {
+		if allocation.InitialAmount > 0 {
+			xAllocations = append(xAllocations, allocation)
 		}
-		memoBytes := []byte{}
-		xAllocations := []Allocation(nil)
-		for _, allocation := range config.Allocations {
-			if allocation.InitialAmount > 0 {
-				xAllocations = append(xAllocations, allocation)
-			}
-		}
-		utils.Sort(xAllocations)
+	}
+	utils.Sort(xAllocations)
 
-		for _, allocation := range xAllocations {
-			addr, err := address.FormatBech32(hrp, allocation.AVAXAddr.Bytes())
-			if err != nil {
-				return nil, ids.Empty, err
-			}
-
-			avax.InitialState["fixedCap"] = append(avax.InitialState["fixedCap"], avm.Holder{
-				Amount:  json.Uint64(allocation.InitialAmount),
-				Address: addr,
-			})
-			memoBytes = append(memoBytes, allocation.ETHAddr.Bytes()...)
-			amount += allocation.InitialAmount
-		}
-
-		var err error
-		avax.Memo, err = formatting.Encode(defaultEncoding, memoBytes)
+	for _, allocation := range xAllocations {
+		addr, err := address.FormatBech32(hrp, allocation.AVAXAddr.Bytes())
 		if err != nil {
-			return nil, ids.Empty, fmt.Errorf("couldn't parse memo bytes to string: %w", err)
+			return nil, ids.Empty, err
 		}
-		avmArgs.GenesisData = map[string]avm.AssetDefinition{
-			"AVAX": avax, // The AVM starts out with one asset: AVAX
-		}
-	}
-	avmReply := avm.BuildGenesisReply{}
 
-	avmSS := avm.CreateStaticService()
-	err := avmSS.BuildGenesis(nil, &avmArgs, &avmReply)
+		avax.InitialState.FixedCap = append(avax.InitialState.FixedCap, avm.Holder{
+			Amount:  allocation.InitialAmount,
+			Address: addr,
+		})
+		memoBytes = append(memoBytes, allocation.ETHAddr.Bytes()...)
+	}
+	avax.Memo = memoBytes
+
+	avmGenesis, err := avm.NewGenesis(
+		config.NetworkID,
+		map[string]avm.AssetDefinition{
+			"AVAX": avax, // The AVM starts out with one asset: AVAX
+		},
+	)
 	if err != nil {
 		return nil, ids.Empty, err
 	}
-
-	bytes, err := formatting.Decode(defaultEncoding, avmReply.Bytes)
+	avmGenesisBytes, err := avmGenesis.Bytes()
 	if err != nil {
-		return nil, ids.Empty, fmt.Errorf("couldn't parse avm genesis reply: %w", err)
+		return nil, ids.Empty, fmt.Errorf("couldn't serialize avm genesis: %w", err)
 	}
-	avaxAssetID, err := AVAXAssetID(bytes)
+
+	avaxAssetID, err := AVAXAssetID(avmGenesisBytes)
 	if err != nil {
 		return nil, ids.Empty, fmt.Errorf("couldn't generate AVAX asset ID: %w", err)
 	}
@@ -344,15 +352,8 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	initiallyStaked := set.Of(config.InitialStakedFunds...)
 	skippedAllocations := []Allocation(nil)
 
-	// Specify the initial state of the Platform Chain
-	platformvmArgs := api.BuildGenesisArgs{
-		AvaxAssetID:   avaxAssetID,
-		NetworkID:     json.Uint32(config.NetworkID),
-		Time:          json.Uint64(config.StartTime),
-		InitialSupply: json.Uint64(initialSupply),
-		Message:       config.Message,
-		Encoding:      defaultEncoding,
-	}
+	// Build UTXOs for the Platform Chain
+	platformAllocations := []genesis.Allocation{}
 	for _, allocation := range config.Allocations {
 		if initiallyStaked.Contains(allocation.AVAXAddr) {
 			skippedAllocations = append(skippedAllocations, allocation)
@@ -364,23 +365,18 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		}
 		for _, unlock := range allocation.UnlockSchedule {
 			if unlock.Amount > 0 {
-				msgStr, err := formatting.Encode(defaultEncoding, allocation.ETHAddr.Bytes())
-				if err != nil {
-					return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
-				}
-				platformvmArgs.UTXOs = append(platformvmArgs.UTXOs,
-					api.UTXO{
-						Locktime: json.Uint64(unlock.Locktime),
-						Amount:   json.Uint64(unlock.Amount),
-						Address:  addr,
-						Message:  msgStr,
-					},
-				)
-				amount += unlock.Amount
+				platformAllocations = append(platformAllocations, genesis.Allocation{
+					Locktime: unlock.Locktime,
+					Amount:   unlock.Amount,
+					Address:  addr,
+					Message:  allocation.ETHAddr.Bytes(),
+				})
 			}
 		}
 	}
 
+	// Build validators for the Platform Chain
+	validators := []genesis.PermissionlessValidator{}
 	allNodeAllocations := splitAllocations(skippedAllocations, len(config.InitialStakers))
 	endStakingTime := genesisTime.Add(time.Duration(config.InitialStakeDuration) * time.Second)
 	stakingOffset := time.Duration(0)
@@ -394,55 +390,45 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 			return nil, ids.Empty, err
 		}
 
-		utxos := []api.UTXO(nil)
+		allocations := []genesis.Allocation(nil)
 		for _, allocation := range nodeAllocations {
 			addr, err := address.FormatBech32(hrp, allocation.AVAXAddr.Bytes())
 			if err != nil {
 				return nil, ids.Empty, err
 			}
 			for _, unlock := range allocation.UnlockSchedule {
-				msgStr, err := formatting.Encode(defaultEncoding, allocation.ETHAddr.Bytes())
-				if err != nil {
-					return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
-				}
-				utxos = append(utxos, api.UTXO{
-					Locktime: json.Uint64(unlock.Locktime),
-					Amount:   json.Uint64(unlock.Amount),
+				allocations = append(allocations, genesis.Allocation{
+					Locktime: unlock.Locktime,
+					Amount:   unlock.Amount,
 					Address:  addr,
-					Message:  msgStr,
+					Message:  allocation.ETHAddr.Bytes(),
 				})
-				amount += unlock.Amount
 			}
 		}
 
-		delegationFee := json.Uint32(staker.DelegationFee)
-
-		platformvmArgs.Validators = append(platformvmArgs.Validators,
-			api.GenesisPermissionlessValidator{
-				GenesisValidator: api.GenesisValidator{
-					StartTime: json.Uint64(genesisTime.Unix()),
-					EndTime:   json.Uint64(endStakingTime.Unix()),
-					NodeID:    staker.NodeID,
-				},
-				RewardOwner: &api.Owner{
-					Threshold: 1,
-					Addresses: []string{destAddrStr},
-				},
-				Staked:             utxos,
-				ExactDelegationFee: &delegationFee,
-				Signer:             staker.Signer,
+		validators = append(validators, genesis.PermissionlessValidator{
+			Validator: genesis.Validator{
+				StartTime: uint64(genesisTime.Unix()),
+				EndTime:   uint64(endStakingTime.Unix()),
+				NodeID:    staker.NodeID,
 			},
-		)
+			RewardOwner: &genesis.Owner{
+				Threshold: 1,
+				Addresses: []string{destAddrStr},
+			},
+			Staked:             allocations,
+			ExactDelegationFee: staker.DelegationFee,
+			Signer:             staker.Signer,
+		})
 	}
 
 	// Specify the chains that exist upon this network's creation
-	genesisStr, err := formatting.Encode(defaultEncoding, []byte(config.CChainGenesis))
 	if err != nil {
 		return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
 	}
-	platformvmArgs.Chains = []api.Chain{
+	chains := []genesis.Chain{
 		{
-			GenesisData: avmReply.Bytes,
+			GenesisData: avmGenesisBytes,
 			SubnetID:    constants.PrimaryNetworkID,
 			VMID:        constants.AVMID,
 			FxIDs: []ids.ID{
@@ -453,25 +439,31 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 			Name: "X-Chain",
 		},
 		{
-			GenesisData: genesisStr,
+			GenesisData: []byte(config.CChainGenesis),
 			SubnetID:    constants.PrimaryNetworkID,
 			VMID:        constants.EVMID,
 			Name:        "C-Chain",
 		},
 	}
 
-	platformvmReply := api.BuildGenesisReply{}
-	platformvmSS := api.StaticService{}
-	if err := platformvmSS.BuildGenesis(nil, &platformvmArgs, &platformvmReply); err != nil {
+	pChainGenesis, err := genesis.New(
+		avaxAssetID,
+		config.NetworkID,
+		platformAllocations,
+		validators,
+		chains,
+		config.StartTime,
+		initialSupply,
+		config.Message,
+	)
+	if err != nil {
 		return nil, ids.Empty, fmt.Errorf("problem while building platform chain's genesis state: %w", err)
 	}
-
-	genesisBytes, err := formatting.Decode(platformvmReply.Encoding, platformvmReply.Bytes)
+	pChainGenesisBytes, err := pChainGenesis.Bytes()
 	if err != nil {
-		return nil, ids.Empty, fmt.Errorf("problem parsing platformvm genesis bytes: %w", err)
+		return nil, ids.Empty, fmt.Errorf("problem while serializing platform chain's genesis state: %w", err)
 	}
-
-	return genesisBytes, avaxAssetID, nil
+	return pChainGenesisBytes, avaxAssetID, nil
 }
 
 func splitAllocations(allocations []Allocation, numSplits int) [][]Allocation {

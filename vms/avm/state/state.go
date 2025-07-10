@@ -11,6 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -151,7 +152,7 @@ func New(
 	txCache, err := metercacher.New[ids.ID, *txs.Tx](
 		"tx_cache",
 		metrics,
-		&cache.LRU[ids.ID, *txs.Tx]{Size: txCacheSize},
+		lru.NewCache[ids.ID, *txs.Tx](txCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -160,7 +161,7 @@ func New(
 	blockIDCache, err := metercacher.New[uint64, ids.ID](
 		"block_id_cache",
 		metrics,
-		&cache.LRU[uint64, ids.ID]{Size: blockIDCacheSize},
+		lru.NewCache[uint64, ids.ID](blockIDCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -169,7 +170,7 @@ func New(
 	blockCache, err := metercacher.New[ids.ID, block.Block](
 		"block_cache",
 		metrics,
-		&cache.LRU[ids.ID, block.Block]{Size: blockCacheSize},
+		lru.NewCache[ids.ID, block.Block](blockCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -329,13 +330,20 @@ func (s *state) InitializeChainState(stopVertexID ids.ID, genesisTimestamp time.
 	if err == database.ErrNotFound {
 		return s.initializeChainState(stopVertexID, genesisTimestamp)
 	} else if err != nil {
-		return err
+		return fmt.Errorf("failed to get last accepted block: %w", err)
 	}
 	s.lastAccepted = lastAccepted
 	s.persistedLastAccepted = lastAccepted
-	s.timestamp, err = database.GetTimestamp(s.singletonDB, timestampKey)
-	s.persistedTimestamp = s.timestamp
-	return err
+
+	timestamp, err := database.GetTimestamp(s.singletonDB, timestampKey)
+	if err != nil {
+		return fmt.Errorf("failed to get last accepted timestamp: %w", err)
+	}
+
+	s.timestamp = timestamp
+	s.persistedTimestamp = timestamp
+
+	return nil
 }
 
 func (s *state) initializeChainState(stopVertexID ids.ID, genesisTimestamp time.Time) error {
@@ -347,13 +355,18 @@ func (s *state) initializeChainState(stopVertexID ids.ID, genesisTimestamp time.
 		s.parser.Codec(),
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to initialize genesis block: %w", err)
 	}
 
 	s.SetLastAccepted(genesis.ID())
 	s.SetTimestamp(genesis.Timestamp())
 	s.AddBlock(genesis)
-	return s.Commit()
+
+	if err := s.Commit(); err != nil {
+		return fmt.Errorf("failed to commit genesis block: %w", err)
+	}
+
+	return nil
 }
 
 func (s *state) IsInitialized() (bool, error) {

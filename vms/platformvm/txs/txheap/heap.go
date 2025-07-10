@@ -19,13 +19,8 @@ type Heap interface {
 	Len() int
 }
 
-type heapTx struct {
-	tx  *txs.Tx
-	age int
-}
-
 type txHeap struct {
-	heap       heap.Map[ids.ID, heapTx]
+	heap       heap.Map[ids.ID, *txs.Tx]
 	currentAge int
 }
 
@@ -34,41 +29,32 @@ func (h *txHeap) Add(tx *txs.Tx) {
 	if h.heap.Contains(txID) {
 		return
 	}
-	htx := heapTx{
-		tx:  tx,
-		age: h.currentAge,
-	}
 	h.currentAge++
-	h.heap.Push(txID, htx)
+	h.heap.Push(txID, tx)
 }
 
 func (h *txHeap) Get(txID ids.ID) *txs.Tx {
 	got, _ := h.heap.Get(txID)
-	return got.tx
+	return got
 }
 
 func (h *txHeap) List() []*txs.Tx {
-	heapTxs := heap.MapValues(h.heap)
-	res := make([]*txs.Tx, 0, len(heapTxs))
-	for _, tx := range heapTxs {
-		res = append(res, tx.tx)
-	}
-	return res
+	return heap.MapValues(h.heap)
 }
 
 func (h *txHeap) Remove(txID ids.ID) *txs.Tx {
 	removed, _ := h.heap.Remove(txID)
-	return removed.tx
+	return removed
 }
 
 func (h *txHeap) Peek() *txs.Tx {
 	_, peeked, _ := h.heap.Peek()
-	return peeked.tx
+	return peeked
 }
 
 func (h *txHeap) RemoveTop() *txs.Tx {
 	_, popped, _ := h.heap.Pop()
-	return popped.tx
+	return popped
 }
 
 func (h *txHeap) Len() int {

@@ -191,7 +191,7 @@ func getProof(t Trie, key []byte) (*Proof, error) {
 	return proof, nil
 }
 
-// GetRangeProof returns a range proof for (at least part of) the key range [start, end].
+// getRangeProof returns a range proof for (at least part of) the key range [start, end].
 // The returned proof's [KeyValues] has at most [maxLength] values.
 // [maxLength] must be > 0.
 // Assumes [t] doesn't change while this function is running.
@@ -211,14 +211,14 @@ func getRangeProof(
 	}
 
 	result := RangeProof{
-		KeyValues: make([]KeyValue, 0, initKeyValuesSize),
+		KeyChanges: make([]KeyChange, 0, initKeyValuesSize),
 	}
 	it := t.NewIteratorWithStart(start.Value())
-	for it.Next() && len(result.KeyValues) < maxLength && (end.IsNothing() || bytes.Compare(it.Key(), end.Value()) <= 0) {
+	for it.Next() && len(result.KeyChanges) < maxLength && (end.IsNothing() || bytes.Compare(it.Key(), end.Value()) <= 0) {
 		// clone the value to prevent editing of the values stored within the trie
-		result.KeyValues = append(result.KeyValues, KeyValue{
+		result.KeyChanges = append(result.KeyChanges, KeyChange{
 			Key:   it.Key(),
-			Value: slices.Clone(it.Value()),
+			Value: maybe.Some(slices.Clone(it.Value())),
 		})
 	}
 	it.Release()
@@ -233,13 +233,15 @@ func getRangeProof(
 		endProof *Proof
 		err      error
 	)
-	if len(result.KeyValues) > 0 {
-		greatestKey := result.KeyValues[len(result.KeyValues)-1].Key
+	if len(result.KeyChanges) > 0 {
+		// [endProof] => inclusion proof for the largest key
+		greatestKey := result.KeyChanges[len(result.KeyChanges)-1].Key
 		endProof, err = getProof(t, greatestKey)
 		if err != nil {
 			return nil, err
 		}
 	} else if end.HasValue() {
+		// [endProof] => exclusion proof for the [end] key
 		endProof, err = getProof(t, end.Value())
 		if err != nil {
 			return nil, err
@@ -250,6 +252,7 @@ func getRangeProof(
 	}
 
 	if start.HasValue() {
+		// [startProof] => inclusion/exclusion proof for [start] key
 		startProof, err := getProof(t, start.Value())
 		if err != nil {
 			return nil, err

@@ -51,7 +51,6 @@ type VM interface {
 		genesisBytes []byte,
 		upgradeBytes []byte,
 		configBytes []byte,
-		toEngine chan<- Message,
 		fxs []*Fx,
 		appSender AppSender,
 	) error
@@ -77,4 +76,11 @@ type VM interface {
 	// it have an extension called `accounts`, where clients could get
 	// information about their accounts.
 	CreateHandlers(context.Context) (map[string]http.Handler, error)
+
+	// CreateHTTP2Handler returns the http/2 handler to register into the
+	// avalanchego api server.
+	CreateHTTP2Handler(ctx context.Context) (http.Handler, error)
+
+	// WaitForEvent blocks until either the given context is cancelled, or a message is returned.
+	WaitForEvent(ctx context.Context) (Message, error)
 }

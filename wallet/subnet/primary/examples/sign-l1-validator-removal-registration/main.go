@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
@@ -165,7 +164,6 @@ func main() {
 	}
 
 	mesageBuilder, err := p2pmessage.NewCreator(
-		logging.NoLog{},
 		prometheus.NewRegistry(),
 		compression.TypeZstd,
 		time.Hour,

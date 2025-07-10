@@ -16,9 +16,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/coreth/core"
-	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/crypto"
 	"github.com/holiman/uint256"
 )
 

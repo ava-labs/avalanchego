@@ -4,6 +4,8 @@
 package x
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -293,13 +295,19 @@ func (w *wallet) IssueTx(
 ) error {
 	ops := common.NewOptions(options)
 	ctx := ops.Context()
+	startTime := time.Now()
 	txID, err := w.client.IssueTx(ctx, tx.Bytes())
 	if err != nil {
 		return err
 	}
 
-	if f := ops.PostIssuanceFunc(); f != nil {
-		f(txID)
+	issuanceDuration := time.Since(startTime)
+	if f := ops.IssuanceHandler(); f != nil {
+		f(common.IssuanceReceipt{
+			ChainAlias: builder.Alias,
+			TxID:       txID,
+			Duration:   issuanceDuration,
+		})
 	}
 
 	if ops.AssumeDecided() {
@@ -308,6 +316,18 @@ func (w *wallet) IssueTx(
 
 	if err := avm.AwaitTxAccepted(w.client, ctx, txID, ops.PollFrequency()); err != nil {
 		return err
+	}
+
+	if f := ops.ConfirmationHandler(); f != nil {
+		totalDuration := time.Since(startTime)
+		confirmationDuration := totalDuration - issuanceDuration
+
+		f(common.ConfirmationReceipt{
+			ChainAlias:           builder.Alias,
+			TxID:                 txID,
+			TotalDuration:        totalDuration,
+			ConfirmationDuration: confirmationDuration,
+		})
 	}
 
 	return w.backend.AcceptTx(ctx, tx)

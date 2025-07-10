@@ -14,7 +14,8 @@ jobs:
           # PR configuration
           days-before-pr-stale: 30
           stale-pr-message: 'This PR has become stale because it has been open for 30 days with no activity. Adding the `lifecycle/frozen` label will cause this PR to ignore lifecycle events.'
-          days-before-pr-close: -1
+          days-before-pr-close: 60
+          close-pr-message: 'This PR is being closed due to no activity. Please re-open if this needs to be prioritized.'
           stale-pr-label: lifecycle/stale
           exempt-pr-labels: lifecycle/frozen
           close-pr-label: lifecycle/rotten
@@ -22,7 +23,8 @@ jobs:
           # Issue configuration
           days-before-issue-stale: 60
           stale-issue-message: 'This issue has become stale because it has been open 60 days with no activity. Adding the `lifecycle/frozen` label will cause this issue to ignore lifecycle events.'
-          days-before-issue-close: -1
+          days-before-issue-close: 90
+          close-issue-message: 'This issue is being closed due to no activity. Please re-open if this needs to be prioritized.'
           stale-issue-label: lifecycle/stale
           exempt-issue-labels: lifecycle/frozen
           close-issue-label: lifecycle/rotten

@@ -23,11 +23,11 @@ var Tests = []struct {
 	Size int
 	Func func(t *testing.T, c cache.Cacher[ids.ID, int64])
 }{
-	{Size: 1, Func: TestBasic},
-	{Size: 2, Func: TestEviction},
+	{Size: 1, Func: Basic},
+	{Size: 2, Func: Eviction},
 }
 
-func TestBasic(t *testing.T, cache cache.Cacher[ids.ID, int64]) {
+func Basic(t *testing.T, cache cache.Cacher[ids.ID, int64]) {
 	require := require.New(t)
 
 	id1 := ids.ID{1}
@@ -62,7 +62,7 @@ func TestBasic(t *testing.T, cache cache.Cacher[ids.ID, int64]) {
 	require.Equal(expectedValue2, value)
 }
 
-func TestEviction(t *testing.T, cache cache.Cacher[ids.ID, int64]) {
+func Eviction(t *testing.T, cache cache.Cacher[ids.ID, int64]) {
 	require := require.New(t)
 
 	id1 := ids.ID{1}

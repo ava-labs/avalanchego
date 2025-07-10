@@ -79,7 +79,6 @@ var (
 	errStakingKeyContentUnset                 = fmt.Errorf("%s key not set but %s set", StakingTLSKeyContentKey, StakingCertContentKey)
 	errStakingCertContentUnset                = fmt.Errorf("%s key set but %s not set", StakingTLSKeyContentKey, StakingCertContentKey)
 	errMissingStakingSigningKeyFile           = errors.New("missing staking signing key file")
-	errTracingEndpointEmpty                   = fmt.Errorf("%s cannot be empty", TracingEndpointKey)
 	errPluginDirNotADirectory                 = errors.New("plugin dir is not a directory")
 	errCannotReadDirectory                    = errors.New("cannot read directory")
 	errUnmarshalling                          = errors.New("unmarshalling failed")
@@ -1196,32 +1195,19 @@ func getDiskTargeterConfig(v *viper.Viper) (tracker.TargeterConfig, error) {
 }
 
 func getTraceConfig(v *viper.Viper) (trace.Config, error) {
-	enabled := v.GetBool(TracingEnabledKey)
-	if !enabled {
-		return trace.Config{
-			Enabled: false,
-		}, nil
-	}
-
 	exporterTypeStr := v.GetString(TracingExporterTypeKey)
 	exporterType, err := trace.ExporterTypeFromString(exporterTypeStr)
 	if err != nil {
 		return trace.Config{}, err
 	}
 
-	endpoint := v.GetString(TracingEndpointKey)
-	if endpoint == "" {
-		return trace.Config{}, errTracingEndpointEmpty
-	}
-
 	return trace.Config{
 		ExporterConfig: trace.ExporterConfig{
 			Type:     exporterType,
-			Endpoint: endpoint,
+			Endpoint: v.GetString(TracingEndpointKey),
 			Insecure: v.GetBool(TracingInsecureKey),
 			Headers:  v.GetStringMapString(TracingHeadersKey),
 		},
-		Enabled:         true,
 		TraceSampleRate: v.GetFloat64(TracingSampleRateKey),
 		AppName:         constants.AppName,
 		Version:         version.Current.String(),

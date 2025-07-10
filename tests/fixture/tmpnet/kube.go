@@ -4,24 +4,32 @@
 package tmpnet
 
 import (
+	"cmp"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer/yaml"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/config"
@@ -50,19 +58,44 @@ func DefaultPodFlags(networkName string, dataDir string) map[string]string {
 // NewNodeStatefulSet returns a statefulset for an avalanchego node.
 func NewNodeStatefulSet(
 	name string,
+	generateName bool,
 	imageName string,
 	containerName string,
 	volumeName string,
 	volumeSize string,
 	volumeMountPath string,
-	flags map[string]string,
+	flags FlagsMap,
+	labels map[string]string,
 ) *appsv1.StatefulSet {
+	objectMeta := metav1.ObjectMeta{}
+	if generateName {
+		objectMeta.GenerateName = name + "-"
+	} else {
+		objectMeta.Name = name
+	}
+
+	podAnnotations := map[string]string{
+		"prometheus.io/scrape": "true",
+		"prometheus.io/path":   "/ext/metrics",
+		"promtail/collect":     "true",
+	}
+
+	podLabels := map[string]string{
+		"app": name,
+	}
+	for label, value := range labels {
+		// These labels may contain values invalid for use in labels. Set them as annotations instead.
+		if label == "gh_repo" || label == "gh_workflow" {
+			podAnnotations[label] = value
+			continue
+		}
+		podLabels[label] = value
+	}
+
 	return &appsv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: name + "-",
-		},
+		ObjectMeta: objectMeta,
 		Spec: appsv1.StatefulSetSpec{
-			Replicas:    pointer.Int32(1),
+			Replicas:    ptr.To[int32](1),
 			ServiceName: name,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
@@ -88,9 +121,8 @@ func NewNodeStatefulSet(
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"app": name,
-					},
+					Labels:      podLabels,
+					Annotations: podAnnotations,
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -123,7 +155,7 @@ func NewNodeStatefulSet(
 								PeriodSeconds:    1,
 								SuccessThreshold: 1,
 							},
-							Env: stringMapToEnvVarSlice(flags),
+							Env: flagsToEnvVarSlice(flags),
 						},
 					},
 				},
@@ -133,17 +165,35 @@ func NewNodeStatefulSet(
 }
 
 // stringMapToEnvVarSlice converts a string map to a kube EnvVar slice.
-func stringMapToEnvVarSlice(mapping map[string]string) []corev1.EnvVar {
-	envVars := make([]corev1.EnvVar, len(mapping))
+func flagsToEnvVarSlice(flags FlagsMap) []corev1.EnvVar {
+	envVars := make([]corev1.EnvVar, len(flags))
 	var i int
-	for k, v := range mapping {
+	for k, v := range flags {
 		envVars[i] = corev1.EnvVar{
 			Name:  config.EnvVarName(config.EnvPrefix, k),
 			Value: v,
 		}
 		i++
 	}
+	sortEnvVars(envVars)
 	return envVars
+}
+
+func envVarsToJSONValue(envVars []corev1.EnvVar) []map[string]string {
+	jsonValue := make([]map[string]string, len(envVars))
+	for i, envVar := range envVars {
+		jsonValue[i] = map[string]string{
+			"name":  envVar.Name,
+			"value": envVar.Value,
+		}
+	}
+	return jsonValue
+}
+
+func sortEnvVars(envVars []corev1.EnvVar) {
+	slices.SortFunc(envVars, func(a, b corev1.EnvVar) int {
+		return cmp.Compare(a.Name, b.Name)
+	})
 }
 
 // WaitForNodeHealthy waits for the node running in the specified pod to report healthy.
@@ -180,7 +230,7 @@ func WaitForNodeHealthy(
 	}
 	if err := wait.PollImmediateInfinite(healthCheckInterval, func() (bool, error) {
 		healthReply, err := CheckNodeHealth(ctx, localNodeURI)
-		if errors.Is(ErrUnrecoverableNodeHealthCheck, err) {
+		if errors.Is(err, ErrUnrecoverableNodeHealthCheck) {
 			return false, err
 		} else if err != nil {
 			// Error is potentially recoverable - log and continue
@@ -339,4 +389,75 @@ func GetClientset(log logging.Logger, path string, context string) (*kubernetes.
 		return nil, fmt.Errorf("failed to create clientset: %w", err)
 	}
 	return clientset, nil
+}
+
+// applyManifest creates or updates the resources defined by the provided manifest using server-side apply.
+// If namespace is empty, the namespace from the manifest will be used for namespaced resources.
+func applyManifest(
+	ctx context.Context,
+	log logging.Logger,
+	dynamicClient dynamic.Interface,
+	manifest []byte,
+	namespace string,
+) error {
+	// Split the manifest into individual resources
+	decoder := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
+	documents := strings.Split(string(manifest), "\n---\n")
+
+	for _, doc := range documents {
+		doc := strings.TrimSpace(doc)
+		if strings.TrimSpace(doc) == "" || strings.HasPrefix(doc, "#") {
+			continue
+		}
+
+		obj := &unstructured.Unstructured{}
+		_, gvk, err := decoder.Decode([]byte(doc), nil, obj)
+		if err != nil {
+			return fmt.Errorf("failed to decode manifest: %w", err)
+		}
+
+		gvr := schema.GroupVersionResource{
+			Group:    gvk.Group,
+			Version:  gvk.Version,
+			Resource: strings.ToLower(gvk.Kind) + "s",
+		}
+
+		// Determine namespace for the resource
+		resourceNamespace := namespace
+		if resourceNamespace == "" {
+			// Use namespace from the manifest if not provided
+			resourceNamespace = obj.GetNamespace()
+		}
+
+		var resourceInterface dynamic.ResourceInterface
+		if strings.HasPrefix(gvk.Kind, "Cluster") || gvk.Kind == "Namespace" {
+			resourceInterface = dynamicClient.Resource(gvr)
+		} else {
+			resourceInterface = dynamicClient.Resource(gvr).Namespace(resourceNamespace)
+		}
+
+		// Convert object to JSON for server-side apply
+		data, err := json.Marshal(obj)
+		if err != nil {
+			return fmt.Errorf("failed to marshal object to JSON: %w", err)
+		}
+
+		// Use server-side apply to create or update the resource
+		_, err = resourceInterface.Patch(ctx, obj.GetName(), types.ApplyPatchType, data, metav1.PatchOptions{
+			FieldManager: "tmpnet-apply",
+			Force:        ptr.To(true),
+		})
+		if err != nil {
+			return fmt.Errorf("failed to apply %s %s/%s: %w", gvk.Kind, resourceNamespace, obj.GetName(), err)
+		}
+		log.Info("applied resource",
+			zap.String("kind", gvk.Kind),
+			zap.String("namespace", resourceNamespace),
+			zap.String("name", obj.GetName()),
+		)
+	}
+
+	// TODO(marun) Check that the resources are running and healthy
+
+	return nil
 }

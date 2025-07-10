@@ -31,13 +31,14 @@ func (*ginkgoWriteCloser) Close() error {
 // Define a simple encoder config appropriate for logging with ginkgo
 var ginkgoEncoderConfig = zapcore.EncoderConfig{
 	// Time, name and caller are omitted for consistency with previous output.
-	TimeKey:       "",
-	LevelKey:      "level",
-	NameKey:       "",
-	CallerKey:     "",
-	MessageKey:    "msg",
-	StacktraceKey: "stacktrace",
-	EncodeLevel:   logging.ConsoleColorLevelEncoder,
+	TimeKey:        "",
+	LevelKey:       "level",
+	NameKey:        "",
+	CallerKey:      "",
+	MessageKey:     "msg",
+	StacktraceKey:  "stacktrace",
+	EncodeLevel:    logging.ConsoleColorLevelEncoder,
+	EncodeDuration: zapcore.StringDurationEncoder,
 }
 
 // NewGinkgoLogger returns a logger with limited output
@@ -45,7 +46,7 @@ func newGinkgoLogger(cfg zapcore.Encoder) logging.Logger {
 	return logging.NewLogger(
 		"",
 		logging.NewWrappedCore(
-			logging.Verbo,
+			logging.Info,
 			&ginkgoWriteCloser{},
 			cfg,
 		),

@@ -98,7 +98,6 @@ func (b *block) Accept(context.Context) error {
 	}
 
 	b.chain.lastAcceptedID = b.id
-	b.chain.lastAcceptedHeight = b.Height()
 	delete(b.chain.verifiedBlocks, b.ParentID)
 	b.state = nil
 	return nil

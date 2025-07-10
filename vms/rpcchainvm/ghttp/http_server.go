@@ -8,11 +8,12 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"net/http"
 	"net/url"
 
-	"google.golang.org/protobuf/types/known/emptypb"
-
+	"github.com/ava-labs/avalanchego/proto/pb/io/reader"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greader"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gresponsewriter"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
@@ -38,7 +39,7 @@ func NewServer(handler http.Handler) *Server {
 	}
 }
 
-func (s *Server) Handle(ctx context.Context, req *httppb.HTTPRequest) (*emptypb.Empty, error) {
+func (s *Server) Handle(ctx context.Context, req *httppb.HTTPRequest) (*httppb.HTTPResponse, error) {
 	clientConn, err := grpcutils.Dial(req.ResponseWriter.ServerAddr)
 	if err != nil {
 		return nil, err
@@ -50,13 +51,14 @@ func (s *Server) Handle(ctx context.Context, req *httppb.HTTPRequest) (*emptypb.
 	}
 
 	writer := gresponsewriter.NewClient(writerHeaders, responsewriterpb.NewWriterClient(clientConn))
+	body := greader.NewClient(reader.NewReaderClient(clientConn))
 
 	// create the request with the current context
 	request, err := http.NewRequestWithContext(
 		ctx,
 		req.Request.Method,
 		req.Request.RequestUri,
-		bytes.NewBuffer(req.Request.Body),
+		body,
 	)
 	if err != nil {
 		return nil, err
@@ -139,24 +141,31 @@ func (s *Server) Handle(ctx context.Context, req *httppb.HTTPRequest) (*emptypb.
 
 	s.handler.ServeHTTP(writer, request)
 
-	return &emptypb.Empty{}, clientConn.Close()
+	if err := clientConn.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close client conn: %w", err)
+	}
+
+	return &httppb.HTTPResponse{
+		Header: grpcutils.GetHTTPHeader(writerHeaders),
+	}, nil
 }
 
 // HandleSimple handles http requests over http2 using a simple request response model.
-// Websockets are not supported. Based on https://www.weave.works/blog/turtles-way-http-grpc/
+// Websockets are not supported.
 func (s *Server) HandleSimple(ctx context.Context, r *httppb.HandleSimpleHTTPRequest) (*httppb.HandleSimpleHTTPResponse, error) {
 	req, err := http.NewRequest(r.Method, r.Url, bytes.NewBuffer(r.Body))
 	if err != nil {
 		return nil, err
 	}
 
-	grpcutils.MergeHTTPHeader(r.Headers, req.Header)
+	grpcutils.SetHeaders(req.Header, r.RequestHeaders)
 
 	req = req.WithContext(ctx)
 	req.RequestURI = r.Url
 	req.ContentLength = int64(len(r.Body))
 
 	w := newResponseWriter()
+	grpcutils.SetHeaders(w.Header(), r.ResponseHeaders)
 	s.handler.ServeHTTP(w, req)
 
 	resp := &httppb.HandleSimpleHTTPResponse{

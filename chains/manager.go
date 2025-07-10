@@ -727,10 +727,6 @@ func (m *manager) createAvalancheChain(
 		},
 	)
 
-	// The channel through which a VM may send messages to the consensus engine
-	// VM uses this channel to notify engine that a block is ready to be made
-	msgChan := make(chan common.Message, defaultChannelSize)
-
 	// The only difference between using avalancheMessageSender and
 	// snowmanMessageSender here is where the metrics will be placed. Because we
 	// end up using this sender after the linearization, we pass in
@@ -742,7 +738,6 @@ func (m *manager) createAvalancheChain(
 		genesisData,
 		chainConfig.Upgrade,
 		chainConfig.Config,
-		msgChan,
 		fxs,
 		snowmanMessageSender,
 	)
@@ -811,19 +806,25 @@ func (m *manager) createAvalancheChain(
 		vmWrappingProposerVM = tracedvm.NewBlockVM(vmWrappingProposerVM, "proposervm", m.Tracer)
 	}
 
+	cn := &block.ChangeNotifier{
+		ChainVM: vmWrappingProposerVM,
+	}
+
+	vmWrappingProposerVM = cn
+
 	// Note: linearizableVM is the VM that the Avalanche engines should be
 	// using.
 	linearizableVM := &initializeOnLinearizeVM{
-		DAGVM:          dagVM,
-		vmToInitialize: vmWrappingProposerVM,
-		vmToLinearize:  untracedVMWrappedInsideProposerVM,
+		waitForLinearize: make(chan struct{}),
+		DAGVM:            dagVM,
+		vmToInitialize:   vmWrappingProposerVM,
+		vmToLinearize:    untracedVMWrappedInsideProposerVM,
 
 		ctx:          ctx.Context,
 		db:           vmDB,
 		genesisBytes: genesisData,
 		upgradeBytes: chainConfig.Upgrade,
 		configBytes:  chainConfig.Config,
-		toEngine:     msgChan,
 		fxs:          fxs,
 		appSender:    snowmanMessageSender,
 	}
@@ -885,8 +886,9 @@ func (m *manager) createAvalancheChain(
 	// Asynchronously passes messages from the network to the consensus engine
 	h, err := handler.New(
 		ctx,
+		cn,
+		linearizableVM.WaitForEvent,
 		vdrs,
-		msgChan,
 		m.FrontierPollFrequency,
 		m.ConsensusAppConcurrency,
 		m.ResourceTracker,
@@ -985,7 +987,7 @@ func (m *manager) createAvalancheChain(
 	}
 
 	// create engine gear
-	avalancheEngine := aveng.New(ctx, avaGetHandler, linearizableVM)
+	avalancheEngine := aveng.New(ctx, avaGetHandler)
 	if m.TracingEnabled {
 		avalancheEngine = common.TraceEngine(avalancheEngine, m.Tracer)
 	}
@@ -1202,9 +1204,10 @@ func (m *manager) createSnowmanChain(
 		vm = tracedvm.NewBlockVM(vm, "proposervm", m.Tracer)
 	}
 
-	// The channel through which a VM may send messages to the consensus engine
-	// VM uses this channel to notify engine that a block is ready to be made
-	msgChan := make(chan common.Message, defaultChannelSize)
+	cn := &block.ChangeNotifier{
+		ChainVM: vm,
+	}
+	vm = cn
 
 	if err := vm.Initialize(
 		context.TODO(),
@@ -1213,7 +1216,6 @@ func (m *manager) createSnowmanChain(
 		genesisData,
 		chainConfig.Upgrade,
 		chainConfig.Config,
-		msgChan,
 		fxs,
 		messageSender,
 	); err != nil {
@@ -1277,8 +1279,9 @@ func (m *manager) createSnowmanChain(
 	// Asynchronously passes messages from the network to the consensus engine
 	h, err := handler.New(
 		ctx,
+		cn,
+		vm.WaitForEvent,
 		vdrs,
-		msgChan,
 		m.FrontierPollFrequency,
 		m.ConsensusAppConcurrency,
 		m.ResourceTracker,

@@ -17,8 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
+	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
 var (
@@ -34,7 +34,7 @@ type Manager interface {
 	// Returns the ID of the most recently accepted block.
 	LastAccepted() ids.ID
 
-	SetPreference(blkID ids.ID) (updated bool)
+	SetPreference(blkID ids.ID)
 	Preferred() ids.ID
 
 	GetBlock(blkID ids.ID) (snowman.Block, error)
@@ -51,7 +51,7 @@ type Manager interface {
 }
 
 func NewManager(
-	mempool mempool.Mempool,
+	mempool mempool.Mempool[*txs.Tx],
 	metrics metrics.Metrics,
 	s state.State,
 	txExecutorBackend *executor.Backend,
@@ -69,10 +69,9 @@ func NewManager(
 	return &manager{
 		backend: backend,
 		acceptor: &acceptor{
-			backend:      backend,
-			metrics:      metrics,
-			validators:   validatorManager,
-			bootstrapped: txExecutorBackend.Bootstrapped,
+			backend:    backend,
+			metrics:    metrics,
+			validators: validatorManager,
 		},
 		rejector: &rejector{
 			backend:         backend,
@@ -111,10 +110,8 @@ func (m *manager) NewBlock(blk block.Block) snowman.Block {
 	}
 }
 
-func (m *manager) SetPreference(blkID ids.ID) bool {
-	updated := m.preferred != blkID
+func (m *manager) SetPreference(blkID ids.ID) {
 	m.preferred = blkID
-	return updated
 }
 
 func (m *manager) Preferred() ids.ID {

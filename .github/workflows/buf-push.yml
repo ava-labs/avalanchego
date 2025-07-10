@@ -15,10 +15,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: bufbuild/buf-action@v1
+      - uses: bufbuild/buf-action@dfda68eacb65895184c76b9ae522b977636a2c47 #v1.1.4
         with:
           input: "proto"
           # Breaking changes are managed by the rpcchainvm protocol version.
           breaking: false
           token: ${{ secrets.BUF_TOKEN }}
-          version: 1.35.0
+          # This version should match the version installed in the nix dev shell
+          version: 1.47.2

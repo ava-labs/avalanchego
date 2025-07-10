@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/databasemock"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -261,9 +260,8 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 				SharedMemory: sharedMemory,
 			},
 		},
-		metrics:      metrics.Noop,
-		validators:   validatorstest.Manager,
-		bootstrapped: &utils.Atomic[bool]{},
+		metrics:    metrics.Noop,
+		validators: validatorstest.Manager,
 	}
 
 	blk, err := block.NewApricotCommitBlock(parentID, 1 /*height*/)
@@ -371,9 +369,8 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 				SharedMemory: sharedMemory,
 			},
 		},
-		metrics:      metrics.Noop,
-		validators:   validatorstest.Manager,
-		bootstrapped: &utils.Atomic[bool]{},
+		metrics:    metrics.Noop,
+		validators: validatorstest.Manager,
 	}
 
 	blk, err := block.NewApricotAbortBlock(parentID, 1 /*height*/)

@@ -1,5 +1,218 @@
 # Release Notes
 
+## [v1.13.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.2)
+
+This version is backwards compatible to [v1.13.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.0). It is optional, but encouraged.
+
+The plugin version is updated to `41` all plugins must update to be compatible.
+
+### APIs
+
+- Added initial support for HTTP2 connections into VMs
+- Removed native support for gzip compression of HTTP requests
+
+### Fixes
+
+- Fixed message timeout handling on L1s configured with `validatorOnly=true`
+- Fixed segfault on ARM64 when profiling is enabled
+
+### What's Changed
+
+- chore(tests/load): C-chain load testing by @qdm12 in https://github.com/ava-labs/avalanchego/pull/3914
+- Improve comments on message Ops by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3987
+- Remove requestID expectation for UnrequestedOps by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3989
+- Add Simplex Messages To p2p.proto by @samliok in https://github.com/ava-labs/avalanchego/pull/3976
+- [tmpnet] Enable exclusive scheduling by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3988
+- [testing] Add local kube support for load tests by @RodrigoVillar in https://github.com/ava-labs/avalanchego/pull/3986
+- Add a label to XSVM tests by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/3991
+- [tmpnet] Avoid port forwarding when running in a kube cluster by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3997
+- Add support for VM HTTP2 handlers by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/3294
+- Move HTTP2 routing information into headers by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/4001
+- Clarify field names for simplex p2p messages by @samliok in https://github.com/ava-labs/avalanchego/pull/4002
+- Remove gzip middleware from API server by @mpignatelli12 in https://github.com/ava-labs/avalanchego/pull/4005
+- fix: allow for load tests to run in-cluster by @RodrigoVillar in https://github.com/ava-labs/avalanchego/pull/4003
+- chore: update libevm version by @alarso16 in https://github.com/ava-labs/avalanchego/pull/4006
+- Add support for XSVM grpc server reflection by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/4010
+- fix: update log commands for stopping collectors by @RodrigoVillar in https://github.com/ava-labs/avalanchego/pull/4011
+- [tmpnet] Enure node config is saved on restart for both runtimes by @maru-ava in https://github.com/ava-labs/avalanchego/pull/4015
+- BLS Components for Simplex by @samliok in https://github.com/ava-labs/avalanchego/pull/3993
+- Capitalize secrets references by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/4018
+- build: update `libevm` to `v1.13.14-0.3.0.rc.1` by @alarso16 in https://github.com/ava-labs/avalanchego/pull/4023
+- Allow internal messages from disallowed nodeIDs by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/4024
+- optimize historical range by @rrazvan1 in https://github.com/ava-labs/avalanchego/pull/3658
+
+### New Contributors
+
+- @mpignatelli12 made their first contribution in https://github.com/ava-labs/avalanchego/pull/4005
+- @alarso16 made their first contribution in https://github.com/ava-labs/avalanchego/pull/4006
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.13.1...v1.13.2
+
+## [v1.13.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.1)
+
+This version is backwards compatible to [v1.13.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.0). It is optional, but encouraged.
+
+The plugin version is updated to `40` all plugins must update to be compatible.
+
+### APIs
+
+- Removed `avm.getAddressTxs` api
+- Added L1 validators to `platformvm.GetCurrentValidators` client implementation
+
+### Configs
+
+- Removed `--tracing-enabled` and added `disabled` as an option to `--tracing-exporter-type`
+- Removed AVM indexer configs
+  - `index-transactions`
+  - `index-allow-incomplete`
+
+### What's Changed
+
+- Export tmpnet functions for CLI interface by @felipemadero in https://github.com/ava-labs/avalanchego/pull/3727
+- Use IPv4 addresses if possible by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3812
+- [ci] Source shellcheck from nix instead of installing via script by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3811
+- [ci] Use SHAs instead of tags for 3rd-party github actions by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3822
+- [tmpnet] Add collector log path to readiness check log output by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3823
+- Add context for errors in proposervm `repairAcceptedChainByHeight` by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/3818
+- [ci] Enable run-monitored-tmpnet-cmd to use a remote flake file by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3820
+- Add context to errors in `avm` by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/3821
+- Remove block reindexing after Etna by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3813
+- Update protobuf dependencies to the same version as nix packages by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3828
+- update: platformvm config doc by @ashucoder9 in https://github.com/ava-labs/avalanchego/pull/3694
+- Expose merkledb defaults by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/3748
+- [tmpnet] Add table of contents to README by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3837
+- fix(metrics): fix c-chain metrics not reporting by @darioush in https://github.com/ava-labs/avalanchego/pull/3835
+- [tmpnet] Update script to run instead of install by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3830
+- [ci] Update to use commit SHAs for non-floating tags by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3834
+- [ci] Configure action/setup-go to read golang version from go.mod by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3825
+- [nix] Install protobuf codegen binaries in the dev shell by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3829
+- [tmpnet] Remove obsolete readme content by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3827
+- [docs] Document requirement to install modern bash on macos by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3841
+- refactor: use the built-in max/min to simplify the code by @evenevent in https://github.com/ava-labs/avalanchego/pull/3844
+- Update BLST to v0.3.14 to support Go 1.24 by @yacovm in https://github.com/ava-labs/avalanchego/pull/3846
+- chore: allow individuals to extend `direnv` config by @ARR4N in https://github.com/ava-labs/avalanchego/pull/3847
+- [tmpnet] s/Network.ChainConfigs/Network.PrimaryChainConfigs/ by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3854
+- Remove plugins/ from .gitignore by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3862
+- fix: record wrong nil `err` by @tinyfoxy in https://github.com/ava-labs/avalanchego/pull/3851
+- [tmpnet] Provide genesis, subnet and chain config via content flags by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3857
+- Make sure inner state summary accept is called by @aaronbuchwald in https://github.com/ava-labs/avalanchego/pull/3831
+- avoid tmpnet to create empty genesis on disk by @felipemadero in https://github.com/ava-labs/avalanchego/pull/3868
+- Remove GetAddressTxs by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/3872
+- [tmpnet] Fixed faulty error handling on bootstrap failure by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3873
+- Set `subnets.Config.ConsensusParameters` to serialize with omitempty by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3874
+- [tmpnet] Update rpc version check to tolerate usage of `go run` by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3869
+- Update coreth to v0.15.1-rc.0 by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3875
+- [tmpnet] Ensure Node has a reference to Network by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3870
+- [tooling] Simplify avalanchego build script by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3861
+- Simplify P-Chain block has changes check by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3880
+- [tmpnet] Switch back to using maps for subnet config by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3877
+- [tmpnet] Refactor runtime configuration in preparation for kube by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3867
+- [tooling] Add scripts that build+run tools and put them in the path by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3878
+- [tooling] Add support for the Task (go-task) task runner by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3863
+- [Docs] Fix links and make paths absolute by @martineckardt in https://github.com/ava-labs/avalanchego/pull/3885
+- Remove unused constant checkIndexedFrequency by @yacovm in https://github.com/ava-labs/avalanchego/pull/3887
+- [tmpnet] Unify start network flag usage between e2e and tmpnetctl by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3871
+- [tmpnet] Avoid serializing the node data directory by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3881
+- [tmpnet] Rename NodeProcess to ProcessRuntime by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3890
+- wrap db in initDatabase with corruptable db by @ceyonur in https://github.com/ava-labs/avalanchego/pull/3892
+- [tmpnet] Switch FlagsMap from map[string]any to map[string]string by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3884
+- [tmpnet] Ensure tmpnet methods always have a logger by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3893
+- [tmpnet] Ensure all node runtime methods accept a context by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3894
+- [tmpnet] Move WaitForHealthy from a function to a tmpnet.Node method by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3896
+- Grant marun ownership of tooling configuration by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3895
+- Bump golang.org/x/net from 0.36.0 to 0.38.0 by @dependabot in https://github.com/ava-labs/avalanchego/pull/3889
+- Fix typos by @omahs in https://github.com/ava-labs/avalanchego/pull/3908
+- Fix typos and add missing hyphens in README files by @Dimitrolito in https://github.com/ava-labs/avalanchego/pull/3583
+- Fix typos in iterator.go by @Marcofann in https://github.com/ava-labs/avalanchego/pull/3809
+- Use EstimateBaseFee in e2e tests by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3782
+- docs: fix flag name to `--proposervm-min-block-delay` by @ceyonur in https://github.com/ava-labs/avalanchego/pull/3911
+- fix rpcchainvm handling for arbitrary length http body by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/3910
+- Add git to nix packages by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3912
+- refactor: use the built-in max/min to simplify the code by @careworry in https://github.com/ava-labs/avalanchego/pull/3913
+- Update codeowners by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/3915
+- [tmpnet] Delegate writing of the flag file to the runtime by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3897
+- [tmpnet] Move monitoring label handling to node by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3898
+- Move database creation to database factory package by @ceyonur in https://github.com/ava-labs/avalanchego/pull/3899
+- Update owner of CODEOWNERS by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3920
+- update merkledb codeowners by @rrazvan1 in https://github.com/ava-labs/avalanchego/pull/3919
+- chore: fix some comments by @standstaff in https://github.com/ava-labs/avalanchego/pull/3584
+- Support UnmarshalJSON for `ExporterType` by @RodrigoVillar in https://github.com/ava-labs/avalanchego/pull/3565
+- Fix change/range proofs + simplify the code by @rrazvan1 in https://github.com/ava-labs/avalanchego/pull/3688
+- [ci] Fix windows build job by reverting to use build script by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3921
+- update: service.md for callouts by @ashucoder9 in https://github.com/ava-labs/avalanchego/pull/3832
+- Reintroduce P-chain block reindexing by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3883
+- Bump bufbuild/buf-action from 1.1.0 to 1.1.1 by @dependabot in https://github.com/ava-labs/avalanchego/pull/3855
+- Bump github/codeql-action from 3.28.13 to 3.28.16 by @dependabot in https://github.com/ava-labs/avalanchego/pull/3916
+- Ensure HTTP headers are propagated through the rpcchainvm by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/3917
+- Document acp-118 message verification by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3925
+- Add P-Chain state test by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3924
+- Document ACP-77 handling of 0 weight requests by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3926
+- Refactor cache implementations by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3239
+- Fix `proposerMinBlockDelay` location in config doc for L1s by @federiconardelli7 in https://github.com/ava-labs/avalanchego/pull/3819
+- Close stale issues and PRs by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/3906
+- Update wallet to report tx processing duration via event handlers by @marun in https://github.com/ava-labs/avalanchego/pull/3560
+- Pretty print logged durations in E2E by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3930
+- Reenable the upgrade test by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3929
+- Remove RequestBuildBlock on P-Chain Mempool by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/3705
+- Add test for proposervm BuildBlock after bootstrapping by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/2876
+- Add logging to corruptabledb closure by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/3938
+- Fix broken Buf documentation link in proto README by @GarmashAlex in https://github.com/ava-labs/avalanchego/pull/3936
+- refactor: replace []byte(fmt.Sprintf) with fmt.Appendf by @findnature in https://github.com/ava-labs/avalanchego/pull/3932
+- Add linkspector CI action by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3939
+- Update minimum golang version to v1.23.9 by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3940
+- fix: validate allocations locked amount in genesis to prevent panic by @DracoLi in https://github.com/ava-labs/avalanchego/pull/3941
+- [tmpnet] Enable runtime-specific restart behavior by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3882
+- [tooling] Misc direnv changes by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3944
+- Fully populate test context by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3943
+- Use libevm instead of coreth by @ceyonur in https://github.com/ava-labs/avalanchego/pull/3918
+- [tmpnet] Define reusable flags for configuring kubernetes client access by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3945
+- Fix flaky bootstrapping test by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3955
+- [tmpnet] Separate start of prometheus and promtail collectors by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3947
+- Add L1 validators to getCurrentValidators response by @ceyonur in https://github.com/ava-labs/avalanchego/pull/3843
+- refactor: use slices.Contains to simplify code by @yetyear in https://github.com/ava-labs/avalanchego/pull/3952
+- Update proposervm summary to roll forward only by @aaronbuchwald in https://github.com/ava-labs/avalanchego/pull/3950
+- Remove dead code by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3966
+- Add Granite to the `upgrade.Config` by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3964
+- refactor genesis building logic in avm and platformvm by @DracoLi in https://github.com/ava-labs/avalanchego/pull/3949
+- [ci] Update dependabot to only propose security updates for github actions by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3969
+- Bump bufbuild/buf-action from 1.1.1 to 1.1.4 by @dependabot in https://github.com/ava-labs/avalanchego/pull/3971
+- Bump github/codeql-action from 3.28.16 to 3.28.18 by @dependabot in https://github.com/ava-labs/avalanchego/pull/3970
+- Add Load Framework by @RodrigoVillar in https://github.com/ava-labs/avalanchego/pull/3942
+- adds config.json for C-Chain during antithesis - json logs by @aleksandarknezevic in https://github.com/ava-labs/avalanchego/pull/3968
+- [tmpnet] Ensure GetNodeURIs returns locally-accessible URIs to ensure kube compatibility by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3973
+- refactor: use slices.Contains to simplify code by @pullmerge in https://github.com/ava-labs/avalanchego/pull/3974
+- chore(deps): use coreth with geth-aligned ethclient package by @qdm12 in https://github.com/ava-labs/avalanchego/pull/3977
+- Remove dead “Turtle’s Way HTTP/gRPC” link by @gap-editor in https://github.com/ava-labs/avalanchego/pull/3978
+- Small cleanup in `App` and `Node` by @geoff-vball in https://github.com/ava-labs/avalanchego/pull/3962
+- make GOPROXY overridable in constants.sh by @siphonelee in https://github.com/ava-labs/avalanchego/pull/3979
+- Disallow slow sorting by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3981
+- [tmpnet] Enable deployment to kube by @marun in https://github.com/ava-labs/avalanchego/pull/3615
+- [tmpnet] Enable monitoring of nodes running in kube by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3794
+- Bump coreth to include fix for large tx handling by @aaronbuchwald in https://github.com/ava-labs/avalanchego/pull/3984
+- Align minCompatibleTime settings across TestNetwork and Network by @michaelkaplan13 in https://github.com/ava-labs/avalanchego/pull/3842
+- Remove dead “Turtle’s Way HTTP/gRPC” link by @gap-editor in https://github.com/ava-labs/avalanchego/pull/3983
+
+### New Contributors
+
+- @evenevent made their first contribution in https://github.com/ava-labs/avalanchego/pull/3844
+- @tinyfoxy made their first contribution in https://github.com/ava-labs/avalanchego/pull/3851
+- @Dimitrolito made their first contribution in https://github.com/ava-labs/avalanchego/pull/3583
+- @Marcofann made their first contribution in https://github.com/ava-labs/avalanchego/pull/3809
+- @careworry made their first contribution in https://github.com/ava-labs/avalanchego/pull/3913
+- @standstaff made their first contribution in https://github.com/ava-labs/avalanchego/pull/3584
+- @RodrigoVillar made their first contribution in https://github.com/ava-labs/avalanchego/pull/3565
+- @federiconardelli7 made their first contribution in https://github.com/ava-labs/avalanchego/pull/3819
+- @GarmashAlex made their first contribution in https://github.com/ava-labs/avalanchego/pull/3936
+- @findnature made their first contribution in https://github.com/ava-labs/avalanchego/pull/3932
+- @yetyear made their first contribution in https://github.com/ava-labs/avalanchego/pull/3952
+- @aleksandarknezevic made their first contribution in https://github.com/ava-labs/avalanchego/pull/3968
+- @pullmerge made their first contribution in https://github.com/ava-labs/avalanchego/pull/3974
+- @gap-editor made their first contribution in https://github.com/ava-labs/avalanchego/pull/3978
+- @geoff-vball made their first contribution in https://github.com/ava-labs/avalanchego/pull/3962
+- @siphonelee made their first contribution in https://github.com/ava-labs/avalanchego/pull/3979
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.13.0...v1.13.1
+
 ## [v1.13.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.0)
 
 This upgrade consists of the following Avalanche Community Proposal (ACP):
@@ -19,7 +232,7 @@ The plugin version is unchanged at `39` and is compatible with version `v1.12.2`
 ### Configs
 
 - Added:
-  - `--proposervm-min-block-duration`
+  - `--proposervm-min-block-delay`
   - `--network-no-ingress-connections-grace-period` to configure how long after startup it is expected for a Mainnet validator to have received an ingress connection.
 
 ### What's Changed

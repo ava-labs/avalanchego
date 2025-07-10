@@ -12,14 +12,34 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	ethcommon "github.com/ethereum/go-ethereum/common"
+	ethcommon "github.com/ava-labs/libevm/common"
 )
 
 const defaultPollFrequency = 100 * time.Millisecond
 
-// Signature of the function that will be called after a transaction
-// has been issued with the ID of the issued transaction.
-type PostIssuanceFunc func(ids.ID)
+// IssuanceReceipt is the information known after issuing a transaction.
+type IssuanceReceipt struct {
+	// Identifies the primary chain ("P", "X" or "C")
+	ChainAlias string
+	// ID of the issued transaction
+	TxID ids.ID
+	// The time from initiation to issuance
+	Duration time.Duration
+}
+
+// ConfirmationReceipt is the information known after issuing and confirming a
+// transaction.
+type ConfirmationReceipt struct {
+	// Identifies the primary chain ("P", "X" or "C")
+	ChainAlias string
+	// ID of the issued transaction
+	TxID ids.ID
+	// The time from initiation to confirmation
+	TotalDuration time.Duration
+	// The time from issuance to confirmation. It does not include the duration
+	// of issuance.
+	ConfirmationDuration time.Duration
+}
 
 type Option func(*Options)
 
@@ -48,7 +68,8 @@ type Options struct {
 	pollFrequencySet bool
 	pollFrequency    time.Duration
 
-	postIssuanceFunc PostIssuanceFunc
+	issuanceHandler     func(IssuanceReceipt)
+	confirmationHandler func(ConfirmationReceipt)
 }
 
 func NewOptions(ops []Option) *Options {
@@ -132,8 +153,12 @@ func (o *Options) PollFrequency() time.Duration {
 	return defaultPollFrequency
 }
 
-func (o *Options) PostIssuanceFunc() PostIssuanceFunc {
-	return o.postIssuanceFunc
+func (o *Options) IssuanceHandler() func(IssuanceReceipt) {
+	return o.issuanceHandler
+}
+
+func (o *Options) ConfirmationHandler() func(ConfirmationReceipt) {
+	return o.confirmationHandler
 }
 
 func WithContext(ctx context.Context) Option {
@@ -200,8 +225,14 @@ func WithPollFrequency(pollFrequency time.Duration) Option {
 	}
 }
 
-func WithPostIssuanceFunc(f PostIssuanceFunc) Option {
+func WithIssuanceHandler(f func(IssuanceReceipt)) Option {
 	return func(o *Options) {
-		o.postIssuanceFunc = f
+		o.issuanceHandler = f
+	}
+}
+
+func WithConfirmationHandler(f func(ConfirmationReceipt)) Option {
+	return func(o *Options) {
+		o.confirmationHandler = f
 	}
 }

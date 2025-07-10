@@ -7,11 +7,22 @@
 
 * @StephenButtolph
 *.md @meaghanfitzgerald @StephenButtolph
+/.dockerignore @maru-ava
+/.envrc @maru-ava
 /.github/ @maru-ava
 /.github/*.md @maru-ava @meaghanfitzgerald
+/.github/CODEOWNERS @StephenButtolph
+/.gitignore @maru-ava @StephenButtolph
+/.golangci.yml @maru-ava @StephenButtolph
+/Dockerfile @maru-ava
+/Taskfile.yml @maru-ava
+/flake.lock @maru-ava
+/flake.nix @maru-ava
 /network/p2p/ @joshua-kim
 /network/p2p/*.md @joshua-kim @meaghanfitzgerald
 /scripts/ @maru-ava
 /scripts/*.md @maru-ava @meaghanfitzgerald
 /tests/ @maru-ava
 /tests/*.md @maru-ava @meaghanfitzgerald
+/x/merkledb @joshua-kim @rrazvan1
+/x/sync @joshua-kim @rrazvan1

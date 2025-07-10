@@ -16,31 +16,22 @@ print_usage() {
 race=''
 while getopts 'r' flag; do
   case "${flag}" in
-    r) race='-r' ;;
+    r)
+      echo "Building with race detection enabled"
+      race='-race'
+      ;;
     *) print_usage
       exit 1 ;;
   esac
 done
 
-# Avalanchego root folder
-AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
-# Load the constants
-source "$AVALANCHE_PATH"/scripts/constants.sh
+REPO_ROOT=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
+# Configure the build environment
+source "${REPO_ROOT}"/scripts/constants.sh
+# Determine the git commit hash to use for the build
+source "${REPO_ROOT}"/scripts/git_commit.sh
 
-# Download dependencies
-echo "Downloading dependencies..."
-go mod download
-
-build_args="$race"
-
-# Build avalanchego
-"$AVALANCHE_PATH"/scripts/build_avalanche.sh $build_args
-
-# Exit build successfully if the AvalancheGo binary is created successfully
-if [[ -f "$avalanchego_path" ]]; then
-        echo "Build Successful"
-        exit 0
-else
-        echo "Build failure" >&2
-        exit 1
-fi
+echo "Building AvalancheGo with [$(go version)]..."
+go build ${race} -o "${avalanchego_path}" \
+   -ldflags "-X github.com/ava-labs/avalanchego/version.GitCommit=$git_commit $static_ld_flags" \
+   "${REPO_ROOT}"/main
