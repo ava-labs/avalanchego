@@ -6,12 +6,12 @@ package vms
 import (
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -226,40 +226,42 @@ var _ = ginkgo.Describe("[XSVM]", ginkgo.Label("xsvm"), func() {
 
 		// Stream pings to the server and block until all events are received
 		// back.
-		wg := &sync.WaitGroup{}
-		wg.Add(2)
+		eg := &errgroup.Group{}
 
 		n := 10
-		go func() {
-			defer func() {
-				ginkgo.GinkgoRecover()
-				wg.Done()
-			}()
-
+		eg.Go(func() error {
 			for i := 0; i < n; i++ {
 				msg := fmt.Sprintf("ping-%d", i)
-				require.NoError(stream.Send(&xsvm.StreamPingRequest{
+				if err := stream.Send(&xsvm.StreamPingRequest{
 					Message: msg,
-				}))
+				}); err != nil {
+					return err
+				}
+
 				log.Info("sent message", zap.String("msg", msg))
 			}
-		}()
 
-		go func() {
-			defer func() {
-				ginkgo.GinkgoRecover()
-				wg.Done()
-			}()
+			return nil
+		})
 
+		eg.Go(func() error {
 			for i := 0; i < n; i++ {
 				reply, err := stream.Recv()
-				require.NoError(err)
-				require.Equal(fmt.Sprintf("ping-%d", i), reply.Message)
+				if err != nil {
+					return err
+				}
+
+				if fmt.Sprintf("ping-%d", i) != reply.Message {
+					return fmt.Errorf("unexpected ping reply: %s", reply.Message)
+				}
+
 				log.Info("received message", zap.String("msg", reply.Message))
 			}
-		}()
 
-		wg.Wait()
+			return nil
+		})
+
+		require.NoError(eg.Wait())
 	})
 })
 

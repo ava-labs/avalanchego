@@ -79,10 +79,9 @@ func TestManagerSetPreference(t *testing.T) {
 	manager := &manager{
 		preferred: initialPreference,
 	}
-	require.False(manager.SetPreference(initialPreference))
+	require.Equal(initialPreference, manager.Preferred())
 
 	newPreference := ids.GenerateTestID()
-	require.True(manager.SetPreference(newPreference))
-	require.False(manager.SetPreference(newPreference))
-	require.True(manager.SetPreference(initialPreference))
+	manager.SetPreference(newPreference)
+	require.Equal(newPreference, manager.Preferred())
 }

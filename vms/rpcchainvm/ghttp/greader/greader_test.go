@@ -29,7 +29,7 @@ func TestErrIOEOF(t *testing.T) {
 	reader.RegisterReaderServer(server, readerServer)
 
 	go func() {
-		require.NoError(server.Serve(listener))
+		_ = server.Serve(listener)
 	}()
 
 	conn, err := grpc.DialContext(context.Background(), "bufnet",

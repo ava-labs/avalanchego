@@ -133,11 +133,9 @@ func (mr *ManagerMockRecorder) Preferred() *gomock.Call {
 }
 
 // SetPreference mocks base method.
-func (m *Manager) SetPreference(blkID ids.ID) bool {
+func (m *Manager) SetPreference(blkID ids.ID) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetPreference", blkID)
-	ret0, _ := ret[0].(bool)
-	return ret0
+	m.ctrl.Call(m, "SetPreference", blkID)
 }
 
 // SetPreference indicates an expected call of SetPreference.

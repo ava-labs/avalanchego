@@ -4,12 +4,14 @@
 package mempool
 
 import (
+	"context"
 	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -296,4 +298,30 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 
 	err = mpool.Add(tx)
 	require.NoError(err, "should have added tx to mempool")
+}
+
+func TestWaitForEventCancelled(t *testing.T) {
+	m := newMempool()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := m.WaitForEvent(ctx)
+	require.ErrorIs(t, err, context.Canceled)
+}
+
+func TestWaitForEventWithTx(t *testing.T) {
+	require := require.New(t)
+
+	m := newMempool()
+	errs := make(chan error)
+	go func() {
+		tx := newTx(0, 32)
+		errs <- m.Add(tx)
+	}()
+
+	msg, err := m.WaitForEvent(context.Background())
+	require.NoError(err)
+	require.Equal(common.PendingTxs, msg)
+	require.NoError(<-errs)
 }

@@ -602,11 +602,7 @@ func (n *network) Peers(
 func (n *network) Dispatch() error {
 	go n.runTimers() // Periodically perform operations
 	go n.inboundConnUpgradeThrottler.Dispatch()
-	for { // Continuously accept new connections
-		if n.onCloseCtx.Err() != nil {
-			break
-		}
-
+	for n.onCloseCtx.Err() == nil { // Continuously accept new connections
 		conn, err := n.listener.Accept() // Returns error when n.Close() is called
 		if err != nil {
 			n.peerConfig.Log.Debug("error during server accept", zap.Error(err))
