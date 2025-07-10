@@ -31,10 +31,9 @@ func (op *TransferOperation) Outs() []verify.State {
 }
 
 func (op *TransferOperation) Verify() error {
-	switch {
-	case op == nil:
+	if op == nil {
 		return errNilTransferOperation
-	default:
-		return verify.All(&op.Input, &op.Output)
 	}
+
+	return verify.All(&op.Input, &op.Output)
 }

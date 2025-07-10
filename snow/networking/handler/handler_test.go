@@ -6,7 +6,6 @@ package handler
 import (
 	"context"
 	"errors"
-	"sync"
 	"testing"
 	"time"
 
@@ -19,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -66,10 +66,13 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	)
 	require.NoError(err)
 
+	subscription, _ := createSubscriber()
+
 	handlerIntf, err := New(
 		ctx,
+		&block.ChangeNotifier{},
+		subscription,
 		vdrs,
-		nil,
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
@@ -173,10 +176,16 @@ func TestHandlerClosesOnError(t *testing.T) {
 	)
 	require.NoError(err)
 
+	var cn block.ChangeNotifier
+	subscription := func(context.Context) (common.Message, error) {
+		return common.PendingTxs, nil
+	}
+
 	handlerIntf, err := New(
 		ctx,
+		&cn,
+		subscription,
 		vdrs,
-		nil,
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
@@ -276,10 +285,13 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	)
 	require.NoError(err)
 
+	subscription, _ := createSubscriber()
+
 	handlerIntf, err := New(
 		ctx,
+		&block.ChangeNotifier{},
+		subscription,
 		vdrs,
-		nil,
 		1,
 		testThreadPoolSize,
 		resourceTracker,
@@ -346,7 +358,6 @@ func TestHandlerDispatchInternal(t *testing.T) {
 
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 	ctx := snowtest.ConsensusContext(snowCtx)
-	msgFromVMChan := make(chan common.Message)
 	vdrs := validators.NewManager()
 	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
@@ -367,10 +378,14 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	)
 	require.NoError(err)
 
+	subscription, messages := createSubscriber()
+	notified := make(chan common.Message)
+
 	handler, err := New(
 		ctx,
+		&block.ChangeNotifier{},
+		subscription,
 		vdrs,
-		msgFromVMChan,
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
@@ -395,10 +410,14 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		return ctx
 	}
 
-	wg := &sync.WaitGroup{}
-	engine.NotifyF = func(context.Context, common.Message) error {
-		wg.Done()
-		return nil
+	engine.NotifyF = func(ctx context.Context, msg common.Message) error {
+		select {
+		case notified <- msg:
+			notified <- msg
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 
 	handler.SetEngineManager(&EngineManager{
@@ -417,10 +436,14 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		return nil
 	}
 
-	wg.Add(1)
 	handler.Start(context.Background(), false)
-	msgFromVMChan <- 0
-	wg.Wait()
+	messages <- common.PendingTxs
+	select {
+	case msg := <-notified:
+		require.Equal(common.PendingTxs, msg)
+	case <-time.After(time.Minute):
+		require.FailNow("Handler did not dispatch expected message")
+	}
 }
 
 // Tests that messages are routed to the correct engine type
@@ -543,10 +566,13 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 			)
 			require.NoError(err)
 
+			subscription, _ := createSubscriber()
+
 			handler, err := New(
 				ctx,
+				&block.ChangeNotifier{},
+				subscription,
 				vdrs,
-				nil,
 				time.Second,
 				testThreadPoolSize,
 				resourceTracker,
@@ -626,10 +652,13 @@ func TestHandlerStartError(t *testing.T) {
 	)
 	require.NoError(err)
 
+	subscription, _ := createSubscriber()
+
 	handler, err := New(
 		ctx,
+		&block.ChangeNotifier{},
+		subscription,
 		validators.NewManager(),
-		nil,
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
@@ -652,4 +681,19 @@ func TestHandlerStartError(t *testing.T) {
 
 	_, err = handler.AwaitStopped(context.Background())
 	require.NoError(err)
+}
+
+func createSubscriber() (common.Subscription, chan<- common.Message) {
+	messages := make(chan common.Message, 1)
+
+	subscription := func(ctx context.Context) (common.Message, error) {
+		select {
+		case msg := <-messages:
+			return msg, nil
+		case <-ctx.Done():
+			return common.Message(0), ctx.Err()
+		}
+	}
+
+	return subscription, messages
 }

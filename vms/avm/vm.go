@@ -140,7 +140,6 @@ func (vm *VM) Initialize(
 	genesisBytes []byte,
 	_ []byte,
 	configBytes []byte,
-	_ chan<- common.Message,
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
@@ -359,13 +358,13 @@ func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, erro
  ******************************************************************************
  */
 
-func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<- common.Message) error {
+func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID) error {
 	time := vm.Config.Upgrades.CortinaTime
 	if err := vm.state.InitializeChainState(stopVertexID, time); err != nil {
 		return fmt.Errorf("failed to initialize chain state: %w", err)
 	}
 
-	mempool, err := xmempool.New("mempool", vm.registerer, toEngine)
+	mempool, err := xmempool.New("mempool", vm.registerer)
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}
