@@ -70,7 +70,7 @@ runs:
     - name: Run command
       shell: bash
       # --impure ensures the env vars are accessible to the command
-      run: ${{ inputs.run_env }} ${{ github.action_path }}/nix-develop.sh --impure --command bash -x ${{ inputs.run }}
+      run: ${{ inputs.run_env }} ${{ github.action_path }}/nix-develop.sh --impure --command ${{ inputs.run }}
       env:
         # Always collect metrics locally even when nodes are running in kube to enable collection from the test workload
         TMPNET_START_METRICS_COLLECTOR: ${{ inputs.prometheus_username != '' }}
