@@ -22,6 +22,7 @@ type VmStateDB interface {
 	SubBalanceMultiCoin(common.Address, common.Hash, *big.Int)
 }
 
+// Allow embedding VmStateDB without exporting the embedded field.
 type vmStateDB = VmStateDB
 
 type StateDB struct {
@@ -47,16 +48,6 @@ func (s *StateDB) Prepare(rules params.Rules, sender, coinbase common.Address, d
 	s.vmStateDB.Prepare(rules, sender, coinbase, dst, precompiles, list)
 }
 
-// GetLogData returns the underlying topics and data from each log included in the [StateDB].
-// Test helper function.
-func (s *StateDB) GetLogData() (topics [][]common.Hash, data [][]byte) {
-	for _, log := range s.Logs() {
-		topics = append(topics, log.Topics)
-		data = append(data, common.CopyBytes(log.Data))
-	}
-	return topics, data
-}
-
 // GetPredicateStorageSlots returns the storage slots associated with the address, index pair.
 // A list of access tuples can be included within transaction types post EIP-2930. The address
 // is declared directly on the access tuple and the index is the i'th occurrence of an access
@@ -73,9 +64,4 @@ func (s *StateDB) GetPredicateStorageSlots(address common.Address, index int) ([
 		return nil, false
 	}
 	return predicates[index], true
-}
-
-// SetPredicateStorageSlots sets the predicate storage slots for the given address
-func (s *StateDB) SetPredicateStorageSlots(address common.Address, predicates [][]byte) {
-	s.predicateStorageSlots[address] = predicates
 }
