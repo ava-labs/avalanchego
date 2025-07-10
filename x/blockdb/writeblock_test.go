@@ -5,6 +5,7 @@ package blockdb
 
 import (
 	"math"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -256,6 +257,7 @@ func TestWriteBlock_Errors(t *testing.T) {
 		setup      func(db *Database)
 		config     DatabaseConfig
 		wantErr    error
+		wantErrMsg string
 	}{
 		{
 			name:       "empty block nil",
@@ -330,6 +332,29 @@ func TestWriteBlock_Errors(t *testing.T) {
 			headerSize: 0,
 			wantErr:    safemath.ErrOverflow,
 		},
+		{
+			name:   "writeBlockAt - data file write failure",
+			height: 0,
+			block:  make([]byte, 100),
+			setup: func(db *Database) {
+				// close the data file to trigger a write error in writeBlockAt
+				file, err := db.getOrOpenDataFile(0)
+				require.NoError(t, err)
+				require.NoError(t, file.Close())
+			},
+			headerSize: 0,
+			wantErrMsg: "failed to write block to data file",
+		},
+		{
+			name:   "writeIndexEntryAt - index file write failure",
+			height: 0,
+			block:  make([]byte, 100),
+			setup: func(db *Database) {
+				db.indexFile.Close()
+			},
+			headerSize: 0,
+			wantErrMsg: "failed to write index entry",
+		},
 	}
 
 	for _, tt := range tests {
@@ -347,7 +372,11 @@ func TestWriteBlock_Errors(t *testing.T) {
 			}
 
 			err := store.WriteBlock(tt.height, tt.block, tt.headerSize)
-			require.ErrorIs(t, err, tt.wantErr)
+			if tt.wantErrMsg != "" {
+				require.True(t, strings.HasPrefix(err.Error(), tt.wantErrMsg), "expected error message to start with %s, got %s", tt.wantErrMsg, err.Error())
+			} else {
+				require.ErrorIs(t, err, tt.wantErr)
+			}
 			checkDatabaseState(t, store, unsetHeight, unsetHeight)
 		})
 	}

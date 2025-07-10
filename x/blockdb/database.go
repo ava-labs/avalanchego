@@ -525,7 +525,7 @@ func (s *Database) ReadHeader(height BlockHeight) (BlockData, error) {
 			zap.Uint32("headerSize", indexEntry.HeaderSize),
 			zap.Uint32("blockSize", indexEntry.Size),
 		)
-		return nil, fmt.Errorf("invalid header size %d exceeds block size %d", indexEntry.HeaderSize, indexEntry.Size)
+		return nil, fmt.Errorf("%w: invalid header size %d exceeds block size %d", ErrHeaderSizeTooLarge, indexEntry.HeaderSize, indexEntry.Size)
 	}
 
 	// Read only the header portion
@@ -711,10 +711,6 @@ func (s *Database) persistIndexHeader() error {
 	if err != nil {
 		return fmt.Errorf("failed to serialize header for writing state: %w", err)
 	}
-	if uint64(len(headerBytes)) != sizeOfIndexFileHeader {
-		return fmt.Errorf("internal error: serialized header state size %d, expected %d", len(headerBytes), sizeOfIndexFileHeader)
-	}
-
 	if _, err := s.indexFile.WriteAt(headerBytes, 0); err != nil {
 		return fmt.Errorf("failed to write header state to index file: %w", err)
 	}
@@ -791,67 +787,75 @@ func (s *Database) recover() error {
 			ErrCorrupted, calculatedNextDataWriteOffset, nextDataWriteOffset)
 	default:
 		// The data on disk is ahead of the index. We need to recover un-indexed blocks.
-		s.log.Info("Recovery: data files are ahead of index; recovering un-indexed blocks.",
-			zap.Uint64("headerNextWriteOffset", nextDataWriteOffset),
-			zap.Uint64("actualDataNextWriteOffset", calculatedNextDataWriteOffset),
-		)
-
-		// Start scan from where the index left off.
-		currentScanOffset := nextDataWriteOffset
-		recoveredHeights := make([]BlockHeight, 0)
-		for currentScanOffset < calculatedNextDataWriteOffset {
-			bh, err := s.recoverBlockAtOffset(currentScanOffset, calculatedNextDataWriteOffset)
-			if err != nil {
-				if errors.Is(err, io.EOF) {
-					// reach end of this file, try to read the next file
-					currentFileIndex := int(currentScanOffset / s.header.MaxDataFileSize)
-					nextFileIndex, err := safemath.Add(uint64(currentFileIndex), 1)
-					if err != nil {
-						return fmt.Errorf("recovery: overflow in file index calculation: %w", err)
-					}
-					if currentScanOffset, err = safemath.Mul(nextFileIndex, s.header.MaxDataFileSize); err != nil {
-						return fmt.Errorf("recovery: overflow in scan offset calculation: %w", err)
-					}
-					continue
-				}
-				return err
-			}
-			s.log.Debug("Recovery: Successfully validated and indexed block",
-				zap.Uint64("height", bh.Height),
-				zap.Uint32("blockSize", bh.Size),
-				zap.Uint64("dataOffset", currentScanOffset),
-			)
-			recoveredHeights = append(recoveredHeights, bh.Height)
-			blockTotalSize, err := safemath.Add(uint64(sizeOfBlockEntryHeader), uint64(bh.Size))
-			if err != nil {
-				return fmt.Errorf("recovery: overflow in block size calculation: %w", err)
-			}
-			currentScanOffset, err = safemath.Add(currentScanOffset, blockTotalSize)
-			if err != nil {
-				return fmt.Errorf("recovery: overflow in scan offset calculation: %w", err)
-			}
+		if err := s.recoverUnindexedBlocks(nextDataWriteOffset, calculatedNextDataWriteOffset); err != nil {
+			return err
 		}
-		s.nextDataWriteOffset.Store(currentScanOffset)
-
-		// Update block heights based on recovered blocks
-		if len(recoveredHeights) > 0 {
-			if err := s.updateRecoveredBlockHeights(recoveredHeights); err != nil {
-				return fmt.Errorf("recovery: failed to update block heights: %w", err)
-			}
-		}
-
-		if err := s.persistIndexHeader(); err != nil {
-			return fmt.Errorf("recovery: failed to save index header after recovery scan: %w", err)
-		}
-
-		heights := s.getBlockHeights()
-		s.log.Info("Recovery: Scan finished",
-			zap.Int("recoveredBlocks", len(recoveredHeights)),
-			zap.Uint64("finalNextWriteOffset", s.nextDataWriteOffset.Load()),
-			zap.Uint64("maxContiguousBlockHeight", heights.maxContiguousHeight),
-			zap.Uint64("maxBlockHeight", heights.maxBlockHeight),
-		)
 	}
+	return nil
+}
+
+// recoverUnindexedBlocks scans data files from the given offset and recovers blocks that were written but not indexed.
+func (s *Database) recoverUnindexedBlocks(startOffset, endOffset uint64) error {
+	s.log.Info("Recovery: data files are ahead of index; recovering un-indexed blocks.",
+		zap.Uint64("startOffset", startOffset),
+		zap.Uint64("endOffset", endOffset),
+	)
+
+	// Start scan from where the index left off.
+	currentScanOffset := startOffset
+	recoveredHeights := make([]BlockHeight, 0)
+	for currentScanOffset < endOffset {
+		bh, err := s.recoverBlockAtOffset(currentScanOffset, endOffset)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				// reach end of this file, try to read the next file
+				currentFileIndex := int(currentScanOffset / s.header.MaxDataFileSize)
+				nextFileIndex, err := safemath.Add(uint64(currentFileIndex), 1)
+				if err != nil {
+					return fmt.Errorf("recovery: overflow in file index calculation: %w", err)
+				}
+				if currentScanOffset, err = safemath.Mul(nextFileIndex, s.header.MaxDataFileSize); err != nil {
+					return fmt.Errorf("recovery: overflow in scan offset calculation: %w", err)
+				}
+				continue
+			}
+			return err
+		}
+		s.log.Debug("Recovery: Successfully validated and indexed block",
+			zap.Uint64("height", bh.Height),
+			zap.Uint32("blockSize", bh.Size),
+			zap.Uint64("dataOffset", currentScanOffset),
+		)
+		recoveredHeights = append(recoveredHeights, bh.Height)
+		blockTotalSize, err := safemath.Add(uint64(sizeOfBlockEntryHeader), uint64(bh.Size))
+		if err != nil {
+			return fmt.Errorf("recovery: overflow in block size calculation: %w", err)
+		}
+		currentScanOffset, err = safemath.Add(currentScanOffset, blockTotalSize)
+		if err != nil {
+			return fmt.Errorf("recovery: overflow in scan offset calculation: %w", err)
+		}
+	}
+	s.nextDataWriteOffset.Store(currentScanOffset)
+
+	// Update block heights based on recovered blocks
+	if len(recoveredHeights) > 0 {
+		if err := s.updateRecoveredBlockHeights(recoveredHeights); err != nil {
+			return fmt.Errorf("recovery: failed to update block heights: %w", err)
+		}
+	}
+
+	if err := s.persistIndexHeader(); err != nil {
+		return fmt.Errorf("recovery: failed to save index header after recovery scan: %w", err)
+	}
+
+	heights := s.getBlockHeights()
+	s.log.Info("Recovery: Scan finished",
+		zap.Int("recoveredBlocks", len(recoveredHeights)),
+		zap.Uint64("finalNextWriteOffset", s.nextDataWriteOffset.Load()),
+		zap.Uint64("maxContiguousBlockHeight", heights.maxContiguousHeight),
+		zap.Uint64("maxBlockHeight", heights.maxBlockHeight),
+	)
 	return nil
 }
 
@@ -1033,6 +1037,7 @@ func (s *Database) closeFiles() {
 		s.indexFile.Close()
 	}
 	if s.fileCache != nil {
+		// closes all data files
 		s.fileCache.Flush()
 	}
 }
@@ -1112,17 +1117,6 @@ func (s *Database) writeBlockAt(offset uint64, bh blockEntryHeader, block BlockD
 
 func (s *Database) updateBlockHeights(writtenBlockHeight BlockHeight) error {
 	s.updateBlockHeightsAtomically(func(current *blockHeights) *blockHeights {
-		if current == nil {
-			heights := &blockHeights{
-				maxBlockHeight:      writtenBlockHeight,
-				maxContiguousHeight: unsetHeight,
-			}
-			if writtenBlockHeight == s.header.MinHeight {
-				heights.maxContiguousHeight = writtenBlockHeight
-			}
-			return heights
-		}
-
 		updated := &blockHeights{
 			maxBlockHeight:      current.maxBlockHeight,
 			maxContiguousHeight: current.maxContiguousHeight,
