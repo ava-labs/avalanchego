@@ -821,21 +821,44 @@ pub unsafe extern "C" fn fwd_free_database_error_result(
     // Note: we don't free the db pointer as it's managed by the caller
 }
 
-/// Start metrics exporter for this process
+/// Start metrics recorder for this process.
 ///
-/// # Arguments
+/// # Returns
+///
+/// A `Value` containing {0, null} if the metrics recorder was initialized.
+/// A `Value` containing {0, "error message"} if an error occurs.
+#[unsafe(no_mangle)]
+pub extern "C" fn fwd_start_metrics() -> Value {
+    metrics_setup::setup_metrics()
+        .map_err(|e| e.to_string())
+        .map_or_else(Into::into, Into::into)
+}
+
+/// Start metrics recorder and exporter for this process.
 ///
 /// * `metrics_port` - the port where metrics will be exposed at
 ///
 /// # Returns
 ///
-/// A `Value` containing {0, null} if the metrics exporter successfully started.
-/// A `Value` containing {0, "error message"} if the metrics exporter failed to start.
+/// A `Value` containing {0, null} if the metrics recorder was initialized and
+/// the exporter was started.
+/// A `Value` containing {0, "error message"} if an error occurs.
 #[unsafe(no_mangle)]
-pub extern "C" fn fwd_start_metrics(metrics_port: u16) -> Value {
-    metrics_setup::setup_metrics(metrics_port)
+pub extern "C" fn fwd_start_metrics_with_exporter(metrics_port: u16) -> Value {
+    metrics_setup::setup_metrics_with_exporter(metrics_port)
         .map_err(|e| e.to_string())
         .map_or_else(Into::into, Into::into)
+}
+
+/// Gather latest metrics for this process.
+///
+/// # Returns
+///
+/// A `Value` containing {len, bytes} representing the latest metrics for this process.
+/// A `Value` containing {0, "error message"} if unable to get the latest metrics.
+#[unsafe(no_mangle)]
+pub extern "C" fn fwd_gather() -> Value {
+    metrics_setup::gather_metrics().map_or_else(Into::into, |s| s.as_bytes().into())
 }
 
 /// Common arguments, accepted by both `fwd_create_db()` and `fwd_open_db()`.

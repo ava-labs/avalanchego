@@ -226,6 +226,16 @@ void fwd_free_database_error_result(struct DatabaseCreationResult *result);
 void fwd_free_value(struct Value *value);
 
 /**
+ * Gather latest metrics for this process.
+ *
+ * # Returns
+ *
+ * A `Value` containing {len, bytes} representing the latest metrics for this process.
+ * A `Value` containing {0, "error message"} if unable to get the latest metrics.
+ */
+struct Value fwd_gather(void);
+
+/**
  * Gets the value associated with the given key from the proposal provided.
  *
  * # Arguments
@@ -408,15 +418,24 @@ struct Value fwd_propose_on_proposal(const struct DatabaseHandle *db,
 struct Value fwd_root_hash(const struct DatabaseHandle *db);
 
 /**
- * Start metrics exporter for this process
+ * Start metrics recorder for this process.
  *
- * # Arguments
+ * # Returns
+ *
+ * A `Value` containing {0, null} if the metrics recorder was initialized.
+ * A `Value` containing {0, "error message"} if an error occurs.
+ */
+struct Value fwd_start_metrics(void);
+
+/**
+ * Start metrics recorder and exporter for this process.
  *
  * * `metrics_port` - the port where metrics will be exposed at
  *
  * # Returns
  *
- * A `Value` containing {0, null} if the metrics exporter successfully started.
- * A `Value` containing {0, "error message"} if the metrics exporter failed to start.
+ * A `Value` containing {0, null} if the metrics recorder was initialized and
+ * the exporter was started.
+ * A `Value` containing {0, "error message"} if an error occurs.
  */
-struct Value fwd_start_metrics(uint16_t metrics_port);
+struct Value fwd_start_metrics_with_exporter(uint16_t metrics_port);

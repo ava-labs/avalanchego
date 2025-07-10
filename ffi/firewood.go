@@ -129,14 +129,6 @@ func New(filePath string, conf *Config) (*Database, error) {
 	return &Database{handle: db}, nil
 }
 
-// Starts metrics exporter for this process.
-// Returns an error if the metrics exporter was unable to start or already started.
-// This function should only be called once per process.
-func StartMetrics(metricsPort uint16) error {
-	result := C.fwd_start_metrics(C.uint16_t(metricsPort))
-	return errorFromValue(&result)
-}
-
 // Update applies a batch of updates to the database, returning the hash of the
 // root node after the batch is applied.
 //

@@ -4,6 +4,7 @@ use std::error::Error;
 use std::fmt::Write;
 use std::net::Ipv6Addr;
 use std::ops::Deref;
+use std::sync::OnceLock;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
@@ -18,19 +19,35 @@ use chrono::{DateTime, Utc};
 use metrics::Key;
 use metrics_util::registry::{AtomicStorage, Registry};
 
-/// Sets up a metrics server over a specified port.
-/// This happens on a per-process basis, meaning that the metrics system
-/// cannot be initialized if it has already been set up in the same process.
-pub(crate) fn setup_metrics(metrics_port: u16) -> Result<(), Box<dyn Error>> {
-    let inner: TextRecorderInner = TextRecorderInner {
+static RECORDER: OnceLock<TextRecorder> = OnceLock::new();
+
+/// Starts metrics recorder.
+/// This happens on a per-process basis, meaning that the metrics system cannot
+/// be initialized if it has already been set up in the same process.
+pub fn setup_metrics() -> Result<(), Box<dyn Error>> {
+    let inner = TextRecorderInner {
         registry: Registry::atomic(),
         help: Mutex::new(HashMap::new()),
     };
     let recorder = TextRecorder {
         inner: Arc::new(inner),
     };
-    metrics::set_global_recorder(recorder.clone())?;
 
+    metrics::set_global_recorder(recorder.clone())?;
+    RECORDER
+        .set(recorder)
+        .map_err(|_| "recorder already initialized")?;
+
+    Ok(())
+}
+
+/// Starts metrics recorder along with an exporter over a specified port.
+/// This happens on a per-process basis, meaning that the metrics system
+/// cannot be initialized if it has already been set up in the same process.
+pub fn setup_metrics_with_exporter(metrics_port: u16) -> Result<(), Box<dyn Error>> {
+    setup_metrics()?;
+
+    let recorder = RECORDER.get().ok_or("recorder not initialized")?;
     Server::new(move |request| {
         if request.method() == "GET" {
             Response::builder()
@@ -51,6 +68,14 @@ pub(crate) fn setup_metrics(metrics_port: u16) -> Result<(), Box<dyn Error>> {
     .with_max_concurrent_connections(2)
     .spawn()?;
     Ok(())
+}
+
+/// Returns the latest metrics for this process.
+pub fn gather_metrics() -> Result<String, String> {
+    let Some(recorder) = RECORDER.get() else {
+        return Err(String::from("recorder not initialized"));
+    };
+    Ok(recorder.stats())
 }
 
 #[derive(Debug)]

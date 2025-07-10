@@ -2,17 +2,13 @@ package ffi
 
 import (
 	"bytes"
-	"context"
 	"encoding/hex"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -961,38 +957,4 @@ func TestGetFromRoot(t *testing.T) {
 	}
 	_, err = db.GetFromRoot(nonExistentRoot, []byte("key"))
 	r.Error(err, "GetFromRoot with non-existent root should return error")
-}
-
-func TestStartMetrics(t *testing.T) {
-	r := require.New(t)
-	ctx := context.Background()
-
-	db := newTestDatabase(t)
-
-	metricsPort := uint16(3000)
-	r.NoError(StartMetrics(metricsPort))
-
-	// Populate DB
-	keys, vals := kvForTest(10)
-	_, err := db.Update(keys, vals)
-	r.NoError(err)
-
-	req, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodGet,
-		fmt.Sprintf("http://localhost:%d", metricsPort),
-		nil,
-	)
-	r.NoError(err)
-
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
-	r.NoError(err)
-
-	body, err := io.ReadAll(resp.Body)
-	r.NoError(err)
-	r.NoError(resp.Body.Close())
-
-	// Check that batch op was recorded
-	r.Contains(string(body), "firewood_ffi_batch 1")
 }
