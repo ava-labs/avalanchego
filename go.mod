@@ -37,6 +37,7 @@ require (
 	github.com/mr-tron/base58 v1.2.0
 	github.com/nbutton23/zxcvbn-go v0.0.0-20180912185939-ae427f1e4c1d
 	github.com/onsi/ginkgo/v2 v2.13.1
+	github.com/onsi/gomega v1.29.0
 	github.com/pires/go-proxyproto v0.6.2
 	github.com/prometheus/client_golang v1.16.0
 	github.com/prometheus/client_model v0.3.0
@@ -81,7 +82,10 @@ require (
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 )
 
-require github.com/ava-labs/firewood-go-ethhash/ffi v0.0.8 // indirect
+require (
+	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.8 // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
+)
 
 require (
 	github.com/FactomProject/basen v0.0.0-20150613233007-fe3947df716e // indirect
