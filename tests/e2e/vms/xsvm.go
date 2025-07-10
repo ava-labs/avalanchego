@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"sync"
 	"time"
 
 	"connectrpc.com/connect"
@@ -17,8 +16,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"golang.org/x/net/http2"
+	"golang.org/x/sync/errgroup"
 
-	"github.com/ava-labs/avalanchego/api/server"
+	"github.com/ava-labs/avalanchego/api/connectclient"
 	"github.com/ava-labs/avalanchego/connectproto/pb/xsvm"
 	"github.com/ava-labs/avalanchego/connectproto/pb/xsvm/xsvmconnect"
 	"github.com/ava-labs/avalanchego/ids"
@@ -211,19 +211,22 @@ var _ = ginkgo.Describe("[XSVM]", ginkgo.Label("xsvm"), func() {
 			},
 		}
 
-		client := xsvmconnect.NewPingClient(httpClient, node.URI)
+		chainID := network.GetSubnet(subnetAName).Chains[0].ChainID.String()
+		client := xsvmconnect.NewPingClient(
+			httpClient,
+			node.URI,
+			connect.WithInterceptors(
+				connectclient.SetRouteHeaderInterceptor{Route: chainID},
+			),
+		)
 
 		tc.By("serving unary rpc")
 		msg := "foobar"
-
 		request := &connect.Request[xsvm.PingRequest]{
 			Msg: &xsvm.PingRequest{
 				Message: msg,
 			},
 		}
-
-		chainID := network.GetSubnet(subnetAName).Chains[0].ChainID
-		request.Header().Set(server.HTTPHeaderRoute, chainID.String())
 
 		reply, err := client.Ping(tc.DefaultContext(), request)
 		require.NoError(err)
@@ -232,7 +235,6 @@ var _ = ginkgo.Describe("[XSVM]", ginkgo.Label("xsvm"), func() {
 		tc.By("serving bidirectional streaming rpc")
 
 		stream := client.StreamPing(tc.DefaultContext())
-		stream.RequestHeader().Set(server.HTTPHeaderRoute, chainID.String())
 		ginkgo.DeferCleanup(func() {
 			require.NoError(stream.CloseRequest())
 		})
@@ -260,8 +262,14 @@ var _ = ginkgo.Describe("[XSVM]", ginkgo.Label("xsvm"), func() {
 		eg.Go(func() error {
 			for i := 0; i < n; i++ {
 				reply, err := stream.Receive()
-				require.NoError(err)
-				require.Equal(fmt.Sprintf("ping-%d", i), reply.Message)
+				if err != nil {
+					return err
+				}
+
+				if fmt.Sprintf("ping-%d", i) != reply.Message {
+					return fmt.Errorf("unexpected ping reply: %s", reply.Message)
+				}
+
 				log.Info("received message", zap.String("msg", reply.Message))
 			}
 
