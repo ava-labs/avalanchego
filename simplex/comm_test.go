@@ -90,7 +90,7 @@ func TestCommFailsWithoutCurrentNode(t *testing.T) {
 	config.Sender = sender
 
 	// set the curNode to a different nodeID than the one in the config
-	vdrs := generateTestValidators(t, 3)
+	vdrs := generateTestNodes(t, 3)
 	config.Validators = newTestValidatorInfo(vdrs)
 
 	_, err := NewComm(config)
