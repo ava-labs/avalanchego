@@ -38,7 +38,7 @@ var (
 func main() {
 	ctx := context.Background()
 	const (
-		chainUUID = "ou89q1D77mWa9ZhqbkhLvoPBNtbFzz4cDe5H4MUAHjbsY9bk6"
+		chainUUID = "2FRZ1cHxkdgqUKWSLGr59WNy1aiUi9QvMqRX1yZfDQ9ZDeq7AQ"
 		uri       = primary.LocalAPIURI + "/ext/bc/" + chainUUID + "/sae/http"
 	)
 	c, err := ethclient.DialContext(ctx, uri)
