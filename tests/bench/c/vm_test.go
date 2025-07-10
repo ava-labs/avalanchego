@@ -103,9 +103,20 @@ func TestReexecuteRange(t *testing.T) {
 		})
 	}
 
+	log := tests.NewDefaultLogger("c-chain-reexecution")
+
 	var (
 		targetDBDir  = filepath.Join(targetDirArg, "db")
 		chainDataDir = filepath.Join(targetDBDir, "chain-data-dir")
+	)
+
+	log.Info("re-executing block range with params",
+		zap.String("source-block-dir", sourceBlockDirArg),
+		zap.String("target-block-dir", targetBlockDirArg),
+		zap.String("target-dir", targetDirArg),
+		zap.Uint64("start-block", startBlockArg),
+		zap.Uint64("end-block", endBlockArg),
+		zap.Int("chan-size", chanSizeArg),
 	)
 
 	blockChan, err := createBlockChanFromLevelDB(t, sourceBlockDirArg, startBlockArg, endBlockArg, chanSizeArg)
@@ -373,7 +384,7 @@ func createBlockChanFromLevelDB(t *testing.T, sourceDir string, startBlock, endB
 			if err != nil {
 				ch <- blockResult{
 					BlockBytes: nil,
-					Err:        err,
+					Err:        fmt.Errorf("failed to get block %d: %w", i, err),
 				}
 				return
 			}

@@ -4,7 +4,15 @@ The C-Chain benchmarks support re-executing a range of mainnet C-Chain blocks ag
 
 AvalancheGo provides a [Taskfile](https://taskfile.dev/) with commands to manage the import/export of data required for re-execution (block range and current state) and triggering a benchmark run.
 
+## Metrics
+
 The C-Chain benchmarks export VM metrics to the same Grafana instance as AvalancheGo CI: https://grafana-poc.avax-dev.network/.
+
+You can view granular C-Chain processing metrics with the label attached to this job (job="c-chain-reexecution") [here](https://grafana-poc.avax-dev.network/d/c-chain-processing-custom-v8/c-chain-processing?orgId=1&from=now-5m&to=now&timezone=browser&var-datasource=P1809F7CD0C75ACF3&var-filter=job%7C%3D%7Cc-chain-reexecution&var-chain=C&refresh=10s).
+
+Note: to ensure Prometheus gets a final scrape at the end of a run, the test will sleep for 2s greater than the 10s Prometheus scrape interval, which will cause short-running tests to appear to take much longer than expected. Additionally, the linked dashboard displays most metrics using a 1min rate, which means that very short running tests will not produce a very useful visualization.
+
+For a realistic view, run the default C-Chain benchmark in the [final step](#run-default-c-chain-benchmark) or view the preview URL printed by the [c-chain-benchmark](../../../.github/workflows/c-chain-benchmark.yml) job, which executes the block range [101, 250k].
 
 ## Configure Dev Environment
 
@@ -20,15 +28,15 @@ To authenticate metrics collection (enabled by default), provide the Prometheus 
 
 ## Import Blocks
 
-To import the first 200 blocks for re-execution, you can fetch the following ZIP from S3: `s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-200.zip`:
+To import the first 200 blocks for re-execution, you can fetch the following ZIP from S3: `s3://avalanchego-bootstrap-testing/blocks-mainnet-10k-ldb.zip`:
 
 ```bash
-task import-s3-to-dir S3_SRC=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-200.zip LOCAL_DST=$HOME/exec-data/blocks
+task import-s3-to-dir S3_SRC=s3://avalanchego-bootstrap-testing/blocks-mainnet-10k-ldb.zip LOCAL_DST=$HOME/exec-data/blocks
 ```
 
 ## Create C-Chain State Snapshot
 
-To execute a range of blocks [N, N+K], we need an initial current state with the last accepted block of N-1. To generate this from scratch, simply execute the range of blocks [0, N-1] locally starting from an empty state:
+To execute a range of blocks [N, N+K], we need an initial current state with the last accepted block of N-1. To generate this from scratch, simply execute the range of blocks [1, N-1] (genesis is "executed" vacuously, so do not provide 0 as the start block) locally starting from an empty state:
 
 ```bash
 task reexecute-cchain-range EXECUTION_DATA_DIR=$HOME/exec-data START_BLOCK=1 END_BLOCK=100
@@ -78,16 +86,16 @@ task reexecute-cchain-range EXECUTION_DATA_DIR=$HOME/exec-data START_BLOCK=101 E
 
 Note: if you attempt to re-execute a second time on the same data set, it will fail because the current state has been updated to block 200.
 
-To re-execute with an entirely fresh copy, either use the defaults provided in [Taskfile.yaml](../../../Taskfile.yml) or provide the parameters we've already used here.
-
-Use the defaults to execute the range [101, 200]:
-
-```bash
-task reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=$HOME/reexec-data-defaults
-```
-
 Provide the parameters explicitly that we have just used locally:
 
 ```bash
-task reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=$HOME/reexec-data-params SOURCE_BLOCK_DIR=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-200.zip CURRENT_STATE_DIR=s3://avalanchego-bootstrap-testing/cchain-current-state-test/** START_BLOCK=101 END_BLOCK=200
+task reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=$HOME/reexec-data-params SOURCE_BLOCK_DIR=s3://avalanchego-bootstrap-testing/blocks-mainnet-10k-ldb.zip CURRENT_STATE_DIR=s3://avalanchego-bootstrap-testing/cchain-current-state-test/** START_BLOCK=101 END_BLOCK=10000
+```
+
+## Run Default C-Chain Benchmark
+
+To re-execute with an entirely fresh copy, use the defaults provided in [Taskfile.yaml](../../../Taskfile.yml) to execute the range [101, 250k]:
+
+```bash
+task reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=$HOME/reexec-data-defaults
 ```
