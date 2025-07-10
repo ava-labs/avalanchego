@@ -13,6 +13,30 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestReadHeader(t *testing.T) {
+	t.Run("error if block header size exceeds block size", func(t *testing.T) {
+		db, cleanup := newTestDatabase(t, DefaultConfig())
+		defer cleanup()
+
+		block := randomBlock(t)
+		require.NoError(t, db.WriteBlock(0, block, 1))
+
+		// load the index file for this block and manually change it such that the header size is larger than block size
+		indexEntry, err := db.readBlockIndex(0)
+		require.NoError(t, err)
+		indexEntry.HeaderSize = indexEntry.Size + 1
+		modified, err := indexEntry.MarshalBinary()
+		require.NoError(t, err)
+		offset, err := db.indexEntryOffset(0)
+		require.NoError(t, err)
+		_, err = db.indexFile.WriteAt(modified, int64(offset))
+		require.NoError(t, err)
+
+		_, err = db.ReadHeader(0)
+		require.ErrorIs(t, err, ErrHeaderSizeTooLarge)
+	})
+}
+
 func TestReadOperations(t *testing.T) {
 	tests := []struct {
 		name           string
