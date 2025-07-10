@@ -1,0 +1,98 @@
+syntax = "proto3";
+package admin.v1;
+
+option go_package = "github.com/ava-labs/avalanchego/proto/pb/admin/v1;adminv1";
+
+// AdminService is the API service for node admin management
+service AdminService {
+  rpc StartCPUProfiler(StartCPUProfilerRequest) returns (StartCPUProfilerResponse);
+  rpc StopCPUProfiler(StopCPUProfilerRequest) returns (StopCPUProfilerResponse);
+  rpc MemoryProfile(MemoryProfileRequest) returns (MemoryProfileResponse);
+  rpc LockProfile(LockProfileRequest) returns (LockProfileResponse);
+  rpc Alias(AliasRequest) returns (AliasResponse);
+  rpc AliasChain(AliasChainRequest) returns (AliasChainResponse);
+  rpc GetChainAliases(GetChainAliasesRequest) returns (GetChainAliasesResponse);
+  rpc Stacktrace(StacktraceRequest) returns (StacktraceResponse);
+  rpc SetLoggerLevel(SetLoggerLevelRequest) returns (SetLoggerLevelResponse);
+  rpc GetLoggerLevel(GetLoggerLevelRequest) returns (GetLoggerLevelResponse);
+  rpc GetConfig(GetConfigRequest) returns (GetConfigResponse);
+  rpc DBGet(DBGetRequest) returns (DBGetResponse);
+}
+
+message StartCPUProfilerRequest {}
+message StartCPUProfilerResponse {}
+
+message StopCPUProfilerRequest {}
+message StopCPUProfilerResponse {}
+
+message MemoryProfileRequest {}
+message MemoryProfileResponse {}
+
+message LockProfileRequest {}
+message LockProfileResponse {}
+
+message AliasRequest {
+  string endpoint = 1;
+  string alias = 2;
+}
+message AliasResponse {}
+
+message AliasChainRequest {
+  string chain = 1;
+  string alias = 2;
+}
+message AliasChainResponse {}
+
+message GetChainAliasesRequest {
+  string chain = 1;
+}
+message GetChainAliasesResponse {
+  repeated string aliases = 1;
+}
+
+message StacktraceRequest {}
+message StacktraceResponse {}
+
+message SetLoggerLevelRequest {
+  string logger_name = 1;
+  string log_level = 2;
+  string display_level = 3;
+}
+message SetLoggerLevelResponse {
+  map<string, LogAndDisplayLevels> logger_levels = 1;
+}
+
+message GetLoggerLevelRequest {
+  string logger_name = 1;
+}
+message GetLoggerLevelResponse {
+  map<string, LogAndDisplayLevels> logger_levels = 1;
+}
+
+message GetConfigRequest {}
+message GetConfigResponse {
+  string config_json = 1;
+}
+
+message DBGetRequest {
+  string key = 1;
+}
+message DBGetResponse {
+  string value = 1;
+  ErrorCode error_code = 2;
+}
+
+message LogAndDisplayLevels {
+  string log_level = 1;
+  string display_level = 2;
+}
+
+message VMAliases {
+  repeated string aliases = 1;
+}
+
+enum ErrorCode {
+  ERROR_CODE_UNSPECIFIED = 0;
+  ERROR_CODE_NOT_FOUND = 1;
+  ERROR_CODE_DATABASE_ERROR = 2;
+}
