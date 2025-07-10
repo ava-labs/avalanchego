@@ -5,9 +5,11 @@ package main
 
 import (
 	"flag"
+	"math/big"
 	"os"
 	"time"
 
+	"github.com/ava-labs/libevm/accounts/abi/bind"
 	"github.com/ava-labs/libevm/ethclient"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
@@ -16,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/tests/load"
+	"github.com/ava-labs/avalanchego/tests/load/c/contracts"
 	"github.com/ava-labs/avalanchego/tests/load2"
 )
 
@@ -110,14 +113,103 @@ func main() {
 	chainID, err := workers[0].Client.ChainID(ctx)
 	require.NoError(err)
 
+	txOpts, err := bind.NewKeyedTransactorWithChainID(workers[0].PrivKey, chainID)
+	require.NoError(err)
+
+	_, tx, contract, err := contracts.DeployEVMLoadSimulator(txOpts, workers[0].Client)
+	require.NoError(err)
+
+	_, err = bind.WaitDeployed(ctx, workers[0].Client, tx)
+	require.NoError(err)
+	workers[0].Nonce++
+
+	randomTest, err := createRandomTest(contract)
+	require.NoError(err)
+
 	generator, err := load2.NewLoadGenerator(
 		workers,
 		chainID,
 		metricsNamespace,
 		registry,
-		load2.ZeroTransferTest{PollFrequency: pollFrequency},
+		randomTest,
 	)
 	require.NoError(err)
 
 	generator.Run(tc, ctx, loadTimeout, testTimeout)
+}
+
+func createRandomTest(contract *contracts.EVMLoadSimulator) (load2.RandomTest, error) {
+	count := big.NewInt(5)
+	weightedTests := []load2.WeightedTest{
+		{
+			Test:   load2.ZeroTransferTest{},
+			Weight: 100,
+		},
+		{
+			Test: load2.ReadTest{
+				Contract: contract,
+				Count:    count,
+			},
+			Weight: 100,
+		},
+		{
+			Test: load2.WriteTest{
+				Contract: contract,
+				Count:    count,
+			},
+			Weight: 100,
+		},
+		{
+			Test: load2.StateModificationTest{
+				Contract: contract,
+				Count:    count,
+			},
+			Weight: 100,
+		},
+		{
+			Test: load2.HashingTest{
+				Contract: contract,
+				Count:    count,
+			},
+			Weight: 100,
+		},
+		{
+			Test: load2.MemoryTest{
+				Contract: contract,
+				Count:    count,
+			},
+			Weight: 100,
+		},
+		{
+			Test: load2.CallDepthTest{
+				Contract: contract,
+				Count:    count,
+			},
+			Weight: 100,
+		},
+		{
+			Test:   load2.ContractCreationTest{Contract: contract},
+			Weight: 100,
+		},
+		{
+			Test: load2.PureComputeTest{
+				Contract:      contract,
+				NumIterations: count,
+			},
+			Weight: 100,
+		},
+		{
+			Test: load2.LargeEventTest{
+				Contract:  contract,
+				NumEvents: count,
+			},
+			Weight: 100,
+		},
+		{
+			Test:   load2.ExternalCallTest{Contract: contract},
+			Weight: 100,
+		},
+	}
+
+	return load2.NewRandomTest(weightedTests)
 }
