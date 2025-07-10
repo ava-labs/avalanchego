@@ -225,7 +225,6 @@ func TestWriteBlock_Concurrency(t *testing.T) {
 
 			err := store.WriteBlock(height, block, 1)
 			if err != nil {
-				require.NoError(t, err, "WriteBlock failed for iteration %d (height %d)", i, height)
 				errors.Add(1)
 			}
 		}(i)
