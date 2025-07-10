@@ -80,15 +80,10 @@ func TestReexecuteRange(t *testing.T) {
 	r := require.New(t)
 	ctx := context.Background()
 
-	// Create a multi gatherer to pass in to the VM with the expected "avalanche_evm" prefix
-	// and chain="C" label.
-	// Apply the chain="C" label at the top-level.
-	cChainLabeledGatherer := metrics.NewLabelGatherer("chain")
-	prefixGatherer := metrics.NewPrefixGatherer()
-	r.NoError(cChainLabeledGatherer.Register("C", prefixGatherer))
-
 	// Create the prefix gatherer passed to the VM and register it with the top-level,
 	// labeled gatherer.
+	prefixGatherer := metrics.NewPrefixGatherer()
+
 	vmMultiGatherer := metrics.NewPrefixGatherer()
 	r.NoError(prefixGatherer.Register("avalanche_evm", vmMultiGatherer))
 
@@ -98,8 +93,10 @@ func TestReexecuteRange(t *testing.T) {
 	r.NoError(prefixGatherer.Register("avalanche_snowman", consensusRegistry))
 
 	if metricsEnabledArg {
-		collectRegistry(t, "c-chain-reexecution", "127.0.0.1:9000", time.Minute, cChainLabeledGatherer, map[string]string{
-			"job": "c-chain-reexecution",
+		collectRegistry(t, "c-chain-reexecution", "127.0.0.1:9000", time.Minute, prefixGatherer, map[string]string{
+			"job":               "c-chain-reexecution",
+			"is_ephemeral_node": "false",
+			"chain":             "C",
 		})
 	}
 
