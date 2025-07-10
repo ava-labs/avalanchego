@@ -319,7 +319,7 @@ tasks:
       SOURCE_BLOCK_DIR: '{{.SOURCE_BLOCK_DIR | default "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb.zip"}}'
       CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR | default "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-100.zip"}}'
       START_BLOCK: '{{.START_BLOCK | default "101"}}'
-      END_BLOCK: '{{.END_BLOCK | default "1000000"}}'
+      END_BLOCK: '{{.END_BLOCK | default "250000"}}'
     cmds:
       - task: import-cchain-reexecute-range
         vars:
