@@ -131,7 +131,12 @@ func TestReexecuteRange(t *testing.T) {
 		r.NoError(sourceVM.Shutdown(ctx))
 	}()
 
-	executor, err := newVMExecutor(sourceVM, consensusRegistry)
+	config := vmExecutorConfig{
+		Log:              tests.NewDefaultLogger("vm-executor"),
+		Registry:         consensusRegistry,
+		ExecutionTimeout: executionTimeout,
+	}
+	executor, err := newVMExecutor(sourceVM, config)
 	r.NoError(err)
 	r.NoError(executor.executeSequence(ctx, blockChan, executionTimeout))
 }
@@ -202,14 +207,25 @@ func newMainnetCChainVM(
 	return vm, nil
 }
 
-type BlockResult struct {
+type blockResult struct {
 	BlockBytes []byte
 	Height     uint64
 	Err        error
 }
 
-type VMExecutor struct {
-	log     logging.Logger
+type vmExecutorConfig struct {
+	Log logging.Logger
+	// Registry is the registry to register the metrics with.
+	Registry prometheus.Registerer
+	// ExecutionTimeout is the maximum timeout to continue executing blocks.
+	// If 0, no timeout is applied. If non-zero, the executor will exit early
+	// WITHOUT error after hitting the timeout.
+	// This is useful to provide consistent duration benchmarks.
+	ExecutionTimeout time.Duration
+}
+
+type vmExecutor struct {
+	config  vmExecutorConfig
 	vm      block.ChainVM
 	metrics *consensusMetrics
 }
@@ -218,8 +234,13 @@ type consensusMetrics struct {
 	lastAcceptedHeight prometheus.Gauge
 }
 
+// newConsensusMetrics creates a subset of the metrics from snowman consensus
+// [engine](../../snow/engine/snowman/metrics.go).
+//
+// The registry passed in is expected to be registered with the prefix
+// "avalanche_snowman" and the chain label (ex. chain="C") that would be handled
+// by the[chain manager](../../../chains/manager.go).
 func newConsensusMetrics(registry prometheus.Registerer) (*consensusMetrics, error) {
-	// Mimic the metrics from snowman consensus [engine](../../snow/engine/snowman/metrics.go).
 	errs := wrappers.Errs{}
 	m := &consensusMetrics{
 		lastAcceptedHeight: prometheus.NewGauge(prometheus.GaugeOpts{
@@ -231,20 +252,20 @@ func newConsensusMetrics(registry prometheus.Registerer) (*consensusMetrics, err
 	return m, errs.Err
 }
 
-func newVMExecutor(vm block.ChainVM, registry prometheus.Registerer) (*VMExecutor, error) {
-	metrics, err := newConsensusMetrics(registry)
+func newVMExecutor(vm block.ChainVM, config vmExecutorConfig) (*vmExecutor, error) {
+	metrics, err := newConsensusMetrics(config.Registry)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create consensus metrics: %w", err)
 	}
 
-	return &VMExecutor{
+	return &vmExecutor{
 		vm:      vm,
 		metrics: metrics,
-		log:     tests.NewDefaultLogger("vm-executor"),
+		config:  config,
 	}, nil
 }
 
-func (e *VMExecutor) execute(ctx context.Context, blockBytes []byte) error {
+func (e *vmExecutor) execute(ctx context.Context, blockBytes []byte) error {
 	blk, err := e.vm.ParseBlock(ctx, blockBytes)
 	if err != nil {
 		return fmt.Errorf("failed to parse block: %w", err)
@@ -261,7 +282,7 @@ func (e *VMExecutor) execute(ctx context.Context, blockBytes []byte) error {
 	return nil
 }
 
-func (e *VMExecutor) executeSequence(ctx context.Context, blkChan <-chan BlockResult, executionTimeout time.Duration) error {
+func (e *vmExecutor) executeSequence(ctx context.Context, blkChan <-chan blockResult, executionTimeout time.Duration) error {
 	blkID, err := e.vm.LastAccepted(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get last accepted block: %w", err)
@@ -272,7 +293,7 @@ func (e *VMExecutor) executeSequence(ctx context.Context, blkChan <-chan BlockRe
 	}
 
 	start := time.Now()
-	e.log.Info("last accepted block", zap.String("blkID", blkID.String()), zap.Uint64("height", blk.Height()))
+	e.config.Log.Info("last accepted block", zap.String("blkID", blkID.String()), zap.Uint64("height", blk.Height()))
 
 	for blkResult := range blkChan {
 		if blkResult.Err != nil {
@@ -280,17 +301,17 @@ func (e *VMExecutor) executeSequence(ctx context.Context, blkChan <-chan BlockRe
 		}
 
 		if blkResult.Height%1000 == 0 {
-			e.log.Info("executing block", zap.Uint64("height", blkResult.Height))
+			e.config.Log.Info("executing block", zap.Uint64("height", blkResult.Height))
 		}
 		if err := e.execute(ctx, blkResult.BlockBytes); err != nil {
 			return err
 		}
 		if executionTimeout > 0 && time.Since(start) > executionTimeout {
-			e.log.Info("exiting early due to execution timeout", zap.Duration("elapsed", time.Since(start)), zap.Duration("execution-timeout", executionTimeout))
+			e.config.Log.Info("exiting early due to execution timeout", zap.Duration("elapsed", time.Since(start)), zap.Duration("execution-timeout", executionTimeout))
 			return nil
 		}
 	}
-	e.log.Info("finished executing sequence")
+	e.config.Log.Info("finished executing sequence")
 
 	return nil
 }
@@ -332,9 +353,9 @@ func collectRegistry(t *testing.T, name string, addr string, timeout time.Durati
 	r.NoError(err)
 }
 
-func createBlockChanFromLevelDB(t *testing.T, sourceDir string, startBlock, endBlock uint64, chanSize int) (<-chan BlockResult, error) {
+func createBlockChanFromLevelDB(t *testing.T, sourceDir string, startBlock, endBlock uint64, chanSize int) (<-chan blockResult, error) {
 	r := require.New(t)
-	ch := make(chan BlockResult, chanSize)
+	ch := make(chan blockResult, chanSize)
 
 	db, err := leveldb.New(sourceDir, nil, logging.NoLog{}, prometheus.NewRegistry())
 	if err != nil {
@@ -350,14 +371,14 @@ func createBlockChanFromLevelDB(t *testing.T, sourceDir string, startBlock, endB
 		for i := startBlock; i <= endBlock; i++ {
 			blockBytes, err := db.Get(binary.BigEndian.AppendUint64(nil, i))
 			if err != nil {
-				ch <- BlockResult{
+				ch <- blockResult{
 					BlockBytes: nil,
 					Err:        err,
 				}
 				return
 			}
 
-			ch <- BlockResult{
+			ch <- blockResult{
 				BlockBytes: blockBytes,
 				Height:     i,
 				Err:        nil,
