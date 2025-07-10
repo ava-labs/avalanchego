@@ -105,7 +105,11 @@ func (c *Comm) simplexMessageToOutboundMessage(msg *simplex.Message) (message.Ou
 	var err error
 	switch {
 	case msg.VerifiedBlockMessage != nil:
-		outboundMessage, err = c.msgBuilder.BlockProposal(c.chainID, msg.VerifiedBlockMessage.VerifiedBlock.Bytes(), msg.VerifiedBlockMessage.Vote)
+		bytes, errBytes := msg.VerifiedBlockMessage.VerifiedBlock.Bytes()
+		if errBytes != nil {
+			return nil, fmt.Errorf("failed to serialize block: %w", err)
+		}
+		outboundMessage, err = c.msgBuilder.BlockProposal(c.chainID, bytes, msg.VerifiedBlockMessage.Vote)
 	case msg.VoteMessage != nil:
 		outboundMessage, err = c.msgBuilder.Vote(c.chainID, msg.VoteMessage.Vote.BlockHeader, msg.VoteMessage.Signature)
 	case msg.EmptyVoteMessage != nil:

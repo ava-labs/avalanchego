@@ -280,7 +280,16 @@ func (b *outMsgBuilder) ReplicationResponse(
 ) (OutboundMessage, error) {
 	qrs := make([]*p2p.QuorumRound, 0, len(data))
 	for _, qr := range data {
-		qrs = append(qrs, simplexQuorumRoundToP2P(&qr))
+		qr, err := simplexQuorumRoundToP2P(&qr)
+		if err != nil {
+			return nil, err
+		}
+		qrs = append(qrs, qr)
+	}
+
+	latestQR, err := simplexQuorumRoundToP2P(latestRound)
+	if err != nil {
+		return nil, err
 	}
 
 	return b.builder.createOutbound(
@@ -291,7 +300,7 @@ func (b *outMsgBuilder) ReplicationResponse(
 					Message: &p2p.Simplex_ReplicationResponse{
 						ReplicationResponse: &p2p.ReplicationResponse{
 							Data:        qrs,
-							LatestRound: simplexQuorumRoundToP2P(latestRound),
+							LatestRound: latestQR,
 						},
 					},
 				},
@@ -319,11 +328,16 @@ func simplexProtocolMetadataToP2P(md simplex.ProtocolMetadata) *p2p.ProtocolMeta
 	}
 }
 
-func simplexQuorumRoundToP2P(qr *simplex.VerifiedQuorumRound) *p2p.QuorumRound {
+func simplexQuorumRoundToP2P(qr *simplex.VerifiedQuorumRound) (*p2p.QuorumRound, error) {
 	p2pQR := &p2p.QuorumRound{}
 
 	if qr.VerifiedBlock != nil {
-		p2pQR.Block = qr.VerifiedBlock.Bytes()
+		bytes, err := qr.VerifiedBlock.Bytes()
+		if err != nil {
+			return nil, err
+		}
+
+		p2pQR.Block = bytes
 	}
 	if qr.Notarization != nil {
 		p2pQR.Notarization = &p2p.QuorumCertificate{
@@ -343,5 +357,5 @@ func simplexQuorumRoundToP2P(qr *simplex.VerifiedQuorumRound) *p2p.QuorumRound {
 			QuorumCertificate: qr.EmptyNotarization.QC.Bytes(),
 		}
 	}
-	return p2pQR
+	return p2pQR, nil
 }

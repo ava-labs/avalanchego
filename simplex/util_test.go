@@ -24,18 +24,17 @@ func newTestValidatorInfo(allVds []validators.GetValidatorOutput) map[ids.NodeID
 	return vds
 }
 
-func newEngineConfig() (*Config, error) {
+func newEngineConfig(t *testing.T, numNodes uint64) *Config {
+	require.Positive(t, numNodes)
+
 	ls, err := localsigner.New()
-	if err != nil {
-		return nil, err
-	}
+	require.NoError(t, err, "failed to create local signer")
 
 	nodeID := ids.GenerateTestNodeID()
 
 	simplexChainContext := SimplexChainContext{
 		NodeID:    nodeID,
 		ChainID:   ids.GenerateTestID(),
-		SubnetID:  ids.GenerateTestID(),
 		NetworkID: constants.UnitTestID,
 	}
 
@@ -46,10 +45,11 @@ func newEngineConfig() (*Config, error) {
 
 	validators := generateTestValidators(t, numNodes-1)
 	validators = append(validators, nodeInfo)
+
 	return &Config{
 		Ctx:        simplexChainContext,
 		Log:        logging.NoLog{},
-		Validators: newTestValidators(validators),
+		Validators: newTestValidatorInfo(validators),
 		SignBLS:    ls.Sign,
 	}
 }
@@ -67,9 +67,4 @@ func generateTestValidators(t *testing.T, num uint64) []validators.GetValidatorO
 		}
 	}
 	return vds
-	return &Config{
-		Ctx:        simplexChainContext,
-		Validators: newTestValidatorInfo([]validators.GetValidatorOutput{nodeInfo}),
-		SignBLS:    ls.Sign,
-	}, nil
 }
