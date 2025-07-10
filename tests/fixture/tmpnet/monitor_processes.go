@@ -5,6 +5,7 @@ package tmpnet
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -261,6 +262,8 @@ func getWorkingDir(cmdName string) (string, error) {
 
 // GetPrometheusServiceDiscoveryDir returns the path for prometheus file-based
 // service discovery configuration.
+//
+// file_sd_config docs: https://prometheus.io/docs/prometheus/latest/configuration/configuration/#file_sd_config
 func GetPrometheusServiceDiscoveryDir() (string, error) {
 	return getServiceDiscoveryDir(prometheusCmd)
 }
@@ -271,6 +274,43 @@ func getServiceDiscoveryDir(cmdName string) (string, error) {
 		return "", err
 	}
 	return filepath.Join(tmpnetDir, cmdName, "file_sd_configs"), nil
+}
+
+type SDConfig struct {
+	Targets []string          `json:"targets"`
+	Labels  map[string]string `json:"labels"`
+}
+
+func applyGitHubLabels(sdConfigs []SDConfig) []SDConfig {
+	for _, sdConfig := range sdConfigs {
+		for label, value := range GetGitHubLabels() {
+			sdConfig.Labels[label] = value
+		}
+	}
+	return sdConfigs
+}
+
+func WritePrometheusServiceDiscoveryConfigFile(name string, sdConfigs []SDConfig, withGitHubLabels bool) (string, error) {
+	serviceDiscoveryDir, err := GetPrometheusServiceDiscoveryDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get service discovery dir: %w", err)
+	}
+
+	if err := os.MkdirAll(serviceDiscoveryDir, perms.ReadWriteExecute); err != nil {
+		return "", fmt.Errorf("failed to create service discovery dir: %w", err)
+	}
+
+	if withGitHubLabels {
+		sdConfigs = applyGitHubLabels(sdConfigs)
+	}
+
+	configPath := filepath.Join(serviceDiscoveryDir, name+".json")
+	configData, err := json.MarshalIndent(sdConfigs, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	return configPath, os.WriteFile(configPath, configData, perms.ReadWrite)
 }
 
 func getLogFilename(cmdName string) string {
