@@ -10,7 +10,6 @@ import "C"
 
 import (
 	"errors"
-	"fmt"
 	"runtime"
 	"unsafe"
 )
@@ -58,7 +57,7 @@ func hashAndIDFromValue(v *C.struct_Value) ([]byte, uint32, error) {
 	if v.len == 0 {
 		errStr := C.GoString((*C.char)(unsafe.Pointer(v.data)))
 		C.fwd_free_value(v)
-		return nil, 0, fmt.Errorf("firewood error: %s", errStr)
+		return nil, 0, errors.New(errStr)
 	}
 
 	// Case 4
@@ -96,7 +95,7 @@ func errorFromValue(v *C.struct_Value) error {
 	if v.len == 0 {
 		errStr := C.GoString((*C.char)(unsafe.Pointer(v.data)))
 		C.fwd_free_value(v)
-		return fmt.Errorf("firewood error: %s", errStr)
+		return errors.New(errStr)
 	}
 
 	// Case 2 and 4
@@ -138,7 +137,7 @@ func bytesFromValue(v *C.struct_Value) ([]byte, error) {
 	if v.len == 0 {
 		errStr := C.GoString((*C.char)(unsafe.Pointer(v.data)))
 		C.fwd_free_value(v)
-		return nil, fmt.Errorf("firewood error: %s", errStr)
+		return nil, errors.New(errStr)
 	}
 
 	// Case 2
@@ -154,7 +153,7 @@ func databaseFromResult(result *C.struct_DatabaseCreationResult) (*C.DatabaseHan
 		errStr := C.GoString((*C.char)(unsafe.Pointer(result.error_str)))
 		C.fwd_free_database_error_result(result)
 		runtime.KeepAlive(result)
-		return nil, fmt.Errorf("firewood error: %s", errStr)
+		return nil, errors.New(errStr)
 	}
 	return result.db, nil
 }
