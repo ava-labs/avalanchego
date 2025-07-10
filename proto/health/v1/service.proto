@@ -1,0 +1,57 @@
+syntax = "proto3";
+package health.v1;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/ava-labs/avalanchego/proto/pb/health/v1;healthv1";
+
+// HealthService is the API service for health checks on a node
+service HealthService {
+  rpc Readiness(ReadinessRequest) returns (ReadinessResponse);
+  rpc Liveness(LivenessRequest) returns (LivenessResponse);
+  rpc Health(HealthRequest) returns (HealthResponse);
+}
+
+// Result is the result of a health check.
+message Result {
+  google.protobuf.Struct message = 1;
+  // Error is the string representation of the error returned by the failing
+  // HealthCheck. The value is nil if the check passed.
+  string error = 2;
+  // Timestamp of the last HealthCheck.
+  google.protobuf.Timestamp timestamp = 3;
+  // Duration is the amount of time this HealthCheck last took to evaluate.
+  int64 duration_ns = 4;
+  // ContiguousFailures the HealthCheck has returned.
+  int64 contiguous_failures = 5;
+  // TimeOfFirstFailure of the HealthCheck.
+  google.protobuf.Timestamp time_of_first_failure = 6;
+}
+
+message ReadinessResponse {
+  map<string, Result> checks = 1;
+  bool healthy = 2;
+}
+
+message ReadinessRequest {
+  repeated string tags = 1;
+}
+
+message LivenessResponse {
+  map<string, Result> checks = 1;
+  bool healthy = 2;
+}
+
+message LivenessRequest {
+  repeated string tags = 1;
+}
+
+message HealthResponse {
+  map<string, Result> checks = 1;
+  bool healthy = 2;
+}
+
+message HealthRequest {
+  repeated string tags = 1;
+}

@@ -14,6 +14,7 @@ import (
 	"io"
 	"io/fs"
 	"net"
+	"net/http"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -21,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"connectrpc.com/grpcreflect"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -47,6 +49,10 @@ import (
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
+	"github.com/ava-labs/avalanchego/proto/pb/admin/v1/adminv1connect"
+	"github.com/ava-labs/avalanchego/proto/pb/health/v1/healthv1connect"
+	"github.com/ava-labs/avalanchego/proto/pb/info/v1/infov1connect"
+	"github.com/ava-labs/avalanchego/proto/pb/metrics/v1/metricsv1connect"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -80,6 +86,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
+	adminconnect "github.com/ava-labs/avalanchego/api/admin/connecthandler"
+	healthconnect "github.com/ava-labs/avalanchego/api/health/connecthandler"
+	infoconnect "github.com/ava-labs/avalanchego/api/info/connecthandler"
+	metricsconnect "github.com/ava-labs/avalanchego/api/metrics/connecthandler"
 	databasefactory "github.com/ava-labs/avalanchego/database/factory"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -1280,13 +1290,27 @@ func (n *Node) initMetricsAPI() error {
 
 	n.Log.Info("initializing metrics API")
 
+	metricsServicePattern, metricsServiceHandler := metricsv1connect.NewMetricsServiceHandler(
+		metricsconnect.NewConnectMetricsService(n.MetricsGatherer),
+	)
+
+	reflectionPattern, reflectionHandler := grpcreflect.NewHandlerV1(
+		grpcreflect.NewStaticReflector(metricsv1connect.MetricsServiceName),
+	)
+
+	mux := http.NewServeMux()
+	mux.Handle(reflectionPattern, reflectionHandler)
+	mux.Handle(metricsServicePattern, metricsServiceHandler)
+
+	n.APIServer.AddHeaderRoute("metrics", mux)
+
 	return n.APIServer.AddRoute(
 		promhttp.HandlerFor(
 			n.MetricsGatherer,
 			promhttp.HandlerOpts{},
 		),
 		"metrics",
-		"",
+		"metrics",
 	)
 }
 
@@ -1298,26 +1322,45 @@ func (n *Node) initAdminAPI() error {
 		return nil
 	}
 	n.Log.Info("initializing admin API")
-	service, err := admin.NewService(
-		admin.Config{
-			Log:          n.Log,
-			DB:           n.DB,
-			ChainManager: n.chainManager,
-			HTTPServer:   n.APIServer,
-			ProfileDir:   n.Config.ProfilerConfig.Dir,
-			LogFactory:   n.LogFactory,
-			NodeConfig:   n.Config,
-			VMManager:    n.VMManager,
-			VMRegistry:   n.VMRegistry,
-		},
-	)
+
+	config := admin.Config{
+		Log:          n.Log,
+		DB:           n.DB,
+		ChainManager: n.chainManager,
+		HTTPServer:   n.APIServer,
+		ProfileDir:   n.Config.ProfilerConfig.Dir,
+		LogFactory:   n.LogFactory,
+		NodeConfig:   n.Config,
+		VMManager:    n.VMManager,
+		VMRegistry:   n.VMRegistry,
+	}
+
+	adminReceiver := &admin.Admin{
+		Config:   config,
+		Profiler: profiler.New(config.ProfileDir),
+	}
+
+	service, err := admin.NewService(adminReceiver)
 	if err != nil {
 		return err
 	}
+
+	adminServicePattern, adminServiceHandler := adminv1connect.NewAdminServiceHandler(
+		adminconnect.NewConnectAdminService(adminReceiver),
+	)
+	reflectionPattern, reflectionHandler := grpcreflect.NewHandlerV1(
+		grpcreflect.NewStaticReflector(adminv1connect.AdminServiceName),
+	)
+
+	mux := http.NewServeMux()
+	mux.Handle(reflectionPattern, reflectionHandler)
+	mux.Handle(adminServicePattern, adminServiceHandler)
+	n.APIServer.AddHeaderRoute("admin", mux)
+
 	return n.APIServer.AddRoute(
 		service,
 		"admin",
-		"",
+		"admin",
 	)
 }
 
@@ -1358,33 +1401,47 @@ func (n *Node) initInfoAPI() error {
 		return fmt.Errorf("problem creating proof of possession: %w", err)
 	}
 
-	service, err := info.NewService(
-		info.Parameters{
-			Version:   version.CurrentApp,
-			NodeID:    n.ID,
-			NodePOP:   pop,
-			NetworkID: n.Config.NetworkID,
-			VMManager: n.VMManager,
-			Upgrades:  n.Config.UpgradeConfig,
-
+	infoReceiver := &info.Info{
+		Parameters: info.Parameters{
+			Version:          version.CurrentApp,
+			NodeID:           n.ID,
+			NodePOP:          pop,
+			NetworkID:        n.Config.NetworkID,
+			VMManager:        n.VMManager,
+			Upgrades:         n.Config.UpgradeConfig,
 			TxFee:            n.Config.TxFee,
 			CreateAssetTxFee: n.Config.CreateAssetTxFee,
 		},
-		n.Log,
-		n.vdrs,
-		n.chainManager,
-		n.VMManager,
-		n.Config.NetworkConfig.MyIPPort,
-		n.Net,
-		n.benchlistManager,
-	)
+		Log:          n.Log,
+		Validators:   n.vdrs,
+		ChainManager: n.chainManager,
+		VmManager:    n.VMManager,
+		MyIP:         n.Config.NetworkConfig.MyIPPort,
+		Networking:   n.Net,
+		Benchlist:    n.benchlistManager,
+	}
+
+	service, err := info.NewService(infoReceiver)
 	if err != nil {
 		return err
 	}
+
+	infoPattern, infoConnHandler := infov1connect.NewInfoServiceHandler(
+		infoconnect.NewConnectInfoService(infoReceiver),
+	)
+	reflectionPattern, reflectionHandler := grpcreflect.NewHandlerV1(
+		grpcreflect.NewStaticReflector(infov1connect.InfoServiceName),
+	)
+
+	mux := http.NewServeMux()
+	mux.Handle(reflectionPattern, reflectionHandler)
+	mux.Handle(infoPattern, infoConnHandler)
+	n.APIServer.AddHeaderRoute("info", mux)
+
 	return n.APIServer.AddRoute(
 		service,
 		"info",
-		"",
+		"info",
 	)
 }
 
@@ -1408,6 +1465,18 @@ func (n *Node) initHealthAPI() error {
 		n.Log.Info("skipping health API initialization because it has been disabled")
 		return nil
 	}
+
+	healthServicePattern, healthServiceHandler := healthv1connect.NewHealthServiceHandler(
+		healthconnect.NewConnectHealthService(n.health),
+	)
+	reflectionPattern, reflectionHandler := grpcreflect.NewHandlerV1(
+		grpcreflect.NewStaticReflector(healthv1connect.HealthServiceName),
+	)
+
+	mux := http.NewServeMux()
+	mux.Handle(reflectionPattern, reflectionHandler)
+	mux.Handle(healthServicePattern, healthServiceHandler)
+	n.APIServer.AddHeaderRoute("health", mux)
 
 	n.Log.Info("initializing Health API")
 	err = n.health.RegisterHealthCheck("network", n.Net, health.ApplicationTag)
@@ -1487,7 +1556,7 @@ func (n *Node) initHealthAPI() error {
 	err = n.APIServer.AddRoute(
 		handler,
 		"health",
-		"",
+		"health",
 	)
 	if err != nil {
 		return err
@@ -1495,8 +1564,8 @@ func (n *Node) initHealthAPI() error {
 
 	err = n.APIServer.AddRoute(
 		health.NewGetHandler(n.health.Readiness),
+		"health/readiness",
 		"health",
-		"/readiness",
 	)
 	if err != nil {
 		return err
@@ -1504,8 +1573,8 @@ func (n *Node) initHealthAPI() error {
 
 	err = n.APIServer.AddRoute(
 		health.NewGetHandler(n.health.Health),
+		"health/health",
 		"health",
-		"/health",
 	)
 	if err != nil {
 		return err
@@ -1513,8 +1582,8 @@ func (n *Node) initHealthAPI() error {
 
 	return n.APIServer.AddRoute(
 		health.NewGetHandler(n.health.Liveness),
+		"health/liveness",
 		"health",
-		"/liveness",
 	)
 }
 
