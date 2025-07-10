@@ -22,7 +22,6 @@ var (
 	lnHalf = math.Log(.5)
 
 	_ Manager = (*manager)(nil)
-	_ Manager = (*NoManager)(nil)
 )
 
 type CPUUser interface {
@@ -66,27 +65,6 @@ type Manager interface {
 	// Shutdown allocated resources and stop tracking all processes.
 	Shutdown()
 }
-
-type NoManager struct{}
-
-func (NoManager) CPUUsage() float64 {
-	return 0
-}
-
-func (NoManager) DiskUsage() (read float64, write float64) {
-	return 0, 0
-}
-
-func (NoManager) AvailableDiskBytes() uint64 {
-	return 0
-}
-
-func (NoManager) TrackProcess(int) {}
-
-func (NoManager) UntrackProcess(int) {}
-
-func (NoManager) Shutdown() {}
-
 type manager struct {
 	log            logging.Logger
 	processMetrics *metrics
