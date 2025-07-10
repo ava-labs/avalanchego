@@ -27,7 +27,6 @@ var (
 	errDigestNotFound       = errors.New("digest not found in block tracker")
 	errMismatchedPrevDigest = errors.New("prev digest does not match block parent")
 	errGenesisVerification  = errors.New("genesis block should not be verified")
-	errBlockAlreadyVerified = errors.New("block has already been verified")
 )
 
 type Block struct {
@@ -81,7 +80,7 @@ func (b *Block) Verify(ctx context.Context) (simplex.VerifiedBlock, error) {
 	}
 
 	if b.blockTracker.isBlockAlreadyVerified(b.vmBlock) {
-		return nil, errBlockAlreadyVerified
+		return b, nil
 	}
 
 	err = b.vmBlock.Verify(ctx)

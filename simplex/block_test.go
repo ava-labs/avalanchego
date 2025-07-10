@@ -111,7 +111,8 @@ func TestVerifyPrevNotFound(t *testing.T) {
 	require.ErrorIs(t, err, errDigestNotFound)
 }
 
-// TestVerifyTwice tests that a block cannot be verified more than once.
+// TestVerifyTwice tests that a block the same vmBlock will only
+// have its Verify method called once, even if Verify is called multiple times.
 func TestVerifyTwice(t *testing.T) {
 	ctx := context.Background()
 	testVMBlock := snowmantest.BuildChild(snowmantest.Genesis)
@@ -126,8 +127,9 @@ func TestVerifyTwice(t *testing.T) {
 	require.NoError(t, err)
 
 	// Attempt to verify the block again
+	vmBlock.VerifyV = errors.New("should not be called again")
 	_, err = b.Verify(ctx)
-	require.ErrorIs(t, err, errBlockAlreadyVerified)
+	require.NoError(t, err)
 }
 
 // TestVerifyGenesis tests that a block with a sequence number of 0 cannot be verified.
