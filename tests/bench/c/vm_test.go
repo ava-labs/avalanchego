@@ -136,10 +136,6 @@ func TestReexecuteRange(t *testing.T) {
 	r.NoError(executor.executeSequence(ctx, blockChan, executionTimeout))
 }
 
-func TestExportBlockRange(t *testing.T) {
-	exportBlockRange(t, sourceBlockDirArg, targetBlockDirArg, startBlockArg, endBlockArg, chanSizeArg)
-}
-
 func newMainnetCChainVM(
 	ctx context.Context,
 	vmAndSharedMemoryDB database.Database,
@@ -370,6 +366,10 @@ func createBlockChanFromLevelDB(t *testing.T, sourceDir string, startBlock, endB
 	}()
 
 	return ch, nil
+}
+
+func TestExportBlockRange(t *testing.T) {
+	exportBlockRange(t, sourceBlockDirArg, targetBlockDirArg, startBlockArg, endBlockArg, chanSizeArg)
 }
 
 func exportBlockRange(t *testing.T, sourceDir string, targetDir string, startBlock, endBlock uint64, chanSize int) {
