@@ -33,9 +33,6 @@ type DatabaseConfig struct {
 
 	// SyncToDisk determines if fsync is called after each write for durability.
 	SyncToDisk bool
-
-	// Truncate determines if existing data should be truncated when opening the database.
-	Truncate bool
 }
 
 // DefaultConfig returns the default options for BlockDB.
@@ -48,7 +45,6 @@ func DefaultConfig() DatabaseConfig {
 		MaxDataFiles:       DefaultMaxDataFiles,
 		CheckpointInterval: 1024,
 		SyncToDisk:         true,
-		Truncate:           false,
 	}
 }
 
@@ -74,12 +70,6 @@ func (c DatabaseConfig) WithDataDir(dataDir string) DatabaseConfig {
 // WithSyncToDisk returns a copy of the config with SyncToDisk set to the given value.
 func (c DatabaseConfig) WithSyncToDisk(syncToDisk bool) DatabaseConfig {
 	c.SyncToDisk = syncToDisk
-	return c
-}
-
-// WithTruncate returns a copy of the config with Truncate set to the given value.
-func (c DatabaseConfig) WithTruncate(truncate bool) DatabaseConfig {
-	c.Truncate = truncate
 	return c
 }
 

@@ -106,7 +106,7 @@ func TestRecovery_Success(t *testing.T) {
 
 				// Corrupt the header by setting the NextWriteOffset to be one block behind
 				blockSize := uint64(sizeOfBlockEntryHeader) + 4*1024
-				header.NextWriteOffset = header.NextWriteOffset - blockSize
+				header.NextWriteOffset -= blockSize
 				header.MaxContiguousHeight = 3
 				header.MaxHeight = 8
 

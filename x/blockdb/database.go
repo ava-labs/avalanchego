@@ -232,7 +232,6 @@ func New(config DatabaseConfig, log logging.Logger) (*Database, error) {
 		zap.String("dataDir", config.DataDir),
 		zap.Uint64("maxDataFileSize", config.MaxDataFileSize),
 		zap.Int("maxDataFiles", config.MaxDataFiles),
-		zap.Bool("truncate", config.Truncate),
 	)
 
 	if err := s.openAndInitializeIndex(); err != nil {
@@ -246,12 +245,10 @@ func New(config DatabaseConfig, log logging.Logger) (*Database, error) {
 		return nil, err
 	}
 
-	if !config.Truncate {
-		if err := s.recover(); err != nil {
-			s.log.Error("Failed to initialize database: recovery failed", zap.Error(err))
-			s.closeFiles()
-			return nil, fmt.Errorf("recovery failed: %w", err)
-		}
+	if err := s.recover(); err != nil {
+		s.log.Error("Failed to initialize database: recovery failed", zap.Error(err))
+		s.closeFiles()
+		return nil, fmt.Errorf("recovery failed: %w", err)
 	}
 
 	heights := s.getBlockHeights()
@@ -958,9 +955,6 @@ func (s *Database) openAndInitializeIndex() error {
 		return fmt.Errorf("failed to create index directory %s: %w", s.config.IndexDir, err)
 	}
 	openFlags := os.O_RDWR | os.O_CREATE
-	if s.config.Truncate {
-		openFlags |= os.O_TRUNC
-	}
 	var err error
 	s.indexFile, err = os.OpenFile(indexPath, openFlags, defaultFilePermissions)
 	if err != nil {
@@ -972,18 +966,6 @@ func (s *Database) openAndInitializeIndex() error {
 func (s *Database) initializeDataFiles() error {
 	if err := os.MkdirAll(s.config.DataDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create data directory %s: %w", s.config.DataDir, err)
-	}
-
-	if s.config.Truncate {
-		dataFiles, _, err := s.listDataFiles()
-		if err != nil {
-			return fmt.Errorf("failed to list data files for truncation: %w", err)
-		}
-		for _, filePath := range dataFiles {
-			if err := os.Remove(filePath); err != nil {
-				return fmt.Errorf("failed to remove old data file %s: %w", filePath, err)
-			}
-		}
 	}
 
 	// Pre-load the data file for the next write offset.
@@ -1003,8 +985,8 @@ func (s *Database) loadOrInitializeHeader() error {
 		return fmt.Errorf("failed to get index file stats: %w", err)
 	}
 
-	// reset index file if its empty or we are truncating
-	if s.config.Truncate || fileInfo.Size() == 0 {
+	// reset index file if its empty
+	if fileInfo.Size() == 0 {
 		s.header = indexFileHeader{
 			Version:             IndexFileVersion,
 			MinHeight:           s.config.MinimumHeight,
