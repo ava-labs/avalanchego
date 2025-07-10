@@ -1,0 +1,126 @@
+syntax = "proto3";
+package info.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/ava-labs/avalanchego/proto/pb/info/v1;infov1";
+
+// InfoService is the API service for unprivileged info on a node
+service InfoService {
+  rpc GetNodeVersion(GetNodeVersionRequest) returns (GetNodeVersionResponse);
+  rpc GetNodeID(GetNodeIDRequest) returns (GetNodeIDResponse);
+  rpc GetNodeIP(GetNodeIPRequest) returns (GetNodeIPResponse);
+  rpc GetNetworkID(GetNetworkIDRequest) returns (GetNetworkIDResponse);
+  rpc GetNetworkName(GetNetworkNameRequest) returns (GetNetworkNameResponse);
+  rpc GetBlockchainID(GetBlockchainIDRequest) returns (GetBlockchainIDResponse);
+  rpc Peers(PeersRequest) returns (PeersResponse);
+  rpc IsBootstrapped(IsBootstrappedRequest) returns (IsBootstrappedResponse);
+  rpc Upgrades(UpgradesRequest) returns (UpgradesResponse);
+  rpc Uptime(UptimeRequest) returns (UptimeResponse);
+  rpc GetVMs(GetVMsRequest) returns (GetVMsResponse);
+}
+
+message GetNodeVersionRequest {}
+message GetNodeVersionResponse {
+  string version = 1;
+  string database_version = 2;
+  uint32 rpc_protocol_version = 3;
+  string git_commit = 4;
+  map<string, string> vm_versions = 5;
+}
+
+message GetNodeIDRequest {}
+message GetNodeIDResponse {
+  string node_id = 1;
+  bytes node_pop = 2;
+}
+
+message GetNodeIPRequest {}
+message GetNodeIPResponse {
+  string ip = 1;
+}
+
+message GetNetworkIDRequest {}
+message GetNetworkIDResponse {
+  uint32 network_id = 1;
+}
+
+message GetNetworkNameRequest {}
+message GetNetworkNameResponse {
+  string network_name = 1;
+}
+
+message GetBlockchainIDRequest {
+  string alias = 1;
+}
+message GetBlockchainIDResponse {
+  string blockchain_id = 1;
+}
+
+message PeersRequest {
+  repeated string node_ids = 1;
+}
+
+// PeerInfo provides metadata about a connected peer in the network
+message PeerInfo {
+  string ip = 1;
+  string public_ip = 2;
+  string node_id = 3;
+  string version = 4;
+  string last_sent = 5;
+  string last_received = 6;
+  repeated string benched = 7;
+  uint32 observed_uptime = 8;
+  repeated string tracked_subnets = 9;
+}
+
+message PeersResponse {
+  uint32 num_peers = 1;
+  repeated PeerInfo peers = 2;
+}
+
+message IsBootstrappedRequest {
+  // Alias of the chain
+  // Can also be the string representation of the chain's ID
+  string chain = 1;
+}
+message IsBootstrappedResponse {
+  // True iff the chain exists and is done bootstrapping
+  bool is_bootstrapped = 1;
+}
+
+message UpgradesRequest {}
+message UpgradesResponse {
+  google.protobuf.Timestamp apricot_phase1_time = 1;
+  google.protobuf.Timestamp apricot_phase2_time = 2;
+  google.protobuf.Timestamp apricot_phase3_time = 3;
+  google.protobuf.Timestamp apricot_phase4_time = 4;
+  uint64 apricot_phase4_min_p_chain_height = 5;
+  google.protobuf.Timestamp apricot_phase5_time = 6;
+  google.protobuf.Timestamp apricot_phase_pre6_time = 7;
+  google.protobuf.Timestamp apricot_phase6_time = 8;
+  google.protobuf.Timestamp apricot_phase_post6_time = 9;
+  google.protobuf.Timestamp banff_time = 10;
+  google.protobuf.Timestamp cortina_time = 11;
+  string cortina_x_chain_stop_vertex_id = 12;
+  google.protobuf.Timestamp durango_time = 13;
+  google.protobuf.Timestamp etna_time = 14;
+  google.protobuf.Timestamp fortuna_time = 15;
+  google.protobuf.Timestamp granite_time = 16;
+}
+
+message UptimeRequest {}
+message UptimeResponse {
+  double rewarding_stake_percentage = 1;
+  double weighted_average_percentage = 2;
+}
+
+message GetVMsRequest {}
+message GetVMsResponse {
+  map<string, VMAliases> vms = 1;
+  map<string, string> fxs = 2;
+}
+
+message VMAliases {
+  repeated string aliases = 1;
+}

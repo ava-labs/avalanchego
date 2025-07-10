@@ -65,6 +65,7 @@ type Server interface {
 	// That is, add <route, handler> pairs to server so that API calls can be
 	// made to the VM.
 	RegisterChain(chainName string, ctx *snow.ConsensusContext, vm common.VM)
+	AddHeaderRoute(route string, handler http.Handler) bool
 	// Shutdown this server
 	Shutdown() error
 }
@@ -209,6 +210,10 @@ func (s *server) RegisterChain(chainName string, ctx *snow.ConsensusContext, vm 
 			zap.Error(err),
 		)
 	}
+}
+
+func (s *server) AddHeaderRoute(route string, handler http.Handler) bool {
+	return s.router.AddHeaderRoute(route, handler)
 }
 
 func (s *server) addChainRoute(chainName string, handler http.Handler, ctx *snow.ConsensusContext, base, endpoint string) error {
