@@ -7,6 +7,7 @@ import (
 	"encoding"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -250,6 +251,10 @@ func TestFileCache_Eviction(t *testing.T) {
 	var wg sync.WaitGroup
 	var writeErrors atomic.Int32
 
+	// Thread-safe error message collection
+	var errorMu sync.Mutex
+	var errorMessages []string
+
 	// Create blocks of 0.5kb each
 	blocks := make([][]byte, numBlocks)
 	for i := range blocks {
@@ -266,6 +271,9 @@ func TestFileCache_Eviction(t *testing.T) {
 				err := store.WriteBlock(height, blocks[height], 0)
 				if err != nil {
 					writeErrors.Add(1)
+					errorMu.Lock()
+					errorMessages = append(errorMessages, fmt.Sprintf("goroutine %d, height %d: %v", goroutineID, height, err))
+					errorMu.Unlock()
 				}
 			}
 		}(g)
@@ -273,8 +281,17 @@ func TestFileCache_Eviction(t *testing.T) {
 
 	wg.Wait()
 
+	// Build error message if there were errors
+	var errorMsg string
+	if writeErrors.Load() > 0 {
+		errorMsg = fmt.Sprintf("concurrent writes had %d errors:\n", writeErrors.Load())
+		for _, msg := range errorMessages {
+			errorMsg += fmt.Sprintf("  %s\n", msg)
+		}
+	}
+
 	// Verify no write errors
-	require.Zero(t, writeErrors.Load(), "concurrent writes had errors")
+	require.Zero(t, writeErrors.Load(), errorMsg)
 
 	// Verify we had some evictions
 	require.Positive(t, evictionCount.Load(), "should have had some cache evictions")

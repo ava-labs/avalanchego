@@ -4,6 +4,7 @@
 package blockdb
 
 import (
+	"bytes"
 	"errors"
 	"math"
 	"sync"
@@ -243,6 +244,10 @@ func TestReadOperations_Concurrency(t *testing.T) {
 
 	var wg sync.WaitGroup
 	var errorCount atomic.Int32
+	var blockErrors atomic.Int32
+	var headerErrors atomic.Int32
+	var bodyErrors atomic.Int32
+
 	for i := range numBlocks + 10 {
 		wg.Add(3) // One for each read operation
 
@@ -258,7 +263,9 @@ func TestReadOperations_Concurrency(t *testing.T) {
 					errorCount.Add(1)
 					return
 				}
-				require.Equal(t, blocks[height], block)
+				if !bytes.Equal(blocks[height], block) {
+					blockErrors.Add(1)
+				}
 			}
 		}(i)
 
@@ -278,7 +285,9 @@ func TestReadOperations_Concurrency(t *testing.T) {
 				if headerSizes[height] == 0 {
 					expectedHeader = nil
 				}
-				require.Equal(t, expectedHeader, header)
+				if !bytes.Equal(expectedHeader, header) {
+					headerErrors.Add(1)
+				}
 			}
 		}(i)
 
@@ -295,10 +304,16 @@ func TestReadOperations_Concurrency(t *testing.T) {
 					return
 				}
 				expectedBody := blocks[height][headerSizes[height]:]
-				require.Equal(t, expectedBody, body)
+				if !bytes.Equal(expectedBody, body) {
+					bodyErrors.Add(1)
+				}
 			}
 		}(i)
 	}
 	wg.Wait()
+
 	require.Zero(t, errorCount.Load(), "concurrent read operations had errors")
+	require.Zero(t, blockErrors.Load(), "block data mismatches detected")
+	require.Zero(t, headerErrors.Load(), "header data mismatches detected")
+	require.Zero(t, bodyErrors.Load(), "body data mismatches detected")
 }
