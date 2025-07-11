@@ -39,7 +39,7 @@ task import-s3-to-dir S3_SRC=s3://avalanchego-bootstrap-testing/cchain-mainnet-b
 To execute a range of blocks [N, N+K], we need an initial current state with the last accepted block of N-1. To generate this from scratch, simply execute the range of blocks [1, N-1] (genesis is "executed" vacuously, so do not provide 0 as the start block) locally starting from an empty state:
 
 ```bash
-task reexecute-cchain-range EXECUTION_DATA_DIR=$HOME/exec-data START_BLOCK=1 END_BLOCK=100
+task reexecute-cchain-range EXECUTION_DATA_DIR=$HOME/exec-data SOURCE_BLOCK_DIR=$HOME/exec-data/blocks START_BLOCK=1 END_BLOCK=100
 ```
 
 This initailizes a `current-state` subdirectory inside of `$HOME/exec-data`. This will contain two subdirectories `chain-data-dir` and `db`. The `chain-data-dir` is the path passed in via `*snow.Context` to the VM as `snowContext.ChainDataDir`. If the VM does not populate it, it may remain empty after a run. The `db` directory is used to initialize the leveldb instance used to create two nested PrefixDBs the database passed into `vm.Initialize(...)` and the database used by shared memory. These two databases must be built on top of the same base database as documented in the shared memory [README](../../../chains/atomic/README.md#shared-database).
@@ -81,7 +81,7 @@ Now that we've pushed the current-state back to S3, we can run the target range 
 First, to run the block range using our locally available data, run:
 
 ```bash
-task reexecute-cchain-range EXECUTION_DATA_DIR=$HOME/exec-data START_BLOCK=101 END_BLOCK=200
+task reexecute-cchain-range EXECUTION_DATA_DIR=$HOME/exec-data SOURCE_BLOCK_DIR=$HOME/exec-data/blocks START_BLOCK=101 END_BLOCK=200
 ```
 
 Note: if you attempt to re-execute a second time on the same data set, it will fail because the current state has been updated to block 200.
