@@ -302,7 +302,7 @@ tasks:
       START_BLOCK: '{{.START_BLOCK}}'
       END_BLOCK: '{{.END_BLOCK}}'
     cmds:
-      - cmd: go test -timeout=0 -v -run=TestReexecuteRange github.com/ava-labs/avalanchego/tests/bench/c --source-block-dir={{.EXECUTION_DATA_DIR}}/blocks --target-dir={{.EXECUTION_DATA_DIR}}/current-state --start-block={{.START_BLOCK}} --end-block={{.END_BLOCK}}
+      - cmd: go test -timeout=0 -v -benchtime=1x -bench=BenchmarkReexecuteRange -run=^$ github.com/ava-labs/avalanchego/tests/bench/c --source-block-dir={{.EXECUTION_DATA_DIR}}/blocks --target-dir={{.EXECUTION_DATA_DIR}}/current-state --start-block={{.START_BLOCK}} --end-block={{.END_BLOCK}} | tee {{.EXECUTION_DATA_DIR}}/reexecute-cchain-range.txt
 
   export-dir-to-s3:
     desc: Copies a directory to s3

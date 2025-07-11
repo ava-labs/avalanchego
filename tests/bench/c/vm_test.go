@@ -76,8 +76,12 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-func TestReexecuteRange(t *testing.T) {
-	r := require.New(t)
+func BenchmarkReexecuteRange(b *testing.B) {
+	benchmarkReexecuteRange(b, sourceBlockDirArg, targetDirArg, startBlockArg, endBlockArg, chanSizeArg, metricsEnabledArg)
+}
+
+func benchmarkReexecuteRange(b *testing.B, sourceBlockDir string, targetDir string, startBlock uint64, endBlock uint64, chanSize int, metricsEnabled bool) {
+	r := require.New(b)
 	ctx := context.Background()
 
 	// Create the prefix gatherer passed to the VM and register it with the top-level,
@@ -92,8 +96,8 @@ func TestReexecuteRange(t *testing.T) {
 	consensusRegistry := prometheus.NewRegistry()
 	r.NoError(prefixGatherer.Register("avalanche_snowman", consensusRegistry))
 
-	if metricsEnabledArg {
-		collectRegistry(t, "c-chain-reexecution", "127.0.0.1:9000", time.Minute, prefixGatherer, map[string]string{
+	if metricsEnabled {
+		collectRegistry(b, "c-chain-reexecution", "127.0.0.1:9000", time.Minute, prefixGatherer, map[string]string{
 			"job":               "c-chain-reexecution",
 			"is_ephemeral_node": "false",
 			"chain":             "C",
@@ -103,20 +107,20 @@ func TestReexecuteRange(t *testing.T) {
 	log := tests.NewDefaultLogger("c-chain-reexecution")
 
 	var (
-		targetDBDir  = filepath.Join(targetDirArg, "db")
-		chainDataDir = filepath.Join(targetDBDir, "chain-data-dir")
+		targetDBDir  = filepath.Join(targetDir, "db")
+		chainDataDir = filepath.Join(targetDir, "chain-data-dir")
 	)
 
 	log.Info("re-executing block range with params",
-		zap.String("source-block-dir", sourceBlockDirArg),
-		zap.String("target-block-dir", targetBlockDirArg),
-		zap.String("target-dir", targetDirArg),
-		zap.Uint64("start-block", startBlockArg),
-		zap.Uint64("end-block", endBlockArg),
-		zap.Int("chan-size", chanSizeArg),
+		zap.String("source-block-dir", sourceBlockDir),
+		zap.String("target-db-dir", targetDBDir),
+		zap.String("chain-data-dir", chainDataDir),
+		zap.Uint64("start-block", startBlock),
+		zap.Uint64("end-block", endBlock),
+		zap.Int("chan-size", chanSize),
 	)
 
-	blockChan, err := createBlockChanFromLevelDB(t, sourceBlockDirArg, startBlockArg, endBlockArg, chanSizeArg)
+	blockChan, err := createBlockChanFromLevelDB(b, sourceBlockDir, startBlock, endBlock, chanSize)
 	r.NoError(err)
 
 	dbLogger := tests.NewDefaultLogger("db")
@@ -146,7 +150,13 @@ func TestReexecuteRange(t *testing.T) {
 	}
 	executor, err := newVMExecutor(sourceVM, config)
 	r.NoError(err)
+
+	start := time.Now()
 	r.NoError(executor.executeSequence(ctx, blockChan, executionTimeout))
+	elapsed := time.Since(start)
+
+	b.ReportMetric(0, "ns/op")                     // Set default ns/op to 0 to hide from the output
+	getTopLevelMetrics(b, prefixGatherer, elapsed) // Report the desired top-level metrics
 }
 
 func newMainnetCChainVM(
@@ -324,52 +334,15 @@ func (e *vmExecutor) executeSequence(ctx context.Context, blkChan <-chan blockRe
 	return nil
 }
 
-// collectRegistry starts prometheus and collects metrics from the provided gatherer.
-// Attaches the provided labels + GitHub labels if available to the collected metrics.
-func collectRegistry(t *testing.T, name string, addr string, timeout time.Duration, gatherer prometheus.Gatherer, labels map[string]string) {
-	r := require.New(t)
-
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	t.Cleanup(cancel)
-
-	r.NoError(tmpnet.StartPrometheus(ctx, tests.NewDefaultLogger("prometheus")))
-
-	server := tests.NewPrometheusServer(addr, "/ext/metrics", gatherer)
-	errChan, err := server.Start()
-	r.NoError(err)
-
-	var sdConfigFilePath string
-	t.Cleanup(func() {
-		// Ensure a final metrics scrape.
-		// This default delay is set above the default scrape interval used by StartPrometheus.
-		time.Sleep(tmpnet.NetworkShutdownDelay)
-
-		r.NoError(server.Stop())
-		r.NoError(<-errChan)
-
-		if sdConfigFilePath != "" {
-			r.NoError(os.Remove(sdConfigFilePath))
-		}
-	})
-
-	sdConfigFilePath, err = tmpnet.WritePrometheusServiceDiscoveryConfigFile(name, []tmpnet.SDConfig{
-		{
-			Targets: []string{server.Address()},
-			Labels:  labels,
-		},
-	}, true)
-	r.NoError(err)
-}
-
-func createBlockChanFromLevelDB(t *testing.T, sourceDir string, startBlock, endBlock uint64, chanSize int) (<-chan blockResult, error) {
-	r := require.New(t)
+func createBlockChanFromLevelDB(tb testing.TB, sourceDir string, startBlock, endBlock uint64, chanSize int) (<-chan blockResult, error) {
+	r := require.New(tb)
 	ch := make(chan blockResult, chanSize)
 
 	db, err := leveldb.New(sourceDir, nil, logging.NoLog{}, prometheus.NewRegistry())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create leveldb database from %q: %w", sourceDir, err)
 	}
-	t.Cleanup(func() {
+	tb.Cleanup(func() {
 		r.NoError(db.Close())
 	})
 
@@ -397,18 +370,78 @@ func createBlockChanFromLevelDB(t *testing.T, sourceDir string, startBlock, endB
 	return ch, nil
 }
 
+// collectRegistry starts prometheus and collects metrics from the provided gatherer.
+// Attaches the provided labels + GitHub labels if available to the collected metrics.
+func collectRegistry(tb testing.TB, name string, addr string, timeout time.Duration, gatherer prometheus.Gatherer, labels map[string]string) {
+	r := require.New(tb)
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	tb.Cleanup(cancel)
+
+	r.NoError(tmpnet.StartPrometheus(ctx, tests.NewDefaultLogger("prometheus")))
+
+	server := tests.NewPrometheusServer(addr, "/ext/metrics", gatherer)
+	errChan, err := server.Start()
+	r.NoError(err)
+
+	var sdConfigFilePath string
+	tb.Cleanup(func() {
+		// Ensure a final metrics scrape.
+		// This default delay is set above the default scrape interval used by StartPrometheus.
+		time.Sleep(tmpnet.NetworkShutdownDelay)
+
+		r.NoError(server.Stop())
+		r.NoError(<-errChan)
+
+		if sdConfigFilePath != "" {
+			r.NoError(os.Remove(sdConfigFilePath))
+		}
+	})
+
+	sdConfigFilePath, err = tmpnet.WritePrometheusServiceDiscoveryConfigFile(name, []tmpnet.SDConfig{
+		{
+			Targets: []string{server.Address()},
+			Labels:  labels,
+		},
+	}, true)
+	r.NoError(err)
+}
+
+func getTopLevelMetrics(b *testing.B, registry prometheus.Gatherer, elapsed time.Duration) {
+	r := require.New(b)
+
+	gasUsed, err := getCounterMetricValue(b, registry, "avalanche_evm_eth_chain_block_gas_used_processed")
+	r.NoError(err)
+	mgasPerSecond := gasUsed / 1_000_000 / elapsed.Seconds()
+	b.ReportMetric(mgasPerSecond, "mgas/s")
+}
+
+func getCounterMetricValue(tb testing.TB, registry prometheus.Gatherer, query string) (float64, error) {
+	metricFamilies, err := registry.Gather()
+	r := require.New(tb)
+	r.NoError(err)
+
+	for _, mf := range metricFamilies {
+		if mf.GetName() == query {
+			return mf.GetMetric()[0].Counter.GetValue(), nil
+		}
+	}
+
+	return 0, fmt.Errorf("metric %s not found", query)
+}
+
 func TestExportBlockRange(t *testing.T) {
 	exportBlockRange(t, sourceBlockDirArg, targetBlockDirArg, startBlockArg, endBlockArg, chanSizeArg)
 }
 
-func exportBlockRange(t *testing.T, sourceDir string, targetDir string, startBlock, endBlock uint64, chanSize int) {
-	r := require.New(t)
-	blockChan, err := createBlockChanFromLevelDB(t, sourceDir, startBlock, endBlock, chanSize)
+func exportBlockRange(tb testing.TB, sourceDir string, targetDir string, startBlock, endBlock uint64, chanSize int) {
+	r := require.New(tb)
+	blockChan, err := createBlockChanFromLevelDB(tb, sourceDir, startBlock, endBlock, chanSize)
 	r.NoError(err)
 
 	db, err := leveldb.New(targetDir, nil, logging.NoLog{}, prometheus.NewRegistry())
 	r.NoError(err)
-	t.Cleanup(func() {
+	tb.Cleanup(func() {
 		r.NoError(db.Close())
 	})
 
