@@ -60,3 +60,13 @@ jobs:
             loki_username: ${{ secrets.LOKI_ID || '' }}
             loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
             runtime: "" # Set runtime input to empty string to disable log collection
+        - name: Publish Benchmark Result
+          uses: benchmark-action/github-action-benchmark@v1
+          with:
+            tool: 'go'
+            output-file-path: $HOME/reexecution-data/c-chain-reexecute-benchmark.txt
+            external-data-json-path: ./cache/c-chain-reexecute-benchmark.json
+            fail-on-alert: true
+            github-token: ${{ secrets.GITHUB_TOKEN }}
+            summary-always: true
+            comment-on-alert: true
