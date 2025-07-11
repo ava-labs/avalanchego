@@ -69,20 +69,21 @@ func main() {
 	metrics, err := load.NewMetrics(registry)
 	require.NoError(err, "failed to register load metrics")
 
-	metricsServer := load.NewPrometheusServer("127.0.0.1:0", registry)
-	merticsErrCh, err := metricsServer.Start()
+	metricsServer := tests.NewPrometheusServer("127.0.0.1:0", "/ext/metrics", registry)
+	metricsErrCh, err := metricsServer.Start()
 	require.NoError(err, "failed to start load metrics server")
 
-	monitoringConfigFilePath, err := metricsServer.GenerateMonitoringConfig(log, network.GetMonitoringLabels())
+	monitoringConfigFilePath, err := tmpnet.WritePrometheusServiceDiscoveryConfigFile("load-test", []tmpnet.SDConfig{
+		{
+			Targets: []string{metricsServer.Address()},
+			Labels:  network.GetMonitoringLabels(),
+		},
+	}, false)
 	require.NoError(err, "failed to generate monitoring config file")
 
 	tc.DeferCleanup(func() {
-		select {
-		case err := <-merticsErrCh:
-			require.NoError(err, "metrics server exited with error")
-		default:
-			require.NoError(metricsServer.Stop(), "failed to stop metrics server")
-		}
+		require.NoError(metricsServer.Stop())
+		require.NoError(<-metricsErrCh)
 	})
 
 	tc.DeferCleanup(func() {
