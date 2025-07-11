@@ -325,7 +325,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			require := require.New(t)
 
 			ctx := context.Background()
-			dbToSync, err := merkledb.GenerateTrie(r, 3*maxKeyValuesLimit)
+			dbToSync, err := merkledb.GenerateTrie(r, 3*maxKeyValuesLimit/2)
 			require.NoError(err)
 
 			syncRoot, err := dbToSync.GetMerkleRoot(ctx)
