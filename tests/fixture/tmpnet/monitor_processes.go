@@ -281,15 +281,6 @@ type SDConfig struct {
 	Labels  map[string]string `json:"labels"`
 }
 
-func applyGitHubLabels(sdConfigs []SDConfig) []SDConfig {
-	for _, sdConfig := range sdConfigs {
-		for label, value := range GetGitHubLabels() {
-			sdConfig.Labels[label] = value
-		}
-	}
-	return sdConfigs
-}
-
 func WritePrometheusServiceDiscoveryConfigFile(name string, sdConfigs []SDConfig, withGitHubLabels bool) (string, error) {
 	serviceDiscoveryDir, err := GetPrometheusServiceDiscoveryDir()
 	if err != nil {
@@ -311,6 +302,15 @@ func WritePrometheusServiceDiscoveryConfigFile(name string, sdConfigs []SDConfig
 	}
 
 	return configPath, os.WriteFile(configPath, configData, perms.ReadWrite)
+}
+
+func applyGitHubLabels(sdConfigs []SDConfig) []SDConfig {
+	for _, sdConfig := range sdConfigs {
+		for label, value := range GetGitHubLabels() {
+			sdConfig.Labels[label] = value
+		}
+	}
+	return sdConfigs
 }
 
 func getLogFilename(cmdName string) string {

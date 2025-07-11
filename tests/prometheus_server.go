@@ -72,8 +72,3 @@ func (s *PrometheusServer) Stop() error {
 func (s *PrometheusServer) Address() string {
 	return s.addr
 }
-
-// URL returns the URL to request the prometheus metrics from the server.
-func (s *PrometheusServer) URL() string {
-	return "http://" + s.addr + s.path
-}
