@@ -334,7 +334,7 @@ func newTxOpts(
 ) (*bind.TransactOpts, error) {
 	txOpts, err := bind.NewKeyedTransactorWithChainID(key, chainID)
 	if err != nil {
-		return nil, fmt.Errorf("creating transaction opts: %w", err)
+		return nil, fmt.Errorf("failed to create transaction opts: %w", err)
 	}
 	txOpts.Nonce = new(big.Int).SetUint64(nonce)
 	txOpts.GasFeeCap = maxFeeCap
