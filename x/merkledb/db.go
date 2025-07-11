@@ -1470,6 +1470,12 @@ func (db *merkleDB) findNextKey(
 	// be removed to obtain a valid proof for a prefix of the [lastReceivedKey].
 	if !proofKeyPath.HasPrefix(endProof[len(endProof)-1].Key) {
 		endProof = endProof[:len(endProof)-1]
+		if len(endProof) == 0 {
+			nextKey := lastReceivedKey
+			nextKey = append(nextKey, 0)
+			return maybe.Some(nextKey), nil
+		}
+
 		// update the proofKeyPath to be for the prefix
 		proofKeyPath = endProof[len(endProof)-1].Key
 	}
