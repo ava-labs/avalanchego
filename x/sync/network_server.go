@@ -52,7 +52,7 @@ var (
 	_ p2p.Handler = (*GetRangeProofHandler)(nil)
 )
 
-func maybeBytesToMaybe(mb *pb.MaybeBytes) maybe.Maybe[[]byte] {
+func MaybeBytesToMaybe(mb *pb.MaybeBytes) maybe.Maybe[[]byte] {
 	if mb != nil && !mb.IsNothing {
 		return maybe.Some(mb.Value)
 	}
@@ -91,8 +91,8 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 	var (
 		keyLimit   = min(req.KeyLimit, maxKeyValuesLimit)
 		bytesLimit = min(int(req.BytesLimit), maxByteSizeLimit)
-		start      = maybeBytesToMaybe(req.StartKey)
-		end        = maybeBytesToMaybe(req.EndKey)
+		start      = MaybeBytesToMaybe(req.StartKey)
+		end        = MaybeBytesToMaybe(req.EndKey)
 	)
 
 	startRoot, err := ids.ToID(req.StartRootHash)
@@ -264,8 +264,8 @@ func getRangeProof(
 		rangeProof, err := db.GetRangeProofAtRoot(
 			ctx,
 			root,
-			maybeBytesToMaybe(req.StartKey),
-			maybeBytesToMaybe(req.EndKey),
+			MaybeBytesToMaybe(req.StartKey),
+			MaybeBytesToMaybe(req.EndKey),
 			keyLimit,
 		)
 		if err != nil {

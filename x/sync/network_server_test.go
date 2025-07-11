@@ -27,7 +27,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 	t.Logf("seed: %d", now)
 	r := rand.New(rand.NewSource(now)) // #nosec G404
 
-	smallTrieDB, err := generateTrieWithMinKeyLen(t, r, defaultRequestKeyLimit, 1)
+	smallTrieDB, err := merkledb.GenerateTrieWithMinKeyLen(r, defaultRequestKeyLimit, 1)
 	require.NoError(t, err)
 	smallTrieRoot, err := smallTrieDB.GetMerkleRoot(context.Background())
 	require.NoError(t, err)
