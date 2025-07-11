@@ -30,7 +30,7 @@ func NewContextFromURI(ctx context.Context, uri string) (*Context, error) {
 
 func NewContextFromClients(
 	ctx context.Context,
-	infoClient info.Client,
+	infoClient *info.Client,
 	xChainClient avm.Client,
 ) (*Context, error) {
 	networkID, err := infoClient.GetNetworkID(ctx)

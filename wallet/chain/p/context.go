@@ -26,7 +26,7 @@ func NewContextFromURI(ctx context.Context, uri string) (*builder.Context, error
 
 func NewContextFromClients(
 	ctx context.Context,
-	infoClient info.Client,
+	infoClient *info.Client,
 	chainClient platformvm.Client,
 ) (*builder.Context, error) {
 	networkID, err := infoClient.GetNetworkID(ctx)
