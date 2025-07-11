@@ -60,8 +60,8 @@ github.com/allegro/bigcache v1.2.1-0.20190218064605-e24eb225f156/go.mod h1:Cb/ax
 github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6/go.mod h1:grANhF5doyWs3UAsr3K4I6qtAmlQcZDesFNEHPZAzj8=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPdPJAN/hZIm0C4OItdklCFmMRWYpio=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
-github.com/ava-labs/avalanchego v1.13.3-0.20250707201933-507e6bbb5e7d h1:+IK0mMgrXj2yOxh23ShACLeJlG+XMb6ZDeXda5IFgb0=
-github.com/ava-labs/avalanchego v1.13.3-0.20250707201933-507e6bbb5e7d/go.mod h1:QmwzzCZtKaam5OY45kuzq3UinsyRXH75LkP85W7713M=
+github.com/ava-labs/avalanchego v1.13.3-rc.1 h1:YhtNjw+MljEohXPdbBqSVGvV74AKjpyknhCunZFFS4E=
+github.com/ava-labs/avalanchego v1.13.3-rc.1/go.mod h1:t5+0qviLU5jwkaBvi9e4KSbuiDIy67OS+VKU7roB38A=
 github.com/ava-labs/firewood-go-ethhash/ffi v0.0.8 h1:f0ZbAiRE1srMiv/0DuXvPQZwgYbLC9OgAWbQUCMebTE=
 github.com/ava-labs/firewood-go-ethhash/ffi v0.0.8/go.mod h1:j6spQFNSBAfcXKt9g0xbObW/8tMlGP4bFjPIsJmDg/o=
 github.com/ava-labs/libevm v1.13.14-0.3.0.rc.1 h1:vBMYo+Iazw0rGTr+cwjkBdh5eadLPlv4ywI4lKye3CA=
