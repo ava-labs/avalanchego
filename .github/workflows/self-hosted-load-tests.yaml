@@ -19,13 +19,16 @@ on:
         required: false
 
 jobs:
-  load_tests:
+  load_test:
     name: Run load test on self-hosted runners
     runs-on: avalanche-avalanchego-runner
     container:
       image: ghcr.io/actions/actions-runner:2.325.0
     steps:
-      - uses: ./.github/actions/self-hosted-load-test
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - name: Run load test
+        uses: ./.github/actions/self-hosted-load-test
         with:
           avalanchego_image: ${{ inputs.avalanchego_image }}
           exclusive_scheduling: ${{ inputs.exclusive_scheduling }}
