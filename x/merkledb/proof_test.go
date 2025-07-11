@@ -928,7 +928,8 @@ func Test_ChangeProof_Verify(t *testing.T) {
 	require.NotNil(proof)
 
 	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), endRoot))
-	require.NoError(dbClone.CommitChangeProof(context.Background(), proof))
+	_, err = dbClone.CommitChangeProof(context.Background(), maybe.Nothing[[]byte](), proof)
+	require.NoError(err)
 
 	newRoot, err := dbClone.GetMerkleRoot(context.Background())
 	require.NoError(err)
