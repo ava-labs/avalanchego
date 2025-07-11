@@ -200,6 +200,8 @@ type Database struct {
 	blockHeights atomic.Pointer[blockHeights]
 	// nextDataWriteOffset tracks the next position to write new data in the data file.
 	nextDataWriteOffset atomic.Uint64
+	// headerWriteOccupied prevents concurrent writes to the index header
+	headerWriteOccupied atomic.Bool
 }
 
 // New creates a block database.
@@ -691,6 +693,15 @@ func (s *Database) writeIndexEntryAt(indexFileOffset, dataFileBlockOffset uint64
 }
 
 func (s *Database) persistIndexHeader() error {
+	if s.headerWriteOccupied.CompareAndSwap(false, true) {
+		defer s.headerWriteOccupied.Store(false)
+		return s.persistIndexHeaderInternal()
+	}
+	s.log.Warn("Skipping persistIndexHeader due to concurrent header write")
+	return nil
+}
+
+func (s *Database) persistIndexHeaderInternal() error {
 	// The index file must be fsync'd before the header is written to prevent
 	// a state where the header is persisted but the index entries it refers to
 	// are not. This could lead to data inconsistency on recovery.
