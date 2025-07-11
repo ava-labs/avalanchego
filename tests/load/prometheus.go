@@ -114,5 +114,9 @@ func (s *MetricsServer) GenerateMonitoringConfig(log logging.Logger, monitoringL
 		return "", err
 	}
 
+	if err := os.MkdirAll(filepath.Dir(collectorFilePath), 0o755); err != nil {
+		return "", err
+	}
+
 	return collectorFilePath, os.WriteFile(collectorFilePath, config, perms.ReadWrite)
 }
