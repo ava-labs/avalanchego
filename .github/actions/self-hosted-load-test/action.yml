@@ -41,12 +41,6 @@ runs:
           sudo apt-get update
           sudo apt-get install -y xz-utils
         fi
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-    - name: Setup Go for project
-      uses: ./.github/actions/setup-go-for-project
     - name: Run exclusive load test
       if: inputs.exclusive_scheduling == 'true'
       uses: ./.github/actions/run-monitored-tmpnet-cmd

@@ -277,11 +277,12 @@ jobs:
   load_self_hosted:
     name: Run load test on self-hosted runners
     if: contains(github.event.pull_request.labels.*.name, 'load-test') || contains(github.event.pull_request.labels.*.name, 'load-test-exclusive')
-    needs: test_build_image
     runs-on: avalanche-avalanchego-runner
     container:
       image: ghcr.io/actions/actions-runner:2.325.0
     steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
       - name: Run load test
         uses: ./.github/actions/self-hosted-load-test
         with:
