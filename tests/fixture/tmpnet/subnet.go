@@ -252,7 +252,7 @@ func (s *Subnet) HasChainConfig() bool {
 func WaitForActiveValidators(
 	ctx context.Context,
 	log logging.Logger,
-	pChainClient platformvm.Client,
+	pChainClient *platformvm.Client,
 	subnet *Subnet,
 ) error {
 	ticker := time.NewTicker(DefaultPollingInterval)
