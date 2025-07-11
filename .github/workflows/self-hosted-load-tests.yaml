@@ -1,0 +1,39 @@
+name: Load test on self-hosted runners
+
+# This workflow runs comprehensive load tests against our Kubernetes cluster
+on:
+  workflow_dispatch:
+    inputs:
+      avalanchego_image:
+        description: 'AvalancheGo image to test'
+        required: false
+        default: 'avaplatform/avalanchego:latest'
+        type: string
+      exclusive_scheduling:
+        description: 'Enable exclusive scheduling'
+        required: false
+        default: false
+        type: boolean
+      duration:
+        description: "Load test duration"
+        required: false
+
+jobs:
+  load_test:
+    name: Run load test on self-hosted runners
+    runs-on: avalanche-avalanchego-runner
+    container:
+      image: ghcr.io/actions/actions-runner:2.325.0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - name: Run load test
+        uses: ./.github/actions/self-hosted-load-test
+        with:
+          avalanchego_image: ${{ inputs.avalanchego_image }}
+          exclusive_scheduling: ${{ inputs.exclusive_scheduling }}
+          duration: ${{ inputs.duration }}
+          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_username: ${{ secrets.LOKI_ID || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
