@@ -134,6 +134,8 @@ func TestNotifierReSubscribeAtPrefChange(t *testing.T) {
 		case <-signal:
 		default:
 			close(signal)
+			<-ctx.Done()
+			return 0, ctx.Err()
 		}
 		select {
 		case <-ctx.Done():
