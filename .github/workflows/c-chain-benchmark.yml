@@ -25,7 +25,7 @@ jobs:
     c-chain-reexecution:
       permissions:
         id-token: write
-        contents: read
+        contents: write
       runs-on: ubuntu-latest
       steps:
         - name: Configure AWS Credentials
@@ -60,12 +60,17 @@ jobs:
             loki_username: ${{ secrets.LOKI_ID || '' }}
             loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
             runtime: "" # Set runtime input to empty string to disable log collection
-        - name: Publish Benchmark Result
+        - name: Download Previous Benchmark Result
+          uses: actions/cache@v4
+          with:
+            path: ./cache
+            key: ${{ runner.os }}-reexecute-cchain-range-benchmark.json
+        - name: Compare Benchmark Results
           uses: benchmark-action/github-action-benchmark@v1
           with:
             tool: 'go'
             output-file-path: ${{github.workspace}}/reexecution-data/reexecute-cchain-range.txt
-            external-data-json-path: ./cache/c-chain-reexecute-benchmark.json
+            external-data-json-path: ./cache/${{ runner.os }}-reexecute-cchain-range-benchmark.json
             fail-on-alert: true
             github-token: ${{ secrets.GITHUB_TOKEN }}
             summary-always: true
