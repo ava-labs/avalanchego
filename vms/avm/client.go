@@ -27,7 +27,9 @@ var (
 
 // Client for interacting with an AVM (X-Chain) instance
 type Client interface {
-	WalletClient
+	// IssueTx issues a transaction to a node and returns the TxID
+	IssueTx(ctx context.Context, tx []byte, options ...rpc.Option) (ids.ID, error)
+
 	// GetBlock returns the block with the given id.
 	GetBlock(ctx context.Context, blkID ids.ID, options ...rpc.Option) ([]byte, error)
 	// GetBlockByHeight returns the block at the given [height].
@@ -125,6 +127,7 @@ func (c *client) GetHeight(ctx context.Context, options ...rpc.Option) (uint64, 
 	return uint64(res.Height), err
 }
 
+// IssueTx issues a transaction to a node and returns the TxID
 func (c *client) IssueTx(ctx context.Context, txBytes []byte, options ...rpc.Option) (ids.ID, error) {
 	txStr, err := formatting.Encode(formatting.Hex, txBytes)
 	if err != nil {
