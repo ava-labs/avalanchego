@@ -43,7 +43,7 @@ const (
 // perform their own assertions.
 var (
 	_ UTXOClient = platformvm.Client(nil)
-	_ UTXOClient = avm.Client(nil)
+	_ UTXOClient = (*avm.Client)(nil)
 )
 
 type UTXOClient interface {
@@ -61,7 +61,7 @@ type UTXOClient interface {
 type AVAXState struct {
 	PClient platformvm.Client
 	PCTX    *pbuilder.Context
-	XClient avm.Client
+	XClient *avm.Client
 	XCTX    *xbuilder.Context
 	CClient client.Client
 	CCTX    *c.Context
