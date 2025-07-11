@@ -90,8 +90,8 @@ func (r *router) GetHandler(base, endpoint string) (http.Handler, error) {
 }
 
 func (r *router) AddHeaderRoute(route string, handler http.Handler) bool {
-	r.routeLock.Lock()
-	defer r.routeLock.Unlock()
+	r.lock.Lock()
+	defer r.lock.Unlock()
 
 	_, ok := r.headerRoutes[route]
 	if ok {
