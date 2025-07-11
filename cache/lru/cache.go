@@ -20,6 +20,17 @@ type Cache[K comparable, V any] struct {
 	lock     sync.Mutex
 	elements *linked.Hashmap[K, V]
 	size     int
+
+	// onEvict is called with the key and value of an evicted entry, if set.
+	onEvict func(K, V)
+}
+
+// SetOnEvict sets a callback to be called with the key and value of an evicted entry.
+// The callback is called synchronously while holding the cache lock.
+func (c *Cache[K, V]) SetOnEvict(cb func(K, V)) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.onEvict = cb
 }
 
 func NewCache[K comparable, V any](size int) *Cache[K, V] {
@@ -34,8 +45,11 @@ func (c *Cache[K, V]) Put(key K, value V) {
 	defer c.lock.Unlock()
 
 	if c.elements.Len() == c.size {
-		oldestKey, _, _ := c.elements.Oldest()
+		oldestKey, oldestValue, _ := c.elements.Oldest()
 		c.elements.Delete(oldestKey)
+		if c.onEvict != nil {
+			c.onEvict(oldestKey, oldestValue)
+		}
 	}
 	c.elements.Put(key, value)
 }
@@ -55,13 +69,24 @@ func (c *Cache[K, V]) Get(key K) (V, bool) {
 func (c *Cache[K, _]) Evict(key K) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-
+	value, _ := c.elements.Get(key)
 	c.elements.Delete(key)
+	if c.onEvict != nil {
+		c.onEvict(key, value)
+	}
 }
 
 func (c *Cache[_, _]) Flush() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+
+	// Call onEvict for each element before clearing
+	if c.onEvict != nil {
+		iter := c.elements.NewIterator()
+		for iter.Next() {
+			c.onEvict(iter.Key(), iter.Value())
+		}
+	}
 
 	c.elements.Clear()
 }
