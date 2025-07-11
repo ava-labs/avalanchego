@@ -416,11 +416,31 @@ func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
 }
 
 func (db *merkleDB) CommitChangeProof(ctx context.Context, end maybe.Maybe[[]byte], proof *ChangeProof) (maybe.Maybe[[]byte], error) {
+	lastHandledKey := end
+	if len(proof.KeyChanges) > 0 {
+		if err := db.commitChangeProof(ctx, proof); err != nil {
+			return maybe.Nothing[[]byte](), err
+		}
+
+		lastHandledKey = maybe.Some(proof.KeyChanges[len(proof.KeyChanges)-1].Key)
+	}
+	if !lastHandledKey.IsNothing() {
+		nextKey, err := db.findNextKey(ctx, lastHandledKey.Value(), end, proof.EndProof)
+		if err != nil {
+			return maybe.Nothing[[]byte](), err
+		}
+		lastHandledKey = nextKey
+	}
+
+	return lastHandledKey, nil
+}
+
+func (db *merkleDB) commitChangeProof(ctx context.Context, proof *ChangeProof) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
 	if db.closed {
-		return maybe.Nothing[[]byte](), database.ErrClosed
+		return database.ErrClosed
 	}
 	ops := make([]database.BatchOp, len(proof.KeyChanges))
 	for i, kv := range proof.KeyChanges {
@@ -433,34 +453,38 @@ func (db *merkleDB) CommitChangeProof(ctx context.Context, end maybe.Maybe[[]byt
 
 	view, err := newView(db, db, ViewChanges{BatchOps: ops})
 	if err != nil {
-		return maybe.Nothing[[]byte](), err
+		return err
 	}
 
-	if err := view.commitToDB(ctx); err != nil {
-		return maybe.Nothing[[]byte](), err
-	}
-
-	lastHandledKey := end
-	if len(proof.KeyChanges) > 0 {
-		lastHandledKey = maybe.Some(proof.KeyChanges[len(proof.KeyChanges)-1].Key)
-	}
-	if !lastHandledKey.IsNothing() {
-		nextKey, err := db.findNextKey(lastHandledKey.Value(), end, proof.EndProof)
-		if err != nil {
-			return maybe.Nothing[[]byte](), err
-		}
-		lastHandledKey = nextKey
-	}
-
-	return lastHandledKey, nil
+	return view.commitToDB(ctx)
 }
 
 func (db *merkleDB) CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) (maybe.Maybe[[]byte], error) {
+	largestKey := end
+	if len(proof.KeyChanges) > 0 {
+		if err := db.commitRangeProof(ctx, start, end, proof); err != nil {
+			return maybe.Nothing[[]byte](), err
+		}
+		largestKey = maybe.Some(proof.KeyChanges[len(proof.KeyChanges)-1].Key)
+	}
+
+	if !largestKey.IsNothing() {
+		nextKey, err := db.findNextKey(ctx, largestKey.Value(), end, proof.EndProof)
+		if err != nil {
+			return maybe.Nothing[[]byte](), err
+		}
+		largestKey = nextKey
+	}
+
+	return largestKey, nil
+}
+
+func (db *merkleDB) commitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
 	if db.closed {
-		return maybe.Nothing[[]byte](), database.ErrClosed
+		return database.ErrClosed
 	}
 
 	ops := make([]database.BatchOp, len(proof.KeyChanges))
@@ -472,14 +496,14 @@ func (db *merkleDB) CommitRangeProof(ctx context.Context, start, end maybe.Maybe
 			Value: kv.Value.Value(),
 		}
 	}
-
 	largestKey := end
 	if len(proof.KeyChanges) > 0 {
 		largestKey = maybe.Some(proof.KeyChanges[len(proof.KeyChanges)-1].Key)
 	}
+
 	keysToDelete, err := db.getKeysNotInSet(start, largestKey, keys)
 	if err != nil {
-		return maybe.Nothing[[]byte](), err
+		return err
 	}
 	for _, keyToDelete := range keysToDelete {
 		ops = append(ops, database.BatchOp{
@@ -491,28 +515,10 @@ func (db *merkleDB) CommitRangeProof(ctx context.Context, start, end maybe.Maybe
 	// Don't need to lock [view] because nobody else has a reference to it.
 	view, err := newView(db, db, ViewChanges{BatchOps: ops})
 	if err != nil {
-		return maybe.Nothing[[]byte](), err
+		return err
 	}
 
-	if err := view.commitToDB(ctx); err != nil {
-		return maybe.Nothing[[]byte](), err
-	}
-
-	// Find the next key to fetch.
-	// If this is empty, then we have no more keys to fetch.
-	lastHandledKey := end
-	if len(proof.KeyChanges) > 0 {
-		lastHandledKey = maybe.Some(proof.KeyChanges[len(proof.KeyChanges)-1].Key)
-	}
-	if !lastHandledKey.IsNothing() {
-		nextKey, err := db.findNextKey(lastHandledKey.Value(), end, proof.EndProof)
-		if err != nil {
-			return maybe.Nothing[[]byte](), err
-		}
-		lastHandledKey = nextKey
-	}
-
-	return lastHandledKey, nil
+	return view.commitToDB(ctx)
 }
 
 func (db *merkleDB) Compact(start []byte, limit []byte) error {
@@ -1443,6 +1449,7 @@ func cacheEntrySize(key Key, n *node) int {
 // Invariant: [lastReceivedKey] < [rangeEnd].
 // If [rangeEnd] is Nothing it's considered > [lastReceivedKey].
 func (db *merkleDB) findNextKey(
+	ctx context.Context,
 	lastReceivedKey []byte,
 	rangeEnd maybe.Maybe[[]byte],
 	endProof []ProofNode,
@@ -1481,7 +1488,7 @@ func (db *merkleDB) findNextKey(
 	}
 
 	// get a proof for the same key as the received proof from the local db
-	localProofOfKey, err := getProof(db, proofKeyPath.Bytes())
+	localProofOfKey, err := db.GetProof(ctx, proofKeyPath.Bytes())
 	if err != nil {
 		return maybe.Nothing[[]byte](), err
 	}

@@ -224,7 +224,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 
 	// the two dbs should be in sync, so next key should be nil
 	lastKey := proof.KeyChanges[len(proof.KeyChanges)-1].Key
-	nextKey, err = dbStruct.findNextKey(lastKey, maybe.Nothing[[]byte](), proof.EndProof)
+	nextKey, err = dbStruct.findNextKey(context.Background(), lastKey, maybe.Nothing[[]byte](), proof.EndProof)
 	require.NoError(err)
 	require.True(nextKey.IsNothing())
 
@@ -256,7 +256,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 		// both nibbles were 0, so move onto the next byte
 	}
 
-	nextKey, err = dbStruct.findNextKey(lastKey, maybe.Some(endPointBeforeNewKey), proof.EndProof)
+	nextKey, err = dbStruct.findNextKey(context.Background(), lastKey, maybe.Some(endPointBeforeNewKey), proof.EndProof)
 	require.NoError(err)
 
 	// next key would be after the end of the range, so it returns Nothing instead
@@ -291,11 +291,11 @@ func Test_Sync_FindNextKey_Deleted(t *testing.T) {
 	// there is now another value in the range that needs to be sync'ed
 	require.NoError(db.Put([]byte{0x13}, []byte{3}))
 
-	nextKey, err := dbStruct.findNextKey([]byte{0x12}, maybe.Some([]byte{0x20}), noExtraNodeProof.Path)
+	nextKey, err := dbStruct.findNextKey(context.Background(), []byte{0x12}, maybe.Some([]byte{0x20}), noExtraNodeProof.Path)
 	require.NoError(err)
 	require.Equal(maybe.Some([]byte{0x13}), nextKey)
 
-	nextKey, err = dbStruct.findNextKey([]byte{0x11}, maybe.Some([]byte{0x20}), extraNodeProof.Path)
+	nextKey, err = dbStruct.findNextKey(context.Background(), []byte{0x11}, maybe.Some([]byte{0x20}), extraNodeProof.Path)
 	require.NoError(err)
 	require.Equal(maybe.Some([]byte{0x13}), nextKey)
 }
@@ -322,7 +322,7 @@ func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
 
 	require.NoError(db.Put([]byte{0x11, 0x15}, []byte{4}))
 
-	nextKey, err := dbStruct.findNextKey([]byte{0x11, 0x11}, maybe.Some([]byte{0x20}), proof.Path)
+	nextKey, err := dbStruct.findNextKey(context.Background(), []byte{0x11, 0x11}, maybe.Some([]byte{0x20}), proof.Path)
 	require.NoError(err)
 	require.Equal(maybe.Some([]byte{0x11, 0x15}), nextKey)
 }
@@ -353,7 +353,7 @@ func Test_Sync_FindNextKey_BranchInReceived(t *testing.T) {
 	require.NoError(err)
 	require.NoError(db.Delete([]byte{0x12, 0xA0}))
 
-	nextKey, err := dbStruct.findNextKey([]byte{0x12}, maybe.Some([]byte{0x20}), proof.Path)
+	nextKey, err := dbStruct.findNextKey(context.Background(), []byte{0x12}, maybe.Some([]byte{0x20}), proof.Path)
 	require.NoError(err)
 	require.Equal(maybe.Some([]byte{0x12, 0xA0}), nextKey)
 }
@@ -395,7 +395,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 	require.NoError(db.Put(midPointVal, []byte{1}))
 
 	// next key at prefix of newly added point
-	nextKey, err = dbStruct.findNextKey(lastKey, maybe.Nothing[[]byte](), proof.EndProof)
+	nextKey, err = dbStruct.findNextKey(context.Background(), lastKey, maybe.Nothing[[]byte](), proof.EndProof)
 	require.NoError(err)
 	require.True(nextKey.HasValue())
 
@@ -409,7 +409,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 	require.NoError(err)
 
 	// next key at prefix of newly added point
-	nextKey, err = dbStruct.findNextKey(lastKey, maybe.Nothing[[]byte](), proof.EndProof)
+	nextKey, err = dbStruct.findNextKey(context.Background(), lastKey, maybe.Nothing[[]byte](), proof.EndProof)
 	require.NoError(err)
 	require.True(nextKey.HasValue())
 
@@ -449,6 +449,7 @@ func TestFindNextKeyEmptyEndProof(t *testing.T) {
 		}
 
 		nextKey, err := dbStruct.findNextKey(
+			context.Background(),
 			lastReceivedKey,
 			rangeEnd,
 			nil, // endProof
@@ -511,7 +512,7 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 	proof, err = dbToSync.GetRangeProof(context.Background(), maybe.Nothing[[]byte](), maybe.Some(proof.KeyChanges[len(proof.KeyChanges)-1].Key), 100)
 	require.NoError(err)
 
-	nextKey, err = dbStruct.findNextKey(proof.KeyChanges[len(proof.KeyChanges)-1].Key, maybe.Nothing[[]byte](), proof.EndProof)
+	nextKey, err = dbStruct.findNextKey(context.Background(), proof.KeyChanges[len(proof.KeyChanges)-1].Key, maybe.Nothing[[]byte](), proof.EndProof)
 	require.NoError(err)
 	require.True(nextKey.HasValue())
 	require.Equal(lastKey, nextKey.Value())
@@ -711,6 +712,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		}
 
 		gotFirstDiff, err := localDBStruct.findNextKey(
+			context.Background(),
 			lastReceivedKey,
 			endKey,
 			remoteProof.EndProof,
