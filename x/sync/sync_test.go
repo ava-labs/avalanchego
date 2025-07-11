@@ -325,7 +325,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			require := require.New(t)
 
 			ctx := context.Background()
-			dbToSync, err := merkledb.GenerateTrie(t, r, 3*maxKeyValuesLimit)
+			dbToSync, err := merkledb.GenerateTrie(r, 3*maxKeyValuesLimit)
 			require.NoError(err)
 
 			syncRoot, err := dbToSync.GetMerkleRoot(ctx)
@@ -414,7 +414,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
 	r := rand.New(rand.NewSource(now)) // #nosec G404
-	dbToSync, err := merkledb.GenerateTrie(t, r, 3*maxKeyValuesLimit)
+	dbToSync, err := merkledb.GenerateTrie(r, 3*maxKeyValuesLimit)
 	require.NoError(err)
 	syncRoot, err := dbToSync.GetMerkleRoot(context.Background())
 	require.NoError(err)
@@ -484,7 +484,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	t.Logf("seed: %d", now)
 	r := rand.New(rand.NewSource(now)) // #nosec G404
 
-	dbToSync, err := merkledb.GenerateTrie(t, r, 3*maxKeyValuesLimit)
+	dbToSync, err := merkledb.GenerateTrie(r, 3*maxKeyValuesLimit)
 	require.NoError(err)
 
 	firstSyncRoot, err := dbToSync.GetMerkleRoot(context.Background())

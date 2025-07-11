@@ -11,11 +11,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/maybe"
-	"github.com/stretchr/testify/require"
 )
 
 // The main goal of these tests is to ensure that merkleDB's `findNextKey` function works as expected.
@@ -29,10 +30,10 @@ func TestFullRangeProof(t *testing.T) {
 
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
-	r := rand.New(rand.NewSource(now))
+	r := rand.New(rand.NewSource(now)) // #nosec G404
 
 	numKeys := 1000
-	fullDB, err := GenerateTrie(t, r, numKeys)
+	fullDB, err := GenerateTrie(r, numKeys)
 	require.NoError(err)
 
 	emptyDB, err := New(
@@ -62,9 +63,9 @@ func TestIncompleteRangeProof(t *testing.T) {
 
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
-	r := rand.New(rand.NewSource(now))
+	r := rand.New(rand.NewSource(now)) // #nosec G404
 	numKeys := 1000
-	fullDB, err := GenerateTrie(t, r, numKeys)
+	fullDB, err := GenerateTrie(r, numKeys)
 	require.NoError(err)
 
 	emptyDB, err := New(
@@ -123,9 +124,9 @@ func TestPartialRangeProof(t *testing.T) {
 
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
-	r := rand.New(rand.NewSource(now))
+	r := rand.New(rand.NewSource(now)) // #nosec G404
 	numKeys := 1000
-	fullDB, err := GenerateTrie(t, r, numKeys)
+	fullDB, err := GenerateTrie(r, numKeys)
 	require.NoError(err)
 
 	emptyDB, err := New(
@@ -189,7 +190,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
 	r := rand.New(rand.NewSource(now)) // #nosec G404
-	dbToSync, err := GenerateTrie(t, r, 1000)
+	dbToSync, err := GenerateTrie(r, 1000)
 	require.NoError(err)
 	require.NoError(err)
 
@@ -363,7 +364,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
 	r := rand.New(rand.NewSource(now)) // #nosec G404
-	dbToSync, err := GenerateTrie(t, r, 1000)
+	dbToSync, err := GenerateTrie(r, 1000)
 	require.NoError(err)
 
 	db, err := New(
@@ -476,7 +477,7 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
 	r := rand.New(rand.NewSource(now)) // #nosec G404
-	dbToSync, err := GenerateTrie(t, r, 500)
+	dbToSync, err := GenerateTrie(r, 500)
 	require.NoError(err)
 
 	db, err := New(

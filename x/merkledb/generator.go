@@ -6,12 +6,11 @@ package merkledb
 import (
 	"context"
 	"math/rand"
-	"testing"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/trace"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/require"
 )
 
 func newTestConfig() Config {
@@ -22,13 +21,11 @@ func newTestConfig() Config {
 	}
 }
 
-func GenerateTrie(t *testing.T, r *rand.Rand, count int) (MerkleDB, error) {
-	return GenerateTrieWithMinKeyLen(t, r, count, 0)
+func GenerateTrie(r *rand.Rand, count int) (MerkleDB, error) {
+	return GenerateTrieWithMinKeyLen(r, count, 0)
 }
 
-func GenerateTrieWithMinKeyLen(t *testing.T, r *rand.Rand, count int, minKeyLen int) (MerkleDB, error) {
-	require := require.New(t)
-
+func GenerateTrieWithMinKeyLen(r *rand.Rand, count int, minKeyLen int) (MerkleDB, error) {
 	db, err := New(
 		context.Background(),
 		memdb.New(),
@@ -49,14 +46,18 @@ func GenerateTrieWithMinKeyLen(t *testing.T, r *rand.Rand, count int, minKeyLen 
 			key := make([]byte, r.Intn(50)+len(prefix))
 			copy(key, prefix)
 			_, err := r.Read(key[len(prefix):])
-			require.NoError(err)
+			if err != nil {
+				panic(err)
+			}
 			return key
 		}
 
 		// new key
 		key := make([]byte, r.Intn(50)+minKeyLen)
 		_, err = r.Read(key)
-		require.NoError(err)
+		if err != nil {
+			panic(err)
+		}
 		return key
 	}
 
@@ -66,7 +67,9 @@ func GenerateTrieWithMinKeyLen(t *testing.T, r *rand.Rand, count int, minKeyLen 
 			value = nil
 		} else {
 			_, err = r.Read(value)
-			require.NoError(err)
+			if err != nil {
+				panic(err)
+			}
 		}
 		key := genKey()
 		if _, seen := seenKeys[string(key)]; seen {
