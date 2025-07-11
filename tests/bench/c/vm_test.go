@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -55,6 +56,7 @@ var (
 	chanSizeArg       int
 	metricsEnabledArg bool
 	executionTimeout  time.Duration
+	labelsArg         string
 )
 
 func TestMain(m *testing.M) {
@@ -70,8 +72,11 @@ func TestMain(m *testing.M) {
 	flag.Uint64Var(&startBlockArg, "start-block", 101, "Start block to begin execution (exclusive).")
 	flag.Uint64Var(&endBlockArg, "end-block", 200, "End block to end execution (inclusive).")
 	flag.IntVar(&chanSizeArg, "chan-size", 100, "Size of the channel to use for block processing.")
-	flag.BoolVar(&metricsEnabledArg, "metrics-enabled", true, "Enable metrics collection.")
 	flag.DurationVar(&executionTimeout, "execution-timeout", 0, "Benchmark execution timeout. After this timeout has elapsed, terminate the benchmark without error.")
+
+	flag.BoolVar(&metricsEnabledArg, "metrics-enabled", true, "Enable metrics collection.")
+	flag.StringVar(&labelsArg, "labels", "", "Comma separated KV list of metric labels to attach to all exported metrics.")
+
 	flag.Parse()
 	m.Run()
 }
@@ -97,11 +102,18 @@ func benchmarkReexecuteRange(b *testing.B, sourceBlockDir string, targetDir stri
 	r.NoError(prefixGatherer.Register("avalanche_snowman", consensusRegistry))
 
 	if metricsEnabled {
-		collectRegistry(b, "c-chain-reexecution", "127.0.0.1:9000", time.Minute, prefixGatherer, map[string]string{
+		labels := map[string]string{
 			"job":               "c-chain-reexecution",
 			"is_ephemeral_node": "false",
 			"chain":             "C",
-		})
+		}
+		if labelsArg != "" {
+			customLabels := parseLabels(labelsArg)
+			for customLabel, customValue := range customLabels {
+				labels[customLabel] = customValue
+			}
+		}
+		collectRegistry(b, "c-chain-reexecution", "127.0.0.1:9000", time.Minute, prefixGatherer, labels)
 	}
 
 	log := tests.NewDefaultLogger("c-chain-reexecution")
@@ -405,6 +417,18 @@ func collectRegistry(tb testing.TB, name string, addr string, timeout time.Durat
 		},
 	}, true)
 	r.NoError(err)
+}
+
+func parseLabels(labelsStr string) map[string]string {
+	labels := make(map[string]string)
+	for _, label := range strings.Split(labelsStr, ",") {
+		parts := strings.SplitN(label, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		labels[parts[0]] = parts[1]
+	}
+	return labels
 }
 
 func getTopLevelMetrics(b *testing.B, registry prometheus.Gatherer, elapsed time.Duration) {

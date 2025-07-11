@@ -302,8 +302,9 @@ tasks:
       SOURCE_BLOCK_DIR: '{{.SOURCE_BLOCK_DIR}}'
       START_BLOCK: '{{.START_BLOCK}}'
       END_BLOCK: '{{.END_BLOCK}}'
+      LABELS: '{{.LABELS | default ""}}'
     cmds:
-      - cmd: go test -timeout=0 -v -benchtime=1x -bench=BenchmarkReexecuteRange -run=^$ github.com/ava-labs/avalanchego/tests/bench/c --source-block-dir={{.SOURCE_BLOCK_DIR} --target-dir={{.EXECUTION_DATA_DIR}}/current-state --start-block={{.START_BLOCK}} --end-block={{.END_BLOCK}} | tee {{.EXECUTION_DATA_DIR}}/reexecute-cchain-range.txt
+      - cmd: go test -timeout=0 -v -benchtime=1x -bench=BenchmarkReexecuteRange -run=^$ github.com/ava-labs/avalanchego/tests/bench/c --source-block-dir={{.SOURCE_BLOCK_DIR} --target-dir={{.EXECUTION_DATA_DIR}}/current-state --start-block={{.START_BLOCK}} --end-block={{.END_BLOCK}} --labels={{.LABELS}} | tee {{.EXECUTION_DATA_DIR}}/reexecute-cchain-range.txt
 
   export-dir-to-s3:
     desc: Copies a directory to s3
@@ -321,6 +322,7 @@ tasks:
       CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR | default "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-100.zip"}}'
       START_BLOCK: '{{.START_BLOCK | default "101"}}'
       END_BLOCK: '{{.END_BLOCK | default "250000"}}'
+      LABELS: '{{.LABELS | default ""}}'
     cmds:
       - task: import-cchain-reexecute-range
         vars:
@@ -333,3 +335,4 @@ tasks:
           EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
           START_BLOCK: '{{.START_BLOCK}}'
           END_BLOCK: '{{.END_BLOCK}}'
+          LABELS: '{{.LABELS}}'
