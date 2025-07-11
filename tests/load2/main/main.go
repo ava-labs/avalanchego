@@ -139,75 +139,78 @@ func main() {
 }
 
 func createRandomTest(contract *contracts.EVMLoadSimulator) (load2.RandomTest, error) {
+	// test params
 	count := big.NewInt(5)
+	weight := uint64(100)
+
 	weightedTests := []load2.WeightedTest{
 		{
 			Test:   load2.ZeroTransferTest{},
-			Weight: 100,
+			Weight: weight,
 		},
 		{
 			Test: load2.ReadTest{
 				Contract: contract,
 				Count:    count,
 			},
-			Weight: 100,
+			Weight: weight,
 		},
 		{
 			Test: load2.WriteTest{
 				Contract: contract,
 				Count:    count,
 			},
-			Weight: 100,
+			Weight: weight,
 		},
 		{
 			Test: load2.StateModificationTest{
 				Contract: contract,
 				Count:    count,
 			},
-			Weight: 100,
+			Weight: weight,
 		},
 		{
 			Test: load2.HashingTest{
 				Contract: contract,
 				Count:    count,
 			},
-			Weight: 100,
+			Weight: weight,
 		},
 		{
 			Test: load2.MemoryTest{
 				Contract: contract,
 				Count:    count,
 			},
-			Weight: 100,
+			Weight: weight,
 		},
 		{
 			Test: load2.CallDepthTest{
 				Contract: contract,
 				Count:    count,
 			},
-			Weight: 100,
+			Weight: weight,
 		},
 		{
 			Test:   load2.ContractCreationTest{Contract: contract},
-			Weight: 100,
+			Weight: weight,
 		},
 		{
 			Test: load2.PureComputeTest{
 				Contract:      contract,
 				NumIterations: count,
 			},
-			Weight: 100,
+			Weight: weight,
 		},
 		{
 			Test: load2.LargeEventTest{
 				Contract:  contract,
 				NumEvents: count,
 			},
-			Weight: 100,
+			Weight: weight,
 		},
 		{
 			Test:   load2.ExternalCallTest{Contract: contract},
-			Weight: 100,
+			Weight: weight,
 		},
 	}
 
