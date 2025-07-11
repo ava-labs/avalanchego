@@ -94,7 +94,7 @@ task reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=$HOME/reexec-dat
 
 ## Run Default C-Chain Benchmark
 
-To re-execute with an entirely fresh copy, use the defaults provided in [Taskfile.yaml](../../../Taskfile.yml) to execute the range [101, 250k]:
+To re-execute with an fresh copy, use the defaults provided in [Taskfile.yaml](../../../Taskfile.yml) to execute the range [101, 250k]:
 
 ```bash
 task reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=$HOME/reexec-data-defaults
