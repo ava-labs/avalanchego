@@ -1080,7 +1080,7 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	return apis, nil
 }
 
-func (vm *VM) CreateHTTP2Handler(context.Context) (http.Handler, error) {
+func (*VM) NewHTTPHandler(context.Context) (http.Handler, error) {
 	return nil, nil
 }
 
