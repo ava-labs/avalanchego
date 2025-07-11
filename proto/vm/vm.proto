@@ -19,9 +19,10 @@ service VM {
   rpc SetState(SetStateRequest) returns (SetStateResponse);
   // Shutdown is called when the node is shutting down.
   rpc Shutdown(google.protobuf.Empty) returns (google.protobuf.Empty);
-  // Creates the HTTP handlers for custom chain network calls.
+  // Creates the HTTP handlers for custom chain network calls. Requests are routed based on the specified path.
   rpc CreateHandlers(google.protobuf.Empty) returns (CreateHandlersResponse);
-  rpc CreateHTTP2Handler(google.protobuf.Empty) returns (CreateHTTP2HandlerResponse);
+  // Creates the HTTP handler for custom chain network calls. Requests are routed based on the route header.
+  rpc NewHTTPHandler(google.protobuf.Empty) returns (NewHTTPHandlerResponse);
   // WaitForEvent blocks until receiving the next event from the VM.
   rpc WaitForEvent(google.protobuf.Empty) returns (WaitForEventResponse);
   rpc Connected(ConnectedRequest) returns (google.protobuf.Empty);
@@ -161,17 +162,17 @@ message CreateHandlersResponse {
   repeated Handler handlers = 1;
 }
 
-message CreateHTTP2HandlerResponse {
-  // server_addr is the address of the gRPC server which serves the
-  // HTTP service
-  string server_addr = 1;
-}
-
 message Handler {
   string prefix = 1;
   // server_addr is the address of the gRPC server which serves the
   // HTTP service
   string server_addr = 2;
+}
+
+message NewHTTPHandlerResponse {
+  // server_addr is the address of the gRPC server which serves the
+  // HTTP service
+  string server_addr = 1;
 }
 
 message WaitForEventResponse {
