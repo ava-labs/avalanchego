@@ -189,11 +189,8 @@ if err != nil {
 
 ## TODO
 
-- Compress data files to reduce storage size
-- ~~Split data across multiple files when `MaxDataFileSize` is reached~~
 - Implement a block cache for recently accessed blocks
 - Use a buffered pool to avoid allocations on reads and writes
-- ~~Add tests for core functionality~~
 - Add metrics
 - Add performance benchmarks
 - Consider supporting missing data files (currently we error if any data files are missing)
