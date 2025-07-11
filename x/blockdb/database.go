@@ -1002,6 +1002,7 @@ func (s *Database) loadOrInitializeHeader() error {
 
 	// reset index file if its empty
 	if fileInfo.Size() == 0 {
+		s.log.Info("Index file is empty, writing initial index file header")
 		s.header = indexFileHeader{
 			Version:             IndexFileVersion,
 			MinHeight:           s.config.MinimumHeight,
@@ -1039,6 +1040,22 @@ func (s *Database) loadOrInitializeHeader() error {
 	}
 	s.nextDataWriteOffset.Store(s.header.NextWriteOffset)
 	s.setBlockHeights(s.header.MaxHeight, s.header.MaxContiguousHeight)
+
+	// log a warning if the config does not match the index header
+	if s.config.MinimumHeight != s.header.MinHeight {
+		s.log.Warn(
+			"MinimumHeight in blockdb config does not match the index header. The MinimumHeight in the index header will be used.",
+			zap.Uint64("configMinimumHeight", s.config.MinimumHeight),
+			zap.Uint64("headerMinimumHeight", s.header.MinHeight),
+		)
+	}
+	if s.config.MaxDataFileSize != s.header.MaxDataFileSize {
+		s.log.Warn(
+			"MaxDataFileSize in blockdb config does not match the index header. The MaxDataFileSize in the index header will be used.",
+			zap.Uint64("configMaxDataFileSize", s.config.MaxDataFileSize),
+			zap.Uint64("headerMaxDataFileSize", s.header.MaxDataFileSize),
+		)
+	}
 
 	return nil
 }
