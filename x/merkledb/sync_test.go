@@ -225,8 +225,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 	require.True(nextKey.IsNothing())
 
 	// add an extra value to sync db past the last key returned
-	newKey := midPoint(maybe.Some(lastKey), maybe.Nothing[[]byte]())
-	newKeyVal := newKey.Value()
+	newKeyVal := midpointWithEnd(lastKey)
 	require.NoError(db.Put(newKeyVal, []byte{1}))
 
 	// create a range endpoint that is before the newly added key, but after the last key
@@ -387,8 +386,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 
 	// add an extra value to local db
 	lastKey := proof.KeyChanges[len(proof.KeyChanges)-1].Key
-	midpoint := midPoint(maybe.Some(lastKey), maybe.Nothing[[]byte]())
-	midPointVal := midpoint.Value()
+	midPointVal := midpointWithEnd(lastKey)
 
 	require.NoError(db.Put(midPointVal, []byte{1}))
 
@@ -725,79 +723,15 @@ func TestFindNextKeyRandom(t *testing.T) {
 	}
 }
 
-// find the midpoint between two keys
-// start is expected to be less than end
-// Nothing/nil [start] is treated as all 0's
-// Nothing/nil [end] is treated as all 255's
-//
-// TODO: this is used in some of the findNextKey tests, but is copied from x/sync/manager.go
-// This should be removed.
-func midPoint(startMaybe, endMaybe maybe.Maybe[[]byte]) maybe.Maybe[[]byte] {
-	start := startMaybe.Value()
-	end := endMaybe.Value()
-	length := len(start)
-	if len(end) > length {
-		length = len(end)
+// Find the point between the key given and a key of all 255's
+func midpointWithEnd(start []byte) []byte {
+	midpoint := make([]byte, len(start))
+
+	for i := 0; i < len(start); i++ {
+		intI := int(start[i])
+		mid := (intI + 256) / 2
+		midpoint[i] = byte(mid)
 	}
 
-	if length == 0 {
-		if endMaybe.IsNothing() {
-			return maybe.Some([]byte{127})
-		} else if len(end) == 0 {
-			return maybe.Nothing[[]byte]()
-		}
-	}
-
-	// This check deals with cases where the end has a 255(or is nothing which is treated as all 255s) and the start key ends 255.
-	// For example, midPoint([255], nothing) should be [255, 127], not [255].
-	// The result needs the extra byte added on to the end to deal with the fact that the naive midpoint between 255 and 255 would be 255
-	if (len(start) > 0 && start[len(start)-1] == 255) && (len(end) == 0 || end[len(end)-1] == 255) {
-		length++
-	}
-
-	leftover := 0
-	midpoint := make([]byte, length+1)
-	for i := 0; i < length; i++ {
-		startVal := 0
-		if i < len(start) {
-			startVal = int(start[i])
-		}
-
-		endVal := 0
-		if endMaybe.IsNothing() {
-			endVal = 255
-		}
-		if i < len(end) {
-			endVal = int(end[i])
-		}
-
-		total := startVal + endVal + leftover
-		leftover = 0
-		// if total is odd, when we divide, we will lose the .5,
-		// record that in the leftover for the next digits
-		if total%2 == 1 {
-			leftover = 256
-		}
-
-		// find the midpoint between the start and the end
-		total /= 2
-
-		// larger than byte can hold, so carry over to previous byte
-		if total >= 256 {
-			total -= 256
-			index := i - 1
-			for index > 0 && midpoint[index] == 255 {
-				midpoint[index] = 0
-				index--
-			}
-			midpoint[index]++
-		}
-		midpoint[i] = byte(total)
-	}
-	if leftover > 0 {
-		midpoint[length] = 127
-	} else {
-		midpoint = midpoint[0:length]
-	}
-	return maybe.Some(midpoint)
+	return midpoint
 }

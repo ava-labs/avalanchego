@@ -537,7 +537,7 @@ func (m *Manager) handleRangeProofResponse(
 		m.setError(err)
 		return nil
 	}
-	//TODO get largest handled key from the range proof
+
 	m.completeWorkItem(work, nextKey, targetRootID)
 	return nil
 }
