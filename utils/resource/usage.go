@@ -65,6 +65,7 @@ type Manager interface {
 	// Shutdown allocated resources and stop tracking all processes.
 	Shutdown()
 }
+
 type manager struct {
 	log            logging.Logger
 	processMetrics *metrics
