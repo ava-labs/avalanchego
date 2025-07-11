@@ -46,7 +46,7 @@ pub use node::{
 };
 pub use nodestore::{
     Committed, HashedNodeReader, ImmutableProposal, LinearAddress, MutableProposal, NodeReader,
-    NodeStore, Parentable, ReadInMemoryNode, RootReader, TrieReader, UpdateError,
+    NodeStore, Parentable, ReadInMemoryNode, RootReader, TrieReader,
 };
 
 pub use linear::filebacked::FileBacked;
