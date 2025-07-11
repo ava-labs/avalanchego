@@ -697,7 +697,7 @@ func (s *Database) persistIndexHeader() error {
 		defer s.headerWriteOccupied.Store(false)
 		return s.persistIndexHeaderInternal()
 	}
-	s.log.Warn("Skipping persistIndexHeader due to concurrent header write")
+	s.log.Info("Skipping persistIndexHeader due to concurrent header write")
 	return nil
 }
 
@@ -1043,14 +1043,14 @@ func (s *Database) loadOrInitializeHeader() error {
 
 	// log a warning if the config does not match the index header
 	if s.config.MinimumHeight != s.header.MinHeight {
-		s.log.Warn(
+		s.log.Info(
 			"MinimumHeight in blockdb config does not match the index header. The MinimumHeight in the index header will be used.",
 			zap.Uint64("configMinimumHeight", s.config.MinimumHeight),
 			zap.Uint64("headerMinimumHeight", s.header.MinHeight),
 		)
 	}
 	if s.config.MaxDataFileSize != s.header.MaxDataFileSize {
-		s.log.Warn(
+		s.log.Info(
 			"MaxDataFileSize in blockdb config does not match the index header. The MaxDataFileSize in the index header will be used.",
 			zap.Uint64("configMaxDataFileSize", s.config.MaxDataFileSize),
 			zap.Uint64("headerMaxDataFileSize", s.header.MaxDataFileSize),
