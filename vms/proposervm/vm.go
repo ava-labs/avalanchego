@@ -228,7 +228,7 @@ func (vm *VM) Initialize(
 	)
 }
 
-// shutdown ops then propagate shutdown to innerVM
+// Shutdown ops then propagate shutdown to innerVM
 func (vm *VM) Shutdown(ctx context.Context) error {
 	if err := vm.db.Commit(); err != nil {
 		return err
