@@ -502,7 +502,7 @@ message ReplicationResponse {
   QuorumRound latest_round = 2; // latest round the responding node is aware of
 }
 
-// QuorumRound represents a round that has acheived quorum on either
+// QuorumRound represents a round that has achieved quorum on either
 // (empty notarization), (block & notarization), or (block, finalization certificate)
 message QuorumRound {
   bytes block = 1;
