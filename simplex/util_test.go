@@ -4,10 +4,15 @@
 package simplex
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 func newTestValidatorInfo(allVds []validators.GetValidatorOutput) map[ids.NodeID]*validators.GetValidatorOutput {
@@ -19,11 +24,11 @@ func newTestValidatorInfo(allVds []validators.GetValidatorOutput) map[ids.NodeID
 	return vds
 }
 
-func newEngineConfig() (*Config, error) {
+func newEngineConfig(t *testing.T, numNodes uint64) *Config {
+	require.Positive(t, numNodes)
+
 	ls, err := localsigner.New()
-	if err != nil {
-		return nil, err
-	}
+	require.NoError(t, err, "failed to create local signer")
 
 	nodeID := ids.GenerateTestNodeID()
 
@@ -38,9 +43,28 @@ func newEngineConfig() (*Config, error) {
 		PublicKey: ls.PublicKey(),
 	}
 
+	validators := generateTestValidators(t, numNodes-1)
+	validators = append(validators, nodeInfo)
+
 	return &Config{
 		Ctx:        simplexChainContext,
-		Validators: newTestValidatorInfo([]validators.GetValidatorOutput{nodeInfo}),
+		Log:        logging.NoLog{},
+		Validators: newTestValidatorInfo(validators),
 		SignBLS:    ls.Sign,
-	}, nil
+	}
+}
+
+func generateTestValidators(t *testing.T, num uint64) []validators.GetValidatorOutput {
+	vds := make([]validators.GetValidatorOutput, num)
+	for i := uint64(0); i < num; i++ {
+		ls, err := localsigner.New()
+		require.NoError(t, err)
+
+		nodeID := ids.GenerateTestNodeID()
+		vds[i] = validators.GetValidatorOutput{
+			NodeID:    nodeID,
+			PublicKey: ls.PublicKey(),
+		}
+	}
+	return vds
 }
