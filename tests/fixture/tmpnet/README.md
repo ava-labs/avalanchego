@@ -438,8 +438,8 @@ Example usage:
   uses: ./.github/actions/run-monitored-tmpnet-cmd #
 
   with:
-    # This needs to be the path to a bash script
-    run: ./scripts/tests.e2e.sh
+    # Command to execute
+    run: bash -x ./scripts/tests.e2e.sh
 
     # Env vars for the script need to be provided via run_env as a space-separated string
     # e.g. `MY_VAR1=foo MY_VAR2=bar`
