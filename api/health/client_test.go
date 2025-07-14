@@ -43,8 +43,8 @@ func TestClient(t *testing.T) {
 		err:    nil,
 		onCall: func() {},
 	}
-	c := &client{
-		requester: mc,
+	c := &Client{
+		Requester: mc,
 	}
 
 	{

@@ -10,10 +10,12 @@ module github.com/ava-labs/avalanchego
 go 1.23.9
 
 require (
+	connectrpc.com/connect v1.18.1
+	connectrpc.com/grpcreflect v1.3.0
 	github.com/DataDog/zstd v1.5.2
 	github.com/StephenButtolph/canoto v0.17.1
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
-	github.com/ava-labs/coreth v0.15.3-rc.0
+	github.com/ava-labs/coreth v0.15.3-rc.1
 	github.com/ava-labs/ledger-avalanche/go v0.0.0-20241009183145-e6f90a8a1a60
 	github.com/ava-labs/libevm v1.13.14-0.3.0.rc.1
 	github.com/btcsuite/btcd/btcutil v1.1.3
@@ -84,6 +86,7 @@ require (
 	github.com/FactomProject/btcutilecc v0.0.0-20130527213604-d3a63a5752ec // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
+	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.8 // indirect
 	github.com/ava-labs/simplex v0.0.0-20250626192006-220e6aeacdc1
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.10.0 // indirect
