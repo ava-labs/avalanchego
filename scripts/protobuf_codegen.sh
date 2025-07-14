@@ -30,25 +30,31 @@ if [[ $(protoc-gen-go-grpc --version | cut -f2 -d' ') != "${PROTOC_GEN_GO_GRPC_V
   exit 255
 fi
 
-TARGET=$PWD/proto
-if [ -n "${1:-}" ]; then
-  TARGET="$1"
-fi
+BUF_MODULES=("proto" "connectproto")
 
-# move to api directory
-cd "$TARGET"
+REPO_ROOT=$PWD
+for BUF_MODULE in "${BUF_MODULES[@]}"; do
+  TARGET=$REPO_ROOT/$BUF_MODULE
+  if [ -n "${1:-}" ]; then
+    TARGET="$1"
+  fi
 
-echo "Running protobuf fmt..."
-buf format -w
+  # move to buf module directory
+  cd "$TARGET"
 
-echo "Running protobuf lint check..."
-if ! buf lint;  then
-    echo "ERROR: protobuf linter failed"
-    exit 1
-fi
+  echo "Generating for buf module $BUF_MODULE"
+  echo "Running protobuf fmt for..."
+  buf format -w
 
-echo "Re-generating protobuf..."
-if ! buf generate;  then
-    echo "ERROR: protobuf generation failed"
-    exit 1
-fi
+  echo "Running protobuf lint check..."
+  if ! buf lint;  then
+      echo "ERROR: protobuf linter failed"
+      exit 1
+  fi
+
+  echo "Re-generating protobuf..."
+  if ! buf generate;  then
+      echo "ERROR: protobuf generation failed"
+      exit 1
+  fi
+done

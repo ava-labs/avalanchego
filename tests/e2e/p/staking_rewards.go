@@ -319,7 +319,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 // TODO(marun) Enable GetConfig to return *node.Config directly. Currently, due
 // to a circular dependency issue, a map-based equivalent is used for which
 // manual unmarshaling is required.
-func getRewardConfig(tc tests.TestContext, client admin.Client) reward.Config {
+func getRewardConfig(tc tests.TestContext, client *admin.Client) reward.Config {
 	require := require.New(tc)
 
 	rawNodeConfigMap, err := client.GetConfig(tc.DefaultContext())
