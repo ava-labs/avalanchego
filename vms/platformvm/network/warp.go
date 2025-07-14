@@ -5,6 +5,7 @@ package network
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"math"
 	"sync"
@@ -16,6 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/proto/pb/platformvm"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
@@ -48,12 +51,13 @@ const (
 var _ acp118.Verifier = (*signatureRequestVerifier)(nil)
 
 type signatureRequestVerifier struct {
+	vdrsState validators.State
 	stateLock sync.Locker
-	state     state.Chain
+	state     state.State
 }
 
 func (s signatureRequestVerifier) Verify(
-	_ context.Context,
+	ctx context.Context,
 	unsignedMessage *warp.UnsignedMessage,
 	justification []byte,
 ) *common.AppError {
@@ -86,6 +90,8 @@ func (s signatureRequestVerifier) Verify(
 		return s.verifyL1ValidatorRegistration(payload, justification)
 	case *message.L1ValidatorWeight:
 		return s.verifyL1ValidatorWeight(payload)
+	case *message.ValidatorSetState:
+		return s.verifyValidatorSetState(ctx, payload)
 	default:
 		return &common.AppError{
 			Code:    ErrUnsupportedWarpAddressedCallPayloadType,
@@ -356,4 +362,89 @@ func (s signatureRequestVerifier) verifyL1ValidatorWeight(
 	default:
 		return nil // The nonce and weight are correct
 	}
+}
+
+func (s signatureRequestVerifier) verifyValidatorSetState(
+	ctx context.Context,
+	msg *message.ValidatorSetState,
+) *common.AppError {
+	// Check that the P-Chain height exists and is within the window of this node
+	minHeight, err := s.vdrsState.GetMinimumHeight(ctx)
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to get minimum height: " + err.Error(),
+		}
+	}
+	if msg.PChainHeight >= minHeight {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: fmt.Sprintf("invalid height. provided %d. current minimum %d", msg.PChainHeight, minHeight),
+		}
+	}
+
+	// Check that the blocktime stamp is correct for the given P-Chain height.
+	blockID, err := s.state.GetBlockIDAtHeight(msg.PChainHeight)
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to get block ID at height: " + err.Error(),
+		}
+	}
+	statelessBlock, err := s.state.GetStatelessBlock(blockID)
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to get block: " + err.Error(),
+		}
+	}
+	banffBlock, ok := statelessBlock.(block.BanffBlock)
+	if !ok {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "block is not a Banff block",
+		}
+	}
+
+	blockTime := banffBlock.Timestamp()
+	if msg.PChainTimestamp != uint64(blockTime.Unix()) {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: fmt.Sprintf("invalid block time. provided %d. expected %d", msg.PChainTimestamp, blockTime),
+		}
+	}
+
+	// Get the validator set for the given blockchain ID at the given P-Chain height.
+	canonicalValidatorSet, err := warp.GetCanonicalValidatorSetFromChainID(ctx, s.vdrsState, msg.PChainHeight, msg.BlockchainID)
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to get canonical validator set: " + err.Error(),
+		}
+	}
+
+	// Check that the validator set hash is correct for the given blockchain ID at the given P-Chain height.
+	validators := make([]*message.Validator, len(canonicalValidatorSet.Validators))
+	for i, validator := range canonicalValidatorSet.Validators {
+		validators[i] = &message.Validator{
+			UncompressedPublicKeyBytes: [96]byte(validator.PublicKey.Serialize()),
+			Weight:                     validator.Weight,
+		}
+	}
+	bytes, err := message.Codec.Marshal(message.CodecVersion, validators)
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to marshal validator set: " + err.Error(),
+		}
+	}
+	hash := sha256.Sum256(bytes)
+	if msg.ValidatorSetHash != ids.ID(hash) {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: fmt.Sprintf("invalid validator set hash. provided %q. expected %q", msg.ValidatorSetHash, ids.ID(hash[:])),
+		}
+	}
+
+	return nil
 }

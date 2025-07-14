@@ -49,7 +49,7 @@ func New(
 	partialSyncPrimaryNetwork bool,
 	appSender common.AppSender,
 	stateLock sync.Locker,
-	state state.Chain,
+	state state.State,
 	signer warp.Signer,
 	registerer prometheus.Registerer,
 	config config.Network,
@@ -163,6 +163,7 @@ func New(
 
 	// We allow all peers to request warp messaging signatures
 	signatureRequestVerifier := signatureRequestVerifier{
+		vdrsState: vdrs,
 		stateLock: stateLock,
 		state:     state,
 	}
