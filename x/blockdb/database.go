@@ -620,6 +620,10 @@ func (s *Database) HasBlock(height BlockHeight) (bool, error) {
 		if errors.Is(err, ErrBlockNotFound) {
 			return false, nil
 		}
+		s.log.Error("Failed to check if block exists: failed to read index entry",
+			zap.Uint64("height", height),
+			zap.Error(err),
+		)
 		return false, err
 	}
 	return true, nil
