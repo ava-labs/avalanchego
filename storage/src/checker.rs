@@ -1,6 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+use crate::logger::warn;
 use crate::range_set::LinearAddressRangeSet;
 use crate::{
     CheckerError, Committed, HashedNodeReader, LinearAddress, Node, NodeReader, NodeStore,
@@ -46,7 +47,10 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
         self.visit_freelist(&mut visited)?;
 
         // 4. check missed areas - what are the spaces between trie nodes and free lists we have traversed?
-        let _ = visited.complement(); // TODO
+        let leaked_ranges = visited.complement();
+        if !leaked_ranges.is_empty() {
+            warn!("Found leaked ranges: {leaked_ranges}");
+        }
 
         Ok(())
     }

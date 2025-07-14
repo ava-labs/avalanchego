@@ -25,6 +25,7 @@ use thiserror::Error;
 mod checker;
 mod hashednode;
 mod hashers;
+mod iter;
 mod linear;
 mod node;
 mod nodestore;
@@ -149,6 +150,10 @@ pub enum CheckerError {
         /// Expected size of the area
         expected_free_list: AreaIndex,
     },
+
+    /// Found leaked areas
+    #[error("Found leaked areas: {0:?}")]
+    AreaLeaks(Vec<Range<LinearAddress>>),
 
     /// IO error
     #[error("IO error")]

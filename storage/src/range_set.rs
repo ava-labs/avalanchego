@@ -4,11 +4,14 @@
 #![warn(clippy::pedantic)]
 
 use std::collections::BTreeMap;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::ops::Range;
 
+use crate::iter::write_limited_with_sep;
 use crate::nodestore::NodeStoreHeader;
 use crate::{CheckerError, LinearAddress};
+
+const MAX_AREAS_TO_DISPLAY: usize = 10;
 
 #[derive(Debug)]
 // BTreeMap: range end --> range start
@@ -191,6 +194,14 @@ impl<T: Clone + Ord + Debug> RangeSet<T> {
 
         Self(complement_tree)
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = Range<&T>> {
+        self.0.iter().map(|(end, start)| Range { start, end })
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
 }
 
 impl<T: Debug> IntoIterator for RangeSet<T> {
@@ -272,6 +283,10 @@ impl LinearAddressRangeSet {
             max_addr: self.max_addr,
         }
     }
+
+    pub(super) fn is_empty(&self) -> bool {
+        self.range_set.is_empty()
+    }
 }
 
 impl IntoIterator for LinearAddressRangeSet {
@@ -280,6 +295,30 @@ impl IntoIterator for LinearAddressRangeSet {
 
     fn into_iter(self) -> Self::IntoIter {
         self.range_set.into_iter()
+    }
+}
+
+impl Display for LinearAddressRangeSet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        struct DisplayRange<'a>(Range<&'a LinearAddress>);
+        impl std::fmt::Display for DisplayRange<'_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let (start, end) = (self.0.start, self.0.end);
+                write!(f, "Address Range: [{start:#x}, {end:#x})")
+            }
+        }
+
+        if self.range_set.is_empty() {
+            write!(f, "Linear Address Range Set: <empty>")
+        } else {
+            write!(f, "Linear Address Range Set:\n\t")?;
+            write_limited_with_sep(
+                f,
+                self.range_set.iter().map(DisplayRange),
+                "\n\t",
+                Some(MAX_AREAS_TO_DISPLAY),
+            )
+        }
     }
 }
 
@@ -509,6 +548,7 @@ mod test_range_set {
 mod test_linear_address_range_set {
 
     use super::*;
+    use test_case::test_case;
 
     #[test]
     fn test_empty() {
@@ -656,5 +696,59 @@ mod test_linear_address_range_set {
         let visited = LinearAddressRangeSet::new(db_size.get()).unwrap();
         let complement = visited.complement().into_iter().collect::<Vec<_>>();
         assert_eq!(complement, vec![]);
+    }
+
+    #[test_case(0, "Linear Address Range Set: <empty>"; "empty")]
+    #[test_case(1, "Linear Address Range Set:\n\
+                    \tAddress Range: [0x1000, 0x1010)"; "1 range")]
+    #[test_case(3, "Linear Address Range Set:\n\
+                    \tAddress Range: [0x1000, 0x1010)\n\
+                    \tAddress Range: [0x1020, 0x1030)\n\
+                    \tAddress Range: [0x1040, 0x1050)"; "3 ranges")]
+    #[test_case(10, "Linear Address Range Set:\n\
+                    \tAddress Range: [0x1000, 0x1010)\n\
+                    \tAddress Range: [0x1020, 0x1030)\n\
+                    \tAddress Range: [0x1040, 0x1050)\n\
+                    \tAddress Range: [0x1060, 0x1070)\n\
+                    \tAddress Range: [0x1080, 0x1090)\n\
+                    \tAddress Range: [0x10a0, 0x10b0)\n\
+                    \tAddress Range: [0x10c0, 0x10d0)\n\
+                    \tAddress Range: [0x10e0, 0x10f0)\n\
+                    \tAddress Range: [0x1100, 0x1110)\n\
+                    \tAddress Range: [0x1120, 0x1130)"; "10 ranges")]
+    #[test_case(11, "Linear Address Range Set:\n\
+                    \tAddress Range: [0x1000, 0x1010)\n\
+                    \tAddress Range: [0x1020, 0x1030)\n\
+                    \tAddress Range: [0x1040, 0x1050)\n\
+                    \tAddress Range: [0x1060, 0x1070)\n\
+                    \tAddress Range: [0x1080, 0x1090)\n\
+                    \tAddress Range: [0x10a0, 0x10b0)\n\
+                    \tAddress Range: [0x10c0, 0x10d0)\n\
+                    \tAddress Range: [0x10e0, 0x10f0)\n\
+                    \tAddress Range: [0x1100, 0x1110)\n\
+                    \tAddress Range: [0x1120, 0x1130)\n\
+                    \t... (1 more hidden)"; "11 ranges")]
+    #[test_case(20, "Linear Address Range Set:\n\
+                    \tAddress Range: [0x1000, 0x1010)\n\
+                    \tAddress Range: [0x1020, 0x1030)\n\
+                    \tAddress Range: [0x1040, 0x1050)\n\
+                    \tAddress Range: [0x1060, 0x1070)\n\
+                    \tAddress Range: [0x1080, 0x1090)\n\
+                    \tAddress Range: [0x10a0, 0x10b0)\n\
+                    \tAddress Range: [0x10c0, 0x10d0)\n\
+                    \tAddress Range: [0x10e0, 0x10f0)\n\
+                    \tAddress Range: [0x1100, 0x1110)\n\
+                    \tAddress Range: [0x1120, 0x1130)\n\
+                    \t... (10 more hidden)"; "20 ranges")]
+    fn test_display(items: usize, expected: &str) {
+        let mut range_set = LinearAddressRangeSet::new(0x2000).unwrap();
+        for i in 0..items {
+            #[allow(clippy::arithmetic_side_effects)]
+            let offset = i as u64 * 0x20 + 0x1000;
+            range_set
+                .insert_area(LinearAddress::new(offset).unwrap(), 0x10)
+                .unwrap();
+        }
+        assert_eq!(format!("{range_set}"), expected);
     }
 }
