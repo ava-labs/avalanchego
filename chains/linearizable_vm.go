@@ -5,6 +5,7 @@ package chains
 
 import (
 	"context"
+	"sync"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -28,18 +29,31 @@ type initializeOnLinearizeVM struct {
 	vmToInitialize common.VM
 	vmToLinearize  *linearizeOnInitializeVM
 
-	ctx          *snow.Context
-	db           database.Database
-	genesisBytes []byte
-	upgradeBytes []byte
-	configBytes  []byte
-	toEngine     chan<- common.Message
-	fxs          []*common.Fx
-	appSender    common.AppSender
+	ctx              *snow.Context
+	db               database.Database
+	genesisBytes     []byte
+	upgradeBytes     []byte
+	configBytes      []byte
+	fxs              []*common.Fx
+	appSender        common.AppSender
+	waitForLinearize chan struct{}
+	linearizeOnce    sync.Once
+}
+
+func (vm *initializeOnLinearizeVM) WaitForEvent(ctx context.Context) (common.Message, error) {
+	select {
+	case <-vm.waitForLinearize:
+		return vm.vmToInitialize.WaitForEvent(ctx)
+	case <-ctx.Done():
+		return 0, ctx.Err()
+	}
 }
 
 func (vm *initializeOnLinearizeVM) Linearize(ctx context.Context, stopVertexID ids.ID) error {
 	vm.vmToLinearize.stopVertexID = stopVertexID
+	defer vm.linearizeOnce.Do(func() {
+		close(vm.waitForLinearize)
+	})
 	return vm.vmToInitialize.Initialize(
 		ctx,
 		vm.ctx,
@@ -47,7 +61,6 @@ func (vm *initializeOnLinearizeVM) Linearize(ctx context.Context, stopVertexID i
 		vm.genesisBytes,
 		vm.upgradeBytes,
 		vm.configBytes,
-		vm.toEngine,
 		vm.fxs,
 		vm.appSender,
 	)
@@ -74,9 +87,8 @@ func (vm *linearizeOnInitializeVM) Initialize(
 	_ []byte,
 	_ []byte,
 	_ []byte,
-	toEngine chan<- common.Message,
 	_ []*common.Fx,
 	_ common.AppSender,
 ) error {
-	return vm.Linearize(ctx, vm.stopVertexID, toEngine)
+	return vm.Linearize(ctx, vm.stopVertexID)
 }

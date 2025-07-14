@@ -231,7 +231,6 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				snowCtx.ValidatorState,
 				tt.txVerifier,
 				tt.mempool,
-				nil,
 				false,
 				tt.appSenderFunc(ctrl),
 				nil,
