@@ -23,6 +23,7 @@ import (
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/set"
 
 	"github.com/ava-labs/libevm/common"
@@ -140,7 +141,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 		context.Background(),
 		vmSetup.syncerVM.ctx,
 		vmSetup.syncerDB,
-		[]byte(genesisJSONLatest),
+		[]byte(toGenesisJSON(forkToChainConfig[upgradetest.Latest])),
 		nil,
 		[]byte(stateSyncDisabledConfigJSON),
 		[]*commonEng.Fx{},
@@ -204,7 +205,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 		context.Background(),
 		vmSetup.syncerVM.ctx,
 		vmSetup.syncerDB,
-		[]byte(genesisJSONLatest),
+		[]byte(toGenesisJSON(forkToChainConfig[upgradetest.Latest])),
 		nil,
 		[]byte(configJSON),
 		[]*commonEng.Fx{},
@@ -273,12 +274,15 @@ func TestVMShutdownWhileSyncing(t *testing.T) {
 func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *syncVMSetup {
 	require := require.New(t)
 	// configure [serverVM]
-	serverVM, _, serverAppSender := GenesisVM(t, true, genesisJSONLatest, "", "")
+	serverVM := newVM(t, testVMConfig{
+		genesisJSON: toGenesisJSON(forkToChainConfig[upgradetest.Latest]),
+	})
+
 	t.Cleanup(func() {
 		log.Info("Shutting down server VM")
-		require.NoError(serverVM.Shutdown(context.Background()))
+		require.NoError(serverVM.vm.Shutdown(context.Background()))
 	})
-	generateAndAcceptBlocks(t, serverVM, numBlocks, func(i int, gen *core.BlockGen) {
+	generateAndAcceptBlocks(t, serverVM.vm, numBlocks, func(i int, gen *core.BlockGen) {
 		b, err := predicate.NewResults().Bytes()
 		if err != nil {
 			t.Fatal(err)
@@ -286,47 +290,52 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 		gen.AppendExtra(b)
 
 		tx := types.NewTransaction(gen.TxNonce(testEthAddrs[0]), testEthAddrs[1], common.Big1, ethparams.TxGas, big.NewInt(testMinGasPrice), nil)
-		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(serverVM.chainConfig.ChainID), testKeys[0])
+		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(serverVM.vm.chainConfig.ChainID), testKeys[0].ToECDSA())
 		require.NoError(err)
 		gen.AddTx(signedTx)
 	}, nil)
 
 	// make some accounts
-	trieDB := triedb.NewDatabase(serverVM.chaindb, nil)
+	trieDB := triedb.NewDatabase(serverVM.vm.chaindb, nil)
 	root, accounts := statesync.FillAccountsWithOverlappingStorage(t, trieDB, types.EmptyRootHash, 1000, 16)
 
 	// patch serverVM's lastAcceptedBlock to have the new root
 	// and update the vm's state so the trie with accounts will
 	// be returned by StateSyncGetLastSummary
-	lastAccepted := serverVM.blockChain.LastAcceptedBlock()
-	patchedBlock := patchBlock(lastAccepted, root, serverVM.chaindb)
+	lastAccepted := serverVM.vm.blockChain.LastAcceptedBlock()
+	patchedBlock := patchBlock(lastAccepted, root, serverVM.vm.chaindb)
 	blockBytes, err := rlp.EncodeToBytes(patchedBlock)
 	require.NoError(err)
-	internalBlock, err := serverVM.parseBlock(context.Background(), blockBytes)
+	internalBlock, err := serverVM.vm.parseBlock(context.Background(), blockBytes)
 	require.NoError(err)
-	require.NoError(serverVM.State.SetLastAcceptedBlock(internalBlock))
+	require.NoError(serverVM.vm.State.SetLastAcceptedBlock(internalBlock))
 
 	// patch syncableInterval for test
-	serverVM.StateSyncServer.(*stateSyncServer).syncableInterval = test.syncableInterval
+	serverVM.vm.StateSyncServer.(*stateSyncServer).syncableInterval = test.syncableInterval
 
 	// initialise [syncerVM] with blank genesis state
 	stateSyncEnabledJSON := fmt.Sprintf(`{"state-sync-enabled":true, "state-sync-min-blocks": %d, "tx-lookup-limit": %d}`, test.stateSyncMinBlocks, 4)
-	syncerVM, syncerDB, syncerAppSender := GenesisVM(t, false, genesisJSONLatest, stateSyncEnabledJSON, "")
-	shutdownOnceSyncerVM := &shutdownOnceVM{VM: syncerVM}
+	syncerVM := newVM(t, testVMConfig{
+		genesisJSON: toGenesisJSON(forkToChainConfig[upgradetest.Latest]),
+		configJSON:  stateSyncEnabledJSON,
+		isSyncing:   true,
+	})
+
+	shutdownOnceSyncerVM := &shutdownOnceVM{VM: syncerVM.vm}
 	t.Cleanup(func() {
 		require.NoError(shutdownOnceSyncerVM.Shutdown(context.Background()))
 	})
-	require.NoError(syncerVM.SetState(context.Background(), snow.StateSyncing))
-	enabled, err := syncerVM.StateSyncEnabled(context.Background())
+	require.NoError(syncerVM.vm.SetState(context.Background(), snow.StateSyncing))
+	enabled, err := syncerVM.vm.StateSyncEnabled(context.Background())
 	require.NoError(err)
 	require.True(enabled)
 
 	// override [serverVM]'s SendAppResponse function to trigger AppResponse on [syncerVM]
-	serverAppSender.SendAppResponseF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
+	serverVM.appSender.SendAppResponseF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
 		if test.responseIntercept == nil {
-			go syncerVM.AppResponse(ctx, nodeID, requestID, response)
+			go syncerVM.vm.AppResponse(ctx, nodeID, requestID, response)
 		} else {
-			go test.responseIntercept(syncerVM, nodeID, requestID, response)
+			go test.responseIntercept(syncerVM.vm, nodeID, requestID, response)
 		}
 
 		return nil
@@ -334,28 +343,28 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 
 	// connect peer to [syncerVM]
 	require.NoError(
-		syncerVM.Connected(
+		syncerVM.vm.Connected(
 			context.Background(),
-			serverVM.ctx.NodeID,
+			serverVM.vm.ctx.NodeID,
 			statesyncclient.StateSyncVersion,
 		),
 	)
 
 	// override [syncerVM]'s SendAppRequest function to trigger AppRequest on [serverVM]
-	syncerAppSender.SendAppRequestF = func(ctx context.Context, nodeSet set.Set[ids.NodeID], requestID uint32, request []byte) error {
+	syncerVM.appSender.SendAppRequestF = func(ctx context.Context, nodeSet set.Set[ids.NodeID], requestID uint32, request []byte) error {
 		nodeID, hasItem := nodeSet.Pop()
 		require.True(hasItem, "expected nodeSet to contain at least 1 nodeID")
-		err := serverVM.AppRequest(ctx, nodeID, requestID, time.Now().Add(1*time.Second), request)
+		err := serverVM.vm.AppRequest(ctx, nodeID, requestID, time.Now().Add(1*time.Second), request)
 		require.NoError(err)
 		return nil
 	}
 
 	return &syncVMSetup{
-		serverVM:             serverVM,
-		serverAppSender:      serverAppSender,
+		serverVM:             serverVM.vm,
+		serverAppSender:      serverVM.appSender,
 		fundedAccounts:       accounts,
-		syncerVM:             syncerVM,
-		syncerDB:             syncerDB,
+		syncerVM:             syncerVM.vm,
+		syncerDB:             syncerVM.db,
 		shutdownOnceSyncerVM: shutdownOnceSyncerVM,
 	}
 }

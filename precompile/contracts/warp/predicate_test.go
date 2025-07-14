@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/subnet-evm/precompile/testutils"
 	"github.com/ava-labs/subnet-evm/predicate"
 	"github.com/ava-labs/subnet-evm/utils"
+	"github.com/ava-labs/subnet-evm/utils/utilstest"
 	"github.com/stretchr/testify/require"
 )
 
@@ -34,7 +35,6 @@ var (
 	_ agoUtils.Sortable[*testValidator] = (*testValidator)(nil)
 
 	errTest        = errors.New("non-nil error")
-	networkID      = uint32(54321)
 	sourceChainID  = ids.GenerateTestID()
 	sourceSubnetID = ids.GenerateTestID()
 
@@ -49,8 +49,6 @@ var (
 	numTestVdrs = 10_000
 	testVdrs    []*testValidator
 	vdrs        map[ids.NodeID]*validators.GetValidatorOutput
-
-	predicateTests = make(map[string]testutils.PredicateTest)
 )
 
 func init() {
@@ -88,7 +86,7 @@ func init() {
 		panic(err)
 	}
 	addressedPayloadBytes = addressedPayload.Bytes()
-	unsignedMsg, err = avalancheWarp.NewUnsignedMessage(networkID, sourceChainID, addressedPayload.Bytes())
+	unsignedMsg, err = avalancheWarp.NewUnsignedMessage(constants.UnitTestID, sourceChainID, addressedPayload.Bytes())
 	if err != nil {
 		panic(err)
 	}
@@ -100,8 +98,6 @@ func init() {
 		}
 		blsSignatures = append(blsSignatures, blsSignature)
 	}
-
-	initWarpPredicateTests()
 }
 
 type testValidator struct {
@@ -174,7 +170,7 @@ type validatorRange struct {
 }
 
 // createSnowCtx creates a snow.Context instance with a validator state specified by the given validatorRanges
-func createSnowCtx(validatorRanges []validatorRange) *snow.Context {
+func createSnowCtx(tb testing.TB, validatorRanges []validatorRange) *snow.Context {
 	getValidatorsOutput := make(map[ids.NodeID]*validators.GetValidatorOutput)
 
 	for _, validatorRange := range validatorRanges {
@@ -190,7 +186,7 @@ func createSnowCtx(validatorRanges []validatorRange) *snow.Context {
 		}
 	}
 
-	snowCtx := utils.TestSnowContext()
+	snowCtx := utilstest.NewTestSnowContext(tb)
 	state := &validatorstest.State{
 		GetSubnetIDF: func(ctx context.Context, chainID ids.ID) (ids.ID, error) {
 			return sourceSubnetID, nil
@@ -200,7 +196,6 @@ func createSnowCtx(validatorRanges []validatorRange) *snow.Context {
 		},
 	}
 	snowCtx.ValidatorState = state
-	snowCtx.NetworkID = networkID
 	return snowCtx
 }
 
@@ -232,7 +227,7 @@ func testWarpMessageFromPrimaryNetwork(t *testing.T, requirePrimaryNetworkSigner
 	cChainID := ids.GenerateTestID()
 	addressedCall, err := payload.NewAddressedCall(agoUtils.RandomBytes(20), agoUtils.RandomBytes(100))
 	require.NoError(err)
-	unsignedMsg, err := avalancheWarp.NewUnsignedMessage(networkID, cChainID, addressedCall.Bytes())
+	unsignedMsg, err := avalancheWarp.NewUnsignedMessage(constants.UnitTestID, cChainID, addressedCall.Bytes())
 	require.NoError(err)
 
 	getValidatorsOutput := make(map[ids.NodeID]*validators.GetValidatorOutput)
@@ -264,11 +259,10 @@ func testWarpMessageFromPrimaryNetwork(t *testing.T, requirePrimaryNetworkSigner
 
 	predicateBytes := predicate.PackPredicate(warpMsg.Bytes())
 
-	snowCtx := utils.TestSnowContext()
+	snowCtx := utilstest.NewTestSnowContext(t)
 	snowCtx.SubnetID = ids.GenerateTestID()
 	snowCtx.ChainID = ids.GenerateTestID()
 	snowCtx.CChainID = cChainID
-	snowCtx.NetworkID = networkID
 	snowCtx.ValidatorState = &validatorstest.State{
 		GetSubnetIDF: func(ctx context.Context, chainID ids.ID) (ids.ID, error) {
 			require.Equal(chainID, cChainID)
@@ -303,7 +297,7 @@ func testWarpMessageFromPrimaryNetwork(t *testing.T, requirePrimaryNetworkSigner
 
 func TestInvalidPredicatePacking(t *testing.T) {
 	numKeys := 1
-	snowCtx := createSnowCtx([]validatorRange{
+	snowCtx := createSnowCtx(t, []validatorRange{
 		{
 			start:     0,
 			end:       numKeys,
@@ -332,7 +326,7 @@ func TestInvalidPredicatePacking(t *testing.T) {
 
 func TestInvalidWarpMessage(t *testing.T) {
 	numKeys := 1
-	snowCtx := createSnowCtx([]validatorRange{
+	snowCtx := createSnowCtx(t, []validatorRange{
 		{
 			start:     0,
 			end:       numKeys,
@@ -363,7 +357,7 @@ func TestInvalidWarpMessage(t *testing.T) {
 
 func TestInvalidAddressedPayload(t *testing.T) {
 	numKeys := 1
-	snowCtx := createSnowCtx([]validatorRange{
+	snowCtx := createSnowCtx(t, []validatorRange{
 		{
 			start:     0,
 			end:       numKeys,
@@ -382,7 +376,7 @@ func TestInvalidAddressedPayload(t *testing.T) {
 	}
 	copy(warpSignature.Signature[:], bls.SignatureToBytes(aggregateSignature))
 	// Create an unsigned message with an invalid addressed payload
-	unsignedMsg, err := avalancheWarp.NewUnsignedMessage(networkID, sourceChainID, []byte{1, 2, 3})
+	unsignedMsg, err := avalancheWarp.NewUnsignedMessage(constants.UnitTestID, sourceChainID, []byte{1, 2, 3})
 	require.NoError(t, err)
 	warpMsg, err := avalancheWarp.NewMessage(unsignedMsg, warpSignature)
 	require.NoError(t, err)
@@ -409,7 +403,7 @@ func TestInvalidBitSet(t *testing.T) {
 	addressedCall, err := payload.NewAddressedCall(agoUtils.RandomBytes(20), agoUtils.RandomBytes(100))
 	require.NoError(t, err)
 	unsignedMsg, err := avalancheWarp.NewUnsignedMessage(
-		networkID,
+		constants.UnitTestID,
 		sourceChainID,
 		addressedCall.Bytes(),
 	)
@@ -425,7 +419,7 @@ func TestInvalidBitSet(t *testing.T) {
 	require.NoError(t, err)
 
 	numKeys := 1
-	snowCtx := createSnowCtx([]validatorRange{
+	snowCtx := createSnowCtx(t, []validatorRange{
 		{
 			start:     0,
 			end:       numKeys,
@@ -451,7 +445,7 @@ func TestInvalidBitSet(t *testing.T) {
 }
 
 func TestWarpSignatureWeightsDefaultQuorumNumerator(t *testing.T) {
-	snowCtx := createSnowCtx([]validatorRange{
+	snowCtx := createSnowCtx(t, []validatorRange{
 		{
 			start:     0,
 			end:       100,
@@ -498,7 +492,7 @@ func TestWarpSignatureWeightsDefaultQuorumNumerator(t *testing.T) {
 
 // multiple messages all correct, multiple messages all incorrect, mixed bag
 func TestWarpMultiplePredicates(t *testing.T) {
-	snowCtx := createSnowCtx([]validatorRange{
+	snowCtx := createSnowCtx(t, []validatorRange{
 		{
 			start:     0,
 			end:       100,
@@ -556,7 +550,7 @@ func TestWarpMultiplePredicates(t *testing.T) {
 }
 
 func TestWarpSignatureWeightsNonDefaultQuorumNumerator(t *testing.T) {
-	snowCtx := createSnowCtx([]validatorRange{
+	snowCtx := createSnowCtx(t, []validatorRange{
 		{
 			start:     0,
 			end:       100,
@@ -599,12 +593,13 @@ func TestWarpSignatureWeightsNonDefaultQuorumNumerator(t *testing.T) {
 	testutils.RunPredicateTests(t, tests)
 }
 
-func initWarpPredicateTests() {
+func makeWarpPredicateTests(tb testing.TB) map[string]testutils.PredicateTest {
+	predicateTests := make(map[string]testutils.PredicateTest)
 	for _, totalNodes := range []int{10, 100, 1_000, 10_000} {
 		testName := fmt.Sprintf("%d signers/%d validators", totalNodes, totalNodes)
 
 		predicateBytes := createPredicate(totalNodes)
-		snowCtx := createSnowCtx([]validatorRange{
+		snowCtx := createSnowCtx(tb, []validatorRange{
 			{
 				start:     0,
 				end:       totalNodes,
@@ -620,7 +615,7 @@ func initWarpPredicateTests() {
 		testName := fmt.Sprintf("%d signers (heavily weighted)/%d validators", numSigners, totalNodes)
 
 		predicateBytes := createPredicate(numSigners)
-		snowCtx := createSnowCtx([]validatorRange{
+		snowCtx := createSnowCtx(tb, []validatorRange{
 			{
 				start:     0,
 				end:       numSigners,
@@ -641,7 +636,7 @@ func initWarpPredicateTests() {
 		testName := fmt.Sprintf("%d signers (heavily weighted)/%d validators (non-signers without registered PublicKey)", numSigners, totalNodes)
 
 		predicateBytes := createPredicate(numSigners)
-		snowCtx := createSnowCtx([]validatorRange{
+		snowCtx := createSnowCtx(tb, []validatorRange{
 			{
 				start:     0,
 				end:       numSigners,
@@ -671,8 +666,8 @@ func initWarpPredicateTests() {
 			}
 		}
 
-		snowCtx := utils.TestSnowContext()
-		snowCtx.NetworkID = networkID
+		snowCtx := utilstest.NewTestSnowContext(tb)
+
 		state := &validatorstest.State{
 			GetSubnetIDF: func(ctx context.Context, chainID ids.ID) (ids.ID, error) {
 				return sourceSubnetID, nil
@@ -685,12 +680,15 @@ func initWarpPredicateTests() {
 
 		predicateTests[testName] = createValidPredicateTest(snowCtx, uint64(numSigners), predicateBytes)
 	}
+	return predicateTests
 }
 
 func TestWarpPredicate(t *testing.T) {
+	predicateTests := makeWarpPredicateTests(t)
 	testutils.RunPredicateTests(t, predicateTests)
 }
 
 func BenchmarkWarpPredicate(b *testing.B) {
+	predicateTests := makeWarpPredicateTests(b)
 	testutils.RunPredicateBenchmarks(b, predicateTests)
 }

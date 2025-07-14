@@ -83,25 +83,28 @@ func TestMempoolEthTxsAppGossipHandling(t *testing.T) {
 	genesisJSON, err := fundAddressByGenesis([]common.Address{addr})
 	assert.NoError(err)
 
-	vm, _, sender := GenesisVM(t, true, genesisJSON, "", "")
+	tvm := newVM(t, testVMConfig{
+		genesisJSON: genesisJSON,
+	})
+
 	defer func() {
-		err := vm.Shutdown(context.Background())
+		err := tvm.vm.Shutdown(context.Background())
 		assert.NoError(err)
 	}()
-	vm.txPool.SetGasTip(common.Big1)
-	vm.txPool.SetMinFee(common.Big0)
+	tvm.vm.txPool.SetGasTip(common.Big1)
+	tvm.vm.txPool.SetMinFee(common.Big0)
 
 	var (
 		wg          sync.WaitGroup
 		txRequested bool
 	)
-	sender.CantSendAppGossip = false
-	sender.SendAppRequestF = func(context.Context, set.Set[ids.NodeID], uint32, []byte) error {
+	tvm.appSender.CantSendAppGossip = false
+	tvm.appSender.SendAppRequestF = func(context.Context, set.Set[ids.NodeID], uint32, []byte) error {
 		txRequested = true
 		return nil
 	}
 	wg.Add(1)
-	sender.SendAppGossipF = func(context.Context, commonEng.SendConfig, []byte) error {
+	tvm.appSender.SendAppGossipF = func(context.Context, commonEng.SendConfig, []byte) error {
 		wg.Done()
 		return nil
 	}
@@ -111,7 +114,7 @@ func TestMempoolEthTxsAppGossipHandling(t *testing.T) {
 
 	// Txs must be submitted over the API to be included in push gossip.
 	// (i.e., txs received via p2p are not included in push gossip)
-	err = vm.eth.APIBackend.SendTx(context.Background(), tx)
+	err = tvm.vm.eth.APIBackend.SendTx(context.Background(), tx)
 	assert.NoError(err)
 	assert.False(txRequested, "tx should not be requested")
 

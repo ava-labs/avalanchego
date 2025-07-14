@@ -5,7 +5,6 @@ package evm
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,12 +18,13 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/log"
+	"github.com/ava-labs/libevm/trie"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -35,10 +35,10 @@ import (
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 
-	"github.com/ava-labs/avalanchego/api/metrics"
-	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/core"
@@ -58,6 +58,7 @@ import (
 	"github.com/ava-labs/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/subnet-evm/rpc"
 	"github.com/ava-labs/subnet-evm/utils"
+	"github.com/ava-labs/subnet-evm/utils/utilstest"
 
 	avagoconstants "github.com/ava-labs/avalanchego/utils/constants"
 )
@@ -65,13 +66,13 @@ import (
 var (
 	testNetworkID uint32 = avagoconstants.UnitTestID
 
-	testMinGasPrice int64 = 225_000_000_000
-	testKeys        []*ecdsa.PrivateKey
+	testMinGasPrice int64            = 225_000_000_000
+	testKeys                         = secp256k1.TestKeys()[:3]
 	testEthAddrs    []common.Address // testEthAddrs[i] corresponds to testKeys[i]
 
 	firstTxAmount = new(big.Int).Mul(big.NewInt(testMinGasPrice), big.NewInt(21000*100))
 
-	genesisJSON = func(cfg *params.ChainConfig) string {
+	toGenesisJSON = func(cfg *params.ChainConfig) string {
 		g := new(core.Genesis)
 		g.Difficulty = big.NewInt(0)
 		g.GasLimit = 8000000
@@ -83,8 +84,15 @@ var (
 		cpy.ChainID = big.NewInt(43111)
 		g.Config = &cpy
 
-		allocStr := `{"0x71562b71999873DB5b286dF957af199Ec94617F7": {"balance":"0x4192927743b88000"}, "0x703c4b2bD70c169f5717101CaeE543299Fc946C7": {"balance":"0x4192927743b88000"}}`
-		json.Unmarshal([]byte(allocStr), &g.Alloc)
+		// Create allocation for the test addresses
+		g.Alloc = make(types.GenesisAlloc)
+		for _, addr := range testEthAddrs {
+			balance := new(big.Int)
+			balance.SetString("0x4192927743b88000", 0)
+			g.Alloc[addr] = types.Account{
+				Balance: balance,
+			}
+		}
 
 		b, err := json.Marshal(g)
 		if err != nil {
@@ -93,38 +101,56 @@ var (
 		return string(b)
 	}
 
-	genesisJSONPreSubnetEVM = genesisJSON(params.TestPreSubnetEVMChainConfig)
-	genesisJSONSubnetEVM    = genesisJSON(params.TestSubnetEVMChainConfig)
-	genesisJSONDurango      = genesisJSON(params.TestDurangoChainConfig)
-	genesisJSONEtna         = genesisJSON(params.TestEtnaChainConfig)
-	// genesisJSONFortuna      = genesisJSON(params.TestFortunaChainConfig)
-	genesisJSONGranite = genesisJSON(params.TestGraniteChainConfig)
-	genesisJSONLatest  = genesisJSONGranite
+	// forkToChainConfig maps a fork to a chain config
+	forkToChainConfig = map[upgradetest.Fork]*params.ChainConfig{
+		upgradetest.Durango: params.TestDurangoChainConfig,
+		upgradetest.Etna:    params.TestEtnaChainConfig,
+		// upgradetest.Fortuna: params.TestFortunaChainConfig,
+		upgradetest.Granite: params.TestGraniteChainConfig,
+	}
+
+	// These will be initialized after init() runs
+	genesisJSONPreSubnetEVM string
+	genesisJSONSubnetEVM    string
 )
 
 func init() {
-	key1, _ := crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
-	key2, _ := crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
-	testKeys = append(testKeys, key1, key2)
-	addr1 := crypto.PubkeyToAddress(key1.PublicKey)
-	addr2 := crypto.PubkeyToAddress(key2.PublicKey)
-	testEthAddrs = append(testEthAddrs, addr1, addr2)
+	for _, key := range testKeys {
+		testEthAddrs = append(testEthAddrs, key.EthAddress())
+	}
+
+	genesisJSONPreSubnetEVM = toGenesisJSON(params.TestPreSubnetEVMChainConfig)
+	genesisJSONSubnetEVM = toGenesisJSON(params.TestSubnetEVMChainConfig)
 }
 
-// setupGenesis sets up the genesis
-// If [genesisJSON] is empty, defaults to using [genesisJSONLatest]
-func setupGenesis(
-	t *testing.T,
-	genesisJSON string,
-) (*snow.Context,
-	database.Database,
-	[]byte,
-	*atomic.Memory,
-) {
-	if len(genesisJSON) == 0 {
-		genesisJSON = genesisJSONLatest
+type testVMConfig struct {
+	isSyncing bool
+	fork      *upgradetest.Fork
+	// If genesisJSON is empty, defaults to the genesis corresponding to the
+	// fork.
+	genesisJSON string
+	upgradeJSON string
+	configJSON  string
+}
+
+type testVM struct {
+	vm           *VM
+	db           *prefixdb.Database
+	atomicMemory *atomic.Memory
+	appSender    *enginetest.Sender
+}
+
+func newVM(t *testing.T, config testVMConfig) *testVM {
+	ctx := utilstest.NewTestSnowContext(t)
+	fork := upgradetest.Latest
+	if config.fork != nil {
+		fork = *config.fork
 	}
-	ctx := utils.TestSnowContext()
+	ctx.NetworkUpgrades = upgradetest.GetConfig(fork)
+
+	if len(config.genesisJSON) == 0 {
+		config.genesisJSON = toGenesisJSON(forkToChainConfig[fork])
+	}
 
 	baseDB := memdb.New()
 
@@ -132,45 +158,78 @@ func setupGenesis(
 	atomicMemory := atomic.NewMemory(prefixdb.New([]byte{0}, baseDB))
 	ctx.SharedMemory = atomicMemory.NewSharedMemory(ctx.ChainID)
 
-	prefixedDB := prefixdb.New([]byte{1}, baseDB)
-	return ctx, prefixedDB, []byte(genesisJSON), atomicMemory
-}
+	// NB: this lock is intentionally left locked when this function returns.
+	// The caller of this function is responsible for unlocking.
+	ctx.Lock.Lock()
 
-// GenesisVM creates a VM instance with the genesis test bytes and returns
-// the channel use to send messages to the engine, the VM, database manager,
-// and sender.
-// If [genesisJSON] is empty, defaults to using [genesisJSONLatest]
-func GenesisVM(t *testing.T, finishBootstrapping bool, genesisJSON string, configJSON string, upgradeJSON string) (*VM, database.Database, *enginetest.Sender) {
+	prefixedDB := prefixdb.New([]byte{1}, baseDB)
+
 	vm := &VM{}
-	ctx, dbManager, genesisBytes, _ := setupGenesis(t, genesisJSON)
 	appSender := &enginetest.Sender{T: t}
 	appSender.CantSendAppGossip = true
 	appSender.SendAppGossipF = func(context.Context, commonEng.SendConfig, []byte) error { return nil }
+
 	err := vm.Initialize(
 		context.Background(),
 		ctx,
-		dbManager,
-		genesisBytes,
-		[]byte(upgradeJSON),
-		[]byte(configJSON),
+		prefixedDB,
+		[]byte(config.genesisJSON),
+		[]byte(config.upgradeJSON),
+		[]byte(config.configJSON),
 		[]*commonEng.Fx{},
 		appSender,
 	)
-	require.NoError(t, err, "error initializing GenesisVM")
+	require.NoError(t, err, "error initializing vm")
 
-	if finishBootstrapping {
+	if !config.isSyncing {
 		require.NoError(t, vm.SetState(context.Background(), snow.Bootstrapping))
 		require.NoError(t, vm.SetState(context.Background(), snow.NormalOp))
 	}
 
-	return vm, dbManager, appSender
+	return &testVM{
+		vm:           vm,
+		db:           prefixedDB,
+		atomicMemory: atomicMemory,
+		appSender:    appSender,
+	}
+}
+
+// setupGenesis sets up the genesis
+func setupGenesis(
+	t *testing.T,
+	fork upgradetest.Fork,
+) (*snow.Context,
+	*prefixdb.Database,
+	[]byte,
+	*atomic.Memory,
+) {
+	ctx := utilstest.NewTestSnowContext(t)
+
+	genesisJSON := toGenesisJSON(forkToChainConfig[fork])
+	ctx.NetworkUpgrades = upgradetest.GetConfig(fork)
+
+	baseDB := memdb.New()
+
+	// initialize the atomic memory
+	atomicMemory := atomic.NewMemory(prefixdb.New([]byte{0}, baseDB))
+	ctx.SharedMemory = atomicMemory.NewSharedMemory(ctx.ChainID)
+
+	// NB: this lock is intentionally left locked when this function returns.
+	// The caller of this function is responsible for unlocking.
+	ctx.Lock.Lock()
+
+	prefixedDB := prefixdb.New([]byte{1}, baseDB)
+
+	return ctx, prefixedDB, []byte(genesisJSON), atomicMemory
 }
 
 func TestVMConfig(t *testing.T) {
 	txFeeCap := float64(11)
 	enabledEthAPIs := []string{"debug"}
-	configJSON := fmt.Sprintf(`{"rpc-tx-fee-cap": %g,"eth-apis": %s}`, txFeeCap, fmt.Sprintf("[%q]", enabledEthAPIs[0]))
-	vm, _, _ := GenesisVM(t, false, "", configJSON, "")
+	vm := newVM(t, testVMConfig{
+		configJSON: fmt.Sprintf(`{"rpc-tx-fee-cap": %g,"eth-apis": %s}`, txFeeCap, fmt.Sprintf("[%q]", enabledEthAPIs[0])),
+	}).vm
+
 	require.Equal(t, vm.config.RPCTxFeeCap, txFeeCap, "Tx Fee Cap should be set")
 	require.Equal(t, vm.config.EthAPIs(), enabledEthAPIs, "EnabledEthAPIs should be set")
 	require.NoError(t, vm.Shutdown(context.Background()))
@@ -179,8 +238,9 @@ func TestVMConfig(t *testing.T) {
 func TestVMConfigDefaults(t *testing.T) {
 	txFeeCap := float64(11)
 	enabledEthAPIs := []string{"debug"}
-	configJSON := fmt.Sprintf(`{"rpc-tx-fee-cap": %g,"eth-apis": %s}`, txFeeCap, fmt.Sprintf("[%q]", enabledEthAPIs[0]))
-	vm, _, _ := GenesisVM(t, false, "", configJSON, "")
+	vm := newVM(t, testVMConfig{
+		configJSON: fmt.Sprintf(`{"rpc-tx-fee-cap": %g,"eth-apis": %s}`, txFeeCap, fmt.Sprintf("[%q]", enabledEthAPIs[0])),
+	}).vm
 
 	var vmConfig config.Config
 	vmConfig.SetDefaults(defaultTxPoolConfig)
@@ -191,7 +251,7 @@ func TestVMConfigDefaults(t *testing.T) {
 }
 
 func TestVMNilConfig(t *testing.T) {
-	vm, _, _ := GenesisVM(t, false, "", "", "")
+	vm := newVM(t, testVMConfig{}).vm
 
 	// VM Config should match defaults if no config is passed in
 	var vmConfig config.Config
@@ -203,8 +263,10 @@ func TestVMNilConfig(t *testing.T) {
 func TestVMContinuousProfiler(t *testing.T) {
 	profilerDir := t.TempDir()
 	profilerFrequency := 500 * time.Millisecond
-	configJSON := fmt.Sprintf(`{"continuous-profiler-dir": %q,"continuous-profiler-frequency": "500ms"}`, profilerDir)
-	vm, _, _ := GenesisVM(t, false, "", configJSON, "")
+	vm := newVM(t, testVMConfig{
+		configJSON: fmt.Sprintf(`{"continuous-profiler-dir": %q,"continuous-profiler-frequency": "500ms"}`, profilerDir),
+	}).vm
+
 	require.Equal(t, vm.config.ContinuousProfilerDir, profilerDir, "profiler dir should be set")
 	require.Equal(t, vm.config.ContinuousProfilerFrequency.Duration, profilerFrequency, "profiler frequency should be set")
 
@@ -222,17 +284,17 @@ func TestVMContinuousProfiler(t *testing.T) {
 func TestVMUpgrades(t *testing.T) {
 	genesisTests := []struct {
 		name             string
-		genesis          string
+		genesisJSON      string
 		expectedGasPrice *big.Int
 	}{
 		{
 			name:             "Subnet EVM",
-			genesis:          genesisJSONSubnetEVM,
+			genesisJSON:      genesisJSONSubnetEVM,
 			expectedGasPrice: big.NewInt(0),
 		},
 		{
 			name:             "Durango",
-			genesis:          genesisJSONDurango,
+			genesisJSON:      toGenesisJSON(params.TestDurangoChainConfig),
 			expectedGasPrice: big.NewInt(0),
 		},
 	}
@@ -240,7 +302,10 @@ func TestVMUpgrades(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			vm, _, _ := GenesisVM(t, true, test.genesis, "", "")
+			vm := newVM(t, testVMConfig{
+				genesisJSON: test.genesisJSON,
+			}).vm
+
 			defer func() {
 				require.NoError(vm.Shutdown(context.Background()))
 			}()
@@ -291,32 +356,35 @@ func issueAndAccept(t *testing.T, vm *VM) snowman.Block {
 
 func TestBuildEthTxBlock(t *testing.T) {
 	// reduce block gas cost
-	vm, dbManager, _ := GenesisVM(t, true, genesisJSONSubnetEVM, `{"pruning-enabled":true}`, "")
+	tvm := newVM(t, testVMConfig{
+		genesisJSON: genesisJSONSubnetEVM,
+		configJSON:  `{"pruning-enabled":true}`,
+	})
 
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
+		if err := tvm.vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
 
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
-	vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
+	tvm.vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
 
 	key := testutils.NewKey(t)
 
 	tx := types.NewTransaction(uint64(0), key.Address, firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[0].ToECDSA())
 	if err != nil {
 		t.Fatal(err)
 	}
-	errs := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
+	errs := tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add tx at index %d: %s", i, err)
 		}
 	}
 
-	blk1 := issueAndAccept(t, vm)
+	blk1 := issueAndAccept(t, tvm.vm)
 	newHead := <-newTxPoolHeadChan
 	if newHead.Head.Hash() != common.Hash(blk1.ID()) {
 		t.Fatalf("Expected new block to match")
@@ -325,27 +393,27 @@ func TestBuildEthTxBlock(t *testing.T) {
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
 		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
-		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), key.PrivateKey)
+		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), key.PrivateKey)
 		if err != nil {
 			t.Fatal(err)
 		}
 		txs[i] = signedTx
 	}
-	errs = vm.txPool.AddRemotesSync(txs)
+	errs = tvm.vm.txPool.AddRemotesSync(txs)
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add tx at index %d: %s", i, err)
 		}
 	}
 
-	vm.clock.Set(vm.clock.Time().Add(2 * time.Second))
-	blk2 := issueAndAccept(t, vm)
+	tvm.vm.clock.Set(tvm.vm.clock.Time().Add(2 * time.Second))
+	blk2 := issueAndAccept(t, tvm.vm)
 	newHead = <-newTxPoolHeadChan
 	if newHead.Head.Hash() != common.Hash(blk2.ID()) {
 		t.Fatalf("Expected new block to match")
 	}
 
-	lastAcceptedID, err := vm.LastAccepted(context.Background())
+	lastAcceptedID, err := tvm.vm.LastAccepted(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -354,19 +422,19 @@ func TestBuildEthTxBlock(t *testing.T) {
 	}
 
 	ethBlk1 := blk1.(*chain.BlockWrapper).Block.(*Block).ethBlock
-	if ethBlk1Root := ethBlk1.Root(); !vm.blockChain.HasState(ethBlk1Root) {
+	if ethBlk1Root := ethBlk1.Root(); !tvm.vm.blockChain.HasState(ethBlk1Root) {
 		t.Fatalf("Expected blk1 state root to not yet be pruned after blk2 was accepted because of tip buffer")
 	}
 
 	// Clear the cache and ensure that GetBlock returns internal blocks with the correct status
-	vm.State.Flush()
-	blk2Refreshed, err := vm.GetBlockInternal(context.Background(), blk2.ID())
+	tvm.vm.State.Flush()
+	blk2Refreshed, err := tvm.vm.GetBlockInternal(context.Background(), blk2.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	blk1RefreshedID := blk2Refreshed.Parent()
-	blk1Refreshed, err := vm.GetBlockInternal(context.Background(), blk1RefreshedID)
+	blk1Refreshed, err := tvm.vm.GetBlockInternal(context.Background(), blk1RefreshedID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -376,11 +444,14 @@ func TestBuildEthTxBlock(t *testing.T) {
 	}
 
 	restartedVM := &VM{}
+	newCTX := utilstest.NewTestSnowContext(t)
+	// Use the network upgrades from the existing VM's context to ensure consistency
+	newCTX.NetworkUpgrades = tvm.vm.ctx.NetworkUpgrades
 
 	if err := restartedVM.Initialize(
 		context.Background(),
-		utils.TestSnowContext(),
-		dbManager,
+		newCTX,
+		tvm.db,
 		[]byte(genesisJSONSubnetEVM),
 		[]byte(""),
 		[]byte(`{"pruning-enabled":true}`),
@@ -415,8 +486,15 @@ func TestBuildEthTxBlock(t *testing.T) {
 func TestSetPreferenceRace(t *testing.T) {
 	// Create two VMs which will agree on block A and then
 	// build the two distinct preferred chains above
-	vm1, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, `{"pruning-enabled":true}`, "")
-	vm2, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, `{"pruning-enabled":true}`, "")
+	tvmConfig := testVMConfig{
+		genesisJSON: genesisJSONSubnetEVM,
+		configJSON:  `{"pruning-enabled":false}`,
+	}
+	tvm1 := newVM(t, tvmConfig)
+	tvm2 := newVM(t, tvmConfig)
+
+	vm1 := tvm1.vm
+	vm2 := tvm2.vm
 
 	defer func() {
 		if err := vm1.Shutdown(context.Background()); err != nil {
@@ -434,7 +512,7 @@ func TestSetPreferenceRace(t *testing.T) {
 	vm2.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan2)
 
 	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[0])
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[0].ToECDSA())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -495,7 +573,7 @@ func TestSetPreferenceRace(t *testing.T) {
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
 		tx := types.NewTransaction(uint64(i), testEthAddrs[0], big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
-		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[1])
+		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[1].ToECDSA())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -656,8 +734,15 @@ func TestSetPreferenceRace(t *testing.T) {
 // accept block C, which should be an orphaned block at this point and
 // get rejected.
 func TestReorgProtection(t *testing.T) {
-	vm1, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, `{"pruning-enabled":false}`, "")
-	vm2, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, `{"pruning-enabled":false}`, "")
+	tvmConfig := testVMConfig{
+		genesisJSON: genesisJSONSubnetEVM,
+		configJSON:  `{"pruning-enabled":false}`,
+	}
+	tvm1 := newVM(t, tvmConfig)
+	tvm2 := newVM(t, tvmConfig)
+
+	vm1 := tvm1.vm
+	vm2 := tvm2.vm
 
 	defer func() {
 		if err := vm1.Shutdown(context.Background()); err != nil {
@@ -675,7 +760,7 @@ func TestReorgProtection(t *testing.T) {
 	vm2.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan2)
 
 	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[0])
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[0].ToECDSA())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -736,7 +821,7 @@ func TestReorgProtection(t *testing.T) {
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
 		tx := types.NewTransaction(uint64(i), testEthAddrs[0], big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
-		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[1])
+		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[1].ToECDSA())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -827,8 +912,14 @@ func TestReorgProtection(t *testing.T) {
 //	 / \
 //	B   C
 func TestNonCanonicalAccept(t *testing.T) {
-	vm1, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
-	vm2, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
+	tvmConfig := testVMConfig{
+		genesisJSON: genesisJSONSubnetEVM,
+	}
+	tvm1 := newVM(t, tvmConfig)
+	tvm2 := newVM(t, tvmConfig)
+
+	vm1 := tvm1.vm
+	vm2 := tvm2.vm
 
 	defer func() {
 		if err := vm1.Shutdown(context.Background()); err != nil {
@@ -846,7 +937,7 @@ func TestNonCanonicalAccept(t *testing.T) {
 	vm2.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan2)
 
 	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[0])
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[0].ToECDSA())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -924,7 +1015,7 @@ func TestNonCanonicalAccept(t *testing.T) {
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
 		tx := types.NewTransaction(uint64(i), testEthAddrs[0], big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
-		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[1])
+		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[1].ToECDSA())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1023,8 +1114,14 @@ func TestNonCanonicalAccept(t *testing.T) {
 //	    |
 //	    D
 func TestStickyPreference(t *testing.T) {
-	vm1, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
-	vm2, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
+	tvmConfig := testVMConfig{
+		genesisJSON: genesisJSONSubnetEVM,
+	}
+	tvm1 := newVM(t, tvmConfig)
+	tvm2 := newVM(t, tvmConfig)
+
+	vm1 := tvm1.vm
+	vm2 := tvm2.vm
 
 	defer func() {
 		if err := vm1.Shutdown(context.Background()); err != nil {
@@ -1042,7 +1139,7 @@ func TestStickyPreference(t *testing.T) {
 	vm2.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan2)
 
 	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[0])
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[0].ToECDSA())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1103,7 +1200,7 @@ func TestStickyPreference(t *testing.T) {
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
 		tx := types.NewTransaction(uint64(i), testEthAddrs[0], big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
-		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[1])
+		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[1].ToECDSA())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1286,8 +1383,14 @@ func TestStickyPreference(t *testing.T) {
 //	    |
 //	    D
 func TestUncleBlock(t *testing.T) {
-	vm1, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
-	vm2, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
+	tvmConfig := testVMConfig{
+		genesisJSON: genesisJSONSubnetEVM,
+	}
+	tvm1 := newVM(t, tvmConfig)
+	tvm2 := newVM(t, tvmConfig)
+
+	vm1 := tvm1.vm
+	vm2 := tvm2.vm
 
 	defer func() {
 		if err := vm1.Shutdown(context.Background()); err != nil {
@@ -1304,7 +1407,7 @@ func TestUncleBlock(t *testing.T) {
 	vm2.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan2)
 
 	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[0])
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[0].ToECDSA())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1363,7 +1466,7 @@ func TestUncleBlock(t *testing.T) {
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
 		tx := types.NewTransaction(uint64(i), testEthAddrs[0], big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
-		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[1])
+		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[1].ToECDSA())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1470,32 +1573,34 @@ func TestUncleBlock(t *testing.T) {
 // Regression test to ensure that a VM that is not able to parse a block that
 // contains no transactions.
 func TestEmptyBlock(t *testing.T) {
-	vm, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
+	tvm := newVM(t, testVMConfig{
+		genesisJSON: genesisJSONSubnetEVM,
+	})
 
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
+		if err := tvm.vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
 
 	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[0].ToECDSA())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	txErrors := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
+	txErrors := tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
 	for i, err := range txErrors {
 		if err != nil {
 			t.Fatalf("Failed to add tx at index %d: %s", i, err)
 		}
 	}
 
-	msg, err := vm.WaitForEvent(context.Background())
+	msg, err := tvm.vm.WaitForEvent(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, commonEng.PendingTxs, msg)
 
-	blk, err := vm.BuildBlock(context.Background())
+	blk, err := tvm.vm.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatalf("Failed to build block with import transaction: %s", err)
 	}
@@ -1511,9 +1616,9 @@ func TestEmptyBlock(t *testing.T) {
 		new(trie.Trie),
 	)
 
-	emptyBlock := vm.newBlock(emptyEthBlock)
+	emptyBlock := tvm.vm.newBlock(emptyEthBlock)
 
-	if _, err := vm.ParseBlock(context.Background(), emptyBlock.Bytes()); !errors.Is(err, errEmptyBlock) {
+	if _, err := tvm.vm.ParseBlock(context.Background(), emptyBlock.Bytes()); !errors.Is(err, errEmptyBlock) {
 		t.Fatalf("VM should have failed with errEmptyBlock but got %s", err.Error())
 	}
 	if err := emptyBlock.Verify(context.Background()); !errors.Is(err, errEmptyBlock) {
@@ -1530,8 +1635,14 @@ func TestEmptyBlock(t *testing.T) {
 //	    |
 //	    D
 func TestAcceptReorg(t *testing.T) {
-	vm1, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
-	vm2, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
+	tvmConfig := testVMConfig{
+		genesisJSON: genesisJSONSubnetEVM,
+	}
+	tvm1 := newVM(t, tvmConfig)
+	tvm2 := newVM(t, tvmConfig)
+
+	vm1 := tvm1.vm
+	vm2 := tvm2.vm
 
 	defer func() {
 		if err := vm1.Shutdown(context.Background()); err != nil {
@@ -1549,7 +1660,7 @@ func TestAcceptReorg(t *testing.T) {
 	vm2.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan2)
 
 	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[0])
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[0].ToECDSA())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1610,7 +1721,7 @@ func TestAcceptReorg(t *testing.T) {
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
 		tx := types.NewTransaction(uint64(i), testEthAddrs[0], big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
-		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[1])
+		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[1].ToECDSA())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1733,32 +1844,34 @@ func TestAcceptReorg(t *testing.T) {
 }
 
 func TestFutureBlock(t *testing.T) {
-	vm, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
+	tvm := newVM(t, testVMConfig{
+		genesisJSON: genesisJSONSubnetEVM,
+	})
 
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
+		if err := tvm.vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
 
 	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[0].ToECDSA())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	txErrors := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
+	txErrors := tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
 	for i, err := range txErrors {
 		if err != nil {
 			t.Fatalf("Failed to add tx at index %d: %s", i, err)
 		}
 	}
 
-	msg, err := vm.WaitForEvent(context.Background())
+	msg, err := tvm.vm.WaitForEvent(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, commonEng.PendingTxs, msg)
 
-	blkA, err := vm.BuildBlock(context.Background())
+	blkA, err := tvm.vm.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatalf("Failed to build block with import transaction: %s", err)
 	}
@@ -1767,7 +1880,7 @@ func TestFutureBlock(t *testing.T) {
 	internalBlkA := blkA.(*chain.BlockWrapper).Block.(*Block)
 	modifiedHeader := types.CopyHeader(internalBlkA.ethBlock.Header())
 	// Set the VM's clock to the time of the produced block
-	vm.clock.Set(time.Unix(int64(modifiedHeader.Time), 0))
+	tvm.vm.clock.Set(time.Unix(int64(modifiedHeader.Time), 0))
 	// Set the modified time to exceed the allowed future time
 	modifiedTime := modifiedHeader.Time + uint64(maxFutureBlockTime.Seconds()+1)
 	modifiedHeader.Time = modifiedTime
@@ -1779,7 +1892,7 @@ func TestFutureBlock(t *testing.T) {
 		trie.NewStackTrie(nil),
 	)
 
-	futureBlock := vm.newBlock(modifiedBlock)
+	futureBlock := tvm.vm.newBlock(modifiedBlock)
 
 	if err := futureBlock.Verify(context.Background()); err == nil {
 		t.Fatal("Future block should have failed verification due to block timestamp too far in the future")
@@ -1789,32 +1902,34 @@ func TestFutureBlock(t *testing.T) {
 }
 
 func TestLastAcceptedBlockNumberAllow(t *testing.T) {
-	vm, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
+	tvm := newVM(t, testVMConfig{
+		genesisJSON: genesisJSONSubnetEVM,
+	})
 
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
+		if err := tvm.vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
 
 	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[0].ToECDSA())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	txErrors := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
+	txErrors := tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
 	for i, err := range txErrors {
 		if err != nil {
 			t.Fatalf("Failed to add tx at index %d: %s", i, err)
 		}
 	}
 
-	msg, err := vm.WaitForEvent(context.Background())
+	msg, err := tvm.vm.WaitForEvent(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, commonEng.PendingTxs, msg)
 
-	blk, err := vm.BuildBlock(context.Background())
+	blk, err := tvm.vm.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatalf("Failed to build block with import transaction: %s", err)
 	}
@@ -1823,17 +1938,17 @@ func TestLastAcceptedBlockNumberAllow(t *testing.T) {
 		t.Fatalf("Block failed verification on VM: %s", err)
 	}
 
-	if err := vm.SetPreference(context.Background(), blk.ID()); err != nil {
+	if err := tvm.vm.SetPreference(context.Background(), blk.ID()); err != nil {
 		t.Fatal(err)
 	}
 
 	blkHeight := blk.Height()
 	blkHash := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock.Hash()
 
-	vm.eth.APIBackend.SetAllowUnfinalizedQueries(true)
+	tvm.vm.eth.APIBackend.SetAllowUnfinalizedQueries(true)
 
 	ctx := context.Background()
-	b, err := vm.eth.APIBackend.BlockByNumber(ctx, rpc.BlockNumber(blkHeight))
+	b, err := tvm.vm.eth.APIBackend.BlockByNumber(ctx, rpc.BlockNumber(blkHeight))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1841,9 +1956,9 @@ func TestLastAcceptedBlockNumberAllow(t *testing.T) {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkHeight, blkHash.Hex(), b.Hash().Hex())
 	}
 
-	vm.eth.APIBackend.SetAllowUnfinalizedQueries(false)
+	tvm.vm.eth.APIBackend.SetAllowUnfinalizedQueries(false)
 
-	_, err = vm.eth.APIBackend.BlockByNumber(ctx, rpc.BlockNumber(blkHeight))
+	_, err = tvm.vm.eth.APIBackend.BlockByNumber(ctx, rpc.BlockNumber(blkHeight))
 	if !errors.Is(err, eth.ErrUnfinalizedData) {
 		t.Fatalf("expected ErrUnfinalizedData but got %s", err.Error())
 	}
@@ -1852,7 +1967,7 @@ func TestLastAcceptedBlockNumberAllow(t *testing.T) {
 		t.Fatalf("VM failed to accept block: %s", err)
 	}
 
-	if b := vm.blockChain.GetBlockByNumber(blkHeight); b.Hash() != blkHash {
+	if b := tvm.vm.blockChain.GetBlockByNumber(blkHeight); b.Hash() != blkHash {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkHeight, blkHash.Hex(), b.Hash().Hex())
 	}
 }
@@ -1860,31 +1975,33 @@ func TestLastAcceptedBlockNumberAllow(t *testing.T) {
 // Regression test to ensure we can build blocks if we are starting with the
 // Subnet EVM ruleset in genesis.
 func TestBuildSubnetEVMBlock(t *testing.T) {
-	vm, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
+	tvm := newVM(t, testVMConfig{
+		genesisJSON: genesisJSONSubnetEVM,
+	})
 
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
+		if err := tvm.vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
 
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
-	vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
+	tvm.vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
 
 	tx := types.NewTransaction(uint64(0), testEthAddrs[1], new(big.Int).Mul(firstTxAmount, big.NewInt(4)), 21000, big.NewInt(testMinGasPrice*3), nil)
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[0].ToECDSA())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	txErrors := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
+	txErrors := tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
 	for i, err := range txErrors {
 		if err != nil {
 			t.Fatalf("Failed to add tx at index %d: %s", i, err)
 		}
 	}
 
-	blk := issueAndAccept(t, vm)
+	blk := issueAndAccept(t, tvm.vm)
 	newHead := <-newTxPoolHeadChan
 	if newHead.Head.Hash() != common.Hash(blk.ID()) {
 		t.Fatalf("Expected new block to match")
@@ -1893,25 +2010,25 @@ func TestBuildSubnetEVMBlock(t *testing.T) {
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
 		tx := types.NewTransaction(uint64(i), testEthAddrs[0], big.NewInt(10), 21000, big.NewInt(testMinGasPrice*3), nil)
-		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[1])
+		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[1].ToECDSA())
 		if err != nil {
 			t.Fatal(err)
 		}
 		txs[i] = signedTx
 	}
-	errs := vm.txPool.AddRemotesSync(txs)
+	errs := tvm.vm.txPool.AddRemotesSync(txs)
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add tx at index %d: %s", i, err)
 		}
 	}
 
-	blk = issueAndAccept(t, vm)
+	blk = issueAndAccept(t, tvm.vm)
 	ethBlk := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
 	if customtypes.BlockGasCost(ethBlk) == nil || customtypes.BlockGasCost(ethBlk).Cmp(big.NewInt(100)) < 0 {
 		t.Fatalf("expected blockGasCost to be at least 100 but got %d", customtypes.BlockGasCost(ethBlk))
 	}
-	chainConfig := params.GetExtra(vm.chainConfig)
+	chainConfig := params.GetExtra(tvm.vm.chainConfig)
 	minRequiredTip, err := header.EstimateRequiredTip(chainConfig, ethBlk.Header())
 	if err != nil {
 		t.Fatal(err)
@@ -1920,7 +2037,7 @@ func TestBuildSubnetEVMBlock(t *testing.T) {
 		t.Fatalf("expected minRequiredTip to be at least 0.05 gwei but got %d", minRequiredTip)
 	}
 
-	lastAcceptedID, err := vm.LastAccepted(context.Background())
+	lastAcceptedID, err := tvm.vm.LastAccepted(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1929,7 +2046,7 @@ func TestBuildSubnetEVMBlock(t *testing.T) {
 	}
 
 	// Confirm all txs are present
-	ethBlkTxs := vm.blockChain.GetBlockByNumber(2).Transactions()
+	ethBlkTxs := tvm.vm.blockChain.GetBlockByNumber(2).Transactions()
 	for i, tx := range txs {
 		if len(ethBlkTxs) <= i {
 			t.Fatalf("missing transactions expected: %d but found: %d", len(txs), len(ethBlkTxs))
@@ -1953,18 +2070,20 @@ func TestBuildAllowListActivationBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	vm, _, _ := GenesisVM(t, true, string(genesisJSON), "", "")
+	tvm := newVM(t, testVMConfig{
+		genesisJSON: string(genesisJSON),
+	})
 
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
+		if err := tvm.vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
 
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
-	vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
+	tvm.vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
 
-	genesisState, err := vm.blockChain.StateAt(vm.blockChain.Genesis().Root())
+	genesisState, err := tvm.vm.blockChain.StateAt(tvm.vm.blockChain.Genesis().Root())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1975,26 +2094,26 @@ func TestBuildAllowListActivationBlock(t *testing.T) {
 
 	// Send basic transaction to construct a simple block and confirm that the precompile state configuration in the worker behaves correctly.
 	tx := types.NewTransaction(uint64(0), testEthAddrs[1], new(big.Int).Mul(firstTxAmount, big.NewInt(4)), 21000, big.NewInt(testMinGasPrice*3), nil)
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[0].ToECDSA())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	txErrors := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
+	txErrors := tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
 	for i, err := range txErrors {
 		if err != nil {
 			t.Fatalf("Failed to add tx at index %d: %s", i, err)
 		}
 	}
 
-	blk := issueAndAccept(t, vm)
+	blk := issueAndAccept(t, tvm.vm)
 	newHead := <-newTxPoolHeadChan
 	if newHead.Head.Hash() != common.Hash(blk.ID()) {
 		t.Fatalf("Expected new block to match")
 	}
 
 	// Verify that the allow list config activation was handled correctly in the first block.
-	blkState, err := vm.blockChain.StateAt(blk.(*chain.BlockWrapper).Block.(*Block).ethBlock.Root())
+	blkState, err := tvm.vm.blockChain.StateAt(blk.(*chain.BlockWrapper).Block.(*Block).ethBlock.Root())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2010,7 +2129,7 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 	managerKey := testKeys[1]
 	managerAddress := testEthAddrs[1]
 	genesis := &core.Genesis{}
-	if err := genesis.UnmarshalJSON([]byte(genesisJSONDurango)); err != nil {
+	if err := genesis.UnmarshalJSON([]byte(toGenesisJSON(forkToChainConfig[upgradetest.Durango]))); err != nil {
 		t.Fatal(err)
 	}
 	// this manager role should not be activated because DurangoTimestamp is in the future
@@ -2040,18 +2159,22 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 	}
 	upgradeBytesJSON, err := json.Marshal(upgradeConfig)
 	require.NoError(t, err)
-	vm, _, _ := GenesisVM(t, true, string(genesisJSON), "", string(upgradeBytesJSON))
+
+	tvm := newVM(t, testVMConfig{
+		genesisJSON: string(genesisJSON),
+		upgradeJSON: string(upgradeBytesJSON),
+	})
 
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
+		if err := tvm.vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
 
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
-	vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
+	tvm.vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
 
-	genesisState, err := vm.blockChain.StateAt(vm.blockChain.Genesis().Root())
+	genesisState, err := tvm.vm.blockChain.StateAt(tvm.vm.blockChain.Genesis().Root())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2071,35 +2194,35 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 
 	// Submit a successful transaction
 	tx0 := types.NewTransaction(uint64(0), testEthAddrs[0], big.NewInt(1), 21000, big.NewInt(testMinGasPrice), nil)
-	signedTx0, err := types.SignTx(tx0, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
+	signedTx0, err := types.SignTx(tx0, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[0].ToECDSA())
 	require.NoError(t, err)
 
-	errs := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx0})
+	errs := tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx0})
 	if err := errs[0]; err != nil {
 		t.Fatalf("Failed to add tx at index: %s", err)
 	}
 
 	// Submit a rejected transaction, should throw an error
 	tx1 := types.NewTransaction(uint64(0), testEthAddrs[1], big.NewInt(2), 21000, big.NewInt(testMinGasPrice), nil)
-	signedTx1, err := types.SignTx(tx1, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[1])
+	signedTx1, err := types.SignTx(tx1, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[1].ToECDSA())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	errs = vm.txPool.AddRemotesSync([]*types.Transaction{signedTx1})
+	errs = tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx1})
 	if err := errs[0]; !errors.Is(err, vmerrors.ErrSenderAddressNotAllowListed) {
 		t.Fatalf("expected ErrSenderAddressNotAllowListed, got: %s", err)
 	}
 
 	// Submit a rejected transaction, should throw an error because manager is not activated
 	tx2 := types.NewTransaction(uint64(0), managerAddress, big.NewInt(2), 21000, big.NewInt(testMinGasPrice), nil)
-	signedTx2, err := types.SignTx(tx2, types.NewEIP155Signer(vm.chainConfig.ChainID), managerKey)
+	signedTx2, err := types.SignTx(tx2, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), managerKey.ToECDSA())
 	require.NoError(t, err)
 
-	errs = vm.txPool.AddRemotesSync([]*types.Transaction{signedTx2})
+	errs = tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx2})
 	require.ErrorIs(t, errs[0], vmerrors.ErrSenderAddressNotAllowListed)
 
-	blk := issueAndAccept(t, vm)
+	blk := issueAndAccept(t, tvm.vm)
 	newHead := <-newTxPoolHeadChan
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
 
@@ -2114,23 +2237,23 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 
 	require.Equal(t, signedTx0.Hash(), txs[0].Hash())
 
-	vm.clock.Set(reenableAllowlistTime.Add(time.Hour))
+	tvm.vm.clock.Set(reenableAllowlistTime.Add(time.Hour))
 
 	// Re-Submit a successful transaction
 	tx0 = types.NewTransaction(uint64(1), testEthAddrs[0], big.NewInt(1), 21000, big.NewInt(testMinGasPrice), nil)
-	signedTx0, err = types.SignTx(tx0, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
+	signedTx0, err = types.SignTx(tx0, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[0].ToECDSA())
 	require.NoError(t, err)
 
-	errs = vm.txPool.AddRemotesSync([]*types.Transaction{signedTx0})
+	errs = tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx0})
 	require.NoError(t, errs[0])
 
 	// accept block to trigger upgrade
-	blk = issueAndAccept(t, vm)
+	blk = issueAndAccept(t, tvm.vm)
 	newHead = <-newTxPoolHeadChan
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
 	block = blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
 
-	blkState, err := vm.blockChain.StateAt(block.Root())
+	blkState, err := tvm.vm.blockChain.StateAt(block.Root())
 	require.NoError(t, err)
 
 	// Check that address 0 is admin and address 1 is manager
@@ -2139,17 +2262,17 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 	role = txallowlist.GetTxAllowListStatus(blkState, managerAddress)
 	require.Equal(t, allowlist.ManagerRole, role)
 
-	vm.clock.Set(vm.clock.Time().Add(2 * time.Second)) // add 2 seconds for gas fee to adjust
+	tvm.vm.clock.Set(tvm.vm.clock.Time().Add(2 * time.Second)) // add 2 seconds for gas fee to adjust
 	// Submit a successful transaction, should not throw an error because manager is activated
 	tx3 := types.NewTransaction(uint64(0), managerAddress, big.NewInt(1), 21000, big.NewInt(testMinGasPrice), nil)
-	signedTx3, err := types.SignTx(tx3, types.NewEIP155Signer(vm.chainConfig.ChainID), managerKey)
+	signedTx3, err := types.SignTx(tx3, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), managerKey.ToECDSA())
 	require.NoError(t, err)
 
-	vm.clock.Set(vm.clock.Time().Add(2 * time.Second)) // add 2 seconds for gas fee to adjust
-	errs = vm.txPool.AddRemotesSync([]*types.Transaction{signedTx3})
+	tvm.vm.clock.Set(tvm.vm.clock.Time().Add(2 * time.Second)) // add 2 seconds for gas fee to adjust
+	errs = tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx3})
 	require.NoError(t, errs[0])
 
-	blk = issueAndAccept(t, vm)
+	blk = issueAndAccept(t, tvm.vm)
 	newHead = <-newTxPoolHeadChan
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
 
@@ -2163,7 +2286,8 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 
 func TestVerifyManagerConfig(t *testing.T) {
 	genesis := &core.Genesis{}
-	require.NoError(t, genesis.UnmarshalJSON([]byte(genesisJSONDurango)))
+	ctx, dbManager, genesisBytes, _ := setupGenesis(t, upgradetest.Durango)
+	require.NoError(t, genesis.UnmarshalJSON(genesisBytes))
 
 	durangoTimestamp := time.Now().Add(10 * time.Hour)
 	params.GetExtra(genesis.Config).DurangoTimestamp = utils.TimeToNewUint64(durangoTimestamp)
@@ -2176,12 +2300,11 @@ func TestVerifyManagerConfig(t *testing.T) {
 	require.NoError(t, err)
 
 	vm := &VM{}
-	ctx, dbManager, genesisBytes, _ := setupGenesis(t, string(genesisJSON))
 	err = vm.Initialize(
 		context.Background(),
 		ctx,
 		dbManager,
-		genesisBytes,
+		genesisJSON, // Manually set genesis bytes due to custom genesis
 		[]byte(""),
 		[]byte(""),
 		[]*commonEng.Fx{},
@@ -2190,7 +2313,7 @@ func TestVerifyManagerConfig(t *testing.T) {
 	require.ErrorIs(t, err, allowlist.ErrCannotAddManagersBeforeDurango)
 
 	genesis = &core.Genesis{}
-	require.NoError(t, genesis.UnmarshalJSON([]byte(genesisJSONDurango)))
+	require.NoError(t, genesis.UnmarshalJSON([]byte(toGenesisJSON(forkToChainConfig[upgradetest.Durango]))))
 	params.GetExtra(genesis.Config).DurangoTimestamp = utils.TimeToNewUint64(durangoTimestamp)
 	genesisJSON, err = genesis.MarshalJSON()
 	require.NoError(t, err)
@@ -2206,12 +2329,12 @@ func TestVerifyManagerConfig(t *testing.T) {
 	require.NoError(t, err)
 
 	vm = &VM{}
-	ctx, dbManager, genesisBytes, _ = setupGenesis(t, string(genesisJSON))
+	ctx, dbManager, _, _ = setupGenesis(t, upgradetest.Latest)
 	err = vm.Initialize(
 		context.Background(),
 		ctx,
 		dbManager,
-		genesisBytes,
+		genesisJSON, // Manually set genesis bytes due to custom genesis
 		upgradeBytesJSON,
 		[]byte(""),
 		[]*commonEng.Fx{},
@@ -2253,20 +2376,23 @@ func TestTxAllowListDisablePrecompile(t *testing.T) {
 	}
 	`, disableAllowListTimestamp.Unix())
 
-	vm, _, _ := GenesisVM(t, true, string(genesisJSON), "", upgradeConfig)
+	tvm := newVM(t, testVMConfig{
+		genesisJSON: string(genesisJSON),
+		upgradeJSON: upgradeConfig,
+	})
 
-	vm.clock.Set(disableAllowListTimestamp) // upgrade takes effect after a block is issued, so we can set vm's clock here.
+	tvm.vm.clock.Set(disableAllowListTimestamp) // upgrade takes effect after a block is issued, so we can set vm's clock here.
 
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
+		if err := tvm.vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
 
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
-	vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
+	tvm.vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
 
-	genesisState, err := vm.blockChain.StateAt(vm.blockChain.Genesis().Root())
+	genesisState, err := tvm.vm.blockChain.StateAt(tvm.vm.blockChain.Genesis().Root())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2283,27 +2409,27 @@ func TestTxAllowListDisablePrecompile(t *testing.T) {
 
 	// Submit a successful transaction
 	tx0 := types.NewTransaction(uint64(0), testEthAddrs[0], big.NewInt(1), 21000, big.NewInt(testMinGasPrice), nil)
-	signedTx0, err := types.SignTx(tx0, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
+	signedTx0, err := types.SignTx(tx0, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[0].ToECDSA())
 	require.NoError(t, err)
 
-	errs := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx0})
+	errs := tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx0})
 	if err := errs[0]; err != nil {
 		t.Fatalf("Failed to add tx at index: %s", err)
 	}
 
 	// Submit a rejected transaction, should throw an error
 	tx1 := types.NewTransaction(uint64(0), testEthAddrs[1], big.NewInt(2), 21000, big.NewInt(testMinGasPrice), nil)
-	signedTx1, err := types.SignTx(tx1, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[1])
+	signedTx1, err := types.SignTx(tx1, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[1].ToECDSA())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	errs = vm.txPool.AddRemotesSync([]*types.Transaction{signedTx1})
+	errs = tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx1})
 	if err := errs[0]; !errors.Is(err, vmerrors.ErrSenderAddressNotAllowListed) {
 		t.Fatalf("expected ErrSenderAddressNotAllowListed, got: %s", err)
 	}
 
-	blk := issueAndAccept(t, vm)
+	blk := issueAndAccept(t, tvm.vm)
 
 	// Verify that the constructed block only has the whitelisted tx
 	block := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
@@ -2319,13 +2445,13 @@ func TestTxAllowListDisablePrecompile(t *testing.T) {
 	<-newTxPoolHeadChan // wait for new head in tx pool
 
 	// retry the rejected Tx, which should now succeed
-	errs = vm.txPool.AddRemotesSync([]*types.Transaction{signedTx1})
+	errs = tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx1})
 	if err := errs[0]; err != nil {
 		t.Fatalf("Failed to add tx at index: %s", err)
 	}
 
-	vm.clock.Set(vm.clock.Time().Add(2 * time.Second)) // add 2 seconds for gas fee to adjust
-	blk = issueAndAccept(t, vm)
+	tvm.vm.clock.Set(tvm.vm.clock.Time().Add(2 * time.Second)) // add 2 seconds for gas fee to adjust
+	blk = issueAndAccept(t, tvm.vm)
 
 	// Verify that the constructed block only has the previously rejected tx
 	block = blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
@@ -2367,18 +2493,20 @@ func TestFeeManagerChangeFee(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	vm, _, _ := GenesisVM(t, true, string(genesisJSON), "", "")
+	tvm := newVM(t, testVMConfig{
+		genesisJSON: string(genesisJSON),
+	})
 
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
+		if err := tvm.vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
 
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
-	vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
+	tvm.vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
 
-	genesisState, err := vm.blockChain.StateAt(vm.blockChain.Genesis().Root())
+	genesisState, err := tvm.vm.blockChain.StateAt(tvm.vm.blockChain.Genesis().Root())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2393,10 +2521,10 @@ func TestFeeManagerChangeFee(t *testing.T) {
 		t.Fatalf("Expected fee manager list status to be set to no role: %s, but found: %s", allowlist.NoRole, role)
 	}
 	// Contract is initialized but no preconfig is given, reader should return genesis fee config
-	feeConfig, lastChangedAt, err := vm.blockChain.GetFeeConfigAt(vm.blockChain.Genesis().Header())
+	feeConfig, lastChangedAt, err := tvm.vm.blockChain.GetFeeConfigAt(tvm.vm.blockChain.Genesis().Header())
 	require.NoError(t, err)
 	require.EqualValues(t, feeConfig, testLowFeeConfig)
-	require.Zero(t, vm.blockChain.CurrentBlock().Number.Cmp(lastChangedAt))
+	require.Zero(t, tvm.vm.blockChain.CurrentBlock().Number.Cmp(lastChangedAt))
 
 	// set a different fee config now
 	testHighFeeConfig := testLowFeeConfig
@@ -2416,17 +2544,17 @@ func TestFeeManagerChangeFee(t *testing.T) {
 		Data:      data,
 	})
 
-	signedTx, err := types.SignTx(tx, types.LatestSigner(genesis.Config), testKeys[0])
+	signedTx, err := types.SignTx(tx, types.LatestSigner(genesis.Config), testKeys[0].ToECDSA())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	errs := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
+	errs := tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
 	if err := errs[0]; err != nil {
 		t.Fatalf("Failed to add tx at index: %s", err)
 	}
 
-	blk := issueAndAccept(t, vm)
+	blk := issueAndAccept(t, tvm.vm)
 	newHead := <-newTxPoolHeadChan
 	if newHead.Head.Hash() != common.Hash(blk.ID()) {
 		t.Fatalf("Expected new block to match")
@@ -2434,10 +2562,10 @@ func TestFeeManagerChangeFee(t *testing.T) {
 
 	block := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
 
-	feeConfig, lastChangedAt, err = vm.blockChain.GetFeeConfigAt(block.Header())
+	feeConfig, lastChangedAt, err = tvm.vm.blockChain.GetFeeConfigAt(block.Header())
 	require.NoError(t, err)
 	require.EqualValues(t, testHighFeeConfig, feeConfig)
-	require.EqualValues(t, vm.blockChain.CurrentBlock().Number, lastChangedAt)
+	require.EqualValues(t, tvm.vm.blockChain.CurrentBlock().Number, lastChangedAt)
 
 	// should fail, with same params since fee is higher now
 	tx2 := types.NewTx(&types.DynamicFeeTx{
@@ -2451,12 +2579,12 @@ func TestFeeManagerChangeFee(t *testing.T) {
 		Data:      data,
 	})
 
-	signedTx2, err := types.SignTx(tx2, types.LatestSigner(genesis.Config), testKeys[0])
+	signedTx2, err := types.SignTx(tx2, types.LatestSigner(genesis.Config), testKeys[0].ToECDSA())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.txPool.AddRemotesSync([]*types.Transaction{signedTx2})[0]
+	err = tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx2})[0]
 	require.ErrorIs(t, err, txpool.ErrUnderpriced)
 }
 
@@ -2471,36 +2599,38 @@ func TestAllowFeeRecipientDisabled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	vm, _, _ := GenesisVM(t, true, string(genesisJSON), "", "")
+	tvm := newVM(t, testVMConfig{
+		genesisJSON: string(genesisJSON),
+	})
 
-	vm.miner.SetEtherbase(common.HexToAddress("0x0123456789")) // set non-blackhole address by force
+	tvm.vm.miner.SetEtherbase(common.HexToAddress("0x0123456789")) // set non-blackhole address by force
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
+		if err := tvm.vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
 
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
-	vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
+	tvm.vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
 
 	tx := types.NewTransaction(uint64(0), testEthAddrs[1], new(big.Int).Mul(firstTxAmount, big.NewInt(4)), 21000, big.NewInt(testMinGasPrice*3), nil)
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[0].ToECDSA())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	txErrors := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
+	txErrors := tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
 	for i, err := range txErrors {
 		if err != nil {
 			t.Fatalf("Failed to add tx at index %d: %s", i, err)
 		}
 	}
 
-	msg, err := vm.WaitForEvent(context.Background())
+	msg, err := tvm.vm.WaitForEvent(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, commonEng.PendingTxs, msg)
 
-	blk, err := vm.BuildBlock(context.Background())
+	blk, err := tvm.vm.BuildBlock(context.Background())
 	require.NoError(t, err) // this won't return an error since miner will set the etherbase to blackhole address
 
 	ethBlock := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
@@ -2518,7 +2648,7 @@ func TestAllowFeeRecipientDisabled(t *testing.T) {
 		trie.NewStackTrie(nil),
 	)
 
-	modifiedBlk := vm.newBlock(modifiedBlock)
+	modifiedBlk := tvm.vm.newBlock(modifiedBlock)
 
 	require.ErrorIs(t, modifiedBlk.Verify(context.Background()), vmerrors.ErrInvalidCoinbase)
 }
@@ -2542,31 +2672,34 @@ func TestAllowFeeRecipientEnabled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	vm, _, _ := GenesisVM(t, true, string(genesisJSON), string(configJSON), "")
+	tvm := newVM(t, testVMConfig{
+		genesisJSON: string(genesisJSON),
+		configJSON:  string(configJSON),
+	})
 
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
+		if err := tvm.vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
 
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
-	vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
+	tvm.vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
 
 	tx := types.NewTransaction(uint64(0), testEthAddrs[1], new(big.Int).Mul(firstTxAmount, big.NewInt(4)), 21000, big.NewInt(testMinGasPrice*3), nil)
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[0].ToECDSA())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	txErrors := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
+	txErrors := tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
 	for i, err := range txErrors {
 		if err != nil {
 			t.Fatalf("Failed to add tx at index %d: %s", i, err)
 		}
 	}
 
-	blk := issueAndAccept(t, vm)
+	blk := issueAndAccept(t, tvm.vm)
 	newHead := <-newTxPoolHeadChan
 	if newHead.Head.Hash() != common.Hash(blk.ID()) {
 		t.Fatalf("Expected new block to match")
@@ -2574,7 +2707,7 @@ func TestAllowFeeRecipientEnabled(t *testing.T) {
 	ethBlock := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
 	require.Equal(t, etherBase, ethBlock.Coinbase())
 	// Verify that etherBase has received fees
-	blkState, err := vm.blockChain.StateAt(ethBlock.Root())
+	blkState, err := tvm.vm.blockChain.StateAt(ethBlock.Root())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2619,15 +2752,19 @@ func TestRewardManagerPrecompileSetRewardAddress(t *testing.T) {
 		}
 		`, disableTime.Unix())
 
-	vm, _, _ := GenesisVM(t, true, string(genesisJSON), string(configJSON), upgradeConfig)
+	tvm := newVM(t, testVMConfig{
+		genesisJSON: string(genesisJSON),
+		configJSON:  string(configJSON),
+		upgradeJSON: upgradeConfig,
+	})
 
 	defer func() {
-		err := vm.Shutdown(context.Background())
+		err := tvm.vm.Shutdown(context.Background())
 		require.NoError(t, err)
 	}()
 
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
-	vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
+	tvm.vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
 
 	testAddr := common.HexToAddress("0x9999991111")
 	data, err := rewardmanager.PackSetRewardAddress(testAddr)
@@ -2637,36 +2774,36 @@ func TestRewardManagerPrecompileSetRewardAddress(t *testing.T) {
 
 	tx := types.NewTransaction(uint64(0), rewardmanager.ContractAddress, big.NewInt(1), gas, big.NewInt(testMinGasPrice), data)
 
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[0].ToECDSA())
 	require.NoError(t, err)
 
-	txErrors := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
+	txErrors := tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
 	for _, err := range txErrors {
 		require.NoError(t, err)
 	}
 
-	blk := issueAndAccept(t, vm)
+	blk := issueAndAccept(t, tvm.vm)
 	newHead := <-newTxPoolHeadChan
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
 	ethBlock := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
 	require.Equal(t, etherBase, ethBlock.Coinbase()) // reward address is activated at this block so this is fine
 
 	tx1 := types.NewTransaction(uint64(0), testEthAddrs[0], big.NewInt(2), 21000, big.NewInt(testMinGasPrice*3), nil)
-	signedTx1, err := types.SignTx(tx1, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[1])
+	signedTx1, err := types.SignTx(tx1, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[1].ToECDSA())
 	require.NoError(t, err)
 
-	txErrors = vm.txPool.AddRemotesSync([]*types.Transaction{signedTx1})
+	txErrors = tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx1})
 	for _, err := range txErrors {
 		require.NoError(t, err)
 	}
 
-	blk = issueAndAccept(t, vm)
+	blk = issueAndAccept(t, tvm.vm)
 	newHead = <-newTxPoolHeadChan
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
 	ethBlock = blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
 	require.Equal(t, testAddr, ethBlock.Coinbase()) // reward address was activated at previous block
 	// Verify that etherBase has received fees
-	blkState, err := vm.blockChain.StateAt(ethBlock.Root())
+	blkState, err := tvm.vm.blockChain.StateAt(ethBlock.Root())
 	require.NoError(t, err)
 
 	balance := blkState.GetBalance(testAddr)
@@ -2677,17 +2814,17 @@ func TestRewardManagerPrecompileSetRewardAddress(t *testing.T) {
 	previousBalance := blkState.GetBalance(etherBase)
 
 	// issue a new block to trigger the upgrade
-	vm.clock.Set(disableTime) // upgrade takes effect after a block is issued, so we can set vm's clock here.
+	tvm.vm.clock.Set(disableTime) // upgrade takes effect after a block is issued, so we can set vm's clock here.
 	tx2 := types.NewTransaction(uint64(1), testEthAddrs[0], big.NewInt(2), 21000, big.NewInt(testMinGasPrice), nil)
-	signedTx2, err := types.SignTx(tx2, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[1])
+	signedTx2, err := types.SignTx(tx2, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[1].ToECDSA())
 	require.NoError(t, err)
 
-	txErrors = vm.txPool.AddRemotesSync([]*types.Transaction{signedTx2})
+	txErrors = tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx2})
 	for _, err := range txErrors {
 		require.NoError(t, err)
 	}
 
-	blk = issueAndAccept(t, vm)
+	blk = issueAndAccept(t, tvm.vm)
 	newHead = <-newTxPoolHeadChan
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
 	ethBlock = blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
@@ -2697,18 +2834,18 @@ func TestRewardManagerPrecompileSetRewardAddress(t *testing.T) {
 	require.Equal(t, testAddr, ethBlock.Coinbase())
 	require.GreaterOrEqual(t, int64(ethBlock.Time()), disableTime.Unix())
 
-	vm.clock.Set(vm.clock.Time().Add(3 * time.Hour)) // let time pass to decrease gas price
+	tvm.vm.clock.Set(tvm.vm.clock.Time().Add(3 * time.Hour)) // let time pass to decrease gas price
 	// issue another block to verify that the reward manager is disabled
 	tx2 = types.NewTransaction(uint64(2), testEthAddrs[0], big.NewInt(2), 21000, big.NewInt(testMinGasPrice), nil)
-	signedTx2, err = types.SignTx(tx2, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[1])
+	signedTx2, err = types.SignTx(tx2, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[1].ToECDSA())
 	require.NoError(t, err)
 
-	txErrors = vm.txPool.AddRemotesSync([]*types.Transaction{signedTx2})
+	txErrors = tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx2})
 	for _, err := range txErrors {
 		require.NoError(t, err)
 	}
 
-	blk = issueAndAccept(t, vm)
+	blk = issueAndAccept(t, tvm.vm)
 	newHead = <-newTxPoolHeadChan
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
 	ethBlock = blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
@@ -2718,7 +2855,7 @@ func TestRewardManagerPrecompileSetRewardAddress(t *testing.T) {
 	require.GreaterOrEqual(t, int64(ethBlock.Time()), disableTime.Unix())
 
 	// Verify that Blackhole has received fees
-	blkState, err = vm.blockChain.StateAt(ethBlock.Root())
+	blkState, err = tvm.vm.blockChain.StateAt(ethBlock.Root())
 	require.NoError(t, err)
 
 	balance = blkState.GetBalance(etherBase)
@@ -2759,14 +2896,18 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 			]
 		}
 		`, disableTime.Unix())
-	vm, _, _ := GenesisVM(t, true, string(genesisJSON), string(configJSON), upgradeConfig)
+	tvm := newVM(t, testVMConfig{
+		genesisJSON: string(genesisJSON),
+		configJSON:  string(configJSON),
+		upgradeJSON: upgradeConfig,
+	})
 
 	defer func() {
-		require.NoError(t, vm.Shutdown(context.Background()))
+		require.NoError(t, tvm.vm.Shutdown(context.Background()))
 	}()
 
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
-	vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
+	tvm.vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
 
 	data, err := rewardmanager.PackAllowFeeRecipients()
 	require.NoError(t, err)
@@ -2775,36 +2916,36 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 
 	tx := types.NewTransaction(uint64(0), rewardmanager.ContractAddress, big.NewInt(1), gas, big.NewInt(testMinGasPrice), data)
 
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[0].ToECDSA())
 	require.NoError(t, err)
 
-	txErrors := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
+	txErrors := tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
 	for _, err := range txErrors {
 		require.NoError(t, err)
 	}
 
-	blk := issueAndAccept(t, vm)
+	blk := issueAndAccept(t, tvm.vm)
 	newHead := <-newTxPoolHeadChan
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
 	ethBlock := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
 	require.Equal(t, constants.BlackholeAddr, ethBlock.Coinbase()) // reward address is activated at this block so this is fine
 
 	tx1 := types.NewTransaction(uint64(0), testEthAddrs[0], big.NewInt(2), 21000, big.NewInt(testMinGasPrice*3), nil)
-	signedTx1, err := types.SignTx(tx1, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[1])
+	signedTx1, err := types.SignTx(tx1, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[1].ToECDSA())
 	require.NoError(t, err)
 
-	txErrors = vm.txPool.AddRemotesSync([]*types.Transaction{signedTx1})
+	txErrors = tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx1})
 	for _, err := range txErrors {
 		require.NoError(t, err)
 	}
 
-	blk = issueAndAccept(t, vm)
+	blk = issueAndAccept(t, tvm.vm)
 	newHead = <-newTxPoolHeadChan
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
 	ethBlock = blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
 	require.Equal(t, etherBase, ethBlock.Coinbase()) // reward address was activated at previous block
 	// Verify that etherBase has received fees
-	blkState, err := vm.blockChain.StateAt(ethBlock.Root())
+	blkState, err := tvm.vm.blockChain.StateAt(ethBlock.Root())
 	require.NoError(t, err)
 
 	balance := blkState.GetBalance(etherBase)
@@ -2814,34 +2955,34 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 	// This should revert back to burning fees
 	previousBalance := blkState.GetBalance(constants.BlackholeAddr)
 
-	vm.clock.Set(disableTime) // upgrade takes effect after a block is issued, so we can set vm's clock here.
+	tvm.vm.clock.Set(disableTime) // upgrade takes effect after a block is issued, so we can set vm's clock here.
 	tx2 := types.NewTransaction(uint64(1), testEthAddrs[0], big.NewInt(2), 21000, big.NewInt(testMinGasPrice), nil)
-	signedTx2, err := types.SignTx(tx2, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[1])
+	signedTx2, err := types.SignTx(tx2, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[1].ToECDSA())
 	require.NoError(t, err)
 
-	txErrors = vm.txPool.AddRemotesSync([]*types.Transaction{signedTx2})
+	txErrors = tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx2})
 	for _, err := range txErrors {
 		require.NoError(t, err)
 	}
 
-	blk = issueAndAccept(t, vm)
+	blk = issueAndAccept(t, tvm.vm)
 	newHead = <-newTxPoolHeadChan
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
 	ethBlock = blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
 	require.Equal(t, etherBase, ethBlock.Coinbase()) // reward address was activated at previous block
 	require.GreaterOrEqual(t, int64(ethBlock.Time()), disableTime.Unix())
 
-	vm.clock.Set(vm.clock.Time().Add(3 * time.Hour)) // let time pass so that gas price is reduced
+	tvm.vm.clock.Set(tvm.vm.clock.Time().Add(3 * time.Hour)) // let time pass so that gas price is reduced
 	tx2 = types.NewTransaction(uint64(2), testEthAddrs[0], big.NewInt(2), 21000, big.NewInt(testMinGasPrice), nil)
-	signedTx2, err = types.SignTx(tx2, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[1])
+	signedTx2, err = types.SignTx(tx2, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[1].ToECDSA())
 	require.NoError(t, err)
 
-	txErrors = vm.txPool.AddRemotesSync([]*types.Transaction{signedTx2})
+	txErrors = tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx2})
 	for _, err := range txErrors {
 		require.NoError(t, err)
 	}
 
-	blk = issueAndAccept(t, vm)
+	blk = issueAndAccept(t, tvm.vm)
 	newHead = <-newTxPoolHeadChan
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
 	ethBlock = blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
@@ -2849,7 +2990,7 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 	require.Greater(t, int64(ethBlock.Time()), disableTime.Unix())
 
 	// Verify that Blackhole has received fees
-	blkState, err = vm.blockChain.StateAt(ethBlock.Root())
+	blkState, err = tvm.vm.blockChain.StateAt(ethBlock.Root())
 	require.NoError(t, err)
 
 	balance = blkState.GetBalance(constants.BlackholeAddr)
@@ -2862,32 +3003,35 @@ func TestSkipChainConfigCheckCompatible(t *testing.T) {
 	// TODO update this test when there is a future network upgrade that can be skipped in the config.
 	t.Skip("no skippable upgrades")
 
-	vm, dbManager, appSender := GenesisVM(t, true, genesisJSONPreSubnetEVM, `{"pruning-enabled":true}`, "")
+	tvm := newVM(t, testVMConfig{
+		genesisJSON: genesisJSONPreSubnetEVM,
+		configJSON:  `{"pruning-enabled":true}`,
+	})
 
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
+		if err := tvm.vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
 
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
-	vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
+	tvm.vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
 
 	key := testutils.NewKey(t)
 
 	tx := types.NewTransaction(uint64(0), key.Address, firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[0].ToECDSA())
 	if err != nil {
 		t.Fatal(err)
 	}
-	errs := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
+	errs := tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add tx at index %d: %s", i, err)
 		}
 	}
 
-	blk := issueAndAccept(t, vm)
+	blk := issueAndAccept(t, tvm.vm)
 	newHead := <-newTxPoolHeadChan
 	if newHead.Head.Hash() != common.Hash(blk.ID()) {
 		t.Fatalf("Expected new block to match")
@@ -2897,24 +3041,24 @@ func TestSkipChainConfigCheckCompatible(t *testing.T) {
 	// use the block's timestamp instead of 0 since rewind to genesis
 	// is hardcoded to be allowed in core/genesis.go.
 	genesisWithUpgrade := &core.Genesis{}
-	require.NoError(t, json.Unmarshal([]byte(genesisJSONDurango), genesisWithUpgrade))
+	require.NoError(t, json.Unmarshal([]byte(toGenesisJSON(forkToChainConfig[upgradetest.Durango])), genesisWithUpgrade))
 	params.GetExtra(genesisWithUpgrade.Config).EtnaTimestamp = utils.TimeToNewUint64(blk.Timestamp())
 	genesisWithUpgradeBytes, err := json.Marshal(genesisWithUpgrade)
 	require.NoError(t, err)
 
 	// Reset metrics to allow re-initialization
-	vm.ctx.Metrics = metrics.NewPrefixGatherer()
+	tvm.vm.ctx.Metrics = metrics.NewPrefixGatherer()
 
 	// this will not be allowed
-	err = reinitVM.Initialize(context.Background(), vm.ctx, dbManager, genesisWithUpgradeBytes, []byte{}, []byte{}, []*commonEng.Fx{}, appSender)
+	err = reinitVM.Initialize(context.Background(), tvm.vm.ctx, tvm.db, genesisWithUpgradeBytes, []byte{}, []byte{}, []*commonEng.Fx{}, tvm.appSender)
 	require.ErrorContains(t, err, "mismatching Cancun fork timestamp in database")
 
 	// Reset metrics to allow re-initialization
-	vm.ctx.Metrics = metrics.NewPrefixGatherer()
+	tvm.vm.ctx.Metrics = metrics.NewPrefixGatherer()
 
 	// try again with skip-upgrade-check
 	config := []byte(`{"skip-upgrade-check": true}`)
-	err = reinitVM.Initialize(context.Background(), vm.ctx, dbManager, genesisWithUpgradeBytes, []byte{}, config, []*commonEng.Fx{}, appSender)
+	err = reinitVM.Initialize(context.Background(), tvm.vm.ctx, tvm.db, genesisWithUpgradeBytes, []byte{}, config, []*commonEng.Fx{}, tvm.appSender)
 	require.NoError(t, err)
 	require.NoError(t, reinitVM.Shutdown(context.Background()))
 }
@@ -2929,39 +3073,39 @@ func TestParentBeaconRootBlock(t *testing.T) {
 	}{
 		{
 			name:          "non-empty parent beacon root in Durango",
-			genesisJSON:   genesisJSONDurango,
+			genesisJSON:   toGenesisJSON(forkToChainConfig[upgradetest.Durango]),
 			beaconRoot:    &common.Hash{0x01},
 			expectedError: true,
 			// err string wont work because it will also fail with blob gas is non-empty (zeroed)
 		},
 		{
 			name:          "empty parent beacon root in Durango",
-			genesisJSON:   genesisJSONDurango,
+			genesisJSON:   toGenesisJSON(forkToChainConfig[upgradetest.Durango]),
 			beaconRoot:    &common.Hash{},
 			expectedError: true,
 		},
 		{
 			name:          "nil parent beacon root in Durango",
-			genesisJSON:   genesisJSONDurango,
+			genesisJSON:   toGenesisJSON(forkToChainConfig[upgradetest.Durango]),
 			beaconRoot:    nil,
 			expectedError: false,
 		},
 		{
 			name:          "non-empty parent beacon root in E-Upgrade (Cancun)",
-			genesisJSON:   genesisJSONEtna,
+			genesisJSON:   toGenesisJSON(forkToChainConfig[upgradetest.Etna]),
 			beaconRoot:    &common.Hash{0x01},
 			expectedError: true,
 			errString:     "expected empty hash",
 		},
 		{
 			name:          "empty parent beacon root in E-Upgrade (Cancun)",
-			genesisJSON:   genesisJSONEtna,
+			genesisJSON:   toGenesisJSON(forkToChainConfig[upgradetest.Etna]),
 			beaconRoot:    &common.Hash{},
 			expectedError: false,
 		},
 		{
 			name:          "nil parent beacon root in E-Upgrade (Cancun)",
-			genesisJSON:   genesisJSONEtna,
+			genesisJSON:   toGenesisJSON(forkToChainConfig[upgradetest.Etna]),
 			beaconRoot:    nil,
 			expectedError: true,
 			errString:     "header is missing parentBeaconRoot",
@@ -2970,32 +3114,34 @@ func TestParentBeaconRootBlock(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			vm, _, _ := GenesisVM(t, true, test.genesisJSON, "", "")
+			tvm := newVM(t, testVMConfig{
+				genesisJSON: test.genesisJSON,
+			})
 
 			defer func() {
-				if err := vm.Shutdown(context.Background()); err != nil {
+				if err := tvm.vm.Shutdown(context.Background()); err != nil {
 					t.Fatal(err)
 				}
 			}()
 
 			tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
-			signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
+			signedTx, err := types.SignTx(tx, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[0].ToECDSA())
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			txErrors := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
+			txErrors := tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
 			for i, err := range txErrors {
 				if err != nil {
 					t.Fatalf("Failed to add tx at index %d: %s", i, err)
 				}
 			}
 
-			msg, err := vm.WaitForEvent(context.Background())
+			msg, err := tvm.vm.WaitForEvent(context.Background())
 			require.NoError(t, err)
 			require.Equal(t, commonEng.PendingTxs, msg)
 
-			blk, err := vm.BuildBlock(context.Background())
+			blk, err := tvm.vm.BuildBlock(context.Background())
 			if err != nil {
 				t.Fatalf("Failed to build block with import transaction: %s", err)
 			}
@@ -3006,7 +3152,7 @@ func TestParentBeaconRootBlock(t *testing.T) {
 			header.ParentBeaconRoot = test.beaconRoot
 			parentBeaconEthBlock := ethBlock.WithSeal(header)
 
-			parentBeaconBlock := vm.newBlock(parentBeaconEthBlock)
+			parentBeaconBlock := tvm.vm.newBlock(parentBeaconEthBlock)
 
 			errCheck := func(err error) {
 				if test.expectedError {
@@ -3020,7 +3166,7 @@ func TestParentBeaconRootBlock(t *testing.T) {
 				}
 			}
 
-			_, err = vm.ParseBlock(context.Background(), parentBeaconBlock.Bytes())
+			_, err = tvm.vm.ParseBlock(context.Background(), parentBeaconBlock.Bytes())
 			errCheck(err)
 			err = parentBeaconBlock.Verify(context.Background())
 			errCheck(err)
@@ -3030,7 +3176,7 @@ func TestParentBeaconRootBlock(t *testing.T) {
 
 func TestStandaloneDB(t *testing.T) {
 	vm := &VM{}
-	ctx := utils.TestSnowContext()
+	ctx := utilstest.NewTestSnowContext(t)
 	baseDB := memdb.New()
 	atomicMemory := atomic.NewMemory(prefixdb.New([]byte{0}, baseDB))
 	ctx.SharedMemory = atomicMemory.NewSharedMemory(ctx.ChainID)
@@ -3054,7 +3200,7 @@ func TestStandaloneDB(t *testing.T) {
 		context.Background(),
 		ctx,
 		sharedDB,
-		[]byte(genesisJSONLatest),
+		[]byte(toGenesisJSON(forkToChainConfig[upgradetest.Latest])),
 		nil,
 		[]byte(configJSON),
 		[]*commonEng.Fx{},
@@ -3069,7 +3215,7 @@ func TestStandaloneDB(t *testing.T) {
 	acceptedBlockEvent := make(chan core.ChainEvent, 1)
 	vm.blockChain.SubscribeChainAcceptedEvent(acceptedBlockEvent)
 	tx0 := types.NewTransaction(uint64(0), testEthAddrs[0], big.NewInt(1), 21000, big.NewInt(testMinGasPrice), nil)
-	signedTx0, err := types.SignTx(tx0, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
+	signedTx0, err := types.SignTx(tx0, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0].ToECDSA())
 	require.NoError(t, err)
 	errs := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx0})
 	require.NoError(t, errs[0])
@@ -3117,7 +3263,9 @@ func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	vm, sharedDB, appSender := GenesisVM(t, true, string(genesisJSON), "", "")
+	tvm := newVM(t, testVMConfig{
+		genesisJSON: string(genesisJSON),
+	})
 
 	// tx pool min base fee should be the high fee config
 	tx := types.NewTx(&types.DynamicFeeTx{
@@ -3130,15 +3278,15 @@ func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
 		GasTipCap: common.Big0,
 		Data:      nil,
 	})
-	signedTx, err := types.SignTx(tx, types.LatestSigner(genesis.Config), testKeys[0])
+	signedTx, err := types.SignTx(tx, types.LatestSigner(genesis.Config), testKeys[0].ToECDSA())
 	require.NoError(t, err)
 
-	errs := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
+	errs := tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
 	require.Len(t, errs, 1)
 	require.ErrorIs(t, errs[0], txpool.ErrUnderpriced) // should fail because mempool expects higher fee
 
 	// restart vm and try again
-	restartedVM, err := restartVM(vm, sharedDB, genesisJSON, appSender, true)
+	restartedVM, err := restartVM(tvm.vm, tvm.db, genesisJSON, tvm.appSender, true)
 	require.NoError(t, err)
 
 	// it still should fail
@@ -3151,7 +3299,7 @@ func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
 	restartedVM.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
 	restartedVM.clock.Set(utils.Uint64ToTime(precompileActivationTime).Add(time.Second * 10))
 	tx = types.NewTransaction(uint64(0), testEthAddrs[0], common.Big0, 21000, big.NewInt(testHighFeeConfig.MinBaseFee.Int64()), nil)
-	signedTx, err = types.SignTx(tx, types.LatestSigner(genesis.Config), testKeys[0])
+	signedTx, err = types.SignTx(tx, types.LatestSigner(genesis.Config), testKeys[0].ToECDSA())
 	require.NoError(t, err)
 	errs = restartedVM.txPool.AddRemotesSync([]*types.Transaction{signedTx})
 	require.NoError(t, errs[0])
@@ -3159,10 +3307,13 @@ func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
 	newHead := <-newTxPoolHeadChan
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
 	// Contract is initialized but no preconfig is given, reader should return genesis fee config
-	feeConfig, lastChangedAt, err := vm.blockChain.GetFeeConfigAt(vm.blockChain.Genesis().Header())
+	// We must query the current block header here (not genesis) because the FeeManager precompile
+	// is only activated at precompileActivationTime, not at genesis. Querying the genesis header would
+	// return the chain config fee config and lastChangedAt as zero, which is not correct after activation.
+	feeConfig, lastChangedAt, err := restartedVM.blockChain.GetFeeConfigAt(restartedVM.blockChain.CurrentBlock())
 	require.NoError(t, err)
 	require.EqualValues(t, feeConfig, testHighFeeConfig)
-	require.Zero(t, vm.blockChain.CurrentBlock().Number.Cmp(lastChangedAt))
+	require.EqualValues(t, restartedVM.blockChain.CurrentBlock().Number, lastChangedAt)
 
 	// set a lower fee config now through feemanager
 	testLowFeeConfig := testHighFeeConfig
@@ -3180,7 +3331,7 @@ func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
 	})
 	// let some time pass for block gas cost
 	restartedVM.clock.Set(restartedVM.clock.Time().Add(time.Second * 10))
-	signedTx, err = types.SignTx(tx, types.LatestSigner(genesis.Config), testKeys[0])
+	signedTx, err = types.SignTx(tx, types.LatestSigner(genesis.Config), testKeys[0].ToECDSA())
 	require.NoError(t, err)
 	errs = restartedVM.txPool.AddRemotesSync([]*types.Transaction{signedTx})
 	require.NoError(t, errs[0])
@@ -3197,7 +3348,7 @@ func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
 
 	// send another tx with low fee
 	tx = types.NewTransaction(uint64(2), testEthAddrs[0], common.Big0, 21000, big.NewInt(testLowFeeConfig.MinBaseFee.Int64()), nil)
-	signedTx, err = types.SignTx(tx, types.LatestSigner(genesis.Config), testKeys[0])
+	signedTx, err = types.SignTx(tx, types.LatestSigner(genesis.Config), testKeys[0].ToECDSA())
 	require.NoError(t, err)
 	errs = restartedVM.txPool.AddRemotesSync([]*types.Transaction{signedTx})
 	require.NoError(t, errs[0])
@@ -3208,13 +3359,13 @@ func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
 
 	// Regression: Mempool should see the new config after restart
-	restartedVM, err = restartVM(restartedVM, sharedDB, genesisJSON, appSender, true)
+	restartedVM, err = restartVM(restartedVM, tvm.db, genesisJSON, tvm.appSender, true)
 	require.NoError(t, err)
 	newTxPoolHeadChan = make(chan core.NewTxPoolReorgEvent, 1)
 	restartedVM.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
 	// send a tx with low fee
 	tx = types.NewTransaction(uint64(3), testEthAddrs[0], common.Big0, 21000, big.NewInt(testLowFeeConfig.MinBaseFee.Int64()), nil)
-	signedTx, err = types.SignTx(tx, types.LatestSigner(genesis.Config), testKeys[0])
+	signedTx, err = types.SignTx(tx, types.LatestSigner(genesis.Config), testKeys[0].ToECDSA())
 	require.NoError(t, err)
 	errs = restartedVM.txPool.AddRemotesSync([]*types.Transaction{signedTx})
 	require.NoError(t, errs[0])
@@ -3284,7 +3435,7 @@ func TestWaitForEvent(t *testing.T) {
 				}()
 
 				tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
-				signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
+				signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0].ToECDSA())
 				require.NoError(t, err)
 
 				for _, err := range vm.txPool.AddRemotesSync([]*types.Transaction{signedTx}) {
@@ -3298,7 +3449,7 @@ func TestWaitForEvent(t *testing.T) {
 			name: "WaitForEvent doesn't return once a block is built and accepted",
 			testCase: func(t *testing.T, vm *VM) {
 				tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
-				signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
+				signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0].ToECDSA())
 				require.NoError(t, err)
 
 				for _, err := range vm.txPool.AddRemotesSync([]*types.Transaction{signedTx}) {
@@ -3335,7 +3486,7 @@ func TestWaitForEvent(t *testing.T) {
 				time.Sleep(time.Second * 2) // sleep some time to let the gas capacity to refill
 
 				tx = types.NewTransaction(uint64(1), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
-				signedTx, err = types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
+				signedTx, err = types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0].ToECDSA())
 				require.NoError(t, err)
 
 				for _, err := range vm.txPool.AddRemotesSync([]*types.Transaction{signedTx}) {
@@ -3368,7 +3519,7 @@ func TestWaitForEvent(t *testing.T) {
 			name: "WaitForEvent waits some time after a block is built",
 			testCase: func(t *testing.T, vm *VM) {
 				tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
-				signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
+				signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0].ToECDSA())
 				require.NoError(t, err)
 
 				for _, err := range vm.txPool.AddRemotesSync([]*types.Transaction{signedTx}) {
@@ -3387,7 +3538,7 @@ func TestWaitForEvent(t *testing.T) {
 				require.NoError(t, blk.Accept(context.Background()))
 
 				tx = types.NewTransaction(uint64(1), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
-				signedTx, err = types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
+				signedTx, err = types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0].ToECDSA())
 				require.NoError(t, err)
 
 				for _, err := range vm.txPool.AddRemotesSync([]*types.Transaction{signedTx}) {
@@ -3414,9 +3565,12 @@ func TestWaitForEvent(t *testing.T) {
 			require.NoError(t, genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)))
 			genesisJSON, err := genesis.MarshalJSON()
 			require.NoError(t, err)
-			vm, _, _ := GenesisVM(t, true, string(genesisJSON), "", "")
-			testCase.testCase(t, vm)
-			vm.Shutdown(context.Background())
+			tvm := newVM(t, testVMConfig{
+				genesisJSON: string(genesisJSON),
+			}).vm
+
+			testCase.testCase(t, tvm)
+			tvm.Shutdown(context.Background())
 		})
 	}
 }
