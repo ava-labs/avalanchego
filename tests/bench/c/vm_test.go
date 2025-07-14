@@ -200,6 +200,12 @@ func newMainnetCChainVM(
 	sharedMemoryDB := prefixdb.New([]byte("sharedmemory"), vmAndSharedMemoryDB)
 	atomicMemory := atomic.NewMemory(sharedMemoryDB)
 
+	chainIDToSubnetID := map[ids.ID]ids.ID{
+		mainnetXChainID: constants.PrimaryNetworkID,
+		mainnetCChainID: constants.PrimaryNetworkID,
+		ids.Empty:       constants.PrimaryNetworkID,
+	}
+
 	if err := vm.Initialize(
 		ctx,
 		&snow.Context{
@@ -221,8 +227,16 @@ func newMainnetCChainVM(
 
 			WarpSigner: warpSigner,
 
-			ValidatorState: &validatorstest.State{},
-			ChainDataDir:   chainDataDir,
+			ValidatorState: &validatorstest.State{
+				GetSubnetIDF: func(ctx context.Context, chainID ids.ID) (ids.ID, error) {
+					subnetID, ok := chainIDToSubnetID[chainID]
+					if ok {
+						return subnetID, nil
+					}
+					return ids.Empty, fmt.Errorf("unknown chainID: %s", chainID)
+				},
+			},
+			ChainDataDir: chainDataDir,
 		},
 		prefixdb.New([]byte("vm"), vmAndSharedMemoryDB),
 		[]byte(genesisConfig.CChainGenesis),
