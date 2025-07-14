@@ -17,7 +17,7 @@ type Config struct {
 	Log logging.Logger
 
 	Sender             sender.ExternalSender
-	OutboundMsgBuilder message.SimplexOutboundMessageBuilder
+	OutboundMsgBuilder message.OutboundMsgBuilder
 
 	// Validators is a map of node IDs to their validator information.
 	// This tells the node about the current membership set, and should be consistent

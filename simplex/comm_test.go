@@ -5,14 +5,18 @@ package simplex
 
 import (
 	"testing"
+	"time"
 
 	"github.com/ava-labs/simplex"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/message/messagemock"
 	"github.com/ava-labs/avalanchego/snow/networking/sender/sendermock"
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 var testSimplexMessage = simplex.Message{
@@ -38,19 +42,21 @@ func TestCommSendMessage(t *testing.T) {
 	config := newEngineConfig(t, 1)
 
 	destinationNodeID := ids.GenerateTestNodeID()
-
 	ctrl := gomock.NewController(t)
-	msgCreator := messagemock.NewOutboundMsgBuilder(ctrl)
 	sender := sendermock.NewExternalSender(ctrl)
+	mc, err := message.NewCreator(
+		prometheus.NewRegistry(),
+		constants.DefaultNetworkCompressionType,
+		10*time.Second,
+	)
+	require.NoError(t, err)
 
-	config.OutboundMsgBuilder = msgCreator
+	config.OutboundMsgBuilder = mc
 	config.Sender = sender
 
 	comm, err := NewComm(config)
 	require.NoError(t, err)
 
-	msgCreator.EXPECT().Vote(gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(nil, nil)
 	sender.EXPECT().Send(gomock.Any(), gomock.Any(), comm.subnetID, gomock.Any())
 
 	comm.SendMessage(&testSimplexMessage, destinationNodeID[:])
@@ -62,18 +68,20 @@ func TestCommBroadcast(t *testing.T) {
 	config := newEngineConfig(t, 3)
 
 	ctrl := gomock.NewController(t)
-	msgCreator := messagemock.NewOutboundMsgBuilder(ctrl)
 	sender := sendermock.NewExternalSender(ctrl)
+	mc, err := message.NewCreator(
+		prometheus.NewRegistry(),
+		constants.DefaultNetworkCompressionType,
+		10*time.Second,
+	)
+	require.NoError(t, err)
 
-	config.OutboundMsgBuilder = msgCreator
+	config.OutboundMsgBuilder = mc
 	config.Sender = sender
 
 	comm, err := NewComm(config)
 	require.NoError(t, err)
 
-	// should only send twice since the current node does not send to itself
-	msgCreator.EXPECT().Vote(gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(nil, nil).Times(2)
 	sender.EXPECT().Send(gomock.Any(), gomock.Any(), comm.subnetID, gomock.Any()).Times(2)
 
 	comm.Broadcast(&testSimplexMessage)

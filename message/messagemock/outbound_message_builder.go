@@ -18,7 +18,6 @@ import (
 	message "github.com/ava-labs/avalanchego/message"
 	p2p "github.com/ava-labs/avalanchego/proto/pb/p2p"
 	ips "github.com/ava-labs/avalanchego/utils/ips"
-	simplex "github.com/ava-labs/simplex"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -166,21 +165,6 @@ func (mr *OutboundMsgBuilderMockRecorder) AppResponse(chainID, requestID, msg an
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppResponse", reflect.TypeOf((*OutboundMsgBuilder)(nil).AppResponse), chainID, requestID, msg)
 }
 
-// BlockProposal mocks base method.
-func (m *OutboundMsgBuilder) BlockProposal(chainID ids.ID, block []byte, vote simplex.Vote) (message.OutboundMessage, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BlockProposal", chainID, block, vote)
-	ret0, _ := ret[0].(message.OutboundMessage)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// BlockProposal indicates an expected call of BlockProposal.
-func (mr *OutboundMsgBuilderMockRecorder) BlockProposal(chainID, block, vote any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BlockProposal", reflect.TypeOf((*OutboundMsgBuilder)(nil).BlockProposal), chainID, block, vote)
-}
-
 // Chits mocks base method.
 func (m *OutboundMsgBuilder) Chits(chainID ids.ID, requestID uint32, preferredID, preferredIDAtHeight, acceptedID ids.ID, acceptedHeight uint64) (message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
@@ -194,66 +178,6 @@ func (m *OutboundMsgBuilder) Chits(chainID ids.ID, requestID uint32, preferredID
 func (mr *OutboundMsgBuilderMockRecorder) Chits(chainID, requestID, preferredID, preferredIDAtHeight, acceptedID, acceptedHeight any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Chits", reflect.TypeOf((*OutboundMsgBuilder)(nil).Chits), chainID, requestID, preferredID, preferredIDAtHeight, acceptedID, acceptedHeight)
-}
-
-// EmptyNotarization mocks base method.
-func (m *OutboundMsgBuilder) EmptyNotarization(chainID ids.ID, protocolMetadata simplex.ProtocolMetadata, qc []byte) (message.OutboundMessage, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EmptyNotarization", chainID, protocolMetadata, qc)
-	ret0, _ := ret[0].(message.OutboundMessage)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// EmptyNotarization indicates an expected call of EmptyNotarization.
-func (mr *OutboundMsgBuilderMockRecorder) EmptyNotarization(chainID, protocolMetadata, qc any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EmptyNotarization", reflect.TypeOf((*OutboundMsgBuilder)(nil).EmptyNotarization), chainID, protocolMetadata, qc)
-}
-
-// EmptyVote mocks base method.
-func (m *OutboundMsgBuilder) EmptyVote(chainID ids.ID, protocolMetadata simplex.ProtocolMetadata, signature simplex.Signature) (message.OutboundMessage, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EmptyVote", chainID, protocolMetadata, signature)
-	ret0, _ := ret[0].(message.OutboundMessage)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// EmptyVote indicates an expected call of EmptyVote.
-func (mr *OutboundMsgBuilderMockRecorder) EmptyVote(chainID, protocolMetadata, signature any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EmptyVote", reflect.TypeOf((*OutboundMsgBuilder)(nil).EmptyVote), chainID, protocolMetadata, signature)
-}
-
-// Finalization mocks base method.
-func (m *OutboundMsgBuilder) Finalization(chainID ids.ID, blockHeader simplex.BlockHeader, qc []byte) (message.OutboundMessage, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Finalization", chainID, blockHeader, qc)
-	ret0, _ := ret[0].(message.OutboundMessage)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Finalization indicates an expected call of Finalization.
-func (mr *OutboundMsgBuilderMockRecorder) Finalization(chainID, blockHeader, qc any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Finalization", reflect.TypeOf((*OutboundMsgBuilder)(nil).Finalization), chainID, blockHeader, qc)
-}
-
-// FinalizeVote mocks base method.
-func (m *OutboundMsgBuilder) FinalizeVote(chainID ids.ID, blockHeader simplex.BlockHeader, signature simplex.Signature) (message.OutboundMessage, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FinalizeVote", chainID, blockHeader, signature)
-	ret0, _ := ret[0].(message.OutboundMessage)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// FinalizeVote indicates an expected call of FinalizeVote.
-func (mr *OutboundMsgBuilderMockRecorder) FinalizeVote(chainID, blockHeader, signature any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FinalizeVote", reflect.TypeOf((*OutboundMsgBuilder)(nil).FinalizeVote), chainID, blockHeader, signature)
 }
 
 // Get mocks base method.
@@ -376,21 +300,6 @@ func (mr *OutboundMsgBuilderMockRecorder) Handshake(networkID, myTime, ip, clien
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Handshake", reflect.TypeOf((*OutboundMsgBuilder)(nil).Handshake), networkID, myTime, ip, client, major, minor, patch, ipSigningTime, ipNodeIDSig, ipBLSSig, trackedSubnets, supportedACPs, objectedACPs, knownPeersFilter, knownPeersSalt, requestAllSubnetIPs)
 }
 
-// Notarization mocks base method.
-func (m *OutboundMsgBuilder) Notarization(chainID ids.ID, blockHeader simplex.BlockHeader, qc []byte) (message.OutboundMessage, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Notarization", chainID, blockHeader, qc)
-	ret0, _ := ret[0].(message.OutboundMessage)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Notarization indicates an expected call of Notarization.
-func (mr *OutboundMsgBuilderMockRecorder) Notarization(chainID, blockHeader, qc any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Notarization", reflect.TypeOf((*OutboundMsgBuilder)(nil).Notarization), chainID, blockHeader, qc)
-}
-
 // PeerList mocks base method.
 func (m *OutboundMsgBuilder) PeerList(peers []*ips.ClaimedIPPort, bypassThrottling bool) (message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
@@ -481,34 +390,19 @@ func (mr *OutboundMsgBuilderMockRecorder) Put(chainID, requestID, container any)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Put", reflect.TypeOf((*OutboundMsgBuilder)(nil).Put), chainID, requestID, container)
 }
 
-// ReplicationRequest mocks base method.
-func (m *OutboundMsgBuilder) ReplicationRequest(chainID ids.ID, seqs []uint64, latestRound uint64) (message.OutboundMessage, error) {
+// SimplexMessage mocks base method.
+func (m *OutboundMsgBuilder) SimplexMessage(msg *p2p.Simplex) (message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ReplicationRequest", chainID, seqs, latestRound)
+	ret := m.ctrl.Call(m, "SimplexMessage", msg)
 	ret0, _ := ret[0].(message.OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ReplicationRequest indicates an expected call of ReplicationRequest.
-func (mr *OutboundMsgBuilderMockRecorder) ReplicationRequest(chainID, seqs, latestRound any) *gomock.Call {
+// SimplexMessage indicates an expected call of SimplexMessage.
+func (mr *OutboundMsgBuilderMockRecorder) SimplexMessage(msg any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReplicationRequest", reflect.TypeOf((*OutboundMsgBuilder)(nil).ReplicationRequest), chainID, seqs, latestRound)
-}
-
-// ReplicationResponse mocks base method.
-func (m *OutboundMsgBuilder) ReplicationResponse(chainID ids.ID, data []simplex.VerifiedQuorumRound, latestRound *simplex.VerifiedQuorumRound) (message.OutboundMessage, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ReplicationResponse", chainID, data, latestRound)
-	ret0, _ := ret[0].(message.OutboundMessage)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ReplicationResponse indicates an expected call of ReplicationResponse.
-func (mr *OutboundMsgBuilderMockRecorder) ReplicationResponse(chainID, data, latestRound any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReplicationResponse", reflect.TypeOf((*OutboundMsgBuilder)(nil).ReplicationResponse), chainID, data, latestRound)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SimplexMessage", reflect.TypeOf((*OutboundMsgBuilder)(nil).SimplexMessage), msg)
 }
 
 // StateSummaryFrontier mocks base method.
@@ -524,19 +418,4 @@ func (m *OutboundMsgBuilder) StateSummaryFrontier(chainID ids.ID, requestID uint
 func (mr *OutboundMsgBuilderMockRecorder) StateSummaryFrontier(chainID, requestID, summary any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StateSummaryFrontier", reflect.TypeOf((*OutboundMsgBuilder)(nil).StateSummaryFrontier), chainID, requestID, summary)
-}
-
-// Vote mocks base method.
-func (m *OutboundMsgBuilder) Vote(chainID ids.ID, blockHeader simplex.BlockHeader, signature simplex.Signature) (message.OutboundMessage, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Vote", chainID, blockHeader, signature)
-	ret0, _ := ret[0].(message.OutboundMessage)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Vote indicates an expected call of Vote.
-func (mr *OutboundMsgBuilderMockRecorder) Vote(chainID, blockHeader, signature any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Vote", reflect.TypeOf((*OutboundMsgBuilder)(nil).Vote), chainID, blockHeader, signature)
 }
