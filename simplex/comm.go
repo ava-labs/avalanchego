@@ -4,10 +4,10 @@
 package simplex
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"slices"
-	"strings"
 
 	"github.com/ava-labs/simplex"
 	"go.uber.org/zap"
@@ -20,7 +20,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var errNodeNotFound = errors.New("node not found in the validator list")
+var (
+	_                simplex.Communication = (*Comm)(nil)
+	errNodeNotFound  = errors.New("node not found in the validator list")
+)
 
 type Comm struct {
 	logger   simplex.Logger
@@ -52,11 +55,11 @@ func NewComm(config *Config) (*Comm, error) {
 		return nil, fmt.Errorf("%w could not find our node: %s", errNodeNotFound, config.Ctx.NodeID)
 	}
 
-	sortedNodes := sortNodes(nodes)
+	sortNodes(nodes)
 
 	c := &Comm{
 		subnetID:   config.Ctx.SubnetID,
-		nodes:      sortedNodes,
+		nodes:      nodes,
 		nodeID:     config.Ctx.NodeID[:],
 		logger:     config.Log,
 		sender:     config.Sender,
@@ -67,11 +70,11 @@ func NewComm(config *Config) (*Comm, error) {
 	return c, nil
 }
 
-func sortNodes(nodes []simplex.NodeID) []simplex.NodeID {
+// sortNodes sorts the nodes in place by their byte representations.
+func sortNodes(nodes []simplex.NodeID) {
 	slices.SortFunc(nodes, func(i, j simplex.NodeID) int {
-		return strings.Compare(i.String(), j.String())
+		return bytes.Compare(i, j)
 	})
-	return nodes
 }
 
 func (c *Comm) ListNodes() []simplex.NodeID {
@@ -101,32 +104,30 @@ func (c *Comm) Broadcast(msg *simplex.Message) {
 }
 
 func (c *Comm) simplexMessageToOutboundMessage(msg *simplex.Message) (message.OutboundMessage, error) {
-	var outboundMessage message.OutboundMessage
-	var err error
 	switch {
 	case msg.VerifiedBlockMessage != nil:
-		bytes, errBytes := msg.VerifiedBlockMessage.VerifiedBlock.Bytes()
-		if errBytes != nil {
+		bytes, err := msg.VerifiedBlockMessage.VerifiedBlock.Bytes()
+		if err != nil {
 			return nil, fmt.Errorf("failed to serialize block: %w", err)
 		}
-		outboundMessage, err = c.msgBuilder.BlockProposal(c.chainID, bytes, msg.VerifiedBlockMessage.Vote)
+		return c.msgBuilder.BlockProposal(c.chainID, bytes, msg.VerifiedBlockMessage.Vote)
 	case msg.VoteMessage != nil:
-		outboundMessage, err = c.msgBuilder.Vote(c.chainID, msg.VoteMessage.Vote.BlockHeader, msg.VoteMessage.Signature)
+		return c.msgBuilder.Vote(c.chainID, msg.VoteMessage.Vote.BlockHeader, msg.VoteMessage.Signature)
 	case msg.EmptyVoteMessage != nil:
-		outboundMessage, err = c.msgBuilder.EmptyVote(c.chainID, msg.EmptyVoteMessage.Vote.ProtocolMetadata, msg.EmptyVoteMessage.Signature)
+		return c.msgBuilder.EmptyVote(c.chainID, msg.EmptyVoteMessage.Vote.ProtocolMetadata, msg.EmptyVoteMessage.Signature)
 	case msg.FinalizeVote != nil:
-		outboundMessage, err = c.msgBuilder.FinalizeVote(c.chainID, msg.FinalizeVote.Finalization.BlockHeader, msg.FinalizeVote.Signature)
+		return c.msgBuilder.FinalizeVote(c.chainID, msg.FinalizeVote.Finalization.BlockHeader, msg.FinalizeVote.Signature)
 	case msg.Notarization != nil:
-		outboundMessage, err = c.msgBuilder.Notarization(c.chainID, msg.Notarization.Vote.BlockHeader, msg.Notarization.QC.Bytes())
+		return c.msgBuilder.Notarization(c.chainID, msg.Notarization.Vote.BlockHeader, msg.Notarization.QC.Bytes())
 	case msg.EmptyNotarization != nil:
-		outboundMessage, err = c.msgBuilder.EmptyNotarization(c.chainID, msg.EmptyNotarization.Vote.ProtocolMetadata, msg.EmptyNotarization.QC.Bytes())
+		return c.msgBuilder.EmptyNotarization(c.chainID, msg.EmptyNotarization.Vote.ProtocolMetadata, msg.EmptyNotarization.QC.Bytes())
 	case msg.Finalization != nil:
-		outboundMessage, err = c.msgBuilder.Finalization(c.chainID, msg.Finalization.Finalization.BlockHeader, msg.Finalization.QC.Bytes())
+		return c.msgBuilder.Finalization(c.chainID, msg.Finalization.Finalization.BlockHeader, msg.Finalization.QC.Bytes())
 	case msg.ReplicationRequest != nil:
-		outboundMessage, err = c.msgBuilder.ReplicationRequest(c.chainID, msg.ReplicationRequest.Seqs, msg.ReplicationRequest.LatestRound)
+		return c.msgBuilder.ReplicationRequest(c.chainID, msg.ReplicationRequest.Seqs, msg.ReplicationRequest.LatestRound)
 	case msg.VerifiedReplicationResponse != nil:
-		outboundMessage, err = c.msgBuilder.ReplicationResponse(c.chainID, msg.VerifiedReplicationResponse.Data, msg.VerifiedReplicationResponse.LatestRound)
+		return c.msgBuilder.ReplicationResponse(c.chainID, msg.VerifiedReplicationResponse.Data, msg.VerifiedReplicationResponse.LatestRound)
 	}
 
-	return outboundMessage, err
+	return nil, nil
 }
