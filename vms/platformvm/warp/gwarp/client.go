@@ -8,7 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 
-	pb "github.com/ava-labs/avalanchego/proto/pb/warp"
+	pb "github.com/ava-labs/avalanchego/buf/proto/pb/warp"
 )
 
 var _ warp.Signer = (*Client)(nil)

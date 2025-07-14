@@ -10,9 +10,9 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/buf/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"

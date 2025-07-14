@@ -8,7 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 
-	aliasreaderpb "github.com/ava-labs/avalanchego/proto/pb/aliasreader"
+	aliasreaderpb "github.com/ava-labs/avalanchego/buf/proto/pb/aliasreader"
 )
 
 var _ ids.AliaserReader = (*Client)(nil)

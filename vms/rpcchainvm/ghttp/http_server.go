@@ -12,13 +12,13 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/ava-labs/avalanchego/proto/pb/io/reader"
+	"github.com/ava-labs/avalanchego/buf/proto/pb/io/reader"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greader"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gresponsewriter"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
-	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
-	responsewriterpb "github.com/ava-labs/avalanchego/proto/pb/http/responsewriter"
+	httppb "github.com/ava-labs/avalanchego/buf/proto/pb/http"
+	responsewriterpb "github.com/ava-labs/avalanchego/buf/proto/pb/http/responsewriter"
 )
 
 var (

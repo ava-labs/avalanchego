@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/set"
 
-	appsenderpb "github.com/ava-labs/avalanchego/proto/pb/appsender"
+	appsenderpb "github.com/ava-labs/avalanchego/buf/proto/pb/appsender"
 )
 
 var _ appsenderpb.AppSenderServer = (*Server)(nil)

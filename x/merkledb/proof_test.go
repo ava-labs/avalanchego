@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/set"
 
-	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
+	pb "github.com/ava-labs/avalanchego/buf/proto/pb/sync"
 )
 
 func Test_Proof_Empty(t *testing.T) {

@@ -19,7 +19,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
-	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
+	httppb "github.com/ava-labs/avalanchego/buf/proto/pb/http"
 )
 
 var _ io.Reader = (*infiniteStream)(nil)

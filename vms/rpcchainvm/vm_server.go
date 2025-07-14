@@ -38,14 +38,14 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
-	aliasreaderpb "github.com/ava-labs/avalanchego/proto/pb/aliasreader"
-	appsenderpb "github.com/ava-labs/avalanchego/proto/pb/appsender"
-	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
-	rpcdbpb "github.com/ava-labs/avalanchego/proto/pb/rpcdb"
-	sharedmemorypb "github.com/ava-labs/avalanchego/proto/pb/sharedmemory"
-	validatorstatepb "github.com/ava-labs/avalanchego/proto/pb/validatorstate"
-	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
-	warppb "github.com/ava-labs/avalanchego/proto/pb/warp"
+	aliasreaderpb "github.com/ava-labs/avalanchego/buf/proto/pb/aliasreader"
+	appsenderpb "github.com/ava-labs/avalanchego/buf/proto/pb/appsender"
+	httppb "github.com/ava-labs/avalanchego/buf/proto/pb/http"
+	rpcdbpb "github.com/ava-labs/avalanchego/buf/proto/pb/rpcdb"
+	sharedmemorypb "github.com/ava-labs/avalanchego/buf/proto/pb/sharedmemory"
+	validatorstatepb "github.com/ava-labs/avalanchego/buf/proto/pb/validatorstate"
+	vmpb "github.com/ava-labs/avalanchego/buf/proto/pb/vm"
+	warppb "github.com/ava-labs/avalanchego/buf/proto/pb/warp"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 )
 

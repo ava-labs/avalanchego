@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 
-	pb "github.com/ava-labs/avalanchego/proto/pb/validatorstate"
+	pb "github.com/ava-labs/avalanchego/buf/proto/pb/validatorstate"
 )
 
 var (

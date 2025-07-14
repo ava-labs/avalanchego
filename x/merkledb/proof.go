@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 
-	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
+	pb "github.com/ava-labs/avalanchego/buf/proto/pb/sync"
 )
 
 const verificationCacheSize = math.MaxUint16

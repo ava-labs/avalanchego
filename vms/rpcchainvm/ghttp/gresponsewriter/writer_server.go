@@ -15,10 +15,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gwriter"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
-	responsewriterpb "github.com/ava-labs/avalanchego/proto/pb/http/responsewriter"
-	readerpb "github.com/ava-labs/avalanchego/proto/pb/io/reader"
-	writerpb "github.com/ava-labs/avalanchego/proto/pb/io/writer"
-	connpb "github.com/ava-labs/avalanchego/proto/pb/net/conn"
+	responsewriterpb "github.com/ava-labs/avalanchego/buf/proto/pb/http/responsewriter"
+	readerpb "github.com/ava-labs/avalanchego/buf/proto/pb/io/reader"
+	writerpb "github.com/ava-labs/avalanchego/buf/proto/pb/io/writer"
+	connpb "github.com/ava-labs/avalanchego/buf/proto/pb/net/conn"
 )
 
 var (

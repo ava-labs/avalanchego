@@ -131,7 +131,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: bufbuild/buf-action@dfda68eacb65895184c76b9ae522b977636a2c47 #v1.1.4
         with:
-          input: "proto"
+          input: "buf/proto"
           pr_comment: false
           # Breaking changes are managed by the rpcchainvm protocol version.
           breaking: false

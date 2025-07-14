@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 
-	sharedmemorypb "github.com/ava-labs/avalanchego/proto/pb/sharedmemory"
+	sharedmemorypb "github.com/ava-labs/avalanchego/buf/proto/pb/sharedmemory"
 )
 
 var _ atomic.SharedMemory = (*Client)(nil)

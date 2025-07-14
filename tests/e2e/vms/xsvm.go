@@ -19,8 +19,8 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/api/connectclient"
-	"github.com/ava-labs/avalanchego/connectproto/pb/xsvm"
-	"github.com/ava-labs/avalanchego/connectproto/pb/xsvm/xsvmconnect"
+	"github.com/ava-labs/avalanchego/buf/connect/pb/xsvm"
+	"github.com/ava-labs/avalanchego/buf/connect/pb/xsvm/xsvmconnect"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/subnet"

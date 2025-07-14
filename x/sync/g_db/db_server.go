@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/x/merkledb"
 	"github.com/ava-labs/avalanchego/x/sync"
 
-	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
+	pb "github.com/ava-labs/avalanchego/buf/proto/pb/sync"
 )
 
 var _ pb.DBServer = (*DBServer)(nil)

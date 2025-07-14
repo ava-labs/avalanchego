@@ -10,7 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 
-	pb "github.com/ava-labs/avalanchego/proto/pb/signer"
+	pb "github.com/ava-labs/avalanchego/buf/proto/pb/signer"
 )
 
 var _ bls.Signer = (*Client)(nil)

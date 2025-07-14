@@ -14,9 +14,9 @@ import (
 	reflect "reflect"
 	time "time"
 
+	p2p "github.com/ava-labs/avalanchego/buf/proto/pb/p2p"
 	ids "github.com/ava-labs/avalanchego/ids"
 	message "github.com/ava-labs/avalanchego/message"
-	p2p "github.com/ava-labs/avalanchego/proto/pb/p2p"
 	handler "github.com/ava-labs/avalanchego/snow/networking/handler"
 	router "github.com/ava-labs/avalanchego/snow/networking/router"
 	timeout "github.com/ava-labs/avalanchego/snow/networking/timeout"

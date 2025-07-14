@@ -32,7 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime/subprocess"
 
-	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
+	vmpb "github.com/ava-labs/avalanchego/buf/proto/pb/vm"
 )
 
 const (

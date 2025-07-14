@@ -6,7 +6,7 @@ package snow
 import (
 	"errors"
 
-	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/buf/proto/pb/p2p"
 )
 
 const (
