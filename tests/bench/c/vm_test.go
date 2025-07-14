@@ -228,7 +228,7 @@ func newMainnetCChainVM(
 			WarpSigner: warpSigner,
 
 			ValidatorState: &validatorstest.State{
-				GetSubnetIDF: func(ctx context.Context, chainID ids.ID) (ids.ID, error) {
+				GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
 					subnetID, ok := chainIDToSubnetID[chainID]
 					if ok {
 						return subnetID, nil
