@@ -101,6 +101,7 @@ type Metrics struct {
 	tracking                *prometheus.GaugeVec
 	trackingLifetimeAverage prometheus.Gauge
 	topValidators           *prometheus.GaugeVec
+	bloomFilterHitRate      prometheus.Histogram
 }
 
 // NewMetrics returns a common set of metrics
@@ -109,6 +110,12 @@ func NewMetrics(
 	namespace string,
 ) (Metrics, error) {
 	m := Metrics{
+		bloomFilterHitRate: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespace,
+			Name:      "bloomfilter_hit_rate",
+			Help:      "Hit rate (%) of the bloom filter sent by pull gossip",
+			Buckets:   prometheus.LinearBuckets(0, 25, 5),
+		}),
 		count: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Namespace: namespace,
@@ -148,6 +155,7 @@ func NewMetrics(
 		),
 	}
 	err := errors.Join(
+		metrics.Register(m.bloomFilterHitRate),
 		metrics.Register(m.count),
 		metrics.Register(m.bytes),
 		metrics.Register(m.tracking),

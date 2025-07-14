@@ -57,6 +57,8 @@ func TestGossiperGossip(t *testing.T) {
 		responder              []*testTx // what the peer we're requesting gossip from has
 		expectedPossibleValues []*testTx // possible values we can have
 		expectedLen            int
+		expectedObserved       bool
+		expectedObservedVal    uint64
 	}{
 		{
 			name: "no gossip - no one knows anything",
@@ -75,6 +77,8 @@ func TestGossiperGossip(t *testing.T) {
 			responder:              []*testTx{{id: ids.ID{0}}},
 			expectedPossibleValues: []*testTx{{id: ids.ID{0}}},
 			expectedLen:            1,
+			expectedObservedVal:    100,
+			expectedObserved:       true,
 		},
 		{
 			name:                   "gossip - requester knows nothing",
@@ -82,6 +86,7 @@ func TestGossiperGossip(t *testing.T) {
 			responder:              []*testTx{{id: ids.ID{0}}},
 			expectedPossibleValues: []*testTx{{id: ids.ID{0}}},
 			expectedLen:            1,
+			expectedObserved:       true,
 		},
 		{
 			name:                   "gossip - requester knows less than responder",
@@ -90,6 +95,8 @@ func TestGossiperGossip(t *testing.T) {
 			responder:              []*testTx{{id: ids.ID{0}}, {id: ids.ID{1}}},
 			expectedPossibleValues: []*testTx{{id: ids.ID{0}}, {id: ids.ID{1}}},
 			expectedLen:            2,
+			expectedObservedVal:    50,
+			expectedObserved:       true,
 		},
 		{
 			name:                   "gossip - target response size exceeded",
@@ -97,6 +104,7 @@ func TestGossiperGossip(t *testing.T) {
 			responder:              []*testTx{{id: ids.ID{0}}, {id: ids.ID{1}}, {id: ids.ID{2}}},
 			expectedPossibleValues: []*testTx{{id: ids.ID{0}}, {id: ids.ID{1}}, {id: ids.ID{2}}},
 			expectedLen:            2,
+			expectedObserved:       true,
 		},
 	}
 
@@ -123,6 +131,12 @@ func TestGossiperGossip(t *testing.T) {
 
 			metrics, err := NewMetrics(prometheus.NewRegistry(), "")
 			require.NoError(err)
+
+			testHistogram := &testHistogram{
+				Histogram: metrics.bloomFilterHitRate,
+			}
+			metrics.bloomFilterHitRate = testHistogram
+
 			marshaller := testMarshaller{}
 			handler := NewHandler[*testTx](
 				logging.NoLog{},
@@ -175,6 +189,8 @@ func TestGossiperGossip(t *testing.T) {
 
 			require.Len(requestSet.txs, tt.expectedLen)
 			require.Subset(tt.expectedPossibleValues, maps.Values(requestSet.txs))
+			require.Equal(tt.expectedObserved, testHistogram.observed)
+			require.Equal(tt.expectedObservedVal, testHistogram.observedVal)
 
 			// we should not receive anything that we already had before we
 			// requested the gossip
@@ -610,4 +626,59 @@ type testValidatorSet struct {
 
 func (t testValidatorSet) Has(_ context.Context, nodeID ids.NodeID) bool {
 	return t.validators.Contains(nodeID)
+}
+
+func TestComputeBloomFilterHitPercentage(t *testing.T) {
+	tests := []struct {
+		name       string
+		hits       uint64
+		misses     uint64
+		percentage uint64
+		ok         bool
+	}{
+		{
+			name:       "no hits",
+			hits:       0,
+			misses:     10,
+			percentage: 0,
+			ok:         true,
+		},
+		{
+			name:       "no misses",
+			hits:       10,
+			misses:     0,
+			percentage: 100,
+			ok:         true,
+		},
+		{
+			name:       "some hits",
+			hits:       5,
+			misses:     5,
+			percentage: 50,
+			ok:         true,
+		},
+		{
+			name: "nothing",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := computeBloomFilterHitPercentage(tt.hits, tt.misses, logging.NoLog{})
+			require.Equal(t, tt.ok, ok)
+			require.Equal(t, tt.percentage, got)
+		})
+	}
+}
+
+type testHistogram struct {
+	prometheus.Histogram
+	observedVal uint64
+	observed    bool
+}
+
+func (t *testHistogram) Observe(value float64) {
+	t.Histogram.Observe(value)
+	t.observedVal = uint64(value)
+	t.observed = true
 }

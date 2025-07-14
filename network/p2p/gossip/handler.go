@@ -14,6 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/logging"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var _ p2p.Handler = (*Handler[*testTx])(nil)
@@ -50,6 +52,8 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 		return nil, p2p.ErrUnexpected
 	}
 
+	var hits, misses uint64
+
 	responseSize := 0
 	gossipBytes := make([][]byte, 0)
 	h.set.Iterate(func(gossipable T) bool {
@@ -57,6 +61,7 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 
 		// filter out what the requesting peer already knows about
 		if bloom.Contains(filter, gossipID[:], salt[:]) {
+			hits++
 			return true
 		}
 
@@ -70,11 +75,17 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 		// size
 		gossipBytes = append(gossipBytes, bytes)
 		responseSize += len(bytes)
+		misses++
 
 		return responseSize <= h.targetResponseSize
 	})
 	if err != nil {
 		return nil, p2p.ErrUnexpected
+	}
+
+	hitsPercentage, ok := computeBloomFilterHitPercentage(hits, misses, h.log)
+	if ok {
+		h.metrics.bloomFilterHitRate.Observe(float64(hitsPercentage))
 	}
 
 	if err := h.metrics.observeMessage(sentPullLabels, len(gossipBytes), responseSize); err != nil {
@@ -123,4 +134,32 @@ func (h Handler[_]) AppGossip(_ context.Context, nodeID ids.NodeID, gossipBytes 
 			zap.Error(err),
 		)
 	}
+}
+
+func computeBloomFilterHitPercentage(hits uint64, misses uint64, log logging.Logger) (uint64, bool) {
+	total, err := safemath.Add(hits, misses)
+	if err != nil {
+		log.Warn("failed to calculate total hits and misses",
+			zap.Uint64("hits", hits),
+			zap.Uint64("misses", misses),
+			zap.Error(err),
+		)
+		return 0, false
+	}
+
+	hitsOneHundred, err := safemath.Mul(hits, 100)
+	if err != nil {
+		log.Warn("failed to calculate hit ratio",
+			zap.Uint64("hits", hits),
+			zap.Uint64("misses", misses),
+			zap.Error(err),
+		)
+		return 0, false
+	}
+
+	if total > 0 {
+		return hitsOneHundred / total, true
+	}
+
+	return 0, false
 }
