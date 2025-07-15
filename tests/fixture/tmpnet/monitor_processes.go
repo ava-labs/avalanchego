@@ -283,8 +283,8 @@ type SDConfig struct {
 	Labels  map[string]string `json:"labels"`
 }
 
-// WritePrometheusSDConfig writes a Prometheus SD config file
-// with the provided sdConfig to the location expected by tmpnet.
+// WritePrometheusSDConfig writes the SDConfig with the provided name
+// to the location expected by tmpnet.
 // If withGitHubLabels is true, it attempts to append GitHub-specific labels
 // to the SDConfig before writing.
 //
