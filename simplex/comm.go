@@ -4,10 +4,8 @@
 package simplex
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
-	"slices"
 
 	"github.com/ava-labs/simplex"
 	"go.uber.org/zap"
@@ -56,9 +54,7 @@ func NewComm(config *Config) (*Comm, error) {
 		return nil, fmt.Errorf("our %w: %s", errNodeNotFound, config.Ctx.NodeID)
 	}
 
-	sortNodes(nodes)
-
-	c := &Comm{
+	return &Comm{
 		subnetID:   config.Ctx.SubnetID,
 		nodes:      nodes,
 		nodeID:     config.Ctx.NodeID[:],
@@ -66,23 +62,14 @@ func NewComm(config *Config) (*Comm, error) {
 		sender:     config.Sender,
 		msgBuilder: config.OutboundMsgBuilder,
 		chainID:    config.Ctx.ChainID,
-	}
-
-	return c, nil
+	}, nil
 }
 
-// sortNodes sorts the nodes in place by their byte representations.
-func sortNodes(nodes []simplex.NodeID) {
-	slices.SortFunc(nodes, func(i, j simplex.NodeID) int {
-		return bytes.Compare(i, j)
-	})
-}
-
-func (c *Comm) ListNodes() []simplex.NodeID {
+func (c *Comm) Nodes() []simplex.NodeID {
 	return c.nodes
 }
 
-func (c *Comm) SendMessage(msg *simplex.Message, destination simplex.NodeID) {
+func (c *Comm) Send(msg *simplex.Message, destination simplex.NodeID) {
 	outboundMsg, err := c.simplexMessageToOutboundMessage(msg)
 	if err != nil {
 		c.logger.Error("Failed creating message", zap.Error(err))

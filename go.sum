@@ -74,6 +74,8 @@ github.com/ava-labs/libevm v1.13.14-0.3.0.rc.1 h1:vBMYo+Iazw0rGTr+cwjkBdh5eadLPl
 github.com/ava-labs/libevm v1.13.14-0.3.0.rc.1/go.mod h1:+Iol+sVQ1KyoBsHf3veyrBmHCXr3xXRWq6ZXkgVfNLU=
 github.com/ava-labs/simplex v0.0.0-20250626192006-220e6aeacdc1 h1:ipeWExRrhYF7DZ/bcigoQrzo3vZWNZrFx8W+Yg2sJ2Q=
 github.com/ava-labs/simplex v0.0.0-20250626192006-220e6aeacdc1/go.mod h1:GVzumIo3zR23/qGRN2AdnVkIPHcKMq/D89EGWZfMGQ0=
+github.com/ava-labs/simplex v0.0.0-20250715173145-e4fe035cb9b2 h1:PZ5PMEDkTbd6NLNiwKWV8nz7QvAM+QC9Rj3/NrL9ICA=
+github.com/ava-labs/simplex v0.0.0-20250715173145-e4fe035cb9b2/go.mod h1:GVzumIo3zR23/qGRN2AdnVkIPHcKMq/D89EGWZfMGQ0=
 github.com/aymerick/raymond v2.0.3-0.20180322193309-b565731e1464+incompatible/go.mod h1:osfaiScAUVup+UC9Nfq76eWqDhXlp+4UYaA8uhTBO6g=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=

@@ -59,7 +59,7 @@ func TestCommSendMessage(t *testing.T) {
 
 	sender.EXPECT().Send(gomock.Any(), gomock.Any(), comm.subnetID, gomock.Any())
 
-	comm.SendMessage(&testSimplexMessage, destinationNodeID[:])
+	comm.Send(&testSimplexMessage, destinationNodeID[:])
 }
 
 // TestCommBroadcast tests the Broadcast method sends to all nodes in the subnet
