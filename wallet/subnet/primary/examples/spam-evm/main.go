@@ -10,11 +10,11 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/params"
+	ethereum "github.com/ava-labs/libevm"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/crypto"
+	"github.com/ava-labs/libevm/ethclient"
+	"github.com/ava-labs/libevm/params"
 
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
@@ -38,7 +38,7 @@ var (
 func main() {
 	ctx := context.Background()
 	const (
-		chainUUID = "2FRZ1cHxkdgqUKWSLGr59WNy1aiUi9QvMqRX1yZfDQ9ZDeq7AQ"
+		chainUUID = "2Cex182D5NukWTzzHzMX8mqmZWtUMfcrRPEKUXn5YUHcoSWUaj"
 		uri       = primary.LocalAPIURI + "/ext/bc/" + chainUUID + "/sae/http"
 	)
 	c, err := ethclient.DialContext(ctx, uri)
