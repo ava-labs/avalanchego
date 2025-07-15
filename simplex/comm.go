@@ -29,22 +29,15 @@ type Comm struct {
 	subnetID ids.ID
 	chainID  ids.ID
 	// nodeID is this nodes ID
-	nodeID simplex.NodeID
-	// nodes are the IDs of all the nodes in the subnet
-	nodes []simplex.NodeID
+	nodeID ids.NodeID
+	// nodes are the IDs of all the nodes in the subnet not including this node
+	nodes set.Set[ids.NodeID]
 	// sender is used to send messages to other nodes
 	sender     sender.ExternalSender
 	msgBuilder message.OutboundMsgBuilder
 }
 
 func NewComm(config *Config) (*Comm, error) {
-	nodes := make([]simplex.NodeID, 0, len(config.Validators))
-
-	// grab all the nodes that are validators for the subnet
-	for _, vd := range config.Validators {
-		nodes = append(nodes, vd.NodeID[:])
-	}
-
 	if _, ok := config.Validators[config.Ctx.NodeID]; !ok {
 		config.Log.Warn("Node is not a validator for the subnet",
 			zap.Stringer("nodeID", config.Ctx.NodeID),
@@ -54,10 +47,21 @@ func NewComm(config *Config) (*Comm, error) {
 		return nil, fmt.Errorf("our %w: %s", errNodeNotFound, config.Ctx.NodeID)
 	}
 
+	nodes := set.Set[ids.NodeID]{}
+
+	// grab all the nodes that are validators for the subnet
+	for _, vd := range config.Validators {
+		if vd.NodeID == config.Ctx.NodeID {
+			continue // skip our own node ID
+		}
+
+		nodes.Add(vd.NodeID)
+	}
+
 	return &Comm{
 		subnetID:   config.Ctx.SubnetID,
 		nodes:      nodes,
-		nodeID:     config.Ctx.NodeID[:],
+		nodeID:     config.Ctx.NodeID,
 		logger:     config.Log,
 		sender:     config.Sender,
 		msgBuilder: config.OutboundMsgBuilder,
@@ -66,7 +70,12 @@ func NewComm(config *Config) (*Comm, error) {
 }
 
 func (c *Comm) Nodes() []simplex.NodeID {
-	return c.nodes
+	nodes := make([]simplex.NodeID, 0, c.nodes.Len()+1)
+	nodes = append(nodes, simplex.NodeID(c.nodeID[:]))
+	for nodeID := range c.nodes {
+		nodes = append(nodes, simplex.NodeID(nodeID[:]))
+	}
+	return nodes
 }
 
 func (c *Comm) Send(msg *simplex.Message, destination simplex.NodeID) {
@@ -76,17 +85,13 @@ func (c *Comm) Send(msg *simplex.Message, destination simplex.NodeID) {
 		return
 	}
 
-	c.send(outboundMsg, destination)
-}
-
-func (c *Comm) send(msg message.OutboundMessage, destination simplex.NodeID) {
 	dest, err := ids.ToNodeID(destination)
 	if err != nil {
 		c.logger.Error("Failed to convert destination NodeID", zap.Error(err))
 		return
 	}
 
-	c.sender.Send(msg, common.SendConfig{NodeIDs: set.Of(dest)}, c.subnetID, subnets.NoOpAllower)
+	c.sender.Send(outboundMsg, common.SendConfig{NodeIDs: set.Of(dest)}, c.subnetID, subnets.NoOpAllower)
 }
 
 func (c *Comm) Broadcast(msg *simplex.Message) {
@@ -96,13 +101,7 @@ func (c *Comm) Broadcast(msg *simplex.Message) {
 		return
 	}
 
-	for _, node := range c.nodes {
-		if node.Equals(c.nodeID) {
-			continue
-		}
-
-		c.send(outboundMsg, node)
-	}
+	c.sender.Send(outboundMsg, common.SendConfig{NodeIDs: c.nodes}, c.subnetID, subnets.NoOpAllower)
 }
 
 func (c *Comm) simplexMessageToOutboundMessage(msg *simplex.Message) (message.OutboundMessage, error) {
@@ -115,21 +114,21 @@ func (c *Comm) simplexMessageToOutboundMessage(msg *simplex.Message) (message.Ou
 		}
 		simplexMsg = newBlockProposal(c.chainID, bytes, msg.VerifiedBlockMessage.Vote)
 	case msg.VoteMessage != nil:
-		simplexMsg = newVote(c.chainID, msg.VoteMessage.Vote.BlockHeader, msg.VoteMessage.Signature)
+		simplexMsg = newVote(c.chainID, msg.VoteMessage)
 	case msg.EmptyVoteMessage != nil:
-		simplexMsg = newEmptyVote(c.chainID, msg.EmptyVoteMessage.Vote.ProtocolMetadata, msg.EmptyVoteMessage.Signature)
+		simplexMsg = newEmptyVote(c.chainID, msg.EmptyVoteMessage)
 	case msg.FinalizeVote != nil:
-		simplexMsg = newFinalizeVote(c.chainID, msg.FinalizeVote.Finalization.BlockHeader, msg.FinalizeVote.Signature)
+		simplexMsg = newFinalizeVote(c.chainID, msg.FinalizeVote)
 	case msg.Notarization != nil:
-		simplexMsg = newNotarization(c.chainID, msg.Notarization.Vote.BlockHeader, msg.Notarization.QC.Bytes())
+		simplexMsg = newNotarization(c.chainID, msg.Notarization)
 	case msg.EmptyNotarization != nil:
-		simplexMsg = newEmptyNotarization(c.chainID, msg.EmptyNotarization.Vote.ProtocolMetadata, msg.EmptyNotarization.QC.Bytes())
+		simplexMsg = newEmptyNotarization(c.chainID, msg.EmptyNotarization)
 	case msg.Finalization != nil:
-		simplexMsg = newFinalization(c.chainID, msg.Finalization.Finalization.BlockHeader, msg.Finalization.QC.Bytes())
+		simplexMsg = newFinalization(c.chainID, msg.Finalization)
 	case msg.ReplicationRequest != nil:
-		simplexMsg = newReplicationRequest(c.chainID, msg.ReplicationRequest.Seqs, msg.ReplicationRequest.LatestRound)
+		simplexMsg = newReplicationRequest(c.chainID, msg.ReplicationRequest)
 	case msg.VerifiedReplicationResponse != nil:
-		msg, err := newReplicationResponse(c.chainID, msg.VerifiedReplicationResponse.Data, msg.VerifiedReplicationResponse.LatestRound)
+		msg, err := newReplicationResponse(c.chainID, msg.VerifiedReplicationResponse)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create replication response: %w", err)
 		}
