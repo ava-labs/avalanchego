@@ -1,0 +1,15 @@
+name: expected golangci.yaml diff
+
+on:
+  push:
+    branches:
+      - "main"
+
+jobs:
+  expected-golangci-yaml-diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate expected golangci-lint changes
+        working-directory: .github 
+        run: ./scripts/verify_golangci_yaml_changes.sh 

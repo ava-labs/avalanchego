@@ -1,0 +1,62 @@
+73,74d72
+<             - pkg: container/list
+<               desc: github.com/ava-labs/avalanchego/utils/linked should be used instead.
+89,92d86
+<         - pattern: require\.Error$(# ErrorIs should be used instead)?
+<         - pattern: require\.ErrorContains$(# ErrorIs should be used instead)?
+<         - pattern: require\.EqualValues$(# Equal should be used instead)?
+<         - pattern: require\.NotEqualValues$(# NotEqual should be used instead)?
+97,111d90
+<     gosec:
+<       excludes:
+<         - G107 # Url provided to HTTP request as taint input https://securego.io/docs/rules/g107
+<         - G115 # TODO(marun) Enable this ruleset in a follow-up PR
+<     importas:
+<       # Do not allow unaliased imports of aliased packages.
+<       no-unaliased: false
+<       # Do not allow non-required aliases.
+<       no-extra-aliases: false
+<       # List of aliases
+<       alias:
+<         - pkg: github.com/ava-labs/avalanchego/utils/math
+<           alias: safemath
+<         - pkg: github.com/ava-labs/avalanchego/utils/json
+<           alias: avajson
+172,182d150
+<     spancheck:
+<       # https://github.com/jjti/go-spancheck#checks
+<       checks:
+<         - end
+<     staticcheck:
+<       # https://staticcheck.io/docs/options#checks
+<       checks:
+<         - all
+<         - -SA6002A # Storing non-pointer values in sync.Pool allocates memory
+<         - -SA1019 # Using a deprecated function, variable, constant or field
+<         - -QF1008 # Unnecessary embedded expressions
+190,199c158,167
+<     # Enable all checkers (https://github.com/Antonboom/testifylint#checkers).
+<     # Default: false
+<     enable-all: true
+<     # Disable checkers by name
+<     # (in addition to default
+<     #   suite-thelper
+<     # ).
+<     disable:
+<       - go-require
+<       - float-compare
+---
+>       # Enable all checkers (https://github.com/Antonboom/testifylint#checkers).
+>       # Default: false
+>       enable-all: true
+>       # Disable checkers by name
+>       # (in addition to default
+>       #   suite-thelper
+>       # ).
+>       disable:
+>         - go-require
+>         - float-compare
+228c196
+<         - prefix(github.com/ava-labs/avalanchego)
+---
+>         - prefix(github.com/ava-labs/firewood/ffi)

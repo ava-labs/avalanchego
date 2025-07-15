@@ -8,8 +8,9 @@ import (
 	"testing"
 	"time"
 
-	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/require"
+
+	dto "github.com/prometheus/client_model/go"
 )
 
 // Test calling metrics exporter along with gathering metrics
