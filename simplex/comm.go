@@ -28,10 +28,11 @@ type Comm struct {
 	logger   simplex.Logger
 	subnetID ids.ID
 	chainID  ids.ID
-	// nodeID is this nodes ID
-	nodeID ids.NodeID
-	// nodes are the IDs of all the nodes in the subnet not including this node
-	nodes set.Set[ids.NodeID]
+	// broadcastNodes are the nodes that should receive broadcast messages
+	broadcastNodes set.Set[ids.NodeID]
+	// allNodes are the IDs of all the nodes in the subnet
+	allNodes []simplex.NodeID
+
 	// sender is used to send messages to other nodes
 	sender     sender.ExternalSender
 	msgBuilder message.OutboundMsgBuilder
@@ -47,35 +48,31 @@ func NewComm(config *Config) (*Comm, error) {
 		return nil, fmt.Errorf("our %w: %s", errNodeNotFound, config.Ctx.NodeID)
 	}
 
-	nodes := set.Set[ids.NodeID]{}
-
+	broadcastNodes := set.Set[ids.NodeID]{}
+	allNodes := make([]simplex.NodeID, 0, len(config.Validators)-1)
 	// grab all the nodes that are validators for the subnet
 	for _, vd := range config.Validators {
+		allNodes = append(allNodes, vd.NodeID[:])
 		if vd.NodeID == config.Ctx.NodeID {
 			continue // skip our own node ID
 		}
 
-		nodes.Add(vd.NodeID)
+		broadcastNodes.Add(vd.NodeID)
 	}
 
 	return &Comm{
-		subnetID:   config.Ctx.SubnetID,
-		nodes:      nodes,
-		nodeID:     config.Ctx.NodeID,
-		logger:     config.Log,
-		sender:     config.Sender,
-		msgBuilder: config.OutboundMsgBuilder,
-		chainID:    config.Ctx.ChainID,
+		subnetID:       config.Ctx.SubnetID,
+		broadcastNodes: broadcastNodes,
+		allNodes:       allNodes,
+		logger:         config.Log,
+		sender:         config.Sender,
+		msgBuilder:     config.OutboundMsgBuilder,
+		chainID:        config.Ctx.ChainID,
 	}, nil
 }
 
 func (c *Comm) Nodes() []simplex.NodeID {
-	nodes := make([]simplex.NodeID, 0, c.nodes.Len()+1)
-	nodes = append(nodes, simplex.NodeID(c.nodeID[:]))
-	for nodeID := range c.nodes {
-		nodes = append(nodes, simplex.NodeID(nodeID[:]))
-	}
-	return nodes
+	return c.allNodes
 }
 
 func (c *Comm) Send(msg *simplex.Message, destination simplex.NodeID) {
@@ -101,7 +98,7 @@ func (c *Comm) Broadcast(msg *simplex.Message) {
 		return
 	}
 
-	c.sender.Send(outboundMsg, common.SendConfig{NodeIDs: c.nodes}, c.subnetID, subnets.NoOpAllower)
+	c.sender.Send(outboundMsg, common.SendConfig{NodeIDs: c.broadcastNodes}, c.subnetID, subnets.NoOpAllower)
 }
 
 func (c *Comm) simplexMessageToOutboundMessage(msg *simplex.Message) (message.OutboundMessage, error) {
