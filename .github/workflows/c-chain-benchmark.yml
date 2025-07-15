@@ -26,7 +26,9 @@ jobs:
       permissions:
         id-token: write
         contents: write
-      runs-on: ubuntu-latest
+      runs-on: avalanche-avalanchego-runner
+      container:
+        image: ghcr.io/actions/actions-runner:2.325.0
       steps:
         - name: Configure AWS Credentials
           uses: aws-actions/configure-aws-credentials@v4
