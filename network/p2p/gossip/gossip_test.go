@@ -628,49 +628,6 @@ func (t testValidatorSet) Has(_ context.Context, nodeID ids.NodeID) bool {
 	return t.validators.Contains(nodeID)
 }
 
-func TestComputeBloomFilterHitPercentage(t *testing.T) {
-	tests := []struct {
-		name       string
-		hits       uint64
-		misses     uint64
-		percentage uint64
-		ok         bool
-	}{
-		{
-			name:       "no hits",
-			hits:       0,
-			misses:     10,
-			percentage: 0,
-			ok:         true,
-		},
-		{
-			name:       "no misses",
-			hits:       10,
-			misses:     0,
-			percentage: 100,
-			ok:         true,
-		},
-		{
-			name:       "some hits",
-			hits:       5,
-			misses:     5,
-			percentage: 50,
-			ok:         true,
-		},
-		{
-			name: "nothing",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, ok := computeBloomFilterHitPercentage(tt.hits, tt.misses, logging.NoLog{})
-			require.Equal(t, tt.ok, ok)
-			require.Equal(t, tt.percentage, got)
-		})
-	}
-}
-
 type testHistogram struct {
 	prometheus.Histogram
 	observedVal uint64

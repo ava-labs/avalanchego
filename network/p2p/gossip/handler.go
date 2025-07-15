@@ -14,8 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/logging"
-
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var _ p2p.Handler = (*Handler[*testTx])(nil)
@@ -52,11 +50,12 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 		return nil, p2p.ErrUnexpected
 	}
 
-	var hits, misses uint64
+	var hits, total uint64
 
 	responseSize := 0
 	gossipBytes := make([][]byte, 0)
 	h.set.Iterate(func(gossipable T) bool {
+		total++
 		gossipID := gossipable.GossipID()
 
 		// filter out what the requesting peer already knows about
@@ -75,7 +74,6 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 		// size
 		gossipBytes = append(gossipBytes, bytes)
 		responseSize += len(bytes)
-		misses++
 
 		return responseSize <= h.targetResponseSize
 	})
@@ -83,7 +81,7 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 		return nil, p2p.ErrUnexpected
 	}
 
-	hitsPercentage, ok := computeBloomFilterHitPercentage(hits, misses, h.log)
+	hitsPercentage, ok := computeBloomFilterHitPercentage(hits, total, h.log)
 	if ok {
 		h.metrics.bloomFilterHitRate.Observe(float64(hitsPercentage))
 	}
@@ -136,30 +134,20 @@ func (h Handler[_]) AppGossip(_ context.Context, nodeID ids.NodeID, gossipBytes 
 	}
 }
 
-func computeBloomFilterHitPercentage(hits uint64, misses uint64, log logging.Logger) (uint64, bool) {
-	total, err := safemath.Add(hits, misses)
-	if err != nil {
-		log.Warn("failed to calculate total hits and misses",
+func computeBloomFilterHitPercentage(hits uint64, total uint64, log logging.Logger) (uint64, bool) {
+	if total == 0 {
+		return 0, false
+	}
+
+	if hits > total {
+		log.Warn("hits bigger than total, probably an overflow during iteration, aborting hit ratio calculation",
 			zap.Uint64("hits", hits),
-			zap.Uint64("misses", misses),
-			zap.Error(err),
+			zap.Uint64("total", total),
 		)
 		return 0, false
 	}
 
-	hitsOneHundred, err := safemath.Mul(hits, 100)
-	if err != nil {
-		log.Warn("failed to calculate hit ratio",
-			zap.Uint64("hits", hits),
-			zap.Uint64("misses", misses),
-			zap.Error(err),
-		)
-		return 0, false
-	}
+	ratio := float64(hits) / float64(total)
 
-	if total > 0 {
-		return hitsOneHundred / total, true
-	}
-
-	return 0, false
+	return uint64(float64(100) * ratio), true
 }
