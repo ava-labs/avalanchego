@@ -127,11 +127,11 @@ func (c *connectAdminService) GetChainAliases(
 		return nil, err
 	}
 
-	Response := &adminv1.GetChainAliasesResponse{
+	response := &adminv1.GetChainAliasesResponse{
 		Aliases: jsonResponse.Aliases,
 	}
 
-	return connect.NewResponse(Response), nil
+	return connect.NewResponse(response), nil
 }
 
 // Stacktrace returns the current global stacktrace
@@ -234,11 +234,11 @@ func (c *connectAdminService) GetConfig(
 		return nil, err
 	}
 
-	Response := &adminv1.GetConfigResponse{
+	response := &adminv1.GetConfigResponse{
 		ConfigJson: string(configJSON),
 	}
 
-	return connect.NewResponse(Response), nil
+	return connect.NewResponse(response), nil
 }
 
 // DBGet returns the value of a database entry
@@ -255,10 +255,10 @@ func (c *connectAdminService) DBGet(
 		return nil, err
 	}
 
-	Response := &adminv1.DBGetResponse{
+	response := &adminv1.DBGetResponse{
 		Value:     jsonResponse.Value,
 		ErrorCode: adminv1.ErrorCode(jsonResponse.ErrorCode),
 	}
 
-	return connect.NewResponse(Response), nil
+	return connect.NewResponse(response), nil
 }
