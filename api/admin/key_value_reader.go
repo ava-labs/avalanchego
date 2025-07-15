@@ -12,10 +12,10 @@ import (
 var _ database.KeyValueReader = (*KeyValueReader)(nil)
 
 type KeyValueReader struct {
-	client Client
+	client *Client
 }
 
-func NewKeyValueReader(client Client) *KeyValueReader {
+func NewKeyValueReader(client *Client) *KeyValueReader {
 	return &KeyValueReader{
 		client: client,
 	}
