@@ -31,7 +31,7 @@ To authenticate metrics collection (enabled by default), provide the Prometheus 
 To import the first 200 blocks for re-execution, you can fetch the following ZIP from S3: `s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb.zip`:
 
 ```bash
-task import-s3-to-dir S3_SRC=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb.zip LOCAL_DST=$HOME/exec-data/blocks
+task import-s3-to-dir SRC=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb.zip DST=$HOME/exec-data/blocks
 ```
 
 ## Create C-Chain State Snapshot

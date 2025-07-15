@@ -264,10 +264,10 @@ tasks:
   import-s3-to-dir:
     desc: Imports an S3 path to a local directory. Unzipping if needed.
     vars:
-      S3_SRC: '{{.S3_SRC}}'
-      LOCAL_DST: '{{.LOCAL_DST}}'
+      SRC: '{{.SRC}}'
+      DST: '{{.DST}}'
     cmds:
-      - cmd: bash -x ./scripts/copy_dir.sh {{.S3_SRC}} {{.LOCAL_DST}}
+      - cmd: bash -x ./scripts/copy_dir.sh {{.SRC}} {{.DST}}
 
   import-cchain-reexecute-range:
     desc: Imports the C-Chain block and state data to re-execute. Defaults to import the first 200 and the current state created with the default config of the C-Chain (hashdb).
@@ -278,12 +278,12 @@ tasks:
     cmds:
       - task: import-s3-to-dir
         vars:
-          S3_SRC: '{{.SOURCE_BLOCK_DIR}}'
-          LOCAL_DST: '{{.EXECUTION_DATA_DIR}}/blocks'
+          SRC: '{{.SOURCE_BLOCK_DIR}}'
+          DST: '{{.EXECUTION_DATA_DIR}}/blocks'
       - task: import-s3-to-dir
         vars:
-          S3_SRC: '{{.CURRENT_STATE_DIR}}'
-          LOCAL_DST: '{{.EXECUTION_DATA_DIR}}/current-state'
+          SRC: '{{.CURRENT_STATE_DIR}}'
+          DST: '{{.EXECUTION_DATA_DIR}}/current-state'
 
   export-cchain-block-range:
     desc: Export range of C-Chain blocks from source to target directory.
