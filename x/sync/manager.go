@@ -1177,7 +1177,8 @@ func calculateBackoff(attempt int) time.Duration {
 		return 0
 	}
 
-	retryWait := min(initialRetryWait*time.Duration(math.Pow(retryWaitFactor, float64(attempt))), maxRetryWait)
-
-	return retryWait
+	return min(
+		initialRetryWait*time.Duration(math.Pow(retryWaitFactor, float64(attempt))),
+		maxRetryWait,
+	)
 }
