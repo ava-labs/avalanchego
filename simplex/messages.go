@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 )
 
-func newP2PSimplexBlockProposal(
+func newBlockProposal(
 	chainID ids.ID,
 	block []byte,
 	vote simplex.Vote,
@@ -21,7 +21,7 @@ func newP2PSimplexBlockProposal(
 			BlockProposal: &p2p.BlockProposal{
 				Block: block,
 				Vote: &p2p.Vote{
-					BlockHeader: simplexBlockheaderToP2P(vote.Vote.BlockHeader),
+					BlockHeader: blockHeaderToP2P(vote.Vote.BlockHeader),
 					Signature: &p2p.Signature{
 						Signer: vote.Signature.Signer,
 						Value:  vote.Signature.Value,
@@ -32,7 +32,7 @@ func newP2PSimplexBlockProposal(
 	}
 }
 
-func newP2PSimplexVote(
+func newVote(
 	chainID ids.ID,
 	blockHeader simplex.BlockHeader,
 	signature simplex.Signature,
@@ -41,7 +41,7 @@ func newP2PSimplexVote(
 		ChainId: chainID[:],
 		Message: &p2p.Simplex_Vote{
 			Vote: &p2p.Vote{
-				BlockHeader: simplexBlockheaderToP2P(blockHeader),
+				BlockHeader: blockHeaderToP2P(blockHeader),
 				Signature: &p2p.Signature{
 					Signer: signature.Signer,
 					Value:  signature.Value,
@@ -51,7 +51,7 @@ func newP2PSimplexVote(
 	}
 }
 
-func newP2PSimplexEmptyVote(
+func newEmptyVote(
 	chainID ids.ID,
 	metadata simplex.ProtocolMetadata,
 	signature simplex.Signature,
@@ -60,7 +60,7 @@ func newP2PSimplexEmptyVote(
 		ChainId: chainID[:],
 		Message: &p2p.Simplex_EmptyVote{
 			EmptyVote: &p2p.EmptyVote{
-				Metadata: simplexProtocolMetadataToP2P(metadata),
+				Metadata: protocolMetadataToP2P(metadata),
 				Signature: &p2p.Signature{
 					Signer: signature.Signer,
 					Value:  signature.Value,
@@ -70,7 +70,7 @@ func newP2PSimplexEmptyVote(
 	}
 }
 
-func newP2PSimplexFinalizeVote(
+func newFinalizeVote(
 	chainID ids.ID,
 	blockHeader simplex.BlockHeader,
 	signature simplex.Signature,
@@ -79,7 +79,7 @@ func newP2PSimplexFinalizeVote(
 		ChainId: chainID[:],
 		Message: &p2p.Simplex_FinalizeVote{
 			FinalizeVote: &p2p.Vote{
-				BlockHeader: simplexBlockheaderToP2P(blockHeader),
+				BlockHeader: blockHeaderToP2P(blockHeader),
 				Signature: &p2p.Signature{
 					Signer: signature.Signer,
 					Value:  signature.Value,
@@ -89,7 +89,7 @@ func newP2PSimplexFinalizeVote(
 	}
 }
 
-func newP2PSimplexNotarization(
+func newNotarization(
 	chainID ids.ID,
 	blockHeader simplex.BlockHeader,
 	qc []byte,
@@ -98,14 +98,14 @@ func newP2PSimplexNotarization(
 		ChainId: chainID[:],
 		Message: &p2p.Simplex_Notarization{
 			Notarization: &p2p.QuorumCertificate{
-				BlockHeader:       simplexBlockheaderToP2P(blockHeader),
+				BlockHeader:       blockHeaderToP2P(blockHeader),
 				QuorumCertificate: qc,
 			},
 		},
 	}
 }
 
-func newP2PSimplexEmptyNotarization(
+func newEmptyNotarization(
 	chainID ids.ID,
 	metadata simplex.ProtocolMetadata,
 	qc []byte,
@@ -114,14 +114,14 @@ func newP2PSimplexEmptyNotarization(
 		ChainId: chainID[:],
 		Message: &p2p.Simplex_EmptyNotarization{
 			EmptyNotarization: &p2p.EmptyNotarization{
-				Metadata:          simplexProtocolMetadataToP2P(metadata),
+				Metadata:          protocolMetadataToP2P(metadata),
 				QuorumCertificate: qc,
 			},
 		},
 	}
 }
 
-func newP2PSimplexFinalization(
+func newFinalization(
 	chainID ids.ID,
 	blockHeader simplex.BlockHeader,
 	qc []byte,
@@ -130,14 +130,14 @@ func newP2PSimplexFinalization(
 		ChainId: chainID[:],
 		Message: &p2p.Simplex_Finalization{
 			Finalization: &p2p.QuorumCertificate{
-				BlockHeader:       simplexBlockheaderToP2P(blockHeader),
+				BlockHeader:       blockHeaderToP2P(blockHeader),
 				QuorumCertificate: qc,
 			},
 		},
 	}
 }
 
-func newP2PSimplexReplicationRequest(
+func newReplicationRequest(
 	chainID ids.ID,
 	seqs []uint64,
 	latestRound uint64,
@@ -153,21 +153,21 @@ func newP2PSimplexReplicationRequest(
 	}
 }
 
-func newP2PSimplexReplicationResponse(
+func newReplicationResponse(
 	chainID ids.ID,
 	data []simplex.VerifiedQuorumRound,
 	latestRound *simplex.VerifiedQuorumRound,
 ) (*p2p.Simplex, error) {
 	qrs := make([]*p2p.QuorumRound, 0, len(data))
 	for _, qr := range data {
-		p2pQR, err := simplexQuorumRoundToP2P(&qr)
+		p2pQR, err := quorumRoundToP2P(&qr)
 		if err != nil {
 			return nil, err
 		}
 		qrs = append(qrs, p2pQR)
 	}
 
-	latestQR, err := simplexQuorumRoundToP2P(latestRound)
+	latestQR, err := quorumRoundToP2P(latestRound)
 	if err != nil {
 		return nil, err
 	}
@@ -183,14 +183,14 @@ func newP2PSimplexReplicationResponse(
 	}, nil
 }
 
-func simplexBlockheaderToP2P(bh simplex.BlockHeader) *p2p.BlockHeader {
+func blockHeaderToP2P(bh simplex.BlockHeader) *p2p.BlockHeader {
 	return &p2p.BlockHeader{
-		Metadata: simplexProtocolMetadataToP2P(bh.ProtocolMetadata),
+		Metadata: protocolMetadataToP2P(bh.ProtocolMetadata),
 		Digest:   bh.Digest[:],
 	}
 }
 
-func simplexProtocolMetadataToP2P(md simplex.ProtocolMetadata) *p2p.ProtocolMetadata {
+func protocolMetadataToP2P(md simplex.ProtocolMetadata) *p2p.ProtocolMetadata {
 	return &p2p.ProtocolMetadata{
 		Version: uint32(md.Version),
 		Epoch:   md.Epoch,
@@ -200,7 +200,7 @@ func simplexProtocolMetadataToP2P(md simplex.ProtocolMetadata) *p2p.ProtocolMeta
 	}
 }
 
-func simplexQuorumRoundToP2P(qr *simplex.VerifiedQuorumRound) (*p2p.QuorumRound, error) {
+func quorumRoundToP2P(qr *simplex.VerifiedQuorumRound) (*p2p.QuorumRound, error) {
 	p2pQR := &p2p.QuorumRound{}
 
 	if qr.VerifiedBlock != nil {
@@ -213,19 +213,19 @@ func simplexQuorumRoundToP2P(qr *simplex.VerifiedQuorumRound) (*p2p.QuorumRound,
 	}
 	if qr.Notarization != nil {
 		p2pQR.Notarization = &p2p.QuorumCertificate{
-			BlockHeader:       simplexBlockheaderToP2P(qr.Notarization.Vote.BlockHeader),
+			BlockHeader:       blockHeaderToP2P(qr.Notarization.Vote.BlockHeader),
 			QuorumCertificate: qr.Notarization.QC.Bytes(),
 		}
 	}
 	if qr.Finalization != nil {
 		p2pQR.Finalization = &p2p.QuorumCertificate{
-			BlockHeader:       simplexBlockheaderToP2P(qr.Finalization.Finalization.BlockHeader),
+			BlockHeader:       blockHeaderToP2P(qr.Finalization.Finalization.BlockHeader),
 			QuorumCertificate: qr.Finalization.QC.Bytes(),
 		}
 	}
 	if qr.EmptyNotarization != nil {
 		p2pQR.EmptyNotarization = &p2p.EmptyNotarization{
-			Metadata:          simplexProtocolMetadataToP2P(qr.EmptyNotarization.Vote.ProtocolMetadata),
+			Metadata:          protocolMetadataToP2P(qr.EmptyNotarization.Vote.ProtocolMetadata),
 			QuorumCertificate: qr.EmptyNotarization.QC.Bytes(),
 		}
 	}

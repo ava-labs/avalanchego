@@ -49,11 +49,11 @@ func NewComm(config *Config) (*Comm, error) {
 
 	if _, ok := config.Validators[config.Ctx.NodeID]; !ok {
 		config.Log.Warn("Node is not a validator for the subnet",
-			zap.String("nodeID", config.Ctx.NodeID.String()),
-			zap.String("chainID", config.Ctx.ChainID.String()),
-			zap.String("subnetID", config.Ctx.SubnetID.String()),
+			zap.Stringer("nodeID", config.Ctx.NodeID),
+			zap.Stringer("chainID", config.Ctx.ChainID),
+			zap.Stringer("subnetID", config.Ctx.SubnetID),
 		)
-		return nil, fmt.Errorf("%w could not find our node: %s", errNodeNotFound, config.Ctx.NodeID)
+		return nil, fmt.Errorf("our %w: %s", errNodeNotFound, config.Ctx.NodeID)
 	}
 
 	sortNodes(nodes)
@@ -89,22 +89,32 @@ func (c *Comm) SendMessage(msg *simplex.Message, destination simplex.NodeID) {
 		return
 	}
 
+	c.send(outboundMsg, destination)
+}
+
+func (c *Comm) send(msg message.OutboundMessage, destination simplex.NodeID) {
 	dest, err := ids.ToNodeID(destination)
 	if err != nil {
 		c.logger.Error("Failed to convert destination NodeID", zap.Error(err))
 		return
 	}
 
-	c.sender.Send(outboundMsg, common.SendConfig{NodeIDs: set.Of(dest)}, c.subnetID, subnets.NoOpAllower)
+	c.sender.Send(msg, common.SendConfig{NodeIDs: set.Of(dest)}, c.subnetID, subnets.NoOpAllower)
 }
 
 func (c *Comm) Broadcast(msg *simplex.Message) {
+	outboundMsg, err := c.simplexMessageToOutboundMessage(msg)
+	if err != nil {
+		c.logger.Error("Failed creating message", zap.Error(err))
+		return
+	}
+
 	for _, node := range c.nodes {
 		if node.Equals(c.nodeID) {
 			continue
 		}
 
-		c.SendMessage(msg, node)
+		c.send(outboundMsg, node)
 	}
 }
 
@@ -116,27 +126,29 @@ func (c *Comm) simplexMessageToOutboundMessage(msg *simplex.Message) (message.Ou
 		if err != nil {
 			return nil, fmt.Errorf("failed to serialize block: %w", err)
 		}
-		simplexMsg = newP2PSimplexBlockProposal(c.chainID, bytes, msg.VerifiedBlockMessage.Vote)
+		simplexMsg = newBlockProposal(c.chainID, bytes, msg.VerifiedBlockMessage.Vote)
 	case msg.VoteMessage != nil:
-		simplexMsg = newP2PSimplexVote(c.chainID, msg.VoteMessage.Vote.BlockHeader, msg.VoteMessage.Signature)
+		simplexMsg = newVote(c.chainID, msg.VoteMessage.Vote.BlockHeader, msg.VoteMessage.Signature)
 	case msg.EmptyVoteMessage != nil:
-		simplexMsg = newP2PSimplexEmptyVote(c.chainID, msg.EmptyVoteMessage.Vote.ProtocolMetadata, msg.EmptyVoteMessage.Signature)
+		simplexMsg = newEmptyVote(c.chainID, msg.EmptyVoteMessage.Vote.ProtocolMetadata, msg.EmptyVoteMessage.Signature)
 	case msg.FinalizeVote != nil:
-		simplexMsg = newP2PSimplexFinalizeVote(c.chainID, msg.FinalizeVote.Finalization.BlockHeader, msg.FinalizeVote.Signature)
+		simplexMsg = newFinalizeVote(c.chainID, msg.FinalizeVote.Finalization.BlockHeader, msg.FinalizeVote.Signature)
 	case msg.Notarization != nil:
-		simplexMsg = newP2PSimplexNotarization(c.chainID, msg.Notarization.Vote.BlockHeader, msg.Notarization.QC.Bytes())
+		simplexMsg = newNotarization(c.chainID, msg.Notarization.Vote.BlockHeader, msg.Notarization.QC.Bytes())
 	case msg.EmptyNotarization != nil:
-		simplexMsg = newP2PSimplexEmptyNotarization(c.chainID, msg.EmptyNotarization.Vote.ProtocolMetadata, msg.EmptyNotarization.QC.Bytes())
+		simplexMsg = newEmptyNotarization(c.chainID, msg.EmptyNotarization.Vote.ProtocolMetadata, msg.EmptyNotarization.QC.Bytes())
 	case msg.Finalization != nil:
-		simplexMsg = newP2PSimplexFinalization(c.chainID, msg.Finalization.Finalization.BlockHeader, msg.Finalization.QC.Bytes())
+		simplexMsg = newFinalization(c.chainID, msg.Finalization.Finalization.BlockHeader, msg.Finalization.QC.Bytes())
 	case msg.ReplicationRequest != nil:
-		simplexMsg = newP2PSimplexReplicationRequest(c.chainID, msg.ReplicationRequest.Seqs, msg.ReplicationRequest.LatestRound)
+		simplexMsg = newReplicationRequest(c.chainID, msg.ReplicationRequest.Seqs, msg.ReplicationRequest.LatestRound)
 	case msg.VerifiedReplicationResponse != nil:
-		msg, err := newP2PSimplexReplicationResponse(c.chainID, msg.VerifiedReplicationResponse.Data, msg.VerifiedReplicationResponse.LatestRound)
+		msg, err := newReplicationResponse(c.chainID, msg.VerifiedReplicationResponse.Data, msg.VerifiedReplicationResponse.LatestRound)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create replication response: %w", err)
 		}
 		simplexMsg = msg
+	default:
+		return nil, fmt.Errorf("unknown message type: %T", msg)
 	}
 
 	return c.msgBuilder.SimplexMessage(simplexMsg)
