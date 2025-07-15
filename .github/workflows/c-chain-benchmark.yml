@@ -30,6 +30,14 @@ jobs:
       container:
         image: ghcr.io/actions/actions-runner:2.325.0
       steps:
+        - name: Install dependencies
+          shell: bash
+          run: |
+            # The xz-utils might be present on some containers
+            if ! command -v xz &> /dev/null; then
+              sudo apt-get update
+              sudo apt-get install -y xz-utils
+            fi
         - name: Configure AWS Credentials
           uses: aws-actions/configure-aws-credentials@v4
           with:
