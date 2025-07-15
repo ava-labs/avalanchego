@@ -21,11 +21,15 @@ type Cache[K comparable, V any] struct {
 	elements *linked.Hashmap[K, V]
 	size     int
 
-	// onEvict is called with the key and value of an evicted entry, if set.
+	// onEvict is called with the key and value of an entry before eviction, if set.
 	onEvict func(K, V)
 }
 
-// SetOnEvict sets a callback to be called with the key and value of an evicted entry.
+// SetOnEvict sets a callback to be called with the key and value of an entry before eviction.
+// The onEvict callback is called while holding the cache lock.
+// Do not call any cache methods (Get, Put, Evict, Flush) from within the callback
+// as this will cause a deadlock. The callback should only be used for cleanup
+// operations like closing files or releasing resources.
 func (c *Cache[K, V]) SetOnEvict(cb func(K, V)) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -44,11 +48,11 @@ func (c *Cache[K, V]) Put(key K, value V) {
 	defer c.lock.Unlock()
 
 	if c.elements.Len() == c.size {
-		oldestKey, oldestValue, _ := c.elements.Oldest()
-		c.elements.Delete(oldestKey)
-		if c.onEvict != nil {
+		oldestKey, oldestValue, found := c.elements.Oldest()
+		if c.onEvict != nil && found {
 			c.onEvict(oldestKey, oldestValue)
 		}
+		c.elements.Delete(oldestKey)
 	}
 	c.elements.Put(key, value)
 }
@@ -68,11 +72,12 @@ func (c *Cache[K, V]) Get(key K) (V, bool) {
 func (c *Cache[K, _]) Evict(key K) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	c.elements.Delete(key)
 	if c.onEvict != nil {
-		value, _ := c.elements.Get(key)
-		c.onEvict(key, value)
+		if value, found := c.elements.Get(key); found {
+			c.onEvict(key, value)
+		}
 	}
+	c.elements.Delete(key)
 }
 
 func (c *Cache[_, _]) Flush() {
