@@ -142,7 +142,7 @@ type Wallet interface {
 func NewWallet(
 	builder builder.Builder,
 	signer signer.Signer,
-	client avm.Client,
+	client *avm.Client,
 	backend Backend,
 ) Wallet {
 	return &wallet{
@@ -157,7 +157,7 @@ type wallet struct {
 	backend Backend
 	builder builder.Builder
 	signer  signer.Signer
-	client  avm.Client
+	client  *avm.Client
 }
 
 func (w *wallet) Builder() builder.Builder {

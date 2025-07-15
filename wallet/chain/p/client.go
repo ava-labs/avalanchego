@@ -16,7 +16,7 @@ import (
 var _ wallet.Client = (*Client)(nil)
 
 func NewClient(
-	c platformvm.Client,
+	c *platformvm.Client,
 	b wallet.Backend,
 ) *Client {
 	return &Client{
@@ -26,7 +26,7 @@ func NewClient(
 }
 
 type Client struct {
-	client  platformvm.Client
+	client  *platformvm.Client
 	backend wallet.Backend
 }
 
