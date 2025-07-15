@@ -274,22 +274,3 @@ jobs:
             prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
             loki_username: ${{ secrets.LOKI_ID || '' }}
             loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-  load_self_hosted:
-    name: Run load test on self-hosted runners
-    if: contains(github.event.pull_request.labels.*.name, 'load-test') || contains(github.event.pull_request.labels.*.name, 'load-test-exclusive')
-    runs-on: avalanche-avalanchego-runner
-    container:
-      image: ghcr.io/actions/actions-runner:2.325.0
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
-      - name: Run load test
-        uses: ./.github/actions/self-hosted-load-test
-        with:
-#          avalanchego_image: 'avalanchego:${{ github.sha }}'  todo: should we maintain image registry?
-          exclusive_scheduling: ${{ contains(github.event.pull_request.labels.*.name, 'load-test-exclusive') }}
-          artifact_prefix: load-ci-self-hosted
-          prometheus_username: ${{ secrets.PROMETHEUS_ID }}
-          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD }}
-          loki_username: ${{ secrets.LOKI_ID }}
-          loki_password: ${{ secrets.LOKI_PASSWORD }}

@@ -1,6 +1,6 @@
 name: Load test on self-hosted runners
 
-# This workflow runs comprehensive load tests against our Kubernetes cluster
+# This workflow runs load tests against our Kubernetes cluster
 on:
   workflow_dispatch:
     inputs:
@@ -25,14 +25,25 @@ jobs:
     container:
       image: ghcr.io/actions/actions-runner:2.325.0
     steps:
+      - name: Install dependencies
+        shell: bash
+        # The xz-utils might be present on some containers
+        run: |
+          if ! command -v xz &> /dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y xz-utils
+          fi
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
       - name: Run load test
-        uses: ./.github/actions/self-hosted-load-test
+        uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          avalanchego_image: ${{ inputs.avalanchego_image }}
-          exclusive_scheduling: ${{ inputs.exclusive_scheduling }}
-          duration: ${{ inputs.duration }}
+          run: >-
+            ./scripts/run_task.sh test-load-kube --
+            --kube-image ${{ inputs.avalanchego_image }}
+            ${{ inputs.exclusive_scheduling == 'true' && '--kube-use-exclusive-scheduling' || '' }}
+            ${{ inputs.duration && format('--duration {0}', inputs.duration) || '' }}
+          artifact_prefix: ${{ inputs.artifact_prefix }}${{ inputs.exclusive_scheduling == 'true' && '-exclusive' || '' }}
           prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           loki_username: ${{ secrets.LOKI_ID || '' }}
