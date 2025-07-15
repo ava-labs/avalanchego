@@ -345,22 +345,20 @@ func (vm *VMServer) CreateHandlers(ctx context.Context, _ *emptypb.Empty) (*vmpb
 	return resp, nil
 }
 
-func (vm *VMServer) CreateHTTP2Handler(ctx context.Context, _ *emptypb.Empty) (*vmpb.CreateHTTP2HandlerResponse, error) {
-	handler, err := vm.vm.CreateHTTP2Handler(ctx)
+func (vm *VMServer) NewHTTPHandler(ctx context.Context, _ *emptypb.Empty) (*vmpb.NewHTTPHandlerResponse, error) {
+	handler, err := vm.vm.NewHTTPHandler(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// The vm does not expose an HTTP2 handler
 	if handler == nil {
-		return &vmpb.CreateHTTP2HandlerResponse{}, nil
+		return &vmpb.NewHTTPHandlerResponse{}, nil
 	}
 
 	serverListener, err := grpcutils.NewListener()
 	if err != nil {
 		return nil, err
 	}
-
 	server := grpcutils.NewServer()
 	vm.serverCloser.Add(server)
 	httppb.RegisterHTTPServer(server, ghttp.NewServer(handler))
@@ -368,7 +366,7 @@ func (vm *VMServer) CreateHTTP2Handler(ctx context.Context, _ *emptypb.Empty) (*
 	// Start HTTP service
 	go grpcutils.Serve(serverListener, server)
 
-	return &vmpb.CreateHTTP2HandlerResponse{
+	return &vmpb.NewHTTPHandlerResponse{
 		ServerAddr: serverListener.Addr().String(),
 	}, nil
 }
