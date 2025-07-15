@@ -1406,7 +1406,7 @@ func (n *Node) initInfoAPI() error {
 		Log:          n.Log,
 		Validators:   n.vdrs,
 		ChainManager: n.chainManager,
-		VmManager:    n.VMManager,
+		VMManager:    n.VMManager,
 		MyIP:         n.Config.NetworkConfig.MyIPPort,
 		Networking:   n.Net,
 		Benchlist:    n.benchlistManager,

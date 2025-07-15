@@ -73,7 +73,7 @@ type Info struct {
 	MyIP         *utils.Atomic[netip.AddrPort]
 	Networking   network.Network
 	ChainManager chains.Manager
-	VmManager    vms.Manager
+	VMManager    vms.Manager
 	Benchlist    benchlist.Manager
 }
 
@@ -116,7 +116,7 @@ func (i *Info) GetNodeVersion(_ *http.Request, _ *struct{}, reply *GetNodeVersio
 		zap.String("method", "getNodeVersion"),
 	)
 
-	vmVersions, err := i.VmManager.Versions()
+	vmVersions, err := i.VMManager.Versions()
 	if err != nil {
 		return err
 	}
