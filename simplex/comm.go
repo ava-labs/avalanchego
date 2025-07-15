@@ -48,8 +48,8 @@ func NewComm(config *Config) (*Comm, error) {
 		return nil, fmt.Errorf("our %w: %s", errNodeNotFound, config.Ctx.NodeID)
 	}
 
-	broadcastNodes := set.Set[ids.NodeID]{}
-	allNodes := make([]simplex.NodeID, 0, len(config.Validators)-1)
+	broadcastNodes := set.NewSet[ids.NodeID](len(config.Validators) - 1)
+	allNodes := make([]simplex.NodeID, 0, len(config.Validators))
 	// grab all the nodes that are validators for the subnet
 	for _, vd := range config.Validators {
 		allNodes = append(allNodes, vd.NodeID[:])
@@ -131,7 +131,7 @@ func (c *Comm) simplexMessageToOutboundMessage(msg *simplex.Message) (message.Ou
 		}
 		simplexMsg = msg
 	default:
-		return nil, fmt.Errorf("unknown message type: %T", msg)
+		return nil, fmt.Errorf("unknown message type: %+v", msg)
 	}
 
 	return c.msgBuilder.SimplexMessage(simplexMsg)
