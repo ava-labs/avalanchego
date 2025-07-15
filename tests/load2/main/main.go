@@ -70,22 +70,17 @@ func main() {
 	require.NoError(err)
 
 	registry := prometheus.NewRegistry()
-	metricsServer := tests.NewPrometheusServer("127.0.0.1:0", "/ext/metrics", registry)
-	metricsErrChan, err := metricsServer.Start()
-	require.NoError(err)
-
-	monitoringConfigFilePath, err := tmpnet.WritePrometheusServiceDiscoveryConfigFile("load-test", []tmpnet.SDConfig{
-		{
-			Targets: []string{metricsServer.Address()},
-			Labels:  network.GetMonitoringLabels(),
-		},
-	}, false)
-	require.NoError(err, "failed to generate monitoring config file")
-
+	metricsServer := tests.NewPrometheusServer(registry)
+	require.NoError(metricsServer.Start())
 	tc.DeferCleanup(func() {
 		require.NoError(metricsServer.Stop())
-		require.NoError(<-metricsErrChan)
 	})
+
+	monitoringConfigFilePath, err := tmpnet.WritePrometheusSDConfig("load-test", tmpnet.SDConfig{
+		Targets: []string{metricsServer.Address()},
+		Labels:  network.GetMonitoringLabels(),
+	}, false)
+	require.NoError(err, "failed to generate monitoring config file")
 
 	tc.DeferCleanup(func() {
 		require.NoError(

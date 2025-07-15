@@ -14,61 +14,66 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+const defaultPrometheusListenAddr = "127.0.0.1:0"
+
 type PrometheusServer struct {
-	addr     string
-	path     string
 	gatherer prometheus.Gatherer
 	server   http.Server
+	errChan  chan error
 }
 
-func NewPrometheusServer(addr string, path string, gatherer prometheus.Gatherer) *PrometheusServer {
+// NewPrometheusServer creates a Prometheus server listening on 127.0.0.1:0 and serving /ext/metrics.
+func NewPrometheusServer(gatherer prometheus.Gatherer) *PrometheusServer {
 	return &PrometheusServer{
-		addr:     addr,
-		path:     path,
 		gatherer: gatherer,
 	}
 }
 
-func (s *PrometheusServer) Start() (<-chan error, error) {
+func (s *PrometheusServer) Start() error {
 	mux := http.NewServeMux()
-	mux.Handle(s.path, promhttp.HandlerFor(s.gatherer, promhttp.HandlerOpts{}))
+	mux.Handle("/ext/metrics", promhttp.HandlerFor(s.gatherer, promhttp.HandlerOpts{}))
 
-	listener, err := net.Listen("tcp", s.addr)
+	listener, err := net.Listen("tcp", defaultPrometheusListenAddr)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	s.addr = listener.Addr().String()
 
 	s.server = http.Server{
-		Addr:              s.addr,
+		Addr:              listener.Addr().String(),
 		Handler:           mux,
 		ReadHeaderTimeout: time.Second,
 		ReadTimeout:       time.Second,
 	}
 
-	errChan := make(chan error)
+	s.errChan = make(chan error, 1)
 	go func() {
-		defer close(errChan)
 		err := s.server.Serve(listener)
-		if errors.Is(err, http.ErrServerClosed) {
-			return
+		if !errors.Is(err, http.ErrServerClosed) {
+			s.errChan <- err
 		}
-		errChan <- err
+		close(s.errChan)
 	}()
 
-	return errChan, nil
+	return nil
 }
 
 func (s *PrometheusServer) Stop() error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	return s.server.Shutdown(shutdownCtx)
+	err := s.server.Shutdown(shutdownCtx)
+	if err != nil {
+		return err
+	}
+	if s.errChan == nil {
+		return nil
+	}
+	return <-s.errChan
 }
 
 // Address returns the address the server is listening on.
 //
 // If the server has not started, the address will be empty.
 func (s *PrometheusServer) Address() string {
-	return s.addr
+	return s.server.Addr
 }
