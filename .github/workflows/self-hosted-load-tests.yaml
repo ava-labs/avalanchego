@@ -15,7 +15,7 @@ on:
         default: false
         type: boolean
       duration:
-        description: "Load test duration"
+        description: "Load test duration: e.g. 5m, 10m, 1h..."
         required: false
 
 jobs:
