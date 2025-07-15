@@ -25,7 +25,6 @@ func TestCacheEviction(t *testing.T) {
 func TestCacheFlushWithOnEvict(t *testing.T) {
 	c := NewCache[ids.ID, int64](2)
 
-	// Track which elements were evicted
 	evicted := make(map[ids.ID]int64)
 	c.SetOnEvict(func(key ids.ID, value int64) {
 		evicted[key] = value
@@ -46,5 +45,5 @@ func TestCachePutWithOnEvict(t *testing.T) {
 
 	cachetest.Basic(t, c)
 	require.Len(t, evicted, 1)
-	require.Equal(t, evicted[ids.ID{1}], int64(1))
+	require.Equal(t, int64(1), evicted[ids.ID{1}])
 }
