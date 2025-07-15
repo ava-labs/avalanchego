@@ -330,12 +330,23 @@ where
     fn root_node(&self) -> Option<SharedNode> {
         self.deref().root_node()
     }
+    fn root_as_maybe_persisted_node(&self) -> Option<MaybePersistedNode> {
+        self.deref().root_as_maybe_persisted_node()
+    }
 }
 
 /// Reads the root of a merkle trie.
+///
+/// The root may be None if the trie is empty.
 pub trait RootReader {
     /// Returns the root of the trie.
+    /// Callers that just need the node at the root should use this function.
     fn root_node(&self) -> Option<SharedNode>;
+
+    /// Returns the root of the trie as a `MaybePersistedNode`.
+    /// Callers that might want to modify the root or know how it is stored
+    /// should use this function.
+    fn root_as_maybe_persisted_node(&self) -> Option<MaybePersistedNode>;
 }
 
 /// A committed revision of a merkle trie.
@@ -623,6 +634,12 @@ impl<S: ReadableStorage> RootReader for NodeStore<MutableProposal, S> {
     fn root_node(&self) -> Option<SharedNode> {
         self.kind.root.as_ref().map(|node| node.clone().into())
     }
+    fn root_as_maybe_persisted_node(&self) -> Option<MaybePersistedNode> {
+        self.kind
+            .root
+            .as_ref()
+            .map(|node| SharedNode::new(node.clone()).into())
+    }
 }
 
 impl<S: ReadableStorage> RootReader for NodeStore<Committed, S> {
@@ -630,12 +647,18 @@ impl<S: ReadableStorage> RootReader for NodeStore<Committed, S> {
         // TODO: If the read_node fails, we just say there is no root; this is incorrect
         self.kind.root.as_ref()?.as_shared_node(self).ok()
     }
+    fn root_as_maybe_persisted_node(&self) -> Option<MaybePersistedNode> {
+        self.kind.root.clone()
+    }
 }
 
 impl<S: ReadableStorage> RootReader for NodeStore<Arc<ImmutableProposal>, S> {
     fn root_node(&self) -> Option<SharedNode> {
         // Use the MaybePersistedNode's as_shared_node method to get the root
         self.kind.root.as_ref()?.as_shared_node(self).ok()
+    }
+    fn root_as_maybe_persisted_node(&self) -> Option<MaybePersistedNode> {
+        self.kind.root.clone()
     }
 }
 

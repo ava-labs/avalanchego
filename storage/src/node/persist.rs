@@ -1,7 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use std::sync::Arc;
+use std::{fmt::Display, sync::Arc};
 
 use arc_swap::ArcSwap;
 
@@ -120,6 +120,24 @@ impl MaybePersistedNode {
     /// * `addr` - The `LinearAddress` where the node has been persisted on disk
     pub fn persist_at(&self, addr: LinearAddress) {
         self.0.store(Arc::new(MaybePersisted::Persisted(addr)));
+    }
+}
+
+/// Display the `MaybePersistedNode` as a string.
+///
+/// This is used in the dump utility.
+///
+/// We render these:
+///   For disk addresses, just the address
+///   For shared nodes, the address of the [`SharedNode`] object, prefixed with a 'M'
+///
+/// If instead you want the node itself, use [`MaybePersistedNode::as_shared_node`] first.
+impl Display for MaybePersistedNode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.0.load().as_ref() {
+            MaybePersisted::Unpersisted(node) => write!(f, "M{:p}", (*node).as_ptr()),
+            MaybePersisted::Persisted(addr) => write!(f, "{addr}"),
+        }
     }
 }
 

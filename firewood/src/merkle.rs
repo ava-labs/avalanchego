@@ -24,8 +24,8 @@ use crate::stream::PathIterator;
 use crate::v2::api;
 use firewood_storage::{
     BranchNode, Child, FileIoError, HashType, Hashable, HashedNodeReader, ImmutableProposal,
-    IntoHashType, LeafNode, LinearAddress, MutableProposal, NibblesIterator, Node, NodeStore, Path,
-    ReadableStorage, SharedNode, TrieReader, ValueDigest,
+    IntoHashType, LeafNode, MaybePersistedNode, MutableProposal, NibblesIterator, Node, NodeStore,
+    Path, ReadableStorage, SharedNode, TrieReader, ValueDigest,
 };
 #[cfg(test)]
 use futures::{StreamExt, TryStreamExt};
@@ -174,10 +174,6 @@ impl<T: TrieReader> Merkle<T> {
     #[cfg(test)]
     pub(crate) const fn nodestore(&self) -> &T {
         &self.nodestore
-    }
-
-    fn read_node(&self, addr: LinearAddress) -> Result<SharedNode, FileIoError> {
-        self.nodestore.read_node(addr)
     }
 
     /// Returns a proof that the given key has a certain value,
@@ -364,14 +360,15 @@ impl<T: TrieReader> Merkle<T> {
 }
 
 impl<T: HashedNodeReader> Merkle<T> {
+    /// Dump a node, recursively, to a dot file
     pub(crate) fn dump_node(
         &self,
-        addr: LinearAddress,
+        node: &MaybePersistedNode,
         hash: Option<&HashType>,
-        seen: &mut HashSet<LinearAddress>,
+        seen: &mut HashSet<String>,
         writer: &mut dyn Write,
     ) -> Result<(), FileIoError> {
-        write!(writer, "  {addr}[label=\"addr:{addr:?}")
+        write!(writer, "  {node}")
             .map_err(Error::other)
             .map_err(|e| FileIoError::new(e, None, 0, None))?;
         if let Some(hash) = hash {
@@ -380,33 +377,28 @@ impl<T: HashedNodeReader> Merkle<T> {
                 .map_err(|e| FileIoError::new(e, None, 0, None))?;
         }
 
-        match &*self.read_node(addr)? {
+        match &*node.as_shared_node(&self.nodestore)? {
             Node::Branch(b) => {
                 write_attributes!(writer, b, &b.value.clone().unwrap_or(Box::from([])));
                 writeln!(writer, "\"]")
                     .map_err(|e| FileIoError::from_generic_no_file(e, "write branch"))?;
                 for (childidx, child) in b.children.iter().enumerate() {
-                    let (child_addr, child_hash) = match child {
+                    let (child, child_hash) = match child {
                         None => continue,
-                        Some(node) => {
-                            let (Some(addr), hash) = (node.persisted_address(), node.hash()) else {
-                                continue;
-                            };
-                            (addr, hash)
-                        }
+                        Some(node) => (node.as_maybe_persisted_node(), node.hash()),
                     };
 
-                    let inserted = seen.insert(child_addr);
+                    let inserted = seen.insert(format!("{child}"));
                     if inserted {
-                        writeln!(writer, "  {addr} -> {child_addr}[label=\"{childidx}\"]")
+                        writeln!(writer, "  {node} -> {child}[label=\"{childidx}\"]")
                             .map_err(|e| FileIoError::from_generic_no_file(e, "write branch"))?;
-                        self.dump_node(child_addr, child_hash, seen, writer)?;
+                        self.dump_node(&child, child_hash, seen, writer)?;
                     } else {
                         // We have already seen this child, which shouldn't happen.
                         // Indicate this with a red edge.
                         writeln!(
                             writer,
-                            "  {addr} -> {child_addr}[label=\"{childidx} (dup)\" color=red]"
+                            "  {node} -> {child}[label=\"{childidx} (dup)\" color=red]"
                         )
                         .map_err(|e| FileIoError::from_generic_no_file(e, "write branch"))?;
                     }
@@ -421,19 +413,25 @@ impl<T: HashedNodeReader> Merkle<T> {
         Ok(())
     }
 
+    /// Dump the trie to a dot file.
+    ///
+    /// This function is primarily used in testing, but also has an API implementation
+    ///
+    /// Dot files can be rendered using `dot -Tpng -o output.png input.dot`
+    /// or online at <https://dreampuf.github.io/GraphvizOnline>
     pub(crate) fn dump(&self) -> Result<String, Error> {
+        let root = self.nodestore.root_as_maybe_persisted_node();
+
         let mut result = String::new();
         writeln!(result, "digraph Merkle {{\n  rankdir=LR;").map_err(Error::other)?;
-        if let (Some(root_addr), Some(root_hash)) =
-            (self.nodestore.root_address(), self.nodestore.root_hash())
-        {
-            writeln!(result, " root -> {root_addr}")
+        if let (Some(root), Some(root_hash)) = (root, self.nodestore.root_hash()) {
+            writeln!(result, " root -> {root}")
                 .map_err(Error::other)
                 .map_err(|e| FileIoError::new(e, None, 0, None))
                 .map_err(Error::other)?;
             let mut seen = HashSet::new();
             self.dump_node(
-                root_addr,
+                &root,
                 Some(&root_hash.into_hash_type()),
                 &mut seen,
                 &mut result,
@@ -462,10 +460,10 @@ impl<S: ReadableStorage> TryFrom<Merkle<NodeStore<MutableProposal, S>>>
 
 impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
     /// Convert a merkle backed by an `MutableProposal` into an `ImmutableProposal`
-    /// TODO: We probably don't need this function
+    ///
+    /// This function is only used in benchmarks and tests
     #[must_use]
     pub fn hash(self) -> Merkle<NodeStore<Arc<ImmutableProposal>, S>> {
-        // I think this is only used in testing
         self.try_into().expect("failed to convert")
     }
 

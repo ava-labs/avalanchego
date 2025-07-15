@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 
 use crate::node::ExtendableBytes;
-use crate::{LeafNode, LinearAddress, MaybePersistedNode, Node, Path};
+use crate::{LeafNode, LinearAddress, MaybePersistedNode, Node, Path, SharedNode};
 use std::fmt::{Debug, Formatter};
 
 /// The type of a hash. For ethereum compatible hashes, this might be a RLP encoded
@@ -110,6 +110,19 @@ impl Child {
             Child::AddressWithHash(_, hash) => Some(hash),
             Child::MaybePersisted(_, hash) => Some(hash),
             Child::Node(_) => None,
+        }
+    }
+
+    /// Return a `MaybePersistedNode` from a child
+    ///
+    /// This is used in the dump utility, but otherwise should be avoided,
+    /// as it may create an unnecessary `MaybePersistedNode`
+    #[must_use]
+    pub fn as_maybe_persisted_node(&self) -> MaybePersistedNode {
+        match self {
+            Child::Node(node) => MaybePersistedNode::from(SharedNode::from(node.clone())),
+            Child::AddressWithHash(addr, _) => MaybePersistedNode::from(*addr),
+            Child::MaybePersisted(maybe_persisted, _) => maybe_persisted.clone(),
         }
     }
 }
