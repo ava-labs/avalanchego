@@ -207,7 +207,6 @@ func (s *server) RegisterChain(chainName string, ctx *snow.ConsensusContext, vm 
 		s.log.Error(
 			"failed to add header route",
 			zap.String("chainName", chainName),
-			zap.Error(err),
 		)
 	}
 }

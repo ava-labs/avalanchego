@@ -35,7 +35,5 @@ func (s SetRouteHeaderInterceptor) WrapStreamingClient(next connect.StreamingCli
 }
 
 func (SetRouteHeaderInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
-	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
-		return next(ctx, conn)
-	}
+	return next
 }
