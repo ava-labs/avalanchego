@@ -5,6 +5,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -300,12 +301,13 @@ func (s *server) AddAliasesWithReadLock(endpoint string, aliases ...string) erro
 
 func (s *server) Shutdown() error {
 	ctx, cancel := context.WithTimeout(context.Background(), s.shutdownTimeout)
-	err := s.srv.Shutdown(ctx)
+	listenerErr := s.listener.Close()
+	serverErr := s.srv.Shutdown(ctx)
 	cancel()
 
 	// If shutdown times out, make sure the server is still shutdown.
 	_ = s.srv.Close()
-	return err
+	return errors.Join(listenerErr, serverErr)
 }
 
 type readPathAdder struct {
