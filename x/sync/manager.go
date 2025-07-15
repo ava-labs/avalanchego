@@ -1030,10 +1030,7 @@ func (m *Manager) enqueueWork(work *workItem) {
 func midPoint(startMaybe, endMaybe maybe.Maybe[[]byte]) maybe.Maybe[[]byte] {
 	start := startMaybe.Value()
 	end := endMaybe.Value()
-	length := len(start)
-	if len(end) > length {
-		length = len(end)
-	}
+	length := max(len(end), len(start))
 
 	if length == 0 {
 		if endMaybe.IsNothing() {
@@ -1180,10 +1177,7 @@ func calculateBackoff(attempt int) time.Duration {
 		return 0
 	}
 
-	retryWait := initialRetryWait * time.Duration(math.Pow(retryWaitFactor, float64(attempt)))
-	if retryWait > maxRetryWait {
-		retryWait = maxRetryWait
-	}
+	retryWait := min(initialRetryWait*time.Duration(math.Pow(retryWaitFactor, float64(attempt))), maxRetryWait)
 
 	return retryWait
 }
