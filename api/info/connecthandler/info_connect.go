@@ -5,7 +5,7 @@ package connecthandler
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
 	"time"
 
 	"connectrpc.com/connect"
@@ -16,30 +16,27 @@ import (
 	"github.com/ava-labs/avalanchego/proto/pb/info/v1/infov1connect"
 	"github.com/ava-labs/avalanchego/upgrade"
 
-	v1 "github.com/ava-labs/avalanchego/proto/pb/info/v1"
+	infov1 "github.com/ava-labs/avalanchego/proto/pb/info/v1"
 )
 
-var _ infov1connect.InfoServiceHandler = (*connectInfoService)(nil)
+var _ infov1connect.InfoServiceHandler = (*ConnectInfoService)(nil)
 
-type connectInfoService struct {
-	*info.Info
+type ConnectInfoService struct {
+	info *info.Info
 }
 
-// NewConnectInfoService returns a ConnectRPC handler for the Info API
-func NewConnectInfoService(info *info.Info) infov1connect.InfoServiceHandler {
-	return &connectInfoService{
-		Info: info,
-	}
+// NewConnectInfoService returns a pointer to a ConnectRPC handler for the Info API
+func NewConnectInfoService(info *info.Info) *ConnectInfoService {
+	return &ConnectInfoService{info: info}
 }
 
-// GetNodeVersion returns the semantic version, database version, RPC protocol version,
-// Git commit hash, and the list of VM versions this node is running
-func (c *connectInfoService) GetNodeVersion(
+// NodeVersion returns version this node is running
+func (c *ConnectInfoService) NodeVersion(
 	_ context.Context,
-	_ *connect.Request[v1.GetNodeVersionRequest],
-) (*connect.Response[v1.GetNodeVersionResponse], error) {
+	_ *connect.Request[infov1.NodeVersionRequest],
+) (*connect.Response[infov1.NodeVersionResponse], error) {
 	var jsonResponse info.GetNodeVersionReply
-	if err := c.Info.GetNodeVersion(nil, nil, &jsonResponse); err != nil {
+	if err := c.info.GetNodeVersion(nil, nil, &jsonResponse); err != nil {
 		return nil, err
 	}
 
@@ -49,7 +46,7 @@ func (c *connectInfoService) GetNodeVersion(
 		vmVersions[id] = version
 	}
 
-	response := &v1.GetNodeVersionResponse{
+	response := &infov1.NodeVersionResponse{
 		Version:            jsonResponse.Version,
 		DatabaseVersion:    jsonResponse.DatabaseVersion,
 		RpcProtocolVersion: uint32(jsonResponse.RPCProtocolVersion),
@@ -60,115 +57,123 @@ func (c *connectInfoService) GetNodeVersion(
 	return connect.NewResponse(response), nil
 }
 
-// GetNodeID returns this node's unique identifier and proof-of-possession bytes
-func (c *connectInfoService) GetNodeID(
+// NodeID returns the node ID of this node
+func (c *ConnectInfoService) NodeID(
 	_ context.Context,
-	_ *connect.Request[v1.GetNodeIDRequest],
-) (*connect.Response[v1.GetNodeIDResponse], error) {
+	_ *connect.Request[infov1.NodeIDRequest],
+) (*connect.Response[infov1.NodeIDResponse], error) {
 	var jsonResponse info.GetNodeIDReply
-	if err := c.Info.GetNodeID(nil, nil, &jsonResponse); err != nil {
+	if err := c.info.GetNodeID(nil, nil, &jsonResponse); err != nil {
 		return nil, err
 	}
 
-	nodePOP := []byte{}
-	if jsonResponse.NodePOP != nil {
-		p := jsonResponse.NodePOP
-		nodePOP = make([]byte, len(p.PublicKey)+len(p.ProofOfPossession))
-		copy(nodePOP[0:len(p.PublicKey)], p.PublicKey[:])
-		copy(nodePOP[len(p.PublicKey):], p.ProofOfPossession[:])
+	// Convert raw PoP bytes into hex strings
+	pop := jsonResponse.NodePOP
+	if err := pop.Verify(); err != nil {
+		return nil, err
+	}
+	rawPopJSON, err := pop.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	var popMessage infov1.ProofOfPossession
+	if err := json.Unmarshal(rawPopJSON, &popMessage); err != nil {
+		return nil, err
 	}
 
-	response := &v1.GetNodeIDResponse{
-		NodeId:  jsonResponse.NodeID.String(),
-		NodePop: nodePOP,
+	response := &infov1.NodeIDResponse{
+		NodeId: jsonResponse.NodeID.String(),
+		NodePop: &infov1.ProofOfPossession{
+			PublicKey:         popMessage.PublicKey,
+			ProofOfPossession: popMessage.ProofOfPossession,
+		},
 	}
 
 	return connect.NewResponse(response), nil
 }
 
-// GetNodeIP returns the primary IP address this node uses for P2P networking.\
-func (c *connectInfoService) GetNodeIP(
+// NodeIP returns the IP address of this node
+func (c *ConnectInfoService) NodeIP(
 	_ context.Context,
-	_ *connect.Request[v1.GetNodeIPRequest],
-) (*connect.Response[v1.GetNodeIPResponse], error) {
+	_ *connect.Request[infov1.NodeIPRequest],
+) (*connect.Response[infov1.NodeIPResponse], error) {
 	var jsonResponse info.GetNodeIPReply
-	if err := c.Info.GetNodeIP(nil, nil, &jsonResponse); err != nil {
+	if err := c.info.GetNodeIP(nil, nil, &jsonResponse); err != nil {
 		return nil, err
 	}
 
-	response := &v1.GetNodeIPResponse{
+	response := &infov1.NodeIPResponse{
 		Ip: jsonResponse.IP.String(),
 	}
 
 	return connect.NewResponse(response), nil
 }
 
-// GetNetworkID returns the numeric ID of the Avalanche network this node is connected to
-func (c *connectInfoService) GetNetworkID(
+// NetworkID returns the ID of the Avalanche network this node is connected to
+func (c *ConnectInfoService) NetworkID(
 	_ context.Context,
-	_ *connect.Request[v1.GetNetworkIDRequest],
-) (*connect.Response[v1.GetNetworkIDResponse], error) {
+	_ *connect.Request[infov1.NetworkIDRequest],
+) (*connect.Response[infov1.NetworkIDResponse], error) {
 	var jsonResponse info.GetNetworkIDReply
-	if err := c.Info.GetNetworkID(nil, nil, &jsonResponse); err != nil {
+	if err := c.info.GetNetworkID(nil, nil, &jsonResponse); err != nil {
 		return nil, err
 	}
 
-	response := &v1.GetNetworkIDResponse{
+	response := &infov1.NetworkIDResponse{
 		NetworkId: uint32(jsonResponse.NetworkID),
 	}
 
 	return connect.NewResponse(response), nil
 }
 
-// GetNetworkName returns the name of the network
-func (c *connectInfoService) GetNetworkName(
+// NetworkName returns the name of the network
+func (c *ConnectInfoService) NetworkName(
 	_ context.Context,
-	_ *connect.Request[v1.GetNetworkNameRequest],
-) (*connect.Response[v1.GetNetworkNameResponse], error) {
+	_ *connect.Request[infov1.NetworkNameRequest],
+) (*connect.Response[infov1.NetworkNameResponse], error) {
 	var jsonResponse info.GetNetworkNameReply
-	if err := c.Info.GetNetworkName(nil, nil, &jsonResponse); err != nil {
+	if err := c.info.GetNetworkName(nil, nil, &jsonResponse); err != nil {
 		return nil, err
 	}
 
-	response := &v1.GetNetworkNameResponse{
+	response := &infov1.NetworkNameResponse{
 		NetworkName: jsonResponse.NetworkName,
 	}
 
 	return connect.NewResponse(response), nil
 }
 
-// GetBlockchainID maps an ID string to its canonical chain ID
-func (c *connectInfoService) GetBlockchainID(
+// BlockchainID maps an ID string to its canonical chain ID
+func (c *ConnectInfoService) BlockchainID(
 	_ context.Context,
-	request *connect.Request[v1.GetBlockchainIDRequest],
-) (*connect.Response[v1.GetBlockchainIDResponse], error) {
+	request *connect.Request[infov1.BlockchainIDRequest],
+) (*connect.Response[infov1.BlockchainIDResponse], error) {
 	jsonRequest := info.GetBlockchainIDArgs{
 		Alias: request.Msg.Alias,
 	}
 
 	var jsonResponse info.GetBlockchainIDReply
-	if err := c.Info.GetBlockchainID(nil, &jsonRequest, &jsonResponse); err != nil {
+	if err := c.info.GetBlockchainID(nil, &jsonRequest, &jsonResponse); err != nil {
 		return nil, err
 	}
 
-	response := &v1.GetBlockchainIDResponse{
+	response := &infov1.BlockchainIDResponse{
 		BlockchainId: jsonResponse.BlockchainID.String(),
 	}
 
 	return connect.NewResponse(response), nil
 }
 
-// Peers returns metadata (IP, nodeID, version, uptimes, subnets, etc.) for the given peer node IDs
-func (c *connectInfoService) Peers(
+// Peers returns metadata for the given peer node IDs
+func (c *ConnectInfoService) Peers(
 	_ context.Context,
-	request *connect.Request[v1.PeersRequest],
-) (*connect.Response[v1.PeersResponse], error) {
+	request *connect.Request[infov1.PeersRequest],
+) (*connect.Response[infov1.PeersResponse], error) {
 	nodeIDs := make([]ids.NodeID, 0, len(request.Msg.NodeIds))
 	for _, nodeIDStr := range request.Msg.NodeIds {
 		nodeID, err := ids.NodeIDFromString(nodeIDStr)
 		if err != nil {
-			return nil, connect.NewError(
-				connect.CodeInvalidArgument, fmt.Errorf("invalid nodeID %s: %w", nodeIDStr, err))
+			return nil, err
 		}
 		nodeIDs = append(nodeIDs, nodeID)
 	}
@@ -178,11 +183,11 @@ func (c *connectInfoService) Peers(
 	}
 
 	var jsonResponse info.PeersReply
-	if err := c.Info.Peers(nil, &jsonRequest, &jsonResponse); err != nil {
+	if err := c.info.Peers(nil, &jsonRequest, &jsonResponse); err != nil {
 		return nil, err
 	}
 
-	peers := make([]*v1.PeerInfo, 0, len(jsonResponse.Peers))
+	peers := make([]*infov1.PeerInfo, 0, len(jsonResponse.Peers))
 	for _, peer := range jsonResponse.Peers {
 		// Convert TrackedSubnets (set.Set[ids.ID]) to []string
 		trackedSubnetsIDs := peer.TrackedSubnets.List()
@@ -194,7 +199,7 @@ func (c *connectInfoService) Peers(
 		benched := make([]string, len(peer.Benched))
 		copy(benched, peer.Benched)
 
-		peers = append(peers, &v1.PeerInfo{
+		peers = append(peers, &infov1.PeerInfo{
 			Ip:             peer.IP.String(),
 			PublicIp:       peer.PublicIP.String(),
 			NodeId:         peer.ID.String(),
@@ -207,7 +212,7 @@ func (c *connectInfoService) Peers(
 		})
 	}
 
-	response := &v1.PeersResponse{
+	response := &infov1.PeersResponse{
 		NumPeers: uint32(jsonResponse.NumPeers),
 		Peers:    peers,
 	}
@@ -221,38 +226,38 @@ func formatTime(t time.Time) string {
 }
 
 // IsBootstrapped returns whether the named chain has finished its bootstrap process on this node
-func (c *connectInfoService) IsBootstrapped(
+func (c *ConnectInfoService) IsBootstrapped(
 	_ context.Context,
-	request *connect.Request[v1.IsBootstrappedRequest],
-) (*connect.Response[v1.IsBootstrappedResponse], error) {
+	request *connect.Request[infov1.IsBootstrappedRequest],
+) (*connect.Response[infov1.IsBootstrappedResponse], error) {
 	// Use the chain from the request
 	jsonRequest := info.IsBootstrappedArgs{
 		Chain: request.Msg.Chain,
 	}
 
 	var jsonResponse info.IsBootstrappedResponse
-	if err := c.Info.IsBootstrapped(nil, &jsonRequest, &jsonResponse); err != nil {
+	if err := c.info.IsBootstrapped(nil, &jsonRequest, &jsonResponse); err != nil {
 		return nil, err
 	}
 
-	response := &v1.IsBootstrappedResponse{
+	response := &infov1.IsBootstrappedResponse{
 		IsBootstrapped: jsonResponse.IsBootstrapped,
 	}
 
 	return connect.NewResponse(response), nil
 }
 
-// Upgrades returns all the scheduled upgrade activation times and parameters for this node
-func (c *connectInfoService) Upgrades(
+// Upgrades returns info about all scheduled upgrades for this node
+func (c *ConnectInfoService) Upgrades(
 	_ context.Context,
-	_ *connect.Request[v1.UpgradesRequest],
-) (*connect.Response[v1.UpgradesResponse], error) {
+	_ *connect.Request[infov1.UpgradesRequest],
+) (*connect.Response[infov1.UpgradesResponse], error) {
 	var config upgrade.Config
-	if err := c.Info.Upgrades(nil, nil, &config); err != nil {
+	if err := c.info.Upgrades(nil, nil, &config); err != nil {
 		return nil, err
 	}
 
-	response := &v1.UpgradesResponse{
+	response := &infov1.UpgradesResponse{
 		ApricotPhase1Time:            timestamppb.New(config.ApricotPhase1Time),
 		ApricotPhase2Time:            timestamppb.New(config.ApricotPhase2Time),
 		ApricotPhase3Time:            timestamppb.New(config.ApricotPhase3Time),
@@ -274,17 +279,17 @@ func (c *connectInfoService) Upgrades(
 	return connect.NewResponse(response), nil
 }
 
-// Uptime returns this node's uptime metrics (rewarding stake %, weighted average %, etc.)
-func (c *connectInfoService) Uptime(
+// Uptime returns this node's uptime metrics
+func (c *ConnectInfoService) Uptime(
 	_ context.Context,
-	_ *connect.Request[v1.UptimeRequest],
-) (*connect.Response[v1.UptimeResponse], error) {
+	_ *connect.Request[infov1.UptimeRequest],
+) (*connect.Response[infov1.UptimeResponse], error) {
 	var jsonResponse info.UptimeResponse
-	if err := c.Info.Uptime(nil, nil, &jsonResponse); err != nil {
+	if err := c.info.Uptime(nil, nil, &jsonResponse); err != nil {
 		return nil, err
 	}
 
-	response := &v1.UptimeResponse{
+	response := &infov1.UptimeResponse{
 		RewardingStakePercentage:  float64(jsonResponse.RewardingStakePercentage),
 		WeightedAveragePercentage: float64(jsonResponse.WeightedAveragePercentage),
 	}
@@ -292,20 +297,20 @@ func (c *connectInfoService) Uptime(
 	return connect.NewResponse(response), nil
 }
 
-// GetVMs returns a map of VM IDs to their known aliases, plus FXs information
-func (c *connectInfoService) GetVMs(
+// VMs returns a map of VM IDs to their known aliases
+func (c *ConnectInfoService) VMs(
 	_ context.Context,
-	_ *connect.Request[v1.GetVMsRequest],
-) (*connect.Response[v1.GetVMsResponse], error) {
+	_ *connect.Request[infov1.VMsRequest],
+) (*connect.Response[infov1.VMsResponse], error) {
 	var jsonResponse info.GetVMsReply
-	if err := c.Info.GetVMs(nil, nil, &jsonResponse); err != nil {
+	if err := c.info.GetVMs(nil, nil, &jsonResponse); err != nil {
 		return nil, err
 	}
 
 	// Convert the VM map from JSON-RPC format to protobuf format
-	vms := make(map[string]*v1.VMAliases)
+	vms := make(map[string]*infov1.VMAliases)
 	for vmID, aliases := range jsonResponse.VMs {
-		vms[vmID.String()] = &v1.VMAliases{
+		vms[vmID.String()] = &infov1.VMAliases{
 			Aliases: aliases,
 		}
 	}
@@ -316,7 +321,7 @@ func (c *connectInfoService) GetVMs(
 		fxs[fxID.String()] = name
 	}
 
-	response := &v1.GetVMsResponse{
+	response := &infov1.VMsResponse{
 		Vms: vms,
 		Fxs: fxs,
 	}

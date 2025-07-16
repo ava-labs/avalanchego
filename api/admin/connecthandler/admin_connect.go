@@ -18,21 +18,19 @@ import (
 	adminv1 "github.com/ava-labs/avalanchego/proto/pb/admin/v1"
 )
 
-var _ adminv1connect.AdminServiceHandler = (*connectAdminService)(nil)
+var _ adminv1connect.AdminServiceHandler = (*ConnectAdminService)(nil)
 
-type connectAdminService struct {
+type ConnectAdminService struct {
 	admin *admin.Admin
 }
 
 // NewConnectAdminService returns a ConnectRPC handler for the Admin API
-func NewConnectAdminService(admin *admin.Admin) adminv1connect.AdminServiceHandler {
-	return &connectAdminService{
-		admin: admin,
-	}
+func NewConnectAdminService(admin *admin.Admin) *ConnectAdminService {
+	return &ConnectAdminService{admin: admin}
 }
 
 // StartCPUProfiler starts a CPU profile writing to the specified file
-func (c *connectAdminService) StartCPUProfiler(
+func (c *ConnectAdminService) StartCPUProfiler(
 	_ context.Context,
 	_ *connect.Request[adminv1.StartCPUProfilerRequest],
 ) (*connect.Response[adminv1.StartCPUProfilerResponse], error) {
@@ -44,7 +42,7 @@ func (c *connectAdminService) StartCPUProfiler(
 }
 
 // StopCPUProfiler stops the CPU profile
-func (c *connectAdminService) StopCPUProfiler(
+func (c *ConnectAdminService) StopCPUProfiler(
 	_ context.Context,
 	_ *connect.Request[adminv1.StopCPUProfilerRequest],
 ) (*connect.Response[adminv1.StopCPUProfilerResponse], error) {
@@ -56,7 +54,7 @@ func (c *connectAdminService) StopCPUProfiler(
 }
 
 // MemoryProfile runs a memory profile writing to the specified file
-func (c *connectAdminService) MemoryProfile(
+func (c *ConnectAdminService) MemoryProfile(
 	_ context.Context,
 	_ *connect.Request[adminv1.MemoryProfileRequest],
 ) (*connect.Response[adminv1.MemoryProfileResponse], error) {
@@ -68,7 +66,7 @@ func (c *connectAdminService) MemoryProfile(
 }
 
 // LockProfile runs a lock profile writing to the specified file
-func (c *connectAdminService) LockProfile(
+func (c *ConnectAdminService) LockProfile(
 	_ context.Context,
 	_ *connect.Request[adminv1.LockProfileRequest],
 ) (*connect.Response[adminv1.LockProfileResponse], error) {
@@ -79,8 +77,8 @@ func (c *connectAdminService) LockProfile(
 	return connect.NewResponse(&adminv1.LockProfileResponse{}), nil
 }
 
-// Alias attempts to alias an HTTP endpoint to a new name
-func (c *connectAdminService) Alias(
+// Alias attempts to alias an endpoint to a new name
+func (c *ConnectAdminService) Alias(
 	_ context.Context,
 	request *connect.Request[adminv1.AliasRequest],
 ) (*connect.Response[adminv1.AliasResponse], error) {
@@ -97,7 +95,7 @@ func (c *connectAdminService) Alias(
 }
 
 // AliasChain attempts to alias a chain to a new name
-func (c *connectAdminService) AliasChain(
+func (c *ConnectAdminService) AliasChain(
 	_ context.Context,
 	request *connect.Request[adminv1.AliasChainRequest],
 ) (*connect.Response[adminv1.AliasChainResponse], error) {
@@ -113,11 +111,11 @@ func (c *connectAdminService) AliasChain(
 	return connect.NewResponse(&adminv1.AliasChainResponse{}), nil
 }
 
-// GetChainAliases returns the aliases of the chain
-func (c *connectAdminService) GetChainAliases(
+// ChainAliases returns the aliases of the chain
+func (c *ConnectAdminService) ChainAliases(
 	_ context.Context,
-	request *connect.Request[adminv1.GetChainAliasesRequest],
-) (*connect.Response[adminv1.GetChainAliasesResponse], error) {
+	request *connect.Request[adminv1.ChainAliasesRequest],
+) (*connect.Response[adminv1.ChainAliasesResponse], error) {
 	jsonRequest := &admin.GetChainAliasesArgs{
 		Chain: request.Msg.Chain,
 	}
@@ -127,7 +125,7 @@ func (c *connectAdminService) GetChainAliases(
 		return nil, err
 	}
 
-	response := &adminv1.GetChainAliasesResponse{
+	response := &adminv1.ChainAliasesResponse{
 		Aliases: jsonResponse.Aliases,
 	}
 
@@ -135,7 +133,7 @@ func (c *connectAdminService) GetChainAliases(
 }
 
 // Stacktrace returns the current global stacktrace
-func (c *connectAdminService) Stacktrace(
+func (c *ConnectAdminService) Stacktrace(
 	_ context.Context,
 	_ *connect.Request[adminv1.StacktraceRequest],
 ) (*connect.Response[adminv1.StacktraceResponse], error) {
@@ -147,7 +145,7 @@ func (c *connectAdminService) Stacktrace(
 }
 
 // SetLoggerLevel sets the log level and/or display level for loggers
-func (c *connectAdminService) SetLoggerLevel(
+func (c *ConnectAdminService) SetLoggerLevel(
 	_ context.Context,
 	request *connect.Request[adminv1.SetLoggerLevelRequest],
 ) (*connect.Response[adminv1.SetLoggerLevelResponse], error) {
@@ -190,11 +188,11 @@ func (c *connectAdminService) SetLoggerLevel(
 	}), nil
 }
 
-// GetLoggerLevel returns the log level and display level of all loggers
-func (c *connectAdminService) GetLoggerLevel(
+// LoggerLevel returns the log level and display level of loggers
+func (c *ConnectAdminService) LoggerLevel(
 	_ context.Context,
-	request *connect.Request[adminv1.GetLoggerLevelRequest],
-) (*connect.Response[adminv1.GetLoggerLevelResponse], error) {
+	request *connect.Request[adminv1.LoggerLevelRequest],
+) (*connect.Response[adminv1.LoggerLevelResponse], error) {
 	jsonRequest := &admin.GetLoggerLevelArgs{
 		LoggerName: request.Msg.LoggerName,
 	}
@@ -213,16 +211,16 @@ func (c *connectAdminService) GetLoggerLevel(
 		}
 	}
 
-	return connect.NewResponse(&adminv1.GetLoggerLevelResponse{
+	return connect.NewResponse(&adminv1.LoggerLevelResponse{
 		LoggerLevels: protoLoggerLevels,
 	}), nil
 }
 
-// GetConfig returns the config that the node was started with
-func (c *connectAdminService) GetConfig(
+// Config returns the config that the node was started with
+func (c *ConnectAdminService) Config(
 	_ context.Context,
-	_ *connect.Request[adminv1.GetConfigRequest],
-) (*connect.Response[adminv1.GetConfigResponse], error) {
+	_ *connect.Request[adminv1.ConfigRequest],
+) (*connect.Response[adminv1.ConfigResponse], error) {
 	var jsonResponse interface{}
 	if err := c.admin.GetConfig(nil, nil, &jsonResponse); err != nil {
 		return nil, err
@@ -234,18 +232,18 @@ func (c *connectAdminService) GetConfig(
 		return nil, err
 	}
 
-	response := &adminv1.GetConfigResponse{
+	response := &adminv1.ConfigResponse{
 		ConfigJson: string(configJSON),
 	}
 
 	return connect.NewResponse(response), nil
 }
 
-// DBGet returns the value of a database entry
-func (c *connectAdminService) DBGet(
+// DB returns the value of a database entry
+func (c *ConnectAdminService) DB(
 	_ context.Context,
-	request *connect.Request[adminv1.DBGetRequest],
-) (*connect.Response[adminv1.DBGetResponse], error) {
+	request *connect.Request[adminv1.DBRequest],
+) (*connect.Response[adminv1.DBResponse], error) {
 	jsonRequest := &admin.DBGetArgs{
 		Key: request.Msg.Key,
 	}
@@ -255,7 +253,7 @@ func (c *connectAdminService) DBGet(
 		return nil, err
 	}
 
-	response := &adminv1.DBGetResponse{
+	response := &adminv1.DBResponse{
 		Value:     jsonResponse.Value,
 		ErrorCode: adminv1.ErrorCode(jsonResponse.ErrorCode),
 	}

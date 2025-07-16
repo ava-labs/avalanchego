@@ -36,22 +36,19 @@ const (
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
-	// InfoServiceGetNodeVersionProcedure is the fully-qualified name of the InfoService's
-	// GetNodeVersion RPC.
-	InfoServiceGetNodeVersionProcedure = "/info.v1.InfoService/GetNodeVersion"
-	// InfoServiceGetNodeIDProcedure is the fully-qualified name of the InfoService's GetNodeID RPC.
-	InfoServiceGetNodeIDProcedure = "/info.v1.InfoService/GetNodeID"
-	// InfoServiceGetNodeIPProcedure is the fully-qualified name of the InfoService's GetNodeIP RPC.
-	InfoServiceGetNodeIPProcedure = "/info.v1.InfoService/GetNodeIP"
-	// InfoServiceGetNetworkIDProcedure is the fully-qualified name of the InfoService's GetNetworkID
+	// InfoServiceNodeVersionProcedure is the fully-qualified name of the InfoService's NodeVersion RPC.
+	InfoServiceNodeVersionProcedure = "/info.v1.InfoService/NodeVersion"
+	// InfoServiceNodeIDProcedure is the fully-qualified name of the InfoService's NodeID RPC.
+	InfoServiceNodeIDProcedure = "/info.v1.InfoService/NodeID"
+	// InfoServiceNodeIPProcedure is the fully-qualified name of the InfoService's NodeIP RPC.
+	InfoServiceNodeIPProcedure = "/info.v1.InfoService/NodeIP"
+	// InfoServiceNetworkIDProcedure is the fully-qualified name of the InfoService's NetworkID RPC.
+	InfoServiceNetworkIDProcedure = "/info.v1.InfoService/NetworkID"
+	// InfoServiceNetworkNameProcedure is the fully-qualified name of the InfoService's NetworkName RPC.
+	InfoServiceNetworkNameProcedure = "/info.v1.InfoService/NetworkName"
+	// InfoServiceBlockchainIDProcedure is the fully-qualified name of the InfoService's BlockchainID
 	// RPC.
-	InfoServiceGetNetworkIDProcedure = "/info.v1.InfoService/GetNetworkID"
-	// InfoServiceGetNetworkNameProcedure is the fully-qualified name of the InfoService's
-	// GetNetworkName RPC.
-	InfoServiceGetNetworkNameProcedure = "/info.v1.InfoService/GetNetworkName"
-	// InfoServiceGetBlockchainIDProcedure is the fully-qualified name of the InfoService's
-	// GetBlockchainID RPC.
-	InfoServiceGetBlockchainIDProcedure = "/info.v1.InfoService/GetBlockchainID"
+	InfoServiceBlockchainIDProcedure = "/info.v1.InfoService/BlockchainID"
 	// InfoServicePeersProcedure is the fully-qualified name of the InfoService's Peers RPC.
 	InfoServicePeersProcedure = "/info.v1.InfoService/Peers"
 	// InfoServiceIsBootstrappedProcedure is the fully-qualified name of the InfoService's
@@ -61,23 +58,23 @@ const (
 	InfoServiceUpgradesProcedure = "/info.v1.InfoService/Upgrades"
 	// InfoServiceUptimeProcedure is the fully-qualified name of the InfoService's Uptime RPC.
 	InfoServiceUptimeProcedure = "/info.v1.InfoService/Uptime"
-	// InfoServiceGetVMsProcedure is the fully-qualified name of the InfoService's GetVMs RPC.
-	InfoServiceGetVMsProcedure = "/info.v1.InfoService/GetVMs"
+	// InfoServiceVMsProcedure is the fully-qualified name of the InfoService's VMs RPC.
+	InfoServiceVMsProcedure = "/info.v1.InfoService/VMs"
 )
 
 // InfoServiceClient is a client for the info.v1.InfoService service.
 type InfoServiceClient interface {
-	GetNodeVersion(context.Context, *connect.Request[v1.GetNodeVersionRequest]) (*connect.Response[v1.GetNodeVersionResponse], error)
-	GetNodeID(context.Context, *connect.Request[v1.GetNodeIDRequest]) (*connect.Response[v1.GetNodeIDResponse], error)
-	GetNodeIP(context.Context, *connect.Request[v1.GetNodeIPRequest]) (*connect.Response[v1.GetNodeIPResponse], error)
-	GetNetworkID(context.Context, *connect.Request[v1.GetNetworkIDRequest]) (*connect.Response[v1.GetNetworkIDResponse], error)
-	GetNetworkName(context.Context, *connect.Request[v1.GetNetworkNameRequest]) (*connect.Response[v1.GetNetworkNameResponse], error)
-	GetBlockchainID(context.Context, *connect.Request[v1.GetBlockchainIDRequest]) (*connect.Response[v1.GetBlockchainIDResponse], error)
+	NodeVersion(context.Context, *connect.Request[v1.NodeVersionRequest]) (*connect.Response[v1.NodeVersionResponse], error)
+	NodeID(context.Context, *connect.Request[v1.NodeIDRequest]) (*connect.Response[v1.NodeIDResponse], error)
+	NodeIP(context.Context, *connect.Request[v1.NodeIPRequest]) (*connect.Response[v1.NodeIPResponse], error)
+	NetworkID(context.Context, *connect.Request[v1.NetworkIDRequest]) (*connect.Response[v1.NetworkIDResponse], error)
+	NetworkName(context.Context, *connect.Request[v1.NetworkNameRequest]) (*connect.Response[v1.NetworkNameResponse], error)
+	BlockchainID(context.Context, *connect.Request[v1.BlockchainIDRequest]) (*connect.Response[v1.BlockchainIDResponse], error)
 	Peers(context.Context, *connect.Request[v1.PeersRequest]) (*connect.Response[v1.PeersResponse], error)
 	IsBootstrapped(context.Context, *connect.Request[v1.IsBootstrappedRequest]) (*connect.Response[v1.IsBootstrappedResponse], error)
 	Upgrades(context.Context, *connect.Request[v1.UpgradesRequest]) (*connect.Response[v1.UpgradesResponse], error)
 	Uptime(context.Context, *connect.Request[v1.UptimeRequest]) (*connect.Response[v1.UptimeResponse], error)
-	GetVMs(context.Context, *connect.Request[v1.GetVMsRequest]) (*connect.Response[v1.GetVMsResponse], error)
+	VMs(context.Context, *connect.Request[v1.VMsRequest]) (*connect.Response[v1.VMsResponse], error)
 }
 
 // NewInfoServiceClient constructs a client for the info.v1.InfoService service. By default, it uses
@@ -91,40 +88,40 @@ func NewInfoServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 	baseURL = strings.TrimRight(baseURL, "/")
 	infoServiceMethods := v1.File_info_v1_service_proto.Services().ByName("InfoService").Methods()
 	return &infoServiceClient{
-		getNodeVersion: connect.NewClient[v1.GetNodeVersionRequest, v1.GetNodeVersionResponse](
+		nodeVersion: connect.NewClient[v1.NodeVersionRequest, v1.NodeVersionResponse](
 			httpClient,
-			baseURL+InfoServiceGetNodeVersionProcedure,
-			connect.WithSchema(infoServiceMethods.ByName("GetNodeVersion")),
+			baseURL+InfoServiceNodeVersionProcedure,
+			connect.WithSchema(infoServiceMethods.ByName("NodeVersion")),
 			connect.WithClientOptions(opts...),
 		),
-		getNodeID: connect.NewClient[v1.GetNodeIDRequest, v1.GetNodeIDResponse](
+		nodeID: connect.NewClient[v1.NodeIDRequest, v1.NodeIDResponse](
 			httpClient,
-			baseURL+InfoServiceGetNodeIDProcedure,
-			connect.WithSchema(infoServiceMethods.ByName("GetNodeID")),
+			baseURL+InfoServiceNodeIDProcedure,
+			connect.WithSchema(infoServiceMethods.ByName("NodeID")),
 			connect.WithClientOptions(opts...),
 		),
-		getNodeIP: connect.NewClient[v1.GetNodeIPRequest, v1.GetNodeIPResponse](
+		nodeIP: connect.NewClient[v1.NodeIPRequest, v1.NodeIPResponse](
 			httpClient,
-			baseURL+InfoServiceGetNodeIPProcedure,
-			connect.WithSchema(infoServiceMethods.ByName("GetNodeIP")),
+			baseURL+InfoServiceNodeIPProcedure,
+			connect.WithSchema(infoServiceMethods.ByName("NodeIP")),
 			connect.WithClientOptions(opts...),
 		),
-		getNetworkID: connect.NewClient[v1.GetNetworkIDRequest, v1.GetNetworkIDResponse](
+		networkID: connect.NewClient[v1.NetworkIDRequest, v1.NetworkIDResponse](
 			httpClient,
-			baseURL+InfoServiceGetNetworkIDProcedure,
-			connect.WithSchema(infoServiceMethods.ByName("GetNetworkID")),
+			baseURL+InfoServiceNetworkIDProcedure,
+			connect.WithSchema(infoServiceMethods.ByName("NetworkID")),
 			connect.WithClientOptions(opts...),
 		),
-		getNetworkName: connect.NewClient[v1.GetNetworkNameRequest, v1.GetNetworkNameResponse](
+		networkName: connect.NewClient[v1.NetworkNameRequest, v1.NetworkNameResponse](
 			httpClient,
-			baseURL+InfoServiceGetNetworkNameProcedure,
-			connect.WithSchema(infoServiceMethods.ByName("GetNetworkName")),
+			baseURL+InfoServiceNetworkNameProcedure,
+			connect.WithSchema(infoServiceMethods.ByName("NetworkName")),
 			connect.WithClientOptions(opts...),
 		),
-		getBlockchainID: connect.NewClient[v1.GetBlockchainIDRequest, v1.GetBlockchainIDResponse](
+		blockchainID: connect.NewClient[v1.BlockchainIDRequest, v1.BlockchainIDResponse](
 			httpClient,
-			baseURL+InfoServiceGetBlockchainIDProcedure,
-			connect.WithSchema(infoServiceMethods.ByName("GetBlockchainID")),
+			baseURL+InfoServiceBlockchainIDProcedure,
+			connect.WithSchema(infoServiceMethods.ByName("BlockchainID")),
 			connect.WithClientOptions(opts...),
 		),
 		peers: connect.NewClient[v1.PeersRequest, v1.PeersResponse](
@@ -151,10 +148,10 @@ func NewInfoServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(infoServiceMethods.ByName("Uptime")),
 			connect.WithClientOptions(opts...),
 		),
-		getVMs: connect.NewClient[v1.GetVMsRequest, v1.GetVMsResponse](
+		vMs: connect.NewClient[v1.VMsRequest, v1.VMsResponse](
 			httpClient,
-			baseURL+InfoServiceGetVMsProcedure,
-			connect.WithSchema(infoServiceMethods.ByName("GetVMs")),
+			baseURL+InfoServiceVMsProcedure,
+			connect.WithSchema(infoServiceMethods.ByName("VMs")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -162,47 +159,47 @@ func NewInfoServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 
 // infoServiceClient implements InfoServiceClient.
 type infoServiceClient struct {
-	getNodeVersion  *connect.Client[v1.GetNodeVersionRequest, v1.GetNodeVersionResponse]
-	getNodeID       *connect.Client[v1.GetNodeIDRequest, v1.GetNodeIDResponse]
-	getNodeIP       *connect.Client[v1.GetNodeIPRequest, v1.GetNodeIPResponse]
-	getNetworkID    *connect.Client[v1.GetNetworkIDRequest, v1.GetNetworkIDResponse]
-	getNetworkName  *connect.Client[v1.GetNetworkNameRequest, v1.GetNetworkNameResponse]
-	getBlockchainID *connect.Client[v1.GetBlockchainIDRequest, v1.GetBlockchainIDResponse]
-	peers           *connect.Client[v1.PeersRequest, v1.PeersResponse]
-	isBootstrapped  *connect.Client[v1.IsBootstrappedRequest, v1.IsBootstrappedResponse]
-	upgrades        *connect.Client[v1.UpgradesRequest, v1.UpgradesResponse]
-	uptime          *connect.Client[v1.UptimeRequest, v1.UptimeResponse]
-	getVMs          *connect.Client[v1.GetVMsRequest, v1.GetVMsResponse]
+	nodeVersion    *connect.Client[v1.NodeVersionRequest, v1.NodeVersionResponse]
+	nodeID         *connect.Client[v1.NodeIDRequest, v1.NodeIDResponse]
+	nodeIP         *connect.Client[v1.NodeIPRequest, v1.NodeIPResponse]
+	networkID      *connect.Client[v1.NetworkIDRequest, v1.NetworkIDResponse]
+	networkName    *connect.Client[v1.NetworkNameRequest, v1.NetworkNameResponse]
+	blockchainID   *connect.Client[v1.BlockchainIDRequest, v1.BlockchainIDResponse]
+	peers          *connect.Client[v1.PeersRequest, v1.PeersResponse]
+	isBootstrapped *connect.Client[v1.IsBootstrappedRequest, v1.IsBootstrappedResponse]
+	upgrades       *connect.Client[v1.UpgradesRequest, v1.UpgradesResponse]
+	uptime         *connect.Client[v1.UptimeRequest, v1.UptimeResponse]
+	vMs            *connect.Client[v1.VMsRequest, v1.VMsResponse]
 }
 
-// GetNodeVersion calls info.v1.InfoService.GetNodeVersion.
-func (c *infoServiceClient) GetNodeVersion(ctx context.Context, req *connect.Request[v1.GetNodeVersionRequest]) (*connect.Response[v1.GetNodeVersionResponse], error) {
-	return c.getNodeVersion.CallUnary(ctx, req)
+// NodeVersion calls info.v1.InfoService.NodeVersion.
+func (c *infoServiceClient) NodeVersion(ctx context.Context, req *connect.Request[v1.NodeVersionRequest]) (*connect.Response[v1.NodeVersionResponse], error) {
+	return c.nodeVersion.CallUnary(ctx, req)
 }
 
-// GetNodeID calls info.v1.InfoService.GetNodeID.
-func (c *infoServiceClient) GetNodeID(ctx context.Context, req *connect.Request[v1.GetNodeIDRequest]) (*connect.Response[v1.GetNodeIDResponse], error) {
-	return c.getNodeID.CallUnary(ctx, req)
+// NodeID calls info.v1.InfoService.NodeID.
+func (c *infoServiceClient) NodeID(ctx context.Context, req *connect.Request[v1.NodeIDRequest]) (*connect.Response[v1.NodeIDResponse], error) {
+	return c.nodeID.CallUnary(ctx, req)
 }
 
-// GetNodeIP calls info.v1.InfoService.GetNodeIP.
-func (c *infoServiceClient) GetNodeIP(ctx context.Context, req *connect.Request[v1.GetNodeIPRequest]) (*connect.Response[v1.GetNodeIPResponse], error) {
-	return c.getNodeIP.CallUnary(ctx, req)
+// NodeIP calls info.v1.InfoService.NodeIP.
+func (c *infoServiceClient) NodeIP(ctx context.Context, req *connect.Request[v1.NodeIPRequest]) (*connect.Response[v1.NodeIPResponse], error) {
+	return c.nodeIP.CallUnary(ctx, req)
 }
 
-// GetNetworkID calls info.v1.InfoService.GetNetworkID.
-func (c *infoServiceClient) GetNetworkID(ctx context.Context, req *connect.Request[v1.GetNetworkIDRequest]) (*connect.Response[v1.GetNetworkIDResponse], error) {
-	return c.getNetworkID.CallUnary(ctx, req)
+// NetworkID calls info.v1.InfoService.NetworkID.
+func (c *infoServiceClient) NetworkID(ctx context.Context, req *connect.Request[v1.NetworkIDRequest]) (*connect.Response[v1.NetworkIDResponse], error) {
+	return c.networkID.CallUnary(ctx, req)
 }
 
-// GetNetworkName calls info.v1.InfoService.GetNetworkName.
-func (c *infoServiceClient) GetNetworkName(ctx context.Context, req *connect.Request[v1.GetNetworkNameRequest]) (*connect.Response[v1.GetNetworkNameResponse], error) {
-	return c.getNetworkName.CallUnary(ctx, req)
+// NetworkName calls info.v1.InfoService.NetworkName.
+func (c *infoServiceClient) NetworkName(ctx context.Context, req *connect.Request[v1.NetworkNameRequest]) (*connect.Response[v1.NetworkNameResponse], error) {
+	return c.networkName.CallUnary(ctx, req)
 }
 
-// GetBlockchainID calls info.v1.InfoService.GetBlockchainID.
-func (c *infoServiceClient) GetBlockchainID(ctx context.Context, req *connect.Request[v1.GetBlockchainIDRequest]) (*connect.Response[v1.GetBlockchainIDResponse], error) {
-	return c.getBlockchainID.CallUnary(ctx, req)
+// BlockchainID calls info.v1.InfoService.BlockchainID.
+func (c *infoServiceClient) BlockchainID(ctx context.Context, req *connect.Request[v1.BlockchainIDRequest]) (*connect.Response[v1.BlockchainIDResponse], error) {
+	return c.blockchainID.CallUnary(ctx, req)
 }
 
 // Peers calls info.v1.InfoService.Peers.
@@ -225,24 +222,24 @@ func (c *infoServiceClient) Uptime(ctx context.Context, req *connect.Request[v1.
 	return c.uptime.CallUnary(ctx, req)
 }
 
-// GetVMs calls info.v1.InfoService.GetVMs.
-func (c *infoServiceClient) GetVMs(ctx context.Context, req *connect.Request[v1.GetVMsRequest]) (*connect.Response[v1.GetVMsResponse], error) {
-	return c.getVMs.CallUnary(ctx, req)
+// VMs calls info.v1.InfoService.VMs.
+func (c *infoServiceClient) VMs(ctx context.Context, req *connect.Request[v1.VMsRequest]) (*connect.Response[v1.VMsResponse], error) {
+	return c.vMs.CallUnary(ctx, req)
 }
 
 // InfoServiceHandler is an implementation of the info.v1.InfoService service.
 type InfoServiceHandler interface {
-	GetNodeVersion(context.Context, *connect.Request[v1.GetNodeVersionRequest]) (*connect.Response[v1.GetNodeVersionResponse], error)
-	GetNodeID(context.Context, *connect.Request[v1.GetNodeIDRequest]) (*connect.Response[v1.GetNodeIDResponse], error)
-	GetNodeIP(context.Context, *connect.Request[v1.GetNodeIPRequest]) (*connect.Response[v1.GetNodeIPResponse], error)
-	GetNetworkID(context.Context, *connect.Request[v1.GetNetworkIDRequest]) (*connect.Response[v1.GetNetworkIDResponse], error)
-	GetNetworkName(context.Context, *connect.Request[v1.GetNetworkNameRequest]) (*connect.Response[v1.GetNetworkNameResponse], error)
-	GetBlockchainID(context.Context, *connect.Request[v1.GetBlockchainIDRequest]) (*connect.Response[v1.GetBlockchainIDResponse], error)
+	NodeVersion(context.Context, *connect.Request[v1.NodeVersionRequest]) (*connect.Response[v1.NodeVersionResponse], error)
+	NodeID(context.Context, *connect.Request[v1.NodeIDRequest]) (*connect.Response[v1.NodeIDResponse], error)
+	NodeIP(context.Context, *connect.Request[v1.NodeIPRequest]) (*connect.Response[v1.NodeIPResponse], error)
+	NetworkID(context.Context, *connect.Request[v1.NetworkIDRequest]) (*connect.Response[v1.NetworkIDResponse], error)
+	NetworkName(context.Context, *connect.Request[v1.NetworkNameRequest]) (*connect.Response[v1.NetworkNameResponse], error)
+	BlockchainID(context.Context, *connect.Request[v1.BlockchainIDRequest]) (*connect.Response[v1.BlockchainIDResponse], error)
 	Peers(context.Context, *connect.Request[v1.PeersRequest]) (*connect.Response[v1.PeersResponse], error)
 	IsBootstrapped(context.Context, *connect.Request[v1.IsBootstrappedRequest]) (*connect.Response[v1.IsBootstrappedResponse], error)
 	Upgrades(context.Context, *connect.Request[v1.UpgradesRequest]) (*connect.Response[v1.UpgradesResponse], error)
 	Uptime(context.Context, *connect.Request[v1.UptimeRequest]) (*connect.Response[v1.UptimeResponse], error)
-	GetVMs(context.Context, *connect.Request[v1.GetVMsRequest]) (*connect.Response[v1.GetVMsResponse], error)
+	VMs(context.Context, *connect.Request[v1.VMsRequest]) (*connect.Response[v1.VMsResponse], error)
 }
 
 // NewInfoServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -252,40 +249,40 @@ type InfoServiceHandler interface {
 // and JSON codecs. They also support gzip compression.
 func NewInfoServiceHandler(svc InfoServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
 	infoServiceMethods := v1.File_info_v1_service_proto.Services().ByName("InfoService").Methods()
-	infoServiceGetNodeVersionHandler := connect.NewUnaryHandler(
-		InfoServiceGetNodeVersionProcedure,
-		svc.GetNodeVersion,
-		connect.WithSchema(infoServiceMethods.ByName("GetNodeVersion")),
+	infoServiceNodeVersionHandler := connect.NewUnaryHandler(
+		InfoServiceNodeVersionProcedure,
+		svc.NodeVersion,
+		connect.WithSchema(infoServiceMethods.ByName("NodeVersion")),
 		connect.WithHandlerOptions(opts...),
 	)
-	infoServiceGetNodeIDHandler := connect.NewUnaryHandler(
-		InfoServiceGetNodeIDProcedure,
-		svc.GetNodeID,
-		connect.WithSchema(infoServiceMethods.ByName("GetNodeID")),
+	infoServiceNodeIDHandler := connect.NewUnaryHandler(
+		InfoServiceNodeIDProcedure,
+		svc.NodeID,
+		connect.WithSchema(infoServiceMethods.ByName("NodeID")),
 		connect.WithHandlerOptions(opts...),
 	)
-	infoServiceGetNodeIPHandler := connect.NewUnaryHandler(
-		InfoServiceGetNodeIPProcedure,
-		svc.GetNodeIP,
-		connect.WithSchema(infoServiceMethods.ByName("GetNodeIP")),
+	infoServiceNodeIPHandler := connect.NewUnaryHandler(
+		InfoServiceNodeIPProcedure,
+		svc.NodeIP,
+		connect.WithSchema(infoServiceMethods.ByName("NodeIP")),
 		connect.WithHandlerOptions(opts...),
 	)
-	infoServiceGetNetworkIDHandler := connect.NewUnaryHandler(
-		InfoServiceGetNetworkIDProcedure,
-		svc.GetNetworkID,
-		connect.WithSchema(infoServiceMethods.ByName("GetNetworkID")),
+	infoServiceNetworkIDHandler := connect.NewUnaryHandler(
+		InfoServiceNetworkIDProcedure,
+		svc.NetworkID,
+		connect.WithSchema(infoServiceMethods.ByName("NetworkID")),
 		connect.WithHandlerOptions(opts...),
 	)
-	infoServiceGetNetworkNameHandler := connect.NewUnaryHandler(
-		InfoServiceGetNetworkNameProcedure,
-		svc.GetNetworkName,
-		connect.WithSchema(infoServiceMethods.ByName("GetNetworkName")),
+	infoServiceNetworkNameHandler := connect.NewUnaryHandler(
+		InfoServiceNetworkNameProcedure,
+		svc.NetworkName,
+		connect.WithSchema(infoServiceMethods.ByName("NetworkName")),
 		connect.WithHandlerOptions(opts...),
 	)
-	infoServiceGetBlockchainIDHandler := connect.NewUnaryHandler(
-		InfoServiceGetBlockchainIDProcedure,
-		svc.GetBlockchainID,
-		connect.WithSchema(infoServiceMethods.ByName("GetBlockchainID")),
+	infoServiceBlockchainIDHandler := connect.NewUnaryHandler(
+		InfoServiceBlockchainIDProcedure,
+		svc.BlockchainID,
+		connect.WithSchema(infoServiceMethods.ByName("BlockchainID")),
 		connect.WithHandlerOptions(opts...),
 	)
 	infoServicePeersHandler := connect.NewUnaryHandler(
@@ -312,26 +309,26 @@ func NewInfoServiceHandler(svc InfoServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(infoServiceMethods.ByName("Uptime")),
 		connect.WithHandlerOptions(opts...),
 	)
-	infoServiceGetVMsHandler := connect.NewUnaryHandler(
-		InfoServiceGetVMsProcedure,
-		svc.GetVMs,
-		connect.WithSchema(infoServiceMethods.ByName("GetVMs")),
+	infoServiceVMsHandler := connect.NewUnaryHandler(
+		InfoServiceVMsProcedure,
+		svc.VMs,
+		connect.WithSchema(infoServiceMethods.ByName("VMs")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/info.v1.InfoService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case InfoServiceGetNodeVersionProcedure:
-			infoServiceGetNodeVersionHandler.ServeHTTP(w, r)
-		case InfoServiceGetNodeIDProcedure:
-			infoServiceGetNodeIDHandler.ServeHTTP(w, r)
-		case InfoServiceGetNodeIPProcedure:
-			infoServiceGetNodeIPHandler.ServeHTTP(w, r)
-		case InfoServiceGetNetworkIDProcedure:
-			infoServiceGetNetworkIDHandler.ServeHTTP(w, r)
-		case InfoServiceGetNetworkNameProcedure:
-			infoServiceGetNetworkNameHandler.ServeHTTP(w, r)
-		case InfoServiceGetBlockchainIDProcedure:
-			infoServiceGetBlockchainIDHandler.ServeHTTP(w, r)
+		case InfoServiceNodeVersionProcedure:
+			infoServiceNodeVersionHandler.ServeHTTP(w, r)
+		case InfoServiceNodeIDProcedure:
+			infoServiceNodeIDHandler.ServeHTTP(w, r)
+		case InfoServiceNodeIPProcedure:
+			infoServiceNodeIPHandler.ServeHTTP(w, r)
+		case InfoServiceNetworkIDProcedure:
+			infoServiceNetworkIDHandler.ServeHTTP(w, r)
+		case InfoServiceNetworkNameProcedure:
+			infoServiceNetworkNameHandler.ServeHTTP(w, r)
+		case InfoServiceBlockchainIDProcedure:
+			infoServiceBlockchainIDHandler.ServeHTTP(w, r)
 		case InfoServicePeersProcedure:
 			infoServicePeersHandler.ServeHTTP(w, r)
 		case InfoServiceIsBootstrappedProcedure:
@@ -340,8 +337,8 @@ func NewInfoServiceHandler(svc InfoServiceHandler, opts ...connect.HandlerOption
 			infoServiceUpgradesHandler.ServeHTTP(w, r)
 		case InfoServiceUptimeProcedure:
 			infoServiceUptimeHandler.ServeHTTP(w, r)
-		case InfoServiceGetVMsProcedure:
-			infoServiceGetVMsHandler.ServeHTTP(w, r)
+		case InfoServiceVMsProcedure:
+			infoServiceVMsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -351,28 +348,28 @@ func NewInfoServiceHandler(svc InfoServiceHandler, opts ...connect.HandlerOption
 // UnimplementedInfoServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedInfoServiceHandler struct{}
 
-func (UnimplementedInfoServiceHandler) GetNodeVersion(context.Context, *connect.Request[v1.GetNodeVersionRequest]) (*connect.Response[v1.GetNodeVersionResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("info.v1.InfoService.GetNodeVersion is not implemented"))
+func (UnimplementedInfoServiceHandler) NodeVersion(context.Context, *connect.Request[v1.NodeVersionRequest]) (*connect.Response[v1.NodeVersionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("info.v1.InfoService.NodeVersion is not implemented"))
 }
 
-func (UnimplementedInfoServiceHandler) GetNodeID(context.Context, *connect.Request[v1.GetNodeIDRequest]) (*connect.Response[v1.GetNodeIDResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("info.v1.InfoService.GetNodeID is not implemented"))
+func (UnimplementedInfoServiceHandler) NodeID(context.Context, *connect.Request[v1.NodeIDRequest]) (*connect.Response[v1.NodeIDResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("info.v1.InfoService.NodeID is not implemented"))
 }
 
-func (UnimplementedInfoServiceHandler) GetNodeIP(context.Context, *connect.Request[v1.GetNodeIPRequest]) (*connect.Response[v1.GetNodeIPResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("info.v1.InfoService.GetNodeIP is not implemented"))
+func (UnimplementedInfoServiceHandler) NodeIP(context.Context, *connect.Request[v1.NodeIPRequest]) (*connect.Response[v1.NodeIPResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("info.v1.InfoService.NodeIP is not implemented"))
 }
 
-func (UnimplementedInfoServiceHandler) GetNetworkID(context.Context, *connect.Request[v1.GetNetworkIDRequest]) (*connect.Response[v1.GetNetworkIDResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("info.v1.InfoService.GetNetworkID is not implemented"))
+func (UnimplementedInfoServiceHandler) NetworkID(context.Context, *connect.Request[v1.NetworkIDRequest]) (*connect.Response[v1.NetworkIDResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("info.v1.InfoService.NetworkID is not implemented"))
 }
 
-func (UnimplementedInfoServiceHandler) GetNetworkName(context.Context, *connect.Request[v1.GetNetworkNameRequest]) (*connect.Response[v1.GetNetworkNameResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("info.v1.InfoService.GetNetworkName is not implemented"))
+func (UnimplementedInfoServiceHandler) NetworkName(context.Context, *connect.Request[v1.NetworkNameRequest]) (*connect.Response[v1.NetworkNameResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("info.v1.InfoService.NetworkName is not implemented"))
 }
 
-func (UnimplementedInfoServiceHandler) GetBlockchainID(context.Context, *connect.Request[v1.GetBlockchainIDRequest]) (*connect.Response[v1.GetBlockchainIDResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("info.v1.InfoService.GetBlockchainID is not implemented"))
+func (UnimplementedInfoServiceHandler) BlockchainID(context.Context, *connect.Request[v1.BlockchainIDRequest]) (*connect.Response[v1.BlockchainIDResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("info.v1.InfoService.BlockchainID is not implemented"))
 }
 
 func (UnimplementedInfoServiceHandler) Peers(context.Context, *connect.Request[v1.PeersRequest]) (*connect.Response[v1.PeersResponse], error) {
@@ -391,6 +388,6 @@ func (UnimplementedInfoServiceHandler) Uptime(context.Context, *connect.Request[
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("info.v1.InfoService.Uptime is not implemented"))
 }
 
-func (UnimplementedInfoServiceHandler) GetVMs(context.Context, *connect.Request[v1.GetVMsRequest]) (*connect.Response[v1.GetVMsResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("info.v1.InfoService.GetVMs is not implemented"))
+func (UnimplementedInfoServiceHandler) VMs(context.Context, *connect.Request[v1.VMsRequest]) (*connect.Response[v1.VMsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("info.v1.InfoService.VMs is not implemented"))
 }
