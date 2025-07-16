@@ -689,6 +689,16 @@ pub mod test_utils {
         nodestore.header = header;
         nodestore.storage.write(0, header_bytes).unwrap();
     }
+
+    // Helper function to write a random stored area to the given offset.
+    pub(crate) fn test_write_zeroed_area<S: WritableStorage>(
+        nodestore: &NodeStore<Committed, S>,
+        size: u64,
+        offset: u64,
+    ) {
+        let area_content = vec![0u8; size as usize];
+        nodestore.storage.write(offset, &area_content).unwrap();
+    }
 }
 
 #[cfg(test)]
