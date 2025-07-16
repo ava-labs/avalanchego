@@ -284,11 +284,8 @@ type SDConfig struct {
 // WritePrometheusSDConfig writes the SDConfig with the provided name
 // to the location expected by the prometheus instance start by tmpnet.
 //
-// If withGitHubLabels is true, checks env vars for GitHub-specific labels
-// and adds them as labels if present before writing the SDConfig.
-//
 // Returns the path to the written configuration file.
-func WritePrometheusSDConfig(name string, sdConfig SDConfig, withGitHubLabels bool) (string, error) {
+func WritePrometheusSDConfig(name string, sdConfig SDConfig) (string, error) {
 	serviceDiscoveryDir, err := GetPrometheusServiceDiscoveryDir()
 	if err != nil {
 		return "", fmt.Errorf("failed to get service discovery dir: %w", err)
@@ -296,10 +293,6 @@ func WritePrometheusSDConfig(name string, sdConfig SDConfig, withGitHubLabels bo
 
 	if err := os.MkdirAll(serviceDiscoveryDir, perms.ReadWriteExecute); err != nil {
 		return "", fmt.Errorf("failed to create service discovery dir: %w", err)
-	}
-
-	if withGitHubLabels {
-		sdConfig = applyGitHubLabels(sdConfig)
 	}
 
 	configPath := filepath.Join(serviceDiscoveryDir, name+".json")
@@ -313,13 +306,6 @@ func WritePrometheusSDConfig(name string, sdConfig SDConfig, withGitHubLabels bo
 	}
 
 	return configPath, nil
-}
-
-func applyGitHubLabels(sdConfig SDConfig) SDConfig {
-	for label, value := range GetGitHubLabels() {
-		sdConfig.Labels[label] = value
-	}
-	return sdConfig
 }
 
 func getLogFilename(cmdName string) string {

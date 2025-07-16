@@ -82,7 +82,7 @@ func main() {
 	monitoringConfigFilePath, err := tmpnet.WritePrometheusSDConfig("load-test", tmpnet.SDConfig{
 		Targets: []string{metricsServer.Address()},
 		Labels:  network.GetMonitoringLabels(),
-	}, false)
+	})
 	require.NoError(err, "failed to generate monitoring config file")
 
 	tc.DeferCleanup(func() {
