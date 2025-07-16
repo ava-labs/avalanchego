@@ -41,6 +41,7 @@ inputs:
   job:
     default: ${{ github.job }}
   grafana_dashboard_id:
+    description: 'The identifier of the Grafana dashboard to use, in the format <UID>/<dashboard-name>.'
     default: 'kBQpRdWnk/avalanche-main-dashboard'
 
 runs:
