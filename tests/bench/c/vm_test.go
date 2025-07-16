@@ -113,7 +113,7 @@ func benchmarkReexecuteRange(b *testing.B, sourceBlockDir string, targetDir stri
 				labels[customLabel] = customValue
 			}
 		}
-		collectRegistry(b, "c-chain-reexecution", "127.0.0.1:9000", time.Minute, prefixGatherer, labels)
+		collectRegistry(b, "c-chain-reexecution", time.Minute, prefixGatherer, labels)
 	}
 
 	log := tests.NewDefaultLogger("c-chain-reexecution")
@@ -398,7 +398,7 @@ func createBlockChanFromLevelDB(tb testing.TB, sourceDir string, startBlock, end
 
 // collectRegistry starts prometheus and collects metrics from the provided gatherer.
 // Attaches the provided labels + GitHub labels if available to the collected metrics.
-func collectRegistry(tb testing.TB, name string, addr string, timeout time.Duration, gatherer prometheus.Gatherer, labels map[string]string) {
+func collectRegistry(tb testing.TB, name string, timeout time.Duration, gatherer prometheus.Gatherer, labels map[string]string) {
 	r := require.New(tb)
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)

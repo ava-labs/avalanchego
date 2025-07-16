@@ -66,7 +66,7 @@ jobs:
             artifact_prefix: c-chain-reexecute-range
             prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
             prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-            grafana_dashboard_uid_plus_name: 'c-chain-processing-custom-v8/c-chain-processing'
+            grafana_dashboard_id: 'c-chain-processing-custom-v8/c-chain-processing'
             loki_username: ${{ secrets.LOKI_ID || '' }}
             loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
             runtime: "" # Set runtime input to empty string to disable log collection
