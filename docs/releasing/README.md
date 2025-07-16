@@ -170,11 +170,11 @@ Once the tag is created, you need to test it on the Fuji testnet both locally an
     git clone git@github.com:ava-labs/avalanchego.git
     ```
 
-1. Build AvalancheGo using those VM ids:
+1. Checkout correct AvalancheGo version, the version should match the one used in Subnet-EVM `go.mod` file
 
     ```bash
     cd avalanchego
-    ./scripts/build.sh
+    git checkout v1.13.0
     ```
 
 1. Get upgrades for each L1 and write them out to `~/.avalanchego/configs/chains/<blockchain-id>/upgrade.json`:
