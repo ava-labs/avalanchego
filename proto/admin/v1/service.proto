@@ -11,12 +11,12 @@ service AdminService {
   rpc LockProfile(LockProfileRequest) returns (LockProfileResponse);
   rpc Alias(AliasRequest) returns (AliasResponse);
   rpc AliasChain(AliasChainRequest) returns (AliasChainResponse);
-  rpc GetChainAliases(GetChainAliasesRequest) returns (GetChainAliasesResponse);
+  rpc ChainAliases(ChainAliasesRequest) returns (ChainAliasesResponse);
   rpc Stacktrace(StacktraceRequest) returns (StacktraceResponse);
   rpc SetLoggerLevel(SetLoggerLevelRequest) returns (SetLoggerLevelResponse);
-  rpc GetLoggerLevel(GetLoggerLevelRequest) returns (GetLoggerLevelResponse);
-  rpc GetConfig(GetConfigRequest) returns (GetConfigResponse);
-  rpc DBGet(DBGetRequest) returns (DBGetResponse);
+  rpc LoggerLevel(LoggerLevelRequest) returns (LoggerLevelResponse);
+  rpc Config(ConfigRequest) returns (ConfigResponse);
+  rpc DB(DBRequest) returns (DBResponse);
 }
 
 message StartCPUProfilerRequest {}
@@ -43,10 +43,10 @@ message AliasChainRequest {
 }
 message AliasChainResponse {}
 
-message GetChainAliasesRequest {
+message ChainAliasesRequest {
   string chain = 1;
 }
-message GetChainAliasesResponse {
+message ChainAliasesResponse {
   repeated string aliases = 1;
 }
 
@@ -62,22 +62,22 @@ message SetLoggerLevelResponse {
   map<string, LogAndDisplayLevels> logger_levels = 1;
 }
 
-message GetLoggerLevelRequest {
+message LoggerLevelRequest {
   string logger_name = 1;
 }
-message GetLoggerLevelResponse {
+message LoggerLevelResponse {
   map<string, LogAndDisplayLevels> logger_levels = 1;
 }
 
-message GetConfigRequest {}
-message GetConfigResponse {
+message ConfigRequest {}
+message ConfigResponse {
   string config_json = 1;
 }
 
-message DBGetRequest {
+message DBRequest {
   string key = 1;
 }
-message DBGetResponse {
+message DBResponse {
   string value = 1;
   ErrorCode error_code = 2;
 }

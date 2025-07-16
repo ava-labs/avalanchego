@@ -17,24 +17,22 @@ import (
 	healthv1 "github.com/ava-labs/avalanchego/proto/pb/health/v1"
 )
 
-var _ healthv1connect.HealthServiceHandler = (*connectHealthService)(nil)
+var _ healthv1connect.HealthServiceHandler = (*ConnectHealthService)(nil)
 
-type connectHealthService struct {
-	service health.Health
+type ConnectHealthService struct {
+	health health.Health
 }
 
 // NewConnectHealthService returns a ConnectRPC handler for the Health API
-func NewConnectHealthService(healthService health.Health) healthv1connect.HealthServiceHandler {
-	return &connectHealthService{
-		service: healthService,
-	}
+func NewConnectHealthService(health health.Health) *ConnectHealthService {
+	return &ConnectHealthService{health: health}
 }
 
-func (c *connectHealthService) Readiness(
+func (c *ConnectHealthService) Readiness(
 	_ context.Context,
 	request *connect.Request[healthv1.ReadinessRequest],
 ) (*connect.Response[healthv1.ReadinessResponse], error) {
-	checks, healthy := c.service.Readiness(request.Msg.Tags...)
+	checks, healthy := c.health.Readiness(request.Msg.Tags...)
 
 	checksProto := convertResults(checks)
 
@@ -46,11 +44,11 @@ func (c *connectHealthService) Readiness(
 	return connect.NewResponse(out), nil
 }
 
-func (c *connectHealthService) Health(
+func (c *ConnectHealthService) Health(
 	_ context.Context,
 	request *connect.Request[healthv1.HealthRequest],
 ) (*connect.Response[healthv1.HealthResponse], error) {
-	checks, healthy := c.service.Health(request.Msg.Tags...)
+	checks, healthy := c.health.Health(request.Msg.Tags...)
 
 	checksProto := convertResults(checks)
 
@@ -62,11 +60,11 @@ func (c *connectHealthService) Health(
 	return connect.NewResponse(out), nil
 }
 
-func (c *connectHealthService) Liveness(
+func (c *ConnectHealthService) Liveness(
 	_ context.Context,
 	request *connect.Request[healthv1.LivenessRequest],
 ) (*connect.Response[healthv1.LivenessResponse], error) {
-	checks, healthy := c.service.Liveness(request.Msg.Tags...)
+	checks, healthy := c.health.Liveness(request.Msg.Tags...)
 
 	checksProto := convertResults(checks)
 

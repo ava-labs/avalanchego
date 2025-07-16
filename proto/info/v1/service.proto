@@ -7,21 +7,21 @@ option go_package = "github.com/ava-labs/avalanchego/proto/pb/info/v1;infov1";
 
 // InfoService is the API service for unprivileged info on a node
 service InfoService {
-  rpc GetNodeVersion(GetNodeVersionRequest) returns (GetNodeVersionResponse);
-  rpc GetNodeID(GetNodeIDRequest) returns (GetNodeIDResponse);
-  rpc GetNodeIP(GetNodeIPRequest) returns (GetNodeIPResponse);
-  rpc GetNetworkID(GetNetworkIDRequest) returns (GetNetworkIDResponse);
-  rpc GetNetworkName(GetNetworkNameRequest) returns (GetNetworkNameResponse);
-  rpc GetBlockchainID(GetBlockchainIDRequest) returns (GetBlockchainIDResponse);
+  rpc NodeVersion(NodeVersionRequest) returns (NodeVersionResponse);
+  rpc NodeID(NodeIDRequest) returns (NodeIDResponse);
+  rpc NodeIP(NodeIPRequest) returns (NodeIPResponse);
+  rpc NetworkID(NetworkIDRequest) returns (NetworkIDResponse);
+  rpc NetworkName(NetworkNameRequest) returns (NetworkNameResponse);
+  rpc BlockchainID(BlockchainIDRequest) returns (BlockchainIDResponse);
   rpc Peers(PeersRequest) returns (PeersResponse);
   rpc IsBootstrapped(IsBootstrappedRequest) returns (IsBootstrappedResponse);
   rpc Upgrades(UpgradesRequest) returns (UpgradesResponse);
   rpc Uptime(UptimeRequest) returns (UptimeResponse);
-  rpc GetVMs(GetVMsRequest) returns (GetVMsResponse);
+  rpc VMs(VMsRequest) returns (VMsResponse);
 }
 
-message GetNodeVersionRequest {}
-message GetNodeVersionResponse {
+message NodeVersionRequest {}
+message NodeVersionResponse {
   string version = 1;
   string database_version = 2;
   uint32 rpc_protocol_version = 3;
@@ -29,38 +29,41 @@ message GetNodeVersionResponse {
   map<string, string> vm_versions = 5;
 }
 
-message GetNodeIDRequest {}
-message GetNodeIDResponse {
+message NodeIDRequest {}
+message ProofOfPossession {
+  string publicKey = 1;
+  string proofOfPossession = 2;
+}
+message NodeIDResponse {
   string node_id = 1;
-  bytes node_pop = 2;
+  ProofOfPossession node_pop = 2;
 }
 
-message GetNodeIPRequest {}
-message GetNodeIPResponse {
+message NodeIPRequest {}
+message NodeIPResponse {
   string ip = 1;
 }
 
-message GetNetworkIDRequest {}
-message GetNetworkIDResponse {
+message NetworkIDRequest {}
+message NetworkIDResponse {
   uint32 network_id = 1;
 }
 
-message GetNetworkNameRequest {}
-message GetNetworkNameResponse {
+message NetworkNameRequest {}
+message NetworkNameResponse {
   string network_name = 1;
 }
 
-message GetBlockchainIDRequest {
+message BlockchainIDRequest {
   string alias = 1;
 }
-message GetBlockchainIDResponse {
+message BlockchainIDResponse {
   string blockchain_id = 1;
 }
 
 message PeersRequest {
   repeated string node_ids = 1;
 }
-
 // PeerInfo provides metadata about a connected peer in the network
 message PeerInfo {
   string ip = 1;
@@ -73,7 +76,6 @@ message PeerInfo {
   uint32 observed_uptime = 8;
   repeated string tracked_subnets = 9;
 }
-
 message PeersResponse {
   uint32 num_peers = 1;
   repeated PeerInfo peers = 2;
@@ -81,7 +83,6 @@ message PeersResponse {
 
 message IsBootstrappedRequest {
   // Alias of the chain
-  // Can also be the string representation of the chain's ID
   string chain = 1;
 }
 message IsBootstrappedResponse {
@@ -115,8 +116,8 @@ message UptimeResponse {
   double weighted_average_percentage = 2;
 }
 
-message GetVMsRequest {}
-message GetVMsResponse {
+message VMsRequest {}
+message VMsResponse {
   map<string, VMAliases> vms = 1;
   map<string, string> fxs = 2;
 }

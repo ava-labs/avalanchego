@@ -1310,7 +1310,7 @@ func (n *Node) initMetricsAPI() error {
 			promhttp.HandlerOpts{},
 		),
 		"metrics",
-		"metrics",
+		"",
 	)
 }
 
@@ -1360,7 +1360,7 @@ func (n *Node) initAdminAPI() error {
 	return n.APIServer.AddRoute(
 		service,
 		"admin",
-		"admin",
+		"",
 	)
 }
 
@@ -1441,7 +1441,7 @@ func (n *Node) initInfoAPI() error {
 	return n.APIServer.AddRoute(
 		service,
 		"info",
-		"info",
+		"",
 	)
 }
 
@@ -1556,7 +1556,7 @@ func (n *Node) initHealthAPI() error {
 	err = n.APIServer.AddRoute(
 		handler,
 		"health",
-		"health",
+		"",
 	)
 	if err != nil {
 		return err
@@ -1564,8 +1564,8 @@ func (n *Node) initHealthAPI() error {
 
 	err = n.APIServer.AddRoute(
 		health.NewGetHandler(n.health.Readiness),
-		"health/readiness",
 		"health",
+		"readiness",
 	)
 	if err != nil {
 		return err
@@ -1573,7 +1573,7 @@ func (n *Node) initHealthAPI() error {
 
 	err = n.APIServer.AddRoute(
 		health.NewGetHandler(n.health.Health),
-		"health/health",
+		"health",
 		"health",
 	)
 	if err != nil {
@@ -1582,8 +1582,8 @@ func (n *Node) initHealthAPI() error {
 
 	return n.APIServer.AddRoute(
 		health.NewGetHandler(n.health.Liveness),
-		"health/liveness",
 		"health",
+		"liveness",
 	)
 }
 

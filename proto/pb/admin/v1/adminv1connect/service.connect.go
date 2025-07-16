@@ -52,21 +52,21 @@ const (
 	AdminServiceAliasProcedure = "/admin.v1.AdminService/Alias"
 	// AdminServiceAliasChainProcedure is the fully-qualified name of the AdminService's AliasChain RPC.
 	AdminServiceAliasChainProcedure = "/admin.v1.AdminService/AliasChain"
-	// AdminServiceGetChainAliasesProcedure is the fully-qualified name of the AdminService's
-	// GetChainAliases RPC.
-	AdminServiceGetChainAliasesProcedure = "/admin.v1.AdminService/GetChainAliases"
+	// AdminServiceChainAliasesProcedure is the fully-qualified name of the AdminService's ChainAliases
+	// RPC.
+	AdminServiceChainAliasesProcedure = "/admin.v1.AdminService/ChainAliases"
 	// AdminServiceStacktraceProcedure is the fully-qualified name of the AdminService's Stacktrace RPC.
 	AdminServiceStacktraceProcedure = "/admin.v1.AdminService/Stacktrace"
 	// AdminServiceSetLoggerLevelProcedure is the fully-qualified name of the AdminService's
 	// SetLoggerLevel RPC.
 	AdminServiceSetLoggerLevelProcedure = "/admin.v1.AdminService/SetLoggerLevel"
-	// AdminServiceGetLoggerLevelProcedure is the fully-qualified name of the AdminService's
-	// GetLoggerLevel RPC.
-	AdminServiceGetLoggerLevelProcedure = "/admin.v1.AdminService/GetLoggerLevel"
-	// AdminServiceGetConfigProcedure is the fully-qualified name of the AdminService's GetConfig RPC.
-	AdminServiceGetConfigProcedure = "/admin.v1.AdminService/GetConfig"
-	// AdminServiceDBGetProcedure is the fully-qualified name of the AdminService's DBGet RPC.
-	AdminServiceDBGetProcedure = "/admin.v1.AdminService/DBGet"
+	// AdminServiceLoggerLevelProcedure is the fully-qualified name of the AdminService's LoggerLevel
+	// RPC.
+	AdminServiceLoggerLevelProcedure = "/admin.v1.AdminService/LoggerLevel"
+	// AdminServiceConfigProcedure is the fully-qualified name of the AdminService's Config RPC.
+	AdminServiceConfigProcedure = "/admin.v1.AdminService/Config"
+	// AdminServiceDBProcedure is the fully-qualified name of the AdminService's DB RPC.
+	AdminServiceDBProcedure = "/admin.v1.AdminService/DB"
 )
 
 // AdminServiceClient is a client for the admin.v1.AdminService service.
@@ -77,12 +77,12 @@ type AdminServiceClient interface {
 	LockProfile(context.Context, *connect.Request[v1.LockProfileRequest]) (*connect.Response[v1.LockProfileResponse], error)
 	Alias(context.Context, *connect.Request[v1.AliasRequest]) (*connect.Response[v1.AliasResponse], error)
 	AliasChain(context.Context, *connect.Request[v1.AliasChainRequest]) (*connect.Response[v1.AliasChainResponse], error)
-	GetChainAliases(context.Context, *connect.Request[v1.GetChainAliasesRequest]) (*connect.Response[v1.GetChainAliasesResponse], error)
+	ChainAliases(context.Context, *connect.Request[v1.ChainAliasesRequest]) (*connect.Response[v1.ChainAliasesResponse], error)
 	Stacktrace(context.Context, *connect.Request[v1.StacktraceRequest]) (*connect.Response[v1.StacktraceResponse], error)
 	SetLoggerLevel(context.Context, *connect.Request[v1.SetLoggerLevelRequest]) (*connect.Response[v1.SetLoggerLevelResponse], error)
-	GetLoggerLevel(context.Context, *connect.Request[v1.GetLoggerLevelRequest]) (*connect.Response[v1.GetLoggerLevelResponse], error)
-	GetConfig(context.Context, *connect.Request[v1.GetConfigRequest]) (*connect.Response[v1.GetConfigResponse], error)
-	DBGet(context.Context, *connect.Request[v1.DBGetRequest]) (*connect.Response[v1.DBGetResponse], error)
+	LoggerLevel(context.Context, *connect.Request[v1.LoggerLevelRequest]) (*connect.Response[v1.LoggerLevelResponse], error)
+	Config(context.Context, *connect.Request[v1.ConfigRequest]) (*connect.Response[v1.ConfigResponse], error)
+	DB(context.Context, *connect.Request[v1.DBRequest]) (*connect.Response[v1.DBResponse], error)
 }
 
 // NewAdminServiceClient constructs a client for the admin.v1.AdminService service. By default, it
@@ -132,10 +132,10 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(adminServiceMethods.ByName("AliasChain")),
 			connect.WithClientOptions(opts...),
 		),
-		getChainAliases: connect.NewClient[v1.GetChainAliasesRequest, v1.GetChainAliasesResponse](
+		chainAliases: connect.NewClient[v1.ChainAliasesRequest, v1.ChainAliasesResponse](
 			httpClient,
-			baseURL+AdminServiceGetChainAliasesProcedure,
-			connect.WithSchema(adminServiceMethods.ByName("GetChainAliases")),
+			baseURL+AdminServiceChainAliasesProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ChainAliases")),
 			connect.WithClientOptions(opts...),
 		),
 		stacktrace: connect.NewClient[v1.StacktraceRequest, v1.StacktraceResponse](
@@ -150,22 +150,22 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(adminServiceMethods.ByName("SetLoggerLevel")),
 			connect.WithClientOptions(opts...),
 		),
-		getLoggerLevel: connect.NewClient[v1.GetLoggerLevelRequest, v1.GetLoggerLevelResponse](
+		loggerLevel: connect.NewClient[v1.LoggerLevelRequest, v1.LoggerLevelResponse](
 			httpClient,
-			baseURL+AdminServiceGetLoggerLevelProcedure,
-			connect.WithSchema(adminServiceMethods.ByName("GetLoggerLevel")),
+			baseURL+AdminServiceLoggerLevelProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("LoggerLevel")),
 			connect.WithClientOptions(opts...),
 		),
-		getConfig: connect.NewClient[v1.GetConfigRequest, v1.GetConfigResponse](
+		config: connect.NewClient[v1.ConfigRequest, v1.ConfigResponse](
 			httpClient,
-			baseURL+AdminServiceGetConfigProcedure,
-			connect.WithSchema(adminServiceMethods.ByName("GetConfig")),
+			baseURL+AdminServiceConfigProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("Config")),
 			connect.WithClientOptions(opts...),
 		),
-		dBGet: connect.NewClient[v1.DBGetRequest, v1.DBGetResponse](
+		dB: connect.NewClient[v1.DBRequest, v1.DBResponse](
 			httpClient,
-			baseURL+AdminServiceDBGetProcedure,
-			connect.WithSchema(adminServiceMethods.ByName("DBGet")),
+			baseURL+AdminServiceDBProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("DB")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -179,12 +179,12 @@ type adminServiceClient struct {
 	lockProfile      *connect.Client[v1.LockProfileRequest, v1.LockProfileResponse]
 	alias            *connect.Client[v1.AliasRequest, v1.AliasResponse]
 	aliasChain       *connect.Client[v1.AliasChainRequest, v1.AliasChainResponse]
-	getChainAliases  *connect.Client[v1.GetChainAliasesRequest, v1.GetChainAliasesResponse]
+	chainAliases     *connect.Client[v1.ChainAliasesRequest, v1.ChainAliasesResponse]
 	stacktrace       *connect.Client[v1.StacktraceRequest, v1.StacktraceResponse]
 	setLoggerLevel   *connect.Client[v1.SetLoggerLevelRequest, v1.SetLoggerLevelResponse]
-	getLoggerLevel   *connect.Client[v1.GetLoggerLevelRequest, v1.GetLoggerLevelResponse]
-	getConfig        *connect.Client[v1.GetConfigRequest, v1.GetConfigResponse]
-	dBGet            *connect.Client[v1.DBGetRequest, v1.DBGetResponse]
+	loggerLevel      *connect.Client[v1.LoggerLevelRequest, v1.LoggerLevelResponse]
+	config           *connect.Client[v1.ConfigRequest, v1.ConfigResponse]
+	dB               *connect.Client[v1.DBRequest, v1.DBResponse]
 }
 
 // StartCPUProfiler calls admin.v1.AdminService.StartCPUProfiler.
@@ -217,9 +217,9 @@ func (c *adminServiceClient) AliasChain(ctx context.Context, req *connect.Reques
 	return c.aliasChain.CallUnary(ctx, req)
 }
 
-// GetChainAliases calls admin.v1.AdminService.GetChainAliases.
-func (c *adminServiceClient) GetChainAliases(ctx context.Context, req *connect.Request[v1.GetChainAliasesRequest]) (*connect.Response[v1.GetChainAliasesResponse], error) {
-	return c.getChainAliases.CallUnary(ctx, req)
+// ChainAliases calls admin.v1.AdminService.ChainAliases.
+func (c *adminServiceClient) ChainAliases(ctx context.Context, req *connect.Request[v1.ChainAliasesRequest]) (*connect.Response[v1.ChainAliasesResponse], error) {
+	return c.chainAliases.CallUnary(ctx, req)
 }
 
 // Stacktrace calls admin.v1.AdminService.Stacktrace.
@@ -232,19 +232,19 @@ func (c *adminServiceClient) SetLoggerLevel(ctx context.Context, req *connect.Re
 	return c.setLoggerLevel.CallUnary(ctx, req)
 }
 
-// GetLoggerLevel calls admin.v1.AdminService.GetLoggerLevel.
-func (c *adminServiceClient) GetLoggerLevel(ctx context.Context, req *connect.Request[v1.GetLoggerLevelRequest]) (*connect.Response[v1.GetLoggerLevelResponse], error) {
-	return c.getLoggerLevel.CallUnary(ctx, req)
+// LoggerLevel calls admin.v1.AdminService.LoggerLevel.
+func (c *adminServiceClient) LoggerLevel(ctx context.Context, req *connect.Request[v1.LoggerLevelRequest]) (*connect.Response[v1.LoggerLevelResponse], error) {
+	return c.loggerLevel.CallUnary(ctx, req)
 }
 
-// GetConfig calls admin.v1.AdminService.GetConfig.
-func (c *adminServiceClient) GetConfig(ctx context.Context, req *connect.Request[v1.GetConfigRequest]) (*connect.Response[v1.GetConfigResponse], error) {
-	return c.getConfig.CallUnary(ctx, req)
+// Config calls admin.v1.AdminService.Config.
+func (c *adminServiceClient) Config(ctx context.Context, req *connect.Request[v1.ConfigRequest]) (*connect.Response[v1.ConfigResponse], error) {
+	return c.config.CallUnary(ctx, req)
 }
 
-// DBGet calls admin.v1.AdminService.DBGet.
-func (c *adminServiceClient) DBGet(ctx context.Context, req *connect.Request[v1.DBGetRequest]) (*connect.Response[v1.DBGetResponse], error) {
-	return c.dBGet.CallUnary(ctx, req)
+// DB calls admin.v1.AdminService.DB.
+func (c *adminServiceClient) DB(ctx context.Context, req *connect.Request[v1.DBRequest]) (*connect.Response[v1.DBResponse], error) {
+	return c.dB.CallUnary(ctx, req)
 }
 
 // AdminServiceHandler is an implementation of the admin.v1.AdminService service.
@@ -255,12 +255,12 @@ type AdminServiceHandler interface {
 	LockProfile(context.Context, *connect.Request[v1.LockProfileRequest]) (*connect.Response[v1.LockProfileResponse], error)
 	Alias(context.Context, *connect.Request[v1.AliasRequest]) (*connect.Response[v1.AliasResponse], error)
 	AliasChain(context.Context, *connect.Request[v1.AliasChainRequest]) (*connect.Response[v1.AliasChainResponse], error)
-	GetChainAliases(context.Context, *connect.Request[v1.GetChainAliasesRequest]) (*connect.Response[v1.GetChainAliasesResponse], error)
+	ChainAliases(context.Context, *connect.Request[v1.ChainAliasesRequest]) (*connect.Response[v1.ChainAliasesResponse], error)
 	Stacktrace(context.Context, *connect.Request[v1.StacktraceRequest]) (*connect.Response[v1.StacktraceResponse], error)
 	SetLoggerLevel(context.Context, *connect.Request[v1.SetLoggerLevelRequest]) (*connect.Response[v1.SetLoggerLevelResponse], error)
-	GetLoggerLevel(context.Context, *connect.Request[v1.GetLoggerLevelRequest]) (*connect.Response[v1.GetLoggerLevelResponse], error)
-	GetConfig(context.Context, *connect.Request[v1.GetConfigRequest]) (*connect.Response[v1.GetConfigResponse], error)
-	DBGet(context.Context, *connect.Request[v1.DBGetRequest]) (*connect.Response[v1.DBGetResponse], error)
+	LoggerLevel(context.Context, *connect.Request[v1.LoggerLevelRequest]) (*connect.Response[v1.LoggerLevelResponse], error)
+	Config(context.Context, *connect.Request[v1.ConfigRequest]) (*connect.Response[v1.ConfigResponse], error)
+	DB(context.Context, *connect.Request[v1.DBRequest]) (*connect.Response[v1.DBResponse], error)
 }
 
 // NewAdminServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -306,10 +306,10 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(adminServiceMethods.ByName("AliasChain")),
 		connect.WithHandlerOptions(opts...),
 	)
-	adminServiceGetChainAliasesHandler := connect.NewUnaryHandler(
-		AdminServiceGetChainAliasesProcedure,
-		svc.GetChainAliases,
-		connect.WithSchema(adminServiceMethods.ByName("GetChainAliases")),
+	adminServiceChainAliasesHandler := connect.NewUnaryHandler(
+		AdminServiceChainAliasesProcedure,
+		svc.ChainAliases,
+		connect.WithSchema(adminServiceMethods.ByName("ChainAliases")),
 		connect.WithHandlerOptions(opts...),
 	)
 	adminServiceStacktraceHandler := connect.NewUnaryHandler(
@@ -324,22 +324,22 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(adminServiceMethods.ByName("SetLoggerLevel")),
 		connect.WithHandlerOptions(opts...),
 	)
-	adminServiceGetLoggerLevelHandler := connect.NewUnaryHandler(
-		AdminServiceGetLoggerLevelProcedure,
-		svc.GetLoggerLevel,
-		connect.WithSchema(adminServiceMethods.ByName("GetLoggerLevel")),
+	adminServiceLoggerLevelHandler := connect.NewUnaryHandler(
+		AdminServiceLoggerLevelProcedure,
+		svc.LoggerLevel,
+		connect.WithSchema(adminServiceMethods.ByName("LoggerLevel")),
 		connect.WithHandlerOptions(opts...),
 	)
-	adminServiceGetConfigHandler := connect.NewUnaryHandler(
-		AdminServiceGetConfigProcedure,
-		svc.GetConfig,
-		connect.WithSchema(adminServiceMethods.ByName("GetConfig")),
+	adminServiceConfigHandler := connect.NewUnaryHandler(
+		AdminServiceConfigProcedure,
+		svc.Config,
+		connect.WithSchema(adminServiceMethods.ByName("Config")),
 		connect.WithHandlerOptions(opts...),
 	)
-	adminServiceDBGetHandler := connect.NewUnaryHandler(
-		AdminServiceDBGetProcedure,
-		svc.DBGet,
-		connect.WithSchema(adminServiceMethods.ByName("DBGet")),
+	adminServiceDBHandler := connect.NewUnaryHandler(
+		AdminServiceDBProcedure,
+		svc.DB,
+		connect.WithSchema(adminServiceMethods.ByName("DB")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/admin.v1.AdminService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -356,18 +356,18 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 			adminServiceAliasHandler.ServeHTTP(w, r)
 		case AdminServiceAliasChainProcedure:
 			adminServiceAliasChainHandler.ServeHTTP(w, r)
-		case AdminServiceGetChainAliasesProcedure:
-			adminServiceGetChainAliasesHandler.ServeHTTP(w, r)
+		case AdminServiceChainAliasesProcedure:
+			adminServiceChainAliasesHandler.ServeHTTP(w, r)
 		case AdminServiceStacktraceProcedure:
 			adminServiceStacktraceHandler.ServeHTTP(w, r)
 		case AdminServiceSetLoggerLevelProcedure:
 			adminServiceSetLoggerLevelHandler.ServeHTTP(w, r)
-		case AdminServiceGetLoggerLevelProcedure:
-			adminServiceGetLoggerLevelHandler.ServeHTTP(w, r)
-		case AdminServiceGetConfigProcedure:
-			adminServiceGetConfigHandler.ServeHTTP(w, r)
-		case AdminServiceDBGetProcedure:
-			adminServiceDBGetHandler.ServeHTTP(w, r)
+		case AdminServiceLoggerLevelProcedure:
+			adminServiceLoggerLevelHandler.ServeHTTP(w, r)
+		case AdminServiceConfigProcedure:
+			adminServiceConfigHandler.ServeHTTP(w, r)
+		case AdminServiceDBProcedure:
+			adminServiceDBHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -401,8 +401,8 @@ func (UnimplementedAdminServiceHandler) AliasChain(context.Context, *connect.Req
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("admin.v1.AdminService.AliasChain is not implemented"))
 }
 
-func (UnimplementedAdminServiceHandler) GetChainAliases(context.Context, *connect.Request[v1.GetChainAliasesRequest]) (*connect.Response[v1.GetChainAliasesResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("admin.v1.AdminService.GetChainAliases is not implemented"))
+func (UnimplementedAdminServiceHandler) ChainAliases(context.Context, *connect.Request[v1.ChainAliasesRequest]) (*connect.Response[v1.ChainAliasesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("admin.v1.AdminService.ChainAliases is not implemented"))
 }
 
 func (UnimplementedAdminServiceHandler) Stacktrace(context.Context, *connect.Request[v1.StacktraceRequest]) (*connect.Response[v1.StacktraceResponse], error) {
@@ -413,14 +413,14 @@ func (UnimplementedAdminServiceHandler) SetLoggerLevel(context.Context, *connect
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("admin.v1.AdminService.SetLoggerLevel is not implemented"))
 }
 
-func (UnimplementedAdminServiceHandler) GetLoggerLevel(context.Context, *connect.Request[v1.GetLoggerLevelRequest]) (*connect.Response[v1.GetLoggerLevelResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("admin.v1.AdminService.GetLoggerLevel is not implemented"))
+func (UnimplementedAdminServiceHandler) LoggerLevel(context.Context, *connect.Request[v1.LoggerLevelRequest]) (*connect.Response[v1.LoggerLevelResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("admin.v1.AdminService.LoggerLevel is not implemented"))
 }
 
-func (UnimplementedAdminServiceHandler) GetConfig(context.Context, *connect.Request[v1.GetConfigRequest]) (*connect.Response[v1.GetConfigResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("admin.v1.AdminService.GetConfig is not implemented"))
+func (UnimplementedAdminServiceHandler) Config(context.Context, *connect.Request[v1.ConfigRequest]) (*connect.Response[v1.ConfigResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("admin.v1.AdminService.Config is not implemented"))
 }
 
-func (UnimplementedAdminServiceHandler) DBGet(context.Context, *connect.Request[v1.DBGetRequest]) (*connect.Response[v1.DBGetResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("admin.v1.AdminService.DBGet is not implemented"))
+func (UnimplementedAdminServiceHandler) DB(context.Context, *connect.Request[v1.DBRequest]) (*connect.Response[v1.DBResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("admin.v1.AdminService.DB is not implemented"))
 }

@@ -15,23 +15,21 @@ import (
 	dto "github.com/prometheus/client_model/go"
 )
 
-var _ metricsv1connect.MetricsServiceHandler = (*connectMetricsService)(nil)
+var _ metricsv1connect.MetricsServiceHandler = (*ConnectMetricsService)(nil)
 
-type connectMetricsService struct {
-	service prometheus.Gatherer
+type ConnectMetricsService struct {
+	metrics prometheus.Gatherer
 }
 
-func NewConnectMetricsService(service prometheus.Gatherer) metricsv1connect.MetricsServiceHandler {
-	return &connectMetricsService{
-		service: service,
-	}
+func NewConnectMetricsService(metrics prometheus.Gatherer) *ConnectMetricsService {
+	return &ConnectMetricsService{metrics: metrics}
 }
 
-func (c *connectMetricsService) GetMetrics(
+func (c *ConnectMetricsService) Metrics(
 	_ context.Context,
 	_ *connect.Request[metricsv1.MetricsRequest],
 ) (*connect.Response[metricsv1.MetricsResponse], error) {
-	mfs, err := c.service.Gather()
+	mfs, err := c.metrics.Gather()
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}

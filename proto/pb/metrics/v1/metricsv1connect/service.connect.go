@@ -36,14 +36,13 @@ const (
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
-	// MetricsServiceGetMetricsProcedure is the fully-qualified name of the MetricsService's GetMetrics
-	// RPC.
-	MetricsServiceGetMetricsProcedure = "/metrics.v1.MetricsService/GetMetrics"
+	// MetricsServiceMetricsProcedure is the fully-qualified name of the MetricsService's Metrics RPC.
+	MetricsServiceMetricsProcedure = "/metrics.v1.MetricsService/Metrics"
 )
 
 // MetricsServiceClient is a client for the metrics.v1.MetricsService service.
 type MetricsServiceClient interface {
-	GetMetrics(context.Context, *connect.Request[v1.MetricsRequest]) (*connect.Response[v1.MetricsResponse], error)
+	Metrics(context.Context, *connect.Request[v1.MetricsRequest]) (*connect.Response[v1.MetricsResponse], error)
 }
 
 // NewMetricsServiceClient constructs a client for the metrics.v1.MetricsService service. By
@@ -57,10 +56,10 @@ func NewMetricsServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 	baseURL = strings.TrimRight(baseURL, "/")
 	metricsServiceMethods := v1.File_metrics_v1_service_proto.Services().ByName("MetricsService").Methods()
 	return &metricsServiceClient{
-		getMetrics: connect.NewClient[v1.MetricsRequest, v1.MetricsResponse](
+		metrics: connect.NewClient[v1.MetricsRequest, v1.MetricsResponse](
 			httpClient,
-			baseURL+MetricsServiceGetMetricsProcedure,
-			connect.WithSchema(metricsServiceMethods.ByName("GetMetrics")),
+			baseURL+MetricsServiceMetricsProcedure,
+			connect.WithSchema(metricsServiceMethods.ByName("Metrics")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -68,17 +67,17 @@ func NewMetricsServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 
 // metricsServiceClient implements MetricsServiceClient.
 type metricsServiceClient struct {
-	getMetrics *connect.Client[v1.MetricsRequest, v1.MetricsResponse]
+	metrics *connect.Client[v1.MetricsRequest, v1.MetricsResponse]
 }
 
-// GetMetrics calls metrics.v1.MetricsService.GetMetrics.
-func (c *metricsServiceClient) GetMetrics(ctx context.Context, req *connect.Request[v1.MetricsRequest]) (*connect.Response[v1.MetricsResponse], error) {
-	return c.getMetrics.CallUnary(ctx, req)
+// Metrics calls metrics.v1.MetricsService.Metrics.
+func (c *metricsServiceClient) Metrics(ctx context.Context, req *connect.Request[v1.MetricsRequest]) (*connect.Response[v1.MetricsResponse], error) {
+	return c.metrics.CallUnary(ctx, req)
 }
 
 // MetricsServiceHandler is an implementation of the metrics.v1.MetricsService service.
 type MetricsServiceHandler interface {
-	GetMetrics(context.Context, *connect.Request[v1.MetricsRequest]) (*connect.Response[v1.MetricsResponse], error)
+	Metrics(context.Context, *connect.Request[v1.MetricsRequest]) (*connect.Response[v1.MetricsResponse], error)
 }
 
 // NewMetricsServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -88,16 +87,16 @@ type MetricsServiceHandler interface {
 // and JSON codecs. They also support gzip compression.
 func NewMetricsServiceHandler(svc MetricsServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
 	metricsServiceMethods := v1.File_metrics_v1_service_proto.Services().ByName("MetricsService").Methods()
-	metricsServiceGetMetricsHandler := connect.NewUnaryHandler(
-		MetricsServiceGetMetricsProcedure,
-		svc.GetMetrics,
-		connect.WithSchema(metricsServiceMethods.ByName("GetMetrics")),
+	metricsServiceMetricsHandler := connect.NewUnaryHandler(
+		MetricsServiceMetricsProcedure,
+		svc.Metrics,
+		connect.WithSchema(metricsServiceMethods.ByName("Metrics")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/metrics.v1.MetricsService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case MetricsServiceGetMetricsProcedure:
-			metricsServiceGetMetricsHandler.ServeHTTP(w, r)
+		case MetricsServiceMetricsProcedure:
+			metricsServiceMetricsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -107,6 +106,6 @@ func NewMetricsServiceHandler(svc MetricsServiceHandler, opts ...connect.Handler
 // UnimplementedMetricsServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedMetricsServiceHandler struct{}
 
-func (UnimplementedMetricsServiceHandler) GetMetrics(context.Context, *connect.Request[v1.MetricsRequest]) (*connect.Response[v1.MetricsResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("metrics.v1.MetricsService.GetMetrics is not implemented"))
+func (UnimplementedMetricsServiceHandler) Metrics(context.Context, *connect.Request[v1.MetricsRequest]) (*connect.Response[v1.MetricsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("metrics.v1.MetricsService.Metrics is not implemented"))
 }
