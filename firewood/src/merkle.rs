@@ -368,11 +368,11 @@ impl<T: HashedNodeReader> Merkle<T> {
         seen: &mut HashSet<String>,
         writer: &mut dyn Write,
     ) -> Result<(), FileIoError> {
-        write!(writer, "  {node}")
+        writeln!(writer, "  {node}[label=\"{node}")
             .map_err(Error::other)
             .map_err(|e| FileIoError::new(e, None, 0, None))?;
         if let Some(hash) = hash {
-            write!(writer, " hash:{hash:.6?}...")
+            write!(writer, " H={hash:.6?}")
                 .map_err(Error::other)
                 .map_err(|e| FileIoError::new(e, None, 0, None))?;
         }
@@ -2033,6 +2033,8 @@ mod tests {
         use rand::rngs::StdRng;
         use rand::{Rng, SeedableRng};
 
+        let _ = env_logger::Builder::new().is_test(true).try_init();
+
         let seed = std::env::var("FIREWOOD_TEST_SEED")
             .ok()
             .map_or_else(
@@ -2071,6 +2073,7 @@ mod tests {
                 .collect();
 
             items.sort();
+            items.dedup_by_key(|(k, _)| k.clone());
 
             let init_merkle: Merkle<NodeStore<MutableProposal, MemStore>> =
                 merkle_build_test::<Vec<u8>, Box<[u8]>>(vec![])?;
