@@ -114,9 +114,20 @@ type Client interface {
 	SendTransaction(context.Context, *types.Transaction) error
 }
 
+// BlockHook is an interface that can be implemented to modify the block
+// after it has been decoded. This is useful for plugins that want to
+// modify the block before it is returned to the caller.
+type BlockHook interface {
+	// OnBlockDecoded is called when a block is decoded. It can be used to
+	// modify the block before it is returned to the caller.
+	OnBlockDecoded(raw json.RawMessage, block *types.Block) error
+}
+
 // client defines implementation for typed wrappers for the Ethereum RPC API.
 type client struct {
 	c *rpc.Client
+	// blockHook is called when a block is decoded.
+	blockHook BlockHook
 }
 
 // Dial connects a client to the given URL.
@@ -135,7 +146,17 @@ func DialContext(ctx context.Context, rawurl string) (Client, error) {
 
 // NewClient creates a client that uses the given RPC client.
 func NewClient(c *rpc.Client) Client {
-	return &client{c}
+	return &client{
+		c: c,
+	}
+}
+
+// NewClientWithHook creates a client that uses the given RPC client and block hook.
+func NewClientWithHook(c *rpc.Client, hook BlockHook) Client {
+	return &client{
+		c:         c,
+		blockHook: hook,
+	}
 }
 
 // Close closes the underlying RPC connection.
@@ -277,10 +298,17 @@ func (ec *client) getBlock(ctx context.Context, method string, args ...interface
 		}
 		txs[i] = tx.tx
 	}
-	return types.NewBlockWithHeader(head).WithBody(types.Body{
+	block := types.NewBlockWithHeader(head).WithBody(types.Body{
 		Transactions: txs,
 		Uncles:       uncles,
-	}), nil
+	})
+	// Fill the block with the extra data. BlockHook can modify the block.
+	if ec.blockHook != nil {
+		if err := ec.blockHook.OnBlockDecoded(raw, block); err != nil {
+			return nil, err
+		}
+	}
+	return block, nil
 }
 
 // HeaderByHash returns the block header with the given hash.
