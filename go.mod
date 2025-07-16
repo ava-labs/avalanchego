@@ -19,7 +19,6 @@ require (
 	github.com/ava-labs/ledger-avalanche/go v0.0.0-20241009183145-e6f90a8a1a60
 	github.com/ava-labs/libevm v1.13.14-0.3.0.rc.1
 	github.com/btcsuite/btcd/btcutil v1.1.3
-	github.com/bufbuild/connect-go v1.10.0
 	github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593
 	github.com/compose-spec/compose-go v1.20.2
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.1.0
