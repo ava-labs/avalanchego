@@ -3,3 +3,4 @@ self-hosted-runner:
     - custom-arm64-jammy
     - custom-arm64-noble
     - avalanche-avalanchego-runner # Github Action Runner Controller
+    - blacksmith-4vcpu-ubuntu-2404 # Blacksmith Runner
