@@ -41,8 +41,9 @@ func (qc *QC) Signers() []simplex.NodeID {
 // Verify checks if the quorum certificate is valid by verifying the aggregated signature against the signers' public keys.
 func (qc *QC) Verify(msg []byte) error {
 	pks := make([]*bls.PublicKey, 0, len(qc.signers))
-	if len(qc.signers) != simplex.Quorum(len(qc.verifier.nodeID2PK)) {
-		return fmt.Errorf("%w: expected %d signers but got %d", errUnexpectedSigners, simplex.Quorum(len(qc.verifier.nodeID2PK)), len(qc.signers))
+	quorum := simplex.Quorum(len(qc.signers))
+	if len(qc.signers) != quorum {
+		return fmt.Errorf("%w: expected %d signers but got %d", errUnexpectedSigners, quorum, len(qc.signers))
 	}
 
 	// ensure all signers are in the membership set
