@@ -554,11 +554,12 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 func TestGetStakingSigner(t *testing.T) {
 	testKey := "HLimS3vRibTMk9lZD4b+Z+GLuSBShvgbsu0WTLt2Kd4="
 	defaultSignerKeyTestDir := t.TempDir()
-	// required for proper write permissions for the default signer-key location
-	t.Setenv("HOME", defaultSignerKeyTestDir)
 
-	fileKeyPath := filepath.Join(t.TempDir(), ".avalanchego/staking/signer.key")
-	defaultSignerKeyPath := filepath.Join(defaultSignerKeyTestDir, ".avalanchego/staking/signer.key")
+	fileKeyPath := filepath.Join(t.TempDir(), "foobar/signer.key")
+	defaultSignerKeyPath := filepath.Join(
+		defaultSignerKeyTestDir,
+		"/staking/signer.key",
+	)
 
 	tests := []struct {
 		name                 string
@@ -568,7 +569,8 @@ func TestGetStakingSigner(t *testing.T) {
 		expectedErr          error
 	}{
 		{
-			name: "default signer",
+			name:   "default signer",
+			config: map[string]any{DataDirKey: defaultSignerKeyTestDir},
 			expectedSignerConfig: node.DefaultSignerConfig{
 				SignerKeyPath: defaultSignerKeyPath,
 			},
