@@ -274,28 +274,6 @@ type vmExecutor struct {
 	metrics *consensusMetrics
 }
 
-type consensusMetrics struct {
-	lastAcceptedHeight prometheus.Gauge
-}
-
-// newConsensusMetrics creates a subset of the metrics from snowman consensus
-// [engine](../../snow/engine/snowman/metrics.go).
-//
-// The registry passed in is expected to be registered with the prefix
-// "avalanche_snowman" and the chain label (ex. chain="C") that would be handled
-// by the[chain manager](../../../chains/manager.go).
-func newConsensusMetrics(registry prometheus.Registerer) (*consensusMetrics, error) {
-	errs := wrappers.Errs{}
-	m := &consensusMetrics{
-		lastAcceptedHeight: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "last_accepted_height",
-			Help: "last height accepted",
-		}),
-	}
-	errs.Add(registry.Register(m.lastAcceptedHeight))
-	return m, errs.Err
-}
-
 func newVMExecutor(vm block.ChainVM, config vmExecutorConfig) (*vmExecutor, error) {
 	metrics, err := newConsensusMetrics(config.Registry)
 	if err != nil {
@@ -396,6 +374,56 @@ func createBlockChanFromLevelDB(tb testing.TB, sourceDir string, startBlock, end
 	return ch, nil
 }
 
+func TestExportBlockRange(t *testing.T) {
+	exportBlockRange(t, sourceBlockDirArg, targetBlockDirArg, startBlockArg, endBlockArg, chanSizeArg)
+}
+
+func exportBlockRange(tb testing.TB, sourceDir string, targetDir string, startBlock, endBlock uint64, chanSize int) {
+	r := require.New(tb)
+	blockChan, err := createBlockChanFromLevelDB(tb, sourceDir, startBlock, endBlock, chanSize)
+	r.NoError(err)
+
+	db, err := leveldb.New(targetDir, nil, logging.NoLog{}, prometheus.NewRegistry())
+	r.NoError(err)
+	tb.Cleanup(func() {
+		r.NoError(db.Close())
+	})
+
+	batch := db.NewBatch()
+	for blkResult := range blockChan {
+		r.NoError(batch.Put(binary.BigEndian.AppendUint64(nil, blkResult.Height), blkResult.BlockBytes))
+
+		if batch.Size() > 10*units.MiB {
+			r.NoError(batch.Write())
+			batch = db.NewBatch()
+		}
+	}
+
+	r.NoError(batch.Write())
+}
+
+type consensusMetrics struct {
+	lastAcceptedHeight prometheus.Gauge
+}
+
+// newConsensusMetrics creates a subset of the metrics from snowman consensus
+// [engine](../../snow/engine/snowman/metrics.go).
+//
+// The registry passed in is expected to be registered with the prefix
+// "avalanche_snowman" and the chain label (ex. chain="C") that would be handled
+// by the[chain manager](../../../chains/manager.go).
+func newConsensusMetrics(registry prometheus.Registerer) (*consensusMetrics, error) {
+	errs := wrappers.Errs{}
+	m := &consensusMetrics{
+		lastAcceptedHeight: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "last_accepted_height",
+			Help: "last height accepted",
+		}),
+	}
+	errs.Add(registry.Register(m.lastAcceptedHeight))
+	return m, errs.Err
+}
+
 // collectRegistry starts prometheus and collects metrics from the provided gatherer.
 // Attaches the provided labels + GitHub labels if available to the collected metrics.
 func collectRegistry(tb testing.TB, name string, timeout time.Duration, gatherer prometheus.Gatherer, labels map[string]string) {
@@ -462,32 +490,4 @@ func getCounterMetricValue(tb testing.TB, registry prometheus.Gatherer, query st
 	}
 
 	return 0, fmt.Errorf("metric %s not found", query)
-}
-
-func TestExportBlockRange(t *testing.T) {
-	exportBlockRange(t, sourceBlockDirArg, targetBlockDirArg, startBlockArg, endBlockArg, chanSizeArg)
-}
-
-func exportBlockRange(tb testing.TB, sourceDir string, targetDir string, startBlock, endBlock uint64, chanSize int) {
-	r := require.New(tb)
-	blockChan, err := createBlockChanFromLevelDB(tb, sourceDir, startBlock, endBlock, chanSize)
-	r.NoError(err)
-
-	db, err := leveldb.New(targetDir, nil, logging.NoLog{}, prometheus.NewRegistry())
-	r.NoError(err)
-	tb.Cleanup(func() {
-		r.NoError(db.Close())
-	})
-
-	batch := db.NewBatch()
-	for blkResult := range blockChan {
-		r.NoError(batch.Put(binary.BigEndian.AppendUint64(nil, blkResult.Height), blkResult.BlockBytes))
-
-		if batch.Size() > 10*units.MiB {
-			r.NoError(batch.Write())
-			batch = db.NewBatch()
-		}
-	}
-
-	r.NoError(batch.Write())
 }

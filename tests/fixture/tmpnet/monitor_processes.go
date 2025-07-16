@@ -261,8 +261,6 @@ func getWorkingDir(cmdName string) (string, error) {
 
 // GetPrometheusServiceDiscoveryDir returns the path for prometheus file-based
 // service discovery configuration.
-//
-// file_sd_config docs: https://prometheus.io/docs/prometheus/latest/configuration/configuration/#file_sd_config
 func GetPrometheusServiceDiscoveryDir() (string, error) {
 	return getServiceDiscoveryDir(prometheusCmd)
 }
