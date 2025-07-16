@@ -261,8 +261,6 @@ func getWorkingDir(cmdName string) (string, error) {
 
 // GetPrometheusServiceDiscoveryDir returns the path for prometheus file-based
 // service discovery configuration.
-//
-// file_sd_config docs: https://prometheus.io/docs/prometheus/latest/configuration/configuration/#file_sd_config
 func GetPrometheusServiceDiscoveryDir() (string, error) {
 	return getServiceDiscoveryDir(prometheusCmd)
 }
@@ -284,7 +282,7 @@ type SDConfig struct {
 }
 
 // WritePrometheusSDConfig writes the SDConfig with the provided name
-// to the location expected by tmpnet.
+// to the location expected by the prometheus instance start by tmpnet.
 // If withGitHubLabels is true, it attempts to append GitHub-specific labels
 // to the SDConfig before writing.
 //

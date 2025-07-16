@@ -61,14 +61,10 @@ func (s *PrometheusServer) Stop() error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	err := s.server.Shutdown(shutdownCtx)
-	if err != nil {
-		return err
-	}
-	if s.errChan == nil {
-		return nil
-	}
-	return <-s.errChan
+	return errors.Join(
+		s.server.Shutdown(shutdownCtx),
+		<-s.errChan,
+	)
 }
 
 // Address returns the address the server is listening on.
