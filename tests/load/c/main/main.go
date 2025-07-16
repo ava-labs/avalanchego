@@ -69,8 +69,8 @@ func main() {
 	metrics, err := load.NewMetrics(registry)
 	require.NoError(err, "failed to register load metrics")
 
-	metricsServer := tests.NewPrometheusServer(registry)
-	require.NoError(metricsServer.Start(), "failed to start load metrics server")
+	metricsServer, err := tests.NewPrometheusServer(registry)
+	require.NoError(err, "failed to start load metrics server")
 	tc.DeferCleanup(func() {
 		require.NoError(metricsServer.Stop())
 	})

@@ -16,20 +16,31 @@ import (
 
 const defaultPrometheusListenAddr = "127.0.0.1:0"
 
+// PrometheusServer is a HTTP server that serves Prometheus metrics from the provided
+// gahterer.
+// Listens on localhost with a dynamic port and serves metrics at /ext/metrics.
 type PrometheusServer struct {
 	gatherer prometheus.Gatherer
 	server   http.Server
 	errChan  chan error
 }
 
-// NewPrometheusServer creates a Prometheus server listening on 127.0.0.1:0 and serving /ext/metrics.
-func NewPrometheusServer(gatherer prometheus.Gatherer) *PrometheusServer {
-	return &PrometheusServer{
+// NewPrometheusServer creates and starts a Prometheus server with the provided gatherer
+// listening on 127.0.0.1:0 and serving /ext/metrics.
+func NewPrometheusServer(gatherer prometheus.Gatherer) (*PrometheusServer, error) {
+	server := &PrometheusServer{
 		gatherer: gatherer,
 	}
+
+	if err := server.start(); err != nil {
+		return nil, err
+	}
+
+	return server, nil
 }
 
-func (s *PrometheusServer) Start() error {
+// start the Prometheus server on a dynamic port.
+func (s *PrometheusServer) start() error {
 	mux := http.NewServeMux()
 	mux.Handle("/ext/metrics", promhttp.HandlerFor(s.gatherer, promhttp.HandlerOpts{}))
 
@@ -57,6 +68,8 @@ func (s *PrometheusServer) Start() error {
 	return nil
 }
 
+// Stop gracefully shuts down the Prometheus server.
+// Waits for the server to shut down and returns any error that occurred during shutdown.
 func (s *PrometheusServer) Stop() error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -68,7 +81,6 @@ func (s *PrometheusServer) Stop() error {
 }
 
 // Address returns the address the server is listening on.
-//
 // If the server has not started, the address will be empty.
 func (s *PrometheusServer) Address() string {
 	return s.server.Addr

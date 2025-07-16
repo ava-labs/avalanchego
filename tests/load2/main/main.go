@@ -73,8 +73,8 @@ func main() {
 	require.NoError(err)
 
 	registry := prometheus.NewRegistry()
-	metricsServer := tests.NewPrometheusServer(registry)
-	require.NoError(metricsServer.Start())
+	metricsServer, err := tests.NewPrometheusServer(registry)
+	require.NoError(err)
 	tc.DeferCleanup(func() {
 		require.NoError(metricsServer.Stop())
 	})
