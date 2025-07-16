@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/subnets"
-	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
 const chainConfigFilenameExtension = ".ex"
@@ -553,11 +552,11 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 
 func TestGetStakingSigner(t *testing.T) {
 	testKey := "HLimS3vRibTMk9lZD4b+Z+GLuSBShvgbsu0WTLt2Kd4="
-	defaultSignerKeyTestDir := t.TempDir()
+	dataDir := t.TempDir()
 
 	fileKeyPath := filepath.Join(t.TempDir(), "foobar", "signer.key")
 	defaultSignerKeyPath := filepath.Join(
-		defaultSignerKeyTestDir,
+		dataDir,
 		"staking",
 		"signer.key",
 	)
@@ -571,7 +570,7 @@ func TestGetStakingSigner(t *testing.T) {
 	}{
 		{
 			name:   "default signer",
-			config: map[string]any{DataDirKey: defaultSignerKeyTestDir},
+			config: map[string]any{DataDirKey: dataDir},
 			expectedSignerConfig: node.DefaultSignerConfig{
 				SignerKeyPath: defaultSignerKeyPath,
 			},
