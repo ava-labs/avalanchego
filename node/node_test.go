@@ -41,13 +41,15 @@ func TestDefaultConfigInitializationUsesExistingDefaultKey(t *testing.T) {
 }
 
 // setups config json file and writes content
-
 func setupViperFlags(t *testing.T) *viper.Viper {
 	v := viper.New()
+
 	fs := config.BuildFlagSet()
 	pflag.Parse()
+
 	if err := v.BindPFlags(fs); err != nil {
 		require.NoError(t, err)
 	}
+
 	return v
 }

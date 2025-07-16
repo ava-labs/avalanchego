@@ -44,19 +44,18 @@ func NewClient(ctx context.Context, url string) (*Client, error) {
 
 	client := pb.NewSignerClient(conn)
 
-	pubkeyResponse, err := client.PublicKey(ctx, &pb.PublicKeyRequest{})
+	pkResponse, err := client.PublicKey(ctx, &pb.PublicKeyRequest{})
 	if err != nil {
 		return nil, errors.Join(
-			fmt.Errorf("failed to get pubkey response: %w", err),
+			fmt.Errorf("failed to get public key: %w", err),
 			conn.Close(),
 		)
 	}
 
-	pkBytes := pubkeyResponse.GetPublicKey()
-	pk, err := bls.PublicKeyFromCompressedBytes(pkBytes)
+	pk, err := bls.PublicKeyFromCompressedBytes(pkResponse.GetPublicKey())
 	if err != nil {
 		return nil, errors.Join(
-			fmt.Errorf("failed to uncompress public key bytes: %w", err),
+			fmt.Errorf("failed to parse compressed public key bytes: %w", err),
 			conn.Close(),
 		)
 	}
@@ -78,11 +77,11 @@ func (c *Client) Sign(message []byte) (*bls.Signature, error) {
 		return nil, fmt.Errorf("failed to sign message: %w", err)
 	}
 
-	sigBytes := resp.GetSignature()
-	sig, err := bls.SignatureFromBytes(sigBytes)
+	sig, err := bls.SignatureFromBytes(resp.GetSignature())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse signature: %w", err)
 	}
+
 	return sig, nil
 }
 
@@ -99,13 +98,14 @@ func (c *Client) SignProofOfPossession(message []byte) (*bls.Signature, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse signature: %w", err)
 	}
+
 	return sig, nil
 }
 
 func (c *Client) Shutdown() error {
-	err := c.connection.Close()
-	if err != nil {
+	if err := c.connection.Close(); err != nil {
 		return fmt.Errorf("failed to close connection: %w", err)
 	}
+
 	return nil
 }

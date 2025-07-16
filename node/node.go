@@ -1627,9 +1627,7 @@ func (n *Node) initDiskTargeter(
 }
 
 // newStakingSigner returns a BLS signer based on the provided configuration.
-func newStakingSigner(
-	config any,
-) (bls.Signer, error) {
+func newStakingSigner(config any) (bls.Signer, error) {
 	switch cfg := config.(type) {
 	case node.EphemeralSignerConfig:
 		signer, err := localsigner.New()
@@ -1638,7 +1636,6 @@ func newStakingSigner(
 		}
 
 		return signer, nil
-
 	case node.ContentKeyConfig:
 		signerKeyContent, err := base64.StdEncoding.DecodeString(cfg.SignerKeyRawContent)
 		if err != nil {
@@ -1651,7 +1648,6 @@ func newStakingSigner(
 		}
 
 		return signer, nil
-
 	case node.RPCSignerConfig:
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -1662,17 +1658,15 @@ func newStakingSigner(
 		}
 
 		return signer, nil
-
 	case node.SignerPathConfig:
 		return createSignerFromFile(cfg.SignerKeyPath)
-
 	case node.DefaultSignerConfig:
 		_, err := os.Stat(cfg.SignerKeyPath)
 		if !errors.Is(err, fs.ErrNotExist) {
 			return createSignerFromFile(cfg.SignerKeyPath)
 		}
-		return createSignerFromNewKey(cfg.SignerKeyPath)
 
+		return createSignerFromNewKey(cfg.SignerKeyPath)
 	default:
 		return nil, fmt.Errorf("unsupported signer type: %T", cfg)
 	}
@@ -1702,13 +1696,18 @@ func createSignerFromNewKey(signerKeyPath string) (bls.Signer, error) {
 		return nil, fmt.Errorf("could not create path for signing key at %s: %w", signerKeyPath, err)
 	}
 
-	keyBytes := signer.ToBytes()
-	if err := os.WriteFile(signerKeyPath, keyBytes, perms.ReadWrite); err != nil {
+	if err := os.WriteFile(
+		signerKeyPath,
+		signer.ToBytes(),
+		perms.ReadWrite,
+	); err != nil {
 		return nil, fmt.Errorf("could not write new signing key to %s: %w", signerKeyPath, err)
 	}
+
 	if err := os.Chmod(signerKeyPath, perms.ReadOnly); err != nil {
 		return nil, fmt.Errorf("could not restrict permissions on new signing key at %s: %w", signerKeyPath, err)
 	}
+
 	return signer, nil
 }
 
@@ -1747,10 +1746,7 @@ func (n *Node) shutdown() {
 
 	if n.StakingSigner != nil {
 		if err := n.StakingSigner.Shutdown(); err != nil {
-			n.Log.Debug(
-				"error during staking signer shutdown",
-				zap.Error(err),
-			)
+			n.Log.Debug("error during staking signer shutdown", zap.Error(err))
 		}
 	}
 	if n.resourceManager != nil {
