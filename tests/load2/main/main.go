@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
-	"github.com/ava-labs/avalanchego/tests/load"
 	"github.com/ava-labs/avalanchego/tests/load2"
 )
 
@@ -74,28 +73,23 @@ func main() {
 	require.NoError(err)
 
 	registry := prometheus.NewRegistry()
-	metricsServer := load.NewPrometheusServer("127.0.0.1:0", registry)
-	metricsErrChan, err := metricsServer.Start()
+	metricsServer, err := tests.NewPrometheusServer(registry)
 	require.NoError(err)
-
 	tc.DeferCleanup(func() {
-		select {
-		case err := <-metricsErrChan:
-			require.NoError(err)
-		default:
-		}
-
-		require.NoError(metricsServer.Stop(), "failed to stop metrics server")
+		require.NoError(metricsServer.Stop())
 	})
 
-	monitoringConfigFilePath, err := metricsServer.GenerateMonitoringConfig(
-		log,
-		network.GetMonitoringLabels(),
-	)
-	require.NoError(err)
+	monitoringConfigFilePath, err := tmpnet.WritePrometheusSDConfig("load-test", tmpnet.SDConfig{
+		Targets: []string{metricsServer.Address()},
+		Labels:  network.GetMonitoringLabels(),
+	}, false)
+	require.NoError(err, "failed to generate monitoring config file")
 
 	tc.DeferCleanup(func() {
-		require.NoError(os.Remove(monitoringConfigFilePath))
+		require.NoError(
+			os.Remove(monitoringConfigFilePath),
+			"failed †o remove monitoring config file",
+		)
 	})
 
 	workers := make([]load2.Worker, len(keys))
