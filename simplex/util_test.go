@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -20,8 +19,6 @@ import (
 type newBlockConfig struct {
 	// If prev is nil, newBlock will create the genesis block
 	prev *Block
-	// If vmBlock is nil, a random child of prev will be created
-	vmBlock snowman.Block
 	// If round is 0, it will be set to one higher than the prev's round
 	round uint64
 }
@@ -46,22 +43,19 @@ func newBlock(t *testing.T, config newBlockConfig) *Block {
 		block.blockTracker = newBlockTracker(block)
 		return block
 	}
-
-	if config.vmBlock == nil {
-		config.vmBlock = snowmantest.BuildChild(config.prev.vmBlock.(*snowmantest.Block))
-	}
 	if config.round == 0 {
 		config.round = config.prev.metadata.Round + 1
 	}
 
+	vmBlock := snowmantest.BuildChild(config.prev.vmBlock.(*snowmantest.Block))
 	block := &Block{
-		vmBlock:      config.vmBlock,
+		vmBlock:      vmBlock,
 		blockTracker: config.prev.blockTracker,
 		metadata: simplex.ProtocolMetadata{
 			Version: 1,
 			Epoch:   1,
 			Round:   config.round,
-			Seq:     config.vmBlock.Height(),
+			Seq:     vmBlock.Height(),
 			Prev:    config.prev.digest,
 		},
 	}

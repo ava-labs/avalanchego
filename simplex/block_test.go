@@ -229,6 +229,9 @@ func TestVerifyInnerBlockBreaksHashChain(t *testing.T) {
 	b := newBlock(t, newBlockConfig{
 		prev: genesis,
 	})
+
+	// This block does not extend the genesis, however it has a valid previous
+	// digest.
 	b.vmBlock.(*snowmantest.Block).ParentV[0]++
 
 	_, err := b.Verify(ctx)
