@@ -306,11 +306,17 @@ tasks:
     vars:
       CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR}}'
       SOURCE_BLOCK_DIR: '{{.SOURCE_BLOCK_DIR}}'
+      BENCHMARK_OUTPUT_FILE: '{{.BENCHMARK_OUTPUT_FILE | default ""}}'
       START_BLOCK: '{{.START_BLOCK}}'
       END_BLOCK: '{{.END_BLOCK}}'
       LABELS: '{{.LABELS | default ""}}'
     cmds:
-      - cmd: go test -timeout=0 -v -benchtime=1x -bench=BenchmarkReexecuteRange -run=^$ github.com/ava-labs/avalanchego/tests/bench/c --source-block-dir={{.SOURCE_BLOCK_DIR}} --target-dir={{.EXECUTION_DATA_DIR}}/current-state --start-block={{.START_BLOCK}} --end-block={{.END_BLOCK}} --labels={{.LABELS}} | tee {{.EXECUTION_DATA_DIR}}/reexecute-cchain-range.txt
+      - cmd: |
+          cmd="go test -timeout=0 -v -benchtime=1x -bench=BenchmarkReexecuteRange -run=^$ github.com/ava-labs/avalanchego/tests/bench/c --source-block-dir={{.SOURCE_BLOCK_DIR}} --target-dir={{.CURRENT_STATE_DIR}} --start-block={{.START_BLOCK}} --end-block={{.END_BLOCK}} --labels={{.LABELS}}"
+          if [ -n "{{.BENCHMARK_OUTPUT_FILE}}" ]; then
+            cmd="$cmd | tee \"{{.BENCHMARK_OUTPUT_FILE}}\""
+          fi
+          eval "$cmd"
 
   export-dir-to-s3:
     desc: Copies a directory to s3
@@ -342,3 +348,4 @@ tasks:
           START_BLOCK: '{{.START_BLOCK}}'
           END_BLOCK: '{{.END_BLOCK}}'
           LABELS: '{{.LABELS}}'
+          BENCHMARK_OUTPUT_FILE: '{{.BENCHMARK_OUTPUT_FILE | default ""}}'
