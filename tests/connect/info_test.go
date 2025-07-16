@@ -23,56 +23,56 @@ import (
 
 type stubInfoService struct{}
 
-func (*stubInfoService) GetNodeVersion(
+func (*stubInfoService) NodeVersion(
 	_ context.Context,
-	_ *connect.Request[infov1.GetNodeVersionRequest],
-) (*connect.Response[infov1.GetNodeVersionResponse], error) {
-	return connect.NewResponse(&infov1.GetNodeVersionResponse{
+	_ *connect.Request[infov1.NodeVersionRequest],
+) (*connect.Response[infov1.NodeVersionResponse], error) {
+	return connect.NewResponse(&infov1.NodeVersionResponse{
 		Version: "stub-v1.2.3",
 	}), nil
 }
 
-func (*stubInfoService) GetNodeID(
+func (*stubInfoService) NodeID(
 	_ context.Context,
-	_ *connect.Request[infov1.GetNodeIDRequest],
-) (*connect.Response[infov1.GetNodeIDResponse], error) {
-	return connect.NewResponse(&infov1.GetNodeIDResponse{
+	_ *connect.Request[infov1.NodeIDRequest],
+) (*connect.Response[infov1.NodeIDResponse], error) {
+	return connect.NewResponse(&infov1.NodeIDResponse{
 		NodeId: "NodeID-stub-node",
 	}), nil
 }
 
-func (*stubInfoService) GetNodeIP(
+func (*stubInfoService) NodeIP(
 	_ context.Context,
-	_ *connect.Request[infov1.GetNodeIPRequest],
-) (*connect.Response[infov1.GetNodeIPResponse], error) {
-	return connect.NewResponse(&infov1.GetNodeIPResponse{
+	_ *connect.Request[infov1.NodeIPRequest],
+) (*connect.Response[infov1.NodeIPResponse], error) {
+	return connect.NewResponse(&infov1.NodeIPResponse{
 		Ip: "127.0.0.1",
 	}), nil
 }
 
-func (*stubInfoService) GetNetworkID(
+func (*stubInfoService) NetworkID(
 	_ context.Context,
-	_ *connect.Request[infov1.GetNetworkIDRequest],
-) (*connect.Response[infov1.GetNetworkIDResponse], error) {
-	return connect.NewResponse(&infov1.GetNetworkIDResponse{
+	_ *connect.Request[infov1.NetworkIDRequest],
+) (*connect.Response[infov1.NetworkIDResponse], error) {
+	return connect.NewResponse(&infov1.NetworkIDResponse{
 		NetworkId: 1,
 	}), nil
 }
 
-func (*stubInfoService) GetNetworkName(
+func (*stubInfoService) NetworkName(
 	_ context.Context,
-	_ *connect.Request[infov1.GetNetworkNameRequest],
-) (*connect.Response[infov1.GetNetworkNameResponse], error) {
-	return connect.NewResponse(&infov1.GetNetworkNameResponse{
+	_ *connect.Request[infov1.NetworkNameRequest],
+) (*connect.Response[infov1.NetworkNameResponse], error) {
+	return connect.NewResponse(&infov1.NetworkNameResponse{
 		NetworkName: "network",
 	}), nil
 }
 
-func (*stubInfoService) GetBlockchainID(
+func (*stubInfoService) BlockchainID(
 	_ context.Context,
-	_ *connect.Request[infov1.GetBlockchainIDRequest],
-) (*connect.Response[infov1.GetBlockchainIDResponse], error) {
-	return connect.NewResponse(&infov1.GetBlockchainIDResponse{
+	_ *connect.Request[infov1.BlockchainIDRequest],
+) (*connect.Response[infov1.BlockchainIDResponse], error) {
+	return connect.NewResponse(&infov1.BlockchainIDResponse{
 		BlockchainId: "blockchain",
 	}), nil
 }
@@ -110,11 +110,11 @@ func (*stubInfoService) Uptime(
 	return connect.NewResponse(&infov1.UptimeResponse{}), nil
 }
 
-func (*stubInfoService) GetVMs(
+func (*stubInfoService) VMs(
 	_ context.Context,
-	_ *connect.Request[infov1.GetVMsRequest],
-) (*connect.Response[infov1.GetVMsResponse], error) {
-	return connect.NewResponse(&infov1.GetVMsResponse{
+	_ *connect.Request[infov1.VMsRequest],
+) (*connect.Response[infov1.VMsResponse], error) {
+	return connect.NewResponse(&infov1.VMsResponse{
 		Vms: map[string]*infov1.VMAliases{
 			"avm": {Aliases: []string{"avm"}},
 		},
@@ -153,50 +153,50 @@ var _ = Describe("InfoService ConnectRPC E2E (integration, no stubs)", func() {
 		}
 	})
 
-	It("GetNodeVersion returns version info", func() {
-		req := connect.NewRequest(&infov1.GetNodeVersionRequest{})
+	It("NodeVersion returns version info", func() {
+		req := connect.NewRequest(&infov1.NodeVersionRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
-		resp, err := client.GetNodeVersion(ctx, req)
+		resp, err := client.NodeVersion(ctx, req)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(resp.Msg.Version).ToNot(BeEmpty())
 	})
 
-	It("GetNodeID returns a node ID", func() {
-		req := connect.NewRequest(&infov1.GetNodeIDRequest{})
+	It("NodeID returns a node ID", func() {
+		req := connect.NewRequest(&infov1.NodeIDRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
-		resp, err := client.GetNodeID(ctx, req)
+		resp, err := client.NodeID(ctx, req)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(resp.Msg.NodeId).To(HavePrefix("NodeID-"))
 	})
 
-	It("GetNetworkID returns a network ID", func() {
-		req := connect.NewRequest(&infov1.GetNetworkIDRequest{})
+	It("NetworkID returns a network ID", func() {
+		req := connect.NewRequest(&infov1.NetworkIDRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
-		resp, err := client.GetNetworkID(ctx, req)
+		resp, err := client.NetworkID(ctx, req)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(resp.Msg.NetworkId).To(BeNumerically(">", 0))
 	})
 
-	It("GetNetworkName returns a network name", func() {
-		req := connect.NewRequest(&infov1.GetNetworkNameRequest{})
+	It("NetworkName returns a network name", func() {
+		req := connect.NewRequest(&infov1.NetworkNameRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
-		resp, err := client.GetNetworkName(ctx, req)
+		resp, err := client.NetworkName(ctx, req)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(resp.Msg.NetworkName).ToNot(BeEmpty())
 	})
 
-	It("GetNodeIP returns an IP", func() {
-		req := connect.NewRequest(&infov1.GetNodeIPRequest{})
+	It("NodeIP returns an IP", func() {
+		req := connect.NewRequest(&infov1.NodeIPRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
-		resp, err := client.GetNodeIP(ctx, req)
+		resp, err := client.NodeIP(ctx, req)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(resp.Msg.Ip).ToNot(BeEmpty())
 	})
 
-	It("GetBlockchainID returns a blockchain ID for X", func() {
-		req := connect.NewRequest(&infov1.GetBlockchainIDRequest{Alias: "X"})
+	It("BlockchainID returns a blockchain ID for X", func() {
+		req := connect.NewRequest(&infov1.BlockchainIDRequest{Alias: "X"})
 		req.Header().Set("Avalanche-API-Route", "info")
-		resp, err := client.GetBlockchainID(ctx, req)
+		resp, err := client.BlockchainID(ctx, req)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(resp.Msg.BlockchainId).ToNot(BeEmpty())
 	})
@@ -234,10 +234,10 @@ var _ = Describe("InfoService ConnectRPC E2E (integration, no stubs)", func() {
 		Expect(resp.Msg).ToNot(BeNil())
 	})
 
-	It("GetVMs returns at least avm", func() {
-		req := connect.NewRequest(&infov1.GetVMsRequest{})
+	It("VMs returns at least avm", func() {
+		req := connect.NewRequest(&infov1.VMsRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
-		resp, err := client.GetVMs(ctx, req)
+		resp, err := client.VMs(ctx, req)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(resp.Msg.Vms).To(HaveKey("avm"))
 	})
