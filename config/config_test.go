@@ -558,7 +558,8 @@ func TestGetStakingSigner(t *testing.T) {
 	fileKeyPath := filepath.Join(t.TempDir(), "foobar", "signer.key")
 	defaultSignerKeyPath := filepath.Join(
 		defaultSignerKeyTestDir,
-		"/staking/signer.key",
+		"staking",
+		"signer.key",
 	)
 
 	tests := []struct {
