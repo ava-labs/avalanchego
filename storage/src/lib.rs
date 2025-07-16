@@ -29,7 +29,6 @@ mod iter;
 mod linear;
 mod node;
 mod nodestore;
-mod range_set;
 mod trie_hash;
 
 use crate::nodestore::AreaIndex;
@@ -99,6 +98,33 @@ pub fn empty_trie_hash() -> TrieHash {
         .expect("empty trie hash is 32 bytes")
 }
 
+/// This enum encapsulates what points to the stored area.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StoredAreaParent {
+    /// The stored area is a trie node
+    TrieNode(TrieNodeParent),
+    /// The stored area is a free list
+    FreeList(FreeListParent),
+}
+
+/// This enum encapsulates what points to the stored area allocated for a trie node.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TrieNodeParent {
+    /// The stored area is the root of the trie, so the header points to it
+    Root,
+    /// The stored area is not the root of the trie, so a parent trie node points to it
+    Parent(LinearAddress, usize),
+}
+
+/// This enum encapsulates what points to the stored area allocated for a free list.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FreeListParent {
+    /// The stored area is the head of the free list, so the header points to it
+    FreeListHead(AreaIndex),
+    /// The stored area is not the head of the free list, so a previous free area points to it
+    PrevFreeArea(LinearAddress),
+}
+
 /// Errors returned by the checker
 #[derive(Error, Debug)]
 #[non_exhaustive]
@@ -149,6 +175,18 @@ pub enum CheckerError {
         actual_free_list: AreaIndex,
         /// Expected size of the area
         expected_free_list: AreaIndex,
+    },
+
+    /// The start address of a stored area is not a multiple of 16
+    #[error(
+        "The start address of a stored area is not a multiple of {}: {address} (parent: {parent_ptr:?})",
+        nodestore::alloc::MIN_AREA_SIZE
+    )]
+    AreaMisaligned {
+        /// The start address of the stored area
+        address: LinearAddress,
+        /// The start address of the parent that points to the stored area
+        parent_ptr: StoredAreaParent,
     },
 
     /// Found leaked areas

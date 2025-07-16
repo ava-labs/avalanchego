@@ -1,12 +1,15 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+mod range_set;
+use range_set::LinearAddressRangeSet;
+
 use crate::logger::warn;
-use crate::nodestore::alloc::{AREA_SIZES, AreaIndex};
-use crate::range_set::LinearAddressRangeSet;
+use crate::nodestore::alloc::{AREA_SIZES, AreaIndex, FreeAreaWithMetadata};
+use crate::nodestore::is_aligned;
 use crate::{
     CheckerError, Committed, HashedNodeReader, LinearAddress, Node, NodeReader, NodeStore,
-    WritableStorage,
+    StoredAreaParent, TrieNodeParent, WritableStorage,
 };
 
 use std::cmp::Ordering;
@@ -44,6 +47,10 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
         // 2. traverse the trie and check the nodes
         if let Some(root_address) = self.root_address() {
             // the database is not empty, traverse the trie
+            self.check_area_aligned(
+                root_address,
+                StoredAreaParent::TrieNode(TrieNodeParent::Root),
+            )?;
             self.visit_trie(root_address, &mut visited)?;
         }
 
@@ -72,7 +79,14 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
 
         if let Node::Branch(branch) = self.read_node(subtree_root_address)?.as_ref() {
             // this is an internal node, traverse the children
-            for (_, address) in branch.children_addresses() {
+            for (child_idx, address) in branch.children_addresses() {
+                self.check_area_aligned(
+                    address,
+                    StoredAreaParent::TrieNode(TrieNodeParent::Parent(
+                        subtree_root_address,
+                        child_idx,
+                    )),
+                )?;
                 self.visit_trie(address, visited)?;
             }
         }
@@ -82,18 +96,39 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
 
     /// Traverse all the free areas in the freelist
     fn visit_freelist(&self, visited: &mut LinearAddressRangeSet) -> Result<(), CheckerError> {
-        for free_area in self.free_list_iter_inner(0) {
-            let (addr, stored_area_index, free_list_id) = free_area?;
-            let area_size = Self::size_from_area_index(stored_area_index);
-            if free_list_id != stored_area_index {
+        let mut free_list_iter = self.free_list_iter(0);
+        while let Some(free_area) = free_list_iter.next_with_metadata() {
+            let FreeAreaWithMetadata {
+                addr,
+                area_index,
+                free_list_id,
+                parent,
+            } = free_area?;
+            self.check_area_aligned(addr, StoredAreaParent::FreeList(parent))?;
+            let area_size = Self::size_from_area_index(area_index);
+            if free_list_id != area_index {
                 return Err(CheckerError::FreelistAreaSizeMismatch {
                     address: addr,
                     size: area_size,
                     actual_free_list: free_list_id,
-                    expected_free_list: stored_area_index,
+                    expected_free_list: area_index,
                 });
             }
             visited.insert_area(addr, area_size)?;
+        }
+        Ok(())
+    }
+
+    const fn check_area_aligned(
+        &self,
+        address: LinearAddress,
+        parent_ptr: StoredAreaParent,
+    ) -> Result<(), CheckerError> {
+        if !is_aligned(address) {
+            return Err(CheckerError::AreaMisaligned {
+                address,
+                parent_ptr,
+            });
         }
         Ok(())
     }
