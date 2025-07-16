@@ -44,6 +44,7 @@ import (
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/internal/ethapi"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/customrawdb"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
@@ -59,6 +60,8 @@ import (
 var (
 	errStateNotFound = errors.New("state not found")
 	errBlockNotFound = errors.New("block not found")
+
+	schemes = []string{rawdb.HashScheme, customrawdb.FirewoodScheme}
 )
 
 type testBackend struct {
@@ -73,7 +76,7 @@ type testBackend struct {
 
 // testBackend creates a new test backend. OBS: After test is done, teardown must be
 // invoked in order to release associated resources.
-func newTestBackend(t *testing.T, n int, gspec *core.Genesis, generator func(i int, b *core.BlockGen)) *testBackend {
+func newTestBackend(t *testing.T, n int, gspec *core.Genesis, scheme string, generator func(i int, b *core.BlockGen)) *testBackend {
 	backend := &testBackend{
 		chainConfig: gspec.Config,
 		engine:      dummy.NewETHFaker(),
@@ -91,8 +94,16 @@ func newTestBackend(t *testing.T, n int, gspec *core.Genesis, generator func(i i
 		TrieDirtyLimit:            256,
 		TriePrefetcherParallelism: 4,
 		SnapshotLimit:             128,
-		Pruning:                   false, // Archive mode
+		Pruning:                   true,
+		CommitInterval:            4096,
+		StateScheme:               scheme,
+		StateHistory:              100, // Sufficient history for testing
+		ChainDataDir:              t.TempDir(),
 	}
+	if scheme == customrawdb.FirewoodScheme {
+		cacheConfig.SnapshotLimit = 0 // Firewood does not support snapshots
+	}
+
 	chain, err := core.NewBlockChain(backend.chaindb, cacheConfig, gspec, backend.engine, vm.Config{}, common.Hash{}, false)
 	if err != nil {
 		t.Fatalf("failed to create tester chain: %v", err)
@@ -223,8 +234,15 @@ func (b *testBackend) StateAtTransaction(ctx context.Context, block *types.Block
 }
 
 func TestTraceCall(t *testing.T) {
-	t.Parallel()
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			t.Parallel()
+			testTraceCall(t, scheme)
+		})
+	}
+}
 
+func testTraceCall(t *testing.T, scheme string) {
 	// Initialize test accounts
 	accounts := newAccounts(3)
 	genesis := &core.Genesis{
@@ -238,7 +256,7 @@ func TestTraceCall(t *testing.T) {
 	genBlocks := 10
 	signer := types.HomesteadSigner{}
 	nonce := uint64(0)
-	backend := newTestBackend(t, genBlocks, genesis, func(i int, b *core.BlockGen) {
+	backend := newTestBackend(t, genBlocks, genesis, scheme, func(i int, b *core.BlockGen) {
 		// Transfer from account[0] to account[1]
 		//    value: 1000 wei
 		//    fee:   0 wei
@@ -441,8 +459,15 @@ func TestTraceCall(t *testing.T) {
 }
 
 func TestTraceTransaction(t *testing.T) {
-	t.Parallel()
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			t.Parallel()
+			testTraceTransaction(t, scheme)
+		})
+	}
+}
 
+func testTraceTransaction(t *testing.T, scheme string) {
 	// Initialize test accounts
 	accounts := newAccounts(2)
 	genesis := &core.Genesis{
@@ -454,7 +479,7 @@ func TestTraceTransaction(t *testing.T) {
 	}
 	target := common.Hash{}
 	signer := types.HomesteadSigner{}
-	backend := newTestBackend(t, 1, genesis, func(i int, b *core.BlockGen) {
+	backend := newTestBackend(t, 1, genesis, scheme, func(i int, b *core.BlockGen) {
 		// Transfer from account[0] to account[1]
 		//    value: 1000 wei
 		//    fee:   0 wei
@@ -497,8 +522,15 @@ func TestTraceTransaction(t *testing.T) {
 }
 
 func TestTraceBlock(t *testing.T) {
-	t.Parallel()
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			t.Parallel()
+			testTraceBlock(t, scheme)
+		})
+	}
+}
 
+func testTraceBlock(t *testing.T, scheme string) {
 	// Initialize test accounts
 	accounts := newAccounts(3)
 	genesis := &core.Genesis{
@@ -512,7 +544,7 @@ func TestTraceBlock(t *testing.T) {
 	genBlocks := 10
 	signer := types.HomesteadSigner{}
 	var txHash common.Hash
-	backend := newTestBackend(t, genBlocks, genesis, func(i int, b *core.BlockGen) {
+	backend := newTestBackend(t, genBlocks, genesis, scheme, func(i int, b *core.BlockGen) {
 		// Transfer from account[0] to account[1]
 		//    value: 1000 wei
 		//    fee:   0 wei
@@ -587,7 +619,15 @@ func TestTraceBlock(t *testing.T) {
 }
 
 func TestTracingWithOverrides(t *testing.T) {
-	t.Parallel()
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			t.Parallel()
+			testTracingWithOverrides(t, scheme)
+		})
+	}
+}
+
+func testTracingWithOverrides(t *testing.T, scheme string) {
 	// Initialize test accounts
 	accounts := newAccounts(3)
 	storageAccount := common.Address{0x13, 37}
@@ -609,7 +649,7 @@ func TestTracingWithOverrides(t *testing.T) {
 	}
 	genBlocks := 10
 	signer := types.HomesteadSigner{}
-	backend := newTestBackend(t, genBlocks, genesis, func(i int, b *core.BlockGen) {
+	backend := newTestBackend(t, genBlocks, genesis, scheme, func(i int, b *core.BlockGen) {
 		// Transfer from account[0] to account[1]
 		//    value: 1000 wei
 		//    fee:   0 wei
@@ -958,6 +998,15 @@ func newStates(keys []common.Hash, vals []common.Hash) *map[common.Hash]common.H
 }
 
 func TestTraceChain(t *testing.T) {
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			t.Parallel()
+			testTraceChain(t, scheme)
+		})
+	}
+}
+
+func testTraceChain(t *testing.T, scheme string) {
 	// Initialize test accounts
 	// Note: the balances in this test have been increased compared to go-ethereum.
 	accounts := newAccounts(3)
@@ -977,7 +1026,7 @@ func TestTraceChain(t *testing.T) {
 		rel   atomic.Uint32 // total rels has made
 		nonce uint64
 	)
-	backend := newTestBackend(t, genBlocks, genesis, func(i int, b *core.BlockGen) {
+	backend := newTestBackend(t, genBlocks, genesis, scheme, func(i int, b *core.BlockGen) {
 		// Transfer from account[0] to account[1]
 		//    value: 1000 wei
 		//    fee:   0 wei
