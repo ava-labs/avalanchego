@@ -64,7 +64,6 @@ message BlockchainIDResponse {
 message PeersRequest {
   repeated string node_ids = 1;
 }
-// PeerInfo provides metadata about a connected peer in the network
 message PeerInfo {
   string ip = 1;
   string public_ip = 2;

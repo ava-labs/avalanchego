@@ -67,7 +67,7 @@ func (p *ProofOfPossession) Key() *bls.PublicKey {
 	return p.publicKey
 }
 
-type JsonProofOfPossession struct {
+type jsonProofOfPossession struct {
 	PublicKey         string `json:"publicKey"`
 	ProofOfPossession string `json:"proofOfPossession"`
 }
@@ -81,14 +81,14 @@ func (p *ProofOfPossession) MarshalJSON() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return json.Marshal(JsonProofOfPossession{
+	return json.Marshal(jsonProofOfPossession{
 		PublicKey:         pk,
 		ProofOfPossession: pop,
 	})
 }
 
 func (p *ProofOfPossession) UnmarshalJSON(b []byte) error {
-	jsonBLS := JsonProofOfPossession{}
+	jsonBLS := jsonProofOfPossession{}
 	err := json.Unmarshal(b, &jsonBLS)
 	if err != nil {
 		return err
