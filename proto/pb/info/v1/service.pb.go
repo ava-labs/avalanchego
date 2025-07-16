@@ -172,8 +172,8 @@ func (*NodeIDRequest) Descriptor() ([]byte, []int) {
 
 type ProofOfPossession struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
-	PublicKey         string                 `protobuf:"bytes,1,opt,name=publicKey,proto3" json:"publicKey,omitempty"`
-	ProofOfPossession string                 `protobuf:"bytes,2,opt,name=proofOfPossession,proto3" json:"proofOfPossession,omitempty"`
+	PublicKey         string                 `protobuf:"bytes,1,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"`
+	ProofOfPossession string                 `protobuf:"bytes,2,opt,name=proof_of_possession,json=proofOfPossession,proto3" json:"proof_of_possession,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -646,7 +646,6 @@ func (x *PeersRequest) GetNodeIds() []string {
 	return nil
 }
 
-// PeerInfo provides metadata about a connected peer in the network
 type PeerInfo struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Ip             string                 `protobuf:"bytes,1,opt,name=ip,proto3" json:"ip,omitempty"`
@@ -1334,10 +1333,11 @@ const file_info_v1_service_proto_rawDesc = "" +
 	"\x0fVmVersionsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x0f\n" +
-	"\rNodeIDRequest\"_\n" +
-	"\x11ProofOfPossession\x12\x1c\n" +
-	"\tpublicKey\x18\x01 \x01(\tR\tpublicKey\x12,\n" +
-	"\x11proofOfPossession\x18\x02 \x01(\tR\x11proofOfPossession\"`\n" +
+	"\rNodeIDRequest\"b\n" +
+	"\x11ProofOfPossession\x12\x1d\n" +
+	"\n" +
+	"public_key\x18\x01 \x01(\tR\tpublicKey\x12.\n" +
+	"\x13proof_of_possession\x18\x02 \x01(\tR\x11proofOfPossession\"`\n" +
 	"\x0eNodeIDResponse\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x125\n" +
 	"\bnode_pop\x18\x02 \x01(\v2\x1a.info.v1.ProofOfPossessionR\anodePop\"\x0f\n" +

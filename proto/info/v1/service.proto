@@ -31,8 +31,8 @@ message NodeVersionResponse {
 
 message NodeIDRequest {}
 message ProofOfPossession {
-  string publicKey = 1;
-  string proofOfPossession = 2;
+  string public_key = 1;
+  string proof_of_possession = 2;
 }
 message NodeIDResponse {
   string node_id = 1;
