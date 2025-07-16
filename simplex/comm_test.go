@@ -4,135 +4,127 @@
 package simplex
 
 import (
-	"errors"
-	"fmt"
+	"testing"
+	"time"
 
 	"github.com/ava-labs/simplex"
-	"go.uber.org/zap"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/networking/sender"
-	"github.com/ava-labs/avalanchego/subnets"
+	"github.com/ava-labs/avalanchego/snow/networking/sender/sendermock"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var (
-	_               simplex.Communication = (*Comm)(nil)
-	errNodeNotFound                       = errors.New("node not found in the validator list")
-)
-
-type Comm struct {
-	logger   simplex.Logger
-	subnetID ids.ID
-	chainID  ids.ID
-	// broadcastNodes are the nodes that should receive broadcast messages
-	broadcastNodes set.Set[ids.NodeID]
-	// allNodes are the IDs of all the nodes in the subnet
-	allNodes []simplex.NodeID
-
-	// sender is used to send messages to other nodes
-	sender     sender.ExternalSender
-	msgBuilder message.OutboundMsgBuilder
+var testSimplexMessage = simplex.Message{
+	VoteMessage: &simplex.Vote{
+		Vote: simplex.ToBeSignedVote{
+			BlockHeader: simplex.BlockHeader{
+				ProtocolMetadata: simplex.ProtocolMetadata{
+					Version: 1,
+					Epoch:   1,
+					Round:   1,
+					Seq:     1,
+				},
+			},
+		},
+		Signature: simplex.Signature{
+			Signer: []byte("dummy_node_id"),
+			Value:  []byte("dummy_signature"),
+		},
+	},
 }
 
-func NewComm(config *Config) (*Comm, error) {
-	if _, ok := config.Validators[config.Ctx.NodeID]; !ok {
-		config.Log.Warn("Node is not a validator for the subnet",
-			zap.Stringer("nodeID", config.Ctx.NodeID),
-			zap.Stringer("chainID", config.Ctx.ChainID),
-			zap.Stringer("subnetID", config.Ctx.SubnetID),
-		)
-		return nil, fmt.Errorf("our %w: %s", errNodeNotFound, config.Ctx.NodeID)
-	}
+func TestCommSendMessage(t *testing.T) {
+	config := newEngineConfig(t, 1)
 
-	broadcastNodes := set.NewSet[ids.NodeID](len(config.Validators) - 1)
-	allNodes := make([]simplex.NodeID, 0, len(config.Validators))
-	// grab all the nodes that are validators for the subnet
-	for _, vd := range config.Validators {
-		allNodes = append(allNodes, vd.NodeID[:])
-		if vd.NodeID == config.Ctx.NodeID {
-			continue // skip our own node ID
+	destinationNodeID := ids.GenerateTestNodeID()
+	ctrl := gomock.NewController(t)
+	sender := sendermock.NewExternalSender(ctrl)
+	mc, err := message.NewCreator(
+		prometheus.NewRegistry(),
+		constants.DefaultNetworkCompressionType,
+		10*time.Second,
+	)
+	require.NoError(t, err)
+
+	config.OutboundMsgBuilder = mc
+	config.Sender = sender
+
+	comm, err := NewComm(config)
+	require.NoError(t, err)
+
+	outboundMsg, err := mc.SimplexMessage(newVote(config.Ctx.ChainID, testSimplexMessage.VoteMessage))
+	require.NoError(t, err)
+	expectedSendConfig := common.SendConfig{
+		NodeIDs: set.Of(destinationNodeID),
+	}
+	sender.EXPECT().Send(outboundMsg, expectedSendConfig, comm.subnetID, gomock.Any())
+
+	comm.Send(&testSimplexMessage, destinationNodeID[:])
+}
+
+// TestCommBroadcast tests the Broadcast method sends to all nodes in the subnet
+// not including the sending node.
+func TestCommBroadcast(t *testing.T) {
+	config := newEngineConfig(t, 3)
+
+	ctrl := gomock.NewController(t)
+	sender := sendermock.NewExternalSender(ctrl)
+	mc, err := message.NewCreator(
+		prometheus.NewRegistry(),
+		constants.DefaultNetworkCompressionType,
+		10*time.Second,
+	)
+	require.NoError(t, err)
+
+	config.OutboundMsgBuilder = mc
+	config.Sender = sender
+
+	comm, err := NewComm(config)
+	require.NoError(t, err)
+	outboundMsg, err := mc.SimplexMessage(newVote(config.Ctx.ChainID, testSimplexMessage.VoteMessage))
+	require.NoError(t, err)
+	nodes := make([]ids.NodeID, 0, len(comm.Nodes()))
+	for _, node := range comm.Nodes() {
+		if node.Equals(config.Ctx.NodeID[:]) {
+			continue // skip the sending node
 		}
-
-		broadcastNodes.Add(vd.NodeID)
+		nodes = append(nodes, ids.NodeID(node))
 	}
 
-	return &Comm{
-		subnetID:       config.Ctx.SubnetID,
-		broadcastNodes: broadcastNodes,
-		allNodes:       allNodes,
-		logger:         config.Log,
-		sender:         config.Sender,
-		msgBuilder:     config.OutboundMsgBuilder,
-		chainID:        config.Ctx.ChainID,
-	}, nil
+	expectedSendConfig := common.SendConfig{
+		NodeIDs: set.Of(nodes...),
+	}
+
+	sender.EXPECT().Send(outboundMsg, expectedSendConfig, comm.subnetID, gomock.Any())
+
+	comm.Broadcast(&testSimplexMessage)
 }
 
-func (c *Comm) Nodes() []simplex.NodeID {
-	return c.allNodes
-}
+func TestCommFailsWithoutCurrentNode(t *testing.T) {
+	config := newEngineConfig(t, 3)
 
-func (c *Comm) Send(msg *simplex.Message, destination simplex.NodeID) {
-	outboundMsg, err := c.simplexMessageToOutboundMessage(msg)
-	if err != nil {
-		c.logger.Error("Failed creating message", zap.Error(err))
-		return
-	}
+	ctrl := gomock.NewController(t)
+	mc, err := message.NewCreator(
+		prometheus.NewRegistry(),
+		constants.DefaultNetworkCompressionType,
+		10*time.Second,
+	)
+	require.NoError(t, err)
+	sender := sendermock.NewExternalSender(ctrl)
 
-	dest, err := ids.ToNodeID(destination)
-	if err != nil {
-		c.logger.Error("Failed to convert destination NodeID", zap.Error(err))
-		return
-	}
+	config.OutboundMsgBuilder = mc
+	config.Sender = sender
 
-	c.sender.Send(outboundMsg, common.SendConfig{NodeIDs: set.Of(dest)}, c.subnetID, subnets.NoOpAllower)
-}
+	// set the curNode to a different nodeID than the one in the config
+	vdrs := generateTestNodes(t, 3)
+	config.Validators = newTestValidatorInfo(vdrs)
 
-func (c *Comm) Broadcast(msg *simplex.Message) {
-	outboundMsg, err := c.simplexMessageToOutboundMessage(msg)
-	if err != nil {
-		c.logger.Error("Failed creating message", zap.Error(err))
-		return
-	}
-
-	c.sender.Send(outboundMsg, common.SendConfig{NodeIDs: c.broadcastNodes}, c.subnetID, subnets.NoOpAllower)
-}
-
-func (c *Comm) simplexMessageToOutboundMessage(msg *simplex.Message) (message.OutboundMessage, error) {
-	var simplexMsg *p2p.Simplex
-	switch {
-	case msg.VerifiedBlockMessage != nil:
-		bytes, err := msg.VerifiedBlockMessage.VerifiedBlock.Bytes()
-		if err != nil {
-			return nil, fmt.Errorf("failed to serialize block: %w", err)
-		}
-		simplexMsg = newBlockProposal(c.chainID, bytes, msg.VerifiedBlockMessage.Vote)
-	case msg.VoteMessage != nil:
-		simplexMsg = newVote(c.chainID, msg.VoteMessage)
-	case msg.EmptyVoteMessage != nil:
-		simplexMsg = newEmptyVote(c.chainID, msg.EmptyVoteMessage)
-	case msg.FinalizeVote != nil:
-		simplexMsg = newFinalizeVote(c.chainID, msg.FinalizeVote)
-	case msg.Notarization != nil:
-		simplexMsg = newNotarization(c.chainID, msg.Notarization)
-	case msg.EmptyNotarization != nil:
-		simplexMsg = newEmptyNotarization(c.chainID, msg.EmptyNotarization)
-	case msg.Finalization != nil:
-		simplexMsg = newFinalization(c.chainID, msg.Finalization)
-	case msg.ReplicationRequest != nil:
-		simplexMsg = newReplicationRequest(c.chainID, msg.ReplicationRequest)
-	case msg.VerifiedReplicationResponse != nil:
-		msg, err := newReplicationResponse(c.chainID, msg.VerifiedReplicationResponse)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create replication response: %w", err)
-		}
-		simplexMsg = msg
-	default:
-		return nil, fmt.Errorf("unknown message type: %+v", msg)
-	}
-
-	return c.msgBuilder.SimplexMessage(simplexMsg)
+	_, err = NewComm(config)
+	require.ErrorIs(t, err, errNodeNotFound)
 }
