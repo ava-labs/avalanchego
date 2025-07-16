@@ -28,8 +28,8 @@ var (
 
 // QC represents a quorum certificate in the Simplex consensus protocol.
 type QC struct {
-	verifier BLSVerifier
-	sig      bls.Signature
+	verifier *BLSVerifier
+	sig      *bls.Signature
 	signers  []simplex.NodeID
 }
 
@@ -67,7 +67,7 @@ func (qc *QC) Verify(msg []byte) error {
 		return fmt.Errorf("%w: %w", errEncodingMessageToSign, err)
 	}
 
-	if !bls.Verify(aggPK, &qc.sig, message2Verify) {
+	if !bls.Verify(aggPK, qc.sig, message2Verify) {
 		return errSignatureVerificationFailed
 	}
 
@@ -83,7 +83,7 @@ type asn1QC struct {
 }
 
 func (qc *QC) MarshalASN1() ([]byte, error) {
-	sigBytes := bls.SignatureToBytes(&qc.sig)
+	sigBytes := bls.SignatureToBytes(qc.sig)
 
 	signersBytes := make([][]byte, len(qc.signers))
 	for i, signer := range qc.signers {
@@ -105,7 +105,7 @@ func (qc *QC) UnmarshalASN1(data []byte) error {
 	}
 	qc.signers = make([]simplex.NodeID, len(decoded.Signers))
 	for i, signerBytes := range decoded.Signers {
-		if len(signerBytes) != ids.ShortIDLen { // TODO: so long as simplex is in a separate repo, we should decouple these ids as much as possible
+		if len(signerBytes) != ids.ShortIDLen {
 			return errors.New("invalid signer length")
 		}
 		qc.signers[i] = simplex.NodeID(signerBytes)
@@ -114,7 +114,7 @@ func (qc *QC) UnmarshalASN1(data []byte) error {
 	if err != nil {
 		return err
 	}
-	qc.sig = *sig
+	qc.sig = sig
 
 	return nil
 }
@@ -136,7 +136,9 @@ func (d QCDeserializer) DeserializeQuorumCertificate(bytes []byte) (simplex.Quor
 	if err := qc.UnmarshalASN1(bytes); err != nil {
 		return nil, fmt.Errorf("%w: %w", errFailedToParseQC, err)
 	}
-	qc.verifier = BLSVerifier(d)
+
+	verifier := BLSVerifier(d)
+	qc.verifier = &verifier
 
 	return &qc, nil
 }
@@ -176,9 +178,10 @@ func (a SignatureAggregator) Aggregate(signatures []simplex.Signature) (simplex.
 		return nil, fmt.Errorf("%w: %w", errSignatureAggregation, err)
 	}
 
+	verifier := BLSVerifier(a)
 	return &QC{
-		verifier: BLSVerifier(a),
+		verifier: &verifier,
 		signers:  signers,
-		sig:      *aggregatedSig,
+		sig:      aggregatedSig,
 	}, nil
 }
