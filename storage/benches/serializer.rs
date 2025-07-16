@@ -16,7 +16,7 @@ use std::num::NonZeroU64;
 use std::os::raw::c_int;
 
 use criterion::profiler::Profiler;
-use criterion::{Criterion, criterion_group, criterion_main};
+use criterion::{Bencher, Criterion, criterion_group, criterion_main};
 use firewood_storage::{LeafNode, Node, Path};
 use pprof::ProfilerGuard;
 use smallvec::SmallVec;
@@ -63,6 +63,24 @@ impl Profiler for FlamegraphProfiler {
     }
 }
 
+fn manual_serializer(b: &mut Bencher, input: &Node) {
+    b.iter(|| to_bytes(input));
+}
+
+fn manual_deserializer(b: &mut Bencher, input: &Vec<u8>) {
+    let (_area_index, input) = input
+        .as_slice()
+        .split_first()
+        .expect("always has at least one byte");
+    b.iter(|| Node::from_reader(std::io::Cursor::new(input)).expect("to deserialize node"));
+}
+
+fn to_bytes(input: &Node) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    input.as_bytes(0, &mut bytes);
+    bytes
+}
+
 fn leaf(c: &mut Criterion) {
     let mut group = c.benchmark_group("leaf");
     let input = Node::Leaf(LeafNode {
@@ -70,12 +88,8 @@ fn leaf(c: &mut Criterion) {
         value: Box::new([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]),
     });
 
-    group.bench_with_input("manual", &input, |b, input| {
-        b.iter(|| {
-            let mut bytes = Vec::<u8>::new();
-            input.as_bytes(0, &mut bytes);
-        });
-    });
+    group.bench_with_input("manual", &input, manual_serializer);
+    group.bench_with_input("from_reader", &to_bytes(&input), manual_deserializer);
     group.finish();
 }
 
@@ -96,30 +110,27 @@ fn branch(c: &mut Criterion) {
         }),
     }));
 
-    let manual_serializer = |b: &mut criterion::Bencher, input: &firewood_storage::Node| {
-        b.iter(|| {
-            let mut bytes = Vec::new();
-            input.as_bytes(0, &mut bytes);
-        });
-    };
-
     group.bench_with_input("manual", &input, manual_serializer);
+    group.bench_with_input("from_reader", &to_bytes(&input), manual_deserializer);
     group.finish();
 
     let mut group = c.benchmark_group("1_child");
     input.as_branch_mut().unwrap().value = None;
     group.bench_with_input("manual", &input, manual_serializer);
-    let child = input.as_branch().unwrap().children[0].clone();
+    group.bench_with_input("from_reader", &to_bytes(&input), manual_deserializer);
     group.finish();
 
+    let child = input.as_branch().unwrap().children[0].clone();
     let mut group = c.benchmark_group("2_child");
     input.as_branch_mut().unwrap().children[1] = child.clone();
     group.bench_with_input("manual", &input, manual_serializer);
+    group.bench_with_input("from_reader", &to_bytes(&input), manual_deserializer);
     group.finish();
 
     let mut group = c.benchmark_group("16_child");
     input.as_branch_mut().unwrap().children = std::array::from_fn(|_| child.clone());
     group.bench_with_input("manual", &input, manual_serializer);
+    group.bench_with_input("from_reader", &to_bytes(&input), manual_deserializer);
     group.finish();
 }
 

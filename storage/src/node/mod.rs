@@ -22,24 +22,22 @@
     reason = "Found 1 occurrences after enabling the lint."
 )]
 
+use crate::node::branch::ReadSerializable;
+use crate::{HashType, Path, SharedNode};
 use bitfield::bitfield;
 use branch::Serializable as _;
+pub use branch::{BranchNode, Child};
 use enum_as_inner::EnumAsInner;
-use integer_encoding::{VarInt, VarIntReader as _, VarIntWriter as _};
+use integer_encoding::{VarInt, VarIntReader as _};
+pub use leaf::LeafNode;
 use std::fmt::Debug;
 use std::io::{Error, Read, Write};
 use std::num::NonZero;
-use std::vec;
 
 pub mod branch;
 mod leaf;
 pub mod path;
 pub mod persist;
-
-pub use branch::{BranchNode, Child};
-pub use leaf::LeafNode;
-
-use crate::{HashType, Path, SharedNode};
 
 /// A node, either a Branch or Leaf
 
@@ -85,7 +83,7 @@ bitfield! {
     partial_path_length, set_partial_path_length: 7, 6;
 }
 #[cfg(not(feature = "branch_factor_256"))]
-const MAX_ENCODED_PARTIAL_PATH_LEN: usize = 2;
+const BRANCH_PARTIAL_PATH_LEN_OVERFLOW: u8 = (1 << 2) - 1; // 3 nibbles
 
 #[cfg(feature = "branch_factor_256")]
 bitfield! {
@@ -97,7 +95,7 @@ bitfield! {
     partial_path_length, set_partial_path_length: 7, 2;
 }
 #[cfg(feature = "branch_factor_256")]
-const MAX_ENCODED_PARTIAL_PATH_LEN: usize = 63;
+const BRANCH_PARTIAL_PATH_LEN_OVERFLOW: u8 = (1 << 6) - 1; // 63 nibbles
 
 bitfield! {
     struct LeafFirstByte(u8);
@@ -107,6 +105,8 @@ bitfield! {
     is_leaf, set_is_leaf: 0, 0;
     partial_path_length, set_partial_path_length: 7, 1;
 }
+
+const LEAF_PARTIAL_PATH_LEN_OVERFLOW: u8 = (1 << 7) - 2; // 126 nibbles (-1 for indicating Free Area (0xff))
 
 impl Default for LeafFirstByte {
     fn default() -> Self {
@@ -269,11 +269,12 @@ impl Node {
                 let childcount = child_iter.clone().count();
 
                 // encode the first byte
-                let pp_len = if b.partial_path.0.len() <= MAX_ENCODED_PARTIAL_PATH_LEN {
-                    b.partial_path.0.len() as u8
-                } else {
-                    MAX_ENCODED_PARTIAL_PATH_LEN as u8 + 1
+                let pp_len = match b.partial_path.len() {
+                    // less than 3 or 62 nibbles
+                    len if len < BRANCH_PARTIAL_PATH_LEN_OVERFLOW as usize => len as u8,
+                    _ => BRANCH_PARTIAL_PATH_LEN_OVERFLOW,
                 };
+
                 #[cfg(not(feature = "branch_factor_256"))]
                 let first_byte: BranchFirstByte = BranchFirstByte::new(
                     u8::from(b.value.is_some()),
@@ -293,18 +294,14 @@ impl Node {
                 encoded.push((childcount % BranchNode::MAX_CHILDREN) as u8);
 
                 // encode the partial path, including the length if it didn't fit above
-                if b.partial_path.0.len() > MAX_ENCODED_PARTIAL_PATH_LEN {
-                    encoded
-                        .write_varint(b.partial_path.len())
-                        .expect("writing to vec should succeed");
+                if pp_len == BRANCH_PARTIAL_PATH_LEN_OVERFLOW {
+                    encoded.extend_var_int(b.partial_path.len());
                 }
                 encoded.extend_from_slice(&b.partial_path);
 
                 // encode the value. For tries that have the same length keys, this is always empty
                 if let Some(v) = &b.value {
-                    encoded
-                        .write_varint(v.len())
-                        .expect("writing to vec should succeed");
+                    encoded.extend_var_int(v.len());
                     encoded.extend_from_slice(v);
                 }
 
@@ -322,9 +319,7 @@ impl Node {
                     }
                 } else {
                     for (position, child) in child_iter {
-                        encoded
-                            .write_varint(position)
-                            .expect("writing to vec should succeed");
+                        encoded.extend_var_int(position);
                         if let Child::AddressWithHash(address, hash) = child {
                             encoded.extend_from_slice(&address.get().to_ne_bytes());
                             hash.write_to(encoded);
@@ -337,7 +332,12 @@ impl Node {
                 }
             }
             Node::Leaf(l) => {
-                let first_byte: LeafFirstByte = LeafFirstByte::new(1, l.partial_path.0.len() as u8);
+                let pp_len = match l.partial_path.len() {
+                    // less than 126 nibbles
+                    len if len < LEAF_PARTIAL_PATH_LEN_OVERFLOW as usize => len as u8,
+                    _ => LEAF_PARTIAL_PATH_LEN_OVERFLOW,
+                };
+                let first_byte: LeafFirstByte = LeafFirstByte::new(1, pp_len);
 
                 const OPTIMIZE_LEAVES_FOR_SIZE: usize = 128;
                 encoded.reserve(OPTIMIZE_LEAVES_FOR_SIZE);
@@ -345,17 +345,13 @@ impl Node {
                 encoded.push(first_byte.0);
 
                 // encode the partial path, including the length if it didn't fit above
-                if l.partial_path.0.len() >= 127 {
-                    encoded
-                        .write_varint(l.partial_path.len())
-                        .expect("write to array should succeed");
+                if pp_len == LEAF_PARTIAL_PATH_LEN_OVERFLOW {
+                    encoded.extend_var_int(l.partial_path.len());
                 }
                 encoded.extend_from_slice(&l.partial_path);
 
                 // encode the value
-                encoded
-                    .write_varint(l.value.len())
-                    .expect("write to array should succeed");
+                encoded.extend_var_int(l.value.len());
                 encoded.extend_from_slice(&l.value);
             }
         }
@@ -363,33 +359,21 @@ impl Node {
 
     /// Given a reader, return a [Node] from those bytes
     pub fn from_reader(mut serialized: impl Read) -> Result<Self, Error> {
-        let mut first_byte: [u8; 1] = [0];
-        serialized.read_exact(&mut first_byte)?;
-        match first_byte[0] {
+        match serialized.read_byte()? {
             255 => {
                 // this is a freed area
                 Err(Error::other("attempt to read freed area"))
             }
-            leaf_first_byte if leaf_first_byte & 1 == 1 => {
-                let partial_path_len = if leaf_first_byte < 255 {
-                    // less than 126 nibbles
-                    LeafFirstByte(leaf_first_byte).partial_path_length() as usize
-                } else {
-                    serialized.read_varint()?
-                };
-
-                let mut partial_path = vec![0u8; partial_path_len];
-                serialized.read_exact(&mut partial_path)?;
-
-                let mut value_len_buf = [0u8; 1];
-                serialized.read_exact(&mut value_len_buf)?;
-                let value_len = value_len_buf[0] as usize;
-
-                let mut value = vec![0u8; value_len];
-                serialized.read_exact(&mut value)?;
-
+            first_byte if first_byte & 1 == 1 => {
+                let partial_path = read_path_with_overflow_length(
+                    &mut serialized,
+                    first_byte >> 1,
+                    LEAF_PARTIAL_PATH_LEN_OVERFLOW,
+                )?;
+                let value_len = serialized.read_varint()?;
+                let value = serialized.read_fixed_len(value_len)?;
                 Ok(Node::Leaf(LeafNode {
-                    partial_path: Path::from(partial_path),
+                    partial_path,
                     value: value.into(),
                 }))
             }
@@ -400,27 +384,17 @@ impl Node {
                 #[cfg(not(feature = "branch_factor_256"))]
                 let childcount = branch_first_byte.number_children() as usize;
                 #[cfg(feature = "branch_factor_256")]
-                let childcount = {
-                    let mut childcount_buf = [0u8; 1];
-                    serialized.read_exact(&mut childcount_buf)?;
-                    childcount_buf[0] as usize
-                };
+                let childcount = serialized.read_byte()? as usize;
 
-                let mut partial_path_len = branch_first_byte.partial_path_length() as usize;
-                if partial_path_len > MAX_ENCODED_PARTIAL_PATH_LEN {
-                    partial_path_len = serialized.read_varint()?;
-                }
-
-                let mut partial_path = vec![0u8; partial_path_len];
-                serialized.read_exact(&mut partial_path)?;
+                let partial_path = read_path_with_overflow_length(
+                    &mut serialized,
+                    branch_first_byte.partial_path_length(),
+                    BRANCH_PARTIAL_PATH_LEN_OVERFLOW,
+                )?;
 
                 let value = if has_value {
-                    let mut value_len_buf = [0u8; 1];
-                    serialized.read_exact(&mut value_len_buf)?;
-                    let value_len = value_len_buf[0] as usize;
-
-                    let mut value = vec![0u8; value_len];
-                    serialized.read_exact(&mut value)?;
+                    let value_len = serialized.read_varint()?;
+                    let value = serialized.read_fixed_len(value_len)?;
                     Some(value.into())
                 } else {
                     None
@@ -462,7 +436,7 @@ impl Node {
                 }
 
                 Ok(Node::Branch(Box::new(BranchNode {
-                    partial_path: partial_path.into(),
+                    partial_path,
                     value,
                     children,
                 })))
@@ -487,12 +461,37 @@ pub struct PathIterItem {
     pub next_nibble: Option<u8>,
 }
 
+fn read_path_with_overflow_length(
+    reader: &mut impl Read,
+    value: u8,
+    overflow: u8,
+) -> std::io::Result<Path> {
+    if value < overflow {
+        // the value is less than the overflow, so we can read it directly
+        read_path_with_provided_length(reader, value as usize)
+    } else {
+        read_path_with_prefix_length(reader)
+    }
+}
+
+#[cold]
+#[inline(never)]
+fn read_path_with_prefix_length(reader: &mut impl Read) -> std::io::Result<Path> {
+    let len = reader.read_varint()?;
+    read_path_with_provided_length(reader, len)
+}
+
+#[inline]
+fn read_path_with_provided_length(reader: &mut impl Read, len: usize) -> std::io::Result<Path> {
+    reader.read_fixed_len(len).map(Path::from)
+}
+
 #[cfg(test)]
 mod test {
     #![expect(clippy::unwrap_used)]
 
     use crate::node::{BranchNode, LeafNode, Node};
-    use crate::{Child, LinearAddress, Path};
+    use crate::{Child, LinearAddress, NibblesIterator, Path};
     use test_case::test_case;
 
     #[test_case(
@@ -500,6 +499,11 @@ mod test {
             partial_path: Path::from(vec![0, 1, 2, 3]),
             value: vec![4, 5, 6, 7].into()
         }), 11; "leaf node with value")]
+    #[test_case(
+        Node::Leaf(LeafNode {
+            partial_path: Path::from_nibbles_iterator(NibblesIterator::new(b"this is a really long partial path, like so long it's more than 63 nibbles long which triggers #1056.")),
+            value: vec![4, 5, 6, 7].into()
+        }), 211; "leaf node obnoxiously long partial path")]
     #[test_case(Node::Branch(Box::new(BranchNode {
         partial_path: Path::from(vec![0, 1]),
         value: None,
@@ -517,6 +521,25 @@ mod test {
         children: std::array::from_fn(|_|
                 Some(Child::AddressWithHash(LinearAddress::new(1).unwrap(), std::array::from_fn::<u8, 32, _>(|i| i as u8).into()))
         )})), 652; "full branch node with long partial path and value"
+    )]
+    #[test_case(Node::Branch(Box::new(BranchNode {
+        partial_path: Path::from_nibbles_iterator(NibblesIterator::new(b"this is a really long partial path, like so long it's more than 63 nibbles long which triggers #1056.")),
+        value: Some(vec![4, 5, 6, 7].into()),
+        children: std::array::from_fn(|_|
+                Some(Child::AddressWithHash(LinearAddress::new(1).unwrap(), std::array::from_fn::<u8, 32, _>(|i| i as u8).into()))
+        )})), 851; "full branch node with obnoxiously long partial path"
+    )]
+    #[test_case(Node::Branch(Box::new(BranchNode {
+        partial_path: Path::from_nibbles_iterator(NibblesIterator::new(b"this is a really long partial path, like so long it's more than 63 nibbles long which triggers #1056.")),
+        value: Some((*br"
+We also need to test values that have a length longer than 255 bytes so that we
+verify that we decode the entire value every time. previously, we would only read
+the first byte for the value length, which is incorrect if the length is greater
+than 126 bytes as the length would be encoded in multiple bytes.
+        ").into()),
+        children: std::array::from_fn(|_|
+                Some(Child::AddressWithHash(LinearAddress::new(1).unwrap(), std::array::from_fn::<u8, 32, _>(|i| i as u8).into()))
+        )})), 1165; "full branch node with obnoxiously long partial path and long value"
     )]
     // When ethhash is enabled, we don't actually check the `expected_length`
     fn test_serialize_deserialize(

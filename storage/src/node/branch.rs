@@ -13,6 +13,7 @@
 use crate::node::ExtendableBytes;
 use crate::{LeafNode, LinearAddress, MaybePersistedNode, Node, Path, SharedNode};
 use std::fmt::{Debug, Formatter};
+use std::io::Read;
 
 /// The type of a hash. For ethereum compatible hashes, this might be a RLP encoded
 /// value if it's small enough to fit in less than 32 bytes. For merkledb compatible
@@ -54,19 +55,32 @@ impl IntoHashType for crate::TrieHash {
 pub(crate) trait Serializable {
     fn write_to<W: ExtendableBytes>(&self, vec: &mut W);
 
-    fn from_reader<R: std::io::Read>(reader: R) -> Result<Self, std::io::Error>
+    fn from_reader<R: Read>(reader: R) -> Result<Self, std::io::Error>
     where
         Self: Sized;
 }
 
-/// An extension trait for [`std::io::Read`] for convenience methods when
+/// An extension trait for [`Read`] for convenience methods when
 /// reading serialized data.
-pub(crate) trait ReadSerializable: std::io::Read {
+pub(crate) trait ReadSerializable: Read {
     /// Read a single byte from the reader.
     fn read_byte(&mut self) -> Result<u8, std::io::Error> {
         let mut this = 0;
         self.read_exact(std::slice::from_mut(&mut this))?;
         Ok(this)
+    }
+
+    /// Reads a fixed amount of bytes from the reader into a vector
+    fn read_fixed_len(&mut self, len: usize) -> Result<Vec<u8>, std::io::Error> {
+        let mut buf = Vec::with_capacity(len);
+        self.take(len as u64).read_to_end(&mut buf)?;
+        if buf.len() != len {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                "not enough bytes read",
+            ));
+        }
+        Ok(buf)
     }
 
     /// Read a value of type `T` from the reader.
@@ -75,7 +89,7 @@ pub(crate) trait ReadSerializable: std::io::Read {
     }
 }
 
-impl<T: std::io::Read> ReadSerializable for T {}
+impl<T: Read> ReadSerializable for T {}
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 #[repr(C)]
