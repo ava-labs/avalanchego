@@ -45,7 +45,6 @@ pub(crate) mod hash;
 pub(crate) mod header;
 pub(crate) mod persist;
 
-use crate::linear::FileIoError;
 use crate::logger::trace;
 use arc_swap::ArcSwap;
 use arc_swap::access::DynAccess;
@@ -88,7 +87,7 @@ use std::sync::Arc;
 use crate::hashednode::hash_node;
 use crate::node::Node;
 use crate::node::persist::MaybePersistedNode;
-use crate::{FileBacked, Path, ReadableStorage, SharedNode, TrieHash};
+use crate::{FileBacked, FileIoError, Path, ReadableStorage, SharedNode, TrieHash};
 
 use super::linear::WritableStorage;
 
@@ -108,9 +107,12 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
         let mut stream = storage.stream_from(0)?;
         let mut header = NodeStoreHeader::new();
         let header_bytes = bytemuck::bytes_of_mut(&mut header);
-        stream
-            .read_exact(header_bytes)
-            .map_err(|e| storage.file_io_error(e, 0, Some("header read".to_string())))?;
+        if let Err(e) = stream.read_exact(header_bytes) {
+            if e.kind() == std::io::ErrorKind::UnexpectedEof {
+                return Self::new_empty_committed(storage.clone());
+            }
+            return Err(storage.file_io_error(e, 0, Some("header read".to_string())));
+        }
 
         drop(stream);
 

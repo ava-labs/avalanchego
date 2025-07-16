@@ -96,11 +96,11 @@ impl FileBacked {
         let fd = OpenOptions::new()
             .read(true)
             .write(true)
-            .create(true)
             .truncate(truncate)
+            .create(true)
             .open(&path)
-            .map_err(|inner| FileIoError {
-                inner,
+            .map_err(|e| FileIoError {
+                inner: e,
                 filename: Some(path.clone()),
                 offset: 0,
                 context: Some("file open".to_string()),
@@ -362,6 +362,7 @@ mod test {
             CacheReadStrategy::WritesOnly,
         )
         .unwrap();
+
         let mut reader = fb.stream_from(0).unwrap();
         let mut buf: String = String::new();
         assert_eq!(reader.read_to_string(&mut buf).unwrap(), 11000);

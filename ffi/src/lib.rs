@@ -870,6 +870,7 @@ pub extern "C" fn fwd_gather() -> Value {
 /// * `revisions` - The maximum number of revisions to keep; firewood currently requires this to be at least 2.
 /// * `strategy` - The cache read strategy to use, 0 for writes only,
 ///   1 for branch reads, and 2 for all reads.
+/// * `truncate` - Whether to truncate the database file if it exists.
 ///   Returns an error if the value is not 0, 1, or 2.
 #[repr(C)]
 pub struct CreateOrOpenArgs {
@@ -878,29 +879,7 @@ pub struct CreateOrOpenArgs {
     free_list_cache_size: usize,
     revisions: usize,
     strategy: u8,
-}
-
-/// Create a database with the given cache size and maximum number of revisions, as well
-/// as a specific cache strategy
-///
-/// # Arguments
-///
-/// See `CreateOrOpenArgs`.
-///
-/// # Returns
-///
-/// A database handle, or panics if it cannot be created
-///
-/// # Safety
-///
-/// This function uses raw pointers so it is unsafe.
-/// It is the caller's responsibility to ensure that path is a valid pointer to a null-terminated string.
-/// The caller must also ensure that the cache size is greater than 0 and that the number of revisions is at least 2.
-/// The caller must call `close` to free the memory associated with the returned database handle.
-///
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn fwd_create_db(args: CreateOrOpenArgs) -> DatabaseCreationResult {
-    unsafe { common_create(&args, true) }.into()
+    truncate: bool,
 }
 
 /// Open a database with the given cache size and maximum number of revisions
@@ -922,14 +901,14 @@ pub unsafe extern "C" fn fwd_create_db(args: CreateOrOpenArgs) -> DatabaseCreati
 ///
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fwd_open_db(args: CreateOrOpenArgs) -> DatabaseCreationResult {
-    unsafe { common_create(&args, false) }.into()
+    unsafe { open_db(&args) }.into()
 }
 
-/// Internal call for `fwd_create_db` and `fwd_open_db` to remove error handling from the C API
+/// Internal call for `fwd_open_db` to remove error handling from the C API
 #[doc(hidden)]
-unsafe fn common_create(args: &CreateOrOpenArgs, create_file: bool) -> Result<Db, String> {
+unsafe fn open_db(args: &CreateOrOpenArgs) -> Result<Db, String> {
     let cfg = DbConfig::builder()
-        .truncate(create_file)
+        .truncate(args.truncate)
         .manager(manager_config(
             args.cache_size,
             args.free_list_cache_size,

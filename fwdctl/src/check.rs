@@ -28,13 +28,14 @@ pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
     let node_cache_size = nonzero!(1usize);
     let free_list_cache_size = nonzero!(1usize);
 
-    let storage = Arc::new(FileBacked::new(
+    let fb = FileBacked::new(
         db_path,
         node_cache_size,
         free_list_cache_size,
         false,
         CacheReadStrategy::WritesOnly, // we scan the database once - no need to cache anything
-    )?);
+    )?;
+    let storage = Arc::new(fb);
 
     NodeStore::open(storage)?.check().map_err(Into::into)
 }

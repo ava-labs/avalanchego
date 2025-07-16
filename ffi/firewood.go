@@ -54,7 +54,7 @@ type Database struct {
 
 // Config configures the opening of a [Database].
 type Config struct {
-	Create               bool
+	Truncate             bool
 	NodeCacheEntries     uint
 	FreeListCacheEntries uint
 	Revisions            uint
@@ -109,18 +109,13 @@ func New(filePath string, conf *Config) (*Database, error) {
 		free_list_cache_size: C.size_t(conf.FreeListCacheEntries),
 		revisions:            C.size_t(conf.Revisions),
 		strategy:             C.uint8_t(conf.ReadCacheStrategy),
+		truncate:             C.bool(conf.Truncate),
 	}
 	// Defer freeing the C string allocated to the heap on the other side
 	// of the FFI boundary.
 	defer C.free(unsafe.Pointer(args.path))
 
-	var dbResult C.struct_DatabaseCreationResult
-	if conf.Create {
-		dbResult = C.fwd_create_db(args)
-	} else {
-		dbResult = C.fwd_open_db(args)
-	}
-
+	dbResult := C.fwd_open_db(args)
 	db, err := databaseFromResult(&dbResult)
 	if err != nil {
 		return nil, err

@@ -134,22 +134,13 @@ func newTestDatabase(t *testing.T) *Database {
 
 func newDatabase(dbFile string) (*Database, func() error, error) {
 	conf := DefaultConfig()
-	conf.Create = true
+	conf.Truncate = true // in tests, we use filepath.Join, which creates an empty file
 
 	f, err := New(dbFile, conf)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create new database at filepath %q: %w", dbFile, err)
 	}
 	return f, f.Close, nil
-}
-
-func TestOpenNonexistentDatabase(t *testing.T) {
-	r := require.New(t)
-	cfg := DefaultConfig()
-	cfg.Create = false
-	db, err := New(filepath.Join(t.TempDir(), "test.db"), cfg)
-	r.ErrorContains(err, "File IO error")
-	r.Nil(db)
 }
 
 func TestUpdateSingleKV(t *testing.T) {
@@ -176,6 +167,38 @@ func TestUpdateMultiKV(t *testing.T) {
 		r.NoError(err)
 		r.Equal(vals[i], got)
 	}
+}
+
+func TestTruncateDatabase(t *testing.T) {
+	r := require.New(t)
+	dbFile := filepath.Join(t.TempDir(), "test.db")
+	// Create a new database with truncate enabled.
+	config := DefaultConfig()
+	config.Truncate = true
+	db, err := New(dbFile, config)
+	r.NoError(err)
+
+	// Insert some data.
+	keys, vals := kvForTest(10)
+	_, err = db.Update(keys, vals)
+	r.NoError(err)
+
+	// Close the database.
+	r.NoError(db.Close())
+
+	// Reopen the database with truncate enabled.
+	db, err = New(dbFile, config)
+	r.NoError(err)
+
+	// Check that the database is empty after truncation.
+	hash, err := db.Root()
+	r.NoError(err)
+	emptyRootStr := expectedRoots[emptyKey]
+	expectedHash, err := hex.DecodeString(emptyRootStr)
+	r.NoError(err)
+	r.Equal(expectedHash, hash, "Root hash mismatch after truncation")
+
+	r.NoError(db.Close())
 }
 
 func TestClosedDatabase(t *testing.T) {

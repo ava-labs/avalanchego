@@ -529,6 +529,7 @@ mod test {
     #[tokio::test]
     async fn reopen_test() {
         let db = testdb().await;
+        let initial_root = db.root_hash().await.unwrap();
         let batch = vec![
             BatchOp::Put {
                 key: b"a",
@@ -548,6 +549,10 @@ mod test {
         let committed = db.root_hash().await.unwrap().unwrap();
         let historical = db.revision(committed).await.unwrap();
         assert_eq!(&*historical.val(b"a").await.unwrap().unwrap(), b"1");
+
+        let db = db.replace().await;
+        println!("{:?}", db.root_hash().await.unwrap());
+        assert!(db.root_hash().await.unwrap() == initial_root);
     }
 
     #[tokio::test]
@@ -717,7 +722,7 @@ mod test {
         let dbpath: PathBuf = [tmpdir.path().to_path_buf(), PathBuf::from("testdb")]
             .iter()
             .collect();
-        let dbconfig = DbConfig::builder().truncate(true).build();
+        let dbconfig = DbConfig::builder().build();
         let db = Db::new(dbpath, dbconfig).await.unwrap();
         TestDb { db, tmpdir }
     }
@@ -732,6 +737,17 @@ mod test {
             let path = self.path();
             drop(self.db);
             let dbconfig = DbConfig::builder().truncate(false).build();
+
+            let db = Db::new(path, dbconfig).await.unwrap();
+            TestDb {
+                db,
+                tmpdir: self.tmpdir,
+            }
+        }
+        async fn replace(self) -> Self {
+            let path = self.path();
+            drop(self.db);
+            let dbconfig = DbConfig::builder().truncate(true).build();
 
             let db = Db::new(path, dbconfig).await.unwrap();
             TestDb {

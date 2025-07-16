@@ -49,6 +49,8 @@ typedef struct DatabaseCreationResult {
   uint8_t *error_str;
 } DatabaseCreationResult;
 
+typedef uint32_t ProposalId;
+
 /**
  * Common arguments, accepted by both `fwd_create_db()` and `fwd_open_db()`.
  *
@@ -59,6 +61,7 @@ typedef struct DatabaseCreationResult {
  * * `revisions` - The maximum number of revisions to keep; firewood currently requires this to be at least 2.
  * * `strategy` - The cache read strategy to use, 0 for writes only,
  *   1 for branch reads, and 2 for all reads.
+ * * `truncate` - Whether to truncate the database file if it exists.
  *   Returns an error if the value is not 0, 1, or 2.
  */
 typedef struct CreateOrOpenArgs {
@@ -67,9 +70,8 @@ typedef struct CreateOrOpenArgs {
   size_t free_list_cache_size;
   size_t revisions;
   uint8_t strategy;
+  bool truncate;
 } CreateOrOpenArgs;
-
-typedef uint32_t ProposalId;
 
 /**
  * Puts the given key-value pairs into the database.
@@ -146,28 +148,6 @@ void fwd_close_db(struct DatabaseHandle *db);
  *
  */
 struct Value fwd_commit(const struct DatabaseHandle *db, uint32_t proposal_id);
-
-/**
- * Create a database with the given cache size and maximum number of revisions, as well
- * as a specific cache strategy
- *
- * # Arguments
- *
- * See `CreateOrOpenArgs`.
- *
- * # Returns
- *
- * A database handle, or panics if it cannot be created
- *
- * # Safety
- *
- * This function uses raw pointers so it is unsafe.
- * It is the caller's responsibility to ensure that path is a valid pointer to a null-terminated string.
- * The caller must also ensure that the cache size is greater than 0 and that the number of revisions is at least 2.
- * The caller must call `close` to free the memory associated with the returned database handle.
- *
- */
-struct DatabaseCreationResult fwd_create_db(struct CreateOrOpenArgs args);
 
 /**
  * Drops a proposal from the database.

@@ -84,18 +84,15 @@ impl RevisionManager {
         truncate: bool,
         config: RevisionManagerConfig,
     ) -> Result<Self, FileIoError> {
-        let storage = Arc::new(FileBacked::new(
+        let fb = FileBacked::new(
             filename,
             config.node_cache_size,
             config.free_list_cache_size,
             truncate,
             config.cache_read_strategy,
-        )?);
-        let nodestore = if truncate {
-            Arc::new(NodeStore::new_empty_committed(storage.clone())?)
-        } else {
-            Arc::new(NodeStore::open(storage.clone())?)
-        };
+        )?;
+        let storage = Arc::new(fb);
+        let nodestore = Arc::new(NodeStore::open(storage.clone())?);
         let manager = Self {
             max_revisions: config.max_revisions,
             historical: RwLock::new(VecDeque::from([nodestore.clone()])),

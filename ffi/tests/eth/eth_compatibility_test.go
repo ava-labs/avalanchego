@@ -67,7 +67,6 @@ func newMerkleTriePair(t *testing.T) *merkleTriePair {
 
 	file := path.Join(t.TempDir(), "test.db")
 	cfg := firewood.DefaultConfig()
-	cfg.Create = true
 	db, err := firewood.New(file, cfg)
 	r.NoError(err)
 
