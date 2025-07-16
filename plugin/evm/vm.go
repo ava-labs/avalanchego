@@ -193,7 +193,6 @@ type VM struct {
 
 	config config.Config
 
-	networkID   uint64
 	genesisHash common.Hash
 	chainConfig *params.ChainConfig
 	ethConfig   ethconfig.Config
@@ -427,7 +426,6 @@ func (vm *VM) Initialize(
 	}
 
 	vm.chainConfig = g.Config
-	vm.networkID = vm.ethConfig.NetworkId
 
 	// create genesisHash after applying upgradeBytes in case
 	// upgradeBytes modifies genesis.

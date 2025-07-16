@@ -533,9 +533,11 @@ func TestReceiveWarpMessage(t *testing.T) {
 	// Note each test corresponds to a block, the tests must be ordered by block
 	// time and cannot, eg be run in parallel or a separate golang test.
 	for _, test := range tests {
-		testReceiveWarpMessage(
-			t, tvm.vm, test.sourceChainID, test.msgFrom, test.useSigners, test.blockTime,
-		)
+		t.Run(test.name, func(t *testing.T) {
+			testReceiveWarpMessage(
+				t, tvm.vm, test.sourceChainID, test.msgFrom, test.useSigners, test.blockTime,
+			)
+		})
 	}
 }
 
@@ -563,20 +565,18 @@ func testReceiveWarpMessage(
 	require.NoError(err)
 
 	type signer struct {
-		networkID ids.ID
 		nodeID    ids.NodeID
 		secret    bls.Signer
 		signature *bls.Signature
 		weight    uint64
 	}
-	newSigner := func(networkID ids.ID, weight uint64) signer {
+	newSigner := func(weight uint64) signer {
 		secret, err := localsigner.New()
 		require.NoError(err)
 		sig, err := secret.Sign(unsignedMessage.Bytes())
 		require.NoError(err)
 
 		return signer{
-			networkID: networkID,
 			nodeID:    ids.GenerateTestNodeID(),
 			secret:    secret,
 			signature: sig,
@@ -585,12 +585,12 @@ func testReceiveWarpMessage(
 	}
 
 	primarySigners := []signer{
-		newSigner(constants.PrimaryNetworkID, 50),
-		newSigner(constants.PrimaryNetworkID, 50),
+		newSigner(50),
+		newSigner(50),
 	}
 	subnetSigners := []signer{
-		newSigner(vm.ctx.SubnetID, 50),
-		newSigner(vm.ctx.SubnetID, 50),
+		newSigner(50),
+		newSigner(50),
 	}
 	signers := subnetSigners
 	if useSigners == signersPrimary {
