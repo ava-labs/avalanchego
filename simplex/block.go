@@ -79,17 +79,11 @@ func (b *Block) Verify(ctx context.Context) (simplex.VerifiedBlock, error) {
 		return nil, err
 	}
 
-	if b.blockTracker.isBlockAlreadyVerified(b.vmBlock) {
-		return b, nil
-	}
-
-	err = b.vmBlock.Verify(ctx)
+	err = b.blockTracker.verifyAndTrackBlock(b)
 	if err != nil {
 		return nil, fmt.Errorf("failed to verify block: %w", err)
 	}
 
-	// once verified, the block tracker will eventually either accept or reject the block
-	b.blockTracker.trackBlock(b)
 	return b, nil
 }
 
@@ -168,20 +162,27 @@ func (bt *blockTracker) getBlockByDigest(digest simplex.Digest) *Block {
 	return bt.simplexDigestsToBlock[digest]
 }
 
-func (bt *blockTracker) isBlockAlreadyVerified(block snowman.Block) bool {
+// verifyAndTrackBlock verifies the block and tracks it in the block tracker.
+// If the block is already verified, it does nothing.
+func (bt *blockTracker) verifyAndTrackBlock(block *Block) error {
 	bt.lock.Lock()
 	defer bt.lock.Unlock()
 
-	_, exists := bt.tree.Get(block)
-	return exists
-}
+	// check if the block is already verified
+	if _, exists := bt.tree.Get(block.vmBlock); exists {
+		return nil
+	}
 
-func (bt *blockTracker) trackBlock(b *Block) {
-	bt.lock.Lock()
-	defer bt.lock.Unlock()
+	// verify the block
+	err := block.vmBlock.Verify(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to verify block: %w", err)
+	}
 
-	bt.simplexDigestsToBlock[b.digest] = b
-	bt.tree.Add(b.vmBlock)
+	// track the block
+	bt.simplexDigestsToBlock[block.digest] = block
+	bt.tree.Add(block.vmBlock)
+	return nil
 }
 
 // indexBlock calls accept on the block with the given digest, and reject on competing blocks.
