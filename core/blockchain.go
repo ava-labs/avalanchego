@@ -62,7 +62,6 @@ import (
 	"github.com/ava-labs/libevm/libevm/stateconf"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/metrics"
-	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/triedb"
 
 	// Force libevm metrics of the same name to be registered first.
@@ -1806,8 +1805,15 @@ func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64) error 
 		}
 	}
 
-	for i := 0; i < int(reexec); i++ {
+	// Find a historic available state root
+	var hasState bool
+	for i := 0; i <= int(reexec); i++ {
 		// TODO: handle canceled context
+
+		if bc.HasState(current.Root()) {
+			hasState = true
+			break
+		}
 
 		if current.NumberU64() == 0 {
 			return errors.New("genesis state is missing")
@@ -1817,18 +1823,9 @@ func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64) error 
 			return fmt.Errorf("missing block %s:%d", current.ParentHash().Hex(), current.NumberU64()-1)
 		}
 		current = parent
-		_, err = bc.stateCache.OpenTrie(current.Root())
-		if err == nil {
-			break
-		}
 	}
-	if err != nil {
-		switch err.(type) {
-		case *trie.MissingNodeError:
-			return fmt.Errorf("required historical state unavailable (reexec=%d)", reexec)
-		default:
-			return err
-		}
+	if !hasState {
+		return fmt.Errorf("required historical state unavailable (reexec=%d)", reexec)
 	}
 
 	// State was available at historical point, regenerate
