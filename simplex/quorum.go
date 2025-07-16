@@ -149,7 +149,7 @@ type SignatureAggregator BLSVerifier
 func (a SignatureAggregator) Aggregate(signatures []simplex.Signature) (simplex.QuorumCertificate, error) {
 	quorumSize := simplex.Quorum(len(a.nodeID2PK))
 	if len(signatures) < quorumSize {
-		return nil, fmt.Errorf("%w: wanted %d signatures but got %d", errUnexpectedSigners, quorumSize, len(signatures))
+		return nil, fmt.Errorf("%w: expected %d signatures but got %d", errUnexpectedSigners, quorumSize, len(signatures))
 	}
 
 	signatures = signatures[:quorumSize]
