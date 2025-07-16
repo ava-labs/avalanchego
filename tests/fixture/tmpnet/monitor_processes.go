@@ -283,8 +283,9 @@ type SDConfig struct {
 
 // WritePrometheusSDConfig writes the SDConfig with the provided name
 // to the location expected by the prometheus instance start by tmpnet.
-// If withGitHubLabels is true, it attempts to append GitHub-specific labels
-// to the SDConfig before writing.
+//
+// If withGitHubLabels is true, checks env vars for GitHub-specific labels
+// and adds them as labels if present before writing the SDConfig.
 //
 // Returns the path to the written configuration file.
 func WritePrometheusSDConfig(name string, sdConfig SDConfig, withGitHubLabels bool) (string, error) {
