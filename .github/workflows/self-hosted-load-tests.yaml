@@ -43,7 +43,7 @@ jobs:
             --kube-image ${{ inputs.avalanchego_image }}
             ${{ inputs.exclusive_scheduling == 'true' && '--kube-use-exclusive-scheduling' || '' }}
             ${{ inputs.duration && format('--duration {0}', inputs.duration) || '' }}
-          artifact_prefix: ${{ inputs.artifact_prefix }}${{ inputs.exclusive_scheduling == 'true' && '-exclusive' || '' }}
+          artifact_prefix: self-hosted-load-test${{ inputs.exclusive_scheduling == 'true' && '-exclusive' || '' }}
           prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           loki_username: ${{ secrets.LOKI_ID || '' }}
