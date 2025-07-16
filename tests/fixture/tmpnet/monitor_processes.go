@@ -5,7 +5,6 @@ package tmpnet
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -276,21 +275,22 @@ func getServiceDiscoveryDir(cmdName string) (string, error) {
 	return filepath.Join(tmpnetDir, cmdName, "file_sd_configs"), nil
 }
 
+// SDConfig represents a Prometheus service discovery config entry.
+//
+// file_sd_config docs: https://prometheus.io/docs/prometheus/latest/configuration/configuration/#file_sd_config
 type SDConfig struct {
 	Targets []string          `json:"targets"`
 	Labels  map[string]string `json:"labels"`
 }
 
-func applyGitHubLabels(sdConfigs []SDConfig) []SDConfig {
-	for _, sdConfig := range sdConfigs {
-		for label, value := range GetGitHubLabels() {
-			sdConfig.Labels[label] = value
-		}
-	}
-	return sdConfigs
-}
-
-func WritePrometheusServiceDiscoveryConfigFile(name string, sdConfigs []SDConfig, withGitHubLabels bool) (string, error) {
+// WritePrometheusSDConfig writes the SDConfig with the provided name
+// to the location expected by the prometheus instance start by tmpnet.
+//
+// If withGitHubLabels is true, checks env vars for GitHub-specific labels
+// and adds them as labels if present before writing the SDConfig.
+//
+// Returns the path to the written configuration file.
+func WritePrometheusSDConfig(name string, sdConfig SDConfig, withGitHubLabels bool) (string, error) {
 	serviceDiscoveryDir, err := GetPrometheusServiceDiscoveryDir()
 	if err != nil {
 		return "", fmt.Errorf("failed to get service discovery dir: %w", err)
@@ -301,16 +301,27 @@ func WritePrometheusServiceDiscoveryConfigFile(name string, sdConfigs []SDConfig
 	}
 
 	if withGitHubLabels {
-		sdConfigs = applyGitHubLabels(sdConfigs)
+		sdConfig = applyGitHubLabels(sdConfig)
 	}
 
 	configPath := filepath.Join(serviceDiscoveryDir, name+".json")
-	configData, err := json.MarshalIndent(sdConfigs, "", "  ")
+	configData, err := DefaultJSONMarshal([]SDConfig{sdConfig})
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	return configPath, os.WriteFile(configPath, configData, perms.ReadWrite)
+	if err := os.WriteFile(configPath, configData, perms.ReadWrite); err != nil {
+		return "", fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	return configPath, nil
+}
+
+func applyGitHubLabels(sdConfig SDConfig) SDConfig {
+	for label, value := range GetGitHubLabels() {
+		sdConfig.Labels[label] = value
+	}
+	return sdConfig
 }
 
 func getLogFilename(cmdName string) string {

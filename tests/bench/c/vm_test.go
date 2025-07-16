@@ -406,8 +406,7 @@ func collectRegistry(tb testing.TB, name string, addr string, timeout time.Durat
 
 	r.NoError(tmpnet.StartPrometheus(ctx, tests.NewDefaultLogger("prometheus")))
 
-	server := tests.NewPrometheusServer(addr, "/ext/metrics", gatherer)
-	errChan, err := server.Start()
+	server, err := tests.NewPrometheusServer(gatherer)
 	r.NoError(err)
 
 	var sdConfigFilePath string
@@ -417,18 +416,15 @@ func collectRegistry(tb testing.TB, name string, addr string, timeout time.Durat
 		time.Sleep(tmpnet.NetworkShutdownDelay)
 
 		r.NoError(server.Stop())
-		r.NoError(<-errChan)
 
 		if sdConfigFilePath != "" {
 			r.NoError(os.Remove(sdConfigFilePath))
 		}
 	})
 
-	sdConfigFilePath, err = tmpnet.WritePrometheusServiceDiscoveryConfigFile(name, []tmpnet.SDConfig{
-		{
-			Targets: []string{server.Address()},
-			Labels:  labels,
-		},
+	sdConfigFilePath, err = tmpnet.WritePrometheusSDConfig(name, tmpnet.SDConfig{
+		Targets: []string{server.Address()},
+		Labels:  labels,
 	}, true)
 	r.NoError(err)
 }
