@@ -58,7 +58,7 @@ jobs:
           loki_username: ${{ secrets.LOKI_ID || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   e2e_post_granite:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
@@ -73,7 +73,7 @@ jobs:
           loki_username: ${{ secrets.LOKI_ID || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   e2e_kube:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
@@ -88,7 +88,7 @@ jobs:
           loki_username: ${{ secrets.LOKI_ID || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   e2e_existing_network:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
@@ -102,7 +102,7 @@ jobs:
           loki_username: ${{ secrets.LOKI_ID || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   Upgrade:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
@@ -116,7 +116,7 @@ jobs:
           loki_username: ${{ secrets.LOKI_ID || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   Lint:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
@@ -126,7 +126,7 @@ jobs:
         run: ./scripts/run_task.sh lint-all-ci
   buf-lint:
     name: Protobuf Lint
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
       - uses: bufbuild/buf-action@dfda68eacb65895184c76b9ae522b977636a2c47 #v1.1.4
@@ -143,7 +143,7 @@ jobs:
           version: 1.47.2
   links-lint:
     name: Markdown Links Lint
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
       - uses: umbrelladocs/action-linkspector@de84085e0f51452a470558693d7d308fbb2fa261 #v1.2.5
@@ -151,7 +151,7 @@ jobs:
           fail_level: any
   check_generated_protobuf:
     name: Up-to-date protobuf
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
@@ -161,7 +161,7 @@ jobs:
         run: ./scripts/run_task.sh check-generate-protobuf
   check_mockgen:
     name: Up-to-date mocks
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
@@ -169,7 +169,7 @@ jobs:
         run: ./scripts/run_task.sh check-generate-mocks
   check_canotogen:
     name: Up-to-date canoto
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
@@ -177,7 +177,7 @@ jobs:
         run: ./scripts/run_task.sh check-generate-canoto
   check_contract_bindings:
     name: Up-to-date contract bindings
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
@@ -186,7 +186,7 @@ jobs:
         run: task check-generate-load-contract-bindings
   go_mod_tidy:
     name: Up-to-date go.mod and go.sum
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
@@ -194,7 +194,7 @@ jobs:
         run: ./scripts/run_task.sh check-go-mod-tidy
   test_build_image:
     name: Image build
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
       - name: Install qemu (required for cross-platform builds)
@@ -206,7 +206,7 @@ jobs:
         run: ./scripts/run_task.sh test-build-image
   test_build_antithesis_avalanchego_images:
     name: Build Antithesis avalanchego images
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
@@ -215,7 +215,7 @@ jobs:
         run: ./scripts/run_task.sh test-build-antithesis-images-avalanchego
   test_build_antithesis_xsvm_images:
     name: Build Antithesis xsvm images
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
@@ -224,7 +224,7 @@ jobs:
         run: ./scripts/run_task.sh test-build-antithesis-images-xsvm
   e2e_bootstrap_monitor:
     name: Run bootstrap monitor e2e tests
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
@@ -234,7 +234,7 @@ jobs:
         run: nix develop --command ./scripts/run_task.sh test-bootstrap-monitor-e2e
   load:
     name: Run process-based load test
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
@@ -248,7 +248,7 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   load_kube_kind:
     name: Run load test on kind cluster
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
@@ -262,7 +262,7 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   load2:
     name: Run load2 test
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
         - uses: actions/checkout@v4
         - uses: ./.github/actions/setup-go-for-project
