@@ -67,7 +67,6 @@ func (c *ConnectInfoService) NodeID(
 		return nil, err
 	}
 
-	// Convert raw PoP bytes into hex strings
 	pop := jsonResponse.NodePOP
 	if err := pop.Verify(); err != nil {
 		return nil, err
@@ -76,16 +75,22 @@ func (c *ConnectInfoService) NodeID(
 	if err != nil {
 		return nil, err
 	}
-	var popMessage infov1.ProofOfPossession
-	if err := json.Unmarshal(rawPopJSON, &popMessage); err != nil {
+
+	type jsonProofOfPossession struct {
+		PublicKey         string `json:"publicKey"`
+		ProofOfPossession string `json:"proofOfPossession"`
+	}
+
+	var popJSON jsonProofOfPossession
+	if err := json.Unmarshal(rawPopJSON, &popJSON); err != nil {
 		return nil, err
 	}
 
 	response := &infov1.NodeIDResponse{
 		NodeId: jsonResponse.NodeID.String(),
 		NodePop: &infov1.ProofOfPossession{
-			PublicKey:         popMessage.PublicKey,
-			ProofOfPossession: popMessage.ProofOfPossession,
+			PublicKey:         popJSON.PublicKey,
+			ProofOfPossession: popJSON.ProofOfPossession,
 		},
 	}
 
