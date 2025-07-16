@@ -17,18 +17,45 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 )
 
-// newBlockWithDigest is a helper function that creates a new block and sets its digest.
-// This is helpful since otherwise we would need the blockDeserializer to create the block.
-func newBlockWithDigest(t *testing.T, vmBlock snowman.Block, tracker *blockTracker, round, seq uint64, prev simplex.Digest) *Block {
+type testBlockConfig struct {
+	vmBlock      snowman.Block
+	blockTracker *blockTracker
+	round        uint64
+	seq          uint64
+	prev         simplex.Digest
+}
+
+// newBlock constructs a random child block of the genesis. This is a helper function
+// used for testing. This is helpful since otherwise we would
+// need the blockDeserializer to create the block.
+func newBlock(t *testing.T, config *testBlockConfig) *Block {
+	genesisBlock := newGenesisBlock(t)
+
+	if config == nil {
+		config = &testBlockConfig{
+			vmBlock:      snowmantest.BuildChild(snowmantest.Genesis),
+			blockTracker: newBlockTracker(genesisBlock),
+			round:        1,
+			seq:          1,
+			prev:         genesisBlock.digest,
+		}
+	}
+	if config.blockTracker == nil {
+		config.blockTracker = newBlockTracker(genesisBlock)
+	}
+	if config.vmBlock == nil {
+		config.vmBlock = snowmantest.BuildChild(snowmantest.Genesis)
+	}
+
 	block := &Block{
-		vmBlock:      vmBlock,
-		blockTracker: tracker,
+		vmBlock:      config.vmBlock,
+		blockTracker: config.blockTracker,
 		metadata: simplex.ProtocolMetadata{
 			Version: 1,
 			Epoch:   1,
-			Round:   round,
-			Seq:     seq,
-			Prev:    prev,
+			Round:   config.round,
+			Seq:     config.seq,
+			Prev:    config.prev,
 		},
 	}
 
@@ -41,12 +68,24 @@ func newBlockWithDigest(t *testing.T, vmBlock snowman.Block, tracker *blockTrack
 	return block
 }
 
-// newTestBlock generate a test block with a given round and sequence number.
-func newTestBlock(t *testing.T, round, seq uint64) *Block {
-	testBlock := snowmantest.BuildChild(snowmantest.Genesis)
+func newGenesisBlock(t *testing.T) *Block {
+	block := &Block{
+		vmBlock: snowmantest.Genesis,
+		metadata: simplex.ProtocolMetadata{
+			Version: 1,
+			Epoch:   1,
+			Round:   0,
+			Seq:     0,
+		},
+	}
 
-	prevDigest := simplex.Digest(ids.GenerateTestID())
-	return newBlockWithDigest(t, testBlock, nil, round, seq, prevDigest)
+	bytes, err := block.Bytes()
+	require.NoError(t, err)
+
+	digest := computeDigest(bytes)
+	block.digest = digest
+
+	return block
 }
 
 func newTestValidatorInfo(allVds []validators.GetValidatorOutput) map[ids.NodeID]*validators.GetValidatorOutput {

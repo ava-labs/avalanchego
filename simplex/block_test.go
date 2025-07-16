@@ -102,10 +102,14 @@ func TestBlockSerialization(t *testing.T) {
 // TestVerifyPrevNotFound attempts to verify a block with a prev digest that is not valid.
 func TestVerifyPrevNotFound(t *testing.T) {
 	ctx := context.Background()
-	testBlock := snowmantest.BuildChild(snowmantest.Genesis)
 
-	tracker := newBlockTracker(newTestBlock(t, 0, 0))
-	b := newBlockWithDigest(t, testBlock, tracker, 1, 1, simplex.Digest{0x01})
+	tracker := newBlockTracker(newBlock(t, nil))
+	b := newBlock(t, &testBlockConfig{
+		blockTracker: tracker,
+		round:        1,
+		seq:          1,
+		prev:         [32]byte{0x00, 0x012}, // Invalid prev digest
+	})
 
 	_, err := b.Verify(ctx)
 	require.ErrorIs(t, err, errDigestNotFound)
@@ -115,19 +119,14 @@ func TestVerifyPrevNotFound(t *testing.T) {
 // have its Verify method called once, even if Verify is called multiple times.
 func TestVerifyTwice(t *testing.T) {
 	ctx := context.Background()
-	testVMBlock := snowmantest.BuildChild(snowmantest.Genesis)
-	testBlock := newBlockWithDigest(t, testVMBlock, nil, 1, 1, simplex.Digest{})
-	tracker := newBlockTracker(testBlock)
-
-	vmBlock := snowmantest.BuildChild(testVMBlock)
-	b := newBlockWithDigest(t, vmBlock, tracker, 1, 1, testBlock.digest)
+	b := newBlock(t, nil)
 
 	// Verify the block for the first time
 	_, err := b.Verify(ctx)
 	require.NoError(t, err)
 
 	// Attempt to verify the block again
-	vmBlock.VerifyV = errors.New("should not be called again")
+	b.vmBlock.(*snowmantest.Block).VerifyV = errors.New("should not be called again")
 	_, err = b.Verify(ctx)
 	require.NoError(t, err)
 }
@@ -136,27 +135,15 @@ func TestVerifyTwice(t *testing.T) {
 func TestVerifyGenesis(t *testing.T) {
 	ctx := context.Background()
 
-	genesis := newBlockWithDigest(t, snowmantest.Genesis, nil, 0, 0, simplex.Digest{})
-	tracker := newBlockTracker(genesis)
-	b := newBlockWithDigest(t, snowmantest.Genesis, tracker, 0, 0, simplex.Digest{})
-
 	// Verify the block for the first time
-	_, err := b.Verify(ctx)
+	_, err := newGenesisBlock(t).Verify(ctx)
 	require.ErrorIs(t, err, errGenesisVerification)
 }
 
-// TestVerifyPrevIsLatest tests that a block with a prev digest that is not found in the block tracker
-// successfully verifies the block if it is the latest accepted block.
-func TestVerifyPrevIsLatest(t *testing.T) {
+func TestVerify(t *testing.T) {
 	ctx := context.Background()
-	latestAccepted := snowmantest.Genesis
 
-	// Create latest accepted block, and its child
-	latestBlock := newBlockWithDigest(t, latestAccepted, nil, 0, 0, [32]byte{})
-	tracker := newBlockTracker(latestBlock)
-
-	testBlock := snowmantest.BuildChild(latestAccepted)
-	b := newBlockWithDigest(t, testBlock, tracker, 1, 1, latestBlock.digest)
+	b := newBlock(t, nil)
 
 	verifiedBlock, err := b.Verify(ctx)
 	require.NoError(t, err)
@@ -168,13 +155,32 @@ func TestVerifyPrevIsLatest(t *testing.T) {
 	blockBytes, err := b.Bytes()
 	require.NoError(t, err)
 	require.Equal(t, blockBytes, vBlockBytes, "block bytes should match after verification")
+}
+
+// TestVerifyPrevIsLatest tests that a block with a prev digest that is not found in the block tracker
+// successfully verifies the block if it is the latest accepted block.
+func TestVerifyPrevIsLatest(t *testing.T) {
+	ctx := context.Background()
+
+	b := newBlock(t, nil)
+	tracker := b.blockTracker
+
+	_, err := b.Verify(ctx)
+	require.NoError(t, err)
 
 	require.NoError(t, tracker.indexBlock(ctx, b.digest))
-	require.Equal(t, snowtest.Accepted, testBlock.Decidable.Status)
+	require.Equal(t, snowtest.Accepted, b.vmBlock.(*snowmantest.Block).Decidable.Status)
 
 	// Ensure future blocks are verified on the new last accepted id and digest
-	nextVMBlock := snowmantest.BuildChild(testBlock)
-	nextBlock := newBlockWithDigest(t, nextVMBlock, tracker, 2, 2, b.digest)
+	nextVMBlock := snowmantest.BuildChild(b.vmBlock.(*snowmantest.Block))
+	nextBlock := newBlock(t, &testBlockConfig{
+		vmBlock:      nextVMBlock,
+		blockTracker: tracker,
+		round:        2,
+		seq:          2,
+		prev:         b.digest,
+	})
+
 	_, err = nextBlock.Verify(ctx)
 	require.NoError(t, err)
 	require.NoError(t, tracker.indexBlock(ctx, nextBlock.digest))
@@ -185,21 +191,24 @@ func TestVerifyPrevIsLatest(t *testing.T) {
 // also be verified and indexed successfully.
 func TestVerifyParentAccepted(t *testing.T) {
 	ctx := context.Background()
-	vmBlock0 := snowmantest.Genesis
-	seq0Block := newBlockWithDigest(t, vmBlock0, nil, 0, 0, [32]byte{})
 
-	tracker := newBlockTracker(seq0Block)
+	seq1Block := newBlock(t, nil)
+	tracker := seq1Block.blockTracker
 
-	vmBlock1 := snowmantest.BuildChild(vmBlock0)
-	seq1Block := newBlockWithDigest(t, vmBlock1, tracker, 1, 1, seq0Block.digest)
-	vmBlock2 := snowmantest.BuildChild(vmBlock1)
-	seq2Block := newBlockWithDigest(t, vmBlock2, tracker, 2, 2, seq1Block.digest)
+	vmBlock2 := snowmantest.BuildChild(seq1Block.vmBlock.(*snowmantest.Block))
+	seq2Block := newBlock(t, &testBlockConfig{
+		vmBlock:      vmBlock2,
+		blockTracker: tracker,
+		round:        2,
+		seq:          2,
+		prev:         seq1Block.digest,
+	})
 
 	_, err := seq1Block.Verify(ctx)
 	require.NoError(t, err)
 
 	require.NoError(t, tracker.indexBlock(ctx, seq1Block.digest))
-	require.Equal(t, snowtest.Accepted, vmBlock1.Decidable.Status)
+	require.Equal(t, snowtest.Accepted, seq1Block.vmBlock.(*snowmantest.Block).Decidable.Status)
 
 	// Verify the second block with the first block as its parent
 	_, err = seq2Block.Verify(ctx)
@@ -208,25 +217,35 @@ func TestVerifyParentAccepted(t *testing.T) {
 	require.Equal(t, snowtest.Accepted, vmBlock2.Decidable.Status)
 
 	// ensure tracker cleans up the block
-	require.Nil(t, tracker.simplexDigestsToBlock[seq0Block.digest])
 	require.Nil(t, tracker.simplexDigestsToBlock[seq1Block.digest])
 }
 
 func TestVerifyBlockRejectsSiblings(t *testing.T) {
 	ctx := context.Background()
-	vmBlock0 := snowmantest.Genesis
-	block0 := newBlockWithDigest(t, vmBlock0, nil, 0, 0, [32]byte{})
-	block0Child0 := snowmantest.BuildChild(vmBlock0)
-	block0Child1 := snowmantest.BuildChild(vmBlock0)
-
-	tracker := newBlockTracker(block0)
+	genesisBlock := newGenesisBlock(t)
+	genesisChild0 := snowmantest.BuildChild(snowmantest.Genesis)
+	genesisChild1 := snowmantest.BuildChild(snowmantest.Genesis)
 
 	// round1Block and round2Block are siblings, both children of seq0
 	// this can happen if we notarize a block for round 1, but the rest
 	// of the network notarizes a dummy block for round 1. Then
 	// we will verify a sibling block for round 2 and must reject the round 1 block.
-	round1Block := newBlockWithDigest(t, block0Child0, tracker, 1, 1, block0.digest)
-	round2Block := newBlockWithDigest(t, block0Child1, tracker, 2, 1, block0.digest)
+	round1Block := newBlock(t, &testBlockConfig{
+		vmBlock: genesisChild0,
+		seq:     1,
+		round:   1,
+		prev:    genesisBlock.digest,
+	})
+
+	tracker := round1Block.blockTracker
+
+	round2Block := newBlock(t, &testBlockConfig{
+		vmBlock:      genesisChild1,
+		blockTracker: tracker,
+		seq:          1,
+		round:        2,
+		prev:         genesisBlock.digest,
+	})
 
 	// Verify the second block with the first block as its parent
 	_, err := round1Block.Verify(ctx)
@@ -236,38 +255,41 @@ func TestVerifyBlockRejectsSiblings(t *testing.T) {
 
 	// When the we index the second block, the first block should be rejected
 	require.NoError(t, tracker.indexBlock(ctx, round2Block.digest))
-	require.Equal(t, snowtest.Accepted, block0Child1.Decidable.Status)
-	require.Equal(t, snowtest.Rejected, block0Child0.Decidable.Status)
+	require.Equal(t, snowtest.Rejected, round1Block.vmBlock.(*snowmantest.Block).Decidable.Status)
+	require.Equal(t, snowtest.Accepted, round2Block.vmBlock.(*snowmantest.Block).Decidable.Status)
 
-	_, exists := tracker.getBlockByDigest(block0.digest)
+	_, exists := tracker.getBlockByDigest(genesisBlock.digest)
 	require.False(t, exists)
 }
 
 func TestVerifyInnerBlockBreaksHashChain(t *testing.T) {
-	genesisBlock := newBlockWithDigest(t, snowmantest.Genesis, nil, 0, 0, [32]byte{})
-
-	tracker := newBlockTracker(genesisBlock)
 	ctx := context.Background()
 
 	// We verify this valid block
-	seq1 := snowmantest.BuildChild(snowmantest.Genesis)
-	seq1Block := newBlockWithDigest(t, seq1, tracker, 1, 1, genesisBlock.digest)
+	seq1Block := newBlock(t, nil)
+	tracker := seq1Block.blockTracker
+
 	_, err := seq1Block.Verify(ctx)
 	require.NoError(t, err)
 
 	// This block does not extend seq1, however it has a valid previous digest(since seq1Block was verified)
 	seq2 := snowmantest.BuildChild(snowmantest.Genesis)
-	seq2Block := newBlockWithDigest(t, seq2, tracker, 2, 2, seq1Block.digest)
+	seq2Block := newBlock(t, &testBlockConfig{
+		vmBlock:      seq2,
+		blockTracker: tracker,
+		round:        2,
+		seq:          2,
+		prev:         seq1Block.digest,
+	})
 	_, err = seq2Block.Verify(ctx)
 	require.ErrorIs(t, err, errMismatchedPrevDigest)
 }
 
 func TestIndexBlockDigestNotFound(t *testing.T) {
-	tracker := newBlockTracker(newTestBlock(t, 0, 0))
+	tracker := newBlockTracker(newBlock(t, nil))
 	ctx := context.Background()
 
-	seq1 := snowmantest.BuildChild(snowmantest.Genesis)
-	seq1Block := newBlockWithDigest(t, seq1, tracker, 1, 1, [32]byte{})
+	seq1Block := newBlock(t, nil)
 	err := tracker.indexBlock(ctx, seq1Block.digest)
 	require.ErrorIs(t, err, errDigestNotFound)
 }
