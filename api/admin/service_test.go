@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/registry/registrymock"
 	"github.com/ava-labs/avalanchego/vms/vmsmock"
 
-	rpcdbpb "github.com/ava-labs/avalanchego/proto/pb/rpcdb"
+	rpcdbpb "github.com/ava-labs/avalanchego/buf/proto/pb/rpcdb"
 )
 
 type loadVMsTest struct {

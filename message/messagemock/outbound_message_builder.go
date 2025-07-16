@@ -14,9 +14,9 @@ import (
 	reflect "reflect"
 	time "time"
 
+	p2p "github.com/ava-labs/avalanchego/buf/proto/pb/p2p"
 	ids "github.com/ava-labs/avalanchego/ids"
 	message "github.com/ava-labs/avalanchego/message"
-	p2p "github.com/ava-labs/avalanchego/proto/pb/p2p"
 	ips "github.com/ava-labs/avalanchego/utils/ips"
 	gomock "go.uber.org/mock/gomock"
 )

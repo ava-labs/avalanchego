@@ -15,8 +15,8 @@ import (
 	"golang.org/x/exp/rand"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/ava-labs/avalanchego/buf/proto/pb/platformvm"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/proto/pb/platformvm"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"

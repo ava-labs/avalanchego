@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids/idstest"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
-	aliasreaderpb "github.com/ava-labs/avalanchego/proto/pb/aliasreader"
+	aliasreaderpb "github.com/ava-labs/avalanchego/buf/proto/pb/aliasreader"
 )
 
 func TestInterface(t *testing.T) {

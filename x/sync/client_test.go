@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
-	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
+	pb "github.com/ava-labs/avalanchego/buf/proto/pb/sync"
 )
 
 var _ p2p.Handler = (*flakyHandler)(nil)

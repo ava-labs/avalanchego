@@ -28,7 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/registry"
 
-	rpcdbpb "github.com/ava-labs/avalanchego/proto/pb/rpcdb"
+	rpcdbpb "github.com/ava-labs/avalanchego/buf/proto/pb/rpcdb"
 )
 
 const (

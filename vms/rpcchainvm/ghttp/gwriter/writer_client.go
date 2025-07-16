@@ -8,7 +8,7 @@ import (
 	"errors"
 	"io"
 
-	writerpb "github.com/ava-labs/avalanchego/proto/pb/io/writer"
+	writerpb "github.com/ava-labs/avalanchego/buf/proto/pb/io/writer"
 )
 
 var _ io.Writer = (*Client)(nil)

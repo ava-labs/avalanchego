@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package xsvm;
 
-option go_package = "github.com/ava-labs/avalanchego/connectproto/pb/xsvm";
+option go_package = "github.com/ava-labs/avalanchego/buf/connect/pb/xsvm";
 
 service Ping {
   rpc Ping(PingRequest) returns (PingReply);

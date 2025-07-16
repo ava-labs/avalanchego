@@ -6,8 +6,8 @@ package gossip
 import (
 	"google.golang.org/protobuf/proto"
 
+	"github.com/ava-labs/avalanchego/buf/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 )
 

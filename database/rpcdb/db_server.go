@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/units"
 
-	rpcdbpb "github.com/ava-labs/avalanchego/proto/pb/rpcdb"
+	rpcdbpb "github.com/ava-labs/avalanchego/buf/proto/pb/rpcdb"
 )
 
 const iterationBatchSize = 128 * units.KiB

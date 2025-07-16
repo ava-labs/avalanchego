@@ -30,9 +30,9 @@ if [[ $(protoc-gen-go-grpc --version | cut -f2 -d' ') != "${PROTOC_GEN_GO_GRPC_V
   exit 255
 fi
 
-BUF_MODULES=("proto" "connectproto")
+BUF_MODULES=("proto" "connect")
 
-REPO_ROOT=$PWD
+REPO_ROOT="${PWD}/buf"
 for BUF_MODULE in "${BUF_MODULES[@]}"; do
   TARGET=$REPO_ROOT/$BUF_MODULE
   if [ -n "${1:-}" ]; then

@@ -21,8 +21,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gruntime"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
-	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
-	runtimepb "github.com/ava-labs/avalanchego/proto/pb/vm/runtime"
+	vmpb "github.com/ava-labs/avalanchego/buf/proto/pb/vm"
+	runtimepb "github.com/ava-labs/avalanchego/buf/proto/pb/vm/runtime"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
 

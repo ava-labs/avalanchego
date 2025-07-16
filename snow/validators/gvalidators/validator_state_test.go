@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
-	pb "github.com/ava-labs/avalanchego/proto/pb/validatorstate"
+	pb "github.com/ava-labs/avalanchego/buf/proto/pb/validatorstate"
 )
 
 var errCustom = errors.New("custom")

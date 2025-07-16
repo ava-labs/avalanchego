@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/signertest"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
-	pb "github.com/ava-labs/avalanchego/proto/pb/warp"
+	pb "github.com/ava-labs/avalanchego/buf/proto/pb/warp"
 )
 
 type testSigner struct {

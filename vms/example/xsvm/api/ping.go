@@ -12,8 +12,8 @@ import (
 	"connectrpc.com/connect"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/connectproto/pb/xsvm"
-	"github.com/ava-labs/avalanchego/connectproto/pb/xsvm/xsvmconnect"
+	"github.com/ava-labs/avalanchego/buf/connect/pb/xsvm"
+	"github.com/ava-labs/avalanchego/buf/connect/pb/xsvm/xsvmconnect"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 

@@ -15,7 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
-	connpb "github.com/ava-labs/avalanchego/proto/pb/net/conn"
+	connpb "github.com/ava-labs/avalanchego/buf/proto/pb/net/conn"
 )
 
 var _ connpb.ConnServer = (*Server)(nil)

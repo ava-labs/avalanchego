@@ -12,7 +12,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
+	httppb "github.com/ava-labs/avalanchego/buf/proto/pb/http"
 	spb "google.golang.org/genproto/googleapis/rpc/status"
 	tspb "google.golang.org/protobuf/types/known/timestamppb"
 )
