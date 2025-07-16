@@ -239,7 +239,8 @@ func TestVerifyBlockRejectsSiblings(t *testing.T) {
 	require.Equal(t, snowtest.Accepted, block0Child1.Decidable.Status)
 	require.Equal(t, snowtest.Rejected, block0Child0.Decidable.Status)
 
-	require.Nil(t, tracker.getBlockByDigest(block0.digest))
+	_, exists := tracker.getBlockByDigest(block0.digest)
+	require.False(t, exists)
 }
 
 func TestVerifyInnerBlockBreaksHashChain(t *testing.T) {

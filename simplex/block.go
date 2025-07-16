@@ -74,13 +74,11 @@ func (b *Block) Verify(ctx context.Context) (simplex.VerifiedBlock, error) {
 		return nil, errGenesisVerification
 	}
 
-	err := b.verifyParentMatchesPrevBlock()
-	if err != nil {
+	if err := b.verifyParentMatchesPrevBlock(); err != nil {
 		return nil, err
 	}
 
-	err = b.blockTracker.verifyAndTrackBlock(b)
-	if err != nil {
+	if err := b.blockTracker.verifyAndTrackBlock(ctx, b); err != nil {
 		return nil, fmt.Errorf("failed to verify block: %w", err)
 	}
 
@@ -90,12 +88,12 @@ func (b *Block) Verify(ctx context.Context) (simplex.VerifiedBlock, error) {
 // verifyParentMatchesPrevBlock verifies that the previous block referenced in the current block's metadata
 // matches the parent of the current block's vmBlock.
 func (b *Block) verifyParentMatchesPrevBlock() error {
-	prevBlock := b.blockTracker.getBlockByDigest(b.metadata.Prev)
-	if prevBlock == nil {
+	prevBlock, ok := b.blockTracker.getBlockByDigest(b.metadata.Prev)
+	if !ok {
 		return fmt.Errorf("%w: %s", errDigestNotFound, b.metadata.Prev)
 	}
 
-	if b.vmBlock.Parent() != prevBlock.vmBlock.ID() || b.metadata.Prev != prevBlock.digest {
+	if b.vmBlock.Parent() != prevBlock.vmBlock.ID() {
 		return fmt.Errorf("%w: parentID %s, prevID %s", errMismatchedPrevDigest, b.vmBlock.Parent(), prevBlock.vmBlock.ID())
 	}
 
@@ -146,35 +144,36 @@ type blockTracker struct {
 }
 
 func newBlockTracker(latestBlock *Block) *blockTracker {
-	simplexDigestsToBlock := make(map[simplex.Digest]*Block)
-	simplexDigestsToBlock[latestBlock.digest] = latestBlock
-
 	return &blockTracker{
-		tree:                  tree.New(),
-		simplexDigestsToBlock: simplexDigestsToBlock,
+		tree: tree.New(),
+		simplexDigestsToBlock: map[simplex.Digest]*Block{
+			latestBlock.digest: latestBlock,
+		},
 	}
 }
 
-func (bt *blockTracker) getBlockByDigest(digest simplex.Digest) *Block {
+func (bt *blockTracker) getBlockByDigest(digest simplex.Digest) (*Block, bool) {
 	bt.lock.Lock()
 	defer bt.lock.Unlock()
 
-	return bt.simplexDigestsToBlock[digest]
+	block, exists := bt.simplexDigestsToBlock[digest]
+	return block, exists
 }
 
 // verifyAndTrackBlock verifies the block and tracks it in the block tracker.
 // If the block is already verified, it does nothing.
-func (bt *blockTracker) verifyAndTrackBlock(block *Block) error {
+func (bt *blockTracker) verifyAndTrackBlock(ctx context.Context, block *Block) error {
 	bt.lock.Lock()
 	defer bt.lock.Unlock()
 
 	// check if the block is already verified
 	if _, exists := bt.tree.Get(block.vmBlock); exists {
+		bt.simplexDigestsToBlock[block.digest] = block
 		return nil
 	}
 
 	// verify the block
-	err := block.vmBlock.Verify(context.Background())
+	err := block.vmBlock.Verify(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to verify block: %w", err)
 	}
