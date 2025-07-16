@@ -113,12 +113,43 @@ impl Child {
         }
     }
 
+    /// Return the unpersisted node if the child is an unpersisted [`Child::MaybePersisted`]
+    /// variant, otherwise None.
+    #[must_use]
+    pub fn unpersisted(&self) -> Option<&MaybePersistedNode> {
+        if let Child::MaybePersisted(maybe_persisted, _) = self {
+            maybe_persisted.unpersisted()
+        } else {
+            None
+        }
+    }
+
     /// Return the hash of the child if it is a [`Child::AddressWithHash`] or [`Child::MaybePersisted`] variant, otherwise None.
     #[must_use]
     pub const fn hash(&self) -> Option<&HashType> {
         match self {
             Child::AddressWithHash(_, hash) => Some(hash),
             Child::MaybePersisted(_, hash) => Some(hash),
+            Child::Node(_) => None,
+        }
+    }
+
+    /// Return the persistence information (address and hash) of the child if it is persisted.
+    ///
+    /// This method returns `Some((address, hash))` for:
+    /// - [`Child::AddressWithHash`] variants (already persisted)
+    /// - [`Child::MaybePersisted`] variants that have been persisted
+    ///
+    /// Returns `None` for:
+    /// - [`Child::Node`] variants (unpersisted nodes)
+    /// - [`Child::MaybePersisted`] variants that are not yet persisted
+    #[must_use]
+    pub fn persist_info(&self) -> Option<(LinearAddress, &HashType)> {
+        match self {
+            Child::AddressWithHash(addr, hash) => Some((*addr, hash)),
+            Child::MaybePersisted(maybe_persisted, hash) => {
+                maybe_persisted.as_linear_address().map(|addr| (addr, hash))
+            }
             Child::Node(_) => None,
         }
     }
