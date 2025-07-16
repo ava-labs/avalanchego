@@ -32,6 +32,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/ava-labs/coreth/plugin/evm/customrawdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
@@ -64,7 +65,8 @@ type TrieDB interface {
 }
 
 func NewTrieWriter(db TrieDB, config *CacheConfig) TrieWriter {
-	if config.Pruning {
+	// Firewood should only be used in pruning mode, but we shouldn't explicitly manage this.
+	if config.Pruning && config.StateScheme != customrawdb.FirewoodScheme {
 		cm := &cappedMemoryTrieWriter{
 			TrieDB:           db,
 			memoryCap:        common.StorageSize(config.TrieDirtyLimit) * 1024 * 1024,

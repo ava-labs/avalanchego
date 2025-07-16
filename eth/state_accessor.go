@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/eth/tracers"
+	"github.com/ava-labs/coreth/plugin/evm/customrawdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -188,6 +189,7 @@ func (eth *Ethereum) hashState(ctx context.Context, block *types.Block, reexec u
 	return statedb, func() { tdb.Dereference(block.Root()) }, nil
 }
 
+// This is compatible with both PathDB and FirewoodDB schemes.
 func (eth *Ethereum) pathState(block *types.Block) (*state.StateDB, func(), error) {
 	// Check if the requested state is available in the live chain.
 	statedb, err := eth.blockchain.StateAt(block.Root())
@@ -223,7 +225,12 @@ func (eth *Ethereum) pathState(block *types.Block) (*state.StateDB, func(), erro
 //     provided, it would be preferable to start from a fresh state, if we have it
 //     on disk.
 func (eth *Ethereum) stateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (statedb *state.StateDB, release tracers.StateReleaseFunc, err error) {
-	if eth.blockchain.TrieDB().Scheme() == rawdb.HashScheme {
+	// Check if we're using firewood backend by typecasting
+	// firewoodDB.Scheme() == rawdb.HashScheme, so typecasting is necessary
+	isFirewood := eth.blockchain.CacheConfig().StateScheme == customrawdb.FirewoodScheme
+
+	// Use `hashState` if the state can be recomputed from the live database.
+	if eth.blockchain.TrieDB().Scheme() == rawdb.HashScheme && !isFirewood {
 		return eth.hashState(ctx, block, reexec, base, readOnly, preferDisk)
 	}
 	return eth.pathState(block)

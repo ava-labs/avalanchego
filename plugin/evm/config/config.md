@@ -113,7 +113,6 @@ The names used in this configuration flag have been updated in Coreth `v0.8.14`.
 
 The mapping of deprecated values and their updated equivalent follows:
 
-
 |Deprecated                      |Use instead         |
 |--------------------------------|--------------------|
 |public-eth                      |eth                 |
@@ -588,6 +587,14 @@ _Boolean_
 If `true`, allow users to unlock accounts in unsafe HTTP environment. Defaults to `false`.
 
 ## Database
+
+### `state-scheme`
+
+_String_
+
+Can be one of `hash` or `firewood`. Defaults to `hash`.
+
+__WARNING__: `firewood` scheme is untested in production.
 
 ### `trie-clean-cache`
 
