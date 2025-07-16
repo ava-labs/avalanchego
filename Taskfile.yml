@@ -304,7 +304,7 @@ tasks:
   reexecute-cchain-range:
     desc: Re-execute a range of C-Chain blocks.
     vars:
-      EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
+      CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR}}'
       SOURCE_BLOCK_DIR: '{{.SOURCE_BLOCK_DIR}}'
       START_BLOCK: '{{.START_BLOCK}}'
       END_BLOCK: '{{.END_BLOCK}}'
@@ -338,7 +338,7 @@ tasks:
       - task: reexecute-cchain-range
         vars:
           SOURCE_BLOCK_DIR: '{{.EXECUTION_DATA_DIR}}/blocks'
-          EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
+          CURRENT_STATE_DIR: '{{.EXECUTION_DATA_DIR}}/current-state'
           START_BLOCK: '{{.START_BLOCK}}'
           END_BLOCK: '{{.END_BLOCK}}'
           LABELS: '{{.LABELS}}'
