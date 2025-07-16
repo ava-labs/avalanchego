@@ -20,30 +20,53 @@ From the load test perspective, only the TPS (transactions per second) is logged
 
 There are more interesting metrics available from the tmpnet nodes being load tested.
 
-Finally, to run the load test, run:
+# How to run
+
+Initiate nix shell: `nix develop`
+
+## Local tmpnet
+
+### Process-based
+Compiles the current `avalanchego` source code, runs load-test against locally provisioned tmpnet nodes.
 
 ```bash
-# Install nix (skip this step if nix is already installed)
-./scripts/run_task.sh install-nix
-# Start the dev shell
-nix develop
-# Start the load test
-task test-load
+./scripts/run_task.sh test-load
 ```
+
+### Against local kind cluster
+
+Builds image from local code and deploys to local Kind cluster:
+
+```shell
+./scripts/run_task.sh test-load-kube-kind
+```
+
+### With additional CLI flags (duration, connections, nodes, etc.)
+```shell
+./scripts/run_task.sh test-load-kube-kind -- --duration=10m --nodes=3
+```
+
+### With custom image (skips building from local code)
+```shell
+./scripts/run_task.sh test-load-kube-kind -- --kube-image=my-registry/avalanchego:v1.2.3
+```
+
+## CI job on self-hosted runner
+
+Use GitHub Actions workflow "Load Tests on k8s":
+- Go to Actions tab in GitHub
+- Select "Load Tests on k8s" workflow
+- Click "Run workflow"
+- Specify image (defaults to avaplatform/avalanchego:latest)
+- Additional parameters can be passed via workflow inputs (duration, connections, node count)
 
 ## Visualize metrics in Grafana
 
 ### Private remote instances
 
-If you have the credentials (internal to Ava Labs) for the CI monitoring stack, you can visualize the metrics following these steps:
+If you have the credentials (internal to Ava Labs) for the CI monitoring stack:
 
-1. Start a dev shell to ensure `prometheus` and `promtail` binaries are available to the test runner so it can use them to collect metrics and logs:
-
-    ```bash
-    nix develop
-    ```
-
-2. Set your monitoring credentials using the credentials you can find in your password manager
+1. Set your monitoring credentials using the credentials you can find in your password manager:
 
     ```bash
     export PROMETHEUS_USERNAME=<username>
@@ -51,19 +74,14 @@ If you have the credentials (internal to Ava Labs) for the CI monitoring stack, 
     export LOKI_USERNAME=<username>
     export LOKI_PASSWORD=<password>
     ```
+2. Run the load test
 
-3. Run the load test:
-
-    ```bash
-    task test-load
-    ```
-
-4. Prior to the test beginning, you will see the following log:
+3. Prior to the test beginning, you will see the following log:
 
     ```log
     INFO metrics and logs available via grafana (collectors must be running)     {"uri": "https://grafana-poc.avax-dev.network/d/eabddd1d-0a06-4ba1-8e68-a44504e37535/C-Chain%20Load?from=1747817500582&to=1747817952631&var-filter=network_uuid%7C%3D%7C4f419e3a-dba5-4ccd-b2fd-bda15f9826ff"}
     ```
 
-5. Open the URL in your browser, and log in with the Grafana credentials which you can find in your password manager.
+4. Open the URL in your browser, and log in with the Grafana credentials which you can find in your password manager.
 
-For reference, see [the tmpnet monitoring section](../../fixture/tmpnet/README.md#monitoring)
+For reference on setting up local monitoring, see [the tmpnet monitoring section](../../fixture/tmpnet/README.md#monitoring)
