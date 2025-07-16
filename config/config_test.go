@@ -590,17 +590,7 @@ func TestGetStakingSigner(t *testing.T) {
 		{
 			name: "file key",
 			config: map[string]any{
-				StakingSignerKeyPathKey: func() string {
-					require.NoError(t, os.MkdirAll(
-						filepath.Dir(fileKeyPath),
-						os.ModePerm,
-					))
-
-					bytes, err := base64.StdEncoding.DecodeString(testKey)
-					require.NoError(t, err)
-					require.NoError(t, os.WriteFile(fileKeyPath, bytes, perms.ReadWrite))
-					return fileKeyPath
-				}(),
+				StakingSignerKeyPathKey: fileKeyPath,
 			},
 			expectedSignerConfig: node.SignerPathConfig{
 				SignerKeyPath: fileKeyPath,
