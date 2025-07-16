@@ -4,7 +4,6 @@
 package simplex
 
 import (
-	"encoding/asn1"
 	"errors"
 	"fmt"
 
@@ -33,6 +32,11 @@ type QC struct {
 	signers  []simplex.NodeID
 }
 
+type SerializedQC struct {
+	Sig     []byte           `serialize:"true"`
+	Signers []simplex.NodeID `serialize:"true"`
+}
+
 // Signers returns the list of signers for the quorum certificate.
 func (qc *QC) Signers() []simplex.NodeID {
 	return qc.signers
@@ -41,7 +45,7 @@ func (qc *QC) Signers() []simplex.NodeID {
 // Verify checks if the quorum certificate is valid by verifying the aggregated signature against the signers' public keys.
 func (qc *QC) Verify(msg []byte) error {
 	pks := make([]*bls.PublicKey, 0, len(qc.signers))
-	quorum := simplex.Quorum(len(qc.signers))
+	quorum := simplex.Quorum(len(qc.verifier.nodeID2PK))
 	if len(qc.signers) != quorum {
 		return fmt.Errorf("%w: expected %d signers but got %d", errUnexpectedSigners, quorum, len(qc.signers))
 	}
@@ -74,54 +78,14 @@ func (qc *QC) Verify(msg []byte) error {
 	return nil
 }
 
-// asn1QC is the ASN.1 structure for the quorum certificate.
-// It contains the signers' public keys and the aggregated signature.
-// The signers are represented as byte slices of their IDs.
-type asn1QC struct {
-	Signers   [][]byte
-	Signature []byte
-}
-
-func (qc *QC) MarshalASN1() ([]byte, error) {
-	sigBytes := bls.SignatureToBytes(qc.sig)
-
-	signersBytes := make([][]byte, len(qc.signers))
-	for i, signer := range qc.signers {
-		s := signer // avoid aliasing
-		signersBytes[i] = s[:]
-	}
-	asn1Data := asn1QC{
-		Signers:   signersBytes,
-		Signature: sigBytes,
-	}
-	return asn1.Marshal(asn1Data)
-}
-
-func (qc *QC) UnmarshalASN1(data []byte) error {
-	var decoded asn1QC
-	_, err := asn1.Unmarshal(data, &decoded)
-	if err != nil {
-		return err
-	}
-	qc.signers = make([]simplex.NodeID, len(decoded.Signers))
-	for i, signerBytes := range decoded.Signers {
-		if len(signerBytes) != ids.ShortIDLen {
-			return errors.New("invalid signer length")
-		}
-		qc.signers[i] = simplex.NodeID(signerBytes)
-	}
-	sig, err := bls.SignatureFromBytes(decoded.Signature)
-	if err != nil {
-		return err
-	}
-	qc.sig = sig
-
-	return nil
-}
-
 // Bytes serializes the quorum certificate into bytes.
 func (qc *QC) Bytes() []byte {
-	bytes, err := qc.MarshalASN1()
+	serializedQC := &SerializedQC{
+		Sig:     bls.SignatureToBytes(qc.sig),
+		Signers: qc.signers,
+	}
+
+	bytes, err := Codec.Marshal(CodecVersion, serializedQC)
 	if err != nil {
 		panic(fmt.Errorf("failed to marshal QC: %w", err))
 	}
@@ -132,9 +96,19 @@ type QCDeserializer BLSVerifier
 
 // DeserializeQuorumCertificate deserializes a quorum certificate from bytes.
 func (d QCDeserializer) DeserializeQuorumCertificate(bytes []byte) (simplex.QuorumCertificate, error) {
-	var qc QC
-	if err := qc.UnmarshalASN1(bytes); err != nil {
+	var serializedQC SerializedQC
+	if _, err := Codec.Unmarshal(bytes, &serializedQC); err != nil {
 		return nil, fmt.Errorf("%w: %w", errFailedToParseQC, err)
+	}
+
+	sig, err := bls.SignatureFromBytes(serializedQC.Sig)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errFailedToParseSignature, err)
+	}
+
+	qc := QC{
+		sig:     sig,
+		signers: serializedQC.Signers,
 	}
 
 	verifier := BLSVerifier(d)
@@ -154,7 +128,6 @@ func (a SignatureAggregator) Aggregate(signatures []simplex.Signature) (simplex.
 	if len(signatures) < quorumSize {
 		return nil, fmt.Errorf("%w: expected %d signatures but got %d", errUnexpectedSigners, quorumSize, len(signatures))
 	}
-
 	signatures = signatures[:quorumSize]
 
 	signers := make([]simplex.NodeID, 0, quorumSize)

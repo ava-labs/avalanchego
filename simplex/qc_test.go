@@ -55,8 +55,8 @@ func TestQCAggregateAndSign(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, qc.Signers(), deserializedQC.Signers())
-	require.NoError(t, deserializedQC.Verify(msg))
 	require.Equal(t, qc.Bytes(), deserializedQC.Bytes())
+	require.NoError(t, deserializedQC.Verify(msg))
 }
 
 func TestQCSignerNotInMembershipSet(t *testing.T) {
@@ -164,6 +164,7 @@ func TestSignatureAggregatorExcessSignatures(t *testing.T) {
 
 	var nodeSigner BLSSigner
 	var verifier BLSVerifier
+
 	// Create signatures from all 4 nodes
 	signatures := make([]simplex.Signature, 4)
 	for i, config := range configs {
