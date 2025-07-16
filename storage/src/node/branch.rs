@@ -2,10 +2,6 @@
 // See the file LICENSE.md for licensing terms.
 
 #![expect(
-    clippy::indexing_slicing,
-    reason = "Found 2 occurrences after enabling the lint."
-)]
-#![expect(
     clippy::match_same_arms,
     reason = "Found 1 occurrences after enabling the lint."
 )]
@@ -13,10 +9,6 @@
     clippy::missing_panics_doc,
     reason = "Found 2 occurrences after enabling the lint."
 )]
-
-use serde::ser::SerializeStruct as _;
-use serde::{Deserialize, Serialize};
-use smallvec::SmallVec;
 
 use crate::node::ExtendableBytes;
 use crate::{LeafNode, LinearAddress, MaybePersistedNode, Node, Path, SharedNode};
@@ -66,6 +58,24 @@ pub(crate) trait Serializable {
     where
         Self: Sized;
 }
+
+/// An extension trait for [`std::io::Read`] for convenience methods when
+/// reading serialized data.
+pub(crate) trait ReadSerializable: std::io::Read {
+    /// Read a single byte from the reader.
+    fn read_byte(&mut self) -> Result<u8, std::io::Error> {
+        let mut this = 0;
+        self.read_exact(std::slice::from_mut(&mut this))?;
+        Ok(this)
+    }
+
+    /// Read a value of type `T` from the reader.
+    fn next_value<T: Serializable>(&mut self) -> Result<T, std::io::Error> {
+        T::from_reader(self)
+    }
+}
+
+impl<T: std::io::Read> ReadSerializable for T {}
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 #[repr(C)]
@@ -129,7 +139,6 @@ impl Child {
 
 #[cfg(feature = "ethhash")]
 mod ethhash {
-    use serde::{Deserialize, Serialize};
     use sha2::Digest as _;
     use sha3::Keccak256;
     use smallvec::SmallVec;
@@ -143,7 +152,7 @@ mod ethhash {
 
     use super::Serializable;
 
-    #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Debug, PartialEq, Eq)]
     pub enum HashOrRlp {
         Hash(TrieHash),
         // TODO: this slice is never larger than 32 bytes so smallvec is probably not our best container
@@ -273,67 +282,6 @@ pub struct BranchNode {
     /// Each element is (`child_hash`, `child_address`).
     /// `child_address` is None if we don't know the child's hash.
     pub children: [Option<Child>; Self::MAX_CHILDREN],
-}
-
-impl Serialize for BranchNode {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let mut state = serializer.serialize_struct("BranchNode", 3)?;
-        state.serialize_field("partial_path", &self.partial_path)?;
-        state.serialize_field("value", &self.value)?;
-
-        let children: SmallVec<[(_, _, _); Self::MAX_CHILDREN]> = self
-            .children
-            .iter()
-            .enumerate()
-            .filter_map(|(offset, child)| match child {
-                None => None,
-                Some(Child::Node(_)) => {
-                    panic!("serializing in-memory node for disk storage")
-                }
-                Some(Child::AddressWithHash(addr, hash)) => Some((offset as u8, *addr, hash)),
-                Some(Child::MaybePersisted(maybe_persisted, hash)) => {
-                    // For MaybePersisted, we need to get the address if it's persisted
-                    maybe_persisted
-                        .as_linear_address()
-                        .map(|addr| (offset as u8, addr, hash))
-                }
-            })
-            .collect();
-
-        state.serialize_field("children", &children)?;
-        state.end()
-    }
-}
-
-impl<'de> Deserialize<'de> for BranchNode {
-    fn deserialize<D>(deserializer: D) -> Result<BranchNode, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        #[derive(Deserialize)]
-        struct SerializedBranchNode {
-            partial_path: Path,
-            value: Option<Box<[u8]>>,
-            children: SmallVec<[(u8, LinearAddress, HashType); BranchNode::MAX_CHILDREN]>,
-        }
-
-        let s: SerializedBranchNode = Deserialize::deserialize(deserializer)?;
-
-        let mut children: [Option<Child>; BranchNode::MAX_CHILDREN] =
-            [const { None }; BranchNode::MAX_CHILDREN];
-        for (offset, addr, hash) in &s.children {
-            children[*offset as usize] = Some(Child::AddressWithHash(*addr, hash.clone()));
-        }
-
-        Ok(BranchNode {
-            partial_path: s.partial_path,
-            value: s.value,
-            children,
-        })
-    }
 }
 
 impl Debug for BranchNode {

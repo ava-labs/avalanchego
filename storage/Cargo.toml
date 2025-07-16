@@ -17,12 +17,10 @@ rust-version.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bincode = { workspace = true }
 bitflags = "2.9.1"
 enum-as-inner = "0.6.1"
 hex = "0.4.3"
-serde = { workspace = true, features = ["derive"] }
-smallvec = { workspace = true, features = ["serde", "write", "union"] }
+smallvec = { workspace = true, features = ["write", "union"] }
 sha2 = { workspace = true }
 integer-encoding = "4.0.2"
 arc-swap = "1.7.1"

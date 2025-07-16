@@ -1,15 +1,11 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use std::fmt::{self, Debug, Display, Formatter};
-
-use serde::de::Visitor;
-use serde::{Deserialize, Serialize};
-use sha2::digest::generic_array::GenericArray;
-use sha2::digest::typenum;
-
 use crate::node::ExtendableBytes;
 use crate::node::branch::Serializable;
+use sha2::digest::generic_array::GenericArray;
+use sha2::digest::typenum;
+use std::fmt::{self, Debug, Display, Formatter};
 
 /// A hash value inside a merkle trie
 /// We use the same type as returned by sha2 here to avoid copies
@@ -96,46 +92,5 @@ impl Serializable for TrieHash {
         let mut buf = [0u8; 32];
         reader.read_exact(&mut buf)?;
         Ok(TrieHash::from(buf))
-    }
-}
-
-impl Serialize for TrieHash {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_bytes(&self.0)
-    }
-}
-
-impl<'de> Deserialize<'de> for TrieHash {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        deserializer.deserialize_bytes(TrieVisitor)
-    }
-}
-
-struct TrieVisitor;
-
-impl Visitor<'_> for TrieVisitor {
-    type Value = TrieHash;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("an array of u8 hash bytes")
-    }
-
-    fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
-        let mut hash = TrieHash::default();
-        if v.len() == hash.0.len() {
-            hash.0.copy_from_slice(v);
-            Ok(hash)
-        } else {
-            Err(E::invalid_length(v.len(), &self))
-        }
     }
 }

@@ -22,9 +22,9 @@
 
 use crate::linear::FileIoError;
 use crate::logger::trace;
-use bincode::{DefaultOptions, Options as _};
+use crate::node::branch::{ReadSerializable, Serializable};
+use integer_encoding::VarIntReader;
 use metrics::counter;
-use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::io::{Error, ErrorKind, Read};
 use std::iter::FusedIterator;
@@ -32,10 +32,15 @@ use std::num::NonZeroU64;
 use std::sync::Arc;
 
 use crate::node::persist::MaybePersistedNode;
-use crate::node::{ByteCounter, Node};
+use crate::node::{ByteCounter, ExtendableBytes, Node};
 use crate::{CacheReadStrategy, ReadableStorage, SharedNode, TrieHash};
 
 use crate::linear::WritableStorage;
+
+/// Returns the maximum size needed to encode a `VarInt`.
+const fn var_int_max_size<VI>() -> usize {
+    const { (size_of::<VI>() * 8 + 7) / 7 }
+}
 
 /// [`NodeStore`] divides the linear store into blocks of different sizes.
 /// [`AREA_SIZES`] is every valid block size.
@@ -64,10 +69,6 @@ pub const AREA_SIZES: [u64; 23] = [
     1024 << 13,
     1024 << 14,
 ];
-
-pub fn serializer() -> impl bincode::Options {
-    DefaultOptions::new().with_varint_encoding()
-}
 
 pub fn area_size_hash() -> TrieHash {
     let mut hasher = Sha256::new();
@@ -150,50 +151,105 @@ pub fn area_size_to_index(n: u64) -> Result<AreaIndex, Error> {
 /// branches can use `Option<LinearAddress>` which is the same size as a [`LinearAddress`]
 pub type LinearAddress = NonZeroU64;
 
-/// Each [`StoredArea`] contains an [Area] which is either a [Node] or a [`FreeArea`].
-#[repr(u8)]
-#[derive(PartialEq, Eq, Clone, Debug, Deserialize, Serialize)]
-pub enum Area<T, U> {
-    Node(T),
-    Free(U) = 255, // this is magic: no node starts with a byte of 255
-}
-
-/// Every item stored in the [`NodeStore`]'s `ReadableStorage`  after the
-/// `NodeStoreHeader` is a [`StoredArea`].
-///
-/// As an overview of what this looks like stored, we get something like this:
-///  - Byte 0: The index of the area size
-///  - Byte 1: 0x255 if free, otherwise the low-order bit indicates Branch or Leaf
-///  - Bytes 2..n: The actual data
-#[derive(PartialEq, Eq, Clone, Debug, Deserialize, Serialize)]
-pub struct StoredArea<T> {
-    /// Index in [`AREA_SIZES`] of this area's size
-    area_size_index: AreaIndex,
-    area: T,
-}
-
-impl<T> StoredArea<T> {
-    /// Create a new `StoredArea`
-    pub const fn new(area_size_index: AreaIndex, area: T) -> Self {
-        Self {
-            area_size_index,
-            area,
-        }
-    }
-
-    /// Destructure the `StoredArea` into its components
-    pub fn into_parts(self) -> (AreaIndex, T) {
-        (self.area_size_index, self.area)
-    }
-}
-
 pub type FreeLists = [Option<LinearAddress>; NUM_AREA_SIZES];
 
 /// A [`FreeArea`] is stored at the start of the area that contained a node that
 /// has been freed.
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct FreeArea {
     next_free_block: Option<LinearAddress>,
+}
+
+impl Serializable for FreeArea {
+    fn write_to<W: crate::node::ExtendableBytes>(&self, vec: &mut W) {
+        vec.push(0xff); // 0xff indicates a free area
+        vec.extend_var_int(self.next_free_block.map_or(0, LinearAddress::get));
+    }
+
+    /// Parse a [`FreeArea`].
+    ///
+    /// The old serde generate code that unintentionally encoded [`FreeArea`]s
+    /// incorrectly. Integers were encoded as variable length integers, but
+    /// expanded to fixed-length below:
+    ///
+    /// ```text
+    /// [
+    ///     0x01, // LE u32 begin -- field index of the old `StoredArea` struct (#1)
+    ///     0x00,
+    ///     0x00,
+    ///     0x00, // LE u32 end
+    ///     0x01, // `Option` discriminant, 1 Indicates `Some(_)` from `Option<LinearAddress>`
+    ///           // because serde does not handle the niche optimization of
+    ///           // `Option<NonZero<_>>`
+    ///     0x2a, // LinearAddress(LE u64) start
+    ///     0x00,
+    ///     0x00,
+    ///     0x00,
+    ///     0x00,
+    ///     0x00,
+    ///     0x00,
+    ///     0x00, // LE u64 end
+    /// ]
+    /// ```
+    ///
+    /// Our manual encoding format is (with variable int, but expanded below):
+    ///
+    /// ```text
+    /// [
+    ///     0xff, // FreeArea marker
+    ///     0x2a, // LinearAddress(LE u64) start
+    ///     0x00,
+    ///     0x00,
+    ///     0x00,
+    ///     0x00,
+    ///     0x00,
+    ///     0x00,
+    ///     0x00, // LE u64 end
+    /// ]
+    /// ```
+    fn from_reader<R: Read>(mut reader: R) -> std::io::Result<Self> {
+        match reader.read_byte()? {
+            0x01 => {
+                // might be old format, look for option discriminant
+                match reader.read_byte()? {
+                    0x00 => {
+                        // serde encoded `Option::None` as 0 with no following data
+                        Ok(Self {
+                            next_free_block: None,
+                        })
+                    }
+                    0x01 => {
+                        // encoded `Some(_)` as 1 with the data following
+                        let addr = LinearAddress::new(reader.read_varint()?).ok_or_else(|| {
+                            Error::new(
+                                ErrorKind::InvalidData,
+                                "Option::<LinearAddress> was Some(0) which is invalid",
+                            )
+                        })?;
+                        Ok(Self {
+                            next_free_block: Some(addr),
+                        })
+                    }
+                    option_discriminant => Err(Error::new(
+                        ErrorKind::InvalidData,
+                        format!("Invalid Option discriminant: {option_discriminant}"),
+                    )),
+                }
+            }
+            0xFF => {
+                // new format: read the address directly (zero is allowed here to indicate None)
+                Ok(Self {
+                    next_free_block: LinearAddress::new(reader.read_varint()?),
+                })
+            }
+            first_byte => Err(Error::new(
+                ErrorKind::InvalidData,
+                format!(
+                    "Invalid FreeArea marker, expected 0xFF (or 0x01 for old format), found {first_byte:#02x}"
+                ),
+            )),
+        }
+    }
 }
 
 impl FreeArea {
@@ -206,34 +262,34 @@ impl FreeArea {
     pub const fn next_free_block(self) -> Option<LinearAddress> {
         self.next_free_block
     }
-}
 
-impl FreeArea {
     pub fn from_storage<S: ReadableStorage>(
         storage: &S,
         address: LinearAddress,
     ) -> Result<(Self, AreaIndex), FileIoError> {
         let free_area_addr = address.get();
         let stored_area_stream = storage.stream_from(free_area_addr)?;
-        let stored_area: StoredArea<Area<Node, FreeArea>> = serializer()
-            .deserialize_from(stored_area_stream)
-            .map_err(|e| {
-                storage.file_io_error(
-                    Error::new(ErrorKind::InvalidData, e),
-                    free_area_addr,
-                    Some("FreeArea::from_storage".to_string()),
-                )
-            })?;
-        let (stored_area_index, area) = stored_area.into_parts();
-        let Area::Free(free_area) = area else {
-            return Err(storage.file_io_error(
-                Error::new(ErrorKind::InvalidData, "Attempted to read a non-free area"),
+        Self::from_storage_reader(stored_area_stream).map_err(|e| {
+            storage.file_io_error(
+                e,
                 free_area_addr,
                 Some("FreeArea::from_storage".to_string()),
-            ));
-        };
+            )
+        })
+    }
 
-        Ok((free_area, stored_area_index as AreaIndex))
+    pub fn as_bytes<T: ExtendableBytes>(self, area_index: AreaIndex, encoded: &mut T) {
+        const RESERVE_SIZE: usize = size_of::<u8>() + var_int_max_size::<u64>();
+
+        encoded.reserve(RESERVE_SIZE);
+        encoded.push(area_index);
+        self.write_to(encoded);
+    }
+
+    fn from_storage_reader(mut reader: impl Read) -> std::io::Result<(Self, AreaIndex)> {
+        let area_index = reader.read_byte()?;
+        let free_area = reader.next_value()?;
+        Ok((free_area, area_index))
     }
 }
 
@@ -253,15 +309,13 @@ impl<T: ReadInMemoryNode, S: ReadableStorage> NodeStore<T, S> {
     ) -> Result<(AreaIndex, u64), FileIoError> {
         let mut area_stream = self.storage.stream_from(addr.get())?;
 
-        let index: AreaIndex = serializer()
-            .deserialize_from(&mut area_stream)
-            .map_err(|e| {
-                self.storage.file_io_error(
-                    Error::new(ErrorKind::InvalidData, e),
-                    addr.get(),
-                    Some("deserialize".to_string()),
-                )
-            })?;
+        let index: AreaIndex = area_stream.read_byte().map_err(|e| {
+            self.storage.file_io_error(
+                Error::new(ErrorKind::InvalidData, e),
+                addr.get(),
+                Some("deserialize".to_string()),
+            )
+        })?;
 
         let size = *AREA_SIZES
             .get(index as usize)
@@ -490,19 +544,9 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
             .increment(AREA_SIZES[area_size_index as usize]);
 
         // The area that contained the node is now free.
-        let area: Area<Node, FreeArea> = Area::Free(FreeArea::new(
-            self.header.free_lists()[area_size_index as usize],
-        ));
-
-        let stored_area = StoredArea::new(area_size_index, area);
-
-        let stored_area_bytes = serializer().serialize(&stored_area).map_err(|e| {
-            self.storage.file_io_error(
-                Error::new(ErrorKind::InvalidData, e),
-                addr.get(),
-                Some("delete_node".to_string()),
-            )
-        })?;
+        let mut stored_area_bytes = Vec::new();
+        FreeArea::new(self.header.free_lists()[area_size_index as usize])
+            .as_bytes(area_size_index, &mut stored_area_bytes);
 
         self.storage.write(addr.into(), &stored_area_bytes)?;
 
@@ -600,7 +644,6 @@ pub mod test_utils {
     use super::*;
     use crate::FileBacked;
     use crate::node::Node;
-    use bincode::Options;
 
     // Helper function to wrap the node in a StoredArea and write it to the given offset. Returns the size of the area on success.
     pub fn test_write_new_node<S: WritableStorage>(
@@ -626,9 +669,8 @@ pub mod test_utils {
         area_size_index: AreaIndex,
         offset: u64,
     ) {
-        let area: Area<Node, FreeArea> = Area::Free(FreeArea::new(next_free_block));
-        let stored_area = StoredArea::new(area_size_index, area);
-        let stored_area_bytes = serializer().serialize(&stored_area).unwrap();
+        let mut stored_area_bytes = Vec::new();
+        FreeArea::new(next_free_block).as_bytes(area_size_index, &mut stored_area_bytes);
         nodestore.storage.write(offset, &stored_area_bytes).unwrap();
     }
 
@@ -651,13 +693,13 @@ pub mod test_utils {
 
 #[cfg(test)]
 #[expect(clippy::unwrap_used, clippy::indexing_slicing)]
-mod test_free_list_iterator {
+mod tests {
     use super::*;
     use crate::linear::memory::MemStore;
     use crate::test_utils::seeded_rng;
-
     use rand::Rng;
     use rand::seq::IteratorRandom;
+    use test_case::test_case;
 
     // Simple helper function for this test - just writes to storage directly
     fn write_free_area_to_storage<S: WritableStorage>(
@@ -666,10 +708,22 @@ mod test_free_list_iterator {
         area_size_index: AreaIndex,
         offset: u64,
     ) {
-        let area: Area<Node, FreeArea> = Area::Free(FreeArea::new(next_free_block));
-        let stored_area = StoredArea::new(area_size_index, area);
-        let stored_area_bytes = serializer().serialize(&stored_area).unwrap();
+        let mut stored_area_bytes = Vec::new();
+        FreeArea::new(next_free_block).as_bytes(area_size_index, &mut stored_area_bytes);
         storage.write(offset, &stored_area_bytes).unwrap();
+    }
+
+    // StoredArea::new(12, Area::<Node, _>::Free(FreeArea::new(LinearAddress::new(42))));
+    #[test_case(&[0x01, 0x01, 0x01, 0x2a], Some((1, 42)); "old format")]
+    // StoredArea::new(12, Area::<Node, _>::Free(FreeArea::new(None)));
+    #[test_case(&[0x02, 0x01, 0x00], Some((2, 0)); "none")]
+    #[test_case(&[0x03, 0xff, 0x2b], Some((3, 43)); "new format")]
+    #[test_case(&[0x03, 0x44, 0x55], None; "garbage")]
+    fn test_free_list_format(reader: &[u8], expected: Option<(AreaIndex, u64)>) {
+        let expected =
+            expected.map(|(index, addr)| (FreeArea::new(LinearAddress::new(addr)), index));
+        let result = FreeArea::from_storage_reader(reader).ok();
+        assert_eq!(result, expected, "Failed to parse FreeArea from {reader:?}");
     }
 
     #[test]

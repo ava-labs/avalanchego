@@ -25,8 +25,7 @@
 use bitfield::bitfield;
 use branch::Serializable as _;
 use enum_as_inner::EnumAsInner;
-use integer_encoding::{VarIntReader as _, VarIntWriter as _};
-use serde::{Deserialize, Serialize};
+use integer_encoding::{VarInt, VarIntReader as _, VarIntWriter as _};
 use std::fmt::Debug;
 use std::io::{Error, Read, Write};
 use std::num::NonZero;
@@ -45,7 +44,7 @@ use crate::{HashType, Path, SharedNode};
 /// A node, either a Branch or Leaf
 
 // TODO: explain why Branch is boxed but Leaf is not
-#[derive(PartialEq, Eq, Clone, Debug, EnumAsInner, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Clone, Debug, EnumAsInner)]
 #[repr(C)]
 pub enum Node {
     /// This node is a [`BranchNode`]
@@ -128,6 +127,18 @@ pub trait ExtendableBytes: Write {
     fn extend_from_slice(&mut self, other: &[u8]) {
         self.extend(other.iter().copied());
     }
+
+    /// Write a variable-length integer to the buffer without allocating an
+    /// intermediate buffer on the heap.
+    ///
+    /// This uses a stack buffer for holding the encoded integer and copies it
+    /// into the buffer.
+    #[expect(clippy::indexing_slicing)]
+    fn extend_var_int<VI: VarInt>(&mut self, int: VI) {
+        let mut buf = [0u8; 10];
+        let len = VarInt::encode_var(int, &mut buf);
+        self.extend_from_slice(&buf[..len]);
+    }
 }
 
 impl ExtendableBytes for Vec<u8> {
@@ -139,6 +150,9 @@ impl ExtendableBytes for Vec<u8> {
     }
     fn push(&mut self, value: u8) {
         Vec::push(self, value);
+    }
+    fn extend_from_slice(&mut self, other: &[u8]) {
+        Vec::extend_from_slice(self, other);
     }
 }
 

@@ -25,7 +25,6 @@
 //!
 
 use bytemuck_derive::{AnyBitPattern, NoUninit};
-use serde::{Deserialize, Serialize};
 use std::io::{Error, ErrorKind};
 
 use super::alloc::{FreeLists, LinearAddress, area_size_hash};
@@ -33,7 +32,7 @@ use crate::logger::{debug, trace};
 
 /// Can be used by filesystem tooling such as "file" to identify
 /// the version of firewood used to create this `NodeStore` file.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, NoUninit, AnyBitPattern)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, NoUninit, AnyBitPattern)]
 #[repr(transparent)]
 pub struct Version {
     bytes: [u8; 16],
@@ -149,7 +148,7 @@ impl Version {
 
 /// Persisted metadata for a `NodeStore`.
 /// The [`NodeStoreHeader`] is at the start of the `ReadableStorage`.
-#[derive(Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Clone, NoUninit, AnyBitPattern)]
+#[derive(Copy, Debug, PartialEq, Eq, Clone, NoUninit, AnyBitPattern)]
 #[repr(C)]
 pub struct NodeStoreHeader {
     /// Identifies the version of firewood used to create this `NodeStore`.
