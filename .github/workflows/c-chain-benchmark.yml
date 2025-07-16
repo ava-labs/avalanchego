@@ -20,6 +20,8 @@ on:
         description: 'The current state directory. Supports S3 directory/zip and local directories.'
         required: false
         default: 's3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-100.zip'
+  schedule:
+    - cron: '0 6 * * 0' # Runs every Sunday at 06:00 UTC
 
 jobs:
     c-chain-reexecution:
