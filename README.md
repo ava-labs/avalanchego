@@ -39,7 +39,7 @@ The Subnet EVM supports the following API namespaces:
 
 Only the `eth` namespace is enabled by default.
 Subnet EVM is a simplified version of [Coreth VM (C-Chain)](https://github.com/ava-labs/coreth).
-Full documentation for the C-Chain's API can be found [here](https://docs.avax.network/apis/avalanchego/apis/c-chain).
+Full documentation for the C-Chain's API can be found [here](https://build.avax.network/docs/api-reference/c-chain/api).
 
 ## Compatibility
 
