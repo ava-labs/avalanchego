@@ -12,9 +12,9 @@ Start off by crating a new branch:
 
 ```console
 $ git fetch
-$ git switch -c release/v0.0.8 origin/main
-branch 'release/v0.0.8' set up to track 'origin/main'.
-Switched to a new branch 'release/v0.0.8'
+$ git switch -c release/v0.0.10 origin/main
+branch 'release/v0.0.10' set up to track 'origin/main'.
+Switched to a new branch 'release/v0.0.10'
 ```
 
 ## Package Version
@@ -49,7 +49,7 @@ table. E.g.,:
 ```toml
 [workspace.dependencies]
 # workspace local packages
-firewood = { path = "firewood", version = "0.0.7" }
+firewood = { path = "firewood", version = "0.0.10" }
 ```
 
 This allows packages within the workspace to inherit the dependency,
@@ -78,7 +78,7 @@ To build the changelog, see git-cliff.org. Short version:
 
 ```sh
 cargo install git-cliff
-git cliff --tag v0.0.8 | sed -e 's/_/\\_/g' > CHANGELOG.md
+git cliff --tag v0.0.10 | sed -e 's/_/\\_/g' > CHANGELOG.md
 ```
 
 ## Review
@@ -92,10 +92,18 @@ git cliff --tag v0.0.8 | sed -e 's/_/\\_/g' > CHANGELOG.md
 To trigger a release, push a tag to the main branch matching the new version,
 
 ```sh
-git tag -S v0.0.8
-git push origin v0.0.8
+git tag -S v0.0.10
+git push origin v0.0.10
 ```
 
-for `v0.0.8` for the merged version change. The CI will automatically publish a
+for `v0.0.10` for the merged version change. The CI will automatically publish a
 draft release which consists of release notes and changes (see
 [.github/workflows/release.yaml](.github/workflows/release.yaml)).
+
+## Milestone
+
+> NOTE: this should be automated as well.
+
+Close the GitHub milestone for the version that was released. Be sure to create
+a new milestone for the next version if one does not already exist. Carry over
+any incomplete tasks to the next milestone.

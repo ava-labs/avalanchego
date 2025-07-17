@@ -2,6 +2,47 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.9] - 2025-07-17
+
+### 🚀 Features
+
+- *(ffi)* Add gauges to metrics reporter (#1035)
+- *(delayed-persist)* Part 1: Roots may be in mem (#1041)
+- *(delayed-persist)* 2.1: Unpersisted deletions (#1045)
+- *(delayed-persist)* Part 2.2: Branch Children (#1047)
+- [**breaking**] Export firewood metrics (#1044)
+- *(checker)* Add error to report finding leaked areas (#1052)
+- *(delayed-persist)* Dump unpersisted nodestore (#1055)
+- *(checker)* Split leaked ranges into valid areas (#1059)
+- *(checker)* Check for misaligned stored areas (#1046)
+- [**breaking**] Auto open or create with truncate (#1064)
+- *(deferred-allocate)* UnpersistedIterator (#1060)
+- *(checker)* Add hash checks (#1063)
+
+### 🐛 Bug Fixes
+
+- Avoid reference to LinearAddress (#1042)
+- Remove dependency on serde (#1066)
+- Encoding partial paths for leaf nodes (#1067)
+- Root\_hash\_reversed\_deletions duplicate keys (#1076)
+- *(checker)* Avoid checking physical file size for compatibility (#1079)
+
+### 🎨 Styling
+
+- Remove unnecessary error descriptor (#1049)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(build)* Remove unused dependencies (#1037)
+- Update firewood in grpc-testtool (#1040)
+- Aaron is requested only for .github (#1043)
+- Remove `#[allow]`s no longer needed (#1022)
+- Split nodestore into functional areas (#1048)
+- Update `golangci-lint` (#1053)
+- Update CODEOWNERS (#1080)
+- Run CI with --no-default-features (#1081)
+- Release 0.0.9 (#1084)
+
 ## [0.0.8] - 2025-07-07
 
 ### 🚀 Features
