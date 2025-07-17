@@ -140,7 +140,7 @@ jobs:
           # responsible for pushes.
           push: false
           # This version should match the version installed in the nix dev shell
-          version: 1.47.2
+          version: 1.52.1
   links-lint:
     name: Markdown Links Lint
     runs-on: ubuntu-latest
