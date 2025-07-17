@@ -28,7 +28,7 @@ jobs:
       permissions:
         id-token: write
         contents: write
-      runs-on: avalanche-avalanchego-runner
+      runs-on: avalanche-avalanchego-runner-2ti
       container:
         image: ghcr.io/actions/actions-runner:2.325.0
       steps:
