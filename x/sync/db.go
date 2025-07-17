@@ -6,23 +6,14 @@ package sync
 import (
 	"context"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/maybe"
-	"github.com/ava-labs/avalanchego/x/merkledb"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-type DB interface {
-	merkledb.Clearer
-	merkledb.MerkleRootGetter
-	merkledb.ProofGetter
-	merkledb.ChangeProofer
-	merkledb.RangeProofer
-}
-
-type ProofClient interface {
-	merkledb.Clearer
-	merkledb.MerkleRootGetter
+type DBSyncClient interface {
+	GetRootHash(ctx context.Context) (ids.ID, error)
 	HandleRangeProofResponse(ctx context.Context, request *pb.SyncGetRangeProofRequest, responseBytes []byte) (maybe.Maybe[[]byte], error)
 	HandleChangeProofResponse(
 		ctx context.Context,
@@ -30,4 +21,5 @@ type ProofClient interface {
 		responseBytes []byte,
 	) (maybe.Maybe[[]byte], error)
 	Error() error
+	Clear() error
 }

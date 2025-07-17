@@ -138,7 +138,7 @@ type Manager struct {
 
 // TODO remove non-config values out of this struct
 type ManagerConfig struct {
-	ProofClient           ProofClient
+	ProofClient           DBSyncClient
 	RangeProofClient      *p2p.Client
 	ChangeProofClient     *p2p.Client
 	SimultaneousWorkLimit int
@@ -561,7 +561,7 @@ func (m *Manager) Wait(ctx context.Context) error {
 		return err
 	}
 
-	root, err := m.config.ProofClient.GetMerkleRoot(ctx)
+	root, err := m.config.ProofClient.GetRootHash(ctx)
 	if err != nil {
 		return err
 	}

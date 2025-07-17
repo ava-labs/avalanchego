@@ -21,14 +21,22 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-var _ ProofClient = (*xSyncClient)(nil)
+var _ DBSyncClient = (*merkleDBSyncClient)(nil)
+
+type DB interface {
+	merkledb.Clearer
+	merkledb.MerkleRootGetter
+	merkledb.ProofGetter
+	merkledb.ChangeProofer
+	merkledb.RangeProofer
+}
 
 type ClientConfig struct {
 	Hasher       merkledb.Hasher
 	BranchFactor merkledb.BranchFactor
 }
 
-type xSyncClient struct {
+type merkleDBSyncClient struct {
 	db        DB
 	config    *ClientConfig
 	tokenSize int
@@ -36,7 +44,7 @@ type xSyncClient struct {
 	errorOnce sync.Once
 }
 
-func NewClient(db DB, config *ClientConfig) (*xSyncClient, error) {
+func NewClient(db DB, config *ClientConfig) (*merkleDBSyncClient, error) {
 	if err := config.BranchFactor.Valid(); err != nil {
 		return nil, err
 	}
@@ -45,32 +53,32 @@ func NewClient(db DB, config *ClientConfig) (*xSyncClient, error) {
 		config.Hasher = merkledb.DefaultHasher
 	}
 
-	return &xSyncClient{
+	return &merkleDBSyncClient{
 		db:        db,
 		config:    config,
 		tokenSize: merkledb.BranchFactorToTokenSize[config.BranchFactor],
 	}, nil
 }
 
-func (c *xSyncClient) Error() error {
+func (c *merkleDBSyncClient) Error() error {
 	return c.err
 }
 
-func (c *xSyncClient) setError(err error) {
+func (c *merkleDBSyncClient) setError(err error) {
 	c.errorOnce.Do(func() {
 		c.err = err
 	})
 }
 
-func (c *xSyncClient) Clear() error {
+func (c *merkleDBSyncClient) Clear() error {
 	return c.db.Clear()
 }
 
-func (c *xSyncClient) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
+func (c *merkleDBSyncClient) GetRootHash(ctx context.Context) (ids.ID, error) {
 	return c.db.GetMerkleRoot(ctx)
 }
 
-func (c *xSyncClient) HandleRangeProofResponse(ctx context.Context, request *pb.SyncGetRangeProofRequest, responseBytes []byte) (maybe.Maybe[[]byte], error) {
+func (c *merkleDBSyncClient) HandleRangeProofResponse(ctx context.Context, request *pb.SyncGetRangeProofRequest, responseBytes []byte) (maybe.Maybe[[]byte], error) {
 	var rangeProofProto pb.RangeProof
 	if err := proto.Unmarshal(responseBytes, &rangeProofProto); err != nil {
 		return maybe.Nothing[[]byte](), err
@@ -123,7 +131,7 @@ func (c *xSyncClient) HandleRangeProofResponse(ctx context.Context, request *pb.
 	return largestHandledKey, nil
 }
 
-func (c *xSyncClient) HandleChangeProofResponse(
+func (c *merkleDBSyncClient) HandleChangeProofResponse(
 	ctx context.Context,
 	request *pb.SyncGetChangeProofRequest,
 	responseBytes []byte,
@@ -247,7 +255,7 @@ func (c *xSyncClient) HandleChangeProofResponse(
 //
 // Invariant: [lastReceivedKey] < [rangeEnd].
 // If [rangeEnd] is Nothing it's considered > [lastReceivedKey].
-func (c *xSyncClient) findNextKey(
+func (c *merkleDBSyncClient) findNextKey(
 	ctx context.Context,
 	lastReceivedKey []byte,
 	rangeEnd maybe.Maybe[[]byte],
