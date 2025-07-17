@@ -92,6 +92,13 @@ func (b *builder) WaitForEvent(ctx context.Context) (common.Message, error) {
 			return 0, err
 		}
 
+		// We shouldn't call durationToSleep until the chain is marked as no longer
+		// bootstrapping.
+		if !b.txExecutorBackend.Bootstrapped.Get() {
+			<-ctx.Done()
+			return 0, ctx.Err()
+		}
+
 		duration, err := b.durationToSleep()
 		if err != nil {
 			b.txExecutorBackend.Ctx.Log.Error("block builder failed to calculate next staker change time",

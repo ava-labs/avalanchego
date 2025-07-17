@@ -2180,3 +2180,98 @@ func TestPruneMempool(t *testing.T) {
 	_, ok = vm.Builder.Get(baseTxID)
 	require.True(ok)
 }
+
+func TestThrottleBlockBuildingUntilNormalOperationsStart(t *testing.T) {
+	require := require.New(t)
+
+	latestForkTime = genesistest.DefaultValidatorStartTime.Add(time.Second)
+	vm := &VM{Internal: config.Internal{
+		Chains:                 chains.TestManager,
+		UptimeLockedCalculator: uptime.NewLockedCalculator(),
+		SybilProtectionEnabled: true,
+		Validators:             validators.NewManager(),
+		DynamicFeeConfig:       defaultDynamicFeeConfig,
+		ValidatorFeeConfig:     defaultValidatorFeeConfig,
+		MinValidatorStake:      defaultMinValidatorStake,
+		MaxValidatorStake:      defaultMaxValidatorStake,
+		MinDelegatorStake:      defaultMinDelegatorStake,
+		MinStakeDuration:       defaultMinStakingDuration,
+		MaxStakeDuration:       defaultMaxStakingDuration,
+		RewardConfig:           defaultRewardConfig,
+		UpgradeConfig:          upgradetest.GetConfigWithUpgradeTime(upgradetest.Latest, latestForkTime),
+	}}
+
+	defer func() {
+		vm.ctx.Lock.Lock()
+		defer vm.ctx.Lock.Unlock()
+
+		require.NoError(vm.Shutdown(context.Background()))
+	}()
+
+	db := memdb.New()
+	chainDB := prefixdb.New([]byte{0}, db)
+	atomicDB := prefixdb.New([]byte{1}, db)
+
+	vm.clock.Set(latestForkTime)
+	ctx := snowtest.Context(t, snowtest.PChainID)
+
+	m := atomic.NewMemory(atomicDB)
+	msm := &mutableSharedMemory{
+		SharedMemory: m.NewSharedMemory(ctx.ChainID),
+	}
+	ctx.SharedMemory = msm
+
+	ctx.Lock.Lock()
+
+	appSender := &enginetest.Sender{}
+	appSender.CantSendAppGossip = true
+	appSender.SendAppGossipF = func(context.Context, common.SendConfig, []byte) error {
+		return nil
+	}
+	appSender.SendAppErrorF = func(context.Context, ids.NodeID, uint32, int32, string) error {
+		return nil
+	}
+
+	dynamicConfigBytes := []byte(`{"network":{"max-validator-set-staleness":0}}`)
+	require.NoError(vm.Initialize(
+		context.Background(),
+		ctx,
+		chainDB,
+		genesistest.NewBytes(t, genesistest.Config{}),
+		nil,
+		dynamicConfigBytes,
+		nil,
+		appSender,
+	))
+
+	vm.state.SetTimestamp(vm.clock.Time())
+	vm.state.SetFeeState(gas.State{
+		Capacity: defaultDynamicFeeConfig.MaxCapacity,
+	})
+
+	newTime := latestForkTime.Add(genesistest.DefaultValidatorDuration)
+
+	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+	require.NoError(vm.onBootstrapStarted())
+
+	vm.clock.Set(newTime)
+
+	ctx.Lock.Unlock()
+
+	impatientContext, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
+
+	msg, err := vm.WaitForEvent(impatientContext)
+	cancel()
+	require.ErrorIs(context.DeadlineExceeded, err)
+	require.Equal(msg, common.Message(0))
+
+	ctx.Lock.Lock()
+	require.NoError(vm.onNormalOperationsStarted())
+	ctx.Lock.Unlock()
+
+	impatientContext, cancel = context.WithTimeout(context.Background(), time.Minute)
+	msg, err = vm.WaitForEvent(impatientContext)
+	cancel()
+	require.NoError(err)
+	require.Equal(common.PendingTxs, msg)
+}
