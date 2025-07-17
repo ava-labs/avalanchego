@@ -133,21 +133,6 @@ func (mr *ChainVMMockRecorder) Connected(ctx, nodeID, nodeVersion any) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Connected", reflect.TypeOf((*ChainVM)(nil).Connected), ctx, nodeID, nodeVersion)
 }
 
-// CreateHTTP2Handler mocks base method.
-func (m *ChainVM) CreateHTTP2Handler(ctx context.Context) (http.Handler, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateHTTP2Handler", ctx)
-	ret0, _ := ret[0].(http.Handler)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// CreateHTTP2Handler indicates an expected call of CreateHTTP2Handler.
-func (mr *ChainVMMockRecorder) CreateHTTP2Handler(ctx any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateHTTP2Handler", reflect.TypeOf((*ChainVM)(nil).CreateHTTP2Handler), ctx)
-}
-
 // CreateHandlers mocks base method.
 func (m *ChainVM) CreateHandlers(arg0 context.Context) (map[string]http.Handler, error) {
 	m.ctrl.T.Helper()
@@ -249,6 +234,21 @@ func (m *ChainVM) LastAccepted(arg0 context.Context) (ids.ID, error) {
 func (mr *ChainVMMockRecorder) LastAccepted(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LastAccepted", reflect.TypeOf((*ChainVM)(nil).LastAccepted), arg0)
+}
+
+// NewHTTPHandler mocks base method.
+func (m *ChainVM) NewHTTPHandler(ctx context.Context) (http.Handler, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NewHTTPHandler", ctx)
+	ret0, _ := ret[0].(http.Handler)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NewHTTPHandler indicates an expected call of NewHTTPHandler.
+func (mr *ChainVMMockRecorder) NewHTTPHandler(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewHTTPHandler", reflect.TypeOf((*ChainVM)(nil).NewHTTPHandler), ctx)
 }
 
 // ParseBlock mocks base method.

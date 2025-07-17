@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand/v2"
-	"time"
 
 	"github.com/ava-labs/libevm/accounts/abi/bind"
 	"github.com/ava-labs/libevm/common"
@@ -114,7 +113,7 @@ func (ZeroTransferTest) Run(
 	})
 	require.NoError(err)
 
-	require.NoError(wallet.SendTx(ctx, tx, time.Millisecond))
+	require.NoError(wallet.SendTx(ctx, tx))
 }
 
 type ReadTest struct {
@@ -135,7 +134,7 @@ func (r ReadTest) Run(
 	tx, err := r.Contract.SimulateReads(txOpts, r.Count)
 	require.NoError(err)
 
-	require.NoError(wallet.SendTx(ctx, tx, time.Millisecond))
+	require.NoError(wallet.SendTx(ctx, tx))
 }
 
 type WriteTest struct {
@@ -156,7 +155,7 @@ func (r WriteTest) Run(
 	tx, err := r.Contract.SimulateRandomWrite(txOpts, r.Count)
 	require.NoError(err)
 
-	require.NoError(wallet.SendTx(ctx, tx, time.Millisecond))
+	require.NoError(wallet.SendTx(ctx, tx))
 }
 
 type StateModificationTest struct {
@@ -177,7 +176,7 @@ func (s StateModificationTest) Run(
 	tx, err := s.Contract.SimulateModification(txOpts, s.Count)
 	require.NoError(err)
 
-	require.NoError(wallet.SendTx(ctx, tx, time.Millisecond))
+	require.NoError(wallet.SendTx(ctx, tx))
 }
 
 type HashingTest struct {
@@ -198,7 +197,7 @@ func (h HashingTest) Run(
 	tx, err := h.Contract.SimulateHashing(txOpts, h.Count)
 	require.NoError(err)
 
-	require.NoError(wallet.SendTx(ctx, tx, time.Millisecond))
+	require.NoError(wallet.SendTx(ctx, tx))
 }
 
 type MemoryTest struct {
@@ -219,7 +218,7 @@ func (m MemoryTest) Run(
 	tx, err := m.Contract.SimulateMemory(txOpts, m.Count)
 	require.NoError(err)
 
-	require.NoError(wallet.SendTx(ctx, tx, time.Millisecond))
+	require.NoError(wallet.SendTx(ctx, tx))
 }
 
 type CallDepthTest struct {
@@ -240,7 +239,7 @@ func (c CallDepthTest) Run(
 	tx, err := c.Contract.SimulateCallDepth(txOpts, c.Count)
 	require.NoError(err)
 
-	require.NoError(wallet.SendTx(ctx, tx, time.Millisecond))
+	require.NoError(wallet.SendTx(ctx, tx))
 }
 
 type ContractCreationTest struct {
@@ -260,7 +259,7 @@ func (c ContractCreationTest) Run(
 	tx, err := c.Contract.SimulateContractCreation(txOpts)
 	require.NoError(err)
 
-	require.NoError(wallet.SendTx(ctx, tx, time.Millisecond))
+	require.NoError(wallet.SendTx(ctx, tx))
 }
 
 type PureComputeTest struct {
@@ -281,7 +280,7 @@ func (p PureComputeTest) Run(
 	tx, err := p.Contract.SimulatePureCompute(txOpts, p.NumIterations)
 	require.NoError(err)
 
-	require.NoError(wallet.SendTx(ctx, tx, time.Millisecond))
+	require.NoError(wallet.SendTx(ctx, tx))
 }
 
 type LargeEventTest struct {
@@ -302,7 +301,7 @@ func (l LargeEventTest) Run(
 	tx, err := l.Contract.SimulateLargeEvent(txOpts, l.NumEvents)
 	require.NoError(err)
 
-	require.NoError(wallet.SendTx(ctx, tx, time.Millisecond))
+	require.NoError(wallet.SendTx(ctx, tx))
 }
 
 type ExternalCallTest struct {
@@ -322,7 +321,7 @@ func (e ExternalCallTest) Run(
 	tx, err := e.Contract.SimulateExternalCall(txOpts)
 	require.NoError(err)
 
-	require.NoError(wallet.SendTx(ctx, tx, time.Millisecond))
+	require.NoError(wallet.SendTx(ctx, tx))
 }
 
 // newTxOpts returns transactions options for contract calls, with sending disabled

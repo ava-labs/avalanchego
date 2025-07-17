@@ -4,7 +4,7 @@ set -euo pipefail
 
 # Run load test against nodes deployed to a kind cluster
 
-if ! [[ "$0" =~ scripts/tests.load.kube.sh ]]; then
+if ! [[ "$0" =~ scripts/tests.load.kube.kind.sh ]]; then
     echo "must be run from repository root"
     exit 255
 fi

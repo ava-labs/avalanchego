@@ -25,160 +25,43 @@ import (
 	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
-var _ Client = (*client)(nil)
-
-// Client interface for interacting with the P Chain endpoint
-type Client interface {
-	// GetHeight returns the current block height of the P Chain
-	GetHeight(ctx context.Context, options ...rpc.Option) (uint64, error)
-	// GetProposedHeight returns the current height of this node's proposer VM.
-	GetProposedHeight(ctx context.Context, options ...rpc.Option) (uint64, error)
-	// GetBalance returns the balance of [addrs] on the P Chain
-	//
-	// Deprecated: GetUTXOs should be used instead.
-	GetBalance(ctx context.Context, addrs []ids.ShortID, options ...rpc.Option) (*GetBalanceResponse, error)
-	// GetUTXOs returns the byte representation of the UTXOs controlled by [addrs]
-	GetUTXOs(
-		ctx context.Context,
-		addrs []ids.ShortID,
-		limit uint32,
-		startAddress ids.ShortID,
-		startUTXOID ids.ID,
-		options ...rpc.Option,
-	) ([][]byte, ids.ShortID, ids.ID, error)
-	// GetAtomicUTXOs returns the byte representation of the atomic UTXOs controlled by [addrs]
-	// from [sourceChain]
-	GetAtomicUTXOs(
-		ctx context.Context,
-		addrs []ids.ShortID,
-		sourceChain string,
-		limit uint32,
-		startAddress ids.ShortID,
-		startUTXOID ids.ID,
-		options ...rpc.Option,
-	) ([][]byte, ids.ShortID, ids.ID, error)
-	// GetSubnet returns information about the specified subnet
-	GetSubnet(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (GetSubnetClientResponse, error)
-	// GetSubnets returns information about the specified subnets
-	//
-	// Deprecated: Subnets should be fetched from a dedicated indexer.
-	GetSubnets(ctx context.Context, subnetIDs []ids.ID, options ...rpc.Option) ([]ClientSubnet, error)
-	// GetStakingAssetID returns the assetID of the asset used for staking on
-	// subnet corresponding to [subnetID]
-	GetStakingAssetID(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (ids.ID, error)
-	// GetCurrentValidators returns the list of current validators for subnet with ID [subnetID]
-	GetCurrentValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.NodeID, options ...rpc.Option) ([]ClientPermissionlessValidator, error)
-	// GetL1Validator returns the requested L1 validator with [validationID] and
-	// the height at which it was calculated.
-	GetL1Validator(ctx context.Context, validationID ids.ID, options ...rpc.Option) (L1Validator, uint64, error)
-	// GetCurrentSupply returns an upper bound on the supply of AVAX in the system along with the P-chain height
-	GetCurrentSupply(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (uint64, uint64, error)
-	// SampleValidators returns the nodeIDs of a sample of [sampleSize] validators from the current validator set for subnet with ID [subnetID]
-	SampleValidators(ctx context.Context, subnetID ids.ID, sampleSize uint16, options ...rpc.Option) ([]ids.NodeID, error)
-	// GetBlockchainStatus returns the current status of blockchain with ID: [blockchainID]
-	GetBlockchainStatus(ctx context.Context, blockchainID string, options ...rpc.Option) (status.BlockchainStatus, error)
-	// ValidatedBy returns the ID of the Subnet that validates [blockchainID]
-	ValidatedBy(ctx context.Context, blockchainID ids.ID, options ...rpc.Option) (ids.ID, error)
-	// Validates returns the list of blockchains that are validated by the subnet with ID [subnetID]
-	Validates(ctx context.Context, subnetID ids.ID, options ...rpc.Option) ([]ids.ID, error)
-	// GetBlockchains returns the list of blockchains on the platform
-	//
-	// Deprecated: Blockchains should be fetched from a dedicated indexer.
-	GetBlockchains(ctx context.Context, options ...rpc.Option) ([]APIBlockchain, error)
-	// IssueTx issues the transaction and returns its txID
-	IssueTx(ctx context.Context, tx []byte, options ...rpc.Option) (ids.ID, error)
-	// GetTx returns the byte representation of the transaction corresponding to [txID]
-	GetTx(ctx context.Context, txID ids.ID, options ...rpc.Option) ([]byte, error)
-	// GetTxStatus returns the status of the transaction corresponding to [txID]
-	GetTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Option) (*GetTxStatusResponse, error)
-	// GetStake returns the amount of nAVAX that [addrs] have cumulatively
-	// staked on the Primary Network.
-	//
-	// Deprecated: Stake should be calculated using GetTx and GetCurrentValidators.
-	GetStake(
-		ctx context.Context,
-		addrs []ids.ShortID,
-		validatorsOnly bool,
-		options ...rpc.Option,
-	) (map[ids.ID]uint64, [][]byte, error)
-	// GetMinStake returns the minimum staking amount in nAVAX for validators
-	// and delegators respectively
-	GetMinStake(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (uint64, uint64, error)
-	// GetTotalStake returns the total amount (in nAVAX) staked on the network
-	GetTotalStake(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (uint64, error)
-	// GetRewardUTXOs returns the reward UTXOs for a transaction
-	//
-	// Deprecated: GetRewardUTXOs should be fetched from a dedicated indexer.
-	GetRewardUTXOs(context.Context, *api.GetTxArgs, ...rpc.Option) ([][]byte, error)
-	// GetTimestamp returns the current chain timestamp
-	GetTimestamp(ctx context.Context, options ...rpc.Option) (time.Time, error)
-	// GetValidatorsAt returns the weights of the validator set of a provided
-	// subnet at the specified height or at proposerVM height if set to
-	// [platformapi.ProposedHeight]
-	GetValidatorsAt(
-		ctx context.Context,
-		subnetID ids.ID,
-		height platformapi.Height,
-		options ...rpc.Option,
-	) (map[ids.NodeID]*validators.GetValidatorOutput, error)
-	// GetBlock returns the block with the given id.
-	GetBlock(ctx context.Context, blockID ids.ID, options ...rpc.Option) ([]byte, error)
-	// GetBlockByHeight returns the block at the given [height].
-	GetBlockByHeight(ctx context.Context, height uint64, options ...rpc.Option) ([]byte, error)
-	// GetFeeConfig returns the dynamic fee config of the chain.
-	GetFeeConfig(ctx context.Context, options ...rpc.Option) (*gas.Config, error)
-	// GetFeeState returns the current fee state of the chain.
-	GetFeeState(ctx context.Context, options ...rpc.Option) (
-		gas.State,
-		gas.Price,
-		time.Time,
-		error,
-	)
-	// GetValidatorFeeConfig returns the validator fee config of the chain.
-	GetValidatorFeeConfig(ctx context.Context, options ...rpc.Option) (*fee.Config, error)
-	// GetValidatorFeeState returns the current validator fee state of the
-	// chain.
-	GetValidatorFeeState(ctx context.Context, options ...rpc.Option) (
-		gas.Gas,
-		gas.Price,
-		time.Time,
-		error,
-	)
+type Client struct {
+	Requester rpc.EndpointRequester
 }
 
-// Client implementation for interacting with the P Chain endpoint
-type client struct {
-	requester rpc.EndpointRequester
-}
-
-// NewClient returns a Client for interacting with the P Chain endpoint
-func NewClient(uri string) Client {
-	return &client{requester: rpc.NewEndpointRequester(
+func NewClient(uri string) *Client {
+	return &Client{Requester: rpc.NewEndpointRequester(
 		uri + "/ext/P",
 	)}
 }
 
-func (c *client) GetHeight(ctx context.Context, options ...rpc.Option) (uint64, error) {
+// GetHeight returns the current block height.
+func (c *Client) GetHeight(ctx context.Context, options ...rpc.Option) (uint64, error) {
 	res := &api.GetHeightResponse{}
-	err := c.requester.SendRequest(ctx, "platform.getHeight", struct{}{}, res, options...)
+	err := c.Requester.SendRequest(ctx, "platform.getHeight", struct{}{}, res, options...)
 	return uint64(res.Height), err
 }
 
-func (c *client) GetProposedHeight(ctx context.Context, options ...rpc.Option) (uint64, error) {
+// GetProposedHeight returns the current height of this node's proposer VM.
+func (c *Client) GetProposedHeight(ctx context.Context, options ...rpc.Option) (uint64, error) {
 	res := &api.GetHeightResponse{}
-	err := c.requester.SendRequest(ctx, "platform.getProposedHeight", struct{}{}, res, options...)
+	err := c.Requester.SendRequest(ctx, "platform.getProposedHeight", struct{}{}, res, options...)
 	return uint64(res.Height), err
 }
 
-func (c *client) GetBalance(ctx context.Context, addrs []ids.ShortID, options ...rpc.Option) (*GetBalanceResponse, error) {
+// GetBalance returns the balance of addrs.
+//
+// Deprecated: GetUTXOs should be used instead.
+func (c *Client) GetBalance(ctx context.Context, addrs []ids.ShortID, options ...rpc.Option) (*GetBalanceResponse, error) {
 	res := &GetBalanceResponse{}
-	err := c.requester.SendRequest(ctx, "platform.getBalance", &GetBalanceRequest{
+	err := c.Requester.SendRequest(ctx, "platform.getBalance", &GetBalanceRequest{
 		Addresses: ids.ShortIDsToStrings(addrs),
 	}, res, options...)
 	return res, err
 }
 
-func (c *client) GetUTXOs(
+// GetUTXOs returns the byte representation of the UTXOs controlled by addrs.
+func (c *Client) GetUTXOs(
 	ctx context.Context,
 	addrs []ids.ShortID,
 	limit uint32,
@@ -189,7 +72,9 @@ func (c *client) GetUTXOs(
 	return c.GetAtomicUTXOs(ctx, addrs, "", limit, startAddress, startUTXOID, options...)
 }
 
-func (c *client) GetAtomicUTXOs(
+// GetAtomicUTXOs returns the byte representation of the atomic UTXOs controlled
+// by addrs from sourceChain.
+func (c *Client) GetAtomicUTXOs(
 	ctx context.Context,
 	addrs []ids.ShortID,
 	sourceChain string,
@@ -199,7 +84,7 @@ func (c *client) GetAtomicUTXOs(
 	options ...rpc.Option,
 ) ([][]byte, ids.ShortID, ids.ID, error) {
 	res := &api.GetUTXOsReply{}
-	err := c.requester.SendRequest(ctx, "platform.getUTXOs", &api.GetUTXOsArgs{
+	err := c.Requester.SendRequest(ctx, "platform.getUTXOs", &api.GetUTXOsArgs{
 		Addresses:   ids.ShortIDsToStrings(addrs),
 		SourceChain: sourceChain,
 		Limit:       json.Uint32(limit),
@@ -245,9 +130,10 @@ type GetSubnetClientResponse struct {
 	ManagerAddress []byte
 }
 
-func (c *client) GetSubnet(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (GetSubnetClientResponse, error) {
+// GetSubnet returns information about the specified subnet.
+func (c *Client) GetSubnet(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (GetSubnetClientResponse, error) {
 	res := &GetSubnetResponse{}
-	err := c.requester.SendRequest(ctx, "platform.getSubnet", &GetSubnetArgs{
+	err := c.Requester.SendRequest(ctx, "platform.getSubnet", &GetSubnetArgs{
 		SubnetID: subnetID,
 	}, res, options...)
 	if err != nil {
@@ -281,9 +167,12 @@ type ClientSubnet struct {
 	Threshold   uint32
 }
 
-func (c *client) GetSubnets(ctx context.Context, ids []ids.ID, options ...rpc.Option) ([]ClientSubnet, error) {
+// GetSubnets returns information about the specified subnets
+//
+// Deprecated: Subnets should be fetched from a dedicated indexer.
+func (c *Client) GetSubnets(ctx context.Context, ids []ids.ID, options ...rpc.Option) ([]ClientSubnet, error) {
 	res := &GetSubnetsResponse{}
-	err := c.requester.SendRequest(ctx, "platform.getSubnets", &GetSubnetsArgs{
+	err := c.Requester.SendRequest(ctx, "platform.getSubnets", &GetSubnetsArgs{
 		IDs: ids,
 	}, res, options...)
 	if err != nil {
@@ -305,22 +194,25 @@ func (c *client) GetSubnets(ctx context.Context, ids []ids.ID, options ...rpc.Op
 	return subnets, nil
 }
 
-func (c *client) GetStakingAssetID(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (ids.ID, error) {
+// GetStakingAssetID returns the assetID of the asset used for staking on the
+// subnet corresponding to subnetID.
+func (c *Client) GetStakingAssetID(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (ids.ID, error) {
 	res := &GetStakingAssetIDResponse{}
-	err := c.requester.SendRequest(ctx, "platform.getStakingAssetID", &GetStakingAssetIDArgs{
+	err := c.Requester.SendRequest(ctx, "platform.getStakingAssetID", &GetStakingAssetIDArgs{
 		SubnetID: subnetID,
 	}, res, options...)
 	return res.AssetID, err
 }
 
-func (c *client) GetCurrentValidators(
+// GetCurrentValidators returns the list of current validators for subnetID.
+func (c *Client) GetCurrentValidators(
 	ctx context.Context,
 	subnetID ids.ID,
 	nodeIDs []ids.NodeID,
 	options ...rpc.Option,
 ) ([]ClientPermissionlessValidator, error) {
 	res := &GetCurrentValidatorsReply{}
-	err := c.requester.SendRequest(ctx, "platform.getCurrentValidators", &GetCurrentValidatorsArgs{
+	err := c.Requester.SendRequest(ctx, "platform.getCurrentValidators", &GetCurrentValidatorsArgs{
 		SubnetID: subnetID,
 		NodeIDs:  nodeIDs,
 	}, res, options...)
@@ -345,13 +237,15 @@ type L1Validator struct {
 	Balance uint64
 }
 
-func (c *client) GetL1Validator(
+// GetL1Validator returns the requested L1 validator with validationID and the
+// height at which it was calculated.
+func (c *Client) GetL1Validator(
 	ctx context.Context,
 	validationID ids.ID,
 	options ...rpc.Option,
 ) (L1Validator, uint64, error) {
 	res := &GetL1ValidatorReply{}
-	err := c.requester.SendRequest(ctx, "platform.getL1Validator",
+	err := c.Requester.SendRequest(ctx, "platform.getL1Validator",
 		&GetL1ValidatorArgs{
 			ValidationID: validationID,
 		},
@@ -406,70 +300,82 @@ func (c *client) GetL1Validator(
 	}, uint64(res.Height), err
 }
 
-func (c *client) GetCurrentSupply(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (uint64, uint64, error) {
+// GetCurrentSupply returns an upper bound on the supply of AVAX in the system
+// along with the chain height.
+func (c *Client) GetCurrentSupply(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (uint64, uint64, error) {
 	res := &GetCurrentSupplyReply{}
-	err := c.requester.SendRequest(ctx, "platform.getCurrentSupply", &GetCurrentSupplyArgs{
+	err := c.Requester.SendRequest(ctx, "platform.getCurrentSupply", &GetCurrentSupplyArgs{
 		SubnetID: subnetID,
 	}, res, options...)
 	return uint64(res.Supply), uint64(res.Height), err
 }
 
-func (c *client) SampleValidators(ctx context.Context, subnetID ids.ID, sampleSize uint16, options ...rpc.Option) ([]ids.NodeID, error) {
+// SampleValidators returns the nodeIDs of a sample of sampleSize validators
+// from the current validator set for subnetID.
+func (c *Client) SampleValidators(ctx context.Context, subnetID ids.ID, sampleSize uint16, options ...rpc.Option) ([]ids.NodeID, error) {
 	res := &SampleValidatorsReply{}
-	err := c.requester.SendRequest(ctx, "platform.sampleValidators", &SampleValidatorsArgs{
+	err := c.Requester.SendRequest(ctx, "platform.sampleValidators", &SampleValidatorsArgs{
 		SubnetID: subnetID,
 		Size:     json.Uint16(sampleSize),
 	}, res, options...)
 	return res.Validators, err
 }
 
-func (c *client) GetBlockchainStatus(ctx context.Context, blockchainID string, options ...rpc.Option) (status.BlockchainStatus, error) {
+// GetBlockchainStatus returns the current status of blockchainID.
+func (c *Client) GetBlockchainStatus(ctx context.Context, blockchainID string, options ...rpc.Option) (status.BlockchainStatus, error) {
 	res := &GetBlockchainStatusReply{}
-	err := c.requester.SendRequest(ctx, "platform.getBlockchainStatus", &GetBlockchainStatusArgs{
+	err := c.Requester.SendRequest(ctx, "platform.getBlockchainStatus", &GetBlockchainStatusArgs{
 		BlockchainID: blockchainID,
 	}, res, options...)
 	return res.Status, err
 }
 
-func (c *client) ValidatedBy(ctx context.Context, blockchainID ids.ID, options ...rpc.Option) (ids.ID, error) {
+// ValidatedBy returns the subnetID that validates blockchainID.
+func (c *Client) ValidatedBy(ctx context.Context, blockchainID ids.ID, options ...rpc.Option) (ids.ID, error) {
 	res := &ValidatedByResponse{}
-	err := c.requester.SendRequest(ctx, "platform.validatedBy", &ValidatedByArgs{
+	err := c.Requester.SendRequest(ctx, "platform.validatedBy", &ValidatedByArgs{
 		BlockchainID: blockchainID,
 	}, res, options...)
 	return res.SubnetID, err
 }
 
-func (c *client) Validates(ctx context.Context, subnetID ids.ID, options ...rpc.Option) ([]ids.ID, error) {
+// Validates returns the list of blockchains that are validated by subnetID.
+func (c *Client) Validates(ctx context.Context, subnetID ids.ID, options ...rpc.Option) ([]ids.ID, error) {
 	res := &ValidatesResponse{}
-	err := c.requester.SendRequest(ctx, "platform.validates", &ValidatesArgs{
+	err := c.Requester.SendRequest(ctx, "platform.validates", &ValidatesArgs{
 		SubnetID: subnetID,
 	}, res, options...)
 	return res.BlockchainIDs, err
 }
 
-func (c *client) GetBlockchains(ctx context.Context, options ...rpc.Option) ([]APIBlockchain, error) {
+// GetBlockchains returns the list of all blockchains on the platform.
+//
+// Deprecated: Blockchains should be fetched from a dedicated indexer.
+func (c *Client) GetBlockchains(ctx context.Context, options ...rpc.Option) ([]APIBlockchain, error) {
 	res := &GetBlockchainsResponse{}
-	err := c.requester.SendRequest(ctx, "platform.getBlockchains", struct{}{}, res, options...)
+	err := c.Requester.SendRequest(ctx, "platform.getBlockchains", struct{}{}, res, options...)
 	return res.Blockchains, err
 }
 
-func (c *client) IssueTx(ctx context.Context, txBytes []byte, options ...rpc.Option) (ids.ID, error) {
+// IssueTx issues the transaction and returns its txID.
+func (c *Client) IssueTx(ctx context.Context, txBytes []byte, options ...rpc.Option) (ids.ID, error) {
 	txStr, err := formatting.Encode(formatting.Hex, txBytes)
 	if err != nil {
 		return ids.Empty, err
 	}
 
 	res := &api.JSONTxID{}
-	err = c.requester.SendRequest(ctx, "platform.issueTx", &api.FormattedTx{
+	err = c.Requester.SendRequest(ctx, "platform.issueTx", &api.FormattedTx{
 		Tx:       txStr,
 		Encoding: formatting.Hex,
 	}, res, options...)
 	return res.TxID, err
 }
 
-func (c *client) GetTx(ctx context.Context, txID ids.ID, options ...rpc.Option) ([]byte, error) {
+// GetTx returns the byte representation of txID.
+func (c *Client) GetTx(ctx context.Context, txID ids.ID, options ...rpc.Option) ([]byte, error) {
 	res := &api.FormattedTx{}
-	err := c.requester.SendRequest(ctx, "platform.getTx", &api.GetTxArgs{
+	err := c.Requester.SendRequest(ctx, "platform.getTx", &api.GetTxArgs{
 		TxID:     txID,
 		Encoding: formatting.Hex,
 	}, res, options...)
@@ -479,9 +385,10 @@ func (c *client) GetTx(ctx context.Context, txID ids.ID, options ...rpc.Option) 
 	return formatting.Decode(res.Encoding, res.Tx)
 }
 
-func (c *client) GetTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Option) (*GetTxStatusResponse, error) {
+// GetTxStatus returns the status of txID.
+func (c *Client) GetTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Option) (*GetTxStatusResponse, error) {
 	res := &GetTxStatusResponse{}
-	err := c.requester.SendRequest(
+	err := c.Requester.SendRequest(
 		ctx,
 		"platform.getTxStatus",
 		&GetTxStatusArgs{
@@ -493,14 +400,18 @@ func (c *client) GetTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Op
 	return res, err
 }
 
-func (c *client) GetStake(
+// GetStake returns the amount of nAVAX that addrs have cumulatively staked on
+// the Primary Network.
+//
+// Deprecated: Stake should be calculated using GetTx and GetCurrentValidators.
+func (c *Client) GetStake(
 	ctx context.Context,
 	addrs []ids.ShortID,
 	validatorsOnly bool,
 	options ...rpc.Option,
 ) (map[ids.ID]uint64, [][]byte, error) {
 	res := &GetStakeReply{}
-	err := c.requester.SendRequest(ctx, "platform.getStake", &GetStakeArgs{
+	err := c.Requester.SendRequest(ctx, "platform.getStake", &GetStakeArgs{
 		JSONAddresses: api.JSONAddresses{
 			Addresses: ids.ShortIDsToStrings(addrs),
 		},
@@ -527,17 +438,20 @@ func (c *client) GetStake(
 	return staked, outputs, err
 }
 
-func (c *client) GetMinStake(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (uint64, uint64, error) {
+// GetMinStake returns the minimum staking amount in nAVAX for validators and
+// delegators respectively.
+func (c *Client) GetMinStake(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (uint64, uint64, error) {
 	res := &GetMinStakeReply{}
-	err := c.requester.SendRequest(ctx, "platform.getMinStake", &GetMinStakeArgs{
+	err := c.Requester.SendRequest(ctx, "platform.getMinStake", &GetMinStakeArgs{
 		SubnetID: subnetID,
 	}, res, options...)
 	return uint64(res.MinValidatorStake), uint64(res.MinDelegatorStake), err
 }
 
-func (c *client) GetTotalStake(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (uint64, error) {
+// GetTotalStake returns the total amount (in nAVAX) staked on the network.
+func (c *Client) GetTotalStake(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (uint64, error) {
 	res := &GetTotalStakeReply{}
-	err := c.requester.SendRequest(ctx, "platform.getTotalStake", &GetTotalStakeArgs{
+	err := c.Requester.SendRequest(ctx, "platform.getTotalStake", &GetTotalStakeArgs{
 		SubnetID: subnetID,
 	}, res, options...)
 	var amount json.Uint64
@@ -549,9 +463,12 @@ func (c *client) GetTotalStake(ctx context.Context, subnetID ids.ID, options ...
 	return uint64(amount), err
 }
 
-func (c *client) GetRewardUTXOs(ctx context.Context, args *api.GetTxArgs, options ...rpc.Option) ([][]byte, error) {
+// GetRewardUTXOs returns the reward UTXOs for a transaction.
+//
+// Deprecated: GetRewardUTXOs should be fetched from a dedicated indexer.
+func (c *Client) GetRewardUTXOs(ctx context.Context, args *api.GetTxArgs, options ...rpc.Option) ([][]byte, error) {
 	res := &GetRewardUTXOsReply{}
-	err := c.requester.SendRequest(ctx, "platform.getRewardUTXOs", args, res, options...)
+	err := c.Requester.SendRequest(ctx, "platform.getRewardUTXOs", args, res, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -566,29 +483,34 @@ func (c *client) GetRewardUTXOs(ctx context.Context, args *api.GetTxArgs, option
 	return utxos, err
 }
 
-func (c *client) GetTimestamp(ctx context.Context, options ...rpc.Option) (time.Time, error) {
+// GetTimestamp returns the current chain timestamp.
+func (c *Client) GetTimestamp(ctx context.Context, options ...rpc.Option) (time.Time, error) {
 	res := &GetTimestampReply{}
-	err := c.requester.SendRequest(ctx, "platform.getTimestamp", struct{}{}, res, options...)
+	err := c.Requester.SendRequest(ctx, "platform.getTimestamp", struct{}{}, res, options...)
 	return res.Timestamp, err
 }
 
-func (c *client) GetValidatorsAt(
+// GetValidatorsAt returns the weights of the validator set of a provided subnet
+// at the specified height or at proposerVM height if set to
+// [platformapi.ProposedHeight].
+func (c *Client) GetValidatorsAt(
 	ctx context.Context,
 	subnetID ids.ID,
 	height platformapi.Height,
 	options ...rpc.Option,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 	res := &GetValidatorsAtReply{}
-	err := c.requester.SendRequest(ctx, "platform.getValidatorsAt", &GetValidatorsAtArgs{
+	err := c.Requester.SendRequest(ctx, "platform.getValidatorsAt", &GetValidatorsAtArgs{
 		SubnetID: subnetID,
 		Height:   height,
 	}, res, options...)
 	return res.Validators, err
 }
 
-func (c *client) GetBlock(ctx context.Context, blockID ids.ID, options ...rpc.Option) ([]byte, error) {
+// GetBlock returns blockID.
+func (c *Client) GetBlock(ctx context.Context, blockID ids.ID, options ...rpc.Option) ([]byte, error) {
 	res := &api.FormattedBlock{}
-	if err := c.requester.SendRequest(ctx, "platform.getBlock", &api.GetBlockArgs{
+	if err := c.Requester.SendRequest(ctx, "platform.getBlock", &api.GetBlockArgs{
 		BlockID:  blockID,
 		Encoding: formatting.Hex,
 	}, res, options...); err != nil {
@@ -597,9 +519,10 @@ func (c *client) GetBlock(ctx context.Context, blockID ids.ID, options ...rpc.Op
 	return formatting.Decode(res.Encoding, res.Block)
 }
 
-func (c *client) GetBlockByHeight(ctx context.Context, height uint64, options ...rpc.Option) ([]byte, error) {
+// GetBlockByHeight returns the block at the given height.
+func (c *Client) GetBlockByHeight(ctx context.Context, height uint64, options ...rpc.Option) ([]byte, error) {
 	res := &api.FormattedBlock{}
-	err := c.requester.SendRequest(ctx, "platform.getBlockByHeight", &api.GetBlockByHeightArgs{
+	err := c.Requester.SendRequest(ctx, "platform.getBlockByHeight", &api.GetBlockByHeightArgs{
 		Height:   json.Uint64(height),
 		Encoding: formatting.HexNC,
 	}, res, options...)
@@ -609,42 +532,46 @@ func (c *client) GetBlockByHeight(ctx context.Context, height uint64, options ..
 	return formatting.Decode(res.Encoding, res.Block)
 }
 
-func (c *client) GetFeeConfig(ctx context.Context, options ...rpc.Option) (*gas.Config, error) {
+// GetFeeConfig returns the dynamic fee config.
+func (c *Client) GetFeeConfig(ctx context.Context, options ...rpc.Option) (*gas.Config, error) {
 	res := &gas.Config{}
-	err := c.requester.SendRequest(ctx, "platform.getFeeConfig", struct{}{}, res, options...)
+	err := c.Requester.SendRequest(ctx, "platform.getFeeConfig", struct{}{}, res, options...)
 	return res, err
 }
 
-func (c *client) GetFeeState(ctx context.Context, options ...rpc.Option) (
+// GetFeeState returns the current fee state.
+func (c *Client) GetFeeState(ctx context.Context, options ...rpc.Option) (
 	gas.State,
 	gas.Price,
 	time.Time,
 	error,
 ) {
 	res := &GetFeeStateReply{}
-	err := c.requester.SendRequest(ctx, "platform.getFeeState", struct{}{}, res, options...)
+	err := c.Requester.SendRequest(ctx, "platform.getFeeState", struct{}{}, res, options...)
 	return res.State, res.Price, res.Time, err
 }
 
-func (c *client) GetValidatorFeeConfig(ctx context.Context, options ...rpc.Option) (*fee.Config, error) {
+// GetValidatorFeeConfig returns the validator fee config.
+func (c *Client) GetValidatorFeeConfig(ctx context.Context, options ...rpc.Option) (*fee.Config, error) {
 	res := &fee.Config{}
-	err := c.requester.SendRequest(ctx, "platform.getValidatorFeeConfig", struct{}{}, res, options...)
+	err := c.Requester.SendRequest(ctx, "platform.getValidatorFeeConfig", struct{}{}, res, options...)
 	return res, err
 }
 
-func (c *client) GetValidatorFeeState(ctx context.Context, options ...rpc.Option) (
+// GetValidatorFeeState returns the current validator fee state.
+func (c *Client) GetValidatorFeeState(ctx context.Context, options ...rpc.Option) (
 	gas.Gas,
 	gas.Price,
 	time.Time,
 	error,
 ) {
 	res := &GetValidatorFeeStateReply{}
-	err := c.requester.SendRequest(ctx, "platform.getValidatorFeeState", struct{}{}, res, options...)
+	err := c.Requester.SendRequest(ctx, "platform.getValidatorFeeState", struct{}{}, res, options...)
 	return res.Excess, res.Price, res.Time, err
 }
 
 func AwaitTxAccepted(
-	c Client,
+	c *Client,
 	ctx context.Context,
 	txID ids.ID,
 	freq time.Duration,
@@ -674,7 +601,7 @@ func AwaitTxAccepted(
 
 // GetSubnetOwners returns a map of subnet ID to current subnet's owner
 func GetSubnetOwners(
-	c Client,
+	c *Client,
 	ctx context.Context,
 	subnetIDs ...ids.ID,
 ) (map[ids.ID]fx.Owner, error) {
@@ -695,7 +622,7 @@ func GetSubnetOwners(
 
 // GetDeactivationOwners returns a map of validation ID to deactivation owners
 func GetDeactivationOwners(
-	c Client,
+	c *Client,
 	ctx context.Context,
 	validationIDs ...ids.ID,
 ) (map[ids.ID]fx.Owner, error) {
@@ -712,7 +639,7 @@ func GetDeactivationOwners(
 
 // GetOwners returns the union of GetSubnetOwners and GetDeactivationOwners.
 func GetOwners(
-	c Client,
+	c *Client,
 	ctx context.Context,
 	subnetIDs []ids.ID,
 	validationIDs []ids.ID,
