@@ -729,10 +729,6 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
         self.header.size()
     }
 
-    pub(crate) fn physical_size(&self) -> Result<u64, FileIoError> {
-        self.storage.size()
-    }
-
     // Find the area index and size of the stored area at the given address if the area is valid.
     // TODO: there should be a way to read stored area directly instead of try reading as a free area then as a node
     pub(crate) fn read_leaked_area(

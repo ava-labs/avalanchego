@@ -32,15 +32,6 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
     pub fn check(&self) -> Result<(), CheckerError> {
         // 1. Check the header
         let db_size = self.size();
-        let file_size = self.physical_size()?;
-        if db_size < file_size {
-            return Err(CheckerError::InvalidDBSize {
-                db_size,
-                description: format!(
-                    "db size should not be smaller than the file size ({file_size})"
-                ),
-            });
-        }
 
         let mut visited = LinearAddressRangeSet::new(db_size)?;
 
