@@ -10,52 +10,53 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 )
 
-type testBlockConfig struct {
-	vmBlock      snowman.Block
-	blockTracker *blockTracker
-	round        uint64
-	seq          uint64
-	prev         simplex.Digest
+type newBlockConfig struct {
+	// If prev is nil, newBlock will create the genesis block
+	prev *Block
+	// If round is 0, it will be set to one higher than the prev's round
+	round uint64
 }
 
-// newBlock constructs a random child block of the genesis. This is a helper function
-// used for testing. This is helpful since otherwise we would
-// need the blockDeserializer to create the block.
-func newBlock(t *testing.T, config *testBlockConfig) *Block {
-	genesisBlock := newGenesisBlock(t)
-
-	if config == nil {
-		config = &testBlockConfig{
-			vmBlock:      snowmantest.BuildChild(snowmantest.Genesis),
-			blockTracker: newBlockTracker(genesisBlock),
-			round:        1,
-			seq:          1,
-			prev:         genesisBlock.digest,
+func newBlock(t *testing.T, config newBlockConfig) *Block {
+	if config.prev == nil {
+		block := &Block{
+			vmBlock: snowmantest.Genesis,
+			metadata: simplex.ProtocolMetadata{
+				Version: 1,
+				Epoch:   1,
+				Round:   0,
+				Seq:     0,
+			},
 		}
+		bytes, err := block.Bytes()
+		require.NoError(t, err)
+
+		digest := computeDigest(bytes)
+		block.digest = digest
+
+		block.blockTracker = newBlockTracker(block)
+		return block
 	}
-	if config.blockTracker == nil {
-		config.blockTracker = newBlockTracker(genesisBlock)
-	}
-	if config.vmBlock == nil {
-		config.vmBlock = snowmantest.BuildChild(snowmantest.Genesis)
+	if config.round == 0 {
+		config.round = config.prev.metadata.Round + 1
 	}
 
+	vmBlock := snowmantest.BuildChild(config.prev.vmBlock.(*snowmantest.Block))
 	block := &Block{
-		vmBlock:      config.vmBlock,
-		blockTracker: config.blockTracker,
+		vmBlock:      vmBlock,
+		blockTracker: config.prev.blockTracker,
 		metadata: simplex.ProtocolMetadata{
 			Version: 1,
 			Epoch:   1,
 			Round:   config.round,
-			Seq:     config.seq,
-			Prev:    config.prev,
+			Seq:     vmBlock.Height(),
+			Prev:    config.prev.digest,
 		},
 	}
 
@@ -64,27 +65,6 @@ func newBlock(t *testing.T, config *testBlockConfig) *Block {
 
 	digest := computeDigest(bytes)
 	block.digest = digest
-
-	return block
-}
-
-func newGenesisBlock(t *testing.T) *Block {
-	block := &Block{
-		vmBlock: snowmantest.Genesis,
-		metadata: simplex.ProtocolMetadata{
-			Version: 1,
-			Epoch:   1,
-			Round:   0,
-			Seq:     0,
-		},
-	}
-
-	bytes, err := block.Bytes()
-	require.NoError(t, err)
-
-	digest := computeDigest(bytes)
-	block.digest = digest
-
 	return block
 }
 

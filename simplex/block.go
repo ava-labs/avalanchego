@@ -172,9 +172,7 @@ func (bt *blockTracker) verifyAndTrackBlock(ctx context.Context, block *Block) e
 		return nil
 	}
 
-	// verify the block
-	err := block.vmBlock.Verify(ctx)
-	if err != nil {
+	if err := block.vmBlock.Verify(ctx); err != nil {
 		return fmt.Errorf("failed to verify block: %w", err)
 	}
 
