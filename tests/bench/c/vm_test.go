@@ -147,7 +147,7 @@ func benchmarkReexecuteRange(b *testing.B, sourceBlockDir string, targetDir stri
 		ctx,
 		db,
 		chainDataDir,
-		[]byte(`{"pruning-enabled": false}`),
+		nil,
 		vmMultiGatherer,
 	)
 	r.NoError(err)
