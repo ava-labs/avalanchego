@@ -26,10 +26,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/utils/tree"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
-	"github.com/ava-labs/avalanchego/vms/proposervm/tree"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
