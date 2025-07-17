@@ -23,6 +23,8 @@ jobs:
     strategy:
       matrix:
         include:
+          - profile-key: debug-no-default-features
+            profile-args: "--no-default-features"
           - profile-key: debug-no-features
             profile-args: ""
           - profile-key: debug-ethhash-logger
@@ -67,6 +69,8 @@ jobs:
     strategy:
       matrix:
         include:
+          - profile-key: debug-no-default-features
+            profile-args: "--no-default-features"
           - profile-key: debug-no-features
             profile-args: ""
           - profile-key: debug-ethhash-logger
@@ -93,6 +97,8 @@ jobs:
     strategy:
       matrix:
         include:
+          - profile-key: debug-no-default-features
+            profile-args: "--no-default-features"
           - profile-key: debug-no-features
             profile-args: ""
           - profile-key: debug-ethhash-logger
@@ -116,13 +122,14 @@ jobs:
     strategy:
       matrix:
         include:
+          - profile-key: debug-no-default-features
+            profile-args: "--no-default-features"
           - profile-key: debug-no-features
             profile-args: ""
           - profile-key: debug-ethhash-logger
             profile-args: "--features ethhash,logger"
           - profile-key: maxperf-ethhash-logger
             profile-args: "--profile maxperf --features ethhash,logger"
-          # TODO: enable testing with branch_factor_256
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -141,6 +148,8 @@ jobs:
     strategy:
       matrix:
         include:
+          - profile-key: debug-no-default-features
+            profile-args: "--no-default-features"
           - profile-key: debug-no-features
             profile-args: ""
           - profile-key: debug-ethhash-logger
@@ -156,7 +165,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           save-if: "false"
-          shared-key: ${{ matrix.profile-key}}
+          shared-key: ${{ matrix.profile-key }}
       - name: Run benchmark example
         run: RUST_BACKTRACE=1 cargo run ${{ matrix.profile-args }} --bin benchmark -- --number-of-batches 100 --batch-size 1000 create
       - name: Run insert example
