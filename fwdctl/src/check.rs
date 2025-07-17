@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use clap::Args;
 use firewood::v2::api;
-use firewood_storage::{CacheReadStrategy, FileBacked, NodeStore};
+use firewood_storage::{CacheReadStrategy, CheckOpt, FileBacked, NodeStore};
 use nonzero_ext::nonzero;
 
 // TODO: (optionally) add a fix option
@@ -21,6 +21,15 @@ pub struct Options {
         help = "Name of the database"
     )]
     pub db: String,
+
+    /// Whether to perform hash check
+    #[arg(
+        long,
+        required = false,
+        default_value_t = false,
+        help = "Should perform hash check"
+    )]
+    pub hash_check: bool,
 }
 
 pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
@@ -37,5 +46,9 @@ pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
     )?;
     let storage = Arc::new(fb);
 
-    NodeStore::open(storage)?.check().map_err(Into::into)
+    NodeStore::open(storage)?
+        .check(CheckOpt {
+            hash_check: opts.hash_check,
+        })
+        .map_err(|e| api::Error::InternalError(Box::new(e)))
 }

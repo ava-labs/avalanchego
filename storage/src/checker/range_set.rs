@@ -219,6 +219,7 @@ pub(super) struct LinearAddressRangeSet {
     max_addr: LinearAddress,
 }
 
+#[expect(clippy::result_large_err)]
 impl LinearAddressRangeSet {
     const NODE_STORE_ADDR_START: LinearAddress = LinearAddress::new(NodeStoreHeader::SIZE).unwrap();
 

@@ -14,7 +14,7 @@ use crate::manager::RevisionManagerError;
 use crate::proof::{Proof, ProofError, ProofNode};
 pub use crate::range_proof::RangeProof;
 use async_trait::async_trait;
-use firewood_storage::{CheckerError, FileIoError, TrieHash};
+use firewood_storage::{FileIoError, TrieHash};
 use futures::Stream;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -155,10 +155,6 @@ pub enum Error {
     /// Revision not found
     #[error("revision not found")]
     RevisionNotFound,
-
-    /// Checker error
-    #[error("checker error")]
-    CheckerError(#[from] CheckerError),
 }
 
 impl From<RevisionManagerError> for Error {
