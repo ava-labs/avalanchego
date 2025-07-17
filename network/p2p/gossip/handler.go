@@ -50,7 +50,7 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 		return nil, p2p.ErrUnexpected
 	}
 
-	var hits, total uint64
+	var hits, total float64
 
 	responseSize := 0
 	gossipBytes := make([][]byte, 0)
@@ -81,7 +81,7 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 		return nil, p2p.ErrUnexpected
 	}
 
-	hitsPercentage, ok := computeBloomFilterHitPercentage(hits, total, h.log)
+	hitsPercentage, ok := computeBloomFilterHitPercentage(hits, total)
 	if ok {
 		h.metrics.bloomFilterHitRate.Observe(float64(hitsPercentage))
 	}
@@ -134,20 +134,9 @@ func (h Handler[_]) AppGossip(_ context.Context, nodeID ids.NodeID, gossipBytes 
 	}
 }
 
-func computeBloomFilterHitPercentage(hits uint64, total uint64, log logging.Logger) (uint64, bool) {
+func computeBloomFilterHitPercentage(hits float64, total float64) (uint64, bool) {
 	if total == 0 {
 		return 0, false
 	}
-
-	if hits > total {
-		log.Warn("hits bigger than total, probably an overflow during iteration, aborting hit ratio calculation",
-			zap.Uint64("hits", hits),
-			zap.Uint64("total", total),
-		)
-		return 0, false
-	}
-
-	ratio := float64(hits) / float64(total)
-
-	return uint64(float64(100) * ratio), true
+	return uint64((hits * 100) / total), true
 }
