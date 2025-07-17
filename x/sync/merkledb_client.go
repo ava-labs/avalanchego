@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"sync"
 
 	"golang.org/x/exp/maps"
 	"google.golang.org/protobuf/proto"
@@ -31,7 +32,8 @@ type xSyncClient struct {
 	db        DB
 	config    *ClientConfig
 	tokenSize int
-	setError  func(error)
+	err       error
+	errorOnce sync.Once
 }
 
 func NewClient(db DB, config *ClientConfig) (*xSyncClient, error) {
@@ -50,8 +52,14 @@ func NewClient(db DB, config *ClientConfig) (*xSyncClient, error) {
 	}, nil
 }
 
-func (c *xSyncClient) RegisterErrorHandler(handler func(error)) {
-	c.setError = handler
+func (c *xSyncClient) Error() error {
+	return c.err
+}
+
+func (c *xSyncClient) setError(err error) {
+	c.errorOnce.Do(func() {
+		c.err = err
+	})
 }
 
 func (c *xSyncClient) Clear() error {
@@ -62,15 +70,15 @@ func (c *xSyncClient) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	return c.db.GetMerkleRoot(ctx)
 }
 
-func (c *xSyncClient) HandleRangeProofResponse(ctx context.Context, request *pb.SyncGetRangeProofRequest, responseBytes []byte, onFinish func(maybe.Maybe[[]byte])) error {
+func (c *xSyncClient) HandleRangeProofResponse(ctx context.Context, request *pb.SyncGetRangeProofRequest, responseBytes []byte) (maybe.Maybe[[]byte], error) {
 	var rangeProofProto pb.RangeProof
 	if err := proto.Unmarshal(responseBytes, &rangeProofProto); err != nil {
-		return err
+		return maybe.Nothing[[]byte](), err
 	}
 
 	var rangeProof merkledb.RangeProof
 	if err := rangeProof.UnmarshalProto(&rangeProofProto); err != nil {
-		return err
+		return maybe.Nothing[[]byte](), err
 	}
 
 	start := maybeBytesToMaybe(request.StartKey)
@@ -86,7 +94,7 @@ func (c *xSyncClient) HandleRangeProofResponse(ctx context.Context, request *pb.
 		c.tokenSize,
 		c.config.Hasher,
 	); err != nil {
-		return err
+		return maybe.Nothing[[]byte](), err
 	}
 
 	largestHandledKey := end
@@ -94,7 +102,7 @@ func (c *xSyncClient) HandleRangeProofResponse(ctx context.Context, request *pb.
 	// Replace all the key-value pairs in the DB from start to end with values from the response.
 	if err := c.db.CommitRangeProof(ctx, start, end, &rangeProof); err != nil {
 		c.setError(err)
-		return nil
+		return maybe.Nothing[[]byte](), err
 	}
 
 	if len(rangeProof.KeyChanges) > 0 {
@@ -107,24 +115,22 @@ func (c *xSyncClient) HandleRangeProofResponse(ctx context.Context, request *pb.
 		nextKey, err := c.findNextKey(ctx, largestHandledKey.Value(), end, rangeProof.EndProof)
 		if err != nil {
 			c.setError(err)
-			return nil
+			return maybe.Nothing[[]byte](), err
 		}
 		largestHandledKey = nextKey
 	}
 
-	onFinish(largestHandledKey)
-	return nil
+	return largestHandledKey, nil
 }
 
 func (c *xSyncClient) HandleChangeProofResponse(
 	ctx context.Context,
 	request *pb.SyncGetChangeProofRequest,
 	responseBytes []byte,
-	onFinish func(maybe.Maybe[[]byte]),
-) error {
+) (maybe.Maybe[[]byte], error) {
 	var changeProofResp pb.SyncGetChangeProofResponse
 	if err := proto.Unmarshal(responseBytes, &changeProofResp); err != nil {
-		return err
+		return maybe.Nothing[[]byte](), err
 	}
 
 	startKey := maybeBytesToMaybe(request.StartKey)
@@ -139,13 +145,13 @@ func (c *xSyncClient) HandleChangeProofResponse(
 		// The server had enough history to send us a change proof
 		var changeProof merkledb.ChangeProof
 		if err := changeProof.UnmarshalProto(changeProofResp.ChangeProof); err != nil {
-			return err
+			return maybe.Nothing[[]byte](), err
 		}
 
 		// Ensure the response does not contain more than the requested number of leaves
 		// and the start and end roots match the requested roots.
 		if len(changeProof.KeyChanges) > int(request.KeyLimit) {
-			return fmt.Errorf(
+			return maybe.Nothing[[]byte](), fmt.Errorf(
 				"%w: (%d) > %d)",
 				errTooManyKeys, len(changeProof.KeyChanges), request.KeyLimit,
 			)
@@ -153,7 +159,7 @@ func (c *xSyncClient) HandleChangeProofResponse(
 
 		endRoot, err := ids.ToID(request.EndRootHash)
 		if err != nil {
-			return err
+			return maybe.Nothing[[]byte](), err
 		}
 
 		if err := c.db.VerifyChangeProof(
@@ -163,7 +169,7 @@ func (c *xSyncClient) HandleChangeProofResponse(
 			endKey,
 			endRoot,
 		); err != nil {
-			return fmt.Errorf("%w due to %w", errInvalidChangeProof, err)
+			return maybe.Nothing[[]byte](), fmt.Errorf("%w due to %w", errInvalidChangeProof, err)
 		}
 
 		largestHandledKey = endKey
@@ -171,7 +177,7 @@ func (c *xSyncClient) HandleChangeProofResponse(
 		if len(changeProof.KeyChanges) > 0 {
 			if err := c.db.CommitChangeProof(ctx, &changeProof); err != nil {
 				c.setError(err)
-				return nil
+				return maybe.Nothing[[]byte](), err
 			}
 			largestHandledKey = maybe.Some(changeProof.KeyChanges[len(changeProof.KeyChanges)-1].Key)
 		}
@@ -180,7 +186,7 @@ func (c *xSyncClient) HandleChangeProofResponse(
 	case *pb.SyncGetChangeProofResponse_RangeProof:
 		var rangeProof merkledb.RangeProof
 		if err := rangeProof.UnmarshalProto(changeProofResp.RangeProof); err != nil {
-			return err
+			return maybe.Nothing[[]byte](), err
 		}
 
 		// The server did not have enough history to send us a change proof
@@ -195,7 +201,7 @@ func (c *xSyncClient) HandleChangeProofResponse(
 			c.tokenSize,
 			c.config.Hasher,
 		); err != nil {
-			return err
+			return maybe.Nothing[[]byte](), err
 		}
 
 		largestHandledKey = endKey
@@ -203,14 +209,14 @@ func (c *xSyncClient) HandleChangeProofResponse(
 			// Add all the key-value pairs we got to the database.
 			if err := c.db.CommitRangeProof(ctx, startKey, endKey, &rangeProof); err != nil {
 				c.setError(err)
-				return nil
+				return maybe.Nothing[[]byte](), err
 			}
 			largestHandledKey = maybe.Some(rangeProof.KeyChanges[len(rangeProof.KeyChanges)-1].Key)
 		}
 		endProof = rangeProof.EndProof
 
 	default:
-		return fmt.Errorf(
+		return maybe.Nothing[[]byte](), fmt.Errorf(
 			"%w: %T",
 			errUnexpectedChangeProofResponse, changeProofResp,
 		)
@@ -221,12 +227,12 @@ func (c *xSyncClient) HandleChangeProofResponse(
 		nextKey, err := c.findNextKey(ctx, largestHandledKey.Value(), endKey, endProof)
 		if err != nil {
 			c.setError(err)
-			return nil
+			return maybe.Nothing[[]byte](), err
 		}
 		largestHandledKey = nextKey
 	}
-	onFinish(largestHandledKey)
-	return nil
+
+	return largestHandledKey, nil
 }
 
 // findNextKey returns the start of the key range that should be fetched next

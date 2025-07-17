@@ -23,12 +23,11 @@ type DB interface {
 type ProofClient interface {
 	merkledb.Clearer
 	merkledb.MerkleRootGetter
-	HandleRangeProofResponse(ctx context.Context, request *pb.SyncGetRangeProofRequest, responseBytes []byte, onFinish func(maybe.Maybe[[]byte])) error
+	HandleRangeProofResponse(ctx context.Context, request *pb.SyncGetRangeProofRequest, responseBytes []byte) (maybe.Maybe[[]byte], error)
 	HandleChangeProofResponse(
 		ctx context.Context,
 		request *pb.SyncGetChangeProofRequest,
 		responseBytes []byte,
-		onFinish func(maybe.Maybe[[]byte]),
-	) error
-	RegisterErrorHandler(handler func(error))
+	) (maybe.Maybe[[]byte], error)
+	Error() error
 }

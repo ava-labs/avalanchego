@@ -174,9 +174,6 @@ func NewManager(config ManagerConfig, registerer prometheus.Registerer) (*Manage
 		metrics:         metrics,
 	}
 	m.unprocessedWorkCond.L = &m.workLock
-	m.config.ProofClient.RegisterErrorHandler(func(err error) {
-		m.setError(err)
-	})
 
 	return m, nil
 }
@@ -219,6 +216,10 @@ func (m *Manager) sync(ctx context.Context) {
 		switch {
 		case ctx.Err() != nil:
 			return // [m.workLock] released by defer.
+		case m.config.ProofClient.Error() != nil:
+			// If the proof client has an error, we can't continue.
+			m.setError(m.config.ProofClient.Error())
+			return
 		case m.processingWorkItems >= m.config.SimultaneousWorkLimit:
 			// We're already processing the maximum number of work items.
 			// Wait until one of them finishes.
@@ -498,14 +499,17 @@ func (m *Manager) handleRangeProofResponse(
 		return err
 	}
 
-	return m.config.ProofClient.HandleRangeProofResponse(
+	nextKey, err := m.config.ProofClient.HandleRangeProofResponse(
 		ctx,
 		request,
 		responseBytes,
-		func(largestHandledKey maybe.Maybe[[]byte]) {
-			m.completeWorkItem(work, largestHandledKey, targetRootID)
-		},
 	)
+	if err != nil {
+		return err
+	}
+
+	m.completeWorkItem(work, nextKey, targetRootID)
+	return nil
 }
 
 func (m *Manager) handleChangeProofResponse(
@@ -520,14 +524,17 @@ func (m *Manager) handleChangeProofResponse(
 		return err
 	}
 
-	return m.config.ProofClient.HandleChangeProofResponse(
+	nextKey, err := m.config.ProofClient.HandleChangeProofResponse(
 		ctx,
 		request,
 		responseBytes,
-		func(largestHandledKey maybe.Maybe[[]byte]) {
-			m.completeWorkItem(work, largestHandledKey, targetRootID)
-		},
 	)
+	if err != nil {
+		return err
+	}
+
+	m.completeWorkItem(work, nextKey, targetRootID)
+	return nil
 }
 
 func (m *Manager) Error() error {
