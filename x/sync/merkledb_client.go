@@ -14,6 +14,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/x/merkledb"
@@ -40,7 +41,7 @@ type merkleDBSyncClient struct {
 	db        DB
 	config    *ClientConfig
 	tokenSize int
-	err       error
+	err       *utils.Atomic[error]
 	errorOnce sync.Once
 }
 
@@ -57,16 +58,17 @@ func NewClient(db DB, config *ClientConfig) (*merkleDBSyncClient, error) {
 		db:        db,
 		config:    config,
 		tokenSize: merkledb.BranchFactorToTokenSize[config.BranchFactor],
+		err:       utils.NewAtomic[error](nil),
 	}, nil
 }
 
 func (c *merkleDBSyncClient) Error() error {
-	return c.err
+	return c.err.Get()
 }
 
 func (c *merkleDBSyncClient) setError(err error) {
 	c.errorOnce.Do(func() {
-		c.err = err
+		c.err.Set(err)
 	})
 }
 

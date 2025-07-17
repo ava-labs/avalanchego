@@ -6,6 +6,7 @@ package sync
 import (
 	"bytes"
 	"context"
+	"errors"
 	"math/rand"
 	"slices"
 	"testing"
@@ -23,7 +24,12 @@ import (
 	"github.com/ava-labs/avalanchego/x/merkledb"
 )
 
-var _ p2p.Handler = (*waitingHandler)(nil)
+var (
+	_ p2p.Handler = (*waitingHandler)(nil)
+
+	// Used to simulate a corrupted DB
+	errorFoo = errors.New("mock error")
+)
 
 func Test_Creation(t *testing.T) {
 	require := require.New(t)
@@ -655,6 +661,63 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	require.Equal(newSyncRoot, m.config.TargetRoot)
 	require.Zero(m.processedWork.Len())
 	require.Equal(1, m.unprocessedWork.Len())
+}
+
+func Test_Sync_DBError(t *testing.T) {
+	require := require.New(t)
+
+	now := time.Now().UnixNano()
+	r := rand.New(rand.NewSource(now)) // #nosec G404
+	dbToSync, err := generateTrie(t, r, maxKeyValuesLimit)
+	require.NoError(err)
+	syncRoot, err := dbToSync.GetMerkleRoot(context.Background())
+	require.NoError(err)
+
+	db, err := merkledb.New(
+		context.Background(),
+		memdb.New(),
+		newDefaultDBConfig(),
+	)
+	require.NoError(err)
+
+	// This client DB will return an error when it tries to commit a range proof.
+	badDB := &badMerkleDB{MerkleDB: db}
+
+	proofClient, err := NewClient(badDB, &ClientConfig{
+		BranchFactor: merkledb.BranchFactor16,
+	})
+	require.NoError(err)
+
+	ctx := context.Background()
+	syncer, err := NewManager(ManagerConfig{
+		ProofClient:           proofClient,
+		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(dbToSync)),
+		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(dbToSync)),
+		TargetRoot:            syncRoot,
+		SimultaneousWorkLimit: 5,
+		Log:                   logging.NoLog{},
+	}, prometheus.NewRegistry())
+	require.NoError(err)
+	require.NotNil(syncer)
+	require.NoError(syncer.Start(context.Background()))
+	err = syncer.Wait(context.Background())
+	require.ErrorIs(err, errorFoo)
+}
+
+var _ DB = (*badMerkleDB)(nil)
+
+type badMerkleDB struct {
+	merkledb.MerkleDB
+}
+
+func (*badMerkleDB) CommitRangeProof(
+	_ context.Context,
+	_ maybe.Maybe[[]byte],
+	_ maybe.Maybe[[]byte],
+	_ *merkledb.RangeProof,
+) error {
+	// Simulate a bad response by returning an error.
+	return errorFoo
 }
 
 func generateTrie(t *testing.T, r *rand.Rand, count int) (merkledb.MerkleDB, error) {
