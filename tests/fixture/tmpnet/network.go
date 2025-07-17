@@ -925,7 +925,15 @@ func (n *Network) GetMonitoringLabels() map[string]string {
 		"is_ephemeral_node": "false",
 		"network_owner":     n.Owner,
 	}
-	// Include the values of github labels if available
+	for label, value := range GetGitHubLabels() {
+		labels[label] = value
+	}
+	return labels
+}
+
+// GetGitHubLabels returns a map of GitHub labels and their values if available.
+func GetGitHubLabels() map[string]string {
+	labels := map[string]string{}
 	for _, label := range githubLabels {
 		value := os.Getenv(strings.ToUpper(label))
 		if len(value) > 0 {

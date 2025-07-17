@@ -23,7 +23,7 @@ import (
 
 func TestBlockSerialization(t *testing.T) {
 	unexpectedBlockBytes := errors.New("unexpected block bytes")
-
+	ctx := context.Background()
 	testBlock := snowmantest.BuildChild(snowmantest.Genesis)
 
 	b := &Block{
@@ -90,7 +90,7 @@ func TestBlockSerialization(t *testing.T) {
 			}
 
 			// Deserialize the block
-			deserializedBlock, err := deserializer.DeserializeBlock(tt.blockBytes)
+			deserializedBlock, err := deserializer.DeserializeBlock(ctx, tt.blockBytes)
 			require.ErrorIs(t, err, tt.expectedError)
 
 			if tt.expectedError == nil {

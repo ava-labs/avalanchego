@@ -108,7 +108,7 @@ type blockDeserializer struct {
 	parser block.Parser
 }
 
-func (d *blockDeserializer) DeserializeBlock(bytes []byte) (simplex.Block, error) {
+func (d *blockDeserializer) DeserializeBlock(ctx context.Context, bytes []byte) (simplex.Block, error) {
 	var canotoBlock canotoSimplexBlock
 
 	if err := canotoBlock.UnmarshalCanoto(bytes); err != nil {
@@ -120,7 +120,7 @@ func (d *blockDeserializer) DeserializeBlock(bytes []byte) (simplex.Block, error
 		return nil, fmt.Errorf("failed to parse protocol metadata: %w", err)
 	}
 
-	vmblock, err := d.parser.ParseBlock(context.TODO(), canotoBlock.InnerBlock)
+	vmblock, err := d.parser.ParseBlock(ctx, canotoBlock.InnerBlock)
 	if err != nil {
 		return nil, err
 	}
