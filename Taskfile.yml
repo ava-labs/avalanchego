@@ -199,11 +199,12 @@ tasks:
       - cmd: bash -x ./scripts/tests.e2e.kube.sh {{.CLI_ARGS}}
 
   test-e2e-kube-ci:
-    desc: Runs e2e tests against a network deployed to kube [serially]
+    # Free github action runners do not have sufficient resources to reliably run a full e2e run against a kube-hosted network
+    desc: Runs the xsvm e2e tests in serial against a network deployed to kube
     env:
       E2E_SERIAL: 1
     cmds:
-      - task: test-e2e-kube
+      - cmd: bash -x ./scripts/tests.e2e.kube.sh --ginkgo.focus-file=xsvm.go {{.CLI_ARGS}}
 
   # To use a different fuzz time, run `task test-fuzz FUZZTIME=[value in seconds]`.
   # A value of `-1` will run until it encounters a failing output.
@@ -233,15 +234,9 @@ tasks:
       - task: build
       - cmd: go run ./tests/load/c/main --avalanchego-path=./build/avalanchego {{.CLI_ARGS}}
 
-  test-load-kube:
-    desc: Runs load tests against a network deployed to kube
-    cmds:
-      - task: generate-load-contract-bindings
-      - cmd: bash -x ./scripts/tests.load.kube.sh {{.CLI_ARGS}}
-
   test-load2:
     desc: Runs second iteration of load tests
-    cmds: 
+    cmds:
       - task: build
       - cmd: go run ./tests/load2/main --avalanchego-path=./build/avalanchego {{.CLI_ARGS}}
 
@@ -249,6 +244,18 @@ tasks:
     desc: Runs load tests against kube with exclusive scheduling
     cmds:
       - cmd: go run ./tests/load/c/main --runtime=kube --kube-use-exclusive-scheduling {{.CLI_ARGS}}
+
+  test-load-kube:
+    desc: Runs load tests against a kubernetes cluster
+    cmds:
+      - task: generate-load-contract-bindings
+      - cmd: go run ./tests/load/c/main --runtime=kube {{.CLI_ARGS}}
+
+  test-load-kube-kind:
+    desc: Runs load tests against a kind cluster
+    cmds:
+      - task: generate-load-contract-bindings
+      - cmd: bash -x ./scripts/tests.load.kube.kind.sh {{.CLI_ARGS}}
 
   test-unit:
     desc: Runs unit tests

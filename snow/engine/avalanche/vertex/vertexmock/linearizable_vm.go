@@ -134,21 +134,6 @@ func (mr *LinearizableVMMockRecorder) Connected(ctx, nodeID, nodeVersion any) *g
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Connected", reflect.TypeOf((*LinearizableVM)(nil).Connected), ctx, nodeID, nodeVersion)
 }
 
-// CreateHTTP2Handler mocks base method.
-func (m *LinearizableVM) CreateHTTP2Handler(ctx context.Context) (http.Handler, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateHTTP2Handler", ctx)
-	ret0, _ := ret[0].(http.Handler)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// CreateHTTP2Handler indicates an expected call of CreateHTTP2Handler.
-func (mr *LinearizableVMMockRecorder) CreateHTTP2Handler(ctx any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateHTTP2Handler", reflect.TypeOf((*LinearizableVM)(nil).CreateHTTP2Handler), ctx)
-}
-
 // CreateHandlers mocks base method.
 func (m *LinearizableVM) CreateHandlers(arg0 context.Context) (map[string]http.Handler, error) {
 	m.ctrl.T.Helper()
@@ -264,6 +249,21 @@ func (m *LinearizableVM) Linearize(ctx context.Context, stopVertexID ids.ID) err
 func (mr *LinearizableVMMockRecorder) Linearize(ctx, stopVertexID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Linearize", reflect.TypeOf((*LinearizableVM)(nil).Linearize), ctx, stopVertexID)
+}
+
+// NewHTTPHandler mocks base method.
+func (m *LinearizableVM) NewHTTPHandler(ctx context.Context) (http.Handler, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NewHTTPHandler", ctx)
+	ret0, _ := ret[0].(http.Handler)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NewHTTPHandler indicates an expected call of NewHTTPHandler.
+func (mr *LinearizableVMMockRecorder) NewHTTPHandler(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewHTTPHandler", reflect.TypeOf((*LinearizableVM)(nil).NewHTTPHandler), ctx)
 }
 
 // ParseBlock mocks base method.

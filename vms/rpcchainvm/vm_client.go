@@ -387,8 +387,8 @@ func (vm *VMClient) CreateHandlers(ctx context.Context) (map[string]http.Handler
 	return handlers, nil
 }
 
-func (vm *VMClient) CreateHTTP2Handler(ctx context.Context) (http.Handler, error) {
-	resp, err := vm.client.CreateHTTP2Handler(ctx, &emptypb.Empty{})
+func (vm *VMClient) NewHTTPHandler(ctx context.Context) (http.Handler, error) {
+	resp, err := vm.client.NewHTTPHandler(ctx, &emptypb.Empty{})
 	if err != nil {
 		return nil, err
 	}
