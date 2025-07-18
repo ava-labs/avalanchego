@@ -50,10 +50,12 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 		return nil, p2p.ErrUnexpected
 	}
 
-	var hits, total float64
-
-	responseSize := 0
-	gossipBytes := make([][]byte, 0)
+	var (
+		hits         float64
+		total        float64
+		responseSize int
+		gossipBytes  [][]byte
+	)
 	h.set.Iterate(func(gossipable T) bool {
 		total++
 		gossipID := gossipable.GossipID()
@@ -81,9 +83,9 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 		return nil, p2p.ErrUnexpected
 	}
 
-	hitsPercentage, ok := computeBloomFilterHitPercentage(hits, total)
-	if ok {
-		h.metrics.bloomFilterHitRate.Observe(float64(hitsPercentage))
+	if total > 0 {
+		hitRate := float64(hits) / float64(total)
+		h.metrics.bloomFilterHitRate.Observe(100 * hitRate)
 	}
 
 	if err := h.metrics.observeMessage(sentPullLabels, len(gossipBytes), responseSize); err != nil {
@@ -132,11 +134,4 @@ func (h Handler[_]) AppGossip(_ context.Context, nodeID ids.NodeID, gossipBytes 
 			zap.Error(err),
 		)
 	}
-}
-
-func computeBloomFilterHitPercentage(hits float64, total float64) (uint64, bool) {
-	if total == 0 {
-		return 0, false
-	}
-	return uint64((hits * 100) / total), true
 }

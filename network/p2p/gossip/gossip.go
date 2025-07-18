@@ -114,7 +114,10 @@ func NewMetrics(
 			Namespace: namespace,
 			Name:      "bloomfilter_hit_rate",
 			Help:      "Hit rate (%) of the bloom filter sent by pull gossip",
-			Buckets:   prometheus.LinearBuckets(0, 25, 4),
+			// Buckets are (-∞, 0], (0, 25%], (25%, 50%], (50%, 75%], (75%, ∞).
+			// 0% is placed into its own bucket so that useless bloom filters
+			// can be inspected individually.
+			Buckets: prometheus.LinearBuckets(0, 25, 4),
 		}),
 		count: prometheus.NewCounterVec(
 			prometheus.CounterOpts{

@@ -57,8 +57,7 @@ func TestGossiperGossip(t *testing.T) {
 		responder              []*testTx // what the peer we're requesting gossip from has
 		expectedPossibleValues []*testTx // possible values we can have
 		expectedLen            int
-		expectedObserved       bool
-		expectedObservedVal    uint64
+		expectedHitRate        float64
 	}{
 		{
 			name: "no gossip - no one knows anything",
@@ -77,8 +76,7 @@ func TestGossiperGossip(t *testing.T) {
 			responder:              []*testTx{{id: ids.ID{0}}},
 			expectedPossibleValues: []*testTx{{id: ids.ID{0}}},
 			expectedLen:            1,
-			expectedObservedVal:    100,
-			expectedObserved:       true,
+			expectedHitRate:        100,
 		},
 		{
 			name:                   "gossip - requester knows nothing",
@@ -86,7 +84,7 @@ func TestGossiperGossip(t *testing.T) {
 			responder:              []*testTx{{id: ids.ID{0}}},
 			expectedPossibleValues: []*testTx{{id: ids.ID{0}}},
 			expectedLen:            1,
-			expectedObserved:       true,
+			expectedHitRate:        0,
 		},
 		{
 			name:                   "gossip - requester knows less than responder",
@@ -95,8 +93,7 @@ func TestGossiperGossip(t *testing.T) {
 			responder:              []*testTx{{id: ids.ID{0}}, {id: ids.ID{1}}},
 			expectedPossibleValues: []*testTx{{id: ids.ID{0}}, {id: ids.ID{1}}},
 			expectedLen:            2,
-			expectedObservedVal:    50,
-			expectedObserved:       true,
+			expectedHitRate:        50,
 		},
 		{
 			name:                   "gossip - target response size exceeded",
@@ -104,7 +101,7 @@ func TestGossiperGossip(t *testing.T) {
 			responder:              []*testTx{{id: ids.ID{0}}, {id: ids.ID{1}}, {id: ids.ID{2}}},
 			expectedPossibleValues: []*testTx{{id: ids.ID{0}}, {id: ids.ID{1}}, {id: ids.ID{2}}},
 			expectedLen:            2,
-			expectedObserved:       true,
+			expectedHitRate:        0,
 		},
 	}
 
@@ -189,8 +186,8 @@ func TestGossiperGossip(t *testing.T) {
 
 			require.Len(requestSet.txs, tt.expectedLen)
 			require.Subset(tt.expectedPossibleValues, maps.Values(requestSet.txs))
-			require.Equal(tt.expectedObserved, testHistogram.observed)
-			require.Equal(tt.expectedObservedVal, testHistogram.observedVal)
+			require.Equal(len(tt.responder) > 0, testHistogram.observed)
+			require.InDelta(tt.expectedHitRate, testHistogram.observedVal, 0)
 
 			// we should not receive anything that we already had before we
 			// requested the gossip
@@ -630,12 +627,12 @@ func (t testValidatorSet) Has(_ context.Context, nodeID ids.NodeID) bool {
 
 type testHistogram struct {
 	prometheus.Histogram
-	observedVal uint64
+	observedVal float64
 	observed    bool
 }
 
 func (t *testHistogram) Observe(value float64) {
 	t.Histogram.Observe(value)
-	t.observedVal = uint64(value)
+	t.observedVal = value
 	t.observed = true
 }
