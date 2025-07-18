@@ -2201,6 +2201,28 @@ func TestThrottleBlockBuildingUntilNormalOperationsStart(t *testing.T) {
 		UpgradeConfig:          upgradetest.GetConfigWithUpgradeTime(upgradetest.Latest, latestForkTime),
 	}}
 
+	vm.clock.Set(latestForkTime)
+	ctx := snowtest.Context(t, snowtest.PChainID)
+
+	ctx.Lock.Lock()
+
+	require.NoError(vm.Initialize(
+		context.Background(),
+		ctx,
+		memdb.New(),
+		genesistest.NewBytes(t, genesistest.Config{}),
+		nil,
+		nil,
+		nil,
+		&enginetest.Sender{
+			SendAppGossipF: func(context.Context, common.SendConfig, []byte) error {
+				return nil
+			},
+			SendAppErrorF: func(context.Context, ids.NodeID, uint32, int32, string) error {
+				return nil
+			},
+		},
+	))
 	defer func() {
 		vm.ctx.Lock.Lock()
 		defer vm.ctx.Lock.Unlock()
@@ -2208,70 +2230,29 @@ func TestThrottleBlockBuildingUntilNormalOperationsStart(t *testing.T) {
 		require.NoError(vm.Shutdown(context.Background()))
 	}()
 
-	db := memdb.New()
-	chainDB := prefixdb.New([]byte{0}, db)
-	atomicDB := prefixdb.New([]byte{1}, db)
-
-	vm.clock.Set(latestForkTime)
-	ctx := snowtest.Context(t, snowtest.PChainID)
-
-	m := atomic.NewMemory(atomicDB)
-	msm := &mutableSharedMemory{
-		SharedMemory: m.NewSharedMemory(ctx.ChainID),
-	}
-	ctx.SharedMemory = msm
-
-	ctx.Lock.Lock()
-
-	appSender := &enginetest.Sender{}
-	appSender.CantSendAppGossip = true
-	appSender.SendAppGossipF = func(context.Context, common.SendConfig, []byte) error {
-		return nil
-	}
-	appSender.SendAppErrorF = func(context.Context, ids.NodeID, uint32, int32, string) error {
-		return nil
-	}
-
-	dynamicConfigBytes := []byte(`{"network":{"max-validator-set-staleness":0}}`)
-	require.NoError(vm.Initialize(
-		context.Background(),
-		ctx,
-		chainDB,
-		genesistest.NewBytes(t, genesistest.Config{}),
-		nil,
-		dynamicConfigBytes,
-		nil,
-		appSender,
-	))
-
-	vm.state.SetTimestamp(vm.clock.Time())
-	vm.state.SetFeeState(gas.State{
-		Capacity: defaultDynamicFeeConfig.MaxCapacity,
-	})
-
-	newTime := latestForkTime.Add(genesistest.DefaultValidatorDuration)
-
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(vm.onBootstrapStarted())
 
+	// Advance the time so that the block builder would be willing to remove the
+	// genesis validators.
+	newTime := latestForkTime.Add(genesistest.DefaultValidatorDuration)
 	vm.clock.Set(newTime)
 
 	ctx.Lock.Unlock()
 
 	impatientContext, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
+	defer cancel()
 
 	msg, err := vm.WaitForEvent(impatientContext)
-	cancel()
 	require.ErrorIs(context.DeadlineExceeded, err)
-	require.Equal(msg, common.Message(0))
+	require.Zero(msg)
 
 	ctx.Lock.Lock()
-	require.NoError(vm.onNormalOperationsStarted())
+	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 	ctx.Lock.Unlock()
 
 	impatientContext, cancel = context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
 	msg, err = vm.WaitForEvent(impatientContext)
-	cancel()
 	require.NoError(err)
 	require.Equal(common.PendingTxs, msg)
 }
