@@ -126,15 +126,9 @@ func (r ReadTest) Run(
 	ctx context.Context,
 	wallet *Wallet,
 ) {
-	require := require.New(tc)
-
-	txOpts, err := newTxOpts(wallet.privKey, wallet.chainID, maxFeeCap, wallet.nonce)
-	require.NoError(err)
-
-	tx, err := r.Contract.SimulateReads(txOpts, r.Count)
-	require.NoError(err)
-
-	require.NoError(wallet.SendTx(ctx, tx))
+	executeContractTx(tc, ctx, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
+		return r.Contract.SimulateReads(txOpts, r.Count)
+	})
 }
 
 type WriteTest struct {
@@ -142,20 +136,14 @@ type WriteTest struct {
 	Count    *big.Int
 }
 
-func (r WriteTest) Run(
+func (w WriteTest) Run(
 	tc tests.TestContext,
 	ctx context.Context,
 	wallet *Wallet,
 ) {
-	require := require.New(tc)
-
-	txOpts, err := newTxOpts(wallet.privKey, wallet.chainID, maxFeeCap, wallet.nonce)
-	require.NoError(err)
-
-	tx, err := r.Contract.SimulateRandomWrite(txOpts, r.Count)
-	require.NoError(err)
-
-	require.NoError(wallet.SendTx(ctx, tx))
+	executeContractTx(tc, ctx, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
+		return w.Contract.SimulateRandomWrite(txOpts, w.Count)
+	})
 }
 
 type StateModificationTest struct {
@@ -168,15 +156,9 @@ func (s StateModificationTest) Run(
 	ctx context.Context,
 	wallet *Wallet,
 ) {
-	require := require.New(tc)
-
-	txOpts, err := newTxOpts(wallet.privKey, wallet.chainID, maxFeeCap, wallet.nonce)
-	require.NoError(err)
-
-	tx, err := s.Contract.SimulateModification(txOpts, s.Count)
-	require.NoError(err)
-
-	require.NoError(wallet.SendTx(ctx, tx))
+	executeContractTx(tc, ctx, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
+		return s.Contract.SimulateModification(txOpts, s.Count)
+	})
 }
 
 type HashingTest struct {
@@ -189,15 +171,9 @@ func (h HashingTest) Run(
 	ctx context.Context,
 	wallet *Wallet,
 ) {
-	require := require.New(tc)
-
-	txOpts, err := newTxOpts(wallet.privKey, wallet.chainID, maxFeeCap, wallet.nonce)
-	require.NoError(err)
-
-	tx, err := h.Contract.SimulateHashing(txOpts, h.Count)
-	require.NoError(err)
-
-	require.NoError(wallet.SendTx(ctx, tx))
+	executeContractTx(tc, ctx, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
+		return h.Contract.SimulateHashing(txOpts, h.Count)
+	})
 }
 
 type MemoryTest struct {
@@ -210,15 +186,9 @@ func (m MemoryTest) Run(
 	ctx context.Context,
 	wallet *Wallet,
 ) {
-	require := require.New(tc)
-
-	txOpts, err := newTxOpts(wallet.privKey, wallet.chainID, maxFeeCap, wallet.nonce)
-	require.NoError(err)
-
-	tx, err := m.Contract.SimulateMemory(txOpts, m.Count)
-	require.NoError(err)
-
-	require.NoError(wallet.SendTx(ctx, tx))
+	executeContractTx(tc, ctx, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
+		return m.Contract.SimulateMemory(txOpts, m.Count)
+	})
 }
 
 type CallDepthTest struct {
@@ -231,15 +201,9 @@ func (c CallDepthTest) Run(
 	ctx context.Context,
 	wallet *Wallet,
 ) {
-	require := require.New(tc)
-
-	txOpts, err := newTxOpts(wallet.privKey, wallet.chainID, maxFeeCap, wallet.nonce)
-	require.NoError(err)
-
-	tx, err := c.Contract.SimulateCallDepth(txOpts, c.Count)
-	require.NoError(err)
-
-	require.NoError(wallet.SendTx(ctx, tx))
+	executeContractTx(tc, ctx, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
+		return c.Contract.SimulateCallDepth(txOpts, c.Count)
+	})
 }
 
 type ContractCreationTest struct {
@@ -251,15 +215,7 @@ func (c ContractCreationTest) Run(
 	ctx context.Context,
 	wallet *Wallet,
 ) {
-	require := require.New(tc)
-
-	txOpts, err := newTxOpts(wallet.privKey, wallet.chainID, maxFeeCap, wallet.nonce)
-	require.NoError(err)
-
-	tx, err := c.Contract.SimulateContractCreation(txOpts)
-	require.NoError(err)
-
-	require.NoError(wallet.SendTx(ctx, tx))
+	executeContractTx(tc, ctx, wallet, c.Contract.SimulateContractCreation)
 }
 
 type PureComputeTest struct {
@@ -272,15 +228,9 @@ func (p PureComputeTest) Run(
 	ctx context.Context,
 	wallet *Wallet,
 ) {
-	require := require.New(tc)
-
-	txOpts, err := newTxOpts(wallet.privKey, wallet.chainID, maxFeeCap, wallet.nonce)
-	require.NoError(err)
-
-	tx, err := p.Contract.SimulatePureCompute(txOpts, p.NumIterations)
-	require.NoError(err)
-
-	require.NoError(wallet.SendTx(ctx, tx))
+	executeContractTx(tc, ctx, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
+		return p.Contract.SimulatePureCompute(txOpts, p.NumIterations)
+	})
 }
 
 type LargeEventTest struct {
@@ -293,15 +243,9 @@ func (l LargeEventTest) Run(
 	ctx context.Context,
 	wallet *Wallet,
 ) {
-	require := require.New(tc)
-
-	txOpts, err := newTxOpts(wallet.privKey, wallet.chainID, maxFeeCap, wallet.nonce)
-	require.NoError(err)
-
-	tx, err := l.Contract.SimulateLargeEvent(txOpts, l.NumEvents)
-	require.NoError(err)
-
-	require.NoError(wallet.SendTx(ctx, tx))
+	executeContractTx(tc, ctx, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
+		return l.Contract.SimulateLargeEvent(txOpts, l.NumEvents)
+	})
 }
 
 type ExternalCallTest struct {
@@ -313,12 +257,21 @@ func (e ExternalCallTest) Run(
 	ctx context.Context,
 	wallet *Wallet,
 ) {
+	executeContractTx(tc, ctx, wallet, e.Contract.SimulateExternalCall)
+}
+
+func executeContractTx(
+	tc tests.TestContext,
+	ctx context.Context,
+	wallet *Wallet,
+	txFunc func(*bind.TransactOpts) (*types.Transaction, error),
+) {
 	require := require.New(tc)
 
 	txOpts, err := newTxOpts(wallet.privKey, wallet.chainID, maxFeeCap, wallet.nonce)
 	require.NoError(err)
 
-	tx, err := e.Contract.SimulateExternalCall(txOpts)
+	tx, err := txFunc(txOpts)
 	require.NoError(err)
 
 	require.NoError(wallet.SendTx(ctx, tx))
