@@ -2243,7 +2243,7 @@ func TestThrottleBlockBuildingUntilNormalOperationsStart(t *testing.T) {
 	defer cancel()
 
 	msg, err := vm.WaitForEvent(impatientContext)
-	require.ErrorIs(context.DeadlineExceeded, err)
+	require.ErrorIs(err, context.DeadlineExceeded)
 	require.Zero(msg)
 
 	ctx.Lock.Lock()
