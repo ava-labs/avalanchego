@@ -120,7 +120,7 @@ func main() {
 	require.NoError(err)
 	workers[0].Nonce++
 
-	randomTest, err := createRandomTest(contract)
+	randomTest, err := createRandomWeightedTest(contract)
 	require.NoError(err)
 
 	generator, err := load2.NewLoadGenerator(
@@ -135,7 +135,7 @@ func main() {
 	generator.Run(tc, ctx, loadTimeout, testTimeout)
 }
 
-func createRandomTest(contract *contracts.EVMLoadSimulator) (load2.RandomTest, error) {
+func createRandomWeightedTest(contract *contracts.EVMLoadSimulator) (load2.RandomWeightedTest, error) {
 	// test params
 	count := big.NewInt(5)
 	weight := uint64(100)
@@ -211,5 +211,5 @@ func createRandomTest(contract *contracts.EVMLoadSimulator) (load2.RandomTest, e
 		},
 	}
 
-	return load2.NewRandomTest(weightedTests)
+	return load2.NewRandomWeightedTest(weightedTests)
 }

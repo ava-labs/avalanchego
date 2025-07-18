@@ -25,7 +25,7 @@ import (
 var (
 	maxFeeCap = big.NewInt(300000000000)
 
-	_ Test = (*RandomTest)(nil)
+	_ Test = (*RandomWeightedTest)(nil)
 	_ Test = (*ZeroTransferTest)(nil)
 	_ Test = (*ReadTest)(nil)
 	_ Test = (*WriteTest)(nil)
@@ -39,13 +39,13 @@ var (
 	_ Test = (*ExternalCallTest)(nil)
 )
 
-type RandomTest struct {
+type RandomWeightedTest struct {
 	tests       []Test
 	weighted    sampler.Weighted
 	totalWeight uint64
 }
 
-func NewRandomTest(weightedTests []WeightedTest) (RandomTest, error) {
+func NewRandomWeightedTest(weightedTests []WeightedTest) (RandomWeightedTest, error) {
 	weighted := sampler.NewWeighted()
 
 	// Initialize weighted set
@@ -58,17 +58,17 @@ func NewRandomTest(weightedTests []WeightedTest) (RandomTest, error) {
 		totalWeight += w.Weight
 	}
 	if err := weighted.Initialize(weights); err != nil {
-		return RandomTest{}, err
+		return RandomWeightedTest{}, err
 	}
 
-	return RandomTest{
+	return RandomWeightedTest{
 		tests:       tests,
 		weighted:    weighted,
 		totalWeight: totalWeight,
 	}, nil
 }
 
-func (r RandomTest) Run(
+func (r RandomWeightedTest) Run(
 	tc tests.TestContext,
 	ctx context.Context,
 	wallet *Wallet,
