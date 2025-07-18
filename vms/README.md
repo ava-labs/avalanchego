@@ -30,7 +30,7 @@ The Snowman VM needs to implement the following functions used by the consensus 
 
 Build block allows the VM to propose a new block to be added to consensus.
 
-The VM can send messages to the consensus engine through a `toEngine` channel that is passed in when the VM is initialized. This channel allows the VM to send the consensus engine a message when it is ready to build a block. For example, if the VM receives some transactions via gossip or from an API, then it will signal that it is ready to build a block by sending a `PendingTxs` message to the consensus engine. The PendingTxs message signals to the consensus engine that it should call `BuildBlock()` so that the block can be added to consensus.
+The VM gets notified of when to build a block after `vm.WaitForEvent()` returns with a `PendingTxs` message.
 
 The major caveat to this is the Snowman VMs are wrapped with [Snowman++](./proposervm/README.md). Snowman++ provides congestion control by using a soft leader, where a leader is designated as the proposer that should create a block at a given time. Snowman++ gracefully falls back to increase the number of validators that are allowed to propose a block to handle the case that the leader does not propose a block in a timely manner.
 
@@ -113,7 +113,7 @@ Therefore, if the tree of blocks in consensus (with root L, the last accepted bl
  A     B
  |    / \
  C   D   G
-    / \ 
+    / \
    E   F
 ```
 
