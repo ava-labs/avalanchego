@@ -39,8 +39,8 @@ const (
 
 func main() {
 	// TODO(marun) Support choosing the log format
-	tc := tests.NewTestContext(tests.NewDefaultLogger(""))
-	defer tc.Cleanup()
+	tc := antithesis.NewInstrumentedTestContext(tests.NewDefaultLogger(""))
+	defer tc.RecoverAndExit()
 	require := require.New(tc)
 
 	c := antithesis.NewConfigWithSubnets(
@@ -55,6 +55,8 @@ func main() {
 		},
 	)
 	ctx := tests.DefaultNotifyContext(c.Duration, tc.DeferCleanup)
+	// Ensure contexts sourced from the test context use the notify context as their parent
+	tc.SetDefaultContextParent(ctx)
 
 	require.Len(c.ChainIDs, 1)
 	tc.Log().Debug("raw chain ID",
@@ -140,8 +142,16 @@ type workload struct {
 func (w *workload) run(ctx context.Context) {
 	timer := timerpkg.StoppedTimer()
 
-	tc := tests.NewTestContext(w.log)
-	defer tc.Cleanup()
+	tc := antithesis.NewInstrumentedTestContextWithArgs(
+		ctx,
+		w.log,
+		map[string]any{
+			"worker": w.id,
+		},
+	)
+	// Any assertion failure from this test context will result in process exit due to the
+	// panic being rethrown. This ensures that failures in test setup are fatal.
+	defer tc.RecoverAndRethrow()
 	require := require.New(tc)
 
 	uri := w.uris[w.id%len(w.uris)]
