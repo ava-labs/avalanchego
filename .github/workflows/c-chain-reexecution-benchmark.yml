@@ -45,9 +45,10 @@ jobs:
           run: |
             sudo apt-get update
             sudo apt-get install -y fio
-        - name: Run fio random latency test
+        - name: Run fio random latency test + df -h
           shell: bash
           run: |
+            df -h
             fio --name=random-latency-test \
                 --ioengine=posixaio \
                 --rw=randrw \
