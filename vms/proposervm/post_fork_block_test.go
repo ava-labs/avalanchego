@@ -65,7 +65,10 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 	slb, err := block.Build(
 		ids.Empty, // refer unknown parent
 		time.Time{},
-		0, // pChainHeight,
+		0,           // pChainHeight,
+		0,           // pChainEpochHeight,
+		0,           // epochNumber,
+		time.Time{}, // epochStartTime,
 		proVM.StakingCertLeaf,
 		innerOracleBlk.Bytes(),
 		proVM.ctx.ChainID,
@@ -153,6 +156,9 @@ func TestBlockVerify_PostForkBlock_PreDurango_ParentChecks(t *testing.T) {
 			ids.Empty, // refer unknown parent
 			proVM.Time(),
 			pChainHeight,
+			0,           // pChainEpochHeight,
+			0,           // epochNumber,
+			time.Time{}, // epochStartTime,
 			childCoreBlk.Bytes(),
 		)
 		require.NoError(err)
@@ -168,6 +174,9 @@ func TestBlockVerify_PostForkBlock_PreDurango_ParentChecks(t *testing.T) {
 			parentBlk.ID(), // refer known parent
 			proVM.Time(),
 			pChainHeight,
+			0,           // pChainEpochHeight,
+			0,           // epochNumber,
+			time.Time{}, // epochStartTime,
 			childCoreBlk.Bytes(),
 		)
 		require.NoError(err)
@@ -241,6 +250,9 @@ func TestBlockVerify_PostForkBlock_PostDurango_ParentChecks(t *testing.T) {
 			ids.Empty, // refer unknown parent
 			proVM.Time(),
 			pChainHeight,
+			0,           // pChainEpochHeight,
+			0,           // epochNumber,
+			time.Time{}, // epochStartTime,
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
@@ -259,6 +271,9 @@ func TestBlockVerify_PostForkBlock_PostDurango_ParentChecks(t *testing.T) {
 			parentBlk.ID(),
 			proVM.Time(),
 			pChainHeight,
+			0,           // pChainEpochHeight,
+			0,           // epochNumber,
+			time.Time{}, // epochStartTime,
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
@@ -363,6 +378,9 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			parentBlk.ID(),
 			newTime,
 			pChainHeight,
+			0,           // pChainEpochHeight,
+			0,           // epochNumber,
+			time.Time{}, // epochStartTime,
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
@@ -387,6 +405,9 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			parentBlk.ID(),
 			beforeWinStart,
 			pChainHeight,
+			0,           // pChainEpochHeight,
+			0,           // epochNumber,
+			time.Time{}, // epochStartTime,
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
@@ -408,6 +429,9 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			parentBlk.ID(),
 			atWindowStart,
 			pChainHeight,
+			0,           // pChainEpochHeight,
+			0,           // epochNumber,
+			time.Time{}, // epochStartTime,
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
@@ -428,6 +452,9 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			parentBlk.ID(),
 			afterWindowStart,
 			pChainHeight,
+			0,           // pChainEpochHeight,
+			0,           // epochNumber,
+			time.Time{}, // epochStartTime,
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
@@ -448,6 +475,9 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			parentBlk.ID(),
 			atSubWindowEnd,
 			pChainHeight,
+			0,           // pChainEpochHeight,
+			0,           // epochNumber,
+			time.Time{}, // epochStartTime,
 			childCoreBlk.Bytes(),
 		)
 		require.NoError(err)
@@ -464,6 +494,9 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			parentBlk.ID(),
 			afterSubWinEnd,
 			pChainHeight,
+			0,           // pChainEpochHeight,
+			0,           // epochNumber,
+			time.Time{}, // epochStartTime,
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
@@ -548,6 +581,9 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			parentBlk.ID(),
 			proVM.Time(),
 			parentBlkPChainHeight-1,
+			0,           // pChainEpochHeight,
+			0,           // epochNumber,
+			time.Time{}, // epochStartTime,
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
@@ -566,6 +602,9 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			parentBlk.ID(),
 			proVM.Time(),
 			parentBlkPChainHeight,
+			0,           // pChainEpochHeight,
+			0,           // epochNumber,
+			time.Time{}, // epochStartTime,
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
@@ -583,6 +622,9 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			parentBlk.ID(),
 			proVM.Time(),
 			parentBlkPChainHeight,
+			0,           // pChainEpochHeight,
+			0,           // epochNumber,
+			time.Time{}, // epochStartTime,
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
@@ -601,6 +643,9 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			parentBlk.ID(),
 			proVM.Time(),
 			currPChainHeight,
+			0,           // pChainEpochHeight,
+			0,           // epochNumber,
+			time.Time{}, // epochStartTime,
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
@@ -618,6 +663,9 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			parentBlk.ID(),
 			proVM.Time(),
 			currPChainHeight*2,
+			0,           // pChainEpochHeight,
+			0,           // epochNumber,
+			time.Time{}, // epochStartTime,
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
@@ -731,6 +779,9 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 			parentBlk.ID(),
 			nextTime,
 			parentBlkPChainHeight-1,
+			0,           // pChainEpochHeight,
+			0,           // epochNumber,
+			time.Time{}, // epochStartTime,
 			childCoreBlk.Bytes(),
 		)
 		require.NoError(err)
@@ -746,6 +797,9 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 			parentBlk.ID(),
 			nextTime,
 			parentBlkPChainHeight,
+			0,           // pChainEpochHeight,
+			0,           // epochNumber,
+			time.Time{}, // epochStartTime,
 			childCoreBlk.Bytes(),
 		)
 		require.NoError(err)
@@ -760,6 +814,9 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 			parentBlk.ID(),
 			nextTime,
 			parentBlkPChainHeight+1,
+			0,           // pChainEpochHeight,
+			0,           // epochNumber,
+			time.Time{}, // epochStartTime,
 			childCoreBlk.Bytes(),
 		)
 		require.NoError(err)
@@ -775,6 +832,9 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 			parentBlk.ID(),
 			nextTime,
 			currPChainHeight,
+			0,           // pChainEpochHeight,
+			0,           // epochNumber,
+			time.Time{}, // epochStartTime,
 			childCoreBlk.Bytes(),
 		)
 		require.NoError(err)
@@ -789,6 +849,9 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 			parentBlk.ID(),
 			nextTime,
 			currPChainHeight*2,
+			0,           // pChainEpochHeight,
+			0,           // epochNumber,
+			time.Time{}, // epochStartTime,
 			childCoreBlk.Bytes(),
 		)
 		require.NoError(err)
@@ -1063,6 +1126,9 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 		postForkOracleBlk.ID(),
 		postForkOracleBlk.Timestamp().Add(proposer.WindowDuration),
 		postForkOracleBlk.PChainHeight(),
+		0,           // pChainEpochHeight,
+		0,           // epochNumber,
+		time.Time{}, // epochStartTime,
 		proVM.StakingCertLeaf,
 		oracleCoreBlk.opts[0].Bytes(),
 		proVM.ctx.ChainID,
@@ -1118,6 +1184,9 @@ func TestBlockVerify_PostForkBlock_PChainTooLow(t *testing.T) {
 		snowmantest.GenesisID,
 		snowmantest.GenesisTimestamp,
 		4,
+		0,           // pChainEpochHeight,
+		0,           // epochNumber,
+		time.Time{}, // epochStartTime,
 		coreBlk.Bytes(),
 	)
 	require.NoError(err)

@@ -596,6 +596,9 @@ func TestBatchedParseBlockParallel(t *testing.T) {
 	parentID := ids.ID{1}
 	timestamp := time.Unix(123, 0)
 	pChainHeight := uint64(2)
+	pChainEpochHeight := uint64(2)
+	epochNumber := uint64(0)
+	epochStartTime := time.Unix(123, 0)
 	chainID := ids.GenerateTestID()
 
 	vm := VM{
@@ -616,10 +619,10 @@ func TestBatchedParseBlockParallel(t *testing.T) {
 
 	blockThatCantBeParsed := snowmantest.BuildChild(snowmantest.Genesis)
 
-	blocksWithUnparsable := makeParseableBlocks(t, parentID, timestamp, pChainHeight, cert, chainID, key)
+	blocksWithUnparsable := makeParseableBlocks(t, parentID, timestamp, pChainHeight, pChainEpochHeight, epochNumber, epochStartTime, cert, chainID, key)
 	blocksWithUnparsable[50] = blockThatCantBeParsed.Bytes()
 
-	parsableBlocks := makeParseableBlocks(t, parentID, timestamp, pChainHeight, cert, chainID, key)
+	parsableBlocks := makeParseableBlocks(t, parentID, timestamp, pChainHeight, pChainEpochHeight, epochNumber, epochStartTime, cert, chainID, key)
 
 	for _, testCase := range []struct {
 		name         string
@@ -663,7 +666,7 @@ func TestBatchedParseBlockParallel(t *testing.T) {
 	}
 }
 
-func makeParseableBlocks(t *testing.T, parentID ids.ID, timestamp time.Time, pChainHeight uint64, cert *staking.Certificate, chainID ids.ID, key crypto.Signer) [][]byte {
+func makeParseableBlocks(t *testing.T, parentID ids.ID, timestamp time.Time, pChainHeight uint64, pChainEpochHeight uint64, epochNumber uint64, epochStartTime time.Time, cert *staking.Certificate, chainID ids.ID, key crypto.Signer) [][]byte {
 	makeSignedBlock := func(i int) []byte {
 		buff := binary.AppendVarint(nil, int64(i))
 
@@ -671,6 +674,9 @@ func makeParseableBlocks(t *testing.T, parentID ids.ID, timestamp time.Time, pCh
 			parentID,
 			timestamp,
 			pChainHeight,
+			pChainEpochHeight,
+			epochNumber,
+			epochStartTime,
 			cert,
 			buff,
 			chainID,
