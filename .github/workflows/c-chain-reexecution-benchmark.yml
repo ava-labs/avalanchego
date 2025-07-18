@@ -13,19 +13,19 @@ on:
       start-block:
         description: 'The start block for the benchmark.'
         required: false
-        default: ${{ env.START_BLOCK }}
+        default: 100
       end-block:
         description: 'The end block for the benchmark.'
         required: false
-        default: ${{ env.END_BLOCK }}
+        default: 1000000
       source-block-dir:
         description: 'The source block directory. Supports S3 directory/zip and local directories.'
         required: false
-        default: ${{ env.SOURCE_BLOCK_DIR }}
+        default: s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb.zip
       current-state-dir:
         description: 'The current state directory. Supports S3 directory/zip and local directories.'
         required: false
-        default: ${{ env.CURRENT_STATE_DIR }}
+        default: s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100.zip
   schedule:
     - cron: '0 6 * * 0' # Runs every Sunday at 06:00 UTC
 
@@ -45,10 +45,10 @@ jobs:
           id: set-params
           run: |
             {
-              echo "START_BLOCK=${{ github.event.inputs.start-block || env.START_BLOCK }}"
-              echo "END_BLOCK=${{ github.event.inputs.end-block || env.END_BLOCK }}"
-              echo "SOURCE_BLOCK_DIR=${{ github.event.inputs.source-block-dir || env.SOURCE_BLOCK_DIR }}"
-              echo "CURRENT_STATE_DIR=${{ github.event.inputs.current-state-dir || env.CURRENT_STATE_DIR }}"
+              echo "START_BLOCK=${{ github.event.inputs.start-block || 100 }}"
+              echo "END_BLOCK=${{ github.event.inputs.end-block || 1000000 }}"
+              echo "SOURCE_BLOCK_DIR=${{ github.event.inputs.source-block-dir || 's3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb.zip' }}"
+              echo "CURRENT_STATE_DIR=${{ github.event.inputs.current-state-dir || 's3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100.zip' }}"
             } >> "$GITHUB_ENV"
         - uses: actions/checkout@v4
         - uses: ./.github/actions/setup-go-for-project
