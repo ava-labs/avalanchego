@@ -2252,6 +2252,7 @@ func TestThrottleBlockBuildingUntilNormalOperationsStart(t *testing.T) {
 
 	impatientContext, cancel = context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
+
 	msg, err = vm.WaitForEvent(impatientContext)
 	require.NoError(err)
 	require.Equal(common.PendingTxs, msg)
