@@ -6,6 +6,7 @@ package vm
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -37,7 +38,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
@@ -57,6 +57,12 @@ var (
 	metricsEnabledArg bool
 	executionTimeout  time.Duration
 	labelsArg         string
+
+	labels map[string]string = map[string]string{
+		"job":               "c-chain-reexecution",
+		"is_ephemeral_node": "false",
+		"chain":             "C",
+	}
 )
 
 func TestMain(m *testing.M) {
@@ -72,16 +78,27 @@ func TestMain(m *testing.M) {
 	flag.Uint64Var(&startBlockArg, "start-block", 101, "Start block to begin execution (exclusive).")
 	flag.Uint64Var(&endBlockArg, "end-block", 200, "End block to end execution (inclusive).")
 	flag.IntVar(&chanSizeArg, "chan-size", 100, "Size of the channel to use for block processing.")
-	flag.DurationVar(&executionTimeout, "execution-timeout", 0, "Benchmark execution timeout. After this timeout has elapsed, terminate the benchmark without error.")
+	flag.DurationVar(&executionTimeout, "execution-timeout", 0, "Benchmark execution timeout. After this timeout has elapsed, terminate the benchmark without error. If 0, no timeout is applied.")
 
 	flag.BoolVar(&metricsEnabledArg, "metrics-enabled", true, "Enable metrics collection.")
-	flag.StringVar(&labelsArg, "labels", "", "Comma separated KV list of metric labels to attach to all exported metrics.")
+	flag.StringVar(&labelsArg, "labels", "", "Comma separated KV list of metric labels to attach to all exported metrics. Ex. \"owner=tim,runner=snoopy\"")
 
 	flag.Parse()
+
+	customLabels, err := parseLabels(labelsArg)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to parse labels: %v\n", err)
+		os.Exit(1)
+	}
+	for customLabel, customValue := range customLabels {
+		labels[customLabel] = customValue
+	}
+
 	m.Run()
 }
 
 func BenchmarkReexecuteRange(b *testing.B) {
+	require.Equalf(b, 1, b.N, "BenchmarkReexecuteRange expects to run a single iteration because it overwrites the input current-state, but found (b.N=%d)", b.N)
 	benchmarkReexecuteRange(b, sourceBlockDirArg, targetDirArg, startBlockArg, endBlockArg, chanSizeArg, metricsEnabledArg)
 }
 
@@ -102,17 +119,6 @@ func benchmarkReexecuteRange(b *testing.B, sourceBlockDir string, targetDir stri
 	r.NoError(prefixGatherer.Register("avalanche_snowman", consensusRegistry))
 
 	if metricsEnabled {
-		labels := map[string]string{
-			"job":               "c-chain-reexecution",
-			"is_ephemeral_node": "false",
-			"chain":             "C",
-		}
-		if labelsArg != "" {
-			customLabels := parseLabels(labelsArg)
-			for customLabel, customValue := range customLabels {
-				labels[customLabel] = customValue
-			}
-		}
 		collectRegistry(b, "c-chain-reexecution", time.Minute, prefixGatherer, labels)
 	}
 
@@ -164,7 +170,7 @@ func benchmarkReexecuteRange(b *testing.B, sourceBlockDir string, targetDir stri
 	r.NoError(err)
 
 	start := time.Now()
-	r.NoError(executor.executeSequence(ctx, blockChan, executionTimeout))
+	r.NoError(executor.executeSequence(ctx, blockChan))
 	elapsed := time.Since(start)
 
 	b.ReportMetric(0, "ns/op")                     // Set default ns/op to 0 to hide from the output
@@ -184,8 +190,6 @@ func newMainnetCChainVM(
 		return nil, fmt.Errorf("failed to create VM from factory: %w", err)
 	}
 	vm := vmIntf.(block.ChainVM)
-
-	log := tests.NewDefaultLogger("mainnet-vm-reexecution")
 
 	blsKey, err := localsigner.New()
 	if err != nil {
@@ -220,7 +224,7 @@ func newMainnetCChainVM(
 			CChainID:    mainnetCChainID,
 			AVAXAssetID: mainnetAvaxAssetID,
 
-			Log:          log,
+			Log:          tests.NewDefaultLogger("mainnet-vm-reexecution"),
 			SharedMemory: atomicMemory.NewSharedMemory(mainnetCChainID),
 			BCLookup:     ids.NewAliaser(),
 			Metrics:      metricsGatherer,
@@ -304,18 +308,24 @@ func (e *vmExecutor) execute(ctx context.Context, blockBytes []byte) error {
 	return nil
 }
 
-func (e *vmExecutor) executeSequence(ctx context.Context, blkChan <-chan blockResult, executionTimeout time.Duration) error {
+func (e *vmExecutor) executeSequence(ctx context.Context, blkChan <-chan blockResult) error {
 	blkID, err := e.vm.LastAccepted(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get last accepted block: %w", err)
 	}
 	blk, err := e.vm.GetBlock(ctx, blkID)
 	if err != nil {
-		return fmt.Errorf("failed to get last accepted block: %w", err)
+		return fmt.Errorf("failed to get last accepted block by blkID %s: %w", blkID, err)
 	}
 
 	start := time.Now()
 	e.config.Log.Info("last accepted block", zap.String("blkID", blkID.String()), zap.Uint64("height", blk.Height()))
+
+	if e.config.ExecutionTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, e.config.ExecutionTimeout)
+		defer cancel()
+	}
 
 	for blkResult := range blkChan {
 		if blkResult.Err != nil {
@@ -328,9 +338,12 @@ func (e *vmExecutor) executeSequence(ctx context.Context, blkChan <-chan blockRe
 		if err := e.execute(ctx, blkResult.BlockBytes); err != nil {
 			return err
 		}
-		if executionTimeout > 0 && time.Since(start) > executionTimeout {
-			e.config.Log.Info("exiting early due to execution timeout", zap.Duration("elapsed", time.Since(start)), zap.Duration("execution-timeout", executionTimeout))
+
+		select {
+		case <-ctx.Done():
+			e.config.Log.Info("exiting early due to context timeout", zap.Duration("elapsed", time.Since(start)), zap.Duration("execution-timeout", e.config.ExecutionTimeout))
 			return nil
+		default:
 		}
 	}
 	e.config.Log.Info("finished executing sequence")
@@ -413,15 +426,16 @@ type consensusMetrics struct {
 // "avalanche_snowman" and the chain label (ex. chain="C") that would be handled
 // by the[chain manager](../../../chains/manager.go).
 func newConsensusMetrics(registry prometheus.Registerer) (*consensusMetrics, error) {
-	errs := wrappers.Errs{}
 	m := &consensusMetrics{
 		lastAcceptedHeight: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "last_accepted_height",
 			Help: "last height accepted",
 		}),
 	}
-	errs.Add(registry.Register(m.lastAcceptedHeight))
-	return m, errs.Err
+	if err := registry.Register(m.lastAcceptedHeight); err != nil {
+		return nil, fmt.Errorf("failed to register last accepted height metric: %w", err)
+	}
+	return m, nil
 }
 
 // collectRegistry starts prometheus and collects metrics from the provided gatherer.
@@ -443,45 +457,53 @@ func collectRegistry(tb testing.TB, name string, timeout time.Duration, gatherer
 		// This default delay is set above the default scrape interval used by StartPrometheus.
 		time.Sleep(tmpnet.NetworkShutdownDelay)
 
-		r.NoError(server.Stop())
-
-		if sdConfigFilePath != "" {
-			r.NoError(os.Remove(sdConfigFilePath))
-		}
+		r.NoError(errors.Join(
+			server.Stop(),
+			func() error {
+				if sdConfigFilePath != "" {
+					return os.Remove(sdConfigFilePath)
+				}
+				return nil
+			}(),
+		))
 	})
 
 	sdConfigFilePath, err = tmpnet.WritePrometheusSDConfig(name, tmpnet.SDConfig{
 		Targets: []string{server.Address()},
 		Labels:  labels,
-	}, true)
+	}, true /* withGitHubLabels */)
 	r.NoError(err)
 }
 
-func parseLabels(labelsStr string) map[string]string {
+func parseLabels(labelsStr string) (map[string]string, error) {
 	labels := make(map[string]string)
-	for _, label := range strings.Split(labelsStr, ",") {
+	if labelsStr == "" {
+		return labels, nil
+	}
+	for i, label := range strings.Split(labelsStr, ",") {
 		parts := strings.SplitN(label, "=", 2)
 		if len(parts) != 2 {
-			continue
+			return nil, fmt.Errorf("invalid label format at index %d: %q (expected key=value)", i, label)
 		}
 		labels[parts[0]] = parts[1]
 	}
-	return labels
+	return labels, nil
 }
 
 func getTopLevelMetrics(b *testing.B, registry prometheus.Gatherer, elapsed time.Duration) {
 	r := require.New(b)
 
-	gasUsed, err := getCounterMetricValue(b, registry, "avalanche_evm_eth_chain_block_gas_used_processed")
+	gasUsed, err := getCounterMetricValue(registry, "avalanche_evm_eth_chain_block_gas_used_processed")
 	r.NoError(err)
 	mgasPerSecond := gasUsed / 1_000_000 / elapsed.Seconds()
 	b.ReportMetric(mgasPerSecond, "mgas/s")
 }
 
-func getCounterMetricValue(tb testing.TB, registry prometheus.Gatherer, query string) (float64, error) {
+func getCounterMetricValue(registry prometheus.Gatherer, query string) (float64, error) {
 	metricFamilies, err := registry.Gather()
-	r := require.New(tb)
-	r.NoError(err)
+	if err != nil {
+		return 0, fmt.Errorf("failed to gather metrics: %w", err)
+	}
 
 	for _, mf := range metricFamilies {
 		if mf.GetName() == query {

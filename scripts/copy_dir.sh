@@ -4,7 +4,8 @@ set -euo pipefail
 
 # Usage: ./scripts/copy_dir.sh source_directory destination_directory
 # Sources can be S3 URLs (s3://bucket/path) or a local file path
-# Assumes s5cmd has been installed and is available in the PATH
+# Assumes s5cmd has been installed and is available in the PATH.
+# s5cmd is included in the nix dev shell.
 
 if [ $# -ne 2 ]; then
     echo "Usage: $0 <source_directory> <destination_directory>"

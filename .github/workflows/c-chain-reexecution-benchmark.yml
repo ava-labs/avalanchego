@@ -1,4 +1,10 @@
-name: C-Chain Benchmark
+name: C-Chain Re-Execution Benchmark
+
+env:
+  START_BLOCK: 100
+  END_BLOCK: 1000000
+  SOURCE_BLOCK_DIR: s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb.zip
+  CURRENT_STATE_DIR: s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100.zip
 
 on:
   pull_request:
@@ -7,19 +13,19 @@ on:
       start-block:
         description: 'The start block for the benchmark.'
         required: false
-        default: '100'
+        default: ${{ env.START_BLOCK }}
       end-block:
         description: 'The end block for the benchmark.'
         required: false
-        default: '1000000'
+        default: ${{ env.END_BLOCK }}
       source-block-dir:
         description: 'The source block directory. Supports S3 directory/zip and local directories.'
         required: false
-        default: 's3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb.zip'
+        default: ${{ env.SOURCE_BLOCK_DIR }}
       current-state-dir:
         description: 'The current state directory. Supports S3 directory/zip and local directories.'
         required: false
-        default: 's3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-100.zip'
+        default: ${{ env.CURRENT_STATE_DIR }}
   schedule:
     - cron: '0 6 * * 0' # Runs every Sunday at 06:00 UTC
 
@@ -38,27 +44,21 @@ jobs:
         - name: Set task env via GITHUB_ENV
           id: set-params
           run: |
-            if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-              echo "START_BLOCK=${{ github.event.inputs.start-block }}"
-              echo "END_BLOCK=${{ github.event.inputs.end-block }}"
-              echo "SOURCE_BLOCK_DIR=${{ github.event.inputs.source-block-dir }}"
-              echo "CURRENT_STATE_DIR=${{ github.event.inputs.current-state-dir }}"
-            else
-              echo "START_BLOCK=100"
-              echo "END_BLOCK=10000"
-              echo "SOURCE_BLOCK_DIR=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb.zip"
-              echo "CURRENT_STATE_DIR=s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-100.zip"
-            fi
+            {
+              echo "START_BLOCK=${{ github.event.inputs.start-block || env.START_BLOCK }}"
+              echo "END_BLOCK=${{ github.event.inputs.end-block || env.END_BLOCK }}"
+              echo "SOURCE_BLOCK_DIR=${{ github.event.inputs.source-block-dir || env.SOURCE_BLOCK_DIR }}"
+              echo "CURRENT_STATE_DIR=${{ github.event.inputs.current-state-dir || env.CURRENT_STATE_DIR }}"
+            } >> "$GITHUB_ENV"
         - uses: actions/checkout@v4
         - uses: ./.github/actions/setup-go-for-project
         - name: Run C-Chain Re-Execution
           uses: ./.github/actions/run-monitored-tmpnet-cmd
           with:
             run: ./scripts/run_task.sh reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=${{ github.workspace }}/reexecution-data BENCHMARK_OUTPUT_FILE=${{ github.workspace }}/reexecute-cchain-range-benchmark-res.txt
-            artifact_prefix: c-chain-reexecute-range
             prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
             prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-            grafana_dashboard_id: 'c-chain-processing-custom-v8/c-chain-processing'
+            grafana_dashboard_id: 'Gl1I20mnk/c-chain'
             loki_username: ${{ secrets.LOKI_ID || '' }}
             loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
             runtime: "" # Set runtime input to empty string to disable log collection
