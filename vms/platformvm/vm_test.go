@@ -2180,3 +2180,80 @@ func TestPruneMempool(t *testing.T) {
 	_, ok = vm.Builder.Get(baseTxID)
 	require.True(ok)
 }
+
+func TestThrottleBlockBuildingUntilNormalOperationsStart(t *testing.T) {
+	require := require.New(t)
+
+	latestForkTime = genesistest.DefaultValidatorStartTime.Add(time.Second)
+	vm := &VM{Internal: config.Internal{
+		Chains:                 chains.TestManager,
+		UptimeLockedCalculator: uptime.NewLockedCalculator(),
+		SybilProtectionEnabled: true,
+		Validators:             validators.NewManager(),
+		DynamicFeeConfig:       defaultDynamicFeeConfig,
+		ValidatorFeeConfig:     defaultValidatorFeeConfig,
+		MinValidatorStake:      defaultMinValidatorStake,
+		MaxValidatorStake:      defaultMaxValidatorStake,
+		MinDelegatorStake:      defaultMinDelegatorStake,
+		MinStakeDuration:       defaultMinStakingDuration,
+		MaxStakeDuration:       defaultMaxStakingDuration,
+		RewardConfig:           defaultRewardConfig,
+		UpgradeConfig:          upgradetest.GetConfigWithUpgradeTime(upgradetest.Latest, latestForkTime),
+	}}
+
+	vm.clock.Set(latestForkTime)
+	ctx := snowtest.Context(t, snowtest.PChainID)
+
+	ctx.Lock.Lock()
+
+	require.NoError(vm.Initialize(
+		context.Background(),
+		ctx,
+		memdb.New(),
+		genesistest.NewBytes(t, genesistest.Config{}),
+		nil,
+		nil,
+		nil,
+		&enginetest.Sender{
+			SendAppGossipF: func(context.Context, common.SendConfig, []byte) error {
+				return nil
+			},
+			SendAppErrorF: func(context.Context, ids.NodeID, uint32, int32, string) error {
+				return nil
+			},
+		},
+	))
+	defer func() {
+		vm.ctx.Lock.Lock()
+		defer vm.ctx.Lock.Unlock()
+
+		require.NoError(vm.Shutdown(context.Background()))
+	}()
+
+	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+
+	// Advance the time so that the block builder would be willing to remove the
+	// genesis validators.
+	newTime := latestForkTime.Add(genesistest.DefaultValidatorDuration)
+	vm.clock.Set(newTime)
+
+	ctx.Lock.Unlock()
+
+	impatientContext, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
+	defer cancel()
+
+	msg, err := vm.WaitForEvent(impatientContext)
+	require.ErrorIs(err, context.DeadlineExceeded)
+	require.Zero(msg)
+
+	ctx.Lock.Lock()
+	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
+	ctx.Lock.Unlock()
+
+	impatientContext, cancel = context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	msg, err = vm.WaitForEvent(impatientContext)
+	require.NoError(err)
+	require.Equal(common.PendingTxs, msg)
+}
