@@ -40,6 +40,26 @@ jobs:
               sudo apt-get update
               sudo apt-get install -y xz-utils
             fi
+        - name: Install fio
+          shell: bash
+          run: |
+            sudo apt-get update
+            sudo apt-get install -y fio
+        - name: Run fio random latency test
+          shell: bash
+          run: |
+            fio --name=random-latency-test \
+                --ioengine=posixaio \
+                --rw=randrw \
+                --bs=4k \
+                --iodepth=64 \
+                --size=1G \
+                --numjobs=1 \
+                --runtime=60 \
+                --group_reporting \
+                --filename=test_file \
+                --direct=1 \
+                --randrepeat=0
         - name: Configure AWS Credentials
           uses: aws-actions/configure-aws-credentials@v4
           with:
