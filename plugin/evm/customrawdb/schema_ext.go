@@ -54,6 +54,8 @@ var (
 	syncPerformedKeyLength = len(syncPerformedPrefix) + wrappers.LongLen
 )
 
+var FirewoodScheme = "firewood"
+
 // upgradeConfigKey = upgradeConfigPrefix + hash
 func upgradeConfigKey(hash common.Hash) []byte {
 	return append(upgradeConfigPrefix, hash.Bytes()...)
