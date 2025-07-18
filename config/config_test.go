@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/config/node"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/subnets"
@@ -545,6 +546,86 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				return
 			}
 			test.testF(require, subnetConfigs)
+		})
+	}
+}
+
+func TestGetStakingSigner(t *testing.T) {
+	testKey := "HLimS3vRibTMk9lZD4b+Z+GLuSBShvgbsu0WTLt2Kd4="
+	dataDir := t.TempDir()
+
+	fileKeyPath := filepath.Join(t.TempDir(), "foobar", "signer.key")
+	defaultSignerKeyPath := filepath.Join(
+		dataDir,
+		"staking",
+		"signer.key",
+	)
+
+	tests := []struct {
+		name                 string
+		viperKeys            string
+		config               map[string]any
+		expectedSignerConfig any
+		expectedErr          error
+	}{
+		{
+			name:   "default signer",
+			config: map[string]any{DataDirKey: dataDir},
+			expectedSignerConfig: node.DefaultSignerConfig{
+				SignerKeyPath: defaultSignerKeyPath,
+			},
+		},
+		{
+			name:                 "ephemeral signer",
+			config:               map[string]any{StakingEphemeralSignerEnabledKey: true},
+			expectedSignerConfig: node.EphemeralSignerConfig{},
+		},
+		{
+			name:   "content key",
+			config: map[string]any{StakingSignerKeyContentKey: testKey},
+			expectedSignerConfig: node.ContentKeyConfig{
+				SignerKeyRawContent: testKey,
+			},
+		},
+		{
+			name: "file key",
+			config: map[string]any{
+				StakingSignerKeyPathKey: fileKeyPath,
+			},
+			expectedSignerConfig: node.SignerPathConfig{
+				SignerKeyPath: fileKeyPath,
+			},
+		},
+		{
+			name:   "rpc signer",
+			config: map[string]any{StakingRPCSignerEndpointKey: "localhost"},
+			expectedSignerConfig: node.RPCSignerConfig{
+				StakingSignerRPC: "localhost",
+			},
+		},
+		{
+			name: "multiple configurations set",
+			config: map[string]any{
+				StakingEphemeralSignerEnabledKey: true,
+				StakingSignerKeyContentKey:       testKey,
+			},
+			expectedErr: errInvalidSignerConfig,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			v := setupViperFlags()
+
+			for key, value := range tt.config {
+				v.Set(key, value)
+			}
+
+			config, err := GetNodeConfig(v)
+
+			require.ErrorIs(err, tt.expectedErr)
+			require.Equal(tt.expectedSignerConfig, config.StakingSignerConfig)
 		})
 	}
 }
