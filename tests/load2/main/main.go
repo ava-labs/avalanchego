@@ -112,7 +112,7 @@ func main() {
 		chainID,
 		metricsNamespace,
 		registry,
-		load2.ZeroTransferTest{PollFrequency: pollFrequency},
+		load2.ZeroTransferTest{},
 	)
 	require.NoError(err)
 
