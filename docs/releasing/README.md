@@ -95,8 +95,8 @@ export VERSION=v0.7.3
     # Double check the tip of the master branch is the expected commit
     # of the squashed release branch
     git log -1
-    git tag -s "$VERSION"
-    git push origin "$VERSION"
+    git tag -s "$VERSION_RC"
+    git push origin "$VERSION_RC"
     ```
 
 Once the tag is created, you need to test it on the Fuji testnet both locally and then as canaries, using the Dispatch and Echo subnets.
