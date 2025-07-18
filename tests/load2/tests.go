@@ -22,22 +22,105 @@ import (
 	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 
-var (
-	maxFeeCap = big.NewInt(300000000000)
+var maxFeeCap = big.NewInt(300000000000)
 
-	_ Test = (*RandomWeightedTest)(nil)
-	_ Test = (*ZeroTransferTest)(nil)
-	_ Test = (*ReadTest)(nil)
-	_ Test = (*WriteTest)(nil)
-	_ Test = (*StateModificationTest)(nil)
-	_ Test = (*HashingTest)(nil)
-	_ Test = (*MemoryTest)(nil)
-	_ Test = (*CallDepthTest)(nil)
-	_ Test = (*ContractCreationTest)(nil)
-	_ Test = (*PureComputeTest)(nil)
-	_ Test = (*LargeEventTest)(nil)
-	_ Test = (*ExternalCallTest)(nil)
-)
+// NewRandomTests creates a RandomWeightedTest containing a collection of EVM
+// load testing scenarios.
+//
+// This function handles the setup of the tests and also assigns each test
+// an equal weight, making them equally likely to be selected during random test execution.
+func NewRandomTests(ctx context.Context, chainID *big.Int, worker *Worker) (RandomWeightedTest, error) {
+	txOpts, err := bind.NewKeyedTransactorWithChainID(worker.PrivKey, chainID)
+	if err != nil {
+		return RandomWeightedTest{}, err
+	}
+
+	_, tx, contract, err := contracts.DeployEVMLoadSimulator(txOpts, worker.Client)
+	if err != nil {
+		return RandomWeightedTest{}, err
+	}
+
+	if _, err := bind.WaitDeployed(ctx, worker.Client, tx); err != nil {
+		return RandomWeightedTest{}, err
+	}
+
+	worker.Nonce++
+
+	weight := uint64(100)
+	count := big.NewInt(5)
+	weightedTests := []WeightedTest{
+		{
+			Test:   ZeroTransferTest{},
+			Weight: weight,
+		},
+		{
+			Test: ReadTest{
+				Contract: contract,
+				Count:    count,
+			},
+			Weight: weight,
+		},
+		{
+			Test: WriteTest{
+				Contract: contract,
+				Count:    count,
+			},
+			Weight: weight,
+		},
+		{
+			Test: StateModificationTest{
+				Contract: contract,
+				Count:    count,
+			},
+			Weight: weight,
+		},
+		{
+			Test: HashingTest{
+				Contract: contract,
+				Count:    count,
+			},
+			Weight: weight,
+		},
+		{
+			Test: MemoryTest{
+				Contract: contract,
+				Count:    count,
+			},
+			Weight: weight,
+		},
+		{
+			Test: CallDepthTest{
+				Contract: contract,
+				Count:    count,
+			},
+			Weight: weight,
+		},
+		{
+			Test:   ContractCreationTest{Contract: contract},
+			Weight: weight,
+		},
+		{
+			Test: PureComputeTest{
+				Contract:      contract,
+				NumIterations: count,
+			},
+			Weight: weight,
+		},
+		{
+			Test: LargeEventTest{
+				Contract:  contract,
+				NumEvents: count,
+			},
+			Weight: weight,
+		},
+		{
+			Test:   ExternalCallTest{Contract: contract},
+			Weight: weight,
+		},
+	}
+
+	return NewRandomWeightedTest(weightedTests)
+}
 
 type RandomWeightedTest struct {
 	tests       []Test
