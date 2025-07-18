@@ -11,7 +11,7 @@ on:
       end-block:
         description: 'The end block for the benchmark.'
         required: false
-        default: 1000000
+        default: 250000
       source-block-dir:
         description: 'The source block directory. Supports S3 directory/zip and local directories.'
         required: false
@@ -40,7 +40,7 @@ jobs:
           run: |
             {
               echo "START_BLOCK=${{ github.event.inputs.start-block || 101 }}"
-              echo "END_BLOCK=${{ github.event.inputs.end-block || 1000000 }}"
+              echo "END_BLOCK=${{ github.event.inputs.end-block || 250000 }}"
               echo "SOURCE_BLOCK_DIR=${{ github.event.inputs.source-block-dir || 's3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb.zip' }}"
               echo "CURRENT_STATE_DIR=${{ github.event.inputs.current-state-dir || 's3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100.zip' }}"
             } >> "$GITHUB_ENV"
