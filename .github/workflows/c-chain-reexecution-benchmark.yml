@@ -1,11 +1,5 @@
 name: C-Chain Re-Execution Benchmark
 
-env:
-  START_BLOCK: 100
-  END_BLOCK: 1000000
-  SOURCE_BLOCK_DIR: s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb.zip
-  CURRENT_STATE_DIR: s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100.zip
-
 on:
   pull_request:
   workflow_dispatch:
