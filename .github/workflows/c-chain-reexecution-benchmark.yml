@@ -7,7 +7,7 @@ on:
       start-block:
         description: 'The start block for the benchmark.'
         required: false
-        default: 100
+        default: 101
       end-block:
         description: 'The end block for the benchmark.'
         required: false
@@ -39,7 +39,7 @@ jobs:
           id: set-params
           run: |
             {
-              echo "START_BLOCK=${{ github.event.inputs.start-block || 100 }}"
+              echo "START_BLOCK=${{ github.event.inputs.start-block || 101 }}"
               echo "END_BLOCK=${{ github.event.inputs.end-block || 1000000 }}"
               echo "SOURCE_BLOCK_DIR=${{ github.event.inputs.source-block-dir || 's3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb.zip' }}"
               echo "CURRENT_STATE_DIR=${{ github.event.inputs.current-state-dir || 's3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100.zip' }}"
