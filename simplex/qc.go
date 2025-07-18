@@ -134,8 +134,7 @@ func (a SignatureAggregator) Aggregate(signatures []simplex.Signature) (simplex.
 	sigs := make([]*bls.Signature, 0, quorumSize)
 	for _, signature := range signatures {
 		signer := signature.Signer
-		_, exists := a.nodeID2PK[ids.NodeID(signer)]
-		if !exists {
+		if _, exists := a.nodeID2PK[ids.NodeID(signer)]; !exists {
 			return nil, fmt.Errorf("%w: %x", errSignerNotFound, signer)
 		}
 		signers = append(signers, signer)
