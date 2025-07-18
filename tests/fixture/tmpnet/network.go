@@ -177,7 +177,7 @@ func BootstrapNewNetwork(
 	if err := checkVMBinaries(log, network.Subnets, network.DefaultRuntimeConfig.Process); err != nil {
 		return err
 	}
-	if err := network.EnsureDefaultConfig(log); err != nil {
+	if err := network.EnsureDefaultConfig(ctx, log); err != nil {
 		return err
 	}
 	if err := network.Create(rootNetworkDir); err != nil {
@@ -234,7 +234,14 @@ func ReadNetwork(ctx context.Context, log logging.Logger, dir string) (*Network,
 }
 
 // Initializes a new network with default configuration.
-func (n *Network) EnsureDefaultConfig(log logging.Logger) error {
+func (n *Network) EnsureDefaultConfig(ctx context.Context, log logging.Logger) error {
+	// Populate runtime defaults before logging it
+	if n.DefaultRuntimeConfig.Kube != nil {
+		if err := n.DefaultRuntimeConfig.Kube.ensureDefaults(ctx, log); err != nil {
+			return err
+		}
+	}
+
 	log.Info("preparing configuration for new network",
 		zap.Any("runtimeConfig", n.DefaultRuntimeConfig),
 	)
