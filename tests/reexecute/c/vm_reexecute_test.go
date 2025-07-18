@@ -146,10 +146,11 @@ func benchmarkReexecuteRange(b *testing.B, sourceBlockDir string, targetDir stri
 	db, err := leveldb.New(targetDBDir, nil, dbLogger, prometheus.NewRegistry())
 	r.NoError(err)
 	defer func() {
+		log.Info("shutting down DB")
 		r.NoError(db.Close())
 	}()
 
-	sourceVM, err := newMainnetCChainVM(
+	vm, err := newMainnetCChainVM(
 		ctx,
 		db,
 		chainDataDir,
@@ -158,7 +159,8 @@ func benchmarkReexecuteRange(b *testing.B, sourceBlockDir string, targetDir stri
 	)
 	r.NoError(err)
 	defer func() {
-		r.NoError(sourceVM.Shutdown(ctx))
+		log.Info("shutting down VM")
+		r.NoError(vm.Shutdown(ctx))
 	}()
 
 	config := vmExecutorConfig{
@@ -166,7 +168,7 @@ func benchmarkReexecuteRange(b *testing.B, sourceBlockDir string, targetDir stri
 		Registry:         consensusRegistry,
 		ExecutionTimeout: executionTimeout,
 	}
-	executor, err := newVMExecutor(sourceVM, config)
+	executor, err := newVMExecutor(vm, config)
 	r.NoError(err)
 
 	start := time.Now()
