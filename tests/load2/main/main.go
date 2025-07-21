@@ -107,7 +107,7 @@ func main() {
 	chainID, err := workers[0].Client.ChainID(ctx)
 	require.NoError(err)
 
-	randomTest, err := load2.NewRandomTests(ctx, chainID, &workers[0])
+	randomTest, err := load2.NewRandomTest(ctx, chainID, &workers[0])
 	require.NoError(err)
 
 	generator, err := load2.NewLoadGenerator(

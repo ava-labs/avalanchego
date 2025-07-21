@@ -24,12 +24,12 @@ import (
 
 var maxFeeCap = big.NewInt(300000000000)
 
-// NewRandomTests creates a RandomWeightedTest containing a collection of EVM
+// NewRandomTest creates a RandomWeightedTest containing a collection of EVM
 // load testing scenarios.
 //
 // This function handles the setup of the tests and also assigns each test
 // an equal weight, making them equally likely to be selected during random test execution.
-func NewRandomTests(ctx context.Context, chainID *big.Int, worker *Worker) (RandomWeightedTest, error) {
+func NewRandomTest(ctx context.Context, chainID *big.Int, worker *Worker) (RandomWeightedTest, error) {
 	txOpts, err := bind.NewKeyedTransactorWithChainID(worker.PrivKey, chainID)
 	if err != nil {
 		return RandomWeightedTest{}, err
