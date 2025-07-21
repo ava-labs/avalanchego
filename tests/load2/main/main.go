@@ -5,6 +5,7 @@ package main
 
 import (
 	"flag"
+	"math/rand"
 	"os"
 	"time"
 
@@ -107,7 +108,12 @@ func main() {
 	chainID, err := workers[0].Client.ChainID(ctx)
 	require.NoError(err)
 
-	randomTest, err := load2.NewRandomTest(ctx, chainID, &workers[0])
+	randomTest, err := load2.NewRandomTest(
+		ctx,
+		chainID,
+		&workers[0],
+		rand.NewSource(time.Now().UnixMilli()),
+	)
 	require.NoError(err)
 
 	generator, err := load2.NewLoadGenerator(

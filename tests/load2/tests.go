@@ -7,8 +7,10 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
+	"math"
 	"math/big"
-	"math/rand/v2"
+	"math/rand"
+	"sync"
 
 	"github.com/ava-labs/libevm/accounts/abi/bind"
 	"github.com/ava-labs/libevm/common"
@@ -29,19 +31,24 @@ var maxFeeCap = big.NewInt(300000000000)
 //
 // This function handles the setup of the tests and also assigns each test
 // an equal weight, making them equally likely to be selected during random test execution.
-func NewRandomTest(ctx context.Context, chainID *big.Int, worker *Worker) (RandomWeightedTest, error) {
+func NewRandomTest(
+	ctx context.Context,
+	chainID *big.Int,
+	worker *Worker,
+	source rand.Source,
+) (*RandomWeightedTest, error) {
 	txOpts, err := bind.NewKeyedTransactorWithChainID(worker.PrivKey, chainID)
 	if err != nil {
-		return RandomWeightedTest{}, err
+		return nil, err
 	}
 
 	_, tx, contract, err := contracts.DeployEVMLoadSimulator(txOpts, worker.Client)
 	if err != nil {
-		return RandomWeightedTest{}, err
+		return nil, err
 	}
 
 	if _, err := bind.WaitDeployed(ctx, worker.Client, tx); err != nil {
-		return RandomWeightedTest{}, err
+		return nil, err
 	}
 
 	worker.Nonce++
@@ -125,16 +132,22 @@ func NewRandomTest(ctx context.Context, chainID *big.Int, worker *Worker) (Rando
 		},
 	}
 
-	return NewRandomWeightedTest(weightedTests)
+	return NewRandomWeightedTest(weightedTests, source)
 }
 
 type RandomWeightedTest struct {
 	tests       []Test
 	weighted    sampler.Weighted
-	totalWeight uint64
+	totalWeight int64
+
+	mu   sync.Mutex
+	rand *rand.Rand
 }
 
-func NewRandomWeightedTest(weightedTests []WeightedTest) (RandomWeightedTest, error) {
+func NewRandomWeightedTest(
+	weightedTests []WeightedTest,
+	source rand.Source,
+) (*RandomWeightedTest, error) {
 	weighted := sampler.NewWeighted()
 
 	// Initialize weighted set
@@ -147,24 +160,39 @@ func NewRandomWeightedTest(weightedTests []WeightedTest) (RandomWeightedTest, er
 		totalWeight += w.Weight
 	}
 	if err := weighted.Initialize(weights); err != nil {
-		return RandomWeightedTest{}, err
+		return nil, err
 	}
 
-	return RandomWeightedTest{
+	if totalWeight > math.MaxInt64 {
+		return nil, fmt.Errorf(
+			"total weight larger than max int64, %d > %d",
+			totalWeight,
+			math.MaxInt64,
+		)
+	}
+
+	rand := rand.New(source) //#nosec G404
+
+	return &RandomWeightedTest{
 		tests:       tests,
 		weighted:    weighted,
-		totalWeight: totalWeight,
+		totalWeight: int64(totalWeight),
+		rand:        rand,
 	}, nil
 }
 
-func (r RandomWeightedTest) Run(
+func (r *RandomWeightedTest) Run(
 	tc tests.TestContext,
 	ctx context.Context,
 	wallet *Wallet,
 ) {
 	require := require.New(tc)
 
-	index, ok := r.weighted.Sample(rand.Uint64N(r.totalWeight)) //#nosec G404
+	r.mu.Lock()
+	sampleValue := r.rand.Int63n(r.totalWeight)
+	r.mu.Unlock()
+
+	index, ok := r.weighted.Sample(uint64(sampleValue))
 	require.True(ok)
 
 	r.tests[index].Run(tc, ctx, wallet)
