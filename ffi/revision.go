@@ -13,8 +13,8 @@ import (
 )
 
 var (
-	errRevisionNotFound  = errors.New("firewood error: revision not found")
-	errInvalidRootLength = fmt.Errorf("firewood error: root hash must be %d bytes", RootLength)
+	errRevisionNotFound  = errors.New("revision not found")
+	errInvalidRootLength = fmt.Errorf("root hash must be %d bytes", RootLength)
 )
 
 type Revision struct {
@@ -28,7 +28,7 @@ type Revision struct {
 
 func newRevision(handle *C.DatabaseHandle, root []byte) (*Revision, error) {
 	if handle == nil {
-		return nil, errors.New("firewood error: nil handle or root")
+		return nil, errDBClosed
 	}
 
 	// Check that the root is the correct length.

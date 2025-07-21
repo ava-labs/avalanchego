@@ -15,8 +15,8 @@ import (
 )
 
 var (
-	errNilStruct = errors.New("firewood error: nil struct pointer cannot be freed")
-	errBadValue  = errors.New("firewood error: value from cgo formatted incorrectly")
+	errNilStruct = errors.New("nil struct pointer cannot be freed")
+	errBadValue  = errors.New("value from cgo formatted incorrectly")
 )
 
 // KeyValue is a key-value pair.
