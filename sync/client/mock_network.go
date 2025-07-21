@@ -8,12 +8,12 @@ import (
 	"errors"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/subnet-evm/peer"
+	"github.com/ava-labs/subnet-evm/network"
 
 	"github.com/ava-labs/avalanchego/version"
 )
 
-var _ peer.NetworkClient = &mockNetwork{}
+var _ network.SyncedNetworkClient = (*mockNetwork)(nil)
 
 // TODO replace with gomock library
 type mockNetwork struct {
@@ -29,7 +29,7 @@ type mockNetwork struct {
 	nodesRequested []ids.NodeID
 }
 
-func (t *mockNetwork) SendAppRequestAny(ctx context.Context, minVersion *version.Application, request []byte) ([]byte, ids.NodeID, error) {
+func (t *mockNetwork) SendSyncedAppRequestAny(ctx context.Context, minVersion *version.Application, request []byte) ([]byte, ids.NodeID, error) {
 	if len(t.response) == 0 {
 		return nil, ids.EmptyNodeID, errors.New("no mocked response to return in mockNetwork")
 	}
@@ -40,7 +40,7 @@ func (t *mockNetwork) SendAppRequestAny(ctx context.Context, minVersion *version
 	return response, ids.EmptyNodeID, err
 }
 
-func (t *mockNetwork) SendAppRequest(ctx context.Context, nodeID ids.NodeID, request []byte) ([]byte, error) {
+func (t *mockNetwork) SendSyncedAppRequest(ctx context.Context, nodeID ids.NodeID, request []byte) ([]byte, error) {
 	if len(t.response) == 0 {
 		return nil, errors.New("no mocked response to return in mockNetwork")
 	}

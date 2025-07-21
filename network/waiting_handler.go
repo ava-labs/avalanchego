@@ -1,15 +1,20 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package peer
+package network
 
 import (
 	"context"
+	"errors"
 
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 )
 
-var _ message.ResponseHandler = (*waitingResponseHandler)(nil)
+var (
+	_ message.ResponseHandler = (*waitingResponseHandler)(nil)
+
+	errRequestFailed = errors.New("request failed")
+)
 
 // waitingResponseHandler implements the ResponseHandler interface
 // Internally used to wait for response after making a request synchronously
@@ -50,7 +55,7 @@ func (waitingHandler *waitingResponseHandler) WaitForResult(ctx context.Context)
 		return nil, ctx.Err()
 	case response := <-waitingHandler.responseChan:
 		if waitingHandler.failed {
-			return nil, ErrRequestFailed
+			return nil, errRequestFailed
 		}
 		return response, nil
 	}

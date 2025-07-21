@@ -29,6 +29,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/subnet-evm/plugin/evm/config"
 	"github.com/ava-labs/subnet-evm/utils/utilstest"
 )
 
@@ -42,9 +43,7 @@ func TestEthTxGossip(t *testing.T) {
 	responseSender := &enginetest.SenderStub{
 		SentAppResponse: make(chan []byte, 1),
 	}
-	vm := &VM{
-		p2pSender: responseSender,
-	}
+	vm := &VM{}
 
 	require.NoError(vm.Initialize(
 		ctx,
@@ -54,7 +53,7 @@ func TestEthTxGossip(t *testing.T) {
 		nil,
 		nil,
 		nil,
-		&enginetest.Sender{},
+		responseSender,
 	))
 	require.NoError(vm.SetState(ctx, snow.NormalOp))
 
@@ -87,7 +86,7 @@ func TestEthTxGossip(t *testing.T) {
 	}
 
 	// Ask the VM for any new transactions. We should get nothing at first.
-	emptyBloomFilter, err := gossip.NewBloomFilter(prometheus.NewRegistry(), "", txGossipBloomMinTargetElements, txGossipBloomTargetFalsePositiveRate, txGossipBloomResetFalsePositiveRate)
+	emptyBloomFilter, err := gossip.NewBloomFilter(prometheus.NewRegistry(), "", config.TxGossipBloomMinTargetElements, config.TxGossipBloomTargetFalsePositiveRate, config.TxGossipBloomResetFalsePositiveRate)
 	require.NoError(err)
 	emptyBloomFilterBytes, _ := emptyBloomFilter.Marshal()
 	request := &sdk.PullGossipRequest{
@@ -148,6 +147,7 @@ func TestEthTxGossip(t *testing.T) {
 	wg.Wait()
 }
 
+// Tests that a tx is gossiped when it is issued
 func TestEthTxPushGossipOutbound(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()

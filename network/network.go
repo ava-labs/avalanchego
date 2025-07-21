@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package peer
+package network
 
 import (
 	"context"
@@ -13,22 +13,27 @@ import (
 	"golang.org/x/sync/semaphore"
 
 	"github.com/ava-labs/libevm/log"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 
-	"github.com/ava-labs/subnet-evm/peer/stats"
+	"github.com/ava-labs/subnet-evm/network/stats"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 )
 
 // Minimum amount of time to handle a request
-const minRequestHandlingDuration = 100 * time.Millisecond
+const (
+	minRequestHandlingDuration = 100 * time.Millisecond
+	maxValidatorSetStaleness   = time.Minute
+)
 
 var (
 	errAcquiringSemaphore                      = errors.New("error acquiring semaphore")
@@ -38,11 +43,30 @@ var (
 	_                     common.AppHandler    = (*network)(nil)
 )
 
+// SyncedNetworkClient defines ability to send request / response through the Network
+type SyncedNetworkClient interface {
+	// SendSyncedAppRequestAny synchronously sends request to an arbitrary peer with a
+	// node version greater than or equal to minVersion.
+	// Returns response bytes, the ID of the chosen peer, and ErrRequestFailed if
+	// the request should be retried.
+	SendSyncedAppRequestAny(ctx context.Context, minVersion *version.Application, request []byte) ([]byte, ids.NodeID, error)
+
+	// SendSyncedAppRequest synchronously sends request to the selected nodeID
+	// Returns response bytes, and ErrRequestFailed if the request should be retried.
+	SendSyncedAppRequest(ctx context.Context, nodeID ids.NodeID, request []byte) ([]byte, error)
+
+	// TrackBandwidth should be called for each valid request with the bandwidth
+	// (length of response divided by request time), and with 0 if the response is invalid.
+	TrackBandwidth(nodeID ids.NodeID, bandwidth float64)
+}
+
 type Network interface {
 	validators.Connector
 	common.AppHandler
 
-	// SendAppRequestAny synchronously sends request to an arbitrary peer with a
+	SyncedNetworkClient
+
+	// SendAppRequestAny sends request to an arbitrary peer with a
 	// node version greater than or equal to minVersion.
 	// Returns the ID of the chosen peer, and an error if the request could not
 	// be sent to a peer with the desired [minVersion].
@@ -62,14 +86,12 @@ type Network interface {
 	// Size returns the size of the network in number of connected peers
 	Size() uint32
 
-	// TrackBandwidth should be called for each valid request with the bandwidth
-	// (length of response divided by request time), and with 0 if the response is invalid.
-	TrackBandwidth(nodeID ids.NodeID, bandwidth float64)
-
 	// NewClient returns a client to send messages with for the given protocol
 	NewClient(protocol uint64, options ...p2p.ClientOption) *p2p.Client
 	// AddHandler registers a server handler for an application protocol
 	AddHandler(protocol uint64, handler p2p.Handler) error
+
+	P2PValidators() *p2p.Validators
 }
 
 // network is an implementation of Network that processes message requests for
@@ -80,12 +102,12 @@ type network struct {
 	requestIDGen               uint32                             // requestID counter used to track outbound requests
 	outstandingRequestHandlers map[uint32]message.ResponseHandler // maps avalanchego requestID => message.ResponseHandler
 	activeAppRequests          *semaphore.Weighted                // controls maximum number of active outbound requests
-	p2pNetwork                 *p2p.Network
-	appSender                  common.AppSender          // avalanchego AppSender for sending messages
-	codec                      codec.Manager             // Codec used for parsing messages
-	appRequestHandler          message.RequestHandler    // maps request type => handler
-	peers                      *peerTracker              // tracking of peers & bandwidth
-	appStats                   stats.RequestHandlerStats // Provide request handler metrics
+	sdkNetwork                 *p2p.Network                       // SDK network (avalanchego p2p) for sending messages to peers
+	appSender                  common.AppSender                   // avalanchego AppSender for sending messages
+	codec                      codec.Manager                      // Codec used for parsing messages
+	appRequestHandler          message.RequestHandler             // maps request type => handler
+	peers                      *peerTracker                       // tracking of peers & bandwidth
+	appStats                   stats.RequestHandlerStats          // Provide request handler metrics
 
 	// Set to true when Shutdown is called, after which all operations on this
 	// struct are no-ops.
@@ -96,20 +118,33 @@ type network struct {
 	// outstanding requests, which means we must guarantee never to register a
 	// request that will never be fulfilled or cancelled.
 	closed utils.Atomic[bool]
+
+	p2pValidators *p2p.Validators
 }
 
-func NewNetwork(p2pNetwork *p2p.Network, appSender common.AppSender, codec codec.Manager, self ids.NodeID, maxActiveAppRequests int64) Network {
+func NewNetwork(
+	ctx *snow.Context,
+	appSender common.AppSender,
+	codec codec.Manager,
+	maxActiveAppRequests int64,
+	registerer prometheus.Registerer,
+) (Network, error) {
+	p2pNetwork, err := p2p.NewNetwork(ctx.Log, appSender, registerer, "p2p")
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize p2p network: %w", err)
+	}
 	return &network{
 		appSender:                  appSender,
 		codec:                      codec,
-		self:                       self,
+		self:                       ctx.NodeID,
 		outstandingRequestHandlers: make(map[uint32]message.ResponseHandler),
 		activeAppRequests:          semaphore.NewWeighted(maxActiveAppRequests),
-		p2pNetwork:                 p2pNetwork,
+		sdkNetwork:                 p2pNetwork,
 		appRequestHandler:          message.NoopRequestHandler{},
 		peers:                      NewPeerTracker(),
 		appStats:                   stats.NewRequestHandlerStats(),
-	}
+		p2pValidators:              p2p.NewValidators(p2pNetwork.Peers, ctx.Log, ctx.SubnetID, ctx.ValidatorState, maxValidatorSetStaleness),
+	}, nil
 }
 
 // SendAppRequestAny synchronously sends request to an arbitrary peer with a
@@ -230,7 +265,7 @@ func (n *network) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID u
 
 	if !IsNetworkRequest(requestID) {
 		log.Debug("forwarding AppRequest to SDK network", "nodeID", nodeID, "requestID", requestID, "requestLen", len(request))
-		return n.p2pNetwork.AppRequest(ctx, nodeID, requestID, deadline, request)
+		return n.sdkNetwork.AppRequest(ctx, nodeID, requestID, deadline, request)
 	}
 
 	bufferedDeadline, err := calculateTimeUntilDeadline(deadline, n.appStats)
@@ -272,7 +307,7 @@ func (n *network) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID 
 	handler, exists := n.markRequestFulfilled(requestID)
 	if !exists {
 		log.Debug("forwarding AppResponse to SDK network", "nodeID", nodeID, "requestID", requestID, "responseLen", len(response))
-		return n.p2pNetwork.AppResponse(ctx, nodeID, requestID, response)
+		return n.sdkNetwork.AppResponse(ctx, nodeID, requestID, response)
 	}
 
 	// We must release the slot
@@ -293,7 +328,7 @@ func (n *network) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, reque
 	handler, exists := n.markRequestFulfilled(requestID)
 	if !exists {
 		log.Debug("forwarding AppRequestFailed to SDK network", "nodeID", nodeID, "requestID", requestID)
-		return n.p2pNetwork.AppRequestFailed(ctx, nodeID, requestID, appErr)
+		return n.sdkNetwork.AppRequestFailed(ctx, nodeID, requestID, appErr)
 	}
 
 	// We must release the slot
@@ -345,7 +380,7 @@ func (n *network) markRequestFulfilled(requestID uint32) (message.ResponseHandle
 // from a peer. An error returned by this function is treated as fatal by the
 // engine.
 func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) error {
-	return n.p2pNetwork.AppGossip(ctx, nodeID, gossipBytes)
+	return n.sdkNetwork.AppGossip(ctx, nodeID, gossipBytes)
 }
 
 // Connected adds the given nodeID to the peer list so that it can receive messages
@@ -364,7 +399,7 @@ func (n *network) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion 
 		n.peers.Connected(nodeID, nodeVersion)
 	}
 
-	return n.p2pNetwork.Connected(ctx, nodeID, nodeVersion)
+	return n.sdkNetwork.Connected(ctx, nodeID, nodeVersion)
 }
 
 // Disconnected removes given [nodeID] from the peer list
@@ -382,7 +417,7 @@ func (n *network) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 		n.peers.Disconnected(nodeID)
 	}
 
-	return n.p2pNetwork.Disconnected(ctx, nodeID)
+	return n.sdkNetwork.Disconnected(ctx, nodeID)
 }
 
 // Shutdown disconnects all peers
@@ -421,12 +456,41 @@ func (n *network) TrackBandwidth(nodeID ids.NodeID, bandwidth float64) {
 	n.peers.TrackBandwidth(nodeID, bandwidth)
 }
 
+// SendSyncedAppRequestAny synchronously sends request to an arbitrary peer with a
+// node version greater than or equal to minVersion.
+// Returns response bytes, the ID of the chosen peer, and ErrRequestFailed if
+// the request should be retried.
+func (n *network) SendSyncedAppRequestAny(ctx context.Context, minVersion *version.Application, request []byte) ([]byte, ids.NodeID, error) {
+	waitingHandler := newWaitingResponseHandler()
+	nodeID, err := n.SendAppRequestAny(ctx, minVersion, request, waitingHandler)
+	if err != nil {
+		return nil, nodeID, err
+	}
+	response, err := waitingHandler.WaitForResult(ctx)
+	return response, nodeID, err
+}
+
+// SendSyncedAppRequest synchronously sends request to the specified nodeID
+// Returns response bytes and ErrRequestFailed if the request should be retried.
+func (n *network) SendSyncedAppRequest(ctx context.Context, nodeID ids.NodeID, request []byte) ([]byte, error) {
+	waitingHandler := newWaitingResponseHandler()
+	if err := n.SendAppRequest(ctx, nodeID, request, waitingHandler); err != nil {
+		return nil, err
+	}
+	return waitingHandler.WaitForResult(ctx)
+}
+
 func (n *network) NewClient(protocol uint64, options ...p2p.ClientOption) *p2p.Client {
-	return n.p2pNetwork.NewClient(protocol, options...)
+	return n.sdkNetwork.NewClient(protocol, options...)
 }
 
 func (n *network) AddHandler(protocol uint64, handler p2p.Handler) error {
-	return n.p2pNetwork.AddHandler(protocol, handler)
+	return n.sdkNetwork.AddHandler(protocol, handler)
+}
+
+// P2PValidators returns the p2p validators
+func (n *network) P2PValidators() *p2p.Validators {
+	return n.p2pValidators
 }
 
 // invariant: peer/network must use explicitly even request ids.

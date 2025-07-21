@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/log"
-	"github.com/ava-labs/subnet-evm/peer"
+	"github.com/ava-labs/subnet-evm/network"
 	"github.com/ava-labs/subnet-evm/warp/aggregator"
 	warpValidators "github.com/ava-labs/subnet-evm/warp/validators"
 )
@@ -30,7 +30,7 @@ type API struct {
 	requirePrimaryNetworkSigners func() bool
 }
 
-func NewAPI(chainCtx *snow.Context, networkCodec codec.Manager, backend Backend, client peer.NetworkClient, requirePrimaryNetworkSigners func() bool) *API {
+func NewAPI(chainCtx *snow.Context, networkCodec codec.Manager, backend Backend, client network.SyncedNetworkClient, requirePrimaryNetworkSigners func() bool) *API {
 	signatureGetter := aggregator.NewSignatureGetter(client, networkCodec)
 	return &API{
 		backend:                      backend,

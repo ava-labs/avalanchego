@@ -26,7 +26,7 @@ import (
 	"github.com/ava-labs/libevm/log"
 	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/trie"
-	"github.com/ava-labs/subnet-evm/peer"
+	"github.com/ava-labs/subnet-evm/network"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 )
 
@@ -75,7 +75,7 @@ type Client interface {
 type parseResponseFn func(codec codec.Manager, request message.Request, response []byte) (interface{}, int, error)
 
 type client struct {
-	networkClient    peer.NetworkClient
+	networkClient    network.SyncedNetworkClient
 	codec            codec.Manager
 	stateSyncNodes   []ids.NodeID
 	stateSyncNodeIdx uint32
@@ -84,7 +84,7 @@ type client struct {
 }
 
 type ClientConfig struct {
-	NetworkClient    peer.NetworkClient
+	NetworkClient    network.SyncedNetworkClient
 	Codec            codec.Manager
 	Stats            stats.ClientSyncerStats
 	StateSyncNodeIDs []ids.NodeID
@@ -320,14 +320,14 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 			start    time.Time = time.Now()
 		)
 		if len(c.stateSyncNodes) == 0 {
-			response, nodeID, err = c.networkClient.SendAppRequestAny(ctx, StateSyncVersion, requestBytes)
+			response, nodeID, err = c.networkClient.SendSyncedAppRequestAny(ctx, StateSyncVersion, requestBytes)
 		} else {
 			// get the next nodeID using the nodeIdx offset. If we're out of nodes, loop back to 0
 			// we do this every attempt to ensure we get a different node each time if possible.
 			nodeIdx := atomic.AddUint32(&c.stateSyncNodeIdx, 1)
 			nodeID = c.stateSyncNodes[nodeIdx%uint32(len(c.stateSyncNodes))]
 
-			response, err = c.networkClient.SendAppRequest(ctx, nodeID, requestBytes)
+			response, err = c.networkClient.SendSyncedAppRequest(ctx, nodeID, requestBytes)
 		}
 		metric.UpdateRequestLatency(time.Since(start))
 
