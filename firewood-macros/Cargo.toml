@@ -15,14 +15,17 @@ rust-version.workspace = true
 proc-macro = true
 
 [dependencies]
+# Regular dependencies
 proc-macro2 = "1.0"
 quote = "1.0"
 syn = { version = "2.0", features = ["full", "extra-traits"] }
 
 [dev-dependencies]
+# Workspace dependencies
+coarsetime.workspace = true
+metrics.workspace = true
+# Regular dependencies
 trybuild = "1.0"
-metrics = "0.24"
-coarsetime = "0.1"
 
 [lints]
 workspace = true

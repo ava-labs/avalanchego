@@ -9,16 +9,19 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+# Regular dependencies
 hash-db = "0.16.0"
 rlp = "0.6"
 
 [dev-dependencies]
-criterion = { workspace = true }
+# Workspace dependencies
+criterion.workspace = true
+ethereum-types.workspace = true
+hex-literal.workspace = true
+# Regular dependencies
 keccak-hasher = "0.16.0"
-ethereum-types = { workspace = true }
 tiny-keccak = { version = "2.0", features = ["keccak"] }
 trie-standardmap = "0.16.0"
-hex-literal = { workspace = true }
 
 [[bench]]
 name = "triehash"

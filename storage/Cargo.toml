@@ -17,36 +17,40 @@ rust-version.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bitflags = "2.9.1"
-enum-as-inner = "0.6.1"
-hex = "0.4.3"
+# Workspace dependencies
+coarsetime.workspace = true
+fastrace.workspace = true
+hex.workspace = true
+metrics.workspace = true
+sha2.workspace = true
 smallvec = { workspace = true, features = ["write", "union"] }
-sha2 = { workspace = true }
-integer-encoding = "4.0.2"
+thiserror.workspace = true
+# Regular dependencies
 arc-swap = "1.7.1"
-lru = "0.16.0"
-metrics = { workspace = true }
-log = { version = "0.4.27", optional = true }
-bytemuck = "1.23.1"
-bytemuck_derive = "1.9.3"
 bitfield = "0.19.1"
-fastrace = { workspace = true }
-io-uring = { version = "0.7.8", optional = true }
+bitflags = "2.9.1"
+bytemuck = "1.23.1"
+bytemuck_derive = "1.10.0"
+enum-as-inner = "0.6.1"
+integer-encoding = "4.0.2"
+lru = "0.16.0"
+nonzero_ext = "0.3.0"
+semver = "1.0.26"
 triomphe = "0.1.14"
-coarsetime = { workspace = true }
+# Optional dependencies
+bytes = { version = "1.10.1", optional = true }
+io-uring = { version = "0.7.8", optional = true }
+log = { version = "0.4.27", optional = true }
 rlp = { version = "0.6.1", optional = true }
 sha3 = { version = "0.10.8", optional = true }
-bytes = { version = "1.10.1", optional = true }
-thiserror = { workspace = true }
-semver = "1.0.26"
-nonzero_ext = "0.3.0"
 
 [dev-dependencies]
-rand = { workspace = true }
-test-case = "3.3.1"
+# Workspace dependencies
 criterion = { workspace = true, features = ["async_tokio", "html_reports"] }
 pprof = { workspace = true, features = ["flamegraph"] }
-tempfile = { workspace = true }
+rand.workspace = true
+tempfile.workspace = true
+test-case.workspace = true
 
 [features]
 logger = ["log"]

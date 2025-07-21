@@ -20,13 +20,16 @@ rust-version.workspace = true
 crate-type = ["staticlib"]
 
 [dependencies]
+# Workspace dependencies
+coarsetime.workspace = true
 firewood.workspace = true
-metrics = { workspace = true }
-metrics-util = { workspace = true }
+metrics.workspace = true
+metrics-util.workspace = true
+# Regular dependencies
 chrono = "0.4.41"
 oxhttp = "0.3.1"
-coarsetime = { workspace = true }
-env_logger = { workspace = true, optional = true}
+# Optional dependencies
+env_logger = { workspace = true, optional = true }
 
 [target.'cfg(unix)'.dependencies]
 tikv-jemallocator = "0.6.0"

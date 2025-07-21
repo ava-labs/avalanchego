@@ -23,26 +23,30 @@ name = "fwdctl"
 path = "src/main.rs"
 
 [dependencies]
+# Workspace dependencies
+clap = { workspace = true, features = ["cargo"] }
+env_logger.workspace = true
 firewood.workspace = true
 firewood-storage.workspace = true
-clap = { workspace = true, features = ["cargo"] }
-env_logger = { workspace = true }
-log = "0.4.27"
+hex.workspace = true
+log.workspace = true
 tokio = { workspace = true, features = ["full"] }
-futures-util = "0.3.31"
-hex = "0.4.3"
+# Regular dependencies
 csv = "1.3.1"
+futures-util = "0.3.31"
 nonzero_ext = "0.3.0"
 
 [features]
 ethhash = ["firewood/ethhash"]
 
 [dev-dependencies]
+# Workspace dependencies
+rand.workspace = true
+# Regular dependencies
 anyhow = "1.0.98"
 assert_cmd = "2.0.17"
 predicates = "3.1.3"
 serial_test = "3.2.0"
-rand = { workspace = true }
 
 [lints]
 workspace = true
