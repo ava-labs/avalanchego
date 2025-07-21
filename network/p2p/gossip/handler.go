@@ -50,13 +50,19 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 		return nil, p2p.ErrUnexpected
 	}
 
-	responseSize := 0
-	gossipBytes := make([][]byte, 0)
+	var (
+		hits         float64
+		total        float64
+		responseSize int
+		gossipBytes  [][]byte
+	)
 	h.set.Iterate(func(gossipable T) bool {
+		total++
 		gossipID := gossipable.GossipID()
 
 		// filter out what the requesting peer already knows about
 		if bloom.Contains(filter, gossipID[:], salt[:]) {
+			hits++
 			return true
 		}
 
@@ -75,6 +81,11 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 	})
 	if err != nil {
 		return nil, p2p.ErrUnexpected
+	}
+
+	if total > 0 {
+		hitRate := float64(hits) / float64(total)
+		h.metrics.bloomFilterHitRate.Observe(100 * hitRate)
 	}
 
 	if err := h.metrics.observeMessage(sentPullLabels, len(gossipBytes), responseSize); err != nil {

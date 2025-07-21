@@ -41,8 +41,8 @@ var (
 // NodeRuntime defines the methods required to support running a node.
 type NodeRuntime interface {
 	readState(ctx context.Context) error
-	GetLocalURI(ctx context.Context) (string, func(), error)
-	GetLocalStakingAddress(ctx context.Context) (netip.AddrPort, func(), error)
+	GetAccessibleURI() string
+	GetAccessibleStakingAddress(ctx context.Context) (netip.AddrPort, func(), error)
 	Start(ctx context.Context) error
 	InitiateStop(ctx context.Context) error
 	WaitForStopped(ctx context.Context) error
@@ -199,12 +199,12 @@ func (n *Node) readState(ctx context.Context) error {
 	return n.getRuntime().readState(ctx)
 }
 
-func (n *Node) GetLocalURI(ctx context.Context) (string, func(), error) {
-	return n.getRuntime().GetLocalURI(ctx)
+func (n *Node) GetAccessibleURI() string {
+	return n.getRuntime().GetAccessibleURI()
 }
 
-func (n *Node) GetLocalStakingAddress(ctx context.Context) (netip.AddrPort, func(), error) {
-	return n.getRuntime().GetLocalStakingAddress(ctx)
+func (n *Node) GetAccessibleStakingAddress(ctx context.Context) (netip.AddrPort, func(), error) {
+	return n.getRuntime().GetAccessibleStakingAddress(ctx)
 }
 
 // Writes the current state of the metrics endpoint to disk
@@ -213,12 +213,7 @@ func (n *Node) SaveMetricsSnapshot(ctx context.Context) error {
 		// No URI to request metrics from
 		return nil
 	}
-	baseURI, cancel, err := n.GetLocalURI(ctx)
-	if err != nil {
-		return nil
-	}
-	defer cancel()
-	uri := baseURI + "/ext/metrics"
+	uri := n.GetAccessibleURI() + "/ext/metrics"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, uri, nil)
 	if err != nil {
 		return err
