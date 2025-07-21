@@ -23,4 +23,17 @@ else
   XSVM_IMAGE="${XSVM_IMAGE}" AVALANCHEGO_IMAGE="${AVALANCHEGO_IMAGE}" bash -x ./scripts/build_xsvm_image.sh
 fi
 
-bash -x ./scripts/tests.e2e.sh --runtime=kube --kube-image="${XSVM_IMAGE}" "$@"
+# Determine kubeconfig context to use
+KUBECONFIG_CONTEXT=""
+
+# Check if --kubeconfig-context is already provided in arguments
+if [[ "$*" =~ --kubeconfig-context ]]; then
+    # User provided a context, use it as-is
+    echo "Using provided kubeconfig context from arguments"
+else
+    # Default to the RBAC context
+    KUBECONFIG_CONTEXT="--kubeconfig-context=kind-kind-tmpnet"
+    echo "Defaulting to limited-permission context 'kind-kind-tmpnet' to test RBAC Role permissions"
+fi
+
+bash -x ./scripts/tests.e2e.sh --runtime=kube --kube-image="${XSVM_IMAGE}" "$KUBECONFIG_CONTEXT" "$@"

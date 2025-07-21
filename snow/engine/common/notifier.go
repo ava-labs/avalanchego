@@ -6,11 +6,14 @@ package common
 import (
 	"context"
 	"sync"
+	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
+
+const errThrottleTime = 100 * time.Millisecond
 
 // Subscription is a function that blocks until either the given context is cancelled, or a message is returned.
 // It is used to receive messages from a VM such as Pending transactions, state sync completion, etc.
@@ -73,6 +76,11 @@ func (nf *NotificationForwarder) forwardNotification() {
 	msg, err := nf.Subscribe(ctx)
 	if err != nil {
 		nf.Log.Debug("Failed subscribing to notifications", zap.Error(err))
+		// Wait to retry
+		select {
+		case <-time.After(errThrottleTime):
+		case <-ctx.Done():
+		}
 		return
 	}
 
@@ -80,6 +88,11 @@ func (nf *NotificationForwarder) forwardNotification() {
 
 	if err := nf.Engine.Notify(ctx, msg); err != nil {
 		nf.Log.Debug("Failed notifying engine", zap.Error(err))
+		// Wait to retry
+		select {
+		case <-time.After(errThrottleTime):
+		case <-ctx.Done():
+		}
 		return
 	}
 

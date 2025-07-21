@@ -69,7 +69,7 @@ func main() {
 	e2e.NewTestEnvironment(tc, flagVars, network)
 
 	ctx := tests.DefaultNotifyContext(0, tc.DeferCleanup)
-	wsURIs, err := tmpnet.GetNodeWebsocketURIs(ctx, network.Nodes, blockchainID, tc.DeferCleanup)
+	wsURIs, err := tmpnet.GetNodeWebsocketURIs(network.Nodes, blockchainID)
 	require.NoError(err)
 
 	registry := prometheus.NewRegistry()
@@ -112,7 +112,7 @@ func main() {
 		chainID,
 		metricsNamespace,
 		registry,
-		load2.ZeroTransferTest{PollFrequency: pollFrequency},
+		load2.ZeroTransferTest{},
 	)
 	require.NoError(err)
 
