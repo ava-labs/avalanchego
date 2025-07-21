@@ -171,6 +171,7 @@ func (w *workload) run(ctx context.Context) {
 	// Any assertion failure from this test context will result in process exit due to the
 	// panic being rethrown. This ensures that failures in test setup are fatal.
 	defer tc.RecoverAndRethrow()
+	require := require.New(tc)
 
 	xAVAX, pAVAX := e2e.GetWalletBalances(tc, w.wallet)
 	assert.Reachable("wallet starting", map[string]any{
@@ -179,30 +180,13 @@ func (w *workload) run(ctx context.Context) {
 		"pBalance": pAVAX,
 	})
 
-	defaultExecutionDelay := big.NewInt(int64(time.Second))
 	for {
 		w.executeTest(ctx)
 
-		// Delay execution of the next test by a random duration
-		rawExecutionDelay, err := rand.Int(rand.Reader, defaultExecutionDelay)
-		// Avoid using require.NoError since the execution delay is not critical and an
-		// assertion failure in this function is fatal.
-		if err != nil {
-			w.log.Error("failed to read randomness",
-				zap.Error(err),
-			)
-			assert.Unreachable("failed to read randomness", map[string]any{
-				"worker": w.id,
-				"err":    err,
-			})
-			rawExecutionDelay = defaultExecutionDelay
-		}
-		executionDelay := time.Duration(rawExecutionDelay.Int64())
-		w.log.Info("waiting",
-			zap.Duration("duration", executionDelay),
-		)
-		timer.Reset(executionDelay)
+		val, err := rand.Int(rand.Reader, big.NewInt(int64(time.Second)))
+		require.NoError(err, "failed to read randomness")
 
+		timer.Reset(time.Duration(val.Int64()))
 		select {
 		case <-ctx.Done():
 			return
