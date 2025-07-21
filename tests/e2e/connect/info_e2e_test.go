@@ -6,15 +6,13 @@ package connect_test
 import (
 	"context"
 	"net/http"
-	"os"
 	"testing"
 	"time"
 
 	"connectrpc.com/connect"
 
 	"github.com/ava-labs/avalanchego/proto/pb/info/v1/infov1connect"
-	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
-	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 
 	infov1 "github.com/ava-labs/avalanchego/proto/pb/info/v1"
 
@@ -26,7 +24,6 @@ var (
 	client     infov1connect.InfoServiceClient
 	ctx        context.Context
 	httpClient *http.Client
-	network    *tmpnet.Network
 	nodeURI    string
 )
 
@@ -37,38 +34,13 @@ func TestInfoE2E(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 	ctx = context.Background()
-	network = tmpnet.NewDefaultNetwork("info-e2e")
-	network.DefaultRuntimeConfig.Process = &tmpnet.ProcessRuntimeConfig{}
-
-	// Use environment variable
-	avaPath := os.Getenv("AVALANCHEGO_PATH")
-	if avaPath == "" {
-		avaPath = "./avalanchego"
-	}
-	// Fail early if binary does not exist
-	if _, err := os.Stat(avaPath); err != nil {
-		Fail("AvalancheGo binary not found at: " + avaPath)
-	}
-	network.DefaultRuntimeConfig.Process.AvalancheGoPath = avaPath
-
-	Expect(network.EnsureDefaultConfig(logging.NoLog{})).To(Succeed())
-	Expect(network.Create("")).To(Succeed())
-	Expect(network.Bootstrap(ctx, logging.NoLog{})).To(Succeed())
-
-	node := network.Nodes[0]
-	uri, cancel, err := node.GetLocalURI(ctx)
-	Expect(err).ToNot(HaveOccurred())
-	defer cancel()
-	nodeURI = uri
+	tc := e2e.NewTestContext()
+	env := e2e.GetEnv(tc)
+	uris := env.GetNodeURIs()
+	nodeURI = uris[0].URI
 
 	httpClient = &http.Client{Timeout: 10 * time.Second}
 	client = infov1connect.NewInfoServiceClient(httpClient, nodeURI)
-})
-
-var _ = AfterSuite(func() {
-	if network != nil {
-		_ = network.Stop(ctx)
-	}
 })
 
 var _ = Describe("InfoService ConnectRPC E2E", func() {
