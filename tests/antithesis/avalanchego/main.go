@@ -218,7 +218,11 @@ func (w *workload) executeTest(ctx context.Context) {
 	defer tc.Recover()
 	require := require.New(tc)
 
-	val, err := rand.Int(rand.Reader, big.NewInt(5))
+	// Ensure this value matches the number of tests + 1 to offset
+	// 0-based + 1 for sleep case in the switch statement for flowID
+	testCount := int64(6)
+
+	val, err := rand.Int(rand.Reader, big.NewInt(testCount))
 	require.NoError(err, "failed to read randomness")
 
 	flowID := val.Int64()
