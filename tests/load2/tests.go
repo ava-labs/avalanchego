@@ -46,8 +46,14 @@ func NewRandomTest(ctx context.Context, chainID *big.Int, worker *Worker) (Rando
 
 	worker.Nonce++
 
-	weight := uint64(100)
-	count := big.NewInt(5)
+	var (
+		weight = uint64(100)
+		// count specifies how many times to repeat an operation (e.g. reads,
+		// writes, or computes) for a test that supports repeated operations.
+		// This value is arbitrary but kept constant to ensure test reproducibility.
+		count = big.NewInt(5)
+	)
+
 	weightedTests := []WeightedTest{
 		{
 			Test:   ZeroTransferTest{},
