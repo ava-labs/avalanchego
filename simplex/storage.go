@@ -9,11 +9,13 @@ import (
 	"github.com/ava-labs/simplex"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 var _ simplex.Storage = (*Storage)(nil)
+var simplexPrefix = []byte("simplex")
 var BlockHeaderLen = 89 // TODO: import from simplex package(not currently exported)
 
 type Storage struct {
@@ -35,9 +37,7 @@ type Storage struct {
 }
 
 // newStorage creates a new Storage instance.
-// it writes the genesis block to the database at height 0, seq 0.
-// The DB should already be prefixed.
-// Assumes the VM is already initialized and the genesis block is set.
+// Assumes the VM has already been initialized.
 func newStorage(ctx context.Context, config *Config, verifier BLSVerifier) (*Storage, error) {
 	lastAccepted, err := config.VM.LastAccepted(ctx)
 	lastAcceptedBlock, err := config.VM.GetBlock(ctx, lastAccepted)
@@ -51,7 +51,7 @@ func newStorage(ctx context.Context, config *Config, verifier BLSVerifier) (*Sto
 	}
 
 	s := &Storage{
-		db:           config.DB,
+		db:           prefixdb.New(simplexPrefix, config.DB,),
 		genesisBlock: genesisBlock,
 		vm:           config.VM,
 		deserializer: QCDeserializer(verifier),
@@ -63,35 +63,6 @@ func newStorage(ctx context.Context, config *Config, verifier BLSVerifier) (*Sto
 
 func (s *Storage) Height() uint64 {
 	return s.height.Load()
-}
-
-func getGenesisBlock(ctx context.Context, config *Config, lastAcceptedBlock snowman.Block) (*Block, error) {
-	genesis := &Block{
-		metadata: simplex.ProtocolMetadata{
-			Version: 0, // todo: add to constants
-			Seq:     0,
-			Round:   0,
-			Epoch:   0,
-		},
-	}
-
-	if lastAcceptedBlock.Height() == 0 {
-		genesis.vmBlock = lastAcceptedBlock
-	} else {
-		snowmanGenesis, err := config.VM.ParseBlock(ctx, config.GenesisBytes)
-		if err != nil {
-			return nil, err
-		}
-		genesis.vmBlock = snowmanGenesis
-	}
-
-	bytes, err := genesis.Bytes()
-	if err != nil {
-		return nil, err
-	}
-	genesis.digest = computeDigest(bytes)
-
-	return genesis, nil
 }
 
 // Retrieve returns the block and finalization at [seq].
@@ -130,6 +101,10 @@ func (s *Storage) Index(block simplex.VerifiedBlock, finalization simplex.Finali
 	}
 
 	currentHeight := s.height.Load()
+	if currentHeight != block.BlockHeader().ProtocolMetadata.Seq {
+		panic("current height does not match block sequence number")
+	}
+	
 	s.height.Add(1)
 
 	seqBuff := make([]byte, 8)
@@ -141,6 +116,35 @@ func (s *Storage) Index(block simplex.VerifiedBlock, finalization simplex.Finali
 	}
 
 	s.blockTracker.indexBlock(context.Background(), block.BlockHeader().Digest)
+}
+
+func getGenesisBlock(ctx context.Context, config *Config, lastAcceptedBlock snowman.Block) (*Block, error) {
+	genesis := &Block{
+		metadata: simplex.ProtocolMetadata{
+			Version: 0, // todo: add to constants
+			Seq:     0,
+			Round:   0,
+			Epoch:   0,
+		},
+	}
+
+	if lastAcceptedBlock.Height() == 0 {
+		genesis.vmBlock = lastAcceptedBlock
+	} else {
+		snowmanGenesis, err := config.VM.ParseBlock(ctx, config.GenesisBytes)
+		if err != nil {
+			return nil, err
+		}
+		genesis.vmBlock = snowmanGenesis
+	}
+
+	bytes, err := genesis.Bytes()
+	if err != nil {
+		return nil, err
+	}
+	genesis.digest = computeDigest(bytes)
+
+	return genesis, nil
 }
 
 // retrieveFinalization retrieves the finalization at [seq].
