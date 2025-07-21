@@ -126,9 +126,12 @@ impl api::DbView for HistoricalRev {
 
     fn iter_option<K: KeyType>(
         &self,
-        _first_key: Option<K>,
+        first_key: Option<K>,
     ) -> Result<Self::Stream<'_>, api::Error> {
-        todo!()
+        match first_key {
+            Some(key) => Ok(MerkleKeyValueStream::from_key(self, key)),
+            None => Ok(MerkleKeyValueStream::from(self)),
+        }
     }
 }
 
