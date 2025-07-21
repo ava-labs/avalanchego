@@ -5,6 +5,7 @@ package gossip
 
 import (
 	"context"
+	"github.com/prometheus/client_golang/prometheus"
 	"time"
 
 	"go.uber.org/zap"
@@ -44,7 +45,7 @@ type Handler[T Gossipable] struct {
 	targetResponseSize int
 }
 
-func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *common.AppError) {
+func (h Handler[T]) AppRequest(_ context.Context, nodeID ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *common.AppError) {
 	filter, salt, err := ParseAppRequest(requestBytes)
 	if err != nil {
 		return nil, p2p.ErrUnexpected
@@ -85,7 +86,14 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 
 	if total > 0 {
 		hitRate := float64(hits) / float64(total)
-		h.metrics.bloomFilterHitRate.Observe(100 * hitRate)
+		percentage := 100 * hitRate
+		h.metrics.bloomFilterHitRate.Observe(percentage)
+
+		if percentage < 10 {
+			h.metrics.bloomFilterMisses.With(prometheus.Labels{
+				"NodeID": nodeID.String(),
+			}).Inc()
+		}
 	}
 
 	if err := h.metrics.observeMessage(sentPullLabels, len(gossipBytes), responseSize); err != nil {
