@@ -91,11 +91,6 @@ use crate::{FileBacked, FileIoError, Path, ReadableStorage, SharedNode, TrieHash
 
 use super::linear::WritableStorage;
 
-#[inline]
-pub(crate) const fn is_aligned(addr: LinearAddress) -> bool {
-    addr.get() % alloc::MIN_AREA_SIZE == 0
-}
-
 impl<S: ReadableStorage> NodeStore<Committed, S> {
     /// Open an existing [`NodeStore`]
     /// Assumes the header is written in the [`ReadableStorage`].
@@ -105,9 +100,8 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
     /// Returns a [`FileIoError`] if the header cannot be read or validated.
     pub fn open(storage: Arc<S>) -> Result<Self, FileIoError> {
         let mut stream = storage.stream_from(0)?;
-        let mut header = NodeStoreHeader::new();
-        let header_bytes = bytemuck::bytes_of_mut(&mut header);
-        if let Err(e) = stream.read_exact(header_bytes) {
+        let mut header_bytes = vec![0u8; std::mem::size_of::<NodeStoreHeader>()];
+        if let Err(e) = stream.read_exact(&mut header_bytes) {
             if e.kind() == std::io::ErrorKind::UnexpectedEof {
                 return Self::new_empty_committed(storage.clone());
             }
@@ -116,6 +110,7 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
 
         drop(stream);
 
+        let header = *NodeStoreHeader::from_bytes(&header_bytes);
         header
             .validate()
             .map_err(|e| storage.file_io_error(e, 0, Some("header read".to_string())))?;
@@ -753,16 +748,16 @@ mod tests {
     use crate::linear::memory::MemStore;
     use crate::{BranchNode, Child, LeafNode};
     use arc_swap::access::DynGuard;
-    use nonzero_ext::nonzero;
+
     use test_case::test_case;
 
     use super::*;
-    use alloc::{AREA_SIZES, MAX_AREA_SIZE, MIN_AREA_SIZE, NUM_AREA_SIZES, area_size_to_index};
+    use alloc::{AREA_SIZES, area_size_to_index};
 
     #[test]
     fn area_sizes_aligned() {
         for area_size in &AREA_SIZES {
-            assert_eq!(area_size % MIN_AREA_SIZE, 0);
+            assert_eq!(area_size % LinearAddress::MIN_AREA_SIZE, 0);
         }
     }
 
@@ -778,7 +773,7 @@ mod tests {
                 assert_eq!(area_size_to_index(area_size - 1).unwrap(), i as AreaIndex);
             }
 
-            if i < NUM_AREA_SIZES - 1 {
+            if i < LinearAddress::num_area_sizes() - 1 {
                 // 1 more than top of range goes to next range
                 assert_eq!(
                     area_size_to_index(area_size + 1).unwrap(),
@@ -787,11 +782,11 @@ mod tests {
             }
         }
 
-        for i in 0..=MIN_AREA_SIZE {
+        for i in 0..=LinearAddress::MIN_AREA_SIZE {
             assert_eq!(area_size_to_index(i).unwrap(), 0);
         }
 
-        assert!(area_size_to_index(MAX_AREA_SIZE + 1).is_err());
+        assert!(area_size_to_index(LinearAddress::MAX_AREA_SIZE + 1).is_err());
     }
 
     #[test]
@@ -832,7 +827,7 @@ mod tests {
         value: Some(vec![9, 10, 11].into_boxed_slice()),
         children: from_fn(|i| {
             if i == 15 {
-                Some(Child::AddressWithHash(nonzero!(1u64), std::array::from_fn::<u8, 32, _>(|i| i as u8).into()))
+                Some(Child::AddressWithHash(LinearAddress::new(1).unwrap(), std::array::from_fn::<u8, 32, _>(|i| i as u8).into()))
             } else {
                 None
             }
@@ -842,7 +837,7 @@ mod tests {
         partial_path: Path::from([6, 7, 8]),
         value: Some(vec![9, 10, 11].into_boxed_slice()),
         children: from_fn(|_|
-            Some(Child::AddressWithHash(nonzero!(1u64), std::array::from_fn::<u8, 32, _>(|i| i as u8).into()))
+            Some(Child::AddressWithHash(LinearAddress::new(1).unwrap(), std::array::from_fn::<u8, 32, _>(|i| i as u8).into()))
         ),
     }; "branch node with all child")]
     #[test_case(

@@ -12,7 +12,6 @@
 
 use std::array::from_fn;
 use std::fs::File;
-use std::num::NonZeroU64;
 use std::os::raw::c_int;
 
 use criterion::profiler::Profiler;
@@ -101,7 +100,7 @@ fn branch(c: &mut Criterion) {
         children: from_fn(|i| {
             if i == 0 {
                 Some(firewood_storage::Child::AddressWithHash(
-                    NonZeroU64::new(1).unwrap(),
+                    firewood_storage::LinearAddress::new(1).unwrap(),
                     firewood_storage::HashType::from([0; 32]),
                 ))
             } else {

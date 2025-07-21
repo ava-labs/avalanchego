@@ -191,6 +191,7 @@ mod test {
             Option::from(&maybe_persisted_node)
         );
 
+        let addr = LinearAddress::new(addr.get()).unwrap();
         maybe_persisted_node.persist_at(addr);
         assert!(maybe_persisted_node.as_shared_node(&store).is_err());
         assert_eq!(Some(addr), Option::from(&maybe_persisted_node));
@@ -199,7 +200,7 @@ mod test {
 
     #[test]
     fn test_from_linear_address() {
-        let addr = nonzero!(1024u64);
+        let addr: LinearAddress = nonzero!(1024u64).into();
         let maybe_persisted_node = MaybePersistedNode::from(addr);
         assert_eq!(Some(addr), Option::from(&maybe_persisted_node));
     }
@@ -226,7 +227,7 @@ mod test {
         assert_eq!(triomphe::Arc::strong_count(&node), 2);
 
         // Persist the original
-        let addr = nonzero!(4096u64);
+        let addr = nonzero!(1024u64).into();
         original.persist_at(addr);
 
         // Both original and clone should now be persisted since they share the same ArcSwap

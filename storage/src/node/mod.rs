@@ -23,7 +23,7 @@
 )]
 
 use crate::node::branch::ReadSerializable;
-use crate::{HashType, Path, SharedNode};
+use crate::{HashType, LinearAddress, Path, SharedNode};
 use bitfield::bitfield;
 use branch::Serializable as _;
 pub use branch::{BranchNode, Child};
@@ -32,13 +32,11 @@ use integer_encoding::{VarInt, VarIntReader as _};
 pub use leaf::LeafNode;
 use std::fmt::Debug;
 use std::io::{Error, Read, Write};
-use std::num::NonZero;
 
 pub mod branch;
 mod leaf;
 pub mod path;
 pub mod persist;
-
 /// A node, either a Branch or Leaf
 
 // TODO: explain why Branch is boxed but Leaf is not
@@ -412,7 +410,8 @@ impl Node {
                         let hash = HashType::from_reader(&mut serialized)?;
 
                         *child = Some(Child::AddressWithHash(
-                            NonZero::new(address).ok_or(Error::other("zero address in child"))?,
+                            LinearAddress::new(address)
+                                .ok_or(Error::other("zero address in child"))?,
                             hash,
                         ));
                     }
@@ -429,7 +428,8 @@ impl Node {
                         let hash = HashType::from_reader(&mut serialized)?;
 
                         children[position] = Some(Child::AddressWithHash(
-                            NonZero::new(address).ok_or(Error::other("zero address in child"))?,
+                            LinearAddress::new(address)
+                                .ok_or(Error::other("zero address in child"))?,
                             hash,
                         ));
                     }

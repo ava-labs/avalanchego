@@ -21,7 +21,6 @@
 
 use std::fmt::Debug;
 use std::io::Read;
-use std::num::NonZero;
 use std::ops::Deref;
 use std::path::PathBuf;
 
@@ -184,7 +183,7 @@ pub trait WritableStorage: ReadableStorage {
     /// Write all nodes to the cache (if any)
     fn write_cached_nodes<'a>(
         &self,
-        _nodes: impl Iterator<Item = (&'a NonZero<u64>, &'a SharedNode)>,
+        _nodes: impl Iterator<Item = (LinearAddress, &'a SharedNode)>,
     ) -> Result<(), FileIoError> {
         Ok(())
     }
