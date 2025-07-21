@@ -85,10 +85,7 @@ func (l LoadGenerator) Run(
 				default:
 				}
 
-				ctx, cancel := context.WithTimeout(ctx, testTimeout)
-				defer cancel()
-
-				execTestWithRecovery(ctx, log, l.test, l.wallets[i])
+				execTestWithRecovery(ctx, log, l.test, l.wallets[i], testTimeout)
 			}
 		})
 	}
@@ -98,8 +95,10 @@ func (l LoadGenerator) Run(
 
 // execTestWithRecovery ensures assertion-related panics encountered during test execution are recovered
 // and that deferred cleanups are always executed before returning.
-func execTestWithRecovery(ctx context.Context, log logging.Logger, test Test, wallet *Wallet) {
+func execTestWithRecovery(ctx context.Context, log logging.Logger, test Test, wallet *Wallet, testTimeout time.Duration) {
 	tc := tests.NewTestContext(log)
 	defer tc.Recover()
-	test.Run(tc, ctx, wallet)
+	contextWithTimeout, cancel := context.WithTimeout(ctx, testTimeout)
+	defer cancel()
+	test.Run(tc, contextWithTimeout, wallet)
 }
