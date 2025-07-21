@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -21,7 +22,12 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-const cliVersion = "0.0.1"
+const (
+	cliVersion = "0.0.1"
+
+	// Need a longer timeout to account for time required to deploy nginx ingress controller and chaos mesh
+	startKindClusterTimeout = 5 * time.Minute
+)
 
 var (
 	errNetworkDirRequired = fmt.Errorf("--network-dir or %s is required", tmpnet.NetworkDirEnvName)
@@ -279,7 +285,7 @@ func main() {
 		Use:   "start-kind-cluster",
 		Short: "Starts a local kind cluster with an integrated registry",
 		RunE: func(*cobra.Command, []string) error {
-			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
+			ctx, cancel := context.WithTimeout(context.Background(), startKindClusterTimeout)
 			defer cancel()
 			log, err := tests.LoggerForFormat("", rawLogFormat)
 			if err != nil {
