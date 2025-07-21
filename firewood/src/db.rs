@@ -703,6 +703,75 @@ mod test {
         assert_eq!(&*value, b"proposal_value");
     }
 
+    /// Test that proposing on a proposal works as expected
+    ///
+    /// Test creates two batches and proposes them, and verifies that the values are in the correct proposal.
+    /// It then commits them one by one, and verifies the latest committed version is correct.
+    #[tokio::test]
+    async fn test_propose_on_proposal() {
+        // number of keys and values to create for this test
+        const N: usize = 20;
+
+        let db = testdb().await;
+
+        // create N keys and values like (key0, value0)..(keyN, valueN)
+        let (keys, vals): (Vec<_>, Vec<_>) = (0..N)
+            .map(|i| {
+                (
+                    format!("key{i}").into_bytes(),
+                    Box::from(format!("value{i}").as_bytes()),
+                )
+            })
+            .unzip();
+
+        // create two batches, one with the first half of keys and values, and one with the last half keys and values
+        let mut kviter = keys
+            .iter()
+            .zip(vals.iter())
+            .map(|(k, v)| BatchOp::Put { key: k, value: v });
+        let batch1 = kviter.by_ref().take(N / 2).collect();
+        let batch2 = kviter.collect();
+
+        // create two proposals, second one has a base of the first one
+        let proposal1 = db.propose(batch1).await.unwrap();
+        let proposal2 = proposal1.clone().propose(batch2).await.unwrap();
+
+        // iterate over the keys and values again, checking that the values are in the correct proposal
+        let mut kviter = keys.iter().zip(vals.iter());
+
+        // first half of the keys should be in both proposals
+        for (k, v) in kviter.by_ref().take(N / 2) {
+            assert_eq!(&proposal1.val(k).await.unwrap().unwrap(), v);
+            assert_eq!(&proposal2.val(k).await.unwrap().unwrap(), v);
+        }
+
+        // remaining keys should only be in the second proposal
+        for (k, v) in kviter {
+            // second half of keys are in the second proposal
+            assert_eq!(&proposal2.val(k).await.unwrap().unwrap(), v);
+            // but not in the first
+            assert_eq!(proposal1.val(k).await.unwrap(), None);
+        }
+
+        proposal1.commit().await.unwrap();
+
+        // all keys are still in the second proposal (first is no longer accessible)
+        for (k, v) in keys.iter().zip(vals.iter()) {
+            assert_eq!(&proposal2.val(k).await.unwrap().unwrap(), v);
+        }
+
+        // commit the second proposal
+        proposal2.commit().await.unwrap();
+
+        // all keys are in the database
+        let committed = db.root_hash().await.unwrap().unwrap();
+        let revision = db.revision(committed).await.unwrap();
+
+        for (k, v) in keys.into_iter().zip(vals.into_iter()) {
+            assert_eq!(revision.val(k).await.unwrap().unwrap(), v);
+        }
+    }
+
     // Testdb is a helper struct for testing the Db. Once it's dropped, the directory and file disappear
     struct TestDb {
         db: Db,
