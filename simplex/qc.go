@@ -13,6 +13,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
 
+//go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
+
 var (
 	_ simplex.QuorumCertificate   = (*QC)(nil)
 	_ simplex.QCDeserializer      = QCDeserializer{}
@@ -32,9 +34,12 @@ type QC struct {
 	signers  []simplex.NodeID
 }
 
-type SerializedQC struct {
-	Sig     []byte           `serialize:"true"`
-	Signers []simplex.NodeID `serialize:"true"`
+// CanotoQC is the Canoto representation of a quorum certificate
+type canotoQC struct {
+	Sig     []byte           `canoto:"bytes,1"`
+	Signers []simplex.NodeID `canoto:"repeated bytes,2"`
+
+	canotoData canotoData_canotoQC
 }
 
 // Signers returns the list of signers for the quorum certificate.
@@ -80,35 +85,31 @@ func (qc *QC) Verify(msg []byte) error {
 
 // Bytes serializes the quorum certificate into bytes.
 func (qc *QC) Bytes() []byte {
-	serializedQC := &SerializedQC{
+	canotoQC := &canotoQC{
 		Sig:     bls.SignatureToBytes(qc.sig),
 		Signers: qc.signers,
 	}
 
-	bytes, err := Codec.Marshal(CodecVersion, serializedQC)
-	if err != nil {
-		panic(fmt.Errorf("failed to marshal QC: %w", err))
-	}
-	return bytes
+	return canotoQC.MarshalCanoto()
 }
 
 type QCDeserializer BLSVerifier
 
 // DeserializeQuorumCertificate deserializes a quorum certificate from bytes.
 func (d QCDeserializer) DeserializeQuorumCertificate(bytes []byte) (simplex.QuorumCertificate, error) {
-	var serializedQC SerializedQC
-	if _, err := Codec.Unmarshal(bytes, &serializedQC); err != nil {
+	var canotoQC canotoQC
+	if err := canotoQC.UnmarshalCanoto(bytes); err != nil {
 		return nil, fmt.Errorf("%w: %w", errFailedToParseQC, err)
 	}
 
-	sig, err := bls.SignatureFromBytes(serializedQC.Sig)
+	sig, err := bls.SignatureFromBytes(canotoQC.Sig)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", errFailedToParseSignature, err)
 	}
 
 	qc := QC{
 		sig:     sig,
-		signers: serializedQC.Signers,
+		signers: canotoQC.Signers,
 	}
 
 	verifier := BLSVerifier(d)
