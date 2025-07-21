@@ -58,7 +58,7 @@ var (
 	executionTimeout  time.Duration
 	labelsArg         string
 
-	labels map[string]string = map[string]string{
+	labels = map[string]string{
 		"job":               "c-chain-reexecution",
 		"is_ephemeral_node": "false",
 		"chain":             "C",
