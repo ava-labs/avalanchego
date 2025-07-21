@@ -1,5 +1,6 @@
-// (c) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
+
 package precompilebind
 
 // tmplSourcePrecompileConfigGo is the Go precompiled config source template.
@@ -20,7 +21,7 @@ import (
 
 )
 
-var _ precompileconfig.Config = &Config{}
+var _ precompileconfig.Config = (*Config)(nil)
 
 // Config implements the precompileconfig.Config interface and
 // adds specific configuration for {{.Contract.Type}}.

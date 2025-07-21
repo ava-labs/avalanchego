@@ -1,4 +1,4 @@
-// (c) 2021-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
-var _ block.StateSummary = &SyncSummary{}
+var _ block.StateSummary = (*SyncSummary)(nil)
 
 // SyncSummary provides the information necessary to sync a node starting
 // at the given block.

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package validators
@@ -182,15 +182,14 @@ func TestLoadNewValidators(t *testing.T) {
 
 			// set initial validators
 			for vID, validator := range test.initialValidators {
-				err := validatorState.AddValidator(interfaces.Validator{
+				require.NoError(validatorState.AddValidator(interfaces.Validator{
 					ValidationID:   vID,
 					NodeID:         validator.NodeID,
 					Weight:         validator.Weight,
 					StartTimestamp: validator.StartTime,
 					IsActive:       validator.IsActive,
 					IsL1Validator:  validator.IsL1Validator,
-				})
-				require.NoError(err)
+				}))
 			}
 			// enable mock listener
 			ctrl := gomock.NewController(tt)

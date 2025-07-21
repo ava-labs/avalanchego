@@ -1,4 +1,4 @@
-// (c) 2021-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package statesyncclient
@@ -51,7 +51,7 @@ var (
 	errInvalidCodeResponseLen = errors.New("number of code bytes in response does not match requested hashes")
 	errMaxCodeSizeExceeded    = errors.New("max code size exceeded")
 )
-var _ Client = &client{}
+var _ Client = (*client)(nil)
 
 // Client synchronously fetches data from the network to fulfill state sync requests.
 // Repeatedly requests failed requests until the context to the request is expired.

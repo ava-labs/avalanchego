@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -91,19 +91,23 @@ func TestState(t *testing.T) {
 	// set a different node ID should fail
 	newNodeID := ids.GenerateTestNodeID()
 	vdr.NodeID = newNodeID
-	require.ErrorIs(state.UpdateValidator(vdr), ErrImmutableField)
+	err = state.UpdateValidator(vdr)
+	require.ErrorIs(err, ErrImmutableField)
 
 	// set a different start time should fail
 	vdr.StartTimestamp = vdr.StartTimestamp + 100
-	require.ErrorIs(state.UpdateValidator(vdr), ErrImmutableField)
+	err = state.UpdateValidator(vdr)
+	require.ErrorIs(err, ErrImmutableField)
 
 	// set IsL1Validator should fail
 	vdr.IsL1Validator = false
-	require.ErrorIs(state.UpdateValidator(vdr), ErrImmutableField)
+	err = state.UpdateValidator(vdr)
+	require.ErrorIs(err, ErrImmutableField)
 
 	// set validation ID should result in not found
 	vdr.ValidationID = ids.GenerateTestID()
-	require.ErrorIs(state.UpdateValidator(vdr), database.ErrNotFound)
+	err = state.UpdateValidator(vdr)
+	require.ErrorIs(err, database.ErrNotFound)
 
 	// delete uptime
 	require.NoError(state.DeleteValidator(vID))

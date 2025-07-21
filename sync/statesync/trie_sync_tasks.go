@@ -1,4 +1,4 @@
-// (c) 2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package statesync
@@ -17,8 +17,8 @@ import (
 )
 
 var (
-	_ syncTask = &mainTrieTask{}
-	_ syncTask = &storageTrieTask{}
+	_ syncTask = (*mainTrieTask)(nil)
+	_ syncTask = (*storageTrieTask)(nil)
 )
 
 type syncTask interface {

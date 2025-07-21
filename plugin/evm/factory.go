@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package evm
@@ -14,7 +14,7 @@ var (
 	IDStr = "subnetevm"
 	ID    = ids.ID{'s', 'u', 'b', 'n', 'e', 't', 'e', 'v', 'm'}
 
-	_ vms.Factory = &Factory{}
+	_ vms.Factory = (*Factory)(nil)
 )
 
 type Factory struct{}

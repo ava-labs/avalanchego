@@ -1,4 +1,4 @@
-// (c) 2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package handlers
@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
-	"github.com/ava-labs/subnet-evm/internal/testutils"
+	"github.com/ava-labs/subnet-evm/metrics/metricstest"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/subnet-evm/utils/utilstest"
 	"github.com/ava-labs/subnet-evm/warp"
@@ -24,7 +24,7 @@ import (
 var networkCodec = message.Codec
 
 func TestMessageSignatureHandler(t *testing.T) {
-	testutils.WithMetrics(t)
+	metricstest.WithMetrics(t)
 
 	database := memdb.New()
 	snowCtx := utilstest.NewTestSnowContext(t)
@@ -136,7 +136,7 @@ func TestMessageSignatureHandler(t *testing.T) {
 }
 
 func TestBlockSignatureHandler(t *testing.T) {
-	testutils.WithMetrics(t)
+	metricstest.WithMetrics(t)
 
 	database := memdb.New()
 	snowCtx := utilstest.NewTestSnowContext(t)

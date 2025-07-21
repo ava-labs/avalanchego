@@ -1,5 +1,6 @@
-// (c) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
+
 package precompilebind
 
 // tmplSourcePrecompileModuleGo is the Go precompiled module source template.
@@ -20,7 +21,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 )
 
-var _ contract.Configurator = &configurator{}
+var _ contract.Configurator = (*configurator)(nil)
 
 // ConfigKey is the key used in json config files to specify this precompile config.
 // must be unique across all precompiles.

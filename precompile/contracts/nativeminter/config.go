@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package nativeminter
@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/subnet-evm/utils"
 )
 
-var _ precompileconfig.Config = &Config{}
+var _ precompileconfig.Config = (*Config)(nil)
 
 // Config implements the precompileconfig.Config interface while adding in the
 // ContractNativeMinter specific precompile config.

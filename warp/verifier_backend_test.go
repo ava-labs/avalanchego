@@ -1,4 +1,4 @@
-// (c) 2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package warp
@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
-	"github.com/ava-labs/subnet-evm/internal/testutils"
+	"github.com/ava-labs/subnet-evm/metrics/metricstest"
 	"github.com/ava-labs/subnet-evm/plugin/evm/validators"
 	stateinterfaces "github.com/ava-labs/subnet-evm/plugin/evm/validators/state/interfaces"
 	"github.com/ava-labs/subnet-evm/utils/utilstest"
@@ -30,7 +30,7 @@ import (
 )
 
 func TestAddressedCallSignatures(t *testing.T) {
-	testutils.WithMetrics(t)
+	metricstest.WithMetrics(t)
 
 	database := memdb.New()
 	snowCtx := utilstest.NewTestSnowContext(t)
@@ -152,7 +152,7 @@ func TestAddressedCallSignatures(t *testing.T) {
 }
 
 func TestBlockSignatures(t *testing.T) {
-	testutils.WithMetrics(t)
+	metricstest.WithMetrics(t)
 
 	database := memdb.New()
 	snowCtx := utilstest.NewTestSnowContext(t)

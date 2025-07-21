@@ -1,4 +1,4 @@
-// (c) 2021-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package statesyncclient
@@ -28,7 +28,7 @@ import (
 	clientstats "github.com/ava-labs/subnet-evm/sync/client/stats"
 	"github.com/ava-labs/subnet-evm/sync/handlers"
 	handlerstats "github.com/ava-labs/subnet-evm/sync/handlers/stats"
-	"github.com/ava-labs/subnet-evm/sync/syncutils"
+	"github.com/ava-labs/subnet-evm/sync/statesync/statesynctest"
 )
 
 func TestGetCode(t *testing.T) {
@@ -413,8 +413,8 @@ func TestGetLeafs(t *testing.T) {
 	const leafsLimit = 1024
 
 	trieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
-	largeTrieRoot, largeTrieKeys, _ := syncutils.GenerateTrie(t, trieDB, 100_000, common.HashLength)
-	smallTrieRoot, _, _ := syncutils.GenerateTrie(t, trieDB, leafsLimit, common.HashLength)
+	largeTrieRoot, largeTrieKeys, _ := statesynctest.GenerateTrie(t, trieDB, 100_000, common.HashLength)
+	smallTrieRoot, _, _ := statesynctest.GenerateTrie(t, trieDB, leafsLimit, common.HashLength)
 
 	handler := handlers.NewLeafsRequestHandler(trieDB, nil, message.Codec, handlerstats.NewNoopHandlerStats())
 	client := NewClient(&ClientConfig{
@@ -784,7 +784,7 @@ func TestGetLeafsRetries(t *testing.T) {
 	rand.Seed(1)
 
 	trieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
-	root, _, _ := syncutils.GenerateTrie(t, trieDB, 100_000, common.HashLength)
+	root, _, _ := statesynctest.GenerateTrie(t, trieDB, 100_000, common.HashLength)
 
 	handler := handlers.NewLeafsRequestHandler(trieDB, nil, message.Codec, handlerstats.NewNoopHandlerStats())
 	mockNetClient := &mockNetwork{}

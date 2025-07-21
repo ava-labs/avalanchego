@@ -1,4 +1,4 @@
-// (c) 2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package warp
@@ -22,7 +22,7 @@ import (
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
-	"github.com/ava-labs/subnet-evm/precompile/testutils"
+	"github.com/ava-labs/subnet-evm/precompile/precompiletest"
 	"github.com/ava-labs/subnet-evm/predicate"
 	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ava-labs/subnet-evm/utils/utilstest"
@@ -199,8 +199,8 @@ func createSnowCtx(tb testing.TB, validatorRanges []validatorRange) *snow.Contex
 	return snowCtx
 }
 
-func createValidPredicateTest(snowCtx *snow.Context, numKeys uint64, predicateBytes []byte) testutils.PredicateTest {
-	return testutils.PredicateTest{
+func createValidPredicateTest(snowCtx *snow.Context, numKeys uint64, predicateBytes []byte) precompiletest.PredicateTest {
+	return precompiletest.PredicateTest{
 		Config: NewDefaultConfig(utils.NewUint64(0)),
 		PredicateContext: &precompileconfig.PredicateContext{
 			SnowCtx: snowCtx,
@@ -278,7 +278,7 @@ func testWarpMessageFromPrimaryNetwork(t *testing.T, requirePrimaryNetworkSigner
 		},
 	}
 
-	test := testutils.PredicateTest{
+	test := precompiletest.PredicateTest{
 		Config: NewConfig(utils.NewUint64(0), 0, requirePrimaryNetworkSigners),
 		PredicateContext: &precompileconfig.PredicateContext{
 			SnowCtx: snowCtx,
@@ -308,7 +308,7 @@ func TestInvalidPredicatePacking(t *testing.T) {
 	predicateBytes := createPredicate(numKeys)
 	predicateBytes = append(predicateBytes, byte(0x01)) // Invalidate the predicate byte packing
 
-	test := testutils.PredicateTest{
+	test := precompiletest.PredicateTest{
 		Config: NewDefaultConfig(utils.NewUint64(0)),
 		PredicateContext: &precompileconfig.PredicateContext{
 			SnowCtx: snowCtx,
@@ -339,7 +339,7 @@ func TestInvalidWarpMessage(t *testing.T) {
 	warpMsgBytes = append(warpMsgBytes, byte(0x01)) // Invalidate warp message packing
 	predicateBytes := predicate.PackPredicate(warpMsgBytes)
 
-	test := testutils.PredicateTest{
+	test := precompiletest.PredicateTest{
 		Config: NewDefaultConfig(utils.NewUint64(0)),
 		PredicateContext: &precompileconfig.PredicateContext{
 			SnowCtx: snowCtx,
@@ -383,7 +383,7 @@ func TestInvalidAddressedPayload(t *testing.T) {
 	warpMsgBytes := warpMsg.Bytes()
 	predicateBytes := predicate.PackPredicate(warpMsgBytes)
 
-	test := testutils.PredicateTest{
+	test := precompiletest.PredicateTest{
 		Config: NewDefaultConfig(utils.NewUint64(0)),
 		PredicateContext: &precompileconfig.PredicateContext{
 			SnowCtx: snowCtx,
@@ -428,7 +428,7 @@ func TestInvalidBitSet(t *testing.T) {
 		},
 	})
 	predicateBytes := predicate.PackPredicate(msg.Bytes())
-	test := testutils.PredicateTest{
+	test := precompiletest.PredicateTest{
 		Config: NewDefaultConfig(utils.NewUint64(0)),
 		PredicateContext: &precompileconfig.PredicateContext{
 			SnowCtx: snowCtx,
@@ -454,7 +454,7 @@ func TestWarpSignatureWeightsDefaultQuorumNumerator(t *testing.T) {
 		},
 	})
 
-	tests := make(map[string]testutils.PredicateTest)
+	tests := make(map[string]precompiletest.PredicateTest)
 	for _, numSigners := range []int{
 		1,
 		int(WarpDefaultQuorumNumerator) - 1,
@@ -473,7 +473,7 @@ func TestWarpSignatureWeightsDefaultQuorumNumerator(t *testing.T) {
 			expectedErr = errFailedVerification
 		}
 
-		tests[fmt.Sprintf("default quorum %d signature(s)", numSigners)] = testutils.PredicateTest{
+		tests[fmt.Sprintf("default quorum %d signature(s)", numSigners)] = precompiletest.PredicateTest{
 			Config: NewDefaultConfig(utils.NewUint64(0)),
 			PredicateContext: &precompileconfig.PredicateContext{
 				SnowCtx: snowCtx,
@@ -487,7 +487,7 @@ func TestWarpSignatureWeightsDefaultQuorumNumerator(t *testing.T) {
 			ExpectedErr:    expectedErr,
 		}
 	}
-	testutils.RunPredicateTests(t, tests)
+	precompiletest.RunPredicateTests(t, tests)
 }
 
 // multiple messages all correct, multiple messages all incorrect, mixed bag
@@ -501,7 +501,7 @@ func TestWarpMultiplePredicates(t *testing.T) {
 		},
 	})
 
-	tests := make(map[string]testutils.PredicateTest)
+	tests := make(map[string]precompiletest.PredicateTest)
 	for _, validMessageIndices := range [][]bool{
 		{},
 		{true, false},
@@ -531,7 +531,7 @@ func TestWarpMultiplePredicates(t *testing.T) {
 				expectedErr = errFailedVerification
 			}
 
-			tests[fmt.Sprintf("multiple predicates %v", validMessageIndices)] = testutils.PredicateTest{
+			tests[fmt.Sprintf("multiple predicates %v", validMessageIndices)] = precompiletest.PredicateTest{
 				Config: NewDefaultConfig(utils.NewUint64(0)),
 				PredicateContext: &precompileconfig.PredicateContext{
 					SnowCtx: snowCtx,
@@ -546,7 +546,7 @@ func TestWarpMultiplePredicates(t *testing.T) {
 			}
 		}
 	}
-	testutils.RunPredicateTests(t, tests)
+	precompiletest.RunPredicateTests(t, tests)
 }
 
 func TestWarpSignatureWeightsNonDefaultQuorumNumerator(t *testing.T) {
@@ -559,7 +559,7 @@ func TestWarpSignatureWeightsNonDefaultQuorumNumerator(t *testing.T) {
 		},
 	})
 
-	tests := make(map[string]testutils.PredicateTest)
+	tests := make(map[string]precompiletest.PredicateTest)
 	nonDefaultQuorumNumerator := 50
 	// Ensure this test fails if the DefaultQuroumNumerator is changed to an unexpected value during development
 	require.NotEqual(t, nonDefaultQuorumNumerator, int(WarpDefaultQuorumNumerator))
@@ -575,7 +575,7 @@ func TestWarpSignatureWeightsNonDefaultQuorumNumerator(t *testing.T) {
 		}
 
 		name := fmt.Sprintf("non-default quorum %d signature(s)", numSigners)
-		tests[name] = testutils.PredicateTest{
+		tests[name] = precompiletest.PredicateTest{
 			Config: NewConfig(utils.NewUint64(0), uint64(nonDefaultQuorumNumerator), false),
 			PredicateContext: &precompileconfig.PredicateContext{
 				SnowCtx: snowCtx,
@@ -590,11 +590,11 @@ func TestWarpSignatureWeightsNonDefaultQuorumNumerator(t *testing.T) {
 		}
 	}
 
-	testutils.RunPredicateTests(t, tests)
+	precompiletest.RunPredicateTests(t, tests)
 }
 
-func makeWarpPredicateTests(tb testing.TB) map[string]testutils.PredicateTest {
-	predicateTests := make(map[string]testutils.PredicateTest)
+func makeWarpPredicateTests(tb testing.TB) map[string]precompiletest.PredicateTest {
+	predicateTests := make(map[string]precompiletest.PredicateTest)
 	for _, totalNodes := range []int{10, 100, 1_000, 10_000} {
 		testName := fmt.Sprintf("%d signers/%d validators", totalNodes, totalNodes)
 
@@ -685,10 +685,10 @@ func makeWarpPredicateTests(tb testing.TB) map[string]testutils.PredicateTest {
 
 func TestWarpPredicate(t *testing.T) {
 	predicateTests := makeWarpPredicateTests(t)
-	testutils.RunPredicateTests(t, predicateTests)
+	precompiletest.RunPredicateTests(t, predicateTests)
 }
 
 func BenchmarkWarpPredicate(b *testing.B) {
 	predicateTests := makeWarpPredicateTests(b)
-	testutils.RunPredicateBenchmarks(b, predicateTests)
+	precompiletest.RunPredicateBenchmarks(b, predicateTests)
 }

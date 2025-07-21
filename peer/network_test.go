@@ -1,4 +1,4 @@
-// (c) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
@@ -38,18 +38,18 @@ var (
 		Patch: 0,
 	}
 
-	_ message.Request = &HelloRequest{}
-	_                 = &HelloResponse{}
-	_                 = &GreetingRequest{}
-	_                 = &GreetingResponse{}
-	_                 = &TestMessage{}
+	_ message.Request = (*HelloRequest)(nil)
+	_                 = (*HelloResponse)(nil)
+	_                 = (*GreetingRequest)(nil)
+	_                 = (*GreetingResponse)(nil)
+	_                 = (*TestMessage)(nil)
 
-	_ message.RequestHandler = &HelloGreetingRequestHandler{}
-	_ message.RequestHandler = &testRequestHandler{}
+	_ message.RequestHandler = (*HelloGreetingRequestHandler)(nil)
+	_ message.RequestHandler = (*testRequestHandler)(nil)
 
 	_ common.AppSender = testAppSender{}
 
-	_ p2p.Handler = &testSDKHandler{}
+	_ p2p.Handler = (*testSDKHandler)(nil)
 )
 
 func TestNetworkDoesNotConnectToItself(t *testing.T) {
@@ -372,8 +372,7 @@ func TestAppRequestAnyOnCtxCancellation(t *testing.T) {
 	<-doneChan
 	// Should still be able to process a response after cancelling.
 	assert.Len(t, net.(*network).outstandingRequestHandlers, 1) // context cancellation SendAppRequestAny failure doesn't clear
-	err = net.AppResponse(context.Background(), sentAppRequestInfo.nodeID, sentAppRequestInfo.requestID, []byte{})
-	assert.NoError(t, err)
+	assert.NoError(t, net.AppResponse(context.Background(), sentAppRequestInfo.nodeID, sentAppRequestInfo.requestID, []byte{}))
 	assert.Empty(t, net.(*network).outstandingRequestHandlers) // Received response
 }
 
@@ -396,8 +395,7 @@ func TestRequestMinVersion(t *testing.T) {
 				if err != nil {
 					panic(err)
 				}
-				err = net.AppResponse(context.Background(), nodeID, reqID, responseBytes)
-				assert.NoError(t, err)
+				assert.NoError(t, net.AppResponse(context.Background(), nodeID, reqID, responseBytes))
 			}()
 			return nil
 		},
@@ -483,8 +481,7 @@ func TestOnRequestHonoursDeadline(t *testing.T) {
 	assert.EqualValues(t, requestHandler.calls, 0)
 
 	requestHandler.processingDuration = 0
-	err = net.AppRequest(context.Background(), nodeID, 2, time.Now().Add(250*time.Millisecond), requestBytes)
-	assert.NoError(t, err)
+	assert.NoError(t, net.AppRequest(context.Background(), nodeID, 2, time.Now().Add(250*time.Millisecond), requestBytes))
 	assert.True(t, responded)
 	assert.EqualValues(t, requestHandler.calls, 1)
 }

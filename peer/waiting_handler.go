@@ -1,4 +1,4 @@
-// (c) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 )
 
-var _ message.ResponseHandler = &waitingResponseHandler{}
+var _ message.ResponseHandler = (*waitingResponseHandler)(nil)
 
 // waitingResponseHandler implements the ResponseHandler interface
 // Internally used to wait for response after making a request synchronously

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package utils
@@ -115,8 +115,7 @@ func RunHardhatTestsCustomURI(ctx context.Context, chainURI string, execPath str
 	cmd.Dir = execPath
 
 	log.Info("Sleeping to wait for test ping", "rpcURI", chainURI)
-	err := os.Setenv("RPC_URI", chainURI)
-	require.NoError(err)
+	require.NoError(os.Setenv("RPC_URI", chainURI))
 	log.Info("Running test command", "cmd", cmd.String())
 
 	out, err := cmd.CombinedOutput()

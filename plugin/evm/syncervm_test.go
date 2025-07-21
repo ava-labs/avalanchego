@@ -1,4 +1,4 @@
-// (c) 2021-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package evm
@@ -38,16 +38,17 @@ import (
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/core"
-	"github.com/ava-labs/subnet-evm/internal/testutils"
+	"github.com/ava-labs/subnet-evm/core/coretest"
 	"github.com/ava-labs/subnet-evm/plugin/evm/customrawdb"
 	"github.com/ava-labs/subnet-evm/plugin/evm/database"
 	"github.com/ava-labs/subnet-evm/predicate"
 	statesyncclient "github.com/ava-labs/subnet-evm/sync/client"
-	"github.com/ava-labs/subnet-evm/sync/statesync"
+	"github.com/ava-labs/subnet-evm/sync/statesync/statesynctest"
+	"github.com/ava-labs/subnet-evm/utils/utilstest"
 )
 
 func TestSkipStateSync(t *testing.T) {
-	rand.Seed(1)
+	rand.New(rand.NewSource(1))
 	test := syncTest{
 		syncableInterval:   256,
 		stateSyncMinBlocks: 300, // must be greater than [syncableInterval] to skip sync
@@ -59,7 +60,7 @@ func TestSkipStateSync(t *testing.T) {
 }
 
 func TestStateSyncFromScratch(t *testing.T) {
-	rand.Seed(1)
+	rand.New(rand.NewSource(1))
 	test := syncTest{
 		syncableInterval:   256,
 		stateSyncMinBlocks: 50, // must be less than [syncableInterval] to perform sync
@@ -71,7 +72,7 @@ func TestStateSyncFromScratch(t *testing.T) {
 }
 
 func TestStateSyncFromScratchExceedParent(t *testing.T) {
-	rand.Seed(1)
+	rand.New(rand.NewSource(1))
 	numToGen := parentsToGet + uint64(32)
 	test := syncTest{
 		syncableInterval:   numToGen,
@@ -84,7 +85,7 @@ func TestStateSyncFromScratchExceedParent(t *testing.T) {
 }
 
 func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
-	rand.Seed(1)
+	rand.New(rand.NewSource(1))
 
 	var lock sync.Mutex
 	reqCount := 0
@@ -260,8 +261,7 @@ func TestVMShutdownWhileSyncing(t *testing.T) {
 				// Note this verifies the VM shutdown does not time out while syncing.
 				require.NoError(t, vmSetup.shutdownOnceSyncerVM.Shutdown(context.Background()))
 			} else if reqCount < 50 {
-				err := syncerVM.AppResponse(context.Background(), nodeID, requestID, response)
-				require.NoError(t, err)
+				require.NoError(t, syncerVM.AppResponse(context.Background(), nodeID, requestID, response))
 			}
 		},
 		expectedErr: context.Canceled,
@@ -297,7 +297,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 
 	// make some accounts
 	trieDB := triedb.NewDatabase(serverVM.vm.chaindb, nil)
-	root, accounts := statesync.FillAccountsWithOverlappingStorage(t, trieDB, types.EmptyRootHash, 1000, 16)
+	root, accounts := statesynctest.FillAccountsWithOverlappingStorage(t, trieDB, types.EmptyRootHash, 1000, 16)
 
 	// patch serverVM's lastAcceptedBlock to have the new root
 	// and update the vm's state so the trie with accounts will
@@ -354,8 +354,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 	syncerVM.appSender.SendAppRequestF = func(ctx context.Context, nodeSet set.Set[ids.NodeID], requestID uint32, request []byte) error {
 		nodeID, hasItem := nodeSet.Pop()
 		require.True(hasItem, "expected nodeSet to contain at least 1 nodeID")
-		err := serverVM.vm.AppRequest(ctx, nodeID, requestID, time.Now().Add(1*time.Second), request)
-		require.NoError(err)
+		require.NoError(serverVM.vm.AppRequest(ctx, nodeID, requestID, time.Now().Add(1*time.Second), request))
 		return nil
 	}
 
@@ -375,7 +374,7 @@ type syncVMSetup struct {
 	serverVM        *VM
 	serverAppSender *enginetest.Sender
 
-	fundedAccounts map[*testutils.Key]*types.StateAccount
+	fundedAccounts map[*utilstest.Key]*types.StateAccount
 
 	syncerVM             *VM
 	syncerDB             avalanchedatabase.Database
@@ -461,7 +460,7 @@ func testSyncerVM(t *testing.T, vmSetup *syncVMSetup, test syncTest) {
 	if syncerVM.ethConfig.TransactionHistory != 0 {
 		tail := lastSyncedBlock.NumberU64()
 
-		core.CheckTxIndices(t, &tail, tail, syncerVM.chaindb, true)
+		coretest.CheckTxIndices(t, &tail, tail, tail, tail, syncerVM.chaindb, true)
 	}
 
 	blocksToBuild := 10
@@ -492,7 +491,7 @@ func testSyncerVM(t *testing.T, vmSetup *syncVMSetup, test syncTest) {
 				if tail < lastSyncedBlock.NumberU64() {
 					tail = lastSyncedBlock.NumberU64()
 				}
-				core.CheckTxIndices(t, &tail, block.NumberU64(), syncerVM.chaindb, true)
+				coretest.CheckTxIndices(t, &tail, tail, block.NumberU64(), block.NumberU64(), syncerVM.chaindb, true)
 			}
 		},
 	)
@@ -525,7 +524,7 @@ func testSyncerVM(t *testing.T, vmSetup *syncVMSetup, test syncTest) {
 				if tail < lastSyncedBlock.NumberU64() {
 					tail = lastSyncedBlock.NumberU64()
 				}
-				core.CheckTxIndices(t, &tail, block.NumberU64(), syncerVM.chaindb, true)
+				coretest.CheckTxIndices(t, &tail, tail, block.NumberU64(), block.NumberU64(), syncerVM.chaindb, true)
 			}
 		},
 	)

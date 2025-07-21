@@ -1,13 +1,5 @@
-// (c) 2024, Ava Labs, Inc.
-//
-// This file is a derived work, based on the go-ethereum library whose original
-// notices appear below.
-//
-// It is distributed under a license compatible with the licensing terms of the
-// original code from which it is derived.
-//
-// Much love to the original authors for their work.
-// **********
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
 
 package log
 

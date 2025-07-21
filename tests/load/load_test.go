@@ -1,4 +1,4 @@
-// Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package load
@@ -87,8 +87,7 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 			rpcEndpoints = append(rpcEndpoints, fmt.Sprintf("%s/ext/bc/%s/rpc", nodeURI.URI, blockchainID))
 		}
 		commaSeparatedRPCEndpoints := strings.Join(rpcEndpoints, ",")
-		err := os.Setenv("RPC_ENDPOINTS", commaSeparatedRPCEndpoints)
-		require.NoError(err)
+		require.NoError(os.Setenv("RPC_ENDPOINTS", commaSeparatedRPCEndpoints))
 
 		log.Info("Running load simulator...", "rpcEndpoints", commaSeparatedRPCEndpoints)
 		cmd := exec.Command("./scripts/run_simulator.sh")

@@ -1,4 +1,4 @@
-// (c) 2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package warp
@@ -49,8 +49,7 @@ func TestAddAndGetValidMessage(t *testing.T) {
 	require.NoError(t, err)
 
 	// Add testUnsignedMessage to the warp backend
-	err = backend.AddMessage(testUnsignedMessage)
-	require.NoError(t, err)
+	require.NoError(t, backend.AddMessage(testUnsignedMessage))
 
 	// Verify that a signature is returned successfully, and compare to expected signature.
 	signature, err := backend.GetMessageSignature(context.TODO(), testUnsignedMessage)
@@ -118,8 +117,7 @@ func TestZeroSizedCache(t *testing.T) {
 	require.NoError(t, err)
 
 	// Add testUnsignedMessage to the warp backend
-	err = backend.AddMessage(testUnsignedMessage)
-	require.NoError(t, err)
+	require.NoError(t, backend.AddMessage(testUnsignedMessage))
 
 	// Verify that a signature is returned successfully, and compare to expected signature.
 	signature, err := backend.GetMessageSignature(context.TODO(), testUnsignedMessage)

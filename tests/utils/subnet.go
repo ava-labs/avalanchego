@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package utils
@@ -92,8 +92,7 @@ func CreateSubnetsSuite(genesisFiles map[string]string) *SubnetSuite {
 		return blockchainIDsBytes
 	}, func(ctx ginkgo.SpecContext, data []byte) {
 		blockchainIDs := make(map[string]string)
-		err := json.Unmarshal(data, &blockchainIDs)
-		require.NoError(err)
+		require.NoError(json.Unmarshal(data, &blockchainIDs))
 
 		globalSuite.SetBlockchainIDs(blockchainIDs)
 	})
@@ -141,8 +140,7 @@ func CreateNewSubnet(ctx context.Context, genesisFilePath string) string {
 	require.NoError(err)
 
 	genesis := &core.Genesis{}
-	err = json.Unmarshal(genesisBytes, genesis)
-	require.NoError(err)
+	require.NoError(json.Unmarshal(genesisBytes, genesis))
 
 	log.Info("Creating new Subnet-EVM blockchain", "genesis", genesis)
 	createChainTx, err := pWallet.IssueCreateChainTx(

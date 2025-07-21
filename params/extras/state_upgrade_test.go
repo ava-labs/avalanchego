@@ -1,4 +1,4 @@
-// (c) 2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package extras
@@ -183,7 +183,6 @@ func TestUnmarshalStateUpgradeJSON(t *testing.T) {
 		},
 	}
 	var unmarshaledConfig UpgradeConfig
-	err := json.Unmarshal(jsonBytes, &unmarshaledConfig)
-	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(jsonBytes, &unmarshaledConfig))
 	require.Equal(t, upgradeConfig, unmarshaledConfig)
 }

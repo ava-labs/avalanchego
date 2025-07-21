@@ -1,24 +1,25 @@
-// (c) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package allowlist_test
+package allowlisttest
 
 import (
 	"testing"
 
-	. "github.com/ava-labs/subnet-evm/precompile/allowlist"
+	"github.com/ava-labs/subnet-evm/core/extstate/extstatetest"
+	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/subnet-evm/precompile/modules"
 )
 
 var testModule = modules.Module{
 	Address:      dummyAddr,
-	Contract:     CreateAllowListPrecompile(dummyAddr),
+	Contract:     allowlist.CreateAllowListPrecompile(dummyAddr),
 	Configurator: &dummyConfigurator{},
 	ConfigKey:    "dummy",
 }
 
 func TestVerifyAllowlist(t *testing.T) {
-	VerifyPrecompileWithAllowListTests(t, testModule, nil)
+	RunPrecompileWithAllowListTests(t, testModule, extstatetest.NewTestStateDB, nil)
 }
 
 func TestEqualAllowList(t *testing.T) {

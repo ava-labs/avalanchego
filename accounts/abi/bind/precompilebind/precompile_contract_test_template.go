@@ -1,5 +1,7 @@
-// (c) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
+
+// #skiplint: import_testing_only_in_tests
 package precompilebind
 
 // tmplSourcePrecompileConfigGo is the Go precompiled config source template.
@@ -14,11 +16,11 @@ import (
 	"testing"
 	"math/big"
 
-	"github.com/ava-labs/subnet-evm/core/extstate"
+	"github.com/ava-labs/subnet-evm/core/extstate/extstatetest"
 	{{- if .Contract.AllowList}}
-	"github.com/ava-labs/subnet-evm/precompile/allowlist"
+	"github.com/ava-labs/subnet-evm/precompile/allowlist/allowlisttest"
 	{{- end}}
-	"github.com/ava-labs/subnet-evm/precompile/testutils"
+	"github.com/ava-labs/subnet-evm/precompile/precompiletest"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/stretchr/testify/require"
@@ -37,7 +39,7 @@ var (
 // allowlist, readOnly behaviour, and gas cost. You should write your own
 // tests for specific cases.
 var(
-	tests = map[string]testutils.PrecompileTest{
+	tests = map[string]precompiletest.PrecompileTest{
 		{{- $contract := .Contract}}
 		{{- $structs := .Structs}}
 		{{- range .Contract.Funcs}}
@@ -47,8 +49,8 @@ var(
 		{{- range $role := $roles}}
 		{{- $fail := and (not $func.Original.IsConstant) (eq $role "NoRole")}}
 		"calling {{decapitalise $func.Normalized.Name}} from {{$role}} should {{- if $fail}} fail {{- else}} succeed{{- end}}":  {
-			Caller:     allowlist.Test{{$role}}Addr,
-			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
+			Caller:     allowlisttest.Test{{$role}}Addr,
+			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
 				{{- if len $func.Normalized.Inputs | lt 1}}
 				// CUSTOM CODE STARTS HERE
@@ -187,12 +189,12 @@ func Test{{.Contract.Type}}Run(t *testing.T) {
 	// and runs them all together.
 	// Even if you don't add any custom tests, keep this. This will still
 	// run the default allowlist tests.
-	allowlist.RunPrecompileWithAllowListTests(t, Module, extstate.NewTestStateDB, tests)
+			allowlisttest.RunPrecompileWithAllowListTests(t, Module, extstatetest.NewTestStateDB, tests)
 	{{- else}}
 	// Run tests.
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			test.Run(t, Module, extstate.NewTestStateDB(t))
+			test.Run(t, Module, extstatetest.NewTestStateDB(t))
 		})
 	}
 	{{- end}}
@@ -247,12 +249,12 @@ func Benchmark{{.Contract.Type}}(b *testing.B) {
 	// and benchmarks them all together.
 	// Even if you don't add any custom tests, keep this. This will still
 	// run the default allowlist tests.
-	allowlist.BenchPrecompileWithAllowList(b, Module, extstate.NewTestStateDB, tests)
+			allowlisttest.BenchPrecompileWithAllowList(b, Module, extstatetest.NewTestStateDB, tests)
 	{{- else}}
 	// Benchmark tests.
 	for name, test := range tests {
 		b.Run(name, func(b *testing.B) {
-			test.Bench(b, Module, extstate.NewTestStateDB(b))
+			test.Bench(b, Module, extstatetest.NewTestStateDB(b))
 		})
 	}
 	{{- end}}

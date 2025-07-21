@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package evm
@@ -230,8 +230,7 @@ func mustMarshal(t *testing.T, v interface{}) string {
 func TestVMStateUpgrade(t *testing.T) {
 	// modify genesis to add a key to the state
 	genesis := &core.Genesis{}
-	err := json.Unmarshal([]byte(genesisJSONSubnetEVM), genesis)
-	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal([]byte(genesisJSONSubnetEVM), genesis))
 	genesisAccount, ok := genesis.Alloc[testEthAddrs[0]]
 	require.True(t, ok)
 	storageKey := common.HexToHash("0x1234")

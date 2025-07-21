@@ -1,4 +1,4 @@
-// Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // Implements solidity tests.
@@ -328,8 +328,7 @@ func (w *warpTest) sendMessageFromSendingSubnet() {
 	signedTx, err := types.SignTx(tx, w.sendingSubnetSigner, w.sendingSubnetFundedKey)
 	require.NoError(err)
 	log.Info("Sending sendWarpMessage transaction", "txHash", signedTx.Hash())
-	err = client.SendTransaction(ctx, signedTx)
-	require.NoError(err)
+	require.NoError(client.SendTransaction(ctx, signedTx))
 
 	log.Info("Waiting for new block confirmation")
 	<-newHeads
@@ -553,8 +552,7 @@ func (w *warpTest) deliverBlockHashPayload() {
 	txBytes, err := signedTx.MarshalBinary()
 	require.NoError(err)
 	log.Info("Sending getVerifiedWarpBlockHash transaction", "txHash", signedTx.Hash(), "txBytes", common.Bytes2Hex(txBytes))
-	err = client.SendTransaction(ctx, signedTx)
-	require.NoError(err)
+	require.NoError(client.SendTransaction(ctx, signedTx))
 
 	log.Info("Waiting for new block confirmation")
 	<-newHeads
@@ -645,8 +643,7 @@ func (w *warpTest) warpLoad() {
 	require.NoError(err)
 	defer func() {
 		sub.Unsubscribe()
-		err := <-sub.Err()
-		require.NoError(err)
+		require.NoError(<-sub.Err())
 	}()
 
 	log.Info("Generating tx sequence to send warp messages...")

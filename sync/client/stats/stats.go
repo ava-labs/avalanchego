@@ -1,4 +1,4 @@
-// (c) 2021-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package stats
@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	_ ClientSyncerStats = &clientSyncerStats{}
-	_ ClientSyncerStats = &noopStats{}
+	_ ClientSyncerStats = (*clientSyncerStats)(nil)
+	_ ClientSyncerStats = (*noopStats)(nil)
 )
 
 type ClientSyncerStats interface {

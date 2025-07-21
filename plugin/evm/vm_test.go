@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package evm
@@ -44,7 +44,6 @@ import (
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/txpool"
 	"github.com/ava-labs/subnet-evm/eth"
-	"github.com/ava-labs/subnet-evm/internal/testutils"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/plugin/evm/config"
@@ -370,7 +369,7 @@ func TestBuildEthTxBlock(t *testing.T) {
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
 	tvm.vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
 
-	key := testutils.NewKey(t)
+	key := utilstest.NewKey(t)
 
 	tx := types.NewTransaction(uint64(0), key.Address, firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[0].ToECDSA())
@@ -2650,7 +2649,8 @@ func TestAllowFeeRecipientDisabled(t *testing.T) {
 
 	modifiedBlk := tvm.vm.newBlock(modifiedBlock)
 
-	require.ErrorIs(t, modifiedBlk.Verify(context.Background()), vmerrors.ErrInvalidCoinbase)
+	err = modifiedBlk.Verify(context.Background())
+	require.ErrorIs(t, err, vmerrors.ErrInvalidCoinbase)
 }
 
 func TestAllowFeeRecipientEnabled(t *testing.T) {
@@ -2759,8 +2759,7 @@ func TestRewardManagerPrecompileSetRewardAddress(t *testing.T) {
 	})
 
 	defer func() {
-		err := tvm.vm.Shutdown(context.Background())
-		require.NoError(t, err)
+		require.NoError(t, tvm.vm.Shutdown(context.Background()))
 	}()
 
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
@@ -3017,7 +3016,7 @@ func TestSkipChainConfigCheckCompatible(t *testing.T) {
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
 	tvm.vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
 
-	key := testutils.NewKey(t)
+	key := utilstest.NewKey(t)
 
 	tx := types.NewTransaction(uint64(0), key.Address, firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[0].ToECDSA())
@@ -3050,16 +3049,14 @@ func TestSkipChainConfigCheckCompatible(t *testing.T) {
 	tvm.vm.ctx.Metrics = metrics.NewPrefixGatherer()
 
 	// this will not be allowed
-	err = reinitVM.Initialize(context.Background(), tvm.vm.ctx, tvm.db, genesisWithUpgradeBytes, []byte{}, []byte{}, []*commonEng.Fx{}, tvm.appSender)
-	require.ErrorContains(t, err, "mismatching Cancun fork timestamp in database")
+	require.ErrorContains(t, reinitVM.Initialize(context.Background(), tvm.vm.ctx, tvm.db, genesisWithUpgradeBytes, []byte{}, []byte{}, []*commonEng.Fx{}, tvm.appSender), "mismatching Cancun fork timestamp in database")
 
 	// Reset metrics to allow re-initialization
 	tvm.vm.ctx.Metrics = metrics.NewPrefixGatherer()
 
 	// try again with skip-upgrade-check
 	config := []byte(`{"skip-upgrade-check": true}`)
-	err = reinitVM.Initialize(context.Background(), tvm.vm.ctx, tvm.db, genesisWithUpgradeBytes, []byte{}, config, []*commonEng.Fx{}, tvm.appSender)
-	require.NoError(t, err)
+	require.NoError(t, reinitVM.Initialize(context.Background(), tvm.vm.ctx, tvm.db, genesisWithUpgradeBytes, []byte{}, config, []*commonEng.Fx{}, tvm.appSender))
 	require.NoError(t, reinitVM.Shutdown(context.Background()))
 }
 

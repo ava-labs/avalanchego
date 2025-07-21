@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/subnet-evm/plugin/evm/validators/state/interfaces"
 )
 
-var _ uptime.State = &state{}
+var _ uptime.State = (*state)(nil)
 
 type dbUpdateStatus bool
 

@@ -1,4 +1,4 @@
-// (c) 2021-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package handlers
@@ -10,8 +10,8 @@ import (
 )
 
 var (
-	_ BlockProvider    = &TestBlockProvider{}
-	_ SnapshotProvider = &TestSnapshotProvider{}
+	_ BlockProvider    = (*TestBlockProvider)(nil)
+	_ SnapshotProvider = (*TestSnapshotProvider)(nil)
 )
 
 type TestBlockProvider struct {

@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // Code generated
@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 )
 
-var _ precompileconfig.Config = &Config{}
+var _ precompileconfig.Config = (*Config)(nil)
 
 type InitialRewardConfig struct {
 	AllowFeeRecipients bool           `json:"allowFeeRecipients"`

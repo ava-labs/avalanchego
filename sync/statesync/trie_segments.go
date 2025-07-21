@@ -1,4 +1,4 @@
-// (c) 2021-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package statesync
@@ -22,8 +22,8 @@ import (
 )
 
 var (
-	_ syncclient.LeafSyncTask = &trieSegment{}
-	_ fmt.Stringer            = &trieSegment{}
+	_ syncclient.LeafSyncTask = (*trieSegment)(nil)
+	_ fmt.Stringer            = (*trieSegment)(nil)
 )
 
 // trieToSync keeps the state of a single trie syncing

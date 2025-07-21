@@ -1,4 +1,5 @@
-// (c) 2019-2020, Ava Labs, Inc.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
 //
 // This file is a derived work, based on the go-ethereum library whose original
 // notices appear below.
@@ -28,6 +29,7 @@
 //
 // Detailed usage document and tutorial available on the go-ethereum Wiki page:
 // https://github.com/ethereum/go-ethereum/wiki/Native-DApps:-Go-bindings-to-Ethereum-contracts
+
 package precompilebind
 
 import (

@@ -1,3 +1,14 @@
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+//
+// This file is a derived work, based on the go-ethereum library whose original
+// notices appear below.
+//
+// It is distributed under a license compatible with the licensing terms of the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********
 // Copyright 2024 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
@@ -28,6 +39,7 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
+	"github.com/ava-labs/subnet-evm/core/coretest"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/stretchr/testify/require"
 )
@@ -92,7 +104,7 @@ func TestTransactionIndices(t *testing.T) {
 	lastAcceptedBlock := blocks[len(blocks)-1]
 	require.Equal(lastAcceptedBlock.Hash(), chain.CurrentHeader().Hash())
 
-	CheckTxIndices(t, nil, lastAcceptedBlock.NumberU64(), chain.db, false) // check all indices has been indexed
+	coretest.CheckTxIndices(t, nil, 0, lastAcceptedBlock.NumberU64(), lastAcceptedBlock.NumberU64(), chain.db, false) // check all indices has been indexed
 	chain.Stop()
 
 	// Reconstruct a block chain which only reserves limited tx indices
@@ -112,8 +124,12 @@ func TestTransactionIndices(t *testing.T) {
 			require.NoError(err)
 
 			tail := getTail(l, lastAcceptedBlock.NumberU64())
+			var indexedFrom uint64
+			if tail != nil {
+				indexedFrom = *tail
+			}
 			// check if startup indices are correct
-			CheckTxIndices(t, tail, lastAcceptedBlock.NumberU64(), chain.db, false)
+			coretest.CheckTxIndices(t, tail, indexedFrom, lastAcceptedBlock.NumberU64(), lastAcceptedBlock.NumberU64(), chain.db, false)
 
 			newBlks := blocks2[i : i+1]
 			_, err = chain.InsertChain(newBlks) // Feed chain a higher block to trigger indices updater.
@@ -125,8 +141,12 @@ func TestTransactionIndices(t *testing.T) {
 			chain.DrainAcceptorQueue()
 
 			tail = getTail(l, lastAcceptedBlock.NumberU64())
+			indexedFrom = uint64(0)
+			if tail != nil {
+				indexedFrom = *tail
+			}
 			// check if indices are updated correctly
-			CheckTxIndices(t, tail, lastAcceptedBlock.NumberU64(), chain.db, false)
+			coretest.CheckTxIndices(t, tail, indexedFrom, lastAcceptedBlock.NumberU64(), lastAcceptedBlock.NumberU64(), chain.db, false)
 			chain.Stop()
 		})
 	}
@@ -192,7 +212,7 @@ func TestTransactionSkipIndexing(t *testing.T) {
 	chain, err := createAndInsertChain(chainDB, conf, gspec, blocks, common.Hash{},
 		func(b *types.Block) {
 			bNumber := b.NumberU64()
-			checkTxIndicesHelper(t, nil, bNumber+1, bNumber+1, bNumber, chainDB, false) // check all indices has been skipped
+			coretest.CheckTxIndices(t, nil, bNumber+1, bNumber+1, bNumber, chainDB, false) // check all indices has been skipped
 		})
 	require.NoError(err)
 	chain.Stop()
@@ -204,7 +224,7 @@ func TestTransactionSkipIndexing(t *testing.T) {
 		func(b *types.Block) {
 			bNumber := b.NumberU64()
 			tail := bNumber - conf.TransactionHistory + 1
-			checkTxIndicesHelper(t, &tail, bNumber+1, bNumber+1, bNumber, chainDB, false) // check all indices has been skipped
+			coretest.CheckTxIndices(t, &tail, bNumber+1, bNumber+1, bNumber, chainDB, false) // check all indices has been skipped
 		})
 	require.NoError(err)
 	chain.Stop()
@@ -216,7 +236,7 @@ func TestTransactionSkipIndexing(t *testing.T) {
 	chain, err = createAndInsertChain(chainDB, conf, gspec, blocks, common.Hash{},
 		func(b *types.Block) {
 			bNumber := b.NumberU64()
-			checkTxIndicesHelper(t, nil, 0, bNumber, bNumber, chainDB, false) // check all indices has been indexed
+			coretest.CheckTxIndices(t, nil, 0, bNumber, bNumber, chainDB, false) // check all indices has been indexed
 		})
 	require.NoError(err)
 	chain.Stop()
@@ -229,7 +249,7 @@ func TestTransactionSkipIndexing(t *testing.T) {
 		func(b *types.Block) {
 			bNumber := b.NumberU64()
 			tail := bNumber - conf.TransactionHistory + 1
-			checkTxIndicesHelper(t, &tail, tail, bNumber-1, bNumber, chainDB, false)
+			coretest.CheckTxIndices(t, &tail, tail, bNumber-1, bNumber, chainDB, false)
 		})
 	require.NoError(err)
 	chain.Stop()
