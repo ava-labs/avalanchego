@@ -69,21 +69,17 @@ func main() {
 	metrics, err := load.NewMetrics(registry)
 	require.NoError(err, "failed to register load metrics")
 
-	metricsServer := load.NewPrometheusServer("127.0.0.1:0", registry)
-	merticsErrCh, err := metricsServer.Start()
+	metricsServer, err := tests.NewPrometheusServer(registry)
 	require.NoError(err, "failed to start load metrics server")
-
-	monitoringConfigFilePath, err := metricsServer.GenerateMonitoringConfig(log, network.GetMonitoringLabels())
-	require.NoError(err, "failed to generate monitoring config file")
-
 	tc.DeferCleanup(func() {
-		select {
-		case err := <-merticsErrCh:
-			require.NoError(err, "metrics server exited with error")
-		default:
-			require.NoError(metricsServer.Stop(), "failed to stop metrics server")
-		}
+		require.NoError(metricsServer.Stop())
 	})
+
+	monitoringConfigFilePath, err := tmpnet.WritePrometheusSDConfig("load-test", tmpnet.SDConfig{
+		Targets: []string{metricsServer.Address()},
+		Labels:  network.GetMonitoringLabels(),
+	}, false)
+	require.NoError(err, "failed to generate monitoring config file")
 
 	tc.DeferCleanup(func() {
 		require.NoError(
@@ -92,7 +88,7 @@ func main() {
 		)
 	})
 
-	endpoints, err := tmpnet.GetNodeWebsocketURIs(ctx, network.Nodes, blockchainID, tc.DeferCleanup)
+	endpoints, err := tmpnet.GetNodeWebsocketURIs(network.Nodes, blockchainID)
 	require.NoError(err, "failed †o get node websocket URIs")
 
 	w := &workload{

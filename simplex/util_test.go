@@ -6,14 +6,68 @@ package simplex
 import (
 	"testing"
 
+	"github.com/ava-labs/simplex"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
+
+type newBlockConfig struct {
+	// If prev is nil, newBlock will create the genesis block
+	prev *Block
+	// If round is 0, it will be set to one higher than the prev's round
+	round uint64
+}
+
+func newBlock(t *testing.T, config newBlockConfig) *Block {
+	if config.prev == nil {
+		block := &Block{
+			vmBlock: snowmantest.Genesis,
+			metadata: simplex.ProtocolMetadata{
+				Version: 1,
+				Epoch:   1,
+				Round:   0,
+				Seq:     0,
+			},
+		}
+		bytes, err := block.Bytes()
+		require.NoError(t, err)
+
+		digest := computeDigest(bytes)
+		block.digest = digest
+
+		block.blockTracker = newBlockTracker(block)
+		return block
+	}
+	if config.round == 0 {
+		config.round = config.prev.metadata.Round + 1
+	}
+
+	vmBlock := snowmantest.BuildChild(config.prev.vmBlock.(*snowmantest.Block))
+	block := &Block{
+		vmBlock:      vmBlock,
+		blockTracker: config.prev.blockTracker,
+		metadata: simplex.ProtocolMetadata{
+			Version: 1,
+			Epoch:   1,
+			Round:   config.round,
+			Seq:     vmBlock.Height(),
+			Prev:    config.prev.digest,
+		},
+	}
+
+	bytes, err := block.Bytes()
+	require.NoError(t, err)
+
+	digest := computeDigest(bytes)
+	block.digest = digest
+	return block
+}
 
 func newTestValidatorInfo(allNodes []*testNode) map[ids.NodeID]*validators.GetValidatorOutput {
 	vds := make(map[ids.NodeID]*validators.GetValidatorOutput, len(allNodes))
