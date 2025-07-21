@@ -177,7 +177,7 @@ func BootstrapNewNetwork(
 	if err := checkVMBinaries(log, network.Subnets, network.DefaultRuntimeConfig.Process); err != nil {
 		return err
 	}
-	if err := network.EnsureDefaultConfig(log); err != nil {
+	if err := network.EnsureDefaultConfig(ctx, log); err != nil {
 		return err
 	}
 	if err := network.Create(rootNetworkDir); err != nil {
@@ -234,7 +234,14 @@ func ReadNetwork(ctx context.Context, log logging.Logger, dir string) (*Network,
 }
 
 // Initializes a new network with default configuration.
-func (n *Network) EnsureDefaultConfig(log logging.Logger) error {
+func (n *Network) EnsureDefaultConfig(ctx context.Context, log logging.Logger) error {
+	// Populate runtime defaults before logging it
+	if n.DefaultRuntimeConfig.Kube != nil {
+		if err := n.DefaultRuntimeConfig.Kube.ensureDefaults(ctx, log); err != nil {
+			return err
+		}
+	}
+
 	log.Info("preparing configuration for new network",
 		zap.Any("runtimeConfig", n.DefaultRuntimeConfig),
 	)
@@ -442,11 +449,7 @@ func (n *Network) Bootstrap(ctx context.Context, log logging.Logger) error {
 	}
 
 	// Don't restart the node during subnet creation since it will always be restarted afterwards.
-	uri, cancel, err := bootstrapNode.GetLocalURI(ctx)
-	if err != nil {
-		return err
-	}
-	defer cancel()
+	uri := bootstrapNode.GetAccessibleURI()
 	if err := n.CreateSubnets(ctx, log, uri, false /* restartRequired */); err != nil {
 		return err
 	}
@@ -777,11 +780,9 @@ func (n *Network) GetNode(nodeID ids.NodeID) (*Node, error) {
 	return nil, fmt.Errorf("%s is not known to the network", nodeID)
 }
 
-// GetNodeURIs returns the URIs of nodes in the network that are running and not ephemeral. The URIs
-// returned are guaranteed be reachable by the caller until the cleanup function is called regardless
-// of whether the nodes are running as local processes or in a kube cluster.
-func (n *Network) GetNodeURIs(ctx context.Context, deferCleanupFunc func(func())) ([]NodeURI, error) {
-	return GetNodeURIs(ctx, n.Nodes, deferCleanupFunc)
+// GetNodeURIs returns the accessible URIs of nodes in the network that are running and not ephemeral.
+func (n *Network) GetNodeURIs() []NodeURI {
+	return GetNodeURIs(n.Nodes)
 }
 
 // GetAvailableNodeIDs returns the node IDs of nodes in the network that are running and not ephemeral.
@@ -925,7 +926,15 @@ func (n *Network) GetMonitoringLabels() map[string]string {
 		"is_ephemeral_node": "false",
 		"network_owner":     n.Owner,
 	}
-	// Include the values of github labels if available
+	for label, value := range GetGitHubLabels() {
+		labels[label] = value
+	}
+	return labels
+}
+
+// GetGitHubLabels returns a map of GitHub labels and their values if available.
+func GetGitHubLabels() map[string]string {
+	labels := map[string]string{}
 	for _, label := range githubLabels {
 		value := os.Getenv(strings.ToUpper(label))
 		if len(value) > 0 {
@@ -954,7 +963,7 @@ func waitForHealthy(ctx context.Context, log logging.Logger, nodes []*Node) erro
 			unhealthyNodes.Remove(node)
 			log.Info("node is healthy",
 				zap.Stringer("nodeID", node.NodeID),
-				zap.String("uri", node.URI),
+				zap.String("uri", node.GetAccessibleURI()),
 			)
 		}
 

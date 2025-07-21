@@ -158,13 +158,14 @@ func (s *Server) HandleSimple(ctx context.Context, r *httppb.HandleSimpleHTTPReq
 		return nil, err
 	}
 
-	grpcutils.SetHeaders(req.Header, r.Headers)
+	grpcutils.SetHeaders(req.Header, r.RequestHeaders)
 
 	req = req.WithContext(ctx)
 	req.RequestURI = r.Url
 	req.ContentLength = int64(len(r.Body))
 
 	w := newResponseWriter()
+	grpcutils.SetHeaders(w.Header(), r.ResponseHeaders)
 	s.handler.ServeHTTP(w, req)
 
 	resp := &httppb.HandleSimpleHTTPResponse{

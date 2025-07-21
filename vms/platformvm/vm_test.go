@@ -64,6 +64,7 @@ import (
 	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
+	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
@@ -150,7 +151,6 @@ func defaultVM(t *testing.T, f upgradetest.Fork) (*VM, database.Database, *mutab
 	atomicDB := prefixdb.New([]byte{1}, db)
 
 	vm.clock.Set(latestForkTime)
-	msgChan := make(chan common.Message, 1)
 	ctx := snowtest.Context(t, snowtest.PChainID)
 
 	m := atomic.NewMemory(atomicDB)
@@ -178,7 +178,6 @@ func defaultVM(t *testing.T, f upgradetest.Fork) (*VM, database.Database, *mutab
 		genesistest.NewBytes(t, genesistest.Config{}),
 		nil,
 		dynamicConfigBytes,
-		msgChan,
 		nil,
 		appSender,
 	))
@@ -1051,7 +1050,6 @@ func TestRestartFullyAccepted(t *testing.T) {
 	firstVM.clock.Set(initialClkTime)
 	firstCtx.Lock.Lock()
 
-	firstMsgChan := make(chan common.Message, 1)
 	require.NoError(firstVM.Initialize(
 		context.Background(),
 		firstCtx,
@@ -1059,7 +1057,6 @@ func TestRestartFullyAccepted(t *testing.T) {
 		genesisBytes,
 		nil,
 		nil,
-		firstMsgChan,
 		nil,
 		nil,
 	))
@@ -1133,7 +1130,6 @@ func TestRestartFullyAccepted(t *testing.T) {
 	}()
 
 	secondDB := prefixdb.New([]byte{}, db)
-	secondMsgChan := make(chan common.Message, 1)
 	require.NoError(secondVM.Initialize(
 		context.Background(),
 		secondCtx,
@@ -1141,7 +1137,6 @@ func TestRestartFullyAccepted(t *testing.T) {
 		genesisBytes,
 		nil,
 		nil,
-		secondMsgChan,
 		nil,
 		nil,
 	))
@@ -1177,7 +1172,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	ctx := snowtest.Context(t, snowtest.PChainID)
 	ctx.Lock.Lock()
 
-	toEngine := make(chan common.Message, 1)
 	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
@@ -1185,7 +1179,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		genesistest.NewBytes(t, genesistest.Config{}),
 		nil,
 		nil,
-		toEngine,
 		nil,
 		nil,
 	))
@@ -1310,10 +1303,16 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	)
 	require.NoError(err)
 
+	noopSubscription := func(ctx context.Context) (common.Message, error) {
+		<-ctx.Done()
+		return common.Message(0), ctx.Err()
+	}
+
 	h, err := handler.New(
 		bootstrapConfig.Ctx,
+		&smblock.ChangeNotifier{},
+		noopSubscription,
 		beacons,
-		toEngine,
 		time.Hour,
 		2,
 		cpuTracker,
@@ -1527,7 +1526,6 @@ func TestUnverifiedParent(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	msgChan := make(chan common.Message, 1)
 	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
@@ -1535,7 +1533,6 @@ func TestUnverifiedParent(t *testing.T) {
 		genesistest.NewBytes(t, genesistest.Config{}),
 		nil,
 		nil,
-		msgChan,
 		nil,
 		nil,
 	))
@@ -1679,7 +1676,6 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 	genesisBytes := genesistest.NewBytes(t, genesistest.Config{})
 
-	firstMsgChan := make(chan common.Message, 1)
 	require.NoError(firstVM.Initialize(
 		context.Background(),
 		firstCtx,
@@ -1687,7 +1683,6 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		genesisBytes,
 		nil,
 		nil,
-		firstMsgChan,
 		nil,
 		nil,
 	))
@@ -1731,7 +1726,6 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	m := atomic.NewMemory(atomicDB)
 	secondCtx.SharedMemory = m.NewSharedMemory(secondCtx.ChainID)
 
-	secondMsgChan := make(chan common.Message, 1)
 	require.NoError(secondVM.Initialize(
 		context.Background(),
 		secondCtx,
@@ -1739,7 +1733,6 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		genesisBytes,
 		nil,
 		nil,
-		secondMsgChan,
 		nil,
 		nil,
 	))
@@ -1824,7 +1817,6 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	m := atomic.NewMemory(atomicDB)
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
-	msgChan := make(chan common.Message, 1)
 	appSender := &enginetest.Sender{T: t}
 	require.NoError(vm.Initialize(
 		context.Background(),
@@ -1833,7 +1825,6 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		genesistest.NewBytes(t, genesistest.Config{}),
 		nil,
 		nil,
-		msgChan,
 		nil,
 		appSender,
 	))
@@ -2188,4 +2179,81 @@ func TestPruneMempool(t *testing.T) {
 	require.False(ok)
 	_, ok = vm.Builder.Get(baseTxID)
 	require.True(ok)
+}
+
+func TestThrottleBlockBuildingUntilNormalOperationsStart(t *testing.T) {
+	require := require.New(t)
+
+	latestForkTime = genesistest.DefaultValidatorStartTime.Add(time.Second)
+	vm := &VM{Internal: config.Internal{
+		Chains:                 chains.TestManager,
+		UptimeLockedCalculator: uptime.NewLockedCalculator(),
+		SybilProtectionEnabled: true,
+		Validators:             validators.NewManager(),
+		DynamicFeeConfig:       defaultDynamicFeeConfig,
+		ValidatorFeeConfig:     defaultValidatorFeeConfig,
+		MinValidatorStake:      defaultMinValidatorStake,
+		MaxValidatorStake:      defaultMaxValidatorStake,
+		MinDelegatorStake:      defaultMinDelegatorStake,
+		MinStakeDuration:       defaultMinStakingDuration,
+		MaxStakeDuration:       defaultMaxStakingDuration,
+		RewardConfig:           defaultRewardConfig,
+		UpgradeConfig:          upgradetest.GetConfigWithUpgradeTime(upgradetest.Latest, latestForkTime),
+	}}
+
+	vm.clock.Set(latestForkTime)
+	ctx := snowtest.Context(t, snowtest.PChainID)
+
+	ctx.Lock.Lock()
+
+	require.NoError(vm.Initialize(
+		context.Background(),
+		ctx,
+		memdb.New(),
+		genesistest.NewBytes(t, genesistest.Config{}),
+		nil,
+		nil,
+		nil,
+		&enginetest.Sender{
+			SendAppGossipF: func(context.Context, common.SendConfig, []byte) error {
+				return nil
+			},
+			SendAppErrorF: func(context.Context, ids.NodeID, uint32, int32, string) error {
+				return nil
+			},
+		},
+	))
+	defer func() {
+		vm.ctx.Lock.Lock()
+		defer vm.ctx.Lock.Unlock()
+
+		require.NoError(vm.Shutdown(context.Background()))
+	}()
+
+	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+
+	// Advance the time so that the block builder would be willing to remove the
+	// genesis validators.
+	newTime := latestForkTime.Add(genesistest.DefaultValidatorDuration)
+	vm.clock.Set(newTime)
+
+	ctx.Lock.Unlock()
+
+	impatientContext, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
+	defer cancel()
+
+	msg, err := vm.WaitForEvent(impatientContext)
+	require.ErrorIs(err, context.DeadlineExceeded)
+	require.Zero(msg)
+
+	ctx.Lock.Lock()
+	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
+	ctx.Lock.Unlock()
+
+	impatientContext, cancel = context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	msg, err = vm.WaitForEvent(impatientContext)
+	require.NoError(err)
+	require.Equal(common.PendingTxs, msg)
 }

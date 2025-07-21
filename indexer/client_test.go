@@ -29,10 +29,10 @@ func (mc *mockClient) SendRequest(_ context.Context, method string, _ interface{
 
 func TestIndexClient(t *testing.T) {
 	require := require.New(t)
-	client := client{}
+	client := Client{}
 	{
 		// Test GetIndex
-		client.requester = &mockClient{
+		client.Requester = &mockClient{
 			require:        require,
 			expectedMethod: "index.getIndex",
 			onSendRequestF: func(reply interface{}) error {
@@ -50,7 +50,7 @@ func TestIndexClient(t *testing.T) {
 		bytes := utils.RandomBytes(10)
 		bytesStr, err := formatting.Encode(formatting.Hex, bytes)
 		require.NoError(err)
-		client.requester = &mockClient{
+		client.Requester = &mockClient{
 			require:        require,
 			expectedMethod: "index.getLastAccepted",
 			onSendRequestF: func(reply interface{}) error {
@@ -74,7 +74,7 @@ func TestIndexClient(t *testing.T) {
 		bytes := utils.RandomBytes(10)
 		bytesStr, err := formatting.Encode(formatting.Hex, bytes)
 		require.NoError(err)
-		client.requester = &mockClient{
+		client.Requester = &mockClient{
 			require:        require,
 			expectedMethod: "index.getContainerRange",
 			onSendRequestF: func(reply interface{}) error {
@@ -93,7 +93,7 @@ func TestIndexClient(t *testing.T) {
 	}
 	{
 		// Test IsAccepted
-		client.requester = &mockClient{
+		client.Requester = &mockClient{
 			require:        require,
 			expectedMethod: "index.isAccepted",
 			onSendRequestF: func(reply interface{}) error {
@@ -111,7 +111,7 @@ func TestIndexClient(t *testing.T) {
 		bytes := utils.RandomBytes(10)
 		bytesStr, err := formatting.Encode(formatting.Hex, bytes)
 		require.NoError(err)
-		client.requester = &mockClient{
+		client.Requester = &mockClient{
 			require:        require,
 			expectedMethod: "index.getContainerByID",
 			onSendRequestF: func(reply interface{}) error {

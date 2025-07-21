@@ -4,19 +4,24 @@
 package vms
 
 import (
+	"context"
+	"crypto/tls"
 	"fmt"
-	"strings"
-	"sync"
+	"net"
+	"net/http"
 	"time"
 
+	"connectrpc.com/connect"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"golang.org/x/net/http2"
+	"golang.org/x/sync/errgroup"
 
+	"github.com/ava-labs/avalanchego/api/connectclient"
+	"github.com/ava-labs/avalanchego/connectproto/pb/xsvm"
+	"github.com/ava-labs/avalanchego/connectproto/pb/xsvm/xsvmconnect"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/proto/pb/xsvm"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/subnet"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
@@ -72,7 +77,7 @@ var _ = ginkgo.Describe("[XSVM]", ginkgo.Label("xsvm"), func() {
 		sourceValidators := getNodesForIDs(network.Nodes, sourceSubnet.ValidatorIDs)
 		require.NotEmpty(sourceValidators)
 		sourceAPINode := sourceValidators[0]
-		sourceAPINodeURI := e2e.GetLocalURI(tc, sourceAPINode)
+		sourceAPINodeURI := sourceAPINode.GetAccessibleURI()
 		tc.Log().Info("issuing transactions for source subnet",
 			zap.String("subnetName", subnetAName),
 			zap.Stringer("nodeID", sourceAPINode.NodeID),
@@ -82,7 +87,7 @@ var _ = ginkgo.Describe("[XSVM]", ginkgo.Label("xsvm"), func() {
 		destinationValidators := getNodesForIDs(network.Nodes, destinationSubnet.ValidatorIDs)
 		require.NotEmpty(destinationValidators)
 		destinationAPINode := destinationValidators[0]
-		destinationAPINodeURI := e2e.GetLocalURI(tc, destinationAPINode)
+		destinationAPINodeURI := destinationAPINode.GetAccessibleURI()
 		tc.Log().Info("issuing transactions for destination subnet",
 			zap.String("subnetName", subnetBName),
 			zap.Stringer("nodeID", destinationAPINode.NodeID),
@@ -120,7 +125,7 @@ var _ = ginkgo.Describe("[XSVM]", ginkgo.Label("xsvm"), func() {
 
 		tc.By("checking that the export transaction has been accepted on all nodes")
 		for _, node := range sourceValidators[1:] {
-			uri := e2e.GetLocalURI(tc, node)
+			uri := node.GetAccessibleURI()
 			require.NoError(api.AwaitTxAccepted(
 				tc.DefaultContext(),
 				api.NewClient(uri, sourceChain.ChainID.String()),
@@ -152,7 +157,7 @@ var _ = ginkgo.Describe("[XSVM]", ginkgo.Label("xsvm"), func() {
 		tc.By(fmt.Sprintf("importing to blockchain %s on subnet %s", destinationChain.ChainID, destinationSubnet.SubnetID))
 		sourceURIs := make([]string, len(sourceValidators))
 		for i, node := range sourceValidators {
-			sourceURIs[i] = e2e.GetLocalURI(tc, node)
+			sourceURIs[i] = node.GetAccessibleURI()
 		}
 		importTxStatus, err := importtx.Import(
 			tc.DefaultContext(),
@@ -196,70 +201,82 @@ var _ = ginkgo.Describe("[XSVM]", ginkgo.Label("xsvm"), func() {
 		node, err := network.GetNode(nodeID)
 		require.NoError(err)
 
-		uri := strings.TrimPrefix(node.URI, "http://")
-		chainID := network.GetSubnet(subnetAName).Chains[0].ChainID
-		client, conn, err := api.NewPingClient(
-			uri,
-			chainID,
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		httpClient := &http.Client{
+			Transport: &http2.Transport{
+				AllowHTTP: true,
+				DialTLSContext: func(_ context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
+					// Skip TLS to use h2c
+					return net.Dial(network, addr)
+				},
+			},
+		}
+
+		chainID := network.GetSubnet(subnetAName).Chains[0].ChainID.String()
+		client := xsvmconnect.NewPingClient(
+			httpClient,
+			node.URI,
+			connect.WithInterceptors(
+				connectclient.SetRouteHeaderInterceptor{Route: chainID},
+			),
 		)
-		require.NoError(err)
-		ginkgo.DeferCleanup(func() {
-			require.NoError(conn.Close())
-		})
 
 		tc.By("serving unary rpc")
 		msg := "foobar"
-		reply, err := client.Ping(tc.DefaultContext(), &xsvm.PingRequest{
-			Message: msg,
-		})
+		request := &connect.Request[xsvm.PingRequest]{
+			Msg: &xsvm.PingRequest{
+				Message: msg,
+			},
+		}
+
+		reply, err := client.Ping(tc.DefaultContext(), request)
 		require.NoError(err)
-		require.Equal(msg, reply.Message)
+		require.Equal(msg, reply.Msg.Message)
 
 		tc.By("serving bidirectional streaming rpc")
-		stream, err := client.StreamPing(tc.DefaultContext())
-		require.NoError(err)
 
+		stream := client.StreamPing(tc.DefaultContext())
 		ginkgo.DeferCleanup(func() {
-			require.NoError(stream.CloseSend())
+			require.NoError(stream.CloseRequest())
 		})
 
 		// Stream pings to the server and block until all events are received
 		// back.
-		wg := &sync.WaitGroup{}
-		wg.Add(2)
+		eg := &errgroup.Group{}
 
 		n := 10
-		go func() {
-			defer func() {
-				ginkgo.GinkgoRecover()
-				wg.Done()
-			}()
-
+		eg.Go(func() error {
 			for i := 0; i < n; i++ {
 				msg := fmt.Sprintf("ping-%d", i)
-				require.NoError(stream.Send(&xsvm.StreamPingRequest{
+				if err := stream.Send(&xsvm.StreamPingRequest{
 					Message: msg,
-				}))
+				}); err != nil {
+					return err
+				}
+
 				log.Info("sent message", zap.String("msg", msg))
 			}
-		}()
 
-		go func() {
-			defer func() {
-				ginkgo.GinkgoRecover()
-				wg.Done()
-			}()
+			return nil
+		})
 
+		eg.Go(func() error {
 			for i := 0; i < n; i++ {
-				reply, err := stream.Recv()
-				require.NoError(err)
-				require.Equal(fmt.Sprintf("ping-%d", i), reply.Message)
+				reply, err := stream.Receive()
+				if err != nil {
+					return err
+				}
+
+				if fmt.Sprintf("ping-%d", i) != reply.Message {
+					return fmt.Errorf("unexpected ping reply: %s", reply.Message)
+				}
+
 				log.Info("received message", zap.String("msg", reply.Message))
 			}
-		}()
 
-		wg.Wait()
+			return nil
+		})
+
+		require.NoError(eg.Wait())
 	})
 })
 

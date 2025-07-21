@@ -2151,3 +2151,127 @@ func FuzzChangeProofVerification(f *testing.F) {
 		))
 	})
 }
+
+func Benchmark_RangeProofs(b *testing.B) {
+	var (
+		keyMaxLen                      = 20
+		historyChanges                 = 100
+		changesPerHistory              = 20000
+		maxLengthChangeProofPercentage = 0.1
+	)
+
+	rand := rand.New(rand.NewSource(time.Now().Unix())) // #nosec G404
+
+	db, err := getBasicDB()
+	require.NoError(b, err)
+
+	for range historyChanges {
+		batch := db.NewBatch()
+		for range changesPerHistory {
+			key := make([]byte, rand.Intn(keyMaxLen))
+			rand.Read(key)
+
+			value := make([]byte, rand.Intn(keyMaxLen))
+			rand.Read(value)
+
+			require.NoError(b, batch.Put(key, value))
+		}
+
+		require.NoError(b, batch.Write())
+	}
+
+	for range b.N {
+		start := make([]byte, rand.Intn(keyMaxLen))
+		rand.Read(start)
+
+		end := make([]byte, rand.Intn(keyMaxLen))
+		rand.Read(end)
+
+		if bytes.Compare(start, end) > 0 {
+			start, end = end, start
+		}
+
+		maxLength := rand.Intn(int(maxLengthChangeProofPercentage * float64(changesPerHistory*historyChanges)))
+		if maxLength == 0 {
+			maxLength = 1
+		}
+
+		b.StartTimer()
+		proof, err := db.GetRangeProof(context.Background(), maybe.Some(start), maybe.Some(end), maxLength)
+
+		require.NoError(b, err)
+		require.NotNil(b, proof)
+	}
+}
+
+func Benchmark_ChangeProofs(b *testing.B) {
+	var (
+		keyMaxLen                      = 20
+		historyChanges                 = 100
+		changesPerHistory              = 20000
+		maxLengthChangeProofPercentage = 0.1
+
+		merkleRoots = make([]ids.ID, historyChanges)
+	)
+
+	b.StopTimer()
+	rand := rand.New(rand.NewSource(time.Now().Unix())) // #nosec G404
+
+	db, err := getBasicDB()
+	require.NoError(b, err)
+
+	for i := 0; i < historyChanges; i++ {
+		batch := db.NewBatch()
+		for range changesPerHistory {
+			key := make([]byte, rand.Intn(keyMaxLen))
+			rand.Read(key)
+
+			value := make([]byte, rand.Intn(keyMaxLen))
+			rand.Read(value)
+
+			require.NoError(b, batch.Put(key, value))
+		}
+
+		require.NoError(b, batch.Write())
+
+		merkleRoots[i] = db.getMerkleRoot()
+	}
+
+	for range b.N {
+		start := make([]byte, rand.Intn(keyMaxLen))
+		rand.Read(start)
+
+		end := make([]byte, rand.Intn(keyMaxLen))
+		rand.Read(end)
+
+		if bytes.Compare(start, end) > 0 {
+			start, end = end, start
+		}
+
+		startRootIdx := rand.Intn(len(merkleRoots))
+		endRootIdx := rand.Intn(len(merkleRoots))
+		for startRootIdx == endRootIdx {
+			// make sure we dont have the same endRootIdx
+			endRootIdx = rand.Intn(len(merkleRoots))
+		}
+
+		if startRootIdx > endRootIdx {
+			startRootIdx, endRootIdx = endRootIdx, startRootIdx
+		}
+
+		maxLength := rand.Intn(int(maxLengthChangeProofPercentage * float64(changesPerHistory*historyChanges)))
+
+		b.StartTimer()
+		proof, err := db.GetChangeProof(
+			context.Background(),
+			merkleRoots[startRootIdx],
+			merkleRoots[endRootIdx],
+			maybe.Some(start),
+			maybe.Some(end),
+			maxLength,
+		)
+
+		require.NoError(b, err)
+		require.NotNil(b, proof)
+	}
+}

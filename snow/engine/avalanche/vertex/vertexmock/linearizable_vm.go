@@ -134,21 +134,6 @@ func (mr *LinearizableVMMockRecorder) Connected(ctx, nodeID, nodeVersion any) *g
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Connected", reflect.TypeOf((*LinearizableVM)(nil).Connected), ctx, nodeID, nodeVersion)
 }
 
-// CreateHTTP2Handler mocks base method.
-func (m *LinearizableVM) CreateHTTP2Handler(ctx context.Context) (http.Handler, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateHTTP2Handler", ctx)
-	ret0, _ := ret[0].(http.Handler)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// CreateHTTP2Handler indicates an expected call of CreateHTTP2Handler.
-func (mr *LinearizableVMMockRecorder) CreateHTTP2Handler(ctx any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateHTTP2Handler", reflect.TypeOf((*LinearizableVM)(nil).CreateHTTP2Handler), ctx)
-}
-
 // CreateHandlers mocks base method.
 func (m *LinearizableVM) CreateHandlers(arg0 context.Context) (map[string]http.Handler, error) {
 	m.ctrl.T.Helper()
@@ -224,17 +209,17 @@ func (mr *LinearizableVMMockRecorder) HealthCheck(arg0 any) *gomock.Call {
 }
 
 // Initialize mocks base method.
-func (m *LinearizableVM) Initialize(ctx context.Context, chainCtx *snow.Context, db database.Database, genesisBytes, upgradeBytes, configBytes []byte, toEngine chan<- common.Message, fxs []*common.Fx, appSender common.AppSender) error {
+func (m *LinearizableVM) Initialize(ctx context.Context, chainCtx *snow.Context, db database.Database, genesisBytes, upgradeBytes, configBytes []byte, fxs []*common.Fx, appSender common.AppSender) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Initialize", ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs, appSender)
+	ret := m.ctrl.Call(m, "Initialize", ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, fxs, appSender)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Initialize indicates an expected call of Initialize.
-func (mr *LinearizableVMMockRecorder) Initialize(ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs, appSender any) *gomock.Call {
+func (mr *LinearizableVMMockRecorder) Initialize(ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, fxs, appSender any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Initialize", reflect.TypeOf((*LinearizableVM)(nil).Initialize), ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs, appSender)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Initialize", reflect.TypeOf((*LinearizableVM)(nil).Initialize), ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, fxs, appSender)
 }
 
 // LastAccepted mocks base method.
@@ -264,6 +249,21 @@ func (m *LinearizableVM) Linearize(ctx context.Context, stopVertexID ids.ID) err
 func (mr *LinearizableVMMockRecorder) Linearize(ctx, stopVertexID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Linearize", reflect.TypeOf((*LinearizableVM)(nil).Linearize), ctx, stopVertexID)
+}
+
+// NewHTTPHandler mocks base method.
+func (m *LinearizableVM) NewHTTPHandler(ctx context.Context) (http.Handler, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NewHTTPHandler", ctx)
+	ret0, _ := ret[0].(http.Handler)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NewHTTPHandler indicates an expected call of NewHTTPHandler.
+func (mr *LinearizableVMMockRecorder) NewHTTPHandler(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewHTTPHandler", reflect.TypeOf((*LinearizableVM)(nil).NewHTTPHandler), ctx)
 }
 
 // ParseBlock mocks base method.
@@ -351,4 +351,19 @@ func (m *LinearizableVM) Version(arg0 context.Context) (string, error) {
 func (mr *LinearizableVMMockRecorder) Version(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Version", reflect.TypeOf((*LinearizableVM)(nil).Version), arg0)
+}
+
+// WaitForEvent mocks base method.
+func (m *LinearizableVM) WaitForEvent(ctx context.Context) (common.Message, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WaitForEvent", ctx)
+	ret0, _ := ret[0].(common.Message)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// WaitForEvent indicates an expected call of WaitForEvent.
+func (mr *LinearizableVMMockRecorder) WaitForEvent(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForEvent", reflect.TypeOf((*LinearizableVM)(nil).WaitForEvent), ctx)
 }

@@ -250,7 +250,7 @@ func (o *Orchestrator[_]) run(ctx context.Context) bool {
 	return achievedTargetTPS
 }
 
-// GetObservedIssued returns the max TPS the orchestrator observed
+// GetMaxObservedTPS returns the max TPS the orchestrator observed
 func (o *Orchestrator[_]) GetMaxObservedTPS() int64 {
 	return o.maxObservedTPS.Load()
 }

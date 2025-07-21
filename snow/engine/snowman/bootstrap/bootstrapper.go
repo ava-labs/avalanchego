@@ -755,7 +755,7 @@ func (b *Bootstrapper) restartBootstrapping(ctx context.Context) error {
 
 func (b *Bootstrapper) Notify(_ context.Context, msg common.Message) error {
 	if msg != common.StateSyncDone {
-		b.Ctx.Log.Warn("received an unexpected message from the VM",
+		b.Ctx.Log.Info("received an unexpected message from the VM",
 			zap.Stringer("msg", msg),
 		)
 		return nil

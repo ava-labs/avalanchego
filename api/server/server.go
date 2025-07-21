@@ -88,8 +88,7 @@ type server struct {
 	metrics *metrics
 
 	// Maps endpoints to handlers
-	router      *router
-	http2Router *http2Router
+	router *router
 
 	srv *http.Server
 
@@ -118,19 +117,9 @@ func New(
 	router := newRouter()
 	handler := wrapHandler(router, nodeID, allowedOrigins, allowedHosts)
 
-	http2Router := newHTTP2Router()
-	http2Handler := wrapHandler(http2Router, nodeID, allowedOrigins, allowedHosts)
-
 	httpServer := &http.Server{
 		Handler: h2c.NewHandler(
-			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.ProtoMajor == 2 {
-					http2Handler.ServeHTTP(w, r)
-					return
-				}
-
-				handler.ServeHTTP(w, r)
-			}),
+			handler,
 			&http2.Server{
 				MaxConcurrentStreams: maxConcurrentStreams,
 			}),
@@ -151,7 +140,6 @@ func New(
 		tracer:          tracer,
 		metrics:         m,
 		router:          router,
-		http2Router:     http2Router,
 		srv:             httpServer,
 		listener:        listener,
 	}, nil
@@ -163,10 +151,10 @@ func (s *server) Dispatch() error {
 
 func (s *server) RegisterChain(chainName string, ctx *snow.ConsensusContext, vm common.VM) {
 	ctx.Lock.Lock()
-	handlers, err := vm.CreateHandlers(context.TODO())
+	pathRouteHandlers, err := vm.CreateHandlers(context.TODO())
 	ctx.Lock.Unlock()
 	if err != nil {
-		s.log.Error("failed to create handlers",
+		s.log.Error("failed to create path route handlers",
 			zap.String("chainName", chainName),
 			zap.Error(err),
 		)
@@ -180,7 +168,7 @@ func (s *server) RegisterChain(chainName string, ctx *snow.ConsensusContext, vm 
 	defaultEndpoint := path.Join(constants.ChainAliasPrefix, ctx.ChainID.String())
 
 	// Register each endpoint
-	for extension, handler := range handlers {
+	for extension, handler := range pathRouteHandlers {
 		// Validate that the route being added is valid
 		// e.g. "/foo" and "" are ok but "\n" is not
 		_, err := url.ParseRequestURI(extension)
@@ -199,26 +187,25 @@ func (s *server) RegisterChain(chainName string, ctx *snow.ConsensusContext, vm 
 	}
 
 	ctx.Lock.Lock()
-	http2Handler, err := vm.CreateHTTP2Handler(context.TODO())
+	headerRouteHandler, err := vm.NewHTTPHandler(context.TODO())
 	ctx.Lock.Unlock()
 	if err != nil {
-		s.log.Error("failed to create http2 handler",
+		s.log.Error("failed to create header route handler",
 			zap.String("chainName", chainName),
 			zap.Error(err),
 		)
 		return
 	}
 
-	if http2Handler == nil {
+	if headerRouteHandler == nil {
 		return
 	}
 
-	http2Handler = s.wrapMiddleware(chainName, http2Handler, ctx)
-	if !s.http2Router.Add(ctx.ChainID, http2Handler) {
+	headerRouteHandler = s.wrapMiddleware(chainName, headerRouteHandler, ctx)
+	if !s.router.AddHeaderRoute(ctx.ChainID.String(), headerRouteHandler) {
 		s.log.Error(
-			"failed to add route to http2 handler",
+			"failed to add header route",
 			zap.String("chainName", chainName),
-			zap.Error(err),
 		)
 	}
 }

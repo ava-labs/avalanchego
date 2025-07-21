@@ -1,5 +1,53 @@
 # Release Notes
 
+## [v1.13.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.2)
+
+This version is backwards compatible to [v1.13.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.0). It is optional, but encouraged.
+
+The plugin version is updated to `41` all plugins must update to be compatible.
+
+### APIs
+
+- Added initial support for HTTP2 connections into VMs
+- Removed native support for gzip compression of HTTP requests
+
+### Fixes
+
+- Fixed message timeout handling on L1s configured with `validatorOnly=true`
+- Fixed segfault on ARM64 when profiling is enabled
+
+### What's Changed
+
+- chore(tests/load): C-chain load testing by @qdm12 in https://github.com/ava-labs/avalanchego/pull/3914
+- Improve comments on message Ops by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3987
+- Remove requestID expectation for UnrequestedOps by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3989
+- Add Simplex Messages To p2p.proto by @samliok in https://github.com/ava-labs/avalanchego/pull/3976
+- [tmpnet] Enable exclusive scheduling by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3988
+- [testing] Add local kube support for load tests by @RodrigoVillar in https://github.com/ava-labs/avalanchego/pull/3986
+- Add a label to XSVM tests by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/3991
+- [tmpnet] Avoid port forwarding when running in a kube cluster by @maru-ava in https://github.com/ava-labs/avalanchego/pull/3997
+- Add support for VM HTTP2 handlers by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/3294
+- Move HTTP2 routing information into headers by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/4001
+- Clarify field names for simplex p2p messages by @samliok in https://github.com/ava-labs/avalanchego/pull/4002
+- Remove gzip middleware from API server by @mpignatelli12 in https://github.com/ava-labs/avalanchego/pull/4005
+- fix: allow for load tests to run in-cluster by @RodrigoVillar in https://github.com/ava-labs/avalanchego/pull/4003
+- chore: update libevm version by @alarso16 in https://github.com/ava-labs/avalanchego/pull/4006
+- Add support for XSVM grpc server reflection by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/4010
+- fix: update log commands for stopping collectors by @RodrigoVillar in https://github.com/ava-labs/avalanchego/pull/4011
+- [tmpnet] Enure node config is saved on restart for both runtimes by @maru-ava in https://github.com/ava-labs/avalanchego/pull/4015
+- BLS Components for Simplex by @samliok in https://github.com/ava-labs/avalanchego/pull/3993
+- Capitalize secrets references by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/4018
+- build: update `libevm` to `v1.13.14-0.3.0.rc.1` by @alarso16 in https://github.com/ava-labs/avalanchego/pull/4023
+- Allow internal messages from disallowed nodeIDs by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/4024
+- optimize historical range by @rrazvan1 in https://github.com/ava-labs/avalanchego/pull/3658
+
+### New Contributors
+
+- @mpignatelli12 made their first contribution in https://github.com/ava-labs/avalanchego/pull/4005
+- @alarso16 made their first contribution in https://github.com/ava-labs/avalanchego/pull/4006
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.13.1...v1.13.2
+
 ## [v1.13.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.1)
 
 This version is backwards compatible to [v1.13.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.0). It is optional, but encouraged.

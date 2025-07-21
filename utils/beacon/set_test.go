@@ -38,8 +38,8 @@ func TestSet(t *testing.T) {
 
 	s := NewSet()
 
-	require.Equal("", s.IDsArg())
-	require.Equal("", s.IPsArg())
+	require.Empty(s.IDsArg())
+	require.Empty(s.IPsArg())
 	require.Zero(s.Len())
 
 	require.NoError(s.Add(b0))

@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -56,20 +55,6 @@ type Builder interface {
 	smblock.BuildBlockWithContextChainVM
 	mempool.Mempool[*txs.Tx]
 
-	// StartBlockTimer starts to issue block creation requests to advance the
-	// chain timestamp.
-	StartBlockTimer()
-
-	// ResetBlockTimer forces the block timer to recalculate when it should
-	// advance the chain timestamp.
-	ResetBlockTimer()
-
-	// ShutdownBlockTimer stops block creation requests to advance the chain
-	// timestamp.
-	//
-	// Invariant: Assumes the context lock is held when calling.
-	ShutdownBlockTimer()
-
 	// BuildBlock can be called to attempt to create a new block
 	BuildBlock(context.Context) (snowman.Block, error)
 
@@ -85,86 +70,68 @@ type Builder interface {
 type builder struct {
 	mempool.Mempool[*txs.Tx]
 
-	toEngine          chan<- common.Message
 	txExecutorBackend *txexecutor.Backend
 	blkManager        blockexecutor.Manager
-
-	// resetTimer is used to signal that the block builder timer should update
-	// when it will trigger building of a block.
-	resetTimer chan struct{}
-	closed     chan struct{}
-	closeOnce  sync.Once
 }
 
 func New(
 	mempool mempool.Mempool[*txs.Tx],
-	toEngine chan<- common.Message,
 	txExecutorBackend *txexecutor.Backend,
 	blkManager blockexecutor.Manager,
 ) Builder {
 	return &builder{
 		Mempool:           mempool,
-		toEngine:          toEngine,
 		txExecutorBackend: txExecutorBackend,
 		blkManager:        blkManager,
-		resetTimer:        make(chan struct{}, 1),
-		closed:            make(chan struct{}),
 	}
 }
 
-func (b *builder) StartBlockTimer() {
-	go func() {
-		timer := time.NewTimer(0)
-		defer timer.Stop()
+func (b *builder) WaitForEvent(ctx context.Context) (common.Message, error) {
+	// We shouldn't call durationToSleep until the chain is marked as no longer
+	// bootstrapping.
+	if !b.txExecutorBackend.Bootstrapped.Get() {
+		<-ctx.Done()
+		return 0, ctx.Err()
+	}
 
-		for {
-			// Invariant: The [timer] is not stopped.
-			select {
-			case <-timer.C:
-			case <-b.resetTimer:
-				if !timer.Stop() {
-					<-timer.C
-				}
-			case <-b.closed:
-				return
-			}
-
-			// Note: Because the context lock is not held here, it is possible
-			// that [ShutdownBlockTimer] is called concurrently with this
-			// execution.
-			for {
-				duration, err := b.durationToSleep()
-				if err != nil {
-					b.txExecutorBackend.Ctx.Log.Error("block builder encountered a fatal error",
-						zap.Error(err),
-					)
-					return
-				}
-
-				if duration > 0 {
-					timer.Reset(duration)
-					break
-				}
-
-				// Block needs to be issued to advance time.
-				select {
-				case b.toEngine <- common.PendingTxs:
-				default:
-				}
-
-				// Invariant: ResetBlockTimer is guaranteed to be called after
-				// [durationToSleep] returns a value <= 0. This is because we
-				// are guaranteed to attempt to build block. After building a
-				// valid block, the chain will have its preference updated which
-				// may change the duration to sleep and trigger a timer reset.
-				select {
-				case <-b.resetTimer:
-				case <-b.closed:
-					return
-				}
-			}
+	for {
+		if err := ctx.Err(); err != nil {
+			return 0, err
 		}
-	}()
+
+		duration, err := b.durationToSleep()
+		if err != nil {
+			b.txExecutorBackend.Ctx.Log.Error("block builder failed to calculate next staker change time",
+				zap.Error(err),
+			)
+			return 0, err
+		}
+		if duration <= 0 {
+			b.txExecutorBackend.Ctx.Log.Debug("Skipping block build wait, next staker change is ready")
+			// The next staker change is ready to be performed.
+			return common.PendingTxs, nil
+		}
+
+		b.txExecutorBackend.Ctx.Log.Debug("Will wait until a transaction comes", zap.Duration("maxWait", duration))
+
+		// Wait for a transaction in the mempool until there is a next staker
+		// change ready to be performed.
+		newCtx, cancel := context.WithTimeout(ctx, duration)
+		msg, err := b.Mempool.WaitForEvent(newCtx)
+		cancel()
+
+		switch {
+		case err == nil:
+			b.txExecutorBackend.Ctx.Log.Debug("New transaction received", zap.Stringer("msg", msg))
+			return msg, nil
+		case errors.Is(err, context.DeadlineExceeded):
+			continue // Recheck the staker change time before returning
+		default:
+			// Error could have been due to the parent context being cancelled
+			// or another unexpected error.
+			return 0, err
+		}
+	}
 }
 
 func (b *builder) durationToSleep() (time.Duration, error) {
@@ -172,16 +139,6 @@ func (b *builder) durationToSleep() (time.Duration, error) {
 	// through modifying of the state.
 	b.txExecutorBackend.Ctx.Lock.Lock()
 	defer b.txExecutorBackend.Ctx.Lock.Unlock()
-
-	// If [ShutdownBlockTimer] was called, we want to exit the block timer
-	// goroutine. We check this with the context lock held because
-	// [ShutdownBlockTimer] is expected to only be called with the context lock
-	// held.
-	select {
-	case <-b.closed:
-		return 0, nil
-	default:
-	}
 
 	preferredID := b.blkManager.Preferred()
 	preferredState, ok := b.blkManager.GetState(preferredID)
@@ -203,20 +160,6 @@ func (b *builder) durationToSleep() (time.Duration, error) {
 	return nextStakerChangeTime.Sub(now), nil
 }
 
-func (b *builder) ResetBlockTimer() {
-	// Ensure that the timer will be reset at least once.
-	select {
-	case b.resetTimer <- struct{}{}:
-	default:
-	}
-}
-
-func (b *builder) ShutdownBlockTimer() {
-	b.closeOnce.Do(func() {
-		close(b.closed)
-	})
-}
-
 func (b *builder) BuildBlock(ctx context.Context) (snowman.Block, error) {
 	return b.BuildBlockWithContext(
 		ctx,
@@ -230,19 +173,6 @@ func (b *builder) BuildBlockWithContext(
 	ctx context.Context,
 	blockContext *smblock.Context,
 ) (snowman.Block, error) {
-	// If there are still transactions in the mempool, then we need to
-	// re-trigger block building.
-	defer func() {
-		if b.Mempool.Len() == 0 {
-			return
-		}
-
-		select {
-		case b.toEngine <- common.PendingTxs:
-		default:
-		}
-	}()
-
 	b.txExecutorBackend.Ctx.Log.Debug("starting to attempt to build a block")
 
 	// Get the block to build on top of and retrieve the new block's context.
