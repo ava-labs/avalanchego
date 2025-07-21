@@ -9,12 +9,12 @@ import (
 	"github.com/ava-labs/simplex"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 var _ simplex.Storage = (*Storage)(nil)
-var heightKey = []byte("height")
-var initializedKey = []byte("initialized")
+var BlockHeaderLen = 89 // TODO: import from simplex package(not currently exported)
 
 type Storage struct {
 	// height represents the number of blocks indexed in storage.
@@ -30,6 +30,8 @@ type Storage struct {
 	deserializer QCDeserializer
 
 	vm block.ChainVM
+
+	blockTracker *blockTracker
 }
 
 // newStorage creates a new Storage instance.
@@ -43,6 +45,27 @@ func newStorage(ctx context.Context, config *Config, verifier BLSVerifier) (*Sto
 		return nil, err
 	}
 
+	genesisBlock, err := getGenesisBlock(ctx, config, lastAcceptedBlock)
+	if err != nil {
+		return nil, err
+	}
+
+	s := &Storage{
+		db:           config.DB,
+		genesisBlock: genesisBlock,
+		vm:           config.VM,
+		deserializer: QCDeserializer(verifier),
+	}
+	s.height.Store(lastAcceptedBlock.Height() + 1)
+
+	return s, nil
+}
+
+func (s *Storage) Height() uint64 {
+	return s.height.Load()
+}
+
+func getGenesisBlock(ctx context.Context, config *Config, lastAcceptedBlock snowman.Block) (*Block, error) {
 	genesis := &Block{
 		metadata: simplex.ProtocolMetadata{
 			Version: 0, // todo: add to constants
@@ -62,26 +85,22 @@ func newStorage(ctx context.Context, config *Config, verifier BLSVerifier) (*Sto
 		genesis.vmBlock = snowmanGenesis
 	}
 
-	genesis.digest = 
-
-	s := &Storage{
-		db:           config.DB,
-		genesisBlock: genesis,
-		vm:           config.VM,
-		deserializer: QCDeserializer(verifier),
+	bytes, err := genesis.Bytes()
+	if err != nil {
+		return nil, err
 	}
-	s.height.Store(lastAcceptedBlock.Height())
+	genesis.digest = computeDigest(bytes)
 
-	return s, nil
-}
-
-func (s *Storage) Height() uint64 {
-	return s.height.Load()
+	return genesis, nil
 }
 
 // Retrieve returns the block and finalization at [seq].
 // If [seq] is not found, returns false.
 func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalization, bool) {
+	if seq == 0 {
+		return s.genesisBlock, simplex.Finalization{}, true
+	}
+
 	id, err := s.vm.GetBlockIDAtHeight(context.Background(), seq)
 	if err != nil {
 		return nil, simplex.Finalization{}, false
@@ -92,66 +111,57 @@ func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalizat
 		return nil, simplex.Finalization{}, false
 	}
 
-	finalization, found := s.retrieveFinalization(seq)
-	if !found {
+	finalization, found, err := s.retrieveFinalization(seq)
+	if !found || err != nil {
 		return nil, simplex.Finalization{}, false
 	}
 
-	vb := &Block{innerBlock: block.Bytes(), metadata: finalization.Finalization.ProtocolMetadata}
+	vb := &Block{vmBlock: block, metadata: finalization.Finalization.ProtocolMetadata}
 
 	return vb, finalization, true
 }
 
 // Index indexes the finalization in the storage.
 // It stores the finalization bytes at the current height and increments the height.
-// TODO: where do we actually store the block? also isn't it weird to pass in a VerifiedBlock here
-// since we haven't verified it yet?
 func (s *Storage) Index(block simplex.VerifiedBlock, finalization simplex.Finalization) {
+	if block.BlockHeader().ProtocolMetadata.Seq == 0 {
+		// This should never happen
+		return
+	}
+
 	currentHeight := s.height.Load()
 	s.height.Add(1)
 
-	heightBuff, seqBuff := make([]byte, 8), make([]byte, 8)
-	binary.BigEndian.PutUint64(heightBuff, currentHeight)
+	seqBuff := make([]byte, 8)
 	binary.BigEndian.PutUint64(seqBuff, currentHeight)
 
-	var finalizationBuf []byte
-
-	// The genesis block does not have a finalization
-	if currentHeight > 0 {
-		finalizationBuf = finalizationToBytes(finalization)
-	}
-
-	// Store the current height in the database.
-	if err := s.db.Put(heightKey, heightBuff); err != nil {
+	finalizationBytes := finalizationToBytes(finalization)
+	if err := s.db.Put(seqBuff, finalizationBytes); err != nil {
 		panic(err)
 	}
 
-	if err := s.db.Put(seqBuff, finalizationBuf); err != nil {
-		panic(err)
-	}
-
-	// TODO: can we call verify on the genesis block?
-	if err := block.(*VerifiedBlock).accept(context.Background()); err != nil {
-		panic(err)
-	}
+	s.blockTracker.indexBlock(context.Background(), block.BlockHeader().Digest)
 }
 
 // retrieveFinalization retrieves the finalization at [seq].
 // If the finalization is not found, it returns false.
-func (s *Storage) retrieveFinalization(seq uint64) (simplex.Finalization, bool) {
+func (s *Storage) retrieveFinalization(seq uint64) (simplex.Finalization, bool, error) {
 	seqBuff := make([]byte, 8)
 	binary.BigEndian.PutUint64(seqBuff, seq)
 	finalizationBytes, err := s.db.Get(seqBuff)
 	if err != nil {
-		return simplex.Finalization{}, false
+		if err == database.ErrNotFound {
+			return simplex.Finalization{}, false, nil
+		}
+		return simplex.Finalization{}, false, err
 	}
 
 	fCert, err := finalizationFromBytes(finalizationBytes, s.deserializer)
 	if err != nil {
-		panic(err)
+		return simplex.Finalization{}, false, err
 	}
 
-	return fCert, true
+	return fCert, true, nil
 }
 
 func finalizationToBytes(finalization simplex.Finalization) []byte {
@@ -165,23 +175,15 @@ func finalizationToBytes(finalization simplex.Finalization) []byte {
 
 func finalizationFromBytes(bytes []byte, d QCDeserializer) (simplex.Finalization, error) {
 	var fCert simplex.Finalization
-	if err := fCert.Finalization.FromBytes(bytes[:simplex.MetadataLen]); err != nil {
+	if err := fCert.Finalization.FromBytes(bytes[:BlockHeaderLen]); err != nil {
 		return simplex.Finalization{}, err
 	}
 
-	qc, err := d.DeserializeQuorumCertificate(bytes[simplex.MetadataLen:])
+	qc, err := d.DeserializeQuorumCertificate(bytes[BlockHeaderLen:])
 	if err != nil {
 		return simplex.Finalization{}, err
 	}
 
 	fCert.QC = qc
 	return fCert, nil
-}
-
-func (s *Storage) isInitialized() (bool, error) {
-	return s.db.Has(initializedKey)
-}
-
-func (s *Storage) setInitialized() error {
-	return s.db.Put(initializedKey, nil)
 }
