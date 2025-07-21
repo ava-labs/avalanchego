@@ -8,22 +8,23 @@ import (
 
 	"github.com/ava-labs/simplex"
 
-	"github.com/ava-labs/avalanchego/database/versiondb"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 var _ simplex.Storage = (*Storage)(nil)
 var heightKey = []byte("height")
+var initializedKey = []byte("initialized")
 
 type Storage struct {
 	// height represents the number of blocks indexed in storage.
 	height atomic.Uint64
 
 	// db is the underlying database used to store blocks and finalizations.
-	db *versiondb.Database
+	db database.Database
 
-	// genesisData is the genesis block data. It is stored as the first block in the storage.
-	genesisData []byte
+	// genesisBlock is the genesis block data. It is stored as the first block in the storage.
+	genesisBlock *Block
 
 	// deserializer is used to deserialize quorum certificates from bytes.
 	deserializer QCDeserializer
@@ -33,7 +34,7 @@ type Storage struct {
 
 // newStorage creates a new Storage instance.
 // it writes the genesis block to the database at height 0, seq 0.
-// The DB should already be prefixed. 
+// The DB should already be prefixed.
 // Assumes the VM is already initialized and the genesis block is set.
 func newStorage(ctx context.Context, config *Config, verifier BLSVerifier) (*Storage, error) {
 	lastAccepted, err := config.VM.LastAccepted(ctx)
@@ -42,21 +43,36 @@ func newStorage(ctx context.Context, config *Config, verifier BLSVerifier) (*Sto
 		return nil, err
 	}
 
+	genesis := &Block{
+		metadata: simplex.ProtocolMetadata{
+			Version: 0, // todo: add to constants
+			Seq:     0,
+			Round:   0,
+			Epoch:   0,
+		},
+	}
+
+	if lastAcceptedBlock.Height() == 0 {
+		genesis.vmBlock = lastAcceptedBlock
+	} else {
+		snowmanGenesis, err := config.VM.ParseBlock(ctx, config.GenesisBytes)
+		if err != nil {
+			return nil, err
+		}
+		genesis.vmBlock = snowmanGenesis
+	}
+
+	genesis.digest = 
+
 	s := &Storage{
-		db:           db,
-		genesisData:  config.GenesisData,
+		db:           config.DB,
+		genesisBlock: genesis,
 		vm:           config.VM,
 		deserializer: QCDeserializer(verifier),
 	}
 	s.height.Store(lastAcceptedBlock.Height())
 
-
-	s.Index(s.getGenesisBlock(), simplex.Finalization{})
 	return s, nil
-}
-
-func (s *Storage) getGenesisBlock() simplex.VerifiedBlock {
-	return &VerifiedBlock{innerBlock: s.genesisData, metadata: simplex.ProtocolMetadata{}}
 }
 
 func (s *Storage) Height() uint64 {
@@ -81,7 +97,7 @@ func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalizat
 		return nil, simplex.Finalization{}, false
 	}
 
-	vb := &VerifiedBlock{innerBlock: block.Bytes(), metadata: finalization.Finalization.ProtocolMetadata}
+	vb := &Block{innerBlock: block.Bytes(), metadata: finalization.Finalization.ProtocolMetadata}
 
 	return vb, finalization, true
 }
@@ -160,4 +176,12 @@ func finalizationFromBytes(bytes []byte, d QCDeserializer) (simplex.Finalization
 
 	fCert.QC = qc
 	return fCert, nil
+}
+
+func (s *Storage) isInitialized() (bool, error) {
+	return s.db.Has(initializedKey)
+}
+
+func (s *Storage) setInitialized() error {
+	return s.db.Put(initializedKey, nil)
 }
