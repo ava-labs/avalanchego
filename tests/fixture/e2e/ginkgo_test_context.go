@@ -118,7 +118,7 @@ func (tc *GinkgoTestContext) WithDefaultContext() common.Option {
 }
 
 func (*GinkgoTestContext) GetDefaultContextParent() context.Context {
-	return nil
+	return context.Background()
 }
 
 // Re-implementation of testify/require.Eventually that is compatible with ginkgo. testify's

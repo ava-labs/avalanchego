@@ -31,7 +31,7 @@ type TestContext interface {
 	DefaultContext() context.Context
 	WithDefaultContext() common.Option
 
-	// The parent context (if non-nil) to use as the parent of default contexts
+	// The parent context to use as the parent of default contexts
 	GetDefaultContextParent() context.Context
 
 	// Ensures compatibility with require.Eventually

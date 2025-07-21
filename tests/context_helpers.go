@@ -17,9 +17,6 @@ const DefaultTimeout = 2 * time.Minute
 // Helper simplifying use of a timed context by canceling the context with the test context.
 func ContextWithTimeout(tc TestContext, duration time.Duration) context.Context {
 	parent := tc.GetDefaultContextParent()
-	if parent == nil {
-		parent = context.Background()
-	}
 	ctx, cancel := context.WithTimeout(parent, duration)
 	tc.DeferCleanup(cancel)
 	return ctx
