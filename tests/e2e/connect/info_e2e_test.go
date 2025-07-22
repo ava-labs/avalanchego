@@ -5,10 +5,12 @@ package connect_test
 
 import (
 	"net/http"
-	"testing"
+	"strings"
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/info/v1/infov1connect"
@@ -16,17 +18,9 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 
 	infov1 "github.com/ava-labs/avalanchego/proto/pb/info/v1"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 )
 
-func TestInfoE2E(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Info E2E Suite")
-}
-
-var _ = Describe("[Connect Info API]", func() {
+var _ = ginkgo.Describe("[Connect Info API]", func() {
 	var (
 		tc     = e2e.NewTestContext()
 		env    = e2e.GetEnv(tc)
@@ -34,12 +28,12 @@ var _ = Describe("[Connect Info API]", func() {
 		ctx    = tc.DefaultContext()
 	)
 
-	BeforeSuite(func() {
+	ginkgo.BeforeAll(func() {
 		rootDir := env.RootNetworkDir
 		network := tmpnet.NewDefaultNetwork("connect-info-e2e")
 
 		err := tmpnet.BootstrapNewNetwork(ctx, tc.Log(), network, rootDir)
-		Expect(err).ToNot(HaveOccurred())
+		require.NoError(tc, err)
 
 		node, err := network.GetNode(ids.BuildTestNodeID([]byte("node-0")))
 		e2e.WaitForHealthy(tc, node)
@@ -47,92 +41,92 @@ var _ = Describe("[Connect Info API]", func() {
 		client = infov1connect.NewInfoServiceClient(http.DefaultClient, url)
 	})
 
-	It("NodeVersion returns version info", func() {
+	tc.By("NodeVersion returns version info", func() {
 		req := connect.NewRequest(&infov1.NodeVersionRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
 		resp, err := client.NodeVersion(ctx, req)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(resp.Msg.Version).ToNot(BeEmpty())
+		require.NoError(tc, err)
+		require.NotEmpty(tc, resp.Msg.Version)
 	})
 
-	It("NodeID returns a node ID", func() {
+	tc.By("NodeID returns a node ID", func() {
 		req := connect.NewRequest(&infov1.NodeIDRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
 		resp, err := client.NodeID(ctx, req)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(resp.Msg.NodeId).To(HavePrefix("NodeID-"))
+		require.NoError(tc, err)
+		require.True(tc, strings.HasPrefix(resp.Msg.NodeId, "NodeID-"))
 	})
 
-	It("NetworkID returns a network ID", func() {
+	tc.By("NetworkID returns a network ID", func() {
 		req := connect.NewRequest(&infov1.NetworkIDRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
 		resp, err := client.NetworkID(ctx, req)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(resp.Msg.NetworkId).To(BeNumerically(">", 0))
+		require.NoError(tc, err)
+		require.Positive(tc, resp.Msg.NetworkId)
 	})
 
-	It("NetworkName returns a network name", func() {
+	tc.By("NetworkName returns a network name", func() {
 		req := connect.NewRequest(&infov1.NetworkNameRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
 		resp, err := client.NetworkName(ctx, req)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(resp.Msg.NetworkName).ToNot(BeEmpty())
+		require.NoError(tc, err)
+		require.NotEmpty(tc, resp.Msg.NetworkName)
 	})
 
-	It("NodeIP returns an IP", func() {
+	tc.By("NodeIP returns an IP", func() {
 		req := connect.NewRequest(&infov1.NodeIPRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
 		resp, err := client.NodeIP(ctx, req)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(resp.Msg.Ip).ToNot(BeEmpty())
+		require.NoError(tc, err)
+		require.NotEmpty(tc, resp.Msg.Ip)
 	})
 
-	It("BlockchainID returns a blockchain ID for X", func() {
+	tc.By("BlockchainID returns a blockchain ID for X", func() {
 		req := connect.NewRequest(&infov1.BlockchainIDRequest{Alias: "X"})
 		req.Header().Set("Avalanche-API-Route", "info")
 		resp, err := client.BlockchainID(ctx, req)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(resp.Msg.BlockchainId).ToNot(BeEmpty())
+		require.NoError(tc, err)
+		require.NotEmpty(tc, resp.Msg.BlockchainId)
 	})
 
-	It("Peers returns a list", func() {
+	tc.By("Peers returns a list", func() {
 		req := connect.NewRequest(&infov1.PeersRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
 		resp, err := client.Peers(ctx, req)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(resp.Msg.NumPeers).To(BeNumerically(">=", 0))
+		require.NoError(tc, err)
+		require.GreaterOrEqual(tc, resp.Msg.NumPeers, 0)
 	})
 
-	It("IsBootstrapped returns true for X", func() {
-		Eventually(func() bool {
+	tc.By("IsBootstrapped returns true for X", func() {
+		tc.Eventually(func() bool {
 			req := connect.NewRequest(&infov1.IsBootstrappedRequest{Chain: "X"})
 			req.Header().Set("Avalanche-API-Route", "info")
 			resp, err := client.IsBootstrapped(ctx, req)
 			return err == nil && resp.Msg.IsBootstrapped
-		}, 60*time.Second, 2*time.Second).Should(BeTrue())
+		}, 60*time.Second, 2*time.Second, "node should eventually bootstrap")
 	})
 
-	It("Upgrades returns a response", func() {
+	tc.By("Upgrades returns a response", func() {
 		req := connect.NewRequest(&infov1.UpgradesRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
 		resp, err := client.Upgrades(ctx, req)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(resp.Msg).ToNot(BeNil())
+		require.NoError(tc, err)
+		require.NotNil(tc, resp.Msg)
 	})
 
-	It("Uptime returns a response", func() {
+	tc.By("Uptime returns a response", func() {
 		req := connect.NewRequest(&infov1.UptimeRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
 		resp, err := client.Uptime(ctx, req)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(resp.Msg).ToNot(BeNil())
+		require.NoError(tc, err)
+		require.NotNil(tc, resp.Msg)
 	})
 
-	It("VMs returns at least avm", func() {
+	tc.By("VMs returns at least avm", func() {
 		req := connect.NewRequest(&infov1.VMsRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
 		resp, err := client.VMs(ctx, req)
-		Expect(err).ToNot(HaveOccurred())
+		require.NoError(tc, err)
 		found := false
 		for _, v := range resp.Msg.Vms {
 			for _, alias := range v.Aliases {
@@ -145,6 +139,6 @@ var _ = Describe("[Connect Info API]", func() {
 				break
 			}
 		}
-		Expect(found).To(BeTrue())
+		require.True(tc, found)
 	})
 })
