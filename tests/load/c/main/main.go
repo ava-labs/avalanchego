@@ -45,7 +45,7 @@ func init() {
 func main() {
 	log := tests.NewDefaultLogger(logPrefix)
 	tc := tests.NewTestContext(log)
-	defer tc.Cleanup()
+	defer tc.RecoverAndExit()
 
 	require := require.New(tc)
 	ctx := context.Background()
@@ -88,7 +88,7 @@ func main() {
 		)
 	})
 
-	endpoints, err := tmpnet.GetNodeWebsocketURIs(ctx, network.Nodes, blockchainID, tc.DeferCleanup)
+	endpoints, err := tmpnet.GetNodeWebsocketURIs(network.Nodes, blockchainID)
 	require.NoError(err, "failed †o get node websocket URIs")
 
 	w := &workload{

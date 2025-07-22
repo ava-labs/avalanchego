@@ -77,7 +77,7 @@ var _ = ginkgo.Describe("[XSVM]", ginkgo.Label("xsvm"), func() {
 		sourceValidators := getNodesForIDs(network.Nodes, sourceSubnet.ValidatorIDs)
 		require.NotEmpty(sourceValidators)
 		sourceAPINode := sourceValidators[0]
-		sourceAPINodeURI := e2e.GetLocalURI(tc, sourceAPINode)
+		sourceAPINodeURI := sourceAPINode.GetAccessibleURI()
 		tc.Log().Info("issuing transactions for source subnet",
 			zap.String("subnetName", subnetAName),
 			zap.Stringer("nodeID", sourceAPINode.NodeID),
@@ -87,7 +87,7 @@ var _ = ginkgo.Describe("[XSVM]", ginkgo.Label("xsvm"), func() {
 		destinationValidators := getNodesForIDs(network.Nodes, destinationSubnet.ValidatorIDs)
 		require.NotEmpty(destinationValidators)
 		destinationAPINode := destinationValidators[0]
-		destinationAPINodeURI := e2e.GetLocalURI(tc, destinationAPINode)
+		destinationAPINodeURI := destinationAPINode.GetAccessibleURI()
 		tc.Log().Info("issuing transactions for destination subnet",
 			zap.String("subnetName", subnetBName),
 			zap.Stringer("nodeID", destinationAPINode.NodeID),
@@ -125,7 +125,7 @@ var _ = ginkgo.Describe("[XSVM]", ginkgo.Label("xsvm"), func() {
 
 		tc.By("checking that the export transaction has been accepted on all nodes")
 		for _, node := range sourceValidators[1:] {
-			uri := e2e.GetLocalURI(tc, node)
+			uri := node.GetAccessibleURI()
 			require.NoError(api.AwaitTxAccepted(
 				tc.DefaultContext(),
 				api.NewClient(uri, sourceChain.ChainID.String()),
@@ -157,7 +157,7 @@ var _ = ginkgo.Describe("[XSVM]", ginkgo.Label("xsvm"), func() {
 		tc.By(fmt.Sprintf("importing to blockchain %s on subnet %s", destinationChain.ChainID, destinationSubnet.SubnetID))
 		sourceURIs := make([]string, len(sourceValidators))
 		for i, node := range sourceValidators {
-			sourceURIs[i] = e2e.GetLocalURI(tc, node)
+			sourceURIs[i] = node.GetAccessibleURI()
 		}
 		importTxStatus, err := importtx.Import(
 			tc.DefaultContext(),
