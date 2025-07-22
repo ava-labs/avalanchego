@@ -9,6 +9,7 @@
 - Demoted unnecessary error log in `core/txpool/legacypool.go` to warning, displaying unexpected but valid behavior.
 - Removed the `snowman-api-enabled` flag and the corresponding API implementation.
 - Enable expermiental `state-scheme` flag to specify Firewood as a state database.
+- Added prometheus metrics for Firewood if it is enabled and expensive metrics are being used.
 
 ## [v0.15.1](https://github.com/ava-labs/coreth/releases/tag/v0.15.1)
 
