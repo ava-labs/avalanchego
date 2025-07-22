@@ -346,7 +346,7 @@ func (e *vmExecutor) executeSequence(ctx context.Context, blkChan <-chan blockRe
 		if blkResult.Height%1000 == 0 {
 			eta := timer.EstimateETA(
 				start,
-				uint64(blkResult.Height-e.config.StartBlock),
+				blkResult.Height-e.config.StartBlock,
 				e.config.EndBlock-e.config.StartBlock,
 			)
 			e.config.Log.Info("executing block",
@@ -414,6 +414,9 @@ func createBlockChanFromLevelDB(tb testing.TB, sourceDir string, startBlock, end
 				Height:     height,
 			}
 			currentHeight++
+			if currentHeight > endBlock {
+				break
+			}
 		}
 		if iter.Error() != nil {
 			ch <- blockResult{
