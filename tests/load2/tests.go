@@ -54,6 +54,12 @@ func NewRandomTest(
 	worker.Nonce++
 
 	var (
+		// weight determines the relative probability of each test being selected
+		// during random test execution. Currently all tests use the same weight,
+		// making them equally likely to be chosen.
+		//
+		// TODO: fine-tune individual test weights so that load is
+		// representative of C-Chain usage patterns.
 		weight = uint64(100)
 		// count specifies how many times to repeat an operation (e.g. reads,
 		// writes, or computes) for a test that supports repeated operations.
