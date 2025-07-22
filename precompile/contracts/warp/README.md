@@ -10,7 +10,7 @@ Avalanche Warp Messaging uses BLS Multi-Signatures with Public-Key Aggregation w
 
 Every node tracking an Avalanche L1 has read access to the Avalanche P-Chain. This provides weighted sets of BLS Public Keys that correspond to the validator sets of each L1 on the Avalanche Network. Avalanche Warp Messaging provides a basic primitive for signing and verifying messages between L1s: the receiving network can verify whether an aggregation of signatures from a set of source L1 validators represents a threshold of stake large enough for the receiving network to process the message.
 
-For more details on Avalanche Warp Messaging, see the AvalancheGo [Warp README](https://docs.avax.network/build/cross-chain/awm/deep-dive).
+For more details on Avalanche Warp Messaging, see the AvalancheGo [Warp README](https://github.com/ava-labs/avalanchego/blob/master/vms/platformvm/warp/README.md).
 
 ### Flow of Sending / Receiving a Warp Message within the EVM
 
@@ -44,7 +44,7 @@ Additionally, the `SourceChainID` is excluded because anyone parsing the chain c
 - `sender`
 - The `messageID` of the unsigned message (sha256 of the unsigned message)
 
-The actual `message` is the entire [Avalanche Warp Unsigned Message](https://github.com/ava-labs/avalanchego/blob/master/vms/platformvm/warp/unsigned_message.go#L14) including an [AddressedCall](https://github.com/ava-labs/avalanchego/tree/master/vms/platformvm/warp/payload#readme). The unsigned message is emitted as the unindexed data in the log.
+The actual `message` is the entire [Avalanche Warp Unsigned Message](https://github.com/ava-labs/avalanchego/blob/master/vms/platformvm/warp/unsigned_message.go#L14) including an [AddressedCall](https://github.com/ava-labs/avalanchego/tree/master/vms/platformvm/warp/payload#addressedcall). The unsigned message is emitted as the unindexed data in the log.
 
 #### getVerifiedMessage
 
@@ -59,7 +59,7 @@ This leads to the following advantages:
 1. The EVM execution does not need to verify the Warp Message at runtime (no signature verification or external calls to the P-Chain)
 2. The EVM can deterministically re-execute and re-verify blocks assuming the predicate was verified by the network (e.g., in bootstrapping)
 
-This pre-verification is performed using the ProposerVM Block header during [block verification](../../../plugin/evm/block.go#L220) and [block building](../../../miner/worker.go#L200).
+This pre-verification is performed using the ProposerVM Block header during [block verification](../../../plugin/evm/block.go#L355) & [block building](../../../miner/worker.go#L200).
 
 #### getBlockchainID
 

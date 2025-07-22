@@ -30,7 +30,7 @@ func PackPredicate(predicateBytes []byte) []byte {
 	return common.RightPadBytes(predicateBytes, (len(predicateBytes)+31)/32*32)
 }
 
-// UnpackPredicate unpacks a predicate by stripping right padded zeroes, checking for the delimter,
+// UnpackPredicate unpacks a predicate by stripping right padded zeroes, checking for the delimiter,
 // ensuring there is not excess padding, and returning the original message.
 // Returns an error if it finds an incorrect encoding.
 func UnpackPredicate(paddedPredicate []byte) ([]byte, error) {
