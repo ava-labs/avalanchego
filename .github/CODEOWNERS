@@ -14,6 +14,7 @@
 /.github/CODEOWNERS @StephenButtolph
 /.gitignore @maru-ava @StephenButtolph
 /.golangci.yml @maru-ava @StephenButtolph
+/docs @aaronbuchwald @ava-labs/platform-avalnchego
 /Dockerfile @maru-ava
 /Taskfile.yml @maru-ava
 /flake.lock @maru-ava
