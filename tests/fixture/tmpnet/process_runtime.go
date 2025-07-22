@@ -417,11 +417,12 @@ func (p *ProcessRuntime) writeMonitoringConfigFile(name string, config []ConfigM
 	return nil
 }
 
-func (p *ProcessRuntime) GetLocalURI(_ context.Context) (string, func(), error) {
-	return p.node.URI, func() {}, nil
+// GetAccessibleURI returns the URI that can be used to access the node's API.
+func (p *ProcessRuntime) GetAccessibleURI() string {
+	return p.node.URI
 }
 
-func (p *ProcessRuntime) GetLocalStakingAddress(_ context.Context) (netip.AddrPort, func(), error) {
+func (p *ProcessRuntime) GetAccessibleStakingAddress(_ context.Context) (netip.AddrPort, func(), error) {
 	return p.node.StakingAddress, func() {}, nil
 }
 

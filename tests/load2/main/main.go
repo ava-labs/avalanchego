@@ -50,7 +50,7 @@ func init() {
 func main() {
 	log := tests.NewDefaultLogger("")
 	tc := tests.NewTestContext(log)
-	defer tc.Cleanup()
+	defer tc.RecoverAndExit()
 
 	require := require.New(tc)
 
@@ -69,7 +69,7 @@ func main() {
 	e2e.NewTestEnvironment(tc, flagVars, network)
 
 	ctx := tests.DefaultNotifyContext(0, tc.DeferCleanup)
-	wsURIs, err := tmpnet.GetNodeWebsocketURIs(ctx, network.Nodes, blockchainID, tc.DeferCleanup)
+	wsURIs, err := tmpnet.GetNodeWebsocketURIs(network.Nodes, blockchainID)
 	require.NoError(err)
 
 	registry := prometheus.NewRegistry()
@@ -116,5 +116,5 @@ func main() {
 	)
 	require.NoError(err)
 
-	generator.Run(tc, ctx, loadTimeout, testTimeout)
+	generator.Run(ctx, log, loadTimeout, testTimeout)
 }

@@ -65,13 +65,13 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		e2e.WaitForHealthy(tc, betaNode)
 
 		tc.By("retrieving alpha node id and pop")
-		alphaNodeURI := e2e.GetLocalURI(tc, alphaNode)
+		alphaNodeURI := alphaNode.GetAccessibleURI()
 		alphaInfoClient := info.NewClient(alphaNodeURI)
 		alphaNodeID, alphaPOP, err := alphaInfoClient.GetNodeID(tc.DefaultContext())
 		require.NoError(err)
 
 		tc.By("retrieving beta node id and pop")
-		betaNodeURI := e2e.GetLocalURI(tc, betaNode)
+		betaNodeURI := betaNode.GetAccessibleURI()
 		betaInfoClient := info.NewClient(betaNodeURI)
 		betaNodeID, betaPOP, err := betaInfoClient.GetNodeID(tc.DefaultContext())
 		require.NoError(err)
