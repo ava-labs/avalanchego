@@ -8,21 +8,21 @@
 * @StephenButtolph
 *.md @meaghanfitzgerald @StephenButtolph
 /.dockerignore @maru-ava
-/.envrc @maru-ava
-/.github/ @maru-ava
-/.github/*.md @maru-ava @meaghanfitzgerald
+/.envrc @maru-ava @JuanLeon2
+/.github/ @maru-ava @JuanLeon2
+/.github/*.md @maru-ava @JuanLeon2 @meaghanfitzgerald
 /.github/CODEOWNERS @StephenButtolph
-/.gitignore @maru-ava @StephenButtolph
-/.golangci.yml @maru-ava @StephenButtolph
-/Dockerfile @maru-ava
-/Taskfile.yml @maru-ava
-/flake.lock @maru-ava
-/flake.nix @maru-ava
+/.gitignore @maru-ava @JuanLeon2 @StephenButtolph
+/.golangci.yml @maru-ava @JuanLeon2 @StephenButtolph
+/Dockerfile @maru-ava @JuanLeon2
+/Taskfile.yml @maru-ava @JuanLeon2
+/flake.lock @maru-ava @JuanLeon2
+/flake.nix @maru-ava @JuanLeon2
 /network/p2p/ @joshua-kim
 /network/p2p/*.md @joshua-kim @meaghanfitzgerald
-/scripts/ @maru-ava
-/scripts/*.md @maru-ava @meaghanfitzgerald
-/tests/ @maru-ava
-/tests/*.md @maru-ava @meaghanfitzgerald
+/scripts/ @maru-ava @JuanLeon2
+/scripts/*.md @maru-ava @JuanLeon2 @meaghanfitzgerald
+/tests/ @maru-ava @JuanLeon2
+/tests/*.md @maru-ava @JuanLeon2 @meaghanfitzgerald
 /x/merkledb @joshua-kim @rrazvan1
 /x/sync @joshua-kim @rrazvan1
