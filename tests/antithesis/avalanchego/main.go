@@ -44,10 +44,12 @@ import (
 
 const NumKeys = 5
 
+// TODO(marun) Extract the common elements of test execution for reuse across test setups
+
 func main() {
 	// TODO(marun) Support choosing the log format
-	tc := tests.NewTestContext(tests.NewDefaultLogger(""))
-	defer tc.Cleanup()
+	tc := antithesis.NewInstrumentedTestContext(tests.NewDefaultLogger(""))
+	defer tc.RecoverAndExit()
 	require := require.New(tc)
 
 	c := antithesis.NewConfig(
@@ -57,17 +59,12 @@ func main() {
 		},
 	)
 	ctx := tests.DefaultNotifyContext(c.Duration, tc.DeferCleanup)
+	// Ensure contexts sourced from the test context use the notify context as their parent
+	tc.SetDefaultContextParent(ctx)
 
 	kc := secp256k1fx.NewKeychain(genesis.EWOQKey)
 	walletSyncStartTime := time.Now()
-	wallet, err := primary.MakeWallet(
-		ctx,
-		c.URIs[0],
-		kc,
-		kc,
-		primary.WalletConfig{},
-	)
-	require.NoError(err, "failed to initialize wallet")
+	wallet := e2e.NewWallet(tc, kc, tmpnet.NodeURI{URI: c.URIs[0]})
 	tc.Log().Info("synced wallet",
 		zap.Duration("duration", time.Since(walletSyncStartTime)),
 	)
@@ -122,14 +119,7 @@ func main() {
 		uri := c.URIs[i%len(c.URIs)]
 		kc := secp256k1fx.NewKeychain(key)
 		walletSyncStartTime := time.Now()
-		wallet, err := primary.MakeWallet(
-			ctx,
-			uri,
-			kc,
-			kc,
-			primary.WalletConfig{},
-		)
-		require.NoError(err, "failed to initialize wallet")
+		wallet := e2e.NewWallet(tc, kc, tmpnet.NodeURI{URI: uri})
 		tc.Log().Info("synced wallet",
 			zap.Duration("duration", time.Since(walletSyncStartTime)),
 		)
@@ -162,11 +152,25 @@ type workload struct {
 	uris   []string
 }
 
+// newTestContext returns a test context that ensures that log output and assertions are
+// associated with this worker.
+func (w *workload) newTestContext(ctx context.Context) *tests.SimpleTestContext {
+	return antithesis.NewInstrumentedTestContextWithArgs(
+		ctx,
+		w.log,
+		map[string]any{
+			"worker": w.id,
+		},
+	)
+}
+
 func (w *workload) run(ctx context.Context) {
 	timer := timerpkg.StoppedTimer()
 
-	tc := tests.NewTestContext(w.log)
-	defer tc.Cleanup()
+	tc := w.newTestContext(ctx)
+	// Any assertion failure from this test context will result in process exit due to the
+	// panic being rethrown. This ensures that failures in test setup are fatal.
+	defer tc.RecoverAndRethrow()
 	require := require.New(tc)
 
 	xAVAX, pAVAX := e2e.GetWalletBalances(tc, w.wallet)
@@ -177,28 +181,9 @@ func (w *workload) run(ctx context.Context) {
 	})
 
 	for {
-		val, err := rand.Int(rand.Reader, big.NewInt(5))
-		require.NoError(err, "failed to read randomness")
+		w.executeTest(ctx)
 
-		flowID := val.Int64()
-		w.log.Info("executing test",
-			zap.Int("workerID", w.id),
-			zap.Int64("flowID", flowID),
-		)
-		switch flowID {
-		case 0:
-			w.issueXChainBaseTx(ctx)
-		case 1:
-			w.issueXChainCreateAssetTx(ctx)
-		case 2:
-			w.issueXChainOperationTx(ctx)
-		case 3:
-			w.issueXToPTransfer(ctx)
-		case 4:
-			w.issuePToXTransfer(ctx)
-		}
-
-		val, err = rand.Int(rand.Reader, big.NewInt(int64(time.Second)))
+		val, err := rand.Int(rand.Reader, big.NewInt(int64(time.Second)))
 		require.NoError(err, "failed to read randomness")
 
 		timer.Reset(time.Duration(val.Int64()))
@@ -208,6 +193,48 @@ func (w *workload) run(ctx context.Context) {
 		case <-timer.C:
 		}
 	}
+}
+
+// executeTest executes a test at random.
+func (w *workload) executeTest(ctx context.Context) {
+	tc := w.newTestContext(ctx)
+	// Panics will be recovered without being rethrown, ensuring that test failures are not fatal.
+	defer tc.Recover()
+	require := require.New(tc)
+
+	// Ensure this value matches the number of tests + 1 to offset
+	// 0-based + 1 for sleep case in the switch statement for flowID
+	testCount := int64(6)
+
+	val, err := rand.Int(rand.Reader, big.NewInt(testCount))
+	require.NoError(err, "failed to read randomness")
+
+	flowID := val.Int64()
+	switch flowID {
+	case 0:
+		// TODO(marun) Create abstraction for a test that supports a name e.g. `aTest{name: "foo", mytestfunc}`
+		w.log.Info("executing issueXChainBaseTx")
+		w.issueXChainBaseTx(ctx)
+	case 1:
+		w.log.Info("executing issueXChainCreateAssetTx")
+		w.issueXChainCreateAssetTx(ctx)
+	case 2:
+		w.log.Info("executing issueXChainOperationTx")
+		w.issueXChainOperationTx(ctx)
+	case 3:
+		w.log.Info("executing issueXToPTransfer")
+		w.issueXToPTransfer(ctx)
+	case 4:
+		w.log.Info("executing issuePToXTransfer")
+		w.issuePToXTransfer(ctx)
+	case 5:
+		w.log.Info("sleeping")
+	}
+
+	// TODO(marun) Enable execution of the banff e2e test as part of https://github.com/ava-labs/avalanchego/issues/4049
+	// w.log.Info("executing banff.TestCustomAssetTransfer")
+	// addr, _ := w.addrs.Peek()
+	// banff.TestCustomAssetTransfer(tc, *w.wallet, addr)
 }
 
 func (w *workload) issueXChainBaseTx(ctx context.Context) {

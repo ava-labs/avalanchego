@@ -45,7 +45,7 @@ func init() {
 func main() {
 	log := tests.NewDefaultLogger(logPrefix)
 	tc := tests.NewTestContext(log)
-	defer tc.Cleanup()
+	defer tc.RecoverAndExit()
 
 	require := require.New(tc)
 	ctx := context.Background()
