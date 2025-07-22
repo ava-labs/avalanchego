@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/extension"
 	"github.com/ava-labs/coreth/plugin/evm/gossip"
 	"github.com/ava-labs/coreth/plugin/evm/vmerrors"
+	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/coreth/consensus/dummy"
@@ -532,6 +533,15 @@ func (vm *VM) initializeMetrics() error {
 	gatherer := corethprometheus.NewGatherer(metrics.DefaultRegistry)
 	if err := vm.ctx.Metrics.Register(ethMetricsPrefix, gatherer); err != nil {
 		return err
+	}
+
+	if vm.config.MetricsExpensiveEnabled && vm.config.StateScheme == customrawdb.FirewoodScheme {
+		if err := ffi.StartMetrics(); err != nil {
+			return fmt.Errorf("failed to start firewood metrics collection: %w", err)
+		}
+		if err := vm.ctx.Metrics.Register("firewood", ffi.Gatherer{}); err != nil {
+			return fmt.Errorf("failed to register firewood metrics: %w", err)
+		}
 	}
 	return vm.ctx.Metrics.Register(sdkMetricsPrefix, vm.sdkMetrics)
 }

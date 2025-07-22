@@ -536,7 +536,7 @@ Maximum duration a non-executable transaction will be allowed in the poll. Defau
 
 _Boolean_
 
-Enables expensive metrics. Defaults to `true`.
+Enables expensive metrics. This includes Firewood metrics. Defaults to `true`.
 
 ## Snapshots
 

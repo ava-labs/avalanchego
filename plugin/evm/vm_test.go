@@ -263,7 +263,7 @@ func getConfig(scheme, otherConfig string) string {
 		if len(innerConfig) > 0 {
 			innerConfig += ", "
 		}
-		innerConfig += fmt.Sprintf(`"state-scheme": "%s", "snapshot-cache": 0, "pruning-enabled": true, "state-sync-enabled": false`, customrawdb.FirewoodScheme)
+		innerConfig += fmt.Sprintf(`"state-scheme": "%s", "snapshot-cache": 0, "pruning-enabled": true, "state-sync-enabled": false, "metrics-expensive-enabled": false`, customrawdb.FirewoodScheme)
 	}
 
 	return fmt.Sprintf(`{%s}`, innerConfig)
