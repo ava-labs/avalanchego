@@ -132,6 +132,7 @@ Configuration is provided as a JSON object. All fields are optional unless other
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
 | `historical-proof-query-window` | uint64 | Number of blocks before last accepted for proof queries (archive mode only, ~24 hours) | `43200` |
+| `state-history` | uint64 | Number of most recent states that are accesible on disk (pruning mode only) | `32` |
 
 ## Transaction Pool Configuration
 
