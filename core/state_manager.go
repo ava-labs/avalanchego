@@ -41,22 +41,13 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-const (
-	// TipBufferSize is the number of recent accepted tries to keep in the TrieDB
-	// dirties cache at tip (only applicable in [pruning] mode).
-	//
-	// Keeping extra tries around at tip enables clients to query data from
-	// recent trie roots.
-	TipBufferSize = 32
-
-	// flushWindow is the distance to the [commitInterval] when we start
-	// optimistically flushing trie nodes to disk (only applicable in [pruning]
-	// mode).
-	//
-	// We perform this optimistic flushing to reduce synchronized database IO at the
-	// [commitInterval].
-	flushWindow = 768
-)
+// flushWindow is the distance to the [commitInterval] when we start
+// optimistically flushing trie nodes to disk (only applicable in [pruning]
+// mode).
+//
+// We perform this optimistic flushing to reduce synchronized database IO at the
+// [commitInterval].
+const flushWindow = 768
 
 type TrieWriter interface {
 	InsertTrie(block *types.Block) error // Handle inserted trie reference of [root]
@@ -80,7 +71,7 @@ func NewTrieWriter(db TrieDB, config *CacheConfig) TrieWriter {
 			targetCommitSize: common.StorageSize(config.TrieDirtyCommitTarget) * 1024 * 1024,
 			imageCap:         4 * 1024 * 1024,
 			commitInterval:   config.CommitInterval,
-			tipBuffer:        NewBoundedBuffer(TipBufferSize, db.Dereference),
+			tipBuffer:        NewBoundedBuffer(int(config.StateHistory), db.Dereference),
 		}
 		cm.flushStepSize = (cm.memoryCap - cm.targetCommitSize) / common.StorageSize(flushWindow)
 		return cm

@@ -548,6 +548,7 @@ func testRepairWithScheme(t *testing.T, tt *rewindTest, snapshots bool, scheme s
 			TrieDirtyLimit:            256,
 			TriePrefetcherParallelism: 4,
 			SnapshotLimit:             0, // Disable snapshot by default
+			StateHistory:              32,
 			StateScheme:               scheme,
 		}
 	)

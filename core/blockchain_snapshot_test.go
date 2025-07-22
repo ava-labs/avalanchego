@@ -314,6 +314,7 @@ func (snaptest *gappedSnapshotTest) test(t *testing.T) {
 		SnapshotLimit:  0,
 		Pruning:        true,
 		CommitInterval: 4096,
+		StateHistory:   32,
 		StateScheme:    snaptest.scheme,
 	}
 	newchain, err := NewBlockChain(snaptest.db, cacheConfig, snaptest.gspec, snaptest.engine, vm.Config{}, snaptest.lastAcceptedHash, false)
@@ -359,6 +360,7 @@ func (snaptest *wipeCrashSnapshotTest) test(t *testing.T) {
 		SnapshotLimit:  0,
 		Pruning:        true,
 		CommitInterval: 4096,
+		StateHistory:   32,
 		StateScheme:    snaptest.scheme,
 	}
 	newchain, err := NewBlockChain(snaptest.db, config, snaptest.gspec, snaptest.engine, vm.Config{}, snaptest.lastAcceptedHash, false)
@@ -376,6 +378,7 @@ func (snaptest *wipeCrashSnapshotTest) test(t *testing.T) {
 		SnapshotLimit:  256,
 		Pruning:        true,
 		CommitInterval: 4096,
+		StateHistory:   32,
 		SnapshotWait:   false, // Don't wait rebuild
 		StateScheme:    snaptest.scheme,
 	}

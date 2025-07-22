@@ -275,6 +275,9 @@ func New(
 		historicalProofQueryWindow: config.HistoricalProofQueryWindow,
 		eth:                        eth,
 	}
+	if config.Pruning {
+		eth.APIBackend.historicalProofQueryWindow = config.StateHistory
+	}
 	if config.AllowUnprotectedTxs {
 		log.Info("Unprotected transactions allowed")
 	}
