@@ -315,6 +315,7 @@ tasks:
   test-load:
     desc: Runs load tests
     cmds:
+      - task: generate-load-contract-bindings
       - task: build
       - cmd: go run ./tests/load2/main --avalanchego-path=./build/avalanchego {{.CLI_ARGS}}
 
