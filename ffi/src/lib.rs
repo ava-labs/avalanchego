@@ -19,7 +19,7 @@ use std::fmt::{self, Display, Formatter};
 use std::ops::Deref;
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt as _;
-use std::path::Path;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 
@@ -916,16 +916,98 @@ unsafe fn open_db(args: &CreateOrOpenArgs) -> Result<Db, String> {
             args.strategy,
         )?)
         .build();
-    #[cfg(feature = "logger")]
-    let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
-        .try_init();
 
-    let path = unsafe { CStr::from_ptr(args.path) };
-    #[cfg(unix)]
-    let path: &Path = OsStr::from_bytes(path.to_bytes()).as_ref();
-    #[cfg(windows)]
-    let path: &Path = OsStr::new(path.to_str().expect("path should be valid UTF-8")).as_ref();
+    let path = to_path(args.path).ok_or("database path is empty")?;
     Db::new_sync(path, cfg).map_err(|e| e.to_string())
+}
+
+/// Arguments for logging
+///
+/// * `path` - The file path where logs for this process are stored. By
+///   default, this is set to /tmp/firewood-log.txt
+/// * `filter_level` - The filter level for logs. By default, this is set to info.
+#[repr(C)]
+pub struct LogArgs {
+    path: *const std::ffi::c_char,
+    filter_level: *const std::ffi::c_char,
+}
+
+/// Start logs for this process.
+///
+/// # Arguments
+///
+/// See `LogArgs`.
+///
+/// # Returns
+///
+/// A `Value` containing {0, null} if the global logger was initialized.
+/// A `Value` containing {0, "error message"} if an error occurs.
+#[unsafe(no_mangle)]
+pub extern "C" fn fwd_start_logs(args: Option<&LogArgs>) -> Value {
+    match args {
+        Some(log_args) => start_logs(log_args).map_or_else(Into::into, Into::into),
+        None => String::from("failed to provide args").into(),
+    }
+}
+
+#[cfg(feature = "logger")]
+#[doc(hidden)]
+fn start_logs(log_args: &LogArgs) -> Result<(), String> {
+    use env_logger::Target::Pipe;
+    use std::fs::OpenOptions;
+    use std::path::Path;
+
+    let log_path =
+        to_path(log_args.path).unwrap_or(Path::join(&std::env::temp_dir(), "firewood-log.txt"));
+
+    let log_dir = log_path.parent().unwrap_or_else(|| Path::new("."));
+    std::fs::create_dir_all(log_dir).map_err(|e| e.to_string())?;
+
+    let level_str = if log_args.filter_level.is_null() {
+        "info"
+    } else {
+        unsafe { CStr::from_ptr(log_args.filter_level) }
+            .to_str()
+            .map_err(|e| e.to_string())?
+    };
+    let level = level_str
+        .parse::<log::LevelFilter>()
+        .map_err(|e| e.to_string())?;
+
+    let file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(false)
+        .open(log_path)
+        .map_err(|e| e.to_string())?;
+
+    env_logger::Builder::new()
+        .filter_level(level)
+        .target(Pipe(Box::new(file)))
+        .try_init()
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[cfg(not(feature = "logger"))]
+#[doc(hidden)]
+fn start_logs(_log_args: &LogArgs) -> Result<(), String> {
+    Err(String::from("logger feature is disabled"))
+}
+
+/// Helper function to convert C String pointers to a path
+/// Returns None if the pointer is null or if the string is empty
+#[doc(hidden)]
+fn to_path(cstr: *const std::ffi::c_char) -> Option<PathBuf> {
+    if cstr.is_null() {
+        return None;
+    }
+
+    let cstr = unsafe { CStr::from_ptr(cstr) };
+    let osstr = OsStr::from_bytes(cstr.to_bytes());
+
+    (!osstr.is_empty()).then(|| PathBuf::from(osstr))
 }
 
 #[doc(hidden)]

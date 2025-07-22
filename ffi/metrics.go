@@ -8,6 +8,7 @@ import "C"
 
 import (
 	"strings"
+	"unsafe"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/expfmt"
@@ -69,4 +70,27 @@ func GatherMetrics() (string, error) {
 		return "", err
 	}
 	return string(b), nil
+}
+
+// LogConfig configures logs for this process.
+type LogConfig struct {
+	Path        string
+	FilterLevel string
+}
+
+// Starts global logs.
+// This function only needs to be called once.
+// An error is returned if this method is called a second time.
+func StartLogs(config *LogConfig) error {
+	args := &C.struct_LogArgs{}
+	if config.Path != "" {
+		args.path = C.CString(config.Path)
+		defer C.free(unsafe.Pointer(args.path))
+	}
+	if config.FilterLevel != "" {
+		args.filter_level = C.CString(config.FilterLevel)
+		defer C.free(unsafe.Pointer(args.filter_level))
+	}
+	result := C.fwd_start_logs(args)
+	return errorFromValue(&result)
 }

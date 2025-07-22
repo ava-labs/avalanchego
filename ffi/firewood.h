@@ -74,6 +74,18 @@ typedef struct CreateOrOpenArgs {
 } CreateOrOpenArgs;
 
 /**
+ * Arguments for logging
+ *
+ * * `path` - The file path where logs for this process are stored. By
+ *   default, this is set to /tmp/firewood-log.txt
+ * * `filter_level` - The filter level for logs. By default, this is set to info.
+ */
+typedef struct LogArgs {
+  const char *path;
+  const char *filter_level;
+} LogArgs;
+
+/**
  * Puts the given key-value pairs into the database.
  *
  * # Arguments
@@ -396,6 +408,20 @@ struct Value fwd_propose_on_proposal(const struct DatabaseHandle *db,
  *
  */
 struct Value fwd_root_hash(const struct DatabaseHandle *db);
+
+/**
+ * Start logs for this process.
+ *
+ * # Arguments
+ *
+ * See `LogArgs`.
+ *
+ * # Returns
+ *
+ * A `Value` containing {0, null} if the global logger was initialized.
+ * A `Value` containing {0, "error message"} if an error occurs.
+ */
+struct Value fwd_start_logs(const struct LogArgs *args);
 
 /**
  * Start metrics recorder for this process.
