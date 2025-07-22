@@ -9,9 +9,8 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	"github.com/onsi/ginkgo"
 
-	"github.com/ava-labs/avalanchego/config"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/info/v1/infov1connect"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
@@ -24,10 +23,10 @@ import (
 
 func TestInfoE2E(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Connect Info API Suite")
+	RunSpecs(t, "Info E2E Suite")
 }
 
-var _ = ginkgo.Describe("[Connect Info API]", func() {
+var _ = Describe("[Connect Info API]", func() {
 	var (
 		tc     = e2e.NewTestContext()
 		env    = e2e.GetEnv(tc)
@@ -36,15 +35,15 @@ var _ = ginkgo.Describe("[Connect Info API]", func() {
 	)
 
 	BeforeSuite(func() {
-		flags := tmpnet.FlagsMap{
-			config.AdminAPIEnabledKey:  "true",
-			config.InfoAPIEnabledKey:   "true",
-			config.HealthAPIEnabledKey: "true",
-		}
-		node := e2e.AddEphemeralNode(tc, env.GetNetwork(), tmpnet.NewEphemeralNode(flags))
+		rootDir := env.RootNetworkDir
+		network := tmpnet.NewDefaultNetwork("connect-info-e2e")
 
+		err := tmpnet.BootstrapNewNetwork(ctx, tc.Log(), network, rootDir)
+		Expect(err).ToNot(HaveOccurred())
+
+		node, err := network.GetNode(ids.BuildTestNodeID([]byte("node-0")))
 		e2e.WaitForHealthy(tc, node)
-		url := node.GetAccessibleURI() + "/ext/info"
+		url := node.GetAccessibleURI()
 		client = infov1connect.NewInfoServiceClient(http.DefaultClient, url)
 	})
 
