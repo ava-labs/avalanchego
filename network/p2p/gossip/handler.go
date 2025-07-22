@@ -5,9 +5,9 @@ package gossip
 
 import (
 	"context"
-	"github.com/prometheus/client_golang/prometheus"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
