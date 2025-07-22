@@ -100,7 +100,9 @@ func TestMain(m *testing.M) {
 
 func BenchmarkReexecuteRange(b *testing.B) {
 	require.Equalf(b, 1, b.N, "BenchmarkReexecuteRange expects to run a single iteration because it overwrites the input current-state, but found (b.N=%d)", b.N)
-	benchmarkReexecuteRange(b, sourceBlockDirArg, targetDirArg, startBlockArg, endBlockArg, chanSizeArg, metricsEnabledArg)
+	b.Run(fmt.Sprintf("[%d,%d]", startBlockArg, endBlockArg), func(b *testing.B) {
+		benchmarkReexecuteRange(b, sourceBlockDirArg, targetDirArg, startBlockArg, endBlockArg, chanSizeArg, metricsEnabledArg)
+	})
 }
 
 func benchmarkReexecuteRange(b *testing.B, sourceBlockDir string, targetDir string, startBlock uint64, endBlock uint64, chanSize int, metricsEnabled bool) {
