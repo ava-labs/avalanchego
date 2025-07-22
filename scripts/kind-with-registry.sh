@@ -47,7 +47,7 @@ nodes:
 - role: control-plane
   extraPortMappings:
   # Exposing a nodeport for nginx ingress is the reason this script needed to be copied and customized
-  # This port must match the value used to deploy the nginx controller by tests/fixture/tmpnet/start-kind-cluster.go
+  # This port must match the ingressNodePort constant in tests/fixture/tmpnet/start_kind_cluster.go
   - containerPort: 30791
     hostPort: 30791
     protocol: TCP

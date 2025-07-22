@@ -261,4 +261,13 @@ jobs:
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           loki_username: ${{ secrets.LOKI_ID || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-
+  robustness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - uses: ./.github/actions/install-nix
+        # TODO(marun) Extend testing of robustness beyond deploying a suitable test environment
+      - name: Deploy kind with chaos mesh
+        shell: bash
+        run: nix develop --command ./scripts/run_task.sh test-robustness

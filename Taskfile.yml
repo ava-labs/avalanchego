@@ -336,6 +336,11 @@ tasks:
       - task: generate-load-contract-bindings
       - cmd: bash -x ./scripts/tests.load.kube.kind.sh {{.CLI_ARGS}}
 
+  test-robustness:
+    desc: Deploys kind with chaos mesh. Intended to eventually run a robustness (fault-injection) test suite.
+    cmds:
+      - ./bin/tmpnetctl start-kind-cluster --install-chaos-mesh
+
   test-unit:
     desc: Runs unit tests
     # Invoking with bash ensures compatibility with CI execution on Windows
