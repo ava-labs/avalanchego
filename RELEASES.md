@@ -1,5 +1,74 @@
 # Release Notes
 
+## [v1.13.3](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.3)
+
+This version is backwards compatible to [v1.13.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.0). It is optional, but encouraged.
+
+The plugin version is updated to `42` all plugins must update to be compatible.
+
+**This release removes the support for running on Windows. Any users running on Windows should utilize Windows Subsystem for Linux.**
+
+### APIs
+
+- Converted HTTP2 support to route by the `Avalanche-Api-Route` header.
+- Added `avalanche_snowman_blks_built_time_skew` metric.
+- Added p2p `bloomfilter_hit_rate` metrics for the P-chain, X-chain, C-chain atomic, and C-chain mempools.
+
+### Fixes
+
+- Fixed HTTP2 update request handling.
+- Fixed plugin handling of special errors during HTTP request handling.
+- Fixed plugin forwarding of HTTP headers.
+- Fixed C-chain shared memory UTXO parsing by the Primary Network Wallet.
+
+### What's Changed
+
+- chore: move windows from tier 3 to unsupported by @aaronbuchwald in https://github.com/ava-labs/avalanchego/pull/4031
+- [tmpnet] Run kube load test under a service account to validate RBAC by @maru-ava in https://github.com/ava-labs/avalanchego/pull/4030
+- Add block timeskew metric by @yacovm in https://github.com/ava-labs/avalanchego/pull/4034
+- refactor: use maps.Copy for cleaner map handling by @gopherorg in https://github.com/ava-labs/avalanchego/pull/4042
+- Fix bug in rpcchainvm where `io.EOF` is not propagated correctly by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/4035
+- chore: fix some minor issues in the comments by @alongdate in https://github.com/ava-labs/avalanchego/pull/4045
+- Update golangci-lint to v2  by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/4037
+- Simplex VerifiedBlock and BlockDeserializer by @samliok in https://github.com/ava-labs/avalanchego/pull/4009
+- Load Framework 2 by @RodrigoVillar in https://github.com/ava-labs/avalanchego/pull/3996
+- Rename test_util -> util_test  by @samliok in https://github.com/ava-labs/avalanchego/pull/4054
+- Replace toEngine channel with a dedicated subscription API by @yacovm in https://github.com/ava-labs/avalanchego/pull/3999
+- Ensure that headers added by the server are propagated by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/4060
+- Update coreth to v0.15.3-rc.0 by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/4062
+- Add default validator set function to snowtest.context by @JonathanOppenheimer in https://github.com/ava-labs/avalanchego/pull/4065
+- Fix flake in TestNotifierReSubscribeAtPrefChange by @yacovm in https://github.com/ava-labs/avalanchego/pull/4067
+- Support header-based routing by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/4036
+- Simplify json-rpc client handling by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/4079
+- Update coreth to v0.15.3-rc.1 by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/4080
+- feat: add default flag options by @RodrigoVillar in https://github.com/ava-labs/avalanchego/pull/4044
+- chore: fix some function names in comment by @shangchenglumetro in https://github.com/ava-labs/avalanchego/pull/4053
+- chore: fix some inconsistent comments by @jingchanglu in https://github.com/ava-labs/avalanchego/pull/4068
+- refactor: use the built-in max/min to simplify the code by @socialsister in https://github.com/ava-labs/avalanchego/pull/4087
+- Comm Component for Simplex by @samliok in https://github.com/ava-labs/avalanchego/pull/3998
+- ci(load-tests): add GitHub Actions workflow for load testing on k8s by @Elvis339 in https://github.com/ava-labs/avalanchego/pull/4051
+- Update run monitored tmpnet cmd to make dashboard param configurable by @aaronbuchwald in https://github.com/ava-labs/avalanchego/pull/4089
+- Add WritePrometheusServiceDiscoveryConfigFile helper by @aaronbuchwald in https://github.com/ava-labs/avalanchego/pull/4072
+- [nix] Update to 25.05 by @maru-ava in https://github.com/ava-labs/avalanchego/pull/4050
+- chore: replace polling with subscription-based acceptance by @RodrigoVillar in https://github.com/ava-labs/avalanchego/pull/4059
+- Add Verification + Tracking Logic To Simplex Blocks by @samliok in https://github.com/ava-labs/avalanchego/pull/4052
+- Fix wrong pkg import for Primary Wallet by @0xJohnnyGault in https://github.com/ava-labs/avalanchego/pull/4096
+- [tmpnet] Source tmpnet defaults from a configmap by @maru-ava in https://github.com/ava-labs/avalanchego/pull/4057
+- Throttle platformVM block building until normal ops by @yacovm in https://github.com/ava-labs/avalanchego/pull/4097
+- fix: add throttle to error retries by @alarso16 in https://github.com/ava-labs/avalanchego/pull/4098
+- Measure bloom filter AppGossip hit rate by @yacovm in https://github.com/ava-labs/avalanchego/pull/4085
+
+### New Contributors
+
+- @gopherorg made their first contribution in https://github.com/ava-labs/avalanchego/pull/4042
+- @alongdate made their first contribution in https://github.com/ava-labs/avalanchego/pull/4045
+- @JonathanOppenheimer made their first contribution in https://github.com/ava-labs/avalanchego/pull/4065
+- @shangchenglumetro made their first contribution in https://github.com/ava-labs/avalanchego/pull/4053
+- @jingchanglu made their first contribution in https://github.com/ava-labs/avalanchego/pull/4068
+- @0xJohnnyGault made their first contribution in https://github.com/ava-labs/avalanchego/pull/4096
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.13.2...v1.13.3
+
 ## [v1.13.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.2)
 
 This version is backwards compatible to [v1.13.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.0). It is optional, but encouraged.

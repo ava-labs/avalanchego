@@ -45,6 +45,18 @@ const (
 	ingressChartRepo      = "https://kubernetes.github.io/ingress-nginx"
 	ingressChartName      = "ingress-nginx/ingress-nginx"
 	ingressControllerName = "ingress-nginx-controller"
+	// This must match the nodePort configured in scripts/kind-with-registry.sh
+	ingressNodePort = 30791
+
+	// Chaos Mesh constants
+	chaosMeshNamespace      = "chaos-mesh"
+	chaosMeshReleaseName    = "chaos-mesh"
+	chaosMeshChartRepo      = "https://charts.chaos-mesh.org"
+	chaosMeshChartName      = "chaos-mesh/chaos-mesh"
+	chaosMeshChartVersion   = "2.7.2"
+	chaosMeshControllerName = "chaos-controller-manager"
+	chaosMeshDashboardName  = "chaos-dashboard"
+	chaosMeshDashboardHost  = "chaos-mesh.localhost"
 )
 
 //go:embed yaml/tmpnet-rbac.yaml
@@ -57,6 +69,7 @@ func StartKindCluster(
 	configPath string,
 	startMetricsCollector bool,
 	startLogsCollector bool,
+	installChaosMesh bool,
 ) error {
 	configContext := KindKubeconfigContext
 
@@ -114,6 +127,12 @@ func StartKindCluster(
 
 	if err := createDefaultsConfigMap(ctx, log, configPath, configContext, DefaultTmpnetNamespace); err != nil {
 		return fmt.Errorf("failed to create defaults ConfigMap: %w", err)
+	}
+
+	if installChaosMesh {
+		if err := deployChaosMesh(ctx, log, configPath, configContext); err != nil {
+			return fmt.Errorf("failed to deploy chaos mesh: %w", err)
+		}
 	}
 
 	return nil
@@ -342,7 +361,7 @@ func deployIngressController(ctx context.Context, log logging.Logger, configPath
 		"--wait",
 		"--set", "controller.service.type=NodePort",
 		// This port value must match the port configured in scripts/kind-with-registry.sh
-		"--set", "controller.service.nodePorts.http=30791",
+		"--set", fmt.Sprintf("controller.service.nodePorts.http=%d", ingressNodePort),
 		"--set", "controller.admissionWebhooks.enabled=false",
 		"--set", "controller.config.proxy-read-timeout=600",
 		"--set", "controller.config.proxy-send-timeout=600",
@@ -355,7 +374,7 @@ func deployIngressController(ctx context.Context, log logging.Logger, configPath
 		return fmt.Errorf("failed to install nginx-ingress: %w", err)
 	}
 
-	return waitForIngressController(ctx, log, configPath, configContext)
+	return waitForDeployment(ctx, log, configPath, configContext, ingressNamespace, ingressControllerName, "nginx ingress controller")
 }
 
 // isIngressControllerRunning checks if the nginx ingress controller is already running.
@@ -369,42 +388,6 @@ func isIngressControllerRunning(ctx context.Context, log logging.Logger, configP
 	_, err = clientset.AppsV1().Deployments(ingressNamespace).Get(ctx, ingressControllerName, metav1.GetOptions{})
 	isRunning := !apierrors.IsNotFound(err) || err == nil
 	return isRunning, nil
-}
-
-// waitForIngressController waits for the nginx ingress controller to be ready.
-func waitForIngressController(ctx context.Context, log logging.Logger, configPath string, configContext string) error {
-	clientset, err := GetClientset(log, configPath, configContext)
-	if err != nil {
-		return fmt.Errorf("failed to get clientset: %w", err)
-	}
-
-	return wait.PollUntilContextCancel(ctx, statusCheckInterval, true /* immediate */, func(ctx context.Context) (bool, error) {
-		deployment, err := clientset.AppsV1().Deployments(ingressNamespace).Get(ctx, ingressControllerName, metav1.GetOptions{})
-		if err != nil {
-			log.Debug("failed to get nginx ingress controller deployment",
-				zap.String("namespace", ingressNamespace),
-				zap.String("deployment", ingressControllerName),
-				zap.Error(err),
-			)
-			return false, nil
-		}
-		if deployment.Status.ReadyReplicas == 0 {
-			log.Debug("waiting for nginx ingress controller to become ready",
-				zap.String("namespace", ingressNamespace),
-				zap.String("deployment", ingressControllerName),
-				zap.Int32("readyReplicas", deployment.Status.ReadyReplicas),
-				zap.Int32("replicas", deployment.Status.Replicas),
-			)
-			return false, nil
-		}
-
-		log.Info("nginx ingress controller is ready",
-			zap.String("namespace", ingressNamespace),
-			zap.String("deployment", ingressControllerName),
-			zap.Int32("readyReplicas", deployment.Status.ReadyReplicas),
-		)
-		return true, nil
-	})
 }
 
 // runHelmCommand runs a Helm command with the given arguments.
@@ -448,7 +431,7 @@ func createDefaultsConfigMap(ctx context.Context, log logging.Logger, configPath
 			Namespace: namespace,
 		},
 		Data: map[string]string{
-			ingressHostKey: "localhost:30791",
+			ingressHostKey: fmt.Sprintf("localhost:%d", ingressNodePort),
 		},
 	}
 
@@ -458,4 +441,125 @@ func createDefaultsConfigMap(ctx context.Context, log logging.Logger, configPath
 	}
 
 	return nil
+}
+
+// deployChaosMesh deploys Chaos Mesh using Helm.
+func deployChaosMesh(ctx context.Context, log logging.Logger, configPath string, configContext string) error {
+	log.Info("checking if chaos mesh is already running")
+
+	isRunning, err := isChaosMeshRunning(ctx, log, configPath, configContext)
+	if err != nil {
+		return fmt.Errorf("failed to check chaos mesh status: %w", err)
+	}
+	if isRunning {
+		log.Info("chaos mesh already running")
+		return nil
+	}
+
+	log.Info("deploying chaos mesh using Helm")
+
+	// Add the helm repo for chaos-mesh
+	if err := runHelmCommand(ctx, "repo", "add", "chaos-mesh", chaosMeshChartRepo); err != nil {
+		return fmt.Errorf("failed to add chaos mesh helm repo: %w", err)
+	}
+	if err := runHelmCommand(ctx, "repo", "update"); err != nil {
+		return fmt.Errorf("failed to update helm repos: %w", err)
+	}
+
+	// Install Chaos Mesh with all required settings including ingress
+	args := []string{
+		"install",
+		chaosMeshReleaseName,
+		chaosMeshChartName,
+		"--namespace", chaosMeshNamespace,
+		"--create-namespace",
+		"--version", chaosMeshChartVersion,
+		"--wait",
+		"--set", "chaosDaemon.runtime=containerd",
+		"--set", "chaosDaemon.socketPath=/run/containerd/containerd.sock",
+		"--set", "dashboard.persistentVolume.enabled=true",
+		"--set", "dashboard.persistentVolume.storageClass=standard",
+		"--set", "dashboard.securityMode=false",
+		"--set", "controllerManager.leaderElection.enabled=false",
+		"--set", "dashboard.ingress.enabled=true",
+		"--set", "dashboard.ingress.ingressClassName=nginx",
+		"--set", "dashboard.ingress.hosts[0].name=" + chaosMeshDashboardHost,
+	}
+
+	if err := runHelmCommand(ctx, args...); err != nil {
+		return fmt.Errorf("failed to install chaos mesh: %w", err)
+	}
+
+	// Wait for Chaos Mesh to be ready
+	if err := waitForChaosMesh(ctx, log, configPath, configContext); err != nil {
+		return fmt.Errorf("chaos mesh deployment failed: %w", err)
+	}
+
+	// Log access information
+	log.Info("Chaos Mesh installed successfully",
+		zap.String("dashboardURL", fmt.Sprintf("http://%s:%d", chaosMeshDashboardHost, ingressNodePort)),
+	)
+	log.Warn("Chaos Mesh dashboard security is disabled - use only for local development")
+
+	return nil
+}
+
+// isChaosMeshRunning checks if Chaos Mesh is already running.
+func isChaosMeshRunning(ctx context.Context, log logging.Logger, configPath string, configContext string) (bool, error) {
+	clientset, err := GetClientset(log, configPath, configContext)
+	if err != nil {
+		return false, err
+	}
+
+	// Check if controller manager deployment exists
+	_, err = clientset.AppsV1().Deployments(chaosMeshNamespace).Get(ctx, chaosMeshControllerName, metav1.GetOptions{})
+	return !apierrors.IsNotFound(err), nil
+}
+
+// waitForChaosMesh waits for Chaos Mesh components to be ready.
+func waitForChaosMesh(ctx context.Context, log logging.Logger, configPath string, configContext string) error {
+	// Wait for controller manager
+	if err := waitForDeployment(ctx, log, configPath, configContext, chaosMeshNamespace, chaosMeshControllerName, "chaos mesh controller manager"); err != nil {
+		return fmt.Errorf("controller manager not ready: %w", err)
+	}
+
+	// Wait for dashboard
+	return waitForDeployment(ctx, log, configPath, configContext, chaosMeshNamespace, chaosMeshDashboardName, "chaos mesh dashboard")
+}
+
+// waitForDeployment waits for a deployment to have at least one ready replica.
+func waitForDeployment(ctx context.Context, log logging.Logger, configPath string, configContext string, namespace string, deploymentName string, displayName string) error {
+	clientset, err := GetClientset(log, configPath, configContext)
+	if err != nil {
+		return fmt.Errorf("failed to get clientset: %w", err)
+	}
+
+	log.Info("waiting for " + displayName + " to be ready")
+	return wait.PollUntilContextCancel(ctx, statusCheckInterval, true /* immediate */, func(ctx context.Context) (bool, error) {
+		deployment, err := clientset.AppsV1().Deployments(namespace).Get(ctx, deploymentName, metav1.GetOptions{})
+		if err != nil {
+			log.Debug("failed to get "+displayName+" deployment",
+				zap.String("namespace", namespace),
+				zap.String("deployment", deploymentName),
+				zap.Error(err),
+			)
+			return false, nil
+		}
+		if deployment.Status.ReadyReplicas == 0 {
+			log.Debug("waiting for "+displayName+" to become ready",
+				zap.String("namespace", namespace),
+				zap.String("deployment", deploymentName),
+				zap.Int32("readyReplicas", deployment.Status.ReadyReplicas),
+				zap.Int32("replicas", deployment.Status.Replicas),
+			)
+			return false, nil
+		}
+
+		log.Info(displayName+" is ready",
+			zap.String("namespace", namespace),
+			zap.String("deployment", deploymentName),
+			zap.Int32("readyReplicas", deployment.Status.ReadyReplicas),
+		)
+		return true, nil
+	})
 }
