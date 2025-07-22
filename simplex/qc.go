@@ -60,15 +60,15 @@ func (qc *QC) Verify(msg []byte) error {
 
 	// ensure all signers are in the membership set
 	for _, signer := range qc.signers {
-		if _, exists := uniqueSigners[ids.NodeID(signer)]; exists {
-			return fmt.Errorf("%w: %x", errDuplicateSigner, signer)
-		}
-		uniqueSigners[ids.NodeID(signer)] = struct{}{}
-
 		id, err := ids.ToNodeID(signer)
 		if err != nil {
-			return err
+			return fmt.Errorf("error converting signer to NodeID: %w", err)
 		}
+
+		if _, exists := uniqueSigners[id]; exists {
+			return fmt.Errorf("%w: %x", errDuplicateSigner, signer)
+		}
+		uniqueSigners[id] = struct{}{}
 
 		pk, exists := qc.verifier.nodeID2PK[id]
 		if !exists {
@@ -152,7 +152,12 @@ func (a *SignatureAggregator) Aggregate(signatures []simplex.Signature) (simplex
 	sigs := make([]*bls.Signature, 0, quorumSize)
 	for _, signature := range signatures {
 		signer := signature.Signer
-		if _, exists := a.verifier.nodeID2PK[ids.NodeID(signer)]; !exists {
+		id, err := ids.ToNodeID(signer)
+		if err != nil {
+			return nil, fmt.Errorf("error converting signer to NodeID: %w", err)
+		}
+
+		if _, exists := a.verifier.nodeID2PK[id]; !exists {
 			return nil, fmt.Errorf("%w: %x", errSignerNotFound, signer)
 		}
 		signers = append(signers, signer)
