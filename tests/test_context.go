@@ -31,6 +31,9 @@ type TestContext interface {
 	DefaultContext() context.Context
 	WithDefaultContext() common.Option
 
+	// The parent context to use as the parent of default contexts
+	GetDefaultContextParent() context.Context
+
 	// Ensures compatibility with require.Eventually
 	Eventually(condition func() bool, waitFor time.Duration, tick time.Duration, msg string)
 }

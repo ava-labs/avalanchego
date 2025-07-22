@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -21,7 +22,12 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-const cliVersion = "0.0.1"
+const (
+	cliVersion = "0.0.1"
+
+	// Need a longer timeout to account for time required to deploy nginx ingress controller and chaos mesh
+	startKindClusterTimeout = 5 * time.Minute
+)
 
 var (
 	errNetworkDirRequired = fmt.Errorf("--network-dir or %s is required", tmpnet.NetworkDirEnvName)
@@ -119,7 +125,11 @@ func main() {
 			return nil
 		},
 	}
-	startNetworkVars = flags.NewStartNetworkFlagSetVars(startNetworkCmd.PersistentFlags(), "" /* defaultNetworkOwner */)
+	startNetworkVars = flags.NewStartNetworkFlagSetVars(
+		startNetworkCmd.PersistentFlags(),
+		"", /* defaultNetworkOwner */
+		tmpnet.DefaultNodeCount,
+	)
 	rootCmd.AddCommand(startNetworkCmd)
 
 	stopNetworkCmd := &cobra.Command{
@@ -267,14 +277,15 @@ func main() {
 	rootCmd.AddCommand(checkLogsCmd)
 
 	var (
-		kubeconfigVars *flags.KubeconfigVars
-		collectorVars  *flags.CollectorVars
+		kubeconfigVars   *flags.KubeconfigVars
+		collectorVars    *flags.CollectorVars
+		installChaosMesh bool
 	)
 	startKindClusterCmd := &cobra.Command{
 		Use:   "start-kind-cluster",
 		Short: "Starts a local kind cluster with an integrated registry",
 		RunE: func(*cobra.Command, []string) error {
-			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
+			ctx, cancel := context.WithTimeout(context.Background(), startKindClusterTimeout)
 			defer cancel()
 			log, err := tests.LoggerForFormat("", rawLogFormat)
 			if err != nil {
@@ -298,11 +309,13 @@ func main() {
 				kubeconfigVars.Path,
 				collectorVars.StartMetricsCollector,
 				collectorVars.StartLogsCollector,
+				installChaosMesh,
 			)
 		},
 	}
 	kubeconfigVars = flags.NewKubeconfigFlagSetVars(startKindClusterCmd.PersistentFlags())
 	collectorVars = flags.NewCollectorFlagSetVars(startKindClusterCmd.PersistentFlags())
+	startKindClusterCmd.PersistentFlags().BoolVar(&installChaosMesh, "install-chaos-mesh", false, "Install Chaos Mesh in the kind cluster")
 	rootCmd.AddCommand(startKindClusterCmd)
 
 	if err := rootCmd.Execute(); err != nil {

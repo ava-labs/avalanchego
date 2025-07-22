@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package xsvm;
+
+option go_package = "github.com/ava-labs/avalanchego/connectproto/pb/xsvm";
+
+service Ping {
+  rpc Ping(PingRequest) returns (PingReply);
+  rpc StreamPing(stream StreamPingRequest) returns (stream StreamPingReply);
+}
+
+message PingRequest {
+  string message = 1;
+}
+
+message PingReply {
+  string message = 1;
+}
+
+message StreamPingRequest {
+  string message = 1;
+}
+
+message StreamPingReply {
+  string message = 1;
+}

@@ -172,7 +172,7 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // response to the client. Protocol upgrade requests (websockets) are not supported
 // and should use ServeHTTP.
 func (c *Client) serveHTTPSimple(w http.ResponseWriter, r *http.Request) {
-	req, err := getHTTPSimpleRequest(r)
+	req, err := getHTTPSimpleRequest(w, r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -196,16 +196,17 @@ func (c *Client) serveHTTPSimple(w http.ResponseWriter, r *http.Request) {
 }
 
 // getHTTPSimpleRequest takes an http request as input and returns a gRPC HandleSimpleHTTPRequest.
-func getHTTPSimpleRequest(r *http.Request) (*httppb.HandleSimpleHTTPRequest, error) {
+func getHTTPSimpleRequest(w http.ResponseWriter, r *http.Request) (*httppb.HandleSimpleHTTPRequest, error) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		return nil, err
 	}
 	return &httppb.HandleSimpleHTTPRequest{
-		Method:  r.Method,
-		Url:     r.RequestURI,
-		Body:    body,
-		Headers: grpcutils.GetHTTPHeader(r.Header),
+		Method:          r.Method,
+		Url:             r.RequestURI,
+		Body:            body,
+		RequestHeaders:  grpcutils.GetHTTPHeader(r.Header),
+		ResponseHeaders: grpcutils.GetHTTPHeader(w.Header()),
 	}, nil
 }
 

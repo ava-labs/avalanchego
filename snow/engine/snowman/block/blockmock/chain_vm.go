@@ -133,21 +133,6 @@ func (mr *ChainVMMockRecorder) Connected(ctx, nodeID, nodeVersion any) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Connected", reflect.TypeOf((*ChainVM)(nil).Connected), ctx, nodeID, nodeVersion)
 }
 
-// CreateHTTP2Handler mocks base method.
-func (m *ChainVM) CreateHTTP2Handler(ctx context.Context) (http.Handler, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateHTTP2Handler", ctx)
-	ret0, _ := ret[0].(http.Handler)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// CreateHTTP2Handler indicates an expected call of CreateHTTP2Handler.
-func (mr *ChainVMMockRecorder) CreateHTTP2Handler(ctx any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateHTTP2Handler", reflect.TypeOf((*ChainVM)(nil).CreateHTTP2Handler), ctx)
-}
-
 // CreateHandlers mocks base method.
 func (m *ChainVM) CreateHandlers(arg0 context.Context) (map[string]http.Handler, error) {
 	m.ctrl.T.Helper()
@@ -223,17 +208,17 @@ func (mr *ChainVMMockRecorder) HealthCheck(arg0 any) *gomock.Call {
 }
 
 // Initialize mocks base method.
-func (m *ChainVM) Initialize(ctx context.Context, chainCtx *snow.Context, db database.Database, genesisBytes, upgradeBytes, configBytes []byte, toEngine chan<- common.Message, fxs []*common.Fx, appSender common.AppSender) error {
+func (m *ChainVM) Initialize(ctx context.Context, chainCtx *snow.Context, db database.Database, genesisBytes, upgradeBytes, configBytes []byte, fxs []*common.Fx, appSender common.AppSender) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Initialize", ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs, appSender)
+	ret := m.ctrl.Call(m, "Initialize", ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, fxs, appSender)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Initialize indicates an expected call of Initialize.
-func (mr *ChainVMMockRecorder) Initialize(ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs, appSender any) *gomock.Call {
+func (mr *ChainVMMockRecorder) Initialize(ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, fxs, appSender any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Initialize", reflect.TypeOf((*ChainVM)(nil).Initialize), ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs, appSender)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Initialize", reflect.TypeOf((*ChainVM)(nil).Initialize), ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, fxs, appSender)
 }
 
 // LastAccepted mocks base method.
@@ -249,6 +234,21 @@ func (m *ChainVM) LastAccepted(arg0 context.Context) (ids.ID, error) {
 func (mr *ChainVMMockRecorder) LastAccepted(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LastAccepted", reflect.TypeOf((*ChainVM)(nil).LastAccepted), arg0)
+}
+
+// NewHTTPHandler mocks base method.
+func (m *ChainVM) NewHTTPHandler(ctx context.Context) (http.Handler, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NewHTTPHandler", ctx)
+	ret0, _ := ret[0].(http.Handler)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NewHTTPHandler indicates an expected call of NewHTTPHandler.
+func (mr *ChainVMMockRecorder) NewHTTPHandler(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewHTTPHandler", reflect.TypeOf((*ChainVM)(nil).NewHTTPHandler), ctx)
 }
 
 // ParseBlock mocks base method.
@@ -321,4 +321,19 @@ func (m *ChainVM) Version(arg0 context.Context) (string, error) {
 func (mr *ChainVMMockRecorder) Version(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Version", reflect.TypeOf((*ChainVM)(nil).Version), arg0)
+}
+
+// WaitForEvent mocks base method.
+func (m *ChainVM) WaitForEvent(ctx context.Context) (common.Message, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WaitForEvent", ctx)
+	ret0, _ := ret[0].(common.Message)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// WaitForEvent indicates an expected call of WaitForEvent.
+func (mr *ChainVMMockRecorder) WaitForEvent(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForEvent", reflect.TypeOf((*ChainVM)(nil).WaitForEvent), ctx)
 }
