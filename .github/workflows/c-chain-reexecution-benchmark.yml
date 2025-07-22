@@ -73,4 +73,4 @@ jobs:
             auto-push: false
         - name: Push Benchmark Result
           if: github.event_name == 'schedule'
-          run: git push
+          run: git push origin gh-pages
