@@ -24,7 +24,7 @@ fn fwdctl_delete_db() -> Result<()> {
 #[test]
 #[serial]
 fn fwdctl_prints_version() -> Result<()> {
-    let expected_version_output: String = format!("{PRG} {VERSION}\n");
+    let expected_version_output: String = format!("{PRG} {VERSION}");
 
     // version is defined and succeeds with the desired output
     Command::cargo_bin(PRG)?
