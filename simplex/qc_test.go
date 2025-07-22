@@ -96,7 +96,8 @@ func TestQCDuplicateSigners(t *testing.T) {
 	qc, err := signatureAggregator.Aggregate(signatures)
 
 	require.NoError(t, err)
-	require.ErrorIs(t, qc.Verify(msg), errDuplicateSigner)
+	err = qc.Verify(msg)
+	require.ErrorIs(t, err, errDuplicateSigner)
 }
 
 func TestQCSignerNotInMembershipSet(t *testing.T) {
