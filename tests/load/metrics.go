@@ -5,63 +5,60 @@ package load
 
 import (
 	"errors"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-type Metrics struct {
-	txsIssuedCounter    prometheus.Counter
-	txsConfirmedCounter prometheus.Counter
-	txsFailedCounter    prometheus.Counter
-	txLatency           prometheus.Histogram
+type metrics struct {
+	txsIssuedCounter      prometheus.Counter
+	txIssuanceLatency     prometheus.Histogram
+	txConfirmationLatency prometheus.Histogram
+	txTotalLatency        prometheus.Histogram
 }
 
-func NewMetrics(registry *prometheus.Registry) (*Metrics, error) {
-	m := &Metrics{
+func newMetrics(namespace string, registry *prometheus.Registry) (metrics, error) {
+	m := metrics{
 		txsIssuedCounter: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "txs_issued",
 			Help:      "Number of transactions issued",
 		}),
-		txsConfirmedCounter: prometheus.NewCounter(prometheus.CounterOpts{
+		txIssuanceLatency: prometheus.NewHistogram(prometheus.HistogramOpts{
 			Namespace: namespace,
-			Name:      "txs_confirmed",
-			Help:      "Number of transactions confirmed",
+			Name:      "tx_issuance_latency",
+			Help:      "Issuance latency of transactions",
 		}),
-		txsFailedCounter: prometheus.NewCounter(prometheus.CounterOpts{
+		txConfirmationLatency: prometheus.NewHistogram(prometheus.HistogramOpts{
 			Namespace: namespace,
-			Name:      "txs_failed",
-			Help:      "Number of transactions failed",
+			Name:      "tx_confirmation_latency",
+			Help:      "Confirmation latency of transactions",
 		}),
-		txLatency: prometheus.NewHistogram(prometheus.HistogramOpts{
+		txTotalLatency: prometheus.NewHistogram(prometheus.HistogramOpts{
 			Namespace: namespace,
-			Name:      "tx_latency",
-			Help:      "Latency of transactions",
+			Name:      "tx_total_latency",
+			Help:      "Total latency of transactions",
 		}),
 	}
 
 	if err := errors.Join(
 		registry.Register(m.txsIssuedCounter),
-		registry.Register(m.txsConfirmedCounter),
-		registry.Register(m.txsFailedCounter),
-		registry.Register(m.txLatency),
+		registry.Register(m.txIssuanceLatency),
+		registry.Register(m.txConfirmationLatency),
+		registry.Register(m.txTotalLatency),
 	); err != nil {
-		return nil, err
+		return metrics{}, err
 	}
 
 	return m, nil
 }
 
-func (m *Metrics) IncIssuedTx() {
+func (m metrics) issue(d time.Duration) {
 	m.txsIssuedCounter.Inc()
+	m.txIssuanceLatency.Observe(float64(d.Milliseconds()))
 }
 
-func (m *Metrics) RecordConfirmedTx(latencyMS float64) {
-	m.txsConfirmedCounter.Inc()
-	m.txLatency.Observe(latencyMS)
-}
-
-func (m *Metrics) RecordFailedTx(latencyMS float64) {
-	m.txsFailedCounter.Inc()
-	m.txLatency.Observe(latencyMS)
+func (m metrics) accept(confirmationDuration time.Duration, totalDuration time.Duration) {
+	m.txConfirmationLatency.Observe(float64(confirmationDuration.Milliseconds()))
+	m.txTotalLatency.Observe(float64(totalDuration.Milliseconds()))
 }
