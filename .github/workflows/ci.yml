@@ -233,7 +233,7 @@ jobs:
         shell: bash
         run: nix develop --command ./scripts/run_task.sh test-bootstrap-monitor-e2e
   load2:
-    name: Run load2 test
+    name: Run process-based load2 test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
