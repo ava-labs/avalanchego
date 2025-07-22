@@ -4,15 +4,17 @@
 package connect_test
 
 import (
-	"context"
 	"net/http"
 	"testing"
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/onsi/ginkgo"
 
+	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/proto/pb/info/v1/infov1connect"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 
 	infov1 "github.com/ava-labs/avalanchego/proto/pb/info/v1"
 
@@ -20,30 +22,32 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var (
-	client     infov1connect.InfoServiceClient
-	ctx        context.Context
-	httpClient *http.Client
-	nodeURI    string
-)
-
 func TestInfoE2E(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Info E2E Suite")
+	RunSpecs(t, "Connect Info API Suite")
 }
 
-var _ = BeforeSuite(func() {
-	ctx = context.Background()
-	tc := e2e.NewTestContext()
-	env := e2e.GetEnv(tc)
-	uris := env.GetNodeURIs()
-	nodeURI = uris[0].URI
+var _ = ginkgo.Describe("[Connect Info API]", func() {
+	var (
+		tc     = e2e.NewTestContext()
+		env    = e2e.GetEnv(tc)
+		client infov1connect.InfoServiceClient
+		ctx    = tc.DefaultContext()
+	)
 
-	httpClient = &http.Client{Timeout: 10 * time.Second}
-	client = infov1connect.NewInfoServiceClient(httpClient, nodeURI)
-})
+	BeforeSuite(func() {
+		flags := tmpnet.FlagsMap{
+			config.AdminAPIEnabledKey:  "true",
+			config.InfoAPIEnabledKey:   "true",
+			config.HealthAPIEnabledKey: "true",
+		}
+		node := e2e.AddEphemeralNode(tc, env.GetNetwork(), tmpnet.NewEphemeralNode(flags))
 
-var _ = Describe("InfoService ConnectRPC E2E", func() {
+		e2e.WaitForHealthy(tc, node)
+		url := node.GetAccessibleURI() + "/ext/info"
+		client = infov1connect.NewInfoServiceClient(http.DefaultClient, url)
+	})
+
 	It("NodeVersion returns version info", func() {
 		req := connect.NewRequest(&infov1.NodeVersionRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
