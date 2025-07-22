@@ -232,8 +232,8 @@ jobs:
       - name: Run e2e tests
         shell: bash
         run: nix develop --command ./scripts/run_task.sh test-bootstrap-monitor-e2e
-  load2:
-    name: Run process-based load2 test
+  load:
+    name: Run process-based load test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -241,13 +241,13 @@ jobs:
       - uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
           run: ./scripts/run_task.sh test-load2 -- --load-timeout=30s
-          artifact_prefix: load2
+          artifact_prefix: load
           prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           loki_username: ${{ secrets.LOKI_ID || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-  load2_kube_kind:
-    name: Run load2 test on kind cluster
+  load_kube_kind:
+    name: Run load test on kind cluster
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -256,7 +256,7 @@ jobs:
         with:
           run: ./scripts/run_task.sh test-load2-kube-kind -- --load-timeout=30s
           runtime: kube
-          artifact_prefix: load2-kube
+          artifact_prefix: load-kube
           prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           loki_username: ${{ secrets.LOKI_ID || '' }}
