@@ -37,6 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
@@ -167,6 +168,8 @@ func benchmarkReexecuteRange(b *testing.B, sourceBlockDir string, targetDir stri
 		Log:              tests.NewDefaultLogger("vm-executor"),
 		Registry:         consensusRegistry,
 		ExecutionTimeout: executionTimeout,
+		StartBlock:       startBlock,
+		EndBlock:         endBlock,
 	}
 	executor, err := newVMExecutor(vm, config)
 	r.NoError(err)
@@ -272,6 +275,9 @@ type vmExecutorConfig struct {
 	// WITHOUT error after hitting the timeout.
 	// This is useful to provide consistent duration benchmarks.
 	ExecutionTimeout time.Duration
+
+	// [StartBlock, EndBlock] defines the range (inclusive) of blocks to execute.
+	StartBlock, EndBlock uint64
 }
 
 type vmExecutor struct {
@@ -321,7 +327,10 @@ func (e *vmExecutor) executeSequence(ctx context.Context, blkChan <-chan blockRe
 	}
 
 	start := time.Now()
-	e.config.Log.Info("last accepted block", zap.String("blkID", blkID.String()), zap.Uint64("height", blk.Height()))
+	e.config.Log.Info("last accepted block",
+		zap.Stringer("blkID", blkID),
+		zap.Uint64("height", blk.Height()),
+	)
 
 	if e.config.ExecutionTimeout > 0 {
 		var cancel context.CancelFunc
@@ -335,17 +344,27 @@ func (e *vmExecutor) executeSequence(ctx context.Context, blkChan <-chan blockRe
 		}
 
 		if blkResult.Height%1000 == 0 {
-			e.config.Log.Info("executing block", zap.Uint64("height", blkResult.Height))
+			eta := timer.EstimateETA(
+				start,
+				uint64(blkResult.Height-e.config.StartBlock),
+				e.config.EndBlock-e.config.StartBlock,
+			)
+			e.config.Log.Info("executing block",
+				zap.Uint64("height", blkResult.Height),
+				zap.Duration("eta", eta),
+			)
 		}
 		if err := e.execute(ctx, blkResult.BlockBytes); err != nil {
 			return err
 		}
 
-		select {
-		case <-ctx.Done():
-			e.config.Log.Info("exiting early due to context timeout", zap.Duration("elapsed", time.Since(start)), zap.Duration("execution-timeout", e.config.ExecutionTimeout))
+		if err := ctx.Err(); err != nil {
+			e.config.Log.Info("exiting early due to context timeout",
+				zap.Duration("elapsed", time.Since(start)),
+				zap.Duration("execution-timeout", e.config.ExecutionTimeout),
+				zap.Error(ctx.Err()),
+			)
 			return nil
-		default:
 		}
 	}
 	e.config.Log.Info("finished executing sequence")
@@ -368,25 +387,48 @@ func createBlockChanFromLevelDB(tb testing.TB, sourceDir string, startBlock, end
 	go func() {
 		defer close(ch)
 
-		for i := startBlock; i <= endBlock; i++ {
-			blockBytes, err := db.Get(binary.BigEndian.AppendUint64(nil, i))
-			if err != nil {
+		iter := db.NewIteratorWithStart(blockKey(startBlock))
+		defer iter.Release()
+
+		currentHeight := startBlock
+
+		for iter.Next() {
+			key := iter.Key()
+			if len(key) != database.Uint64Size {
 				ch <- blockResult{
 					BlockBytes: nil,
-					Err:        fmt.Errorf("failed to get block %d: %w", i, err),
+					Err:        fmt.Errorf("expected key length %d while looking for block at height %d, got %d", database.Uint64Size, currentHeight, len(key)),
 				}
 				return
 			}
-
-			ch <- blockResult{
-				BlockBytes: blockBytes,
-				Height:     i,
-				Err:        nil,
+			height := binary.BigEndian.Uint64(key)
+			if height != currentHeight {
+				ch <- blockResult{
+					BlockBytes: nil,
+					Err:        fmt.Errorf("expected next height %d, got %d", currentHeight, height),
+				}
+				return
 			}
+			ch <- blockResult{
+				BlockBytes: iter.Value(),
+				Height:     height,
+			}
+			currentHeight++
+		}
+		if iter.Error() != nil {
+			ch <- blockResult{
+				BlockBytes: nil,
+				Err:        fmt.Errorf("failed to iterate over blocks at height %d: %w", currentHeight, iter.Error()),
+			}
+			return
 		}
 	}()
 
 	return ch, nil
+}
+
+func blockKey(height uint64) []byte {
+	return binary.BigEndian.AppendUint64(nil, height)
 }
 
 func TestExportBlockRange(t *testing.T) {
@@ -406,7 +448,7 @@ func exportBlockRange(tb testing.TB, sourceDir string, targetDir string, startBl
 
 	batch := db.NewBatch()
 	for blkResult := range blockChan {
-		r.NoError(batch.Put(binary.BigEndian.AppendUint64(nil, blkResult.Height), blkResult.BlockBytes))
+		r.NoError(batch.Put(blockKey(blkResult.Height), blkResult.BlockBytes))
 
 		if batch.Size() > 10*units.MiB {
 			r.NoError(batch.Write())
