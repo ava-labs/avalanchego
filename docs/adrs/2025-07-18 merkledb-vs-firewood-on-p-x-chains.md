@@ -23,7 +23,7 @@ We have two such things: merkledb and firewood.
 
 ## Non-goals
 
-* Improved Throughput - needs of P- and X= chains are met by current solutions.
+* Improved Throughput - needs of P- and X-chains are met by current solutions.
 * Improved Latency - idem.
 * Consistent recovery - we recover via sync from other nodes if needed
 
@@ -43,7 +43,7 @@ We have two such things: merkledb and firewood.
 
 ## Rationale
 
-We discounted software diversity's accrual to resilience, because both P- and C- chains are critical to the Avalanche network, and there is no situation whether we could tolerate either being down.
+We discounted software diversity's accrual to resilience, because both P- and C- chains are critical to the Avalanche network, and there is no situation where we could tolerate either being down.
 
 merkleDb seems likely to continue to need attention, and despite its greater age it does not appear to have been more thoroughly tested.  At this point, Firewood has ingested data resulting from verification of all blocks since genesis, more than once.  
 
