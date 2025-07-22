@@ -1,7 +1,6 @@
 name: C-Chain Re-Execution Benchmark
 
 on:
-  pull_request:
   workflow_dispatch:
     inputs:
       start-block:
