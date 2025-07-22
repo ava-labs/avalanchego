@@ -78,14 +78,14 @@ func TestGatherer_Gather(t *testing.T) {
 		familyStrings[i] = families[i].String()
 	}
 	want := []string{
-		`name:"test_counter" type:COUNTER metric:<counter:<value:12345 > > `,
-		`name:"test_counter_float64" type:COUNTER metric:<counter:<value:1.1 > > `,
-		`name:"test_gauge" type:GAUGE metric:<gauge:<value:23456 > > `,
-		`name:"test_gauge_float64" type:GAUGE metric:<gauge:<value:34567.89 > > `,
-		`name:"test_histogram" type:SUMMARY metric:<summary:<sample_count:0 sample_sum:0 quantile:<quantile:0.5 value:0 > quantile:<quantile:0.75 value:0 > quantile:<quantile:0.95 value:0 > quantile:<quantile:0.99 value:0 > quantile:<quantile:0.999 value:0 > quantile:<quantile:0.9999 value:0 > > > `,
-		`name:"test_meter" type:GAUGE metric:<gauge:<value:9.999999e+06 > > `,
-		`name:"test_resetting_timer" type:SUMMARY metric:<summary:<sample_count:1 quantile:<quantile:50 value:1e+09 > quantile:<quantile:95 value:1e+09 > quantile:<quantile:99 value:1e+09 > > > `,
-		`name:"test_timer" type:SUMMARY metric:<summary:<sample_count:6 sample_sum:2.3e+08 quantile:<quantile:0.5 value:2.25e+07 > quantile:<quantile:0.75 value:4.8e+07 > quantile:<quantile:0.95 value:1.2e+08 > quantile:<quantile:0.99 value:1.2e+08 > quantile:<quantile:0.999 value:1.2e+08 > quantile:<quantile:0.9999 value:1.2e+08 > > > `,
+		`name:"test_counter" type:COUNTER metric:{counter:{value:12345}}`,
+		`name:"test_counter_float64" type:COUNTER metric:{counter:{value:1.1}}`,
+		`name:"test_gauge" type:GAUGE metric:{gauge:{value:23456}}`,
+		`name:"test_gauge_float64" type:GAUGE metric:{gauge:{value:34567.89}}`,
+		`name:"test_histogram" type:SUMMARY metric:{summary:{sample_count:0 sample_sum:0 quantile:{quantile:0.5 value:0} quantile:{quantile:0.75 value:0} quantile:{quantile:0.95 value:0} quantile:{quantile:0.99 value:0} quantile:{quantile:0.999 value:0} quantile:{quantile:0.9999 value:0}}}`,
+		`name:"test_meter" type:GAUGE metric:{gauge:{value:9.999999e+06}}`,
+		`name:"test_resetting_timer" type:SUMMARY metric:{summary:{sample_count:1 quantile:{quantile:50 value:1e+09} quantile:{quantile:95 value:1e+09} quantile:{quantile:99 value:1e+09}}}`,
+		`name:"test_timer" type:SUMMARY metric:{summary:{sample_count:6 sample_sum:2.3e+08 quantile:{quantile:0.5 value:2.25e+07} quantile:{quantile:0.75 value:4.8e+07} quantile:{quantile:0.95 value:1.2e+08} quantile:{quantile:0.99 value:1.2e+08} quantile:{quantile:0.999 value:1.2e+08} quantile:{quantile:0.9999 value:1.2e+08}}}`,
 	}
 	assert.Equal(t, want, familyStrings)
 
