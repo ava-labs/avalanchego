@@ -41,7 +41,7 @@ func TestQCAggregateAndSign(t *testing.T) {
 	}
 
 	// aggregate the signatures into a quorum certificate
-	signatureAggregator := SignatureAggregator(verifier)
+	signatureAggregator := SignatureAggregator{verifier: &verifier}
 	qc, err := signatureAggregator.Aggregate(signatures)
 
 	require.NoError(t, err)
@@ -49,7 +49,7 @@ func TestQCAggregateAndSign(t *testing.T) {
 	// verify the quorum certificate
 	require.NoError(t, qc.Verify(msg))
 
-	d := QCDeserializer(verifier)
+	d := QCDeserializer{verifier: &verifier}
 	// try to deserialize the quorum certificate
 	deserializedQC, err := d.DeserializeQuorumCertificate(qc.Bytes())
 	require.NoError(t, err)
@@ -57,6 +57,46 @@ func TestQCAggregateAndSign(t *testing.T) {
 	require.Equal(t, qc.Signers(), deserializedQC.Signers())
 	require.Equal(t, qc.Bytes(), deserializedQC.Bytes())
 	require.NoError(t, deserializedQC.Verify(msg))
+}
+
+// TestQCDuplicateSigners tests verification fails if the
+// same signer signs multiple times.
+func TestQCDuplicateSigners(t *testing.T) {
+	configs := newNetworkConfigs(t, 2)
+	quorum := simplex.Quorum(len(configs))
+
+	msg := []byte("Begin at the beginning, and go on till you come to the end: then stop")
+
+	signatures := make([]simplex.Signature, 0, quorum)
+	var signer BLSSigner
+	var verifier BLSVerifier
+
+	for i, config := range configs {
+		signer, verifier = NewBLSAuth(config)
+
+		sig, err := signer.Sign(msg)
+		require.NoError(t, err)
+		require.NoError(t, verifier.Verify(msg, sig, config.Ctx.NodeID[:]))
+
+		signatures = append(signatures, simplex.Signature{
+			Signer: config.Ctx.NodeID[:],
+			Value:  sig,
+		})
+		if i == 0 {
+			// Duplicate the first signer to test for duplicate signers
+			signatures = append(signatures, simplex.Signature{
+				Signer: config.Ctx.NodeID[:],
+				Value:  sig,
+			})
+		}
+	}
+
+	// aggregate the signatures into a quorum certificate
+	signatureAggregator := SignatureAggregator{verifier: &verifier}
+	qc, err := signatureAggregator.Aggregate(signatures)
+
+	require.NoError(t, err)
+	require.ErrorIs(t, qc.Verify(msg), errDuplicateSigner)
 }
 
 func TestQCSignerNotInMembershipSet(t *testing.T) {
@@ -80,7 +120,7 @@ func TestQCSignerNotInMembershipSet(t *testing.T) {
 	require.NoError(t, verifier2.Verify(msg, sig2, node2.Ctx.NodeID[:]))
 
 	// aggregate the signatures into a quorum certificate
-	signatureAggregator := SignatureAggregator(verifier)
+	signatureAggregator := SignatureAggregator{verifier: &verifier}
 	_, err = signatureAggregator.Aggregate(
 		[]simplex.Signature{
 			{Signer: node1.Ctx.NodeID[:], Value: sig},
@@ -94,7 +134,7 @@ func TestQCDeserializerInvalidInput(t *testing.T) {
 	config := newEngineConfig(t, 2)
 
 	_, verifier := NewBLSAuth(config)
-	deserializer := QCDeserializer(verifier)
+	deserializer := QCDeserializer{verifier: &verifier}
 
 	tests := []struct {
 		name  string
@@ -130,7 +170,7 @@ func TestSignatureAggregatorInsufficientSignatures(t *testing.T) {
 	require.NoError(t, err)
 
 	// try to aggregate with only 1 signature when quorum is 2
-	signatureAggregator := SignatureAggregator(verifier)
+	signatureAggregator := SignatureAggregator{verifier: &verifier}
 	_, err = signatureAggregator.Aggregate(
 		[]simplex.Signature{
 			{Signer: config.Ctx.NodeID[:], Value: sig},
@@ -147,7 +187,7 @@ func TestSignatureAggregatorInvalidSignatureBytes(t *testing.T) {
 	sig, err := signer.Sign(msg)
 	require.NoError(t, err)
 
-	signatureAggregator := SignatureAggregator(verifier)
+	signatureAggregator := SignatureAggregator{verifier: &verifier}
 	_, err = signatureAggregator.Aggregate(
 		[]simplex.Signature{
 			{Signer: config.Ctx.NodeID[:], Value: sig},
@@ -176,7 +216,7 @@ func TestSignatureAggregatorExcessSignatures(t *testing.T) {
 	}
 
 	// Aggregate should only use the first 3 signatures
-	signatureAggregator := SignatureAggregator(verifier)
+	signatureAggregator := SignatureAggregator{verifier: &verifier}
 	qc, err := signatureAggregator.Aggregate(signatures)
 	require.NoError(t, err)
 
@@ -202,7 +242,7 @@ func TestQCVerifyWithWrongMessage(t *testing.T) {
 	sig2, err := signer2.Sign(originalMsg)
 	require.NoError(t, err)
 
-	signatureAggregator := SignatureAggregator(verifier)
+	signatureAggregator := SignatureAggregator{verifier: &verifier}
 	qc, err := signatureAggregator.Aggregate(
 		[]simplex.Signature{
 			{Signer: node1.Ctx.NodeID[:], Value: sig1},

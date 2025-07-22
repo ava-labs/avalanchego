@@ -31,14 +31,15 @@ type canotoData_canotoQC struct {
 
 // CanotoSpec returns the specification of this canoto message.
 func (*canotoQC) CanotoSpec(...reflect.Type) *canoto.Spec {
+	var zero canotoQC
 	s := &canoto.Spec{
 		Name: "canotoQC",
 		Fields: []canoto.FieldType{
 			{
-				FieldNumber: 1,
-				Name:        "Sig",
-				OneOf:       "",
-				TypeBytes:   true,
+				FieldNumber:    1,
+				Name:           "Sig",
+				OneOf:          "",
+				TypeFixedBytes: uint64(len(zero.Sig)),
 			},
 			{
 				FieldNumber: 2,
@@ -95,12 +96,26 @@ func (c *canotoQC) UnmarshalCanotoFrom(r canoto.Reader) error {
 				return canoto.ErrUnexpectedWireType
 			}
 
-			if err := canoto.ReadBytes(&r, &c.Sig); err != nil {
+			const (
+				expectedLength       = len(c.Sig)
+				expectedLengthUint64 = uint64(expectedLength)
+			)
+			var length uint64
+			if err := canoto.ReadUint(&r, &length); err != nil {
 				return err
 			}
-			if len(c.Sig) == 0 {
+			if length != expectedLengthUint64 {
+				return canoto.ErrInvalidLength
+			}
+			if expectedLength > len(r.B) {
+				return io.ErrUnexpectedEOF
+			}
+
+			copy((&c.Sig)[:], r.B)
+			if canoto.IsZero(c.Sig) {
 				return canoto.ErrZeroValue
 			}
+			r.B = r.B[expectedLength:]
 		case 2:
 			if wireType != canoto.Len {
 				return canoto.ErrUnexpectedWireType
@@ -170,8 +185,8 @@ func (c *canotoQC) CalculateCanotoCache() {
 		return
 	}
 	var size uint64
-	if len(c.Sig) != 0 {
-		size += uint64(len(canoto__canotoQC__Sig__tag)) + canoto.SizeBytes(c.Sig)
+	if !canoto.IsZero(c.Sig) {
+		size += uint64(len(canoto__canotoQC__Sig__tag)) + canoto.SizeBytes((&c.Sig)[:])
 	}
 	for _, v := range c.Signers {
 		size += uint64(len(canoto__canotoQC__Signers__tag)) + canoto.SizeBytes(v)
@@ -220,9 +235,9 @@ func (c *canotoQC) MarshalCanotoInto(w canoto.Writer) canoto.Writer {
 	if c == nil {
 		return w
 	}
-	if len(c.Sig) != 0 {
+	if !canoto.IsZero(c.Sig) {
 		canoto.Append(&w, canoto__canotoQC__Sig__tag)
-		canoto.AppendBytes(&w, c.Sig)
+		canoto.AppendBytes(&w, (&c.Sig)[:])
 	}
 	for _, v := range c.Signers {
 		canoto.Append(&w, canoto__canotoQC__Signers__tag)

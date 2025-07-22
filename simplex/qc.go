@@ -3,6 +3,8 @@
 
 package simplex
 
+//go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
+
 import (
 	"errors"
 	"fmt"
@@ -13,11 +15,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
 
-//go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
-
 var (
 	_ simplex.QuorumCertificate   = (*QC)(nil)
-	_ simplex.QCDeserializer      = QCDeserializer{}
+	_ simplex.QCDeserializer      = (*QCDeserializer)(nil)
 	_ simplex.SignatureAggregator = (*SignatureAggregator)(nil)
 
 	// QC errors
@@ -25,6 +25,7 @@ var (
 	errUnexpectedSigners     = errors.New("unexpected number of signers in quorum certificate")
 	errSignatureAggregation  = errors.New("signature aggregation failed")
 	errEncodingMessageToSign = errors.New("failed to encode message to sign")
+	errDuplicateSigner       = errors.New("duplicate signer in quorum certificate")
 )
 
 // QC represents a quorum certificate in the Simplex consensus protocol.
@@ -36,8 +37,8 @@ type QC struct {
 
 // CanotoQC is the Canoto representation of a quorum certificate
 type canotoQC struct {
-	Sig     []byte           `canoto:"bytes,1"`
-	Signers []simplex.NodeID `canoto:"repeated bytes,2"`
+	Sig     [bls.SignatureLen]byte `canoto:"fixed bytes,1"`
+	Signers []simplex.NodeID       `canoto:"repeated bytes,2"`
 
 	canotoData canotoData_canotoQC
 }
@@ -55,9 +56,21 @@ func (qc *QC) Verify(msg []byte) error {
 		return fmt.Errorf("%w: expected %d signers but got %d", errUnexpectedSigners, quorum, len(qc.signers))
 	}
 
+	uniqueSigners := make(map[ids.NodeID]struct{}, len(qc.signers))
+
 	// ensure all signers are in the membership set
 	for _, signer := range qc.signers {
-		pk, exists := qc.verifier.nodeID2PK[ids.NodeID(signer)]
+		if _, exists := uniqueSigners[ids.NodeID(signer)]; exists {
+			return fmt.Errorf("%w: %x", errDuplicateSigner, signer)
+		}
+		uniqueSigners[ids.NodeID(signer)] = struct{}{}
+
+		id, err := ids.ToNodeID(signer)
+		if err != nil {
+			return err
+		}
+
+		pk, exists := qc.verifier.nodeID2PK[id]
 		if !exists {
 			return fmt.Errorf("%w: %x", errSignerNotFound, signer)
 		}
@@ -85,24 +98,27 @@ func (qc *QC) Verify(msg []byte) error {
 
 // Bytes serializes the quorum certificate into bytes.
 func (qc *QC) Bytes() []byte {
+	sigBytes := bls.SignatureToBytes(qc.sig)
 	canotoQC := &canotoQC{
-		Sig:     bls.SignatureToBytes(qc.sig),
+		Sig:     [bls.SignatureLen]byte(sigBytes),
 		Signers: qc.signers,
 	}
 
 	return canotoQC.MarshalCanoto()
 }
 
-type QCDeserializer BLSVerifier
+type QCDeserializer struct {
+	verifier *BLSVerifier
+}
 
 // DeserializeQuorumCertificate deserializes a quorum certificate from bytes.
-func (d QCDeserializer) DeserializeQuorumCertificate(bytes []byte) (simplex.QuorumCertificate, error) {
+func (d *QCDeserializer) DeserializeQuorumCertificate(bytes []byte) (simplex.QuorumCertificate, error) {
 	var canotoQC canotoQC
 	if err := canotoQC.UnmarshalCanoto(bytes); err != nil {
 		return nil, fmt.Errorf("%w: %w", errFailedToParseQC, err)
 	}
 
-	sig, err := bls.SignatureFromBytes(canotoQC.Sig)
+	sig, err := bls.SignatureFromBytes(canotoQC.Sig[:])
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", errFailedToParseSignature, err)
 	}
@@ -112,20 +128,21 @@ func (d QCDeserializer) DeserializeQuorumCertificate(bytes []byte) (simplex.Quor
 		signers: canotoQC.Signers,
 	}
 
-	verifier := BLSVerifier(d)
-	qc.verifier = &verifier
+	qc.verifier = d.verifier
 
 	return &qc, nil
 }
 
 // SignatureAggregator aggregates signatures into a quorum certificate.
-type SignatureAggregator BLSVerifier
+type SignatureAggregator struct {
+	verifier *BLSVerifier
+}
 
 // Aggregate aggregates the provided signatures into a quorum certificate.
 // It requires at least a quorum of signatures to succeed.
 // If any signature is from a signer not in the membership set, it returns an error.
-func (a SignatureAggregator) Aggregate(signatures []simplex.Signature) (simplex.QuorumCertificate, error) {
-	quorumSize := simplex.Quorum(len(a.nodeID2PK))
+func (a *SignatureAggregator) Aggregate(signatures []simplex.Signature) (simplex.QuorumCertificate, error) {
+	quorumSize := simplex.Quorum(len(a.verifier.nodeID2PK))
 	if len(signatures) < quorumSize {
 		return nil, fmt.Errorf("%w: expected %d signatures but got %d", errUnexpectedSigners, quorumSize, len(signatures))
 	}
@@ -135,7 +152,7 @@ func (a SignatureAggregator) Aggregate(signatures []simplex.Signature) (simplex.
 	sigs := make([]*bls.Signature, 0, quorumSize)
 	for _, signature := range signatures {
 		signer := signature.Signer
-		if _, exists := a.nodeID2PK[ids.NodeID(signer)]; !exists {
+		if _, exists := a.verifier.nodeID2PK[ids.NodeID(signer)]; !exists {
 			return nil, fmt.Errorf("%w: %x", errSignerNotFound, signer)
 		}
 		signers = append(signers, signer)
@@ -151,9 +168,8 @@ func (a SignatureAggregator) Aggregate(signatures []simplex.Signature) (simplex.
 		return nil, fmt.Errorf("%w: %w", errSignatureAggregation, err)
 	}
 
-	verifier := BLSVerifier(a)
 	return &QC{
-		verifier: &verifier,
+		verifier: a.verifier,
 		signers:  signers,
 		sig:      aggregatedSig,
 	}, nil
