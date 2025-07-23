@@ -10,6 +10,7 @@ import (
 	"math"
 	"sync"
 
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -18,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/proto/pb/platformvm"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -54,6 +56,7 @@ type signatureRequestVerifier struct {
 	vdrsState validators.State
 	stateLock sync.Locker
 	state     state.State
+	log       logging.Logger
 }
 
 func (s signatureRequestVerifier) Verify(
@@ -368,6 +371,12 @@ func (s signatureRequestVerifier) verifyValidatorSetState(
 	ctx context.Context,
 	msg *message.ValidatorSetState,
 ) *common.AppError {
+	s.log.Debug("verifying validator set state",
+		zap.Stringer("blockchainID", msg.BlockchainID),
+		zap.Uint64("pChainHeight", msg.PChainHeight),
+		zap.Stringer("validatorSetHash", msg.ValidatorSetHash),
+	)
+
 	// Check that the P-Chain height exists and is within the window of this node
 	minHeight, err := s.vdrsState.GetMinimumHeight(ctx)
 	if err != nil {
