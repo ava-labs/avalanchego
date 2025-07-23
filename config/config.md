@@ -56,11 +56,11 @@ Configuration for blockchain-specific settings. For detailed chain-specific conf
 
 | Flag | Environment Variable | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
-| `--chain-config-dir` | `AVAGO_CHAIN_CONFIG_DIR` | string | `$HOME/.avalanchego/configs/chains` | Directory for chain-specific configurations. Structure: `{chain-config-dir}/{chainID}/config.*` See [Chain Configs documentation](/docs/nodes/chain-configs) for detailed configuration options |
+| `--chain-config-dir` | `AVAGO_CHAIN_CONFIG_DIR` | string | `~/.avalanchego/configs/chains` | Directory for chain-specific configurations. Structure: `{chain-config-dir}/{chainID}/config.*` See [Chain Configs documentation](/docs/nodes/chain-configs) for detailed configuration options |
 | `--chain-config-content` | `AVAGO_CHAIN_CONFIG_CONTENT` | string | - | Base64 encoded chain config as alternative to config files. See [Chain Configs documentation](/docs/nodes/chain-configs) |
 | `--chain-aliases-file` | `AVAGO_CHAIN_ALIASES_FILE` | string | `~/.avalanchego/configs/chains/aliases.json` | JSON file mapping blockchain IDs to aliases. Example: `{"q2aTwKuyzgs8pynF7UXBZCU7DejbZbZ6EUyHr3JQzYgwNPUPi": ["DFK"]}` |
 | `--chain-aliases-file-content` | `AVAGO_CHAIN_ALIASES_FILE_CONTENT` | string | - | Base64 encoded chain aliases |
-| `--chain-data-dir` | `AVAGO_CHAIN_DATA_DIR` | string | `$HOME/.avalanchego/chainData` | Chain data directory |
+| `--chain-data-dir` | `AVAGO_CHAIN_DATA_DIR` | string | `~/.avalanchego/chainData` | Chain data directory |
 
 ### Config File
 
@@ -78,7 +78,7 @@ Base directory configuration.
 
 | Flag | Environment Variable | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
-| `--data-dir` | `AVAGO_DATA_DIR` | string | `$HOME/.avalanchego` | Base data directory |
+| `--data-dir` | `AVAGO_DATA_DIR` | string | `~/.avalanchego` | Base data directory |
 
 ### Database
 
@@ -86,7 +86,7 @@ Database configuration options.
 
 | Flag | Environment Variable | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
-| `--db-dir` | `AVAGO_DB_DIR` | string | `$HOME/.avalanchego/db` | Database directory |
+| `--db-dir` | `AVAGO_DB_DIR` | string | `~/.avalanchego/db` | Database directory |
 | `--db-type` | `AVAGO_DB_TYPE` | string | `leveldb` | Database type (leveldb, memdb, pebbledb) |
 | `--db-config-file` | `AVAGO_DB_CONFIG_FILE` | string | - | Database config file path |
 | `--db-config-file-content` | `AVAGO_DB_CONFIG_FILE_CONTENT` | string | - | Base64 encoded database config |
@@ -137,7 +137,7 @@ Logging configuration.
 | `--log-level` | `AVAGO_LOG_LEVEL` | string | `info` | Log level (off, fatal, error, warn, info, trace, debug, verbo) |
 | `--log-display-level` | `AVAGO_LOG_DISPLAY_LEVEL` | string | value of `--log-level` | Console log level |
 | `--log-format` | `AVAGO_LOG_FORMAT` | string | `auto` | Log format (auto, plain, colors, json) |
-| `--log-dir` | `AVAGO_LOG_DIR` | string | `$HOME/.avalanchego/logs` | Log directory |
+| `--log-dir` | `AVAGO_LOG_DIR` | string | `~/.avalanchego/logs` | Log directory |
 | `--log-disable-display-plugin-logs` | `AVAGO_LOG_DISABLE_DISPLAY_PLUGIN_LOGS` | boolean | `false` | Hide plugin logs from stdout |
 | `--log-rotater-max-size` | `AVAGO_LOG_ROTATER_MAX_SIZE` | uint | `8` | Max log file size (MB) |
 | `--log-rotater-max-files` | `AVAGO_LOG_ROTATER_MAX_FILES` | uint | `7` | Max rotated files to keep |
@@ -199,9 +199,9 @@ Staking and validator configuration.
 | `--staking-port` | `AVAGO_STAKING_PORT` | int | `9651` | Staking port |
 | `--sybil-protection-enabled` | `AVAGO_SYBIL_PROTECTION_ENABLED` | boolean | `true` | Enable sybil protection (PoS) |
 | `--sybil-protection-disabled-weight` | `AVAGO_SYBIL_PROTECTION_DISABLED_WEIGHT` | uint | `100` | Weight when sybil protection disabled |
-| `--staking-tls-cert-file` | `AVAGO_STAKING_TLS_CERT_FILE` | string | `$HOME/.avalanchego/staking/staker.crt` | Staking TLS certificate |
+| `--staking-tls-cert-file` | `AVAGO_STAKING_TLS_CERT_FILE` | string | `~/.avalanchego/staking/staker.crt` | Staking TLS certificate |
 | `--staking-tls-cert-file-content` | `AVAGO_STAKING_TLS_CERT_FILE_CONTENT` | string | - | Base64 encoded staking certificate |
-| `--staking-tls-key-file` | `AVAGO_STAKING_TLS_KEY_FILE` | string | `$HOME/.avalanchego/staking/staker.key` | Staking TLS key |
+| `--staking-tls-key-file` | `AVAGO_STAKING_TLS_KEY_FILE` | string | `~/.avalanchego/staking/staker.key` | Staking TLS key |
 | `--staking-tls-key-file-content` | `AVAGO_STAKING_TLS_KEY_FILE_CONTENT` | string | - | Base64 encoded staking key |
 
 ### Subnets
@@ -211,7 +211,7 @@ Subnet configuration.
 | Flag | Environment Variable | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--track-subnets` | `AVAGO_TRACK_SUBNETS` | string | - | Comma-separated subnet IDs to track |
-| `--subnet-config-dir` | `AVAGO_SUBNET_CONFIG_DIR` | string | `$HOME/.avalanchego/configs/subnets` | Subnet config directory |
+| `--subnet-config-dir` | `AVAGO_SUBNET_CONFIG_DIR` | string | `~/.avalanchego/configs/subnets` | Subnet config directory |
 | `--subnet-config-content` | `AVAGO_SUBNET_CONFIG_CONTENT` | string | - | Base64 encoded subnet config |
 
 ### Version
@@ -309,7 +309,7 @@ Performance profiling configuration.
 | Flag | Environment Variable | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--profile-continuous-enabled` | `AVAGO_PROFILE_CONTINUOUS_ENABLED` | boolean | `false` | Enable continuous profiling |
-| `--profile-dir` | `AVAGO_PROFILE_DIR` | string | `$HOME/.avalanchego/profiles/` | Profile output directory |
+| `--profile-dir` | `AVAGO_PROFILE_DIR` | string | `~/.avalanchego/profiles/` | Profile output directory |
 | `--profile-continuous-freq` | `AVAGO_PROFILE_CONTINUOUS_FREQ` | duration | `15m` | Profile creation frequency |
 | `--profile-continuous-max-files` | `AVAGO_PROFILE_CONTINUOUS_MAX_FILES` | int | `5` | Max profile files to keep |
 
@@ -426,14 +426,14 @@ Advanced network settings.
 | `--system-tracker-processing-halflife` | `AVAGO_SYSTEM_TRACKER_PROCESSING_HALFLIFE` | duration | `15s` | Processing tracker halflife |
 | `--system-tracker-cpu-halflife` | `AVAGO_SYSTEM_TRACKER_CPU_HALFLIFE` | duration | `15s` | CPU tracker halflife |
 | `--system-tracker-disk-halflife` | `AVAGO_SYSTEM_TRACKER_DISK_HALFLIFE` | duration | `1m` | Disk tracker halflife |
-| `--system-tracker-disk-required-available-space` | `AVAGO_SYSTEM_TRACKER_DISK_REQUIRED_AVAILABLE_SPACE` | uint | `512 MiB` | Required disk space |
-| `--system-tracker-disk-warning-threshold-available-space` | `AVAGO_SYSTEM_TRACKER_DISK_WARNING_THRESHOLD_AVAILABLE_SPACE` | uint | `1 GiB` | Disk space warning threshold |
+| `--system-tracker-disk-required-available-space` | `AVAGO_SYSTEM_TRACKER_DISK_REQUIRED_AVAILABLE_SPACE` | uint | `512MiB` | Required disk space |
+| `--system-tracker-disk-warning-threshold-available-space` | `AVAGO_SYSTEM_TRACKER_DISK_WARNING_THRESHOLD_AVAILABLE_SPACE` | uint | `1GiB` | Disk space warning threshold |
 
 ### Additional Configuration
 
 | Flag | Environment Variable | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
-| `--plugin-dir` | `AVAGO_PLUGIN_DIR` | string | `$HOME/.avalanchego/plugins` | VM plugins directory |
+| `--plugin-dir` | `AVAGO_PLUGIN_DIR` | string | `~/.avalanchego/plugins` | VM plugins directory |
 | `--vm-aliases-file` | `AVAGO_VM_ALIASES_FILE` | string | `~/.avalanchego/configs/vms/aliases.json` | VM aliases file |
 | `--vm-aliases-file-content` | `AVAGO_VM_ALIASES_FILE_CONTENT` | string | - | Base64 encoded VM aliases |
 | `--index-allow-incomplete` | `AVAGO_INDEX_ALLOW_INCOMPLETE` | boolean | `false` | Allow incomplete index |
