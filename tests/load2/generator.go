@@ -69,10 +69,9 @@ func (l LoadGenerator) Run(
 ) {
 	eg := &errgroup.Group{}
 
-	childCtx := ctx
 	if loadTimeout != 0 {
-		ctx, cancel := context.WithTimeout(ctx, loadTimeout)
-		childCtx = ctx
+		childCtx, cancel := context.WithTimeout(ctx, loadTimeout)
+		ctx = childCtx
 		defer cancel()
 	}
 
@@ -80,7 +79,7 @@ func (l LoadGenerator) Run(
 		eg.Go(func() error {
 			for {
 				select {
-				case <-childCtx.Done():
+				case <-ctx.Done():
 					return nil
 				default:
 				}
