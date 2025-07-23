@@ -20,7 +20,7 @@ on:
         required: false
         default: s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100.zip
   schedule:
-    - cron: '0 6 * * 0' # Runs every Sunday at 06:00 UTC
+    - cron: '0 9 * * *' # Runs every day at 09:00 UTC (04:00 EST)
 
 jobs:
     c-chain-reexecution:
