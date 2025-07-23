@@ -11,8 +11,8 @@
 )]
 
 use firewood_storage::{
-    BranchNode, FileIoError, HashType, Hashable, IntoHashType, NibblesIterator, Path, PathIterItem,
-    Preimage, TrieHash, ValueDigest,
+    BranchNode, Children, FileIoError, HashType, Hashable, IntoHashType, NibblesIterator, Path,
+    PathIterItem, Preimage, TrieHash, ValueDigest,
 };
 use thiserror::Error;
 
@@ -87,7 +87,7 @@ pub struct ProofNode {
     /// Otherwise, the node's value or the hash of its value.
     pub value_digest: Option<ValueDigest<Value>>,
     /// The hash of each child, or None if the child does not exist.
-    pub child_hashes: [Option<HashType>; BranchNode::MAX_CHILDREN],
+    pub child_hashes: Children<HashType>,
 }
 
 impl Hashable for ProofNode {
@@ -107,26 +107,18 @@ impl Hashable for ProofNode {
         })
     }
 
-    fn children(&self) -> impl Iterator<Item = (usize, HashType)> + Clone {
-        self.child_hashes
-            .iter()
-            .enumerate()
-            .filter_map(|(i, hash)| hash.as_ref().map(|h| (i, h.clone())))
+    fn children(&self) -> Children<HashType> {
+        self.child_hashes.clone()
     }
 }
 
 impl From<PathIterItem> for ProofNode {
     fn from(item: PathIterItem) -> Self {
-        let mut child_hashes: [Option<HashType>; BranchNode::MAX_CHILDREN] =
-            [const { None }; BranchNode::MAX_CHILDREN];
-
-        if let Some(branch) = item.node.as_branch() {
-            // TODO danlaine: can we avoid indexing?
-            #[expect(clippy::indexing_slicing)]
-            for (i, hash) in branch.children_hashes() {
-                child_hashes[i] = Some(hash.clone());
-            }
-        }
+        let child_hashes = if let Some(branch) = item.node.as_branch() {
+            branch.children_hashes()
+        } else {
+            BranchNode::empty_children()
+        };
 
         #[cfg(feature = "ethhash")]
         let partial_len = item
@@ -208,14 +200,11 @@ impl<T: ProofCollection + ?Sized> Proof<T> {
 
                 expected_hash = node
                     .children()
-                    .find_map(|(i, hash)| {
-                        if i == next_nibble as usize {
-                            Some(hash.clone())
-                        } else {
-                            None
-                        }
-                    })
-                    .ok_or(ProofError::NodeNotInTrie)?;
+                    .get(usize::from(next_nibble))
+                    .ok_or(ProofError::ChildIndexOutOfBounds)?
+                    .as_ref()
+                    .ok_or(ProofError::NodeNotInTrie)?
+                    .clone();
             }
         }
 

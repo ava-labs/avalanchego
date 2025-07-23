@@ -250,7 +250,7 @@ impl NodeStore<Committed, FileBacked> {
     ///
     /// This method performs a complete persistence operation by:
     /// 1. Flushing all nodes to storage
-    /// 2. Setting the root address in the header  
+    /// 2. Setting the root address in the header
     /// 3. Flushing the header to storage
     ///
     /// # Errors
@@ -582,42 +582,38 @@ mod tests {
         //                                -> branch2 -> leaf[2]
         let inner_branch = create_branch(&[10], Some(&[50]), vec![(0, leaves[2].clone())]);
 
+        let mut children = BranchNode::empty_children();
+        for (value, slot) in [
+            // unpersisted leaves
+            Child::MaybePersisted(
+                MaybePersistedNode::from(SharedNode::new(leaves[0].clone())),
+                HashType::default(),
+            ),
+            Child::MaybePersisted(
+                MaybePersistedNode::from(SharedNode::new(leaves[1].clone())),
+                HashType::default(),
+            ),
+            // unpersisted branch
+            Child::MaybePersisted(
+                MaybePersistedNode::from(SharedNode::new(inner_branch.clone())),
+                HashType::default(),
+            ),
+            // persisted branch
+            Child::MaybePersisted(
+                MaybePersistedNode::from(LinearAddress::new(42).unwrap()),
+                HashType::default(),
+            ),
+        ]
+        .into_iter()
+        .zip(children.iter_mut())
+        {
+            slot.replace(value);
+        }
+
         let root_branch: Node = BranchNode {
             partial_path: Path::new(),
             value: None,
-            children: [
-                // unpersisted leaves
-                Some(Child::MaybePersisted(
-                    MaybePersistedNode::from(SharedNode::new(leaves[0].clone())),
-                    HashType::default(),
-                )),
-                Some(Child::MaybePersisted(
-                    MaybePersistedNode::from(SharedNode::new(leaves[1].clone())),
-                    HashType::default(),
-                )),
-                // unpersisted branch
-                Some(Child::MaybePersisted(
-                    MaybePersistedNode::from(SharedNode::new(inner_branch.clone())),
-                    HashType::default(),
-                )),
-                // persisted branch
-                Some(Child::MaybePersisted(
-                    MaybePersistedNode::from(LinearAddress::new(42).unwrap()),
-                    HashType::default(),
-                )),
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-            ],
+            children,
         }
         .into();
 

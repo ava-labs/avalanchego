@@ -22,7 +22,7 @@ use crate::node::branch::ReadSerializable;
 use crate::{HashType, LinearAddress, Path, SharedNode};
 use bitfield::bitfield;
 use branch::Serializable as _;
-pub use branch::{BranchNode, Child};
+pub use branch::{BranchNode, Child, Children};
 use enum_as_inner::EnumAsInner;
 use integer_encoding::{VarInt, VarIntReader as _};
 pub use leaf::LeafNode;
@@ -356,7 +356,7 @@ impl Node {
                     None
                 };
 
-                let mut children = [const { None }; BranchNode::MAX_CHILDREN];
+                let mut children = BranchNode::empty_children();
                 if childcount == 0 {
                     // branch is full of all children
                     for child in &mut children {

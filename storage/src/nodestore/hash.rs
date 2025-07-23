@@ -6,6 +6,8 @@
 //! This module contains all node hashing functionality for the nodestore, including
 //! specialized support for Ethereum-compatible hash processing.
 
+#[cfg(feature = "ethhash")]
+use crate::Children;
 use crate::hashednode::hash_node;
 use crate::linear::FileIoError;
 use crate::logger::trace;
@@ -33,7 +35,7 @@ where
     #[cfg(feature = "ethhash")]
     pub(super) fn ethhash_classify_children<'a>(
         &self,
-        children: &'a mut [Option<Child>; crate::node::BranchNode::MAX_CHILDREN],
+        children: &'a mut Children<Child>,
     ) -> ClassifiedChildren<'a> {
         children.iter_mut().enumerate().fold(
             ClassifiedChildren {
