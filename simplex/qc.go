@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
@@ -20,61 +21,62 @@ var (
 	_ simplex.QCDeserializer      = (*QCDeserializer)(nil)
 	_ simplex.SignatureAggregator = (*SignatureAggregator)(nil)
 
-	// QC errors
 	errFailedToParseQC       = errors.New("failed to parse quorum certificate")
 	errUnexpectedSigners     = errors.New("unexpected number of signers in quorum certificate")
 	errSignatureAggregation  = errors.New("signature aggregation failed")
 	errEncodingMessageToSign = errors.New("failed to encode message to sign")
 	errDuplicateSigner       = errors.New("duplicate signer in quorum certificate")
+	errInvalidBitSet         = errors.New("bitset is invalid")
+	errFailedToFilterSigners = errors.New("failed to filter signers")
 )
 
 // QC represents a quorum certificate in the Simplex consensus protocol.
 type QC struct {
 	verifier *BLSVerifier
 	sig      *bls.Signature
-	signers  []simplex.NodeID
+	signers  []ids.NodeID
 }
 
 // CanotoQC is the Canoto representation of a quorum certificate
 type canotoQC struct {
 	Sig     [bls.SignatureLen]byte `canoto:"fixed bytes,1"`
-	Signers []simplex.NodeID       `canoto:"repeated bytes,2"`
+	Signers []byte                 `canoto:"bytes,2"`
 
 	canotoData canotoData_canotoQC
 }
 
 // Signers returns the list of signers for the quorum certificate.
 func (qc *QC) Signers() []simplex.NodeID {
-	return qc.signers
+	signers := make([]simplex.NodeID, len(qc.signers))
+	for i, signer := range qc.signers {
+		signers[i] = simplex.NodeID(signer[:])
+	}
+
+	return signers
 }
 
 // Verify checks if the quorum certificate is valid by verifying the aggregated signature against the signers' public keys.
 func (qc *QC) Verify(msg []byte) error {
-	pks := make([]*bls.PublicKey, 0, len(qc.signers))
 	quorum := simplex.Quorum(len(qc.verifier.nodeID2PK))
 	if len(qc.signers) != quorum {
 		return fmt.Errorf("%w: expected %d signers but got %d", errUnexpectedSigners, quorum, len(qc.signers))
 	}
 
-	uniqueSigners := make(map[ids.NodeID]struct{}, len(qc.signers))
+	uniqueSigners := set.NewSet[ids.NodeID](len(qc.signers))
+	pks := make([]*bls.PublicKey, 0, len(qc.signers))
 
-	// ensure all signers are in the membership set
+	// ensure signers are not double counted and are in the membership set
 	for _, signer := range qc.signers {
-		id, err := ids.ToNodeID(signer)
-		if err != nil {
-			return fmt.Errorf("error converting signer to NodeID: %w", err)
-		}
-
-		if _, exists := uniqueSigners[id]; exists {
+		if uniqueSigners.Contains(signer) {
 			return fmt.Errorf("%w: %x", errDuplicateSigner, signer)
 		}
-		uniqueSigners[id] = struct{}{}
 
-		pk, exists := qc.verifier.nodeID2PK[id]
+		pk, exists := qc.verifier.nodeID2PK[signer]
 		if !exists {
 			return fmt.Errorf("%w: %x", errSignerNotFound, signer)
 		}
 
+		uniqueSigners.Add(signer)
 		pks = append(pks, pk)
 	}
 
@@ -99,12 +101,26 @@ func (qc *QC) Verify(msg []byte) error {
 // Bytes serializes the quorum certificate into bytes.
 func (qc *QC) Bytes() []byte {
 	sigBytes := bls.SignatureToBytes(qc.sig)
+	signers := qc.createSignersBitSet()
+
 	canotoQC := &canotoQC{
 		Sig:     [bls.SignatureLen]byte(sigBytes),
-		Signers: qc.signers,
+		Signers: signers,
 	}
 
 	return canotoQC.MarshalCanoto()
+}
+
+func (qc *QC) createSignersBitSet() []byte {
+	bitset := set.NewBits()
+	for _, signer := range qc.signers {
+		// index should always exist, since we deserialized the signers from the same verifier
+		index := qc.verifier.canonicalNodeIDIndices[signer]
+		bitset.Add(index)
+	}
+
+	signerBytes := bitset.Bytes()
+	return signerBytes
 }
 
 type QCDeserializer struct {
@@ -123,14 +139,16 @@ func (d *QCDeserializer) DeserializeQuorumCertificate(bytes []byte) (simplex.Quo
 		return nil, fmt.Errorf("%w: %w", errFailedToParseSignature, err)
 	}
 
-	qc := QC{
-		sig:     sig,
-		signers: canotoQC.Signers,
+	signers, err := d.signersFromBytes(canotoQC.Signers)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errInvalidBitSet, err)
 	}
 
-	qc.verifier = d.verifier
-
-	return &qc, nil
+	return &QC{
+		sig:      sig,
+		signers:  signers,
+		verifier: d.verifier,
+	}, nil
 }
 
 // SignatureAggregator aggregates signatures into a quorum certificate.
@@ -148,23 +166,24 @@ func (a *SignatureAggregator) Aggregate(signatures []simplex.Signature) (simplex
 	}
 	signatures = signatures[:quorumSize]
 
-	signers := make([]simplex.NodeID, 0, quorumSize)
+	signers := make([]ids.NodeID, 0, quorumSize)
 	sigs := make([]*bls.Signature, 0, quorumSize)
 	for _, signature := range signatures {
 		signer := signature.Signer
 		id, err := ids.ToNodeID(signer)
 		if err != nil {
-			return nil, fmt.Errorf("error converting signer to NodeID: %w", err)
+			return nil, fmt.Errorf("%w: %w", errInvalidNodeID, err)
 		}
 
 		if _, exists := a.verifier.nodeID2PK[id]; !exists {
 			return nil, fmt.Errorf("%w: %x", errSignerNotFound, signer)
 		}
-		signers = append(signers, signer)
 		sig, err := bls.SignatureFromBytes(signature.Value)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %w", errFailedToParseSignature, err)
 		}
+
+		signers = append(signers, id)
 		sigs = append(sigs, sig)
 	}
 
@@ -178,4 +197,46 @@ func (a *SignatureAggregator) Aggregate(signatures []simplex.Signature) (simplex
 		signers:  signers,
 		sig:      aggregatedSig,
 	}, nil
+}
+
+func (d *QCDeserializer) signersFromBytes(signerBytes []byte) ([]ids.NodeID, error) {
+	signerIndices := set.BitsFromBytes(signerBytes)
+	if len(signerIndices.Bytes()) != len(signerBytes) {
+		return nil, errInvalidBitSet
+	}
+
+	signers, err := filterNodes(signerIndices, d.verifier.canonicalNodeIDs)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errFailedToFilterSigners, err)
+	}
+	return signers, nil
+}
+
+// filterNodeIDS returns the nodeIDs in nodeIDs whose bit is set to 1 in
+// [indices].
+//
+// Returns an error if [indices] references an unknown node.
+func filterNodes(
+	indices set.Bits,
+	nodeIDs []ids.NodeID,
+) ([]ids.NodeID, error) {
+	// Verify that all alleged signers exist
+	if indices.BitLen() > len(nodeIDs) {
+		return nil, fmt.Errorf(
+			"%w: NumIndices (%d) >= NumFilteredValidators (%d)",
+			errNodeNotFound,
+			indices.BitLen()-1, // -1 to convert from length to index
+			len(nodeIDs),
+		)
+	}
+
+	filteredNodes := make([]ids.NodeID, 0, len(nodeIDs))
+	for i, nodeID := range nodeIDs {
+		if !indices.Contains(i) {
+			continue
+		}
+
+		filteredNodes = append(filteredNodes, nodeID)
+	}
+	return filteredNodes, nil
 }

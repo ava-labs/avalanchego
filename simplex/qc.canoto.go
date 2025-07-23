@@ -44,7 +44,6 @@ func (*canotoQC) CanotoSpec(...reflect.Type) *canoto.Spec {
 			{
 				FieldNumber: 2,
 				Name:        "Signers",
-				Repeated:    true,
 				OneOf:       "",
 				TypeBytes:   true,
 			},
@@ -121,37 +120,11 @@ func (c *canotoQC) UnmarshalCanotoFrom(r canoto.Reader) error {
 				return canoto.ErrUnexpectedWireType
 			}
 
-			// Skip the first entry because we have already stripped the tag.
-			remainingBytes := r.B
-			originalUnsafe := r.Unsafe
-			r.Unsafe = true
-			if err := canoto.ReadBytes(&r, new([]byte)); err != nil {
+			if err := canoto.ReadBytes(&r, &c.Signers); err != nil {
 				return err
 			}
-			r.Unsafe = originalUnsafe
-
-			// Count the number of additional entries after the first entry.
-			countMinus1, err := canoto.CountBytes(r.B, canoto__canotoQC__Signers__tag)
-			if err != nil {
-				return err
-			}
-			c.Signers = canoto.MakeSlice(c.Signers, countMinus1+1)
-			field := c.Signers
-
-			// Read the first entry manually because the tag is still already
-			// stripped.
-			r.B = remainingBytes
-			if err := canoto.ReadBytes(&r, &field[0]); err != nil {
-				return err
-			}
-
-			// Read the rest of the entries, stripping the tag each time.
-			field = field[1:]
-			for i := range field {
-				r.B = r.B[len(canoto__canotoQC__Signers__tag):]
-				if err := canoto.ReadBytes(&r, &field[i]); err != nil {
-					return err
-				}
+			if len(c.Signers) == 0 {
+				return canoto.ErrZeroValue
 			}
 		default:
 			return canoto.ErrUnknownField
@@ -188,8 +161,8 @@ func (c *canotoQC) CalculateCanotoCache() {
 	if !canoto.IsZero(c.Sig) {
 		size += uint64(len(canoto__canotoQC__Sig__tag)) + canoto.SizeBytes((&c.Sig)[:])
 	}
-	for _, v := range c.Signers {
-		size += uint64(len(canoto__canotoQC__Signers__tag)) + canoto.SizeBytes(v)
+	if len(c.Signers) != 0 {
+		size += uint64(len(canoto__canotoQC__Signers__tag)) + canoto.SizeBytes(c.Signers)
 	}
 	atomic.StoreUint64(&c.canotoData.size, size)
 }
@@ -239,9 +212,9 @@ func (c *canotoQC) MarshalCanotoInto(w canoto.Writer) canoto.Writer {
 		canoto.Append(&w, canoto__canotoQC__Sig__tag)
 		canoto.AppendBytes(&w, (&c.Sig)[:])
 	}
-	for _, v := range c.Signers {
+	if len(c.Signers) != 0 {
 		canoto.Append(&w, canoto__canotoQC__Signers__tag)
-		canoto.AppendBytes(&w, v)
+		canoto.AppendBytes(&w, c.Signers)
 	}
 	return w
 }
