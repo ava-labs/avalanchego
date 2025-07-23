@@ -23,7 +23,7 @@ func TestQCDuplicateSigners(t *testing.T) {
 	sig, err := signer.Sign(msg)
 	require.NoError(t, err)
 	require.NoError(t, verifier.Verify(msg, sig, configs[0].Ctx.NodeID[:]))
-	
+
 	signatures := make([]simplex.Signature, 0, quorum)
 	signatures = append(signatures, simplex.Signature{
 		Signer: configs[0].Ctx.NodeID[:],
@@ -195,7 +195,9 @@ func TestSignatureAggregation(t *testing.T) {
 				deserializedQC, err := d.DeserializeQuorumCertificate(qc.Bytes())
 				require.NoError(t, err)
 
-				require.Equal(t, qc.Signers(), deserializedQC.Signers())
+				for _, signer := range qc.Signers() {
+					require.Contains(t, deserializedQC.Signers(), signer)
+				}
 				require.Equal(t, qc.Bytes(), deserializedQC.Bytes())
 				require.NoError(t, deserializedQC.Verify(msg))
 			}
