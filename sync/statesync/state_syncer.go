@@ -20,7 +20,7 @@ const (
 	segmentThreshold       = 500_000 // if we estimate trie to have greater than this number of leafs, split it
 	numStorageTrieSegments = 4
 	numMainTrieSegments    = 8
-	defaultNumThreads      = 8
+	defaultNumWorkers      = 8
 )
 
 type StateSyncerConfig struct {
@@ -74,13 +74,13 @@ func NewStateSyncer(config *StateSyncerConfig) (*stateSync, error) {
 		triesInProgress: make(map[common.Hash]*trieToSync),
 
 		// [triesInProgressSem] is used to keep the number of tries syncing
-		// less than or equal to [defaultNumThreads].
-		triesInProgressSem: make(chan struct{}, defaultNumThreads),
+		// less than or equal to [defaultNumWorkers].
+		triesInProgressSem: make(chan struct{}, defaultNumWorkers),
 
 		// Each [trieToSync] will have a maximum of [numSegments] segments.
-		// We set the capacity of [segments] such that [defaultNumThreads]
+		// We set the capacity of [segments] such that [defaultNumWorkers]
 		// storage tries can sync concurrently.
-		segments:         make(chan syncclient.LeafSyncTask, defaultNumThreads*numStorageTrieSegments),
+		segments:         make(chan syncclient.LeafSyncTask, defaultNumWorkers*numStorageTrieSegments),
 		mainTrieDone:     make(chan struct{}),
 		storageTriesDone: make(chan struct{}),
 		done:             make(chan error, 1),
@@ -221,7 +221,7 @@ func (t *stateSync) Start(ctx context.Context) error {
 	// Start the code syncer and leaf syncer.
 	eg, egCtx := errgroup.WithContext(ctx)
 	t.codeSyncer.start(egCtx) // start the code syncer first since the leaf syncer may add code tasks
-	t.syncer.Start(egCtx, defaultNumThreads, t.onSyncFailure)
+	t.syncer.Start(egCtx, defaultNumWorkers, t.onSyncFailure)
 	eg.Go(func() error {
 		if err := <-t.syncer.Done(); err != nil {
 			return err

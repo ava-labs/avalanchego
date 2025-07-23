@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -15,27 +16,122 @@ import (
 	"github.com/ava-labs/libevm/common"
 
 	atomicstate "github.com/ava-labs/coreth/plugin/evm/atomic/state"
+	"github.com/ava-labs/coreth/plugin/evm/config"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	syncclient "github.com/ava-labs/coreth/sync/client"
 
 	"github.com/ava-labs/libevm/trie"
 )
 
-// TrieNode represents a leaf node that belongs to the atomic trie.
-const TrieNode message.NodeType = 2
+const (
+	minNumWorkers     = 1
+	maxNumWorkers     = 64
+	defaultNumWorkers = 8 // TODO: Dynamic worker count discovery will be implemented in a future PR.
+
+	minRequestSize = 1
+	maxRequestSize = 1024 // Matches [maxLeavesLimit] in sync/handlers/leafs_request.go
+
+	// TrieNode represents a leaf node that belongs to the atomic trie.
+	TrieNode message.NodeType = 2
+)
 
 var (
+	// errWaitBeforeStart is returned when Wait() is called before Start().
+	errWaitBeforeStart = errors.New("Wait() called before Start() - call Start() first")
+
+	// errTooFewWorkers is returned when numWorkers is below the minimum.
+	errTooFewWorkers = errors.New("numWorkers below minimum")
+
+	// errTooManyWorkers is returned when numWorkers exceeds the maximum.
+	errTooManyWorkers = errors.New("numWorkers above maximum")
+
+	errNilClient           = errors.New("Client cannot be nil")
+	errNilDatabase         = errors.New("Database cannot be nil")
+	errNilAtomicTrie       = errors.New("AtomicTrie cannot be nil")
+	errEmptyTargetRoot     = errors.New("TargetRoot cannot be empty")
+	errInvalidTargetHeight = errors.New("TargetHeight must be greater than 0")
+	errInvalidRequestSize  = errors.New("RequestSize must be between 1 and 1024")
+
+	// Pre-allocate zero bytes to avoid repeated allocations.
+	zeroBytes = bytes.Repeat([]byte{0x00}, common.HashLength)
+
 	_ Syncer                  = (*syncer)(nil)
 	_ syncclient.LeafSyncTask = (*syncerLeafTask)(nil)
 )
 
+// Config holds the configuration for creating a new atomic syncer.
+type Config struct {
+	// Client is the leaf client used to fetch data from the network.
+	Client syncclient.LeafClient
+
+	// Database is the version database for storing synced data.
+	Database *versiondb.Database
+
+	// AtomicTrie is the atomic trie to sync into.
+	AtomicTrie *atomicstate.AtomicTrie
+
+	// TargetRoot is the root hash of the trie to sync to.
+	TargetRoot common.Hash
+
+	// TargetHeight is the target block height to sync to.
+	TargetHeight uint64
+
+	// RequestSize is the maximum number of leaves to request in a single network call.
+	RequestSize uint16
+
+	// NumWorkers is the number of worker goroutines to use for syncing.
+	// If not set, [DefaultNumWorkers] will be used.
+	NumWorkers int
+}
+
+// Validate checks if the configuration is valid and returns an error if not.
+func (c *Config) Validate() error {
+	if c.Client == nil {
+		return errNilClient
+	}
+	if c.Database == nil {
+		return errNilDatabase
+	}
+	if c.AtomicTrie == nil {
+		return errNilAtomicTrie
+	}
+	if c.TargetRoot == (common.Hash{}) {
+		return errEmptyTargetRoot
+	}
+	if c.TargetHeight == 0 {
+		return errInvalidTargetHeight
+	}
+
+	// Set default RequestSize if not specified.
+	if c.RequestSize == 0 {
+		c.RequestSize = config.DefaultStateSyncRequestSize
+	}
+	if c.RequestSize < minRequestSize || c.RequestSize > maxRequestSize {
+		return fmt.Errorf("%w: %d (must be between %d and %d)", errInvalidRequestSize, c.RequestSize, minRequestSize, maxRequestSize)
+	}
+
+	// Validate NumWorkers.
+	numWorkers := c.NumWorkers
+	if numWorkers == 0 {
+		numWorkers = defaultNumWorkers
+	}
+	if numWorkers < minNumWorkers {
+		return fmt.Errorf("%w: %d (minimum: %d)", errTooFewWorkers, numWorkers, minNumWorkers)
+	}
+	if numWorkers > maxNumWorkers {
+		return fmt.Errorf("%w: %d (maximum: %d)", errTooManyWorkers, numWorkers, maxNumWorkers)
+	}
+
+	return nil
+}
+
 // Syncer represents a step in state sync,
-// along with Start/Done methods to control
+// along with Start/Wait methods to control
 // and monitor progress.
 // Error returns an error if any was encountered.
 type Syncer interface {
 	Start(ctx context.Context) error
-	Done() <-chan error
+	Wait(ctx context.Context) error
 }
 
 // syncer is used to sync the atomic trie from the network. The CallbackLeafSyncer
@@ -54,41 +150,68 @@ type syncer struct {
 	// lastHeight is the greatest height for which key / values
 	// were last inserted into the [atomicTrie]
 	lastHeight uint64
+
+	// numWorkers is the number of worker goroutines to use for syncing
+	numWorkers int
+
+	// cancel is used to cancel the sync operation
+	cancel context.CancelFunc
 }
 
 // addZeros adds [common.HashLenth] zeros to [height] and returns the result as []byte
 func addZeroes(height uint64) []byte {
 	packer := wrappers.Packer{Bytes: make([]byte, atomicstate.TrieKeyLength)}
 	packer.PackLong(height)
-	packer.PackFixedBytes(bytes.Repeat([]byte{0x00}, common.HashLength))
+	packer.PackFixedBytes(zeroBytes)
 	return packer.Bytes
 }
 
-func newSyncer(client syncclient.LeafClient, vdb *versiondb.Database, atomicTrie *atomicstate.AtomicTrie, targetRoot common.Hash, targetHeight uint64, requestSize uint16) (*syncer, error) {
-	lastCommittedRoot, lastCommit := atomicTrie.LastCommitted()
-	trie, err := atomicTrie.OpenTrie(lastCommittedRoot)
+// newSyncer returns a new syncer instance that will sync the atomic trie from the network.
+func newSyncer(config *Config) (*syncer, error) {
+	// Validate the configuration
+	if err := config.Validate(); err != nil {
+		return nil, err
+	}
+
+	// Use default workers if not specified.
+	numWorkers := config.NumWorkers
+	if numWorkers == 0 {
+		numWorkers = defaultNumWorkers
+	}
+
+	lastCommittedRoot, lastCommit := config.AtomicTrie.LastCommitted()
+	trie, err := config.AtomicTrie.OpenTrie(lastCommittedRoot)
 	if err != nil {
 		return nil, err
 	}
 
 	syncer := &syncer{
-		db:           vdb,
-		atomicTrie:   atomicTrie,
+		db:           config.Database,
+		atomicTrie:   config.AtomicTrie,
 		trie:         trie,
-		targetRoot:   targetRoot,
-		targetHeight: targetHeight,
+		targetRoot:   config.TargetRoot,
+		targetHeight: config.TargetHeight,
 		lastHeight:   lastCommit,
+		numWorkers:   numWorkers,
 	}
-	tasks := make(chan syncclient.LeafSyncTask, 1)
+
+	// Create tasks channel with capacity for the number of workers.
+	tasks := make(chan syncclient.LeafSyncTask, numWorkers)
+
+	// For atomic trie syncing, we typically want a single task since the trie is sequential.
+	// But we can create multiple tasks if needed for parallel processing of different ranges.
 	tasks <- &syncerLeafTask{syncer: syncer}
 	close(tasks)
-	syncer.syncer = syncclient.NewCallbackLeafSyncer(client, tasks, requestSize)
+
+	syncer.syncer = syncclient.NewCallbackLeafSyncer(config.Client, tasks, config.RequestSize)
 	return syncer, nil
 }
 
-// Start begins syncing the target atomic root.
+// Start begins syncing the target atomic root with the configured number of worker goroutines.
 func (s *syncer) Start(ctx context.Context) error {
-	s.syncer.Start(ctx, 1, s.onSyncFailure)
+	ctx, s.cancel = context.WithCancel(ctx)
+	s.syncer.Start(ctx, s.numWorkers, s.onSyncFailure)
+
 	return nil
 }
 
@@ -171,8 +294,22 @@ func (s *syncer) onSyncFailure(error) error {
 	return nil
 }
 
-// Done returns a channel which produces any error that occurred during syncing or nil on success.
-func (s *syncer) Done() <-chan error { return s.syncer.Done() }
+// Wait blocks until the sync operation completes and returns any error that occurred.
+// It respects context cancellation and returns ctx.Err() if the context is cancelled.
+// This method must be called after Start() has been called.
+func (s *syncer) Wait(ctx context.Context) error {
+	if s.cancel == nil {
+		return errWaitBeforeStart
+	}
+
+	select {
+	case err := <-s.syncer.Done():
+		return err
+	case <-ctx.Done():
+		s.cancel()
+		return ctx.Err()
+	}
+}
 
 type syncerLeafTask struct {
 	syncer *syncer
