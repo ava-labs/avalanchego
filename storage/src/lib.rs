@@ -141,11 +141,11 @@ pub enum CheckerError {
 
     /// Hash mismatch for a node
     #[error(
-        "Hash mismatch for node {partial_path:?} at address {address}: parent stored {parent_stored_hash}, computed {computed_hash}"
+        "Hash mismatch for node {path:?} at address {address}: parent stored {parent_stored_hash}, computed {computed_hash}"
     )]
     HashMismatch {
         /// The path of the node
-        partial_path: Path,
+        path: Path,
         /// The address of the node
         address: LinearAddress,
         /// The hash value stored in the parent node

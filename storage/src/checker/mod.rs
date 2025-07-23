@@ -103,6 +103,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
                     )),
                 )?;
                 let mut child_path_prefix = path_prefix.clone();
+                child_path_prefix.0.extend_from_slice(node.partial_path());
                 child_path_prefix.0.push(nibble as u8);
                 self.visit_trie(
                     address,
@@ -118,8 +119,10 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
         if hash_check {
             let hash = hash_node(&node, &path_prefix);
             if hash != subtree_root_hash {
+                let mut path = path_prefix.clone();
+                path.0.extend_from_slice(node.partial_path());
                 return Err(CheckerError::HashMismatch {
-                    partial_path: path_prefix,
+                    path,
                     address: subtree_root_address,
                     parent_stored_hash: subtree_root_hash,
                     computed_hash: hash,
@@ -285,7 +288,7 @@ mod test {
             value: Box::new([3, 4, 5]),
         });
         let leaf_addr = LinearAddress::new(high_watermark).unwrap();
-        let leaf_hash = hash_node(&leaf, &Path::from_nibbles_iterator([0u8, 1].into_iter()));
+        let leaf_hash = hash_node(&leaf, &Path::from_nibbles_iterator([0u8, 0, 1].into_iter()));
         let leaf_area = test_write_new_node(nodestore, &leaf, high_watermark);
         high_watermark += leaf_area;
 
@@ -362,7 +365,7 @@ mod test {
             panic!("test trie content changed, the test should be updated");
         };
         let wrong_hash = HashType::default();
-        let branch_path = &branch_node.as_branch().unwrap().partial_path;
+        let branch_path = Path::from([0]) + branch_node.as_branch().unwrap().partial_path.clone();
         let Some(Child::AddressWithHash(_, hash)) = root_node.as_branch_mut().unwrap().children
             [branch_path[0] as usize]
             .replace(Child::AddressWithHash(*branch_addr, wrong_hash.clone()))
@@ -381,12 +384,12 @@ mod test {
         err,
         CheckerError::HashMismatch {
             address,
-            partial_path,
+            path,
             parent_stored_hash,
             computed_hash
         }
         if address == *branch_addr
-            && partial_path == *branch_path
+            && path == branch_path
             && parent_stored_hash == wrong_hash
             && computed_hash == branch_hash
         ));

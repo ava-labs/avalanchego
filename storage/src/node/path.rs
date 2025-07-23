@@ -19,6 +19,7 @@ use bitflags::bitflags;
 use smallvec::SmallVec;
 use std::fmt::{self, Debug};
 use std::iter::{FusedIterator, once};
+use std::ops::Add;
 
 static NIBBLES: [u8; 16] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
@@ -133,6 +134,15 @@ impl Path {
 #[derive(Debug)]
 pub struct BytesIterator<'a> {
     nibbles_iter: std::slice::Iter<'a, u8>,
+}
+
+impl Add<Path> for Path {
+    type Output = Path;
+    fn add(self, other: Path) -> Self::Output {
+        let mut new = self.clone();
+        new.extend(other.iter().copied());
+        new
+    }
 }
 
 impl Iterator for BytesIterator<'_> {
