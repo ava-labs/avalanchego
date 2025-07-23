@@ -23,7 +23,7 @@ on:
 jobs:
   antithesis_avalanchego:
     name: Run Antithesis Avalanchego Test Setup
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: antithesishq/antithesis-trigger-action@b7d0c9d1d9316bd4de73a44144c56636ea3a64ba #v0.8
         with:
