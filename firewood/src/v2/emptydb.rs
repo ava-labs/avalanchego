@@ -1,11 +1,9 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use crate::proof::{Proof, ProofNode};
-use crate::range_proof::RangeProof;
-
 use super::api::{Batch, Db, DbView, Error, HashKey, KeyType, ValueType};
 use super::propose::{Proposal, ProposalBase};
+use crate::v2::api::{FrozenProof, FrozenRangeProof};
 use async_trait::async_trait;
 use futures::Stream;
 use std::sync::Arc;
@@ -66,7 +64,7 @@ impl DbView for HistoricalImpl {
         Ok(None)
     }
 
-    async fn single_key_proof<K: KeyType>(&self, _key: K) -> Result<Proof<ProofNode>, Error> {
+    async fn single_key_proof<K: KeyType>(&self, _key: K) -> Result<FrozenProof, Error> {
         Err(Error::RangeProofOnEmptyTrie)
     }
 
@@ -75,8 +73,8 @@ impl DbView for HistoricalImpl {
         _first_key: Option<K>,
         _last_key: Option<K>,
         _limit: Option<usize>,
-    ) -> Result<Option<RangeProof<Box<[u8]>, Box<[u8]>, ProofNode>>, Error> {
-        Ok(None)
+    ) -> Result<FrozenRangeProof, Error> {
+        Err(Error::RangeProofOnEmptyTrie)
     }
 
     fn iter_option<K: KeyType>(&self, _first_key: Option<K>) -> Result<EmptyStreamer, Error> {

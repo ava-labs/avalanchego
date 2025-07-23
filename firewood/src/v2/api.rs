@@ -44,6 +44,12 @@ impl<T> ValueType for T where T: AsRef<[u8]> + Send + Sync + Debug {}
 ///    proof
 pub type HashKey = firewood_storage::TrieHash;
 
+/// A frozen proof is a proof that is stored in immutable memory.
+pub type FrozenRangeProof = RangeProof<Box<[u8]>, Box<[u8]>, Box<[ProofNode]>>;
+
+/// A frozen proof uses an immutable collection of proof nodes.
+pub type FrozenProof = Proof<Box<[ProofNode]>>;
+
 /// A key/value pair operation. Only put (upsert) and delete are
 /// supported
 #[derive(Debug)]
@@ -244,7 +250,7 @@ pub trait DbView {
     async fn val<K: KeyType>(&self, key: K) -> Result<Option<Box<[u8]>>, Error>;
 
     /// Obtain a proof for a single key
-    async fn single_key_proof<K: KeyType>(&self, key: K) -> Result<Proof<ProofNode>, Error>;
+    async fn single_key_proof<K: KeyType>(&self, key: K) -> Result<FrozenProof, Error>;
 
     /// Obtain a range proof over a set of keys
     ///
@@ -259,7 +265,7 @@ pub trait DbView {
         first_key: Option<K>,
         last_key: Option<K>,
         limit: Option<usize>,
-    ) -> Result<Option<RangeProof<Box<[u8]>, Box<[u8]>, ProofNode>>, Error>;
+    ) -> Result<FrozenRangeProof, Error>;
 
     /// Obtain a stream over the keys/values of this view, using an optional starting point
     ///

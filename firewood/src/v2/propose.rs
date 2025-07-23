@@ -9,9 +9,7 @@ use async_trait::async_trait;
 use futures::stream::Empty;
 
 use super::api::{KeyType, ValueType};
-use crate::proof::{Proof, ProofNode};
-use crate::range_proof::RangeProof;
-use crate::v2::api;
+use crate::v2::api::{self, FrozenProof, FrozenRangeProof};
 
 #[derive(Clone, Debug)]
 pub(crate) enum KeyOp<V: ValueType> {
@@ -137,7 +135,7 @@ impl<T: api::DbView + Send + Sync> api::DbView for Proposal<T> {
         }
     }
 
-    async fn single_key_proof<K: KeyType>(&self, _key: K) -> Result<Proof<ProofNode>, api::Error> {
+    async fn single_key_proof<K: KeyType>(&self, _key: K) -> Result<FrozenProof, api::Error> {
         todo!();
     }
 
@@ -146,7 +144,7 @@ impl<T: api::DbView + Send + Sync> api::DbView for Proposal<T> {
         _first_key: Option<KT>,
         _last_key: Option<KT>,
         _limit: Option<usize>,
-    ) -> Result<Option<RangeProof<Box<[u8]>, Box<[u8]>, ProofNode>>, api::Error> {
+    ) -> Result<FrozenRangeProof, api::Error> {
         todo!();
     }
 

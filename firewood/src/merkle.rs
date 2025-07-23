@@ -20,8 +20,9 @@ use crate::range_proof::RangeProof;
 #[cfg(test)]
 use crate::stream::MerkleKeyValueStream;
 use crate::stream::PathIterator;
+use crate::v2::api::FrozenProof;
 #[cfg(test)]
-use crate::v2::api;
+use crate::v2::api::{self, FrozenRangeProof};
 use firewood_storage::{
     BranchNode, Child, FileIoError, HashType, Hashable, HashedNodeReader, ImmutableProposal,
     IntoHashType, LeafNode, MaybePersistedNode, MutableProposal, NibblesIterator, Node, NodeStore,
@@ -178,7 +179,7 @@ impl<T: TrieReader> Merkle<T> {
 
     /// Returns a proof that the given key has a certain value,
     /// or that the key isn't in the trie.
-    pub fn prove(&self, key: &[u8]) -> Result<Proof<ProofNode>, ProofError> {
+    pub fn prove(&self, key: &[u8]) -> Result<FrozenProof, ProofError> {
         let Some(root) = self.root() else {
             return Err(ProofError::Empty);
         };
@@ -216,7 +217,7 @@ impl<T: TrieReader> Merkle<T> {
             });
         }
 
-        Ok(Proof(proof.into_boxed_slice()))
+        Ok(Proof::new(proof.into_boxed_slice()))
     }
 
     /// Verify a proof that a key has a certain value, or that the key isn't in the trie.
@@ -258,7 +259,7 @@ impl<T: TrieReader> Merkle<T> {
         start_key: Option<&[u8]>,
         end_key: Option<&[u8]>,
         limit: Option<NonZeroUsize>,
-    ) -> Result<RangeProof<Box<[u8]>, Box<[u8]>, ProofNode>, api::Error> {
+    ) -> Result<FrozenRangeProof, api::Error> {
         if let (Some(k1), Some(k2)) = (&start_key, &end_key) {
             if k1 > k2 {
                 return Err(api::Error::InvalidRange {

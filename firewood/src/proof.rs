@@ -146,10 +146,10 @@ impl From<PathIterItem> for ProofNode {
 }
 
 /// A proof that a given key-value pair either exists or does not exist in a trie.
-#[derive(Clone, Debug)]
-pub struct Proof<T: Hashable>(pub Box<[T]>);
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub struct Proof<T: ?Sized>(T);
 
-impl<T: Hashable> Proof<T> {
+impl<T: ProofCollection + ?Sized> Proof<T> {
     /// Verify a proof
     pub fn verify<K: AsRef<[u8]>, V: AsRef<[u8]>>(
         &self,
@@ -164,20 +164,20 @@ impl<T: Hashable> Proof<T> {
     /// with the given `root_hash`. If the key does not exist in the trie, returns `None`.
     /// Returns an error if the proof is invalid or doesn't prove the key for the
     /// given revision.
-    fn value_digest<K: AsRef<[u8]>>(
+    pub fn value_digest<K: AsRef<[u8]>>(
         &self,
         key: K,
         root_hash: &TrieHash,
     ) -> Result<Option<ValueDigest<&[u8]>>, ProofError> {
         let key: Box<[u8]> = NibblesIterator::new(key.as_ref()).collect();
 
-        let Some(last_node) = self.0.last() else {
+        let Some(last_node) = self.0.as_ref().last() else {
             return Err(ProofError::Empty);
         };
 
         let mut expected_hash = root_hash.clone().into_hash_type();
 
-        let mut iter = self.0.iter().peekable();
+        let mut iter = self.0.as_ref().iter().peekable();
         while let Some(node) = iter.next() {
             if node.to_hash() != expected_hash {
                 return Err(ProofError::UnexpectedHash);
@@ -224,6 +224,153 @@ impl<T: Hashable> Proof<T> {
         // This is an exclusion proof.
         Ok(None)
     }
+
+    /// Returns the length of the proof.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.0.as_ref().len()
+    }
+
+    /// Returns true if the proof is empty.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.0.as_ref().is_empty()
+    }
+}
+
+impl<T: ProofCollection + ?Sized> std::ops::Deref for Proof<T> {
+    type Target = T;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T: ProofCollection + ?Sized> std::ops::DerefMut for Proof<T> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl<T: ProofCollection> Proof<T> {
+    /// Constructs a new proof from a collection of proof nodes.
+    #[inline]
+    #[must_use]
+    pub const fn new(proof: T) -> Self {
+        Self(proof)
+    }
+}
+
+impl Proof<EmptyProofCollection> {
+    /// Constructs a new empty proof.
+    #[inline]
+    #[must_use]
+    pub const fn empty() -> Self {
+        Self::new(EmptyProofCollection)
+    }
+
+    /// Converts an empty immutable proof into an empty mutable proof.
+    #[inline]
+    #[must_use]
+    pub const fn into_mutable<T: Hashable>(self) -> Proof<Vec<T>> {
+        Proof::new(Vec::new())
+    }
+}
+
+impl<T: Hashable> Proof<Box<[T]>> {
+    /// Converts an immutable proof into a mutable proof.
+    #[inline]
+    #[must_use]
+    pub fn into_mutable(self) -> Proof<Vec<T>> {
+        Proof::new(self.0.into_vec())
+    }
+}
+
+impl<T: Hashable> Proof<Vec<T>> {
+    /// Converts a mutable proof into an immutable proof.
+    #[inline]
+    #[must_use]
+    pub fn into_immutable(self) -> Proof<Box<[T]>> {
+        Proof::new(self.0.into_boxed_slice())
+    }
+}
+
+impl<T, V> Proof<V>
+where
+    T: Hashable,
+    V: ProofCollection<Node = T> + IntoIterator<Item = T> + FromIterator<T>,
+{
+    /// Joins two proofs into one.
+    #[inline]
+    #[must_use]
+    pub fn join<O: ProofCollection<Node = T> + IntoIterator<Item = T>>(
+        self,
+        other: Proof<O>,
+    ) -> Proof<V> {
+        self.into_iter().chain(other).collect()
+    }
+}
+
+impl<V: ProofCollection + FromIterator<V::Node>> FromIterator<V::Node> for Proof<V> {
+    #[inline]
+    fn from_iter<I: IntoIterator<Item = V::Node>>(iter: I) -> Self {
+        Proof(iter.into_iter().collect())
+    }
+}
+
+impl<V: ProofCollection + Extend<V::Node>> Extend<V::Node> for Proof<V> {
+    #[inline]
+    fn extend<I: IntoIterator<Item = V::Node>>(&mut self, iter: I) {
+        self.0.extend(iter);
+    }
+}
+
+impl<V: ProofCollection + IntoIterator<Item = V::Node>> IntoIterator for Proof<V> {
+    type Item = V::Node;
+    type IntoIter = V::IntoIter;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+/// A trait representing a collection of proof nodes.
+///
+/// This allows [`Proof`] to be generic over different types of collections such
+/// a `Box<[T]>` or `Vec<T>`, where `T` implements the `Hashable` trait.
+pub trait ProofCollection: AsRef<[Self::Node]> {
+    /// The type of nodes in the proof collection.
+    type Node: Hashable;
+}
+
+impl<T: Hashable> ProofCollection for [T] {
+    type Node = T;
+}
+
+impl<T: Hashable> ProofCollection for Box<[T]> {
+    type Node = T;
+}
+
+impl<T: Hashable> ProofCollection for Vec<T> {
+    type Node = T;
+}
+
+/// A zero-sized type to represent an empty proof collection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct EmptyProofCollection;
+
+impl AsRef<[ProofNode]> for EmptyProofCollection {
+    #[inline]
+    fn as_ref(&self) -> &[ProofNode] {
+        &[]
+    }
+}
+
+impl ProofCollection for EmptyProofCollection {
+    type Node = ProofNode;
 }
 
 /// Returns the next nibble in `c` after `b`.
