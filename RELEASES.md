@@ -1,12 +1,26 @@
 # Release Notes
 
 ## Pending Release
-- Added maximum number of addresses (1000) to be queried in a single filter.
 
-## [v0.7.6](https://github.com/ava-labs/subnet-evm/releases/tag/v0.7.6)
+- Add pending releases here
+
+## [v0.7.7](https://github.com/ava-labs/subnet-evm/releases/tag/v0.7.7)
+
+This version is backwards compatible to v0.7.0. It is optional, but encouraged.
+
+### AvalancheGo Compatibility
+
+The plugin version is **updated** to 42 and is compatible with AvalancheGo version v1.13.3.
+
+### Updates
+
+- Added maximum number of addresses (1000) to be queried in a single filter.
 - Demoted unnecessary error log in `core/txpool/legacypool.go` to warning, displaying unexpected but valid behavior
 - Use `state-history` eth config flag to designate the number of recent states queryable.
-- @TODO - write release notes here on what is in this release
+
+## [v0.7.6](https://github.com/ava-labs/subnet-evm/releases/tag/v0.7.6)
+
+_This release should be skipped entirely in favor of 0.7.7 due to the use of a AvalancheGo release candidate version._
 
 ## [v0.7.5](https://github.com/ava-labs/subnet-evm/releases/tag/v0.7.5)
 

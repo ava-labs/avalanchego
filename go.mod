@@ -5,7 +5,7 @@ go 1.23.9
 require (
 	github.com/VictoriaMetrics/fastcache v1.12.1
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
-	github.com/ava-labs/avalanchego v1.13.3-rc.2
+	github.com/ava-labs/avalanchego v1.13.3
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.8
 	github.com/ava-labs/libevm v1.13.14-0.3.0.rc.1
 	github.com/davecgh/go-spew v1.1.1
