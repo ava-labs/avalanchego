@@ -9,7 +9,6 @@ import (
 	"github.com/ava-labs/simplex"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
 
@@ -68,28 +67,23 @@ func TestQCDuplicateSigners(t *testing.T) {
 	msg := []byte("Begin at the beginning, and go on till you come to the end: then stop")
 
 	signatures := make([]simplex.Signature, 0, quorum)
-	var signer BLSSigner
-	var verifier BLSVerifier
 
-	for i, config := range configs {
-		signer, verifier = NewBLSAuth(config)
+	signer, verifier := NewBLSAuth(configs[0])
 
-		sig, err := signer.Sign(msg)
-		require.NoError(t, err)
-		require.NoError(t, verifier.Verify(msg, sig, config.Ctx.NodeID[:]))
+	sig, err := signer.Sign(msg)
+	require.NoError(t, err)
+	require.NoError(t, verifier.Verify(msg, sig, configs[0].Ctx.NodeID[:]))
 
-		signatures = append(signatures, simplex.Signature{
-			Signer: config.Ctx.NodeID[:],
-			Value:  sig,
-		})
-		if i == 0 {
-			// Duplicate the first signer to test for duplicate signers
-			signatures = append(signatures, simplex.Signature{
-				Signer: config.Ctx.NodeID[:],
-				Value:  sig,
-			})
-		}
-	}
+	signatures = append(signatures, simplex.Signature{
+		Signer: configs[0].Ctx.NodeID[:],
+		Value:  sig,
+	})
+
+	// Duplicate the first signer to test for duplicate signers
+	signatures = append(signatures, simplex.Signature{
+		Signer: configs[0].Ctx.NodeID[:],
+		Value:  sig,
+	})
 
 	// aggregate the signatures into a quorum certificate
 	signatureAggregator := SignatureAggregator{verifier: &verifier}
@@ -131,11 +125,14 @@ func TestQCSignerNotInMembershipSet(t *testing.T) {
 	require.ErrorIs(t, err, errSignerNotFound)
 }
 
-func TestQCDeserializerInvalidInput(t *testing.T) {
+func TestQCDeserializerInvalidBytes(t *testing.T) {
 	config := newEngineConfig(t, 2)
 
 	_, verifier := NewBLSAuth(config)
 	deserializer := QCDeserializer{verifier: &verifier}
+
+	sig, err := config.SignBLS([]byte("message2Sign"))
+	require.NoError(t, err)
 
 	tests := []struct {
 		name  string
@@ -143,14 +140,32 @@ func TestQCDeserializerInvalidInput(t *testing.T) {
 		err   error
 	}{
 		{
-			name:  "too short input",
+			name:  "qc bytes too short",
 			input: make([]byte, 10),
 			err:   errFailedToParseQC,
 		},
 		{
-			name:  "invalid signature bytes",
-			input: make([]byte, simplex.Quorum(len(verifier.nodeID2PK))*ids.NodeIDLen+bls.SignatureLen),
-			err:   errFailedToParseQC,
+			name: "invalid bitset",
+			input: func() []byte {
+				sigBytes := bls.SignatureToBytes(sig)
+				canotoQC := &canotoQC{
+					Sig:     [bls.SignatureLen]byte(sigBytes),
+					Signers: []byte{0, 1, 2, 3},
+				}
+				return canotoQC.MarshalCanoto()
+			}(),
+			err: errInvalidBitSet,
+		},
+		{
+			name: "invalid qc signer bytes",
+			input: func() []byte {
+				canotoQC := &canotoQC{
+					Sig:     [bls.SignatureLen]byte{},
+					Signers: []byte{0, 1, 2, 3},
+				}
+				return canotoQC.MarshalCanoto()
+			}(),
+			err: errFailedToParseSignature,
 		},
 	}
 
