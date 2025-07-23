@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/ava-labs/avalanchego/api/info"
@@ -194,9 +195,11 @@ func (c *ConnectInfoService) Peers(
 
 	peers := make([]*infov1.PeerInfo, 0, len(jsonResponse.Peers))
 	for _, peer := range jsonResponse.Peers {
-		// Convert TrackedSubnets (set.Set[ids.ID]) to []string
 		trackedSubnetsIDs := peer.TrackedSubnets.List()
 		trackedSubnets := make([]string, len(trackedSubnetsIDs))
+		for _, subnetID := range peer.TrackedSubnets.List() {
+			trackedSubnets = append(trackedSubnets, subnetID.String())
+		}
 		for i, id := range trackedSubnetsIDs {
 			trackedSubnets[i] = id.String()
 		}
@@ -209,10 +212,10 @@ func (c *ConnectInfoService) Peers(
 			PublicIp:       peer.PublicIP.String(),
 			NodeId:         peer.ID.String(),
 			Version:        peer.Version,
-			LastSent:       formatTime(peer.LastSent),
-			LastReceived:   formatTime(peer.LastReceived),
+			LastSent:       timestamppb.New(peer.LastSent),
+			LastReceived:   timestamppb.New(peer.LastReceived),
 			Benched:        benched,
-			ObservedUptime: uint32(peer.ObservedUptime),
+			ObservedUptime: durationpb.New(time.Duration(peer.ObservedUptime) * time.Second),
 			TrackedSubnets: trackedSubnets,
 		})
 	}
@@ -225,17 +228,11 @@ func (c *ConnectInfoService) Peers(
 	return connect.NewResponse(response), nil
 }
 
-// formatTime formats a time.Time object to a string in "YYYY-MM-DDThh:mm:ssZ" format
-func formatTime(t time.Time) string {
-	return t.Format(time.RFC3339)
-}
-
 // IsBootstrapped returns whether the named chain has finished its bootstrap process on this node
 func (c *ConnectInfoService) IsBootstrapped(
 	_ context.Context,
 	request *connect.Request[infov1.IsBootstrappedRequest],
 ) (*connect.Response[infov1.IsBootstrappedResponse], error) {
-	// Use the chain from the request
 	jsonRequest := info.IsBootstrappedArgs{
 		Chain: request.Msg.Chain,
 	}
@@ -312,7 +309,6 @@ func (c *ConnectInfoService) VMs(
 		return nil, err
 	}
 
-	// Convert the VM map from JSON-RPC format to protobuf format
 	vms := make(map[string]*infov1.VMAliases)
 	for vmID, aliases := range jsonResponse.VMs {
 		vms[vmID.String()] = &infov1.VMAliases{
@@ -320,7 +316,6 @@ func (c *ConnectInfoService) VMs(
 		}
 	}
 
-	// Convert the FXs map from JSON-RPC format to protobuf format
 	fxs := make(map[string]string)
 	for fxID, name := range jsonResponse.Fxs {
 		fxs[fxID.String()] = name
