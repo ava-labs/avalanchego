@@ -385,7 +385,7 @@ func (s signatureRequestVerifier) verifyValidatorSetState(
 			Message: "failed to get minimum height: " + err.Error(),
 		}
 	}
-	if msg.PChainHeight >= minHeight {
+	if msg.PChainHeight < minHeight {
 		return &common.AppError{
 			Code:    common.ErrUndefined.Code,
 			Message: fmt.Sprintf("invalid height. provided %d. current minimum %d", msg.PChainHeight, minHeight),
