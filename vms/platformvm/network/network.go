@@ -164,8 +164,9 @@ func New(
 		vdrsState: vdrs,
 		stateLock: stateLock,
 		state:     state,
+		log:       log,
 	}
-	signatureRequestHandler := acp118.NewHandler(signatureRequestVerifier, signer)
+	signatureRequestHandler := acp118.NewHandler(signatureRequestVerifier, signer, log)
 
 	if err := p2pNetwork.AddHandler(acp118.HandlerID, signatureRequestHandler); err != nil {
 		return nil, err
