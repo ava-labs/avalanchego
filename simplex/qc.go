@@ -212,10 +212,10 @@ func (d *QCDeserializer) signersFromBytes(signerBytes []byte) ([]ids.NodeID, err
 	return signers, nil
 }
 
-// filterNodeIDS returns the nodeIDs in nodeIDs whose bit is set to 1 in
-// [indices].
+// filterNodeIDS returns the nodeIDs in nodeIDs whose
+// bit is set to 1 in indices.
 //
-// Returns an error if [indices] references an unknown node.
+// Returns an error if indices references an unknown node.
 func filterNodes(
 	indices set.Bits,
 	nodeIDs []ids.NodeID,

@@ -39,8 +39,7 @@ type BLSVerifier struct {
 	networkID uint32
 	chainID   ids.ID
 
-	canonicalNodeIDs []ids.NodeID
-	// for fast lookup of indices of node IDs in canonicalNodeIDs
+	canonicalNodeIDs       []ids.NodeID
 	canonicalNodeIDIndices map[ids.NodeID]int
 }
 
