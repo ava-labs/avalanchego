@@ -118,4 +118,4 @@ tasks:
 
   update-avalanchego-version:
     desc: Update AvalancheGo version in go.mod and sync GitHub Actions workflow custom action version
-    cmd: ./scripts/update_avalanchego_version.sh # ci.yml 
+    cmd: bash -x ./scripts/update_avalanchego_version.sh # ci.yml 
