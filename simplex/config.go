@@ -28,7 +28,6 @@ type Config struct {
 
 	VM block.ChainVM
 
-	GenesisBytes []byte
 	DB           database.Database
 	// SignBLS is the signing function used for this node to sign messages.
 	SignBLS SignFunc
