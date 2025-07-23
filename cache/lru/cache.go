@@ -35,11 +35,6 @@ func NewCache[K comparable, V any](size int) *Cache[K, V] {
 }
 
 // NewCacheWithOnEvict creates a new LRU cache with the given size and eviction callback.
-// The onEvict callback is called with the key and value of an entry before eviction.
-// The onEvict callback is called while holding the cache lock.
-// Do not call any cache methods (Get, Put, Evict, Flush) from within the callback
-// as this will cause a deadlock. The callback should only be used for cleanup
-// operations like closing files or releasing resources.
 func NewCacheWithOnEvict[K comparable, V any](size int, onEvict func(K, V)) *Cache[K, V] {
 	return &Cache[K, V]{
 		elements: linked.NewHashmap[K, V](),
@@ -53,8 +48,8 @@ func (c *Cache[K, V]) Put(key K, value V) {
 	defer c.lock.Unlock()
 
 	if c.elements.Len() == c.size {
-		oldestKey, oldestValue, found := c.elements.Oldest()
-		if found {
+		oldestKey, oldestValue, ok := c.elements.Oldest()
+		if ok {
 			c.onEvict(oldestKey, oldestValue)
 		}
 		c.elements.Delete(oldestKey)
@@ -77,21 +72,18 @@ func (c *Cache[K, V]) Get(key K) (V, bool) {
 func (c *Cache[K, _]) Evict(key K) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	if value, ok := c.elements.Get(key); ok {
-		c.onEvict(key, value)
+	value, ok := c.elements.Get(key)
+	if !ok {
+		return
 	}
+	c.onEvict(key, value)
 	c.elements.Delete(key)
 }
 
 func (c *Cache[_, _]) Flush() {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	// Call onEvict for each element before clearing
 	iter := c.elements.NewIterator()
 	for iter.Next() {
-		c.onEvict(iter.Key(), iter.Value())
-		c.elements.Delete(iter.Key())
+		c.Evict(iter.Key())
 	}
 }
 
