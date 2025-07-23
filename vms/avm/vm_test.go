@@ -32,6 +32,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"path/filepath"
+	"github.com/ava-labs/firewood/ffi"
 )
 
 func TestInvalidGenesis(t *testing.T) {
@@ -908,4 +910,43 @@ func TestVMLinearizeStateMigration(t *testing.T) {
 		_, err := vm.GetUTXO(utxo.InputID())
 		require.ErrorIs(err, database.ErrNotFound)
 	}
+}
+
+func TestFirewood(t *testing.T) {
+	r := require.New(t)
+	path := filepath.Join(t.TempDir(), "firewood")
+	fw, err := ffi.New(path, ffi.DefaultConfig())
+	r.NoError(err)
+
+	_, err = fw.Update(
+		[][]byte{
+			[]byte("k1"),
+			[]byte("k2"),
+			[]byte("k3"),
+			[]byte("k4"),
+		},
+		[][]byte{
+			[]byte("v1"),
+			[]byte("v2"),
+			{},
+			nil,
+		},
+	)
+	r.NoError(err)
+
+	gotVal, err := fw.Get([]byte("k1"))
+	r.NoError(err)
+	r.Equal(gotVal, []byte("v1"))
+
+	gotVal, err = fw.Get([]byte("k2"))
+	r.NoError(err)
+	r.Equal(gotVal, []byte("v2"))
+
+	gotVal, err = fw.Get([]byte("k3"))
+	r.NoError(err)
+	r.Equal([]byte(nil), gotVal)
+
+	gotVal, err = fw.Get([]byte("k4"))
+	r.NoError(err)
+	r.Nil(gotVal)
 }
