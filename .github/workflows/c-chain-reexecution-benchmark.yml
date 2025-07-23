@@ -20,7 +20,7 @@ on:
         required: false
         default: s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100.zip
   schedule:
-    - cron: '0 6 * * 0' # Runs every Sunday at 06:00 UTC
+    - cron: '0 9 * * *' # Runs every day at 09:00 UTC (04:00 EST)
 
 jobs:
     c-chain-reexecution:
@@ -70,3 +70,7 @@ jobs:
             github-token: ${{ secrets.GITHUB_TOKEN }}
             summary-always: true
             comment-on-alert: true
+            auto-push: false
+        - name: Push Benchmark Result
+          if: github.event_name == 'schedule'
+          run: git push origin gh-pages
