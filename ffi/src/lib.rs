@@ -1,6 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+#![doc = include_str!("../README.md")]
 #![expect(
     unsafe_code,
     reason = "This is an FFI library, so unsafe code is expected."
