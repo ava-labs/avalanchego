@@ -11,10 +11,12 @@
 )]
 
 use firewood_storage::{
-    BranchNode, FileIoError, HashType, Hashable, IntoHashType, NibblesIterator, PathIterItem,
+    BranchNode, FileIoError, HashType, Hashable, IntoHashType, NibblesIterator, Path, PathIterItem,
     Preimage, TrieHash, ValueDigest,
 };
 use thiserror::Error;
+
+use crate::merkle::{Key, Value};
 
 #[derive(Debug, Error)]
 /// Reasons why a proof is invalid
@@ -77,13 +79,13 @@ pub enum ProofError {
 /// A node in a proof.
 pub struct ProofNode {
     /// The key this node is at. Each byte is a nibble.
-    pub key: Box<[u8]>,
+    pub key: Key,
     /// The length of the key prefix that is shared with the previous node.
     #[cfg(feature = "ethhash")]
     pub partial_len: usize,
     /// None if the node does not have a value.
     /// Otherwise, the node's value or the hash of its value.
-    pub value_digest: Option<ValueDigest<Box<[u8]>>>,
+    pub value_digest: Option<ValueDigest<Value>>,
     /// The hash of each child, or None if the child does not exist.
     pub child_hashes: [Option<HashType>; BranchNode::MAX_CHILDREN],
 }
@@ -169,7 +171,7 @@ impl<T: ProofCollection + ?Sized> Proof<T> {
         key: K,
         root_hash: &TrieHash,
     ) -> Result<Option<ValueDigest<&[u8]>>, ProofError> {
-        let key: Box<[u8]> = NibblesIterator::new(key.as_ref()).collect();
+        let key = Path(NibblesIterator::new(key.as_ref()).collect());
 
         let Some(last_node) = self.0.as_ref().last() else {
             return Err(ProofError::Empty);

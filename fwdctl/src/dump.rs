@@ -8,7 +8,7 @@
 
 use clap::Args;
 use firewood::db::{Db, DbConfig};
-use firewood::merkle::Key;
+use firewood::merkle::{Key, Value};
 use firewood::stream::MerkleKeyValueStream;
 use firewood::v2::api::{self, Db as _};
 use futures_util::StreamExt;
@@ -18,7 +18,7 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 
-type KeyFromStream = Option<Result<(Key, Vec<u8>), api::Error>>;
+type KeyFromStream = Option<Result<(Key, Value), api::Error>>;
 
 #[derive(Debug, Args)]
 pub struct Options {

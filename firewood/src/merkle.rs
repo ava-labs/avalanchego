@@ -44,9 +44,8 @@ use std::sync::Arc;
 /// Keys are boxed u8 slices
 pub type Key = Box<[u8]>;
 
-/// Values are vectors
-/// TODO: change to Box<[u8]>
-pub type Value = Vec<u8>;
+/// Values are boxed u8 slices
+pub type Value = Box<[u8]>;
 
 // convert a set of nibbles into a printable string
 // panics if there is a non-nibble byte in the set
@@ -303,7 +302,7 @@ impl<T: TrieReader> Merkle<T> {
         let start_proof = self.prove(&first_key)?;
         let limit = limit.map(|old_limit| old_limit.get().saturating_sub(1));
 
-        let mut key_values = vec![(first_key, first_value.into_boxed_slice())];
+        let mut key_values = vec![(first_key, first_value)];
 
         // we stop streaming if either we hit the limit or the key returned was larger
         // than the largest key requested
@@ -324,8 +323,7 @@ impl<T: TrieReader> Merkle<T> {
                     // keep going if the key returned is less than the last key requested
                     ready(&*kv.0 <= last_key)
                 })
-                .map(|kv| kv.map(|(k, v)| (k, v.into())))
-                .try_collect::<Vec<(Box<[u8]>, Box<[u8]>)>>()
+                .try_collect::<Vec<(Key, Value)>>()
                 .await?,
         );
 
@@ -343,7 +341,7 @@ impl<T: TrieReader> Merkle<T> {
         })
     }
 
-    pub(crate) fn get_value(&self, key: &[u8]) -> Result<Option<Box<[u8]>>, FileIoError> {
+    pub(crate) fn get_value(&self, key: &[u8]) -> Result<Option<Value>, FileIoError> {
         let Some(node) = self.get_node(key)? else {
             return Ok(None);
         };
@@ -470,7 +468,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
 
     /// Map `key` to `value` in the trie.
     /// Each element of key is 2 nibbles.
-    pub fn insert(&mut self, key: &[u8], value: Box<[u8]>) -> Result<(), FileIoError> {
+    pub fn insert(&mut self, key: &[u8], value: Value) -> Result<(), FileIoError> {
         let key = Path::from_nibbles_iterator(NibblesIterator::new(key));
 
         let root = self.nodestore.mut_root();
@@ -498,7 +496,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
         &mut self,
         mut node: Node,
         key: &[u8],
-        value: Box<[u8]>,
+        value: Value,
     ) -> Result<Node, FileIoError> {
         // 4 possibilities for the position of the `key` relative to `node`:
         // 1. The node is at `key`
@@ -634,7 +632,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
     /// Returns the value that was removed, if any.
     /// Otherwise returns `None`.
     /// Each element of `key` is 2 nibbles.
-    pub fn remove(&mut self, key: &[u8]) -> Result<Option<Box<[u8]>>, FileIoError> {
+    pub fn remove(&mut self, key: &[u8]) -> Result<Option<Value>, FileIoError> {
         let key = Path::from_nibbles_iterator(NibblesIterator::new(key));
 
         let root = self.nodestore.mut_root();
@@ -659,12 +657,11 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
     /// Removes the value associated with the given `key` from the subtrie rooted at `node`.
     /// Returns the new root of the subtrie and the value that was removed, if any.
     /// Each element of `key` is 1 nibble.
-    #[expect(clippy::type_complexity)]
     fn remove_helper(
         &mut self,
         mut node: Node,
         key: &[u8],
-    ) -> Result<(Option<Node>, Option<Box<[u8]>>), FileIoError> {
+    ) -> Result<(Option<Node>, Option<Value>), FileIoError> {
         // 4 possibilities for the position of the `key` relative to `node`:
         // 1. The node is at `key`
         // 2. The key is above the node (i.e. its ancestor)

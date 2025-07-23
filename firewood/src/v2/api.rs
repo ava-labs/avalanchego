@@ -11,6 +11,7 @@
 )]
 
 use crate::manager::RevisionManagerError;
+use crate::merkle::{Key, Value};
 use crate::proof::{Proof, ProofError, ProofNode};
 pub use crate::range_proof::RangeProof;
 use async_trait::async_trait;
@@ -45,7 +46,7 @@ impl<T> ValueType for T where T: AsRef<[u8]> + Send + Sync + Debug {}
 pub type HashKey = firewood_storage::TrieHash;
 
 /// A frozen proof is a proof that is stored in immutable memory.
-pub type FrozenRangeProof = RangeProof<Box<[u8]>, Box<[u8]>, Box<[ProofNode]>>;
+pub type FrozenRangeProof = RangeProof<Key, Value, Box<[ProofNode]>>;
 
 /// A frozen proof uses an immutable collection of proof nodes.
 pub type FrozenProof = Proof<Box<[ProofNode]>>;
@@ -113,9 +114,9 @@ pub enum Error {
     #[error("Invalid range: {start_key:?} > {end_key:?}")]
     InvalidRange {
         /// The provided starting key
-        start_key: Box<[u8]>,
+        start_key: Key,
         /// The provided ending key
-        end_key: Box<[u8]>,
+        end_key: Key,
     },
 
     #[error("IO error: {0}")]
@@ -234,7 +235,7 @@ pub trait Db {
 #[async_trait]
 pub trait DbView {
     /// The type of a stream of key/value pairs
-    type Stream<'a>: Stream<Item = Result<(Box<[u8]>, Vec<u8>), Error>>
+    type Stream<'a>: Stream<Item = Result<(Key, Value), Error>>
     where
         Self: 'a;
 
@@ -247,7 +248,7 @@ pub trait DbView {
     async fn root_hash(&self) -> Result<Option<HashKey>, Error>;
 
     /// Get the value of a specific key
-    async fn val<K: KeyType>(&self, key: K) -> Result<Option<Box<[u8]>>, Error>;
+    async fn val<K: KeyType>(&self, key: K) -> Result<Option<Value>, Error>;
 
     /// Obtain a proof for a single key
     async fn single_key_proof<K: KeyType>(&self, key: K) -> Result<FrozenProof, Error>;
@@ -282,7 +283,7 @@ pub trait DbView {
 
     /// Obtain a stream over the keys/values of this view, starting from the beginning
     fn iter(&self) -> Result<Self::Stream<'_>, Error> {
-        self.iter_option(Option::<Box<[u8]>>::None)
+        self.iter_option(Option::<Key>::None)
     }
 
     /// Obtain a stream over the key/values, starting at a specific key

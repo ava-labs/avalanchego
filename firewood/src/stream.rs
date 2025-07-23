@@ -383,13 +383,9 @@ impl<T: TrieReader> Stream for MerkleKeyValueStream<'_, T> {
                                     return self.poll_next(_cx);
                                 };
 
-                                let value = value.to_vec();
-                                Poll::Ready(Some(Ok((key, value))))
+                                Poll::Ready(Some(Ok((key, value.clone()))))
                             }
-                            Node::Leaf(leaf) => {
-                                let value = leaf.value.to_vec();
-                                Poll::Ready(Some(Ok((key, value))))
-                            }
+                            Node::Leaf(leaf) => Poll::Ready(Some(Ok((key, leaf.value.clone())))),
                         },
                         Some(Err(e)) => Poll::Ready(Some(Err(e.into()))),
                         None => Poll::Ready(None),
@@ -1081,7 +1077,10 @@ mod tests {
                         .await
                         .unwrap()
                         .unwrap(),
-                    (expected_key.into_boxed_slice(), expected_value),
+                    (
+                        expected_key.into_boxed_slice(),
+                        expected_value.into_boxed_slice()
+                    ),
                     "i: {i}, j: {j}",
                 );
             }
@@ -1099,7 +1098,10 @@ mod tests {
                         .await
                         .unwrap()
                         .unwrap(),
-                    (expected_key.into_boxed_slice(), expected_value),
+                    (
+                        expected_key.into_boxed_slice(),
+                        expected_value.into_boxed_slice()
+                    ),
                     "i: {i}, j: {j}",
                 );
             }
@@ -1111,7 +1113,10 @@ mod tests {
                         .await
                         .unwrap()
                         .unwrap(),
-                    (vec![i + 1, 0].into_boxed_slice(), vec![i + 1, 0]),
+                    (
+                        vec![i + 1, 0].into_boxed_slice(),
+                        vec![i + 1, 0].into_boxed_slice()
+                    ),
                     "i: {i}",
                 );
             }
@@ -1145,7 +1150,7 @@ mod tests {
                 .unwrap()
                 .unwrap();
             assert_eq!(&*next.0, &*next.1);
-            assert_eq!(&next.1, kv);
+            assert_eq!(&*next.1, kv);
         }
 
         check_stream_is_done(stream).await;
@@ -1187,20 +1192,17 @@ mod tests {
 
         assert_eq!(
             stream.next().await.unwrap().unwrap(),
-            (branch.to_vec().into_boxed_slice(), branch.to_vec())
+            (branch.into(), branch.into())
         );
 
         assert_eq!(
             stream.next().await.unwrap().unwrap(),
-            (first_leaf.to_vec().into_boxed_slice(), first_leaf.to_vec())
+            (first_leaf.into(), first_leaf.into())
         );
 
         assert_eq!(
             stream.next().await.unwrap().unwrap(),
-            (
-                second_leaf.to_vec().into_boxed_slice(),
-                second_leaf.to_vec()
-            )
+            (second_leaf.into(), second_leaf.into())
         );
     }
 
@@ -1231,13 +1233,13 @@ mod tests {
         let first = stream.next().await.unwrap().unwrap();
 
         assert_eq!(&*first.0, &*first.1);
-        assert_eq!(first.1, first_expected);
+        assert_eq!(&*first.1, first_expected);
 
         let second_expected = key_values[2].as_slice();
         let second = stream.next().await.unwrap().unwrap();
 
         assert_eq!(&*second.0, &*second.1);
-        assert_eq!(second.1, second_expected);
+        assert_eq!(&*second.1, second_expected);
 
         check_stream_is_done(stream).await;
     }

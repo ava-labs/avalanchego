@@ -3,6 +3,7 @@
 
 use super::api::{Batch, Db, DbView, Error, HashKey, KeyType, ValueType};
 use super::propose::{Proposal, ProposalBase};
+use crate::merkle::{Key, Value};
 use crate::v2::api::{FrozenProof, FrozenRangeProof};
 use async_trait::async_trait;
 use futures::Stream;
@@ -60,7 +61,7 @@ impl DbView for HistoricalImpl {
         Ok(None)
     }
 
-    async fn val<K: KeyType>(&self, _key: K) -> Result<Option<Box<[u8]>>, Error> {
+    async fn val<K: KeyType>(&self, _key: K) -> Result<Option<Value>, Error> {
         Ok(None)
     }
 
@@ -87,7 +88,7 @@ impl DbView for HistoricalImpl {
 pub struct EmptyStreamer;
 
 impl Stream for EmptyStreamer {
-    type Item = Result<(Box<[u8]>, Vec<u8>), Error>;
+    type Item = Result<(Key, Value), Error>;
 
     fn poll_next(
         self: std::pin::Pin<&mut Self>,

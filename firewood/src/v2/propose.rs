@@ -9,7 +9,10 @@ use async_trait::async_trait;
 use futures::stream::Empty;
 
 use super::api::{KeyType, ValueType};
-use crate::v2::api::{self, FrozenProof, FrozenRangeProof};
+use crate::{
+    merkle::{Key, Value},
+    v2::api::{self, FrozenProof, FrozenRangeProof},
+};
 
 #[derive(Clone, Debug)]
 pub(crate) enum KeyOp<V: ValueType> {
@@ -68,7 +71,7 @@ impl<T: api::DbView> Clone for ProposalBase<T> {
 #[derive(Debug)]
 pub struct Proposal<T> {
     pub(crate) base: ProposalBase<T>,
-    pub(crate) delta: BTreeMap<Box<[u8]>, KeyOp<Box<[u8]>>>,
+    pub(crate) delta: BTreeMap<Key, KeyOp<Value>>,
 }
 
 // Implement Clone because T doesn't need to be Clone
@@ -111,7 +114,7 @@ impl<T> Proposal<T> {
 impl<T: api::DbView + Send + Sync> api::DbView for Proposal<T> {
     // TODO: Replace with the correct stream type for an in-memory proposal implementation
     type Stream<'a>
-        = Empty<Result<(Box<[u8]>, Vec<u8>), api::Error>>
+        = Empty<Result<(Key, Value), api::Error>>
     where
         T: 'a;
 
@@ -119,7 +122,7 @@ impl<T: api::DbView + Send + Sync> api::DbView for Proposal<T> {
         todo!();
     }
 
-    async fn val<K: KeyType>(&self, key: K) -> Result<Option<Box<[u8]>>, api::Error> {
+    async fn val<K: KeyType>(&self, key: K) -> Result<Option<Value>, api::Error> {
         // see if this key is in this proposal
         match self.delta.get(key.as_ref()) {
             Some(change) => match change {
