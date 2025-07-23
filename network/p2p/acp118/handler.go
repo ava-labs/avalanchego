@@ -41,12 +41,12 @@ type Verifier interface {
 
 // NewHandler returns an instance of Handler
 func NewHandler(verifier Verifier, signer warp.Signer, log logging.Logger) *Handler {
-	return NewCachedHandler(
-		&cache.Empty[ids.ID, []byte]{},
-		verifier,
-		signer,
-		log,
-	)
+	return &Handler{
+		signatureCache: &cache.Empty[ids.ID, []byte]{},
+		verifier:       verifier,
+		signer:         signer,
+		log:            log,
+	}
 }
 
 // NewCachedHandler returns an instance of Handler that caches successful
@@ -55,13 +55,11 @@ func NewCachedHandler(
 	cacher cache.Cacher[ids.ID, []byte],
 	verifier Verifier,
 	signer warp.Signer,
-	log logging.Logger,
 ) *Handler {
 	return &Handler{
 		signatureCache: cacher,
 		verifier:       verifier,
 		signer:         signer,
-		log:            log,
 	}
 }
 
