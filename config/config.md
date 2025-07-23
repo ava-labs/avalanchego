@@ -507,6 +507,6 @@ Configuration sources are applied in the following order (highest to lowest prec
 
 ## Additional Resources
 
-- [Full documentation](https://docs.avax.network/)
+- [Full documentation](https://docs.avax.network/quick-start)
 - [Example configurations](https://github.com/ava-labs/avalanchego/tree/master/config)
 - [Network upgrade schedules](https://docs.avax.network/learn/avalanche/avalanche-platform)
