@@ -34,13 +34,13 @@ func NewCache[K comparable, V any](size int) *Cache[K, V] {
 	}
 }
 
-// NewCacheWithCallback creates a new LRU cache with the given size and eviction callback.
+// NewCacheWithOnEvict creates a new LRU cache with the given size and eviction callback.
 // The onEvict callback is called with the key and value of an entry before eviction.
 // The onEvict callback is called while holding the cache lock.
 // Do not call any cache methods (Get, Put, Evict, Flush) from within the callback
 // as this will cause a deadlock. The callback should only be used for cleanup
 // operations like closing files or releasing resources.
-func NewCacheWithCallback[K comparable, V any](size int, onEvict func(K, V)) *Cache[K, V] {
+func NewCacheWithOnEvict[K comparable, V any](size int, onEvict func(K, V)) *Cache[K, V] {
 	return &Cache[K, V]{
 		elements: linked.NewHashmap[K, V](),
 		size:     max(size, 1),
@@ -77,7 +77,7 @@ func (c *Cache[K, V]) Get(key K) (V, bool) {
 func (c *Cache[K, _]) Evict(key K) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	if value, found := c.elements.Get(key); found {
+	if value, ok := c.elements.Get(key); ok {
 		c.onEvict(key, value)
 	}
 	c.elements.Delete(key)

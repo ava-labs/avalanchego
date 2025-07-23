@@ -90,7 +90,7 @@ func TestCacheOnEvict(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			evictedKeys := make([]int, 0)
 			evictedValues := make([]int, 0)
-			c := NewCacheWithCallback(tt.cacheSize, func(key, value int) {
+			c := NewCacheWithOnEvict(tt.cacheSize, func(key, value int) {
 				evictedKeys = append(evictedKeys, key)
 				evictedValues = append(evictedValues, value)
 			})
