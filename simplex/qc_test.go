@@ -17,17 +17,14 @@ import (
 func TestQCDuplicateSigners(t *testing.T) {
 	configs := newNetworkConfigs(t, 2)
 	quorum := simplex.Quorum(len(configs))
-
 	msg := []byte("Begin at the beginning, and go on till you come to the end: then stop")
 
-	signatures := make([]simplex.Signature, 0, quorum)
-
 	signer, verifier := NewBLSAuth(configs[0])
-
 	sig, err := signer.Sign(msg)
 	require.NoError(t, err)
 	require.NoError(t, verifier.Verify(msg, sig, configs[0].Ctx.NodeID[:]))
-
+	
+	signatures := make([]simplex.Signature, 0, quorum)
 	signatures = append(signatures, simplex.Signature{
 		Signer: configs[0].Ctx.NodeID[:],
 		Value:  sig,
