@@ -268,57 +268,58 @@ mod test {
     use crate::nodestore::alloc::{AREA_SIZES, FreeLists};
     use crate::{BranchNode, Child, LeafNode, NodeStore, Path, hash_node};
 
-    // set up a basic trie:
-    // -------------------------
-    // |     |  X  |  X  | ... |    Root node
-    // -------------------------
-    //    |
-    //    V
-    // -------------------------
-    // |  X  |     |  X  | ... |    Branch node
-    // -------------------------
-    //          |
-    //          V
-    // -------------------------
-    // |   [0,1] -> [3,4,5]    |    Leaf node
-    // -------------------------
+    #[derive(Debug)]
+    struct TestTrie {
+        nodes: Vec<(Node, LinearAddress)>,
+        high_watermark: u64,
+        root_address: LinearAddress,
+        root_hash: HashType,
+    }
+
+    /// Generate a test trie with the following structure:
+    ///
+    #[cfg_attr(doc, aquamarine)]
+    /// ```mermaid
+    /// graph TD
+    ///     Root["Root Node<br/>partial_path: [2]<br/>children: [0] -> Branch"]
+    ///     Branch["Branch Node<br/>partial_path: [3]<br/>path: 0x203<br/>children: [1] -> Leaf"]
+    ///     Leaf["Leaf Node<br/>partial_path: [4, 5]<br/>path: 0x203145<br/>value: [6, 7, 8]"]
+    ///
+    ///     Root -->|"nibble 0"| Branch
+    ///     Branch -->|"nibble 1"| Leaf
+    /// ```
     #[expect(clippy::arithmetic_side_effects)]
-    fn gen_test_trie(
-        nodestore: &mut NodeStore<Committed, MemStore>,
-    ) -> (Vec<(Node, LinearAddress)>, u64, (LinearAddress, HashType)) {
+    fn gen_test_trie(nodestore: &mut NodeStore<Committed, MemStore>) -> TestTrie {
         let mut high_watermark = NodeStoreHeader::SIZE;
         let leaf = Node::Leaf(LeafNode {
-            partial_path: Path::from([0, 1]),
-            value: Box::new([3, 4, 5]),
+            partial_path: Path::from([4, 5]),
+            value: Box::new([6, 7, 8]),
         });
         let leaf_addr = LinearAddress::new(high_watermark).unwrap();
-        let leaf_hash = hash_node(&leaf, &Path::from_nibbles_iterator([0u8, 0, 1].into_iter()));
-        let leaf_area = test_write_new_node(nodestore, &leaf, high_watermark);
-        high_watermark += leaf_area;
+        let leaf_hash = hash_node(&leaf, &Path::from([2, 0, 3, 1]));
+        high_watermark += test_write_new_node(nodestore, &leaf, high_watermark);
 
         let mut branch_children = BranchNode::empty_children();
         branch_children[1] = Some(Child::AddressWithHash(leaf_addr, leaf_hash));
         let branch = Node::Branch(Box::new(BranchNode {
-            partial_path: Path::from([0]),
+            partial_path: Path::from([3]),
             value: None,
             children: branch_children,
         }));
         let branch_addr = LinearAddress::new(high_watermark).unwrap();
-        let branch_hash = hash_node(&branch, &Path::from_nibbles_iterator([0u8].into_iter()));
-        let branch_area = test_write_new_node(nodestore, &branch, high_watermark);
-        high_watermark += branch_area;
+        let branch_hash = hash_node(&branch, &Path::from([2, 0]));
+        high_watermark += test_write_new_node(nodestore, &branch, high_watermark);
 
         let mut root_children = BranchNode::empty_children();
         root_children[0] = Some(Child::AddressWithHash(branch_addr, branch_hash));
         let root = Node::Branch(Box::new(BranchNode {
-            partial_path: Path::from([]),
+            partial_path: Path::from([2]),
             value: None,
             children: root_children,
         }));
         let root_addr = LinearAddress::new(high_watermark).unwrap();
         let root_hash = hash_node(&root, &Path::new());
-        let root_area = test_write_new_node(nodestore, &root, high_watermark);
-        high_watermark += root_area;
+        high_watermark += test_write_new_node(nodestore, &root, high_watermark);
 
         // write the header
         test_write_header(
@@ -328,11 +329,12 @@ mod test {
             FreeLists::default(),
         );
 
-        (
-            vec![(leaf, leaf_addr), (branch, branch_addr), (root, root_addr)],
+        TestTrie {
+            nodes: vec![(leaf, leaf_addr), (branch, branch_addr), (root, root_addr)],
             high_watermark,
-            (root_addr, root_hash),
-        )
+            root_address: root_addr,
+            root_hash,
+        }
     }
 
     use std::collections::HashMap;
@@ -344,17 +346,23 @@ mod test {
     )]
     // This test creates a simple trie and checks that the checker traverses it correctly.
     // We use primitive calls here to do a low-level check.
-    // TODO: add a high-level test in the firewood crate
     fn checker_traverse_correct_trie() {
         let memstore = MemStore::new(vec![]);
         let mut nodestore = NodeStore::new_empty_committed(memstore.into()).unwrap();
 
-        let (_, high_watermark, (root_addr, root_hash)) = gen_test_trie(&mut nodestore);
+        let test_trie = gen_test_trie(&mut nodestore);
+        // let (_, high_watermark, (root_addr, root_hash)) = gen_test_trie(&mut nodestore);
 
         // verify that all of the space is accounted for - since there is no free area
-        let mut visited = LinearAddressRangeSet::new(high_watermark).unwrap();
+        let mut visited = LinearAddressRangeSet::new(test_trie.high_watermark).unwrap();
         nodestore
-            .visit_trie(root_addr, root_hash, Path::new(), &mut visited, true)
+            .visit_trie(
+                test_trie.root_address,
+                test_trie.root_hash,
+                Path::new(),
+                &mut visited,
+                true,
+            )
             .unwrap();
         let complement = visited.complement();
         assert_eq!(complement.into_iter().collect::<Vec<_>>(), vec![]);
@@ -370,41 +378,52 @@ mod test {
         let memstore = MemStore::new(vec![]);
         let mut nodestore = NodeStore::new_empty_committed(memstore.into()).unwrap();
 
-        let (mut nodes, high_watermark, (root_addr, root_hash)) = gen_test_trie(&mut nodestore);
+        let mut test_trie = gen_test_trie(&mut nodestore);
 
-        // replace the branch hash in the root node with a wrong hash
-        let [_, (branch_node, branch_addr), (root_node, _)] = nodes.as_mut_slice() else {
-            panic!("test trie content changed, the test should be updated");
-        };
-        let wrong_hash = HashType::default();
-        let branch_path = Path::from([0]) + branch_node.as_branch().unwrap().partial_path.clone();
-        let Some(Child::AddressWithHash(_, hash)) = root_node.as_branch_mut().unwrap().children
-            [branch_path[0] as usize]
-            .replace(Child::AddressWithHash(*branch_addr, wrong_hash.clone()))
-        else {
-            panic!("test trie content changed, the test should be updated");
-        };
-        let branch_hash = hash;
+        // find the root node and replace the branch hash with an incorrect (default) hash
+        let (root_node, root_addr) = test_trie
+            .nodes
+            .iter_mut()
+            .find(|(node, _)| matches!(node, Node::Branch(b) if *b.partial_path.0 == [2]))
+            .unwrap();
+
+        let root_branch = root_node.as_branch_mut().unwrap();
+
+        // Get the branch address and original hash from the root's first child
+        let (branch_addr, computed_hash) = root_branch.children[0]
+            .as_ref()
+            .unwrap()
+            .persist_info()
+            .unwrap();
+        let computed_hash = computed_hash.clone();
+        root_branch.children[0] = Some(Child::AddressWithHash(branch_addr, HashType::default()));
+
+        // Replace the branch hash in the root node with a wrong hash
+        if let Node::Branch(root_branch) = root_node {
+            root_branch.children[0] =
+                Some(Child::AddressWithHash(branch_addr, HashType::default()));
+        }
         test_write_new_node(&nodestore, root_node, root_addr.get());
 
-        // verify that all of the space is accounted for - since there is no free area
-        let mut visited = LinearAddressRangeSet::new(high_watermark).unwrap();
+        // run the checker and verify that it returns the HashMismatch error
+        let mut visited = LinearAddressRangeSet::new(test_trie.high_watermark).unwrap();
         let err = nodestore
-            .visit_trie(root_addr, root_hash, Path::new(), &mut visited, true)
+            .visit_trie(
+                test_trie.root_address,
+                test_trie.root_hash,
+                Path::new(),
+                &mut visited,
+                true,
+            )
             .unwrap_err();
-        assert!(matches!(
-        err,
-        CheckerError::HashMismatch {
-            address,
-            path,
-            parent_stored_hash,
-            computed_hash
-        }
-        if address == *branch_addr
-            && path == branch_path
-            && parent_stored_hash == wrong_hash
-            && computed_hash == branch_hash
-        ));
+
+        let expected_error = CheckerError::HashMismatch {
+            address: branch_addr,
+            path: Path::from([2, 0, 3]),
+            parent_stored_hash: HashType::default(),
+            computed_hash,
+        };
+        assert_eq!(err, expected_error);
     }
 
     #[test]
