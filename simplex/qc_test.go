@@ -12,52 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
 
-// TestQCAggregateAndSign tests the aggregation of multiple signatures
-// and then verifies the generated quorum certificate on that message.
-func TestQCAggregateAndSign(t *testing.T) {
-	configs := newNetworkConfigs(t, 2)
-	quorum := simplex.Quorum(len(configs))
-
-	msg := []byte("Begin at the beginning, and go on till you come to the end: then stop")
-
-	signatures := make([]simplex.Signature, 0, quorum)
-	nodes := make([]simplex.NodeID, 0, quorum)
-	var signer BLSSigner
-	var verifier BLSVerifier
-
-	for _, config := range configs {
-		signer, verifier = NewBLSAuth(config)
-
-		sig, err := signer.Sign(msg)
-		require.NoError(t, err)
-		require.NoError(t, verifier.Verify(msg, sig, config.Ctx.NodeID[:]))
-
-		signatures = append(signatures, simplex.Signature{
-			Signer: config.Ctx.NodeID[:],
-			Value:  sig,
-		})
-		nodes = append(nodes, config.Ctx.NodeID[:])
-	}
-
-	// aggregate the signatures into a quorum certificate
-	signatureAggregator := SignatureAggregator{verifier: &verifier}
-	qc, err := signatureAggregator.Aggregate(signatures)
-
-	require.NoError(t, err)
-	require.Equal(t, nodes, qc.Signers())
-	// verify the quorum certificate
-	require.NoError(t, qc.Verify(msg))
-
-	d := QCDeserializer{verifier: &verifier}
-	// try to deserialize the quorum certificate
-	deserializedQC, err := d.DeserializeQuorumCertificate(qc.Bytes())
-	require.NoError(t, err)
-
-	require.Equal(t, qc.Signers(), deserializedQC.Signers())
-	require.Equal(t, qc.Bytes(), deserializedQC.Bytes())
-	require.NoError(t, deserializedQC.Verify(msg))
-}
-
 // TestQCDuplicateSigners tests verification fails if the
 // same signer signs multiple times.
 func TestQCDuplicateSigners(t *testing.T) {
@@ -177,68 +131,79 @@ func TestQCDeserializerInvalidBytes(t *testing.T) {
 	}
 }
 
-func TestSignatureAggregatorInsufficientSignatures(t *testing.T) {
-	config := newEngineConfig(t, 3)
-
-	signer, verifier := NewBLSAuth(config)
-	msg := []byte("test message")
-	sig, err := signer.Sign(msg)
-	require.NoError(t, err)
-
-	// try to aggregate with only 1 signature when quorum is 2
-	signatureAggregator := SignatureAggregator{verifier: &verifier}
-	_, err = signatureAggregator.Aggregate(
-		[]simplex.Signature{
-			{Signer: config.Ctx.NodeID[:], Value: sig},
-		},
-	)
-	require.ErrorIs(t, err, errUnexpectedSigners)
-}
-
-func TestSignatureAggregatorInvalidSignatureBytes(t *testing.T) {
-	config := newEngineConfig(t, 2)
-
-	signer, verifier := NewBLSAuth(config)
-	msg := []byte("test message")
-	sig, err := signer.Sign(msg)
-	require.NoError(t, err)
-
-	signatureAggregator := SignatureAggregator{verifier: &verifier}
-	_, err = signatureAggregator.Aggregate(
-		[]simplex.Signature{
-			{Signer: config.Ctx.NodeID[:], Value: sig},
-			{Signer: config.Ctx.NodeID[:], Value: []byte("invalid signature")},
-		},
-	)
-	require.ErrorIs(t, err, errFailedToParseSignature)
-}
-
-func TestSignatureAggregatorExcessSignatures(t *testing.T) {
+func TestSignatureAggregation(t *testing.T) {
 	configs := newNetworkConfigs(t, 4)
-
 	msg := []byte("test message")
 
-	var nodeSigner BLSSigner
-	var verifier BLSVerifier
-
-	// Create signatures from all 4 nodes
-	signatures := make([]simplex.Signature, 4)
-	for i, config := range configs {
-		nodeSigner, verifier = NewBLSAuth(config)
-		sig, err := nodeSigner.Sign(msg)
-		require.NoError(t, err)
-
-		signatures[i] = simplex.Signature{Signer: config.Ctx.NodeID[:], Value: sig}
+	tests := []struct {
+		name        string
+		signers     []simplex.Signature
+		expectError error
+	}{
+		{
+			name: "invalid signature bytes",
+			signers: []simplex.Signature{
+				{Signer: configs[0].Ctx.NodeID[:], Value: []byte("invalid signature")},
+				{Signer: configs[1].Ctx.NodeID[:], Value: []byte("another invalid signature")},
+				{Signer: configs[2].Ctx.NodeID[:], Value: []byte("another invalid signature")},
+			},
+			expectError: errFailedToParseSignature,
+		},
+		{
+			name: "excess signatures",
+			signers: func() []simplex.Signature {
+				sigs := make([]simplex.Signature, 0, 4)
+				for _, config := range configs {
+					signer, _ := NewBLSAuth(config)
+					sig, err := signer.Sign(msg)
+					require.NoError(t, err)
+					sigs = append(sigs, simplex.Signature{Signer: config.Ctx.NodeID[:], Value: sig})
+				}
+				return sigs
+			}(),
+			expectError: nil, // should succeed, but only use the first 3 signatures
+		},
+		{
+			name: "insufficient signatures",
+			signers: func() []simplex.Signature {
+				sigs := make([]simplex.Signature, 0, 4)
+				for i, config := range configs {
+					signer, _ := NewBLSAuth(config)
+					if i < 2 {
+						sig, err := signer.Sign(msg)
+						require.NoError(t, err)
+						sigs = append(sigs, simplex.Signature{Signer: config.Ctx.NodeID[:], Value: sig})
+					}
+				}
+				return sigs
+			}(),
+			expectError: errUnexpectedSigners,
+		},
 	}
 
-	// Aggregate should only use the first 3 signatures
-	signatureAggregator := SignatureAggregator{verifier: &verifier}
-	qc, err := signatureAggregator.Aggregate(signatures)
-	require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, verifier := NewBLSAuth(configs[0])
+			signatureAggregator := SignatureAggregator{verifier: &verifier}
+			qc, err := signatureAggregator.Aggregate(tt.signers)
+			require.ErrorIs(t, err, tt.expectError)
 
-	// Should only have 3 signers, not 4
-	require.Len(t, qc.Signers(), simplex.Quorum(len(configs)))
-	require.NoError(t, qc.Verify(msg))
+			// verify the quorum certificate
+			if tt.expectError == nil {
+				require.Len(t, qc.Signers(), simplex.Quorum(len(configs)))
+				require.NoError(t, qc.Verify(msg))
+
+				d := QCDeserializer{verifier: &verifier}
+				// try to deserialize the quorum certificate
+				deserializedQC, err := d.DeserializeQuorumCertificate(qc.Bytes())
+				require.NoError(t, err)
+
+				require.Equal(t, qc.Signers(), deserializedQC.Signers())
+				require.Equal(t, qc.Bytes(), deserializedQC.Bytes())
+				require.NoError(t, deserializedQC.Verify(msg))
+			}
+		})
+	}
 }
 
 func TestQCVerifyWithWrongMessage(t *testing.T) {
