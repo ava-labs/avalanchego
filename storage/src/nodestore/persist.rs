@@ -27,9 +27,7 @@
 //! - Memory-efficient serialization with pre-allocated buffers
 //! - Ring buffer management for io-uring operations
 
-#[cfg(test)]
 use std::iter::FusedIterator;
-use std::sync::Arc;
 
 use crate::linear::FileIoError;
 use coarsetime::Instant;
@@ -38,16 +36,20 @@ use metrics::counter;
 #[cfg(feature = "io-uring")]
 use crate::logger::trace;
 
-use crate::{FileBacked, WritableStorage};
+use crate::{FileBacked, MaybePersistedNode, NodeReader, WritableStorage};
 
 #[cfg(test)]
-use crate::{MaybePersistedNode, NodeReader, RootReader};
+use crate::RootReader;
 
 #[cfg(feature = "io-uring")]
 use crate::ReadableStorage;
 
+use super::alloc::NodeAllocator;
 use super::header::NodeStoreHeader;
-use super::{ImmutableProposal, NodeStore};
+use super::{Committed, NodeStore};
+
+#[cfg(not(test))]
+use super::RootReader;
 
 impl<T, S: WritableStorage> NodeStore<T, S> {
     /// Persist the header from this proposal to storage.
@@ -82,17 +84,14 @@ impl<T, S: WritableStorage> NodeStore<T, S> {
 /// This iterator assumes the root node is unpersisted and will return it as the
 /// last item. It looks at each node and traverses the children in depth first order.
 /// A stack of child iterators is maintained to properly handle nested branches.
-#[cfg(test)]
 struct UnPersistedNodeIterator<'a, N> {
     store: &'a N,
     stack: Vec<MaybePersistedNode>,
     child_iter_stack: Vec<Box<dyn Iterator<Item = MaybePersistedNode> + 'a>>,
 }
 
-#[cfg(test)]
 impl<N: NodeReader + RootReader> FusedIterator for UnPersistedNodeIterator<'_, N> {}
 
-#[cfg(test)]
 impl<'a, N: NodeReader + RootReader> UnPersistedNodeIterator<'a, N> {
     /// Creates a new iterator over unpersisted nodes in depth-first order.
     fn new(store: &'a N) -> Self {
@@ -140,7 +139,6 @@ impl<'a, N: NodeReader + RootReader> UnPersistedNodeIterator<'a, N> {
     }
 }
 
-#[cfg(test)]
 impl<N: NodeReader + RootReader> Iterator for UnPersistedNodeIterator<'_, N> {
     type Item = MaybePersistedNode;
 
@@ -186,7 +184,7 @@ impl<N: NodeReader + RootReader> Iterator for UnPersistedNodeIterator<'_, N> {
     }
 }
 
-impl NodeStore<Arc<ImmutableProposal>, FileBacked> {
+impl NodeStore<Committed, FileBacked> {
     /// Persist the freelist from this proposal to storage.
     ///
     /// # Errors
@@ -208,20 +206,71 @@ impl NodeStore<Arc<ImmutableProposal>, FileBacked> {
     /// Returns a [`FileIoError`] if any node cannot be written to storage.
     #[fastrace::trace(short_name = true)]
     #[cfg(not(feature = "io-uring"))]
-    pub fn flush_nodes(&self) -> Result<(), FileIoError> {
+    pub fn flush_nodes(&mut self) -> Result<NodeStoreHeader, FileIoError> {
         let flush_start = Instant::now();
 
-        for (addr, (area_size_index, node)) in &self.kind.new {
-            let mut stored_area_bytes = Vec::new();
-            node.as_bytes(*area_size_index, &mut stored_area_bytes);
+        // keep arcs to the allocated nodes to add them to cache
+        let mut cached_nodes = Vec::new();
+
+        // find all the unpersisted nodes
+        let unpersisted_iter = UnPersistedNodeIterator::new(self);
+
+        let mut header = self.header;
+        let mut allocator = NodeAllocator::new(self.storage.as_ref(), &mut header);
+        for node in unpersisted_iter {
+            let shared_node = node.as_shared_node(self).expect("in memory, so no IO");
+            let mut serialized = Vec::new();
+            shared_node.as_bytes(0, &mut serialized);
+
+            let (persisted_address, area_size_index) =
+                allocator.allocate_node(serialized.as_slice())?;
+            *serialized.get_mut(0).expect("byte was reserved") = area_size_index;
             self.storage
-                .write(addr.get(), stored_area_bytes.as_slice())?;
+                .write(persisted_address.get(), serialized.as_slice())?;
+            node.persist_at(persisted_address);
+
+            // Move the arc to a vector of persisted nodes for caching
+            // we save them so we don't have to lock the cache while we write them
+            // If we ever persist out of band, we might have a race condition, so
+            // consider adding each node to the cache as we persist them
+            cached_nodes.push((persisted_address, shared_node));
         }
 
-        self.storage
-            .write_cached_nodes(self.kind.new.iter().map(|(&addr, (_, node))| (addr, node)))?;
+        self.storage.write_cached_nodes(cached_nodes)?;
+
         let flush_time = flush_start.elapsed().as_millis();
         counter!("firewood.flush_nodes").increment(flush_time);
+
+        Ok(header)
+    }
+}
+
+impl NodeStore<Committed, FileBacked> {
+    /// Persist the entire nodestore to storage.
+    ///
+    /// This method performs a complete persistence operation by:
+    /// 1. Flushing all nodes to storage
+    /// 2. Setting the root address in the header  
+    /// 3. Flushing the header to storage
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`FileIoError`] if any of the persistence operations fail.
+    #[fastrace::trace(short_name = true)]
+    pub fn persist(&mut self) -> Result<(), FileIoError> {
+        // First persist all the nodes
+        self.header = self.flush_nodes()?;
+
+        // Set the root address in the header based on the persisted root
+        let root_address = self
+            .kind
+            .root
+            .as_ref()
+            .and_then(crate::MaybePersistedNode::as_linear_address);
+        self.header.set_root_address(root_address);
+
+        // Finally persist the header
+        self.flush_header()?;
 
         Ok(())
     }
@@ -233,7 +282,7 @@ impl NodeStore<Arc<ImmutableProposal>, FileBacked> {
     /// Returns a [`FileIoError`] if any node cannot be written to storage.
     #[fastrace::trace(short_name = true)]
     #[cfg(feature = "io-uring")]
-    pub fn flush_nodes(&self) -> Result<(), FileIoError> {
+    pub fn flush_nodes(&mut self) -> Result<NodeStoreHeader, FileIoError> {
         use std::pin::Pin;
 
         #[derive(Clone, Debug)]
@@ -281,6 +330,18 @@ impl NodeStore<Arc<ImmutableProposal>, FileBacked> {
 
         let flush_start = Instant::now();
 
+        let mut header = self.header;
+        let mut node_allocator = NodeAllocator::new(self.storage.as_ref(), &mut header);
+
+        // Collect all unpersisted nodes first to avoid mutating self while iterating
+        let unpersisted_nodes: Vec<MaybePersistedNode> = {
+            let unpersisted_iter = UnPersistedNodeIterator::new(self);
+            unpersisted_iter.collect()
+        };
+
+        // Collect addresses and nodes for caching
+        let mut cached_nodes = Vec::new();
+
         let mut ring = self.storage.ring.lock().expect("poisoned lock");
         let mut saved_pinned_buffers = vec![
             PinnedBufferEntry {
@@ -290,9 +351,14 @@ impl NodeStore<Arc<ImmutableProposal>, FileBacked> {
             RINGSIZE
         ];
 
-        for (&addr, &(area_size_index, ref node)) in &self.kind.new {
+        // Process each unpersisted node
+        for node in unpersisted_nodes {
+            let shared_node = node.as_shared_node(self).expect("in memory, so no IO");
             let mut serialized = Vec::with_capacity(100); // TODO: better size? we can guess branches are larger
-            node.as_bytes(area_size_index, &mut serialized);
+            shared_node.as_bytes(0, &mut serialized);
+            let (persisted_address, area_size_index) =
+                node_allocator.allocate_node(serialized.as_slice())?;
+            *serialized.get_mut(0).expect("byte was reserved") = area_size_index;
             let mut serialized = serialized.into_boxed_slice();
 
             loop {
@@ -303,12 +369,12 @@ impl NodeStore<Arc<ImmutableProposal>, FileBacked> {
                     .find(|(_, pbe)| pbe.offset.is_none())
                 {
                     pbe.pinned_buffer = std::pin::Pin::new(std::mem::take(&mut serialized));
-                    pbe.offset = Some(addr.get());
+                    pbe.offset = Some(persisted_address.get());
 
                     let submission_queue_entry = self
                         .storage
                         .make_op(&pbe.pinned_buffer)
-                        .offset(addr.get())
+                        .offset(persisted_address.get())
                         .build()
                         .user_data(pos as u64);
 
@@ -320,7 +386,7 @@ impl NodeStore<Arc<ImmutableProposal>, FileBacked> {
                         ring.submitter().squeue_wait().map_err(|e| {
                             self.storage.file_io_error(
                                 e,
-                                addr.get(),
+                                persisted_address.get(),
                                 Some("io-uring squeue_wait".to_string()),
                             )
                         })?;
@@ -344,6 +410,10 @@ impl NodeStore<Arc<ImmutableProposal>, FileBacked> {
                     &mut saved_pinned_buffers,
                 )?;
             }
+
+            // Mark node as persisted and collect for cache
+            node.persist_at(persisted_address);
+            cached_nodes.push((persisted_address, shared_node));
         }
         let pending = saved_pinned_buffers
             .iter()
@@ -362,14 +432,13 @@ impl NodeStore<Arc<ImmutableProposal>, FileBacked> {
             saved_pinned_buffers.iter().find(|pbe| pbe.offset.is_some())
         );
 
-        self.storage
-            .write_cached_nodes(self.kind.new.iter().map(|(&addr, (_, node))| (addr, node)))?;
+        self.storage.write_cached_nodes(cached_nodes)?;
         debug_assert!(ring.completion().is_empty());
 
         let flush_time = flush_start.elapsed().as_millis();
         counter!("firewood.flush_nodes").increment(flush_time);
 
-        Ok(())
+        Ok(header)
     }
 }
 

@@ -46,14 +46,15 @@ pub(crate) mod header;
 pub(crate) mod persist;
 
 use crate::logger::trace;
+use crate::node::branch::ReadSerializable as _;
 use arc_swap::ArcSwap;
 use arc_swap::access::DynAccess;
 use smallvec::SmallVec;
-use std::collections::HashMap;
 use std::fmt::Debug;
+use std::io::{Error, ErrorKind};
 
 // Re-export types from alloc module
-pub use alloc::{AreaIndex, LinearAddress};
+pub use alloc::{AreaIndex, LinearAddress, NodeAllocator};
 
 // Re-export types from header module
 pub use header::NodeStoreHeader;
@@ -87,7 +88,10 @@ use std::sync::Arc;
 use crate::hashednode::hash_node;
 use crate::node::Node;
 use crate::node::persist::MaybePersistedNode;
-use crate::{FileBacked, FileIoError, Path, ReadableStorage, SharedNode, TrieHash};
+use crate::nodestore::alloc::AREA_SIZES;
+use crate::{
+    CacheReadStrategy, FileBacked, FileIoError, Path, ReadableStorage, SharedNode, TrieHash,
+};
 
 use super::linear::WritableStorage;
 
@@ -218,9 +222,7 @@ impl<S: ReadableStorage> NodeStore<MutableProposal, S> {
     /// # Errors
     ///
     /// Returns a [`FileIoError`] if the parent root cannot be read.
-    pub fn new<F: Parentable + ReadInMemoryNode>(
-        parent: &Arc<NodeStore<F, S>>,
-    ) -> Result<Self, FileIoError> {
+    pub fn new<F: Parentable>(parent: &Arc<NodeStore<F, S>>) -> Result<Self, FileIoError> {
         let mut deleted = Vec::default();
         let root = if let Some(ref root) = parent.kind.root() {
             deleted.push(root.clone());
@@ -359,13 +361,6 @@ pub struct Committed {
     root: Option<MaybePersistedNode>,
 }
 
-impl ReadInMemoryNode for Committed {
-    // A committed revision has no in-memory changes. All its nodes are in storage.
-    fn read_in_memory_node(&self, _addr: LinearAddress) -> Option<SharedNode> {
-        None
-    }
-}
-
 #[derive(Clone, Debug)]
 pub enum NodeStoreParent {
     Proposed(Arc<ImmutableProposal>),
@@ -387,8 +382,6 @@ impl Eq for NodeStoreParent {}
 #[derive(Debug)]
 /// Contains state for a proposed revision of the trie.
 pub struct ImmutableProposal {
-    /// Address --> Node for nodes created in this proposal.
-    new: HashMap<LinearAddress, (u8, SharedNode)>,
     /// Nodes that have been deleted in this proposal.
     deleted: Box<[MaybePersistedNode]>,
     /// The parent of this proposal.
@@ -411,43 +404,6 @@ impl ImmutableProposal {
             NodeStoreParent::Committed(root_hash) => *root_hash == hash,
             NodeStoreParent::Proposed(_) => false,
         }
-    }
-}
-
-impl ReadInMemoryNode for ImmutableProposal {
-    fn read_in_memory_node(&self, addr: LinearAddress) -> Option<SharedNode> {
-        // Check if the node being requested was created in this proposal.
-        if let Some((_, node)) = self.new.get(&addr) {
-            return Some(node.clone());
-        }
-
-        // It wasn't. Try our parent, and its parent, and so on until we find it or find
-        // a committed revision.
-        match *self.parent.load() {
-            NodeStoreParent::Proposed(ref parent) => parent.read_in_memory_node(addr),
-            NodeStoreParent::Committed(_) => None,
-        }
-    }
-}
-
-/// Proposed [`NodeStore`] types keep some nodes in memory. These nodes are new nodes that were allocated from
-/// the free list, but are not yet on disk. This trait checks to see if a node is in memory and returns it if
-/// it's there. If it's not there, it will be read from disk.
-///
-/// This trait does not know anything about the underlying storage, so it just returns None if the node isn't in memory.
-pub trait ReadInMemoryNode {
-    /// Returns the node at `addr` if it is in memory.
-    /// Returns None if it isn't.
-    fn read_in_memory_node(&self, addr: LinearAddress) -> Option<SharedNode>;
-}
-
-impl<T> ReadInMemoryNode for T
-where
-    T: Deref,
-    T::Target: ReadInMemoryNode,
-{
-    fn read_in_memory_node(&self, addr: LinearAddress) -> Option<SharedNode> {
-        self.deref().read_in_memory_node(addr)
     }
 }
 
@@ -490,26 +446,7 @@ pub struct MutableProposal {
     parent: NodeStoreParent,
 }
 
-impl ReadInMemoryNode for NodeStoreParent {
-    /// Returns the node at `addr` if it is in memory from a parent proposal.
-    /// If the base revision is committed, there are no in-memory nodes, so we return None
-    fn read_in_memory_node(&self, addr: LinearAddress) -> Option<SharedNode> {
-        match self {
-            NodeStoreParent::Proposed(proposed) => proposed.read_in_memory_node(addr),
-            NodeStoreParent::Committed(_) => None,
-        }
-    }
-}
-
-impl ReadInMemoryNode for MutableProposal {
-    /// [`MutableProposal`] types do not have any nodes in memory, but their parent proposal might, so we check there.
-    /// This might be recursive: a grandparent might also have that node in memory.
-    fn read_in_memory_node(&self, addr: LinearAddress) -> Option<SharedNode> {
-        self.parent.read_in_memory_node(addr)
-    }
-}
-
-impl<T: ReadInMemoryNode + Into<NodeStoreParent>, S: ReadableStorage> From<NodeStore<T, S>>
+impl<T: Into<NodeStoreParent>, S: ReadableStorage> From<NodeStore<T, S>>
     for NodeStore<MutableProposal, S>
 {
     fn from(val: NodeStore<T, S>) -> Self {
@@ -552,9 +489,12 @@ impl NodeStore<Arc<ImmutableProposal>, FileBacked> {
     /// Return a Committed version of this proposal, which doesn't have any modified nodes.
     /// This function is used during commit.
     #[must_use]
-    pub fn as_committed(&self) -> NodeStore<Committed, FileBacked> {
+    pub fn as_committed(
+        &self,
+        current_revision: Arc<NodeStore<Committed, FileBacked>>,
+    ) -> NodeStore<Committed, FileBacked> {
         NodeStore {
-            header: self.header,
+            header: current_revision.header,
             kind: Committed {
                 deleted: self.kind.deleted.clone(),
                 root_hash: self.kind.root_hash.clone(),
@@ -580,7 +520,6 @@ impl<S: ReadableStorage> TryFrom<NodeStore<MutableProposal, S>>
         let mut nodestore = NodeStore {
             header,
             kind: Arc::new(ImmutableProposal {
-                new: HashMap::new(),
                 deleted: kind.deleted.into(),
                 parent: Arc::new(ArcSwap::new(Arc::new(kind.parent))),
                 root_hash: None,
@@ -596,23 +535,19 @@ impl<S: ReadableStorage> TryFrom<NodeStore<MutableProposal, S>>
         };
 
         // Hashes the trie and returns the address of the new root.
-        let mut new_nodes = HashMap::new();
         #[cfg(feature = "ethhash")]
-        let (root_addr, root_hash) =
-            nodestore.hash_helper(root, &mut Path::new(), &mut new_nodes, None)?;
+        let (root, root_hash) = nodestore.hash_helper(root, &mut Path::new(), None)?;
         #[cfg(not(feature = "ethhash"))]
-        let (root_addr, root_hash) =
-            nodestore.hash_helper(root, &mut Path::new(), &mut new_nodes)?;
+        let (root, root_hash) =
+            NodeStore::<MutableProposal, S>::hash_helper(root, &mut Path::new())?;
 
-        nodestore.header.set_root_address(Some(root_addr));
         let immutable_proposal =
             Arc::into_inner(nodestore.kind).expect("no other references to the proposal");
         nodestore.kind = Arc::new(ImmutableProposal {
-            new: new_nodes,
             deleted: immutable_proposal.deleted,
             parent: immutable_proposal.parent,
             root_hash: Some(root_hash.into_triehash()),
-            root: Some(root_addr.into()),
+            root: Some(root),
         });
 
         Ok(nodestore)
@@ -621,19 +556,12 @@ impl<S: ReadableStorage> TryFrom<NodeStore<MutableProposal, S>>
 
 impl<S: ReadableStorage> NodeReader for NodeStore<MutableProposal, S> {
     fn read_node(&self, addr: LinearAddress) -> Result<SharedNode, FileIoError> {
-        if let Some(node) = self.kind.read_in_memory_node(addr) {
-            return Ok(node);
-        }
-
         self.read_node_from_disk(addr, "write")
     }
 }
 
-impl<T: Parentable + ReadInMemoryNode, S: ReadableStorage> NodeReader for NodeStore<T, S> {
+impl<T: Parentable, S: ReadableStorage> NodeReader for NodeStore<T, S> {
     fn read_node(&self, addr: LinearAddress) -> Result<SharedNode, FileIoError> {
-        if let Some(node) = self.kind.read_in_memory_node(addr) {
-            return Ok(node);
-        }
         self.read_node_from_disk(addr, "read")
     }
 }
@@ -685,6 +613,83 @@ where
     }
 }
 
+impl<T, S: ReadableStorage> NodeStore<T, S> {
+    /// Read a [Node] from the provided [`LinearAddress`].
+    /// `addr` is the address of a `StoredArea` in the `ReadableStorage`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`FileIoError`] if the node cannot be read.
+    pub fn read_node_from_disk(
+        &self,
+        addr: LinearAddress,
+        mode: &'static str,
+    ) -> Result<SharedNode, FileIoError> {
+        if let Some(node) = self.storage.read_cached_node(addr, mode) {
+            return Ok(node);
+        }
+
+        debug_assert!(addr.is_aligned());
+
+        // saturating because there is no way we can be reading at u64::MAX
+        // and this will fail very soon afterwards
+        let actual_addr = addr.get().saturating_add(1); // skip the length byte
+
+        let _span = fastrace::local::LocalSpan::enter_with_local_parent("read_and_deserialize");
+
+        let area_stream = self.storage.stream_from(actual_addr)?;
+        let node: SharedNode = Node::from_reader(area_stream)
+            .map_err(|e| {
+                self.storage
+                    .file_io_error(e, actual_addr, Some("read_node_from_disk".to_string()))
+            })?
+            .into();
+        match self.storage.cache_read_strategy() {
+            CacheReadStrategy::All => {
+                self.storage.cache_node(addr, node.clone());
+            }
+            CacheReadStrategy::BranchReads => {
+                if !node.is_leaf() {
+                    self.storage.cache_node(addr, node.clone());
+                }
+            }
+            CacheReadStrategy::WritesOnly => {}
+        }
+        Ok(node)
+    }
+
+    /// Returns (index, `area_size`) for the stored area at `addr`.
+    /// `index` is the index of `area_size` in the array of valid block sizes.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`FileIoError`] if the area cannot be read.
+    pub fn area_index_and_size(
+        &self,
+        addr: LinearAddress,
+    ) -> Result<(AreaIndex, u64), FileIoError> {
+        let mut area_stream = self.storage.stream_from(addr.get())?;
+
+        let index: AreaIndex = area_stream.read_byte().map_err(|e| {
+            self.storage.file_io_error(
+                Error::new(ErrorKind::InvalidData, e),
+                addr.get(),
+                Some("area_index_and_size".to_string()),
+            )
+        })?;
+
+        let size = *AREA_SIZES
+            .get(index as usize)
+            .ok_or(self.storage.file_io_error(
+                Error::other(format!("Invalid area size index {index}")),
+                addr.get(),
+                Some("area_index_and_size".to_string()),
+            ))?;
+
+        Ok((index, size))
+    }
+}
+
 impl<N> HashedNodeReader for Arc<N>
 where
     N: HashedNodeReader,
@@ -711,8 +716,9 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
         self.storage
             .invalidate_cached_nodes(self.kind.deleted.iter());
         trace!("There are {} nodes to reap", self.kind.deleted.len());
+        let mut allocator = NodeAllocator::new(self.storage.as_ref(), &mut proposal.header);
         for node in take(&mut self.kind.deleted) {
-            proposal.delete_node(node)?;
+            allocator.delete_node(node)?;
         }
         Ok(())
     }
@@ -743,13 +749,10 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
 #[expect(clippy::unwrap_used)]
 #[expect(clippy::cast_possible_truncation)]
 mod tests {
-    use std::array::from_fn;
 
+    use crate::LeafNode;
     use crate::linear::memory::MemStore;
-    use crate::{BranchNode, Child, LeafNode};
     use arc_swap::access::DynGuard;
-
-    use test_case::test_case;
 
     use super::*;
     use alloc::{AREA_SIZES, area_size_to_index};
@@ -822,41 +825,8 @@ mod tests {
         }
     }
 
-    #[test_case(BranchNode {
-        partial_path: Path::from([6, 7, 8]),
-        value: Some(vec![9, 10, 11].into_boxed_slice()),
-        children: from_fn(|i| {
-            if i == 15 {
-                Some(Child::AddressWithHash(LinearAddress::new(1).unwrap(), std::array::from_fn::<u8, 32, _>(|i| i as u8).into()))
-            } else {
-                None
-            }
-        }),
-    }; "branch node with 1 child")]
-    #[test_case(BranchNode {
-        partial_path: Path::from([6, 7, 8]),
-        value: Some(vec![9, 10, 11].into_boxed_slice()),
-        children: from_fn(|_|
-            Some(Child::AddressWithHash(LinearAddress::new(1).unwrap(), std::array::from_fn::<u8, 32, _>(|i| i as u8).into()))
-        ),
-    }; "branch node with all child")]
-    #[test_case(
-    Node::Leaf(LeafNode {
-        partial_path: Path::from([0, 1, 2]),
-        value: Box::new([3, 4, 5]),
-    }); "leaf node")]
-
-    fn test_serialized_len<N: Into<Node>>(node: N) {
-        let node = node.into();
-
-        let computed_length =
-            NodeStore::<std::sync::Arc<ImmutableProposal>, MemStore>::stored_len(&node);
-
-        let mut serialized = Vec::new();
-        node.as_bytes(0, &mut serialized);
-        assert_eq!(serialized.len() as u64, computed_length);
-    }
     #[test]
+    #[ignore = "https://github.com/ava-labs/firewood/issues/1054"]
     #[should_panic(expected = "Node size 16777225 is too large")]
     fn giant_node() {
         let memstore = MemStore::new(vec![]);

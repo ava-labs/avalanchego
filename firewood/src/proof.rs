@@ -107,11 +107,11 @@ impl Hashable for ProofNode {
         })
     }
 
-    fn children(&self) -> impl Iterator<Item = (usize, &HashType)> + Clone {
+    fn children(&self) -> impl Iterator<Item = (usize, HashType)> + Clone {
         self.child_hashes
             .iter()
             .enumerate()
-            .filter_map(|(i, hash)| hash.as_ref().map(|h| (i, h)))
+            .filter_map(|(i, hash)| hash.as_ref().map(|h| (i, h.clone())))
     }
 }
 

@@ -166,6 +166,12 @@ pub struct NodeStoreHeader {
     ethhash: u64,
 }
 
+impl Default for NodeStoreHeader {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NodeStoreHeader {
     /// The first SIZE bytes of the `ReadableStorage` are reserved for the
     /// [`NodeStoreHeader`].

@@ -412,8 +412,13 @@ impl BranchNode {
     }
 
     /// Returns (index, hash) for each child that has a hash set.
-    pub fn children_hashes(&self) -> impl Iterator<Item = (usize, &HashType)> + Clone {
-        self.children_iter().map(|(idx, (_, hash))| (idx, hash))
+    pub fn children_hashes(&self) -> impl Iterator<Item = (usize, HashType)> + Clone {
+        self.children.iter().enumerate().filter_map(|(i, child)| {
+            child
+                .as_ref()
+                .and_then(|child| child.hash().cloned())
+                .map(|hash| (i, hash))
+        })
     }
 
     /// Returns (index, address) for each child that has a hash set.

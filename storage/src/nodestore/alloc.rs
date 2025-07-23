@@ -23,6 +23,7 @@
 use crate::linear::FileIoError;
 use crate::logger::trace;
 use crate::node::branch::{ReadSerializable, Serializable};
+use crate::nodestore::NodeStoreHeader;
 use integer_encoding::VarIntReader;
 use metrics::counter;
 
@@ -31,13 +32,9 @@ use std::fmt;
 use std::io::{Error, ErrorKind, Read};
 use std::iter::FusedIterator;
 use std::num::NonZeroU64;
-use std::sync::Arc;
 
-use crate::node::persist::MaybePersistedNode;
-use crate::node::{ByteCounter, ExtendableBytes, Node};
-use crate::{CacheReadStrategy, FreeListParent, ReadableStorage, SharedNode, TrieHash};
-
-use crate::linear::WritableStorage;
+use crate::node::ExtendableBytes;
+use crate::{FreeListParent, MaybePersistedNode, ReadableStorage, TrieHash, WritableStorage};
 
 /// Returns the maximum size needed to encode a `VarInt`.
 const fn var_int_max_size<VI>() -> usize {
@@ -78,6 +75,17 @@ pub fn area_size_hash() -> TrieHash {
         hasher.update(size.to_ne_bytes());
     }
     hasher.finalize().into()
+}
+
+/// Get the size of an area index (used by the checker)
+///
+/// # Panics
+///
+/// Panics if `index` is out of bounds for the `AREA_SIZES` array.
+#[must_use]
+pub const fn size_from_area_index(index: AreaIndex) -> u64 {
+    #[expect(clippy::indexing_slicing)]
+    AREA_SIZES[index as usize]
 }
 
 // TODO: automate this, must stay in sync with above
@@ -427,9 +435,20 @@ impl FreeArea {
 }
 
 // Re-export the NodeStore types we need
-use super::{Committed, ImmutableProposal, NodeStore, ReadInMemoryNode};
+use super::NodeStore;
 
-impl<T: ReadInMemoryNode, S: ReadableStorage> NodeStore<T, S> {
+/// Writable allocator for allocating and deleting nodes
+#[derive(Debug)]
+pub struct NodeAllocator<'a, S> {
+    storage: &'a S,
+    header: &'a mut NodeStoreHeader,
+}
+
+impl<'a, S: ReadableStorage> NodeAllocator<'a, S> {
+    pub const fn new(storage: &'a S, header: &'a mut NodeStoreHeader) -> Self {
+        Self { storage, header }
+    }
+
     /// Returns (index, `area_size`) for the stored area at `addr`.
     /// `index` is the index of `area_size` in the array of valid block sizes.
     ///
@@ -461,95 +480,6 @@ impl<T: ReadInMemoryNode, S: ReadableStorage> NodeStore<T, S> {
         Ok((index, size))
     }
 
-    /// Read a [Node] from the provided [`LinearAddress`].
-    /// `addr` is the address of a `StoredArea` in the `ReadableStorage`.
-    ///
-    /// # Errors
-    ///
-    /// Returns a [`FileIoError`] if the node cannot be read.
-    pub fn read_node_from_disk(
-        &self,
-        addr: LinearAddress,
-        mode: &'static str,
-    ) -> Result<SharedNode, FileIoError> {
-        if let Some(node) = self.storage.read_cached_node(addr, mode) {
-            return Ok(node);
-        }
-
-        debug_assert!(addr.is_aligned());
-
-        // saturating because there is no way we can be reading at u64::MAX
-        // and this will fail very soon afterwards
-        let actual_addr = addr.get().saturating_add(1); // skip the length byte
-
-        let _span = fastrace::local::LocalSpan::enter_with_local_parent("read_and_deserialize");
-
-        let area_stream = self.storage.stream_from(actual_addr)?;
-        let node: SharedNode = Node::from_reader(area_stream)
-            .map_err(|e| {
-                self.storage
-                    .file_io_error(e, actual_addr, Some("read_node_from_disk".to_string()))
-            })?
-            .into();
-        match self.storage.cache_read_strategy() {
-            CacheReadStrategy::All => {
-                self.storage.cache_node(addr, node.clone());
-            }
-            CacheReadStrategy::BranchReads => {
-                if !node.is_leaf() {
-                    self.storage.cache_node(addr, node.clone());
-                }
-            }
-            CacheReadStrategy::WritesOnly => {}
-        }
-        Ok(node)
-    }
-
-    /// Read a [Node] from the provided [`LinearAddress`] and size.
-    /// This is an uncached read, primarily used by check utilities
-    ///
-    /// # Errors
-    ///
-    /// Returns a [`FileIoError`] if the node cannot be read.
-    pub fn uncached_read_node_and_size(
-        &self,
-        addr: LinearAddress,
-    ) -> Result<(SharedNode, u8), FileIoError> {
-        let mut area_stream = self.storage.stream_from(addr.get())?;
-        let mut size = [0u8];
-        area_stream.read_exact(&mut size).map_err(|e| {
-            self.storage.file_io_error(
-                e,
-                addr.get(),
-                Some("uncached_read_node_and_size".to_string()),
-            )
-        })?;
-        self.storage.stream_from(addr.get().saturating_add(1))?;
-        let node: SharedNode = Node::from_reader(area_stream)
-            .map_err(|e| {
-                self.storage.file_io_error(
-                    e,
-                    addr.get(),
-                    Some("uncached_read_node_and_size".to_string()),
-                )
-            })?
-            .into();
-        Ok((node, size[0]))
-    }
-
-    /// Get the size of an area index (used by the checker)
-    ///
-    /// # Panics
-    ///
-    /// Panics if `index` is out of bounds for the `AREA_SIZES` array.
-    #[must_use]
-    pub const fn size_from_area_index(index: AreaIndex) -> u64 {
-        #[expect(clippy::indexing_slicing)]
-        AREA_SIZES[index as usize]
-    }
-}
-
-impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
     /// Attempts to allocate `n` bytes from the free lists.
     /// If successful returns the address of the newly allocated area
     /// and the index of the free list that was used.
@@ -582,8 +512,7 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
                 trace!("free_head@{address}(cached): {free_head:?} size:{index}");
                 *free_stored_area_addr = free_head;
             } else {
-                let (free_head, read_index) =
-                    FreeArea::from_storage(self.storage.as_ref(), address)?;
+                let (free_head, read_index) = FreeArea::from_storage(self.storage, address)?;
                 debug_assert_eq!(read_index as usize, index);
 
                 // Update the free list to point to the next free block.
@@ -621,14 +550,6 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
         Ok((addr, index))
     }
 
-    /// Returns the length of the serialized area for a node.
-    #[must_use]
-    pub fn stored_len(node: &Node) -> u64 {
-        let mut bytecounter = ByteCounter::new();
-        node.as_bytes(0, &mut bytecounter);
-        bytecounter.count()
-    }
-
     /// Returns an address that can be used to store the given `node` and updates
     /// `self.header` to reflect the allocation. Doesn't actually write the node to storage.
     /// Also returns the index of the free list the node was allocated from.
@@ -638,9 +559,9 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
     /// Returns a [`FileIoError`] if the node cannot be allocated.
     pub fn allocate_node(
         &mut self,
-        node: &Node,
+        node: &[u8],
     ) -> Result<(LinearAddress, AreaIndex), FileIoError> {
-        let stored_area_size = Self::stored_len(node);
+        let stored_area_size = node.len() as u64;
 
         // Attempt to allocate from a free list.
         // If we can't allocate from a free list, allocate past the existing
@@ -654,14 +575,13 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
     }
 }
 
-impl<S: WritableStorage> NodeStore<Committed, S> {
-    /// Deletes the [Node] at the given address, updating the next pointer at
-    /// the given addr, and changing the header of this committed nodestore to
-    /// have the address on the freelist
+impl<S: WritableStorage> NodeAllocator<'_, S> {
+    /// Deletes the `Node` and updates the header of the allocator.
+    /// Nodes that are not persisted are just dropped.
     ///
     /// # Errors
     ///
-    /// Returns a [`FileIoError`] if the node cannot be deleted.
+    /// Returns a [`FileIoError`] if the area cannot be read or written.
     #[expect(clippy::indexing_slicing)]
     pub fn delete_node(&mut self, node: MaybePersistedNode) -> Result<(), FileIoError> {
         let Some(addr) = node.as_linear_address() else {
@@ -859,9 +779,9 @@ impl<T, S: ReadableStorage> NodeStore<T, S> {
 #[expect(clippy::unwrap_used, clippy::indexing_slicing)]
 pub mod test_utils {
     use super::*;
-    use crate::FileBacked;
+
     use crate::node::Node;
-    use crate::nodestore::{Committed, ImmutableProposal, NodeStore, NodeStoreHeader};
+    use crate::nodestore::{Committed, NodeStore, NodeStoreHeader};
 
     // Helper function to wrap the node in a StoredArea and write it to the given offset. Returns the size of the area on success.
     pub fn test_write_new_node<S: WritableStorage>(
@@ -869,8 +789,10 @@ pub mod test_utils {
         node: &Node,
         offset: u64,
     ) -> u64 {
-        let node_length = NodeStore::<Arc<ImmutableProposal>, FileBacked>::stored_len(node);
-        let area_size_index = area_size_to_index(node_length).unwrap();
+        let mut encoded_node = Vec::new();
+        node.as_bytes(0, &mut encoded_node);
+        let encoded_node_len = encoded_node.len() as u64;
+        let area_size_index = area_size_to_index(encoded_node_len).unwrap();
         let mut stored_area_bytes = Vec::new();
         node.as_bytes(area_size_index, &mut stored_area_bytes);
         nodestore
@@ -923,9 +845,7 @@ pub mod test_utils {
 #[expect(clippy::unwrap_used, clippy::indexing_slicing)]
 mod tests {
     use super::*;
-
     use crate::linear::memory::MemStore;
-    use crate::nodestore::header::NodeStoreHeader;
     use crate::test_utils::seeded_rng;
     use rand::Rng;
     use rand::seq::IteratorRandom;

@@ -5,10 +5,11 @@ mod range_set;
 use range_set::LinearAddressRangeSet;
 
 use crate::logger::warn;
-use crate::nodestore::alloc::{AREA_SIZES, AreaIndex, FreeAreaWithMetadata};
+use crate::nodestore::alloc::{AREA_SIZES, AreaIndex, FreeAreaWithMetadata, size_from_area_index};
 use crate::{
-    CheckerError, Committed, HashType, HashedNodeReader, LinearAddress, Node, NodeReader,
-    NodeStore, Path, StoredAreaParent, TrieNodeParent, WritableStorage, hash_node,
+    CheckerError, Committed, HashType, HashedNodeReader, IntoHashType, LinearAddress, Node,
+    NodeReader, NodeStore, Path, RootReader, StoredAreaParent, TrieNodeParent, WritableStorage,
+    hash_node,
 };
 
 use std::cmp::Ordering;
@@ -42,19 +43,25 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
         let mut visited = LinearAddressRangeSet::new(db_size)?;
 
         // 2. traverse the trie and check the nodes
-        if let (Some(root_address), Some(root_hash)) = (self.root_address(), self.root_hash()) {
-            // the database is not empty, traverse the trie
-            self.check_area_aligned(
-                root_address,
-                StoredAreaParent::TrieNode(TrieNodeParent::Root),
-            )?;
-            self.visit_trie(
-                root_address,
-                HashType::from(root_hash),
-                Path::new(),
-                &mut visited,
-                opt.hash_check,
-            )?;
+        if let (Some(root), Some(root_hash)) =
+            (self.root_as_maybe_persisted_node(), self.root_hash())
+        {
+            // the database is not empty, and has a physical address, so traverse the trie
+            if let Some(root_address) = root.as_linear_address() {
+                self.check_area_aligned(
+                    root_address,
+                    StoredAreaParent::TrieNode(TrieNodeParent::Root),
+                )?;
+                self.visit_trie(
+                    root_address,
+                    root_hash.into_hash_type(),
+                    Path::new(),
+                    &mut visited,
+                    opt.hash_check,
+                )?;
+            } else {
+                return Err(CheckerError::UnpersistedRoot);
+            }
         }
 
         // 3. check the free list - this can happen in parallel with the trie traversal
@@ -71,7 +78,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
         Ok(())
     }
 
-    /// Recursively traverse the trie from the given root address.
+    /// Recursively traverse the trie from the given root node.
     fn visit_trie(
         &self,
         subtree_root_address: LinearAddress,
@@ -134,7 +141,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
                 parent,
             } = free_area?;
             self.check_area_aligned(addr, StoredAreaParent::FreeList(parent))?;
-            let area_size = Self::size_from_area_index(area_index);
+            let area_size = size_from_area_index(area_index);
             if free_list_id != area_index {
                 return Err(CheckerError::FreelistAreaSizeMismatch {
                     address: addr,

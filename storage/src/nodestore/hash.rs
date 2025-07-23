@@ -10,20 +10,11 @@ use crate::hashednode::hash_node;
 use crate::linear::FileIoError;
 use crate::logger::trace;
 use crate::node::Node;
-use crate::{Child, HashType, Path, ReadableStorage, SharedNode};
+use crate::{Child, HashType, MaybePersistedNode, NodeStore, Path, ReadableStorage, SharedNode};
 
-#[cfg(feature = "ethhash")]
 use super::NodeReader;
 #[cfg(feature = "ethhash")]
-use crate::node::persist::MaybePersistedNode;
-#[cfg(feature = "ethhash")]
 use std::ops::Deref;
-
-use std::collections::HashMap;
-use std::sync::Arc;
-
-use super::alloc::LinearAddress;
-use super::{ImmutableProposal, NodeStore};
 
 /// Classified children for ethereum hash processing
 #[cfg(feature = "ethhash")]
@@ -32,7 +23,10 @@ pub(super) struct ClassifiedChildren<'a> {
     pub(super) hashed: Vec<(usize, (MaybePersistedNode, &'a mut HashType))>,
 }
 
-impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
+impl<T, S: ReadableStorage> NodeStore<T, S>
+where
+    NodeStore<T, S>: NodeReader,
+{
     /// Helper function to classify children for ethereum hash processing
     /// We have some special cases based on the number of children
     /// and whether they are hashed or unhashed, so we need to classify them.
@@ -62,7 +56,7 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
                             acc.hashed.push((idx, (maybe_persisted_node, h)));
                         } else {
                             // If not persisted, we need to get the node to hash it
-                            if let Ok(node) = maybe_persisted.as_shared_node(self) {
+                            if let Ok(node) = maybe_persisted.as_shared_node(&self) {
                                 acc.unhashed.push((idx, node.deref().clone()));
                             }
                         }
@@ -76,13 +70,12 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
     /// Hashes `node`, which is at the given `path_prefix`, and its children recursively.
     /// Returns the hashed node and its hash.
     pub(super) fn hash_helper(
-        &mut self,
+        #[cfg(feature = "ethhash")] &self,
         mut node: Node,
         path_prefix: &mut Path,
-        new_nodes: &mut HashMap<LinearAddress, (u8, SharedNode)>,
         #[cfg(feature = "ethhash")] fake_root_extra_nibble: Option<u8>,
-    ) -> Result<(LinearAddress, HashType), FileIoError> {
-        // If this is a branch, find all unhashed children and recursively call hash_helper on them.
+    ) -> Result<(MaybePersistedNode, HashType), FileIoError> {
+        // If this is a branch, find all unhashed children and recursively hash them.
         trace!("hashing {node:?} at {path_prefix:?}");
         if let Node::Branch(ref mut b) = node {
             // special case code for ethereum hashes at the account level
@@ -143,7 +136,7 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
                 // If this is empty or already hashed, we're done
                 // Empty matches None, and non-Node types match Some(None) here, so we want
                 // Some(Some(node))
-                let Some(Some(child_node)) = child.as_mut().map(|child| child.as_mut_node()) else {
+                let Some(child_node) = child.as_mut().and_then(|child| child.as_mut_node()) else {
                     continue;
                 };
 
@@ -164,13 +157,13 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
                 path_prefix.0.push(nibble as u8);
 
                 #[cfg(feature = "ethhash")]
-                let (child_addr, child_hash) =
-                    self.hash_helper(child_node, path_prefix, new_nodes, make_fake_root)?;
+                let (child_node, child_hash) =
+                    self.hash_helper(child_node, path_prefix, make_fake_root)?;
                 #[cfg(not(feature = "ethhash"))]
-                let (child_addr, child_hash) =
-                    self.hash_helper(child_node, path_prefix, new_nodes)?;
+                let (child_node, child_hash) = Self::hash_helper(child_node, path_prefix)?;
 
-                *child = Some(Child::AddressWithHash(child_addr, child_hash));
+                *child = Some(Child::MaybePersisted(child_node, child_hash));
+                trace!("child now {child:?}");
                 path_prefix.0.truncate(original_length);
             }
         }
@@ -195,10 +188,6 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
         #[cfg(not(feature = "ethhash"))]
         let hash = hash_node(&node, path_prefix);
 
-        let (addr, size) = self.allocate_node(&node)?;
-
-        new_nodes.insert(addr, (size, node.into()));
-
-        Ok((addr, hash))
+        Ok((SharedNode::new(node).into(), hash))
     }
 }

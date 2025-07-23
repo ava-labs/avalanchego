@@ -38,6 +38,7 @@ nonzero_ext = "0.3.0"
 
 [features]
 ethhash = ["firewood/ethhash"]
+logger = ["firewood/logger"]
 
 [dev-dependencies]
 # Workspace dependencies

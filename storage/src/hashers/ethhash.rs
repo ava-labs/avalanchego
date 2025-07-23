@@ -173,7 +173,7 @@ impl<T: Hashable> Preimage for T {
             let mut rlp = RlpStream::new_list(17);
             let mut child_iter = self.children().peekable();
             for index in 0..=15 {
-                if let Some(&(child_index, digest)) = child_iter.peek() {
+                if let Some(&(child_index, ref digest)) = child_iter.peek() {
                     if child_index == index {
                         match digest {
                             HashType::Hash(hash) => rlp.append(&hash.as_slice()),
@@ -225,7 +225,7 @@ impl<T: Hashable> Preimage for T {
                                     self.partial_path().collect::<Box<_>>(),
                                     true,
                                 ));
-                                rlp.append_raw(rlp_bytes, 1);
+                                rlp.append_raw(&rlp_bytes, 1);
                                 let bytes = rlp.out();
                                 TrieHash::from(Keccak256::digest(bytes))
                             }

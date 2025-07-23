@@ -145,21 +145,10 @@ impl RevisionManager {
     ///    It only contains the address of the nodes that are deleted, which should be very small.
     /// 3. Revision reaping. If more than the maximum number of revisions are kept in memory, the
     ///    oldest revision is reaped.
-    /// 4. Set last committed revision.
+    /// 4. Persist to disk. This includes flushing everything to disk.
+    /// 5. Set last committed revision.
     ///    Set last committed revision in memory.
-    ///    Another commit can start after this but before the node flush is completed.
-    /// 5. Free list flush.
-    ///    Persist/write the free list header.
-    ///    The free list is flushed first to prevent future allocations from using the space allocated to this proposal.
-    ///    This should be done in a single write since the free list headers are small, and must be persisted to disk before starting the next step.
-    /// 6. Node flush.
-    ///    Persist/write all the nodes to disk.
-    ///    Note that since these are all freshly allocated nodes, they will never be referred to by any prior commit.
-    ///    After flushing all nodes, the file should be flushed to disk (fsync) before performing the next step.
-    /// 7. Root move.
-    ///    The root address on disk must be updated.
-    ///    This write can be delayed, but would mean that recovery will not roll forward to this revision.
-    /// 8. Proposal Cleanup.
+    /// 6. Proposal Cleanup.
     ///    Any other proposals that have this proposal as a parent should be reparented to the committed version.
     #[fastrace::trace(short_name = true)]
     #[crate::metrics("firewood.proposal.commit", "proposal commit to storage")]
@@ -170,7 +159,7 @@ impl RevisionManager {
             return Err(RevisionManagerError::NotLatest);
         }
 
-        let mut committed = proposal.as_committed();
+        let mut committed = proposal.as_committed(current_revision);
 
         // 2. Persist delete list for this committed revision to disk for recovery
 
@@ -212,7 +201,12 @@ impl RevisionManager {
             gauge!("firewood.max_revisions").set(self.max_revisions as f64);
         }
 
-        // 4. Set last committed revision
+        // 4. Persist to disk.
+        // TODO: We can probably do this in another thread, but it requires that
+        // we move the header out of NodeStore, which is in a future PR.
+        committed.persist()?;
+
+        // 5. Set last committed revision
         let committed: CommittedRevision = committed.into();
         self.historical
             .write()
@@ -224,18 +218,8 @@ impl RevisionManager {
                 .expect("poisoned lock")
                 .insert(hash, committed.clone());
         }
-        // TODO: We could allow other commits to start here using the pending list
 
-        // 5. Free list flush, which will prevent allocating on top of the nodes we are about to write
-        proposal.flush_freelist()?;
-
-        // 6. Node flush
-        proposal.flush_nodes()?;
-
-        // 7. Root move
-        proposal.flush_header()?;
-
-        // 8. Proposal Cleanup
+        // 6. Proposal Cleanup
         // Free proposal that is being committed as well as any proposals no longer
         // referenced by anyone else.
         self.proposals

@@ -47,7 +47,7 @@ pub use node::{
 };
 pub use nodestore::{
     Committed, HashedNodeReader, ImmutableProposal, LinearAddress, MutableProposal, NodeReader,
-    NodeStore, Parentable, ReadInMemoryNode, RootReader, TrieReader,
+    NodeStore, Parentable, RootReader, TrieReader,
 };
 
 pub use linear::filebacked::FileBacked;
@@ -208,6 +208,10 @@ pub enum CheckerError {
     /// Found leaked areas
     #[error("Found leaked areas: {0:?}")]
     AreaLeaks(Vec<Range<LinearAddress>>),
+
+    /// The root is not persisted
+    #[error("The checker can only check persisted nodestores")]
+    UnpersistedRoot,
 
     /// IO error
     #[error("IO error")]
