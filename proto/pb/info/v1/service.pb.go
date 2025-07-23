@@ -9,6 +9,7 @@ package infov1
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	durationpb "google.golang.org/protobuf/types/known/durationpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
@@ -652,10 +653,10 @@ type PeerInfo struct {
 	PublicIp       string                 `protobuf:"bytes,2,opt,name=public_ip,json=publicIp,proto3" json:"public_ip,omitempty"`
 	NodeId         string                 `protobuf:"bytes,3,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
 	Version        string                 `protobuf:"bytes,4,opt,name=version,proto3" json:"version,omitempty"`
-	LastSent       string                 `protobuf:"bytes,5,opt,name=last_sent,json=lastSent,proto3" json:"last_sent,omitempty"`
-	LastReceived   string                 `protobuf:"bytes,6,opt,name=last_received,json=lastReceived,proto3" json:"last_received,omitempty"`
+	LastSent       *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=last_sent,json=lastSent,proto3" json:"last_sent,omitempty"`
+	LastReceived   *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=last_received,json=lastReceived,proto3" json:"last_received,omitempty"`
 	Benched        []string               `protobuf:"bytes,7,rep,name=benched,proto3" json:"benched,omitempty"`
-	ObservedUptime uint32                 `protobuf:"varint,8,opt,name=observed_uptime,json=observedUptime,proto3" json:"observed_uptime,omitempty"`
+	ObservedUptime *durationpb.Duration   `protobuf:"bytes,8,opt,name=observed_uptime,json=observedUptime,proto3" json:"observed_uptime,omitempty"`
 	TrackedSubnets []string               `protobuf:"bytes,9,rep,name=tracked_subnets,json=trackedSubnets,proto3" json:"tracked_subnets,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
@@ -719,18 +720,18 @@ func (x *PeerInfo) GetVersion() string {
 	return ""
 }
 
-func (x *PeerInfo) GetLastSent() string {
+func (x *PeerInfo) GetLastSent() *timestamppb.Timestamp {
 	if x != nil {
 		return x.LastSent
 	}
-	return ""
+	return nil
 }
 
-func (x *PeerInfo) GetLastReceived() string {
+func (x *PeerInfo) GetLastReceived() *timestamppb.Timestamp {
 	if x != nil {
 		return x.LastReceived
 	}
-	return ""
+	return nil
 }
 
 func (x *PeerInfo) GetBenched() []string {
@@ -740,11 +741,11 @@ func (x *PeerInfo) GetBenched() []string {
 	return nil
 }
 
-func (x *PeerInfo) GetObservedUptime() uint32 {
+func (x *PeerInfo) GetObservedUptime() *durationpb.Duration {
 	if x != nil {
 		return x.ObservedUptime
 	}
-	return 0
+	return nil
 }
 
 func (x *PeerInfo) GetTrackedSubnets() []string {
@@ -1320,7 +1321,7 @@ var File_info_v1_service_proto protoreflect.FileDescriptor
 
 const file_info_v1_service_proto_rawDesc = "" +
 	"\n" +
-	"\x15info/v1/service.proto\x12\ainfo.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x14\n" +
+	"\x15info/v1/service.proto\x12\ainfo.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x14\n" +
 	"\x12NodeVersionRequest\"\xb9\x02\n" +
 	"\x13NodeVersionResponse\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\tR\aversion\x12)\n" +
@@ -1356,16 +1357,16 @@ const file_info_v1_service_proto_rawDesc = "" +
 	"\x14BlockchainIDResponse\x12#\n" +
 	"\rblockchain_id\x18\x01 \x01(\tR\fblockchainId\")\n" +
 	"\fPeersRequest\x12\x19\n" +
-	"\bnode_ids\x18\x01 \x03(\tR\anodeIds\"\x98\x02\n" +
+	"\bnode_ids\x18\x01 \x03(\tR\anodeIds\"\xeb\x02\n" +
 	"\bPeerInfo\x12\x0e\n" +
 	"\x02ip\x18\x01 \x01(\tR\x02ip\x12\x1b\n" +
 	"\tpublic_ip\x18\x02 \x01(\tR\bpublicIp\x12\x17\n" +
 	"\anode_id\x18\x03 \x01(\tR\x06nodeId\x12\x18\n" +
-	"\aversion\x18\x04 \x01(\tR\aversion\x12\x1b\n" +
-	"\tlast_sent\x18\x05 \x01(\tR\blastSent\x12#\n" +
-	"\rlast_received\x18\x06 \x01(\tR\flastReceived\x12\x18\n" +
-	"\abenched\x18\a \x03(\tR\abenched\x12'\n" +
-	"\x0fobserved_uptime\x18\b \x01(\rR\x0eobservedUptime\x12'\n" +
+	"\aversion\x18\x04 \x01(\tR\aversion\x127\n" +
+	"\tlast_sent\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\blastSent\x12?\n" +
+	"\rlast_received\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\flastReceived\x12\x18\n" +
+	"\abenched\x18\a \x03(\tR\abenched\x12B\n" +
+	"\x0fobserved_uptime\x18\b \x01(\v2\x19.google.protobuf.DurationR\x0eobservedUptime\x12'\n" +
 	"\x0ftracked_subnets\x18\t \x03(\tR\x0etrackedSubnets\"U\n" +
 	"\rPeersResponse\x12\x1b\n" +
 	"\tnum_peers\x18\x01 \x01(\rR\bnumPeers\x12'\n" +
@@ -1467,55 +1468,59 @@ var file_info_v1_service_proto_goTypes = []any{
 	nil,                            // 26: info.v1.VMsResponse.VmsEntry
 	nil,                            // 27: info.v1.VMsResponse.FxsEntry
 	(*timestamppb.Timestamp)(nil),  // 28: google.protobuf.Timestamp
+	(*durationpb.Duration)(nil),    // 29: google.protobuf.Duration
 }
 var file_info_v1_service_proto_depIdxs = []int32{
 	25, // 0: info.v1.NodeVersionResponse.vm_versions:type_name -> info.v1.NodeVersionResponse.VmVersionsEntry
 	3,  // 1: info.v1.NodeIDResponse.node_pop:type_name -> info.v1.ProofOfPossession
-	14, // 2: info.v1.PeersResponse.peers:type_name -> info.v1.PeerInfo
-	28, // 3: info.v1.UpgradesResponse.apricot_phase1_time:type_name -> google.protobuf.Timestamp
-	28, // 4: info.v1.UpgradesResponse.apricot_phase2_time:type_name -> google.protobuf.Timestamp
-	28, // 5: info.v1.UpgradesResponse.apricot_phase3_time:type_name -> google.protobuf.Timestamp
-	28, // 6: info.v1.UpgradesResponse.apricot_phase4_time:type_name -> google.protobuf.Timestamp
-	28, // 7: info.v1.UpgradesResponse.apricot_phase5_time:type_name -> google.protobuf.Timestamp
-	28, // 8: info.v1.UpgradesResponse.apricot_phase_pre6_time:type_name -> google.protobuf.Timestamp
-	28, // 9: info.v1.UpgradesResponse.apricot_phase6_time:type_name -> google.protobuf.Timestamp
-	28, // 10: info.v1.UpgradesResponse.apricot_phase_post6_time:type_name -> google.protobuf.Timestamp
-	28, // 11: info.v1.UpgradesResponse.banff_time:type_name -> google.protobuf.Timestamp
-	28, // 12: info.v1.UpgradesResponse.cortina_time:type_name -> google.protobuf.Timestamp
-	28, // 13: info.v1.UpgradesResponse.durango_time:type_name -> google.protobuf.Timestamp
-	28, // 14: info.v1.UpgradesResponse.etna_time:type_name -> google.protobuf.Timestamp
-	28, // 15: info.v1.UpgradesResponse.fortuna_time:type_name -> google.protobuf.Timestamp
-	28, // 16: info.v1.UpgradesResponse.granite_time:type_name -> google.protobuf.Timestamp
-	26, // 17: info.v1.VMsResponse.vms:type_name -> info.v1.VMsResponse.VmsEntry
-	27, // 18: info.v1.VMsResponse.fxs:type_name -> info.v1.VMsResponse.FxsEntry
-	24, // 19: info.v1.VMsResponse.VmsEntry.value:type_name -> info.v1.VMAliases
-	0,  // 20: info.v1.InfoService.NodeVersion:input_type -> info.v1.NodeVersionRequest
-	2,  // 21: info.v1.InfoService.NodeID:input_type -> info.v1.NodeIDRequest
-	5,  // 22: info.v1.InfoService.NodeIP:input_type -> info.v1.NodeIPRequest
-	7,  // 23: info.v1.InfoService.NetworkID:input_type -> info.v1.NetworkIDRequest
-	9,  // 24: info.v1.InfoService.NetworkName:input_type -> info.v1.NetworkNameRequest
-	11, // 25: info.v1.InfoService.BlockchainID:input_type -> info.v1.BlockchainIDRequest
-	13, // 26: info.v1.InfoService.Peers:input_type -> info.v1.PeersRequest
-	16, // 27: info.v1.InfoService.IsBootstrapped:input_type -> info.v1.IsBootstrappedRequest
-	18, // 28: info.v1.InfoService.Upgrades:input_type -> info.v1.UpgradesRequest
-	20, // 29: info.v1.InfoService.Uptime:input_type -> info.v1.UptimeRequest
-	22, // 30: info.v1.InfoService.VMs:input_type -> info.v1.VMsRequest
-	1,  // 31: info.v1.InfoService.NodeVersion:output_type -> info.v1.NodeVersionResponse
-	4,  // 32: info.v1.InfoService.NodeID:output_type -> info.v1.NodeIDResponse
-	6,  // 33: info.v1.InfoService.NodeIP:output_type -> info.v1.NodeIPResponse
-	8,  // 34: info.v1.InfoService.NetworkID:output_type -> info.v1.NetworkIDResponse
-	10, // 35: info.v1.InfoService.NetworkName:output_type -> info.v1.NetworkNameResponse
-	12, // 36: info.v1.InfoService.BlockchainID:output_type -> info.v1.BlockchainIDResponse
-	15, // 37: info.v1.InfoService.Peers:output_type -> info.v1.PeersResponse
-	17, // 38: info.v1.InfoService.IsBootstrapped:output_type -> info.v1.IsBootstrappedResponse
-	19, // 39: info.v1.InfoService.Upgrades:output_type -> info.v1.UpgradesResponse
-	21, // 40: info.v1.InfoService.Uptime:output_type -> info.v1.UptimeResponse
-	23, // 41: info.v1.InfoService.VMs:output_type -> info.v1.VMsResponse
-	31, // [31:42] is the sub-list for method output_type
-	20, // [20:31] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	28, // 2: info.v1.PeerInfo.last_sent:type_name -> google.protobuf.Timestamp
+	28, // 3: info.v1.PeerInfo.last_received:type_name -> google.protobuf.Timestamp
+	29, // 4: info.v1.PeerInfo.observed_uptime:type_name -> google.protobuf.Duration
+	14, // 5: info.v1.PeersResponse.peers:type_name -> info.v1.PeerInfo
+	28, // 6: info.v1.UpgradesResponse.apricot_phase1_time:type_name -> google.protobuf.Timestamp
+	28, // 7: info.v1.UpgradesResponse.apricot_phase2_time:type_name -> google.protobuf.Timestamp
+	28, // 8: info.v1.UpgradesResponse.apricot_phase3_time:type_name -> google.protobuf.Timestamp
+	28, // 9: info.v1.UpgradesResponse.apricot_phase4_time:type_name -> google.protobuf.Timestamp
+	28, // 10: info.v1.UpgradesResponse.apricot_phase5_time:type_name -> google.protobuf.Timestamp
+	28, // 11: info.v1.UpgradesResponse.apricot_phase_pre6_time:type_name -> google.protobuf.Timestamp
+	28, // 12: info.v1.UpgradesResponse.apricot_phase6_time:type_name -> google.protobuf.Timestamp
+	28, // 13: info.v1.UpgradesResponse.apricot_phase_post6_time:type_name -> google.protobuf.Timestamp
+	28, // 14: info.v1.UpgradesResponse.banff_time:type_name -> google.protobuf.Timestamp
+	28, // 15: info.v1.UpgradesResponse.cortina_time:type_name -> google.protobuf.Timestamp
+	28, // 16: info.v1.UpgradesResponse.durango_time:type_name -> google.protobuf.Timestamp
+	28, // 17: info.v1.UpgradesResponse.etna_time:type_name -> google.protobuf.Timestamp
+	28, // 18: info.v1.UpgradesResponse.fortuna_time:type_name -> google.protobuf.Timestamp
+	28, // 19: info.v1.UpgradesResponse.granite_time:type_name -> google.protobuf.Timestamp
+	26, // 20: info.v1.VMsResponse.vms:type_name -> info.v1.VMsResponse.VmsEntry
+	27, // 21: info.v1.VMsResponse.fxs:type_name -> info.v1.VMsResponse.FxsEntry
+	24, // 22: info.v1.VMsResponse.VmsEntry.value:type_name -> info.v1.VMAliases
+	0,  // 23: info.v1.InfoService.NodeVersion:input_type -> info.v1.NodeVersionRequest
+	2,  // 24: info.v1.InfoService.NodeID:input_type -> info.v1.NodeIDRequest
+	5,  // 25: info.v1.InfoService.NodeIP:input_type -> info.v1.NodeIPRequest
+	7,  // 26: info.v1.InfoService.NetworkID:input_type -> info.v1.NetworkIDRequest
+	9,  // 27: info.v1.InfoService.NetworkName:input_type -> info.v1.NetworkNameRequest
+	11, // 28: info.v1.InfoService.BlockchainID:input_type -> info.v1.BlockchainIDRequest
+	13, // 29: info.v1.InfoService.Peers:input_type -> info.v1.PeersRequest
+	16, // 30: info.v1.InfoService.IsBootstrapped:input_type -> info.v1.IsBootstrappedRequest
+	18, // 31: info.v1.InfoService.Upgrades:input_type -> info.v1.UpgradesRequest
+	20, // 32: info.v1.InfoService.Uptime:input_type -> info.v1.UptimeRequest
+	22, // 33: info.v1.InfoService.VMs:input_type -> info.v1.VMsRequest
+	1,  // 34: info.v1.InfoService.NodeVersion:output_type -> info.v1.NodeVersionResponse
+	4,  // 35: info.v1.InfoService.NodeID:output_type -> info.v1.NodeIDResponse
+	6,  // 36: info.v1.InfoService.NodeIP:output_type -> info.v1.NodeIPResponse
+	8,  // 37: info.v1.InfoService.NetworkID:output_type -> info.v1.NetworkIDResponse
+	10, // 38: info.v1.InfoService.NetworkName:output_type -> info.v1.NetworkNameResponse
+	12, // 39: info.v1.InfoService.BlockchainID:output_type -> info.v1.BlockchainIDResponse
+	15, // 40: info.v1.InfoService.Peers:output_type -> info.v1.PeersResponse
+	17, // 41: info.v1.InfoService.IsBootstrapped:output_type -> info.v1.IsBootstrappedResponse
+	19, // 42: info.v1.InfoService.Upgrades:output_type -> info.v1.UpgradesResponse
+	21, // 43: info.v1.InfoService.Uptime:output_type -> info.v1.UptimeResponse
+	23, // 44: info.v1.InfoService.VMs:output_type -> info.v1.VMsResponse
+	34, // [34:45] is the sub-list for method output_type
+	23, // [23:34] is the sub-list for method input_type
+	23, // [23:23] is the sub-list for extension type_name
+	23, // [23:23] is the sub-list for extension extendee
+	0,  // [0:23] is the sub-list for field type_name
 }
 
 func init() { file_info_v1_service_proto_init() }

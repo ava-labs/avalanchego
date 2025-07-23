@@ -1,6 +1,7 @@
 syntax = "proto3";
 package info.v1;
 
+import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 
 option go_package = "github.com/ava-labs/avalanchego/proto/pb/info/v1;infov1";
@@ -69,10 +70,10 @@ message PeerInfo {
   string public_ip = 2;
   string node_id = 3;
   string version = 4;
-  string last_sent = 5;
-  string last_received = 6;
+  google.protobuf.Timestamp last_sent = 5;
+  google.protobuf.Timestamp last_received = 6;
   repeated string benched = 7;
-  uint32 observed_uptime = 8;
+  google.protobuf.Duration observed_uptime = 8;
   repeated string tracked_subnets = 9;
 }
 message PeersResponse {

@@ -1565,7 +1565,7 @@ func (n *Node) initHealthAPI() error {
 	err = n.APIServer.AddRoute(
 		health.NewGetHandler(n.health.Readiness),
 		"health",
-		"readiness",
+		"/readiness",
 	)
 	if err != nil {
 		return err
@@ -1574,7 +1574,7 @@ func (n *Node) initHealthAPI() error {
 	err = n.APIServer.AddRoute(
 		health.NewGetHandler(n.health.Health),
 		"health",
-		"health",
+		"/health",
 	)
 	if err != nil {
 		return err
@@ -1583,7 +1583,7 @@ func (n *Node) initHealthAPI() error {
 	return n.APIServer.AddRoute(
 		health.NewGetHandler(n.health.Liveness),
 		"health",
-		"liveness",
+		"/liveness",
 	)
 }
 
