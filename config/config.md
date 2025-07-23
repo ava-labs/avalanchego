@@ -10,19 +10,21 @@ For example:
 - Flag: `--api-admin-enabled`
 - Environment Variable: `AVAGO_API_ADMIN_ENABLED`
 
+**Note:** In the tables below, environment variables are shown without the `AVAGO_` prefix for brevity. All environment variables must be prefixed with `AVAGO_`.
+
 ## Configuration Options
 
 ### APIs
 
 Configuration for various APIs exposed by the node.
 
-| Flag | Environment Variable | Type | Default | Description |
-|------|---------------------|------|---------|-------------|
-| `--api-admin-enabled` | `AVAGO_API_ADMIN_ENABLED` | boolean | `false` | Enables the Admin API. See [Admin API documentation](https://build.avax.network/docs/api-reference/admin-api) |
-| `--api-health-enabled` | `AVAGO_API_HEALTH_ENABLED` | boolean | `true` | Enables the Health API. See [Health API documentation](https://build.avax.network/docs/api-reference/health-api) |
-| `--index-enabled` | `AVAGO_INDEX_ENABLED` | boolean | `false` | Enables the indexer and Index API. See [Index API documentation](https://build.avax.network/docs/api-reference/index-api) |
-| `--api-info-enabled` | `AVAGO_API_INFO_ENABLED` | boolean | `true` | Enables the Info API. See [Info API documentation](https://build.avax.network/docs/api-reference/info-api) |
-| `--api-metrics-enabled` | `AVAGO_API_METRICS_ENABLED` | boolean | `true` | Enables the Metrics API. See [Metrics API documentation](https://build.avax.network/docs/api-reference/metrics-api) |
+| Flag | Env Var | Type | Default | Description |
+|------|---------|------|---------|-------------|
+| `--api-admin-enabled` | `API_ADMIN_ENABLED` | bool | `false` | Enables the Admin API. Provides administrative functions for node management including adding/removing validators, managing aliases, and other privileged operations. See [Admin API documentation](https://build.avax.network/docs/api-reference/admin-api) |
+| `--api-health-enabled` | `API_HEALTH_ENABLED` | bool | `true` | Enables the Health API. Allows monitoring of node health status, readiness checks, and liveness probes. Essential for containerized deployments and monitoring systems. See [Health API documentation](https://build.avax.network/docs/api-reference/health-api) |
+| `--index-enabled` | `INDEX_ENABLED` | bool | `false` | Enables the indexer and Index API. Required for querying historical blockchain data, searching transactions, and retrieving detailed blockchain analytics. Note: Enabling indexing increases disk usage. See [Index API documentation](https://build.avax.network/docs/api-reference/index-api) |
+| `--api-info-enabled` | `API_INFO_ENABLED` | bool | `true` | Enables the Info API. Provides general information about the node including version, network ID, peer information, and blockchain details. Commonly used for node monitoring and debugging. See [Info API documentation](https://build.avax.network/docs/api-reference/info-api) |
+| `--api-metrics-enabled` | `API_METRICS_ENABLED` | bool | `true` | Enables the Metrics API. Exposes Prometheus-compatible metrics for monitoring node performance, resource usage, and blockchain statistics. Essential for observability setups. See [Metrics API documentation](https://build.avax.network/docs/api-reference/metrics-api) |
 
 ### Avalanche Community Proposals
 
@@ -37,26 +39,26 @@ Support for [Avalanche Community Proposals](https://github.com/avalanche-foundat
 
 Configuration for node bootstrapping process.
 
-| Flag | Environment Variable | Type | Default | Description |
-|------|---------------------|------|---------|-------------|
-| `--bootstrap-ancestors-max-containers-sent` | `AVAGO_BOOTSTRAP_ANCESTORS_MAX_CONTAINERS_SENT` | uint | `2000` | Max containers in an Ancestors message |
-| `--bootstrap-ancestors-max-containers-received` | `AVAGO_BOOTSTRAP_ANCESTORS_MAX_CONTAINERS_RECEIVED` | uint | `2000` | Max containers to read from incoming Ancestors |
-| `--bootstrap-beacon-connection-timeout` | `AVAGO_BOOTSTRAP_BEACON_CONNECTION_TIMEOUT` | duration | `1m` | Timeout for beacon connections |
-| `--bootstrap-ids` | `AVAGO_BOOTSTRAP_IDS` | string | network dependent | Comma-separated validator IDs for bootstrapping |
-| `--bootstrap-ips` | `AVAGO_BOOTSTRAP_IPS` | string | network dependent | Comma-separated IP:port pairs for bootstrapping |
-| `--bootstrap-max-time-get-ancestors` | `AVAGO_BOOTSTRAP_MAX_TIME_GET_ANCESTORS` | duration | `50ms` | Max time fetching a container and ancestors |
-| `--bootstrap-retry-enabled` | `AVAGO_BOOTSTRAP_RETRY_ENABLED` | boolean | `true` | Enable bootstrap retry on failure |
-| `--bootstrap-retry-warn-frequency` | `AVAGO_BOOTSTRAP_RETRY_WARN_FREQUENCY` | uint | `50` | Warn after this many retry attempts |
+| Flag | Env Var | Type | Default | Description |
+|------|---------|------|---------|-------------|
+| `--bootstrap-ancestors-max-containers-sent` | `BOOTSTRAP_ANCESTORS_MAX_CONTAINERS_SENT` | uint | `2000` | Maximum number of containers to include in an Ancestors message. Higher values can speed up bootstrapping but increase bandwidth usage. Consider network conditions when adjusting. |
+| `--bootstrap-ancestors-max-containers-received` | `BOOTSTRAP_ANCESTORS_MAX_CONTAINERS_RECEIVED` | uint | `2000` | Maximum number of containers to process from incoming Ancestors messages. Protects against excessive memory usage from malicious or misconfigured peers. Should match or exceed the sent limit. |
+| `--bootstrap-beacon-connection-timeout` | `BOOTSTRAP_BEACON_CONNECTION_TIMEOUT` | dur | `1m` | Maximum time to wait when connecting to bootstrap beacon nodes. Increase in high-latency environments or decrease for faster failure detection. |
+| `--bootstrap-ids` | `BOOTSTRAP_IDS` | string | network | Comma-separated list of validator node IDs to use for bootstrapping. Must specify trusted validators. Example: `NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg,NodeID-MFrZFVCXPv5iCn6M9K6XduxGTYp891xXZ`. Count must match `--bootstrap-ips`. |
+| `--bootstrap-ips` | `BOOTSTRAP_IPS` | string | network | Comma-separated list of IP:port pairs corresponding to bootstrap node IDs. Example: `127.0.0.1:9651,1.2.3.4:9651`. Count must match `--bootstrap-ids`. Default port is 9651 if not specified. |
+| `--bootstrap-max-time-get-ancestors` | `BOOTSTRAP_MAX_TIME_GET_ANCESTORS` | dur | `50ms` | Maximum time to spend fetching a container and its ancestors when responding to GetAncestors requests. Prevents long-running requests from blocking other operations. |
+| `--bootstrap-retry-enabled` | `BOOTSTRAP_RETRY_ENABLED` | bool | `true` | Whether to retry bootstrapping if initial attempt fails. Disabling prevents automatic recovery from temporary network issues during startup. |
+| `--bootstrap-retry-warn-frequency` | `BOOTSTRAP_RETRY_WARN_FREQUENCY` | uint | `50` | Number of bootstrap retry attempts before logging a warning. Helps identify persistent bootstrapping issues while avoiding log spam for temporary problems. |
 
 ### Chain Configuration
 
-Configuration for blockchain-specific settings.
+Configuration for blockchain-specific settings. For detailed chain-specific configuration options (C-Chain, P-Chain, X-Chain, Subnet-EVM), see the [Chain Configs documentation](/docs/nodes/chain-configs).
 
 | Flag | Environment Variable | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
-| `--chain-config-dir` | `AVAGO_CHAIN_CONFIG_DIR` | string | `$HOME/.avalanchego/configs/chains` | Chain config directory |
-| `--chain-config-content` | `AVAGO_CHAIN_CONFIG_CONTENT` | string | - | Base64 encoded chain config |
-| `--chain-aliases-file` | `AVAGO_CHAIN_ALIASES_FILE` | string | `~/.avalanchego/configs/chains/aliases.json` | Chain aliases file path |
+| `--chain-config-dir` | `AVAGO_CHAIN_CONFIG_DIR` | string | `$HOME/.avalanchego/configs/chains` | Directory for chain-specific configurations. Structure: `{chain-config-dir}/{chainID}/config.*` See [Chain Configs documentation](/docs/nodes/chain-configs) for detailed configuration options |
+| `--chain-config-content` | `AVAGO_CHAIN_CONFIG_CONTENT` | string | - | Base64 encoded chain config as alternative to config files. See [Chain Configs documentation](/docs/nodes/chain-configs) |
+| `--chain-aliases-file` | `AVAGO_CHAIN_ALIASES_FILE` | string | `~/.avalanchego/configs/chains/aliases.json` | JSON file mapping blockchain IDs to aliases. Example: `{"q2aTwKuyzgs8pynF7UXBZCU7DejbZbZ6EUyHr3JQzYgwNPUPi": ["DFK"]}` |
 | `--chain-aliases-file-content` | `AVAGO_CHAIN_ALIASES_FILE_CONTENT` | string | - | Base64 encoded chain aliases |
 | `--chain-data-dir` | `AVAGO_CHAIN_DATA_DIR` | string | `$HOME/.avalanchego/chainData` | Chain data directory |
 
