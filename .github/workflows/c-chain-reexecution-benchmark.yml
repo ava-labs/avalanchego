@@ -70,3 +70,7 @@ jobs:
             github-token: ${{ secrets.GITHUB_TOKEN }}
             summary-always: true
             comment-on-alert: true
+            auto-push: false
+        - name: Push Benchmark Result
+          if: github.event_name == 'schedule'
+          run: git push origin gh-pages
