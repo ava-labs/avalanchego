@@ -28,7 +28,7 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/triedb"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const testSyncTimeout = 30 * time.Second
@@ -66,9 +66,7 @@ func testSync(t *testing.T, test syncTest) {
 		MaxOutstandingCodeHashes: DefaultMaxOutstandingCodeHashes,
 		RequestSize:              1024,
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err, "failed to create state syncer")
 	// begin sync
 	s.Start(ctx)
 	waitFor(t, s.Done(), test.expectedError, testSyncTimeout)
@@ -93,14 +91,7 @@ func waitFor(t *testing.T, result <-chan error, expected error, timeout time.Dur
 	t.Helper()
 	select {
 	case err := <-result:
-		if expected != nil {
-			if err == nil {
-				t.Fatalf("Expected error %s, but got nil", expected)
-			}
-			assert.Contains(t, err.Error(), expected.Error())
-		} else if err != nil {
-			t.Fatal("unexpected error waiting for sync result", err)
-		}
+		require.ErrorIs(t, err, expected, "result of sync did not match expected error")
 	case <-time.After(timeout):
 		// print a stack trace to assist with debugging
 		// if the test times out.
@@ -135,9 +126,7 @@ func TestSimpleSyncCases(t *testing.T) {
 					if index%3 == 0 {
 						codeBytes := make([]byte, 256)
 						_, err := rand.Read(codeBytes)
-						if err != nil {
-							t.Fatalf("error reading random code bytes: %v", err)
-						}
+						require.NoError(t, err, "error reading random code bytes")
 
 						codeHash := crypto.Keccak256Hash(codeBytes)
 						rawdb.WriteCode(serverDB, codeHash, codeBytes)
@@ -269,7 +258,7 @@ func TestResumeSyncAccountsTrieInterrupted(t *testing.T) {
 		GetLeafsIntercept: intercept.getLeafsIntercept,
 	})
 
-	assert.EqualValues(t, 2, intercept.numRequests)
+	require.EqualValues(t, 2, intercept.numRequests)
 
 	testSync(t, syncTest{
 		prepareForTest: func(t *testing.T) (ethdb.Database, ethdb.Database, *triedb.Database, common.Hash) {
@@ -427,26 +416,18 @@ func TestResyncNewRootAfterDeletes(t *testing.T) {
 					if len(it.Key()) != len(rawdb.CodePrefix)+common.HashLength {
 						continue
 					}
-					if err := clientDB.Delete(it.Key()); err != nil {
-						t.Fatal(err)
-					}
+					require.NoError(t, clientDB.Delete(it.Key()), "failed to delete code hash %x", it.Key()[len(rawdb.CodePrefix):])
 				}
-				if err := it.Error(); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, it.Error(), "error iterating over code hashes")
 			},
 		},
 		"delete intermediate storage nodes": {
 			deleteBetweenSyncs: func(t *testing.T, root common.Hash, clientDB ethdb.Database) {
 				clientTrieDB := triedb.NewDatabase(clientDB, nil)
 				tr, err := trie.New(trie.TrieID(root), clientTrieDB)
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err, "failed to create trie for root %s", root)
 				nodeIt, err := tr.NodeIterator(nil)
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err, "failed to create node iterator for root %s", root)
 				it := trie.NewIterator(nodeIt)
 				accountsWithStorage := 0
 
@@ -456,9 +437,7 @@ func TestResyncNewRootAfterDeletes(t *testing.T) {
 				corruptedStorageRoots := make(map[common.Hash]struct{})
 				for it.Next() {
 					var acc types.StateAccount
-					if err := rlp.DecodeBytes(it.Value, &acc); err != nil {
-						t.Fatal(err)
-					}
+					require.NoError(t, rlp.DecodeBytes(it.Value, &acc), "failed to decode account at key %x", it.Key)
 					if acc.Root == types.EmptyRootHash {
 						continue
 					}
@@ -472,23 +451,17 @@ func TestResyncNewRootAfterDeletes(t *testing.T) {
 					}
 					corruptedStorageRoots[acc.Root] = struct{}{}
 					tr, err := trie.New(trie.TrieID(acc.Root), clientTrieDB)
-					if err != nil {
-						t.Fatal(err)
-					}
+					require.NoError(t, err, "failed to create trie for root %s", acc.Root)
 					statesynctest.CorruptTrie(t, clientDB, tr, 2)
 				}
-				if err := it.Err; err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, it.Err, "error iterating over trie nodes")
 			},
 		},
 		"delete intermediate account trie nodes": {
 			deleteBetweenSyncs: func(t *testing.T, root common.Hash, clientDB ethdb.Database) {
 				clientTrieDB := triedb.NewDatabase(clientDB, nil)
 				tr, err := trie.New(trie.TrieID(root), clientTrieDB)
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err, "failed to create trie for root %s", root)
 				statesynctest.CorruptTrie(t, clientDB, tr, 5)
 			},
 		},
@@ -547,9 +520,7 @@ func assertDBConsistency(t testing.TB, root common.Hash, clientDB ethdb.Database
 		}
 		numSnapshotAccounts++
 	}
-	if err := accountIt.Error(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, accountIt.Error(), "error iterating over account snapshots")
 	trieAccountLeaves := 0
 
 	statesynctest.AssertTrieConsistency(t, root, serverTrieDB, clientTrieDB, func(key, val []byte) error {
@@ -562,15 +533,15 @@ func assertDBConsistency(t testing.TB, root common.Hash, clientDB ethdb.Database
 		// check snapshot consistency
 		snapshotVal := rawdb.ReadAccountSnapshot(clientDB, accHash)
 		expectedSnapshotVal := types.SlimAccountRLP(acc)
-		assert.Equal(t, expectedSnapshotVal, snapshotVal)
+		require.Equal(t, expectedSnapshotVal, snapshotVal)
 
 		// check code consistency
 		if !bytes.Equal(acc.CodeHash, types.EmptyCodeHash[:]) {
 			codeHash := common.BytesToHash(acc.CodeHash)
 			code := rawdb.ReadCode(clientDB, codeHash)
 			actualHash := crypto.Keccak256Hash(code)
-			assert.NotZero(t, len(code))
-			assert.Equal(t, codeHash, actualHash)
+			require.NotZero(t, len(code))
+			require.Equal(t, codeHash, actualHash)
 		}
 		if acc.Root == types.EmptyRootHash {
 			return nil
@@ -590,25 +561,23 @@ func assertDBConsistency(t testing.TB, root common.Hash, clientDB ethdb.Database
 		statesynctest.AssertTrieConsistency(t, acc.Root, serverTrieDB, clientTrieDB, func(key, val []byte) error {
 			storageTrieLeavesCount++
 			snapshotVal := rawdb.ReadStorageSnapshot(clientDB, accHash, common.BytesToHash(key))
-			assert.Equal(t, val, snapshotVal)
+			require.Equal(t, val, snapshotVal)
 			return nil
 		})
 
-		assert.Equal(t, storageTrieLeavesCount, snapshotStorageKeysCount)
+		require.Equal(t, storageTrieLeavesCount, snapshotStorageKeysCount)
 		return nil
 	})
 
 	// Check that the number of accounts in the snapshot matches the number of leaves in the accounts trie
-	assert.Equal(t, trieAccountLeaves, numSnapshotAccounts)
+	require.Equal(t, trieAccountLeaves, numSnapshotAccounts)
 }
 
 func fillAccountsWithStorage(t *testing.T, serverDB ethdb.Database, serverTrieDB *triedb.Database, root common.Hash, numAccounts int) common.Hash {
 	newRoot, _ := statesynctest.FillAccounts(t, serverTrieDB, root, numAccounts, func(t *testing.T, index int, account types.StateAccount) types.StateAccount {
 		codeBytes := make([]byte, 256)
 		_, err := rand.Read(codeBytes)
-		if err != nil {
-			t.Fatalf("error reading random code bytes: %v", err)
-		}
+		require.NoError(t, err, "error reading random code bytes")
 
 		codeHash := crypto.Keccak256Hash(codeBytes)
 		rawdb.WriteCode(serverDB, codeHash, codeBytes)
