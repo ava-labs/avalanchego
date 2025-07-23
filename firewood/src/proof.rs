@@ -14,7 +14,6 @@ use firewood_storage::{
     BranchNode, FileIoError, HashType, Hashable, IntoHashType, NibblesIterator, PathIterItem,
     Preimage, TrieHash, ValueDigest,
 };
-use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -158,40 +157,7 @@ impl<T: Hashable> Proof<T> {
         expected_value: Option<V>,
         root_hash: &TrieHash,
     ) -> Result<(), ProofError> {
-        let value_digest = self.value_digest(key, root_hash)?;
-
-        let Some(value_digest) = value_digest else {
-            // This proof proves that `key` maps to None.
-            if expected_value.is_some() {
-                return Err(ProofError::ExpectedValue);
-            }
-            return Ok(());
-        };
-
-        let Some(expected_value) = expected_value else {
-            // We were expecting `key` to map to None.
-            return Err(ProofError::UnexpectedValue);
-        };
-
-        match value_digest {
-            ValueDigest::Value(got_value) => {
-                // This proof proves that `key` maps to `got_value`.
-                if got_value != expected_value.as_ref() {
-                    // `key` maps to an unexpected value.
-                    return Err(ProofError::ValueMismatch);
-                }
-            }
-            ValueDigest::Hash(got_hash) => {
-                // This proof proves that `key` maps to a value
-                // whose hash is `got_hash`.
-                let value_hash = Sha256::digest(expected_value.as_ref());
-                if got_hash != value_hash.as_slice() {
-                    // `key` maps to an unexpected value.
-                    return Err(ProofError::ValueMismatch);
-                }
-            }
-        }
-        Ok(())
+        verify_opt_value_digest(expected_value, self.value_digest(key, root_hash)?)
     }
 
     /// Returns the value digest associated with the given `key` in the trie revision
@@ -279,4 +245,17 @@ where
     }
 
     c.next()
+}
+
+fn verify_opt_value_digest(
+    expected_value: Option<impl AsRef<[u8]>>,
+    found_value: Option<ValueDigest<impl AsRef<[u8]>>>,
+) -> Result<(), ProofError> {
+    match (expected_value, found_value) {
+        (None, None) => Ok(()),
+        (Some(_), None) => Err(ProofError::ExpectedValue),
+        (None, Some(_)) => Err(ProofError::UnexpectedValue),
+        (Some(ref expected), Some(found)) if found.verify(expected) => Ok(()),
+        (Some(_), Some(_)) => Err(ProofError::ValueMismatch),
+    }
 }

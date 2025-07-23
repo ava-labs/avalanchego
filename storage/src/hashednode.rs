@@ -6,14 +6,13 @@
     reason = "Found 1 occurrences after enabling the lint."
 )]
 
+use crate::{BranchNode, HashType, LeafNode, Node, Path};
+use sha2::{Digest, Sha256};
+use smallvec::SmallVec;
 use std::{
     iter::{self},
     ops::Deref,
 };
-
-use smallvec::SmallVec;
-
-use crate::{BranchNode, HashType, LeafNode, Node, Path};
 
 /// Returns the hash of `node`, which is at the given `path_prefix`.
 #[must_use]
@@ -109,6 +108,23 @@ impl<T> Deref for ValueDigest<T> {
         match self {
             ValueDigest::Value(value) => value,
             ValueDigest::Hash(hash) => hash,
+        }
+    }
+}
+
+impl<T: AsRef<[u8]>> ValueDigest<T> {
+    /// Verifies that the value or hash matches the expected value.
+    pub fn verify(&self, expected: impl AsRef<[u8]>) -> bool {
+        match self {
+            Self::Value(got_value) => {
+                // This proof proves that `key` maps to `got_value`.
+                got_value.as_ref() == expected.as_ref()
+            }
+            Self::Hash(got_hash) => {
+                // This proof proves that `key` maps to a value
+                // whose hash is `got_hash`.
+                got_hash.as_ref() == Sha256::digest(expected.as_ref()).as_slice()
+            }
         }
     }
 }
