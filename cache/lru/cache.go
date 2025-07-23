@@ -21,7 +21,7 @@ type Cache[K comparable, V any] struct {
 	elements *linked.Hashmap[K, V]
 	size     int
 
-	// onEvict is called with the key and value of an entry before eviction, if set.
+	// onEvict is called with the key and value of an entry before eviction.
 	onEvict func(K, V)
 }
 
@@ -30,7 +30,7 @@ func NewCache[K comparable, V any](size int) *Cache[K, V] {
 	return &Cache[K, V]{
 		elements: linked.NewHashmap[K, V](),
 		size:     max(size, 1),
-		onEvict:  nil,
+		onEvict:  func(K, V) {}, // no-op by default
 	}
 }
 
@@ -54,7 +54,7 @@ func (c *Cache[K, V]) Put(key K, value V) {
 
 	if c.elements.Len() == c.size {
 		oldestKey, oldestValue, found := c.elements.Oldest()
-		if c.onEvict != nil && found {
+		if found {
 			c.onEvict(oldestKey, oldestValue)
 		}
 		c.elements.Delete(oldestKey)
@@ -77,10 +77,8 @@ func (c *Cache[K, V]) Get(key K) (V, bool) {
 func (c *Cache[K, _]) Evict(key K) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	if c.onEvict != nil {
-		if value, found := c.elements.Get(key); found {
-			c.onEvict(key, value)
-		}
+	if value, found := c.elements.Get(key); found {
+		c.onEvict(key, value)
 	}
 	c.elements.Delete(key)
 }
@@ -90,14 +88,11 @@ func (c *Cache[_, _]) Flush() {
 	defer c.lock.Unlock()
 
 	// Call onEvict for each element before clearing
-	if c.onEvict != nil {
-		iter := c.elements.NewIterator()
-		for iter.Next() {
-			c.onEvict(iter.Key(), iter.Value())
-		}
+	iter := c.elements.NewIterator()
+	for iter.Next() {
+		c.onEvict(iter.Key(), iter.Value())
+		c.elements.Delete(iter.Key())
 	}
-
-	c.elements.Clear()
 }
 
 func (c *Cache[_, _]) Len() int {
