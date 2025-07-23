@@ -10,8 +10,6 @@ For example:
 - Flag: `--api-admin-enabled`
 - Environment Variable: `AVAGO_API_ADMIN_ENABLED`
 
-**Note:** In the tables below, environment variables are shown without the `AVAGO_` prefix for brevity. All environment variables must be prefixed with `AVAGO_`.
-
 ## Configuration Options
 
 ### APIs
@@ -20,18 +18,18 @@ Configuration for various APIs exposed by the node.
 
 | Flag | Env Var | Type | Default | Description |
 |------|---------|------|---------|-------------|
-| `--api-admin-enabled` | `API_ADMIN_ENABLED` | bool | `false` | Enables the Admin API. Provides administrative functions for node management including adding/removing validators, managing aliases, and other privileged operations. See [Admin API documentation](https://build.avax.network/docs/api-reference/admin-api) |
-| `--api-health-enabled` | `API_HEALTH_ENABLED` | bool | `true` | Enables the Health API. Allows monitoring of node health status, readiness checks, and liveness probes. Essential for containerized deployments and monitoring systems. See [Health API documentation](https://build.avax.network/docs/api-reference/health-api) |
-| `--index-enabled` | `INDEX_ENABLED` | bool | `false` | Enables the indexer and Index API. Required for querying historical blockchain data, searching transactions, and retrieving detailed blockchain analytics. Note: Enabling indexing increases disk usage. See [Index API documentation](https://build.avax.network/docs/api-reference/index-api) |
-| `--api-info-enabled` | `API_INFO_ENABLED` | bool | `true` | Enables the Info API. Provides general information about the node including version, network ID, peer information, and blockchain details. Commonly used for node monitoring and debugging. See [Info API documentation](https://build.avax.network/docs/api-reference/info-api) |
-| `--api-metrics-enabled` | `API_METRICS_ENABLED` | bool | `true` | Enables the Metrics API. Exposes Prometheus-compatible metrics for monitoring node performance, resource usage, and blockchain statistics. Essential for observability setups. See [Metrics API documentation](https://build.avax.network/docs/api-reference/metrics-api) |
+| `--api-admin-enabled` | `AVAGO_API_ADMIN_ENABLED` | bool | `false` | Enables the Admin API. Provides administrative functions for node management including adding/removing validators, managing aliases, and other privileged operations. See [Admin API documentation](https://build.avax.network/docs/api-reference/admin-api) |
+| `--api-health-enabled` | `AVAGO_API_HEALTH_ENABLED` | bool | `true` | Enables the Health API. Allows monitoring of node health status, readiness checks, and liveness probes. Essential for containerized deployments and monitoring systems. See [Health API documentation](https://build.avax.network/docs/api-reference/health-api) |
+| `--index-enabled` | `AVAGO_INDEX_ENABLED` | bool | `false` | Enables the indexer and Index API. Required for querying historical blockchain data, searching transactions, and retrieving detailed blockchain analytics. Note: Enabling indexing increases disk usage. See [Index API documentation](https://build.avax.network/docs/api-reference/index-api) |
+| `--api-info-enabled` | `AVAGO_API_INFO_ENABLED` | bool | `true` | Enables the Info API. Provides general information about the node including version, network ID, peer information, and blockchain details. Commonly used for node monitoring and debugging. See [Info API documentation](https://build.avax.network/docs/api-reference/info-api) |
+| `--api-metrics-enabled` | `AVAGO_API_METRICS_ENABLED` | bool | `true` | Enables the Metrics API. Exposes Prometheus-compatible metrics for monitoring node performance, resource usage, and blockchain statistics. Essential for observability setups. See [Metrics API documentation](https://build.avax.network/docs/api-reference/metrics-api) |
 
 ### Avalanche Community Proposals
 
 Support for [Avalanche Community Proposals](https://github.com/avalanche-foundation/ACPs).
 
-| Flag | Environment Variable | Type | Default | Description |
-|------|---------------------|------|---------|-------------|
+| Flag | Env Var | Type | Default | Description |
+|------|---------|------|---------|-------------|
 | `--acp-support` | `AVAGO_ACP_SUPPORT` | []int | `[]` | List of ACP IDs to support |
 | `--acp-object` | `AVAGO_ACP_OBJECT` | []int | `[]` | List of ACP IDs to object to |
 
@@ -41,20 +39,20 @@ Configuration for node bootstrapping process.
 
 | Flag | Env Var | Type | Default | Description |
 |------|---------|------|---------|-------------|
-| `--bootstrap-ancestors-max-containers-sent` | `BOOTSTRAP_ANCESTORS_MAX_CONTAINERS_SENT` | uint | `2000` | Maximum number of containers to include in an Ancestors message. Higher values can speed up bootstrapping but increase bandwidth usage. Consider network conditions when adjusting. |
-| `--bootstrap-ancestors-max-containers-received` | `BOOTSTRAP_ANCESTORS_MAX_CONTAINERS_RECEIVED` | uint | `2000` | Maximum number of containers to process from incoming Ancestors messages. Protects against excessive memory usage from malicious or misconfigured peers. Should match or exceed the sent limit. |
-| `--bootstrap-beacon-connection-timeout` | `BOOTSTRAP_BEACON_CONNECTION_TIMEOUT` | dur | `1m` | Maximum time to wait when connecting to bootstrap beacon nodes. Increase in high-latency environments or decrease for faster failure detection. |
-| `--bootstrap-ids` | `BOOTSTRAP_IDS` | string | network | Comma-separated list of validator node IDs to use for bootstrapping. Must specify trusted validators. Example: `NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg,NodeID-MFrZFVCXPv5iCn6M9K6XduxGTYp891xXZ`. Count must match `--bootstrap-ips`. |
-| `--bootstrap-ips` | `BOOTSTRAP_IPS` | string | network | Comma-separated list of IP:port pairs corresponding to bootstrap node IDs. Example: `127.0.0.1:9651,1.2.3.4:9651`. Count must match `--bootstrap-ids`. Default port is 9651 if not specified. |
-| `--bootstrap-max-time-get-ancestors` | `BOOTSTRAP_MAX_TIME_GET_ANCESTORS` | dur | `50ms` | Maximum time to spend fetching a container and its ancestors when responding to GetAncestors requests. Prevents long-running requests from blocking other operations. |
-| `--bootstrap-retry-enabled` | `BOOTSTRAP_RETRY_ENABLED` | bool | `true` | Whether to retry bootstrapping if initial attempt fails. Disabling prevents automatic recovery from temporary network issues during startup. |
-| `--bootstrap-retry-warn-frequency` | `BOOTSTRAP_RETRY_WARN_FREQUENCY` | uint | `50` | Number of bootstrap retry attempts before logging a warning. Helps identify persistent bootstrapping issues while avoiding log spam for temporary problems. |
+| `--bootstrap-ancestors-max-containers-sent` | `AVAGO_BOOTSTRAP_ANCESTORS_MAX_CONTAINERS_SENT` | uint | `2000` | Max number of containers in an Ancestors message sent by this node. |
+| `--bootstrap-ancestors-max-containers-received` | `AVAGO_BOOTSTRAP_ANCESTORS_MAX_CONTAINERS_RECEIVED` | uint | `2000` | This node reads at most this many containers from an incoming Ancestors message. |
+| `--bootstrap-beacon-connection-timeout` | `AVAGO_BOOTSTRAP_BEACON_CONNECTION_TIMEOUT` | dur | `1m` | Timeout when attempting to connect to bootstrapping beacons. |
+| `--bootstrap-ids` | `AVAGO_BOOTSTRAP_IDS` | string | network | Bootstrap IDs is a comma-separated list of validator IDs. These IDs will be used to authenticate bootstrapping peers. An example setting of this field would be --bootstrap-ids="NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg,NodeID-MFrZFVCXPv5iCn6M9K6XduxGTYp891xXZ". The number of given IDs here must be same with number of given --bootstrap-ips.  |
+| `--bootstrap-ips` | `AVAGO_BOOTSTRAP_IPS` | string | network | Comma-separated list of IP:port pairs corresponding to bootstrap node IDs. Example: `127.0.0.1:9651,1.2.3.4:9651`. Count must match `--bootstrap-ids`. Default port is 9651 if not specified. |
+| `--bootstrap-max-time-get-ancestors` | `AVAGO_BOOTSTRAP_MAX_TIME_GET_ANCESTORS` | dur | `50ms` | Maximum time to spend fetching a container and its ancestors when responding to GetAncestors requests. Prevents long-running requests from blocking other operations. |
+| `--bootstrap-retry-enabled` | `AVAGO_BOOTSTRAP_RETRY_ENABLED` | bool | `true` | Whether to retry bootstrapping if initial attempt fails. Disabling prevents automatic recovery from temporary network issues during startup. |
+| `--bootstrap-retry-warn-frequency` | `AVAGO_BOOTSTRAP_RETRY_WARN_FREQUENCY` | uint | `50` | Number of bootstrap retry attempts before logging a warning. Helps identify persistent bootstrapping issues while avoiding log spam for temporary problems. |
 
 ### Chain Configuration
 
 Configuration for blockchain-specific settings. For detailed chain-specific configuration options (C-Chain, P-Chain, X-Chain, Subnet-EVM), see the [Chain Configs documentation](/docs/nodes/chain-configs).
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--chain-config-dir` | `AVAGO_CHAIN_CONFIG_DIR` | string | `~/.avalanchego/configs/chains` | Directory for chain-specific configurations. Structure: `{chain-config-dir}/{chainID}/config.*` See [Chain Configs documentation](/docs/nodes/chain-configs) for detailed configuration options |
 | `--chain-config-content` | `AVAGO_CHAIN_CONFIG_CONTENT` | string | - | Base64 encoded chain config as alternative to config files. See [Chain Configs documentation](/docs/nodes/chain-configs) |
@@ -66,7 +64,7 @@ Configuration for blockchain-specific settings. For detailed chain-specific conf
 
 Node configuration file settings.
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--config-file` | `AVAGO_CONFIG_FILE` | string | - | JSON config file path |
 | `--config-file-content` | `AVAGO_CONFIG_FILE_CONTENT` | string | - | Base64 encoded config content |
@@ -76,7 +74,7 @@ Node configuration file settings.
 
 Base directory configuration.
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--data-dir` | `AVAGO_DATA_DIR` | string | `~/.avalanchego` | Base data directory |
 
@@ -84,7 +82,7 @@ Base directory configuration.
 
 Database configuration options.
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--db-dir` | `AVAGO_DB_DIR` | string | `~/.avalanchego/db` | Database directory |
 | `--db-type` | `AVAGO_DB_TYPE` | string | `leveldb` | Database type (leveldb, memdb, pebbledb) |
@@ -93,7 +91,7 @@ Database configuration options.
 
 ### File Descriptor Limit
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--fd-limit` | `AVAGO_FD_LIMIT` | int | `32768` | Target file descriptor limit |
 
@@ -101,7 +99,7 @@ Database configuration options.
 
 Genesis configuration.
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--genesis-file` | `AVAGO_GENESIS_FILE` | string | - | Genesis file path |
 | `--genesis-file-content` | `AVAGO_GENESIS_FILE_CONTENT` | string | - | Base64 encoded genesis data |
@@ -110,7 +108,7 @@ Genesis configuration.
 
 HTTP API server configuration.
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--http-allowed-hosts` | `AVAGO_HTTP_ALLOWED_HOSTS` | string | `localhost` | Allowed hostnames (comma-separated) |
 | `--http-allowed-origins` | `AVAGO_HTTP_ALLOWED_ORIGINS` | string | `*` | Allowed origins |
@@ -132,7 +130,7 @@ HTTP API server configuration.
 
 Logging configuration.
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--log-level` | `AVAGO_LOG_LEVEL` | string | `info` | Log level (off, fatal, error, warn, info, trace, debug, verbo) |
 | `--log-display-level` | `AVAGO_LOG_DISPLAY_LEVEL` | string | value of `--log-level` | Console log level |
@@ -148,7 +146,7 @@ Logging configuration.
 
 Network identification and configuration.
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--network-id` | `AVAGO_NETWORK_ID` | string | `mainnet` | Network to connect to (mainnet, fuji, testnet, local, network-{id}) |
 
@@ -156,7 +154,7 @@ Network identification and configuration.
 
 Tracing and observability configuration.
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--tracing-endpoint` | `AVAGO_TRACING_ENDPOINT` | string | See description | Trace export endpoint |
 | `--tracing-exporter-type` | `AVAGO_TRACING_EXPORTER_TYPE` | string | `disabled` | Exporter type (disabled, grpc, http) |
@@ -167,7 +165,7 @@ Tracing and observability configuration.
 
 Partial synchronization settings.
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--partial-sync-primary-network` | `AVAGO_PARTIAL_SYNC_PRIMARY_NETWORK` | boolean | `false` | Sync only P-chain on primary network |
 
@@ -175,7 +173,7 @@ Partial synchronization settings.
 
 Public IP configuration for validators.
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--public-ip` | `AVAGO_PUBLIC_IP` | string | - | Node's public IP address |
 | `--public-ip-resolution-frequency` | `AVAGO_PUBLIC_IP_RESOLUTION_FREQUENCY` | duration | `5m` | IP resolution frequency |
@@ -185,7 +183,7 @@ Public IP configuration for validators.
 
 State synchronization configuration.
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--state-sync-ids` | `AVAGO_STATE_SYNC_IDS` | string | - | Comma-separated validator IDs for state sync |
 | `--state-sync-ips` | `AVAGO_STATE_SYNC_IPS` | string | - | Comma-separated IP:port pairs for state sync |
@@ -194,7 +192,7 @@ State synchronization configuration.
 
 Staking and validator configuration.
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--staking-port` | `AVAGO_STAKING_PORT` | int | `9651` | Staking port |
 | `--sybil-protection-enabled` | `AVAGO_SYBIL_PROTECTION_ENABLED` | boolean | `true` | Enable sybil protection (PoS) |
@@ -208,7 +206,7 @@ Staking and validator configuration.
 
 Subnet configuration.
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--track-subnets` | `AVAGO_TRACK_SUBNETS` | string | - | Comma-separated subnet IDs to track |
 | `--subnet-config-dir` | `AVAGO_SUBNET_CONFIG_DIR` | string | `~/.avalanchego/configs/subnets` | Subnet config directory |
@@ -218,7 +216,7 @@ Subnet configuration.
 
 Version information.
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--version` | `AVAGO_VERSION` | boolean | `false` | Print version and exit |
 
@@ -230,7 +228,7 @@ Version information.
 
 Consensus gossiping parameters.
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--consensus-accepted-frontier-gossip-validator-size` | `AVAGO_CONSENSUS_ACCEPTED_FRONTIER_GOSSIP_VALIDATOR_SIZE` | uint | `0` | Validators to gossip accepted frontier |
 | `--consensus-accepted-frontier-gossip-non-validator-size` | `AVAGO_CONSENSUS_ACCEPTED_FRONTIER_GOSSIP_NON_VALIDATOR_SIZE` | uint | `0` | Non-validators to gossip accepted frontier |
@@ -244,7 +242,7 @@ Consensus gossiping parameters.
 
 Peer benchlisting configuration.
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--benchlist-duration` | `AVAGO_BENCHLIST_DURATION` | duration | `15m` | Max benchlist duration |
 | `--benchlist-fail-threshold` | `AVAGO_BENCHLIST_FAIL_THRESHOLD` | int | `10` | Failures before benchlisting |
@@ -254,7 +252,7 @@ Peer benchlisting configuration.
 
 Core consensus configuration.
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--consensus-shutdown-timeout` | `AVAGO_CONSENSUS_SHUTDOWN_TIMEOUT` | duration | `5s` | Unresponsive chain timeout |
 | `--create-asset-tx-fee` | `AVAGO_CREATE_ASSET_TX_FEE` | int | `10000000` | Asset creation fee (nAVAX) |
@@ -266,7 +264,7 @@ Core consensus configuration.
 
 Staking economics configuration.
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--min-validator-stake` | `AVAGO_MIN_VALIDATOR_STAKE` | int | network dependent | Min validator stake (nAVAX) |
 | `--max-validator-stake` | `AVAGO_MAX_VALIDATOR_STAKE` | int | network dependent | Max validator stake (nAVAX) |
@@ -283,7 +281,7 @@ Staking economics configuration.
 
 Snow consensus protocol parameters.
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--snow-concurrent-repolls` | `AVAGO_SNOW_CONCURRENT_REPOLLS` | int | `4` | Concurrent repolls |
 | `--snow-sample-size` | `AVAGO_SNOW_SAMPLE_SIZE` | int | `20` | Sample size (k) |
@@ -297,7 +295,7 @@ Snow consensus protocol parameters.
 
 ProposerVM configuration.
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--proposervm-use-current-height` | `AVAGO_PROPOSERVM_USE_CURRENT_HEIGHT` | boolean | `false` | Report current P-chain height |
 | `--proposervm-min-block-delay` | `AVAGO_PROPOSERVM_MIN_BLOCK_DELAY` | duration | `1s` | Min block build delay |
@@ -306,7 +304,7 @@ ProposerVM configuration.
 
 Performance profiling configuration.
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--profile-continuous-enabled` | `AVAGO_PROFILE_CONTINUOUS_ENABLED` | boolean | `false` | Enable continuous profiling |
 | `--profile-dir` | `AVAGO_PROFILE_DIR` | string | `~/.avalanchego/profiles/` | Profile output directory |
@@ -317,7 +315,7 @@ Performance profiling configuration.
 
 Health monitoring configuration.
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--health-check-frequency` | `AVAGO_HEALTH_CHECK_FREQUENCY` | duration | `30s` | Health check frequency |
 | `--health-check-averager-halflife` | `AVAGO_HEALTH_CHECK_AVERAGER_HALFLIFE` | duration | `10s` | Averager half-life |
@@ -326,7 +324,7 @@ Health monitoring configuration.
 
 Advanced network settings.
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--network-allow-private-ips` | `AVAGO_NETWORK_ALLOW_PRIVATE_IPS` | boolean | `true` | Allow private IP connections |
 | `--network-compression-type` | `AVAGO_NETWORK_COMPRESSION_TYPE` | string | `gzip` | Message compression (gzip, zstd, none) |
@@ -357,7 +355,7 @@ Advanced network settings.
 
 #### CPU Based Rate-Limiting
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--throttler-inbound-cpu-validator-alloc` | `AVAGO_THROTTLER_INBOUND_CPU_VALIDATOR_ALLOC` | float | half of CPUs | CPU allocation for validators |
 | `--throttler-inbound-cpu-max-recheck-delay` | `AVAGO_THROTTLER_INBOUND_CPU_MAX_RECHECK_DELAY` | duration | `5s` | CPU recheck delay |
@@ -370,14 +368,14 @@ Advanced network settings.
 
 #### Bandwidth Based Rate-Limiting
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--throttler-inbound-bandwidth-refill-rate` | `AVAGO_THROTTLER_INBOUND_BANDWIDTH_REFILL_RATE` | uint | `512` | Bandwidth refill rate (bytes/sec) |
 | `--throttler-inbound-bandwidth-max-burst-size` | `AVAGO_THROTTLER_INBOUND_BANDWIDTH_MAX_BURST_SIZE` | uint | `2 MiB` | Max bandwidth burst |
 
 #### Message Size Based Rate-Limiting
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--throttler-inbound-at-large-alloc-size` | `AVAGO_THROTTLER_INBOUND_AT_LARGE_ALLOC_SIZE` | uint | `6 MiB` | At-large allocation size |
 | `--throttler-inbound-validator-alloc-size` | `AVAGO_THROTTLER_INBOUND_VALIDATOR_ALLOC_SIZE` | uint | `32 MiB` | Validator allocation size |
@@ -385,13 +383,13 @@ Advanced network settings.
 
 #### Message Based Rate-Limiting
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--throttler-inbound-node-max-processing-msgs` | `AVAGO_THROTTLER_INBOUND_NODE_MAX_PROCESSING_MSGS` | uint | `1024` | Max processing messages per node |
 
 #### Outbound Rate-Limiting
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--throttler-outbound-at-large-alloc-size` | `AVAGO_THROTTLER_OUTBOUND_AT_LARGE_ALLOC_SIZE` | uint | `32 MiB` | Outbound at-large allocation |
 | `--throttler-outbound-validator-alloc-size` | `AVAGO_THROTTLER_OUTBOUND_VALIDATOR_ALLOC_SIZE` | uint | `32 MiB` | Outbound validator allocation |
@@ -399,7 +397,7 @@ Advanced network settings.
 
 ### Connection Rate-Limiting
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--network-inbound-connection-throttling-cooldown` | `AVAGO_NETWORK_INBOUND_CONNECTION_THROTTLING_COOLDOWN` | duration | `10s` | Connection upgrade cooldown |
 | `--network-inbound-connection-throttling-max-conns-per-sec` | `AVAGO_NETWORK_INBOUND_CONNECTION_THROTTLING_MAX_CONNS_PER_SEC` | uint | `512` | Max inbound connections/sec |
@@ -407,7 +405,7 @@ Advanced network settings.
 
 ### Peer List Gossiping
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--network-peer-list-num-validator-ips` | `AVAGO_NETWORK_PEER_LIST_NUM_VALIDATOR_IPS` | int | `15` | Validator IPs to gossip |
 | `--network-peer-list-validator-gossip-size` | `AVAGO_NETWORK_PEER_LIST_VALIDATOR_GOSSIP_SIZE` | int | `20` | Validators to gossip to |
@@ -419,7 +417,7 @@ Advanced network settings.
 
 ### Resource Usage Tracking
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--meter-vms-enabled` | `AVAGO_METER_VMS_ENABLED` | boolean | `true` | Enable VM metering |
 | `--system-tracker-frequency` | `AVAGO_SYSTEM_TRACKER_FREQUENCY` | duration | `500ms` | System tracking frequency |
@@ -431,7 +429,7 @@ Advanced network settings.
 
 ### Additional Configuration
 
-| Flag | Environment Variable | Type | Default | Description |
+| Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--plugin-dir` | `AVAGO_PLUGIN_DIR` | string | `~/.avalanchego/plugins` | VM plugins directory |
 | `--vm-aliases-file` | `AVAGO_VM_ALIASES_FILE` | string | `~/.avalanchego/configs/vms/aliases.json` | VM aliases file |
