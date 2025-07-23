@@ -389,7 +389,7 @@ impl<T: HashedNodeReader> Merkle<T> {
 
                     let inserted = seen.insert(format!("{child}"));
                     if inserted {
-                        writeln!(writer, "  {node} -> {child}[label=\"{childidx}\"]")
+                        writeln!(writer, "  {node} -> {child}[label=\"{childidx:x}\"]")
                             .map_err(|e| FileIoError::from_generic_no_file(e, "write branch"))?;
                         self.dump_node(&child, child_hash, seen, writer)?;
                     } else {
@@ -397,7 +397,7 @@ impl<T: HashedNodeReader> Merkle<T> {
                         // Indicate this with a red edge.
                         writeln!(
                             writer,
-                            "  {node} -> {child}[label=\"{childidx} (dup)\" color=red]"
+                            "  {node} -> {child}[label=\"{childidx:x} (dup)\" color=red]"
                         )
                         .map_err(|e| FileIoError::from_generic_no_file(e, "write branch"))?;
                     }
