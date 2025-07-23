@@ -32,15 +32,13 @@ var _ = ginkgo.Describe("[Connect Info API]", func() {
 	ginkgo.BeforeAll(func() {
 		rootDir := env.RootNetworkDir
 		network := tmpnet.NewDefaultNetwork("connect-info-e2e")
-
-		err := tmpnet.BootstrapNewNetwork(ctx, tc.Log(), network, rootDir)
-		require.NoError(err)
+		require.NoError(tmpnet.BootstrapNewNetwork(ctx, tc.Log(), network, rootDir))
 
 		node, err := network.GetNode(ids.BuildTestNodeID([]byte("node-0")))
 		require.NoError(err)
 		e2e.WaitForHealthy(tc, node)
-		url := node.GetAccessibleURI()
-		client = infov1connect.NewInfoServiceClient(http.DefaultClient, url)
+		uri := node.GetAccessibleURI()
+		client = infov1connect.NewInfoServiceClient(http.DefaultClient, uri)
 	})
 
 	ginkgo.It("NodeVersion returns version info", func() {
