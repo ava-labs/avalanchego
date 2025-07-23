@@ -42,7 +42,6 @@ type VM interface {
 	//                 system, `genesisBytes` would probably contain a genesis
 	//                 transaction that gives coins to some accounts, and this
 	//                 transaction would be in the genesis block.
-	// [toEngine]: The channel used to send messages to the consensus engine.
 	// [fxs]: Feature extensions that attach to this VM.
 	Initialize(
 		ctx context.Context,

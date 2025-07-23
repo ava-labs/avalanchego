@@ -2828,10 +2828,7 @@ func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
 		return innerBlock3, nil
 	}
 
-	// Attempting to build a block now errors with an unexpected error. This
-	// results in dropping the build block request, which breaks the invariant
-	// that BuildBlock will be called at least once after sending a PendingTxs
-	// message on the ToEngine channel.
+	// Attempting to build a block now errors with an unexpected error.
 	_, err = proVM.BuildBlock(context.Background())
 	require.NoError(err)
 }
