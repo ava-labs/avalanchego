@@ -4,7 +4,6 @@
 package message
 
 import (
-	"bytes"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -14,15 +13,6 @@ type Validator struct {
 	UncompressedPublicKeyBytes [96]byte `serialize:"true"`
 	Weight                     uint64   `serialize:"true"`
 }
-
-// TODO: Remove this. Just added as a util
-func (v *Validator) Compare(o *Validator) int {
-	return bytes.Compare(v.UncompressedPublicKeyBytes[:], o.UncompressedPublicKeyBytes[:])
-}
-
-// type ValidatorSet struct {
-// 	Validators []*Validator `serialize:"true"`
-// }
 
 // ValidatorSetState is sent by the P-chain.
 //
