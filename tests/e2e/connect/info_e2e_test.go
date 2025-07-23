@@ -22,10 +22,11 @@ import (
 
 var _ = ginkgo.Describe("[Connect Info API]", func() {
 	var (
-		tc     = e2e.NewTestContext()
-		env    = e2e.GetEnv(tc)
-		client infov1connect.InfoServiceClient
-		ctx    = tc.DefaultContext()
+		tc      = e2e.NewTestContext()
+		env     = e2e.GetEnv(tc)
+		require = require.New(tc)
+		client  infov1connect.InfoServiceClient
+		ctx     = tc.DefaultContext()
 	)
 
 	ginkgo.BeforeAll(func() {
@@ -33,71 +34,72 @@ var _ = ginkgo.Describe("[Connect Info API]", func() {
 		network := tmpnet.NewDefaultNetwork("connect-info-e2e")
 
 		err := tmpnet.BootstrapNewNetwork(ctx, tc.Log(), network, rootDir)
-		require.NoError(tc, err)
+		require.NoError(err)
 
 		node, err := network.GetNode(ids.BuildTestNodeID([]byte("node-0")))
+		require.NoError(err)
 		e2e.WaitForHealthy(tc, node)
 		url := node.GetAccessibleURI()
 		client = infov1connect.NewInfoServiceClient(http.DefaultClient, url)
 	})
 
-	tc.By("NodeVersion returns version info", func() {
+	ginkgo.It("NodeVersion returns version info", func() {
 		req := connect.NewRequest(&infov1.NodeVersionRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
 		resp, err := client.NodeVersion(ctx, req)
-		require.NoError(tc, err)
-		require.NotEmpty(tc, resp.Msg.Version)
+		require.NoError(err)
+		require.NotEmpty(resp.Msg.Version)
 	})
 
-	tc.By("NodeID returns a node ID", func() {
+	ginkgo.It("NodeID returns a node ID", func() {
 		req := connect.NewRequest(&infov1.NodeIDRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
 		resp, err := client.NodeID(ctx, req)
-		require.NoError(tc, err)
-		require.True(tc, strings.HasPrefix(resp.Msg.NodeId, "NodeID-"))
+		require.NoError(err)
+		require.True(strings.HasPrefix(resp.Msg.NodeId, "NodeID-"))
 	})
 
-	tc.By("NetworkID returns a network ID", func() {
+	ginkgo.It("NetworkID returns a network ID", func() {
 		req := connect.NewRequest(&infov1.NetworkIDRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
 		resp, err := client.NetworkID(ctx, req)
-		require.NoError(tc, err)
-		require.Positive(tc, resp.Msg.NetworkId)
+		require.NoError(err)
+		require.Positive(resp.Msg.NetworkId)
 	})
 
-	tc.By("NetworkName returns a network name", func() {
+	ginkgo.It("NetworkName returns a network name", func() {
 		req := connect.NewRequest(&infov1.NetworkNameRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
 		resp, err := client.NetworkName(ctx, req)
-		require.NoError(tc, err)
-		require.NotEmpty(tc, resp.Msg.NetworkName)
+		require.NoError(err)
+		require.NotEmpty(resp.Msg.NetworkName)
 	})
 
-	tc.By("NodeIP returns an IP", func() {
+	ginkgo.It("NodeIP returns an IP", func() {
 		req := connect.NewRequest(&infov1.NodeIPRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
 		resp, err := client.NodeIP(ctx, req)
-		require.NoError(tc, err)
-		require.NotEmpty(tc, resp.Msg.Ip)
+		require.NoError(err)
+		require.NotEmpty(resp.Msg.Ip)
 	})
 
-	tc.By("BlockchainID returns a blockchain ID for X", func() {
+	ginkgo.It("BlockchainID returns a blockchain ID for X", func() {
 		req := connect.NewRequest(&infov1.BlockchainIDRequest{Alias: "X"})
 		req.Header().Set("Avalanche-API-Route", "info")
 		resp, err := client.BlockchainID(ctx, req)
-		require.NoError(tc, err)
-		require.NotEmpty(tc, resp.Msg.BlockchainId)
+		require.NoError(err)
+		require.NotEmpty(resp.Msg.BlockchainId)
 	})
 
-	tc.By("Peers returns a list", func() {
+	ginkgo.It("Peers returns a list", func() {
 		req := connect.NewRequest(&infov1.PeersRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
 		resp, err := client.Peers(ctx, req)
-		require.NoError(tc, err)
-		require.GreaterOrEqual(tc, resp.Msg.NumPeers, 0)
+		require.NoError(err)
+		require.NotEmpty(resp.Msg.Peers)
 	})
 
-	tc.By("IsBootstrapped returns true for X", func() {
+	ginkgo.It("IsBootstrapped returns true for X", func() {
 		tc.Eventually(func() bool {
 			req := connect.NewRequest(&infov1.IsBootstrappedRequest{Chain: "X"})
 			req.Header().Set("Avalanche-API-Route", "info")
@@ -106,27 +108,27 @@ var _ = ginkgo.Describe("[Connect Info API]", func() {
 		}, 60*time.Second, 2*time.Second, "node should eventually bootstrap")
 	})
 
-	tc.By("Upgrades returns a response", func() {
+	ginkgo.It("Upgrades returns a response", func() {
 		req := connect.NewRequest(&infov1.UpgradesRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
 		resp, err := client.Upgrades(ctx, req)
-		require.NoError(tc, err)
-		require.NotNil(tc, resp.Msg)
+		require.NoError(err)
+		require.NotNil(resp.Msg)
 	})
 
-	tc.By("Uptime returns a response", func() {
+	ginkgo.It("Uptime returns a response", func() {
 		req := connect.NewRequest(&infov1.UptimeRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
 		resp, err := client.Uptime(ctx, req)
-		require.NoError(tc, err)
-		require.NotNil(tc, resp.Msg)
+		require.NoError(err)
+		require.NotNil(resp.Msg)
 	})
 
-	tc.By("VMs returns at least avm", func() {
+	ginkgo.It("VMs returns at least avm", func() {
 		req := connect.NewRequest(&infov1.VMsRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
 		resp, err := client.VMs(ctx, req)
-		require.NoError(tc, err)
+		require.NoError(err)
 		found := false
 		for _, v := range resp.Msg.Vms {
 			for _, alias := range v.Aliases {
@@ -139,6 +141,6 @@ var _ = ginkgo.Describe("[Connect Info API]", func() {
 				break
 			}
 		}
-		require.True(tc, found)
+		require.True(found)
 	})
 })
