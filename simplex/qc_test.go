@@ -166,7 +166,7 @@ func TestSignatureAggregation(t *testing.T) {
 		{
 			name: "insufficient signatures",
 			signers: func() []simplex.Signature {
-				sigs := make([]simplex.Signature, 0, 4)
+				sigs := make([]simplex.Signature, 0, 2)
 				for i, config := range configs {
 					signer, _ := NewBLSAuth(config)
 					if i < 2 {
