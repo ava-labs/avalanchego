@@ -779,6 +779,10 @@ mod test {
     }
 
     #[tokio::test]
+    #[cfg_attr(
+        feature = "ethhash",
+        ignore = "https://github.com/ava-labs/firewood/issues/1108"
+    )]
     async fn fuzz_checker() {
         use rand::rngs::StdRng;
         use rand::{Rng, SeedableRng};

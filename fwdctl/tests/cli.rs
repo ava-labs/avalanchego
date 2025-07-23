@@ -521,6 +521,10 @@ fn fwdctl_dump_with_hex() -> Result<()> {
 
 #[test]
 #[serial]
+#[cfg_attr(
+    feature = "ethhash",
+    ignore = "https://github.com/ava-labs/firewood/issues/1108"
+)]
 fn fwdctl_check_empty_db() -> Result<()> {
     Command::cargo_bin(PRG)?
         .arg("create")
@@ -540,6 +544,10 @@ fn fwdctl_check_empty_db() -> Result<()> {
 
 #[test]
 #[serial]
+#[cfg_attr(
+    feature = "ethhash",
+    ignore = "https://github.com/ava-labs/firewood/issues/1108"
+)]
 fn fwdctl_check_db_with_data() -> Result<()> {
     use rand::rngs::StdRng;
     use rand::{Rng, SeedableRng, rng};

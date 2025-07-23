@@ -776,7 +776,7 @@ impl<T, S: ReadableStorage> NodeStore<T, S> {
 }
 
 #[cfg(test)]
-#[expect(clippy::unwrap_used, clippy::indexing_slicing)]
+#[expect(clippy::unwrap_used)]
 pub mod test_utils {
     use super::*;
 
@@ -789,6 +789,7 @@ pub mod test_utils {
         node: &Node,
         offset: u64,
     ) -> u64 {
+        #![expect(clippy::indexing_slicing)]
         let mut encoded_node = Vec::new();
         node.as_bytes(0, &mut encoded_node);
         let encoded_node_len = encoded_node.len() as u64;

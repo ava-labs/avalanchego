@@ -37,6 +37,10 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
     /// Panics if the header has too many free lists, which can never happen since freelists have a fixed size.
     // TODO: report all errors, not just the first one
     pub fn check(&self, opt: CheckOpt) -> Result<(), CheckerError> {
+        if cfg!(feature = "ethhash") {
+            unimplemented!("ethhash is not supported yet");
+        }
+
         // 1. Check the header
         let db_size = self.size();
 
@@ -334,6 +338,10 @@ mod test {
     use std::collections::HashMap;
 
     #[test]
+    #[cfg_attr(
+        feature = "ethhash",
+        ignore = "https://github.com/ava-labs/firewood/issues/1108"
+    )]
     // This test creates a simple trie and checks that the checker traverses it correctly.
     // We use primitive calls here to do a low-level check.
     // TODO: add a high-level test in the firewood crate
@@ -353,6 +361,10 @@ mod test {
     }
 
     #[test]
+    #[cfg_attr(
+        feature = "ethhash",
+        ignore = "https://github.com/ava-labs/firewood/issues/1108"
+    )]
     // This test permutes the simple trie with a wrong hash and checks that the checker detects it.
     fn checker_traverse_trie_with_wrong_hash() {
         let memstore = MemStore::new(vec![]);
