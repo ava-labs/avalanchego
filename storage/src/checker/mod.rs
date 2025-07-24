@@ -15,11 +15,15 @@ use crate::{
 use std::cmp::Ordering;
 use std::ops::Range;
 
+use indicatif::ProgressBar;
+
 /// Options for the checker
 #[derive(Debug)]
 pub struct CheckOpt {
     /// Whether to check the hash of the nodes
     pub hash_check: bool,
+    /// Optional progress bar to show the checker progress
+    pub progress_bar: Option<ProgressBar>,
 }
 
 /// [`NodeStore`] checker
@@ -30,7 +34,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
     /// 1. Check the header
     /// 2. traverse the trie and check the nodes
     /// 3. check the free list
-    /// 4. check missed areas - what are the spaces between trie nodes and free lists we have traversed?
+    /// 4. check leaked areas - what are the spaces between trie nodes and free lists we have traversed?
     /// # Errors
     /// Returns a [`CheckerError`] if the database is inconsistent.
     /// # Panics
@@ -47,6 +51,10 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
         let mut visited = LinearAddressRangeSet::new(db_size)?;
 
         // 2. traverse the trie and check the nodes
+        if let Some(progress_bar) = &opt.progress_bar {
+            progress_bar.set_length(db_size);
+            progress_bar.set_message("Traversing the trie...");
+        }
         if let (Some(root), Some(root_hash)) =
             (self.root_as_maybe_persisted_node(), self.root_hash())
         {
@@ -61,6 +69,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
                     root_hash.into_hash_type(),
                     Path::new(),
                     &mut visited,
+                    opt.progress_bar.as_ref(),
                     opt.hash_check,
                 )?;
             } else {
@@ -69,14 +78,20 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
         }
 
         // 3. check the free list - this can happen in parallel with the trie traversal
-        self.visit_freelist(&mut visited)?;
+        if let Some(progress_bar) = &opt.progress_bar {
+            progress_bar.set_message("Traversing free lists...");
+        }
+        self.visit_freelist(&mut visited, opt.progress_bar.as_ref())?;
 
-        // 4. check missed areas - what are the spaces between trie nodes and free lists we have traversed?
+        // 4. check leaked areas - what are the spaces between trie nodes and free lists we have traversed?
+        if let Some(progress_bar) = &opt.progress_bar {
+            progress_bar.set_message("Checking leaked areas...");
+        }
         let leaked_ranges = visited.complement();
         if !leaked_ranges.is_empty() {
             warn!("Found leaked ranges: {leaked_ranges}");
         }
-        let _leaked_areas = self.split_all_leaked_ranges(leaked_ranges);
+        let _leaked_areas = self.split_all_leaked_ranges(leaked_ranges, opt.progress_bar.as_ref());
         // TODO: add leaked areas to the free list
 
         Ok(())
@@ -89,6 +104,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
         subtree_root_hash: HashType,
         path_prefix: Path,
         visited: &mut LinearAddressRangeSet,
+        progress_bar: Option<&ProgressBar>,
         hash_check: bool,
     ) -> Result<(), CheckerError> {
         let (_, area_size) = self.area_index_and_size(subtree_root_address)?;
@@ -114,6 +130,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
                     hash.clone(),
                     child_path_prefix,
                     visited,
+                    progress_bar,
                     hash_check,
                 )?;
             }
@@ -134,11 +151,17 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
             }
         }
 
+        update_progress_bar(progress_bar, visited);
+
         Ok(())
     }
 
     /// Traverse all the free areas in the freelist
-    fn visit_freelist(&self, visited: &mut LinearAddressRangeSet) -> Result<(), CheckerError> {
+    fn visit_freelist(
+        &self,
+        visited: &mut LinearAddressRangeSet,
+        progress_bar: Option<&ProgressBar>,
+    ) -> Result<(), CheckerError> {
         let mut free_list_iter = self.free_list_iter(0);
         while let Some(free_area) = free_list_iter.next_with_metadata() {
             let FreeAreaWithMetadata {
@@ -158,6 +181,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
                 });
             }
             visited.insert_area(addr, area_size)?;
+            update_progress_bar(progress_bar, visited);
         }
         Ok(())
     }
@@ -180,10 +204,11 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
     fn split_all_leaked_ranges(
         &self,
         leaked_ranges: impl IntoIterator<Item = Range<LinearAddress>>,
+        progress_bar: Option<&ProgressBar>,
     ) -> impl Iterator<Item = (LinearAddress, AreaIndex)> {
         leaked_ranges
             .into_iter()
-            .flat_map(|range| self.split_range_into_leaked_areas(range))
+            .flat_map(move |range| self.split_range_into_leaked_areas(range, progress_bar))
     }
 
     /// Split a range of addresses into leaked areas that can be stored in the free list.
@@ -192,6 +217,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
     fn split_range_into_leaked_areas(
         &self,
         leaked_range: Range<LinearAddress>,
+        progress_bar: Option<&ProgressBar>,
     ) -> Vec<(LinearAddress, AreaIndex)> {
         let mut leaked = Vec::new();
         let mut current_addr = leaked_range.start;
@@ -213,6 +239,9 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
                 Ordering::Equal => {
                     // we have reached the end of the leaked area, done
                     leaked.push((current_addr, area_index));
+                    if let Some(progress_bar) = progress_bar {
+                        progress_bar.inc(area_size);
+                    }
                     return leaked;
                 }
                 Ordering::Greater => {
@@ -225,6 +254,9 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
                 Ordering::Less => {
                     // continue to the next area
                     leaked.push((current_addr, area_index));
+                    if let Some(progress_bar) = progress_bar {
+                        progress_bar.inc(area_size);
+                    }
                     current_addr = next_addr;
                 }
             }
@@ -239,6 +271,9 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
                     .expect("address overflow is impossible");
                 if next_addr <= leaked_range.end {
                     leaked.push((current_addr, area_index as AreaIndex));
+                    if let Some(progress_bar) = progress_bar {
+                        progress_bar.inc(*area_size);
+                    }
                     current_addr = next_addr;
                 } else {
                     break;
@@ -249,6 +284,17 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
         // we assume that all areas are aligned to `MIN_AREA_SIZE`, in which case leaked ranges can always be split into free areas perfectly
         debug_assert!(current_addr == leaked_range.end);
         leaked
+    }
+}
+
+fn update_progress_bar(progress_bar: Option<&ProgressBar>, range_set: &LinearAddressRangeSet) {
+    if let Some(progress_bar) = progress_bar {
+        progress_bar.set_position(
+            range_set
+                .bytes_in_set()
+                .checked_add(crate::nodestore::NodeStoreHeader::SIZE)
+                .expect("overflow can only happen if max_addr >= U64_MAX + NODE_STORE_START_ADDR"),
+        );
     }
 }
 
@@ -361,6 +407,7 @@ mod test {
                 test_trie.root_hash,
                 Path::new(),
                 &mut visited,
+                None,
                 true,
             )
             .unwrap();
@@ -413,6 +460,7 @@ mod test {
                 test_trie.root_hash,
                 Path::new(),
                 &mut visited,
+                None,
                 true,
             )
             .unwrap_err();
@@ -460,7 +508,7 @@ mod test {
 
         // test that the we traversed all the free areas
         let mut visited = LinearAddressRangeSet::new(high_watermark).unwrap();
-        nodestore.visit_freelist(&mut visited).unwrap();
+        nodestore.visit_freelist(&mut visited, None).unwrap();
         let complement = visited.complement();
         assert_eq!(complement.into_iter().collect::<Vec<_>>(), vec![]);
     }
@@ -521,7 +569,7 @@ mod test {
         }
 
         // check the leaked areas
-        let leaked_areas: HashMap<_, _> = nodestore.split_all_leaked_ranges(leaked).collect();
+        let leaked_areas: HashMap<_, _> = nodestore.split_all_leaked_ranges(leaked, None).collect();
 
         // assert that all leaked areas end up on the free list
         assert_eq!(leaked_areas, expected_free_areas);
@@ -563,7 +611,7 @@ mod test {
             .unwrap();
         let (leaked_areas_offsets, leaked_area_size_indices): (Vec<LinearAddress>, Vec<AreaIndex>) =
             nodestore
-                .split_range_into_leaked_areas(leaked_range)
+                .split_range_into_leaked_areas(leaked_range, None)
                 .into_iter()
                 .unzip();
 
@@ -610,7 +658,7 @@ mod test {
             nonzero!(NodeStoreHeader::SIZE).into()..LinearAddress::new(high_watermark).unwrap();
         let (leaked_areas_offsets, leaked_area_size_indices): (Vec<LinearAddress>, Vec<AreaIndex>) =
             nodestore
-                .split_range_into_leaked_areas(leaked_range)
+                .split_range_into_leaked_areas(leaked_range, None)
                 .into_iter()
                 .unzip();
 

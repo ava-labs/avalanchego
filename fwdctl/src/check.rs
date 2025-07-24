@@ -7,6 +7,7 @@ use std::sync::Arc;
 use clap::Args;
 use firewood::v2::api;
 use firewood_storage::{CacheReadStrategy, CheckOpt, FileBacked, NodeStore};
+use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
 use nonzero_ext::nonzero;
 
 // TODO: (optionally) add a fix option
@@ -46,9 +47,18 @@ pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
     )?;
     let storage = Arc::new(fb);
 
+    let progress_bar = ProgressBar::no_length()
+        .with_style(
+            ProgressStyle::with_template("{wide_bar} {bytes}/{total_bytes} [{msg}]")
+                .expect("valid template")
+                .progress_chars("#>-"),
+        )
+        .with_finish(ProgressFinish::WithMessage("Check Completed!".into()));
+
     NodeStore::open(storage)?
         .check(CheckOpt {
             hash_check: opts.hash_check,
+            progress_bar: Some(progress_bar),
         })
         .map_err(|e| api::Error::InternalError(Box::new(e)))
 }

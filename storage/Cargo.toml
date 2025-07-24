@@ -35,9 +35,9 @@ bytemuck_derive = "1.10.0"
 enum-as-inner = "0.6.1"
 integer-encoding = "4.0.2"
 lru = "0.16.0"
-num-traits = "0.2.19"
 semver = "1.0.26"
 triomphe = "0.1.14"
+indicatif = "0.18.0"
 derive-where = "1.5.0"
 # Optional dependencies
 bytes = { version = "1.10.1", optional = true }

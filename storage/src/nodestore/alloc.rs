@@ -230,20 +230,13 @@ impl LinearAddress {
             Some(sum) => Some(LinearAddress(sum)),
         }
     }
-}
 
-impl std::ops::Add for LinearAddress {
-    type Output = Self;
-    fn add(self, other: Self) -> Self {
-        self.checked_add(other.get())
-            .map(LinearAddress)
-            .expect("non zero result")
-    }
-}
-
-impl num_traits::CheckedAdd for LinearAddress {
-    fn checked_add(&self, other: &Self) -> Option<Self> {
-        self.0.checked_add(other.get()).map(LinearAddress)
+    /// Returns the number of bytes between `other` and `self` if `other` is less than or equal to `self`.
+    /// Otherwise, returns `None`.
+    #[inline]
+    #[must_use]
+    pub const fn distance_from(self, other: Self) -> Option<u64> {
+        self.0.get().checked_sub(other.0.get())
     }
 }
 

@@ -817,7 +817,13 @@ mod test {
 
             // check the database for consistency, sometimes checking the hashes
             let hash_check = rng.borrow_mut().random();
-            if let Err(e) = db.check(CheckOpt { hash_check }).await {
+            if let Err(e) = db
+                .check(CheckOpt {
+                    hash_check,
+                    progress_bar: None,
+                })
+                .await
+            {
                 db.dump(&mut std::io::stdout()).await.unwrap();
                 panic!("error: {e}");
             }
