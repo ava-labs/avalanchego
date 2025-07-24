@@ -112,6 +112,9 @@ func (h *Handler) AppRequest(
 	// populated with the expected values.
 	signature, err := h.signer.Sign(msg)
 	if err != nil {
+		h.log.Warn("failed to sign message",
+			zap.Error(err),
+		)
 		return nil, &common.AppError{
 			Code:    p2p.ErrUnexpected.Code,
 			Message: fmt.Sprintf("failed to sign message: %s", err),
@@ -119,7 +122,14 @@ func (h *Handler) AppRequest(
 	}
 
 	h.signatureCache.Put(msgID, signature)
-	return signatureToResponse(signature)
+	resp, appErr := signatureToResponse(signature)
+	if err != nil {
+		h.log.Warn("failed to marshal response",
+			zap.Error(err),
+		)
+		return nil, appErr
+	}
+	return resp, nil
 }
 
 func signatureToResponse(signature []byte) ([]byte, *common.AppError) {
