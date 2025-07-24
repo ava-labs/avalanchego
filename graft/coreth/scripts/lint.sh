@@ -92,7 +92,8 @@ function test_license_header {
     go run github.com/palantir/go-license@v1.25.0 \
       --config=./license_header_for_upstream.yml \
       ${_addlicense_flags} \
-      "${UPSTREAM_FILES[@]}"
+      "${UPSTREAM_FILES[@]}" \
+      || return 1
   fi
 
   if [[ ${#DEFAULT_FILES[@]} -gt 0 ]]; then
@@ -101,7 +102,8 @@ function test_license_header {
     go run github.com/palantir/go-license@v1.25.0 \
       --config=./license_header.yml \
       ${_addlicense_flags} \
-      "${DEFAULT_FILES[@]}"
+      "${DEFAULT_FILES[@]}" \
+      || return 1
   fi
 }
 
