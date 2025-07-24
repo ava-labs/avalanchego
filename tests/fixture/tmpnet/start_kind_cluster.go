@@ -45,7 +45,8 @@ const (
 	ingressChartRepo      = "https://kubernetes.github.io/ingress-nginx"
 	ingressChartName      = "ingress-nginx/ingress-nginx"
 	ingressControllerName = "ingress-nginx-controller"
-	ingressNodePort       = 30791
+	// This must match the nodePort configured in scripts/kind-with-registry.sh
+	ingressNodePort = 30791
 
 	// Chaos Mesh constants
 	chaosMeshNamespace      = "chaos-mesh"
