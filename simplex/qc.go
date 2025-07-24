@@ -120,8 +120,7 @@ func (qc *QC) createSignersBitSet() []byte {
 		bitset.Add(index)
 	}
 
-	signerBytes := bitset.Bytes()
-	return signerBytes
+	return bitset.Bytes()
 }
 
 type QCDeserializer struct {
