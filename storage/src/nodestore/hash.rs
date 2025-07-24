@@ -58,9 +58,10 @@ where
                             acc.hashed.push((idx, (maybe_persisted_node, h)));
                         } else {
                             // If not persisted, we need to get the node to hash it
-                            if let Ok(node) = maybe_persisted.as_shared_node(&self) {
-                                acc.unhashed.push((idx, node.deref().clone()));
-                            }
+                            let node = maybe_persisted
+                                .as_shared_node(&self)
+                                .expect("will never fail for unpersisted nodes");
+                            acc.unhashed.push((idx, node.deref().clone()));
                         }
                     }
                 }
@@ -70,6 +71,7 @@ where
     }
 
     /// Hashes `node`, which is at the given `path_prefix`, and its children recursively.
+    /// The function appends to `path_prefix` and then truncate it back to the original length - we only reuse the memory space to avoid allocations
     /// Returns the hashed node and its hash.
     pub(super) fn hash_helper(
         #[cfg(feature = "ethhash")] &self,
@@ -93,11 +95,10 @@ where
                 trace!("hashed {hashed:?} unhashed {unhashed:?}");
                 if hashed.len() == 1 {
                     // we were left with one hashed node that must be rehashed
-                    let invalidated_node = hashed.first_mut().expect("hashed is not empty");
+                    let (invalidated_node_idx, (invalidated_node, invalidated_hash)) =
+                        hashed.first_mut().expect("hashed is not empty");
                     // Extract the address from the MaybePersistedNode
-                    let addr = invalidated_node
-                        .1
-                        .0
+                    let addr: crate::LinearAddress = invalidated_node
                         .as_linear_address()
                         .expect("hashed node should be persisted");
                     let mut hashable_node = self.read_node(addr)?.deref().clone();
@@ -105,15 +106,15 @@ where
                     path_prefix.0.extend(b.partial_path.0.iter().copied());
                     if unhashed.is_empty() {
                         hashable_node.update_partial_path(Path::from_nibbles_iterator(
-                            std::iter::once(invalidated_node.0 as u8)
+                            std::iter::once(*invalidated_node_idx as u8)
                                 .chain(hashable_node.partial_path().0.iter().copied()),
                         ));
                     } else {
-                        path_prefix.0.push(invalidated_node.0 as u8);
+                        path_prefix.0.push(*invalidated_node_idx as u8);
                     }
                     let hash = hash_node(&hashable_node, path_prefix);
                     path_prefix.0.truncate(original_length);
-                    *invalidated_node.1.1 = hash;
+                    **invalidated_hash = hash;
                 }
                 // handle the single-child case for an account special below
                 if hashed.is_empty() && unhashed.len() == 1 {
@@ -191,5 +192,29 @@ where
         let hash = hash_node(&node, path_prefix);
 
         Ok((SharedNode::new(node).into(), hash))
+    }
+
+    #[cfg(feature = "ethhash")]
+    pub(crate) fn compute_node_ethhash(
+        node: &Node,
+        path_prefix: &Path,
+        have_peers: bool,
+    ) -> HashType {
+        if path_prefix.0.len() == 65 && !have_peers {
+            // This is the special case when this node is the only child of an account
+            //  - 64 nibbles for account + 1 nibble for its position in account branch node
+            let mut fake_root = node.clone();
+            fake_root.update_partial_path(Path::from_nibbles_iterator(
+                path_prefix
+                    .0
+                    .last()
+                    .into_iter()
+                    .chain(fake_root.partial_path().0.iter())
+                    .copied(),
+            ));
+            hash_node(&fake_root, path_prefix)
+        } else {
+            hash_node(node, path_prefix)
+        }
     }
 }

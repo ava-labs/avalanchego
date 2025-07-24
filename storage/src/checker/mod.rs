@@ -9,8 +9,10 @@ use crate::nodestore::alloc::{AREA_SIZES, AreaIndex, FreeAreaWithMetadata, size_
 use crate::{
     CheckerError, Committed, HashType, HashedNodeReader, IntoHashType, LinearAddress, Node,
     NodeReader, NodeStore, Path, RootReader, StoredAreaParent, TrieNodeParent, WritableStorage,
-    hash_node,
 };
+
+#[cfg(not(feature = "ethhash"))]
+use crate::hashednode::hash_node;
 
 use std::cmp::Ordering;
 use std::ops::Range;
@@ -31,6 +33,8 @@ struct SubTrieMetadata {
     root_hash: HashType,
     parent: TrieNodeParent,
     path_prefix: Path,
+    #[cfg(feature = "ethhash")]
+    has_peers: bool,
 }
 
 /// [`NodeStore`] checker
@@ -46,10 +50,6 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
     /// Returns a [`CheckerError`] if the database is inconsistent.
     // TODO: report all errors, not just the first one
     pub fn check(&self, opt: CheckOpt) -> Result<(), CheckerError> {
-        if cfg!(feature = "ethhash") {
-            unimplemented!("ethhash is not supported yet");
-        }
-
         // 1. Check the header
         let db_size = self.size();
 
@@ -109,13 +109,15 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
         progress_bar: Option<&ProgressBar>,
         hash_check: bool,
     ) -> Result<(), CheckerError> {
-        let subtrie = SubTrieMetadata {
+        let trie = SubTrieMetadata {
             root_address,
             root_hash,
             parent: TrieNodeParent::Root,
             path_prefix: Path::new(),
+            #[cfg(feature = "ethhash")]
+            has_peers: false,
         };
-        self.visit_trie_helper(subtrie, visited, progress_bar, hash_check)
+        self.visit_trie_helper(trie, visited, progress_bar, hash_check)
     }
 
     /// Recursively traverse the trie from the given root node.
@@ -131,6 +133,8 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
             root_hash: subtrie_root_hash,
             parent,
             path_prefix,
+            #[cfg(feature = "ethhash")]
+            has_peers,
         } = subtrie;
 
         // check that address is aligned
@@ -148,6 +152,8 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
         let node = self.read_node(subtrie_root_address)?;
         if let Node::Branch(branch) = node.as_ref() {
             // this is an internal node, traverse the children
+            #[cfg(feature = "ethhash")]
+            let num_children = branch.children_iter().count();
             for (nibble, (address, hash)) in branch.children_iter() {
                 let parent = TrieNodeParent::Parent(subtrie_root_address, nibble);
                 let mut child_path_prefix = path_prefix.clone();
@@ -158,6 +164,8 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
                     root_hash: hash.clone(),
                     parent,
                     path_prefix: child_path_prefix,
+                    #[cfg(feature = "ethhash")]
+                    has_peers: num_children != 1,
                 };
                 self.visit_trie_helper(child_subtrie, visited, progress_bar, hash_check)?;
             }
@@ -165,6 +173,9 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
 
         // hash check - at this point all children hashes have been verified
         if hash_check {
+            #[cfg(feature = "ethhash")]
+            let hash = Self::compute_node_ethhash(&node, &path_prefix, has_peers);
+            #[cfg(not(feature = "ethhash"))]
             let hash = hash_node(&node, &path_prefix);
             if hash != subtrie_root_hash {
                 let mut path = path_prefix.clone();
@@ -412,10 +423,6 @@ mod test {
     use std::collections::HashMap;
 
     #[test]
-    #[cfg_attr(
-        feature = "ethhash",
-        ignore = "https://github.com/ava-labs/firewood/issues/1108"
-    )]
     // This test creates a simple trie and checks that the checker traverses it correctly.
     // We use primitive calls here to do a low-level check.
     fn checker_traverse_correct_trie() {
@@ -441,10 +448,6 @@ mod test {
     }
 
     #[test]
-    #[cfg_attr(
-        feature = "ethhash",
-        ignore = "https://github.com/ava-labs/firewood/issues/1108"
-    )]
     // This test permutes the simple trie with a wrong hash and checks that the checker detects it.
     fn checker_traverse_trie_with_wrong_hash() {
         let memstore = MemStore::new(vec![]);
