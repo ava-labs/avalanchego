@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/simplex"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
 
@@ -37,6 +38,9 @@ type BLSVerifier struct {
 	nodeID2PK map[ids.NodeID]*bls.PublicKey
 	networkID uint32
 	chainID   ids.ID
+
+	canonicalNodeIDs       []ids.NodeID
+	canonicalNodeIDIndices map[ids.NodeID]int
 }
 
 func NewBLSAuth(config *Config) (BLSSigner, BLSVerifier) {
@@ -116,8 +120,17 @@ func createVerifier(config *Config) BLSVerifier {
 		chainID:   config.Ctx.ChainID,
 	}
 
+	nodeIDs := make([]ids.NodeID, 0, len(config.Validators))
 	for _, node := range config.Validators {
 		verifier.nodeID2PK[node.NodeID] = node.PublicKey
+		nodeIDs = append(nodeIDs, node.NodeID)
+	}
+
+	utils.Sort(nodeIDs)
+	verifier.canonicalNodeIDs = nodeIDs
+	verifier.canonicalNodeIDIndices = make(map[ids.NodeID]int, len(nodeIDs))
+	for i, nodeID := range nodeIDs {
+		verifier.canonicalNodeIDIndices[nodeID] = i
 	}
 
 	return verifier

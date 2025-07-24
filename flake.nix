@@ -60,6 +60,9 @@
 
             # Solidity compiler
             solc
+
+            # s5cmd for rapid s3 interactions
+            s5cmd
           ] ++ lib.optionals stdenv.isDarwin [
             # macOS-specific frameworks
             darwin.apple_sdk.frameworks.Security

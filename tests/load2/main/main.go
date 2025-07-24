@@ -5,6 +5,7 @@ package main
 
 import (
 	"flag"
+	"math/rand"
 	"os"
 	"time"
 
@@ -50,7 +51,7 @@ func init() {
 func main() {
 	log := tests.NewDefaultLogger("")
 	tc := tests.NewTestContext(log)
-	defer tc.Cleanup()
+	defer tc.RecoverAndExit()
 
 	require := require.New(tc)
 
@@ -107,14 +108,22 @@ func main() {
 	chainID, err := workers[0].Client.ChainID(ctx)
 	require.NoError(err)
 
+	randomTest, err := load2.NewRandomTest(
+		ctx,
+		chainID,
+		&workers[0],
+		rand.NewSource(time.Now().UnixMilli()),
+	)
+	require.NoError(err)
+
 	generator, err := load2.NewLoadGenerator(
 		workers,
 		chainID,
 		metricsNamespace,
 		registry,
-		load2.ZeroTransferTest{},
+		randomTest,
 	)
 	require.NoError(err)
 
-	generator.Run(tc, ctx, loadTimeout, testTimeout)
+	generator.Run(ctx, log, loadTimeout, testTimeout)
 }
