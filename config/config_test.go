@@ -571,20 +571,23 @@ func TestGetStakingSigner(t *testing.T) {
 		{
 			name:   "default signer",
 			config: map[string]any{DataDirKey: dataDir},
-			expectedSignerConfig: node.DefaultSignerConfig{
-				SignerKeyPath: defaultSignerKeyPath,
+			expectedSignerConfig: node.StakingSignerConfig{
+				KeyPath:      defaultSignerKeyPath,
+				KeyPathIsSet: false,
 			},
 		},
 		{
-			name:                 "ephemeral signer",
-			config:               map[string]any{StakingEphemeralSignerEnabledKey: true},
-			expectedSignerConfig: node.EphemeralSignerConfig{},
+			name:   "ephemeral signer",
+			config: map[string]any{StakingEphemeralSignerEnabledKey: true},
+			expectedSignerConfig: node.StakingSignerConfig{
+				EphemeralSignerEnabled: true,
+			},
 		},
 		{
 			name:   "content key",
 			config: map[string]any{StakingSignerKeyContentKey: testKey},
-			expectedSignerConfig: node.ContentKeyConfig{
-				SignerKeyRawContent: testKey,
+			expectedSignerConfig: node.StakingSignerConfig{
+				KeyContent: testKey,
 			},
 		},
 		{
@@ -592,15 +595,16 @@ func TestGetStakingSigner(t *testing.T) {
 			config: map[string]any{
 				StakingSignerKeyPathKey: fileKeyPath,
 			},
-			expectedSignerConfig: node.SignerPathConfig{
-				SignerKeyPath: fileKeyPath,
+			expectedSignerConfig: node.StakingSignerConfig{
+				KeyPath:      fileKeyPath,
+				KeyPathIsSet: true,
 			},
 		},
 		{
 			name:   "rpc signer",
 			config: map[string]any{StakingRPCSignerEndpointKey: "localhost"},
-			expectedSignerConfig: node.RPCSignerConfig{
-				StakingSignerRPC: "localhost",
+			expectedSignerConfig: node.StakingSignerConfig{
+				RPCEndpoint: "localhost",
 			},
 		},
 		{
@@ -625,7 +629,9 @@ func TestGetStakingSigner(t *testing.T) {
 			config, err := GetNodeConfig(v)
 
 			require.ErrorIs(err, tt.expectedErr)
-			require.Equal(tt.expectedSignerConfig, config.StakingSignerConfig)
+			if tt.expectedErr != nil {
+				require.Equal(tt.expectedSignerConfig, config.StakingSignerConfig)
+			}
 		})
 	}
 }

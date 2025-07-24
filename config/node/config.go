@@ -78,27 +78,15 @@ type StakingConfig struct {
 	SybilProtectionDisabledWeight uint64          `json:"sybilProtectionDisabledWeight"`
 	StakingTLSKeyPath             string          `json:"stakingTLSKeyPath"`
 	StakingTLSCertPath            string          `json:"stakingTLSCertPath"`
-
-	// This is set in order to instatiate the correct signer type at runtime.
-	StakingSignerConfig any
+	StakingSignerConfig           `json:"stakingSingerConfig"`
 }
 
-type EphemeralSignerConfig struct{}
-
-type ContentKeyConfig struct {
-	SignerKeyRawContent string
-}
-
-type SignerPathConfig struct {
-	SignerKeyPath string
-}
-
-type DefaultSignerConfig struct {
-	SignerKeyPath string
-}
-
-type RPCSignerConfig struct {
-	StakingSignerRPC string
+type StakingSignerConfig struct {
+	EphemeralSignerEnabled bool   `json:"ephemeralSignerEnabled"`
+	KeyContent             string `json:"signerKeyContent"`
+	KeyPath                string `json:"keyPath"`
+	RPCEndpoint            string `json:"RPCEndpoint"`
+	KeyPathIsSet           bool   `json:"keyPathIsSet"`
 }
 
 type StateSyncConfig struct {

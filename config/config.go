@@ -701,7 +701,7 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 	return config, nil
 }
 
-func getStakingSignerConfig(v *viper.Viper) (any, error) {
+func getStakingSignerConfig(v *viper.Viper) (node.StakingSignerConfig, error) {
 	// A maximum of one signer option can be set
 	bools := bag.Of(
 		v.GetBool(StakingEphemeralSignerEnabledKey),
@@ -710,33 +710,22 @@ func getStakingSignerConfig(v *viper.Viper) (any, error) {
 		v.IsSet(StakingRPCSignerEndpointKey),
 	)
 	if bools.Count(true) > 1 {
-		return node.StakingConfig{}, errInvalidSignerConfig
+		return node.StakingSignerConfig{}, errInvalidSignerConfig
 	}
 
-	switch {
-	case v.GetBool(StakingEphemeralSignerEnabledKey):
-		return node.EphemeralSignerConfig{}, nil
-
-	case v.IsSet(StakingSignerKeyContentKey):
-		return node.ContentKeyConfig{
-			SignerKeyRawContent: getExpandedArg(v, StakingSignerKeyContentKey),
-		}, nil
-
-	case v.IsSet(StakingRPCSignerEndpointKey):
-		return node.RPCSignerConfig{
-			StakingSignerRPC: getExpandedArg(v, StakingRPCSignerEndpointKey),
-		}, nil
-
-	case v.IsSet(StakingSignerKeyPathKey):
-		return node.SignerPathConfig{
-			SignerKeyPath: getExpandedArg(v, StakingSignerKeyPathKey),
-		}, nil
-
-	default:
-		return node.DefaultSignerConfig{
-			SignerKeyPath: getExpandedArg(v, StakingSignerKeyPathKey),
-		}, nil
+	var signerKeyPath string
+	// Set signerKeyPath only none of the other signer options are set
+	if !v.GetBool(StakingEphemeralSignerEnabledKey) && !v.IsSet(StakingSignerKeyContentKey) && !v.IsSet(StakingRPCSignerEndpointKey) {
+		signerKeyPath = getExpandedArg(v, StakingSignerKeyPathKey)
 	}
+
+	return node.StakingSignerConfig{
+		EphemeralSignerEnabled: v.GetBool(StakingEphemeralSignerEnabledKey),
+		KeyContent:             getExpandedArg(v, StakingSignerKeyContentKey),
+		KeyPath:                signerKeyPath,
+		RPCEndpoint:            getExpandedArg(v, StakingRPCSignerEndpointKey),
+		KeyPathIsSet:           v.IsSet(StakingSignerKeyPathKey),
+	}, nil
 }
 
 func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {

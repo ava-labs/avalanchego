@@ -1626,18 +1626,19 @@ func (n *Node) initDiskTargeter(
 	)
 }
 
-// newStakingSigner returns a BLS signer based on the provided configuration.
-func newStakingSigner(config any) (bls.Signer, error) {
-	switch cfg := config.(type) {
-	case node.EphemeralSignerConfig:
+// newStakingSigner returns a BLS signer based on the provided validated configuration.
+func newStakingSigner(cfg node.StakingSignerConfig) (bls.Signer, error) {
+	if cfg.EphemeralSignerEnabled {
 		signer, err := localsigner.New()
 		if err != nil {
 			return nil, fmt.Errorf("could not generate ephemeral signer: %w", err)
 		}
 
 		return signer, nil
-	case node.ContentKeyConfig:
-		signerKeyContent, err := base64.StdEncoding.DecodeString(cfg.SignerKeyRawContent)
+	}
+
+	if cfg.KeyContent != "" {
+		signerKeyContent, err := base64.StdEncoding.DecodeString(cfg.KeyContent)
 		if err != nil {
 			return nil, fmt.Errorf("unable to decode base64 content: %w", err)
 		}
@@ -1648,23 +1649,25 @@ func newStakingSigner(config any) (bls.Signer, error) {
 		}
 
 		return signer, nil
-	case node.RPCSignerConfig:
+	}
+
+	if cfg.RPCEndpoint != "" {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		signer, err := rpcsigner.NewClient(ctx, cfg.StakingSignerRPC)
+		signer, err := rpcsigner.NewClient(ctx, cfg.RPCEndpoint)
 		if err != nil {
 			return nil, fmt.Errorf("could not create rpc signer client: %w", err)
 		}
 
 		return signer, nil
-	case node.SignerPathConfig:
-		return localsigner.FromFile(cfg.SignerKeyPath)
-	case node.DefaultSignerConfig:
-		return localsigner.FromFileOrPersistNew(cfg.SignerKeyPath)
-	default:
-		return nil, fmt.Errorf("unsupported signer type: %T", cfg)
 	}
+
+	if cfg.KeyPathIsSet {
+		return localsigner.FromFile(cfg.KeyPath)
+	}
+
+	return localsigner.FromFileOrPersistNew(cfg.KeyPath)
 }
 
 // Shutdown this node
