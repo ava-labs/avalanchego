@@ -1659,56 +1659,12 @@ func newStakingSigner(config any) (bls.Signer, error) {
 
 		return signer, nil
 	case node.SignerPathConfig:
-		return createSignerFromFile(cfg.SignerKeyPath)
+		return localsigner.FromFile(cfg.SignerKeyPath)
 	case node.DefaultSignerConfig:
-		_, err := os.Stat(cfg.SignerKeyPath)
-		if !errors.Is(err, fs.ErrNotExist) {
-			return createSignerFromFile(cfg.SignerKeyPath)
-		}
-
-		return createSignerFromNewKey(cfg.SignerKeyPath)
+		return localsigner.FromFileOrPersistNew(cfg.SignerKeyPath)
 	default:
 		return nil, fmt.Errorf("unsupported signer type: %T", cfg)
 	}
-}
-
-func createSignerFromFile(signerKeyPath string) (bls.Signer, error) {
-	signingKeyBytes, err := os.ReadFile(signerKeyPath)
-	if err != nil {
-		return nil, fmt.Errorf("could not read signing key from %s: %w", signerKeyPath, err)
-	}
-
-	signer, err := localsigner.FromBytes(signingKeyBytes)
-	if err != nil {
-		return nil, fmt.Errorf("could not parse signing key: %w", err)
-	}
-
-	return signer, nil
-}
-
-func createSignerFromNewKey(signerKeyPath string) (bls.Signer, error) {
-	signer, err := localsigner.New()
-	if err != nil {
-		return nil, fmt.Errorf("could not generate new signing key: %w", err)
-	}
-
-	if err := os.MkdirAll(filepath.Dir(signerKeyPath), perms.ReadWriteExecute); err != nil {
-		return nil, fmt.Errorf("could not create path for signing key at %s: %w", signerKeyPath, err)
-	}
-
-	if err := os.WriteFile(
-		signerKeyPath,
-		signer.ToBytes(),
-		perms.ReadWrite,
-	); err != nil {
-		return nil, fmt.Errorf("could not write new signing key to %s: %w", signerKeyPath, err)
-	}
-
-	if err := os.Chmod(signerKeyPath, perms.ReadOnly); err != nil {
-		return nil, fmt.Errorf("could not restrict permissions on new signing key at %s: %w", signerKeyPath, err)
-	}
-
-	return signer, nil
 }
 
 // Shutdown this node
