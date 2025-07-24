@@ -455,5 +455,11 @@ func (s signatureRequestVerifier) verifyValidatorSetState(
 		}
 	}
 
+	s.log.Info("validator set state verified",
+		zap.Stringer("blockchainID", msg.BlockchainID),
+		zap.Uint64("pChainHeight", msg.PChainHeight),
+		zap.Stringer("validatorSetHash", msg.ValidatorSetHash),
+	)
+
 	return nil
 }
