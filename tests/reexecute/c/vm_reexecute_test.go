@@ -9,6 +9,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -91,9 +92,7 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "failed to parse labels: %v\n", err)
 		os.Exit(1)
 	}
-	for customLabel, customValue := range customLabels {
-		labels[customLabel] = customValue
-	}
+	maps.Copy(labels, customLabels)
 
 	m.Run()
 }
