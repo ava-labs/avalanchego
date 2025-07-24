@@ -509,4 +509,4 @@ Configuration sources are applied in the following order (highest to lowest prec
 
 - [Full documentation](https://build.avax.network/docs/quick-start)
 - [Example configurations](https://github.com/ava-labs/avalanchego/tree/master/config)
-- [Network upgrade schedules](https://docs.avax.network/learn/avalanche/avalanche-platform)
+- [Network upgrade schedules](https://build.avax.network/docs/quick-start/primary-network)
