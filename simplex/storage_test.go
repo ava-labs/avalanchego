@@ -148,15 +148,19 @@ func TestStorageRetrieve(t *testing.T) {
 }
 
 func TestStorageIndex(t *testing.T) {
+	ctx := context.Background()
 	// index genesis
 	// index a block not the next in sequence
 	// index normal
+	genesis := newBlock(t, newBlockConfig{})
+	child1 := newBlock(t, newBlockConfig{prev: genesis })
+	 newBlock(t, newBlockConfig{prev: child1 })
+	child2 := newBlock(t, newBlockConfig{prev: child1 })
 
-	ctx := context.Background()
-	config := newEngineConfig(t, 1)
+	config := newEngineConfig(t, 4)
 	_, verifier := NewBLSAuth(config)
 	qc := QCDeserializer(verifier)
-		vm := &blocktest.VM{
+	vm := &blocktest.VM{
 		LastAcceptedF: func(ctx context.Context) (ids.ID, error) {
 			return snowmantest.GenesisID, nil
 		},
@@ -168,22 +172,85 @@ func TestStorageIndex(t *testing.T) {
 		},
 	}
 	config.VM = vm
-	blockTracker := newBlockTracker(genesis)
 
-	s, err := newStorage(ctx, config, &qc, blockTracker)
+	tests := []struct {
+		name          string
+		expectedError error
+		finalization simplex.Finalization
+		block *Block
+	}{
+		{
+			name: "index genesis block",
+			expectedError: errGenesisIndexed,
+			block: genesis,
+			finalization: simplex.Finalization{},
+		},
+		{
+			name: "index invalid qc",
+			expectedError: errInvalidQC,
+			block: child1,
+			finalization: simplex.Finalization{
+				QC: nil, // no quorum certificate
+				Finalization: simplex.ToBeSignedFinalization{
+					BlockHeader: child1.BlockHeader(),
+				},
+			},
+		},
+		{
+			name: "mismatched seq",
+			expectedError: errUnexpectedSeq,
+			block: child1,
+			finalization: simplex.Finalization{
+				QC: nil, // no quorum certificate
+				Finalization: simplex.ToBeSignedFinalization{
+					BlockHeader: simplex.BlockHeader{
+						ProtocolMetadata: simplex.ProtocolMetadata{
+							Seq: 100, // seq does not match block header
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "indexing too high seq",
+			expectedError: errUnexpectedSeq,
+			block: child2, // index child2 before child1
+			finalization: simplex.Finalization{
+				QC: nil, // no quorum certificate
+				Finalization: simplex.ToBeSignedFinalization{
+					BlockHeader: simplex.BlockHeader{
+						ProtocolMetadata: simplex.ProtocolMetadata{
+							Seq: 2, // seq does not match current height
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "indexing before verifying",
+			expectedError: errDigestNotFound,
+			block: child1,
+			finalization: simplex.Finalization{
+				QC: nil, // no quorum certificate
+				Finalization: simplex.ToBeSignedFinalization{
+					BlockHeader: child1.BlockHeader(),
+				},
+			},
+		},
+	}
+	
+	
+	s, err := newStorage(ctx, config, &qc, genesis.blockTracker)
 	require.NoError(t, err)
 
-	block, finalization, exists := s.Retrieve(tt.seq)
-	if tt.expectedExists {
-		bytes, err := block.Bytes()
-		require.NoError(t, err)
+	err = s.Index(ctx, genesis, simplex.Finalization{})
+	require.ErrorIs(t, err, errGenesisIndexed)
 
-		genesisBytes, err := genesis.Bytes()
-		require.NoError(t, err)
+	err = s.Index(ctx, child1, simplex.Finalization{
+		Finalization: simplex.ToBeSignedFinalization{
+			BlockHeader: child1.BlockHeader(),
+		},
+	})
 
-		require.Equal(t, genesisBytes, bytes)
-	}
-
-	require.Equal(t, tt.expectedFinalization, finalization)
-	require.Equal(t, tt.expectedExists, exists)
+	require.ErrorIs(t, err, errDigestNotFound) // shouldn't be able to index a block without verifing
 }

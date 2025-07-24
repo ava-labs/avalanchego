@@ -20,6 +20,8 @@ import (
 var _ simplex.Storage = (*Storage)(nil)
 var simplexPrefix = []byte("simplex")
 var errUnexpectedSeq = errors.New("unexpected sequence number")
+var errGenesisIndexed = errors.New("genesis block should not be indexed")
+var errInvalidQC = errors.New("invalid quorum certificate")
 var genesisMetadata = simplex.ProtocolMetadata{
 				Version: 1,
 				Epoch:   1,
@@ -88,7 +90,6 @@ func (s *Storage) Height() uint64 {
 // If [seq] is not found, returns false.
 func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalization, bool) {
 	if seq == 0 {
-		fmt.Println("s.genesisBlock", s.genesisBlock)
 		return s.genesisBlock, simplex.Finalization{}, true
 	}
 
@@ -115,9 +116,8 @@ func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalizat
 func (s *Storage) Index(ctx context.Context, block simplex.VerifiedBlock, finalization simplex.Finalization) error 	{
 	bh := block.BlockHeader()
 	if bh.Seq == 0 {
-		// This should never happen
 		s.log.Warn("attempted to index genesis block, which should not be indexed")
-		return nil
+		return errGenesisIndexed
 	}
 
 	currentHeight := s.height.Load()
@@ -127,6 +127,10 @@ func (s *Storage) Index(ctx context.Context, block simplex.VerifiedBlock, finali
 	
 	if bh.Seq != finalization.Finalization.Seq {
 		return fmt.Errorf("%w: expected %d, got %d", errUnexpectedSeq, bh.Seq, finalization.Finalization.Seq)
+	}
+
+	if finalization.QC == nil {
+		return errInvalidQC
 	}
 	
 	seqBuff := make([]byte, 8)
