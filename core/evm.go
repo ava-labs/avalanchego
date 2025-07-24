@@ -41,6 +41,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
+	"github.com/ava-labs/libevm/libevm/stateconf"
 	"github.com/holiman/uint256"
 )
 
@@ -76,20 +77,31 @@ func (hooks) OverrideEVMResetArgs(rules params.Rules, args *vm.EVMResetArgs) *vm
 	return args
 }
 
-func wrapStateDB(rules params.Rules, db vm.StateDB) vm.StateDB {
+func wrapStateDB(rules params.Rules, statedb vm.StateDB) vm.StateDB {
+	wrappedStateDB := extstate.New(statedb.(*state.StateDB))
 	if params.GetRulesExtra(rules).IsApricotPhase1 {
-		db = &StateDbAP1{db.(extstate.VmStateDB)}
+		return wrappedStateDB
 	}
-	return extstate.New(db.(extstate.VmStateDB))
+	return &StateDBAP0{wrappedStateDB}
 }
 
-type StateDbAP1 struct {
-	extstate.VmStateDB
+// StateDBAP0 implements the GetCommittedState behavior that existed prior to
+// the AP1 upgrade.
+//
+// Since launch, state keys have been normalized to allow for multicoin
+// balances. However, at launch GetCommittedState was not updated. This meant
+// that gas refunds were not calculated as expected for SSTORE opcodes.
+//
+// This oversight was fixed in AP1, but in order to execute blocks prior to AP1
+// and generate the same merkle root, this behavior must be maintained.
+//
+// See the [extstate] package for details around state key normalization.
+type StateDBAP0 struct {
+	*extstate.StateDB
 }
 
-func (s *StateDbAP1) GetCommittedState(addr common.Address, key common.Hash) common.Hash {
-	state.NormalizeStateKey(&key)
-	return s.VmStateDB.GetCommittedState(addr, key)
+func (s *StateDBAP0) GetCommittedState(addr common.Address, key common.Hash, _ ...stateconf.StateDBStateOption) common.Hash {
+	return s.StateDB.GetCommittedState(addr, key, stateconf.SkipStateKeyTransformation())
 }
 
 // ChainContext supports retrieving headers and consensus parameters from the

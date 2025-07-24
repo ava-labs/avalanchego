@@ -61,7 +61,7 @@ func handleWarpMessage(accessibleState contract.AccessibleState, input []byte, s
 	warpIndex := int(warpIndexInput) // This conversion is safe even if int is 32 bits because we checked above.
 	state := accessibleState.GetStateDB()
 	predicateBytes, exists := state.GetPredicateStorageSlots(ContractAddress, warpIndex)
-	predicateResults := accessibleState.GetBlockContext().GetPredicateResults(state.GetTxHash(), ContractAddress)
+	predicateResults := accessibleState.GetBlockContext().GetPredicateResults(state.TxHash(), ContractAddress)
 	valid := exists && !set.BitsFromBytes(predicateResults).Contains(warpIndex)
 	if !valid {
 		return handler.packFailed(), remainingGas, nil

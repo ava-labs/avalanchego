@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/coreth/consensus/dummy"
+	"github.com/ava-labs/coreth/core/extstate"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap4"
@@ -23,17 +24,19 @@ import (
 
 var (
 	TestCallbacks = dummy.ConsensusCallbacks{
-		OnExtraStateChange: func(block *types.Block, _ *types.Header, sdb *state.StateDB) (*big.Int, *big.Int, error) {
-			sdb.AddBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(block.Number().Int64()))
+		OnExtraStateChange: func(block *types.Block, _ *types.Header, statedb *state.StateDB) (*big.Int, *big.Int, error) {
+			wrappedStateDB := extstate.New(statedb)
+			wrappedStateDB.AddBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(block.Number().Int64()))
 			return nil, nil, nil
 		},
 		OnFinalizeAndAssemble: func(
 			header *types.Header,
 			_ *types.Header,
-			sdb *state.StateDB,
+			statedb *state.StateDB,
 			_ []*types.Transaction,
 		) ([]byte, *big.Int, *big.Int, error) {
-			sdb.AddBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(header.Number.Int64()))
+			wrappedStateDB := extstate.New(statedb)
+			wrappedStateDB.AddBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(header.Number.Int64()))
 			return nil, nil, nil, nil
 		},
 	}
