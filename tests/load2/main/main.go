@@ -5,6 +5,7 @@ package main
 
 import (
 	"flag"
+	"math/rand"
 	"os"
 	"time"
 
@@ -15,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
-	"github.com/ava-labs/avalanchego/tests/load"
 	"github.com/ava-labs/avalanchego/tests/load2"
 )
 
@@ -51,7 +51,7 @@ func init() {
 func main() {
 	log := tests.NewDefaultLogger("")
 	tc := tests.NewTestContext(log)
-	defer tc.Cleanup()
+	defer tc.RecoverAndExit()
 
 	require := require.New(tc)
 
@@ -70,32 +70,27 @@ func main() {
 	e2e.NewTestEnvironment(tc, flagVars, network)
 
 	ctx := tests.DefaultNotifyContext(0, tc.DeferCleanup)
-	wsURIs, err := tmpnet.GetNodeWebsocketURIs(ctx, network.Nodes, blockchainID, tc.DeferCleanup)
+	wsURIs, err := tmpnet.GetNodeWebsocketURIs(network.Nodes, blockchainID)
 	require.NoError(err)
 
 	registry := prometheus.NewRegistry()
-	metricsServer := load.NewPrometheusServer("127.0.0.1:0", registry)
-	metricsErrChan, err := metricsServer.Start()
+	metricsServer, err := tests.NewPrometheusServer(registry)
 	require.NoError(err)
-
 	tc.DeferCleanup(func() {
-		select {
-		case err := <-metricsErrChan:
-			require.NoError(err)
-		default:
-		}
-
-		require.NoError(metricsServer.Stop(), "failed to stop metrics server")
+		require.NoError(metricsServer.Stop())
 	})
 
-	monitoringConfigFilePath, err := metricsServer.GenerateMonitoringConfig(
-		log,
-		network.GetMonitoringLabels(),
-	)
-	require.NoError(err)
+	monitoringConfigFilePath, err := tmpnet.WritePrometheusSDConfig("load-test", tmpnet.SDConfig{
+		Targets: []string{metricsServer.Address()},
+		Labels:  network.GetMonitoringLabels(),
+	}, false)
+	require.NoError(err, "failed to generate monitoring config file")
 
 	tc.DeferCleanup(func() {
-		require.NoError(os.Remove(monitoringConfigFilePath))
+		require.NoError(
+			os.Remove(monitoringConfigFilePath),
+			"failed †o remove monitoring config file",
+		)
 	})
 
 	workers := make([]load2.Worker, len(keys))
@@ -113,14 +108,22 @@ func main() {
 	chainID, err := workers[0].Client.ChainID(ctx)
 	require.NoError(err)
 
+	randomTest, err := load2.NewRandomTest(
+		ctx,
+		chainID,
+		&workers[0],
+		rand.NewSource(time.Now().UnixMilli()),
+	)
+	require.NoError(err)
+
 	generator, err := load2.NewLoadGenerator(
 		workers,
 		chainID,
 		metricsNamespace,
 		registry,
-		load2.ZeroTransferTest{PollFrequency: pollFrequency},
+		randomTest,
 	)
 	require.NoError(err)
 
-	generator.Run(tc, ctx, loadTimeout, testTimeout)
+	generator.Run(ctx, log, loadTimeout, testTimeout)
 }

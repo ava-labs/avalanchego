@@ -14,6 +14,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/tests"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 type Test interface {
@@ -61,17 +62,16 @@ func NewLoadGenerator(
 }
 
 func (l LoadGenerator) Run(
-	tc tests.TestContext,
 	ctx context.Context,
+	log logging.Logger,
 	loadTimeout time.Duration,
 	testTimeout time.Duration,
 ) {
 	eg := &errgroup.Group{}
 
-	childCtx := ctx
 	if loadTimeout != 0 {
-		ctx, cancel := context.WithTimeout(ctx, loadTimeout)
-		childCtx = ctx
+		childCtx, cancel := context.WithTimeout(ctx, loadTimeout)
+		ctx = childCtx
 		defer cancel()
 	}
 
@@ -79,18 +79,25 @@ func (l LoadGenerator) Run(
 		eg.Go(func() error {
 			for {
 				select {
-				case <-childCtx.Done():
+				case <-ctx.Done():
 					return nil
 				default:
 				}
 
-				ctx, cancel := context.WithTimeout(ctx, testTimeout)
-				defer cancel()
-
-				l.test.Run(tc, ctx, l.wallets[i])
+				execTestWithRecovery(ctx, log, l.test, l.wallets[i], testTimeout)
 			}
 		})
 	}
 
 	_ = eg.Wait()
+}
+
+// execTestWithRecovery ensures assertion-related panics encountered during test execution are recovered
+// and that deferred cleanups are always executed before returning.
+func execTestWithRecovery(ctx context.Context, log logging.Logger, test Test, wallet *Wallet, testTimeout time.Duration) {
+	tc := tests.NewTestContext(log)
+	defer tc.Recover()
+	contextWithTimeout, cancel := context.WithTimeout(ctx, testTimeout)
+	defer cancel()
+	test.Run(tc, contextWithTimeout, wallet)
 }

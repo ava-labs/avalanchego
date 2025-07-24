@@ -78,8 +78,8 @@ github.com/ava-labs/ledger-avalanche/go v0.0.0-20241009183145-e6f90a8a1a60 h1:EL
 github.com/ava-labs/ledger-avalanche/go v0.0.0-20241009183145-e6f90a8a1a60/go.mod h1:/7qKobTfbzBu7eSTVaXMTr56yTYk4j2Px6/8G+idxHo=
 github.com/ava-labs/libevm v1.13.14-0.3.0.rc.1 h1:vBMYo+Iazw0rGTr+cwjkBdh5eadLPlv4ywI4lKye3CA=
 github.com/ava-labs/libevm v1.13.14-0.3.0.rc.1/go.mod h1:+Iol+sVQ1KyoBsHf3veyrBmHCXr3xXRWq6ZXkgVfNLU=
-github.com/ava-labs/simplex v0.0.0-20250626192006-220e6aeacdc1 h1:ipeWExRrhYF7DZ/bcigoQrzo3vZWNZrFx8W+Yg2sJ2Q=
-github.com/ava-labs/simplex v0.0.0-20250626192006-220e6aeacdc1/go.mod h1:GVzumIo3zR23/qGRN2AdnVkIPHcKMq/D89EGWZfMGQ0=
+github.com/ava-labs/simplex v0.0.0-20250715173145-e4fe035cb9b2 h1:PZ5PMEDkTbd6NLNiwKWV8nz7QvAM+QC9Rj3/NrL9ICA=
+github.com/ava-labs/simplex v0.0.0-20250715173145-e4fe035cb9b2/go.mod h1:GVzumIo3zR23/qGRN2AdnVkIPHcKMq/D89EGWZfMGQ0=
 github.com/aymerick/raymond v2.0.3-0.20180322193309-b565731e1464+incompatible/go.mod h1:osfaiScAUVup+UC9Nfq76eWqDhXlp+4UYaA8uhTBO6g=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
@@ -814,8 +814,8 @@ golang.org/x/oauth2 v0.0.0-20200902213428-5d25da1a8d43/go.mod h1:KelEdhl1UZF7XfJ
 golang.org/x/oauth2 v0.0.0-20201109201403-9fd604954f58/go.mod h1:KelEdhl1UZF7XfJ4dDtk6s++YSgaE7mD/BuKKDLBl4A=
 golang.org/x/oauth2 v0.0.0-20201208152858-08078c50e5b5/go.mod h1:KelEdhl1UZF7XfJ4dDtk6s++YSgaE7mD/BuKKDLBl4A=
 golang.org/x/oauth2 v0.0.0-20210218202405-ba52d332ba99/go.mod h1:KelEdhl1UZF7XfJ4dDtk6s++YSgaE7mD/BuKKDLBl4A=
-golang.org/x/oauth2 v0.21.0 h1:tsimM75w1tF/uws5rbeHzIWxEqElMehnc+iW793zsZs=
-golang.org/x/oauth2 v0.21.0/go.mod h1:XYTD2NtWslqkgxebSiOHnXEap4TF09sJSc7H1sXbhtI=
+golang.org/x/oauth2 v0.27.0 h1:da9Vo7/tDv5RH/7nZDz1eMGS/q1Vv1N/7FCrBhI9I3M=
+golang.org/x/oauth2 v0.27.0/go.mod h1:onh5ek6nERTohokkhCD/y2cV4Do3fxFHFuAejCkRWT8=
 golang.org/x/sync v0.0.0-20180314180146-1d60e4601c6f/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/sync v0.0.0-20181108010431-42b317875d0f/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/sync v0.0.0-20181221193216-37e7f081c4d4/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
