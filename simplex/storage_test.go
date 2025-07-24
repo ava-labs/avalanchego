@@ -18,10 +18,10 @@ import (
 func TestStorageNew(t *testing.T) {
 	ctx := context.Background()
 	child := snowmantest.BuildChild(snowmantest.Genesis)
-	
+
 	tests := []struct {
-		name          string
-		vm 		block.ChainVM
+		name           string
+		vm             block.ChainVM
 		expectedHeight uint64
 	}{
 		{
@@ -65,12 +65,14 @@ func TestStorageNew(t *testing.T) {
 			expectedHeight: 2,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config := newEngineConfig(t, 1)
 			_, verifier := NewBLSAuth(config)
-			qc := QCDeserializer(verifier)
+			qc := QCDeserializer{
+				verifier: &verifier,
+			}
 
 			config.VM = tt.vm
 
@@ -83,7 +85,7 @@ func TestStorageNew(t *testing.T) {
 
 func TestStorageRetrieve(t *testing.T) {
 	genesis := newBlock(t, newBlockConfig{})
-	
+
 	vm := &blocktest.VM{
 		LastAcceptedF: func(ctx context.Context) (ids.ID, error) {
 			return snowmantest.GenesisID, nil
@@ -97,25 +99,25 @@ func TestStorageRetrieve(t *testing.T) {
 	}
 
 	tests := []struct {
-		name     string
-		seq      uint64
-		expectedBlock *Block
+		name                 string
+		seq                  uint64
+		expectedBlock        *Block
 		expectedFinalization simplex.Finalization
-		expectedExists bool
+		expectedExists       bool
 	}{
 		{
-			name:  "retrieve genesis block",
-			seq:  0,
-			expectedBlock: genesis,
+			name:                 "retrieve genesis block",
+			seq:                  0,
+			expectedBlock:        genesis,
 			expectedFinalization: simplex.Finalization{},
-			expectedExists: true,
+			expectedExists:       true,
 		},
 		{
-			name:     "seq not found",
-			seq:     1,
-			expectedBlock: nil,
+			name:                 "seq not found",
+			seq:                  1,
+			expectedBlock:        nil,
 			expectedFinalization: simplex.Finalization{},
-			expectedExists: false,
+			expectedExists:       false,
 		},
 	}
 
@@ -124,7 +126,10 @@ func TestStorageRetrieve(t *testing.T) {
 			ctx := context.Background()
 			config := newEngineConfig(t, 1)
 			_, verifier := NewBLSAuth(config)
-			qc := QCDeserializer(verifier)
+			qc := QCDeserializer{
+				verifier: &verifier,
+			}
+
 			config.VM = vm
 
 			s, err := newStorage(ctx, config, &qc, genesis.blockTracker)
@@ -153,13 +158,16 @@ func TestStorageIndex(t *testing.T) {
 	// index a block not the next in sequence
 	// index normal
 	genesis := newBlock(t, newBlockConfig{})
-	child1 := newBlock(t, newBlockConfig{prev: genesis })
-	 newBlock(t, newBlockConfig{prev: child1 })
-	child2 := newBlock(t, newBlockConfig{prev: child1 })
+	child1 := newBlock(t, newBlockConfig{prev: genesis})
+	newBlock(t, newBlockConfig{prev: child1})
+	child2 := newBlock(t, newBlockConfig{prev: child1})
 
 	config := newEngineConfig(t, 4)
 	_, verifier := NewBLSAuth(config)
-	qc := QCDeserializer(verifier)
+	qc := QCDeserializer{
+		verifier: &verifier,
+	}
+
 	vm := &blocktest.VM{
 		LastAcceptedF: func(ctx context.Context) (ids.ID, error) {
 			return snowmantest.GenesisID, nil
@@ -176,19 +184,19 @@ func TestStorageIndex(t *testing.T) {
 	tests := []struct {
 		name          string
 		expectedError error
-		finalization simplex.Finalization
-		block *Block
+		finalization  simplex.Finalization
+		block         *Block
 	}{
 		{
-			name: "index genesis block",
+			name:          "index genesis block",
 			expectedError: errGenesisIndexed,
-			block: genesis,
-			finalization: simplex.Finalization{},
+			block:         genesis,
+			finalization:  simplex.Finalization{},
 		},
 		{
-			name: "index invalid qc",
+			name:          "index invalid qc",
 			expectedError: errInvalidQC,
-			block: child1,
+			block:         child1,
 			finalization: simplex.Finalization{
 				QC: nil, // no quorum certificate
 				Finalization: simplex.ToBeSignedFinalization{
@@ -197,9 +205,9 @@ func TestStorageIndex(t *testing.T) {
 			},
 		},
 		{
-			name: "mismatched seq",
+			name:          "mismatched seq",
 			expectedError: errUnexpectedSeq,
-			block: child1,
+			block:         child1,
 			finalization: simplex.Finalization{
 				QC: nil, // no quorum certificate
 				Finalization: simplex.ToBeSignedFinalization{
@@ -212,9 +220,9 @@ func TestStorageIndex(t *testing.T) {
 			},
 		},
 		{
-			name: "indexing too high seq",
+			name:          "indexing too high seq",
 			expectedError: errUnexpectedSeq,
-			block: child2, // index child2 before child1
+			block:         child2, // index child2 before child1
 			finalization: simplex.Finalization{
 				QC: nil, // no quorum certificate
 				Finalization: simplex.ToBeSignedFinalization{
@@ -227,9 +235,9 @@ func TestStorageIndex(t *testing.T) {
 			},
 		},
 		{
-			name: "indexing before verifying",
+			name:          "indexing before verifying",
 			expectedError: errDigestNotFound,
-			block: child1,
+			block:         child1,
 			finalization: simplex.Finalization{
 				QC: nil, // no quorum certificate
 				Finalization: simplex.ToBeSignedFinalization{
@@ -238,8 +246,7 @@ func TestStorageIndex(t *testing.T) {
 			},
 		},
 	}
-	
-	
+
 	s, err := newStorage(ctx, config, &qc, genesis.blockTracker)
 	require.NoError(t, err)
 

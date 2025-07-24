@@ -27,7 +27,7 @@ type newBlockConfig struct {
 func newBlock(t *testing.T, config newBlockConfig) *Block {
 	if config.prev == nil {
 		block := &Block{
-			vmBlock: snowmantest.Genesis,
+			vmBlock:  snowmantest.Genesis,
 			metadata: genesisMetadata,
 		}
 		bytes, err := block.Bytes()
@@ -126,3 +126,51 @@ func generateTestNodes(t *testing.T, num uint64) []*testNode {
 	}
 	return nodes
 }
+
+// newFinalization creates a new finalization over the blockheader, by collecting a 
+// quorum of signatures from the provided configs.
+func newTestFinalization(t *testing.T, configs []*Config, bh simplex.BlockHeader) *simplex.Finalization {
+	quorum := simplex.Quorum(len(configs))
+	finalizedVotes := make([]*simplex.FinalizeVote, 0, quorum)
+
+	for _, config := range configs[:quorum] {
+		vote := simplex.ToBeSignedFinalization{
+			BlockHeader: bh,
+		}
+		signer, _ := NewBLSAuth(config)
+		sig, err := vote.Sign(&signer)
+		require.NoError(t, err)
+		finalizedVotes = append(finalizedVotes, &simplex.FinalizeVote{
+			Finalization: vote,
+			Signature:  simplex.Signature{
+				Signer: config.Ctx.NodeID[:],
+				Value:  sig,
+			},
+		})
+	}
+
+	_, verifier := NewBLSAuth(configs[0])
+	sigAgg := &SignatureAggregator{verifier: &verifier}
+
+	finalization, err := simplex.NewFinalization(configs[0].Log, sigAgg, finalizedVotes)
+	require.NoError(t, err)
+	return &finalization
+}
+
+// func newQuorumCertificate(t *testing.T, configs []*Config, msg []byte) *simplex.QuorumCertificate {
+// 	sigs := make([]simplex.Signature, 0, len(configs))
+// 	for _, config := range configs {
+// 		signer, err := NewBLSAuth(config)
+// 		require.NoError(t, err)
+
+// 		sig, err := signer.Sign(msg)
+// 		require.NoError(t, err)
+
+// 		sigs = append(sigs, simplex.Signature{Signer: config.Ctx.NodeID[:], Value: sig})
+// 	}
+
+// 	return &simplex.QuorumCertificate{
+// 		Signers: sigs,
+// 		Message: msg,
+// 	}
+// }

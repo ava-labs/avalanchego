@@ -23,11 +23,11 @@ var errUnexpectedSeq = errors.New("unexpected sequence number")
 var errGenesisIndexed = errors.New("genesis block should not be indexed")
 var errInvalidQC = errors.New("invalid quorum certificate")
 var genesisMetadata = simplex.ProtocolMetadata{
-				Version: 1,
-				Epoch:   1,
-				Round:   0,
-				Seq:     0,
-			}
+	Version: 1,
+	Epoch:   1,
+	Round:   0,
+	Seq:     0,
+}
 
 type Storage struct {
 	// height represents the number of blocks indexed in storage.
@@ -44,7 +44,7 @@ type Storage struct {
 
 	// blockTracker is used to manage blocks that have been indexed.
 	blockTracker *blockTracker
-	
+
 	vm block.ChainVM
 
 	log logging.Logger
@@ -70,7 +70,7 @@ func newStorage(ctx context.Context, config *Config, qcDeserializer *QCDeseriali
 	}
 
 	s := &Storage{
-		db:           prefixdb.New(simplexPrefix, config.DB,),
+		db:           prefixdb.New(simplexPrefix, config.DB),
 		genesisBlock: genesisBlock,
 		vm:           config.VM,
 		deserializer: qcDeserializer,
@@ -113,7 +113,7 @@ func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalizat
 
 // Index indexes the finalization in the storage.
 // It stores the finalization bytes at the current height and increments the height.
-func (s *Storage) Index(ctx context.Context, block simplex.VerifiedBlock, finalization simplex.Finalization) error 	{
+func (s *Storage) Index(ctx context.Context, block simplex.VerifiedBlock, finalization simplex.Finalization) error {
 	bh := block.BlockHeader()
 	if bh.Seq == 0 {
 		s.log.Warn("attempted to index genesis block, which should not be indexed")
@@ -124,7 +124,7 @@ func (s *Storage) Index(ctx context.Context, block simplex.VerifiedBlock, finali
 	if currentHeight != bh.Seq {
 		return fmt.Errorf("%w: expected %d, got %d", errUnexpectedSeq, currentHeight, bh.Seq)
 	}
-	
+
 	if bh.Seq != finalization.Finalization.Seq {
 		return fmt.Errorf("%w: expected %d, got %d", errUnexpectedSeq, bh.Seq, finalization.Finalization.Seq)
 	}
@@ -132,7 +132,7 @@ func (s *Storage) Index(ctx context.Context, block simplex.VerifiedBlock, finali
 	if finalization.QC == nil {
 		return errInvalidQC
 	}
-	
+
 	seqBuff := make([]byte, 8)
 	binary.BigEndian.PutUint64(seqBuff, currentHeight)
 
@@ -140,7 +140,7 @@ func (s *Storage) Index(ctx context.Context, block simplex.VerifiedBlock, finali
 	if err := s.db.Put(seqBuff, finalizationBytes); err != nil {
 		return fmt.Errorf("failed to store finalization: %w", err)
 	}
-	
+
 	s.height.Add(1)
 	return s.blockTracker.indexBlock(ctx, bh.Digest)
 }
