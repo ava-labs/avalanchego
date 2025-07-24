@@ -629,7 +629,7 @@ func TestGetStakingSigner(t *testing.T) {
 			config, err := GetNodeConfig(v)
 
 			require.ErrorIs(err, tt.expectedErr)
-			if tt.expectedErr != nil {
+			if tt.expectedErr == nil {
 				require.Equal(tt.expectedSignerConfig, config.StakingSignerConfig)
 			}
 		})
