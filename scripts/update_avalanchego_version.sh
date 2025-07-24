@@ -24,6 +24,8 @@ CURL_ARGS=(curl -s)
 if [[ -n "${GITHUB_TOKEN:-}" ]]; then
   # Using an auth token avoids being rate limited when run in CI
   CURL_ARGS+=(-H "Authorization: token ${GITHUB_TOKEN}")
+else
+  echo "No GITHUB_TOKEN found, using unauthenticated requests"
 fi
 
 GIT_COMMIT=$("${CURL_ARGS[@]}" "https://api.github.com/repos/ava-labs/avalanchego/commits/${AVALANCHE_VERSION}")
