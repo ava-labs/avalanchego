@@ -33,4 +33,4 @@ else
     echo "Defaulting to limited-permission context 'kind-kind-tmpnet' to test RBAC Role permissions"
 fi
 
-go run ./tests/load/c/main --runtime=kube --kube-image="$AVALANCHEGO_IMAGE" "$KUBECONFIG_CONTEXT" "$@"
+go run ./tests/load2/main --runtime=kube --kube-image="$AVALANCHEGO_IMAGE" "$KUBECONFIG_CONTEXT" "$@"
