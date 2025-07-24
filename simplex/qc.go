@@ -6,6 +6,7 @@ package simplex
 //go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 
@@ -49,7 +50,7 @@ type canotoQC struct {
 func (qc *QC) Signers() []simplex.NodeID {
 	signers := make([]simplex.NodeID, len(qc.signers))
 	for i, signer := range qc.signers {
-		signers[i] = simplex.NodeID(signer[:])
+		signers[i] = signer[:]
 	}
 
 	return signers
@@ -201,7 +202,7 @@ func (a *SignatureAggregator) Aggregate(signatures []simplex.Signature) (simplex
 
 func (d *QCDeserializer) signersFromBytes(signerBytes []byte) ([]ids.NodeID, error) {
 	signerIndices := set.BitsFromBytes(signerBytes)
-	if len(signerIndices.Bytes()) != len(signerBytes) {
+	if !bytes.Equal(signerIndices.Bytes(), signerBytes) {
 		return nil, errInvalidBitSet
 	}
 

@@ -127,10 +127,9 @@ func createVerifier(config *Config) BLSVerifier {
 	}
 
 	utils.Sort(nodeIDs)
-	verifier.canonicalNodeIDs = make([]ids.NodeID, len(nodeIDs))
+	verifier.canonicalNodeIDs = nodeIDs
 	verifier.canonicalNodeIDIndices = make(map[ids.NodeID]int, len(nodeIDs))
 	for i, nodeID := range nodeIDs {
-		verifier.canonicalNodeIDs[i] = nodeID
 		verifier.canonicalNodeIDIndices[nodeID] = i
 	}
 
